@@ -1,0 +1,34 @@
+# Binary
+/lft
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Go
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+*.test
+*.out
+*.prof
+coverage.txt
+coverage.html
+
+# Vendor (if not committed)
+# vendor/
+
+# Debug
+__debug_bin*
+
+# Logs
+*.log

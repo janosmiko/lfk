@@ -1,0 +1,203 @@
+package ui
+
+import (
+	"fmt"
+	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+
+	"github.com/janosmiko/lfk/internal/model"
+)
+
+// configMapInnerPanelStyle is the bordered panel containing the configmap table.
+var configMapInnerPanelStyle = lipgloss.NewStyle().
+	Border(lipgloss.RoundedBorder()).
+	BorderForeground(lipgloss.Color(ColorBorder)).
+	Padding(0, 1)
+
+// RenderConfigMapEditorOverlay renders a centered popup overlay for editing configmaps.
+func RenderConfigMapEditorOverlay(
+	cm *model.ConfigMapData,
+	cursor int,
+	editing bool,
+	editKey string,
+	editValue string,
+	editColumn int, // 0=key, 1=value
+	screenWidth, screenHeight int,
+) string {
+	if cm == nil {
+		return OverlayStyle.Render(ErrorStyle.Render("No configmap loaded"))
+	}
+
+	// Popup dimensions: 75% of screen.
+	boxW := screenWidth * 75 / 100
+	boxH := screenHeight * 75 / 100
+	if boxW < 50 {
+		boxW = 50
+	}
+	if boxH < 10 {
+		boxH = 10
+	}
+
+	outerPadH := 4 // outer border (2) + outer padding (2)
+	outerPadW := 6 // outer border (2) + outer padding (2*2)
+	innerPadH := 2 // inner border (2)
+	innerPadW := 4 // inner border (2) + inner padding (1*2)
+	titleH := 1
+	helpH := 1
+	gapH := 2
+
+	panelContentH := boxH - outerPadH - innerPadH - titleH - helpH - gapH
+	if panelContentH < 3 {
+		panelContentH = 3
+	}
+	panelContentW := boxW - outerPadW - innerPadW
+	if panelContentW < 20 {
+		panelContentW = 20
+	}
+	panelW := boxW - outerPadW
+
+	// Title.
+	title := OverlayTitleStyle.Render("ConfigMap Editor")
+
+	// Data table content.
+	dataContent := renderConfigMapEditorTable(
+		cm, cursor,
+		editing, editKey, editValue, editColumn,
+		panelContentW, panelContentH,
+	)
+
+	// Inner bordered panel.
+	innerPanel := configMapInnerPanelStyle.
+		Width(panelW).
+		Height(panelContentH).
+		Render(dataContent)
+
+	// Help line.
+	var helpLine string
+	if editing {
+		helpLine = HelpKeyStyle.Render("ctrl+s") + DimStyle.Render(" save") + "  " +
+			HelpKeyStyle.Render("enter") + DimStyle.Render(" newline") + "  " +
+			HelpKeyStyle.Render("tab") + DimStyle.Render(" switch") + "  " +
+			HelpKeyStyle.Render("esc") + DimStyle.Render(" cancel")
+	} else {
+		helpLine = HelpKeyStyle.Render("jk") + DimStyle.Render(" nav") + "  " +
+			HelpKeyStyle.Render("e") + DimStyle.Render(" edit") + "  " +
+			HelpKeyStyle.Render("a") + DimStyle.Render(" add") + "  " +
+			HelpKeyStyle.Render("y") + DimStyle.Render(" copy") + "  " +
+			HelpKeyStyle.Render("D") + DimStyle.Render(" del") + "  " +
+			HelpKeyStyle.Render("s") + DimStyle.Render(" save") + "  " +
+			HelpKeyStyle.Render("esc") + DimStyle.Render(" close")
+	}
+
+	body := title + "\n" + innerPanel + "\n" + helpLine
+
+	return OverlayStyle.
+		Width(boxW).
+		Render(body)
+}
+
+// renderConfigMapEditorTable renders the key-value table inside the configmap editor.
+func renderConfigMapEditorTable(
+	cm *model.ConfigMapData,
+	selectedIdx int,
+	editing bool,
+	editKey string,
+	editValue string,
+	editColumn int,
+	width, height int,
+) string {
+	keyColW := 0
+	for _, k := range cm.Keys {
+		if len(k) > keyColW {
+			keyColW = len(k)
+		}
+	}
+	if keyColW < 10 {
+		keyColW = 10
+	}
+	if keyColW > width/3 {
+		keyColW = width / 3
+	}
+
+	valColW := width - keyColW - 10
+	if valColW < 8 {
+		valColW = 8
+	}
+
+	var lines []string
+
+	// Header.
+	keyPadded := fmt.Sprintf("%-*s", keyColW, "Key")
+	headerLine := "  " + HeaderStyle.Render(keyPadded) + "  |  " + HeaderStyle.Render("Value")
+	separator := "  " + strings.Repeat("-", keyColW) + "--+--" + strings.Repeat("-", valColW)
+	lines = append(lines, headerLine)
+	lines = append(lines, DimStyle.Render(separator))
+
+	tableHeight := height - 2
+	if tableHeight < 1 {
+		tableHeight = 1
+	}
+	start := 0
+	if selectedIdx >= tableHeight {
+		start = selectedIdx - tableHeight + 1
+	}
+	end := start + tableHeight
+	if end > len(cm.Keys) {
+		end = len(cm.Keys)
+	}
+
+	for i := start; i < end; i++ {
+		k := cm.Keys[i]
+		v := cm.Data[k]
+		// For multiline values, show first line + indicator.
+		displayV := configMapValueDisplay(v, valColW)
+
+		var line string
+		if i == selectedIdx && editing {
+			// Inline edit mode.
+			if editColumn == 0 {
+				// Editing key.
+				editDisplay := editKey + DimStyle.Render("\u2588")
+				editW := lipgloss.Width(editDisplay)
+				pad := keyColW - editW
+				if pad < 0 {
+					pad = 0
+				}
+				line = HelpKeyStyle.Render("> ") + editDisplay + strings.Repeat(" ", pad) + "  |  " + displayV
+			} else {
+				// Editing value.
+				keyDisplay := Truncate(k, keyColW)
+				editDisplay := editValue + DimStyle.Render("\u2588")
+				line = HelpKeyStyle.Render("> ") + fmt.Sprintf("%-*s", keyColW, keyDisplay) + "  |  " + editDisplay
+			}
+		} else if i == selectedIdx {
+			// Selected row.
+			rawLine := fmt.Sprintf("> %-*s  |  %-*s", keyColW, Truncate(k, keyColW), valColW, displayV)
+			line = OverlaySelectedStyle.Render(rawLine)
+		} else {
+			// Normal row.
+			kPadded := fmt.Sprintf("%-*s", keyColW, Truncate(k, keyColW))
+			keyStr := HelpKeyStyle.Render(kPadded)
+			valStr := DimStyle.Render(displayV)
+			line = "  " + keyStr + "  |  " + valStr
+		}
+		lines = append(lines, line)
+	}
+
+	if len(cm.Keys) == 0 {
+		lines = append(lines, DimStyle.Render("  (empty - press 'a' to add a key)"))
+	}
+
+	return strings.Join(lines, "\n")
+}
+
+// configMapValueDisplay returns the display string for a configmap value.
+// For multiline values, shows the first line with a continuation indicator.
+func configMapValueDisplay(val string, maxW int) string {
+	if idx := strings.IndexByte(val, '\n'); idx >= 0 {
+		firstLine := val[:idx]
+		return Truncate(firstLine, maxW-4) + " ..."
+	}
+	return Truncate(val, maxW)
+}

@@ -1,0 +1,200 @@
+# lfk - Full Configuration Example
+# Place this file at ~/.config/lfk/config.yaml
+# All fields are optional — only specify what you want to override.
+
+# ─── Color Scheme ──────────────────────────────────────────────────────────────
+# Built-in color scheme. Custom theme overrides below are applied on top.
+# Options: tokyonight (default), tokyonight-storm, tokyonight-day,
+#          kanagawa-wave, kanagawa-dragon, bluloco-dark, bluloco-light,
+#          nord, gruvbox-dark, gruvbox-light, dracula,
+#          catppuccin-mocha, catppuccin-macchiato, catppuccin-frappe, catppuccin-latte
+colorscheme: tokyonight
+
+# ─── Icon Mode ─────────────────────────────────────────────────────────────────
+# How resource icons are displayed.
+# Options: "unicode" (default), "simple" (ASCII labels like [Po], [De]),
+#          "emoji" (emoji icons), "none" (no icons)
+icons: unicode
+
+# ─── Log Path ──────────────────────────────────────────────────────────────────
+# Application log file location. Default: ~/.local/share/lfk/lfk.log
+log_path: /tmp/lfk.log
+
+# ─── Dashboard ─────────────────────────────────────────────────────────────────
+# Show cluster overview dashboard when entering a context.
+# Set to false to go directly to the resource types list.
+dashboard: true
+
+# ─── Per-Resource-Type Columns ─────────────────────────────────────────────────
+# Configure visible columns for specific resource types (Kind names, case-insensitive).
+# When not set for a kind, columns are auto-detected from resource data.
+resource_columns:
+  # Pod: ["IP", "Node", "Image", "CPU", "MEM", "CPU/R", "CPU/L", "MEM/R", "MEM/L"]
+  # Deployment: ["Replicas", "Available", "CPU", "MEM"]
+  # Service: ["*"]  # show all for Services
+  # StatefulSet: ["Replicas"]
+
+# ─── Theme ─────────────────────────────────────────────────────────────────────
+# Custom color theme. All values are CSS hex color codes.
+# Only specify colors you want to override; others keep colorscheme defaults.
+theme:
+  primary: "#7aa2f7"       # Borders, headers, breadcrumbs, active columns
+  secondary: "#9ece6a"     # Help keys, running status, success markers
+  text: "#c0caf5"          # Normal text
+  selected_fg: "#1a1b26"   # Selected item foreground
+  selected_bg: "#7aa2f7"   # Selected item background
+  border: "#3b4261"        # Inactive borders
+  dimmed: "#565f89"        # Help text, placeholders, dimmed items
+  error: "#f7768e"         # Errors, failures, delete confirmations
+  warning: "#e0af68"       # Warnings, pending status, namespace indicator
+  purple: "#bb9af7"        # Special values
+  base: "#1a1b26"          # Dark background base
+  bar_bg: "#24283b"        # Title and status bar backgrounds
+  surface: "#1f2335"       # Surface color for overlays
+
+# ─── Keybindings ───────────────────────────────────────────────────────────────
+# Override direct-action keybindings. Navigation and other keys are fixed.
+keybindings:
+  logs: "L"                # View logs (default: L)
+  refresh: "R"             # Refresh view (default: R)
+  restart: "r"             # Restart resource (default: r)
+  exec: "s"                # Exec into pod (default: s)
+  describe: "v"            # Describe resource (default: v)
+  delete: "D"              # Delete resource (default: D)
+  force_delete: "X"        # Force delete resource (default: X)
+  scale: "S"               # Scale resource (default: S)
+
+# ─── Search Abbreviations ─────────────────────────────────────────────────────
+# Short names for resource types used in search/filter.
+# These extend the built-in defaults. Override a built-in by redefining the key.
+abbreviations:
+  po: pod
+  deploy: deployment
+  rs: replicaset
+  sts: statefulset
+  ds: daemonset
+  svc: service
+  ing: ingress
+  cm: configmap
+  sec: secret
+  ns: namespace
+  no: node
+  pvc: persistentvolumeclaim
+  pv: persistentvolume
+  sc: storageclass
+  sa: serviceaccount
+  hpa: horizontalpodautoscaler
+  vpa: verticalpodautoscaler
+  cj: cronjob
+  job: job
+  crd: customresourcedefinition
+  ev: event
+  ep: endpoint
+  eps: endpointslice
+  rb: rolebinding
+  crb: clusterrolebinding
+  cr: clusterrole
+  role: role
+  limit: limitrange
+  quota: resourcequota
+  pdb: poddisruptionbudget
+  netpol: networkpolicy
+  rc: replicationcontroller
+  # Add your own custom abbreviations:
+  # myapp: myapplication.example.com
+
+# ─── Custom Actions ────────────────────────────────────────────────────────────
+# Define custom shell commands per resource type.
+# These appear in the action menu (x key) after the built-in actions.
+#
+# Template variables:
+#   {name}       - Resource name
+#   {namespace}  - Resource namespace
+#   {context}    - Kubeconfig context name
+#   {kind}       - Resource kind (e.g., "Pod")
+#   {<Column>}   - Any column value (e.g., {Node}, {IP}) — case-insensitive
+#
+# Commands are executed via `sh -c` with KUBECONFIG set.
+# Interactive commands (ssh, etc.) hand over the terminal.
+custom_actions:
+  # Pod:
+  #   - label: "SSH to Node"
+  #     command: "ssh {Node}"
+  #     key: "S"
+  #     description: "SSH into the pod's node"
+  #   - label: "Copy Logs"
+  #     command: "kubectl logs {name} -n {namespace} --context {context} > /tmp/{name}.log"
+  #     key: "C"
+  #     description: "Copy pod logs to file"
+  #   - label: "Tcpdump"
+  #     command: "kubectl exec -it {name} -n {namespace} --context {context} -- tcpdump -i any -w /tmp/capture.pcap"
+  #     key: "T"
+  #     description: "Capture network traffic"
+  # Deployment:
+  #   - label: "Rollout History"
+  #     command: "kubectl rollout history deployment/{name} -n {namespace} --context {context}"
+  #     key: "H"
+  #     description: "Show deployment rollout history"
+  # Service:
+  #   - label: "Curl Endpoint"
+  #     command: "kubectl run curl-test --rm -it --image=curlimages/curl --restart=Never -n {namespace} --context {context} -- curl -s http://{name}"
+  #     key: "C"
+  #     description: "Curl the service endpoint"
+
+# ─── Filter Presets ───────────────────────────────────────────────────────────
+# Define custom quick filter presets per resource type.
+# These appear alongside the built-in presets when you press "." at resource level.
+#
+# Each preset has:
+#   name  - Display name in the filter overlay
+#   key   - Single-character shortcut key (must not conflict with built-in presets)
+#   match - Filter criteria (all specified fields must match — AND logic):
+#     status:       Substring match against the resource status (case-insensitive)
+#     ready_not:    true to match resources where ready count != desired (e.g., "1/3")
+#     restarts_gt:  Match pods with restart count greater than this number
+#     column:       Column key to check (case-insensitive, e.g., "Node", "IP")
+#     column_value: Substring match against the column value (case-insensitive)
+#
+# Built-in presets vary by kind (Pod gets Failing/Pending/NotReady/Restarting,
+# Deployment gets NotReady/Failing, etc.). Universal presets (Old, Recent)
+# are always shown. Your custom presets appear after the built-ins.
+filter_presets:
+  # Pod:
+  #   - name: "On GPU Nodes"
+  #     key: "g"
+  #     match:
+  #       column: "Node"
+  #       column_value: "gpu"
+  #   - name: "High Memory"
+  #     key: "m"
+  #     match:
+  #       column: "MEM"
+  #       column_value: "Gi"
+  # Deployment:
+  #   - name: "Single Replica"
+  #     key: "1"
+  #     match:
+  #       column: "Replicas"
+  #       column_value: "1"
+  # Event:
+  #   - name: "OOM Events"
+  #     key: "m"
+  #     match:
+  #       status: "OOMKilled"
+
+# ─── Pinned CRD Groups ──────────────────────────────────────────────────────
+# Pin CRD API groups so they appear right after built-in categories
+# (Workloads, Networking, etc.) instead of being sorted alphabetically.
+# Can also be managed interactively: press 'p' at resource types level.
+# In-app pins are stored per-context in ~/.local/state/lfk/pinned.yaml.
+# pinned_groups:
+#   - karpenter.sh
+#   - monitoring.coreos.com
+#   - argoproj.io
+#   - longhorn.io
+
+# ─── Terminal Mode ────────────────────────────────────────────────────────────
+# How exec and shell commands are executed.
+# "pty" (default): Embedded in the TUI
+# "exec": Takes over the terminal (TUI suspends)
+# terminal: pty
