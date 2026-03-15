@@ -134,8 +134,8 @@ type exportDoneMsg struct {
 // logLineMsg carries a single line of log output from kubectl.
 type logLineMsg struct {
 	line string
-	done bool           // true when the log stream has ended
-	ch   chan string     // the channel this line came from (for tab identity)
+	done bool        // true when the log stream has ended
+	ch   chan string // the channel this line came from (for tab identity)
 }
 
 // podSelectMsg carries the pod list for exec/attach pod selection on parent resources.
@@ -165,9 +165,6 @@ type diffLoadedMsg struct {
 	rightName string
 	err       error
 }
-
-// execRetryShMsg is sent when bash exec fails, to retry with sh.
-type execRetryShMsg struct{}
 
 // bulkActionResultMsg is returned after a bulk action completes.
 type bulkActionResultMsg struct {
@@ -778,7 +775,11 @@ func renderBar(used, total int64, width int) string {
 }
 
 // renderStackedBar renders a stacked bar showing proportions of multiple segments.
-func renderStackedBar(segments []struct{ count int; style lipgloss.Style }, total, width int) string {
+func renderStackedBar(segments []struct {
+	count int
+	style lipgloss.Style
+}, total, width int,
+) string {
 	if total <= 0 {
 		return "[" + strings.Repeat("\u2591", width) + "]"
 	}
@@ -934,7 +935,7 @@ func (m Model) loadDashboard() tea.Cmd {
 		// Node metrics: per-node and totals.
 		nodeMetrics, _ := client.GetAllNodeMetrics(reqCtx, kctx)
 		type nodeInfo struct {
-			name                             string
+			name                                 string
 			cpuUsed, cpuAlloc, memUsed, memAlloc int64
 		}
 		var nodes []nodeInfo
@@ -1229,7 +1230,6 @@ func (m Model) loadMonitoringDashboard() tea.Cmd {
 		defer cancel()
 
 		alerts, err := client.GetAllActiveAlerts(ctx, kctx, ns)
-
 		if err != nil {
 			lines = append(lines, ui.DimStyle.Render("  Prometheus/Alertmanager not reachable"))
 			lines = append(lines, ui.DimStyle.Render("  "+err.Error()))
@@ -1946,8 +1946,10 @@ func (m *Model) startLogStream() tea.Cmd {
 			// kubectl logs deployment/<name> only follows a single pod.
 			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx)
 			if selector != "" {
-				args = []string{"logs", "-l", selector, "--all-containers=true", "--prefix", "-f",
-					"--max-log-requests=20", "-n", ns, "--context", kctx}
+				args = []string{
+					"logs", "-l", selector, "--all-containers=true", "--prefix", "-f",
+					"--max-log-requests=20", "-n", ns, "--context", kctx,
+				}
 			} else {
 				// Fallback: use resource reference (follows only one pod).
 				resourceRef := strings.ToLower(kind) + "/" + name
@@ -2005,7 +2007,8 @@ func kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx st
 
 	resourceRef := strings.ToLower(kind) + "/" + name
 
-	getArgs := []string{"get", resourceRef,
+	getArgs := []string{
+		"get", resourceRef,
 		"-n", ns, "--context", kctx,
 		"-o", "json",
 	}
@@ -2168,10 +2171,6 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) execKubectlExec() tea.Cmd {
-	return m.execKubectlExecWithShell("bash")
-}
-
-func (m Model) execKubectlExecWithShell(shell string) tea.Cmd {
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
 		return func() tea.Msg {
@@ -2184,9 +2183,9 @@ func (m Model) execKubectlExecWithShell(shell string) tea.Cmd {
 	if m.actionCtx.containerName != "" {
 		args = append(args, "-c", m.actionCtx.containerName)
 	}
-	args = append(args, "--", shell)
+	args = append(args, "--", "/bin/sh", "-c", "clear; (bash || ash || sh)")
 
-	logger.Info("Starting kubectl exec", "shell", shell, "args", strings.Join(args, " "))
+	logger.Info("Starting kubectl exec", "args", strings.Join(args, " "))
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
 
@@ -2199,16 +2198,11 @@ func (m Model) execKubectlExecWithShell(shell string) tea.Cmd {
 		if rows < 5 {
 			rows = 24
 		}
-		title := fmt.Sprintf("Exec: %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, shell)
+		title := fmt.Sprintf("Exec: %s/%s", m.actionNamespace(), m.actionCtx.name)
 		return startPTYExecCmd(cmd, title, cols, rows)
 	}
 
 	return tea.ExecProcess(clearBeforeExec(cmd), func(err error) tea.Msg {
-		if err != nil && shell == "bash" {
-			// bash not found — retry with sh.
-			logger.Info("bash exec failed, retrying with sh", "error", err.Error())
-			return execRetryShMsg{}
-		}
 		return actionResultMsg{message: "Exec session ended", err: err}
 	})
 }
@@ -2485,8 +2479,10 @@ func (m Model) runDebugPod() tea.Cmd {
 	ctx := m.actionCtx.context
 	podName := fmt.Sprintf("debug-%d", time.Now().Unix())
 
-	args := []string{"run", podName, "--image=alpine", "-it", "--rm",
-		"--restart=Never", "--context", ctx, "-n", ns, "--", "sh"}
+	args := []string{
+		"run", podName, "--image=alpine", "-it", "--rm",
+		"--restart=Never", "--context", ctx, "-n", ns, "--", "sh",
+	}
 
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
@@ -2533,9 +2529,11 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 	}`, podName, pvcName)
 
 	// Use kubectl run with overrides to mount the PVC.
-	args := []string{"run", podName, "--image=alpine", "-it", "--rm",
+	args := []string{
+		"run", podName, "--image=alpine", "-it", "--rm",
 		"--restart=Never", "--context", ctx, "-n", ns,
-		"--overrides", manifest, "--", "sh"}
+		"--overrides", manifest, "--", "sh",
+	}
 
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
@@ -2623,14 +2621,18 @@ func (m Model) forceDeleteResource() tea.Cmd {
 	ctx := m.actionCtx.context
 	logger.Info("Force deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
 
-	patchArgs := []string{"patch", rt.Resource, name, "--context", ctx,
-		"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`}
+	patchArgs := []string{
+		"patch", rt.Resource, name, "--context", ctx,
+		"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`,
+	}
 	if rt.Namespaced {
 		patchArgs = append(patchArgs, "-n", ns)
 	}
 
-	deleteArgs := []string{"delete", rt.Resource, name, "--context", ctx,
-		"--grace-period=0", "--force"}
+	deleteArgs := []string{
+		"delete", rt.Resource, name, "--context", ctx,
+		"--grace-period=0", "--force",
+	}
 	if rt.Namespaced {
 		deleteArgs = append(deleteArgs, "-n", ns)
 	}
@@ -2759,8 +2761,10 @@ func (m Model) diffArgoApp() tea.Cmd {
 		kubeEnv := "KUBECONFIG=" + m.client.KubeconfigPaths()
 
 		// Get the Application resource as JSON to extract managed resources.
-		getArgs := []string{"get", "applications.argoproj.io", name,
-			"-n", ns, "--context", ctx, "-o", "json"}
+		getArgs := []string{
+			"get", "applications.argoproj.io", name,
+			"-n", ns, "--context", ctx, "-o", "json",
+		}
 		getCmd := exec.Command(kubectlPath, getArgs...)
 		getCmd.Env = append(os.Environ(), kubeEnv)
 		logger.Info("Running kubectl command", "cmd", getCmd.String())
@@ -3094,8 +3098,10 @@ func (m Model) execKubectlDrain() tea.Cmd {
 		}
 	}
 	name := m.actionCtx.name
-	args := []string{"drain", name, "--context", m.actionCtx.context,
-		"--ignore-daemonsets", "--delete-emptydir-data"}
+	args := []string{
+		"drain", name, "--context", m.actionCtx.context,
+		"--ignore-daemonsets", "--delete-emptydir-data",
+	}
 
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
@@ -3157,10 +3163,12 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 	nodeName := m.actionCtx.name
 	ctx := m.actionCtx.context
 
-	args := []string{"debug", "node/" + nodeName, "-it",
+	args := []string{
+		"debug", "node/" + nodeName, "-it",
 		"--image=busybox",
 		"--context", ctx,
-		"--", "chroot", "/host", "/bin/sh"}
+		"--", "chroot", "/host", "/bin/sh",
+	}
 
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
@@ -3238,8 +3246,10 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			logger.Info("Bulk force deleting", "resource", rt.Resource, "name", item.Name, "namespace", itemNs)
 
 			// Remove finalizers first.
-			patchArgs := []string{"patch", rt.Resource, item.Name, "--context", ctx,
-				"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`}
+			patchArgs := []string{
+				"patch", rt.Resource, item.Name, "--context", ctx,
+				"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`,
+			}
 			if rt.Namespaced {
 				patchArgs = append(patchArgs, "-n", itemNs)
 			}
@@ -3249,8 +3259,10 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			patchCmd.Run() //nolint:errcheck
 
 			// Force delete.
-			deleteArgs := []string{"delete", rt.Resource, item.Name, "--context", ctx,
-				"--grace-period=0", "--force"}
+			deleteArgs := []string{
+				"delete", rt.Resource, item.Name, "--context", ctx,
+				"--grace-period=0", "--force",
+			}
 			if rt.Namespaced {
 				deleteArgs = append(deleteArgs, "-n", itemNs)
 			}

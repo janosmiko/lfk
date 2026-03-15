@@ -219,7 +219,7 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 `l` Logs, `e` Exec, `A` Attach, `r` Restart, `p` Port Forward, `d` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `v` Events
 
 ### Service Actions
-`l` Logs, `e` Exec, `A` Attach, `p` Port Forward, `d` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `v` Events
+`l` Logs, `e` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `d` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `v` Events
 
 ### Node Actions
 `c` Cordon, `u` Uncordon, `n` Drain, `t` Taint, `T` Untaint, `s` Shell, `d` Describe, `E` Edit, `v` Events

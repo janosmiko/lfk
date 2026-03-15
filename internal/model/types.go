@@ -902,8 +902,8 @@ func ActionsForKind(kind string) []ActionMenuItem {
 	case "Service":
 		return []ActionMenuItem{
 			{Label: "Logs", Description: "View aggregated pod logs", Key: "l"},
-			{Label: "Exec", Description: "Execute command in pod container", Key: "e"},
-			{Label: "Attach", Description: "Attach to running container", Key: "A"},
+			{Label: "Exec", Description: "Exec into pod behind service", Key: "e"},
+			{Label: "Attach", Description: "Attach to pod behind service", Key: "A"},
 			{Label: "Port Forward", Description: "Forward local port to service", Key: "p"},
 			{Label: "Describe", Description: "Describe resource", Key: "d"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},

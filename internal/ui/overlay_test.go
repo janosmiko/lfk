@@ -84,7 +84,7 @@ func TestRenderActionOverlay(t *testing.T) {
 		{Name: "Describe", Extra: "Describe resource", Status: "D"},
 	}
 
-	result := RenderActionOverlay(items, 0)
+	result := RenderActionOverlay(items, 0, 70)
 	assert.Contains(t, result, "Actions")
 	assert.Contains(t, result, "Delete")
 	assert.Contains(t, result, "Describe")

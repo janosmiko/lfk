@@ -1705,8 +1705,8 @@ func (m Model) renderOverlay(background string) string {
 		overlayW = min(60, m.width-10)
 		overlayH = min(20, m.height-6)
 	case overlayAction:
-		content = ui.RenderActionOverlay(m.overlayItems, m.overlayCursor)
-		overlayW = min(50, m.width-10)
+		overlayW = min(70, m.width-10)
+		content = ui.RenderActionOverlay(m.overlayItems, m.overlayCursor, overlayW)
 		overlayH = min(15, m.height-6)
 	case overlayConfirm:
 		content = ui.RenderConfirmOverlay(m.confirmAction)

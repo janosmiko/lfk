@@ -342,9 +342,6 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.previewYAML = indentYAMLListItems(msg.content)
 		return m, nil
 
-	case execRetryShMsg:
-		return m, m.execKubectlExecWithShell("sh")
-
 	case actionResultMsg:
 		m.loading = false
 		m.bulkMode = false
@@ -4359,7 +4356,7 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		if m.actionCtx.containerName != "" {
 			cArg = " -c " + m.actionCtx.containerName
 		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl exec -it %s%s -n %s --context %s -- bash", name, cArg, ns, ctx))
+		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl exec -it %s%s -n %s --context %s -- /bin/sh -c 'clear; (bash || ash || sh)'", name, cArg, ns, ctx))
 		return m, m.execKubectlExec()
 	case "Attach":
 		kind := m.actionCtx.kind
