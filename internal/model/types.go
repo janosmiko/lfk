@@ -3,6 +3,7 @@ package model
 
 import (
 	"sort"
+	"strings"
 	"time"
 )
 
@@ -577,6 +578,31 @@ func MergeWithCRDs(discovered []ResourceTypeEntry) []Item {
 		}
 	}
 
+	// Build a map of discovered CRD versions so built-in entries can be updated
+	// to match the version the cluster actually serves.
+	discoveredVersion := make(map[string]string, len(discovered))
+	for _, crd := range discovered {
+		discoveredVersion[crd.APIGroup+"/"+crd.Resource] = crd.APIVersion
+	}
+
+	// Update built-in items whose API version differs from what the cluster serves.
+	// This prevents stale hardcoded versions from causing "resource not found" errors.
+	for i := range items {
+		key := items[i].Extra
+		if key == "" {
+			continue
+		}
+		// Extra format is "group/version/resource" — extract group and resource.
+		parts := strings.SplitN(key, "/", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		groupResource := parts[0] + "/" + parts[2]
+		if ver, ok := discoveredVersion[groupResource]; ok && ver != parts[1] {
+			items[i].Extra = parts[0] + "/" + ver + "/" + parts[2]
+		}
+	}
+
 	// Build builtInCategoryForGroup dynamically from TopLevelResourceTypes.
 	// Maps API groups to their category name so discovered CRDs from the same group
 	// get inserted alongside built-in entries.
@@ -633,6 +659,7 @@ func MergeWithCRDs(discovered []ResourceTypeEntry) []Item {
 	orderedGroups = append(orderedGroups, pinnedOrder...)
 	orderedGroups = append(orderedGroups, unpinnedOrder...)
 
+	// Build items for each discovered group (non-duplicate CRDs only).
 	for _, group := range orderedGroups {
 		categoryName, isBuiltInGroup := builtInCategoryForGroup[group]
 		if !isBuiltInGroup {
@@ -652,6 +679,7 @@ func MergeWithCRDs(discovered []ResourceTypeEntry) []Item {
 		}
 
 		if isBuiltInGroup {
+			// Merge extra discovered CRDs into their built-in category.
 			insertIdx := -1
 			for i, it := range items {
 				if it.Category == categoryName {
@@ -667,35 +695,38 @@ func MergeWithCRDs(discovered []ResourceTypeEntry) []Item {
 			}
 		}
 
-		if pinnedSet[group] && !isBuiltInGroup {
-			builtInCategoryNames := make(map[string]bool)
-			for _, cat := range TopLevelResourceTypes() {
-				builtInCategoryNames[cat.Name] = true
-			}
-			insertIdx := -1
-			for i, it := range items {
-				if builtInCategoryNames[it.Category] {
-					insertIdx = i
-				}
-			}
-			for i, it := range items {
-				if pinnedSet[it.Category] {
-					if i > insertIdx {
-						insertIdx = i
-					}
-				}
-			}
-			if insertIdx >= 0 {
-				tail := make([]Item, len(items[insertIdx+1:]))
-				copy(tail, items[insertIdx+1:])
-				items = append(items[:insertIdx+1], crdItems...)
-				items = append(items, tail...)
-				continue
-			}
-		}
-
+		// Append non-built-in discovered groups at the end (sorted below).
 		items = append(items, crdItems...)
 	}
+
+	// Sort all non-core CRD categories alphabetically by category name,
+	// with pinned groups appearing first (in user-configured order).
+	// Core categories retain their fixed position at the top.
+	var coreItems, pinnedItems, crdItemsList []Item
+	for _, it := range items {
+		if coreCategories[it.Category] || it.Category == "" {
+			coreItems = append(coreItems, it)
+		} else if pinnedSet[it.Category] {
+			pinnedItems = append(pinnedItems, it)
+		} else {
+			crdItemsList = append(crdItemsList, it)
+		}
+	}
+
+	// Sort pinned items by the user's configured pinned group order.
+	sort.SliceStable(pinnedItems, func(i, j int) bool {
+		return pinnedOrderMap[pinnedItems[i].Category] < pinnedOrderMap[pinnedItems[j].Category]
+	})
+
+	// Sort CRD items alphabetically by category name.
+	sort.SliceStable(crdItemsList, func(i, j int) bool {
+		return crdItemsList[i].Category < crdItemsList[j].Category
+	})
+
+	items = make([]Item, 0, len(coreItems)+len(pinnedItems)+len(crdItemsList))
+	items = append(items, coreItems...)
+	items = append(items, pinnedItems...)
+	items = append(items, crdItemsList...)
 
 	return items
 }
@@ -730,10 +761,21 @@ func FindResourceType(ref string) (ResourceTypeEntry, bool) {
 
 // FindResourceTypeIn looks up a ResourceTypeEntry by its ref string, searching both
 // built-in types and the provided additional entries (e.g., discovered CRDs).
+// The ref format is "group/version/resource". If a built-in entry matches by
+// group and resource but has a different version (e.g., hardcoded v1beta1 vs
+// cluster-served v1), the version from the ref is used.
 func FindResourceTypeIn(ref string, additional []ResourceTypeEntry) (ResourceTypeEntry, bool) {
+	// Parse the ref to extract version for potential override.
+	refParts := strings.SplitN(ref, "/", 3)
+
 	for _, cat := range TopLevelResourceTypes() {
 		for _, rt := range cat.Types {
 			if rt.ResourceRef() == ref {
+				return rt, true
+			}
+			// Match by group/resource, override version from ref.
+			if len(refParts) == 3 && rt.APIGroup == refParts[0] && rt.Resource == refParts[2] {
+				rt.APIVersion = refParts[1]
 				return rt, true
 			}
 		}
