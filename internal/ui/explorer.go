@@ -14,10 +14,6 @@ import (
 // ActiveHighlightQuery is set by the app to highlight matching text in item names.
 var ActiveHighlightQuery string
 
-// ActiveExtraColumns is set by the app before rendering to indicate which extra columns
-// from Item.Columns to show in the table view. Empty means auto-detect.
-var ActiveExtraColumns []string
-
 // ActiveFullscreenMode is set by the app to indicate fullscreen middle column mode.
 // In fullscreen mode, more columns (IP, Node, etc.) are shown.
 var ActiveFullscreenMode bool
@@ -1400,12 +1396,6 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 				if _, ok := seen[cfgKey]; ok {
 					candidates = append(candidates, cfgKey)
 				}
-			}
-		}
-	case len(ActiveExtraColumns) > 0:
-		for _, key := range ActiveExtraColumns {
-			if _, ok := seen[key]; ok {
-				candidates = append(candidates, key)
 			}
 		}
 	default:

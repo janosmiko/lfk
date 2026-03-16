@@ -838,18 +838,6 @@ func TestBuiltinTemplates(t *testing.T) {
 	}
 }
 
-func TestTemplateCategories(t *testing.T) {
-	cats := TemplateCategories()
-	assert.NotEmpty(t, cats)
-
-	// Categories should be unique.
-	seen := make(map[string]bool)
-	for _, c := range cats {
-		assert.False(t, seen[c], "duplicate category: %s", c)
-		seen[c] = true
-	}
-}
-
 func TestBuiltinTemplatesContainNamespace(t *testing.T) {
 	for _, tmpl := range BuiltinTemplates() {
 		if tmpl.Name == "Namespace" {

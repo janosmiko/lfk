@@ -291,14 +291,3 @@ func GroupedSchemeEntries() []SchemeEntry {
 	}
 	return entries
 }
-
-// SchemeNames returns the sorted list of built-in color scheme names.
-func SchemeNames() []string {
-	schemes := BuiltinSchemes()
-	names := make([]string, 0, len(schemes))
-	for name := range schemes {
-		names = append(names, name)
-	}
-	sort.Strings(names)
-	return names
-}

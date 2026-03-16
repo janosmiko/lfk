@@ -191,16 +191,3 @@ metadata:
 		},
 	}
 }
-
-// TemplateCategories returns the unique ordered categories from the templates.
-func TemplateCategories() []string {
-	seen := make(map[string]bool)
-	var cats []string
-	for _, t := range BuiltinTemplates() {
-		if !seen[t.Category] {
-			seen[t.Category] = true
-			cats = append(cats, t.Category)
-		}
-	}
-	return cats
-}

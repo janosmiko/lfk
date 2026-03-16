@@ -17,9 +17,6 @@ const (
 	LevelContainers                 // Containers within a pod
 )
 
-// MaxLevel is the deepest navigation level.
-const MaxLevel = LevelContainers
-
 // ResourceCategory groups related resource types for display.
 type ResourceCategory struct {
 	Name  string
@@ -1050,12 +1047,3 @@ func ActionsForPortForward() []ActionMenuItem {
 	}
 }
 
-// IsPortForwardableKind returns true if the given kind supports port forwarding.
-func IsPortForwardableKind(kind string) bool {
-	switch kind {
-	case "Pod", "Service", "Deployment", "StatefulSet", "DaemonSet":
-		return true
-	default:
-		return false
-	}
-}

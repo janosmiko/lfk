@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"sort"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -98,14 +97,3 @@ func TestGroupedSchemeEntries(t *testing.T) {
 	}
 }
 
-func TestSchemeNames(t *testing.T) {
-	names := SchemeNames()
-	assert.NotEmpty(t, names)
-
-	// Should be sorted.
-	assert.True(t, sort.StringsAreSorted(names), "SchemeNames should return sorted list")
-
-	// Should contain all built-in schemes.
-	schemes := BuiltinSchemes()
-	assert.Equal(t, len(schemes), len(names))
-}
