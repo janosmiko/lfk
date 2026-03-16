@@ -495,3 +495,204 @@ func TestComputeQuotaPercent(t *testing.T) {
 		})
 	}
 }
+
+// --- evaluateSimpleJSONPath ---
+
+func TestEvaluateSimpleJSONPath(t *testing.T) {
+	obj := map[string]interface{}{
+		"status": map[string]interface{}{
+			"phase": "Running",
+			"conditions": []interface{}{
+				map[string]interface{}{
+					"type":   "Ready",
+					"status": "True",
+				},
+				map[string]interface{}{
+					"type":   "Initialized",
+					"status": "True",
+				},
+			},
+		},
+		"spec": map[string]interface{}{
+			"source": map[string]interface{}{
+				"repoURL": "https://github.com/example/repo",
+			},
+			"replicas": float64(3),
+		},
+		"metadata": map[string]interface{}{
+			"creationTimestamp": "2025-01-15T10:30:00Z",
+		},
+	}
+
+	tests := []struct {
+		name     string
+		path     string
+		wantVal  interface{}
+		wantOK   bool
+	}{
+		{"simple field", ".status.phase", "Running", true},
+		{"nested field", ".spec.source.repoURL", "https://github.com/example/repo", true},
+		{"numeric field", ".spec.replicas", float64(3), true},
+		{"array index", ".status.conditions[0].type", "Ready", true},
+		{"array index 1", ".status.conditions[1].status", "True", true},
+		{"metadata field", ".metadata.creationTimestamp", "2025-01-15T10:30:00Z", true},
+		{"missing field", ".status.missing", nil, false},
+		{"missing nested", ".status.deep.missing", nil, false},
+		{"array out of bounds", ".status.conditions[5].type", nil, false},
+		{"empty path", "", nil, false},
+		{"path without leading dot", "status.phase", "Running", true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			val, ok := evaluateSimpleJSONPath(obj, tt.path)
+			assert.Equal(t, tt.wantOK, ok)
+			if tt.wantOK {
+				assert.Equal(t, tt.wantVal, val)
+			}
+		})
+	}
+}
+
+// --- formatPrinterValue ---
+
+func TestFormatPrinterValue(t *testing.T) {
+	tests := []struct {
+		name    string
+		val     interface{}
+		colType string
+		want    string
+	}{
+		{"string value", "Running", "string", "Running"},
+		{"default type string", "hello", "", "hello"},
+		{"integer from float64", float64(42), "integer", "42"},
+		{"integer from int64", int64(7), "integer", "7"},
+		{"number whole", float64(100), "number", "100"},
+		{"number fractional", float64(3.14), "number", "3.14"},
+		{"boolean true", true, "boolean", "true"},
+		{"boolean false", false, "boolean", "false"},
+		{"date RFC3339", "2025-01-15T10:30:00Z", "date", formatAge(time.Since(func() time.Time {
+			t, _ := time.Parse(time.RFC3339, "2025-01-15T10:30:00Z")
+			return t
+		}()))},
+		{"date invalid", "not-a-date", "date", "not-a-date"},
+		{"nil value", nil, "string", ""},
+		{"integer from string fallback", "42", "integer", "42"},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := formatPrinterValue(tt.val, tt.colType)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+// --- extractCRDPrinterColumns ---
+
+func TestExtractCRDPrinterColumns(t *testing.T) {
+	t.Run("extracts columns from matching version", func(t *testing.T) {
+		spec := map[string]interface{}{
+			"versions": []interface{}{
+				map[string]interface{}{
+					"name":   "v1alpha1",
+					"served": true,
+					"additionalPrinterColumns": []interface{}{
+						map[string]interface{}{
+							"name":     "Status",
+							"type":     "string",
+							"jsonPath": ".status.phase",
+						},
+						map[string]interface{}{
+							"name":     "Repo",
+							"type":     "string",
+							"jsonPath": ".spec.source.repoURL",
+						},
+						map[string]interface{}{
+							"name":     "Age",
+							"type":     "date",
+							"jsonPath": ".metadata.creationTimestamp",
+						},
+					},
+				},
+			},
+		}
+		cols := extractCRDPrinterColumns(spec, "v1alpha1")
+		// Age should be skipped.
+		assert.Len(t, cols, 2)
+		assert.Equal(t, "Status", cols[0].Name)
+		assert.Equal(t, "string", cols[0].Type)
+		assert.Equal(t, ".status.phase", cols[0].JSONPath)
+		assert.Equal(t, "Repo", cols[1].Name)
+	})
+
+	t.Run("returns nil for non-matching version", func(t *testing.T) {
+		spec := map[string]interface{}{
+			"versions": []interface{}{
+				map[string]interface{}{
+					"name":   "v1",
+					"served": true,
+					"additionalPrinterColumns": []interface{}{
+						map[string]interface{}{
+							"name":     "Status",
+							"type":     "string",
+							"jsonPath": ".status.phase",
+						},
+					},
+				},
+			},
+		}
+		cols := extractCRDPrinterColumns(spec, "v2")
+		assert.Nil(t, cols)
+	})
+
+	t.Run("returns nil when no versions", func(t *testing.T) {
+		spec := map[string]interface{}{}
+		cols := extractCRDPrinterColumns(spec, "v1")
+		assert.Nil(t, cols)
+	})
+
+	t.Run("returns nil when no additionalPrinterColumns", func(t *testing.T) {
+		spec := map[string]interface{}{
+			"versions": []interface{}{
+				map[string]interface{}{
+					"name":   "v1",
+					"served": true,
+				},
+			},
+		}
+		cols := extractCRDPrinterColumns(spec, "v1")
+		assert.Nil(t, cols)
+	})
+
+	t.Run("skips columns with empty name or jsonPath", func(t *testing.T) {
+		spec := map[string]interface{}{
+			"versions": []interface{}{
+				map[string]interface{}{
+					"name":   "v1",
+					"served": true,
+					"additionalPrinterColumns": []interface{}{
+						map[string]interface{}{
+							"name":     "",
+							"type":     "string",
+							"jsonPath": ".status.phase",
+						},
+						map[string]interface{}{
+							"name":     "Status",
+							"type":     "string",
+							"jsonPath": "",
+						},
+						map[string]interface{}{
+							"name":     "Valid",
+							"type":     "string",
+							"jsonPath": ".status.phase",
+						},
+					},
+				},
+			},
+		}
+		cols := extractCRDPrinterColumns(spec, "v1")
+		assert.Len(t, cols, 1)
+		assert.Equal(t, "Valid", cols[0].Name)
+	})
+}

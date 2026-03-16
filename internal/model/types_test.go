@@ -663,6 +663,37 @@ func TestFindResourceTypeIn(t *testing.T) {
 		_, ok := FindResourceTypeIn("nope/v1/nothing", nil)
 		assert.False(t, ok)
 	})
+
+	t.Run("built-in enriched with PrinterColumns from discovered CRDs", func(t *testing.T) {
+		// Simulate a discovered CRD that matches a built-in resource type (e.g. deployments)
+		// and carries PrinterColumns from CRD discovery.
+		additional := []ResourceTypeEntry{
+			{
+				Kind:       "Deployment",
+				APIGroup:   "apps",
+				APIVersion: "v1",
+				Resource:   "deployments",
+				PrinterColumns: []PrinterColumn{
+					{Name: "Ready", Type: "string", JSONPath: ".status.readyReplicas"},
+					{Name: "Available", Type: "integer", JSONPath: ".status.availableReplicas"},
+				},
+			},
+		}
+		rt, ok := FindResourceTypeIn("apps/v1/deployments", additional)
+		require.True(t, ok)
+		assert.Equal(t, "Deployment", rt.Kind)
+		// The built-in match should be enriched with PrinterColumns from discovered CRDs.
+		assert.Len(t, rt.PrinterColumns, 2)
+		assert.Equal(t, "Ready", rt.PrinterColumns[0].Name)
+		assert.Equal(t, "Available", rt.PrinterColumns[1].Name)
+	})
+
+	t.Run("built-in without matching CRD has no PrinterColumns", func(t *testing.T) {
+		rt, ok := FindResourceTypeIn("apps/v1/deployments", nil)
+		require.True(t, ok)
+		assert.Equal(t, "Deployment", rt.Kind)
+		assert.Empty(t, rt.PrinterColumns)
+	})
 }
 
 // --- ActionsForKind ---

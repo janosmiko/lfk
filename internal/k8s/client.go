@@ -246,6 +246,29 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 		// Populate Ready and Restarts based on kind.
 		populateResourceDetails(&ti, item.Object, rt.Kind)
 
+		// Evaluate CRD additionalPrinterColumns if present.
+		if len(rt.PrinterColumns) > 0 {
+			// Build a set of existing column keys to avoid duplicates.
+			existingKeys := make(map[string]bool, len(ti.Columns))
+			for _, kv := range ti.Columns {
+				existingKeys[kv.Key] = true
+			}
+			for _, pc := range rt.PrinterColumns {
+				if existingKeys[pc.Name] {
+					continue
+				}
+				val, ok := evaluateSimpleJSONPath(item.Object, pc.JSONPath)
+				if !ok || val == nil {
+					continue
+				}
+				formatted := formatPrinterValue(val, pc.Type)
+				if formatted == "" {
+					continue
+				}
+				ti.Columns = append(ti.Columns, model.KeyValue{Key: pc.Name, Value: formatted})
+			}
+		}
+
 		// Extract owner references for navigation.
 		if metadata, ok := item.Object["metadata"].(map[string]interface{}); ok {
 			if ownerRefs, ok := metadata["ownerReferences"].([]interface{}); ok {
@@ -1683,6 +1706,127 @@ func parseEventTimestamp(obj map[string]interface{}, field string) time.Time {
 	return t
 }
 
+// evaluateSimpleJSONPath traverses a map[string]interface{} using a simple
+// dot-notation JSONPath expression like ".status.phase" or ".status.conditions[0].type".
+// It returns the value found and a boolean indicating success.
+// This does NOT handle complex JSONPath features (wildcards, filters, etc.).
+func evaluateSimpleJSONPath(obj map[string]interface{}, path string) (interface{}, bool) {
+	// Strip leading dot.
+	path = strings.TrimPrefix(path, ".")
+	if path == "" {
+		return nil, false
+	}
+
+	parts := strings.Split(path, ".")
+	var current interface{} = obj
+
+	for _, part := range parts {
+		if current == nil {
+			return nil, false
+		}
+
+		// Check for array index notation, e.g. "conditions[0]".
+		fieldName := part
+		arrayIdx := -1
+		if bracketIdx := strings.Index(part, "["); bracketIdx >= 0 {
+			closeBracket := strings.Index(part, "]")
+			if closeBracket > bracketIdx+1 {
+				idxStr := part[bracketIdx+1 : closeBracket]
+				if idx, err := strconv.Atoi(idxStr); err == nil {
+					arrayIdx = idx
+				}
+			}
+			fieldName = part[:bracketIdx]
+		}
+
+		// Navigate into the map.
+		m, ok := current.(map[string]interface{})
+		if !ok {
+			return nil, false
+		}
+		val, exists := m[fieldName]
+		if !exists {
+			return nil, false
+		}
+
+		// If we need to index into an array.
+		if arrayIdx >= 0 {
+			arr, ok := val.([]interface{})
+			if !ok || arrayIdx >= len(arr) {
+				return nil, false
+			}
+			current = arr[arrayIdx]
+		} else {
+			current = val
+		}
+	}
+
+	return current, true
+}
+
+// formatPrinterValue formats a value from a CRD printer column based on its type.
+func formatPrinterValue(val interface{}, colType string) string {
+	if val == nil {
+		return ""
+	}
+
+	switch colType {
+	case "date":
+		// Try to parse as RFC3339 and format as relative time.
+		s, ok := val.(string)
+		if !ok {
+			return fmt.Sprintf("%v", val)
+		}
+		t, err := time.Parse(time.RFC3339, s)
+		if err != nil {
+			// Try RFC3339Nano as fallback.
+			t, err = time.Parse(time.RFC3339Nano, s)
+			if err != nil {
+				return s
+			}
+		}
+		return formatAge(time.Since(t))
+
+	case "integer":
+		switch v := val.(type) {
+		case float64:
+			return strconv.FormatInt(int64(v), 10)
+		case int64:
+			return strconv.FormatInt(v, 10)
+		default:
+			return fmt.Sprintf("%v", val)
+		}
+
+	case "number":
+		switch v := val.(type) {
+		case float64:
+			// Use compact formatting: no trailing zeros.
+			if v == float64(int64(v)) {
+				return strconv.FormatInt(int64(v), 10)
+			}
+			return strconv.FormatFloat(v, 'f', -1, 64)
+		case int64:
+			return strconv.FormatInt(v, 10)
+		default:
+			return fmt.Sprintf("%v", val)
+		}
+
+	case "boolean":
+		switch v := val.(type) {
+		case bool:
+			if v {
+				return "true"
+			}
+			return "false"
+		default:
+			return fmt.Sprintf("%v", val)
+		}
+
+	default: // "string" and everything else
+		return fmt.Sprintf("%v", val)
+	}
+}
+
 func formatAge(d time.Duration) string {
 	if d < time.Minute {
 		return fmt.Sprintf("%ds", int(d.Seconds()))
@@ -2028,13 +2172,14 @@ func (c *Client) DiscoverCRDs(ctx context.Context, contextName string) ([]model.
 		displayName := strings.ToUpper(plural[:1]) + plural[1:]
 
 		entry := model.ResourceTypeEntry{
-			DisplayName: displayName,
-			Kind:        kind,
-			APIGroup:    group,
-			APIVersion:  apiVersion,
-			Resource:    plural,
-			Icon:        "⧫",
-			Namespaced:  namespaced,
+			DisplayName:    displayName,
+			Kind:           kind,
+			APIGroup:       group,
+			APIVersion:     apiVersion,
+			Resource:       plural,
+			Icon:           "⧫",
+			Namespaced:     namespaced,
+			PrinterColumns: extractCRDPrinterColumns(spec, apiVersion),
 		}
 
 		// Check if this CRD uses a deprecated API version.
@@ -2094,6 +2239,59 @@ func preferredCRDVersion(spec, obj map[string]interface{}) string {
 	}
 
 	return "v1"
+}
+
+// extractCRDPrinterColumns extracts additionalPrinterColumns from the CRD spec
+// for the given preferred version. It skips the "Age" column since age is already
+// computed by the application.
+func extractCRDPrinterColumns(spec map[string]interface{}, preferredVersion string) []model.PrinterColumn {
+	versions, ok := spec["versions"].([]interface{})
+	if !ok {
+		return nil
+	}
+
+	// Find the version entry matching the preferred version.
+	for _, v := range versions {
+		vm, ok := v.(map[string]interface{})
+		if !ok {
+			continue
+		}
+		name, _ := vm["name"].(string)
+		if name != preferredVersion {
+			continue
+		}
+
+		cols, ok := vm["additionalPrinterColumns"].([]interface{})
+		if !ok || len(cols) == 0 {
+			return nil
+		}
+
+		var result []model.PrinterColumn
+		for _, c := range cols {
+			cm, ok := c.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			colName, _ := cm["name"].(string)
+			colType, _ := cm["type"].(string)
+			jsonPath, _ := cm["jsonPath"].(string)
+			if colName == "" || jsonPath == "" {
+				continue
+			}
+			// Skip "Age" — the app computes it from creationTimestamp.
+			if strings.EqualFold(colName, "Age") {
+				continue
+			}
+			result = append(result, model.PrinterColumn{
+				Name:     colName,
+				Type:     colType,
+				JSONPath: jsonPath,
+			})
+		}
+		return result
+	}
+
+	return nil
 }
 
 // containerStateString returns a human-readable container state.

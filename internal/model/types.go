@@ -36,6 +36,15 @@ type ResourceTypeEntry struct {
 	RequiresCRD    bool   // true if this resource type depends on a CRD being installed
 	Deprecated     bool   // true if this API version is deprecated
 	DeprecationMsg string // human-readable deprecation message
+
+	PrinterColumns []PrinterColumn // additionalPrinterColumns from CRD spec
+}
+
+// PrinterColumn represents an additionalPrinterColumn from a CRD spec.
+type PrinterColumn struct {
+	Name     string
+	Type     string // string, integer, number, boolean, date
+	JSONPath string // e.g. ".status.phase", ".spec.source.repoURL"
 }
 
 // KeyValue represents an ordered key-value pair for resource summary display.
@@ -769,14 +778,30 @@ func FindResourceTypeIn(ref string, additional []ResourceTypeEntry) (ResourceTyp
 	// Parse the ref to extract version for potential override.
 	refParts := strings.SplitN(ref, "/", 3)
 
+	// Build a lookup of discovered CRDs by group/resource for enriching built-in types
+	// with PrinterColumns from CRD discovery.
+	discoveredByGR := make(map[string]*ResourceTypeEntry, len(additional))
+	for i := range additional {
+		key := additional[i].APIGroup + "/" + additional[i].Resource
+		discoveredByGR[key] = &additional[i]
+	}
+
 	for _, cat := range TopLevelResourceTypes() {
 		for _, rt := range cat.Types {
+			matched := false
 			if rt.ResourceRef() == ref {
-				return rt, true
-			}
-			// Match by group/resource, override version from ref.
-			if len(refParts) == 3 && rt.APIGroup == refParts[0] && rt.Resource == refParts[2] {
+				matched = true
+			} else if len(refParts) == 3 && rt.APIGroup == refParts[0] && rt.Resource == refParts[2] {
+				// Match by group/resource, override version from ref.
 				rt.APIVersion = refParts[1]
+				matched = true
+			}
+			if matched {
+				// Enrich built-in type with PrinterColumns from discovered CRDs.
+				grKey := rt.APIGroup + "/" + rt.Resource
+				if crd, ok := discoveredByGR[grKey]; ok && len(crd.PrinterColumns) > 0 {
+					rt.PrinterColumns = crd.PrinterColumns
+				}
 				return rt, true
 			}
 		}
