@@ -243,9 +243,10 @@ func (c *Client) SyncArgoApp(contextName, namespace, name string, applyOnly bool
 	}
 
 	// Build the sync operation, carrying over syncOptions and prune from the app's syncPolicy.
-	strategy := map[string]interface{}{"hook": map[string]interface{}{}}
+	// Explicitly null the other strategy so the merge patch clears it.
+	strategy := map[string]interface{}{"hook": map[string]interface{}{}, "apply": nil}
 	if applyOnly {
-		strategy = map[string]interface{}{"apply": map[string]interface{}{}}
+		strategy = map[string]interface{}{"apply": map[string]interface{}{}, "hook": nil}
 	}
 	syncOp := map[string]interface{}{
 		"syncStrategy": strategy,

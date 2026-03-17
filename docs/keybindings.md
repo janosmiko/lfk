@@ -112,6 +112,8 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
 | `/` | Search in YAML |
 | `n` / `N` | Next / previous search match |
+| `V` | Visual select lines |
+| `y` | Copy selected lines (in visual mode) |
 | `Tab` / `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
 | `e` | Edit resource in `$EDITOR` |

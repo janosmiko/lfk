@@ -2194,6 +2194,86 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// In visual selection mode, restrict keys to selection/copy/cancel.
+	if m.yamlVisualMode {
+		switch msg.String() {
+		case "V", "esc":
+			m.yamlVisualMode = false
+			return m, nil
+		case "y":
+			// Copy selected lines to clipboard using original content (no fold indicators).
+			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+			_, mapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+			selStart := min(m.yamlVisualStart, m.yamlCursor)
+			selEnd := max(m.yamlVisualStart, m.yamlCursor)
+			if selStart < 0 {
+				selStart = 0
+			}
+			if selEnd >= len(mapping) {
+				selEnd = len(mapping) - 1
+			}
+			origLines := strings.Split(yamlForDisplay, "\n")
+			var selected []string
+			for i := selStart; i <= selEnd; i++ {
+				if i < len(mapping) && mapping[i] >= 0 && mapping[i] < len(origLines) {
+					selected = append(selected, origLines[mapping[i]])
+				}
+			}
+			m.yamlVisualMode = false
+			m.setStatusMessage(fmt.Sprintf("Copied %d lines", len(selected)), false)
+			return m, tea.Batch(copyToSystemClipboard(strings.Join(selected, "\n")), scheduleStatusClear())
+		case "j", "down":
+			if m.yamlCursor < totalVisible-1 {
+				m.yamlCursor++
+			}
+			m.ensureYAMLCursorVisible()
+			return m, nil
+		case "k", "up":
+			if m.yamlCursor > 0 {
+				m.yamlCursor--
+			}
+			m.ensureYAMLCursorVisible()
+			return m, nil
+		case "g":
+			if m.pendingG {
+				m.pendingG = false
+				m.yamlCursor = 0
+				m.yamlScroll = 0
+				return m, nil
+			}
+			m.pendingG = true
+			return m, nil
+		case "G":
+			m.yamlCursor = totalVisible - 1
+			if m.yamlCursor < 0 {
+				m.yamlCursor = 0
+			}
+			m.yamlScroll = maxScroll
+			return m, nil
+		case "ctrl+d":
+			m.yamlCursor += m.height / 2
+			if m.yamlCursor >= totalVisible {
+				m.yamlCursor = totalVisible - 1
+			}
+			m.ensureYAMLCursorVisible()
+			return m, nil
+		case "ctrl+u":
+			m.yamlCursor -= m.height / 2
+			if m.yamlCursor < 0 {
+				m.yamlCursor = 0
+			}
+			m.ensureYAMLCursorVisible()
+			return m, nil
+		case "ctrl+c":
+			m.yamlVisualMode = false
+			m.mode = modeExplorer
+			m.yamlScroll = 0
+			m.yamlCursor = 0
+			return m, nil
+		}
+		return m, nil
+	}
+
 	switch msg.String() {
 	case "?":
 		m.mode = modeHelp
@@ -2201,6 +2281,11 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.helpFilter.Clear()
 		m.helpSearchActive = false
 		m.helpContextMode = "YAML View"
+		return m, nil
+	case "V":
+		// Enter visual line selection mode.
+		m.yamlVisualMode = true
+		m.yamlVisualStart = m.yamlCursor
 		return m, nil
 	case "q", "esc":
 		if m.yamlSearchText.Value != "" {

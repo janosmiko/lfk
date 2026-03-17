@@ -120,6 +120,8 @@ func helpSections() []helpSection {
 				{"/", "Search in YAML"},
 				{"n", "Next search match"},
 				{"N", "Previous search match"},
+				{"V", "Visual select lines"},
+				{"y", "Copy selected lines (in visual mode)"},
 				{"Tab/z", "Toggle fold on section under cursor"},
 				{"Z", "Toggle all folds (collapse/expand)"},
 				{"e", "Edit resource in editor"},

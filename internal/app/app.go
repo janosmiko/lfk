@@ -207,6 +207,10 @@ type Model struct {
 	yamlMatchLines []int     // line indices matching the search
 	yamlMatchIdx   int       // current match index in yamlMatchLines
 
+	// Visual line selection in YAML view.
+	yamlVisualMode  bool // true when in visual line selection mode
+	yamlVisualStart int  // anchor line (visible-line index) where visual selection started
+
 	// Collapsible YAML sections.
 	yamlSections  []yamlSection   // parsed hierarchical sections
 	yamlCollapsed map[string]bool // collapsed state per section key (persists across resources)
@@ -953,16 +957,25 @@ func (m Model) renderTitleBar() string {
 
 func (m Model) viewYAML() string {
 	title := ui.TitleStyle.Render(m.yamlTitle())
-	yamlHints := []struct{ key, desc string }{
-		{"j/k", "scroll"},
-		{"g/G", "top/bottom"},
-		{"ctrl+d/u", "half page"},
-		{"ctrl+f/b", "page"},
-		{"/", "search"},
-		{"tab/z", "fold"},
-		{"Z", "all folds"},
-		{"e", "edit"},
-		{"q/esc", "back"},
+	var yamlHints []struct{ key, desc string }
+	if m.yamlVisualMode {
+		yamlHints = []struct{ key, desc string }{
+			{"j/k", "extend selection"},
+			{"y", "copy selected"},
+			{"V/esc", "cancel"},
+		}
+	} else {
+		yamlHints = []struct{ key, desc string }{
+			{"j/k", "scroll"},
+			{"g/G", "top/bottom"},
+			{"ctrl+d/u", "half page"},
+			{"ctrl+f/b", "page"},
+			{"/", "search"},
+			{"V", "visual select"},
+			{"tab/z", "fold"},
+			{"e", "edit"},
+			{"q/esc", "back"},
+		}
 	}
 	yamlHintParts := make([]string, 0, len(yamlHints))
 	for _, h := range yamlHints {
@@ -1033,6 +1046,13 @@ func (m Model) viewYAML() string {
 		m.yamlCursor = 0
 	}
 
+	// Compute visual selection range (if active).
+	selStart, selEnd := -1, -1
+	if m.yamlVisualMode {
+		selStart = min(m.yamlVisualStart, m.yamlCursor)
+		selEnd = max(m.yamlVisualStart, m.yamlCursor)
+	}
+
 	// Apply YAML highlighting to visible lines, with search highlights and cursor.
 	highlightedLines := make([]string, 0, len(viewport))
 	for i, line := range viewport {
@@ -1049,6 +1069,11 @@ func (m Model) viewYAML() string {
 				highlighted = ui.HighlightSearchInLine(line, m.yamlSearchText.Value, false)
 			}
 		}
+		// Visual selection highlight: override with selected style.
+		isSelected := m.yamlVisualMode && visIdx >= selStart && visIdx <= selEnd
+		if isSelected {
+			highlighted = ui.SelectedStyle.Render(line)
+		}
 		// Line number gutter
 		lineNumStr := strings.Repeat(" ", gutterWidth+1)
 		if origLine >= 0 {
@@ -1057,6 +1082,8 @@ func (m Model) viewYAML() string {
 		// Cursor indicator + line number + content
 		if visIdx == m.yamlCursor {
 			highlighted = ui.YamlCursorIndicatorStyle.Render("▎") + ui.DimStyle.Render(lineNumStr) + highlighted
+		} else if isSelected {
+			highlighted = ui.YamlCursorIndicatorStyle.Render(" ") + ui.DimStyle.Render(lineNumStr) + highlighted
 		} else {
 			highlighted = " " + ui.DimStyle.Render(lineNumStr) + highlighted
 		}
