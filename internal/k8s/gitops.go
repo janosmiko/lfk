@@ -2,12 +2,12 @@ package k8s
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"sort"
 	"strings"
 	"time"
 
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
@@ -224,9 +224,16 @@ func (c *Client) getArgoManagedResources(ctx context.Context, dynClient dynamic.
 	return items, nil
 }
 
-// SyncArgoApp triggers a sync on an ArgoCD Application by patching the operation field.
-// It reads the application's syncPolicy first to carry over syncOptions (e.g., ServerSideApply=true).
+// SyncArgoApp triggers a sync on an ArgoCD Application by setting the operation field.
+// It reads the application first to carry over syncOptions (e.g., ServerSideApply=true).
 // If applyOnly is true, uses the "apply" strategy (no hooks); otherwise uses "hook" strategy (default).
+//
+// Replicates what ArgoCD's own API server does (argo.SetAppOperation):
+//  1. Get the application
+//  2. Set status.operationState = nil (clear stale state)
+//  3. Set operation with the desired sync strategy
+//  4. Update the full object in one call
+//
 // See: https://argo-cd.readthedocs.io/en/stable/user-guide/sync-kubectl/
 func (c *Client) SyncArgoApp(contextName, namespace, name string, applyOnly bool) error {
 	dynClient, err := c.dynamicForContext(contextName)
@@ -236,58 +243,75 @@ func (c *Client) SyncArgoApp(contextName, namespace, name string, applyOnly bool
 
 	appGVR := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "applications"}
 
-	// Read the application to extract syncPolicy options.
-	app, err := dynClient.Resource(appGVR).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("getting application %s: %w", name, err)
-	}
+	for {
+		// Read the application (retry loop handles conflicts).
+		app, err := dynClient.Resource(appGVR).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("getting application %s: %w", name, err)
+		}
 
-	// Build the sync operation, carrying over syncOptions and prune from the app's syncPolicy.
-	// Explicitly null the other strategy so the merge patch clears it.
-	strategy := map[string]interface{}{"hook": map[string]interface{}{}, "apply": nil}
-	if applyOnly {
-		strategy = map[string]interface{}{"apply": map[string]interface{}{}, "hook": nil}
-	}
-	syncOp := map[string]interface{}{
-		"syncStrategy": strategy,
-	}
+		// Reject if another operation is already in progress.
+		if app.Object["operation"] != nil {
+			return fmt.Errorf("another operation is already in progress for %s", name)
+		}
 
-	if spec, ok := app.Object["spec"].(map[string]interface{}); ok {
-		if syncPolicy, ok := spec["syncPolicy"].(map[string]interface{}); ok {
-			// Carry over syncOptions (e.g., ServerSideApply=true, Validate=false).
-			if syncOptions, ok := syncPolicy["syncOptions"].([]interface{}); ok && len(syncOptions) > 0 {
-				syncOp["syncOptions"] = syncOptions
-			}
-			// Carry over prune setting from automated sync.
-			if automated, ok := syncPolicy["automated"].(map[string]interface{}); ok {
-				if prune, ok := automated["prune"].(bool); ok {
-					syncOp["prune"] = prune
+		// Build the sync operation with exactly one strategy key.
+		strategy := "hook"
+		if applyOnly {
+			strategy = "apply"
+		}
+
+		syncBlock := map[string]interface{}{
+			"syncStrategy": map[string]interface{}{
+				strategy: map[string]interface{}{},
+			},
+		}
+
+		if spec, ok := app.Object["spec"].(map[string]interface{}); ok {
+			if syncPolicy, ok := spec["syncPolicy"].(map[string]interface{}); ok {
+				if syncOptions, ok := syncPolicy["syncOptions"].([]interface{}); ok && len(syncOptions) > 0 {
+					syncBlock["syncOptions"] = syncOptions
+				}
+				if automated, ok := syncPolicy["automated"].(map[string]interface{}); ok {
+					if prune, ok := automated["prune"].(bool); ok {
+						syncBlock["prune"] = prune
+					}
 				}
 			}
 		}
-	}
 
-	patch := map[string]interface{}{
-		"operation": map[string]interface{}{
+		// Clear stale syncStrategy from operationState to prevent ArgoCD from
+		// merging the old strategy into the new sync.
+		if status, ok := app.Object["status"].(map[string]interface{}); ok {
+			if opState, ok := status["operationState"].(map[string]interface{}); ok {
+				if op, ok := opState["operation"].(map[string]interface{}); ok {
+					if syncMap, ok := op["sync"].(map[string]interface{}); ok {
+						delete(syncMap, "syncStrategy")
+					}
+				}
+			}
+		}
+
+		// Set operation with exactly one syncStrategy key.
+		app.Object["operation"] = map[string]interface{}{
 			"initiatedBy": map[string]interface{}{
-				"username": "k-tui",
+				"username": "lfk",
 			},
-			"sync": syncOp,
-		},
-	}
+			"sync": syncBlock,
+		}
 
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("marshaling sync patch: %w", err)
+		_, err = dynClient.Resource(appGVR).Namespace(namespace).Update(
+			context.Background(), app, metav1.UpdateOptions{},
+		)
+		if err != nil {
+			if apierrors.IsConflict(err) {
+				logger.Warn("conflict updating application for sync, retrying", "app", name)
+				continue
+			}
+			return fmt.Errorf("syncing application %s: %w", name, err)
+		}
+		return nil
 	}
-
-	_, err = dynClient.Resource(appGVR).Namespace(namespace).Patch(
-		context.Background(), name, k8stypes.MergePatchType, patchBytes, metav1.PatchOptions{},
-	)
-	if err != nil {
-		return fmt.Errorf("syncing application %s: %w", name, err)
-	}
-	return nil
 }
 
 // TerminateArgoSync terminates a running sync operation on an ArgoCD Application
