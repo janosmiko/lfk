@@ -5,12 +5,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
 	"sync"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -547,6 +547,7 @@ func (m Model) execKubectlDebug() tea.Cmd {
 }
 
 // runDebugPod runs a standalone alpine debug pod in the target namespace.
+// The pod is named lfk-debug-<5-random-chars> and is auto-removed on exit.
 func (m Model) runDebugPod() tea.Cmd {
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
@@ -557,22 +558,47 @@ func (m Model) runDebugPod() tea.Cmd {
 
 	ns := m.actionNamespace()
 	ctx := m.actionCtx.context
-	podName := fmt.Sprintf("debug-%d", time.Now().Unix())
+	podName := "lfk-debug-" + randomSuffix(5)
 
 	args := []string{
-		"run", podName, "--image=alpine", "-it", "--rm",
-		"--restart=Never", "--context", ctx, "-n", ns, "--", "sh",
+		"run", podName, "--image=alpine", "--rm", "-it",
+		"--restart=Never", "-n", ns, "--context", ctx, "--", "sh",
 	}
+
+	logger.Info("Running debug pod", "pod", podName, "namespace", ns, "context", ctx)
 
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-	logger.Info("Running kubectl command", "cmd", cmd.String())
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+
+	if ui.ConfigTerminalMode == "pty" {
+		cols := m.width - 4
+		rows := m.height - 6
+		if cols < 20 {
+			cols = 80
+		}
+		if rows < 5 {
+			rows = 24
+		}
+		title := fmt.Sprintf("Debug Pod: %s/%s", ns, podName)
+		return startPTYExecCmd(cmd, title, cols, rows)
+	}
+
+	return tea.ExecProcess(clearBeforeExec(cmd), func(err error) tea.Msg {
 		if err != nil {
 			logger.Error("kubectl run debug pod failed", "cmd", cmd.String(), "error", err)
 		}
 		return actionResultMsg{message: "Debug pod session ended", err: err}
 	})
+}
+
+// randomSuffix generates a random lowercase alphanumeric string of the given length.
+func randomSuffix(n int) string {
+	const chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+	b := make([]byte, n)
+	for i := range b {
+		b[i] = chars[rand.IntN(len(chars))]
+	}
+	return string(b)
 }
 
 // runDebugPodWithPVC runs an alpine debug pod with a PVC mounted at /mnt/data.
@@ -587,7 +613,7 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 	ns := m.actionNamespace()
 	ctx := m.actionCtx.context
 	pvcName := m.actionCtx.name
-	podName := fmt.Sprintf("debug-pvc-%d", time.Now().Unix())
+	podName := "lfk-debug-pvc-" + randomSuffix(5)
 
 	// Create a pod manifest with the PVC mounted.
 	manifest := fmt.Sprintf(`{

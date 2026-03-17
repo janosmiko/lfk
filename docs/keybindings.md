@@ -224,7 +224,7 @@ Autocompletion is available for kubectl commands (subcommands, resource types, r
 The action menu (`x` key) shows context-specific actions based on the resource type:
 
 ### Pod Actions
-`l` Logs, `s` Exec, `A` Attach, `b` Debug, `p` Port Forward, `S` Startup Analysis, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events
+`l` Logs, `s` Exec, `A` Attach, `b` Debug, `B` Debug Pod, `p` Port Forward, `S` Startup Analysis, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events
 
 ### Deployment Actions
 `l` Logs, `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
@@ -239,34 +239,34 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 `l` Logs, `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Secret Actions
-`e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `V` Events
+`e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `b` Debug Pod, `V` Events
 
 ### ConfigMap Actions
-`e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `V` Events
+`e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `b` Debug Pod, `V` Events
 
 ### Node Actions
-`c` Cordon, `u` Uncordon, `n` Drain, `t` Taint, `T` Untaint, `s` Shell, `v` Describe, `E` Edit, `V` Events
+`c` Cordon, `u` Uncordon, `n` Drain, `t` Taint, `T` Untaint, `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
 ### Job Actions
-`l` Logs, `s` Exec, `A` Attach, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events
+`l` Logs, `s` Exec, `A` Attach, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 
 ### CronJob Actions
-`l` Logs, `s` Exec, `A` Attach, `t` Trigger (create Job), `v` Describe, `E` Edit, `D` Delete, `V` Events
+`l` Logs, `s` Exec, `A` Attach, `t` Trigger (create Job), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### ArgoCD Application Actions
-`s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `V` Events
+`s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Helm Release Actions
-`u` Values, `A` All Values, `E` Edit Values, `R` Rollback, `v` Describe, `D` Delete, `V` Events
+`u` Values, `A` All Values, `E` Edit Values, `R` Rollback, `v` Describe, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Ingress Actions
-`o` Open in Browser, `v` Describe, `E` Edit, `D` Delete, `V` Events
+`o` Open in Browser, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### PVC Actions
-`b` Debug Mount, `v` Describe, `E` Edit, `D` Delete, `V` Events
+`b` Debug Mount, `B` Debug Pod, `v` Describe, `E` Edit, `D` Delete, `V` Events
 
 ### Default Actions (all other resources)
-`v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `V` Events
+`v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `b` Debug Pod, `V` Events
 
 ### Bulk Actions (when items multi-selected)
 `D` Delete, `X` Force Delete, `S` Scale, `r` Restart

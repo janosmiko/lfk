@@ -76,7 +76,7 @@ func helpSections() []helpSection {
 			bindings: []helpEntry{
 				{"\\", "Select namespace"},
 				{"A", "Toggle all-namespaces mode"},
-				{"x", "Action menu (logs, exec, debug, describe, edit, delete, scale, port-forward, events, startup analysis, RBAC permissions)"},
+				{"x", "Action menu (logs, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, RBAC permissions)"},
 				{"L", "View logs for selected resource"},
 				{"e", "Secret/ConfigMap editor (inline key-value editing)"},
 				{"E", "Edit selected resource in $EDITOR"},

@@ -560,7 +560,7 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl debug node/%s -it --image=busybox --context %s -- chroot /host /bin/sh", name, ctx))
 		return m, m.execKubectlNodeShell()
 	case "Debug Pod":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run debug-pod --image=alpine -it --rm --restart=Never -n %s --context %s -- sh", ns, ctx))
+		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run lfk-debug-<id> --image=alpine --rm -it --restart=Never -n %s --context %s -- sh", ns, ctx))
 		return m, m.runDebugPod()
 	case "Debug Mount":
 		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run debug-pvc --image=alpine -it --rm --restart=Never --overrides='{...pvc:%s...}' -n %s --context %s -- sh", name, ns, ctx))

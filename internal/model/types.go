@@ -903,6 +903,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Exec", Description: "Execute command in container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Debug", Description: "Debug pod with ephemeral container", Key: "b"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "B"},
 			{Label: "Port Forward", Description: "Forward local port to pod", Key: "p"},
 			{Label: "Startup Analysis", Description: "Analyze pod startup timing", Key: "S"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
@@ -933,6 +934,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this replicaset", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "Node":
@@ -945,6 +947,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Shell", Description: "Open shell on node via debug pod", Key: "s"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in current namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "HorizontalPodAutoscaler":
@@ -952,6 +955,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this HPA", Key: "D"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "StatefulSet":
@@ -990,6 +994,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this job", Key: "D"},
 			{Label: "Force Delete", Description: "Force delete this job (grace-period=0)", Key: "X"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "CronJob":
@@ -1001,6 +1006,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this cronjob", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "Service":
@@ -1024,11 +1030,13 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this application", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "PersistentVolumeClaim":
 		return []ActionMenuItem{
 			{Label: "Debug Mount", Description: "Run debug pod with this PVC mounted", Key: "b"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "B"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this PVC", Key: "D"},
@@ -1040,6 +1048,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this ingress", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "HelmRelease":
@@ -1050,6 +1059,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Rollback", Description: "Rollback to previous revision", Key: "R"},
 			{Label: "Describe", Description: "Show release info", Key: "v"},
 			{Label: "Delete", Description: "Uninstall this release", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "Kustomization":
@@ -1061,6 +1071,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "GitRepository", "HelmRepository", "HelmChart", "OCIRepository", "Bucket":
@@ -1072,6 +1083,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "Alert", "Provider", "Receiver":
@@ -1083,6 +1095,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "ImageRepository", "ImagePolicy", "ImageUpdateAutomation":
@@ -1094,6 +1107,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "Certificate", "CertificateRequest":
@@ -1102,6 +1116,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "Issuer", "ClusterIssuer":
@@ -1110,6 +1125,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "Order", "Challenge":
@@ -1117,6 +1133,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 		return []ActionMenuItem{
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
 	case "Secret":
@@ -1126,6 +1143,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this secret", Key: "D"},
 			{Label: "Labels / Annotations", Description: "Edit labels and annotations", Key: "l"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 			{Label: "Permissions", Description: "Check RBAC permissions", Key: "P"},
 		}
@@ -1136,6 +1154,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this configmap", Key: "D"},
 			{Label: "Labels / Annotations", Description: "Edit labels and annotations", Key: "l"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 			{Label: "Permissions", Description: "Check RBAC permissions", Key: "P"},
 		}
@@ -1145,6 +1164,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this network policy", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 			{Label: "Permissions", Description: "Check RBAC permissions", Key: "P"},
 		}
@@ -1154,6 +1174,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this resource", Key: "D"},
 			{Label: "Labels / Annotations", Description: "Edit labels and annotations", Key: "l"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 			{Label: "Permissions", Description: "Check RBAC permissions", Key: "P"},
 		}
