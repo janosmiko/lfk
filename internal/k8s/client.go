@@ -2546,6 +2546,9 @@ func containerStateString(ready bool, waiting *corev1.ContainerStateWaiting, run
 		return "Waiting"
 	}
 	if terminated != nil {
+		if terminated.Reason == "Completed" {
+			return "Completed"
+		}
 		return "Terminated"
 	}
 	return "Unknown"
