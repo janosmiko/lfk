@@ -2880,6 +2880,22 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			}
 		}
 		return m, nil
+	case "w":
+		// Move cursor to next word start.
+		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
+			m.yamlVisualCurCol = nextWordStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
+		}
+		return m, nil
+	case "b":
+		// Move cursor to previous word start.
+		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
+			m.yamlVisualCurCol = prevWordStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
+		}
+		return m, nil
 	case "j", "down":
 		if m.yamlCursor < totalVisible-1 {
 			m.yamlCursor++
@@ -3368,6 +3384,20 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if lineLen > 0 {
 				m.logVisualCurCol = lineLen - 1
 			}
+		}
+		return m, nil
+	case "e":
+		// Move cursor to end of current/next word.
+		m.logLineInput = ""
+		if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+			m.logVisualCurCol = wordEnd(m.logLines[m.logCursor], m.logVisualCurCol)
+		}
+		return m, nil
+	case "b":
+		// Move cursor to previous word start.
+		m.logLineInput = ""
+		if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+			m.logVisualCurCol = prevWordStart(m.logLines[m.logCursor], m.logVisualCurCol)
 		}
 		return m, nil
 	case "V":
@@ -4032,6 +4062,75 @@ func (m Model) handleHeaderClick(relX int) (tea.Model, tea.Cmd) {
 	}
 	// Remaining space is AGE (or extra columns, mapped to age sort).
 	return m.applySortMode(sortByAge)
+}
+
+// nextWordStart returns the column of the next word start (vim 'w' motion).
+func nextWordStart(line string, col int) int {
+	runes := []rune(line)
+	n := len(runes)
+	if col >= n-1 {
+		return col
+	}
+	i := col
+	// Skip current word characters.
+	for i < n && !isWordBoundary(runes[i]) {
+		i++
+	}
+	// Skip whitespace/punctuation.
+	for i < n && isWordBoundary(runes[i]) {
+		i++
+	}
+	if i >= n {
+		return n - 1
+	}
+	return i
+}
+
+// wordEnd returns the column of the current/next word end (vim 'e' motion).
+func wordEnd(line string, col int) int {
+	runes := []rune(line)
+	n := len(runes)
+	if col >= n-1 {
+		return col
+	}
+	i := col + 1
+	// Skip whitespace/punctuation.
+	for i < n && isWordBoundary(runes[i]) {
+		i++
+	}
+	// Move to end of word.
+	for i < n-1 && !isWordBoundary(runes[i+1]) {
+		i++
+	}
+	if i >= n {
+		return n - 1
+	}
+	return i
+}
+
+// prevWordStart returns the column of the previous word start (vim 'b' motion).
+func prevWordStart(line string, col int) int {
+	runes := []rune(line)
+	if col <= 0 {
+		return 0
+	}
+	i := col - 1
+	// Skip whitespace/punctuation.
+	for i > 0 && isWordBoundary(runes[i]) {
+		i--
+	}
+	// Move to start of word.
+	for i > 0 && !isWordBoundary(runes[i-1]) {
+		i--
+	}
+	return i
+}
+
+// isWordBoundary returns true if the rune is whitespace or punctuation (non-word character).
+func isWordBoundary(r rune) bool {
+	return r == ' ' || r == '\t' || r == '.' || r == ':' || r == ',' || r == ';' ||
+		r == '/' || r == '-' || r == '_' || r == '"' || r == '\'' || r == '(' || r == ')' ||
+		r == '[' || r == ']' || r == '{' || r == '}'
 }
 
 // countLines counts newline characters.

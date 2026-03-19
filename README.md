@@ -267,6 +267,9 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | Key | Action |
 |---|---|
 | `j` / `k` | Scroll up/down |
+| `h` / `l` | Move cursor column left/right |
+| `0` / `$` | Move cursor to line start/end |
+| `w` / `b` | Move cursor to next/previous word |
 | `g` / `G` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
@@ -286,6 +289,9 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | Key | Action |
 |---|---|
 | `j` / `k` | Scroll up/down |
+| `h` / `l` | Move cursor column left/right |
+| `$` | Move cursor to line end |
+| `e` / `b` | Move cursor to word end/previous word |
 | `g` / `G` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |

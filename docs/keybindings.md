@@ -115,6 +115,7 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 | `j` / `k` | Scroll up/down |
 | `h` / `l` | Move cursor column left/right |
 | `0` / `$` | Move cursor to line start/end |
+| `w` / `b` | Move cursor to next/previous word |
 | `gg` / `G` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
@@ -137,6 +138,7 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 | `j` / `k` | Move cursor up/down |
 | `h` / `l` / `Left` / `Right` | Move cursor column left/right |
 | `$` | Move cursor to line end |
+| `e` / `b` | Move cursor to word end/previous word |
 | `gg` / `G` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` | Full page down / up |
