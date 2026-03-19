@@ -10,14 +10,14 @@ import (
 
 // --- Bookmark handlers ---
 
-// bookmarkCurrentLocation saves the current navigation state as a bookmark.
-func (m Model) bookmarkCurrentLocation() (tea.Model, tea.Cmd) {
+// bookmarkToSlot saves the current location as a named mark in the given slot (a-z, 0-9).
+// If a bookmark already exists in that slot, it prompts for confirmation.
+func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	if m.nav.Level < model.LevelResourceTypes {
 		m.setStatusMessage("Navigate to a resource type first", true)
 		return m, scheduleStatusClear()
 	}
 
-	// Build a readable name for the bookmark.
 	parts := []string{m.nav.Context}
 	if m.nav.ResourceType.DisplayName != "" {
 		parts = append(parts, m.nav.ResourceType.DisplayName)
@@ -38,14 +38,47 @@ func (m Model) bookmarkCurrentLocation() (tea.Model, tea.Cmd) {
 		Namespace:    ns,
 		ResourceType: m.nav.ResourceType.ResourceRef(),
 		ResourceName: m.nav.ResourceName,
+		Slot:         slot,
 	}
 
-	m.bookmarks = addBookmark(m.bookmarks, bm)
+	// Check if slot is already in use; if so, ask for confirmation.
+	for _, b := range m.bookmarks {
+		if b.Slot == slot {
+			m.pendingBookmark = &bm
+			m.setStatusMessage(fmt.Sprintf("Mark '%s' exists (%s). Overwrite? (y/n)", slot, b.Name), true)
+			return m, nil
+		}
+	}
+
+	return m.saveBookmark(bm)
+}
+
+// saveBookmark persists a bookmark, replacing any existing one in the same slot.
+func (m Model) saveBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
+	for i, b := range m.bookmarks {
+		if b.Slot == bm.Slot {
+			m.bookmarks = append(m.bookmarks[:i], m.bookmarks[i+1:]...)
+			break
+		}
+	}
+	m.bookmarks = append(m.bookmarks, bm)
+
 	if err := saveBookmarks(m.bookmarks); err != nil {
-		m.setStatusMessage("Failed to save bookmark: "+err.Error(), true)
+		m.setStatusMessage("Failed to save mark: "+err.Error(), true)
 		return m, scheduleStatusClear()
 	}
-	m.setStatusMessage("Bookmarked: "+name, false)
+	m.setStatusMessage(fmt.Sprintf("Mark '%s' set: %s", bm.Slot, bm.Name), false)
+	return m, scheduleStatusClear()
+}
+
+// jumpToSlot navigates to the bookmark saved in the given slot.
+func (m Model) jumpToSlot(slot string) (tea.Model, tea.Cmd) {
+	for _, bm := range m.bookmarks {
+		if bm.Slot == slot {
+			return m.navigateToBookmark(bm)
+		}
+	}
+	m.setStatusMessage(fmt.Sprintf("Mark '%s' not set", slot), true)
 	return m, scheduleStatusClear()
 }
 
@@ -206,14 +239,20 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 		m.bookmarkSearchMode = bookmarkModeFilter
 		m.bookmarkFilter.Clear()
 		return m, nil
-	case "d":
+	case "D":
 		cmd := m.bookmarkDeleteCurrent()
 		return m, cmd
-	case "D":
+	case "ctrl+x":
 		cmd := m.bookmarkDeleteAll()
 		return m, cmd
 	case "ctrl+c":
 		return m.closeTabOrQuit()
+	default:
+		// Slot-key shortcut: pressing a-z or 0-9 jumps directly to that named mark.
+		key := msg.String()
+		if len(key) == 1 && ((key[0] >= 'a' && key[0] <= 'z') || (key[0] >= '0' && key[0] <= '9')) {
+			return m.jumpToSlot(key)
+		}
 	}
 	return m, nil
 }
@@ -320,11 +359,21 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.leftItemsHistory = [][]model.Item{contexts}
 	m.leftItems = resourceTypes
 
-	// Reset cursors.
+	// Reset cursors, then set the parent (resource types) cursor to the
+	// correct position so that pressing 'h' returns to the right item.
 	m.cursors = [5]int{}
 	m.cursorMemory = make(map[string]int)
 	m.itemCache = make(map[string][]model.Item)
 	m.setCursor(0)
+
+	// Remember the resource type position at the parent level (navKey = context only).
+	rtRef := rt.ResourceRef()
+	for i, item := range resourceTypes {
+		if item.Extra == rtRef {
+			m.cursorMemory[bm.Context] = i
+			break
+		}
+	}
 
 	m.cancelAndReset()
 	m.requestGen++
@@ -340,21 +389,30 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 // restoreSession applies the pending session state after contexts have been loaded.
 // It navigates to the saved context and optionally to the resource type level,
 // similar to how bookmark navigation works.
+//
+// When the session contains multiple tabs (Tabs field), the non-active tabs are
+// created with their navigation state pre-populated and needsLoad=true so that
+// their data is fetched lazily when the user switches to them.
 func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
 	sess := m.pendingSession
 	m.pendingSession = nil
 	m.sessionRestored = true
 
-	// Verify the saved context still exists in the loaded context list.
-	contextExists := false
-	for _, item := range contexts {
-		if item.Name == sess.Context {
-			contextExists = true
-			break
-		}
+	// If the session has multi-tab data, delegate to the multi-tab restore path.
+	if len(sess.Tabs) > 0 {
+		return m.restoreMultiTabSession(sess, contexts)
 	}
-	if !contextExists {
-		// Context no longer exists; fall back to normal startup.
+
+	// Legacy single-tab session restore (no Tabs field).
+	return m.restoreSingleTabSession(sess, contexts)
+}
+
+// restoreSingleTabSession handles the legacy session format that stores a single
+// navigation path. This is the original restore logic preserved for backward
+// compatibility with session files that predate multi-tab support.
+func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item) (tea.Model, tea.Cmd) {
+	// Verify the saved context still exists in the loaded context list.
+	if !contextInList(sess.Context, contexts) {
 		return m, m.loadPreview()
 	}
 
@@ -373,21 +431,7 @@ func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
 	m.clearRight()
 
 	// Restore namespace settings from session.
-	if sess.AllNamespaces {
-		m.allNamespaces = true
-		m.selectedNamespaces = nil
-	} else if sess.Namespace != "" {
-		m.namespace = sess.Namespace
-		m.allNamespaces = false
-		if len(sess.SelectedNamespaces) > 0 {
-			m.selectedNamespaces = make(map[string]bool, len(sess.SelectedNamespaces))
-			for _, ns := range sess.SelectedNamespaces {
-				m.selectedNamespaces[ns] = true
-			}
-		} else {
-			m.selectedNamespaces = map[string]bool{sess.Namespace: true}
-		}
-	}
+	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces)
 
 	cmds := []tea.Cmd{m.discoverCRDs(sess.Context)}
 
@@ -395,6 +439,17 @@ func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
 	if sess.ResourceType != "" {
 		rt, ok := model.FindResourceType(sess.ResourceType)
 		if ok {
+			// Save cursor position at the resource types level so navigating
+			// back (h) restores the cursor to the correct resource type.
+			rtRef := rt.ResourceRef()
+			for i, item := range m.middleItems {
+				if item.Extra == rtRef {
+					// navKey at ResourceTypes level = context only.
+					m.cursorMemory[m.nav.Context] = i
+					break
+				}
+			}
+
 			// Push resource types into history and navigate to resources level.
 			m.leftItemsHistory = [][]model.Item{contexts}
 			m.leftItems = m.middleItems
@@ -418,4 +473,130 @@ func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
 	m.clampCursor()
 	cmds = append(cmds, m.loadPreview())
 	return m, tea.Batch(cmds...)
+}
+
+// restoreMultiTabSession creates tab entries from the session's Tabs slice,
+// fully restores the active tab, and marks the rest as needsLoad so their
+// data is fetched on first switch.
+func (m Model) restoreMultiTabSession(sess *SessionState, contexts []model.Item) (tea.Model, tea.Cmd) {
+	activeIdx := sess.ActiveTab
+	if activeIdx < 0 || activeIdx >= len(sess.Tabs) {
+		activeIdx = 0
+	}
+
+	// Validate the active tab's context exists; if not fall back to normal startup.
+	activeSess := sess.Tabs[activeIdx]
+	if !contextInList(activeSess.Context, contexts) {
+		return m, m.loadPreview()
+	}
+
+	// Build TabState entries for every tab.
+	tabs := make([]TabState, 0, len(sess.Tabs))
+	for i, st := range sess.Tabs {
+		tab := buildSessionTabState(&st)
+		if i != activeIdx {
+			// Non-active tabs are lazily loaded on first switch.
+			tab.needsLoad = true
+		}
+		tabs = append(tabs, tab)
+	}
+
+	m.tabs = tabs
+	m.activeTab = activeIdx
+
+	// Fully restore the active tab into the Model (same logic as single-tab).
+	return m.restoreSingleTabSession(&SessionState{
+		Context:            activeSess.Context,
+		Namespace:          activeSess.Namespace,
+		AllNamespaces:      activeSess.AllNamespaces,
+		SelectedNamespaces: activeSess.SelectedNamespaces,
+		ResourceType:       activeSess.ResourceType,
+		ResourceName:       activeSess.ResourceName,
+	}, contexts)
+}
+
+// buildSessionTabState creates a TabState with navigation fields populated
+// from a SessionTab. The tab has no loaded items yet; those are fetched
+// when the tab becomes active (needsLoad).
+func buildSessionTabState(st *SessionTab) TabState {
+	tab := TabState{
+		nav: model.NavigationState{
+			Context: st.Context,
+		},
+		splitPreview:      true,
+		watchMode:         true,
+		warningEventsOnly: true,
+		allGroupsExpanded: true,
+		cursorMemory:      make(map[string]int),
+		itemCache:         make(map[string][]model.Item),
+		selectedItems:     make(map[string]bool),
+		selectionAnchor:   -1,
+	}
+
+	// Namespace state.
+	if st.AllNamespaces {
+		tab.allNamespaces = true
+	} else if st.Namespace != "" {
+		tab.namespace = st.Namespace
+		if len(st.SelectedNamespaces) > 0 {
+			tab.selectedNamespaces = make(map[string]bool, len(st.SelectedNamespaces))
+			for _, ns := range st.SelectedNamespaces {
+				tab.selectedNamespaces[ns] = true
+			}
+		} else {
+			tab.selectedNamespaces = map[string]bool{st.Namespace: true}
+		}
+	} else {
+		tab.allNamespaces = true
+	}
+
+	// Resource type and navigation level.
+	if st.ResourceType != "" {
+		rt, ok := model.FindResourceType(st.ResourceType)
+		if ok {
+			tab.nav.ResourceType = rt
+			tab.nav.Level = model.LevelResources
+			if st.ResourceName != "" {
+				tab.nav.ResourceName = st.ResourceName
+			}
+		} else {
+			// Resource type not found; start at resource types level.
+			tab.nav.Level = model.LevelResourceTypes
+		}
+	} else if st.Context != "" {
+		tab.nav.Level = model.LevelResourceTypes
+	} else {
+		tab.nav.Level = model.LevelClusters
+	}
+
+	return tab
+}
+
+// contextInList returns true if the given context name exists in the items list.
+func contextInList(ctx string, items []model.Item) bool {
+	for _, item := range items {
+		if item.Name == ctx {
+			return true
+		}
+	}
+	return false
+}
+
+// applySessionNamespaces restores namespace settings from session data onto the model.
+func applySessionNamespaces(m *Model, allNS bool, ns string, selectedNS []string) {
+	if allNS {
+		m.allNamespaces = true
+		m.selectedNamespaces = nil
+	} else if ns != "" {
+		m.namespace = ns
+		m.allNamespaces = false
+		if len(selectedNS) > 0 {
+			m.selectedNamespaces = make(map[string]bool, len(selectedNS))
+			for _, n := range selectedNS {
+				m.selectedNamespaces[n] = true
+			}
+		} else {
+			m.selectedNamespaces = map[string]bool{ns: true}
+		}
+	}
 }

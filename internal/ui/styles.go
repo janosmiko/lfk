@@ -60,11 +60,11 @@ var (
 	IconStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorPrimary))
 
-	// Status colors.
-	StatusRunning = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary))
-	StatusPending = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning))
-	StatusFailed  = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
-	StatusOther   = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
+	// Status colors: Green=running, Blue=progressing, Red=error, Grey=completed/other.
+	StatusRunning     = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary))
+	StatusProgressing = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary))
+	StatusFailed      = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
+	StatusOther       = lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
 
 	// Title bar (full-width background).
 	TitleBarStyle = lipgloss.NewStyle().
@@ -286,21 +286,22 @@ func StatusStyle(status string) lipgloss.Style {
 	case "Succeeded", "Completed",
 		"Superseded":
 		return StatusOther
-	case "Pending", "ContainerCreating", "Terminating", "Waiting", "Init",
+	case "Pending", "ContainerCreating", "PodInitializing", "Terminating",
+		"Waiting", "Init", "NotReady",
 		"Progressing", "Progressing/Synced", "Progressing/OutOfSync",
 		"Missing", "Suspended", "Unknown", "Reconciling",
 		"Healthy/OutOfSync", "Missing/OutOfSync", "Suspended/OutOfSync",
 		"OutOfSync",
 		"Pending-install", "Pending-upgrade", "Pending-rollback", "Uninstalling":
-		return StatusPending
+		return StatusProgressing
 	case "Warning":
-		return StatusPending
+		return StatusProgressing
 	case "Normal":
 		return DimStyle
 	case "Failed", "CrashLoopBackOff", "Error", "ImagePullBackOff", "Terminated",
 		"Degraded", "Degraded/Synced", "Degraded/OutOfSync",
 		"Missing/Synced",
-		"OOMKilled", "NotReady", "ErrImagePull", "CreateContainerConfigError":
+		"OOMKilled", "ErrImagePull", "CreateContainerConfigError":
 		return StatusFailed
 	default:
 		if status == "" {

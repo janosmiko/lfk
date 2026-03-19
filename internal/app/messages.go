@@ -353,9 +353,28 @@ type explainLoadedMsg struct {
 	err         error
 }
 
+// logHistoryMsg carries a batch of older log lines fetched by a one-shot kubectl logs.
+type logHistoryMsg struct {
+	lines     []string
+	prevTotal int
+	err       error
+}
+
+// logSaveAllMsg carries the result of saving all logs to a file.
+type logSaveAllMsg struct {
+	path string
+	err  error
+}
+
 // explainRecursiveMsg carries results from a recursive kubectl explain search.
 type explainRecursiveMsg struct {
 	matches []model.ExplainField // matching fields with full paths
 	query   string
 	err     error
+}
+
+// logContainersLoadedMsg carries the container list for the log container filter overlay.
+type logContainersLoadedMsg struct {
+	containers []string
+	err        error
 }

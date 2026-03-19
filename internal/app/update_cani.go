@@ -308,6 +308,7 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "?":
+		m.helpPreviousMode = modeExplorer
 		m.overlay = overlayNone
 		m.mode = modeHelp
 		m.helpScroll = 0

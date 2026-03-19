@@ -128,6 +128,13 @@ var ConfigPinnedGroups []string
 // ConfigTipsEnabled controls whether to show random tips on startup.
 var ConfigTipsEnabled = true
 
+// ConfigConfirmOnExit controls whether ctrl+c on the last tab shows a quit confirmation.
+var ConfigConfirmOnExit = true
+
+// ConfigLogTailLines controls how many log lines are initially loaded via --tail.
+// When the user scrolls to the top, older logs are fetched in the background.
+var ConfigLogTailLines = 1000
+
 // ActiveSchemeName holds the name of the currently active color scheme.
 var ActiveSchemeName = "tokyonight"
 
@@ -165,6 +172,13 @@ type configFile struct {
 	// Tips controls whether to show random tips on startup.
 	// Defaults to true. Set to false to disable.
 	Tips *bool `json:"tips" yaml:"tips"`
+	// LogTailLines controls how many log lines are initially loaded via --tail.
+	// When the user scrolls to the top, older logs are fetched in the background.
+	// Defaults to 1000.
+	LogTailLines *int `json:"log_tail_lines" yaml:"log_tail_lines"`
+	// ConfirmOnExit controls whether ctrl+c on the last tab shows a quit confirmation.
+	// Defaults to true. Set to false to exit immediately on ctrl+c.
+	ConfirmOnExit *bool `json:"confirm_on_exit" yaml:"confirm_on_exit"`
 }
 
 // DefaultAbbreviations returns the default search abbreviation map.
@@ -363,6 +377,16 @@ func LoadAndApplyTheme() {
 		ConfigTipsEnabled = *cfg.Tips
 	}
 
+	// Apply log tail lines setting.
+	if cfg.LogTailLines != nil && *cfg.LogTailLines > 0 {
+		ConfigLogTailLines = *cfg.LogTailLines
+	}
+
+	// Apply confirm on exit setting.
+	if cfg.ConfirmOnExit != nil {
+		ConfigConfirmOnExit = *cfg.ConfirmOnExit
+	}
+
 	ApplyTheme(theme)
 	ActiveKeybindings = kb
 	SearchAbbreviations = abbr
@@ -400,7 +424,7 @@ func ApplyTheme(t Theme) {
 		Foreground(lipgloss.Color(t.Primary))
 
 	StatusRunning = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary))
-	StatusPending = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Warning))
+	StatusProgressing = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary))
 	StatusFailed = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Error))
 	StatusOther = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Dimmed))
 

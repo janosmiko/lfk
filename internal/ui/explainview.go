@@ -14,7 +14,7 @@ import (
 // description (right).
 func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resourceDesc, title, path, searchQuery, hintBar string, width, height int) string {
 	// Title bar.
-	titleText := TitleStyle.Render("API Explorer: " + title)
+	titleText := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render("API Explorer: " + title)
 
 	// Calculate column widths matching the main explorer (12%, 51%, remainder).
 	usable := width - 6 // 3 columns x 2 border chars
@@ -173,7 +173,7 @@ func renderFieldList(fields []model.ExplainField, cursor, scroll, width, maxLine
 			highlightedName := highlightName(fmt.Sprintf("%-*s", nameWidth, name), searchQuery)
 			styledReq := "    "
 			if f.Required {
-				styledReq = StatusPending.Render(" yes")
+				styledReq = StatusProgressing.Render(" yes")
 			}
 			namePart := prefix + highlightedName
 			reqPart := "  " + styledReq

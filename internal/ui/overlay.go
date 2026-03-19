@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -17,6 +18,18 @@ var overlayNsScroll int
 
 // ResetOverlayNsScroll resets the namespace overlay scroll position (call when opening the overlay).
 func ResetOverlayNsScroll() { overlayNsScroll = 0 }
+
+// overlayPodScroll is the persistent scroll position for the pod selection overlay.
+var overlayPodScroll int
+
+// ResetOverlayPodScroll resets the pod overlay scroll position (call when opening the overlay).
+func ResetOverlayPodScroll() { overlayPodScroll = 0 }
+
+// overlayContainerScroll is the persistent scroll position for the container selection overlay.
+var overlayContainerScroll int
+
+// ResetOverlayContainerScroll resets the container overlay scroll position (call when opening the overlay).
+func ResetOverlayContainerScroll() { overlayContainerScroll = 0 }
 
 // ErrorLogEntry stores a single application log entry with its timestamp and severity level.
 type ErrorLogEntry struct {
@@ -144,6 +157,21 @@ func RenderConfirmOverlay(action string) string {
 	b.WriteString(OverlayTitleStyle.Render("Confirm Delete"))
 	b.WriteString("\n\n")
 	b.WriteString(OverlayWarningStyle.Render(fmt.Sprintf("Delete %s?", action)))
+	b.WriteString("\n\n")
+	b.WriteString(OverlayNormalStyle.Render("Press "))
+	b.WriteString(OverlayFilterStyle.Render("y"))
+	b.WriteString(OverlayNormalStyle.Render(" to confirm, "))
+	b.WriteString(OverlayFilterStyle.Render("n"))
+	b.WriteString(OverlayNormalStyle.Render(" to cancel"))
+	return b.String()
+}
+
+// RenderQuitConfirmOverlay renders the quit confirmation overlay content.
+func RenderQuitConfirmOverlay() string {
+	var b strings.Builder
+	b.WriteString(OverlayTitleStyle.Render("Quit"))
+	b.WriteString("\n\n")
+	b.WriteString(OverlayNormalStyle.Render("Quit lfk?"))
 	b.WriteString("\n\n")
 	b.WriteString(OverlayNormalStyle.Render("Press "))
 	b.WriteString(OverlayFilterStyle.Render("y"))
@@ -338,28 +366,57 @@ func RenderContainerSelectOverlay(items []model.Item, cursor int) string {
 	return b.String()
 }
 
-// RenderPodSelectOverlay renders the pod selection overlay content.
-func RenderPodSelectOverlay(items []model.Item, cursor int) string {
+// RenderLogContainerSelectOverlay renders the container filter overlay for the log viewer.
+// The first item should be an "All Containers" virtual item with Status "all".
+// Empty selectedContainers means all containers are selected.
+func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedContainers []string, filter string, filterActive bool, canSwitchPod bool) string {
 	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Select Pod"))
+	b.WriteString(OverlayTitleStyle.Render("Filter Containers"))
 	b.WriteString("\n")
 
+	// Filter input.
+	switch {
+	case filterActive:
+		b.WriteString(OverlayFilterStyle.Render("/ " + filter + "\u2588"))
+	case filter != "":
+		b.WriteString(OverlayFilterStyle.Render("/ " + filter))
+	default:
+		b.WriteString(OverlayDimStyle.Render("/ to filter"))
+	}
+	b.WriteString("\n\n")
+
+	if len(items) == 0 {
+		b.WriteString(OverlayDimStyle.Render("No matching containers"))
+		return b.String()
+	}
+
 	maxVisible := min(15, len(items))
-	start := 0
-	if cursor >= maxVisible {
-		start = cursor - maxVisible + 1
+	scrollOff := 3
+	if len(items) <= maxVisible {
+		scrollOff = 0
+	} else if maxSO := (maxVisible - 1) / 2; scrollOff > maxSO {
+		scrollOff = maxSO
 	}
-	end := start + maxVisible
-	if end > len(items) {
-		end = len(items)
-	}
+
+	displayLines := func(from, to int) int { return to - from }
+	start := VimScrollOff(overlayContainerScroll, cursor, len(items), maxVisible, scrollOff, displayLines)
+	overlayContainerScroll = start
+
+	end := min(start+maxVisible, len(items))
 
 	for i := start; i < end; i++ {
 		item := items[i]
-		line := fmt.Sprintf("  %s", item.Name)
-		if item.Status != "" {
-			line += "  " + item.Status
+		prefix := "  "
+		switch {
+		case item.Status == "all":
+			if len(selectedContainers) == 0 {
+				prefix = "\u2713 "
+			}
+		case slices.Contains(selectedContainers, item.Name):
+			prefix = "\u2713 "
 		}
+		line := prefix + item.Name
+
 		if i == cursor {
 			b.WriteString(OverlaySelectedStyle.Render(line))
 		} else {
@@ -371,7 +428,84 @@ func RenderPodSelectOverlay(items []model.Item, cursor int) string {
 	}
 
 	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("j/k: navigate  enter: select  esc: close"))
+	hint := "space: select  enter: apply"
+	if canSwitchPod {
+		hint += "  P: switch pod"
+	}
+	hint += "  / to filter  esc: close"
+	b.WriteString(OverlayDimStyle.Render(hint))
+
+	return b.String()
+}
+
+// RenderPodSelectOverlay renders the pod selection overlay content.
+func RenderPodSelectOverlay(items []model.Item, cursor int, filter string, filterActive bool) string {
+	var b strings.Builder
+	b.WriteString(OverlayTitleStyle.Render("Select Pod"))
+	b.WriteString("\n")
+
+	// Filter input.
+	switch {
+	case filterActive:
+		b.WriteString(OverlayFilterStyle.Render("/ " + filter + "\u2588"))
+	case filter != "":
+		b.WriteString(OverlayFilterStyle.Render("/ " + filter))
+	default:
+		b.WriteString(OverlayDimStyle.Render("/ to filter"))
+	}
+	b.WriteString("\n\n")
+
+	if items == nil {
+		b.WriteString(OverlayDimStyle.Render("Loading pods..."))
+		return b.String()
+	}
+	if len(items) == 0 {
+		b.WriteString(OverlayDimStyle.Render("No matching pods"))
+		return b.String()
+	}
+
+	maxVisible := min(15, len(items))
+	scrollOff := 3
+	if len(items) <= maxVisible {
+		scrollOff = 0
+	} else if maxSO := (maxVisible - 1) / 2; scrollOff > maxSO {
+		scrollOff = maxSO
+	}
+
+	displayLines := func(from, to int) int { return to - from }
+	start := VimScrollOff(overlayPodScroll, cursor, len(items), maxVisible, scrollOff, displayLines)
+	overlayPodScroll = start
+
+	end := min(start+maxVisible, len(items))
+
+	for i := start; i < end; i++ {
+		item := items[i]
+		line := fmt.Sprintf("  %s", item.Name)
+		if item.Status != "" {
+			styledStatus := StatusStyle(item.Status).Render(item.Status)
+			line += "  " + styledStatus
+		}
+		if i == cursor {
+			if item.Status != "" {
+				// Re-render without status styling so selected style dominates the name.
+				plainLine := fmt.Sprintf("  %s  %s", item.Name, item.Status)
+				b.WriteString(OverlaySelectedStyle.Render(plainLine))
+			} else {
+				b.WriteString(OverlaySelectedStyle.Render(line))
+			}
+		} else {
+			b.WriteString(OverlayNormalStyle.Render(fmt.Sprintf("  %s", item.Name)))
+			if item.Status != "" {
+				b.WriteString("  " + StatusStyle(item.Status).Render(item.Status))
+			}
+		}
+		if i < end-1 {
+			b.WriteString("\n")
+		}
+	}
+
+	b.WriteString("\n\n")
+	b.WriteString(OverlayDimStyle.Render("/ to filter  j/k: navigate  enter: select  esc: close"))
 
 	return b.String()
 }
@@ -383,8 +517,8 @@ const (
 )
 
 // RenderBookmarkOverlay renders the bookmark list overlay content.
-// mode: 0 = normal, 1 = filter.
-func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode int) string {
+// mode: 0 = normal, 1 = filter. overlayH is the total overlay height for footer pinning.
+func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode, overlayH int) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Bookmarks"))
 	b.WriteString("\n")
@@ -406,8 +540,8 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 		b.WriteString(OverlayDimStyle.Render("No bookmarks yet"))
 		b.WriteString("\n\n")
 		b.WriteString(OverlayDimStyle.Render("Press "))
-		b.WriteString(OverlayFilterStyle.Render("B"))
-		b.WriteString(OverlayDimStyle.Render(" in explorer to bookmark current location"))
+		b.WriteString(OverlayFilterStyle.Render("m<key>"))
+		b.WriteString(OverlayDimStyle.Render(" in explorer to set a mark"))
 		return b.String()
 	}
 
@@ -441,22 +575,39 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 
 	for i := start; i < end; i++ {
 		bm := bookmarks[i]
-		name := bm.Name
 
-		if bm.Namespace != "" {
-			name += DimStyle.Render(" [" + bm.Namespace + "]")
-		}
-		// Prefix with a number shortcut (1-9) for the first 9 bookmarks.
-		var prefix string
-		if i < 9 {
-			prefix = fmt.Sprintf("%d ", i+1)
-		} else {
-			prefix = "  "
-		}
-		line := fmt.Sprintf("  %s%s", prefix, name)
 		if i == cursor {
+			// Build plain text for the selected line so the highlight
+			// background covers the entire line uniformly.
+			var prefix string
+			if bm.Slot != "" {
+				prefix = bm.Slot + " "
+			} else if i < 9 {
+				prefix = fmt.Sprintf("%d ", i+1)
+			} else {
+				prefix = "  "
+			}
+			name := bm.Name
+			if bm.Namespace != "" {
+				name += " [" + bm.Namespace + "]"
+			}
+			line := fmt.Sprintf("  %s%s", prefix, name)
 			b.WriteString(OverlaySelectedStyle.Render(line))
 		} else {
+			// Non-selected: use styled prefix and namespace.
+			var prefix string
+			if bm.Slot != "" {
+				prefix = OverlayFilterStyle.Render(bm.Slot) + " "
+			} else if i < 9 {
+				prefix = fmt.Sprintf("%d ", i+1)
+			} else {
+				prefix = "  "
+			}
+			name := bm.Name
+			if bm.Namespace != "" {
+				name += DimStyle.Render(" [" + bm.Namespace + "]")
+			}
+			line := fmt.Sprintf("  %s%s", prefix, name)
 			b.WriteString(OverlayNormalStyle.Render(line))
 		}
 		if i < end-1 {
@@ -464,24 +615,32 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 		}
 	}
 
-	b.WriteString("\n\n")
-
-	// Footer hints based on mode.
+	// Build footer hints.
+	var footer strings.Builder
 	switch mode {
 	case bookmarkModeFilter:
-		b.WriteString(OverlayDimStyle.Render("type to filter  "))
-		b.WriteString(OverlayDimStyle.Render("enter: apply  "))
-		b.WriteString(OverlayDimStyle.Render("esc: clear"))
+		footer.WriteString(OverlayDimStyle.Render("type to filter  "))
+		footer.WriteString(OverlayDimStyle.Render("enter: apply  "))
+		footer.WriteString(OverlayDimStyle.Render("esc: clear"))
 	default:
-		b.WriteString(OverlayDimStyle.Render("1-9: jump  "))
-		b.WriteString(OverlayDimStyle.Render("enter: jump  "))
-		b.WriteString(OverlayDimStyle.Render("/: filter  "))
-		b.WriteString(OverlayDimStyle.Render("d: delete  "))
-		b.WriteString(OverlayDimStyle.Render("D: delete all  "))
-		b.WriteString(OverlayDimStyle.Render("esc: close"))
+		footer.WriteString(OverlayDimStyle.Render("a-z/0-9: jump  "))
+		footer.WriteString(OverlayDimStyle.Render("enter: jump  "))
+		footer.WriteString(OverlayDimStyle.Render("/: filter  "))
+		footer.WriteString(OverlayDimStyle.Render("D: delete  "))
+		footer.WriteString(OverlayDimStyle.Render("^X: delete all  "))
+		footer.WriteString(OverlayDimStyle.Render("esc: close"))
 	}
 
-	return b.String()
+	// Pin footer to the bottom of the overlay interior.
+	// OverlayStyle.Height() includes padding (1 top + 1 bottom), so usable = overlayH - 2.
+	body := b.String()
+	interiorH := overlayH - 2
+	footerStr := footer.String()
+
+	// Use lipgloss to place body at top and footer at bottom within
+	// a fixed-height container, ensuring footer is always visible.
+	bodyBlock := lipgloss.NewStyle().Height(interiorH - 1).Render(body)
+	return bodyBlock + "\n" + footerStr
 }
 
 // RenderTemplateOverlay renders the template selection overlay content.
@@ -2014,7 +2173,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		rows = append(rows, "")
 	}
 
-	title := TitleStyle.Render("Resource Diff")
+	title := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render("Resource Diff")
 	sepLine := gutterPad + strings.Repeat("-", colWidth) + " + " + gutterPad + strings.Repeat("-", colWidth)
 	bodyContent := header + "\n" + separatorStyle.Render(sepLine) + "\n" + strings.Join(rows, "\n")
 
@@ -2023,7 +2182,8 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		BorderForeground(lipgloss.Color(ColorPrimary)).
 		Padding(0, 1).
 		Width(width - 2).
-		Height(maxLines + 2) // +2 for header + separator lines
+		Height(maxLines + 2). // +2 for header + separator lines
+		MaxHeight(maxLines + 4)
 	body := borderStyle.Render(bodyContent)
 
 	// Hint bar.
@@ -2037,7 +2197,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		HelpKeyStyle.Render("q/esc") + DimStyle.Render(": back"),
 	}
 	scrollInfo := DimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))
-	hint := StatusBarBgStyle.Width(width).Render(strings.Join(hintParts, DimStyle.Render(" | ")) + scrollInfo)
+	hint := StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(strings.Join(hintParts, DimStyle.Render(" | ")) + scrollInfo)
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
 }
@@ -2080,7 +2240,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		}
 	}
 
-	title := TitleStyle.Render("Resource Diff (unified)")
+	title := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render("Resource Diff (unified)")
 
 	// Reserve lines for title, hint bar, and border (top+bottom).
 	maxLines := height - 4
@@ -2118,7 +2278,8 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		BorderForeground(lipgloss.Color(ColorPrimary)).
 		Padding(0, 1).
 		Width(width - 2).
-		Height(maxLines)
+		Height(maxLines).
+		MaxHeight(maxLines + 2)
 	body := borderStyle.Render(bodyContent)
 
 	// Hint bar.
@@ -2132,7 +2293,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		HelpKeyStyle.Render("q/esc") + DimStyle.Render(": back"),
 	}
 	scrollInfo := DimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))
-	hint := StatusBarBgStyle.Width(width).Render(strings.Join(hintParts, DimStyle.Render(" | ")) + scrollInfo)
+	hint := StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(strings.Join(hintParts, DimStyle.Render(" | ")) + scrollInfo)
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
 }

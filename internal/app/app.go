@@ -69,6 +69,9 @@ const (
 	overlayCanISubject
 	overlayCanI
 	overlayExplainSearch
+	overlayLogPodSelect
+	overlayLogContainerSelect
+	overlayQuitConfirm
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -101,6 +104,11 @@ type actionContext struct {
 
 // TabState holds per-tab navigation state so each tab is fully independent.
 type TabState struct {
+	// needsLoad is true for tabs restored from a session file that have not
+	// yet had their items loaded.  When loadTab detects this flag it triggers
+	// a full refreshCurrentLevel instead of the lighter loadPreview.
+	needsLoad bool
+
 	nav                 model.NavigationState
 	leftItems           []model.Item
 	middleItems         []model.Item
@@ -143,22 +151,36 @@ type TabState struct {
 	allGroupsExpanded bool   // override: show all groups expanded (toggled by hotkey)
 
 	// Per-tab view mode and fullscreen state.
-	mode           viewMode
-	logLines       []string
-	logScroll      int
-	logFollow      bool
-	logWrap        bool
-	logLineNumbers bool
-	logTimestamps  bool
-	logPrevious    bool
-	logIsMulti     bool
-	logTitle       string
-	logCancel      context.CancelFunc
-	logCh          chan string
+	mode              viewMode
+	logLines          []string
+	logScroll         int
+	logFollow         bool
+	logWrap           bool
+	logLineNumbers    bool
+	logTimestamps     bool
+	logPrevious       bool
+	logIsMulti        bool
+	logTitle          string
+	logCancel         context.CancelFunc
+	logCh             chan string
+	logTailLines      int  // current --tail value for the active stream
+	logHasMoreHistory bool // true if older lines may exist
+	logLoadingHistory bool // true while fetching older logs
+	logCursor         int  // cursor position (absolute line index), -1 when inactive
+	logVisualMode     bool // true when in visual line selection mode
+	logVisualStart    int  // anchor line where visual selection started
+	logVisualType     rune // 'V' = line, 'v' = char, 'B' = block
+	logVisualCol      int  // character column of anchor (for char and block modes)
+	logVisualCurCol   int  // current cursor column (for char and block modes)
 
 	// Log viewer: parent resource context for pod re-selection.
-	logParentKind string
-	logParentName string
+	logParentKind   string
+	logParentName   string
+	logSavedPodName string // saved pod name before overlay, for restoring on cancel
+
+	// Log viewer: container filter state.
+	logContainers         []string // available container names for current pod
+	logSelectedContainers []string // which containers are currently selected (empty = all)
 
 	// Describe viewer state (per-tab).
 	describeContent string
@@ -226,9 +248,12 @@ type Model struct {
 	yamlMatchLines []int     // line indices matching the search
 	yamlMatchIdx   int       // current match index in yamlMatchLines
 
-	// Visual line selection in YAML view.
-	yamlVisualMode  bool // true when in visual line selection mode
-	yamlVisualStart int  // anchor line (visible-line index) where visual selection started
+	// Visual selection in YAML view.
+	yamlVisualMode   bool // true when in visual line selection mode
+	yamlVisualStart  int  // anchor line (visible-line index) where visual selection started
+	yamlVisualType   rune // 'V' = line, 'v' = char, 'B' = block
+	yamlVisualCol    int  // character column of anchor (for char and block modes)
+	yamlVisualCurCol int  // current cursor column (for char and block modes)
 
 	// Collapsible YAML sections.
 	yamlSections  []yamlSection   // parsed hierarchical sections
@@ -303,12 +328,17 @@ type Model struct {
 	statusMessage    string
 	statusMessageErr bool
 	statusMessageExp time.Time // when message expires
+	statusMessageTip bool      // true when the message is a startup tip (dismiss on keypress)
 
 	// Pending target: when set, after resources load, find and select this item by name.
 	pendingTarget string
 
 	// Vim-style 'gg' command: when true, the next 'g' press jumps to top.
 	pendingG bool
+
+	// Vim-style named marks: m<key> sets a mark, '<key> jumps to it.
+	pendingMark     bool            // waiting for the slot key after 'm'
+	pendingBookmark *model.Bookmark // bookmark awaiting overwrite confirmation
 
 	// Watch mode: auto-refresh the current view on a timer.
 	watchMode     bool
@@ -318,7 +348,8 @@ type Model struct {
 	helpScroll       int
 	helpFilter       TextInput
 	helpSearchActive bool
-	helpContextMode  string // section to highlight (e.g. "YAML View", "Log Viewer")
+	helpContextMode  string   // section to highlight (e.g. "YAML View", "Log Viewer")
+	helpPreviousMode viewMode // mode to return to when help is closed
 	helpSearchInput  textinput.Model
 
 	// Resource filter state (/ key).
@@ -332,22 +363,46 @@ type Model struct {
 	searchPrevCursor int
 
 	// Log viewer state.
-	logLines       []string           // buffered log lines
-	logScroll      int                // scroll offset (top visible line)
-	logFollow      bool               // auto-scroll to bottom
-	logWrap        bool               // wrap long lines
-	logLineNumbers bool               // show line numbers
-	logTimestamps  bool               // show timestamps (--timestamps)
-	logPrevious    bool               // show previous container logs (--previous)
-	logIsMulti     bool               // multi-log stream (for restart)
-	logMultiItems  []model.Item       // items for multi-log restart
-	logTitle       string             // title for the log overlay
-	logCancel      context.CancelFunc // cancel the kubectl log process
-	logCh          chan string        // channel for streaming log lines
+	logLines          []string           // buffered log lines
+	logScroll         int                // scroll offset (top visible line)
+	logFollow         bool               // auto-scroll to bottom
+	logWrap           bool               // wrap long lines
+	logLineNumbers    bool               // show line numbers
+	logTimestamps     bool               // show timestamps (--timestamps)
+	logPrevious       bool               // show previous container logs (--previous)
+	logIsMulti        bool               // multi-log stream (for restart)
+	logMultiItems     []model.Item       // items for multi-log restart
+	logTitle          string             // title for the log overlay
+	logCancel         context.CancelFunc // cancel the kubectl log process
+	logCh             chan string        // channel for streaming log lines
+	logTailLines      int                // current --tail value for the active stream
+	logHasMoreHistory bool               // true if older lines may exist
+	logLoadingHistory bool               // true while fetching older logs
+	logHistoryCancel  context.CancelFunc // cancel for the history fetch
+	logCursor         int                // cursor position (absolute line index), -1 when inactive
+	logVisualMode     bool               // true when in visual line selection mode
+	logVisualStart    int                // anchor line where visual selection started
+	logVisualType     rune               // 'V' = line, 'v' = char, 'B' = block
+	logVisualCol      int                // character column of anchor (for char and block modes)
+	logVisualCurCol   int                // current cursor column (for char and block modes)
 
 	// Log viewer: parent resource context for pod re-selection.
-	logParentKind string // original parent resource kind (e.g., "Deployment")
-	logParentName string // original parent resource name
+	logParentKind   string // original parent resource kind (e.g., "Deployment")
+	logParentName   string // original parent resource name
+	logSavedPodName string // saved pod name before overlay, for restoring on cancel
+
+	// Log viewer: container filter state.
+	logContainers         []string // available container names for current pod
+	logSelectedContainers []string // which containers are currently selected (empty = all)
+
+	// Log pod selector filter state.
+	logPodFilterText   string
+	logPodFilterActive bool
+
+	// Log container selector filter state.
+	logContainerFilterText        string
+	logContainerFilterActive      bool
+	logContainerSelectionModified bool
 
 	// Log viewer: jump to line (digits + G).
 	logLineInput string
@@ -373,11 +428,12 @@ type Model struct {
 	diffLineInput   string // digit accumulator for jump-to-line (digits + G)
 
 	// Embedded terminal state (PTY mode).
-	execPTY   *os.File       // PTY master file descriptor
-	execTerm  vt10x.Terminal // Virtual terminal emulator
-	execTitle string         // Title for the exec session
-	execDone  *atomic.Bool   // Process has exited (shared across copies)
-	execMu    *sync.Mutex    // Protects execTerm access
+	execPTY        *os.File       // PTY master file descriptor
+	execTerm       vt10x.Terminal // Virtual terminal emulator
+	execTitle      string         // Title for the exec session
+	execDone       *atomic.Bool   // Process has exited (shared across copies)
+	execMu         *sync.Mutex    // Protects execTerm access
+	execEscPressed bool           // Ctrl+] prefix pressed, waiting for follow-up key
 
 	// Multi-selection state: maps "namespace/name" keys to selected status.
 	selectedItems   map[string]bool
@@ -1029,13 +1085,25 @@ func (m Model) renderTitleBar() string {
 }
 
 func (m Model) viewYAML() string {
-	title := ui.TitleStyle.Render(m.yamlTitle())
+	yamlTitleText := m.yamlTitle()
+	if m.yamlVisualMode {
+		switch m.yamlVisualType {
+		case 'v':
+			yamlTitleText += " [VISUAL]"
+		case 'B':
+			yamlTitleText += " [VISUAL BLOCK]"
+		default:
+			yamlTitleText += " [VISUAL LINE]"
+		}
+	}
+	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(yamlTitleText)
 	var yamlHints []struct{ key, desc string }
 	if m.yamlVisualMode {
 		yamlHints = []struct{ key, desc string }{
 			{"j/k", "extend selection"},
 			{"y", "copy selected"},
-			{"V/esc", "cancel"},
+			{"v/V/ctrl+v", "switch mode"},
+			{"esc", "cancel"},
 		}
 	} else {
 		yamlHints = []struct{ key, desc string }{
@@ -1044,7 +1112,7 @@ func (m Model) viewYAML() string {
 			{"ctrl+d/u", "half page"},
 			{"ctrl+f/b", "page"},
 			{"/", "search"},
-			{"V", "visual select"},
+			{"v/V/ctrl+v", "visual select"},
 			{"tab/z", "fold"},
 			{"e", "edit"},
 			{"q/esc", "back"},
@@ -1054,19 +1122,19 @@ func (m Model) viewYAML() string {
 	for _, h := range yamlHints {
 		yamlHintParts = append(yamlHintParts, ui.HelpKeyStyle.Render(h.key)+ui.DimStyle.Render(": "+h.desc))
 	}
-	hint := ui.StatusBarBgStyle.Width(m.width).Render(strings.Join(yamlHintParts, ui.DimStyle.Render(" \u2502 ")))
+	hint := ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(strings.Join(yamlHintParts, ui.DimStyle.Render(" \u2502 ")))
 
 	// If search is active, show search bar instead of hints.
 	if m.yamlSearchMode {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.NormalStyle.Render(m.yamlSearchText.CursorLeft()) + ui.DimStyle.Render("\u2588") + ui.NormalStyle.Render(m.yamlSearchText.CursorRight())
-		hint = ui.StatusBarBgStyle.Width(m.width).Render(searchBar)
+		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	} else if m.yamlSearchText.Value != "" {
 		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlMatchIdx+1, len(m.yamlMatchLines))
 		if len(m.yamlMatchLines) == 0 {
 			matchInfo = " [no matches]"
 		}
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.NormalStyle.Render(m.yamlSearchText.Value) + ui.DimStyle.Render(matchInfo)
-		hint = ui.StatusBarBgStyle.Width(m.width).Render(searchBar)
+		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
 	maxLines := m.height - 4
@@ -1126,6 +1194,15 @@ func (m Model) viewYAML() string {
 		selEnd = max(m.yamlVisualStart, m.yamlCursor)
 	}
 
+	// Compute column range for char/block visual modes.
+	// For char mode: anchorCol on anchor line, cursorCol on cursor line.
+	// For block mode: rectangular column range on every selected line.
+	visualColStart, visualColEnd := 0, 0
+	if m.yamlVisualMode && (m.yamlVisualType == 'v' || m.yamlVisualType == 'B') {
+		visualColStart = min(m.yamlVisualCol, m.yamlCursorCol())
+		visualColEnd = max(m.yamlVisualCol, m.yamlCursorCol())
+	}
+
 	// Apply YAML highlighting to visible lines, with search highlights and cursor.
 	highlightedLines := make([]string, 0, len(viewport))
 	for i, line := range viewport {
@@ -1145,7 +1222,7 @@ func (m Model) viewYAML() string {
 		// Visual selection highlight: override with selected style.
 		isSelected := m.yamlVisualMode && visIdx >= selStart && visIdx <= selEnd
 		if isSelected {
-			highlighted = ui.SelectedStyle.Render(line)
+			highlighted = ui.RenderVisualSelection(line, m.yamlVisualType, visIdx, selStart, selEnd, m.yamlVisualCol, m.yamlCursorCol(), visualColStart, visualColEnd)
 		}
 		// Line number gutter
 		lineNumStr := strings.Repeat(" ", gutterWidth+1)
@@ -1154,7 +1231,12 @@ func (m Model) viewYAML() string {
 		}
 		// Cursor indicator + line number + content
 		if visIdx == m.yamlCursor {
-			highlighted = ui.YamlCursorIndicatorStyle.Render("▎") + ui.DimStyle.Render(lineNumStr) + highlighted
+			if m.yamlVisualMode {
+				// In visual mode, don't overlay block cursor on top of visual selection styling.
+				highlighted = ui.YamlCursorIndicatorStyle.Render("▎") + ui.DimStyle.Render(lineNumStr) + highlighted
+			} else {
+				highlighted = ui.YamlCursorIndicatorStyle.Render("▎") + ui.DimStyle.Render(lineNumStr) + ui.RenderCursorAtCol(highlighted, line, m.yamlVisualCurCol)
+			}
 		} else if isSelected {
 			highlighted = ui.YamlCursorIndicatorStyle.Render(" ") + ui.DimStyle.Render(lineNumStr) + highlighted
 		} else {
@@ -1174,7 +1256,8 @@ func (m Model) viewYAML() string {
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
 		Padding(0, 1).
 		Width(m.width - 2).
-		Height(maxLines)
+		Height(maxLines).
+		MaxHeight(maxLines + 2)
 	body := borderStyle.Render(bodyContent)
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
@@ -1198,14 +1281,26 @@ func (m Model) yamlTitle() string {
 	return "YAML"
 }
 
+// yamlCursorCol returns the current cursor column position within the YAML line.
+func (m Model) yamlCursorCol() int {
+	return m.yamlVisualCurCol
+}
+
 func (m Model) viewLogs() string {
 	viewH := m.logViewHeight()
 	canSwitchPod := m.logParentKind != ""
-	return ui.RenderLogViewer(m.logLines, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod)
+	canFilterContainers := m.actionCtx.kind == "Pod"
+	var statusMsg string
+	var statusIsErr bool
+	if m.hasStatusMessage() {
+		statusMsg = m.statusMessage
+		statusIsErr = m.statusMessageErr
+	}
+	return ui.RenderLogViewer(m.logLines, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol)
 }
 
 func (m Model) viewDescribe() string {
-	title := ui.TitleStyle.Render(m.describeTitle)
+	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(m.describeTitle)
 	hints := []struct{ key, desc string }{
 		{"j/k", "scroll"},
 		{"g/G", "top/bottom"},
@@ -1217,7 +1312,7 @@ func (m Model) viewDescribe() string {
 	for _, h := range hints {
 		hintParts = append(hintParts, ui.HelpKeyStyle.Render(h.key)+ui.DimStyle.Render(": "+h.desc))
 	}
-	hint := ui.StatusBarBgStyle.Width(m.width).Render(strings.Join(hintParts, ui.DimStyle.Render(" \u2502 ")))
+	hint := ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(strings.Join(hintParts, ui.DimStyle.Render(" \u2502 ")))
 
 	lines := strings.Split(m.describeContent, "\n")
 
@@ -1249,7 +1344,8 @@ func (m Model) viewDescribe() string {
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
 		Padding(0, 1).
 		Width(m.width - 2).
-		Height(maxLines)
+		Height(maxLines).
+		MaxHeight(maxLines + 2)
 	body := borderStyle.Render(bodyContent)
 
 	return lipgloss.JoinVertical(lipgloss.Left, title, body, hint)
@@ -1275,15 +1371,15 @@ func (m Model) viewExplain() string {
 	for _, h := range hints {
 		hintParts = append(hintParts, ui.HelpKeyStyle.Render(h.key)+ui.DimStyle.Render(": "+h.desc))
 	}
-	hint := ui.StatusBarBgStyle.Width(m.width).Render(strings.Join(hintParts, ui.DimStyle.Render(" | ")))
+	hint := ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(strings.Join(hintParts, ui.DimStyle.Render(" | ")))
 
 	// If search is active, show search bar instead of hints.
 	if m.explainSearchActive {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.NormalStyle.Render(m.explainSearchInput.CursorLeft()) + ui.DimStyle.Render("\u2588") + ui.NormalStyle.Render(m.explainSearchInput.CursorRight())
-		hint = ui.StatusBarBgStyle.Width(m.width).Render(searchBar)
+		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	} else if m.explainSearchQuery != "" {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.NormalStyle.Render(m.explainSearchQuery)
-		hint = ui.StatusBarBgStyle.Width(m.width).Render(searchBar)
+		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
 	return ui.RenderExplainView(
@@ -1315,8 +1411,23 @@ func (m Model) logViewHeight() int {
 	return h
 }
 
+// logContentHeight returns the number of visible log content lines accounting
+// for ALL overhead: app title bar (1), optional tab bar (1), log viewer
+// title (1), border top+bottom (2), and footer (1). This is used by scroll
+// calculations in Update() where m.height is the original terminal height.
+func (m *Model) logContentHeight() int {
+	h := m.height - 5 // app title(1) + log title(1) + border(2) + footer(1)
+	if len(m.tabs) > 1 {
+		h-- // tab bar
+	}
+	if h < 1 {
+		h = 1
+	}
+	return h
+}
+
 func (m *Model) clampLogScroll() {
-	viewH := m.logViewHeight() - 2 // subtract border top + bottom
+	viewH := m.logContentHeight()
 	if viewH < 1 {
 		viewH = 1
 	}
@@ -1364,13 +1475,36 @@ func (m *Model) clampLogScroll() {
 	}
 }
 
-// logMaxScroll returns the maximum valid scroll offset for the log viewer.
-// It is wrap-aware when logWrap is enabled.
-func (m *Model) logMaxScroll() int {
-	viewH := m.logViewHeight() - 2 // subtract border top + bottom
+// ensureLogCursorVisible adjusts logScroll so the cursor is within the visible content area.
+func (m *Model) ensureLogCursorVisible() {
+	if m.logCursor < 0 {
+		return
+	}
+	if m.logCursor < 0 {
+		m.logCursor = 0
+	}
+	if len(m.logLines) > 0 && m.logCursor >= len(m.logLines) {
+		m.logCursor = len(m.logLines) - 1
+	}
+	viewH := m.logContentHeight()
 	if viewH < 1 {
 		viewH = 1
 	}
+	// Scroll up if cursor is above viewport.
+	if m.logCursor < m.logScroll {
+		m.logScroll = m.logCursor
+	}
+	// Scroll down if cursor is below viewport.
+	if m.logCursor >= m.logScroll+viewH {
+		m.logScroll = m.logCursor - viewH + 1
+	}
+	m.clampLogScroll()
+}
+
+// logMaxScroll returns the maximum valid scroll offset for the log viewer.
+// It is wrap-aware when logWrap is enabled.
+func (m *Model) logMaxScroll() int {
+	viewH := m.logContentHeight()
 
 	if m.logWrap {
 		contentWidth := m.width - 4
@@ -1422,24 +1556,72 @@ func wrappedLineCount(line string, width int) int {
 }
 
 // clampPreviewScroll prevents scrolling past the preview content.
+// Only details+events scroll; pinned header (children) and footer (resource usage) are excluded.
 func (m *Model) clampPreviewScroll() {
-	// Render with a very large height to get the full untruncated content.
+	// Compute the right column width exactly as the View function does.
 	usable := m.width - 6
 	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
-	fullContent := m.renderRightColumnContent(rightW-2, 10000)
-	if m.metricsContent != "" && !m.fullYAMLPreview {
-		fullContent += "\n" + m.metricsContent
-	}
-	if m.previewEventsContent != "" && !m.fullYAMLPreview {
-		fullContent += "\n" + m.previewEventsContent
-	}
-	totalLines := strings.Count(fullContent, "\n") + 1
+	innerW := rightW - 2
 
-	visibleHeight := m.height - 4
-	if visibleHeight < 3 {
-		visibleHeight = 3
+	// Compute the column height exactly as the View function does.
+	colHeight := m.height - 4 // title + status bar + column borders
+	if colHeight < 3 {
+		colHeight = 3
 	}
-	maxScroll := totalLines - visibleHeight
+	if len(m.tabs) > 1 {
+		colHeight-- // tab bar
+	}
+
+	// Compute footer lines (must match renderRightColumn).
+	footerLines := 0
+	if !m.fullYAMLPreview && m.metricsContent != "" {
+		sep := ui.DimStyle.Render(strings.Repeat("\u2500", innerW))
+		footer := sep + "\n" + m.metricsContent
+		footerLines = strings.Count(footer, "\n") + 1
+	}
+
+	// Compute scrollable viewport height (must match renderRightColumn).
+	scrollableH := colHeight - footerLines
+	if scrollableH < 3 {
+		scrollableH = 3
+	}
+
+	if m.hasSplitPreview() {
+		childrenHeight := (scrollableH - 2) / 3
+		if childrenHeight < 2 {
+			childrenHeight = 2
+		}
+		childLabel := strings.ToUpper(m.ownedChildKindLabel())
+		pinnedHeader := ui.RenderTable(childLabel, m.rightItems, -1, innerW, childrenHeight, m.loading, m.spinner.View(), "", false)
+		pinnedHeader += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", innerW))
+		pinnedHeaderLines := strings.Count(pinnedHeader, "\n") + 1
+		scrollableH -= pinnedHeaderLines
+		if scrollableH < 3 {
+			scrollableH = 3
+		}
+	}
+
+	// Get the scrollable content line count.
+	// Use the actual scrollable height (not 10000) to avoid inflated YAML fill.
+	measureH := scrollableH * 3 // enough headroom for scroll, but not inflated
+	if measureH < 200 {
+		measureH = 200
+	}
+	var totalLines int
+	if m.hasSplitPreview() {
+		fullContent := m.renderDetailsOnly(innerW, measureH)
+		totalLines = strings.Count(fullContent, "\n") + 1
+	} else {
+		fullContent := m.renderRightColumnContent(innerW, measureH)
+		totalLines = strings.Count(fullContent, "\n") + 1
+	}
+
+	// Include events in the scrollable content (they scroll with details).
+	if !m.fullYAMLPreview && m.previewEventsContent != "" {
+		totalLines += 1 + strings.Count(m.previewEventsContent, "\n") + 1 // separator + event lines
+	}
+
+	maxScroll := totalLines - scrollableH
 	if maxScroll < 0 {
 		maxScroll = 0
 	}
@@ -1449,34 +1631,125 @@ func (m *Model) clampPreviewScroll() {
 }
 
 func (m Model) renderRightColumn(width, height int) string {
-	// Request extra lines to account for scroll offset so content isn't
-	// truncated before the scroll slice is applied.
-	renderHeight := height + m.previewScroll
-	result := m.renderRightColumnContent(width, renderHeight)
-
-	// Append resource usage metrics at the very bottom of the right pane (hide in YAML preview mode).
-	if m.metricsContent != "" && !m.fullYAMLPreview {
-		result += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width)) + "\n" + m.metricsContent
+	// Build the pinned footer: only resource usage (metrics) is pinned.
+	var footerParts []string
+	if !m.fullYAMLPreview && m.metricsContent != "" {
+		footerParts = append(footerParts,
+			ui.DimStyle.Render(strings.Repeat("\u2500", width)),
+			m.metricsContent)
 	}
 
-	// Append event timeline below metrics (hide in YAML preview mode).
-	if m.previewEventsContent != "" && !m.fullYAMLPreview {
+	// Reserve height for the pinned footer.
+	footerLines := 0
+	footer := ""
+	if len(footerParts) > 0 {
+		footer = strings.Join(footerParts, "\n")
+		footerLines = strings.Count(footer, "\n") + 1
+	}
+	contentHeight := height - footerLines
+	if contentHeight < 3 {
+		contentHeight = 3
+	}
+
+	// Pin children table at the top when in split preview mode.
+	pinnedHeader := ""
+	pinnedHeaderLines := 0
+	if m.hasSplitPreview() {
+		childrenHeight := (contentHeight - 2) / 3
+		if childrenHeight < 2 {
+			childrenHeight = 2
+		}
+		childLabel := strings.ToUpper(m.ownedChildKindLabel())
+		pinnedHeader = ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+		pinnedHeader += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width))
+		pinnedHeaderLines = strings.Count(pinnedHeader, "\n") + 1
+		contentHeight -= pinnedHeaderLines
+		if contentHeight < 3 {
+			contentHeight = 3
+		}
+	}
+
+	// Render the scrollable content (details only when split preview, full content otherwise).
+	renderHeight := contentHeight + m.previewScroll
+	var result string
+	if m.hasSplitPreview() {
+		result = m.renderDetailsOnly(width, renderHeight)
+	} else {
+		result = m.renderRightColumnContent(width, renderHeight)
+	}
+
+	// Append events to scrollable content (events scroll with the details).
+	if !m.fullYAMLPreview && m.previewEventsContent != "" {
 		result += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width)) + "\n" + m.previewEventsContent
 	}
 
-	// Apply preview scroll.
+	// Apply preview scroll to the scrollable content only.
+	lines := strings.Split(result, "\n")
 	if m.previewScroll > 0 {
-		lines := strings.Split(result, "\n")
 		if m.previewScroll >= len(lines) {
 			m.previewScroll = len(lines) - 1
 		}
 		if m.previewScroll > 0 {
 			lines = lines[m.previewScroll:]
 		}
-		result = strings.Join(lines, "\n")
+	}
+	// Truncate to contentHeight so footer always has room.
+	if len(lines) > contentHeight {
+		lines = lines[:contentHeight]
+	}
+	// Pad to contentHeight so footer is pinned to the bottom of the pane.
+	for len(lines) < contentHeight {
+		lines = append(lines, "")
+	}
+	result = strings.Join(lines, "\n")
+
+	// Assemble: pinned header (children) + scrollable content + pinned footer (metrics).
+	if pinnedHeader != "" {
+		result = pinnedHeader + "\n" + result
+	}
+	if footer != "" {
+		result += "\n" + footer
 	}
 
 	return result
+}
+
+// hasSplitPreview returns true when the right column shows children + details (split view).
+func (m Model) hasSplitPreview() bool {
+	if m.fullYAMLPreview || m.mapView {
+		return false
+	}
+	if m.nav.Level == model.LevelResources && (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod") && len(m.rightItems) > 0 {
+		return true
+	}
+	if m.nav.Level == model.LevelOwned {
+		sel := m.selectedMiddleItem()
+		if sel != nil && sel.Kind == "Pod" && len(m.rightItems) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+// renderDetailsOnly renders the details portion (without children table) for the right column.
+func (m Model) renderDetailsOnly(width, height int) string {
+	sel := m.selectedMiddleItem()
+	detailsHeader := ui.DimStyle.Bold(true).Render("DETAILS")
+	var bottomContent string
+	if sel != nil && len(sel.Columns) > 0 {
+		bottomContent = ui.RenderResourceSummary(sel, "", width, height)
+	} else {
+		yaml := m.previewYAML
+		if yaml == "" {
+			yaml = m.yamlContent
+		}
+		if yaml != "" {
+			bottomContent = ui.RenderYAMLContent(m.maskYAMLIfSecret(yaml), width, height)
+		} else {
+			bottomContent = ui.DimStyle.Render("No details available")
+		}
+	}
+	return detailsHeader + "\n" + bottomContent
 }
 
 func (m Model) renderRightColumnContent(width, height int) string {
@@ -1860,7 +2133,7 @@ func (m Model) statusBar() string {
 			{"a", "create"},
 			{",", "sort"},
 			{"f", "filter"},
-			{"b/B", "bookmarks"},
+			{"m/'", "marks"},
 			{"?", "help"},
 			{"q", "quit"},
 		}
@@ -1890,6 +2163,10 @@ func (m Model) renderOverlay(background string) string {
 		overlayW = min(70, m.width-10)
 		content = ui.RenderActionOverlay(m.overlayItems, m.overlayCursor, overlayW)
 		overlayH = min(15, m.height-6)
+	case overlayQuitConfirm:
+		content = ui.RenderQuitConfirmOverlay()
+		overlayW = min(40, m.width-10)
+		overlayH = min(7, m.height-6)
 	case overlayConfirm:
 		content = ui.RenderConfirmOverlay(m.confirmAction)
 		overlayW = min(50, m.width-10)
@@ -1910,14 +2187,19 @@ func (m Model) renderOverlay(background string) string {
 		content = ui.RenderContainerSelectOverlay(m.overlayItems, m.overlayCursor)
 		overlayW = min(50, m.width-10)
 		overlayH = min(15, m.height-6)
-	case overlayPodSelect:
-		content = ui.RenderPodSelectOverlay(m.overlayItems, m.overlayCursor)
+	case overlayPodSelect, overlayLogPodSelect:
+		content = ui.RenderPodSelectOverlay(m.filteredLogPodItems(), m.overlayCursor, m.logPodFilterText, m.logPodFilterActive)
 		overlayW = min(60, m.width-10)
 		overlayH = min(20, m.height-6)
+	case overlayLogContainerSelect:
+		canSwitchPod := m.logParentKind != ""
+		content = ui.RenderLogContainerSelectOverlay(m.filteredLogContainerItems(), m.overlayCursor, m.logSelectedContainers, m.logContainerFilterText, m.logContainerFilterActive, canSwitchPod)
+		overlayW = min(60, m.width-10)
+		overlayH = min(len(m.filteredLogContainerItems())+9, m.height-6)
 	case overlayBookmarks:
-		content = ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode))
-		overlayW = min(70, m.width-10)
-		overlayH = min(20, m.height-6)
+		overlayW = min(90, m.width-10)
+		overlayH = min(25, m.height-6)
+		content = ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode), overlayH)
 	case overlayTemplates:
 		content = ui.RenderTemplateOverlay(m.templateItems, m.templateCursor)
 		overlayW = min(60, m.width-10)
@@ -2272,6 +2554,36 @@ func (m *Model) clampCursor() {
 	m.setCursor(c)
 }
 
+// cursorItemKey returns a stable identifier for the currently selected visible item.
+// Returns empty strings if no item is selected.
+func (m *Model) cursorItemKey() (name, namespace, extra string) {
+	visible := m.visibleMiddleItems()
+	c := m.cursor()
+	if c >= 0 && c < len(visible) {
+		return visible[c].Name, visible[c].Namespace, visible[c].Extra
+	}
+	return "", "", ""
+}
+
+// restoreCursorToItem adjusts the cursor to point at the item matching the given
+// name/namespace/extra in the current visible items. Falls back to clampCursor
+// if the item is no longer in the list.
+func (m *Model) restoreCursorToItem(name, namespace, extra string) {
+	if name == "" && extra == "" {
+		m.clampCursor()
+		return
+	}
+	visible := m.visibleMiddleItems()
+	for i, item := range visible {
+		if item.Name == name && item.Namespace == namespace && item.Extra == extra {
+			m.setCursor(i)
+			return
+		}
+	}
+	// Item gone — keep cursor in bounds.
+	m.clampCursor()
+}
+
 // carryOverMetricsColumns copies metrics columns (CPU, CPU/R, CPU/L, MEM, MEM/R, MEM/L)
 // from existing middle items to new items by matching on name+namespace.
 // This prevents blinking during watch mode refreshes while metrics load async.
@@ -2568,6 +2880,37 @@ func (m *Model) filteredOverlayItems() []model.Item {
 	filter := strings.ToLower(m.overlayFilter.Value)
 	for _, item := range m.overlayItems {
 		if strings.Contains(strings.ToLower(item.Name), filter) {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
+// filteredLogPodItems returns overlay items matching the current log pod filter.
+func (m *Model) filteredLogPodItems() []model.Item {
+	if m.logPodFilterText == "" {
+		return m.overlayItems
+	}
+	var filtered []model.Item
+	filter := strings.ToLower(m.logPodFilterText)
+	for _, item := range m.overlayItems {
+		if strings.Contains(strings.ToLower(item.Name), filter) {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
+// filteredLogContainerItems returns overlay items matching the current log container filter.
+func (m *Model) filteredLogContainerItems() []model.Item {
+	if m.logContainerFilterText == "" {
+		return m.overlayItems
+	}
+	var filtered []model.Item
+	filter := strings.ToLower(m.logContainerFilterText)
+	for _, item := range m.overlayItems {
+		// Always include the "All Containers" virtual item.
+		if item.Status == "all" || strings.Contains(strings.ToLower(item.Name), filter) {
 			filtered = append(filtered, item)
 		}
 	}
@@ -2990,8 +3333,20 @@ func (m *Model) saveCurrentTab() {
 	t.logTitle = m.logTitle
 	t.logCancel = m.logCancel
 	t.logCh = m.logCh
+	t.logTailLines = m.logTailLines
+	t.logHasMoreHistory = m.logHasMoreHistory
+	t.logLoadingHistory = m.logLoadingHistory
+	t.logCursor = m.logCursor
+	t.logVisualMode = m.logVisualMode
+	t.logVisualStart = m.logVisualStart
+	t.logVisualType = m.logVisualType
+	t.logVisualCol = m.logVisualCol
+	t.logVisualCurCol = m.logVisualCurCol
 	t.logParentKind = m.logParentKind
 	t.logParentName = m.logParentName
+	t.logSavedPodName = m.logSavedPodName
+	t.logContainers = append([]string(nil), m.logContainers...)
+	t.logSelectedContainers = append([]string(nil), m.logSelectedContainers...)
 	t.describeContent = m.describeContent
 	t.describeScroll = m.describeScroll
 	t.describeTitle = m.describeTitle
@@ -3018,8 +3373,11 @@ func (m *Model) saveCurrentTab() {
 }
 
 // loadTab restores Model fields from the given tab index.
-func (m *Model) loadTab(idx int) {
+// If the tab was restored from a session and has not been loaded yet (needsLoad),
+// it returns a tea.Cmd that fetches the tab's data; otherwise it returns nil.
+func (m *Model) loadTab(idx int) tea.Cmd {
 	t := m.tabs[idx]
+	needsLoad := t.needsLoad
 	m.activeTab = idx
 	m.nav = t.nav
 	m.leftItems = append([]model.Item(nil), t.leftItems...)
@@ -3074,8 +3432,20 @@ func (m *Model) loadTab(idx int) {
 	m.logTitle = t.logTitle
 	m.logCancel = t.logCancel
 	m.logCh = t.logCh
+	m.logTailLines = t.logTailLines
+	m.logHasMoreHistory = t.logHasMoreHistory
+	m.logLoadingHistory = t.logLoadingHistory
+	m.logCursor = t.logCursor
+	m.logVisualMode = t.logVisualMode
+	m.logVisualStart = t.logVisualStart
+	m.logVisualType = t.logVisualType
+	m.logVisualCol = t.logVisualCol
+	m.logVisualCurCol = t.logVisualCurCol
 	m.logParentKind = t.logParentKind
 	m.logParentName = t.logParentName
+	m.logSavedPodName = t.logSavedPodName
+	m.logContainers = append([]string(nil), t.logContainers...)
+	m.logSelectedContainers = append([]string(nil), t.logSelectedContainers...)
 	m.describeContent = t.describeContent
 	m.describeScroll = t.describeScroll
 	m.describeTitle = t.describeTitle
@@ -3105,6 +3475,47 @@ func (m *Model) loadTab(idx int) {
 	m.filterActive = false
 	m.searchActive = false
 	m.err = nil
+
+	// If this tab was restored from a session but never loaded, clear the
+	// flag, set up the navigation column structure, and return a command
+	// that fetches the tab's data.
+	if needsLoad {
+		m.tabs[idx].needsLoad = false
+		m.applyPinnedGroups()
+
+		// Load contexts for the left column breadcrumb.
+		contexts, _ := m.client.GetContexts()
+		resourceTypes := model.FlattenedResourceTypes()
+		if crds := m.discoveredCRDs[m.nav.Context]; len(crds) > 0 {
+			resourceTypes = model.MergeWithCRDs(crds)
+		}
+
+		switch m.nav.Level {
+		case model.LevelResources:
+			// At resources level: left = resource types, history = [contexts].
+			m.leftItemsHistory = [][]model.Item{contexts}
+			m.leftItems = resourceTypes
+			m.middleItems = nil
+			m.clearRight()
+			m.setCursor(0)
+			m.loading = true
+			return m.loadResources(false)
+		case model.LevelResourceTypes:
+			// At resource types level: left = contexts, middle = resource types.
+			m.leftItemsHistory = nil
+			m.leftItems = contexts
+			m.middleItems = resourceTypes
+			m.itemCache[m.navKey()] = m.middleItems
+			m.clearRight()
+			m.clampCursor()
+			return m.loadPreview()
+		default:
+			// Clusters level or unknown: just load contexts.
+			m.loading = true
+			return m.refreshCurrentLevel()
+		}
+	}
+	return nil
 }
 
 // cloneCurrentTab creates a deep copy of the current model state as a new TabState.
@@ -3126,15 +3537,26 @@ func (m *Model) cloneCurrentTab() TabState {
 		previewYAML:         m.previewYAML,
 		namespace:           m.namespace,
 		allNamespaces:       m.allNamespaces,
+		selectedNamespaces:  copyMapStringBool(m.selectedNamespaces),
 		sortBy:              m.sortBy,
 		filterText:          m.filterText,
 		watchMode:           m.watchMode,
+		requestGen:          m.requestGen,
 		selectedItems:       copyMapStringBool(m.selectedItems),
 		selectionAnchor:     m.selectionAnchor,
 		fullscreenMiddle:    m.fullscreenMiddle,
 		fullscreenDashboard: m.fullscreenDashboard,
 		dashboardPreview:    m.dashboardPreview,
 		monitoringPreview:   m.monitoringPreview,
+		warningEventsOnly:   m.warningEventsOnly,
+		expandedGroup:       m.expandedGroup,
+		allGroupsExpanded:   m.allGroupsExpanded,
+		logCursor:           m.logCursor,
+		logVisualMode:       false, // don't clone visual mode into new tabs
+		logVisualStart:      0,
+		logVisualType:       'V',
+		logVisualCol:        0,
+		logVisualCurCol:     0,
 	}
 	// Deep copy leftItemsHistory.
 	newTab.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))
@@ -3208,7 +3630,9 @@ func (m Model) viewExecTerminal() string {
 
 	// Render hints.
 	hints := []struct{ key, desc string }{
-		{"ctrl+]", "exit"},
+		{"ctrl+] ctrl+]", "exit"},
+		{"ctrl+] ]/[", "switch tab"},
+		{"ctrl+] t", "new tab"},
 	}
 	hintParts := make([]string, 0, len(hints))
 	for _, h := range hints {
@@ -3216,8 +3640,9 @@ func (m Model) viewExecTerminal() string {
 	}
 	hintLine := "  " + strings.Join(hintParts, "  ")
 
-	// Render terminal content (account for border: 2 lines top/bottom, 2 cols left/right).
-	viewH := m.height - 6 // title + hint + border top/bottom
+	// Render terminal content. Overhead: exec title (1) + border top/bottom (2) + hint line (1) = 4.
+	// The outer View() already subtracted the main title bar and tab bar from m.height.
+	viewH := m.height - 4
 	if viewH < 3 {
 		viewH = 3
 	}
@@ -3230,8 +3655,27 @@ func (m Model) viewExecTerminal() string {
 	if m.execTerm != nil {
 		m.execMu.Lock()
 		cols, rows := m.execTerm.Size()
+		cursor := m.execTerm.Cursor()
+
+		// Calculate vertical scroll offset to keep the cursor visible.
+		// When the terminal buffer is taller than the viewport, show the
+		// portion that contains the cursor row.
+		startY := 0
+		renderH := rows
+		if rows > viewH {
+			renderH = viewH
+			// Ensure cursor row is within the visible portion.
+			startY = cursor.Y - viewH + 1
+			if startY < 0 {
+				startY = 0
+			}
+			if startY+viewH > rows {
+				startY = rows - viewH
+			}
+		}
+
 		var lines []string
-		for y := 0; y < rows && y < viewH; y++ {
+		for y := startY; y < startY+renderH && y < rows; y++ {
 			var line strings.Builder
 			for x := 0; x < cols && x < viewW; x++ {
 				g := m.execTerm.Cell(x, y)

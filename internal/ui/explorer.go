@@ -1504,6 +1504,8 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 				// ArgoCD: Health and Sync are redundant with Status field.
 				"Health": true, "Sync": true,
 				"Path": true,
+				// Metadata fields: too verbose for table, shown in detail pane.
+				"Labels": true, "Finalizers": true, "Annotations": true,
 			}
 		} else {
 			blocked = map[string]bool{
@@ -1518,6 +1520,8 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 				"Sync Message": true, "Sync Errors": true,
 				// Events: Message and Source are too verbose for table view.
 				"Message": true, "Source": true,
+				// Metadata fields: too verbose for table, shown in detail pane.
+				"Labels": true, "Finalizers": true, "Annotations": true,
 			}
 		}
 		for k, v := range rawMetricsCols {
@@ -1881,8 +1885,9 @@ func RenderTabBar(tabLabels []string, activeTab, width int) string {
 	return " " + strings.Join(parts, "")
 }
 
-// RenderResourceSummary renders a key-value summary of resource fields,
-// followed by truncated YAML if space permits.
+// RenderResourceSummary renders a table-style detail summary of resource fields,
+// followed by truncated YAML if space permits. It shows metadata that is NOT
+// already visible in the middle column table (Name, Ready, Restarts, Status, Age).
 func RenderResourceSummary(item *model.Item, yaml string, width, height int) string {
 	if item == nil || len(item.Columns) == 0 {
 		// No summary data, fall back to YAML.
@@ -1894,33 +1899,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 
 	var lines []string
 
-	// Header with resource name/kind.
-	nameLabel := item.Kind + ": " + item.Name
-	if len(nameLabel) > width-2 {
-		nameLabel = nameLabel[:width-5] + "..."
-	}
-	lines = append(lines, DimStyle.Bold(true).Render(nameLabel))
-
-	// Basic fields: Status, Age, Ready, Restarts (if present).
-	if item.Status != "" {
-		lines = append(lines, renderKV("Status", item.Status, width))
-	}
-	if item.Age != "" {
-		lines = append(lines, HeaderStyle.Render("Age:")+" "+AgeStyle(item.Age).Render(item.Age))
-	}
-	if item.Ready != "" {
-		lines = append(lines, renderKV("Ready", item.Ready, width))
-	}
-	if item.Restarts != "" {
-		lines = append(lines, renderKV("Restarts", item.Restarts, width))
-	}
-	if item.Namespace != "" {
-		lines = append(lines, renderKV("Namespace", item.Namespace, width))
-	}
-
-	// Additional columns (skip secret values unless toggle is on, skip metrics columns
-	// as they are shown separately in the resource usage bars).
-	// Data/secret fields are collected separately and rendered after a separator.
+	// Skip metrics keys and keys already shown as standard table columns.
 	metricsKeys := map[string]bool{
 		"CPU": true, "CPU/R": true, "CPU/L": true,
 		"MEM": true, "MEM/R": true, "MEM/L": true,
@@ -1928,9 +1907,25 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		"CPU Req": true, "CPU Lim": true, "Mem Req": true, "Mem Lim": true,
 		"CPU Alloc": true, "Mem Alloc": true,
 	}
+	tableKeys := map[string]bool{
+		"Status": true, "Reason": true,
+	}
+
+	// Collect table rows (key-value pairs) and multi-line fields separately.
+	type detailRow struct {
+		key   string
+		value string
+	}
+	var rows []detailRow
+	var multiLineFields []model.KeyValue // Labels, Finalizers
 	var dataLines []string
+
+	if item.Namespace != "" {
+		rows = append(rows, detailRow{"NAMESPACE", item.Namespace})
+	}
+
 	for _, kv := range item.Columns {
-		if metricsKeys[kv.Key] {
+		if metricsKeys[kv.Key] || tableKeys[kv.Key] {
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "secret:") {
@@ -1947,18 +1942,62 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			dataLines = append(dataLines, renderDataKV(label, kv.Value, width)...)
 			continue
 		}
-		if len(lines) < height-2 {
-			lines = append(lines, renderKV(kv.Key, kv.Value, width))
+		if kv.Key == "Labels" || kv.Key == "Finalizers" || kv.Key == "Annotations" {
+			multiLineFields = append(multiLineFields, kv)
+			continue
+		}
+		rows = append(rows, detailRow{strings.ToUpper(kv.Key), kv.Value})
+	}
+
+	// Calculate key column width for table alignment.
+	keyW := 0
+	for _, r := range rows {
+		if len(r.key) > keyW {
+			keyW = len(r.key)
+		}
+	}
+	keyW += 2 // spacing after key
+
+	// Style for detail keys: bold + primary, no underline (HeaderStyle has underline).
+	detailKeyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorPrimary))
+
+	// Render rows as aligned key-value pairs (key styled, value as dim).
+	for _, r := range rows {
+		if len(lines) >= height-2 {
+			break
+		}
+		valW := max(width-keyW-2, 4)
+		val := r.value
+		if len(val) > valW {
+			val = val[:valW-3] + "..."
+		}
+		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
+		if r.key == "DELETION" && item.Deleting {
+			lines = append(lines, keyStr+ErrorStyle.Render(val))
+		} else {
+			lines = append(lines, keyStr+DimStyle.Render(val))
+		}
+	}
+
+	// Multi-line fields (Labels, Finalizers) below the table.
+	for _, kv := range multiLineFields {
+		if len(lines) >= height-2 {
+			break
+		}
+		lines = append(lines, "")
+		lines = append(lines, detailKeyStyle.Render(strings.ToUpper(kv.Key)))
+		for entry := range strings.SplitSeq(kv.Value, ", ") {
+			if len(lines) >= height-2 {
+				break
+			}
+			lines = append(lines, "  "+DimStyle.Render(entry))
 		}
 	}
 
 	// Render data/secret fields in a separate section with a header.
 	if len(dataLines) > 0 && len(lines) < height-2 {
-		separator := fmt.Sprintf("── DATA (%d) ", len(dataLines))
-		if remaining := min(width-2, 40) - lipgloss.Width(separator); remaining > 0 {
-			separator += strings.Repeat("─", remaining)
-		}
-		lines = append(lines, DimStyle.Render(separator))
+		lines = append(lines, "")
+		lines = append(lines, detailKeyStyle.Render(fmt.Sprintf("DATA (%d)", len(dataLines))))
 		for _, dl := range dataLines {
 			if len(lines) >= height-2 {
 				break
@@ -1971,8 +2010,8 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	usedLines := len(lines)
 	remaining := height - usedLines - 1 // -1 for separator
 	if remaining > 3 && yaml != "" {
-		lines = append(lines, DimStyle.Render(strings.Repeat("─", min(width-2, 40))))
-		yamlContent := RenderYAMLContent(yaml, width, remaining-1)
+		lines = append(lines, "")
+		yamlContent := RenderYAMLContent(yaml, width, remaining)
 		lines = append(lines, yamlContent)
 	}
 
@@ -2026,15 +2065,9 @@ func renderUsageBar(used, req, lim int64, barWidth int, formatFn func(int64) str
 	suffixW := lipgloss.Width(suffix)
 
 	// Calculate bar width.
-	bw := barWidth - suffixW - 2 // 2 for brackets
-	if bw < 5 {
-		bw = 5
-	}
+	bw := max(barWidth-suffixW-2, 5) // 2 for brackets
 
-	filled := int(float64(bw) * pct / 100)
-	if filled > bw {
-		filled = bw
-	}
+	filled := min(int(float64(bw)*pct/100), bw)
 	empty := bw - filled
 
 	// Color based on percentage.
@@ -2097,10 +2130,7 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 	}
 
 	// Message width: total width minus age, type indicator, reason, spacing.
-	msgWidth := width - maxAgeW - 3 - maxReasonW - 4 // 3 for " ● ", 4 for spacing
-	if msgWidth < 20 {
-		msgWidth = 20
-	}
+	msgWidth := max(width-maxAgeW-3-maxReasonW-4, 20) // 3 for " ● ", 4 for spacing
 
 	for _, e := range events {
 		ageStr := relativeTime(e.Timestamp)
@@ -2192,10 +2222,7 @@ func ComputePctStr(used int64, refStr string, isCPU bool) string {
 func renderKV(key, value string, width int) string {
 	keyStr := HeaderStyle.Render(key + ":")
 	keyW := lipgloss.Width(keyStr)
-	maxVal := width - keyW - 2
-	if maxVal < 4 {
-		maxVal = 4
-	}
+	maxVal := max(width-keyW-2, 4)
 	if len(value) > maxVal {
 		value = value[:maxVal-3] + "..."
 	}
@@ -2218,11 +2245,8 @@ func renderDataKV(key, value string, width int) []string {
 	header := HeaderStyle.Render(key + ":")
 	lines := []string{header}
 	indent := "  "
-	maxVal := width - len(indent) - 1
-	if maxVal < 4 {
-		maxVal = 4
-	}
-	for _, vline := range strings.Split(value, "\n") {
+	maxVal := max(width-len(indent)-1, 4)
+	for vline := range strings.SplitSeq(value, "\n") {
 		rendered := vline
 		if len(rendered) > maxVal {
 			rendered = rendered[:maxVal-3] + "..."

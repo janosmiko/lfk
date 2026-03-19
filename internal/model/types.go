@@ -172,6 +172,7 @@ type Bookmark struct {
 	Namespace    string `json:"namespace" yaml:"namespace"`
 	ResourceType string `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
 	ResourceName string `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+	Slot         string `json:"slot,omitempty" yaml:"slot,omitempty"` // single char key for vim-style named marks (a-z, 0-9)
 }
 
 // ActionMenuItem represents an entry in the action menu.

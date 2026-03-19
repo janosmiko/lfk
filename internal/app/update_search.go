@@ -35,7 +35,7 @@ func (m Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "q", "esc", "?":
-		m.mode = modeExplorer
+		m.mode = m.helpPreviousMode
 		return m, nil
 	case "j", "down":
 		m.helpScroll++

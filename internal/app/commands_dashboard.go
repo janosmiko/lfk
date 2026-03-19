@@ -38,7 +38,7 @@ func renderBar(used, total int64, width int) string {
 	case pct >= 90:
 		style = ui.StatusFailed
 	case pct >= 75:
-		style = ui.StatusPending
+		style = ui.StatusProgressing
 	default:
 		style = ui.StatusRunning
 	}
@@ -277,7 +277,7 @@ func (m Model) loadDashboard() tea.Cmd {
 			podStatus += " " + ui.StatusFailed.Render(fmt.Sprintf("%d Failed", failedPods))
 		}
 		if pendingPods > 0 {
-			podStatus += " " + ui.StatusPending.Render(fmt.Sprintf("%d Pending", pendingPods))
+			podStatus += " " + ui.StatusProgressing.Render(fmt.Sprintf("%d Pending", pendingPods))
 		}
 		lines = append(lines, fmt.Sprintf("  %s %s  %s",
 			ui.HelpKeyStyle.Render("Pods:"),
@@ -291,7 +291,7 @@ func (m Model) loadDashboard() tea.Cmd {
 				style lipgloss.Style
 			}{
 				{runningPods, ui.StatusRunning},
-				{pendingPods, ui.StatusPending},
+				{pendingPods, ui.StatusProgressing},
 				{failedPods, ui.StatusFailed},
 			}
 			podBar := renderStackedBar(segments, podCount, 30)
@@ -307,7 +307,7 @@ func (m Model) loadDashboard() tea.Cmd {
 		if totalCPUAlloc > 0 || totalMemAlloc > 0 {
 			lines = append(lines, ui.DimStyle.Bold(true).Render("  CLUSTER RESOURCES"))
 			if nodeMetricsErr != nil {
-				lines = append(lines, ui.StatusPending.Render("  (metrics-server unavailable)"))
+				lines = append(lines, ui.StatusProgressing.Render("  (metrics-server unavailable)"))
 			}
 			lines = append(lines, "")
 			if totalCPUAlloc > 0 {
@@ -429,9 +429,9 @@ func (m Model) loadDashboard() tea.Cmd {
 			lines = append(lines, "")
 			for _, pw := range pdbWarnings {
 				lines = append(lines, fmt.Sprintf("  %s %s/%s",
-					ui.StatusPending.Render("\u2298"),
+					ui.StatusProgressing.Render("\u2298"),
 					ui.DimStyle.Render(pw.namespace),
-					ui.StatusPending.Render(pw.name)))
+					ui.StatusProgressing.Render(pw.name)))
 				detail := fmt.Sprintf("       MinAvail=%s  Healthy=%s  DisruptionsAllowed=%s",
 					pw.minAvailable, pw.currentHealthy, pw.disruptionsAllowed)
 				lines = append(lines, ui.DimStyle.Render(detail))
@@ -470,7 +470,7 @@ func (m Model) loadDashboard() tea.Cmd {
 					countLabel = ui.DimStyle.Render(fmt.Sprintf("(x%s) ", count))
 				}
 				line := fmt.Sprintf("  %s %s %s%s %s",
-					ui.StatusPending.Render("\u26a0"),
+					ui.StatusProgressing.Render("\u26a0"),
 					ui.DimStyle.Render(fmt.Sprintf("%-4s", ev.Age)),
 					countLabel,
 					ui.StatusFailed.Render(reason+":"),
@@ -560,7 +560,7 @@ func (m Model) loadMonitoringDashboard() tea.Cmd {
 				if stateStr != "" {
 					stateStr += "  "
 				}
-				stateStr += ui.StatusPending.Render(fmt.Sprintf("%d pending", pending))
+				stateStr += ui.StatusProgressing.Render(fmt.Sprintf("%d pending", pending))
 			}
 			if stateStr != "" {
 				lines = append(lines, "           "+stateStr)
@@ -575,7 +575,7 @@ func (m Model) loadMonitoringDashboard() tea.Cmd {
 				if sevStr != "" {
 					sevStr += "  "
 				}
-				sevStr += ui.StatusPending.Render(fmt.Sprintf("%d warning", warning))
+				sevStr += ui.StatusProgressing.Render(fmt.Sprintf("%d warning", warning))
 			}
 			if info > 0 {
 				if sevStr != "" {
@@ -644,7 +644,7 @@ func (m Model) loadMonitoringDashboard() tea.Cmd {
 				case "firing":
 					stateStr = ui.StatusFailed.Render(fmt.Sprintf("%-10s", a.State))
 				case "pending":
-					stateStr = ui.StatusPending.Render(fmt.Sprintf("%-10s", a.State))
+					stateStr = ui.StatusProgressing.Render(fmt.Sprintf("%-10s", a.State))
 				default:
 					stateStr = ui.DimStyle.Render(fmt.Sprintf("%-10s", a.State))
 				}
@@ -655,7 +655,7 @@ func (m Model) loadMonitoringDashboard() tea.Cmd {
 				case "critical":
 					sevStr = ui.StatusFailed.Bold(true).Render(fmt.Sprintf("%-12s", a.Severity))
 				case "warning":
-					sevStr = ui.StatusPending.Render(fmt.Sprintf("%-12s", a.Severity))
+					sevStr = ui.StatusProgressing.Render(fmt.Sprintf("%-12s", a.Severity))
 				default:
 					sevStr = ui.DimStyle.Render(fmt.Sprintf("%-12s", a.Severity))
 				}

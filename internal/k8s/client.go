@@ -240,10 +240,15 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 		// Check if the resource is being deleted.
 		if item.GetDeletionTimestamp() != nil {
 			ti.Deleting = true
+			ti.Columns = append(ti.Columns, model.KeyValue{
+				Key:   "Deletion",
+				Value: item.GetDeletionTimestamp().Format(time.RFC3339),
+			})
 		}
 
-		// Populate namespace when listing across all namespaces.
-		if namespace == "" && rt.Namespaced {
+		// Always populate namespace for namespaced resources so that actions
+		// (logs, exec, etc.) use the item's actual namespace, not the selector.
+		if rt.Namespaced {
 			ti.Namespace = item.GetNamespace()
 		}
 
@@ -298,6 +303,9 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 				}
 			}
 		}
+
+		// Extract labels, finalizers, and annotation count from metadata.
+		populateMetadataFields(&ti, item.Object)
 
 		items = append(items, ti)
 	}
@@ -370,8 +378,17 @@ func populateResourceDetails(ti *model.Item, obj map[string]interface{}, kind st
 		// Override status based on container readiness.
 		// Succeeded pods stay green even with unready containers.
 		if ti.Status != "Succeeded" && readyCount < totalContainers && totalContainers > 0 {
-			// Extract reason from container statuses.
-			reason := extractContainerNotReadyReason(containerStatuses)
+			// Check init container statuses first — when an init container fails,
+			// regular containers show "PodInitializing" which hides the real reason.
+			initContainerStatuses, _ := status["initContainerStatuses"].([]interface{})
+			reason := extractContainerNotReadyReason(initContainerStatuses)
+			if reason == "" || reason == "PodInitializing" {
+				reason = extractContainerNotReadyReason(containerStatuses)
+			}
+			// If the pod phase is Failed, prefer that over "PodInitializing".
+			if reason == "PodInitializing" && ti.Status == "Failed" {
+				reason = ""
+			}
 			if reason != "" {
 				ti.Status = reason
 				ti.Columns = append(ti.Columns, model.KeyValue{Key: "Reason", Value: reason})
@@ -1582,6 +1599,61 @@ func populateResourceDetails(ti *model.Item, obj map[string]interface{}, kind st
 				extractGenericConditions(ti, conditions)
 			}
 		}
+	}
+}
+
+// populateMetadataFields extracts labels, finalizers, and annotation count from
+// the object metadata. These are appended as Columns entries for the detail pane.
+func populateMetadataFields(ti *model.Item, obj map[string]interface{}) {
+	metadata, _ := obj["metadata"].(map[string]interface{})
+	if metadata == nil {
+		return
+	}
+
+	// Labels: extract key=value pairs, skip noisy labels.
+	if labels, ok := metadata["labels"].(map[string]interface{}); ok && len(labels) > 0 {
+		var labelPairs []string
+		for k, v := range labels {
+			if k == "helm.sh/chart" || strings.HasPrefix(k, "app.kubernetes.io/managed-by") {
+				continue
+			}
+			labelPairs = append(labelPairs, k+"="+fmt.Sprint(v))
+		}
+		sort.Strings(labelPairs)
+		if len(labelPairs) > 0 {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Labels", Value: strings.Join(labelPairs, ", ")})
+		}
+	}
+
+	// Finalizers: important for debugging stuck deletions.
+	if finalizers, ok := metadata["finalizers"].([]interface{}); ok && len(finalizers) > 0 {
+		var fins []string
+		for _, f := range finalizers {
+			if s, ok := f.(string); ok {
+				fins = append(fins, s)
+			}
+		}
+		if len(fins) > 0 {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Finalizers", Value: strings.Join(fins, ", ")})
+		}
+	}
+
+	// Annotations: store key=value pairs (sorted, noisy ones filtered).
+	if annotations, ok := metadata["annotations"].(map[string]interface{}); ok && len(annotations) > 0 {
+		var annPairs []string
+		for k, v := range annotations {
+			// Skip very long values (e.g., kubectl.kubernetes.io/last-applied-configuration).
+			val := fmt.Sprint(v)
+			if len(val) > 100 {
+				val = val[:97] + "..."
+			}
+			annPairs = append(annPairs, k+"="+val)
+		}
+		sort.Strings(annPairs)
+		ti.Columns = append(ti.Columns, model.KeyValue{
+			Key:   "Annotations",
+			Value: strings.Join(annPairs, ", "),
+		})
 	}
 }
 

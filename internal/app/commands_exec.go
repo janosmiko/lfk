@@ -11,6 +11,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -37,8 +38,14 @@ func (m *Model) startLogStream() tea.Cmd {
 	kctx := m.actionCtx.context
 	containerName := m.actionCtx.containerName
 	kubeconfigPaths := m.client.KubeconfigPaths()
-	logTimestamps := m.logTimestamps
 	logPrevious := m.logPrevious
+	tailLines := m.logTailLines
+	if tailLines == 0 {
+		tailLines = ui.ConfigLogTailLines
+	}
+
+	// Capture selected containers for filtering (empty = show all).
+	selectedContainers := append([]string(nil), m.logSelectedContainers...)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.logCancel = cancel
@@ -83,9 +90,13 @@ func (m *Model) startLogStream() tea.Cmd {
 			}
 		}
 
-		if logTimestamps {
-			args = append(args, "--timestamps")
+		// Add --tail for initial loading (not for --previous mode since it's already finite).
+		if tailLines > 0 && !logPrevious {
+			args = append(args, fmt.Sprintf("--tail=%d", tailLines))
 		}
+
+		// Always include --timestamps so toggling visibility doesn't need a restart.
+		args = append(args, "--timestamps")
 
 		logger.Info("Starting kubectl logs", "args", strings.Join(args, " "))
 
@@ -111,8 +122,13 @@ func (m *Model) startLogStream() tea.Cmd {
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
 		for scanner.Scan() {
+			line := scanner.Text()
+			// Filter by selected containers when using --prefix mode.
+			if len(selectedContainers) > 0 && !matchesContainerFilter(line, selectedContainers) {
+				continue
+			}
 			select {
-			case ch <- scanner.Text():
+			case ch <- line:
 			case <-ctx.Done():
 				return
 			}
@@ -192,6 +208,33 @@ func kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx st
 	return strings.Join(parts, ",")
 }
 
+// matchesContainerFilter checks whether a prefixed log line belongs to one of
+// the selected containers. The prefix format is "[pod/<podname>/<containername>] ...".
+// If the line doesn't have a prefix (no bracket), it is passed through.
+func matchesContainerFilter(line string, selectedContainers []string) bool {
+	if len(line) == 0 || line[0] != '[' {
+		// No prefix, pass through (non-prefixed lines like error messages).
+		return true
+	}
+	closeBracket := strings.Index(line, "] ")
+	if closeBracket < 0 {
+		return true // not a standard prefix line
+	}
+	prefix := line[1:closeBracket] // "pod/<podname>/<containername>"
+	// kubectl --prefix format uses slashes: pod/<podname>/<containername>
+	lastSlash := strings.LastIndex(prefix, "/")
+	if lastSlash < 0 {
+		return true // unexpected format
+	}
+	containerName := prefix[lastSlash+1:]
+	for _, sc := range selectedContainers {
+		if sc == containerName {
+			return true
+		}
+	}
+	return false
+}
+
 // waitForLogLine returns a tea.Cmd that reads the next line from the log channel.
 func (m Model) waitForLogLine() tea.Cmd {
 	ch := m.logCh
@@ -228,6 +271,12 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 	m.logIsMulti = true
 	m.logMultiItems = items
 	m.logTitle = fmt.Sprintf("Logs: %d resources", len(items))
+	m.logTailLines = ui.ConfigLogTailLines
+	m.logHasMoreHistory = false // too complex to deduplicate across multiple streams
+	m.logLoadingHistory = false
+	m.logCursor = 0 // will track end as lines stream in with follow mode
+	m.logVisualMode = false
+	m.logVisualStart = 0
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.logCancel = cancel
@@ -268,9 +317,12 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 			}
 		}
 
-		if m.logTimestamps {
-			args = append(args, "--timestamps")
+		// Add --tail for initial loading.
+		if m.logTailLines > 0 {
+			args = append(args, fmt.Sprintf("--tail=%d", m.logTailLines))
 		}
+
+		args = append(args, "--timestamps")
 
 		logger.Info("Starting multi-log kubectl", "item", item.Name, "args", strings.Join(args, " "))
 		m.addLogEntry("DBG", "kubectl "+strings.Join(args, " "))
@@ -362,9 +414,12 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 			}
 		}
 
-		if m.logTimestamps {
-			args = append(args, "--timestamps")
+		// Add --tail for initial loading.
+		if m.logTailLines > 0 {
+			args = append(args, fmt.Sprintf("--tail=%d", m.logTailLines))
 		}
+
+		args = append(args, "--timestamps")
 
 		cmd := exec.CommandContext(ctx, kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
@@ -767,7 +822,21 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
 	logger.Info("Running kubectl command", "cmd", cmd.String())
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+
+	if ui.ConfigTerminalMode == "pty" {
+		cols := m.width - 4
+		rows := m.height - 6
+		if cols < 20 {
+			cols = 80
+		}
+		if rows < 5 {
+			rows = 24
+		}
+		title := fmt.Sprintf("Debug PVC: %s/%s → %s", ns, pvcName, podName)
+		return startPTYExecCmd(cmd, title, cols, rows)
+	}
+
+	return tea.ExecProcess(clearBeforeExec(cmd), func(err error) tea.Msg {
 		if err != nil {
 			logger.Error("kubectl run debug pod with PVC failed", "cmd", cmd.String(), "error", err)
 		}
@@ -1239,6 +1308,186 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 		matches := parseRecursiveExplainForSearch(string(output), query)
 		return explainRecursiveMsg{matches: matches, query: query}
 	}
+}
+
+// fetchOlderLogs fetches an additional batch of older log lines using a
+// one-shot kubectl logs call (no -f). The result is returned as a logHistoryMsg.
+func (m *Model) fetchOlderLogs() tea.Cmd {
+	kubectlPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		return func() tea.Msg { return logHistoryMsg{err: err} }
+	}
+
+	ns := m.actionNamespace()
+	kind := m.actionCtx.kind
+	name := m.actionCtx.name
+	kctx := m.actionCtx.context
+	containerName := m.actionCtx.containerName
+	kubeconfigPaths := m.client.KubeconfigPaths()
+	newTail := m.logTailLines + ui.ConfigLogTailLines
+	prevTotal := len(m.logLines)
+	// Capture selected containers for filtering (empty = show all).
+	selectedContainers := append([]string(nil), m.logSelectedContainers...)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	m.logHistoryCancel = cancel
+
+	return func() tea.Msg {
+		defer cancel()
+
+		var args []string //nolint:prealloc
+		switch kind {
+		case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob", "Service":
+			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx)
+			if selector != "" {
+				args = []string{
+					"logs", "-l", selector, "--all-containers=true", "--prefix",
+					"--max-log-requests=20", "-n", ns, "--context", kctx,
+				}
+			} else {
+				resourceRef := strings.ToLower(kind) + "/" + name
+				args = []string{
+					"logs", resourceRef, "--all-containers=true", "--prefix",
+					"--max-log-requests=20", "-n", ns, "--context", kctx,
+				}
+			}
+		case "Pod":
+			// When multi-container filtering is active, always use --all-containers --prefix
+			// so that matchesContainerFilter can parse the prefix and filter correctly.
+			if len(selectedContainers) > 0 || containerName == "" {
+				args = []string{
+					"logs", name, "--all-containers=true", "--prefix",
+					"--max-log-requests=20", "-n", ns, "--context", kctx,
+				}
+			} else {
+				args = []string{
+					"logs", name, "-c", containerName, "--prefix", "-n", ns, "--context", kctx,
+				}
+			}
+		default:
+			return logHistoryMsg{err: fmt.Errorf("unsupported kind for log history: %s", kind)}
+		}
+
+		args = append(args, fmt.Sprintf("--tail=%d", newTail))
+		args = append(args, "--timestamps")
+
+		kubeconfigEnv := "KUBECONFIG=" + kubeconfigPaths
+		cmd := exec.CommandContext(ctx, kubectlPath, args...)
+		cmd.Env = append(os.Environ(), kubeconfigEnv)
+
+		output, err := cmd.Output()
+		if err != nil {
+			return logHistoryMsg{err: err, prevTotal: prevTotal}
+		}
+
+		var lines []string
+		for _, line := range strings.Split(string(output), "\n") {
+			if line == "" {
+				continue
+			}
+			// Filter by selected containers (same as live stream filtering).
+			if len(selectedContainers) > 0 && !matchesContainerFilter(line, selectedContainers) {
+				continue
+			}
+			lines = append(lines, line)
+		}
+
+		return logHistoryMsg{lines: lines, prevTotal: prevTotal}
+	}
+}
+
+// maybeLoadMoreHistory triggers a background fetch of older log lines
+// when the user has scrolled to the top and more history may be available.
+func (m *Model) maybeLoadMoreHistory() tea.Cmd {
+	if m.logScroll == 0 && m.logHasMoreHistory && !m.logLoadingHistory && !m.logPrevious {
+		m.logLoadingHistory = true
+		return m.fetchOlderLogs()
+	}
+	return nil
+}
+
+// saveLoadedLogs writes the currently buffered log lines to a file under /tmp.
+func (m *Model) saveLoadedLogs() (string, error) {
+	name := sanitizeFilename(m.actionCtx.name)
+	path := fmt.Sprintf("/tmp/lfk-logs-%s-%d.log", name, time.Now().Unix())
+	content := strings.Join(m.logLines, "\n") + "\n"
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		return "", err
+	}
+	return path, nil
+}
+
+// saveAllLogs runs a one-shot kubectl logs (without --tail) and writes everything to a file.
+func (m *Model) saveAllLogs() tea.Cmd {
+	kubectlPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		return func() tea.Msg { return logSaveAllMsg{err: err} }
+	}
+
+	ns := m.actionNamespace()
+	kind := m.actionCtx.kind
+	name := m.actionCtx.name
+	kctx := m.actionCtx.context
+	containerName := m.actionCtx.containerName
+	kubeconfigPaths := m.client.KubeconfigPaths()
+	logPrevious := m.logPrevious
+	sanitized := sanitizeFilename(name)
+
+	return func() tea.Msg {
+		var args []string
+		switch kind {
+		case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob", "Service":
+			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx)
+			if selector != "" {
+				args = []string{
+					"logs", "-l", selector, "--all-containers=true", "--prefix",
+					"--max-log-requests=20", "--timestamps", "-n", ns, "--context", kctx,
+				}
+			} else {
+				resourceRef := strings.ToLower(kind) + "/" + name
+				args = []string{
+					"logs", resourceRef, "--all-containers=true", "--prefix",
+					"--timestamps", "--max-log-requests=20", "-n", ns, "--context", kctx,
+				}
+			}
+		case "Pod":
+			if containerName != "" {
+				args = []string{
+					"logs", name, "-c", containerName, "--prefix", "--timestamps",
+					"-n", ns, "--context", kctx,
+				}
+			} else {
+				args = []string{
+					"logs", name, "--all-containers=true", "--prefix", "--timestamps",
+					"--max-log-requests=20", "-n", ns, "--context", kctx,
+				}
+			}
+		default:
+			return logSaveAllMsg{err: fmt.Errorf("unsupported kind: %s", kind)}
+		}
+
+		if logPrevious {
+			args = append(args, "--previous")
+		}
+
+		cmd := exec.CommandContext(context.Background(), kubectlPath, args...)
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+		output, err := cmd.Output()
+		if err != nil {
+			return logSaveAllMsg{err: err}
+		}
+
+		path := fmt.Sprintf("/tmp/lfk-logs-%s-%d-all.log", sanitized, time.Now().Unix())
+		if err := os.WriteFile(path, output, 0o644); err != nil {
+			return logSaveAllMsg{err: err}
+		}
+		return logSaveAllMsg{path: path}
+	}
+}
+
+// sanitizeFilename replaces characters not suitable for filenames.
+func sanitizeFilename(s string) string {
+	return strings.NewReplacer("/", "_", "\\", "_", ":", "_", " ", "_").Replace(s)
 }
 
 // execCustomAction runs a user-defined custom action command via sh -c.

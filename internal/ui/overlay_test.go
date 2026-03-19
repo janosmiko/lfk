@@ -211,17 +211,27 @@ func TestRenderPodSelectOverlay(t *testing.T) {
 		{Name: "pod-1", Status: "Running"},
 		{Name: "pod-2", Status: "Pending"},
 	}
-	result := RenderPodSelectOverlay(items, 0)
+	result := RenderPodSelectOverlay(items, 0, "", false)
 	assert.Contains(t, result, "Select Pod")
 	assert.Contains(t, result, "pod-1")
 	assert.Contains(t, result, "pod-2")
+	assert.Contains(t, result, "/ to filter")
+}
+
+func TestRenderPodSelectOverlay_FilterActive(t *testing.T) {
+	items := []model.Item{
+		{Name: "pod-1", Status: "Running"},
+		{Name: "pod-2", Status: "Pending"},
+	}
+	result := RenderPodSelectOverlay(items, 0, "pod", true)
+	assert.Contains(t, result, "/ pod")
 }
 
 // --- RenderBookmarkOverlay ---
 
 func TestRenderBookmarkOverlay(t *testing.T) {
 	t.Run("no bookmarks", func(t *testing.T) {
-		result := RenderBookmarkOverlay(nil, "", 0, 0)
+		result := RenderBookmarkOverlay(nil, "", 0, 0, 25)
 		assert.Contains(t, result, "No bookmarks yet")
 	})
 
@@ -230,7 +240,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "My Pods", Namespace: "default"},
 			{Name: "Deployments", Namespace: "staging"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
 		assert.Contains(t, result, "1 My Pods")
 		assert.Contains(t, result, "2 Deployments")
 	})
@@ -240,20 +250,20 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "My Pods"},
 			{Name: "Deployments"},
 		}
-		result := RenderBookmarkOverlay(bms, "pod", 0, 1)
+		result := RenderBookmarkOverlay(bms, "pod", 0, 1, 25)
 		assert.Contains(t, result, "filter>")
 		assert.Contains(t, result, "pod")
 	})
 
 	t.Run("filtered no match", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "Pods"}}
-		result := RenderBookmarkOverlay(bms, "zzz", 0, 0)
+		result := RenderBookmarkOverlay(bms, "zzz", 0, 0, 25)
 		assert.Contains(t, result, "No matching bookmarks")
 	})
 
 	t.Run("bookmark with namespace shows bracket", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "My Pods", Namespace: "production"}}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
 		assert.Contains(t, result, "production")
 	})
 
@@ -262,17 +272,17 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 		for i := range 11 {
 			bms = append(bms, model.Bookmark{Name: fmt.Sprintf("Bookmark %d", i+1)})
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
 		assert.Contains(t, result, "1 Bookmark 1")
 		assert.Contains(t, result, "9 Bookmark 9")
 		// 10th and 11th bookmarks should not have a number prefix.
 		assert.NotContains(t, result, "10 Bookmark 10")
 	})
 
-	t.Run("normal mode footer shows 1-9 hint", func(t *testing.T) {
+	t.Run("normal mode footer shows jump hint", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "Test"}}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
-		assert.Contains(t, result, "1-9: jump")
+		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
+		assert.Contains(t, result, "a-z/0-9: jump")
 	})
 }
 
@@ -896,7 +906,7 @@ func TestRenderDiffView(t *testing.T) {
 	})
 
 	t.Run("shows hint bar", func(t *testing.T) {
-		result := RenderDiffView("a: 1", "a: 2", "x", "y", 0, 80, 20, false)
+		result := RenderDiffView("a: 1", "a: 2", "x", "y", 0, 140, 20, false)
 		assert.Contains(t, result, "j/k")
 		assert.Contains(t, result, "q/esc")
 	})

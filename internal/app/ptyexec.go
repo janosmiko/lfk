@@ -74,18 +74,46 @@ func (m *Model) cleanupExecPTY() {
 }
 
 // handleExecKey forwards key presses to the embedded PTY.
+// Ctrl+] is a prefix key (like tmux's Ctrl+b):
+//   - Ctrl+] then ] = next tab
+//   - Ctrl+] then [ = previous tab
+//   - Ctrl+] then t = new tab
+//   - Ctrl+] then Ctrl+] = exit terminal
+//   - Ctrl+] then any other key = cancel, return to PTY
 func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// ctrl+] exits the embedded terminal.
-	if msg.String() == "ctrl+]" {
+	// If process has exited, any key returns to explorer.
+	if m.execDone != nil && m.execDone.Load() {
 		m.cleanupExecPTY()
+		m.execEscPressed = false
 		m.mode = modeExplorer
 		return m, nil
 	}
 
-	// If process has exited, any key returns to explorer.
-	if m.execDone != nil && m.execDone.Load() {
-		m.cleanupExecPTY()
-		m.mode = modeExplorer
+	// Handle follow-up key after Ctrl+] prefix.
+	if m.execEscPressed {
+		m.execEscPressed = false
+		switch msg.String() {
+		case "ctrl+]":
+			// Double Ctrl+] exits the terminal.
+			m.cleanupExecPTY()
+			m.mode = modeExplorer
+			return m, nil
+		case "]":
+			return m.execSwitchTab((m.activeTab + 1) % len(m.tabs))
+		case "[":
+			return m.execSwitchTab((m.activeTab - 1 + len(m.tabs)) % len(m.tabs))
+		case "t":
+			return m.execNewTab()
+		default:
+			// Cancel prefix — key is swallowed (not forwarded).
+			return m, nil
+		}
+	}
+
+	// Ctrl+] pressed: set prefix flag and show hint.
+	if msg.String() == "ctrl+]" {
+		m.execEscPressed = true
+		m.setStatusMessage("Ctrl+]: ]/[ switch tab, t new tab, Ctrl+] exit", false)
 		return m, nil
 	}
 
@@ -99,6 +127,50 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		_, _ = m.execPTY.Write(raw)
 	}
 	return m, nil
+}
+
+// execSwitchTab saves the current tab and switches to the target tab index.
+func (m Model) execSwitchTab(target int) (tea.Model, tea.Cmd) {
+	if len(m.tabs) <= 1 {
+		return m, nil
+	}
+	m.saveCurrentTab()
+	if cmd := m.loadTab(target); cmd != nil {
+		return m, cmd
+	}
+	switch m.mode {
+	case modeExplorer:
+		return m, m.loadPreview()
+	case modeLogs:
+		if m.logCh != nil {
+			return m, m.waitForLogLine()
+		}
+	case modeExec:
+		if m.execPTY != nil {
+			return m, m.scheduleExecTick()
+		}
+	}
+	return m, nil
+}
+
+// execNewTab creates a new tab from exec mode (starts in explorer).
+func (m Model) execNewTab() (tea.Model, tea.Cmd) {
+	if len(m.tabs) >= 9 {
+		m.setStatusMessage("Max 9 tabs", true)
+		return m, scheduleStatusClear()
+	}
+	m.saveCurrentTab()
+	newTab := m.cloneCurrentTab()
+	newTab.mode = modeExplorer
+	newTab.logLines = nil
+	newTab.logCancel = nil
+	newTab.logCh = nil
+	insertAt := m.activeTab + 1
+	m.tabs = append(m.tabs[:insertAt], append([]TabState{newTab}, m.tabs[insertAt:]...)...)
+	m.activeTab = insertAt
+	m.loadTab(m.activeTab)
+	m.setStatusMessage(fmt.Sprintf("Tab %d created", m.activeTab+1), false)
+	return m, scheduleStatusClear()
 }
 
 // startExecPTYReader launches the background goroutine that reads from PTY

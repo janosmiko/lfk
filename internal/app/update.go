@@ -13,6 +13,7 @@ import (
 
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/creack/pty"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -38,6 +39,24 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.width = msg.Width
 		m.height = msg.Height
 		m.clampAllCursors()
+		// Resize the embedded PTY terminal if active.
+		if m.mode == modeExec && m.execTerm != nil && m.execPTY != nil {
+			cols := m.width - 4
+			rows := m.height - 6
+			if cols < 20 {
+				cols = 20
+			}
+			if rows < 5 {
+				rows = 5
+			}
+			m.execMu.Lock()
+			m.execTerm.Resize(cols, rows)
+			m.execMu.Unlock()
+			_ = pty.Setsize(m.execPTY, &pty.Winsize{
+				Rows: uint16(rows),
+				Cols: uint16(cols),
+			})
+		}
 		return m, nil
 
 	case tea.MouseMsg:
@@ -124,6 +143,17 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			} else {
 				// User is deeper: update leftItems so back-navigation shows CRDs.
 				m.leftItems = merged
+				// Update cursor memory for the resource types level so
+				// navigating back lands on the correct resource type.
+				if m.nav.ResourceType.Resource != "" {
+					rtRef := m.nav.ResourceType.ResourceRef()
+					for i, item := range merged {
+						if item.Extra == rtRef {
+							m.cursorMemory[msg.context] = i
+							break
+						}
+					}
+				}
 			}
 		}
 		return m, nil
@@ -162,6 +192,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(msg.items) == 0 {
 			logger.Info("No resources found", "resourceType", m.nav.ResourceType.Kind, "namespace", m.namespace)
 		}
+		// Remember which item is currently selected so the cursor can be
+		// restored after the list is replaced (watch mode may reorder items).
+		prevName, prevNs, prevExtra := m.cursorItemKey()
+
 		// For pod/node views, carry over existing metrics columns to avoid blinking
 		// when watch mode refreshes (metrics enrichment arrives async).
 		kind := m.nav.ResourceType.Kind
@@ -203,8 +237,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				}
 			}
 			m.pendingTarget = ""
+		} else {
+			// Restore cursor to the previously selected item.
+			m.restoreCursorToItem(prevName, prevNs, prevExtra)
 		}
-		m.clampCursor()
 		// For pod/node views, also trigger async metrics enrichment.
 		var cmds []tea.Cmd
 		cmds = append(cmds, m.loadPreview())
@@ -244,9 +280,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.rightItems = msg.items
 			return m, nil
 		}
+		prevName, prevNs, prevExtra := m.cursorItemKey()
 		m.middleItems = msg.items
 		m.itemCache[m.navKey()] = m.middleItems
-		m.clampCursor()
+		m.restoreCursorToItem(prevName, prevNs, prevExtra)
 		return m, m.loadPreview()
 
 	case resourceTreeLoadedMsg:
@@ -498,10 +535,12 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case statusMessageExpiredMsg:
 		m.statusMessage = ""
+		m.statusMessageTip = false
 		return m, nil
 
 	case startupTipMsg:
 		m.setStatusMessage("Tip: "+msg.tip, false)
+		m.statusMessageTip = true
 		return m, scheduleStatusClear()
 
 	case watchTickMsg:
@@ -541,6 +580,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.overlayItems = pods
 		m.overlay = overlayPodSelect
 		m.overlayCursor = 0
+		m.logPodFilterText = ""
+		m.logPodFilterActive = false
+		ui.ResetOverlayPodScroll()
 		return m, nil
 
 	case podLogSelectMsg:
@@ -548,6 +590,13 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if msg.err != nil {
 			m.setErrorFromErr("Error: ", msg.err)
 			m.pendingAction = ""
+			// If in log mode, restart the previous log stream on error.
+			if m.mode == modeLogs && m.logSavedPodName != "" {
+				m.actionCtx.name = m.logSavedPodName
+				m.actionCtx.kind = "Pod"
+				m.logSavedPodName = ""
+				return m, m.startLogStream()
+			}
 			return m, scheduleStatusClear()
 		}
 		var pods []model.Item
@@ -559,8 +608,48 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		if len(pods) == 0 {
 			m.setStatusMessage("No pods found", true)
 			m.pendingAction = ""
+			// If in log mode, restart the previous log stream when no pods found.
+			if m.mode == modeLogs && m.logSavedPodName != "" {
+				m.actionCtx.name = m.logSavedPodName
+				m.actionCtx.kind = "Pod"
+				m.logSavedPodName = ""
+				return m, m.startLogStream()
+			}
 			return m, scheduleStatusClear()
 		}
+
+		// If we're in log mode (P was pressed from the log viewer), handle inline.
+		if m.mode == modeLogs {
+			if len(pods) == 1 {
+				// Only one pod; switch directly to its logs.
+				m.actionCtx.name = pods[0].Name
+				m.actionCtx.kind = "Pod"
+				if pods[0].Namespace != "" {
+					m.actionCtx.namespace = pods[0].Namespace
+				}
+				m.pendingAction = ""
+				m.logSavedPodName = ""
+				m.logLines = nil
+				m.logScroll = 0
+				m.logFollow = true
+				m.logTailLines = ui.ConfigLogTailLines
+				m.logHasMoreHistory = true
+				m.logLoadingHistory = false
+				m.logCursor = 0
+				m.logVisualMode = false
+				m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+				return m, m.startLogStream()
+			}
+			// Multiple pods; show inline pod selector overlay.
+			m.overlayItems = pods
+			m.overlay = overlayLogPodSelect
+			m.overlayCursor = 0
+			m.logPodFilterText = ""
+			m.logPodFilterActive = false
+			ui.ResetOverlayPodScroll()
+			return m, nil
+		}
+
 		if len(pods) == 1 {
 			// Only one pod, start log streaming directly.
 			m.actionCtx.name = pods[0].Name
@@ -575,6 +664,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.overlayItems = pods
 		m.overlay = overlayPodSelect
 		m.overlayCursor = 0
+		m.logPodFilterText = ""
+		m.logPodFilterActive = false
+		ui.ResetOverlayPodScroll()
 		return m, nil
 
 	case containerSelectMsg:
@@ -791,6 +883,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.explainRecursiveFilter.Clear()
 		m.explainRecursiveFilterActive = false
 		m.overlay = overlayExplainSearch
+		return m, nil
+
+	case logContainersLoadedMsg:
+		if msg.err != nil {
+			m.setErrorFromErr("Failed to load containers: ", msg.err)
+			m.overlay = overlayNone
+			return m, scheduleStatusClear()
+		}
+		if len(msg.containers) <= 1 {
+			// Only one container (or none), no need for a selector.
+			m.overlay = overlayNone
+			name := "this pod"
+			if len(msg.containers) == 1 {
+				name = msg.containers[0]
+			}
+			m.setStatusMessage(fmt.Sprintf("Only one container: %s", name), false)
+			return m, scheduleStatusClear()
+		}
+		m.logContainers = msg.containers
+		// Build overlay items with "All Containers" virtual item at the top.
+		items := []model.Item{{Name: "All Containers", Status: "all"}}
+		for _, c := range msg.containers {
+			items = append(items, model.Item{Name: c})
+		}
+		m.overlayItems = items
 		return m, nil
 
 	case metricsLoadedMsg:
@@ -1236,20 +1353,95 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			m.logLines = append(m.logLines, "--- stream ended ---")
 			if m.logFollow {
 				m.logScroll = m.logMaxScroll()
+				m.logCursor = len(m.logLines) - 1
 			}
 			return m, nil
 		}
 		m.logLines = append(m.logLines, msg.line)
 		if m.logFollow {
 			m.logScroll = m.logMaxScroll()
+			m.logCursor = len(m.logLines) - 1
 		}
 		return m, m.waitForLogLine()
+
+	case logHistoryMsg:
+		m.logLoadingHistory = false
+		if msg.err != nil {
+			m.logHasMoreHistory = false
+			return m, nil
+		}
+		if m.mode != modeLogs {
+			return m, nil
+		}
+
+		// Find overlap: search for the first 3 current lines in the fetched history.
+		overlapIdx := -1
+		if len(m.logLines) >= 3 && len(msg.lines) > 3 {
+			first3 := m.logLines[:3]
+			for i := len(msg.lines) - 3; i >= 0; i-- {
+				if msg.lines[i] == first3[0] && msg.lines[i+1] == first3[1] && msg.lines[i+2] == first3[2] {
+					overlapIdx = i
+					break
+				}
+			}
+		} else if len(m.logLines) > 0 && len(msg.lines) > 0 {
+			// Single-line fallback.
+			for i := len(msg.lines) - 1; i >= 0; i-- {
+				if msg.lines[i] == m.logLines[0] {
+					overlapIdx = i
+					break
+				}
+			}
+		}
+
+		var newOlderLines []string
+		if overlapIdx > 0 {
+			newOlderLines = msg.lines[:overlapIdx]
+		} else if overlapIdx == -1 && len(msg.lines) > 0 {
+			// No overlap found; prepend all (logs may have rotated).
+			newOlderLines = msg.lines
+		}
+
+		if len(newOlderLines) == 0 {
+			m.logHasMoreHistory = false
+			return m, nil
+		}
+
+		// Prepend and adjust scroll to maintain view position.
+		prepended := len(newOlderLines)
+		m.logLines = append(newOlderLines, m.logLines...)
+		m.logScroll += prepended
+		if m.logCursor >= 0 {
+			m.logCursor += prepended
+		}
+		m.logTailLines += ui.ConfigLogTailLines
+
+		// Cap total to prevent unbounded growth.
+		if m.logTailLines > 100000 {
+			m.logHasMoreHistory = false
+		}
+
+		return m, nil
+
+	case logSaveAllMsg:
+		if msg.err != nil {
+			m.setErrorFromErr("Log save failed: ", msg.err)
+			return m, scheduleStatusClear()
+		}
+		m.setStatusMessage("All logs saved to "+msg.path, false)
+		return m, scheduleStatusClear()
 	}
 
 	return m, nil
 }
 
 func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Dismiss startup tip on any keypress.
+	if m.statusMessageTip {
+		m.statusMessage = ""
+		m.statusMessageTip = false
+	}
+
 	// Handle error log overlay first (independent of regular overlays).
 	if m.overlayErrorLog {
 		return m.handleErrorLogOverlayKey(msg)
@@ -1283,7 +1475,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if len(m.tabs) > 1 {
 				m.saveCurrentTab() // save mode + log state BEFORE switching
 				next := (m.activeTab + 1) % len(m.tabs)
-				m.loadTab(next)
+				if cmd := m.loadTab(next); cmd != nil {
+					return m, cmd
+				}
 				if m.mode == modeExplorer {
 					return m, m.loadPreview()
 				}
@@ -1299,7 +1493,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if len(m.tabs) > 1 {
 				m.saveCurrentTab()
 				prev := (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
-				m.loadTab(prev)
+				if cmd := m.loadTab(prev); cmd != nil {
+					return m, cmd
+				}
 				if m.mode == modeExplorer {
 					return m, m.loadPreview()
 				}
@@ -1327,7 +1523,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				insertAt := m.activeTab + 1
 				m.tabs = append(m.tabs[:insertAt], append([]TabState{newTab}, m.tabs[insertAt:]...)...)
 				m.activeTab = insertAt
-				m.loadTab(m.activeTab)
+				m.loadTab(m.activeTab) // cloned tab is always fully loaded, ignore returned cmd
 				m.setStatusMessage(fmt.Sprintf("Tab %d created", m.activeTab+1), false)
 				return m, scheduleStatusClear()
 			}
@@ -1377,12 +1573,32 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pendingG = false
 	}
 
+	// Vim-style named marks: m<key> saves bookmark to slot, '<key> jumps to slot.
+	if m.pendingMark {
+		m.pendingMark = false
+		key := msg.String()
+		if len(key) == 1 && ((key[0] >= 'a' && key[0] <= 'z') || (key[0] >= '0' && key[0] <= '9')) {
+			return m.bookmarkToSlot(key)
+		}
+		// Invalid slot key — ignore silently.
+		return m, nil
+	}
+
+	// Bookmark overwrite confirmation: y accepts, anything else cancels.
+	if m.pendingBookmark != nil {
+		bm := m.pendingBookmark
+		m.pendingBookmark = nil
+		if msg.String() == "y" || msg.String() == "Y" {
+			return m.saveBookmark(*bm)
+		}
+		m.setStatusMessage("Cancelled", false)
+		return m, scheduleStatusClear()
+	}
+
 	switch msg.String() {
 	case "q":
-		if m.portForwardMgr != nil {
-			m.portForwardMgr.StopAll()
-		}
-		return m, tea.Quit
+		m.overlay = overlayQuitConfirm
+		return m, nil
 
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -1431,7 +1647,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				if m.activeTab >= len(m.tabs) {
 					m.activeTab = len(m.tabs) - 1
 				}
-				m.loadTab(m.activeTab)
+				if cmd := m.loadTab(m.activeTab); cmd != nil {
+					return m, cmd
+				}
 				return m, m.loadPreview()
 			}
 			return m, tea.Quit
@@ -1692,18 +1910,20 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "b":
-		// Open bookmarks overlay.
+	case "'":
+		// Open bookmarks overlay immediately; slot keys (a-z, 0-9) jump from within the overlay.
 		m.overlay = overlayBookmarks
 		m.overlayCursor = 0
 		m.bookmarkFilter.Clear()
 		return m, nil
 
-	case "B":
-		// Bookmark current location.
-		return m.bookmarkCurrentLocation()
+	case "m":
+		// Vim-style set mark: wait for slot key.
+		m.pendingMark = true
+		return m, nil
 
 	case "?":
+		m.helpPreviousMode = modeExplorer
 		m.mode = modeHelp
 		m.helpScroll = 0
 		m.helpFilter.Clear()
@@ -1740,7 +1960,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commandHistory.reset()
 		return m, nil
 
-	case "m":
+	case "M":
 		// Toggle resource relationship map in the right column.
 		if m.nav.Level >= model.LevelResources && (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod" || m.nav.ResourceType.Kind == "ReplicaSet") {
 			m.mapView = !m.mapView
@@ -2093,7 +2313,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.saveCurrentTab()
 		next := (m.activeTab + 1) % len(m.tabs)
-		m.loadTab(next)
+		if cmd := m.loadTab(next); cmd != nil {
+			return m, cmd
+		}
 		if m.mode == modeExec && m.execPTY != nil {
 			return m, m.scheduleExecTick()
 		}
@@ -2106,7 +2328,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.saveCurrentTab()
 		prev := (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
-		m.loadTab(prev)
+		if cmd := m.loadTab(prev); cmd != nil {
+			return m, cmd
+		}
 		if m.mode == modeExec && m.execPTY != nil {
 			return m, m.scheduleExecTick()
 		}
@@ -2335,11 +2559,35 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// In visual selection mode, restrict keys to selection/copy/cancel.
 	if m.yamlVisualMode {
 		switch msg.String() {
-		case "V", "esc":
+		case "esc":
 			m.yamlVisualMode = false
 			return m, nil
+		case "V":
+			// Toggle: if already in line mode, cancel; otherwise switch to line mode.
+			if m.yamlVisualType == 'V' {
+				m.yamlVisualMode = false
+			} else {
+				m.yamlVisualType = 'V'
+			}
+			return m, nil
+		case "v":
+			// Toggle: if already in char mode, cancel; otherwise switch to char mode.
+			if m.yamlVisualType == 'v' {
+				m.yamlVisualMode = false
+			} else {
+				m.yamlVisualType = 'v'
+			}
+			return m, nil
+		case "ctrl+v":
+			// Toggle: if already in block mode, cancel; otherwise switch to block mode.
+			if m.yamlVisualType == 'B' {
+				m.yamlVisualMode = false
+			} else {
+				m.yamlVisualType = 'B'
+			}
+			return m, nil
 		case "y":
-			// Copy selected lines to clipboard using original content (no fold indicators).
+			// Copy selected content to clipboard using original content (no fold indicators).
 			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
 			_, mapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
 			selStart := min(m.yamlVisualStart, m.yamlCursor)
@@ -2351,15 +2599,94 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				selEnd = len(mapping) - 1
 			}
 			origLines := strings.Split(yamlForDisplay, "\n")
-			var selected []string
-			for i := selStart; i <= selEnd; i++ {
-				if i < len(mapping) && mapping[i] >= 0 && mapping[i] < len(origLines) {
-					selected = append(selected, origLines[mapping[i]])
+			var clipText string
+			switch m.yamlVisualType {
+			case 'v': // Character mode: partial first/last lines.
+				var parts []string
+				colStart := m.yamlVisualCol
+				colEnd := m.yamlVisualCurCol
+				for i := selStart; i <= selEnd; i++ {
+					if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
+						continue
+					}
+					line := origLines[mapping[i]]
+					runes := []rune(line)
+					if selStart == selEnd {
+						// Single line: extract column range.
+						cs := min(colStart, colEnd)
+						ce := max(colStart, colEnd) + 1
+						if cs > len(runes) {
+							cs = len(runes)
+						}
+						if ce > len(runes) {
+							ce = len(runes)
+						}
+						parts = append(parts, string(runes[cs:ce]))
+					} else if i == selStart {
+						cs := colStart
+						if cs > len(runes) {
+							cs = len(runes)
+						}
+						parts = append(parts, string(runes[cs:]))
+					} else if i == selEnd {
+						ce := colEnd + 1
+						if ce > len(runes) {
+							ce = len(runes)
+						}
+						parts = append(parts, string(runes[:ce]))
+					} else {
+						parts = append(parts, line)
+					}
+				}
+				clipText = strings.Join(parts, "\n")
+			case 'B': // Block mode: rectangular column range.
+				colStart := min(m.yamlVisualCol, m.yamlVisualCurCol)
+				colEnd := max(m.yamlVisualCol, m.yamlVisualCurCol) + 1
+				var parts []string
+				for i := selStart; i <= selEnd; i++ {
+					if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
+						continue
+					}
+					line := origLines[mapping[i]]
+					runes := []rune(line)
+					cs := colStart
+					ce := colEnd
+					if cs > len(runes) {
+						cs = len(runes)
+					}
+					if ce > len(runes) {
+						ce = len(runes)
+					}
+					parts = append(parts, string(runes[cs:ce]))
+				}
+				clipText = strings.Join(parts, "\n")
+			default: // Line mode: whole lines.
+				var selected []string
+				for i := selStart; i <= selEnd; i++ {
+					if i < len(mapping) && mapping[i] >= 0 && mapping[i] < len(origLines) {
+						selected = append(selected, origLines[mapping[i]])
+					}
+				}
+				clipText = strings.Join(selected, "\n")
+			}
+			lineCount := selEnd - selStart + 1
+			m.yamlVisualMode = false
+			m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
+			return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+		case "h", "left":
+			// Move cursor column left (for char and block modes).
+			if m.yamlVisualType == 'v' || m.yamlVisualType == 'B' {
+				if m.yamlVisualCurCol > 0 {
+					m.yamlVisualCurCol--
 				}
 			}
-			m.yamlVisualMode = false
-			m.setStatusMessage(fmt.Sprintf("Copied %d lines", len(selected)), false)
-			return m, tea.Batch(copyToSystemClipboard(strings.Join(selected, "\n")), scheduleStatusClear())
+			return m, nil
+		case "l", "right":
+			// Move cursor column right (for char and block modes).
+			if m.yamlVisualType == 'v' || m.yamlVisualType == 'B' {
+				m.yamlVisualCurCol++
+			}
+			return m, nil
 		case "j", "down":
 			if m.yamlCursor < totalVisible-1 {
 				m.yamlCursor++
@@ -2414,6 +2741,7 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "?":
+		m.helpPreviousMode = modeYAML
 		m.mode = modeHelp
 		m.helpScroll = 0
 		m.helpFilter.Clear()
@@ -2423,7 +2751,23 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "V":
 		// Enter visual line selection mode.
 		m.yamlVisualMode = true
+		m.yamlVisualType = 'V'
 		m.yamlVisualStart = m.yamlCursor
+		m.yamlVisualCol = m.yamlVisualCurCol
+		return m, nil
+	case "v":
+		// Enter character visual selection mode; anchor at current cursor column.
+		m.yamlVisualMode = true
+		m.yamlVisualType = 'v'
+		m.yamlVisualStart = m.yamlCursor
+		m.yamlVisualCol = m.yamlVisualCurCol
+		return m, nil
+	case "ctrl+v":
+		// Enter block visual selection mode; anchor at current cursor column.
+		m.yamlVisualMode = true
+		m.yamlVisualType = 'B'
+		m.yamlVisualStart = m.yamlCursor
+		m.yamlVisualCol = m.yamlVisualCurCol
 		return m, nil
 	case "q", "esc":
 		if m.yamlSearchText.Value != "" {
@@ -2510,6 +2854,31 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.yamlCollapsed = make(map[string]bool)
 		}
 		m.clampYAMLScroll()
+		return m, nil
+	case "h", "left":
+		// Move cursor column left.
+		if m.yamlVisualCurCol > 0 {
+			m.yamlVisualCurCol--
+		}
+		return m, nil
+	case "l", "right":
+		// Move cursor column right.
+		m.yamlVisualCurCol++
+		return m, nil
+	case "0":
+		// Move cursor to beginning of line.
+		m.yamlVisualCurCol = 0
+		return m, nil
+	case "$":
+		// Move cursor to end of current line.
+		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
+			lineLen := len([]rune(visLines[m.yamlCursor]))
+			if lineLen > 0 {
+				m.yamlVisualCurCol = lineLen - 1
+			}
+		}
 		return m, nil
 	case "j", "down":
 		if m.yamlCursor < totalVisible-1 {
@@ -2686,6 +3055,7 @@ func (m Model) handleDescribeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "?":
+		m.helpPreviousMode = modeDescribe
 		m.mode = modeHelp
 		m.helpScroll = 0
 		m.helpFilter.Clear()
@@ -2764,6 +3134,7 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "?":
+		m.helpPreviousMode = modeDiff
 		m.mode = modeHelp
 		m.helpScroll = 0
 		m.helpFilter.Clear()
@@ -2842,7 +3213,7 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.diffUnified = !m.diffUnified
 		m.diffScroll = 0
 		return m, nil
-	case "l":
+	case "#":
 		m.diffLineInput = ""
 		m.diffLineNumbers = !m.diffLineNumbers
 		return m, nil
@@ -2863,8 +3234,14 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLogSearchKey(msg)
 	}
 
+	// Handle visual select mode keys.
+	if m.logVisualMode {
+		return m.handleLogVisualKey(msg)
+	}
+
 	switch msg.String() {
 	case "?":
+		m.helpPreviousMode = modeLogs
 		m.mode = modeHelp
 		m.helpScroll = 0
 		m.helpFilter.Clear()
@@ -2876,6 +3253,10 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.logCancel()
 			m.logCancel = nil
 		}
+		if m.logHistoryCancel != nil {
+			m.logHistoryCancel()
+			m.logHistoryCancel = nil
+		}
 		m.logCh = nil
 		m.mode = modeExplorer
 		m.logLineInput = ""
@@ -2883,48 +3264,63 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.logSearchInput.Clear()
 		m.logParentKind = ""
 		m.logParentName = ""
+		m.logVisualMode = false
 		return m, nil
 	case "j", "down":
 		m.logFollow = false
 		m.logLineInput = ""
-		m.logScroll++
-		m.clampLogScroll()
+		if m.logCursor < len(m.logLines)-1 {
+			m.logCursor++
+		}
+		m.ensureLogCursorVisible()
 		return m, nil
 	case "k", "up":
 		m.logFollow = false
 		m.logLineInput = ""
-		if m.logScroll > 0 {
-			m.logScroll--
+		if m.logCursor > 0 {
+			m.logCursor--
 		}
-		return m, nil
+		m.ensureLogCursorVisible()
+		cmd := m.maybeLoadMoreHistory()
+		return m, cmd
 	case "ctrl+d":
 		m.logFollow = false
 		m.logLineInput = ""
-		m.logScroll += m.logViewHeight() / 2
-		m.clampLogScroll()
+		m.logCursor += m.logContentHeight() / 2
+		if m.logCursor >= len(m.logLines) {
+			m.logCursor = len(m.logLines) - 1
+		}
+		m.ensureLogCursorVisible()
 		return m, nil
 	case "ctrl+u":
 		m.logFollow = false
 		m.logLineInput = ""
-		m.logScroll -= m.logViewHeight() / 2
-		if m.logScroll < 0 {
-			m.logScroll = 0
+		m.logCursor -= m.logContentHeight() / 2
+		if m.logCursor < 0 {
+			m.logCursor = 0
 		}
-		return m, nil
+		m.ensureLogCursorVisible()
+		cmd := m.maybeLoadMoreHistory()
+		return m, cmd
 	case "ctrl+f":
 		m.logFollow = false
 		m.logLineInput = ""
-		m.logScroll += m.logViewHeight()
-		m.clampLogScroll()
+		m.logCursor += m.logContentHeight()
+		if m.logCursor >= len(m.logLines) {
+			m.logCursor = len(m.logLines) - 1
+		}
+		m.ensureLogCursorVisible()
 		return m, nil
 	case "ctrl+b":
 		m.logFollow = false
 		m.logLineInput = ""
-		m.logScroll -= m.logViewHeight()
-		if m.logScroll < 0 {
-			m.logScroll = 0
+		m.logCursor -= m.logContentHeight()
+		if m.logCursor < 0 {
+			m.logCursor = 0
 		}
-		return m, nil
+		m.ensureLogCursorVisible()
+		cmd := m.maybeLoadMoreHistory()
+		return m, cmd
 	case "G":
 		if m.logLineInput != "" {
 			lineNum, _ := strconv.Atoi(m.logLineInput)
@@ -2932,27 +3328,83 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if lineNum > 0 {
 				lineNum-- // 0-indexed
 			}
-			m.logScroll = min(lineNum, m.logMaxScroll())
+			m.logCursor = min(lineNum, len(m.logLines)-1)
 			m.logFollow = false
 		} else {
-			m.logScroll = m.logMaxScroll()
+			m.logCursor = len(m.logLines) - 1
 			m.logFollow = true
 		}
+		m.ensureLogCursorVisible()
 		return m, nil
 	case "g":
 		if m.pendingG {
 			m.pendingG = false
 			m.logFollow = false
 			m.logLineInput = ""
-			m.logScroll = 0
-			return m, nil
+			m.logCursor = 0
+			m.ensureLogCursorVisible()
+			cmd := m.maybeLoadMoreHistory()
+			return m, cmd
 		}
 		m.pendingG = true
+		return m, nil
+	case "h", "left":
+		// Move cursor column left.
+		m.logLineInput = ""
+		if m.logVisualCurCol > 0 {
+			m.logVisualCurCol--
+		}
+		return m, nil
+	case "l", "right":
+		// Move cursor column right.
+		m.logLineInput = ""
+		m.logVisualCurCol++
+		return m, nil
+	case "$":
+		// Move cursor to end of current line.
+		m.logLineInput = ""
+		if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+			lineLen := len([]rune(m.logLines[m.logCursor]))
+			if lineLen > 0 {
+				m.logVisualCurCol = lineLen - 1
+			}
+		}
+		return m, nil
+	case "V":
+		m.logLineInput = ""
+		if m.logCursor < 0 {
+			m.logCursor = m.logScroll
+		}
+		m.logVisualMode = true
+		m.logVisualType = 'V'
+		m.logVisualStart = m.logCursor
+		m.logVisualCol = m.logVisualCurCol
+		return m, nil
+	case "v":
+		m.logLineInput = ""
+		if m.logCursor < 0 {
+			m.logCursor = m.logScroll
+		}
+		m.logVisualMode = true
+		m.logVisualType = 'v'
+		m.logVisualStart = m.logCursor
+		m.logVisualCol = m.logVisualCurCol
+		return m, nil
+	case "ctrl+v":
+		m.logLineInput = ""
+		if m.logCursor < 0 {
+			m.logCursor = m.logScroll
+		}
+		m.logVisualMode = true
+		m.logVisualType = 'B'
+		m.logVisualStart = m.logCursor
+		m.logVisualCol = m.logVisualCurCol
 		return m, nil
 	case "f":
 		m.logLineInput = ""
 		m.logFollow = !m.logFollow
 		if m.logFollow {
+			m.logCursor = len(m.logLines) - 1
 			m.logScroll = m.logMaxScroll()
 		}
 		return m, nil
@@ -2974,25 +3426,30 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.logLineInput = ""
 		m.findNextLogMatch(false)
 		return m, nil
-	case "l":
+	case "#":
 		m.logLineInput = ""
 		m.logLineNumbers = !m.logLineNumbers
 		return m, nil
 	case "s":
+		// Toggle timestamp visibility (no stream restart — timestamps are always streamed).
 		m.logLineInput = ""
 		m.logTimestamps = !m.logTimestamps
-		// Restart the log stream with updated --timestamps flag.
-		if m.logCancel != nil {
-			m.logCancel()
+		return m, nil
+	case "W":
+		// Save loaded logs to file.
+		m.logLineInput = ""
+		path, err := m.saveLoadedLogs()
+		if err != nil {
+			m.setErrorFromErr("Log save failed: ", err)
+			return m, scheduleStatusClear()
 		}
-		m.logLines = nil
-		m.logScroll = 0
-		if m.logIsMulti && len(m.logMultiItems) > 0 {
-			var cmd tea.Cmd
-			m, cmd = m.restartMultiLogStream()
-			return m, cmd
-		}
-		return m, m.startLogStream()
+		m.setStatusMessage("Loaded logs saved to "+path, false)
+		return m, scheduleStatusClear()
+	case "ctrl+s":
+		// Save all logs (full kubectl logs without --tail) to file.
+		m.logLineInput = ""
+		m.setStatusMessage("Saving all logs...", false)
+		return m, m.saveAllLogs()
 	case "c":
 		m.logLineInput = ""
 		m.logPrevious = !m.logPrevious
@@ -3004,8 +3461,17 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.logCancel != nil {
 			m.logCancel()
 		}
+		if m.logHistoryCancel != nil {
+			m.logHistoryCancel()
+			m.logHistoryCancel = nil
+		}
 		m.logLines = nil
 		m.logScroll = 0
+		m.logCursor = 0
+		m.logVisualMode = false
+		m.logTailLines = ui.ConfigLogTailLines
+		m.logHasMoreHistory = !m.logPrevious && !m.logIsMulti
+		m.logLoadingHistory = false
 		if m.logIsMulti && len(m.logMultiItems) > 0 {
 			var cmd tea.Cmd
 			m, cmd = m.restartMultiLogStream()
@@ -3015,35 +3481,220 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		m.logLineInput += msg.String()
 		return m, nil
-	case "P":
-		// Switch pod: re-trigger pod selection for the parent resource.
+	case "\\":
+		// Unified selector: container filter first (if on a Pod), pod switch second.
 		m.logLineInput = ""
-		if m.logParentKind == "" {
-			return m, nil
+		if m.actionCtx.kind == "Pod" {
+			// Show container selector overlay for filtering which containers' logs are shown.
+			m.overlay = overlayLogContainerSelect
+			m.overlayCursor = 0
+			m.logContainerFilterText = ""
+			m.logContainerFilterActive = false
+			m.logContainerSelectionModified = false
+			ui.ResetOverlayContainerScroll()
+			return m, m.loadContainersForLogFilter()
 		}
-		// Cancel current log stream.
-		if m.logCancel != nil {
-			m.logCancel()
-			m.logCancel = nil
+		if m.logParentKind != "" {
+			// Switch pod: show inline pod selector overlay without leaving log mode.
+			m.logSavedPodName = m.actionCtx.name
+			if m.logCancel != nil {
+				m.logCancel()
+				m.logCancel = nil
+			}
+			if m.logHistoryCancel != nil {
+				m.logHistoryCancel()
+				m.logHistoryCancel = nil
+			}
+			m.logCh = nil
+			m.actionCtx.kind = m.logParentKind
+			m.actionCtx.name = m.logParentName
+			m.actionCtx.containerName = ""
+			m.pendingAction = "Logs"
+			m.loading = true
+			m.setStatusMessage("Loading pods...", false)
+			return m, m.loadPodsForLogAction()
 		}
-		m.logCh = nil
-		// Restore the parent resource context for pod selection.
-		m.actionCtx.kind = m.logParentKind
-		m.actionCtx.name = m.logParentName
-		m.actionCtx.containerName = ""
-		// Exit log mode so the pod selector overlay can render.
-		m.mode = modeExplorer
-		m.pendingAction = "Logs"
-		m.loading = true
-		m.setStatusMessage("Loading pods...", false)
-		return m, m.loadPodsForLogAction()
+		return m, nil
 	case "ctrl+c":
 		if m.logCancel != nil {
 			m.logCancel()
 		}
+		if m.logHistoryCancel != nil {
+			m.logHistoryCancel()
+			m.logHistoryCancel = nil
+		}
 		return m.closeTabOrQuit()
 	default:
 		m.logLineInput = ""
+	}
+	return m, nil
+}
+
+func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.logVisualMode = false
+		return m, nil
+	case "V":
+		// Toggle: if already in line mode, cancel; otherwise switch to line mode.
+		if m.logVisualType == 'V' {
+			m.logVisualMode = false
+		} else {
+			m.logVisualType = 'V'
+		}
+		return m, nil
+	case "v":
+		// Toggle: if already in char mode, cancel; otherwise switch to char mode.
+		if m.logVisualType == 'v' {
+			m.logVisualMode = false
+		} else {
+			m.logVisualType = 'v'
+		}
+		return m, nil
+	case "ctrl+v":
+		// Toggle: if already in block mode, cancel; otherwise switch to block mode.
+		if m.logVisualType == 'B' {
+			m.logVisualMode = false
+		} else {
+			m.logVisualType = 'B'
+		}
+		return m, nil
+	case "y":
+		// Copy selected content to clipboard.
+		selStart := min(m.logVisualStart, m.logCursor)
+		selEnd := max(m.logVisualStart, m.logCursor)
+		if selStart < 0 {
+			selStart = 0
+		}
+		if selEnd >= len(m.logLines) {
+			selEnd = len(m.logLines) - 1
+		}
+		var clipText string
+		switch m.logVisualType {
+		case 'v': // Character mode: partial first/last lines.
+			var parts []string
+			colStart := m.logVisualCol
+			colEnd := m.logVisualCurCol
+			for i := selStart; i <= selEnd; i++ {
+				line := m.logLines[i]
+				runes := []rune(line)
+				if selStart == selEnd {
+					// Single line: extract column range.
+					cs := min(colStart, colEnd)
+					ce := max(colStart, colEnd) + 1
+					if cs > len(runes) {
+						cs = len(runes)
+					}
+					if ce > len(runes) {
+						ce = len(runes)
+					}
+					parts = append(parts, string(runes[cs:ce]))
+				} else if i == selStart {
+					cs := colStart
+					if cs > len(runes) {
+						cs = len(runes)
+					}
+					parts = append(parts, string(runes[cs:]))
+				} else if i == selEnd {
+					ce := colEnd + 1
+					if ce > len(runes) {
+						ce = len(runes)
+					}
+					parts = append(parts, string(runes[:ce]))
+				} else {
+					parts = append(parts, line)
+				}
+			}
+			clipText = strings.Join(parts, "\n")
+		case 'B': // Block mode: rectangular column range.
+			colStart := min(m.logVisualCol, m.logVisualCurCol)
+			colEnd := max(m.logVisualCol, m.logVisualCurCol) + 1
+			var parts []string
+			for i := selStart; i <= selEnd; i++ {
+				line := m.logLines[i]
+				runes := []rune(line)
+				cs := colStart
+				ce := colEnd
+				if cs > len(runes) {
+					cs = len(runes)
+				}
+				if ce > len(runes) {
+					ce = len(runes)
+				}
+				parts = append(parts, string(runes[cs:ce]))
+			}
+			clipText = strings.Join(parts, "\n")
+		default: // Line mode: whole lines.
+			var selected []string
+			for i := selStart; i <= selEnd; i++ {
+				selected = append(selected, m.logLines[i])
+			}
+			clipText = strings.Join(selected, "\n")
+		}
+		lineCount := selEnd - selStart + 1
+		m.logVisualMode = false
+		m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
+		return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+	case "h", "left":
+		// Move cursor column left (for char and block modes).
+		if m.logVisualType == 'v' || m.logVisualType == 'B' {
+			if m.logVisualCurCol > 0 {
+				m.logVisualCurCol--
+			}
+		}
+		return m, nil
+	case "l", "right":
+		// Move cursor column right (for char and block modes).
+		if m.logVisualType == 'v' || m.logVisualType == 'B' {
+			m.logVisualCurCol++
+		}
+		return m, nil
+	case "j", "down":
+		if m.logCursor < len(m.logLines)-1 {
+			m.logCursor++
+		}
+		m.ensureLogCursorVisible()
+		return m, nil
+	case "k", "up":
+		if m.logCursor > 0 {
+			m.logCursor--
+		}
+		m.ensureLogCursorVisible()
+		cmd := m.maybeLoadMoreHistory()
+		return m, cmd
+	case "G":
+		m.logCursor = len(m.logLines) - 1
+		m.ensureLogCursorVisible()
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.logCursor = 0
+			m.ensureLogCursorVisible()
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "ctrl+d":
+		m.logCursor += m.logContentHeight() / 2
+		if m.logCursor >= len(m.logLines) {
+			m.logCursor = len(m.logLines) - 1
+		}
+		m.ensureLogCursorVisible()
+		return m, nil
+	case "ctrl+u":
+		m.logCursor -= m.logContentHeight() / 2
+		if m.logCursor < 0 {
+			m.logCursor = 0
+		}
+		m.ensureLogCursorVisible()
+		return m, nil
+	case "ctrl+c":
+		m.logVisualMode = false
+		return m.closeTabOrQuit()
+	case "q":
+		m.logVisualMode = false
+		return m, nil
 	}
 	return m, nil
 }
@@ -3087,36 +3738,43 @@ func (m *Model) findNextLogMatch(forward bool) {
 		return
 	}
 	query := strings.ToLower(m.logSearchQuery)
-	start := m.logScroll
+	start := m.logCursor
+	if start < 0 {
+		start = m.logScroll
+	}
 	if forward {
 		for i := start + 1; i < len(m.logLines); i++ {
 			if strings.Contains(strings.ToLower(m.logLines[i]), query) {
-				m.logScroll = i
+				m.logCursor = i
 				m.logFollow = false
+				m.ensureLogCursorVisible()
 				return
 			}
 		}
 		// Wrap around.
 		for i := 0; i <= start; i++ {
 			if strings.Contains(strings.ToLower(m.logLines[i]), query) {
-				m.logScroll = i
+				m.logCursor = i
 				m.logFollow = false
+				m.ensureLogCursorVisible()
 				return
 			}
 		}
 	} else {
 		for i := start - 1; i >= 0; i-- {
 			if strings.Contains(strings.ToLower(m.logLines[i]), query) {
-				m.logScroll = i
+				m.logCursor = i
 				m.logFollow = false
+				m.ensureLogCursorVisible()
 				return
 			}
 		}
 		// Wrap around.
 		for i := len(m.logLines) - 1; i >= start; i-- {
 			if strings.Contains(strings.ToLower(m.logLines[i]), query) {
-				m.logScroll = i
+				m.logCursor = i
 				m.logFollow = false
+				m.ensureLogCursorVisible()
 				return
 			}
 		}
@@ -3135,6 +3793,8 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 					m.logScroll = 0
 				}
 			}
+			cmd := m.maybeLoadMoreHistory()
+			return m, cmd
 		case tea.MouseButtonWheelDown:
 			m.logFollow = false
 			m.logScroll += 3

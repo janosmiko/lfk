@@ -95,7 +95,7 @@ func (m Model) loadOwned(forPreview bool) tea.Cmd {
 		if sel.Namespace != "" {
 			ns = sel.Namespace
 		}
-	} else if m.allNamespaces {
+	} else if ns == "" && m.nav.Namespace != "" {
 		ns = m.nav.Namespace
 	}
 	return func() tea.Msg {
@@ -147,7 +147,7 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 	ns := m.effectiveNamespace()
 	gen := m.requestGen
 	reqCtx := m.reqCtx
-	if m.allNamespaces {
+	if ns == "" && m.nav.Namespace != "" {
 		ns = m.nav.Namespace
 	}
 	podName := m.nav.OwnedName
@@ -328,7 +328,7 @@ func (m Model) loadDiff(rt model.ResourceTypeEntry, itemA, itemB model.Item) tea
 
 // resolveNamespace returns the namespace to use for get/describe operations.
 func (m Model) resolveNamespace() string {
-	if m.allNamespaces && m.nav.Namespace != "" {
+	if m.nav.Namespace != "" {
 		return m.nav.Namespace
 	}
 	return m.namespace

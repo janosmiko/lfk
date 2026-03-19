@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math/rand/v2"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -48,7 +49,7 @@ var startupTips = []string{
 	"Press v to describe a resource (like kubectl describe)",
 	"Press p to pin/unpin CRD groups for quick access",
 	"Use abbreviated search: type 'po' for Pods, 'deploy' for Deployments",
-	"In log viewer: s for timestamps, c for previous container logs",
+	"In log viewer: s for timestamps, c for previous, C to filter containers",
 	"Press Ctrl+Y to copy full resource YAML, Ctrl+P to paste and create",
 	"Configure custom actions per resource type in ~/.config/lfk/config.yaml",
 	"Disable tips with 'tips: false' in ~/.config/lfk/config.yaml",
@@ -56,9 +57,7 @@ var startupTips = []string{
 
 // scheduleStartupTip sends a random tip after a short delay to let the UI settle.
 func scheduleStartupTip() tea.Cmd {
-	//nolint:gosec // math/rand is fine for tip selection
-	idx := time.Now().UnixNano() % int64(len(startupTips))
-	tip := startupTips[idx]
+	tip := startupTips[rand.IntN(len(startupTips))]
 	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
 		return startupTipMsg{tip: tip}
 	})
@@ -201,6 +200,25 @@ func (m Model) loadContainersForAction() tea.Cmd {
 			items[i], items[j] = items[j], items[i]
 		}
 		return containerSelectMsg{items: items, err: err}
+	}
+}
+
+// loadContainersForLogFilter fetches the container list for the current pod in the log viewer.
+// Returns a logContainersLoadedMsg with container names for the filter overlay.
+func (m Model) loadContainersForLogFilter() tea.Cmd {
+	kctx := m.actionCtx.context
+	ns := m.actionNamespace()
+	podName := m.actionCtx.name
+	return func() tea.Msg {
+		items, err := m.client.GetContainers(context.Background(), kctx, ns, podName)
+		if err != nil {
+			return logContainersLoadedMsg{err: err}
+		}
+		var names []string
+		for _, item := range items {
+			names = append(names, item.Name)
+		}
+		return logContainersLoadedMsg{containers: names}
 	}
 }
 

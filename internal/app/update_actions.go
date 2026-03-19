@@ -127,10 +127,11 @@ func (m *Model) buildActionCtx(sel *model.Item, kind string) actionContext {
 	}
 
 	// Capture the namespace of the target resource.
+	// Priority: item namespace > navigation namespace > selector namespace.
 	switch {
 	case sel.Namespace != "":
 		ctx.namespace = sel.Namespace
-	case m.allNamespaces && m.nav.Namespace != "":
+	case m.nav.Namespace != "":
 		ctx.namespace = m.nav.Namespace
 	default:
 		ctx.namespace = m.namespace
@@ -358,6 +359,14 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.logPrevious = false
 		m.logIsMulti = false
 		m.logMultiItems = nil
+		m.logSelectedContainers = nil
+		m.logContainers = nil
+		m.logTailLines = ui.ConfigLogTailLines
+		m.logHasMoreHistory = true
+		m.logLoadingHistory = false
+		m.logCursor = 0 // will track end as lines stream in with follow mode
+		m.logVisualMode = false
+		m.logVisualStart = 0
 		if m.actionCtx.containerName != "" {
 			m.logTitle = fmt.Sprintf("Logs: %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
 		} else {
@@ -768,19 +777,28 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 }
 
 // closeTabOrQuit closes the current tab if multiple tabs are open,
-// otherwise quits the application.
+// otherwise quits the application (with optional confirmation).
 func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 	if len(m.tabs) > 1 {
 		m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
 		if m.activeTab >= len(m.tabs) {
 			m.activeTab = len(m.tabs) - 1
 		}
-		m.loadTab(m.activeTab)
+		m.saveCurrentSession()
+		if cmd := m.loadTab(m.activeTab); cmd != nil {
+			return m, cmd
+		}
 		return m, m.loadPreview()
+	}
+	// On last tab, show confirmation if configured.
+	if ui.ConfigConfirmOnExit {
+		m.overlay = overlayQuitConfirm
+		return m, nil
 	}
 	// Stop all active port forwards before quitting.
 	if m.portForwardMgr != nil {
 		m.portForwardMgr.StopAll()
 	}
+	m.saveCurrentSession()
 	return m, tea.Quit
 }

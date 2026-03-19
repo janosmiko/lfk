@@ -3,18 +3,34 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"slices"
 
 	"sigs.k8s.io/yaml"
 )
 
+// SessionTab represents the persisted navigation state for a single tab.
+type SessionTab struct {
+	Context            string   `json:"context" yaml:"context"`
+	Namespace          string   `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	AllNamespaces      bool     `json:"all_namespaces,omitempty" yaml:"all_namespaces,omitempty"`
+	SelectedNamespaces []string `json:"selected_namespaces,omitempty" yaml:"selected_namespaces,omitempty"`
+	ResourceType       string   `json:"resource_type,omitempty" yaml:"resource_type,omitempty"`
+	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+}
+
 // SessionState represents the persisted navigation state across restarts.
 type SessionState struct {
+	// Legacy single-tab fields (kept for backward compatibility on load).
 	Context            string   `json:"context" yaml:"context"`
 	Namespace          string   `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	AllNamespaces      bool     `json:"all_namespaces,omitempty" yaml:"all_namespaces,omitempty"`
 	SelectedNamespaces []string `json:"selected_namespaces,omitempty" yaml:"selected_namespaces,omitempty"`
 	ResourceType       string   `json:"resource_type,omitempty" yaml:"resource_type,omitempty"` // group/version/resource ref string
 	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+
+	// Multi-tab fields.
+	Tabs      []SessionTab `json:"tabs,omitempty" yaml:"tabs,omitempty"`
+	ActiveTab int          `json:"active_tab,omitempty" yaml:"active_tab,omitempty"`
 }
 
 // sessionFilePath returns the path to the session state file.
@@ -96,24 +112,43 @@ func saveSession(s SessionState) error {
 
 // saveCurrentSession persists the current navigation state to the session file.
 func (m *Model) saveCurrentSession() {
+	// Ensure the active tab's state is up to date before serialising.
+	m.saveCurrentTab()
+
 	s := SessionState{
-		Context:       m.nav.Context,
-		AllNamespaces: m.allNamespaces,
+		ActiveTab: m.activeTab,
 	}
-	if !m.allNamespaces {
-		s.Namespace = m.namespace
-		if len(m.selectedNamespaces) > 0 {
-			for ns := range m.selectedNamespaces {
-				s.SelectedNamespaces = append(s.SelectedNamespaces, ns)
+
+	for _, t := range m.tabs {
+		st := SessionTab{
+			Context:       t.nav.Context,
+			AllNamespaces: t.allNamespaces,
+		}
+		if !t.allNamespaces {
+			st.Namespace = t.namespace
+			if len(t.selectedNamespaces) > 0 {
+				nsList := make([]string, 0, len(t.selectedNamespaces))
+				for ns := range t.selectedNamespaces {
+					nsList = append(nsList, ns)
+				}
+				slices.Sort(nsList)
+				st.SelectedNamespaces = nsList
 			}
 		}
+		if t.nav.ResourceType.Resource != "" {
+			st.ResourceType = t.nav.ResourceType.ResourceRef()
+		}
+		if t.nav.ResourceName != "" {
+			st.ResourceName = t.nav.ResourceName
+		}
+		s.Tabs = append(s.Tabs, st)
 	}
-	if m.nav.ResourceType.Resource != "" {
-		s.ResourceType = m.nav.ResourceType.ResourceRef()
+
+	// Legacy compat: set top-level context to active tab's context.
+	if len(s.Tabs) > 0 && s.ActiveTab < len(s.Tabs) {
+		s.Context = s.Tabs[s.ActiveTab].Context
 	}
-	if m.nav.ResourceName != "" {
-		s.ResourceName = m.nav.ResourceName
-	}
+
 	// Fire and forget; session persistence is best-effort.
 	_ = saveSession(s)
 }

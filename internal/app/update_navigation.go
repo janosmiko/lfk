@@ -346,6 +346,9 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 		if sel.Kind == "Pod" {
 			m.saveCursor()
 			m.nav.OwnedName = sel.Name
+			if sel.Namespace != "" {
+				m.nav.Namespace = sel.Namespace
+			}
 			m.nav.Level = model.LevelContainers
 			m.pushLeft()
 			m.clearRight()
