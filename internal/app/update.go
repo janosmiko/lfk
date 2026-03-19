@@ -2736,6 +2736,48 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.yamlScroll = 0
 			m.yamlCursor = 0
 			return m, nil
+		case "0":
+			m.yamlVisualCurCol = 0
+			return m, nil
+		case "$":
+			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
+				lineLen := len([]rune(visLines[m.yamlCursor]))
+				if lineLen > 0 {
+					m.yamlVisualCurCol = lineLen - 1
+				}
+			}
+			return m, nil
+		case "w":
+			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
+				newCol := nextWordStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
+				if newCol == m.yamlVisualCurCol && m.yamlCursor < len(visLines)-1 {
+					m.yamlCursor++
+					m.yamlVisualCurCol = nextWordStart(visLines[m.yamlCursor], 0)
+					m.ensureYAMLCursorVisible()
+				} else {
+					m.yamlVisualCurCol = newCol
+				}
+			}
+			return m, nil
+		case "b":
+			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
+				newCol := prevWordStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
+				if newCol == m.yamlVisualCurCol && m.yamlVisualCurCol == 0 && m.yamlCursor > 0 {
+					m.yamlCursor--
+					lineLen := len([]rune(visLines[m.yamlCursor]))
+					m.yamlVisualCurCol = prevWordStart(visLines[m.yamlCursor], lineLen)
+					m.ensureYAMLCursorVisible()
+				} else {
+					m.yamlVisualCurCol = newCol
+				}
+			}
+			return m, nil
 		}
 		return m, nil
 	}
@@ -3755,6 +3797,39 @@ func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.closeTabOrQuit()
 	case "q":
 		m.logVisualMode = false
+		return m, nil
+	case "$":
+		if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+			lineLen := len([]rune(m.logLines[m.logCursor]))
+			if lineLen > 0 {
+				m.logVisualCurCol = lineLen - 1
+			}
+		}
+		return m, nil
+	case "e":
+		if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+			newCol := wordEnd(m.logLines[m.logCursor], m.logVisualCurCol)
+			if newCol == m.logVisualCurCol && m.logCursor < len(m.logLines)-1 {
+				m.logCursor++
+				m.logVisualCurCol = wordEnd(m.logLines[m.logCursor], 0)
+				m.ensureLogCursorVisible()
+			} else {
+				m.logVisualCurCol = newCol
+			}
+		}
+		return m, nil
+	case "b":
+		if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+			newCol := prevWordStart(m.logLines[m.logCursor], m.logVisualCurCol)
+			if newCol == m.logVisualCurCol && m.logVisualCurCol == 0 && m.logCursor > 0 {
+				m.logCursor--
+				lineLen := len([]rune(m.logLines[m.logCursor]))
+				m.logVisualCurCol = prevWordStart(m.logLines[m.logCursor], lineLen)
+				m.ensureLogCursorVisible()
+			} else {
+				m.logVisualCurCol = newCol
+			}
+		}
 		return m, nil
 	}
 	return m, nil
