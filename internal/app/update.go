@@ -4068,8 +4068,11 @@ func (m Model) handleHeaderClick(relX int) (tea.Model, tea.Cmd) {
 func nextWordStart(line string, col int) int {
 	runes := []rune(line)
 	n := len(runes)
+	if n == 0 {
+		return 0
+	}
 	if col >= n-1 {
-		return col
+		return n - 1
 	}
 	i := col
 	// Skip current word characters.
@@ -4090,8 +4093,11 @@ func nextWordStart(line string, col int) int {
 func wordEnd(line string, col int) int {
 	runes := []rune(line)
 	n := len(runes)
+	if n == 0 {
+		return 0
+	}
 	if col >= n-1 {
-		return col
+		return n - 1
 	}
 	i := col + 1
 	// Skip whitespace/punctuation.
@@ -4111,8 +4117,12 @@ func wordEnd(line string, col int) int {
 // prevWordStart returns the column of the previous word start (vim 'b' motion).
 func prevWordStart(line string, col int) int {
 	runes := []rune(line)
-	if col <= 0 {
+	n := len(runes)
+	if n == 0 || col <= 0 {
 		return 0
+	}
+	if col >= n {
+		col = n
 	}
 	i := col - 1
 	// Skip whitespace/punctuation.
