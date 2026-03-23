@@ -99,28 +99,55 @@ func (c *Client) DeleteResource(contextName, namespace string, rt model.Resource
 	return nil
 }
 
-// ScaleDeployment scales a deployment to the specified replica count.
-func (c *Client) ScaleDeployment(contextName, namespace, name string, replicas int32) error {
+// ScaleResource scales a Deployment, StatefulSet, or ReplicaSet to the specified replica count.
+func (c *Client) ScaleResource(contextName, namespace, name, kind string, replicas int32) error {
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
 	}
 
-	scale, err := cs.AppsV1().Deployments(namespace).GetScale(context.Background(), name, metav1.GetOptions{})
-	if err != nil {
-		return fmt.Errorf("getting scale for %s: %w", name, err)
-	}
+	ctx := context.Background()
+	appsV1 := cs.AppsV1()
 
-	scale.Spec.Replicas = replicas
-	_, err = cs.AppsV1().Deployments(namespace).UpdateScale(context.Background(), name, scale, metav1.UpdateOptions{})
-	if err != nil {
-		return fmt.Errorf("scaling %s to %d: %w", name, replicas, err)
+	switch kind {
+	case "Deployment":
+		scale, err := appsV1.Deployments(namespace).GetScale(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("getting scale for %s: %w", name, err)
+		}
+		scale.Spec.Replicas = replicas
+		_, err = appsV1.Deployments(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("scaling %s to %d: %w", name, replicas, err)
+		}
+	case "StatefulSet":
+		scale, err := appsV1.StatefulSets(namespace).GetScale(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("getting scale for %s: %w", name, err)
+		}
+		scale.Spec.Replicas = replicas
+		_, err = appsV1.StatefulSets(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("scaling %s to %d: %w", name, replicas, err)
+		}
+	case "ReplicaSet":
+		scale, err := appsV1.ReplicaSets(namespace).GetScale(ctx, name, metav1.GetOptions{})
+		if err != nil {
+			return fmt.Errorf("getting scale for %s: %w", name, err)
+		}
+		scale.Spec.Replicas = replicas
+		_, err = appsV1.ReplicaSets(namespace).UpdateScale(ctx, name, scale, metav1.UpdateOptions{})
+		if err != nil {
+			return fmt.Errorf("scaling %s to %d: %w", name, replicas, err)
+		}
+	default:
+		return fmt.Errorf("unsupported kind for scaling: %s", kind)
 	}
 	return nil
 }
 
-// RestartDeployment performs a rolling restart by patching the pod template annotation.
-func (c *Client) RestartDeployment(contextName, namespace, name string) error {
+// RestartResource performs a rolling restart by patching the pod template annotation.
+func (c *Client) RestartResource(contextName, namespace, name, kind string) error {
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
@@ -143,11 +170,21 @@ func (c *Client) RestartDeployment(contextName, namespace, name string) error {
 		return fmt.Errorf("marshalling patch: %w", err)
 	}
 
-	_, err = cs.AppsV1().Deployments(namespace).Patch(
-		context.Background(), name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{},
-	)
+	ctx := context.Background()
+	appsV1 := cs.AppsV1()
+
+	switch kind {
+	case "Deployment":
+		_, err = appsV1.Deployments(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	case "StatefulSet":
+		_, err = appsV1.StatefulSets(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	case "DaemonSet":
+		_, err = appsV1.DaemonSets(namespace).Patch(ctx, name, k8stypes.StrategicMergePatchType, patchBytes, metav1.PatchOptions{})
+	default:
+		return fmt.Errorf("unsupported kind for restart: %s", kind)
+	}
 	if err != nil {
-		return fmt.Errorf("restarting deployment %s: %w", name, err)
+		return fmt.Errorf("restarting %s %s: %w", kind, name, err)
 	}
 	return nil
 }

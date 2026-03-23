@@ -323,7 +323,7 @@ func (m Model) bulkScaleResources(replicas int32) tea.Cmd {
 				itemNs = item.Namespace
 			}
 			logger.Info("Bulk scaling", "name", item.Name, "replicas", replicas, "namespace", itemNs)
-			err := client.ScaleDeployment(ctx, itemNs, item.Name, replicas)
+			err := client.ScaleResource(ctx, itemNs, item.Name, m.actionCtx.kind, replicas)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
@@ -350,7 +350,7 @@ func (m Model) bulkRestartResources() tea.Cmd {
 				itemNs = item.Namespace
 			}
 			logger.Info("Bulk restarting", "name", item.Name, "namespace", itemNs)
-			err := client.RestartDeployment(ctx, itemNs, item.Name)
+			err := client.RestartResource(ctx, itemNs, item.Name, m.actionCtx.kind)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))

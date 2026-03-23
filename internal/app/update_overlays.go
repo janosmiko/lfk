@@ -574,13 +574,13 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 		// Bulk mode.
 		if m.bulkMode && len(m.bulkItems) > 0 {
-			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl scale deployment --replicas=%d (%d items) -n %s --context %s", replicas, len(m.bulkItems), m.actionCtx.namespace, m.actionCtx.context))
+			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl scale %s --replicas=%d (%d items) -n %s --context %s", strings.ToLower(m.actionCtx.kind), replicas, len(m.bulkItems), m.actionCtx.namespace, m.actionCtx.context))
 			m.clearSelection()
 			return m, m.bulkScaleResources(int32(replicas))
 		}
 
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl scale deployment %s --replicas=%d -n %s --context %s", m.actionCtx.name, replicas, m.actionCtx.namespace, m.actionCtx.context))
-		return m, m.scaleDeployment(int32(replicas))
+		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl scale %s %s --replicas=%d -n %s --context %s", strings.ToLower(m.actionCtx.kind), m.actionCtx.name, replicas, m.actionCtx.namespace, m.actionCtx.context))
+		return m, m.scaleResource(int32(replicas))
 	case "backspace":
 		if len(m.scaleInput.Value) > 0 {
 			m.scaleInput.Backspace()

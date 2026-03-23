@@ -511,13 +511,14 @@ rm -f "$TMPFILE"
 
 // --- Deployment and scaling commands ---
 
-func (m Model) scaleDeployment(replicas int32) tea.Cmd {
+func (m Model) scaleResource(replicas int32) tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
-	logger.Info("Scaling deployment", "name", name, "replicas", replicas, "namespace", ns, "context", ctx)
+	kind := m.actionCtx.kind
+	logger.Info("Scaling resource", "kind", kind, "name", name, "replicas", replicas, "namespace", ns, "context", ctx)
 	return func() tea.Msg {
-		err := m.client.ScaleDeployment(ctx, ns, name, replicas)
+		err := m.client.ScaleResource(ctx, ns, name, kind, replicas)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -525,13 +526,14 @@ func (m Model) scaleDeployment(replicas int32) tea.Cmd {
 	}
 }
 
-func (m Model) restartDeployment() tea.Cmd {
+func (m Model) restartResource() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
-	logger.Info("Restarting deployment", "name", name, "namespace", ns, "context", ctx)
+	kind := m.actionCtx.kind
+	logger.Info("Restarting resource", "kind", kind, "name", name, "namespace", ns, "context", ctx)
 	return func() tea.Msg {
-		err := m.client.RestartDeployment(ctx, ns, name)
+		err := m.client.RestartResource(ctx, ns, name, kind)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}

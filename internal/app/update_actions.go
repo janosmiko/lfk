@@ -453,9 +453,9 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 			}
 			return m, nil
 		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout restart deployment %s -n %s --context %s", name, ns, ctx))
+		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout restart %s %s -n %s --context %s", strings.ToLower(m.actionCtx.kind), name, ns, ctx))
 		m.loading = true
-		return m, m.restartDeployment()
+		return m, m.restartResource()
 	case "Rollback":
 		if m.actionCtx.kind == "HelmRelease" {
 			m.addLogEntry("DBG", fmt.Sprintf("$ helm history %s -n %s --kube-context %s -o json", name, ns, ctx))
