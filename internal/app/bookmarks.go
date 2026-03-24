@@ -6,6 +6,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -25,18 +26,39 @@ func bookmarksFilePath() string {
 
 // loadBookmarks reads bookmarks from the YAML file on disk.
 // Falls back to the legacy ~/.config/lfk/ location and migrates if found.
+// If the primary file is missing or corrupt, tries the backup file.
 func loadBookmarks() []model.Bookmark {
 	path := bookmarksFilePath()
 	if path == "" {
 		return nil
 	}
-	data, err := os.ReadFile(path)
-	if err != nil {
-		// Try legacy location and migrate.
-		data = migrateStateFile("bookmarks.yaml", path)
-		if data == nil {
-			return nil
+	if bm := loadBookmarksFromFile(path); bm != nil {
+		return bm
+	}
+	// Try legacy location and migrate.
+	data := migrateStateFile("bookmarks.yaml", path)
+	if data != nil {
+		var bookmarks []model.Bookmark
+		if err := yaml.Unmarshal(data, &bookmarks); err == nil && len(bookmarks) > 0 {
+			return bookmarks
 		}
+	}
+	// Try the backup file as a last resort.
+	bakPath := path + ".bak"
+	if bm := loadBookmarksFromFile(bakPath); bm != nil {
+		logger.Info("Loaded bookmarks from backup file", "path", bakPath)
+		// Restore the primary file from backup.
+		_ = saveBookmarks(bm)
+		return bm
+	}
+	return nil
+}
+
+// loadBookmarksFromFile reads and parses bookmarks from a specific file path.
+func loadBookmarksFromFile(path string) []model.Bookmark {
+	data, err := os.ReadFile(path)
+	if err != nil || len(data) == 0 {
+		return nil
 	}
 	var bookmarks []model.Bookmark
 	if err := yaml.Unmarshal(data, &bookmarks); err != nil {
@@ -46,15 +68,14 @@ func loadBookmarks() []model.Bookmark {
 }
 
 // saveBookmarks writes bookmarks to the YAML file on disk using an atomic
-// write (write to temp file, then rename) to prevent data loss if the process
-// is interrupted mid-write.
+// write (write to temp file, fsync, then rename) to prevent data loss if the
+// process is interrupted mid-write. A backup of the previous file is kept.
 func saveBookmarks(bookmarks []model.Bookmark) error {
 	path := bookmarksFilePath()
 	if path == "" {
 		return nil
 	}
 	dir := filepath.Dir(path)
-	// Ensure the directory exists.
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
@@ -62,8 +83,15 @@ func saveBookmarks(bookmarks []model.Bookmark) error {
 	if err != nil {
 		return err
 	}
-	// Atomic write: write to a temp file in the same directory, then rename.
-	// This ensures the target file is never partially written.
+	bakPath := path + ".bak"
+	if len(bookmarks) == 0 {
+		// Explicit delete-all: remove the backup so it doesn't resurrect.
+		_ = os.Remove(bakPath)
+	} else if info, statErr := os.Stat(path); statErr == nil && info.Size() > 0 {
+		// Keep a backup of the current file before overwriting.
+		_ = copyFile(path, bakPath)
+	}
+	// Atomic write: write to a temp file in the same directory, fsync, then rename.
 	tmp, err := os.CreateTemp(dir, ".bookmarks-*.yaml.tmp")
 	if err != nil {
 		return err
@@ -74,11 +102,26 @@ func saveBookmarks(bookmarks []model.Bookmark) error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
+	// Fsync to ensure data is flushed to stable storage before rename.
+	if err := tmp.Sync(); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
 	if err := tmp.Close(); err != nil {
 		_ = os.Remove(tmpPath)
 		return err
 	}
 	return os.Rename(tmpPath, path)
+}
+
+// copyFile copies src to dst, overwriting dst if it exists.
+func copyFile(src, dst string) error {
+	data, err := os.ReadFile(src)
+	if err != nil {
+		return err
+	}
+	return os.WriteFile(dst, data, 0o644)
 }
 
 // removeBookmark removes the bookmark at the given index.

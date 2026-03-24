@@ -285,3 +285,73 @@ func TestDeleteThenSave_NoCrossContamination(t *testing.T) {
 	assert.True(t, slotSet["c"])
 	assert.True(t, slotSet["d"])
 }
+
+// --- backup recovery when primary file is corrupt ---
+
+func TestLoadBookmarks_RecoverFromBackup(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", tmpDir)
+
+	// Save bookmarks (this also creates a backup on second save).
+	initial := []model.Bookmark{
+		{Slot: "a", Name: "alpha"},
+		{Slot: "b", Name: "bravo"},
+	}
+	require.NoError(t, saveBookmarks(initial))
+
+	// Save again so the backup contains the first version.
+	updated := []model.Bookmark{
+		{Slot: "a", Name: "alpha"},
+		{Slot: "b", Name: "bravo"},
+		{Slot: "c", Name: "charlie"},
+	}
+	require.NoError(t, saveBookmarks(updated))
+
+	// Corrupt the primary file.
+	path := bookmarksFilePath()
+	require.NoError(t, os.WriteFile(path, []byte("!!!invalid yaml{{{"), 0o644))
+
+	// Load should recover from backup (which has a, b).
+	loaded := loadBookmarks()
+	require.NotNil(t, loaded, "should recover bookmarks from backup")
+	assert.Len(t, loaded, 2, "backup had 2 bookmarks before the third was added")
+}
+
+// --- backup is created on save ---
+
+func TestSaveBookmarks_CreatesBackup(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", tmpDir)
+
+	// Save initial bookmarks.
+	require.NoError(t, saveBookmarks([]model.Bookmark{{Slot: "a", Name: "alpha"}}))
+
+	// Save updated bookmarks — this should backup the previous version.
+	require.NoError(t, saveBookmarks([]model.Bookmark{{Slot: "b", Name: "bravo"}}))
+
+	// Backup file should exist and contain the old data.
+	bakPath := bookmarksFilePath() + ".bak"
+	bakData, err := os.ReadFile(bakPath)
+	require.NoError(t, err, "backup file should exist")
+	assert.Contains(t, string(bakData), "alpha", "backup should contain previous bookmarks")
+}
+
+// --- empty save removes backup to prevent resurrection ---
+
+func TestSaveBookmarks_EmptyRemovesBackup(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", tmpDir)
+
+	require.NoError(t, saveBookmarks([]model.Bookmark{{Slot: "a"}}))
+	require.NoError(t, saveBookmarks([]model.Bookmark{{Slot: "b"}}))
+
+	// Backup should exist now.
+	bakPath := bookmarksFilePath() + ".bak"
+	_, err := os.Stat(bakPath)
+	require.NoError(t, err, "backup should exist after two saves")
+
+	// Save empty (delete all) should remove backup.
+	require.NoError(t, saveBookmarks(nil))
+	_, err = os.Stat(bakPath)
+	assert.True(t, os.IsNotExist(err), "backup should be removed after saving empty")
+}
