@@ -6,8 +6,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/charmbracelet/lipgloss"
-
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -219,9 +217,6 @@ func RenderNamespaceOverlay(items []model.Item, filter string, cursor int, curre
 		}
 	}
 
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("space: select  c: clear  enter: apply  esc: close"))
-
 	return b.String()
 }
 
@@ -257,9 +252,6 @@ func RenderActionOverlay(items []model.Item, cursor int, width int) string {
 		}
 	}
 
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("j/k: navigate  enter/key: select  esc: close"))
-
 	return b.String()
 }
 
@@ -270,11 +262,6 @@ func RenderConfirmOverlay(action string) string {
 	b.WriteString("\n\n")
 	b.WriteString(OverlayWarningStyle.Render(fmt.Sprintf("Delete %s?", action)))
 	b.WriteString("\n\n")
-	b.WriteString(OverlayNormalStyle.Render("Press "))
-	b.WriteString(OverlayFilterStyle.Render("y"))
-	b.WriteString(OverlayNormalStyle.Render(" to confirm, "))
-	b.WriteString(OverlayFilterStyle.Render("n"))
-	b.WriteString(OverlayNormalStyle.Render(" to cancel"))
 	return b.String()
 }
 
@@ -284,12 +271,6 @@ func RenderQuitConfirmOverlay() string {
 	b.WriteString(OverlayTitleStyle.Render("Quit"))
 	b.WriteString("\n\n")
 	b.WriteString(OverlayNormalStyle.Render("Quit lfk?"))
-	b.WriteString("\n\n")
-	b.WriteString(OverlayNormalStyle.Render("Press "))
-	b.WriteString(OverlayFilterStyle.Render("y"))
-	b.WriteString(OverlayNormalStyle.Render(" to confirm, "))
-	b.WriteString(OverlayFilterStyle.Render("n"))
-	b.WriteString(OverlayNormalStyle.Render(" to cancel"))
 	return b.String()
 }
 
@@ -309,8 +290,6 @@ func RenderConfirmTypeOverlay(action, input string) string {
 	} else {
 		b.WriteString(OverlayFilterStyle.Render(input))
 	}
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("esc: cancel"))
 	return b.String()
 }
 
@@ -325,8 +304,6 @@ func RenderScaleOverlay(input string) string {
 	} else {
 		b.WriteString(OverlayInputStyle.Render(input))
 	}
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("Enter a number, then press Enter"))
 	return b.String()
 }
 
@@ -381,19 +358,6 @@ func RenderPortForwardOverlay(input string, availablePorts []PortInfo, cursor in
 			b.WriteString(OverlayInputStyle.Render(input))
 		}
 	}
-	b.WriteString("\n\n")
-
-	var hints string
-	if len(availablePorts) > 0 {
-		if cursor >= 0 && cursor < len(availablePorts) && input == "" {
-			hints = "j/k: select port  enter: forward (random local port)  type: set local port"
-		} else {
-			hints = "j/k: select port  enter: forward  type: set local port"
-		}
-	} else {
-		hints = "Format: localPort:remotePort, then press Enter"
-	}
-	b.WriteString(OverlayDimStyle.Render(hints))
 	return b.String()
 }
 
@@ -420,9 +384,6 @@ func RenderContainerSelectOverlay(items []model.Item, cursor int) string {
 			b.WriteString("\n")
 		}
 	}
-
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("j/k: navigate  enter: select  esc: close"))
 
 	return b.String()
 }
@@ -487,14 +448,6 @@ func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedCon
 			b.WriteString("\n")
 		}
 	}
-
-	b.WriteString("\n\n")
-	hint := "space: select  enter: apply"
-	if canSwitchPod {
-		hint += "  P: switch pod"
-	}
-	hint += "  / to filter  esc: close"
-	b.WriteString(OverlayDimStyle.Render(hint))
 
 	return b.String()
 }
@@ -565,15 +518,12 @@ func RenderPodSelectOverlay(items []model.Item, cursor int, filter string, filte
 		}
 	}
 
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("/ to filter  j/k: navigate  enter: select  esc: close"))
-
 	return b.String()
 }
 
 // RenderBookmarkOverlay renders the bookmark list overlay content.
 // mode: 0 = normal, 1 = filter. overlayH is the total overlay height for footer pinning.
-func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode, overlayH int) string {
+func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode int) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Bookmarks"))
 	b.WriteString("\n")
@@ -678,32 +628,7 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 		}
 	}
 
-	// Build footer hints.
-	var footer strings.Builder
-	switch mode {
-	case bookmarkModeFilter:
-		footer.WriteString(OverlayDimStyle.Render("type to filter  "))
-		footer.WriteString(OverlayDimStyle.Render("enter: apply  "))
-		footer.WriteString(OverlayDimStyle.Render("esc: clear"))
-	default:
-		footer.WriteString(OverlayDimStyle.Render("a-z/A-Z/0-9: jump  "))
-		footer.WriteString(OverlayDimStyle.Render("enter: jump  "))
-		footer.WriteString(OverlayDimStyle.Render("/: filter  "))
-		footer.WriteString(OverlayDimStyle.Render("D: delete  "))
-		footer.WriteString(OverlayDimStyle.Render("^X: delete all  "))
-		footer.WriteString(OverlayDimStyle.Render("esc: close"))
-	}
-
-	// Pin footer to the bottom of the overlay interior.
-	// OverlayStyle.Height() includes padding (1 top + 1 bottom), so usable = overlayH - 2.
-	body := b.String()
-	interiorH := overlayH - 2
-	footerStr := footer.String()
-
-	// Use lipgloss to place body at top and footer at bottom within
-	// a fixed-height container, ensuring footer is always visible.
-	bodyBlock := lipgloss.NewStyle().Height(interiorH - 1).Render(body)
-	return bodyBlock + "\n" + footerStr
+	return b.String()
 }
 
 // RenderTemplateOverlay renders the template selection overlay content.
@@ -726,17 +651,12 @@ func RenderTemplateOverlay(templates []model.ResourceTemplate, filter string, cu
 
 	if len(templates) == 0 {
 		b.WriteString(OverlayDimStyle.Render("No templates available"))
-		body := b.String()
-		footer := OverlayDimStyle.Render("esc: close")
-		interiorH := overlayH - 2
-		bodyBlock := lipgloss.NewStyle().Height(interiorH - 1).Render(body)
-		return bodyBlock + "\n" + footer
+		return b.String()
 	}
 
-	// Fixed-height list: title(1) + filter(1) + blank(1) = 3 header lines,
-	// footer(1) + padding(2) = 3 bottom lines. Available = interiorH - 3 - 1.
+	// Fixed-height list: title(1) + filter(1) = 2 header lines + padding(2).
 	interiorH := overlayH - 2
-	maxVisible := interiorH - 4 // 3 header lines + 1 footer
+	maxVisible := interiorH - 3 // 2 header lines + 1 blank
 	if maxVisible < 1 {
 		maxVisible = 1
 	}
@@ -765,21 +685,5 @@ func RenderTemplateOverlay(templates []model.ResourceTemplate, filter string, cu
 		}
 	}
 
-	// Build footer hints.
-	var footer strings.Builder
-	if filterMode {
-		footer.WriteString(OverlayDimStyle.Render("type to filter  "))
-		footer.WriteString(OverlayDimStyle.Render("enter: apply  "))
-		footer.WriteString(OverlayDimStyle.Render("esc: clear"))
-	} else {
-		footer.WriteString(OverlayDimStyle.Render("enter: select  "))
-		footer.WriteString(OverlayDimStyle.Render("/: filter  "))
-		footer.WriteString(OverlayDimStyle.Render("esc: close"))
-	}
-
-	// Pin footer to the bottom of the overlay interior.
-	body := b.String()
-	footerStr := footer.String()
-	bodyBlock := lipgloss.NewStyle().Height(interiorH - 1).Render(body)
-	return bodyBlock + "\n" + footerStr
+	return b.String()
 }

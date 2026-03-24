@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -339,7 +338,7 @@ func buildHelpLines(filter string) []string {
 
 // RenderHelpScreen renders a full help overlay with all keybindings.
 // It supports scrolling via the scroll parameter and filtering via the filter parameter.
-func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter string, searching bool, searchInput *textinput.Model) string {
+func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter string) string {
 	boxW := screenWidth * 70 / 100
 	boxH := screenHeight * 80 / 100
 	if boxW < 50 {
@@ -400,27 +399,7 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter string, sear
 		Width(contentW).
 		Render(content)
 
-	// Build help/status line.
-	var helpLine string
-	switch {
-	case searching:
-		helpLine = DimStyle.Render("search: ") + searchInput.View()
-	case filter != "":
-		helpLine = DimStyle.Render("filter: ") +
-			HelpKeyStyle.Render(filter) +
-			DimStyle.Render("  ") +
-			HelpKeyStyle.Render("/") + DimStyle.Render(" edit  ") +
-			HelpKeyStyle.Render("Esc") + DimStyle.Render(" close")
-	default:
-		helpLine = HelpKeyStyle.Render("j/k") + DimStyle.Render(" scroll  ") +
-			HelpKeyStyle.Render("^d/^u") + DimStyle.Render(" half-page  ") +
-			HelpKeyStyle.Render("/") + DimStyle.Render(" search  ") +
-			HelpKeyStyle.Render("Esc") + DimStyle.Render(" / ") +
-			HelpKeyStyle.Render("?") + DimStyle.Render(" / ") +
-			HelpKeyStyle.Render("q") + DimStyle.Render(" close")
-	}
-
-	body := title + "\n" + innerPanel + "\n" + helpLine
+	body := title + "\n" + innerPanel
 
 	return OverlayStyle.
 		Width(boxW).

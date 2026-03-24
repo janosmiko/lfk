@@ -313,8 +313,6 @@ func RenderExplainSearchOverlay(results []model.ExplainField, cursor, scroll, ma
 			b.WriteString("\n")
 			b.WriteString(OverlayDimStyle.Render("  No matching fields"))
 		}
-		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("Enter: navigate  /: filter  Esc: close"))
 		return b.String()
 	}
 
@@ -382,8 +380,6 @@ func RenderExplainSearchOverlay(results []model.ExplainField, cursor, scroll, ma
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
-	b.WriteString(OverlayDimStyle.Render("Enter: navigate  /: filter  Esc: close"))
 	return b.String()
 }
 

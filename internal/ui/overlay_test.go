@@ -67,12 +67,13 @@ func TestRenderNamespaceOverlay(t *testing.T) {
 		assert.Contains(t, result, "/ to filter")
 	})
 
-	t.Run("footer shows key hints", func(t *testing.T) {
+	t.Run("footer hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		items := []model.Item{{Name: "default"}}
 		result := RenderNamespaceOverlay(items, "", 0, "", false, nil, false)
-		assert.Contains(t, result, "space: select")
-		assert.Contains(t, result, "enter: apply")
-		assert.Contains(t, result, "esc: close")
+		assert.NotContains(t, result, "space: select")
+		assert.NotContains(t, result, "enter: apply")
+		assert.NotContains(t, result, "esc: close")
 	})
 }
 
@@ -169,25 +170,12 @@ func TestRenderPortForwardOverlay(t *testing.T) {
 		assert.Contains(t, result, "[UDP]")
 	})
 
-	t.Run("hints show key bindings with ports and random hint", func(t *testing.T) {
+	t.Run("hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		ports := []PortInfo{{Port: "80", Name: "http", Protocol: "TCP"}}
 		result := RenderPortForwardOverlay("", ports, 0, "my-svc")
-		assert.Contains(t, result, "j/k: select port")
-		assert.Contains(t, result, "enter: forward (random local port)")
-		assert.Contains(t, result, "set local port")
-	})
-
-	t.Run("hints show regular forward when local port typed", func(t *testing.T) {
-		ports := []PortInfo{{Port: "80", Name: "http", Protocol: "TCP"}}
-		result := RenderPortForwardOverlay("9090", ports, 0, "my-svc")
-		assert.Contains(t, result, "j/k: select port")
-		assert.Contains(t, result, "enter: forward")
-		assert.NotContains(t, result, "random local port")
-	})
-
-	t.Run("hints show format without ports", func(t *testing.T) {
-		result := RenderPortForwardOverlay("", nil, -1, "my-pod")
-		assert.Contains(t, result, "Format: localPort:remotePort")
+		assert.NotContains(t, result, "j/k: select port")
+		assert.NotContains(t, result, "enter: forward")
 	})
 }
 
@@ -231,7 +219,7 @@ func TestRenderPodSelectOverlay_FilterActive(t *testing.T) {
 
 func TestRenderBookmarkOverlay(t *testing.T) {
 	t.Run("no bookmarks", func(t *testing.T) {
-		result := RenderBookmarkOverlay(nil, "", 0, 0, 25)
+		result := RenderBookmarkOverlay(nil, "", 0, 0)
 		assert.Contains(t, result, "No bookmarks yet")
 	})
 
@@ -240,7 +228,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "My Pods", Namespace: "default"},
 			{Name: "Deployments", Namespace: "staging"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
+		result := RenderBookmarkOverlay(bms, "", 0, 0)
 		assert.Contains(t, result, "My Pods [default]")
 		assert.Contains(t, result, "Deployments [staging]")
 	})
@@ -250,20 +238,20 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "My Pods"},
 			{Name: "Deployments"},
 		}
-		result := RenderBookmarkOverlay(bms, "pod", 0, 1, 25)
+		result := RenderBookmarkOverlay(bms, "pod", 0, 1)
 		assert.Contains(t, result, "filter>")
 		assert.Contains(t, result, "pod")
 	})
 
 	t.Run("filtered no match", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "Pods"}}
-		result := RenderBookmarkOverlay(bms, "zzz", 0, 0, 25)
+		result := RenderBookmarkOverlay(bms, "zzz", 0, 0)
 		assert.Contains(t, result, "No matching bookmarks")
 	})
 
 	t.Run("bookmark with namespace shows bracket", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "My Pods", Namespace: "production"}}
-		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
+		result := RenderBookmarkOverlay(bms, "", 0, 0)
 		assert.Contains(t, result, "production")
 	})
 
@@ -273,7 +261,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "With Slot B", Slot: "b"},
 			{Name: "No Slot"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
+		result := RenderBookmarkOverlay(bms, "", 0, 0)
 		assert.Contains(t, result, "a")
 		assert.Contains(t, result, "With Slot A")
 		assert.Contains(t, result, "b")
@@ -281,17 +269,17 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 		assert.Contains(t, result, "No Slot")
 	})
 
-	t.Run("normal mode footer shows jump hint with uppercase range", func(t *testing.T) {
+	t.Run("normal mode shows bookmark content", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "Test"}}
-		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
-		assert.Contains(t, result, "a-z/A-Z/0-9: jump")
+		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		assert.Contains(t, result, "Test")
 	})
 
 	t.Run("scope indicator shows G for global bookmarks", func(t *testing.T) {
 		bms := []model.Bookmark{
 			{Name: "Global Mark", Slot: "A", Global: true},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
+		result := RenderBookmarkOverlay(bms, "", 0, 0)
 		assert.Contains(t, result, "[G]", "global bookmark should show [G] scope indicator")
 		assert.Contains(t, result, "Global Mark")
 	})
@@ -300,7 +288,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 		bms := []model.Bookmark{
 			{Name: "Local Mark", Slot: "a", Global: false},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
+		result := RenderBookmarkOverlay(bms, "", 0, 0)
 		assert.Contains(t, result, "[L]", "local bookmark should show [L] scope indicator")
 		assert.Contains(t, result, "Local Mark")
 	})
@@ -311,7 +299,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "Local Deploys", Slot: "a", Global: false},
 			{Name: "Global Svcs", Slot: "B", Global: true},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0, 25)
+		result := RenderBookmarkOverlay(bms, "", 0, 0)
 		assert.Contains(t, result, "[G]")
 		assert.Contains(t, result, "[L]")
 		assert.Contains(t, result, "Global Pods")
@@ -455,7 +443,8 @@ func TestRenderPodStartupOverlay(t *testing.T) {
 		assert.Contains(t, result, "Image Pull")
 		assert.Contains(t, result, "Container Startup")
 		assert.Contains(t, result, "Readiness Probes")
-		assert.Contains(t, result, "Press any key to close")
+		// Hint moved to status bar.
+		assert.NotContains(t, result, "Press any key to close")
 	})
 
 	t.Run("no phases shows message", func(t *testing.T) {
@@ -567,7 +556,8 @@ func TestRenderQuotaDashboardOverlay(t *testing.T) {
 			},
 		}
 		result := RenderQuotaDashboardOverlay(quotas, 80, 30)
-		assert.Contains(t, result, "esc/q: close")
+		// Hint moved to status bar.
+		assert.NotContains(t, result, "esc/q: close")
 	})
 
 	t.Run("multiple quotas", func(t *testing.T) {
@@ -640,7 +630,7 @@ func TestRenderAlertsOverlay(t *testing.T) {
 	t.Run("empty alerts shows no-alerts message", func(t *testing.T) {
 		result := RenderAlertsOverlay(nil, 0, 80, 25)
 		assert.Contains(t, result, "No active alerts")
-		assert.Contains(t, result, "esc")
+		// Hint moved to status bar.
 	})
 
 	t.Run("renders single alert", func(t *testing.T) {
@@ -866,16 +856,15 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 		assert.Contains(t, result, "Namespace")
 	})
 
-	t.Run("footer shows scroll hints", func(t *testing.T) {
+	t.Run("footer hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		info := NetworkPolicyEntry{
 			Name:      "test",
 			Namespace: "default",
 		}
 		result := RenderNetworkPolicyOverlay(info, 0, 70, 40)
-		assert.Contains(t, result, "j/k")
-		assert.Contains(t, result, "scroll")
-		assert.Contains(t, result, "esc")
-		assert.Contains(t, result, "close")
+		assert.NotContains(t, result, "j/k")
+		assert.NotContains(t, result, "close")
 	})
 
 	t.Run("scrolling works", func(t *testing.T) {

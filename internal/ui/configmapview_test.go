@@ -133,27 +133,25 @@ func TestRenderConfigMapEditorOverlay(t *testing.T) {
 		assert.Contains(t, result, "No configmap loaded")
 	})
 
-	t.Run("normal mode shows navigation help", func(t *testing.T) {
+	t.Run("normal mode hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		cm := &model.ConfigMapData{
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "value1"},
 		}
 		result := RenderConfigMapEditorOverlay(cm, 0, false, "", "", 0, 100, 40)
 		assert.Contains(t, result, "ConfigMap Editor")
-		assert.Contains(t, result, "nav")
-		assert.Contains(t, result, "edit")
-		assert.Contains(t, result, "close")
+		assert.Contains(t, result, "key1")
 	})
 
-	t.Run("editing mode shows save help", func(t *testing.T) {
+	t.Run("editing mode hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		cm := &model.ConfigMapData{
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "value1"},
 		}
 		result := RenderConfigMapEditorOverlay(cm, 0, true, "key1", "value1", 1, 100, 40)
 		assert.Contains(t, result, "ConfigMap Editor")
-		assert.Contains(t, result, "save")
-		assert.Contains(t, result, "cancel")
 	})
 
 	t.Run("small screen clamps dimensions", func(t *testing.T) {

@@ -78,26 +78,14 @@ func TestRenderLogContainerSelectOverlay(t *testing.T) {
 		assert.Contains(t, result, "/ to filter")
 	})
 
-	t.Run("switch pod hint shown", func(t *testing.T) {
+	t.Run("hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		ResetOverlayContainerScroll()
 		items := []model.Item{{Name: "nginx"}}
 		result := RenderLogContainerSelectOverlay(items, 0, nil, "", false, true)
-		assert.Contains(t, result, "P: switch pod")
-	})
-
-	t.Run("no switch pod hint when not applicable", func(t *testing.T) {
-		ResetOverlayContainerScroll()
-		items := []model.Item{{Name: "nginx"}}
-		result := RenderLogContainerSelectOverlay(items, 0, nil, "", false, false)
 		assert.NotContains(t, result, "P: switch pod")
-	})
-
-	t.Run("footer hints present", func(t *testing.T) {
-		ResetOverlayContainerScroll()
-		items := []model.Item{{Name: "c1"}}
-		result := RenderLogContainerSelectOverlay(items, 0, nil, "", false, false)
-		assert.Contains(t, result, "space: select")
-		assert.Contains(t, result, "enter: apply")
-		assert.Contains(t, result, "esc: close")
+		assert.NotContains(t, result, "space: select")
+		assert.NotContains(t, result, "enter: apply")
+		assert.NotContains(t, result, "esc: close")
 	})
 }

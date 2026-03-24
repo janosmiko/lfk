@@ -231,7 +231,8 @@ func TestRenderExplainSearchOverlay(t *testing.T) {
 		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "", false)
 		assert.Contains(t, result, "Recursive Field Browser")
 		assert.Contains(t, result, "0 fields")
-		assert.Contains(t, result, "Enter: navigate")
+		// Hints now live in the main status bar, not inline.
+		assert.NotContains(t, result, "Enter: navigate")
 	})
 
 	t.Run("empty results with filter shows no matching", func(t *testing.T) {

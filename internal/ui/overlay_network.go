@@ -175,21 +175,12 @@ func RenderNetworkPolicyOverlay(info NetworkPolicyEntry, scroll, width, height i
 
 	body := strings.Join(visible, "\n")
 
-	// Styled hint bar matching the app's bottom bar pattern.
-	scrollInfo := ""
+	// Scroll info (hints moved to the main status bar).
 	if maxScroll > 0 {
-		scrollInfo = DimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, maxScroll+1))
+		body += "\n" + DimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, maxScroll+1))
 	}
-	hintParts := []string{
-		HelpKeyStyle.Render("j/k") + DimStyle.Render(":scroll"),
-		HelpKeyStyle.Render("g/G") + DimStyle.Render(":top/bottom"),
-		HelpKeyStyle.Render("ctrl+d/u") + DimStyle.Render(":half page"),
-		HelpKeyStyle.Render("ctrl+f/b") + DimStyle.Render(":page"),
-		HelpKeyStyle.Render("esc") + DimStyle.Render(":close"),
-	}
-	hint := StatusBarBgStyle.Width(width).Render(strings.Join(hintParts, DimStyle.Render(" | ")) + scrollInfo)
 
-	return body + "\n" + hint
+	return body
 }
 
 // renderNetpolRuleDiagram renders a visual diagram for a single ingress/egress rule.

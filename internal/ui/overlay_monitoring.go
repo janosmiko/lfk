@@ -31,10 +31,6 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 		} else {
 			b.WriteString(OverlayDimStyle.Render("No log entries"))
 		}
-		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("Press "))
-		b.WriteString(OverlayFilterStyle.Render("esc"))
-		b.WriteString(OverlayDimStyle.Render(" to close"))
 		return b.String()
 	}
 
@@ -89,12 +85,6 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 		scrollInfo += fmt.Sprintf(" | scroll %d/%d", scroll+1, maxScroll+1)
 	}
 	b.WriteString(OverlayDimStyle.Render(scrollInfo))
-	b.WriteString("  ")
-	debugHint := "d: show debug"
-	if showDebug {
-		debugHint = "d: hide debug"
-	}
-	b.WriteString(OverlayDimStyle.Render("j/k: scroll  " + debugHint + "  esc: close"))
 
 	return b.String()
 }
@@ -196,9 +186,6 @@ func RenderColorschemeOverlay(entries []SchemeEntry, filter string, cursor int, 
 		}
 	}
 
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("enter: apply  esc: cancel"))
-
 	return b.String()
 }
 
@@ -231,9 +218,6 @@ func RenderFilterPresetOverlay(presets []FilterPresetEntry, cursor int, activePr
 		}
 	}
 
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("key: apply  enter: apply  esc: close  .: clear"))
-
 	return b.String()
 }
 
@@ -254,8 +238,6 @@ func RenderRBACOverlay(results []RBACCheckEntry, kind string) string {
 		b.WriteString("\n")
 	}
 
-	b.WriteString("\n")
-	b.WriteString(OverlayDimStyle.Render("Press any key to close"))
 	return b.String()
 }
 
@@ -282,10 +264,6 @@ func RenderBatchLabelOverlay(mode int, input string, remove bool) string {
 	}
 	b.WriteString("\n")
 	fmt.Fprintf(&b, "  %s%s", OverlayInputStyle.Render(input), OverlayDimStyle.Render("\u2588"))
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("  Tab: toggle add/remove"))
-	b.WriteString("\n")
-	b.WriteString(OverlayDimStyle.Render("  Enter: apply  Esc: cancel"))
 	return b.String()
 }
 
@@ -305,8 +283,6 @@ func RenderPodStartupOverlay(entry PodStartupEntry) string {
 
 	if len(entry.Phases) == 0 {
 		b.WriteString(OverlayDimStyle.Render("  No startup phases available"))
-		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("Press any key to close"))
 		return b.String()
 	}
 
@@ -410,8 +386,6 @@ func RenderPodStartupOverlay(entry PodStartupEntry) string {
 	b.WriteString(OverlayDimStyle.Render("  "))
 	b.WriteString(inProgressStyle.Render("\u25cb"))
 	b.WriteString(OverlayDimStyle.Render(" in-progress"))
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("Press any key to close"))
 
 	return b.String()
 }
@@ -514,9 +488,6 @@ func RenderQuotaDashboardOverlay(quotas []QuotaEntry, width, height int) string 
 		}
 	}
 
-	b.WriteString("\n")
-	b.WriteString(OverlayDimStyle.Render("  esc/q: close"))
-
 	return b.String()
 }
 
@@ -531,10 +502,6 @@ func RenderEventTimelineOverlay(events []EventTimelineEntry, resourceName string
 
 	if len(events) == 0 {
 		b.WriteString(OverlayDimStyle.Render("No events found"))
-		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("Press "))
-		b.WriteString(OverlayFilterStyle.Render("esc"))
-		b.WriteString(OverlayDimStyle.Render(" to close"))
 		return b.String()
 	}
 
@@ -671,14 +638,12 @@ func RenderEventTimelineOverlay(events []EventTimelineEntry, resourceName string
 	}
 	b.WriteString("\n")
 
-	// Scroll info + hints.
+	// Scroll info (hints moved to main status bar).
 	scrollInfo := fmt.Sprintf("%d events", len(events))
 	if scroll > 0 || end < len(events) {
 		scrollInfo += fmt.Sprintf(" | showing %d-%d", scroll+1, end)
 	}
 	b.WriteString(OverlayDimStyle.Render(scrollInfo))
-	b.WriteString("  ")
-	b.WriteString(OverlayDimStyle.Render("j/k: scroll  g/G: top/bottom  esc: close"))
 
 	return b.String()
 }
@@ -716,10 +681,6 @@ func RenderAlertsOverlay(alerts []AlertEntry, scroll, width, height int) string 
 		b.WriteString(OverlayDimStyle.Render("  Prometheus was queried in well-known namespaces"))
 		b.WriteString("\n")
 		b.WriteString(OverlayDimStyle.Render("  (monitoring, prometheus, observability, kube-prometheus-stack)"))
-		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("  Press "))
-		b.WriteString(OverlayFilterStyle.Render("esc"))
-		b.WriteString(OverlayDimStyle.Render(" to close"))
 		return b.String()
 	}
 
@@ -811,7 +772,7 @@ func RenderAlertsOverlay(alerts []AlertEntry, scroll, width, height int) string 
 	if maxScroll > 0 {
 		info += fmt.Sprintf(" | scroll %d/%d", scroll+1, maxScroll+1)
 	}
-	b.WriteString(OverlayDimStyle.Render(info + "  j/k: scroll  esc: close"))
+	b.WriteString(OverlayDimStyle.Render(info))
 
 	return b.String()
 }

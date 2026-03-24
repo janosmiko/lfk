@@ -94,18 +94,16 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			LabelKeys: []string{"k"},
 		}
 		result := RenderLabelEditorOverlay(data, 0, 0, true, "k", "v", 0, 100, 40)
-		assert.Contains(t, result, "save")
-		assert.Contains(t, result, "cancel")
+		assert.Contains(t, result, "Label / Annotation Editor")
 	})
 
-	t.Run("normal mode shows navigation help", func(t *testing.T) {
+	t.Run("normal mode hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		data := &model.LabelAnnotationData{
 			Labels:    map[string]string{"k": "v"},
 			LabelKeys: []string{"k"},
 		}
 		result := RenderLabelEditorOverlay(data, 0, 0, false, "", "", 0, 100, 40)
-		assert.Contains(t, result, "nav")
-		assert.Contains(t, result, "edit")
-		assert.Contains(t, result, "close")
+		assert.Contains(t, result, "Label / Annotation Editor")
 	})
 }

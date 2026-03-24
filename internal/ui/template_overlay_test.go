@@ -27,12 +27,13 @@ func TestRenderTemplateOverlayShowsFilterLabel(t *testing.T) {
 	assert.Contains(t, result, "dep")
 }
 
-func TestRenderTemplateOverlayNoFilterShowsSlashHint(t *testing.T) {
+func TestRenderTemplateOverlayNoFilterHintRemoved(t *testing.T) {
+	// Hints now live in the main status bar, not inline.
 	templates := []model.ResourceTemplate{
 		{Name: "Deployment", Description: "Create a Deployment", Category: "Workloads"},
 	}
 	result := RenderTemplateOverlay(templates, "", 0, false, 25)
-	assert.Contains(t, result, "/: filter")
+	assert.NotContains(t, result, "/: filter")
 }
 
 func TestRenderTemplateOverlayEmptyTemplates(t *testing.T) {

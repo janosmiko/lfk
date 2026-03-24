@@ -144,26 +144,24 @@ func TestRenderSecretEditorOverlay(t *testing.T) {
 		assert.Contains(t, result, "No secret loaded")
 	})
 
-	t.Run("normal mode shows navigation help", func(t *testing.T) {
+	t.Run("normal mode hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		secret := &model.SecretData{
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "val1"},
 		}
 		result := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", "", 0, 100, 40)
 		assert.Contains(t, result, "Secret Editor")
-		assert.Contains(t, result, "nav")
-		assert.Contains(t, result, "toggle")
-		assert.Contains(t, result, "close")
+		assert.Contains(t, result, "key1")
 	})
 
-	t.Run("editing mode shows save help", func(t *testing.T) {
+	t.Run("editing mode hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		secret := &model.SecretData{
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "val1"},
 		}
 		result := RenderSecretEditorOverlay(secret, 0, nil, false, true, "key1", "val1", 1, 100, 40)
 		assert.Contains(t, result, "Secret Editor")
-		assert.Contains(t, result, "save")
-		assert.Contains(t, result, "cancel")
 	})
 }

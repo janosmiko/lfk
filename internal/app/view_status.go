@@ -107,6 +107,48 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(styled)
 	}
 
+	// When an overlay is active, show overlay-specific hints instead of explorer hints.
+	if hint := m.overlayHintBar(); hint != "" {
+		content := ui.Truncate(hint, innerWidth)
+		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+	}
+
+	// When the help screen is active, show help-specific hints.
+	if m.mode == modeHelp {
+		var helpHint string
+		switch {
+		case m.helpSearchActive:
+			helpHint = ui.HelpKeyStyle.Render("search") + ui.DimStyle.Render(": ") + m.helpSearchInput.View()
+		case m.helpFilter.Value != "":
+			helpHint = ui.DimStyle.Render("filter: ") +
+				ui.HelpKeyStyle.Render(m.helpFilter.Value) + "  " +
+				ui.HelpKeyStyle.Render("/") + ui.DimStyle.Render(" edit") + "  " +
+				ui.HelpKeyStyle.Render("Esc") + ui.DimStyle.Render(" close")
+		default:
+			helpHint = m.renderHints([]hintEntry{
+				{"j/k", "scroll"},
+				{"^d/^u", "half-page"},
+				{"/", "search"},
+				{"Esc/?/q", "close"},
+			})
+		}
+		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(helpHint)
+	}
+
+	// When the error log overlay is active, show error log hints.
+	if m.overlayErrorLog {
+		debugHint := "show debug"
+		if m.showDebugLogs {
+			debugHint = "hide debug"
+		}
+		hint := m.renderHints([]hintEntry{
+			{"j/k", "scroll"},
+			{"d", debugHint},
+			{"esc", "close"},
+		})
+		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
+	}
+
 	var parts []string
 
 	// Show selection count when items are selected.
@@ -223,7 +265,7 @@ func (m Model) renderOverlay(background string) string {
 	case overlayBookmarks:
 		overlayW = min(90, m.width-10)
 		overlayH = min(25, m.height-6)
-		content = ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode), overlayH)
+		content = ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode))
 	case overlayTemplates:
 		filtered := m.filteredTemplates()
 		overlayW = min(60, m.width-10)
@@ -382,8 +424,7 @@ func (m Model) renderOverlay(background string) string {
 			}
 			overlayW = min(100, m.width-6)
 			overlayH = min(35, m.height-4)
-			// Netpol overlay renders its own hint bar, so we build the
-			// bordered box here to avoid OverlayStyle.Height() clipping it.
+			// Build the bordered box without fixed Height to avoid clipping.
 			innerW := overlayW - 4 // account for OverlayStyle Padding(1,2) = 2 chars each side
 			innerH := overlayH - 2 // account for OverlayStyle Padding(1,2) = 1 line top + 1 line bottom
 			netpolContent := ui.RenderNetworkPolicyOverlay(entry, m.netpolScroll, innerW, innerH)
@@ -472,23 +513,8 @@ func (m Model) renderCanIOverlay(background string) string {
 	innerW := overlayW - 4
 	innerH := overlayH - 2
 
-	filterLabel := "all"
-	if m.canIAllowedOnly {
-		filterLabel = "allowed only"
-	}
-	hints := []struct{ key, desc string }{
-		{"j/k", "navigate"},
-		{"a", filterLabel},
-		{"s", "switch subject"},
-		{"/", "search groups"},
-		{"q/Esc", "close/back"},
-	}
-	hintParts := make([]string, 0, len(hints))
-	for _, h := range hints {
-		hintParts = append(hintParts, ui.HelpKeyStyle.Render(h.key)+ui.DimStyle.Render(": "+h.desc))
-	}
-	hintBar := ui.StatusBarBgStyle.Width(innerW).Render(strings.Join(hintParts, ui.DimStyle.Render(" | ")))
-
+	// Search bar shown inside the overlay; normal hints moved to the main status bar.
+	var hintBar string
 	if m.canISearchActive {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.NormalStyle.Render(m.canISearchInput.CursorLeft()) + ui.DimStyle.Render("\u2588") + ui.NormalStyle.Render(m.canISearchInput.CursorRight())
 		hintBar = ui.StatusBarBgStyle.Width(innerW).Render(searchBar)

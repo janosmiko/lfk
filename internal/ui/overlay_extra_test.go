@@ -15,7 +15,7 @@ func TestRenderQuitConfirmOverlay(t *testing.T) {
 	}{
 		{
 			name:       "contains quit title and confirmation prompts",
-			wantSubstr: []string{"Quit", "Quit lfk?", "y", "n", "confirm", "cancel"},
+			wantSubstr: []string{"Quit", "Quit lfk?"},
 		},
 	}
 	for _, tt := range tests {
@@ -42,7 +42,7 @@ func TestRenderConfirmTypeOverlay(t *testing.T) {
 			name:       "empty input shows placeholder",
 			action:     "my-pod",
 			input:      "",
-			wantSubstr: []string{"Confirm Force Finalize", "my-pod", "DELETE", "_", "esc: cancel"},
+			wantSubstr: []string{"Confirm Force Finalize", "my-pod", "DELETE", "_"},
 		},
 		{
 			name:       "partial input shown",

@@ -75,7 +75,7 @@ func (m Model) View() string {
 
 	// Render help screen as an overlay on top of the explorer view.
 	if m.mode == modeHelp {
-		overlay := ui.RenderHelpScreen(m.width, m.height, m.helpScroll, m.helpFilter.Value, m.helpSearchActive, &m.helpSearchInput)
+		overlay := ui.RenderHelpScreen(m.width, m.height, m.helpScroll, m.helpFilter.Value)
 		view = ui.PlaceOverlay(m.width, m.height, overlay, view)
 	}
 

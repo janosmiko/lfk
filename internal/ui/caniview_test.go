@@ -274,11 +274,12 @@ func TestRenderCanISubjectOverlay(t *testing.T) {
 		assert.Contains(t, result, "/ to filter")
 	})
 
-	t.Run("hint bar content", func(t *testing.T) {
+	t.Run("hint bar removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		items := []model.Item{{Name: "admin"}}
 		ResetOverlayCanISubjectScroll()
 		result := RenderCanISubjectOverlay(items, "", 0, false)
-		assert.Contains(t, result, "Enter: select")
-		assert.Contains(t, result, "Esc: cancel")
+		assert.NotContains(t, result, "Enter: select")
+		assert.NotContains(t, result, "Esc: cancel")
 	})
 }

@@ -69,14 +69,13 @@ func TestRenderRollbackOverlay(t *testing.T) {
 		assert.Contains(t, result, "+2")
 	})
 
-	t.Run("help hints shown", func(t *testing.T) {
+	t.Run("hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		revisions := []k8s.DeploymentRevision{
 			{Revision: 1, Name: "rs1", Images: []string{"img:1"}},
 		}
 		result := RenderRollbackOverlay(revisions, 0, 100, 40)
-		assert.Contains(t, result, "nav")
-		assert.Contains(t, result, "rollback")
-		assert.Contains(t, result, "cancel")
+		assert.Contains(t, result, "Rollback Deployment")
 	})
 }
 
@@ -129,13 +128,12 @@ func TestRenderHelmRollbackOverlay(t *testing.T) {
 		assert.Contains(t, result, "app-0.9")
 	})
 
-	t.Run("help hints shown", func(t *testing.T) {
+	t.Run("hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		revisions := []HelmRevision{
 			{Revision: 1, Status: "deployed", Chart: "app-1.0"},
 		}
 		result := RenderHelmRollbackOverlay(revisions, 0, 100, 40)
-		assert.Contains(t, result, "nav")
-		assert.Contains(t, result, "rollback")
-		assert.Contains(t, result, "cancel")
+		assert.Contains(t, result, "Rollback Helm Release")
 	})
 }

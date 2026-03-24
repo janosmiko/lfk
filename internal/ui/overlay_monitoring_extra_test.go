@@ -56,11 +56,12 @@ func TestRenderFilterPresetOverlay(t *testing.T) {
 		assert.NotContains(t, result, "\u2713 ")
 	})
 
-	t.Run("footer hints present", func(t *testing.T) {
+	t.Run("footer hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		presets := []FilterPresetEntry{{Name: "P", Description: "d", Key: "p"}}
 		result := RenderFilterPresetOverlay(presets, 0, "")
-		assert.Contains(t, result, "enter: apply")
-		assert.Contains(t, result, "esc: close")
+		assert.NotContains(t, result, "enter: apply")
+		assert.NotContains(t, result, "esc: close")
 	})
 }
 
@@ -84,10 +85,11 @@ func TestRenderRBACOverlay(t *testing.T) {
 		assert.Contains(t, result, "\u2717")
 	})
 
-	t.Run("empty results shows title and close hint", func(t *testing.T) {
+	t.Run("empty results shows title", func(t *testing.T) {
 		result := RenderRBACOverlay(nil, "secrets")
 		assert.Contains(t, result, "RBAC Permissions: secrets")
-		assert.Contains(t, result, "Press any key to close")
+		// Hint moved to status bar.
+		assert.NotContains(t, result, "Press any key to close")
 	})
 
 	t.Run("all allowed", func(t *testing.T) {
@@ -109,7 +111,7 @@ func TestRenderBatchLabelOverlay(t *testing.T) {
 		assert.Contains(t, result, "Add Labels")
 		assert.Contains(t, result, "Enter key=value:")
 		assert.Contains(t, result, "app=nginx")
-		assert.Contains(t, result, "Tab: toggle add/remove")
+		// Tab hint moved to status bar.
 	})
 
 	t.Run("remove labels mode", func(t *testing.T) {
@@ -136,10 +138,11 @@ func TestRenderBatchLabelOverlay(t *testing.T) {
 		assert.Contains(t, result, "\u2588")
 	})
 
-	t.Run("footer hints present", func(t *testing.T) {
+	t.Run("footer hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		result := RenderBatchLabelOverlay(0, "", false)
-		assert.Contains(t, result, "Enter: apply")
-		assert.Contains(t, result, "Esc: cancel")
+		assert.NotContains(t, result, "Enter: apply")
+		assert.NotContains(t, result, "Esc: cancel")
 	})
 }
 
@@ -150,7 +153,7 @@ func TestRenderEventTimelineOverlay(t *testing.T) {
 		result := RenderEventTimelineOverlay(nil, "my-pod", 0, 80, 30)
 		assert.Contains(t, result, "Event Timeline - my-pod")
 		assert.Contains(t, result, "No events found")
-		assert.Contains(t, result, "esc")
+		// Hint moved to status bar.
 	})
 
 	t.Run("events rendered with reason and message", func(t *testing.T) {
@@ -212,7 +215,8 @@ func TestRenderEventTimelineOverlay(t *testing.T) {
 		assert.Contains(t, result, "Pod/other-pod")
 	})
 
-	t.Run("scroll hints shown for many events", func(t *testing.T) {
+	t.Run("scroll hints removed from overlay body", func(t *testing.T) {
+		// Hints now live in the main status bar, not inline.
 		events := make([]EventTimelineEntry, 50)
 		for i := range events {
 			events[i] = EventTimelineEntry{
@@ -224,6 +228,6 @@ func TestRenderEventTimelineOverlay(t *testing.T) {
 			}
 		}
 		result := RenderEventTimelineOverlay(events, "pod", 0, 80, 15)
-		assert.Contains(t, result, "j/k: scroll")
+		assert.NotContains(t, result, "j/k: scroll")
 	})
 }

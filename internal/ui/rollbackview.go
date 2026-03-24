@@ -63,11 +63,7 @@ func RenderRollbackOverlay(revisions []k8s.DeploymentRevision, cursor int, scree
 		}
 	}
 
-	helpLine := HelpKeyStyle.Render("jk") + DimStyle.Render(" nav") + "  " +
-		HelpKeyStyle.Render("Enter") + DimStyle.Render(" rollback") + "  " +
-		HelpKeyStyle.Render("esc") + DimStyle.Render(" cancel")
-
-	body := title + "\n" + strings.Join(lines, "\n") + "\n\n" + helpLine
+	body := title + "\n" + strings.Join(lines, "\n")
 
 	return OverlayStyle.
 		Width(boxW).
@@ -137,11 +133,7 @@ func RenderHelmRollbackOverlay(revisions []HelmRevision, cursor int, screenWidth
 		}
 	}
 
-	helpLine := HelpKeyStyle.Render("jk") + DimStyle.Render(" nav") + "  " +
-		HelpKeyStyle.Render("Enter") + DimStyle.Render(" rollback") + "  " +
-		HelpKeyStyle.Render("esc") + DimStyle.Render(" cancel")
-
-	body := title + "\n" + strings.Join(lines, "\n") + "\n\n" + helpLine
+	body := title + "\n" + strings.Join(lines, "\n")
 
 	return OverlayStyle.
 		Width(boxW).

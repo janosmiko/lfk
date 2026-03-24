@@ -44,10 +44,9 @@ func RenderLabelEditorOverlay(
 	innerPadH := 2
 	innerPadW := 4
 	titleH := 2 // title + tab bar
-	helpH := 1
-	gapH := 2
+	gapH := 1
 
-	panelContentH := boxH - outerPadH - innerPadH - titleH - helpH - gapH
+	panelContentH := boxH - outerPadH - innerPadH - titleH - gapH
 	if panelContentH < 3 {
 		panelContentH = 3
 	}
@@ -89,23 +88,7 @@ func RenderLabelEditorOverlay(
 		Height(panelContentH).
 		Render(dataContent)
 
-	var helpLine string
-	if editing {
-		helpLine = HelpKeyStyle.Render("ctrl+s") + DimStyle.Render(" save") + "  " +
-			HelpKeyStyle.Render("tab") + DimStyle.Render(" switch") + "  " +
-			HelpKeyStyle.Render("esc") + DimStyle.Render(" cancel")
-	} else {
-		helpLine = HelpKeyStyle.Render("Tab") + DimStyle.Render(" switch") + "  " +
-			HelpKeyStyle.Render("jk") + DimStyle.Render(" nav") + "  " +
-			HelpKeyStyle.Render("e") + DimStyle.Render(" edit") + "  " +
-			HelpKeyStyle.Render("a") + DimStyle.Render(" add") + "  " +
-			HelpKeyStyle.Render("y") + DimStyle.Render(" copy") + "  " +
-			HelpKeyStyle.Render("D") + DimStyle.Render(" del") + "  " +
-			HelpKeyStyle.Render("s") + DimStyle.Render(" save") + "  " +
-			HelpKeyStyle.Render("esc") + DimStyle.Render(" close")
-	}
-
-	body := title + "\n" + tabBar + "\n" + innerPanel + "\n" + helpLine
+	body := title + "\n" + tabBar + "\n" + innerPanel
 
 	return OverlayStyle.
 		Width(boxW).

@@ -44,10 +44,9 @@ func RenderConfigMapEditorOverlay(
 	innerPadH := 2 // inner border (2)
 	innerPadW := 4 // inner border (2) + inner padding (1*2)
 	titleH := 1
-	helpH := 1
-	gapH := 2
+	gapH := 1
 
-	panelContentH := boxH - outerPadH - innerPadH - titleH - helpH - gapH
+	panelContentH := boxH - outerPadH - innerPadH - titleH - gapH
 	if panelContentH < 3 {
 		panelContentH = 3
 	}
@@ -73,24 +72,7 @@ func RenderConfigMapEditorOverlay(
 		Height(panelContentH).
 		Render(dataContent)
 
-	// Help line.
-	var helpLine string
-	if editing {
-		helpLine = HelpKeyStyle.Render("ctrl+s") + DimStyle.Render(" save") + "  " +
-			HelpKeyStyle.Render("enter") + DimStyle.Render(" newline") + "  " +
-			HelpKeyStyle.Render("tab") + DimStyle.Render(" switch") + "  " +
-			HelpKeyStyle.Render("esc") + DimStyle.Render(" cancel")
-	} else {
-		helpLine = HelpKeyStyle.Render("jk") + DimStyle.Render(" nav") + "  " +
-			HelpKeyStyle.Render("e") + DimStyle.Render(" edit") + "  " +
-			HelpKeyStyle.Render("a") + DimStyle.Render(" add") + "  " +
-			HelpKeyStyle.Render("y") + DimStyle.Render(" copy") + "  " +
-			HelpKeyStyle.Render("D") + DimStyle.Render(" del") + "  " +
-			HelpKeyStyle.Render("s") + DimStyle.Render(" save") + "  " +
-			HelpKeyStyle.Render("esc") + DimStyle.Render(" close")
-	}
-
-	body := title + "\n" + innerPanel + "\n" + helpLine
+	body := title + "\n" + innerPanel
 
 	return OverlayStyle.
 		Width(boxW).

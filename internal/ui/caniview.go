@@ -272,9 +272,6 @@ func RenderCanISubjectOverlay(items []model.Item, filter string, cursor int, fil
 		}
 	}
 
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("Enter: select  /: filter  Esc: cancel"))
-
 	return b.String()
 }
 
