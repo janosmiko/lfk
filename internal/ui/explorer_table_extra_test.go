@@ -250,6 +250,30 @@ func TestCollectExtraColumns(t *testing.T) {
 		}
 	})
 
+	t.Run("Selector column excluded from Service table in both modes", func(t *testing.T) {
+		items := []model.Item{
+			{Name: "svc1", Kind: "Service", Columns: []model.KeyValue{
+				{Key: "Cluster IP", Value: "10.0.0.1"},
+				{Key: "Selector", Value: "app=nginx"},
+			}},
+			{Name: "svc2", Kind: "Service", Columns: []model.KeyValue{
+				{Key: "Cluster IP", Value: "10.0.0.2"},
+				{Key: "Selector", Value: "app=redis"},
+			}},
+		}
+		for _, fs := range []bool{false, true} {
+			origFS := ActiveFullscreenMode
+			ActiveFullscreenMode = fs
+			result := collectExtraColumns(items, 120, 30, "Service")
+			ActiveFullscreenMode = origFS
+
+			for _, col := range result {
+				assert.NotEqual(t, "Selector", col.key,
+					"Selector should be blocked from table (fullscreen=%v)", fs)
+			}
+		}
+	})
+
 	t.Run("Used By column excluded from PVC table in both modes", func(t *testing.T) {
 		items := []model.Item{
 			{Name: "pvc1", Kind: "PersistentVolumeClaim", Columns: []model.KeyValue{

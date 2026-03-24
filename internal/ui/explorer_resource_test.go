@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -239,6 +240,32 @@ func TestRenderResourceSummary(t *testing.T) {
 		assert.Contains(t, result, "DATA")
 		assert.Contains(t, result, "********")
 		assert.NotContains(t, result, "super-secret")
+	})
+
+	t.Run("selector rendered as multiline table", func(t *testing.T) {
+		item := &model.Item{
+			Name: "my-svc",
+			Columns: []model.KeyValue{
+				{Key: "Cluster IP", Value: "10.0.0.1"},
+				{Key: "Selector", Value: "app=nginx, tier=frontend"},
+			},
+		}
+		result := RenderResourceSummary(item, "", 80, 30)
+		// Selector should be rendered as a multi-line section with each
+		// selector on its own indented line, not as a single key-value row.
+		assert.Contains(t, result, "SELECTOR")
+		assert.Contains(t, result, "app=nginx")
+		assert.Contains(t, result, "tier=frontend")
+		// The two selectors must appear on different lines.
+		lines := strings.Split(result, "\n")
+		var selectorLines []string
+		for _, line := range lines {
+			if strings.Contains(line, "app=nginx") || strings.Contains(line, "tier=frontend") {
+				selectorLines = append(selectorLines, line)
+			}
+		}
+		assert.GreaterOrEqual(t, len(selectorLines), 2,
+			"each selector should be on its own line")
 	})
 
 	t.Run("secret fields revealed when toggle is on", func(t *testing.T) {

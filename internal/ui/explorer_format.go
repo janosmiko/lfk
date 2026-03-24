@@ -201,6 +201,8 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 				"Used By": true,
 				// Deletion timestamp: shown in detail pane only.
 				"Deletion": true,
+				// Service selectors: shown in detail pane as table.
+				"Selector": true,
 			}
 		} else {
 			blocked = map[string]bool{
@@ -221,6 +223,8 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 				"Used By": true,
 				// Deletion timestamp: shown in detail pane only.
 				"Deletion": true,
+				// Service selectors: shown in detail pane as table.
+				"Selector": true,
 			}
 		}
 		for k, v := range rawMetricsCols {
