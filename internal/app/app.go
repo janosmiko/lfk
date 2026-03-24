@@ -39,8 +39,8 @@ const (
 	overlayNone overlayKind = iota
 	overlayNamespace
 	overlayAction
-	overlayConfirm
-	overlayConfirmType // requires typing "DELETE" to confirm
+	overlayConfirm     // y/n confirmation (regular delete, drain)
+	overlayConfirmType // requires typing "DELETE" to confirm (force delete, force finalize)
 	overlayScaleInput
 	overlayPortForward
 	overlayContainerSelect
@@ -300,6 +300,10 @@ type Model struct {
 
 	// Confirm action label (for delete confirmation).
 	confirmAction string
+
+	// Title and question for the type-to-confirm overlay.
+	confirmTitle    string
+	confirmQuestion string
 
 	// Text input for type-to-confirm overlay (e.g., Force Finalize).
 	confirmTypeInput TextInput

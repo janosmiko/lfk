@@ -99,8 +99,6 @@ func TestRenderConfirmOverlay(t *testing.T) {
 	result := RenderConfirmOverlay("my-deployment")
 	assert.Contains(t, result, "Confirm Delete")
 	assert.Contains(t, result, "my-deployment")
-	assert.Contains(t, result, "y")
-	assert.Contains(t, result, "n")
 }
 
 // --- RenderScaleOverlay ---

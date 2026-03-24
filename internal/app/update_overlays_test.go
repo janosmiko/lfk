@@ -474,7 +474,7 @@ func TestActionOverlayKeyNavigation(t *testing.T) {
 	})
 }
 
-// --- handleConfirmOverlayKey ---
+// --- handleConfirmOverlayKey (y/n for regular delete, drain) ---
 
 func TestConfirmOverlayKeyDeclines(t *testing.T) {
 	tests := []struct {
@@ -503,6 +503,31 @@ func TestConfirmOverlayKeyDeclines(t *testing.T) {
 			assert.Empty(t, result.pendingAction)
 		})
 	}
+}
+
+// --- handleConfirmTypeOverlayKey (type DELETE for force delete, force finalize) ---
+
+func TestConfirmTypeOverlayDispatchesForceDelete(t *testing.T) {
+	m := Model{
+		overlay:          overlayConfirmType,
+		pendingAction:    "Force Delete",
+		confirmAction:    "my-pod (FORCE)",
+		confirmTypeInput: TextInput{Value: "DELETE", Cursor: 6},
+		tabs:             []TabState{{}},
+		width:            80,
+		height:           40,
+		actionCtx: actionContext{
+			name:         "my-pod",
+			namespace:    "default",
+			context:      "test",
+			resourceType: model.ResourceTypeEntry{Resource: "pods", Namespaced: true},
+		},
+	}
+	ret, cmd := m.handleConfirmTypeOverlayKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay)
+	assert.True(t, result.loading)
+	assert.NotNil(t, cmd, "should dispatch force delete command")
 }
 
 // --- handleConfirmTypeOverlayKey ---

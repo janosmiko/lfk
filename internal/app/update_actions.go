@@ -252,6 +252,8 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 	// If resource is already deleting, offer Force Finalize instead.
 	if sel.Deleting {
 		m.confirmAction = sel.Name
+		m.confirmTitle = "Confirm Force Finalize"
+		m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", sel.Name)
 		m.confirmTypeInput.Clear()
 		m.overlay = overlayConfirmType
 		m.pendingAction = "Force Finalize"
@@ -278,7 +280,10 @@ func (m Model) directActionForceDelete() (tea.Model, tea.Cmd) {
 	}
 	m.actionCtx = m.buildActionCtx(sel, kind)
 	m.confirmAction = sel.Name + " (FORCE)"
-	m.overlay = overlayConfirm
+	m.confirmTitle = "Confirm Force Delete"
+	m.confirmQuestion = fmt.Sprintf("Force delete %s?", sel.Name)
+	m.confirmTypeInput.Clear()
+	m.overlay = overlayConfirmType
 	m.pendingAction = "Force Delete"
 	return m, nil
 }
@@ -438,6 +443,7 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	case "Delete":
 		m.confirmAction = m.actionCtx.name
 		m.overlay = overlayConfirm
+		m.pendingAction = "Delete"
 		return m, nil
 	case "Scale":
 		m.scaleInput.Clear()
@@ -516,6 +522,8 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		return m, m.forceDeleteResource()
 	case "Force Finalize":
 		m.confirmAction = m.actionCtx.name
+		m.confirmTitle = "Confirm Force Finalize"
+		m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", m.actionCtx.name)
 		m.confirmTypeInput.Clear()
 		m.overlay = overlayConfirmType
 		m.pendingAction = "Force Finalize"
@@ -755,7 +763,10 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "Force Delete":
 		m.confirmAction = fmt.Sprintf("%d resources (FORCE)", len(m.bulkItems))
-		m.overlay = overlayConfirm
+		m.confirmTitle = "Confirm Force Delete"
+		m.confirmQuestion = fmt.Sprintf("Force delete %d resources?", len(m.bulkItems))
+		m.confirmTypeInput.Clear()
+		m.overlay = overlayConfirmType
 		m.pendingAction = "Force Delete"
 		return m, nil
 	case "Scale":

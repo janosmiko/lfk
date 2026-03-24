@@ -467,25 +467,19 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			nsArg = " -n " + ns
 		}
 
-		// Bulk mode.
+		// Bulk delete.
 		if m.bulkMode && len(m.bulkItems) > 0 {
 			m.clearSelection()
-			if action == "Force Delete" {
-				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 %s (%d items)%s --context %s", rt.Resource, len(m.bulkItems), nsArg, ctx))
-				return m, m.bulkForceDeleteResources()
-			}
 			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(m.bulkItems), nsArg, ctx))
 			return m, m.bulkDeleteResources()
 		}
 
-		if action == "Force Delete" {
-			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --grace-period=0 --force%s --context %s", rt.Resource, name, nsArg, ctx))
-			return m, m.forceDeleteResource()
-		}
 		if action == "Drain" {
 			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl drain %s --ignore-daemonsets --delete-emptydir-data --context %s", name, ctx))
 			return m, m.execKubectlDrain()
 		}
+
+		// Regular delete.
 		if rt.APIGroup == "_helm" {
 			m.addLogEntry("DBG", fmt.Sprintf("$ helm uninstall %s -n %s --kube-context %s", name, ns, ctx))
 		} else {
@@ -508,6 +502,8 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "esc", "q":
 		m.overlay = overlayNone
 		m.confirmAction = ""
+		m.confirmTitle = ""
+		m.confirmQuestion = ""
 		m.pendingAction = ""
 		m.confirmTypeInput.Clear()
 		return m, nil
@@ -520,6 +516,8 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			action := m.pendingAction
 			m.pendingAction = ""
 			m.confirmAction = ""
+			m.confirmTitle = ""
+			m.confirmQuestion = ""
 			m.confirmTypeInput.Clear()
 
 			ns := m.actionCtx.namespace
@@ -531,9 +529,20 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				nsArg = " -n " + ns
 			}
 
-			if action == "Force Finalize" {
+			// Bulk force delete.
+			if m.bulkMode && len(m.bulkItems) > 0 && action == "Force Delete" {
+				m.clearSelection()
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 %s (%d items)%s --context %s", rt.Resource, len(m.bulkItems), nsArg, ctx))
+				return m, m.bulkForceDeleteResources()
+			}
+
+			switch action {
+			case "Force Finalize":
 				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl patch %s %s --type merge -p '{\"metadata\":{\"finalizers\":null}}'%s --context %s", rt.Resource, name, nsArg, ctx))
 				return m, m.removeFinalizers()
+			case "Force Delete":
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --grace-period=0 --force%s --context %s", rt.Resource, name, nsArg, ctx))
+				return m, m.forceDeleteResource()
 			}
 		}
 		return m, nil

@@ -255,7 +255,8 @@ func RenderActionOverlay(items []model.Item, cursor int, width int) string {
 	return b.String()
 }
 
-// RenderConfirmOverlay renders the delete confirmation overlay content.
+// RenderConfirmOverlay renders the y/n confirmation overlay content
+// for standard destructive actions (delete, drain).
 func RenderConfirmOverlay(action string) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Confirm Delete"))
@@ -276,11 +277,13 @@ func RenderQuitConfirmOverlay() string {
 
 // RenderConfirmTypeOverlay renders the type-to-confirm overlay content.
 // The user must type "DELETE" to confirm the action.
-func RenderConfirmTypeOverlay(action, input string) string {
+// title is the overlay header (e.g. "Confirm Delete"), question is the
+// action-specific prompt (e.g. "Delete my-pod?").
+func RenderConfirmTypeOverlay(title, question, input string) string {
 	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Confirm Force Finalize"))
+	b.WriteString(OverlayTitleStyle.Render(title))
 	b.WriteString("\n\n")
-	b.WriteString(OverlayWarningStyle.Render(fmt.Sprintf("Remove all finalizers from %s?", action)))
+	b.WriteString(OverlayWarningStyle.Render(question))
 	b.WriteString("\n\n")
 	b.WriteString(OverlayNormalStyle.Render("Type "))
 	b.WriteString(OverlayFilterStyle.Render("DELETE"))

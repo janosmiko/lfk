@@ -82,6 +82,8 @@ func TestRenderOverlayConfirmType(t *testing.T) {
 	m := baseOverlayModel()
 	m.overlay = overlayConfirmType
 	m.confirmAction = "Delete namespace production"
+	m.confirmTitle = "Confirm Delete"
+	m.confirmQuestion = "Delete namespace production?"
 	m.confirmTypeInput = TextInput{Value: "DELE"}
 	bg := strings.Repeat("bg\n", 10)
 	result := m.renderOverlay(bg)

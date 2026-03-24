@@ -238,7 +238,7 @@ func (m Model) renderOverlay(background string) string {
 		overlayW = min(50, m.width-10)
 		overlayH = min(8, m.height-6)
 	case overlayConfirmType:
-		content = ui.RenderConfirmTypeOverlay(m.confirmAction, m.confirmTypeInput.Value)
+		content = ui.RenderConfirmTypeOverlay(m.confirmTitle, m.confirmQuestion, m.confirmTypeInput.Value)
 		overlayW = min(55, m.width-10)
 		overlayH = min(10, m.height-6)
 	case overlayScaleInput:
