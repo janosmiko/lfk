@@ -140,16 +140,18 @@ func TestBookmarkToSlot_GlobalFlag(t *testing.T) {
 	rt := podResourceType()
 
 	tests := []struct {
-		slot       string
-		wantGlobal bool
+		slot        string
+		wantGlobal  bool
+		wantContext string // global saves context, local does not
+		wantName    string // global includes context in name, local does not
 	}{
-		{slot: "a", wantGlobal: false},
-		{slot: "z", wantGlobal: false},
-		{slot: "0", wantGlobal: false},
-		{slot: "9", wantGlobal: false},
-		{slot: "A", wantGlobal: true},
-		{slot: "Z", wantGlobal: true},
-		{slot: "M", wantGlobal: true},
+		{slot: "a", wantGlobal: false, wantContext: "", wantName: "Pods"},
+		{slot: "z", wantGlobal: false, wantContext: "", wantName: "Pods"},
+		{slot: "0", wantGlobal: false, wantContext: "", wantName: "Pods"},
+		{slot: "9", wantGlobal: false, wantContext: "", wantName: "Pods"},
+		{slot: "A", wantGlobal: true, wantContext: "test", wantName: "test > Pods"},
+		{slot: "Z", wantGlobal: true, wantContext: "test", wantName: "test > Pods"},
+		{slot: "M", wantGlobal: true, wantContext: "test", wantName: "test > Pods"},
 	}
 
 	for _, tt := range tests {
@@ -172,7 +174,10 @@ func TestBookmarkToSlot_GlobalFlag(t *testing.T) {
 			bm := resultModel.bookmarks[len(resultModel.bookmarks)-1]
 			assert.Equal(t, tt.slot, bm.Slot)
 			assert.Equal(t, tt.wantGlobal, bm.Global, "slot %q: Global should be %v", tt.slot, tt.wantGlobal)
-			assert.Equal(t, "test", bm.Context)
+			assert.Equal(t, tt.wantContext, bm.Context,
+				"slot %q: local bookmarks should not save context", tt.slot)
+			assert.Equal(t, tt.wantName, bm.Name,
+				"slot %q: local bookmarks should not include context in name", tt.slot)
 			assert.Equal(t, rt.ResourceRef(), bm.ResourceType)
 		})
 	}

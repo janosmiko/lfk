@@ -19,7 +19,14 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	parts := []string{m.nav.Context}
+	isGlobal := len(slot) == 1 && slot[0] >= 'A' && slot[0] <= 'Z'
+
+	// Global bookmarks include the context in the name and save it for
+	// cross-cluster navigation. Local bookmarks are context-independent.
+	var parts []string
+	if isGlobal {
+		parts = append(parts, m.nav.Context)
+	}
 	if m.nav.ResourceType.DisplayName != "" {
 		parts = append(parts, m.nav.ResourceType.DisplayName)
 	}
@@ -44,15 +51,20 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 		ns = m.namespace
 	}
 
+	bmContext := ""
+	if isGlobal {
+		bmContext = m.nav.Context
+	}
+
 	bm := model.Bookmark{
 		Name:         name,
-		Context:      m.nav.Context,
+		Context:      bmContext,
 		Namespace:    ns,
 		Namespaces:   nsList,
 		ResourceType: m.nav.ResourceType.ResourceRef(),
 		ResourceName: m.nav.ResourceName,
 		Slot:         slot,
-		Global:       len(slot) == 1 && slot[0] >= 'A' && slot[0] <= 'Z',
+		Global:       isGlobal,
 	}
 
 	// Check if slot is already in use; if so, ask for confirmation.
