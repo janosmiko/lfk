@@ -13,8 +13,9 @@ func ActionsForContainer() []ActionMenuItem {
 }
 
 // ActionsForBulk returns the action menu items available for bulk operations.
-func ActionsForBulk() []ActionMenuItem {
-	return []ActionMenuItem{
+// Kind-specific bulk actions are appended when kind is non-empty.
+func ActionsForBulk(kind string) []ActionMenuItem {
+	actions := []ActionMenuItem{
 		{Label: "Logs", Description: "Stream logs from selected resources", Key: "L"},
 		{Label: "Delete", Description: "Delete selected resources", Key: "D"},
 		{Label: "Force Delete", Description: "Force delete selected resources", Key: "X"},
@@ -23,6 +24,15 @@ func ActionsForBulk() []ActionMenuItem {
 		{Label: "Labels / Annotations", Description: "Edit labels and annotations", Key: "l"},
 		{Label: "Diff", Description: "Compare YAML of two resources", Key: "d"},
 	}
+	switch kind {
+	case "Application":
+		actions = append(actions,
+			ActionMenuItem{Label: "Sync", Description: "Sync selected applications", Key: "s"},
+			ActionMenuItem{Label: "Sync (Apply Only)", Description: "Sync selected applications without hooks", Key: "a"},
+			ActionMenuItem{Label: "Refresh", Description: "Hard refresh selected applications", Key: "R"},
+		)
+	}
+	return actions
 }
 
 // ActionsForKind returns the action menu items appropriate for a given resource kind.

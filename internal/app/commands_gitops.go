@@ -97,6 +97,58 @@ func (m Model) resumeFluxResource() tea.Cmd {
 	}
 }
 
+func (m Model) bulkSyncArgoApps(applyOnly bool) tea.Cmd {
+	items := m.bulkItems
+	ctx := m.actionCtx.context
+	ns := m.actionNamespace()
+	client := m.client
+
+	return func() tea.Msg {
+		var succeeded, failed int
+		var errors []string
+		for _, item := range items {
+			itemNs := ns
+			if item.Namespace != "" {
+				itemNs = item.Namespace
+			}
+			err := client.SyncArgoApp(ctx, itemNs, item.Name, applyOnly)
+			if err != nil {
+				failed++
+				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
+			} else {
+				succeeded++
+			}
+		}
+		return bulkActionResultMsg{succeeded: succeeded, failed: failed, errors: errors}
+	}
+}
+
+func (m Model) bulkRefreshArgoApps() tea.Cmd {
+	items := m.bulkItems
+	ctx := m.actionCtx.context
+	ns := m.actionNamespace()
+	client := m.client
+
+	return func() tea.Msg {
+		var succeeded, failed int
+		var errors []string
+		for _, item := range items {
+			itemNs := ns
+			if item.Namespace != "" {
+				itemNs = item.Namespace
+			}
+			err := client.RefreshArgoApp(ctx, itemNs, item.Name)
+			if err != nil {
+				failed++
+				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
+			} else {
+				succeeded++
+			}
+		}
+		return bulkActionResultMsg{succeeded: succeeded, failed: failed, errors: errors}
+	}
+}
+
 func (m Model) terminateArgoSync() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()

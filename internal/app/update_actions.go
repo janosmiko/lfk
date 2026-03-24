@@ -27,7 +27,7 @@ func (m Model) openActionMenu() (tea.Model, tea.Cmd) {
 		}
 		m.actionCtx = m.buildActionCtx(&selectedList[0], kind)
 
-		actions := model.ActionsForBulk()
+		actions := model.ActionsForBulk(kind)
 		// Filter out actions that don't apply to the selected resource kind.
 		if !model.IsScaleableKind(kind) || !model.IsRestartableKind(kind) {
 			filtered := actions[:0]
@@ -792,6 +792,21 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.loading = true
 		m.setStatusMessage("Loading diff...", false)
 		return m, m.loadDiff(m.actionCtx.resourceType, m.bulkItems[0], m.bulkItems[1])
+	case "Sync":
+		m.addLogEntry("DBG", fmt.Sprintf("Bulk sync (%d apps, hook strategy)", len(m.bulkItems)))
+		m.loading = true
+		m.clearSelection()
+		return m, m.bulkSyncArgoApps(false)
+	case "Sync (Apply Only)":
+		m.addLogEntry("DBG", fmt.Sprintf("Bulk sync (%d apps, apply strategy)", len(m.bulkItems)))
+		m.loading = true
+		m.clearSelection()
+		return m, m.bulkSyncArgoApps(true)
+	case "Refresh":
+		m.addLogEntry("DBG", fmt.Sprintf("Bulk refresh (%d apps)", len(m.bulkItems)))
+		m.loading = true
+		m.clearSelection()
+		return m, m.bulkRefreshArgoApps()
 	}
 
 	return m, nil

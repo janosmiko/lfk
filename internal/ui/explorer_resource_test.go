@@ -179,6 +179,8 @@ func TestRenderResourceSummary(t *testing.T) {
 			},
 		}
 		result := RenderResourceSummary(item, "", 80, 20)
+		assert.Contains(t, result, "NAME")
+		assert.Contains(t, result, "nginx-pod")
 		assert.Contains(t, result, "NAMESPACE")
 		assert.Contains(t, result, "default")
 		assert.Contains(t, result, "NODE")

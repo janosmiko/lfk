@@ -222,7 +222,7 @@ func TestRenderDetailsOnlyWithColumns(t *testing.T) {
 	}
 	result := m.renderDetailsOnly(80, 20)
 	assert.Contains(t, result, "DETAILS")
-	assert.Contains(t, result, "pod-1", "header should include resource name")
+	assert.Contains(t, result, "pod-1", "summary should include resource name as NAME row")
 }
 
 func TestRenderDetailsOnlyWithYAML(t *testing.T) {
@@ -236,7 +236,6 @@ func TestRenderDetailsOnlyWithYAML(t *testing.T) {
 	}
 	result := m.renderDetailsOnly(80, 20)
 	assert.Contains(t, result, "DETAILS")
-	assert.Contains(t, result, "cm-1", "header should include resource name")
 	assert.Contains(t, result, "apiVersion")
 }
 
@@ -249,7 +248,6 @@ func TestRenderDetailsOnlyNoData(t *testing.T) {
 		middleItems: []model.Item{{Name: "cm-1"}},
 	}
 	result := m.renderDetailsOnly(80, 20)
-	assert.Contains(t, result, "cm-1", "header should include resource name even with no data")
 	assert.Contains(t, result, "No details available")
 }
 

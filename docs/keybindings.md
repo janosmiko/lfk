@@ -349,6 +349,9 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 ### Bulk Actions (when items multi-selected)
 `D` Delete, `X` Force Delete, `S` Scale, `r` Restart
 
+ArgoCD Application bulk actions (when Application resources are multi-selected):
+`s` Sync, `a` Sync (Apply Only), `R` Refresh
+
 Custom actions defined in the config file appear after the built-in actions.
 
 ## Configuring Keybindings

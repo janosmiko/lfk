@@ -70,7 +70,7 @@ func helpSections() []helpSection {
 				{"Ctrl+Space", "Select range from anchor to cursor"},
 				{"Ctrl+A", "Select/deselect all visible items"},
 				{"Esc", "Clear selection"},
-				{"x", "Bulk action menu (delete, force delete, scale, restart, diff)"},
+				{"x", "Bulk action menu (delete, force delete, scale, restart, diff, ArgoCD sync/refresh)"},
 				{"d", "Diff: compare YAML of two selected resources"},
 			},
 		},

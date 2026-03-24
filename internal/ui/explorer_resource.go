@@ -44,6 +44,9 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	var multiLineFields []model.KeyValue // Labels, Finalizers
 	var dataLines []string
 
+	if item.Name != "" {
+		rows = append(rows, detailRow{"NAME", item.Name})
+	}
 	if item.Namespace != "" {
 		rows = append(rows, detailRow{"NAMESPACE", item.Namespace})
 	}

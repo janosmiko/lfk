@@ -849,12 +849,25 @@ func TestActionsForContainer(t *testing.T) {
 }
 
 func TestActionsForBulk(t *testing.T) {
-	actions := ActionsForBulk()
+	actions := ActionsForBulk("")
 	assert.NotEmpty(t, actions)
 	labels := actionLabels(actions)
 	assert.Contains(t, labels, "Delete")
 	assert.Contains(t, labels, "Scale")
 	assert.Contains(t, labels, "Restart")
+	// Generic bulk should NOT include ArgoCD actions.
+	assert.NotContains(t, labels, "Sync")
+	assert.NotContains(t, labels, "Refresh")
+}
+
+func TestActionsForBulkApplication(t *testing.T) {
+	actions := ActionsForBulk("Application")
+	labels := actionLabels(actions)
+	assert.Contains(t, labels, "Sync", "Application bulk should include Sync")
+	assert.Contains(t, labels, "Sync (Apply Only)", "Application bulk should include Sync (Apply Only)")
+	assert.Contains(t, labels, "Refresh", "Application bulk should include Refresh")
+	// Should still have generic bulk actions.
+	assert.Contains(t, labels, "Delete")
 }
 
 func TestActionsForPortForward(t *testing.T) {

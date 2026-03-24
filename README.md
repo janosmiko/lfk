@@ -38,7 +38,7 @@
 
 - **Context-aware action menus**: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward
 - **Custom user-defined actions**: Define custom shell commands per resource type in config
-- **Multi-select with bulk actions**: Select multiple resources with Space, range-select with Ctrl+Space, perform bulk delete, scale, restart
+- **Multi-select with bulk actions**: Select multiple resources with Space, range-select with Ctrl+Space, perform bulk delete, scale, restart, and ArgoCD bulk sync/refresh
 - **Resource sorting** by name, age, or status
 - **Filter and search**: Filter with `f`, search with `/`
 - **Abbreviated search**: Type `pvc`, `hpa`, `deploy` etc. to jump to resource types
