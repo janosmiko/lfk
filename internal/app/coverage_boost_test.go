@@ -746,6 +746,7 @@ func TestCovHandleBookmarkFilterMode(t *testing.T) {
 }
 
 func TestCovHandleBookmarkConfirmDelete(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	m := baseModelCov()
 	m.bookmarkSearchMode = bookmarkModeConfirmDelete
 	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
@@ -759,6 +760,7 @@ func TestCovHandleBookmarkConfirmDelete(t *testing.T) {
 }
 
 func TestCovHandleBookmarkConfirmDeleteAll(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	m := baseModelCov()
 	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
 	r, cmd := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
