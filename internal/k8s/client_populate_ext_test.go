@@ -311,6 +311,46 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 			name: "nil status and spec",
 			obj:  map[string]interface{}{},
 		},
+		{
+			name: "application with conditions",
+			obj: map[string]interface{}{
+				"status": map[string]interface{}{
+					"health": map[string]interface{}{
+						"status": "Degraded",
+					},
+					"conditions": []interface{}{
+						map[string]interface{}{
+							"type":    "ComparisonError",
+							"message": "rpc error: code = NotFound desc = repo not found",
+						},
+						map[string]interface{}{
+							"type":               "SyncError",
+							"message":            "sync failed: manifest generation error",
+							"lastTransitionTime": "2025-01-15T10:00:00Z",
+						},
+					},
+				},
+			},
+			wantCols: map[string]string{
+				"Health":          "Degraded",
+				"ComparisonError": "rpc error: code = NotFound desc = repo not found",
+			},
+		},
+		{
+			name: "application with condition without message",
+			obj: map[string]interface{}{
+				"status": map[string]interface{}{
+					"conditions": []interface{}{
+						map[string]interface{}{
+							"type": "OrphanedResourceWarning",
+						},
+					},
+				},
+			},
+			wantCols: map[string]string{
+				"OrphanedResourceWarning": "(no message)",
+			},
+		},
 	}
 
 	for _, tt := range tests {

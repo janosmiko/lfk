@@ -285,6 +285,30 @@ func populateArgoCDApplication(ti *model.Item, _ map[string]interface{}, status,
 			}
 		}
 	}
+	// Extract conditions (e.g., ComparisonError, InvalidSpecError, SyncError).
+	if conditions, ok := status["conditions"].([]interface{}); ok {
+		for _, c := range conditions {
+			cond, ok := c.(map[string]interface{})
+			if !ok {
+				continue
+			}
+			condType, _ := cond["type"].(string)
+			condMsg, _ := cond["message"].(string)
+			if condType == "" {
+				continue
+			}
+			value := condMsg
+			if value == "" {
+				value = "(no message)"
+			}
+			if lastTransition, ok := cond["lastTransitionTime"].(string); ok && lastTransition != "" {
+				if t, err := time.Parse(time.RFC3339, lastTransition); err == nil {
+					value += " (" + formatRelativeTime(t) + ")"
+				}
+			}
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: condType, Value: value})
+		}
+	}
 	if spec != nil {
 		if dest, ok := spec["destination"].(map[string]interface{}); ok {
 			if ns, ok := dest["namespace"].(string); ok && ns != "" {
