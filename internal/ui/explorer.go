@@ -337,7 +337,7 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 	if len(items) == 0 {
 		switch {
 		case loading:
-			b.WriteString(DimStyle.Render(spinnerView + " Loading..."))
+			b.WriteString(DimStyle.Render(spinnerView+" ") + DimStyle.Render("Loading..."))
 		case errMsg != "":
 			b.WriteString(ErrorStyle.Render(Truncate(errMsg, width)))
 		default:
@@ -580,12 +580,12 @@ func FormatItem(item model.Item, width int) string {
 		displayName = item.Namespace + "/" + displayName
 	}
 
-	name := displayName
+	name := NormalStyle.Render(displayName)
 
 	// Prepend icon if present (resolved based on IconMode).
 	icon := resolveIcon(item.Icon)
 	if icon != "" {
-		name = IconStyle.Render(icon) + " " + name
+		name = IconStyle.Render(icon+" ") + name
 	}
 
 	// Append deprecation warning indicator for deprecated API versions.

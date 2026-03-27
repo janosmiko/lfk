@@ -238,6 +238,25 @@ var (
 				Foreground(lipgloss.Color(ColorWarning))
 )
 
+// FillLinesBg post-processes a multi-line string so that every line is padded
+// to the given width with the specified background color. This fills the gaps
+// left by ANSI resets from inner styled text, ensuring the theme background is
+// continuous across each line. bg should be BaseBg, BarBg, or SurfaceBg.
+func FillLinesBg(content string, width int, bg lipgloss.TerminalColor) string {
+	if _, ok := bg.(lipgloss.NoColor); ok {
+		return content // transparent mode, nothing to fill
+	}
+	fill := lipgloss.NewStyle().Background(bg)
+	lines := strings.Split(content, "\n")
+	for i, line := range lines {
+		w := lipgloss.Width(line)
+		if w < width {
+			lines[i] = line + fill.Render(strings.Repeat(" ", width-w))
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
 // AgeStyle returns a color style based on the age string of a resource.
 // Very new resources (< 1h) are cyan, recent (< 24h) are green,
 // normal (1-7d) are default dim, and old (> 7d) are extra dim.

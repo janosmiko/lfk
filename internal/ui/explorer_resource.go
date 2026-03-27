@@ -193,7 +193,7 @@ func renderUsageBar(used, req, lim int64, barWidth int, formatFn func(int64) str
 
 	if ref == 0 {
 		// No reference: just show the used value without a bar.
-		return usedStr
+		return NormalStyle.Render(usedStr)
 	}
 
 	pct := float64(used) / float64(ref) * 100
@@ -225,8 +225,8 @@ func renderUsageBar(used, req, lim int64, barWidth int, formatFn func(int64) str
 	barStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(barColor)).Background(BaseBg)
 	emptyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBorder)).Background(BaseBg)
 
-	bar := "[" + barStyle.Render(strings.Repeat("\u2588", filled)) + emptyStyle.Render(strings.Repeat("\u2591", empty)) + "]"
-	return bar + suffix
+	bar := NormalStyle.Render("[") + barStyle.Render(strings.Repeat("\u2588", filled)) + emptyStyle.Render(strings.Repeat("\u2591", empty)) + NormalStyle.Render("]")
+	return bar + NormalStyle.Render(suffix)
 }
 
 // RenderPreviewEvents renders an event timeline section for the preview pane.
@@ -302,7 +302,8 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 			msg = msg[:msgWidth-3] + "..."
 		}
 
-		fmt.Fprintf(&b, " %s %s %s %s", ageFormatted, dot, reasonStr, dimStyle.Render(msg))
+		fmt.Fprintf(&b, "%s%s%s%s%s%s%s",
+			DimStyle.Render(" "), ageFormatted, DimStyle.Render(" "), dot, DimStyle.Render(" "), reasonStr, DimStyle.Render(" "+msg))
 		if countStr != "" {
 			b.WriteString(countStr)
 		}

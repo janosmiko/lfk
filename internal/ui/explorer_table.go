@@ -181,36 +181,36 @@ func FormatItemNameOnly(item model.Item, width int) string {
 		prefix := CurrentMarkerStyle.Render("* ")
 		prefixW := lipgloss.Width(prefix)
 		if resolvedIcon != "" {
-			icon := IconStyle.Render(resolvedIcon) + " "
+			icon := IconStyle.Render(resolvedIcon + " ")
 			iconW := lipgloss.Width(icon)
 			remaining := width - prefixW - iconW - deprecationW
 			if remaining < 1 {
 				remaining = 1
 			}
-			return prefix + icon + Truncate(displayName, remaining) + deprecationSuffix
+			return prefix + icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 		}
 		remaining := width - prefixW - deprecationW
 		if remaining < 1 {
 			remaining = 1
 		}
-		return prefix + Truncate(displayName, remaining) + deprecationSuffix
+		return prefix + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 	}
 
 	if resolvedIcon != "" {
-		icon := IconStyle.Render(resolvedIcon) + " "
+		icon := IconStyle.Render(resolvedIcon + " ")
 		iconW := lipgloss.Width(icon)
 		remaining := width - iconW - deprecationW
 		if remaining < 1 {
 			remaining = 1
 		}
-		return icon + Truncate(displayName, remaining) + deprecationSuffix
+		return icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 	}
 
 	remaining := width - deprecationW
 	if remaining < 1 {
 		remaining = 1
 	}
-	return Truncate(displayName, remaining) + deprecationSuffix
+	return NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 }
 
 // FormatItemNameOnlyPlain formats an item showing only name and icon, without ANSI styling.
@@ -317,7 +317,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	if len(items) == 0 {
 		switch {
 		case loading:
-			b.WriteString(DimStyle.Render(spinnerView + " Loading..."))
+			b.WriteString(DimStyle.Render(spinnerView+" ") + DimStyle.Render("Loading..."))
 		case errMsg != "":
 			b.WriteString(ErrorStyle.Render(Truncate(errMsg, width)))
 		default:

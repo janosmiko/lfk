@@ -389,7 +389,7 @@ func formatTableRowStyledWithExtra(item model.Item, nameW, nsW, readyW, restarts
 			base += StatusRunning.Render("↓") + style.Render(padRight(truncFn(baseVal, ec.width-2), ec.width-1))
 		case ec.hasArrow:
 			// Placeholder space to align with rows that have arrows.
-			base += " " + style.Render(padRight(truncFn(val, ec.width-2), ec.width-1))
+			base += NormalStyle.Render(" ") + style.Render(padRight(truncFn(val, ec.width-2), ec.width-1))
 		default:
 			base += style.Render(padRight(truncFn(val, ec.width-1), ec.width))
 		}

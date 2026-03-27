@@ -33,6 +33,7 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 	// Left column: path breadcrumb.
 	leftCol := renderExplainPath(path, title, leftInner, contentHeight)
 	leftCol = padExplainToHeight(leftCol, contentHeight)
+	leftCol = FillLinesBg(leftCol, leftInner, BaseBg)
 	left := InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
 
 	// Middle column: field list (active).
@@ -46,6 +47,7 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 	middleHeader := DimStyle.Bold(true).Render(fmt.Sprintf("  %-*s  %-4s  %s", nameWidth, "NAME", "REQ", "TYPE"))
 	middleContent := middleHeader + "\n" + strings.Join(fieldLines, "\n")
 	middleContent = padExplainToHeight(middleContent, contentHeight)
+	middleContent = FillLinesBg(middleContent, middleInner, BaseBg)
 	middle := ActiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(middleContent)
 
 	// Right column: description (inactive).
@@ -53,6 +55,7 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 	rightHeader := DimStyle.Bold(true).Render("DESCRIPTION")
 	rightContent := rightHeader + "\n" + strings.Join(descLines, "\n")
 	rightContent = padExplainToHeight(rightContent, contentHeight)
+	rightContent = FillLinesBg(rightContent, rightInner, BaseBg)
 	right := InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)

@@ -172,6 +172,7 @@ func (m Model) viewExplorer() string {
 		middleCol = ui.RenderColumn(middleHeader, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, true, m.loading, m.spinner.View(), middleErrMsg)
 	}
 	middleCol = padToHeight(middleCol, contentHeight)
+	middleCol = ui.FillLinesBg(middleCol, middleInner, ui.BaseBg)
 	middle := ui.ActiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(middleCol)
 
 	var columns string
@@ -203,6 +204,7 @@ func (m Model) viewExplorer() string {
 			dashContent = strings.Join(lines, "\n")
 		}
 		dashCol := padToHeight(dashContent, contentHeight)
+		dashCol = ui.FillLinesBg(dashCol, m.width-4, ui.BaseBg)
 		columns = ui.ActiveColumnStyle.Width(m.width - 2).Height(contentHeight).MaxHeight(contentHeight + 2).Render(dashCol)
 	case m.fullscreenMiddle:
 		columns = middle
@@ -222,6 +224,8 @@ func (m Model) viewExplorer() string {
 		ui.ActiveHighlightQuery = savedHighlight
 		leftCol = padToHeight(leftCol, contentHeight)
 		rightCol = padToHeight(rightCol, contentHeight)
+		leftCol = ui.FillLinesBg(leftCol, leftInner, ui.BaseBg)
+		rightCol = ui.FillLinesBg(rightCol, rightInner, ui.BaseBg)
 		left := ui.InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
 		right := ui.InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
 		columns = lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
@@ -252,7 +256,7 @@ func (m Model) renderTitleBar() string {
 
 	var watchIndicator string
 	if m.watchMode {
-		watchIndicator = " " + ui.HelpKeyStyle.Render("\u27f3") + " "
+		watchIndicator = ui.HelpKeyStyle.Render(" \u27f3 ")
 	}
 
 	nsText := m.namespace
@@ -279,7 +283,7 @@ func (m Model) renderTitleBar() string {
 
 	var versionLabel string
 	if m.version != "" {
-		versionLabel = " " + ui.DimStyle.Render(m.version)
+		versionLabel = ui.BarDimStyle.Render(" " + m.version)
 	}
 
 	// Calculate available width for breadcrumb.
@@ -304,6 +308,6 @@ func (m Model) renderTitleBar() string {
 		gap = 0
 	}
 
-	barContent := bc + watchIndicator + strings.Repeat(" ", gap) + nsLabel + versionLabel
+	barContent := bc + watchIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + nsLabel + versionLabel
 	return ui.TitleBarStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(barContent)
 }
