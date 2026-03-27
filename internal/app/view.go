@@ -113,7 +113,7 @@ func (m Model) viewExplorer() string {
 		rightW = max(10, usable-leftW-middleW)
 	}
 
-	contentHeight := m.height - 4 // room for title + status bar
+	contentHeight := m.height - 4 // room for title(1) + column borders(2) + status(1)
 	if contentHeight < 3 {
 		contentHeight = 3
 	}

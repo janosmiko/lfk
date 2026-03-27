@@ -424,29 +424,41 @@ func ApplyTheme(t Theme) {
 		InactiveColumnStyle = InactiveColumnStyle.Background(lipgloss.Color(t.Base))
 	}
 
+	// baseBg is the background applied to all column text styles so the theme
+	// background shows behind text (ANSI resets from styled content would
+	// otherwise clear the container background). Empty when transparent.
+	var baseBg lipgloss.TerminalColor = lipgloss.NoColor{}
+	if !ConfigTransparentBg {
+		baseBg = lipgloss.Color(t.Base)
+	}
+
 	SelectedStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(t.SelectedFg)).
 		Background(lipgloss.Color(t.SelectedBg))
 
 	NormalStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Text))
+		Foreground(lipgloss.Color(t.Text)).
+		Background(baseBg)
 
 	DimStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Dimmed))
+		Foreground(lipgloss.Color(t.Dimmed)).
+		Background(baseBg)
 
 	CategoryStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Dimmed)).
 		Bold(true).
-		Italic(true)
+		Italic(true).
+		Background(baseBg)
 
 	IconStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Primary))
+		Foreground(lipgloss.Color(t.Primary)).
+		Background(baseBg)
 
-	StatusRunning = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary))
-	StatusProgressing = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary))
-	StatusFailed = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Error))
-	StatusOther = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Dimmed))
+	StatusRunning = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Secondary)).Background(baseBg)
+	StatusProgressing = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary)).Background(baseBg)
+	StatusFailed = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Error)).Background(baseBg)
+	StatusOther = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Dimmed)).Background(baseBg)
 
 	TitleBarStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Text)).
@@ -491,17 +503,21 @@ func ApplyTheme(t Theme) {
 
 	YamlKeyStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Primary)).
-		Bold(true)
+		Bold(true).
+		Background(baseBg)
 
 	YamlValueStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Text))
+		Foreground(lipgloss.Color(t.Text)).
+		Background(baseBg)
 
 	YamlPunctuationStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Dimmed))
+		Foreground(lipgloss.Color(t.Dimmed)).
+		Background(baseBg)
 
 	YamlCommentStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Dimmed)).
-		Italic(true)
+		Italic(true).
+		Background(baseBg)
 
 	StatusBarBgStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Dimmed)).
@@ -537,10 +553,13 @@ func ApplyTheme(t Theme) {
 		BorderForeground(lipgloss.Color(t.Border)).
 		Padding(0, 1)
 
+	surfaceBg := lipgloss.Color(t.Surface)
+
 	OverlayTitleStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(t.Primary)).
-		Padding(0, 0, 1, 0)
+		Padding(0, 0, 1, 0).
+		Background(surfaceBg)
 
 	OverlaySelectedStyle = lipgloss.NewStyle().
 		Bold(true).
@@ -548,23 +567,28 @@ func ApplyTheme(t Theme) {
 		Background(lipgloss.Color(t.SelectedBg))
 
 	OverlayNormalStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Text))
+		Foreground(lipgloss.Color(t.Text)).
+		Background(surfaceBg)
 
 	OverlayFilterStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Secondary)).
-		Bold(true)
+		Bold(true).
+		Background(surfaceBg)
 
 	OverlayDimStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Dimmed))
+		Foreground(lipgloss.Color(t.Dimmed)).
+		Background(surfaceBg)
 
 	OverlayWarningStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Error)).
-		Bold(true)
+		Bold(true).
+		Background(surfaceBg)
 
 	OverlayInputStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Text)).
 		Bold(true).
-		Underline(true)
+		Underline(true).
+		Background(surfaceBg)
 
 	ParentHighlightStyle = lipgloss.NewStyle().
 		Bold(true).
@@ -600,7 +624,8 @@ func ApplyTheme(t Theme) {
 		Bold(true)
 
 	DeprecationStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Warning))
+		Foreground(lipgloss.Color(t.Warning)).
+		Background(baseBg)
 }
 
 // mergeThemeOverrides applies non-empty fields from overrides onto base.
