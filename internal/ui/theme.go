@@ -408,29 +408,27 @@ func LoadAndApplyTheme() {
 
 // ApplyTheme updates all style variables with the given theme colors.
 func ApplyTheme(t Theme) {
-	ActiveColumnStyle = lipgloss.NewStyle().
-		Padding(0, 1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(t.Primary))
-	if !ConfigTransparentBg {
-		ActiveColumnStyle = ActiveColumnStyle.Background(lipgloss.Color(t.Base))
-	}
-
-	InactiveColumnStyle = lipgloss.NewStyle().
-		Padding(0, 1).
-		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color(t.Border))
-	if !ConfigTransparentBg {
-		InactiveColumnStyle = InactiveColumnStyle.Background(lipgloss.Color(t.Base))
-	}
-
-	// baseBg is the background applied to all column text styles so the theme
-	// background shows behind text (ANSI resets from styled content would
-	// otherwise clear the container background). Empty when transparent.
+	// baseBg is applied to all column/content text styles so the theme
+	// background shows behind text (ANSI resets from inner styled content
+	// would otherwise clear the container background). NoColor when transparent.
 	var baseBg lipgloss.TerminalColor = lipgloss.NoColor{}
 	if !ConfigTransparentBg {
 		baseBg = lipgloss.Color(t.Base)
 	}
+
+	ActiveColumnStyle = lipgloss.NewStyle().
+		Padding(0, 1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(t.Primary)).
+		BorderBackground(baseBg).
+		Background(baseBg)
+
+	InactiveColumnStyle = lipgloss.NewStyle().
+		Padding(0, 1).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(t.Border)).
+		BorderBackground(baseBg).
+		Background(baseBg)
 
 	SelectedStyle = lipgloss.NewStyle().
 		Bold(true).
@@ -460,23 +458,25 @@ func ApplyTheme(t Theme) {
 	StatusFailed = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Error)).Background(baseBg)
 	StatusOther = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Dimmed)).Background(baseBg)
 
+	var barBg lipgloss.TerminalColor = lipgloss.NoColor{}
+	if !ConfigTransparentBg {
+		barBg = lipgloss.Color(t.BarBg)
+	}
+
 	TitleBarStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Text)).
+		Background(barBg).
 		Padding(0, 1)
-	if !ConfigTransparentBg {
-		TitleBarStyle = TitleBarStyle.Background(lipgloss.Color(t.BarBg))
-	}
 
 	TitleBreadcrumbStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color(t.Primary))
-	if !ConfigTransparentBg {
-		TitleBreadcrumbStyle = TitleBreadcrumbStyle.Background(lipgloss.Color(t.BarBg))
-	}
+		Foreground(lipgloss.Color(t.Primary)).
+		Background(barBg)
 
 	TitleStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(t.Primary)).
+		Background(barBg).
 		Padding(0, 1)
 
 	NamespaceBadgeStyle = lipgloss.NewStyle().
@@ -488,17 +488,21 @@ func ApplyTheme(t Theme) {
 	HeaderStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(t.Primary)).
-		Underline(true)
+		Underline(true).
+		Background(baseBg)
 
 	HeaderIconStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color(t.Primary))
+		Foreground(lipgloss.Color(t.Primary)).
+		Background(baseBg)
 
 	NamespaceStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Warning)).
 		Bold(true).
+		Background(barBg).
 		Padding(0, 1)
 
 	YamlViewStyle = lipgloss.NewStyle().
+		Background(baseBg).
 		Padding(1, 2)
 
 	YamlKeyStyle = lipgloss.NewStyle().
@@ -521,25 +525,27 @@ func ApplyTheme(t Theme) {
 
 	StatusBarBgStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Dimmed)).
+		Background(barBg).
 		Padding(0, 1)
-	if !ConfigTransparentBg {
-		StatusBarBgStyle = StatusBarBgStyle.Background(lipgloss.Color(t.BarBg))
-	}
 
 	StatusBarStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Dimmed)).
+		Background(barBg).
 		Padding(0, 1)
 
 	HelpKeyStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Secondary)).
+		Background(barBg).
 		Bold(true)
 
 	ErrorStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Error)).
+		Background(baseBg).
 		Bold(true)
 
 	CurrentMarkerStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Secondary)).
+		Background(baseBg).
 		Bold(true)
 
 	OverlayStyle = lipgloss.NewStyle().
@@ -597,10 +603,12 @@ func ApplyTheme(t Theme) {
 
 	StatusMessageOkStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Secondary)).
+		Background(barBg).
 		Bold(true)
 
 	StatusMessageErrStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Error)).
+		Background(barBg).
 		Bold(true)
 
 	SearchHighlightStyle = lipgloss.NewStyle().
@@ -616,6 +624,7 @@ func ApplyTheme(t Theme) {
 
 	SelectionMarkerStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Secondary)).
+		Background(baseBg).
 		Bold(true)
 
 	SelectionCountStyle = lipgloss.NewStyle().
