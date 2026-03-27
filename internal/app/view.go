@@ -20,7 +20,7 @@ func (m Model) View() string {
 	// Render fullscreen modes (YAML, Logs, Describe, Diff, Exec, Explain) with title bar and tab bar.
 	// Each view renders its own hint bar, so the main status bar is not shown.
 	if m.mode == modeYAML || m.mode == modeLogs || m.mode == modeDescribe || m.mode == modeDiff || m.mode == modeExec || m.mode == modeExplain {
-		title := m.renderTitleBar()
+		title := ui.FillLinesBg(m.renderTitleBar(), m.width, ui.BarBg)
 		m.height -= 1 // title bar
 
 		var tabBar string
@@ -232,10 +232,10 @@ func (m Model) viewExplorer() string {
 	}
 
 	// Title bar with namespace indicator on the right.
-	title := m.renderTitleBar()
+	title := ui.FillLinesBg(m.renderTitleBar(), m.width, ui.BarBg)
 
 	// Status bar.
-	status := m.statusBar()
+	status := ui.FillLinesBg(m.statusBar(), m.width, ui.BarBg)
 
 	var parts []string
 	parts = append(parts, title)

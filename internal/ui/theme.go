@@ -549,7 +549,6 @@ func ApplyTheme(t Theme) {
 
 	HelpKeyStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Secondary)).
-		Background(barBg).
 		Bold(true)
 
 	ErrorStyle = lipgloss.NewStyle().
