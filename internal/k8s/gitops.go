@@ -9,6 +9,7 @@ import (
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -494,6 +495,214 @@ func (c *Client) ReconcileFluxResource(contextName, namespace, name string, gvr 
 	return nil
 }
 
+// --- cert-manager helpers ---
+
+// ForceRenewCertificate triggers re-issuance of a cert-manager Certificate by
+// patching its status to add the Issuing condition (replicating what cmctl renew does).
+func (c *Client) ForceRenewCertificate(contextName, namespace, name string) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "cert-manager.io", Version: "v1", Resource: "certificates"}
+	patch := []byte(`{"status":{"conditions":[{"type":"Issuing","status":"True","reason":"ManuallyTriggered","message":"Certificate re-issuance triggered via lfk"}]}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{}, "status",
+	)
+	if err != nil {
+		return fmt.Errorf("triggering renewal for certificate %s: %w", name, err)
+	}
+	return nil
+}
+
+// --- Argo Workflows helpers ---
+
+// SuspendArgoWorkflow sets spec.suspend=true on an Argo Workflow.
+func (c *Client) SuspendArgoWorkflow(contextName, namespace, name string) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
+	patch := []byte(`{"spec":{"suspend":true}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("suspending workflow %s: %w", name, err)
+	}
+	return nil
+}
+
+// ResumeArgoWorkflow sets spec.suspend=false on an Argo Workflow.
+func (c *Client) ResumeArgoWorkflow(contextName, namespace, name string) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
+	patch := []byte(`{"spec":{"suspend":false}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("resuming workflow %s: %w", name, err)
+	}
+	return nil
+}
+
+// StopArgoWorkflow sets spec.shutdown="Stop" on an Argo Workflow.
+// This stops new steps from running but allows exit handlers to execute.
+func (c *Client) StopArgoWorkflow(contextName, namespace, name string) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
+	patch := []byte(`{"spec":{"shutdown":"Stop"}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("stopping workflow %s: %w", name, err)
+	}
+	return nil
+}
+
+// TerminateArgoWorkflow sets spec.shutdown="Terminate" on an Argo Workflow.
+// This immediately terminates the workflow without running exit handlers.
+func (c *Client) TerminateArgoWorkflow(contextName, namespace, name string) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
+	patch := []byte(`{"spec":{"shutdown":"Terminate"}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("terminating workflow %s: %w", name, err)
+	}
+	return nil
+}
+
+// ResubmitArgoWorkflow creates a new Workflow from an existing one's spec.
+func (c *Client) ResubmitArgoWorkflow(contextName, namespace, name string) (string, error) {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return "", err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
+	original, err := dynClient.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("getting workflow %s: %w", name, err)
+	}
+
+	spec, ok := original.Object["spec"]
+	if !ok {
+		return "", fmt.Errorf("workflow %s has no spec", name)
+	}
+
+	newName := name + "-resubmit-" + time.Now().Format("20060102-150405")
+	newWf := map[string]interface{}{
+		"apiVersion": "argoproj.io/v1alpha1",
+		"kind":       "Workflow",
+		"metadata": map[string]interface{}{
+			"name":      newName,
+			"namespace": namespace,
+		},
+		"spec": spec,
+	}
+
+	obj := &unstructured.Unstructured{Object: newWf}
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Create(context.Background(), obj, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("creating resubmitted workflow: %w", err)
+	}
+	return newName, nil
+}
+
+// SubmitWorkflowFromTemplate creates a new Workflow that references a WorkflowTemplate or
+// ClusterWorkflowTemplate. If clusterScope is true, the reference uses clusterScope: true.
+func (c *Client) SubmitWorkflowFromTemplate(contextName, namespace, templateName string, clusterScope bool) (string, error) {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return "", err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
+	wfName := templateName + "-" + time.Now().Format("20060102-150405")
+
+	ref := map[string]interface{}{
+		"name": templateName,
+	}
+	if clusterScope {
+		ref["clusterScope"] = true
+	}
+
+	newWf := map[string]interface{}{
+		"apiVersion": "argoproj.io/v1alpha1",
+		"kind":       "Workflow",
+		"metadata": map[string]interface{}{
+			"name":      wfName,
+			"namespace": namespace,
+		},
+		"spec": map[string]interface{}{
+			"workflowTemplateRef": ref,
+		},
+	}
+
+	obj := &unstructured.Unstructured{Object: newWf}
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Create(context.Background(), obj, metav1.CreateOptions{})
+	if err != nil {
+		return "", fmt.Errorf("submitting workflow from template %s: %w", templateName, err)
+	}
+	return wfName, nil
+}
+
+// SuspendCronWorkflow sets spec.suspend=true on an Argo CronWorkflow.
+func (c *Client) SuspendCronWorkflow(contextName, namespace, name string) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "cronworkflows"}
+	patch := []byte(`{"spec":{"suspend":true}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("suspending cron workflow %s: %w", name, err)
+	}
+	return nil
+}
+
+// ResumeCronWorkflow sets spec.suspend=false on an Argo CronWorkflow.
+func (c *Client) ResumeCronWorkflow(contextName, namespace, name string) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "cronworkflows"}
+	patch := []byte(`{"spec":{"suspend":false}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("resuming cron workflow %s: %w", name, err)
+	}
+	return nil
+}
+
 // SuspendFluxResource sets spec.suspend=true on a FluxCD resource.
 func (c *Client) SuspendFluxResource(contextName, namespace, name string, gvr schema.GroupVersionResource) error {
 	dynClient, err := c.dynamicForContext(contextName)
@@ -507,6 +716,75 @@ func (c *Client) SuspendFluxResource(contextName, namespace, name string, gvr sc
 	)
 	if err != nil {
 		return fmt.Errorf("suspending %s %s: %w", gvr.Resource, name, err)
+	}
+	return nil
+}
+
+// --- External Secrets Operator helpers ---
+
+// ForceRefreshExternalSecret triggers a force sync on an ExternalSecret,
+// ClusterExternalSecret, or PushSecret by setting the
+// force-sync.external-secrets.io/force-sync annotation to the current timestamp.
+func (c *Client) ForceRefreshExternalSecret(contextName, namespace, name string, gvr schema.GroupVersionResource) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	now := time.Now().Format(time.RFC3339Nano)
+	patch := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"force-sync.external-secrets.io/force-sync":"%s"}}}`, now))
+
+	var patchErr error
+	if namespace != "" {
+		_, patchErr = dynClient.Resource(gvr).Namespace(namespace).Patch(
+			context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		)
+	} else {
+		_, patchErr = dynClient.Resource(gvr).Patch(
+			context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+		)
+	}
+	if patchErr != nil {
+		return fmt.Errorf("force refreshing %s %s: %w", gvr.Resource, name, patchErr)
+	}
+	return nil
+}
+
+// --- KEDA helpers ---
+
+// PauseKEDAResource pauses a KEDA ScaledObject or ScaledJob by setting the
+// autoscaling.keda.sh/paused-replicas annotation to "0".
+func (c *Client) PauseKEDAResource(contextName, namespace, name string, gvr schema.GroupVersionResource) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	patch := []byte(`{"metadata":{"annotations":{"autoscaling.keda.sh/paused-replicas":"0"}}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("pausing %s %s: %w", gvr.Resource, name, err)
+	}
+	return nil
+}
+
+// UnpauseKEDAResource unpauses a KEDA ScaledObject or ScaledJob by removing
+// the autoscaling.keda.sh/paused-replicas annotation.
+func (c *Client) UnpauseKEDAResource(contextName, namespace, name string, gvr schema.GroupVersionResource) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	// JSON merge patch with null removes the key.
+	patch := []byte(`{"metadata":{"annotations":{"autoscaling.keda.sh/paused-replicas":null}}}`)
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("unpausing %s %s: %w", gvr.Resource, name, err)
 	}
 	return nil
 }

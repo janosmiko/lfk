@@ -509,6 +509,281 @@ rm -f "$TMPFILE"
 	})
 }
 
+// helmDiff fetches the default chart values and user-supplied values,
+// then returns them for side-by-side comparison in the diff viewer.
+// It tries to resolve the repo-qualified chart name via "helm search repo"
+// to get true defaults; falls back to "helm get values --all" if the chart
+// is not in a configured repo.
+func (m Model) helmDiff() tea.Cmd {
+	helmPath, err := exec.LookPath("helm")
+	if err != nil {
+		return func() tea.Msg {
+			return diffLoadedMsg{err: fmt.Errorf("helm not found: %w", err)}
+		}
+	}
+
+	ns := m.actionNamespace()
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	kubeconfigPaths := m.client.KubeconfigPaths()
+
+	return func() tea.Msg {
+		env := append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+
+		// Resolve bare chart name from the release (e.g. "cilium-1.16.0" -> "cilium").
+		chartName := resolveHelmChartName(helmPath, name, ns, ctx, kubeconfigPaths)
+
+		// Try to get true default values via "helm show values <repo/chart>".
+		defaultOut, leftLabel := helmShowDefaultValues(helmPath, chartName, env)
+
+		// If we couldn't get true defaults, fall back to merged values.
+		if defaultOut == "" {
+			logger.Info("helm show values unavailable, falling back to --all", "chart", chartName)
+			allArgs := []string{"get", "values", name, "--all", "-n", ns, "--kube-context", ctx, "-o", "yaml"}
+			allCmd := exec.Command(helmPath, allArgs...)
+			allCmd.Env = env
+			allOut, allErr := allCmd.CombinedOutput()
+			if allErr != nil {
+				return diffLoadedMsg{err: fmt.Errorf("getting all values: %w: %s", allErr, strings.TrimSpace(string(allOut)))}
+			}
+			defaultOut = string(allOut)
+			leftLabel = "All Values (defaults + overrides)"
+		}
+
+		// Get user-supplied values only.
+		userArgs := []string{"get", "values", name, "-n", ns, "--kube-context", ctx, "-o", "yaml"}
+		userCmd := exec.Command(helmPath, userArgs...)
+		userCmd.Env = env
+		logger.Info("Running helm command", "cmd", userCmd.String())
+		userOut, userErr := userCmd.CombinedOutput()
+		if userErr != nil {
+			return diffLoadedMsg{err: fmt.Errorf("getting user values: %w: %s", userErr, strings.TrimSpace(string(userOut)))}
+		}
+
+		return diffLoadedMsg{
+			left:      defaultOut,
+			right:     string(userOut),
+			leftName:  leftLabel,
+			rightName: "User Values",
+		}
+	}
+}
+
+// resolveHelmChartName extracts the bare chart name from "helm list" output.
+// Returns empty string on failure.
+func resolveHelmChartName(helmPath, release, ns, ctx, kubeconfigPaths string) string {
+	args := []string{"list", "-n", ns, "--kube-context", ctx, "--filter", "^" + release + "$", "-o", "json"}
+	cmd := exec.Command(helmPath, args...)
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return ""
+	}
+
+	out := strings.TrimSpace(string(output))
+	_, after, found := strings.Cut(out, `"chart":"`)
+	if !found {
+		return ""
+	}
+	chartVersion, _, found := strings.Cut(after, `"`)
+	if !found {
+		return ""
+	}
+
+	// Strip trailing -<semver> to get chart name.
+	parts := strings.Split(chartVersion, "-")
+	if last := len(parts) - 1; last > 0 && len(parts[last]) > 0 && parts[last][0] >= '0' && parts[last][0] <= '9' {
+		return strings.Join(parts[:last], "-")
+	}
+	return chartVersion
+}
+
+// helmShowDefaultValues tries to get default chart values via "helm show values".
+// It first searches configured repos for the repo-qualified name. Returns the
+// output and label on success, or empty string on failure.
+func helmShowDefaultValues(helmPath, chartName string, env []string) (string, string) {
+	if chartName == "" {
+		return "", ""
+	}
+
+	// Search repos for the chart to get the repo-qualified name (e.g. "cilium/cilium").
+	searchArgs := []string{"search", "repo", chartName, "-o", "json"}
+	searchCmd := exec.Command(helmPath, searchArgs...)
+	searchCmd.Env = env
+	logger.Info("Running helm command", "cmd", searchCmd.String())
+	searchOut, searchErr := searchCmd.CombinedOutput()
+	if searchErr != nil {
+		return "", ""
+	}
+
+	// Parse first matching "name" field from JSON array: [{"name":"repo/chart",...}]
+	repoChart := parseFirstJSONField(string(searchOut), "name", chartName)
+	if repoChart == "" {
+		return "", ""
+	}
+
+	// Get the default values from the chart.
+	showArgs := []string{"show", "values", repoChart}
+	showCmd := exec.Command(helmPath, showArgs...)
+	showCmd.Env = env
+	logger.Info("Running helm command", "cmd", showCmd.String())
+	showOut, showErr := showCmd.CombinedOutput()
+	if showErr != nil {
+		return "", ""
+	}
+	return string(showOut), "Default Values (" + repoChart + ")"
+}
+
+// parseFirstJSONField finds the first "name":"value" in a JSON array where value
+// ends with the given suffix (bare chart name). Returns the value or empty string.
+func parseFirstJSONField(jsonStr, field, suffix string) string {
+	needle := `"` + field + `":"`
+	rest := jsonStr
+	for {
+		_, after, found := strings.Cut(rest, needle)
+		if !found {
+			return ""
+		}
+		value, remaining, found := strings.Cut(after, `"`)
+		if !found {
+			return ""
+		}
+		// Match: value ends with /chartName or equals chartName exactly.
+		if value == suffix || strings.HasSuffix(value, "/"+suffix) {
+			return value
+		}
+		rest = remaining
+	}
+}
+
+// helmUpgrade runs "helm upgrade" interactively via tea.ExecProcess.
+func (m Model) helmUpgrade() tea.Cmd {
+	helmPath, err := exec.LookPath("helm")
+	if err != nil {
+		return func() tea.Msg {
+			return actionResultMsg{err: fmt.Errorf("helm not found: %w", err)}
+		}
+	}
+
+	ns := m.actionNamespace()
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	kubeconfigPaths := m.client.KubeconfigPaths()
+
+	// Build a shell script that resolves the chart and runs helm upgrade --reuse-values.
+	script := fmt.Sprintf(`
+set -e
+HELM=%q
+RELEASE=%q
+NS=%q
+CTX=%q
+export KUBECONFIG=%q
+
+CHART_VERSION=$($HELM list -n "$NS" --kube-context "$CTX" --filter "^${RELEASE}$" -o json 2>/dev/null \
+  | sed -n 's/.*"chart":"\([^"]*\)".*/\1/p' | head -1)
+CHART_NAME=$(echo "$CHART_VERSION" | sed 's/-[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*.*$//')
+if [ -z "$CHART_NAME" ]; then
+  echo "Could not determine chart for release $RELEASE."
+  echo "Run manually: helm upgrade $RELEASE <CHART> -n $NS --kube-context $CTX --reuse-values"
+  exit 1
+fi
+
+echo "Upgrading $RELEASE with chart $CHART_NAME..."
+$HELM upgrade "$RELEASE" "$CHART_NAME" -n "$NS" --kube-context "$CTX" --reuse-values
+`,
+		helmPath, name, ns, ctx, kubeconfigPaths,
+	)
+
+	cmd := exec.Command("sh", "-c", script)
+	cmd.Env = os.Environ()
+	logger.Info("Running helm upgrade", "release", name, "namespace", ns, "context", ctx)
+	return tea.ExecProcess(cmd, func(err error) tea.Msg {
+		if err != nil {
+			logger.Error("helm upgrade failed", "release", name, "error", err)
+			return actionResultMsg{err: fmt.Errorf("helm upgrade: %w", err)}
+		}
+		return actionResultMsg{message: fmt.Sprintf("Upgraded %s", name)}
+	})
+}
+
+// --- Vulnerability scanning commands ---
+
+// vulnScanImage runs trivy to scan a container image for vulnerabilities
+// and returns the output for display in the describe viewer.
+func (m Model) vulnScanImage(image string) tea.Cmd {
+	trivyPath, err := exec.LookPath("trivy")
+	if err != nil {
+		return func() tea.Msg {
+			return describeLoadedMsg{
+				title: "Vulnerability Scan",
+				err:   fmt.Errorf("trivy not found in PATH: %w (install: https://aquasecurity.github.io/trivy)", err),
+			}
+		}
+	}
+
+	title := fmt.Sprintf("Vuln Scan: %s", image)
+	return func() tea.Msg {
+		args := []string{"image", "--scanners", "vuln", "--format", "table", "--no-progress", image}
+		cmd := exec.Command(trivyPath, args...)
+		cmd.Env = os.Environ()
+		logger.Info("Running trivy command", "cmd", cmd.String())
+		output, cmdErr := cmd.CombinedOutput()
+		content := cleanANSI(strings.TrimSpace(string(output)))
+		if cmdErr != nil {
+			logger.Error("trivy scan failed", "cmd", cmd.String(), "error", cmdErr, "output", content)
+			if content == "" {
+				return describeLoadedMsg{title: title, err: fmt.Errorf("trivy scan failed: %w", cmdErr)}
+			}
+			// Show trivy output even on non-zero exit (may contain partial results).
+			return describeLoadedMsg{content: content, title: title}
+		}
+		if content == "" {
+			content = "No vulnerabilities found."
+		}
+		return describeLoadedMsg{content: content, title: title}
+	}
+}
+
+// cleanANSI removes ANSI escape sequences from a string.
+func cleanANSI(s string) string {
+	var b strings.Builder
+	b.Grow(len(s))
+	i := 0
+	for i < len(s) {
+		if s[i] == '\x1b' && i+1 < len(s) && s[i+1] == '[' {
+			// Skip until the terminating letter.
+			j := i + 2
+			for j < len(s) && (s[j] < 'A' || s[j] > 'Z') && (s[j] < 'a' || s[j] > 'z') {
+				j++
+			}
+			if j < len(s) {
+				j++ // skip the terminating letter
+			}
+			i = j
+			continue
+		}
+		b.WriteByte(s[i])
+		i++
+	}
+	return b.String()
+}
+
+// --- PVC commands ---
+
+func (m Model) resizePVC(newSize string) tea.Cmd {
+	ctx := m.actionCtx.context
+	ns := m.actionNamespace()
+	name := m.actionCtx.name
+	logger.Info("Resizing PVC", "name", name, "newSize", newSize, "namespace", ns, "context", ctx)
+	return func() tea.Msg {
+		err := m.client.ResizePVC(ctx, ns, name, newSize)
+		if err != nil {
+			return actionResultMsg{err: err}
+		}
+		return actionResultMsg{message: fmt.Sprintf("Resize requested for %s to %s", name, newSize)}
+	}
+}
+
 // --- Deployment and scaling commands ---
 
 func (m Model) scaleResource(replicas int32) tea.Cmd {

@@ -67,6 +67,7 @@ const (
 	overlayLogPodSelect
 	overlayLogContainerSelect
 	overlayQuitConfirm
+	overlayPVCResize
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -95,6 +96,7 @@ type actionContext struct {
 	namespace     string // namespace of the target resource (captured at action time)
 	context       string // kubeconfig context name (captured at action time)
 	containerName string // container name (for exec/logs at container level)
+	image         string // container image (for vuln scan at container level)
 	resourceType  model.ResourceTypeEntry
 	columns       []model.KeyValue // additional item columns (e.g., Node, IP) for custom action templates
 }
@@ -294,6 +296,9 @@ type Model struct {
 
 	// Scale input state.
 	scaleInput TextInput
+
+	// PVC resize: current size displayed in the overlay.
+	pvcCurrentSize string
 
 	// Port forward input state.
 	portForwardInput TextInput

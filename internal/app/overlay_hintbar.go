@@ -51,6 +51,12 @@ func (m Model) overlayHintBar() string {
 			{Key: "esc", Desc: "cancel"},
 		})
 
+	case overlayPVCResize:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "Enter", Desc: "resize"},
+			{Key: "esc", Desc: "cancel"},
+		})
+
 	case overlayPortForward:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "select port"},

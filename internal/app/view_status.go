@@ -245,6 +245,10 @@ func (m Model) renderOverlay(background string) string {
 		content = ui.RenderScaleOverlay(m.scaleInput.Value)
 		overlayW = min(45, m.width-10)
 		overlayH = min(8, m.height-6)
+	case overlayPVCResize:
+		content = ui.RenderPVCResizeOverlay(m.scaleInput.Value, m.pvcCurrentSize)
+		overlayW = min(45, m.width-10)
+		overlayH = min(10, m.height-6)
 	case overlayPortForward:
 		content = ui.RenderPortForwardOverlay(m.portForwardInput.Value, m.pfAvailablePorts, m.pfPortCursor, m.actionCtx.name)
 		overlayW = min(55, m.width-10)

@@ -146,6 +146,7 @@ func (m *Model) buildActionCtx(sel *model.Item, kind string) actionContext {
 		}
 	case model.LevelContainers:
 		ctx.containerName = sel.Name
+		ctx.image = sel.Extra
 		ctx.name = m.nav.OwnedName
 		ctx.kind = "Pod"
 		ctx.resourceType = model.ResourceTypeEntry{APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true}
@@ -456,6 +457,18 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayConfirm
 		m.pendingAction = "Delete"
 		return m, nil
+	case "Resize":
+		// Extract current PVC size from columns for display in the overlay.
+		m.pvcCurrentSize = ""
+		for _, kv := range m.actionCtx.columns {
+			if kv.Key == "Capacity" || kv.Key == "CAPACITY" {
+				m.pvcCurrentSize = kv.Value
+				break
+			}
+		}
+		m.scaleInput.Clear()
+		m.overlay = overlayPVCResize
+		return m, nil
 	case "Scale":
 		m.scaleInput.Clear()
 		m.overlay = overlayScaleInput
@@ -511,6 +524,55 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.addLogEntry("DBG", fmt.Sprintf("Terminate sync for %s/%s in %s", ns, name, ctx))
 		m.loading = true
 		return m, m.terminateArgoSync()
+	case "Suspend Workflow":
+		m.addLogEntry("DBG", fmt.Sprintf("Suspending workflow %s in %s", name, ns))
+		m.loading = true
+		return m, m.suspendArgoWorkflow()
+	case "Resume Workflow":
+		m.addLogEntry("DBG", fmt.Sprintf("Resuming workflow %s in %s", name, ns))
+		m.loading = true
+		return m, m.resumeArgoWorkflow()
+	case "Stop Workflow":
+		m.addLogEntry("DBG", fmt.Sprintf("Stopping workflow %s in %s", name, ns))
+		m.loading = true
+		return m, m.stopArgoWorkflow()
+	case "Terminate Workflow":
+		m.addLogEntry("DBG", fmt.Sprintf("Terminating workflow %s in %s", name, ns))
+		m.loading = true
+		return m, m.terminateArgoWorkflow()
+	case "Resubmit Workflow":
+		m.addLogEntry("DBG", fmt.Sprintf("Resubmitting workflow %s in %s", name, ns))
+		m.loading = true
+		return m, m.resubmitArgoWorkflow()
+	case "Submit Workflow":
+		clusterScope := m.actionCtx.kind == "ClusterWorkflowTemplate"
+		m.addLogEntry("DBG", fmt.Sprintf("Submitting workflow from template %s in %s", name, ns))
+		m.loading = true
+		return m, m.submitWorkflowFromTemplate(clusterScope)
+	case "Suspend CronWorkflow":
+		m.addLogEntry("DBG", fmt.Sprintf("Suspending cron workflow %s in %s", name, ns))
+		m.loading = true
+		return m, m.suspendCronWorkflow()
+	case "Resume CronWorkflow":
+		m.addLogEntry("DBG", fmt.Sprintf("Resuming cron workflow %s in %s", name, ns))
+		m.loading = true
+		return m, m.resumeCronWorkflow()
+	case "Force Renew":
+		m.addLogEntry("DBG", fmt.Sprintf("Triggering renewal for %s/%s in %s", m.actionCtx.kind, name, ns))
+		m.loading = true
+		return m, m.forceRenewCertificate()
+	case "Force Refresh":
+		m.addLogEntry("DBG", fmt.Sprintf("Force refreshing %s/%s in %s", m.actionCtx.kind, name, ns))
+		m.loading = true
+		return m, m.forceRefreshExternalSecret()
+	case "Pause":
+		m.addLogEntry("DBG", fmt.Sprintf("Pausing %s/%s in %s", m.actionCtx.kind, name, ns))
+		m.loading = true
+		return m, m.pauseKEDAResource()
+	case "Unpause":
+		m.addLogEntry("DBG", fmt.Sprintf("Unpausing %s/%s in %s", m.actionCtx.kind, name, ns))
+		m.loading = true
+		return m, m.unpauseKEDAResource()
 	case "Reconcile":
 		m.addLogEntry("DBG", fmt.Sprintf("Reconciling %s/%s in %s", m.actionCtx.kind, name, ns))
 		m.loading = true
@@ -658,6 +720,27 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	case "Edit Values":
 		m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml → $EDITOR → helm upgrade --reuse-values", name, ns, ctx))
 		return m, m.editHelmValues()
+	case "Diff":
+		if m.actionCtx.kind == "HelmRelease" {
+			m.addLogEntry("DBG", fmt.Sprintf("Comparing default vs user values for %s", name))
+			m.loading = true
+			return m, m.helmDiff()
+		}
+		// Non-Helm diff (two-resource YAML diff) is handled via bulk action.
+		return m, nil
+	case "Upgrade":
+		m.addLogEntry("DBG", fmt.Sprintf("$ helm upgrade %s -n %s --kube-context %s", name, ns, ctx))
+		return m, m.helmUpgrade()
+	case "Vuln Scan":
+		image := m.actionCtx.image
+		if image == "" {
+			m.setStatusMessage("No image found for this container", true)
+			return m, scheduleStatusClear()
+		}
+		m.addLogEntry("DBG", fmt.Sprintf("$ trivy image %s", image))
+		m.loading = true
+		m.setStatusMessage("Scanning image for vulnerabilities...", false)
+		return m, m.vulnScanImage(image)
 	case "Permissions":
 		m.loading = true
 		m.setStatusMessage("Checking RBAC permissions...", false)

@@ -21,6 +21,8 @@ func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfirmTypeOverlayKey(msg)
 	case overlayScaleInput:
 		return m.handleScaleOverlayKey(msg)
+	case overlayPVCResize:
+		return m.handlePVCResizeOverlayKey(msg)
 	case overlayPortForward:
 		return m.handlePortForwardOverlayKey(msg)
 	case overlayContainerSelect:
@@ -569,6 +571,56 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		key := msg.String()
 		if len(key) == 1 && key[0] >= '0' && key[0] <= '9' {
+			m.scaleInput.Insert(key)
+		}
+		return m, nil
+	}
+}
+
+func (m Model) handlePVCResizeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc", "q":
+		m.overlay = overlayNone
+		m.scaleInput.Clear()
+		return m, nil
+	case "enter":
+		newSize := strings.TrimSpace(m.scaleInput.Value)
+		if newSize == "" {
+			m.setStatusMessage("No size specified", true)
+			m.overlay = overlayNone
+			m.scaleInput.Clear()
+			return m, scheduleStatusClear()
+		}
+		m.overlay = overlayNone
+		m.loading = true
+		m.addLogEntry("DBG", fmt.Sprintf("Resizing PVC %s to %s in %s", m.actionCtx.name, newSize, m.actionNamespace()))
+		m.scaleInput.Clear()
+		return m, m.resizePVC(newSize)
+	case "backspace":
+		if len(m.scaleInput.Value) > 0 {
+			m.scaleInput.Backspace()
+		}
+		return m, nil
+	case "ctrl+w":
+		m.scaleInput.DeleteWord()
+		return m, nil
+	case "ctrl+a":
+		m.scaleInput.Home()
+		return m, nil
+	case "ctrl+e":
+		m.scaleInput.End()
+		return m, nil
+	case "left":
+		m.scaleInput.Left()
+		return m, nil
+	case "right":
+		m.scaleInput.Right()
+		return m, nil
+	case "ctrl+c":
+		return m.closeTabOrQuit()
+	default:
+		key := msg.String()
+		if len(key) == 1 {
 			m.scaleInput.Insert(key)
 		}
 		return m, nil

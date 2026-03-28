@@ -310,6 +310,24 @@ func RenderScaleOverlay(input string) string {
 	return b.String()
 }
 
+// RenderPVCResizeOverlay renders the PVC resize overlay content.
+func RenderPVCResizeOverlay(input, currentSize string) string {
+	var b strings.Builder
+	b.WriteString(OverlayTitleStyle.Render("Resize PVC"))
+	b.WriteString("\n\n")
+	if currentSize != "" {
+		b.WriteString(OverlayDimStyle.Render("Current: " + currentSize))
+		b.WriteString("\n")
+	}
+	b.WriteString(OverlayNormalStyle.Render("New size: "))
+	if input == "" {
+		b.WriteString(OverlayDimStyle.Render("e.g. 10Gi"))
+	} else {
+		b.WriteString(OverlayInputStyle.Render(input))
+	}
+	return b.String()
+}
+
 // RenderPortForwardOverlay renders the port forward overlay content.
 // availablePorts shows discovered ports from the resource.
 // cursor indicates which available port is selected (-1 for manual input mode).

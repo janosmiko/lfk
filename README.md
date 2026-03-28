@@ -36,7 +36,7 @@
 
 ### Resource Operations
 
-- **Context-aware action menus**: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward
+- **Context-aware action menus**: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward, vuln scan, PVC resize
 - **Custom user-defined actions**: Define custom shell commands per resource type in config
 - **Multi-select with bulk actions**: Select multiple resources with Space, range-select with Ctrl+Space, perform bulk delete, scale, restart, and ArgoCD bulk sync/refresh
 - **Resource sorting** by name, age, or status
@@ -68,7 +68,10 @@
 ### Integrations
 
 - **ArgoCD integration**: Browse Applications, sync, terminate sync, refresh, view managed resources
+- **Argo Workflows integration**: Suspend/resume, stop/terminate, resubmit Workflows; submit from WorkflowTemplates; suspend/resume CronWorkflows
 - **Helm integration**: Browse releases, view managed resources, uninstall
+- **KEDA integration**: Pause/unpause ScaledObjects and ScaledJobs
+- **External Secrets integration**: Force refresh ExternalSecrets, ClusterExternalSecrets, and PushSecrets
 - **CRD discovery**: Automatically discovers installed CRDs and groups them by API group
 
 ### Customization

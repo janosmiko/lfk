@@ -6,9 +6,10 @@ func ActionsForContainer() []ActionMenuItem {
 		{Label: "Logs", Description: "View container logs", Key: "l"},
 		{Label: "Exec", Description: "Execute command in container", Key: "s"},
 		{Label: "Attach", Description: "Attach to running container", Key: "A"},
+		{Label: "Vuln Scan", Description: "Scan container image for vulnerabilities", Key: "V"},
 		{Label: "Debug", Description: "Debug container with ephemeral container", Key: "b"},
 		{Label: "Describe", Description: "Describe parent pod", Key: "v"},
-		{Label: "Events", Description: "Show related events", Key: "V"},
+		{Label: "Events", Description: "Show related events", Key: "e"},
 	}
 }
 
@@ -164,6 +165,51 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Debug Pod", Description: "Run alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
+	case "Workflow":
+		// Argo Workflows
+		return []ActionMenuItem{
+			{Label: "Suspend Workflow", Description: "Pause workflow execution", Key: "s"},
+			{Label: "Resume Workflow", Description: "Resume paused workflow", Key: "r"},
+			{Label: "Stop Workflow", Description: "Stop workflow (allow exit handlers)", Key: "S"},
+			{Label: "Terminate Workflow", Description: "Immediately terminate workflow", Key: "T"},
+			{Label: "Resubmit Workflow", Description: "Create new workflow from this spec", Key: "R"},
+			{Label: "Logs", Description: "View workflow pod logs", Key: "l"},
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this workflow", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}
+	case "WorkflowTemplate":
+		// Argo Workflow Templates
+		return []ActionMenuItem{
+			{Label: "Submit Workflow", Description: "Create workflow from this template", Key: "s"},
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this template", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}
+	case "ClusterWorkflowTemplate":
+		// Argo Cluster Workflow Templates
+		return []ActionMenuItem{
+			{Label: "Submit Workflow", Description: "Create workflow from this template", Key: "s"},
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this template", Key: "D"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}
+	case "CronWorkflow":
+		// Argo Cron Workflows
+		return []ActionMenuItem{
+			{Label: "Suspend CronWorkflow", Description: "Suspend scheduled execution", Key: "s"},
+			{Label: "Resume CronWorkflow", Description: "Resume scheduled execution", Key: "r"},
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this cron workflow", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}
 	case "Application":
 		return []ActionMenuItem{
 			{Label: "Sync", Description: "Sync application", Key: "s"},
@@ -178,6 +224,7 @@ func ActionsForKind(kind string) []ActionMenuItem {
 		}
 	case "PersistentVolumeClaim":
 		return []ActionMenuItem{
+			{Label: "Resize", Description: "Expand PVC storage size", Key: "r"},
 			{Label: "Go to Pod", Description: "Navigate to pod using this PVC", Key: "g"},
 			{Label: "Debug Mount", Description: "Run debug pod with this PVC mounted", Key: "b"},
 			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "B"},
@@ -200,6 +247,8 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Values", Description: "View user-supplied values", Key: "u"},
 			{Label: "All Values", Description: "View all values (including defaults)", Key: "A"},
 			{Label: "Edit Values", Description: "Edit values in $EDITOR", Key: "E"},
+			{Label: "Diff", Description: "Compare default vs user-supplied values", Key: "d"},
+			{Label: "Upgrade", Description: "Upgrade release to latest chart version", Key: "U"},
 			{Label: "Rollback", Description: "Rollback to previous revision", Key: "R"},
 			{Label: "Describe", Description: "Show release info", Key: "v"},
 			{Label: "Delete", Description: "Uninstall this release", Key: "D"},
@@ -254,8 +303,39 @@ func ActionsForKind(kind string) []ActionMenuItem {
 			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}
-	case "Certificate", "CertificateRequest":
+	case "ScaledObject", "ScaledJob":
+		// KEDA ScaledObject / ScaledJob
+		return []ActionMenuItem{
+			{Label: "Pause", Description: "Pause autoscaling", Key: "p"},
+			{Label: "Unpause", Description: "Resume autoscaling", Key: "u"},
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}
+	case "ExternalSecret", "ClusterExternalSecret", "PushSecret":
+		// External Secrets Operator resources
+		return []ActionMenuItem{
+			{Label: "Force Refresh", Description: "Force sync external secret", Key: "r"},
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}
+	case "Certificate":
 		// cert-manager Certificate resources
+		return []ActionMenuItem{
+			{Label: "Force Renew", Description: "Trigger certificate re-issuance", Key: "r"},
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this resource", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}
+	case "CertificateRequest":
+		// cert-manager CertificateRequest resources
 		return []ActionMenuItem{
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},

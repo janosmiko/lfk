@@ -493,40 +493,40 @@ func TestMergeWithCRDs(t *testing.T) {
 	t.Run("argoproj.io CRDs grouped under ArgoCD category", func(t *testing.T) {
 		crds := []ResourceTypeEntry{
 			// Built-in ArgoCD entries will be filtered as duplicates; this extra
-			// argoproj.io CRD should appear under "argoproj.io", not "argoproj.io".
-			{DisplayName: "Workflows", Kind: "Workflow", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "workflows", Icon: "⎈", Namespaced: true},
+			// argoproj.io CRD should appear under "argoproj.io", not a raw API group.
+			{DisplayName: "WorkflowEventBindings", Kind: "WorkflowEventBinding", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "workfloweventbindings", Icon: "⎈", Namespaced: true},
 		}
 		items := MergeWithCRDs(crds)
 
-		// Verify the Workflow CRD has the "argoproj.io" category.
-		workflowFound := false
+		// Verify the discovered CRD has the "argoproj.io" category.
+		crdFound := false
 		for _, item := range items {
-			if item.Kind == "Workflow" {
-				workflowFound = true
+			if item.Kind == "WorkflowEventBinding" {
+				crdFound = true
 				assert.Equal(t, "argoproj.io", item.Category,
 					"argoproj.io CRDs should use ArgoCD category, not raw API group")
 				break
 			}
 		}
-		assert.True(t, workflowFound, "Workflow CRD should be present")
+		assert.True(t, crdFound, "WorkflowEventBinding CRD should be present")
 
-		// Verify Workflow appears right after the built-in ArgoCD entries,
+		// Verify the discovered CRD appears right after the built-in argoproj.io entries,
 		// not at the very end of the list.
 		lastArgoCDIdx := -1
-		workflowIdx := -1
+		crdIdx := -1
 		for i, item := range items {
 			if item.Category == "argoproj.io" {
 				lastArgoCDIdx = i
 			}
-			if item.Kind == "Workflow" {
-				workflowIdx = i
+			if item.Kind == "WorkflowEventBinding" {
+				crdIdx = i
 			}
 		}
-		assert.Greater(t, workflowIdx, 0, "Workflow should be in the list")
-		// The Workflow should be among the ArgoCD items (lastArgoCDIdx should
-		// be >= workflowIdx since Workflow is one of the ArgoCD items).
-		assert.Equal(t, lastArgoCDIdx, workflowIdx,
-			"Workflow should be the last ArgoCD item (inserted after built-in ArgoCD entries)")
+		assert.Greater(t, crdIdx, 0, "WorkflowEventBinding should be in the list")
+		// The discovered CRD should be among the argoproj.io items (lastArgoCDIdx should
+		// be >= crdIdx since it's inserted after built-in entries).
+		assert.Equal(t, lastArgoCDIdx, crdIdx,
+			"WorkflowEventBinding should be the last argoproj.io item (inserted after built-in entries)")
 	})
 
 	t.Run("gateway.networking.k8s.io CRDs grouped under gateway.networking.k8s.io category", func(t *testing.T) {

@@ -281,6 +281,10 @@ func TopLevelResourceTypes() []ResourceCategory {
 				{DisplayName: "Applications", Kind: "Application", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "applications", Icon: "⎈", Namespaced: true},
 				{DisplayName: "ApplicationSets", Kind: "ApplicationSet", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "applicationsets", Icon: "⎈", Namespaced: true},
 				{DisplayName: "AppProjects", Kind: "AppProject", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "appprojects", Icon: "⎈", Namespaced: true},
+				{DisplayName: "Workflows", Kind: "Workflow", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "workflows", Icon: "⟳", Namespaced: true},
+				{DisplayName: "WorkflowTemplates", Kind: "WorkflowTemplate", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "workflowtemplates", Icon: "⟳", Namespaced: true},
+				{DisplayName: "ClusterWorkflowTemplates", Kind: "ClusterWorkflowTemplate", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "clusterworkflowtemplates", Icon: "⟳", Namespaced: false},
+				{DisplayName: "CronWorkflows", Kind: "CronWorkflow", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "cronworkflows", Icon: "⟳", Namespaced: true},
 			},
 		},
 		{
@@ -449,6 +453,8 @@ func TopLevelResourceTypes() []ResourceCategory {
 			Name: "external-secrets.io",
 			Types: []ResourceTypeEntry{
 				{DisplayName: "ExternalSecrets", Kind: "ExternalSecret", APIGroup: "external-secrets.io", APIVersion: "v1beta1", Resource: "externalsecrets", Icon: "⚿", Namespaced: true},
+				{DisplayName: "ClusterExternalSecrets", Kind: "ClusterExternalSecret", APIGroup: "external-secrets.io", APIVersion: "v1beta1", Resource: "clusterexternalsecrets", Icon: "⚿", Namespaced: false},
+				{DisplayName: "PushSecrets", Kind: "PushSecret", APIGroup: "external-secrets.io", APIVersion: "v1alpha1", Resource: "pushsecrets", Icon: "⚿", Namespaced: true},
 				{DisplayName: "SecretStores", Kind: "SecretStore", APIGroup: "external-secrets.io", APIVersion: "v1beta1", Resource: "secretstores", Icon: "⚿", Namespaced: true},
 				{DisplayName: "ClusterSecretStores", Kind: "ClusterSecretStore", APIGroup: "external-secrets.io", APIVersion: "v1beta1", Resource: "clustersecretstores", Icon: "⚿", Namespaced: false},
 			},

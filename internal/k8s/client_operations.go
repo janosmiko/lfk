@@ -146,6 +146,24 @@ func (c *Client) ScaleResource(contextName, namespace, name, kind string, replic
 	return nil
 }
 
+// ResizePVC patches a PersistentVolumeClaim's spec.resources.requests.storage to the given size.
+func (c *Client) ResizePVC(contextName, namespace, name, newSize string) error {
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return err
+	}
+
+	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
+	patch := []byte(fmt.Sprintf(`{"spec":{"resources":{"requests":{"storage":"%s"}}}}`, newSize))
+	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
+		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
+	)
+	if err != nil {
+		return fmt.Errorf("resizing PVC %s to %s: %w", name, newSize, err)
+	}
+	return nil
+}
+
 // RestartResource performs a rolling restart by patching the pod template annotation.
 func (c *Client) RestartResource(contextName, namespace, name, kind string) error {
 	cs, err := c.clientsetForContext(contextName)
