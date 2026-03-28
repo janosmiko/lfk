@@ -316,8 +316,8 @@ func populateArgoCDApplication(ti *model.Item, _ map[string]interface{}, status,
 		}
 		if len(condTypes) > 0 {
 			val := strings.Join(condTypes, ", ")
-			if len(val) > 30 {
-				val = val[:27] + "..."
+			if len(val) > 15 {
+				val = val[:14] + "~"
 			}
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Condition", Value: val})
 		}
