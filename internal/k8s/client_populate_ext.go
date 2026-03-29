@@ -111,7 +111,7 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]interface{}, kind
 		}
 
 	case "Application", "ApplicationSet":
-		populateArgoCDApplication(ti, obj, status, spec)
+		populateArgoCDApplication(ti, obj, status, spec, kind)
 
 	case "Event":
 		populateEvent(ti, obj)
@@ -214,20 +214,16 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]interface{}, kind
 	}
 }
 
-func populateArgoCDApplication(ti *model.Item, _ map[string]interface{}, status, spec map[string]interface{}) {
+func populateArgoCDApplication(ti *model.Item, _ map[string]interface{}, status, spec map[string]interface{}, kind string) {
 	if status != nil {
+		// Health and Sync details are shown in the DETAILS pane only;
+		// the STATUS column already combines health/sync status.
 		if health, ok := status["health"].(map[string]interface{}); ok {
-			if hs, ok := health["status"].(string); ok {
-				ti.Columns = append(ti.Columns, model.KeyValue{Key: "Health", Value: hs})
-			}
 			if msg, ok := health["message"].(string); ok && msg != "" {
 				ti.Columns = append(ti.Columns, model.KeyValue{Key: "Health Message", Value: msg})
 			}
 		}
 		if sync, ok := status["sync"].(map[string]interface{}); ok {
-			if ss, ok := sync["status"].(string); ok {
-				ti.Columns = append(ti.Columns, model.KeyValue{Key: "Sync", Value: ss})
-			}
 			if rev, ok := sync["revision"].(string); ok && rev != "" {
 				if len(rev) > 8 {
 					rev = rev[:8]
@@ -323,20 +319,22 @@ func populateArgoCDApplication(ti *model.Item, _ map[string]interface{}, status,
 		}
 	}
 	if spec != nil {
-		// AutoSync column from spec.syncPolicy.automated.
-		autoSyncVal := "Off"
-		if syncPolicy, ok := spec["syncPolicy"].(map[string]interface{}); ok {
-			if automated, ok := syncPolicy["automated"].(map[string]interface{}); ok && automated != nil {
-				autoSyncVal = "On"
-				if sh, ok := automated["selfHeal"].(bool); ok && sh {
-					autoSyncVal += "/SH"
-				}
-				if pr, ok := automated["prune"].(bool); ok && pr {
-					autoSyncVal += "/P"
+		// AutoSync column: only for Application, not ApplicationSet.
+		if kind == "Application" {
+			autoSyncVal := "Off"
+			if syncPolicy, ok := spec["syncPolicy"].(map[string]interface{}); ok {
+				if automated, ok := syncPolicy["automated"].(map[string]interface{}); ok && automated != nil {
+					autoSyncVal = "On"
+					if sh, ok := automated["selfHeal"].(bool); ok && sh {
+						autoSyncVal += "/SH"
+					}
+					if pr, ok := automated["prune"].(bool); ok && pr {
+						autoSyncVal += "/P"
+					}
 				}
 			}
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "AutoSync", Value: autoSyncVal})
 		}
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "AutoSync", Value: autoSyncVal})
 
 		if dest, ok := spec["destination"].(map[string]interface{}); ok {
 			if ns, ok := dest["namespace"].(string); ok && ns != "" {

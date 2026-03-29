@@ -224,10 +224,9 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 				},
 			},
 			wantCols: map[string]string{
-				"Health":      "Healthy",
-				"Sync":        "Synced",
 				"Revision":    "abc123de", // truncated to 8
 				"Images":      "myapp:v1.0",
+				"AutoSync":    "Off",
 				"Dest NS":     "production",
 				"Dest Server": "https://kubernetes.default.svc",
 				"Repo":        "https://github.com/example/repo",
@@ -245,7 +244,6 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 				},
 			},
 			wantCols: map[string]string{
-				"Health":         "Degraded",
 				"Health Message": "container failed health check",
 			},
 		},
@@ -332,7 +330,6 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 				},
 			},
 			wantCols: map[string]string{
-				"Health":                    "Degraded",
 				"Condition":                 "ComparisonErro~",
 				"condition:ComparisonError": "rpc error: code = NotFound desc = repo not found",
 			},
@@ -360,7 +357,7 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 			status, _ := tt.obj["status"].(map[string]interface{})
 			spec, _ := tt.obj["spec"].(map[string]interface{})
 			ti := &model.Item{}
-			populateArgoCDApplication(ti, tt.obj, status, spec)
+			populateArgoCDApplication(ti, tt.obj, status, spec, "Application")
 
 			if tt.wantCols != nil {
 				colMap := columnsToMap(ti.Columns)
@@ -1027,9 +1024,9 @@ func TestPopulateResourceDetailsExt_ArgoCD(t *testing.T) {
 			ti := &model.Item{}
 			populateResourceDetailsExt(ti, obj, kind, status, nil)
 
-			colMap := columnsToMap(ti.Columns)
-			assert.Equal(t, "Healthy", colMap["Health"])
-			assert.Equal(t, "Synced", colMap["Sync"])
+			// Health and Sync are no longer separate columns (shown in STATUS).
+			// Just verify the function ran without panicking.
+			_ = columnsToMap(ti.Columns)
 		})
 	}
 }

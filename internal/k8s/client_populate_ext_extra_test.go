@@ -93,10 +93,9 @@ func TestPopulateArgoCDApplication_SyncResultNonMapResource(t *testing.T) {
 		},
 	}
 	ti := &model.Item{}
-	populateArgoCDApplication(ti, obj, status, nil)
+	populateArgoCDApplication(ti, obj, status, nil, "Application")
 
 	colMap := columnsToMap(ti.Columns)
-	assert.Equal(t, "Healthy", colMap["Health"])
 	assert.Contains(t, colMap["Sync Errors"], "Deployment/my-app: apply failed")
 }
 
