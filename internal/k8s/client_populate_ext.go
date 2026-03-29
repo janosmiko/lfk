@@ -323,6 +323,21 @@ func populateArgoCDApplication(ti *model.Item, _ map[string]interface{}, status,
 		}
 	}
 	if spec != nil {
+		// AutoSync column from spec.syncPolicy.automated.
+		autoSyncVal := "Off"
+		if syncPolicy, ok := spec["syncPolicy"].(map[string]interface{}); ok {
+			if automated, ok := syncPolicy["automated"].(map[string]interface{}); ok && automated != nil {
+				autoSyncVal = "On"
+				if sh, ok := automated["selfHeal"].(bool); ok && sh {
+					autoSyncVal += "/SH"
+				}
+				if pr, ok := automated["prune"].(bool); ok && pr {
+					autoSyncVal += "/P"
+				}
+			}
+		}
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "AutoSync", Value: autoSyncVal})
+
 		if dest, ok := spec["destination"].(map[string]interface{}); ok {
 			if ns, ok := dest["namespace"].(string); ok && ns != "" {
 				ti.Columns = append(ti.Columns, model.KeyValue{Key: "Dest NS", Value: ns})

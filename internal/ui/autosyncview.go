@@ -28,15 +28,25 @@ func RenderAutoSyncOverlay(enabled, selfHeal, prune bool, cursor, screenWidth, s
 
 	onStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
 	offStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorError))
+	disabledStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed))
 
 	var lines []string
 	for i, opt := range opts {
+		// Self-Heal and Prune are disabled when AutoSync is off.
+		isDisabled := !enabled && i > 0
+
 		indicator := offStyle.Render("OFF")
 		if opt.on {
 			indicator = onStyle.Render(" ON")
 		}
+		if isDisabled {
+			indicator = disabledStyle.Render("  -")
+		}
 
 		label := fmt.Sprintf("%-14s", opt.label)
+		if isDisabled {
+			label = disabledStyle.Render(label)
+		}
 		line := fmt.Sprintf("  %s  %s", label, indicator)
 
 		if i == cursor {

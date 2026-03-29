@@ -373,9 +373,13 @@ func (m Model) handleAutoSyncKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		case 0:
 			m.autoSyncEnabled = !m.autoSyncEnabled
 		case 1:
-			m.autoSyncSelfHeal = !m.autoSyncSelfHeal
+			if m.autoSyncEnabled {
+				m.autoSyncSelfHeal = !m.autoSyncSelfHeal
+			}
 		case 2:
-			m.autoSyncPrune = !m.autoSyncPrune
+			if m.autoSyncEnabled {
+				m.autoSyncPrune = !m.autoSyncPrune
+			}
 		}
 		return m, nil
 	case "ctrl+s":
