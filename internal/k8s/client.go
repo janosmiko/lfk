@@ -286,8 +286,9 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 				if formatted == "" {
 					continue
 				}
-				// Skip printer columns that duplicate the STATUS column.
-				if formatted == ti.Status {
+				// Skip printer columns that duplicate the STATUS column
+				// (exact match or contained within, e.g., "Healthy" in "Healthy/Synced").
+				if formatted == ti.Status || strings.Contains(ti.Status, formatted) {
 					continue
 				}
 				ti.Columns = append(ti.Columns, model.KeyValue{Key: pc.Name, Value: formatted})

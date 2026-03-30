@@ -221,7 +221,6 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 				// Nodes: verbose fields, show in fullscreen/details only.
 				"OS": true, "Runtime": true,
 				"Hostname": true, "InternalIP": true, "ExternalIP": true,
-				"Taints": true,
 				// Events: Source is too verbose for table view; Message is kept.
 				"Source": true,
 				// Metadata fields: too verbose for table, shown in detail pane.
@@ -329,8 +328,8 @@ func formatTableRowWithExtra(name, ns, ready, restarts, status, age string,
 	for ecIdx, ec := range extraCols {
 		var val string
 		if item == nil {
-			// Header row: use key as header.
-			val = ec.key
+			// Header row: use uppercased key as header.
+			val = strings.ToUpper(ec.key)
 		} else {
 			val = getExtraColumnValue(item, ec.key)
 		}
