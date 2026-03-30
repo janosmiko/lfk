@@ -289,6 +289,18 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		prevName, prevNs, prevExtra := m.cursorItemKey()
 		m.middleItems = msg.items
 		m.itemCache[m.navKey()] = m.middleItems
+		// Re-apply active filter preset on owned refresh (same as resourcesLoadedMsg).
+		if m.activeFilterPreset != nil {
+			m.unfilteredMiddleItems = append([]model.Item(nil), m.middleItems...)
+			var filtered []model.Item
+			for _, item := range m.middleItems {
+				if m.activeFilterPreset.MatchFn(item) {
+					filtered = append(filtered, item)
+				}
+			}
+			m.middleItems = filtered
+			m.itemCache[m.navKey()] = m.middleItems
+		}
 		m.restoreCursorToItem(prevName, prevNs, prevExtra)
 		return m, m.loadPreview()
 
