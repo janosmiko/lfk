@@ -167,8 +167,44 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		}
 	}
 
-	// Render multi-line fields (Labels, Annotations, Finalizers, etc.).
+	// Render status and sync rows first.
+	for _, r := range statusRows {
+		if len(lines) >= height-2 {
+			break
+		}
+		valW := max(width-keyW-2, 4)
+		val := r.value
+		if len(val) > valW {
+			val = val[:valW-3] + "..."
+		}
+		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
+		lines = append(lines, keyStr+DimStyle.Render(val))
+	}
+	for _, r := range syncRows {
+		if len(lines) >= height-2 {
+			break
+		}
+		valW := max(width-keyW-2, 4)
+		val := r.value
+		if len(val) > valW {
+			val = val[:valW-3] + "..."
+		}
+		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
+		lines = append(lines, keyStr+DimStyle.Render(val))
+	}
+
+	// Render multi-line fields in order: Labels, Annotations, Finalizers,
+	// then Selector, Used By.
+	multiOrder := []string{"Labels", "Annotations", "Finalizers", "Selector", "Used By"}
+	multiMap := make(map[string]model.KeyValue, len(multiLineFields))
 	for _, kv := range multiLineFields {
+		multiMap[kv.Key] = kv
+	}
+	for _, name := range multiOrder {
+		kv, ok := multiMap[name]
+		if !ok {
+			continue
+		}
 		if len(lines) >= height-2 {
 			break
 		}
@@ -195,15 +231,13 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		}
 	}
 
-	// Add separator after multi-line fields before status rows.
+	// Add separator after multi-line fields before spec rows.
 	if len(multiLineFields) > 0 && len(lines) < height-2 {
 		lines = append(lines, "")
 	}
 
-	// Render remaining rows (status, sync, spec, messages).
-	orderedRows := make([]detailRow, 0, len(statusRows)+len(syncRows)+len(specRows)+len(messageRows))
-	orderedRows = append(orderedRows, statusRows...)
-	orderedRows = append(orderedRows, syncRows...)
+	// Render spec and message rows.
+	orderedRows := make([]detailRow, 0, len(specRows)+len(messageRows))
 	orderedRows = append(orderedRows, specRows...)
 	orderedRows = append(orderedRows, messageRows...)
 	for _, r := range orderedRows {
