@@ -63,7 +63,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	}
 
 	for _, kv := range item.Columns {
-		if metricsKeys[kv.Key] || tableKeys[kv.Key] {
+		if metricsKeys[kv.Key] || tableKeys[kv.Key] || kv.Key == "Deletion" {
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "secret:") {
