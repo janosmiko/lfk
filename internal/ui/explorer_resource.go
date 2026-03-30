@@ -35,20 +35,31 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		"Status": true, "Reason": true,
 	}
 
-	// Collect table rows (key-value pairs) and multi-line fields separately.
+	// Collect fields into categorized buckets for ordered rendering.
 	type detailRow struct {
 		key   string
 		value string
 	}
-	var rows []detailRow
-	var multiLineFields []model.KeyValue // Labels, Finalizers
+
+	// Category buckets.
+	var statusRows []detailRow  // Status/Health/Sync/Phase/Ready/AutoSync/Suspended/Condition
+	var syncRows []detailRow    // Last Sync, Synced At, Sync Message, Sync Errors, Revision
+	var specRows []detailRow    // Dest NS, Dest Server, Repo, Path, Type, etc.
+	var messageRows []detailRow // Reason, Message, Health Message
+	var multiLineFields []model.KeyValue
 	var dataLines []string
 
-	if item.Name != "" {
-		rows = append(rows, detailRow{"NAME", item.Name})
+	// Key sets for categorization.
+	statusKeys := map[string]bool{
+		"Ready": true, "Health": true, "Sync": true, "Phase": true,
+		"AutoSync": true, "Suspended": true, "Condition": true,
 	}
-	if item.Namespace != "" {
-		rows = append(rows, detailRow{"NAMESPACE", item.Namespace})
+	syncKeys := map[string]bool{
+		"Last Sync": true, "Synced At": true, "Sync Message": true,
+		"Sync Errors": true, "Revision": true,
+	}
+	messageKeys := map[string]bool{
+		"Reason": true, "Message": true, "Health Message": true,
 	}
 
 	for _, kv := range item.Columns {
@@ -71,34 +82,75 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		}
 		if strings.HasPrefix(kv.Key, "condition:") {
 			label := kv.Key[len("condition:"):]
-			rows = append(rows, detailRow{strings.ToUpper(label), kv.Value})
+			statusRows = append(statusRows, detailRow{strings.ToUpper(label), kv.Value})
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "cond:") {
-			// Collected separately for the CONDITIONS section.
 			continue
 		}
 		if kv.Key == "Labels" || kv.Key == "Finalizers" || kv.Key == "Annotations" || kv.Key == "Used By" || kv.Key == "Selector" {
 			multiLineFields = append(multiLineFields, kv)
 			continue
 		}
-		rows = append(rows, detailRow{strings.ToUpper(kv.Key), kv.Value})
+		row := detailRow{strings.ToUpper(kv.Key), kv.Value}
+		switch {
+		case statusKeys[kv.Key]:
+			statusRows = append(statusRows, row)
+		case syncKeys[kv.Key]:
+			syncRows = append(syncRows, row)
+		case messageKeys[kv.Key]:
+			messageRows = append(messageRows, row)
+		default:
+			specRows = append(specRows, row)
+		}
 	}
+
+	// Build ordered rows:
+	// 1. Identity (Name, Namespace, Deletion)
+	// 2. Multi-line fields (Labels, Annotations, Finalizers, Selector, Used By)
+	//    — rendered separately below
+	// 3. Status/Health
+	// 4. Sync/Operation details
+	// 5. Spec fields
+	// 6. Messages/Reasons
+	var identityRows []detailRow
+	if item.Name != "" {
+		identityRows = append(identityRows, detailRow{"NAME", item.Name})
+	}
+	if item.Namespace != "" {
+		identityRows = append(identityRows, detailRow{"NAMESPACE", item.Namespace})
+	}
+	if item.Deleting {
+		// Find deletion timestamp from columns.
+		for _, kv := range item.Columns {
+			if kv.Key == "Deletion" || kv.Key == "DELETION" {
+				identityRows = append(identityRows, detailRow{"DELETION", kv.Value})
+				break
+			}
+		}
+	}
+
+	allRows := make([]detailRow, 0, len(identityRows)+len(statusRows)+len(syncRows)+len(specRows)+len(messageRows))
+	allRows = append(allRows, identityRows...)
+	allRows = append(allRows, statusRows...)
+	allRows = append(allRows, syncRows...)
+	allRows = append(allRows, specRows...)
+	allRows = append(allRows, messageRows...)
 
 	// Calculate key column width for table alignment.
 	keyW := 0
-	for _, r := range rows {
+	for _, r := range allRows {
 		if len(r.key) > keyW {
 			keyW = len(r.key)
 		}
 	}
-	keyW += 2 // spacing after key
+	keyW += 2
 
 	// Style for detail keys: bold + primary, no underline (HeaderStyle has underline).
 	detailKeyStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorPrimary)).Background(BaseBg)
 
-	// Render rows as aligned key-value pairs (key styled, value as dim).
-	for _, r := range rows {
+	// Render identity rows.
+	for _, r := range identityRows {
 		if len(lines) >= height-2 {
 			break
 		}
@@ -108,14 +160,14 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			val = val[:valW-3] + "..."
 		}
 		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
-		if r.key == "DELETION" && item.Deleting {
+		if r.key == "DELETION" {
 			lines = append(lines, keyStr+ErrorStyle.Render(val))
 		} else {
 			lines = append(lines, keyStr+DimStyle.Render(val))
 		}
 	}
 
-	// Multi-line fields (Labels, Finalizers) below the table.
+	// Render multi-line fields (Labels, Annotations, Finalizers, etc.).
 	for _, kv := range multiLineFields {
 		if len(lines) >= height-2 {
 			break
@@ -126,12 +178,11 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			if len(lines) >= height-2 {
 				break
 			}
-			maxW := max(width-4, 10) // 2 indent + 2 margin
+			maxW := max(width-4, 10)
 			entryRunes := []rune(entry)
 			if len(entryRunes) <= maxW {
 				lines = append(lines, "  "+DimStyle.Render(entry))
 			} else {
-				// First line
 				lines = append(lines, "  "+DimStyle.Render(string(entryRunes[:maxW])))
 				for start := maxW; start < len(entryRunes); start += maxW {
 					if len(lines) >= height-2 {
@@ -142,6 +193,25 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 				}
 			}
 		}
+	}
+
+	// Render remaining rows (status, sync, spec, messages).
+	orderedRows := make([]detailRow, 0, len(statusRows)+len(syncRows)+len(specRows)+len(messageRows))
+	orderedRows = append(orderedRows, statusRows...)
+	orderedRows = append(orderedRows, syncRows...)
+	orderedRows = append(orderedRows, specRows...)
+	orderedRows = append(orderedRows, messageRows...)
+	for _, r := range orderedRows {
+		if len(lines) >= height-2 {
+			break
+		}
+		valW := max(width-keyW-2, 4)
+		val := r.value
+		if len(val) > valW {
+			val = val[:valW-3] + "..."
+		}
+		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
+		lines = append(lines, keyStr+DimStyle.Render(val))
 	}
 
 	// Render data/secret fields in a separate section with a header.
