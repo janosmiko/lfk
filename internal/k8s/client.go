@@ -286,6 +286,10 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 				if formatted == "" {
 					continue
 				}
+				// Skip printer columns that duplicate the STATUS column.
+				if formatted == ti.Status {
+					continue
+				}
 				ti.Columns = append(ti.Columns, model.KeyValue{Key: pc.Name, Value: formatted})
 			}
 		}

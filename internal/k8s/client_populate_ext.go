@@ -197,6 +197,7 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]interface{}, kind
 
 	default:
 		// For unknown/CRD resources, extract top-level status fields.
+		// Skip fields that duplicate ti.Status (already shown in the STATUS column).
 		if status != nil {
 			for _, key := range []string{"phase", "state", "health", "sync", "message", "reason"} {
 				if v, ok := status[key]; ok {
@@ -208,7 +209,12 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]interface{}, kind
 							ti.Columns = append(ti.Columns, model.KeyValue{Key: subLabel, Value: fmt.Sprintf("%v", subVal)})
 						}
 					default:
-						ti.Columns = append(ti.Columns, model.KeyValue{Key: label, Value: fmt.Sprintf("%v", val)})
+						s := fmt.Sprintf("%v", val)
+						// Skip if this duplicates the STATUS column.
+						if (key == "phase" || key == "state") && s == ti.Status {
+							continue
+						}
+						ti.Columns = append(ti.Columns, model.KeyValue{Key: label, Value: s})
 					}
 				}
 			}
