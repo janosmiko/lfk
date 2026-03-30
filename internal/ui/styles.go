@@ -354,7 +354,7 @@ func StatusStyle(status string) lipgloss.Style {
 	case "Running", "Active", "Bound", "Available", "Ready",
 		"Healthy", "Healthy/Synced", "Synced",
 		"Deployed",
-		"SecretSynced", "SecretSyncedSuccessfully":
+		"SecretSynced", "Created", "Updated", "Valid":
 		return StatusRunning
 	case "Succeeded", "Completed",
 		"Superseded":
@@ -375,7 +375,9 @@ func StatusStyle(status string) lipgloss.Style {
 		"Degraded", "Degraded/Synced", "Degraded/OutOfSync",
 		"Missing/Synced",
 		"OOMKilled", "ErrImagePull", "CreateContainerConfigError",
-		"SecretSyncError", "UpdateFailed", "FailedScheduling":
+		"SecretSyncedError", "SecretMissing", "MissingProviderSecret",
+		"UpdateFailed", "FailedScheduling",
+		"InvalidStoreConfiguration", "InvalidProviderConfig", "ValidationFailed":
 		return StatusFailed
 	default:
 		if status == "" {
