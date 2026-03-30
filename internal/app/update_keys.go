@@ -540,7 +540,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "M":
 		// Toggle resource relationship map in the right column.
-		if m.nav.Level >= model.LevelResources && (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod" || m.nav.ResourceType.Kind == "ReplicaSet") {
+		if m.nav.Level >= model.LevelResources {
 			m.mapView = !m.mapView
 			if m.mapView {
 				m.fullYAMLPreview = false

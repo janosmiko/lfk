@@ -59,6 +59,11 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 	m.previewYAML = ""
 	m.previewScroll = 0
 	m.loading = true
+	// Reload resource map if active.
+	if m.mapView {
+		m.resourceTree = nil
+		return m, tea.Batch(m.loadPreview(), m.loadResourceTree())
+	}
 	return m, m.loadPreview()
 }
 
