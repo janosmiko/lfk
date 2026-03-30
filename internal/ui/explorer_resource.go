@@ -598,14 +598,17 @@ func RenderResourceTree(root *model.ResourceNode, width, height int) string {
 		b.WriteString("\n")
 	}
 
-	return b.String()
+	result := b.String()
+	return FillLinesBg(result, width, BaseBg)
 }
 
 // renderTreeNodeLabel builds the display label for a single tree node.
 // parentNamespace is used to conditionally show the namespace when it differs
 // from the parent node.
 func renderTreeNodeLabel(node *model.ResourceNode, parentNamespace string) string {
-	label := OverlayTitleStyle.Render(node.Kind+"/") + NormalStyle.Render(node.Name)
+	// Use YamlKeyStyle (bold + primary + themed background) for the kind prefix.
+	// OverlayTitleStyle has bottom padding which breaks tree indentation.
+	label := YamlKeyStyle.Render(node.Kind+"/") + NormalStyle.Render(node.Name)
 
 	// Show namespace when it differs from the parent.
 	if node.Namespace != "" && node.Namespace != parentNamespace {

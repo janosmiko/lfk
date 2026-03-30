@@ -82,6 +82,9 @@ func (c *Client) GetResourceTree(ctx context.Context, contextName, namespace, ki
 		err = c.buildNodeTree(ctx, dynClient, name, root)
 	case "Pod":
 		err = c.buildPodTree(ctx, contextName, namespace, name, root)
+	default:
+		// Generic: find pods owned (directly or transitively) by this resource.
+		err = c.buildGenericOwnerTree(ctx, dynClient, namespace, kind, name, root)
 	}
 
 	return root, err
@@ -173,6 +176,87 @@ func (c *Client) buildPodOwnerTree(ctx context.Context, dynClient dynamic.Interf
 			}
 		}
 	}
+	return nil
+}
+
+// buildGenericOwnerTree finds pods (and intermediate controllers) owned by a
+// CRD resource by walking owner references. This handles resources like CNPG
+// Cluster → StatefulSet → Pod.
+func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.Interface, namespace, ownerKind, ownerName string, root *model.ResourceNode) error {
+	// List common intermediate controllers to discover indirect ownership.
+	intermediateGVRs := []struct {
+		gvr  schema.GroupVersionResource
+		kind string
+	}{
+		{schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "statefulsets"}, "StatefulSet"},
+		{schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}, "ReplicaSet"},
+		{schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "deployments"}, "Deployment"},
+		{schema.GroupVersionResource{Group: "batch", Version: "v1", Resource: "jobs"}, "Job"},
+	}
+
+	// Map of intermediate resource name → kind for those owned by the target.
+	ownedIntermediates := make(map[string]string)
+	var intermediateNodes []*model.ResourceNode
+
+	for _, ig := range intermediateGVRs {
+		list, err := dynClient.Resource(ig.gvr).Namespace(namespace).List(ctx, metav1.ListOptions{})
+		if err != nil {
+			continue // Silently skip resources we can't list.
+		}
+		for _, item := range list.Items {
+			for _, ref := range item.GetOwnerReferences() {
+				if ref.Kind == ownerKind && ref.Name == ownerName {
+					nodeName := item.GetName()
+					ownedIntermediates[nodeName] = ig.kind
+					intermediateNodes = append(intermediateNodes, &model.ResourceNode{
+						Name:      nodeName,
+						Kind:      ig.kind,
+						Namespace: item.GetNamespace(),
+						Status:    extractStatus(item.Object),
+					})
+					break
+				}
+			}
+		}
+	}
+
+	// List pods and assign them to intermediate owners or directly to root.
+	podGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	podList, err := dynClient.Resource(podGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return fmt.Errorf("listing pods: %w", err)
+	}
+
+	// Index intermediate nodes by name for child assignment.
+	intermediateMap := make(map[string]*model.ResourceNode, len(intermediateNodes))
+	for _, n := range intermediateNodes {
+		intermediateMap[n.Name] = n
+	}
+
+	for _, pod := range podList.Items {
+		for _, ref := range pod.GetOwnerReferences() {
+			podNode := &model.ResourceNode{
+				Name:      pod.GetName(),
+				Kind:      "Pod",
+				Namespace: pod.GetNamespace(),
+				Status:    extractStatus(pod.Object),
+			}
+			// Pod owned by an intermediate controller.
+			if parent, ok := intermediateMap[ref.Name]; ok {
+				parent.Children = append(parent.Children, podNode)
+				break
+			}
+			// Pod directly owned by the target resource.
+			if ref.Kind == ownerKind && ref.Name == ownerName {
+				root.Children = append(root.Children, podNode)
+				break
+			}
+		}
+	}
+
+	// Attach intermediate nodes to root.
+	root.Children = append(root.Children, intermediateNodes...)
+
 	return nil
 }
 
