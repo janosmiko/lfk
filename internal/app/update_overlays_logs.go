@@ -114,27 +114,35 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case "enter":
 		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
 			sel := items[m.overlayCursor]
-			m.actionCtx.name = sel.Name
-			m.actionCtx.kind = "Pod"
-			if sel.Namespace != "" {
-				m.actionCtx.namespace = sel.Namespace
-			}
-			m.actionCtx.containerName = ""
 			m.overlay = overlayNone
 			m.pendingAction = ""
 			m.logSavedPodName = ""
 			m.logPodFilterText = ""
 			m.logPodFilterActive = false
-			// Reset container selection when switching pods.
 			m.logSelectedContainers = nil
 			m.logContainers = nil
-			// Reset log viewer state for the new pod's stream.
 			m.logLines = nil
 			m.logScroll = 0
 			m.logTailLines = ui.ConfigLogTailLines
 			m.logHasMoreHistory = true
 			m.logLoadingHistory = false
-			m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+
+			if sel.Status == "all" {
+				// "All Pods" selected: stream all pods using the parent resource.
+				m.actionCtx.kind = m.logParentKind
+				m.actionCtx.name = m.logParentName
+				m.actionCtx.containerName = ""
+				m.logTitle = fmt.Sprintf("Logs: %s/%s (all pods)", m.actionNamespace(), m.logParentName)
+			} else {
+				// Specific pod selected.
+				m.actionCtx.name = sel.Name
+				m.actionCtx.kind = "Pod"
+				if sel.Namespace != "" {
+					m.actionCtx.namespace = sel.Namespace
+				}
+				m.actionCtx.containerName = ""
+				m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+			}
 			return m, m.startLogStream()
 		}
 		return m, nil

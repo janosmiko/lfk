@@ -397,20 +397,10 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.logLineInput += msg.String()
 		return m, nil
 	case "\\":
-		// Unified selector: container filter first (if on a Pod), pod switch second.
+		// Pod selector for group resources, container selector for single pods.
 		m.logLineInput = ""
-		if m.actionCtx.kind == "Pod" {
-			// Show container selector overlay for filtering which containers' logs are shown.
-			m.overlay = overlayLogContainerSelect
-			m.overlayCursor = 0
-			m.logContainerFilterText = ""
-			m.logContainerFilterActive = false
-			m.logContainerSelectionModified = false
-			ui.ResetOverlayContainerScroll()
-			return m, m.loadContainersForLogFilter()
-		}
 		if m.logParentKind != "" {
-			// Switch pod: show inline pod selector overlay without leaving log mode.
+			// Group resource: show pod selector to switch between pods.
 			m.logSavedPodName = m.actionCtx.name
 			if m.logCancel != nil {
 				m.logCancel()
@@ -428,6 +418,16 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.loading = true
 			m.setStatusMessage("Loading pods...", false)
 			return m, m.loadPodsForLogAction()
+		}
+		if m.actionCtx.kind == "Pod" {
+			// Single pod: show container selector for filtering.
+			m.overlay = overlayLogContainerSelect
+			m.overlayCursor = 0
+			m.logContainerFilterText = ""
+			m.logContainerFilterActive = false
+			m.logContainerSelectionModified = false
+			ui.ResetOverlayContainerScroll()
+			return m, m.loadContainersForLogFilter()
 		}
 		return m, nil
 	case "ctrl+c":

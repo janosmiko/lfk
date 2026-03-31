@@ -110,8 +110,10 @@ func TestExecuteLogsGroupResourceSetsLogParent(t *testing.T) {
 	result, _ := m.executeAction("Logs")
 	mdl := result.(Model)
 
+	// Group resources now stream all pods directly (no pod selector).
+	// Parent context is still saved for pod/container re-selection from the log viewer.
 	assert.Equal(t, "Job", mdl.logParentKind)
 	assert.Equal(t, "my-job", mdl.logParentName)
-	assert.Equal(t, "Logs", mdl.pendingAction,
-		"group resource should go to pod selector, not direct streaming")
+	assert.Equal(t, modeLogs, mdl.mode,
+		"group resource should go directly to log streaming")
 }

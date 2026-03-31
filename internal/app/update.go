@@ -673,8 +673,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
 				return m, m.startLogStream()
 			}
-			// Multiple pods; show inline pod selector overlay.
-			m.overlayItems = pods
+			// Multiple pods; show inline pod selector overlay with "All Pods" at top.
+			allItem := model.Item{Name: "All Pods", Status: "all"}
+			m.overlayItems = append([]model.Item{allItem}, pods...)
 			m.overlay = overlayLogPodSelect
 			m.overlayCursor = 0
 			m.logPodFilterText = ""

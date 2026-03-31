@@ -333,14 +333,11 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 			kind == "Job" || kind == "CronJob" || kind == "Service"
 
 		if isGroupResource && m.actionCtx.containerName == "" {
-			// Save parent resource context for pod re-selection from the log viewer.
+			// Save parent resource context for pod/container re-selection from the log viewer.
 			m.logParentKind = m.actionCtx.kind
 			m.logParentName = m.actionCtx.name
-			// Show pod selector for group resources.
-			m.pendingAction = actionLabel
-			m.loading = true
-			m.setStatusMessage("Loading pods...", false)
-			return m, m.loadPodsForLogAction()
+			// Stream all pods at once using label selector (no pod selection step).
+			// The user can still filter pods/containers from the log viewer overlay.
 		}
 
 		if kind != "Pod" && !isGroupResource && m.actionCtx.containerName == "" {
@@ -349,10 +346,13 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		}
 
 		// Direct log streaming for pods or when container is already selected.
-		// Reset parent context so stale values from a previous group-resource
-		// log session don't leak into the new session's pod/container selector.
-		m.logParentKind = ""
-		m.logParentName = ""
+		// Reset parent context only for non-group resources so stale values
+		// from a previous session don't leak. Group resources keep their
+		// parent context for the pod/container re-selection overlay.
+		if !isGroupResource {
+			m.logParentKind = ""
+			m.logParentName = ""
+		}
 
 		if m.actionCtx.containerName != "" {
 			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl logs -f %s -c %s -n %s --context %s", name, m.actionCtx.containerName, ns, ctx))
