@@ -16,8 +16,9 @@ import (
 // Returns (model, cmd, handled) where handled indicates whether the key
 // was consumed. If not handled, the caller should fall through.
 func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
 	switch msg.String() {
-	case "A":
+	case kb.AllNamespaces:
 		m.allNamespaces = !m.allNamespaces
 		if m.allNamespaces {
 			m.selectedNamespaces = nil
@@ -29,12 +30,12 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.requestGen++
 		return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear()), true
 
-	case "Q":
+	case kb.QuotaDashboard:
 		m.loading = true
 		m.setStatusMessage("Loading quota data...", false)
 		return m, m.loadQuotas(), true
 
-	case "ctrl+d":
+	case kb.PageDown:
 		if m.fullscreenDashboard {
 			halfPage := (m.height - 4) / 2
 			m.previewScroll += halfPage
@@ -58,7 +59,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.loading = true
 		return m, m.loadPreview(), true
 
-	case "ctrl+u":
+	case kb.PageUp:
 		if m.fullscreenDashboard {
 			halfPage := (m.height - 4) / 2
 			m.previewScroll -= halfPage
@@ -84,7 +85,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.loading = true
 		return m, m.loadPreview(), true
 
-	case "ctrl+f":
+	case kb.PageForward:
 		if m.fullscreenDashboard {
 			fullPage := m.height - 4
 			m.previewScroll += fullPage
@@ -108,7 +109,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.loading = true
 		return m, m.loadPreview(), true
 
-	case "ctrl+b":
+	case kb.PageBack:
 		if m.fullscreenDashboard {
 			fullPage := m.height - 4
 			m.previewScroll -= fullPage
@@ -134,7 +135,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.loading = true
 		return m, m.loadPreview(), true
 
-	case "0":
+	case kb.LevelCluster:
 		// Jump to clusters level.
 		for m.nav.Level > model.LevelClusters {
 			ret, _ := m.navigateParent()
@@ -142,7 +143,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, m.loadPreview(), true
 
-	case "1":
+	case kb.LevelTypes:
 		// Jump to resource types level.
 		if m.nav.Level < model.LevelResourceTypes {
 			return m, nil, true // can't jump forward
@@ -153,7 +154,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, m.loadPreview(), true
 
-	case "2":
+	case kb.LevelResources:
 		// Jump to resources level.
 		if m.nav.Level < model.LevelResources {
 			return m, nil, true
@@ -164,7 +165,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, m.loadPreview(), true
 
-	case "W":
+	case kb.SaveResource:
 		if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "Event" {
 			m.warningEventsOnly = !m.warningEventsOnly
 			// Re-filter the current items.
@@ -189,7 +190,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 			}
 			return m, scheduleStatusClear(), true
 		}
-		// Save resource YAML to file (same as 'S').
+		// Save resource YAML to file (same as Scale key).
 		if m.nav.Level == model.LevelResources || m.nav.Level == model.LevelOwned || m.nav.Level == model.LevelContainers {
 			sel := m.selectedMiddleItem()
 			if sel != nil {
@@ -199,20 +200,20 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, nil, true
 
-	case "J":
+	case kb.PreviewDown:
 		// Scroll preview pane down, clamped to content length.
 		m.previewScroll++
 		m.clampPreviewScroll()
 		return m, nil, true
 
-	case "K":
+	case kb.PreviewUp:
 		// Scroll preview pane up.
 		if m.previewScroll > 0 {
 			m.previewScroll--
 		}
 		return m, nil, true
 
-	case "o":
+	case kb.JumpOwner:
 		// Navigate to owner/controller.
 		sel := m.selectedMiddleItem()
 		if sel == nil {
@@ -243,14 +244,14 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		ret, cmd := m.navigateToOwner(owner.kind, owner.name)
 		return ret, cmd, true
 
-	case ",":
+	case kb.SortCycle:
 		m.sortBy = (m.sortBy + 1) % 3
 		m.sortMiddleItems()
 		m.clampCursor()
 		m.setStatusMessage("Sort: "+m.sortModeName(), false)
 		return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
 
-	case "ctrl+o":
+	case kb.OpenBrowser:
 		// Open ingress host in browser (works when viewing an Ingress resource).
 		kind := m.selectedResourceKind()
 		if kind != "Ingress" {
@@ -265,7 +266,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		ret, cmd := m.executeAction("Open in Browser")
 		return ret, cmd, true
 
-	case "c", "y":
+	case kb.CopyName:
 		// Copy resource name to clipboard.
 		sel := m.selectedMiddleItem()
 		if sel != nil {
@@ -274,7 +275,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, nil, true
 
-	case "C", "ctrl+y":
+	case kb.CopyYAML:
 		// Copy resource YAML to clipboard.
 		sel := m.selectedMiddleItem()
 		if sel != nil {
@@ -282,10 +283,10 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, nil, true
 
-	case "ctrl+p":
+	case kb.PasteApply:
 		return m, m.applyFromClipboard(), true
 
-	case "t":
+	case kb.NewTab:
 		// Create new tab (clone current state, max 9).
 		if len(m.tabs) >= 9 {
 			m.setStatusMessage("Max 9 tabs", true)
@@ -299,7 +300,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.setStatusMessage(fmt.Sprintf("Tab %d created", m.activeTab+1), false)
 		return m, scheduleStatusClear(), true
 
-	case "]":
+	case kb.NextTab:
 		// Next tab.
 		if len(m.tabs) <= 1 {
 			return m, nil, true
@@ -314,7 +315,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, m.loadPreview(), true
 
-	case "[":
+	case kb.PrevTab:
 		// Previous tab.
 		if len(m.tabs) <= 1 {
 			return m, nil, true
@@ -329,7 +330,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, m.loadPreview(), true
 
-	case "a":
+	case kb.CreateTemplate:
 		// Open template creation overlay.
 		// Sort templates so the one matching the current resource kind appears first.
 		templates := model.BuiltinTemplates()
@@ -348,7 +349,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.overlay = overlayTemplates
 		return m, nil, true
 
-	case "e":
+	case kb.SecretEditor:
 		// Open secret editor when a Secret resource is selected.
 		if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "Secret" {
 			sel := m.selectedMiddleItem()
@@ -365,17 +366,17 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, nil, true
 
-	case "I":
+	case kb.APIExplorer:
 		// Open API explain browser (resource structure).
 		ret, cmd := m.openExplainBrowser()
 		return ret, cmd, true
 
-	case "U":
+	case kb.RBACBrowser:
 		// Open RBAC permissions browser (can-i).
 		ret, cmd := m.openCanIBrowser()
 		return ret, cmd, true
 
-	case "i":
+	case kb.LabelEditor:
 		// Open label/annotation editor for any resource (not port forwards).
 		if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind != "__port_forwards__" {
 			sel := m.selectedMiddleItem()
@@ -395,7 +396,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		}
 		return m, nil, true
 
-	case ".":
+	case kb.FilterPresets:
 		// Quick filter presets: toggle or open overlay.
 		if m.nav.Level < model.LevelResources {
 			m.setStatusMessage("Quick filters are only available at resource level", true)
@@ -418,18 +419,7 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.overlay = overlayFilterPreset
 		return m, nil, true
 
-	case "S":
-		// Export resource YAML to file.
-		if m.nav.Level == model.LevelResources || m.nav.Level == model.LevelOwned || m.nav.Level == model.LevelContainers {
-			sel := m.selectedMiddleItem()
-			if sel != nil {
-				m.setStatusMessage("Exporting...", false)
-				return m, m.exportResourceToFile(), true
-			}
-		}
-		return m, nil, true
-
-	case "d":
+	case kb.Diff:
 		// Diff two selected resources side by side.
 		if m.nav.Level < model.LevelResources {
 			m.setStatusMessage("Diff is only available at resource level", true)
@@ -444,13 +434,13 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.setStatusMessage("Loading diff...", false)
 		return m, m.loadDiff(m.nav.ResourceType, selected[0], selected[1]), true
 
-	case "!":
+	case kb.ErrorLog:
 		// Open the error log overlay.
 		m.overlayErrorLog = true
 		m.errorLogScroll = 0
 		return m, nil, true
 
-	case "@":
+	case kb.Monitoring:
 		// Navigate to the Monitoring dashboard item.
 		if m.nav.Level < model.LevelResourceTypes {
 			m.setStatusMessage("Select a cluster first", true)
@@ -469,7 +459,6 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 
 	// Configurable direct action keybindings.
 	key := msg.String()
-	kb := ui.ActiveKeybindings
 	if key == kb.Logs {
 		ret, cmd := m.directActionLogs()
 		return ret, cmd, true

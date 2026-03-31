@@ -42,9 +42,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Tab switching keys work in all fullscreen modes (YAML, Logs, Describe, Diff, Help)
 	// as long as the user is not in a text input sub-mode (search, etc.).
+	kb := ui.ActiveKeybindings
 	if m.mode != modeExplorer && m.mode != modeExec && !m.yamlSearchMode && !m.logSearchActive && !m.helpSearchActive && !m.explainSearchActive {
 		switch msg.String() {
-		case "]":
+		case kb.NextTab:
 			if len(m.tabs) > 1 {
 				m.saveCurrentTab() // save mode + log state BEFORE switching
 				next := (m.activeTab + 1) % len(m.tabs)
@@ -62,7 +63,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-		case "[":
+		case kb.PrevTab:
 			if len(m.tabs) > 1 {
 				m.saveCurrentTab()
 				prev := (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
@@ -80,7 +81,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 				return m, nil
 			}
-		case "t":
+		case kb.NewTab:
 			if m.mode != modeHelp { // 't' is not used as a regular key in fullscreen modes
 				if len(m.tabs) >= 9 {
 					m.setStatusMessage("Max 9 tabs", true)
@@ -142,7 +143,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Clear pending 'g' state if any other key is pressed (vim-style gg).
-	if m.pendingG && msg.String() != "g" {
+	if m.pendingG && msg.String() != kb.JumpTop {
 		m.pendingG = false
 	}
 
@@ -176,7 +177,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 
-	case "T":
+	case kb.ThemeSelector:
 		m.schemeEntries = ui.GroupedSchemeEntries()
 		m.schemeCursor = 0
 		m.schemeFilter.Clear()
@@ -234,7 +235,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.navigateParent()
 
-	case "j", "down":
+	case kb.Down, "down":
 		if m.fullscreenDashboard {
 			m.previewScroll++
 			m.clampPreviewScroll()
@@ -242,7 +243,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.moveCursor(1)
 
-	case "k", "up":
+	case kb.Up, "up":
 		if m.fullscreenDashboard {
 			if m.previewScroll > 0 {
 				m.previewScroll--
@@ -251,7 +252,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.moveCursor(-1)
 
-	case "g":
+	case kb.JumpTop:
 		if m.fullscreenDashboard {
 			if m.pendingG {
 				m.pendingG = false
@@ -271,7 +272,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pendingG = true
 		return m, nil
 
-	case "G":
+	case kb.JumpBottom:
 		if m.fullscreenDashboard {
 			m.previewScroll = 99999 // will be clamped
 			m.clampPreviewScroll()
@@ -284,7 +285,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.syncExpandedGroup()
 		return m, m.loadPreview()
 
-	case "ctrl+@": // ctrl+space: region selection
+	case kb.SelectRange: // ctrl+space: region selection
 		if m.nav.Level < model.LevelResources {
 			return m, nil
 		}
@@ -311,7 +312,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case " ":
+	case kb.ToggleSelect:
 		// Toggle selection on current item and move cursor down.
 		if m.nav.Level >= model.LevelResources {
 			sel := m.selectedMiddleItem()
@@ -338,7 +339,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "ctrl+a":
+	case kb.SelectAll:
 		// Select/deselect all visible items.
 		if m.nav.Level >= model.LevelResources {
 			visible := m.visibleMiddleItems()
@@ -356,7 +357,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "h", "left":
+	case kb.Left, "left":
 		if m.fullscreenDashboard {
 			m.fullscreenDashboard = false
 			m.previewScroll = 0
@@ -365,13 +366,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.navigateParent()
 
-	case "l", "right":
+	case kb.Right, "right":
 		return m.navigateChild()
 
-	case "enter":
+	case kb.Enter:
 		return m.enterFullView()
 
-	case "n":
+	case kb.NextMatch:
 		// Jump to next search match.
 		if m.searchInput.Value != "" {
 			m.jumpToSearchMatch(m.cursor() + 1)
@@ -380,7 +381,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "N":
+	case kb.PrevMatch:
 		// Jump to previous search match.
 		if m.searchInput.Value != "" {
 			m.jumpToPrevSearchMatch(m.cursor() - 1)
@@ -389,7 +390,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "\\":
+	case kb.NamespaceSelector:
 		// Open namespace selector immediately with loading state.
 		m.overlay = overlayNamespace
 		m.overlayFilter.Clear()
@@ -400,10 +401,10 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.nsSelectionModified = false
 		return m, m.loadNamespaces()
 
-	case "x":
+	case kb.ActionMenu:
 		return m.openActionMenu()
 
-	case "w":
+	case kb.WatchMode:
 		m.watchMode = !m.watchMode
 		if m.watchMode {
 			m.setStatusMessage("Watch mode ON (refresh every 2s)", false)
@@ -412,7 +413,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Watch mode OFF", false)
 		return m, scheduleStatusClear()
 
-	case "z":
+	case kb.ExpandCollapse:
 		// Toggle expand/collapse all groups at resource types level.
 		if m.nav.Level == model.LevelResourceTypes {
 			if m.allGroupsExpanded {
@@ -462,7 +463,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "p":
+	case kb.PinGroup:
 		// Pin/unpin CRD group at resource types level.
 		if m.nav.Level == model.LevelResourceTypes {
 			sel := m.selectedMiddleItem()
@@ -488,19 +489,19 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "'":
+	case kb.OpenMarks:
 		// Open bookmarks overlay immediately; slot keys (a-z, 0-9) jump from within the overlay.
 		m.overlay = overlayBookmarks
 		m.overlayCursor = 0
 		m.bookmarkFilter.Clear()
 		return m, nil
 
-	case "m":
+	case kb.SetMark:
 		// Vim-style set mark: wait for slot key.
 		m.pendingMark = true
 		return m, nil
 
-	case "?":
+	case kb.Help:
 		m.helpPreviousMode = modeExplorer
 		m.mode = modeHelp
 		m.helpScroll = 0
@@ -515,7 +516,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "f":
+	case kb.Filter:
 		m.filterActive = true
 		m.filterInput.Clear()
 		m.filterText = ""
@@ -523,13 +524,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.clampCursor()
 		return m, nil
 
-	case "/":
+	case kb.Search:
 		m.searchActive = true
 		m.searchInput.Clear()
 		m.searchPrevCursor = m.cursor()
 		return m, nil
 
-	case ":":
+	case kb.CommandBar:
 		// Open kubectl command bar.
 		m.commandBarActive = true
 		m.commandBarInput.Clear()
@@ -538,12 +539,12 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commandHistory.reset()
 		return m, nil
 
-	case "ctrl+g":
+	case kb.FinalizerSearch:
 		// Open finalizer search overlay.
 		m.openFinalizerSearch()
 		return m, nil
 
-	case "M":
+	case kb.ResourceMap:
 		// Toggle resource relationship map in the right column.
 		if m.nav.Level >= model.LevelResources {
 			m.mapView = !m.mapView
@@ -559,7 +560,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 
-	case "P":
+	case kb.TogglePreview:
 		// No preview toggle on dashboard views.
 		if sel := m.selectedMiddleItem(); sel != nil && m.nav.Level == model.LevelResourceTypes &&
 			(sel.Extra == "__overview__" || sel.Extra == "__monitoring__") {
@@ -577,7 +578,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, tea.Batch(m.loadPreview(), scheduleStatusClear())
 
-	case "F":
+	case kb.Fullscreen:
 		// If standing on Cluster Dashboard or Monitoring, toggle fullscreen dashboard instead.
 		sel := m.selectedMiddleItem()
 		if sel != nil && (sel.Extra == "__overview__" || sel.Extra == "__monitoring__") && m.nav.Level == model.LevelResourceTypes {
@@ -599,7 +600,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, scheduleStatusClear()
 
-	case "ctrl+s":
+	case kb.SecretToggle:
 		// Toggle secret value visibility.
 		m.showSecretValues = !m.showSecretValues
 		if m.showSecretValues {

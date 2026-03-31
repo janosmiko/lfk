@@ -72,7 +72,7 @@ func runTUI() error {
 		return fmt.Errorf("initializing Kubernetes client: %w", err)
 	}
 
-	ui.LoadAndApplyTheme()
+	ui.LoadConfig()
 	model.PinnedGroups = ui.ConfigPinnedGroups
 
 	if err := logger.Init(ui.ConfigLogPath); err != nil {

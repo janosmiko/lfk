@@ -186,13 +186,13 @@ func TestActionKeyCommaCyclesSort(t *testing.T) {
 	assert.Equal(t, sortByAge, result.sortBy)
 }
 
-// --- handleExplorerActionKey: c/y copies resource name ---
+// --- handleExplorerActionKey: y copies resource name ---
 
-func TestActionKeyCCopiesResourceName(t *testing.T) {
+func TestActionKeyYCopiesResourceName(t *testing.T) {
 	m := baseExplorerModel()
 	m.setCursor(0)
 
-	_, cmd, handled := m.handleExplorerActionKey(runeKey('c'))
+	_, cmd, handled := m.handleExplorerActionKey(runeKey('y'))
 	assert.True(t, handled)
 	assert.NotNil(t, cmd)
 }

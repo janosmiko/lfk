@@ -1,6 +1,6 @@
 # Keybindings Reference
 
-Complete list of all keybindings in `lfk`. Keybindings marked with **(configurable)** can be overridden in `~/.config/lfk/config.yaml` under the `keybindings` section.
+Complete list of all keybindings in `lfk`. All keybindings can be overridden in `~/.config/lfk/config.yaml` under the `keybindings` section. Only `esc`, `ctrl+c`, and `q` (quit) are hardcoded.
 
 ## Navigation
 
@@ -59,22 +59,25 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 
 ## Actions
 
-| Key | Action | Configurable |
+| Key | Action | Config key |
 |---|---|---|
-| `x` | Open action menu (bulk actions when items selected) | No |
-| `\` | Open namespace selector | No |
-| `A` | Toggle all-namespaces mode | No |
-| `L` | View logs for selected resource | Yes (`logs`) |
-| `e` | Secret/ConfigMap editor (inline key-value editing) | No |
-| `E` | Edit selected resource in $EDITOR | Yes (`edit`) |
-| `R` | Refresh current view | Yes (`refresh`) |
-| `v` | Describe selected resource (default: `v`) | Yes (`describe`) |
-| `D` | Delete resource (Force Finalize if already deleting) | Yes (`delete`) |
-| `X` | Force delete with grace-period=0 (Pod/Job only) | Yes (`force_delete`) |
-| `S` | Export resource YAML to file | No |
-| `Ctrl+O` | Open ingress host in browser | No |
-| `i` | Edit labels/annotations | No |
-| `a` | Create new resource from template (/ to search) | No |
+| `x` | Open action menu (bulk actions when items selected) | `action_menu` |
+| `\` | Open namespace selector | `namespace_selector` |
+| `A` | Toggle all-namespaces mode | `all_namespaces` |
+| `L` | View logs for selected resource | `logs` |
+| `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
+| `E` | Edit selected resource in $EDITOR | `edit` |
+| `R` | Refresh current view | `refresh` |
+| `r` | Restart resource | `restart` |
+| `s` | Exec into container | `exec` |
+| `v` | Describe selected resource | `describe` |
+| `D` | Delete resource (Force Finalize if already deleting) | `delete` |
+| `X` | Force delete with grace-period=0 (Pod/Job only) | `force_delete` |
+| `S` | Scale / Export resource YAML to file | `scale` / `save_resource` |
+| `Ctrl+O` | Open ingress host in browser | `open_browser` |
+| `i` | Edit labels/annotations | `label_editor` |
+| `a` | Create new resource from template (/ to search) | `create_template` |
+| `d` | Diff two selected resources | `diff` |
 
 Port forwarding is available via the action menu (`x`) on Pod, Service, Deployment, StatefulSet, and DaemonSet resources. After creating a port forward, the view automatically navigates to the Port Forwards list and displays the resolved local port in the status bar. Active port forwards can be managed via the "Port Forwards" virtual resource in the Networking group.
 
@@ -359,19 +362,78 @@ Custom actions defined in the config file appear after the built-in actions.
 
 ## Configuring Keybindings
 
-Add to `~/.config/lfk/config.yaml`:
+All keybindings can be overridden in `~/.config/lfk/config.yaml`. Only specify the keys you want to change — defaults apply for everything else.
 
 ```yaml
 keybindings:
-  logs: "L"           # Default: L
-  refresh: "R"        # Default: R
-  restart: "r"        # Default: r
-  exec: "s"           # Default: s
-  edit: "E"           # Default: E
-  describe: "v"        # Default: v
-  delete: "D"         # Default: D
-  force_delete: "X"   # Default: X
-  scale: "S"          # Default: S
-```
+  # Navigation
+  left: "h"              # Navigate to parent
+  right: "l"             # Navigate into item
+  down: "j"              # Move cursor down
+  up: "k"                # Move cursor up
+  jump_top: "g"          # Jump to top (gg)
+  jump_bottom: "G"       # Jump to bottom
+  page_down: "ctrl+d"    # Half-page down
+  page_up: "ctrl+u"      # Half-page up
+  page_forward: "ctrl+f" # Full-page down
+  page_back: "ctrl+b"    # Full-page up
+  preview_down: "J"      # Scroll preview down
+  preview_up: "K"        # Scroll preview up
+  jump_owner: "o"        # Jump to owner
 
-Only specify the keys you want to change.
+  # Views and Modes
+  help: "?"              # Toggle help
+  filter: "f"            # Filter items
+  search: "/"            # Search and jump
+  toggle_preview: "P"    # Toggle YAML preview
+  resource_map: "M"      # Resource map
+  fullscreen: "F"        # Fullscreen toggle
+  watch_mode: "w"        # Watch mode
+  command_bar: ":"        # Command bar
+  theme_selector: "T"    # Theme selector
+  finalizer_search: "ctrl+g"  # Finalizer search
+  api_explorer: "I"      # API Explorer
+  rbac_browser: "U"      # RBAC browser
+  secret_toggle: "ctrl+s" # Secret visibility
+  error_log: "!"         # Error log
+  sort_cycle: ","        # Cycle sort mode
+  filter_presets: "."    # Quick filter presets
+  monitoring: "@"        # Monitoring dashboard
+  quota_dashboard: "Q"   # Quota dashboard
+
+  # Actions
+  action_menu: "x"       # Action menu
+  namespace_selector: "\\" # Namespace selector
+  all_namespaces: "A"    # Toggle all-namespaces
+  logs: "L"              # View logs
+  refresh: "R"           # Refresh view
+  restart: "r"           # Restart resource
+  exec: "s"              # Exec into container
+  edit: "E"              # Edit in $EDITOR
+  describe: "v"          # Describe resource
+  delete: "D"            # Delete resource
+  force_delete: "X"      # Force delete
+  scale: "S"             # Scale resource
+  label_editor: "i"      # Labels/annotations
+  secret_editor: "e"     # Secret/configmap editor
+  create_template: "a"   # Create from template
+  copy_name: "y"         # Copy name
+  copy_yaml: "ctrl+y"    # Copy YAML
+  paste_apply: "ctrl+p"  # Apply from clipboard
+  open_browser: "ctrl+o" # Open in browser
+  diff: "d"              # Diff resources
+
+  # Multi-selection
+  toggle_select: " "     # Toggle selection (space)
+  select_range: "ctrl+@" # Select range (Ctrl+Space)
+  select_all: "ctrl+a"   # Select all
+
+  # Tabs
+  new_tab: "t"           # New tab
+  next_tab: "]"          # Next tab
+  prev_tab: "["          # Previous tab
+
+  # Bookmarks
+  set_mark: "m"          # Set mark
+  open_marks: "'"        # Open bookmarks
+```

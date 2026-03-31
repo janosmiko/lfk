@@ -175,40 +175,37 @@ func (m Model) statusBar() string {
 	parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
 
 	// Styled key hints -- show a reduced set for dashboard views.
-	var hints []struct{ key, desc string }
+	kb := ui.ActiveKeybindings
+	var hintEntries []ui.HintEntry
 	sel := m.selectedMiddleItem()
 	isDashboard := sel != nil && m.nav.Level == model.LevelResourceTypes &&
 		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__")
 	if isDashboard {
-		hints = []struct{ key, desc string }{
-			{"j/k", "move"},
-			{"ctrl+d/u", "scroll"},
-			{"\\", "namespace"},
-			{"t", "new tab"},
-			{"?", "help"},
-			{"q", "quit"},
+		hintEntries = []ui.HintEntry{
+			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
+			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
+			{Key: kb.NamespaceSelector, Desc: "namespace"},
+			{Key: kb.NewTab, Desc: "new tab"},
+			{Key: kb.Help, Desc: "help"},
+			{Key: "q", Desc: "quit"},
 		}
 	} else {
-		hints = []struct{ key, desc string }{
-			{"h/l", "navigate"},
-			{"j/k", "move"},
-			{"enter", "view"},
-			{"\\", "namespace"},
-			{"A", "all-ns"},
-			{"x", "actions"},
-			{"a", "create"},
-			{",", "sort"},
-			{"f", "filter"},
-			{"m/'", "marks"},
-			{"?", "help"},
-			{"q", "quit"},
+		hintEntries = []ui.HintEntry{
+			{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
+			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
+			{Key: kb.Enter, Desc: "view"},
+			{Key: kb.NamespaceSelector, Desc: "namespace"},
+			{Key: kb.AllNamespaces, Desc: "all-ns"},
+			{Key: kb.ActionMenu, Desc: "actions"},
+			{Key: kb.CreateTemplate, Desc: "create"},
+			{Key: kb.SortCycle, Desc: "sort"},
+			{Key: kb.Filter, Desc: "filter"},
+			{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
+			{Key: kb.Help, Desc: "help"},
+			{Key: "q", Desc: "quit"},
 		}
 	}
-	hintParts := make([]string, 0, len(hints))
-	for _, h := range hints {
-		hintParts = append(hintParts, ui.HelpKeyStyle.Render(h.key)+ui.BarDimStyle.Render(": "+h.desc))
-	}
-	parts = append(parts, strings.Join(hintParts, ui.BarDimStyle.Render(" \u2502 ")))
+	parts = append(parts, ui.FormatHintParts(hintEntries))
 
 	content := strings.Join(parts, "  ")
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
