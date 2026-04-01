@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // --- leftColumnHeader ---
@@ -189,18 +190,21 @@ func TestStatusBarShowsFilterCount(t *testing.T) {
 }
 
 func TestStatusBarShowsSortMode(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
 	m := Model{
-		nav:           model.NavigationState{Level: model.LevelResources},
-		middleItems:   []model.Item{{Name: "pod"}},
-		sortBy:        sortByAge,
-		width:         120,
-		height:        40,
-		tabs:          []TabState{{}},
-		selectedItems: make(map[string]bool),
+		nav:            model.NavigationState{Level: model.LevelResources},
+		middleItems:    []model.Item{{Name: "pod"}},
+		sortColumnName: "Age",
+		sortAscending:  true,
+		width:          120,
+		height:         40,
+		tabs:           []TabState{{}},
+		selectedItems:  make(map[string]bool),
 	}
 	bar := m.statusBar()
 	stripped := stripANSI(bar)
-	assert.Contains(t, stripped, "sort:age")
+	assert.Contains(t, stripped, "sort:Age")
 }
 
 func TestStatusBarShowsSelectionCount(t *testing.T) {

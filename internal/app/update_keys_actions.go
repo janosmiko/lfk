@@ -244,8 +244,40 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		ret, cmd := m.navigateToOwner(owner.kind, owner.name)
 		return ret, cmd, true
 
-	case kb.SortCycle:
-		m.sortBy = (m.sortBy + 1) % 3
+	case kb.SortNext:
+		colCount := ui.ActiveSortableColumnCount
+		if colCount > 0 {
+			idx := sortColumnIndex(m.sortColumnName)
+			idx = (idx + 1) % colCount
+			m.sortColumnName = ui.ActiveSortableColumns[idx]
+		}
+		m.sortMiddleItems()
+		m.clampCursor()
+		m.setStatusMessage("Sort: "+m.sortModeName(), false)
+		return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
+
+	case kb.SortPrev:
+		colCount := ui.ActiveSortableColumnCount
+		if colCount > 0 {
+			idx := sortColumnIndex(m.sortColumnName)
+			idx = (idx - 1 + colCount) % colCount
+			m.sortColumnName = ui.ActiveSortableColumns[idx]
+		}
+		m.sortMiddleItems()
+		m.clampCursor()
+		m.setStatusMessage("Sort: "+m.sortModeName(), false)
+		return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
+
+	case kb.SortFlip:
+		m.sortAscending = !m.sortAscending
+		m.sortMiddleItems()
+		m.clampCursor()
+		m.setStatusMessage("Sort: "+m.sortModeName(), false)
+		return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
+
+	case kb.SortReset:
+		m.sortColumnName = sortColDefault
+		m.sortAscending = true
 		m.sortMiddleItems()
 		m.clampCursor()
 		m.setStatusMessage("Sort: "+m.sortModeName(), false)

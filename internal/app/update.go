@@ -210,7 +210,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 		m.middleItems = msg.items
 		m.itemCache[m.navKey()] = m.middleItems
-		if m.sortBy != sortByName {
+		if m.sortColumnName != sortColDefault || !m.sortAscending {
 			m.sortMiddleItems()
 		}
 		// Auto-filter events to warnings-only when enabled.

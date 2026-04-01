@@ -320,6 +320,22 @@ func (m Model) overlayHintBar() string {
 			{Key: "esc", Desc: "cancel"},
 		})
 
+	case overlayColumnToggle:
+		if m.columnToggleFilterActive {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "type", Desc: "filter"},
+				{Key: "esc", Desc: "clear/close"},
+			})
+		}
+		return m.renderHints([]ui.HintEntry{
+			{Key: "space", Desc: "toggle"},
+			{Key: "J/K", Desc: "reorder"},
+			{Key: "enter", Desc: "apply"},
+			{Key: "R", Desc: "reset"},
+			{Key: "/", Desc: "filter"},
+			{Key: "esc", Desc: "close"},
+		})
+
 	case overlayExplainSearch:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "enter", Desc: "navigate"},

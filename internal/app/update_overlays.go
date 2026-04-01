@@ -82,6 +82,8 @@ func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLogContainerSelectOverlayKey(msg)
 	case overlayFinalizerSearch:
 		return m.handleFinalizerSearchKey(msg)
+	case overlayColumnToggle:
+		return m.handleColumnToggleKey(msg)
 	}
 	return m, nil
 }

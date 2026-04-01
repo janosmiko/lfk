@@ -12,6 +12,37 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// sortIndicatorForColumn returns a sort direction indicator (" ▲" or " ▼") if
+// the given column name matches the currently sorted column, or "" otherwise.
+// sortIndicatorForColumn returns "↑" or "↓" if the given column is sorted, or "".
+func sortIndicatorForColumn(colName string) string {
+	if ActiveSortColumnName == colName {
+		if ActiveSortAscending {
+			return "\u2191" // ↑
+		}
+		return "\u2193" // ↓
+	}
+	return ""
+}
+
+// headerWithIndicator returns a column header string that fits within colWidth,
+// with the sort indicator placed at the end using the column's padding space.
+func headerWithIndicator(label string, colName string, colWidth int) string {
+	ind := sortIndicatorForColumn(colName)
+	if ind == "" {
+		return padRight(label, colWidth)
+	}
+	// Truncate label to make room for the indicator.
+	maxLabel := colWidth - 2 // space + indicator
+	if maxLabel < 1 {
+		maxLabel = 1
+	}
+	if len(label) > maxLabel {
+		label = label[:maxLabel]
+	}
+	return padRight(label+" "+ind, colWidth)
+}
+
 // formatTableRow builds a plain text table row.
 // Column widths include padding space; truncation reserves 1 char for the gap
 // so truncated text never touches the next column.
@@ -129,6 +160,28 @@ type extraColumn struct {
 	hasArrow bool   // true if any value in this column has a trend arrow
 }
 
+// ExtraColumnInfo is an exported representation of an extra column for use by
+// the app layer (e.g., header click handling).
+type ExtraColumnInfo struct {
+	Key   string
+	Width int
+}
+
+// CollectExtraColumns is an exported wrapper around collectExtraColumns.
+// It returns the extra columns as ExtraColumnInfo for use outside the ui package.
+func CollectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind string) []ExtraColumnInfo {
+	cols := collectExtraColumns(items, totalWidth, usedWidth, kind)
+	result := make([]ExtraColumnInfo, len(cols))
+	for i, c := range cols {
+		result[i] = ExtraColumnInfo{Key: c.key, Width: c.width}
+	}
+	return result
+}
+
+// ActiveSessionColumns holds the session-only column override for the current
+// resource type. Set by the app before rendering. Nil means no override.
+var ActiveSessionColumns []string
+
 // collectExtraColumns discovers which extra columns to show based on item data and config.
 // usedWidth is the width already consumed by fixed columns (excluding name).
 // kind is the resource Kind (e.g. "Pod") used to resolve per-type column overrides.
@@ -166,10 +219,16 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	}
 
 	// Determine which columns to include based on config.
-	// Per-resource-type columns take precedence over global columns.
-	configCols := ColumnsForKind(kind)
+	// Session override takes highest priority, then per-resource-type config.
+	configCols := ColumnsForKind(kind, ActiveContext)
 	var candidates []string
 	switch {
+	case len(ActiveSessionColumns) > 0:
+		for _, key := range ActiveSessionColumns {
+			if _, ok := seen[key]; ok {
+				candidates = append(candidates, key)
+			}
+		}
 	case len(configCols) > 0:
 		if len(configCols) == 1 && configCols[0] == "*" {
 			candidates = order
@@ -325,20 +384,13 @@ func formatTableRowWithExtra(name, ns, ready, restarts, status, age string,
 	row := formatTableRow(name, ns, ready, restarts, status,
 		nameW, nsW, readyW, restartsW, statusW, hasNs, hasReady, hasRestarts, hasStatus)
 
-	for ecIdx, ec := range extraCols {
+	for _, ec := range extraCols {
 		var val string
 		if item == nil {
-			// Header row: use uppercased key as header.
-			val = strings.ToUpper(ec.key)
+			// Header row: use uppercased key as header with sort indicator.
+			val = strings.ToUpper(ec.key) + sortIndicatorForColumn(ec.key)
 		} else {
 			val = getExtraColumnValue(item, ec.key)
-		}
-		// For the last extra column, use simple rune-slice truncation (no "~" marker)
-		// since wrapped content continues on subsequent lines.
-		isLast := item != nil && ecIdx == len(extraCols)-1
-		truncFn := Truncate
-		if isLast {
-			truncFn = truncateNoMarker
 		}
 		// Handle arrow values the same way as the styled path:
 		// strip the arrow prefix and render it as a separate character,
@@ -347,12 +399,12 @@ func formatTableRowWithExtra(name, ns, ready, restarts, status, age string,
 		case strings.HasPrefix(val, "↑ ") || strings.HasPrefix(val, "↓ "):
 			arrow := string([]rune(val)[0])
 			baseVal := val[len("↑ "):]
-			row += arrow + padRight(truncFn(baseVal, ec.width-2), ec.width-1)
+			row += arrow + padRight(Truncate(baseVal, ec.width-2), ec.width-1)
 		case ec.hasArrow:
 			// Placeholder space to align with rows that have arrows.
-			row += " " + padRight(truncFn(val, ec.width-2), ec.width-1)
+			row += " " + padRight(Truncate(val, ec.width-2), ec.width-1)
 		default:
-			row += padRight(truncFn(val, ec.width-1), ec.width)
+			row += padRight(Truncate(val, ec.width-1), ec.width)
 		}
 	}
 
@@ -372,32 +424,24 @@ func formatTableRowStyledWithExtra(item model.Item, nameW, nsW, readyW, restarts
 	base := formatTableRowStyled(item, nameW, nsW, readyW, restartsW, statusW,
 		hasNs, hasReady, hasRestarts, hasStatus, anyRecentRestart)
 
-	for ecIdx, ec := range extraCols {
+	for _, ec := range extraCols {
 		val := getExtraColumnValue(&item, ec.key)
 		style := resourceColumnStyle(ec.key, val)
-
-		// For the last extra column, use simple rune-slice truncation (no "~" marker)
-		// since wrapped content continues on subsequent lines.
-		isLast := ecIdx == len(extraCols)-1
-		truncFn := Truncate
-		if isLast {
-			truncFn = truncateNoMarker
-		}
 
 		// Color trend arrows in metric values (arrows before value).
 		// Use a space placeholder for rows without arrows to keep values aligned.
 		switch {
 		case strings.HasPrefix(val, "↑ "):
 			baseVal := val[len("↑ "):]
-			base += ErrorStyle.Render("↑") + style.Render(padRight(truncFn(baseVal, ec.width-2), ec.width-1))
+			base += ErrorStyle.Render("↑") + style.Render(padRight(Truncate(baseVal, ec.width-2), ec.width-1))
 		case strings.HasPrefix(val, "↓ "):
 			baseVal := val[len("↓ "):]
-			base += StatusRunning.Render("↓") + style.Render(padRight(truncFn(baseVal, ec.width-2), ec.width-1))
+			base += StatusRunning.Render("↓") + style.Render(padRight(Truncate(baseVal, ec.width-2), ec.width-1))
 		case ec.hasArrow:
 			// Placeholder space to align with rows that have arrows.
-			base += NormalStyle.Render(" ") + style.Render(padRight(truncFn(val, ec.width-2), ec.width-1))
+			base += NormalStyle.Render(" ") + style.Render(padRight(Truncate(val, ec.width-2), ec.width-1))
 		default:
-			base += style.Render(padRight(truncFn(val, ec.width-1), ec.width))
+			base += style.Render(padRight(Truncate(val, ec.width-1), ec.width))
 		}
 	}
 

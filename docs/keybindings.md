@@ -37,7 +37,8 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `U` | RBAC permissions browser (can-i) |
 | `M` | Toggle resource relationship map view |
 | `w` | Toggle watch mode (auto-refresh every 2s) |
-| `,` | Cycle sort mode (name / age / status) |
+| `,` | Column visibility toggle (show/hide and reorder columns) |
+| `>` / `<` | Next / previous sort mode (name / age / status) |
 | `W` | Save resource to file / toggle warnings-only filter (Events view) |
 | `T` | Switch color scheme (live preview, not persisted) |
 | `Ctrl+G` | Finalizer search and remove |
@@ -396,7 +397,9 @@ keybindings:
   rbac_browser: "U"      # RBAC browser
   secret_toggle: "ctrl+s" # Secret visibility
   error_log: "!"         # Error log
-  sort_cycle: ","        # Cycle sort mode
+  column_toggle: ","     # Column visibility toggle
+  sort_next: ">"         # Next sort mode
+  sort_prev: "<"         # Previous sort mode
   filter_presets: "."    # Quick filter presets
   monitoring: "@"        # Monitoring dashboard
   quota_dashboard: "Q"   # Quota dashboard

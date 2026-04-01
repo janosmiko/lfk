@@ -67,6 +67,19 @@ resource_columns:
   # Service: ["*"]  # show all for Services
   # StatefulSet: ["Replicas"]
 
+# ─── Per-Cluster Overrides ─────────────────────────────────────────────────────
+# Override settings per kubeconfig context name.
+# Currently supports per-cluster resource_columns (same format as global).
+# Per-cluster columns take precedence over the global resource_columns setting.
+clusters:
+  # my-prod-cluster:
+  #   resource_columns:
+  #     Pod: ["IP", "Node", "Image", "CPU", "MEM"]
+  #     Deployment: ["Replicas", "Available"]
+  # my-staging-cluster:
+  #   resource_columns:
+  #     Pod: ["IP", "Node", "Image"]
+
 # ─── Theme ─────────────────────────────────────────────────────────────────────
 # Custom color theme. All values are CSS hex color codes.
 # Only specify colors you want to override; others keep colorscheme defaults.

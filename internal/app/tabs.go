@@ -75,40 +75,106 @@ func (m *Model) effectiveNamespace() string {
 	return m.namespace
 }
 
-// sortMiddleItems sorts middleItems based on the current sort mode.
+// sortMiddleItems sorts middleItems based on the current sort column and direction.
 // At LevelResourceTypes and LevelClusters, items keep their original ordering.
 func (m *Model) sortMiddleItems() {
 	if m.nav.Level == model.LevelResourceTypes || m.nav.Level == model.LevelClusters {
 		return
 	}
-	switch m.sortBy {
-	case sortByName:
-		sort.Slice(m.middleItems, func(i, j int) bool {
-			return m.middleItems[i].Name < m.middleItems[j].Name
-		})
-	case sortByAge:
-		sort.Slice(m.middleItems, func(i, j int) bool {
-			if m.middleItems[i].CreatedAt.IsZero() && m.middleItems[j].CreatedAt.IsZero() {
-				return m.middleItems[i].Name < m.middleItems[j].Name
-			}
-			if m.middleItems[i].CreatedAt.IsZero() {
-				return false
-			}
-			if m.middleItems[j].CreatedAt.IsZero() {
-				return true
-			}
-			return m.middleItems[i].CreatedAt.After(m.middleItems[j].CreatedAt)
-		})
-	case sortByStatus:
-		sort.Slice(m.middleItems, func(i, j int) bool {
-			pi := statusPriority(m.middleItems[i].Status)
-			pj := statusPriority(m.middleItems[j].Status)
-			if pi != pj {
-				return pi < pj
-			}
-			return m.middleItems[i].Name < m.middleItems[j].Name
-		})
+
+	cols := ui.ActiveSortableColumns
+	if len(cols) == 0 {
+		return
 	}
+
+	colName := m.sortColumnName
+	asc := m.sortAscending
+
+	sort.SliceStable(m.middleItems, func(i, j int) bool {
+		a, b := m.middleItems[i], m.middleItems[j]
+		var less bool
+		switch colName {
+		case "Name":
+			less = strings.ToLower(a.Name) < strings.ToLower(b.Name)
+		case "Namespace":
+			less = strings.ToLower(a.Namespace) < strings.ToLower(b.Namespace)
+		case "Ready":
+			less = compareReady(a.Ready, b.Ready)
+		case "Restarts":
+			less = compareNumeric(a.Restarts, b.Restarts)
+		case "Status":
+			pa, pb := statusPriority(a.Status), statusPriority(b.Status)
+			if pa != pb {
+				less = pa < pb
+			} else {
+				less = strings.ToLower(a.Name) < strings.ToLower(b.Name)
+			}
+		case "Age":
+			if a.CreatedAt.IsZero() && b.CreatedAt.IsZero() {
+				less = a.Name < b.Name
+			} else if a.CreatedAt.IsZero() {
+				less = false
+			} else if b.CreatedAt.IsZero() {
+				less = true
+			} else {
+				less = a.CreatedAt.After(b.CreatedAt) // newest first is "ascending" for age
+			}
+		default:
+			// Extra column: compare values as strings, with numeric awareness for CPU/MEM.
+			va := getColumnValue(a, colName)
+			vb := getColumnValue(b, colName)
+			if colName == "CPU" || colName == "MEM" || colName == "CPU/R" || colName == "CPU/L" || colName == "MEM/R" || colName == "MEM/L" {
+				less = compareResourceValues(va, vb, colName)
+			} else {
+				less = strings.ToLower(va) < strings.ToLower(vb)
+			}
+		}
+		if !asc {
+			return !less
+		}
+		return less
+	})
+}
+
+func compareReady(a, b string) bool {
+	ra := parseReadyRatio(a)
+	rb := parseReadyRatio(b)
+	return ra < rb
+}
+
+func parseReadyRatio(s string) float64 {
+	parts := strings.SplitN(s, "/", 2)
+	if len(parts) != 2 {
+		return 0
+	}
+	num, _ := strconv.ParseFloat(parts[0], 64)
+	den, _ := strconv.ParseFloat(parts[1], 64)
+	if den == 0 {
+		return 0
+	}
+	return num / den
+}
+
+func compareNumeric(a, b string) bool {
+	na, _ := strconv.Atoi(strings.TrimSpace(a))
+	nb, _ := strconv.Atoi(strings.TrimSpace(b))
+	return na < nb
+}
+
+func compareResourceValues(a, b, col string) bool {
+	isCPU := strings.HasPrefix(col, "CPU")
+	va := ui.ParseResourceValue(a, isCPU)
+	vb := ui.ParseResourceValue(b, isCPU)
+	return va < vb
+}
+
+func getColumnValue(item model.Item, key string) string {
+	for _, kv := range item.Columns {
+		if kv.Key == key {
+			return kv.Value
+		}
+	}
+	return ""
 }
 
 // statusPriority returns a sort priority for a status string.
@@ -126,17 +192,16 @@ func statusPriority(status string) int {
 	}
 }
 
-// sortModeName returns a display name for the current sort mode.
+// sortModeName returns a display name for the current sort column with direction indicator.
 func (m *Model) sortModeName() string {
-	switch m.sortBy {
-	case sortByName:
-		return "name"
-	case sortByAge:
-		return "age"
-	case sortByStatus:
-		return "status"
+	if m.sortColumnName != "" {
+		dir := "\u2191" // ↑
+		if !m.sortAscending {
+			dir = "\u2193" // ↓
+		}
+		return m.sortColumnName + " " + dir
 	}
-	return "name"
+	return "Name \u2191"
 }
 
 // sanitizeError strips newlines and truncates an error message for status bar display.
@@ -388,7 +453,8 @@ func (m *Model) saveCurrentTab() {
 	t.namespace = m.namespace
 	t.allNamespaces = m.allNamespaces
 	t.selectedNamespaces = copyMapStringBool(m.selectedNamespaces)
-	t.sortBy = m.sortBy
+	t.sortColumnName = m.sortColumnName
+	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
 	t.watchMode = m.watchMode
 	t.requestGen = m.requestGen
@@ -485,7 +551,8 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.namespace = t.namespace
 	m.allNamespaces = t.allNamespaces
 	m.selectedNamespaces = copyMapStringBool(t.selectedNamespaces)
-	m.sortBy = t.sortBy
+	m.sortColumnName = t.sortColumnName
+	m.sortAscending = t.sortAscending
 	m.filterText = t.filterText
 	m.watchMode = t.watchMode
 	m.requestGen = t.requestGen
@@ -618,7 +685,8 @@ func (m *Model) cloneCurrentTab() TabState {
 		namespace:           m.namespace,
 		allNamespaces:       m.allNamespaces,
 		selectedNamespaces:  copyMapStringBool(m.selectedNamespaces),
-		sortBy:              m.sortBy,
+		sortColumnName:      m.sortColumnName,
+		sortAscending:       m.sortAscending,
 		filterText:          m.filterText,
 		watchMode:           m.watchMode,
 		requestGen:          m.requestGen,

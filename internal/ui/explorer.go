@@ -16,6 +16,14 @@ var ActiveHighlightQuery string
 // In fullscreen mode, more columns (IP, Node, etc.) are shown.
 var ActiveFullscreenMode bool
 
+// ActiveContext is set by the app to the current cluster context name.
+// Used by collectExtraColumns for per-cluster column config lookups.
+var ActiveContext string
+
+// ActiveExtraColumnKeys holds the keys of the extra columns currently displayed
+// in the middle column table. Set during RenderTable for the column toggle overlay.
+var ActiveExtraColumnKeys []string
+
 // ActiveCollapsedCategories is set by the app before rendering the resource types
 // column. Keys are category names; presence means the category is collapsed.
 var ActiveCollapsedCategories map[string]bool
@@ -35,6 +43,24 @@ var ActiveLeftScroll int
 // the line is non-clickable (separator or category header). Built during
 // middle column rendering for use by mouse click handling.
 var ActiveMiddleLineMap []int
+
+// ActiveSortColumn is the currently sorted column index (visual order).
+// Derived from ActiveSortColumnName during RenderTable.
+var ActiveSortColumn int
+
+// ActiveSortColumnName is the name of the currently sorted column.
+// Set by the app layer before rendering.
+var ActiveSortColumnName string
+
+// ActiveSortAscending is true for ascending sort.
+var ActiveSortAscending = true
+
+// ActiveSortableColumns holds the names of all sortable columns in visual order.
+// Set during RenderTable. Used by the app layer for sort cycling.
+var ActiveSortableColumns []string
+
+// ActiveSortableColumnCount is len(ActiveSortableColumns).
+var ActiveSortableColumnCount int
 
 // VimScrollOff computes the viewport start position using vim-style scrolloff.
 // It takes the current scroll position and adjusts it only when the cursor

@@ -53,6 +53,7 @@ var startupTips = []string{
 	"Press Ctrl+Y to copy full resource YAML, Ctrl+P to paste and create",
 	"Configure custom actions per resource type in ~/.config/lfk/config.yaml",
 	"Press Ctrl+G to search and remove finalizers across resources",
+	"Press , to show/hide and reorder columns in the resource list",
 	"Disable tips with 'tips: false' in ~/.config/lfk/config.yaml",
 }
 

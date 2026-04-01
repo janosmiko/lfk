@@ -458,8 +458,7 @@ func FormatItemNameOnlyPlain(item model.Item, width int) string {
 }
 
 // wrapExtraValue splits a value into continuation-line chunks of the given width.
-// It returns only the continuation lines (chunks after the first), since the first
-// chunk is already rendered by the normal row. Returns nil if no wrapping is needed.
+// Retained for test compatibility. No longer called by production code.
 func wrapExtraValue(val string, width int) []string {
 	if width <= 0 {
 		return nil
@@ -479,24 +478,10 @@ func wrapExtraValue(val string, width int) []string {
 	return lines
 }
 
-// itemExtraLines returns how many continuation lines an item needs for wrapping the last extra column.
-func itemExtraLines(item *model.Item, extraCols []extraColumn) int {
-	if len(extraCols) == 0 || item == nil {
-		return 0
-	}
-	lastCol := extraCols[len(extraCols)-1]
-	val := getExtraColumnValue(item, lastCol.key)
-	wrapWidth := lastCol.width - 1 // account for spacing
-	if wrapWidth <= 0 {
-		return 0
-	}
-	runes := []rune(val)
-	if len(runes) <= wrapWidth {
-		return 0
-	}
-	// Number of continuation lines (total lines minus the first one).
-	totalLines := (len(runes) + wrapWidth - 1) / wrapWidth
-	return totalLines - 1
+// itemExtraLines returns how many continuation lines an item needs.
+// Line wrapping has been removed; every row is exactly one line.
+func itemExtraLines(_ *model.Item, _ []extraColumn) int {
+	return 0
 }
 
 // RenderTable renders items in a table format with column headers for resource views.
@@ -623,6 +608,46 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	}
 	extraCols := collectExtraColumns(items, width, nsW+readyW+restartsW+ageW+statusW+markerColW, tableKind)
 
+	// Populate ActiveExtraColumnKeys for the column toggle overlay.
+	ActiveExtraColumnKeys = ActiveExtraColumnKeys[:0]
+	for _, ec := range extraCols {
+		ActiveExtraColumnKeys = append(ActiveExtraColumnKeys, ec.key)
+	}
+
+	// Build sortable column list only for the middle column (not children/right column).
+	// ActiveMiddleScroll >= 0 indicates this is the active middle column render.
+	if ActiveMiddleScroll >= 0 {
+		ActiveSortableColumns = ActiveSortableColumns[:0]
+		if hasNs {
+			ActiveSortableColumns = append(ActiveSortableColumns, "Namespace")
+		}
+		ActiveSortableColumns = append(ActiveSortableColumns, "Name")
+		if hasReady {
+			ActiveSortableColumns = append(ActiveSortableColumns, "Ready")
+		}
+		if hasRestarts {
+			ActiveSortableColumns = append(ActiveSortableColumns, "Restarts")
+		}
+		if hasStatus {
+			ActiveSortableColumns = append(ActiveSortableColumns, "Status")
+		}
+		for _, ec := range extraCols {
+			ActiveSortableColumns = append(ActiveSortableColumns, ec.key)
+		}
+		if hasAge {
+			ActiveSortableColumns = append(ActiveSortableColumns, "Age")
+		}
+		ActiveSortableColumnCount = len(ActiveSortableColumns)
+		// Derive ActiveSortColumn index from the name now that columns are built.
+		ActiveSortColumn = 0
+		for i, col := range ActiveSortableColumns {
+			if col == ActiveSortColumnName {
+				ActiveSortColumn = i
+				break
+			}
+		}
+	}
+
 	// Calculate total extra column width.
 	extraTotalW := 0
 	for _, ec := range extraCols {
@@ -635,17 +660,42 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		nameW = 10
 	}
 
-	// Render header.
+	// Render header with sort indicators fitted within column widths.
 	if headerLabel == "" {
 		headerLabel = "NAME"
 	}
-	hdrMarker := ""
+	nameHeader := headerWithIndicator(headerLabel, "Name", nameW)
+	nsHeader := headerWithIndicator("NAMESPACE", "Namespace", nsW)
+	readyHeader := headerWithIndicator("READY", "Ready", readyW)
+	rsHeader := headerWithIndicator("RS", "Restarts", restartsW)
+	statusHeader := headerWithIndicator("STATUS", "Status", statusW)
+	ageHeader := headerWithIndicator("AGE", "Age", ageW)
+
+	// Build header row directly with sort indicators fitted within column widths.
+	var hdrParts []string
 	if wantMarker {
-		hdrMarker = "  "
+		hdrParts = append(hdrParts, "  ")
 	}
-	hdr := hdrMarker + formatTableRowWithExtra(headerLabel, "NAMESPACE", "READY", "RS", "STATUS", "AGE",
-		nameW, nsW, readyW, restartsW, statusW, ageW, hasNs, hasReady, hasRestarts, hasStatus, hasAge,
-		extraCols, nil)
+	if hasNs {
+		hdrParts = append(hdrParts, nsHeader)
+	}
+	hdrParts = append(hdrParts, nameHeader)
+	if hasReady {
+		hdrParts = append(hdrParts, readyHeader)
+	}
+	if hasRestarts {
+		hdrParts = append(hdrParts, rsHeader)
+	}
+	if hasStatus {
+		hdrParts = append(hdrParts, statusHeader)
+	}
+	for _, ec := range extraCols {
+		hdrParts = append(hdrParts, headerWithIndicator(strings.ToUpper(ec.key), ec.key, ec.width))
+	}
+	if hasAge {
+		hdrParts = append(hdrParts, ageHeader)
+	}
+	hdr := strings.Join(hdrParts, "")
 	b.WriteString(DimStyle.Bold(true).Render(Truncate(hdr, width)))
 	height-- // header takes one line
 
@@ -685,13 +735,9 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		return n
 	}
 
-	// Display lines for a range of items (each item = 1 line + category headers + wrap lines).
+	// Display lines for a range of items (each item = 1 line + category headers).
 	tableDisplayLines := func(from, to int) int {
-		base := (to - from) + categoryLines(from, to)
-		for i := from; i < to && i < len(items); i++ {
-			base += itemExtraLines(&items[i], extraCols)
-		}
-		return base
+		return (to - from) + categoryLines(from, to)
 	}
 
 	// Scrolling: use vim-style scrolloff for stable viewport.
@@ -743,11 +789,10 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				extraLines++ // separator line (not shown for first visible item)
 			}
 		}
-		wrapLines := itemExtraLines(&items[endIdx], extraCols)
-		if usedLines+1+extraLines+wrapLines > height {
+		if usedLines+1+extraLines > height {
 			break
 		}
-		usedLines += 1 + extraLines + wrapLines
+		usedLines += 1 + extraLines
 		endIdx++
 	}
 
@@ -763,10 +808,6 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				ActiveMiddleLineMap = append(ActiveMiddleLineMap, -1) // category header
 			}
 			ActiveMiddleLineMap = append(ActiveMiddleLineMap, i) // item line
-			extra := itemExtraLines(&items[i], extraCols)
-			for range extra {
-				ActiveMiddleLineMap = append(ActiveMiddleLineMap, i) // wrap continuation
-			}
 		}
 	}
 
@@ -845,40 +886,6 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols, anyRecentRestart))
 		}
 
-		// Emit continuation lines for wrapped last extra column.
-		if len(extraCols) > 0 {
-			lastCol := extraCols[len(extraCols)-1]
-			val := getExtraColumnValue(&item, lastCol.key)
-			wrapWidth := lastCol.width - 1
-			if wrapWidth > 0 {
-				contLines := wrapExtraValue(val, wrapWidth)
-				if len(contLines) > 0 {
-					// Calculate padding offset to align with the last extra column.
-					padOffset := nsW + nameW + readyW + restartsW + statusW
-					if wantMarker {
-						padOffset += markerColW
-					}
-					for j := range len(extraCols) - 1 {
-						padOffset += extraCols[j].width
-					}
-					padding := strings.Repeat(" ", padOffset)
-
-					for _, chunk := range contLines {
-						contLine := padding + chunk
-						b.WriteString("\n")
-						if i == cursor {
-							lineW := lipgloss.Width(contLine)
-							if lineW < width {
-								contLine += strings.Repeat(" ", width-lineW)
-							}
-							b.WriteString(SelectedStyle.MaxWidth(width).Render(contLine))
-						} else {
-							b.WriteString(DimStyle.Render(contLine))
-						}
-					}
-				}
-			}
-		}
 	}
 	return b.String()
 }

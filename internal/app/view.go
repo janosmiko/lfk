@@ -133,8 +133,21 @@ func (m Model) viewExplorer() string {
 	// Set secret values visibility for rendering.
 	ui.ActiveShowSecretValues = m.showSecretValues
 
-	// Set fullscreen mode for column visibility.
+	// Set fullscreen mode and context for column visibility.
 	ui.ActiveFullscreenMode = m.fullscreenMiddle
+	ui.ActiveContext = m.nav.Context
+
+	// Set sort state for column header indicators.
+	ui.ActiveSortColumnName = m.sortColumnName
+	ui.ActiveSortAscending = m.sortAscending
+
+	// Set session column override for the current resource type.
+	kind := strings.ToLower(m.nav.ResourceType.Kind)
+	if sessionCols, ok := m.sessionColumns[kind]; ok {
+		ui.ActiveSessionColumns = sessionCols
+	} else {
+		ui.ActiveSessionColumns = nil
+	}
 
 	// Set selection state for rendering.
 	ui.ActiveSelectedItems = m.selectedItems
@@ -211,6 +224,8 @@ func (m Model) viewExplorer() string {
 	default:
 		middleCol = ui.RenderColumn(middleHeader, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, true, m.loading, m.spinner.View(), middleErrMsg)
 	}
+	// Clear sort indicator so it doesn't appear in right column (children) tables.
+	ui.ActiveSortColumnName = ""
 	middleCol = ui.PadToHeight(middleCol, contentHeight)
 	middleCol = ui.FillLinesBg(middleCol, middleInner, ui.BaseBg)
 	middle := ui.ActiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(middleCol)

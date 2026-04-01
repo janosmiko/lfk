@@ -544,6 +544,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.openFinalizerSearch()
 		return m, nil
 
+	case kb.ColumnToggle:
+		// Open column toggle overlay.
+		if m.nav.Level >= model.LevelResources {
+			m.openColumnToggle()
+		}
+		return m, nil
+
 	case kb.ResourceMap:
 		// Toggle resource relationship map in the right column.
 		if m.nav.Level >= model.LevelResources {

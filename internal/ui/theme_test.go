@@ -124,45 +124,45 @@ func TestColumnsForKind(t *testing.T) {
 
 	t.Run("returns nil when nothing configured", func(t *testing.T) {
 		ConfigResourceColumns = nil
-		assert.Nil(t, ColumnsForKind("Pod"))
-		assert.Nil(t, ColumnsForKind(""))
+		assert.Nil(t, ColumnsForKind("Pod", ""))
+		assert.Nil(t, ColumnsForKind("", ""))
 	})
 
 	t.Run("returns nil for unconfigured kind", func(t *testing.T) {
 		ConfigResourceColumns = map[string][]string{
 			"pod": {"IP", "Node", "Image"},
 		}
-		assert.Nil(t, ColumnsForKind("Deployment"))
+		assert.Nil(t, ColumnsForKind("Deployment", ""))
 	})
 
 	t.Run("returns columns for configured kind", func(t *testing.T) {
 		ConfigResourceColumns = map[string][]string{
 			"pod": {"IP", "Node", "Image"},
 		}
-		assert.Equal(t, []string{"IP", "Node", "Image"}, ColumnsForKind("Pod"))
+		assert.Equal(t, []string{"IP", "Node", "Image"}, ColumnsForKind("Pod", ""))
 	})
 
 	t.Run("kind lookup is case-insensitive", func(t *testing.T) {
 		ConfigResourceColumns = map[string][]string{
 			"deployment": {"Replicas", "Available"},
 		}
-		assert.Equal(t, []string{"Replicas", "Available"}, ColumnsForKind("Deployment"))
-		assert.Equal(t, []string{"Replicas", "Available"}, ColumnsForKind("deployment"))
-		assert.Equal(t, []string{"Replicas", "Available"}, ColumnsForKind("DEPLOYMENT"))
+		assert.Equal(t, []string{"Replicas", "Available"}, ColumnsForKind("Deployment", ""))
+		assert.Equal(t, []string{"Replicas", "Available"}, ColumnsForKind("deployment", ""))
+		assert.Equal(t, []string{"Replicas", "Available"}, ColumnsForKind("DEPLOYMENT", ""))
 	})
 
 	t.Run("empty kind returns nil", func(t *testing.T) {
 		ConfigResourceColumns = map[string][]string{
 			"pod": {"IP"},
 		}
-		assert.Nil(t, ColumnsForKind(""))
+		assert.Nil(t, ColumnsForKind("", ""))
 	})
 
 	t.Run("wildcard works", func(t *testing.T) {
 		ConfigResourceColumns = map[string][]string{
 			"pod": {"*"},
 		}
-		assert.Equal(t, []string{"*"}, ColumnsForKind("Pod"))
+		assert.Equal(t, []string{"*"}, ColumnsForKind("Pod", ""))
 	})
 }
 

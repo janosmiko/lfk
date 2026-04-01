@@ -50,12 +50,16 @@ type Keybindings struct {
 	ThemeSelector   string `json:"theme_selector" yaml:"theme_selector"`
 	CommandBar      string `json:"command_bar" yaml:"command_bar"`
 	WatchMode       string `json:"watch_mode" yaml:"watch_mode"`
-	SortCycle       string `json:"sort_cycle" yaml:"sort_cycle"`
+	SortNext        string `json:"sort_next" yaml:"sort_next"`
+	SortPrev        string `json:"sort_prev" yaml:"sort_prev"`
+	SortFlip        string `json:"sort_flip" yaml:"sort_flip"`
+	SortReset       string `json:"sort_reset" yaml:"sort_reset"`
 	SaveResource    string `json:"save_resource" yaml:"save_resource"`
 	Monitoring      string `json:"monitoring" yaml:"monitoring"`
 	QuotaDashboard  string `json:"quota_dashboard" yaml:"quota_dashboard"`
 	ExpandCollapse  string `json:"expand_collapse" yaml:"expand_collapse"`
 	PinGroup        string `json:"pin_group" yaml:"pin_group"`
+	ColumnToggle    string `json:"column_toggle" yaml:"column_toggle"`
 
 	// Actions
 	NamespaceSelector string `json:"namespace_selector" yaml:"namespace_selector"`
@@ -112,8 +116,10 @@ func DefaultKeybindings() Keybindings {
 		FilterPresets: ".", ErrorLog: "!", SecretToggle: "ctrl+s",
 		FinalizerSearch: "ctrl+g", APIExplorer: "I", RBACBrowser: "U",
 		ThemeSelector: "T", CommandBar: ":", WatchMode: "w",
-		SortCycle: ",", SaveResource: "W", Monitoring: "@",
+		SortNext: ">", SortPrev: "<", SortFlip: "=", SortReset: "-",
+		SaveResource: "W", Monitoring: "@",
 		QuotaDashboard: "Q", ExpandCollapse: "z", PinGroup: "p",
+		ColumnToggle: ",",
 
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",
@@ -159,8 +165,12 @@ var SearchAbbreviations map[string]string
 // IconMode controls how resource icons are displayed.
 var IconMode = "unicode"
 
-// ConfigResourceColumns holds per-resource-type column overrides.
+// ConfigResourceColumns holds global per-resource-type column overrides.
 var ConfigResourceColumns map[string][]string
+
+// ConfigClusterResourceColumns holds per-cluster per-resource-type column overrides.
+// Keys: context name -> lowercase kind -> column list.
+var ConfigClusterResourceColumns map[string]map[string][]string
 
 // ConfigFilterMatch defines the match criteria for a user-configured filter preset.
 type ConfigFilterMatch struct {
@@ -181,10 +191,21 @@ type ConfigFilterPreset struct {
 // ConfigFilterPresets maps lowercase Kind names to user-configured filter presets.
 var ConfigFilterPresets map[string][]ConfigFilterPreset
 
-// ColumnsForKind returns the configured column list for the given resource kind.
-func ColumnsForKind(kind string) []string {
+// ColumnsForKind returns the configured column list for the given resource kind
+// and cluster context. Per-cluster config takes priority over global config.
+func ColumnsForKind(kind, context string) []string {
+	lk := strings.ToLower(kind)
+	// Per-cluster override first.
+	if context != "" && len(ConfigClusterResourceColumns) > 0 {
+		if clusterCols, ok := ConfigClusterResourceColumns[context]; ok {
+			if cols, ok := clusterCols[lk]; ok {
+				return cols
+			}
+		}
+	}
+	// Global override.
 	if len(ConfigResourceColumns) > 0 && kind != "" {
-		if cols, ok := ConfigResourceColumns[strings.ToLower(kind)]; ok {
+		if cols, ok := ConfigResourceColumns[lk]; ok {
 			return cols
 		}
 	}
@@ -271,6 +292,13 @@ type configFile struct {
 	// own background shows through. Selection highlights remain opaque.
 	// Defaults to false.
 	TransparentBg *bool `json:"transparent_background" yaml:"transparent_background"`
+	// Clusters maps context names to per-cluster configuration overrides.
+	Clusters map[string]clusterConfig `json:"clusters" yaml:"clusters"`
+}
+
+// clusterConfig holds per-cluster configuration overrides.
+type clusterConfig struct {
+	ResourceColumns map[string][]string `json:"resource_columns" yaml:"resource_columns"`
 }
 
 // DefaultAbbreviations returns the default search abbreviation map.
@@ -409,6 +437,20 @@ func LoadConfig() {
 		switch strings.ToLower(cfg.Terminal) {
 		case "pty", "exec":
 			ConfigTerminalMode = strings.ToLower(cfg.Terminal)
+		}
+	}
+
+	// Apply per-cluster resource column overrides (normalize keys to lowercase).
+	if len(cfg.Clusters) > 0 {
+		ConfigClusterResourceColumns = make(map[string]map[string][]string, len(cfg.Clusters))
+		for ctx, cc := range cfg.Clusters {
+			if len(cc.ResourceColumns) > 0 {
+				cols := make(map[string][]string, len(cc.ResourceColumns))
+				for k, v := range cc.ResourceColumns {
+					cols[strings.ToLower(k)] = v
+				}
+				ConfigClusterResourceColumns[ctx] = cols
+			}
 		}
 	}
 

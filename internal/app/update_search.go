@@ -356,15 +356,6 @@ func (m *Model) searchAllItems(queries []string, startIdx int, forward bool) {
 	}
 }
 
-// applySortMode sets the sort mode, re-sorts items, and shows a status message.
-func (m Model) applySortMode(mode sortMode) (tea.Model, tea.Cmd) {
-	m.sortBy = mode
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear())
-}
-
 // handleCommandBarKey processes key events when the command bar is active.
 func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {

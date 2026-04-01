@@ -120,7 +120,8 @@
 - **Configurable search abbreviations**
 - **Configurable filter presets** per resource type (extend built-in quick filters with `.`)
 - **Configurable icon modes**: Unicode (default), simple ASCII, or no icons
-- **Configurable table columns** (global and per-resource-type)
+- **Configurable table columns** (global, per-resource-type, and per-cluster)
+- **Column visibility toggle** overlay to show/hide and reorder columns at runtime (`,` key)
 - **Startup tips**: Random tips on startup to help discover features (configurable via `tips: false`)
 - **Status-aware coloring**: Running=green, Pending=yellow, Failed=red
 - **Resource usage metrics**: CPU/MEM with color-coded bars in dashboard
@@ -266,7 +267,8 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `T` | Open theme selector |
 | `:` | Open command bar (kubectl/shell commands) |
 | `w` | Toggle watch mode (auto-refresh) |
-| `,` | Cycle sort mode (name / age / status) |
+| `,` | Column visibility toggle (show/hide and reorder columns) |
+| `>` / `<` | Next / previous sort mode (name / age / status) |
 | `W` | Save resource to file / toggle warnings-only (Events) |
 | `@` | Monitoring overview (active Prometheus alerts) |
 | `Q` | Namespace resource quota dashboard |
@@ -441,6 +443,14 @@ resource_columns:
   # Pod: ["IP", "Node", "Image", "CPU", "MEM"]
   # Deployment: ["Replicas", "Available"]
 
+# Per-cluster configuration overrides
+# Keys are kubeconfig context names
+clusters:
+  # my-prod-cluster:
+  #   resource_columns:
+  #     Pod: ["IP", "Node", "Image", "CPU", "MEM"]
+  #     Deployment: ["Replicas", "Available"]
+
 # Custom color theme (Tokyonight-inspired defaults shown)
 theme:
   primary: "#7aa2f7"       # Blue - borders, headers, breadcrumbs, active columns
@@ -578,7 +588,7 @@ All theme colors accept CSS hex color codes. Only specify the colors you want to
 
 ### Keybinding Overrides
 
-The following direct-action keybindings can be overridden in the config file. Other keybindings (navigation, views, tabs, etc.) are fixed.
+All keybindings can be overridden in the config file. Only specify the keys you want to change -- defaults apply for everything else. See [`docs/keybindings.md`](docs/keybindings.md) for the full list.
 
 | Config Key | Default | Action |
 |---|---|---|
@@ -590,6 +600,9 @@ The following direct-action keybindings can be overridden in the config file. Ot
 | `delete` | `D` | Delete selected resource (with confirmation) |
 | `force_delete` | `X` | Force destroy (remove finalizers + force delete) |
 | `scale` | `S` | Scale resource (deployments, statefulsets, daemonsets) |
+| `column_toggle` | `,` | Column visibility toggle (show/hide and reorder columns) |
+| `sort_next` | `>` | Next sort mode (name / age / status) |
+| `sort_prev` | `<` | Previous sort mode |
 
 ## Architecture
 

@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // --- handleExplorerActionKey: A toggles all namespaces ---
@@ -174,16 +175,34 @@ func TestActionKey2JumpsToResources(t *testing.T) {
 	assert.Equal(t, model.LevelResources, result.nav.Level)
 }
 
-// --- handleExplorerActionKey: , cycles sort mode ---
+// --- handleExplorerActionKey: > cycles sort mode forward ---
 
-func TestActionKeyCommaCyclesSort(t *testing.T) {
+func TestActionKeyGreaterCyclesSortNext(t *testing.T) {
 	m := baseExplorerModel()
-	m.sortBy = sortByName
+	m.sortColumnName = "Name"
+	m.sortAscending = true
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	ui.ActiveSortableColumnCount = 3
 
-	ret, _, handled := m.handleExplorerActionKey(runeKey(','))
+	ret, _, handled := m.handleExplorerActionKey(runeKey('>'))
 	assert.True(t, handled)
 	result := ret.(Model)
-	assert.Equal(t, sortByAge, result.sortBy)
+	assert.Equal(t, "Age", result.sortColumnName)
+}
+
+// --- handleExplorerActionKey: < cycles sort mode backward ---
+
+func TestActionKeyLessCyclesSortPrev(t *testing.T) {
+	m := baseExplorerModel()
+	m.sortColumnName = "Name"
+	m.sortAscending = true
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	ui.ActiveSortableColumnCount = 3
+
+	ret, _, handled := m.handleExplorerActionKey(runeKey('<'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Status", result.sortColumnName)
 }
 
 // --- handleExplorerActionKey: y copies resource name ---

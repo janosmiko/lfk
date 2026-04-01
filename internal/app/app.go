@@ -70,6 +70,7 @@ const (
 	overlayPVCResize
 	overlayAutoSync
 	overlayFinalizerSearch
+	overlayColumnToggle
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -82,14 +83,19 @@ const (
 	bookmarkModeConfirmDeleteAll
 )
 
-// sortMode determines how resources are sorted in the middle column.
-type sortMode int
+// sortColDefault is the default sort column name.
+const sortColDefault = "Name"
 
-const (
-	sortByName sortMode = iota
-	sortByAge
-	sortByStatus
-)
+// sortColumnIndex returns the index of sortColumnName in ActiveSortableColumns,
+// or 0 if not found.
+func sortColumnIndex(name string) int {
+	for i, col := range ui.ActiveSortableColumns {
+		if col == name {
+			return i
+		}
+	}
+	return 0
+}
 
 // actionContext stores which resource an action targets.
 type actionContext struct {
@@ -133,7 +139,8 @@ type TabState struct {
 	namespace           string
 	allNamespaces       bool
 	selectedNamespaces  map[string]bool
-	sortBy              sortMode
+	sortColumnName      string // column name to sort by (e.g. "Name", "Age", "CPU")
+	sortAscending       bool
 	filterText          string
 	watchMode           bool
 	requestGen          uint64
@@ -329,8 +336,9 @@ type Model struct {
 	// Fullscreen dashboard: renders the cluster dashboard full screen.
 	fullscreenDashboard bool
 
-	// Sort mode for resources.
-	sortBy sortMode
+	// Sort state for resources: column name and direction.
+	sortColumnName string // which column to sort by (e.g. "Name", "Age")
+	sortAscending  bool   // true = ascending, false = descending
 
 	// Status message (temporary, shown in status bar).
 	statusMessage    string
@@ -686,6 +694,19 @@ type Model struct {
 	finalizerSearchLoading      bool
 	finalizerSearchFilter       string
 	finalizerSearchFilterActive bool
+
+	// Column toggle overlay state.
+	columnToggleItems        []columnToggleEntry
+	columnToggleCursor       int
+	columnToggleFilter       string
+	columnToggleFilterActive bool
+	sessionColumns           map[string][]string // kind -> ordered visible column keys (session-only)
+}
+
+// columnToggleEntry represents a single column in the column toggle overlay.
+type columnToggleEntry struct {
+	key     string
+	visible bool
 }
 
 // ownedParentState captures the navigation state that must be restored
@@ -718,6 +739,8 @@ func NewModel(client *k8s.Client) Model {
 		splitPreview:        true,
 		allNamespaces:       true,
 		watchMode:           true,
+		sortColumnName:      sortColDefault,
+		sortAscending:       true,
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
 		selectedItems:       make(map[string]bool),
@@ -735,6 +758,8 @@ func NewModel(client *k8s.Client) Model {
 			splitPreview:       true,
 			allNamespaces:      true,
 			watchMode:          true,
+			sortColumnName:     sortColDefault,
+			sortAscending:      true,
 			warningEventsOnly:  true,
 			allGroupsExpanded:  true,
 			cursorMemory:       make(map[string]int),

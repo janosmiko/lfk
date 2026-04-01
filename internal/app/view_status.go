@@ -198,7 +198,7 @@ func (m Model) statusBar() string {
 			{Key: kb.AllNamespaces, Desc: "all-ns"},
 			{Key: kb.ActionMenu, Desc: "actions"},
 			{Key: kb.CreateTemplate, Desc: "create"},
-			{Key: kb.SortCycle, Desc: "sort"},
+			{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
 			{Key: kb.Filter, Desc: "filter"},
 			{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
 			{Key: kb.Help, Desc: "help"},
@@ -474,6 +474,15 @@ func (m Model) renderOverlay(background string) string {
 		)
 		bg := ui.PadToHeight(background, m.height)
 		return ui.PlaceOverlay(m.width, m.height, overlay, bg)
+	case overlayColumnToggle:
+		filtered := m.filteredColumnToggleItems()
+		entries := make([]ui.ColumnToggleEntry, len(filtered))
+		for i, e := range filtered {
+			entries[i] = ui.ColumnToggleEntry{Key: e.key, Visible: e.visible}
+		}
+		content = ui.RenderColumnToggleOverlay(entries, m.columnToggleCursor, m.columnToggleFilter, m.columnToggleFilterActive, m.width, m.height)
+		overlayW = min(50, m.width-10)
+		overlayH = min(20, m.height-6)
 	case overlayFinalizerSearch:
 		filtered := m.filteredFinalizerResults()
 		entries := make([]ui.FinalizerMatchEntry, len(filtered))

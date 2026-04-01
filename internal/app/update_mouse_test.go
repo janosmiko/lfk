@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // --- handleMouse: explorer mode scroll ---
@@ -175,9 +176,12 @@ func TestHandleHeaderClickNoItems(t *testing.T) {
 
 func TestHandleHeaderClickNameColumn(t *testing.T) {
 	m := baseExplorerModel()
-	m.sortBy = sortByAge
+	m.sortColumnName = "Age"
+	m.sortAscending = true
+	ui.ActiveSortableColumns = []string{"Name", "Age"}
+	ui.ActiveSortableColumnCount = 2
 
 	ret, _ := m.handleHeaderClick(5)
 	result := ret.(Model)
-	assert.Equal(t, sortByName, result.sortBy)
+	assert.Equal(t, "Name", result.sortColumnName) // clicks Name column
 }

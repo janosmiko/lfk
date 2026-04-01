@@ -13,6 +13,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `dashboard` | bool | `true` | Show cluster dashboard when entering a context. Set to `false` to go directly to resource types. |
 | `monitoring` | map[string]object | `{}` | Per-cluster monitoring endpoint configuration. Keys are context names or `"default"`. See [Monitoring](#monitoring) section. |
 | `resource_columns` | map[string]list | `{}` | Per-resource-type column configuration. Keys are resource Kind names (case-insensitive). When not set for a kind, columns are auto-detected. |
+| `clusters` | map[string]object | `{}` | Per-cluster configuration overrides. Keys are context names. See [Clusters](#clusters) section. |
 | `theme` | object | *(see Theme section)* | Custom color theme overrides. |
 | `keybindings` | object | *(see Keybindings section)* | Custom keybinding overrides for direct actions. |
 | `abbreviations` | map[string]string | *(see Abbreviations section)* | Custom search abbreviation overrides/extensions. |
@@ -77,6 +78,29 @@ When not configured, the following defaults are used for auto-discovery:
 | Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
 | Alertmanager | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `alertmanager-operated`, `alertmanager`, `prometheus-kube-prometheus-alertmanager`, `alertmanager-main` |
 
+## Clusters
+
+Per-cluster configuration overrides allow you to customize settings for individual kubeconfig contexts. Keys are context names.
+
+Currently supported per-cluster overrides:
+
+| Field | Type | Description |
+|---|---|---|
+| `resource_columns` | map[string]list | Per-resource-type column overrides for this cluster. Same format as the global `resource_columns`. |
+
+Per-cluster `resource_columns` take precedence over the global `resource_columns` setting.
+
+```yaml
+clusters:
+  my-prod-cluster:
+    resource_columns:
+      Pod: ["IP", "Node", "Image", "CPU", "MEM"]
+      Deployment: ["Replicas", "Available"]
+  my-staging-cluster:
+    resource_columns:
+      Pod: ["IP", "Node", "Image"]
+```
+
 ## Theme
 
 All theme colors accept CSS hex color codes (e.g., `"#7aa2f7"`). Only specify the colors you want to change; unspecified colors keep their defaults from the selected colorscheme.
@@ -99,7 +123,7 @@ All theme colors accept CSS hex color codes (e.g., `"#7aa2f7"`). Only specify th
 
 ## Keybindings
 
-Only direct-action keybindings can be overridden. Navigation, views, tabs, and other keybindings are fixed.
+All keybindings can be overridden. Only specify the keys you want to change -- defaults apply for everything else. See [`keybindings.md`](keybindings.md) for the full list.
 
 | Field | Default | Action |
 |---|---|---|
@@ -111,6 +135,9 @@ Only direct-action keybindings can be overridden. Navigation, views, tabs, and o
 | `delete` | `D` | Delete selected resource (with confirmation) |
 | `force_delete` | `X` | Force destroy (remove finalizers + force delete) |
 | `scale` | `S` | Scale resource (deployments, statefulsets, daemonsets) |
+| `column_toggle` | `,` | Column visibility toggle (show/hide and reorder columns) |
+| `sort_next` | `>` | Next sort mode (name / age / status) |
+| `sort_prev` | `<` | Previous sort mode |
 
 ## Resource Columns
 

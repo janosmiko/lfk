@@ -684,16 +684,14 @@ func TestItemExtraLines(t *testing.T) {
 		assert.Equal(t, 0, itemExtraLines(item, cols))
 	})
 
-	t.Run("value needs wrapping", func(t *testing.T) {
+	t.Run("value needs wrapping returns 0 (wrapping disabled)", func(t *testing.T) {
 		item := &model.Item{
 			Name:    "pod",
 			Columns: []model.KeyValue{{Key: "MSG", Value: "this is a really long message that needs wrapping"}},
 		}
-		// width=11 means wrapWidth=10 (minus 1 for spacing).
-		// "this is a really long message that needs wrapping" = 50 chars.
-		// ceil(50/10) - 1 = 4 continuation lines.
+		// Wrapping is disabled — always returns 0 regardless of value length.
 		cols := []extraColumn{{key: "MSG", width: 11}}
-		assert.Equal(t, 4, itemExtraLines(item, cols))
+		assert.Equal(t, 0, itemExtraLines(item, cols))
 	})
 
 	t.Run("uses last column only", func(t *testing.T) {

@@ -123,29 +123,28 @@ func TestEffectiveNamespace(t *testing.T) {
 // --- sortModeName ---
 
 func TestSortModeName(t *testing.T) {
-	tests := []struct {
-		mode     sortMode
-		expected string
-	}{
-		{sortByName, "name"},
-		{sortByAge, "age"},
-		{sortByStatus, "status"},
-		{sortMode(99), "name"}, // unknown defaults to "name"
-	}
-	for _, tt := range tests {
-		t.Run(tt.expected, func(t *testing.T) {
-			m := Model{sortBy: tt.mode}
-			assert.Equal(t, tt.expected, m.sortModeName())
-		})
-	}
+	// Set up sortable columns so sortModeName can reference them.
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	m := Model{sortColumnName: "Name", sortAscending: true}
+	assert.Contains(t, m.sortModeName(), "Name")
+
+	m.sortColumnName = "Age"
+	assert.Contains(t, m.sortModeName(), "Age")
+
+	m.sortColumnName = "" // empty falls back to default
+	assert.Contains(t, m.sortModeName(), "Name")
 }
 
 // --- sortMiddleItems ---
 
 func TestSortMiddleItemsByName(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
 	m := Model{
-		nav:    model.NavigationState{Level: model.LevelResources},
-		sortBy: sortByName,
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "Name", sortAscending: true,
 		middleItems: []model.Item{
 			{Name: "charlie"},
 			{Name: "alpha"},
@@ -159,10 +158,12 @@ func TestSortMiddleItemsByName(t *testing.T) {
 }
 
 func TestSortMiddleItemsByAge(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
 	now := time.Now()
 	m := Model{
-		nav:    model.NavigationState{Level: model.LevelResources},
-		sortBy: sortByAge,
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "Age", sortAscending: true,
 		middleItems: []model.Item{
 			{Name: "old", CreatedAt: now.Add(-10 * time.Hour)},
 			{Name: "new", CreatedAt: now.Add(-1 * time.Hour)},
@@ -177,9 +178,11 @@ func TestSortMiddleItemsByAge(t *testing.T) {
 }
 
 func TestSortMiddleItemsByStatus(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
 	m := Model{
-		nav:    model.NavigationState{Level: model.LevelResources},
-		sortBy: sortByStatus,
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "Status", sortAscending: true,
 		middleItems: []model.Item{
 			{Name: "err-pod", Status: "CrashLoopBackOff"},
 			{Name: "run-pod", Status: "Running"},
@@ -193,9 +196,11 @@ func TestSortMiddleItemsByStatus(t *testing.T) {
 }
 
 func TestSortMiddleItemsSkipsResourceTypes(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name"}
+	defer func() { ui.ActiveSortableColumns = nil }()
 	m := Model{
-		nav:    model.NavigationState{Level: model.LevelResourceTypes},
-		sortBy: sortByName,
+		nav:            model.NavigationState{Level: model.LevelResourceTypes},
+		sortColumnName: "Name", sortAscending: true,
 		middleItems: []model.Item{
 			{Name: "charlie"},
 			{Name: "alpha"},

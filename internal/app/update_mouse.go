@@ -217,45 +217,113 @@ func (m Model) handleHeaderClick(relX int) (tea.Model, tea.Cmd) {
 
 	markerColW := 2
 
-	nameW := width - nsW - readyW - restartsW - ageW - statusW - markerColW
+	// Collect extra column widths to match RenderTable layout.
+	tableKind := ""
+	if len(items) > 0 {
+		tableKind = items[0].Kind
+	}
+	extraCols := ui.CollectExtraColumns(items, width, nsW+readyW+restartsW+ageW+statusW+markerColW, tableKind)
+	extraTotalW := 0
+	for _, ec := range extraCols {
+		extraTotalW += ec.Width
+	}
+
+	nameW := width - nsW - readyW - restartsW - ageW - statusW - markerColW - extraTotalW
 	if nameW < 10 {
 		nameW = 10
 	}
 
-	// Determine which column was clicked based on cumulative position.
-	// Column order: marker | namespace | NAME | READY | RS | STATUS | extra columns... | AGE
+	// Build column regions: each entry is (endPos, sortableColumnIndex).
+	// Column visual order: marker | namespace | NAME | READY | RS | STATUS | extra... | AGE
+	cols := ui.ActiveSortableColumns
+	if len(cols) == 0 {
+		return m, nil
+	}
+
+	type colRegion struct {
+		end   int
+		index int // index into ActiveSortableColumns
+	}
+	var regions []colRegion
+
+	findCol := func(name string) int {
+		for i, c := range cols {
+			if c == name {
+				return i
+			}
+		}
+		return -1
+	}
+
 	pos := markerColW
 	if hasNs {
-		if relX < pos+nsW {
-			// Clicked NAMESPACE — sort by name.
-			return m.applySortMode(sortByName)
-		}
 		pos += nsW
+		if idx := findCol("Namespace"); idx >= 0 {
+			regions = append(regions, colRegion{pos, idx})
+		}
 	}
 	pos += nameW
-	if relX < pos {
-		return m.applySortMode(sortByName)
+	if idx := findCol("Name"); idx >= 0 {
+		regions = append(regions, colRegion{pos, idx})
 	}
 	if hasReady {
 		pos += readyW
-		if relX < pos {
-			return m.applySortMode(sortByStatus)
+		if idx := findCol("Ready"); idx >= 0 {
+			regions = append(regions, colRegion{pos, idx})
 		}
 	}
 	if hasRestarts {
 		pos += restartsW
-		if relX < pos {
-			return m.applySortMode(sortByStatus)
+		if idx := findCol("Restarts"); idx >= 0 {
+			regions = append(regions, colRegion{pos, idx})
 		}
 	}
 	if hasStatus {
 		pos += statusW
-		if relX < pos {
-			return m.applySortMode(sortByStatus)
+		if idx := findCol("Status"); idx >= 0 {
+			regions = append(regions, colRegion{pos, idx})
 		}
 	}
-	// Remaining space is AGE (or extra columns, mapped to age sort).
-	return m.applySortMode(sortByAge)
+	for _, ec := range extraCols {
+		pos += ec.Width
+		if idx := findCol(ec.Key); idx >= 0 {
+			regions = append(regions, colRegion{pos, idx})
+		}
+	}
+	if hasAge {
+		pos += ageW
+		if idx := findCol("Age"); idx >= 0 {
+			regions = append(regions, colRegion{pos, idx})
+		}
+	}
+
+	// Find which region the click falls into.
+	clickedIdx := -1
+	for _, r := range regions {
+		if relX < r.end {
+			clickedIdx = r.index
+			break
+		}
+	}
+	if clickedIdx < 0 && len(regions) > 0 {
+		clickedIdx = regions[len(regions)-1].index
+	}
+	if clickedIdx < 0 {
+		return m, nil
+	}
+
+	// If clicking the already-sorted column, toggle direction; otherwise sort ascending.
+	clickedName := ui.ActiveSortableColumns[clickedIdx]
+	if m.sortColumnName == clickedName {
+		m.sortAscending = !m.sortAscending
+	} else {
+		m.sortColumnName = clickedName
+		m.sortAscending = true
+	}
+	m.sortMiddleItems()
+	m.clampCursor()
+	m.setStatusMessage("Sort: "+m.sortModeName(), false)
+	return m, tea.Batch(m.loadPreview(), scheduleStatusClear())
 }
 
 // tabAtX returns the tab index at the given X coordinate in the tab bar,

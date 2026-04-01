@@ -25,6 +25,7 @@ func baseModel() Model {
 		cursorMemory:   make(map[string]int),
 		itemCache:      make(map[string][]model.Item),
 		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
+		sortAscending:  true,
 		width:          80,
 		height:         40,
 		execMu:         &sync.Mutex{},
