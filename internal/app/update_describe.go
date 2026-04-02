@@ -92,10 +92,13 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.ensureDiffFoldState(foldRegions)
 
 	totalLines := ui.DiffViewTotalLines(m.diffLeft, m.diffRight, foldRegions, m.diffFoldState)
+	// Side-by-side: height - 6 (title + hint + border top/bottom + header + separator).
+	// Unified: height - 4 (title + hint + border top/bottom; headers are inside content).
+	visibleLines := m.height - 6
 	if m.diffUnified {
 		totalLines = ui.UnifiedDiffViewTotalLines(m.diffLeft, m.diffRight, foldRegions, m.diffFoldState)
+		visibleLines = m.height - 4
 	}
-	visibleLines := m.height - 4
 	if visibleLines < 3 {
 		visibleLines = 3
 	}
