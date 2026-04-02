@@ -264,6 +264,9 @@ type Model struct {
 	yamlVisualCol    int  // character column of anchor (for char and block modes)
 	yamlVisualCurCol int  // current cursor column (for char and block modes)
 
+	// Word wrap toggle for YAML view.
+	yamlWrap bool
+
 	// Collapsible YAML sections.
 	yamlSections  []yamlSection   // parsed hierarchical sections
 	yamlCollapsed map[string]bool // collapsed state per section key (persists across resources)
@@ -434,6 +437,7 @@ type Model struct {
 	describeContent     string
 	describeScroll      int
 	describeTitle       string
+	describeWrap        bool           // word wrap toggle for describe view
 	describeAutoRefresh bool           // when true, describe viewer auto-refreshes every 2s
 	describeRefreshFunc func() tea.Cmd // returns the load command for auto-refresh
 
@@ -446,6 +450,7 @@ type Model struct {
 	diffCursor       int    // cursor line in visible-line space
 	diffCursorSide   int    // 0=left, 1=right (side-by-side only)
 	diffUnified      bool   // true = unified diff, false = side-by-side
+	diffWrap         bool   // word wrap toggle for diff view
 	diffLineNumbers  bool   // show line numbers in diff view
 	diffLineInput    string // digit accumulator for jump-to-line (digits + G)
 	diffSearchMode   bool   // true when typing in the search bar

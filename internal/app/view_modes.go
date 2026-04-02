@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/hinshun/vt10x"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -24,12 +25,17 @@ func (m Model) viewLogs() string {
 }
 
 func (m Model) viewDescribe() string {
-	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(m.describeTitle)
+	titleText := m.describeTitle
+	if m.describeWrap {
+		titleText += " [WRAP]"
+	}
+	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(titleText)
 	hints := []ui.HintEntry{
 		{Key: "j/k", Desc: "scroll"},
 		{Key: "g/G", Desc: "top/bottom"},
 		{Key: "ctrl+d/u", Desc: "half page"},
 		{Key: "ctrl+f/b", Desc: "page"},
+		{Key: "ctrl+w/>", Desc: "wrap"},
 		{Key: "q/esc", Desc: "back"},
 	}
 	if m.describeAutoRefresh {
@@ -44,6 +50,12 @@ func (m Model) viewDescribe() string {
 		maxLines = 3
 	}
 
+	// Content width for wrapping/truncation.
+	contentWidth := m.width - 4 // border (2) + padding (2)
+	if contentWidth < 10 {
+		contentWidth = 10
+	}
+
 	scroll := m.describeScroll
 	if scroll > len(lines) {
 		scroll = len(lines) - 1
@@ -56,9 +68,37 @@ func (m Model) viewDescribe() string {
 		visible = visible[:maxLines]
 	}
 
+	// When wrap is enabled, expand long lines into sub-lines.
+	if m.describeWrap {
+		var expanded []string
+		for _, line := range visible {
+			subLines := ui.WrapLine(line, contentWidth)
+			for _, sub := range subLines {
+				expanded = append(expanded, sub)
+				if len(expanded) >= maxLines {
+					break
+				}
+			}
+			if len(expanded) >= maxLines {
+				break
+			}
+		}
+		visible = expanded
+	}
+
 	// Pad to fill available height so the hint bar stays at the bottom.
 	for len(visible) < maxLines {
 		visible = append(visible, "")
+	}
+
+	// Truncate lines that exceed the content area width to prevent lipgloss
+	// from wrapping them internally, which would push the bottom border off screen.
+	if !m.describeWrap {
+		for i, line := range visible {
+			if lipgloss.Width(line) > contentWidth {
+				visible[i] = ansi.Truncate(line, contentWidth, "")
+			}
+		}
 	}
 
 	bodyContent := strings.Join(visible, "\n")
@@ -120,9 +160,9 @@ func (m Model) viewDiff() string {
 		VisualCol:   m.diffVisualCol,
 	}
 	if m.diffUnified {
-		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
 	}
-	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
 }
 
 func (m Model) logViewHeight() int {

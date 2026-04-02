@@ -102,7 +102,7 @@ type DiffVisualParams struct {
 
 // RenderDiffView renders a side-by-side YAML diff view with search highlighting
 // and fold support.
-func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams) string {
+func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams) string {
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -294,6 +294,9 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 	}
 
 	titleText := "Resource Diff"
+	if wrap {
+		titleText += " [WRAP]"
+	}
 	if vp.VisualMode {
 		switch vp.VisualType {
 		case 'v':
@@ -347,6 +350,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 			{Key: "tab", Desc: "side"},
 			{Key: "z", Desc: "fold"},
 			{Key: "#", Desc: "lines"},
+			{Key: ">", Desc: "wrap"},
 			{Key: "u", Desc: "unified"},
 			{Key: "q/esc", Desc: "back"},
 		})
@@ -359,7 +363,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 
 // RenderUnifiedDiffView renders a unified diff view of two YAML resources
 // with search highlighting and fold support.
-func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams) string {
+func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams) string {
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -459,6 +463,9 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 	}
 
 	titleText := "Resource Diff (unified)"
+	if wrap {
+		titleText += " [WRAP]"
+	}
 	if vp.VisualMode {
 		switch vp.VisualType {
 		case 'v':
@@ -565,6 +572,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 			{Key: "v/V", Desc: "select"},
 			{Key: "z", Desc: "fold"},
 			{Key: "#", Desc: "lines"},
+			{Key: ">", Desc: "wrap"},
 			{Key: "u", Desc: "side-by-side"},
 			{Key: "q/esc", Desc: "back"},
 		})

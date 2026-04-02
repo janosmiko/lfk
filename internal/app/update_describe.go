@@ -27,11 +27,15 @@ func (m Model) handleDescribeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.helpScroll = 0
 		m.helpFilter.Clear()
 		m.helpSearchActive = false
-		m.helpContextMode = "Navigation"
+		m.helpContextMode = "Describe View"
+		return m, nil
+	case "ctrl+w", ">":
+		m.describeWrap = !m.describeWrap
 		return m, nil
 	case "q", "esc":
 		m.mode = modeExplorer
 		m.describeScroll = 0
+		m.describeWrap = false
 		m.describeAutoRefresh = false
 		m.describeRefreshFunc = nil
 		return m, nil
@@ -182,12 +186,16 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.helpSearchActive = false
 		m.helpContextMode = "Diff View"
 		return m, nil
+	case "ctrl+w", ">":
+		m.diffWrap = !m.diffWrap
+		return m, nil
 	case "q", "esc":
 		m.mode = modeExplorer
 		m.diffScroll = 0
 		m.diffCursor = 0
 		m.diffCursorSide = 0
 		m.diffLineInput = ""
+		m.diffWrap = false
 		m.diffSearchQuery = ""
 		m.diffSearchText.Clear()
 		m.diffMatchLines = nil

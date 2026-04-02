@@ -351,9 +351,21 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Ctrl+V` | Block (column) visual selection |
 | `h` / `l` | Move selection column (in visual mode) |
 | `y` | Copy selected text (in visual mode) |
-| `Tab` / `z` | Toggle fold on section under cursor |
+| `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
+| `Ctrl+W` / `>` | Toggle line wrapping |
 | `Ctrl+E` | Edit resource in `$EDITOR` |
+| `q` / `Esc` | Back to explorer |
+
+### In Describe View
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Scroll up/down |
+| `gg` / `G` | Jump to top / bottom |
+| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+W` / `>` | Toggle line wrapping |
 | `q` / `Esc` | Back to explorer |
 
 ### In Log Viewer
@@ -372,7 +384,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
 | `f` | Toggle follow mode (auto-scroll) |
-| `Tab` / `z` | Toggle line wrapping |
+| `Tab` / `z` / `>` | Toggle line wrapping |
 | `#` | Toggle line numbers |
 | `/` | Search in logs |
 | `n` / `N` | Next / previous search match |
@@ -430,6 +442,7 @@ All other keys are forwarded to the PTY process.
 | `z` | Toggle fold unchanged section at cursor |
 | `Z` | Toggle all folds |
 | `#` | Toggle line numbers |
+| `Ctrl+W` / `>` | Toggle line wrapping |
 | `u` | Toggle unified/side-by-side view |
 | `q` / `Esc` | Back to explorer |
 

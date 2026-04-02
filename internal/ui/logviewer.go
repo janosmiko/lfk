@@ -97,7 +97,7 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 			{Key: "ctrl+d/u", Desc: "half page"},
 			{Key: "ctrl+f/b", Desc: "page"},
 			{Key: "f", Desc: "follow"},
-			{Key: "tab/z", Desc: "wrap"},
+			{Key: "tab/z/>", Desc: "wrap"},
 			{Key: "#", Desc: "line#"},
 			{Key: "s", Desc: "timestamps"},
 			{Key: "p", Desc: "prefixes"},
@@ -395,6 +395,12 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 		}
 	}
 	return result
+}
+
+// WrapLine splits a line into chunks of at most width runes.
+// Exported for reuse in YAML, describe, and diff view wrapping.
+func WrapLine(line string, width int) []string {
+	return wrapLine(line, width)
 }
 
 // wrapLine splits a line into chunks of at most width runes.

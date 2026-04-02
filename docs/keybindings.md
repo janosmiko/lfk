@@ -140,9 +140,21 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
 | `y` | Copy selected text (in visual mode) |
-| `Tab` / `z` | Toggle fold on section under cursor |
+| `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
+| `Ctrl+W` / `>` | Toggle line wrapping |
 | `Ctrl+E` | Edit resource in `$EDITOR` |
+| `q` / `Esc` | Back to explorer |
+
+## Describe View
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Scroll up/down |
+| `gg` / `G` | Jump to top / bottom |
+| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+W` / `>` | Toggle line wrapping |
 | `q` / `Esc` | Back to explorer |
 
 ## Log Viewer
@@ -161,7 +173,7 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` | Full page down / up |
 | `f` | Toggle follow mode (auto-scroll to new logs) |
-| `Tab` / `z` | Toggle line wrapping |
+| `Tab` / `z` / `>` | Toggle line wrapping |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
 | `p` | Toggle pod/container prefixes |
@@ -221,6 +233,7 @@ All other keys are forwarded to the PTY process. The PTY session continues runni
 | `z` | Toggle fold unchanged section at cursor |
 | `Z` | Toggle all folds |
 | `#` | Toggle line numbers |
+| `Ctrl+W` / `>` | Toggle line wrapping |
 | `u` | Toggle unified/side-by-side view |
 | `q` / `Esc` | Back to explorer |
 

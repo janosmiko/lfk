@@ -50,7 +50,7 @@ func TestDescribeKeyQuestionMarkOpensHelp(t *testing.T) {
 	result := ret.(Model)
 	assert.Equal(t, modeHelp, result.mode)
 	assert.Equal(t, modeDescribe, result.helpPreviousMode)
-	assert.Equal(t, "Navigation", result.helpContextMode)
+	assert.Equal(t, "Describe View", result.helpContextMode)
 }
 
 func TestDescribeKeyJScrollsDown(t *testing.T) {

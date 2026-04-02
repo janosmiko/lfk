@@ -13,6 +13,9 @@ import (
 
 func (m Model) viewYAML() string {
 	yamlTitleText := m.yamlTitle()
+	if m.yamlWrap {
+		yamlTitleText += " [WRAP]"
+	}
 	if m.yamlVisualMode {
 		switch m.yamlVisualType {
 		case 'v':
@@ -41,6 +44,7 @@ func (m Model) viewYAML() string {
 			{Key: "/", Desc: "search"},
 			{Key: "v/V/ctrl+v", Desc: "visual select"},
 			{Key: "tab/z", Desc: "fold"},
+			{Key: "ctrl+w/>", Desc: "wrap"},
 			{Key: "ctrl+e", Desc: "edit"},
 			{Key: "q/esc", Desc: "back"},
 		}
@@ -126,6 +130,12 @@ func (m Model) viewYAML() string {
 		visualColEnd = max(m.yamlVisualCol, m.yamlCursorCol())
 	}
 
+	// Content width for wrapping/truncation.
+	contentWidth := m.width - 4 // border (2) + padding (2)
+	if contentWidth < 10 {
+		contentWidth = 10
+	}
+
 	// Apply YAML highlighting to visible lines, with search highlights and cursor.
 	highlightedLines := make([]string, 0, len(viewport))
 	for i, line := range viewport {
@@ -143,42 +153,102 @@ func (m Model) viewYAML() string {
 			foldPrefix = string(lineRunes[:yamlFoldPrefixLen])
 			contentLine = string(lineRunes[yamlFoldPrefixLen:])
 		}
-		highlighted := ui.HighlightYAMLLine(contentLine)
-		if m.yamlSearchText.Value != "" && origLine >= 0 && matchSet[origLine] {
-			if origLine == currentMatchLine {
-				highlighted = ui.HighlightSearchInLine(contentLine, m.yamlSearchText.Value, true)
-			} else {
-				highlighted = ui.HighlightSearchInLine(contentLine, m.yamlSearchText.Value, false)
+
+		// When wrapping is enabled, split long content lines into sub-lines.
+		if m.yamlWrap {
+			// gutterOverhead: cursor indicator (1) + line number gutter + fold prefix
+			gutterOverhead := 1 + gutterWidth + 1 + yamlFoldPrefixLen
+			wrapWidth := contentWidth - gutterOverhead
+			if wrapWidth < 10 {
+				wrapWidth = 10
 			}
-		}
-		// Visual selection highlight: override with selected style.
-		isSelected := m.yamlVisualMode && visIdx >= selStart && visIdx <= selEnd
-		if isSelected {
-			adjAnchorCol := m.yamlVisualCol - yamlFoldPrefixLen
-			adjCursorCol := m.yamlCursorCol() - yamlFoldPrefixLen
-			adjColStart := visualColStart - yamlFoldPrefixLen
-			adjColEnd := visualColEnd - yamlFoldPrefixLen
-			highlighted = ui.RenderVisualSelection(contentLine, m.yamlVisualType, visIdx, selStart, selEnd, m.yamlVisualStart, adjAnchorCol, adjCursorCol, adjColStart, adjColEnd)
-		}
-		// Line number gutter
-		lineNumStr := strings.Repeat(" ", gutterWidth+1)
-		if origLine >= 0 {
-			lineNumStr = fmt.Sprintf("%*d ", gutterWidth, origLine+1)
-		}
-		// Cursor indicator + line number + content
-		if visIdx == m.yamlCursor {
-			if m.yamlVisualMode {
-				// In visual mode, don't overlay block cursor on top of visual selection styling.
-				highlighted = ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
-			} else {
-				highlighted = ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNumStr) + foldPrefix + ui.RenderCursorAtCol(highlighted, contentLine, m.yamlVisualCurCol-yamlFoldPrefixLen)
+			subLines := ui.WrapLine(contentLine, wrapWidth)
+			for si, sub := range subLines {
+				highlighted := ui.HighlightYAMLLine(sub)
+				if m.yamlSearchText.Value != "" && origLine >= 0 && matchSet[origLine] {
+					if origLine == currentMatchLine {
+						highlighted = ui.HighlightSearchInLine(sub, m.yamlSearchText.Value, true)
+					} else {
+						highlighted = ui.HighlightSearchInLine(sub, m.yamlSearchText.Value, false)
+					}
+				}
+				isSelected := m.yamlVisualMode && visIdx >= selStart && visIdx <= selEnd
+				if isSelected && si == 0 {
+					adjAnchorCol := m.yamlVisualCol - yamlFoldPrefixLen
+					adjCursorCol := m.yamlCursorCol() - yamlFoldPrefixLen
+					adjColStart := visualColStart - yamlFoldPrefixLen
+					adjColEnd := visualColEnd - yamlFoldPrefixLen
+					highlighted = ui.RenderVisualSelection(sub, m.yamlVisualType, visIdx, selStart, selEnd, m.yamlVisualStart, adjAnchorCol, adjCursorCol, adjColStart, adjColEnd)
+				}
+				if si == 0 {
+					// First sub-line: show line number and fold prefix.
+					lineNumStr := strings.Repeat(" ", gutterWidth+1)
+					if origLine >= 0 {
+						lineNumStr = fmt.Sprintf("%*d ", gutterWidth, origLine+1)
+					}
+					if visIdx == m.yamlCursor {
+						if m.yamlVisualMode {
+							highlighted = ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
+						} else {
+							highlighted = ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNumStr) + foldPrefix + ui.RenderCursorAtCol(highlighted, sub, m.yamlVisualCurCol-yamlFoldPrefixLen)
+						}
+					} else if isSelected {
+						highlighted = ui.YamlCursorIndicatorStyle.Render(" ") + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
+					} else {
+						highlighted = " " + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
+					}
+				} else {
+					// Continuation sub-line: indent with padding to align with content.
+					pad := strings.Repeat(" ", 1+gutterWidth+1+yamlFoldPrefixLen+2)
+					highlighted = pad + highlighted
+				}
+				highlightedLines = append(highlightedLines, highlighted)
+				if len(highlightedLines) >= maxLines {
+					break
+				}
 			}
-		} else if isSelected {
-			highlighted = ui.YamlCursorIndicatorStyle.Render(" ") + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
 		} else {
-			highlighted = " " + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
+			highlighted := ui.HighlightYAMLLine(contentLine)
+			if m.yamlSearchText.Value != "" && origLine >= 0 && matchSet[origLine] {
+				if origLine == currentMatchLine {
+					highlighted = ui.HighlightSearchInLine(contentLine, m.yamlSearchText.Value, true)
+				} else {
+					highlighted = ui.HighlightSearchInLine(contentLine, m.yamlSearchText.Value, false)
+				}
+			}
+			// Visual selection highlight: override with selected style.
+			isSelected := m.yamlVisualMode && visIdx >= selStart && visIdx <= selEnd
+			if isSelected {
+				adjAnchorCol := m.yamlVisualCol - yamlFoldPrefixLen
+				adjCursorCol := m.yamlCursorCol() - yamlFoldPrefixLen
+				adjColStart := visualColStart - yamlFoldPrefixLen
+				adjColEnd := visualColEnd - yamlFoldPrefixLen
+				highlighted = ui.RenderVisualSelection(contentLine, m.yamlVisualType, visIdx, selStart, selEnd, m.yamlVisualStart, adjAnchorCol, adjCursorCol, adjColStart, adjColEnd)
+			}
+			// Line number gutter
+			lineNumStr := strings.Repeat(" ", gutterWidth+1)
+			if origLine >= 0 {
+				lineNumStr = fmt.Sprintf("%*d ", gutterWidth, origLine+1)
+			}
+			// Cursor indicator + line number + content
+			if visIdx == m.yamlCursor {
+				if m.yamlVisualMode {
+					// In visual mode, don't overlay block cursor on top of visual selection styling.
+					highlighted = ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
+				} else {
+					highlighted = ui.YamlCursorIndicatorStyle.Render("\u258e") + ui.DimStyle.Render(lineNumStr) + foldPrefix + ui.RenderCursorAtCol(highlighted, contentLine, m.yamlVisualCurCol-yamlFoldPrefixLen)
+				}
+			} else if isSelected {
+				highlighted = ui.YamlCursorIndicatorStyle.Render(" ") + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
+			} else {
+				highlighted = " " + ui.DimStyle.Render(lineNumStr) + foldPrefix + highlighted
+			}
+			highlightedLines = append(highlightedLines, highlighted)
 		}
-		highlightedLines = append(highlightedLines, highlighted)
+
+		if len(highlightedLines) >= maxLines {
+			break
+		}
 	}
 
 	// Pad to fill available height so the hint bar stays at the bottom.
@@ -188,10 +258,6 @@ func (m Model) viewYAML() string {
 
 	// Truncate lines that exceed the content area width to prevent lipgloss
 	// from wrapping them internally, which would push the bottom border off screen.
-	contentWidth := m.width - 4 // border (2) + padding (2)
-	if contentWidth < 10 {
-		contentWidth = 10
-	}
 	for i, line := range highlightedLines {
 		if lipgloss.Width(line) > contentWidth {
 			highlightedLines[i] = ansi.Truncate(line, contentWidth, "")

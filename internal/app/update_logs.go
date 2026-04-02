@@ -228,7 +228,7 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.logScroll = m.logMaxScroll()
 		}
 		return m, nil
-	case "tab", "z":
+	case "tab", "z", ">":
 		m.logLineInput = ""
 		m.logWrap = !m.logWrap
 		m.clampLogScroll()

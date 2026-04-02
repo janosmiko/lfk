@@ -76,7 +76,7 @@ func TestRenderUnifiedDiffView(t *testing.T) {
 			leftName:   "x",
 			rightName:  "y",
 			scroll:     0,
-			width:      120,
+			width:      140,
 			height:     30,
 			lineNums:   false,
 			wantSubstr: []string{"[1/"},
@@ -96,7 +96,7 @@ func TestRenderUnifiedDiffView(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := RenderUnifiedDiffView(tt.left, tt.right, tt.leftName, tt.rightName, tt.scroll, tt.width, tt.height, tt.lineNums, "", nil, nil, false, "", 0, DiffVisualParams{})
+			result := RenderUnifiedDiffView(tt.left, tt.right, tt.leftName, tt.rightName, tt.scroll, tt.width, tt.height, tt.lineNums, false, "", nil, nil, false, "", 0, DiffVisualParams{})
 			for _, sub := range tt.wantSubstr {
 				assert.Contains(t, result, sub, "result should contain %q", sub)
 			}

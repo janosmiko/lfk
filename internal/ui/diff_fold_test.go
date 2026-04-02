@@ -233,12 +233,12 @@ func TestRenderDiffViewWithSearch(t *testing.T) {
 	right := "apiVersion: v2\nkind: Pod\nmetadata:\n  name: test"
 
 	t.Run("search query appears in title", func(t *testing.T) {
-		result := RenderDiffView(left, right, "a", "b", 0, 120, 30, false, "Pod", nil, nil, false, "", 0, DiffVisualParams{})
+		result := RenderDiffView(left, right, "a", "b", 0, 120, 30, false, false, "Pod", nil, nil, false, "", 0, DiffVisualParams{})
 		assert.Contains(t, result, "[/Pod]")
 	})
 
 	t.Run("search mode shows search bar", func(t *testing.T) {
-		result := RenderDiffView(left, right, "a", "b", 0, 120, 30, false, "", nil, nil, true, "test", 0, DiffVisualParams{})
+		result := RenderDiffView(left, right, "a", "b", 0, 120, 30, false, false, "", nil, nil, true, "test", 0, DiffVisualParams{})
 		assert.Contains(t, result, "type: search")
 	})
 }
@@ -248,7 +248,7 @@ func TestRenderUnifiedDiffViewWithSearch(t *testing.T) {
 	right := "apiVersion: v2\nkind: Pod"
 
 	t.Run("search query appears in title", func(t *testing.T) {
-		result := RenderUnifiedDiffView(left, right, "a", "b", 0, 120, 30, false, "Pod", nil, nil, false, "", 0, DiffVisualParams{})
+		result := RenderUnifiedDiffView(left, right, "a", "b", 0, 120, 30, false, false, "Pod", nil, nil, false, "", 0, DiffVisualParams{})
 		assert.Contains(t, result, "[/Pod]")
 	})
 }
@@ -267,12 +267,12 @@ func TestRenderDiffViewWithFolding(t *testing.T) {
 	}
 
 	t.Run("collapsed region shows placeholder", func(t *testing.T) {
-		result := RenderDiffView(content, content, "a", "b", 0, 120, 40, false, "", regions, foldState, false, "", 0, DiffVisualParams{})
+		result := RenderDiffView(content, content, "a", "b", 0, 120, 40, false, false, "", regions, foldState, false, "", 0, DiffVisualParams{})
 		assert.Contains(t, result, "unchanged lines")
 	})
 
 	t.Run("unified view collapsed region shows placeholder", func(t *testing.T) {
-		result := RenderUnifiedDiffView(content, content, "a", "b", 0, 120, 40, false, "", regions, foldState, false, "", 0, DiffVisualParams{})
+		result := RenderUnifiedDiffView(content, content, "a", "b", 0, 120, 40, false, false, "", regions, foldState, false, "", 0, DiffVisualParams{})
 		assert.Contains(t, result, "unchanged lines")
 	})
 }

@@ -471,11 +471,13 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeExplorer
 		m.yamlScroll = 0
 		m.yamlCursor = 0
+		m.yamlWrap = false
 		return m, nil
 	case "ctrl+c":
 		m.mode = modeExplorer
 		m.yamlScroll = 0
 		m.yamlCursor = 0
+		m.yamlWrap = false
 		m.yamlSearchText.Clear()
 		m.yamlMatchLines = nil
 		return m, nil
@@ -517,7 +519,10 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.execKubectlEdit()
 		}
 		return m, nil
-	case "tab", "z":
+	case "ctrl+w", ">":
+		m.yamlWrap = !m.yamlWrap
+		return m, nil
+	case "z":
 		// Toggle fold on the section at the cursor position.
 		_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 		sec := sectionAtScrollPos(m.yamlCursor, mapping, m.yamlSections)
