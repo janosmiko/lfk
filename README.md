@@ -374,9 +374,10 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Tab` / `z` | Toggle line wrapping |
 | `#` | Toggle line numbers |
 | `/` | Search in logs |
-| `n` / `N` / `p` | Next / previous search match |
+| `n` / `N` | Next / previous search match |
 | `123G` | Jump to line number |
 | `s` | Toggle timestamps |
+| `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
 | `S` | Save loaded logs to file |
 | `Ctrl+S` | Save all logs to file (full kubectl logs) |

@@ -163,9 +163,10 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 | `Tab` / `z` | Toggle line wrapping |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
+| `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
 | `/` | Search in logs |
-| `n` / `N` / `p` | Next / previous search match |
+| `n` / `N` | Next / previous search match |
 | `123G` | Jump to specific line number |
 | `S` | Save loaded logs to file |
 | `Ctrl+S` | Save all logs to file (full kubectl logs) |

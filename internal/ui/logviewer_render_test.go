@@ -76,7 +76,7 @@ func TestRenderLogViewer(t *testing.T) {
 		lines := []string{"log entry 1", "log entry 2", "log entry 3"}
 		result := RenderLogViewer(
 			lines, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"my-pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -90,7 +90,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("follow indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			true, false, false, false, false,
+			true, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -102,7 +102,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("wrap indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, true, false, false, false,
+			false, true, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -114,7 +114,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("line numbers indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, true, false, false,
+			false, false, true, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -126,7 +126,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("timestamps indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, false, true, false,
+			false, false, false, true, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -138,7 +138,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("previous indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, false, false, true,
+			false, false, false, false, true, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -150,7 +150,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("search query shown in title", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"error log"}, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "error", "",
 			false, false, false, false, false,
 			"", false,
@@ -162,7 +162,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("search active shows input prompt", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "err",
 			true, false, false, false, false,
 			"", false,
@@ -175,7 +175,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("status message shown in footer", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"Saved to file", false,
@@ -187,7 +187,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("visual mode indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -199,7 +199,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("visual char mode indicator", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -211,7 +211,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("visual block mode indicator", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -223,7 +223,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("empty lines list renders without panic", func(t *testing.T) {
 		result := RenderLogViewer(
 			nil, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
@@ -236,7 +236,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("loading history indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 80, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, true,
 			"", false,
@@ -249,7 +249,7 @@ func TestRenderLogViewer(t *testing.T) {
 		// Use a very wide terminal so the hint bar does not truncate.
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 400, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "",
 			false, true, false, false, false,
 			"", false,
@@ -261,7 +261,7 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("containers hint shown when wide enough", func(t *testing.T) {
 		result := RenderLogViewer(
 			[]string{"log"}, 0, 400, 20,
-			false, false, false, false, false,
+			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, true, false, false,
 			"", false,
@@ -274,7 +274,7 @@ func TestRenderLogViewer(t *testing.T) {
 		longLine := strings.Repeat("x", 100)
 		result := RenderLogViewer(
 			[]string{longLine}, 0, 40, 20,
-			false, true, false, false, false,
+			false, true, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,

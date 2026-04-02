@@ -328,9 +328,14 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.logLineInput = ""
 		m.findNextLogMatch(true)
 		return m, nil
-	case "N", "p":
+	case "N":
 		m.logLineInput = ""
 		m.findNextLogMatch(false)
+		return m, nil
+	case "p":
+		// Toggle pod/container prefix visibility.
+		m.logLineInput = ""
+		m.logHidePrefixes = !m.logHidePrefixes
 		return m, nil
 	case "#":
 		m.logLineInput = ""

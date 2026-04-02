@@ -15,7 +15,7 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 	Bold(true)
 
 // RenderLogViewer renders the full-screen log viewer.
-func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol int) string {
+func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol int) string {
 	// Title bar with status indicators.
 	var indicators []string
 	if follow {
@@ -29,6 +29,9 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	}
 	if timestamps {
 		indicators = append(indicators, HelpKeyStyle.Render("[TIMESTAMPS]"))
+	}
+	if hidePrefixes {
+		indicators = append(indicators, HelpKeyStyle.Render("[NO PREFIX]"))
 	}
 	if previous {
 		indicators = append(indicators, HelpKeyStyle.Render("[PREVIOUS]"))
@@ -97,6 +100,7 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 			{Key: "tab/z", Desc: "wrap"},
 			{Key: "#", Desc: "line#"},
 			{Key: "s", Desc: "timestamps"},
+			{Key: "p", Desc: "prefixes"},
 			{Key: "c", Desc: "previous"},
 			{Key: "v/V/ctrl+v", Desc: "select"},
 			{Key: "/", Desc: "search"},
@@ -136,10 +140,9 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 		scroll = 0
 	}
 
-	// Strip timestamps from visible lines if not showing them.
-	// Timestamps are always streamed (--timestamps) but only displayed when toggled on.
+	// Strip timestamps and/or pod prefixes from visible lines.
 	displayLines := lines
-	if !timestamps && len(lines) > 0 {
+	if (!timestamps || hidePrefixes) && len(lines) > 0 {
 		end := scroll + contentHeight
 		if end > len(lines) {
 			end = len(lines)
@@ -147,7 +150,12 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 		displayLines = make([]string, len(lines))
 		copy(displayLines, lines)
 		for i := scroll; i < end; i++ {
-			displayLines[i] = stripTimestamp(lines[i])
+			if !timestamps {
+				displayLines[i] = stripTimestamp(lines[i])
+			}
+			if hidePrefixes {
+				displayLines[i] = stripPodPrefix(displayLines[i])
+			}
 		}
 	}
 
@@ -492,6 +500,18 @@ func colorizePodPrefix(line string) string {
 	style := lipgloss.NewStyle().Foreground(color)
 
 	return style.Render("["+prefix+"]") + " " + rest
+}
+
+// stripPodPrefix removes the leading "[pod/name/container] " prefix from a log line.
+func stripPodPrefix(line string) string {
+	if len(line) == 0 || line[0] != '[' {
+		return line
+	}
+	closeBracket := strings.Index(line, "] ")
+	if closeBracket < 0 {
+		return line
+	}
+	return line[closeBracket+2:]
 }
 
 // sanitizeLogLine replaces non-printable control characters (except tab) with

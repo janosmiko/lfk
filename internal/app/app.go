@@ -385,6 +385,7 @@ type Model struct {
 	logWrap           bool               // wrap long lines
 	logLineNumbers    bool               // show line numbers
 	logTimestamps     bool               // show timestamps (--timestamps)
+	logHidePrefixes   bool               // hide [pod/name/container] prefixes
 	logPrevious       bool               // show previous container logs (--previous)
 	logIsMulti        bool               // multi-log stream (for restart)
 	logMultiItems     []model.Item       // items for multi-log restart

@@ -181,19 +181,21 @@ func TestLogKeyNPrevMatch(t *testing.T) {
 	assert.Equal(t, 0, result.logCursor)
 }
 
-func TestLogKeyPPrevMatch(t *testing.T) {
+func TestLogKeyPTogglesPrefixes(t *testing.T) {
 	m := Model{
-		mode:           modeLogs,
-		logLines:       []string{"error first", "info", "error second"},
-		logSearchQuery: "error",
-		logCursor:      2,
-		tabs:           []TabState{{}},
-		width:          80,
-		height:         40,
+		mode:     modeLogs,
+		logLines: []string{"[pod/app/web] some log"},
+		tabs:     []TabState{{}},
+		width:    80,
+		height:   40,
 	}
+	assert.False(t, m.logHidePrefixes)
 	ret, _ := m.handleLogKey(runeKey('p'))
 	result := ret.(Model)
-	assert.Equal(t, 0, result.logCursor)
+	assert.True(t, result.logHidePrefixes)
+	ret2, _ := result.handleLogKey(runeKey('p'))
+	result2 := ret2.(Model)
+	assert.False(t, result2.logHidePrefixes)
 }
 
 func TestLogKeyGGGoesToTop(t *testing.T) {
