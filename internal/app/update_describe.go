@@ -1,7 +1,9 @@
 package app
 
 import (
+	"fmt"
 	"strconv"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -154,6 +156,11 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
+	// In visual selection mode, delegate to the visual key handler.
+	if m.diffVisualMode {
+		return m.handleDiffVisualKey(msg, foldRegions, totalLines, visibleLines, maxScroll)
+	}
+
 	switch msg.String() {
 	case "?":
 		m.helpPreviousMode = modeDiff
@@ -174,6 +181,8 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.diffMatchLines = nil
 		m.diffMatchIdx = 0
 		m.diffFoldState = nil
+		m.diffVisualMode = false
+		m.diffVisualCurCol = 0
 		return m, nil
 	case "j", "down":
 		m.diffLineInput = ""
@@ -189,6 +198,16 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.diffCursor--
 		}
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "h", "left":
+		m.diffLineInput = ""
+		if m.diffVisualCurCol > 0 {
+			m.diffVisualCurCol--
+		}
+		return m, nil
+	case "l", "right":
+		m.diffLineInput = ""
+		m.diffVisualCurCol++
 		return m, nil
 	case "g":
 		if m.pendingG {
@@ -236,6 +255,117 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.diffCursor = max(m.diffCursor-m.height, 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
+	case "0":
+		// If digits are pending, append 0 (e.g. 10G, 20G).
+		// Otherwise move cursor to beginning of line.
+		if m.diffLineInput != "" {
+			m.diffLineInput += "0"
+		} else {
+			m.diffVisualCurCol = 0
+		}
+		return m, nil
+	case "$":
+		m.diffLineInput = ""
+		lineText := m.diffCurrentLineText(foldRegions)
+		lineLen := len([]rune(lineText))
+		if lineLen > 0 {
+			m.diffVisualCurCol = lineLen - 1
+		}
+		return m, nil
+	case "^":
+		m.diffLineInput = ""
+		lineText := m.diffCurrentLineText(foldRegions)
+		m.diffVisualCurCol = firstNonWhitespace(lineText)
+		return m, nil
+	case "w":
+		m.diffLineInput = ""
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			lineLen := len([]rune(lineText))
+			newCol := nextWordStart(lineText, m.diffVisualCurCol)
+			if newCol >= lineLen {
+				// Stay at end of line in diff view (no cross-line).
+				newCol = max(lineLen-1, 0)
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "b":
+		m.diffLineInput = ""
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			newCol := prevWordStart(lineText, m.diffVisualCurCol)
+			if newCol < 0 {
+				newCol = 0
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "e":
+		m.diffLineInput = ""
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			lineLen := len([]rune(lineText))
+			newCol := wordEnd(lineText, m.diffVisualCurCol)
+			if newCol >= lineLen {
+				newCol = max(lineLen-1, 0)
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "E":
+		m.diffLineInput = ""
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			lineLen := len([]rune(lineText))
+			newCol := WORDEnd(lineText, m.diffVisualCurCol)
+			if newCol >= lineLen {
+				newCol = max(lineLen-1, 0)
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "W":
+		m.diffLineInput = ""
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			lineLen := len([]rune(lineText))
+			newCol := nextWORDStart(lineText, m.diffVisualCurCol)
+			if newCol >= lineLen {
+				newCol = max(lineLen-1, 0)
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "B":
+		m.diffLineInput = ""
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			newCol := prevWORDStart(lineText, m.diffVisualCurCol)
+			if newCol < 0 {
+				newCol = 0
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "v":
+		m.diffVisualMode = true
+		m.diffVisualType = 'v'
+		m.diffVisualStart = m.diffCursor
+		m.diffVisualCol = m.diffVisualCurCol
+		return m, nil
+	case "V":
+		m.diffVisualMode = true
+		m.diffVisualType = 'V'
+		m.diffVisualStart = m.diffCursor
+		m.diffVisualCol = m.diffVisualCurCol
+		return m, nil
+	case "ctrl+v":
+		m.diffVisualMode = true
+		m.diffVisualType = 'B'
+		m.diffVisualStart = m.diffCursor
+		m.diffVisualCol = m.diffVisualCurCol
+		return m, nil
 	case "u":
 		m.diffLineInput = ""
 		m.diffUnified = !m.diffUnified
@@ -280,13 +410,250 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.diffLineInput = ""
 		m.toggleAllDiffFolds(foldRegions)
 		return m, nil
-	case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		m.diffLineInput += msg.String()
 		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
 		m.diffLineInput = ""
+	}
+	return m, nil
+}
+
+// diffCurrentLineText returns the plain text of the current diff line on the active side.
+func (m *Model) diffCurrentLineText(foldRegions []ui.DiffFoldRegion) string {
+	return ui.DiffLineTextAt(m.diffLeft, m.diffRight, foldRegions, m.diffFoldState, m.diffCursor, m.diffCursorSide, m.diffUnified)
+}
+
+// handleDiffVisualKey handles key events while in diff visual selection mode.
+func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.diffVisualMode = false
+		return m, nil
+	case "V":
+		if m.diffVisualType == 'V' {
+			m.diffVisualMode = false
+		} else {
+			m.diffVisualType = 'V'
+		}
+		return m, nil
+	case "v":
+		if m.diffVisualType == 'v' {
+			m.diffVisualMode = false
+		} else {
+			m.diffVisualType = 'v'
+		}
+		return m, nil
+	case "ctrl+v":
+		if m.diffVisualType == 'B' {
+			m.diffVisualMode = false
+		} else {
+			m.diffVisualType = 'B'
+		}
+		return m, nil
+	case "y":
+		// Yank (copy) selected text to clipboard.
+		selStart := min(m.diffVisualStart, m.diffCursor)
+		selEnd := max(m.diffVisualStart, m.diffCursor)
+
+		var parts []string
+		for i := selStart; i <= selEnd; i++ {
+			lineText := ui.DiffLineTextAt(m.diffLeft, m.diffRight, foldRegions, m.diffFoldState, i, m.diffCursorSide, m.diffUnified)
+
+			switch m.diffVisualType {
+			case 'v': // Character mode: partial first/last lines.
+				runes := []rune(lineText)
+				anchorCol := m.diffVisualCol
+				cursorCol := m.diffVisualCurCol
+				startCol, endCol := anchorCol, cursorCol
+				if m.diffVisualStart > m.diffCursor {
+					startCol, endCol = cursorCol, anchorCol
+				}
+				if selStart == selEnd {
+					cs := min(anchorCol, cursorCol)
+					ce := max(anchorCol, cursorCol) + 1
+					if cs > len(runes) {
+						cs = len(runes)
+					}
+					if ce > len(runes) {
+						ce = len(runes)
+					}
+					parts = append(parts, string(runes[cs:ce]))
+				} else if i == selStart {
+					cs := startCol
+					if cs > len(runes) {
+						cs = len(runes)
+					}
+					parts = append(parts, string(runes[cs:]))
+				} else if i == selEnd {
+					ce := endCol + 1
+					if ce > len(runes) {
+						ce = len(runes)
+					}
+					parts = append(parts, string(runes[:ce]))
+				} else {
+					parts = append(parts, lineText)
+				}
+			case 'B': // Block mode: rectangular column range.
+				runes := []rune(lineText)
+				colStart := min(m.diffVisualCol, m.diffVisualCurCol)
+				colEnd := max(m.diffVisualCol, m.diffVisualCurCol) + 1
+				if colStart > len(runes) {
+					colStart = len(runes)
+				}
+				if colEnd > len(runes) {
+					colEnd = len(runes)
+				}
+				parts = append(parts, string(runes[colStart:colEnd]))
+			default: // Line mode: full lines.
+				parts = append(parts, lineText)
+			}
+		}
+		clipText := strings.Join(parts, "\n")
+		lineCount := selEnd - selStart + 1
+		m.diffVisualMode = false
+		m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
+		return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+	case "j", "down":
+		maxCursor := max(totalLines-1, 0)
+		if m.diffCursor < maxCursor {
+			m.diffCursor++
+		}
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "k", "up":
+		if m.diffCursor > 0 {
+			m.diffCursor--
+		}
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "h", "left":
+		if m.diffVisualType == 'v' || m.diffVisualType == 'B' {
+			if m.diffVisualCurCol > 0 {
+				m.diffVisualCurCol--
+			}
+		}
+		return m, nil
+	case "l", "right":
+		if m.diffVisualType == 'v' || m.diffVisualType == 'B' {
+			m.diffVisualCurCol++
+		}
+		return m, nil
+	case "0":
+		m.diffVisualCurCol = 0
+		return m, nil
+	case "$":
+		lineText := m.diffCurrentLineText(foldRegions)
+		lineLen := len([]rune(lineText))
+		if lineLen > 0 {
+			m.diffVisualCurCol = lineLen - 1
+		}
+		return m, nil
+	case "^":
+		lineText := m.diffCurrentLineText(foldRegions)
+		m.diffVisualCurCol = firstNonWhitespace(lineText)
+		return m, nil
+	case "w":
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			lineLen := len([]rune(lineText))
+			newCol := nextWordStart(lineText, m.diffVisualCurCol)
+			if newCol >= lineLen {
+				newCol = max(lineLen-1, 0)
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "b":
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			newCol := prevWordStart(lineText, m.diffVisualCurCol)
+			if newCol < 0 {
+				newCol = 0
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "e":
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			lineLen := len([]rune(lineText))
+			newCol := wordEnd(lineText, m.diffVisualCurCol)
+			if newCol >= lineLen {
+				newCol = max(lineLen-1, 0)
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "E":
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			lineLen := len([]rune(lineText))
+			newCol := WORDEnd(lineText, m.diffVisualCurCol)
+			if newCol >= lineLen {
+				newCol = max(lineLen-1, 0)
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "W":
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			lineLen := len([]rune(lineText))
+			newCol := nextWORDStart(lineText, m.diffVisualCurCol)
+			if newCol >= lineLen {
+				newCol = max(lineLen-1, 0)
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "B":
+		lineText := m.diffCurrentLineText(foldRegions)
+		if lineText != "" {
+			newCol := prevWORDStart(lineText, m.diffVisualCurCol)
+			if newCol < 0 {
+				newCol = 0
+			}
+			m.diffVisualCurCol = newCol
+		}
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.diffCursor = 0
+			m.diffScroll = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G":
+		maxCursor := max(totalLines-1, 0)
+		m.diffCursor = maxCursor
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "ctrl+d":
+		maxCursor := max(totalLines-1, 0)
+		m.diffCursor = min(m.diffCursor+m.height/2, maxCursor)
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "ctrl+u":
+		m.diffCursor = max(m.diffCursor-m.height/2, 0)
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "ctrl+f":
+		maxCursor := max(totalLines-1, 0)
+		m.diffCursor = min(m.diffCursor+m.height, maxCursor)
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "ctrl+b":
+		m.diffCursor = max(m.diffCursor-m.height, 0)
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "ctrl+c":
+		m.diffVisualMode = false
+		return m.closeTabOrQuit()
 	}
 	return m, nil
 }

@@ -408,6 +408,13 @@ All other keys are forwarded to the PTY process.
 | Key | Action |
 |---|---|
 | `j` / `k` | Move cursor up/down |
+| `h` / `l` | Move cursor column left/right |
+| `0` / `$` | Move cursor to line start/end |
+| `^` | Move cursor to first non-whitespace |
+| `w` / `b` | Move cursor to next/previous word start |
+| `W` / `B` | Move cursor to next/previous WORD start |
+| `e` | Move cursor to end of word |
+| `E` | Move cursor to end of WORD |
 | `Tab` | Switch cursor side (side-by-side mode) |
 | `gg` / `G` | Jump to top / bottom |
 | `123G` | Jump to line number |
@@ -415,10 +422,14 @@ All other keys are forwarded to the PTY process.
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
 | `/` | Search in diff |
 | `n` / `N` | Next / previous search match |
+| `v` | Character visual selection |
+| `V` | Visual line selection |
+| `Ctrl+V` | Block (column) visual selection |
+| `h` / `l` | Move selection column (in visual mode) |
+| `y` | Copy selected text (in visual mode) |
 | `z` | Toggle fold unchanged section at cursor |
 | `Z` | Toggle all folds |
 | `#` | Toggle line numbers |
-| `123G` | Jump to line number |
 | `u` | Toggle unified/side-by-side view |
 | `q` / `Esc` | Back to explorer |
 

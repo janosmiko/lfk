@@ -90,9 +90,19 @@ func DiffViewTotalLines(left, right string, foldRegions []DiffFoldRegion, foldSt
 	return len(visLines) + 1
 }
 
+// DiffVisualParams holds visual selection state passed to diff renderers.
+type DiffVisualParams struct {
+	CursorSide  int  // 0=left, 1=right (side-by-side only)
+	CursorCol   int  // current cursor column
+	VisualMode  bool // true when in visual selection mode
+	VisualType  rune // 'V' = line, 'v' = char, 'B' = block
+	VisualStart int  // anchor line (visible-line index)
+	VisualCol   int  // anchor column
+}
+
 // RenderDiffView renders a side-by-side YAML diff view with search highlighting
 // and fold support.
-func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int) string {
+func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams) string {
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -167,12 +177,27 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 
 	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
 
+	// Precompute visual selection range.
+	selStart, selEnd := -1, -1
+	if vp.VisualMode {
+		selStart = min(vp.VisualStart, cursor)
+		selEnd = max(vp.VisualStart, cursor)
+	}
+
 	rows := make([]string, 0, len(visible))
 	for ri, vl := range visible {
-		isCursorLine := ri+scroll == cursor
-		cursorIndicator := " "
+		visIdx := ri + scroll
+		isCursorLine := visIdx == cursor
+
+		// Show cursor indicator on the active side.
+		leftCursorInd := " "
+		rightCursorInd := " "
 		if isCursorLine {
-			cursorIndicator = cursorStyle.Render(">")
+			if vp.CursorSide == 0 {
+				leftCursorInd = cursorStyle.Render(">")
+			} else {
+				rightCursorInd = cursorStyle.Render(">")
+			}
 		}
 
 		if vl.IsFoldPlaceholder {
@@ -180,22 +205,40 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 			gutterPadL := strings.Repeat(" ", gutterWidth)
 			leftPlaceholder := padToWidth(placeholder, colWidth)
 			rightPlaceholder := padToWidth(placeholder, colWidth)
-			row := cursorIndicator + gutterPadL + leftPlaceholder + separatorStyle.Render(" | ") + gutterPadL + rightPlaceholder
+			row := leftCursorInd + gutterPadL + leftPlaceholder + separatorStyle.Render(" | ") + rightCursorInd + gutterPadL + rightPlaceholder
 			rows = append(rows, row)
 			continue
 		}
 		dl := rawDiffLines[vl.Original]
+
+		isSelected := vp.VisualMode && visIdx >= selStart && visIdx <= selEnd
+
 		var leftCol, rightCol, leftGutter, rightGutter string
 		switch dl.status {
 		case '=':
-			leftText := truncateToWidth(dl.left, colWidth)
-			rightText := truncateToWidth(dl.right, colWidth)
-			if searchQuery != "" {
-				leftText = highlightDiffSearchInLine(leftText, searchQuery)
-				rightText = highlightDiffSearchInLine(rightText, searchQuery)
+			var leftText, rightText string
+			// Apply visual selection on the active side.
+			if isSelected {
+				leftText, rightText = applyDiffVisualSelection(dl.left, dl.right, vp, visIdx, selStart, selEnd, colWidth)
+			} else {
+				if searchQuery != "" {
+					leftText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery))
+					rightText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery))
+				} else {
+					leftText = normalStyle.Render(truncateToWidth(dl.left, colWidth))
+					rightText = normalStyle.Render(truncateToWidth(dl.right, colWidth))
+				}
 			}
-			leftCol = normalStyle.Render(leftText)
-			rightCol = normalStyle.Render(rightText)
+			// Block cursor on cursor line (non-visual mode).
+			if isCursorLine && !vp.VisualMode {
+				if vp.CursorSide == 0 {
+					leftText = RenderCursorAtCol(leftText, dl.left, vp.CursorCol)
+				} else {
+					rightText = RenderCursorAtCol(rightText, dl.right, vp.CursorCol)
+				}
+			}
+			leftCol = leftText
+			rightCol = rightText
 			if lineNumbers {
 				leftGutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, leftNum))
 				rightGutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, rightNum))
@@ -203,11 +246,18 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 			leftNum++
 			rightNum++
 		case '<':
-			leftText := truncateToWidth(dl.left, colWidth)
-			if searchQuery != "" {
-				leftText = highlightDiffSearchInLine(leftText, searchQuery)
+			var leftText string
+			if isSelected && vp.CursorSide == 0 {
+				leftText = applyDiffVisualSide(dl.left, vp, visIdx, selStart, selEnd)
+			} else if searchQuery != "" {
+				leftText = removedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery))
+			} else {
+				leftText = removedStyle.Render(truncateToWidth(dl.left, colWidth))
 			}
-			leftCol = removedStyle.Render(leftText)
+			if isCursorLine && !vp.VisualMode && vp.CursorSide == 0 {
+				leftText = RenderCursorAtCol(leftText, dl.left, vp.CursorCol)
+			}
+			leftCol = leftText
 			rightCol = ""
 			if lineNumbers {
 				leftGutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, leftNum))
@@ -215,19 +265,26 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 			}
 			leftNum++
 		case '>':
-			rightText := truncateToWidth(dl.right, colWidth)
-			if searchQuery != "" {
-				rightText = highlightDiffSearchInLine(rightText, searchQuery)
+			var rightText string
+			if isSelected && vp.CursorSide == 1 {
+				rightText = applyDiffVisualSide(dl.right, vp, visIdx, selStart, selEnd)
+			} else if searchQuery != "" {
+				rightText = addedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery))
+			} else {
+				rightText = addedStyle.Render(truncateToWidth(dl.right, colWidth))
+			}
+			if isCursorLine && !vp.VisualMode && vp.CursorSide == 1 {
+				rightText = RenderCursorAtCol(rightText, dl.right, vp.CursorCol)
 			}
 			leftCol = ""
-			rightCol = addedStyle.Render(rightText)
+			rightCol = rightText
 			if lineNumbers {
 				leftGutter = strings.Repeat(" ", gutterWidth)
 				rightGutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, rightNum))
 			}
 			rightNum++
 		}
-		row := cursorIndicator + leftGutter + padToWidth(leftCol, colWidth) + separatorStyle.Render(" | ") + rightGutter + padToWidth(rightCol, colWidth)
+		row := leftCursorInd + leftGutter + padToWidth(leftCol, colWidth) + separatorStyle.Render(" | ") + rightCursorInd + rightGutter + padToWidth(rightCol, colWidth)
 		rows = append(rows, row)
 	}
 
@@ -237,6 +294,16 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 	}
 
 	titleText := "Resource Diff"
+	if vp.VisualMode {
+		switch vp.VisualType {
+		case 'v':
+			titleText += " [VISUAL]"
+		case 'B':
+			titleText += " [VISUAL BLOCK]"
+		default:
+			titleText += " [VISUAL LINE]"
+		}
+	}
 	if searchQuery != "" && !searchMode {
 		titleText += " [/" + searchQuery + "]"
 	}
@@ -261,11 +328,23 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 			HelpKeyStyle.Render("esc") + BarDimStyle.Render(": cancel") +
 			BarDimStyle.Render("  /") + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(searchBar)
+	} else if vp.VisualMode {
+		hintContent := FormatHintParts([]HintEntry{
+			{Key: "j/k", Desc: "extend"},
+			{Key: "h/l", Desc: "column"},
+			{Key: "y", Desc: "copy"},
+			{Key: "v/V/ctrl+v", Desc: "switch mode"},
+			{Key: "esc", Desc: "cancel"},
+		})
+		scrollInfo := BarDimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))
+		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(hintContent + scrollInfo)
 	} else {
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
 			{Key: "/", Desc: "search"},
+			{Key: "v/V", Desc: "select"},
+			{Key: "tab", Desc: "side"},
 			{Key: "z", Desc: "fold"},
 			{Key: "#", Desc: "lines"},
 			{Key: "u", Desc: "unified"},
@@ -280,7 +359,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 
 // RenderUnifiedDiffView renders a unified diff view of two YAML resources
 // with search highlighting and fold support.
-func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int) string {
+func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams) string {
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -296,15 +375,27 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		gutterWidth = len(fmt.Sprintf("%d", len(rawDiffLines)+2)) + 1 // +2 for header lines
 	}
 
+	// Precompute visual selection range.
+	selStart, selEnd := -1, -1
+	if vp.VisualMode {
+		selStart = min(vp.VisualStart, cursor)
+		selEnd = max(vp.VisualStart, cursor)
+	}
+
 	// Build unified diff lines from visible lines.
-	var lines []string
-	lines = append(lines, headerStyle.Render("--- "+leftName))
-	lines = append(lines, headerStyle.Render("+++ "+rightName))
+	type unifiedLine struct {
+		text   string
+		plain  string // plain text for cursor rendering
+		visIdx int    // visible diff line index (for selection)
+	}
+	var lines []unifiedLine
+	lines = append(lines, unifiedLine{text: headerStyle.Render("--- " + leftName), visIdx: -1})
+	lines = append(lines, unifiedLine{text: headerStyle.Render("+++ " + rightName), visIdx: -1})
 
 	lineNum := 1
-	for _, vl := range visLines {
+	for vi, vl := range visLines {
 		if vl.IsFoldPlaceholder {
-			lines = append(lines, DiffFoldPlaceholderText(vl.HiddenCount))
+			lines = append(lines, unifiedLine{text: DiffFoldPlaceholderText(vl.HiddenCount), visIdx: vi})
 			continue
 		}
 		dl := rawDiffLines[vl.Original]
@@ -313,29 +404,71 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 			gutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, lineNum))
 		}
 		lineNum++
+
+		isSelected := vp.VisualMode && vi >= selStart && vi <= selEnd
+		isCursorLine := vi == cursor
+		// Get the plain content for this line (without +/- prefix).
+		var plainContent string
+		if dl.left != "" {
+			plainContent = dl.left
+		} else {
+			plainContent = dl.right
+		}
+
 		switch dl.status {
 		case '=':
 			content := " " + dl.left
-			if searchQuery != "" {
-				content = highlightDiffSearchInLine(content, searchQuery)
+			if isSelected {
+				content = applyDiffVisualSide(content, vp, vi, selStart, selEnd)
+			} else if searchQuery != "" {
+				content = normalStyle.Render(highlightDiffSearchInLine(content, searchQuery))
+			} else {
+				content = normalStyle.Render(content)
 			}
-			lines = append(lines, gutter+normalStyle.Render(content))
+			if isCursorLine && !vp.VisualMode {
+				content = RenderCursorAtCol(content, " "+plainContent, vp.CursorCol)
+			}
+			lines = append(lines, unifiedLine{text: gutter + content, plain: " " + plainContent, visIdx: vi})
 		case '<':
 			content := "-" + dl.left
-			if searchQuery != "" {
-				content = highlightDiffSearchInLine(content, searchQuery)
+			if isSelected {
+				content = applyDiffVisualSide(content, vp, vi, selStart, selEnd)
+			} else if searchQuery != "" {
+				content = removedStyle.Render(highlightDiffSearchInLine(content, searchQuery))
+			} else {
+				content = removedStyle.Render(content)
 			}
-			lines = append(lines, gutter+removedStyle.Render(content))
+			if isCursorLine && !vp.VisualMode {
+				content = RenderCursorAtCol(content, "-"+plainContent, vp.CursorCol)
+			}
+			lines = append(lines, unifiedLine{text: gutter + content, plain: "-" + plainContent, visIdx: vi})
 		case '>':
 			content := "+" + dl.right
-			if searchQuery != "" {
-				content = highlightDiffSearchInLine(content, searchQuery)
+			if isSelected {
+				content = applyDiffVisualSide(content, vp, vi, selStart, selEnd)
+			} else if searchQuery != "" {
+				content = addedStyle.Render(highlightDiffSearchInLine(content, searchQuery))
+			} else {
+				content = addedStyle.Render(content)
 			}
-			lines = append(lines, gutter+addedStyle.Render(content))
+			if isCursorLine && !vp.VisualMode {
+				content = RenderCursorAtCol(content, "+"+plainContent, vp.CursorCol)
+			}
+			lines = append(lines, unifiedLine{text: gutter + content, plain: "+" + plainContent, visIdx: vi})
 		}
 	}
 
 	titleText := "Resource Diff (unified)"
+	if vp.VisualMode {
+		switch vp.VisualType {
+		case 'v':
+			titleText += " [VISUAL]"
+		case 'B':
+			titleText += " [VISUAL BLOCK]"
+		default:
+			titleText += " [VISUAL LINE]"
+		}
+	}
 	if searchQuery != "" && !searchMode {
 		titleText += " [/" + searchQuery + "]"
 	}
@@ -361,27 +494,28 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 	}
 
 	// Visible slice.
-	visible := lines[scroll:]
-	if len(visible) > maxLines {
-		visible = visible[:maxLines]
+	visibleSlice := lines[scroll:]
+	if len(visibleSlice) > maxLines {
+		visibleSlice = visibleSlice[:maxLines]
 	}
 
 	// Add cursor indicator gutter (> or space) to each visible line.
 	cursorStyleU := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
-	for i := range visible {
-		if i+scroll == cursor {
-			visible[i] = cursorStyleU.Render(">") + visible[i]
+	rendered := make([]string, len(visibleSlice))
+	for i, ul := range visibleSlice {
+		if ul.visIdx == cursor {
+			rendered[i] = cursorStyleU.Render(">") + ul.text
 		} else {
-			visible[i] = " " + visible[i]
+			rendered[i] = " " + ul.text
 		}
 	}
 
 	// Pad to fill available height so content fills the border.
-	for len(visible) < maxLines {
-		visible = append(visible, "")
+	for len(rendered) < maxLines {
+		rendered = append(rendered, "")
 	}
 
-	bodyContent := strings.Join(visible, "\n")
+	bodyContent := strings.Join(rendered, "\n")
 	borderStyle := FullscreenBorderStyle(width, maxLines)
 	body := borderStyle.Render(bodyContent)
 
@@ -393,11 +527,22 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 			HelpKeyStyle.Render("esc") + BarDimStyle.Render(": cancel") +
 			BarDimStyle.Render("  /") + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(searchBar)
+	} else if vp.VisualMode {
+		hintContent := FormatHintParts([]HintEntry{
+			{Key: "j/k", Desc: "extend"},
+			{Key: "h/l", Desc: "column"},
+			{Key: "y", Desc: "copy"},
+			{Key: "v/V/ctrl+v", Desc: "switch mode"},
+			{Key: "esc", Desc: "cancel"},
+		})
+		scrollInfo := BarDimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))
+		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(hintContent + scrollInfo)
 	} else {
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
 			{Key: "/", Desc: "search"},
+			{Key: "v/V", Desc: "select"},
 			{Key: "z", Desc: "fold"},
 			{Key: "#", Desc: "lines"},
 			{Key: "u", Desc: "side-by-side"},
@@ -448,6 +593,53 @@ func DiffVisibleIndexForOriginal(left, right string, foldRegions []DiffFoldRegio
 		}
 	}
 	return -1
+}
+
+// DiffLineTextAt returns the text of a specific visible diff line on the given side.
+// For side-by-side mode, side 0 returns the left text, side 1 returns the right text.
+// For unified mode, it returns whichever side has content.
+// Returns empty string if the index is out of range or the line is a fold placeholder.
+func DiffLineTextAt(left, right string, foldRegions []DiffFoldRegion, foldState []bool, visibleIdx, side int, unified bool) string {
+	rawDiffLines := computeDiff(left, right)
+	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
+	if visibleIdx < 0 || visibleIdx >= len(visLines) {
+		return ""
+	}
+	vl := visLines[visibleIdx]
+	if vl.IsFoldPlaceholder || vl.Original < 0 {
+		return ""
+	}
+	dl := rawDiffLines[vl.Original]
+	if unified {
+		if dl.left != "" {
+			return dl.left
+		}
+		return dl.right
+	}
+	if side == 0 {
+		return dl.left
+	}
+	return dl.right
+}
+
+// applyDiffVisualSelection applies visual selection highlighting to both sides
+// of a side-by-side diff line and returns the styled left and right text.
+func applyDiffVisualSelection(leftPlain, rightPlain string, vp DiffVisualParams, visIdx, selStart, selEnd, colWidth int) (string, string) {
+	if vp.CursorSide == 0 {
+		leftResult := applyDiffVisualSide(leftPlain, vp, visIdx, selStart, selEnd)
+		rightResult := truncateToWidth(rightPlain, colWidth)
+		return leftResult, rightResult
+	}
+	leftResult := truncateToWidth(leftPlain, colWidth)
+	rightResult := applyDiffVisualSide(rightPlain, vp, visIdx, selStart, selEnd)
+	return leftResult, rightResult
+}
+
+// applyDiffVisualSide applies visual selection highlighting to a single side's text.
+func applyDiffVisualSide(plainText string, vp DiffVisualParams, visIdx, selStart, selEnd int) string {
+	colStart := min(vp.VisualCol, vp.CursorCol)
+	colEnd := max(vp.VisualCol, vp.CursorCol)
+	return RenderVisualSelection(plainText, vp.VisualType, visIdx, selStart, selEnd, vp.VisualStart, vp.VisualCol, vp.CursorCol, colStart, colEnd)
 }
 
 // truncateToWidth truncates a string to fit within the given visual width.

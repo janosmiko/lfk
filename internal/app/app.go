@@ -438,22 +438,27 @@ type Model struct {
 	describeRefreshFunc func() tea.Cmd // returns the load command for auto-refresh
 
 	// Diff viewer state.
-	diffLeft        string // YAML content of first resource
-	diffRight       string // YAML content of second resource
-	diffLeftName    string // name of first resource
-	diffRightName   string // name of second resource
-	diffScroll      int    // scroll position in diff view
-	diffCursor      int    // cursor line in visible-line space
-	diffCursorSide  int    // 0=left, 1=right (side-by-side only)
-	diffUnified     bool   // true = unified diff, false = side-by-side
-	diffLineNumbers bool   // show line numbers in diff view
-	diffLineInput   string // digit accumulator for jump-to-line (digits + G)
-	diffSearchMode  bool   // true when typing in the search bar
-	diffSearchText  TextInput
-	diffSearchQuery string // committed search query
-	diffMatchLines  []int  // diff line indices with matches
-	diffMatchIdx    int    // current match index in diffMatchLines
-	diffFoldState   []bool // per-unchanged-region collapsed state
+	diffLeft         string // YAML content of first resource
+	diffRight        string // YAML content of second resource
+	diffLeftName     string // name of first resource
+	diffRightName    string // name of second resource
+	diffScroll       int    // scroll position in diff view
+	diffCursor       int    // cursor line in visible-line space
+	diffCursorSide   int    // 0=left, 1=right (side-by-side only)
+	diffUnified      bool   // true = unified diff, false = side-by-side
+	diffLineNumbers  bool   // show line numbers in diff view
+	diffLineInput    string // digit accumulator for jump-to-line (digits + G)
+	diffSearchMode   bool   // true when typing in the search bar
+	diffSearchText   TextInput
+	diffSearchQuery  string // committed search query
+	diffMatchLines   []int  // diff line indices with matches
+	diffMatchIdx     int    // current match index in diffMatchLines
+	diffFoldState    []bool // per-unchanged-region collapsed state
+	diffVisualMode   bool   // true when in visual selection mode
+	diffVisualType   rune   // 'V' = line, 'v' = char, 'B' = block
+	diffVisualStart  int    // anchor line (visible-line index)
+	diffVisualCol    int    // anchor column
+	diffVisualCurCol int    // current cursor column
 
 	// Embedded terminal state (PTY mode).
 	execPTY        *os.File       // PTY master file descriptor

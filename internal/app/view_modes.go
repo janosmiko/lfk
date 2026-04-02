@@ -111,10 +111,18 @@ func (m Model) viewExplain() string {
 func (m Model) viewDiff() string {
 	foldRegions := ui.ComputeDiffFoldRegions(m.diffLeft, m.diffRight)
 	searchInput := m.diffSearchText.Value
-	if m.diffUnified {
-		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor)
+	vp := ui.DiffVisualParams{
+		CursorSide:  m.diffCursorSide,
+		CursorCol:   m.diffVisualCurCol,
+		VisualMode:  m.diffVisualMode,
+		VisualType:  m.diffVisualType,
+		VisualStart: m.diffVisualStart,
+		VisualCol:   m.diffVisualCol,
 	}
-	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor)
+	if m.diffUnified {
+		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+	}
+	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
 }
 
 func (m Model) logViewHeight() int {
