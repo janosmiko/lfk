@@ -461,6 +461,11 @@ func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		var parts []string
 		for i := selStart; i <= selEnd; i++ {
 			lineText := ui.DiffLineTextAt(m.diffLeft, m.diffRight, foldRegions, m.diffFoldState, i, m.diffCursorSide, m.diffUnified)
+			// Skip lines where the active side has no content (e.g., additions
+			// on the opposite side show as empty on this side).
+			if lineText == "" {
+				continue
+			}
 
 			switch m.diffVisualType {
 			case 'v': // Character mode: partial first/last lines.
