@@ -501,7 +501,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pendingMark = true
 		return m, nil
 
-	case kb.Help:
+	case kb.Help, "f1":
 		m.helpPreviousMode = modeExplorer
 		m.mode = modeHelp
 		m.helpScroll = 0

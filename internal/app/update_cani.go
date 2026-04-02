@@ -307,7 +307,7 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	visibleLines := m.canIVisibleLines()
 
 	switch msg.String() {
-	case "?":
+	case "?", "f1":
 		m.helpPreviousMode = modeExplorer
 		m.overlay = overlayNone
 		m.mode = modeHelp

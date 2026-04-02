@@ -21,7 +21,7 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "?":
+	case "?", "f1":
 		m.helpPreviousMode = modeLogs
 		m.mode = modeHelp
 		m.helpScroll = 0

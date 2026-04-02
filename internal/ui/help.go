@@ -58,7 +58,7 @@ func helpSections() []helpSection {
 		{
 			title: "Views",
 			bindings: []helpEntry{
-				{kb.Help, "Toggle help screen"},
+				{kb.Help + " / F1", "Toggle help screen"},
 				{kb.Filter, "Filter items in current view"},
 				{kb.Search, "Search and jump to match"},
 				{kb.NextMatch, "Next search match"},

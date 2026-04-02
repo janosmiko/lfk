@@ -21,7 +21,7 @@ func (m Model) handleDescribeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "?":
+	case "?", "f1":
 		m.helpPreviousMode = modeDescribe
 		m.mode = modeHelp
 		m.helpScroll = 0
@@ -178,7 +178,7 @@ func (m Model) handleDiffKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "?":
+	case "?", "f1":
 		m.helpPreviousMode = modeDiff
 		m.mode = modeHelp
 		m.helpScroll = 0

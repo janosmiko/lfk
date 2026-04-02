@@ -107,7 +107,7 @@ func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "?":
+	case "?", "f1":
 		m.helpPreviousMode = modeExplain
 		m.mode = modeHelp
 		m.helpScroll = 0

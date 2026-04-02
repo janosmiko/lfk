@@ -431,7 +431,7 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	switch msg.String() {
-	case "?":
+	case "?", "f1":
 		m.helpPreviousMode = modeYAML
 		m.mode = modeHelp
 		m.helpScroll = 0
