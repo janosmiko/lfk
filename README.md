@@ -272,6 +272,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `=` | Toggle sort direction (ascending/descending) |
 | `-` | Reset sort to default (Name ascending) |
 | `W` | Save resource to file / toggle warnings-only (Events) |
+| `Ctrl+T` | Toggle terminal mode (pty embedded / exec takeover) |
 | `@` | Monitoring overview (active Prometheus alerts) |
 | `Q` | Namespace resource quota dashboard |
 
@@ -620,6 +621,7 @@ All keybindings can be overridden in the config file. Only specify the keys you 
 | `sort_reset` | `-` | Reset sort to default |
 | `error_log` | `!` | Error log overlay |
 | `finalizer_search` | `ctrl+g` | Finalizer search and remove |
+| `terminal_toggle` | `ctrl+t` | Toggle terminal mode (pty/exec) |
 
 ## Architecture
 

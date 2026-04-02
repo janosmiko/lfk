@@ -43,6 +43,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `-` | Reset sort to default (Name ascending) |
 | `W` | Save resource to file / toggle warnings-only filter (Events view) |
 | `T` | Switch color scheme (live preview, not persisted) |
+| `Ctrl+T` | Toggle terminal mode (pty embedded / exec takeover) |
 | `Ctrl+G` | Finalizer search and remove |
 | `@` | Monitoring overview (active Prometheus alerts) |
 | `Q` | Namespace resource quota dashboard |
@@ -425,6 +426,7 @@ keybindings:
   filter_presets: "."    # Quick filter presets
   monitoring: "@"        # Monitoring dashboard
   quota_dashboard: "Q"   # Quota dashboard
+  terminal_toggle: "ctrl+t"  # Toggle terminal mode (pty/exec)
 
   # Actions
   action_menu: "x"       # Action menu

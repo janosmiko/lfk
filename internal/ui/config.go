@@ -96,6 +96,9 @@ type Keybindings struct {
 	// Bookmarks
 	SetMark   string `json:"set_mark" yaml:"set_mark"`
 	OpenMarks string `json:"open_marks" yaml:"open_marks"`
+
+	// Terminal mode
+	TerminalToggle string `json:"terminal_toggle" yaml:"terminal_toggle"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -138,6 +141,9 @@ func DefaultKeybindings() Keybindings {
 
 		// Bookmarks
 		SetMark: "m", OpenMarks: "'",
+
+		// Terminal mode
+		TerminalToggle: "ctrl+t",
 	}
 }
 

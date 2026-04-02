@@ -145,6 +145,7 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `sort_reset` | `-` | Reset sort to default |
 | `error_log` | `!` | Error log overlay |
 | `finalizer_search` | `ctrl+g` | Finalizer search and remove |
+| `terminal_toggle` | `ctrl+t` | Toggle terminal mode (pty/exec) |
 
 ## Resource Columns
 

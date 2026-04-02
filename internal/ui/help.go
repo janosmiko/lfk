@@ -113,6 +113,7 @@ func helpSections() []helpSection {
 				{kb.QuotaDashboard, "Namespace resource quota dashboard"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down/up"},
 				{kb.SaveResource, "Save resource to file / toggle warnings-only (Events)"},
+				{helpKeyDisplay(kb.TerminalToggle), "Toggle terminal mode (pty embedded / exec takeover)"},
 				{"", "Port forwarding: use action menu (" + kb.ActionMenu + ") on Pod/Service/Deployment/StatefulSet/DaemonSet"},
 				{"", "Auto-navigates to Port Forwards list after creation; shows resolved local port"},
 			},

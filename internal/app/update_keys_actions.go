@@ -472,6 +472,17 @@ func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 		m.errorLogScroll = 0
 		return m, nil, true
 
+	case kb.TerminalToggle:
+		// Toggle between PTY (embedded) and exec (takes over terminal) mode.
+		if ui.ConfigTerminalMode == "pty" {
+			ui.ConfigTerminalMode = "exec"
+			m.setStatusMessage("Terminal mode: exec (takes over terminal)", false)
+		} else {
+			ui.ConfigTerminalMode = "pty"
+			m.setStatusMessage("Terminal mode: pty (embedded)", false)
+		}
+		return m, scheduleStatusClear(), true
+
 	case kb.Monitoring:
 		// Navigate to the Monitoring dashboard item.
 		if m.nav.Level < model.LevelResourceTypes {
