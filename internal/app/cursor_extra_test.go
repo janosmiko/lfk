@@ -49,25 +49,25 @@ func TestSyncExpandedGroupDashboardCategoryAlwaysExpanded(t *testing.T) {
 	assert.True(t, hasDashboard)
 }
 
-// --- visibleMiddleItems: filter by Kind ---
+// --- visibleMiddleItems: filter matches name only ---
 
-func TestVisibleMiddleItemsFilterByKind(t *testing.T) {
+func TestVisibleMiddleItemsFilterByName(t *testing.T) {
 	m := Model{
 		nav: model.NavigationState{Level: model.LevelResources},
 		middleItems: []model.Item{
 			{Name: "pod-a", Kind: "Pod"},
 			{Name: "deploy-b", Kind: "Deployment"},
 		},
-		filterText: "Pod",
+		filterText: "pod",
 	}
 	visible := m.visibleMiddleItems()
 	assert.Len(t, visible, 1)
 	assert.Equal(t, "pod-a", visible[0].Name)
 }
 
-// --- visibleMiddleItems: filter by Extra (not at LevelOwned) ---
+// --- visibleMiddleItems: filter does NOT match by Extra/Kind/Status ---
 
-func TestVisibleMiddleItemsFilterByExtra(t *testing.T) {
+func TestVisibleMiddleItemsFilterIgnoresExtra(t *testing.T) {
 	m := Model{
 		nav: model.NavigationState{Level: model.LevelResources},
 		middleItems: []model.Item{
@@ -76,25 +76,23 @@ func TestVisibleMiddleItemsFilterByExtra(t *testing.T) {
 		},
 		filterText: "LoadBalancer",
 	}
-	visible := m.visibleMiddleItems()
-	assert.Len(t, visible, 1)
-	assert.Equal(t, "svc-b", visible[0].Name)
-}
-
-// --- visibleMiddleItems: filter by Extra excluded at LevelOwned ---
-
-func TestVisibleMiddleItemsExtraExcludedAtOwned(t *testing.T) {
-	m := Model{
-		nav: model.NavigationState{Level: model.LevelOwned},
-		middleItems: []model.Item{
-			{Name: "pod-a", Extra: "some-extra"},
-			{Name: "pod-b"},
-		},
-		filterText: "some-extra",
-	}
-	// At LevelOwned, Extra is not included in filter search text.
+	// Filter only matches names, not Extra fields.
 	visible := m.visibleMiddleItems()
 	assert.Empty(t, visible)
+}
+
+func TestVisibleMiddleItemsFilterByNamespaceName(t *testing.T) {
+	m := Model{
+		nav: model.NavigationState{Level: model.LevelResources},
+		middleItems: []model.Item{
+			{Name: "pod-a", Namespace: "kube-system"},
+			{Name: "pod-b", Namespace: "default"},
+		},
+		filterText: "kube-system",
+	}
+	visible := m.visibleMiddleItems()
+	assert.Len(t, visible, 1)
+	assert.Equal(t, "pod-a", visible[0].Name)
 }
 
 // --- selectedMiddleItem: with filter ---

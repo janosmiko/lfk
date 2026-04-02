@@ -268,24 +268,10 @@ func (m *Model) visibleMiddleItems() []model.Item {
 				filtered = append(filtered, item)
 				continue
 			}
+			// Match against name (and namespace/name for namespaced resources).
 			searchText := item.Name
 			if item.Namespace != "" {
 				searchText = item.Namespace + "/" + searchText
-			}
-			if item.Kind != "" {
-				searchText += " " + item.Kind
-			}
-			if item.Status != "" {
-				searchText += " " + item.Status
-			}
-			if item.Extra != "" && m.nav.Level != model.LevelOwned {
-				searchText += " " + item.Extra
-			}
-			for _, kv := range item.Columns {
-				if !strings.HasPrefix(kv.Key, "secret:") && !strings.HasPrefix(kv.Key, "data:") &&
-					!strings.HasPrefix(kv.Key, "owner:") && !strings.HasPrefix(kv.Key, "__") {
-					searchText += " " + kv.Value
-				}
 			}
 			if ui.MatchLine(searchText, rawQuery) {
 				filtered = append(filtered, item)
