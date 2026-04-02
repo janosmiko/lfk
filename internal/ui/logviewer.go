@@ -151,10 +151,10 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 		copy(displayLines, lines)
 		for i := scroll; i < end; i++ {
 			if !timestamps {
-				displayLines[i] = stripTimestamp(lines[i])
+				displayLines[i] = StripTimestamp(lines[i])
 			}
 			if hidePrefixes {
-				displayLines[i] = stripPodPrefix(displayLines[i])
+				displayLines[i] = StripPodPrefix(displayLines[i])
 			}
 		}
 	}
@@ -415,10 +415,10 @@ func wrapLine(line string, width int) []string {
 	return parts
 }
 
-// stripTimestamp removes a leading kubectl timestamp (RFC3339Nano + space) from a log line.
+// StripTimestamp removes a leading kubectl timestamp (RFC3339Nano + space) from a log line.
 // kubectl --timestamps format: "2024-01-15T10:30:00.000000000Z <log content>"
 // With --prefix: "[pod/name container] 2024-01-15T10:30:00.000000000Z <log content>"
-func stripTimestamp(line string) string {
+func StripTimestamp(line string) string {
 	// Handle prefixed lines: "[pod/name container] timestamp rest"
 	if len(line) > 0 && line[0] == '[' {
 		closeBracket := strings.Index(line, "] ")
@@ -502,8 +502,8 @@ func colorizePodPrefix(line string) string {
 	return style.Render("["+prefix+"]") + " " + rest
 }
 
-// stripPodPrefix removes the leading "[pod/name/container] " prefix from a log line.
-func stripPodPrefix(line string) string {
+// StripPodPrefix removes the leading "[pod/name/container] " prefix from a log line.
+func StripPodPrefix(line string) string {
 	if len(line) == 0 || line[0] != '[' {
 		return line
 	}

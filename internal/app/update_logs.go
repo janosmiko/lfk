@@ -793,10 +793,18 @@ func (m *Model) findNextLogMatch(forward bool) {
 
 	jumpToMatch := func(lineIdx int) {
 		m.logCursor = lineIdx
-		// Move cursor column to the match position within the line.
-		col := strings.Index(strings.ToLower(m.logLines[lineIdx]), query)
+		// Compute cursor column against the display line (after stripping
+		// timestamps and prefixes) so the cursor lands on the visible match.
+		displayLine := m.logLines[lineIdx]
+		if !m.logTimestamps {
+			displayLine = ui.StripTimestamp(displayLine)
+		}
+		if m.logHidePrefixes {
+			displayLine = ui.StripPodPrefix(displayLine)
+		}
+		col := strings.Index(strings.ToLower(displayLine), query)
 		if col >= 0 {
-			m.logVisualCurCol = len([]rune(m.logLines[lineIdx][:col]))
+			m.logVisualCurCol = len([]rune(displayLine[:col]))
 		}
 		m.logFollow = false
 		m.ensureLogCursorVisible()

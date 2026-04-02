@@ -832,6 +832,15 @@ func (m *Model) yamlScrollToMatchFolded(viewportLines int) {
 
 	// Move cursor to the match and center it in the viewport.
 	m.yamlCursor = visIdx
+	// Move cursor column to the match position within the line.
+	yamlLines := strings.Split(m.yamlContent, "\n")
+	if targetOrig >= 0 && targetOrig < len(yamlLines) {
+		query := strings.ToLower(m.yamlSearchText.Value)
+		col := strings.Index(strings.ToLower(yamlLines[targetOrig]), query)
+		if col >= 0 {
+			m.yamlVisualCurCol = len([]rune(yamlLines[targetOrig][:col]))
+		}
+	}
 	m.yamlScroll = visIdx - viewportLines/2
 	if m.yamlScroll > maxScroll {
 		m.yamlScroll = maxScroll
