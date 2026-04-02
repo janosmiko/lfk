@@ -92,7 +92,7 @@ func DiffViewTotalLines(left, right string, foldRegions []DiffFoldRegion, foldSt
 
 // RenderDiffView renders a side-by-side YAML diff view with search highlighting
 // and fold support.
-func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor, cursorSide int) string {
+func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int) string {
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -110,7 +110,8 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 	}
 
 	// Calculate column widths: split the available content area in half with a separator.
-	colWidth := (width - 7 - gutterWidth*2) / 2
+	// -1 for cursor gutter (> or space).
+	colWidth := (width - 8 - gutterWidth*2) / 2
 	if colWidth < 10 {
 		colWidth = 10
 	}
@@ -218,25 +219,13 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 			}
 			rightNum++
 		}
-		// Cursor indicator: show > on the active side.
+		// Cursor indicator: 1-char gutter prefix (> or space).
 		isCursorLine := ri+scroll == cursor
+		cursorIndicator := " "
 		if isCursorLine {
-			indicator := cursorStyle.Render(">")
-			if cursorSide == 0 {
-				if len(leftGutter) > 1 {
-					leftGutter = indicator + leftGutter[1:]
-				} else {
-					leftGutter = indicator
-				}
-			} else {
-				if len(rightGutter) > 1 {
-					rightGutter = indicator + rightGutter[1:]
-				} else {
-					rightGutter = indicator
-				}
-			}
+			cursorIndicator = cursorStyle.Render(">")
 		}
-		row := leftGutter + padToWidth(leftCol, colWidth) + separatorStyle.Render(" | ") + rightGutter + padToWidth(rightCol, colWidth)
+		row := cursorIndicator + leftGutter + padToWidth(leftCol, colWidth) + separatorStyle.Render(" | ") + rightGutter + padToWidth(rightCol, colWidth)
 		rows = append(rows, row)
 	}
 
@@ -289,7 +278,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 
 // RenderUnifiedDiffView renders a unified diff view of two YAML resources
 // with search highlighting and fold support.
-func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor, cursorSide int) string {
+func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int) string {
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -369,16 +358,20 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		scroll = 0
 	}
 
-	// Add cursor indicator.
-	cursorStyleU := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
-	if cursor >= 0 && cursor < len(lines) {
-		lines[cursor] = cursorStyleU.Render(">") + lines[cursor]
-	}
-
 	// Visible slice.
 	visible := lines[scroll:]
 	if len(visible) > maxLines {
 		visible = visible[:maxLines]
+	}
+
+	// Add cursor indicator gutter (> or space) to each visible line.
+	cursorStyleU := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
+	for i := range visible {
+		if i+scroll == cursor {
+			visible[i] = cursorStyleU.Render(">") + visible[i]
+		} else {
+			visible[i] = " " + visible[i]
+		}
 	}
 
 	// Pad to fill available height so content fills the border.

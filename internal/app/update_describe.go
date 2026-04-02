@@ -338,6 +338,7 @@ func (m *Model) diffScrollToMatch(foldRegions []ui.DiffFoldRegion, viewportLines
 }
 
 // toggleDiffFoldAtCursor toggles the fold on the unchanged section at the cursor.
+// When collapsing, moves the cursor to the fold placeholder line.
 func (m *Model) toggleDiffFoldAtCursor(foldRegions []ui.DiffFoldRegion) {
 	rawDiffLines := ui.ComputeDiffLines(m.diffLeft, m.diffRight)
 	visLines := ui.BuildVisibleDiffLines(rawDiffLines, foldRegions, m.diffFoldState)
@@ -351,8 +352,22 @@ func (m *Model) toggleDiffFoldAtCursor(foldRegions []ui.DiffFoldRegion) {
 	}
 
 	vl := visLines[idx]
-	if vl.RegionIdx >= 0 && vl.RegionIdx < len(m.diffFoldState) {
-		m.diffFoldState[vl.RegionIdx] = !m.diffFoldState[vl.RegionIdx]
+	if vl.RegionIdx < 0 || vl.RegionIdx >= len(m.diffFoldState) {
+		return
+	}
+
+	wasCollapsed := m.diffFoldState[vl.RegionIdx]
+	m.diffFoldState[vl.RegionIdx] = !wasCollapsed
+
+	// When collapsing, reposition cursor to the fold placeholder.
+	if !wasCollapsed {
+		newVisLines := ui.BuildVisibleDiffLines(rawDiffLines, foldRegions, m.diffFoldState)
+		for i, nvl := range newVisLines {
+			if nvl.IsFoldPlaceholder && nvl.RegionIdx == vl.RegionIdx {
+				m.diffCursor = i
+				break
+			}
+		}
 	}
 }
 
