@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -152,69 +153,245 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m, nil
 }
 
+// errorLogVisibleCount returns the number of visible entries and max dimensions for the error log overlay.
+func (m Model) errorLogVisibleCount() (visibleCount, maxVisible, maxScroll int) {
+	reversed := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
+	visibleCount = len(reversed)
+
+	var overlayH int
+	if m.errorLogFullscreen {
+		overlayH = m.height - 1
+	} else {
+		overlayH = min(30, m.height-4)
+	}
+	maxVisible = max(overlayH-4, 1)
+	maxScroll = max(visibleCount-maxVisible, 0)
+	return
+}
+
 // handleErrorLogOverlayKey handles keyboard input when the error log overlay is open.
 func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Count visible entries (respecting debug filter).
-	visibleCount := 0
-	for _, e := range m.errorLog {
-		if e.Level == "DBG" && !m.showDebugLogs {
-			continue
-		}
-		visibleCount++
-	}
-	// Calculate the max visible lines (same logic as RenderErrorLogOverlay).
-	overlayH := min(30, m.height-4)
-	maxVisible := overlayH - 4
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
-	maxScroll := visibleCount - maxVisible
-	if maxScroll < 0 {
-		maxScroll = 0
+	visibleCount, maxVisible, maxScroll := m.errorLogVisibleCount()
+	maxCursor := max(visibleCount-1, 0)
+
+	key := msg.String()
+
+	// In visual mode, Esc cancels visual mode instead of closing.
+	if key == "esc" && m.errorLogVisualMode != 0 {
+		m.errorLogVisualMode = 0
+		return m, nil
 	}
 
-	switch msg.String() {
+	switch key {
 	case "esc", "q":
 		m.overlayErrorLog = false
 		m.errorLogScroll = 0
+		m.errorLogFullscreen = false
+		m.errorLogVisualMode = 0
+		m.errorLogCursorLine = 0
 		return m, nil
-	case "d":
-		m.showDebugLogs = !m.showDebugLogs
+
+	case "f":
+		m.errorLogFullscreen = !m.errorLogFullscreen
+		// Reset scroll when toggling to avoid out-of-bounds.
 		m.errorLogScroll = 0
 		return m, nil
+
+	case "V":
+		if m.errorLogVisualMode == 'V' {
+			m.errorLogVisualMode = 0
+		} else {
+			m.errorLogVisualMode = 'V'
+			m.errorLogVisualStart = m.errorLogCursorLine
+		}
+		return m, nil
+
+	case "v":
+		if m.errorLogVisualMode == 'v' {
+			m.errorLogVisualMode = 0
+		} else {
+			m.errorLogVisualMode = 'v'
+			m.errorLogVisualStart = m.errorLogCursorLine
+			m.errorLogVisualStartCol = m.errorLogCursorCol
+		}
+		return m, nil
+
+	case "h", "left":
+		if m.errorLogVisualMode == 'v' && m.errorLogCursorCol > 0 {
+			m.errorLogCursorCol--
+		}
+		return m, nil
+
+	case "l", "right":
+		if m.errorLogVisualMode == 'v' {
+			// Clamp to line length.
+			reversed := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
+			if m.errorLogCursorLine < len(reversed) {
+				lineLen := len([]rune(ui.ErrorLogEntryPlainText(reversed[m.errorLogCursorLine])))
+				if m.errorLogCursorCol < lineLen-1 {
+					m.errorLogCursorCol++
+				}
+			}
+		}
+		return m, nil
+
+	case "0":
+		if m.errorLogVisualMode == 'v' {
+			m.errorLogCursorCol = 0
+		}
+		return m, nil
+
+	case "$":
+		if m.errorLogVisualMode == 'v' {
+			reversed := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
+			if m.errorLogCursorLine < len(reversed) {
+				lineLen := len([]rune(ui.ErrorLogEntryPlainText(reversed[m.errorLogCursorLine])))
+				m.errorLogCursorCol = max(lineLen-1, 0)
+			}
+		}
+		return m, nil
+
+	case "y":
+		return m.errorLogYank()
+
+	case "d":
+		if m.errorLogVisualMode != 0 {
+			// Don't toggle debug in visual mode — 'd' is ambiguous.
+			return m, nil
+		}
+		m.showDebugLogs = !m.showDebugLogs
+		m.errorLogScroll = 0
+		m.errorLogCursorLine = 0
+		return m, nil
+
 	case "j", "down":
-		m.errorLogScroll = clampOverlayCursor(m.errorLogScroll, 1, maxScroll)
+		if m.errorLogCursorLine < maxCursor {
+			m.errorLogCursorLine++
+		}
+		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
+
 	case "k", "up":
-		m.errorLogScroll = clampOverlayCursor(m.errorLogScroll, -1, maxScroll)
+		if m.errorLogCursorLine > 0 {
+			m.errorLogCursorLine--
+		}
+		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
+
 	case "g":
 		if m.pendingG {
 			m.pendingG = false
+			m.errorLogCursorLine = 0
 			m.errorLogScroll = 0
 			return m, nil
 		}
 		m.pendingG = true
 		return m, nil
+
 	case "G":
+		m.errorLogCursorLine = maxCursor
 		m.errorLogScroll = maxScroll
 		return m, nil
+
 	case "ctrl+d":
 		halfPage := maxVisible / 2
-		m.errorLogScroll = clampOverlayCursor(m.errorLogScroll, halfPage, maxScroll)
+		m.errorLogCursorLine = min(m.errorLogCursorLine+halfPage, maxCursor)
+		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
+
 	case "ctrl+u":
 		halfPage := maxVisible / 2
-		m.errorLogScroll = clampOverlayCursor(m.errorLogScroll, -halfPage, maxScroll)
+		m.errorLogCursorLine = max(m.errorLogCursorLine-halfPage, 0)
+		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
+
 	case "ctrl+f":
-		m.errorLogScroll = clampOverlayCursor(m.errorLogScroll, maxVisible, maxScroll)
+		m.errorLogCursorLine = min(m.errorLogCursorLine+maxVisible, maxCursor)
+		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
+
 	case "ctrl+b":
-		m.errorLogScroll = clampOverlayCursor(m.errorLogScroll, -maxVisible, maxScroll)
+		m.errorLogCursorLine = max(m.errorLogCursorLine-maxVisible, 0)
+		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
 	}
 	return m, nil
+}
+
+// errorLogEnsureCursorVisible adjusts scroll so the cursor line is within the visible window.
+func (m Model) errorLogEnsureCursorVisible(maxVisible, maxScroll int) int {
+	scroll := m.errorLogScroll
+	if m.errorLogCursorLine < scroll {
+		scroll = m.errorLogCursorLine
+	}
+	if m.errorLogCursorLine >= scroll+maxVisible {
+		scroll = m.errorLogCursorLine - maxVisible + 1
+	}
+	return max(min(scroll, maxScroll), 0)
+}
+
+// errorLogYank copies error log content to clipboard.
+// In visual mode: copies selected lines. Otherwise: copies all visible entries.
+func (m Model) errorLogYank() (tea.Model, tea.Cmd) {
+	reversed := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
+	if len(reversed) == 0 {
+		return m, nil
+	}
+
+	var lines []string
+	switch m.errorLogVisualMode {
+	case 'v':
+		// Character visual mode: extract partial text respecting column positions.
+		selStart := min(m.errorLogVisualStart, m.errorLogCursorLine)
+		selEnd := max(m.errorLogVisualStart, m.errorLogCursorLine)
+		// Determine start/end columns based on direction.
+		var startCol, endCol int
+		if m.errorLogVisualStart <= m.errorLogCursorLine {
+			startCol = m.errorLogVisualStartCol
+			endCol = m.errorLogCursorCol
+		} else {
+			startCol = m.errorLogCursorCol
+			endCol = m.errorLogVisualStartCol
+		}
+		for i := selStart; i <= selEnd && i < len(reversed); i++ {
+			plain := ui.ErrorLogEntryPlainText(reversed[i])
+			runes := []rune(plain)
+			if selStart == selEnd {
+				// Single line: extract between columns.
+				cStart := min(startCol, endCol)
+				cEnd := min(max(startCol, endCol)+1, len(runes))
+				if cStart < len(runes) {
+					lines = append(lines, string(runes[cStart:cEnd]))
+				}
+			} else if i == selStart {
+				if startCol < len(runes) {
+					lines = append(lines, string(runes[startCol:]))
+				}
+			} else if i == selEnd {
+				cEnd := min(endCol+1, len(runes))
+				lines = append(lines, string(runes[:cEnd]))
+			} else {
+				lines = append(lines, plain)
+			}
+		}
+		m.errorLogVisualMode = 0
+	case 'V':
+		// Line visual mode: full lines.
+		selStart := min(m.errorLogVisualStart, m.errorLogCursorLine)
+		selEnd := max(m.errorLogVisualStart, m.errorLogCursorLine)
+		for i := selStart; i <= selEnd && i < len(reversed); i++ {
+			lines = append(lines, ui.ErrorLogEntryPlainText(reversed[i]))
+		}
+		m.errorLogVisualMode = 0
+	default:
+		for _, e := range reversed {
+			lines = append(lines, ui.ErrorLogEntryPlainText(e))
+		}
+	}
+
+	text := strings.Join(lines, "\n")
+	m.setStatusMessage(fmt.Sprintf("Copied %d entries to clipboard", len(lines)), false)
+	return m, tea.Batch(copyToSystemClipboard(text), scheduleStatusClear())
 }
 
 func (m Model) handleFilterPresetOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

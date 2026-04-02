@@ -100,12 +100,17 @@ func (m Model) openActionMenu() (tea.Model, tea.Cmd) {
 		})
 	}
 
-	// If the resource is being deleted, replace "Delete" with "Force Finalize".
+	// If the resource is being deleted, escalate the Delete action.
 	if sel.Deleting {
 		for i, item := range items {
 			if item.Name == "Delete" {
-				items[i].Name = "Force Finalize"
-				items[i].Extra = "Remove finalizers to force finalize"
+				if model.IsForceDeleteableKind(kind) {
+					items[i].Name = "Force Delete"
+					items[i].Extra = "Force delete (--force --grace-period=0)"
+				} else {
+					items[i].Name = "Force Finalize"
+					items[i].Extra = "Remove finalizers to force finalize"
+				}
 				break
 			}
 		}
@@ -220,14 +225,23 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.actionCtx = m.buildActionCtx(sel, kind)
-	// If resource is already deleting, offer Force Finalize instead.
+	// If resource is already deleting, escalate the action.
 	if sel.Deleting {
-		m.confirmAction = sel.Name
-		m.confirmTitle = "Confirm Force Finalize"
-		m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", sel.Name)
 		m.confirmTypeInput.Clear()
 		m.overlay = overlayConfirmType
-		m.pendingAction = "Force Finalize"
+		if model.IsForceDeleteableKind(kind) {
+			// Pod/Job: offer force delete (--force --grace-period=0).
+			m.confirmAction = sel.Name + " (FORCE)"
+			m.confirmTitle = "Confirm Force Delete"
+			m.confirmQuestion = fmt.Sprintf("Force delete %s? (--force --grace-period=0)", sel.Name)
+			m.pendingAction = "Force Delete"
+		} else {
+			// Other kinds: offer force finalize (remove finalizers).
+			m.confirmAction = sel.Name
+			m.confirmTitle = "Confirm Force Finalize"
+			m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", sel.Name)
+			m.pendingAction = "Force Finalize"
+		}
 		return m, nil
 	}
 	return m.executeAction("Delete")

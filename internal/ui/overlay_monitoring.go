@@ -20,15 +20,17 @@ func GetOverlaySchemeScroll() int { return overlaySchemeScroll }
 // SchemeOverlayMaxVisible is the number of visible lines in the colorscheme overlay.
 const SchemeOverlayMaxVisible = 20
 
-// RenderErrorLogOverlay renders the application log overlay showing timestamped
-// log entries with level indicators. The scroll parameter controls which portion is visible.
-// When showDebug is false, DBG entries are filtered out.
-func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, showDebug bool) string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Application Log"))
-	b.WriteString("\n")
+// ErrorLogVisualParams holds visual selection state for the error log overlay.
+type ErrorLogVisualParams struct {
+	VisualMode     byte // 0 = off, 'v' = char, 'V' = line
+	VisualStart    int  // anchor line index
+	VisualStartCol int  // anchor column (for char mode)
+	CursorLine     int  // current cursor line index
+	CursorCol      int  // cursor column for char mode
+}
 
-	// Filter entries based on debug visibility.
+// FilteredErrorLogEntries returns visible entries (respecting debug filter) in reverse chronological order.
+func FilteredErrorLogEntries(entries []ErrorLogEntry, showDebug bool) []ErrorLogEntry {
 	visible := make([]ErrorLogEntry, 0, len(entries))
 	for _, e := range entries {
 		if e.Level == "DBG" && !showDebug {
@@ -36,8 +38,29 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 		}
 		visible = append(visible, e)
 	}
+	reversed := make([]ErrorLogEntry, len(visible))
+	for i, e := range visible {
+		reversed[len(visible)-1-i] = e
+	}
+	return reversed
+}
 
-	if len(visible) == 0 {
+// ErrorLogEntryPlainText returns a plain text representation of a log entry for clipboard.
+func ErrorLogEntryPlainText(e ErrorLogEntry) string {
+	return fmt.Sprintf("%s [%s] %s", e.Time.Format("15:04:05"), e.Level, e.Message)
+}
+
+// RenderErrorLogOverlay renders the application log overlay showing timestamped
+// log entries with level indicators. The scroll parameter controls which portion is visible.
+// When showDebug is false, DBG entries are filtered out.
+func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, showDebug bool, vp ErrorLogVisualParams) string {
+	var b strings.Builder
+	b.WriteString(OverlayTitleStyle.Render("Application Log"))
+	b.WriteString("\n")
+
+	reversed := FilteredErrorLogEntries(entries, showDebug)
+
+	if len(reversed) == 0 {
 		if len(entries) > 0 && !showDebug {
 			b.WriteString(OverlayDimStyle.Render("No entries (debug logs hidden, press d to show)"))
 		} else {
@@ -49,17 +72,17 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 	// Reserve lines for the title (1), blank line before footer (1), footer (1), and border padding.
 	maxVisible := max(height-4, 1)
 
-	// Show entries in reverse chronological order (newest first).
-	reversed := make([]ErrorLogEntry, len(visible))
-	for i, e := range visible {
-		reversed[len(visible)-1-i] = e
-	}
-
 	// Clamp scroll.
 	maxScroll := max(len(reversed)-maxVisible, 0)
 	scroll = max(min(scroll, maxScroll), 0)
 
 	end := min(scroll+maxVisible, len(reversed))
+
+	// Visual selection range.
+	selStart := min(vp.VisualStart, vp.CursorLine)
+	selEnd := max(vp.VisualStart, vp.CursorLine)
+	colStart := min(vp.VisualStartCol, vp.CursorCol)
+	colEnd := max(vp.VisualStartCol, vp.CursorCol)
 
 	// Level styles.
 	errLevelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5555")).Bold(true).Background(SurfaceBg)
@@ -67,34 +90,67 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 	infLevelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Background(SurfaceBg)
 	dbgLevelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6272a4")).Background(SurfaceBg)
 
+	// Cursor line style: subtle highlight to show current position.
+	cursorLineStyle := lipgloss.NewStyle().Background(BaseBg).Bold(true)
+
 	for i := scroll; i < end; i++ {
 		entry := reversed[i]
-		ts := OverlayDimStyle.Render(entry.Time.Format("15:04:05"))
-		var lvl string
-		switch entry.Level {
-		case "ERR":
-			lvl = errLevelStyle.Render("ERR")
-		case "WRN":
-			lvl = wrnLevelStyle.Render("WRN")
-		case "DBG":
-			lvl = dbgLevelStyle.Render("DBG")
-		default:
-			lvl = infLevelStyle.Render("INF")
+		plainText := ErrorLogEntryPlainText(entry)
+
+		// Check if this line is in visual selection.
+		inSelection := vp.VisualMode != 0 && i >= selStart && i <= selEnd
+		isCursorLine := i == vp.CursorLine
+
+		if inSelection {
+			// Render with visual selection highlighting.
+			rendered := RenderVisualSelection(
+				plainText, rune(vp.VisualMode),
+				i, selStart, selEnd,
+				vp.VisualStart, vp.VisualStartCol, vp.CursorCol,
+				colStart, colEnd,
+			)
+			b.WriteString("  " + rendered)
+		} else if isCursorLine && vp.VisualMode == 0 {
+			// Cursor line indicator (outside visual mode).
+			b.WriteString(cursorLineStyle.Render("> " + plainText))
+		} else {
+			ts := OverlayDimStyle.Render(entry.Time.Format("15:04:05"))
+			var lvl string
+			switch entry.Level {
+			case "ERR":
+				lvl = errLevelStyle.Render("ERR")
+			case "WRN":
+				lvl = wrnLevelStyle.Render("WRN")
+			case "DBG":
+				lvl = dbgLevelStyle.Render("DBG")
+			default:
+				lvl = infLevelStyle.Render("INF")
+			}
+			line := fmt.Sprintf("  %s %s %s", ts, lvl, OverlayNormalStyle.Render(entry.Message))
+			b.WriteString(line)
 		}
-		line := fmt.Sprintf("  %s %s %s", ts, lvl, OverlayNormalStyle.Render(entry.Message))
-		b.WriteString(line)
 		if i < end-1 {
 			b.WriteString("\n")
 		}
 	}
 
 	b.WriteString("\n\n")
-	scrollInfo := fmt.Sprintf("%d entries", len(visible))
-	if len(visible) != len(entries) {
-		scrollInfo += fmt.Sprintf(" (%d hidden)", len(entries)-len(visible))
+
+	// Filter count for footer.
+	visibleCount := len(reversed)
+	scrollInfo := fmt.Sprintf("%d entries", visibleCount)
+	if visibleCount != len(entries) {
+		scrollInfo += fmt.Sprintf(" (%d hidden)", len(entries)-visibleCount)
 	}
 	if maxScroll > 0 {
 		scrollInfo += fmt.Sprintf(" | scroll %d/%d", scroll+1, maxScroll+1)
+	}
+	if vp.VisualMode != 0 {
+		modeLabel := "VISUAL LINE"
+		if vp.VisualMode == 'v' {
+			modeLabel = "VISUAL"
+		}
+		scrollInfo += " | " + modeLabel
 	}
 	b.WriteString(OverlayDimStyle.Render(scrollInfo))
 

@@ -290,46 +290,46 @@ func TestErrorLogOverlayKeyNavigation(t *testing.T) {
 		assert.True(t, result.showDebugLogs)
 	})
 
-	t.Run("j scrolls down", func(t *testing.T) {
+	t.Run("j moves cursor down", func(t *testing.T) {
 		m := Model{
-			overlayErrorLog: true,
-			errorLog:        entries,
-			errorLogScroll:  0,
-			tabs:            []TabState{{}},
-			width:           80,
-			height:          10, // small height so maxVisible < len(entries)
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogCursorLine: 0,
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             10,
 		}
 		ret, _ := m.handleErrorLogOverlayKey(runeKey('j'))
 		result := ret.(Model)
-		assert.Equal(t, 1, result.errorLogScroll)
+		assert.Equal(t, 1, result.errorLogCursorLine)
 	})
 
-	t.Run("k scrolls up", func(t *testing.T) {
+	t.Run("k moves cursor up", func(t *testing.T) {
 		m := Model{
-			overlayErrorLog: true,
-			errorLog:        entries,
-			errorLogScroll:  3,
-			tabs:            []TabState{{}},
-			width:           80,
-			height:          10, // small height so maxVisible < len(entries)
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogCursorLine: 3,
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             10,
 		}
 		ret, _ := m.handleErrorLogOverlayKey(runeKey('k'))
 		result := ret.(Model)
-		assert.Equal(t, 2, result.errorLogScroll)
+		assert.Equal(t, 2, result.errorLogCursorLine)
 	})
 
 	t.Run("k at zero stays", func(t *testing.T) {
 		m := Model{
-			overlayErrorLog: true,
-			errorLog:        entries,
-			errorLogScroll:  0,
-			tabs:            []TabState{{}},
-			width:           80,
-			height:          40,
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogCursorLine: 0,
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             40,
 		}
 		ret, _ := m.handleErrorLogOverlayKey(runeKey('k'))
 		result := ret.(Model)
-		assert.Equal(t, 0, result.errorLogScroll)
+		assert.Equal(t, 0, result.errorLogCursorLine)
 	})
 
 	t.Run("G scrolls to bottom", func(t *testing.T) {
@@ -363,6 +363,214 @@ func TestErrorLogOverlayKeyNavigation(t *testing.T) {
 		result2 := ret2.(Model)
 		assert.False(t, result2.pendingG)
 		assert.Equal(t, 0, result2.errorLogScroll)
+	})
+}
+
+func TestErrorLogVisualSelection(t *testing.T) {
+	entries := []ui.ErrorLogEntry{
+		{Level: "ERR", Message: "error 1"},
+		{Level: "INF", Message: "info 1"},
+		{Level: "ERR", Message: "error 2"},
+		{Level: "INF", Message: "info 2"},
+	}
+
+	t.Run("V enters line visual mode", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog: true,
+			errorLog:        entries,
+			tabs:            []TabState{{}},
+			width:           80,
+			height:          40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('V'))
+		result := ret.(Model)
+		assert.Equal(t, byte('V'), result.errorLogVisualMode)
+		assert.Equal(t, 0, result.errorLogVisualStart)
+	})
+
+	t.Run("v enters char visual mode", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog: true,
+			errorLog:        entries,
+			tabs:            []TabState{{}},
+			width:           80,
+			height:          40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('v'))
+		result := ret.(Model)
+		assert.Equal(t, byte('v'), result.errorLogVisualMode)
+	})
+
+	t.Run("V toggles off", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogVisualMode: 'V',
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('V'))
+		result := ret.(Model)
+		assert.Equal(t, byte(0), result.errorLogVisualMode)
+	})
+
+	t.Run("esc cancels visual mode without closing", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogVisualMode: 'V',
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(specialKey(tea.KeyEsc))
+		result := ret.(Model)
+		assert.Equal(t, byte(0), result.errorLogVisualMode)
+		assert.True(t, result.overlayErrorLog, "overlay should stay open")
+	})
+
+	t.Run("j in visual mode moves cursor", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:     true,
+			errorLog:            entries,
+			errorLogVisualMode:  'V',
+			errorLogVisualStart: 0,
+			errorLogCursorLine:  0,
+			tabs:                []TabState{{}},
+			width:               80,
+			height:              40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('j'))
+		result := ret.(Model)
+		assert.Equal(t, 1, result.errorLogCursorLine)
+	})
+
+	t.Run("k in visual mode moves cursor up", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:     true,
+			errorLog:            entries,
+			errorLogVisualMode:  'V',
+			errorLogVisualStart: 0,
+			errorLogCursorLine:  2,
+			tabs:                []TabState{{}},
+			width:               80,
+			height:              40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('k'))
+		result := ret.(Model)
+		assert.Equal(t, 1, result.errorLogCursorLine)
+	})
+
+	t.Run("y copies selected lines", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:     true,
+			errorLog:            entries,
+			errorLogVisualMode:  'V',
+			errorLogVisualStart: 0,
+			errorLogCursorLine:  1,
+			tabs:                []TabState{{}},
+			width:               80,
+			height:              40,
+		}
+		ret, cmd := m.handleErrorLogOverlayKey(runeKey('y'))
+		result := ret.(Model)
+		assert.Equal(t, byte(0), result.errorLogVisualMode, "visual mode should be cleared after yank")
+		assert.NotNil(t, cmd, "should return clipboard command")
+		assert.Contains(t, result.statusMessage, "Copied 2 entries")
+	})
+
+	t.Run("y without visual copies all", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog: true,
+			errorLog:        entries,
+			tabs:            []TabState{{}},
+			width:           80,
+			height:          40,
+		}
+		ret, cmd := m.handleErrorLogOverlayKey(runeKey('y'))
+		result := ret.(Model)
+		assert.NotNil(t, cmd)
+		assert.Contains(t, result.statusMessage, "Copied 4 entries")
+	})
+
+	t.Run("d is ignored in visual mode", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogVisualMode: 'V',
+			showDebugLogs:      false,
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('d'))
+		result := ret.(Model)
+		assert.False(t, result.showDebugLogs, "d should not toggle debug in visual mode")
+	})
+}
+
+func TestErrorLogFullscreen(t *testing.T) {
+	entries := []ui.ErrorLogEntry{
+		{Level: "ERR", Message: "error 1"},
+		{Level: "INF", Message: "info 1"},
+	}
+
+	t.Run("f toggles fullscreen on", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog: true,
+			errorLog:        entries,
+			tabs:            []TabState{{}},
+			width:           80,
+			height:          40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('f'))
+		result := ret.(Model)
+		assert.True(t, result.errorLogFullscreen)
+	})
+
+	t.Run("f toggles fullscreen off", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogFullscreen: true,
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('f'))
+		result := ret.(Model)
+		assert.False(t, result.errorLogFullscreen)
+	})
+
+	t.Run("esc from fullscreen closes and resets", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogFullscreen: true,
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(specialKey(tea.KeyEsc))
+		result := ret.(Model)
+		assert.False(t, result.overlayErrorLog)
+		assert.False(t, result.errorLogFullscreen)
+	})
+
+	t.Run("q from fullscreen closes and resets", func(t *testing.T) {
+		m := Model{
+			overlayErrorLog:    true,
+			errorLog:           entries,
+			errorLogFullscreen: true,
+			tabs:               []TabState{{}},
+			width:              80,
+			height:             40,
+		}
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('q'))
+		result := ret.(Model)
+		assert.False(t, result.overlayErrorLog)
+		assert.False(t, result.errorLogFullscreen)
 	})
 }
 

@@ -132,6 +132,22 @@ func helpSections() []helpSection {
 			},
 		},
 		{
+			title: "Error Log (" + kb.ErrorLog + ")",
+			bindings: []helpEntry{
+				{"j/k", "Scroll up/down"},
+				{"g/G", "Top/bottom"},
+				{"Ctrl+D/U", "Page down/up (half page)"},
+				{"Ctrl+F/B", "Page down/up (full page)"},
+				{"V", "Enter line visual selection mode"},
+				{"v", "Enter character visual selection mode"},
+				{"y", "Copy selected lines (visual) or all entries (normal)"},
+				{"f", "Toggle fullscreen / overlay mode"},
+				{"d", "Toggle debug log visibility"},
+				{"Esc", "Cancel visual selection, or close overlay"},
+				{"q", "Close overlay"},
+			},
+		},
+		{
 			title: "YAML View",
 			bindings: []helpEntry{
 				{"j/k", "Scroll up/down"},

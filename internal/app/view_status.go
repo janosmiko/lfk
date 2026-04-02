@@ -137,15 +137,41 @@ func (m Model) statusBar() string {
 
 	// When the error log overlay is active, show error log hints.
 	if m.overlayErrorLog {
-		debugHint := "show debug"
-		if m.showDebugLogs {
-			debugHint = "hide debug"
+		var entries []ui.HintEntry
+		switch m.errorLogVisualMode {
+		case 'v':
+			entries = []ui.HintEntry{
+				{Key: "h/l", Desc: "column"},
+				{Key: "j/k", Desc: "extend"},
+				{Key: "0/$", Desc: "start/end"},
+				{Key: "y", Desc: "copy"},
+				{Key: "esc", Desc: "cancel"},
+			}
+		case 'V':
+			entries = []ui.HintEntry{
+				{Key: "j/k", Desc: "extend"},
+				{Key: "y", Desc: "copy"},
+				{Key: "esc", Desc: "cancel"},
+			}
+		default:
+			debugHint := "show debug"
+			if m.showDebugLogs {
+				debugHint = "hide debug"
+			}
+			fsHint := "fullscreen"
+			if m.errorLogFullscreen {
+				fsHint = "overlay"
+			}
+			entries = []ui.HintEntry{
+				{Key: "j/k", Desc: "scroll"},
+				{Key: "V", Desc: "select"},
+				{Key: "y", Desc: "copy all"},
+				{Key: "f", Desc: fsHint},
+				{Key: "d", Desc: debugHint},
+				{Key: "esc", Desc: "close"},
+			}
 		}
-		hint := m.renderHints([]ui.HintEntry{
-			{Key: "j/k", Desc: "scroll"},
-			{Key: "d", Desc: debugHint},
-			{Key: "esc", Desc: "close"},
-		})
+		hint := m.renderHints(entries)
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
 	}
 
@@ -585,7 +611,27 @@ func (m Model) renderCanIOverlay(background string) string {
 }
 
 // renderErrorLogOverlay renders the error log overlay on top of the given background.
+// In fullscreen mode it replaces the background entirely; in overlay mode it centers on top.
 func (m Model) renderErrorLogOverlay(background string) string {
+	vp := ui.ErrorLogVisualParams{
+		VisualMode:     m.errorLogVisualMode,
+		VisualStart:    m.errorLogVisualStart,
+		VisualStartCol: m.errorLogVisualStartCol,
+		CursorLine:     m.errorLogCursorLine,
+		CursorCol:      m.errorLogCursorCol,
+	}
+
+	if m.errorLogFullscreen {
+		// Fullscreen: use full terminal dimensions, no overlay border.
+		content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, m.height-1, m.showDebugLogs, vp)
+		// Pad to full height so there's no background bleed.
+		lines := strings.Split(content, "\n")
+		for len(lines) < m.height-1 {
+			lines = append(lines, "")
+		}
+		return strings.Join(lines[:m.height-1], "\n")
+	}
+
 	overlayW := min(140, m.width-4)
 	overlayH := min(30, m.height-4)
 	if overlayW < 10 {
@@ -595,7 +641,7 @@ func (m Model) renderErrorLogOverlay(background string) string {
 		overlayH = 3
 	}
 
-	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, overlayH, m.showDebugLogs)
+	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, overlayH, m.showDebugLogs, vp)
 	content = ui.FillLinesBg(content, overlayW-4, ui.SurfaceBg)
 	overlay := ui.OverlayStyle.Width(overlayW).Height(overlayH).Render(content)
 	bg := ui.PadToHeight(background, m.height)

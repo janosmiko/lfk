@@ -527,10 +527,16 @@ type Model struct {
 	allGroupsExpanded bool   // override: show all groups expanded (toggled by hotkey)
 
 	// Error log: global buffer of application errors for the error log overlay.
-	errorLog        []ui.ErrorLogEntry
-	overlayErrorLog bool
-	errorLogScroll  int
-	showDebugLogs   bool
+	errorLog               []ui.ErrorLogEntry
+	overlayErrorLog        bool
+	errorLogScroll         int
+	showDebugLogs          bool
+	errorLogFullscreen     bool // true = fullscreen, false = overlay
+	errorLogVisualMode     byte // 0 = off, 'v' = char, 'V' = line
+	errorLogVisualStart    int  // anchor line index in visual mode
+	errorLogVisualStartCol int  // anchor column when entering char visual mode
+	errorLogCursorLine     int  // cursor position (line index into visible entries)
+	errorLogCursorCol      int  // cursor column for character visual mode
 
 	// Color scheme selector state.
 	schemeEntries      []ui.SchemeEntry

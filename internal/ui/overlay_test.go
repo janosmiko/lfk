@@ -354,7 +354,7 @@ func TestRenderColorschemeOverlay(t *testing.T) {
 
 func TestRenderErrorLogOverlay(t *testing.T) {
 	t.Run("empty entries", func(t *testing.T) {
-		result := RenderErrorLogOverlay(nil, 0, 20, false)
+		result := RenderErrorLogOverlay(nil, 0, 20, false, ErrorLogVisualParams{})
 		assert.Contains(t, result, "No log entries")
 	})
 
@@ -364,7 +364,7 @@ func TestRenderErrorLogOverlay(t *testing.T) {
 			{Time: time.Date(2024, 1, 1, 10, 1, 0, 0, time.UTC), Message: "second warning", Level: "WRN"},
 			{Time: time.Date(2024, 1, 1, 10, 2, 0, 0, time.UTC), Message: "info message", Level: "INF"},
 		}
-		result := RenderErrorLogOverlay(entries, 0, 20, false)
+		result := RenderErrorLogOverlay(entries, 0, 20, false, ErrorLogVisualParams{})
 		assert.Contains(t, result, "Application Log")
 		assert.Contains(t, result, "first error")
 		assert.Contains(t, result, "second warning")
@@ -378,7 +378,7 @@ func TestRenderErrorLogOverlay(t *testing.T) {
 			{Time: time.Now(), Message: "wrn", Level: "WRN"},
 			{Time: time.Now(), Message: "inf", Level: "INF"},
 		}
-		result := RenderErrorLogOverlay(entries, 0, 20, false)
+		result := RenderErrorLogOverlay(entries, 0, 20, false, ErrorLogVisualParams{})
 		assert.Contains(t, result, "ERR")
 		assert.Contains(t, result, "WRN")
 		assert.Contains(t, result, "INF")
@@ -389,7 +389,7 @@ func TestRenderErrorLogOverlay(t *testing.T) {
 			{Time: time.Now(), Message: "debug msg", Level: "DBG"},
 			{Time: time.Now(), Message: "info msg", Level: "INF"},
 		}
-		result := RenderErrorLogOverlay(entries, 0, 20, false)
+		result := RenderErrorLogOverlay(entries, 0, 20, false, ErrorLogVisualParams{})
 		assert.NotContains(t, result, "debug msg")
 		assert.Contains(t, result, "info msg")
 		assert.Contains(t, result, "1 hidden")
@@ -400,10 +400,69 @@ func TestRenderErrorLogOverlay(t *testing.T) {
 			{Time: time.Now(), Message: "debug msg", Level: "DBG"},
 			{Time: time.Now(), Message: "info msg", Level: "INF"},
 		}
-		result := RenderErrorLogOverlay(entries, 0, 20, true)
+		result := RenderErrorLogOverlay(entries, 0, 20, true, ErrorLogVisualParams{})
 		assert.Contains(t, result, "debug msg")
 		assert.Contains(t, result, "DBG")
 		assert.Contains(t, result, "info msg")
+	})
+}
+
+func TestFilteredErrorLogEntries(t *testing.T) {
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Message: "first", Level: "ERR"},
+		{Time: time.Date(2024, 1, 1, 10, 1, 0, 0, time.UTC), Message: "second", Level: "DBG"},
+		{Time: time.Date(2024, 1, 1, 10, 2, 0, 0, time.UTC), Message: "third", Level: "INF"},
+	}
+
+	t.Run("returns reversed order", func(t *testing.T) {
+		result := FilteredErrorLogEntries(entries, true)
+		assert.Len(t, result, 3)
+		assert.Equal(t, "third", result[0].Message)
+		assert.Equal(t, "first", result[2].Message)
+	})
+
+	t.Run("filters debug when disabled", func(t *testing.T) {
+		result := FilteredErrorLogEntries(entries, false)
+		assert.Len(t, result, 2)
+		for _, e := range result {
+			assert.NotEqual(t, "DBG", e.Level)
+		}
+	})
+}
+
+func TestErrorLogEntryPlainText(t *testing.T) {
+	e := ErrorLogEntry{
+		Time:    time.Date(2024, 1, 1, 10, 30, 15, 0, time.UTC),
+		Level:   "ERR",
+		Message: "something failed",
+	}
+	result := ErrorLogEntryPlainText(e)
+	assert.Equal(t, "10:30:15 [ERR] something failed", result)
+}
+
+func TestRenderErrorLogOverlayVisualMode(t *testing.T) {
+	entries := []ErrorLogEntry{
+		{Time: time.Now(), Message: "line 0", Level: "ERR"},
+		{Time: time.Now(), Message: "line 1", Level: "INF"},
+		{Time: time.Now(), Message: "line 2", Level: "WRN"},
+	}
+
+	t.Run("visual mode shows VISUAL LINE indicator", func(t *testing.T) {
+		vp := ErrorLogVisualParams{VisualMode: 'V', VisualStart: 0, CursorLine: 1}
+		result := RenderErrorLogOverlay(entries, 0, 20, false, vp)
+		assert.Contains(t, result, "VISUAL LINE")
+	})
+
+	t.Run("char visual mode shows VISUAL indicator", func(t *testing.T) {
+		vp := ErrorLogVisualParams{VisualMode: 'v', VisualStart: 0, CursorLine: 0}
+		result := RenderErrorLogOverlay(entries, 0, 20, false, vp)
+		assert.Contains(t, result, "VISUAL")
+		assert.NotContains(t, result, "VISUAL LINE")
+	})
+
+	t.Run("no visual mode has no indicator", func(t *testing.T) {
+		result := RenderErrorLogOverlay(entries, 0, 20, false, ErrorLogVisualParams{})
+		assert.NotContains(t, result, "VISUAL")
 	})
 }
 
