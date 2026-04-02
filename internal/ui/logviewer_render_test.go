@@ -285,3 +285,57 @@ func TestRenderLogViewer(t *testing.T) {
 		assert.Contains(t, result, "xxx")
 	})
 }
+
+// --- colorizePodPrefix ---
+
+func TestColorizePodPrefix(t *testing.T) {
+	t.Run("preserves prefix and content", func(t *testing.T) {
+		line := "[pod/myapp-abc12/app] some log output"
+		result := colorizePodPrefix(line)
+		// Should contain the prefix text and log content.
+		assert.Contains(t, result, "pod/myapp-abc12/app")
+		assert.Contains(t, result, "some log output")
+	})
+
+	t.Run("no prefix passes through", func(t *testing.T) {
+		line := "plain log line without prefix"
+		result := colorizePodPrefix(line)
+		assert.Equal(t, line, result)
+	})
+
+	t.Run("empty line passes through", func(t *testing.T) {
+		assert.Equal(t, "", colorizePodPrefix(""))
+	})
+
+	t.Run("same pod gets same result", func(t *testing.T) {
+		line1 := "[pod/myapp-abc12/app] log 1"
+		line2 := "[pod/myapp-abc12/app] log 2"
+		r1 := colorizePodPrefix(line1)
+		r2 := colorizePodPrefix(line2)
+		// Same pod prefix should produce identical styling.
+		idx1 := strings.Index(r1, "log 1")
+		idx2 := strings.Index(r2, "log 2")
+		assert.Greater(t, idx1, 0)
+		assert.Greater(t, idx2, 0)
+		assert.Equal(t, r1[:idx1], r2[:idx2])
+	})
+
+	t.Run("no close bracket passes through", func(t *testing.T) {
+		line := "[incomplete prefix without close"
+		result := colorizePodPrefix(line)
+		assert.Equal(t, line, result)
+	})
+
+	t.Run("extracts pod name correctly for hashing", func(t *testing.T) {
+		// Two lines with same pod but different containers should get same color.
+		line1 := "[pod/myapp-abc12/app] log 1"
+		line2 := "[pod/myapp-abc12/sidecar] log 2"
+		r1 := colorizePodPrefix(line1)
+		r2 := colorizePodPrefix(line2)
+		// Both reference pod "myapp-abc12" so they should get same color styling.
+		// We can't directly compare ANSI codes in non-terminal tests,
+		// but verify both process correctly.
+		assert.Contains(t, r1, "pod/myapp-abc12/app")
+		assert.Contains(t, r2, "pod/myapp-abc12/sidecar")
+	})
+}

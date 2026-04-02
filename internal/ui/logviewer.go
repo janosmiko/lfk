@@ -274,6 +274,10 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 				line = DimStyle.Render(numStr) + line
 			}
 		} else {
+			// Colorize pod prefix for non-selected, non-cursor lines.
+			if i != cursor {
+				line = colorizePodPrefix(line)
+			}
 			if lineNumbers && i != cursor {
 				// Non-cursor lines get line numbers here.
 				// Cursor line's number is added after RenderCursorAtCol to avoid it being stripped.
@@ -297,7 +301,7 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 					numStr := fmt.Sprintf("%*d ", lineNumWidth-1, i+1)
 					cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
 				}
-				line = YamlCursorIndicatorStyle.Render("\u258e") + cursorLine
+				line = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
 			}
 		} else {
 			line = " " + line
@@ -347,6 +351,10 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 					}
 				}
 			} else {
+				// Colorize pod prefix for non-selected, non-cursor first sub-lines.
+				if j == 0 && i != cursor {
+					wl = colorizePodPrefix(wl)
+				}
 				if lineNumbers && (i != cursor || j != 0) {
 					// Non-cursor lines get line numbers here.
 					// Cursor line's number is added after RenderCursorAtCol.
@@ -369,7 +377,7 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 						numStr := fmt.Sprintf("%*d ", lineNumWidth-1, i+1)
 						cursorLine = YamlCursorIndicatorStyle.Render(numStr) + cursorLine
 					}
-					wl = YamlCursorIndicatorStyle.Render("\u258e") + cursorLine
+					wl = YamlCursorIndicatorStyle.Render("\u258e") + colorizePodPrefix(cursorLine)
 				}
 			} else {
 				wl = " " + wl
@@ -432,6 +440,58 @@ func stripTimestampRaw(s string) string {
 		return s
 	}
 	return s[spaceIdx+1:]
+}
+
+// podPrefixColors is a palette of distinct colors for pod/container log prefixes.
+var podPrefixColors = []lipgloss.Color{
+	"#7aa2f7", // blue
+	"#9ece6a", // green
+	"#bb9af7", // purple
+	"#e0af68", // yellow
+	"#f7768e", // red/pink
+	"#73daca", // cyan
+	"#ff9e64", // orange
+	"#2ac3de", // light blue
+	"#b4f9f8", // teal
+	"#c0caf5", // light lavender
+	"#ff007c", // magenta
+	"#41a6b5", // dark cyan
+}
+
+// colorizePodPrefix replaces the "[pod/name/container] " prefix with a colorized
+// version. The color is deterministically assigned based on the pod name so the
+// same pod always gets the same color across the session.
+func colorizePodPrefix(line string) string {
+	if len(line) == 0 || line[0] != '[' {
+		return line
+	}
+	closeBracket := strings.Index(line, "] ")
+	if closeBracket < 0 {
+		return line
+	}
+	prefix := line[1:closeBracket] // "pod/name/container"
+	rest := line[closeBracket+2:]
+
+	// Extract pod name for color hashing (between first and last slash).
+	podName := prefix
+	if firstSlash := strings.Index(prefix, "/"); firstSlash >= 0 {
+		afterFirst := prefix[firstSlash+1:]
+		if lastSlash := strings.LastIndex(afterFirst, "/"); lastSlash >= 0 {
+			podName = afterFirst[:lastSlash]
+		} else {
+			podName = afterFirst
+		}
+	}
+
+	// Simple hash to pick a deterministic color.
+	var hash uint32
+	for _, c := range podName {
+		hash = hash*31 + uint32(c)
+	}
+	color := podPrefixColors[hash%uint32(len(podPrefixColors))]
+	style := lipgloss.NewStyle().Foreground(color)
+
+	return style.Render("["+prefix+"]") + " " + rest
 }
 
 // sanitizeLogLine replaces non-printable control characters (except tab) with
