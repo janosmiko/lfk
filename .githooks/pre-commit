@@ -14,7 +14,7 @@ if [ -z "$STAGED_GO_FILES" ]; then
 fi
 
 echo "pre-commit: running golangci-lint..."
-golangci-lint run ./...
+golangci-lint run --new-from-rev=HEAD ./...
 status=$?
 
 if [ $status -eq 0 ]; then
