@@ -1,4 +1,4 @@
-.PHONY: setup lint lint-fix test build generate-themes
+.PHONY: setup lint lint-fix test coverage build generate-themes
 
 setup:
 	git config core.hooksPath .githooks
@@ -11,6 +11,12 @@ lint-fix:
 
 test:
 	go test ./...
+
+coverage: ## Run tests with coverage report
+	go test ./... -coverprofile=coverage.out
+	go tool cover -func=coverage.out | tail -1
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Open coverage.html in your browser for details"
 
 build: setup
 	go build -o lfk .

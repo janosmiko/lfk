@@ -15,6 +15,7 @@ linters:
     - durationcheck
     - errcheck
     - errorlint
+    - gocyclo
     - gocritic
     - govet
     - ineffassign
@@ -27,6 +28,8 @@ linters:
     - unparam
     - unused
   settings:
+    gocyclo:
+      min-complexity: 30
     gocritic:
       disabled-tags:
         - style
