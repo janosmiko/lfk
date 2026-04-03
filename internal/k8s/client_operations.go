@@ -329,7 +329,13 @@ func (c *Client) restConfigForContext(contextName string) (*rest.Config, error) 
 	return cfg, nil
 }
 
-func (c *Client) clientsetForContext(contextName string) (*kubernetes.Clientset, error) {
+func (c *Client) clientsetForContext(contextName string) (kubernetes.Interface, error) {
+	// Allow tests to inject a fake clientset.
+	if c.testClientset != nil {
+		if cs, ok := c.testClientset.(kubernetes.Interface); ok {
+			return cs, nil
+		}
+	}
 	cfg, err := c.restConfigForContext(contextName)
 	if err != nil {
 		return nil, err
@@ -342,6 +348,12 @@ func (c *Client) clientsetForContext(contextName string) (*kubernetes.Clientset,
 }
 
 func (c *Client) dynamicForContext(contextName string) (dynamic.Interface, error) {
+	// Allow tests to inject a fake dynamic client.
+	if c.testDynClient != nil {
+		if dc, ok := c.testDynClient.(dynamic.Interface); ok {
+			return dc, nil
+		}
+	}
 	cfg, err := c.restConfigForContext(contextName)
 	if err != nil {
 		return nil, err

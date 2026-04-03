@@ -297,7 +297,7 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 
 // queryPrometheusNodeMetric runs a PromQL instant query via Kubernetes service proxy
 // and returns a map of node name -> float64 value.
-func (c *Client) queryPrometheusNodeMetric(ctx context.Context, cs *kubernetes.Clientset, namespaces, services []string, port, query string) (map[string]float64, error) {
+func (c *Client) queryPrometheusNodeMetric(ctx context.Context, cs kubernetes.Interface, namespaces, services []string, port, query string) (map[string]float64, error) {
 	params := map[string]string{"query": query}
 
 	// Check cache for a known working namespace+service.

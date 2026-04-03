@@ -23,6 +23,12 @@ import (
 type Client struct {
 	rawConfig    api.Config
 	loadingRules *clientcmd.ClientConfigLoadingRules
+
+	// testClientset and testDynClient allow tests to inject fake clients.
+	// When set, clientsetForContext and dynamicForContext return these
+	// instead of building real clients from the kubeconfig.
+	testClientset interface{} // kubernetes.Interface (avoid import cycle in non-test code)
+	testDynClient interface{} // dynamic.Interface
 }
 
 // RBACCheck represents a single permission check result.
