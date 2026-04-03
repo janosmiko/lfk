@@ -25,17 +25,23 @@ func main() {
 	skipList := flag.String("skip", "", "comma-separated theme names to skip (hand-crafted)")
 	flag.Parse()
 
+	if err := run(*inputDir, *output, *skipList); err != nil {
+		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		os.Exit(1)
+	}
+}
+
+func run(inputDir, output, skipList string) error {
 	skip := make(map[string]bool)
-	if *skipList != "" {
-		for _, s := range strings.Split(*skipList, ",") {
+	if skipList != "" {
+		for _, s := range strings.Split(skipList, ",") {
 			skip[strings.TrimSpace(s)] = true
 		}
 	}
 
-	entries, err := os.ReadDir(*inputDir)
+	entries, err := os.ReadDir(inputDir)
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "error reading input directory %s: %v\n", *inputDir, err)
-		os.Exit(1)
+		return fmt.Errorf("reading input directory %s: %w", inputDir, err)
 	}
 
 	var themes []themeEntry
@@ -53,7 +59,7 @@ func main() {
 		}
 		seen[name] = true
 
-		path := filepath.Join(*inputDir, entry.Name())
+		path := filepath.Join(inputDir, entry.Name())
 		td, err := parseThemeFile(path)
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "warning: skipping %s: %v\n", entry.Name(), err)
@@ -75,10 +81,7 @@ func main() {
 		return themes[i].Name < themes[j].Name
 	})
 
-	if err := writeOutput(*output, themes, skipped, failed); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
-		os.Exit(1)
-	}
+	return writeOutput(output, themes, skipped, failed)
 }
 
 func writeOutput(path string, themes []themeEntry, skipped, failed int) error {
