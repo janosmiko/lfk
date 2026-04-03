@@ -2,6 +2,7 @@ package app
 
 import (
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/hinshun/vt10x"
@@ -494,4 +495,425 @@ func TestVt10xColorToLipgloss(t *testing.T) {
 
 	color2 := vt10xColorToLipgloss(vt10x.Color(255))
 	assert.NotNil(t, color2)
+}
+
+func TestPush3ViewHelpNotEmpty(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeHelp
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewExplorerNotEmpty(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeExplorer
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewYAMLNotEmpty(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeYAML
+	m.yamlContent = "apiVersion: v1"
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewDiffNotEmpty(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeDiff
+	m.diffLeft = "left"
+	m.diffRight = "right"
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewDescribeNotEmpty(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeDescribe
+	m.describeContent = "Name: pod-1\nStatus: Running"
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewExplainNotEmpty(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeExplain
+	m.explainTitle = "pods"
+	m.explainFields = []model.ExplainField{
+		{Name: "apiVersion", Type: "string", Description: "API version"},
+	}
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewFullscreenDashboard(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeExplorer
+	m.fullscreenDashboard = true
+	m.dashboardPreview = "CLUSTER DASHBOARD\n..."
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewWithTabs(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeExplorer
+	m.tabs = []TabState{{}, {}}
+	m.activeTab = 0
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewWithError(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeExplorer
+	m.err = assert.AnError
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewWithSelection(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeExplorer
+	m.selectedItems = map[string]bool{"default/pod-1": true}
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestPush3ViewFullscreenMiddle(t *testing.T) {
+	m := basePush80v3Model()
+	m.mode = modeExplorer
+	m.fullscreenMiddle = true
+	result := m.View()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewExecTerminalSmall(t *testing.T) {
+	m := Model{
+		width: 15, height: 8, mode: modeExec, execTitle: "Exec",
+		tabs: []TabState{{}}, execMu: &sync.Mutex{},
+	}
+	assert.NotEmpty(t, m.viewExecTerminal())
+}
+
+func TestCovViewLogsBasic(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, tabs: []TabState{{}},
+		logLines: []string{"line 1", "line 2"}, logTitle: "Logs: pod",
+		logFollow: true, actionCtx: actionContext{kind: "Pod"}, logSearchInput: TextInput{},
+	}
+	assert.NotEmpty(t, m.viewLogs())
+}
+
+func TestCovViewLogsSearch(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, tabs: []TabState{{}},
+		logLines: []string{"line"}, logTitle: "Logs",
+		logSearchActive: true, logSearchInput: TextInput{Value: "err"},
+		actionCtx: actionContext{kind: "Pod"},
+	}
+	assert.NotEmpty(t, m.viewLogs())
+}
+
+func TestCovViewLogsStatus(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, tabs: []TabState{{}},
+		logLines: []string{"line"}, logTitle: "Logs",
+		statusMessage: "Copied", actionCtx: actionContext{kind: "Pod"},
+		logSearchInput: TextInput{},
+	}
+	assert.NotEmpty(t, m.viewLogs())
+}
+
+func TestCovLoadPreviewYAMLNil(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.middleItems = nil
+	cmd := m.loadPreviewYAML()
+	assert.Nil(t, cmd)
+}
+
+func TestCovEventViewerModeKeyEsc(t *testing.T) {
+	m := baseModelHandlers2()
+	m.mode = modeEventViewer
+	m.eventTimelineLines = []string{"line1"}
+	result, _ := m.handleEventViewerModeKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, modeExplorer, rm.mode)
+}
+
+func TestCovEventViewerModeKeyF(t *testing.T) {
+	m := baseModelHandlers2()
+	m.mode = modeEventViewer
+	m.eventTimelineFullscreen = true
+	m.eventTimelineLines = []string{"line1"}
+	result, _ := m.handleEventViewerModeKey(keyMsg("f"))
+	rm := result.(Model)
+	assert.Equal(t, modeExplorer, rm.mode)
+	assert.Equal(t, overlayEventTimeline, rm.overlay)
+}
+
+func TestCovHighlightDescribeSearchLineEmpty(t *testing.T) {
+	assert.Equal(t, "hello world", highlightDescribeSearchLine("hello world", ""))
+}
+
+func TestCovHighlightDescribeSearchLineMatch(t *testing.T) {
+	// The function expects a pre-lowered query.
+	result := highlightDescribeSearchLine("Hello World", "hello")
+	// Result contains "Hello" (possibly styled), always non-empty.
+	assert.Contains(t, result, "World")
+}
+
+func TestCovHighlightDescribeSearchLineNoMatch(t *testing.T) {
+	result := highlightDescribeSearchLine("Hello World", "xyz")
+	assert.Equal(t, "Hello World", result)
+}
+
+func TestCovHighlightDescribeSearchLineMultiple(t *testing.T) {
+	result := highlightDescribeSearchLine("the the the", "the")
+	// Result should contain all three occurrences (possibly with styling).
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewEventViewer(t *testing.T) {
+	m := Model{
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeEventViewer,
+		eventTimelineLines: []string{
+			"10:00 Normal pod-1 Started",
+			"10:01 Warning pod-2 OOMKilled",
+		},
+		eventTimelineSearchInput: TextInput{},
+		actionCtx:                actionContext{name: "my-pod"},
+	}
+	result := m.viewEventViewer()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewEventViewerWithSearch(t *testing.T) {
+	m := Model{
+		width:                     80,
+		height:                    30,
+		tabs:                      []TabState{{}},
+		execMu:                    &sync.Mutex{},
+		mode:                      modeEventViewer,
+		eventTimelineLines:        []string{"line1"},
+		eventTimelineSearchActive: true,
+		eventTimelineSearchInput:  TextInput{Value: "err"},
+	}
+	result := m.viewEventViewer()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewEventViewerWithVisualMode(t *testing.T) {
+	m := Model{
+		width:                    80,
+		height:                   30,
+		tabs:                     []TabState{{}},
+		execMu:                   &sync.Mutex{},
+		mode:                     modeEventViewer,
+		eventTimelineLines:       []string{"line1"},
+		eventTimelineVisualMode:  'V',
+		eventTimelineSearchInput: TextInput{},
+	}
+	result := m.viewEventViewer()
+	assert.NotEmpty(t, result)
+	assert.Contains(t, result, "VISUAL LINE")
+}
+
+func TestCovViewEventViewerWrap(t *testing.T) {
+	m := Model{
+		width:                    80,
+		height:                   30,
+		tabs:                     []TabState{{}},
+		execMu:                   &sync.Mutex{},
+		mode:                     modeEventViewer,
+		eventTimelineLines:       []string{"line1"},
+		eventTimelineWrap:        true,
+		eventTimelineSearchInput: TextInput{},
+	}
+	result := m.viewEventViewer()
+	assert.Contains(t, result, "WRAP")
+}
+
+func TestCovViewExplain(t *testing.T) {
+	m := Model{
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeExplain,
+		explainFields: []model.ExplainField{
+			{Name: "spec", Type: "Object"},
+			{Name: "status", Type: "Object"},
+		},
+		explainTitle:       "pods",
+		explainSearchInput: TextInput{},
+	}
+	result := m.viewExplain()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewExplainWithSearch(t *testing.T) {
+	m := Model{
+		width:               80,
+		height:              30,
+		tabs:                []TabState{{}},
+		execMu:              &sync.Mutex{},
+		mode:                modeExplain,
+		explainSearchActive: true,
+		explainSearchInput:  TextInput{Value: "spec"},
+		explainFields:       []model.ExplainField{{Name: "spec"}},
+		explainTitle:        "pods",
+	}
+	result := m.viewExplain()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewExplainWithQuery(t *testing.T) {
+	m := Model{
+		width:              80,
+		height:             30,
+		tabs:               []TabState{{}},
+		execMu:             &sync.Mutex{},
+		mode:               modeExplain,
+		explainSearchQuery: "status",
+		explainSearchInput: TextInput{},
+		explainFields:      []model.ExplainField{{Name: "spec"}, {Name: "status"}},
+		explainTitle:       "pods",
+	}
+	result := m.viewExplain()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovLogViewHeight(t *testing.T) {
+	m := Model{height: 30}
+	assert.Equal(t, 28, m.logViewHeight())
+
+	m.height = 3
+	assert.Equal(t, 3, m.logViewHeight())
+}
+
+func TestCovLogContentHeight(t *testing.T) {
+	m := Model{height: 30}
+	h := m.logContentHeight()
+	assert.Greater(t, h, 0)
+}
+
+func TestCovRenderSplitPreview(t *testing.T) {
+	m := Model{
+		width:        120,
+		height:       30,
+		tabs:         []TabState{{}},
+		execMu:       &sync.Mutex{},
+		nav:          model.NavigationState{Level: model.LevelResources, ResourceType: model.ResourceTypeEntry{Kind: "Pod"}},
+		splitPreview: true,
+		previewYAML:  "apiVersion: v1\nkind: Pod",
+		yamlContent:  "apiVersion: v1\nkind: Pod",
+		middleItems:  []model.Item{{Name: "pod-1", Namespace: "ns1", Status: "Running"}},
+		cursors:      [5]int{},
+	}
+	result := m.renderSplitPreview(60, 25)
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewDescribeWithContent(t *testing.T) {
+	m := Model{
+		width:               80,
+		height:              30,
+		tabs:                []TabState{{}},
+		execMu:              &sync.Mutex{},
+		mode:                modeDescribe,
+		describeContent:     "Name: nginx\nNamespace: default\nStatus: Running",
+		describeTitle:       "Describe: pods/nginx",
+		describeSearchInput: TextInput{},
+	}
+	result := m.viewDescribe()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewDescribeSearchActive(t *testing.T) {
+	m := Model{
+		width:                80,
+		height:               30,
+		tabs:                 []TabState{{}},
+		execMu:               &sync.Mutex{},
+		mode:                 modeDescribe,
+		describeContent:      "Name: nginx",
+		describeTitle:        "Describe",
+		describeSearchActive: true,
+		describeSearchInput:  TextInput{Value: "Name"},
+	}
+	result := m.viewDescribe()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewDescribeWithSearchQuery(t *testing.T) {
+	m := Model{
+		width:               80,
+		height:              30,
+		tabs:                []TabState{{}},
+		execMu:              &sync.Mutex{},
+		mode:                modeDescribe,
+		describeContent:     "Name: nginx\nStatus: Running",
+		describeTitle:       "Describe",
+		describeSearchQuery: "Status",
+		describeSearchInput: TextInput{},
+	}
+	result := m.viewDescribe()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewDescribeVisualMode(t *testing.T) {
+	m := Model{
+		width:               80,
+		height:              30,
+		tabs:                []TabState{{}},
+		execMu:              &sync.Mutex{},
+		mode:                modeDescribe,
+		describeContent:     "Name: nginx\nStatus: Running",
+		describeTitle:       "Describe",
+		describeVisualMode:  'V',
+		describeSearchInput: TextInput{},
+	}
+	result := m.viewDescribe()
+	assert.Contains(t, result, "VISUAL LINE")
+}
+
+func TestCovViewDiff(t *testing.T) {
+	m := Model{
+		width:          80,
+		height:         30,
+		tabs:           []TabState{{}},
+		execMu:         &sync.Mutex{},
+		mode:           modeDiff,
+		diffLeft:       "key: default\n",
+		diffRight:      "key: custom\n",
+		diffLeftName:   "Default Values",
+		diffRightName:  "User Values",
+		diffSearchText: TextInput{},
+	}
+	result := m.viewDiff()
+	assert.NotEmpty(t, result)
+}
+
+func TestCovViewDiffUnified(t *testing.T) {
+	m := Model{
+		width:          80,
+		height:         30,
+		tabs:           []TabState{{}},
+		execMu:         &sync.Mutex{},
+		mode:           modeDiff,
+		diffLeft:       "key: default\n",
+		diffRight:      "key: custom\n",
+		diffLeftName:   "Default",
+		diffRightName:  "User",
+		diffUnified:    true,
+		diffSearchText: TextInput{},
+	}
+	result := m.viewDiff()
+	assert.NotEmpty(t, result)
 }

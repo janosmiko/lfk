@@ -315,3 +315,114 @@ func TestFindNextEventMatchNotFound(t *testing.T) {
 	// Cursor should not change.
 	assert.Equal(t, 0, m.eventTimelineCursor)
 }
+
+func TestCovAlertsKeyEsc(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayAlerts
+	m.alertsData = []k8s.AlertInfo{{Name: "alert1"}, {Name: "alert2"}}
+	result, _ := m.handleAlertsOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovAlertsKeyDown(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsData = []k8s.AlertInfo{{Name: "alert1"}, {Name: "alert2"}}
+	m.alertsScroll = 0
+	result, _ := m.handleAlertsOverlayKey(keyMsg("j"))
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.alertsScroll)
+}
+
+func TestCovAlertsKeyUp(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsData = []k8s.AlertInfo{{Name: "alert1"}, {Name: "alert2"}}
+	m.alertsScroll = 1
+	result, _ := m.handleAlertsOverlayKey(keyMsg("k"))
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.alertsScroll)
+}
+
+func TestCovAlertsKeyUpAtZero(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsScroll = 0
+	result, _ := m.handleAlertsOverlayKey(keyMsg("k"))
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.alertsScroll)
+}
+
+func TestCovAlertsKeyGG(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsScroll = 5
+	m.alertsData = []k8s.AlertInfo{{Name: "a"}}
+	result, _ := m.handleAlertsOverlayKey(keyMsg("g"))
+	rm := result.(Model)
+	assert.True(t, rm.pendingG)
+	result, _ = rm.handleAlertsOverlayKey(keyMsg("g"))
+	rm = result.(Model)
+	assert.Equal(t, 0, rm.alertsScroll)
+}
+
+func TestCovAlertsKeyBigG(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsData = []k8s.AlertInfo{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	result, _ := m.handleAlertsOverlayKey(keyMsg("G"))
+	rm := result.(Model)
+	assert.Equal(t, 3, rm.alertsScroll) // len(alertsData)
+}
+
+func TestCovAlertsKeyBigGWithLineInput(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsData = []k8s.AlertInfo{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	m.alertsLineInput = "2"
+	result, _ := m.handleAlertsOverlayKey(keyMsg("G"))
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.alertsScroll) // 2-1=1
+}
+
+func TestCovAlertsKeyDigit(t *testing.T) {
+	m := baseModelOverlay()
+	result, _ := m.handleAlertsOverlayKey(keyMsg("5"))
+	rm := result.(Model)
+	assert.Equal(t, "5", rm.alertsLineInput)
+}
+
+func TestCovAlertsKeyZeroInInput(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsLineInput = "1"
+	result, _ := m.handleAlertsOverlayKey(keyMsg("0"))
+	rm := result.(Model)
+	assert.Equal(t, "10", rm.alertsLineInput)
+}
+
+func TestCovAlertsKeyCtrlD(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsScroll = 0
+	result, _ := m.handleAlertsOverlayKey(keyMsg("ctrl+d"))
+	rm := result.(Model)
+	assert.Equal(t, 10, rm.alertsScroll)
+}
+
+func TestCovAlertsKeyCtrlU(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsScroll = 15
+	result, _ := m.handleAlertsOverlayKey(keyMsg("ctrl+u"))
+	rm := result.(Model)
+	assert.Equal(t, 5, rm.alertsScroll)
+}
+
+func TestCovAlertsKeyCtrlF(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsScroll = 0
+	result, _ := m.handleAlertsOverlayKey(keyMsg("ctrl+f"))
+	rm := result.(Model)
+	assert.Equal(t, 20, rm.alertsScroll)
+}
+
+func TestCovAlertsKeyCtrlB(t *testing.T) {
+	m := baseModelOverlay()
+	m.alertsScroll = 25
+	result, _ := m.handleAlertsOverlayKey(keyMsg("ctrl+b"))
+	rm := result.(Model)
+	assert.Equal(t, 5, rm.alertsScroll)
+}

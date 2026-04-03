@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -452,4 +453,831 @@ func TestNavigateToBookmark_LocalResourceNotFound(t *testing.T) {
 	assert.True(t, resultModel.statusMessageErr)
 	// Context should remain unchanged since navigation was aborted.
 	assert.Equal(t, "cluster-A", resultModel.nav.Context)
+}
+
+func TestCovHandleBookmarkOverlayKeyDispatch(t *testing.T) {
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeFilter
+	r, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyEscape})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+
+	m.bookmarkSearchMode = bookmarkModeConfirmDelete
+	r, _ = m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+
+	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
+	r, _ = m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+}
+
+func TestCovHandleBookmarkNormalMode(t *testing.T) {
+	filtered := []model.Bookmark{{Name: "a", Slot: "1"}, {Name: "b", Slot: "2"}, {Name: "c", Slot: "3"}}
+	m := baseModelCov()
+	m.overlay = overlayBookmarks
+
+	r, _ := m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyEscape}, nil)
+	assert.Equal(t, overlayNone, r.(Model).overlay)
+
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}}, filtered)
+	assert.Equal(t, 1, r.(Model).overlayCursor)
+
+	m.overlayCursor = 1
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}}, filtered)
+	assert.Equal(t, 0, r.(Model).overlayCursor)
+
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}}, filtered)
+	assert.Equal(t, 2, r.(Model).overlayCursor)
+
+	m.pendingG = true
+	m.overlayCursor = 2
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}, filtered)
+	assert.Equal(t, 0, r.(Model).overlayCursor)
+
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}}, filtered)
+	assert.Equal(t, bookmarkModeConfirmDelete, r.(Model).bookmarkSearchMode)
+
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyCtrlX}, filtered)
+	assert.Equal(t, bookmarkModeConfirmDeleteAll, r.(Model).bookmarkSearchMode)
+
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}}, filtered)
+	assert.Equal(t, bookmarkModeFilter, r.(Model).bookmarkSearchMode)
+
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyCtrlD}, filtered)
+	assert.GreaterOrEqual(t, r.(Model).overlayCursor, 0)
+
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyCtrlU}, filtered)
+	assert.GreaterOrEqual(t, r.(Model).overlayCursor, 0)
+}
+
+func TestCovHandleBookmarkFilterMode(t *testing.T) {
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeFilter
+
+	r, _ := m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+
+	m.bookmarkSearchMode = bookmarkModeFilter
+	m.bookmarkFilter = TextInput{Value: "pr", Cursor: 2}
+	r, _ = m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyBackspace})
+	assert.Equal(t, "p", r.(Model).bookmarkFilter.Value)
+
+	m.bookmarkFilter = TextInput{}
+	r, _ = m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'p'}})
+	assert.Equal(t, "p", r.(Model).bookmarkFilter.Value)
+
+	m.bookmarkFilter = TextInput{Value: "hello", Cursor: 5}
+	r, _ = m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
+	assert.Empty(t, r.(Model).bookmarkFilter.Value)
+
+	r, _ = m.handleBookmarkFilterMode(tea.KeyMsg{Type: tea.KeyEscape})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+}
+
+func TestCovHandleBookmarkConfirmDelete(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDelete
+	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
+	r, cmd := m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.NotNil(t, cmd)
+
+	r, cmd = m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.NotNil(t, cmd)
+}
+
+func TestCovHandleBookmarkConfirmDeleteAll(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
+	r, cmd := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'y'}})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.NotNil(t, cmd)
+
+	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
+	r, cmd = m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.NotNil(t, cmd)
+}
+
+func TestCovBuildSessionTabState(t *testing.T) {
+	st := &SessionTab{
+		Context:       "my-ctx",
+		Namespace:     "my-ns",
+		AllNamespaces: false,
+		ResourceType:  "",
+	}
+	tab := buildSessionTabState(st)
+	assert.Equal(t, "my-ctx", tab.nav.Context)
+	assert.Equal(t, "my-ns", tab.namespace)
+	assert.Equal(t, model.LevelResourceTypes, tab.nav.Level)
+}
+
+func TestCovBuildSessionTabStateAllNS(t *testing.T) {
+	st := &SessionTab{
+		Context:       "my-ctx",
+		AllNamespaces: true,
+	}
+	tab := buildSessionTabState(st)
+	assert.True(t, tab.allNamespaces)
+}
+
+func TestCovBuildSessionTabStateNoContext(t *testing.T) {
+	st := &SessionTab{}
+	tab := buildSessionTabState(st)
+	assert.Equal(t, model.LevelClusters, tab.nav.Level)
+}
+
+func TestCovBuildSessionTabStateWithSelectedNS(t *testing.T) {
+	st := &SessionTab{
+		Context:            "ctx",
+		Namespace:          "ns1",
+		SelectedNamespaces: []string{"ns1", "ns2"},
+	}
+	tab := buildSessionTabState(st)
+	assert.True(t, tab.selectedNamespaces["ns1"])
+	assert.True(t, tab.selectedNamespaces["ns2"])
+}
+
+func TestFinal2RestoreSessionSingleTab(t *testing.T) {
+	m := baseFinalModel()
+	m.pendingSession = &SessionState{
+		Context:   "test-ctx",
+		Namespace: "default",
+	}
+	m.sessionRestored = false
+	contexts := []model.Item{{Name: "test-ctx"}, {Name: "other-ctx"}}
+	result, cmd := m.restoreSession(contexts)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.True(t, rm.sessionRestored)
+}
+
+func TestFinal2RestoreSingleTabSessionContextNotFound(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{Context: "nonexistent"}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, _ := m.restoreSingleTabSession(sess, contexts)
+	_ = result.(Model)
+}
+
+func TestFinal2RestoreSingleTabSessionWithResourceType(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{
+		Context:      "test-ctx",
+		Namespace:    "default",
+		ResourceType: "/v1/pods",
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, cmd := m.restoreSingleTabSession(sess, contexts)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+}
+
+func TestFinal2RestoreSingleTabSessionWithResourceName(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{
+		Context:      "test-ctx",
+		Namespace:    "default",
+		ResourceType: "/v1/pods",
+		ResourceName: "my-pod",
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, cmd := m.restoreSingleTabSession(sess, contexts)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Equal(t, "my-pod", rm.pendingTarget)
+}
+
+func TestFinal2RestoreSingleTabSessionNoResourceType(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{
+		Context:   "test-ctx",
+		Namespace: "default",
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, cmd := m.restoreSingleTabSession(sess, contexts)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
+}
+
+func TestFinal2RestoreSingleTabSessionAllNamespaces(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{
+		Context:       "test-ctx",
+		AllNamespaces: true,
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, _ := m.restoreSingleTabSession(sess, contexts)
+	rm := result.(Model)
+	assert.True(t, rm.allNamespaces)
+}
+
+func TestFinal2RestoreSingleTabSessionSelectedNS(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{
+		Context:            "test-ctx",
+		Namespace:          "ns1",
+		SelectedNamespaces: []string{"ns1", "ns2"},
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, _ := m.restoreSingleTabSession(sess, contexts)
+	rm := result.(Model)
+	assert.True(t, rm.selectedNamespaces["ns1"])
+	assert.True(t, rm.selectedNamespaces["ns2"])
+}
+
+func TestFinal2RestoreMultiTabSession(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{
+		ActiveTab: 0,
+		Tabs: []SessionTab{
+			{Context: "test-ctx", Namespace: "default", ResourceType: "/v1/pods"},
+			{Context: "test-ctx", Namespace: "kube-system"},
+		},
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, cmd := m.restoreMultiTabSession(sess, contexts)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Equal(t, 2, len(rm.tabs))
+	assert.Equal(t, 0, rm.activeTab)
+}
+
+func TestFinal2RestoreMultiTabSessionInvalidActiveTab(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{
+		ActiveTab: 5,
+		Tabs: []SessionTab{
+			{Context: "test-ctx", Namespace: "default"},
+		},
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, _ := m.restoreMultiTabSession(sess, contexts)
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.activeTab)
+}
+
+func TestFinal2RestoreMultiTabSessionContextNotFound(t *testing.T) {
+	m := baseFinalModel()
+	sess := &SessionState{
+		ActiveTab: 0,
+		Tabs: []SessionTab{
+			{Context: "nonexistent"},
+		},
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, _ := m.restoreMultiTabSession(sess, contexts)
+	_ = result.(Model)
+}
+
+func TestFinal2RestoreSessionMultiTab(t *testing.T) {
+	m := baseFinalModel()
+	m.pendingSession = &SessionState{
+		ActiveTab: 0,
+		Tabs: []SessionTab{
+			{Context: "test-ctx", Namespace: "default"},
+		},
+	}
+	m.sessionRestored = false
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, _ := m.restoreSession(contexts)
+	rm := result.(Model)
+	assert.True(t, rm.sessionRestored)
+}
+
+func TestFinalBookmarkToSlotTooLow(t *testing.T) {
+	m := baseFinalModel()
+	m.nav.Level = model.LevelClusters
+	result, _ := m.bookmarkToSlot("a")
+	rm := result.(Model)
+	assert.Contains(t, rm.statusMessage, "Navigate to a resource type")
+}
+
+func TestFinalBookmarkToSlotLocal(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods", Kind: "Pod", Resource: "pods"}
+	result, cmd := m.bookmarkToSlot("a")
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Contains(t, rm.statusMessage, "Mark 'a' set")
+}
+
+func TestFinalBookmarkToSlotGlobal(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "prod-cluster"
+	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods", Kind: "Pod", Resource: "pods"}
+	result, cmd := m.bookmarkToSlot("A")
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Contains(t, rm.statusMessage, "Mark 'A' set")
+}
+
+func TestFinalBookmarkToSlotOverwrite(t *testing.T) {
+	m := baseFinalModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods", Kind: "Pod", Resource: "pods"}
+	m.bookmarks = []model.Bookmark{{Slot: "a", Name: "existing"}}
+	result, cmd := m.bookmarkToSlot("a")
+	assert.Nil(t, cmd) // Should prompt for confirmation
+	rm := result.(Model)
+	assert.NotNil(t, rm.pendingBookmark)
+}
+
+func TestFinalBookmarkToSlotAllNamespaces(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods", Kind: "Pod", Resource: "pods"}
+	m.allNamespaces = true
+	result, cmd := m.bookmarkToSlot("b")
+	require.NotNil(t, cmd)
+	_ = result.(Model)
+}
+
+func TestFinalBookmarkToSlotMultiNamespaces(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods", Kind: "Pod", Resource: "pods"}
+	m.selectedNamespaces = map[string]bool{"ns1": true, "ns2": true}
+	result, cmd := m.bookmarkToSlot("c")
+	require.NotNil(t, cmd)
+	_ = result.(Model)
+}
+
+func TestFinalFilteredBookmarksEmpty(t *testing.T) {
+	m := baseFinalModel()
+	m.bookmarks = nil
+	result := m.filteredBookmarks()
+	assert.Empty(t, result)
+}
+
+func TestFinalFilteredBookmarksNoFilter(t *testing.T) {
+	m := baseFinalModel()
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}, {Name: "bm2", Slot: "b"}}
+	result := m.filteredBookmarks()
+	assert.Len(t, result, 2)
+}
+
+func TestFinalBookmarkDeleteCurrentEmpty(t *testing.T) {
+	m := baseFinalModel()
+	m.bookmarks = nil
+	cmd := m.bookmarkDeleteCurrent()
+	assert.Nil(t, cmd)
+}
+
+func TestFinalBookmarkDeleteCurrentValid(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}}
+	m.overlayCursor = 0
+	cmd := m.bookmarkDeleteCurrent()
+	assert.NotNil(t, cmd)
+	assert.Empty(t, m.bookmarks)
+}
+
+func TestFinalBookmarkDeleteAll(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}, {Name: "bm2", Slot: "b"}}
+	cmd := m.bookmarkDeleteAll()
+	assert.NotNil(t, cmd)
+	assert.Nil(t, m.bookmarks)
+}
+
+func TestFinalHandleBookmarkNormalModeEsc(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleBookmarkNormalModeJ(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}, {Name: "bm2", Slot: "b"}}
+	m.overlayCursor = 0
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("j"))
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.overlayCursor)
+}
+
+func TestFinalHandleBookmarkNormalModeK(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}, {Name: "bm2", Slot: "b"}}
+	m.overlayCursor = 1
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("k"))
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.overlayCursor)
+}
+
+func TestFinalHandleBookmarkNormalModeGG(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}, {Name: "bm2", Slot: "b"}}
+	m.overlayCursor = 1
+	m.pendingG = true
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("g"))
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.overlayCursor)
+}
+
+func TestFinalHandleBookmarkNormalModeG(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("G"))
+	rm := result.(Model)
+	_ = rm
+}
+
+func TestFinalHandleBookmarkNormalModeSlash(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("/"))
+	rm := result.(Model)
+	assert.Equal(t, bookmarkModeFilter, rm.bookmarkSearchMode)
+}
+
+func TestFinalHandleBookmarkNormalModeD(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}}
+	m.overlayCursor = 0
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("D"))
+	rm := result.(Model)
+	assert.Equal(t, bookmarkModeConfirmDelete, rm.bookmarkSearchMode)
+}
+
+func TestFinalHandleBookmarkNormalModeCtrlX(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}}
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("ctrl+x"))
+	rm := result.(Model)
+	assert.Equal(t, bookmarkModeConfirmDeleteAll, rm.bookmarkSearchMode)
+}
+
+func TestFinalHandleBookmarkNormalModeCtrlD(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = make([]model.Bookmark, 20)
+	m.overlayCursor = 0
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("ctrl+d"))
+	rm := result.(Model)
+	assert.Greater(t, rm.overlayCursor, 0)
+}
+
+func TestFinalHandleBookmarkNormalModeCtrlU(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = make([]model.Bookmark, 20)
+	m.overlayCursor = 15
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("ctrl+u"))
+	rm := result.(Model)
+	assert.Less(t, rm.overlayCursor, 15)
+}
+
+func TestFinalHandleBookmarkNormalModeCtrlF(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = make([]model.Bookmark, 30)
+	m.overlayCursor = 0
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("ctrl+f"))
+	rm := result.(Model)
+	assert.Greater(t, rm.overlayCursor, 0)
+}
+
+func TestFinalHandleBookmarkNormalModeCtrlB(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = make([]model.Bookmark, 30)
+	m.overlayCursor = 25
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("ctrl+b"))
+	rm := result.(Model)
+	assert.Less(t, rm.overlayCursor, 25)
+}
+
+func TestFinalHandleBookmarkFilterModeEsc(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeFilter
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, bookmarkModeNormal, rm.bookmarkSearchMode)
+}
+
+func TestFinalHandleBookmarkFilterModeEnter(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeFilter
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("enter"))
+	rm := result.(Model)
+	assert.Equal(t, bookmarkModeNormal, rm.bookmarkSearchMode)
+}
+
+func TestFinalHandleBookmarkFilterModeTyping(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeFilter
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("a"))
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.overlayCursor)
+}
+
+func TestFinalHandleBookmarkConfirmDeleteYes(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeConfirmDelete
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}}
+	m.overlayCursor = 0
+	result, cmd := m.handleBookmarkOverlayKey(keyMsg("y"))
+	rm := result.(Model)
+	assert.NotNil(t, cmd)
+	assert.Equal(t, bookmarkModeNormal, rm.bookmarkSearchMode)
+}
+
+func TestFinalHandleBookmarkConfirmDeleteNo(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeConfirmDelete
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("n"))
+	rm := result.(Model)
+	assert.Equal(t, bookmarkModeNormal, rm.bookmarkSearchMode)
+	assert.Contains(t, rm.statusMessage, "Cancelled")
+}
+
+func TestFinalHandleBookmarkConfirmDeleteAllYes(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}}
+	result, cmd := m.handleBookmarkOverlayKey(keyMsg("Y"))
+	rm := result.(Model)
+	assert.NotNil(t, cmd)
+	assert.Equal(t, bookmarkModeNormal, rm.bookmarkSearchMode)
+}
+
+func TestFinalHandleBookmarkConfirmDeleteAllNo(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("n"))
+	rm := result.(Model)
+	assert.Equal(t, bookmarkModeNormal, rm.bookmarkSearchMode)
+}
+
+func TestFinalContextInList(t *testing.T) {
+	items := []model.Item{{Name: "ctx-1"}, {Name: "ctx-2"}}
+	assert.True(t, contextInList("ctx-1", items))
+	assert.True(t, contextInList("ctx-2", items))
+	assert.False(t, contextInList("ctx-3", items))
+}
+
+func TestFinalContextInListEmpty(t *testing.T) {
+	assert.False(t, contextInList("any", nil))
+}
+
+func TestFinalApplySessionNamespaces(t *testing.T) {
+	m := baseFinalModel()
+	applySessionNamespaces(&m, true, "", nil)
+	assert.True(t, m.allNamespaces)
+
+	m2 := baseFinalModel()
+	applySessionNamespaces(&m2, false, "custom-ns", nil)
+	assert.Equal(t, "custom-ns", m2.namespace)
+	assert.False(t, m2.allNamespaces)
+
+	m3 := baseFinalModel()
+	applySessionNamespaces(&m3, false, "ns1", []string{"ns1", "ns2"})
+	assert.Equal(t, "ns1", m3.namespace)
+	assert.True(t, m3.selectedNamespaces["ns1"])
+	assert.True(t, m3.selectedNamespaces["ns2"])
+}
+
+func TestFinalBuildSessionTabState(t *testing.T) {
+	st := SessionTab{
+		Context:      "ctx-1",
+		Namespace:    "ns-1",
+		ResourceType: "/v1/pods",
+	}
+	tab := buildSessionTabState(&st)
+	assert.Equal(t, "ctx-1", tab.nav.Context)
+	assert.Equal(t, model.LevelResources, tab.nav.Level)
+}
+
+func TestFinalBuildSessionTabStateNoResourceType(t *testing.T) {
+	st := SessionTab{
+		Context: "ctx-1",
+	}
+	tab := buildSessionTabState(&st)
+	assert.Equal(t, model.LevelResourceTypes, tab.nav.Level)
+}
+
+func TestFinalBuildSessionTabStateNoContext(t *testing.T) {
+	st := SessionTab{}
+	tab := buildSessionTabState(&st)
+	assert.Equal(t, model.LevelClusters, tab.nav.Level)
+}
+
+func TestFinalBuildSessionTabStateAllNamespaces(t *testing.T) {
+	st := SessionTab{
+		Context:       "ctx-1",
+		AllNamespaces: true,
+	}
+	tab := buildSessionTabState(&st)
+	assert.True(t, tab.allNamespaces)
+}
+
+func TestFinalBuildSessionTabStateSelectedNS(t *testing.T) {
+	st := SessionTab{
+		Context:            "ctx-1",
+		Namespace:          "ns1",
+		SelectedNamespaces: []string{"ns1", "ns2"},
+	}
+	tab := buildSessionTabState(&st)
+	assert.True(t, tab.selectedNamespaces["ns1"])
+	assert.True(t, tab.selectedNamespaces["ns2"])
+}
+
+func TestFinalBuildSessionTabStateNSOnly(t *testing.T) {
+	st := SessionTab{
+		Context:   "ctx-1",
+		Namespace: "ns1",
+	}
+	tab := buildSessionTabState(&st)
+	assert.Equal(t, "ns1", tab.namespace)
+	assert.True(t, tab.selectedNamespaces["ns1"])
+}
+
+func TestFinalNavigateToBookmarkResourceNotFound(t *testing.T) {
+	m := baseFinalModel()
+	bm := model.Bookmark{
+		ResourceType: "nonexistent",
+		Global:       false,
+	}
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Contains(t, rm.statusMessage, "not found")
+}
+
+func TestFinalNavigateToBookmarkAllNamespaces(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredCRDs["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	bm := model.Bookmark{
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "",
+		Global:       false,
+	}
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.True(t, rm.allNamespaces)
+}
+
+func TestFinalNavigateToBookmarkMultiNS(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredCRDs["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	bm := model.Bookmark{
+		ResourceType: podRT.ResourceRef(),
+		Namespaces:   []string{"ns1", "ns2"},
+		Global:       false,
+	}
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.True(t, rm.selectedNamespaces["ns1"])
+	assert.True(t, rm.selectedNamespaces["ns2"])
+}
+
+func TestFinalNavigateToBookmarkSingleNS(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredCRDs["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	bm := model.Bookmark{
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "production",
+		Global:       false,
+	}
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Equal(t, "production", rm.namespace)
+}
+
+func TestFinalNavigateToBookmarkGlobal(t *testing.T) {
+	m := baseFinalModel()
+	// Global bookmarks switch context. CRD must have matching ResourceRef.
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredCRDs["prod-ctx"] = []model.ResourceTypeEntry{podRT}
+	bm := model.Bookmark{
+		ResourceType: podRT.ResourceRef(),
+		Context:      "prod-ctx",
+		Namespace:    "default",
+		Global:       true,
+	}
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Contains(t, rm.statusMessage, "Jumped to")
+}
+
+func TestFinalNavigateToBookmarkSingleNamespaceInList(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredCRDs["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	bm := model.Bookmark{
+		ResourceType: podRT.ResourceRef(),
+		Namespaces:   []string{"only-ns"},
+		Global:       false,
+	}
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Contains(t, rm.statusMessage, "Jumped to")
+}
+
+func TestFinalBookmarkDeleteAllWithFilter(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.bookmarks = []model.Bookmark{
+		{Name: "alpha-bm", Slot: "a"},
+		{Name: "beta-bm", Slot: "b"},
+		{Name: "gamma-bm", Slot: "c"},
+	}
+	m.bookmarkFilter.Value = "alpha"
+	cmd := m.bookmarkDeleteAll()
+	assert.NotNil(t, cmd)
+	// Only bookmarks not matching the filter should remain.
+	assert.Equal(t, 2, len(m.bookmarks))
+}
+
+func TestFinalBookmarkDeleteAllEmptyFiltered(t *testing.T) {
+	m := baseFinalModel()
+	m.bookmarks = nil
+	cmd := m.bookmarkDeleteAll()
+	assert.Nil(t, cmd)
+}
+
+func TestFinalHandleBookmarkEnterNoItems(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = nil
+	result, cmd := m.handleBookmarkOverlayKey(keyMsg("enter"))
+	assert.Nil(t, cmd)
+	_ = result.(Model)
+}
+
+func TestFinalHandleBookmarkSlotJump(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = []model.Bookmark{{Name: "bm", Slot: "x"}}
+	m.discoveredCRDs["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true},
+	}
+	// Pressing a slot key that doesn't exist should show error.
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("z"))
+	rm := result.(Model)
+	assert.Contains(t, rm.statusMessage, "not set")
+}
+
+// Test the removeBookmark helper used by bookmark delete.
+func TestFinalRemoveBookmark(t *testing.T) {
+	bms := []model.Bookmark{
+		{Slot: "a", Name: "first"},
+		{Slot: "b", Name: "second"},
+		{Slot: "c", Name: "third"},
+	}
+	result := removeBookmark(bms, 1)
+	assert.Len(t, result, 2)
+	assert.Equal(t, "a", result[0].Slot)
+	assert.Equal(t, "c", result[1].Slot)
 }

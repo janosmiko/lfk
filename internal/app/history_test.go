@@ -173,3 +173,82 @@ func TestHistoryFilePath(t *testing.T) {
 		assert.Contains(t, path, ".local/state/lfk/history")
 	})
 }
+
+func TestCovCommandHistoryAdd(t *testing.T) {
+	h := &commandHistory{cursor: -1}
+
+	h.add("ls")
+	assert.Len(t, h.entries, 1)
+
+	// Empty: ignore.
+	h.add("")
+	assert.Len(t, h.entries, 1)
+
+	// Whitespace only: ignore.
+	h.add("   ")
+	assert.Len(t, h.entries, 1)
+
+	// Duplicate: ignore.
+	h.add("ls")
+	assert.Len(t, h.entries, 1)
+
+	h.add("pwd")
+	assert.Len(t, h.entries, 2)
+}
+
+func TestCovCommandHistoryUpDown(t *testing.T) {
+	h := &commandHistory{
+		entries: []string{"first", "second", "third"},
+		cursor:  -1,
+	}
+
+	// Up from current input.
+	assert.Equal(t, "third", h.up("current"))
+	assert.Equal(t, "current", h.draft)
+
+	assert.Equal(t, "second", h.up("ignored"))
+	assert.Equal(t, "first", h.up("ignored"))
+	// At start: stays at first.
+	assert.Equal(t, "first", h.up("ignored"))
+
+	// Down.
+	assert.Equal(t, "second", h.down())
+	assert.Equal(t, "third", h.down())
+	// Past end: restore draft.
+	assert.Equal(t, "current", h.down())
+	assert.Equal(t, -1, h.cursor)
+
+	// Down when not browsing: returns draft (which was saved as "current").
+	result := h.down()
+	assert.Equal(t, "current", result)
+}
+
+func TestCovCommandHistoryUpEmpty(t *testing.T) {
+	h := &commandHistory{cursor: -1}
+	assert.Equal(t, "current", h.up("current"))
+}
+
+func TestCovCommandHistoryReset(t *testing.T) {
+	h := &commandHistory{
+		entries: []string{"a", "b"},
+		cursor:  1,
+		draft:   "draft",
+	}
+	h.reset()
+	assert.Equal(t, -1, h.cursor)
+	assert.Empty(t, h.draft)
+}
+
+func TestCovCommandHistorySaveLoad(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+
+	h := &commandHistory{cursor: -1}
+	h.add("test command 1")
+	h.add("test command 2")
+	h.save()
+
+	h2 := loadCommandHistory()
+	assert.Len(t, h2.entries, 2)
+	assert.Equal(t, "test command 1", h2.entries[0])
+	assert.Equal(t, "test command 2", h2.entries[1])
+}

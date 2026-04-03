@@ -378,3 +378,26 @@ func TestCopyItemCache(t *testing.T) {
 		assert.False(t, exists)
 	})
 }
+
+func TestCov80FindCustomActionNoMatch(t *testing.T) {
+	_, found := findCustomAction("Pod", "nonexistent-action")
+	assert.False(t, found)
+}
+
+func TestCov80ExpandCustomActionTemplate(t *testing.T) {
+	actx := actionContext{
+		name:      "my-pod",
+		namespace: "default",
+		context:   "prod",
+		kind:      "Pod",
+		columns: []model.KeyValue{
+			{Key: "Node", Value: "worker-1"},
+			{Key: "IP", Value: "10.0.0.1"},
+		},
+	}
+	result := expandCustomActionTemplate("kubectl exec {name} -n {namespace} --context {context} # {Node} {ip}", actx)
+	assert.Contains(t, result, "my-pod")
+	assert.Contains(t, result, "default")
+	assert.Contains(t, result, "prod")
+	assert.Contains(t, result, "worker-1")
+}

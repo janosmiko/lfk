@@ -1505,3 +1505,584 @@ func TestBatchLabelOverlayInputNavigation(t *testing.T) {
 	result = ret.(Model)
 	assert.NotEqual(t, "key=value", result.batchLabelInput.Value)
 }
+
+func TestCovHandleOverlayKeyRBAC(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayRBAC
+	result, _ := m.handleOverlayKey(keyMsg("q"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovHandleOverlayKeyPodStartup(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayPodStartup
+	result, _ := m.handleOverlayKey(keyMsg("q"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovHandleOverlayKeyQuotaDashboardEsc(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayQuotaDashboard
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovHandleOverlayKeyQuotaDashboardQ(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayQuotaDashboard
+	result, _ := m.handleOverlayKey(keyMsg("q"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovHandleOverlayKeyAutoSync(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayAutoSync
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovHandleOverlayKeyLogPodSelect(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayLogPodSelect
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovHandleOverlayKeyLogContainerSelect(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayLogContainerSelect
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovHandleOverlayKeyEventTimeline(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayEventTimeline
+	m.eventTimelineLines = []string{"event1"}
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovHandleOverlayKeyNone(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayNone
+	result, cmd := m.handleOverlayKey(keyMsg("q"))
+	assert.Nil(t, cmd)
+	_ = result
+}
+
+func TestFinalHandleOverlayKeyRBAC(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayRBAC
+	result, cmd := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.Nil(t, cmd)
+}
+
+func TestFinalHandleOverlayKeyPodStartup(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayPodStartup
+	result, cmd := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.Nil(t, cmd)
+}
+
+func TestFinalHandleOverlayKeyQuotaDashboard(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayQuotaDashboard
+	result, cmd := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.Nil(t, cmd)
+}
+
+func TestFinalHandleOverlayKeyQuotaDashboardQ(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayQuotaDashboard
+	result, cmd := m.handleOverlayKey(keyMsg("q"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.Nil(t, cmd)
+}
+
+func TestFinalHandleOverlayKeyQuotaDashboardOtherKey(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayQuotaDashboard
+	result, cmd := m.handleOverlayKey(keyMsg("j"))
+	rm := result.(Model)
+	// Should stay open on other keys
+	assert.Equal(t, overlayQuotaDashboard, rm.overlay)
+	assert.Nil(t, cmd)
+}
+
+func TestFinalHandleOverlayKeyConfirm(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayConfirm
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyAction(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayAction
+	m.overlayItems = []model.Item{{Name: "Delete"}}
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyScaleInput(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayScaleInput
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyPVCResize(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayPVCResize
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyConfirmType(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayConfirmType
+	m.confirmAction = "test-res"
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyBookmarks(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyTemplates(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayTemplates
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyColorscheme(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayColorscheme
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyNamespace(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayNamespace
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyContainerSelect(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayContainerSelect
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyPodSelect(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayPodSelect
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyPortForward(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayPortForward
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyRollback(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayRollback
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyHelmRollback(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayHelmRollback
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyLabelEditor(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayLabelEditor
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeySecretEditor(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlaySecretEditor
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyConfigMapEditor(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayConfigMapEditor
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyAlerts(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayAlerts
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyBatchLabel(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBatchLabel
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyEventTimeline(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayEventTimeline
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyNetworkPolicy(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayNetworkPolicy
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyCanI(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayCanI
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyCanISubject(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayCanISubject
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	// Esc in CanISubject may go back to CanI overlay, not overlayNone.
+	assert.NotEqual(t, overlayCanISubject, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyExplainSearch(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayExplainSearch
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyFilterPreset(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayFilterPreset
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyAutoSync(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayAutoSync
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestFinalHandleOverlayKeyQuitConfirm(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayQuitConfirm
+	result, _ := m.handleOverlayKey(keyMsg("n"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovConfirmOverlayKeyY(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayConfirm
+	m.pendingAction = "Delete"
+	m.actionCtx = actionContext{
+		context:      "ctx",
+		kind:         "Pod",
+		name:         "pod-1",
+		namespace:    "default",
+		resourceType: model.ResourceTypeEntry{Resource: "pods"},
+	}
+	result, _ := m.handleConfirmOverlayKey(keyMsg("y"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovConfirmOverlayKeyN(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayConfirm
+	result, _ := m.handleConfirmOverlayKey(keyMsg("n"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovConfirmOverlayKeyEsc(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayConfirm
+	result, _ := m.handleConfirmOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovActionOverlayKeyEsc(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayAction
+	m.overlayItems = []model.Item{{Name: "Delete"}, {Name: "Edit"}}
+	result, _ := m.handleActionOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovActionOverlayKeyDown(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayAction
+	m.overlayItems = []model.Item{{Name: "Delete"}, {Name: "Edit"}}
+	m.overlayCursor = 0
+	result, _ := m.handleActionOverlayKey(keyMsg("j"))
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.overlayCursor)
+}
+
+func TestCovActionOverlayKeyUp(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayAction
+	m.overlayItems = []model.Item{{Name: "Delete"}, {Name: "Edit"}}
+	m.overlayCursor = 1
+	result, _ := m.handleActionOverlayKey(keyMsg("k"))
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.overlayCursor)
+}
+
+func TestCovActionOverlayKeyCtrlN(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayAction
+	m.overlayItems = []model.Item{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	m.overlayCursor = 0
+	result, _ := m.handleActionOverlayKey(keyMsg("ctrl+n"))
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.overlayCursor)
+}
+
+func TestCovActionOverlayKeyCtrlP(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayAction
+	m.overlayItems = []model.Item{{Name: "a"}, {Name: "b"}, {Name: "c"}}
+	m.overlayCursor = 2
+	result, _ := m.handleActionOverlayKey(keyMsg("ctrl+p"))
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.overlayCursor)
+}
+
+func TestCovActionOverlayKeyDefault(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayAction
+	m.overlayItems = []model.Item{{Name: "Delete", Status: "d"}}
+	// Press a key that doesn't match any action
+	result, _ := m.handleActionOverlayKey(keyMsg("x"))
+	_ = result.(Model)
+}
+
+func TestCovConfirmTypeOverlayKeyEsc(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayConfirmType
+	result, _ := m.handleConfirmTypeOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovConfirmTypeOverlayKeyTyping(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayConfirmType
+	result, _ := m.handleConfirmTypeOverlayKey(keyMsg("D"))
+	rm := result.(Model)
+	assert.Equal(t, "D", rm.confirmTypeInput.Value)
+}
+
+func TestCovConfirmTypeOverlayKeyBackspace(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayConfirmType
+	m.confirmTypeInput.Insert("DEL")
+	result, _ := m.handleConfirmTypeOverlayKey(keyMsg("backspace"))
+	rm := result.(Model)
+	assert.Equal(t, "DE", rm.confirmTypeInput.Value)
+}
+
+func TestCovErrorLogEnsureCursorVisible(t *testing.T) {
+	m := baseModelCov()
+	m.errorLogScroll = 0
+	m.errorLogCursorLine = 25
+
+	scroll := m.errorLogEnsureCursorVisible(10, 50)
+	assert.Greater(t, scroll, 0)
+
+	m.errorLogCursorLine = 0
+	m.errorLogScroll = 20
+	scroll = m.errorLogEnsureCursorVisible(10, 50)
+	assert.LessOrEqual(t, scroll, 20)
+}
+
+func TestCovOverlayKeyDispatchRBAC(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayRBAC
+	result, _ := m.handleOverlayKey(keyMsg("x"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovOverlayKeyDispatchPodStartup(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayPodStartup
+	result, _ := m.handleOverlayKey(keyMsg("x"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovOverlayKeyDispatchQuotaDashboardEsc(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayQuotaDashboard
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovOverlayKeyDispatchQuotaDashboardQ(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayQuotaDashboard
+	result, _ := m.handleOverlayKey(keyMsg("q"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovOverlayKeyDispatchQuitConfirm(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayQuitConfirm
+	result, _ := m.handleOverlayKey(keyMsg("n"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovOverlayKeyDispatchFinalizerSearch(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayFinalizerSearch
+	m.finalizerSearchResults = nil
+	m.finalizerSearchSelected = make(map[string]bool)
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovApplyFilterPreset(t *testing.T) {
+	m := baseModelOverlay()
+	m.middleItems = []model.Item{
+		{Name: "pod-1", Status: "Running"},
+		{Name: "pod-2", Status: "Failed"},
+		{Name: "pod-3", Status: "Running"},
+	}
+	preset := FilterPreset{
+		Name: "Running",
+		MatchFn: func(item model.Item) bool {
+			return item.Status == "Running"
+		},
+	}
+	result, cmd := m.applyFilterPreset(preset)
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.Len(t, rm.middleItems, 2)
+	assert.NotNil(t, rm.activeFilterPreset)
+	assert.NotNil(t, cmd)
+}
+
+func TestCovNetworkPolicyOverlayEsc(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayNetworkPolicy
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovPodSelectOverlayEsc(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayPodSelect
+	m.overlayItems = []model.Item{{Name: "pod-1"}}
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovLogPodSelectOverlayEsc(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayLogPodSelect
+	m.logMultiItems = []model.Item{{Name: "pod-1"}}
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovLogContainerSelectOverlayEsc(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayLogContainerSelect
+	m.logContainers = []string{"container-1"}
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovAutoSyncKeyEsc(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayAutoSync
+	result, _ := m.handleOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}

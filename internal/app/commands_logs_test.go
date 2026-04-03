@@ -3,7 +3,9 @@ package app
 import (
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- matchesContainerFilter ---
@@ -92,4 +94,154 @@ func TestSanitizeFilename(t *testing.T) {
 			assert.Equal(t, tt.expected, sanitizeFilename(tt.input))
 		})
 	}
+}
+
+func TestCovSaveLoadedLogs(t *testing.T) {
+	m := baseModelCov()
+	m.logLines = []string{"line1", "line2", "line3"}
+	m.actionCtx = actionContext{name: "test-pod"}
+	path, err := m.saveLoadedLogs()
+	assert.NoError(t, err)
+	assert.Contains(t, path, "lfk-logs-test-pod")
+}
+
+func TestCovSaveAllLogs(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.logLines = []string{"line1", "line2"}
+	m.logTitle = "Logs: my-pod"
+	m = withActionCtx(m, "my-pod", "default", "Pod", model.ResourceTypeEntry{})
+	cmd := m.saveAllLogs()
+	assert.NotNil(t, cmd)
+}
+
+func TestCovBuildLogTitle(t *testing.T) {
+	m := baseModelCov()
+	m.actionCtx = actionContext{name: "my-pod", namespace: "default", context: "ctx"}
+	title := m.buildLogTitle()
+	assert.Contains(t, title, "Logs: default/my-pod")
+}
+
+func TestCovBuildLogTitleWithContainerFilter(t *testing.T) {
+	m := baseModelCov()
+	m.actionCtx = actionContext{name: "my-pod", namespace: "default", context: "ctx"}
+	m.logContainers = []string{"main", "sidecar"}
+	m.logSelectedContainers = []string{"main"}
+	title := m.buildLogTitle()
+	assert.Contains(t, title, "[main]")
+}
+
+func TestFinalMatchesContainerFilterEmptyLine(t *testing.T) {
+	assert.True(t, matchesContainerFilter("", []string{"main"}))
+}
+
+func TestFinalMatchesContainerFilterNoBracket(t *testing.T) {
+	assert.True(t, matchesContainerFilter("some log line", []string{"main"}))
+}
+
+func TestFinalMatchesContainerFilterNoCloseBracket(t *testing.T) {
+	assert.True(t, matchesContainerFilter("[pod/name/container", []string{"main"}))
+}
+
+func TestFinalMatchesContainerFilterNoSlash(t *testing.T) {
+	assert.True(t, matchesContainerFilter("[container] log", []string{"main"}))
+}
+
+func TestFinalMatchesContainerFilterMatch(t *testing.T) {
+	assert.True(t, matchesContainerFilter("[pod/my-pod/main] log line", []string{"main"}))
+}
+
+func TestFinalMatchesContainerFilterNoMatch(t *testing.T) {
+	assert.False(t, matchesContainerFilter("[pod/my-pod/sidecar] log line", []string{"main"}))
+}
+
+func TestFinalWaitForLogLineNilChannel(t *testing.T) {
+	m := baseFinalModel()
+	m.logCh = nil
+	cmd := m.waitForLogLine()
+	assert.Nil(t, cmd)
+}
+
+func TestFinalWaitForLogLineWithChannel(t *testing.T) {
+	m := baseFinalModel()
+	ch := make(chan string, 1)
+	ch <- "test log line"
+	m.logCh = ch
+	cmd := m.waitForLogLine()
+	require.NotNil(t, cmd)
+	msg := cmd()
+	logMsg := msg.(logLineMsg)
+	assert.Equal(t, "test log line", logMsg.line)
+	assert.False(t, logMsg.done)
+}
+
+func TestFinalWaitForLogLineChannelClosed(t *testing.T) {
+	m := baseFinalModel()
+	ch := make(chan string)
+	close(ch)
+	m.logCh = ch
+	cmd := m.waitForLogLine()
+	require.NotNil(t, cmd)
+	msg := cmd()
+	logMsg := msg.(logLineMsg)
+	assert.True(t, logMsg.done)
+}
+
+func TestFinalSanitizeFilename(t *testing.T) {
+	tests := []struct {
+		input string
+		want  string
+	}{
+		{"simple", "simple"},
+		{"path/to/file", "path_to_file"},
+		{"back\\slash", "back_slash"},
+		{"has:colon", "has_colon"},
+		{"has space", "has_space"},
+		{"a/b:c d\\e", "a_b_c_d_e"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, sanitizeFilename(tt.input))
+	}
+}
+
+func TestFinalSaveLoadedLogs(t *testing.T) {
+	m := baseFinalModel()
+	m.actionCtx.name = "test-pod"
+	m.logLines = []string{"line1", "line2", "line3"}
+	path, err := m.saveLoadedLogs()
+	require.NoError(t, err)
+	assert.Contains(t, path, "lfk-logs-test-pod")
+}
+
+func TestFinalMaybeLoadMoreHistoryNotAtTop(t *testing.T) {
+	m := baseFinalModel()
+	m.logScroll = 5
+	m.logHasMoreHistory = true
+	cmd := m.maybeLoadMoreHistory()
+	assert.Nil(t, cmd)
+}
+
+func TestFinalMaybeLoadMoreHistoryNoMore(t *testing.T) {
+	m := baseFinalModel()
+	m.logScroll = 0
+	m.logHasMoreHistory = false
+	cmd := m.maybeLoadMoreHistory()
+	assert.Nil(t, cmd)
+}
+
+func TestFinalMaybeLoadMoreHistoryAlreadyLoading(t *testing.T) {
+	m := baseFinalModel()
+	m.logScroll = 0
+	m.logHasMoreHistory = true
+	m.logLoadingHistory = true
+	cmd := m.maybeLoadMoreHistory()
+	assert.Nil(t, cmd)
+}
+
+func TestFinalMaybeLoadMoreHistoryPrevious(t *testing.T) {
+	m := baseFinalModel()
+	m.logScroll = 0
+	m.logHasMoreHistory = true
+	m.logPrevious = true
+	cmd := m.maybeLoadMoreHistory()
+	assert.Nil(t, cmd)
 }

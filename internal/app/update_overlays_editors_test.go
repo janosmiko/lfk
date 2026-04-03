@@ -790,3 +790,109 @@ func TestLabelEditorEditingMode(t *testing.T) {
 		assert.Equal(t, "ngin", result.labelEditValue.Value)
 	})
 }
+
+func TestCovBatchLabelOverlayKeyEsc(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayBatchLabel
+	result, _ := m.handleBatchLabelOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovBatchLabelOverlayKeyTyping(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayBatchLabel
+	m.batchLabelMode = 0
+	result, _ := m.handleBatchLabelOverlayKey(keyMsg("a"))
+	rm := result.(Model)
+	assert.Contains(t, rm.batchLabelInput.Value, "a")
+}
+
+func TestCovBatchLabelOverlayKeyBackspace(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayBatchLabel
+	m.batchLabelMode = 0
+	m.batchLabelInput.Insert("abc")
+	result, _ := m.handleBatchLabelOverlayKey(keyMsg("backspace"))
+	rm := result.(Model)
+	assert.Equal(t, "ab", rm.batchLabelInput.Value)
+}
+
+func TestCovPVCResizeOverlayKeyEsc(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayPVCResize
+	result, _ := m.handlePVCResizeOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovPVCResizeOverlayKeyTyping(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlay = overlayPVCResize
+	result, _ := m.handlePVCResizeOverlayKey(keyMsg("5"))
+	rm := result.(Model)
+	assert.Contains(t, rm.scaleInput.Value, "5")
+}
+
+func TestCovHandlePVCResizeOverlayKeyEsc(t *testing.T) {
+	m := baseModelCov()
+	m.overlay = overlayPVCResize
+	m.scaleInput = TextInput{Value: "10Gi"}
+
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyEscape})
+	assert.Equal(t, overlayNone, r.(Model).overlay)
+	assert.Empty(t, r.(Model).scaleInput.Value)
+}
+
+func TestCovHandlePVCResizeOverlayKeyEnterEmpty(t *testing.T) {
+	m := baseModelCov()
+	m.overlay = overlayPVCResize
+	m.scaleInput = TextInput{}
+
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Equal(t, overlayNone, r.(Model).overlay)
+	assert.True(t, r.(Model).statusMessageErr)
+}
+
+func TestCovHandlePVCResizeOverlayKeyBackspace(t *testing.T) {
+	m := baseModelCov()
+	m.scaleInput = TextInput{Value: "10G", Cursor: 3}
+
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	assert.Equal(t, "10", r.(Model).scaleInput.Value)
+}
+
+func TestCovHandlePVCResizeOverlayKeyCtrlW(t *testing.T) {
+	m := baseModelCov()
+	m.scaleInput = TextInput{Value: "10 Gi", Cursor: 5}
+
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	assert.Equal(t, "10 ", r.(Model).scaleInput.Value)
+}
+
+func TestCovHandlePVCResizeOverlayKeyCursorMovement(t *testing.T) {
+	m := baseModelCov()
+	m.scaleInput = TextInput{Value: "10Gi", Cursor: 2}
+
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	assert.Equal(t, 0, r.(Model).scaleInput.Cursor)
+
+	r, _ = m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+	assert.Equal(t, 4, r.(Model).scaleInput.Cursor)
+
+	m.scaleInput.Cursor = 2
+	r, _ = m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyLeft})
+	assert.Equal(t, 1, r.(Model).scaleInput.Cursor)
+
+	m.scaleInput.Cursor = 2
+	r, _ = m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyRight})
+	assert.Equal(t, 3, r.(Model).scaleInput.Cursor)
+}
+
+func TestCovHandlePVCResizeOverlayKeyInsert(t *testing.T) {
+	m := baseModelCov()
+	m.scaleInput = TextInput{Value: "10", Cursor: 2}
+
+	r, _ := m.handlePVCResizeOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'G'}})
+	assert.Equal(t, "10G", r.(Model).scaleInput.Value)
+}

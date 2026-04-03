@@ -3,6 +3,9 @@ package app
 import (
 	"strings"
 	"testing"
+
+	"github.com/janosmiko/lfk/internal/ui"
+	"github.com/stretchr/testify/assert"
 )
 
 // TestOverlayHintBar_NoOverlay verifies that no hint bar is returned when no overlay is active.
@@ -92,4 +95,14 @@ func TestStatusBar_ShowsOverlayHints(t *testing.T) {
 	if strings.Contains(bar, "h/l") {
 		t.Error("status bar with overlay active should not show explorer hints")
 	}
+}
+
+func TestCovRenderHints(t *testing.T) {
+	m := baseModelCov()
+	hints := []ui.HintEntry{
+		{Key: "j/k", Desc: "navigate"},
+		{Key: "q", Desc: "quit"},
+	}
+	result := m.renderHints(hints)
+	assert.NotEmpty(t, result)
 }

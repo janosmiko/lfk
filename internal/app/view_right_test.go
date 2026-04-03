@@ -266,3 +266,47 @@ func TestLogContentHeight(t *testing.T) {
 		assert.Equal(t, 1, m.logContentHeight())
 	})
 }
+
+func TestCovMiddleColumnHeader(t *testing.T) {
+	tests := []struct {
+		level  model.Level
+		kind   string
+		expect string
+	}{
+		{model.LevelClusters, "", "KUBECONFIG"},
+		{model.LevelResourceTypes, "", "RESOURCE TYPE"},
+		{model.LevelResources, "Pod", "POD"},
+		{model.LevelContainers, "", "CONTAINER"},
+		{99, "", ""},
+	}
+	for _, tt := range tests {
+		m := Model{nav: model.NavigationState{Level: tt.level, ResourceType: model.ResourceTypeEntry{Kind: tt.kind}}}
+		assert.Equal(t, tt.expect, m.middleColumnHeader())
+	}
+}
+
+func TestCovMiddleColumnHeaderOwned(t *testing.T) {
+	for _, kind := range []string{"CronJob", "Application", "Pod", "Node", "Deployment"} {
+		m := Model{nav: model.NavigationState{Level: model.LevelOwned, ResourceType: model.ResourceTypeEntry{Kind: kind}}}
+		assert.NotEmpty(t, m.middleColumnHeader())
+	}
+}
+
+func TestCovLeftColumnHeader(t *testing.T) {
+	tests := []struct {
+		level  model.Level
+		dn     string
+		expect string
+	}{
+		{model.LevelClusters, "", ""},
+		{model.LevelResourceTypes, "", "KUBECONFIG"},
+		{model.LevelResources, "", "RESOURCE TYPE"},
+		{model.LevelOwned, "Deployments", "DEPLOYMENTS"},
+		{model.LevelContainers, "Pods", "PODS"},
+		{99, "", ""},
+	}
+	for _, tt := range tests {
+		m := Model{nav: model.NavigationState{Level: tt.level, ResourceType: model.ResourceTypeEntry{DisplayName: tt.dn}}}
+		assert.Equal(t, tt.expect, m.leftColumnHeader())
+	}
+}

@@ -6,6 +6,8 @@ import (
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestBuiltinFilterPresets_UniversalPresetsAlwaysPresent(t *testing.T) {
@@ -386,4 +388,68 @@ func findPreset(presets []FilterPreset, name string) *FilterPreset {
 		}
 	}
 	return nil
+}
+
+func TestCovFilterPresetsServiceLBNoIP(t *testing.T) {
+	presets := builtinFilterPresets("Service")
+	lbNoIP := findPreset(presets, "LB No IP")
+	require.NotNil(t, lbNoIP)
+
+	assert.True(t, lbNoIP.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Type", Value: "LoadBalancer"}, {Key: "External-IP", Value: "<pending>"}}}))
+	assert.True(t, lbNoIP.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Type", Value: "LoadBalancer"}, {Key: "External-IP", Value: "<none>"}}}))
+	assert.True(t, lbNoIP.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Type", Value: "LoadBalancer"}, {Key: "External-IP", Value: ""}}}))
+	assert.False(t, lbNoIP.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Type", Value: "LoadBalancer"}, {Key: "External-IP", Value: "1.2.3.4"}}}))
+	assert.False(t, lbNoIP.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Type", Value: "ClusterIP"}}}))
+}
+
+func TestCovFilterPresetsNodeCordoned(t *testing.T) {
+	presets := builtinFilterPresets("Node")
+	cordoned := findPreset(presets, "Cordoned")
+	require.NotNil(t, cordoned)
+	assert.True(t, cordoned.MatchFn(model.Item{Status: "Ready,SchedulingDisabled"}))
+	assert.False(t, cordoned.MatchFn(model.Item{Status: "Ready"}))
+}
+
+func TestCovFilterPresetsEventWarnings(t *testing.T) {
+	presets := builtinFilterPresets("Event")
+	warnings := findPreset(presets, "Warnings")
+	require.NotNil(t, warnings)
+	assert.True(t, warnings.MatchFn(model.Item{Status: "Warning"}))
+	assert.False(t, warnings.MatchFn(model.Item{Status: "Normal"}))
+}
+
+func TestCovFilterPresetsCertExpiring(t *testing.T) {
+	presets := builtinFilterPresets("Certificate")
+	expiring := findPreset(presets, "Expiring Soon")
+	require.NotNil(t, expiring)
+
+	in15d := time.Now().Add(15 * 24 * time.Hour).Format(time.RFC3339)
+	assert.True(t, expiring.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Expires", Value: in15d}}}))
+
+	in60d := time.Now().Add(60 * 24 * time.Hour).Format(time.RFC3339)
+	assert.False(t, expiring.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Expires", Value: in60d}}}))
+	assert.False(t, expiring.MatchFn(model.Item{}))
+
+	in10d := time.Now().Add(10 * 24 * time.Hour).Format("2006-01-02")
+	assert.True(t, expiring.MatchFn(model.Item{Columns: []model.KeyValue{{Key: "Not After", Value: in10d}}}))
+}
+
+func TestCovBuildConfigMatchFnCombined(t *testing.T) {
+	fn := buildConfigMatchFn(ui.ConfigFilterMatch{Status: "error", ReadyNot: true})
+	assert.True(t, fn(model.Item{Status: "Error", Ready: "0/1"}))
+	assert.False(t, fn(model.Item{Status: "Error", Ready: "1/1"}))
+	assert.False(t, fn(model.Item{Status: "Running", Ready: "0/1"}))
+}
+
+func TestCovBuildConfigMatchFnColumnNoValue(t *testing.T) {
+	fn := buildConfigMatchFn(ui.ConfigFilterMatch{Column: "IP"})
+	assert.True(t, fn(model.Item{Columns: []model.KeyValue{{Key: "IP", Value: "10.0.0.1"}}}))
+	assert.False(t, fn(model.Item{Columns: []model.KeyValue{{Key: "IP", Value: ""}}}))
+}
+
+func TestCovBuildConfigMatchFnRestartsGt(t *testing.T) {
+	fn := buildConfigMatchFn(ui.ConfigFilterMatch{RestartsGt: 5})
+	assert.True(t, fn(model.Item{Restarts: "10"}))
+	assert.False(t, fn(model.Item{Restarts: "3"}))
+	assert.False(t, fn(model.Item{Restarts: ""}))
 }

@@ -188,3 +188,146 @@ func TestTextInput_InsertNewline(t *testing.T) {
 	ti.Insert("line2")
 	assert.Equal(t, "line1\nline2", ti.Value)
 }
+
+func TestCovTextInputHomeCov(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("hello")
+	ti.Home()
+	assert.Equal(t, 0, ti.Cursor)
+}
+
+func TestCovTextInputEndCov(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("hello")
+	ti.Home()
+	ti.End()
+	assert.Equal(t, 5, ti.Cursor)
+}
+
+func TestCovTextInputLeftCov(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("hello")
+	ti.Left()
+	assert.Equal(t, 4, ti.Cursor)
+}
+
+func TestCovTextInputRightCov(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("hello")
+	ti.Home()
+	ti.Right()
+	assert.Equal(t, 1, ti.Cursor)
+}
+
+func TestCovTextInputInsert(t *testing.T) {
+	ti := TextInput{}
+	ti.Insert("hello")
+	assert.Equal(t, "hello", ti.Value)
+	assert.Equal(t, 5, ti.Cursor)
+
+	ti.Insert(" world")
+	assert.Equal(t, "hello world", ti.Value)
+	assert.Equal(t, 11, ti.Cursor)
+}
+
+func TestCovTextInputInsertMiddle(t *testing.T) {
+	ti := TextInput{Value: "helo", Cursor: 2}
+	ti.Insert("l")
+	assert.Equal(t, "hello", ti.Value)
+	assert.Equal(t, 3, ti.Cursor)
+}
+
+func TestCovTextInputBackspace(t *testing.T) {
+	ti := TextInput{Value: "hello", Cursor: 5}
+	ti.Backspace()
+	assert.Equal(t, "hell", ti.Value)
+	assert.Equal(t, 4, ti.Cursor)
+
+	// At start: no-op.
+	ti.Cursor = 0
+	ti.Backspace()
+	assert.Equal(t, "hell", ti.Value)
+	assert.Equal(t, 0, ti.Cursor)
+}
+
+func TestCovTextInputDeleteWord(t *testing.T) {
+	ti := TextInput{Value: "hello world", Cursor: 11}
+	ti.DeleteWord()
+	assert.Equal(t, "hello ", ti.Value)
+	assert.Equal(t, 6, ti.Cursor)
+
+	ti.DeleteWord()
+	assert.Equal(t, "", ti.Value)
+	assert.Equal(t, 0, ti.Cursor)
+
+	// At cursor 0: no-op.
+	ti.DeleteWord()
+	assert.Equal(t, "", ti.Value)
+}
+
+func TestCovTextInputDeleteWordWithSpaces(t *testing.T) {
+	ti := TextInput{Value: "hello   world  ", Cursor: 15}
+	ti.DeleteWord()
+	assert.Equal(t, "hello   ", ti.Value)
+}
+
+func TestCovTextInputHome(t *testing.T) {
+	ti := TextInput{Value: "hello", Cursor: 3}
+	ti.Home()
+	assert.Equal(t, 0, ti.Cursor)
+}
+
+func TestCovTextInputEnd(t *testing.T) {
+	ti := TextInput{Value: "hello", Cursor: 0}
+	ti.End()
+	assert.Equal(t, 5, ti.Cursor)
+}
+
+func TestCovTextInputLeft(t *testing.T) {
+	ti := TextInput{Value: "hello", Cursor: 3}
+	ti.Left()
+	assert.Equal(t, 2, ti.Cursor)
+
+	ti.Cursor = 0
+	ti.Left()
+	assert.Equal(t, 0, ti.Cursor)
+}
+
+func TestCovTextInputRight(t *testing.T) {
+	ti := TextInput{Value: "hello", Cursor: 3}
+	ti.Right()
+	assert.Equal(t, 4, ti.Cursor)
+
+	ti.Cursor = 5
+	ti.Right()
+	assert.Equal(t, 5, ti.Cursor)
+}
+
+func TestCovTextInputSet(t *testing.T) {
+	ti := TextInput{}
+	ti.Set("new value")
+	assert.Equal(t, "new value", ti.Value)
+	assert.Equal(t, 9, ti.Cursor)
+}
+
+func TestCovTextInputClear(t *testing.T) {
+	ti := TextInput{Value: "hello", Cursor: 3}
+	ti.Clear()
+	assert.Empty(t, ti.Value)
+	assert.Equal(t, 0, ti.Cursor)
+}
+
+func TestCovTextInputString(t *testing.T) {
+	ti := TextInput{Value: "hello"}
+	assert.Equal(t, "hello", ti.String())
+}
+
+func TestCovTextInputCursorLeft(t *testing.T) {
+	ti := TextInput{Value: "hello", Cursor: 3}
+	assert.Equal(t, "hel", ti.CursorLeft())
+}
+
+func TestCovTextInputCursorRight(t *testing.T) {
+	ti := TextInput{Value: "hello", Cursor: 3}
+	assert.Equal(t, "lo", ti.CursorRight())
+}

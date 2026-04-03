@@ -1,6 +1,10 @@
 package app
 
-import "testing"
+import (
+	"testing"
+
+	"github.com/stretchr/testify/assert"
+)
 
 func TestClampOverlayCursor(t *testing.T) {
 	tests := []struct {
@@ -57,6 +61,29 @@ func TestClampOverlayCursor(t *testing.T) {
 				t.Errorf("clampOverlayCursor(%d, %d, %d) = %d, want %d",
 					tt.cursor, tt.delta, tt.maxIdx, got, tt.want)
 			}
+		})
+	}
+}
+
+func TestCovClampOverlayCursorExhaustive(t *testing.T) {
+	tests := []struct {
+		name     string
+		cursor   int
+		delta    int
+		maxIdx   int
+		expected int
+	}{
+		{"move down", 0, 1, 5, 1},
+		{"move up", 3, -1, 5, 2},
+		{"clamp at max", 5, 1, 5, 5},
+		{"clamp at zero", 0, -1, 5, 0},
+		{"empty list", 0, 1, -1, 0},
+		{"big jump", 0, 100, 10, 10},
+		{"big negative", 5, -100, 10, 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.expected, clampOverlayCursor(tt.cursor, tt.delta, tt.maxIdx))
 		})
 	}
 }

@@ -1,40 +1,23 @@
 package app
 
 import (
-	"sync"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/janosmiko/lfk/internal/k8s"
-	"github.com/janosmiko/lfk/internal/model"
 )
 
-func baseModelFinalizer() Model {
-	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
-	}
-	m.overlay = overlayFinalizerSearch
-	m.finalizerSearchResults = []k8s.FinalizerMatch{
-		{Name: "pod-1", Namespace: "default", Kind: "Pod", Matched: "kubernetes.io/pv-protection"},
-		{Name: "pod-2", Namespace: "default", Kind: "Pod", Matched: "kubernetes.io/pv-protection"},
-		{Name: "pod-3", Namespace: "kube-system", Kind: "Pod", Matched: "finalizer.example.com"},
-	}
-	m.finalizerSearchSelected = make(map[string]bool)
-	return m
-}
+func TestCovOpenFinalizerSearch(t *testing.T) {
+	m := baseModelCov()
+	m.openFinalizerSearch()
 
-// =============================================================
-// handleFinalizerSearchKey -- normal mode
-// =============================================================
+	assert.Equal(t, overlayFinalizerSearch, m.overlay)
+	assert.True(t, m.finalizerSearchFilterActive)
+	assert.False(t, m.finalizerSearchLoading)
+	assert.Empty(t, m.finalizerSearchPattern)
+	assert.Empty(t, m.finalizerSearchResults)
+	assert.NotNil(t, m.finalizerSearchSelected)
+	assert.Equal(t, 0, m.finalizerSearchCursor)
+}
 
 func TestCovFinalizerKeyEsc(t *testing.T) {
 	m := baseModelFinalizer()
@@ -171,10 +154,6 @@ func TestCovFinalizerKeySlash(t *testing.T) {
 	assert.True(t, rm.finalizerSearchFilterActive)
 }
 
-// =============================================================
-// handleFinalizerSearchFilterKey
-// =============================================================
-
 func TestCovFinalizerFilterEscClearsFilter(t *testing.T) {
 	m := baseModelFinalizer()
 	m.finalizerSearchFilterActive = true
@@ -260,10 +239,6 @@ func TestCovFinalizerFilterTyping(t *testing.T) {
 	assert.Equal(t, "x", rm.finalizerSearchFilter)
 }
 
-// =============================================================
-// filteredFinalizerResults
-// =============================================================
-
 func TestCovFilteredFinalizerResultsNoFilter(t *testing.T) {
 	m := baseModelFinalizer()
 	results := m.filteredFinalizerResults()
@@ -277,10 +252,6 @@ func TestCovFilteredFinalizerResultsWithFilter(t *testing.T) {
 	assert.Len(t, results, 1)
 	assert.Equal(t, "pod-3", results[0].Name)
 }
-
-// =============================================================
-// Dispatch to filter mode
-// =============================================================
 
 func TestCovFinalizerSearchKeyDispatchToFilter(t *testing.T) {
 	m := baseModelFinalizer()

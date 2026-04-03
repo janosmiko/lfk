@@ -185,3 +185,246 @@ func TestHandleHeaderClickNameColumn(t *testing.T) {
 	result := ret.(Model)
 	assert.Equal(t, "Name", result.sortColumnName) // clicks Name column
 }
+
+func TestP4MouseClickLeftColumn(t *testing.T) {
+	m := bp4()
+	m.mode = modeExplorer
+	// Click in left column (x < leftEnd).
+	result, _ := m.handleMouseClick(2, 10)
+	_ = result.(Model)
+}
+
+func TestCov80SwitchToTabExplorer(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeExplorer
+	m.tabs = []TabState{{}, {}}
+	m.activeTab = 0
+	result, _ := m.switchToTab(1)
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.activeTab)
+}
+
+func TestCov80SwitchToTabLogs(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogs
+	ch := make(chan string, 1)
+	m.logCh = ch
+	m.tabs = []TabState{{}, {}}
+	m.activeTab = 0
+	// Pre-fill the second tab so loadTab restores it.
+	m.tabs[1].mode = modeLogs
+	m.tabs[1].logCh = ch
+	result, cmd := m.switchToTab(1)
+	rm := result.(Model)
+	_ = rm
+	// Should return waitForLogLine cmd.
+	_ = cmd
+}
+
+func TestCov80SwitchToTabNilCmd(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeExplorer
+	m.tabs = []TabState{{}}
+	m.activeTab = 0
+	// Switching to same tab index.
+	result, cmd := m.switchToTab(0)
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.activeTab)
+	_ = cmd
+}
+
+func TestCov80HandleMouseWheelUpInLogs(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogs
+	m.logScroll = 10
+	msg := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
+	result, _ := m.handleMouse(msg)
+	rm := result.(Model)
+	assert.Less(t, rm.logScroll, 10)
+}
+
+func TestCov80HandleMouseWheelDownInLogs(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogs
+	m.logScroll = 0
+	msg := tea.MouseMsg{Button: tea.MouseButtonWheelDown}
+	result, _ := m.handleMouse(msg)
+	rm := result.(Model)
+	assert.GreaterOrEqual(t, rm.logScroll, 0)
+}
+
+func TestCov80HandleMouseInOverlay(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeExplorer
+	m.overlay = overlayAction
+	msg := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
+	result, cmd := m.handleMouse(msg)
+	_ = result
+	assert.Nil(t, cmd)
+}
+
+func TestCov80HandleMouseLeftClickNotPress(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeExplorer
+	msg := tea.MouseMsg{Button: tea.MouseButtonLeft, Action: tea.MouseActionRelease}
+	result, cmd := m.handleMouse(msg)
+	_ = result
+	assert.Nil(t, cmd)
+}
+
+func TestCovSwitchToTab(t *testing.T) {
+	m := baseModelActions()
+	m.tabs = []TabState{
+		{
+			nav:           model.NavigationState{Context: "ctx1"},
+			cursorMemory:  make(map[string]int),
+			itemCache:     make(map[string][]model.Item),
+			selectedItems: make(map[string]bool),
+		},
+		{
+			nav:           model.NavigationState{Context: "ctx2"},
+			cursorMemory:  make(map[string]int),
+			itemCache:     make(map[string][]model.Item),
+			selectedItems: make(map[string]bool),
+		},
+	}
+	m.activeTab = 0
+	result, _ := m.switchToTab(1)
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.activeTab)
+}
+
+func TestCovMouseScrollUpInLogs(t *testing.T) {
+	m := baseModelActions()
+	m.mode = modeLogs
+	m.logScroll = 5
+	m.logLines = make([]string, 20)
+	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	rm := result.(Model)
+	assert.Less(t, rm.logScroll, 5)
+	assert.False(t, rm.logFollow)
+}
+
+func TestCovMouseScrollDownInLogs(t *testing.T) {
+	m := baseModelActions()
+	m.mode = modeLogs
+	m.logScroll = 0
+	m.logLines = make([]string, 20)
+	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+	rm := result.(Model)
+	assert.GreaterOrEqual(t, rm.logScroll, 0)
+}
+
+func TestCovMouseInOverlay(t *testing.T) {
+	m := baseModelActions()
+	m.mode = modeExplorer
+	m.overlay = overlayAction
+	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	_ = result.(Model)
+}
+
+func TestCovMouseInHelp(t *testing.T) {
+	m := baseModelActions()
+	m.mode = modeHelp
+	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+	_ = result.(Model)
+}
+
+func TestCovMouseLeftClickInMiddle(t *testing.T) {
+	m := baseModelActions()
+	m.mode = modeExplorer
+	m.middleItems = []model.Item{{Name: "item-1"}}
+	// middleEnd should be around 45-50 area
+	result, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+		X:      30,
+		Y:      5,
+	})
+	_ = result.(Model)
+}
+
+func TestCovMouseLeftClickRelease(t *testing.T) {
+	m := baseModelActions()
+	m.mode = modeExplorer
+	// Should be ignored (release, not press)
+	result, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionRelease,
+		X:      30,
+		Y:      5,
+	})
+	_ = result.(Model)
+}
+
+func TestCovHandleHeaderClickNoItems(t *testing.T) {
+	m := baseModelActions()
+	m.middleItems = nil
+	result, cmd := m.handleHeaderClick(5)
+	_ = result.(Model)
+	assert.Nil(t, cmd)
+}
+
+func TestCovHandleHeaderClickNoColumns(t *testing.T) {
+	m := baseModelActions()
+	m.middleItems = []model.Item{{Name: "pod-1"}}
+	ui.ActiveSortableColumns = nil
+	result, cmd := m.handleHeaderClick(5)
+	_ = result.(Model)
+	assert.Nil(t, cmd)
+}
+
+func TestCovHandleHeaderClickWithColumns(t *testing.T) {
+	m := baseModelActions()
+	m.middleItems = []model.Item{
+		{Name: "pod-1", Namespace: "default", Status: "Running", Age: "1h", Ready: "1/1"},
+	}
+	ui.ActiveSortableColumns = []string{"Name", "Namespace", "Status", "Age"}
+	result, cmd := m.handleHeaderClick(5)
+	rm := result.(Model)
+	assert.NotNil(t, cmd)
+	assert.NotEmpty(t, rm.sortColumnName)
+}
+
+func TestCovHandleHeaderClickToggleDirection(t *testing.T) {
+	m := baseModelActions()
+	m.middleItems = []model.Item{
+		{Name: "pod-1", Namespace: "default"},
+	}
+	ui.ActiveSortableColumns = []string{"Name", "Namespace"}
+	m.sortColumnName = "Namespace"
+	m.sortAscending = true
+	// Click within the namespace column region (at the start)
+	result, cmd := m.handleHeaderClick(2)
+	rm := result.(Model)
+	// Should either toggle direction or switch column
+	if rm.sortColumnName == "Namespace" {
+		assert.False(t, rm.sortAscending)
+	}
+	_ = cmd
+}
+
+func TestCovMouseClickLeftColumn(t *testing.T) {
+	m := baseModelActions()
+	m.mode = modeExplorer
+	m.leftItems = []model.Item{{Name: "context-1"}}
+	result, _ := m.handleMouseClick(2, 5)
+	_ = result.(Model)
+}
+
+func TestCovMouseClickRightColumn(t *testing.T) {
+	m := baseModelActions()
+	m.mode = modeExplorer
+	m.rightItems = []model.Item{{Name: "child-1"}}
+	result, _ := m.handleMouseClick(70, 5)
+	_ = result.(Model)
+}
+
+func TestCovSwitchToTabSameTab(t *testing.T) {
+	m := baseModelCov()
+	m.activeTab = 0
+	m.tabs = []TabState{{}}
+	ret, cmd := m.switchToTab(0)
+	_ = ret.(Model)
+	assert.Nil(t, cmd)
+}

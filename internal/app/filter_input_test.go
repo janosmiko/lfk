@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -381,4 +382,373 @@ func TestLogContainerFilterModeViaShared_CtrlW(t *testing.T) {
 	ret, _ := m.handleLogContainerFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
 	result := ret.(Model)
 	assert.Equal(t, "hello ", result.logContainerFilterText)
+}
+
+func TestCovStringFilterInputNavigation(t *testing.T) {
+	s := "hello"
+	fi := &stringFilterInput{ptr: &s}
+
+	// These are all no-ops for stringFilterInput but need coverage.
+	fi.Home()
+	fi.End()
+	fi.Left()
+	fi.Right()
+	assert.Equal(t, "hello", s)
+
+	fi.Insert("!")
+	assert.Equal(t, "hello!", s)
+
+	fi.Backspace()
+	assert.Equal(t, "hello", s)
+
+	fi.DeleteWord()
+	assert.Equal(t, "", s)
+
+	fi.Clear()
+	assert.Equal(t, "", s)
+}
+
+func TestCovErrorLogOverlayKeyEsc(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlayErrorLog = true
+	m.errorLog = []ui.ErrorLogEntry{{Level: "ERR", Message: "error1"}}
+	result, _ := m.handleErrorLogOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.False(t, rm.overlayErrorLog)
+}
+
+func TestCovErrorLogOverlayKeyDown(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlayErrorLog = true
+	m.errorLog = []ui.ErrorLogEntry{{Level: "ERR", Message: "error1"}, {Level: "ERR", Message: "error2"}}
+	m.errorLogCursorLine = 0
+	result, _ := m.handleErrorLogOverlayKey(keyMsg("j"))
+	rm := result.(Model)
+	assert.Equal(t, 1, rm.errorLogCursorLine)
+}
+
+func TestCovErrorLogOverlayKeyUp(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlayErrorLog = true
+	m.errorLog = []ui.ErrorLogEntry{{Level: "ERR", Message: "error1"}, {Level: "ERR", Message: "error2"}}
+	m.errorLogCursorLine = 1
+	result, _ := m.handleErrorLogOverlayKey(keyMsg("k"))
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.errorLogCursorLine)
+}
+
+func TestCovErrorLogOverlayKeyBigG(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlayErrorLog = true
+	m.errorLog = []ui.ErrorLogEntry{{Level: "E", Message: "a"}, {Level: "E", Message: "b"}, {Level: "E", Message: "c"}}
+	result, _ := m.handleErrorLogOverlayKey(keyMsg("G"))
+	rm := result.(Model)
+	assert.Equal(t, 2, rm.errorLogCursorLine)
+}
+
+func TestCovErrorLogOverlayKeyGG(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlayErrorLog = true
+	m.errorLog = []ui.ErrorLogEntry{{Level: "E", Message: "a"}, {Level: "E", Message: "b"}}
+	m.errorLogCursorLine = 1
+	result, _ := m.handleErrorLogOverlayKey(keyMsg("g"))
+	rm := result.(Model)
+	assert.True(t, rm.pendingG)
+	result, _ = rm.handleErrorLogOverlayKey(keyMsg("g"))
+	rm = result.(Model)
+	assert.Equal(t, 0, rm.errorLogCursorLine)
+}
+
+func TestCovErrorLogOverlayKeyCtrlD(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlayErrorLog = true
+	m.errorLog = make([]ui.ErrorLogEntry, 30)
+	for i := range m.errorLog {
+		m.errorLog[i] = ui.ErrorLogEntry{Level: "E", Message: "err"}
+	}
+	m.errorLogCursorLine = 0
+	result, _ := m.handleErrorLogOverlayKey(keyMsg("ctrl+d"))
+	rm := result.(Model)
+	assert.Greater(t, rm.errorLogCursorLine, 0)
+}
+
+func TestCovErrorLogOverlayKeyCtrlU(t *testing.T) {
+	m := baseModelHandlers2()
+	m.overlayErrorLog = true
+	m.errorLog = make([]ui.ErrorLogEntry, 30)
+	for i := range m.errorLog {
+		m.errorLog[i] = ui.ErrorLogEntry{Level: "E", Message: "err"}
+	}
+	m.errorLogCursorLine = 20
+	result, _ := m.handleErrorLogOverlayKey(keyMsg("ctrl+u"))
+	rm := result.(Model)
+	assert.Less(t, rm.errorLogCursorLine, 20)
+}
+
+func TestCovHandleCommandBarKeyEsc(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: "test"}
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyEscape})
+	assert.False(t, r.(Model).commandBarActive)
+	assert.Empty(t, r.(Model).commandBarInput.Value)
+}
+
+func TestCovHandleCommandBarKeyEnterEmpty(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: ""}
+	m.commandHistory = &commandHistory{cursor: -1}
+
+	r, cmd := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.False(t, r.(Model).commandBarActive)
+	assert.Nil(t, cmd)
+}
+
+func TestCovHandleCommandBarKeyEnterQuit(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: "q", Cursor: 1}
+	m.commandHistory = &commandHistory{cursor: -1}
+
+	_, cmd := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.NotNil(t, cmd)
+}
+
+func TestCovHandleCommandBarKeyUpDown(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandHistory = &commandHistory{
+		entries: []string{"first", "second"},
+		cursor:  -1,
+	}
+	m.commandBarInput = TextInput{Value: "current", Cursor: 7}
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyUp})
+	assert.Equal(t, "second", r.(Model).commandBarInput.Value)
+
+	m2 := r.(Model)
+	r, _ = m2.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyDown})
+	assert.Equal(t, "current", r.(Model).commandBarInput.Value)
+}
+
+func TestCovHandleCommandBarKeyTab(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: "get", Cursor: 3}
+	m.commandBarSuggestions = []string{"get", "get pods"}
+	m.commandBarSelectedSuggestion = 0
+	m.commandHistory = &commandHistory{cursor: -1}
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyTab})
+	assert.NotEqual(t, "get", r.(Model).commandBarInput.Value)
+}
+
+func TestCovHandleCommandBarKeyShiftTab(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarSuggestions = []string{"a", "b", "c"}
+	m.commandBarSelectedSuggestion = 0
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyShiftTab})
+	assert.Equal(t, 2, r.(Model).commandBarSelectedSuggestion)
+}
+
+func TestCovHandleCommandBarKeyBackspace(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: "get", Cursor: 3}
+	m.commandHistory = &commandHistory{cursor: -1}
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyBackspace})
+	assert.Equal(t, "ge", r.(Model).commandBarInput.Value)
+}
+
+func TestCovHandleCommandBarKeyCtrlW(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: "get pods", Cursor: 8}
+	m.commandHistory = &commandHistory{cursor: -1}
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlW})
+	assert.Equal(t, "get ", r.(Model).commandBarInput.Value)
+}
+
+func TestCovHandleCommandBarKeyCtrlC(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: "test"}
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlC})
+	assert.False(t, r.(Model).commandBarActive)
+}
+
+func TestCovHandleCommandBarKeyInsert(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{}
+	m.commandHistory = &commandHistory{cursor: -1}
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}})
+	assert.Equal(t, "x", r.(Model).commandBarInput.Value)
+}
+
+func TestCovHandleCommandBarKeyRightLeft(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: "hello", Cursor: 3}
+
+	// Without suggestions: moves cursor.
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyRight})
+	assert.Equal(t, 4, r.(Model).commandBarInput.Cursor)
+
+	r, _ = m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyLeft})
+	assert.Equal(t, 2, r.(Model).commandBarInput.Cursor)
+
+	// With suggestions: cycles.
+	m.commandBarSuggestions = []string{"a", "b", "c"}
+	m.commandBarSelectedSuggestion = 0
+
+	r, _ = m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyRight})
+	assert.Equal(t, 1, r.(Model).commandBarSelectedSuggestion)
+
+	m.commandBarSelectedSuggestion = 0
+	r, _ = m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyLeft})
+	assert.Equal(t, 2, r.(Model).commandBarSelectedSuggestion)
+}
+
+func TestCovHandleCommandBarKeyCtrlAE(t *testing.T) {
+	m := baseModelCov()
+	m.commandBarActive = true
+	m.commandBarInput = TextInput{Value: "hello", Cursor: 3}
+
+	r, _ := m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+	assert.Equal(t, 0, r.(Model).commandBarInput.Cursor)
+
+	r, _ = m.handleCommandBarKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+	assert.Equal(t, 5, r.(Model).commandBarInput.Cursor)
+}
+
+func TestCovHandleErrorLogOverlayKeyEsc(t *testing.T) {
+	m := baseModelCov()
+	m.overlayErrorLog = true
+
+	r, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyEscape})
+	assert.False(t, r.(Model).overlayErrorLog)
+}
+
+func TestCovHandleErrorLogOverlayKeyFullscreen(t *testing.T) {
+	m := baseModelCov()
+	m.overlayErrorLog = true
+
+	r, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	assert.True(t, r.(Model).errorLogFullscreen)
+
+	m2 := r.(Model)
+	r, _ = m2.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	assert.False(t, r.(Model).errorLogFullscreen)
+}
+
+func TestCovHandleErrorLogOverlayKeyVisualMode(t *testing.T) {
+	m := baseModelCov()
+	m.overlayErrorLog = true
+
+	r, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'V'}})
+	assert.Equal(t, byte('V'), r.(Model).errorLogVisualMode)
+
+	// Esc cancels visual mode.
+	m2 := r.(Model)
+	r, _ = m2.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyEscape})
+	assert.Equal(t, byte(0), r.(Model).errorLogVisualMode)
+}
+
+func TestCovHandleQuitConfirmOverlayKey(t *testing.T) {
+	m := baseModelCov()
+	m.overlay = overlayQuitConfirm
+
+	// 'n' cancels.
+	r, _ := m.handleQuitConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
+	assert.Equal(t, overlayNone, r.(Model).overlay)
+}
+
+func TestCovQuitConfirmKeyY(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayQuitConfirm
+	result, cmd := m.handleQuitConfirmOverlayKey(keyMsg("y"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.NotNil(t, cmd) // tea.Quit
+}
+
+func TestCovQuitConfirmKeyBigY(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayQuitConfirm
+	result, cmd := m.handleQuitConfirmOverlayKey(keyMsg("Y"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.NotNil(t, cmd) // tea.Quit
+}
+
+func TestCovQuitConfirmKeyN(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayQuitConfirm
+	result, _ := m.handleQuitConfirmOverlayKey(keyMsg("n"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovQuitConfirmKeyEsc(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayQuitConfirm
+	result, _ := m.handleQuitConfirmOverlayKey(keyMsg("esc"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+}
+
+func TestCovQuitConfirmKeyDefault(t *testing.T) {
+	m := baseModelOverlay()
+	m.overlay = overlayQuitConfirm
+	result, _ := m.handleQuitConfirmOverlayKey(keyMsg("x"))
+	_ = result.(Model)
+}
+
+func TestCovStringFilterInput(t *testing.T) {
+	s := "hello"
+	fi := &stringFilterInput{ptr: &s}
+
+	fi.Insert("!")
+	assert.Equal(t, "hello!", s)
+
+	fi.Backspace()
+	assert.Equal(t, "hello", s)
+
+	fi.DeleteWord()
+	assert.Equal(t, "", s)
+
+	// DeleteWord on empty: no-op.
+	fi.DeleteWord()
+	assert.Equal(t, "", s)
+
+	// Backspace on empty: no-op.
+	fi.Backspace()
+	assert.Equal(t, "", s)
+
+	// Clear.
+	s = "test"
+	fi.Clear()
+	assert.Equal(t, "", s)
+
+	// No-op cursor methods.
+	fi.Home()
+	fi.End()
+	fi.Left()
+	fi.Right()
+}
+
+func TestCovStringFilterInputDeleteWordWithSpaces(t *testing.T) {
+	s := "hello world  "
+	fi := &stringFilterInput{ptr: &s}
+	fi.DeleteWord()
+	assert.Equal(t, "hello ", s)
 }

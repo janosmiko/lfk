@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // stripANSI removes ANSI escape codes to allow plain-text assertions on
@@ -359,4 +360,174 @@ func TestFormatTimeAgo(t *testing.T) {
 			assert.NotEmpty(t, result)
 		})
 	}
+}
+
+func TestCov80LoadDashboardReturnsCmd(t *testing.T) {
+	m := basePush80Model()
+	cmd := m.loadDashboard()
+	require.NotNil(t, cmd)
+	// The returned cmd is non-nil, confirming that the function captures
+	// all needed state and returns a valid tea.Cmd closure.
+}
+
+func TestCov80LoadDashboardDifferentContexts(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Context = "prod-cluster"
+	cmd := m.loadDashboard()
+	require.NotNil(t, cmd)
+
+	m.nav.Context = ""
+	cmd = m.loadDashboard()
+	require.NotNil(t, cmd)
+}
+
+func TestCov80LoadMonitoringDashboardReturnsCmd(t *testing.T) {
+	m := basePush80Model()
+	cmd := m.loadMonitoringDashboard()
+	// The closure captures client/context; confirm it's non-nil.
+	require.NotNil(t, cmd)
+}
+
+func TestCov80LoadMonitoringDashboardAllNs(t *testing.T) {
+	m := basePush80Model()
+	m.allNamespaces = true
+	cmd := m.loadMonitoringDashboard()
+	require.NotNil(t, cmd)
+}
+
+func TestCov80LoadMonitoringDashboardDifferentContext(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Context = "staging"
+	cmd := m.loadMonitoringDashboard()
+	require.NotNil(t, cmd)
+}
+
+func TestCovBoost2LoadDashboardCmd(t *testing.T) {
+	m := baseModelBoost2()
+	cmd := m.loadDashboard()
+	assert.NotNil(t, cmd)
+}
+
+func TestCovBoost2LoadMonitoringDashboardCmd(t *testing.T) {
+	m := baseModelBoost2()
+	cmd := m.loadMonitoringDashboard()
+	assert.NotNil(t, cmd)
+}
+
+func TestCovLoadMonitoringDashboardReturnsCmd(t *testing.T) {
+	m := baseModelWithFakeClient()
+	cmd := m.loadMonitoringDashboard()
+	// Just verify a command is returned. Executing it hits nil pointer in
+	// alerts code that needs a real clientset for service discovery.
+	assert.NotNil(t, cmd)
+}
+
+func TestFinal3LoadDashboardRichData(t *testing.T) {
+	m := baseRichModel()
+	cmd := m.loadDashboard()
+	require.NotNil(t, cmd)
+	msg := cmd()
+	result, ok := msg.(dashboardLoadedMsg)
+	require.True(t, ok, "expected dashboardLoadedMsg, got %T", msg)
+
+	content := stripANSI(result.content)
+	assert.Contains(t, content, "CLUSTER DASHBOARD")
+	assert.Contains(t, content, "Nodes:")
+	assert.Contains(t, content, "Pods:")
+	assert.Contains(t, content, "Namespaces:")
+	assert.Equal(t, "test-ctx", result.context)
+}
+
+func TestFinal3LoadDashboardEventsContent(t *testing.T) {
+	m := baseRichModel()
+	cmd := m.loadDashboard()
+	msg := cmd()
+	result := msg.(dashboardLoadedMsg)
+	events := stripANSI(result.events)
+	assert.Contains(t, events, "RECENT EVENTS")
+}
+
+func TestFinal3LoadDashboardNotEmpty(t *testing.T) {
+	m := baseRichModel()
+	cmd := m.loadDashboard()
+	msg := cmd()
+	result := msg.(dashboardLoadedMsg)
+	assert.NotEmpty(t, result.content)
+	assert.NotEmpty(t, result.events)
+}
+
+func TestFinalLoadDashboardReturnsCmd(t *testing.T) {
+	m := baseFinalModel()
+	cmd := m.loadDashboard()
+	require.NotNil(t, cmd)
+}
+
+func TestFinalLoadDashboardExecutesAndReturnsDashboardMsg(t *testing.T) {
+	m := baseFinalModelWithDynamic()
+	cmd := m.loadDashboard()
+	require.NotNil(t, cmd)
+	msg := cmd()
+	result, ok := msg.(dashboardLoadedMsg)
+	require.True(t, ok, "expected dashboardLoadedMsg, got %T", msg)
+	assert.NotEmpty(t, result.content)
+	assert.Equal(t, "test-ctx", result.context)
+}
+
+func TestFinalLoadDashboardContentContainsSections(t *testing.T) {
+	m := baseFinalModelWithDynamic()
+	cmd := m.loadDashboard()
+	msg := cmd()
+	result := msg.(dashboardLoadedMsg)
+	stripped := stripANSI(result.content)
+	assert.Contains(t, stripped, "CLUSTER DASHBOARD")
+	assert.Contains(t, stripped, "Nodes:")
+	assert.Contains(t, stripped, "Namespaces:")
+	assert.Contains(t, stripped, "Pods:")
+}
+
+func TestFinalLoadDashboardEventsColumn(t *testing.T) {
+	m := baseFinalModelWithDynamic()
+	cmd := m.loadDashboard()
+	msg := cmd()
+	result := msg.(dashboardLoadedMsg)
+	stripped := stripANSI(result.events)
+	assert.Contains(t, stripped, "RECENT EVENTS")
+}
+
+func TestFinalLoadMonitoringDashboardReturnsCmd(t *testing.T) {
+	m := baseFinalModelWithDynamic()
+	cmd := m.loadMonitoringDashboard()
+	require.NotNil(t, cmd)
+}
+
+func TestFinalLoadMonitoringDashboardNamespace(t *testing.T) {
+	m := baseFinalModelWithDynamic()
+	m.namespace = "custom-ns"
+	cmd := m.loadMonitoringDashboard()
+	require.NotNil(t, cmd)
+}
+
+func TestFinalLoadMonitoringDashboardAllNamespaces(t *testing.T) {
+	m := baseFinalModelWithDynamic()
+	m.allNamespaces = true
+	cmd := m.loadMonitoringDashboard()
+	require.NotNil(t, cmd)
+}
+
+func TestFinalFormatTimeAgoExact(t *testing.T) {
+	// Just under a minute.
+	result := formatTimeAgo(time.Now().Add(-45 * time.Second))
+	assert.Contains(t, result, "s ago")
+
+	// Just over a minute.
+	result2 := formatTimeAgo(time.Now().Add(-90 * time.Second))
+	assert.Contains(t, result2, "m ago")
+
+	// Several hours.
+	result3 := formatTimeAgo(time.Now().Add(-5 * time.Hour))
+	assert.Contains(t, result3, "h ago")
+
+	// Several days.
+	result4 := formatTimeAgo(time.Now().Add(-72 * time.Hour))
+	assert.Contains(t, result4, "d ago")
 }

@@ -88,3 +88,53 @@ func TestSavePortForwardStateEmpty(t *testing.T) {
 	loaded := loadPortForwardState()
 	assert.Empty(t, loaded.PortForwards)
 }
+
+func TestCov80SaveAndLoadPortForwardState(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	state := &PortForwardStates{
+		PortForwards: []PortForwardState{
+			{ResourceKind: "svc", ResourceName: "web", Namespace: "prod", Context: "ctx", LocalPort: "3000", RemotePort: "80"},
+		},
+	}
+	err := savePortForwardState(state)
+	require.NoError(t, err)
+	loaded := loadPortForwardState()
+	require.Len(t, loaded.PortForwards, 1)
+	assert.Equal(t, "web", loaded.PortForwards[0].ResourceName)
+}
+
+func TestCov80LoadPortForwardStateNoFile(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	loaded := loadPortForwardState()
+	assert.NotNil(t, loaded)
+	assert.Empty(t, loaded.PortForwards)
+}
+
+func TestCovPortForwardStateSaveLoad(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+
+	states := &PortForwardStates{
+		PortForwards: []PortForwardState{
+			{ResourceKind: "svc", ResourceName: "nginx", Namespace: "default", Context: "prod", LocalPort: "8080", RemotePort: "80"},
+		},
+	}
+
+	err := savePortForwardState(states)
+	assert.NoError(t, err)
+
+	loaded := loadPortForwardState()
+	assert.Len(t, loaded.PortForwards, 1)
+	assert.Equal(t, "nginx", loaded.PortForwards[0].ResourceName)
+}
+
+func TestCovPortForwardStateLoadMissing(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	loaded := loadPortForwardState()
+	assert.Empty(t, loaded.PortForwards)
+}
+
+func TestCovPortForwardStatePath(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", "/tmp/test-state")
+	path := portForwardStatePath()
+	assert.Contains(t, path, "portforwards.yaml")
+}

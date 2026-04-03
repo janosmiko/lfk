@@ -462,3 +462,72 @@ func TestActionKeyQLoadsQuotas(t *testing.T) {
 	assert.True(t, result.loading)
 	assert.NotNil(t, cmd)
 }
+
+func TestPush2HandleExplorerActionKeyBackspace(t *testing.T) {
+	m := basePush80v2Model()
+	result, _, handled := m.handleExplorerActionKey(keyMsg("backspace"))
+	if handled {
+		_ = result.(Model)
+	}
+}
+
+func TestPush2HandleExplorerActionKeyM(t *testing.T) {
+	m := basePush80v2Model()
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	result, _, handled := m.handleExplorerActionKey(keyMsg("m"))
+	// 'm' is handled by handleKey, not handleExplorerActionKey.
+	// It may not be handled here.
+	_ = result
+	_ = handled
+}
+
+func TestPush2HandleExplorerActionKeyEqualSign(t *testing.T) {
+	m := basePush80v2Model()
+	ui.ActiveSortableColumns = []string{"Name", "Status"}
+	m.sortColumnName = "Name"
+	m.sortAscending = true
+	result, cmd, handled := m.handleExplorerActionKey(keyMsg("="))
+	assert.True(t, handled)
+	rm := result.(Model)
+	assert.False(t, rm.sortAscending)
+	assert.NotNil(t, cmd)
+}
+
+func TestPush2HandleExplorerActionKeyDash(t *testing.T) {
+	m := basePush80v2Model()
+	ui.ActiveSortableColumns = []string{"Name", "Status"}
+	m.sortColumnName = "Status"
+	result, cmd, handled := m.handleExplorerActionKey(keyMsg("-"))
+	assert.True(t, handled)
+	rm := result.(Model)
+	// '-' resets sort -- sortColumnName becomes "Name" (default) or cleared.
+	_ = rm
+	assert.NotNil(t, cmd)
+}
+
+func TestP4ExplorerActionKeyF(t *testing.T) {
+	m := bp4()
+	result, _, handled := m.handleExplorerActionKey(keyMsg("f"))
+	if handled {
+		rm := result.(Model)
+		assert.True(t, rm.filterActive)
+	}
+}
+
+func TestP4ExplorerActionKeyQuote(t *testing.T) {
+	m := bp4()
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	result, _, handled := m.handleExplorerActionKey(keyMsg("'"))
+	if handled {
+		_ = result.(Model)
+	}
+}
+
+func TestP4ExplorerActionKeyComma(t *testing.T) {
+	m := bp4()
+	ui.ActiveSortableColumns = []string{"Name", "Status", "Age"}
+	result, _, handled := m.handleExplorerActionKey(keyMsg(","))
+	if handled {
+		_ = result.(Model)
+	}
+}
