@@ -14,98 +14,7 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Handle editing mode.
 	if m.secretEditing {
-		switch msg.String() {
-		case "esc":
-			m.secretEditing = false
-			m.secretEditColumn = -1
-			return m, nil
-		case "ctrl+s":
-			// Save the edit.
-			if m.secretEditColumn == 0 {
-				// Renaming key.
-				oldKey := m.secretData.Keys[m.secretCursor]
-				newKey := m.secretEditKey.Value
-				if newKey != "" && newKey != oldKey {
-					val := m.secretData.Data[oldKey]
-					delete(m.secretData.Data, oldKey)
-					m.secretData.Data[newKey] = val
-					m.secretData.Keys[m.secretCursor] = newKey
-				}
-			} else {
-				// Editing value.
-				key := m.secretData.Keys[m.secretCursor]
-				m.secretData.Data[key] = m.secretEditValue.Value
-			}
-			m.secretEditing = false
-			m.secretEditColumn = -1
-			return m, nil
-		case "enter":
-			// Insert newline into current value.
-			if m.secretEditColumn == 1 {
-				m.secretEditValue.Insert("\n")
-			}
-			return m, nil
-		case "tab":
-			// Switch between key and value columns.
-			if m.secretEditColumn == 0 {
-				m.secretEditColumn = 1
-			} else {
-				m.secretEditColumn = 0
-			}
-			return m, nil
-		case "backspace":
-			if m.secretEditColumn == 0 && len(m.secretEditKey.Value) > 0 {
-				m.secretEditKey.Backspace()
-			} else if m.secretEditColumn == 1 && len(m.secretEditValue.Value) > 0 {
-				m.secretEditValue.Backspace()
-			}
-			return m, nil
-		case "ctrl+w":
-			if m.secretEditColumn == 0 {
-				m.secretEditKey.DeleteWord()
-			} else {
-				m.secretEditValue.DeleteWord()
-			}
-			return m, nil
-		case "ctrl+a":
-			if m.secretEditColumn == 0 {
-				m.secretEditKey.Home()
-			} else {
-				m.secretEditValue.Home()
-			}
-			return m, nil
-		case "ctrl+e":
-			if m.secretEditColumn == 0 {
-				m.secretEditKey.End()
-			} else {
-				m.secretEditValue.End()
-			}
-			return m, nil
-		case "left":
-			if m.secretEditColumn == 0 {
-				m.secretEditKey.Left()
-			} else {
-				m.secretEditValue.Left()
-			}
-			return m, nil
-		case "right":
-			if m.secretEditColumn == 0 {
-				m.secretEditKey.Right()
-			} else {
-				m.secretEditValue.Right()
-			}
-			return m, nil
-		default:
-			key := msg.String()
-			if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-				if m.secretEditColumn == 0 {
-					m.secretEditKey.Insert(key)
-				} else {
-					m.secretEditValue.Insert(key)
-				}
-			}
-			return m, nil
-		}
+		return m.handleSecretEditorEditKey(msg)
 	}
 
 	// Normal mode.
@@ -166,98 +75,7 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Handle editing mode.
 	if m.configMapEditing {
-		switch msg.String() {
-		case "esc":
-			m.configMapEditing = false
-			m.configMapEditColumn = -1
-			return m, nil
-		case "ctrl+s":
-			// Save the edit.
-			if m.configMapEditColumn == 0 {
-				// Renaming key.
-				oldKey := m.configMapData.Keys[m.configMapCursor]
-				newKey := m.configMapEditKey.Value
-				if newKey != "" && newKey != oldKey {
-					val := m.configMapData.Data[oldKey]
-					delete(m.configMapData.Data, oldKey)
-					m.configMapData.Data[newKey] = val
-					m.configMapData.Keys[m.configMapCursor] = newKey
-				}
-			} else {
-				// Editing value.
-				key := m.configMapData.Keys[m.configMapCursor]
-				m.configMapData.Data[key] = m.configMapEditValue.Value
-			}
-			m.configMapEditing = false
-			m.configMapEditColumn = -1
-			return m, nil
-		case "enter":
-			// Insert newline into current value.
-			if m.configMapEditColumn == 1 {
-				m.configMapEditValue.Insert("\n")
-			}
-			return m, nil
-		case "tab":
-			// Switch between key and value columns.
-			if m.configMapEditColumn == 0 {
-				m.configMapEditColumn = 1
-			} else {
-				m.configMapEditColumn = 0
-			}
-			return m, nil
-		case "backspace":
-			if m.configMapEditColumn == 0 && len(m.configMapEditKey.Value) > 0 {
-				m.configMapEditKey.Backspace()
-			} else if m.configMapEditColumn == 1 && len(m.configMapEditValue.Value) > 0 {
-				m.configMapEditValue.Backspace()
-			}
-			return m, nil
-		case "ctrl+w":
-			if m.configMapEditColumn == 0 {
-				m.configMapEditKey.DeleteWord()
-			} else {
-				m.configMapEditValue.DeleteWord()
-			}
-			return m, nil
-		case "ctrl+a":
-			if m.configMapEditColumn == 0 {
-				m.configMapEditKey.Home()
-			} else {
-				m.configMapEditValue.Home()
-			}
-			return m, nil
-		case "ctrl+e":
-			if m.configMapEditColumn == 0 {
-				m.configMapEditKey.End()
-			} else {
-				m.configMapEditValue.End()
-			}
-			return m, nil
-		case "left":
-			if m.configMapEditColumn == 0 {
-				m.configMapEditKey.Left()
-			} else {
-				m.configMapEditValue.Left()
-			}
-			return m, nil
-		case "right":
-			if m.configMapEditColumn == 0 {
-				m.configMapEditKey.Right()
-			} else {
-				m.configMapEditValue.Right()
-			}
-			return m, nil
-		default:
-			key := msg.String()
-			if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-				if m.configMapEditColumn == 0 {
-					m.configMapEditKey.Insert(key)
-				} else {
-					m.configMapEditValue.Insert(key)
-				}
-			}
-			return m, nil
-		}
+		return m.handleConfigMapEditorEditKey(msg)
 	}
 
 	// Normal mode.
@@ -354,97 +172,7 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if m.labelEditing {
-		switch msg.String() {
-		case "esc":
-			m.labelEditing = false
-			m.labelEditColumn = -1
-			return m, nil
-		case "ctrl+s":
-			// Save the edit.
-			if m.labelEditColumn == 0 {
-				oldKey := currentKeys[m.labelCursor]
-				newKey := m.labelEditKey.Value
-				if newKey != "" && newKey != oldKey {
-					val := currentData[oldKey]
-					delete(currentData, oldKey)
-					currentData[newKey] = val
-					currentKeys[m.labelCursor] = newKey
-				}
-			} else {
-				key := currentKeys[m.labelCursor]
-				currentData[key] = m.labelEditValue.Value
-			}
-			if m.labelTab == 0 {
-				m.labelData.LabelKeys = currentKeys
-				m.labelData.Labels = currentData
-			} else {
-				m.labelData.AnnotKeys = currentKeys
-				m.labelData.Annotations = currentData
-			}
-			m.labelEditing = false
-			m.labelEditColumn = -1
-			return m, nil
-		case "tab":
-			// Switch between key and value columns.
-			if m.labelEditColumn == 0 {
-				m.labelEditColumn = 1
-			} else {
-				m.labelEditColumn = 0
-			}
-			return m, nil
-		case "backspace":
-			if m.labelEditColumn == 0 && len(m.labelEditKey.Value) > 0 {
-				m.labelEditKey.Backspace()
-			} else if m.labelEditColumn == 1 && len(m.labelEditValue.Value) > 0 {
-				m.labelEditValue.Backspace()
-			}
-			return m, nil
-		case "ctrl+w":
-			if m.labelEditColumn == 0 {
-				m.labelEditKey.DeleteWord()
-			} else {
-				m.labelEditValue.DeleteWord()
-			}
-			return m, nil
-		case "ctrl+a":
-			if m.labelEditColumn == 0 {
-				m.labelEditKey.Home()
-			} else {
-				m.labelEditValue.Home()
-			}
-			return m, nil
-		case "ctrl+e":
-			if m.labelEditColumn == 0 {
-				m.labelEditKey.End()
-			} else {
-				m.labelEditValue.End()
-			}
-			return m, nil
-		case "left":
-			if m.labelEditColumn == 0 {
-				m.labelEditKey.Left()
-			} else {
-				m.labelEditValue.Left()
-			}
-			return m, nil
-		case "right":
-			if m.labelEditColumn == 0 {
-				m.labelEditKey.Right()
-			} else {
-				m.labelEditValue.Right()
-			}
-			return m, nil
-		default:
-			key := msg.String()
-			if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-				if m.labelEditColumn == 0 {
-					m.labelEditKey.Insert(key)
-				} else {
-					m.labelEditValue.Insert(key)
-				}
-			}
-			return m, nil
-		}
+		return m.handleLabelEditorEditKey(msg, currentKeys, currentData)
 	}
 
 	switch msg.String() {
@@ -566,6 +294,79 @@ func (m Model) handleSecretEditorKeyD() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleSecretEditorEditKey handles key events while editing a secret value.
+func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	keyInput := &m.secretEditKey
+	valInput := &m.secretEditValue
+	col := m.secretEditColumn
+	activeInput := valInput
+	if col == 0 {
+		activeInput = keyInput
+	}
+
+	switch msg.String() {
+	case "esc":
+		m.secretEditing = false
+		m.secretEditColumn = -1
+		return m, nil
+	case "ctrl+s":
+		if col == 0 {
+			oldKey := m.secretData.Keys[m.secretCursor]
+			newKey := keyInput.Value
+			if newKey != "" && newKey != oldKey {
+				val := m.secretData.Data[oldKey]
+				delete(m.secretData.Data, oldKey)
+				m.secretData.Data[newKey] = val
+				m.secretData.Keys[m.secretCursor] = newKey
+			}
+		} else {
+			key := m.secretData.Keys[m.secretCursor]
+			m.secretData.Data[key] = valInput.Value
+		}
+		m.secretEditing = false
+		m.secretEditColumn = -1
+		return m, nil
+	case "enter":
+		if col == 1 {
+			valInput.Insert("\n")
+		}
+		return m, nil
+	case "tab":
+		if col == 0 {
+			m.secretEditColumn = 1
+		} else {
+			m.secretEditColumn = 0
+		}
+		return m, nil
+	case "backspace":
+		if len(activeInput.Value) > 0 {
+			activeInput.Backspace()
+		}
+		return m, nil
+	case "ctrl+w":
+		activeInput.DeleteWord()
+		return m, nil
+	case "ctrl+a":
+		activeInput.Home()
+		return m, nil
+	case "ctrl+e":
+		activeInput.End()
+		return m, nil
+	case "left":
+		activeInput.Left()
+		return m, nil
+	case "right":
+		activeInput.Right()
+		return m, nil
+	default:
+		key := msg.String()
+		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
+			activeInput.Insert(key)
+		}
+		return m, nil
+	}
+}
+
 func (m Model) handleLabelEditorKeyEsc() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.labelData = nil
@@ -626,4 +427,152 @@ func (m Model) handleConfigMapEditorKeyD() (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// handleConfigMapEditorEditKey handles key events while editing a configmap value.
+func (m Model) handleConfigMapEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	keyInput := &m.configMapEditKey
+	valInput := &m.configMapEditValue
+	col := m.configMapEditColumn
+	activeInput := valInput
+	if col == 0 {
+		activeInput = keyInput
+	}
+
+	switch msg.String() {
+	case "esc":
+		m.configMapEditing = false
+		m.configMapEditColumn = -1
+		return m, nil
+	case "ctrl+s":
+		if col == 0 {
+			oldKey := m.configMapData.Keys[m.configMapCursor]
+			newKey := keyInput.Value
+			if newKey != "" && newKey != oldKey {
+				val := m.configMapData.Data[oldKey]
+				delete(m.configMapData.Data, oldKey)
+				m.configMapData.Data[newKey] = val
+				m.configMapData.Keys[m.configMapCursor] = newKey
+			}
+		} else {
+			key := m.configMapData.Keys[m.configMapCursor]
+			m.configMapData.Data[key] = valInput.Value
+		}
+		m.configMapEditing = false
+		m.configMapEditColumn = -1
+		return m, nil
+	case "enter":
+		if col == 1 {
+			valInput.Insert("\n")
+		}
+		return m, nil
+	case "tab":
+		if col == 0 {
+			m.configMapEditColumn = 1
+		} else {
+			m.configMapEditColumn = 0
+		}
+		return m, nil
+	case "backspace":
+		if len(activeInput.Value) > 0 {
+			activeInput.Backspace()
+		}
+		return m, nil
+	case "ctrl+w":
+		activeInput.DeleteWord()
+		return m, nil
+	case "ctrl+a":
+		activeInput.Home()
+		return m, nil
+	case "ctrl+e":
+		activeInput.End()
+		return m, nil
+	case "left":
+		activeInput.Left()
+		return m, nil
+	case "right":
+		activeInput.Right()
+		return m, nil
+	default:
+		key := msg.String()
+		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
+			activeInput.Insert(key)
+		}
+		return m, nil
+	}
+}
+
+// handleLabelEditorEditKey handles key events while editing a label/annotation value.
+func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, currentData map[string]string) (tea.Model, tea.Cmd) {
+	keyInput := &m.labelEditKey
+	valInput := &m.labelEditValue
+	col := m.labelEditColumn
+	activeInput := valInput
+	if col == 0 {
+		activeInput = keyInput
+	}
+
+	switch msg.String() {
+	case "esc":
+		m.labelEditing = false
+		m.labelEditColumn = -1
+		return m, nil
+	case "ctrl+s":
+		if col == 0 {
+			oldKey := currentKeys[m.labelCursor]
+			newKey := keyInput.Value
+			if newKey != "" && newKey != oldKey {
+				val := currentData[oldKey]
+				delete(currentData, oldKey)
+				currentData[newKey] = val
+				currentKeys[m.labelCursor] = newKey
+			}
+		} else {
+			key := currentKeys[m.labelCursor]
+			currentData[key] = valInput.Value
+		}
+		if m.labelTab == 0 {
+			m.labelData.LabelKeys = currentKeys
+			m.labelData.Labels = currentData
+		} else {
+			m.labelData.AnnotKeys = currentKeys
+			m.labelData.Annotations = currentData
+		}
+		m.labelEditing = false
+		m.labelEditColumn = -1
+		return m, nil
+	case "tab":
+		if col == 0 {
+			m.labelEditColumn = 1
+		} else {
+			m.labelEditColumn = 0
+		}
+		return m, nil
+	case "backspace":
+		if len(activeInput.Value) > 0 {
+			activeInput.Backspace()
+		}
+		return m, nil
+	case "ctrl+w":
+		activeInput.DeleteWord()
+		return m, nil
+	case "ctrl+a":
+		activeInput.Home()
+		return m, nil
+	case "ctrl+e":
+		activeInput.End()
+		return m, nil
+	case "left":
+		activeInput.Left()
+		return m, nil
+	case "right":
+		activeInput.Right()
+		return m, nil
+	default:
+		key := msg.String()
+		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
+			activeInput.Insert(key)
+		}
+		return m, nil
+	}
 }

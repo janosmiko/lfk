@@ -27,420 +27,389 @@ func (m Model) yamlViewportLines() int {
 }
 
 func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	// Compute visible line count (accounting for collapsed sections).
+	// When in search input mode, handle text input.
+	if m.yamlSearchMode {
+		return m.handleYAMLSearchInput(msg)
+	}
+
+	// In visual selection mode, restrict keys to selection/copy/cancel.
+	if m.yamlVisualMode {
+		return m.handleYAMLVisualKey(msg)
+	}
+
+	return m.handleYAMLNormalKey(msg)
+}
+
+// handleYAMLSearchInput handles key events when the YAML search input is active.
+func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	viewportLines := m.yamlViewportLines()
+
+	switch msg.String() {
+	case "enter":
+		m.yamlSearchMode = false
+		m.updateYAMLSearchMatches()
+		if len(m.yamlMatchLines) > 0 {
+			m.yamlMatchIdx = m.findYAMLMatchFromCursor()
+			m.yamlScrollToMatchFolded(viewportLines)
+		}
+		return m, nil
+	case "esc":
+		m.yamlSearchMode = false
+		m.yamlSearchText.Clear()
+		m.yamlMatchLines = nil
+		m.yamlMatchIdx = 0
+		return m, nil
+	case "backspace":
+		if len(m.yamlSearchText.Value) > 0 {
+			m.yamlSearchText.Backspace()
+		}
+		return m, nil
+	case "ctrl+w":
+		m.yamlSearchText.DeleteWord()
+		return m, nil
+	case "ctrl+a":
+		m.yamlSearchText.Home()
+		return m, nil
+	case "ctrl+e":
+		m.yamlSearchText.End()
+		return m, nil
+	case "left":
+		m.yamlSearchText.Left()
+		return m, nil
+	case "right":
+		m.yamlSearchText.Right()
+		return m, nil
+	case "ctrl+c":
+		m.yamlSearchMode = false
+		m.yamlSearchText.Clear()
+		m.yamlMatchLines = nil
+		return m, nil
+	default:
+		if len(msg.String()) == 1 || msg.String() == " " {
+			m.yamlSearchText.Insert(msg.String())
+		}
+		return m, nil
+	}
+}
+
+// handleYAMLVisualKey handles key events while in YAML visual selection mode.
+func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	totalVisible := visibleLineCount(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	maxScroll := m.yamlMaxScroll(totalVisible)
+
+	switch msg.String() {
+	case "esc":
+		m.yamlVisualMode = false
+		return m, nil
+	case "V":
+		return m.handleYAMLVisualToggleMode('V')
+	case "v":
+		return m.handleYAMLVisualToggleMode('v')
+	case "ctrl+v":
+		return m.handleYAMLVisualToggleMode('B')
+	case "y":
+		return m.handleYAMLVisualCopy()
+	case "h", "left":
+		if m.yamlVisualType == 'v' || m.yamlVisualType == 'B' {
+			if m.yamlVisualCurCol > yamlFoldPrefixLen {
+				m.yamlVisualCurCol--
+			}
+		}
+		return m, nil
+	case "l", "right":
+		if m.yamlVisualType == 'v' || m.yamlVisualType == 'B' {
+			m.yamlVisualCurCol++
+		}
+		return m, nil
+	case "j", "down":
+		if m.yamlCursor < totalVisible-1 {
+			m.yamlCursor++
+		}
+		m.ensureYAMLCursorVisible()
+		return m, nil
+	case "k", "up":
+		if m.yamlCursor > 0 {
+			m.yamlCursor--
+		}
+		m.ensureYAMLCursorVisible()
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.yamlLineInput = ""
+			m.yamlCursor = 0
+			m.yamlScroll = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G":
+		return m.handleYAMLVisualG(totalVisible, maxScroll)
+	case "ctrl+d":
+		m.yamlCursor += m.height / 2
+		if m.yamlCursor >= totalVisible {
+			m.yamlCursor = totalVisible - 1
+		}
+		m.ensureYAMLCursorVisible()
+		return m, nil
+	case "ctrl+u":
+		m.yamlCursor -= m.height / 2
+		if m.yamlCursor < 0 {
+			m.yamlCursor = 0
+		}
+		m.ensureYAMLCursorVisible()
+		return m, nil
+	case "ctrl+c":
+		m.yamlVisualMode = false
+		m.mode = modeExplorer
+		m.yamlScroll = 0
+		m.yamlCursor = 0
+		return m, nil
+	case "0":
+		m.yamlVisualCurCol = yamlFoldPrefixLen
+		return m, nil
+	case "$", "w", "b", "e", "E", "B", "W", "^":
+		return m.handleYAMLVisualWordMotion(msg.String())
+	}
+	return m, nil
+}
+
+// handleYAMLVisualToggleMode toggles the visual selection type or cancels it.
+func (m Model) handleYAMLVisualToggleMode(mode rune) (tea.Model, tea.Cmd) {
+	if m.yamlVisualType == mode {
+		m.yamlVisualMode = false
+	} else {
+		m.yamlVisualType = mode
+	}
+	return m, nil
+}
+
+// handleYAMLVisualG handles the G key in visual mode (go-to-line or end).
+func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cmd) {
+	if m.yamlLineInput != "" {
+		lineNum, _ := strconv.Atoi(m.yamlLineInput)
+		m.yamlLineInput = ""
+		if lineNum > 0 {
+			lineNum--
+		}
+		m.yamlCursor = min(lineNum, totalVisible-1)
+		if m.yamlCursor < 0 {
+			m.yamlCursor = 0
+		}
+		m.ensureYAMLCursorVisible()
+	} else {
+		m.yamlCursor = totalVisible - 1
+		if m.yamlCursor < 0 {
+			m.yamlCursor = 0
+		}
+		m.yamlScroll = maxScroll
+	}
+	return m, nil
+}
+
+// handleYAMLVisualCopy copies the visually selected content to the clipboard.
+func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
+	yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+	_, mapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+	selStart := min(m.yamlVisualStart, m.yamlCursor)
+	selEnd := max(m.yamlVisualStart, m.yamlCursor)
+	if selStart < 0 {
+		selStart = 0
+	}
+	if selEnd >= len(mapping) {
+		selEnd = len(mapping) - 1
+	}
+	origLines := strings.Split(yamlForDisplay, "\n")
+	var clipText string
+	switch m.yamlVisualType {
+	case 'v':
+		clipText = m.yamlVisualCopyChar(selStart, selEnd, mapping, origLines)
+	case 'B':
+		clipText = m.yamlVisualCopyBlock(selStart, selEnd, mapping, origLines)
+	default:
+		clipText = m.yamlVisualCopyLine(selStart, selEnd, mapping, origLines)
+	}
+	lineCount := selEnd - selStart + 1
+	m.yamlVisualMode = false
+	m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
+	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+}
+
+// yamlVisualCopyChar extracts text for character-mode visual selection.
+func (m Model) yamlVisualCopyChar(selStart, selEnd int, mapping []int, origLines []string) string {
+	var parts []string
+	anchorCol := m.yamlVisualCol - yamlFoldPrefixLen
+	cursorCol := m.yamlVisualCurCol - yamlFoldPrefixLen
+	startCol, endCol := anchorCol, cursorCol
+	if m.yamlVisualStart > m.yamlCursor {
+		startCol, endCol = cursorCol, anchorCol
+	}
+	for i := selStart; i <= selEnd; i++ {
+		if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
+			continue
+		}
+		line := origLines[mapping[i]]
+		runes := []rune(line)
+		if selStart == selEnd {
+			cs := min(anchorCol, cursorCol)
+			ce := max(anchorCol, cursorCol) + 1
+			if cs > len(runes) {
+				cs = len(runes)
+			}
+			if ce > len(runes) {
+				ce = len(runes)
+			}
+			parts = append(parts, string(runes[cs:ce]))
+		} else if i == selStart {
+			cs := startCol
+			if cs > len(runes) {
+				cs = len(runes)
+			}
+			parts = append(parts, string(runes[cs:]))
+		} else if i == selEnd {
+			ce := endCol + 1
+			if ce > len(runes) {
+				ce = len(runes)
+			}
+			parts = append(parts, string(runes[:ce]))
+		} else {
+			parts = append(parts, line)
+		}
+	}
+	return strings.Join(parts, "\n")
+}
+
+// yamlVisualCopyBlock extracts text for block-mode visual selection.
+func (m Model) yamlVisualCopyBlock(selStart, selEnd int, mapping []int, origLines []string) string {
+	colStart := min(m.yamlVisualCol, m.yamlVisualCurCol) - yamlFoldPrefixLen
+	colEnd := max(m.yamlVisualCol, m.yamlVisualCurCol) - yamlFoldPrefixLen + 1
+	var parts []string
+	for i := selStart; i <= selEnd; i++ {
+		if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
+			continue
+		}
+		line := origLines[mapping[i]]
+		runes := []rune(line)
+		cs := colStart
+		ce := colEnd
+		if cs > len(runes) {
+			cs = len(runes)
+		}
+		if ce > len(runes) {
+			ce = len(runes)
+		}
+		parts = append(parts, string(runes[cs:ce]))
+	}
+	return strings.Join(parts, "\n")
+}
+
+// yamlVisualCopyLine extracts text for line-mode visual selection.
+func (m Model) yamlVisualCopyLine(selStart, selEnd int, mapping []int, origLines []string) string {
+	var selected []string
+	for i := selStart; i <= selEnd; i++ {
+		if i < len(mapping) && mapping[i] >= 0 && mapping[i] < len(origLines) {
+			selected = append(selected, origLines[mapping[i]])
+		}
+	}
+	return strings.Join(selected, "\n")
+}
+
+// handleYAMLVisualWordMotion handles word/WORD motion and cursor position keys
+// in visual mode ($, w, b, e, E, B, W, ^).
+func (m Model) handleYAMLVisualWordMotion(key string) (tea.Model, tea.Cmd) {
+	yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+	visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+	if m.yamlCursor < 0 || m.yamlCursor >= len(visLines) {
+		return m, nil
+	}
+
+	switch key {
+	case "$":
+		lineLen := len([]rune(visLines[m.yamlCursor]))
+		if lineLen > 0 {
+			m.yamlVisualCurCol = lineLen - 1
+		}
+	case "^":
+		col := firstNonWhitespace(visLines[m.yamlCursor])
+		if col < yamlFoldPrefixLen {
+			col = yamlFoldPrefixLen
+		}
+		m.yamlVisualCurCol = col
+	case "w":
+		m.yamlWordForward(visLines, nextWordStart)
+	case "W":
+		m.yamlWordForward(visLines, nextWORDStart)
+	case "b":
+		m.yamlWordBackward(visLines, prevWordStart)
+	case "B":
+		m.yamlWordBackward(visLines, prevWORDStart)
+	case "e":
+		m.yamlWordForward(visLines, wordEnd)
+	case "E":
+		m.yamlWordForward(visLines, WORDEnd)
+	}
+	return m, nil
+}
+
+// yamlWordForward moves the cursor forward using the given word-motion function.
+func (m *Model) yamlWordForward(visLines []string, motionFn func(string, int) int) {
+	lineLen := len([]rune(visLines[m.yamlCursor]))
+	newCol := motionFn(visLines[m.yamlCursor], m.yamlVisualCurCol)
+	if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
+		m.yamlCursor++
+		newCol = motionFn(visLines[m.yamlCursor], 0)
+		nextLineLen := len([]rune(visLines[m.yamlCursor]))
+		if newCol >= nextLineLen {
+			newCol = max(nextLineLen-1, 0)
+		}
+		m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
+		m.ensureYAMLCursorVisible()
+	} else {
+		m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
+	}
+}
+
+// yamlWordBackward moves the cursor backward using the given word-motion function.
+func (m *Model) yamlWordBackward(visLines []string, motionFn func(string, int) int) {
+	newCol := motionFn(visLines[m.yamlCursor], m.yamlVisualCurCol)
+	if newCol < 0 && m.yamlCursor > 0 {
+		m.yamlCursor--
+		lineLen := len([]rune(visLines[m.yamlCursor]))
+		newCol = motionFn(visLines[m.yamlCursor], lineLen)
+		if newCol < 0 {
+			newCol = 0
+		}
+		m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
+		m.ensureYAMLCursorVisible()
+	} else {
+		m.yamlVisualCurCol = max(yamlFoldPrefixLen, max(newCol, 0))
+	}
+}
+
+// yamlMaxScroll returns the maximum scroll offset for the YAML viewer.
+func (m Model) yamlMaxScroll(totalVisible int) int {
 	viewportLines := m.yamlViewportLines()
 	maxScroll := totalVisible - viewportLines
 	if maxScroll < 0 {
 		maxScroll = 0
 	}
+	return maxScroll
+}
 
-	// When in search input mode, handle text input.
-	if m.yamlSearchMode {
-		switch msg.String() {
-		case "enter":
-			m.yamlSearchMode = false
-			m.updateYAMLSearchMatches()
-			if len(m.yamlMatchLines) > 0 {
-				m.yamlMatchIdx = m.findYAMLMatchFromCursor()
-				m.yamlScrollToMatchFolded(viewportLines)
-			}
-			return m, nil
-		case "esc":
-			m.yamlSearchMode = false
-			m.yamlSearchText.Clear()
-			m.yamlMatchLines = nil
-			m.yamlMatchIdx = 0
-			return m, nil
-		case "backspace":
-			if len(m.yamlSearchText.Value) > 0 {
-				m.yamlSearchText.Backspace()
-			}
-			return m, nil
-		case "ctrl+w":
-			m.yamlSearchText.DeleteWord()
-			return m, nil
-		case "ctrl+a":
-			m.yamlSearchText.Home()
-			return m, nil
-		case "ctrl+e":
-			m.yamlSearchText.End()
-			return m, nil
-		case "left":
-			m.yamlSearchText.Left()
-			return m, nil
-		case "right":
-			m.yamlSearchText.Right()
-			return m, nil
-		case "ctrl+c":
-			m.yamlSearchMode = false
-			m.yamlSearchText.Clear()
-			m.yamlMatchLines = nil
-			return m, nil
-		default:
-			if len(msg.String()) == 1 || msg.String() == " " {
-				m.yamlSearchText.Insert(msg.String())
-			}
-			return m, nil
-		}
-	}
-
-	// In visual selection mode, restrict keys to selection/copy/cancel.
-	if m.yamlVisualMode {
-		switch msg.String() {
-		case "esc":
-			m.yamlVisualMode = false
-			return m, nil
-		case "V":
-			// Toggle: if already in line mode, cancel; otherwise switch to line mode.
-			if m.yamlVisualType == 'V' {
-				m.yamlVisualMode = false
-			} else {
-				m.yamlVisualType = 'V'
-			}
-			return m, nil
-		case "v":
-			// Toggle: if already in char mode, cancel; otherwise switch to char mode.
-			if m.yamlVisualType == 'v' {
-				m.yamlVisualMode = false
-			} else {
-				m.yamlVisualType = 'v'
-			}
-			return m, nil
-		case "ctrl+v":
-			// Toggle: if already in block mode, cancel; otherwise switch to block mode.
-			if m.yamlVisualType == 'B' {
-				m.yamlVisualMode = false
-			} else {
-				m.yamlVisualType = 'B'
-			}
-			return m, nil
-		case "y":
-			// Copy selected content to clipboard using original content (no fold indicators).
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			_, mapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			selStart := min(m.yamlVisualStart, m.yamlCursor)
-			selEnd := max(m.yamlVisualStart, m.yamlCursor)
-			if selStart < 0 {
-				selStart = 0
-			}
-			if selEnd >= len(mapping) {
-				selEnd = len(mapping) - 1
-			}
-			origLines := strings.Split(yamlForDisplay, "\n")
-			var clipText string
-			switch m.yamlVisualType {
-			case 'v': // Character mode: partial first/last lines.
-				var parts []string
-				anchorCol := m.yamlVisualCol - yamlFoldPrefixLen
-				cursorCol := m.yamlVisualCurCol - yamlFoldPrefixLen
-				// Determine direction: assign columns to selStart/selEnd lines.
-				startCol, endCol := anchorCol, cursorCol
-				if m.yamlVisualStart > m.yamlCursor {
-					// Upward selection: cursor is at selStart, anchor at selEnd.
-					startCol, endCol = cursorCol, anchorCol
-				}
-				for i := selStart; i <= selEnd; i++ {
-					if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
-						continue
-					}
-					line := origLines[mapping[i]]
-					runes := []rune(line)
-					if selStart == selEnd {
-						// Single line: extract column range.
-						cs := min(anchorCol, cursorCol)
-						ce := max(anchorCol, cursorCol) + 1
-						if cs > len(runes) {
-							cs = len(runes)
-						}
-						if ce > len(runes) {
-							ce = len(runes)
-						}
-						parts = append(parts, string(runes[cs:ce]))
-					} else if i == selStart {
-						cs := startCol
-						if cs > len(runes) {
-							cs = len(runes)
-						}
-						parts = append(parts, string(runes[cs:]))
-					} else if i == selEnd {
-						ce := endCol + 1
-						if ce > len(runes) {
-							ce = len(runes)
-						}
-						parts = append(parts, string(runes[:ce]))
-					} else {
-						parts = append(parts, line)
-					}
-				}
-				clipText = strings.Join(parts, "\n")
-			case 'B': // Block mode: rectangular column range.
-				colStart := min(m.yamlVisualCol, m.yamlVisualCurCol) - yamlFoldPrefixLen
-				colEnd := max(m.yamlVisualCol, m.yamlVisualCurCol) - yamlFoldPrefixLen + 1
-				var parts []string
-				for i := selStart; i <= selEnd; i++ {
-					if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
-						continue
-					}
-					line := origLines[mapping[i]]
-					runes := []rune(line)
-					cs := colStart
-					ce := colEnd
-					if cs > len(runes) {
-						cs = len(runes)
-					}
-					if ce > len(runes) {
-						ce = len(runes)
-					}
-					parts = append(parts, string(runes[cs:ce]))
-				}
-				clipText = strings.Join(parts, "\n")
-			default: // Line mode: whole lines.
-				var selected []string
-				for i := selStart; i <= selEnd; i++ {
-					if i < len(mapping) && mapping[i] >= 0 && mapping[i] < len(origLines) {
-						selected = append(selected, origLines[mapping[i]])
-					}
-				}
-				clipText = strings.Join(selected, "\n")
-			}
-			lineCount := selEnd - selStart + 1
-			m.yamlVisualMode = false
-			m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
-			return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
-		case "h", "left":
-			// Move cursor column left (for char and block modes).
-			if m.yamlVisualType == 'v' || m.yamlVisualType == 'B' {
-				if m.yamlVisualCurCol > yamlFoldPrefixLen {
-					m.yamlVisualCurCol--
-				}
-			}
-			return m, nil
-		case "l", "right":
-			// Move cursor column right (for char and block modes).
-			if m.yamlVisualType == 'v' || m.yamlVisualType == 'B' {
-				m.yamlVisualCurCol++
-			}
-			return m, nil
-		case "j", "down":
-			if m.yamlCursor < totalVisible-1 {
-				m.yamlCursor++
-			}
-			m.ensureYAMLCursorVisible()
-			return m, nil
-		case "k", "up":
-			if m.yamlCursor > 0 {
-				m.yamlCursor--
-			}
-			m.ensureYAMLCursorVisible()
-			return m, nil
-		case "g":
-			if m.pendingG {
-				m.pendingG = false
-				m.yamlLineInput = ""
-				m.yamlCursor = 0
-				m.yamlScroll = 0
-				return m, nil
-			}
-			m.pendingG = true
-			return m, nil
-		case "G":
-			if m.yamlLineInput != "" {
-				lineNum, _ := strconv.Atoi(m.yamlLineInput)
-				m.yamlLineInput = ""
-				if lineNum > 0 {
-					lineNum-- // 0-indexed
-				}
-				m.yamlCursor = min(lineNum, totalVisible-1)
-				if m.yamlCursor < 0 {
-					m.yamlCursor = 0
-				}
-				m.ensureYAMLCursorVisible()
-			} else {
-				m.yamlCursor = totalVisible - 1
-				if m.yamlCursor < 0 {
-					m.yamlCursor = 0
-				}
-				m.yamlScroll = maxScroll
-			}
-			return m, nil
-		case "ctrl+d":
-			m.yamlCursor += m.height / 2
-			if m.yamlCursor >= totalVisible {
-				m.yamlCursor = totalVisible - 1
-			}
-			m.ensureYAMLCursorVisible()
-			return m, nil
-		case "ctrl+u":
-			m.yamlCursor -= m.height / 2
-			if m.yamlCursor < 0 {
-				m.yamlCursor = 0
-			}
-			m.ensureYAMLCursorVisible()
-			return m, nil
-		case "ctrl+c":
-			m.yamlVisualMode = false
-			m.mode = modeExplorer
-			m.yamlScroll = 0
-			m.yamlCursor = 0
-			return m, nil
-		case "0":
-			m.yamlVisualCurCol = yamlFoldPrefixLen
-			return m, nil
-		case "$":
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-				lineLen := len([]rune(visLines[m.yamlCursor]))
-				if lineLen > 0 {
-					m.yamlVisualCurCol = lineLen - 1
-				}
-			}
-			return m, nil
-		case "w":
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-				lineLen := len([]rune(visLines[m.yamlCursor]))
-				newCol := nextWordStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
-				if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-					m.yamlCursor++
-					newCol = nextWordStart(visLines[m.yamlCursor], 0)
-					nextLineLen := len([]rune(visLines[m.yamlCursor]))
-					if newCol >= nextLineLen {
-						newCol = max(nextLineLen-1, 0)
-					}
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-					m.ensureYAMLCursorVisible()
-				} else {
-					m.yamlVisualCurCol = newCol
-				}
-			}
-			return m, nil
-		case "b":
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-				newCol := prevWordStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
-				if newCol < 0 && m.yamlCursor > 0 {
-					m.yamlCursor--
-					lineLen := len([]rune(visLines[m.yamlCursor]))
-					newCol = prevWordStart(visLines[m.yamlCursor], lineLen)
-					if newCol < 0 {
-						newCol = 0
-					}
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-					m.ensureYAMLCursorVisible()
-				} else {
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, max(newCol, 0))
-				}
-			}
-			return m, nil
-		case "e":
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-				lineLen := len([]rune(visLines[m.yamlCursor]))
-				newCol := wordEnd(visLines[m.yamlCursor], m.yamlVisualCurCol)
-				if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-					m.yamlCursor++
-					newCol = wordEnd(visLines[m.yamlCursor], 0)
-					nextLineLen := len([]rune(visLines[m.yamlCursor]))
-					if newCol >= nextLineLen {
-						newCol = max(nextLineLen-1, 0)
-					}
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-					m.ensureYAMLCursorVisible()
-				} else {
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-				}
-			}
-			return m, nil
-		case "E":
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-				lineLen := len([]rune(visLines[m.yamlCursor]))
-				newCol := WORDEnd(visLines[m.yamlCursor], m.yamlVisualCurCol)
-				if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-					m.yamlCursor++
-					newCol = WORDEnd(visLines[m.yamlCursor], 0)
-					nextLineLen := len([]rune(visLines[m.yamlCursor]))
-					if newCol >= nextLineLen {
-						newCol = max(nextLineLen-1, 0)
-					}
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-					m.ensureYAMLCursorVisible()
-				} else {
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-				}
-			}
-			return m, nil
-		case "B":
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-				newCol := prevWORDStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
-				if newCol < 0 && m.yamlCursor > 0 {
-					m.yamlCursor--
-					lineLen := len([]rune(visLines[m.yamlCursor]))
-					newCol = prevWORDStart(visLines[m.yamlCursor], lineLen)
-					if newCol < 0 {
-						newCol = 0
-					}
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-					m.ensureYAMLCursorVisible()
-				} else {
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, max(newCol, 0))
-				}
-			}
-			return m, nil
-		case "W":
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-				lineLen := len([]rune(visLines[m.yamlCursor]))
-				newCol := nextWORDStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
-				if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-					m.yamlCursor++
-					newCol = nextWORDStart(visLines[m.yamlCursor], 0)
-					nextLineLen := len([]rune(visLines[m.yamlCursor]))
-					if newCol >= nextLineLen {
-						newCol = max(nextLineLen-1, 0)
-					}
-					m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-					m.ensureYAMLCursorVisible()
-				} else {
-					m.yamlVisualCurCol = newCol
-				}
-			}
-			return m, nil
-		case "^":
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-			if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-				col := firstNonWhitespace(visLines[m.yamlCursor])
-				if col < yamlFoldPrefixLen {
-					col = yamlFoldPrefixLen
-				}
-				m.yamlVisualCurCol = col
-			}
-			return m, nil
-		}
-		return m, nil
-	}
+// handleYAMLNormalKey handles key events in normal YAML viewing mode.
+func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	totalVisible := visibleLineCount(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	viewportLines := m.yamlViewportLines()
+	maxScroll := m.yamlMaxScroll(totalVisible)
 
 	switch msg.String() {
 	case "?", "f1":
 		return m.handleYAMLKeyQuestion()
 	case "V":
-		// Enter visual line selection mode.
 		return m.handleYAMLKeyV()
 	case "v":
-		// Enter character visual selection mode; anchor at current cursor column.
 		return m.handleYAMLKeyV2()
 	case "ctrl+v":
-		// Enter block visual selection mode; anchor at current cursor column.
 		return m.handleYAMLKeyCtrlV()
 	case "q", "esc":
 		return m.handleYAMLKeyQ()
@@ -449,240 +418,30 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "/":
 		return m.handleYAMLKeySlash()
 	case "n":
-		// Next match: first check for another match on the current line after cursor.
-		if len(m.yamlMatchLines) > 0 {
-			if m.yamlNextIntraLineMatch(true) {
-				return m, nil
-			}
-			m.yamlMatchIdx = (m.yamlMatchIdx + 1) % len(m.yamlMatchLines)
-			m.yamlScrollToMatchFolded(viewportLines)
-		}
-		return m, nil
+		return m.handleYAMLKeyN(viewportLines)
 	case "N":
-		// Previous match: first check for a match on the current line before cursor.
-		if len(m.yamlMatchLines) > 0 {
-			if m.yamlNextIntraLineMatch(false) {
-				return m, nil
-			}
-			m.yamlMatchIdx--
-			if m.yamlMatchIdx < 0 {
-				m.yamlMatchIdx = len(m.yamlMatchLines) - 1
-			}
-			m.yamlScrollToMatchFolded(viewportLines)
-		}
-		return m, nil
+		return m.handleYAMLKeyShiftN(viewportLines)
 	case "ctrl+e":
-		// Edit the resource in $EDITOR via kubectl edit.
-		kind := m.selectedResourceKind()
-		sel := m.selectedMiddleItem()
-		if kind != "" && sel != nil {
-			m.actionCtx = m.buildActionCtx(sel, kind)
-			return m, m.execKubectlEdit()
-		}
-		return m, nil
+		return m.handleYAMLKeyCtrlE()
 	case "ctrl+w", ">":
 		m.yamlWrap = !m.yamlWrap
 		return m, nil
 	case "z":
-		// Toggle fold on the section at the cursor position.
-		_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
-		sec := sectionAtScrollPos(m.yamlCursor, mapping, m.yamlSections)
-		if sec != "" {
-			if m.yamlCollapsed == nil {
-				m.yamlCollapsed = make(map[string]bool)
-			}
-			m.yamlCollapsed[sec] = !m.yamlCollapsed[sec]
-
-			// Move cursor to the fold header line so it stays visible
-			// after collapsing.
-			if m.yamlCollapsed[sec] {
-				// Find the section's startLine and locate it in the
-				// new visible line mapping.
-				var startLine int
-				for _, s := range m.yamlSections {
-					if s.key == sec {
-						startLine = s.startLine
-						break
-					}
-				}
-				yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-				_, newMapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-				for vi, orig := range newMapping {
-					if orig == startLine {
-						m.yamlCursor = vi
-						break
-					}
-				}
-			}
-
-			m.clampYAMLScroll()
-			m.ensureYAMLCursorVisible()
-		}
-		return m, nil
+		return m.handleYAMLKeyFoldToggle()
 	case "Z":
-		// Toggle all folds: if any section is expanded, collapse all; otherwise expand all.
 		return m.handleYAMLKeyZ()
 	case "h", "left":
-		// Move cursor column left.
 		return m.handleYAMLKeyH()
 	case "l", "right":
-		// Move cursor column right.
 		m.yamlVisualCurCol++
 		return m, nil
 	case "0":
-		// If digits are pending, append 0 (e.g. 10G, 20G).
-		// Otherwise move cursor to beginning of line.
 		return m.handleYAMLKeyZero()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		m.yamlLineInput += msg.String()
 		return m, nil
-	case "$":
-		// Move cursor to end of current line.
-		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-			lineLen := len([]rune(visLines[m.yamlCursor]))
-			if lineLen > 0 {
-				m.yamlVisualCurCol = lineLen - 1
-			}
-		}
-		return m, nil
-	case "w":
-		// Move cursor to next word start; jump to next line at end of line.
-		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-			lineLen := len([]rune(visLines[m.yamlCursor]))
-			newCol := nextWordStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
-			if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-				m.yamlCursor++
-				newCol = nextWordStart(visLines[m.yamlCursor], 0)
-				nextLineLen := len([]rune(visLines[m.yamlCursor]))
-				if newCol >= nextLineLen {
-					newCol = max(nextLineLen-1, 0)
-				}
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-				m.ensureYAMLCursorVisible()
-			} else {
-				m.yamlVisualCurCol = newCol
-			}
-		}
-		return m, nil
-	case "b":
-		// Move cursor to previous word start; jump to previous line at start of line.
-		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-			newCol := prevWordStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
-			if newCol < 0 && m.yamlCursor > 0 {
-				m.yamlCursor--
-				lineLen := len([]rune(visLines[m.yamlCursor]))
-				newCol = prevWordStart(visLines[m.yamlCursor], lineLen)
-				if newCol < 0 {
-					newCol = 0
-				}
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-				m.ensureYAMLCursorVisible()
-			} else {
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, max(newCol, 0))
-			}
-		}
-		return m, nil
-	case "e":
-		// Move cursor to end of current/next word; jump to next line at end of line.
-		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-			lineLen := len([]rune(visLines[m.yamlCursor]))
-			newCol := wordEnd(visLines[m.yamlCursor], m.yamlVisualCurCol)
-			if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-				m.yamlCursor++
-				newCol = wordEnd(visLines[m.yamlCursor], 0)
-				nextLineLen := len([]rune(visLines[m.yamlCursor]))
-				if newCol >= nextLineLen {
-					newCol = max(nextLineLen-1, 0)
-				}
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-				m.ensureYAMLCursorVisible()
-			} else {
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-			}
-		}
-		return m, nil
-	case "E":
-		// Move cursor to end of current/next WORD; jump to next line at end of line.
-		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-			lineLen := len([]rune(visLines[m.yamlCursor]))
-			newCol := WORDEnd(visLines[m.yamlCursor], m.yamlVisualCurCol)
-			if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-				m.yamlCursor++
-				newCol = WORDEnd(visLines[m.yamlCursor], 0)
-				nextLineLen := len([]rune(visLines[m.yamlCursor]))
-				if newCol >= nextLineLen {
-					newCol = max(nextLineLen-1, 0)
-				}
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-				m.ensureYAMLCursorVisible()
-			} else {
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-			}
-		}
-		return m, nil
-	case "B":
-		// Move cursor to previous WORD start; jump to previous line at start of line.
-		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-			newCol := prevWORDStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
-			if newCol < 0 && m.yamlCursor > 0 {
-				m.yamlCursor--
-				lineLen := len([]rune(visLines[m.yamlCursor]))
-				newCol = prevWORDStart(visLines[m.yamlCursor], lineLen)
-				if newCol < 0 {
-					newCol = 0
-				}
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-				m.ensureYAMLCursorVisible()
-			} else {
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, max(newCol, 0))
-			}
-		}
-		return m, nil
-	case "W":
-		// Move cursor to next WORD start; jump to next line at end of line.
-		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-			lineLen := len([]rune(visLines[m.yamlCursor]))
-			newCol := nextWORDStart(visLines[m.yamlCursor], m.yamlVisualCurCol)
-			if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-				m.yamlCursor++
-				newCol = nextWORDStart(visLines[m.yamlCursor], 0)
-				nextLineLen := len([]rune(visLines[m.yamlCursor]))
-				if newCol >= nextLineLen {
-					newCol = max(nextLineLen-1, 0)
-				}
-				m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
-				m.ensureYAMLCursorVisible()
-			} else {
-				m.yamlVisualCurCol = newCol
-			}
-		}
-		return m, nil
-	case "^":
-		// Move cursor to first non-whitespace character.
-		yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-		visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
-		if m.yamlCursor >= 0 && m.yamlCursor < len(visLines) {
-			col := firstNonWhitespace(visLines[m.yamlCursor])
-			if col < yamlFoldPrefixLen {
-				col = yamlFoldPrefixLen
-			}
-			m.yamlVisualCurCol = col
-		}
-		return m, nil
+	case "$", "w", "b", "e", "E", "B", "W", "^":
+		return m.handleYAMLVisualWordMotion(msg.String())
 	case "j", "down":
 		m.yamlLineInput = ""
 		if m.yamlCursor < totalVisible-1 {
@@ -695,51 +454,138 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "g":
 		return m.handleYAMLKeyG()
 	case "G":
-		if m.yamlLineInput != "" {
-			lineNum, _ := strconv.Atoi(m.yamlLineInput)
-			m.yamlLineInput = ""
-			if lineNum > 0 {
-				lineNum-- // 1-indexed to 0-indexed
-			}
-			if lineNum >= totalVisible {
-				lineNum = totalVisible - 1
-			}
-			if lineNum < 0 {
-				lineNum = 0
-			}
-			m.yamlCursor = lineNum
-			m.ensureYAMLCursorVisible()
-			return m, nil
-		}
-		m.yamlCursor = totalVisible - 1
-		if m.yamlCursor < 0 {
-			m.yamlCursor = 0
-		}
-		m.yamlScroll = maxScroll
-		return m, nil
+		return m.handleYAMLNormalG(totalVisible, maxScroll)
 	case "ctrl+d":
-		m.yamlLineInput = ""
-		m.yamlCursor += m.height / 2
-		if m.yamlCursor >= totalVisible {
-			m.yamlCursor = totalVisible - 1
-		}
-		m.ensureYAMLCursorVisible()
-		return m, nil
+		return m.handleYAMLNormalHalfPageDown(totalVisible)
 	case "ctrl+u":
 		return m.handleYAMLKeyCtrlU()
 	case "ctrl+f":
-		m.yamlLineInput = ""
-		m.yamlCursor += m.height
-		if m.yamlCursor >= totalVisible {
-			m.yamlCursor = totalVisible - 1
-		}
-		m.ensureYAMLCursorVisible()
-		return m, nil
+		return m.handleYAMLNormalPageDown(totalVisible)
 	case "ctrl+b":
 		return m.handleYAMLKeyCtrlB()
 	default:
 		m.yamlLineInput = ""
 	}
+	return m, nil
+}
+
+// handleYAMLKeyN handles the 'n' key (next search match) in normal YAML mode.
+func (m Model) handleYAMLKeyN(viewportLines int) (tea.Model, tea.Cmd) {
+	if len(m.yamlMatchLines) > 0 {
+		if m.yamlNextIntraLineMatch(true) {
+			return m, nil
+		}
+		m.yamlMatchIdx = (m.yamlMatchIdx + 1) % len(m.yamlMatchLines)
+		m.yamlScrollToMatchFolded(viewportLines)
+	}
+	return m, nil
+}
+
+// handleYAMLKeyShiftN handles the 'N' key (previous search match) in normal YAML mode.
+func (m Model) handleYAMLKeyShiftN(viewportLines int) (tea.Model, tea.Cmd) {
+	if len(m.yamlMatchLines) > 0 {
+		if m.yamlNextIntraLineMatch(false) {
+			return m, nil
+		}
+		m.yamlMatchIdx--
+		if m.yamlMatchIdx < 0 {
+			m.yamlMatchIdx = len(m.yamlMatchLines) - 1
+		}
+		m.yamlScrollToMatchFolded(viewportLines)
+	}
+	return m, nil
+}
+
+// handleYAMLKeyCtrlE handles ctrl+e (edit resource) in normal YAML mode.
+func (m Model) handleYAMLKeyCtrlE() (tea.Model, tea.Cmd) {
+	kind := m.selectedResourceKind()
+	sel := m.selectedMiddleItem()
+	if kind != "" && sel != nil {
+		m.actionCtx = m.buildActionCtx(sel, kind)
+		return m, m.execKubectlEdit()
+	}
+	return m, nil
+}
+
+// handleYAMLKeyFoldToggle toggles the fold on the section at the cursor position.
+func (m Model) handleYAMLKeyFoldToggle() (tea.Model, tea.Cmd) {
+	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	sec := sectionAtScrollPos(m.yamlCursor, mapping, m.yamlSections)
+	if sec != "" {
+		if m.yamlCollapsed == nil {
+			m.yamlCollapsed = make(map[string]bool)
+		}
+		m.yamlCollapsed[sec] = !m.yamlCollapsed[sec]
+
+		if m.yamlCollapsed[sec] {
+			var startLine int
+			for _, s := range m.yamlSections {
+				if s.key == sec {
+					startLine = s.startLine
+					break
+				}
+			}
+			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
+			_, newMapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+			for vi, orig := range newMapping {
+				if orig == startLine {
+					m.yamlCursor = vi
+					break
+				}
+			}
+		}
+
+		m.clampYAMLScroll()
+		m.ensureYAMLCursorVisible()
+	}
+	return m, nil
+}
+
+// handleYAMLNormalG handles the G key in normal mode (go-to-line or end).
+func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cmd) {
+	if m.yamlLineInput != "" {
+		lineNum, _ := strconv.Atoi(m.yamlLineInput)
+		m.yamlLineInput = ""
+		if lineNum > 0 {
+			lineNum--
+		}
+		if lineNum >= totalVisible {
+			lineNum = totalVisible - 1
+		}
+		if lineNum < 0 {
+			lineNum = 0
+		}
+		m.yamlCursor = lineNum
+		m.ensureYAMLCursorVisible()
+		return m, nil
+	}
+	m.yamlCursor = totalVisible - 1
+	if m.yamlCursor < 0 {
+		m.yamlCursor = 0
+	}
+	m.yamlScroll = maxScroll
+	return m, nil
+}
+
+// handleYAMLNormalHalfPageDown handles ctrl+d (half page down) in normal YAML mode.
+func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cmd) {
+	m.yamlLineInput = ""
+	m.yamlCursor += m.height / 2
+	if m.yamlCursor >= totalVisible {
+		m.yamlCursor = totalVisible - 1
+	}
+	m.ensureYAMLCursorVisible()
+	return m, nil
+}
+
+// handleYAMLNormalPageDown handles ctrl+f (full page down) in normal YAML mode.
+func (m Model) handleYAMLNormalPageDown(totalVisible int) (tea.Model, tea.Cmd) {
+	m.yamlLineInput = ""
+	m.yamlCursor += m.height
+	if m.yamlCursor >= totalVisible {
+		m.yamlCursor = totalVisible - 1
+	}
+	m.ensureYAMLCursorVisible()
 	return m, nil
 }
 

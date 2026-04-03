@@ -42,111 +42,119 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	// Tab switching keys work in all fullscreen modes (YAML, Logs, Describe, Diff, Help)
 	// as long as the user is not in a text input sub-mode (search, etc.).
+	if mdl, cmd, handled := m.handleTabSwitchKey(msg); handled {
+		return mdl, cmd
+	}
+
+	// Dispatch to mode-specific handlers.
+	if mdl, cmd, handled := m.handleModeKey(msg); handled {
+		return mdl, cmd
+	}
+
+	// Explorer mode key handling.
+	return m.handleExplorerKey(msg)
+}
+
+// handleTabSwitchKey handles tab switching keys (next/prev/new tab).
+func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
-	if m.mode != modeExplorer && m.mode != modeExec && !m.yamlSearchMode && !m.logSearchActive && !m.helpSearchActive && !m.explainSearchActive && !m.diffSearchMode {
-		switch msg.String() {
-		case kb.NextTab:
-			if len(m.tabs) > 1 {
-				m.saveCurrentTab() // save mode + log state BEFORE switching
-				next := (m.activeTab + 1) % len(m.tabs)
-				if cmd := m.loadTab(next); cmd != nil {
-					return m, cmd
-				}
-				if m.mode == modeExplorer {
-					return m, m.loadPreview()
-				}
-				if m.mode == modeLogs && m.logCh != nil {
-					return m, m.waitForLogLine()
-				}
-				if m.mode == modeExec && m.execPTY != nil {
-					return m, m.scheduleExecTick()
-				}
-				return m, nil
+	if m.mode == modeExplorer || m.mode == modeExec || m.yamlSearchMode || m.logSearchActive || m.helpSearchActive || m.explainSearchActive || m.diffSearchMode {
+		return m, nil, false
+	}
+	switch msg.String() {
+	case kb.NextTab:
+		if len(m.tabs) > 1 {
+			m.saveCurrentTab()
+			next := (m.activeTab + 1) % len(m.tabs)
+			if cmd := m.loadTab(next); cmd != nil {
+				return m, cmd, true
 			}
-		case kb.PrevTab:
-			if len(m.tabs) > 1 {
-				m.saveCurrentTab()
-				prev := (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
-				if cmd := m.loadTab(prev); cmd != nil {
-					return m, cmd
-				}
-				if m.mode == modeExplorer {
-					return m, m.loadPreview()
-				}
-				if m.mode == modeLogs && m.logCh != nil {
-					return m, m.waitForLogLine()
-				}
-				if m.mode == modeExec && m.execPTY != nil {
-					return m, m.scheduleExecTick()
-				}
-				return m, nil
+			return m, m.postTabSwitchCmd(), true
+		}
+	case kb.PrevTab:
+		if len(m.tabs) > 1 {
+			m.saveCurrentTab()
+			prev := (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
+			if cmd := m.loadTab(prev); cmd != nil {
+				return m, cmd, true
 			}
-		case kb.NewTab:
-			if m.mode != modeHelp { // 't' is not used as a regular key in fullscreen modes
-				if len(m.tabs) >= 9 {
-					m.setStatusMessage("Max 9 tabs", true)
-					return m, scheduleStatusClear()
-				}
-				m.saveCurrentTab()
-				newTab := m.cloneCurrentTab()
-				// New tab always starts in explorer mode.
-				newTab.mode = modeExplorer
-				newTab.logLines = nil
-				newTab.logCancel = nil
-				newTab.logCh = nil
-				insertAt := m.activeTab + 1
-				m.tabs = append(m.tabs[:insertAt], append([]TabState{newTab}, m.tabs[insertAt:]...)...)
-				m.activeTab = insertAt
-				m.loadTab(m.activeTab) // cloned tab is always fully loaded, ignore returned cmd
-				m.setStatusMessage(fmt.Sprintf("Tab %d created", m.activeTab+1), false)
-				return m, scheduleStatusClear()
+			return m, m.postTabSwitchCmd(), true
+		}
+	case kb.NewTab:
+		if m.mode != modeHelp {
+			if len(m.tabs) >= 9 {
+				m.setStatusMessage("Max 9 tabs", true)
+				return m, scheduleStatusClear(), true
 			}
+			m.saveCurrentTab()
+			newTab := m.cloneCurrentTab()
+			newTab.mode = modeExplorer
+			newTab.logLines = nil
+			newTab.logCancel = nil
+			newTab.logCh = nil
+			insertAt := m.activeTab + 1
+			m.tabs = append(m.tabs[:insertAt], append([]TabState{newTab}, m.tabs[insertAt:]...)...)
+			m.activeTab = insertAt
+			m.loadTab(m.activeTab)
+			m.setStatusMessage(fmt.Sprintf("Tab %d created", m.activeTab+1), false)
+			return m, scheduleStatusClear(), true
 		}
 	}
+	return m, nil, false
+}
 
-	// Embedded terminal mode: forward keys to PTY.
-	if m.mode == modeExec {
-		return m.handleExecKey(msg)
+// postTabSwitchCmd returns the appropriate command after switching tabs.
+func (m Model) postTabSwitchCmd() tea.Cmd {
+	if m.mode == modeExplorer {
+		return m.loadPreview()
 	}
+	if m.mode == modeLogs && m.logCh != nil {
+		return m.waitForLogLine()
+	}
+	if m.mode == modeExec && m.execPTY != nil {
+		return m.scheduleExecTick()
+	}
+	return nil
+}
 
-	// In help view mode.
-	if m.mode == modeHelp {
-		return m.handleHelpKey(msg)
+// handleModeKey dispatches to the appropriate mode-specific handler.
+func (m Model) handleModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	switch m.mode {
+	case modeExec:
+		mdl, cmd := m.handleExecKey(msg)
+		return mdl, cmd, true
+	case modeHelp:
+		mdl, cmd := m.handleHelpKey(msg)
+		return mdl, cmd, true
+	case modeLogs:
+		mdl, cmd := m.handleLogKey(msg)
+		return mdl, cmd, true
+	case modeDiff:
+		mdl, cmd := m.handleDiffKey(msg)
+		return mdl, cmd, true
+	case modeDescribe:
+		mdl, cmd := m.handleDescribeKey(msg)
+		return mdl, cmd, true
+	case modeEventViewer:
+		mdl, cmd := m.handleEventViewerModeKey(msg)
+		return mdl, cmd, true
+	case modeExplain:
+		if m.explainSearchActive {
+			mdl, cmd := m.handleExplainSearchKey(msg)
+			return mdl, cmd, true
+		}
+		mdl, cmd := m.handleExplainKey(msg)
+		return mdl, cmd, true
+	case modeYAML:
+		mdl, cmd := m.handleYAMLKey(msg)
+		return mdl, cmd, true
 	}
+	return m, nil, false
+}
 
-	// In log viewer mode.
-	if m.mode == modeLogs {
-		return m.handleLogKey(msg)
-	}
-
-	// In diff view mode.
-	if m.mode == modeDiff {
-		return m.handleDiffKey(msg)
-	}
-
-	// In describe view mode.
-	if m.mode == modeDescribe {
-		return m.handleDescribeKey(msg)
-	}
-
-	// In fullscreen event viewer mode: reuse the overlay key handler,
-	// but override q/esc/f to return to explorer mode.
-	if m.mode == modeEventViewer {
-		return m.handleEventViewerModeKey(msg)
-	}
-
-	// In explain view mode: handle search input before general keys.
-	if m.mode == modeExplain && m.explainSearchActive {
-		return m.handleExplainSearchKey(msg)
-	}
-	if m.mode == modeExplain {
-		return m.handleExplainKey(msg)
-	}
-
-	// In YAML view mode.
-	if m.mode == modeYAML {
-		return m.handleYAMLKey(msg)
-	}
+// handleExplorerKey handles key events in the main explorer mode.
+func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	kb := ui.ActiveKeybindings
 
 	// Clear pending 'g' state if any other key is pressed (vim-style gg).
 	if m.pendingG && msg.String() != kb.JumpTop {
@@ -160,7 +168,6 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(key) == 1 && ((key[0] >= 'a' && key[0] <= 'z') || (key[0] >= 'A' && key[0] <= 'Z') || (key[0] >= '0' && key[0] <= '9')) {
 			return m.bookmarkToSlot(key)
 		}
-		// Invalid slot key — ignore silently.
 		return m, nil
 	}
 
@@ -175,256 +182,281 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	if mdl, cmd, handled := m.handleExplorerNavKey(msg); handled {
+		return mdl, cmd
+	}
+	if mdl, cmd, handled := m.handleExplorerUIKey(msg); handled {
+		return mdl, cmd
+	}
+
+	// Delegate remaining keys (actions, scrolling, tabs, editors, etc.)
+	if ret, cmd, handled := m.handleExplorerActionKey(msg); handled {
+		return ret, cmd
+	}
+
+	return m, nil
+}
+
+// handleExplorerNavKey handles navigation keys in explorer mode (movement, selection, enter).
+func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
 	switch msg.String() {
 	case "q":
 		m.overlay = overlayQuitConfirm
-		return m, nil
-
+		return m, nil, true
 	case "ctrl+c":
-		return m.closeTabOrQuit()
-
-	case kb.ThemeSelector:
-		return m.handleKeyThemeSelector()
-
+		mdl, cmd := m.closeTabOrQuit()
+		return mdl, cmd, true
 	case "esc":
-		if m.fullscreenDashboard {
-			m.fullscreenDashboard = false
-			m.previewScroll = 0
-			m.setStatusMessage("Dashboard fullscreen OFF", false)
-			return m, scheduleStatusClear()
-		}
-		if m.hasSelection() {
-			m.clearSelection()
-			return m, nil
-		}
-		if m.filterText != "" {
-			m.filterText = ""
-			m.setCursor(0)
-			m.clampCursor()
-			return m, m.loadPreview()
-		}
-		if m.nav.Level == model.LevelClusters {
-			if len(m.tabs) > 1 {
-				// Close current tab instead of quitting when multiple tabs are open.
-				m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
-				if m.activeTab > 0 {
-					m.activeTab--
-				}
-				// Load the surviving tab BEFORE saving session, so saveCurrentTab
-				// writes the surviving tab's data (not the closed tab's stale state).
-				cmd := m.loadTab(m.activeTab)
-				m.saveCurrentSession()
-				if cmd != nil {
-					return m, cmd
-				}
-				return m, m.loadPreview()
-			}
-			return m, tea.Quit
-		}
-		return m.navigateParent()
-
+		mdl, cmd := m.handleExplorerEsc()
+		return mdl, cmd, true
 	case kb.Down, "down":
 		if m.fullscreenDashboard {
 			m.previewScroll++
 			m.clampPreviewScroll()
-			return m, nil
+			return m, nil, true
 		}
-		return m.moveCursor(1)
-
+		mdl, cmd := m.moveCursor(1)
+		return mdl, cmd, true
 	case kb.Up, "up":
 		if m.fullscreenDashboard {
 			if m.previewScroll > 0 {
 				m.previewScroll--
 			}
-			return m, nil
+			return m, nil, true
 		}
-		return m.moveCursor(-1)
-
+		mdl, cmd := m.moveCursor(-1)
+		return mdl, cmd, true
 	case kb.JumpTop:
-		if m.fullscreenDashboard {
-			if m.pendingG {
-				m.pendingG = false
-				m.previewScroll = 0
-				return m, nil
-			}
-			m.pendingG = true
-			return m, nil
-		}
-		if m.pendingG {
-			m.pendingG = false
-			m.setCursor(0)
-			m.clampCursor()
-			m.syncExpandedGroup()
-			return m, m.loadPreview()
-		}
-		m.pendingG = true
-		return m, nil
-
+		mdl, cmd := m.handleExplorerJumpTop()
+		return mdl, cmd, true
 	case kb.JumpBottom:
-		if m.fullscreenDashboard {
-			m.previewScroll = 99999 // will be clamped
-			m.clampPreviewScroll()
-			return m, nil
-		}
-		visible := m.visibleMiddleItems()
-		if len(visible) > 0 {
-			m.setCursor(len(visible) - 1)
-		}
-		m.syncExpandedGroup()
-		return m, m.loadPreview()
-
-	case kb.SelectRange: // ctrl+space: region selection
-		return m.handleKeySelectRange()
-
+		mdl, cmd := m.handleExplorerJumpBottom()
+		return mdl, cmd, true
+	case kb.SelectRange:
+		mdl, cmd := m.handleKeySelectRange()
+		return mdl, cmd, true
 	case kb.ToggleSelect:
-		// Toggle selection on current item and move cursor down.
-		return m.handleKeyToggleSelect()
-
+		mdl, cmd := m.handleKeyToggleSelect()
+		return mdl, cmd, true
 	case kb.SelectAll:
-		// Select/deselect all visible items.
-		return m.handleKeySelectAll()
-
+		mdl, cmd := m.handleKeySelectAll()
+		return mdl, cmd, true
 	case kb.Left, "left":
 		if m.fullscreenDashboard {
 			m.fullscreenDashboard = false
 			m.previewScroll = 0
 			m.setStatusMessage("Dashboard fullscreen OFF", false)
-			return m, scheduleStatusClear()
+			return m, scheduleStatusClear(), true
 		}
-		return m.navigateParent()
-
+		mdl, cmd := m.navigateParent()
+		return mdl, cmd, true
 	case kb.Right, "right":
-		return m.navigateChild()
-
+		mdl, cmd := m.navigateChild()
+		return mdl, cmd, true
 	case kb.Enter:
-		return m.enterFullView()
-
+		mdl, cmd := m.enterFullView()
+		return mdl, cmd, true
 	case kb.NextMatch:
-		// Jump to next search match.
-		return m.handleKeyNextMatch()
-
+		mdl, cmd := m.handleKeyNextMatch()
+		return mdl, cmd, true
 	case kb.PrevMatch:
-		// Jump to previous search match.
-		return m.handleKeyPrevMatch()
+		mdl, cmd := m.handleKeyPrevMatch()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
 
-	case kb.NamespaceSelector:
-		// Open namespace selector immediately with loading state.
-		return m.handleKeyNamespaceSelector()
-
-	case kb.ActionMenu:
-		return m.openActionMenu()
-
-	case kb.WatchMode:
-		return m.handleKeyWatchMode()
-
-	case kb.ExpandCollapse:
-		// Toggle expand/collapse all groups at resource types level.
-		return m.handleKeyExpandCollapse()
-
-	case kb.PinGroup:
-		// Pin/unpin CRD group at resource types level.
-		return m.handleKeyPinGroup()
-
-	case kb.OpenMarks:
-		// Open bookmarks overlay immediately; slot keys (a-z, 0-9) jump from within the overlay.
-		return m.handleKeyOpenMarks()
-
-	case kb.SetMark:
-		// Vim-style set mark: wait for slot key.
-		m.pendingMark = true
+// handleExplorerEsc handles the Escape key in explorer mode.
+func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
+	if m.fullscreenDashboard {
+		m.fullscreenDashboard = false
+		m.previewScroll = 0
+		m.setStatusMessage("Dashboard fullscreen OFF", false)
+		return m, scheduleStatusClear()
+	}
+	if m.hasSelection() {
+		m.clearSelection()
 		return m, nil
-
-	case kb.Help, "f1":
-		return m.handleKeyHelp()
-
-	case kb.Filter:
-		return m.handleKeyFilter()
-
-	case kb.Search:
-		return m.handleKeySearch()
-
-	case kb.CommandBar:
-		// Open kubectl command bar.
-		return m.handleKeyCommandBar()
-
-	case kb.FinalizerSearch:
-		// Open finalizer search overlay.
-		m.openFinalizerSearch()
-		return m, nil
-
-	case kb.ColumnToggle:
-		// Open column toggle overlay.
-		return m.handleKeyColumnToggle()
-
-	case kb.ResourceMap:
-		// Toggle resource relationship map in the right column.
-		if m.nav.Level >= model.LevelResources {
-			m.mapView = !m.mapView
-			if m.mapView {
-				m.fullYAMLPreview = false
-				m.previewScroll = 0
-				m.setStatusMessage("Resource map", false)
-				return m, tea.Batch(m.loadResourceTree(), scheduleStatusClear())
+	}
+	if m.filterText != "" {
+		m.filterText = ""
+		m.setCursor(0)
+		m.clampCursor()
+		return m, m.loadPreview()
+	}
+	if m.nav.Level == model.LevelClusters {
+		if len(m.tabs) > 1 {
+			m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
+			if m.activeTab > 0 {
+				m.activeTab--
 			}
-			m.resourceTree = nil
-			m.setStatusMessage("Details preview", false)
-			return m, tea.Batch(m.loadPreview(), scheduleStatusClear())
+			cmd := m.loadTab(m.activeTab)
+			m.saveCurrentSession()
+			if cmd != nil {
+				return m, cmd
+			}
+			return m, m.loadPreview()
 		}
-		return m, nil
+		return m, tea.Quit
+	}
+	return m.navigateParent()
+}
 
-	case kb.TogglePreview:
-		// No preview toggle on dashboard views.
-		if sel := m.selectedMiddleItem(); sel != nil && m.nav.Level == model.LevelResourceTypes &&
-			(sel.Extra == "__overview__" || sel.Extra == "__monitoring__") {
+// handleExplorerJumpTop handles g/gg (jump to top) in explorer mode.
+func (m Model) handleExplorerJumpTop() (tea.Model, tea.Cmd) {
+	if m.fullscreenDashboard {
+		if m.pendingG {
+			m.pendingG = false
+			m.previewScroll = 0
 			return m, nil
 		}
-		// Toggle between split view (children + details) and full YAML preview.
-		m.fullYAMLPreview = !m.fullYAMLPreview
-		m.mapView = false
-		m.resourceTree = nil
-		if m.fullYAMLPreview {
-			m.setStatusMessage("YAML preview", false)
-		} else {
-			m.previewYAML = ""
-			m.setStatusMessage("Details preview", false)
-		}
-		return m, tea.Batch(m.loadPreview(), scheduleStatusClear())
+		m.pendingG = true
+		return m, nil
+	}
+	if m.pendingG {
+		m.pendingG = false
+		m.setCursor(0)
+		m.clampCursor()
+		m.syncExpandedGroup()
+		return m, m.loadPreview()
+	}
+	m.pendingG = true
+	return m, nil
+}
 
+// handleExplorerJumpBottom handles G (jump to bottom) in explorer mode.
+func (m Model) handleExplorerJumpBottom() (tea.Model, tea.Cmd) {
+	if m.fullscreenDashboard {
+		m.previewScroll = 99999
+		m.clampPreviewScroll()
+		return m, nil
+	}
+	visible := m.visibleMiddleItems()
+	if len(visible) > 0 {
+		m.setCursor(len(visible) - 1)
+	}
+	m.syncExpandedGroup()
+	return m, m.loadPreview()
+}
+
+// handleExplorerUIKey handles UI toggle keys in explorer mode (filter, search, overlays, etc.).
+func (m Model) handleExplorerUIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
+	switch msg.String() {
+	case kb.ThemeSelector:
+		mdl, cmd := m.handleKeyThemeSelector()
+		return mdl, cmd, true
+	case kb.NamespaceSelector:
+		mdl, cmd := m.handleKeyNamespaceSelector()
+		return mdl, cmd, true
+	case kb.ActionMenu:
+		mdl, cmd := m.openActionMenu()
+		return mdl, cmd, true
+	case kb.WatchMode:
+		mdl, cmd := m.handleKeyWatchMode()
+		return mdl, cmd, true
+	case kb.ExpandCollapse:
+		mdl, cmd := m.handleKeyExpandCollapse()
+		return mdl, cmd, true
+	case kb.PinGroup:
+		mdl, cmd := m.handleKeyPinGroup()
+		return mdl, cmd, true
+	case kb.OpenMarks:
+		mdl, cmd := m.handleKeyOpenMarks()
+		return mdl, cmd, true
+	case kb.SetMark:
+		m.pendingMark = true
+		return m, nil, true
+	case kb.Help, "f1":
+		mdl, cmd := m.handleKeyHelp()
+		return mdl, cmd, true
+	case kb.Filter:
+		mdl, cmd := m.handleKeyFilter()
+		return mdl, cmd, true
+	case kb.Search:
+		mdl, cmd := m.handleKeySearch()
+		return mdl, cmd, true
+	case kb.CommandBar:
+		mdl, cmd := m.handleKeyCommandBar()
+		return mdl, cmd, true
+	case kb.FinalizerSearch:
+		m.openFinalizerSearch()
+		return m, nil, true
+	case kb.ColumnToggle:
+		mdl, cmd := m.handleKeyColumnToggle()
+		return mdl, cmd, true
+	case kb.ResourceMap:
+		mdl, cmd := m.handleExplorerResourceMap()
+		return mdl, cmd, true
+	case kb.TogglePreview:
+		mdl, cmd := m.handleExplorerTogglePreview()
+		return mdl, cmd, true
 	case kb.Fullscreen:
-		// If standing on Cluster Dashboard or Monitoring, toggle fullscreen dashboard instead.
-		sel := m.selectedMiddleItem()
-		if sel != nil && (sel.Extra == "__overview__" || sel.Extra == "__monitoring__") && m.nav.Level == model.LevelResourceTypes {
-			m.fullscreenDashboard = !m.fullscreenDashboard
+		mdl, cmd := m.handleExplorerFullscreen()
+		return mdl, cmd, true
+	case kb.SecretToggle:
+		mdl, cmd := m.handleKeySecretToggle()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+// handleExplorerResourceMap handles the resource map toggle key.
+func (m Model) handleExplorerResourceMap() (tea.Model, tea.Cmd) {
+	if m.nav.Level >= model.LevelResources {
+		m.mapView = !m.mapView
+		if m.mapView {
+			m.fullYAMLPreview = false
 			m.previewScroll = 0
-			if m.fullscreenDashboard {
-				m.setStatusMessage("Dashboard fullscreen ON", false)
-			} else {
-				m.setStatusMessage("Dashboard fullscreen OFF", false)
-			}
-			return m, scheduleStatusClear()
+			m.setStatusMessage("Resource map", false)
+			return m, tea.Batch(m.loadResourceTree(), scheduleStatusClear())
 		}
-		// Toggle fullscreen middle column.
-		m.fullscreenMiddle = !m.fullscreenMiddle
-		if m.fullscreenMiddle {
-			m.setStatusMessage("Fullscreen ON", false)
+		m.resourceTree = nil
+		m.setStatusMessage("Details preview", false)
+		return m, tea.Batch(m.loadPreview(), scheduleStatusClear())
+	}
+	return m, nil
+}
+
+// handleExplorerTogglePreview toggles between split view and full YAML preview.
+func (m Model) handleExplorerTogglePreview() (tea.Model, tea.Cmd) {
+	if sel := m.selectedMiddleItem(); sel != nil && m.nav.Level == model.LevelResourceTypes &&
+		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__") {
+		return m, nil
+	}
+	m.fullYAMLPreview = !m.fullYAMLPreview
+	m.mapView = false
+	m.resourceTree = nil
+	if m.fullYAMLPreview {
+		m.setStatusMessage("YAML preview", false)
+	} else {
+		m.previewYAML = ""
+		m.setStatusMessage("Details preview", false)
+	}
+	return m, tea.Batch(m.loadPreview(), scheduleStatusClear())
+}
+
+// handleExplorerFullscreen toggles fullscreen mode for the middle column or dashboard.
+func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
+	sel := m.selectedMiddleItem()
+	if sel != nil && (sel.Extra == "__overview__" || sel.Extra == "__monitoring__") && m.nav.Level == model.LevelResourceTypes {
+		m.fullscreenDashboard = !m.fullscreenDashboard
+		m.previewScroll = 0
+		if m.fullscreenDashboard {
+			m.setStatusMessage("Dashboard fullscreen ON", false)
 		} else {
-			m.setStatusMessage("Fullscreen OFF", false)
+			m.setStatusMessage("Dashboard fullscreen OFF", false)
 		}
 		return m, scheduleStatusClear()
-
-	case kb.SecretToggle:
-		// Toggle secret value visibility.
-		return m.handleKeySecretToggle()
-
-	default:
-		// Delegate remaining keys (actions, scrolling, tabs, editors, etc.)
-		// to the action key handler in update_keys_actions.go.
-		if ret, cmd, handled := m.handleExplorerActionKey(msg); handled {
-			return ret, cmd
-		}
 	}
-
-	return m, nil
+	m.fullscreenMiddle = !m.fullscreenMiddle
+	if m.fullscreenMiddle {
+		m.setStatusMessage("Fullscreen ON", false)
+	} else {
+		m.setStatusMessage("Fullscreen OFF", false)
+	}
+	return m, scheduleStatusClear()
 }
 
 func (m Model) handleKeyThemeSelector() (tea.Model, tea.Cmd) {

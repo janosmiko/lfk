@@ -305,191 +305,441 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		"namespace", m.actionCtx.namespace,
 		"context", m.actionCtx.context,
 	)
+
+	if mdl, cmd, ok := m.executeActionCore(actionLabel); ok {
+		return mdl, cmd
+	}
+	if mdl, cmd, ok := m.executeActionExtended(actionLabel); ok {
+		return mdl, cmd
+	}
+	return m.executeActionDefault(actionLabel)
+}
+
+// executeActionCore dispatches core kubectl-related actions.
+// Returns the model, cmd, and true if the action was handled.
+func (m Model) executeActionCore(actionLabel string) (tea.Model, tea.Cmd, bool) {
+	if mdl, cmd, ok := m.executeActionCoreK8s(actionLabel); ok {
+		return mdl, cmd, true
+	}
+	return m.executeActionCoreOps(actionLabel)
+}
+
+// executeActionCoreK8s dispatches core kubectl resource actions.
+func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, bool) {
+	switch actionLabel {
+	case "Logs":
+		mdl, cmd := m.executeActionLogs()
+		return mdl, cmd, true
+	case "Exec":
+		mdl, cmd := m.executeActionExec()
+		return mdl, cmd, true
+	case "Attach":
+		mdl, cmd := m.executeActionAttach()
+		return mdl, cmd, true
+	case "Describe":
+		mdl, cmd := m.executeActionDescribe()
+		return mdl, cmd, true
+	case "Edit":
+		mdl, cmd := m.executeActionEdit()
+		return mdl, cmd, true
+	case "Secret Editor":
+		return m, m.loadSecretData(), true
+	case "ConfigMap Editor":
+		return m, m.loadConfigMapData(), true
+	case "Delete":
+		mdl, cmd := m.executeActionDelete()
+		return mdl, cmd, true
+	case "Resize":
+		mdl, cmd := m.executeActionResize()
+		return mdl, cmd, true
+	case "Scale":
+		mdl, cmd := m.executeActionScale()
+		return mdl, cmd, true
+	case "Restart":
+		mdl, cmd := m.executeActionRestart()
+		return mdl, cmd, true
+	case "Rollback":
+		mdl, cmd := m.executeActionRollback()
+		return mdl, cmd, true
+	case "Port Forward":
+		mdl, cmd := m.executeActionPortForward()
+		return mdl, cmd, true
+	case "Debug":
+		mdl, cmd := m.executeActionDebug()
+		return mdl, cmd, true
+	case "Events":
+		mdl, cmd := m.executeActionEvents()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+// executeActionCoreOps dispatches node, PVC, and other operational actions.
+func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, bool) {
+	switch actionLabel {
+	case "Force Delete":
+		mdl, cmd := m.executeActionForceDelete()
+		return mdl, cmd, true
+	case "Force Finalize":
+		mdl, cmd := m.executeActionForceFinalize()
+		return mdl, cmd, true
+	case "Cordon":
+		mdl, cmd := m.executeActionCordon()
+		return mdl, cmd, true
+	case "Uncordon":
+		mdl, cmd := m.executeActionUncordon()
+		return mdl, cmd, true
+	case "Drain":
+		mdl, cmd := m.executeActionDrain()
+		return mdl, cmd, true
+	case "Taint":
+		mdl, cmd := m.executeActionTaint()
+		return mdl, cmd, true
+	case "Untaint":
+		mdl, cmd := m.executeActionUntaint()
+		return mdl, cmd, true
+	case "Trigger":
+		mdl, cmd := m.executeActionTrigger()
+		return mdl, cmd, true
+	case "Shell":
+		mdl, cmd := m.executeActionShell()
+		return mdl, cmd, true
+	case "Debug Pod":
+		mdl, cmd := m.executeActionDebugPod()
+		return mdl, cmd, true
+	case "Go to Pod":
+		mdl, cmd := m.executeActionGoToPod()
+		return mdl, cmd, true
+	case "Debug Mount":
+		mdl, cmd := m.executeActionDebugMount()
+		return mdl, cmd, true
+	case "Open in Browser":
+		mdl, cmd := m.executeActionOpenInBrowser()
+		return mdl, cmd, true
+	case "Stop":
+		mdl, cmd := m.executeActionStop()
+		return mdl, cmd, true
+	case "Remove":
+		mdl, cmd := m.executeActionRemove()
+		return mdl, cmd, true
+	case "Permissions":
+		mdl, cmd := m.executeActionPermissions()
+		return mdl, cmd, true
+	case "Startup Analysis":
+		mdl, cmd := m.executeActionStartupAnalysis()
+		return mdl, cmd, true
+	case "Alerts":
+		mdl, cmd := m.executeActionAlerts()
+		return mdl, cmd, true
+	case "Visualize":
+		mdl, cmd := m.executeActionVisualize()
+		return mdl, cmd, true
+	case "Labels / Annotations":
+		mdl, cmd := m.executeActionLabelsAnnotations()
+		return mdl, cmd, true
+	case "Vuln Scan":
+		mdl, cmd := m.executeActionVulnScan()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+// executeActionExtended dispatches Argo, Helm, Flux, and other extended actions.
+// Returns the model, cmd, and true if the action was handled.
+func (m Model) executeActionExtended(actionLabel string) (tea.Model, tea.Cmd, bool) {
+	switch actionLabel {
+	case "Configure AutoSync", "Sync", "Sync (Apply Only)", "Refresh",
+		"Terminate Sync", "Watch Workflow", "Suspend Workflow",
+		"Resume Workflow", "Stop Workflow", "Terminate Workflow",
+		"Resubmit Workflow", "Submit Workflow",
+		"Suspend CronWorkflow", "Resume CronWorkflow":
+		mdl, cmd := m.executeActionArgo(actionLabel)
+		return mdl, cmd, true
+	case "Force Renew":
+		mdl, cmd := m.executeActionSimpleLoading("Triggering renewal for", m.forceRenewCertificate)
+		return mdl, cmd, true
+	case "Force Refresh":
+		mdl, cmd := m.executeActionSimpleLoading("Force refreshing", m.forceRefreshExternalSecret)
+		return mdl, cmd, true
+	case "Pause":
+		mdl, cmd := m.executeActionSimpleLoading("Pausing", m.pauseKEDAResource)
+		return mdl, cmd, true
+	case "Unpause":
+		mdl, cmd := m.executeActionSimpleLoading("Unpausing", m.unpauseKEDAResource)
+		return mdl, cmd, true
+	case "Reconcile":
+		mdl, cmd := m.executeActionSimpleLoading("Reconciling", m.reconcileFluxResource)
+		return mdl, cmd, true
+	case "Suspend":
+		mdl, cmd := m.executeActionSimpleLoading("Suspending", m.suspendFluxResource)
+		return mdl, cmd, true
+	case "Resume":
+		mdl, cmd := m.executeActionSimpleLoading("Resuming", m.resumeFluxResource)
+		return mdl, cmd, true
+	case "Values":
+		mdl, cmd := m.executeActionHelmValues(false)
+		return mdl, cmd, true
+	case "All Values":
+		mdl, cmd := m.executeActionHelmValues(true)
+		return mdl, cmd, true
+	case "Edit Values":
+		mdl, cmd := m.executeActionEditValues()
+		return mdl, cmd, true
+	case "Diff":
+		mdl, cmd := m.executeActionDiff()
+		return mdl, cmd, true
+	case "Upgrade":
+		mdl, cmd := m.executeActionUpgrade()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+// executeActionLogs handles the "Logs" action.
+func (m Model) executeActionLogs() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	kind := m.actionCtx.kind
+	isGroupResource := kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" ||
+		kind == "Job" || kind == "CronJob" || kind == "Service"
+
+	if isGroupResource && m.actionCtx.containerName == "" {
+		// Save parent resource context for pod/container re-selection from the log viewer.
+		m.logParentKind = m.actionCtx.kind
+		m.logParentName = m.actionCtx.name
+		// Stream all pods at once using label selector (no pod selection step).
+		// The user can still filter pods/containers from the log viewer overlay.
+	}
+
+	if kind != "Pod" && !isGroupResource && m.actionCtx.containerName == "" {
+		m.pendingAction = "Logs"
+		return m, m.loadContainersForAction()
+	}
+
+	// Direct log streaming for pods or when container is already selected.
+	// Reset parent context only for non-group resources so stale values
+	// from a previous session don't leak. Group resources keep their
+	// parent context for the pod/container re-selection overlay.
+	if !isGroupResource {
+		m.logParentKind = ""
+		m.logParentName = ""
+	}
+
+	if m.actionCtx.containerName != "" {
+		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl logs -f %s -c %s -n %s --context %s", name, m.actionCtx.containerName, ns, ctx))
+	} else {
+		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl logs -f %s --all-containers --prefix -n %s --context %s", name, ns, ctx))
+	}
+	// Initialize log viewer state.
+	m.mode = modeLogs
+	m.logLines = nil
+	m.logScroll = 0
+	m.logFollow = true
+	m.logWrap = false
+	m.logLineNumbers = true
+	m.logTimestamps = false
+	m.logPrevious = false
+	m.logIsMulti = false
+	m.logMultiItems = nil
+	m.logContainers = nil
+	// For single-container logs, pre-select that container so the
+	// container selector overlay shows the correct active state.
+	if m.actionCtx.containerName != "" {
+		m.logSelectedContainers = []string{m.actionCtx.containerName}
+	} else {
+		m.logSelectedContainers = nil
+	}
+	m.logTailLines = ui.ConfigLogTailLines
+	m.logHasMoreHistory = true
+	m.logLoadingHistory = false
+	m.logCursor = 0 // will track end as lines stream in with follow mode
+	m.logVisualMode = false
+	m.logVisualStart = 0
+	if m.actionCtx.containerName != "" {
+		m.logTitle = fmt.Sprintf("Logs: %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
+	} else {
+		m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+	}
+	return m, m.startLogStream()
+}
+
+// executeActionExec handles the "Exec" action.
+func (m Model) executeActionExec() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	kind := m.actionCtx.kind
+	isParentExec := kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" ||
+		kind == "Job" || kind == "CronJob" || kind == "Service"
+	if isParentExec {
+		m.pendingAction = "Exec"
+		m.loading = true
+		m.setStatusMessage("Loading pods...", false)
+		return m, m.loadPodsForAction()
+	}
+	if m.actionCtx.containerName == "" {
+		m.pendingAction = "Exec"
+		m.loading = true
+		m.setStatusMessage("Loading containers...", false)
+		return m, m.loadContainersForAction()
+	}
+	cArg := ""
+	if m.actionCtx.containerName != "" {
+		cArg = " -c " + m.actionCtx.containerName
+	}
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl exec -it %s%s -n %s --context %s -- /bin/sh -c 'clear; (bash || ash || sh)'", name, cArg, ns, ctx))
+	return m, m.execKubectlExec()
+}
+
+// executeActionAttach handles the "Attach" action.
+func (m Model) executeActionAttach() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	kind := m.actionCtx.kind
+	isParentAttach := kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" ||
+		kind == "Job" || kind == "CronJob" || kind == "Service"
+	if isParentAttach {
+		m.pendingAction = "Attach"
+		m.loading = true
+		m.setStatusMessage("Loading pods...", false)
+		return m, m.loadPodsForAction()
+	}
+	if m.actionCtx.containerName == "" {
+		m.pendingAction = "Attach"
+		m.loading = true
+		m.setStatusMessage("Loading containers...", false)
+		return m, m.loadContainersForAction()
+	}
+	cArg := ""
+	if m.actionCtx.containerName != "" {
+		cArg = " -c " + m.actionCtx.containerName
+	}
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl attach -it %s%s -n %s --context %s", name, cArg, ns, ctx))
+	return m, m.execKubectlAttach()
+}
+
+// executeActionDescribe handles the "Describe" action.
+func (m Model) executeActionDescribe() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	rt := m.actionCtx.resourceType
+	nsArg := ""
+	if rt.Namespaced {
+		nsArg = " -n " + ns
+	}
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl describe %s %s%s --context %s", rt.Resource, name, nsArg, ctx))
+	return m, m.execKubectlDescribe()
+}
+
+// executeActionEdit handles the "Edit" action.
+func (m Model) executeActionEdit() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	rt := m.actionCtx.resourceType
+	nsArg := ""
+	if rt.Namespaced {
+		nsArg = " -n " + ns
+	}
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl edit %s %s%s --context %s", rt.Resource, name, nsArg, ctx))
+	return m, m.execKubectlEdit()
+}
+
+// executeActionDelete handles the "Delete" action.
+func (m Model) executeActionDelete() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	m.confirmAction = m.actionCtx.name
+	m.overlay = overlayConfirm
+	m.pendingAction = "Delete"
+	return m, nil
+}
+
+// executeActionResize handles the "Resize" action.
+func (m Model) executeActionResize() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	// Extract current PVC size from columns for display in the overlay.
+	m.pvcCurrentSize = ""
+	for _, kv := range m.actionCtx.columns {
+		if kv.Key == "Capacity" || kv.Key == "CAPACITY" {
+			m.pvcCurrentSize = kv.Value
+			break
+		}
+	}
+	m.scaleInput.Clear()
+	m.overlay = overlayPVCResize
+	return m, nil
+}
+
+// executeActionRestart handles the "Restart" action.
+func (m Model) executeActionRestart() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	// Restart a stopped/failed port forward entry.
+	if m.actionCtx.kind == "__port_forward_entry__" || m.actionCtx.kind == "__port_forwards__" {
+		pfID := m.getPortForwardID(m.actionCtx.columns)
+		if pfID > 0 {
+			m.setStatusMessage("Restarting port forward...", false)
+			return m, m.restartPortForward(pfID)
+		}
+		return m, nil
+	}
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout restart %s %s -n %s --context %s", strings.ToLower(m.actionCtx.kind), name, ns, ctx))
+	m.loading = true
+	return m, m.restartResource()
+}
+
+// executeActionRollback handles the "Rollback" action.
+func (m Model) executeActionRollback() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	if m.actionCtx.kind == "HelmRelease" {
+		m.addLogEntry("DBG", fmt.Sprintf("$ helm history %s -n %s --kube-context %s -o json", name, ns, ctx))
+		return m, m.loadHelmRevisions()
+	}
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout undo deployment %s -n %s --context %s", name, ns, ctx))
+	return m, m.loadRevisions()
+}
+
+// executeActionPortForward handles the "Port Forward" action.
+func (m Model) executeActionPortForward() (tea.Model, tea.Cmd) {
+	m.portForwardInput.Clear()
+	m.pfAvailablePorts = nil
+	m.pfPortCursor = -1
+	m.loading = true
+	m.setStatusMessage("Loading ports...", false)
+	return m, m.loadContainerPorts()
+}
+
+// executeActionDebug handles the "Debug" action.
+func (m Model) executeActionDebug() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl debug %s -it --image=busybox -n %s --context %s", name, ns, ctx))
+	return m, m.execKubectlDebug()
+}
+
+// executeActionEvents handles the "Events" action.
+func (m Model) executeActionEvents() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	m.loading = true
+	m.setStatusMessage("Loading events...", false)
+	m.addLogEntry("DBG", fmt.Sprintf("Loading event timeline for %s/%s in %s", m.actionCtx.kind, name, ns))
+	return m, m.loadEventTimeline()
+}
+
+// executeActionArgo handles Argo-related actions (sync, refresh, workflows, etc.).
+func (m Model) executeActionArgo(actionLabel string) (tea.Model, tea.Cmd) {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
 	rt := m.actionCtx.resourceType
 
 	switch actionLabel {
-	case "Logs":
-		kind := m.actionCtx.kind
-		isGroupResource := kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" ||
-			kind == "Job" || kind == "CronJob" || kind == "Service"
-
-		if isGroupResource && m.actionCtx.containerName == "" {
-			// Save parent resource context for pod/container re-selection from the log viewer.
-			m.logParentKind = m.actionCtx.kind
-			m.logParentName = m.actionCtx.name
-			// Stream all pods at once using label selector (no pod selection step).
-			// The user can still filter pods/containers from the log viewer overlay.
-		}
-
-		if kind != "Pod" && !isGroupResource && m.actionCtx.containerName == "" {
-			m.pendingAction = actionLabel
-			return m, m.loadContainersForAction()
-		}
-
-		// Direct log streaming for pods or when container is already selected.
-		// Reset parent context only for non-group resources so stale values
-		// from a previous session don't leak. Group resources keep their
-		// parent context for the pod/container re-selection overlay.
-		if !isGroupResource {
-			m.logParentKind = ""
-			m.logParentName = ""
-		}
-
-		if m.actionCtx.containerName != "" {
-			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl logs -f %s -c %s -n %s --context %s", name, m.actionCtx.containerName, ns, ctx))
-		} else {
-			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl logs -f %s --all-containers --prefix -n %s --context %s", name, ns, ctx))
-		}
-		// Initialize log viewer state.
-		m.mode = modeLogs
-		m.logLines = nil
-		m.logScroll = 0
-		m.logFollow = true
-		m.logWrap = false
-		m.logLineNumbers = true
-		m.logTimestamps = false
-		m.logPrevious = false
-		m.logIsMulti = false
-		m.logMultiItems = nil
-		m.logContainers = nil
-		// For single-container logs, pre-select that container so the
-		// container selector overlay shows the correct active state.
-		if m.actionCtx.containerName != "" {
-			m.logSelectedContainers = []string{m.actionCtx.containerName}
-		} else {
-			m.logSelectedContainers = nil
-		}
-		m.logTailLines = ui.ConfigLogTailLines
-		m.logHasMoreHistory = true
-		m.logLoadingHistory = false
-		m.logCursor = 0 // will track end as lines stream in with follow mode
-		m.logVisualMode = false
-		m.logVisualStart = 0
-		if m.actionCtx.containerName != "" {
-			m.logTitle = fmt.Sprintf("Logs: %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
-		} else {
-			m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
-		}
-		return m, m.startLogStream()
-	case "Exec":
-		kind := m.actionCtx.kind
-		isParentExec := kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" ||
-			kind == "Job" || kind == "CronJob" || kind == "Service"
-		if isParentExec {
-			m.pendingAction = actionLabel
-			m.loading = true
-			m.setStatusMessage("Loading pods...", false)
-			return m, m.loadPodsForAction()
-		}
-		if m.actionCtx.containerName == "" {
-			m.pendingAction = actionLabel
-			m.loading = true
-			m.setStatusMessage("Loading containers...", false)
-			return m, m.loadContainersForAction()
-		}
-		cArg := ""
-		if m.actionCtx.containerName != "" {
-			cArg = " -c " + m.actionCtx.containerName
-		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl exec -it %s%s -n %s --context %s -- /bin/sh -c 'clear; (bash || ash || sh)'", name, cArg, ns, ctx))
-		return m, m.execKubectlExec()
-	case "Attach":
-		kind := m.actionCtx.kind
-		isParentAttach := kind == "Deployment" || kind == "StatefulSet" || kind == "DaemonSet" ||
-			kind == "Job" || kind == "CronJob" || kind == "Service"
-		if isParentAttach {
-			m.pendingAction = actionLabel
-			m.loading = true
-			m.setStatusMessage("Loading pods...", false)
-			return m, m.loadPodsForAction()
-		}
-		if m.actionCtx.containerName == "" {
-			m.pendingAction = actionLabel
-			m.loading = true
-			m.setStatusMessage("Loading containers...", false)
-			return m, m.loadContainersForAction()
-		}
-		cArg := ""
-		if m.actionCtx.containerName != "" {
-			cArg = " -c " + m.actionCtx.containerName
-		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl attach -it %s%s -n %s --context %s", name, cArg, ns, ctx))
-		return m, m.execKubectlAttach()
-	case "Describe":
-		nsArg := ""
-		if rt.Namespaced {
-			nsArg = " -n " + ns
-		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl describe %s %s%s --context %s", rt.Resource, name, nsArg, ctx))
-		return m, m.execKubectlDescribe()
-	case "Edit":
-		nsArg := ""
-		if rt.Namespaced {
-			nsArg = " -n " + ns
-		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl edit %s %s%s --context %s", rt.Resource, name, nsArg, ctx))
-		return m, m.execKubectlEdit()
-	case "Secret Editor":
-		return m, m.loadSecretData()
-	case "ConfigMap Editor":
-		return m, m.loadConfigMapData()
-	case "Delete":
-		m.confirmAction = m.actionCtx.name
-		m.overlay = overlayConfirm
-		m.pendingAction = "Delete"
-		return m, nil
-	case "Resize":
-		// Extract current PVC size from columns for display in the overlay.
-		m.pvcCurrentSize = ""
-		for _, kv := range m.actionCtx.columns {
-			if kv.Key == "Capacity" || kv.Key == "CAPACITY" {
-				m.pvcCurrentSize = kv.Value
-				break
-			}
-		}
-		m.scaleInput.Clear()
-		m.overlay = overlayPVCResize
-		return m, nil
-	case "Scale":
-		return m.executeActionScale()
-	case "Restart":
-		// Restart a stopped/failed port forward entry.
-		if m.actionCtx.kind == "__port_forward_entry__" || m.actionCtx.kind == "__port_forwards__" {
-			pfID := m.getPortForwardID(m.actionCtx.columns)
-			if pfID > 0 {
-				m.setStatusMessage("Restarting port forward...", false)
-				return m, m.restartPortForward(pfID)
-			}
-			return m, nil
-		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout restart %s %s -n %s --context %s", strings.ToLower(m.actionCtx.kind), name, ns, ctx))
-		m.loading = true
-		return m, m.restartResource()
-	case "Rollback":
-		if m.actionCtx.kind == "HelmRelease" {
-			m.addLogEntry("DBG", fmt.Sprintf("$ helm history %s -n %s --kube-context %s -o json", name, ns, ctx))
-			return m, m.loadHelmRevisions()
-		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout undo deployment %s -n %s --context %s", name, ns, ctx))
-		return m, m.loadRevisions()
-	case "Port Forward":
-		m.portForwardInput.Clear()
-		m.pfAvailablePorts = nil
-		m.pfPortCursor = -1
-		m.loading = true
-		m.setStatusMessage("Loading ports...", false)
-		return m, m.loadContainerPorts()
-	case "Debug":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl debug %s -it --image=busybox -n %s --context %s", name, ns, ctx))
-		return m, m.execKubectlDebug()
-	case "Events":
-		m.loading = true
-		m.setStatusMessage("Loading events...", false)
-		m.addLogEntry("DBG", fmt.Sprintf("Loading event timeline for %s/%s in %s", m.actionCtx.kind, name, ns))
-		return m, m.loadEventTimeline()
 	case "Configure AutoSync":
 		m.addLogEntry("DBG", fmt.Sprintf("Loading autosync config for %s/%s in %s", ns, name, ctx))
 		return m, m.loadAutoSyncConfig()
@@ -551,227 +801,300 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.addLogEntry("DBG", fmt.Sprintf("Resuming cron workflow %s in %s", name, ns))
 		m.loading = true
 		return m, m.resumeCronWorkflow()
-	case "Force Renew":
-		m.addLogEntry("DBG", fmt.Sprintf("Triggering renewal for %s/%s in %s", m.actionCtx.kind, name, ns))
-		m.loading = true
-		return m, m.forceRenewCertificate()
-	case "Force Refresh":
-		m.addLogEntry("DBG", fmt.Sprintf("Force refreshing %s/%s in %s", m.actionCtx.kind, name, ns))
-		m.loading = true
-		return m, m.forceRefreshExternalSecret()
-	case "Pause":
-		m.addLogEntry("DBG", fmt.Sprintf("Pausing %s/%s in %s", m.actionCtx.kind, name, ns))
-		m.loading = true
-		return m, m.pauseKEDAResource()
-	case "Unpause":
-		m.addLogEntry("DBG", fmt.Sprintf("Unpausing %s/%s in %s", m.actionCtx.kind, name, ns))
-		m.loading = true
-		return m, m.unpauseKEDAResource()
-	case "Reconcile":
-		m.addLogEntry("DBG", fmt.Sprintf("Reconciling %s/%s in %s", m.actionCtx.kind, name, ns))
-		m.loading = true
-		return m, m.reconcileFluxResource()
-	case "Suspend":
-		m.addLogEntry("DBG", fmt.Sprintf("Suspending %s/%s in %s", m.actionCtx.kind, name, ns))
-		m.loading = true
-		return m, m.suspendFluxResource()
-	case "Resume":
-		m.addLogEntry("DBG", fmt.Sprintf("Resuming %s/%s in %s", m.actionCtx.kind, name, ns))
-		m.loading = true
-		return m, m.resumeFluxResource()
-	case "Force Delete":
-		nsArg := ""
-		if rt.Namespaced {
-			nsArg = " -n " + ns
-		}
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --grace-period=0 --force%s --context %s", rt.Resource, name, nsArg, ctx))
-		m.loading = true
-		return m, m.forceDeleteResource()
-	case "Force Finalize":
-		m.confirmAction = m.actionCtx.name
-		m.confirmTitle = "Confirm Force Finalize"
-		m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", m.actionCtx.name)
-		m.confirmTypeInput.Clear()
-		m.overlay = overlayConfirmType
-		m.pendingAction = "Force Finalize"
-		return m, nil
-	case "Cordon":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl cordon %s --context %s", name, ctx))
-		m.loading = true
-		return m, m.execKubectlCordon()
-	case "Uncordon":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl uncordon %s --context %s", name, ctx))
-		m.loading = true
-		return m, m.execKubectlUncordon()
-	case "Drain":
-		m.confirmAction = m.actionCtx.name + " (drain)"
-		m.pendingAction = "Drain"
-		m.overlay = overlayConfirm
-		return m, nil
-	case "Taint":
-		m.commandBarActive = true
-		m.commandBarInput.Clear()
-		m.commandBarInput.Insert("taint node " + name + " ")
-		m.commandBarSuggestions = nil
-		m.commandBarSelectedSuggestion = 0
-		return m, nil
-	case "Untaint":
-		// Pre-fill with existing taint keys for convenient removal.
-		prefill := "taint node " + name + " "
-		for _, col := range m.actionCtx.columns {
-			if col.Key == "Taints" && col.Value != "" {
-				// Parse taint strings and append removal syntax (key-).
-				parts := strings.Split(col.Value, ", ")
-				for i, p := range parts {
-					// Extract just the key from key=value:effect or key:effect.
-					taintKey := strings.SplitN(p, "=", 2)[0]
-					taintKey = strings.SplitN(taintKey, ":", 2)[0]
-					if i > 0 {
-						prefill += " "
-					}
-					prefill += taintKey + "-"
-				}
-				break
-			}
-		}
-		m.commandBarActive = true
-		m.commandBarInput.Clear()
-		m.commandBarInput.Insert(prefill)
-		m.commandBarSuggestions = nil
-		m.commandBarSelectedSuggestion = 0
-		return m, nil
-	case "Trigger":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl create job --from=cronjob/%s manual-trigger -n %s --context %s", name, ns, ctx))
-		m.loading = true
-		return m, m.triggerCronJob()
-	case "Shell":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl debug node/%s -it --image=busybox --context %s -- chroot /host /bin/sh", name, ctx))
-		return m, m.execKubectlNodeShell()
-	case "Debug Pod":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run lfk-debug-<id> --image=alpine --rm -it --restart=Never -n %s --context %s -- sh", ns, ctx))
-		return m, m.runDebugPod()
-	case "Go to Pod":
-		var podNames []string
-		for _, kv := range m.actionCtx.columns {
-			if kv.Key == "Used By" && kv.Value != "" {
-				for p := range strings.SplitSeq(kv.Value, ", ") {
-					p = strings.TrimSpace(p)
-					if p != "" {
-						podNames = append(podNames, p)
-					}
-				}
-				break
-			}
-		}
-		if len(podNames) == 0 {
-			m.setStatusMessage("No pods using this PVC", true)
-			return m, scheduleStatusClear()
-		}
-		if len(podNames) == 1 {
-			return m.navigateToOwner("Pod", podNames[0])
-		}
-		var items []model.Item
-		for _, pn := range podNames {
-			items = append(items, model.Item{Name: pn, Namespace: ns})
-		}
-		m.overlayItems = items
-		m.overlay = overlayPodSelect
-		m.overlayCursor = 0
-		m.pendingAction = "Go to Pod"
-		m.logPodFilterText = ""
-		m.logPodFilterActive = false
-		ui.ResetOverlayPodScroll()
-		return m, nil
-	case "Debug Mount":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run debug-pvc --image=alpine -it --rm --restart=Never --overrides='{...pvc:%s...}' -n %s --context %s -- sh", name, ns, ctx))
-		return m, m.runDebugPodWithPVC()
-	case "Open in Browser":
-		if m.actionCtx.kind == "__port_forward_entry__" || m.actionCtx.kind == "__port_forwards__" {
-			var localPort string
-			for _, kv := range m.actionCtx.columns {
-				if kv.Key == "Local" {
-					localPort = kv.Value
-					break
-				}
-			}
-			if localPort != "" {
-				url := "http://localhost:" + localPort
-				m.setStatusMessage("Opening "+url, false)
-				return m, tea.Batch(openInBrowser(url), scheduleStatusClear())
-			}
-			m.setStatusMessage("No local port found", true)
-			return m, scheduleStatusClear()
-		}
-		return m.openIngressInBrowser()
-	case "Values":
-		m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml", name, ns, ctx))
-		m.loading = true
-		return m, m.loadHelmValues(false)
-	case "All Values":
-		m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml --all", name, ns, ctx))
-		m.loading = true
-		return m, m.loadHelmValues(true)
-	case "Edit Values":
-		m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml → $EDITOR → helm upgrade --reuse-values", name, ns, ctx))
-		return m, m.editHelmValues()
-	case "Diff":
-		if m.actionCtx.kind == "HelmRelease" {
-			m.addLogEntry("DBG", fmt.Sprintf("Comparing default vs user values for %s", name))
-			m.loading = true
-			return m, m.helmDiff()
-		}
-		// Non-Helm diff (two-resource YAML diff) is handled via bulk action.
-		return m, nil
-	case "Upgrade":
-		m.addLogEntry("DBG", fmt.Sprintf("$ helm upgrade %s -n %s --kube-context %s", name, ns, ctx))
-		return m, m.helmUpgrade()
-	case "Vuln Scan":
-		return m.executeActionVulnScan()
-	case "Permissions":
-		m.loading = true
-		m.setStatusMessage("Checking RBAC permissions...", false)
-		return m, m.checkRBAC()
-	case "Startup Analysis":
-		m.loading = true
-		m.setStatusMessage("Analyzing pod startup...", false)
-		return m, m.loadPodStartup()
-	case "Alerts":
-		m.loading = true
-		m.setStatusMessage("Loading Prometheus alerts...", false)
-		return m, m.loadAlerts()
-	case "Visualize":
-		return m.executeActionVisualize()
-	case "Labels / Annotations":
-		m.labelResourceType = rt
-		return m, m.loadLabelData()
-	case "Stop":
-		// Stop a port forward entry.
-		if m.actionCtx.kind == "__port_forward_entry__" || m.actionCtx.kind == "__port_forwards__" {
-			pfID := m.getPortForwardID(m.actionCtx.columns)
-			if pfID > 0 {
-				return m, m.stopPortForward(pfID)
-			}
-		}
-		return m, nil
-	case "Remove":
-		// Remove a port forward entry.
-		if m.actionCtx.kind == "__port_forward_entry__" || m.actionCtx.kind == "__port_forwards__" {
-			pfID := m.getPortForwardID(m.actionCtx.columns)
-			if pfID > 0 {
-				m.portForwardMgr.Remove(pfID)
-				m.middleItems = m.portForwardItems()
-				m.clampCursor()
-				m.saveCurrentPortForwards()
-				m.setStatusMessage("Port forward removed", false)
-				return m, scheduleStatusClear()
-			}
-		}
-		return m, nil
-	default:
-		// Check if this is a user-defined custom action.
-		return m.executeActionDefault(actionLabel)
 	}
+	return m, nil
+}
 
+// executeActionSimpleLoading handles actions that log, set loading, and call a command.
+func (m Model) executeActionSimpleLoading(verb string, cmdFn func() tea.Cmd) (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	m.addLogEntry("DBG", fmt.Sprintf("%s %s/%s in %s", verb, m.actionCtx.kind, name, ns))
+	m.loading = true
+	return m, cmdFn()
+}
+
+// executeActionForceDelete handles the "Force Delete" action.
+func (m Model) executeActionForceDelete() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	rt := m.actionCtx.resourceType
+	nsArg := ""
+	if rt.Namespaced {
+		nsArg = " -n " + ns
+	}
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --grace-period=0 --force%s --context %s", rt.Resource, name, nsArg, ctx))
+	m.loading = true
+	return m, m.forceDeleteResource()
+}
+
+// executeActionForceFinalize handles the "Force Finalize" action.
+func (m Model) executeActionForceFinalize() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	m.confirmAction = m.actionCtx.name
+	m.confirmTitle = "Confirm Force Finalize"
+	m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", m.actionCtx.name)
+	m.confirmTypeInput.Clear()
+	m.overlay = overlayConfirmType
+	m.pendingAction = "Force Finalize"
+	return m, nil
+}
+
+// executeActionCordon handles the "Cordon" action.
+func (m Model) executeActionCordon() (tea.Model, tea.Cmd) {
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl cordon %s --context %s", name, ctx))
+	m.loading = true
+	return m, m.execKubectlCordon()
+}
+
+// executeActionUncordon handles the "Uncordon" action.
+func (m Model) executeActionUncordon() (tea.Model, tea.Cmd) {
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl uncordon %s --context %s", name, ctx))
+	m.loading = true
+	return m, m.execKubectlUncordon()
+}
+
+// executeActionDrain handles the "Drain" action.
+func (m Model) executeActionDrain() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	m.confirmAction = m.actionCtx.name + " (drain)"
+	m.pendingAction = "Drain"
+	m.overlay = overlayConfirm
+	return m, nil
+}
+
+// executeActionTaint handles the "Taint" action.
+func (m Model) executeActionTaint() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	name := m.actionCtx.name
+	m.commandBarActive = true
+	m.commandBarInput.Clear()
+	m.commandBarInput.Insert("taint node " + name + " ")
+	m.commandBarSuggestions = nil
+	m.commandBarSelectedSuggestion = 0
+	return m, nil
+}
+
+// executeActionUntaint handles the "Untaint" action.
+func (m Model) executeActionUntaint() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	name := m.actionCtx.name
+	// Pre-fill with existing taint keys for convenient removal.
+	prefill := "taint node " + name + " "
+	for _, col := range m.actionCtx.columns {
+		if col.Key == "Taints" && col.Value != "" {
+			// Parse taint strings and append removal syntax (key-).
+			parts := strings.Split(col.Value, ", ")
+			for i, p := range parts {
+				// Extract just the key from key=value:effect or key:effect.
+				taintKey := strings.SplitN(p, "=", 2)[0]
+				taintKey = strings.SplitN(taintKey, ":", 2)[0]
+				if i > 0 {
+					prefill += " "
+				}
+				prefill += taintKey + "-"
+			}
+			break
+		}
+	}
+	m.commandBarActive = true
+	m.commandBarInput.Clear()
+	m.commandBarInput.Insert(prefill)
+	m.commandBarSuggestions = nil
+	m.commandBarSelectedSuggestion = 0
+	return m, nil
+}
+
+// executeActionTrigger handles the "Trigger" action.
+func (m Model) executeActionTrigger() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl create job --from=cronjob/%s manual-trigger -n %s --context %s", name, ns, ctx))
+	m.loading = true
+	return m, m.triggerCronJob()
+}
+
+// executeActionShell handles the "Shell" action.
+func (m Model) executeActionShell() (tea.Model, tea.Cmd) {
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl debug node/%s -it --image=busybox --context %s -- chroot /host /bin/sh", name, ctx))
+	return m, m.execKubectlNodeShell()
+}
+
+// executeActionDebugPod handles the "Debug Pod" action.
+func (m Model) executeActionDebugPod() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run lfk-debug-<id> --image=alpine --rm -it --restart=Never -n %s --context %s -- sh", ns, ctx))
+	return m, m.runDebugPod()
+}
+
+// executeActionGoToPod handles the "Go to Pod" action.
+func (m Model) executeActionGoToPod() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	var podNames []string
+	for _, kv := range m.actionCtx.columns {
+		if kv.Key == "Used By" && kv.Value != "" {
+			for p := range strings.SplitSeq(kv.Value, ", ") {
+				p = strings.TrimSpace(p)
+				if p != "" {
+					podNames = append(podNames, p)
+				}
+			}
+			break
+		}
+	}
+	if len(podNames) == 0 {
+		m.setStatusMessage("No pods using this PVC", true)
+		return m, scheduleStatusClear()
+	}
+	if len(podNames) == 1 {
+		return m.navigateToOwner("Pod", podNames[0])
+	}
+	var items []model.Item
+	for _, pn := range podNames {
+		items = append(items, model.Item{Name: pn, Namespace: ns})
+	}
+	m.overlayItems = items
+	m.overlay = overlayPodSelect
+	m.overlayCursor = 0
+	m.pendingAction = "Go to Pod"
+	m.logPodFilterText = ""
+	m.logPodFilterActive = false
+	ui.ResetOverlayPodScroll()
+	return m, nil
+}
+
+// executeActionDebugMount handles the "Debug Mount" action.
+func (m Model) executeActionDebugMount() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run debug-pvc --image=alpine -it --rm --restart=Never --overrides='{...pvc:%s...}' -n %s --context %s", name, ns, ctx))
+	return m, m.runDebugPodWithPVC()
+}
+
+// executeActionOpenInBrowser handles the "Open in Browser" action.
+func (m Model) executeActionOpenInBrowser() (tea.Model, tea.Cmd) {
+	if m.actionCtx.kind == "__port_forward_entry__" || m.actionCtx.kind == "__port_forwards__" {
+		var localPort string
+		for _, kv := range m.actionCtx.columns {
+			if kv.Key == "Local" {
+				localPort = kv.Value
+				break
+			}
+		}
+		if localPort != "" {
+			url := "http://localhost:" + localPort
+			m.setStatusMessage("Opening "+url, false)
+			return m, tea.Batch(openInBrowser(url), scheduleStatusClear())
+		}
+		m.setStatusMessage("No local port found", true)
+		return m, scheduleStatusClear()
+	}
+	return m.openIngressInBrowser()
+}
+
+// executeActionHelmValues handles the "Values" and "All Values" actions.
+func (m Model) executeActionHelmValues(all bool) (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	if all {
+		m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml --all", name, ns, ctx))
+	} else {
+		m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml", name, ns, ctx))
+	}
+	m.loading = true
+	return m, m.loadHelmValues(all)
+}
+
+// executeActionEditValues handles the "Edit Values" action.
+func (m Model) executeActionEditValues() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml → $EDITOR → helm upgrade --reuse-values", name, ns, ctx))
+	return m, m.editHelmValues()
+}
+
+// executeActionDiff handles the "Diff" action.
+func (m Model) executeActionDiff() (tea.Model, tea.Cmd) {
+	name := m.actionCtx.name
+	if m.actionCtx.kind == "HelmRelease" {
+		m.addLogEntry("DBG", fmt.Sprintf("Comparing default vs user values for %s", name))
+		m.loading = true
+		return m, m.helmDiff()
+	}
+	// Non-Helm diff (two-resource YAML diff) is handled via bulk action.
+	return m, nil
+}
+
+// executeActionUpgrade handles the "Upgrade" action.
+func (m Model) executeActionUpgrade() (tea.Model, tea.Cmd) {
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	m.addLogEntry("DBG", fmt.Sprintf("$ helm upgrade %s -n %s --kube-context %s", name, ns, ctx))
+	return m, m.helmUpgrade()
+}
+
+// executeActionPermissions handles the "Permissions" action.
+func (m Model) executeActionPermissions() (tea.Model, tea.Cmd) {
+	m.loading = true
+	m.setStatusMessage("Checking RBAC permissions...", false)
+	return m, m.checkRBAC()
+}
+
+// executeActionStartupAnalysis handles the "Startup Analysis" action.
+func (m Model) executeActionStartupAnalysis() (tea.Model, tea.Cmd) {
+	m.loading = true
+	m.setStatusMessage("Analyzing pod startup...", false)
+	return m, m.loadPodStartup()
+}
+
+// executeActionAlerts handles the "Alerts" action.
+func (m Model) executeActionAlerts() (tea.Model, tea.Cmd) {
+	m.loading = true
+	m.setStatusMessage("Loading Prometheus alerts...", false)
+	return m, m.loadAlerts()
+}
+
+// executeActionLabelsAnnotations handles the "Labels / Annotations" action.
+func (m Model) executeActionLabelsAnnotations() (tea.Model, tea.Cmd) {
+	m.labelResourceType = m.actionCtx.resourceType
+	return m, m.loadLabelData()
+}
+
+// executeActionStop handles the "Stop" action.
+func (m Model) executeActionStop() (tea.Model, tea.Cmd) {
+	// Stop a port forward entry.
+	if m.actionCtx.kind == "__port_forward_entry__" || m.actionCtx.kind == "__port_forwards__" {
+		pfID := m.getPortForwardID(m.actionCtx.columns)
+		if pfID > 0 {
+			return m, m.stopPortForward(pfID)
+		}
+	}
+	return m, nil
+}
+
+// executeActionRemove handles the "Remove" action.
+func (m Model) executeActionRemove() (tea.Model, tea.Cmd) {
+	// Remove a port forward entry.
+	if m.actionCtx.kind == "__port_forward_entry__" || m.actionCtx.kind == "__port_forwards__" {
+		pfID := m.getPortForwardID(m.actionCtx.columns)
+		if pfID > 0 {
+			m.portForwardMgr.Remove(pfID)
+			m.middleItems = m.portForwardItems()
+			m.clampCursor()
+			m.saveCurrentPortForwards()
+			m.setStatusMessage("Port forward removed", false)
+			return m, scheduleStatusClear()
+		}
+	}
 	return m, nil
 }
 

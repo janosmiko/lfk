@@ -43,232 +43,257 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.updateWindowSize(msg)
-
 	case tea.MouseMsg:
 		return m.handleMouse(msg)
-
 	case tea.KeyMsg:
 		return m.handleKey(msg)
-
 	case spinner.TickMsg:
 		return m.updateTick(msg)
-
-	case contextsLoadedMsg:
-		return m.updateContextsLoaded(msg)
-
-	case resourceTypesMsg:
-		return m.updateResourceTypes(msg)
-
-	case crdDiscoveryMsg:
-		return m.updateCrdDiscovery(msg)
-
-	case resourcesLoadedMsg:
-		return m.updateResourcesLoaded(msg)
-
-	case ownedLoadedMsg:
-		return m.updateOwnedLoaded(msg)
-
-	case resourceTreeLoadedMsg:
-		return m.updateResourceTreeLoaded(msg)
-
-	case containersLoadedMsg:
-		return m.updateContainersLoaded(msg)
-
-	case namespacesLoadedMsg:
-		return m.updateNamespacesLoaded(msg)
-
-	case yamlLoadedMsg:
-		return m.updateYamlLoaded(msg)
-
-	case previewYAMLLoadedMsg:
-		return m.updatePreviewYAMLLoaded(msg)
-
-	case actionResultMsg:
-		return m.updateActionResult(msg)
-
-	case containerPortsLoadedMsg:
-		return m.updateContainerPortsLoaded(msg)
-
-	case portForwardStartedMsg:
-		return m.updatePortForwardStarted(msg)
-
-	case portForwardStoppedMsg:
-		return m.updatePortForwardStopped(msg)
-
-	case portForwardUpdateMsg:
-		// Port forward state changed (e.g., port resolved, process exited).
-		return m.updatePortForwardUpdate(msg)
-
-	case commandBarResultMsg:
-		return m.updateCommandBarResult(msg)
-
-	case triggerCronJobMsg:
-		return m.updateTriggerCronJob(msg)
-
-	case bulkActionResultMsg:
-		return m.updateBulkActionResult(msg)
-
-	case finalizerSearchResultMsg:
-		return m.updateFinalizerSearchResult(msg)
-
-	case finalizerRemoveResultMsg:
-		return m.updateFinalizerRemoveResult(msg)
-
 	case stderrCapturedMsg:
-		// Show captured stderr output (e.g., AWS SSO errors) in the status bar
-		// and error log. Continue listening for more messages.
 		m.setStatusMessage("stderr: "+msg.message, true)
 		return m, tea.Batch(scheduleStatusClear(), m.waitForStderr())
-
-	case statusMessageExpiredMsg:
-		return m.updateStatusMessageExpired(msg)
-
-	case startupTipMsg:
-		return m.updateStartupTip(msg)
-
-	case watchTickMsg:
-		return m.updateWatchTick(msg)
-
-	case podSelectMsg:
-		return m.updatePodSelect(msg)
-
-	case podLogSelectMsg:
-		return m.updatePodLogSelect(msg)
-
-	case containerSelectMsg:
-		return m.updateContainerSelect(msg)
-
-	case yamlClipboardMsg:
-		return m.updateYamlClipboard(msg)
-
-	case eventTimelineMsg:
-		return m.updateEventTimeline(msg)
-
-	case rbacCheckMsg:
-		return m.updateRbacCheck(msg)
-
-	case canILoadedMsg:
-		return m.updateCanILoaded(msg)
-
-	case canISAListMsg:
-		return m.updateCanISAList(msg)
-
-	case podStartupMsg:
-		return m.updatePodStartup(msg)
-
-	case quotaLoadedMsg:
-		return m.updateQuotaLoaded(msg)
-
-	case alertsLoadedMsg:
-		return m.updateAlertsLoaded(msg)
-
-	case netpolLoadedMsg:
-		return m.updateNetpolLoaded(msg)
-
-	case describeLoadedMsg:
-		return m.updateDescribeLoaded(msg)
-
-	case describeRefreshTickMsg:
-		return m.updateDescribeRefreshTick(msg)
-
-	case helmValuesLoadedMsg:
-		return m.updateHelmValuesLoaded(msg)
-
-	case diffLoadedMsg:
-		return m.updateDiffLoaded(msg)
-
-	case explainLoadedMsg:
-		return m.updateExplainLoaded(msg)
-
-	case explainRecursiveMsg:
-		return m.updateExplainRecursive(msg)
-
-	case logContainersLoadedMsg:
-		return m.updateLogContainersLoaded(msg)
-
-	case metricsLoadedMsg:
-		return m.updateMetricsLoaded(msg)
-
-	case previewEventsLoadedMsg:
-		return m.updatePreviewEventsLoaded(msg)
-
-	case podMetricsEnrichedMsg:
-		return m.updatePodMetricsEnriched(msg)
-
-	case nodeMetricsEnrichedMsg:
-		return m.updateNodeMetricsEnriched(msg)
-
-	case secretDataLoadedMsg:
-		return m.updateSecretDataLoaded(msg)
-
-	case dashboardLoadedMsg:
-		return m.updateDashboardLoaded(msg)
-
-	case monitoringDashboardMsg:
-		return m.updateMonitoringDashboard(msg)
-
-	case secretSavedMsg:
-		return m.updateSecretSaved(msg)
-
-	case configMapDataLoadedMsg:
-		return m.updateConfigMapDataLoaded(msg)
-
-	case configMapSavedMsg:
-		return m.updateConfigMapSaved(msg)
-
-	case labelDataLoadedMsg:
-		return m.updateLabelDataLoaded(msg)
-
-	case labelSavedMsg:
-		return m.updateLabelSaved(msg)
-
-	case autoSyncLoadedMsg:
-		return m.updateAutoSyncLoaded(msg)
-
-	case autoSyncSavedMsg:
-		return m.updateAutoSyncSaved(msg)
-
-	case exportDoneMsg:
-		return m.updateExportDone(msg)
-
-	case revisionListMsg:
-		return m.updateRevisionList(msg)
-
-	case rollbackDoneMsg:
-		return m.updateRollbackDone(msg)
-
-	case helmRevisionListMsg:
-		return m.updateHelmRevisionList(msg)
-
-	case helmRollbackDoneMsg:
-		return m.updateHelmRollbackDone(msg)
-
-	case templateApplyMsg:
-		// Editor closed; only apply if the file was actually saved (modified).
-		return m.updateTemplateApply(msg)
-
-	case execPTYTickMsg:
-		// Only tick if this belongs to the current tab's PTY.
-		return m.updateExecPTYTick(msg)
-
-	case execPTYExitMsg:
-		return m.updateExecPTYExit(msg)
-
-	case execPTYStartMsg:
-		return m.updateExecPTYStart(msg)
-
-	case logLineMsg:
-		// Check if this message belongs to the current tab's log channel.
-		return m.updateLogLine(msg)
-
-	case logHistoryMsg:
-		return m.updateLogHistory(msg)
-
-	case logSaveAllMsg:
-		return m.updateLogSaveAll(msg)
+	default:
+		if mdl, cmd, ok := m.updateResourceMsg(msg); ok {
+			return mdl, cmd
+		}
+		if mdl, cmd, ok := m.updateResultMsg(msg); ok {
+			return mdl, cmd
+		}
 	}
-
 	return m, nil
+}
+
+// updateResourceMsg handles resource-loading and navigation-related messages.
+func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case contextsLoadedMsg:
+		mdl, cmd := m.updateContextsLoaded(msg)
+		return mdl, cmd, true
+	case resourceTypesMsg:
+		mdl, cmd := m.updateResourceTypes(msg)
+		return mdl, cmd, true
+	case crdDiscoveryMsg:
+		mdl, cmd := m.updateCrdDiscovery(msg)
+		return mdl, cmd, true
+	case resourcesLoadedMsg:
+		mdl, cmd := m.updateResourcesLoaded(msg)
+		return mdl, cmd, true
+	case ownedLoadedMsg:
+		mdl, cmd := m.updateOwnedLoaded(msg)
+		return mdl, cmd, true
+	case resourceTreeLoadedMsg:
+		mdl, cmd := m.updateResourceTreeLoaded(msg)
+		return mdl, cmd, true
+	case containersLoadedMsg:
+		mdl, cmd := m.updateContainersLoaded(msg)
+		return mdl, cmd, true
+	case namespacesLoadedMsg:
+		mdl, cmd := m.updateNamespacesLoaded(msg)
+		return mdl, cmd, true
+	case yamlLoadedMsg:
+		mdl, cmd := m.updateYamlLoaded(msg)
+		return mdl, cmd, true
+	case previewYAMLLoadedMsg:
+		mdl, cmd := m.updatePreviewYAMLLoaded(msg)
+		return mdl, cmd, true
+	case containerPortsLoadedMsg:
+		mdl, cmd := m.updateContainerPortsLoaded(msg)
+		return mdl, cmd, true
+	case portForwardStartedMsg:
+		mdl, cmd := m.updatePortForwardStarted(msg)
+		return mdl, cmd, true
+	case portForwardStoppedMsg:
+		mdl, cmd := m.updatePortForwardStopped(msg)
+		return mdl, cmd, true
+	case portForwardUpdateMsg:
+		mdl, cmd := m.updatePortForwardUpdate(msg)
+		return mdl, cmd, true
+	case statusMessageExpiredMsg:
+		mdl, cmd := m.updateStatusMessageExpired(msg)
+		return mdl, cmd, true
+	case startupTipMsg:
+		mdl, cmd := m.updateStartupTip(msg)
+		return mdl, cmd, true
+	case watchTickMsg:
+		mdl, cmd := m.updateWatchTick(msg)
+		return mdl, cmd, true
+	case podSelectMsg:
+		mdl, cmd := m.updatePodSelect(msg)
+		return mdl, cmd, true
+	case podLogSelectMsg:
+		mdl, cmd := m.updatePodLogSelect(msg)
+		return mdl, cmd, true
+	case containerSelectMsg:
+		mdl, cmd := m.updateContainerSelect(msg)
+		return mdl, cmd, true
+	case eventTimelineMsg:
+		mdl, cmd := m.updateEventTimeline(msg)
+		return mdl, cmd, true
+	case metricsLoadedMsg:
+		mdl, cmd := m.updateMetricsLoaded(msg)
+		return mdl, cmd, true
+	case previewEventsLoadedMsg:
+		mdl, cmd := m.updatePreviewEventsLoaded(msg)
+		return mdl, cmd, true
+	case podMetricsEnrichedMsg:
+		mdl, cmd := m.updatePodMetricsEnriched(msg)
+		return mdl, cmd, true
+	case nodeMetricsEnrichedMsg:
+		mdl, cmd := m.updateNodeMetricsEnriched(msg)
+		return mdl, cmd, true
+	case dashboardLoadedMsg:
+		mdl, cmd := m.updateDashboardLoaded(msg)
+		return mdl, cmd, true
+	case monitoringDashboardMsg:
+		mdl, cmd := m.updateMonitoringDashboard(msg)
+		return mdl, cmd, true
+	case logContainersLoadedMsg:
+		mdl, cmd := m.updateLogContainersLoaded(msg)
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+// updateResultMsg handles action results, editor operations, and other response messages.
+func (m Model) updateResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	if mdl, cmd, ok := m.updateActionResultMsg(msg); ok {
+		return mdl, cmd, true
+	}
+	return m.updateEditorResultMsg(msg)
+}
+
+// updateActionResultMsg handles action and command result messages.
+func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case actionResultMsg:
+		mdl, cmd := m.updateActionResult(msg)
+		return mdl, cmd, true
+	case commandBarResultMsg:
+		mdl, cmd := m.updateCommandBarResult(msg)
+		return mdl, cmd, true
+	case triggerCronJobMsg:
+		mdl, cmd := m.updateTriggerCronJob(msg)
+		return mdl, cmd, true
+	case bulkActionResultMsg:
+		mdl, cmd := m.updateBulkActionResult(msg)
+		return mdl, cmd, true
+	case finalizerSearchResultMsg:
+		mdl, cmd := m.updateFinalizerSearchResult(msg)
+		return mdl, cmd, true
+	case finalizerRemoveResultMsg:
+		mdl, cmd := m.updateFinalizerRemoveResult(msg)
+		return mdl, cmd, true
+	case yamlClipboardMsg:
+		mdl, cmd := m.updateYamlClipboard(msg)
+		return mdl, cmd, true
+	case rbacCheckMsg:
+		mdl, cmd := m.updateRbacCheck(msg)
+		return mdl, cmd, true
+	case canILoadedMsg:
+		mdl, cmd := m.updateCanILoaded(msg)
+		return mdl, cmd, true
+	case canISAListMsg:
+		mdl, cmd := m.updateCanISAList(msg)
+		return mdl, cmd, true
+	case podStartupMsg:
+		mdl, cmd := m.updatePodStartup(msg)
+		return mdl, cmd, true
+	case quotaLoadedMsg:
+		mdl, cmd := m.updateQuotaLoaded(msg)
+		return mdl, cmd, true
+	case alertsLoadedMsg:
+		mdl, cmd := m.updateAlertsLoaded(msg)
+		return mdl, cmd, true
+	case netpolLoadedMsg:
+		mdl, cmd := m.updateNetpolLoaded(msg)
+		return mdl, cmd, true
+	case describeLoadedMsg:
+		mdl, cmd := m.updateDescribeLoaded(msg)
+		return mdl, cmd, true
+	case describeRefreshTickMsg:
+		mdl, cmd := m.updateDescribeRefreshTick(msg)
+		return mdl, cmd, true
+	case helmValuesLoadedMsg:
+		mdl, cmd := m.updateHelmValuesLoaded(msg)
+		return mdl, cmd, true
+	case diffLoadedMsg:
+		mdl, cmd := m.updateDiffLoaded(msg)
+		return mdl, cmd, true
+	case explainLoadedMsg:
+		mdl, cmd := m.updateExplainLoaded(msg)
+		return mdl, cmd, true
+	case explainRecursiveMsg:
+		mdl, cmd := m.updateExplainRecursive(msg)
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+// updateEditorResultMsg handles editor, revision, export, and exec-related messages.
+func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case secretDataLoadedMsg:
+		mdl, cmd := m.updateSecretDataLoaded(msg)
+		return mdl, cmd, true
+	case secretSavedMsg:
+		mdl, cmd := m.updateSecretSaved(msg)
+		return mdl, cmd, true
+	case configMapDataLoadedMsg:
+		mdl, cmd := m.updateConfigMapDataLoaded(msg)
+		return mdl, cmd, true
+	case configMapSavedMsg:
+		mdl, cmd := m.updateConfigMapSaved(msg)
+		return mdl, cmd, true
+	case labelDataLoadedMsg:
+		mdl, cmd := m.updateLabelDataLoaded(msg)
+		return mdl, cmd, true
+	case labelSavedMsg:
+		mdl, cmd := m.updateLabelSaved(msg)
+		return mdl, cmd, true
+	case autoSyncLoadedMsg:
+		mdl, cmd := m.updateAutoSyncLoaded(msg)
+		return mdl, cmd, true
+	case autoSyncSavedMsg:
+		mdl, cmd := m.updateAutoSyncSaved(msg)
+		return mdl, cmd, true
+	case exportDoneMsg:
+		mdl, cmd := m.updateExportDone(msg)
+		return mdl, cmd, true
+	case revisionListMsg:
+		mdl, cmd := m.updateRevisionList(msg)
+		return mdl, cmd, true
+	case rollbackDoneMsg:
+		mdl, cmd := m.updateRollbackDone(msg)
+		return mdl, cmd, true
+	case helmRevisionListMsg:
+		mdl, cmd := m.updateHelmRevisionList(msg)
+		return mdl, cmd, true
+	case helmRollbackDoneMsg:
+		mdl, cmd := m.updateHelmRollbackDone(msg)
+		return mdl, cmd, true
+	case templateApplyMsg:
+		mdl, cmd := m.updateTemplateApply(msg)
+		return mdl, cmd, true
+	case execPTYTickMsg:
+		mdl, cmd := m.updateExecPTYTick(msg)
+		return mdl, cmd, true
+	case execPTYExitMsg:
+		mdl, cmd := m.updateExecPTYExit(msg)
+		return mdl, cmd, true
+	case execPTYStartMsg:
+		mdl, cmd := m.updateExecPTYStart(msg)
+		return mdl, cmd, true
+	case logLineMsg:
+		mdl, cmd := m.updateLogLine(msg)
+		return mdl, cmd, true
+	case logHistoryMsg:
+		mdl, cmd := m.updateLogHistory(msg)
+		return mdl, cmd, true
+	case logSaveAllMsg:
+		mdl, cmd := m.updateLogSaveAll(msg)
+		return mdl, cmd, true
+	}
+	return m, nil, false
 }
 
 func (m Model) updateWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
