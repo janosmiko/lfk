@@ -568,7 +568,7 @@ func (m *Model) maybeLoadMoreHistory() tea.Cmd {
 // saveLoadedLogs writes the currently buffered log lines to a file under /tmp.
 func (m *Model) saveLoadedLogs() (string, error) {
 	name := sanitizeFilename(m.actionCtx.name)
-	path := fmt.Sprintf("/tmp/lfk-logs-%s-%d.log", name, time.Now().Unix())
+	path := fmt.Sprintf("%s/lfk-logs-%s-%d.log", os.TempDir(), name, time.Now().Unix())
 	content := strings.Join(m.logLines, "\n") + "\n"
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return "", err
