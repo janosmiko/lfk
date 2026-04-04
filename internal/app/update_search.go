@@ -394,43 +394,13 @@ func (m *Model) searchAllItemsFind(allItems []model.Item, queries []string, star
 func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle paste events.
 	if msg.Paste {
-		text := strings.TrimRight(string(msg.Runes), "\n")
-		if strings.Contains(text, "\n") {
-			m.triggerPasteConfirm(text, pasteTargetCommandBar)
-			return m, nil
-		}
-		if text != "" {
-			m.commandBarInput.Insert(text)
-		}
-		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
-		m.commandBarSelectedSuggestion = 0
-		return m, nil
+		return m.handleCommandBarPaste(msg)
 	}
 	switch msg.String() {
-	case "esc":
-		m.commandBarActive = false
-		m.commandBarInput.Clear()
-		m.commandBarSuggestions = nil
-		m.commandBarSelectedSuggestion = 0
-		return m, nil
+	case "esc", "ctrl+c":
+		return m.commandBarClose(), nil
 	case "enter":
-		m.commandBarActive = false
-		input := m.commandBarInput.Value
-		m.commandBarInput.Clear()
-		m.commandBarSuggestions = nil
-		m.commandBarSelectedSuggestion = 0
-		trimmed := strings.TrimSpace(input)
-		if trimmed == "" {
-			return m, nil
-		}
-		// Record command in persistent history.
-		m.commandHistory.add(trimmed)
-		m.commandHistory.save()
-		// Handle built-in commands.
-		if trimmed == "q" || trimmed == "q!" || trimmed == "quit" {
-			return m, tea.Quit
-		}
-		return m, m.executeCommandBar(input)
+		return m.commandBarSubmit()
 	case "up":
 		m.commandBarInput.Set(m.commandHistory.up(m.commandBarInput.Value))
 		return m, nil
@@ -438,39 +408,20 @@ func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.commandBarInput.Set(m.commandHistory.down())
 		return m, nil
 	case "tab":
-		if len(m.commandBarSuggestions) > 0 {
-			// Accept the currently selected suggestion into the input.
-			suggestion := m.commandBarSuggestions[m.commandBarSelectedSuggestion]
-			m.commandBarInput.Set(m.commandBarApplySuggestion(suggestion))
-			m.commandBarSuggestions = nil
-			m.commandBarSelectedSuggestion = 0
-			// Regenerate suggestions for the new input state.
-			m.commandBarSuggestions = m.commandBarGenerateSuggestions()
-		}
-		return m, nil
+		return m.commandBarAcceptSuggestion(), nil
 	case "shift+tab":
-		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarSelectedSuggestion--
-			if m.commandBarSelectedSuggestion < 0 {
-				m.commandBarSelectedSuggestion = len(m.commandBarSuggestions) - 1
-			}
-		}
+		m.commandBarCycleSuggestion(-1)
 		return m, nil
 	case "right":
-		// Cycle forward through suggestions, or move cursor if no suggestions.
 		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarSelectedSuggestion = (m.commandBarSelectedSuggestion + 1) % len(m.commandBarSuggestions)
+			m.commandBarCycleSuggestion(1)
 		} else {
 			m.commandBarInput.Right()
 		}
 		return m, nil
 	case "left":
-		// Cycle backward through suggestions, or move cursor if no suggestions.
 		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarSelectedSuggestion--
-			if m.commandBarSelectedSuggestion < 0 {
-				m.commandBarSelectedSuggestion = len(m.commandBarSuggestions) - 1
-			}
+			m.commandBarCycleSuggestion(-1)
 		} else {
 			m.commandBarInput.Left()
 		}
@@ -485,38 +436,84 @@ func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.commandBarInput.Value) > 0 {
 			m.commandBarInput.Backspace()
 		}
-		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
-		m.commandBarSelectedSuggestion = 0
-		return m, nil
+		return m.commandBarRefreshSuggestions(), nil
 	case "ctrl+w":
-		// Delete word backwards.
 		m.commandBarInput.DeleteWord()
-		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
-		m.commandBarSelectedSuggestion = 0
-		return m, nil
+		return m.commandBarRefreshSuggestions(), nil
 	case "ctrl+u":
-		// Delete line before cursor.
 		m.commandBarInput.DeleteLine()
-		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
-		m.commandBarSelectedSuggestion = 0
-		return m, nil
-	case "ctrl+c":
-		m.commandBarActive = false
-		m.commandBarInput.Clear()
-		m.commandBarSuggestions = nil
-		m.commandBarSelectedSuggestion = 0
-		return m, nil
+		return m.commandBarRefreshSuggestions(), nil
 	default:
 		key := msg.String()
 		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
 			m.commandBarInput.Insert(key)
-		} else if key == " " {
-			m.commandBarInput.Insert(" ")
 		}
-		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
-		m.commandBarSelectedSuggestion = 0
+		return m.commandBarRefreshSuggestions(), nil
+	}
+}
+
+func (m Model) handleCommandBarPaste(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	text := strings.TrimRight(string(msg.Runes), "\n")
+	if strings.Contains(text, "\n") {
+		m.triggerPasteConfirm(text, pasteTargetCommandBar)
 		return m, nil
 	}
+	if text != "" {
+		m.commandBarInput.Insert(text)
+	}
+	return m.commandBarRefreshSuggestions(), nil
+}
+
+func (m Model) commandBarClose() Model {
+	m.commandBarActive = false
+	m.commandBarInput.Clear()
+	m.commandBarSuggestions = nil
+	m.commandBarSelectedSuggestion = 0
+	return m
+}
+
+func (m Model) commandBarSubmit() (tea.Model, tea.Cmd) {
+	m.commandBarActive = false
+	input := m.commandBarInput.Value
+	m.commandBarInput.Clear()
+	m.commandBarSuggestions = nil
+	m.commandBarSelectedSuggestion = 0
+	trimmed := strings.TrimSpace(input)
+	if trimmed == "" {
+		return m, nil
+	}
+	m.commandHistory.add(trimmed)
+	m.commandHistory.save()
+	if trimmed == "q" || trimmed == "q!" || trimmed == "quit" {
+		return m, tea.Quit
+	}
+	return m, m.executeCommandBar(input)
+}
+
+func (m Model) commandBarAcceptSuggestion() Model {
+	if len(m.commandBarSuggestions) > 0 {
+		suggestion := m.commandBarSuggestions[m.commandBarSelectedSuggestion]
+		m.commandBarInput.Set(m.commandBarApplySuggestion(suggestion))
+		m.commandBarSuggestions = nil
+		m.commandBarSelectedSuggestion = 0
+		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
+	}
+	return m
+}
+
+func (m *Model) commandBarCycleSuggestion(delta int) {
+	if len(m.commandBarSuggestions) == 0 {
+		return
+	}
+	m.commandBarSelectedSuggestion += delta
+	n := len(m.commandBarSuggestions)
+	m.commandBarSelectedSuggestion = ((m.commandBarSelectedSuggestion % n) + n) % n
+}
+
+func (m Model) commandBarRefreshSuggestions() Model {
+	m.commandBarSuggestions = m.commandBarGenerateSuggestions()
+	m.commandBarSelectedSuggestion = 0
+	return m
 }
 
 // commandBarApplySuggestion replaces the current partial word in the input
