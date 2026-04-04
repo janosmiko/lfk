@@ -40,6 +40,15 @@ func (t *TextInput) DeleteWord() {
 	t.Cursor = i + 1
 }
 
+// DeleteLine deletes everything before the cursor (Unix ctrl+u behavior).
+func (t *TextInput) DeleteLine() {
+	if t.Cursor == 0 {
+		return
+	}
+	t.Value = t.Value[t.Cursor:]
+	t.Cursor = 0
+}
+
 // Home moves the cursor to the beginning of the input.
 func (t *TextInput) Home() {
 	t.Cursor = 0

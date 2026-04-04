@@ -46,6 +46,7 @@ type FilterInput interface {
 	Insert(s string)
 	Backspace()
 	DeleteWord()
+	DeleteLine()
 	Home()
 	End()
 	Left()
@@ -67,11 +68,12 @@ type stringFilterInput struct {
 // Verify stringFilterInput satisfies FilterInput at compile time.
 var _ FilterInput = (*stringFilterInput)(nil)
 
-func (s *stringFilterInput) Clear() { *s.ptr = "" }
-func (s *stringFilterInput) Home()  {} // no-op: raw string has no cursor
-func (s *stringFilterInput) End()   {} // no-op: raw string has no cursor
-func (s *stringFilterInput) Left()  {} // no-op: raw string has no cursor
-func (s *stringFilterInput) Right() {} // no-op: raw string has no cursor
+func (s *stringFilterInput) Clear()      { *s.ptr = "" }
+func (s *stringFilterInput) DeleteLine() { *s.ptr = "" } // no cursor: clears all
+func (s *stringFilterInput) Home()       {}              // no-op: raw string has no cursor
+func (s *stringFilterInput) End()        {}              // no-op: raw string has no cursor
+func (s *stringFilterInput) Left()       {}              // no-op: raw string has no cursor
+func (s *stringFilterInput) Right()      {}              // no-op: raw string has no cursor
 
 func (s *stringFilterInput) Insert(ch string) {
 	*s.ptr += ch
@@ -144,6 +146,9 @@ func handleFilterKey(input FilterInput, key string) filterAction {
 		return filterContinue
 	case "ctrl+w":
 		input.DeleteWord()
+		return filterContinue
+	case "ctrl+u":
+		input.DeleteLine()
 		return filterContinue
 	case "ctrl+a":
 		input.Home()

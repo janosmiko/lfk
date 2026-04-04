@@ -129,6 +129,12 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setCursor(0)
 		m.clampCursor()
 		return m, nil
+	case "ctrl+u":
+		m.filterInput.DeleteLine()
+		m.filterText = m.filterInput.Value
+		m.setCursor(0)
+		m.clampCursor()
+		return m, nil
 	case "ctrl+a":
 		m.filterInput.Home()
 		return m, nil
@@ -189,6 +195,10 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "ctrl+w":
 		m.searchInput.DeleteWord()
+		m.jumpToSearchMatch(0)
+		return m, nil
+	case "ctrl+u":
+		m.searchInput.DeleteLine()
 		m.jumpToSearchMatch(0)
 		return m, nil
 	case "ctrl+a":
@@ -481,6 +491,12 @@ func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+w":
 		// Delete word backwards.
 		m.commandBarInput.DeleteWord()
+		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
+		m.commandBarSelectedSuggestion = 0
+		return m, nil
+	case "ctrl+u":
+		// Delete line before cursor.
+		m.commandBarInput.DeleteLine()
 		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
 		m.commandBarSelectedSuggestion = 0
 		return m, nil

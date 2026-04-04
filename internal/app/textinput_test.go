@@ -331,3 +331,42 @@ func TestCovTextInputCursorRight(t *testing.T) {
 	ti := TextInput{Value: "hello", Cursor: 3}
 	assert.Equal(t, "lo", ti.CursorRight())
 }
+
+func TestTextInput_DeleteLine(t *testing.T) {
+	tests := []struct {
+		name       string
+		value      string
+		cursor     int
+		wantValue  string
+		wantCursor int
+	}{
+		{"empty", "", 0, "", 0},
+		{"at start", "hello", 0, "hello", 0},
+		{"mid word", "hello world", 5, " world", 0},
+		{"at end", "hello", 5, "", 0},
+		{"one char in", "hello", 1, "ello", 0},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ti := TextInput{Value: tt.value, Cursor: tt.cursor}
+			ti.DeleteLine()
+			assert.Equal(t, tt.wantValue, ti.Value)
+			assert.Equal(t, tt.wantCursor, ti.Cursor)
+		})
+	}
+}
+
+func TestHandleFilterKeyCtrlU(t *testing.T) {
+	ti := &TextInput{Value: "hello world", Cursor: 5}
+	action := handleFilterKey(ti, "ctrl+u")
+	assert.Equal(t, filterContinue, action)
+	assert.Equal(t, " world", ti.Value)
+	assert.Equal(t, 0, ti.Cursor)
+}
+
+func TestStringFilterInput_DeleteLine(t *testing.T) {
+	s := "hello world"
+	sfi := &stringFilterInput{ptr: &s}
+	sfi.DeleteLine()
+	assert.Equal(t, "", s)
+}
