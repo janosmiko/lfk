@@ -133,6 +133,18 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		switch handlePastedText(&m.overlayFilter, msg.Runes) {
+		case filterContinue:
+			m.overlayCursor = 0
+			return m, nil
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), &m.overlayFilter)
+			return m, nil
+		}
+		return m, nil
+	}
 	switch handleFilterKey(&m.overlayFilter, msg.String()) {
 	case filterEscape:
 		m.nsFilterMode = false
@@ -220,6 +232,18 @@ func (m Model) handleTemplateOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleTemplateFilterMode handles keys when the template overlay is in filter input mode.
 func (m Model) handleTemplateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		switch handlePastedText(&m.templateFilter, msg.Runes) {
+		case filterContinue:
+			m.templateCursor = 0
+			return m, nil
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), &m.templateFilter)
+			return m, nil
+		}
+		return m, nil
+	}
 	switch handleFilterKey(&m.templateFilter, msg.String()) {
 	case filterEscape:
 		m.templateSearchMode = false
@@ -464,6 +488,20 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		switch handlePastedText(&m.schemeFilter, msg.Runes) {
+		case filterContinue:
+			m.schemeCursor = 0
+			ui.ResetOverlaySchemeScroll()
+			m.previewSchemeAtCursor(m.filteredSchemeNames())
+			return m, nil
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), &m.schemeFilter)
+			return m, nil
+		}
+		return m, nil
+	}
 	switch handleFilterKey(&m.schemeFilter, msg.String()) {
 	case filterEscape:
 		m.schemeFilterMode = false

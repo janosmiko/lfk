@@ -275,6 +275,20 @@ func RenderQuitConfirmOverlay() string {
 	return b.String()
 }
 
+// RenderPasteConfirmOverlay renders the multiline paste confirmation overlay.
+// lineCount is the number of lines in the pasted text.
+func RenderPasteConfirmOverlay(lineCount int) string {
+	var b strings.Builder
+	b.WriteString(OverlayTitleStyle.Render("Paste"))
+	b.WriteString("\n\n")
+	b.WriteString(OverlayNormalStyle.Render(fmt.Sprintf("Paste contains %d lines.", lineCount)))
+	b.WriteString("\n")
+	b.WriteString(OverlayNormalStyle.Render("Flatten to single line and insert?"))
+	b.WriteString("\n\n")
+	b.WriteString(OverlayDimStyle.Render("[y] yes  [n] no"))
+	return b.String()
+}
+
 // RenderConfirmTypeOverlay renders the type-to-confirm overlay content.
 // The user must type "DELETE" to confirm the action.
 // title is the overlay header (e.g. "Confirm Delete"), question is the

@@ -139,9 +139,20 @@ func TestHandleFilterKeyInsertCharMidString(t *testing.T) {
 // --- handleFilterKey: non-printable unhandled ---
 
 func TestHandleFilterKeyUnhandled(t *testing.T) {
+	// Multi-char key names like "tab" are ignored by handleFilterKey.
+	// Paste events are handled separately via handlePastedText.
 	ti := &TextInput{Value: "test", Cursor: 4}
 	action := handleFilterKey(ti, "tab")
 	assert.Equal(t, filterIgnored, action)
+	assert.Equal(t, "test", ti.Value)
+}
+
+func TestHandleFilterKeyUnhandledControlChar(t *testing.T) {
+	// Single non-printable byte (e.g. raw control char) is ignored.
+	ti := &TextInput{Value: "test", Cursor: 4}
+	action := handleFilterKey(ti, "\x01")
+	assert.Equal(t, filterIgnored, action)
+	assert.Equal(t, "test", ti.Value)
 }
 
 // --- stringFilterInput adapter ---
@@ -744,6 +755,42 @@ func TestCovStringFilterInput(t *testing.T) {
 	fi.End()
 	fi.Left()
 	fi.Right()
+}
+
+// --- handlePastedText ---
+
+func TestHandlePastedTextSingleLine(t *testing.T) {
+	ti := &TextInput{Value: "", Cursor: 0}
+	action := handlePastedText(ti, []rune("hello world"))
+	assert.Equal(t, filterContinue, action)
+	assert.Equal(t, "hello world", ti.Value)
+}
+
+func TestHandlePastedTextTrailingNewline(t *testing.T) {
+	ti := &TextInput{Value: "", Cursor: 0}
+	action := handlePastedText(ti, []rune("hello\n"))
+	assert.Equal(t, filterContinue, action)
+	assert.Equal(t, "hello", ti.Value)
+}
+
+func TestHandlePastedTextMultiline(t *testing.T) {
+	ti := &TextInput{Value: "", Cursor: 0}
+	action := handlePastedText(ti, []rune("line1\nline2"))
+	assert.Equal(t, filterPasteMultiline, action)
+	assert.Equal(t, "", ti.Value) // not inserted yet
+}
+
+func TestHandlePastedTextEmpty(t *testing.T) {
+	ti := &TextInput{Value: "pre", Cursor: 3}
+	action := handlePastedText(ti, []rune(""))
+	assert.Equal(t, filterIgnored, action)
+	assert.Equal(t, "pre", ti.Value)
+}
+
+func TestHandlePastedTextOnlyNewlines(t *testing.T) {
+	ti := &TextInput{Value: "pre", Cursor: 3}
+	action := handlePastedText(ti, []rune("\n\n"))
+	assert.Equal(t, filterIgnored, action)
 }
 
 func TestCovStringFilterInputDeleteWordWithSpaces(t *testing.T) {

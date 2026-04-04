@@ -86,6 +86,21 @@ func (m Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		text := strings.TrimRight(string(msg.Runes), "\n")
+		if strings.Contains(text, "\n") {
+			m.triggerPasteConfirm(text, &m.filterInput)
+			return m, nil
+		}
+		if text != "" {
+			m.filterInput.Insert(text)
+			m.filterText = m.filterInput.Value
+			m.setCursor(0)
+			m.clampCursor()
+		}
+		return m, nil
+	}
 	switch msg.String() {
 	case "enter":
 		m.filterText = m.filterInput.Value
@@ -141,6 +156,19 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		text := strings.TrimRight(string(msg.Runes), "\n")
+		if strings.Contains(text, "\n") {
+			m.triggerPasteConfirm(text, &m.searchInput)
+			return m, nil
+		}
+		if text != "" {
+			m.searchInput.Insert(text)
+			m.jumpToSearchMatch(0)
+		}
+		return m, nil
+	}
 	switch msg.String() {
 	case "enter":
 		m.searchActive = false
@@ -354,6 +382,20 @@ func (m *Model) searchAllItemsFind(allItems []model.Item, queries []string, star
 
 // handleCommandBarKey processes key events when the command bar is active.
 func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		text := strings.TrimRight(string(msg.Runes), "\n")
+		if strings.Contains(text, "\n") {
+			m.triggerPasteConfirm(text, &m.commandBarInput)
+			return m, nil
+		}
+		if text != "" {
+			m.commandBarInput.Insert(text)
+		}
+		m.commandBarSuggestions = m.commandBarGenerateSuggestions()
+		m.commandBarSelectedSuggestion = 0
+		return m, nil
+	}
 	switch msg.String() {
 	case "esc":
 		m.commandBarActive = false

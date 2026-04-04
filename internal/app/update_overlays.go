@@ -129,8 +129,34 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	case overlayColumnToggle:
 		mdl, cmd := m.handleColumnToggleKey(msg)
 		return mdl, cmd, true
+	case overlayPasteConfirm:
+		mdl, cmd := m.handlePasteConfirmKey(msg)
+		return mdl, cmd, true
 	}
 	return m, nil, false
+}
+
+// handlePasteConfirmKey handles the y/n confirmation for multiline paste.
+func (m Model) handlePasteConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "y", "Y":
+		m.overlay = overlayNone
+		if m.pasteTarget != nil && m.pendingPaste != "" {
+			flattened := strings.ReplaceAll(strings.TrimRight(m.pendingPaste, "\n"), "\n", " ")
+			m.pasteTarget.Insert(flattened)
+		}
+		m.pendingPaste = ""
+		m.pasteTarget = nil
+		m.setStatusMessage("Pasted (flattened to single line)", false)
+		return m, scheduleStatusClear()
+	case "n", "N", "esc":
+		m.overlay = overlayNone
+		m.pendingPaste = ""
+		m.pasteTarget = nil
+		m.setStatusMessage("Paste cancelled", false)
+		return m, scheduleStatusClear()
+	}
+	return m, nil
 }
 
 // handleNetworkPolicyOverlayKey handles keyboard input in the network policy visualizer overlay.

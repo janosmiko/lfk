@@ -292,6 +292,18 @@ func (m Model) handleBookmarkNavKey(msg tea.KeyMsg, filtered []model.Bookmark) (
 
 // handleBookmarkFilterMode handles keys when the bookmark overlay is in filter input mode.
 func (m Model) handleBookmarkFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		switch handlePastedText(&m.bookmarkFilter, msg.Runes) {
+		case filterContinue:
+			m.overlayCursor = 0
+			return m, nil
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), &m.bookmarkFilter)
+			return m, nil
+		}
+		return m, nil
+	}
 	switch handleFilterKey(&m.bookmarkFilter, msg.String()) {
 	case filterEscape:
 		m.bookmarkSearchMode = bookmarkModeNormal

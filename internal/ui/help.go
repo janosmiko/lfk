@@ -61,6 +61,7 @@ func helpSections() []helpSection {
 				{kb.Help + " / F1", "Toggle help screen"},
 				{kb.Filter, "Filter items (~prefix: fuzzy, regex auto-detected, \\prefix: literal)"},
 				{kb.Search, "Search and jump to match (~fuzzy, regex auto, \\literal)"},
+				{"", "Paste from clipboard: Cmd+V (macOS) / Ctrl+Shift+V (Linux). Multiline asks to confirm."},
 				{kb.NextMatch, "Next search match"},
 				{kb.PrevMatch, "Previous search match"},
 				{kb.TogglePreview, "Toggle between details and YAML preview"},

@@ -72,6 +72,7 @@ const (
 	overlayAutoSync
 	overlayFinalizerSearch
 	overlayColumnToggle
+	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -496,6 +497,8 @@ type Model struct {
 
 	// Pending action waiting for container selection.
 	pendingAction string
+	pendingPaste  string      // multiline paste awaiting confirmation
+	pasteTarget   FilterInput // input to insert into after paste confirm
 
 	// Request generation counter for stale response detection.
 	// Incremented on every navigation change; async messages carry the gen

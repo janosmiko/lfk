@@ -355,6 +355,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayFinalizerSearch:
 		c, w, h := m.renderOverlayFinalizerSearch()
 		return c, w, h, true
+	case overlayPasteConfirm:
+		lineCount := strings.Count(strings.TrimRight(m.pendingPaste, "\n"), "\n") + 1
+		return ui.RenderPasteConfirmOverlay(lineCount), min(45, m.width-10), min(8, m.height-6), true
 	}
 	return "", 0, 0, false
 }

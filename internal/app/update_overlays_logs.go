@@ -170,7 +170,20 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 
 // handleLogPodFilterMode handles keyboard input while the pod selector filter is active.
 func (m Model) handleLogPodFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch handleFilterKey(&stringFilterInput{ptr: &m.logPodFilterText}, msg.String()) {
+	fi := &stringFilterInput{ptr: &m.logPodFilterText}
+	// Handle paste events.
+	if msg.Paste {
+		switch handlePastedText(fi, msg.Runes) {
+		case filterContinue:
+			m.overlayCursor = 0
+			return m, nil
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), fi)
+			return m, nil
+		}
+		return m, nil
+	}
+	switch handleFilterKey(fi, msg.String()) {
 	case filterEscape:
 		m.logPodFilterActive = false
 		m.logPodFilterText = ""
@@ -319,7 +332,20 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 
 // handleLogContainerFilterMode handles keyboard input while the container selector filter is active.
 func (m Model) handleLogContainerFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch handleFilterKey(&stringFilterInput{ptr: &m.logContainerFilterText}, msg.String()) {
+	fi := &stringFilterInput{ptr: &m.logContainerFilterText}
+	// Handle paste events.
+	if msg.Paste {
+		switch handlePastedText(fi, msg.Runes) {
+		case filterContinue:
+			m.overlayCursor = 0
+			return m, nil
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), fi)
+			return m, nil
+		}
+		return m, nil
+	}
+	switch handleFilterKey(fi, msg.String()) {
 	case filterEscape:
 		m.logContainerFilterActive = false
 		m.logContainerFilterText = ""

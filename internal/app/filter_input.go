@@ -1,5 +1,7 @@
 package app
 
+import "strings"
+
 // filterAction describes the outcome of a key press inside a filter input.
 type filterAction int
 
@@ -23,6 +25,11 @@ const (
 	// filterNavigate means the key was a cursor movement (home/end/left/right).
 	// No text was changed; the caller typically does nothing extra.
 	filterNavigate
+
+	// filterPasteMultiline means the input was a multi-line paste.
+	// The caller should show a confirmation before inserting.
+	// Returned by handlePastedText when the pasted text contains newlines.
+	filterPasteMultiline
 
 	// filterIgnored means the key was not handled by the filter input.
 	filterIgnored
@@ -94,11 +101,36 @@ func (s *stringFilterInput) DeleteWord() {
 	*s.ptr = v[:i+1]
 }
 
+// triggerPasteConfirm sets up the paste confirmation overlay for multiline input.
+func (m *Model) triggerPasteConfirm(text string, target FilterInput) {
+	m.pendingPaste = text
+	m.pasteTarget = target
+	m.overlay = overlayPasteConfirm
+}
+
+// handlePastedText processes bracketed paste content for a filter input.
+// Returns the filterAction: filterContinue if inserted, filterPasteMultiline
+// if the caller must show a confirmation overlay first.
+func handlePastedText(input FilterInput, runes []rune) filterAction {
+	text := strings.TrimRight(string(runes), "\n")
+	if text == "" {
+		return filterIgnored
+	}
+	if strings.Contains(text, "\n") {
+		return filterPasteMultiline
+	}
+	input.Insert(text)
+	return filterContinue
+}
+
 // handleFilterKey processes a key message for a filter/search text input.
 // It delegates text editing operations to the FilterInput and returns a
 // filterAction indicating what happened. The caller is responsible for
 // mode flag changes (esc/enter behavior varies per overlay) and any
 // overlay-specific side effects (cursor resets, preview updates, etc.).
+//
+// NOTE: Callers must check msg.Paste BEFORE calling this function and
+// use handlePastedText instead for paste events.
 func handleFilterKey(input FilterInput, key string) filterAction {
 	switch key {
 	case "esc":

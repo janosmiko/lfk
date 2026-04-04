@@ -417,6 +417,18 @@ func (m Model) handleCanISubjectNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 // handleCanISubjectFilterMode handles filter-mode keys in the subject selector overlay.
 func (m Model) handleCanISubjectFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		switch handlePastedText(&m.overlayFilter, msg.Runes) {
+		case filterContinue:
+			m.overlayCursor = 0
+			return m, nil
+		case filterPasteMultiline:
+			m.triggerPasteConfirm(strings.TrimRight(string(msg.Runes), "\n"), &m.overlayFilter)
+			return m, nil
+		}
+		return m, nil
+	}
 	switch handleFilterKey(&m.overlayFilter, msg.String()) {
 	case filterEscape:
 		m.canISubjectFilterMode = false
@@ -494,6 +506,21 @@ func (m *Model) exitCanIView() {
 
 // handleCanISearchKey handles keyboard input when search is active in the can-i browser.
 func (m Model) handleCanISearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle paste events.
+	if msg.Paste {
+		text := strings.TrimRight(string(msg.Runes), "\n")
+		if strings.Contains(text, "\n") {
+			m.triggerPasteConfirm(text, &m.canISearchInput)
+			return m, nil
+		}
+		if text != "" {
+			m.canISearchInput.Insert(text)
+			m.canIGroupCursor = 0
+			m.canIGroupScroll = 0
+			m.canIResourceScroll = 0
+		}
+		return m, nil
+	}
 	switch msg.String() {
 	case "enter":
 		m.canISearchActive = false

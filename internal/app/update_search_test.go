@@ -865,7 +865,7 @@ func TestCovHandleFilterKeyAllActions(t *testing.T) {
 		{"left", "left", filterNavigate},
 		{"right", "right", filterNavigate},
 		{"printable char", "a", filterContinue},
-		{"non-printable", "f1", filterIgnored},
+		{"multi-char key ignored", "f1", filterIgnored},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

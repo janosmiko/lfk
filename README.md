@@ -99,7 +99,7 @@
 
 - **Resource templates**: Create resources from 25+ built-in templates (`a`, `/` to search); includes a Custom Resource template as a starting point
 - **Port forwarding** from the action menu (with local port setting and browser open); manage active forwards via the Networking group
-- **Clipboard support**: Copy resource name (`y`), YAML (`Y`), paste/apply from clipboard (`Ctrl+P`)
+- **Clipboard support**: Copy resource name (`y`), YAML (`Y`), paste/apply from clipboard (`Ctrl+P`), paste into search/filter boxes (`Cmd+V` / `Ctrl+Shift+V`)
 - **Bookmarks**: Save favorite resource paths for quick navigation
 - **Session persistence**: Remembers last context/namespace/resource across restarts
 - **Command bar**: Press `:` for shell/kubectl commands with autocompletion
@@ -586,6 +586,8 @@ All search and filter inputs (explorer filter `f`, search `/`, YAML search, log 
 | Literal | `\` prefix | `\err.*` | Forces substring mode, treating metacharacters as literal text |
 
 The search bar shows `[RE]` for regex mode and `[~]` for fuzzy mode.
+
+**Clipboard paste**: All search and filter inputs accept pasted text from the system clipboard (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). If the pasted text contains multiple lines, a confirmation dialog appears before inserting (content is flattened to a single line).
 
 ```yaml
 # Custom actions per resource type (appear in action menu after built-in actions)
