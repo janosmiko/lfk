@@ -151,6 +151,76 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mdl, cmd := m.updateLogContainersLoaded(msg)
 		return mdl, cmd, true
 	}
+
+	return m.updateEasterEggMsg(msg)
+}
+
+// updateEasterEggMsg handles easter egg tick/clear messages.
+func (m Model) updateEasterEggMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg.(type) {
+	case konamiClearMsg:
+		m = m.clearKonami()
+		return m, nil, true
+	case nyanTickMsg:
+		if m.nyanMode {
+			m.nyanTick++
+			return m, scheduleNyanTick(), true
+		}
+		return m, nil, true
+	case creditsTickMsg:
+		var stopped bool
+		m, stopped = m.tickCredits()
+		if stopped {
+			// Content reached center -- wait 10 seconds then auto-close.
+			return m, scheduleCreditsClose(), true
+		}
+		return m, scheduleCreditsScroll(), true
+	case creditsCloseMsg:
+		m.mode = modeExplorer
+		m.creditsStopped = false
+		return m, nil, true
+	case kubetrisAnimTickMsg:
+		// Visual-only animation countdown -- doesn't block gameplay.
+		if m.mode == modeKubetris && m.kubetrisGame != nil && m.kubetrisGame.animating {
+			m.kubetrisGame.animTicks--
+			if m.kubetrisGame.animTicks <= 0 {
+				m.kubetrisGame.finishAnimation()
+			} else {
+				return m, scheduleKubetrisAnimTick(), true
+			}
+		}
+		return m, nil, true
+	case kubetrisLockTickMsg:
+		if m.mode == modeKubetris && m.kubetrisGame != nil {
+			m.kubetrisGame.doLock()
+			if m.kubetrisGame.gameOver {
+				m.kubetrisGame.saveHighScore()
+				return m, nil, true
+			}
+			if m.kubetrisGame.animating {
+				return m, scheduleKubetrisAnimTick(), true
+			}
+		}
+		return m, nil, true
+	case kubetrisTickMsg:
+		if m.mode == modeKubetris && m.kubetrisGame != nil && !m.kubetrisGame.paused && !m.kubetrisGame.gameOver {
+			needsLock := m.kubetrisGame.tick()
+			if m.kubetrisGame.gameOver {
+				m.kubetrisGame.saveHighScore()
+				return m, nil, true
+			}
+			var cmds []tea.Cmd
+			cmds = append(cmds, m.scheduleKubetrisTick())
+			if needsLock {
+				cmds = append(cmds, scheduleKubetrisLockDelay())
+			}
+			if m.kubetrisGame.animating {
+				cmds = append(cmds, scheduleKubetrisAnimTick())
+			}
+			return m, tea.Batch(cmds...), true
+		}
+		return m, nil, true
+	}
 	return m, nil, false
 }
 

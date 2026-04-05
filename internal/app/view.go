@@ -17,6 +17,10 @@ func (m Model) View() string {
 		return "Loading..."
 	}
 
+	// Sync nyan mode state to UI globals for rendering.
+	ui.NyanMode = m.nyanMode
+	ui.NyanTick = m.nyanTick
+
 	// Render fullscreen modes (YAML, Logs, Describe, Diff, Exec, Explain) with title bar and tab bar.
 	// Each view renders its own hint bar, so the main status bar is not shown.
 	// Also render the fullscreen view as background when help is open from a fullscreen mode.
@@ -99,6 +103,16 @@ func (m Model) View() string {
 		}
 
 		return view
+	}
+
+	// Credits mode: fullscreen scrolling credits, any key exits.
+	if m.mode == modeCredits {
+		return m.viewCredits()
+	}
+
+	// Kubetris mode: fullscreen falling blocks game.
+	if m.mode == modeKubetris {
+		return m.viewKubetris()
 	}
 
 	view := m.viewExplorer()

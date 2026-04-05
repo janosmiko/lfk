@@ -871,7 +871,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 			if lineW < width {
 				row += strings.Repeat(" ", width-lineW)
 			}
-			b.WriteString(SelectedStyle.MaxWidth(width).Render(row))
+			b.WriteString(ActiveSelectedStyle(i).MaxWidth(width).Render(row))
 		} else {
 			// Selection marker (styled for non-cursor rows).
 			markerPrefix := ""

@@ -48,6 +48,18 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 	case cmdBuiltin:
 		return m.executeBuiltinCommand(input)
 	case cmdKubectl:
+		// Easter egg: "kubectl explain life" or "k explain life".
+		trimmed := strings.TrimSpace(input)
+		trimmed = strings.TrimPrefix(trimmed, "kubectl ")
+		trimmed = strings.TrimPrefix(trimmed, "k ")
+		fields := strings.Fields(trimmed)
+		if len(fields) >= 2 && fields[0] == "explain" && fields[1] == "life" {
+			m.mode = modeDescribe
+			m.describeContent = explainLifeContent()
+			m.describeScroll = 0
+			return m, nil
+		}
+
 		return m, m.executeKubectlCommand(input)
 	case cmdResourceJump:
 		return m.executeResourceJump(input)
@@ -163,6 +175,23 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		}
 		m.setStatusMessage(fmt.Sprintf("Unknown export format: %s", arg), true)
 		return m, scheduleStatusClear()
+
+	case "nyan":
+		var cmd tea.Cmd
+		m, cmd = m.toggleNyan()
+		return m, tea.Batch(cmd, scheduleStatusClear())
+
+	case "kubetris":
+		g := newKubetrisGame()
+		g.loadHighScore()
+		m.kubetrisGame = g
+		m.mode = modeKubetris
+		return m, m.scheduleKubetrisTick()
+
+	case "credits":
+		m.mode = modeCredits
+		m.creditsScroll = m.height
+		return m, scheduleCreditsScroll()
 
 	default:
 		m.setStatusMessage(fmt.Sprintf("Unknown command: %s", canonical), true)

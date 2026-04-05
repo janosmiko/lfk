@@ -315,7 +315,7 @@ func (m *Model) generateCommandBarSuggestions() []ui.Suggestion {
 func builtinCommandNames() []string {
 	// Exclude short quit aliases -- :q and :q! are typed deliberately.
 	// Keep "quit" so :qu shows it as a suggestion.
-	exclude := map[string]bool{"q": true, "q!": true}
+	exclude := map[string]bool{"q": true, "q!": true, "nyan": true, "kubetris": true, "credits": true}
 	seen := make(map[string]bool)
 	var names []string
 	for k := range builtinCommands {

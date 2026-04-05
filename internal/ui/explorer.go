@@ -62,6 +62,26 @@ var ActiveSortableColumns []string
 // ActiveSortableColumnCount is len(ActiveSortableColumns).
 var ActiveSortableColumnCount int
 
+// NyanMode enables rainbow cursor styling (easter egg).
+var NyanMode bool
+
+// NyanTick is the animation tick for nyan mode rainbow cycling.
+var NyanTick int
+
+// nyanPalette is the rainbow color cycle for nyan mode.
+var nyanPalette = []string{"#ff0000", "#ff8800", "#ffff00", "#00ff00", "#0088ff", "#8800ff"}
+
+// ActiveSelectedStyle returns SelectedStyle or a nyan rainbow style if nyan mode is active.
+func ActiveSelectedStyle(rowIdx int) lipgloss.Style {
+	if !NyanMode {
+		return SelectedStyle
+	}
+	bgColor := nyanPalette[(NyanTick+rowIdx)%len(nyanPalette)]
+	return lipgloss.NewStyle().Bold(true).
+		Foreground(lipgloss.Color("#000000")).
+		Background(lipgloss.Color(bgColor))
+}
+
 // VimScrollOff computes the viewport start position using vim-style scrolloff.
 // It takes the current scroll position and adjusts it only when the cursor
 // would be outside the visible area or within the scrolloff margin.
@@ -508,7 +528,7 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 				if lineWidth < width {
 					line += strings.Repeat(" ", width-lineWidth)
 				}
-				b.WriteString(SelectedStyle.MaxWidth(width).Render(line))
+				b.WriteString(ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line))
 			} else {
 				b.WriteString(CategoryStyle.Render(Truncate(headerText, width)))
 			}
@@ -536,7 +556,7 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 			if lineWidth < width {
 				line += strings.Repeat(" ", width-lineWidth)
 			}
-			line = SelectedStyle.MaxWidth(width).Render(line)
+			line = ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line)
 		case e.itemIdx == cursor && cursor >= 0:
 			// Parent column highlight (dimmer than active selection).
 			line = FormatItemNameOnlyPlain(item, width)

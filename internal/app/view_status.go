@@ -205,6 +205,11 @@ func (m Model) statusBar() string {
 		parts = append(parts, ui.HelpKeyStyle.Render("[filter: "+m.activeFilterPreset.Name+"]"))
 	}
 
+	// Show nyan mode indicator.
+	if m.nyanMode {
+		parts = append(parts, ui.HelpKeyStyle.Render("[NYAN]"))
+	}
+
 	visible := m.visibleMiddleItems()
 	total := len(m.middleItems)
 	cur := m.cursor() + 1

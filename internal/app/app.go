@@ -31,6 +31,8 @@ const (
 	modeExec
 	modeExplain
 	modeEventViewer
+	modeKubetris
+	modeCredits
 )
 
 // overlayKind tracks which overlay is currently open.
@@ -766,6 +768,15 @@ type Model struct {
 	columnToggleFilter       string
 	columnToggleFilterActive bool
 	sessionColumns           map[string][]string // kind -> ordered visible column keys (session-only)
+
+	// Easter egg state.
+	konamiProgress int  // current position in the Konami Code sequence
+	konamiActive   bool // true when cheat code was just activated (clears after 5s)
+	nyanMode       bool // toggleable nyan mode indicator
+	nyanTick       int  // animation tick for nyan mode
+	creditsScroll  int  // scroll position for credits screen
+	creditsStopped bool // true when credits reached center and waiting to close
+	kubetrisGame   *kubetrisGame
 }
 
 // columnToggleEntry represents a single column in the column toggle overlay.

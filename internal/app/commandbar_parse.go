@@ -37,6 +37,9 @@ var builtinCommands = map[string]string{
 	"quit":      "quit",
 	"q":         "quit",
 	"q!":        "quit",
+	"nyan":      "nyan",
+	"kubetris":  "kubetris",
+	"credits":   "credits",
 }
 
 // kubectlSubcommandSet contains known kubectl subcommands.

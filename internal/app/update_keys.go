@@ -64,6 +64,10 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	switch msg.String() {
 	case kb.NextTab:
 		if len(m.tabs) > 1 {
+			// Auto-pause Kubetris when switching tabs.
+			if m.mode == modeKubetris && m.kubetrisGame != nil && !m.kubetrisGame.paused {
+				m.kubetrisGame.paused = true
+			}
 			m.saveCurrentTab()
 			next := (m.activeTab + 1) % len(m.tabs)
 			if cmd := m.loadTab(next); cmd != nil {
@@ -73,6 +77,9 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		}
 	case kb.PrevTab:
 		if len(m.tabs) > 1 {
+			if m.mode == modeKubetris && m.kubetrisGame != nil && !m.kubetrisGame.paused {
+				m.kubetrisGame.paused = true
+			}
 			m.saveCurrentTab()
 			prev := (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
 			if cmd := m.loadTab(prev); cmd != nil {
@@ -81,6 +88,9 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			return m, m.postTabSwitchCmd(), true
 		}
 	case kb.NewTab:
+		if m.mode == modeKubetris && m.kubetrisGame != nil && !m.kubetrisGame.paused {
+			m.kubetrisGame.paused = true
+		}
 		if m.mode != modeHelp {
 			if len(m.tabs) >= 9 {
 				m.setStatusMessage("Max 9 tabs", true)
@@ -148,6 +158,13 @@ func (m Model) handleModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case modeYAML:
 		mdl, cmd := m.handleYAMLKey(msg)
 		return mdl, cmd, true
+	case modeKubetris:
+		mdl, cmd := m.handleKubetrisKey(msg)
+		return mdl, cmd, true
+	case modeCredits:
+		// Any key exits the credits screen.
+		m.mode = modeExplorer
+		return m, nil, true
 	}
 	return m, nil, false
 }
@@ -155,6 +172,13 @@ func (m Model) handleModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 // handleExplorerKey handles key events in the main explorer mode.
 func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	kb := ui.ActiveKeybindings
+
+	// Konami Code detection: track progress through the sequence.
+	wasKonami := m.konamiActive
+	m = m.checkKonami(msg)
+	if m.konamiActive && !wasKonami {
+		return m, scheduleKonamiClear()
+	}
 
 	// Clear pending 'g' state if any other key is pressed (vim-style gg).
 	if m.pendingG && msg.String() != kb.JumpTop {
