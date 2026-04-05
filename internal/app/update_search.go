@@ -413,81 +413,21 @@ func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch key {
 	case "ctrl+@", "ctrl+space":
-		// Open/refresh suggestions.
 		return m.commandBarRefreshSuggestions()
 	case "esc":
-		// If suggestions are open, close them first. Otherwise close the command bar.
-		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarSuggestions = nil
-			m.commandBarSelectedSuggestion = 0
-			m.commandBarPreview = ""
-			return m, nil
-		}
-		return m.commandBarClose(), nil
+		return m.commandBarHandleEsc()
 	case "ctrl+c":
 		return m.commandBarClose(), nil
 	case "enter":
 		return m.commandBarEnter()
 	case "tab", "ctrl+n", "down":
-		if len(m.commandBarSuggestions) > 0 {
-			sel := m.commandBarSuggestions[m.commandBarSelectedSuggestion]
-			// Skip status entries (e.g., "loading...").
-			if sel.Category == "status" {
-				return m, nil
-			}
-			// If only one actionable suggestion, accept it directly.
-			actionable := m.commandBarActionableSuggestionCount()
-			if key == "tab" && actionable == 1 {
-				m.commandBarInput.Set(m.commandBarApplySuggestion(sel.Text))
-				m.commandBarPreview = ""
-				return m.commandBarRefreshSuggestions()
-			}
-			m.commandBarCycleSuggestion(1)
-			// Skip over status entries when cycling.
-			for m.commandBarSuggestions[m.commandBarSelectedSuggestion].Category == "status" {
-				m.commandBarCycleSuggestion(1)
-			}
-			m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
-			return m, nil
-		}
-		if key == "down" {
-			m.commandBarInput.Set(m.commandHistory.down())
-			return m, nil
-		}
-		return m, nil
+		return m.commandBarCycleForward(key)
 	case "shift+tab", "ctrl+p", "up":
-		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarCycleSuggestion(-1)
-			// Skip over status entries when cycling.
-			for m.commandBarSuggestions[m.commandBarSelectedSuggestion].Category == "status" {
-				m.commandBarCycleSuggestion(-1)
-			}
-			m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
-			return m, nil
-		}
-		if key == "up" {
-			m.commandBarInput.Set(m.commandHistory.up(m.commandBarInput.Value))
-			return m, nil
-		}
-		return m, nil
-	case "ctrl+d":
-		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarCycleSuggestion(5)
-			m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
-		}
-		return m, nil
-	case "ctrl+f":
-		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarCycleSuggestion(10)
-			m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
-		}
-		return m, nil
-	case "ctrl+b":
-		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarCycleSuggestion(-10)
-			m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
-		}
-		return m, nil
+		return m.commandBarCycleBackward(key)
+	case "ctrl+d", "ctrl+u":
+		return m.commandBarScrollSuggestions(key, 5)
+	case "ctrl+f", "ctrl+b":
+		return m.commandBarScrollSuggestions(key, 10)
 	case "ctrl+a":
 		m.commandBarInput.Home()
 		return m, nil
@@ -502,14 +442,6 @@ func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+w":
 		m.commandBarInput.DeleteWord()
 		return m.commandBarRefreshSuggestions()
-	case "ctrl+u":
-		if len(m.commandBarSuggestions) > 0 {
-			m.commandBarCycleSuggestion(-5)
-			m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
-			return m, nil
-		}
-		m.commandBarInput.DeleteLine()
-		return m.commandBarRefreshSuggestions()
 	case "left":
 		m.commandBarInput.Left()
 		return m, nil
@@ -522,6 +454,73 @@ func (m Model) handleCommandBarKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m.commandBarRefreshSuggestions()
 	}
+}
+
+func (m Model) commandBarHandleEsc() (tea.Model, tea.Cmd) {
+	if len(m.commandBarSuggestions) > 0 {
+		m.commandBarSuggestions = nil
+		m.commandBarSelectedSuggestion = 0
+		m.commandBarPreview = ""
+		return m, nil
+	}
+	return m.commandBarClose(), nil
+}
+
+func (m Model) commandBarCycleForward(key string) (tea.Model, tea.Cmd) {
+	if len(m.commandBarSuggestions) > 0 {
+		sel := m.commandBarSuggestions[m.commandBarSelectedSuggestion]
+		if sel.Category == "status" {
+			return m, nil
+		}
+		if key == "tab" && m.commandBarActionableSuggestionCount() == 1 {
+			m.commandBarInput.Set(m.commandBarApplySuggestion(sel.Text))
+			m.commandBarPreview = ""
+			return m.commandBarRefreshSuggestions()
+		}
+		m.commandBarCycleSuggestion(1)
+		for m.commandBarSuggestions[m.commandBarSelectedSuggestion].Category == "status" {
+			m.commandBarCycleSuggestion(1)
+		}
+		m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
+		return m, nil
+	}
+	if key == "down" {
+		m.commandBarInput.Set(m.commandHistory.down())
+	}
+	return m, nil
+}
+
+func (m Model) commandBarCycleBackward(key string) (tea.Model, tea.Cmd) {
+	if len(m.commandBarSuggestions) > 0 {
+		m.commandBarCycleSuggestion(-1)
+		for m.commandBarSuggestions[m.commandBarSelectedSuggestion].Category == "status" {
+			m.commandBarCycleSuggestion(-1)
+		}
+		m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
+		return m, nil
+	}
+	if key == "up" {
+		m.commandBarInput.Set(m.commandHistory.up(m.commandBarInput.Value))
+	}
+	return m, nil
+}
+
+func (m Model) commandBarScrollSuggestions(key string, amount int) (tea.Model, tea.Cmd) {
+	if len(m.commandBarSuggestions) == 0 {
+		// ctrl+u without suggestions: delete line.
+		if key == "ctrl+u" {
+			m.commandBarInput.DeleteLine()
+			return m.commandBarRefreshSuggestions()
+		}
+		return m, nil
+	}
+	delta := amount
+	if key == "ctrl+u" || key == "ctrl+b" {
+		delta = -amount
+	}
+	m.commandBarCycleSuggestion(delta)
+	m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
+	return m, nil
 }
 
 // commandBarActionableSuggestionCount returns the number of suggestions
