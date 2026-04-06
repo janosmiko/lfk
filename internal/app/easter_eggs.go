@@ -151,7 +151,7 @@ func creditsLines(version string) []string {
 		"Open Source",
 		"github.com/janosmiko/lfk",
 		"",
-		"Licensed under the MIT License",
+		"Licensed under the Apache License 2.0",
 		"",
 		"Thank you for using LFK.",
 		"",

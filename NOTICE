@@ -1,0 +1,8 @@
+LFK - Lightning Fast Kubernetes Navigator
+Copyright 2026 Janos Miko
+
+This product includes software developed by Janos Miko
+(https://github.com/janosmiko/lfk).
+
+Third-party libraries used in this project are listed in go.mod
+and are subject to their own respective licenses.
