@@ -99,8 +99,22 @@ func TestManagerCancellation(t *testing.T) {
 	m.Register(&FakeSource{NameStr: "slow", Available: true, FetchDelay: 500 * time.Millisecond})
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel() // cancel before call
-	_, err := m.FetchAll(ctx, "ctx", "")
-	// Error is allowed to be nil if cancellation happened cleanly — what matters
-	// is we return quickly.
-	_ = err
+
+	start := time.Now()
+	_, _ = m.FetchAll(ctx, "ctx", "")
+	elapsed := time.Since(start)
+
+	// Must return well before the source's 500ms delay — cancellation path.
+	assert.Less(t, elapsed, 100*time.Millisecond,
+		"cancellation must return quickly, not wait for FetchDelay")
+}
+
+func TestManagerAnyAvailableSkipsSourcesWithErrors(t *testing.T) {
+	m := NewManager()
+	m.Register(&FakeSource{NameStr: "broken", Available: false, AvailableErr: errors.New("probe failed")})
+	m.Register(&FakeSource{NameStr: "healthy", Available: true})
+
+	ok, err := m.AnyAvailable(context.Background(), "ctx")
+	require.NoError(t, err)
+	assert.True(t, ok, "AnyAvailable must skip erroring sources and return true when another is healthy")
 }
