@@ -620,13 +620,9 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 			// background covers the entire line uniformly.
 			var prefix string
 			if bm.Slot != "" {
-				scope := "L"
-				if bm.Global {
-					scope = "G"
-				}
-				prefix = bm.Slot + " [" + scope + "] "
+				prefix = bm.Slot + "   "
 			} else {
-				prefix = "       "
+				prefix = "    "
 			}
 			name := bm.Name
 			if len(bm.Namespaces) > 1 {
@@ -640,13 +636,9 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 			// Non-selected: use styled prefix and namespace.
 			var prefix string
 			if bm.Slot != "" {
-				scope := "L"
-				if bm.Global {
-					scope = "G"
-				}
-				prefix = OverlayFilterStyle.Render(bm.Slot) + " " + OverlayDimStyle.Render("["+scope+"]") + " "
+				prefix = OverlayFilterStyle.Render(bm.Slot) + "   "
 			} else {
-				prefix = "       "
+				prefix = "    "
 			}
 			name := bm.Name
 			if len(bm.Namespaces) > 1 {

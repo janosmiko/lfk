@@ -105,67 +105,168 @@ func TestBookmarksFilePath(t *testing.T) {
 	})
 }
 
-// --- Global field YAML persistence ---
+// --- Context field YAML persistence ---
 
-func TestBookmarkGlobalFieldPersistence(t *testing.T) {
+// TestBookmarkContextPersistence verifies that the Context field round-trips
+// through save/load correctly and that the omitempty tag causes context-free
+// bookmarks to not write an empty "context:" line.
+func TestBookmarkContextPersistence(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", tmpDir)
 
 	bookmarks := []model.Bookmark{
 		{
-			Name:         "global-mark",
+			Name:         "context-aware-mark",
 			Context:      "prod-cluster",
 			Namespace:    "production",
 			ResourceType: "/v1/pods",
-			Slot:         "A",
-			Global:       true,
+			Slot:         "a",
 		},
 		{
-			Name:         "local-mark",
-			Context:      "dev-cluster",
+			Name:         "context-free-mark",
 			Namespace:    "development",
 			ResourceType: "apps/v1/deployments",
-			Slot:         "a",
-			Global:       false,
+			Slot:         "A",
 		},
 	}
 
-	// Save and reload via the real save/load functions.
 	err := saveBookmarks(bookmarks)
 	require.NoError(t, err)
 
 	loaded := loadBookmarks()
 	require.Len(t, loaded, 2)
 
-	// Verify Global field is preserved through the round-trip.
-	assert.True(t, loaded[0].Global, "global bookmark should have Global=true after reload")
-	assert.Equal(t, "A", loaded[0].Slot)
-	assert.False(t, loaded[1].Global, "local bookmark should have Global=false after reload")
-	assert.Equal(t, "a", loaded[1].Slot)
+	assert.True(t, loaded[0].IsContextAware(),
+		"context-aware bookmark should report IsContextAware=true after reload")
+	assert.Equal(t, "prod-cluster", loaded[0].Context)
+	assert.Equal(t, "a", loaded[0].Slot)
 
-	// Verify that Global=false is omitted from YAML output (omitempty tag).
+	assert.False(t, loaded[1].IsContextAware(),
+		"context-free bookmark should report IsContextAware=false after reload")
+	assert.Empty(t, loaded[1].Context)
+	assert.Equal(t, "A", loaded[1].Slot)
+
 	rawYAML, err := yaml.Marshal(bookmarks)
 	require.NoError(t, err)
 	yamlStr := string(rawYAML)
 
-	// The global bookmark should have the "global: true" field.
-	assert.Contains(t, yamlStr, "global: true")
+	assert.Contains(t, yamlStr, "context: prod-cluster",
+		"context-aware bookmark must write context field")
+	assert.NotContains(t, yamlStr, "global:",
+		"saved YAML must not contain legacy global field")
 
-	// The local bookmark (Global=false) should NOT have a "global:" field at all,
-	// because the struct tag uses omitempty and false is the zero value.
-	// Split the YAML by entries and check the local bookmark section.
-	lines := strings.Split(yamlStr, "\n")
-	inLocalEntry := false
-	for _, line := range lines {
-		if strings.Contains(line, "local-mark") {
-			inLocalEntry = true
+	// Note: omitempty verification for context-free entries lives in
+	// TestSaveLoadRoundTripNewFormat (Task 7), which runs after Task 5
+	// adds the omitempty tag to the Context field.
+}
+
+// TestLoadBookmarksLegacyGlobalField verifies that bookmark files written
+// before the Global field was removed still load correctly. The unknown
+// "global:" key is silently dropped by sigs.k8s.io/yaml; context-awareness
+// is determined by the Context field presence.
+func TestLoadBookmarksLegacyGlobalField(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", tmpDir)
+
+	legacyYAML := `- name: legacy-context-aware
+  context: test-cluster
+  namespace: default
+  resource_type: /v1/pods
+  slot: A
+  global: true
+- name: legacy-context-free
+  context: ""
+  namespace: default
+  resource_type: /v1/pods
+  slot: a
+  global: false
+`
+
+	path := filepath.Join(tmpDir, "lfk", "bookmarks.yaml")
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	require.NoError(t, os.WriteFile(path, []byte(legacyYAML), 0o600))
+
+	loaded := loadBookmarks()
+	require.Len(t, loaded, 2)
+
+	assert.Equal(t, "legacy-context-aware", loaded[0].Name)
+	assert.Equal(t, "test-cluster", loaded[0].Context)
+	assert.True(t, loaded[0].IsContextAware(),
+		"legacy bookmark with populated context must load as context-aware")
+
+	assert.Equal(t, "legacy-context-free", loaded[1].Name)
+	assert.Empty(t, loaded[1].Context)
+	assert.False(t, loaded[1].IsContextAware(),
+		"legacy bookmark with empty context must load as context-free")
+}
+
+// TestSaveLoadRoundTripNewFormat verifies that saved bookmarks use the new
+// schema (no global field, no empty context lines) and reload correctly.
+func TestSaveLoadRoundTripNewFormat(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", tmpDir)
+
+	original := []model.Bookmark{
+		{
+			Name:         "aware",
+			Context:      "prod-cluster",
+			Namespace:    "production",
+			ResourceType: "/v1/pods",
+			Slot:         "a",
+		},
+		{
+			Name:         "free",
+			Namespace:    "development",
+			ResourceType: "apps/v1/deployments",
+			Slot:         "A",
+		},
+	}
+
+	require.NoError(t, saveBookmarks(original))
+
+	rawBytes, err := os.ReadFile(filepath.Join(tmpDir, "lfk", "bookmarks.yaml"))
+	require.NoError(t, err)
+	raw := string(rawBytes)
+
+	assert.NotContains(t, raw, "global:",
+		"saved bookmark file must not contain the legacy global field")
+
+	assert.Contains(t, raw, "context: prod-cluster",
+		"context-aware bookmark must write its context")
+
+	// Scan the raw YAML to verify the context-free entry (the second one,
+	// entryIdx == 1) omits the "context:" line entirely thanks to omitempty.
+	// The context-aware entry's "context: prod-cluster" line is validated
+	// by the global assert.Contains above, so we only guard the
+	// "must not contain" side here.
+	// Track which YAML sequence entry we're in by counting "- " lines.
+	entryIdx := -1
+	for line := range strings.SplitSeq(raw, "\n") {
+		if strings.HasPrefix(strings.TrimSpace(line), "- ") {
+			entryIdx++
 		}
-		if inLocalEntry && strings.HasPrefix(strings.TrimSpace(line), "- ") && !strings.Contains(line, "local-mark") {
-			break // Moved to next entry.
-		}
-		if inLocalEntry {
-			assert.NotContains(t, line, "global:",
-				"local bookmark with Global=false should omit the global field from YAML")
+		// The second entry (index 1) is the context-free "free" bookmark.
+		if entryIdx == 1 {
+			assert.NotContains(t, line, "context:",
+				"context-free bookmark with empty Context must omit the context field")
 		}
 	}
+	require.Equal(t, 1, entryIdx, "expected exactly 2 YAML entries in saved bookmark file")
+
+	loaded := loadBookmarks()
+	require.Len(t, loaded, 2)
+
+	assert.Equal(t, original[0].Name, loaded[0].Name)
+	assert.Equal(t, original[0].Context, loaded[0].Context)
+	assert.Equal(t, original[0].Namespace, loaded[0].Namespace)
+	assert.Equal(t, original[0].ResourceType, loaded[0].ResourceType)
+	assert.Equal(t, original[0].Slot, loaded[0].Slot)
+	assert.True(t, loaded[0].IsContextAware())
+
+	assert.Equal(t, original[1].Name, loaded[1].Name)
+	assert.Empty(t, loaded[1].Context)
+	assert.Equal(t, original[1].Namespace, loaded[1].Namespace)
+	assert.Equal(t, original[1].ResourceType, loaded[1].ResourceType)
+	assert.Equal(t, original[1].Slot, loaded[1].Slot)
+	assert.False(t, loaded[1].IsContextAware())
 }

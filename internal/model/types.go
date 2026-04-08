@@ -176,13 +176,19 @@ type PodMetrics struct {
 // Bookmark represents a saved navigation path for quick access.
 type Bookmark struct {
 	Name         string   `json:"name" yaml:"name"`
-	Context      string   `json:"context" yaml:"context"`
+	Context      string   `json:"context,omitempty" yaml:"context,omitempty"`
 	Namespace    string   `json:"namespace" yaml:"namespace"`
 	Namespaces   []string `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
 	ResourceType string   `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
 	ResourceName string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
-	Slot         string   `json:"slot,omitempty" yaml:"slot,omitempty"`     // single char key for vim-style named marks (a-z, A-Z, 0-9)
-	Global       bool     `json:"global,omitempty" yaml:"global,omitempty"` // true = switches cluster on jump; false = stays in current cluster
+	Slot         string   `json:"slot,omitempty" yaml:"slot,omitempty"` // single char key for vim-style named marks (a-z, A-Z, 0-9)
+}
+
+// IsContextAware reports whether this bookmark is anchored to a specific
+// kube context. Context-aware bookmarks switch to their stored context on
+// jump; context-free bookmarks use whatever context is currently active.
+func (b Bookmark) IsContextAware() bool {
+	return b.Context != ""
 }
 
 // ActionMenuItem represents an entry in the action menu.

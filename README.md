@@ -292,7 +292,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `D` / `X` | Delete / force delete |
 | `y` / `Y` | Copy name / YAML to clipboard |
 | `Space` | Toggle multi-selection (bulk actions via `x`) |
-| `m<key>` / `'` | Set / jump to bookmark |
+| `m<slot>` / `'<slot>` | Set / jump to bookmark (lowercase = context-aware, uppercase = context-free) |
 | `t` / `]` / `[` | New tab / next / previous |
 
 All views (YAML, logs, describe, diff, exec) use vim-style navigation (`j`/`k`, `gg`/`G`, `Ctrl+D`/`Ctrl+U`, `/` search, `v`/`V` visual selection). See [docs/keybindings.md](docs/keybindings.md) for the full reference.

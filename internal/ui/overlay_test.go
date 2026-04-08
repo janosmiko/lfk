@@ -273,36 +273,44 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 		assert.Contains(t, result, "Test")
 	})
 
-	t.Run("scope indicator shows G for global bookmarks", func(t *testing.T) {
+	t.Run("context-aware bookmarks are rendered", func(t *testing.T) {
 		bms := []model.Bookmark{
-			{Name: "Global Mark", Slot: "A", Global: true},
+			{Name: "Context-aware Mark", Slot: "A", Context: "prod-cluster"},
 		}
 		result := RenderBookmarkOverlay(bms, "", 0, 0)
-		assert.Contains(t, result, "[G]", "global bookmark should show [G] scope indicator")
-		assert.Contains(t, result, "Global Mark")
+		assert.Contains(t, result, "Context-aware Mark")
+		assert.NotContains(t, result, "[L]",
+			"bookmark picker must not render the legacy [L] tag")
+		assert.NotContains(t, result, "[G]",
+			"bookmark picker must not render the legacy [G] tag")
 	})
 
-	t.Run("scope indicator shows L for local bookmarks", func(t *testing.T) {
+	t.Run("context-free bookmarks are rendered", func(t *testing.T) {
 		bms := []model.Bookmark{
-			{Name: "Local Mark", Slot: "a", Global: false},
+			{Name: "Context-free Mark", Slot: "a"},
 		}
 		result := RenderBookmarkOverlay(bms, "", 0, 0)
-		assert.Contains(t, result, "[L]", "local bookmark should show [L] scope indicator")
-		assert.Contains(t, result, "Local Mark")
+		assert.Contains(t, result, "Context-free Mark")
+		assert.NotContains(t, result, "[L]",
+			"bookmark picker must not render the legacy [L] tag")
+		assert.NotContains(t, result, "[G]",
+			"bookmark picker must not render the legacy [G] tag")
 	})
 
-	t.Run("mixed global and local bookmarks show correct indicators", func(t *testing.T) {
+	t.Run("mixed context-aware and context-free bookmarks are rendered", func(t *testing.T) {
 		bms := []model.Bookmark{
-			{Name: "Global Pods", Slot: "A", Global: true},
-			{Name: "Local Deploys", Slot: "a", Global: false},
-			{Name: "Global Svcs", Slot: "B", Global: true},
+			{Name: "Context-aware Pods", Slot: "A", Context: "prod-cluster"},
+			{Name: "Context-free Deploys", Slot: "a"},
+			{Name: "Context-aware Svcs", Slot: "B", Context: "prod-cluster"},
 		}
 		result := RenderBookmarkOverlay(bms, "", 0, 0)
-		assert.Contains(t, result, "[G]")
-		assert.Contains(t, result, "[L]")
-		assert.Contains(t, result, "Global Pods")
-		assert.Contains(t, result, "Local Deploys")
-		assert.Contains(t, result, "Global Svcs")
+		assert.Contains(t, result, "Context-aware Pods")
+		assert.Contains(t, result, "Context-free Deploys")
+		assert.Contains(t, result, "Context-aware Svcs")
+		assert.NotContains(t, result, "[L]",
+			"bookmark picker must not render the legacy [L] tag")
+		assert.NotContains(t, result, "[G]",
+			"bookmark picker must not render the legacy [G] tag")
 	})
 }
 

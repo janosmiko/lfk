@@ -225,8 +225,8 @@ func (m Model) overlayHintBarBookmarks() string {
 			{Key: "a-z/0-9", Desc: "jump"},
 			{Key: "enter", Desc: "jump"},
 			{Key: "/", Desc: "filter"},
-			{Key: "D", Desc: "delete"},
-			{Key: "ctrl+x", Desc: "delete all"},
+			{Key: "ctrl+x", Desc: "delete"},
+			{Key: "alt+x", Desc: "delete all"},
 			{Key: "esc", Desc: "close"},
 		})
 	}

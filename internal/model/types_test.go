@@ -1095,3 +1095,22 @@ func actionLabels(actions []ActionMenuItem) []string {
 	}
 	return labels
 }
+
+func TestBookmarkIsContextAware(t *testing.T) {
+	tests := []struct {
+		name    string
+		context string
+		want    bool
+	}{
+		{name: "empty context is context-free", context: "", want: false},
+		{name: "populated context is context-aware", context: "prod-cluster", want: true},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			bm := Bookmark{Context: tt.context}
+			if got := bm.IsContextAware(); got != tt.want {
+				t.Errorf("IsContextAware() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

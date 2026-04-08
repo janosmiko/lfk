@@ -12,7 +12,10 @@ import (
 
 // --- Bookmark handlers ---
 
-// bookmarkToSlot saves the current location as a named mark in the given slot (a-z, 0-9).
+// bookmarkToSlot saves the current location as a named mark in the given slot.
+// Lowercase (a-z) and digit (0-9) slots create context-aware bookmarks that
+// remember the current kube context. Uppercase (A-Z) slots create
+// context-free bookmarks that use whatever context is active on jump.
 // If a bookmark already exists in that slot, it prompts for confirmation.
 func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	if m.nav.Level < model.LevelResourceTypes {
@@ -20,12 +23,15 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	isGlobal := len(slot) == 1 && slot[0] >= 'A' && slot[0] <= 'Z'
+	// Lowercase (a-z) and digit (0-9) slots create context-aware bookmarks
+	// that remember the current kube context. Uppercase (A-Z) slots create
+	// context-free bookmarks that use whatever context is active on jump.
+	isContextAware := len(slot) != 1 || slot[0] < 'A' || slot[0] > 'Z'
 
-	// Global bookmarks include the context in the name and save it for
-	// cross-cluster navigation. Local bookmarks are context-independent.
+	// Context-aware bookmarks include the context in the display name and
+	// save it for cross-cluster navigation. Context-free bookmarks do not.
 	var parts []string
-	if isGlobal {
+	if isContextAware {
 		parts = append(parts, m.nav.Context)
 	}
 	if m.nav.ResourceType.DisplayName != "" {
@@ -53,7 +59,7 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	}
 
 	bmContext := ""
-	if isGlobal {
+	if isContextAware {
 		bmContext = m.nav.Context
 	}
 
@@ -65,7 +71,6 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 		ResourceType: m.nav.ResourceType.ResourceRef(),
 		ResourceName: m.nav.ResourceName,
 		Slot:         slot,
-		Global:       isGlobal,
 	}
 
 	// Check if slot is already in use; if so, ask for confirmation.
@@ -96,7 +101,14 @@ func (m Model) saveBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Failed to save mark: "+err.Error(), true)
 		return m, scheduleStatusClear()
 	}
-	m.setStatusMessage(fmt.Sprintf("Mark '%s' set: %s", bm.Slot, bm.Name), false)
+	kind := "context-free"
+	if bm.IsContextAware() {
+		kind = "context-aware"
+	}
+	m.setStatusMessage(
+		fmt.Sprintf("Mark '%s' set: %s (%s)", bm.Slot, bm.Name, kind),
+		false,
+	)
 	return m, scheduleStatusClear()
 }
 
@@ -222,7 +234,9 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 		m.bookmarkSearchMode = bookmarkModeFilter
 		m.bookmarkFilter.Clear()
 		return m, nil
-	case "D":
+	case "ctrl+x":
+		// Single-bookmark delete. Moved off of uppercase "D" so that slot
+		// can be used to jump to context-free bookmarks stored in slot D.
 		if len(filtered) > 0 && m.overlayCursor >= 0 && m.overlayCursor < len(filtered) {
 			target := filtered[m.overlayCursor]
 			label := target.Name
@@ -233,7 +247,9 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 			m.setStatusMessage(fmt.Sprintf("Delete mark %s? (y/n)", label), true)
 		}
 		return m, nil
-	case "ctrl+x":
+	case "alt+x":
+		// Delete-all. Moved off of ctrl+x (now single delete). "cut one"
+		// (ctrl+x) vs "cut all" (alt+x) keeps the two hotkeys related.
 		if len(filtered) > 0 {
 			count := len(filtered)
 			m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
@@ -353,10 +369,10 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.bookmarkFilter.Clear()
 
-	// For local bookmarks, stay in the current cluster context.
-	// For global bookmarks, switch to the bookmark's saved context.
+	// For context-free bookmarks, stay in the current cluster context.
+	// For context-aware bookmarks, switch to the bookmark's saved context.
 	effectiveContext := bm.Context
-	if !bm.Global {
+	if !bm.IsContextAware() {
 		effectiveContext = m.nav.Context
 	}
 
@@ -366,7 +382,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	// Switch context (global bookmarks change cluster, local bookmarks keep current).
+	// Switch context (context-aware bookmarks change cluster, context-free bookmarks keep current).
 	m.nav.Context = effectiveContext
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""

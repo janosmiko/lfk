@@ -120,7 +120,7 @@ func TestApplySessionNamespaces(t *testing.T) {
 	})
 }
 
-// --- bookmarkToSlot Global flag ---
+// --- bookmarkToSlot context-aware flag ---
 
 // podResourceType returns a Pod ResourceTypeEntry for test fixtures.
 func podResourceType() model.ResourceTypeEntry {
@@ -134,25 +134,25 @@ func podResourceType() model.ResourceTypeEntry {
 	}
 }
 
-func TestBookmarkToSlot_GlobalFlag(t *testing.T) {
+func TestBookmarkToSlot_ContextAwareFlag(t *testing.T) {
 	tmpDir := t.TempDir()
 	t.Setenv("XDG_STATE_HOME", tmpDir)
 
 	rt := podResourceType()
 
 	tests := []struct {
-		slot        string
-		wantGlobal  bool
-		wantContext string // global saves context, local does not
-		wantName    string // global includes context in name, local does not
+		slot             string
+		wantContextAware bool
+		wantContext      string // context-aware saves context, context-free does not
+		wantName         string // context-aware includes context in name, context-free does not
 	}{
-		{slot: "a", wantGlobal: false, wantContext: "", wantName: "Pods"},
-		{slot: "z", wantGlobal: false, wantContext: "", wantName: "Pods"},
-		{slot: "0", wantGlobal: false, wantContext: "", wantName: "Pods"},
-		{slot: "9", wantGlobal: false, wantContext: "", wantName: "Pods"},
-		{slot: "A", wantGlobal: true, wantContext: "test", wantName: "test > Pods"},
-		{slot: "Z", wantGlobal: true, wantContext: "test", wantName: "test > Pods"},
-		{slot: "M", wantGlobal: true, wantContext: "test", wantName: "test > Pods"},
+		{slot: "a", wantContextAware: true, wantContext: "test", wantName: "test > Pods"},
+		{slot: "z", wantContextAware: true, wantContext: "test", wantName: "test > Pods"},
+		{slot: "0", wantContextAware: true, wantContext: "test", wantName: "test > Pods"},
+		{slot: "9", wantContextAware: true, wantContext: "test", wantName: "test > Pods"},
+		{slot: "A", wantContextAware: false, wantContext: "", wantName: "Pods"},
+		{slot: "Z", wantContextAware: false, wantContext: "", wantName: "Pods"},
+		{slot: "M", wantContextAware: false, wantContext: "", wantName: "Pods"},
 	}
 
 	for _, tt := range tests {
@@ -170,16 +170,18 @@ func TestBookmarkToSlot_GlobalFlag(t *testing.T) {
 			result, _ := m.bookmarkToSlot(tt.slot)
 			resultModel := result.(Model)
 
-			// The bookmark should be the last entry in the list.
-			require.NotEmpty(t, resultModel.bookmarks, "bookmarks should not be empty for slot %q", tt.slot)
+			require.NotEmpty(t, resultModel.bookmarks,
+				"bookmarks should not be empty for slot %q", tt.slot)
 			bm := resultModel.bookmarks[len(resultModel.bookmarks)-1]
 			assert.Equal(t, tt.slot, bm.Slot)
-			assert.Equal(t, tt.wantGlobal, bm.Global, "slot %q: Global should be %v", tt.slot, tt.wantGlobal)
+			assert.Equal(t, tt.wantContextAware, bm.IsContextAware(),
+				"slot %q: IsContextAware should be %v", tt.slot, tt.wantContextAware)
 			assert.Equal(t, tt.wantContext, bm.Context,
-				"slot %q: local bookmarks should not save context", tt.slot)
+				"slot %q: Context should be %q", tt.slot, tt.wantContext)
 			assert.Equal(t, tt.wantName, bm.Name,
-				"slot %q: local bookmarks should not include context in name", tt.slot)
-			assert.Equal(t, rt.ResourceRef(), bm.ResourceType)
+				"slot %q: Name should be %q", tt.slot, tt.wantName)
+			assert.Equal(t, rt.ResourceRef(), bm.ResourceType,
+				"slot %q: ResourceType should match the current nav resource type", tt.slot)
 		})
 	}
 }
@@ -202,10 +204,10 @@ func customCRDResourceType() model.ResourceTypeEntry {
 
 func TestNavigateToBookmark_LocalKeepsContext(t *testing.T) {
 	// The custom CRD exists only in cluster-A (the current context).
-	// A local bookmark (Global=false) should look up resources in the current
-	// context (cluster-A), not the bookmark's saved context (cluster-B).
-	// Since the CRD is in cluster-A, the lookup succeeds, which proves the
-	// function used the current context for lookup.
+	// A context-free bookmark should look up resources in the current
+	// context (cluster-A). Since the CRD is in cluster-A, the lookup
+	// succeeds, which proves the function used the current context for
+	// lookup.
 	crd := customCRDResourceType()
 
 	m := Model{
@@ -219,26 +221,25 @@ func TestNavigateToBookmark_LocalKeepsContext(t *testing.T) {
 	}
 
 	bm := model.Bookmark{
-		Context:      "cluster-B",
-		Global:       false,
 		ResourceType: crd.ResourceRef(),
 		Namespace:    "default",
 	}
 
 	// If navigateToBookmark correctly uses the current context (cluster-A)
-	// for a local bookmark, the CRD lookup will succeed and the function
-	// will proceed past the "not found" check. It will then panic at
-	// m.client.GetContexts() because client is nil, but the lookup
+	// for a context-free bookmark, the CRD lookup will succeed and the
+	// function will proceed past the "not found" check. It will then panic
+	// at m.client.GetContexts() because client is nil, but the lookup
 	// succeeding proves the correct context was used.
 	assert.Panics(t, func() {
 		m.navigateToBookmark(bm)
-	}, "local bookmark should find CRD in current context and proceed to client call")
+	}, "context-free bookmark should find CRD in current context and proceed to client call")
 }
 
 func TestNavigateToBookmark_LocalKeepsContext_FailsInWrongCluster(t *testing.T) {
-	// Complementary test: same bookmark but the CRD only exists in cluster-B.
-	// A local bookmark should NOT look in cluster-B, so the lookup fails
-	// and the function returns early with "not found" instead of panicking.
+	// Complementary test: the CRD only exists in cluster-B but the bookmark
+	// is context-free. A context-free bookmark should NOT look in cluster-B,
+	// so the lookup fails and the function returns early with "not found"
+	// instead of panicking.
 	crd := customCRDResourceType()
 
 	m := Model{
@@ -252,27 +253,25 @@ func TestNavigateToBookmark_LocalKeepsContext_FailsInWrongCluster(t *testing.T) 
 	}
 
 	bm := model.Bookmark{
-		Context:      "cluster-B",
-		Global:       false,
 		ResourceType: crd.ResourceRef(),
 		Namespace:    "default",
 	}
 
 	// Should return cleanly with an error (no panic), proving the function
-	// looked in cluster-A (current), not cluster-B (bookmark).
+	// looked in cluster-A (current), not cluster-B.
 	result, _ := m.navigateToBookmark(bm)
 	resultModel := result.(Model)
 
 	assert.Contains(t, resultModel.statusMessage, "Resource type not found in current cluster")
 	assert.True(t, resultModel.statusMessageErr)
 	assert.Equal(t, "cluster-A", resultModel.nav.Context,
-		"local bookmark should not change context when resource is not found")
+		"context-free bookmark should not change context when resource is not found")
 }
 
 func TestNavigateToBookmark_GlobalSwitchesContext(t *testing.T) {
 	// The custom CRD exists only in cluster-B (the bookmark's context).
-	// A global bookmark (Global=true) should look up resources in the
-	// bookmark's saved context (cluster-B), not the current context (cluster-A).
+	// A context-aware bookmark should look up resources in the bookmark's
+	// saved context (cluster-B), not the current context (cluster-A).
 	// Since the CRD is in cluster-B, the lookup succeeds, proving the
 	// function used the bookmark's context.
 	crd := customCRDResourceType()
@@ -289,23 +288,23 @@ func TestNavigateToBookmark_GlobalSwitchesContext(t *testing.T) {
 
 	bm := model.Bookmark{
 		Context:      "cluster-B",
-		Global:       true,
 		ResourceType: crd.ResourceRef(),
 		Namespace:    "default",
 	}
 
 	// If navigateToBookmark correctly uses the bookmark's context (cluster-B)
-	// for a global bookmark, the CRD lookup will succeed. The function then
-	// panics at m.client.GetContexts(), proving the correct context was used.
+	// for a context-aware bookmark, the CRD lookup will succeed. The function
+	// then panics at m.client.GetContexts(), proving the correct context was
+	// used.
 	assert.Panics(t, func() {
 		m.navigateToBookmark(bm)
-	}, "global bookmark should find CRD in bookmark context and proceed to client call")
+	}, "context-aware bookmark should find CRD in bookmark context and proceed to client call")
 }
 
 func TestNavigateToBookmark_GlobalFailsInWrongCluster(t *testing.T) {
 	// Complementary test: the CRD only exists in cluster-A.
-	// A global bookmark should look in cluster-B (bookmark context), so the
-	// lookup fails and the function returns with "not found".
+	// A context-aware bookmark should look in cluster-B (bookmark context),
+	// so the lookup fails and the function returns with "not found".
 	crd := customCRDResourceType()
 
 	m := Model{
@@ -320,7 +319,6 @@ func TestNavigateToBookmark_GlobalFailsInWrongCluster(t *testing.T) {
 
 	bm := model.Bookmark{
 		Context:      "cluster-B",
-		Global:       true,
 		ResourceType: crd.ResourceRef(),
 		Namespace:    "default",
 	}
@@ -439,8 +437,6 @@ func TestNavigateToBookmark_LocalResourceNotFound(t *testing.T) {
 	}
 
 	bm := model.Bookmark{
-		Context:      "cluster-B",
-		Global:       false,
 		ResourceType: "nonexistent.example.com/v1/fakes",
 		Namespace:    "default",
 	}
@@ -493,10 +489,18 @@ func TestCovHandleBookmarkNormalMode(t *testing.T) {
 	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'g'}}, filtered)
 	assert.Equal(t, 0, r.(Model).overlayCursor)
 
+	// "D" is no longer a delete hotkey — it must fall through to slot jump
+	// (which is a no-op here because no bookmark is stored in slot D).
 	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'D'}}, filtered)
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+
+	// ctrl+x is now the single-delete hotkey.
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyCtrlX}, filtered)
 	assert.Equal(t, bookmarkModeConfirmDelete, r.(Model).bookmarkSearchMode)
 
-	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyCtrlX}, filtered)
+	// alt+x is now the delete-all hotkey.
+	m.bookmarkSearchMode = bookmarkModeNormal
+	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}, Alt: true}, filtered)
 	assert.Equal(t, bookmarkModeConfirmDeleteAll, r.(Model).bookmarkSearchMode)
 
 	r, _ = m.handleBookmarkNormalMode(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'/'}}, filtered)
@@ -914,7 +918,11 @@ func TestFinalHandleBookmarkNormalModeSlash(t *testing.T) {
 	assert.Equal(t, bookmarkModeFilter, rm.bookmarkSearchMode)
 }
 
-func TestFinalHandleBookmarkNormalModeD(t *testing.T) {
+func TestFinalHandleBookmarkNormalModeDJumpsToSlot(t *testing.T) {
+	// Pressing "D" in the bookmark overlay must NOT trigger delete. It should
+	// be passed through to the slot-jump default branch so context-free
+	// bookmarks stored in slot D can be reached from the overlay. This guards
+	// against regressing the delete hotkey back onto the uppercase letter.
 	m := baseFinalModel()
 	m.overlay = overlayBookmarks
 	m.bookmarkSearchMode = bookmarkModeNormal
@@ -922,15 +930,30 @@ func TestFinalHandleBookmarkNormalModeD(t *testing.T) {
 	m.overlayCursor = 0
 	result, _ := m.handleBookmarkOverlayKey(keyMsg("D"))
 	rm := result.(Model)
-	assert.Equal(t, bookmarkModeConfirmDelete, rm.bookmarkSearchMode)
+	assert.Equal(t, bookmarkModeNormal, rm.bookmarkSearchMode)
 }
 
-func TestFinalHandleBookmarkNormalModeCtrlX(t *testing.T) {
+func TestFinalHandleBookmarkNormalModeCtrlXSingleDelete(t *testing.T) {
+	// ctrl+x is the single-bookmark delete hotkey (moved off of "D" to free
+	// the uppercase letter for context-free slot jumps).
 	m := baseFinalModel()
 	m.overlay = overlayBookmarks
 	m.bookmarkSearchMode = bookmarkModeNormal
 	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}}
+	m.overlayCursor = 0
 	result, _ := m.handleBookmarkOverlayKey(keyMsg("ctrl+x"))
+	rm := result.(Model)
+	assert.Equal(t, bookmarkModeConfirmDelete, rm.bookmarkSearchMode)
+}
+
+func TestFinalHandleBookmarkNormalModeAltXDeleteAll(t *testing.T) {
+	// alt+x is the delete-all hotkey (moved off of ctrl+x which now handles
+	// single delete). Uses the "cut one" / "cut all" mental model.
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.bookmarks = []model.Bookmark{{Name: "bm1", Slot: "a"}}
+	result, _ := m.handleBookmarkOverlayKey(keyMsg("alt+x"))
 	rm := result.(Model)
 	assert.Equal(t, bookmarkModeConfirmDeleteAll, rm.bookmarkSearchMode)
 }
@@ -1137,7 +1160,6 @@ func TestFinalNavigateToBookmarkResourceNotFound(t *testing.T) {
 	m := baseFinalModel()
 	bm := model.Bookmark{
 		ResourceType: "nonexistent",
-		Global:       false,
 	}
 	result, cmd := m.navigateToBookmark(bm)
 	require.NotNil(t, cmd)
@@ -1152,7 +1174,6 @@ func TestFinalNavigateToBookmarkAllNamespaces(t *testing.T) {
 	bm := model.Bookmark{
 		ResourceType: podRT.ResourceRef(),
 		Namespace:    "",
-		Global:       false,
 	}
 	result, cmd := m.navigateToBookmark(bm)
 	require.NotNil(t, cmd)
@@ -1167,7 +1188,6 @@ func TestFinalNavigateToBookmarkMultiNS(t *testing.T) {
 	bm := model.Bookmark{
 		ResourceType: podRT.ResourceRef(),
 		Namespaces:   []string{"ns1", "ns2"},
-		Global:       false,
 	}
 	result, cmd := m.navigateToBookmark(bm)
 	require.NotNil(t, cmd)
@@ -1183,7 +1203,6 @@ func TestFinalNavigateToBookmarkSingleNS(t *testing.T) {
 	bm := model.Bookmark{
 		ResourceType: podRT.ResourceRef(),
 		Namespace:    "production",
-		Global:       false,
 	}
 	result, cmd := m.navigateToBookmark(bm)
 	require.NotNil(t, cmd)
@@ -1193,14 +1212,13 @@ func TestFinalNavigateToBookmarkSingleNS(t *testing.T) {
 
 func TestFinalNavigateToBookmarkGlobal(t *testing.T) {
 	m := baseFinalModel()
-	// Global bookmarks switch context. CRD must have matching ResourceRef.
+	// Context-aware bookmarks switch context. CRD must have matching ResourceRef.
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredCRDs["prod-ctx"] = []model.ResourceTypeEntry{podRT}
 	bm := model.Bookmark{
 		ResourceType: podRT.ResourceRef(),
 		Context:      "prod-ctx",
 		Namespace:    "default",
-		Global:       true,
 	}
 	result, cmd := m.navigateToBookmark(bm)
 	require.NotNil(t, cmd)
@@ -1215,7 +1233,6 @@ func TestFinalNavigateToBookmarkSingleNamespaceInList(t *testing.T) {
 	bm := model.Bookmark{
 		ResourceType: podRT.ResourceRef(),
 		Namespaces:   []string{"only-ns"},
-		Global:       false,
 	}
 	result, cmd := m.navigateToBookmark(bm)
 	require.NotNil(t, cmd)
@@ -1280,4 +1297,46 @@ func TestFinalRemoveBookmark(t *testing.T) {
 	assert.Len(t, result, 2)
 	assert.Equal(t, "a", result[0].Slot)
 	assert.Equal(t, "c", result[1].Slot)
+}
+
+// TestSaveBookmarkStatusMessageIncludesKind verifies the status message
+// after setting a bookmark explicitly states whether it is context-aware
+// or context-free. This makes the new slot-case convention visible to
+// users on every save.
+func TestSaveBookmarkStatusMessageIncludesKind(t *testing.T) {
+	t.Run("context-aware bookmark", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_STATE_HOME", tmpDir)
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelResources,
+				Context:      "test",
+				ResourceType: podResourceType(),
+			},
+			namespace: "default",
+			tabs:      []TabState{{}},
+		}
+		result, _ := m.bookmarkToSlot("a")
+		rm := result.(Model)
+		assert.Contains(t, rm.statusMessage, "(context-aware)",
+			"status message must call out context-aware kind")
+	})
+
+	t.Run("context-free bookmark", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		t.Setenv("XDG_STATE_HOME", tmpDir)
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelResources,
+				Context:      "test",
+				ResourceType: podResourceType(),
+			},
+			namespace: "default",
+			tabs:      []TabState{{}},
+		}
+		result, _ := m.bookmarkToSlot("A")
+		rm := result.(Model)
+		assert.Contains(t, rm.statusMessage, "(context-free)",
+			"status message must call out context-free kind")
+	})
 }

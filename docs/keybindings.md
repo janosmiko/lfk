@@ -106,6 +106,21 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 
 ## Bookmarks
 
+lfk supports vim-style named marks for quick navigation. A bookmark stores a
+resource path (context + namespace + resource type + optional resource name)
+under a single-character slot.
+
+Bookmarks come in two flavors depending on the slot case you choose:
+
+- **Context-aware** (lowercase `a-z` / digit `0-9`): remembers the kube
+  context you were in when you set it. Jumping to the bookmark switches
+  clusters if needed. Use this when you want the bookmark to point at a
+  specific environment (e.g., `a` for "production pods").
+- **Context-free** (uppercase `A-Z`): doesn't remember a context. Jumping
+  to the bookmark uses whatever cluster is currently active. Use this for
+  cluster-agnostic shortcuts (e.g., `P` for "whatever cluster I'm in, go
+  to Pods").
+
 | Key | Context | Action |
 |---|---|---|
 | `m<key>` | Explorer | Set mark at current location (`a-z`, `0-9`) |
@@ -114,8 +129,8 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 | `j` / `k` | Bookmark overlay | Navigate bookmarks |
 | `/` | Bookmark overlay | Filter bookmarks by name |
 | `Enter` | Bookmark overlay | Jump to selected bookmark |
-| `D` | Bookmark overlay | Delete selected bookmark (with confirmation) |
-| `Ctrl+X` | Bookmark overlay | Delete all bookmarks (with confirmation) |
+| `Ctrl+X` | Bookmark overlay | Delete selected bookmark (with confirmation) |
+| `Alt+X` | Bookmark overlay | Delete all bookmarks (with confirmation) |
 
 ## YAML View
 
