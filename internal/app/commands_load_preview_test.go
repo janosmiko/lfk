@@ -7,6 +7,9 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 )
 
 func TestCovBoost2LoadPreviewNilSelection(t *testing.T) {
@@ -222,4 +225,50 @@ func TestCovLoadPreviewContainers(t *testing.T) {
 	m = withMiddleItem(m, model.Item{Name: "container-1"})
 	cmd := m.loadPreview()
 	assert.Nil(t, cmd)
+}
+
+// TestLoadPreviewOwnedUsesNavNamespaceForMissingItemNamespace is the
+// regression guard for the "Warning: getting resource: the server could not
+// find the requested resource" warning that fires when hovering on Helm
+// manifest children without a metadata.namespace. Helm stores the rendered
+// manifest verbatim in the release secret, and many chart authors rely on
+// the --namespace CLI flag rather than templating .Release.Namespace into
+// metadata.namespace — so the stored manifest frequently has an empty
+// namespace field for namespaced resources. The drill-in flow writes the
+// release's namespace into m.nav.Namespace, so loadPreviewOwned must fall
+// back to m.resolveNamespace() (which reads m.nav.Namespace first), not to
+// m.namespace directly.
+func TestLoadPreviewOwnedUsesNavNamespaceForMissingItemNamespace(t *testing.T) {
+	// A PVC living in the helm release's namespace. This is what actually
+	// exists on the cluster after `helm install --namespace release-ns`.
+	pvcGVR := schema.GroupVersionResource{Version: "v1", Resource: "persistentvolumeclaims"}
+	pvc := &unstructured.Unstructured{}
+	pvc.SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "PersistentVolumeClaim"})
+	pvc.SetName("data-pvc")
+	pvc.SetNamespace("release-ns")
+
+	gvrToListKind := map[schema.GroupVersionResource]string{pvcGVR: "PersistentVolumeClaimList"}
+	m := baseModelWithFakeDynamic(gvrToListKind, pvc)
+
+	// Simulate the state after drilling into a helm release at "release-ns"
+	// while the ambient namespace filter is still the arbitrary "default".
+	m.nav.Level = model.LevelOwned
+	m.nav.Namespace = "release-ns"
+	m.namespace = "default"
+	// Helm manifest parsed from the release secret — metadata.namespace was
+	// not templated so the Item carries an empty Namespace but Kind + Extra
+	// from the apiVersion (just "v1" for core resources).
+	m = withMiddleItem(m, model.Item{
+		Name:  "data-pvc",
+		Kind:  "PersistentVolumeClaim",
+		Extra: "v1",
+	})
+
+	cmd := m.loadPreview()
+	require.NotNil(t, cmd)
+	msg := cmd()
+	loaded, ok := msg.(yamlLoadedMsg)
+	require.True(t, ok, "expected yamlLoadedMsg, got %T", msg)
+	assert.NoError(t, loaded.err, "should find the PVC in nav.Namespace, not m.namespace")
+	assert.Contains(t, loaded.content, "data-pvc")
 }

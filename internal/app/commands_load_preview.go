@@ -115,7 +115,12 @@ func (m Model) loadPreviewOwned(sel *model.Item) tea.Cmd {
 	}
 	name := sel.Name
 	kctx := m.nav.Context
-	ns := m.namespace
+	// Fall back to nav.Namespace (set when drilling into a helm release or
+	// argocd application) so children without a metadata.namespace — common
+	// for helm manifests that rely on --namespace rather than templating
+	// .Release.Namespace — are fetched from the parent's namespace instead
+	// of the ambient namespace filter.
+	ns := m.resolveNamespace()
 	if sel.Namespace != "" {
 		ns = sel.Namespace
 	}
