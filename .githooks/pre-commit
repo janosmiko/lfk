@@ -1,16 +1,15 @@
 #!/bin/sh
-# Pre-commit hook: run golangci-lint.
-
+# Pre-commit hook: run golangci-lint on the entire working tree, mirroring
+# what CI does. The hook does NOT filter by staged files and does NOT stash
+# unstaged changes — it lints whatever is on disk so the result matches
+# `golangci-lint run ./...` from the project root, the same command CI runs.
+#
+# REQUIRED_LINT_VERSION must match the `version:` pinned in
+# .github/workflows/ci.yml and release.yml. The hook warns when the local
+# binary differs so contributors don't ship code that fails CI silently.
 if ! command -v golangci-lint >/dev/null 2>&1; then
     echo "golangci-lint is not installed. Install it: https://golangci-lint.run/welcome/install/"
     exit 1
-fi
-
-# Only run linter if Go files are staged.
-STAGED_GO_FILES=$(git diff --cached --name-only --diff-filter=ACM -- '*.go')
-if [ -z "$STAGED_GO_FILES" ]; then
-    echo "pre-commit: no Go files staged, skipping golangci-lint"
-    exit 0
 fi
 
 echo "pre-commit: running golangci-lint..."

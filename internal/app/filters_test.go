@@ -208,9 +208,7 @@ func TestNodeCordonedPreset(t *testing.T) {
 func TestEventWarningsPreset(t *testing.T) {
 	presets := builtinFilterPresets("Event")
 	warnings := findPreset(presets, "Warnings")
-	if warnings == nil {
-		t.Fatal("Warnings preset not found")
-	}
+	require.NotNil(t, warnings, "Warnings preset not found")
 
 	item := model.Item{Status: "Warning"}
 	if !warnings.MatchFn(item) {
@@ -225,9 +223,7 @@ func TestEventWarningsPreset(t *testing.T) {
 func TestUniversalOldPreset(t *testing.T) {
 	presets := builtinFilterPresets("Pod")
 	old := findPreset(presets, "Old (>30d)")
-	if old == nil {
-		t.Fatal("Old preset not found")
-	}
+	require.NotNil(t, old, "Old preset not found")
 
 	recent := model.Item{CreatedAt: time.Now().Add(-1 * time.Hour)}
 	if old.MatchFn(recent) {

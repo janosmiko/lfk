@@ -616,6 +616,7 @@ func TestBlockHeaderListItemFoldVisibility(t *testing.T) {
 	}
 	if httpSec == nil {
 		t.Fatal("http section not found")
+		return // unreachable — keeps staticcheck SA5011 happy across linter versions
 	}
 
 	// Fold the http section.
@@ -667,6 +668,7 @@ func TestListItemBlockHeaderSiblingKeys(t *testing.T) {
 	}
 	if argsSec == nil {
 		t.Fatalf("args section not found. Sections: %+v", sections)
+		return // unreachable — keeps staticcheck SA5011 happy across linter versions
 	}
 
 	// "- args:" is at line 2. Its children are:
@@ -738,9 +740,11 @@ func TestSplitListItemBlockHeader(t *testing.T) { //nolint:gocyclo
 	}
 	if listItemSec == nil {
 		t.Fatal("expected listItem section for '- args:' line")
+		return // unreachable — keeps staticcheck SA5011 happy across linter versions
 	}
 	if argsSec == nil {
 		t.Fatal("expected regular section for '- args:' line")
+		return // unreachable — keeps staticcheck SA5011 happy across linter versions
 	}
 
 	// Test 1: Uncollapsed - both dash and content lines visible.
