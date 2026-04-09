@@ -59,8 +59,15 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(copyToSystemClipboard(val), scheduleStatusClear())
 		}
 		return m, nil
-	case "s":
-		// Save the secret.
+	case "enter":
+		// Save the secret only if something changed. If nothing changed,
+		// close the overlay silently so Enter can double as "done".
+		if !m.secretDataDirty() {
+			m.overlay = overlayNone
+			m.secretData = nil
+			m.secretDataOriginal = nil
+			return m, nil
+		}
 		return m, m.saveSecretData()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -113,8 +120,15 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(copyToSystemClipboard(val), scheduleStatusClear())
 		}
 		return m, nil
-	case "s":
-		// Save the configmap.
+	case "enter":
+		// Save the configmap only if something changed. If nothing
+		// changed, close the overlay silently.
+		if !m.configMapDataDirty() {
+			m.overlay = overlayNone
+			m.configMapData = nil
+			m.configMapDataOriginal = nil
+			return m, nil
+		}
 		return m, m.saveConfigMapData()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -236,7 +250,16 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, tea.Batch(copyToSystemClipboard(val), scheduleStatusClear())
 		}
 		return m, nil
-	case "s":
+	case "enter":
+		// Save labels/annotations only if something changed. If nothing
+		// changed, close the overlay silently.
+		if !m.labelDataDirty() {
+			m.overlay = overlayNone
+			m.labelData = nil
+			m.labelLabelsOriginal = nil
+			m.labelAnnotationsOriginal = nil
+			return m, nil
+		}
 		return m, m.saveLabelData()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -247,6 +270,7 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleSecretEditorKeyEsc() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.secretData = nil
+	m.secretDataOriginal = nil
 	return m, nil
 }
 
@@ -326,19 +350,20 @@ func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.secretEditColumn = -1
 		return m, nil
 	case "ctrl+s":
-		if col == 0 {
-			oldKey := m.secretData.Keys[m.secretCursor]
-			newKey := keyInput.Value
-			if newKey != "" && newKey != oldKey {
-				val := m.secretData.Data[oldKey]
-				delete(m.secretData.Data, oldKey)
-				m.secretData.Data[newKey] = val
-				m.secretData.Keys[m.secretCursor] = newKey
-			}
-		} else {
-			key := m.secretData.Keys[m.secretCursor]
-			m.secretData.Data[key] = valInput.Value
+		// Commit both the key and the value edits at once, regardless of
+		// which column is currently active. This lets the user type a
+		// value, tab back to the key column (or vice versa), and save
+		// without silently losing the other column's edit.
+		oldKey := m.secretData.Keys[m.secretCursor]
+		newKey := keyInput.Value
+		if newKey == "" {
+			newKey = oldKey
 		}
+		if newKey != oldKey {
+			delete(m.secretData.Data, oldKey)
+			m.secretData.Keys[m.secretCursor] = newKey
+		}
+		m.secretData.Data[newKey] = valInput.Value
 		m.secretEditing = false
 		m.secretEditColumn = -1
 		return m, nil
@@ -386,6 +411,8 @@ func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleLabelEditorKeyEsc() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.labelData = nil
+	m.labelLabelsOriginal = nil
+	m.labelAnnotationsOriginal = nil
 	return m, nil
 }
 
@@ -405,6 +432,7 @@ func (m Model) handleLabelEditorKeyK() (tea.Model, tea.Cmd) {
 func (m Model) handleConfigMapEditorKeyEsc() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.configMapData = nil
+	m.configMapDataOriginal = nil
 	return m, nil
 }
 
@@ -476,19 +504,20 @@ func (m Model) handleConfigMapEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		m.configMapEditColumn = -1
 		return m, nil
 	case "ctrl+s":
-		if col == 0 {
-			oldKey := m.configMapData.Keys[m.configMapCursor]
-			newKey := keyInput.Value
-			if newKey != "" && newKey != oldKey {
-				val := m.configMapData.Data[oldKey]
-				delete(m.configMapData.Data, oldKey)
-				m.configMapData.Data[newKey] = val
-				m.configMapData.Keys[m.configMapCursor] = newKey
-			}
-		} else {
-			key := m.configMapData.Keys[m.configMapCursor]
-			m.configMapData.Data[key] = valInput.Value
+		// Commit both the key and the value edits at once, regardless of
+		// which column is currently active. This lets the user type a
+		// value, tab back to the key column (or vice versa), and save
+		// without silently losing the other column's edit.
+		oldKey := m.configMapData.Keys[m.configMapCursor]
+		newKey := keyInput.Value
+		if newKey == "" {
+			newKey = oldKey
 		}
+		if newKey != oldKey {
+			delete(m.configMapData.Data, oldKey)
+			m.configMapData.Keys[m.configMapCursor] = newKey
+		}
+		m.configMapData.Data[newKey] = valInput.Value
 		m.configMapEditing = false
 		m.configMapEditColumn = -1
 		return m, nil
@@ -622,4 +651,52 @@ func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, cu
 		}
 		return m, nil
 	}
+}
+
+// secretDataDirty reports whether the in-memory secret data differs from
+// the snapshot taken when the secret was loaded. Used by the Enter-to-save
+// handler so it can skip the API call when there is nothing to save.
+func (m *Model) secretDataDirty() bool {
+	if m.secretData == nil || m.secretDataOriginal == nil {
+		return false
+	}
+	return !stringMapsEqual(m.secretData.Data, m.secretDataOriginal)
+}
+
+// configMapDataDirty is the configmap counterpart of secretDataDirty.
+func (m *Model) configMapDataDirty() bool {
+	if m.configMapData == nil || m.configMapDataOriginal == nil {
+		return false
+	}
+	return !stringMapsEqual(m.configMapData.Data, m.configMapDataOriginal)
+}
+
+// labelDataDirty reports whether either the labels map or the annotations
+// map has changed since the editor was opened.
+func (m *Model) labelDataDirty() bool {
+	if m.labelData == nil {
+		return false
+	}
+	if !stringMapsEqual(m.labelData.Labels, m.labelLabelsOriginal) {
+		return true
+	}
+	if !stringMapsEqual(m.labelData.Annotations, m.labelAnnotationsOriginal) {
+		return true
+	}
+	return false
+}
+
+// stringMapsEqual returns true when two string→string maps have the same
+// set of keys with the same values.
+func stringMapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, va := range a {
+		vb, ok := b[k]
+		if !ok || va != vb {
+			return false
+		}
+	}
+	return true
 }

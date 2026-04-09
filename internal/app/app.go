@@ -596,22 +596,24 @@ type Model struct {
 	schemeOriginalName string // scheme name before opening overlay, for cancel restore
 
 	// Secret editor state.
-	secretData        *model.SecretData
-	secretCursor      int
-	secretRevealed    map[string]bool
-	secretAllRevealed bool
-	secretEditing     bool
-	secretEditKey     TextInput
-	secretEditValue   TextInput
-	secretEditColumn  int // 0=key, 1=value
+	secretData         *model.SecretData
+	secretDataOriginal map[string]string // snapshot taken at load time for dirty detection
+	secretCursor       int
+	secretRevealed     map[string]bool
+	secretAllRevealed  bool
+	secretEditing      bool
+	secretEditKey      TextInput
+	secretEditValue    TextInput
+	secretEditColumn   int // 0=key, 1=value
 
 	// ConfigMap editor state.
-	configMapData       *model.ConfigMapData
-	configMapCursor     int
-	configMapEditing    bool
-	configMapEditKey    TextInput
-	configMapEditValue  TextInput
-	configMapEditColumn int // 0=key, 1=value
+	configMapData         *model.ConfigMapData
+	configMapDataOriginal map[string]string // snapshot taken at load time for dirty detection
+	configMapCursor       int
+	configMapEditing      bool
+	configMapEditKey      TextInput
+	configMapEditValue    TextInput
+	configMapEditColumn   int // 0=key, 1=value
 
 	// Rollback overlay state (deployments).
 	rollbackRevisions []k8s.DeploymentRevision
@@ -633,14 +635,16 @@ type Model struct {
 	helmRevisionsLoading bool
 
 	// Label/annotation editor state.
-	labelData         *model.LabelAnnotationData
-	labelCursor       int
-	labelTab          int // 0=labels, 1=annotations
-	labelEditing      bool
-	labelEditKey      TextInput
-	labelEditValue    TextInput
-	labelEditColumn   int                     // 0=key, 1=value
-	labelResourceType model.ResourceTypeEntry // the resource type being edited
+	labelData                *model.LabelAnnotationData
+	labelLabelsOriginal      map[string]string // snapshot of labels at load time
+	labelAnnotationsOriginal map[string]string // snapshot of annotations at load time
+	labelCursor              int
+	labelTab                 int // 0=labels, 1=annotations
+	labelEditing             bool
+	labelEditKey             TextInput
+	labelEditValue           TextInput
+	labelEditColumn          int                     // 0=key, 1=value
+	labelResourceType        model.ResourceTypeEntry // the resource type being edited
 
 	// ArgoCD autosync overlay state.
 	autoSyncEnabled  bool

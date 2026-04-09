@@ -312,7 +312,7 @@ func (m Model) overlayHintBarOverlaySecretEditor() string {
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
 		{Key: "D", Desc: "del"},
-		{Key: "s", Desc: "save"},
+		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
 	})
 }
@@ -332,7 +332,7 @@ func (m Model) overlayHintBarOverlayConfigMapEditor() string {
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
 		{Key: "D", Desc: "del"},
-		{Key: "s", Desc: "save"},
+		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
 	})
 }
@@ -352,7 +352,7 @@ func (m Model) overlayHintBarOverlayLabelEditor() string {
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
 		{Key: "D", Desc: "del"},
-		{Key: "s", Desc: "save"},
+		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
 	})
 }

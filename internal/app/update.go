@@ -1687,6 +1687,11 @@ func (m Model) updateSecretDataLoaded(msg secretDataLoadedMsg) (tea.Model, tea.C
 		return m, scheduleStatusClear()
 	}
 	m.secretData = msg.data
+	// Snapshot the original data for dirty detection on save.
+	m.secretDataOriginal = make(map[string]string, len(msg.data.Data))
+	for k, v := range msg.data.Data {
+		m.secretDataOriginal[k] = v
+	}
 	m.secretCursor = 0
 	m.secretRevealed = make(map[string]bool)
 	m.secretAllRevealed = false
@@ -1727,6 +1732,11 @@ func (m Model) updateConfigMapDataLoaded(msg configMapDataLoadedMsg) (tea.Model,
 		return m, scheduleStatusClear()
 	}
 	m.configMapData = msg.data
+	// Snapshot the original data for dirty detection on save.
+	m.configMapDataOriginal = make(map[string]string, len(msg.data.Data))
+	for k, v := range msg.data.Data {
+		m.configMapDataOriginal[k] = v
+	}
 	m.configMapCursor = 0
 	m.configMapEditing = false
 	m.configMapEditColumn = -1
@@ -1750,6 +1760,15 @@ func (m Model) updateLabelDataLoaded(msg labelDataLoadedMsg) (tea.Model, tea.Cmd
 		return m, scheduleStatusClear()
 	}
 	m.labelData = msg.data
+	// Snapshot both maps for dirty detection on save.
+	m.labelLabelsOriginal = make(map[string]string, len(msg.data.Labels))
+	for k, v := range msg.data.Labels {
+		m.labelLabelsOriginal[k] = v
+	}
+	m.labelAnnotationsOriginal = make(map[string]string, len(msg.data.Annotations))
+	for k, v := range msg.data.Annotations {
+		m.labelAnnotationsOriginal[k] = v
+	}
 	m.labelCursor = 0
 	m.labelTab = 0
 	m.labelEditing = false
