@@ -177,3 +177,38 @@ func TestManagerAvailabilityCached(t *testing.T) {
 	assert.Equal(t, int32(1), s.AvailCalls.Load(),
 		"availability should be cached within TTL")
 }
+
+func TestFindingIndexCountsAndLookup(t *testing.T) {
+	m := NewManager()
+	s := &FakeSource{NameStr: "s", Available: true, Findings: []Finding{
+		{
+			ID: "1", Severity: SeverityCritical,
+			Resource: ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"},
+		},
+		{
+			ID: "2", Severity: SeverityHigh,
+			Resource: ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"},
+		},
+		{
+			ID: "3", Severity: SeverityLow,
+			Resource: ResourceRef{Namespace: "prod", Kind: "Pod", Name: "db-0"},
+		},
+	}}
+	m.Register(s)
+
+	_, err := m.FetchAll(context.Background(), "ctx", "")
+	require.NoError(t, err)
+
+	idx := m.Index()
+	api := idx.For(ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"})
+	assert.Equal(t, 1, api.Critical)
+	assert.Equal(t, 1, api.High)
+	assert.Equal(t, 0, api.Medium)
+	assert.Equal(t, 0, api.Low)
+	assert.Equal(t, 2, api.Total())
+	assert.Equal(t, SeverityCritical, api.Highest())
+
+	empty := idx.For(ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "nope"})
+	assert.Equal(t, 0, empty.Total())
+	assert.Equal(t, SeverityUnknown, empty.Highest())
+}

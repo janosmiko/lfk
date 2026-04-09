@@ -36,6 +36,7 @@ type Manager struct {
 	cacheKey     string // lastCtx + "|" + lastNamespace
 	cachedResult FetchResult
 	cachedAt     time.Time
+	cachedIndex  *FindingIndex
 
 	availCache map[string]availEntry // key = kubeCtx
 }
@@ -179,6 +180,78 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 	m.cacheKey = cacheKey
 	m.cachedResult = res
 	m.cachedAt = time.Now()
+	m.cachedIndex = BuildFindingIndex(res.Findings)
 	m.mu.Unlock()
 	return res, nil
+}
+
+// SeverityCounts holds severity breakdown for a single resource.
+type SeverityCounts struct {
+	Critical, High, Medium, Low int
+}
+
+// Total returns the sum of all severity buckets.
+func (c SeverityCounts) Total() int {
+	return c.Critical + c.High + c.Medium + c.Low
+}
+
+// Highest returns the highest severity present, or SeverityUnknown if none.
+func (c SeverityCounts) Highest() Severity {
+	switch {
+	case c.Critical > 0:
+		return SeverityCritical
+	case c.High > 0:
+		return SeverityHigh
+	case c.Medium > 0:
+		return SeverityMedium
+	case c.Low > 0:
+		return SeverityLow
+	default:
+		return SeverityUnknown
+	}
+}
+
+// FindingIndex aggregates findings by resource for O(1) per-row lookup.
+type FindingIndex struct {
+	counts map[string]SeverityCounts
+}
+
+// For returns the aggregated counts for the given resource. Zero value when absent.
+func (i *FindingIndex) For(ref ResourceRef) SeverityCounts {
+	if i == nil {
+		return SeverityCounts{}
+	}
+	return i.counts[ref.Key()]
+}
+
+// BuildFindingIndex constructs an index from a slice of findings.
+func BuildFindingIndex(findings []Finding) *FindingIndex {
+	idx := &FindingIndex{counts: make(map[string]SeverityCounts)}
+	for _, f := range findings {
+		key := f.Resource.Key()
+		c := idx.counts[key]
+		switch f.Severity {
+		case SeverityCritical:
+			c.Critical++
+		case SeverityHigh:
+			c.High++
+		case SeverityMedium:
+			c.Medium++
+		case SeverityLow:
+			c.Low++
+		}
+		idx.counts[key] = c
+	}
+	return idx
+}
+
+// Index returns the FindingIndex for the most recent FetchAll result.
+// Returns an empty index if FetchAll has not been called yet.
+func (m *Manager) Index() *FindingIndex {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.cachedIndex == nil {
+		return &FindingIndex{counts: map[string]SeverityCounts{}}
+	}
+	return m.cachedIndex
 }
