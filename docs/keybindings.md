@@ -17,6 +17,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
 | `z` | Toggle expand/collapse all resource groups |
 | `p` | Pin/unpin CRD group (at resource types level) |
+| `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar (resets each launch) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |
@@ -32,7 +33,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `F` | Toggle fullscreen (middle column or dashboard) |
 | `.` | Quick filter presets |
 | `!` | Error log |
-| `Ctrl+S` | Toggle secret value visibility (decode base64) |
+| `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
 | `I` | API Explorer (browse resource structure interactively) |
 | `U` | RBAC permissions browser (can-i) |
 | `M` | Toggle resource relationship map view |
@@ -252,6 +253,41 @@ All other keys are forwarded to the PTY process. The PTY session continues runni
 | `u` | Toggle unified/side-by-side view |
 | `q` / `Esc` | Back to explorer |
 
+## Inline Editors (Secret / ConfigMap / Labels & Annotations)
+
+The Secret, ConfigMap, and Labels/Annotations editors use a shared key-value
+overlay. The list view supports vim-like navigation; pressing `e` or `a`
+enters edit mode for the selected (or new) entry.
+
+### List view
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Move cursor up/down |
+| `e` | Edit selected key/value |
+| `a` | Add a new key/value entry |
+| `y` | Copy selected value to clipboard |
+| `D` | Delete selected entry |
+| `Enter` | Save changes and close (no-op if nothing changed) |
+| `Esc` | Close without saving |
+
+The Labels/Annotations editor additionally has a `Tab` binding in the list
+view to switch between the labels pane and the annotations pane.
+
+### Edit mode
+
+| Key | Action |
+|---|---|
+| `Tab` | Switch between key and value fields (in-progress edits in both fields are preserved) |
+| `Cmd+V` (macOS) / `Ctrl+Shift+V` (Linux) | Paste from clipboard |
+| `Ctrl+S` | Commit the in-progress edit back to the list |
+| `Esc` | Cancel the in-progress edit |
+
+> Pressing `Enter` from the list view saves all pending changes via `kubectl
+> apply`/`patch` and refreshes the resource. If no fields were modified, the
+> overlay closes silently. The previous `s` save shortcut has been removed —
+> use `Enter` instead.
+
 ## API Explorer
 
 | Key | Action |
@@ -462,6 +498,7 @@ keybindings:
   preview_down: "J"      # Scroll preview down
   preview_up: "K"        # Scroll preview up
   jump_owner: "o"        # Jump to owner
+  toggle_rare: "H"       # Toggle rarely used resource types in the sidebar
 
   # Views and Modes
   help: "?"              # Toggle help

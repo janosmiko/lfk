@@ -57,6 +57,7 @@
 - **Resource groups**: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
 - **Pinned CRD groups**: Pin frequently used CRD API groups so they appear after built-in categories. Configurable via `pinned_groups` in config or interactively with `p` key (stored per-context)
 - **CRD categories**: Discovered CRDs are grouped by API group name (e.g., `argoproj.io`, `longhorn.io`, `networking.istio.io`)
+- **Hide rarely used resources**: CSI internals, admission webhooks, APF, leases, runtime classes, endpoints, and uncategorized core resources are hidden by default. Press `H` to surface them under their categories and an "Advanced" group (resets each launch)
 - **Expandable/collapsible resource groups** with `z`
 - **Fullscreen middle column** toggle with `Shift+F`
 - **Vim-style keybindings** throughout (fully customizable via config)
@@ -248,6 +249,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Enter` | Open full-screen YAML view / navigate into |
 | `z` | Toggle expand/collapse all resource groups |
 | `p` | Pin/unpin CRD group (at resource types level) |
+| `H` | Toggle rarely used resource types (CSI internals, webhooks, leases, advanced core) in the sidebar |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |

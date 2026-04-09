@@ -48,6 +48,8 @@ var startupTips = []string{
 	"Press e to edit resources with your $EDITOR",
 	"Press v to describe a resource (like kubectl describe)",
 	"Press p to pin/unpin CRD groups for quick access",
+	"Press Shift+H to surface rarely used resource types (CSI, webhooks, leases, advanced core)",
+	"In the secret/configmap/labels editor: Tab switches fields, Enter saves, Cmd+V pastes",
 	"Use abbreviated search: type 'po' for Pods, 'deploy' for Deployments",
 	"In log viewer: s for timestamps, c for previous terminated container, \\ to filter pods/containers",
 	"Configure custom actions per resource type in ~/.config/lfk/config.yaml",
