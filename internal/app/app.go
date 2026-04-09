@@ -15,6 +15,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -569,6 +570,11 @@ type Model struct {
 
 	// Monitoring preview: rendered monitoring dashboard for the right column.
 	monitoringPreview string
+
+	// Security dashboard state.
+	securityManager   *security.Manager
+	securityView      ui.SecurityViewState
+	securityAvailable bool
 
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)

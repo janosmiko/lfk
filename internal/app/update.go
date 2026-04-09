@@ -152,6 +152,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return mdl, cmd, true
 	}
 
+	if mdl, ok := m.updateSecurityMsg(msg); ok {
+		return mdl, nil, true
+	}
 	return m.updateEasterEggMsg(msg)
 }
 
