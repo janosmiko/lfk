@@ -224,51 +224,60 @@ func (m Model) statusBar() string {
 	parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
 
 	// Styled key hints -- show a reduced set for dashboard views.
+	parts = append(parts, ui.FormatHintParts(m.explorerHintEntries()))
+
+	content := strings.Join(parts, "  ")
+	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+}
+
+// explorerHintEntries returns the styled key hints displayed in the status bar
+// for the explorer (and related dashboard) views. Dashboard pseudo-resources
+// (overview/monitoring/security) get a reduced hint set.
+func (m Model) explorerHintEntries() []ui.HintEntry {
 	kb := ui.ActiveKeybindings
-	var hintEntries []ui.HintEntry
 	sel := m.selectedMiddleItem()
 	isDashboard := sel != nil && m.nav.Level == model.LevelResourceTypes &&
-		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__")
+		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__" || sel.Extra == "__security__")
 	if isDashboard {
-		hintEntries = []ui.HintEntry{
+		return []ui.HintEntry{
 			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
 			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
 			{Key: kb.NewTab, Desc: "new tab"},
+			{Key: kb.Monitoring, Desc: "monitoring"},
+			{Key: kb.Security, Desc: "security"},
 			{Key: kb.Help, Desc: "help"},
 			{Key: "q", Desc: "quit"},
-		}
-	} else {
-		hintEntries = []ui.HintEntry{
-			{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
-			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
-			{Key: kb.Enter, Desc: "view"},
-			{Key: kb.NamespaceSelector, Desc: "namespace"},
-			{Key: kb.AllNamespaces, Desc: "all-ns"},
-			{Key: kb.ActionMenu, Desc: "actions"},
-			{Key: kb.CreateTemplate, Desc: "create"},
-			{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
-			{Key: kb.Filter, Desc: "filter"},
-			{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
-			{Key: kb.Help, Desc: "help"},
-			{Key: "q", Desc: "quit"},
-		}
-		// Add context-specific hints for Events resource type.
-		if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "Event" {
-			toggleDesc := "warnings only"
-			if m.warningEventsOnly {
-				toggleDesc = "all events"
-			}
-			hintEntries = append(hintEntries[:len(hintEntries)-1], // before "quit"
-				ui.HintEntry{Key: kb.SaveResource, Desc: toggleDesc},
-				hintEntries[len(hintEntries)-1], // "quit" at end
-			)
 		}
 	}
-	parts = append(parts, ui.FormatHintParts(hintEntries))
-
-	content := strings.Join(parts, "  ")
-	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+	hintEntries := []ui.HintEntry{
+		{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
+		{Key: kb.Down + "/" + kb.Up, Desc: "move"},
+		{Key: kb.Enter, Desc: "view"},
+		{Key: kb.NamespaceSelector, Desc: "namespace"},
+		{Key: kb.AllNamespaces, Desc: "all-ns"},
+		{Key: kb.ActionMenu, Desc: "actions"},
+		{Key: kb.CreateTemplate, Desc: "create"},
+		{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
+		{Key: kb.Filter, Desc: "filter"},
+		{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
+		{Key: kb.Monitoring, Desc: "monitoring"},
+		{Key: kb.Security, Desc: "security"},
+		{Key: kb.Help, Desc: "help"},
+		{Key: "q", Desc: "quit"},
+	}
+	// Add context-specific hints for Events resource type.
+	if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "Event" {
+		toggleDesc := "warnings only"
+		if m.warningEventsOnly {
+			toggleDesc = "all events"
+		}
+		hintEntries = append(hintEntries[:len(hintEntries)-1], // before "quit"
+			ui.HintEntry{Key: kb.SaveResource, Desc: toggleDesc},
+			hintEntries[len(hintEntries)-1], // "quit" at end
+		)
+	}
+	return hintEntries
 }
 
 // --- Overlay rendering ---

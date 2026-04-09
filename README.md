@@ -105,6 +105,14 @@
 - **Session persistence**: Remembers last context/namespace/resource across restarts
 - **Command bar**: Press `:` for shell/kubectl commands with autocompletion
 
+### Security Dashboard
+
+- **Unified security view**: Press `#` to open an aggregate dashboard showing findings from built-in heuristic checks and (when installed) the Trivy Operator (`VulnerabilityReport`, `ConfigAuditReport`).
+- **Per-resource indicators**: Explorer rows show severity-colored badges and counts for workloads with findings (auto-gated on source availability).
+- **Per-resource drill-down**: Press `H` on a selected resource to open the dashboard pre-filtered to that resource, or use the "Security Findings" entry in the action menu (`x`).
+- **Category tabs**: Findings are grouped by category (Vulnerabilities, Misconfiguration, Policy, Compliance). Cycle with `Tab`/`Shift+Tab` or jump by index with `1`-`4`.
+- **Configurable sources**: Enable/disable heuristic checks and the trivy-operator source per cluster via the `security` config block.
+
 ### Integrations
 
 - **ArgoCD integration**: Browse Applications, sync, terminate sync, refresh, view managed resources

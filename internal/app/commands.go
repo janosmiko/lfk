@@ -40,6 +40,8 @@ var startupTips = []string{
 	"Press I to explore any API resource with kubectl explain",
 	"Press U to check RBAC permissions for a resource type",
 	"Press @ to open the monitoring dashboard",
+	"Press # to open the security dashboard",
+	"Press H on a resource to see its security findings",
 	"Press o to jump to the parent/owner of a resource",
 	"Press m<key> to save a bookmark, ' to open bookmarks",
 	"Press y to copy resource name, Y to copy YAML",

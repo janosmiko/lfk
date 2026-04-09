@@ -12,6 +12,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `log_path` | string | `"~/.local/share/lfk/lfk.log"` | Path to the application log file. |
 | `dashboard` | bool | `true` | Show cluster dashboard when entering a context. Set to `false` to go directly to resource types. |
 | `monitoring` | map[string]object | `{}` | Per-cluster monitoring endpoint configuration. Keys are context names or `"default"`. See [Monitoring](#monitoring) section. |
+| `security` | map[string]object | *(see default)* | Per-cluster security dashboard configuration. Keys are context names or `"default"`. See [Security](#security) section. |
 | `resource_columns` | map[string]list | `{}` | Per-resource-type column configuration. Keys are resource Kind names (case-insensitive). When not set for a kind, columns are auto-detected. |
 | `clusters` | map[string]object | `{}` | Per-cluster configuration overrides. Keys are context names. See [Clusters](#clusters) section. |
 | `theme` | object | *(see Theme section)* | Custom color theme overrides. |
@@ -78,6 +79,66 @@ When not configured, the following defaults are used for auto-discovery:
 |---|---|---|
 | Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
 | Alertmanager | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `alertmanager-operated`, `alertmanager`, `prometheus-kube-prometheus-alertmanager`, `alertmanager-main` |
+
+## Security
+
+Configure the security dashboard (`#` key) and per-resource indicators. All
+fields are optional with sensible defaults. Keys are kubeconfig context names;
+the special key `"default"` applies to any cluster without an explicit entry.
+
+```yaml
+security:
+  default:
+    enabled: true
+    per_resource_indicators: true
+    per_resource_action: true
+    refresh_ttl: 30s
+    availability_ttl: 60s
+    sources:
+      heuristic:
+        enabled: true
+        checks:
+          - privileged
+          - host_namespaces
+          - host_path
+          - readonly_root_fs
+          - run_as_root
+          - allow_priv_esc
+          - dangerous_caps
+          - missing_resource_limits
+          - default_sa
+          - latest_tag
+      trivy_operator:
+        enabled: true
+```
+
+### Security Entry Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | bool | `true` | Master switch for the security dashboard and `#`/`H` hotkeys |
+| `per_resource_indicators` | bool | `true` | Show severity badges in the explorer when sources are available |
+| `per_resource_action` | bool | `true` | Show "Security Findings" in the action menu |
+| `refresh_ttl` | duration | `"30s"` | Cache TTL for fetched findings |
+| `availability_ttl` | duration | `"60s"` | Cache TTL for source availability checks |
+| `sources` | map | *(see default)* | Per-source configuration map (`heuristic`, `trivy_operator`) |
+
+### Source Fields
+
+Each source entry under `sources:` accepts:
+
+| Field | Type | Description |
+|---|---|---|
+| `enabled` | bool | Per-source opt-out toggle (defaults to `true` for each source) |
+| `checks` | list[string] | (heuristic only) Which checks to run. Omit or set to `null` to run all built-in checks. |
+
+Available heuristic checks: `privileged`, `host_namespaces`, `host_path`,
+`readonly_root_fs`, `run_as_root`, `allow_priv_esc`, `dangerous_caps`,
+`missing_resource_limits`, `default_sa`, `latest_tag`.
+
+The `trivy_operator` source reads `VulnerabilityReport` and `ConfigAuditReport`
+CRDs from the `aquasecurity.github.io/v1alpha1` API group. It is automatically
+disabled when those CRDs are not present in the cluster.
 
 ## Clusters
 
