@@ -206,6 +206,16 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	// Route interactive keys to the security dashboard when the security
+	// pseudo-item is focused. Standard explorer keys (h/l, /, etc.) continue
+	// to flow through the normal dispatch via a conservative whitelist.
+	if m.nav.Level == model.LevelResourceTypes && isSecurityDashboardKey(msg) {
+		if sel := m.selectedMiddleItem(); sel != nil && sel.Extra == "__security__" {
+			updated, cmd := m.handleSecurityKey(msg)
+			return updated, cmd
+		}
+	}
+
 	if mdl, cmd, handled := m.handleExplorerNavKey(msg); handled {
 		return mdl, cmd
 	}
@@ -446,7 +456,7 @@ func (m Model) handleExplorerResourceMap() (tea.Model, tea.Cmd) {
 // handleExplorerTogglePreview toggles between split view and full YAML preview.
 func (m Model) handleExplorerTogglePreview() (tea.Model, tea.Cmd) {
 	if sel := m.selectedMiddleItem(); sel != nil && m.nav.Level == model.LevelResourceTypes &&
-		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__") {
+		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__" || sel.Extra == "__security__") {
 		return m, nil
 	}
 	m.fullYAMLPreview = !m.fullYAMLPreview
@@ -464,7 +474,7 @@ func (m Model) handleExplorerTogglePreview() (tea.Model, tea.Cmd) {
 // handleExplorerFullscreen toggles fullscreen mode for the middle column or dashboard.
 func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 	sel := m.selectedMiddleItem()
-	if sel != nil && (sel.Extra == "__overview__" || sel.Extra == "__monitoring__") && m.nav.Level == model.LevelResourceTypes {
+	if sel != nil && (sel.Extra == "__overview__" || sel.Extra == "__monitoring__" || sel.Extra == "__security__") && m.nav.Level == model.LevelResourceTypes {
 		m.fullscreenDashboard = !m.fullscreenDashboard
 		m.previewScroll = 0
 		if m.fullscreenDashboard {
@@ -760,4 +770,25 @@ func (m Model) handleKeySecretToggle() (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Secret values HIDDEN", false)
 	}
 	return m, scheduleStatusClear()
+}
+
+// isSecurityDashboardKey reports whether the key is one that the security
+// dashboard handles in the preview pane. Used by the explorer key dispatch
+// to route to handleSecurityKey when the security pseudo-item is focused.
+// The whitelist is intentionally conservative: standard explorer keys such
+// as h/l (navigate back/forward) and / (search) continue to be handled by
+// the regular explorer dispatch even while the security item is focused.
+func isSecurityDashboardKey(msg tea.KeyMsg) bool {
+	switch msg.Type {
+	case tea.KeyTab, tea.KeyShiftTab, tea.KeyEnter:
+		return true
+	}
+	if len(msg.Runes) == 0 {
+		return false
+	}
+	switch msg.Runes[0] {
+	case 'j', 'k', 'g', 'G', 'r', 'C', '1', '2', '3', '4':
+		return true
+	}
+	return false
 }

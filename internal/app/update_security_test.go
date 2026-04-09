@@ -302,3 +302,81 @@ func TestHandleExplorerActionKeySecurityResourceNoSelection(t *testing.T) {
 	require.True(t, ok)
 	assert.Nil(t, mm.securityView.ResourceFilter)
 }
+
+// --- Integration: security keys must reach handleSecurityKey via the live dispatch ---
+
+func TestSecurityKeysReachHandlerViaDispatch(t *testing.T) {
+	m := Model{}
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Security", Extra: "__security__"},
+	}
+	m.securityView.AvailableCategories = []security.Category{
+		security.CategoryVuln, security.CategoryMisconfig,
+	}
+	m.securityView.ActiveCategory = security.CategoryVuln
+
+	// Drive the key through the live dispatch function (not handleSecurityKey
+	// directly). This guards against regressions where the security handler
+	// becomes unreachable from the explorer key path.
+	updated, _ := m.handleExplorerKey(tea.KeyMsg{Type: tea.KeyTab})
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, security.CategoryMisconfig, mm.securityView.ActiveCategory,
+		"live key dispatch must route Tab to handleSecurityKey")
+}
+
+func TestSecurityKeysDoNotInterceptOtherItems(t *testing.T) {
+	// When the selected middle item is not the security pseudo-item,
+	// security keys must fall through to the regular explorer dispatch.
+	m := Model{}
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "pods", Kind: "Pod"},
+	}
+	m.securityView.AvailableCategories = []security.Category{
+		security.CategoryVuln, security.CategoryMisconfig,
+	}
+	m.securityView.ActiveCategory = security.CategoryVuln
+
+	updated, _ := m.handleExplorerKey(tea.KeyMsg{Type: tea.KeyTab})
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, security.CategoryVuln, mm.securityView.ActiveCategory,
+		"Tab must not cycle security category when security item is not focused")
+}
+
+func TestIsSecurityDashboardKeyWhitelist(t *testing.T) {
+	// Positive: whitelisted keys.
+	positives := []tea.KeyMsg{
+		{Type: tea.KeyTab},
+		{Type: tea.KeyShiftTab},
+		{Type: tea.KeyEnter},
+		{Type: tea.KeyRunes, Runes: []rune{'j'}},
+		{Type: tea.KeyRunes, Runes: []rune{'k'}},
+		{Type: tea.KeyRunes, Runes: []rune{'g'}},
+		{Type: tea.KeyRunes, Runes: []rune{'G'}},
+		{Type: tea.KeyRunes, Runes: []rune{'r'}},
+		{Type: tea.KeyRunes, Runes: []rune{'C'}},
+		{Type: tea.KeyRunes, Runes: []rune{'1'}},
+		{Type: tea.KeyRunes, Runes: []rune{'2'}},
+		{Type: tea.KeyRunes, Runes: []rune{'3'}},
+		{Type: tea.KeyRunes, Runes: []rune{'4'}},
+	}
+	for _, p := range positives {
+		assert.True(t, isSecurityDashboardKey(p), "expected key to be whitelisted: %+v", p)
+	}
+
+	// Negative: explorer keys that must continue to work normally.
+	negatives := []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'h'}},
+		{Type: tea.KeyRunes, Runes: []rune{'l'}},
+		{Type: tea.KeyRunes, Runes: []rune{'/'}},
+		{Type: tea.KeyRunes, Runes: []rune{'f'}},
+		{Type: tea.KeyRunes, Runes: []rune{'?'}},
+		{Type: tea.KeyRunes}, // empty runes
+	}
+	for _, n := range negatives {
+		assert.False(t, isSecurityDashboardKey(n), "expected key to fall through: %+v", n)
+	}
+}

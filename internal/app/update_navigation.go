@@ -268,7 +268,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
-	if sel.Extra == "__overview__" || sel.Extra == "__monitoring__" {
+	if sel.Extra == "__overview__" || sel.Extra == "__monitoring__" || sel.Extra == "__security__" {
 		m.fullscreenDashboard = true
 		m.previewScroll = 0
 		m.setStatusMessage("Dashboard fullscreen ON", false)
