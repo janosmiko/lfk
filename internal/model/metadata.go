@@ -145,11 +145,11 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 
 	// ---- Networking ----
 	"/services":                                {Category: "Networking", DisplayName: "Services", Icon: "⇌"},
-	"/endpoints":                               {Category: "Networking", DisplayName: "Endpoints", Icon: "⇢", Rare: true},
+	"/endpoints":                               {Category: "Networking", DisplayName: "Endpoints", Icon: "⇢"},
 	"networking.k8s.io/ingresses":              {Category: "Networking", DisplayName: "Ingresses", Icon: "↳"},
 	"networking.k8s.io/networkpolicies":        {Category: "Networking", DisplayName: "NetworkPolicies", Icon: "⛊"},
 	"networking.k8s.io/ingressclasses":         {Category: "Networking", DisplayName: "IngressClasses", Icon: "↳"},
-	"discovery.k8s.io/endpointslices":          {Category: "Networking", DisplayName: "EndpointSlices", Icon: "⇢", Rare: true},
+	"discovery.k8s.io/endpointslices":          {Category: "Networking", DisplayName: "EndpointSlices", Icon: "⇢"},
 	"gateway.networking.k8s.io/gatewayclasses": {Category: "Networking", DisplayName: "GatewayClasses", Icon: "⇶"},
 	"gateway.networking.k8s.io/httproutes":     {Category: "Networking", DisplayName: "HTTPRoutes", Icon: "⇶"},
 	"gateway.networking.k8s.io/tlsroutes":      {Category: "Networking", DisplayName: "TLSRoutes", Icon: "⇶"},
