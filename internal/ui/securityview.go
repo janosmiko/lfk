@@ -366,4 +366,69 @@ func renderSecurityStatusOverlay(state SecurityViewState) string {
 	return ""
 }
 
-// RenderSecurityDashboard (F6) composes everything — implemented in the next task.
+// -----------------------------------------------------------------------------
+// F6 — main composition
+// -----------------------------------------------------------------------------
+
+// RenderSecurityDashboard composes the header, tiles, tab strip, findings
+// table, and details pane into a single string sized to (width, height).
+// This is the only exported render function for the security view.
+func RenderSecurityDashboard(state SecurityViewState, width, height int) string {
+	if overlay := renderSecurityStatusOverlay(state); overlay != "" && len(state.Findings) == 0 {
+		return overlay
+	}
+
+	var b strings.Builder
+
+	// Header.
+	header := "Security Dashboard"
+	if state.ResourceFilter != nil {
+		header = "Security: " + state.ResourceFilter.Key() + "    [C] clear filter"
+	}
+	b.WriteString(header)
+	b.WriteString("    ")
+	b.WriteString(DimStyle.Render("updated "))
+	b.WriteString(DimStyle.Render(state.updatedAgo()))
+	b.WriteString("\n")
+	b.WriteString(strings.Repeat("─", width))
+	b.WriteString("\n")
+
+	// Tiles.
+	b.WriteString(renderSeverityTiles(state, width))
+	b.WriteString("\n\n")
+
+	// Tab strip.
+	if tabs := renderTabStrip(state); tabs != "" {
+		b.WriteString(tabs)
+		b.WriteString("\n")
+	}
+	b.WriteString(strings.Repeat("─", width))
+	b.WriteString("\n")
+
+	// Table — reserve rows for header/details/hint.
+	reserved := 8 // header + tiles + separators
+	if state.ShowDetail {
+		reserved += 8
+	}
+	maxRows := height - reserved
+	if maxRows < 1 {
+		maxRows = 1
+	}
+	b.WriteString(renderFindingsTable(state, width, maxRows))
+
+	// Details pane.
+	if state.ShowDetail {
+		b.WriteString("\n")
+		b.WriteString(renderDetailsPane(state, width))
+	}
+
+	// Hint bar.
+	b.WriteString("\n")
+	hint := "[/]filter [Tab]tab [Enter]det [r]refresh [J/K]scroll"
+	if state.ResourceFilter != nil {
+		hint = "[/]filter [Tab]tab [Enter]det [r]refresh [C]clear [J/K]scroll"
+	}
+	b.WriteString(DimStyle.Render(hint))
+
+	return b.String()
+}

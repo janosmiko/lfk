@@ -254,3 +254,69 @@ func TestRenderNoSourcesAvailable(t *testing.T) {
 	out := renderSecurityStatusOverlay(state)
 	assert.Contains(t, out, "No security sources available")
 }
+
+// -----------------------------------------------------------------------------
+// F6 — composition
+// -----------------------------------------------------------------------------
+
+func TestRenderSecurityDashboardComposition(t *testing.T) {
+	state := SecurityViewState{
+		AvailableCategories: []security.Category{security.CategoryVuln, security.CategoryMisconfig},
+		ActiveCategory:      security.CategoryVuln,
+		LastFetch:           time.Now().Add(-12 * time.Second),
+		Findings: []security.Finding{
+			{
+				ID: "1", Category: security.CategoryVuln, Severity: security.SeverityCritical,
+				Title: "CVE-2024-1", Source: "trivy-op",
+				Resource: security.ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"},
+			},
+		},
+	}
+	out := RenderSecurityDashboard(state, 80, 20)
+	assert.Contains(t, out, "Security Dashboard")
+	assert.Contains(t, out, "CRIT")
+	assert.Contains(t, out, "Vulns 1")
+	assert.Contains(t, out, "CVE-2024-1")
+	assert.Contains(t, out, "ago")
+}
+
+func TestRenderSecurityDashboardLoading(t *testing.T) {
+	state := SecurityViewState{Loading: true}
+	out := RenderSecurityDashboard(state, 80, 20)
+	assert.Contains(t, out, "Loading security findings")
+}
+
+func TestRenderSecurityDashboardWithFilter(t *testing.T) {
+	ref := &security.ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"}
+	state := SecurityViewState{
+		AvailableCategories: []security.Category{security.CategoryVuln},
+		ActiveCategory:      security.CategoryVuln,
+		ResourceFilter:      ref,
+	}
+	out := RenderSecurityDashboard(state, 80, 20)
+	assert.Contains(t, out, "Security: prod/Deployment/api")
+	assert.Contains(t, out, "clear filter")
+}
+
+// -----------------------------------------------------------------------------
+// F7 — width adaptation
+// -----------------------------------------------------------------------------
+
+func TestRenderSecurityDashboardCompactWidth(t *testing.T) {
+	state := SecurityViewState{
+		AvailableCategories: []security.Category{security.CategoryVuln},
+		ActiveCategory:      security.CategoryVuln,
+		Findings: []security.Finding{
+			{
+				Severity: security.SeverityCritical, Title: "X",
+				Resource: security.ResourceRef{Namespace: "p", Kind: "Deployment", Name: "api"},
+				Category: security.CategoryVuln,
+			},
+		},
+	}
+	for _, w := range []int{30, 50, 70, 120} {
+		out := RenderSecurityDashboard(state, w, 20)
+		assert.NotEmpty(t, out, "width %d should still render", w)
+		assert.Contains(t, out, "CRIT", "width %d should include severity", w)
+	}
+}
