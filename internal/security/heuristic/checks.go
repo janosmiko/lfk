@@ -2,6 +2,7 @@ package heuristic
 
 import (
 	"fmt"
+	"strings"
 
 	corev1 "k8s.io/api/core/v1"
 
@@ -124,4 +125,102 @@ func checkAllowPrivilegeEscalation(pod *corev1.Pod, c corev1.Container) []securi
 	return []security.Finding{makeFinding(pod, c, "allow_priv_esc", security.SeverityMedium,
 		"privilege escalation allowed",
 		fmt.Sprintf("Container %q does not set allowPrivilegeEscalation: false. Setuid binaries can elevate.", c.Name))}
+}
+
+var dangerousCapabilities = map[corev1.Capability]bool{
+	"SYS_ADMIN":  true,
+	"NET_ADMIN":  true,
+	"SYS_PTRACE": true,
+	"SYS_MODULE": true,
+	"NET_RAW":    true,
+	"ALL":        true,
+}
+
+// checkDangerousCapabilities flags containers adding known-dangerous capabilities.
+func checkDangerousCapabilities(pod *corev1.Pod, c corev1.Container) []security.Finding {
+	if c.SecurityContext == nil || c.SecurityContext.Capabilities == nil {
+		return nil
+	}
+	var findings []security.Finding
+	for _, cap := range c.SecurityContext.Capabilities.Add {
+		if !dangerousCapabilities[cap] {
+			continue
+		}
+		findings = append(findings, makeFinding(pod, c, "dangerous_caps_"+string(cap), security.SeverityHigh,
+			"dangerous capability added",
+			fmt.Sprintf("Container %q adds capability %q. Drop it unless strictly required.", c.Name, cap)))
+	}
+	return findings
+}
+
+// checkResourceLimits flags containers missing CPU or memory limits.
+func checkResourceLimits(pod *corev1.Pod, c corev1.Container) []security.Finding {
+	cpu, hasCPU := c.Resources.Limits[corev1.ResourceCPU]
+	mem, hasMem := c.Resources.Limits[corev1.ResourceMemory]
+	if hasCPU && !cpu.IsZero() && hasMem && !mem.IsZero() {
+		return nil
+	}
+	var missing []string
+	if !hasCPU || cpu.IsZero() {
+		missing = append(missing, "cpu")
+	}
+	if !hasMem || mem.IsZero() {
+		missing = append(missing, "memory")
+	}
+	return []security.Finding{makeFinding(pod, c, "missing_resource_limits", security.SeverityLow,
+		"missing resource limits",
+		fmt.Sprintf("Container %q is missing resource limits (%v). Unbounded containers can DoS the node.", c.Name, missing))}
+}
+
+// checkDefaultServiceAccount flags pods using the namespace's default service account.
+// Emits once per pod (bound to first container).
+func checkDefaultServiceAccount(pod *corev1.Pod, c corev1.Container) []security.Finding {
+	if pod.Spec.Containers[0].Name != c.Name {
+		return nil
+	}
+	sa := pod.Spec.ServiceAccountName
+	if sa != "" && sa != "default" {
+		return nil
+	}
+	return []security.Finding{makeFinding(pod, c, "default_sa", security.SeverityLow,
+		"uses default ServiceAccount",
+		"Pod uses the default ServiceAccount. Create a dedicated SA with minimal RBAC.")}
+}
+
+// checkLatestImageTag flags containers without a pinned tag.
+func checkLatestImageTag(pod *corev1.Pod, c corev1.Container) []security.Finding {
+	img := c.Image
+	if strings.Contains(img, "@sha256:") {
+		return nil
+	}
+	last := strings.LastIndex(img, "/")
+	rest := img
+	if last >= 0 {
+		rest = img[last+1:]
+	}
+	colon := strings.Index(rest, ":")
+	tag := ""
+	if colon >= 0 {
+		tag = rest[colon+1:]
+	}
+	if tag != "" && tag != "latest" {
+		return nil
+	}
+	return []security.Finding{makeFinding(pod, c, "latest_tag", security.SeverityLow,
+		"unpinned image tag",
+		fmt.Sprintf("Container %q uses image %q without a pinned version. Pin by tag or digest.", c.Name, img))}
+}
+
+// allChecks is the ordered list of checks the Source runs against each container.
+var allChecks = []checkFn{
+	checkPrivileged,
+	checkHostNamespaces,
+	checkHostPath,
+	checkReadOnlyRootFilesystem,
+	checkRunAsRoot,
+	checkAllowPrivilegeEscalation,
+	checkDangerousCapabilities,
+	checkResourceLimits,
+	checkDefaultServiceAccount,
+	checkLatestImageTag,
 }

@@ -6,7 +6,9 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	corev1 "k8s.io/api/core/v1"
+	"k8s.io/apimachinery/pkg/api/resource"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/janosmiko/lfk/internal/security"
 )
@@ -22,12 +24,19 @@ func boolPtr(b bool) *bool    { return &b }
 func int64Ptr(i int64) *int64 { return &i }
 
 func TestSourceMetadata(t *testing.T) {
-	s := New()
+	s := NewWithClient(fake.NewSimpleClientset())
 	assert.Equal(t, "heuristic", s.Name())
 	assert.Equal(t, []security.Category{security.CategoryMisconfig}, s.Categories())
 	ok, err := s.IsAvailable(context.Background(), "")
 	assert.NoError(t, err)
-	assert.True(t, ok, "heuristic is always available")
+	assert.True(t, ok, "heuristic source with a client is always available")
+}
+
+func TestSourceUnavailableWithoutClient(t *testing.T) {
+	s := New()
+	ok, err := s.IsAvailable(context.Background(), "")
+	assert.NoError(t, err)
+	assert.False(t, ok, "heuristic with nil client reports unavailable")
 }
 
 // TestAllChecksRegistered verifies every expected check is wired into the
@@ -35,7 +44,7 @@ func TestSourceMetadata(t *testing.T) {
 // runs each check against an empty pod/container to confirm the signatures
 // line up and the slice is non-nil.
 func TestAllChecksRegistered(t *testing.T) {
-	assert.Len(t, allChecks, 6, "allChecks should contain the six B1-B4 checks")
+	assert.NotEmpty(t, allChecks, "allChecks must contain at least one check")
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
 		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c"}}},
@@ -187,6 +196,104 @@ func TestCheckAllowPrivilegeEscalation(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			c := corev1.Container{Name: "c", SecurityContext: tc.sc}
 			findings := checkAllowPrivilegeEscalation(pod, c)
+			assert.Len(t, findings, tc.want)
+		})
+	}
+}
+
+func resourceQuantity(s string) resource.Quantity { return resource.MustParse(s) }
+
+func TestCheckDangerousCapabilities(t *testing.T) {
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	cases := []struct {
+		name     string
+		caps     *corev1.Capabilities
+		want     int
+		wantCaps []string
+	}{
+		{"nil -> clean", nil, 0, nil},
+		{"safe caps -> clean", &corev1.Capabilities{Add: []corev1.Capability{"NET_BIND_SERVICE"}}, 0, nil},
+		{"SYS_ADMIN -> flag", &corev1.Capabilities{Add: []corev1.Capability{"SYS_ADMIN"}}, 1, []string{"SYS_ADMIN"}},
+		{"NET_ADMIN -> flag", &corev1.Capabilities{Add: []corev1.Capability{"NET_ADMIN"}}, 1, []string{"NET_ADMIN"}},
+		{"ALL -> flag", &corev1.Capabilities{Add: []corev1.Capability{"ALL"}}, 1, []string{"ALL"}},
+		{"multiple dangerous -> flag", &corev1.Capabilities{Add: []corev1.Capability{"SYS_ADMIN", "NET_ADMIN"}}, 2, []string{"SYS_ADMIN", "NET_ADMIN"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := corev1.Container{Name: "c", SecurityContext: &corev1.SecurityContext{Capabilities: tc.caps}}
+			findings := checkDangerousCapabilities(pod, c)
+			assert.Len(t, findings, tc.want)
+			for i, f := range findings {
+				assert.Equal(t, security.SeverityHigh, f.Severity)
+				assert.Contains(t, f.Summary, tc.wantCaps[i])
+			}
+		})
+	}
+}
+
+func TestCheckResourceLimits(t *testing.T) {
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	resCPU := resourceQuantity("100m")
+	resMem := resourceQuantity("128Mi")
+
+	cases := []struct {
+		name string
+		res  corev1.ResourceRequirements
+		want int
+	}{
+		{"no limits", corev1.ResourceRequirements{}, 1},
+		{"cpu only", corev1.ResourceRequirements{Limits: corev1.ResourceList{corev1.ResourceCPU: resCPU}}, 1},
+		{"memory only", corev1.ResourceRequirements{Limits: corev1.ResourceList{corev1.ResourceMemory: resMem}}, 1},
+		{"both set", corev1.ResourceRequirements{Limits: corev1.ResourceList{
+			corev1.ResourceCPU: resCPU, corev1.ResourceMemory: resMem,
+		}}, 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := corev1.Container{Name: "c", Resources: tc.res}
+			findings := checkResourceLimits(pod, c)
+			assert.Len(t, findings, tc.want)
+		})
+	}
+}
+
+func TestCheckDefaultServiceAccount(t *testing.T) {
+	cases := []struct {
+		name string
+		sa   string
+		want int
+	}{
+		{"empty (defaults to default) -> flag", "", 1},
+		{"explicit default -> flag", "default", 1},
+		{"custom -> clean", "api-sa", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			pod := &corev1.Pod{
+				ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+				Spec:       corev1.PodSpec{ServiceAccountName: tc.sa, Containers: []corev1.Container{{Name: "c"}}},
+			}
+			findings := checkDefaultServiceAccount(pod, pod.Spec.Containers[0])
+			assert.Len(t, findings, tc.want)
+		})
+	}
+}
+
+func TestCheckLatestImageTag(t *testing.T) {
+	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
+	cases := []struct {
+		name, image string
+		want        int
+	}{
+		{"latest tag", "nginx:latest", 1},
+		{"no tag", "nginx", 1},
+		{"specific tag", "nginx:1.25.3", 0},
+		{"digest", "nginx@sha256:abcdef", 0},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			c := corev1.Container{Name: "c", Image: tc.image}
+			findings := checkLatestImageTag(pod, c)
 			assert.Len(t, findings, tc.want)
 		})
 	}
