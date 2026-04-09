@@ -531,3 +531,52 @@ func TestP4ExplorerActionKeyComma(t *testing.T) {
 		_ = result.(Model)
 	}
 }
+
+// --- handleExplorerActionKeySecurity: G4 ---
+
+func TestHandleExplorerActionKeySecurityJumpsToItem(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Cluster", Extra: "__overview__"},
+		{Name: "Monitoring", Extra: "__monitoring__"},
+		{Name: "Security", Extra: "__security__"},
+		{Name: "Workloads"},
+	}
+
+	updated, _, handled := m.handleExplorerActionKeySecurity()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, 2, mm.cursor())
+}
+
+func TestHandleExplorerActionKeySecurityRequiresContext(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+
+	result, _, handled := m.handleExplorerActionKeySecurity()
+	assert.True(t, handled)
+	mm, ok := result.(Model)
+	require.True(t, ok)
+	assert.Contains(t, mm.statusMessage, "Select a cluster first")
+}
+
+func TestHandleExplorerActionKeySecurityViaDispatch(t *testing.T) {
+	prev := ui.ActiveKeybindings.Security
+	ui.ActiveKeybindings.Security = "#"
+	t.Cleanup(func() { ui.ActiveKeybindings.Security = prev })
+
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Cluster", Extra: "__overview__"},
+		{Name: "Security", Extra: "__security__"},
+	}
+
+	result, _, handled := m.handleExplorerActionKey(runeKey('#'))
+	assert.True(t, handled, "# key should be dispatched to security handler")
+	mm, ok := result.(Model)
+	require.True(t, ok)
+	assert.Equal(t, 1, mm.cursor())
+}

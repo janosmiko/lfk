@@ -47,6 +47,9 @@ func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 	if sel.Extra == "__monitoring__" {
 		return m.loadMonitoringDashboard()
 	}
+	if sel.Extra == "__security__" {
+		return m.loadSecurityDashboard()
+	}
 	if sel.Kind == "__collapsed_group__" {
 		return nil
 	}

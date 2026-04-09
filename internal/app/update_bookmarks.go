@@ -387,6 +387,8 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
+	m.securityView = ui.SecurityViewState{}
+	m.securityAvailable = false
 	m.applyPinnedGroups()
 
 	// Set namespace(s).

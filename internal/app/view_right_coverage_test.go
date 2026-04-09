@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // --- renderRightColumnContent: various modes ---
@@ -85,6 +86,30 @@ func TestRenderRightColumnContentResourceTypesMonitoringLoading(t *testing.T) {
 	}
 	result := m.renderRightColumnContent(80, 20)
 	assert.Contains(t, result, "Loading monitoring dashboard")
+}
+
+func TestRenderRightResourceTypesSecurityBranch(t *testing.T) {
+	m := Model{
+		nav: model.NavigationState{Level: model.LevelResourceTypes},
+		middleItems: []model.Item{
+			{Name: "Security", Extra: "__security__"},
+		},
+		securityView: ui.SecurityViewState{Loading: true},
+	}
+	out := m.renderRightResourceTypes(100, 20)
+	assert.Contains(t, out, "Loading security findings")
+}
+
+func TestRenderRightColumnContentResourceTypesSecurity(t *testing.T) {
+	m := Model{
+		nav: model.NavigationState{Level: model.LevelResourceTypes},
+		middleItems: []model.Item{
+			{Name: "Security", Extra: "__security__"},
+		},
+		securityView: ui.SecurityViewState{Loading: true},
+	}
+	result := m.renderRightColumnContent(80, 20)
+	assert.Contains(t, result, "Loading security findings")
 }
 
 func TestRenderRightColumnContentFullYAMLPreview(t *testing.T) {

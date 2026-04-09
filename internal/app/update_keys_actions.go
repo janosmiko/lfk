@@ -68,6 +68,8 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		return m.handleExplorerActionKeySortReset()
 	case kb.Monitoring:
 		return m.handleExplorerActionKeyMonitoring()
+	case kb.Security:
+		return m.handleExplorerActionKeySecurity()
 	}
 	return m, nil, false
 }
@@ -602,6 +604,22 @@ func (m Model) handleExplorerActionKeyMonitoring() (tea.Model, tea.Cmd, bool) {
 	// Find the Monitoring item in the middle column and select it.
 	for i, item := range m.middleItems {
 		if item.Extra == "__monitoring__" {
+			m.setCursor(i)
+			m.clampCursor()
+			return m, m.loadPreview(), true
+		}
+	}
+	return m, nil, true
+}
+
+func (m Model) handleExplorerActionKeySecurity() (tea.Model, tea.Cmd, bool) {
+	if m.nav.Level < model.LevelResourceTypes {
+		m.setStatusMessage("Select a cluster first", true)
+		return m, scheduleStatusClear(), true
+	}
+	// Find the Security item in the middle column and select it.
+	for i, item := range m.middleItems {
+		if item.Extra == "__security__" {
 			m.setCursor(i)
 			m.clampCursor()
 			return m, m.loadPreview(), true

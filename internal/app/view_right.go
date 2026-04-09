@@ -261,6 +261,9 @@ func (m Model) renderRightResourceTypes(width, height int) string {
 		}
 		return m.monitoringPreview
 	}
+	if sel != nil && sel.Extra == "__security__" {
+		return ui.RenderSecurityDashboard(m.securityView, width, height)
+	}
 	return m.renderRightDefault(width, height)
 }
 
