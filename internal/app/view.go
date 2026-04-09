@@ -169,6 +169,20 @@ func (m Model) viewExplorer() string {
 	ui.ActiveSelectedItems = m.selectedItems
 	defer func() { ui.ActiveSelectedItems = nil }()
 
+	// Set security badge state so RenderTable can decorate eligible rows.
+	// The badge is gated on securityAvailable so clusters without a source
+	// see the same output they had before security was introduced.
+	ui.ActiveSecurityAvailable = m.securityAvailable
+	if m.securityAvailable && m.securityManager != nil {
+		ui.ActiveSecurityIndex = m.securityManager.Index()
+	} else {
+		ui.ActiveSecurityIndex = nil
+	}
+	defer func() {
+		ui.ActiveSecurityAvailable = false
+		ui.ActiveSecurityIndex = nil
+	}()
+
 	// Calculate column widths: left=12%, middle=51%, right=remainder (~37%).
 	usable := m.width - 6 // 3 columns x 2 border chars
 	var leftW, middleW, rightW int

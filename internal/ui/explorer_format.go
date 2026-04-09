@@ -46,7 +46,9 @@ func headerWithIndicator(label string, colName string, colWidth int) string {
 // formatTableRow builds a plain text table row.
 // Column widths include padding space; truncation reserves 1 char for the gap
 // so truncated text never touches the next column.
-func formatTableRow(name, ns, ready, restarts, status string,
+// securityBadge, when non-empty, is appended inside the name column budget
+// (name is truncated to make room). Pass an empty string to skip the badge.
+func formatTableRow(name, ns, ready, restarts, status, securityBadge string,
 	nameW, nsW, readyW, restartsW, statusW int,
 	hasNs, hasReady, hasRestarts, hasStatus bool,
 ) string {
@@ -54,7 +56,7 @@ func formatTableRow(name, ns, ready, restarts, status string,
 	if hasNs {
 		parts = append(parts, padRight(Truncate(ns, nsW-1), nsW))
 	}
-	parts = append(parts, padRight(Truncate(name, nameW-1), nameW))
+	parts = append(parts, renderNameWithBadge(name, securityBadge, nameW))
 	if hasReady {
 		parts = append(parts, padRight(ready, readyW))
 	}
@@ -68,11 +70,37 @@ func formatTableRow(name, ns, ready, restarts, status string,
 	return strings.Join(parts, "")
 }
 
+// renderNameWithBadge places the resource name and an optional security
+// badge inside a single name-column slot of width nameW. The name is
+// truncated to leave room for the badge (plus a separating space), and the
+// whole result is padded to nameW so downstream column alignment remains
+// stable. Both arguments are treated as plain text here; callers pass
+// already-styled versions to the *WithExtra helpers.
+func renderNameWithBadge(name, badge string, nameW int) string {
+	if badge == "" {
+		return padRight(Truncate(name, nameW-1), nameW)
+	}
+	badgeW := lipgloss.Width(badge)
+	// Reserve 1 char for the column gap after the badge, plus 1 char for the
+	// space separating name and badge. If the badge alone would overflow,
+	// drop it silently rather than clobber the name column.
+	reserved := badgeW + 2
+	if reserved >= nameW {
+		return padRight(Truncate(name, nameW-1), nameW)
+	}
+	nameMax := nameW - reserved
+	trimmed := Truncate(name, nameMax)
+	content := trimmed + " " + badge
+	return padRight(content, nameW)
+}
+
 // formatTableRowStyled builds a styled table row with colored status and icon.
 // anyRecentRestart indicates whether any item in the table has a recent restart,
 // which controls whether a " " placeholder is added for alignment in the restarts column.
+// securityBadge, when non-empty, is appended inside the name column (name is
+// truncated to make room). Pass an empty string to skip the badge.
 func formatTableRowStyled(item model.Item, nameW, nsW, readyW, restartsW, statusW int,
-	hasNs, hasReady, hasRestarts, hasStatus bool, anyRecentRestart bool,
+	hasNs, hasReady, hasRestarts, hasStatus bool, anyRecentRestart bool, securityBadge string,
 ) string {
 	var parts []string
 
@@ -92,6 +120,14 @@ func formatTableRowStyled(item model.Item, nameW, nsW, readyW, restartsW, status
 	if isDimmed {
 		nameStyle = DimStyle
 	}
+
+	// Badge reservation: keep room for " " + badge inside nameW.
+	badgeW := lipgloss.Width(securityBadge)
+	badgeReserve := 0
+	if badgeW > 0 {
+		badgeReserve = badgeW + 1 // 1 space separator
+	}
+
 	if resolvedIcon := resolveIcon(item.Icon); resolvedIcon != "" {
 		iconSt := IconStyle
 		if isDimmed {
@@ -99,29 +135,59 @@ func formatTableRowStyled(item model.Item, nameW, nsW, readyW, restartsW, status
 		}
 		icon := iconSt.Render(resolvedIcon) + " "
 		iconVisualW := lipgloss.Width(icon)
-		nameRemaining := nameW - iconVisualW - 1 // -1 reserves gap before next column
+		nameRemaining := nameW - iconVisualW - 1 - badgeReserve // -1 reserves gap before next column
 		if nameRemaining < 1 {
 			nameRemaining = 1
+		}
+		// If the badge reservation would not fit, drop the badge and use the
+		// full name budget. This keeps very narrow layouts readable.
+		badge := securityBadge
+		if badgeReserve > 0 && nameW-iconVisualW-1 <= badgeReserve {
+			badge = ""
+			nameRemaining = nameW - iconVisualW - 1
+			if nameRemaining < 1 {
+				nameRemaining = 1
+			}
 		}
 		namePart := Truncate(item.Name, nameRemaining)
 		if ActiveHighlightQuery != "" {
 			namePart = highlightName(namePart, ActiveHighlightQuery)
 		}
 		nameVisualW := lipgloss.Width(namePart)
-		pad := nameW - iconVisualW - nameVisualW
+		badgeSegmentW := 0
+		badgeSegment := ""
+		if badge != "" {
+			badgeSegment = " " + badge
+			badgeSegmentW = lipgloss.Width(badgeSegment)
+		}
+		pad := nameW - iconVisualW - nameVisualW - badgeSegmentW
 		if pad < 0 {
 			pad = 0
 		}
 		if isDimmed {
 			namePart = DimStyle.Render(namePart)
 		}
-		parts = append(parts, icon+namePart+strings.Repeat(" ", pad))
+		parts = append(parts, icon+namePart+badgeSegment+strings.Repeat(" ", pad))
 	} else {
-		displayName := Truncate(item.Name, nameW-1)
-		if ActiveHighlightQuery != "" {
-			displayName = highlightName(displayName, ActiveHighlightQuery)
+		nameBudget := nameW - 1 - badgeReserve
+		if nameBudget < 1 {
+			// Badge would not fit; drop it and fall back to the pre-badge layout.
+			displayName := Truncate(item.Name, nameW-1)
+			if ActiveHighlightQuery != "" {
+				displayName = highlightName(displayName, ActiveHighlightQuery)
+			}
+			parts = append(parts, nameStyle.Render(padRight(displayName, nameW)))
+		} else {
+			displayName := Truncate(item.Name, nameBudget)
+			if ActiveHighlightQuery != "" {
+				displayName = highlightName(displayName, ActiveHighlightQuery)
+			}
+			styledName := nameStyle.Render(displayName)
+			if securityBadge != "" {
+				styledName += " " + securityBadge
+			}
+			parts = append(parts, padRight(styledName, nameW))
 		}
-		parts = append(parts, nameStyle.Render(padRight(displayName, nameW)))
 	}
 
 	if hasReady {
@@ -386,7 +452,13 @@ func formatTableRowWithExtra(name, ns, ready, restarts, status, age string,
 	hasNs, hasReady, hasRestarts, hasStatus, hasAge bool,
 	extraCols []extraColumn, item *model.Item,
 ) string {
-	row := formatTableRow(name, ns, ready, restarts, status,
+	// Plain-text rendering path (cursor row): use the plain badge so ANSI
+	// sequences don't leak into the inverted row highlight style.
+	secBadge := ""
+	if item != nil {
+		secBadge = securityBadgePlainForItem(item)
+	}
+	row := formatTableRow(name, ns, ready, restarts, status, secBadge,
 		nameW, nsW, readyW, restartsW, statusW, hasNs, hasReady, hasRestarts, hasStatus)
 
 	for _, ec := range extraCols {
@@ -426,8 +498,9 @@ func formatTableRowStyledWithExtra(item model.Item, nameW, nsW, readyW, restarts
 	hasNs, hasReady, hasRestarts, hasStatus, hasAge bool,
 	extraCols []extraColumn, anyRecentRestart bool,
 ) string {
+	secBadge := securityBadgeForItem(&item)
 	base := formatTableRowStyled(item, nameW, nsW, readyW, restartsW, statusW,
-		hasNs, hasReady, hasRestarts, hasStatus, anyRecentRestart)
+		hasNs, hasReady, hasRestarts, hasStatus, anyRecentRestart, secBadge)
 
 	for _, ec := range extraCols {
 		val := getExtraColumnValue(&item, ec.key)

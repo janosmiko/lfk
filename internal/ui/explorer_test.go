@@ -666,7 +666,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts:      "3",
 			LastRestartAt: time.Now().Add(-10 * time.Minute), // 10 minutes ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
 		assert.Contains(t, result, "↑")
 		assert.Contains(t, result, "3")
 	})
@@ -677,7 +677,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts:      "3",
 			LastRestartAt: time.Now().Add(-2 * time.Hour), // 2 hours ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
 		assert.NotContains(t, result, "↑")
 		assert.Contains(t, result, "3")
 	})
@@ -687,7 +687,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Name:     "my-pod",
 			Restarts: "0",
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
 		assert.NotContains(t, result, "↑")
 		assert.Contains(t, result, "0")
 	})
@@ -698,7 +698,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts:      "5",
 			LastRestartAt: time.Now().Add(-5 * time.Minute), // 5 minutes ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
 		assert.Contains(t, result, "↑")
 		assert.Contains(t, result, "5")
 	})
@@ -709,7 +709,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts: "2",
 			// LastRestartAt is zero value
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
 		assert.NotContains(t, result, "↑")
 	})
 }

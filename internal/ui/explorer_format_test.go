@@ -102,7 +102,7 @@ func TestFormatTableRow(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatTableRow(tt.itemName, tt.ns, tt.ready, tt.restarts, tt.status,
+			result := formatTableRow(tt.itemName, tt.ns, tt.ready, tt.restarts, tt.status, "",
 				tt.nameW, tt.nsW, tt.readyW, tt.restartsW, tt.statusW,
 				tt.hasNs, tt.hasReady, tt.hasRestarts, tt.hasStatus)
 			for _, sub := range tt.wantContains {
@@ -119,13 +119,13 @@ func TestFormatTableRow(t *testing.T) {
 
 func TestFormatTableRow_Padding(t *testing.T) {
 	t.Run("name is padded to nameW", func(t *testing.T) {
-		result := formatTableRow("hi", "", "", "", "",
+		result := formatTableRow("hi", "", "", "", "", "",
 			10, 0, 0, 0, 0, false, false, false, false)
 		assert.Equal(t, 10, len(result), "result length should match nameW")
 	})
 
 	t.Run("namespace is padded when present", func(t *testing.T) {
-		result := formatTableRow("pod", "ns", "", "", "",
+		result := formatTableRow("pod", "ns", "", "", "", "",
 			10, 8, 0, 0, 0, true, false, false, false)
 		// Total = nsW + nameW = 8 + 10 = 18.
 		assert.Equal(t, 18, len(result))
@@ -212,7 +212,7 @@ func TestTruncatedColumnSpacing(t *testing.T) {
 		// Name that exceeds nameW, followed by a status column.
 		// After truncation, there must be at least 1 space before the status text.
 		result := formatTableRow(
-			"very-long-pod-name-that-definitely-exceeds", "", "", "", "Running",
+			"very-long-pod-name-that-definitely-exceeds", "", "", "", "Running", "",
 			15, 0, 0, 0, 10,
 			false, false, false, true,
 		)
@@ -224,7 +224,7 @@ func TestTruncatedColumnSpacing(t *testing.T) {
 
 	t.Run("truncated namespace has space before name", func(t *testing.T) {
 		result := formatTableRow(
-			"pod-1", "extremely-long-namespace-name-here", "", "", "",
+			"pod-1", "extremely-long-namespace-name-here", "", "", "", "",
 			15, 12, 0, 0, 0,
 			true, false, false, false,
 		)
@@ -235,7 +235,7 @@ func TestTruncatedColumnSpacing(t *testing.T) {
 
 	t.Run("non-truncated columns still padded correctly", func(t *testing.T) {
 		result := formatTableRow(
-			"short", "ns", "", "", "OK",
+			"short", "ns", "", "", "OK", "",
 			15, 10, 0, 0, 10,
 			true, false, false, true,
 		)
