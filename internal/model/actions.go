@@ -460,3 +460,19 @@ type MonitoringConfig struct {
 // ConfigMonitoring maps cluster context names to monitoring config.
 // The special key "default" applies to clusters without explicit config.
 var ConfigMonitoring map[string]MonitoringConfig
+
+// SecurityConfig is per-cluster security dashboard configuration.
+type SecurityConfig struct {
+	Enabled               bool                         `json:"enabled" yaml:"enabled"`
+	PerResourceIndicators bool                         `json:"per_resource_indicators" yaml:"per_resource_indicators"`
+	PerResourceAction     bool                         `json:"per_resource_action" yaml:"per_resource_action"`
+	RefreshTTL            string                       `json:"refresh_ttl" yaml:"refresh_ttl"`
+	AvailabilityTTL       string                       `json:"availability_ttl" yaml:"availability_ttl"`
+	Sources               map[string]SecuritySourceCfg `json:"sources" yaml:"sources"`
+}
+
+// SecuritySourceCfg is the per-source config shared across adapters.
+type SecuritySourceCfg struct {
+	Enabled bool     `json:"enabled" yaml:"enabled"`
+	Checks  []string `json:"checks,omitempty" yaml:"checks,omitempty"`
+}
