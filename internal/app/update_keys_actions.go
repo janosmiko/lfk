@@ -7,6 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -70,6 +71,8 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		return m.handleExplorerActionKeyMonitoring()
 	case kb.Security:
 		return m.handleExplorerActionKeySecurity()
+	case kb.SecurityResource:
+		return m.handleExplorerActionKeySecurityResource()
 	}
 	return m, nil, false
 }
@@ -626,4 +629,39 @@ func (m Model) handleExplorerActionKeySecurity() (tea.Model, tea.Cmd, bool) {
 		}
 	}
 	return m, nil, true
+}
+
+// handleExplorerActionKeySecurityResource handles the per-resource security
+// hotkey (default: H). It scopes the security dashboard to the currently
+// selected resource and jumps to the security pseudo-item in the middle
+// column so the preview pane renders the filtered view.
+//
+// When no security sources are available for the current cluster it shows a
+// status message and is otherwise a no-op.
+func (m Model) handleExplorerActionKeySecurityResource() (tea.Model, tea.Cmd, bool) {
+	if !m.securityAvailable {
+		m.setStatusMessage("No security sources available", true)
+		return m, scheduleStatusClear(), true
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil, true
+	}
+	ref := security.ResourceRef{
+		Namespace: sel.Namespace,
+		Kind:      sel.Kind,
+		Name:      sel.Name,
+	}
+	m.securityView.ResourceFilter = &ref
+	m.securityView.Loading = true
+	// Jump to the security pseudo-item in the middle column so the preview
+	// pane picks up the filter and renders the dashboard.
+	for i, item := range m.middleItems {
+		if item.Extra == "__security__" {
+			m.setCursor(i)
+			m.clampCursor()
+			break
+		}
+	}
+	return m, m.loadSecurityDashboard(), true
 }

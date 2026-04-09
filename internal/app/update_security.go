@@ -165,6 +165,13 @@ func (m Model) handleSecurityFindingsLoaded(msg securityFindingsLoadedMsg) Model
 		m.securityView.ActiveCategory = m.securityView.AvailableCategories[0]
 	}
 
+	// Rebuild the manager's FindingIndex from the async message payload so
+	// the SEC column and per-resource lookups stay fresh. The manager's
+	// FetchAll cache is bypassed when findings arrive via tea.Msg.
+	if m.securityManager != nil {
+		m.securityManager.SetIndex(security.BuildFindingIndex(msg.result.Findings))
+	}
+
 	return m
 }
 

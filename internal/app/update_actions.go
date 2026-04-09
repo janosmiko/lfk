@@ -7,8 +7,24 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// isSecurityActionEligibleKind reports whether a given resource kind is a
+// reasonable target for the "Security Findings" action. The security
+// dashboard indexes findings by (namespace, kind, name), so only kinds that
+// security sources actually emit findings for are worth offering. Cluster
+// menu virtual kinds (e.g. "__port_forwards__") and empty kinds are excluded.
+func isSecurityActionEligibleKind(kind string) bool {
+	if kind == "" {
+		return false
+	}
+	if strings.HasPrefix(kind, "__") {
+		return false
+	}
+	return true
+}
 
 func (m Model) openActionMenu() Model {
 	// Bulk mode: when items are selected, show bulk action menu.
@@ -89,6 +105,17 @@ func (m Model) openActionMenu() Model {
 				Key:         ca.Key,
 			})
 		}
+	}
+
+	// Append "Security Findings" when security sources are available for
+	// the current cluster. This jumps the user to the security dashboard
+	// pre-filtered to the selected resource.
+	if m.securityAvailable && isSecurityActionEligibleKind(kind) {
+		actions = append(actions, model.ActionMenuItem{
+			Label:       "Security Findings",
+			Description: "Show security findings for this resource",
+			Key:         ui.ActiveKeybindings.SecurityResource,
+		})
 	}
 
 	items := make([]model.Item, 0, len(actions))
@@ -440,8 +467,41 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Vuln Scan":
 		mdl, cmd := m.executeActionVulnScan()
 		return mdl, cmd, true
+	case "Security Findings":
+		mdl, cmd := m.executeActionSecurityFindings()
+		return mdl, cmd, true
 	}
 	return m, nil, false
+}
+
+// executeActionSecurityFindings handles the "Security Findings" action by
+// opening the security dashboard scoped to the selected resource. When no
+// security sources are available for the current cluster, it shows a status
+// message and is otherwise a no-op.
+func (m Model) executeActionSecurityFindings() (tea.Model, tea.Cmd) {
+	if !m.securityAvailable {
+		m.setStatusMessage("No security sources available", true)
+		return m, scheduleStatusClear()
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil
+	}
+	ref := security.ResourceRef{
+		Namespace: sel.Namespace,
+		Kind:      sel.Kind,
+		Name:      sel.Name,
+	}
+	m.securityView.ResourceFilter = &ref
+	m.securityView.Loading = true
+	// Jump to the security pseudo-item in the middle column if present.
+	for i, item := range m.middleItems {
+		if item.Extra == "__security__" {
+			m.setCursor(i)
+			break
+		}
+	}
+	return m, m.loadSecurityDashboard()
 }
 
 // executeActionExtended dispatches Argo, Helm, Flux, and other extended actions.

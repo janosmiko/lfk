@@ -16,6 +16,8 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
+	"github.com/janosmiko/lfk/internal/security/heuristic"
+	"github.com/janosmiko/lfk/internal/security/trivyop"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -880,7 +882,45 @@ func NewModel(client *k8s.Client) Model {
 	m.helpSearchInput.Prompt = ""
 	m.helpSearchInput.CharLimit = 100
 
+	// Initialize the security manager and register sources against the
+	// current context. Sources are re-registered on context switch via
+	// refreshSecuritySources so each cluster uses its own client handles.
+	m.securityManager = security.NewManager()
+	m.refreshSecuritySources()
+
 	return m
+}
+
+// refreshSecuritySources rebuilds the security manager's source list against
+// the currently active cluster context. It is called from NewModel and again
+// on every cluster switch so that security sources always use the right
+// per-context clients.
+//
+// The heuristic source needs a kubernetes.Interface; the trivy-operator source
+// needs a dynamic.Interface. Any source whose underlying client cannot be
+// constructed is skipped, and the manager.AnyAvailable call will naturally
+// report false for that cluster.
+func (m *Model) refreshSecuritySources() {
+	if m.securityManager == nil {
+		m.securityManager = security.NewManager()
+	}
+	// Replace the manager wholesale so stale sources from a prior context
+	// cannot linger. NewManager resets both the source list and the
+	// fetch/availability caches.
+	mgr := security.NewManager()
+	if m.client != nil {
+		kctx := m.nav.Context
+		if kctx == "" {
+			kctx = m.client.CurrentContext()
+		}
+		if kc := m.client.RawClientsetForContext(kctx); kc != nil {
+			mgr.Register(heuristic.NewWithClient(kc))
+		}
+		if dc := m.client.RawDynamicForContext(kctx); dc != nil {
+			mgr.Register(trivyop.NewWithDynamic(dc))
+		}
+	}
+	m.securityManager = mgr
 }
 
 // cancelAndReset cancels any in-flight API requests and creates a fresh

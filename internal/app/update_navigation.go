@@ -243,6 +243,10 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.monitoringPreview = ""
 	m.securityView = ui.SecurityViewState{}
 	m.securityAvailable = false
+	// Re-register security sources against the newly selected context so
+	// they use the right per-cluster clients. Safe to call even when the
+	// manager has no sources yet.
+	m.refreshSecuritySources()
 	m.applyPinnedGroups()
 	m.nav.Level = model.LevelResourceTypes
 	m.pushLeft()

@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -153,4 +154,151 @@ func TestSecurityKeyRequireMsg(t *testing.T) {
 
 	// Satisfy the require import (tested when require asserts in other tests).
 	require.True(t, true)
+}
+
+// --- H5: FindingIndex rebuild on findings-loaded message ---
+
+func TestFindingIndexRebuiltOnFindingsLoaded(t *testing.T) {
+	m := Model{}
+	m.securityManager = security.NewManager()
+	m.securityManager.Register(&security.FakeSource{
+		NameStr:       "s",
+		Available:     true,
+		CategoriesVal: []security.Category{security.CategoryVuln},
+	})
+	msg := securityFindingsLoadedMsg{
+		context: "kctx",
+		result: security.FetchResult{
+			Findings: []security.Finding{
+				{
+					ID:       "1",
+					Severity: security.SeverityCritical,
+					Resource: security.ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"},
+				},
+				{
+					ID:       "2",
+					Severity: security.SeverityHigh,
+					Resource: security.ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"},
+				},
+			},
+			Sources: []security.SourceStatus{{Name: "s", Available: true, Count: 2}},
+		},
+	}
+	updated := m.handleSecurityFindingsLoaded(msg)
+	require.NotNil(t, updated.securityManager)
+	idx := updated.securityManager.Index()
+	counts := idx.For(security.ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"})
+	assert.Equal(t, 1, counts.Critical, "expected 1 critical finding in rebuilt index")
+	assert.Equal(t, 1, counts.High, "expected 1 high finding in rebuilt index")
+}
+
+func TestFindingIndexNoRebuildWhenManagerNil(t *testing.T) {
+	// Defensive: handleSecurityFindingsLoaded must not panic when
+	// securityManager is nil (e.g., in minimal test fixtures).
+	m := Model{}
+	msg := securityFindingsLoadedMsg{
+		context: "kctx",
+		result: security.FetchResult{
+			Findings: []security.Finding{{ID: "1", Severity: security.SeverityLow}},
+		},
+	}
+	updated := m.handleSecurityFindingsLoaded(msg)
+	assert.Len(t, updated.securityView.Findings, 1)
+}
+
+// --- H3: executeActionSecurityFindings handler ---
+
+func TestExecuteActionSecurityFindings(t *testing.T) {
+	m := baseModelActions()
+	m.securityAvailable = true
+	m.middleItems = []model.Item{
+		{Name: "api", Kind: "Deployment", Namespace: "prod"},
+		{Name: "Security", Extra: "__security__"},
+	}
+	m.setCursor(0) // point at the deployment
+	m.securityManager = security.NewManager()
+
+	updated, _ := m.executeActionSecurityFindings()
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	require.NotNil(t, mm.securityView.ResourceFilter)
+	assert.Equal(t, "api", mm.securityView.ResourceFilter.Name)
+	assert.Equal(t, "Deployment", mm.securityView.ResourceFilter.Kind)
+	assert.Equal(t, "prod", mm.securityView.ResourceFilter.Namespace)
+	assert.True(t, mm.securityView.Loading, "loading should flip on after dispatch")
+}
+
+func TestExecuteActionSecurityFindingsWhenUnavailable(t *testing.T) {
+	m := baseModelActions()
+	m.securityAvailable = false
+	m.middleItems = []model.Item{
+		{Name: "api", Kind: "Deployment", Namespace: "prod"},
+	}
+	m.setCursor(0)
+
+	updated, _ := m.executeActionSecurityFindings()
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Nil(t, mm.securityView.ResourceFilter, "filter must stay nil when unavailable")
+	assert.NotEmpty(t, mm.statusMessage, "status message should explain why nothing happened")
+}
+
+func TestExecuteActionSecurityFindingsNoSelection(t *testing.T) {
+	m := baseModelActions()
+	m.securityAvailable = true
+	m.middleItems = nil
+	m.setCursor(0)
+
+	updated, _ := m.executeActionSecurityFindings()
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Nil(t, mm.securityView.ResourceFilter, "no selection -> no filter")
+}
+
+// --- H4: handleExplorerActionKeySecurityResource hotkey ---
+
+func TestHandleExplorerActionKeySecurityResource(t *testing.T) {
+	m := baseExplorerModel()
+	m.securityAvailable = true
+	m.middleItems = []model.Item{
+		{Name: "api", Kind: "Deployment", Namespace: "prod"},
+		{Name: "Security", Extra: "__security__"},
+	}
+	m.setCursor(0)
+	m.securityManager = security.NewManager()
+
+	updated, _, handled := m.handleExplorerActionKeySecurityResource()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	require.NotNil(t, mm.securityView.ResourceFilter)
+	assert.Equal(t, "api", mm.securityView.ResourceFilter.Name)
+	assert.Equal(t, "Deployment", mm.securityView.ResourceFilter.Kind)
+	assert.Equal(t, "prod", mm.securityView.ResourceFilter.Namespace)
+}
+
+func TestHandleExplorerActionKeySecurityResourceNoOpWhenUnavailable(t *testing.T) {
+	m := baseExplorerModel()
+	m.securityAvailable = false
+	m.middleItems = []model.Item{{Name: "api", Kind: "Deployment", Namespace: "prod"}}
+	m.setCursor(0)
+
+	updated, _, handled := m.handleExplorerActionKeySecurityResource()
+	assert.True(t, handled, "hotkey should still be consumed even when unavailable")
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Nil(t, mm.securityView.ResourceFilter, "filter must stay nil when unavailable")
+	assert.NotEmpty(t, mm.statusMessage, "status message should explain why nothing happened")
+}
+
+func TestHandleExplorerActionKeySecurityResourceNoSelection(t *testing.T) {
+	m := baseExplorerModel()
+	m.securityAvailable = true
+	m.middleItems = nil
+
+	updated, _, handled := m.handleExplorerActionKeySecurityResource()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Nil(t, mm.securityView.ResourceFilter)
 }

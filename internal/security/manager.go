@@ -255,3 +255,12 @@ func (m *Manager) Index() *FindingIndex {
 	}
 	return m.cachedIndex
 }
+
+// SetIndex overrides the cached FindingIndex. Used by callers that produce
+// findings outside of FetchAll (e.g., async message paths in internal/app
+// that receive a FetchResult via a tea.Msg and bypass the cache).
+func (m *Manager) SetIndex(idx *FindingIndex) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.cachedIndex = idx
+}
