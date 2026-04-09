@@ -3,6 +3,7 @@ package security
 import (
 	"context"
 	"sync"
+	"time"
 
 	"golang.org/x/sync/errgroup"
 )
@@ -23,15 +24,57 @@ type SourceStatus struct {
 }
 
 // Manager aggregates SecuritySource instances, runs IsAvailable and Fetch
-// concurrently, and exposes an aggregate result. Caching is added in Task A3.
+// concurrently, and exposes an aggregate result. It caches FetchAll results by
+// (kubeCtx, namespace) and AnyAvailable results by kubeCtx.
 type Manager struct {
 	mu      sync.RWMutex
 	sources []SecuritySource
+
+	refreshTTL      time.Duration
+	availabilityTTL time.Duration
+
+	cacheKey     string // lastCtx + "|" + lastNamespace
+	cachedResult FetchResult
+	cachedAt     time.Time
+
+	availCache map[string]availEntry // key = kubeCtx
 }
 
-// NewManager returns an empty Manager. Sources are registered via Register.
+type availEntry struct {
+	available bool
+	at        time.Time
+}
+
+// NewManager returns a Manager with sensible cache defaults (30s fetch, 60s availability).
 func NewManager() *Manager {
-	return &Manager{}
+	return &Manager{
+		refreshTTL:      30 * time.Second,
+		availabilityTTL: 60 * time.Second,
+		availCache:      make(map[string]availEntry),
+	}
+}
+
+// SetRefreshTTL overrides the FetchAll cache TTL. Zero disables caching.
+func (m *Manager) SetRefreshTTL(d time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.refreshTTL = d
+}
+
+// SetAvailabilityTTL overrides the AnyAvailable cache TTL.
+func (m *Manager) SetAvailabilityTTL(d time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.availabilityTTL = d
+}
+
+// Refresh is FetchAll that always bypasses the cache.
+func (m *Manager) Refresh(ctx context.Context, kubeCtx, namespace string) (FetchResult, error) {
+	m.mu.Lock()
+	m.cacheKey = ""
+	m.availCache = make(map[string]availEntry)
+	m.mu.Unlock()
+	return m.FetchAll(ctx, kubeCtx, namespace)
 }
 
 // Register appends a source. Not safe to call concurrently with FetchAll.
@@ -51,23 +94,44 @@ func (m *Manager) Sources() []SecuritySource {
 }
 
 // AnyAvailable returns true if at least one registered source reports
-// IsAvailable(ctx, kubeCtx) == true.
+// IsAvailable(ctx, kubeCtx) == true. Results are cached per kubeCtx.
 func (m *Manager) AnyAvailable(ctx context.Context, kubeCtx string) (bool, error) {
+	m.mu.RLock()
+	if entry, ok := m.availCache[kubeCtx]; ok && time.Since(entry.at) < m.availabilityTTL {
+		m.mu.RUnlock()
+		return entry.available, nil
+	}
+	m.mu.RUnlock()
+
 	for _, s := range m.Sources() {
-		ok, err := s.IsAvailable(ctx, kubeCtx)
-		if err != nil {
-			continue // treat errors as "not available"
-		}
+		ok, _ := s.IsAvailable(ctx, kubeCtx)
 		if ok {
+			m.mu.Lock()
+			m.availCache[kubeCtx] = availEntry{available: true, at: time.Now()}
+			m.mu.Unlock()
 			return true, nil
 		}
 	}
+	m.mu.Lock()
+	m.availCache[kubeCtx] = availEntry{available: false, at: time.Now()}
+	m.mu.Unlock()
 	return false, nil
 }
 
 // FetchAll runs Fetch concurrently across all available sources. Per-source
 // errors do not cancel other sources; they are collected in result.Errors.
+// Results are cached by (kubeCtx, namespace) for refreshTTL.
 func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (FetchResult, error) {
+	cacheKey := kubeCtx + "|" + namespace
+
+	m.mu.RLock()
+	if cacheKey == m.cacheKey && m.refreshTTL > 0 && time.Since(m.cachedAt) < m.refreshTTL {
+		cached := m.cachedResult
+		m.mu.RUnlock()
+		return cached, nil
+	}
+	m.mu.RUnlock()
+
 	sources := m.Sources()
 
 	type sourceResult struct {
@@ -110,5 +174,11 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 			Name: r.name, Available: true, Count: len(r.findings),
 		})
 	}
+
+	m.mu.Lock()
+	m.cacheKey = cacheKey
+	m.cachedResult = res
+	m.cachedAt = time.Now()
+	m.mu.Unlock()
 	return res, nil
 }

@@ -118,3 +118,62 @@ func TestManagerAnyAvailableSkipsSourcesWithErrors(t *testing.T) {
 	require.NoError(t, err)
 	assert.True(t, ok, "AnyAvailable must skip erroring sources and return true when another is healthy")
 }
+
+func TestManagerCachedFetch(t *testing.T) {
+	m := NewManager()
+	m.SetRefreshTTL(200 * time.Millisecond)
+	s := &FakeSource{
+		NameStr: "s", Available: true,
+		Findings: []Finding{{ID: "x"}},
+	}
+	m.Register(s)
+
+	_, err := m.FetchAll(context.Background(), "ctx", "")
+	require.NoError(t, err)
+	_, err = m.FetchAll(context.Background(), "ctx", "")
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), s.FetchCalls.Load(),
+		"second call within TTL should hit cache")
+}
+
+func TestManagerForceRefresh(t *testing.T) {
+	m := NewManager()
+	m.SetRefreshTTL(1 * time.Hour)
+	s := &FakeSource{
+		NameStr: "s", Available: true,
+		Findings: []Finding{{ID: "x"}},
+	}
+	m.Register(s)
+
+	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.Refresh(context.Background(), "ctx", "")
+	assert.Equal(t, int32(2), s.FetchCalls.Load(),
+		"Refresh must bypass the cache")
+}
+
+func TestManagerInvalidateOnContextChange(t *testing.T) {
+	m := NewManager()
+	m.SetRefreshTTL(1 * time.Hour)
+	s := &FakeSource{
+		NameStr: "s", Available: true,
+		Findings: []Finding{{ID: "x"}},
+	}
+	m.Register(s)
+
+	_, _ = m.FetchAll(context.Background(), "ctxA", "")
+	_, _ = m.FetchAll(context.Background(), "ctxB", "")
+	assert.Equal(t, int32(2), s.FetchCalls.Load(),
+		"different kubeCtx should bypass cache")
+}
+
+func TestManagerAvailabilityCached(t *testing.T) {
+	m := NewManager()
+	m.SetAvailabilityTTL(200 * time.Millisecond)
+	s := &FakeSource{NameStr: "s", Available: true}
+	m.Register(s)
+
+	_, _ = m.AnyAvailable(context.Background(), "ctx")
+	_, _ = m.AnyAvailable(context.Background(), "ctx")
+	assert.Equal(t, int32(1), s.AvailCalls.Load(),
+		"availability should be cached within TTL")
+}
