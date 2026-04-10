@@ -232,12 +232,12 @@ func (m Model) statusBar() string {
 
 // explorerHintEntries returns the styled key hints displayed in the status bar
 // for the explorer (and related dashboard) views. Dashboard pseudo-resources
-// (overview/monitoring/security) get a reduced hint set.
+// (overview/monitoring) get a reduced hint set.
 func (m Model) explorerHintEntries() []ui.HintEntry {
 	kb := ui.ActiveKeybindings
 	sel := m.selectedMiddleItem()
 	isDashboard := sel != nil && m.nav.Level == model.LevelResourceTypes &&
-		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__" || sel.Extra == "__security__")
+		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__")
 	if isDashboard {
 		return []ui.HintEntry{
 			{Key: kb.Down + "/" + kb.Up, Desc: "move"},

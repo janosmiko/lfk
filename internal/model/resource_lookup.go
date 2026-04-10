@@ -34,13 +34,6 @@ func FlattenedResourceTypesFiltered(availableGroups map[string]bool) []Item {
 		Category: "Dashboards",
 		Icon:     "⊙",
 	})
-	items = append(items, Item{
-		Name:     "Security",
-		Kind:     "__security__",
-		Extra:    "__security__",
-		Category: "Dashboards",
-		Icon:     "◈",
-	})
 	for _, cat := range TopLevelResourceTypes() {
 		if !coreCategories[cat.Name] {
 			// CRD-based category: only show if the API group is detected.

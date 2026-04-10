@@ -44,7 +44,7 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 	}
 	clusterTypes := make(map[string]itemInfo)
 	for _, item := range leftItems {
-		if item.Extra == "" || item.Extra == "__overview__" || item.Extra == "__monitoring__" || item.Extra == "__security__" {
+		if item.Extra == "" || item.Extra == "__overview__" || item.Extra == "__monitoring__" {
 			continue
 		}
 		parts := strings.Split(item.Extra, "/")
@@ -73,7 +73,7 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 	}
 	// Also include display names from leftItems (e.g., "Pods", "Deployments").
 	for _, item := range leftItems {
-		if item.Extra != "" && item.Extra != "__overview__" && item.Extra != "__monitoring__" && item.Extra != "__security__" {
+		if item.Extra != "" && item.Extra != "__overview__" && item.Extra != "__monitoring__" {
 			clusterTypeNames[strings.ToLower(item.Name)] = true
 		}
 	}
@@ -519,12 +519,12 @@ func filterSuggestionsTyped(candidates []string, prefix, category string) []ui.S
 }
 
 // extractCRDNames collects CRD display names from the left column items.
-// It skips special entries like __overview__, __monitoring__ and __security__.
+// It skips special entries like __overview__ and __monitoring__.
 func extractCRDNames(m *Model) []string {
 	var names []string
 	seen := make(map[string]bool)
 	for _, item := range m.resourceTypeItems() {
-		if item.Extra == "" || item.Extra == "__overview__" || item.Extra == "__monitoring__" || item.Extra == "__security__" {
+		if item.Extra == "" || item.Extra == "__overview__" || item.Extra == "__monitoring__" {
 			continue
 		}
 		// Extract resource name from Extra field (group/version/resource).

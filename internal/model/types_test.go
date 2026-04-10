@@ -1114,23 +1114,3 @@ func TestBookmarkIsContextAware(t *testing.T) {
 		})
 	}
 }
-
-func TestFlattenedResourceTypesIncludesSecurity(t *testing.T) {
-	items := FlattenedResourceTypes()
-	var found bool
-	var securityIdx, monitoringIdx int
-	for i, it := range items {
-		if it.Extra == "__security__" {
-			found = true
-			securityIdx = i
-			assert.Equal(t, "Security", it.Name)
-			assert.Equal(t, "Dashboards", it.Category)
-		}
-		if it.Extra == "__monitoring__" {
-			monitoringIdx = i
-		}
-	}
-	assert.True(t, found, "security pseudo-item must be present")
-	assert.Equal(t, monitoringIdx+1, securityIdx,
-		"security must appear immediately after monitoring")
-}

@@ -446,7 +446,7 @@ func (m Model) handleExplorerResourceMap() (tea.Model, tea.Cmd) {
 // handleExplorerTogglePreview toggles between split view and full YAML preview.
 func (m Model) handleExplorerTogglePreview() (tea.Model, tea.Cmd) {
 	if sel := m.selectedMiddleItem(); sel != nil && m.nav.Level == model.LevelResourceTypes &&
-		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__" || sel.Extra == "__security__") {
+		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__") {
 		return m, nil
 	}
 	m.fullYAMLPreview = !m.fullYAMLPreview
@@ -464,7 +464,7 @@ func (m Model) handleExplorerTogglePreview() (tea.Model, tea.Cmd) {
 // handleExplorerFullscreen toggles fullscreen mode for the middle column or dashboard.
 func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 	sel := m.selectedMiddleItem()
-	if sel != nil && (sel.Extra == "__overview__" || sel.Extra == "__monitoring__" || sel.Extra == "__security__") && m.nav.Level == model.LevelResourceTypes {
+	if sel != nil && (sel.Extra == "__overview__" || sel.Extra == "__monitoring__") && m.nav.Level == model.LevelResourceTypes {
 		m.fullscreenDashboard = !m.fullscreenDashboard
 		m.previewScroll = 0
 		if m.fullscreenDashboard {
