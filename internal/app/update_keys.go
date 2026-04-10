@@ -206,26 +206,6 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	// Route interactive keys to the security dashboard when the security
-	// pseudo-item is focused. Two behaviors depending on mode:
-	//
-	//   - Normal three-column view: only the preview-scoped whitelist is
-	//     claimed (Tab, Enter, J/K, r, C, 1-4). Lowercase j/k flow through
-	//     to middle-column navigation so users can leave the Security item.
-	//   - Fullscreen dashboard: the dashboard owns the whole screen so
-	//     lowercase j/k/g/G are ALSO routed to the finding cursor because
-	//     there's no middle column to navigate anymore.
-	if sel := m.selectedMiddleItem(); sel != nil && sel.Extra == "__security__" {
-		switch {
-		case m.fullscreenDashboard && isSecurityDashboardKeyFullscreen(msg):
-			updated, cmd := m.handleSecurityKey(msg)
-			return updated, cmd
-		case !m.fullscreenDashboard && m.nav.Level == model.LevelResourceTypes && isSecurityDashboardKey(msg):
-			updated, cmd := m.handleSecurityKey(msg)
-			return updated, cmd
-		}
-	}
-
 	if mdl, cmd, handled := m.handleExplorerNavKey(msg); handled {
 		return mdl, cmd
 	}
@@ -780,42 +760,4 @@ func (m Model) handleKeySecretToggle() (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Secret values HIDDEN", false)
 	}
 	return m, scheduleStatusClear()
-}
-
-// isSecurityDashboardKey reports whether the key is one that the security
-// dashboard handles in the NORMAL three-column view. Lowercase j/k/g/G are
-// NOT claimed here — they flow through to middle-column navigation so users
-// can leave the Security item. Capital J/K move the finding cursor, matching
-// lfk's convention that capital navigation keys are scoped to the right
-// preview pane. h/l and / also flow through to regular explorer dispatch.
-func isSecurityDashboardKey(msg tea.KeyMsg) bool {
-	switch msg.Type {
-	case tea.KeyTab, tea.KeyShiftTab, tea.KeyEnter:
-		return true
-	}
-	if len(msg.Runes) == 0 {
-		return false
-	}
-	switch msg.Runes[0] {
-	case 'J', 'K', 'r', 'C', '1', '2', '3', '4':
-		return true
-	}
-	return false
-}
-
-// isSecurityDashboardKeyFullscreen extends isSecurityDashboardKey with
-// lowercase j/k/g/G. In fullscreen mode there is no middle column to
-// navigate, so the dashboard owns those keys to move the finding cursor.
-func isSecurityDashboardKeyFullscreen(msg tea.KeyMsg) bool {
-	if isSecurityDashboardKey(msg) {
-		return true
-	}
-	if len(msg.Runes) == 0 {
-		return false
-	}
-	switch msg.Runes[0] {
-	case 'j', 'k', 'g', 'G':
-		return true
-	}
-	return false
 }

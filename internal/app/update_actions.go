@@ -7,7 +7,6 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -110,7 +109,7 @@ func (m Model) openActionMenu() Model {
 	// Append "Security Findings" when security sources are available for
 	// the current cluster. This jumps the user to the security dashboard
 	// pre-filtered to the selected resource.
-	if m.securityAvailable && isSecurityActionEligibleKind(kind) {
+	if m.securityAvailableAny() && isSecurityActionEligibleKind(kind) {
 		actions = append(actions, model.ActionMenuItem{
 			Label:       "Security Findings",
 			Description: "Show security findings for this resource",
@@ -474,34 +473,16 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 	return m, nil, false
 }
 
-// executeActionSecurityFindings handles the "Security Findings" action by
-// opening the security dashboard scoped to the selected resource. When no
-// security sources are available for the current cluster, it shows a status
-// message and is otherwise a no-op.
+// executeActionSecurityFindings handles the "Security Findings" action.
+// The body is a temporary stub during the security navigation revamp;
+// Phase E re-wires it to the new hierarchical Security category navigation.
 func (m Model) executeActionSecurityFindings() (tea.Model, tea.Cmd) {
-	if !m.securityAvailable {
+	if !m.securityAvailableAny() {
 		m.setStatusMessage("No security sources available", true)
 		return m, scheduleStatusClear()
 	}
-	sel := m.selectedMiddleItem()
-	if sel == nil {
-		return m, nil
-	}
-	ref := security.ResourceRef{
-		Namespace: sel.Namespace,
-		Kind:      sel.Kind,
-		Name:      sel.Name,
-	}
-	m.securityView.ResourceFilter = &ref
-	m.securityView.Loading = true
-	// Jump to the security pseudo-item in the middle column if present.
-	for i, item := range m.middleItems {
-		if item.Extra == "__security__" {
-			m.setCursor(i)
-			break
-		}
-	}
-	return m, m.loadSecurityDashboard()
+	m.setStatusMessage("Security Findings navigation pending revamp", true)
+	return m, scheduleStatusClear()
 }
 
 // executeActionExtended dispatches Argo, Helm, Flux, and other extended actions.

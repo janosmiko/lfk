@@ -574,9 +574,8 @@ type Model struct {
 	monitoringPreview string
 
 	// Security dashboard state.
-	securityManager   *security.Manager
-	securityView      ui.SecurityViewState
-	securityAvailable bool
+	securityManager            *security.Manager
+	securityAvailabilityByName map[string]bool
 
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)
@@ -889,6 +888,18 @@ func NewModel(client *k8s.Client) Model {
 	m.refreshSecuritySources()
 
 	return m
+}
+
+// securityAvailableAny returns true if any registered security source
+// is currently available (per the most recent availability probe).
+// Replaces the old m.securityAvailable field with a derived method.
+func (m Model) securityAvailableAny() bool {
+	for _, ok := range m.securityAvailabilityByName {
+		if ok {
+			return true
+		}
+	}
+	return false
 }
 
 // refreshSecuritySources rebuilds the security manager's source list against

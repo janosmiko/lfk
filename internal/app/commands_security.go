@@ -1,3 +1,4 @@
+// Package app — commands_security.go
 package app
 
 import (
@@ -5,37 +6,11 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-
-	"github.com/janosmiko/lfk/internal/logger"
 )
 
-// loadSecurityDashboard fetches findings from the security Manager and returns
-// a securityFindingsLoadedMsg with the result. Per-source errors are logged
-// via internal/logger and included in result.Errors.
-func (m Model) loadSecurityDashboard() tea.Cmd {
-	if m.securityManager == nil {
-		return nil
-	}
-	mgr := m.securityManager
-	kctx := m.nav.Context
-	ns := m.effectiveNamespace()
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		res, err := mgr.FetchAll(ctx, kctx, ns)
-		if err != nil {
-			return securityFetchErrorMsg{context: kctx, err: err}
-		}
-		for name, e := range res.Errors {
-			logger.Logger.Error("security source fetch failed",
-				"source", name, "context", kctx, "error", e.Error())
-		}
-		return securityFindingsLoadedMsg{context: kctx, namespace: ns, result: res}
-	}
-}
-
-// loadSecurityAvailability probes Manager.AnyAvailable and returns a message
-// so the Model can gate UI features (SEC column, H key).
+// loadSecurityAvailability probes each registered source's IsAvailable
+// and returns a securityAvailabilityLoadedMsg with a per-source map.
+// Used by the SEC column and Security category to decide what to show.
 func (m Model) loadSecurityAvailability() tea.Cmd {
 	if m.securityManager == nil {
 		return nil
@@ -45,7 +20,11 @@ func (m Model) loadSecurityAvailability() tea.Cmd {
 	return func() tea.Msg {
 		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 		defer cancel()
-		ok, _ := mgr.AnyAvailable(ctx, kctx)
-		return securityAvailabilityLoadedMsg{context: kctx, available: ok}
+		byName := make(map[string]bool)
+		for _, s := range mgr.Sources() {
+			ok, _ := s.IsAvailable(ctx, kctx)
+			byName[s.Name()] = ok
+		}
+		return securityAvailabilityLoadedMsg{context: kctx, availability: byName}
 	}
 }

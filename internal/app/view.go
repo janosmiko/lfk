@@ -170,10 +170,10 @@ func (m Model) viewExplorer() string {
 	defer func() { ui.ActiveSelectedItems = nil }()
 
 	// Set security badge state so RenderTable can decorate eligible rows.
-	// The badge is gated on securityAvailable so clusters without a source
-	// see the same output they had before security was introduced.
-	ui.ActiveSecurityAvailable = m.securityAvailable
-	if m.securityAvailable && m.securityManager != nil {
+	// The badge is gated on any available security source so clusters without
+	// one see the same output they had before security was introduced.
+	ui.ActiveSecurityAvailable = m.securityAvailableAny()
+	if ui.ActiveSecurityAvailable && m.securityManager != nil {
 		ui.ActiveSecurityIndex = m.securityManager.Index()
 	} else {
 		ui.ActiveSecurityIndex = nil
@@ -394,25 +394,8 @@ func (m Model) renderTitleBar() string {
 func (m Model) viewExplorerDashboard(contentHeight int) string {
 	sel := m.selectedMiddleItem()
 	isMonitoring := sel != nil && sel.Extra == "__monitoring__"
-	isSecurity := sel != nil && sel.Extra == "__security__"
 
 	fullW := m.width - 2
-
-	// Security dashboard renders directly from live SecurityViewState rather
-	// than a pre-rendered string like monitoring/overview. Call the renderer
-	// with the fullscreen dimensions so tiles/tabs/table fit.
-	if isSecurity {
-		// Populate the package-level active-index state so any badge rendering
-		// inside the dashboard has access to the latest findings index.
-		ui.ActiveSecurityAvailable = m.securityAvailable
-		ui.ActiveSecurityIndex = m.securityManager.Index()
-		defer func() {
-			ui.ActiveSecurityAvailable = false
-			ui.ActiveSecurityIndex = nil
-		}()
-		dashContent := ui.RenderSecurityDashboard(m.securityView, fullW-2, contentHeight)
-		return m.viewExplorerDashboardSingleCol(dashContent, fullW, contentHeight)
-	}
 
 	var dashContent string
 	if isMonitoring {

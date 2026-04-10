@@ -7,7 +7,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -649,40 +648,14 @@ func (m Model) handleExplorerActionKeySecurity() (tea.Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
-// handleExplorerActionKeySecurityResource handles the per-resource security
-// hotkey (default: H). It scopes the security dashboard to the currently
-// selected resource and jumps to the security pseudo-item in the middle
-// column so the preview pane renders the filtered view.
-//
-// When no security sources are available for the current cluster it shows a
-// status message and is otherwise a no-op.
+// handleExplorerActionKeySecurityResource is a temporary stub during the
+// security navigation revamp. It is removed entirely in the follow-up
+// commit that also deletes the SecurityResource keybinding.
 func (m Model) handleExplorerActionKeySecurityResource() (tea.Model, tea.Cmd, bool) {
-	if !m.securityAvailable {
+	if !m.securityAvailableAny() {
 		m.setStatusMessage("No security sources available", true)
 		return m, scheduleStatusClear(), true
 	}
-	sel := m.selectedMiddleItem()
-	if sel == nil {
-		return m, nil, true
-	}
-	// Capture the resource reference BEFORE ascending — ascendToResourceTypes
-	// changes the selected item to the Security pseudo-resource.
-	ref := security.ResourceRef{
-		Namespace: sel.Namespace,
-		Kind:      sel.Kind,
-		Name:      sel.Name,
-	}
-	m = m.ascendToResourceTypes()
-	m.securityView.ResourceFilter = &ref
-	m.securityView.Loading = true
-	// Jump to the security pseudo-item in the middle column so the preview
-	// pane picks up the filter and renders the dashboard.
-	for i, item := range m.middleItems {
-		if item.Extra == "__security__" {
-			m.setCursor(i)
-			m.clampCursor()
-			break
-		}
-	}
-	return m, m.loadSecurityDashboard(), true
+	m.setStatusMessage("Security Findings navigation pending revamp", true)
+	return m, scheduleStatusClear(), true
 }
