@@ -117,10 +117,64 @@ func titleCase(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
-// Placeholders to silence "imported and not used" until later tasks.
-// Remove in Task C3 and C4.
-var (
-	_ = context.Background
-	_ = sort.SliceStable
-	_ = time.Now
-)
+// findingToItem maps a security.Finding onto the model.Item shape the
+// explorer table already knows how to render. All display data for the
+// middle column lives in the first five Columns (Severity, Resource,
+// Title, Category, ResourceKind). Details-only fields (Source,
+// Description, References, raw labels) live in subsequent columns and
+// are read by the finding details preview renderer.
+func findingToItem(f security.Finding) model.Item {
+	item := model.Item{
+		Name:      f.Title,
+		Kind:      "__security_finding__",
+		Namespace: f.Resource.Namespace,
+		Status:    severityToStatus(f.Severity),
+		Extra:     f.ID,
+		CreatedAt: time.Now(),
+		Columns: []model.KeyValue{
+			{Key: "Severity", Value: severityLabel(f.Severity)},
+			{Key: "Resource", Value: shortResource(f.Resource)},
+			{Key: "Title", Value: f.Title},
+			{Key: "Category", Value: string(f.Category)},
+			{Key: "ResourceKind", Value: f.Resource.Kind},
+		},
+	}
+	if f.Source != "" {
+		item.Columns = append(item.Columns, model.KeyValue{
+			Key: "Source", Value: f.Source,
+		})
+	}
+	if f.Summary != "" || f.Details != "" {
+		desc := f.Summary
+		if f.Details != "" {
+			if desc != "" {
+				desc += "\n\n"
+			}
+			desc += f.Details
+		}
+		item.Columns = append(item.Columns, model.KeyValue{
+			Key: "Description", Value: desc,
+		})
+	}
+	if len(f.References) > 0 {
+		item.Columns = append(item.Columns, model.KeyValue{
+			Key: "References", Value: strings.Join(f.References, "\n"),
+		})
+	}
+	// Source-specific labels as additional columns with TitleCase keys.
+	// Sort for deterministic test output.
+	labelKeys := make([]string, 0, len(f.Labels))
+	for k := range f.Labels {
+		labelKeys = append(labelKeys, k)
+	}
+	sort.Strings(labelKeys)
+	for _, k := range labelKeys {
+		item.Columns = append(item.Columns, model.KeyValue{
+			Key: titleCase(k), Value: f.Labels[k],
+		})
+	}
+	return item
+}
+
+// Placeholder to silence "imported and not used" until Task C4.
+var _ = context.Background
