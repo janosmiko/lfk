@@ -245,6 +245,10 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 // scopes to the given namespace; for cluster-scoped resources it lists globally.
 // When namespace is empty and the resource is namespaced, it lists across all namespaces.
 func (c *Client) GetResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+	// Virtual security resource types — dispatched to the injected manager.
+	if rt.APIGroup == model.SecurityVirtualAPIGroup {
+		return c.getSecurityFindings(ctx, contextName, namespace, rt)
+	}
 	// Special handling for virtual resource types.
 	if rt.APIGroup == "_helm" && rt.Resource == "releases" {
 		return c.GetHelmReleases(ctx, contextName, namespace)
