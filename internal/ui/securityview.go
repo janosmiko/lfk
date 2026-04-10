@@ -424,9 +424,9 @@ func RenderSecurityDashboard(state SecurityViewState, width, height int) string 
 
 	// Hint bar.
 	b.WriteString("\n")
-	hint := "[Tab]tab [Enter]det [r]refresh [J/K]cursor [j/k]leave"
+	hint := "[Tab]tab [Enter]det [r]refresh [J/K]cursor [F]fullscreen"
 	if state.ResourceFilter != nil {
-		hint = "[Tab]tab [Enter]det [r]refresh [C]clear [J/K]cursor [j/k]leave"
+		hint = "[Tab]tab [Enter]det [r]refresh [C]clear [J/K]cursor [F]fullscreen"
 	}
 	b.WriteString(DimStyle.Render(hint))
 

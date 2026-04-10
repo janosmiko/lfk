@@ -51,16 +51,18 @@ func TestSecurityKeyCapitalKMovesCursorUp(t *testing.T) {
 	assert.Equal(t, 0, updated.securityView.Cursor)
 }
 
-func TestSecurityKeyLowercaseJKNotHandled(t *testing.T) {
-	// Lowercase j/k must NOT be claimed by handleSecurityKey — they flow
-	// through to the normal explorer middle-column navigation so users can
-	// move off the security pseudo-item.
+func TestSecurityKeyLowercaseJKMovesCursor(t *testing.T) {
+	// When called directly, handleSecurityKey handles lowercase j/k too.
+	// The routing layer (handleExplorerKey) is responsible for deciding
+	// when to invoke handleSecurityKey on lowercase keys — only in
+	// fullscreen mode. See TestSecurityKeyDispatchLowercaseJKNormalView
+	// and TestSecurityKeyDispatchLowercaseJKFullscreen for the dispatch
+	// behavior.
 	m := baseSecurityModel()
 	updated, _ := m.handleSecurityKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
-	assert.Equal(t, 0, updated.securityView.Cursor, "lowercase j must not move finding cursor")
-	updated.securityView.Cursor = 1
+	assert.Equal(t, 1, updated.securityView.Cursor)
 	updated2, _ := updated.handleSecurityKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
-	assert.Equal(t, 1, updated2.securityView.Cursor, "lowercase k must not move finding cursor")
+	assert.Equal(t, 0, updated2.securityView.Cursor)
 }
 
 func TestSecurityKeyEnterTogglesDetail(t *testing.T) {
@@ -358,6 +360,61 @@ func TestSecurityKeysDoNotInterceptOtherItems(t *testing.T) {
 		"Tab must not cycle security category when security item is not focused")
 }
 
+// TestSecurityKeyDispatchLowercaseJKNormalView verifies that in the NORMAL
+// three-column view, lowercase j/k do NOT reach the security finding cursor
+// and instead flow through to middle-column navigation.
+func TestSecurityKeyDispatchLowercaseJKNormalView(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Security", Extra: "__security__"},
+		{Name: "Workloads"},
+	}
+	m.fullscreenDashboard = false
+	m.securityView.Findings = []security.Finding{
+		{ID: "1"}, {ID: "2"},
+	}
+	m.securityView.Cursor = 0
+
+	// Lowercase j in normal view should NOT move the finding cursor.
+	updated, _ := m.handleExplorerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, 0, mm.securityView.Cursor,
+		"lowercase j in normal view must not move finding cursor")
+}
+
+// TestSecurityKeyDispatchLowercaseJKFullscreen verifies that in FULLSCREEN
+// mode, lowercase j/k DO reach the security finding cursor because the
+// middle column is not visible.
+func TestSecurityKeyDispatchLowercaseJKFullscreen(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Security", Extra: "__security__"},
+	}
+	m.fullscreenDashboard = true
+	m.securityView.AvailableCategories = []security.Category{security.CategoryVuln}
+	m.securityView.ActiveCategory = security.CategoryVuln
+	m.securityView.Findings = []security.Finding{
+		{ID: "1", Category: security.CategoryVuln},
+		{ID: "2", Category: security.CategoryVuln},
+	}
+	m.securityView.Cursor = 0
+
+	updated, _ := m.handleExplorerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, 1, mm.securityView.Cursor,
+		"lowercase j in fullscreen must move finding cursor")
+
+	updated2, _ := mm.handleExplorerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	mm2, ok := updated2.(Model)
+	require.True(t, ok)
+	assert.Equal(t, 0, mm2.securityView.Cursor,
+		"lowercase k in fullscreen must move finding cursor up")
+}
+
 func TestIsSecurityDashboardKeyWhitelist(t *testing.T) {
 	// Positive: whitelisted keys.
 	positives := []tea.KeyMsg{
@@ -377,9 +434,9 @@ func TestIsSecurityDashboardKeyWhitelist(t *testing.T) {
 		assert.True(t, isSecurityDashboardKey(p), "expected key to be whitelisted: %+v", p)
 	}
 
-	// Negative: explorer keys that must continue to work normally.
-	// Lowercase j/k and g/G must fall through so users can navigate the
-	// middle column off the security pseudo-item.
+	// Negative: explorer keys that must continue to work normally in the
+	// normal three-column view. Lowercase j/k and g/G must fall through so
+	// users can navigate the middle column off the security pseudo-item.
 	negatives := []tea.KeyMsg{
 		{Type: tea.KeyRunes, Runes: []rune{'j'}},
 		{Type: tea.KeyRunes, Runes: []rune{'k'}},
@@ -394,5 +451,45 @@ func TestIsSecurityDashboardKeyWhitelist(t *testing.T) {
 	}
 	for _, n := range negatives {
 		assert.False(t, isSecurityDashboardKey(n), "expected key to fall through: %+v", n)
+	}
+}
+
+// TestIsSecurityDashboardKeyFullscreenWhitelist verifies the fullscreen
+// whitelist additionally claims lowercase j/k/g/G (no middle column to
+// navigate) while still letting h/l/// fall through.
+func TestIsSecurityDashboardKeyFullscreenWhitelist(t *testing.T) {
+	// Fullscreen-only positives — lowercase nav keys the dashboard owns
+	// because the middle column is hidden.
+	fullscreenExtras := []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'j'}},
+		{Type: tea.KeyRunes, Runes: []rune{'k'}},
+		{Type: tea.KeyRunes, Runes: []rune{'g'}},
+		{Type: tea.KeyRunes, Runes: []rune{'G'}},
+	}
+	for _, p := range fullscreenExtras {
+		assert.True(t, isSecurityDashboardKeyFullscreen(p),
+			"expected key to be in fullscreen whitelist: %+v", p)
+	}
+
+	// Fullscreen must still pass everything from the base whitelist.
+	basePositives := []tea.KeyMsg{
+		{Type: tea.KeyTab},
+		{Type: tea.KeyRunes, Runes: []rune{'J'}},
+		{Type: tea.KeyRunes, Runes: []rune{'r'}},
+	}
+	for _, p := range basePositives {
+		assert.True(t, isSecurityDashboardKeyFullscreen(p))
+	}
+
+	// Non-nav keys must still fall through even in fullscreen.
+	stillNegatives := []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'h'}},
+		{Type: tea.KeyRunes, Runes: []rune{'l'}},
+		{Type: tea.KeyRunes, Runes: []rune{'/'}},
+		{Type: tea.KeyRunes, Runes: []rune{'f'}},
+	}
+	for _, n := range stillNegatives {
+		assert.False(t, isSecurityDashboardKeyFullscreen(n),
+			"expected key to fall through even in fullscreen: %+v", n)
 	}
 }

@@ -31,14 +31,17 @@ func (m Model) updateSecurityMsg(msg tea.Msg) (Model, bool) {
 	return m, false
 }
 
-// handleSecurityKey handles key events when the security preview is focused
-// (i.e., selectedMiddleItem().Extra == "__security__"). Returns the updated
-// Model and an optional command.
+// handleSecurityKey handles key events routed to the security dashboard.
+// The caller (handleExplorerKey) decides when to route based on whether the
+// dashboard is fullscreen or embedded in the three-column preview pane:
 //
-// Cursor movement within the findings list uses J/K (capital), mirroring
-// lfk's convention that capital nav keys are scoped to the right preview
-// pane. Lowercase j/k are NOT handled here — they flow through to normal
-// explorer middle-column navigation so users can leave the security item.
+//   - Normal three-column view: only the preview-scoped keys reach here
+//     (Tab, Enter, J/K, r, C, 1-4). Lowercase j/k/g/G never arrive.
+//   - Fullscreen dashboard: lowercase j/k/g/G also reach here because the
+//     middle column isn't visible and there's nothing else to navigate.
+//
+// Both uppercase and lowercase j/k/g/G map to the same finding-cursor
+// actions — the routing layer decides when each mode is active.
 func (m Model) handleSecurityKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyTab:
@@ -55,10 +58,18 @@ func (m Model) handleSecurityKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg.Runes[0] {
-	case 'J':
+	case 'j', 'J':
 		m = securityCursorDown(m)
-	case 'K':
+	case 'k', 'K':
 		m = securityCursorUp(m)
+	case 'g':
+		m.securityView.Cursor = 0
+		m.securityView.Scroll = 0
+	case 'G':
+		visible := m.securityView.VisibleFindings()
+		if len(visible) > 0 {
+			m.securityView.Cursor = len(visible) - 1
+		}
 	case 'r':
 		m.securityView.Loading = true
 		return m, m.loadSecurityDashboard()

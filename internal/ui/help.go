@@ -324,13 +324,15 @@ func helpSections() []helpSection {
 			bindings: []helpEntry{
 				{kb.Security, "Open security dashboard (aggregate findings)"},
 				{kb.SecurityResource, "Security findings for the selected resource"},
-				{"J/K", "Move finding cursor down/up (capital, preview-scoped)"},
-				{"j/k", "Leave security item (middle-column nav)"},
+				{"J/K", "Move finding cursor down/up (always)"},
+				{"j/k", "Finding cursor in fullscreen; middle-column nav in normal view"},
+				{"g/G", "Top/bottom of findings list (fullscreen only)"},
 				{"Tab / Shift+Tab", "Cycle category tabs"},
 				{"1-4", "Jump to tab by index"},
 				{"Enter", "Toggle inline details pane"},
 				{"r", "Force refresh findings"},
 				{"C", "Clear resource filter (per-resource view)"},
+				{"F", "Toggle fullscreen dashboard"},
 			},
 		},
 		{

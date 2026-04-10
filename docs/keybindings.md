@@ -314,17 +314,34 @@ checks and the Trivy Operator (`VulnerabilityReport`, `ConfigAuditReport`).
 Press `#` from the explorer to open it, or `H` on a selected resource to open
 it pre-filtered to that resource.
 
+The dashboard has two modes with slightly different key behavior:
+
+### Normal three-column view (Security item selected in middle column)
+
 | Key | Action |
 |---|---|
-| `J` / `K` | Move finding cursor down / up (capital, preview-scoped) |
-| `j` / `k` | Move cursor in the middle column (leaves the security item) |
+| `J` / `K` | Move finding cursor down / up (preview-scoped) |
+| `j` / `k` | Move cursor in the middle column (leaves the Security item) |
 | `Tab` / `Shift+Tab` | Cycle category tabs |
 | `1`-`4` | Jump to tab by index |
 | `Enter` | Toggle inline details pane |
 | `r` | Force refresh |
 | `C` | Clear resource filter (when per-resource view is active) |
 
-**Note:** Capital `J`/`K` move the cursor inside the findings list (preview-scoped, matching lfk's convention for capital navigation keys in the right pane). Lowercase `j`/`k` flow through to normal middle-column navigation so you can leave the Security item and return to the resource type list.
+### Fullscreen dashboard (after pressing `F` on the Security item)
+
+| Key | Action |
+|---|---|
+| `j` / `k` / `J` / `K` | Move finding cursor down / up |
+| `g` / `G` | Jump to top / bottom of findings list |
+| `Tab` / `Shift+Tab` | Cycle category tabs |
+| `1`-`4` | Jump to tab by index |
+| `Enter` | Toggle inline details pane |
+| `r` | Force refresh |
+| `C` | Clear resource filter (when per-resource view is active) |
+| `F` / `Esc` / `Left` | Exit fullscreen |
+
+**Note:** In the normal three-column view, lowercase `j`/`k` flow through to standard middle-column navigation so you can leave the Security item. Capital `J`/`K` stay scoped to the findings list, matching lfk's convention for capital navigation keys in the right preview pane. In fullscreen mode there's no middle column to navigate, so lowercase `j`/`k`/`g`/`G` are also claimed by the dashboard for vim-style list navigation.
 
 ## Error Log (`!`)
 
