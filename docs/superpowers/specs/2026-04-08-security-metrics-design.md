@@ -1,5 +1,9 @@
 # Security Metrics Dashboard — Design Spec
 
+> **Status: Superseded by [2026-04-10-security-navigation-revamp-design.md](./2026-04-10-security-navigation-revamp-design.md)**
+>
+> The Phase 1 dashboard described in this document was implemented on branch `feat/security-dashboard` but never merged. Manual testing surfaced several friction points (see the revamp spec for details). This file is kept for historical context.
+
 **Date:** 2026-04-08
 **Status:** Approved, ready for implementation plan
 **Scope:** Phase 1 (MVP) focused, with phases 2 and 3 outlined

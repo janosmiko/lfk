@@ -310,7 +310,7 @@ type configFile struct {
 	// Monitoring maps cluster context names to custom monitoring endpoint config.
 	// The special key "default" applies to clusters without explicit config.
 	Monitoring map[string]model.MonitoringConfig `json:"monitoring" yaml:"monitoring"`
-	// Security maps cluster context names to security dashboard configuration.
+	// Security maps cluster context names to security findings browser configuration.
 	// The special key "default" applies to clusters without explicit config.
 	Security map[string]model.SecurityConfig `json:"security" yaml:"security"`
 	// Tips controls whether to show random tips on startup.

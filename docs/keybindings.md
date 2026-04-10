@@ -46,8 +46,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+T` | Toggle terminal mode (pty embedded / exec takeover) |
 | `Ctrl+G` | Finalizer search and remove |
 | `@` | Monitoring overview (active Prometheus alerts) |
-| `#` | Open security dashboard |
-| `H` | Security findings for the selected resource |
+| `#` | Jump to Security category |
 | `Q` | Namespace resource quota dashboard |
 | `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl (`:k get pod`), shell (`:! cmd`) |
 
@@ -307,41 +306,19 @@ The title bar shows the namespace scope (`ns:...`) used for the permission check
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
 | `q` / `Esc` | Close visualizer |
 
-## Security Dashboard
+## Security findings browser
 
-The security dashboard surfaces findings aggregated from built-in heuristic
-checks and the Trivy Operator (`VulnerabilityReport`, `ConfigAuditReport`).
-Press `#` from the explorer to open it, or `H` on a selected resource to open
-it pre-filtered to that resource.
-
-The dashboard has two modes with slightly different key behavior:
-
-### Normal three-column view (Security item selected in middle column)
+Press `#` to jump to the Security category. Inside a source, findings behave exactly like regular resources:
 
 | Key | Action |
 |---|---|
-| `J` / `K` | Move finding cursor down / up (preview-scoped) |
-| `j` / `k` | Move cursor in the middle column (leaves the Security item) |
-| `Tab` / `Shift+Tab` | Cycle category tabs |
-| `1`-`4` | Jump to tab by index |
-| `Enter` | Toggle inline details pane |
-| `r` | Force refresh |
-| `C` | Clear resource filter (when per-resource view is active) |
-
-### Fullscreen dashboard (after pressing `F` on the Security item)
-
-| Key | Action |
-|---|---|
-| `j` / `k` / `J` / `K` | Move finding cursor down / up |
-| `g` / `G` | Jump to top / bottom of findings list |
-| `Tab` / `Shift+Tab` | Cycle category tabs |
-| `1`-`4` | Jump to tab by index |
-| `Enter` | Toggle inline details pane |
-| `r` | Force refresh |
-| `C` | Clear resource filter (when per-resource view is active) |
-| `F` / `Esc` / `Left` | Exit fullscreen |
-
-**Note:** In the normal three-column view, lowercase `j`/`k` flow through to standard middle-column navigation so you can leave the Security item. Capital `J`/`K` stay scoped to the findings list, matching lfk's convention for capital navigation keys in the right preview pane. In fullscreen mode there's no middle column to navigate, so lowercase `j`/`k`/`g`/`G` are also claimed by the dashboard for vim-style list navigation.
+| `j` / `k` | Move cursor up/down |
+| `Enter` | Jump to the affected resource |
+| `o` | Owner jump (same effect) |
+| `y` | Copy finding ID |
+| `/` | Search findings |
+| `f` | Filter findings |
+| `r` | Refresh (invalidates security cache) |
 
 ## Error Log (`!`)
 
@@ -523,8 +500,7 @@ keybindings:
   sort_reset: "-"        # Reset sort to default
   filter_presets: "."    # Quick filter presets
   monitoring: "@"        # Monitoring dashboard
-  security: "#"           # Security dashboard
-  security_resource: "H"  # Security findings for selected resource
+  security: "#"           # Jump to Security category
   quota_dashboard: "Q"   # Quota dashboard
   terminal_toggle: "ctrl+t"  # Toggle terminal mode (pty/exec)
 

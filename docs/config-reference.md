@@ -12,7 +12,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `log_path` | string | `"~/.local/share/lfk/lfk.log"` | Path to the application log file. |
 | `dashboard` | bool | `true` | Show cluster dashboard when entering a context. Set to `false` to go directly to resource types. |
 | `monitoring` | map[string]object | `{}` | Per-cluster monitoring endpoint configuration. Keys are context names or `"default"`. See [Monitoring](#monitoring) section. |
-| `security` | map[string]object | *(see default)* | Per-cluster security dashboard configuration. Keys are context names or `"default"`. See [Security](#security) section. |
+| `security` | map[string]object | *(see default)* | Per-cluster security findings browser configuration. Keys are context names or `"default"`. See [Security](#security) section. |
 | `resource_columns` | map[string]list | `{}` | Per-resource-type column configuration. Keys are resource Kind names (case-insensitive). When not set for a kind, columns are auto-detected. |
 | `clusters` | map[string]object | `{}` | Per-cluster configuration overrides. Keys are context names. See [Clusters](#clusters) section. |
 | `theme` | object | *(see Theme section)* | Custom color theme overrides. |
@@ -82,55 +82,44 @@ When not configured, the following defaults are used for auto-discovery:
 
 ## Security
 
-Configure the security dashboard (`#` key) and per-resource indicators. All
-fields are optional with sensible defaults. Keys are kubeconfig context names;
-the special key `"default"` applies to any cluster without an explicit entry.
+Configure the security findings browser and SEC column. All fields are
+optional with sensible defaults. Keys are kubeconfig context names; the
+special key `"default"` applies to any cluster without an explicit entry.
 
 ```yaml
 security:
   default:
     enabled: true
-    per_resource_indicators: true
-    per_resource_action: true
-    refresh_ttl: 30s
-    availability_ttl: 60s
+    sec_column: true
     sources:
       heuristic:
         enabled: true
-        checks:
-          - privileged
-          - host_namespaces
-          - host_path
-          - readonly_root_fs
-          - run_as_root
-          - allow_priv_esc
-          - dangerous_caps
-          - missing_resource_limits
-          - default_sa
-          - latest_tag
       trivy_operator:
         enabled: true
+      policy_report:
+        enabled: false
+      kube_bench:
+        enabled: false
+      falco:
+        enabled: false
 ```
 
-### Security Entry Fields
+### Fields
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `enabled` | bool | `true` | Master switch for the security dashboard and `#`/`H` hotkeys |
-| `per_resource_indicators` | bool | `true` | Show severity badges in the explorer when sources are available |
-| `per_resource_action` | bool | `true` | Show "Security Findings" in the action menu |
-| `refresh_ttl` | duration | `"30s"` | Cache TTL for fetched findings |
-| `availability_ttl` | duration | `"60s"` | Cache TTL for source availability checks |
-| `sources` | map | *(see default)* | Per-source configuration map (`heuristic`, `trivy_operator`) |
+| `enabled` | bool | `true` | Master switch for the entire security feature |
+| `sec_column` | bool | `true` | Show the SEC badge in the Workloads explorer table |
+| `sources` | map | *(see default)* | Per-source configuration |
 
-### Source Fields
+### Source fields
 
 Each source entry under `sources:` accepts:
 
 | Field | Type | Description |
 |---|---|---|
-| `enabled` | bool | Per-source opt-out toggle (defaults to `true` for each source) |
-| `checks` | list[string] | (heuristic only) Which checks to run. Omit or set to `null` to run all built-in checks. |
+| `enabled` | bool | Opt-out toggle for the source |
+| `checks` | list[string] | (heuristic only) List of checks to run. Omit or set to `null` to run all built-in checks. |
 
 Available heuristic checks: `privileged`, `host_namespaces`, `host_path`,
 `readonly_root_fs`, `run_as_root`, `allow_priv_esc`, `dangerous_caps`,
@@ -139,6 +128,16 @@ Available heuristic checks: `privileged`, `host_namespaces`, `host_path`,
 The `trivy_operator` source reads `VulnerabilityReport` and `ConfigAuditReport`
 CRDs from the `aquasecurity.github.io/v1alpha1` API group. It is automatically
 disabled when those CRDs are not present in the cluster.
+
+### Migration from Phase 1 dashboard
+
+If you used an earlier config shape, these fields are **removed** (YAML
+ignores unknown fields, so old configs load cleanly):
+
+- `per_resource_indicators` → renamed to `sec_column`
+- `per_resource_action` → dropped (action menu entry is always shown)
+- `refresh_ttl`, `availability_ttl` → removed (code defaults: 30s / 60s)
+- `keybindings.security_resource` → dropped (H hotkey removed)
 
 ## Clusters
 

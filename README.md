@@ -105,13 +105,14 @@
 - **Session persistence**: Remembers last context/namespace/resource across restarts
 - **Command bar**: Press `:` for shell/kubectl commands with autocompletion
 
-### Security Dashboard
+### Security findings browser
 
-- **Unified security view**: Press `#` to open an aggregate dashboard showing findings from built-in heuristic checks and (when installed) the Trivy Operator (`VulnerabilityReport`, `ConfigAuditReport`).
-- **Per-resource indicators**: Explorer rows show severity-colored badges and counts for workloads with findings (auto-gated on source availability).
-- **Per-resource drill-down**: Press `H` on a selected resource to open the dashboard pre-filtered to that resource, or use the "Security Findings" entry in the action menu (`x`).
-- **Category tabs**: Findings are grouped by category (Vulnerabilities, Misconfiguration, Policy, Compliance). Cycle with `Tab`/`Shift+Tab` or jump by index with `1`-`4`.
-- **Configurable sources**: Enable/disable heuristic checks and the trivy-operator source per cluster via the `security` config block.
+- **Hierarchical navigation**: Press `#` to jump to the Security category in the middle column. Drill into a source (Trivy, Kyverno, Heuristic, ...) to see its findings as regular explorer rows.
+- **Per-source drill-down**: Findings are sorted by severity (Critical → Low), then namespace, then title. Use `j`/`k`, `gg`/`G`, `/` search, and `f` filter exactly as you would for any other resource type.
+- **Inline details**: Select a finding and the right preview pane shows the full description, affected resource, source, category, references, and any source-specific labels.
+- **Jump to resource**: Press `Enter` on a finding to navigate to the affected Deployment/Pod/etc. The existing `o` owner-jump key also works.
+- **SEC column in the explorer**: Deployments, Pods, and other workloads display a severity badge in the Name column when security sources are available. The badge is color-coded by highest severity and shows the total finding count.
+- **Per-resource drill-in**: Press `x` on a resource and choose "Security Findings" to jump to the Security category with a pre-filter matching that resource.
 
 ### Integrations
 

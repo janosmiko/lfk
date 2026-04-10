@@ -58,34 +58,15 @@ monitoring:
 #     namespaces: ["monitoring", "observability"]
 #     services: ["prometheus-server", "prometheus"]
 
-# ─── Security Dashboard ────────────────────────────────────────────────────────
-# Configure the security dashboard (# key) and per-resource indicators.
-# All fields are optional. Keys are kubeconfig context names; "default" applies
-# to clusters without an explicit entry.
+# ─── Security findings browser ────────────────────────────────────────────────
+# Security findings browser. All fields are optional.
 # security:
 #   default:
 #     enabled: true
-#     per_resource_indicators: true
-#     per_resource_action: true
-#     refresh_ttl: 30s
-#     availability_ttl: 60s
+#     sec_column: true
 #     sources:
 #       heuristic:
 #         enabled: true
-#         # Available checks: privileged, host_namespaces, host_path,
-#         # readonly_root_fs, run_as_root, allow_priv_esc, dangerous_caps,
-#         # missing_resource_limits, default_sa, latest_tag
-#         checks:
-#           - privileged
-#           - host_namespaces
-#           - host_path
-#           - readonly_root_fs
-#           - run_as_root
-#           - allow_priv_esc
-#           - dangerous_caps
-#           - missing_resource_limits
-#           - default_sa
-#           - latest_tag
 #       trivy_operator:
 #         enabled: true
 
