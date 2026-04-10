@@ -1,14 +1,17 @@
 package app
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -644,4 +647,36 @@ func TestJumpToFindingResourceMalformedResource(t *testing.T) {
 	updated, _ := m.jumpToFindingResource(sel)
 	_, ok := updated.(Model)
 	assert.True(t, ok)
+}
+
+// --- directActionRefresh: security cache invalidation ---
+
+func TestHandleKeyRefreshInvalidatesSecurityCache(t *testing.T) {
+	mgr := security.NewManager()
+	mgr.SetRefreshTTL(1 * time.Hour)
+	fakeSrc := &security.FakeSource{
+		NameStr: "fake", Available: true,
+		Findings: []security.Finding{{ID: "1"}},
+	}
+	mgr.Register(fakeSrc)
+
+	_, _ = mgr.FetchAll(context.Background(), "kctx", "")
+	require.Equal(t, int32(1), fakeSrc.FetchCalls.Load())
+
+	_, _ = mgr.FetchAll(context.Background(), "kctx", "")
+	require.Equal(t, int32(1), fakeSrc.FetchCalls.Load())
+
+	m := baseExplorerModel()
+	m.securityManager = mgr
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind:     "__security_trivy-operator__",
+		APIGroup: model.SecurityVirtualAPIGroup,
+	}
+	m.nav.Context = "kctx"
+
+	_, _ = m.directActionRefresh()
+
+	_, _ = mgr.FetchAll(context.Background(), "kctx", "")
+	assert.Equal(t, int32(2), fakeSrc.FetchCalls.Load())
 }

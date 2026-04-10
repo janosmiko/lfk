@@ -205,6 +205,14 @@ func (m Model) directActionLogs() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) directActionRefresh() (tea.Model, tea.Cmd) {
+	// On security source views, invalidate the Manager's fetch +
+	// availability caches so the subsequent loadResources does a real
+	// fetch instead of returning stale cached results.
+	if m.nav.Level == model.LevelResources &&
+		strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") &&
+		m.securityManager != nil {
+		m.securityManager.Invalidate()
+	}
 	m.cancelAndReset()
 	m.requestGen++
 	m.setStatusMessage("Refreshing...", false)
