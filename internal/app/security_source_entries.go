@@ -7,9 +7,17 @@ import (
 )
 
 // buildSecuritySourceEntries builds the Security category entries from the
-// Manager's currently registered and available sources. Called by the
-// SecuritySourcesFn hook installed in NewModel.
-func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]bool) []model.SecuritySourceEntry {
+// Manager's currently registered sources. Called by the SecuritySourcesFn
+// hook installed in NewModel.
+//
+// All registered sources are shown regardless of the availability map.
+// Sources whose external dependencies are missing (e.g., Trivy Operator
+// CRDs not installed) will return errors at fetch time, which surface
+// naturally in the findings list and the error log. Filtering them out
+// at registration time would hide discoverable features from the user
+// (e.g., "Trivy is an option I could enable"). The availability map is
+// kept for the action menu gate and for diagnostic logging.
+func buildSecuritySourceEntries(mgr *security.Manager, _ map[string]bool) []model.SecuritySourceEntry {
 	if mgr == nil {
 		return nil
 	}
@@ -25,9 +33,6 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 	idx := mgr.Index()
 	var entries []model.SecuritySourceEntry
 	for _, src := range mgr.Sources() {
-		if !availability[src.Name()] {
-			continue
-		}
 		meta, known := displayByName[src.Name()]
 		if !known {
 			meta.display = src.Name()

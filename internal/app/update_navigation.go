@@ -262,6 +262,9 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	if _, ok := m.discoveredCRDs[sel.Name]; !ok {
 		cmds = append(cmds, m.discoverCRDs(sel.Name))
 	}
+	if cmd := m.loadSecurityAvailability(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	return m, tea.Batch(cmds...)
 }
 
