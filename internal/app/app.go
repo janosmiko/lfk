@@ -21,6 +21,15 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// Package-level pointers used by the SecuritySourcesFn closure to read
+// the live Model state. Because Bubbletea passes Model by value, the
+// closure cannot capture the fields directly — it must indirect through
+// these pointers, which are updated by NewModel.
+var (
+	currentSecurityManagerPtr      **security.Manager
+	currentSecurityAvailabilityPtr *map[string]bool
+)
+
 // viewMode tracks the current view state.
 type viewMode int
 
@@ -886,6 +895,30 @@ func NewModel(client *k8s.Client) Model {
 	// refreshSecuritySources so each cluster uses its own client handles.
 	m.securityManager = security.NewManager()
 	m.refreshSecuritySources()
+
+	// Per-source availability map — initially empty until the first
+	// availability probe completes.
+	m.securityAvailabilityByName = make(map[string]bool)
+
+	// Wire the manager into the Client so k8s.GetResources can dispatch
+	// _security APIGroup calls.
+	if m.client != nil {
+		m.client.SetSecurityManager(m.securityManager)
+	}
+
+	// Package-level pointers so the SecuritySourcesFn closure can read
+	// the live model state on each render. Closures capture by value in
+	// Bubbletea because Model is passed around by value — these pointers
+	// let the hook follow updates.
+	currentSecurityManagerPtr = &m.securityManager
+	currentSecurityAvailabilityPtr = &m.securityAvailabilityByName
+
+	model.SecuritySourcesFn = func() []model.SecuritySourceEntry {
+		if currentSecurityManagerPtr == nil || currentSecurityAvailabilityPtr == nil {
+			return nil
+		}
+		return buildSecuritySourceEntries(*currentSecurityManagerPtr, *currentSecurityAvailabilityPtr)
+	}
 
 	return m
 }
