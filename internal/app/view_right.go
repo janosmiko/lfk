@@ -275,6 +275,10 @@ func (m Model) renderRightClusters(width, height int) string {
 }
 
 func (m Model) renderRightResources(width, height int) string {
+	// Security findings get a dedicated details renderer.
+	if sel := m.selectedMiddleItem(); sel != nil && sel.Kind == "__security_finding__" {
+		return ui.RenderFindingDetails(*sel, width, height)
+	}
 	if (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod") && len(m.rightItems) > 0 {
 		return m.renderSplitPreview(width, height)
 	}

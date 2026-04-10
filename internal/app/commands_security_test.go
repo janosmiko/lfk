@@ -6,6 +6,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
 )
 
@@ -55,4 +56,24 @@ func TestSecurityAvailabilityLoadedStaleContextDiscarded(t *testing.T) {
 	}
 	updated := m.handleSecurityAvailabilityLoaded(msg)
 	assert.False(t, updated.securityAvailabilityByName["trivy-operator"])
+}
+
+func TestRenderRightResourcesShowsFindingDetails(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.middleItems = []model.Item{
+		{
+			Name: "CVE-2024-1234",
+			Kind: "__security_finding__",
+			Columns: []model.KeyValue{
+				{Key: "Severity", Value: "CRIT"},
+				{Key: "Title", Value: "CVE-2024-1234"},
+				{Key: "Resource", Value: "deploy/api"},
+			},
+		},
+	}
+	out := m.renderRightResources(80, 20)
+	assert.Contains(t, out, "CRIT")
+	assert.Contains(t, out, "CVE-2024-1234")
+	assert.Contains(t, out, "deploy/api")
 }
