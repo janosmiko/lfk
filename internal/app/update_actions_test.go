@@ -2181,3 +2181,45 @@ func TestFinalExecuteActionExplain(t *testing.T) {
 	_ = result.(Model)
 	_ = cmd
 }
+
+// --- executeActionSecurityFindings: action menu → navigate + filter ---
+
+func TestExecuteActionSecurityFindingsFiltersToResource(t *testing.T) {
+	prev := model.SecuritySourcesFn
+	t.Cleanup(func() { model.SecuritySourcesFn = prev })
+	model.SecuritySourcesFn = func() []model.SecuritySourceEntry {
+		return []model.SecuritySourceEntry{
+			{DisplayName: "Trivy", SourceName: "trivy-operator", Icon: "◈"},
+		}
+	}
+
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment"}
+	m.middleItems = []model.Item{
+		{Name: "api", Kind: "Deployment", Namespace: "prod"},
+	}
+	m.leftItems = []model.Item{
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings"},
+	}
+
+	updated, _ := m.executeActionSecurityFindings()
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, "api", mm.filterText)
+}
+
+func TestExecuteActionSecurityFindingsNoSources(t *testing.T) {
+	prev := model.SecuritySourcesFn
+	t.Cleanup(func() { model.SecuritySourcesFn = prev })
+	model.SecuritySourcesFn = nil
+
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.middleItems = []model.Item{{Name: "api"}}
+	m.leftItems = []model.Item{}
+	updated, _ := m.executeActionSecurityFindings()
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Contains(t, mm.statusMessage, "No security sources available")
+}

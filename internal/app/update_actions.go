@@ -473,15 +473,39 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 }
 
 // executeActionSecurityFindings handles the "Security Findings" action.
-// The body is a temporary stub during the security navigation revamp;
-// Phase E re-wires it to the new hierarchical Security category navigation.
+// Ascends to LevelResourceTypes, jumps to the first entry in the Security
+// category, drills into it, and sets the filter text to the originally
+// selected resource's name so only findings for that resource are shown.
 func (m Model) executeActionSecurityFindings() (tea.Model, tea.Cmd) {
-	if !m.securityAvailableAny() {
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil
+	}
+	filterText := sel.Name
+
+	m = m.ascendToResourceTypes()
+	var found bool
+	for i, item := range m.middleItems {
+		if item.Category == "Security" && item.Extra != "" {
+			m.setCursor(i)
+			m.clampCursor()
+			found = true
+			break
+		}
+	}
+	if !found {
 		m.setStatusMessage("No security sources available", true)
 		return m, scheduleStatusClear()
 	}
-	m.setStatusMessage("Security Findings navigation pending revamp", true)
-	return m, scheduleStatusClear()
+	mdl, cmd := m.navigateChild()
+	m2, ok := mdl.(Model)
+	if !ok {
+		return mdl, cmd
+	}
+	m2.filterText = filterText
+	m2.setCursor(0)
+	m2.clampCursor()
+	return m2, tea.Batch(cmd, m2.loadPreview())
 }
 
 // executeActionExtended dispatches Argo, Helm, Flux, and other extended actions.
