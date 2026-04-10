@@ -542,8 +542,8 @@ func TestHandleExplorerActionKeySecurityJumpsToFirstEntry(t *testing.T) {
 	m.nav.Level = model.LevelResourceTypes
 	m.middleItems = []model.Item{
 		{Name: "Monitoring", Extra: "__monitoring__"},
-		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings"},
-		{Name: "Heuristic", Category: "Security", Extra: "_security/v1/findings"},
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
+		{Name: "Heuristic", Category: "Security", Extra: "_security/v1/findings-heuristic"},
 		{Name: "Workloads"},
 	}
 	updated, _, handled := m.handleExplorerActionKeySecurity()
@@ -585,7 +585,7 @@ func TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel(t *testing.T) {
 	m := baseExplorerModel() // starts at LevelResources with middleItems = pods
 	m.leftItems = []model.Item{
 		{Name: "Monitoring", Extra: "__monitoring__"},
-		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings"},
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
 		{Name: "Workloads"},
 	}
 

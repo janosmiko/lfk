@@ -2200,7 +2200,7 @@ func TestExecuteActionSecurityFindingsFiltersToResource(t *testing.T) {
 		{Name: "api", Kind: "Deployment", Namespace: "prod"},
 	}
 	m.leftItems = []model.Item{
-		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings"},
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
 	}
 
 	updated, _ := m.executeActionSecurityFindings()

@@ -265,7 +265,7 @@ func TestGetResourcesDispatchesSecurityAPIGroup(t *testing.T) {
 	rt := model.ResourceTypeEntry{
 		Kind:     "__security_trivy-operator__",
 		APIGroup: model.SecurityVirtualAPIGroup,
-		Resource: "findings",
+		Resource: "findings-trivy-operator",
 	}
 	items, err := c.GetResources(context.Background(), "kctx", "", rt)
 	require.NoError(t, err)

@@ -591,6 +591,13 @@ func TopLevelResourceTypes() []ResourceCategory {
 	// Prepended to the category list so it renders just after Dashboards
 	// (which FlattenedResourceTypesFiltered hardcodes at the very top).
 	// Always visible (heuristic source has no external dependency).
+	//
+	// The Resource field is set to "findings-<source>" so each entry's
+	// ResourceRef() returns a unique value. FlattenedResourceTypesFiltered
+	// uses ResourceRef() as the Item.Extra (the navigation lookup key),
+	// and FindResourceTypeIn returns the first match — if all security
+	// entries shared "_security/v1/findings", drilling into Trivy would
+	// always find the Heuristic entry first.
 	var securityEntries []ResourceTypeEntry
 	if SecuritySourcesFn != nil {
 		for _, src := range SecuritySourcesFn() {
@@ -603,7 +610,7 @@ func TopLevelResourceTypes() []ResourceCategory {
 				Kind:        "__security_" + src.SourceName + "__",
 				APIGroup:    SecurityVirtualAPIGroup,
 				APIVersion:  "v1",
-				Resource:    "findings",
+				Resource:    "findings-" + src.SourceName,
 				Icon:        src.Icon,
 				Namespaced:  false,
 			})

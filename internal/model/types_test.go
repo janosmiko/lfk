@@ -1183,11 +1183,17 @@ func TestSecuritySourcesFnReturnsEntries(t *testing.T) {
 	assert.Equal(t, "Trivy (5)", securityCat.Types[0].DisplayName)
 	assert.Equal(t, "__security_trivy-operator__", securityCat.Types[0].Kind)
 	assert.Equal(t, SecurityVirtualAPIGroup, securityCat.Types[0].APIGroup)
-	assert.Equal(t, "findings", securityCat.Types[0].Resource)
+	assert.Equal(t, "findings-trivy-operator", securityCat.Types[0].Resource)
 	assert.False(t, securityCat.Types[0].Namespaced)
 
 	assert.Equal(t, "Heuristic (12)", securityCat.Types[1].DisplayName)
 	assert.Equal(t, "__security_heuristic__", securityCat.Types[1].Kind)
+	assert.Equal(t, "findings-heuristic", securityCat.Types[1].Resource)
+
+	// Crucial: each entry's ResourceRef must be unique so FindResourceTypeIn
+	// returns the right entry when the user drills in.
+	assert.NotEqual(t, securityCat.Types[0].ResourceRef(), securityCat.Types[1].ResourceRef(),
+		"security entries must have unique ResourceRef values")
 }
 
 func TestSecurityIsCoreCategoryAlwaysShown(t *testing.T) {
