@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 )
 
 // Client wraps Kubernetes API access.
@@ -30,6 +31,19 @@ type Client struct {
 	// instead of building real clients from the kubeconfig.
 	testClientset interface{} // kubernetes.Interface (avoid import cycle in non-test code)
 	testDynClient interface{} // dynamic.Interface
+
+	// securityManager is injected by the app layer so GetResources can
+	// dispatch _security virtual APIGroup calls to it without creating an
+	// import cycle (internal/k8s must not import internal/security/heuristic
+	// or trivyop, but can import internal/security for the interface).
+	securityManager *security.Manager
+}
+
+// SetSecurityManager injects the security manager. Must be called before
+// GetResources is invoked on a _security APIGroup entry. Safe to call with
+// nil to clear the reference.
+func (c *Client) SetSecurityManager(mgr *security.Manager) {
+	c.securityManager = mgr
 }
 
 // RBACCheck represents a single permission check result.
