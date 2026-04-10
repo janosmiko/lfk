@@ -645,3 +645,22 @@ func (m Model) handleExplorerActionKeySecurity() (tea.Model, tea.Cmd, bool) {
 	}
 	return m, nil, true
 }
+
+// jumpToFindingResource navigates from a selected security finding item to
+// the Kubernetes resource it was attached to. Reads the resource kind from
+// the "ResourceKind" column (full k8s kind, not the short abbreviation)
+// and the name from the "Resource" column's "shortKind/name" format.
+func (m Model) jumpToFindingResource(sel model.Item) (tea.Model, tea.Cmd) {
+	kind := sel.ColumnValue("ResourceKind")
+	resource := sel.ColumnValue("Resource")
+	if kind == "" || resource == "" || resource == "(cluster-scoped)" {
+		m.setStatusMessage("No affected resource for this finding", true)
+		return m, scheduleStatusClear()
+	}
+	parts := strings.SplitN(resource, "/", 2)
+	if len(parts) != 2 {
+		return m, nil
+	}
+	name := parts[1]
+	return m.navigateToOwner(kind, name)
+}

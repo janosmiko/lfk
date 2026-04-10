@@ -420,6 +420,11 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Security findings jump to the affected resource rather than open YAML.
+	if sel.Kind == "__security_finding__" {
+		return m.jumpToFindingResource(*sel)
+	}
+
 	if m.nav.Level == model.LevelClusters || m.nav.Level == model.LevelResourceTypes {
 		return m.navigateChild()
 	}

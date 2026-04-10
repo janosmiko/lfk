@@ -621,3 +621,34 @@ func TestHandleExplorerActionKeyMonitoringAscendsFromDeeperLevel(t *testing.T) {
 	assert.Equal(t, model.LevelResourceTypes, mm.nav.Level)
 	assert.Equal(t, 1, mm.cursor())
 }
+
+// --- jumpToFindingResource: Enter on a finding ---
+
+func TestJumpToFindingResourceClusterScoped(t *testing.T) {
+	m := baseExplorerModel()
+	sel := model.Item{
+		Kind: "__security_finding__",
+		Columns: []model.KeyValue{
+			{Key: "Resource", Value: "(cluster-scoped)"},
+			{Key: "ResourceKind", Value: ""},
+		},
+	}
+	updated, _ := m.jumpToFindingResource(sel)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Contains(t, mm.statusMessage, "No affected resource")
+}
+
+func TestJumpToFindingResourceMalformedResource(t *testing.T) {
+	m := baseExplorerModel()
+	sel := model.Item{
+		Kind: "__security_finding__",
+		Columns: []model.KeyValue{
+			{Key: "Resource", Value: "malformed-no-slash"},
+			{Key: "ResourceKind", Value: "Deployment"},
+		},
+	}
+	updated, _ := m.jumpToFindingResource(sel)
+	_, ok := updated.(Model)
+	assert.True(t, ok)
+}
