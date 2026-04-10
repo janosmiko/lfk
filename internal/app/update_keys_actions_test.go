@@ -534,21 +534,34 @@ func TestP4ExplorerActionKeyComma(t *testing.T) {
 
 // --- handleExplorerActionKeySecurity: G4 ---
 
-func TestHandleExplorerActionKeySecurityJumpsToItem(t *testing.T) {
+func TestHandleExplorerActionKeySecurityJumpsToFirstEntry(t *testing.T) {
 	m := baseExplorerModel()
 	m.nav.Level = model.LevelResourceTypes
 	m.middleItems = []model.Item{
-		{Name: "Cluster", Extra: "__overview__"},
 		{Name: "Monitoring", Extra: "__monitoring__"},
-		{Name: "Security", Extra: "__security__"},
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings"},
+		{Name: "Heuristic", Category: "Security", Extra: "_security/v1/findings"},
 		{Name: "Workloads"},
 	}
-
 	updated, _, handled := m.handleExplorerActionKeySecurity()
 	assert.True(t, handled)
 	mm, ok := updated.(Model)
 	require.True(t, ok)
-	assert.Equal(t, 2, mm.cursor())
+	assert.Equal(t, 1, mm.cursor())
+}
+
+func TestHandleExplorerActionKeySecurityNoSourcesAvailable(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Monitoring", Extra: "__monitoring__"},
+		{Name: "Workloads"},
+	}
+	updated, _, handled := m.handleExplorerActionKeySecurity()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Contains(t, mm.statusMessage, "No security sources available")
 }
 
 func TestHandleExplorerActionKeySecurityRequiresContext(t *testing.T) {
@@ -562,34 +575,14 @@ func TestHandleExplorerActionKeySecurityRequiresContext(t *testing.T) {
 	assert.Contains(t, mm.statusMessage, "Select a cluster first")
 }
 
-func TestHandleExplorerActionKeySecurityViaDispatch(t *testing.T) {
-	prev := ui.ActiveKeybindings.Security
-	ui.ActiveKeybindings.Security = "#"
-	t.Cleanup(func() { ui.ActiveKeybindings.Security = prev })
-
-	m := baseExplorerModel()
-	m.nav.Level = model.LevelResourceTypes
-	m.middleItems = []model.Item{
-		{Name: "Cluster", Extra: "__overview__"},
-		{Name: "Security", Extra: "__security__"},
-	}
-
-	result, _, handled := m.handleExplorerActionKey(runeKey('#'))
-	assert.True(t, handled, "# key should be dispatched to security handler")
-	mm, ok := result.(Model)
-	require.True(t, ok)
-	assert.Equal(t, 1, mm.cursor())
-}
-
 // TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel verifies that
 // pressing # while at LevelResources (viewing a pod list) ascends back to
-// LevelResourceTypes and jumps to the Security pseudo-item.
+// LevelResourceTypes and jumps to the first Security category entry.
 func TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel(t *testing.T) {
 	m := baseExplorerModel() // starts at LevelResources with middleItems = pods
 	m.leftItems = []model.Item{
-		{Name: "Cluster", Extra: "__overview__"},
 		{Name: "Monitoring", Extra: "__monitoring__"},
-		{Name: "Security", Extra: "__security__"},
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings"},
 		{Name: "Workloads"},
 	}
 
@@ -599,8 +592,8 @@ func TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, model.LevelResourceTypes, mm.nav.Level,
 		"handler should ascend to LevelResourceTypes before jumping")
-	assert.Equal(t, 2, mm.cursor(),
-		"cursor should land on the Security item (index 2) after ascension")
+	assert.Equal(t, 1, mm.cursor(),
+		"cursor should land on the Trivy entry (index 1) after ascension")
 }
 
 // TestHandleExplorerActionKeyMonitoringAscendsFromDeeperLevel verifies the

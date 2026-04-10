@@ -635,15 +635,16 @@ func (m Model) handleExplorerActionKeySecurity() (tea.Model, tea.Cmd, bool) {
 		return m, scheduleStatusClear(), true
 	}
 	m = m.ascendToResourceTypes()
-	// Find the Security item in the middle column and select it.
+	// Jump to the first entry in the Security category.
 	for i, item := range m.middleItems {
-		if item.Extra == "__security__" {
+		if item.Category == "Security" && item.Extra != "" {
 			m.setCursor(i)
 			m.clampCursor()
 			return m, m.loadPreview(), true
 		}
 	}
-	return m, nil, true
+	m.setStatusMessage("No security sources available", true)
+	return m, scheduleStatusClear(), true
 }
 
 // jumpToFindingResource navigates from a selected security finding item to
