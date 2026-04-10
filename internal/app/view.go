@@ -393,6 +393,11 @@ func (m Model) renderTitleBar() string {
 		watchIndicator = ui.HelpKeyStyle.Render(" \u27f3 ")
 	}
 
+	var tasksIndicator string
+	if m.bgtasks != nil && m.bgtasks.Len() > 0 {
+		tasksIndicator = renderTasksIndicator(m.spinner.View(), m.bgtasks.Snapshot())
+	}
+
 	nsText := m.namespace
 	switch {
 	case m.allNamespaces:
@@ -421,7 +426,7 @@ func (m Model) renderTitleBar() string {
 	}
 
 	// Calculate available width for breadcrumb.
-	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
+	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	maxBcWidth := innerWidth - fixedWidth - 1 // -1 for minimum gap
 	if maxBcWidth < 10 {
 		maxBcWidth = 10
@@ -436,13 +441,13 @@ func (m Model) renderTitleBar() string {
 	}
 	bc := ui.TitleBreadcrumbStyle.Render(bcText)
 
-	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
+	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	gap := innerWidth - contentWidth
 	if gap < 0 {
 		gap = 0
 	}
 
-	barContent := bc + watchIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + nsLabel + versionLabel
+	barContent := bc + watchIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + tasksIndicator + nsLabel + versionLabel
 	return ui.TitleBarStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(barContent)
 }
 

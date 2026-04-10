@@ -28,6 +28,11 @@ type resourcesLoadedMsg struct {
 	err        error
 	forPreview bool
 	gen        uint64
+	// silent marks this load as originating from a watch-mode refresh
+	// (or another caller that set Model.suppressBgtasks). Its downstream
+	// preview/metrics cmds in updateResourcesLoadedMain must also run
+	// suppressed so the title-bar indicator doesn't flash every 2 seconds.
+	silent bool
 }
 
 type ownedLoadedMsg struct {
@@ -35,6 +40,7 @@ type ownedLoadedMsg struct {
 	err        error
 	forPreview bool
 	gen        uint64
+	silent     bool
 }
 
 type containersLoadedMsg struct {
@@ -42,6 +48,7 @@ type containersLoadedMsg struct {
 	err        error
 	forPreview bool
 	gen        uint64
+	silent     bool
 }
 
 type resourceTreeLoadedMsg struct {

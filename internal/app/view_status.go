@@ -403,6 +403,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayAlerts:
 		c, w, h := m.renderOverlayAlerts()
 		return c, w, h, true
+	case overlayBackgroundTasks:
+		c, w, h := m.renderOverlayBackgroundTasks()
+		return c, w, h, true
 	case overlayExplainSearch:
 		c, w, h := m.renderOverlayExplainSearch()
 		return c, w, h, true
@@ -488,6 +491,21 @@ func (m Model) renderOverlayAlerts() (string, int, int) {
 	}
 	w, h := min(80, m.width-10), min(25, m.height-6)
 	return ui.RenderAlertsOverlay(entries, m.alertsScroll, w, h), w, h
+}
+
+func (m Model) renderOverlayBackgroundTasks() (string, int, int) {
+	snap := m.bgtasks.Snapshot()
+	rows := make([]ui.BackgroundTaskRow, len(snap))
+	for i, t := range snap {
+		rows[i] = ui.BackgroundTaskRow{
+			Kind:      t.Kind.String(),
+			Name:      t.Name,
+			Target:    t.Target,
+			StartedAt: t.StartedAt,
+		}
+	}
+	w, h := min(80, m.width-10), min(20, m.height-6)
+	return ui.RenderBackgroundTasksOverlay(rows, w, h), w, h
 }
 
 func (m Model) renderOverlayCanISubject(background string) string {

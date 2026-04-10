@@ -595,6 +595,14 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	} else {
 		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
 	}
+	// If this load originated from a watch-mode refresh, propagate the
+	// suppress flag to the downstream preview/metrics cmds so they too
+	// stay off the title-bar indicator. Capture the prior flag so the
+	// returned model resets it cleanly for subsequent user Updates.
+	savedSuppress := m.suppressBgtasks
+	if msg.silent {
+		m.suppressBgtasks = true
+	}
 	var cmds []tea.Cmd
 	// Mark the preview pane as loading so the right column shows the
 	// spinner during the gap between the main list arriving (which cleared
@@ -611,6 +619,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	case "Node":
 		cmds = append(cmds, m.loadNodeMetricsForList())
 	}
+	m.suppressBgtasks = savedSuppress
 	return m, tea.Batch(cmds...)
 }
 
@@ -711,11 +720,17 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 		m.itemCache[m.navKey()] = m.middleItems
 	}
 	m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
+	// Propagate the silent flag to the downstream preview cmd.
+	savedSuppress := m.suppressBgtasks
+	if msg.silent {
+		m.suppressBgtasks = true
+	}
 	// Mark the preview pane as loading (see updateResourcesLoadedMain).
 	previewCmd := m.loadPreview()
 	if previewCmd != nil {
 		m.previewLoading = true
 	}
+	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
 
@@ -756,11 +771,17 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	m.middleItems = msg.items
 	m.itemCache[m.navKey()] = m.middleItems
 	m.clampCursor()
+	// Propagate the silent flag to the downstream preview cmd.
+	savedSuppress := m.suppressBgtasks
+	if msg.silent {
+		m.suppressBgtasks = true
+	}
 	// Mark the preview pane as loading (see updateResourcesLoadedMain).
 	previewCmd := m.loadPreview()
 	if previewCmd != nil {
 		m.previewLoading = true
 	}
+	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
 
@@ -1051,7 +1072,23 @@ func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	if !m.watchMode {
 		return m, nil
 	}
-	return m, tea.Batch(m.refreshCurrentLevel(), scheduleWatchTick(m.watchInterval))
+	// Mark this dispatch as a watch-tick refresh so the instrumented
+	// loaders called below (through refreshCurrentLevel) use
+	// Registry.StartUntracked and don't flash the title-bar indicator
+	// every 2 seconds.
+	//
+	// trackBgTask captures the decision synchronously at construction
+	// time, so we only need the flag true for the duration of the
+	// refreshCurrentLevel() call. Reset it to false before returning so
+	// the flag doesn't leak into subsequent user-driven Updates — the
+	// returned model becomes the framework's next state, and any
+	// navigation that happens after this watch tick must see a clean
+	// flag or its loaders would also call StartUntracked and the
+	// indicator would never appear for user actions.
+	m.suppressBgtasks = true
+	cmd := tea.Batch(m.refreshCurrentLevel(), scheduleWatchTick(m.watchInterval))
+	m.suppressBgtasks = false
+	return m, cmd
 }
 
 func (m Model) updatePodSelect(msg podSelectMsg) (tea.Model, tea.Cmd) {

@@ -40,6 +40,7 @@ var builtinCommands = map[string]string{
 	"nyan":      "nyan",
 	"kubetris":  "kubetris",
 	"credits":   "credits",
+	"tasks":     "tasks",
 }
 
 // kubectlSubcommandSet contains known kubectl subcommands.

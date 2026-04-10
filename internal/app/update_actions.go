@@ -1247,9 +1247,14 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 		return m.loadResourceTypes()
 	case model.LevelResources:
 		// Port forwards are virtual - refresh from the manager directly.
+		// The gen field MUST be captured and forwarded so the update
+		// handler doesn't discard the message as stale when requestGen
+		// has been bumped by any cursor movement since the cmd was built.
 		if m.nav.ResourceType.Kind == "__port_forwards__" {
+			gen := m.requestGen
+			items := m.portForwardItems()
 			return func() tea.Msg {
-				return resourcesLoadedMsg{items: m.portForwardItems()}
+				return resourcesLoadedMsg{items: items, gen: gen}
 			}
 		}
 		return m.loadResources(false)

@@ -185,6 +185,10 @@ func (m Model) overlayHintBarMisc() string {
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayBackgroundTasks:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "esc", Desc: "close"},
+		})
 	case overlayNetworkPolicy:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "scroll"},

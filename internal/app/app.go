@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/hinshun/vt10x"
 
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -76,6 +77,7 @@ const (
 	overlayFinalizerSearch
 	overlayColumnToggle
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
+	overlayBackgroundTasks
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -551,6 +553,18 @@ type Model struct {
 	// Collapse duplicate Events (per-tab mirror of Model.eventGrouping).
 	eventGrouping bool
 
+	// bgtasks tracks in-flight async loads (resource lists, YAML fetches,
+	// metrics, dashboards). Process-global instance shared across tabs so
+	// the title bar reflects all activity, not just the active tab's.
+	bgtasks *bgtasks.Registry
+
+	// suppressBgtasks, when true, makes loaders call Registry.StartUntracked
+	// instead of Registry.Start so their tasks don't appear in the title-bar
+	// indicator. Set by updateWatchTick before dispatching watch-mode
+	// auto-refreshes — periodic refreshes shouldn't flash through the
+	// indicator every 2 seconds.
+	suppressBgtasks bool
+
 	// Discovered CRDs per context: keyed by context name.
 	discoveredResources map[string][]model.ResourceTypeEntry
 
@@ -867,6 +881,7 @@ func NewModel(client *k8s.Client) Model {
 		allGroupsExpanded:   true,
 		warningEventsOnly:   true,
 		eventGrouping:       true,
+		bgtasks:             bgtasks.New(bgtasks.DefaultThreshold),
 		diffLineNumbers:     true,
 		reqCtx:              reqCtx,
 		reqCancel:           reqCancel,
