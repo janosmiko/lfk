@@ -28,3 +28,19 @@ func (m Model) loadSecurityAvailability() tea.Cmd {
 		return securityAvailabilityLoadedMsg{context: kctx, availability: byName}
 	}
 }
+
+// handleSecurityAvailabilityLoaded merges a per-source availability
+// probe result into the Model. Stale messages (from a prior context)
+// are discarded.
+func (m Model) handleSecurityAvailabilityLoaded(msg securityAvailabilityLoadedMsg) Model {
+	if msg.context != m.nav.Context && m.nav.Context != "" {
+		return m
+	}
+	if m.securityAvailabilityByName == nil {
+		m.securityAvailabilityByName = make(map[string]bool)
+	}
+	for k, v := range msg.availability {
+		m.securityAvailabilityByName[k] = v
+	}
+	return m
+}

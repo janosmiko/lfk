@@ -150,6 +150,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case logContainersLoadedMsg:
 		mdl, cmd := m.updateLogContainersLoaded(msg)
 		return mdl, cmd, true
+	case securityAvailabilityLoadedMsg:
+		return m.handleSecurityAvailabilityLoaded(msg), nil, true
 	}
 
 	return m.updateEasterEggMsg(msg)
