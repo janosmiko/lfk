@@ -149,15 +149,12 @@ func DefaultKeybindings() Keybindings {
 	}
 }
 
-// DefaultSecurityConfig returns the default security configuration applied when
-// no override is present.
+// DefaultSecurityConfig returns the default security configuration applied
+// when no override is present.
 func DefaultSecurityConfig() model.SecurityConfig {
 	return model.SecurityConfig{
-		Enabled:               true,
-		PerResourceIndicators: true,
-		PerResourceAction:     true,
-		RefreshTTL:            "30s",
-		AvailabilityTTL:       "60s",
+		Enabled:   true,
+		SecColumn: true,
 		Sources: map[string]model.SecuritySourceCfg{
 			"heuristic": {Enabled: true, Checks: []string{
 				"privileged", "host_namespaces", "host_path", "readonly_root_fs",
@@ -165,6 +162,9 @@ func DefaultSecurityConfig() model.SecurityConfig {
 				"missing_resource_limits", "default_sa", "latest_tag",
 			}},
 			"trivy_operator": {Enabled: true},
+			"policy_report":  {Enabled: false},
+			"kube_bench":     {Enabled: false},
+			"falco":          {Enabled: false},
 		},
 	}
 }

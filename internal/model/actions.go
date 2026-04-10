@@ -461,14 +461,15 @@ type MonitoringConfig struct {
 // The special key "default" applies to clusters without explicit config.
 var ConfigMonitoring map[string]MonitoringConfig
 
-// SecurityConfig is per-cluster security dashboard configuration.
+// SecurityConfig is per-cluster security configuration. The dashboard-
+// specific fields (per_resource_indicators, per_resource_action,
+// refresh_ttl, availability_ttl) from the Phase 1 design are removed;
+// TTLs are code defaults (30s fetch / 60s availability). The
+// per_resource_indicators field was renamed to sec_column for clarity.
 type SecurityConfig struct {
-	Enabled               bool                         `json:"enabled" yaml:"enabled"`
-	PerResourceIndicators bool                         `json:"per_resource_indicators" yaml:"per_resource_indicators"`
-	PerResourceAction     bool                         `json:"per_resource_action" yaml:"per_resource_action"`
-	RefreshTTL            string                       `json:"refresh_ttl" yaml:"refresh_ttl"`
-	AvailabilityTTL       string                       `json:"availability_ttl" yaml:"availability_ttl"`
-	Sources               map[string]SecuritySourceCfg `json:"sources" yaml:"sources"`
+	Enabled   bool                         `json:"enabled" yaml:"enabled"`
+	SecColumn bool                         `json:"sec_column" yaml:"sec_column"`
+	Sources   map[string]SecuritySourceCfg `json:"sources" yaml:"sources"`
 }
 
 // SecuritySourceCfg is the per-source config shared across adapters.

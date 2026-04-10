@@ -88,10 +88,9 @@ func TestDefaultKeybindingsIncludeSecurity(t *testing.T) {
 func TestDefaultSecurityConfig(t *testing.T) {
 	def := DefaultSecurityConfig()
 	assert.True(t, def.Enabled)
-	assert.True(t, def.PerResourceIndicators)
-	assert.Equal(t, "30s", def.RefreshTTL)
-	assert.Equal(t, "60s", def.AvailabilityTTL)
+	assert.True(t, def.SecColumn)
 	assert.True(t, def.Sources["heuristic"].Enabled)
 	assert.NotEmpty(t, def.Sources["heuristic"].Checks)
 	assert.True(t, def.Sources["trivy_operator"].Enabled)
+	assert.False(t, def.Sources["policy_report"].Enabled)
 }
