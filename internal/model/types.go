@@ -588,6 +588,8 @@ func TopLevelResourceTypes() []ResourceCategory {
 	}
 
 	// Security category — dynamically populated from SecuritySourcesFn.
+	// Prepended to the category list so it renders just after Dashboards
+	// (which FlattenedResourceTypesFiltered hardcodes at the very top).
 	// Always visible (heuristic source has no external dependency).
 	var securityEntries []ResourceTypeEntry
 	if SecuritySourcesFn != nil {
@@ -607,7 +609,7 @@ func TopLevelResourceTypes() []ResourceCategory {
 			})
 		}
 	}
-	cats = append(cats, ResourceCategory{Name: "Security", Types: securityEntries})
+	cats = append([]ResourceCategory{{Name: "Security", Types: securityEntries}}, cats...)
 
 	return cats
 }

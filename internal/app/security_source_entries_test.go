@@ -14,9 +14,9 @@ func TestBuildSecuritySourceEntriesNilManager(t *testing.T) {
 	assert.Nil(t, entries)
 }
 
-func TestBuildSecuritySourceEntriesShowsAllRegistered(t *testing.T) {
-	// All registered sources are shown regardless of availability — missing
-	// external dependencies surface at fetch time, not at category-build time.
+func TestBuildSecuritySourceEntriesFiltersUnavailable(t *testing.T) {
+	// Sources without a confirmed availability probe result are hidden so
+	// clusters without Trivy Operator don't see a dead "Trivy (0)" entry.
 	mgr := security.NewManager()
 	mgr.Register(&security.FakeSource{NameStr: "heuristic", Available: true})
 	mgr.Register(&security.FakeSource{NameStr: "trivy-operator", Available: false})
@@ -26,14 +26,9 @@ func TestBuildSecuritySourceEntriesShowsAllRegistered(t *testing.T) {
 	}
 
 	entries := buildSecuritySourceEntries(mgr, avail)
-	require.Len(t, entries, 2,
-		"registered sources should always appear, even when availability probe is false")
-	names := map[string]bool{}
-	for _, e := range entries {
-		names[e.SourceName] = true
-	}
-	assert.True(t, names["heuristic"])
-	assert.True(t, names["trivy-operator"])
+	require.Len(t, entries, 1,
+		"unavailable sources must be filtered out")
+	assert.Equal(t, "heuristic", entries[0].SourceName)
 }
 
 func TestBuildSecuritySourceEntriesFallbackDisplayName(t *testing.T) {

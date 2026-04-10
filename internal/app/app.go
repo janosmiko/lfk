@@ -21,14 +21,37 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// Package-level pointers used by the SecuritySourcesFn closure to read
-// the live Model state. Because Bubbletea passes Model by value, the
-// closure cannot capture the fields directly — it must indirect through
-// these pointers, which are updated by NewModel.
+// Package-level hook state read by SecuritySourcesFn on every render.
+// Bubbletea passes Model by value, so we cannot take &m.field in the
+// closure — the address goes stale after the first Update cycle, leaving
+// the hook reading the ORIGINAL cluster's state forever (resulting in
+// Trivy entries persisting across cluster switches and stale heuristic
+// counts). Instead, refreshSecuritySources and handleSecurityAvailabilityLoaded
+// call setSecurityHookState to publish the current cluster's manager and
+// availability map under a mutex.
 var (
-	currentSecurityManagerPtr      **security.Manager
-	currentSecurityAvailabilityPtr *map[string]bool
+	securityHookMu           sync.RWMutex
+	securityHookManager      *security.Manager
+	securityHookAvailability map[string]bool
 )
+
+// setSecurityHookState publishes the currently-active manager and
+// availability map so the SecuritySourcesFn hook reads them on the next
+// render. Safe to call from any goroutine.
+func setSecurityHookState(mgr *security.Manager, avail map[string]bool) {
+	securityHookMu.Lock()
+	defer securityHookMu.Unlock()
+	securityHookManager = mgr
+	securityHookAvailability = avail
+}
+
+// currentSecurityHookState returns a snapshot of the current hook state.
+// Callers must not mutate the returned map.
+func currentSecurityHookState() (*security.Manager, map[string]bool) {
+	securityHookMu.RLock()
+	defer securityHookMu.RUnlock()
+	return securityHookManager, securityHookAvailability
+}
 
 // viewMode tracks the current view state.
 type viewMode int
@@ -890,15 +913,17 @@ func NewModel(client *k8s.Client) Model {
 	m.helpSearchInput.Prompt = ""
 	m.helpSearchInput.CharLimit = 100
 
-	// Initialize the security manager and register sources against the
-	// current context. Sources are re-registered on context switch via
-	// refreshSecuritySources so each cluster uses its own client handles.
-	m.securityManager = security.NewManager()
-	m.refreshSecuritySources()
-
 	// Per-source availability map — initially empty until the first
 	// availability probe completes.
 	m.securityAvailabilityByName = make(map[string]bool)
+
+	// Initialize the security manager and register sources against the
+	// current context. Sources are re-registered on context switch via
+	// refreshSecuritySources so each cluster uses its own client handles.
+	// refreshSecuritySources also updates the package-level hook state
+	// so the SecuritySourcesFn reads the current manager + availability.
+	m.securityManager = security.NewManager()
+	m.refreshSecuritySources()
 
 	// Wire the manager into the Client so k8s.GetResources can dispatch
 	// _security APIGroup calls.
@@ -906,18 +931,13 @@ func NewModel(client *k8s.Client) Model {
 		m.client.SetSecurityManager(m.securityManager)
 	}
 
-	// Package-level pointers so the SecuritySourcesFn closure can read
-	// the live model state on each render. Closures capture by value in
-	// Bubbletea because Model is passed around by value — these pointers
-	// let the hook follow updates.
-	currentSecurityManagerPtr = &m.securityManager
-	currentSecurityAvailabilityPtr = &m.securityAvailabilityByName
-
+	// Install the SecuritySourcesFn hook. It reads the package-level
+	// hook state under RLock; refreshSecuritySources and the availability
+	// message handler update that state whenever the cluster changes or
+	// new probe results arrive.
 	model.SecuritySourcesFn = func() []model.SecuritySourceEntry {
-		if currentSecurityManagerPtr == nil || currentSecurityAvailabilityPtr == nil {
-			return nil
-		}
-		return buildSecuritySourceEntries(*currentSecurityManagerPtr, *currentSecurityAvailabilityPtr)
+		mgr, avail := currentSecurityHookState()
+		return buildSecuritySourceEntries(mgr, avail)
 	}
 
 	return m
@@ -936,21 +956,18 @@ func (m Model) securityAvailableAny() bool {
 }
 
 // refreshSecuritySources rebuilds the security manager's source list against
-// the currently active cluster context. It is called from NewModel and again
-// on every cluster switch so that security sources always use the right
-// per-context clients.
+// the currently active cluster context. Called from NewModel and again on
+// every cluster switch so that security sources use the right per-context
+// clients AND so that cached findings, availability results, and the
+// Security category entries do not bleed across clusters.
 //
-// The heuristic source needs a kubernetes.Interface; the trivy-operator source
-// needs a dynamic.Interface. Any source whose underlying client cannot be
-// constructed is skipped, and the manager.AnyAvailable call will naturally
-// report false for that cluster.
+// After rebuilding, this method publishes the new manager and a fresh
+// empty availability map to the package-level hook state so the
+// SecuritySourcesFn reads the current cluster's data.
 func (m *Model) refreshSecuritySources() {
-	if m.securityManager == nil {
-		m.securityManager = security.NewManager()
-	}
-	// Replace the manager wholesale so stale sources from a prior context
-	// cannot linger. NewManager resets both the source list and the
-	// fetch/availability caches.
+	// Replace the manager wholesale so stale sources, caches, and the
+	// FindingIndex from a prior context cannot linger. NewManager resets
+	// everything to zero state.
 	mgr := security.NewManager()
 	if m.client != nil {
 		kctx := m.nav.Context
@@ -965,6 +982,18 @@ func (m *Model) refreshSecuritySources() {
 		}
 	}
 	m.securityManager = mgr
+	// Fresh empty availability map — the probe for the new context has
+	// not run yet, so the Security category starts empty and populates
+	// asynchronously when handleSecurityAvailabilityLoaded processes the
+	// probe result.
+	m.securityAvailabilityByName = make(map[string]bool)
+	// Wire the new manager into the Client so k8s.GetResources dispatches
+	// against the current cluster's sources.
+	if m.client != nil {
+		m.client.SetSecurityManager(mgr)
+	}
+	// Publish to the hook state so SecuritySourcesFn reads the new data.
+	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)
 }
 
 // cancelAndReset cancels any in-flight API requests and creates a fresh

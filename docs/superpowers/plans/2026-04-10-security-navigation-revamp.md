@@ -3165,7 +3165,7 @@ git commit -m "docs: rewrite security feature documentation for navigation revam
 **Files:**
 - Create: `internal/app/security_e2e_test.go`
 
-- [ ] **Step 1: Write the test**
+- [>] **Step 1: Write the test**
 
 ```go
 // internal/app/security_e2e_test.go
@@ -3396,12 +3396,12 @@ func getSecurityFindingsForE2E(ctx context.Context, mgr *security.Manager, conte
 
 If the plan executor decides this shortcut is too loose, swap in a real client via `k8s.NewClient` with a fake kubeconfig. That's a larger delta and can be done in a follow-up.
 
-- [ ] **Step 2: Run the test**
+- [>] **Step 2: Run the test**
 
 Run: `go test ./internal/app/... -run TestSecurityNavigationFlowEndToEnd -race`
 Expected: PASS.
 
-- [ ] **Step 3: Commit**
+- [>] **Step 3: Commit**
 
 ```bash
 git add internal/app/security_e2e_test.go

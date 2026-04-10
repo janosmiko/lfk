@@ -976,23 +976,37 @@ func TestIsCoreCategory(t *testing.T) {
 	}
 }
 
-// --- Cluster group is first in TopLevelResourceTypes ---
+// --- Security group is first, Cluster group is second in TopLevelResourceTypes ---
 
-func TestClusterGroupIsFirst(t *testing.T) {
+func TestSecurityGroupIsFirst(t *testing.T) {
 	cats := TopLevelResourceTypes()
 	require.NotEmpty(t, cats)
-	assert.Equal(t, "Cluster", cats[0].Name,
-		"Cluster group should be the first category (shown below Dashboards)")
+	assert.Equal(t, "Security", cats[0].Name,
+		"Security group should be the first category (shown just below Dashboards)")
+}
+
+func TestClusterGroupIsSecond(t *testing.T) {
+	cats := TopLevelResourceTypes()
+	require.GreaterOrEqual(t, len(cats), 2)
+	assert.Equal(t, "Cluster", cats[1].Name,
+		"Cluster group should be the second category (after Security)")
 }
 
 func TestClusterGroupOrder(t *testing.T) {
 	cats := TopLevelResourceTypes()
-	require.Equal(t, "Cluster", cats[0].Name)
-	types := cats[0].Types
-	require.Len(t, types, 3)
-	assert.Equal(t, "Node", types[0].Kind, "first should be Nodes")
-	assert.Equal(t, "Namespace", types[1].Kind, "second should be Namespaces")
-	assert.Equal(t, "Event", types[2].Kind, "third should be Events")
+	var cluster *ResourceCategory
+	for i := range cats {
+		if cats[i].Name == "Cluster" {
+			c := cats[i]
+			cluster = &c
+			break
+		}
+	}
+	require.NotNil(t, cluster, "Cluster category must be present")
+	require.Len(t, cluster.Types, 3)
+	assert.Equal(t, "Node", cluster.Types[0].Kind, "first should be Nodes")
+	assert.Equal(t, "Namespace", cluster.Types[1].Kind, "second should be Namespaces")
+	assert.Equal(t, "Event", cluster.Types[2].Kind, "third should be Events")
 }
 
 func TestClusterGroupContents(t *testing.T) {
