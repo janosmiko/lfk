@@ -241,3 +241,24 @@ func TestFindingIndexCountBySourceNil(t *testing.T) {
 	var idx *FindingIndex
 	assert.Equal(t, 0, idx.CountBySource("any"))
 }
+
+func TestManagerInvalidateClearsCache(t *testing.T) {
+	m := NewManager()
+	m.SetRefreshTTL(1 * time.Hour)
+	s := &FakeSource{
+		NameStr: "s", Available: true,
+		Findings: []Finding{{ID: "x"}},
+	}
+	m.Register(s)
+
+	_, err := m.FetchAll(context.Background(), "ctx", "")
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), s.FetchCalls.Load())
+
+	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	assert.Equal(t, int32(1), s.FetchCalls.Load())
+
+	m.Invalidate()
+	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	assert.Equal(t, int32(2), s.FetchCalls.Load())
+}

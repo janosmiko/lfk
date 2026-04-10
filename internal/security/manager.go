@@ -78,6 +78,17 @@ func (m *Manager) Refresh(ctx context.Context, kubeCtx, namespace string) (Fetch
 	return m.FetchAll(ctx, kubeCtx, namespace)
 }
 
+// Invalidate clears the fetch cache and the availability cache without
+// performing a new fetch. The next call to FetchAll or AnyAvailable will
+// go back to the source(s). Used when callers know the underlying cluster
+// state has changed (e.g., the user pressed `r` to refresh).
+func (m *Manager) Invalidate() {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.cacheKey = ""
+	m.availCache = make(map[string]availEntry)
+}
+
 // Register appends a source. Not safe to call concurrently with FetchAll.
 func (m *Manager) Register(s SecuritySource) {
 	m.mu.Lock()
