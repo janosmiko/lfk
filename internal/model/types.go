@@ -146,6 +146,18 @@ type Item struct {
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
 }
 
+// ColumnValue returns the value of the named column, or "" if the column
+// is not present. Used by callers that need to read fields out of an Item
+// without knowing the column's position.
+func (i Item) ColumnValue(key string) string {
+	for _, c := range i.Columns {
+		if c.Key == key {
+			return c.Value
+		}
+	}
+	return ""
+}
+
 // ResourceNode represents a node in a resource relationship tree.
 type ResourceNode struct {
 	Name      string

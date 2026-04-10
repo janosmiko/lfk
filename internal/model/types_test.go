@@ -1179,3 +1179,26 @@ func TestSecuritySourcesFnReturnsEntries(t *testing.T) {
 func TestSecurityIsCoreCategoryAlwaysShown(t *testing.T) {
 	assert.True(t, IsCoreCategory("Security"), "Security must be a core category")
 }
+
+// --- Item.ColumnValue ---
+
+func TestItemColumnValuePresent(t *testing.T) {
+	it := Item{
+		Columns: []KeyValue{
+			{Key: "Severity", Value: "CRIT"},
+			{Key: "Title", Value: "CVE-2024-1234"},
+		},
+	}
+	assert.Equal(t, "CRIT", it.ColumnValue("Severity"))
+	assert.Equal(t, "CVE-2024-1234", it.ColumnValue("Title"))
+}
+
+func TestItemColumnValueAbsent(t *testing.T) {
+	it := Item{Columns: []KeyValue{{Key: "Severity", Value: "HIGH"}}}
+	assert.Equal(t, "", it.ColumnValue("Missing"))
+}
+
+func TestItemColumnValueEmptyColumns(t *testing.T) {
+	it := Item{}
+	assert.Equal(t, "", it.ColumnValue("anything"))
+}
