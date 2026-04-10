@@ -83,7 +83,6 @@ func TestColumnsForKind_CaseInsensitive(t *testing.T) {
 func TestDefaultKeybindingsIncludeSecurity(t *testing.T) {
 	kb := DefaultKeybindings()
 	assert.Equal(t, "#", kb.Security)
-	assert.Equal(t, "H", kb.SecurityResource)
 }
 
 func TestDefaultSecurityConfig(t *testing.T) {

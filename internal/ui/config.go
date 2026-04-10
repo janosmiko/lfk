@@ -33,35 +33,34 @@ type Keybindings struct {
 	JumpOwner      string `json:"jump_owner" yaml:"jump_owner"`
 
 	// Views and Modes
-	Help             string `json:"help" yaml:"help"`
-	Filter           string `json:"filter" yaml:"filter"`
-	Search           string `json:"search" yaml:"search"`
-	NextMatch        string `json:"next_match" yaml:"next_match"`
-	PrevMatch        string `json:"prev_match" yaml:"prev_match"`
-	TogglePreview    string `json:"toggle_preview" yaml:"toggle_preview"`
-	ResourceMap      string `json:"resource_map" yaml:"resource_map"`
-	Fullscreen       string `json:"fullscreen" yaml:"fullscreen"`
-	FilterPresets    string `json:"filter_presets" yaml:"filter_presets"`
-	ErrorLog         string `json:"error_log" yaml:"error_log"`
-	SecretToggle     string `json:"secret_toggle" yaml:"secret_toggle"`
-	FinalizerSearch  string `json:"finalizer_search" yaml:"finalizer_search"`
-	APIExplorer      string `json:"api_explorer" yaml:"api_explorer"`
-	RBACBrowser      string `json:"rbac_browser" yaml:"rbac_browser"`
-	ThemeSelector    string `json:"theme_selector" yaml:"theme_selector"`
-	CommandBar       string `json:"command_bar" yaml:"command_bar"`
-	WatchMode        string `json:"watch_mode" yaml:"watch_mode"`
-	SortNext         string `json:"sort_next" yaml:"sort_next"`
-	SortPrev         string `json:"sort_prev" yaml:"sort_prev"`
-	SortFlip         string `json:"sort_flip" yaml:"sort_flip"`
-	SortReset        string `json:"sort_reset" yaml:"sort_reset"`
-	SaveResource     string `json:"save_resource" yaml:"save_resource"`
-	Monitoring       string `json:"monitoring" yaml:"monitoring"`
-	Security         string `json:"security" yaml:"security"`
-	SecurityResource string `json:"security_resource" yaml:"security_resource"`
-	QuotaDashboard   string `json:"quota_dashboard" yaml:"quota_dashboard"`
-	ExpandCollapse   string `json:"expand_collapse" yaml:"expand_collapse"`
-	PinGroup         string `json:"pin_group" yaml:"pin_group"`
-	ColumnToggle     string `json:"column_toggle" yaml:"column_toggle"`
+	Help            string `json:"help" yaml:"help"`
+	Filter          string `json:"filter" yaml:"filter"`
+	Search          string `json:"search" yaml:"search"`
+	NextMatch       string `json:"next_match" yaml:"next_match"`
+	PrevMatch       string `json:"prev_match" yaml:"prev_match"`
+	TogglePreview   string `json:"toggle_preview" yaml:"toggle_preview"`
+	ResourceMap     string `json:"resource_map" yaml:"resource_map"`
+	Fullscreen      string `json:"fullscreen" yaml:"fullscreen"`
+	FilterPresets   string `json:"filter_presets" yaml:"filter_presets"`
+	ErrorLog        string `json:"error_log" yaml:"error_log"`
+	SecretToggle    string `json:"secret_toggle" yaml:"secret_toggle"`
+	FinalizerSearch string `json:"finalizer_search" yaml:"finalizer_search"`
+	APIExplorer     string `json:"api_explorer" yaml:"api_explorer"`
+	RBACBrowser     string `json:"rbac_browser" yaml:"rbac_browser"`
+	ThemeSelector   string `json:"theme_selector" yaml:"theme_selector"`
+	CommandBar      string `json:"command_bar" yaml:"command_bar"`
+	WatchMode       string `json:"watch_mode" yaml:"watch_mode"`
+	SortNext        string `json:"sort_next" yaml:"sort_next"`
+	SortPrev        string `json:"sort_prev" yaml:"sort_prev"`
+	SortFlip        string `json:"sort_flip" yaml:"sort_flip"`
+	SortReset       string `json:"sort_reset" yaml:"sort_reset"`
+	SaveResource    string `json:"save_resource" yaml:"save_resource"`
+	Monitoring      string `json:"monitoring" yaml:"monitoring"`
+	Security        string `json:"security" yaml:"security"`
+	QuotaDashboard  string `json:"quota_dashboard" yaml:"quota_dashboard"`
+	ExpandCollapse  string `json:"expand_collapse" yaml:"expand_collapse"`
+	PinGroup        string `json:"pin_group" yaml:"pin_group"`
+	ColumnToggle    string `json:"column_toggle" yaml:"column_toggle"`
 
 	// Actions
 	NamespaceSelector string `json:"namespace_selector" yaml:"namespace_selector"`
@@ -123,7 +122,7 @@ func DefaultKeybindings() Keybindings {
 		ThemeSelector: "T", CommandBar: ":", WatchMode: "w",
 		SortNext: ">", SortPrev: "<", SortFlip: "=", SortReset: "-",
 		SaveResource: "W", Monitoring: "@",
-		Security: "#", SecurityResource: "H",
+		Security:       "#",
 		QuotaDashboard: "Q", ExpandCollapse: "z", PinGroup: "p",
 		ColumnToggle: ",",
 

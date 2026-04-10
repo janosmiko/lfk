@@ -70,8 +70,6 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		return m.handleExplorerActionKeyMonitoring()
 	case kb.Security:
 		return m.handleExplorerActionKeySecurity()
-	case kb.SecurityResource:
-		return m.handleExplorerActionKeySecurityResource()
 	}
 	return m, nil, false
 }
@@ -646,16 +644,4 @@ func (m Model) handleExplorerActionKeySecurity() (tea.Model, tea.Cmd, bool) {
 		}
 	}
 	return m, nil, true
-}
-
-// handleExplorerActionKeySecurityResource is a temporary stub during the
-// security navigation revamp. It is removed entirely in the follow-up
-// commit that also deletes the SecurityResource keybinding.
-func (m Model) handleExplorerActionKeySecurityResource() (tea.Model, tea.Cmd, bool) {
-	if !m.securityAvailableAny() {
-		m.setStatusMessage("No security sources available", true)
-		return m, scheduleStatusClear(), true
-	}
-	m.setStatusMessage("Security Findings navigation pending revamp", true)
-	return m, scheduleStatusClear(), true
 }

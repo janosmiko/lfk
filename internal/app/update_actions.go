@@ -107,13 +107,12 @@ func (m Model) openActionMenu() Model {
 	}
 
 	// Append "Security Findings" when security sources are available for
-	// the current cluster. This jumps the user to the security dashboard
-	// pre-filtered to the selected resource.
+	// the current cluster. The action will be re-wired in Phase E of the
+	// security navigation revamp to jump to the Security category.
 	if m.securityAvailableAny() && isSecurityActionEligibleKind(kind) {
 		actions = append(actions, model.ActionMenuItem{
 			Label:       "Security Findings",
 			Description: "Show security findings for this resource",
-			Key:         ui.ActiveKeybindings.SecurityResource,
 		})
 	}
 

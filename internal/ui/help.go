@@ -115,7 +115,6 @@ func helpSections() []helpSection {
 				{kb.WatchMode, "Toggle watch mode (auto-refresh)"},
 				{kb.Monitoring, "Monitoring overview (active Prometheus alerts)"},
 				{kb.Security, "Security dashboard (heuristic + trivy-operator findings)"},
-				{kb.SecurityResource, "Security findings for the selected resource"},
 				{kb.QuotaDashboard, "Namespace resource quota dashboard"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down/up"},
 				{kb.SaveResource, "Save resource to file / toggle warnings-only (Events)"},
@@ -323,7 +322,6 @@ func helpSections() []helpSection {
 			title: "Security Dashboard",
 			bindings: []helpEntry{
 				{kb.Security, "Open security dashboard (aggregate findings)"},
-				{kb.SecurityResource, "Security findings for the selected resource"},
 				{"J/K", "Move finding cursor down/up (always)"},
 				{"j/k", "Finding cursor in fullscreen; middle-column nav in normal view"},
 				{"g/G", "Top/bottom of findings list (fullscreen only)"},
