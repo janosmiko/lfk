@@ -247,3 +247,28 @@ func TestGetSecurityFindingsSortsBySeverity(t *testing.T) {
 	assert.Equal(t, "MED", items[2].ColumnValue("Severity"))
 	assert.Equal(t, "LOW", items[3].ColumnValue("Severity"))
 }
+
+func TestGetResourcesDispatchesSecurityAPIGroup(t *testing.T) {
+	mgr := security.NewManager()
+	mgr.Register(&security.FakeSource{
+		NameStr: "trivy-operator", Available: true,
+		Findings: []security.Finding{
+			{
+				Source: "trivy-operator", Title: "CVE-X",
+				Severity: security.SeverityCritical,
+				Resource: security.ResourceRef{Namespace: "p", Kind: "Deployment", Name: "api"},
+			},
+		},
+	})
+	c := &Client{securityManager: mgr}
+
+	rt := model.ResourceTypeEntry{
+		Kind:     "__security_trivy-operator__",
+		APIGroup: model.SecurityVirtualAPIGroup,
+		Resource: "findings",
+	}
+	items, err := c.GetResources(context.Background(), "kctx", "", rt)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "CVE-X", items[0].Name)
+}
