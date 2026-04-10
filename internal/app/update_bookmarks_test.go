@@ -186,6 +186,177 @@ func TestBookmarkToSlot_ContextAwareFlag(t *testing.T) {
 	}
 }
 
+// --- bookmarkToSlot display name resolution ---
+
+// TestBookmarkToSlot_CRDNameIncludesResourceType covers the user-reported
+// regression where bookmarking on a Custom Resource (like External Secrets)
+// produced a bookmark with an empty name. The root cause was that
+// DiscoverAPIResources never populates ResourceTypeEntry.DisplayName, so the
+// bookmark label resolver always fell through to just the context.
+func TestBookmarkToSlot_CRDNameIncludesResourceType(t *testing.T) {
+	tests := []struct {
+		name     string
+		rt       model.ResourceTypeEntry
+		wantName string
+	}{
+		{
+			// External Secrets: the exact CRD from the bug report. The
+			// group/resource key lives in BuiltInMetadata with a curated
+			// plural DisplayName, so that wins over the raw Kind.
+			name: "CRD with BuiltInMetadata entry (External Secrets)",
+			rt: model.ResourceTypeEntry{
+				Kind:       "ExternalSecret",
+				APIGroup:   "external-secrets.io",
+				APIVersion: "v1beta1",
+				Resource:   "externalsecrets",
+				Namespaced: true,
+			},
+			wantName: "prod > ExternalSecrets",
+		},
+		{
+			// CRD unknown to BuiltInMetadata: Kind is the nicest fallback
+			// because the plural resource name (widgets) is awkward.
+			name: "CRD without BuiltInMetadata entry",
+			rt: model.ResourceTypeEntry{
+				Kind:       "Widget",
+				APIGroup:   "example.com",
+				APIVersion: "v1alpha1",
+				Resource:   "widgets",
+				Namespaced: true,
+			},
+			wantName: "prod > Widget",
+		},
+		{
+			// Built-in core resource: ResourceTypeEntry.DisplayName is empty
+			// after the discovery refactor, so the resolver must look up
+			// BuiltInMetadata ("pods" → "Pods").
+			name: "Core built-in (Pods) without DisplayName",
+			rt: model.ResourceTypeEntry{
+				Kind:       "Pod",
+				APIGroup:   "",
+				APIVersion: "v1",
+				Resource:   "pods",
+				Namespaced: true,
+			},
+			wantName: "prod > Pods",
+		},
+		{
+			// Pseudo-resource with a pre-set DisplayName — the resolver
+			// must honor it instead of reaching into BuiltInMetadata.
+			name: "Pseudo-resource with DisplayName (Releases)",
+			rt: model.ResourceTypeEntry{
+				DisplayName: "Releases",
+				Kind:        "HelmRelease",
+				APIGroup:    "_helm",
+				APIVersion:  "v1",
+				Resource:    "releases",
+				Namespaced:  true,
+			},
+			wantName: "prod > Releases",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Setenv("XDG_STATE_HOME", t.TempDir())
+			m := Model{
+				nav: model.NavigationState{
+					Level:        model.LevelResources,
+					Context:      "prod",
+					ResourceType: tt.rt,
+				},
+				namespace: "default",
+				tabs:      []TabState{{}},
+			}
+
+			result, _ := m.bookmarkToSlot("a")
+			rm := result.(Model)
+			require.NotEmpty(t, rm.bookmarks)
+			bm := rm.bookmarks[0]
+			assert.Equal(t, tt.wantName, bm.Name)
+			assert.Equal(t, tt.rt.ResourceRef(), bm.ResourceType)
+		})
+	}
+}
+
+// TestBookmarkToSlot_AtResourceTypesLevel covers bookmarking while still on
+// the resource types list (middle column), before drilling into a specific
+// type. Before the fix, nav.ResourceType was zero at this level so the
+// bookmark had nothing but the context.
+func TestBookmarkToSlot_AtResourceTypesLevel(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+
+	crd := model.ResourceTypeEntry{
+		Kind:       "ExternalSecret",
+		APIGroup:   "external-secrets.io",
+		APIVersion: "v1beta1",
+		Resource:   "externalsecrets",
+		Namespaced: true,
+	}
+
+	m := Model{
+		nav: model.NavigationState{
+			Level:   model.LevelResourceTypes,
+			Context: "prod",
+		},
+		discoveredResources: map[string][]model.ResourceTypeEntry{
+			"prod": {crd},
+		},
+		// allGroupsExpanded keeps the sidebar expanded so the CRD item is
+		// directly visible instead of being hidden behind a collapsed group
+		// placeholder — matching the user's view when they press m<key>.
+		allGroupsExpanded: true,
+		middleItems: []model.Item{
+			{
+				Name:     "ExternalSecrets",
+				Kind:     "ExternalSecret",
+				Extra:    crd.ResourceRef(),
+				Category: "external-secrets.io",
+			},
+		},
+		namespace: "default",
+		tabs:      []TabState{{}},
+	}
+	m.setCursor(0)
+
+	result, _ := m.bookmarkToSlot("a")
+	rm := result.(Model)
+	require.NotEmpty(t, rm.bookmarks)
+	bm := rm.bookmarks[0]
+	assert.Equal(t, "prod > ExternalSecrets", bm.Name)
+	assert.Equal(t, crd.ResourceRef(), bm.ResourceType,
+		"bookmark must capture the ResourceRef of the item under the cursor")
+}
+
+// TestBookmarkToSlot_AtResourceTypesLevel_CollapsedGroup verifies that
+// attempting to bookmark while the cursor sits on a collapsed group header
+// produces a clear error rather than an empty bookmark.
+func TestBookmarkToSlot_AtResourceTypesLevel_CollapsedGroup(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := Model{
+		nav: model.NavigationState{
+			Level:   model.LevelResourceTypes,
+			Context: "prod",
+		},
+		allGroupsExpanded: true,
+		middleItems: []model.Item{
+			{
+				Name:     "external-secrets.io",
+				Kind:     "__collapsed_group__",
+				Category: "external-secrets.io",
+			},
+		},
+		namespace: "default",
+		tabs:      []TabState{{}},
+	}
+	m.setCursor(0)
+
+	result, _ := m.bookmarkToSlot("a")
+	rm := result.(Model)
+	assert.Empty(t, rm.bookmarks, "should not create a bookmark for a collapsed group header")
+	assert.Contains(t, rm.statusMessage, "Select a resource type")
+}
+
 // --- navigateToBookmark context switching ---
 
 // customCRDResourceType returns a CRD-based ResourceTypeEntry that won't match
@@ -643,6 +814,50 @@ func TestFinal2RestoreSingleTabSessionWithResourceType(t *testing.T) {
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.Equal(t, model.LevelResources, rm.nav.Level)
+}
+
+// TestFinal2RestoreSingleTabSessionSeedFallback verifies that session
+// restore resolves core K8s resource types from the seed list even when
+// runtime API discovery has not yet populated discoveredResources. This
+// regression guard prevents users from being dropped back at the resource
+// types list instead of their saved view.
+func TestFinal2RestoreSingleTabSessionSeedFallback(t *testing.T) {
+	m := baseFinalModel()
+	// Intentionally do NOT populate discoveredResources — simulates the
+	// real startup path where discovery is still in flight.
+	sess := &SessionState{
+		Context:      "test-ctx",
+		Namespace:    "default",
+		ResourceType: "/v1/pods",
+	}
+	contexts := []model.Item{{Name: "test-ctx"}}
+	result, cmd := m.restoreSingleTabSession(sess, contexts)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+	assert.Equal(t, model.LevelResources, rm.nav.Level, "must navigate into resources level via seed fallback")
+	assert.Equal(t, "Pod", rm.nav.ResourceType.Kind)
+	assert.Equal(t, "pods", rm.nav.ResourceType.Resource)
+}
+
+// TestResolveSessionResourceTypeSeedFallback is a unit test for the helper
+// that performs the discovered-then-seed lookup.
+func TestResolveSessionResourceTypeSeedFallback(t *testing.T) {
+	// With empty discovered set, /v1/pods should resolve from the seed list.
+	rt, ok := resolveSessionResourceType("/v1/pods", nil)
+	require.True(t, ok)
+	assert.Equal(t, "Pod", rt.Kind)
+
+	// With a populated discovered set that doesn't include Pod, seed fallback still applies.
+	discovered := []model.ResourceTypeEntry{
+		{Kind: "Custom", APIGroup: "example.com", APIVersion: "v1", Resource: "customs"},
+	}
+	rt, ok = resolveSessionResourceType("/v1/pods", discovered)
+	require.True(t, ok)
+	assert.Equal(t, "Pod", rt.Kind)
+
+	// Unknown ref that is in neither discovered nor seed returns !ok.
+	_, ok = resolveSessionResourceType("unknown.example.com/v1/widgets", nil)
+	assert.False(t, ok)
 }
 
 func TestFinal2RestoreSingleTabSessionWithResourceName(t *testing.T) {

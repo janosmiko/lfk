@@ -565,16 +565,19 @@ func TestVimScrollOff(t *testing.T) {
 	})
 }
 
-// --- formatTableRowStyled restart arrow ---
+// --- styledRestartsCell restart arrow ---
 
-func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
+// These tests exercise the restart-arrow rendering logic that used to live
+// inline in formatTableRowStyled. The helper was extracted so the ordered
+// rendering path can reuse it; the tests still cover the same behavior.
+func TestStyledRestartsCell_RestartArrow(t *testing.T) {
 	t.Run("recent restart with count > 0 shows arrow", func(t *testing.T) {
 		item := model.Item{
 			Name:          "my-pod",
 			Restarts:      "3",
 			LastRestartAt: time.Now().Add(-10 * time.Minute), // 10 minutes ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := styledRestartsCell(item, 10, true)
 		assert.Contains(t, result, "↑")
 		assert.Contains(t, result, "3")
 	})
@@ -585,7 +588,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts:      "3",
 			LastRestartAt: time.Now().Add(-2 * time.Hour), // 2 hours ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := styledRestartsCell(item, 10, true)
 		assert.NotContains(t, result, "↑")
 		assert.Contains(t, result, "3")
 	})
@@ -595,7 +598,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Name:     "my-pod",
 			Restarts: "0",
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := styledRestartsCell(item, 10, true)
 		assert.NotContains(t, result, "↑")
 		assert.Contains(t, result, "0")
 	})
@@ -606,7 +609,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts:      "5",
 			LastRestartAt: time.Now().Add(-5 * time.Minute), // 5 minutes ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := styledRestartsCell(item, 10, true)
 		assert.Contains(t, result, "↑")
 		assert.Contains(t, result, "5")
 	})
@@ -617,7 +620,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts: "2",
 			// LastRestartAt is zero value
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true)
+		result := styledRestartsCell(item, 10, true)
 		assert.NotContains(t, result, "↑")
 	})
 }

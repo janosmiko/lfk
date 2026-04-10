@@ -123,80 +123,6 @@ func (m Model) handleMouseClick(x, y int) (tea.Model, tea.Cmd) {
 	}
 }
 
-// headerColumnWidths holds computed column widths for header click detection.
-type headerColumnWidths struct {
-	nsW, readyW, restartsW, ageW, statusW           int
-	hasNs, hasReady, hasRestarts, hasAge, hasStatus bool
-}
-
-// detectHeaderColumns scans items to determine which columns are present and their widths.
-func detectHeaderColumns(items []model.Item) headerColumnWidths {
-	var h headerColumnWidths
-	for _, item := range items {
-		if item.Namespace != "" {
-			h.hasNs = true
-		}
-		if item.Ready != "" {
-			h.hasReady = true
-		}
-		if item.Restarts != "" {
-			h.hasRestarts = true
-		}
-		if item.Age != "" {
-			h.hasAge = true
-		}
-		if item.Status != "" {
-			h.hasStatus = true
-		}
-	}
-
-	if h.hasNs {
-		h.nsW = len("NAMESPACE")
-		for _, item := range items {
-			if w := len(item.Namespace); w > h.nsW {
-				h.nsW = w
-			}
-		}
-		h.nsW = min(h.nsW+1, 30)
-	}
-	if h.hasReady {
-		h.readyW = len("READY")
-		for _, item := range items {
-			if w := len(item.Ready); w > h.readyW {
-				h.readyW = w
-			}
-		}
-		h.readyW++
-	}
-	if h.hasRestarts {
-		h.restartsW = len("RS") + 1
-		for _, item := range items {
-			if w := len(item.Restarts); w >= h.restartsW {
-				h.restartsW = w + 1
-			}
-		}
-	}
-	if h.hasAge {
-		h.ageW = len("AGE") + 1
-		for _, item := range items {
-			if w := len(item.Age); w >= h.ageW {
-				h.ageW = w + 1
-			}
-		}
-		h.ageW = min(h.ageW, 10)
-	}
-	if h.hasStatus {
-		h.statusW = len("STATUS")
-		for _, item := range items {
-			if w := len(item.Status); w > h.statusW {
-				h.statusW = w
-			}
-		}
-		h.statusW = min(h.statusW+1, 20)
-	}
-	return h
-}
-
 // findSortableCol returns the index of name in ActiveSortableColumns, or -1.
 func findSortableCol(name string) int {
 	for i, c := range ui.ActiveSortableColumns {
@@ -207,109 +133,46 @@ func findSortableCol(name string) int {
 	return -1
 }
 
-// colRegion maps a screen position to a sortable column index.
-type colRegion struct {
-	end   int
-	index int
-}
-
-// buildHeaderRegions builds the click regions for header columns.
-func buildHeaderRegions(h headerColumnWidths, nameW int, extraCols []ui.ExtraColumnInfo) []colRegion {
-	markerColW := 2
-	var regions []colRegion
-
-	pos := markerColW
-	if h.hasNs {
-		pos += h.nsW
-		if idx := findSortableCol("Namespace"); idx >= 0 {
-			regions = append(regions, colRegion{pos, idx})
-		}
-	}
-	pos += nameW
-	if idx := findSortableCol("Name"); idx >= 0 {
-		regions = append(regions, colRegion{pos, idx})
-	}
-	if h.hasReady {
-		pos += h.readyW
-		if idx := findSortableCol("Ready"); idx >= 0 {
-			regions = append(regions, colRegion{pos, idx})
-		}
-	}
-	if h.hasRestarts {
-		pos += h.restartsW
-		if idx := findSortableCol("Restarts"); idx >= 0 {
-			regions = append(regions, colRegion{pos, idx})
-		}
-	}
-	if h.hasStatus {
-		pos += h.statusW
-		if idx := findSortableCol("Status"); idx >= 0 {
-			regions = append(regions, colRegion{pos, idx})
-		}
-	}
-	for _, ec := range extraCols {
-		pos += ec.Width
-		if idx := findSortableCol(ec.Key); idx >= 0 {
-			regions = append(regions, colRegion{pos, idx})
-		}
-	}
-	if h.hasAge {
-		pos += h.ageW
-		if idx := findSortableCol("Age"); idx >= 0 {
-			regions = append(regions, colRegion{pos, idx})
-		}
-	}
-	return regions
-}
-
 // handleHeaderClick sorts the table by the column that was clicked in the header row.
 // relX is the click position relative to the start of the middle column content area.
+// It consumes the ActiveMiddleColumnLayout populated by RenderTable so the mapping
+// from click X to column key always matches the actual rendered order, even when
+// the user has reordered columns via the column-toggle overlay.
 func (m Model) handleHeaderClick(relX int) (tea.Model, tea.Cmd) {
 	items := m.visibleMiddleItems()
-	if len(items) == 0 || len(ui.ActiveSortableColumns) == 0 {
+	if len(items) == 0 || len(ui.ActiveSortableColumns) == 0 || len(ui.ActiveMiddleColumnLayout) == 0 {
 		return m, nil
 	}
 
-	usable := m.width - 6
-	middleW := max(10, usable*51/100)
-	if m.fullscreenMiddle {
-		middleW = m.width - 2
-	}
-	width := middleW - 2
-	markerColW := 2
-
-	h := detectHeaderColumns(items)
-	tableKind := items[0].Kind
-	extraCols := ui.CollectExtraColumns(items, width, h.nsW+h.readyW+h.restartsW+h.ageW+h.statusW+markerColW, tableKind)
-
-	extraTotalW := 0
-	for _, ec := range extraCols {
-		extraTotalW += ec.Width
-	}
-	nameW := max(width-h.nsW-h.readyW-h.restartsW-h.ageW-h.statusW-markerColW-extraTotalW, 10)
-
-	regions := buildHeaderRegions(h, nameW, extraCols)
-
-	// Find which region the click falls into.
-	clickedIdx := -1
-	for _, r := range regions {
-		if relX < r.end {
-			clickedIdx = r.index
+	// Find which column region the click falls into.
+	clickedKey := ""
+	for _, region := range ui.ActiveMiddleColumnLayout {
+		if relX >= region.StartX && relX < region.EndX {
+			clickedKey = region.Key
 			break
 		}
 	}
-	if clickedIdx < 0 && len(regions) > 0 {
-		clickedIdx = regions[len(regions)-1].index
+	// Clicks past the last column fall through to the rightmost column so
+	// the behavior matches the previous implementation.
+	if clickedKey == "" {
+		last := ui.ActiveMiddleColumnLayout[len(ui.ActiveMiddleColumnLayout)-1]
+		if relX >= last.EndX {
+			clickedKey = last.Key
+		}
 	}
-	if clickedIdx < 0 {
+	if clickedKey == "" {
 		return m, nil
 	}
 
-	clickedName := ui.ActiveSortableColumns[clickedIdx]
-	if m.sortColumnName == clickedName {
+	// Only react if the clicked column is actually sortable.
+	if findSortableCol(clickedKey) < 0 {
+		return m, nil
+	}
+
+	if m.sortColumnName == clickedKey {
 		m.sortAscending = !m.sortAscending
 	} else {
-		m.sortColumnName = clickedName
+		m.sortColumnName = clickedKey
 		m.sortAscending = true
 	}
 	m.sortMiddleItems()

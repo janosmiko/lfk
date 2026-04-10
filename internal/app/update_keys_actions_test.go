@@ -531,3 +531,128 @@ func TestP4ExplorerActionKeyComma(t *testing.T) {
 		_ = result.(Model)
 	}
 }
+
+// --- handleExplorerActionKeyToggleRare ---
+
+// rareResourceEntries returns a discovered resource set that contains one
+// always-visible entry (Pod) and one curated Rare entry (CSIDriver). Used to
+// exercise the rare-toggle rebuild in tests.
+func rareResourceEntries() []model.ResourceTypeEntry {
+	return []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		{Kind: "CSIDriver", APIGroup: "storage.k8s.io", APIVersion: "v1", Resource: "csidrivers", Namespaced: false},
+	}
+}
+
+// containsCSIDrivers reports whether the given sidebar item list contains
+// the curated Rare "CSIDrivers" entry. Sidebar items use the display name
+// as Name, so a substring match is sufficient for this regression guard.
+func containsCSIDrivers(items []model.Item) bool {
+	for _, it := range items {
+		if it.Name == "CSIDrivers" {
+			return true
+		}
+	}
+	return false
+}
+
+// TestActionKeyToggleRareAtLevelResourceTypes verifies the in-place rebuild
+// of middleItems when the user is on the resource types level.
+func TestActionKeyToggleRareAtLevelResourceTypes(t *testing.T) {
+	defer func(orig bool) { model.ShowRareResources = orig }(model.ShowRareResources)
+	model.ShowRareResources = false
+
+	m := baseExplorerModel()
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{}
+	m.nav.Level = model.LevelResourceTypes
+	m.nav.ResourceType = model.ResourceTypeEntry{}
+	m.discoveredResources["test"] = rareResourceEntries()
+	m.middleItems = model.BuildSidebarItems(rareResourceEntries())
+	m.leftItems = nil
+
+	require.False(t, containsCSIDrivers(m.middleItems),
+		"CSIDrivers must be hidden by default")
+
+	result, _, handled := m.handleExplorerActionKeyToggleRare()
+	require.True(t, handled)
+	rm := result.(Model)
+
+	assert.True(t, rm.showRareResources)
+	assert.True(t, containsCSIDrivers(rm.middleItems),
+		"middleItems must include CSIDrivers after toggle ON")
+}
+
+// TestActionKeyToggleRareAtLevelResourcesRefreshesParent verifies that the
+// parent column (leftItems) is refreshed when the user is deeper than the
+// resource types level. This is the bug fix: previously the handler only
+// updated middleItems and left the parent column stale.
+func TestActionKeyToggleRareAtLevelResourcesRefreshesParent(t *testing.T) {
+	defer func(orig bool) { model.ShowRareResources = orig }(model.ShowRareResources)
+	model.ShowRareResources = false
+
+	m := baseExplorerModel()
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{}
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "test"
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true,
+	}
+	m.discoveredResources["test"] = rareResourceEntries()
+	// The parent column starts with the default (no-rare) list.
+	m.leftItems = model.BuildSidebarItems(rareResourceEntries())
+	// The middle column has pods for the user's current view.
+	m.middleItems = []model.Item{
+		{Name: "pod-a", Kind: "Pod"},
+		{Name: "pod-b", Kind: "Pod"},
+	}
+
+	require.False(t, containsCSIDrivers(m.leftItems),
+		"CSIDrivers must be hidden in the parent column by default")
+
+	result, _, handled := m.handleExplorerActionKeyToggleRare()
+	require.True(t, handled)
+	rm := result.(Model)
+
+	assert.True(t, rm.showRareResources)
+	assert.True(t, containsCSIDrivers(rm.leftItems),
+		"leftItems (parent column) must include CSIDrivers after toggle ON")
+	// The middle column (the pods list) must be untouched.
+	assert.Len(t, rm.middleItems, 2, "middleItems (pods) must not be rebuilt")
+	assert.Equal(t, "pod-a", rm.middleItems[0].Name)
+}
+
+// TestActionKeyToggleRareAtLevelResourcesUpdatesCursorMemory verifies that
+// after rebuilding the parent column, the cursor memory for the resource
+// types level points at the current resource type so navigating back with
+// `h` lands on the correct row.
+func TestActionKeyToggleRareAtLevelResourcesUpdatesCursorMemory(t *testing.T) {
+	defer func(orig bool) { model.ShowRareResources = orig }(model.ShowRareResources)
+	model.ShowRareResources = false
+
+	m := baseExplorerModel()
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{}
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "test"
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true,
+	}
+	m.discoveredResources["test"] = rareResourceEntries()
+	m.leftItems = model.BuildSidebarItems(rareResourceEntries())
+	m.cursorMemory = map[string]int{"test": 0}
+
+	result, _, handled := m.handleExplorerActionKeyToggleRare()
+	require.True(t, handled)
+	rm := result.(Model)
+
+	// Find Pod's index in the rebuilt leftItems.
+	podIdx := -1
+	for i, it := range rm.leftItems {
+		if it.Extra == "/v1/pods" {
+			podIdx = i
+			break
+		}
+	}
+	require.GreaterOrEqual(t, podIdx, 0, "Pod must be present in rebuilt leftItems")
+	assert.Equal(t, podIdx, rm.cursorMemory["test"],
+		"cursorMemory[context] must point at the current resource type after rebuild")
+}

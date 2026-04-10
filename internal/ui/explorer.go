@@ -24,6 +24,30 @@ var ActiveContext string
 // in the middle column table. Set during RenderTable for the column toggle overlay.
 var ActiveExtraColumnKeys []string
 
+// ActiveColumnOrder is the user-specified column order for the current
+// middle-column render, excluding the mandatory Name column which is
+// always first. Nil means "use the default order". Keys may refer to
+// built-in columns (Namespace/Ready/Restarts/Status/Age) or to extra
+// column keys from additionalPrinterColumns. Entries whose columns are
+// not currently present are silently dropped at render time.
+var ActiveColumnOrder []string
+
+// MiddleColumnRegion records the byte range a single column occupies in the
+// header row of the most recently rendered middle-column table. Key refers
+// to a built-in key (Namespace/Ready/Restarts/Status/Age), "Name", or an
+// extra column key. StartX is inclusive, EndX is exclusive.
+type MiddleColumnRegion struct {
+	Key    string
+	StartX int
+	EndX   int
+}
+
+// ActiveMiddleColumnLayout records the visual layout of the columns rendered
+// in the most recent middle-column table. Populated by RenderTable when
+// ActiveMiddleScroll >= 0 and consumed by mouse click handling to map a
+// click X coordinate to a column key.
+var ActiveMiddleColumnLayout []MiddleColumnRegion
+
 // ActiveCollapsedCategories is set by the app before rendering the resource types
 // column. Keys are category names; presence means the category is collapsed.
 var ActiveCollapsedCategories map[string]bool

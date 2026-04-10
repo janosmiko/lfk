@@ -58,6 +58,36 @@ func hasDeeperContent(lines []string, startLine, minIndent int) bool {
 	return nextIndent >= minIndent
 }
 
+// buildYAMLLoadedMsg constructs a yamlLoadedMsg with the content pre-indented
+// and sections pre-parsed, so the Bubble Tea message handler has no heavy
+// work to do when it lands on the main event loop. Called from inside
+// loader goroutines — never from the main thread — because parseYAMLSections
+// on very large CRD manifests (50k+ lines) can take multiple seconds.
+func buildYAMLLoadedMsg(content string, err error) yamlLoadedMsg {
+	if err != nil {
+		return yamlLoadedMsg{err: err}
+	}
+	indented := indentYAMLListItems(content)
+	return yamlLoadedMsg{
+		content:  indented,
+		sections: parseYAMLSections(indented),
+	}
+}
+
+// buildPreviewYAMLLoadedMsg constructs a previewYAMLLoadedMsg with the content
+// pre-indented, matching buildYAMLLoadedMsg. Preview mode does not need the
+// section tree (no fold indicators in the preview pane), so only the indent
+// pass is run — still non-trivial on huge documents.
+func buildPreviewYAMLLoadedMsg(content string, err error, gen uint64) previewYAMLLoadedMsg {
+	if err != nil {
+		return previewYAMLLoadedMsg{err: err, gen: gen}
+	}
+	return previewYAMLLoadedMsg{
+		content: indentYAMLListItems(content),
+		gen:     gen,
+	}
+}
+
 // parseYAMLSections identifies hierarchical YAML sections and their line ranges.
 // A section is any line containing "key:" with no inline value (or a block scalar
 // indicator like | or >) that has indented content on subsequent lines.

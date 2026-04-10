@@ -1,5 +1,7 @@
 package model
 
+import "strings"
+
 // ResourceRef returns the "group/version/resource" reference string.
 func (r ResourceTypeEntry) ResourceRef() string {
 	return r.APIGroup + "/" + r.APIVersion + "/" + r.Resource
@@ -47,6 +49,32 @@ func FindResourceTypeIn(ref string, discovered []ResourceTypeEntry) (ResourceTyp
 // discovered set yet; most callers should use FindResourceTypeIn directly.
 func FindResourceType(ref string) (ResourceTypeEntry, bool) {
 	return FindResourceTypeIn(ref, nil)
+}
+
+// DisplayNameFor returns a user-friendly label for a ResourceTypeEntry. It
+// honors any DisplayName already set on the entry (PseudoResources sets one
+// for Helm Releases and Port Forwards), then falls back to the curated name
+// in BuiltInMetadata, then the Kind, and finally the raw Resource plural.
+//
+// Discovery-produced entries do not populate DisplayName themselves, so
+// callers that want a label must go through this helper instead of reading
+// rt.DisplayName directly.
+func DisplayNameFor(rt ResourceTypeEntry) string {
+	if rt.DisplayName != "" {
+		return rt.DisplayName
+	}
+	if meta, ok := BuiltInMetadata[rt.APIGroup+"/"+rt.Resource]; ok && meta.DisplayName != "" {
+		return meta.DisplayName
+	}
+	if rt.Kind != "" {
+		return rt.Kind
+	}
+	if rt.Resource == "" {
+		return ""
+	}
+	// Title-case the first byte of the plural resource name. Kubernetes
+	// resource plurals are always lowercase ASCII, so this is safe.
+	return strings.ToUpper(rt.Resource[:1]) + rt.Resource[1:]
 }
 
 // IsScaleableKind returns true if the given kind supports the scale operation.

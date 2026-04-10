@@ -7,9 +7,31 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// --- formatTableRow ---
+// --- formatTableRowOrdered ---
 
-func TestFormatTableRow(t *testing.T) {
+// buildOrder turns a bool-per-column selection into the ordered slice used
+// by the new rendering path, matching the canonical default order.
+func buildOrder(hasNs, hasReady, hasRestarts, hasStatus, hasAge bool) []string {
+	var order []string
+	if hasNs {
+		order = append(order, "Namespace")
+	}
+	if hasReady {
+		order = append(order, "Ready")
+	}
+	if hasRestarts {
+		order = append(order, "Restarts")
+	}
+	if hasStatus {
+		order = append(order, "Status")
+	}
+	if hasAge {
+		order = append(order, "Age")
+	}
+	return order
+}
+
+func TestFormatTableRowOrdered(t *testing.T) {
 	tests := []struct {
 		name         string
 		itemName     string
@@ -102,9 +124,10 @@ func TestFormatTableRow(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatTableRow(tt.itemName, tt.ns, tt.ready, tt.restarts, tt.status,
-				tt.nameW, tt.nsW, tt.readyW, tt.restartsW, tt.statusW,
-				tt.hasNs, tt.hasReady, tt.hasRestarts, tt.hasStatus)
+			order := buildOrder(tt.hasNs, tt.hasReady, tt.hasRestarts, tt.hasStatus, false)
+			result := formatTableRowOrdered(tt.itemName, tt.ns, tt.ready, tt.restarts, tt.status, "",
+				tt.nameW, tt.nsW, tt.readyW, tt.restartsW, tt.statusW, 0,
+				order, nil, nil)
 			for _, sub := range tt.wantContains {
 				assert.Contains(t, result, sub, "result should contain %q", sub)
 			}
@@ -115,19 +138,20 @@ func TestFormatTableRow(t *testing.T) {
 	}
 }
 
-// --- formatTableRow padding ---
+// --- formatTableRowOrdered padding ---
 
-func TestFormatTableRow_Padding(t *testing.T) {
+func TestFormatTableRowOrdered_Padding(t *testing.T) {
 	t.Run("name is padded to nameW", func(t *testing.T) {
-		result := formatTableRow("hi", "", "", "", "",
-			10, 0, 0, 0, 0, false, false, false, false)
+		result := formatTableRowOrdered("hi", "", "", "", "", "",
+			10, 0, 0, 0, 0, 0, nil, nil, nil)
 		assert.Equal(t, 10, len(result), "result length should match nameW")
 	})
 
 	t.Run("namespace is padded when present", func(t *testing.T) {
-		result := formatTableRow("pod", "ns", "", "", "",
-			10, 8, 0, 0, 0, true, false, false, false)
-		// Total = nsW + nameW = 8 + 10 = 18.
+		result := formatTableRowOrdered("pod", "ns", "", "", "", "",
+			10, 8, 0, 0, 0, 0, []string{"Namespace"}, nil, nil)
+		// Total = nameW + nsW = 10 + 8 = 18. Note: in the ordered path Name
+		// comes first, then Namespace.
 		assert.Equal(t, 18, len(result))
 	})
 }
@@ -211,10 +235,10 @@ func TestTruncatedColumnSpacing(t *testing.T) {
 	t.Run("truncated name has space before next column", func(t *testing.T) {
 		// Name that exceeds nameW, followed by a status column.
 		// After truncation, there must be at least 1 space before the status text.
-		result := formatTableRow(
-			"very-long-pod-name-that-definitely-exceeds", "", "", "", "Running",
-			15, 0, 0, 0, 10,
-			false, false, false, true,
+		result := formatTableRowOrdered(
+			"very-long-pod-name-that-definitely-exceeds", "", "", "", "Running", "",
+			15, 0, 0, 0, 10, 0,
+			[]string{"Status"}, nil, nil,
 		)
 		// The name is truncated to 15 chars. The status "Running" should NOT immediately
 		// follow the truncated name — there must be at least 1 space gap.
@@ -222,25 +246,26 @@ func TestTruncatedColumnSpacing(t *testing.T) {
 		assert.Contains(t, result, "Running")
 	})
 
-	t.Run("truncated namespace has space before name", func(t *testing.T) {
-		result := formatTableRow(
-			"pod-1", "extremely-long-namespace-name-here", "", "", "",
-			15, 12, 0, 0, 0,
-			true, false, false, false,
+	t.Run("truncated name followed by namespace has space", func(t *testing.T) {
+		// In the ordered path Name always comes first, so test that a
+		// truncated name is followed by a space before the Namespace column.
+		result := formatTableRowOrdered(
+			"extremely-long-pod-name-here", "prod", "", "", "", "",
+			15, 12, 0, 0, 0, 0,
+			[]string{"Namespace"}, nil, nil,
 		)
-		// Namespace truncated to 12 chars, must have space before name.
-		assert.Contains(t, result, "~ ", "truncated namespace should have space before name column")
-		assert.Contains(t, result, "pod-1")
+		assert.Contains(t, result, "~ ", "truncated name should have space before namespace column")
+		assert.Contains(t, result, "prod")
 	})
 
 	t.Run("non-truncated columns still padded correctly", func(t *testing.T) {
-		result := formatTableRow(
-			"short", "ns", "", "", "OK",
-			15, 10, 0, 0, 10,
-			true, false, false, true,
+		result := formatTableRowOrdered(
+			"short", "ns", "", "", "OK", "",
+			15, 10, 0, 0, 10, 0,
+			[]string{"Namespace", "Status"}, nil, nil,
 		)
-		// Short values should be padded as before.
-		assert.Equal(t, 35, len(result), "total width should be nsW+nameW+statusW")
+		// Short values should be padded as before: nameW + nsW + statusW = 15 + 10 + 10 = 35.
+		assert.Equal(t, 35, len(result), "total width should be nameW+nsW+statusW")
 	})
 }
 

@@ -44,7 +44,9 @@ func (m *Model) clampPreviewScroll() {
 			childrenHeight = 2
 		}
 		childLabel := strings.ToUpper(m.ownedChildKindLabel())
-		pinnedHeader := ui.RenderTable(childLabel, m.rightItems, -1, innerW, childrenHeight, m.loading, m.spinner.View(), "", false)
+		pinnedHeader := m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
+			return ui.RenderTable(childLabel, m.rightItems, -1, innerW, childrenHeight, m.loading, m.spinner.View(), "", false)
+		})
 		pinnedHeader += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", innerW))
 		pinnedHeaderLines := strings.Count(pinnedHeader, "\n") + 1
 		scrollableH -= pinnedHeaderLines
@@ -112,7 +114,9 @@ func (m Model) renderRightColumn(width, height int) string {
 			childrenHeight = 2
 		}
 		childLabel := strings.ToUpper(m.ownedChildKindLabel())
-		pinnedHeader = ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+		pinnedHeader = m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
+			return ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+		})
 		pinnedHeader += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width))
 		pinnedHeaderLines = strings.Count(pinnedHeader, "\n") + 1
 		contentHeight -= pinnedHeaderLines
@@ -318,7 +322,9 @@ func (m Model) renderRightDefault(width, height int) string {
 		}
 		return ui.DimStyle.Render("No resources found")
 	}
-	return ui.RenderTable(strings.ToUpper(m.ownedChildKindLabel()), m.rightItems, -1, width, height, m.loading, m.spinner.View(), "", false)
+	return m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
+		return ui.RenderTable(strings.ToUpper(m.ownedChildKindLabel()), m.rightItems, -1, width, height, m.loading, m.spinner.View(), "", false)
+	})
 }
 
 // renderSplitPreview renders the right column as a split: top children table, bottom details.
@@ -332,9 +338,13 @@ func (m Model) renderSplitPreview(width, height int) string {
 		detailsHeight = 1
 	}
 
-	// Render children as table (same format as middle column).
+	// Render children as table (same format as middle column). Scope the
+	// session column config to the child kind so pod/container configs
+	// stay independent even when the middle column shows pods.
 	childLabel := strings.ToUpper(m.ownedChildKindLabel())
-	childrenContent := ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+	childrenContent := m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
+		return ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+	})
 
 	// Separator line.
 	separator := ui.DimStyle.Render(strings.Repeat("\u2500", width))

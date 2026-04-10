@@ -582,6 +582,7 @@ func TestSaveCurrentTab(t *testing.T) {
 func TestPush2UpdateStatusMessageExpiredMsg(t *testing.T) {
 	m := basePush80v2Model()
 	m.setStatusMessage("temp msg", false)
+	m.statusMessageExp = time.Now().Add(-1 * time.Second) // simulate genuine expiration
 	result, cmd := m.Update(statusMessageExpiredMsg{})
 	rm := result.(Model)
 	assert.Empty(t, rm.statusMessage)
@@ -1278,6 +1279,7 @@ func TestCovSortMiddleItemsSkipsResourceTypes(t *testing.T) {
 func TestFinalUpdateStatusClearMsg(t *testing.T) {
 	m := baseFinalModel()
 	m.setStatusMessage("test message", false)
+	m.statusMessageExp = time.Now().Add(-1 * time.Second) // simulate genuine expiration
 	result, _ := m.Update(statusMessageExpiredMsg{})
 	rm := result.(Model)
 	assert.Empty(t, rm.statusMessage)
@@ -1410,6 +1412,7 @@ func TestCovErrorLogVisibleCountFullscreen(t *testing.T) {
 func TestCovUpdateStatusClearMsg(t *testing.T) {
 	m := baseModelNav()
 	m.setStatusMessage("test", false)
+	m.statusMessageExp = time.Now().Add(-1 * time.Second) // simulate genuine expiration
 	result, _ := m.Update(statusMessageExpiredMsg{})
 	rm := result.(Model)
 	assert.False(t, rm.hasStatusMessage())
@@ -1440,6 +1443,7 @@ func TestCovUpdateActionResultError(t *testing.T) {
 func TestCovUpdateStatusClear(t *testing.T) {
 	m := baseModelUpdate()
 	m.setStatusMessage("test message", false)
+	m.statusMessageExp = time.Now().Add(-1 * time.Second) // simulate genuine expiration
 	result, _ := m.Update(statusMessageExpiredMsg{})
 	rm := result.(Model)
 	assert.False(t, rm.hasStatusMessage())

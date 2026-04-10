@@ -160,6 +160,28 @@ func (m *Model) clampAllCursors() {
 	}
 }
 
+// middleColumnKind returns the lowercased kind that identifies the items
+// currently rendered in the middle column. It is used as the key for the
+// sessionColumns, hiddenBuiltinColumns, and columnOrder maps so that
+// column-visibility changes made while viewing one level do not leak into
+// another level that happens to navigate under the same parent
+// ResourceType (e.g., container columns must be independent of pod
+// columns even though nav.ResourceType stays "Pod" at LevelContainers).
+//
+// At LevelOwned and LevelContainers the parent's ResourceType.Kind is
+// misleading — the middle column shows different kinds (ReplicaSets,
+// Containers, etc.), so the method derives the kind from the first
+// middleItem. It falls back to nav.ResourceType.Kind when middleItems is
+// empty or at shallower levels.
+func (m *Model) middleColumnKind() string {
+	if m.nav.Level == model.LevelOwned || m.nav.Level == model.LevelContainers {
+		if len(m.middleItems) > 0 && m.middleItems[0].Kind != "" {
+			return strings.ToLower(m.middleItems[0].Kind)
+		}
+	}
+	return strings.ToLower(m.nav.ResourceType.Kind)
+}
+
 // navKey builds a unique key from the current navigation state, used for
 // cursor memory and item caching.
 func (m *Model) navKey() string {

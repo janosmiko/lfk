@@ -270,7 +270,7 @@ func (m Model) loadYAML() tea.Cmd {
 		}
 		return func() tea.Msg {
 			content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
-			return yamlLoadedMsg{content: content, err: err}
+			return buildYAMLLoadedMsg(content, err)
 		}
 	case model.LevelOwned:
 		sel := m.selectedMiddleItem()
@@ -285,24 +285,24 @@ func (m Model) loadYAML() tea.Cmd {
 		if sel.Kind == "Pod" {
 			return func() tea.Msg {
 				content, err := m.client.GetPodYAML(reqCtx, kctx, itemNs, name)
-				return yamlLoadedMsg{content: content, err: err}
+				return buildYAMLLoadedMsg(content, err)
 			}
 		}
 		rt, ok := m.resolveOwnedResourceType(sel)
 		if !ok {
 			return func() tea.Msg {
-				return yamlLoadedMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind)}
+				return buildYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind))
 			}
 		}
 		return func() tea.Msg {
 			content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
-			return yamlLoadedMsg{content: content, err: err}
+			return buildYAMLLoadedMsg(content, err)
 		}
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
 		return func() tea.Msg {
 			content, err := m.client.GetPodYAML(reqCtx, kctx, ns, podName)
-			return yamlLoadedMsg{content: content, err: err}
+			return buildYAMLLoadedMsg(content, err)
 		}
 	}
 	return nil

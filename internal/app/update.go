@@ -772,8 +772,10 @@ func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
-	m.yamlContent = indentYAMLListItems(msg.content)
-	m.yamlSections = parseYAMLSections(m.yamlContent)
+	// Content and sections are pre-processed in the loading goroutine so
+	// the main event loop stays responsive on very large CRD manifests.
+	m.yamlContent = msg.content
+	m.yamlSections = msg.sections
 	return m, nil
 }
 
@@ -785,7 +787,8 @@ func (m Model) updatePreviewYAMLLoaded(msg previewYAMLLoadedMsg) Model {
 		m.previewYAML = ""
 		return m
 	}
-	m.previewYAML = indentYAMLListItems(msg.content)
+	// Pre-indented in the loading goroutine — no heavy work on main thread.
+	m.previewYAML = msg.content
 	return m
 }
 
@@ -991,6 +994,13 @@ func (m Model) updateFinalizerRemoveResult(msg finalizerRemoveResultMsg) (tea.Mo
 }
 
 func (m Model) updateStatusMessageExpired(msg statusMessageExpiredMsg) Model {
+	// A prior scheduleStatusClear tick may arrive while a newer message is
+	// still active. If the current message's expiration hasn't actually
+	// passed, leave it alone — the newer message's own tick (or the view
+	// layer's time-based check) will clean it up at the right time.
+	if m.statusMessage != "" && time.Now().Before(m.statusMessageExp) {
+		return m
+	}
 	m.statusMessage = ""
 	m.statusMessageTip = false
 	return m

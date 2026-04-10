@@ -792,7 +792,9 @@ type Model struct {
 	columnToggleCursor       int
 	columnToggleFilter       string
 	columnToggleFilterActive bool
-	sessionColumns           map[string][]string // kind -> ordered visible column keys (session-only)
+	sessionColumns           map[string][]string // kind -> ordered visible extra column keys (session-only)
+	hiddenBuiltinColumns     map[string][]string // kind -> hidden built-in column keys (session-only)
+	columnOrder              map[string][]string // kind -> ordered column keys (built-ins + extras interleaved; Name is implicit)
 
 	// Easter egg state.
 	konamiProgress int  // current position in the Konami Code sequence
@@ -805,9 +807,15 @@ type Model struct {
 }
 
 // columnToggleEntry represents a single column in the column toggle overlay.
+// The builtin flag distinguishes built-in columns (Namespace/Ready/Restarts/
+// Status/Age, sourced from Item fields) from extra columns (from Item.Columns,
+// sourced from additionalPrinterColumns). The distinction matters because the
+// two kinds are persisted in different maps on Model and have different
+// name-collision handling when a CRD reuses a built-in column name.
 type columnToggleEntry struct {
 	key     string
 	visible bool
+	builtin bool
 }
 
 // ownedParentState captures the navigation state that must be restored

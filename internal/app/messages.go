@@ -55,14 +55,22 @@ type namespacesLoadedMsg struct {
 	err   error
 }
 
+// yamlLoadedMsg delivers a full YAML document for the YAML view. The content
+// and sections are pre-processed in the loading goroutine so the main event
+// loop never spends time on indentYAMLListItems or parseYAMLSections — on
+// really long CRD manifests (50k+ lines) those calls can take seconds and
+// freeze the UI. Producers must call buildYAMLViewPayload before sending.
 type yamlLoadedMsg struct {
-	content string
-	err     error
+	content  string        // already indented via indentYAMLListItems
+	sections []yamlSection // already parsed via parseYAMLSections
+	err      error
 }
 
-// previewYAMLLoadedMsg carries YAML content for the split/full preview in the right column.
+// previewYAMLLoadedMsg carries YAML content for the split/full preview in the
+// right column. As with yamlLoadedMsg, the content is pre-indented inside the
+// loading goroutine to keep the main event loop responsive.
 type previewYAMLLoadedMsg struct {
-	content string
+	content string // already indented via indentYAMLListItems
 	err     error
 	gen     uint64
 }

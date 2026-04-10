@@ -138,6 +138,77 @@ func (m Model) View() string {
 	return view
 }
 
+// applySessionColumnsForKind sets the ui package vars that drive column
+// visibility to the configuration stored for the given kind. Pass an empty
+// kind to clear all overrides. The vars are globals consumed by RenderTable
+// during the next render, so the caller must call this immediately before
+// rendering and use withSessionColumnsForKind to restore if the same frame
+// needs to render multiple kinds.
+func (m Model) applySessionColumnsForKind(kind string) {
+	if kind == "" {
+		ui.ActiveSessionColumns = nil
+		ui.ActiveHiddenBuiltinColumns = nil
+		ui.ActiveColumnOrder = nil
+		return
+	}
+	// Session extras: nil vs non-nil-empty distinguishes "auto-detect" from
+	// "user explicitly configured no extras".
+	if sessionCols, ok := m.sessionColumns[kind]; ok {
+		if sessionCols == nil {
+			sessionCols = []string{}
+		}
+		ui.ActiveSessionColumns = sessionCols
+	} else {
+		ui.ActiveSessionColumns = nil
+	}
+	// Hidden built-in columns for this kind.
+	if hiddenBi, ok := m.hiddenBuiltinColumns[kind]; ok && len(hiddenBi) > 0 {
+		set := make(map[string]bool, len(hiddenBi))
+		for _, k := range hiddenBi {
+			set[k] = true
+		}
+		ui.ActiveHiddenBuiltinColumns = set
+	} else {
+		ui.ActiveHiddenBuiltinColumns = nil
+	}
+	// Explicit column order (excluding Name).
+	if order, ok := m.columnOrder[kind]; ok && len(order) > 0 {
+		ui.ActiveColumnOrder = order
+	} else {
+		ui.ActiveColumnOrder = nil
+	}
+}
+
+// withSessionColumnsForKind applies the session configuration for the
+// given kind around fn. The previous ui.Active* values are captured before
+// fn runs and restored afterwards, so this can be used to render a single
+// table (e.g., the right-column children) with a different kind's config
+// without leaking the swap back into subsequent renders in the same frame.
+// fn's return value is passed through untouched.
+func (m Model) withSessionColumnsForKind(kind string, fn func() string) string {
+	prevSession := ui.ActiveSessionColumns
+	prevHidden := ui.ActiveHiddenBuiltinColumns
+	prevOrder := ui.ActiveColumnOrder
+	m.applySessionColumnsForKind(kind)
+	defer func() {
+		ui.ActiveSessionColumns = prevSession
+		ui.ActiveHiddenBuiltinColumns = prevHidden
+		ui.ActiveColumnOrder = prevOrder
+	}()
+	return fn()
+}
+
+// rightColumnKind returns the lowercased kind that identifies the items
+// currently rendered in the right column (children pane). Derived from
+// the first rightItem when available; falls back to the empty string,
+// which applySessionColumnsForKind treats as "no overrides".
+func (m Model) rightColumnKind() string {
+	if len(m.rightItems) > 0 && m.rightItems[0].Kind != "" {
+		return strings.ToLower(m.rightItems[0].Kind)
+	}
+	return ""
+}
+
 func (m Model) viewExplorer() string {
 	// Set highlight query for search/filter term highlighting.
 	ui.ActiveHighlightQuery = m.filterText
@@ -157,13 +228,12 @@ func (m Model) viewExplorer() string {
 	ui.ActiveSortColumnName = m.sortColumnName
 	ui.ActiveSortAscending = m.sortAscending
 
-	// Set session column override for the current resource type.
-	kind := strings.ToLower(m.nav.ResourceType.Kind)
-	if sessionCols, ok := m.sessionColumns[kind]; ok {
-		ui.ActiveSessionColumns = sessionCols
-	} else {
-		ui.ActiveSessionColumns = nil
-	}
+	// Apply session column config for the middle column's kind.
+	// middleColumnKind() reflects the kind of items actually rendered in
+	// the middle column, which differs from nav.ResourceType.Kind at
+	// LevelOwned/LevelContainers (e.g., containers under a pod must not
+	// share column config with the parent pod list).
+	m.applySessionColumnsForKind(m.middleColumnKind())
 
 	// Set selection state for rendering.
 	ui.ActiveSelectedItems = m.selectedItems

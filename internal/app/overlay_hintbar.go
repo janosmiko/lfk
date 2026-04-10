@@ -413,6 +413,7 @@ func (m Model) overlayHintBarOverlayColumnToggle() string {
 		{Key: "space", Desc: "toggle"},
 		{Key: "J/K", Desc: "reorder"},
 		{Key: "enter", Desc: "apply"},
+		{Key: "c", Desc: "clear"},
 		{Key: "R", Desc: "reset"},
 		{Key: "/", Desc: "filter"},
 		{Key: "esc", Desc: "close"},

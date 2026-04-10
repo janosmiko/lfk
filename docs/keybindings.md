@@ -38,7 +38,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `U` | RBAC permissions browser (can-i) |
 | `M` | Toggle resource relationship map view |
 | `w` | Toggle watch mode (auto-refresh every 2s) |
-| `,` | Column visibility toggle (show/hide and reorder columns) |
+| `,` | Column visibility toggle (show/hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
 | `>` / `<` | Sort by next / previous column |
 | `=` | Toggle sort direction (ascending/descending) |
 | `-` | Reset sort to default (Name ascending) |
@@ -252,6 +252,42 @@ All other keys are forwarded to the PTY process. The PTY session continues runni
 | `Ctrl+W` / `>` | Toggle line wrapping |
 | `u` | Toggle unified/side-by-side view |
 | `q` / `Esc` | Back to explorer |
+
+## Column Toggle Overlay
+
+Press `,` in the resource list to open the column toggle overlay. It lists
+every toggleable column for the current kind — both built-ins (Namespace,
+Ready, Restarts, Status, Age) and extras from the resource's
+`additionalPrinterColumns`.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate up/down |
+| `Space` | Toggle the current entry |
+| `J` / `K` | Reorder the current entry down/up |
+| `/` | Filter entries by name |
+| `c` | Clear selection (uncheck every entry) |
+| `R` | Reset to defaults for the current kind |
+| `Enter` | Apply the selection |
+| `Esc` / `q` | Close without saving |
+
+Built-in and extra columns can be freely interleaved — `J`/`K` moves
+either kind, so you can put `Age` before `Namespace` or drop an extra
+like `IP` between `Ready` and `Status`. The only fixed column is `Name`,
+which always renders first and is never listed in the overlay.
+
+The selection you apply is explicit: the table renders exactly the
+columns you check, in the exact order they appear in the overlay, and
+will not auto-fill the remaining space with unchecked columns. The
+chosen order is remembered per resource kind for the duration of the
+session (it is not persisted to disk). To start from a clean slate,
+press `c` to uncheck every entry at once, then space-select only the
+columns you want.
+
+If you apply a completely empty selection (no built-ins, no extras), the
+overlay interprets it as "reset to defaults for this kind" rather than
+leaving the table empty. To render only built-ins with zero extras, keep
+at least one built-in column checked when you press Enter.
 
 ## Inline Editors (Secret / ConfigMap / Labels & Annotations)
 

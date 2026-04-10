@@ -124,19 +124,46 @@ func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)
 func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 	m.showRareResources = !m.showRareResources
 	model.ShowRareResources = m.showRareResources
-	// Rebuild the sidebar at LevelResourceTypes so the change is visible
-	// immediately. Preserve cursor identity so the user doesn't lose their
-	// place when items appear or disappear.
-	if m.nav.Level == model.LevelResourceTypes {
-		prevName, prevNs, prevExtra, prevKind := m.cursorItemKey()
-		if discovered, ok := m.discoveredResources[m.nav.Context]; ok && len(discovered) > 0 {
-			m.middleItems = model.BuildSidebarItems(discovered)
-		} else {
-			m.middleItems = model.BuildSidebarItems(model.SeedResources())
-		}
-		m.itemCache[m.navKey()] = m.middleItems
-		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
+
+	// Rebuild the resource types list from the current context's discovered
+	// set (falling back to the seed list when discovery hasn't completed).
+	var merged []model.Item
+	if discovered, ok := m.discoveredResources[m.nav.Context]; ok && len(discovered) > 0 {
+		merged = model.BuildSidebarItems(discovered)
+	} else {
+		merged = model.BuildSidebarItems(model.SeedResources())
 	}
+	// Refresh the resource-types cache so cached reads stay in sync.
+	m.itemCache[m.nav.Context] = merged
+
+	// Apply the rebuild to whichever column currently shows the resource
+	// types list, depending on the user's navigation level.
+	switch m.nav.Level {
+	case model.LevelResourceTypes:
+		// User is on resource types level: update middleItems and preserve
+		// cursor identity so they don't lose their place when entries
+		// appear or disappear.
+		prevName, prevNs, prevExtra, prevKind := m.cursorItemKey()
+		m.middleItems = merged
+		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
+	default:
+		// User is deeper (LevelResources / LevelOwned / LevelContainers):
+		// the resource types list is in leftItems. Refresh it so the
+		// parent column reflects the new visibility immediately and
+		// keep the resource-types cursor memory pointing at the current
+		// resource type.
+		m.leftItems = merged
+		if m.nav.ResourceType.Resource != "" {
+			rtRef := m.nav.ResourceType.ResourceRef()
+			for i, item := range merged {
+				if item.Extra == rtRef {
+					m.cursorMemory[m.nav.Context] = i
+					break
+				}
+			}
+		}
+	}
+
 	if m.showRareResources {
 		m.setStatusMessage("Rarely used resource types: ON", false)
 	} else {

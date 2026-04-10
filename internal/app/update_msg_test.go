@@ -81,6 +81,34 @@ func TestUpdateStatusMessageExpired(t *testing.T) {
 	assert.Empty(t, mdl.statusMessage)
 }
 
+// TestUpdateStatusMessageExpired_StaleTickPreservesNewerMessage asserts
+// that a stale statusMessageExpiredMsg arriving while a newer (still
+// unexpired) message is active does NOT clobber the newer message. This
+// scenario happens when action A calls setStatusMessage+scheduleStatusClear
+// and action B sets a new message before A's tick fires.
+func TestUpdateStatusMessageExpired_StaleTickPreservesNewerMessage(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelResources},
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		width:         80,
+		height:        40,
+		execMu:        &sync.Mutex{},
+	}
+	// Simulate action B: setStatusMessage pushes expiration into the future.
+	m.setStatusMessage("Removed bookmark: foo", false)
+
+	// A stale tick from a prior scheduleStatusClear arrives now.
+	result, _ := m.Update(statusMessageExpiredMsg{})
+	mdl := result.(Model)
+
+	// The newer message must still be present.
+	assert.Equal(t, "Removed bookmark: foo", mdl.statusMessage)
+	assert.True(t, mdl.hasStatusMessage(), "hasStatusMessage() should still return true")
+}
+
 // --- Update: resourceTypesMsg ---
 
 func TestUpdateResourceTypesMsg(t *testing.T) {

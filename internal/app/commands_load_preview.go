@@ -128,12 +128,12 @@ func (m Model) loadPreviewOwned(sel *model.Item) tea.Cmd {
 	rt, ok := m.resolveOwnedResourceType(sel)
 	if !ok {
 		return func() tea.Msg {
-			return yamlLoadedMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind)}
+			return buildYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind))
 		}
 	}
 	return func() tea.Msg {
 		content, err := m.client.GetResourceYAML(reqCtx, kctx, ns, rt, name)
-		return yamlLoadedMsg{content: content, err: err}
+		return buildYAMLLoadedMsg(content, err)
 	}
 }
 
@@ -159,7 +159,7 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 		}
 		return func() tea.Msg {
 			content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
-			return previewYAMLLoadedMsg{content: content, err: err, gen: gen}
+			return buildPreviewYAMLLoadedMsg(content, err, gen)
 		}
 	case model.LevelOwned:
 		name := sel.Name
@@ -170,18 +170,18 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 		if sel.Kind == "Pod" {
 			return func() tea.Msg {
 				content, err := m.client.GetPodYAML(reqCtx, kctx, itemNs, name)
-				return previewYAMLLoadedMsg{content: content, err: err, gen: gen}
+				return buildPreviewYAMLLoadedMsg(content, err, gen)
 			}
 		}
 		rt, ok := m.resolveOwnedResourceType(sel)
 		if !ok {
 			return func() tea.Msg {
-				return previewYAMLLoadedMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind), gen: gen}
+				return buildPreviewYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind), gen)
 			}
 		}
 		return func() tea.Msg {
 			content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
-			return previewYAMLLoadedMsg{content: content, err: err, gen: gen}
+			return buildPreviewYAMLLoadedMsg(content, err, gen)
 		}
 	}
 	return nil
