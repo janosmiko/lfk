@@ -212,3 +212,32 @@ func TestFindingIndexCountsAndLookup(t *testing.T) {
 	assert.Equal(t, 0, empty.Total())
 	assert.Equal(t, SeverityUnknown, empty.Highest())
 }
+
+func TestFindingIndexCountBySource(t *testing.T) {
+	idx := BuildFindingIndex([]Finding{
+		{
+			Source:   "trivy-operator",
+			Severity: SeverityCritical,
+			Resource: ResourceRef{Namespace: "p", Kind: "Deployment", Name: "a"},
+		},
+		{
+			Source:   "trivy-operator",
+			Severity: SeverityHigh,
+			Resource: ResourceRef{Namespace: "p", Kind: "Deployment", Name: "b"},
+		},
+		{
+			Source:   "heuristic",
+			Severity: SeverityMedium,
+			Resource: ResourceRef{Namespace: "p", Kind: "Pod", Name: "c"},
+		},
+	})
+
+	assert.Equal(t, 2, idx.CountBySource("trivy-operator"))
+	assert.Equal(t, 1, idx.CountBySource("heuristic"))
+	assert.Equal(t, 0, idx.CountBySource("missing"))
+}
+
+func TestFindingIndexCountBySourceNil(t *testing.T) {
+	var idx *FindingIndex
+	assert.Equal(t, 0, idx.CountBySource("any"))
+}

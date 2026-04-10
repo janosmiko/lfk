@@ -213,7 +213,8 @@ func (c SeverityCounts) Highest() Severity {
 
 // FindingIndex aggregates findings by resource for O(1) per-row lookup.
 type FindingIndex struct {
-	counts map[string]SeverityCounts
+	counts   map[string]SeverityCounts
+	bySource map[string]int
 }
 
 // For returns the aggregated counts for the given resource. Zero value when absent.
@@ -224,9 +225,21 @@ func (i *FindingIndex) For(ref ResourceRef) SeverityCounts {
 	return i.counts[ref.Key()]
 }
 
+// CountBySource returns the total finding count for the given source
+// name. Returns 0 if the index is nil or the source isn't present.
+func (i *FindingIndex) CountBySource(name string) int {
+	if i == nil {
+		return 0
+	}
+	return i.bySource[name]
+}
+
 // BuildFindingIndex constructs an index from a slice of findings.
 func BuildFindingIndex(findings []Finding) *FindingIndex {
-	idx := &FindingIndex{counts: make(map[string]SeverityCounts)}
+	idx := &FindingIndex{
+		counts:   make(map[string]SeverityCounts),
+		bySource: make(map[string]int),
+	}
 	for _, f := range findings {
 		key := f.Resource.Key()
 		c := idx.counts[key]
@@ -241,6 +254,7 @@ func BuildFindingIndex(findings []Finding) *FindingIndex {
 			c.Low++
 		}
 		idx.counts[key] = c
+		idx.bySource[f.Source]++
 	}
 	return idx
 }
@@ -251,7 +265,10 @@ func (m *Manager) Index() *FindingIndex {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if m.cachedIndex == nil {
-		return &FindingIndex{counts: map[string]SeverityCounts{}}
+		return &FindingIndex{
+			counts:   map[string]SeverityCounts{},
+			bySource: map[string]int{},
+		}
 	}
 	return m.cachedIndex
 }
