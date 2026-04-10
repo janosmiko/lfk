@@ -48,6 +48,12 @@ func TestTopLevelResourceTypes(t *testing.T) {
 	catNames := make(map[string]bool)
 	for _, cat := range cats {
 		catNames[cat.Name] = true
+		// The Security category is dynamically populated from
+		// SecuritySourcesFn; when the hook is unset (as in this test)
+		// the category is present but empty.
+		if cat.Name == "Security" {
+			continue
+		}
 		assert.NotEmpty(t, cat.Types, "category %s should have types", cat.Name)
 		for _, rt := range cat.Types {
 			assert.NotEmpty(t, rt.DisplayName)
@@ -61,6 +67,7 @@ func TestTopLevelResourceTypes(t *testing.T) {
 	assert.True(t, catNames["Networking"])
 	assert.True(t, catNames["Storage"])
 	assert.True(t, catNames["Cluster"])
+	assert.True(t, catNames["Security"])
 }
 
 // --- FlattenedResourceTypes ---
@@ -1113,4 +1120,62 @@ func TestBookmarkIsContextAware(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- Security virtual API group and dynamic category ---
+
+func TestSecurityVirtualAPIGroupConstant(t *testing.T) {
+	assert.Equal(t, "_security", SecurityVirtualAPIGroup)
+}
+
+func TestSecuritySourcesFnNilReturnsNothing(t *testing.T) {
+	prev := SecuritySourcesFn
+	t.Cleanup(func() { SecuritySourcesFn = prev })
+	SecuritySourcesFn = nil
+
+	cats := TopLevelResourceTypes()
+	var securityCat *ResourceCategory
+	for i := range cats {
+		if cats[i].Name == "Security" {
+			securityCat = &cats[i]
+			break
+		}
+	}
+	require.NotNil(t, securityCat, "Security category must exist even when hook is nil")
+	assert.Empty(t, securityCat.Types)
+}
+
+func TestSecuritySourcesFnReturnsEntries(t *testing.T) {
+	prev := SecuritySourcesFn
+	t.Cleanup(func() { SecuritySourcesFn = prev })
+	SecuritySourcesFn = func() []SecuritySourceEntry {
+		return []SecuritySourceEntry{
+			{DisplayName: "Trivy", SourceName: "trivy-operator", Icon: "◈", Count: 5},
+			{DisplayName: "Heuristic", SourceName: "heuristic", Icon: "◉", Count: 12},
+		}
+	}
+
+	cats := TopLevelResourceTypes()
+	var securityCat *ResourceCategory
+	for i := range cats {
+		if cats[i].Name == "Security" {
+			securityCat = &cats[i]
+			break
+		}
+	}
+	require.NotNil(t, securityCat)
+	require.Len(t, securityCat.Types, 2)
+
+	assert.Equal(t, "Trivy (5)", securityCat.Types[0].DisplayName)
+	assert.Equal(t, "__security_trivy-operator__", securityCat.Types[0].Kind)
+	assert.Equal(t, SecurityVirtualAPIGroup, securityCat.Types[0].APIGroup)
+	assert.Equal(t, "findings", securityCat.Types[0].Resource)
+	assert.False(t, securityCat.Types[0].Namespaced)
+
+	assert.Equal(t, "Heuristic (12)", securityCat.Types[1].DisplayName)
+	assert.Equal(t, "__security_heuristic__", securityCat.Types[1].Kind)
+}
+
+func TestSecurityIsCoreCategoryAlwaysShown(t *testing.T) {
+	assert.True(t, IsCoreCategory("Security"), "Security must be a core category")
 }

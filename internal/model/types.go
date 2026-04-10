@@ -2,8 +2,27 @@
 package model
 
 import (
+	"fmt"
 	"time"
 )
+
+// SecurityVirtualAPIGroup is the APIGroup used by synthetic security
+// resource types. Client.GetResources dispatches on this value.
+const SecurityVirtualAPIGroup = "_security"
+
+// SecuritySourceEntry describes one entry shown under the Security category
+// in the middle column. Populated at startup by the app layer.
+type SecuritySourceEntry struct {
+	DisplayName string // "Trivy", "Kyverno", "Heuristic"
+	SourceName  string // matches security.SecuritySource.Name() — "trivy-operator", "heuristic", "policy-report"
+	Icon        string
+	Count       int // populated from FindingIndex at render time
+}
+
+// SecuritySourcesFn returns the list of security source entries to display
+// in the Security category. Set by the app at startup. When nil or empty,
+// the Security category is still shown (it's a core category) but empty.
+var SecuritySourcesFn func() []SecuritySourceEntry
 
 // Level represents the current navigation depth in the owner-based hierarchy.
 type Level int
@@ -97,6 +116,7 @@ var coreCategories = map[string]bool{
 	"Storage":        true,
 	"Access Control": true,
 	"Helm":           true,
+	"Security":       true,
 	"API and CRDs":   true,
 }
 
@@ -200,7 +220,7 @@ type ActionMenuItem struct {
 
 // TopLevelResourceTypes returns the curated list of resource types shown at level 1.
 func TopLevelResourceTypes() []ResourceCategory {
-	return []ResourceCategory{
+	cats := []ResourceCategory{ //nolint:prealloc // dynamic Security category appended below
 		{
 			Name: "Cluster",
 			Types: []ResourceTypeEntry{
@@ -554,4 +574,28 @@ func TopLevelResourceTypes() []ResourceCategory {
 			},
 		},
 	}
+
+	// Security category — dynamically populated from SecuritySourcesFn.
+	// Always visible (heuristic source has no external dependency).
+	var securityEntries []ResourceTypeEntry
+	if SecuritySourcesFn != nil {
+		for _, src := range SecuritySourcesFn() {
+			displayName := src.DisplayName
+			if src.Count >= 0 {
+				displayName = fmt.Sprintf("%s (%d)", src.DisplayName, src.Count)
+			}
+			securityEntries = append(securityEntries, ResourceTypeEntry{
+				DisplayName: displayName,
+				Kind:        "__security_" + src.SourceName + "__",
+				APIGroup:    SecurityVirtualAPIGroup,
+				APIVersion:  "v1",
+				Resource:    "findings",
+				Icon:        src.Icon,
+				Namespaced:  false,
+			})
+		}
+	}
+	cats = append(cats, ResourceCategory{Name: "Security", Types: securityEntries})
+
+	return cats
 }
