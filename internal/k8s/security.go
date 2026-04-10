@@ -117,6 +117,47 @@ func titleCase(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
+// getSecurityFindings is the dispatch target for virtual _security resource
+// types. It fetches findings from the manager for the source encoded in
+// the ResourceTypeEntry's Kind and returns them as model.Items.
+//
+//nolint:unparam // contextName and namespace are passed straight through from GetResources callers.
+func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+	if c.securityManager == nil {
+		return nil, nil
+	}
+	sourceName := sourceNameFromKind(rt.Kind)
+	if sourceName == "" {
+		return nil, fmt.Errorf("unrecognized security kind: %s", rt.Kind)
+	}
+	res, err := c.securityManager.FetchAll(ctx, contextName, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("security fetch: %w", err)
+	}
+	items := make([]model.Item, 0)
+	for _, f := range res.Findings {
+		if f.Source != sourceName {
+			continue
+		}
+		items = append(items, findingToItem(f))
+	}
+	sort.SliceStable(items, func(i, j int) bool {
+		si := severityOrder(items[i])
+		sj := severityOrder(items[j])
+		if si != sj {
+			return si > sj
+		}
+		if items[i].Namespace != items[j].Namespace {
+			return items[i].Namespace < items[j].Namespace
+		}
+		if items[i].Name != items[j].Name {
+			return items[i].Name < items[j].Name
+		}
+		return items[i].ColumnValue("Title") < items[j].ColumnValue("Title")
+	})
+	return items, nil
+}
+
 // findingToItem maps a security.Finding onto the model.Item shape the
 // explorer table already knows how to render. All display data for the
 // middle column lives in the first five Columns (Severity, Resource,
@@ -175,6 +216,3 @@ func findingToItem(f security.Finding) model.Item {
 	}
 	return item
 }
-
-// Placeholder to silence "imported and not used" until Task C4.
-var _ = context.Background

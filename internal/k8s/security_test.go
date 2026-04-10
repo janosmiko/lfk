@@ -1,9 +1,11 @@
 package k8s
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
@@ -146,4 +148,102 @@ func TestFindingToItemMinimal(t *testing.T) {
 	assert.Equal(t, "Pending", it.Status)
 	assert.Equal(t, "", it.ColumnValue("Description"))
 	assert.Equal(t, "", it.ColumnValue("References"))
+}
+
+func TestGetSecurityFindingsNilManager(t *testing.T) {
+	c := &Client{}
+	items, err := c.getSecurityFindings(
+		context.Background(),
+		"kctx", "",
+		model.ResourceTypeEntry{Kind: "__security_trivy-operator__"},
+	)
+	assert.NoError(t, err)
+	assert.Nil(t, items)
+}
+
+func TestGetSecurityFindingsUnknownKind(t *testing.T) {
+	mgr := security.NewManager()
+	c := &Client{securityManager: mgr}
+	_, err := c.getSecurityFindings(
+		context.Background(),
+		"kctx", "",
+		model.ResourceTypeEntry{Kind: "not-a-security-kind"},
+	)
+	assert.Error(t, err)
+	assert.Contains(t, err.Error(), "unrecognized security kind")
+}
+
+func TestGetSecurityFindingsFiltersBySource(t *testing.T) {
+	mgr := security.NewManager()
+	mgr.Register(&security.FakeSource{
+		NameStr: "trivy-operator", Available: true,
+		CategoriesVal: []security.Category{security.CategoryVuln},
+		Findings: []security.Finding{
+			{
+				ID: "1", Source: "trivy-operator", Title: "CVE-1",
+				Severity: security.SeverityCritical,
+				Resource: security.ResourceRef{Namespace: "p", Kind: "Deployment", Name: "api"},
+			},
+		},
+	})
+	mgr.Register(&security.FakeSource{
+		NameStr: "heuristic", Available: true,
+		CategoriesVal: []security.Category{security.CategoryMisconfig},
+		Findings: []security.Finding{
+			{
+				ID: "2", Source: "heuristic", Title: "privileged",
+				Severity: security.SeverityCritical,
+				Resource: security.ResourceRef{Namespace: "p", Kind: "Pod", Name: "bad"},
+			},
+		},
+	})
+	c := &Client{securityManager: mgr}
+
+	items, err := c.getSecurityFindings(
+		context.Background(),
+		"kctx", "",
+		model.ResourceTypeEntry{Kind: "__security_trivy-operator__"},
+	)
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "CVE-1", items[0].Name)
+	assert.Equal(t, "trivy-operator", items[0].ColumnValue("Source"))
+}
+
+func TestGetSecurityFindingsSortsBySeverity(t *testing.T) {
+	mgr := security.NewManager()
+	mgr.Register(&security.FakeSource{
+		NameStr: "trivy-operator", Available: true,
+		Findings: []security.Finding{
+			{
+				Source: "trivy-operator", Title: "low", Severity: security.SeverityLow,
+				Resource: security.ResourceRef{Namespace: "p", Kind: "Pod", Name: "a"},
+			},
+			{
+				Source: "trivy-operator", Title: "crit", Severity: security.SeverityCritical,
+				Resource: security.ResourceRef{Namespace: "p", Kind: "Pod", Name: "b"},
+			},
+			{
+				Source: "trivy-operator", Title: "med", Severity: security.SeverityMedium,
+				Resource: security.ResourceRef{Namespace: "p", Kind: "Pod", Name: "c"},
+			},
+			{
+				Source: "trivy-operator", Title: "high", Severity: security.SeverityHigh,
+				Resource: security.ResourceRef{Namespace: "p", Kind: "Pod", Name: "d"},
+			},
+		},
+	})
+	c := &Client{securityManager: mgr}
+
+	items, err := c.getSecurityFindings(
+		context.Background(),
+		"other-context", "",
+		model.ResourceTypeEntry{Kind: "__security_trivy-operator__"},
+	)
+	require.NoError(t, err)
+	require.Len(t, items, 4)
+	assert.Equal(t, "CRIT", items[0].ColumnValue("Severity"))
+	assert.Equal(t, "HIGH", items[1].ColumnValue("Severity"))
+	assert.Equal(t, "MED", items[2].ColumnValue("Severity"))
+	assert.Equal(t, "LOW", items[3].ColumnValue("Severity"))
 }
