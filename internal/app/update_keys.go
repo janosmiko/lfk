@@ -775,9 +775,14 @@ func (m Model) handleKeySecretToggle() (tea.Model, tea.Cmd) {
 // isSecurityDashboardKey reports whether the key is one that the security
 // dashboard handles in the preview pane. Used by the explorer key dispatch
 // to route to handleSecurityKey when the security pseudo-item is focused.
-// The whitelist is intentionally conservative: standard explorer keys such
-// as h/l (navigate back/forward) and / (search) continue to be handled by
-// the regular explorer dispatch even while the security item is focused.
+//
+// The whitelist is intentionally conservative:
+//   - Lowercase j/k and g/G are NOT handled here — they flow through to the
+//     normal explorer middle-column navigation so users can move off the
+//     security pseudo-item.
+//   - Capital J/K move the finding cursor, matching lfk's convention that
+//     capital navigation keys are scoped to the right preview pane.
+//   - h/l and / also flow through to regular explorer dispatch.
 func isSecurityDashboardKey(msg tea.KeyMsg) bool {
 	switch msg.Type {
 	case tea.KeyTab, tea.KeyShiftTab, tea.KeyEnter:
@@ -787,7 +792,7 @@ func isSecurityDashboardKey(msg tea.KeyMsg) bool {
 		return false
 	}
 	switch msg.Runes[0] {
-	case 'j', 'k', 'g', 'G', 'r', 'C', '1', '2', '3', '4':
+	case 'J', 'K', 'r', 'C', '1', '2', '3', '4':
 		return true
 	}
 	return false

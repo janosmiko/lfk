@@ -580,3 +580,44 @@ func TestHandleExplorerActionKeySecurityViaDispatch(t *testing.T) {
 	require.True(t, ok)
 	assert.Equal(t, 1, mm.cursor())
 }
+
+// TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel verifies that
+// pressing # while at LevelResources (viewing a pod list) ascends back to
+// LevelResourceTypes and jumps to the Security pseudo-item.
+func TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel(t *testing.T) {
+	m := baseExplorerModel() // starts at LevelResources with middleItems = pods
+	m.leftItems = []model.Item{
+		{Name: "Cluster", Extra: "__overview__"},
+		{Name: "Monitoring", Extra: "__monitoring__"},
+		{Name: "Security", Extra: "__security__"},
+		{Name: "Workloads"},
+	}
+
+	updated, _, handled := m.handleExplorerActionKeySecurity()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, model.LevelResourceTypes, mm.nav.Level,
+		"handler should ascend to LevelResourceTypes before jumping")
+	assert.Equal(t, 2, mm.cursor(),
+		"cursor should land on the Security item (index 2) after ascension")
+}
+
+// TestHandleExplorerActionKeyMonitoringAscendsFromDeeperLevel verifies the
+// same fix applies to the monitoring @ hotkey (shared ascendToResourceTypes
+// helper).
+func TestHandleExplorerActionKeyMonitoringAscendsFromDeeperLevel(t *testing.T) {
+	m := baseExplorerModel()
+	m.leftItems = []model.Item{
+		{Name: "Cluster", Extra: "__overview__"},
+		{Name: "Monitoring", Extra: "__monitoring__"},
+		{Name: "Workloads"},
+	}
+
+	updated, _, handled := m.handleExplorerActionKeyMonitoring()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, model.LevelResourceTypes, mm.nav.Level)
+	assert.Equal(t, 1, mm.cursor())
+}

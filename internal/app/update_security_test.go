@@ -38,17 +38,29 @@ func TestSecurityKeyShiftTabCyclesBackward(t *testing.T) {
 	assert.Equal(t, security.CategoryMisconfig, updated.securityView.ActiveCategory)
 }
 
-func TestSecurityKeyJMovesCursor(t *testing.T) {
+func TestSecurityKeyCapitalJMovesCursor(t *testing.T) {
 	m := baseSecurityModel()
-	updated, _ := m.handleSecurityKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	updated, _ := m.handleSecurityKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'J'}})
 	assert.Equal(t, 1, updated.securityView.Cursor)
 }
 
-func TestSecurityKeyKMovesCursorUp(t *testing.T) {
+func TestSecurityKeyCapitalKMovesCursorUp(t *testing.T) {
 	m := baseSecurityModel()
 	m.securityView.Cursor = 1
-	updated, _ := m.handleSecurityKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	updated, _ := m.handleSecurityKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'K'}})
 	assert.Equal(t, 0, updated.securityView.Cursor)
+}
+
+func TestSecurityKeyLowercaseJKNotHandled(t *testing.T) {
+	// Lowercase j/k must NOT be claimed by handleSecurityKey — they flow
+	// through to the normal explorer middle-column navigation so users can
+	// move off the security pseudo-item.
+	m := baseSecurityModel()
+	updated, _ := m.handleSecurityKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'j'}})
+	assert.Equal(t, 0, updated.securityView.Cursor, "lowercase j must not move finding cursor")
+	updated.securityView.Cursor = 1
+	updated2, _ := updated.handleSecurityKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'k'}})
+	assert.Equal(t, 1, updated2.securityView.Cursor, "lowercase k must not move finding cursor")
 }
 
 func TestSecurityKeyEnterTogglesDetail(t *testing.T) {
@@ -352,10 +364,8 @@ func TestIsSecurityDashboardKeyWhitelist(t *testing.T) {
 		{Type: tea.KeyTab},
 		{Type: tea.KeyShiftTab},
 		{Type: tea.KeyEnter},
-		{Type: tea.KeyRunes, Runes: []rune{'j'}},
-		{Type: tea.KeyRunes, Runes: []rune{'k'}},
-		{Type: tea.KeyRunes, Runes: []rune{'g'}},
-		{Type: tea.KeyRunes, Runes: []rune{'G'}},
+		{Type: tea.KeyRunes, Runes: []rune{'J'}},
+		{Type: tea.KeyRunes, Runes: []rune{'K'}},
 		{Type: tea.KeyRunes, Runes: []rune{'r'}},
 		{Type: tea.KeyRunes, Runes: []rune{'C'}},
 		{Type: tea.KeyRunes, Runes: []rune{'1'}},
@@ -368,7 +378,13 @@ func TestIsSecurityDashboardKeyWhitelist(t *testing.T) {
 	}
 
 	// Negative: explorer keys that must continue to work normally.
+	// Lowercase j/k and g/G must fall through so users can navigate the
+	// middle column off the security pseudo-item.
 	negatives := []tea.KeyMsg{
+		{Type: tea.KeyRunes, Runes: []rune{'j'}},
+		{Type: tea.KeyRunes, Runes: []rune{'k'}},
+		{Type: tea.KeyRunes, Runes: []rune{'g'}},
+		{Type: tea.KeyRunes, Runes: []rune{'G'}},
 		{Type: tea.KeyRunes, Runes: []rune{'h'}},
 		{Type: tea.KeyRunes, Runes: []rune{'l'}},
 		{Type: tea.KeyRunes, Runes: []rune{'/'}},

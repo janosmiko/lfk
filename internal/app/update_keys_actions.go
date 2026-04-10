@@ -599,11 +599,28 @@ func (m Model) handleExplorerActionKeyTerminalToggle() (tea.Model, tea.Cmd, bool
 	return m, scheduleStatusClear(), true
 }
 
+// ascendToResourceTypes navigates the model back up to LevelResourceTypes.
+// Used by dashboard hotkeys (# and @) that must operate at the resource-types
+// level but can be invoked from any deeper level. Discards per-step tea.Cmds
+// because the caller issues a fresh loadPreview after landing.
+func (m Model) ascendToResourceTypes() Model {
+	for m.nav.Level > model.LevelResourceTypes {
+		mdl, _ := m.navigateParent()
+		mm, ok := mdl.(Model)
+		if !ok {
+			break
+		}
+		m = mm
+	}
+	return m
+}
+
 func (m Model) handleExplorerActionKeyMonitoring() (tea.Model, tea.Cmd, bool) {
 	if m.nav.Level < model.LevelResourceTypes {
 		m.setStatusMessage("Select a cluster first", true)
 		return m, scheduleStatusClear(), true
 	}
+	m = m.ascendToResourceTypes()
 	// Find the Monitoring item in the middle column and select it.
 	for i, item := range m.middleItems {
 		if item.Extra == "__monitoring__" {
@@ -620,6 +637,7 @@ func (m Model) handleExplorerActionKeySecurity() (tea.Model, tea.Cmd, bool) {
 		m.setStatusMessage("Select a cluster first", true)
 		return m, scheduleStatusClear(), true
 	}
+	m = m.ascendToResourceTypes()
 	// Find the Security item in the middle column and select it.
 	for i, item := range m.middleItems {
 		if item.Extra == "__security__" {
@@ -647,11 +665,14 @@ func (m Model) handleExplorerActionKeySecurityResource() (tea.Model, tea.Cmd, bo
 	if sel == nil {
 		return m, nil, true
 	}
+	// Capture the resource reference BEFORE ascending — ascendToResourceTypes
+	// changes the selected item to the Security pseudo-resource.
 	ref := security.ResourceRef{
 		Namespace: sel.Namespace,
 		Kind:      sel.Kind,
 		Name:      sel.Name,
 	}
+	m = m.ascendToResourceTypes()
 	m.securityView.ResourceFilter = &ref
 	m.securityView.Loading = true
 	// Jump to the security pseudo-item in the middle column so the preview

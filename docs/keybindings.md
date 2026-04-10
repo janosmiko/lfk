@@ -316,14 +316,15 @@ it pre-filtered to that resource.
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Move cursor down / up |
-| `g` / `G` | Jump to top / bottom of list |
+| `J` / `K` | Move finding cursor down / up (capital, preview-scoped) |
+| `j` / `k` | Move cursor in the middle column (leaves the security item) |
 | `Tab` / `Shift+Tab` | Cycle category tabs |
 | `1`-`4` | Jump to tab by index |
 | `Enter` | Toggle inline details pane |
 | `r` | Force refresh |
-| `/` | Filter findings (substring) |
 | `C` | Clear resource filter (when per-resource view is active) |
+
+**Note:** Capital `J`/`K` move the cursor inside the findings list (preview-scoped, matching lfk's convention for capital navigation keys in the right pane). Lowercase `j`/`k` flow through to normal middle-column navigation so you can leave the Security item and return to the resource type list.
 
 ## Error Log (`!`)
 

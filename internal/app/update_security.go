@@ -34,6 +34,11 @@ func (m Model) updateSecurityMsg(msg tea.Msg) (Model, bool) {
 // handleSecurityKey handles key events when the security preview is focused
 // (i.e., selectedMiddleItem().Extra == "__security__"). Returns the updated
 // Model and an optional command.
+//
+// Cursor movement within the findings list uses J/K (capital), mirroring
+// lfk's convention that capital nav keys are scoped to the right preview
+// pane. Lowercase j/k are NOT handled here — they flow through to normal
+// explorer middle-column navigation so users can leave the security item.
 func (m Model) handleSecurityKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 	switch msg.Type {
 	case tea.KeyTab:
@@ -50,18 +55,10 @@ func (m Model) handleSecurityKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m, nil
 	}
 	switch msg.Runes[0] {
-	case 'j':
+	case 'J':
 		m = securityCursorDown(m)
-	case 'k':
+	case 'K':
 		m = securityCursorUp(m)
-	case 'g':
-		m.securityView.Cursor = 0
-		m.securityView.Scroll = 0
-	case 'G':
-		visible := m.securityView.VisibleFindings()
-		if len(visible) > 0 {
-			m.securityView.Cursor = len(visible) - 1
-		}
 	case 'r':
 		m.securityView.Loading = true
 		return m, m.loadSecurityDashboard()

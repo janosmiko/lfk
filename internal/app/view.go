@@ -394,6 +394,25 @@ func (m Model) renderTitleBar() string {
 func (m Model) viewExplorerDashboard(contentHeight int) string {
 	sel := m.selectedMiddleItem()
 	isMonitoring := sel != nil && sel.Extra == "__monitoring__"
+	isSecurity := sel != nil && sel.Extra == "__security__"
+
+	fullW := m.width - 2
+
+	// Security dashboard renders directly from live SecurityViewState rather
+	// than a pre-rendered string like monitoring/overview. Call the renderer
+	// with the fullscreen dimensions so tiles/tabs/table fit.
+	if isSecurity {
+		// Populate the package-level active-index state so any badge rendering
+		// inside the dashboard has access to the latest findings index.
+		ui.ActiveSecurityAvailable = m.securityAvailable
+		ui.ActiveSecurityIndex = m.securityManager.Index()
+		defer func() {
+			ui.ActiveSecurityAvailable = false
+			ui.ActiveSecurityIndex = nil
+		}()
+		dashContent := ui.RenderSecurityDashboard(m.securityView, fullW-2, contentHeight)
+		return m.viewExplorerDashboardSingleCol(dashContent, fullW, contentHeight)
+	}
 
 	var dashContent string
 	if isMonitoring {
@@ -408,7 +427,6 @@ func (m Model) viewExplorerDashboard(contentHeight int) string {
 		}
 	}
 
-	fullW := m.width - 2
 	if !isMonitoring && m.dashboardEventsPreview != "" {
 		return m.viewExplorerDashboardTwoCol(dashContent, fullW, contentHeight)
 	}
