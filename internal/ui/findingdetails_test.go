@@ -79,3 +79,28 @@ func TestRenderFindingDetailsExtraColumnsRendered(t *testing.T) {
 	assert.Contains(t, out, "Installed")
 	assert.Contains(t, out, "1.0.0")
 }
+
+func TestWrapLinesShortInput(t *testing.T) {
+	lines := wrapLines("hello", 80)
+	assert.Equal(t, []string{"hello"}, lines)
+}
+
+func TestWrapLinesLongInput(t *testing.T) {
+	lines := wrapLines("one two three four five", 10)
+	assert.Equal(t, []string{"one two", "three four", "five"}, lines)
+}
+
+func TestWrapLinesPreservesNewlines(t *testing.T) {
+	lines := wrapLines("first line\nsecond line", 80)
+	assert.Equal(t, []string{"first line", "second line"}, lines)
+}
+
+func TestWrapLinesEmptyParagraph(t *testing.T) {
+	lines := wrapLines("a\n\nb", 80)
+	assert.Equal(t, []string{"a", "", "b"}, lines)
+}
+
+func TestStyleSeverityBadgeUnknown(t *testing.T) {
+	out := styleSeverityBadge("UNKNOWN")
+	assert.Contains(t, out, "?")
+}
