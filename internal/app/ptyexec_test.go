@@ -121,7 +121,26 @@ func TestKeyToBytes(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := keyToBytes(tt.msg)
+			result := keyToBytes(tt.msg, false)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func TestKeyToBytesAppCursorMode(t *testing.T) {
+	tests := []struct {
+		name     string
+		msg      tea.KeyMsg
+		expected []byte
+	}{
+		{name: "up", msg: tea.KeyMsg{Type: tea.KeyUp}, expected: []byte{'\x1b', 'O', 'A'}},
+		{name: "down", msg: tea.KeyMsg{Type: tea.KeyDown}, expected: []byte{'\x1b', 'O', 'B'}},
+		{name: "right", msg: tea.KeyMsg{Type: tea.KeyRight}, expected: []byte{'\x1b', 'O', 'C'}},
+		{name: "left", msg: tea.KeyMsg{Type: tea.KeyLeft}, expected: []byte{'\x1b', 'O', 'D'}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := keyToBytes(tt.msg, true)
 			assert.Equal(t, tt.expected, result)
 		})
 	}

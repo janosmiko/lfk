@@ -36,7 +36,7 @@ func TestKeyToBytesCtrlKeys(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := keyToBytes(tt.msg)
+			result := keyToBytes(tt.msg, false)
 			assert.Equal(t, tt.expected, result)
 		})
 	}
@@ -44,7 +44,7 @@ func TestKeyToBytesCtrlKeys(t *testing.T) {
 
 func TestKeyToBytesMultiCharRunes(t *testing.T) {
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'h', 'e', 'l', 'l', 'o'}}
-	result := keyToBytes(msg)
+	result := keyToBytes(msg, false)
 	assert.Equal(t, []byte("hello"), result)
 }
 
@@ -52,7 +52,7 @@ func TestKeyToBytesFallbackSingleChar(t *testing.T) {
 	// Simulate an unknown key type with a single-char string representation.
 	// This exercises the final fallback path.
 	msg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'x'}}
-	result := keyToBytes(msg)
+	result := keyToBytes(msg, false)
 	assert.Equal(t, []byte("x"), result)
 }
 
