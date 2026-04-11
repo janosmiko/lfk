@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -307,6 +308,36 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.previewYAML = ""
 		m.loading = true
 		return m, m.loadPreview()
+	}
+	// Virtual Security source entries are injected by BuildSidebarItems and
+	// are not present in discoveredResources, so FindResourceTypeIn cannot
+	// find them. Synthesize the RT from the Item's Kind/Extra fields so the
+	// standard load path (loadResources -> GetResources -> getSecurityFindings)
+	// still fires and the bgtask surfaces in the :tasks overlay.
+	if strings.HasPrefix(sel.Kind, "__security_") && sel.Kind != "__security_finding__" {
+		sourceName := strings.TrimSuffix(strings.TrimPrefix(sel.Kind, "__security_"), "__")
+		m.saveCursor()
+		m.nav.ResourceType = model.ResourceTypeEntry{
+			DisplayName: sel.Name,
+			Kind:        sel.Kind,
+			APIGroup:    model.SecurityVirtualAPIGroup,
+			APIVersion:  "v1",
+			Resource:    "findings-" + sourceName,
+			Namespaced:  false,
+		}
+		m.nav.Level = model.LevelResources
+		m.pushLeft()
+		m.clearRight()
+		m.saveCurrentSession()
+		if cached, ok := m.itemCache[m.navKey()]; ok {
+			m.middleItems = cached
+			m.restoreCursor()
+		} else {
+			m.middleItems = nil
+			m.setCursor(0)
+		}
+		m.loading = true
+		return m, m.loadResources(false)
 	}
 	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[m.nav.Context])
 	if !ok {

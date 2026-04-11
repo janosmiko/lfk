@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
@@ -414,4 +415,56 @@ func TestCovNavigateChildEmpty(t *testing.T) {
 	m.middleItems = nil
 	result, _ := m.navigateChild()
 	_ = result.(Model) // no panic
+}
+
+// --- navigateChildResourceType: synthetic security sources ---
+
+// TestNavigateChildResourceTypeSynthesizesSecurityRT verifies that clicking a
+// virtual Security source Item (Kind prefixed with __security_ and Extra
+// carrying the _security/v1/findings-<name> ref) produces a navigation into
+// LevelResources with a fully-populated ResourceTypeEntry. Security sources
+// are not present in discoveredResources, so the handler has to synthesize
+// the RT from the Item's Kind/Extra fields; otherwise FindResourceTypeIn
+// silently fails and the user cannot enter the Security category at all.
+func TestNavigateChildResourceTypeSynthesizesSecurityRT(t *testing.T) {
+	m := baseModelBoost2()
+	m.nav.Level = model.LevelResourceTypes
+	m.nav.Context = "test-ctx"
+	sel := model.Item{
+		Name:     "Trivy (5)",
+		Kind:     "__security_trivy-operator__",
+		Extra:    model.SecurityVirtualAPIGroup + "/v1/findings-trivy-operator",
+		Category: "Security",
+		Icon:     "◈",
+	}
+	m.middleItems = []model.Item{sel}
+
+	result, cmd := m.navigateChildResourceType(&sel)
+	rm, ok := result.(Model)
+	require.True(t, ok)
+	require.NotNil(t, cmd, "security navigation must produce a load command")
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+	assert.Equal(t, "__security_trivy-operator__", rm.nav.ResourceType.Kind)
+	assert.Equal(t, model.SecurityVirtualAPIGroup, rm.nav.ResourceType.APIGroup)
+	assert.Equal(t, "findings-trivy-operator", rm.nav.ResourceType.Resource)
+	assert.Equal(t, "Trivy (5)", rm.nav.ResourceType.DisplayName)
+}
+
+// TestNavigateChildResourceTypeSecurityFallsThroughWhenNoPrefix verifies that
+// items whose Kind lacks the __security_ prefix still go through the normal
+// FindResourceTypeIn path, so existing navigation is untouched.
+func TestNavigateChildResourceTypeSecurityFallsThroughWhenNoPrefix(t *testing.T) {
+	m := baseModelBoost2()
+	m.nav.Level = model.LevelResourceTypes
+	m.nav.Context = "test-ctx"
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
+	sel := model.Item{Name: "Pods", Kind: "Pod", Extra: "/v1/pods"}
+	m.middleItems = []model.Item{sel}
+
+	result, cmd := m.navigateChildResourceType(&sel)
+	rm := result.(Model)
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "Pod", rm.nav.ResourceType.Kind)
 }
