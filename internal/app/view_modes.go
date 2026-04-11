@@ -491,6 +491,10 @@ func (m Model) viewExecTerminal() string {
 				if g.Mode&1 != 0 { // reverse (attrReverse = 1)
 					style = style.Reverse(true)
 				}
+				// Render cursor block at the terminal's cursor position.
+				if x == cursor.X && y == cursor.Y {
+					style = style.Reverse(true)
+				}
 				line.WriteString(style.Render(string(ch)))
 			}
 			lines = append(lines, line.String())
