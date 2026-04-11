@@ -93,6 +93,16 @@ func ApplyTheme(t Theme) {
 		Italic(true).
 		Background(baseBg)
 
+	// CategoryBarStyle renders a category header as a full-width
+	// "bar" with a distinct background. Uses the theme's BarBg color
+	// (same palette the title / status bar uses) so the bar stands
+	// out clearly against the base item-row background without
+	// overpowering the view.
+	CategoryBarStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(t.Primary)).
+		Bold(true).
+		Background(lipgloss.Color(t.BarBg))
+
 	IconStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Primary)).
 		Background(baseBg)

@@ -1,12 +1,150 @@
 package ui
 
 import (
+	"fmt"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// TestRenderColumnLastItemReachableAtAnyHeight is a regression guard
+// for the compound scroll bug user-reported on a 245-item / 30-
+// category list: when decrementing startEntry past an earlier entry
+// with 2-3 display lines (category header + blank separator + item),
+// (1) the "don't leave empty space" loop shifted startEntry too far
+// back so displayLines > height and the end-loop dropped tail items,
+// and (2) the render loop flipped `first=false` in the elided-sep
+// branch, adding a phantom leading blank row that pushed the last
+// entry out of the visible area. The net effect: the final 1-2
+// resource types were unreachable by scrolling with `j`/`G`.
+//
+// The fix is in two places: VimScrollOff (and the fallback inline
+// scroll) now check the resulting displayLines BEFORE decrementing,
+// and the render loop no longer flips `first` when it elides the
+// sep for the viewport's first visible entry.
+func TestRenderColumnLastItemReachableAtAnyHeight(t *testing.T) {
+	// 50 items in 10 categories (5 per cat) = 69 total display
+	// lines with separators. Heights below 69 must still render
+	// the last item when the cursor is on it.
+	const numCats = 10
+	const itemsPerCat = 5
+	items := make([]model.Item, 0, numCats*itemsPerCat)
+	for c := range numCats {
+		catName := fmt.Sprintf("Cat%02d", c)
+		for i := range itemsPerCat {
+			items = append(items, model.Item{
+				Name:     fmt.Sprintf("c%02d-item%d", c, i),
+				Category: catName,
+			})
+		}
+	}
+
+	lastIdx := len(items) - 1
+	lastName := items[lastIdx].Name
+
+	for _, height := range []int{11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 30, 40, 50, 60, 68, 69} {
+		t.Run(fmt.Sprintf("h=%d", height), func(t *testing.T) {
+			ActiveMiddleScroll = 0
+			defer func() { ActiveMiddleScroll = -1 }()
+
+			out := RenderColumn("", items, lastIdx, 40, height, true, false, "", "")
+			lines := strings.Split(out, "\n")
+			assert.LessOrEqual(t, len(lines), height,
+				"rendered %d lines must fit in height=%d", len(lines), height)
+			assert.Contains(t, out, lastName,
+				"cursor=%d (%s) must be visible at height=%d", lastIdx, lastName, height)
+		})
+	}
+}
+
+// TestRenderColumnCategoriesSeparatorsAndScroll verifies the blank
+// separator rows between groups and that scrolling reveals the list
+// tail. With 8 items in 3 categories: 3 headers + 2 seps + 8 items
+// = 13 rows. Height = 11 cannot fit everything, so scroll is
+// required to see the last items — but cursor-at-last MUST shift
+// the viewport so the last item is visible.
+func TestRenderColumnCategoriesSeparatorsAndScroll(t *testing.T) {
+	items := []model.Item{
+		{Name: "a", Category: "Cat1"},
+		{Name: "b", Category: "Cat1"},
+		{Name: "c", Category: "Cat1"},
+		{Name: "d", Category: "Cat2"},
+		{Name: "e", Category: "Cat2"},
+		{Name: "f", Category: "Cat2"},
+		{Name: "g", Category: "Cat3"},
+		{Name: "h", Category: "Cat3"},
+	}
+
+	t.Run("cursor at top shows leading items and first separator", func(t *testing.T) {
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = -1 }()
+
+		out := RenderColumn("", items, 0, 30, 11, true, false, "", "")
+		lines := strings.Split(out, "\n")
+		assert.LessOrEqual(t, len(lines), 11)
+
+		// First items must be visible.
+		assert.Contains(t, out, "a")
+		assert.Contains(t, out, "b")
+		assert.Contains(t, out, "c")
+
+		// At least one blank row between groups must be present.
+		blanks := 0
+		for _, l := range lines {
+			if strings.TrimSpace(l) == "" {
+				blanks++
+			}
+		}
+		assert.GreaterOrEqual(t, blanks, 1, "blank separator row between groups")
+	})
+
+	t.Run("cursor at last item scrolls viewport to show it", func(t *testing.T) {
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = -1 }()
+
+		out := RenderColumn("", items, 7, 30, 11, true, false, "", "")
+		lines := strings.Split(out, "\n")
+		assert.LessOrEqual(t, len(lines), 11)
+
+		// The cursor's item MUST be visible — this is the key
+		// assertion. Without a correct scroll, 'h' would be clipped
+		// and the user would have no way to reach it.
+		assert.Contains(t, out, "h", "cursor-at-last must be visible after scroll")
+		assert.Contains(t, out, "g")
+	})
+}
+
+// TestRenderColumnHeaderDoesNotWrap is a regression guard for the
+// overflow that cut off the last row of the explorer middle column
+// when only one tab was open. The left column uses a 10-char header
+// like "KUBECONFIG" but its inner width is 8 (leftW=10 minus 1 cell
+// of padding on each side). Without truncation, lipgloss wraps the
+// header onto a second line, making the left column 1 row taller
+// than the middle/right columns — which pushes the overall view 1
+// row past m.height and the terminal clips the bottom row.
+//
+// Fix: RenderColumn truncates the header to `width` so it always
+// occupies exactly 1 line and the column-height math stays correct.
+func TestRenderColumnHeaderDoesNotWrap(t *testing.T) {
+	items := []model.Item{
+		{Name: "row-1"},
+		{Name: "row-2"},
+		{Name: "row-3"},
+	}
+	// header "KUBECONFIG" is 10 chars; width=8 forces truncation.
+	result := RenderColumn("KUBECONFIG", items, 0, 8, 10, true, false, "", "")
+	// The result must contain exactly one header line followed by the
+	// items. Specifically: splitting on "\n" should yield 4 lines — one
+	// header (truncated to width) and three rows.
+	lines := strings.Split(result, "\n")
+	assert.Len(t, lines, 4, "one header line + three item lines, no wrap")
+	// First line must contain the truncated header (runes up to width).
+	assert.Contains(t, lines[0], "KUBECON", "header truncated to fit width")
+	assert.NotContains(t, lines[0], "KUBECONFIG", "full header must not fit in width=8")
+}
 
 // --- RenderColumn ---
 

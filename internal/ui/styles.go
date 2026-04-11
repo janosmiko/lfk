@@ -64,6 +64,12 @@ var (
 			Bold(true).
 			Italic(true)
 
+	// Category header rendered as a full-width "bar" with a distinct
+	// background, used by explorer columns to separate groups.
+	CategoryBarStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorPrimary)).
+				Bold(true)
+
 	// Resource type icon style.
 	IconStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorPrimary))
