@@ -38,9 +38,16 @@ func truncateHelmOutput(out []byte) string {
 
 // --- Commands ---
 
-func (m Model) loadContexts() tea.Msg {
-	items, err := m.client.GetContexts()
-	return contextsLoadedMsg{items: items, err: err}
+func (m Model) loadContexts() tea.Cmd {
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"List contexts",
+		"",
+		func() tea.Msg {
+			items, err := m.client.GetContexts()
+			return contextsLoadedMsg{items: items, err: err}
+		},
+	)
 }
 
 func (m Model) loadResourceTypes() tea.Cmd {
@@ -63,10 +70,15 @@ func (m Model) loadResourceTypes() tea.Cmd {
 // actions (cancelAndReset). Results are delivered via apiResourceDiscoveryMsg.
 func (m Model) discoverAPIResources(contextName string) tea.Cmd {
 	client := m.client
-	return func() tea.Msg {
-		entries, err := client.DiscoverAPIResources(context.Background(), contextName)
-		return apiResourceDiscoveryMsg{context: contextName, entries: entries, err: err}
-	}
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"Discover API resources",
+		contextName,
+		func() tea.Msg {
+			entries, err := client.DiscoverAPIResources(context.Background(), contextName)
+			return apiResourceDiscoveryMsg{context: contextName, entries: entries, err: err}
+		},
+	)
 }
 
 // loadQuotas fetches ResourceQuota objects for the current namespace.
@@ -432,68 +444,78 @@ func (m Model) loadMetrics() tea.Cmd {
 	switch kind {
 	case "Pod":
 		podName := sel.Name
-		return func() tea.Msg {
-			pm, err := client.GetPodMetrics(reqCtx, kctx, ns, podName)
-			if err != nil {
-				return metricsLoadedMsg{gen: gen} // silently ignore
-			}
-			cpuReq, cpuLim, memReq, memLim, err := client.GetPodResourceRequests(reqCtx, kctx, ns, podName)
-			if err != nil {
-				cpuReq, cpuLim, memReq, memLim = 0, 0, 0, 0
-			}
-			return metricsLoadedMsg{
-				cpuUsed: pm.CPU, cpuReq: cpuReq, cpuLim: cpuLim,
-				memUsed: pm.Memory, memReq: memReq, memLim: memLim,
-				gen: gen,
-			}
-		}
-	case "Deployment", "StatefulSet", "DaemonSet":
-		name := sel.Name
-		return func() tea.Msg {
-			// Get child pods.
-			childItems, err := client.GetOwnedResources(reqCtx, kctx, ns, kind, name)
-			if err != nil || len(childItems) == 0 {
-				return metricsLoadedMsg{gen: gen}
-			}
-			var podNames []string
-			for _, item := range childItems {
-				if item.Kind == "Pod" {
-					podNames = append(podNames, item.Name)
+		return m.trackBgTask(
+			bgtasks.KindMetrics,
+			"Metrics: Pod/"+podName,
+			bgtaskTarget(kctx, ns),
+			func() tea.Msg {
+				pm, err := client.GetPodMetrics(reqCtx, kctx, ns, podName)
+				if err != nil {
+					return metricsLoadedMsg{gen: gen} // silently ignore
 				}
-			}
-			if len(podNames) == 0 {
-				return metricsLoadedMsg{gen: gen}
-			}
-			metrics, err := client.GetPodsMetrics(reqCtx, kctx, ns, podNames)
-			if err != nil || len(metrics) == 0 {
-				return metricsLoadedMsg{gen: gen}
-			}
-
-			var totalCPU, totalMem int64
-			for _, pm := range metrics {
-				totalCPU += pm.CPU
-				totalMem += pm.Memory
-			}
-
-			// Sum requests/limits from all pods.
-			var totalCPUReq, totalCPULim, totalMemReq, totalMemLim int64
-			for _, podName := range podNames {
 				cpuReq, cpuLim, memReq, memLim, err := client.GetPodResourceRequests(reqCtx, kctx, ns, podName)
 				if err != nil {
-					continue
+					cpuReq, cpuLim, memReq, memLim = 0, 0, 0, 0
 				}
-				totalCPUReq += cpuReq
-				totalCPULim += cpuLim
-				totalMemReq += memReq
-				totalMemLim += memLim
-			}
+				return metricsLoadedMsg{
+					cpuUsed: pm.CPU, cpuReq: cpuReq, cpuLim: cpuLim,
+					memUsed: pm.Memory, memReq: memReq, memLim: memLim,
+					gen: gen,
+				}
+			},
+		)
+	case "Deployment", "StatefulSet", "DaemonSet":
+		name := sel.Name
+		return m.trackBgTask(
+			bgtasks.KindMetrics,
+			"Metrics: "+kind+"/"+name,
+			bgtaskTarget(kctx, ns),
+			func() tea.Msg {
+				// Get child pods.
+				childItems, err := client.GetOwnedResources(reqCtx, kctx, ns, kind, name)
+				if err != nil || len(childItems) == 0 {
+					return metricsLoadedMsg{gen: gen}
+				}
+				var podNames []string
+				for _, item := range childItems {
+					if item.Kind == "Pod" {
+						podNames = append(podNames, item.Name)
+					}
+				}
+				if len(podNames) == 0 {
+					return metricsLoadedMsg{gen: gen}
+				}
+				metrics, err := client.GetPodsMetrics(reqCtx, kctx, ns, podNames)
+				if err != nil || len(metrics) == 0 {
+					return metricsLoadedMsg{gen: gen}
+				}
 
-			return metricsLoadedMsg{
-				cpuUsed: totalCPU, cpuReq: totalCPUReq, cpuLim: totalCPULim,
-				memUsed: totalMem, memReq: totalMemReq, memLim: totalMemLim,
-				gen: gen,
-			}
-		}
+				var totalCPU, totalMem int64
+				for _, pm := range metrics {
+					totalCPU += pm.CPU
+					totalMem += pm.Memory
+				}
+
+				// Sum requests/limits from all pods.
+				var totalCPUReq, totalCPULim, totalMemReq, totalMemLim int64
+				for _, podName := range podNames {
+					cpuReq, cpuLim, memReq, memLim, err := client.GetPodResourceRequests(reqCtx, kctx, ns, podName)
+					if err != nil {
+						continue
+					}
+					totalCPUReq += cpuReq
+					totalCPULim += cpuLim
+					totalMemReq += memReq
+					totalMemLim += memLim
+				}
+
+				return metricsLoadedMsg{
+					cpuUsed: totalCPU, cpuReq: totalCPUReq, cpuLim: totalCPULim,
+					memUsed: totalMem, memReq: totalMemReq, memLim: totalMemLim,
+					gen: gen,
+				}
+			},
+		)
 	}
 	return nil
 }

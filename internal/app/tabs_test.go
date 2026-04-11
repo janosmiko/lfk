@@ -315,6 +315,157 @@ func TestSortMiddleItemsByColumnValueDeterministic(t *testing.T) {
 		"column-value sort output must be deterministic regardless of input order")
 }
 
+// TestSortMiddleItemsPrimaryAwareTiebreakerName exercises the
+// primary-aware tiebreaker chain when the primary column is Name. With
+// Name as primary, the chain becomes (Namespace, Age, Kind, Extra) —
+// Name itself is skipped because it cannot discriminate rows with equal
+// primary keys. The test fixes Name to a single value across all rows so
+// the tiebreaker fully determines the output order, and varies Namespace
+// and Age to exercise both levels of the fallback.
+func TestSortMiddleItemsPrimaryAwareTiebreakerName(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Namespace", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	now := time.Now()
+	// All items share Name="traefik". Order after sort must be:
+	//   1. dev / newest (Namespace ASC first, Age newest-first within ns)
+	//   2. dev / older
+	//   3. prod / newest
+	//   4. prod / older
+	items := []model.Item{
+		{Name: "traefik", Namespace: "prod", CreatedAt: now.Add(-10 * time.Hour)},
+		{Name: "traefik", Namespace: "dev", CreatedAt: now.Add(-2 * time.Hour)},
+		{Name: "traefik", Namespace: "prod", CreatedAt: now.Add(-1 * time.Hour)},
+		{Name: "traefik", Namespace: "dev", CreatedAt: now.Add(-5 * time.Hour)},
+	}
+	m := Model{
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "Name", sortAscending: true,
+		middleItems: items,
+	}
+	m.sortMiddleItems()
+
+	require.Len(t, m.middleItems, 4)
+	assert.Equal(t, "dev", m.middleItems[0].Namespace, "Namespace is secondary")
+	assert.Equal(t, 2*time.Hour, now.Sub(m.middleItems[0].CreatedAt), "Age (newest) is tertiary within dev")
+	assert.Equal(t, "dev", m.middleItems[1].Namespace)
+	assert.Equal(t, 5*time.Hour, now.Sub(m.middleItems[1].CreatedAt))
+	assert.Equal(t, "prod", m.middleItems[2].Namespace)
+	assert.Equal(t, 1*time.Hour, now.Sub(m.middleItems[2].CreatedAt), "Age (newest) is tertiary within prod")
+	assert.Equal(t, "prod", m.middleItems[3].Namespace)
+	assert.Equal(t, 10*time.Hour, now.Sub(m.middleItems[3].CreatedAt))
+}
+
+// TestSortMiddleItemsPrimaryAwareTiebreakerNamespace exercises the
+// chain when the primary column is Namespace: (Name, Age, Kind, Extra).
+// Namespace is skipped from the tiebreaker because the primary already
+// discriminates it. Rows with equal Namespace must fall through to Name,
+// then to Age.
+func TestSortMiddleItemsPrimaryAwareTiebreakerNamespace(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Namespace", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	now := time.Now()
+	// All items share Namespace="default". Expected order:
+	//   1. alpha (Name ASC first)
+	//   2. bravo / newest (Age within equal Name)
+	//   3. bravo / older
+	items := []model.Item{
+		{Name: "bravo", Namespace: "default", CreatedAt: now.Add(-5 * time.Hour)},
+		{Name: "alpha", Namespace: "default", CreatedAt: now.Add(-10 * time.Hour)},
+		{Name: "bravo", Namespace: "default", CreatedAt: now.Add(-1 * time.Hour)},
+	}
+	m := Model{
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "Namespace", sortAscending: true,
+		middleItems: items,
+	}
+	m.sortMiddleItems()
+
+	require.Len(t, m.middleItems, 3)
+	assert.Equal(t, "alpha", m.middleItems[0].Name, "Name is secondary when Namespace is primary")
+	assert.Equal(t, "bravo", m.middleItems[1].Name)
+	assert.Equal(t, 1*time.Hour, now.Sub(m.middleItems[1].CreatedAt), "Age (newest) is tertiary within equal Name")
+	assert.Equal(t, "bravo", m.middleItems[2].Name)
+	assert.Equal(t, 5*time.Hour, now.Sub(m.middleItems[2].CreatedAt))
+}
+
+// TestSortMiddleItemsPrimaryAwareTiebreakerAge exercises the chain when
+// the primary column is Age: (Name, Namespace, Kind, Extra). Age is
+// skipped. Rows with identical CreatedAt must fall through to Name, then
+// Namespace.
+func TestSortMiddleItemsPrimaryAwareTiebreakerAge(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Namespace", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	sharedTime := time.Now().Add(-3 * time.Hour)
+	items := []model.Item{
+		{Name: "bravo", Namespace: "prod", CreatedAt: sharedTime},
+		{Name: "alpha", Namespace: "prod", CreatedAt: sharedTime},
+		{Name: "bravo", Namespace: "dev", CreatedAt: sharedTime},
+	}
+	m := Model{
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "Age", sortAscending: true,
+		middleItems: items,
+	}
+	m.sortMiddleItems()
+
+	require.Len(t, m.middleItems, 3)
+	assert.Equal(t, "alpha", m.middleItems[0].Name, "Name is secondary when Age is primary")
+	assert.Equal(t, "bravo", m.middleItems[1].Name)
+	assert.Equal(t, "dev", m.middleItems[1].Namespace, "Namespace is tertiary within equal Name")
+	assert.Equal(t, "bravo", m.middleItems[2].Name)
+	assert.Equal(t, "prod", m.middleItems[2].Namespace)
+}
+
+// TestSortMiddleItemsPrimaryAwareTiebreakerCustomColumn exercises the
+// chain when the primary column is not one of (Name, Namespace, Age) —
+// in this case the full identity triple participates in the tiebreaker:
+// (Name, Namespace, Age, Kind, Extra). Rows with identical column values
+// must fall through to Name, then Namespace, then Age.
+func TestSortMiddleItemsPrimaryAwareTiebreakerCustomColumn(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Namespace", "CPU"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	now := time.Now()
+	// All items share CPU="100m" so the tiebreaker fully determines order.
+	row := func(name, ns string, age time.Duration) model.Item {
+		return model.Item{
+			Name: name, Namespace: ns, CreatedAt: now.Add(-age),
+			Columns: []model.KeyValue{{Key: "CPU", Value: "100m"}},
+		}
+	}
+	items := []model.Item{
+		row("bravo", "prod", 1*time.Hour),
+		row("alpha", "prod", 5*time.Hour),
+		row("alpha", "dev", 10*time.Hour),
+		row("alpha", "dev", 2*time.Hour),
+	}
+	m := Model{
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "CPU", sortAscending: true,
+		middleItems: items,
+	}
+	m.sortMiddleItems()
+
+	require.Len(t, m.middleItems, 4)
+	// Expected:
+	//   alpha / dev / 2h  (Name, Namespace, Age newest)
+	//   alpha / dev / 10h
+	//   alpha / prod / 5h
+	//   bravo / prod / 1h
+	assert.Equal(t, "alpha", m.middleItems[0].Name)
+	assert.Equal(t, "dev", m.middleItems[0].Namespace)
+	assert.Equal(t, 2*time.Hour, now.Sub(m.middleItems[0].CreatedAt))
+	assert.Equal(t, "alpha", m.middleItems[1].Name)
+	assert.Equal(t, "dev", m.middleItems[1].Namespace)
+	assert.Equal(t, 10*time.Hour, now.Sub(m.middleItems[1].CreatedAt))
+	assert.Equal(t, "alpha", m.middleItems[2].Name)
+	assert.Equal(t, "prod", m.middleItems[2].Namespace)
+	assert.Equal(t, "bravo", m.middleItems[3].Name)
+}
+
 func TestSortMiddleItemsSkipsResourceTypes(t *testing.T) {
 	ui.ActiveSortableColumns = []string{"Name"}
 	defer func() { ui.ActiveSortableColumns = nil }()

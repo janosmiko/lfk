@@ -308,6 +308,8 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 
 All views (YAML, logs, describe, diff, exec) use vim-style navigation (`j`/`k`, `gg`/`G`, `Ctrl+D`/`Ctrl+U`, `/` search, `v`/`V` visual selection). See [docs/keybindings.md](docs/keybindings.md) for the full reference.
 
+> For the complete command bar reference (built-in commands, shell/kubectl execution, resource jumps), see [docs/commands.md](docs/commands.md).
+
 ## Configuration
 
 Create `~/.config/lfk/config.yaml` to customize the application. All fields are optional; only the values you specify will override the defaults.

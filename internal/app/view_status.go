@@ -503,18 +503,30 @@ func (m Model) renderOverlayAlerts() (string, int, int) {
 }
 
 func (m Model) renderOverlayBackgroundTasks() (string, int, int) {
-	snap := m.bgtasks.Snapshot()
-	rows := make([]ui.BackgroundTaskRow, len(snap))
-	for i, t := range snap {
-		rows[i] = ui.BackgroundTaskRow{
-			Kind:      t.Kind.String(),
-			Name:      t.Name,
-			Target:    t.Target,
-			StartedAt: t.StartedAt,
+	var rows []ui.BackgroundTaskRow
+	mode := ui.ModeRunning
+	if m.tasksOverlayShowCompleted {
+		mode = ui.ModeCompleted
+		// Collapse identical (Kind, Name, Target) entries into a single
+		// row with "×N" appended to Name. Without this, a watch-mode
+		// session fills the 50-entry history with twelve consecutive
+		// "List Pods / dev-envs" refreshes and evicts genuinely
+		// interesting one-off tasks.
+		rows = groupCompletedTasks(m.bgtasks.SnapshotCompleted())
+	} else {
+		snap := m.bgtasks.Snapshot()
+		rows = make([]ui.BackgroundTaskRow, len(snap))
+		for i, t := range snap {
+			rows[i] = ui.BackgroundTaskRow{
+				Kind:      t.Kind.String(),
+				Name:      t.Name,
+				Target:    t.Target,
+				StartedAt: t.StartedAt,
+			}
 		}
 	}
-	w, h := min(80, m.width-10), min(20, m.height-6)
-	return ui.RenderBackgroundTasksOverlay(rows, w, h), w, h
+	w, h := min(120, m.width-10), min(20, m.height-6)
+	return ui.RenderBackgroundTasksOverlay(rows, mode, m.tasksOverlayScroll, w, h), w, h
 }
 
 func (m Model) renderOverlayCanISubject(background string) string {

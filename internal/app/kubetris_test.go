@@ -153,7 +153,7 @@ func TestKubetrisScoring(t *testing.T) {
 		{"single", 1, false, 1, 100},
 		{"double", 2, false, 1, 300},
 		{"triple", 3, false, 1, 500},
-		{"tetris", 4, false, 1, 800},
+		{"kubetris", 4, false, 1, 800},
 		{"single_level2", 1, false, 2, 200},
 		{"tspin_single", 1, true, 1, 800},
 		{"tspin_double", 2, true, 1, 1200},
@@ -487,7 +487,7 @@ func TestKubetrisMultipleLineClear(t *testing.T) {
 
 	cleared := g.clearLines()
 	if cleared != 4 {
-		t.Errorf("expected 4 lines cleared (tetris), got %d", cleared)
+		t.Errorf("expected 4 lines cleared (kubetris), got %d", cleared)
 	}
 }
 

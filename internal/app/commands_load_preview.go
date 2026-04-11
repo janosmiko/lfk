@@ -217,20 +217,20 @@ func (m Model) loadEventTimeline() tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindResourceList, "Event timeline: "+kind+"/"+name, bgtaskTarget(ctx, ns), func() tea.Msg {
 		events, err := client.GetResourceEvents(context.Background(), ctx, ns, name, kind)
 		return eventTimelineMsg{events: events, err: err}
-	}
+	})
 }
 
 func (m Model) checkRBAC() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	rt := m.actionCtx.resourceType
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindResourceList, "RBAC check: "+rt.Kind, bgtaskTarget(ctx, ns), func() tea.Msg {
 		results, err := m.client.CheckRBAC(context.Background(), ctx, ns, rt.APIGroup, rt.Resource)
 		return rbacCheckMsg{results: results, kind: rt.Kind, resource: rt.Resource, err: err}
-	}
+	})
 }
 
 func (m Model) loadCanIRules() tea.Cmd {
@@ -245,27 +245,27 @@ func (m Model) loadCanIRules() tea.Cmd {
 	// When checking a specific SA, discover all namespaces where it has
 	// RoleBindings and query permissions across all of them.
 	if subject != "" && strings.HasPrefix(subject, "system:serviceaccount:") {
-		return func() tea.Msg {
+		return m.trackBgTask(bgtasks.KindResourceList, "CanI rules: "+subject, ctx, func() tea.Msg {
 			rules, namespaces, err := client.GetSelfRulesMultiNS(context.Background(), ctx, subject)
 			return canILoadedMsg{rules: rules, namespaces: namespaces, err: err}
-		}
+		})
 	}
 
 	// User or Group impersonation: query in the current namespace.
 	// GetSelfRulesAs handles the "group:" prefix internally.
 	if subject != "" {
 		viewNS := ns
-		return func() tea.Msg {
+		return m.trackBgTask(bgtasks.KindResourceList, "CanI rules: "+subject, bgtaskTarget(ctx, viewNS), func() tea.Msg {
 			rules, err := client.GetSelfRulesAs(context.Background(), ctx, viewNS, subject)
 			return canILoadedMsg{rules: rules, namespaces: []string{viewNS}, err: err}
-		}
+		})
 	}
 
 	// Current user: use the active namespace only.
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindResourceList, "CanI rules (current user)", bgtaskTarget(ctx, ns), func() tea.Msg {
 		rules, err := client.GetSelfRulesAs(context.Background(), ctx, ns, "")
 		return canILoadedMsg{rules: rules, namespaces: []string{ns}, err: err}
-	}
+	})
 }
 
 func (m Model) loadCanISAList() tea.Cmd {
@@ -274,14 +274,14 @@ func (m Model) loadCanISAList() tea.Cmd {
 	// Always list SAs across all namespaces so the user can check
 	// permissions for any service account regardless of the current view.
 	// Also discover Users and Groups from RBAC bindings.
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindResourceList, "List service accounts", ctx, func() tea.Msg {
 		accounts, err := client.ListServiceAccounts(context.Background(), ctx, "")
 		if err != nil {
 			return canISAListMsg{err: err}
 		}
 		subjects, _ := client.ListRBACSubjects(context.Background(), ctx)
 		return canISAListMsg{accounts: accounts, subjects: subjects}
-	}
+	})
 }
 
 func (m Model) loadPodStartup() tea.Cmd {
@@ -289,10 +289,10 @@ func (m Model) loadPodStartup() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindResourceList, "Pod startup analysis: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
 		info, err := client.GetPodStartupAnalysis(context.Background(), ctx, ns, name)
 		return podStartupMsg{info: info, err: err}
-	}
+	})
 }
 
 func (m Model) loadAlerts() tea.Cmd {
@@ -300,10 +300,10 @@ func (m Model) loadAlerts() tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindDashboard, "Alerts: "+kind+"/"+name, bgtaskTarget(kubeCtx, ns), func() tea.Msg {
 		alerts, err := m.client.GetActiveAlerts(context.Background(), kubeCtx, ns, name, kind)
 		return alertsLoadedMsg{alerts: alerts, err: err}
-	}
+	})
 }
 
 // loadNetworkPolicy fetches and parses a NetworkPolicy for visualization.
@@ -312,10 +312,10 @@ func (m Model) loadNetworkPolicy() tea.Cmd {
 	kctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindResourceList, "NetworkPolicy: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		info, err := client.GetNetworkPolicyInfo(context.Background(), kctx, ns, name)
 		return netpolLoadedMsg{info: info, err: err}
-	}
+	})
 }
 
 // loadHelmValues runs `helm get values` and returns the output as a message.
@@ -342,7 +342,7 @@ func (m Model) loadHelmValues(allValues bool) tea.Cmd {
 
 	title := fmt.Sprintf("Helm %s: %s", titleSuffix, name)
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, title, bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(helmPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logger.Info("Running helm command", "cmd", cmd.String())
@@ -362,7 +362,7 @@ func (m Model) loadHelmValues(allValues bool) tea.Cmd {
 			content: content,
 			title:   title,
 		}
-	}
+	})
 }
 
 // loadContainerPorts loads the available ports for the action context resource.
@@ -373,7 +373,7 @@ func (m Model) loadContainerPorts() tea.Cmd {
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindContainers, "List ports: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		var ports []k8s.ContainerPort
 		var err error
 		switch kind {
@@ -391,7 +391,7 @@ func (m Model) loadContainerPorts() tea.Cmd {
 			err = fmt.Errorf("unsupported kind for port discovery: %s", kind)
 		}
 		return containerPortsLoadedMsg{ports: ports, err: err}
-	}
+	})
 }
 
 // waitForStderr listens for captured stderr output and returns it as a message.

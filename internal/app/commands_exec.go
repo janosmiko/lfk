@@ -9,6 +9,8 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -132,7 +134,7 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 
 	title := fmt.Sprintf("Describe: %s/%s", rt.Resource, name)
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, title, bgtaskTarget(m.actionCtx.context, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
 		logger.Info("Running kubectl command", "cmd", cmd.String())
@@ -148,7 +150,7 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 			content: string(output),
 			title:   title,
 		}
-	}
+	})
 }
 
 // --- Debug commands ---
@@ -319,13 +321,13 @@ func (m Model) deleteResource() tea.Cmd {
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
 	logger.Info("Deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		err := m.client.DeleteResource(ctx, ns, rt, name)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Deleted %s/%s", rt.Resource, name)}
-	}
+	})
 }
 
 func (m Model) forceDeleteResource() tea.Cmd {
@@ -350,7 +352,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 		deleteArgs = append(deleteArgs, "-n", ns)
 	}
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Force delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, deleteArgs...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
 		logger.Info("Running kubectl command", "cmd", cmd.String())
@@ -359,7 +361,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 			return actionResultMsg{err: fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Force deleted %s/%s", rt.Resource, name)}
-	}
+	})
 }
 
 func (m Model) removeFinalizers() tea.Cmd {
@@ -384,7 +386,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 		patchArgs = append(patchArgs, "-n", ns)
 	}
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Remove finalizers: %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, patchArgs...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
 		logger.Info("Running kubectl command", "cmd", cmd.String())
@@ -393,7 +395,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 			return actionResultMsg{err: fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Finalizers removed from %s/%s", rt.Resource, name)}
-	}
+	})
 }
 
 // --- Helm commands ---
@@ -527,7 +529,7 @@ func (m Model) helmDiff() tea.Cmd {
 	ctx := m.actionCtx.context
 	kubeconfigPaths := m.client.KubeconfigPaths()
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, "Helm diff: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
 		env := append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 
 		// Resolve bare chart name from the release (e.g. "cilium-1.16.0" -> "cilium").
@@ -566,7 +568,7 @@ func (m Model) helmDiff() tea.Cmd {
 			leftName:  leftLabel,
 			rightName: "User Values",
 		}
-	}
+	})
 }
 
 // resolveHelmChartName extracts the bare chart name from "helm list" output.
@@ -722,7 +724,7 @@ func (m Model) vulnScanImage(image string) tea.Cmd {
 	}
 
 	title := fmt.Sprintf("Vuln Scan: %s", image)
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, title, "", func() tea.Msg {
 		args := []string{"image", "--scanners", "vuln", "--format", "table", "--no-progress", image}
 		cmd := exec.Command(trivyPath, args...)
 		cmd.Env = os.Environ()
@@ -741,7 +743,7 @@ func (m Model) vulnScanImage(image string) tea.Cmd {
 			content = "No vulnerabilities found."
 		}
 		return describeLoadedMsg{content: content, title: title}
-	}
+	})
 }
 
 // cleanANSI removes ANSI escape sequences from a string.
@@ -775,13 +777,13 @@ func (m Model) resizePVC(newSize string) tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logger.Info("Resizing PVC", "name", name, "newSize", newSize, "namespace", ns, "context", ctx)
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, "Resize PVC: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
 		err := m.client.ResizePVC(ctx, ns, name, newSize)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Resize requested for %s to %s", name, newSize)}
-	}
+	})
 }
 
 // --- Deployment and scaling commands ---
@@ -792,13 +794,13 @@ func (m Model) scaleResource(replicas int32) tea.Cmd {
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
 	logger.Info("Scaling resource", "kind", kind, "name", name, "replicas", replicas, "namespace", ns, "context", ctx)
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Scale %s/%s → %d", kind, name, replicas), bgtaskTarget(ctx, ns), func() tea.Msg {
 		err := m.client.ScaleResource(ctx, ns, name, kind, replicas)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Scaled %s to %d replicas", name, replicas)}
-	}
+	})
 }
 
 func (m Model) restartResource() tea.Cmd {
@@ -807,13 +809,13 @@ func (m Model) restartResource() tea.Cmd {
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
 	logger.Info("Restarting resource", "kind", kind, "name", name, "namespace", ns, "context", ctx)
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Restart %s/%s", kind, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		err := m.client.RestartResource(ctx, ns, name, kind)
 		if err != nil {
 			return actionResultMsg{err: err}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Restarting %s", name)}
-	}
+	})
 }
 
 // rollbackDeployment performs the actual rollback.
@@ -823,10 +825,10 @@ func (m Model) rollbackDeployment(revision int64) tea.Cmd {
 	name := m.actionCtx.name
 	client := m.client
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Rollback Deployment: %s@%d", name, revision), bgtaskTarget(kctx, ns), func() tea.Msg {
 		err := client.RollbackDeployment(context.Background(), kctx, ns, name, revision)
 		return rollbackDoneMsg{err: err}
-	}
+	})
 }
 
 // rollbackHelmRelease performs a Helm rollback to the specified revision.
@@ -843,7 +845,7 @@ func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
 	ctx := m.actionCtx.context
 	kubeconfigPaths := m.client.KubeconfigPaths()
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, fmt.Sprintf("Helm rollback: %s@%d", name, revision), bgtaskTarget(ctx, ns), func() tea.Msg {
 		args := []string{"rollback", name, fmt.Sprintf("%d", revision), "-n", ns, "--kube-context", ctx}
 		cmd := exec.Command(helmPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
@@ -854,7 +856,7 @@ func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
 			return helmRollbackDoneMsg{err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output)))}
 		}
 		return helmRollbackDoneMsg{}
-	}
+	})
 }
 
 // --- Node commands ---
@@ -902,7 +904,7 @@ func (m Model) execKubectlNodeCmd(subcmd string) tea.Cmd {
 	name := m.actionCtx.name
 	args := []string{subcmd, name, "--context", m.actionCtx.context}
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("%s node: %s", subcmd, name), m.actionCtx.context, func() tea.Msg {
 		cmd := exec.Command(kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
 		logger.Info("Running kubectl command", "cmd", cmd.String())
@@ -912,7 +914,7 @@ func (m Model) execKubectlNodeCmd(subcmd string) tea.Cmd {
 			return actionResultMsg{err: fmt.Errorf("%s %s: %s", subcmd, name, strings.TrimSpace(string(output)))}
 		}
 		return actionResultMsg{message: strings.TrimSpace(string(output))}
-	}
+	})
 }
 
 // triggerCronJob creates a Job from a CronJob.
@@ -922,10 +924,10 @@ func (m Model) triggerCronJob() tea.Cmd {
 	kctx := m.actionCtx.context
 	client := m.client
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindMutation, "Trigger CronJob: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		jobName, err := client.TriggerCronJob(context.Background(), kctx, ns, name)
 		return triggerCronJobMsg{jobName: jobName, err: err}
-	}
+	})
 }
 
 // execKubectlNodeShell opens a debug shell on a node using kubectl debug.
@@ -1001,7 +1003,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 		title = title + " > " + strings.ReplaceAll(fieldPath, ".", " > ")
 	}
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, "Explain: "+target, kctx, func() tea.Msg {
 		args := []string{"explain", target, "--context", kctx}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
@@ -1024,7 +1026,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 			title:       title,
 			path:        fieldPath,
 		}
-	}
+	})
 }
 
 // execKubectlExplainRecursive runs kubectl explain --recursive and searches for matching fields.
@@ -1039,7 +1041,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 	kctx := m.nav.Context
 	kubeconfigPaths := m.client.KubeconfigPaths()
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, "Explain (recursive): "+resource, kctx, func() tea.Msg {
 		args := []string{"explain", resource, "--recursive", "--context", kctx}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
@@ -1056,7 +1058,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 
 		matches := parseRecursiveExplainForSearch(string(output), query)
 		return explainRecursiveMsg{matches: matches, query: query}
-	}
+	})
 }
 
 // --- Custom action commands ---

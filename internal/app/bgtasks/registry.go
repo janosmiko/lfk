@@ -20,6 +20,12 @@ import (
 // filter.
 const DefaultThreshold = 0
 
+// DefaultCompletedCap is the maximum number of completed tasks the
+// Registry retains for the :tasks overlay's history view. Once the cap
+// is reached, oldest entries are evicted on each Finish. 50 is a
+// reasonable "what did I just do?" window without unbounded memory.
+const DefaultCompletedCap = 50
+
 // Kind classifies a tracked async operation. Used to label rows in the
 // :tasks overlay.
 type Kind int
@@ -31,6 +37,8 @@ const (
 	KindResourceTree             // resource map / owned tree
 	KindDashboard                // cluster + monitoring dashboards
 	KindContainers               // container listing for a pod
+	KindMutation                 // write operations: delete, scale, restart, sync, reconcile, etc.
+	KindSubprocess               // external command: helm, trivy, kubectl describe/explain
 )
 
 // String returns the human-readable label for a Kind.
@@ -48,6 +56,10 @@ func (k Kind) String() string {
 		return "Dashboard"
 	case KindContainers:
 		return "Containers"
+	case KindMutation:
+		return "Mutation"
+	case KindSubprocess:
+		return "Subprocess"
 	default:
 		return "Unknown"
 	}
@@ -62,23 +74,49 @@ type Task struct {
 	StartedAt time.Time
 }
 
+// CompletedTask is a Task that has finished. FinishedAt - StartedAt
+// gives the total duration the operation took.
+type CompletedTask struct {
+	Task
+	FinishedAt time.Time
+}
+
+// Duration returns how long the task took from Start to Finish.
+func (c CompletedTask) Duration() time.Duration {
+	return c.FinishedAt.Sub(c.StartedAt)
+}
+
 // Registry is a process-global record of in-flight tracked operations.
 // Safe for concurrent use from any number of goroutines.
 type Registry struct {
-	mu        sync.Mutex
-	tasks     map[uint64]*Task
-	order     []uint64 // insertion order for stable Snapshot output
-	nextID    atomic.Uint64
-	threshold time.Duration
+	mu           sync.Mutex
+	tasks        map[uint64]*Task
+	order        []uint64 // insertion order for stable Snapshot output
+	nextID       atomic.Uint64
+	threshold    time.Duration
+	completed    []CompletedTask // newest-first; capped at completedCap
+	completedCap int
 }
 
-// New constructs a Registry with the given display threshold. Tasks whose
-// age is below this threshold are stored but excluded from Snapshot, so
+// New constructs a Registry with the given display threshold and the
+// default completed-history cap (DefaultCompletedCap). Tasks whose age
+// is below this threshold are stored but excluded from Snapshot, so
 // fast loads never flicker through the UI.
 func New(threshold time.Duration) *Registry {
+	return NewWithCap(threshold, DefaultCompletedCap)
+}
+
+// NewWithCap constructs a Registry with a custom completed-history cap.
+// Mostly for tests that want to exercise cap/eviction without pushing
+// DefaultCompletedCap entries.
+func NewWithCap(threshold time.Duration, completedCap int) *Registry {
+	if completedCap < 0 {
+		completedCap = 0
+	}
 	return &Registry{
-		tasks:     make(map[uint64]*Task),
-		threshold: threshold,
+		tasks:        make(map[uint64]*Task),
+		threshold:    threshold,
+		completedCap: completedCap,
 	}
 }
 
@@ -137,16 +175,20 @@ func (r *Registry) StartUntracked() uint64 {
 	return 0
 }
 
-// Finish removes the task with the given ID. Finishing 0 or an unknown ID
-// is a no-op (idempotent — important because cancel + late Finish can race).
-// A nil receiver is also a no-op to mirror Start's nil behavior.
+// Finish removes the task with the given ID and appends it to the
+// completed-history ring (newest-first, capped at completedCap).
+// Finishing 0 or an unknown ID is a no-op (idempotent — important
+// because cancel + late Finish can race, and dedupe eviction also
+// leaves stale IDs behind). A nil receiver is also a no-op to mirror
+// Start's nil behavior.
 func (r *Registry) Finish(id uint64) {
 	if r == nil || id == 0 {
 		return
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	if _, ok := r.tasks[id]; !ok {
+	task, ok := r.tasks[id]
+	if !ok {
 		return
 	}
 	delete(r.tasks, id)
@@ -154,6 +196,15 @@ func (r *Registry) Finish(id uint64) {
 		if oid == id {
 			r.order = append(r.order[:i], r.order[i+1:]...)
 			break
+		}
+	}
+	// Append to completed history, newest-first. Prepend to the front so
+	// SnapshotCompleted returns most-recent at index 0.
+	if r.completedCap > 0 {
+		done := CompletedTask{Task: *task, FinishedAt: time.Now()}
+		r.completed = append([]CompletedTask{done}, r.completed...)
+		if len(r.completed) > r.completedCap {
+			r.completed = r.completed[:r.completedCap]
 		}
 	}
 }
@@ -209,6 +260,23 @@ func (r *Registry) Len() int {
 		}
 	}
 	return n
+}
+
+// SnapshotCompleted returns a copy of the finished-task history, newest
+// first. Mutating the returned slice does not affect subsequent calls.
+// A nil receiver returns nil.
+func (r *Registry) SnapshotCompleted() []CompletedTask {
+	if r == nil {
+		return nil
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if len(r.completed) == 0 {
+		return nil
+	}
+	out := make([]CompletedTask, len(r.completed))
+	copy(out, r.completed)
+	return out
 }
 
 // NextIDForTest exposes the next-ID atomic for use by integration tests

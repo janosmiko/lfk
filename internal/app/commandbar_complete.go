@@ -205,8 +205,12 @@ func completeKubectl(tokens []token, m *Model) []ui.Suggestion {
 		}
 	}
 
+	// Empty effective tokens: the user has typed exactly "k" or
+	// "kubectl" with no following word yet. Offer the subcommand list
+	// as a preview of what they can type next — same content the user
+	// would see after typing a trailing space.
 	if len(effective) == 0 {
-		return nil
+		return filterSuggestionsTyped(kubectlSubcommandList(), "", "subcommand")
 	}
 
 	lastToken := effective[len(effective)-1]
@@ -315,7 +319,7 @@ func (m *Model) generateCommandBarSuggestions() []ui.Suggestion {
 func builtinCommandNames() []string {
 	// Exclude short quit aliases -- :q and :q! are typed deliberately.
 	// Keep "quit" so :qu shows it as a suggestion.
-	exclude := map[string]bool{"q": true, "q!": true, "nyan": true, "kubetris": true, "credits": true}
+	exclude := map[string]bool{"q": true, "q!": true}
 	seen := make(map[string]bool)
 	var names []string
 	for k := range builtinCommands {
@@ -783,6 +787,18 @@ func effectivePosition(tokens []token) int {
 	return pos
 }
 
+// kubectlPrefixSuggestions returns the two kubectl dispatch prefixes ("k"
+// and "kubectl") as autocomplete entries. They are NOT builtin commands
+// (kubectl goes through its own classifier branch), but they must be
+// discoverable in the same dropdown as builtins so users don't need to
+// know the full prefix to find them.
+func kubectlPrefixSuggestions() []ui.Suggestion {
+	return []ui.Suggestion{
+		{Text: "k", Category: "kubectl"},
+		{Text: "kubectl", Category: "kubectl"},
+	}
+}
+
 // defaultSuggestions returns a mix of builtin command names and resource types
 // for when the command bar is empty.
 func (m *Model) defaultSuggestions() []ui.Suggestion {
@@ -793,6 +809,10 @@ func (m *Model) defaultSuggestions() []ui.Suggestion {
 		result = append(result, ui.Suggestion{Text: name, Category: "command"})
 	}
 
+	// Add kubectl prefixes so users discover :k / :kubectl without
+	// already knowing to type them.
+	result = append(result, kubectlPrefixSuggestions()...)
+
 	// Add some common resource types.
 	count := 0
 	for _, rt := range m.discoveredResources[m.nav.Context] {
@@ -801,7 +821,7 @@ func (m *Model) defaultSuggestions() []ui.Suggestion {
 			Category: "resource",
 		})
 		count++
-		if count+len(builtinCommandNames()) >= maxSuggestions {
+		if count+len(builtinCommandNames())+len(kubectlPrefixSuggestions()) >= maxSuggestions {
 			return result
 		}
 	}
@@ -824,6 +844,15 @@ func (m *Model) mixedSuggestions(input string) []ui.Suggestion {
 	for _, name := range builtinCommandNames() {
 		if strings.HasPrefix(strings.ToLower(name), prefix) && strings.ToLower(name) != prefix {
 			result = append(result, ui.Suggestion{Text: name, Category: "command"})
+		}
+	}
+
+	// Kubectl prefixes — matched by prefix so "ku", "kub", "kube" all
+	// surface "kubectl". Skip exact matches since classifyInput would
+	// route those directly to completeKubectl.
+	for _, s := range kubectlPrefixSuggestions() {
+		if strings.HasPrefix(s.Text, prefix) && s.Text != prefix {
+			result = append(result, s)
 		}
 	}
 

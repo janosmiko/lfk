@@ -212,6 +212,54 @@ func TestCompleteBuiltin_ContextArg(t *testing.T) {
 
 // --- completeKubectl ---
 
+// TestCompleteKubectlBareKShowsSubcommands verifies that typing just
+// ":k" (with no trailing space or subsequent tokens) surfaces the
+// kubectl subcommand list in the autocomplete dropdown. Previously
+// completeKubectl returned nil when effective tokens were empty, so
+// users got zero suggestions for ":k" and had to know to type a space.
+func TestCompleteKubectlBareKShowsSubcommands(t *testing.T) {
+	tokens := []token{{text: "k", start: 0, end: 1}}
+	m := baseModelCov()
+	got := completeKubectl(tokens, &m)
+	assert.True(t, hasSuggestionCategory(got, "get", "subcommand"),
+		"':k' alone should offer kubectl subcommands")
+	assert.True(t, hasSuggestionCategory(got, "describe", "subcommand"))
+}
+
+// TestCompleteKubectlBareKubectlShowsSubcommands is the same guard for
+// the full-word ":kubectl" alias.
+func TestCompleteKubectlBareKubectlShowsSubcommands(t *testing.T) {
+	tokens := []token{{text: "kubectl", start: 0, end: 7}}
+	m := baseModelCov()
+	got := completeKubectl(tokens, &m)
+	assert.True(t, hasSuggestionCategory(got, "get", "subcommand"),
+		"':kubectl' alone should offer kubectl subcommands")
+}
+
+// TestDefaultSuggestionsIncludesKubectlPrefixes verifies that an empty
+// command bar (immediately after pressing ':') lists both "k" and
+// "kubectl" as discoverable entries, so users don't have to already
+// know to type them.
+func TestDefaultSuggestionsIncludesKubectlPrefixes(t *testing.T) {
+	m := baseModelCov()
+	got := m.defaultSuggestions()
+	assert.True(t, hasSuggestionCategory(got, "k", "kubectl"),
+		"empty ':' dropdown must include 'k' kubectl prefix")
+	assert.True(t, hasSuggestionCategory(got, "kubectl", "kubectl"),
+		"empty ':' dropdown must include 'kubectl' prefix")
+}
+
+// TestMixedSuggestionsIncludesKubectlPrefix is the same guard for
+// partial-word input that falls through the cmdUnknown classifier
+// branch. Typing ":kub" should surface "kubectl" even though "kub" is
+// neither a builtin command nor a recognized kubectl prefix.
+func TestMixedSuggestionsIncludesKubectlPrefix(t *testing.T) {
+	m := baseModelCov()
+	got := m.mixedSuggestions("kub")
+	assert.True(t, hasSuggestionCategory(got, "kubectl", "kubectl"),
+		"partial ':kub' must surface 'kubectl'")
+}
+
 func TestCompleteKubectl_SubcommandSuggestion(t *testing.T) {
 	tokens := []token{
 		{text: "kubectl", start: 0, end: 7},

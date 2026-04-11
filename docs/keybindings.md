@@ -50,7 +50,8 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `@` | Monitoring overview (active Prometheus alerts) |
 | `#` | Jump to Security category |
 | `Q` | Namespace resource quota dashboard |
-| `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl (`:k get pod`), shell (`:! cmd`) |
+| `` ` `` | Background tasks overlay (Tab toggles running / completed history) |
+| `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`, `:tasks`), kubectl (`:k get pod`), shell (`:! cmd`) |
 
 ## Search and Filter
 

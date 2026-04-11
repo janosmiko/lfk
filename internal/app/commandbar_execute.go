@@ -195,6 +195,10 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 
 	case "tasks":
 		m.overlay = overlayBackgroundTasks
+		// Always open fresh in running mode with scroll at the top.
+		// Tab inside the overlay switches to the completed-history view.
+		m.tasksOverlayShowCompleted = false
+		m.tasksOverlayScroll = 0
 		return m, nil
 
 	default:

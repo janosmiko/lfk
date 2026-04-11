@@ -186,7 +186,12 @@ func (m Model) overlayHintBarMisc() string {
 			{Key: "esc", Desc: "close"},
 		})
 	case overlayBackgroundTasks:
+		tabDesc := "history"
+		if m.tasksOverlayShowCompleted {
+			tabDesc = "running"
+		}
 		return m.renderHints([]ui.HintEntry{
+			{Key: "tab", Desc: tabDesc},
 			{Key: "esc", Desc: "close"},
 		})
 	case overlayNetworkPolicy:

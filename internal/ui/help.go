@@ -117,6 +117,7 @@ func helpSections() []helpSection {
 				{kb.Monitoring, "Monitoring overview (active Prometheus alerts)"},
 				{kb.Security, "Jump to Security category (heuristic + trivy-operator findings)"},
 				{kb.QuotaDashboard, "Namespace resource quota dashboard"},
+				{kb.TasksOverlay, "Background tasks overlay (Tab toggles running/completed history)"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down/up"},
 				{kb.SaveResource, "Save resource to file / toggle warnings-only (Events)"},
 				{helpKeyDisplay(kb.TerminalToggle), "Toggle terminal mode (pty embedded / exec takeover)"},

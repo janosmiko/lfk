@@ -600,6 +600,20 @@ type Model struct {
 	// indicator every 2 seconds.
 	suppressBgtasks bool
 
+	// tasksOverlayShowCompleted selects which view the :tasks overlay
+	// renders when it's open. false (default) shows currently running
+	// tasks with a live ELAPSED column; true shows the recent
+	// completed-task history with a fixed DURATION column. Toggled with
+	// Tab inside the overlay; reset to false every time the overlay is
+	// opened fresh.
+	tasksOverlayShowCompleted bool
+
+	// tasksOverlayScroll is the first-visible-row index for the :tasks
+	// overlay. Bumped by j/k (and friends) inside the overlay; reset on
+	// open and on Tab mode switch. The renderer clamps this into a
+	// valid range so the handler can bump it blindly.
+	tasksOverlayScroll int
+
 	// Discovered CRDs per context: keyed by context name.
 	discoveredResources map[string][]model.ResourceTypeEntry
 
@@ -1079,7 +1093,7 @@ func (m *Model) SetStderrChan(ch <-chan string) {
 
 // Init loads the initial context list.
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadContexts, m.spinner.Tick}
+	cmds := []tea.Cmd{m.loadContexts(), m.spinner.Tick}
 	if m.stderrChan != nil {
 		cmds = append(cmds, m.waitForStderr())
 	}

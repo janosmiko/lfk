@@ -1314,7 +1314,7 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 func (m Model) refreshCurrentLevel() tea.Cmd {
 	switch m.nav.Level {
 	case model.LevelClusters:
-		return m.loadContexts
+		return m.loadContexts()
 	case model.LevelResourceTypes:
 		return m.loadResourceTypes()
 	case model.LevelResources:

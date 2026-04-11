@@ -1,6 +1,7 @@
 package bgtasks
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -275,6 +276,8 @@ func TestKindString(t *testing.T) {
 		{KindResourceTree, "ResourceTree"},
 		{KindDashboard, "Dashboard"},
 		{KindContainers, "Containers"},
+		{KindMutation, "Mutation"},
+		{KindSubprocess, "Subprocess"},
 		{Kind(99), "Unknown"},
 	}
 	for _, tt := range tests {
@@ -282,4 +285,141 @@ func TestKindString(t *testing.T) {
 			assert.Equal(t, tt.want, tt.kind.String())
 		})
 	}
+}
+
+// TestFinishAppendsToCompleted verifies that Finish moves the task into
+// the completed history with the current time as FinishedAt, so the
+// :tasks overlay's "Completed" mode can show what just ran. A freshly
+// finished task must become the head of SnapshotCompleted (newest-first
+// ordering so the user sees their most recent action first).
+func TestFinishAppendsToCompleted(t *testing.T) {
+	r := New(0)
+	id := r.Start(KindResourceList, "List Pods", "test-ctx / default")
+	before := time.Now()
+	r.Finish(id)
+	after := time.Now()
+
+	done := r.SnapshotCompleted()
+	require.Len(t, done, 1)
+	assert.Equal(t, "List Pods", done[0].Name)
+	assert.Equal(t, KindResourceList, done[0].Kind)
+	assert.Equal(t, "test-ctx / default", done[0].Target)
+	// FinishedAt must fall inside the window we captured around Finish.
+	assert.False(t, done[0].FinishedAt.Before(before))
+	assert.False(t, done[0].FinishedAt.After(after))
+
+	// And the running list must be empty.
+	assert.Equal(t, 0, r.Len())
+}
+
+// TestSnapshotCompletedNewestFirst verifies history ordering — the last
+// finish appears at index 0 and earlier ones trail behind.
+func TestSnapshotCompletedNewestFirst(t *testing.T) {
+	r := New(0)
+	id1 := r.Start(KindResourceList, "first", "t")
+	id2 := r.Start(KindYAMLFetch, "second", "t")
+	id3 := r.Start(KindMetrics, "third", "t")
+
+	r.Finish(id1)
+	r.Finish(id2)
+	r.Finish(id3)
+
+	done := r.SnapshotCompleted()
+	require.Len(t, done, 3)
+	assert.Equal(t, "third", done[0].Name, "most recently finished must be head of list")
+	assert.Equal(t, "second", done[1].Name)
+	assert.Equal(t, "first", done[2].Name)
+}
+
+// TestCompletedCapEvictsOldest verifies the ring-buffer behavior when
+// the completed history exceeds its cap. The OLDEST entries are evicted
+// first, so newest-first ordering of what remains is preserved.
+func TestCompletedCapEvictsOldest(t *testing.T) {
+	r := NewWithCap(0, 3) // cap = 3 for test compactness
+	for _, name := range []string{"a", "b", "c", "d", "e"} {
+		id := r.Start(KindResourceList, name, "t")
+		r.Finish(id)
+	}
+
+	done := r.SnapshotCompleted()
+	require.Len(t, done, 3, "cap should hard-limit history length")
+	// Newest-first: most recently finished is at index 0.
+	assert.Equal(t, "e", done[0].Name)
+	assert.Equal(t, "d", done[1].Name)
+	assert.Equal(t, "c", done[2].Name)
+	// "a" and "b" are gone.
+}
+
+// TestSnapshotCompletedReturnsCopy verifies the same defensive-copy
+// contract Snapshot has: mutating the returned slice must not affect
+// subsequent SnapshotCompleted calls.
+func TestSnapshotCompletedReturnsCopy(t *testing.T) {
+	r := New(0)
+	id := r.Start(KindResourceList, "Original", "t")
+	r.Finish(id)
+
+	got := r.SnapshotCompleted()
+	require.Len(t, got, 1)
+	got[0].Name = "Mutated"
+
+	got2 := r.SnapshotCompleted()
+	require.Len(t, got2, 1)
+	assert.Equal(t, "Original", got2[0].Name,
+		"SnapshotCompleted must return copies, not aliases")
+}
+
+// TestStartDedupeDoesNotPopulateCompleted pins that cursor-hover dedupe
+// evictions don't leak into the history. Deduped attempts were
+// superseded before the user ever saw them — they're not meaningful as
+// "just ran".
+func TestStartDedupeDoesNotPopulateCompleted(t *testing.T) {
+	r := New(0)
+	_ = r.Start(KindResourceList, "List Pods", "t") // evicted by next Start
+	_ = r.Start(KindResourceList, "List Pods", "t") // supersedes
+
+	// Nothing has been explicitly Finished yet.
+	done := r.SnapshotCompleted()
+	assert.Empty(t, done,
+		"deduped attempts must not appear in completed history")
+}
+
+// TestFinishUnknownIDDoesNotPopulateCompleted pins that a late Finish on
+// an already-evicted or never-registered id does not insert a phantom
+// entry into the history.
+func TestFinishUnknownIDDoesNotPopulateCompleted(t *testing.T) {
+	r := New(0)
+	r.Finish(42) // never started
+	r.Finish(0)  // untracked sentinel
+
+	assert.Empty(t, r.SnapshotCompleted())
+}
+
+// TestStartUntrackedNeverReachesCompleted pins that watch-tick refreshes
+// (via StartUntracked) stay completely out of history, mirroring their
+// absence from the running list.
+func TestStartUntrackedNeverReachesCompleted(t *testing.T) {
+	r := New(0)
+	id := r.StartUntracked()
+	assert.Equal(t, uint64(0), id)
+	r.Finish(id) // id == 0, no-op
+
+	assert.Empty(t, r.SnapshotCompleted())
+}
+
+// TestNewWithCapDefaultBehaviour pins that New (the common constructor)
+// still produces a Registry whose completed history is capped at the
+// documented default.
+func TestNewUsesDefaultCompletedCap(t *testing.T) {
+	r := New(0)
+	// Push more than the default to verify eviction at DefaultCompletedCap.
+	//
+	// Each iteration uses a unique name so Start's dedupe eviction doesn't
+	// drop the previous entry — we need all pushes to actually hit Finish
+	// and populate the history so the cap logic is exercised.
+	for i := range DefaultCompletedCap + 10 {
+		name := fmt.Sprintf("load-%d", i)
+		id := r.Start(KindResourceList, name, "t")
+		r.Finish(id)
+	}
+	assert.Len(t, r.SnapshotCompleted(), DefaultCompletedCap)
 }

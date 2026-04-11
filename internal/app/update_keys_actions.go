@@ -70,6 +70,8 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		return m.handleExplorerActionKeyMonitoring()
 	case kb.Security:
 		return m.handleExplorerActionKeySecurity()
+	case kb.TasksOverlay:
+		return m.handleExplorerActionKeyTasksOverlay()
 	}
 	return m, nil, false
 }
@@ -221,6 +223,17 @@ func (m Model) handleExplorerActionKeyQuotaDashboard() (tea.Model, tea.Cmd, bool
 	m.loading = true
 	m.setStatusMessage("Loading quota data...", false)
 	return m, m.loadQuotas(), true
+}
+
+// handleExplorerActionKeyTasksOverlay opens the :tasks overlay fresh
+// in running mode with scroll at the top. Mirrors the :tasks
+// command-bar entry so users can pop the overlay from anywhere in the
+// explorer with a single key.
+func (m Model) handleExplorerActionKeyTasksOverlay() (tea.Model, tea.Cmd, bool) {
+	m.overlay = overlayBackgroundTasks
+	m.tasksOverlayShowCompleted = false
+	m.tasksOverlayScroll = 0
+	return m, nil, true
 }
 
 func (m Model) handleExplorerActionKeyPageDown() (tea.Model, tea.Cmd, bool) {

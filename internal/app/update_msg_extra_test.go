@@ -170,6 +170,40 @@ func TestUpdateResourcesLoadedError(t *testing.T) {
 	assert.NotNil(t, cmd) // scheduleStatusClear
 }
 
+// TestUpdateResourcesLoadedAlwaysSortsOnLoad is a regression guard for
+// the Helm-releases flicker: updateResourcesLoadedMain previously only
+// ran sortMiddleItems when the user had changed sort away from the
+// default (Name, ascending), relying on the k8s layer to pre-sort by
+// Name. But the k8s layer uses a non-stable sort with a single-key
+// comparator, so rows with equal Name would shuffle between watch
+// refreshes. The fix unconditionally calls sortMiddleItems so the
+// app-level tiebreaker always applies.
+//
+// The test feeds in two items with identical Name and different
+// Namespace in "wrong" order (prod before dev). If sortMiddleItems runs,
+// the ascending Namespace tiebreaker puts dev first. If the old skip is
+// back, the input order survives and prod comes out first.
+func TestUpdateResourcesLoadedAlwaysSortsOnLoad(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Namespace", "Status"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	m := baseModel()
+	m.sortColumnName = "Name"
+	m.sortAscending = true
+
+	items := []model.Item{
+		{Name: "traefik", Namespace: "prod", Kind: "HelmRelease"},
+		{Name: "traefik", Namespace: "dev", Kind: "HelmRelease"},
+	}
+	result, _ := m.Update(resourcesLoadedMsg{items: items, gen: 0})
+	mdl := result.(Model)
+
+	assert.Len(t, mdl.middleItems, 2)
+	assert.Equal(t, "dev", mdl.middleItems[0].Namespace,
+		"tiebreaker must put dev before prod even on default Name/asc sort")
+	assert.Equal(t, "prod", mdl.middleItems[1].Namespace)
+}
+
 func TestUpdateResourcesLoadedWithWarningEventsFilter(t *testing.T) {
 	m := baseModel()
 	m.warningEventsOnly = true

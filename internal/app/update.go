@@ -580,9 +580,12 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	}
 	m.middleItems = msg.items
 	m.itemCache[m.navKey()] = m.middleItems
-	if m.sortColumnName != sortColDefault || !m.sortAscending {
-		m.sortMiddleItems()
-	}
+	// Always sort: the k8s layer uses a non-stable single-key sort that
+	// shuffles ties between refreshes (e.g. Helm releases with the same
+	// name in different namespaces). Running sortMiddleItems guarantees
+	// the app-level tiebreaker chain is applied on every load — even the
+	// default Name/ascending case — so watch-mode output is deterministic.
+	m.sortMiddleItems()
 	m.applyWarningEventsFilter()
 	m.applyEventGrouping()
 	m.reapplyFilterPreset()
@@ -709,6 +712,12 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 	prevName, prevNs, prevExtra, prevKind := m.cursorItemKey()
 	m.middleItems = msg.items
 	m.itemCache[m.navKey()] = m.middleItems
+	// Sort with the app-level tiebreaker on every load (see
+	// updateResourcesLoadedMain for rationale): the k8s layer returns
+	// items in a non-deterministic order for equal keys, so the
+	// tiebreaker chain must run here too or owned-resource refreshes
+	// will flicker.
+	m.sortMiddleItems()
 	// Re-apply active filter preset on owned refresh (same as resourcesLoadedMsg).
 	if m.activeFilterPreset != nil {
 		m.unfilteredMiddleItems = append([]model.Item(nil), m.middleItems...)
@@ -772,6 +781,11 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	}
 	m.middleItems = msg.items
 	m.itemCache[m.navKey()] = m.middleItems
+	// Sort with the app-level tiebreaker on every container-list load
+	// (see updateResourcesLoadedMain for rationale): container rows use
+	// the parent pod's namespace and only differ by Name/Kind, so the
+	// tiebreaker still provides a stable order across refreshes.
+	m.sortMiddleItems()
 	m.clampCursor()
 	// Propagate the silent flag to the downstream preview cmd.
 	savedSuppress := m.suppressBgtasks

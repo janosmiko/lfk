@@ -13,6 +13,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -491,7 +492,7 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.logHistoryCancel = cancel
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, "Log history: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		defer cancel()
 
 		var args []string //nolint:prealloc
@@ -552,7 +553,7 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 		}
 
 		return logHistoryMsg{lines: lines, prevTotal: prevTotal}
-	}
+	})
 }
 
 // maybeLoadMoreHistory triggers a background fetch of older log lines
@@ -592,7 +593,7 @@ func (m *Model) saveAllLogs() tea.Cmd {
 	logPrevious := m.logPrevious
 	sanitized := sanitizeFilename(name)
 
-	return func() tea.Msg {
+	return m.trackBgTask(bgtasks.KindSubprocess, "Save all logs: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		var args []string
 		switch kind {
 		case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob", "Service":
@@ -641,7 +642,7 @@ func (m *Model) saveAllLogs() tea.Cmd {
 			return logSaveAllMsg{err: err}
 		}
 		return logSaveAllMsg{path: path}
-	}
+	})
 }
 
 // sanitizeFilename replaces characters not suitable for filenames.

@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -30,12 +31,17 @@ func (m Model) searchFinalizers(pattern string) tea.Cmd {
 		resourceTypes = append(resourceTypes, m.discoveredResources[kctx]...)
 	}
 
-	return func() tea.Msg {
-		results, err := client.FindResourcesWithFinalizer(
-			context.Background(), kctx, ns, pattern, resourceTypes,
-		)
-		return finalizerSearchResultMsg{results: results, err: err}
-	}
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"Search finalizers: "+pattern,
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			results, err := client.FindResourcesWithFinalizer(
+				context.Background(), kctx, ns, pattern, resourceTypes,
+			)
+			return finalizerSearchResultMsg{results: results, err: err}
+		},
+	)
 }
 
 // bulkRemoveFinalizer returns a command that removes the matched finalizer
@@ -57,26 +63,31 @@ func (m Model) bulkRemoveFinalizer() tea.Cmd {
 		}
 	}
 
-	return func() tea.Msg {
-		var succeeded, failed int
-		var errors []string
+	return m.trackBgTask(
+		bgtasks.KindMutation,
+		fmt.Sprintf("Remove finalizers (%d)", len(targets)),
+		kctx,
+		func() tea.Msg {
+			var succeeded, failed int
+			var errors []string
 
-		for _, t := range targets {
-			err := client.RemoveFinalizerFromResource(context.Background(), kctx, t.match)
-			if err != nil {
-				failed++
-				errors = append(errors, fmt.Sprintf("%s/%s: %s", t.match.Kind, t.match.Name, err.Error()))
-			} else {
-				succeeded++
+			for _, t := range targets {
+				err := client.RemoveFinalizerFromResource(context.Background(), kctx, t.match)
+				if err != nil {
+					failed++
+					errors = append(errors, fmt.Sprintf("%s/%s: %s", t.match.Kind, t.match.Name, err.Error()))
+				} else {
+					succeeded++
+				}
 			}
-		}
 
-		return finalizerRemoveResultMsg{
-			succeeded: succeeded,
-			failed:    failed,
-			errors:    errors,
-		}
-	}
+			return finalizerRemoveResultMsg{
+				succeeded: succeeded,
+				failed:    failed,
+				errors:    errors,
+			}
+		},
+	)
 }
 
 // finalizerTarget holds a match targeted for finalizer removal.

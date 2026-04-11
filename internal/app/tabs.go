@@ -116,14 +116,20 @@ func (m *Model) sortMiddleItems() {
 		}
 
 		// Tiebreaker: items with identical primary keys fall through to a
-		// stable (Namespace, Name, Kind, Extra) chain that is always
-		// ascending, regardless of the primary's asc/desc flag. Without
-		// this, watch-mode refreshes would reshuffle rows with identical
-		// primary keys (e.g. a Helm release "traefik" deployed to multiple
-		// namespaces), because k8s API list calls can return items in
-		// different orders and sort.SliceStable would then preserve that
-		// shifting order.
-		return itemTiebreakerLess(a, b)
+		// stable chain that is always ascending, regardless of the
+		// primary's asc/desc flag. The chain is primary-aware: the
+		// identity triple (Name, Namespace, Age) forms the main fallback
+		// in that order, with whichever of those three is already the
+		// primary column skipped so the tiebreaker doesn't redo work
+		// the primary already did. Kind and Extra are appended as
+		// absolute final discriminators.
+		//
+		// Without this, watch-mode refreshes would reshuffle rows with
+		// identical primary keys (e.g. a Helm release "traefik" deployed
+		// to multiple namespaces), because k8s API list calls can return
+		// items in different orders and sort.SliceStable would then
+		// preserve that shifting order.
+		return itemTiebreakerLess(a, b, colName)
 	})
 }
 
@@ -131,12 +137,31 @@ func (m *Model) sortMiddleItems() {
 // tiebreaker. Always ascending — independent of the primary sort's asc
 // flag — so identical primary keys land in a deterministic order across
 // refreshes whether the user is sorting ascending or descending.
-func itemTiebreakerLess(a, b model.Item) bool {
-	if c := strings.Compare(strings.ToLower(a.Namespace), strings.ToLower(b.Namespace)); c != 0 {
-		return c < 0
+//
+// The chain is primary-aware: (Name, Namespace, Age) participates in
+// that order, with whichever of those three is the current primary
+// column excluded. Kind and Extra act as final fallbacks so rows with
+// truly identical identity still have a stable order.
+//
+//	primary=Name      → (Namespace, Age,   Kind, Extra)
+//	primary=Namespace → (Name,      Age,   Kind, Extra)
+//	primary=Age       → (Name,      Namespace, Kind, Extra)
+//	primary=anything  → (Name, Namespace, Age, Kind, Extra)
+func itemTiebreakerLess(a, b model.Item, primaryCol string) bool {
+	if primaryCol != "Name" {
+		if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+			return c < 0
+		}
 	}
-	if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
-		return c < 0
+	if primaryCol != "Namespace" {
+		if c := strings.Compare(strings.ToLower(a.Namespace), strings.ToLower(b.Namespace)); c != 0 {
+			return c < 0
+		}
+	}
+	if primaryCol != "Age" {
+		if c := compareAgeCmp(a, b); c != 0 {
+			return c < 0
+		}
 	}
 	if c := strings.Compare(a.Kind, b.Kind); c != 0 {
 		return c < 0

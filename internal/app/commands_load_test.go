@@ -282,7 +282,9 @@ func TestCov80LoadNamespacesEmptyContext(t *testing.T) {
 
 func TestCov80LoadContexts(t *testing.T) {
 	m := basePush80Model()
-	msg := m.loadContexts()
+	cmd := m.loadContexts()
+	require.NotNil(t, cmd)
+	msg := cmd()
 	cmsg, ok := msg.(contextsLoadedMsg)
 	require.True(t, ok)
 	_ = cmsg
@@ -577,8 +579,9 @@ func TestCovResolveNamespace(t *testing.T) {
 
 func TestCovLoadContexts(t *testing.T) {
 	m := baseModelWithFakeClient()
-	msg := m.loadContexts()
-	result, ok := msg.(contextsLoadedMsg)
+	cmd := m.loadContexts()
+	require.NotNil(t, cmd)
+	result, ok := cmd().(contextsLoadedMsg)
 	require.True(t, ok)
 	assert.NoError(t, result.err)
 	// The test client has "test-ctx" as the only context.
