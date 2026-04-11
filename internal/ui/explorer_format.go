@@ -43,182 +43,6 @@ func headerWithIndicator(label string, colName string, colWidth int) string {
 	return padRight(label+" "+ind, colWidth)
 }
 
-// formatTableRow builds a plain text table row.
-// Column widths include padding space; truncation reserves 1 char for the gap
-// so truncated text never touches the next column.
-// securityBadge, when non-empty, is appended inside the name column budget
-// (name is truncated to make room). Pass an empty string to skip the badge.
-func formatTableRow(name, ns, ready, restarts, status, securityBadge string,
-	nameW, nsW, readyW, restartsW, statusW int,
-	hasNs, hasReady, hasRestarts, hasStatus bool,
-) string {
-	var parts []string
-	if hasNs {
-		parts = append(parts, padRight(Truncate(ns, nsW-1), nsW))
-	}
-	parts = append(parts, renderNameWithBadge(name, securityBadge, nameW))
-	if hasReady {
-		parts = append(parts, padRight(ready, readyW))
-	}
-	if hasRestarts {
-		parts = append(parts, padRight(restarts, restartsW))
-	}
-	if hasStatus {
-		parts = append(parts, padRight(Truncate(status, statusW-1), statusW))
-	}
-	// Age is appended later in formatTableRowWithExtra, after extra columns.
-	return strings.Join(parts, "")
-}
-
-// renderNameWithBadge places the resource name and an optional security
-// badge inside a single name-column slot of width nameW. The name is
-// truncated to leave room for the badge (plus a separating space), and the
-// whole result is padded to nameW so downstream column alignment remains
-// stable. Both arguments are treated as plain text here; callers pass
-// already-styled versions to the *WithExtra helpers.
-func renderNameWithBadge(name, badge string, nameW int) string {
-	if badge == "" {
-		return padRight(Truncate(name, nameW-1), nameW)
-	}
-	badgeW := lipgloss.Width(badge)
-	// Reserve 1 char for the column gap after the badge, plus 1 char for the
-	// space separating name and badge. If the badge alone would overflow,
-	// drop it silently rather than clobber the name column.
-	reserved := badgeW + 2
-	if reserved >= nameW {
-		return padRight(Truncate(name, nameW-1), nameW)
-	}
-	nameMax := nameW - reserved
-	trimmed := Truncate(name, nameMax)
-	content := trimmed + " " + badge
-	return padRight(content, nameW)
-}
-
-// formatTableRowStyled builds a styled table row with colored status and icon.
-// anyRecentRestart indicates whether any item in the table has a recent restart,
-// which controls whether a " " placeholder is added for alignment in the restarts column.
-// securityBadge, when non-empty, is appended inside the name column (name is
-// truncated to make room). Pass an empty string to skip the badge.
-func formatTableRowStyled(item model.Item, nameW, nsW, readyW, restartsW, statusW int,
-	hasNs, hasReady, hasRestarts, hasStatus bool, anyRecentRestart bool, securityBadge string,
-) string {
-	var parts []string
-
-	// Namespace comes first when shown.
-	if hasNs {
-		ns := item.Namespace
-		if ns == "" {
-			ns = "-"
-		}
-		parts = append(parts, DimStyle.Render(padRight(Truncate(ns, nsW-1), nsW)))
-	}
-
-	// Name with optional icon styling.
-	// Succeeded/Completed pods get dimmed names.
-	isDimmed := item.Status == "Succeeded" || item.Status == "Completed"
-	nameStyle := NormalStyle
-	if isDimmed {
-		nameStyle = DimStyle
-	}
-
-	// Badge reservation: keep room for " " + badge inside nameW.
-	badgeW := lipgloss.Width(securityBadge)
-	badgeReserve := 0
-	if badgeW > 0 {
-		badgeReserve = badgeW + 1 // 1 space separator
-	}
-
-	if resolvedIcon := resolveIcon(item.Icon); resolvedIcon != "" {
-		iconSt := IconStyle
-		if isDimmed {
-			iconSt = DimStyle
-		}
-		icon := iconSt.Render(resolvedIcon) + " "
-		iconVisualW := lipgloss.Width(icon)
-		nameRemaining := nameW - iconVisualW - 1 - badgeReserve // -1 reserves gap before next column
-		if nameRemaining < 1 {
-			nameRemaining = 1
-		}
-		// If the badge reservation would not fit, drop the badge and use the
-		// full name budget. This keeps very narrow layouts readable.
-		badge := securityBadge
-		if badgeReserve > 0 && nameW-iconVisualW-1 <= badgeReserve {
-			badge = ""
-			nameRemaining = nameW - iconVisualW - 1
-			if nameRemaining < 1 {
-				nameRemaining = 1
-			}
-		}
-		namePart := Truncate(item.Name, nameRemaining)
-		if ActiveHighlightQuery != "" {
-			namePart = highlightName(namePart, ActiveHighlightQuery)
-		}
-		nameVisualW := lipgloss.Width(namePart)
-		badgeSegmentW := 0
-		badgeSegment := ""
-		if badge != "" {
-			badgeSegment = " " + badge
-			badgeSegmentW = lipgloss.Width(badgeSegment)
-		}
-		pad := nameW - iconVisualW - nameVisualW - badgeSegmentW
-		if pad < 0 {
-			pad = 0
-		}
-		if isDimmed {
-			namePart = DimStyle.Render(namePart)
-		}
-		parts = append(parts, icon+namePart+badgeSegment+strings.Repeat(" ", pad))
-	} else {
-		nameBudget := nameW - 1 - badgeReserve
-		if nameBudget < 1 {
-			// Badge would not fit; drop it and fall back to the pre-badge layout.
-			displayName := Truncate(item.Name, nameW-1)
-			if ActiveHighlightQuery != "" {
-				displayName = highlightName(displayName, ActiveHighlightQuery)
-			}
-			parts = append(parts, nameStyle.Render(padRight(displayName, nameW)))
-		} else {
-			displayName := Truncate(item.Name, nameBudget)
-			if ActiveHighlightQuery != "" {
-				displayName = highlightName(displayName, ActiveHighlightQuery)
-			}
-			styledName := nameStyle.Render(displayName)
-			if securityBadge != "" {
-				styledName += " " + securityBadge
-			}
-			parts = append(parts, padRight(styledName, nameW))
-		}
-	}
-
-	if hasReady {
-		parts = append(parts, DimStyle.Render(padRight(item.Ready, readyW)))
-	}
-	if hasRestarts {
-		restartCount, _ := strconv.Atoi(item.Restarts)
-		recentRestart := !item.LastRestartAt.IsZero() && time.Since(item.LastRestartAt) < time.Hour
-		switch {
-		case restartCount > 0 && recentRestart:
-			restartText := "↑" + item.Restarts
-			if restartCount >= 5 {
-				parts = append(parts, ErrorStyle.Render(padRight(restartText, restartsW)))
-			} else {
-				parts = append(parts, StatusFailed.Render(padRight(restartText, restartsW)))
-			}
-		case anyRecentRestart:
-			// Use " " prefix as placeholder to align with rows that have "↑".
-			parts = append(parts, DimStyle.Render(padRight(" "+item.Restarts, restartsW)))
-		default:
-			parts = append(parts, DimStyle.Render(padRight(item.Restarts, restartsW)))
-		}
-	}
-	if hasStatus {
-		parts = append(parts, StatusStyle(item.Status).Render(padRight(Truncate(item.Status, statusW-1), statusW)))
-	}
-	// Age is appended later in formatTableRowStyledWithExtra, after extra columns.
-
-	return strings.Join(parts, "")
-}
-
 // extraColumn represents an additional column discovered from item data.
 type extraColumn struct {
 	key      string // column key (e.g., "IP", "Node")
@@ -247,6 +71,12 @@ func CollectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 // ActiveSessionColumns holds the session-only column override for the current
 // resource type. Set by the app before rendering. Nil means no override.
 var ActiveSessionColumns []string
+
+// ActiveHiddenBuiltinColumns holds the set of built-in column keys that should
+// be suppressed in the current middle-column render. Valid keys: "Namespace",
+// "Ready", "Restarts", "Age", "Status". Set by the app before rendering.
+// Nil means no overrides.
+var ActiveHiddenBuiltinColumns map[string]bool
 
 // collectExtraColumns discovers which extra columns to show based on item data and config.
 // usedWidth is the width already consumed by fixed columns (excluding name).
@@ -339,11 +169,14 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 
 // selectColumnCandidates determines which extra columns to display based on
 // session overrides, per-kind config, or auto-detection.
+//
+// ActiveSessionColumns is the authoritative signal when non-nil: an empty
+// slice means the user explicitly configured this kind with no extras and
+// must not fall through to auto-detect. Only a nil slice means "no session
+// override" and lets the config / auto-detect paths run.
 func selectColumnCandidates(seen map[string]*colInfo, order []string, kind string, items []model.Item) []string {
-	configCols := ColumnsForKind(kind, ActiveContext)
-
-	if len(ActiveSessionColumns) > 0 {
-		var candidates []string
+	if ActiveSessionColumns != nil {
+		candidates := make([]string, 0, len(ActiveSessionColumns))
 		for _, key := range ActiveSessionColumns {
 			if _, ok := seen[key]; ok {
 				candidates = append(candidates, key)
@@ -352,6 +185,7 @@ func selectColumnCandidates(seen map[string]*colInfo, order []string, kind strin
 		return candidates
 	}
 
+	configCols := ColumnsForKind(kind, ActiveContext)
 	if len(configCols) > 0 {
 		if len(configCols) == 1 && configCols[0] == "*" {
 			return order
@@ -445,90 +279,271 @@ func getExtraColumnValue(item *model.Item, key string) string {
 	return ""
 }
 
-// formatTableRowWithExtra builds a plain text table row including extra columns.
-// When item is nil, header values from extraCols keys are used.
-func formatTableRowWithExtra(name, ns, ready, restarts, status, age string,
-	nameW, nsW, readyW, restartsW, statusW, ageW int,
-	hasNs, hasReady, hasRestarts, hasStatus, hasAge bool,
-	extraCols []extraColumn, item *model.Item,
+// plainExtraCell builds the plain-text cell for a single extra column.
+// When item is nil, the cell renders a header value (uppercased key plus
+// sort indicator).
+func plainExtraCell(ec extraColumn, item *model.Item) string {
+	var val string
+	if item == nil {
+		val = strings.ToUpper(ec.key) + sortIndicatorForColumn(ec.key)
+	} else {
+		val = getExtraColumnValue(item, ec.key)
+	}
+	switch {
+	case strings.HasPrefix(val, "↑ ") || strings.HasPrefix(val, "↓ "):
+		arrow := string([]rune(val)[0])
+		baseVal := val[len("↑ "):]
+		return arrow + padRight(Truncate(baseVal, ec.width-2), ec.width-1)
+	case ec.hasArrow:
+		return " " + padRight(Truncate(val, ec.width-2), ec.width-1)
+	default:
+		return padRight(Truncate(val, ec.width-1), ec.width)
+	}
+}
+
+// styledExtraCell builds the styled cell for a single extra column.
+func styledExtraCell(ec extraColumn, item *model.Item) string {
+	val := getExtraColumnValue(item, ec.key)
+	style := resourceColumnStyle(ec.key, val)
+	switch {
+	case strings.HasPrefix(val, "↑ "):
+		baseVal := val[len("↑ "):]
+		return ErrorStyle.Render("↑") + style.Render(padRight(Truncate(baseVal, ec.width-2), ec.width-1))
+	case strings.HasPrefix(val, "↓ "):
+		baseVal := val[len("↓ "):]
+		return StatusRunning.Render("↓") + style.Render(padRight(Truncate(baseVal, ec.width-2), ec.width-1))
+	case ec.hasArrow:
+		return NormalStyle.Render(" ") + style.Render(padRight(Truncate(val, ec.width-2), ec.width-1))
+	default:
+		return style.Render(padRight(Truncate(val, ec.width-1), ec.width))
+	}
+}
+
+// plainBuiltinCell builds the plain-text cell for a single built-in column.
+// Values are the already-resolved display strings for this row (e.g. ns with
+// dash fallback, preprocessed restarts with arrow prefix).
+func plainBuiltinCell(key string, ns, ready, restarts, status, age string,
+	nsW, readyW, restartsW, statusW, ageW int,
 ) string {
-	// Plain-text rendering path (cursor row): use the plain badge so ANSI
-	// sequences don't leak into the inverted row highlight style.
-	secBadge := ""
-	if item != nil {
-		secBadge = securityBadgePlainForItem(item)
+	switch key {
+	case "Namespace":
+		return padRight(Truncate(ns, nsW-1), nsW)
+	case "Ready":
+		return padRight(ready, readyW)
+	case "Restarts":
+		return padRight(restarts, restartsW)
+	case "Status":
+		return padRight(Truncate(status, statusW-1), statusW)
+	case "Age":
+		return padRight(age, ageW)
 	}
-	row := formatTableRow(name, ns, ready, restarts, status, secBadge,
-		nameW, nsW, readyW, restartsW, statusW, hasNs, hasReady, hasRestarts, hasStatus)
+	return ""
+}
 
-	for _, ec := range extraCols {
-		var val string
-		if item == nil {
-			// Header row: use uppercased key as header with sort indicator.
-			val = strings.ToUpper(ec.key) + sortIndicatorForColumn(ec.key)
-		} else {
-			val = getExtraColumnValue(item, ec.key)
+// styledBuiltinCell builds the styled cell for a single built-in column.
+// Namespaces are dimmed, Ready is dimmed, Restarts is delegated to
+// styledRestartsCell for its arrow handling, Status and Age use their own
+// status-aware style helpers.
+func styledBuiltinCell(key string, item model.Item,
+	nsW, readyW, restartsW, statusW, ageW int, anyRecentRestart bool,
+) string {
+	switch key {
+	case "Namespace":
+		ns := item.Namespace
+		if ns == "" {
+			ns = "-"
 		}
-		// Handle arrow values the same way as the styled path:
-		// strip the arrow prefix and render it as a separate character,
-		// or use a space placeholder for non-arrow rows in arrow columns.
-		switch {
-		case strings.HasPrefix(val, "↑ ") || strings.HasPrefix(val, "↓ "):
-			arrow := string([]rune(val)[0])
-			baseVal := val[len("↑ "):]
-			row += arrow + padRight(Truncate(baseVal, ec.width-2), ec.width-1)
-		case ec.hasArrow:
-			// Placeholder space to align with rows that have arrows.
-			row += " " + padRight(Truncate(val, ec.width-2), ec.width-1)
-		default:
-			row += padRight(Truncate(val, ec.width-1), ec.width)
+		return DimStyle.Render(padRight(Truncate(ns, nsW-1), nsW))
+	case "Ready":
+		return DimStyle.Render(padRight(item.Ready, readyW))
+	case "Restarts":
+		return styledRestartsCell(item, restartsW, anyRecentRestart)
+	case "Status":
+		return StatusStyle(item.Status).Render(padRight(Truncate(item.Status, statusW-1), statusW))
+	case "Age":
+		return AgeStyle(item.Age).Render(padRight(item.Age, ageW))
+	}
+	return ""
+}
+
+// styledRestartsCell renders the restarts column with recent-restart arrow
+// styling. Rows whose LastRestartAt is within the past hour are tagged with
+// an up-arrow; when any row in the table has a recent restart, rows without
+// one get a space prefix so values remain column-aligned.
+func styledRestartsCell(item model.Item, restartsW int, anyRecentRestart bool) string {
+	restartCount, _ := strconv.Atoi(item.Restarts)
+	recentRestart := !item.LastRestartAt.IsZero() && time.Since(item.LastRestartAt) < time.Hour
+	switch {
+	case restartCount > 0 && recentRestart:
+		restartText := "↑" + item.Restarts
+		if restartCount >= 5 {
+			return ErrorStyle.Render(padRight(restartText, restartsW))
+		}
+		return StatusFailed.Render(padRight(restartText, restartsW))
+	case anyRecentRestart:
+		return DimStyle.Render(padRight(" "+item.Restarts, restartsW))
+	default:
+		return DimStyle.Render(padRight(item.Restarts, restartsW))
+	}
+}
+
+// formatTableRowOrdered builds a plain-text table row using the given column
+// order. Name is always emitted first. The preprocessed values (ns, ready,
+// restarts, status, age) are passed through since they have row-specific
+// handling upstream (e.g. the cursor row preprocesses restarts for arrow
+// alignment).
+//
+// When a security finding index is active and the item has matching findings,
+// a plain-text severity badge is appended inside the name column budget so the
+// row layout stays stable with the styled path.
+func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
+	nameW, nsW, readyW, restartsW, statusW, ageW int,
+	order []string, extraCols []extraColumn, item *model.Item,
+) string {
+	row := plainNameCellWithBadge(name, item, nameW)
+	for _, key := range order {
+		if isBuiltinColumnKey(key) {
+			row += plainBuiltinCell(key, ns, ready, restarts, status, age,
+				nsW, readyW, restartsW, statusW, ageW)
+			continue
+		}
+		// Extra column: look up metadata and emit via plainExtraCell.
+		for _, ec := range extraCols {
+			if ec.key == key {
+				row += plainExtraCell(ec, item)
+				break
+			}
 		}
 	}
-
-	// Age comes last, after extra columns.
-	if hasAge {
-		row += padRight(age, ageW)
-	}
-
 	return row
 }
 
-// formatTableRowStyledWithExtra builds a styled table row including extra columns.
-func formatTableRowStyledWithExtra(item model.Item, nameW, nsW, readyW, restartsW, statusW, ageW int,
-	hasNs, hasReady, hasRestarts, hasStatus, hasAge bool,
-	extraCols []extraColumn, anyRecentRestart bool,
+// formatTableRowStyledOrdered builds a styled table row using the given
+// column order. Name (with icon handling) is always emitted first via the
+// existing styled name helper; the rest is dispatched per-key.
+func formatTableRowStyledOrdered(item model.Item,
+	nameW, nsW, readyW, restartsW, statusW, ageW int,
+	order []string, extraCols []extraColumn, anyRecentRestart bool,
 ) string {
-	secBadge := securityBadgeForItem(&item)
-	base := formatTableRowStyled(item, nameW, nsW, readyW, restartsW, statusW,
-		hasNs, hasReady, hasRestarts, hasStatus, anyRecentRestart, secBadge)
-
-	for _, ec := range extraCols {
-		val := getExtraColumnValue(&item, ec.key)
-		style := resourceColumnStyle(ec.key, val)
-
-		// Color trend arrows in metric values (arrows before value).
-		// Use a space placeholder for rows without arrows to keep values aligned.
-		switch {
-		case strings.HasPrefix(val, "↑ "):
-			baseVal := val[len("↑ "):]
-			base += ErrorStyle.Render("↑") + style.Render(padRight(Truncate(baseVal, ec.width-2), ec.width-1))
-		case strings.HasPrefix(val, "↓ "):
-			baseVal := val[len("↓ "):]
-			base += StatusRunning.Render("↓") + style.Render(padRight(Truncate(baseVal, ec.width-2), ec.width-1))
-		case ec.hasArrow:
-			// Placeholder space to align with rows that have arrows.
-			base += NormalStyle.Render(" ") + style.Render(padRight(Truncate(val, ec.width-2), ec.width-1))
-		default:
-			base += style.Render(padRight(Truncate(val, ec.width-1), ec.width))
+	base := styledNameCell(item, nameW)
+	for _, key := range order {
+		if isBuiltinColumnKey(key) {
+			base += styledBuiltinCell(key, item, nsW, readyW, restartsW, statusW, ageW, anyRecentRestart)
+			continue
+		}
+		for _, ec := range extraCols {
+			if ec.key == key {
+				base += styledExtraCell(ec, &item)
+				break
+			}
 		}
 	}
-
-	// Age comes last, after extra columns — colored by age bracket.
-	if hasAge {
-		base += AgeStyle(item.Age).Render(padRight(item.Age, ageW))
-	}
-
 	return base
+}
+
+// plainNameCellWithBadge renders the name column for the plain-text path,
+// appending the security severity badge inside the budget when one applies.
+// Callers use this path for the cursor row so the highlighted background
+// does not clash with ANSI styling in the badge.
+func plainNameCellWithBadge(name string, item *model.Item, nameW int) string {
+	badge := ""
+	if item != nil {
+		badge = securityBadgePlainForItem(item)
+	}
+	if badge == "" {
+		return padRight(Truncate(name, nameW-1), nameW)
+	}
+	badgeW := lipgloss.Width(badge)
+	reserved := badgeW + 2 // 1 space separator + 1 column gap
+	if reserved >= nameW {
+		return padRight(Truncate(name, nameW-1), nameW)
+	}
+	nameMax := nameW - reserved
+	trimmed := Truncate(name, nameMax)
+	content := trimmed + " " + badge
+	return padRight(content, nameW)
+}
+
+// styledNameCell renders the Name column with optional icon and dimmed
+// styling for completed items. Pods in Succeeded or Completed status get
+// their name dimmed; otherwise NormalStyle is used. The active highlight
+// query is applied to the resolved display name.
+//
+// When a security finding index is active and the item has matching findings,
+// the styled severity badge is appended inside the column budget (name is
+// truncated to make room). Gated callers (ActiveSecurityAvailable == false)
+// get an empty badge and the row renders identically to the pre-security UI.
+func styledNameCell(item model.Item, nameW int) string {
+	isDimmed := item.Status == "Succeeded" || item.Status == "Completed"
+	nameStyle := NormalStyle
+	if isDimmed {
+		nameStyle = DimStyle
+	}
+	badge := securityBadgeForItem(&item)
+	badgeW := lipgloss.Width(badge)
+	badgeReserve := 0
+	if badgeW > 0 {
+		badgeReserve = badgeW + 1 // separator space
+	}
+	if resolvedIcon := resolveIcon(item.Icon); resolvedIcon != "" {
+		iconSt := IconStyle
+		if isDimmed {
+			iconSt = DimStyle
+		}
+		icon := iconSt.Render(resolvedIcon) + " "
+		iconVisualW := lipgloss.Width(icon)
+		nameRemaining := nameW - iconVisualW - 1 - badgeReserve // -1 reserves gap before next column
+		if nameRemaining < 1 {
+			nameRemaining = 1
+		}
+		// Drop the badge when it would not fit alongside a readable name.
+		activeBadge := badge
+		if badgeReserve > 0 && nameW-iconVisualW-1 <= badgeReserve {
+			activeBadge = ""
+			nameRemaining = nameW - iconVisualW - 1
+			if nameRemaining < 1 {
+				nameRemaining = 1
+			}
+		}
+		namePart := Truncate(item.Name, nameRemaining)
+		if ActiveHighlightQuery != "" {
+			namePart = highlightName(namePart, ActiveHighlightQuery)
+		}
+		nameVisualW := lipgloss.Width(namePart)
+		badgeSegment := ""
+		badgeSegmentW := 0
+		if activeBadge != "" {
+			badgeSegment = " " + activeBadge
+			badgeSegmentW = lipgloss.Width(badgeSegment)
+		}
+		pad := nameW - iconVisualW - nameVisualW - badgeSegmentW
+		if pad < 0 {
+			pad = 0
+		}
+		if isDimmed {
+			namePart = DimStyle.Render(namePart)
+		}
+		return icon + namePart + badgeSegment + strings.Repeat(" ", pad)
+	}
+	nameBudget := nameW - 1 - badgeReserve
+	if nameBudget < 1 {
+		// Badge cannot fit — fall back to pre-badge layout so the column
+		// stays readable on very narrow terminals.
+		displayName := Truncate(item.Name, nameW-1)
+		if ActiveHighlightQuery != "" {
+			displayName = highlightName(displayName, ActiveHighlightQuery)
+		}
+		return nameStyle.Render(padRight(displayName, nameW))
+	}
+	displayName := Truncate(item.Name, nameBudget)
+	if ActiveHighlightQuery != "" {
+		displayName = highlightName(displayName, ActiveHighlightQuery)
+	}
+	styled := nameStyle.Render(displayName)
+	if badge != "" {
+		styled += " " + badge
+	}
+	return padRight(styled, nameW)
 }
 
 // resourceColumnStyle returns a style for extra columns, colorizing CPU/Mem columns.
@@ -727,6 +742,30 @@ func RenderTabBar(tabLabels []string, activeTab, width int) string {
 		return lipgloss.NewStyle().Background(BarBg).Width(width).MaxWidth(width).Render(tabContent)
 	}
 
+	// Reserve space for the leading " " padding (added below) and for the
+	// arrow indicators that get prepended/appended once the window is
+	// chosen. Without this reservation, the rendered tabContent can exceed
+	// `width` and the outer Width(width).MaxWidth(width).Render call wraps
+	// it to a second line, which hides the title bar above. Indicators are
+	// only needed when we can't reach the corresponding edge from the
+	// active tab, so we reserve their width conditionally to avoid dropping
+	// tabs from the window unnecessarily.
+	const leadingPadW = 1
+	leftIndicatorW := lipgloss.Width(inactiveStyle.Render("◂")) + sepW
+	rightIndicatorW := sepW + lipgloss.Width(inactiveStyle.Render("▸"))
+	budget := maxBarW - leadingPadW
+	if activeTab > 0 {
+		budget -= leftIndicatorW
+	}
+	if activeTab < len(tabs)-1 {
+		budget -= rightIndicatorW
+	}
+	// Always allow the active tab to render, even if reservations leave
+	// almost nothing — lipgloss will clip if it's still wider than the bar.
+	if budget < tabs[activeTab].width {
+		budget = tabs[activeTab].width
+	}
+
 	// Window around active tab.
 	left := activeTab
 	right := activeTab
@@ -736,7 +775,7 @@ func RenderTabBar(tabLabels []string, activeTab, width int) string {
 		expanded := false
 		if left > 0 {
 			needed := sepW + tabs[left-1].width
-			if usedW+needed <= maxBarW {
+			if usedW+needed <= budget {
 				left--
 				usedW += needed
 				expanded = true
@@ -744,7 +783,7 @@ func RenderTabBar(tabLabels []string, activeTab, width int) string {
 		}
 		if right < len(tabs)-1 {
 			needed := sepW + tabs[right+1].width
-			if usedW+needed <= maxBarW {
+			if usedW+needed <= budget {
 				right++
 				usedW += needed
 				expanded = true

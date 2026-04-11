@@ -25,18 +25,18 @@ func baseFinalModel() Model {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		client:         k8s.NewTestClient(cs, dyn),
-		namespace:      "default",
-		reqCtx:         context.Background(),
+		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		client:              k8s.NewTestClient(cs, dyn),
+		namespace:           "default",
+		reqCtx:              context.Background(),
 	}
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default", Kind: "Pod", Status: "Running"},
@@ -63,18 +63,18 @@ func baseFinalModelWithDynamic() Model {
 	dyn := newFinalDynClient()
 
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		client:         k8s.NewTestClient(cs, dyn),
-		namespace:      "default",
-		reqCtx:         context.Background(),
+		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		client:              k8s.NewTestClient(cs, dyn),
+		namespace:           "default",
+		reqCtx:              context.Background(),
 	}
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default", Kind: "Pod", Status: "Running"},
@@ -97,15 +97,15 @@ func baseFinalModelWithDynamic() Model {
 
 func baseModelActions() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default", Kind: "Pod", Status: "Running"},
@@ -124,18 +124,18 @@ func baseModelBoost2() Model {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		client:         k8s.NewTestClient(cs, dyn),
-		namespace:      "default",
-		reqCtx:         context.Background(),
+		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		client:              k8s.NewTestClient(cs, dyn),
+		namespace:           "default",
+		reqCtx:              context.Background(),
 	}
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default", Kind: "Pod", Status: "Running"},
@@ -159,29 +159,29 @@ func baseModelBoost2() Model {
 // baseModelCov returns a minimal Model for coverage tests.
 func baseModelCov() Model {
 	return Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 }
 
 func baseModelDescribe() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 	m.describeContent = "line0\nline1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9"
 	m.mode = modeDescribe
@@ -190,15 +190,15 @@ func baseModelDescribe() Model {
 
 func baseModelExplain() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 	m.mode = modeExplain
 	m.explainFields = []model.ExplainField{
@@ -215,15 +215,15 @@ func baseModelExplain() Model {
 
 func baseModelFinalizer() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 	m.overlay = overlayFinalizerSearch
 	m.finalizerSearchResults = []k8s.FinalizerMatch{
@@ -237,15 +237,15 @@ func baseModelFinalizer() Model {
 
 func baseModelHandlers2() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 	return m
 }
@@ -260,14 +260,14 @@ func baseModelNav() Model {
 				Resource: "pods",
 			},
 		},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default", Kind: "Pod", Status: "Running"},
@@ -281,30 +281,30 @@ func baseModelNav() Model {
 
 func baseModelOverlay() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 	return m
 }
 
 func baseModelSearch() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 	m.helpSearchInput = textinput.New()
 	return m
@@ -315,19 +315,19 @@ func baseModelUpdate() Model {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		client:         k8s.NewTestClient(cs, dyn),
-		namespace:      "default",
-		reqCtx:         context.Background(),
-		portForwardMgr: k8s.NewPortForwardManager(),
+		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		client:              k8s.NewTestClient(cs, dyn),
+		namespace:           "default",
+		reqCtx:              context.Background(),
+		portForwardMgr:      k8s.NewPortForwardManager(),
 	}
 	m.middleItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", Namespaced: true}
@@ -372,17 +372,17 @@ func baseModelWithFakeDynamic(
 
 func basePush4Model() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		namespace:      "default",
-		reqCtx:         context.Background(),
+		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		namespace:           "default",
+		reqCtx:              context.Background(),
 	}
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default", Kind: "Pod", Status: "Running"},
@@ -405,16 +405,16 @@ func basePush80Model() Model {
 			Level:   model.LevelResources,
 			Context: "test-ctx",
 		},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		namespace:      "default",
-		reqCtx:         context.Background(),
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		namespace:           "default",
+		reqCtx:              context.Background(),
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
@@ -440,16 +440,16 @@ func basePush80v2Model() Model {
 			Level:   model.LevelResources,
 			Context: "test-ctx",
 		},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		namespace:      "default",
-		reqCtx:         context.Background(),
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		namespace:           "default",
+		reqCtx:              context.Background(),
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
@@ -475,16 +475,16 @@ func basePush80v3Model() Model {
 			Level:   model.LevelResources,
 			Context: "test-ctx",
 		},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		namespace:      "default",
-		reqCtx:         context.Background(),
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		namespace:           "default",
+		reqCtx:              context.Background(),
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
@@ -508,18 +508,18 @@ func baseRichModel() Model {
 	dyn := newRichDynClient()
 
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		client:         k8s.NewTestClient(cs, dyn),
-		namespace:      "default",
-		reqCtx:         context.Background(),
+		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		client:              k8s.NewTestClient(cs, dyn),
+		namespace:           "default",
+		reqCtx:              context.Background(),
 	}
 	m.middleItems = []model.Item{
 		{Name: "pod-1", Namespace: "default", Kind: "Pod", Status: "Running"},
@@ -542,13 +542,13 @@ func baseRichModel() Model {
 
 func bp4() Model {
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120, height: 40, execMu: &sync.Mutex{}, namespace: "default",
+		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120, height: 40, execMu: &sync.Mutex{}, namespace: "default",
 		reqCtx: context.Background(),
 	}
 	m.client = k8s.NewTestClient(fake.NewClientset(), dynfake.NewSimpleDynamicClient(runtime.NewScheme()))
@@ -763,17 +763,17 @@ func testModelExec() Model {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 
 	m := Model{
-		nav:            model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          120,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		client:         k8s.NewTestClient(cs, dyn),
-		namespace:      "default",
+		nav:                 model.NavigationState{Level: model.LevelResources, Context: "test-ctx"},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               120,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		client:              k8s.NewTestClient(cs, dyn),
+		namespace:           "default",
 	}
 	m.actionCtx = actionContext{
 		context:      "test-ctx",

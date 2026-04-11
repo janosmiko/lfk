@@ -93,54 +93,122 @@ func (m *Model) sortMiddleItems() {
 	}
 
 	colName := m.sortColumnName
+	if colName == "" {
+		// Production always seeds sortColumnName with sortColDefault in
+		// NewModel; an empty value here means a test fixture that built
+		// a bare Model{} literal. Skip sorting in that case — otherwise
+		// the tiebreaker below would impose a deterministic order on
+		// items the caller may want to keep in their original sequence.
+		return
+	}
 	asc := m.sortAscending
 
 	sort.SliceStable(m.middleItems, func(i, j int) bool {
 		a, b := m.middleItems[i], m.middleItems[j]
-		var less bool
-		switch colName {
-		case "Name":
-			less = strings.ToLower(a.Name) < strings.ToLower(b.Name)
-		case "Namespace":
-			less = strings.ToLower(a.Namespace) < strings.ToLower(b.Namespace)
-		case "Ready":
-			less = compareReady(a.Ready, b.Ready)
-		case "Restarts":
-			less = compareNumeric(a.Restarts, b.Restarts)
-		case "Status":
-			pa, pb := statusPriority(a.Status), statusPriority(b.Status)
-			if pa != pb {
-				less = pa < pb
-			} else {
-				less = strings.ToLower(a.Name) < strings.ToLower(b.Name)
+
+		// Primary comparison on the selected column.
+		primary := comparePrimaryColumn(a, b, colName)
+		if primary != 0 {
+			if asc {
+				return primary < 0
 			}
-		case "Age":
-			if a.CreatedAt.IsZero() && b.CreatedAt.IsZero() {
-				less = a.Name < b.Name
-			} else if a.CreatedAt.IsZero() {
-				less = false
-			} else if b.CreatedAt.IsZero() {
-				less = true
-			} else {
-				less = a.CreatedAt.After(b.CreatedAt) // newest first is "ascending" for age
-			}
-		default:
-			// Extra column: compare with numeric/resource-quantity awareness.
-			va := getColumnValue(a, colName)
-			vb := getColumnValue(b, colName)
-			less = compareColumnValues(va, vb, colName)
+			return primary > 0
 		}
-		if !asc {
-			return !less
-		}
-		return less
+
+		// Tiebreaker: items with identical primary keys fall through to a
+		// stable (Namespace, Name, Kind, Extra) chain that is always
+		// ascending, regardless of the primary's asc/desc flag. Without
+		// this, watch-mode refreshes would reshuffle rows with identical
+		// primary keys (e.g. a Helm release "traefik" deployed to multiple
+		// namespaces), because k8s API list calls can return items in
+		// different orders and sort.SliceStable would then preserve that
+		// shifting order.
+		return itemTiebreakerLess(a, b)
 	})
 }
 
+// itemTiebreakerLess defines a total order on model.Item used as a sort
+// tiebreaker. Always ascending — independent of the primary sort's asc
+// flag — so identical primary keys land in a deterministic order across
+// refreshes whether the user is sorting ascending or descending.
+func itemTiebreakerLess(a, b model.Item) bool {
+	if c := strings.Compare(strings.ToLower(a.Namespace), strings.ToLower(b.Namespace)); c != 0 {
+		return c < 0
+	}
+	if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+		return c < 0
+	}
+	if c := strings.Compare(a.Kind, b.Kind); c != 0 {
+		return c < 0
+	}
+	return a.Extra < b.Extra
+}
+
+// comparePrimaryColumn returns -1, 0, or +1 for a < b, a == b, a > b
+// according to the selected sort column. Returning 0 lets the caller run
+// a tiebreaker chain instead of relying on sort.SliceStable's input-order
+// preservation.
+func comparePrimaryColumn(a, b model.Item, colName string) int {
+	switch colName {
+	case "Name":
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	case "Namespace":
+		return strings.Compare(strings.ToLower(a.Namespace), strings.ToLower(b.Namespace))
+	case "Ready":
+		return compareReadyCmp(a.Ready, b.Ready)
+	case "Restarts":
+		return compareNumericCmp(a.Restarts, b.Restarts)
+	case "Status":
+		if c := cmpInt(statusPriority(a.Status), statusPriority(b.Status)); c != 0 {
+			return c
+		}
+		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	case "Age":
+		return compareAgeCmp(a, b)
+	default:
+		return compareColumnValuesCmp(getColumnValue(a, colName), getColumnValue(b, colName), colName)
+	}
+}
+
+func cmpInt(a, b int) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func cmpFloat(a, b float64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func cmpInt64(a, b int64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
 func compareReady(a, b string) bool {
-	ra := parseReadyRatio(a)
-	rb := parseReadyRatio(b)
-	return ra < rb
+	return compareReadyCmp(a, b) < 0
+}
+
+func compareReadyCmp(a, b string) int {
+	return cmpFloat(parseReadyRatio(a), parseReadyRatio(b))
 }
 
 func parseReadyRatio(s string) float64 {
@@ -157,24 +225,57 @@ func parseReadyRatio(s string) float64 {
 }
 
 func compareNumeric(a, b string) bool {
+	return compareNumericCmp(a, b) < 0
+}
+
+func compareNumericCmp(a, b string) int {
 	na, _ := strconv.Atoi(strings.TrimSpace(a))
 	nb, _ := strconv.Atoi(strings.TrimSpace(b))
-	return na < nb
+	return cmpInt(na, nb)
 }
 
 func compareResourceValues(a, b, col string) bool {
-	isCPU := strings.HasPrefix(col, "CPU")
-	va := ui.ParseResourceValue(a, isCPU)
-	vb := ui.ParseResourceValue(b, isCPU)
-	return va < vb
+	return compareResourceValuesCmp(a, b, col) < 0
 }
 
-// compareColumnValues compares two column values with automatic detection of
-// resource quantities (10Gi, 500Mi, 100m), plain numbers, and strings.
-func compareColumnValues(a, b, colName string) bool {
+func compareResourceValuesCmp(a, b, col string) int {
+	isCPU := strings.HasPrefix(col, "CPU")
+	return cmpInt64(ui.ParseResourceValue(a, isCPU), ui.ParseResourceValue(b, isCPU))
+}
+
+// compareAgeCmp returns the three-way age comparison with zero-time
+// values sorted last and newer timestamps sorted first ("ascending" age
+// means newest-first in the UI).
+func compareAgeCmp(a, b model.Item) int {
+	aZero := a.CreatedAt.IsZero()
+	bZero := b.CreatedAt.IsZero()
+	switch {
+	case aZero && bZero:
+		return strings.Compare(a.Name, b.Name)
+	case aZero:
+		return 1 // zero sorts after any real time
+	case bZero:
+		return -1
+	}
+	// Newer timestamps are "less" (render higher in ascending view).
+	switch {
+	case a.CreatedAt.After(b.CreatedAt):
+		return -1
+	case a.CreatedAt.Before(b.CreatedAt):
+		return 1
+	default:
+		return 0
+	}
+}
+
+// compareColumnValuesCmp compares two column values with automatic detection
+// of resource quantities (10Gi, 500Mi, 100m), plain numbers, and strings.
+// Returns -1, 0, or +1 so sort.SliceStable callers can detect equality
+// and fall through to the row-identity tiebreaker chain.
+func compareColumnValuesCmp(a, b, colName string) int {
 	// Known CPU/MEM columns: use resource value parser directly.
 	if colName == "CPU" || colName == "MEM" || colName == "CPU/R" || colName == "CPU/L" || colName == "MEM/R" || colName == "MEM/L" {
-		return compareResourceValues(a, b, colName)
+		return compareResourceValuesCmp(a, b, colName)
 	}
 
 	// Try parsing as resource quantities (Gi, Mi, Ki, B suffixes or millicores).
@@ -182,7 +283,7 @@ func compareColumnValues(a, b, colName string) bool {
 		va := ui.ParseResourceValue(a, false)
 		vb := ui.ParseResourceValue(b, false)
 		if va != 0 || vb != 0 {
-			return va < vb
+			return cmpInt64(va, vb)
 		}
 	}
 
@@ -190,11 +291,11 @@ func compareColumnValues(a, b, colName string) bool {
 	na, errA := strconv.ParseFloat(strings.TrimSpace(a), 64)
 	nb, errB := strconv.ParseFloat(strings.TrimSpace(b), 64)
 	if errA == nil && errB == nil {
-		return na < nb
+		return cmpFloat(na, nb)
 	}
 
 	// Fall back to lexicographic comparison.
-	return strings.ToLower(a) < strings.ToLower(b)
+	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 }
 
 // looksLikeResourceQuantity returns true if the value has a Kubernetes resource
@@ -390,10 +491,10 @@ func (m *Model) navigateToPortForwards() {
 	// Build the correct left column state for LevelResources.
 	contexts, _ := m.client.GetContexts()
 	var resourceTypes []model.Item
-	if crds := m.discoveredCRDs[m.nav.Context]; len(crds) > 0 {
-		resourceTypes = model.MergeWithCRDs(crds)
+	if discovered := m.discoveredResources[m.nav.Context]; len(discovered) > 0 {
+		resourceTypes = model.BuildSidebarItems(discovered)
 	} else {
-		resourceTypes = model.FlattenedResourceTypes()
+		resourceTypes = model.BuildSidebarItems(model.SeedResources())
 	}
 
 	m.nav.ResourceType = model.ResourceTypeEntry{
@@ -436,31 +537,47 @@ func (m *Model) getPortForwardID(columns []model.KeyValue) int {
 	return 0
 }
 
-// tabLabels builds a display label for each tab.
+// tabLabels builds a display label for each tab. Inactive tabs render from
+// their saved TabState; the active tab is overridden with the live model
+// state so navigation within a tab updates its label immediately.
 func (m Model) tabLabels() []string {
 	labels := make([]string, len(m.tabs))
 	for i, t := range m.tabs {
-		if t.nav.Context != "" {
-			label := t.nav.Context
-			if t.nav.ResourceType.DisplayName != "" {
-				label += "/" + t.nav.ResourceType.DisplayName
-			}
-			labels[i] = label
-		} else {
-			labels[i] = "clusters"
-		}
+		labels[i] = labelForNav(t.nav)
 	}
-	// Update current tab label from live model state.
-	if m.nav.Context != "" {
-		label := m.nav.Context
-		if m.nav.ResourceType.DisplayName != "" {
-			label += "/" + m.nav.ResourceType.DisplayName
-		}
-		labels[m.activeTab] = label
-	} else {
-		labels[m.activeTab] = "clusters"
-	}
+	labels[m.activeTab] = labelForNav(m.nav)
 	return labels
+}
+
+// labelForNav builds a "context/Type/Name/Owned" label that grows as the user
+// drills deeper into the resource hierarchy. RenderTabBar truncates long
+// labels by chopping the prefix and keeping the suffix, so the most-specific
+// (and most useful) part of the path always wins for screen space.
+//
+// The resource type label goes through model.DisplayNameFor because
+// API-discovery-produced ResourceTypeEntry values do NOT populate
+// DisplayName themselves — only the curated metadata table does. Reading
+// nav.ResourceType.DisplayName directly silently drops the type for almost
+// every real-world resource.
+func labelForNav(nav model.NavigationState) string {
+	if nav.Context == "" {
+		return "clusters"
+	}
+	parts := []string{nav.Context}
+	if name := model.DisplayNameFor(nav.ResourceType); name != "" {
+		parts = append(parts, name)
+	}
+	if nav.ResourceName != "" {
+		parts = append(parts, nav.ResourceName)
+	}
+	// navigateChildResource sets both ResourceName and OwnedName to the same
+	// value when entering a Pod (so the containers view knows its parent).
+	// Skip the duplicate so the label reads "ctx/Pods/my-pod" instead of
+	// "ctx/Pods/my-pod/my-pod".
+	if nav.OwnedName != "" && nav.OwnedName != nav.ResourceName {
+		parts = append(parts, nav.OwnedName)
+	}
+	return strings.Join(parts, "/")
 }
 
 // saveCurrentTab persists Model fields into the current TabState.
@@ -506,6 +623,7 @@ func (m *Model) saveCurrentTab() {
 	t.dashboardEventsPreview = m.dashboardEventsPreview
 	t.monitoringPreview = m.monitoringPreview
 	t.warningEventsOnly = m.warningEventsOnly
+	t.eventGrouping = m.eventGrouping
 	t.expandedGroup = m.expandedGroup
 	t.allGroupsExpanded = m.allGroupsExpanded
 	t.mode = m.mode
@@ -605,6 +723,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.dashboardEventsPreview = t.dashboardEventsPreview
 	m.monitoringPreview = t.monitoringPreview
 	m.warningEventsOnly = t.warningEventsOnly
+	m.eventGrouping = t.eventGrouping
 	m.expandedGroup = t.expandedGroup
 	m.allGroupsExpanded = t.allGroupsExpanded
 
@@ -674,9 +793,9 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 
 		// Load contexts for the left column breadcrumb.
 		contexts, _ := m.client.GetContexts()
-		resourceTypes := model.FlattenedResourceTypes()
-		if crds := m.discoveredCRDs[m.nav.Context]; len(crds) > 0 {
-			resourceTypes = model.MergeWithCRDs(crds)
+		resourceTypes := model.BuildSidebarItems(model.SeedResources())
+		if discovered := m.discoveredResources[m.nav.Context]; len(discovered) > 0 {
+			resourceTypes = model.BuildSidebarItems(discovered)
 		}
 
 		switch m.nav.Level {
@@ -740,6 +859,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		dashboardEventsPreview: m.dashboardEventsPreview,
 		monitoringPreview:      m.monitoringPreview,
 		warningEventsOnly:      m.warningEventsOnly,
+		eventGrouping:          m.eventGrouping,
 		expandedGroup:          m.expandedGroup,
 		allGroupsExpanded:      m.allGroupsExpanded,
 		logCursor:              m.logCursor,

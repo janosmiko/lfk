@@ -282,8 +282,8 @@ func (m *Model) generateCommandBarSuggestions() []ui.Suggestion {
 		tokens := parseTokens(input, len(input))
 		if len(tokens) >= 2 {
 			// Only suggest namespaces if the resource type is namespaced.
-			resourceName := resolveResourceType(strings.ToLower(tokens[0].text))
-			if !isNamespacedResource(resourceName, m.resourceTypeItems()) {
+			resourceName := m.resolveResourceType(strings.ToLower(tokens[0].text))
+			if !m.isNamespacedResource(resourceName) {
 				return nil
 			}
 			// Second+ tokens: suggest namespace names, excluding already selected.
@@ -594,28 +594,11 @@ func (m Model) fetchCommandBarResourceNames(resourceType, namespace string) tea.
 	// Find the ResourceTypeEntry for this resource type.
 	var rt model.ResourceTypeEntry
 	found := false
-	for _, cat := range model.TopLevelResourceTypes() {
-		for _, t := range cat.Types {
-			if strings.ToLower(t.Resource) == resourceType {
-				rt = t
-				found = true
-				break
-			}
-		}
-		if found {
+	for _, t := range m.discoveredResources[kctx] {
+		if strings.ToLower(t.Resource) == resourceType {
+			rt = t
+			found = true
 			break
-		}
-	}
-	if !found {
-		// Check discovered CRDs.
-		if crds, ok := m.discoveredCRDs[kctx]; ok {
-			for _, crd := range crds {
-				if strings.ToLower(crd.Resource) == resourceType {
-					rt = crd
-					found = true
-					break
-				}
-			}
 		}
 	}
 	if !found {
@@ -683,7 +666,7 @@ func resourceNamesForKubectl(m *Model, effective []token) []string {
 	}
 
 	// Resolve to canonical plural resource name.
-	cmdResourceType = resolveResourceType(cmdResourceType)
+	cmdResourceType = m.resolveResourceType(cmdResourceType)
 
 	// Determine the target namespace from flags, defaulting to current.
 	cmdNamespace := m.effectiveNamespace()
@@ -723,38 +706,33 @@ func toSingular(plural string) string {
 }
 
 // isNamespacedResource checks if a resource type (plural name) is namespaced.
-func isNamespacedResource(resourceName string, _ []model.Item) bool {
+// Returns true if not found (safer default for unknown resources).
+func (m *Model) isNamespacedResource(resourceName string) bool {
 	lower := strings.ToLower(resourceName)
-	for _, cat := range model.TopLevelResourceTypes() {
-		for _, rt := range cat.Types {
-			if strings.ToLower(rt.Resource) == lower {
-				return rt.Namespaced
-			}
+	for _, rt := range m.discoveredResources[m.nav.Context] {
+		if strings.ToLower(rt.Resource) == lower {
+			return rt.Namespaced
 		}
 	}
-	// Unknown resource (e.g., CRD): assume namespaced.
+	// Unknown resource (e.g., CRD not yet discovered): assume namespaced.
 	return true
 }
 
 // resolveResourceType maps a resource name (singular or plural, or abbreviation)
-// to the plural resource type name used in the API.
-func resolveResourceType(name string) string {
+// to the plural resource type name used in the API. Consults abbreviations
+// first, then the discovered resource set for the current context.
+func (m *Model) resolveResourceType(name string) string {
 	lower := strings.ToLower(name)
-	// Check abbreviations first.
 	if expanded, ok := ui.SearchAbbreviations[lower]; ok {
 		lower = strings.ToLower(expanded)
 	}
-	// Try to find the plural form in the registry.
-	for _, cat := range model.TopLevelResourceTypes() {
-		for _, rt := range cat.Types {
-			res := strings.ToLower(rt.Resource)
-			kind := strings.ToLower(rt.Kind)
-			if res == lower || kind == lower {
-				return res
-			}
+	for _, rt := range m.discoveredResources[m.nav.Context] {
+		res := strings.ToLower(rt.Resource)
+		kind := strings.ToLower(rt.Kind)
+		if res == lower || kind == lower {
+			return res
 		}
 	}
-	// If it already looks plural or is unknown, return as-is.
 	if !strings.HasSuffix(lower, "s") {
 		return lower + "s"
 	}
@@ -817,16 +795,14 @@ func (m *Model) defaultSuggestions() []ui.Suggestion {
 
 	// Add some common resource types.
 	count := 0
-	for _, cat := range model.TopLevelResourceTypes() {
-		for _, rt := range cat.Types {
-			result = append(result, ui.Suggestion{
-				Text:     strings.ToLower(rt.Resource),
-				Category: "resource",
-			})
-			count++
-			if count+len(builtinCommandNames()) >= maxSuggestions {
-				return result
-			}
+	for _, rt := range m.discoveredResources[m.nav.Context] {
+		result = append(result, ui.Suggestion{
+			Text:     strings.ToLower(rt.Resource),
+			Category: "resource",
+		})
+		count++
+		if count+len(builtinCommandNames()) >= maxSuggestions {
+			return result
 		}
 	}
 

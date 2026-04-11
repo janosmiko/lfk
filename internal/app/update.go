@@ -72,8 +72,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case resourceTypesMsg:
 		mdl, cmd := m.updateResourceTypes(msg)
 		return mdl, cmd, true
-	case crdDiscoveryMsg:
-		mdl := m.updateCrdDiscovery(msg)
+	case apiResourceDiscoveryMsg:
+		mdl := m.updateAPIResourceDiscovery(msg)
 		return mdl, nil, true
 	case resourcesLoadedMsg:
 		mdl, cmd := m.updateResourcesLoaded(msg)
@@ -466,25 +466,33 @@ func (m Model) updateResourceTypes(msg resourceTypesMsg) (tea.Model, tea.Cmd) {
 	return m, m.loadPreview()
 }
 
-func (m Model) updateCrdDiscovery(msg crdDiscoveryMsg) Model {
+func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 	if isContextCanceled(msg.err) {
 		return m
 	}
 	if msg.err != nil {
-		// CRD discovery failed (permissions, etc.) -- silently ignore.
-		logger.Info("CRD discovery failed", "context", msg.context, "error", msg.err.Error())
+		// API resource discovery failed (permissions, etc.) -- silently ignore.
+		logger.Info("API resource discovery failed", "context", msg.context, "error", msg.err.Error())
 		return m
 	}
-	m.discoveredCRDs[msg.context] = msg.entries
+	// Prepend LFK pseudo-resources (helm releases, port forwards) so they
+	// resolve via FindResourceType* and appear in the sidebar uniformly
+	// with real discovered resources.
+	entries := append(model.PseudoResources(), msg.entries...)
+	m.discoveredResources[msg.context] = entries
 	if m.nav.Context == msg.context {
-		merged := model.MergeWithCRDs(msg.entries)
+		merged := model.BuildSidebarItems(entries)
 		// Update the item cache for the resource types level.
 		rtCacheKey := msg.context
 		m.itemCache[rtCacheKey] = merged
 		if m.nav.Level == model.LevelResourceTypes {
 			// User is on resource types level: update the visible list.
+			// Preserve cursor identity across the refresh so a user who
+			// navigated to "Pods" in the seed doesn't end up on a random
+			// item after the full discovered set replaces the seed.
+			prevName, prevNs, prevExtra, prevKind := m.cursorItemKey()
 			m.middleItems = merged
-			m.clampCursor()
+			m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
 		} else {
 			// User is deeper: update leftItems so back-navigation shows CRDs.
 			m.leftItems = merged
@@ -537,6 +545,13 @@ func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) (tea.Model, 
 		}
 		m.rightItems = filtered
 	}
+	// Collapse duplicate events so noisy pods don't drown out the preview.
+	// The preview pane is always a summary, so we follow the main list's
+	// grouping toggle without offering a separate control — toggling `z` in
+	// the Events view also affects the preview shown for other resources.
+	if m.eventGrouping && len(m.rightItems) > 0 && m.rightItems[0].Kind == "Event" {
+		m.rightItems = groupEvents(m.rightItems)
+	}
 	if len(m.rightItems) == 0 {
 		logger.Info("No child resources found", "resourceType", m.nav.ResourceType.Kind, "resource", m.nav.ResourceName)
 	}
@@ -569,6 +584,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 		m.sortMiddleItems()
 	}
 	m.applyWarningEventsFilter()
+	m.applyEventGrouping()
 	m.reapplyFilterPreset()
 	if m.pendingTarget != "" {
 		for i, item := range m.middleItems {
@@ -580,6 +596,14 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 		m.pendingTarget = ""
 	} else {
 		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
+	}
+	// If this load originated from a watch-mode refresh, propagate the
+	// suppress flag to the downstream preview/metrics cmds so they too
+	// stay off the title-bar indicator. Capture the prior flag so the
+	// returned model resets it cleanly for subsequent user Updates.
+	savedSuppress := m.suppressBgtasks
+	if msg.silent {
+		m.suppressBgtasks = true
 	}
 	var cmds []tea.Cmd
 	// Mark the preview pane as loading so the right column shows the
@@ -597,6 +621,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	case "Node":
 		cmds = append(cmds, m.loadNodeMetricsForList())
 	}
+	m.suppressBgtasks = savedSuppress
 	return m, tea.Batch(cmds...)
 }
 
@@ -610,6 +635,33 @@ func (m *Model) applyWarningEventsFilter() {
 		}
 		m.middleItems = filtered
 	}
+}
+
+// applyEventGrouping collapses duplicate Events sharing Type/Reason/Message/Object
+// into a single row with a summed Count. Runs only when viewing the Event
+// resource list with grouping enabled; other resource kinds pass through untouched.
+func (m *Model) applyEventGrouping() {
+	if !m.eventGrouping || m.nav.ResourceType.Kind != "Event" {
+		return
+	}
+	m.middleItems = groupEvents(m.middleItems)
+}
+
+// rebuildEventsFromCache re-derives the visible Event list from the raw cache
+// after an Events-view toggle (warnings-only, grouping). It re-applies the
+// full pipeline — warning filter, grouping, and the active filter preset —
+// so toggling any one of them never silently drops the others. A cache miss
+// leaves m.middleItems untouched; the next resource load will rebuild it.
+func (m *Model) rebuildEventsFromCache() {
+	cached, ok := m.itemCache[m.navKey()]
+	if !ok {
+		return
+	}
+	m.middleItems = append([]model.Item(nil), cached...)
+	m.applyWarningEventsFilter()
+	m.applyEventGrouping()
+	m.reapplyFilterPreset()
+	m.clampCursor()
 }
 
 func (m *Model) reapplyFilterPreset() {
@@ -670,11 +722,17 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 		m.itemCache[m.navKey()] = m.middleItems
 	}
 	m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
+	// Propagate the silent flag to the downstream preview cmd.
+	savedSuppress := m.suppressBgtasks
+	if msg.silent {
+		m.suppressBgtasks = true
+	}
 	// Mark the preview pane as loading (see updateResourcesLoadedMain).
 	previewCmd := m.loadPreview()
 	if previewCmd != nil {
 		m.previewLoading = true
 	}
+	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
 
@@ -715,11 +773,17 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	m.middleItems = msg.items
 	m.itemCache[m.navKey()] = m.middleItems
 	m.clampCursor()
+	// Propagate the silent flag to the downstream preview cmd.
+	savedSuppress := m.suppressBgtasks
+	if msg.silent {
+		m.suppressBgtasks = true
+	}
 	// Mark the preview pane as loading (see updateResourcesLoadedMain).
 	previewCmd := m.loadPreview()
 	if previewCmd != nil {
 		m.previewLoading = true
 	}
+	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
 
@@ -766,8 +830,10 @@ func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
-	m.yamlContent = indentYAMLListItems(msg.content)
-	m.yamlSections = parseYAMLSections(m.yamlContent)
+	// Content and sections are pre-processed in the loading goroutine so
+	// the main event loop stays responsive on very large CRD manifests.
+	m.yamlContent = msg.content
+	m.yamlSections = msg.sections
 	return m, nil
 }
 
@@ -779,7 +845,8 @@ func (m Model) updatePreviewYAMLLoaded(msg previewYAMLLoadedMsg) Model {
 		m.previewYAML = ""
 		return m
 	}
-	m.previewYAML = indentYAMLListItems(msg.content)
+	// Pre-indented in the loading goroutine — no heavy work on main thread.
+	m.previewYAML = msg.content
 	return m
 }
 
@@ -985,6 +1052,13 @@ func (m Model) updateFinalizerRemoveResult(msg finalizerRemoveResultMsg) (tea.Mo
 }
 
 func (m Model) updateStatusMessageExpired(msg statusMessageExpiredMsg) Model {
+	// A prior scheduleStatusClear tick may arrive while a newer message is
+	// still active. If the current message's expiration hasn't actually
+	// passed, leave it alone — the newer message's own tick (or the view
+	// layer's time-based check) will clean it up at the right time.
+	if m.statusMessage != "" && time.Now().Before(m.statusMessageExp) {
+		return m
+	}
 	m.statusMessage = ""
 	m.statusMessageTip = false
 	return m
@@ -1000,7 +1074,23 @@ func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	if !m.watchMode {
 		return m, nil
 	}
-	return m, tea.Batch(m.refreshCurrentLevel(), scheduleWatchTick(m.watchInterval))
+	// Mark this dispatch as a watch-tick refresh so the instrumented
+	// loaders called below (through refreshCurrentLevel) use
+	// Registry.StartUntracked and don't flash the title-bar indicator
+	// every 2 seconds.
+	//
+	// trackBgTask captures the decision synchronously at construction
+	// time, so we only need the flag true for the duration of the
+	// refreshCurrentLevel() call. Reset it to false before returning so
+	// the flag doesn't leak into subsequent user-driven Updates — the
+	// returned model becomes the framework's next state, and any
+	// navigation that happens after this watch tick must see a clean
+	// flag or its loaders would also call StartUntracked and the
+	// indicator would never appear for user actions.
+	m.suppressBgtasks = true
+	cmd := tea.Batch(m.refreshCurrentLevel(), scheduleWatchTick(m.watchInterval))
+	m.suppressBgtasks = false
+	return m, cmd
 }
 
 func (m Model) updatePodSelect(msg podSelectMsg) (tea.Model, tea.Cmd) {
@@ -1681,6 +1771,11 @@ func (m Model) updateSecretDataLoaded(msg secretDataLoadedMsg) (tea.Model, tea.C
 		return m, scheduleStatusClear()
 	}
 	m.secretData = msg.data
+	// Snapshot the original data for dirty detection on save.
+	m.secretDataOriginal = make(map[string]string, len(msg.data.Data))
+	for k, v := range msg.data.Data {
+		m.secretDataOriginal[k] = v
+	}
 	m.secretCursor = 0
 	m.secretRevealed = make(map[string]bool)
 	m.secretAllRevealed = false
@@ -1721,6 +1816,11 @@ func (m Model) updateConfigMapDataLoaded(msg configMapDataLoadedMsg) (tea.Model,
 		return m, scheduleStatusClear()
 	}
 	m.configMapData = msg.data
+	// Snapshot the original data for dirty detection on save.
+	m.configMapDataOriginal = make(map[string]string, len(msg.data.Data))
+	for k, v := range msg.data.Data {
+		m.configMapDataOriginal[k] = v
+	}
 	m.configMapCursor = 0
 	m.configMapEditing = false
 	m.configMapEditColumn = -1
@@ -1744,6 +1844,15 @@ func (m Model) updateLabelDataLoaded(msg labelDataLoadedMsg) (tea.Model, tea.Cmd
 		return m, scheduleStatusClear()
 	}
 	m.labelData = msg.data
+	// Snapshot both maps for dirty detection on save.
+	m.labelLabelsOriginal = make(map[string]string, len(msg.data.Labels))
+	for k, v := range msg.data.Labels {
+		m.labelLabelsOriginal[k] = v
+	}
+	m.labelAnnotationsOriginal = make(map[string]string, len(msg.data.Annotations))
+	for k, v := range msg.data.Annotations {
+		m.labelAnnotationsOriginal[k] = v
+	}
 	m.labelCursor = 0
 	m.labelTab = 0
 	m.labelEditing = false

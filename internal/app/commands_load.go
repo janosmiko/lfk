@@ -10,6 +10,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -43,25 +44,28 @@ func (m Model) loadContexts() tea.Msg {
 }
 
 func (m Model) loadResourceTypes() tea.Cmd {
-	crds := m.discoveredCRDs[m.nav.Context]
+	kctx := m.nav.Context
+	discovered := m.discoveredResources[kctx]
+	var items []model.Item
+	if len(discovered) > 0 {
+		items = model.BuildSidebarItems(discovered)
+	} else {
+		items = model.BuildSidebarItems(model.SeedResources())
+	}
 	return func() tea.Msg {
-		if len(crds) > 0 {
-			return resourceTypesMsg{items: model.MergeWithCRDs(crds)}
-		}
-		// No CRDs discovered yet: hide ArgoCD and Gateway API (require CRDs), show Helm (uses helm binary).
-		// Pass nil availableGroups so individual CRD-dependent entries (e.g. VPA) are also hidden.
-		return resourceTypesMsg{items: model.FlattenedResourceTypesFiltered(nil)}
+		return resourceTypesMsg{items: items}
 	}
 }
 
-// discoverCRDs launches async CRD discovery for the given context.
-// Uses context.Background() instead of m.reqCtx because CRD discovery should
-// not be cancelled by navigation actions (cancelAndReset).
-func (m Model) discoverCRDs(contextName string) tea.Cmd {
+// discoverAPIResources launches async API resource discovery for the given
+// context via Client.DiscoverAPIResources. Uses context.Background() instead
+// of m.reqCtx because discovery should not be cancelled by navigation
+// actions (cancelAndReset). Results are delivered via apiResourceDiscoveryMsg.
+func (m Model) discoverAPIResources(contextName string) tea.Cmd {
 	client := m.client
 	return func() tea.Msg {
-		entries, err := client.DiscoverCRDs(context.Background(), contextName)
-		return crdDiscoveryMsg{context: contextName, entries: entries, err: err}
+		entries, err := client.DiscoverAPIResources(context.Background(), contextName)
+		return apiResourceDiscoveryMsg{context: contextName, entries: entries, err: err}
 	}
 }
 
@@ -81,22 +85,28 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 	ns := m.effectiveNamespace()
 	rt := m.nav.ResourceType
 	gen := m.requestGen
+	silent := m.suppressBgtasks
 	reqCtx := m.reqCtx
 	if forPreview {
 		sel := m.selectedMiddleItem()
 		if sel == nil {
 			return nil
 		}
-		found, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredCRDs[kctx])
+		found, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[kctx])
 		if !ok {
 			return nil
 		}
 		rt = found
 	}
-	return func() tea.Msg {
-		items, err := m.client.GetResources(reqCtx, kctx, ns, rt)
-		return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen}
-	}
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"List "+model.DisplayNameFor(rt),
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			items, err := m.client.GetResources(reqCtx, kctx, ns, rt)
+			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
+		},
+	)
 }
 
 func (m Model) loadOwned(forPreview bool) tea.Cmd {
@@ -105,6 +115,7 @@ func (m Model) loadOwned(forPreview bool) tea.Cmd {
 	kind := m.nav.ResourceType.Kind
 	name := m.nav.ResourceName
 	gen := m.requestGen
+	silent := m.suppressBgtasks
 	reqCtx := m.reqCtx
 	if forPreview {
 		sel := m.selectedMiddleItem()
@@ -118,10 +129,15 @@ func (m Model) loadOwned(forPreview bool) tea.Cmd {
 	} else if ns == "" && m.nav.Namespace != "" {
 		ns = m.nav.Namespace
 	}
-	return func() tea.Msg {
-		items, err := m.client.GetOwnedResources(reqCtx, kctx, ns, kind, name)
-		return ownedLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen}
-	}
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"List "+kind+" children",
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			items, err := m.client.GetOwnedResources(reqCtx, kctx, ns, kind, name)
+			return ownedLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
+		},
+	)
 }
 
 func (m Model) loadResourceTree() tea.Cmd {
@@ -156,16 +172,22 @@ func (m Model) loadResourceTree() tea.Cmd {
 		return nil
 	}
 
-	return func() tea.Msg {
-		tree, err := m.client.GetResourceTree(reqCtx, kctx, ns, kind, name)
-		return resourceTreeLoadedMsg{tree: tree, err: err, gen: gen}
-	}
+	return m.trackBgTask(
+		bgtasks.KindResourceTree,
+		"Resource tree: "+kind+"/"+name,
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			tree, err := m.client.GetResourceTree(reqCtx, kctx, ns, kind, name)
+			return resourceTreeLoadedMsg{tree: tree, err: err, gen: gen}
+		},
+	)
 }
 
 func (m Model) loadContainers(forPreview bool) tea.Cmd {
 	kctx := m.nav.Context
 	ns := m.effectiveNamespace()
 	gen := m.requestGen
+	silent := m.suppressBgtasks
 	reqCtx := m.reqCtx
 	if ns == "" && m.nav.Namespace != "" {
 		ns = m.nav.Namespace
@@ -181,10 +203,19 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 			ns = sel.Namespace
 		}
 	}
-	return func() tea.Msg {
-		items, err := m.client.GetContainers(reqCtx, kctx, ns, podName)
-		return containersLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen}
+	taskTarget := bgtaskTarget(kctx, ns)
+	if podName != "" {
+		taskTarget = taskTarget + " / " + podName
 	}
+	return m.trackBgTask(
+		bgtasks.KindContainers,
+		"List containers",
+		taskTarget,
+		func() tea.Msg {
+			items, err := m.client.GetContainers(reqCtx, kctx, ns, podName)
+			return containersLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
+		},
+	)
 }
 
 func (m Model) loadNamespaces() tea.Cmd {
@@ -206,14 +237,34 @@ func (m Model) loadNamespaces() tea.Cmd {
 // it falls back to constructing a ResourceTypeEntry from the item's Extra
 // metadata (which may contain "group/version" from ArgoCD status) and the
 // Kind. Returns false if the type cannot be resolved.
+//
+// When sel.Extra carries a "group/version" hint (e.g. helm manifest items
+// expose the rendered apiVersion there), the lookup is biased toward the
+// matching APIGroup so that two CRDs sharing the same Kind name but living
+// in different API groups (e.g. VaultDynamicSecret in secrets.hashicorp.com
+// vs. generators.external-secrets.io) resolve to the right CRD instead of
+// whichever one was iterated first.
 func (m Model) resolveOwnedResourceType(sel *model.Item) (model.ResourceTypeEntry, bool) {
 	if sel == nil {
 		return model.ResourceTypeEntry{}, false
 	}
 	kctx := m.nav.Context
-	crds := m.discoveredCRDs[kctx]
+	crds := m.discoveredResources[kctx]
 
-	// First try to find by Kind in built-in types and discovered CRDs.
+	// If Extra carries an apiVersion ("group/version"), prefer matching by
+	// Kind+APIGroup so duplicate Kind names across API groups resolve to
+	// the right CRD. Core types (Extra="v1") have no group component and
+	// fall through to the Kind-only lookup below.
+	if sel.Extra != "" && sel.Kind != "" {
+		parts := strings.SplitN(sel.Extra, "/", 2)
+		if len(parts) == 2 && parts[0] != "" {
+			if rt, ok := model.FindResourceTypeByKindAndGroup(sel.Kind, parts[0], crds); ok {
+				return rt, true
+			}
+		}
+	}
+
+	// Try to find by Kind in built-in types and discovered CRDs.
 	if rt, ok := model.FindResourceTypeByKind(sel.Kind, crds); ok {
 		return rt, true
 	}
@@ -222,24 +273,6 @@ func (m Model) resolveOwnedResourceType(sel *model.Item) (model.ResourceTypeEntr
 	if sel.Extra != "" {
 		if rt, ok := model.FindResourceTypeIn(sel.Extra, crds); ok {
 			return rt, true
-		}
-	}
-
-	// Fallback: if Extra contains "group/version" (from ArgoCD status.resources),
-	// construct a ResourceTypeEntry by deriving the plural resource name from Kind.
-	if sel.Extra != "" && sel.Kind != "" {
-		parts := strings.SplitN(sel.Extra, "/", 2)
-		if len(parts) == 2 {
-			group := parts[0]
-			version := parts[1]
-			resource := strings.ToLower(sel.Kind) + "s"
-			return model.ResourceTypeEntry{
-				Kind:       sel.Kind,
-				APIGroup:   group,
-				APIVersion: version,
-				Resource:   resource,
-				Namespaced: true,
-			}, true
 		}
 	}
 
@@ -263,10 +296,15 @@ func (m Model) loadYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
-		return func() tea.Msg {
-			content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
-			return yamlLoadedMsg{content: content, err: err}
-		}
+		return m.trackBgTask(
+			bgtasks.KindYAMLFetch,
+			"YAML: "+name,
+			bgtaskTarget(kctx, itemNs),
+			func() tea.Msg {
+				content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
+				return buildYAMLLoadedMsg(content, err)
+			},
+		)
 	case model.LevelOwned:
 		sel := m.selectedMiddleItem()
 		if sel == nil {
@@ -277,28 +315,44 @@ func (m Model) loadYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
+		taskTarget := bgtaskTarget(kctx, itemNs)
 		if sel.Kind == "Pod" {
-			return func() tea.Msg {
-				content, err := m.client.GetPodYAML(reqCtx, kctx, itemNs, name)
-				return yamlLoadedMsg{content: content, err: err}
-			}
+			return m.trackBgTask(
+				bgtasks.KindYAMLFetch,
+				"YAML: "+name,
+				taskTarget,
+				func() tea.Msg {
+					content, err := m.client.GetPodYAML(reqCtx, kctx, itemNs, name)
+					return buildYAMLLoadedMsg(content, err)
+				},
+			)
 		}
 		rt, ok := m.resolveOwnedResourceType(sel)
 		if !ok {
 			return func() tea.Msg {
-				return yamlLoadedMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind)}
+				return buildYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind))
 			}
 		}
-		return func() tea.Msg {
-			content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
-			return yamlLoadedMsg{content: content, err: err}
-		}
+		return m.trackBgTask(
+			bgtasks.KindYAMLFetch,
+			"YAML: "+name,
+			taskTarget,
+			func() tea.Msg {
+				content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
+				return buildYAMLLoadedMsg(content, err)
+			},
+		)
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
-		return func() tea.Msg {
-			content, err := m.client.GetPodYAML(reqCtx, kctx, ns, podName)
-			return yamlLoadedMsg{content: content, err: err}
-		}
+		return m.trackBgTask(
+			bgtasks.KindYAMLFetch,
+			"YAML: "+podName,
+			bgtaskTarget(kctx, ns),
+			func() tea.Msg {
+				content, err := m.client.GetPodYAML(reqCtx, kctx, ns, podName)
+				return buildYAMLLoadedMsg(content, err)
+			},
+		)
 	}
 	return nil
 }
@@ -466,13 +520,18 @@ func (m Model) loadPreviewEvents() tea.Cmd {
 		kind = sel.Kind
 	}
 
-	return func() tea.Msg {
-		events, err := client.GetResourceEvents(context.Background(), kctx, ns, name, kind)
-		if err != nil {
-			return previewEventsLoadedMsg{gen: gen}
-		}
-		return previewEventsLoadedMsg{events: events, gen: gen}
-	}
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"Preview events: "+name,
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			events, err := client.GetResourceEvents(context.Background(), kctx, ns, name, kind)
+			if err != nil {
+				return previewEventsLoadedMsg{gen: gen}
+			}
+			return previewEventsLoadedMsg{events: events, gen: gen}
+		},
+	)
 }
 
 // loadPodMetricsForList fetches metrics for all pods in the current namespace
@@ -483,13 +542,18 @@ func (m Model) loadPodMetricsForList() tea.Cmd {
 	gen := m.requestGen
 	client := m.client
 	reqCtx := m.reqCtx
-	return func() tea.Msg {
-		metrics, err := client.GetAllPodMetrics(reqCtx, kctx, ns)
-		if err != nil {
-			return podMetricsEnrichedMsg{gen: gen} // silently ignore
-		}
-		return podMetricsEnrichedMsg{metrics: metrics, gen: gen}
-	}
+	return m.trackBgTask(
+		bgtasks.KindMetrics,
+		"Pod metrics",
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			metrics, err := client.GetAllPodMetrics(reqCtx, kctx, ns)
+			if err != nil {
+				return podMetricsEnrichedMsg{gen: gen} // silently ignore
+			}
+			return podMetricsEnrichedMsg{metrics: metrics, gen: gen}
+		},
+	)
 }
 
 // loadNodeMetricsForList fetches metrics for all nodes and returns them
@@ -499,13 +563,18 @@ func (m Model) loadNodeMetricsForList() tea.Cmd {
 	gen := m.requestGen
 	client := m.client
 	reqCtx := m.reqCtx
-	return func() tea.Msg {
-		metrics, err := client.GetAllNodeMetrics(reqCtx, kctx)
-		if err != nil {
-			return nodeMetricsEnrichedMsg{gen: gen}
-		}
-		return nodeMetricsEnrichedMsg{metrics: metrics, gen: gen}
-	}
+	return m.trackBgTask(
+		bgtasks.KindMetrics,
+		"Node metrics",
+		bgtaskTarget(kctx, ""),
+		func() tea.Msg {
+			metrics, err := client.GetAllNodeMetrics(reqCtx, kctx)
+			if err != nil {
+				return nodeMetricsEnrichedMsg{gen: gen}
+			}
+			return nodeMetricsEnrichedMsg{metrics: metrics, gen: gen}
+		},
+	)
 }
 
 // loadSecretData fetches secret data for the secret editor.
@@ -778,5 +847,50 @@ func (m Model) loadHelmHistory() tea.Cmd {
 			return helmHistoryListMsg{err: err}
 		}
 		return helmHistoryListMsg{revisions: revisions}
+	}
+}
+
+// bgtaskTarget formats a context+namespace pair for the :tasks overlay's
+// Target column. Falls back gracefully when either part is empty.
+func bgtaskTarget(kctx, ns string) string {
+	switch {
+	case kctx != "" && ns != "":
+		return kctx + " / " + ns
+	case kctx != "":
+		return kctx
+	case ns != "":
+		return ns
+	default:
+		return ""
+	}
+}
+
+// trackBgTask wraps a loader's inner closure with bgtasks Start/Finish.
+// It calls Start SYNCHRONOUSLY (while Update is still building the Cmd
+// return value), so the very next View() frame already sees the task in
+// the registry. If Start were inside the returned closure instead, it
+// would only run after the goroutine that executes the Cmd begins —
+// which is after View() has already rendered that frame, so the user
+// would never see the indicator for sub-frame loads.
+//
+// The deferred Finish still runs inside the goroutine, so it correctly
+// fires on success, error, panic, or context cancellation.
+//
+// Pass a nil inner to skip tracking entirely (for loaders whose early
+// return paths don't dispatch any work).
+func (m Model) trackBgTask(kind bgtasks.Kind, name, target string, inner func() tea.Msg) tea.Cmd {
+	if inner == nil {
+		return nil
+	}
+	registry := m.bgtasks
+	var id uint64
+	if m.suppressBgtasks {
+		id = registry.StartUntracked()
+	} else {
+		id = registry.Start(kind, name, target)
+	}
+	return func() tea.Msg {
+		defer registry.Finish(id)
+		return inner()
 	}
 }

@@ -160,6 +160,28 @@ func (m *Model) clampAllCursors() {
 	}
 }
 
+// middleColumnKind returns the lowercased kind that identifies the items
+// currently rendered in the middle column. It is used as the key for the
+// sessionColumns, hiddenBuiltinColumns, and columnOrder maps so that
+// column-visibility changes made while viewing one level do not leak into
+// another level that happens to navigate under the same parent
+// ResourceType (e.g., container columns must be independent of pod
+// columns even though nav.ResourceType stays "Pod" at LevelContainers).
+//
+// At LevelOwned and LevelContainers the parent's ResourceType.Kind is
+// misleading — the middle column shows different kinds (ReplicaSets,
+// Containers, etc.), so the method derives the kind from the first
+// middleItem. It falls back to nav.ResourceType.Kind when middleItems is
+// empty or at shallower levels.
+func (m *Model) middleColumnKind() string {
+	if m.nav.Level == model.LevelOwned || m.nav.Level == model.LevelContainers {
+		if len(m.middleItems) > 0 && m.middleItems[0].Kind != "" {
+			return strings.ToLower(m.middleItems[0].Kind)
+		}
+	}
+	return strings.ToLower(m.nav.ResourceType.Kind)
+}
+
 // navKey builds a unique key from the current navigation state, used for
 // cursor memory and item caching.
 func (m *Model) navKey() string {
@@ -318,8 +340,12 @@ func (m *Model) visibleMiddleItems() []model.Item {
 		}
 	}
 
-	// Apply collapsible group logic at LevelResourceTypes.
-	if m.nav.Level == model.LevelResourceTypes && !m.allGroupsExpanded {
+	// Apply collapsible group logic at LevelResourceTypes. When a text
+	// filter is active, skip the collapse step so matched items in
+	// non-expanded categories stay visible and navigable — otherwise a
+	// filter like "pods" would hide the Pods item inside a collapsed
+	// "Workloads" header when some other group happens to be expanded.
+	if m.nav.Level == model.LevelResourceTypes && !m.allGroupsExpanded && m.filterText == "" {
 		var collapsed []model.Item
 		seenCategories := make(map[string]bool)
 		for _, item := range items {

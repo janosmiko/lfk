@@ -325,98 +325,6 @@ func TestStatusStyle(t *testing.T) {
 	}
 }
 
-// --- MaskSecretYAML ---
-
-func TestMaskSecretYAML(t *testing.T) {
-	t.Run("masks data values", func(t *testing.T) {
-		input := `apiVersion: v1
-kind: Secret
-metadata:
-  name: my-secret
-data:
-  username: dXNlcm5hbWU=
-  password: cGFzc3dvcmQ=
-type: Opaque`
-		expected := `apiVersion: v1
-kind: Secret
-metadata:
-  name: my-secret
-data:
-  username: "********"
-  password: "********"
-type: Opaque`
-		assert.Equal(t, expected, MaskSecretYAML(input))
-	})
-
-	t.Run("masks stringData values", func(t *testing.T) {
-		input := `apiVersion: v1
-kind: Secret
-metadata:
-  name: my-secret
-stringData:
-  api-key: super-secret-key
-  token: abc123
-type: Opaque`
-		expected := `apiVersion: v1
-kind: Secret
-metadata:
-  name: my-secret
-stringData:
-  api-key: "********"
-  token: "********"
-type: Opaque`
-		assert.Equal(t, expected, MaskSecretYAML(input))
-	})
-
-	t.Run("masks both data and stringData", func(t *testing.T) {
-		input := `apiVersion: v1
-kind: Secret
-data:
-  encoded: dGVzdA==
-stringData:
-  plain: hello`
-		expected := `apiVersion: v1
-kind: Secret
-data:
-  encoded: "********"
-stringData:
-  plain: "********"`
-		assert.Equal(t, expected, MaskSecretYAML(input))
-	})
-
-	t.Run("does not mask metadata or other keys", func(t *testing.T) {
-		input := `apiVersion: v1
-kind: Secret
-metadata:
-  name: my-secret
-  namespace: default
-type: Opaque`
-		assert.Equal(t, input, MaskSecretYAML(input))
-	})
-
-	t.Run("handles empty data block", func(t *testing.T) {
-		input := `apiVersion: v1
-kind: Secret
-data:
-type: Opaque`
-		assert.Equal(t, input, MaskSecretYAML(input))
-	})
-
-	t.Run("preserves empty lines in data block", func(t *testing.T) {
-		input := `data:
-  key1: val1
-
-  key2: val2
-type: Opaque`
-		expected := `data:
-  key1: "********"
-
-  key2: "********"
-type: Opaque`
-		assert.Equal(t, expected, MaskSecretYAML(input))
-	})
-}
-
 // --- RenderResourceTree ---
 
 func TestRenderResourceTree(t *testing.T) {
@@ -657,16 +565,19 @@ func TestVimScrollOff(t *testing.T) {
 	})
 }
 
-// --- formatTableRowStyled restart arrow ---
+// --- styledRestartsCell restart arrow ---
 
-func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
+// These tests exercise the restart-arrow rendering logic that used to live
+// inline in formatTableRowStyled. The helper was extracted so the ordered
+// rendering path can reuse it; the tests still cover the same behavior.
+func TestStyledRestartsCell_RestartArrow(t *testing.T) {
 	t.Run("recent restart with count > 0 shows arrow", func(t *testing.T) {
 		item := model.Item{
 			Name:          "my-pod",
 			Restarts:      "3",
 			LastRestartAt: time.Now().Add(-10 * time.Minute), // 10 minutes ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
+		result := styledRestartsCell(item, 10, true)
 		assert.Contains(t, result, "↑")
 		assert.Contains(t, result, "3")
 	})
@@ -677,7 +588,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts:      "3",
 			LastRestartAt: time.Now().Add(-2 * time.Hour), // 2 hours ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
+		result := styledRestartsCell(item, 10, true)
 		assert.NotContains(t, result, "↑")
 		assert.Contains(t, result, "3")
 	})
@@ -687,7 +598,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Name:     "my-pod",
 			Restarts: "0",
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
+		result := styledRestartsCell(item, 10, true)
 		assert.NotContains(t, result, "↑")
 		assert.Contains(t, result, "0")
 	})
@@ -698,7 +609,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts:      "5",
 			LastRestartAt: time.Now().Add(-5 * time.Minute), // 5 minutes ago
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
+		result := styledRestartsCell(item, 10, true)
 		assert.Contains(t, result, "↑")
 		assert.Contains(t, result, "5")
 	})
@@ -709,7 +620,7 @@ func TestFormatTableRowStyled_RestartArrow(t *testing.T) {
 			Restarts: "2",
 			// LastRestartAt is zero value
 		}
-		result := formatTableRowStyled(item, 30, 0, 0, 10, 0, false, false, true, false, true, "")
+		result := styledRestartsCell(item, 10, true)
 		assert.NotContains(t, result, "↑")
 	})
 }

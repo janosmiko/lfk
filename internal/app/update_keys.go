@@ -618,6 +618,19 @@ func (m Model) handleKeyWatchMode() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyExpandCollapse() (tea.Model, tea.Cmd) {
+	// At the Events resource list, reuse the expand/collapse key to toggle
+	// grouping of duplicate events (same Type/Reason/Message/Object collapsed
+	// into a single row with a summed Count).
+	if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "Event" {
+		m.eventGrouping = !m.eventGrouping
+		m.rebuildEventsFromCache()
+		if m.eventGrouping {
+			m.setStatusMessage("Events grouped (duplicates collapsed)", false)
+		} else {
+			m.setStatusMessage("Events expanded (raw)", false)
+		}
+		return m, scheduleStatusClear()
+	}
 	if m.nav.Level == model.LevelResourceTypes {
 		if m.allGroupsExpanded {
 			// Collapsing: find current item's category BEFORE changing mode.

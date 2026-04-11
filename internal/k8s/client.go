@@ -285,9 +285,13 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 		ti := c.buildResourceItem(ctx, contextName, &item, &rt)
 		items = append(items, ti)
 	}
-	// Sort events by time (newest first); all other resources alphabetically by name.
+	// Sort events by most recent observation first (LastSeen, not CreatedAt).
+	// CreatedAt holds the firstTimestamp — sorting on it would push recurring
+	// incidents to the bottom even when their latest report is the freshest
+	// thing in the list. Users expect "what happened most recently" at the top.
+	// All other resources sort alphabetically by name.
 	if rt.Kind == "Event" {
-		sort.Slice(items, func(i, j int) bool { return items[i].CreatedAt.After(items[j].CreatedAt) })
+		sort.Slice(items, func(i, j int) bool { return items[i].LastSeen.After(items[j].LastSeen) })
 	} else {
 		sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
 	}

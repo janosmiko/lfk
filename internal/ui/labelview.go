@@ -142,6 +142,10 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 		var line string
 		switch {
 		case i == selectedIdx && editing:
+			// While editing, always show the in-progress edit values in
+			// both columns, not the committed slot value. Only the cursor
+			// block follows editColumn. This keeps the user's typed key
+			// visible after tabbing to the value column (and vice versa).
 			if editColumn == 0 {
 				editDisplay := editKey + DimStyle.Render("\u2588")
 				editW := lipgloss.Width(editDisplay)
@@ -149,9 +153,10 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 				if pad < 0 {
 					pad = 0
 				}
-				line = HelpKeyStyle.Render("> ") + editDisplay + strings.Repeat(" ", pad) + "  |  " + displayV
+				valDisplay := Truncate(editValue, valColW)
+				line = HelpKeyStyle.Render("> ") + editDisplay + strings.Repeat(" ", pad) + "  |  " + valDisplay
 			} else {
-				keyDisplay := Truncate(k, keyColW)
+				keyDisplay := Truncate(editKey, keyColW)
 				editDisplay := editValue + DimStyle.Render("\u2588")
 				line = HelpKeyStyle.Render("> ") + fmt.Sprintf("%-*s", keyColW, keyDisplay) + "  |  " + editDisplay
 			}

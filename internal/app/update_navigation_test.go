@@ -330,7 +330,7 @@ func TestCovBoost2NavigateChildNoSelection(t *testing.T) {
 
 func TestCovNavigateToOwnerUnknownKind(t *testing.T) {
 	m := baseModelCov()
-	m.discoveredCRDs = map[string][]model.ResourceTypeEntry{}
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{}
 	ret, cmd := m.navigateToOwner("UnknownKind", "some-name")
 	result := ret.(Model)
 	assert.True(t, result.hasStatusMessage())

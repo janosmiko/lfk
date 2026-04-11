@@ -1,0 +1,469 @@
+package model
+
+// CoreCategories lists the navigation categories that are built-in to LFK
+// and always appear in a fixed order at the top of the sidebar. They cannot
+// be pinned or reordered by the user.
+var CoreCategories = []string{
+	"Dashboards",
+	"Security", // dynamically populated via model.SecuritySourcesFn
+	"Cluster",
+	"Workloads",
+	"Config",
+	"Networking",
+	"Storage",
+	"Access Control",
+	"Helm",
+	"API and CRDs",
+	"Advanced", // surfaced only when ShowRareResources is true
+}
+
+// IsCoreCategory reports whether name is one of the fixed CoreCategories.
+func IsCoreCategory(name string) bool {
+	for _, c := range CoreCategories {
+		if c == name {
+			return true
+		}
+	}
+	return false
+}
+
+// KnownResourceNames returns the set of lowercase plural resource names
+// known to LFK via BuiltInMetadata. Used by command bar parsers and
+// completion when a discovered resource set is not available at the call
+// site. CRDs not in BuiltInMetadata are handled at runtime via the
+// discovered slice passed through higher-level helpers.
+func KnownResourceNames() map[string]bool {
+	out := make(map[string]bool, len(BuiltInMetadata))
+	for key := range BuiltInMetadata {
+		// key format: "group/resource" — take the part after the slash.
+		for i := len(key) - 1; i >= 0; i-- {
+			if key[i] == '/' {
+				out[key[i+1:]] = true
+				break
+			}
+		}
+	}
+	return out
+}
+
+// DisplayMetadata describes how a discovered API resource should appear in
+// the sidebar. It carries display intent only — GVR, version, and scope come
+// from runtime discovery and live on ResourceTypeEntry.
+type DisplayMetadata struct {
+	Category    string // e.g., "Workloads", "Storage"
+	DisplayName string // e.g., "Deployments"
+	Icon        string // Unicode glyph
+	Rare        bool   // if true, hidden from the sidebar unless ShowRareResources is toggled on
+}
+
+// ShowRareResources, when true, causes BuildSidebarItems to surface
+// BuiltInMetadata entries marked Rare=true as well as uncategorized core
+// Kubernetes resources that are otherwise hidden. The app toggles this via
+// a keybinding. It is a package-level var (like PinnedGroups) so
+// BuildSidebarItems can read it without a signature change.
+var ShowRareResources bool
+
+// AdvancedCategory is the category name used for uncategorized core
+// Kubernetes resources (TokenReview, Binding, ComponentStatus, etc.) when
+// ShowRareResources is true. It is appended to CoreCategories so the
+// section appears at the end of the core sidebar area.
+const AdvancedCategory = "Advanced"
+
+// CoreK8sGroups lists the API groups that belong to the core Kubernetes API
+// surface. Discovered resources whose group matches this set AND whose
+// group/resource key is absent from BuiltInMetadata are intentionally hidden
+// from the sidebar (they are obscure built-ins like Binding, TokenReview,
+// ComponentStatus that clutter navigation). Discovered resources outside
+// this set are treated as CRDs and grouped under their API group.
+var CoreK8sGroups = map[string]bool{
+	"":                             true, // core/v1
+	"apps":                         true,
+	"batch":                        true,
+	"autoscaling":                  true,
+	"policy":                       true,
+	"networking.k8s.io":            true,
+	"rbac.authorization.k8s.io":    true,
+	"storage.k8s.io":               true,
+	"storagemigration.k8s.io":      true,
+	"coordination.k8s.io":          true,
+	"discovery.k8s.io":             true,
+	"scheduling.k8s.io":            true,
+	"node.k8s.io":                  true,
+	"events.k8s.io":                true,
+	"certificates.k8s.io":          true,
+	"admissionregistration.k8s.io": true,
+	"apiregistration.k8s.io":       true,
+	"apiextensions.k8s.io":         true,
+	"flowcontrol.apiserver.k8s.io": true,
+	"authorization.k8s.io":         true,
+	"authentication.k8s.io":        true,
+	"internal.apiserver.k8s.io":    true,
+	"resource.k8s.io":              true,
+	"gateway.networking.k8s.io":    true,
+}
+
+// BuiltInMetadata maps "group/resource" to display metadata for the curated
+// sidebar. The key format is "<group>/<resource>" with an empty group for
+// core/v1 resources (e.g., "/pods", "/services"). Resources the cluster
+// serves but absent from this map are either hidden (if the group is in
+// CoreK8sGroups) or shown as generic CRD entries under their API group.
+//
+// This map is hand-maintained. Adding an entry here makes the corresponding
+// resource appear in the sidebar with the given category and icon whenever
+// the cluster serves it.
+var BuiltInMetadata = map[string]DisplayMetadata{
+	// ---- Cluster ----
+	"/nodes":      {Category: "Cluster", DisplayName: "Nodes", Icon: "⬡"},
+	"/namespaces": {Category: "Cluster", DisplayName: "Namespaces", Icon: "▣"},
+	"/events":     {Category: "Cluster", DisplayName: "Events", Icon: "↯"},
+
+	// ---- Workloads ----
+	"/pods":             {Category: "Workloads", DisplayName: "Pods", Icon: "⬤"},
+	"apps/deployments":  {Category: "Workloads", DisplayName: "Deployments", Icon: "◆"},
+	"apps/replicasets":  {Category: "Workloads", DisplayName: "ReplicaSets", Icon: "◈"},
+	"apps/statefulsets": {Category: "Workloads", DisplayName: "StatefulSets", Icon: "◇"},
+	"apps/daemonsets":   {Category: "Workloads", DisplayName: "DaemonSets", Icon: "●"},
+	"batch/jobs":        {Category: "Workloads", DisplayName: "Jobs", Icon: "▶"},
+	"batch/cronjobs":    {Category: "Workloads", DisplayName: "CronJobs", Icon: "⟳"},
+
+	// ---- Config ----
+	"/configmaps":                          {Category: "Config", DisplayName: "ConfigMaps", Icon: "≡"},
+	"/secrets":                             {Category: "Config", DisplayName: "Secrets", Icon: "⊡"},
+	"/resourcequotas":                      {Category: "Config", DisplayName: "ResourceQuotas", Icon: "⊞"},
+	"/limitranges":                         {Category: "Config", DisplayName: "LimitRanges", Icon: "⊟"},
+	"autoscaling/horizontalpodautoscalers": {Category: "Config", DisplayName: "HPA", Icon: "⇔"},
+	"autoscaling.k8s.io/verticalpodautoscalers":                      {Category: "Config", DisplayName: "VPA", Icon: "⇕"},
+	"policy/poddisruptionbudgets":                                    {Category: "Config", DisplayName: "PodDisruptionBudgets", Icon: "⊘"},
+	"scheduling.k8s.io/priorityclasses":                              {Category: "Config", DisplayName: "PriorityClasses", Icon: "⇑"},
+	"node.k8s.io/runtimeclasses":                                     {Category: "Config", DisplayName: "RuntimeClasses", Icon: "⊙", Rare: true},
+	"coordination.k8s.io/leases":                                     {Category: "Config", DisplayName: "Leases", Icon: "⏱", Rare: true},
+	"admissionregistration.k8s.io/mutatingwebhookconfigurations":     {Category: "Config", DisplayName: "MutatingWebhookConfigurations", Icon: "⚙", Rare: true},
+	"admissionregistration.k8s.io/validatingwebhookconfigurations":   {Category: "Config", DisplayName: "ValidatingWebhookConfigurations", Icon: "⚙", Rare: true},
+	"admissionregistration.k8s.io/validatingadmissionpolicies":       {Category: "Config", DisplayName: "ValidatingAdmissionPolicies", Icon: "⚙", Rare: true},
+	"admissionregistration.k8s.io/validatingadmissionpolicybindings": {Category: "Config", DisplayName: "ValidatingAdmissionPolicyBindings", Icon: "⚙", Rare: true},
+	"flowcontrol.apiserver.k8s.io/flowschemas":                       {Category: "Config", DisplayName: "FlowSchemas", Icon: "⚙", Rare: true},
+	"flowcontrol.apiserver.k8s.io/prioritylevelconfigurations":       {Category: "Config", DisplayName: "PriorityLevelConfigurations", Icon: "⚙", Rare: true},
+
+	// ---- Networking ----
+	"/services":                                {Category: "Networking", DisplayName: "Services", Icon: "⇌"},
+	"/endpoints":                               {Category: "Networking", DisplayName: "Endpoints", Icon: "⇢"},
+	"networking.k8s.io/ingresses":              {Category: "Networking", DisplayName: "Ingresses", Icon: "↳"},
+	"networking.k8s.io/networkpolicies":        {Category: "Networking", DisplayName: "NetworkPolicies", Icon: "⛊"},
+	"networking.k8s.io/ingressclasses":         {Category: "Networking", DisplayName: "IngressClasses", Icon: "↳"},
+	"discovery.k8s.io/endpointslices":          {Category: "Networking", DisplayName: "EndpointSlices", Icon: "⇢"},
+	"gateway.networking.k8s.io/gatewayclasses": {Category: "Networking", DisplayName: "GatewayClasses", Icon: "⇶"},
+	"gateway.networking.k8s.io/httproutes":     {Category: "Networking", DisplayName: "HTTPRoutes", Icon: "⇶"},
+	"gateway.networking.k8s.io/tlsroutes":      {Category: "Networking", DisplayName: "TLSRoutes", Icon: "⇶"},
+	"gateway.networking.k8s.io/grpcroutes":     {Category: "Networking", DisplayName: "GRPCRoutes", Icon: "⇶"},
+
+	// ---- Storage ----
+	"/persistentvolumeclaims":             {Category: "Storage", DisplayName: "PersistentVolumeClaims", Icon: "⊞"},
+	"/persistentvolumes":                  {Category: "Storage", DisplayName: "PersistentVolumes", Icon: "⊞"},
+	"storage.k8s.io/storageclasses":       {Category: "Storage", DisplayName: "StorageClasses", Icon: "▤"},
+	"storage.k8s.io/csidrivers":           {Category: "Storage", DisplayName: "CSIDrivers", Icon: "▤", Rare: true},
+	"storage.k8s.io/csinodes":             {Category: "Storage", DisplayName: "CSINodes", Icon: "▤", Rare: true},
+	"storage.k8s.io/csistoragecapacities": {Category: "Storage", DisplayName: "CSIStorageCapacities", Icon: "▤", Rare: true},
+	"storage.k8s.io/volumeattachments":    {Category: "Storage", DisplayName: "VolumeAttachments", Icon: "▤", Rare: true},
+
+	// ---- Access Control ----
+	"/serviceaccounts":                              {Category: "Access Control", DisplayName: "ServiceAccounts", Icon: "⊕"},
+	"rbac.authorization.k8s.io/roles":               {Category: "Access Control", DisplayName: "Roles", Icon: "⚿"},
+	"rbac.authorization.k8s.io/rolebindings":        {Category: "Access Control", DisplayName: "RoleBindings", Icon: "⚿"},
+	"rbac.authorization.k8s.io/clusterroles":        {Category: "Access Control", DisplayName: "ClusterRoles", Icon: "⚿"},
+	"rbac.authorization.k8s.io/clusterrolebindings": {Category: "Access Control", DisplayName: "ClusterRoleBindings", Icon: "⚿"},
+
+	// ---- API and CRDs ----
+	"apiregistration.k8s.io/apiservices":             {Category: "API and CRDs", DisplayName: "API Services", Icon: "⧫", Rare: true},
+	"apiextensions.k8s.io/customresourcedefinitions": {Category: "API and CRDs", DisplayName: "Custom Resource Definitions", Icon: "⧫"},
+
+	// ---- LFK pseudo-resources ----
+	// These are not served by any Kubernetes cluster. They are injected into
+	// the discovered resource set so the sidebar, command bar, and resolver
+	// can treat them uniformly with real resources. The "_helm" and
+	// "_portforward" API groups are LFK-only sentinels that GetResources /
+	// GetResourceYAML route to helm and port-forward handlers.
+	"_helm/releases":            {Category: "Helm", DisplayName: "Releases", Icon: "⎋"},
+	"_portforward/portforwards": {Category: "Networking", DisplayName: "Port Forwards", Icon: "⇋"},
+
+	// ---- Ecosystem CRDs (ported from TopLevelResourceTypes) ----
+	// argoproj.io
+	"argoproj.io/applications":             {Category: "argoproj.io", DisplayName: "Applications", Icon: "⎈"},
+	"argoproj.io/applicationsets":          {Category: "argoproj.io", DisplayName: "ApplicationSets", Icon: "⎈"},
+	"argoproj.io/appprojects":              {Category: "argoproj.io", DisplayName: "AppProjects", Icon: "⎈"},
+	"argoproj.io/workflows":                {Category: "argoproj.io", DisplayName: "Workflows", Icon: "⟳"},
+	"argoproj.io/workflowtemplates":        {Category: "argoproj.io", DisplayName: "WorkflowTemplates", Icon: "⟳"},
+	"argoproj.io/clusterworkflowtemplates": {Category: "argoproj.io", DisplayName: "ClusterWorkflowTemplates", Icon: "⟳"},
+	"argoproj.io/cronworkflows":            {Category: "argoproj.io", DisplayName: "CronWorkflows", Icon: "⟳"},
+
+	// Flux CD
+	"kustomize.toolkit.fluxcd.io/kustomizations":     {Category: "kustomize.toolkit.fluxcd.io", DisplayName: "Kustomizations", Icon: "⎈"},
+	"helm.toolkit.fluxcd.io/helmreleases":            {Category: "helm.toolkit.fluxcd.io", DisplayName: "HelmReleases", Icon: "⎋"},
+	"source.toolkit.fluxcd.io/gitrepositories":       {Category: "source.toolkit.fluxcd.io", DisplayName: "GitRepositories", Icon: "⧫"},
+	"source.toolkit.fluxcd.io/helmrepositories":      {Category: "source.toolkit.fluxcd.io", DisplayName: "HelmRepositories", Icon: "⧫"},
+	"source.toolkit.fluxcd.io/helmcharts":            {Category: "source.toolkit.fluxcd.io", DisplayName: "HelmCharts", Icon: "⧫"},
+	"source.toolkit.fluxcd.io/ocirepositories":       {Category: "source.toolkit.fluxcd.io", DisplayName: "OCIRepositories", Icon: "⧫"},
+	"source.toolkit.fluxcd.io/buckets":               {Category: "source.toolkit.fluxcd.io", DisplayName: "Buckets", Icon: "⧫"},
+	"notification.toolkit.fluxcd.io/alerts":          {Category: "notification.toolkit.fluxcd.io", DisplayName: "Alerts", Icon: "⧫"},
+	"notification.toolkit.fluxcd.io/providers":       {Category: "notification.toolkit.fluxcd.io", DisplayName: "Providers", Icon: "⧫"},
+	"notification.toolkit.fluxcd.io/receivers":       {Category: "notification.toolkit.fluxcd.io", DisplayName: "Receivers", Icon: "⧫"},
+	"image.toolkit.fluxcd.io/imagerepositories":      {Category: "image.toolkit.fluxcd.io", DisplayName: "ImageRepositories", Icon: "⧫"},
+	"image.toolkit.fluxcd.io/imagepolicies":          {Category: "image.toolkit.fluxcd.io", DisplayName: "ImagePolicies", Icon: "⧫"},
+	"image.toolkit.fluxcd.io/imageupdateautomations": {Category: "image.toolkit.fluxcd.io", DisplayName: "ImageUpdateAutomations", Icon: "⧫"},
+
+	// cert-manager.io
+	"cert-manager.io/certificates":        {Category: "cert-manager.io", DisplayName: "Certificates", Icon: "⊡"},
+	"cert-manager.io/issuers":             {Category: "cert-manager.io", DisplayName: "Issuers", Icon: "⚿"},
+	"cert-manager.io/clusterissuers":      {Category: "cert-manager.io", DisplayName: "ClusterIssuers", Icon: "⚿"},
+	"cert-manager.io/certificaterequests": {Category: "cert-manager.io", DisplayName: "CertificateRequests", Icon: "⧫"},
+	"acme.cert-manager.io/orders":         {Category: "acme.cert-manager.io", DisplayName: "Orders", Icon: "⧫"},
+	"acme.cert-manager.io/challenges":     {Category: "acme.cert-manager.io", DisplayName: "Challenges", Icon: "⧫"},
+
+	// longhorn.io
+	"longhorn.io/volumes":       {Category: "longhorn.io", DisplayName: "Volumes", Icon: "⬡"},
+	"longhorn.io/engines":       {Category: "longhorn.io", DisplayName: "Engines", Icon: "⬡"},
+	"longhorn.io/replicas":      {Category: "longhorn.io", DisplayName: "Replicas", Icon: "⬡"},
+	"longhorn.io/nodes":         {Category: "longhorn.io", DisplayName: "Longhorn Nodes", Icon: "⬡"},
+	"longhorn.io/backingimages": {Category: "longhorn.io", DisplayName: "BackingImages", Icon: "⬡"},
+	"longhorn.io/backups":       {Category: "longhorn.io", DisplayName: "Backups", Icon: "⬡"},
+	"longhorn.io/recurringjobs": {Category: "longhorn.io", DisplayName: "RecurringJobs", Icon: "⬡"},
+	"longhorn.io/settings":      {Category: "longhorn.io", DisplayName: "Settings", Icon: "⬡"},
+
+	// Istio
+	"networking.istio.io/virtualservices":      {Category: "networking.istio.io", DisplayName: "VirtualServices", Icon: "⎈"},
+	"networking.istio.io/destinationrules":     {Category: "networking.istio.io", DisplayName: "DestinationRules", Icon: "⎈"},
+	"networking.istio.io/gateways":             {Category: "networking.istio.io", DisplayName: "Gateways", Icon: "⎈"},
+	"networking.istio.io/serviceentries":       {Category: "networking.istio.io", DisplayName: "ServiceEntries", Icon: "⎈"},
+	"networking.istio.io/sidecars":             {Category: "networking.istio.io", DisplayName: "Sidecars", Icon: "⎈"},
+	"security.istio.io/peerauthentications":    {Category: "security.istio.io", DisplayName: "PeerAuthentications", Icon: "⎈"},
+	"security.istio.io/authorizationpolicies":  {Category: "security.istio.io", DisplayName: "AuthorizationPolicies", Icon: "⎈"},
+	"security.istio.io/requestauthentications": {Category: "security.istio.io", DisplayName: "RequestAuthentications", Icon: "⎈"},
+	"telemetry.istio.io/telemetries":           {Category: "telemetry.istio.io", DisplayName: "Telemetries", Icon: "⎈"},
+
+	// Cloud provider
+	"cloud.google.com/backendconfigs":                          {Category: "cloud.google.com", DisplayName: "BackendConfigs", Icon: "☁"},
+	"networking.gke.io/managedcertificates":                    {Category: "networking.gke.io", DisplayName: "ManagedCertificates", Icon: "☁"},
+	"vpcresources.k8s.aws/securitygrouppolicies":               {Category: "vpcresources.k8s.aws", DisplayName: "SecurityGroupPolicies", Icon: "☁"},
+	"crd.k8s.amazonaws.com/eniconfigs":                         {Category: "crd.k8s.amazonaws.com", DisplayName: "ENIConfigs", Icon: "☁"},
+	"aadpodidentity.k8s.io/azureidentities":                    {Category: "aadpodidentity.k8s.io", DisplayName: "AzureIdentities", Icon: "☁"},
+	"aadpodidentity.k8s.io/azureidentitybindings":              {Category: "aadpodidentity.k8s.io", DisplayName: "AzureIdentityBindings", Icon: "☁"},
+	"infrastructure.cluster.x-k8s.io/azuremanagedclusters":     {Category: "infrastructure.cluster.x-k8s.io", DisplayName: "AzureManagedClusters", Icon: "☁"},
+	"infrastructure.cluster.x-k8s.io/azuremanagedmachinepools": {Category: "infrastructure.cluster.x-k8s.io", DisplayName: "AzureManagedMachinePools", Icon: "☁"},
+
+	// Karpenter
+	"karpenter.sh/nodepools":           {Category: "karpenter.sh", DisplayName: "NodePools", Icon: "⬡"},
+	"karpenter.sh/nodeclaims":          {Category: "karpenter.sh", DisplayName: "NodeClaims", Icon: "⬡"},
+	"karpenter.k8s.aws/ec2nodeclasses": {Category: "karpenter.k8s.aws", DisplayName: "EC2NodeClasses", Icon: "⬡"},
+
+	// Prometheus operator
+	"monitoring.coreos.com/servicemonitors": {Category: "monitoring.coreos.com", DisplayName: "ServiceMonitors", Icon: "⊙"},
+	"monitoring.coreos.com/podmonitors":     {Category: "monitoring.coreos.com", DisplayName: "PodMonitors", Icon: "⊙"},
+	"monitoring.coreos.com/prometheusrules": {Category: "monitoring.coreos.com", DisplayName: "PrometheusRules", Icon: "⊙"},
+	"monitoring.coreos.com/alertmanagers":   {Category: "monitoring.coreos.com", DisplayName: "Alertmanagers", Icon: "⊙"},
+	"monitoring.coreos.com/prometheuses":    {Category: "monitoring.coreos.com", DisplayName: "Prometheuses", Icon: "⊙"},
+	"monitoring.coreos.com/thanosrulers":    {Category: "monitoring.coreos.com", DisplayName: "ThanosRulers", Icon: "⊙"},
+
+	// keda.sh
+	"keda.sh/scaledobjects":                 {Category: "keda.sh", DisplayName: "ScaledObjects", Icon: "⚡"},
+	"keda.sh/scaledjobs":                    {Category: "keda.sh", DisplayName: "ScaledJobs", Icon: "⚡"},
+	"keda.sh/triggerauthentications":        {Category: "keda.sh", DisplayName: "TriggerAuthentications", Icon: "⚡"},
+	"keda.sh/clustertriggerauthentications": {Category: "keda.sh", DisplayName: "ClusterTriggerAuthentications", Icon: "⚡"},
+
+	// external-secrets.io
+	"external-secrets.io/externalsecrets":        {Category: "external-secrets.io", DisplayName: "ExternalSecrets", Icon: "⚿"},
+	"external-secrets.io/clusterexternalsecrets": {Category: "external-secrets.io", DisplayName: "ClusterExternalSecrets", Icon: "⚿"},
+	"external-secrets.io/pushsecrets":            {Category: "external-secrets.io", DisplayName: "PushSecrets", Icon: "⚿"},
+	"external-secrets.io/secretstores":           {Category: "external-secrets.io", DisplayName: "SecretStores", Icon: "⚿"},
+	"external-secrets.io/clustersecretstores":    {Category: "external-secrets.io", DisplayName: "ClusterSecretStores", Icon: "⚿"},
+
+	// bitnami.com
+	"bitnami.com/sealedsecrets": {Category: "bitnami.com", DisplayName: "SealedSecrets", Icon: "⚿"},
+
+	// traefik.io
+	"traefik.io/ingressroutes":    {Category: "traefik.io", DisplayName: "IngressRoutes", Icon: "⎈"},
+	"traefik.io/middlewares":      {Category: "traefik.io", DisplayName: "Middlewares", Icon: "⎈"},
+	"traefik.io/ingressroutetcps": {Category: "traefik.io", DisplayName: "IngressRouteTCPs", Icon: "⎈"},
+	"traefik.io/tlsoptions":       {Category: "traefik.io", DisplayName: "TLSOptions", Icon: "⎈"},
+
+	// externaldns.k8s.io
+	"externaldns.k8s.io/dnsendpoints": {Category: "externaldns.k8s.io", DisplayName: "DNSEndpoints", Icon: "⧫"},
+
+	// Crossplane
+	"apiextensions.crossplane.io/compositions":                 {Category: "apiextensions.crossplane.io", DisplayName: "Compositions", Icon: "⧫"},
+	"apiextensions.crossplane.io/compositeresourcedefinitions": {Category: "apiextensions.crossplane.io", DisplayName: "CompositeResourceDefinitions", Icon: "⧫"},
+	"pkg.crossplane.io/providers":                              {Category: "pkg.crossplane.io", DisplayName: "Providers", Icon: "⧫"},
+	"pkg.crossplane.io/configurations":                         {Category: "pkg.crossplane.io", DisplayName: "Configurations", Icon: "⧫"},
+
+	// velero.io
+	"velero.io/backups":                {Category: "velero.io", DisplayName: "Backups", Icon: "⧫"},
+	"velero.io/restores":               {Category: "velero.io", DisplayName: "Restores", Icon: "⧫"},
+	"velero.io/schedules":              {Category: "velero.io", DisplayName: "Schedules", Icon: "⧫"},
+	"velero.io/backupstoragelocations": {Category: "velero.io", DisplayName: "BackupStorageLocations", Icon: "⧫"},
+
+	// tekton.dev
+	"tekton.dev/pipelines":    {Category: "tekton.dev", DisplayName: "Pipelines", Icon: "⧫"},
+	"tekton.dev/tasks":        {Category: "tekton.dev", DisplayName: "Tasks", Icon: "⧫"},
+	"tekton.dev/pipelineruns": {Category: "tekton.dev", DisplayName: "PipelineRuns", Icon: "⧫"},
+	"tekton.dev/taskruns":     {Category: "tekton.dev", DisplayName: "TaskRuns", Icon: "⧫"},
+
+	// kafka.strimzi.io
+	"kafka.strimzi.io/kafkas":        {Category: "kafka.strimzi.io", DisplayName: "Kafkas", Icon: "⧫"},
+	"kafka.strimzi.io/kafkatopics":   {Category: "kafka.strimzi.io", DisplayName: "KafkaTopics", Icon: "⧫"},
+	"kafka.strimzi.io/kafkaconnects": {Category: "kafka.strimzi.io", DisplayName: "KafkaConnects", Icon: "⧫"},
+	"kafka.strimzi.io/kafkausers":    {Category: "kafka.strimzi.io", DisplayName: "KafkaUsers", Icon: "⧫"},
+	"kafka.strimzi.io/kafkabridges":  {Category: "kafka.strimzi.io", DisplayName: "KafkaBridges", Icon: "⧫"},
+
+	// knative
+	"serving.knative.dev/services":       {Category: "serving.knative.dev", DisplayName: "Knative Services", Icon: "⧫"},
+	"serving.knative.dev/routes":         {Category: "serving.knative.dev", DisplayName: "Routes", Icon: "⧫"},
+	"serving.knative.dev/revisions":      {Category: "serving.knative.dev", DisplayName: "Revisions", Icon: "⧫"},
+	"serving.knative.dev/configurations": {Category: "serving.knative.dev", DisplayName: "Configurations", Icon: "⧫"},
+	"eventing.knative.dev/triggers":      {Category: "eventing.knative.dev", DisplayName: "Triggers", Icon: "⧫"},
+	"eventing.knative.dev/brokers":       {Category: "eventing.knative.dev", DisplayName: "Brokers", Icon: "⧫"},
+}
+
+// BuiltInOrderRank maps "group/resource" keys to their display rank within
+// a category. Lower rank appears first. This restores the curated display
+// order of the former TopLevelResourceTypes list (e.g., Pods before
+// Deployments, not alphabetical). Keys not in this map fall back to
+// alphabetical ordering by display name within the category.
+//
+// Ranks are grouped by category in increments of 10 so new entries can be
+// inserted between existing ones without renumbering.
+var BuiltInOrderRank = map[string]int{
+	// Cluster
+	"/nodes":      10,
+	"/namespaces": 11,
+	"/events":     12,
+
+	// Workloads (the old curated order: Pods first, then controllers by
+	// increasing abstraction, then batch).
+	"/pods":             20,
+	"apps/deployments":  21,
+	"apps/replicasets":  22,
+	"apps/statefulsets": 23,
+	"apps/daemonsets":   24,
+	"batch/jobs":        25,
+	"batch/cronjobs":    26,
+
+	// Config
+	"/configmaps":                          30,
+	"/secrets":                             31,
+	"autoscaling/horizontalpodautoscalers": 32,
+	"/resourcequotas":                      33,
+	"/limitranges":                         34,
+	"autoscaling.k8s.io/verticalpodautoscalers":                      35,
+	"policy/poddisruptionbudgets":                                    36,
+	"scheduling.k8s.io/priorityclasses":                              37,
+	"node.k8s.io/runtimeclasses":                                     38,
+	"coordination.k8s.io/leases":                                     39,
+	"admissionregistration.k8s.io/mutatingwebhookconfigurations":     40,
+	"admissionregistration.k8s.io/validatingwebhookconfigurations":   41,
+	"admissionregistration.k8s.io/validatingadmissionpolicies":       42,
+	"admissionregistration.k8s.io/validatingadmissionpolicybindings": 43,
+	"flowcontrol.apiserver.k8s.io/flowschemas":                       44,
+	"flowcontrol.apiserver.k8s.io/prioritylevelconfigurations":       45,
+
+	// Networking
+	"/services":                                50,
+	"networking.k8s.io/ingresses":              51,
+	"networking.k8s.io/networkpolicies":        52,
+	"/endpoints":                               53,
+	"discovery.k8s.io/endpointslices":          54,
+	"networking.k8s.io/ingressclasses":         55,
+	"_portforward/portforwards":                56,
+	"gateway.networking.k8s.io/gatewayclasses": 57,
+	"gateway.networking.k8s.io/httproutes":     58,
+	"gateway.networking.k8s.io/tlsroutes":      59,
+	"gateway.networking.k8s.io/grpcroutes":     60,
+
+	// Storage
+	"/persistentvolumeclaims":             70,
+	"/persistentvolumes":                  71,
+	"storage.k8s.io/storageclasses":       72,
+	"storage.k8s.io/csidrivers":           73,
+	"storage.k8s.io/csinodes":             74,
+	"storage.k8s.io/csistoragecapacities": 75,
+	"storage.k8s.io/volumeattachments":    76,
+
+	// Access Control
+	"/serviceaccounts":                              80,
+	"rbac.authorization.k8s.io/roles":               81,
+	"rbac.authorization.k8s.io/rolebindings":        82,
+	"rbac.authorization.k8s.io/clusterroles":        83,
+	"rbac.authorization.k8s.io/clusterrolebindings": 84,
+
+	// Helm
+	"_helm/releases": 90,
+
+	// API and CRDs
+	"apiregistration.k8s.io/apiservices":             100,
+	"apiextensions.k8s.io/customresourcedefinitions": 101,
+}
+
+// PseudoResources returns the LFK-only resource types that are not served
+// by any Kubernetes cluster but need to appear in the sidebar, resolve via
+// FindResourceType*, and round-trip through the command bar. The entries
+// use sentinel API groups ("_helm", "_portforward") that GetResources and
+// GetResourceYAML recognize and route to helm/port-forward handlers.
+//
+// These entries should be prepended to the discovered resource set in both
+// the async discovery handler and the pre-discovery seed path so they are
+// uniformly available regardless of cluster state.
+func PseudoResources() []ResourceTypeEntry {
+	return []ResourceTypeEntry{
+		{
+			DisplayName: "Releases",
+			Kind:        "HelmRelease",
+			APIGroup:    "_helm",
+			APIVersion:  "v1",
+			Resource:    "releases",
+			Namespaced:  true,
+		},
+		{
+			DisplayName: "Port Forwards",
+			Kind:        "__port_forwards__",
+			APIGroup:    "_portforward",
+			APIVersion:  "v1",
+			Resource:    "portforwards",
+			Namespaced:  false,
+		},
+	}
+}
+
+// SeedResources returns the minimum set of core Kubernetes resources that
+// should appear in the sidebar before DiscoverAPIResources completes for a
+// new context, plus the LFK pseudo-resources from PseudoResources(). Every
+// entry must have a matching BuiltInMetadata key.
+//
+// The seed is replaced wholesale (not merged) the first time discovery
+// returns for a context — that replacement path also prepends
+// PseudoResources() so the pseudo-entries remain present.
+func SeedResources() []ResourceTypeEntry {
+	seed := PseudoResources()
+	seed = append(seed,
+		// Workloads
+		ResourceTypeEntry{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		ResourceTypeEntry{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+		ResourceTypeEntry{Kind: "StatefulSet", APIGroup: "apps", APIVersion: "v1", Resource: "statefulsets", Namespaced: true},
+		ResourceTypeEntry{Kind: "DaemonSet", APIGroup: "apps", APIVersion: "v1", Resource: "daemonsets", Namespaced: true},
+		ResourceTypeEntry{Kind: "ReplicaSet", APIGroup: "apps", APIVersion: "v1", Resource: "replicasets", Namespaced: true},
+		ResourceTypeEntry{Kind: "Job", APIGroup: "batch", APIVersion: "v1", Resource: "jobs", Namespaced: true},
+		ResourceTypeEntry{Kind: "CronJob", APIGroup: "batch", APIVersion: "v1", Resource: "cronjobs", Namespaced: true},
+		// Networking
+		ResourceTypeEntry{Kind: "Service", APIGroup: "", APIVersion: "v1", Resource: "services", Namespaced: true},
+		ResourceTypeEntry{Kind: "Ingress", APIGroup: "networking.k8s.io", APIVersion: "v1", Resource: "ingresses", Namespaced: true},
+		// Config
+		ResourceTypeEntry{Kind: "ConfigMap", APIGroup: "", APIVersion: "v1", Resource: "configmaps", Namespaced: true},
+		ResourceTypeEntry{Kind: "Secret", APIGroup: "", APIVersion: "v1", Resource: "secrets", Namespaced: true},
+		// Cluster
+		ResourceTypeEntry{Kind: "Namespace", APIGroup: "", APIVersion: "v1", Resource: "namespaces", Namespaced: false},
+		ResourceTypeEntry{Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false},
+		ResourceTypeEntry{Kind: "Event", APIGroup: "", APIVersion: "v1", Resource: "events", Namespaced: true},
+		// Storage
+		ResourceTypeEntry{Kind: "PersistentVolumeClaim", APIGroup: "", APIVersion: "v1", Resource: "persistentvolumeclaims", Namespaced: true},
+		ResourceTypeEntry{Kind: "PersistentVolume", APIGroup: "", APIVersion: "v1", Resource: "persistentvolumes", Namespaced: false},
+		// Access Control
+		ResourceTypeEntry{Kind: "ServiceAccount", APIGroup: "", APIVersion: "v1", Resource: "serviceaccounts", Namespaced: true},
+	)
+	return seed
+}

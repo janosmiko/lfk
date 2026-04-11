@@ -1,12 +1,19 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// stripANSI removes ANSI escape sequences from s for plain-text assertions.
+func stripANSI(s string) string {
+	return ansi.Strip(s)
+}
 
 // --- RenderTable ---
 
@@ -50,6 +57,50 @@ func TestRenderTable(t *testing.T) {
 		assert.Contains(t, result, "nginx")
 		assert.Contains(t, result, "redis")
 		assert.Contains(t, result, "Running")
+	})
+
+	t.Run("ActiveHiddenBuiltinColumns suppresses built-in columns", func(t *testing.T) {
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0 // active middle column render (required for suppression)
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = map[string]bool{"Ready": true, "Status": true}
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{
+			{Name: "nginx", Status: "Running", Ready: "1/1", Restarts: "0", Age: "5m"},
+		}
+		result := RenderTable("NAME", items, 0, 80, 20, false, "", "")
+		assert.Contains(t, result, "NAME", "NAME header must always be present")
+		assert.Contains(t, result, "AGE", "AGE header must still be present (not hidden)")
+		assert.Contains(t, result, "RS", "RESTARTS header must still be present (not hidden)")
+		assert.NotContains(t, result, "READY", "READY header must be suppressed")
+		assert.NotContains(t, result, "STATUS", "STATUS header must be suppressed")
+	})
+
+	t.Run("ActiveHiddenBuiltinColumns ignored for non-middle render", func(t *testing.T) {
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = -1 // non-middle render (child/right pane)
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = map[string]bool{"Ready": true}
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{
+			{Name: "nginx", Ready: "1/1", Age: "5m"},
+		}
+		result := RenderTable("NAME", items, 0, 80, 20, false, "", "")
+		assert.Contains(t, result, "READY", "READY header must be shown for non-middle renders")
 	})
 
 	t.Run("items with namespace show NAMESPACE header", func(t *testing.T) {
@@ -134,6 +185,187 @@ func TestRenderTable(t *testing.T) {
 		result := RenderTable("NAME", items, 0, 80, 20, false, "", "")
 		assert.Contains(t, result, "RS")
 		assert.Contains(t, result, "3")
+	})
+
+	t.Run("default_order_preserved", func(t *testing.T) {
+		// With no ActiveColumnOrder set, the header should come out in the
+		// historical order: NAMESPACE NAME READY RS STATUS AGE. Extras are
+		// still appended before Age.
+		origQuery := ActiveHighlightQuery
+		ActiveHighlightQuery = ""
+		defer func() { ActiveHighlightQuery = origQuery }()
+
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origOrder := ActiveColumnOrder
+		ActiveColumnOrder = nil
+		defer func() { ActiveColumnOrder = origOrder }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = nil
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{
+			{Name: "nginx", Namespace: "default", Ready: "1/1", Restarts: "0", Status: "Running", Age: "5m"},
+		}
+		result := RenderTable("NAME", items, 0, 120, 20, false, "", "")
+
+		// The header line is the first line of the output.
+		firstLine := strings.Split(result, "\n")[0]
+		// Strip ANSI codes for easier substring ordering checks.
+		plain := stripANSI(firstLine)
+
+		nsIdx := strings.Index(plain, "NAMESPACE")
+		nameIdx := strings.Index(plain, "NAME ") // trailing space disambiguates from NAMESPACE
+		if nameIdx < 0 {
+			nameIdx = strings.Index(plain, "NAME")
+		}
+		readyIdx := strings.Index(plain, "READY")
+		rsIdx := strings.Index(plain, "RS ")
+		if rsIdx < 0 {
+			rsIdx = strings.LastIndex(plain, "RS")
+		}
+		statusIdx := strings.Index(plain, "STATUS")
+		ageIdx := strings.Index(plain, "AGE")
+
+		assert.GreaterOrEqual(t, nsIdx, 0, "NAMESPACE must be present")
+		assert.GreaterOrEqual(t, nameIdx, 0, "NAME must be present")
+		assert.GreaterOrEqual(t, readyIdx, 0, "READY must be present")
+		assert.GreaterOrEqual(t, rsIdx, 0, "RS must be present")
+		assert.GreaterOrEqual(t, statusIdx, 0, "STATUS must be present")
+		assert.GreaterOrEqual(t, ageIdx, 0, "AGE must be present")
+
+		// Check relative ordering (Name comes first, built-ins in canonical order,
+		// Age last).
+		assert.Less(t, nameIdx, readyIdx, "NAME must come before READY")
+		assert.Less(t, readyIdx, rsIdx, "READY must come before RS")
+		assert.Less(t, rsIdx, statusIdx, "RS must come before STATUS")
+		assert.Less(t, statusIdx, ageIdx, "STATUS must come before AGE")
+	})
+
+	t.Run("custom_order_honored", func(t *testing.T) {
+		// With ActiveColumnOrder set, the header should come out in the
+		// user-specified order, with Name always first.
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origOrder := ActiveColumnOrder
+		ActiveColumnOrder = []string{"Age", "Status", "Namespace", "Ready"}
+		defer func() { ActiveColumnOrder = origOrder }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = nil
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{
+			{Name: "nginx", Namespace: "default", Ready: "1/1", Status: "Running", Age: "5m"},
+		}
+		result := RenderTable("NAME", items, 0, 120, 20, false, "", "")
+
+		firstLine := strings.Split(result, "\n")[0]
+		plain := stripANSI(firstLine)
+
+		nameIdx := strings.Index(plain, "NAME ")
+		if nameIdx < 0 {
+			nameIdx = strings.Index(plain, "NAME")
+		}
+		ageIdx := strings.Index(plain, "AGE")
+		statusIdx := strings.Index(plain, "STATUS")
+		nsIdx := strings.Index(plain, "NAMESPACE")
+		readyIdx := strings.Index(plain, "READY")
+
+		assert.GreaterOrEqual(t, nameIdx, 0)
+		assert.GreaterOrEqual(t, ageIdx, 0)
+		assert.GreaterOrEqual(t, statusIdx, 0)
+		assert.GreaterOrEqual(t, nsIdx, 0)
+		assert.GreaterOrEqual(t, readyIdx, 0)
+
+		// Name must still be first.
+		assert.Less(t, nameIdx, ageIdx, "NAME comes before AGE")
+		// Then the user-specified order.
+		assert.Less(t, ageIdx, statusIdx, "AGE comes before STATUS (per custom order)")
+		assert.Less(t, statusIdx, nsIdx, "STATUS comes before NAMESPACE (per custom order)")
+		assert.Less(t, nsIdx, readyIdx, "NAMESPACE comes before READY (per custom order)")
+	})
+
+	t.Run("hidden_builtin_with_custom_order", func(t *testing.T) {
+		// A hidden built-in should be dropped from the ordered list even if
+		// the user's saved order references it.
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origOrder := ActiveColumnOrder
+		ActiveColumnOrder = []string{"Age", "Status", "Namespace"}
+		defer func() { ActiveColumnOrder = origOrder }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = map[string]bool{"Status": true}
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{
+			{Name: "nginx", Namespace: "default", Status: "Running", Age: "5m"},
+		}
+		result := RenderTable("NAME", items, 0, 120, 20, false, "", "")
+		firstLine := strings.Split(result, "\n")[0]
+		plain := stripANSI(firstLine)
+
+		assert.NotContains(t, plain, "STATUS", "STATUS must be hidden")
+
+		nameIdx := strings.Index(plain, "NAME")
+		ageIdx := strings.Index(plain, "AGE")
+		nsIdx := strings.Index(plain, "NAMESPACE")
+		assert.Less(t, nameIdx, ageIdx, "NAME before AGE")
+		assert.Less(t, ageIdx, nsIdx, "AGE before NAMESPACE")
+	})
+
+	t.Run("stale_order_key_dropped", func(t *testing.T) {
+		// A key in the saved order that isn't currently present (no data,
+		// no extra column) should be silently dropped.
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origOrder := ActiveColumnOrder
+		ActiveColumnOrder = []string{"IP", "Namespace"}
+		defer func() { ActiveColumnOrder = origOrder }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = nil
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{
+			{Name: "nginx", Namespace: "default"},
+		}
+		result := RenderTable("NAME", items, 0, 120, 20, false, "", "")
+		firstLine := strings.Split(result, "\n")[0]
+		plain := stripANSI(firstLine)
+
+		assert.NotContains(t, plain, "IP", "IP is not a real column, must be dropped")
+		nameIdx := strings.Index(plain, "NAME")
+		nsIdx := strings.Index(plain, "NAMESPACE")
+		assert.GreaterOrEqual(t, nameIdx, 0)
+		assert.GreaterOrEqual(t, nsIdx, 0)
+		assert.Less(t, nameIdx, nsIdx, "NAME before NAMESPACE")
 	})
 }
 

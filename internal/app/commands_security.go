@@ -7,28 +7,39 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
 // loadSecurityAvailability probes each registered source's IsAvailable
 // and returns a securityAvailabilityLoadedMsg with a per-source map.
 // Used by the SEC column and Security category to decide what to show.
+//
+// The probe is tracked through the bgtasks Registry so it surfaces in the
+// background tasks overlay and titlebar spinner alongside other long-running
+// cluster queries. Each source's IsAvailable call can take up to 3 s, so
+// users deserve to see the probe in flight.
 func (m Model) loadSecurityAvailability() tea.Cmd {
 	if m.securityManager == nil {
 		return nil
 	}
 	mgr := m.securityManager
 	kctx := m.nav.Context
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-		defer cancel()
-		byName := make(map[string]bool)
-		for _, s := range mgr.Sources() {
-			ok, _ := s.IsAvailable(ctx, kctx)
-			byName[s.Name()] = ok
-		}
-		return securityAvailabilityLoadedMsg{context: kctx, availability: byName}
-	}
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"Security availability",
+		bgtaskTarget(kctx, ""),
+		func() tea.Msg {
+			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+			defer cancel()
+			byName := make(map[string]bool)
+			for _, s := range mgr.Sources() {
+				ok, _ := s.IsAvailable(ctx, kctx)
+				byName[s.Name()] = ok
+			}
+			return securityAvailabilityLoadedMsg{context: kctx, availability: byName}
+		},
+	)
 }
 
 // handleSecurityAvailabilityLoaded merges a per-source availability
@@ -54,10 +65,10 @@ func (m Model) handleSecurityAvailabilityLoaded(msg securityAvailabilityLoadedMs
 	// middleItems were built with an empty availability map and don't
 	// include the Security entries.
 	if m.nav.Level == model.LevelResourceTypes {
-		if crds, ok := m.discoveredCRDs[m.nav.Context]; ok && len(crds) > 0 {
-			m.middleItems = model.MergeWithCRDs(crds)
+		if discovered, ok := m.discoveredResources[m.nav.Context]; ok && len(discovered) > 0 {
+			m.middleItems = model.BuildSidebarItems(discovered)
 		} else {
-			m.middleItems = model.FlattenedResourceTypes()
+			m.middleItems = model.BuildSidebarItems(model.SeedResources())
 		}
 		m.itemCache[m.navKey()] = m.middleItems
 		m.clampCursor()

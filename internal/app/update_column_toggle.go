@@ -4,18 +4,137 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// openColumnToggle populates the column toggle overlay from the current resource list.
+// builtinColumnOrder is the canonical left-to-right order of built-in
+// columns in RenderTable. openColumnToggle emits entries in this order so
+// the overlay matches the header row.
+var builtinColumnOrder = []string{"Namespace", "Ready", "Restarts", "Status", "Age"}
+
+// openColumnToggle populates the column toggle overlay from the current
+// resource list. It enumerates both built-in columns (backed by Item fields)
+// and extra columns (from Item.Columns), pre-selecting entries to reflect
+// what is currently rendered on screen.
 func (m *Model) openColumnToggle() {
-	// Collect all available column keys from current items.
 	items := m.visibleMiddleItems()
+	// Use middleColumnKind so column config at LevelContainers/LevelOwned
+	// is scoped to the actual kind being shown (e.g., "container", not the
+	// parent pod's "pod").
+	kind := m.middleColumnKind()
+
+	builtinEntries := m.collectBuiltinToggleEntries(items, kind)
+	extraEntries := m.collectExtraToggleEntries(items)
+
+	if len(builtinEntries) == 0 && len(extraEntries) == 0 {
+		return
+	}
+
+	entries := mergeColumnToggleEntries(builtinEntries, extraEntries, m.columnOrder[kind])
+
+	m.columnToggleItems = entries
+	m.columnToggleCursor = 0
+	m.columnToggleFilter = ""
+	m.columnToggleFilterActive = false
+	m.overlay = overlayColumnToggle
+}
+
+// mergeColumnToggleEntries interleaves built-in and extra toggle entries
+// according to the user's saved column order for the current kind. Entries
+// whose keys are not listed in savedOrder are appended in the default
+// position (built-ins first, then extras) so newly-discovered columns still
+// surface. Built-in keys take precedence over any extra sharing the name.
+func mergeColumnToggleEntries(builtinEntries, extraEntries []columnToggleEntry, savedOrder []string) []columnToggleEntry {
+	byKey := make(map[string]columnToggleEntry, len(builtinEntries)+len(extraEntries))
+	for _, e := range builtinEntries {
+		byKey[e.key] = e
+	}
+	for _, e := range extraEntries {
+		// Built-in keys take precedence — never let an extra with a clashing key overwrite.
+		if _, exists := byKey[e.key]; exists {
+			continue
+		}
+		byKey[e.key] = e
+	}
+
+	result := make([]columnToggleEntry, 0, len(byKey))
+	seen := make(map[string]bool, len(byKey))
+
+	for _, k := range savedOrder {
+		if e, ok := byKey[k]; ok && !seen[k] {
+			result = append(result, e)
+			seen[k] = true
+		}
+	}
+	// Append remaining entries in default order: built-ins first, then extras.
+	for _, e := range builtinEntries {
+		if !seen[e.key] {
+			result = append(result, e)
+			seen[e.key] = true
+		}
+	}
+	for _, e := range extraEntries {
+		if !seen[e.key] {
+			result = append(result, e)
+			seen[e.key] = true
+		}
+	}
+	return result
+}
+
+// collectBuiltinToggleEntries returns toggle entries for built-in columns
+// present in the item data. Name is intentionally excluded (it is mandatory).
+// The visible flag is true unless the column is in hiddenBuiltinColumns[kind].
+func (m *Model) collectBuiltinToggleEntries(items []model.Item, kind string) []columnToggleEntry {
+	present := map[string]bool{}
+	for _, item := range items {
+		if item.Namespace != "" {
+			present["Namespace"] = true
+		}
+		if item.Ready != "" {
+			present["Ready"] = true
+		}
+		if item.Restarts != "" {
+			present["Restarts"] = true
+		}
+		if item.Status != "" {
+			present["Status"] = true
+		}
+		if item.Age != "" {
+			present["Age"] = true
+		}
+	}
+
+	hidden := map[string]bool{}
+	for _, k := range m.hiddenBuiltinColumns[kind] {
+		hidden[k] = true
+	}
+
+	entries := make([]columnToggleEntry, 0, len(builtinColumnOrder))
+	for _, key := range builtinColumnOrder {
+		if !present[key] {
+			continue
+		}
+		entries = append(entries, columnToggleEntry{
+			key:     key,
+			visible: !hidden[key],
+			builtin: true,
+		})
+	}
+	return entries
+}
+
+// collectExtraToggleEntries returns toggle entries for extra columns found in
+// item.Columns. Visibility is derived from ui.ActiveExtraColumnKeys (the set
+// of extra columns currently rendered on screen) so the overlay always
+// reflects what the user actually sees regardless of saved preferences.
+func (m *Model) collectExtraToggleEntries(items []model.Item) []columnToggleEntry {
 	seen := make(map[string]bool)
 	var allKeys []string
 	for _, item := range items {
 		for _, kv := range item.Columns {
-			// Skip internal/data prefixed columns.
 			if strings.HasPrefix(kv.Key, "__") || strings.HasPrefix(kv.Key, "secret:") ||
 				strings.HasPrefix(kv.Key, "owner:") || strings.HasPrefix(kv.Key, "data:") ||
 				strings.HasPrefix(kv.Key, "condition:") || strings.HasPrefix(kv.Key, "step:") ||
@@ -30,46 +149,28 @@ func (m *Model) openColumnToggle() {
 	}
 
 	if len(allKeys) == 0 {
-		return
+		return nil
 	}
 
-	// Determine which columns are currently visible.
-	// Use session override if set, otherwise get from collectExtraColumns result.
-	kind := strings.ToLower(m.nav.ResourceType.Kind)
-	var visibleKeys map[string]bool
-	if sessionCols, ok := m.sessionColumns[kind]; ok {
-		visibleKeys = make(map[string]bool, len(sessionCols))
-		for _, k := range sessionCols {
-			visibleKeys[k] = true
-		}
-	} else {
-		// Use currently displayed columns from the table.
-		visibleKeys = make(map[string]bool)
-		for _, k := range ui.ActiveExtraColumnKeys {
-			visibleKeys[k] = true
-		}
+	visibleSet := make(map[string]bool, len(ui.ActiveExtraColumnKeys))
+	for _, k := range ui.ActiveExtraColumnKeys {
+		visibleSet[k] = true
 	}
 
-	// Build entries: visible ones first (in order), then hidden ones.
-	var entries []columnToggleEntry
-	// Add visible columns in their current order.
-	for _, k := range allKeys {
-		if visibleKeys[k] {
+	// Visible extras first, in the order they appear on screen.
+	entries := make([]columnToggleEntry, 0, len(allKeys))
+	for _, k := range ui.ActiveExtraColumnKeys {
+		if seen[k] {
 			entries = append(entries, columnToggleEntry{key: k, visible: true})
 		}
 	}
-	// Add hidden columns after.
+	// Then hidden extras, in discovery order.
 	for _, k := range allKeys {
-		if !visibleKeys[k] {
+		if !visibleSet[k] {
 			entries = append(entries, columnToggleEntry{key: k, visible: false})
 		}
 	}
-
-	m.columnToggleItems = entries
-	m.columnToggleCursor = 0
-	m.columnToggleFilter = ""
-	m.columnToggleFilterActive = false
-	m.overlay = overlayColumnToggle
+	return entries
 }
 
 // handleColumnToggleKey handles keyboard input for the column toggle overlay.
@@ -145,6 +246,14 @@ func (m Model) handleColumnToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "R":
 		// Reset: clear session override, fall back to config/auto-detect.
 		return m.handleColumnToggleKeyR()
+
+	case "c":
+		// Clear: uncheck every entry without closing the overlay, so the
+		// user can pick a fresh set from scratch. Apply with Enter to save.
+		for i := range m.columnToggleItems {
+			m.columnToggleItems[i].visible = false
+		}
+		return m, nil
 
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -252,30 +361,93 @@ func (m Model) handleColumnToggleKeyK2() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleColumnToggleKeyEnter() (tea.Model, tea.Cmd) {
-	kind := strings.ToLower(m.nav.ResourceType.Kind)
-	var visible []string
+	kind := m.middleColumnKind()
+
+	// Walk the current overlay order to collect three parallel views of the
+	// user's selection:
+	//   - visibleExtras: ordered visible extras (persisted to sessionColumns)
+	//   - hiddenBuiltins: built-in keys the user unchecked
+	//   - fullOrder: all visible entries in overlay order (persisted to
+	//     columnOrder so the next render honors the user's interleaving)
+	var visibleExtras []string
+	var hiddenBuiltins []string
+	var fullOrder []string
+	visibleCount := 0
 	for _, e := range m.columnToggleItems {
 		if e.visible {
-			visible = append(visible, e.key)
+			visibleCount++
+			fullOrder = append(fullOrder, e.key)
+		}
+		if e.builtin {
+			if !e.visible {
+				hiddenBuiltins = append(hiddenBuiltins, e.key)
+			}
+			continue
+		}
+		if e.visible {
+			visibleExtras = append(visibleExtras, e.key)
 		}
 	}
+
+	// If the user unselected absolutely everything, interpret it as "revert
+	// to defaults" instead of leaving the table completely empty. This is
+	// equivalent to pressing R and matches the more intuitive behavior.
+	if visibleCount == 0 {
+		delete(m.sessionColumns, kind)
+		delete(m.hiddenBuiltinColumns, kind)
+		delete(m.columnOrder, kind)
+		m.overlay = overlayNone
+		m.columnToggleItems = nil
+		return m, nil
+	}
+
 	if m.sessionColumns == nil {
 		m.sessionColumns = make(map[string][]string)
 	}
-	if len(visible) == 0 {
-		delete(m.sessionColumns, kind)
-	} else {
-		m.sessionColumns[kind] = visible
+	// Always save the extras list, even if empty, so the user's explicit
+	// "no extras" choice is preserved. A non-nil empty slice is the signal
+	// that the user configured this kind; selectColumnCandidates treats nil
+	// (no entry in the map) as "auto-detect" and an empty slice as "show
+	// no extras". Without this, unselecting all extras would fall back to
+	// auto-detect and re-add columns like CPU/MEM.
+	if visibleExtras == nil {
+		visibleExtras = []string{}
 	}
+	m.sessionColumns[kind] = visibleExtras
+
+	if m.hiddenBuiltinColumns == nil {
+		m.hiddenBuiltinColumns = make(map[string][]string)
+	}
+	if len(hiddenBuiltins) == 0 {
+		delete(m.hiddenBuiltinColumns, kind)
+	} else {
+		m.hiddenBuiltinColumns[kind] = hiddenBuiltins
+	}
+
+	if m.columnOrder == nil {
+		m.columnOrder = make(map[string][]string)
+	}
+	if len(fullOrder) == 0 {
+		delete(m.columnOrder, kind)
+	} else {
+		m.columnOrder[kind] = fullOrder
+	}
+
 	m.overlay = overlayNone
 	m.columnToggleItems = nil
 	return m, nil
 }
 
 func (m Model) handleColumnToggleKeyR() (tea.Model, tea.Cmd) {
-	kind := strings.ToLower(m.nav.ResourceType.Kind)
+	kind := m.middleColumnKind()
 	if m.sessionColumns != nil {
 		delete(m.sessionColumns, kind)
+	}
+	if m.hiddenBuiltinColumns != nil {
+		delete(m.hiddenBuiltinColumns, kind)
+	}
+	if m.columnOrder != nil {
+		delete(m.columnOrder, kind)
 	}
 	m.overlay = overlayNone
 	m.columnToggleItems = nil

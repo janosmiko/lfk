@@ -155,6 +155,9 @@ func TestCov80ResolveOwnedResourceTypeNil(t *testing.T) {
 
 func TestCov80ResolveOwnedResourceTypeKnownKind(t *testing.T) {
 	m := basePush80Model()
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+	}
 	item := &model.Item{Kind: "Deployment", Name: "deploy-1"}
 	rt, ok := m.resolveOwnedResourceType(item)
 	assert.True(t, ok)
@@ -168,17 +171,6 @@ func TestCov80ResolveOwnedResourceTypeExtraRef(t *testing.T) {
 	if ok {
 		assert.NotEmpty(t, rt.Resource)
 	}
-}
-
-func TestCov80ResolveOwnedResourceTypeFallbackGroupVersion(t *testing.T) {
-	m := basePush80Model()
-	// Extra with group/version format, unknown kind.
-	item := &model.Item{Kind: "MyCustomResource", Extra: "custom.io/v1beta1"}
-	rt, ok := m.resolveOwnedResourceType(item)
-	assert.True(t, ok)
-	assert.Equal(t, "custom.io", rt.APIGroup)
-	assert.Equal(t, "v1beta1", rt.APIVersion)
-	assert.Equal(t, "mycustomresources", rt.Resource)
 }
 
 func TestCov80ResolveOwnedResourceTypeNoMatch(t *testing.T) {
@@ -360,9 +352,9 @@ func TestCov80LoadNodeMetricsForList(t *testing.T) {
 	require.NotNil(t, cmd)
 }
 
-func TestCov80DiscoverCRDs(t *testing.T) {
+func TestCov80DiscoverAPIResources(t *testing.T) {
 	m := basePush80Model()
-	cmd := m.discoverCRDs("test-ctx")
+	cmd := m.discoverAPIResources("test-ctx")
 	require.NotNil(t, cmd)
 }
 
@@ -378,7 +370,7 @@ func TestCov80LoadResourceTypesNoCRDs(t *testing.T) {
 
 func TestCov80LoadResourceTypesWithCRDs(t *testing.T) {
 	m := basePush80Model()
-	m.discoveredCRDs["test-ctx"] = []model.ResourceTypeEntry{
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
 		{Kind: "MyCRD", Resource: "mycrds", APIGroup: "test.io", APIVersion: "v1", Namespaced: true},
 	}
 	cmd := m.loadResourceTypes()
@@ -399,7 +391,7 @@ func TestCovLoadContainersForLogFilter(t *testing.T) {
 func TestCovLoadResourceTypesWithCRDs(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "ctx"
-	m.discoveredCRDs["ctx"] = []model.ResourceTypeEntry{
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
 		{Kind: "Application", Resource: "applications", APIGroup: "argoproj.io"},
 	}
 	assert.NotNil(t, m.loadResourceTypes())
@@ -553,7 +545,7 @@ func TestCovLoadContainersBranches(t *testing.T) {
 func TestCovResolveOwnedResourceType(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "ctx"
-	m.discoveredCRDs["ctx"] = nil
+	m.discoveredResources["ctx"] = nil
 
 	_, ok := m.resolveOwnedResourceType(nil)
 	assert.False(t, ok, "nil item")
@@ -561,8 +553,13 @@ func TestCovResolveOwnedResourceType(t *testing.T) {
 	_, ok = m.resolveOwnedResourceType(&model.Item{Kind: "CompletelyUnknown"})
 	assert.False(t, ok, "unknown kind")
 
+	// Pre-populate the discovered set so the resolver can find the entry
+	// without relying on any hardcoded fallback.
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
+		{Kind: "CustomThing", APIGroup: "custom.io", APIVersion: "v1", Resource: "customthings", Namespaced: true},
+	}
 	rt, ok := m.resolveOwnedResourceType(&model.Item{Kind: "CustomThing", Extra: "custom.io/v1"})
-	assert.True(t, ok, "group/version fallback")
+	assert.True(t, ok)
 	assert.Equal(t, "custom.io", rt.APIGroup)
 	assert.Equal(t, "v1", rt.APIVersion)
 	assert.Equal(t, "customthings", rt.Resource)
@@ -601,7 +598,7 @@ func TestCovLoadResourceTypes(t *testing.T) {
 
 func TestCovLoadResourceTypesWithCRDsFakeClient(t *testing.T) {
 	m := baseModelWithFakeClient()
-	m.discoveredCRDs["test-ctx"] = []model.ResourceTypeEntry{
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
 		{DisplayName: "TestCRD", Kind: "TestCRD", APIGroup: "test.io", APIVersion: "v1", Resource: "testcrds"},
 	}
 	cmd := m.loadResourceTypes()
@@ -611,11 +608,11 @@ func TestCovLoadResourceTypesWithCRDsFakeClient(t *testing.T) {
 	assert.NotEmpty(t, result.items)
 }
 
-func TestCovDiscoverCRDsReturnsCmd(t *testing.T) {
+func TestCovDiscoverAPIResourcesReturnsCmd(t *testing.T) {
 	m := baseModelWithFakeClient()
-	cmd := m.discoverCRDs("test-ctx")
+	cmd := m.discoverAPIResources("test-ctx")
 	// Just verify it returns a non-nil command. Executing it would panic because
-	// the fake dynamic client does not have the CRD list kind registered.
+	// the fake dynamic client does not have the necessary resources registered.
 	assert.NotNil(t, cmd)
 }
 
@@ -995,15 +992,110 @@ func TestCovResolveOwnedResourceTypeNil(t *testing.T) {
 	assert.False(t, ok)
 }
 
-func TestCovResolveOwnedResourceTypeFallback(t *testing.T) {
+func TestCovResolveOwnedResourceTypeFromDiscoveredSet(t *testing.T) {
 	m := baseModelCov()
-	m.discoveredCRDs = map[string][]model.ResourceTypeEntry{}
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"": { // baseModelCov uses empty context
+			{Kind: "MyCustomResource", APIGroup: "mygroup.io", APIVersion: "v1", Resource: "mycustomresources", Namespaced: true},
+		},
+	}
 	sel := &model.Item{Kind: "MyCustomResource", Extra: "mygroup.io/v1"}
 	rt, ok := m.resolveOwnedResourceType(sel)
 	assert.True(t, ok)
 	assert.Equal(t, "mygroup.io", rt.APIGroup)
 	assert.Equal(t, "v1", rt.APIVersion)
 	assert.Equal(t, "mycustomresources", rt.Resource)
+}
+
+// TestResolveOwnedResourceType_DisambiguatesDuplicateKinds is a regression
+// guard for the bug where two CRDs sharing the same Kind name but living in
+// different API groups would resolve to whichever one was iterated first,
+// causing the wrong CRD to be fetched. The user's example:
+//
+//	vaultdynamicsecrets.generators.external-secrets.io
+//	vaultdynamicsecrets.secrets.hashicorp.com
+//
+// Both expose Kind="VaultDynamicSecret". When the helm view holds an item with
+// Extra="secrets.hashicorp.com/v1beta1" the resolver must pick the
+// secrets.hashicorp.com CRD, not the external-secrets.io one.
+func TestResolveOwnedResourceType_DisambiguatesDuplicateKinds(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "ctx"
+	// Two CRDs with the same Kind but different API groups, in the order
+	// the external-secrets.io CRD is iterated first (the bug scenario).
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
+		{
+			DisplayName: "VaultDynamicSecret",
+			Kind:        "VaultDynamicSecret",
+			APIGroup:    "generators.external-secrets.io",
+			APIVersion:  "v1alpha1",
+			Resource:    "vaultdynamicsecrets",
+			Namespaced:  true,
+		},
+		{
+			DisplayName: "VaultDynamicSecret",
+			Kind:        "VaultDynamicSecret",
+			APIGroup:    "secrets.hashicorp.com",
+			APIVersion:  "v1beta1",
+			Resource:    "vaultdynamicsecrets",
+			Namespaced:  true,
+		},
+	}
+
+	// Item from a helm release manifest: Extra is the full apiVersion that
+	// helm wrote (group/version).
+	sel := &model.Item{
+		Kind:  "VaultDynamicSecret",
+		Extra: "secrets.hashicorp.com/v1beta1",
+	}
+	rt, ok := m.resolveOwnedResourceType(sel)
+	require.True(t, ok)
+	assert.Equal(t, "secrets.hashicorp.com", rt.APIGroup,
+		"resolver must pick the CRD matching the item's apiVersion group, not just by Kind")
+	assert.Equal(t, "v1beta1", rt.APIVersion)
+	assert.Equal(t, "vaultdynamicsecrets", rt.Resource)
+
+	// The other side of the disambiguation: a sibling item from a different
+	// chart hits the external-secrets.io CRD with the same Kind name.
+	sel2 := &model.Item{
+		Kind:  "VaultDynamicSecret",
+		Extra: "generators.external-secrets.io/v1alpha1",
+	}
+	rt2, ok := m.resolveOwnedResourceType(sel2)
+	require.True(t, ok)
+	assert.Equal(t, "generators.external-secrets.io", rt2.APIGroup)
+	assert.Equal(t, "v1alpha1", rt2.APIVersion)
+}
+
+// TestResolveOwnedResourceType_CSIDriverClusterScoped is a regression guard
+// for CSIDriver resolution. CSIDriver is a cluster-scoped built-in K8s
+// resource in storage.k8s.io. The fallback path was constructing a
+// ResourceTypeEntry with Namespaced:true, causing API calls to hit the wrong
+// namespaced endpoint which returns "resource not found".
+func TestResolveOwnedResourceType_CSIDriverClusterScoped(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "ctx"
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
+		{
+			DisplayName: "CSIDrivers",
+			Kind:        "CSIDriver",
+			APIGroup:    "storage.k8s.io",
+			APIVersion:  "v1",
+			Resource:    "csidrivers",
+			Namespaced:  false,
+		},
+	}
+
+	sel := &model.Item{
+		Kind:  "CSIDriver",
+		Extra: "storage.k8s.io/v1",
+	}
+	rt, ok := m.resolveOwnedResourceType(sel)
+	require.True(t, ok, "CSIDriver must be resolvable")
+	assert.Equal(t, "storage.k8s.io", rt.APIGroup)
+	assert.Equal(t, "v1", rt.APIVersion)
+	assert.Equal(t, "csidrivers", rt.Resource)
+	assert.False(t, rt.Namespaced, "CSIDriver is cluster-scoped, Namespaced must be false")
 }
 
 func TestCovLoadPreviewEventsWithSelection(t *testing.T) {

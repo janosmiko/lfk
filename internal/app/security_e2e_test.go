@@ -132,32 +132,30 @@ func TestSecurityNavigationFlowEndToEnd(t *testing.T) {
 	require.Len(t, entries, 2,
 		"expected 2 Security entries (heuristic + trivy-operator)")
 
-	// Sanity check: the Security category in TopLevelResourceTypes is
-	// now populated from the hook.
-	var securityCat *model.ResourceCategory
-	for _, cat := range model.TopLevelResourceTypes() {
-		if cat.Name == "Security" {
-			c := cat
-			securityCat = &c
-			break
+	// Sanity check: the Security category in BuildSidebarItems is now
+	// populated from the hook.
+	var securityItems []model.Item
+	for _, it := range model.BuildSidebarItems(nil) {
+		if it.Category == "Security" {
+			securityItems = append(securityItems, it)
 		}
 	}
-	require.NotNil(t, securityCat, "Security category must exist")
-	require.Len(t, securityCat.Types, 2,
+	require.Len(t, securityItems, 2,
 		"Security category must have 2 entries")
 
 	// Pick the trivy-operator source entry to verify the Kind/APIGroup
-	// wiring is intact.
-	var trivyRT model.ResourceTypeEntry
-	for _, rt := range securityCat.Types {
-		if rt.Kind == "__security_trivy-operator__" {
-			trivyRT = rt
+	// wiring is intact. Items use Extra to carry the resource ref, which
+	// starts with the virtual API group.
+	var trivyItem *model.Item
+	for i := range securityItems {
+		if securityItems[i].Kind == "__security_trivy-operator__" {
+			trivyItem = &securityItems[i]
 			break
 		}
 	}
-	require.NotEmpty(t, trivyRT.Kind,
+	require.NotNil(t, trivyItem,
 		"trivy-operator entry must be present in the category")
-	assert.Equal(t, model.SecurityVirtualAPIGroup, trivyRT.APIGroup)
+	assert.Contains(t, trivyItem.Extra, model.SecurityVirtualAPIGroup)
 
 	// Render the preview pane for a sample finding (prove the details
 	// renderer wiring is intact).

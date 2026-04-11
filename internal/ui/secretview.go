@@ -140,10 +140,12 @@ func renderSecretEditorTable(
 		var line string
 		switch {
 		case i == selectedIdx && editing:
-			// Inline edit mode.
+			// Inline edit mode. Always show the in-progress edit values
+			// in both columns so they survive tabbing between columns.
+			// Only the cursor block follows editColumn.
 			if editColumn == 0 {
-				// Editing key.
-				valDisplay := secretValueDisplay(v, revealedKeys[k] || allRevealed, valColW)
+				// Editing key, value column shows the in-progress edit value.
+				valDisplay := Truncate(editValue, valColW)
 				editDisplay := editKey + DimStyle.Render("\u2588")
 				editW := lipgloss.Width(editDisplay)
 				pad := keyColW - editW
@@ -152,8 +154,8 @@ func renderSecretEditorTable(
 				}
 				line = HelpKeyStyle.Render("> ") + editDisplay + strings.Repeat(" ", pad) + "  |  " + valDisplay
 			} else {
-				// Editing value.
-				keyDisplay := Truncate(k, keyColW)
+				// Editing value, key column shows the in-progress edit key.
+				keyDisplay := Truncate(editKey, keyColW)
 				editDisplay := editValue + DimStyle.Render("\u2588")
 				line = HelpKeyStyle.Render("> ") + fmt.Sprintf("%-*s", keyColW, keyDisplay) + "  |  " + editDisplay
 			}

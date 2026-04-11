@@ -558,30 +558,71 @@ func populateArgoWorkflowSteps(ti *model.Item, status map[string]interface{}) {
 	}
 }
 
+// Column keys produced by populateEvent. Consumers (such as the grouping
+// logic in internal/app) reference these constants so a rename breaks at
+// compile time instead of silently mis-aggregating rows.
+const (
+	EventColObject   = "Object"
+	EventColReason   = "Reason"
+	EventColMessage  = "Message"
+	EventColCount    = "Count"
+	EventColSource   = "Source"
+	EventColLastSeen = "Last Seen"
+)
+
+// FormatAge exposes the package-internal age formatter so other packages can
+// produce consistent relative-time strings (used by event grouping when it
+// recomputes Age/Last Seen after merging rows).
+func FormatAge(d time.Duration) string {
+	return formatAge(d)
+}
+
 func populateEvent(ti *model.Item, obj map[string]interface{}) {
 	if eventType, ok := obj["type"].(string); ok {
 		ti.Status = eventType
 	}
-	eventTime := parseEventTimestamp(obj, "lastTimestamp")
-	if eventTime.IsZero() {
-		eventTime = parseEventTimestamp(obj, "eventTime")
+
+	// Extract first-seen and last-seen timestamps from the Event object.
+	// The legacy core/v1 Event API uses firstTimestamp/lastTimestamp; the
+	// newer events.k8s.io/v1 API uses eventTime (single observation) and
+	// optional series.lastObservedTime. We fall back conservatively so a
+	// row always has both first and last populated, even if only one
+	// timestamp field is present.
+	firstTime := parseEventTimestamp(obj, "firstTimestamp")
+	lastTime := parseEventTimestamp(obj, "lastTimestamp")
+	if firstTime.IsZero() {
+		firstTime = parseEventTimestamp(obj, "eventTime")
 	}
-	if !eventTime.IsZero() {
-		ti.CreatedAt = eventTime
-		ti.Age = formatAge(time.Since(eventTime))
+	if lastTime.IsZero() {
+		lastTime = parseEventTimestamp(obj, "eventTime")
 	}
+	if firstTime.IsZero() && !lastTime.IsZero() {
+		firstTime = lastTime
+	}
+	if lastTime.IsZero() && !firstTime.IsZero() {
+		lastTime = firstTime
+	}
+
+	if !firstTime.IsZero() {
+		ti.CreatedAt = firstTime
+		ti.Age = formatAge(time.Since(firstTime))
+	}
+	if !lastTime.IsZero() {
+		ti.LastSeen = lastTime
+	}
+
 	if involvedObj, ok := obj["involvedObject"].(map[string]interface{}); ok {
 		objKind, _ := involvedObj["kind"].(string)
 		objName, _ := involvedObj["name"].(string)
 		if objKind != "" && objName != "" {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Object", Value: objKind + "/" + objName})
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: EventColObject, Value: objKind + "/" + objName})
 		}
 	}
 	if reason, ok := obj["reason"].(string); ok && reason != "" {
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Reason", Value: reason})
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: EventColReason, Value: reason})
 	}
 	if message, ok := obj["message"].(string); ok && message != "" {
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Message", Value: message})
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: EventColMessage, Value: message})
 	}
 	eventCount := int64(1)
 	if count, ok := obj["count"].(int64); ok && count > 0 {
@@ -589,11 +630,14 @@ func populateEvent(ti *model.Item, obj map[string]interface{}) {
 	} else if countF, ok := obj["count"].(float64); ok && countF > 0 {
 		eventCount = int64(countF)
 	}
-	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Count", Value: fmt.Sprintf("%d", eventCount)})
+	ti.Columns = append(ti.Columns, model.KeyValue{Key: EventColCount, Value: fmt.Sprintf("%d", eventCount)})
 	if source, ok := obj["source"].(map[string]interface{}); ok {
 		if component, ok := source["component"].(string); ok && component != "" {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Source", Value: component})
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: EventColSource, Value: component})
 		}
+	}
+	if !lastTime.IsZero() {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: EventColLastSeen, Value: formatAge(time.Since(lastTime))})
 	}
 }
 

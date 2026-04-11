@@ -209,8 +209,7 @@ func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 
 // handleYAMLVisualCopy copies the visually selected content to the clipboard.
 func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
-	yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-	_, mapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	selStart := min(m.yamlVisualStart, m.yamlCursor)
 	selEnd := max(m.yamlVisualStart, m.yamlCursor)
 	if selStart < 0 {
@@ -219,7 +218,7 @@ func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
 	if selEnd >= len(mapping) {
 		selEnd = len(mapping) - 1
 	}
-	origLines := strings.Split(yamlForDisplay, "\n")
+	origLines := strings.Split(m.yamlContent, "\n")
 	var clipText string
 	switch m.yamlVisualType {
 	case 'v':
@@ -317,8 +316,7 @@ func (m Model) yamlVisualCopyLine(selStart, selEnd int, mapping []int, origLines
 // handleYAMLVisualWordMotion handles word/WORD motion and cursor position keys
 // in visual mode ($, w, b, e, E, B, W, ^).
 func (m Model) handleYAMLVisualWordMotion(key string) (tea.Model, tea.Cmd) {
-	yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-	visLines, _ := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+	visLines, _ := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	if m.yamlCursor < 0 || m.yamlCursor >= len(visLines) {
 		return m, nil
 	}
@@ -525,8 +523,7 @@ func (m Model) handleYAMLKeyFoldToggle() (tea.Model, tea.Cmd) {
 					break
 				}
 			}
-			yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-			_, newMapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+			_, newMapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 			for vi, orig := range newMapping {
 				if orig == startLine {
 					m.yamlCursor = vi

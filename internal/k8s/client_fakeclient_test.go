@@ -1337,6 +1337,60 @@ func newFakeDynClient(objects ...runtime.Object) *dynamicfake.FakeDynamicClient 
 		}, objects...)
 }
 
+// --- GetResources: Event ordering ---
+
+// TestGetResources_EventsSortedByLastSeen verifies that GetResources orders
+// Event items so that the most-recently-observed event sits at the top. The
+// fixture deliberately inverts firstTimestamp vs lastTimestamp ordering — a
+// sort keyed on first-seen (CreatedAt) would put "old-incident-recurring" at
+// the bottom even though its lastTimestamp is the newest, which is exactly
+// the bug we're guarding against.
+func TestGetResources_EventsSortedByLastSeen(t *testing.T) {
+	mkEvent := func(name, first, last string) *unstructured.Unstructured {
+		return &unstructured.Unstructured{
+			Object: map[string]interface{}{
+				"apiVersion": "v1",
+				"kind":       "Event",
+				"metadata": map[string]interface{}{
+					"name":      name,
+					"namespace": "default",
+				},
+				"type":           "Warning",
+				"reason":         "Backoff",
+				"message":        "container failed",
+				"firstTimestamp": first,
+				"lastTimestamp":  last,
+				"count":          int64(1),
+				"involvedObject": map[string]interface{}{
+					"kind": "Pod",
+					"name": name,
+				},
+			},
+		}
+	}
+
+	// Three events. firstTimestamp ascending order is A, B, C. But
+	// lastTimestamp ordering puts A on top because the same incident keeps
+	// recurring — A's most recent observation is the newest.
+	eventA := mkEvent("old-incident-recurring", "2026-04-10T08:00:00Z", "2026-04-10T12:00:00Z")
+	eventB := mkEvent("recent-once-only", "2026-04-10T11:00:00Z", "2026-04-10T11:00:00Z")
+	eventC := mkEvent("middle-once-only", "2026-04-10T10:00:00Z", "2026-04-10T10:00:00Z")
+
+	dc := newFakeDynClient(eventA, eventB, eventC)
+	c := newFakeClient(nil, dc)
+
+	items, err := c.GetResources(context.Background(), "", "default", model.ResourceTypeEntry{
+		Kind: "Event", APIGroup: "", APIVersion: "v1", Resource: "events", Namespaced: true,
+	})
+	require.NoError(t, err)
+	require.Len(t, items, 3)
+
+	got := []string{items[0].Name, items[1].Name, items[2].Name}
+	want := []string{"old-incident-recurring", "recent-once-only", "middle-once-only"}
+	assert.Equal(t, want, got,
+		"events must be ordered newest-LastSeen first, not newest-CreatedAt first")
+}
+
 // --- DeleteResource ---
 
 func TestDeleteResource_Namespaced(t *testing.T) {

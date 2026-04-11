@@ -1,97 +1,14 @@
 package k8s
 
 import (
-	"context"
 	"fmt"
-	"sort"
 	"strings"
 	"time"
 
 	corev1 "k8s.io/api/core/v1"
-	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/apimachinery/pkg/runtime/schema"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
-
-// DiscoverCRDs lists all installed CRDs on the given cluster context and returns
-// them as ResourceTypeEntry values suitable for navigation. Each CRD is mapped
-// to a resource type using its spec metadata (group, versions, names, scope).
-func (c *Client) DiscoverCRDs(ctx context.Context, contextName string) ([]model.ResourceTypeEntry, error) {
-	dynClient, err := c.dynamicForContext(contextName)
-	if err != nil {
-		return nil, err
-	}
-
-	crdGVR := schema.GroupVersionResource{
-		Group:    "apiextensions.k8s.io",
-		Version:  "v1",
-		Resource: "customresourcedefinitions",
-	}
-
-	list, err := dynClient.Resource(crdGVR).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, fmt.Errorf("listing CRDs: %w", err)
-	}
-
-	entries := make([]model.ResourceTypeEntry, 0, len(list.Items))
-	for _, item := range list.Items {
-		spec, ok := item.Object["spec"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-
-		group, _ := spec["group"].(string)
-
-		names, ok := spec["names"].(map[string]interface{})
-		if !ok {
-			continue
-		}
-		plural, _ := names["plural"].(string)
-		kind, _ := names["kind"].(string)
-		if plural == "" || kind == "" {
-			continue
-		}
-
-		// Determine the preferred/served version.
-		apiVersion := preferredCRDVersion(spec, item.Object)
-
-		// Determine scope.
-		scope, _ := spec["scope"].(string)
-		namespaced := strings.EqualFold(scope, "Namespaced")
-
-		// Build a display name from the plural name (title case the first letter).
-		displayName := strings.ToUpper(plural[:1]) + plural[1:]
-
-		entry := model.ResourceTypeEntry{
-			DisplayName:    displayName,
-			Kind:           kind,
-			APIGroup:       group,
-			APIVersion:     apiVersion,
-			Resource:       plural,
-			Icon:           "⧫",
-			Namespaced:     namespaced,
-			PrinterColumns: extractCRDPrinterColumns(spec, apiVersion),
-		}
-
-		// Check if this CRD uses a deprecated API version.
-		if dep, found := CheckDeprecation(group, apiVersion, plural); found {
-			entry.Deprecated = true
-			entry.DeprecationMsg = dep.Message
-		}
-
-		entries = append(entries, entry)
-	}
-
-	sort.Slice(entries, func(i, j int) bool {
-		if entries[i].APIGroup != entries[j].APIGroup {
-			return entries[i].APIGroup < entries[j].APIGroup
-		}
-		return entries[i].DisplayName < entries[j].DisplayName
-	})
-
-	return entries, nil
-}
 
 // preferredCRDVersion extracts the preferred or first served version from a CRD object.
 func preferredCRDVersion(spec, obj map[string]interface{}) string {

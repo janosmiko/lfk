@@ -71,9 +71,7 @@ func (m Model) viewYAML() string {
 	}
 
 	// Build visible lines with fold indicators, respecting collapsed sections.
-	// Mask secret data values when secret display is toggled off.
-	yamlForDisplay := m.maskYAMLIfSecret(m.yamlContent)
-	visLines, mapping := buildVisibleLines(yamlForDisplay, m.yamlSections, m.yamlCollapsed)
+	visLines, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 
 	yamlScroll := m.yamlScroll
 	if yamlScroll >= len(visLines) {

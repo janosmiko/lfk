@@ -26,26 +26,8 @@ func (m Model) searchFinalizers(pattern string) tea.Cmd {
 		// Scoped to the current resource type.
 		resourceTypes = []model.ResourceTypeEntry{m.nav.ResourceType}
 	} else {
-		// All known resource types: built-in + discovered CRDs.
-		seen := make(map[string]bool)
-		for _, cat := range model.TopLevelResourceTypes() {
-			for _, rt := range cat.Types {
-				key := rt.APIGroup + "/" + rt.Resource
-				if !seen[key] {
-					seen[key] = true
-					resourceTypes = append(resourceTypes, rt)
-				}
-			}
-		}
-		if crds, ok := m.discoveredCRDs[kctx]; ok {
-			for _, rt := range crds {
-				key := rt.APIGroup + "/" + rt.Resource
-				if !seen[key] {
-					seen[key] = true
-					resourceTypes = append(resourceTypes, rt)
-				}
-			}
-		}
+		// All known resource types from the discovered API resource set.
+		resourceTypes = append(resourceTypes, m.discoveredResources[kctx]...)
 	}
 
 	return func() tea.Msg {

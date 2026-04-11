@@ -193,6 +193,10 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.creditsScroll = m.height
 		return m, scheduleCreditsScroll()
 
+	case "tasks":
+		m.overlay = overlayBackgroundTasks
+		return m, nil
+
 	default:
 		m.setStatusMessage(fmt.Sprintf("Unknown command: %s", canonical), true)
 		return m, scheduleStatusClear()

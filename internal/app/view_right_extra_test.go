@@ -8,44 +8,6 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
-// --- maskYAMLIfSecret ---
-
-func TestMaskYAMLIfSecretRightColumn(t *testing.T) {
-	t.Run("non-secret returns unchanged", func(t *testing.T) {
-		m := Model{
-			nav: model.NavigationState{
-				ResourceType: model.ResourceTypeEntry{Kind: "ConfigMap"},
-			},
-			showSecretValues: false,
-		}
-		yaml := "data:\n  key: value"
-		assert.Equal(t, yaml, m.maskYAMLIfSecret(yaml))
-	})
-
-	t.Run("secret with show values returns unchanged", func(t *testing.T) {
-		m := Model{
-			nav: model.NavigationState{
-				ResourceType: model.ResourceTypeEntry{Kind: "Secret"},
-			},
-			showSecretValues: true,
-		}
-		yaml := "data:\n  key: c2VjcmV0"
-		assert.Equal(t, yaml, m.maskYAMLIfSecret(yaml))
-	})
-
-	t.Run("secret with hidden values masks content", func(t *testing.T) {
-		m := Model{
-			nav: model.NavigationState{
-				ResourceType: model.ResourceTypeEntry{Kind: "Secret"},
-			},
-			showSecretValues: false,
-		}
-		yaml := "data:\n  key: c2VjcmV0"
-		result := m.maskYAMLIfSecret(yaml)
-		assert.NotEqual(t, yaml, result)
-	})
-}
-
 // --- renderFallbackYAML ---
 
 func TestRenderFallbackYAML(t *testing.T) {

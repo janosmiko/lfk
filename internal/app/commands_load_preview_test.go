@@ -250,6 +250,13 @@ func TestLoadPreviewOwnedUsesNavNamespaceForMissingItemNamespace(t *testing.T) {
 	gvrToListKind := map[schema.GroupVersionResource]string{pvcGVR: "PersistentVolumeClaimList"}
 	m := baseModelWithFakeDynamic(gvrToListKind, pvc)
 
+	// Pre-populate discoveredResources with the PVC resource type so the new
+	// parameter-only Find* functions can resolve it. Before the runtime
+	// discovery refactor, this lookup consulted a hardcoded list.
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "PersistentVolumeClaim", APIGroup: "", APIVersion: "v1", Resource: "persistentvolumeclaims", Namespaced: true},
+	}
+
 	// Simulate the state after drilling into a helm release at "release-ns"
 	// while the ambient namespace filter is still the arbitrary "default".
 	m.nav.Level = model.LevelOwned

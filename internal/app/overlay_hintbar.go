@@ -185,6 +185,10 @@ func (m Model) overlayHintBarMisc() string {
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayBackgroundTasks:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "esc", Desc: "close"},
+		})
 	case overlayNetworkPolicy:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "scroll"},
@@ -312,7 +316,7 @@ func (m Model) overlayHintBarOverlaySecretEditor() string {
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
 		{Key: "D", Desc: "del"},
-		{Key: "s", Desc: "save"},
+		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
 	})
 }
@@ -332,7 +336,7 @@ func (m Model) overlayHintBarOverlayConfigMapEditor() string {
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
 		{Key: "D", Desc: "del"},
-		{Key: "s", Desc: "save"},
+		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
 	})
 }
@@ -352,7 +356,7 @@ func (m Model) overlayHintBarOverlayLabelEditor() string {
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
 		{Key: "D", Desc: "del"},
-		{Key: "s", Desc: "save"},
+		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
 	})
 }
@@ -413,6 +417,7 @@ func (m Model) overlayHintBarOverlayColumnToggle() string {
 		{Key: "space", Desc: "toggle"},
 		{Key: "J/K", Desc: "reorder"},
 		{Key: "enter", Desc: "apply"},
+		{Key: "c", Desc: "clear"},
 		{Key: "R", Desc: "reset"},
 		{Key: "/", Desc: "filter"},
 		{Key: "esc", Desc: "close"},

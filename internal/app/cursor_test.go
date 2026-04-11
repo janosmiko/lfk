@@ -1089,15 +1089,15 @@ func TestRefreshOwnedAtLevelOwnedPreservesCursor(t *testing.T) {
 			},
 			ResourceName: "my-app",
 		},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		requestGen:     1,
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		requestGen:          1,
 	}
 	items := []model.Item{
 		{Name: "child-1", Kind: "Deployment", Namespace: "default", Extra: "apps/v1"},
@@ -1140,15 +1140,15 @@ func TestMoveCursorAtLevelOwnedKeepsCursorPosition(t *testing.T) {
 			},
 			ResourceName: "my-app",
 		},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
-		requestGen:     1,
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
+		requestGen:          1,
 	}
 	items := []model.Item{
 		{Name: "child-1", Kind: "Deployment", Namespace: "default", Extra: "apps/v1"},
@@ -1482,6 +1482,11 @@ func TestCov80NavigateChildFromResourceTypesPortForward(t *testing.T) {
 func TestCov80NavigateChildFromResourceTypesCollapsedGroup(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelResourceTypes
+	// Pre-populate discoveredResources so that loadResources (called after
+	// expanding the collapsed group) can resolve the Pod resource type.
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
 	m.middleItems = []model.Item{
 		{Name: "Core", Kind: "__collapsed_group__", Category: "Core"},
 		{Name: "Pods", Kind: "Pod", Category: "Core", Extra: "/v1/pods"},
@@ -2381,7 +2386,7 @@ func TestFinalNavigateChildLevelResourceTypesPods(t *testing.T) {
 	m.nav.Context = "test-ctx"
 	// Set up CRDs so FindResourceTypeIn works.
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
-	m.discoveredCRDs["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
 	// Extra must match ResourceRef format.
 	m.middleItems = []model.Item{{Name: "Pods", Extra: podRT.ResourceRef()}}
 	m.setCursor(0)

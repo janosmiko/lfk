@@ -199,6 +199,122 @@ func TestSortMiddleItemsByStatus(t *testing.T) {
 	assert.Equal(t, "err-pod", m.middleItems[2].Name)
 }
 
+// TestSortMiddleItemsDeterministicForEqualPrimaryKeys is a regression guard
+// for the watch-mode flicker bug: items with identical primary sort keys
+// (e.g. a Helm release "traefik" deployed to two namespaces) were
+// previously left in arbitrary order because the comparator returned
+// "equal" and the only stabilizer was sort.SliceStable relying on input
+// order — but k8s API refreshes can return items in different orders each
+// call, so the list would visibly jump on every watch tick.
+//
+// Fix: make the comparator total by adding a (Namespace, Name, Kind)
+// tiebreaker chain that is always ascending, regardless of the primary
+// sort direction, so identical primary keys have a deterministic order
+// across refreshes.
+func TestSortMiddleItemsDeterministicForEqualPrimaryKeys(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status", "Namespace"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	// Two items with identical Name and different Namespace. The sort must
+	// produce the same result regardless of which order they arrive in.
+	aFirst := []model.Item{
+		{Name: "traefik", Namespace: "prod"},
+		{Name: "traefik", Namespace: "dev"},
+	}
+	bFirst := []model.Item{
+		{Name: "traefik", Namespace: "dev"},
+		{Name: "traefik", Namespace: "prod"},
+	}
+
+	sortCopy := func(items []model.Item) []model.Item {
+		cp := append([]model.Item(nil), items...)
+		m := Model{
+			nav:            model.NavigationState{Level: model.LevelResources},
+			sortColumnName: "Name", sortAscending: true,
+			middleItems: cp,
+		}
+		m.sortMiddleItems()
+		return m.middleItems
+	}
+
+	gotA := sortCopy(aFirst)
+	gotB := sortCopy(bFirst)
+
+	require.Len(t, gotA, 2)
+	require.Len(t, gotB, 2)
+	assert.Equal(t, "dev", gotA[0].Namespace,
+		"input order A: tiebreaker must put dev before prod")
+	assert.Equal(t, "prod", gotA[1].Namespace)
+	assert.Equal(t, "dev", gotB[0].Namespace,
+		"input order B: tiebreaker must put dev before prod")
+	assert.Equal(t, "prod", gotB[1].Namespace)
+	assert.Equal(t, gotA, gotB,
+		"sort output must be deterministic regardless of input order")
+}
+
+// TestSortMiddleItemsTiebreakerIgnoresDescFlag verifies that when the
+// primary sort is descending, the tiebreaker chain still runs ascending.
+// Flipping the tiebreaker with the primary direction would re-introduce
+// flicker when sorting in reverse.
+func TestSortMiddleItemsTiebreakerIgnoresDescFlag(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status", "Namespace"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	m := Model{
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "Name", sortAscending: false,
+		middleItems: []model.Item{
+			{Name: "traefik", Namespace: "prod"},
+			{Name: "alpha", Namespace: "dev"},
+			{Name: "traefik", Namespace: "dev"},
+		},
+	}
+	m.sortMiddleItems()
+
+	require.Len(t, m.middleItems, 3)
+	// Name desc: traefik rows first (two), then alpha. Within the two
+	// traefik rows, namespace ASC tiebreaker means dev before prod.
+	assert.Equal(t, "traefik", m.middleItems[0].Name)
+	assert.Equal(t, "dev", m.middleItems[0].Namespace)
+	assert.Equal(t, "traefik", m.middleItems[1].Name)
+	assert.Equal(t, "prod", m.middleItems[1].Namespace)
+	assert.Equal(t, "alpha", m.middleItems[2].Name)
+}
+
+// TestSortMiddleItemsByColumnValueDeterministic is the same guard for
+// sorting by an arbitrary extra column (e.g. a Revision column on a Helm
+// release). Two releases with the same revision number should still have
+// a deterministic namespace-based order.
+func TestSortMiddleItemsByColumnValueDeterministic(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Revision"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	sortCopy := func(items []model.Item) []model.Item {
+		cp := append([]model.Item(nil), items...)
+		m := Model{
+			nav:            model.NavigationState{Level: model.LevelResources},
+			sortColumnName: "Revision", sortAscending: true,
+			middleItems: cp,
+		}
+		m.sortMiddleItems()
+		return m.middleItems
+	}
+
+	rows := []model.Item{
+		{Name: "traefik", Namespace: "prod", Columns: []model.KeyValue{{Key: "Revision", Value: "5"}}},
+		{Name: "traefik", Namespace: "dev", Columns: []model.KeyValue{{Key: "Revision", Value: "5"}}},
+	}
+	gotA := sortCopy(rows)
+
+	// Reverse input order.
+	rowsB := []model.Item{rows[1], rows[0]}
+	gotB := sortCopy(rowsB)
+
+	assert.Equal(t, "dev", gotA[0].Namespace)
+	assert.Equal(t, gotA, gotB,
+		"column-value sort output must be deterministic regardless of input order")
+}
+
 func TestSortMiddleItemsSkipsResourceTypes(t *testing.T) {
 	ui.ActiveSortableColumns = []string{"Name"}
 	defer func() { ui.ActiveSortableColumns = nil }()
@@ -352,6 +468,129 @@ func TestTabLabels(t *testing.T) {
 		}
 		labels := m.tabLabels()
 		assert.Equal(t, "clusters", labels[0])
+	})
+
+	t.Run("LevelOwned shows resource name", func(t *testing.T) {
+		// Navigated into a Deployment to see its pods. The tab should
+		// expose the deployment name so users can tell tabs apart.
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelOwned,
+				Context:      "prod",
+				ResourceType: model.ResourceTypeEntry{DisplayName: "Deployments"},
+				ResourceName: "web-server",
+			},
+			tabs:      []TabState{{nav: model.NavigationState{}}},
+			activeTab: 0,
+		}
+		labels := m.tabLabels()
+		assert.Equal(t, "prod/Deployments/web-server", labels[0])
+	})
+
+	t.Run("LevelContainers shows resource and owned name", func(t *testing.T) {
+		// Navigated all the way down: deployment -> pod -> containers.
+		// The tab should expose both names so the user can tell which pod
+		// of which deployment they're looking at.
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelContainers,
+				Context:      "prod",
+				ResourceType: model.ResourceTypeEntry{DisplayName: "Deployments"},
+				ResourceName: "web-server",
+				OwnedName:    "web-server-abc-xyz",
+			},
+			tabs:      []TabState{{nav: model.NavigationState{}}},
+			activeTab: 0,
+		}
+		labels := m.tabLabels()
+		assert.Equal(t, "prod/Deployments/web-server/web-server-abc-xyz", labels[0])
+	})
+
+	t.Run("discovered resource type without DisplayName uses metadata", func(t *testing.T) {
+		// Resource types coming from API discovery have an empty DisplayName
+		// (per model.DisplayNameFor). The label must still surface a friendly
+		// name by going through the metadata fallback chain.
+		m := Model{
+			nav: model.NavigationState{
+				Level:   model.LevelResources,
+				Context: "prod",
+				ResourceType: model.ResourceTypeEntry{
+					// DisplayName intentionally empty.
+					Kind:       "Pod",
+					APIGroup:   "",
+					APIVersion: "v1",
+					Resource:   "pods",
+				},
+			},
+			tabs:      []TabState{{nav: model.NavigationState{}}},
+			activeTab: 0,
+		}
+		labels := m.tabLabels()
+		assert.Equal(t, "prod/Pods", labels[0])
+	})
+
+	t.Run("discovered resource falls back to Kind when no metadata", func(t *testing.T) {
+		// CRD-style resource: no DisplayName, no built-in metadata entry,
+		// only Kind. The label should still show the Kind so the tab is
+		// distinguishable.
+		m := Model{
+			nav: model.NavigationState{
+				Level:   model.LevelResources,
+				Context: "prod",
+				ResourceType: model.ResourceTypeEntry{
+					Kind:       "MyCustomResource",
+					APIGroup:   "example.com",
+					APIVersion: "v1",
+					Resource:   "mycustomresources",
+				},
+			},
+			tabs:      []TabState{{nav: model.NavigationState{}}},
+			activeTab: 0,
+		}
+		labels := m.tabLabels()
+		assert.Equal(t, "prod/MyCustomResource", labels[0])
+	})
+
+	t.Run("Pod at LevelContainers does not duplicate name", func(t *testing.T) {
+		// navigateChildResource sets both ResourceName AND OwnedName to the
+		// same value when entering a Pod (so the containers view knows its
+		// parent). The label must not show "ctx/Pods/my-pod/my-pod".
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelContainers,
+				Context:      "prod",
+				ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"},
+				ResourceName: "web-7d8c-abc",
+				OwnedName:    "web-7d8c-abc",
+			},
+			tabs:      []TabState{{nav: model.NavigationState{}}},
+			activeTab: 0,
+		}
+		labels := m.tabLabels()
+		assert.Equal(t, "prod/Pods/web-7d8c-abc", labels[0],
+			"ResourceName == OwnedName should appear only once")
+	})
+
+	t.Run("inactive tab also reflects its saved depth", func(t *testing.T) {
+		// Inactive tabs are rendered from saved TabState, not the live model.
+		// They should still show the deeper navigation if that's where the
+		// tab was last left.
+		m := Model{
+			nav: model.NavigationState{Context: "dev"},
+			tabs: []TabState{
+				{nav: model.NavigationState{
+					Level:        model.LevelOwned,
+					Context:      "prod",
+					ResourceType: model.ResourceTypeEntry{DisplayName: "StatefulSets"},
+					ResourceName: "db",
+				}},
+				{nav: model.NavigationState{Context: "dev"}},
+			},
+			activeTab: 1,
+		}
+		labels := m.tabLabels()
+		assert.Equal(t, "prod/StatefulSets/db", labels[0])
+		assert.Equal(t, "dev", labels[1])
 	})
 }
 
@@ -582,6 +821,7 @@ func TestSaveCurrentTab(t *testing.T) {
 func TestPush2UpdateStatusMessageExpiredMsg(t *testing.T) {
 	m := basePush80v2Model()
 	m.setStatusMessage("temp msg", false)
+	m.statusMessageExp = time.Now().Add(-1 * time.Second) // simulate genuine expiration
 	result, cmd := m.Update(statusMessageExpiredMsg{})
 	rm := result.(Model)
 	assert.Empty(t, rm.statusMessage)
@@ -614,7 +854,10 @@ func TestCov80TabLabels(t *testing.T) {
 	m.activeTab = 0
 	labels := m.tabLabels()
 	require.Len(t, labels, 3)
-	assert.Equal(t, "test-ctx", labels[0]) // active tab updated
+	// basePush80Model sets m.nav.ResourceType.Kind = "Pod" / Resource = "pods"
+	// (no DisplayName), which model.DisplayNameFor resolves to "Pods" via the
+	// built-in metadata table.
+	assert.Equal(t, "test-ctx/Pods", labels[0])
 	assert.Contains(t, labels[1], "dev/Pods")
 	assert.Equal(t, "clusters", labels[2])
 }
@@ -1278,6 +1521,7 @@ func TestCovSortMiddleItemsSkipsResourceTypes(t *testing.T) {
 func TestFinalUpdateStatusClearMsg(t *testing.T) {
 	m := baseFinalModel()
 	m.setStatusMessage("test message", false)
+	m.statusMessageExp = time.Now().Add(-1 * time.Second) // simulate genuine expiration
 	result, _ := m.Update(statusMessageExpiredMsg{})
 	rm := result.(Model)
 	assert.Empty(t, rm.statusMessage)
@@ -1410,6 +1654,7 @@ func TestCovErrorLogVisibleCountFullscreen(t *testing.T) {
 func TestCovUpdateStatusClearMsg(t *testing.T) {
 	m := baseModelNav()
 	m.setStatusMessage("test", false)
+	m.statusMessageExp = time.Now().Add(-1 * time.Second) // simulate genuine expiration
 	result, _ := m.Update(statusMessageExpiredMsg{})
 	rm := result.(Model)
 	assert.False(t, rm.hasStatusMessage())
@@ -1440,6 +1685,7 @@ func TestCovUpdateActionResultError(t *testing.T) {
 func TestCovUpdateStatusClear(t *testing.T) {
 	m := baseModelUpdate()
 	m.setStatusMessage("test message", false)
+	m.statusMessageExp = time.Now().Add(-1 * time.Second) // simulate genuine expiration
 	result, _ := m.Update(statusMessageExpiredMsg{})
 	rm := result.(Model)
 	assert.False(t, rm.hasStatusMessage())

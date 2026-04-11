@@ -98,6 +98,9 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	case overlayAlerts:
 		mdl, cmd := m.handleAlertsOverlayKey(msg)
 		return mdl, cmd, true
+	case overlayBackgroundTasks:
+		mdl, cmd := m.handleBackgroundTasksOverlayKey(msg)
+		return mdl, cmd, true
 	case overlayBatchLabel:
 		mdl, cmd := m.handleBatchLabelOverlayKey(msg)
 		return mdl, cmd, true

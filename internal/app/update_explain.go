@@ -33,7 +33,7 @@ func (m Model) openExplainBrowser() (tea.Model, tea.Cmd) {
 		// At LevelResourceTypes, Item.Extra holds the resource ref in
 		// format "group/version/resource" (from ResourceTypeEntry.ResourceRef()).
 		// We need to find the actual ResourceTypeEntry to build the kubectl explain specifier.
-		crds := m.discoveredCRDs[m.nav.Context]
+		crds := m.discoveredResources[m.nav.Context]
 		rt, ok := model.FindResourceTypeIn(sel.Extra, crds)
 		if ok {
 			resource, apiVersion = buildExplainResourceFromType(rt)

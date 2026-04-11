@@ -13,6 +13,7 @@ import (
 	"github.com/charmbracelet/lipgloss"
 	"github.com/hinshun/vt10x"
 
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
@@ -111,6 +112,7 @@ const (
 	overlayFinalizerSearch
 	overlayColumnToggle
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
+	overlayBackgroundTasks
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -194,6 +196,11 @@ type TabState struct {
 
 	// Toggle to show only Warning events in Event list view.
 	warningEventsOnly bool
+
+	// Collapse duplicate Events (same Type/Reason/Message/Object) into a
+	// single row with a summed Count column. Grouped-by-default reduces
+	// noise when many pods hit the same failure mode at once.
+	eventGrouping bool
 
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)
@@ -578,8 +585,23 @@ type Model struct {
 	// Toggle to show only Warning events in Event list view.
 	warningEventsOnly bool
 
+	// Collapse duplicate Events (per-tab mirror of Model.eventGrouping).
+	eventGrouping bool
+
+	// bgtasks tracks in-flight async loads (resource lists, YAML fetches,
+	// metrics, dashboards). Process-global instance shared across tabs so
+	// the title bar reflects all activity, not just the active tab's.
+	bgtasks *bgtasks.Registry
+
+	// suppressBgtasks, when true, makes loaders call Registry.StartUntracked
+	// instead of Registry.Start so their tasks don't appear in the title-bar
+	// indicator. Set by updateWatchTick before dispatching watch-mode
+	// auto-refreshes — periodic refreshes shouldn't flash through the
+	// indicator every 2 seconds.
+	suppressBgtasks bool
+
 	// Discovered CRDs per context: keyed by context name.
-	discoveredCRDs map[string][]model.ResourceTypeEntry
+	discoveredResources map[string][]model.ResourceTypeEntry
 
 	// Preview scroll offset for the right column.
 	previewScroll int
@@ -612,6 +634,7 @@ type Model struct {
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)
 	allGroupsExpanded bool   // override: show all groups expanded (toggled by hotkey)
+	showRareResources bool   // override: show rarely used resources and uncategorized core built-ins (H hotkey)
 
 	// Error log: global buffer of application errors for the error log overlay.
 	errorLog               []ui.ErrorLogEntry
@@ -634,22 +657,24 @@ type Model struct {
 	schemeOriginalName string // scheme name before opening overlay, for cancel restore
 
 	// Secret editor state.
-	secretData        *model.SecretData
-	secretCursor      int
-	secretRevealed    map[string]bool
-	secretAllRevealed bool
-	secretEditing     bool
-	secretEditKey     TextInput
-	secretEditValue   TextInput
-	secretEditColumn  int // 0=key, 1=value
+	secretData         *model.SecretData
+	secretDataOriginal map[string]string // snapshot taken at load time for dirty detection
+	secretCursor       int
+	secretRevealed     map[string]bool
+	secretAllRevealed  bool
+	secretEditing      bool
+	secretEditKey      TextInput
+	secretEditValue    TextInput
+	secretEditColumn   int // 0=key, 1=value
 
 	// ConfigMap editor state.
-	configMapData       *model.ConfigMapData
-	configMapCursor     int
-	configMapEditing    bool
-	configMapEditKey    TextInput
-	configMapEditValue  TextInput
-	configMapEditColumn int // 0=key, 1=value
+	configMapData         *model.ConfigMapData
+	configMapDataOriginal map[string]string // snapshot taken at load time for dirty detection
+	configMapCursor       int
+	configMapEditing      bool
+	configMapEditKey      TextInput
+	configMapEditValue    TextInput
+	configMapEditColumn   int // 0=key, 1=value
 
 	// Rollback overlay state (deployments).
 	rollbackRevisions []k8s.DeploymentRevision
@@ -671,14 +696,16 @@ type Model struct {
 	helmRevisionsLoading bool
 
 	// Label/annotation editor state.
-	labelData         *model.LabelAnnotationData
-	labelCursor       int
-	labelTab          int // 0=labels, 1=annotations
-	labelEditing      bool
-	labelEditKey      TextInput
-	labelEditValue    TextInput
-	labelEditColumn   int                     // 0=key, 1=value
-	labelResourceType model.ResourceTypeEntry // the resource type being edited
+	labelData                *model.LabelAnnotationData
+	labelLabelsOriginal      map[string]string // snapshot of labels at load time
+	labelAnnotationsOriginal map[string]string // snapshot of annotations at load time
+	labelCursor              int
+	labelTab                 int // 0=labels, 1=annotations
+	labelEditing             bool
+	labelEditKey             TextInput
+	labelEditValue           TextInput
+	labelEditColumn          int                     // 0=key, 1=value
+	labelResourceType        model.ResourceTypeEntry // the resource type being edited
 
 	// ArgoCD autosync overlay state.
 	autoSyncEnabled  bool
@@ -826,7 +853,9 @@ type Model struct {
 	columnToggleCursor       int
 	columnToggleFilter       string
 	columnToggleFilterActive bool
-	sessionColumns           map[string][]string // kind -> ordered visible column keys (session-only)
+	sessionColumns           map[string][]string // kind -> ordered visible extra column keys (session-only)
+	hiddenBuiltinColumns     map[string][]string // kind -> hidden built-in column keys (session-only)
+	columnOrder              map[string][]string // kind -> ordered column keys (built-ins + extras interleaved; Name is implicit)
 
 	// Easter egg state.
 	konamiProgress int  // current position in the Konami Code sequence
@@ -839,9 +868,15 @@ type Model struct {
 }
 
 // columnToggleEntry represents a single column in the column toggle overlay.
+// The builtin flag distinguishes built-in columns (Namespace/Ready/Restarts/
+// Status/Age, sourced from Item fields) from extra columns (from Item.Columns,
+// sourced from additionalPrinterColumns). The distinction matters because the
+// two kinds are persisted in different maps on Model and have different
+// name-collision handling when a CRD reuses a built-in column name.
 type columnToggleEntry struct {
 	key     string
 	visible bool
+	builtin bool
 }
 
 // ownedParentState captures the navigation state that must be restored
@@ -881,9 +916,11 @@ func NewModel(client *k8s.Client) Model {
 		selectedItems:       make(map[string]bool),
 		selectionAnchor:     -1,
 		yamlCollapsed:       make(map[string]bool),
-		discoveredCRDs:      make(map[string][]model.ResourceTypeEntry),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		allGroupsExpanded:   true,
 		warningEventsOnly:   true,
+		eventGrouping:       true,
+		bgtasks:             bgtasks.New(bgtasks.DefaultThreshold),
 		diffLineNumbers:     true,
 		reqCtx:              reqCtx,
 		reqCancel:           reqCancel,
@@ -896,6 +933,7 @@ func NewModel(client *k8s.Client) Model {
 			sortColumnName:     sortColDefault,
 			sortAscending:      true,
 			warningEventsOnly:  true,
+			eventGrouping:      true,
 			allGroupsExpanded:  true,
 			cursorMemory:       make(map[string]int),
 			itemCache:          make(map[string][]model.Item),

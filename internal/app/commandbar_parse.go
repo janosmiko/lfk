@@ -40,6 +40,7 @@ var builtinCommands = map[string]string{
 	"nyan":      "nyan",
 	"kubetris":  "kubetris",
 	"credits":   "credits",
+	"tasks":     "tasks",
 }
 
 // kubectlSubcommandSet contains known kubectl subcommands.
@@ -134,26 +135,19 @@ func firstWordOf(s string) string {
 }
 
 // isKnownResourceType checks whether name matches a known Kubernetes resource
-// type by searching abbreviations and the built-in resource type registry.
+// type by searching abbreviations and BuiltInMetadata via KnownResourceNames.
+// Matches only the plural resource name — Kind matching was dropped because
+// the abbreviations table covers most short-form identifiers.
 func isKnownResourceType(name string) bool {
 	lower := strings.ToLower(name)
-
-	// Check abbreviations (e.g., "po" -> "pod", "deploy" -> "deployment").
 	if ui.SearchAbbreviations != nil {
 		if _, ok := ui.SearchAbbreviations[lower]; ok {
 			return true
 		}
 	}
-
-	// Check all built-in resource types by plural resource name and kind.
-	for _, cat := range model.TopLevelResourceTypes() {
-		for _, rt := range cat.Types {
-			if strings.ToLower(rt.Resource) == lower || strings.ToLower(rt.Kind) == lower {
-				return true
-			}
-		}
+	if model.KnownResourceNames()[lower] {
+		return true
 	}
-
 	return false
 }
 

@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -208,6 +209,51 @@ func TestVisibleMiddleItemsCollapsedWithDashboards(t *testing.T) {
 		}
 	}
 	assert.True(t, foundOverview)
+}
+
+// --- visibleMiddleItems: filter disables collapse so matches are reachable ---
+
+// TestVisibleMiddleItemsFilterShowsMatchesAcrossCollapsedGroups is the
+// regression guard for the race where a filter applied at
+// LevelResourceTypes returned matching items that were then hidden inside
+// collapsed group headers — making them impossible to jump to even though
+// they matched the query. When a filter is active, collapse must be
+// bypassed so all matched items render as individual lines.
+func TestVisibleMiddleItemsFilterShowsMatchesAcrossCollapsedGroups(t *testing.T) {
+	m := Model{
+		nav: model.NavigationState{Level: model.LevelResourceTypes},
+		middleItems: []model.Item{
+			{Name: "Overview", Kind: "__overview__", Category: "Dashboards"},
+			{Name: "Pods", Kind: "Pod", Category: "Workloads"},
+			{Name: "Services", Kind: "Service", Category: "Networking"},
+			{Name: "Ingresses", Kind: "Ingress", Category: "Networking"},
+		},
+		// Cluster is the expanded group — neither Workloads nor
+		// Networking is expanded, so without a filter their items would
+		// be replaced by collapsed headers.
+		expandedGroup:     "Cluster",
+		allGroupsExpanded: false,
+		filterText:        "ing", // matches "Ingresses" by name
+	}
+
+	visible := m.visibleMiddleItems()
+
+	// The Ingresses item must be present as a real item (not a collapsed
+	// header) so the user can navigate to it and it renders with the
+	// name-highlight query applied.
+	var ingresses *model.Item
+	for i := range visible {
+		if visible[i].Name == "Ingresses" && visible[i].Kind == "Ingress" {
+			ingresses = &visible[i]
+			break
+		}
+	}
+	require.NotNil(t, ingresses, "filtered match in a non-expanded category must be visible, not collapsed")
+
+	// No collapsed group header should appear when a filter is active.
+	for _, it := range visible {
+		assert.NotEqual(t, "__collapsed_group__", it.Kind, "collapse must be bypassed while a filter is active")
+	}
 }
 
 // --- categoryCounts: no categories ---

@@ -528,13 +528,14 @@ func (c *Client) getFluxManagedResources(ctx context.Context, dynClient dynamic.
 			icon = "▣"
 		}
 
-		displayName := entryName
-		if entryNS != "" && entryNS != namespace {
-			displayName = entryNS + "/" + entryName
-		}
-
+		// Item.Name must be the raw Kubernetes resource name (no
+		// namespace prefix) because it is forwarded to the dynamic client
+		// as a resource name when the user loads YAML or labels for the
+		// item, and the API server rejects any name containing '/'. The
+		// renderer surfaces entryNS via the NAMESPACE column whenever
+		// any item carries one.
 		items = append(items, model.Item{
-			Name:      displayName,
+			Name:      entryName,
 			Namespace: entryNS,
 			Kind:      entryKind,
 			Icon:      icon,

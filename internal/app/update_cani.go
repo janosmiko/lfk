@@ -94,31 +94,15 @@ func (m *Model) processCanIRules(rules []k8s.AccessRule) {
 	perms := buildPermLookup(rules)
 	groupMap := make(map[string][]model.CanIResource)
 
-	// Add resources from discovered CRDs.
-	for _, rt := range m.discoveredCRDs[m.nav.Context] {
+	// Add resources from discovered API resources (built-ins + CRDs).
+	for _, rt := range m.discoveredResources[m.nav.Context] {
 		verbs := resolveVerbs(perms, rt.APIGroup, rt.Resource)
 		groupMap[rt.APIGroup] = append(groupMap[rt.APIGroup], model.CanIResource{
 			APIGroup: rt.APIGroup, Resource: rt.Resource, Kind: rt.Kind, Verbs: verbs,
 		})
 	}
 
-	// Add built-in resource types not already covered by CRDs.
-	for _, cat := range model.TopLevelResourceTypes() {
-		for _, rt := range cat.Types {
-			if strings.HasPrefix(rt.APIGroup, "_") {
-				continue
-			}
-			if groupHasResource(groupMap, rt.APIGroup, rt.Resource) {
-				continue
-			}
-			verbs := resolveVerbs(perms, rt.APIGroup, rt.Resource)
-			groupMap[rt.APIGroup] = append(groupMap[rt.APIGroup], model.CanIResource{
-				APIGroup: rt.APIGroup, Resource: rt.Resource, Kind: rt.Kind, Verbs: verbs,
-			})
-		}
-	}
-
-	// Add resources from rules that aren't in CRDs or built-in types.
+	// Add resources from rules that aren't in the discovered set.
 	for key, verbSet := range perms {
 		if strings.HasSuffix(key, "/*") {
 			continue

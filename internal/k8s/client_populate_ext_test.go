@@ -465,6 +465,51 @@ func TestPopulateEvent(t *testing.T) {
 	}
 }
 
+// TestPopulateEventTimestamps verifies that populateEvent extracts both
+// firstTimestamp and lastTimestamp into CreatedAt/LastSeen, and that the
+// Last Seen column is populated.
+func TestPopulateEventTimestamps(t *testing.T) {
+	t.Run("both first and last timestamps", func(t *testing.T) {
+		obj := map[string]interface{}{
+			"firstTimestamp": "2026-04-10T08:00:00Z",
+			"lastTimestamp":  "2026-04-10T11:30:00Z",
+			"reason":         "BackOff",
+		}
+		ti := &model.Item{}
+		populateEvent(ti, obj)
+
+		assert.Equal(t, 2026, ti.CreatedAt.Year())
+		assert.Equal(t, 8, ti.CreatedAt.Hour(), "CreatedAt should be firstTimestamp (08:00)")
+		assert.Equal(t, 11, ti.LastSeen.Hour(), "LastSeen should be lastTimestamp (11:30)")
+		colMap := columnsToMap(ti.Columns)
+		assert.NotEmpty(t, colMap["Last Seen"], "Last Seen column should be present")
+	})
+
+	t.Run("only lastTimestamp falls back to first=last", func(t *testing.T) {
+		obj := map[string]interface{}{
+			"lastTimestamp": "2026-04-10T11:30:00Z",
+		}
+		ti := &model.Item{}
+		populateEvent(ti, obj)
+
+		assert.Equal(t, ti.CreatedAt, ti.LastSeen,
+			"missing firstTimestamp should fall back to lastTimestamp")
+		assert.Equal(t, 11, ti.LastSeen.Hour())
+	})
+
+	t.Run("only eventTime (events.k8s.io v1)", func(t *testing.T) {
+		obj := map[string]interface{}{
+			"eventTime": "2026-04-10T11:30:00.123Z",
+		}
+		ti := &model.Item{}
+		populateEvent(ti, obj)
+
+		assert.False(t, ti.CreatedAt.IsZero())
+		assert.False(t, ti.LastSeen.IsZero())
+		assert.Equal(t, ti.CreatedAt, ti.LastSeen)
+	})
+}
+
 // --- populatePersistentVolume ---
 
 func TestPopulatePersistentVolume(t *testing.T) {

@@ -430,6 +430,60 @@ metadata:
 	assert.NotContains(t, names, "old-cm")
 }
 
+// TestBuildItemsFromManifestRefs_PreservesK8sNameForCrossNamespace is a
+// regression guard for the bug where cross-namespace resources had their
+// Item.Name mutated to "<namespace>/<name>" for display purposes. The mutated
+// name was later forwarded verbatim to the Kubernetes API as a resource name,
+// which the API server rejects with "invalid resource name [...]: may not
+// contain '/'", breaking YAML preview and label edits.
+//
+// The contract is:
+//   - Item.Name must always be the actual K8s resource name (no slashes)
+//   - Item.Namespace must carry the resource's namespace so the renderer can
+//     show it in its own NAMESPACE column
+//
+// This applies regardless of whether the resource lives in the release's own
+// namespace or in a different one.
+func TestBuildItemsFromManifestRefs_PreservesK8sNameForCrossNamespace(t *testing.T) {
+	refs := []ManifestResourceRef{
+		// Same-namespace resource: namespace matches the release.
+		{APIVersion: "v1", Kind: "ConfigMap", Name: "in-release", Namespace: "default"},
+		// Cross-namespace resource: a Secret in cilium-secrets while the
+		// release is deployed in default. This is the exact shape that
+		// triggered the original "invalid resource name" error.
+		{APIVersion: "v1", Kind: "Secret", Name: "cilium-operator-tlsinterception-secrets", Namespace: "cilium-secrets"},
+		// Cluster-scoped resource: no namespace at all.
+		{APIVersion: "rbac.authorization.k8s.io/v1", Kind: "ClusterRole", Name: "cluster-role"},
+	}
+
+	items, index := buildItemsFromManifestRefs(refs)
+	require.Len(t, items, 3)
+
+	// Same-namespace item: name unchanged, namespace populated.
+	assert.Equal(t, "in-release", items[0].Name, "same-namespace item must keep its raw name")
+	assert.Equal(t, "default", items[0].Namespace)
+
+	// Cross-namespace item: name MUST NOT contain '/' so the K8s API
+	// accepts it when fetching YAML. Namespace is preserved separately so
+	// the explorer's NAMESPACE column still shows it.
+	assert.Equal(t, "cilium-operator-tlsinterception-secrets", items[1].Name,
+		"cross-namespace item must not be mutated with namespace prefix")
+	assert.NotContains(t, items[1].Name, "/",
+		"K8s resource names cannot contain slashes")
+	assert.Equal(t, "cilium-secrets", items[1].Namespace,
+		"namespace must still be carried in Item.Namespace for the renderer")
+
+	// Cluster-scoped item: name unchanged, namespace empty.
+	assert.Equal(t, "cluster-role", items[2].Name)
+	assert.Empty(t, items[2].Namespace)
+
+	// The merge index is keyed by the actual ref identity and must continue
+	// to point at the right items so live-status enrichment keeps working.
+	assert.Equal(t, 0, index[helmRefKey("ConfigMap", "default", "in-release")])
+	assert.Equal(t, 1, index[helmRefKey("Secret", "cilium-secrets", "cilium-operator-tlsinterception-secrets")])
+	assert.Equal(t, 2, index[helmRefKey("ClusterRole", "", "cluster-role")])
+}
+
 func TestGetHelmReleases_LatestVersionWins(t *testing.T) {
 	earlier := time.Now().Add(-2 * time.Hour)
 	later := time.Now()
@@ -460,4 +514,42 @@ func TestGetHelmReleases_LatestVersionWins(t *testing.T) {
 	}
 	assert.Equal(t, "0.2.0", keys["Chart Version"])
 	assert.Equal(t, "2", keys["Revision"])
+}
+
+// TestGetHelmManagedResources_VolumeAttachmentResolves is an end-to-end
+// regression guard for the CSIDriver-class bug: a helm release that deploys
+// a cluster-scoped built-in resource (here VolumeAttachment, part of
+// storage.k8s.io but historically missing from the hardcoded list) must
+// surface in the managed-resources list with its correct Extra/APIVersion
+// so downstream resolution produces the right GVR.
+func TestGetHelmManagedResources_VolumeAttachmentResolves(t *testing.T) {
+	manifest := `---
+apiVersion: storage.k8s.io/v1
+kind: VolumeAttachment
+metadata:
+  name: csi-attachment-xyz
+`
+	blob := makeHelmBlobWithManifest(
+		"storage-bundle", "storage-bundle", "1.0.0", "1.0.0",
+		"deployed", "Install", manifest, 1,
+	)
+	secret := newFakeHelmReleaseSecret(
+		t, "sh.helm.release.v1.storage-bundle.v1", "storage-bundle", "deployed", "1", blob, time.Now(),
+	)
+	cs := k8sfake.NewClientset(secret)
+	c := newFakeClient(cs, nil)
+
+	items, err := c.getHelmManagedResources(context.Background(), "", "default", "storage-bundle")
+	require.NoError(t, err)
+
+	var va *model.Item
+	for i := range items {
+		if items[i].Kind == "VolumeAttachment" {
+			va = &items[i]
+			break
+		}
+	}
+	require.NotNil(t, va, "VolumeAttachment must appear in helm managed resources")
+	assert.Equal(t, "csi-attachment-xyz", va.Name, "name must be the raw K8s name, not namespace-prefixed")
+	assert.Equal(t, "storage.k8s.io/v1", va.Extra, "Extra must carry the apiVersion for resolver disambiguation")
 }

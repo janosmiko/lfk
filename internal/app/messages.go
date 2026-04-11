@@ -28,6 +28,11 @@ type resourcesLoadedMsg struct {
 	err        error
 	forPreview bool
 	gen        uint64
+	// silent marks this load as originating from a watch-mode refresh
+	// (or another caller that set Model.suppressBgtasks). Its downstream
+	// preview/metrics cmds in updateResourcesLoadedMain must also run
+	// suppressed so the title-bar indicator doesn't flash every 2 seconds.
+	silent bool
 }
 
 type ownedLoadedMsg struct {
@@ -35,6 +40,7 @@ type ownedLoadedMsg struct {
 	err        error
 	forPreview bool
 	gen        uint64
+	silent     bool
 }
 
 type containersLoadedMsg struct {
@@ -42,6 +48,7 @@ type containersLoadedMsg struct {
 	err        error
 	forPreview bool
 	gen        uint64
+	silent     bool
 }
 
 type resourceTreeLoadedMsg struct {
@@ -55,14 +62,22 @@ type namespacesLoadedMsg struct {
 	err   error
 }
 
+// yamlLoadedMsg delivers a full YAML document for the YAML view. The content
+// and sections are pre-processed in the loading goroutine so the main event
+// loop never spends time on indentYAMLListItems or parseYAMLSections — on
+// really long CRD manifests (50k+ lines) those calls can take seconds and
+// freeze the UI. Producers must call buildYAMLViewPayload before sending.
 type yamlLoadedMsg struct {
-	content string
-	err     error
+	content  string        // already indented via indentYAMLListItems
+	sections []yamlSection // already parsed via parseYAMLSections
+	err      error
 }
 
-// previewYAMLLoadedMsg carries YAML content for the split/full preview in the right column.
+// previewYAMLLoadedMsg carries YAML content for the split/full preview in the
+// right column. As with yamlLoadedMsg, the content is pre-indented inside the
+// loading goroutine to keep the main event loop responsive.
 type previewYAMLLoadedMsg struct {
-	content string
+	content string // already indented via indentYAMLListItems
 	err     error
 	gen     uint64
 }
@@ -176,8 +191,8 @@ type quotaLoadedMsg struct {
 	err    error
 }
 
-// crdDiscoveryMsg carries the result of CRD discovery for a cluster context.
-type crdDiscoveryMsg struct {
+// apiResourceDiscoveryMsg delivers the result of DiscoverAPIResources.
+type apiResourceDiscoveryMsg struct {
 	context string
 	entries []model.ResourceTypeEntry
 	err     error

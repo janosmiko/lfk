@@ -10,6 +10,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -125,26 +126,31 @@ func (m Model) loadDashboard() tea.Cmd {
 	kctx := m.nav.Context
 	client := m.client
 	reqCtx := m.reqCtx
-	return func() tea.Msg {
-		data := fetchDashboardData(reqCtx, kctx, client)
+	return m.trackBgTask(
+		bgtasks.KindDashboard,
+		"Cluster dashboard",
+		bgtaskTarget(kctx, ""),
+		func() tea.Msg {
+			data := fetchDashboardData(reqCtx, kctx, client)
 
-		var lines []string
-		lines = append(lines, "")
-		lines = dashboardHeaderSection(lines, data)
-		lines = dashboardResourcesSection(lines, data)
-		lines = dashboardNodesSection(lines, data)
-		lines = dashboardWarningsSection(lines, data)
-		lines = dashboardInlineEventsSection(lines, data.warningEvents)
-		lines = append(lines, "")
+			var lines []string
+			lines = append(lines, "")
+			lines = dashboardHeaderSection(lines, data)
+			lines = dashboardResourcesSection(lines, data)
+			lines = dashboardNodesSection(lines, data)
+			lines = dashboardWarningsSection(lines, data)
+			lines = dashboardInlineEventsSection(lines, data.warningEvents)
+			lines = append(lines, "")
 
-		eventLines := dashboardEventsColumn(data.allWarnings)
+			eventLines := dashboardEventsColumn(data.allWarnings)
 
-		return dashboardLoadedMsg{
-			content: strings.Join(lines, "\n"),
-			events:  strings.Join(eventLines, "\n"),
-			context: kctx,
-		}
-	}
+			return dashboardLoadedMsg{
+				content: strings.Join(lines, "\n"),
+				events:  strings.Join(eventLines, "\n"),
+				context: kctx,
+			}
+		},
+	)
 }
 
 // fetchDashboardData fetches all cluster data needed for the dashboard.
@@ -209,6 +215,9 @@ func countPodStats(podItems []model.Item) podStats {
 }
 
 // fetchWarningEvents fetches events and returns (limited for inline, all for column).
+// Events are ordered most-recently-observed first (LastSeen, not CreatedAt) so a
+// long-running incident that just fired again sits at the top of the dashboard
+// instead of being buried under one-off events that happened to start later.
 func fetchWarningEvents(reqCtx context.Context, kctx string, client *k8s.Client) (limited, all []model.Item) {
 	eventItems, _ := client.GetResources(reqCtx, kctx, "", model.ResourceTypeEntry{
 		Kind: "Event", APIGroup: "", APIVersion: "v1", Resource: "events", Namespaced: true,
@@ -220,7 +229,7 @@ func fetchWarningEvents(reqCtx context.Context, kctx string, client *k8s.Client)
 		}
 	}
 	sort.Slice(warnings, func(i, j int) bool {
-		return warnings[i].CreatedAt.After(warnings[j].CreatedAt)
+		return warnings[i].LastSeen.After(warnings[j].LastSeen)
 	})
 	all = warnings
 	limited = warnings
@@ -639,34 +648,39 @@ func (m Model) loadMonitoringDashboard() tea.Cmd {
 	kctx := m.nav.Context
 	client := m.client
 	ns := m.effectiveNamespace()
-	return func() tea.Msg {
-		var lines []string
-		lines = append(lines, "")
-		lines = append(lines, ui.DimStyle.Bold(true).Render("  MONITORING OVERVIEW"))
-		lines = append(lines, "")
-
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-
-		alerts, err := client.GetAllActiveAlerts(ctx, kctx, ns)
-		if err != nil {
-			lines = append(lines, ui.DimStyle.Render("  Prometheus/Alertmanager not reachable"))
-			lines = append(lines, ui.DimStyle.Render("  "+err.Error()))
+	return m.trackBgTask(
+		bgtasks.KindDashboard,
+		"Monitoring dashboard",
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			var lines []string
 			lines = append(lines, "")
-			lines = append(lines, ui.DimStyle.Render("  Searched in well-known namespaces:"))
-			lines = append(lines, ui.DimStyle.Render("  monitoring, prometheus, observability, kube-prometheus-stack"))
+			lines = append(lines, ui.DimStyle.Bold(true).Render("  MONITORING OVERVIEW"))
+			lines = append(lines, "")
+
+			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+			defer cancel()
+
+			alerts, err := client.GetAllActiveAlerts(ctx, kctx, ns)
+			if err != nil {
+				lines = append(lines, ui.DimStyle.Render("  Prometheus/Alertmanager not reachable"))
+				lines = append(lines, ui.DimStyle.Render("  "+err.Error()))
+				lines = append(lines, "")
+				lines = append(lines, ui.DimStyle.Render("  Searched in well-known namespaces:"))
+				lines = append(lines, ui.DimStyle.Render("  monitoring, prometheus, observability, kube-prometheus-stack"))
+				lines = append(lines, "")
+				return monitoringDashboardMsg{content: strings.Join(lines, "\n"), context: kctx}
+			}
+
+			lines = monitoringAlertSummary(lines, alerts)
+			lines = append(lines, "")
+			sortAlerts(alerts)
+			lines = monitoringAlertTable(lines, alerts)
+
 			lines = append(lines, "")
 			return monitoringDashboardMsg{content: strings.Join(lines, "\n"), context: kctx}
-		}
-
-		lines = monitoringAlertSummary(lines, alerts)
-		lines = append(lines, "")
-		sortAlerts(alerts)
-		lines = monitoringAlertTable(lines, alerts)
-
-		lines = append(lines, "")
-		return monitoringDashboardMsg{content: strings.Join(lines, "\n"), context: kctx}
-	}
+		},
+	)
 }
 
 // monitoringAlertSummary renders the alert summary header with state/severity counts.

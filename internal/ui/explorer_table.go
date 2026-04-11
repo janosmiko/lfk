@@ -477,6 +477,127 @@ func itemExtraLines(_ *model.Item, _ []extraColumn) int {
 	return 0
 }
 
+// isBuiltinColumnKey reports whether key is one of the five mandatory
+// built-in column keys. Extras sharing a built-in name are never surfaced
+// (the built-in always wins — matches the existing ActiveSortableColumns
+// de-dup precedent).
+func isBuiltinColumnKey(key string) bool {
+	switch key {
+	case "Namespace", "Ready", "Restarts", "Status", "Age":
+		return true
+	}
+	return false
+}
+
+// orderedColumnKeys returns the ordered list of column keys (excluding "Name")
+// that RenderTable should emit for a middle-column render. It honors
+// ActiveColumnOrder when set (gated on ActiveMiddleScroll >= 0), falling back
+// to the default layout [Namespace, Ready, Restarts, Status, extras..., Age]
+// otherwise. Keys whose columns are not currently visible (hasX=false or not
+// in extraCols) are dropped. Keys not referenced by the saved order are
+// appended at their default position so newly-discovered extras still show up.
+func orderedColumnKeys(hasNs, hasReady, hasRestarts, hasStatus, hasAge bool, extraCols []extraColumn) []string {
+	defaults := make([]string, 0, 5+len(extraCols))
+	if hasNs {
+		defaults = append(defaults, "Namespace")
+	}
+	if hasReady {
+		defaults = append(defaults, "Ready")
+	}
+	if hasRestarts {
+		defaults = append(defaults, "Restarts")
+	}
+	if hasStatus {
+		defaults = append(defaults, "Status")
+	}
+	for _, ec := range extraCols {
+		defaults = append(defaults, ec.key)
+	}
+	if hasAge {
+		defaults = append(defaults, "Age")
+	}
+
+	if ActiveMiddleScroll < 0 || ActiveColumnOrder == nil {
+		return defaults
+	}
+
+	// Build a "visible" set so stale entries in the saved order are dropped.
+	visible := make(map[string]bool, len(defaults))
+	for _, k := range defaults {
+		visible[k] = true
+	}
+
+	seen := make(map[string]bool, len(defaults))
+	ordered := make([]string, 0, len(defaults))
+
+	// Apply the user's saved order first, dropping stale or hidden keys.
+	for _, k := range ActiveColumnOrder {
+		if !visible[k] || seen[k] {
+			continue
+		}
+		ordered = append(ordered, k)
+		seen[k] = true
+	}
+	// Append any visible keys the saved order didn't mention, in default slot.
+	for _, k := range defaults {
+		if !seen[k] {
+			ordered = append(ordered, k)
+			seen[k] = true
+		}
+	}
+	return ordered
+}
+
+// widthForColumnKey returns the precomputed width for a given column key.
+// Built-in keys use their dedicated width variables; extra keys are looked
+// up in extraCols. Returns 0 for unknown keys (should not happen in practice).
+func widthForColumnKey(key string, nsW, readyW, restartsW, statusW, ageW int, extraCols []extraColumn) int {
+	switch key {
+	case "Namespace":
+		return nsW
+	case "Ready":
+		return readyW
+	case "Restarts":
+		return restartsW
+	case "Status":
+		return statusW
+	case "Age":
+		return ageW
+	}
+	for _, ec := range extraCols {
+		if ec.key == key {
+			return ec.width
+		}
+	}
+	return 0
+}
+
+// headerCellForKey returns the pre-styled header cell string for a single
+// column key, reusing the already-built headers for built-in columns and
+// calling headerWithIndicator for extras.
+func headerCellForKey(key string, extraCols []extraColumn,
+	nsHeader, readyHeader, rsHeader, statusHeader, ageHeader string,
+) string {
+	switch key {
+	case "Namespace":
+		return nsHeader
+	case "Ready":
+		return readyHeader
+	case "Restarts":
+		return rsHeader
+	case "Status":
+		return statusHeader
+	case "Age":
+		return ageHeader
+	}
+	for _, ec := range extraCols {
+		if ec.key == key {
+			return headerWithIndicator(strings.ToUpper(ec.key), ec.key, ec.width)
+		}
+	}
+	return ""
+}
+
 // RenderTable renders items in a table format with column headers for resource views.
 // headerLabel is used as the first column header; defaults to "NAME" if empty.
 func RenderTable(headerLabel string, items []model.Item, cursor int, width, height int, loading bool, spinnerView string, errMsg string, showMarker ...bool) string { //nolint:gocyclo // rendering function with inherent layout complexity
@@ -511,6 +632,27 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 		if item.Status != "" {
 			hasStatus = true
+		}
+	}
+
+	// Apply user-chosen built-in column suppression from the column toggle
+	// overlay. Only the middle column honors this — child/right previews do
+	// not use ActiveHiddenBuiltinColumns so their layout stays stable.
+	if ActiveMiddleScroll >= 0 && ActiveHiddenBuiltinColumns != nil {
+		if ActiveHiddenBuiltinColumns["Namespace"] {
+			hasNs = false
+		}
+		if ActiveHiddenBuiltinColumns["Ready"] {
+			hasReady = false
+		}
+		if ActiveHiddenBuiltinColumns["Restarts"] {
+			hasRestarts = false
+		}
+		if ActiveHiddenBuiltinColumns["Age"] {
+			hasAge = false
+		}
+		if ActiveHiddenBuiltinColumns["Status"] {
+			hasStatus = false
 		}
 	}
 
@@ -601,42 +743,38 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	}
 	extraCols := collectExtraColumns(items, width, nsW+readyW+restartsW+ageW+statusW+markerColW, tableKind)
 
-	// Populate ActiveExtraColumnKeys for the column toggle overlay.
-	ActiveExtraColumnKeys = ActiveExtraColumnKeys[:0]
+	// Drop any extras that collide with a built-in key so the built-in always
+	// wins (matches the existing ActiveSortableColumns de-dup precedent) and
+	// keeps column-order serialization simple (bare keys, no disambiguation).
+	filtered := extraCols[:0]
 	for _, ec := range extraCols {
-		ActiveExtraColumnKeys = append(ActiveExtraColumnKeys, ec.key)
+		if !isBuiltinColumnKey(ec.key) {
+			filtered = append(filtered, ec)
+		}
 	}
+	extraCols = filtered
+
+	// Populate ActiveExtraColumnKeys for the column toggle overlay.
+	// Only the active middle column is authoritative — child/right table
+	// renders must not overwrite this or the overlay would show stale data.
+	if ActiveMiddleScroll >= 0 {
+		ActiveExtraColumnKeys = ActiveExtraColumnKeys[:0]
+		for _, ec := range extraCols {
+			ActiveExtraColumnKeys = append(ActiveExtraColumnKeys, ec.key)
+		}
+	}
+
+	// Build the ordered list of non-Name column keys. This honors any saved
+	// ActiveColumnOrder for the current kind when rendering the middle column,
+	// falling back to the default layout for child/right renders.
+	order := orderedColumnKeys(hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols)
 
 	// Build sortable column list only for the middle column (not children/right column).
 	// ActiveMiddleScroll >= 0 indicates this is the active middle column render.
 	if ActiveMiddleScroll >= 0 {
 		ActiveSortableColumns = ActiveSortableColumns[:0]
-		if hasNs {
-			ActiveSortableColumns = append(ActiveSortableColumns, "Namespace")
-		}
 		ActiveSortableColumns = append(ActiveSortableColumns, "Name")
-		if hasReady {
-			ActiveSortableColumns = append(ActiveSortableColumns, "Ready")
-		}
-		if hasRestarts {
-			ActiveSortableColumns = append(ActiveSortableColumns, "Restarts")
-		}
-		if hasStatus {
-			ActiveSortableColumns = append(ActiveSortableColumns, "Status")
-		}
-		// Add extra columns, skipping any that duplicate built-in column names.
-		builtinCols := map[string]bool{
-			"Namespace": hasNs, "Name": true, "Ready": hasReady,
-			"Restarts": hasRestarts, "Status": hasStatus, "Age": hasAge,
-		}
-		for _, ec := range extraCols {
-			if !builtinCols[ec.key] {
-				ActiveSortableColumns = append(ActiveSortableColumns, ec.key)
-			}
-		}
-		if hasAge {
-			ActiveSortableColumns = append(ActiveSortableColumns, "Age")
-		}
+		ActiveSortableColumns = append(ActiveSortableColumns, order...)
 		ActiveSortableColumnCount = len(ActiveSortableColumns)
 		// Derive ActiveSortColumn index from the name now that columns are built.
 		ActiveSortColumn = 0
@@ -671,33 +809,38 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	statusHeader := headerWithIndicator("STATUS", "Status", statusW)
 	ageHeader := headerWithIndicator("AGE", "Age", ageW)
 
-	// Build header row directly with sort indicators fitted within column widths.
+	// Build header row using the ordered walk. Name is always first (after
+	// any marker column). Built-ins use their pre-built headers; extras are
+	// built on demand via headerCellForKey.
 	var hdrParts []string
 	if wantMarker {
 		hdrParts = append(hdrParts, "  ")
 	}
-	if hasNs {
-		hdrParts = append(hdrParts, nsHeader)
-	}
 	hdrParts = append(hdrParts, nameHeader)
-	if hasReady {
-		hdrParts = append(hdrParts, readyHeader)
-	}
-	if hasRestarts {
-		hdrParts = append(hdrParts, rsHeader)
-	}
-	if hasStatus {
-		hdrParts = append(hdrParts, statusHeader)
-	}
-	for _, ec := range extraCols {
-		hdrParts = append(hdrParts, headerWithIndicator(strings.ToUpper(ec.key), ec.key, ec.width))
-	}
-	if hasAge {
-		hdrParts = append(hdrParts, ageHeader)
+	for _, key := range order {
+		hdrParts = append(hdrParts, headerCellForKey(key, extraCols, nsHeader, readyHeader, rsHeader, statusHeader, ageHeader))
 	}
 	hdr := strings.Join(hdrParts, "")
 	b.WriteString(DimStyle.Bold(true).Render(Truncate(hdr, width)))
 	height-- // header takes one line
+
+	// Record the byte ranges of each rendered column so mouse handling can
+	// map a click X coordinate to a column key. Only populated for the
+	// active middle render.
+	if ActiveMiddleScroll >= 0 {
+		ActiveMiddleColumnLayout = ActiveMiddleColumnLayout[:0]
+		x := 0
+		if wantMarker {
+			x += markerColW
+		}
+		ActiveMiddleColumnLayout = append(ActiveMiddleColumnLayout, MiddleColumnRegion{Key: "Name", StartX: x, EndX: x + nameW})
+		x += nameW
+		for _, key := range order {
+			w := widthForColumnKey(key, nsW, readyW, restartsW, statusW, ageW, extraCols)
+			ActiveMiddleColumnLayout = append(ActiveMiddleColumnLayout, MiddleColumnRegion{Key: key, StartX: x, EndX: x + w})
+			x += w
+		}
+	}
 
 	// Detect category transitions for category headers.
 	hasCategories := false
@@ -859,9 +1002,8 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				}
 			}
 			// Selected row: plain text, no inner styles.
-			row := markerPrefix + formatTableRowWithExtra(displayName, ns, item.Ready, cursorRestarts, item.Status, item.Age,
-				nameW, nsW, readyW, restartsW, statusW, ageW, hasNs, hasReady, hasRestarts, hasStatus, hasAge,
-				extraCols, &item)
+			row := markerPrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, item.Age,
+				nameW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
 			// Apply search/filter highlight on the selected row with contrasting style.
 			if ActiveHighlightQuery != "" {
 				row = highlightNameSelected(row, ActiveHighlightQuery)
@@ -882,8 +1024,8 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				}
 			}
 			// Non-selected row: apply styling.
-			b.WriteString(markerPrefix + formatTableRowStyledWithExtra(item, nameW, nsW, readyW, restartsW, statusW, ageW,
-				hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols, anyRecentRestart))
+			b.WriteString(markerPrefix + formatTableRowStyledOrdered(item, nameW, nsW, readyW, restartsW, statusW, ageW,
+				order, extraCols, anyRecentRestart))
 		}
 
 	}

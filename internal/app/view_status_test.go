@@ -140,6 +140,54 @@ func TestBreadcrumb(t *testing.T) {
 			},
 			expected: "lfk > prod > Deployments > my-deploy > my-pod-abc",
 		},
+		{
+			// Resource types coming from API discovery have an empty
+			// DisplayName (per model.DisplayNameFor). The breadcrumb must
+			// still surface a friendly name by going through the metadata
+			// fallback chain.
+			name: "discovered resource type without DisplayName uses metadata",
+			nav: model.NavigationState{
+				Context: "prod",
+				ResourceType: model.ResourceTypeEntry{
+					// DisplayName intentionally empty.
+					Kind:       "Pod",
+					APIGroup:   "",
+					APIVersion: "v1",
+					Resource:   "pods",
+				},
+			},
+			expected: "lfk > prod > Pods",
+		},
+		{
+			// CRD-style resource: no DisplayName, no built-in metadata entry,
+			// only Kind. The breadcrumb should still show the Kind so the
+			// title bar tells the user what they're standing on.
+			name: "discovered CRD falls back to Kind when no metadata",
+			nav: model.NavigationState{
+				Context: "prod",
+				ResourceType: model.ResourceTypeEntry{
+					Kind:       "MyCustomResource",
+					APIGroup:   "example.com",
+					APIVersion: "v1",
+					Resource:   "mycustomresources",
+				},
+			},
+			expected: "lfk > prod > MyCustomResource",
+		},
+		{
+			// Pod at LevelContainers: navigateChildResource sets both
+			// ResourceName AND OwnedName to the same value so the containers
+			// view knows its parent. The breadcrumb must not show the name
+			// twice ("lfk > prod > Pods > my-pod > my-pod").
+			name: "pod containers does not duplicate name",
+			nav: model.NavigationState{
+				Context:      "prod",
+				ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"},
+				ResourceName: "web-7d8c-abc",
+				OwnedName:    "web-7d8c-abc",
+			},
+			expected: "lfk > prod > Pods > web-7d8c-abc",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

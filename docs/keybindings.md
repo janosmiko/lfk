@@ -15,8 +15,9 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Enter` | Open full-screen YAML view / navigate into |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
-| `z` | Toggle expand/collapse all resource groups |
+| `z` | Toggle expand/collapse all resource groups / toggle event grouping in the Events list |
 | `p` | Pin/unpin CRD group (at resource types level) |
+| `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar (resets each launch) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |
@@ -32,16 +33,17 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `F` | Toggle fullscreen (middle column or dashboard) |
 | `.` | Quick filter presets |
 | `!` | Error log |
-| `Ctrl+S` | Toggle secret value visibility (decode base64) |
+| `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
 | `I` | API Explorer (browse resource structure interactively) |
 | `U` | RBAC permissions browser (can-i) |
 | `M` | Toggle resource relationship map view |
 | `w` | Toggle watch mode (auto-refresh every 2s) |
-| `,` | Column visibility toggle (show/hide and reorder columns) |
+| `,` | Column visibility toggle (show/hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
 | `>` / `<` | Sort by next / previous column |
 | `=` | Toggle sort direction (ascending/descending) |
 | `-` | Reset sort to default (Name ascending) |
 | `W` | Save resource to file / toggle warnings-only filter (Events view) |
+| | Events list also groups duplicate events (same Type/Reason/Message/Object) by default; press `z` to toggle grouping |
 | `T` | Switch color scheme (live preview, not persisted) |
 | `Ctrl+T` | Toggle terminal mode (pty embedded / exec takeover) |
 | `Ctrl+G` | Finalizer search and remove |
@@ -252,6 +254,77 @@ All other keys are forwarded to the PTY process. The PTY session continues runni
 | `Ctrl+W` / `>` | Toggle line wrapping |
 | `u` | Toggle unified/side-by-side view |
 | `q` / `Esc` | Back to explorer |
+
+## Column Toggle Overlay
+
+Press `,` in the resource list to open the column toggle overlay. It lists
+every toggleable column for the current kind — both built-ins (Namespace,
+Ready, Restarts, Status, Age) and extras from the resource's
+`additionalPrinterColumns`.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate up/down |
+| `Space` | Toggle the current entry |
+| `J` / `K` | Reorder the current entry down/up |
+| `/` | Filter entries by name |
+| `c` | Clear selection (uncheck every entry) |
+| `R` | Reset to defaults for the current kind |
+| `Enter` | Apply the selection |
+| `Esc` / `q` | Close without saving |
+
+Built-in and extra columns can be freely interleaved — `J`/`K` moves
+either kind, so you can put `Age` before `Namespace` or drop an extra
+like `IP` between `Ready` and `Status`. The only fixed column is `Name`,
+which always renders first and is never listed in the overlay.
+
+The selection you apply is explicit: the table renders exactly the
+columns you check, in the exact order they appear in the overlay, and
+will not auto-fill the remaining space with unchecked columns. The
+chosen order is remembered per resource kind for the duration of the
+session (it is not persisted to disk). To start from a clean slate,
+press `c` to uncheck every entry at once, then space-select only the
+columns you want.
+
+If you apply a completely empty selection (no built-ins, no extras), the
+overlay interprets it as "reset to defaults for this kind" rather than
+leaving the table empty. To render only built-ins with zero extras, keep
+at least one built-in column checked when you press Enter.
+
+## Inline Editors (Secret / ConfigMap / Labels & Annotations)
+
+The Secret, ConfigMap, and Labels/Annotations editors use a shared key-value
+overlay. The list view supports vim-like navigation; pressing `e` or `a`
+enters edit mode for the selected (or new) entry.
+
+### List view
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Move cursor up/down |
+| `e` | Edit selected key/value |
+| `a` | Add a new key/value entry |
+| `y` | Copy selected value to clipboard |
+| `D` | Delete selected entry |
+| `Enter` | Save changes and close (no-op if nothing changed) |
+| `Esc` | Close without saving |
+
+The Labels/Annotations editor additionally has a `Tab` binding in the list
+view to switch between the labels pane and the annotations pane.
+
+### Edit mode
+
+| Key | Action |
+|---|---|
+| `Tab` | Switch between key and value fields (in-progress edits in both fields are preserved) |
+| `Cmd+V` (macOS) / `Ctrl+Shift+V` (Linux) | Paste from clipboard |
+| `Ctrl+S` | Commit the in-progress edit back to the list |
+| `Esc` | Cancel the in-progress edit |
+
+> Pressing `Enter` from the list view saves all pending changes via `kubectl
+> apply`/`patch` and refreshes the resource. If no fields were modified, the
+> overlay closes silently. The previous `s` save shortcut has been removed —
+> use `Enter` instead.
 
 ## API Explorer
 
@@ -477,6 +550,7 @@ keybindings:
   preview_down: "J"      # Scroll preview down
   preview_up: "K"        # Scroll preview up
   jump_owner: "o"        # Jump to owner
+  toggle_rare: "H"       # Toggle rarely used resource types in the sidebar
 
   # Views and Modes
   help: "?"              # Toggle help

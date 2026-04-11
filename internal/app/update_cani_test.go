@@ -286,7 +286,7 @@ func TestCovHandleCanISearchKey(t *testing.T) {
 func TestCovProcessCanIRulesWildcard(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "ctx"
-	m.discoveredCRDs["ctx"] = nil
+	m.discoveredResources["ctx"] = nil
 
 	m.processCanIRules([]k8s.AccessRule{
 		{APIGroups: []string{""}, Resources: []string{"pods"}, Verbs: []string{"*"}},
@@ -297,7 +297,9 @@ func TestCovProcessCanIRulesWildcard(t *testing.T) {
 func TestCovProcessCanIRulesWildcardAll(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "ctx"
-	m.discoveredCRDs["ctx"] = nil
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
 
 	m.processCanIRules([]k8s.AccessRule{
 		{APIGroups: []string{"*"}, Resources: []string{"*"}, Verbs: []string{"get", "list"}},
@@ -308,7 +310,9 @@ func TestCovProcessCanIRulesWildcardAll(t *testing.T) {
 func TestCovProcessCanIRulesEmpty(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "ctx"
-	m.discoveredCRDs["ctx"] = nil
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
 
 	m.processCanIRules(nil)
 	assert.NotEmpty(t, m.canIGroups)
@@ -317,7 +321,7 @@ func TestCovProcessCanIRulesEmpty(t *testing.T) {
 func TestCovProcessCanIRulesWithCRDs(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "ctx"
-	m.discoveredCRDs["ctx"] = []model.ResourceTypeEntry{
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
 		{Kind: "Application", Resource: "applications", APIGroup: "argoproj.io", APIVersion: "v1alpha1"},
 	}
 

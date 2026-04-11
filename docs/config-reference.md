@@ -207,6 +207,7 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `error_log` | `!` | Error log overlay |
 | `finalizer_search` | `ctrl+g` | Finalizer search and remove |
 | `terminal_toggle` | `ctrl+t` | Toggle terminal mode (pty/exec) |
+| `toggle_rare` | `H` | Toggle rarely used resource types in the sidebar |
 
 ## Resource Columns
 

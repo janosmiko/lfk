@@ -973,6 +973,57 @@ func TestGetFluxManagedResources(t *testing.T) {
 	assert.Equal(t, "ConfigMap", items[0].Kind)
 }
 
+// TestGetFluxManagedResources_PreservesK8sNameForCrossNamespace is a regression
+// guard mirroring the helm-side fix: cross-namespace inventory entries must not
+// have their Item.Name mutated to "<namespace>/<name>", because that mutated
+// value is forwarded to the Kubernetes API as the resource name when the user
+// loads YAML or labels for the item, and the API rejects any name containing
+// '/'.
+func TestGetFluxManagedResources_PreservesK8sNameForCrossNamespace(t *testing.T) {
+	// Kustomization lives in flux-system; the inventory holds an entry in a
+	// different namespace (cilium-secrets) so the cross-namespace path is
+	// exercised.
+	ks := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
+			"kind":       "Kustomization",
+			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
+			"status": map[string]interface{}{
+				"inventory": map[string]interface{}{
+					"entries": []interface{}{
+						map[string]interface{}{"id": "cilium-secrets_cilium-operator-tlsinterception-secrets__Secret", "v": "v1"},
+						map[string]interface{}{"id": "flux-system_local-cm__ConfigMap", "v": "v1"},
+					},
+				},
+			},
+		},
+	}
+	dc := newFakeDynClient(ks)
+	c := newFakeClient(nil, dc)
+
+	items, err := c.getFluxManagedResources(context.Background(), dc, "flux-system", "my-ks")
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+
+	// Find the cross-namespace Secret in the result regardless of sort order.
+	var secret *model.Item
+	for i := range items {
+		if items[i].Kind == "Secret" {
+			secret = &items[i]
+			break
+		}
+	}
+	require.NotNil(t, secret)
+
+	// Name must be the raw K8s name, namespace must live in Item.Namespace.
+	assert.Equal(t, "cilium-operator-tlsinterception-secrets", secret.Name,
+		"cross-namespace inventory entries must not be mutated with namespace prefix")
+	assert.NotContains(t, secret.Name, "/",
+		"K8s resource names cannot contain slashes")
+	assert.Equal(t, "cilium-secrets", secret.Namespace,
+		"namespace must still be carried in Item.Namespace for the renderer")
+}
+
 func TestGetFluxManagedResources_NoStatus(t *testing.T) {
 	ks := &unstructured.Unstructured{
 		Object: map[string]interface{}{

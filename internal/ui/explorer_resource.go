@@ -152,7 +152,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 
 	// Render identity rows.
 	for _, r := range identityRows {
-		if len(lines) >= height-2 {
+		if len(lines) >= height {
 			break
 		}
 		valW := max(width-keyW-2, 4)
@@ -172,7 +172,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	valW := max(width-keyW-2, 4)
 	indent := strings.Repeat(" ", keyW)
 	renderRow := func(r detailRow) {
-		if len(lines) >= height-2 {
+		if len(lines) >= height {
 			return
 		}
 		keyStr := detailKeyStyle.Render(fmt.Sprintf("%-*s", keyW, r.key))
@@ -183,7 +183,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		}
 		lines = append(lines, keyStr+DimStyle.Render(string(valRunes[:valW])))
 		for start := valW; start < len(valRunes); start += valW {
-			if len(lines) >= height-2 {
+			if len(lines) >= height {
 				break
 			}
 			end := min(start+valW, len(valRunes))
@@ -205,8 +205,9 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		renderRow(r)
 	}
 
-	// Render multi-line fields: Labels, Annotations, Finalizers, etc.
-	multiOrder := []string{"Labels", "Annotations", "Finalizers", "Taints", "Selector", "Used By"}
+	// Render multi-line fields: Taints first (important for node scheduling
+	// decisions), then Labels and Annotations, then Finalizers/Selector/UsedBy.
+	multiOrder := []string{"Taints", "Labels", "Annotations", "Finalizers", "Selector", "Used By"}
 	multiMap := make(map[string]model.KeyValue, len(multiLineFields))
 	for _, kv := range multiLineFields {
 		multiMap[kv.Key] = kv
@@ -216,13 +217,13 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		if !ok {
 			continue
 		}
-		if len(lines) >= height-2 {
+		if len(lines) >= height {
 			break
 		}
 		lines = append(lines, "")
 		lines = append(lines, detailKeyStyle.Render(strings.ToUpper(kv.Key)))
 		for entry := range strings.SplitSeq(kv.Value, ", ") {
-			if len(lines) >= height-2 {
+			if len(lines) >= height {
 				break
 			}
 			maxW := max(width-4, 10)
@@ -232,7 +233,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			} else {
 				lines = append(lines, "  "+DimStyle.Render(string(entryRunes[:maxW])))
 				for start := maxW; start < len(entryRunes); start += maxW {
-					if len(lines) >= height-2 {
+					if len(lines) >= height {
 						break
 					}
 					end := min(start+maxW, len(entryRunes))
@@ -243,11 +244,11 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	}
 
 	// Render data/secret fields in a separate section with a header.
-	if len(dataLines) > 0 && len(lines) < height-2 {
+	if len(dataLines) > 0 && len(lines) < height {
 		lines = append(lines, "")
 		lines = append(lines, detailKeyStyle.Render(fmt.Sprintf("DATA (%d)", len(dataLines))))
 		for _, dl := range dataLines {
-			if len(lines) >= height-2 {
+			if len(lines) >= height {
 				break
 			}
 			lines = append(lines, dl)
@@ -255,11 +256,11 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	}
 
 	// Render CONDITIONS section from item.Conditions with color coding.
-	if len(item.Conditions) > 0 && len(lines) < height-2 {
+	if len(item.Conditions) > 0 && len(lines) < height {
 		lines = append(lines, "")
 		lines = append(lines, detailKeyStyle.Render("CONDITIONS"))
 		for _, cond := range item.Conditions {
-			if len(lines) >= height-2 {
+			if len(lines) >= height {
 				break
 			}
 
@@ -297,11 +298,11 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			stepEntries = append(stepEntries, kv)
 		}
 	}
-	if len(stepEntries) > 0 && len(lines) < height-2 {
+	if len(stepEntries) > 0 && len(lines) < height {
 		lines = append(lines, "")
 		lines = append(lines, detailKeyStyle.Render("STEPS"))
 		for _, kv := range stepEntries {
-			if len(lines) >= height-2 {
+			if len(lines) >= height {
 				break
 			}
 			stepName := kv.Key[len("step:"):]

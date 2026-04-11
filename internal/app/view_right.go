@@ -44,7 +44,9 @@ func (m *Model) clampPreviewScroll() {
 			childrenHeight = 2
 		}
 		childLabel := strings.ToUpper(m.ownedChildKindLabel())
-		pinnedHeader := ui.RenderTable(childLabel, m.rightItems, -1, innerW, childrenHeight, m.loading, m.spinner.View(), "", false)
+		pinnedHeader := m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
+			return ui.RenderTable(childLabel, m.rightItems, -1, innerW, childrenHeight, m.loading, m.spinner.View(), "", false)
+		})
 		pinnedHeader += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", innerW))
 		pinnedHeaderLines := strings.Count(pinnedHeader, "\n") + 1
 		scrollableH -= pinnedHeaderLines
@@ -112,7 +114,9 @@ func (m Model) renderRightColumn(width, height int) string {
 			childrenHeight = 2
 		}
 		childLabel := strings.ToUpper(m.ownedChildKindLabel())
-		pinnedHeader = ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+		pinnedHeader = m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
+			return ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+		})
 		pinnedHeader += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width))
 		pinnedHeaderLines = strings.Count(pinnedHeader, "\n") + 1
 		contentHeight -= pinnedHeaderLines
@@ -184,19 +188,26 @@ func (m Model) hasSplitPreview() bool {
 }
 
 // renderDetailsOnly renders the details portion (without children table) for the right column.
+// The returned string contains a "DETAILS" header line followed by the summary
+// body, and fits within the requested height (body capped at height-1 to
+// reserve one line for the header).
 func (m Model) renderDetailsOnly(width, height int) string {
 	sel := m.selectedMiddleItem()
 	detailsHeader := ui.DimStyle.Bold(true).Render("DETAILS")
+	bodyHeight := height - 1
+	if bodyHeight < 1 {
+		bodyHeight = 1
+	}
 	var bottomContent string
 	if sel != nil && len(sel.Columns) > 0 {
-		bottomContent = ui.RenderResourceSummary(sel, "", width, height)
+		bottomContent = ui.RenderResourceSummary(sel, "", width, bodyHeight)
 	} else {
 		yaml := m.previewYAML
 		if yaml == "" {
 			yaml = m.yamlContent
 		}
 		if yaml != "" {
-			bottomContent = ui.RenderYAMLContent(m.maskYAMLIfSecret(yaml), width, height)
+			bottomContent = ui.RenderYAMLContent(yaml, width, bodyHeight)
 		} else {
 			bottomContent = ui.DimStyle.Render("No details available")
 		}
@@ -244,7 +255,7 @@ func (m Model) renderFullYAMLPreview(width, height int) string {
 	if yaml == "" {
 		return ui.DimStyle.Render("Loading YAML...")
 	}
-	return ui.RenderYAMLContent(m.maskYAMLIfSecret(yaml), width, height)
+	return ui.RenderYAMLContent(yaml, width, height)
 }
 
 func (m Model) renderRightResourceTypes(width, height int) string {
@@ -315,7 +326,9 @@ func (m Model) renderRightDefault(width, height int) string {
 		}
 		return ui.DimStyle.Render("No resources found")
 	}
-	return ui.RenderTable(strings.ToUpper(m.ownedChildKindLabel()), m.rightItems, -1, width, height, m.loading, m.spinner.View(), "", false)
+	return m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
+		return ui.RenderTable(strings.ToUpper(m.ownedChildKindLabel()), m.rightItems, -1, width, height, m.loading, m.spinner.View(), "", false)
+	})
 }
 
 // renderSplitPreview renders the right column as a split: top children table, bottom details.
@@ -329,9 +342,13 @@ func (m Model) renderSplitPreview(width, height int) string {
 		detailsHeight = 1
 	}
 
-	// Render children as table (same format as middle column).
+	// Render children as table (same format as middle column). Scope the
+	// session column config to the child kind so pod/container configs
+	// stay independent even when the middle column shows pods.
 	childLabel := strings.ToUpper(m.ownedChildKindLabel())
-	childrenContent := ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+	childrenContent := m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
+		return ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+	})
 
 	// Separator line.
 	separator := ui.DimStyle.Render(strings.Repeat("\u2500", width))
@@ -349,7 +366,7 @@ func (m Model) renderSplitPreview(width, height int) string {
 			yaml = m.yamlContent
 		}
 		if yaml != "" {
-			bottomContent = ui.RenderYAMLContent(m.maskYAMLIfSecret(yaml), width, detailsHeight)
+			bottomContent = ui.RenderYAMLContent(yaml, width, detailsHeight)
 		} else {
 			bottomContent = ui.DimStyle.Render("No details available")
 		}
@@ -365,18 +382,9 @@ func (m Model) renderFallbackYAML(width, height int) string {
 		yaml = m.yamlContent
 	}
 	if yaml != "" {
-		return ui.RenderYAMLContent(m.maskYAMLIfSecret(yaml), width, height)
+		return ui.RenderYAMLContent(yaml, width, height)
 	}
 	return ui.DimStyle.Render("No preview")
-}
-
-// maskYAMLIfSecret masks secret data values in YAML content when the current
-// resource is a Secret and secret display is toggled off.
-func (m Model) maskYAMLIfSecret(yaml string) string {
-	if !m.showSecretValues && m.nav.ResourceType.Kind == "Secret" {
-		return ui.MaskSecretYAML(yaml)
-	}
-	return yaml
 }
 
 func (m Model) resourceTypeHasChildren() bool {

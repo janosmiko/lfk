@@ -19,16 +19,16 @@ import (
 
 func baseModel() Model {
 	return Model{
-		nav:            model.NavigationState{Level: model.LevelResources},
-		tabs:           []TabState{{}},
-		selectedItems:  make(map[string]bool),
-		cursorMemory:   make(map[string]int),
-		itemCache:      make(map[string][]model.Item),
-		discoveredCRDs: make(map[string][]model.ResourceTypeEntry),
-		sortAscending:  true,
-		width:          80,
-		height:         40,
-		execMu:         &sync.Mutex{},
+		nav:                 model.NavigationState{Level: model.LevelResources},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		sortAscending:       true,
+		width:               80,
+		height:              40,
+		execMu:              &sync.Mutex{},
 	}
 }
 
@@ -648,30 +648,33 @@ func TestUpdateMetricsLoadedZero(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
-// --- crdDiscoveryMsg ---
+// --- apiResourceDiscoveryMsg ---
 
-func TestUpdateCRDDiscoveryError(t *testing.T) {
+func TestUpdateAPIResourceDiscoveryError(t *testing.T) {
 	m := baseModel()
 
-	result, cmd := m.Update(crdDiscoveryMsg{
+	result, cmd := m.Update(apiResourceDiscoveryMsg{
 		context: "test",
 		err:     errors.New("forbidden"),
 	})
 	mdl := result.(Model)
-	assert.Nil(t, mdl.discoveredCRDs["test"])
+	assert.Nil(t, mdl.discoveredResources["test"])
 	assert.Nil(t, cmd)
 }
 
-func TestUpdateCRDDiscoveryDifferentContext(t *testing.T) {
+func TestUpdateAPIResourceDiscoveryDifferentContext(t *testing.T) {
 	m := baseModel()
 	m.nav.Context = "prod"
 
 	entries := []model.ResourceTypeEntry{
 		{Kind: "MyResource", Resource: "myresources", DisplayName: "MyResource"},
 	}
-	result, cmd := m.Update(crdDiscoveryMsg{context: "staging", entries: entries})
+	result, cmd := m.Update(apiResourceDiscoveryMsg{context: "staging", entries: entries})
 	mdl := result.(Model)
-	assert.Len(t, mdl.discoveredCRDs["staging"], 1)
+	// Discovery prepends PseudoResources() (helm releases + port forwards)
+	// so the stored slice contains the 2 pseudo entries plus the real one.
+	expected := len(model.PseudoResources()) + 1
+	assert.Len(t, mdl.discoveredResources["staging"], expected)
 	assert.Empty(t, mdl.middleItems) // not in same context, no middle update
 	assert.Nil(t, cmd)
 }

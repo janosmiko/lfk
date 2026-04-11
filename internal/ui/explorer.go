@@ -24,6 +24,30 @@ var ActiveContext string
 // in the middle column table. Set during RenderTable for the column toggle overlay.
 var ActiveExtraColumnKeys []string
 
+// ActiveColumnOrder is the user-specified column order for the current
+// middle-column render, excluding the mandatory Name column which is
+// always first. Nil means "use the default order". Keys may refer to
+// built-in columns (Namespace/Ready/Restarts/Status/Age) or to extra
+// column keys from additionalPrinterColumns. Entries whose columns are
+// not currently present are silently dropped at render time.
+var ActiveColumnOrder []string
+
+// MiddleColumnRegion records the byte range a single column occupies in the
+// header row of the most recently rendered middle-column table. Key refers
+// to a built-in key (Namespace/Ready/Restarts/Status/Age), "Name", or an
+// extra column key. StartX is inclusive, EndX is exclusive.
+type MiddleColumnRegion struct {
+	Key    string
+	StartX int
+	EndX   int
+}
+
+// ActiveMiddleColumnLayout records the visual layout of the columns rendered
+// in the most recent middle-column table. Populated by RenderTable when
+// ActiveMiddleScroll >= 0 and consumed by mouse click handling to map a
+// click X coordinate to a column key.
+var ActiveMiddleColumnLayout []MiddleColumnRegion
+
 // ActiveCollapsedCategories is set by the app before rendering the resource types
 // column. Keys are category names; presence means the category is collapsed.
 var ActiveCollapsedCategories map[string]bool
@@ -260,50 +284,10 @@ func resolveIcon(icon string) string {
 // Keys are "namespace/name" or "name" for non-namespaced resources.
 var ActiveSelectedItems map[string]bool
 
-// ActiveShowSecretValues controls whether decoded secret values are shown in previews.
+// ActiveShowSecretValues controls whether secret values are revealed in the
+// resource details pane. When false, columns prefixed with `secret:` are
+// rendered as `********`. The YAML preview is not affected by this toggle.
 var ActiveShowSecretValues bool
-
-// MaskSecretYAML replaces values under `data:` and `stringData:` top-level keys
-// in Kubernetes Secret YAML with "********". This prevents leaking secret values
-// in YAML previews when secret display is toggled off.
-func MaskSecretYAML(yaml string) string {
-	lines := strings.Split(yaml, "\n")
-	inDataBlock := false
-	result := make([]string, 0, len(lines))
-	for _, line := range lines {
-		trimmed := strings.TrimRight(line, " \t")
-		// Detect top-level `data:` or `stringData:` keys (no leading whitespace).
-		if trimmed == "data:" || trimmed == "stringData:" {
-			inDataBlock = true
-			result = append(result, line)
-			continue
-		}
-		// If we're in a data block, check if the line is an indented key-value pair.
-		if inDataBlock {
-			// A non-empty line without leading whitespace ends the data block.
-			if len(trimmed) > 0 && (trimmed[0] != ' ' && trimmed[0] != '\t') {
-				inDataBlock = false
-				result = append(result, line)
-				continue
-			}
-			// Empty lines within the block are kept as-is.
-			if trimmed == "" {
-				result = append(result, line)
-				continue
-			}
-			// Indented key: value line -> mask the value.
-			if colonIdx := strings.Index(line, ": "); colonIdx > 0 {
-				result = append(result, line[:colonIdx]+": \"********\"")
-				continue
-			}
-			// Indented key with colon at end (multiline value) or continuation lines.
-			result = append(result, line)
-			continue
-		}
-		result = append(result, line)
-	}
-	return strings.Join(result, "\n")
-}
 
 // selectionMarker is the unicode checkmark prepended to selected items.
 const selectionMarker = "\u2713 "

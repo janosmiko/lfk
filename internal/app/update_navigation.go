@@ -170,7 +170,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateToOwner(kind, name string) (tea.Model, tea.Cmd) {
-	crds := m.discoveredCRDs[m.nav.Context]
+	crds := m.discoveredResources[m.nav.Context]
 	rt, ok := model.FindResourceTypeByKind(kind, crds)
 	if !ok {
 		m.setStatusMessage(fmt.Sprintf("Unknown resource type: %s", kind), true)
@@ -249,18 +249,18 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.nav.Level = model.LevelResourceTypes
 	m.pushLeft()
 	m.clearRight()
-	if crds, ok := m.discoveredCRDs[sel.Name]; ok && len(crds) > 0 {
-		m.middleItems = model.MergeWithCRDs(crds)
+	if discovered, ok := m.discoveredResources[sel.Name]; ok && len(discovered) > 0 {
+		m.middleItems = model.BuildSidebarItems(discovered)
 	} else {
-		m.middleItems = model.FlattenedResourceTypes()
+		m.middleItems = model.BuildSidebarItems(model.SeedResources())
 	}
 	m.itemCache[m.navKey()] = m.middleItems
 	m.restoreCursor()
 	m.syncExpandedGroup()
 	m.saveCurrentSession()
 	cmds := []tea.Cmd{m.loadPreview()}
-	if _, ok := m.discoveredCRDs[sel.Name]; !ok {
-		cmds = append(cmds, m.discoverCRDs(sel.Name))
+	if _, ok := m.discoveredResources[sel.Name]; !ok {
+		cmds = append(cmds, m.discoverAPIResources(sel.Name))
 	}
 	if cmd := m.loadSecurityAvailability(); cmd != nil {
 		cmds = append(cmds, cmd)
@@ -308,7 +308,7 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.loading = true
 		return m, m.loadPreview()
 	}
-	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredCRDs[m.nav.Context])
+	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[m.nav.Context])
 	if !ok {
 		return m, nil
 	}

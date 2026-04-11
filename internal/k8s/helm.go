@@ -277,7 +277,7 @@ func (c *Client) collectHelmResourcesFromManifest(ctx context.Context, cs kubern
 		return nil, false
 	}
 
-	items, mergeIndex := buildItemsFromManifestRefs(refs, namespace)
+	items, mergeIndex := buildItemsFromManifestRefs(refs)
 
 	// Enrich workload kinds with live status (Ready column) by merging with
 	// the existing label-based collectors, matching on Kind+Name.
@@ -348,22 +348,22 @@ func findLatestHelmReleaseSecret(ctx context.Context, cs kubernetes.Interface, n
 // buildItemsFromManifestRefs converts parsed manifest refs into model.Items.
 // Instead of setting per-kind icons, it populates Columns with KIND and
 // APIVERSION key-value pairs so the explorer renders them as table columns
-// (matching the ArgoCD Application children pattern). Cross-namespace
-// resources display as "namespace/name" so the user can tell at a glance
-// which resources live outside the release's own namespace.
-// The second return value is an index keyed by real Kind+Namespace+Name that
-// lets the caller match items to live resources without depending on the
-// display-name transform applied to the Name field.
-func buildItemsFromManifestRefs(refs []ManifestResourceRef, releaseNamespace string) ([]model.Item, map[string]int) {
+// (matching the ArgoCD Application children pattern).
+//
+// Item.Name is always the raw Kubernetes resource name (no namespace prefix)
+// because it is forwarded to the dynamic client as a resource name when the
+// user loads YAML, and the API server rejects any name containing '/'.
+// Cross-namespace visibility is provided by Item.Namespace, which the explorer
+// surfaces in its own NAMESPACE column whenever any item carries one.
+//
+// The second return value is an index keyed by Kind+Namespace+Name that lets
+// the caller match items to live resources for status enrichment.
+func buildItemsFromManifestRefs(refs []ManifestResourceRef) ([]model.Item, map[string]int) {
 	items := make([]model.Item, 0, len(refs))
 	index := make(map[string]int, len(refs))
 	for _, ref := range refs {
-		displayName := ref.Name
-		if ref.Namespace != "" && ref.Namespace != releaseNamespace {
-			displayName = ref.Namespace + "/" + ref.Name
-		}
 		items = append(items, model.Item{
-			Name:      displayName,
+			Name:      ref.Name,
 			Namespace: ref.Namespace,
 			Kind:      ref.Kind,
 			Extra:     ref.APIVersion,

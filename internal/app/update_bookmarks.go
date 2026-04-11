@@ -23,6 +23,43 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	// Resolve which resource type the bookmark refers to. At LevelResources
+	// and deeper, m.nav.ResourceType has been populated by navigation. At
+	// LevelResourceTypes, nav.ResourceType is still zero — fall back to the
+	// item currently under the cursor in the middle column so the user can
+	// bookmark a resource type from the sidebar directly.
+	rt := m.nav.ResourceType
+	if m.nav.Level == model.LevelResourceTypes {
+		sel := m.selectedMiddleItem()
+		if sel == nil {
+			m.setStatusMessage("Navigate to a resource type first", true)
+			return m, scheduleStatusClear()
+		}
+		if sel.Kind == "__collapsed_group__" || sel.Extra == "__overview__" || sel.Extra == "__monitoring__" {
+			m.setStatusMessage("Select a resource type to bookmark", true)
+			return m, scheduleStatusClear()
+		}
+		resolved, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[m.nav.Context])
+		if !ok {
+			// Discovery may not have run yet (seed sidebar). Fall back to
+			// the seed set the same way restoreSessionResourceType does.
+			resolved, ok = model.FindResourceTypeIn(sel.Extra, model.SeedResources())
+		}
+		if ok {
+			rt = resolved
+		} else {
+			// Last-resort synthesis from the sidebar item so the bookmark
+			// still records the ResourceRef. The jump code will look up the
+			// current cluster's discovered set at navigation time.
+			rt = model.ResourceTypeEntry{Kind: sel.Kind}
+			if parts := strings.SplitN(sel.Extra, "/", 3); len(parts) == 3 {
+				rt.APIGroup = parts[0]
+				rt.APIVersion = parts[1]
+				rt.Resource = parts[2]
+			}
+		}
+	}
+
 	// Lowercase (a-z) and digit (0-9) slots create context-aware bookmarks
 	// that remember the current kube context. Uppercase (A-Z) slots create
 	// context-free bookmarks that use whatever context is active on jump.
@@ -34,8 +71,8 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	if isContextAware {
 		parts = append(parts, m.nav.Context)
 	}
-	if m.nav.ResourceType.DisplayName != "" {
-		parts = append(parts, m.nav.ResourceType.DisplayName)
+	if label := model.DisplayNameFor(rt); label != "" {
+		parts = append(parts, label)
 	}
 	if m.nav.ResourceName != "" {
 		parts = append(parts, m.nav.ResourceName)
@@ -68,7 +105,7 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 		Context:      bmContext,
 		Namespace:    ns,
 		Namespaces:   nsList,
-		ResourceType: m.nav.ResourceType.ResourceRef(),
+		ResourceType: rt.ResourceRef(),
 		ResourceName: m.nav.ResourceName,
 		Slot:         slot,
 	}
@@ -376,7 +413,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 		effectiveContext = m.nav.Context
 	}
 
-	rt, ok := model.FindResourceTypeIn(bm.ResourceType, m.discoveredCRDs[effectiveContext])
+	rt, ok := model.FindResourceTypeIn(bm.ResourceType, m.discoveredResources[effectiveContext])
 	if !ok {
 		m.setStatusMessage("Resource type not found in current cluster", true)
 		return m, scheduleStatusClear()
@@ -434,10 +471,10 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	// Load contexts as the base left column.
 	contexts, _ := m.client.GetContexts()
 	var resourceTypes []model.Item
-	if crds := m.discoveredCRDs[effectiveContext]; len(crds) > 0 {
-		resourceTypes = model.MergeWithCRDs(crds)
+	if discovered := m.discoveredResources[effectiveContext]; len(discovered) > 0 {
+		resourceTypes = model.BuildSidebarItems(discovered)
 	} else {
-		resourceTypes = model.FlattenedResourceTypes()
+		resourceTypes = model.BuildSidebarItems(model.SeedResources())
 	}
 
 	// Set up history: at LevelResources, leftItemsHistory has [contexts], leftItems = resourceTypes.
@@ -519,18 +556,22 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	m.leftItems = contexts
 
 	// Load resource types for the middle column.
-	m.middleItems = model.FlattenedResourceTypes()
+	m.middleItems = model.BuildSidebarItems(model.SeedResources())
 	m.itemCache[m.navKey()] = m.middleItems
 	m.clearRight()
 
 	// Restore namespace settings from session.
 	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces)
 
-	cmds := []tea.Cmd{m.discoverCRDs(sess.Context)}
+	cmds := []tea.Cmd{m.discoverAPIResources(sess.Context)}
 
 	// If a resource type was saved, navigate deeper.
 	if sess.ResourceType != "" {
-		rt, ok := model.FindResourceType(sess.ResourceType)
+		// Runtime discovery is async, so discoveredResources[ctx] is empty
+		// at restore time. Fall back to the seed list so core K8s resources
+		// (Pods, Deployments, Services, etc.) still resolve and the user
+		// lands back on their saved view instead of the resource types list.
+		rt, ok := resolveSessionResourceType(sess.ResourceType, m.discoveredResources[sess.Context])
 		if ok {
 			// Save cursor position at the resource types level so navigating
 			// back (h) restores the cursor to the correct resource type.
@@ -586,7 +627,7 @@ func (m Model) restoreMultiTabSession(sess *SessionState, contexts []model.Item)
 	// Build TabState entries for every tab.
 	tabs := make([]TabState, 0, len(sess.Tabs))
 	for i, st := range sess.Tabs {
-		tab := buildSessionTabState(&st)
+		tab := buildSessionTabState(&st, m.discoveredResources[st.Context])
 		if i != activeIdx {
 			// Non-active tabs are lazily loaded on first switch.
 			tab.needsLoad = true
@@ -610,8 +651,10 @@ func (m Model) restoreMultiTabSession(sess *SessionState, contexts []model.Item)
 
 // buildSessionTabState creates a TabState with navigation fields populated
 // from a SessionTab. The tab has no loaded items yet; those are fetched
-// when the tab becomes active (needsLoad).
-func buildSessionTabState(st *SessionTab) TabState {
+// when the tab becomes active (needsLoad). The discovered parameter
+// provides the resource types known for the tab's context so the saved
+// ResourceType can be resolved to a concrete GVR.
+func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) TabState {
 	tab := TabState{
 		nav: model.NavigationState{
 			Context: st.Context,
@@ -619,6 +662,7 @@ func buildSessionTabState(st *SessionTab) TabState {
 		splitPreview:      true,
 		watchMode:         true,
 		warningEventsOnly: true,
+		eventGrouping:     true,
 		allGroupsExpanded: true,
 		cursorMemory:      make(map[string]int),
 		itemCache:         make(map[string][]model.Item),
@@ -645,7 +689,7 @@ func buildSessionTabState(st *SessionTab) TabState {
 
 	// Resource type and navigation level.
 	if st.ResourceType != "" {
-		rt, ok := model.FindResourceType(st.ResourceType)
+		rt, ok := resolveSessionResourceType(st.ResourceType, discovered)
 		if ok {
 			tab.nav.ResourceType = rt
 			tab.nav.Level = model.LevelResources
@@ -663,6 +707,18 @@ func buildSessionTabState(st *SessionTab) TabState {
 	}
 
 	return tab
+}
+
+// resolveSessionResourceType looks up a saved resource type reference
+// ("group/version/resource") first in the discovered resource set and then
+// in the seed list. The seed fallback is important on session restore
+// because runtime API discovery runs asynchronously and has not populated
+// discoveredResources yet when the session is first replayed.
+func resolveSessionResourceType(ref string, discovered []model.ResourceTypeEntry) (model.ResourceTypeEntry, bool) {
+	if rt, ok := model.FindResourceTypeIn(ref, discovered); ok {
+		return rt, true
+	}
+	return model.FindResourceTypeIn(ref, model.SeedResources())
 }
 
 // contextInList returns true if the given context name exists in the items list.

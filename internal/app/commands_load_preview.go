@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -52,8 +53,9 @@ func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 	}
 	if sel.Kind == "__port_forwards__" {
 		items := m.portForwardItems()
+		gen := m.requestGen
 		return func() tea.Msg {
-			return resourcesLoadedMsg{items: items, forPreview: true}
+			return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
 		}
 	}
 	return m.loadResources(true)
@@ -128,13 +130,18 @@ func (m Model) loadPreviewOwned(sel *model.Item) tea.Cmd {
 	rt, ok := m.resolveOwnedResourceType(sel)
 	if !ok {
 		return func() tea.Msg {
-			return yamlLoadedMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind)}
+			return buildYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind))
 		}
 	}
-	return func() tea.Msg {
-		content, err := m.client.GetResourceYAML(reqCtx, kctx, ns, rt, name)
-		return yamlLoadedMsg{content: content, err: err}
-	}
+	return m.trackBgTask(
+		bgtasks.KindYAMLFetch,
+		"YAML: "+name,
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			content, err := m.client.GetResourceYAML(reqCtx, kctx, ns, rt, name)
+			return buildYAMLLoadedMsg(content, err)
+		},
+	)
 }
 
 // loadPreviewYAML loads the YAML for the currently selected middle item into previewYAML.
@@ -157,32 +164,48 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
-		return func() tea.Msg {
-			content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
-			return previewYAMLLoadedMsg{content: content, err: err, gen: gen}
-		}
+		return m.trackBgTask(
+			bgtasks.KindYAMLFetch,
+			"Preview YAML: "+name,
+			bgtaskTarget(kctx, itemNs),
+			func() tea.Msg {
+				content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
+				return buildPreviewYAMLLoadedMsg(content, err, gen)
+			},
+		)
 	case model.LevelOwned:
 		name := sel.Name
 		itemNs := ns
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
+		taskTarget := bgtaskTarget(kctx, itemNs)
 		if sel.Kind == "Pod" {
-			return func() tea.Msg {
-				content, err := m.client.GetPodYAML(reqCtx, kctx, itemNs, name)
-				return previewYAMLLoadedMsg{content: content, err: err, gen: gen}
-			}
+			return m.trackBgTask(
+				bgtasks.KindYAMLFetch,
+				"Preview YAML: "+name,
+				taskTarget,
+				func() tea.Msg {
+					content, err := m.client.GetPodYAML(reqCtx, kctx, itemNs, name)
+					return buildPreviewYAMLLoadedMsg(content, err, gen)
+				},
+			)
 		}
 		rt, ok := m.resolveOwnedResourceType(sel)
 		if !ok {
 			return func() tea.Msg {
-				return previewYAMLLoadedMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind), gen: gen}
+				return buildPreviewYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind), gen)
 			}
 		}
-		return func() tea.Msg {
-			content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
-			return previewYAMLLoadedMsg{content: content, err: err, gen: gen}
-		}
+		return m.trackBgTask(
+			bgtasks.KindYAMLFetch,
+			"Preview YAML: "+name,
+			taskTarget,
+			func() tea.Msg {
+				content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
+				return buildPreviewYAMLLoadedMsg(content, err, gen)
+			},
+		)
 	}
 	return nil
 }
