@@ -551,6 +551,14 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	m.applyPinnedGroups()
 	m.nav.Level = model.LevelResourceTypes
 
+	// Re-register security sources against the restored context so source
+	// clients point at the right cluster (NewModel wired them to whatever
+	// was the current kubeconfig context at startup, which is not
+	// necessarily the context the session asks to restore). This mirrors
+	// the navigateChildCluster path the user would have taken if they had
+	// picked the cluster manually.
+	m.refreshSecuritySources()
+
 	// Set up left column history: contexts list becomes the breadcrumb.
 	m.leftItemsHistory = nil
 	m.leftItems = contexts
@@ -564,6 +572,13 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces)
 
 	cmds := []tea.Cmd{m.discoverAPIResources(sess.Context)}
+	// Dispatch the security availability probe so the Security category
+	// populates itself on cold start. Without this call the probe only
+	// fires from navigateChildCluster, which is never hit on session
+	// restore — the user lands past the cluster picker directly.
+	if cmd := m.loadSecurityAvailability(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 
 	// If a resource type was saved, navigate deeper.
 	if sess.ResourceType != "" {
