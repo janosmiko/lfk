@@ -2189,7 +2189,7 @@ func TestExecuteActionSecurityFindingsFiltersToResource(t *testing.T) {
 	t.Cleanup(func() { model.SecuritySourcesFn = prev })
 	model.SecuritySourcesFn = func() []model.SecuritySourceEntry {
 		return []model.SecuritySourceEntry{
-			{DisplayName: "Trivy", SourceName: "trivy-operator", Icon: "◈"},
+			{DisplayName: "Trivy", SourceName: "trivy-operator", Icon: model.Icon{Unicode: "◈"}},
 		}
 	}
 

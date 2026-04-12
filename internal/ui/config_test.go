@@ -94,3 +94,84 @@ func TestDefaultSecurityConfig(t *testing.T) {
 	assert.True(t, def.Sources["trivy_operator"].Enabled)
 	assert.False(t, def.Sources["policy_report"].Enabled)
 }
+
+func TestDetectIconModeFromEnv(t *testing.T) {
+	tests := []struct {
+		name       string
+		envLFK     string
+		envTerm    string
+		envProgram string
+		want       string
+	}{
+		{"LFK_ICONS=nerdfont forces nerdfont", "nerdfont", "", "", "nerdfont"},
+		{"LFK_ICONS=unicode forces unicode", "unicode", "", "", "unicode"},
+		{"LFK_ICONS=simple forces simple", "simple", "", "", "simple"},
+		{"LFK_ICONS=emoji forces emoji", "emoji", "", "", "emoji"},
+		{"LFK_ICONS=none forces none", "none", "", "", "none"},
+		{"LFK_ICONS=bogus falls through to TERM", "bogus", "xterm-ghostty", "", "nerdfont"},
+
+		{"TERM=xterm-ghostty", "", "xterm-ghostty", "", "nerdfont"},
+		{"TERM=xterm-ghostty-256color", "", "xterm-ghostty-256color", "", "nerdfont"},
+		{"TERM=xterm-kitty", "", "xterm-kitty", "", "nerdfont"},
+		{"TERM=screen.wezterm", "", "screen.wezterm", "", "nerdfont"},
+
+		{"TERM=xterm-256color + TERM_PROGRAM=ghostty", "", "xterm-256color", "ghostty", "nerdfont"},
+		{"TERM=xterm-256color + TERM_PROGRAM=WezTerm", "", "xterm-256color", "WezTerm", "nerdfont"},
+		{"TERM=xterm-256color + TERM_PROGRAM=kitty", "", "xterm-256color", "kitty", "nerdfont"},
+		{"TERM=xterm-256color + TERM_PROGRAM=iTerm.app", "", "xterm-256color", "iTerm.app", "unicode"},
+
+		{"TERM and TERM_PROGRAM unset", "", "", "", "unicode"},
+		{"TERM=dumb + LFK_ICONS=nerdfont (env override)", "nerdfont", "dumb", "", "nerdfont"},
+		{"mixed case LFK_ICONS", "NERDFONT", "", "", "nerdfont"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("LFK_ICONS", tc.envLFK)
+			t.Setenv("TERM", tc.envTerm)
+			t.Setenv("TERM_PROGRAM", tc.envProgram)
+			if got := detectIconMode(); got != tc.want {
+				t.Errorf("detectIconMode() = %q, want %q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestApplyConfigOptionsIconResolution(t *testing.T) {
+	tests := []struct {
+		name     string
+		cfgIcons string
+		envLFK   string
+		envTerm  string
+		wantIcon string
+	}{
+		{"unset config + ghostty → nerdfont (auto)", "", "", "xterm-ghostty", "nerdfont"},
+		{"unset config + no terminal hint → unicode (auto)", "", "", "", "unicode"},
+		{"icons: auto explicit + ghostty → nerdfont", "auto", "", "xterm-ghostty", "nerdfont"},
+		{"icons: unicode explicit + ghostty → unicode (override)", "unicode", "", "xterm-ghostty", "unicode"},
+		{"icons: nerdfont explicit + non-nerd terminal → nerdfont (user's choice)", "nerdfont", "", "xterm-256color", "nerdfont"},
+		{"icons: simple → simple", "simple", "", "", "simple"},
+		{"icons: emoji → emoji", "emoji", "", "", "emoji"},
+		{"icons: none → none", "none", "", "", "none"},
+		{"unknown icons value → unicode fallback", "bogus", "", "", "unicode"},
+		{"LFK_ICONS env overrides auto config", "auto", "unicode", "xterm-ghostty", "unicode"},
+		{"LFK_ICONS env overrides explicit config", "simple", "nerdfont", "", "nerdfont"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			t.Setenv("LFK_ICONS", tc.envLFK)
+			t.Setenv("TERM", tc.envTerm)
+			t.Setenv("TERM_PROGRAM", "")
+
+			prev := IconMode
+			defer func() { IconMode = prev }()
+			IconMode = "unicode" // reset
+
+			cfg := configFile{Icons: tc.cfgIcons}
+			applyConfigOptions(cfg)
+
+			if IconMode != tc.wantIcon {
+				t.Errorf("IconMode = %q, want %q", IconMode, tc.wantIcon)
+			}
+		})
+	}
+}

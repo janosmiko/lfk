@@ -124,7 +124,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 				Kind:       rt.Kind,
 				Extra:      rt.ResourceRef(),
 				Category:   AdvancedCategory,
-				Icon:       "⧫",
+				Icon:       Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"},
 				Deprecated: rt.Deprecated,
 			})
 			continue
@@ -135,7 +135,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 			Kind:       rt.Kind,
 			Extra:      rt.ResourceRef(),
 			Category:   rt.APIGroup,
-			Icon:       "⧫",
+			Icon:       Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"},
 			Deprecated: rt.Deprecated,
 		})
 	}
@@ -149,8 +149,8 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 // normal metadata-overlay path, not by this function.
 func injectPseudoCategoryHeaders() []Item {
 	return []Item{
-		{Name: "Cluster", Kind: "__overview__", Extra: "__overview__", Category: "Dashboards", Icon: "◎"},
-		{Name: "Monitoring", Kind: "__monitoring__", Extra: "__monitoring__", Category: "Dashboards", Icon: "⊙"},
+		{Name: "Cluster", Kind: "__overview__", Extra: "__overview__", Category: "Dashboards", Icon: Icon{Unicode: "⌂", Simple: "[Cd]", Emoji: "🏠", NerdFont: "\U000f0a07"}},
+		{Name: "Monitoring", Kind: "__monitoring__", Extra: "__monitoring__", Category: "Dashboards", Icon: Icon{Unicode: "⌖", Simple: "[Mo]", Emoji: "👁️", NerdFont: "\U000f13b4"}},
 	}
 }
 
@@ -228,7 +228,7 @@ func sortSidebarItems(items []Item) []Item {
 				}
 			}
 		}
-		return a.Name < b.Name
+		return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 	})
 	return items
 }

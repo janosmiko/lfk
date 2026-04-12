@@ -163,8 +163,17 @@ func VimScrollOff(scroll, cursor, numEntries, height, scrollOff int, displayLine
 		startEntry = topTarget
 	}
 
-	// Don't leave empty space at the bottom.
-	for startEntry > 0 && displayLines(startEntry, numEntries) < height {
+	// Don't leave empty space at the bottom — shift the viewport
+	// UP while the resulting position still fits. Check the new
+	// position BEFORE committing: if decrementing would push the
+	// total past height (common when the previous entry has 2-3
+	// display lines — a category header with its blank separator
+	// and item), stop. Otherwise the viewport ends up at a start
+	// that over-runs the bottom and the last 1-2 items get clipped.
+	for startEntry > 0 {
+		if displayLines(startEntry-1, numEntries) > height {
+			break
+		}
 		startEntry--
 	}
 
@@ -179,104 +188,23 @@ func VimScrollOff(scroll, cursor, numEntries, height, scrollOff int, displayLine
 // Maps category name to the total number of items in that category.
 var ActiveCategoryCounts map[string]int
 
-// simpleIcons maps unicode icons to short ASCII labels for "simple" icon mode.
-var simpleIcons = map[string]string{
-	"⬤": "[Po]",
-	"◆": "[De]",
-	"◈": "[RS]",
-	"◇": "[SS]",
-	"●": "[DS]",
-	"▶": "[Jo]",
-	"⟳": "[CJ]",
-	"≡": "[CM]",
-	"⊡": "[Se]",
-	"⇔": "[HP]",
-	"⊞": "[PV]",
-	"⊟": "[LR]",
-	"⊘": "[PD]",
-	"⇑": "[PC]",
-	"⊙": "[RC]",
-	"⏱": "[Le]",
-	"⚙": "[WH]",
-	"⇌": "[Sv]",
-	"↳": "[In]",
-	"⛊": "[NP]",
-	"⇢": "[EP]",
-	"⇶": "[GW]",
-	"▤": "[SC]",
-	"▣": "[NS]",
-	"⎈": "[Ar]",
-	"⎋": "[He]",
-	"⊕": "[SA]",
-	"⚿": "[Ro]",
-	"⬡": "[No]",
-	"⧫": "[CR]",
-	"↯": "[Ev]",
-	"◎": "[OV]",
-	"⇋": "[PF]",
-}
-
-// emojiIcons maps unicode icons to emoji for "emoji" icon mode.
-var emojiIcons = map[string]string{
-	"⬤": "🔵",  // Pods
-	"◆": "🚀",  // Deployments
-	"◈": "📦",  // ReplicaSets
-	"◇": "🗄️", // StatefulSets
-	"●": "🔄",  // DaemonSets
-	"▶": "⚡️", // Jobs
-	"⟳": "⏰️", // CronJobs
-	"≡": "📋",  // ConfigMaps
-	"⊡": "🔒",  // Secrets
-	"⇔": "📊",  // HPA
-	"⊞": "📏",  // ResourceQuotas / PVCs / PVs
-	"⊟": "📐",  // LimitRanges
-	"⇕": "📈",  // VPA
-	"⊘": "🛡️", // PodDisruptionBudgets
-	"⇌": "🔀",  // Services
-	"↳": "🌐",  // Ingresses / IngressClasses
-	"⛊": "🔥",  // NetworkPolicies
-	"⇢": "📍",  // Endpoints / EndpointSlices
-	"⇶": "🚪",  // Gateway API resources
-	"▤": "💾",  // StorageClasses
-	"⊕": "👤",  // ServiceAccounts
-	"⚿": "🔑",  // Roles / RoleBindings / ClusterRoles / ClusterRoleBindings
-	"▣": "📦",  // Namespaces
-	"↯": "🔔",  // Events
-	"⬡": "🖥️", // Nodes
-	"⧫": "🔷",  // CRDs / API Services
-	"⎋": "⛵",  // Helm
-	"⎈": "☸️", // ArgoCD
-	"⇑": "🏷️", // PriorityClasses
-	"⊙": "⚙️", // RuntimeClasses
-	"⏱": "⏱️", // Leases
-	"⚙": "🔧",  // Webhook Configurations
-	"◎": "🏠",  // Cluster Dashboard
-	"⇋": "🔗",  // Port Forwards
-}
-
-// resolveIcon returns the appropriate icon string based on the current IconMode.
-// In "unicode" mode, icons are returned as-is. In "simple" mode, they are mapped
-// to short ASCII labels. In "emoji" mode, they are mapped to emoji. In "none" mode,
-// an empty string is returned.
-func resolveIcon(icon string) string {
-	if icon == "" {
+// resolveIcon returns the glyph for the active IconMode, or empty string for
+// "none" and zero-value icons. Unknown IconMode values fall back to Unicode.
+func resolveIcon(icon model.Icon) string {
+	if icon.IsEmpty() {
 		return ""
 	}
 	switch IconMode {
 	case "none":
 		return ""
+	case "nerdfont":
+		return icon.NerdFont
 	case "simple":
-		if simple, ok := simpleIcons[icon]; ok {
-			return simple
-		}
-		return "[?]"
+		return icon.Simple
 	case "emoji":
-		if e, ok := emojiIcons[icon]; ok {
-			return e
-		}
-		return icon
-	default: // "unicode"
-		return icon
+		return icon.Emoji
+	default: // "unicode" and any unexpected value
+		return icon.Unicode
 	}
 }
 
@@ -322,7 +250,15 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 	var b strings.Builder
 
 	if header != "" {
-		b.WriteString(DimStyle.Bold(true).Render(header))
+		// Truncate to column width so lipgloss doesn't wrap a long
+		// header ("KUBECONFIG", "RESOURCE TYPE") onto a second line.
+		// Without truncation, the wrapped header pushes the column 1
+		// row taller than its neighbors, the outer view overflows
+		// m.height by 1, and the terminal clips the bottom row of the
+		// middle column. Truncating here guarantees the header always
+		// occupies exactly one rendered line so the height-- below
+		// remains correct.
+		b.WriteString(DimStyle.Bold(true).Render(Truncate(header, width)))
 		b.WriteString("\n")
 		height--
 	}
@@ -339,11 +275,16 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 		return b.String()
 	}
 
-	// Pre-calculate how many display lines each item will consume,
-	// accounting for category headers and separator lines.
+	// Pre-calculate how many display lines each item will consume.
+	// Each category starts with a full-width category bar, preceded
+	// by a blank separator row for every category header except the
+	// very first. When the total exceeds the viewport height, items
+	// naturally scroll — VimScrollOff shifts the viewport down to
+	// keep the cursor visible, showing the list tail with earlier
+	// items (or trailing blank padding) at the top of the window.
 	type displayEntry struct {
 		itemIdx       int
-		hasSep        bool // separator line before this category header
+		hasSep        bool // blank row before this category header
 		hasHeader     bool // category header line
 		isPlaceholder bool // collapsed group placeholder (header-only, no item line)
 	}
@@ -354,10 +295,10 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 		e := displayEntry{itemIdx: i}
 		if item.Category != "" && item.Category != lastCategory {
 			lastCategory = item.Category
+			e.hasHeader = true
 			if i > 0 {
 				e.hasSep = true
 			}
-			e.hasHeader = true
 		}
 		if item.Kind == "__collapsed_group__" {
 			e.isPlaceholder = true
@@ -430,7 +371,13 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 					startEntry = 0
 				}
 			}
-			for startEntry > 0 && displayLines(startEntry, len(entries)) < height {
+			// Check the new position BEFORE decrementing so we
+			// don't overshoot when an earlier entry has 2-3
+			// display lines (header + sep + item).
+			for startEntry > 0 {
+				if displayLines(startEntry-1, len(entries)) > height {
+					break
+				}
 				startEntry--
 			}
 		}
@@ -489,7 +436,14 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 			if !first {
 				b.WriteString("\n")
 			}
-			first = false
+			// Do NOT flip `first` here. The sep row is a visual
+			// empty line between groups — when it IS written (not
+			// first in viewport) the newline on its own is enough;
+			// when it's elided (first visible entry), nothing was
+			// drawn, so `first` must remain true so the subsequent
+			// header block doesn't prepend a leading "\n" that
+			// creates a phantom empty row at the top of the view
+			// (and throws off the displayLines() budget by 1).
 		}
 		if e.hasHeader {
 			if !first {
@@ -514,7 +468,15 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 				}
 				b.WriteString(ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line))
 			} else {
-				b.WriteString(CategoryStyle.Render(Truncate(headerText, width)))
+				// Render the category header as a full-width "bar"
+				// with a distinct style so groups are visually
+				// separated without needing a blank row above.
+				line := Truncate(headerText, width)
+				lineWidth := lipgloss.Width(line)
+				if lineWidth < width {
+					line += strings.Repeat(" ", width-lineWidth)
+				}
+				b.WriteString(CategoryBarStyle.Render(line))
 			}
 			first = false
 		}

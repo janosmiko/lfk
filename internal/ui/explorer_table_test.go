@@ -559,7 +559,7 @@ func TestFormatItemNameOnly_WithIcons(t *testing.T) {
 	IconMode = "unicode"
 
 	t.Run("icon is shown before name", func(t *testing.T) {
-		item := model.Item{Name: "my-pod", Icon: "⬤"}
+		item := model.Item{Name: "my-pod", Icon: model.Icon{Unicode: "⬤"}}
 		result := FormatItemNameOnly(item, 40)
 		assert.Contains(t, result, "my-pod")
 		// The icon should appear before the name.
@@ -571,7 +571,7 @@ func TestFormatItemNameOnly_WithIcons(t *testing.T) {
 	})
 
 	t.Run("icon with current status", func(t *testing.T) {
-		item := model.Item{Name: "my-ctx", Icon: "⬤", Status: "current"}
+		item := model.Item{Name: "my-ctx", Icon: model.Icon{Unicode: "⬤"}, Status: "current"}
 		result := FormatItemNameOnly(item, 40)
 		assert.Contains(t, result, "*")
 		assert.Contains(t, result, "my-ctx")
@@ -586,7 +586,7 @@ func TestFormatItemNameOnlyPlain_WithIcons(t *testing.T) {
 	IconMode = "unicode"
 
 	t.Run("icon is shown before name in plain", func(t *testing.T) {
-		item := model.Item{Name: "my-deploy", Icon: "◆"}
+		item := model.Item{Name: "my-deploy", Icon: model.Icon{Unicode: "◆"}}
 		result := FormatItemNameOnlyPlain(item, 40)
 		assert.Contains(t, result, "my-deploy")
 		iconIdx := strings.Index(result, "◆")

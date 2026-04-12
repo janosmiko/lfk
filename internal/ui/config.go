@@ -196,6 +196,39 @@ var SearchAbbreviations map[string]string
 // IconMode controls how resource icons are displayed.
 var IconMode = "unicode"
 
+// detectIconMode inspects the environment and returns the icon mode to use
+// when the resolved config value is "auto". It honors an explicit LFK_ICONS
+// env override first (accepting any valid mode string), then sniffs TERM for
+// known Nerd-Font-shipping terminals (substring match — this survives
+// tmux-through-ghostty setups where TERM=xterm-ghostty but TERM_PROGRAM=tmux),
+// then TERM_PROGRAM for direct launches, and falls back to "unicode".
+//
+// Priority order:
+//  1. LFK_ICONS env override (if valid, returned directly — can force any mode).
+//  2. TERM substring match: "ghostty", "kitty", "wezterm".
+//  3. TERM_PROGRAM match: "ghostty", "WezTerm", "kitty".
+//  4. Fallback: "unicode".
+func detectIconMode() string {
+	if v := strings.ToLower(os.Getenv("LFK_ICONS")); v != "" {
+		switch v {
+		case "nerdfont", "unicode", "simple", "emoji", "none":
+			return v
+		}
+	}
+	if term := strings.ToLower(os.Getenv("TERM")); term != "" {
+		if strings.Contains(term, "ghostty") ||
+			strings.Contains(term, "kitty") ||
+			strings.Contains(term, "wezterm") {
+			return "nerdfont"
+		}
+	}
+	switch os.Getenv("TERM_PROGRAM") {
+	case "ghostty", "WezTerm", "kitty":
+		return "nerdfont"
+	}
+	return "unicode"
+}
+
 // ConfigResourceColumns holds global per-resource-type column overrides.
 var ConfigResourceColumns map[string][]string
 
@@ -444,12 +477,37 @@ func applyColorscheme(theme *Theme, cfg configFile) {
 
 // applyConfigOptions applies scalar config options (icons, terminal, tips, etc.).
 func applyConfigOptions(cfg configFile) {
-	if cfg.Icons != "" {
-		switch strings.ToLower(cfg.Icons) {
-		case "unicode", "simple", "emoji", "none":
-			IconMode = strings.ToLower(cfg.Icons)
+	// Icon mode resolution:
+	//   1. LFK_ICONS env var (if valid) — unconditional override.
+	//   2. cfg.Icons if explicit non-auto.
+	//   3. Otherwise, detectIconMode() for auto.
+	//   4. Fallback: unicode.
+	resolvedIcons := ""
+	if envMode := strings.ToLower(os.Getenv("LFK_ICONS")); envMode != "" {
+		switch envMode {
+		case "unicode", "nerdfont", "simple", "emoji", "none":
+			resolvedIcons = envMode
 		}
 	}
+	if resolvedIcons == "" {
+		cfgMode := strings.ToLower(cfg.Icons)
+		if cfgMode == "" {
+			cfgMode = "auto"
+		}
+		if cfgMode == "auto" {
+			resolvedIcons = detectIconMode()
+		} else {
+			switch cfgMode {
+			case "unicode", "nerdfont", "simple", "emoji", "none":
+				resolvedIcons = cfgMode
+			}
+		}
+	}
+	if resolvedIcons == "" {
+		resolvedIcons = "unicode"
+	}
+	IconMode = resolvedIcons
+
 	if cfg.Dashboard != nil {
 		ConfigDashboard = *cfg.Dashboard
 	}

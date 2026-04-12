@@ -24,12 +24,12 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 	}
 	displayByName := map[string]struct {
 		display string
-		icon    string
+		icon    model.Icon
 	}{
-		"heuristic":      {"Heuristic", "◉"},
-		"trivy-operator": {"Trivy", "◈"},
-		"policy-report":  {"Kyverno", "◇"},
-		"kube-bench":     {"CIS", "◆"},
+		"heuristic":      {"Heuristic", model.Icon{Unicode: "◉", Simple: "[He]", Emoji: "🛡️", NerdFont: "\U000f0483"}},
+		"trivy-operator": {"Trivy", model.Icon{Unicode: "◈", Simple: "[Tr]", Emoji: "🔍", NerdFont: "\U000f0483"}},
+		"policy-report":  {"Kyverno", model.Icon{Unicode: "◇", Simple: "[Ky]", Emoji: "📋", NerdFont: "\U000f0483"}},
+		"kube-bench":     {"CIS", model.Icon{Unicode: "◆", Simple: "[CI]", Emoji: "📝", NerdFont: "\U000f0483"}},
 	}
 	idx := mgr.Index()
 	var entries []model.SecuritySourceEntry
@@ -40,7 +40,7 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 		meta, known := displayByName[src.Name()]
 		if !known {
 			meta.display = src.Name()
-			meta.icon = "●"
+			meta.icon = model.Icon{Unicode: "●", Simple: "[Se]", Emoji: "🔒", NerdFont: "\U000f0483"}
 		}
 		entries = append(entries, model.SecuritySourceEntry{
 			DisplayName: meta.display,

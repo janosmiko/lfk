@@ -845,6 +845,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	// Detect category transitions for category headers.
 	hasCategories := false
 	categoryForItem := make([]string, len(items)) // category header to show before item i, or ""
+	hasSepForItem := make([]bool, len(items))     // true if a blank separator row precedes item i's category header
 	{
 		lastCat := ""
 		for i, item := range items {
@@ -852,6 +853,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				categoryForItem[i] = item.Category
 				if lastCat != "" {
 					hasCategories = true // at least 2 different categories
+					hasSepForItem[i] = true
 				}
 				lastCat = item.Category
 			}
@@ -860,19 +862,23 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		if !hasCategories {
 			for i := range categoryForItem {
 				categoryForItem[i] = ""
+				hasSepForItem[i] = false
 			}
 		}
 	}
 
-	// Count extra lines consumed by category headers in a range.
+	// Count extra lines consumed by category headers and blank
+	// separator rows. The separator is elided for the first visible
+	// entry so the viewport doesn't start with a leading empty row
+	// when the user scrolls the list tail into view.
 	categoryLines := func(start, end int) int {
 		n := 0
 		for i := start; i < end && i < len(items); i++ {
 			if categoryForItem[i] != "" {
 				n++ // category header line
-				if i > start {
-					n++ // separator line before category (not for first item in range)
-				}
+			}
+			if hasSepForItem[i] && i > start {
+				n++ // blank separator row above header
 			}
 		}
 		return n
@@ -915,7 +921,13 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 					startIdx = 0
 				}
 			}
-			for startIdx > 0 && tableDisplayLines(startIdx, len(items)) < height {
+			// Check the new position BEFORE decrementing so we
+			// don't overshoot when an earlier row has 2 display
+			// lines (category header + item).
+			for startIdx > 0 {
+				if tableDisplayLines(startIdx-1, len(items)) > height {
+					break
+				}
 				startIdx--
 			}
 		}
@@ -928,9 +940,9 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		extraLines := 0
 		if categoryForItem[endIdx] != "" {
 			extraLines++ // category header line
-			if endIdx > startIdx {
-				extraLines++ // separator line (not shown for first visible item)
-			}
+		}
+		if hasSepForItem[endIdx] && endIdx > startIdx {
+			extraLines++ // blank separator row (elided for first visible entry)
 		}
 		if usedLines+1+extraLines > height {
 			break
@@ -944,10 +956,10 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	if ActiveMiddleScroll >= 0 {
 		ActiveMiddleLineMap = ActiveMiddleLineMap[:0]
 		for i := startIdx; i < endIdx; i++ {
+			if hasSepForItem[i] && i > startIdx {
+				ActiveMiddleLineMap = append(ActiveMiddleLineMap, -1) // separator
+			}
 			if hasCategories && categoryForItem[i] != "" {
-				if i > startIdx {
-					ActiveMiddleLineMap = append(ActiveMiddleLineMap, -1) // separator
-				}
 				ActiveMiddleLineMap = append(ActiveMiddleLineMap, -1) // category header
 			}
 			ActiveMiddleLineMap = append(ActiveMiddleLineMap, i) // item line
@@ -957,12 +969,22 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	for i := startIdx; i < endIdx; i++ {
 		item := items[i]
 
+		// Blank separator row above the category header, elided for
+		// the first visible entry so the viewport never starts with
+		// a leading empty row.
+		if hasSepForItem[i] && i > startIdx {
+			b.WriteString("\n")
+		}
+
 		// Render category header if this item starts a new category.
+		// Full-width bar with strong background, plus the blank row
+		// above it, makes groups visually obvious.
 		if hasCategories && categoryForItem[i] != "" {
-			if i > startIdx {
-				b.WriteString("\n") // separator line
+			headerLine := Truncate(categoryForItem[i], width)
+			if w := lipgloss.Width(headerLine); w < width {
+				headerLine += strings.Repeat(" ", width-w)
 			}
-			b.WriteString("\n" + CategoryStyle.Render(Truncate(categoryForItem[i], width)))
+			b.WriteString("\n" + CategoryBarStyle.Render(headerLine))
 		}
 
 		b.WriteString("\n")

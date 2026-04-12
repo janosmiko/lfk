@@ -507,7 +507,7 @@ func (c *Client) getFluxManagedResources(ctx context.Context, dynClient dynamic.
 		icon := "⧫"
 		switch entryKind {
 		case "Deployment":
-			icon = "◆"
+			icon = "■"
 		case "Service":
 			icon = "⇌"
 		case "ConfigMap":
@@ -515,17 +515,17 @@ func (c *Client) getFluxManagedResources(ctx context.Context, dynClient dynamic.
 		case "Secret":
 			icon = "⊡"
 		case "Pod":
-			icon = "⬤"
+			icon = "□"
 		case "StatefulSet":
-			icon = "◇"
+			icon = "▥"
 		case "DaemonSet":
 			icon = "●"
 		case "Ingress":
 			icon = "↳"
 		case "ServiceAccount":
-			icon = "⊕"
+			icon = "⚇"
 		case "Namespace":
-			icon = "▣"
+			icon = "❐"
 		}
 
 		// Item.Name must be the raw Kubernetes resource name (no
@@ -538,7 +538,7 @@ func (c *Client) getFluxManagedResources(ctx context.Context, dynClient dynamic.
 			Name:      entryName,
 			Namespace: entryNS,
 			Kind:      entryKind,
-			Icon:      icon,
+			Icon:      model.Icon{Unicode: icon},
 			Extra:     entryGroup,
 		})
 	}

@@ -14,8 +14,8 @@ const SecurityVirtualAPIGroup = "_security"
 type SecuritySourceEntry struct {
 	DisplayName string // "Trivy", "Kyverno", "Heuristic"
 	SourceName  string // matches security.SecuritySource.Name() — "trivy-operator", "heuristic", "policy-report"
-	Icon        string
-	Count       int // populated from FindingIndex at render time
+	Icon        Icon   // Icon variants for display (see icon.go)
+	Count       int    // populated from FindingIndex at render time
 }
 
 // SecuritySourcesFn returns the list of security source entries to display
@@ -41,7 +41,7 @@ type ResourceTypeEntry struct {
 	APIGroup       string // e.g., "apps"
 	APIVersion     string // e.g., "v1"
 	Resource       string // e.g., "deployments" (plural lowercase for API calls)
-	Icon           string // Unicode icon for display (e.g., "◆")
+	Icon           Icon   // Icon variants for display (see icon.go)
 	Namespaced     bool   // true for namespace-scoped resources, false for cluster-scoped
 	RequiresCRD    bool   // true if this resource type depends on a CRD being installed
 	Deprecated     bool   // true if this API version is deprecated
@@ -106,7 +106,7 @@ type Item struct {
 	Kind          string           // The Kubernetes resource kind
 	Extra         string           // Extra metadata (e.g., resource ref "group/version/resource")
 	Category      string           // Display category grouping (e.g., "Workloads", "Networking")
-	Icon          string           // Unicode icon for display
+	Icon          Icon             // Icon variants for display (see icon.go)
 	Age           string           // Human-readable age (e.g., "5m", "2h", "3d")
 	Ready         string           // Ready count (e.g., "2/3" for pods or deployments)
 	Restarts      string           // Restart count (for pods)

@@ -111,7 +111,7 @@ func TestSecurityAvailabilityLoadedRebuildsLeftItemsAtLevelResources(t *testing.
 	installTestSecurityHook(t, model.SecuritySourceEntry{
 		DisplayName: "Trivy",
 		SourceName:  "trivy-operator",
-		Icon:        "◈",
+		Icon:        model.Icon{Unicode: "◈"},
 		Count:       -1,
 	})
 
@@ -156,7 +156,7 @@ func TestSecurityAvailabilityLoadedStillRebuildsMiddleAtLevelResourceTypes(t *te
 	installTestSecurityHook(t, model.SecuritySourceEntry{
 		DisplayName: "Heuristic",
 		SourceName:  "heuristic",
-		Icon:        "◉",
+		Icon:        model.Icon{Unicode: "◉"},
 		Count:       -1,
 	})
 

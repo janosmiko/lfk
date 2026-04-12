@@ -435,7 +435,7 @@ func TestNavigateChildResourceTypeSynthesizesSecurityRT(t *testing.T) {
 		Kind:     "__security_trivy-operator__",
 		Extra:    model.SecurityVirtualAPIGroup + "/v1/findings-trivy-operator",
 		Category: "Security",
-		Icon:     "◈",
+		Icon:     model.Icon{Unicode: "◈"},
 	}
 	m.middleItems = []model.Item{sel}
 

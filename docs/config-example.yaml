@@ -16,10 +16,17 @@ colorscheme: tokyonight
 # transparent_background: false
 
 # ─── Icon Mode ─────────────────────────────────────────────────────────────────
-# How resource icons are displayed.
-# Options: "unicode" (default), "simple" (ASCII labels like [Po], [De]),
-#          "emoji" (emoji icons), "none" (no icons)
-icons: unicode
+# Icon display mode.
+#   "auto"     - default; detects Nerd Font-capable terminals (Ghostty, Kitty,
+#                WezTerm) and picks "nerdfont"; otherwise picks "unicode".
+#   "unicode"  - curated unicode glyphs (works in any terminal).
+#   "nerdfont" - Material Design Icons from Nerd Fonts v3.x (requires a Nerd
+#                Font in your terminal).
+#   "simple"   - ASCII labels like [Po], [De] (works in any terminal).
+#   "emoji"    - emoji glyphs.
+#   "none"     - no icons.
+# The LFK_ICONS environment variable takes priority over this setting.
+icons: auto
 
 # ─── Log Path ──────────────────────────────────────────────────────────────────
 # Application log file location. Default: ~/.local/share/lfk/lfk.log

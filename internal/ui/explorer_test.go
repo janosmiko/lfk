@@ -16,56 +16,9 @@ func TestResolveIcon(t *testing.T) {
 		for _, mode := range []string{"unicode", "simple", "emoji", "none"} {
 			origMode := IconMode
 			IconMode = mode
-			assert.Equal(t, "", resolveIcon(""))
+			assert.Equal(t, "", resolveIcon(model.Icon{}))
 			IconMode = origMode
 		}
-	})
-
-	t.Run("unicode mode returns icon as-is", func(t *testing.T) {
-		origMode := IconMode
-		IconMode = "unicode"
-		defer func() { IconMode = origMode }()
-		assert.Equal(t, "⬤", resolveIcon("⬤"))
-		assert.Equal(t, "◆", resolveIcon("◆"))
-	})
-
-	t.Run("simple mode maps known icons", func(t *testing.T) {
-		origMode := IconMode
-		IconMode = "simple"
-		defer func() { IconMode = origMode }()
-		assert.Equal(t, "[Po]", resolveIcon("⬤"))
-		assert.Equal(t, "[De]", resolveIcon("◆"))
-		assert.Equal(t, "[No]", resolveIcon("⬡"))
-	})
-
-	t.Run("simple mode returns [?] for unknown", func(t *testing.T) {
-		origMode := IconMode
-		IconMode = "simple"
-		defer func() { IconMode = origMode }()
-		assert.Equal(t, "[?]", resolveIcon("★"))
-	})
-
-	t.Run("emoji mode maps known icons", func(t *testing.T) {
-		origMode := IconMode
-		IconMode = "emoji"
-		defer func() { IconMode = origMode }()
-		assert.Equal(t, "🔵", resolveIcon("⬤"))
-		assert.Equal(t, "🚀", resolveIcon("◆"))
-	})
-
-	t.Run("emoji mode falls back to original for unknown", func(t *testing.T) {
-		origMode := IconMode
-		IconMode = "emoji"
-		defer func() { IconMode = origMode }()
-		assert.Equal(t, "★", resolveIcon("★"))
-	})
-
-	t.Run("none mode returns empty", func(t *testing.T) {
-		origMode := IconMode
-		IconMode = "none"
-		defer func() { IconMode = origMode }()
-		assert.Equal(t, "", resolveIcon("⬤"))
-		assert.Equal(t, "", resolveIcon("◆"))
 	})
 }
 
@@ -623,4 +576,36 @@ func TestStyledRestartsCell_RestartArrow(t *testing.T) {
 		result := styledRestartsCell(item, 10, true)
 		assert.NotContains(t, result, "↑")
 	})
+}
+
+// --- resolveIcon struct-field-direct ---
+
+func TestResolveIconAllModes(t *testing.T) {
+	icon := model.Icon{
+		Unicode:  "X",
+		Simple:   "[Xx]",
+		Emoji:    "🅾️",
+		NerdFont: "\U000f01a7", // nf-md-cube-outline, single-cell
+	}
+	tests := []struct {
+		mode string
+		want string
+	}{
+		{"unicode", "X"},
+		{"simple", "[Xx]"},
+		{"emoji", "🅾️"},
+		{"nerdfont", "\U000f01a7"},
+		{"none", ""},
+		{"bogus", "X"}, // unknown mode falls back to Unicode
+	}
+	for _, tc := range tests {
+		t.Run(tc.mode, func(t *testing.T) {
+			prev := IconMode
+			defer func() { IconMode = prev }()
+			IconMode = tc.mode
+			if got := resolveIcon(icon); got != tc.want {
+				t.Errorf("resolveIcon in %q = %q, want %q", tc.mode, got, tc.want)
+			}
+		})
+	}
 }

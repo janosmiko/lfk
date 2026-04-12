@@ -39,7 +39,7 @@ func TestBuildSecuritySourceEntriesFallbackDisplayName(t *testing.T) {
 	entries := buildSecuritySourceEntries(mgr, avail)
 	require.Len(t, entries, 1)
 	assert.Equal(t, "custom-scanner", entries[0].DisplayName)
-	assert.Equal(t, "●", entries[0].Icon)
+	assert.Equal(t, "●", entries[0].Icon.Unicode)
 }
 
 func TestBuildSecuritySourceEntriesKnownSources(t *testing.T) {

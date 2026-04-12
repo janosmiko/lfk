@@ -21,7 +21,7 @@ func TestBuildSidebarItems_CategorizesBuiltIns(t *testing.T) {
 	cats := collectByDisplay(items)
 	require.Contains(t, cats, "Pods")
 	assert.Equal(t, "Workloads", cats["Pods"].Category)
-	assert.Equal(t, "⬤", cats["Pods"].Icon)
+	assert.Equal(t, "□", cats["Pods"].Icon.Unicode)
 
 	require.Contains(t, cats, "Deployments")
 	assert.Equal(t, "Workloads", cats["Deployments"].Category)
@@ -81,7 +81,7 @@ func TestBuildSidebarItems_ShowsCRDsAsGenericEntries(t *testing.T) {
 	}
 	require.NotNil(t, widget)
 	assert.Equal(t, "example.com", widget.Category)
-	assert.Equal(t, "⧫", widget.Icon)
+	assert.Equal(t, "⧫", widget.Icon.Unicode)
 	assert.Equal(t, "Widgets", widget.Name)
 }
 
@@ -117,7 +117,7 @@ func TestBuildSidebarItems_PseudoResourcesCategorized(t *testing.T) {
 	assert.Equal(t, "Helm", cats["Releases"].Category)
 	assert.Equal(t, "HelmRelease", cats["Releases"].Kind)
 	assert.Equal(t, "_helm/v1/releases", cats["Releases"].Extra)
-	assert.Equal(t, "⎋", cats["Releases"].Icon)
+	assert.Equal(t, "⎈", cats["Releases"].Icon.Unicode)
 
 	require.Contains(t, cats, "Port Forwards")
 	assert.Equal(t, "Networking", cats["Port Forwards"].Category)
@@ -231,8 +231,8 @@ func TestBuildSidebarItems_InjectsSecuritySources(t *testing.T) {
 
 	SecuritySourcesFn = func() []SecuritySourceEntry {
 		return []SecuritySourceEntry{
-			{DisplayName: "Trivy", SourceName: "trivy-operator", Icon: "◈", Count: 5},
-			{DisplayName: "Heuristic", SourceName: "heuristic", Icon: "◉", Count: 12},
+			{DisplayName: "Trivy", SourceName: "trivy-operator", Icon: Icon{Unicode: "◈"}, Count: 5},
+			{DisplayName: "Heuristic", SourceName: "heuristic", Icon: Icon{Unicode: "◉"}, Count: 12},
 		}
 	}
 
@@ -252,7 +252,7 @@ func TestBuildSidebarItems_InjectsSecuritySources(t *testing.T) {
 
 	assert.Equal(t, "Trivy (5)", trivy.Name)
 	assert.Equal(t, "Security", trivy.Category)
-	assert.Equal(t, "◈", trivy.Icon)
+	assert.Equal(t, "◈", trivy.Icon.Unicode)
 	assert.Equal(t, SecurityVirtualAPIGroup+"/v1/findings-trivy-operator", trivy.Extra)
 
 	assert.Equal(t, "Heuristic (12)", heuristic.Name)

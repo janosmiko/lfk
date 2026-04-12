@@ -132,7 +132,7 @@
 - **Configurable keybindings** for direct actions
 - **Configurable search abbreviations**
 - **Configurable filter presets** per resource type (extend built-in quick filters with `.`)
-- **Configurable icon modes**: Unicode (default), simple ASCII, or no icons
+- **Configurable icon modes**: `auto` (default, detects Nerd Font-capable terminals like Ghostty/Kitty/WezTerm), `unicode`, `nerdfont` (Material Design Icons), `simple` (ASCII labels), `emoji`, or `none`. Override at runtime with the `LFK_ICONS` environment variable.
 - **Configurable table columns** (global, per-resource-type, and per-cluster)
 - **Column visibility toggle** overlay to show/hide and reorder columns at runtime (`,` key)
 - **Startup tips**: Random tips on startup to help discover features (configurable via `tips: false`)
@@ -325,8 +325,10 @@ colorscheme: catppuccin-mocha
 # Use terminal's own background
 transparent_background: true
 
-# Icon mode: "unicode" (default), "simple", "emoji", "none"
-icons: unicode
+# Icon mode: "auto" (default, detects Nerd Font terminals like Ghostty/Kitty/WezTerm),
+# "unicode", "nerdfont" (requires Nerd Font in terminal), "simple" (ASCII labels),
+# "emoji", or "none". The LFK_ICONS env var overrides this setting.
+icons: auto
 
 # Custom keybinding overrides (only specify what you want to change)
 keybindings:
@@ -426,7 +428,7 @@ If you find lfk useful and want to support its development:
 
 ## License
 
-Apache License 2.0 -- see [LICENSE](LICENSE) for details.
+Apache License 2.0 - see [LICENSE](LICENSE) for details.
 
 ## Star History
 

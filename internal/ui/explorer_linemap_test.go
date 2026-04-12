@@ -45,7 +45,7 @@ func TestRenderColumnLineMap(t *testing.T) {
 		assert.Equal(t, []int{0, 1, 2}, ActiveMiddleLineMap)
 	})
 
-	t.Run("items with categories include headers and separators", func(t *testing.T) {
+	t.Run("items with categories include headers and blank separator rows", func(t *testing.T) {
 		defer setup()()
 
 		items := []model.Item{
@@ -59,7 +59,7 @@ func TestRenderColumnLineMap(t *testing.T) {
 		// 0: "Workloads" header -> -1
 		// 1: Pods -> 0
 		// 2: Deployments -> 1
-		// 3: separator -> -1
+		// 3: blank separator -> -1
 		// 4: "Networking" header -> -1
 		// 5: Services -> 2
 		assert.Equal(t, []int{-1, 0, 1, -1, -1, 2}, ActiveMiddleLineMap)
@@ -140,7 +140,7 @@ func TestRenderTableLineMap(t *testing.T) {
 		assert.Equal(t, []int{0, 1, 2}, ActiveMiddleLineMap)
 	})
 
-	t.Run("items with categories include headers and separators", func(t *testing.T) {
+	t.Run("items with categories include headers and blank separator rows", func(t *testing.T) {
 		defer setup()()
 
 		items := []model.Item{
@@ -154,7 +154,7 @@ func TestRenderTableLineMap(t *testing.T) {
 		// 0: "Workloads" header -> -1
 		// 1: nginx -> 0
 		// 2: redis -> 1
-		// 3: separator -> -1
+		// 3: blank separator -> -1
 		// 4: "Networking" header -> -1
 		// 5: my-svc -> 2
 		assert.Equal(t, []int{-1, 0, 1, -1, -1, 2}, ActiveMiddleLineMap)

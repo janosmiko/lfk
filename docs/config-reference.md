@@ -8,7 +8,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 |---|---|---|---|
 | `colorscheme` | string | `"tokyonight"` | Built-in color scheme name (460+ available). Press `T` in-app to browse. Custom `theme` overrides are applied on top. |
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars. Selection highlights remain opaque. |
-| `icons` | string | `"unicode"` | Icon display mode: `"unicode"`, `"simple"` (ASCII), `"emoji"`, or `"none"`. |
+| `icons` | string | `"auto"` | Icon display mode. One of: `"auto"` (detects Nerd Font terminals; default), `"unicode"`, `"nerdfont"` (Material Design Icons; requires Nerd Font in terminal), `"simple"` (ASCII labels), `"emoji"`, or `"none"`. Unknown values fall back to `"unicode"`. Can be overridden at runtime by the `LFK_ICONS` environment variable. |
 | `log_path` | string | `"~/.local/share/lfk/lfk.log"` | Path to the application log file. |
 | `dashboard` | bool | `true` | Show cluster dashboard when entering a context. Set to `false` to go directly to resource types. |
 | `monitoring` | map[string]object | `{}` | Per-cluster monitoring endpoint configuration. Keys are context names or `"default"`. See [Monitoring](#monitoring) section. |
@@ -26,6 +26,21 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `log_tail_lines` | int | `1000` | Number of log lines to load initially via `--tail`. Scrolling to the top loads older history. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |
+
+### Icon mode auto-detection
+
+When `icons: auto` (the default), lfk inspects your environment at startup to
+choose between `nerdfont` and `unicode`:
+
+1. `LFK_ICONS` environment variable wins if set to any valid mode value.
+2. `TERM` is checked for substrings `ghostty`, `kitty`, `wezterm` (works with
+   tmux-through-ghostty setups where `TERM=xterm-ghostty` but
+   `TERM_PROGRAM=tmux`).
+3. `TERM_PROGRAM` is checked for `ghostty`, `WezTerm`, `kitty`.
+4. Falls back to `unicode` otherwise.
+
+If detection guesses wrong for your setup, set `icons: nerdfont` (or the mode
+you want) in your config, or export `LFK_ICONS=nerdfont` in your shell.
 
 ## Monitoring
 
