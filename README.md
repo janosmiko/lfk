@@ -10,6 +10,10 @@
 
 ![Demo](./docs/imgs/demo.gif)
 
+### Themes
+
+![Themes](./docs/imgs/themes.gif)
+
 ### Pods
 
 ![Pods](./docs/imgs/pods.png)
