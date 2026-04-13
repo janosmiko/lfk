@@ -159,6 +159,71 @@ func TestCov80BulkDeleteWithFakeClient(t *testing.T) {
 	assert.Equal(t, 3, result.failed)
 }
 
+func TestExpandGroupedItems_NoGroupedRefs(t *testing.T) {
+	items := []model.Item{
+		{Name: "pod-1", Namespace: "ns-1"},
+		{Name: "pod-2", Namespace: "ns-2"},
+	}
+	refs := expandGroupedItems(items)
+	require.Len(t, refs, 2)
+	assert.Equal(t, "pod-1", refs[0].Name)
+	assert.Equal(t, "ns-1", refs[0].Namespace)
+	assert.Equal(t, "pod-2", refs[1].Name)
+	assert.Equal(t, "ns-2", refs[1].Namespace)
+}
+
+func TestExpandGroupedItems_WithGroupedRefs(t *testing.T) {
+	items := []model.Item{
+		{
+			Name:      "evt-first",
+			Namespace: "ns-1",
+			GroupedRefs: []model.GroupedRef{
+				{Name: "evt-aaa", Namespace: "ns-1"},
+				{Name: "evt-bbb", Namespace: "ns-1"},
+				{Name: "evt-ccc", Namespace: "ns-2"},
+			},
+		},
+		{Name: "pod-1", Namespace: "default"},
+	}
+	refs := expandGroupedItems(items)
+	require.Len(t, refs, 4, "grouped event expands to 3 refs + 1 plain item")
+	assert.Equal(t, "evt-aaa", refs[0].Name)
+	assert.Equal(t, "evt-bbb", refs[1].Name)
+	assert.Equal(t, "evt-ccc", refs[2].Name)
+	assert.Equal(t, "pod-1", refs[3].Name)
+}
+
+func TestExpandGroupedItems_Empty(t *testing.T) {
+	refs := expandGroupedItems(nil)
+	assert.Empty(t, refs)
+}
+
+func TestBulkDeleteExpandsGroupedEvents(t *testing.T) {
+	m := basePush80Model()
+	m.bulkItems = []model.Item{
+		{
+			Name:      "evt-first",
+			Namespace: "default",
+			Kind:      "Event",
+			GroupedRefs: []model.GroupedRef{
+				{Name: "evt-aaa", Namespace: "default"},
+				{Name: "evt-bbb", Namespace: "default"},
+			},
+		},
+	}
+	m.actionCtx = actionContext{
+		context:      "test-ctx",
+		resourceType: model.ResourceTypeEntry{Resource: "events", Kind: "Event", APIVersion: "v1", Namespaced: true},
+	}
+	cmd := m.bulkDeleteResources()
+	require.NotNil(t, cmd)
+	msg := cmd()
+	result, ok := msg.(bulkActionResultMsg)
+	require.True(t, ok)
+	// 2 underlying events should be attempted (both fail since fake client has none).
+	assert.Equal(t, 2, result.failed, "should attempt to delete all underlying events, not just the grouped row")
+}
+
 func TestCov80BulkScaleWithFakeClient(t *testing.T) {
 	m := basePush80Model()
 	m.bulkItems = []model.Item{

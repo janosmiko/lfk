@@ -695,7 +695,8 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Bulk delete.
 		if m.bulkMode && len(m.bulkItems) > 0 {
 			m.clearSelection()
-			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(m.bulkItems), nsArg, ctx))
+			expanded := expandGroupedItems(m.bulkItems)
+			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
 			return m, m.bulkDeleteResources()
 		}
 
@@ -757,7 +758,8 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			// Bulk force delete.
 			if m.bulkMode && len(m.bulkItems) > 0 && action == "Force Delete" {
 				m.clearSelection()
-				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 %s (%d items)%s --context %s", rt.Resource, len(m.bulkItems), nsArg, ctx))
+				expanded := expandGroupedItems(m.bulkItems)
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
 				return m, m.bulkForceDeleteResources()
 			}
 
