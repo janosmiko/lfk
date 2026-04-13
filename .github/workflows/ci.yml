@@ -31,7 +31,7 @@ jobs:
           go test -coverprofile=coverage.out -json ./... > test-report.json
 
       - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: coverage.out
           token: ${{ secrets.CODECOV_TOKEN }}
