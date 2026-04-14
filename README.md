@@ -185,6 +185,35 @@ docker run -it --rm \
   janosmiko/lfk
 ```
 
+### Nightly Builds
+
+Nightly builds track the latest development work and are published as GitHub
+pre-releases with every `v*-nightly*` tag.
+
+**Homebrew:**
+
+```bash
+brew install janosmiko/tap/lfk-nightly
+```
+
+**Docker:**
+
+```bash
+# Latest nightly
+docker run -it --rm \
+  -v ~/.kube:/home/lfk/.kube:ro \
+  janosmiko/lfk:nightly
+
+# Specific nightly date
+docker run -it --rm \
+  -v ~/.kube:/home/lfk/.kube:ro \
+  janosmiko/lfk:nightly-20260414
+```
+
+**Binary releases:**
+
+Download from [GitHub Releases](https://github.com/janosmiko/lfk/releases) (look for pre-release tags).
+
 ### External Dependencies
 
 **Required:**
