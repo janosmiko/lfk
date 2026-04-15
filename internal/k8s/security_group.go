@@ -211,7 +211,7 @@ func findingGroupToItem(g findingGroup) model.Item {
 func affectedResourceToItem(ref security.ResourceRef, groupKey string, findings []security.Finding) model.Item {
 	var highestSev security.Severity
 	var count int
-	var summaries []string
+	var descriptions []string
 
 	for _, f := range findings {
 		if findingGroupKey(f) != groupKey {
@@ -224,8 +224,16 @@ func affectedResourceToItem(ref security.ResourceRef, groupKey string, findings 
 		if f.Severity > highestSev {
 			highestSev = f.Severity
 		}
-		if f.Summary != "" {
-			summaries = append(summaries, f.Summary)
+		// Build a per-finding description block with summary + details.
+		desc := f.Summary
+		if f.Details != "" {
+			if desc != "" {
+				desc += "\n"
+			}
+			desc += f.Details
+		}
+		if desc != "" {
+			descriptions = append(descriptions, desc)
 		}
 	}
 
@@ -243,10 +251,11 @@ func affectedResourceToItem(ref security.ResourceRef, groupKey string, findings 
 			{Key: "FindingCount", Value: fmt.Sprintf("%d", count)},
 		},
 	}
-	// Add finding summaries for the details preview.
-	if len(summaries) > 0 {
+	// Add finding descriptions for the details preview. Separate
+	// multiple findings with a divider line.
+	if len(descriptions) > 0 {
 		item.Columns = append(item.Columns, model.KeyValue{
-			Key: "Description", Value: strings.Join(summaries, "\n"),
+			Key: "Description", Value: strings.Join(descriptions, "\n---\n"),
 		})
 	}
 	return item

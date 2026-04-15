@@ -333,6 +333,9 @@ func (m Model) viewExplorer() string {
 
 	// Build columns.
 	middleHeader := m.middleColumnHeader()
+	if m.filterText != "" {
+		middleHeader += " (filtered: " + m.filterText + ")"
+	}
 	var middleCol string
 	switch m.nav.Level {
 	case model.LevelResources, model.LevelOwned, model.LevelContainers:

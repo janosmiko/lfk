@@ -1061,9 +1061,12 @@ func (m *Model) refreshSecuritySources() {
 		if kctx == "" {
 			kctx = m.client.CurrentContext()
 		}
+		// Apply global and per-source ignored namespaces from config.
+		if secCfg := resolveSecurityConfig(kctx); secCfg != nil {
+			mgr.SetIgnoredNamespaces(secCfg.IgnoredNamespaces)
+		}
 		if kc := m.client.RawClientsetForContext(kctx); kc != nil {
 			hs := heuristic.NewWithClient(kc)
-			// Apply ignored namespaces from config.
 			if secCfg := resolveSecurityConfig(kctx); secCfg != nil {
 				if src, ok := secCfg.Sources["heuristic"]; ok {
 					hs.SetIgnoredNamespaces(src.IgnoredNamespaces)

@@ -39,6 +39,8 @@ type Manager struct {
 	cachedIndex  *FindingIndex
 
 	availCache map[string]availEntry // key = kubeCtx
+
+	ignoredNamespaces map[string]bool // global namespace filter applied to all sources
 }
 
 type availEntry struct {
@@ -97,6 +99,19 @@ func (m *Manager) Register(s SecuritySource) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.sources = append(m.sources, s)
+}
+
+// SetIgnoredNamespaces configures namespaces that are excluded from ALL
+// sources. Findings with a resource in an ignored namespace are dropped
+// after FetchAll collects them. This is in addition to any per-source
+// ignored_namespaces config.
+func (m *Manager) SetIgnoredNamespaces(namespaces []string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.ignoredNamespaces = make(map[string]bool, len(namespaces))
+	for _, ns := range namespaces {
+		m.ignoredNamespaces[ns] = true
+	}
 }
 
 // Sources returns a snapshot of currently registered sources.
@@ -188,6 +203,17 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 		res.Sources = append(res.Sources, SourceStatus{
 			Name: r.name, Available: true, Count: len(r.findings),
 		})
+	}
+
+	// Apply global namespace filter.
+	if len(m.ignoredNamespaces) > 0 {
+		filtered := res.Findings[:0]
+		for _, f := range res.Findings {
+			if !m.ignoredNamespaces[f.Resource.Namespace] {
+				filtered = append(filtered, f)
+			}
+		}
+		res.Findings = filtered
 	}
 
 	m.mu.Lock()

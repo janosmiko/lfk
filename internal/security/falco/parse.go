@@ -56,6 +56,9 @@ func parseLogLine(line []byte, namespace string) []security.Finding {
 		labels["tag:"+tag] = "true"
 	}
 
+	// Build a structured summary from output_fields.
+	summary, details := formatFalcoOutput(entry)
+
 	return []security.Finding{
 		{
 			ID:       id,
@@ -64,10 +67,75 @@ func parseLogLine(line []byte, namespace string) []security.Finding {
 			Severity: parseSeverity(entry.Priority),
 			Title:    entry.Rule,
 			Resource: ref,
-			Summary:  entry.Output,
+			Summary:  summary,
+			Details:  details,
 			Labels:   labels,
 		},
 	}
+}
+
+// formatFalcoOutput extracts a human-readable summary and structured details
+// from a Falco log entry. The summary is a one-liner; the details show
+// key fields as labeled lines.
+func formatFalcoOutput(entry falcoLogEntry) (summary, details string) {
+	fields := entry.OutputFields
+	str := func(key string) string {
+		v, _ := fields[key].(string)
+		if v == "" {
+			if raw, ok := fields[key]; ok && raw != nil {
+				return fmt.Sprintf("%v", raw)
+			}
+		}
+		return v
+	}
+
+	// Extract the message part before the | separator.
+	summary = entry.Output
+	if idx := strings.Index(summary, "|"); idx > 0 {
+		summary = strings.TrimSpace(summary[:idx])
+	}
+	// Strip the timestamp prefix if present.
+	if len(summary) > 20 && summary[2] == ':' && summary[5] == ':' {
+		if spaceIdx := strings.Index(summary, " "); spaceIdx > 0 {
+			rest := strings.TrimSpace(summary[spaceIdx+1:])
+			// Skip the priority word (Critical/Warning/etc.)
+			if wordEnd := strings.Index(rest, " "); wordEnd > 0 {
+				summary = strings.TrimSpace(rest[wordEnd+1:])
+			}
+		}
+	}
+
+	// Build structured details from important fields.
+	var b strings.Builder
+	kv := func(label, value string) {
+		if value == "" || value == "<NA>" {
+			return
+		}
+		if len(label) < 16 {
+			label += strings.Repeat(" ", 16-len(label))
+		}
+		fmt.Fprintf(&b, "%s  %s\n", label, value)
+	}
+	kv("Process:", str("proc_exepath"))
+	kv("Command:", str("proc_cmdline"))
+	if cmd := str("proc_cmdline"); cmd == "" {
+		kv("Command:", str("command"))
+	}
+	kv("Parent:", str("parent"))
+	kv("User:", str("user"))
+	kv("Container:", str("container.name"))
+	kv("Image:", str("container.image.repository"))
+	kv("Image Tag:", str("container.image.tag"))
+	kv("Pod:", str("k8s.pod.name"))
+	kv("Namespace:", str("k8s.ns.name"))
+	kv("Event Type:", str("evt.type"))
+	if et := str("evt.type"); et == "" {
+		kv("Event Type:", str("evt_type"))
+	}
+	kv("Time:", entry.Time)
+
+	details = b.String()
+	return summary, details
 }
 
 // extractRefFromOutputFields reads k8s resource info from Falco's

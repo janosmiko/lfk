@@ -467,9 +467,10 @@ var ConfigMonitoring map[string]MonitoringConfig
 // TTLs are code defaults (30s fetch / 60s availability). The
 // per_resource_indicators field was renamed to sec_column for clarity.
 type SecurityConfig struct {
-	Enabled   bool                         `json:"enabled" yaml:"enabled"`
-	SecColumn bool                         `json:"sec_column" yaml:"sec_column"`
-	Sources   map[string]SecuritySourceCfg `json:"sources" yaml:"sources"`
+	Enabled           bool                         `json:"enabled" yaml:"enabled"`
+	SecColumn         bool                         `json:"sec_column" yaml:"sec_column"`
+	IgnoredNamespaces []string                     `json:"ignored_namespaces,omitempty" yaml:"ignored_namespaces,omitempty"`
+	Sources           map[string]SecuritySourceCfg `json:"sources" yaml:"sources"`
 }
 
 // SecuritySourceCfg is the per-source config shared across adapters.
