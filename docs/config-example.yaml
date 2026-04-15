@@ -54,7 +54,7 @@ dashboard: true
 
 # ─── Monitoring Endpoints ──────────────────────────────────────────────────────
 # Configure Prometheus and Alertmanager endpoints per cluster context.
-# Keys are kubeconfig context names; the special key "default" applies to
+# Keys are kubeconfig context names; the special key "_global" applies to
 # clusters without an explicit entry.
 # When not configured, lfk auto-discovers monitoring services by trying
 # common service names across common namespaces.
@@ -69,7 +69,7 @@ monitoring:
 #     services: ["alertmanager-main"]
 #     port: "9093"
 #   node_metrics: prometheus  # "prometheus" or "metrics-api" (default: auto-detect)
-# default:
+# _global:
 #   prometheus:
 #     namespaces: ["monitoring", "observability"]
 #     services: ["prometheus-server", "prometheus"]

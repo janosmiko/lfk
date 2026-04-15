@@ -1096,7 +1096,7 @@ func (m *Model) refreshSecuritySources() {
 }
 
 // resolveSecurityConfig returns the SecurityConfig for the given cluster
-// context, falling back to "default" if no context-specific entry exists.
+// context, falling back to "_global" if no context-specific entry exists.
 // Returns nil when no config is set.
 func resolveSecurityConfig(kctx string) *model.SecurityConfig {
 	if ui.ConfigSecurity == nil {
@@ -1105,7 +1105,7 @@ func resolveSecurityConfig(kctx string) *model.SecurityConfig {
 	if cfg, ok := ui.ConfigSecurity[kctx]; ok {
 		return &cfg
 	}
-	if cfg, ok := ui.ConfigSecurity["default"]; ok {
+	if cfg, ok := ui.ConfigSecurity["_global"]; ok {
 		return &cfg
 	}
 	return nil

@@ -340,10 +340,10 @@ func resolveMonitoringEndpoints(contextName string) (promNs, promSvc []string, p
 		return
 	}
 
-	// Try context-specific config first, then "default".
+	// Try context-specific config first, then "_global".
 	mc, ok := cfg[contextName]
 	if !ok {
-		mc, ok = cfg["default"]
+		mc, ok = cfg["_global"]
 	}
 	if !ok {
 		return

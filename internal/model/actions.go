@@ -458,7 +458,7 @@ type MonitoringConfig struct {
 }
 
 // ConfigMonitoring maps cluster context names to monitoring config.
-// The special key "default" applies to clusters without explicit config.
+// The special key "_global" applies to clusters without explicit config.
 var ConfigMonitoring map[string]MonitoringConfig
 
 // SecurityConfig is per-cluster security configuration. The dashboard-

@@ -576,10 +576,10 @@ func TestResolveMonitoringEndpoints(t *testing.T) {
 		assert.Equal(t, "9999", amPort)
 	})
 
-	t.Run("falls back to default config when context not found", func(t *testing.T) {
+	t.Run("falls back to _global config when context not found", func(t *testing.T) {
 		origCfg := model.ConfigMonitoring
 		model.ConfigMonitoring = map[string]model.MonitoringConfig{
-			"default": {
+			"_global": {
 				Prometheus: &model.MonitoringEndpoint{
 					Namespaces: []string{"default-mon"},
 					Services:   []string{"default-prom"},

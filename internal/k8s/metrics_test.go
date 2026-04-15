@@ -433,10 +433,10 @@ func TestResolveNodeMetricsConfig(t *testing.T) {
 		assert.True(t, hp)
 	})
 
-	t.Run("falls back to default context", func(t *testing.T) {
+	t.Run("falls back to _global config", func(t *testing.T) {
 		origCfg := model.ConfigMonitoring
 		model.ConfigMonitoring = map[string]model.MonitoringConfig{
-			"default": {
+			"_global": {
 				NodeMetrics: "metrics-api",
 			},
 		}

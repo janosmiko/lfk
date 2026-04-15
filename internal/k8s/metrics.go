@@ -168,7 +168,7 @@ func resolveNodeMetricsConfig(contextName string) (nodeMetrics string, hasPromet
 
 	mc, ok := cfg[contextName]
 	if !ok {
-		mc, ok = cfg["default"]
+		mc, ok = cfg["_global"]
 	}
 	if !ok {
 		return "", false
