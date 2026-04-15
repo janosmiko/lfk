@@ -2206,7 +2206,9 @@ func TestExecuteActionSecurityFindingsFiltersToResource(t *testing.T) {
 	updated, _ := m.executeActionSecurityFindings()
 	mm, ok := updated.(Model)
 	require.True(t, ok)
-	assert.Equal(t, "api", mm.filterText)
+	// The filter is stored as pending and applied when the user drills
+	// into a specific security source.
+	assert.Equal(t, "api", mm.pendingSecurityFilter)
 }
 
 func TestExecuteActionSecurityFindingsNoSources(t *testing.T) {

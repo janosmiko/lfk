@@ -206,6 +206,7 @@ func TestGetSecurityFindingsFiltersBySource(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
+	assert.Equal(t, "__security_finding_group__", items[0].Kind)
 	assert.Equal(t, "CVE-1", items[0].Name)
 	assert.Equal(t, "trivy-operator", items[0].ColumnValue("Source"))
 }
@@ -242,10 +243,15 @@ func TestGetSecurityFindingsSortsBySeverity(t *testing.T) {
 	)
 	require.NoError(t, err)
 	require.Len(t, items, 4)
+	// Grouped items sorted by severity desc, then title asc.
 	assert.Equal(t, "CRIT", items[0].ColumnValue("Severity"))
 	assert.Equal(t, "HIGH", items[1].ColumnValue("Severity"))
 	assert.Equal(t, "MED", items[2].ColumnValue("Severity"))
 	assert.Equal(t, "LOW", items[3].ColumnValue("Severity"))
+	// All items are groups.
+	for _, it := range items {
+		assert.Equal(t, "__security_finding_group__", it.Kind)
+	}
 }
 
 func TestGetResourcesDispatchesSecurityAPIGroup(t *testing.T) {
@@ -270,5 +276,45 @@ func TestGetResourcesDispatchesSecurityAPIGroup(t *testing.T) {
 	items, err := c.GetResources(context.Background(), "kctx", "", rt)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
+	assert.Equal(t, "__security_finding_group__", items[0].Kind)
 	assert.Equal(t, "CVE-X", items[0].Name)
+}
+
+func TestGetSecurityAffectedResources(t *testing.T) {
+	mgr := security.NewManager()
+	mgr.Register(&security.FakeSource{
+		NameStr: "heuristic", Available: true,
+		Findings: []security.Finding{
+			{
+				Source: "heuristic", Title: "privileged", Severity: security.SeverityCritical,
+				Resource: security.ResourceRef{Namespace: "ns", Kind: "Pod", Name: "web"},
+				Labels:   map[string]string{"check": "privileged"},
+			},
+			{
+				Source: "heuristic", Title: "privileged", Severity: security.SeverityHigh,
+				Resource: security.ResourceRef{Namespace: "ns", Kind: "Pod", Name: "api"},
+				Labels:   map[string]string{"check": "privileged"},
+			},
+			{
+				Source: "heuristic", Title: "host_pid", Severity: security.SeverityHigh,
+				Resource: security.ResourceRef{Namespace: "ns", Kind: "Pod", Name: "web"},
+				Labels:   map[string]string{"check": "host_pid"},
+			},
+		},
+	})
+	c := &Client{securityManager: mgr}
+	rt := model.ResourceTypeEntry{Kind: "__security_heuristic__"}
+
+	items, err := c.GetSecurityAffectedResources(
+		context.Background(), "kctx", "", rt, "privileged",
+	)
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	for _, it := range items {
+		assert.Equal(t, "__security_affected_resource__", it.Kind)
+	}
+	// Sorted by namespace then name.
+	assert.Equal(t, "pod/api", items[0].Name)
+	assert.Equal(t, "pod/web", items[1].Name)
+	assert.Equal(t, "Pod", items[0].ColumnValue("ResourceKind"))
 }

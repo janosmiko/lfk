@@ -17,7 +17,9 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
+	"github.com/janosmiko/lfk/internal/security/falco"
 	"github.com/janosmiko/lfk/internal/security/heuristic"
+	"github.com/janosmiko/lfk/internal/security/policyreport"
 	"github.com/janosmiko/lfk/internal/security/trivyop"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -644,6 +646,8 @@ type Model struct {
 	// Security dashboard state.
 	securityManager            *security.Manager
 	securityAvailabilityByName map[string]bool
+	securityFindingsBySource   map[string][]security.Finding
+	pendingSecurityFilter      string // set by "Security Findings" action, consumed on drill-in
 
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)
@@ -1027,10 +1031,19 @@ func (m *Model) refreshSecuritySources() {
 			kctx = m.client.CurrentContext()
 		}
 		if kc := m.client.RawClientsetForContext(kctx); kc != nil {
-			mgr.Register(heuristic.NewWithClient(kc))
+			hs := heuristic.NewWithClient(kc)
+			// Apply ignored namespaces from config.
+			if secCfg := resolveSecurityConfig(kctx); secCfg != nil {
+				if src, ok := secCfg.Sources["heuristic"]; ok {
+					hs.SetIgnoredNamespaces(src.IgnoredNamespaces)
+				}
+			}
+			mgr.Register(hs)
+			mgr.Register(falco.NewWithClient(kc))
 		}
 		if dc := m.client.RawDynamicForContext(kctx); dc != nil {
 			mgr.Register(trivyop.NewWithDynamic(dc))
+			mgr.Register(policyreport.NewWithDynamic(dc))
 		}
 	}
 	m.securityManager = mgr
@@ -1046,6 +1059,22 @@ func (m *Model) refreshSecuritySources() {
 	}
 	// Publish to the hook state so SecuritySourcesFn reads the new data.
 	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)
+}
+
+// resolveSecurityConfig returns the SecurityConfig for the given cluster
+// context, falling back to "default" if no context-specific entry exists.
+// Returns nil when no config is set.
+func resolveSecurityConfig(kctx string) *model.SecurityConfig {
+	if ui.ConfigSecurity == nil {
+		return nil
+	}
+	if cfg, ok := ui.ConfigSecurity[kctx]; ok {
+		return &cfg
+	}
+	if cfg, ok := ui.ConfigSecurity["default"]; ok {
+		return &cfg
+	}
+	return nil
 }
 
 // cancelAndReset cancels any in-flight API requests and creates a fresh

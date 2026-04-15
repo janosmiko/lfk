@@ -58,6 +58,33 @@ func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 			return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
 		}
 	}
+	// Virtual security source entries are not in discoveredResources, so
+	// loadResources(true) cannot resolve them via FindResourceTypeIn.
+	// Synthesize the RT here (same logic as navigateChildResourceType) so
+	// the preview pane shows findings when the cursor rests on a source.
+	if strings.HasPrefix(sel.Kind, "__security_") && sel.Kind != "__security_finding__" {
+		sourceName := strings.TrimSuffix(strings.TrimPrefix(sel.Kind, "__security_"), "__")
+		kctx := m.nav.Context
+		ns := m.effectiveNamespace()
+		gen := m.requestGen
+		rt := model.ResourceTypeEntry{
+			DisplayName: sel.Name,
+			Kind:        sel.Kind,
+			APIGroup:    model.SecurityVirtualAPIGroup,
+			APIVersion:  "v1",
+			Resource:    "findings-" + sourceName,
+			Namespaced:  true,
+		}
+		return m.trackBgTask(
+			bgtasks.KindResourceList,
+			"List "+sel.Name,
+			bgtaskTarget(kctx, ns),
+			func() tea.Msg {
+				items, err := m.client.GetResources(m.reqCtx, kctx, ns, rt)
+				return resourcesLoadedMsg{items: items, err: err, forPreview: true, gen: gen}
+			},
+		)
+	}
 	return m.loadResources(true)
 }
 
@@ -65,6 +92,10 @@ func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 func (m Model) loadPreviewResources() tea.Cmd {
 	if m.nav.ResourceType.Kind == "__port_forwards__" {
 		return nil
+	}
+	// Security finding groups: preview shows affected resources.
+	if sel := m.selectedMiddleItem(); sel != nil && sel.Kind == "__security_finding_group__" {
+		return m.loadSecurityAffectedResourcesPreview(sel.Extra)
 	}
 	var cmds []tea.Cmd
 	switch {
@@ -95,6 +126,10 @@ func (m Model) loadPreviewResources() tea.Cmd {
 
 // loadPreviewOwned handles preview loading at the owned level.
 func (m Model) loadPreviewOwned(sel *model.Item) tea.Cmd {
+	// Security affected resources are virtual — no YAML to preview.
+	if strings.HasPrefix(sel.Kind, "__security_") {
+		return nil
+	}
 	if sel.Kind == "Pod" {
 		var cmds []tea.Cmd
 		cmds = append(cmds, m.loadContainers(true))

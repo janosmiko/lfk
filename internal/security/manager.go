@@ -46,10 +46,13 @@ type availEntry struct {
 	at        time.Time
 }
 
-// NewManager returns a Manager with sensible cache defaults (30s fetch, 60s availability).
+// NewManager returns a Manager with sensible cache defaults (5min fetch, 60s availability).
+// The 5-minute fetch TTL keeps findings stable across navigation cycles
+// (drill into group → jump to resource → navigate back). Users press R
+// for explicit refresh.
 func NewManager() *Manager {
 	return &Manager{
-		refreshTTL:      30 * time.Second,
+		refreshTTL:      5 * time.Minute,
 		availabilityTTL: 60 * time.Second,
 		availCache:      make(map[string]availEntry),
 	}
@@ -188,10 +191,15 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 	}
 
 	m.mu.Lock()
-	m.cacheKey = cacheKey
-	m.cachedResult = res
-	m.cachedAt = time.Now()
-	m.cachedIndex = BuildFindingIndex(res.Findings)
+	// Only cache non-empty results. Empty results from sources that
+	// weren't ready yet (IsAvailable returned false) should not prevent
+	// a subsequent fetch from trying again once the sources are up.
+	if len(res.Findings) > 0 {
+		m.cacheKey = cacheKey
+		m.cachedResult = res
+		m.cachedAt = time.Now()
+		m.cachedIndex = BuildFindingIndex(res.Findings)
+	}
 	m.mu.Unlock()
 	return res, nil
 }
@@ -246,13 +254,24 @@ func (i *FindingIndex) CountBySource(name string) int {
 }
 
 // BuildFindingIndex constructs an index from a slice of findings.
+// Findings are deduplicated per resource by Title so the SEC badge
+// shows unique checks (e.g., "privileged", "run_as_root") rather than
+// raw per-container counts. A pod with 3 containers all running
+// privileged counts as 1 finding, not 3.
 func BuildFindingIndex(findings []Finding) *FindingIndex {
 	idx := &FindingIndex{
 		counts:   make(map[string]SeverityCounts),
 		bySource: make(map[string]int),
 	}
+	// Track (resource + title) pairs to deduplicate per-container findings.
+	seen := make(map[string]bool)
 	for _, f := range findings {
 		key := f.Resource.Key()
+		dedup := key + "|" + f.Title
+		if seen[dedup] {
+			continue
+		}
+		seen[dedup] = true
 		c := idx.counts[key]
 		switch f.Severity {
 		case SeverityCritical:

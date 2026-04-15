@@ -233,8 +233,9 @@ func TestStatusBarShowsFilterCount(t *testing.T) {
 	}
 	bar := m.statusBar()
 	stripped := stripANSI(bar)
-	assert.Contains(t, stripped, "filtered")
+	assert.Contains(t, stripped, "filter:nginx")
 	assert.Contains(t, stripped, "2/3")
+	assert.Contains(t, stripped, "Esc to clear")
 }
 
 func TestStatusBarShowsSortMode(t *testing.T) {

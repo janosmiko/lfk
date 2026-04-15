@@ -382,17 +382,18 @@ The title bar shows the namespace scope (`ns:...`) used for the permission check
 
 ## Security findings browser
 
-Press `#` to jump to the Security category. Inside a source, findings behave exactly like regular resources:
+Press `#` to jump to the Security category. Navigate through sources, finding groups, and affected resources:
 
 | Key | Action |
 |---|---|
+| `#` | Jump to Security category |
+| `Enter` / `l` | Drill into finding group (shows affected resources) or jump to Kubernetes resource (from affected resource level) |
+| `h` | Navigate back to parent level |
+| `R` | Refresh (invalidates security cache, re-fetches from all enabled sources) |
+| `x` then `y` | From any resource: show security findings for that resource (source picker if multiple sources available) |
 | `j` / `k` | Move cursor up/down |
-| `Enter` | Jump to the affected resource |
-| `o` | Owner jump (same effect) |
-| `y` | Copy finding ID |
 | `/` | Search findings |
 | `f` | Filter findings |
-| `r` | Refresh (invalidates security cache) |
 
 ## Error Log (`!`)
 

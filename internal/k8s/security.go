@@ -119,7 +119,9 @@ func titleCase(s string) string {
 
 // getSecurityFindings is the dispatch target for virtual _security resource
 // types. It fetches findings from the manager for the source encoded in
-// the ResourceTypeEntry's Kind and returns them as model.Items.
+// the ResourceTypeEntry's Kind and returns them as grouped model.Items
+// (one item per unique finding title/check). Drilling into a group shows
+// the affected resources via GetSecurityAffectedResources.
 //
 //nolint:unparam // contextName and namespace are passed straight through from GetResources callers.
 func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
@@ -134,27 +136,58 @@ func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace
 	if err != nil {
 		return nil, fmt.Errorf("security fetch: %w", err)
 	}
-	items := make([]model.Item, 0)
-	for _, f := range res.Findings {
-		if f.Source != sourceName {
-			continue
-		}
-		items = append(items, findingToItem(f))
+	groups := groupFindings(res.Findings, sourceName)
+	items := make([]model.Item, 0, len(groups))
+	for _, g := range groups {
+		items = append(items, findingGroupToItem(g))
 	}
-	sort.SliceStable(items, func(i, j int) bool {
-		si := severityOrder(items[i])
-		sj := severityOrder(items[j])
-		if si != sj {
-			return si > sj
+	return items, nil
+}
+
+// GetSecurityAffectedResources returns the list of resources affected by
+// a specific finding group (identified by groupKey) within a security
+// source. Each item has Kind __security_affected_resource__ and carries
+// the real resource Kind/Name for jumpToFindingResource navigation.
+func (c *Client) GetSecurityAffectedResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry, groupKey string) ([]model.Item, error) {
+	if c.securityManager == nil {
+		return nil, nil
+	}
+	sourceName := sourceNameFromKind(rt.Kind)
+	if sourceName == "" {
+		return nil, fmt.Errorf("unrecognized security kind: %s", rt.Kind)
+	}
+	res, err := c.securityManager.FetchAll(ctx, contextName, namespace)
+	if err != nil {
+		return nil, fmt.Errorf("security fetch: %w", err)
+	}
+	// Filter to findings matching source and group key.
+	var matched []security.Finding
+	for _, f := range res.Findings {
+		if f.Source == sourceName && findingGroupKey(f) == groupKey {
+			matched = append(matched, f)
 		}
-		if items[i].Namespace != items[j].Namespace {
-			return items[i].Namespace < items[j].Namespace
+	}
+	// Collect unique resources.
+	seen := make(map[string]bool)
+	var refs []security.ResourceRef
+	for _, f := range matched {
+		key := f.Resource.Key()
+		if !seen[key] {
+			seen[key] = true
+			refs = append(refs, f.Resource)
 		}
-		if items[i].Name != items[j].Name {
-			return items[i].Name < items[j].Name
+	}
+	// Sort refs by namespace then name for stable output.
+	sort.Slice(refs, func(i, j int) bool {
+		if refs[i].Namespace != refs[j].Namespace {
+			return refs[i].Namespace < refs[j].Namespace
 		}
-		return items[i].ColumnValue("Title") < items[j].ColumnValue("Title")
+		return refs[i].Name < refs[j].Name
 	})
+	items := make([]model.Item, 0, len(refs))
+	for _, ref := range refs {
+		items = append(items, affectedResourceToItem(ref, groupKey, matched))
+	}
 	return items, nil
 }
 

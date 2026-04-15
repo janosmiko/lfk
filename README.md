@@ -1,6 +1,6 @@
 # :zap: LFK - Lightning Fast Kubernetes navigator
 
-[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) 
+[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk)
 
 **LFK** is a lightning-fast, keyboard-focused, yazi-inspired terminal user interface for navigating and managing Kubernetes clusters. Built for speed and efficiency, it brings a three-column Miller columns layout with an owner-based resource hierarchy to your terminal.
 
@@ -108,12 +108,13 @@
 
 ### Security findings browser
 
-- **Hierarchical navigation**: Press `#` to jump to the Security category in the middle column. Drill into a source (Trivy, Kyverno, Heuristic, ...) to see its findings as regular explorer rows.
-- **Per-source drill-down**: Findings are sorted by severity (Critical → Low), then namespace, then title. Use `j`/`k`, `gg`/`G`, `/` search, and `f` filter exactly as you would for any other resource type.
-- **Inline details**: Select a finding and the right preview pane shows the full description, affected resource, source, category, references, and any source-specific labels.
-- **Jump to resource**: Press `Enter` on a finding to navigate to the affected Deployment/Pod/etc. The existing `o` owner-jump key also works.
-- **SEC column in the explorer**: Deployments, Pods, and other workloads display a severity badge in the Name column when security sources are available. The badge is color-coded by highest severity and shows the total finding count.
-- **Per-resource drill-in**: Press `x` on a resource and choose "Security Findings" to jump to the Security category with a pre-filter matching that resource.
+- **Grouped findings**: Press `#` to jump to the Security category. Findings are grouped by check, CVE, or rule name. Each group shows severity, affected resource count, and category. Drill into a group to see affected resources.
+- **Five security sources**: Heuristic (built-in pod security checks), Trivy Operator (CVE and misconfiguration scanning via CRDs), Kyverno (policy violations via PolicyReports), Falco (runtime security events), CIS (placeholder for kube-bench).
+- **Hierarchical navigation**: Security > Source > Finding Group > Affected Resources. From an affected resource, press `Enter` or `l` to jump to the corresponding Kubernetes resource in the explorer.
+- **SEC column badge**: Workload rows (Pods, Deployments, etc.) display a severity badge in the Name column. The badge aggregates both direct findings (e.g., heuristic checks on the Pod) and owner findings (e.g., Trivy results targeting the parent Deployment).
+- **Per-resource drill-in**: Press `x` on any resource, then `y` to jump to security findings for that resource. When multiple sources have results, a source picker overlay appears.
+- **Color-coded severity**: CRIT=red, HIGH=orange, MED=yellow, LOW=green in the Severity column.
+- **Refresh**: Press `R` to invalidate the security cache and re-fetch findings from all enabled sources.
 
 ### Integrations
 

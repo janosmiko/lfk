@@ -104,3 +104,56 @@ func TestStyleSeverityBadgeUnknown(t *testing.T) {
 	out := styleSeverityBadge("UNKNOWN")
 	assert.Contains(t, out, "?")
 }
+
+func TestRenderFindingGroupDetails(t *testing.T) {
+	group := model.Item{
+		Name: "Privileged Container",
+		Kind: "__security_finding_group__",
+		Columns: []model.KeyValue{
+			{Key: "Severity", Value: "CRIT"},
+			{Key: "Affected", Value: "3"},
+			{Key: "Category", Value: "misconfig"},
+			{Key: "Source", Value: "heuristic"},
+			{Key: "Description", Value: "Runs as privileged"},
+		},
+	}
+	affected := []model.Item{
+		{
+			Name:      "pod/web-1",
+			Namespace: "default",
+			Kind:      "__security_affected_resource__",
+			Columns: []model.KeyValue{
+				{Key: "Severity", Value: "CRIT"},
+				{Key: "ResourceKind", Value: "Pod"},
+				{Key: "Namespace", Value: "default"},
+			},
+		},
+		{
+			Name:      "pod/web-2",
+			Namespace: "default",
+			Kind:      "__security_affected_resource__",
+			Columns: []model.KeyValue{
+				{Key: "Severity", Value: "CRIT"},
+				{Key: "ResourceKind", Value: "Pod"},
+				{Key: "Namespace", Value: "default"},
+			},
+		},
+	}
+
+	out := RenderFindingGroupDetails(group, affected, 80, 30)
+
+	// Group header and summary fields.
+	assert.Contains(t, out, "CRIT")
+	assert.Contains(t, out, "Privileged Container")
+	assert.Contains(t, out, "3 resources")
+	assert.Contains(t, out, "heuristic")
+	assert.Contains(t, out, "misconfig")
+	assert.Contains(t, out, "Runs as privileged")
+
+	// Affected resources are listed.
+	assert.Contains(t, out, "pod/web-1")
+	assert.Contains(t, out, "pod/web-2")
+
+	// Hint bar.
+	assert.Contains(t, out, "[Enter/l] affected resources")
+}

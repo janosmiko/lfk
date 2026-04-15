@@ -112,10 +112,34 @@ security:
       trivy_operator:
         enabled: true
       policy_report:
-        enabled: false
+        enabled: true
+      falco:
+        enabled: true
       kube_bench:
         enabled: false
+```
+
+Per-cluster overrides work the same way as the monitoring section:
+
+```yaml
+security:
+  my-prod-cluster:
+    sources:
       falco:
+        enabled: false
+  default:
+    enabled: true
+    sec_column: true
+    sources:
+      heuristic:
+        enabled: true
+      trivy_operator:
+        enabled: true
+      policy_report:
+        enabled: true
+      falco:
+        enabled: true
+      kube_bench:
         enabled: false
 ```
 
@@ -140,19 +164,15 @@ Available heuristic checks: `privileged`, `host_namespaces`, `host_path`,
 `readonly_root_fs`, `run_as_root`, `allow_priv_esc`, `dangerous_caps`,
 `missing_resource_limits`, `default_sa`, `latest_tag`.
 
-The `trivy_operator` source reads `VulnerabilityReport` and `ConfigAuditReport`
-CRDs from the `aquasecurity.github.io/v1alpha1` API group. It is automatically
-disabled when those CRDs are not present in the cluster.
+### Source requirements
 
-### Migration from Phase 1 dashboard
-
-If you used an earlier config shape, these fields are **removed** (YAML
-ignores unknown fields, so old configs load cleanly):
-
-- `per_resource_indicators` → renamed to `sec_column`
-- `per_resource_action` → dropped (action menu entry is always shown)
-- `refresh_ttl`, `availability_ttl` → removed (code defaults: 30s / 60s)
-- `keybindings.security_resource` → dropped (H hotkey removed)
+| Source | Default | Requirements |
+|---|---|---|
+| `heuristic` | enabled | No external dependencies. Built-in pod security checks run against the Kubernetes API directly. |
+| `trivy_operator` | enabled | Requires [Trivy Operator](https://aquasecurity.github.io/trivy-operator/) installed in the cluster. Reads `VulnerabilityReport` and `ConfigAuditReport` CRDs from the `aquasecurity.github.io/v1alpha1` API group. Automatically disabled when those CRDs are not present. |
+| `policy_report` | enabled | Requires [Kyverno](https://kyverno.io/) or any implementation of the [Policy Reports API](https://github.com/kubernetes-sigs/wg-policy-prototypes). Reads `PolicyReport` and `ClusterPolicyReport` CRDs from the `wgpolicyk8s.io/v1alpha2` API group. Automatically disabled when those CRDs are not present. |
+| `falco` | enabled | Requires [Falco](https://falco.org/) DaemonSet installed. For findings to appear, falcosidekick must be configured with Kubernetes output enabled (`config.kubernetes.enabled: true` in the falcosidekick Helm values). Automatically disabled when Falco is not detected. |
+| `kube_bench` | disabled | Not yet implemented (placeholder). |
 
 ## Clusters
 

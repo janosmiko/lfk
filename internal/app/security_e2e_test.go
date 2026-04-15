@@ -20,6 +20,8 @@ import (
 	dynfake "k8s.io/client-go/dynamic/fake"
 	kubefake "k8s.io/client-go/kubernetes/fake"
 
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/security/heuristic"
@@ -202,4 +204,102 @@ func TestSecurityNavigationFlowEndToEnd(t *testing.T) {
 	entered, _ := m2.enterFullView()
 	_, ok = entered.(Model)
 	assert.True(t, ok, "enterFullView must return a Model for a finding item")
+}
+
+// TestSecurityGroupDrillDownEndToEnd exercises the full flow:
+// 1. getSecurityFindings returns grouped items
+// 2. navigateChild drills into the group
+// 3. The returned cmd loads affected resources
+// 4. updateOwnedLoaded populates middleItems
+func TestSecurityGroupDrillDownEndToEnd(t *testing.T) {
+	// Build a manager with a heuristic source containing two findings for
+	// the same check (privileged) on different pods.
+	mgr := security.NewManager()
+	mgr.Register(&security.FakeSource{
+		NameStr:   "heuristic",
+		Available: true,
+		Findings: []security.Finding{
+			{
+				ID: "1", Source: "heuristic", Title: "Privileged Container",
+				Severity: security.SeverityCritical,
+				Resource: security.ResourceRef{Namespace: "prod", Kind: "Pod", Name: "web"},
+				Labels:   map[string]string{"check": "privileged"},
+			},
+			{
+				ID: "2", Source: "heuristic", Title: "Privileged Container",
+				Severity: security.SeverityHigh,
+				Resource: security.ResourceRef{Namespace: "prod", Kind: "Pod", Name: "api"},
+				Labels:   map[string]string{"check": "privileged"},
+			},
+		},
+	})
+
+	// Wire up a k8s Client with the security manager.
+	client := k8s.NewTestClient(nil, nil)
+	client.SetSecurityManager(mgr)
+
+	// Build a Model with enough state for navigation.
+	m := Model{
+		client:                     client,
+		securityManager:            mgr,
+		securityAvailabilityByName: map[string]bool{"heuristic": true},
+		bgtasks:                    bgtasks.New(0),
+		itemCache:                  make(map[string][]model.Item),
+		cursorMemory:               make(map[string]int),
+		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
+		selectedNamespaces:         make(map[string]bool),
+		selectedItems:              make(map[string]bool),
+		selectionAnchor:            -1,
+		tabs:                       []TabState{{}},
+		width:                      120,
+		height:                     40,
+		mode:                       modeExplorer,
+		namespace:                  "prod",
+	}
+	m.cancelAndReset() // create a valid reqCtx
+
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "test-ctx"
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		DisplayName: "Heuristic",
+		Kind:        "__security_heuristic__",
+		APIGroup:    model.SecurityVirtualAPIGroup,
+		APIVersion:  "v1",
+		Resource:    "findings-heuristic",
+		Namespaced:  true,
+	}
+
+	// Step 1: Load grouped findings (simulate what loadResources does).
+	items, err := client.GetResources(context.Background(), "test-ctx", "", m.nav.ResourceType)
+	require.NoError(t, err)
+	require.Len(t, items, 1, "two findings with same check should produce 1 group")
+	assert.Equal(t, "__security_finding_group__", items[0].Kind)
+	assert.Equal(t, "privileged", items[0].Name, "Name should be the group key (check label)")
+	assert.Equal(t, "2", items[0].ColumnValue("Affected"))
+
+	// Populate middleItems with the grouped findings.
+	m.middleItems = items
+	m.setCursor(0)
+
+	// Step 2: Drill into the group.
+	ret, cmd := m.navigateChild()
+	updated := ret.(Model)
+	assert.Equal(t, model.LevelOwned, updated.nav.Level)
+	require.NotNil(t, cmd, "navigateChild must return a cmd for loading affected resources")
+
+	// Step 3: Execute the cmd — it calls GetSecurityAffectedResources.
+	msg := cmd()
+	ownedMsg, ok := msg.(ownedLoadedMsg)
+	require.True(t, ok, "cmd must produce ownedLoadedMsg, got %T", msg)
+	require.NoError(t, ownedMsg.err)
+	require.Len(t, ownedMsg.items, 2, "two unique affected resources expected")
+
+	// Step 4: Process the response.
+	result, _ := updated.updateOwnedLoaded(ownedMsg)
+	final := result.(Model)
+	assert.Len(t, final.middleItems, 2,
+		"middleItems must contain the 2 affected resources after updateOwnedLoaded")
+	for _, it := range final.middleItems {
+		assert.Equal(t, "__security_affected_resource__", it.Kind)
+	}
 }

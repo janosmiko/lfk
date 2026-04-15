@@ -46,14 +46,17 @@ func buildIndex(t *testing.T, findings ...security.Finding) *security.FindingInd
 func TestSecurityBadgeForWithFindings(t *testing.T) {
 	idx := buildIndex(t,
 		security.Finding{
+			Title:    "CVE-2024-3001",
 			Severity: security.SeverityCritical,
 			Resource: security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "api"},
 		},
 		security.Finding{
+			Title:    "CVE-2024-3002",
 			Severity: security.SeverityHigh,
 			Resource: security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "api"},
 		},
 		security.Finding{
+			Title:    "CVE-2024-3003",
 			Severity: security.SeverityLow,
 			Resource: security.ResourceRef{Namespace: "default", Kind: "Pod", Name: "api"},
 		},
@@ -72,10 +75,12 @@ func TestSecurityBadgeForWithFindings(t *testing.T) {
 func TestSecurityBadgeForHighUsesOrange(t *testing.T) {
 	idx := buildIndex(t,
 		security.Finding{
+			Title:    "CVE-2024-4001",
 			Severity: security.SeverityHigh,
 			Resource: security.ResourceRef{Namespace: "ns", Kind: "Deployment", Name: "web"},
 		},
 		security.Finding{
+			Title:    "CVE-2024-4002",
 			Severity: security.SeverityMedium,
 			Resource: security.ResourceRef{Namespace: "ns", Kind: "Deployment", Name: "web"},
 		},

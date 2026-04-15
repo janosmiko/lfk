@@ -64,7 +64,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // updateResourceMsg handles resource-loading and navigation-related messages.
-func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nolint:gocyclo // message dispatch switch
 	switch msg := msg.(type) {
 	case contextsLoadedMsg:
 		mdl, cmd := m.updateContextsLoaded(msg)
@@ -151,7 +151,10 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mdl, cmd := m.updateLogContainersLoaded(msg)
 		return mdl, cmd, true
 	case securityAvailabilityLoadedMsg:
-		return m.handleSecurityAvailabilityLoaded(msg), nil, true
+		mdl, cmd := m.handleSecurityAvailabilityLoaded(msg)
+		return mdl, cmd, true
+	case securityFindingsScannedMsg:
+		return m.handleSecurityFindingsScanned(msg), nil, true
 	}
 
 	return m.updateEasterEggMsg(msg)
@@ -1087,6 +1090,14 @@ func (m Model) updateStartupTip(msg startupTipMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	if !m.watchMode {
 		return m, nil
+	}
+	// Security findings are fetched via the security manager, not the k8s
+	// watch API. Watch-mode refreshes would call FetchAll which may return
+	// empty results (cache invalidated, sources still scanning), wiping
+	// the current list. Skip watch ticks for security resource types —
+	// findings are refreshed via the explicit `r` key or background scans.
+	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		return m, scheduleWatchTick(m.watchInterval)
 	}
 	// Mark this dispatch as a watch-tick refresh so the instrumented
 	// loaders called below (through refreshCurrentLevel) use

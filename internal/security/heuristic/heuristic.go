@@ -14,7 +14,8 @@ import (
 
 // Source is the heuristic SecuritySource implementation.
 type Source struct {
-	client kubernetes.Interface
+	client            kubernetes.Interface
+	ignoredNamespaces map[string]bool
 }
 
 // New returns a heuristic source with no client. Fetch returns an empty slice
@@ -25,6 +26,14 @@ func New() *Source { return &Source{} }
 // NewWithClient returns a heuristic source that lists pods via the given client.
 func NewWithClient(client kubernetes.Interface) *Source {
 	return &Source{client: client}
+}
+
+// SetIgnoredNamespaces configures namespaces to exclude from heuristic checks.
+func (s *Source) SetIgnoredNamespaces(namespaces []string) {
+	s.ignoredNamespaces = make(map[string]bool, len(namespaces))
+	for _, ns := range namespaces {
+		s.ignoredNamespaces[ns] = true
+	}
 }
 
 // Name returns the stable identifier.
@@ -54,6 +63,9 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 	var findings []security.Finding
 	for i := range list.Items {
 		pod := &list.Items[i]
+		if s.ignoredNamespaces[pod.Namespace] {
+			continue
+		}
 		for _, c := range pod.Spec.Containers {
 			for _, check := range allChecks {
 				findings = append(findings, check(pod, c)...)

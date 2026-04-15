@@ -35,6 +35,9 @@ func (m Model) middleColumnHeader() string {
 	case model.LevelResourceTypes:
 		return "RESOURCE TYPE"
 	case model.LevelResources:
+		if m.nav.ResourceType.DisplayName != "" {
+			return strings.ToUpper(m.nav.ResourceType.DisplayName)
+		}
 		return strings.ToUpper(m.nav.ResourceType.Kind)
 	case model.LevelOwned:
 		return strings.ToUpper(m.ownedItemKindLabel())
@@ -225,7 +228,8 @@ func (m Model) statusBar() string {
 	cur := m.cursor() + 1
 
 	if m.filterText != "" {
-		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d filtered: %d/%d]", cur, len(visible), len(visible), total)))
+		filterLabel := ui.HelpKeyStyle.Render("filter:" + m.filterText)
+		parts = append(parts, filterLabel+ui.BarDimStyle.Render(fmt.Sprintf(" [%d/%d] (Esc to clear)", len(visible), total)))
 	} else {
 		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d]", cur, total)))
 	}

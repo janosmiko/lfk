@@ -180,12 +180,18 @@ func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 func (m Model) handleExplorerDirectActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	key := msg.String()
+	// Refresh works everywhere, including security findings.
+	if key == kb.Refresh {
+		ret, cmd := m.directActionRefresh()
+		return ret, cmd, true
+	}
+	// Security findings are virtual — other k8s resource actions don't apply.
+	if sel := m.selectedMiddleItem(); sel != nil && strings.HasPrefix(sel.Kind, "__security_") {
+		return m, nil, false
+	}
 	switch key {
 	case kb.Logs:
 		ret, cmd := m.directActionLogs()
-		return ret, cmd, true
-	case kb.Refresh:
-		ret, cmd := m.directActionRefresh()
 		return ret, cmd, true
 	case kb.Edit:
 		ret, cmd := m.directActionEdit()
@@ -216,7 +222,10 @@ func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool)
 	}
 	m.cancelAndReset()
 	m.requestGen++
-	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear()), true
+	// Re-scan security findings for the new namespace scope so the SEC
+	// column badge reflects the correct findings.
+	secCmd := m.loadSecurityFindings()
+	return m, tea.Batch(m.refreshCurrentLevel(), secCmd, scheduleStatusClear()), true
 }
 
 func (m Model) handleExplorerActionKeyQuotaDashboard() (tea.Model, tea.Cmd, bool) {

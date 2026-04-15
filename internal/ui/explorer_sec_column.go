@@ -2,6 +2,7 @@ package ui
 
 import (
 	"strconv"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -95,11 +96,24 @@ func itemSecurityRef(item *model.Item) security.ResourceRef {
 // securityBadgeForItem returns the styled badge for an item, honoring the
 // ActiveSecurityAvailable gate. Returns empty string when gated off or the
 // item has no matching findings. Intended for use by row formatters.
+//
+// For items with owner references (e.g., Pods owned by Deployments),
+// findings for the owner are included so that trivy-operator findings
+// (which reference the Deployment, not individual Pods) surface on
+// Pod rows too.
 func securityBadgeForItem(item *model.Item) string {
 	if !ActiveSecurityAvailable || ActiveSecurityIndex == nil || item == nil {
 		return ""
 	}
-	return securityBadgeFor(ActiveSecurityIndex, itemSecurityRef(item))
+	counts := itemSecurityCounts(item)
+	if counts.Total() == 0 {
+		return ""
+	}
+	sym, style := securityBadgeSymbolStyle(counts.Highest())
+	if sym == "" {
+		return ""
+	}
+	return style.Render(sym + strconv.Itoa(counts.Total()))
 }
 
 // securityBadgePlainForItem returns the plain text badge for an item, used
@@ -109,6 +123,36 @@ func securityBadgePlainForItem(item *model.Item) string {
 	if !ActiveSecurityAvailable || ActiveSecurityIndex == nil || item == nil {
 		return ""
 	}
-	counts := ActiveSecurityIndex.For(itemSecurityRef(item))
+	counts := itemSecurityCounts(item)
 	return securityBadgePlain(counts)
+}
+
+// itemSecurityCounts returns the merged SeverityCounts for an item,
+// combining findings for the item itself with findings for its owner
+// resources (extracted from owner:N columns).
+func itemSecurityCounts(item *model.Item) security.SeverityCounts {
+	counts := ActiveSecurityIndex.For(itemSecurityRef(item))
+	// Also check owner references so trivy findings (which reference the
+	// Deployment, not the Pod) show on Pod rows.
+	for _, col := range item.Columns {
+		if len(col.Key) < 6 || col.Key[:6] != "owner:" {
+			continue
+		}
+		parts := strings.SplitN(col.Value, "||", 3)
+		if len(parts) != 3 {
+			continue
+		}
+		ownerKind, ownerName := parts[1], parts[2]
+		ownerRef := security.ResourceRef{
+			Namespace: item.Namespace,
+			Kind:      ownerKind,
+			Name:      ownerName,
+		}
+		oc := ActiveSecurityIndex.For(ownerRef)
+		counts.Critical += oc.Critical
+		counts.High += oc.High
+		counts.Medium += oc.Medium
+		counts.Low += oc.Low
+	}
+	return counts
 }

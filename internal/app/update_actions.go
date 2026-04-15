@@ -26,6 +26,12 @@ func isSecurityActionEligibleKind(kind string) bool {
 }
 
 func (m Model) openActionMenu() Model {
+	// Security findings are virtual — k8s resource actions don't apply.
+	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		m.setStatusMessage("No actions available for security findings", true)
+		return m
+	}
+
 	// Bulk mode: when items are selected, show bulk action menu.
 	if m.hasSelection() {
 		selectedList := m.selectedItemsList()
@@ -82,6 +88,13 @@ func (m Model) openActionMenu() Model {
 		return m
 	}
 
+	// Security findings and groups are virtual items — k8s resource
+	// actions (delete, edit, scale, etc.) don't apply to them.
+	if strings.HasPrefix(sel.Kind, "__security_") {
+		m.setStatusMessage("No actions available for security findings", true)
+		return m
+	}
+
 	m.bulkMode = false
 	m.actionCtx = m.buildActionCtx(sel, kind)
 
@@ -113,6 +126,7 @@ func (m Model) openActionMenu() Model {
 		actions = append(actions, model.ActionMenuItem{
 			Label:       "Security Findings",
 			Description: "Show security findings for this resource",
+			Key:         "y",
 		})
 	}
 
@@ -326,6 +340,14 @@ func (m Model) directActionScale() (tea.Model, tea.Cmd) {
 func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 
+	// Security source picker: the user selected a source from the
+	// overlay shown by "Security Findings". Only applies when the
+	// current level is LevelResourceTypes (where the picker lands).
+	if m.pendingSecurityFilter != "" && m.nav.Level == model.LevelResourceTypes {
+		return m.navigateToSecuritySource(actionLabel)
+	}
+	m.pendingSecurityFilter = "" // clear stale filter
+
 	// Handle bulk actions.
 	if m.bulkMode && len(m.bulkItems) > 0 {
 		return m.executeBulkAction(actionLabel)
@@ -481,39 +503,65 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 }
 
 // executeActionSecurityFindings handles the "Security Findings" action.
-// Ascends to LevelResourceTypes, jumps to the first entry in the Security
-// category, drills into it, and sets the filter text to the originally
-// selected resource's name so only findings for that resource are shown.
+// Shows an overlay listing available security sources (Heuristic, Trivy, etc.)
+// so the user can pick which one to view. On selection, navigates to that
+// source and applies a filter for the originally selected resource.
 func (m Model) executeActionSecurityFindings() (tea.Model, tea.Cmd) {
 	sel := m.selectedMiddleItem()
 	if sel == nil {
 		return m, nil
 	}
-	filterText := sel.Name
 
+	// Build overlay items from available security sources.
 	m = m.ascendToResourceTypes()
-	var found bool
-	for i, item := range m.middleItems {
+	var items []model.Item
+	for _, item := range m.middleItems {
 		if item.Category == "Security" && item.Extra != "" {
-			m.setCursor(i)
-			m.clampCursor()
-			found = true
-			break
+			items = append(items, item)
 		}
 	}
-	if !found {
+	if len(items) == 0 {
 		m.setStatusMessage("No security sources available", true)
 		return m, scheduleStatusClear()
 	}
-	mdl, cmd := m.navigateChild()
-	m2, ok := mdl.(Model)
-	if !ok {
-		return mdl, cmd
+
+	// If only one source, go directly.
+	if len(items) == 1 {
+		m.pendingSecurityFilter = sel.Name
+		for i, it := range m.middleItems {
+			if it.Kind == items[0].Kind {
+				m.setCursor(i)
+				break
+			}
+		}
+		return m.navigateChild()
 	}
-	m2.filterText = filterText
-	m2.setCursor(0)
-	m2.clampCursor()
-	return m2, tea.Batch(cmd, m2.loadPreview())
+
+	// Multiple sources — show a picker overlay.
+	m.pendingSecurityFilter = sel.Name
+	m.overlay = overlayAction
+	m.overlayItems = items
+	m.overlayCursor = 0
+	return m, nil
+}
+
+// navigateToSecuritySource handles the selection from the security source
+// picker overlay. Finds the matching source in middleItems, moves the
+// cursor to it, and drills in. The pendingSecurityFilter is consumed by
+// navigateChildResourceType to apply the resource name filter.
+func (m Model) navigateToSecuritySource(sourceName string) (tea.Model, tea.Cmd) {
+	// Find the source entry in middleItems by display name.
+	for i, item := range m.middleItems {
+		if item.Category == "Security" && item.Name == sourceName {
+			m.setCursor(i)
+			m.clampCursor()
+			return m.navigateChild()
+		}
+	}
+	// Not found — clear pending filter and show error.
+	m.pendingSecurityFilter = ""
+	m.setStatusMessage("Security source not found: "+sourceName, true)
+	return m, scheduleStatusClear()
 }
 
 // executeActionExtended dispatches Argo, Helm, Flux, and other extended actions.
@@ -1331,6 +1379,19 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 		}
 		return m.loadResources(false)
 	case model.LevelOwned:
+		// Security finding groups use a dedicated loader; the generic
+		// loadOwned has no dispatch for virtual security kinds and would
+		// return nil items, wiping the affected resources list.
+		if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+			// Find the group key from leftItems (the grouped findings pushed
+			// when the user drilled in). nav.ResourceName holds the group title.
+			for _, it := range m.leftItems {
+				if it.Kind == "__security_finding_group__" && it.Name == m.nav.ResourceName {
+					return m.loadSecurityAffectedResources(it.Extra)
+				}
+			}
+			return nil
+		}
 		return m.loadOwned(false)
 	case model.LevelContainers:
 		return m.loadContainers(false)

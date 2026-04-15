@@ -324,6 +324,7 @@ func helpSections() []helpSection {
 			title: "Security findings browser",
 			bindings: []helpEntry{
 				{kb.Security, "Jump to the Security category"},
+				{"x then y", "Go to security findings for selected resource"},
 				{"Enter", "Jump to the affected resource (on a finding)"},
 				{"o", "Owner jump (same effect)"},
 				{"r", "Refresh findings (invalidates cache)"},

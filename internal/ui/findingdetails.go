@@ -91,6 +91,134 @@ func RenderFindingDetails(item model.Item, width, height int) string {
 	return b.String()
 }
 
+// RenderFindingGroupDetails produces the right preview pane body when a
+// __security_finding_group__ item is selected. It shows the group summary
+// plus a mini table of affected resources (from rightItems).
+func RenderFindingGroupDetails(group model.Item, affected []model.Item, width, height int) string {
+	var b strings.Builder
+
+	severity := group.ColumnValue("Severity")
+	title := group.Name
+	fmt.Fprintf(&b, "%s  %s\n", styleSeverityBadge(severity), title)
+	sepWidth := width
+	if sepWidth < 1 {
+		sepWidth = 1
+	}
+	if sepWidth > 120 {
+		sepWidth = 120
+	}
+	b.WriteString(strings.Repeat("─", sepWidth))
+	b.WriteString("\n\n")
+
+	kv := func(k, v string) {
+		if v == "" {
+			return
+		}
+		label := k + ":"
+		if len(label) < 14 {
+			label = label + strings.Repeat(" ", 14-len(label))
+		}
+		fmt.Fprintf(&b, "  %s  %s\n", label, v)
+	}
+	kv("Affected", group.ColumnValue("Affected")+" resources")
+	kv("Source", group.ColumnValue("Source"))
+	kv("Category", group.ColumnValue("Category"))
+
+	if desc := group.ColumnValue("Description"); desc != "" {
+		b.WriteString("\n  Description:\n")
+		wrapWidth := width - 4
+		if wrapWidth < 20 {
+			wrapWidth = 20
+		}
+		for _, line := range wrapLines(desc, wrapWidth) {
+			fmt.Fprintf(&b, "    %s\n", line)
+		}
+	}
+
+	if refs := group.ColumnValue("References"); refs != "" {
+		b.WriteString("\n  References:\n")
+		for _, ref := range strings.Split(refs, "\n") {
+			fmt.Fprintf(&b, "    %s\n", ref)
+		}
+	}
+
+	if len(affected) > 0 {
+		b.WriteString("\n  Affected resources:\n")
+		maxShow := height / 2
+		if maxShow < 5 {
+			maxShow = 5
+		}
+		if maxShow > len(affected) {
+			maxShow = len(affected)
+		}
+		for i := range maxShow {
+			it := affected[i]
+			sev := it.ColumnValue("Severity")
+			fmt.Fprintf(&b, "    %s  %s",
+				styleSeverityBadge(sev), it.Name)
+			if it.Namespace != "" {
+				fmt.Fprintf(&b, "  (%s)", it.Namespace)
+			}
+			b.WriteString("\n")
+		}
+		if len(affected) > maxShow {
+			fmt.Fprintf(&b, "    ... and %d more\n", len(affected)-maxShow)
+		}
+	}
+
+	b.WriteString("\n")
+	b.WriteString(DimStyle.Render("  [Enter/l] affected resources   [#] security menu"))
+	return b.String()
+}
+
+// RenderAffectedResourceDetails produces the right preview pane body for
+// a __security_affected_resource__ item at LevelOwned.
+func RenderAffectedResourceDetails(item model.Item, width, height int) string {
+	var b strings.Builder
+
+	severity := item.ColumnValue("Severity")
+	resource := item.ColumnValue("Resource")
+	fmt.Fprintf(&b, "%s  %s\n", styleSeverityBadge(severity), resource)
+	sepWidth := width
+	if sepWidth < 1 {
+		sepWidth = 1
+	}
+	if sepWidth > 120 {
+		sepWidth = 120
+	}
+	b.WriteString(strings.Repeat("─", sepWidth))
+	b.WriteString("\n\n")
+
+	kv := func(k, v string) {
+		if v == "" {
+			return
+		}
+		label := k + ":"
+		if len(label) < 14 {
+			label = label + strings.Repeat(" ", 14-len(label))
+		}
+		fmt.Fprintf(&b, "  %s  %s\n", label, v)
+	}
+	kv("Kind", item.ColumnValue("ResourceKind"))
+	kv("Namespace", item.ColumnValue("Namespace"))
+	kv("Findings", item.ColumnValue("FindingCount"))
+
+	if desc := item.ColumnValue("Description"); desc != "" {
+		b.WriteString("\n  Details:\n")
+		wrapWidth := width - 4
+		if wrapWidth < 20 {
+			wrapWidth = 20
+		}
+		for _, line := range wrapLines(desc, wrapWidth) {
+			fmt.Fprintf(&b, "    %s\n", line)
+		}
+	}
+
+	b.WriteString("\n")
+	b.WriteString(DimStyle.Render("  [Enter] jump to resource   [h] back to group   [#] security menu"))
+	return b.String()
+}
+
 // styleSeverityBadge returns a colored inline badge for a severity string.
 func styleSeverityBadge(sev string) string {
 	switch sev {

@@ -460,7 +460,7 @@ func TestRefreshSecuritySourcesRebuildsOnContextChange(t *testing.T) {
 	// With fake clients injected, both sources are still registered because
 	// NewTestClient returns the same fake for any context name.
 	sources := m.securityManager.Sources()
-	assert.Len(t, sources, 2, "both sources should re-register when clients are available")
+	assert.Len(t, sources, 4, "all sources should re-register when clients are available")
 }
 
 func TestRefreshSecuritySourcesNilClient(t *testing.T) {

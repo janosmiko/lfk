@@ -474,6 +474,7 @@ type SecurityConfig struct {
 
 // SecuritySourceCfg is the per-source config shared across adapters.
 type SecuritySourceCfg struct {
-	Enabled bool     `json:"enabled" yaml:"enabled"`
-	Checks  []string `json:"checks,omitempty" yaml:"checks,omitempty"`
+	Enabled           bool     `json:"enabled" yaml:"enabled"`
+	Checks            []string `json:"checks,omitempty" yaml:"checks,omitempty"`
+	IgnoredNamespaces []string `json:"ignored_namespaces,omitempty" yaml:"ignored_namespaces,omitempty"`
 }

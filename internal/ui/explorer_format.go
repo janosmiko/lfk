@@ -245,6 +245,7 @@ func blockedColumnsForMode() map[string]bool {
 			"Health Message": true, "Keys": true,
 			"Service Account": true, "Images": true, "Image": true,
 			"Health": true, "Sync": true, "Path": true,
+			"Description": true, "References": true,
 			"Labels": true, "Finalizers": true, "Annotations": true,
 			"Used By": true, "Deletion": true, "Selector": true,
 		}
@@ -260,7 +261,7 @@ func blockedColumnsForMode() map[string]bool {
 		"Sync Message": true, "Sync Errors": true,
 		"OS": true, "Runtime": true,
 		"Hostname": true, "InternalIP": true, "ExternalIP": true,
-		"Source": true,
+		"Source": true, "Description": true, "References": true,
 		"Labels": true, "Finalizers": true, "Annotations": true,
 		"Used By": true, "Deletion": true, "Selector": true,
 	}
@@ -557,6 +558,19 @@ func resourceColumnStyle(key, val string) lipgloss.Style {
 		return pctStyle(val)
 	case "CPU Req", "CPU Lim", "Mem Req", "Mem Lim", "CPU Alloc", "Mem Alloc":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Background(BaseBg)
+	case "Severity":
+		switch val {
+		case "CRIT":
+			return StatusFailed // red
+		case "HIGH":
+			return DeprecationStyle // orange
+		case "MED":
+			return StatusProgressing // yellow/blue
+		case "LOW":
+			return StatusRunning // green
+		default:
+			return DimStyle
+		}
 	case "Last Sync", "Health", "Sync", "Reason":
 		return StatusStyle(val)
 	case "Synced At":

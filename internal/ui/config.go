@@ -165,9 +165,9 @@ func DefaultSecurityConfig() model.SecurityConfig {
 				"missing_resource_limits", "default_sa", "latest_tag",
 			}},
 			"trivy_operator": {Enabled: true},
-			"policy_report":  {Enabled: false},
+			"policy_report":  {Enabled: true},
 			"kube_bench":     {Enabled: false},
-			"falco":          {Enabled: false},
+			"falco":          {Enabled: true},
 		},
 	}
 }
@@ -308,6 +308,10 @@ var ConfigLogTailLines = 1000
 // ConfigScrollOff is the number of lines to keep visible above/below the cursor.
 // Used by all views with cursor-based navigation.
 var ConfigScrollOff = 5
+
+// ConfigSecurity holds the per-cluster security configuration map.
+// Keys are context names; "default" applies to unmatched clusters.
+var ConfigSecurity map[string]model.SecurityConfig
 
 // ActiveSchemeName holds the name of the currently active color scheme.
 var ActiveSchemeName = "tokyonight-storm"
@@ -571,5 +575,8 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 				ConfigClusterResourceColumns[ctx] = cols
 			}
 		}
+	}
+	if len(cfg.Security) > 0 {
+		ConfigSecurity = cfg.Security
 	}
 }

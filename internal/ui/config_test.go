@@ -92,7 +92,7 @@ func TestDefaultSecurityConfig(t *testing.T) {
 	assert.True(t, def.Sources["heuristic"].Enabled)
 	assert.NotEmpty(t, def.Sources["heuristic"].Checks)
 	assert.True(t, def.Sources["trivy_operator"].Enabled)
-	assert.False(t, def.Sources["policy_report"].Enabled)
+	assert.True(t, def.Sources["policy_report"].Enabled)
 }
 
 func TestDetectIconModeFromEnv(t *testing.T) {

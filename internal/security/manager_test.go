@@ -182,15 +182,15 @@ func TestFindingIndexCountsAndLookup(t *testing.T) {
 	m := NewManager()
 	s := &FakeSource{NameStr: "s", Available: true, Findings: []Finding{
 		{
-			ID: "1", Severity: SeverityCritical,
+			ID: "1", Title: "CVE-2024-0001", Severity: SeverityCritical,
 			Resource: ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"},
 		},
 		{
-			ID: "2", Severity: SeverityHigh,
+			ID: "2", Title: "CVE-2024-0002", Severity: SeverityHigh,
 			Resource: ResourceRef{Namespace: "prod", Kind: "Deployment", Name: "api"},
 		},
 		{
-			ID: "3", Severity: SeverityLow,
+			ID: "3", Title: "CVE-2024-0003", Severity: SeverityLow,
 			Resource: ResourceRef{Namespace: "prod", Kind: "Pod", Name: "db-0"},
 		},
 	}}
