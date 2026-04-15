@@ -224,6 +224,18 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleExplorerNavKey handles navigation keys in explorer mode (movement, selection, enter).
 func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
+
+	// Cancel active bulk operations on Ctrl+C or Esc before the normal
+	// close-tab / back-navigation handling. This lets the user abort a
+	// long-running delete/scale/restart without losing their tab.
+	if m.bgtasks != nil && m.bgtasks.HasActiveMutations() {
+		if key := msg.String(); key == "ctrl+c" || key == "esc" {
+			m.bgtasks.CancelMutations()
+			m.setStatusMessage("Cancelling...", false)
+			return m, nil, true
+		}
+	}
+
 	switch msg.String() {
 	case "q":
 		m.overlay = overlayQuitConfirm

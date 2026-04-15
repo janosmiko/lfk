@@ -130,6 +130,11 @@ const (
 // sortColDefault is the default sort column name.
 const sortColDefault = "Name"
 
+// sortColEventLastSeen is a sentinel used internally by sortMiddleItems
+// to override the default "Name" sort for Events. It is NOT a user-visible
+// column name and must not appear in the sortable-column cycle.
+const sortColEventLastSeen = "__event_last_seen__"
+
 // sortColumnIndex returns the index of sortColumnName in ActiveSortableColumns,
 // or 0 if not found.
 func sortColumnIndex(name string) int {
@@ -906,10 +911,16 @@ type ownedParentState struct {
 }
 
 // NewModel creates the initial model.
-func NewModel(client *k8s.Client) Model {
+func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
 	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
+
+	contextName := client.CurrentContext()
+	if opts.Context != "" {
+		contextName = opts.Context
+	}
+	defaultNS := client.DefaultNamespace(contextName)
 
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
@@ -921,7 +932,7 @@ func NewModel(client *k8s.Client) Model {
 		pendingPortForwards: loadPortForwardState(),
 		commandHistory:      loadCommandHistory(),
 		pinnedState:         pinnedSt,
-		namespace:           client.DefaultNamespace(client.CurrentContext()),
+		namespace:           defaultNS,
 		spinner:             s,
 		watchInterval:       2 * time.Second,
 		splitPreview:        true,
@@ -944,7 +955,7 @@ func NewModel(client *k8s.Client) Model {
 		reqCancel:           reqCancel,
 		tabs: []TabState{{
 			nav:                model.NavigationState{Level: model.LevelClusters},
-			namespace:          client.DefaultNamespace(client.CurrentContext()),
+			namespace:          defaultNS,
 			splitPreview:       true,
 			allNamespaces:      true,
 			watchMode:          true,
@@ -963,6 +974,26 @@ func NewModel(client *k8s.Client) Model {
 		execMu:         &sync.Mutex{},
 		portForwardMgr: k8s.NewPortForwardManager(),
 	}
+
+	// When CLI flags are provided, replace the file-loaded session with a
+	// synthetic one so the app opens in the requested context/namespace.
+	if opts.HasCLIOverrides() {
+		tab := SessionTab{
+			Context: contextName,
+		}
+		if len(opts.Namespaces) > 0 {
+			tab.AllNamespaces = false
+			tab.Namespace = opts.Namespaces[0]
+			tab.SelectedNamespaces = opts.Namespaces
+		} else {
+			tab.AllNamespaces = true
+		}
+		m.pendingSession = &SessionState{
+			Context: contextName,
+			Tabs:    []SessionTab{tab},
+		}
+	}
+
 	m.applyPinnedGroups()
 
 	m.helpSearchInput = textinput.New()

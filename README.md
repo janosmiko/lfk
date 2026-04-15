@@ -10,6 +10,10 @@
 
 ![Demo](./docs/imgs/demo.gif)
 
+### Themes
+
+![Themes](./docs/imgs/themes.gif)
+
 ### Pods
 
 ![Pods](./docs/imgs/pods.png)
@@ -191,6 +195,35 @@ docker run -it --rm \
   janosmiko/lfk
 ```
 
+### Nightly Builds
+
+Nightly builds track the latest development work and are published as GitHub
+pre-releases with every `v*-nightly*` tag.
+
+**Homebrew:**
+
+```bash
+brew install janosmiko/tap/lfk-nightly
+```
+
+**Docker:**
+
+```bash
+# Latest nightly
+docker run -it --rm \
+  -v ~/.kube:/home/lfk/.kube:ro \
+  janosmiko/lfk:nightly
+
+# Specific nightly date
+docker run -it --rm \
+  -v ~/.kube:/home/lfk/.kube:ro \
+  janosmiko/lfk:nightly-20260414
+```
+
+**Binary releases:**
+
+Download from [GitHub Releases](https://github.com/janosmiko/lfk/releases) (look for pre-release tags).
+
 ### External Dependencies
 
 **Required:**
@@ -210,12 +243,51 @@ All other features (KEDA, External Secrets, Argo Workflows, cert-manager, ArgoCD
 # Use default kubeconfig (~/.kube/config + ~/.kube/config.d/*)
 lfk
 
-# Use a specific kubeconfig
+# Start in a specific context
+lfk --context my-cluster
+
+# Start in a specific namespace (disables all-namespaces mode)
+lfk -n kube-system
+
+# Start with multiple namespaces selected
+lfk -n default -n kube-system
+
+# Combine context and namespace
+lfk --context production -n monitoring
+
+# Use a specific config file (overrides ~/.config/lfk/config.yaml)
+lfk -c /path/to/config.yaml
+lfk --config /path/to/config.yaml
+
+# Use a specific kubeconfig file (overrides default discovery)
+lfk --kubeconfig /path/to/kubeconfig
+
+# Disable mouse capture (enables native terminal text selection)
+lfk --no-mouse
+
+# Use a specific kubeconfig via environment variable
 KUBECONFIG=/path/to/config lfk
 
-# Use multiple kubeconfigs
+# Use multiple kubeconfigs via environment variable
 KUBECONFIG=/path/to/config1:/path/to/config2 lfk
 ```
+
+When `--context` or `--namespace` flags are provided, the saved session state is
+ignored and the app opens directly in the specified context/namespace. The user
+can still change the namespace during the session.
+
+### Mouse Support
+
+By default, lfk captures mouse input for click navigation, scroll, and tab
+switching. If you need native terminal text selection (e.g., shift+click to
+select text), you can disable mouse capture:
+
+- **CLI flag:** `lfk --no-mouse`
+- **Config file:** Add `mouse: false` to `~/.config/lfk/config.yaml`
+
+> **Note:** macOS Terminal.app does not support shift+click text selection while
+> mouse capture is active. Use `--no-mouse` or switch to a terminal that handles
+> this correctly (iTerm2, Kitty, Alacritty, WezTerm, Ghostty).
 
 ## Navigation Hierarchy
 
@@ -330,6 +402,9 @@ transparent_background: true
 # "unicode", "nerdfont" (requires Nerd Font in terminal), "simple" (ASCII labels),
 # "emoji", or "none". The LFK_ICONS env var overrides this setting.
 icons: auto
+
+# Disable mouse capture (allows native terminal text selection)
+mouse: false
 
 # Custom keybinding overrides (only specify what you want to change)
 keybindings:

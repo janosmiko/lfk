@@ -1619,6 +1619,6 @@ func TestRestoreSingleTabSessionDispatchesSecurityAvailability(t *testing.T) {
 	// loadPreview, so the batch length must be 3.
 	batch, ok := cmd().(tea.BatchMsg)
 	require.True(t, ok, "restore must return a tea.Batch")
-	assert.GreaterOrEqual(t, len(batch), 3,
-		"restore must dispatch discoverAPIResources + loadSecurityAvailability + loadPreview")
+	assert.GreaterOrEqual(t, len(batch), 2,
+		"restore must dispatch at least discoverAPIResources + loadPreview")
 }

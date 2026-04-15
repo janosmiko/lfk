@@ -261,12 +261,15 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.clearRight()
 	if discovered, ok := m.discoveredResources[sel.Name]; ok && len(discovered) > 0 {
 		m.middleItems = model.BuildSidebarItems(discovered)
+		m.itemCache[m.navKey()] = m.middleItems
+		m.restoreCursor()
+		m.syncExpandedGroup()
 	} else {
-		m.middleItems = model.BuildSidebarItems(model.SeedResources())
+		// Discovery not yet available: show loading spinner instead of
+		// seed resources to avoid the jarring pop-in when CRDs arrive.
+		m.middleItems = nil
+		m.loading = true
 	}
-	m.itemCache[m.navKey()] = m.middleItems
-	m.restoreCursor()
-	m.syncExpandedGroup()
 	m.saveCurrentSession()
 	cmds := []tea.Cmd{m.loadPreview()}
 	if _, ok := m.discoveredResources[sel.Name]; !ok {

@@ -238,6 +238,51 @@ func TestGroupEvents_HandlesMissingCount(t *testing.T) {
 	assert.Equal(t, "2", readCountColumn(got[0]), "missing Count columns should count as 1 each")
 }
 
+func TestGroupEvents_PopulatesGroupedRefs(t *testing.T) {
+	now := time.Now()
+	e1 := newEvent("Warning", "FailedScheduling", "msg", "Pod/foo", "1", now)
+	e1.Name = "evt-aaa"
+	e1.Namespace = "ns-1"
+	e2 := newEvent("Warning", "FailedScheduling", "msg", "Pod/foo", "1", now.Add(-time.Minute))
+	e2.Name = "evt-bbb"
+	e2.Namespace = "ns-1"
+	e3 := newEvent("Warning", "FailedScheduling", "msg", "Pod/foo", "1", now.Add(-2*time.Minute))
+	e3.Name = "evt-ccc"
+	e3.Namespace = "ns-2"
+
+	got := groupEvents([]model.Item{e1, e2, e3})
+	require.Len(t, got, 1, "all three share the same group key")
+	require.Len(t, got[0].GroupedRefs, 3, "grouped row must track all underlying event names")
+
+	names := make([]string, len(got[0].GroupedRefs))
+	for i, ref := range got[0].GroupedRefs {
+		names[i] = ref.Namespace + "/" + ref.Name
+	}
+	assert.Contains(t, names, "ns-1/evt-aaa")
+	assert.Contains(t, names, "ns-1/evt-bbb")
+	assert.Contains(t, names, "ns-2/evt-ccc")
+}
+
+func TestGroupEvents_SingleEventHasGroupedRef(t *testing.T) {
+	now := time.Now()
+	e := newEvent("Warning", "BackOff", "msg", "Pod/bar", "1", now)
+	e.Name = "solo-evt"
+	e.Namespace = "default"
+
+	got := groupEvents([]model.Item{e})
+	require.Len(t, got, 1)
+	require.Len(t, got[0].GroupedRefs, 1, "even a single event should have its own ref")
+	assert.Equal(t, "solo-evt", got[0].GroupedRefs[0].Name)
+	assert.Equal(t, "default", got[0].GroupedRefs[0].Namespace)
+}
+
+func TestGroupEvents_NonEventHasNoGroupedRefs(t *testing.T) {
+	pod := model.Item{Name: "pod-a", Kind: "Pod"}
+	got := groupEvents([]model.Item{pod})
+	require.Len(t, got, 1)
+	assert.Empty(t, got[0].GroupedRefs, "non-Event items should not have GroupedRefs")
+}
+
 // TestGroupEvents_MatchesPopulateEventKeys pins the grouping column-key
 // constants to the canonical k8s package exports. If populateEvent renames
 // any of these strings without updating the constants, grouping would

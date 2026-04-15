@@ -423,3 +423,100 @@ func TestNewUsesDefaultCompletedCap(t *testing.T) {
 	}
 	assert.Len(t, r.SnapshotCompleted(), DefaultCompletedCap)
 }
+
+func TestUpdateProgress(t *testing.T) {
+	r := New(0)
+	id := r.Start(KindMutation, "Delete pods", "default")
+	r.UpdateProgress(id, 3, 10)
+	snap := r.Snapshot()
+	require.Len(t, snap, 1)
+	assert.Equal(t, 3, snap[0].Current)
+	assert.Equal(t, 10, snap[0].Total)
+}
+
+func TestUpdateProgressUnknownID(t *testing.T) {
+	r := New(0)
+	r.UpdateProgress(999, 1, 5) // should not panic
+}
+
+func TestUpdateProgressNilReceiver(t *testing.T) {
+	var r *Registry
+	r.UpdateProgress(1, 1, 5) // should not panic
+}
+
+func TestStartCancellable(t *testing.T) {
+	r := New(0)
+	cancelled := false
+	id := r.StartCancellable(KindMutation, "Delete", "ns", func() { cancelled = true })
+	assert.NotZero(t, id)
+	snap := r.Snapshot()
+	require.Len(t, snap, 1)
+	assert.Equal(t, "Delete", snap[0].Name)
+	r.Cancel(id)
+	assert.True(t, cancelled)
+}
+
+func TestCancelUnknownID(t *testing.T) {
+	r := New(0)
+	r.Cancel(999) // should not panic
+}
+
+func TestCancelNilReceiver(t *testing.T) {
+	var r *Registry
+	r.Cancel(1) // should not panic
+}
+
+func TestCancelMutations(t *testing.T) {
+	r := New(0)
+	cancelled1, cancelled2, cancelled3 := false, false, false
+	r.StartCancellable(KindMutation, "Delete", "ns", func() { cancelled1 = true })
+	r.StartCancellable(KindMutation, "Scale", "ns", func() { cancelled2 = true })
+	r.StartCancellable(KindResourceList, "List Pods", "ns", func() { cancelled3 = true })
+	r.CancelMutations()
+	assert.True(t, cancelled1, "mutation task 1 should be cancelled")
+	assert.True(t, cancelled2, "mutation task 2 should be cancelled")
+	assert.False(t, cancelled3, "non-mutation task should not be cancelled")
+}
+
+func TestCancelMutationsNilReceiver(t *testing.T) {
+	var r *Registry
+	r.CancelMutations() // should not panic
+}
+
+func TestHasActiveMutations(t *testing.T) {
+	r := New(0)
+	assert.False(t, r.HasActiveMutations())
+	id := r.Start(KindResourceList, "List", "ns")
+	assert.False(t, r.HasActiveMutations())
+	r.Finish(id)
+	mutID := r.Start(KindMutation, "Delete", "ns")
+	assert.True(t, r.HasActiveMutations())
+	r.Finish(mutID)
+	assert.False(t, r.HasActiveMutations())
+}
+
+func TestHasActiveMutationsNilReceiver(t *testing.T) {
+	var r *Registry
+	assert.False(t, r.HasActiveMutations())
+}
+
+func TestFinishCleansCancelFunc(t *testing.T) {
+	r := New(0)
+	cancelled := false
+	id := r.StartCancellable(KindMutation, "Delete", "ns", func() { cancelled = true })
+	r.Finish(id)
+	r.Cancel(id) // should be no-op after Finish
+	assert.False(t, cancelled, "cancel func should be removed by Finish")
+}
+
+func TestProgressPreservedInSnapshot(t *testing.T) {
+	r := New(0)
+	id := r.Start(KindMutation, "Scale", "ns")
+	r.UpdateProgress(id, 0, 5)
+	r.UpdateProgress(id, 3, 5)
+	r.UpdateProgress(id, 5, 5)
+	snap := r.Snapshot()
+	require.Len(t, snap, 1)
+	assert.Equal(t, 5, snap[0].Current)
+	assert.Equal(t, 5, snap[0].Total)
+}

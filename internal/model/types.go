@@ -98,6 +98,13 @@ type ConditionEntry struct {
 // Set from config at startup.
 var PinnedGroups []string
 
+// GroupedRef identifies a single resource within a grouped row (e.g., one
+// of the many Event objects collapsed into a single line by event grouping).
+type GroupedRef struct {
+	Name      string
+	Namespace string
+}
+
 // Item represents a single navigable entry in any column.
 type Item struct {
 	Name          string
@@ -118,6 +125,7 @@ type Item struct {
 	Selected      bool             // Whether this item is part of a multi-selection
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
+	GroupedRefs   []GroupedRef     // For grouped rows (Events): all underlying resource identifiers
 }
 
 // ColumnValue returns the value of the named column, or "" if the column

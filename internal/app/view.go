@@ -225,8 +225,13 @@ func (m Model) viewExplorer() string {
 	ui.ActiveContext = m.nav.Context
 
 	// Set sort state for column header indicators.
+	// Mirror the Event override so the arrow appears on "Last Seen"
+	// instead of "Name" when Events use their default sort.
 	ui.ActiveSortColumnName = m.sortColumnName
 	ui.ActiveSortAscending = m.sortAscending
+	if m.sortColumnName == sortColDefault && m.nav.ResourceType.Kind == "Event" {
+		ui.ActiveSortColumnName = "Last Seen"
+	}
 
 	// Apply session column config for the middle column's kind.
 	// middleColumnKind() reflects the kind of items actually rendered in
@@ -407,9 +412,11 @@ func (m Model) renderTitleBar() string {
 		watchIndicator = ui.HelpKeyStyle.Render(" \u27f3 ")
 	}
 
-	var tasksIndicator string
+	var mutationProgress, tasksIndicator string
 	if m.bgtasks != nil && m.bgtasks.Len() > 0 {
-		tasksIndicator = renderTasksIndicator(m.spinner.View(), m.bgtasks.Snapshot())
+		snap := m.bgtasks.Snapshot()
+		mutationProgress = renderMutationProgress(m.spinner.View(), snap)
+		tasksIndicator = renderTasksIndicator(m.spinner.View(), snap)
 	}
 
 	nsText := m.namespace
@@ -440,7 +447,7 @@ func (m Model) renderTitleBar() string {
 	}
 
 	// Calculate available width for breadcrumb.
-	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
+	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	maxBcWidth := innerWidth - fixedWidth - 1 // -1 for minimum gap
 	if maxBcWidth < 10 {
 		maxBcWidth = 10
@@ -455,13 +462,13 @@ func (m Model) renderTitleBar() string {
 	}
 	bc := ui.TitleBreadcrumbStyle.Render(bcText)
 
-	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
+	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	gap := innerWidth - contentWidth
 	if gap < 0 {
 		gap = 0
 	}
 
-	barContent := bc + watchIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + tasksIndicator + nsLabel + versionLabel
+	barContent := bc + watchIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + mutationProgress + tasksIndicator + nsLabel + versionLabel
 	return ui.TitleBarStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(barContent)
 }
 

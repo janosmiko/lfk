@@ -414,7 +414,7 @@ func TestNewModelHasSecurityManagerAfterInit(t *testing.T) {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 	client := k8s.NewTestClient(cs, dyn)
 
-	m := NewModel(client)
+	m := NewModel(client, StartupOptions{})
 	require.NotNil(t, m.securityManager,
 		"NewModel must initialize securityManager so async security commands have a target")
 }
@@ -427,7 +427,7 @@ func TestNewModelRegistersSecuritySourcesWhenClientsAvailable(t *testing.T) {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 	client := k8s.NewTestClient(cs, dyn)
 
-	m := NewModel(client)
+	m := NewModel(client, StartupOptions{})
 	sources := m.securityManager.Sources()
 	// Collect source names to be order-independent.
 	names := make(map[string]bool, len(sources))
@@ -443,7 +443,7 @@ func TestRefreshSecuritySourcesRebuildsOnContextChange(t *testing.T) {
 	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
 	client := k8s.NewTestClient(cs, dyn)
 
-	m := NewModel(client)
+	m := NewModel(client, StartupOptions{})
 	originalMgr := m.securityManager
 	require.NotNil(t, originalMgr)
 

@@ -7,6 +7,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -1340,4 +1341,51 @@ func TestCovHandleKeyExplainSearch(t *testing.T) {
 	result, _ := m.handleKey(keyMsg("enter"))
 	rm := result.(Model)
 	assert.False(t, rm.explainSearchActive)
+}
+
+// --- Cancellation of active mutations ---
+
+func TestCtrlCCancelsMutationsInsteadOfClosingTab(t *testing.T) {
+	cancelled := false
+	r := bgtasks.New(0)
+	r.StartCancellable(bgtasks.KindMutation, "Delete pods (5)", "ctx / ns", func() { cancelled = true })
+
+	m := baseModelNav()
+	m.bgtasks = r
+
+	result, cmd, handled := m.handleExplorerNavKey(specialKey(tea.KeyCtrlC))
+	assert.True(t, handled)
+	assert.Nil(t, cmd)
+	assert.True(t, cancelled, "Ctrl+C should cancel active mutations")
+	rm := result.(Model)
+	assert.True(t, rm.hasStatusMessage())
+}
+
+func TestEscCancelsMutationsInsteadOfNavigatingBack(t *testing.T) {
+	cancelled := false
+	r := bgtasks.New(0)
+	r.StartCancellable(bgtasks.KindMutation, "Scale deploys (3)", "ctx / ns", func() { cancelled = true })
+
+	m := baseModelNav()
+	m.bgtasks = r
+
+	result, cmd, handled := m.handleExplorerNavKey(specialKey(tea.KeyEsc))
+	assert.True(t, handled)
+	assert.Nil(t, cmd)
+	assert.True(t, cancelled, "Esc should cancel active mutations")
+	rm := result.(Model)
+	assert.True(t, rm.hasStatusMessage())
+}
+
+func TestCtrlCClosesTabWhenNoMutationsActive(t *testing.T) {
+	r := bgtasks.New(0)
+	r.Start(bgtasks.KindResourceList, "List Pods", "ctx / ns") // non-mutation
+
+	m := baseModelNav()
+	m.bgtasks = r
+	m.tabs = []TabState{{}, {}} // 2 tabs so close-tab doesn't quit
+
+	_, _, handled := m.handleExplorerNavKey(specialKey(tea.KeyCtrlC))
+	assert.True(t, handled)
+	// Should fall through to normal close-tab behavior (not cancelled)
 }

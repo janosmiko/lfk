@@ -62,6 +62,40 @@ func TestGetContexts(t *testing.T) {
 	assert.Equal(t, "current", items[0].Status)
 }
 
+// --- ContextExists ---
+
+func TestContextExists(t *testing.T) {
+	tests := []struct {
+		name        string
+		contextName string
+		want        bool
+	}{
+		{
+			name:        "known context returns true",
+			contextName: "test-context",
+			want:        true,
+		},
+		{
+			name:        "unknown context returns false",
+			contextName: "nonexistent-context",
+			want:        false,
+		},
+		{
+			name:        "empty string returns false",
+			contextName: "",
+			want:        false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c := newTestClient(t)
+			got := c.ContextExists(tt.contextName)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // --- dynamicForContext ---
 
 func TestDynamicForContext_InvalidContext(t *testing.T) {

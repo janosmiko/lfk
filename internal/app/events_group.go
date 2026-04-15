@@ -61,6 +61,10 @@ func groupEvents(items []model.Item) []model.Item {
 			continue
 		}
 		clone := cloneEventItem(it)
+		// Seed GroupedRefs with the first item in the group so bulk
+		// operations can expand the grouped row back into individual
+		// delete calls covering every underlying Event object.
+		clone.GroupedRefs = []model.GroupedRef{{Name: it.Name, Namespace: it.Namespace}}
 		// Refresh the relative-time columns so the cloned row always
 		// reflects its CreatedAt/LastSeen fields, even if the source item
 		// arrived with stale strings.
@@ -90,6 +94,7 @@ func mergeEventInto(dst *model.Item, src model.Item) {
 	addEventCount(dst, readEventCount(src))
 	mergeFirstSeen(dst, src)
 	mergeLastSeen(dst, src)
+	dst.GroupedRefs = append(dst.GroupedRefs, model.GroupedRef{Name: src.Name, Namespace: src.Namespace})
 }
 
 // mergeFirstSeen pulls dst.CreatedAt backwards if src has an earlier

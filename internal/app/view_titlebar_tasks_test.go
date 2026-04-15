@@ -116,3 +116,118 @@ func TestTitleBarTasksIndicatorHiddenWhenRegistryEmpty(t *testing.T) {
 	assert.NotEqual(t, outEmpty, outActive,
 		"title bar must change appearance when tasks start")
 }
+
+// --- renderMutationProgress ---
+
+func TestRenderMutationProgressEmpty(t *testing.T) {
+	t.Parallel()
+	got := renderMutationProgress("\u280b", nil)
+	assert.Empty(t, got)
+}
+
+func TestRenderMutationProgressNoMutationTasks(t *testing.T) {
+	t.Parallel()
+	snap := []bgtasks.Task{
+		{ID: 1, Kind: bgtasks.KindResourceList, Name: "List Pods", Total: 5, Current: 3},
+	}
+	got := renderMutationProgress("\u280b", snap)
+	assert.Empty(t, got, "non-mutation tasks should not produce progress indicator")
+}
+
+func TestRenderMutationProgressNoTotal(t *testing.T) {
+	t.Parallel()
+	snap := []bgtasks.Task{
+		{ID: 1, Kind: bgtasks.KindMutation, Name: "Delete pods (5)", Total: 0, Current: 0},
+	}
+	got := renderMutationProgress("\u280b", snap)
+	assert.Empty(t, got, "mutation tasks with Total==0 should not produce progress indicator")
+}
+
+func TestRenderMutationProgressShowsProgress(t *testing.T) {
+	t.Parallel()
+	snap := []bgtasks.Task{
+		{ID: 1, Kind: bgtasks.KindMutation, Name: "Delete pods (10)", Total: 10, Current: 3},
+	}
+	got := renderMutationProgress("\u280b", snap)
+	stripped := stripANSI(got)
+	assert.Contains(t, stripped, "Deleting")
+	assert.Contains(t, stripped, "3/10")
+	assert.Contains(t, stripped, "\u280b")
+}
+
+func TestRenderMutationProgressScaling(t *testing.T) {
+	t.Parallel()
+	snap := []bgtasks.Task{
+		{ID: 1, Kind: bgtasks.KindMutation, Name: "Scale deployments (5)", Total: 5, Current: 2},
+	}
+	got := renderMutationProgress("\u280b", snap)
+	stripped := stripANSI(got)
+	assert.Contains(t, stripped, "Scaling")
+	assert.Contains(t, stripped, "2/5")
+}
+
+func TestRenderMutationProgressForceDelete(t *testing.T) {
+	t.Parallel()
+	snap := []bgtasks.Task{
+		{ID: 1, Kind: bgtasks.KindMutation, Name: "Force delete pods (3)", Total: 3, Current: 1},
+	}
+	got := renderMutationProgress("\u280b", snap)
+	stripped := stripANSI(got)
+	assert.Contains(t, stripped, "Force deleting")
+	assert.Contains(t, stripped, "1/3")
+}
+
+func TestRenderMutationProgressOnlyFirstShown(t *testing.T) {
+	t.Parallel()
+	snap := []bgtasks.Task{
+		{ID: 1, Kind: bgtasks.KindMutation, Name: "Delete pods (10)", Total: 10, Current: 5},
+		{ID: 2, Kind: bgtasks.KindMutation, Name: "Scale deploys (3)", Total: 3, Current: 1},
+	}
+	got := renderMutationProgress("\u280b", snap)
+	stripped := stripANSI(got)
+	assert.Contains(t, stripped, "5/10", "first mutation task's progress should be shown")
+	assert.NotContains(t, stripped, "1/3", "second mutation task should not appear")
+}
+
+// --- shortMutationLabel ---
+
+func TestShortMutationLabel(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		want string
+	}{
+		{"Delete pods (10)", "Deleting"},
+		{"Force delete pods (3)", "Force deleting"},
+		{"Scale deployments (5)", "Scaling"},
+		{"Restart daemonsets (2)", "Restarting"},
+		{"Patch labels (4)", "Patching"},
+		{"Unknown operation", "Unknown operation"},
+	}
+	for _, tt := range tests {
+		assert.Equal(t, tt.want, shortMutationLabel(tt.name), "shortMutationLabel(%q)", tt.name)
+	}
+}
+
+func TestTitleBarShowsMutationProgress(t *testing.T) {
+	t.Parallel()
+	r := bgtasks.New(0)
+	id := r.Start(bgtasks.KindMutation, "Delete pods (5)", "test-ctx / default")
+	r.UpdateProgress(id, 3, 5)
+
+	m := Model{
+		width:  120,
+		height: 40,
+		nav: model.NavigationState{
+			Context:      "test-ctx",
+			ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"},
+		},
+		bgtasks: r,
+	}
+	m.spinner = spinner.New()
+
+	out := m.renderTitleBar()
+	stripped := stripANSI(out)
+	assert.Contains(t, stripped, "3/5", "title bar must include mutation progress")
+	assert.Contains(t, stripped, "Deleting", "title bar must include mutation label")
+}

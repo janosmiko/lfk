@@ -13,6 +13,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -235,58 +236,95 @@ func (m Model) loadContainersForLogFilter() tea.Cmd {
 }
 
 func (m Model) bulkDeleteResources() tea.Cmd {
-	items := m.bulkItems
-	ctx := m.actionCtx.context
+	refs := expandGroupedItems(m.bulkItems)
+	actionCtx := m.actionCtx.context
 	rt := m.actionCtx.resourceType
 	client := m.client
 	ns := m.actionNamespace()
+	registry := m.bgtasks
+	total := len(refs)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	taskName := fmt.Sprintf("Delete %s (%d)", rt.Resource, total)
+	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
+		defer registry.Finish(id)
 		var succeeded, failed int
 		var errors []string
-		for _, item := range items {
-			itemNs := ns
-			if item.Namespace != "" {
-				itemNs = item.Namespace
+		for i, ref := range refs {
+			if ctx.Err() != nil {
+				break
 			}
-			logger.Info("Bulk deleting", "resource", rt.Resource, "name", item.Name, "namespace", itemNs)
-			err := client.DeleteResource(ctx, itemNs, rt, item.Name)
+			itemNs := ns
+			if ref.Namespace != "" {
+				itemNs = ref.Namespace
+			}
+			logger.Info("Bulk deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs)
+			err := client.DeleteResource(actionCtx, itemNs, rt, ref.Name)
 			if err != nil {
 				failed++
-				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
+				errors = append(errors, fmt.Sprintf("%s: %s", ref.Name, err.Error()))
 			} else {
 				succeeded++
 			}
+			registry.UpdateProgress(id, i+1, total)
 		}
 		return bulkActionResultMsg{succeeded: succeeded, failed: failed, errors: errors}
 	}
 }
 
+// expandGroupedItems flattens bulk items so that grouped rows (with
+// GroupedRefs) are expanded into one entry per underlying resource.
+// Non-grouped items pass through unchanged.
+func expandGroupedItems(items []model.Item) []model.GroupedRef {
+	refs := make([]model.GroupedRef, 0, len(items))
+	for _, item := range items {
+		if len(item.GroupedRefs) > 0 {
+			refs = append(refs, item.GroupedRefs...)
+		} else {
+			refs = append(refs, model.GroupedRef{Name: item.Name, Namespace: item.Namespace})
+		}
+	}
+	return refs
+}
+
 func (m Model) bulkForceDeleteResources() tea.Cmd {
-	items := m.bulkItems
-	ctx := m.actionCtx.context
+	refs := expandGroupedItems(m.bulkItems)
+	actionCtx := m.actionCtx.context
 	rt := m.actionCtx.resourceType
 	client := m.client
 	ns := m.actionNamespace()
+	registry := m.bgtasks
+	total := len(refs)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	taskName := fmt.Sprintf("Force delete %s (%d)", rt.Resource, total)
+	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
+		defer registry.Finish(id)
+
 		kubectlPath, err := exec.LookPath("kubectl")
 		if err != nil {
-			return bulkActionResultMsg{failed: len(items), errors: []string{"kubectl not found"}}
+			return bulkActionResultMsg{failed: total, errors: []string{"kubectl not found"}}
 		}
 
 		var succeeded, failed int
 		var errors []string
-		for _, item := range items {
-			itemNs := ns
-			if item.Namespace != "" {
-				itemNs = item.Namespace
+		for i, ref := range refs {
+			if ctx.Err() != nil {
+				break
 			}
-			logger.Info("Bulk force deleting", "resource", rt.Resource, "name", item.Name, "namespace", itemNs)
+			itemNs := ns
+			if ref.Namespace != "" {
+				itemNs = ref.Namespace
+			}
+			logger.Info("Bulk force deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs)
 
 			// Remove finalizers first.
 			patchArgs := []string{
-				"patch", rt.Resource, item.Name, "--context", ctx,
+				"patch", rt.Resource, ref.Name, "--context", actionCtx,
 				"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`,
 			}
 			if rt.Namespaced {
@@ -299,7 +337,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 
 			// Force delete.
 			deleteArgs := []string{
-				"delete", rt.Resource, item.Name, "--context", ctx,
+				"delete", rt.Resource, ref.Name, "--context", actionCtx,
 				"--grace-period=0", "--force",
 			}
 			if rt.Namespaced {
@@ -311,10 +349,11 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			if output, err := cmd.CombinedOutput(); err != nil {
 				logger.Error("kubectl bulk force delete failed", "cmd", cmd.String(), "error", err, "output", string(output))
 				failed++
-				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, strings.TrimSpace(string(output))))
+				errors = append(errors, fmt.Sprintf("%s: %s", ref.Name, strings.TrimSpace(string(output))))
 			} else {
 				succeeded++
 			}
+			registry.UpdateProgress(id, i+1, total)
 		}
 		return bulkActionResultMsg{succeeded: succeeded, failed: failed, errors: errors}
 	}
@@ -322,26 +361,39 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 
 func (m Model) bulkScaleResources(replicas int32) tea.Cmd {
 	items := m.bulkItems
-	ctx := m.actionCtx.context
+	actionCtx := m.actionCtx.context
+	kind := m.actionCtx.kind
+	rt := m.actionCtx.resourceType
 	client := m.client
 	ns := m.actionNamespace()
+	registry := m.bgtasks
+	total := len(items)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	taskName := fmt.Sprintf("Scale %s (%d)", rt.Resource, total)
+	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
+		defer registry.Finish(id)
 		var succeeded, failed int
 		var errors []string
-		for _, item := range items {
+		for i, item := range items {
+			if ctx.Err() != nil {
+				break
+			}
 			itemNs := ns
 			if item.Namespace != "" {
 				itemNs = item.Namespace
 			}
 			logger.Info("Bulk scaling", "name", item.Name, "replicas", replicas, "namespace", itemNs)
-			err := client.ScaleResource(ctx, itemNs, item.Name, m.actionCtx.kind, replicas)
+			err := client.ScaleResource(actionCtx, itemNs, item.Name, kind, replicas)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
 			} else {
 				succeeded++
 			}
+			registry.UpdateProgress(id, i+1, total)
 		}
 		return bulkActionResultMsg{succeeded: succeeded, failed: failed, errors: errors}
 	}
@@ -349,26 +401,39 @@ func (m Model) bulkScaleResources(replicas int32) tea.Cmd {
 
 func (m Model) bulkRestartResources() tea.Cmd {
 	items := m.bulkItems
-	ctx := m.actionCtx.context
+	actionCtx := m.actionCtx.context
+	kind := m.actionCtx.kind
+	rt := m.actionCtx.resourceType
 	client := m.client
 	ns := m.actionNamespace()
+	registry := m.bgtasks
+	total := len(items)
+
+	ctx, cancel := context.WithCancel(context.Background())
+	taskName := fmt.Sprintf("Restart %s (%d)", rt.Resource, total)
+	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
+		defer registry.Finish(id)
 		var succeeded, failed int
 		var errors []string
-		for _, item := range items {
+		for i, item := range items {
+			if ctx.Err() != nil {
+				break
+			}
 			itemNs := ns
 			if item.Namespace != "" {
 				itemNs = item.Namespace
 			}
 			logger.Info("Bulk restarting", "name", item.Name, "namespace", itemNs)
-			err := client.RestartResource(ctx, itemNs, item.Name, m.actionCtx.kind)
+			err := client.RestartResource(actionCtx, itemNs, item.Name, kind)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
 			} else {
 				succeeded++
 			}
+			registry.UpdateProgress(id, i+1, total)
 		}
 		return bulkActionResultMsg{succeeded: succeeded, failed: failed, errors: errors}
 	}
@@ -376,7 +441,7 @@ func (m Model) bulkRestartResources() tea.Cmd {
 
 func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation bool) tea.Cmd {
 	items := m.bulkItems
-	ctx := m.actionCtx.context
+	actionCtx := m.actionCtx.context
 	rt := m.actionCtx.resourceType
 	gvr := schema.GroupVersionResource{
 		Group:    rt.APIGroup,
@@ -385,10 +450,25 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 	}
 	client := m.client
 	ns := m.namespace
+	registry := m.bgtasks
+	total := len(items)
+
+	labelOrAnnotation := "labels"
+	if isAnnotation {
+		labelOrAnnotation = "annotations"
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	taskName := fmt.Sprintf("Patch %s (%d)", labelOrAnnotation, total)
+	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
-		var success, failed int
-		for _, item := range items {
+		defer registry.Finish(id)
+		var succeeded, failed int
+		for i, item := range items {
+			if ctx.Err() != nil {
+				break
+			}
 			var patch map[string]interface{}
 			if remove {
 				patch = map[string]interface{}{key: nil}
@@ -401,17 +481,18 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 			}
 			var err error
 			if isAnnotation {
-				err = client.PatchAnnotations(context.Background(), ctx, itemNs, item.Name, gvr, patch)
+				err = client.PatchAnnotations(ctx, actionCtx, itemNs, item.Name, gvr, patch)
 			} else {
-				err = client.PatchLabels(context.Background(), ctx, itemNs, item.Name, gvr, patch)
+				err = client.PatchLabels(ctx, actionCtx, itemNs, item.Name, gvr, patch)
 			}
 			if err != nil {
 				failed++
 			} else {
-				success++
+				succeeded++
 			}
+			registry.UpdateProgress(id, i+1, total)
 		}
-		return bulkActionResultMsg{succeeded: success, failed: failed}
+		return bulkActionResultMsg{succeeded: succeeded, failed: failed}
 	}
 }
 

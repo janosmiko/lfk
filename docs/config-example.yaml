@@ -28,6 +28,15 @@ colorscheme: tokyonight
 # The LFK_ICONS environment variable takes priority over this setting.
 icons: auto
 
+# ─── Mouse ────────────────────────────────────────────────────────────────────
+# Capture mouse input for click navigation, scroll, and tab switching.
+# Set to false to disable mouse capture, allowing native terminal text selection
+# (shift+click, drag-to-select). Useful for macOS Terminal.app where shift+click
+# does not work with mouse capture enabled.
+# Also available as --no-mouse CLI flag.
+# Default: true
+# mouse: true
+
 # ─── Log Path ──────────────────────────────────────────────────────────────────
 # Application log file location. Default: ~/.local/share/lfk/lfk.log
 log_path: /tmp/lfk.log

@@ -96,8 +96,13 @@ type DeploymentRevision struct {
 // 1. KUBECONFIG env var
 // 2. ~/.kube/config
 // 3. All files in ~/.kube/config.d/ (recursively)
-func NewClient() (*Client, error) {
-	kubeconfigPaths := buildKubeconfigPaths()
+func NewClient(kubeconfigOverride string) (*Client, error) {
+	var kubeconfigPaths []string
+	if kubeconfigOverride != "" {
+		kubeconfigPaths = []string{kubeconfigOverride}
+	} else {
+		kubeconfigPaths = buildKubeconfigPaths()
+	}
 
 	loadingRules := &clientcmd.ClientConfigLoadingRules{
 		Precedence: kubeconfigPaths,
@@ -210,6 +215,12 @@ func (c *Client) GetContexts() ([]model.Item, error) {
 // CurrentContext returns the current context name from the kubeconfig.
 func (c *Client) CurrentContext() string {
 	return c.rawConfig.CurrentContext
+}
+
+// ContextExists returns true if the named context is defined in the loaded kubeconfig.
+func (c *Client) ContextExists(name string) bool {
+	_, ok := c.rawConfig.Contexts[name]
+	return ok
 }
 
 // DefaultNamespace returns the namespace configured for the given context,

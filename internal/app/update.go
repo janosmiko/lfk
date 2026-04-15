@@ -474,8 +474,16 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 		return m
 	}
 	if msg.err != nil {
-		// API resource discovery failed (permissions, etc.) -- silently ignore.
+		// API resource discovery failed (permissions, etc.) -- fall back to
+		// seed resources so the user can still navigate.
 		logger.Info("API resource discovery failed", "context", msg.context, "error", msg.err.Error())
+		if m.nav.Context == msg.context && m.loading {
+			m.loading = false
+			m.middleItems = model.BuildSidebarItems(model.SeedResources())
+			m.itemCache[m.navKey()] = m.middleItems
+			m.restoreCursor()
+			m.syncExpandedGroup()
+		}
 		return m
 	}
 	// Prepend LFK pseudo-resources (helm releases, port forwards) so they
@@ -490,12 +498,10 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 		m.itemCache[rtCacheKey] = merged
 		if m.nav.Level == model.LevelResourceTypes {
 			// User is on resource types level: update the visible list.
-			// Preserve cursor identity across the refresh so a user who
-			// navigated to "Pods" in the seed doesn't end up on a random
-			// item after the full discovered set replaces the seed.
-			prevName, prevNs, prevExtra, prevKind := m.cursorItemKey()
+			m.loading = false
 			m.middleItems = merged
-			m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
+			m.restoreCursor()
+			m.syncExpandedGroup()
 		} else {
 			// User is deeper: update leftItems so back-navigation shows CRDs.
 			m.leftItems = merged
@@ -537,6 +543,16 @@ func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd
 
 func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {
 	m.previewLoading = false
+	// Filter by selected namespaces when multi-select is active.
+	if len(m.selectedNamespaces) > 1 {
+		filtered := make([]model.Item, 0, len(msg.items))
+		for _, item := range msg.items {
+			if item.Namespace == "" || m.selectedNamespaces[item.Namespace] {
+				filtered = append(filtered, item)
+			}
+		}
+		msg.items = filtered
+	}
 	m.rightItems = msg.items
 	// Filter events in children view to warnings-only when enabled.
 	if m.warningEventsOnly && len(m.rightItems) > 0 && m.rightItems[0].Kind == "Event" {
@@ -566,7 +582,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	if len(m.selectedNamespaces) > 1 {
 		filtered := make([]model.Item, 0, len(msg.items))
 		for _, item := range msg.items {
-			if m.selectedNamespaces[item.Namespace] {
+			if item.Namespace == "" || m.selectedNamespaces[item.Namespace] {
 				filtered = append(filtered, item)
 			}
 		}

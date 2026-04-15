@@ -319,6 +319,11 @@ var ActiveSchemeName = "tokyonight-storm"
 // ConfigTransparentBg controls whether bar/surface backgrounds are transparent.
 var ConfigTransparentBg bool
 
+// ConfigMouse controls whether mouse input is captured by the TUI.
+// Defaults to true. Set to false to disable mouse capture, allowing native
+// terminal text selection (shift+click, drag-to-select).
+var ConfigMouse = true
+
 type configFile struct {
 	// Colorscheme selects a built-in color scheme by name (e.g. "dracula", "nord").
 	// Custom theme overrides in the "theme" section are applied on top.
@@ -370,6 +375,10 @@ type configFile struct {
 	// own background shows through. Selection highlights remain opaque.
 	// Defaults to false.
 	TransparentBg *bool `json:"transparent_background" yaml:"transparent_background"`
+	// Mouse controls whether the TUI captures mouse input for click navigation
+	// and scroll. Defaults to true. Set to false to allow native terminal text
+	// selection (useful in Terminal.app where shift+click doesn't work).
+	Mouse *bool `json:"mouse" yaml:"mouse"`
 	// Clusters maps context names to per-cluster configuration overrides.
 	Clusters map[string]clusterConfig `json:"clusters" yaml:"clusters"`
 }
@@ -420,12 +429,12 @@ func DefaultAbbreviations() map[string]string {
 }
 
 // LoadConfig loads the config file (theme, keybindings, abbreviations, etc.) and applies them.
-func LoadConfig() {
+func LoadConfig(configOverride string) {
 	theme := DefaultTheme()
 	kb := DefaultKeybindings()
 	abbr := DefaultAbbreviations()
 
-	cfg, ok := loadConfigFile()
+	cfg, ok := loadConfigFile(configOverride)
 	if !ok {
 		ApplyTheme(theme)
 		ActiveKeybindings = kb
@@ -446,17 +455,24 @@ func LoadConfig() {
 }
 
 // loadConfigFile reads and parses the YAML config file.
-func loadConfigFile() (configFile, bool) {
-	configDir := os.Getenv("XDG_CONFIG_HOME")
-	if configDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return configFile{}, false
+// When configOverride is non-empty, it is used directly instead of the default
+// XDG-based path.
+func loadConfigFile(configOverride string) (configFile, bool) {
+	var configPath string
+	if configOverride != "" {
+		configPath = configOverride
+	} else {
+		configDir := os.Getenv("XDG_CONFIG_HOME")
+		if configDir == "" {
+			home, err := os.UserHomeDir()
+			if err != nil {
+				return configFile{}, false
+			}
+			configDir = filepath.Join(home, ".config")
 		}
-		configDir = filepath.Join(home, ".config")
+		configPath = filepath.Join(configDir, "lfk", "config.yaml")
 	}
 
-	configPath := filepath.Join(configDir, "lfk", "config.yaml")
 	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return configFile{}, false
@@ -541,6 +557,9 @@ func applyConfigOptions(cfg configFile) {
 	}
 	if cfg.TransparentBg != nil {
 		ConfigTransparentBg = *cfg.TransparentBg
+	}
+	if cfg.Mouse != nil {
+		ConfigMouse = *cfg.Mouse
 	}
 }
 

@@ -1,0 +1,112 @@
+# yaml-language-server: $schema=https://goreleaser.com/static/schema.json
+# GoReleaser v2 configuration for the "lfk" CLI tool.
+# Docs: https://goreleaser.com
+version: 2
+
+builds:
+  - id: lfk
+    binary: lfk
+    main: .
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w
+      - -X github.com/janosmiko/lfk/internal/version.Version={{.Version}}
+      - -X github.com/janosmiko/lfk/internal/version.GitCommit={{.ShortCommit}}
+      - -X github.com/janosmiko/lfk/internal/version.BuildDate={{.Date}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    format_overrides:
+      - goos: darwin
+        formats:
+          - zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+nfpms:
+  - id: lfk
+    package_name: lfk
+    vendor: janosmiko
+    homepage: "https://github.com/janosmiko/lfk"
+    maintainer: "janosmiko <janosmiko@users.noreply.github.com>"
+    description: "Lightning Fast Kubernetes navigator - keyboard-focused TUI for managing K8s clusters"
+    license: MIT
+    formats:
+      - deb
+      - rpm
+
+dockers:
+  - image_templates:
+      - "janosmiko/lfk:{{ .Tag }}-amd64"
+      - "janosmiko/lfk:latest-amd64"
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/amd64"
+    goarch: amd64
+  - image_templates:
+      - "janosmiko/lfk:{{ .Tag }}-arm64"
+      - "janosmiko/lfk:latest-arm64"
+    use: buildx
+    dockerfile: Dockerfile.goreleaser
+    build_flag_templates:
+      - "--platform=linux/arm64"
+    goarch: arm64
+
+docker_manifests:
+  - name_template: "janosmiko/lfk:{{ .Tag }}"
+    image_templates:
+      - "janosmiko/lfk:{{ .Tag }}-amd64"
+      - "janosmiko/lfk:{{ .Tag }}-arm64"
+  - name_template: "janosmiko/lfk:latest"
+    image_templates:
+      - "janosmiko/lfk:latest-amd64"
+      - "janosmiko/lfk:latest-arm64"
+
+brews:
+  - repository:
+      owner: janosmiko
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+    directory: Formula
+    name: lfk
+    homepage: "https://github.com/janosmiko/lfk"
+    description: "Lightning Fast Kubernetes navigator - keyboard-focused TUI for managing K8s clusters"
+    license: "MIT"
+    dependencies:
+      - name: kubectl
+        type: optional
+      - name: helm
+        type: optional
+    install: |
+      bin.install "lfk"
+    test: |
+      system "#{bin}/lfk", "--version"
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
+      - "^chore:"
+
+checksum:
+  name_template: "checksums.txt"
+
+release:
+  github:
+    owner: janosmiko
+    name: lfk

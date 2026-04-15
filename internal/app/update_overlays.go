@@ -11,6 +11,11 @@ import (
 )
 
 func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Toggle: pressing the same hotkey that opened an overlay closes it.
+	if m.isOverlayToggleKey(msg.String()) {
+		m.overlay = overlayNone
+		return m, nil
+	}
 	if mdl, cmd, ok := m.handleOverlayKeyPrimary(msg); ok {
 		return mdl, cmd
 	}
@@ -18,6 +23,30 @@ func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return mdl, cmd
 	}
 	return m, nil
+}
+
+// isOverlayToggleKey returns true when key matches the hotkey that
+// originally opened the current overlay. This lets users press the
+// same key to close an overlay instead of reaching for Esc.
+func (m Model) isOverlayToggleKey(key string) bool {
+	kb := ui.ActiveKeybindings
+	switch m.overlay {
+	case overlayBackgroundTasks:
+		return key == kb.TasksOverlay
+	case overlayNamespace:
+		return key == kb.NamespaceSelector
+	case overlayAction:
+		return key == kb.ActionMenu
+	case overlayColorscheme:
+		return key == kb.ThemeSelector
+	case overlayFilterPreset:
+		return key == kb.FilterPresets
+	case overlayColumnToggle:
+		return key == kb.ColumnToggle
+	case overlayQuotaDashboard:
+		return key == kb.QuotaDashboard
+	}
+	return false
 }
 
 // handleOverlayKeyPrimary dispatches overlay keys for core overlays
@@ -254,6 +283,11 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	maxCursor := max(visibleCount-1, 0)
 
 	key := msg.String()
+
+	// Toggle: pressing the error log hotkey again closes the overlay.
+	if key == ui.ActiveKeybindings.ErrorLog {
+		return m.handleErrorLogOverlayKeyEsc()
+	}
 
 	// In visual mode, Esc cancels visual mode instead of closing.
 	if key == "esc" && m.errorLogVisualMode != 0 {
@@ -695,7 +729,8 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Bulk delete.
 		if m.bulkMode && len(m.bulkItems) > 0 {
 			m.clearSelection()
-			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(m.bulkItems), nsArg, ctx))
+			expanded := expandGroupedItems(m.bulkItems)
+			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
 			return m, m.bulkDeleteResources()
 		}
 
@@ -757,7 +792,8 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			// Bulk force delete.
 			if m.bulkMode && len(m.bulkItems) > 0 && action == "Force Delete" {
 				m.clearSelection()
-				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 %s (%d items)%s --context %s", rt.Resource, len(m.bulkItems), nsArg, ctx))
+				expanded := expandGroupedItems(m.bulkItems)
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
 				return m, m.bulkForceDeleteResources()
 			}
 

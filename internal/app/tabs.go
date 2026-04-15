@@ -108,6 +108,14 @@ func (m *Model) sortMiddleItems() {
 	}
 	asc := m.sortAscending
 
+	// Events default to LastSeen ordering (most recent first) when the
+	// user hasn't explicitly chosen a different column. The override
+	// uses a sentinel that comparePrimaryColumn recognizes, without
+	// injecting "Last Seen" into the sortable-column cycle.
+	if colName == sortColDefault && m.nav.ResourceType.Kind == "Event" {
+		colName = sortColEventLastSeen
+	}
+
 	sort.SliceStable(m.middleItems, func(i, j int) bool {
 		a, b := m.middleItems[i], m.middleItems[j]
 
@@ -195,6 +203,8 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	case "Age":
 		return compareAgeCmp(a, b)
+	case sortColEventLastSeen:
+		return compareLastSeenCmp(a, b)
 	default:
 		return compareColumnValuesCmp(getColumnValue(a, colName), getColumnValue(b, colName), colName)
 	}
@@ -298,6 +308,30 @@ func compareAgeCmp(a, b model.Item) int {
 	}
 }
 
+// compareLastSeenCmp compares by the LastSeen timestamp (Events only).
+// Most recent observation sorts first in ascending mode, matching the
+// natural expectation of "what happened most recently" at the top.
+func compareLastSeenCmp(a, b model.Item) int {
+	aZero := a.LastSeen.IsZero()
+	bZero := b.LastSeen.IsZero()
+	switch {
+	case aZero && bZero:
+		return strings.Compare(a.Name, b.Name)
+	case aZero:
+		return 1
+	case bZero:
+		return -1
+	}
+	switch {
+	case a.LastSeen.After(b.LastSeen):
+		return -1
+	case a.LastSeen.Before(b.LastSeen):
+		return 1
+	default:
+		return 0
+	}
+}
+
 // compareColumnValuesCmp compares two column values with automatic detection
 // of resource quantities (10Gi, 500Mi, 100m), plain numbers, and strings.
 // Returns -1, 0, or +1 so sort.SliceStable callers can detect equality
@@ -365,12 +399,19 @@ func statusPriority(status string) int {
 
 // sortModeName returns a display name for the current sort column with direction indicator.
 func (m *Model) sortModeName() string {
-	if m.sortColumnName != "" {
+	col := m.sortColumnName
+	asc := m.sortAscending
+	// Mirror the Event override from sortMiddleItems so the display
+	// matches the actual sort order.
+	if col == sortColDefault && m.nav.ResourceType.Kind == "Event" {
+		col = "Last Seen"
+	}
+	if col != "" {
 		dir := "\u2191" // ↑
-		if !m.sortAscending {
+		if !asc {
 			dir = "\u2193" // ↓
 		}
-		return m.sortColumnName + " " + dir
+		return col + " " + dir
 	}
 	return "Name \u2191"
 }
