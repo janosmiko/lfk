@@ -9,6 +9,14 @@ import (
 	"github.com/janosmiko/lfk/internal/security"
 )
 
+// isFalcoSource returns true if the result source identifies a Falco-generated
+// PolicyReport (created by falcosidekick). These are handled by the dedicated
+// falco adapter.
+func isFalcoSource(source string) bool {
+	s := strings.ToLower(source)
+	return s == "falco" || s == "falcosidekick" || strings.HasPrefix(s, "falco")
+}
+
 // parseSeverity converts a Policy Reports API severity string to our scale.
 // The wgpolicyk8s.io spec uses: critical, high, medium, low, info.
 func parseSeverity(s string) security.Severity {
@@ -85,6 +93,14 @@ func parsePolicyReport(u *unstructured.Unstructured) []security.Finding {
 		return nil
 	}
 
+	// Skip entire reports created by falcosidekick (common label/annotation).
+	labels := u.GetLabels()
+	if isFalcoSource(labels["app.kubernetes.io/managed-by"]) ||
+		isFalcoSource(labels["created-by"]) ||
+		strings.Contains(strings.ToLower(u.GetName()), "falco") {
+		return nil
+	}
+
 	// Report-level scope: Kyverno sets this to identify the resource the
 	// entire report applies to. Used as fallback when per-result resources
 	// are not set.
@@ -99,6 +115,13 @@ func parsePolicyReport(u *unstructured.Unstructured) []security.Finding {
 
 		status, _ := m["result"].(string)
 		if !isFailingResult(status) {
+			continue
+		}
+
+		// Skip Falco-generated results — those are handled by the
+		// dedicated falco adapter to avoid duplicates.
+		source, _ := m["source"].(string)
+		if isFalcoSource(source) {
 			continue
 		}
 

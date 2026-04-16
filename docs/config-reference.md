@@ -183,6 +183,38 @@ Available heuristic checks: `privileged`, `host_namespaces`, `host_path`,
 | `falco` | enabled | Requires [Falco](https://falco.org/) DaemonSet installed with `json_output: true` (default in Helm chart). Reads alerts directly from Falco pod logs. Falls back to Kubernetes Events if falcosidekick has `policyreport` output enabled. Automatically disabled when Falco pods are not detected. |
 | `kube_bench` | disabled | Not yet implemented (placeholder). |
 
+### Ignoring findings
+
+Individual findings or entire finding groups can be ignored via the action menu (`x` key) when viewing security findings. Ignored findings are stored per cluster context in a state file:
+
+```
+~/.local/state/lfk/security_ignores.yaml
+```
+
+The file format:
+
+```yaml
+contexts:
+  my-cluster:
+    - source: "heuristic"
+      group_key: "privileged"
+      comment: "accepted risk for admin pods"
+      created_at: "2026-04-15T10:30:00Z"
+    - source: "trivy-operator"
+      group_key: "CVE-2024-1234"
+      resource: "default/Pod/web"
+      comment: "mitigated by network policy"
+      created_at: "2026-04-15T11:00:00Z"
+    - source: "falco"
+      group_key: "Terminal shell in container"
+      comment: "expected for debug pods"
+      created_at: "2026-04-15T12:00:00Z"
+```
+
+Each rule requires a `source` field (`heuristic`, `trivy-operator`, `policy-report`, `falco`) so ignores are scoped to their security source. When `resource` is empty, the rule ignores the entire finding group globally within that source. When set (format: `namespace/Kind/name`), it only ignores the finding for that specific resource.
+
+Use `Ctrl+I` to toggle visibility of ignored findings. When visible, ignored items show with an `[IGNORED]` tag.
+
 ## Clusters
 
 Per-cluster configuration overrides allow you to customize settings for individual kubeconfig contexts. Keys are context names.
@@ -252,6 +284,7 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `finalizer_search` | `ctrl+g` | Finalizer search and remove |
 | `terminal_toggle` | `ctrl+t` | Toggle terminal mode (pty/exec) |
 | `toggle_rare` | `H` | Toggle rarely used resource types in the sidebar |
+| `security_ignore_toggle` | `ctrl+i` | Toggle show/hide ignored security findings |
 
 ## Resource Columns
 

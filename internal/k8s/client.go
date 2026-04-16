@@ -37,6 +37,8 @@ type Client struct {
 	// import cycle (internal/k8s must not import internal/security/heuristic
 	// or trivyop, but can import internal/security for the interface).
 	securityManager *security.Manager
+	ignoreChecker   IgnoreChecker
+	showIgnored     bool
 }
 
 // SetSecurityManager injects the security manager. Must be called before
@@ -44,6 +46,17 @@ type Client struct {
 // nil to clear the reference.
 func (c *Client) SetSecurityManager(mgr *security.Manager) {
 	c.securityManager = mgr
+}
+
+// SetIgnoreChecker sets the ignore checker used to filter security findings.
+func (c *Client) SetIgnoreChecker(checker IgnoreChecker) {
+	c.ignoreChecker = checker
+}
+
+// SetShowIgnored sets whether ignored findings are shown (with a visual tag)
+// or hidden entirely.
+func (c *Client) SetShowIgnored(show bool) {
+	c.showIgnored = show
 }
 
 // RBACCheck represents a single permission check result.

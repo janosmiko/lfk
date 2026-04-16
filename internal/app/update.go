@@ -523,7 +523,16 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 
 func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.gen != m.requestGen {
-		return m, nil // stale response, discard
+		// Security resource loads are slow (FetchAll reads pod logs, CRDs).
+		// The gen may drift from cursor movement (invalidatePreviewForCursorChange)
+		// while the fetch is in flight. Accept the response if we're still
+		// on the same security resource type at LevelResources.
+		isSecurityMain := !msg.forPreview &&
+			m.nav.Level == model.LevelResources &&
+			strings.HasPrefix(m.nav.ResourceType.Kind, "__security_")
+		if !isSecurityMain {
+			return m, nil // stale response, discard
+		}
 	}
 	m.loading = false
 	if isContextCanceled(msg.err) {

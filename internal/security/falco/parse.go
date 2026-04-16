@@ -105,7 +105,10 @@ func formatFalcoOutput(entry falcoLogEntry) (summary, details string) {
 		}
 	}
 
-	// Build structured details from important fields.
+	// Build structured details from important fields. Falco uses
+	// dot-separated keys in output_fields (proc.exepath, proc.cmdline)
+	// but the text output uses underscores (proc_exepath, proc_cmdline).
+	// Try both variants for each field.
 	var b strings.Builder
 	kv := func(label, value string) {
 		if value == "" || value == "<NA>" {
@@ -116,22 +119,31 @@ func formatFalcoOutput(entry falcoLogEntry) (summary, details string) {
 		}
 		fmt.Fprintf(&b, "%s  %s\n", label, value)
 	}
-	kv("Process:", str("proc_exepath"))
-	kv("Command:", str("proc_cmdline"))
-	if cmd := str("proc_cmdline"); cmd == "" {
-		kv("Command:", str("command"))
+	// Helper: try multiple keys, return first non-empty.
+	any := func(keys ...string) string {
+		for _, k := range keys {
+			if v := str(k); v != "" && v != "<NA>" {
+				return v
+			}
+		}
+		return ""
 	}
-	kv("Parent:", str("parent"))
-	kv("User:", str("user"))
-	kv("Container:", str("container.name"))
-	kv("Image:", str("container.image.repository"))
-	kv("Image Tag:", str("container.image.tag"))
-	kv("Pod:", str("k8s.pod.name"))
-	kv("Namespace:", str("k8s.ns.name"))
-	kv("Event Type:", str("evt.type"))
-	if et := str("evt.type"); et == "" {
-		kv("Event Type:", str("evt_type"))
-	}
+	kv("Process:", any("proc.exepath", "proc_exepath", "proc.name", "process"))
+	kv("Command:", any("proc.cmdline", "proc_cmdline", "command"))
+	kv("Parent:", any("proc.pname", "parent", "proc_sname"))
+	kv("User:", any("user.name", "user"))
+	kv("User UID:", any("user.uid", "user_uid"))
+	kv("Container:", any("container.name", "container_name"))
+	kv("Image:", any("container.image.repository", "container_image_repository"))
+	kv("Image Tag:", any("container.image.tag", "container_image_tag"))
+	kv("Container ID:", any("container.id", "container_id"))
+	kv("Pod:", any("k8s.pod.name", "k8s_pod_name"))
+	kv("Namespace:", any("k8s.ns.name", "k8s_ns_name"))
+	kv("Deployment:", any("k8s.deployment.name"))
+	kv("Event Type:", any("evt.type", "evt_type"))
+	kv("File:", any("fd.name", "fd_name"))
+	kv("Directory:", any("proc.cwd", "proc_cwd"))
+	kv("Exe Flags:", any("evt.arg.flags", "exe_flags"))
 	kv("Time:", entry.Time)
 
 	details = b.String()

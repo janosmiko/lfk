@@ -330,6 +330,8 @@ func helpSections() []helpSection {
 				{"r", "Refresh findings (invalidates cache)"},
 				{"/", "Search findings"},
 				{"f", "Filter findings"},
+				{kb.SecurityIgnoreToggle, "Toggle show/hide ignored findings"},
+				{"x", "Action menu (ignore/un-ignore a finding)"},
 			},
 		},
 		{

@@ -282,6 +282,8 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	}
 	// Add context-specific hints for Events resource type.
 	hintEntries = m.appendEventsHintEntries(hintEntries)
+	// Add context-specific hints for Security findings views.
+	hintEntries = m.appendSecurityHintEntries(hintEntries)
 	return hintEntries
 }
 
@@ -314,6 +316,32 @@ func (m Model) appendEventsHintEntries(entries []ui.HintEntry) []ui.HintEntry {
 	}
 	// Insert before the trailing "quit" entry so the Events toggles sit next
 	// to the other contextual actions.
+	out := make([]ui.HintEntry, 0, len(entries)+len(extras))
+	out = append(out, entries[:len(entries)-1]...)
+	out = append(out, extras...)
+	out = append(out, entries[len(entries)-1])
+	return out
+}
+
+// appendSecurityHintEntries injects Security-view hints (ignore toggle,
+// action menu) just before the trailing "quit" entry. Returns the input
+// slice unchanged when the current view isn't a security findings list.
+func (m Model) appendSecurityHintEntries(entries []ui.HintEntry) []ui.HintEntry {
+	if !strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		return entries
+	}
+	kb := ui.ActiveKeybindings
+	toggleDesc := "show ignored"
+	if m.showSecurityIgnored {
+		toggleDesc = "hide ignored"
+	}
+	extras := []ui.HintEntry{
+		{Key: kb.SecurityIgnoreToggle, Desc: toggleDesc},
+		{Key: kb.ActionMenu, Desc: "ignore/actions"},
+	}
+	if len(entries) == 0 {
+		return extras
+	}
 	out := make([]ui.HintEntry, 0, len(entries)+len(extras))
 	out = append(out, entries[:len(entries)-1]...)
 	out = append(out, extras...)

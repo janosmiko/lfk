@@ -136,7 +136,7 @@ func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace
 	if err != nil {
 		return nil, fmt.Errorf("security fetch: %w", err)
 	}
-	groups := groupFindings(res.Findings, sourceName)
+	groups := groupFindings(res.Findings, sourceName, c.ignoreChecker, c.showIgnored)
 	items := make([]model.Item, 0, len(groups))
 	for _, g := range groups {
 		items = append(items, findingGroupToItem(g))

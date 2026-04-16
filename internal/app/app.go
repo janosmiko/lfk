@@ -653,6 +653,8 @@ type Model struct {
 	securityAvailabilityByName map[string]bool
 	securityFindingsBySource   map[string][]security.Finding
 	pendingSecurityFilter      string // set by "Security Findings" action, consumed on drill-in
+	securityIgnores            *SecurityIgnoreState
+	showSecurityIgnored        bool
 
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)
@@ -1004,6 +1006,9 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	// availability probe completes.
 	m.securityAvailabilityByName = make(map[string]bool)
 
+	// Load persisted security ignore rules from disk.
+	m.securityIgnores = loadSecurityIgnores()
+
 	// Initialize the security manager and register sources against the
 	// current context. Sources are re-registered on context switch via
 	// refreshSecuritySources so each cluster uses its own client handles.
@@ -1056,8 +1061,8 @@ func (m *Model) refreshSecuritySources() {
 	// FindingIndex from a prior context cannot linger. NewManager resets
 	// everything to zero state.
 	mgr := security.NewManager()
+	kctx := m.nav.Context
 	if m.client != nil {
-		kctx := m.nav.Context
 		if kctx == "" {
 			kctx = m.client.CurrentContext()
 		}
@@ -1090,6 +1095,8 @@ func (m *Model) refreshSecuritySources() {
 	// against the current cluster's sources.
 	if m.client != nil {
 		m.client.SetSecurityManager(mgr)
+		m.client.SetIgnoreChecker(&modelIgnoreChecker{state: m.securityIgnores, ctx: kctx})
+		m.client.SetShowIgnored(m.showSecurityIgnored)
 	}
 	// Publish to the hook state so SecuritySourcesFn reads the new data.
 	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)

@@ -391,6 +391,8 @@ Press `#` to jump to the Security category. Navigate through sources, finding gr
 | `h` | Navigate back to parent level |
 | `R` | Refresh (invalidates security cache, re-fetches from all enabled sources) |
 | `x` then `y` | From any resource: show security findings for that resource (source picker if multiple sources available) |
+| `x` | Action menu on security items: Ignore (Global), Ignore (This Resource), Un-ignore |
+| `Ctrl+I` | Toggle show/hide ignored findings |
 | `j` / `k` | Move cursor up/down |
 | `/` | Search findings |
 | `f` | Filter findings |

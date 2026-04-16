@@ -91,7 +91,7 @@ func TestGroupFindings(t *testing.T) {
 		},
 	}
 
-	groups := groupFindings(findings, "heuristic")
+	groups := groupFindings(findings, "heuristic", nil, false)
 
 	assert.Len(t, groups, 2)
 
@@ -128,7 +128,7 @@ func TestGroupFindingsHighestSeverityWins(t *testing.T) {
 		},
 	}
 
-	groups := groupFindings(findings, "heuristic")
+	groups := groupFindings(findings, "heuristic", nil, false)
 
 	assert.Len(t, groups, 1)
 	assert.Equal(t, security.SeverityCritical, groups[0].Severity)
@@ -156,7 +156,7 @@ func TestGroupFindingsFiltersSource(t *testing.T) {
 		},
 	}
 
-	groups := groupFindings(findings, "heuristic")
+	groups := groupFindings(findings, "heuristic", nil, false)
 
 	assert.Len(t, groups, 2)
 	for _, g := range groups {
@@ -267,7 +267,7 @@ func TestGroupFindingsUniqueResources(t *testing.T) {
 		},
 	}
 
-	groups := groupFindings(findings, "heuristic")
+	groups := groupFindings(findings, "heuristic", nil, false)
 
 	assert.Len(t, groups, 1)
 	assert.Equal(t, 1, groups[0].Count, "same pod with two containers should count as 1 unique resource")
@@ -300,7 +300,7 @@ func TestFindingGroupToItemResourcesColumnForFiltering(t *testing.T) {
 		},
 	}
 
-	groups := groupFindings(findings, "heuristic")
+	groups := groupFindings(findings, "heuristic", nil, false)
 	assert.Len(t, groups, 3, "3 distinct checks = 3 groups")
 
 	// Convert to items and verify ALL groups affecting "bad" have the

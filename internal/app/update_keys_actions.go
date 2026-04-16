@@ -185,6 +185,23 @@ func (m Model) handleExplorerDirectActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cm
 		ret, cmd := m.directActionRefresh()
 		return ret, cmd, true
 	}
+	// Toggle show/hide of ignored security findings.
+	if key == kb.SecurityIgnoreToggle {
+		m.showSecurityIgnored = !m.showSecurityIgnored
+		if m.client != nil {
+			m.client.SetShowIgnored(m.showSecurityIgnored)
+		}
+		if m.showSecurityIgnored {
+			m.setStatusMessage("Showing ignored findings", false)
+		} else {
+			m.setStatusMessage("Hiding ignored findings", false)
+		}
+		// Refresh if on a security view.
+		if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+			return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear()), true
+		}
+		return m, scheduleStatusClear(), true
+	}
 	// Security findings are virtual — other k8s resource actions don't apply.
 	if sel := m.selectedMiddleItem(); sel != nil && strings.HasPrefix(sel.Kind, "__security_") {
 		return m, nil, false

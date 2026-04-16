@@ -14,6 +14,15 @@ import (
 	"github.com/janosmiko/lfk/internal/security"
 )
 
+// IgnoreChecker decides whether a finding group or a specific resource
+// within a group should be hidden from the UI. Implemented by the app
+// layer using the persistent SecurityIgnoreState. A nil checker means
+// no filtering (all findings shown).
+type IgnoreChecker interface {
+	IsGroupIgnored(source, groupKey string) bool
+	IsResourceIgnored(source, groupKey, resourceKey string) bool
+}
+
 // findingGroup aggregates one or more findings that share the same
 // check/vulnerability key into a single navigable row.
 type findingGroup struct {
@@ -22,8 +31,9 @@ type findingGroup struct {
 	Severity     security.Severity // highest in group
 	Category     security.Category
 	Source       string
-	Count        int // number of unique affected resources
-	FindingCount int // total individual findings (may differ from Count due to per-container findings)
+	Count        int  // number of unique affected resources
+	FindingCount int  // total individual findings (may differ from Count due to per-container findings)
+	Ignored      bool // true when an IgnoreChecker matched this group
 	Summary      string
 	Details      string
 	References   []string
@@ -55,8 +65,10 @@ func findingGroupKey(f security.Finding) string {
 
 // groupFindings filters findings to those matching sourceName, groups
 // them by findingGroupKey, and returns sorted groups (severity desc,
-// then title asc).
-func groupFindings(findings []security.Finding, sourceName string) []findingGroup {
+// affected count desc, then title asc). When checker is non-nil,
+// globally-ignored groups are omitted unless showIgnored is true.
+// Resource-level ignores reduce the group's affected count.
+func groupFindings(findings []security.Finding, sourceName string, checker IgnoreChecker, showIgnored bool) []findingGroup {
 	type accumulator struct {
 		group    findingGroup
 		seenRefs map[string]struct{} // ResourceRef.Key() -> seen
@@ -71,6 +83,16 @@ func groupFindings(findings []security.Finding, sourceName string) []findingGrou
 		}
 
 		key := findingGroupKey(f)
+
+		// Apply ignore checks when a checker is provided.
+		if checker != nil && !showIgnored {
+			if checker.IsGroupIgnored(sourceName, key) {
+				continue
+			}
+			if checker.IsResourceIgnored(sourceName, key, f.Resource.Key()) {
+				continue
+			}
+		}
 
 		acc, exists := byKey[key]
 		if !exists {
@@ -122,6 +144,10 @@ func groupFindings(findings []security.Finding, sourceName string) []findingGrou
 	for _, key := range order {
 		g := byKey[key].group
 		g.Count = len(g.Resources)
+		// Tag groups as ignored in show-ignored mode.
+		if checker != nil && showIgnored && checker.IsGroupIgnored(sourceName, key) {
+			g.Ignored = true
+		}
 		groups = append(groups, g)
 	}
 
@@ -161,6 +187,12 @@ func findingGroupToItem(g findingGroup) model.Item {
 	if g.Title != "" && g.Title != g.Key {
 		item.Columns = append(item.Columns, model.KeyValue{
 			Key: "Title", Value: g.Title,
+		})
+	}
+
+	if g.Ignored {
+		item.Columns = append(item.Columns, model.KeyValue{
+			Key: "__ignored__", Value: "true",
 		})
 	}
 
@@ -249,6 +281,7 @@ func affectedResourceToItem(ref security.ResourceRef, groupKey string, findings 
 			{Key: "ResourceKind", Value: ref.Kind},
 			{Key: "Namespace", Value: ref.Namespace},
 			{Key: "FindingCount", Value: fmt.Sprintf("%d", count)},
+			{Key: "__resource_key__", Value: ref.Key()},
 		},
 	}
 	// Add finding descriptions for the details preview. Separate
