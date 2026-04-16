@@ -20,7 +20,17 @@ func (m Model) viewLogs() string {
 		statusMsg = m.statusMessage
 		statusIsErr = m.statusMessageErr
 	}
-	return ui.RenderLogViewer(m.logLines, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol)
+	// Surface the active severity floor (if any) so the title bar can
+	// render a distinct chip — users set via `>` / `<` often lose track
+	// of whether a floor is active unless it's called out separately.
+	severityFloor := ""
+	for _, r := range m.logRules {
+		if sev, ok := r.(SeverityRule); ok {
+			severityFloor = sev.Floor.String()
+			break
+		}
+	}
+	return ui.RenderLogViewer(m.logLines, m.logVisibleIndices, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, len(m.logRules), severityFloor)
 }
 
 func (m Model) viewDescribe() string {
@@ -289,20 +299,28 @@ func (m *Model) clampLogScroll() {
 		viewH = 1
 	}
 
+	// When filter is active, logScroll is a visible-coordinate — it indexes
+	// into logVisibleIndices, NOT logLines. The buffer walked for maxScroll
+	// must be the projected slice so logScroll can't exceed the visible set.
+	filterActive := m.logFilterChain != nil && m.logFilterChain.Active()
+	bufLen := len(m.logLines)
+	if filterActive {
+		bufLen = len(m.logVisibleIndices)
+	}
+
 	var maxScroll int
 	if m.logWrap {
 		// When wrapping, each source line may produce multiple visual lines.
-		// Walk backward from the end, accumulating visual lines until we
-		// exceed viewH. The first source line that pushes us over is the
-		// maximum scroll position.
+		// Walk backward from the end (of the projected buffer when filter is
+		// active), accumulating visual lines until we exceed viewH.
 		contentWidth := m.width - 4 // match logviewer.go contentWidth calculation
 		if contentWidth < 10 {
 			contentWidth = 10
 		}
 		// Account for cursor gutter (1) and line number gutter width.
 		lineNumWidth := 0
-		if m.logLineNumbers && len(m.logLines) > 0 {
-			lineNumWidth = len(fmt.Sprintf("%d", len(m.logLines))) + 1
+		if m.logLineNumbers && bufLen > 0 {
+			lineNumWidth = len(fmt.Sprintf("%d", bufLen)) + 1
 		}
 		availWidth := contentWidth - 1 - lineNumWidth // -1 for cursor gutter
 		if availWidth < 10 {
@@ -310,16 +328,17 @@ func (m *Model) clampLogScroll() {
 		}
 
 		visualLines := 0
-		maxScroll = len(m.logLines) // default: can scroll to end
-		for i := len(m.logLines) - 1; i >= 0; i-- {
-			visualLines += wrappedLineCount(m.logLines[i], availWidth)
+		maxScroll = bufLen // default: can scroll to end
+		for i := bufLen - 1; i >= 0; i-- {
+			line := m.lineAtBufferIndex(i, filterActive)
+			visualLines += wrappedLineCount(line, availWidth)
 			if visualLines >= viewH {
 				maxScroll = i
 				break
 			}
 		}
 	} else {
-		maxScroll = len(m.logLines) - viewH
+		maxScroll = bufLen - viewH
 	}
 	if maxScroll < 0 {
 		maxScroll = 0
@@ -332,14 +351,36 @@ func (m *Model) clampLogScroll() {
 	}
 }
 
+// lineAtBufferIndex returns the text of the line at position i in the
+// active buffer (projected through logVisibleIndices when filter is active,
+// raw logLines otherwise). Out-of-range returns "".
+func (m *Model) lineAtBufferIndex(i int, filterActive bool) string {
+	if filterActive {
+		if i < 0 || i >= len(m.logVisibleIndices) {
+			return ""
+		}
+		src := m.logVisibleIndices[i]
+		if src < 0 || src >= len(m.logLines) {
+			return ""
+		}
+		return m.logLines[src]
+	}
+	if i < 0 || i >= len(m.logLines) {
+		return ""
+	}
+	return m.logLines[i]
+}
+
 // ensureLogCursorVisible adjusts logScroll so the cursor is within the visible
 // content area with scrolloff margin.
 func (m *Model) ensureLogCursorVisible() {
 	if m.logCursor < 0 {
 		return
 	}
-	if len(m.logLines) > 0 && m.logCursor >= len(m.logLines) {
-		m.logCursor = len(m.logLines) - 1
+	// Clamp cursor against the visible buffer when filter is active
+	// (logCursor is a visible-coordinate in that case).
+	if max := m.logCursorMax(); max >= 0 && m.logCursor > max {
+		m.logCursor = max
 	}
 	viewH := m.logContentHeight()
 	if viewH < 1 {

@@ -270,6 +270,10 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 	// Initialize log viewer state.
 	m.mode = modeLogs
 	m.logLines = nil
+	m.logVisibleIndices = nil
+	m.logRules = nil
+	m.logIncludeMode = IncludeAny
+	m.logFilterChain = NewFilterChain(nil, IncludeAny, m.logSeverityDetector)
 	m.logScroll = 0
 	m.logFollow = true
 	m.logWrap = false

@@ -20,6 +20,17 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLogVisualKey(msg)
 	}
 
+	// Handle pending bracket (]e/[e/]w/[w jump-to-severity) before movement
+	// keys so 'e' and 'w' get routed to jumpToSeverity, not word-movement.
+	if m.logPendingBracket != 0 {
+		return m.handleLogPendingBracketKey(msg), nil
+	}
+
+	// Prime pending bracket on '[' or ']'.
+	if ret, ok := m.handleLogBracketPrimeKey(msg); ok {
+		return ret, nil
+	}
+
 	// Try movement keys.
 	if ret, cmd, ok := m.handleLogMovementKey(msg); ok {
 		return ret, cmd
@@ -30,6 +41,43 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	m.logLineInput = ""
 	return m, nil
+}
+
+// handleLogBracketPrimeKey arms the pending bracket state on '[' or ']'.
+// Returns true when consumed.
+func (m Model) handleLogBracketPrimeKey(msg tea.KeyMsg) (Model, bool) {
+	switch msg.String() {
+	case "]":
+		m.logPendingBracket = ']'
+		return m, true
+	case "[":
+		m.logPendingBracket = '['
+		return m, true
+	}
+	return m, false
+}
+
+// handleLogPendingBracketKey resolves the pending bracket state. If the next
+// key is 'e' or 'w', it jumps to the next/prev visible line of the matching
+// severity; any other key clears the pending state and is consumed so the
+// caller does not double-process it.
+func (m Model) handleLogPendingBracketKey(msg tea.KeyMsg) Model {
+	dir := +1
+	if m.logPendingBracket == '[' {
+		dir = -1
+	}
+	switch msg.String() {
+	case "e":
+		m.logPendingBracket = 0
+		return m.jumpToSeverity(dir, SeverityError)
+	case "w":
+		m.logPendingBracket = 0
+		return m.jumpToSeverity(dir, SeverityWarn)
+	}
+	// Any other key cancels the pending bracket; swallow it so that
+	// neither the bracket nor the follow-up key triggers unrelated actions.
+	m.logPendingBracket = 0
+	return m
 }
 
 // handleLogMovementKey handles cursor/scroll movement keys in the log viewer.
@@ -120,8 +168,17 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "f":
 		ret := m.handleLogKeyF()
 		return ret, nil, true
-	case "tab", "z", ">":
+	case "F":
+		ret := m.handleLogKeyShiftF()
+		return ret, nil, true
+	case "tab", "z":
 		ret := m.handleLogKeyTab()
+		return ret, nil, true
+	case ">":
+		ret := m.handleLogKeyCycleSeverityUp()
+		return ret, nil, true
+	case "<":
+		ret := m.handleLogKeyCycleSeverityDown()
 		return ret, nil, true
 	case "/":
 		ret := m.handleLogKeySlash()
@@ -441,7 +498,7 @@ func (m Model) handleLogKeyQ() Model {
 func (m Model) handleLogKeyJ() Model {
 	m.logFollow = false
 	m.logLineInput = ""
-	if m.logCursor < len(m.logLines)-1 {
+	if m.logCursor < m.logCursorMax() {
 		m.logCursor++
 	}
 	m.ensureLogCursorVisible()
@@ -463,8 +520,8 @@ func (m Model) handleLogKeyCtrlD() Model {
 	m.logFollow = false
 	m.logLineInput = ""
 	m.logCursor += m.logContentHeight() / 2
-	if m.logCursor >= len(m.logLines) {
-		m.logCursor = len(m.logLines) - 1
+	if m.logCursor >= m.logVisibleCount() {
+		m.logCursor = m.logCursorMax()
 	}
 	m.ensureLogCursorVisible()
 	return m
@@ -486,8 +543,8 @@ func (m Model) handleLogKeyCtrlF() Model {
 	m.logFollow = false
 	m.logLineInput = ""
 	m.logCursor += m.logContentHeight()
-	if m.logCursor >= len(m.logLines) {
-		m.logCursor = len(m.logLines) - 1
+	if m.logCursor >= m.logVisibleCount() {
+		m.logCursor = m.logCursorMax()
 	}
 	m.ensureLogCursorVisible()
 	return m
@@ -512,10 +569,10 @@ func (m Model) handleLogKeyG() Model {
 		if lineNum > 0 {
 			lineNum-- // 0-indexed
 		}
-		m.logCursor = min(lineNum, len(m.logLines)-1)
+		m.logCursor = min(lineNum, m.logCursorMax())
 		m.logFollow = false
 	} else {
-		m.logCursor = len(m.logLines) - 1
+		m.logCursor = m.logCursorMax()
 		m.logFollow = true
 	}
 	m.ensureLogCursorVisible()
@@ -552,8 +609,9 @@ func (m Model) handleLogKeyL() Model {
 
 func (m Model) handleLogKeyDollar() Model {
 	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
+	line, ok := m.logCursorLine()
+	if ok {
+		lineLen := len([]rune(line))
 		if lineLen > 0 {
 			m.logVisualCurCol = lineLen - 1
 		}
@@ -563,41 +621,47 @@ func (m Model) handleLogKeyDollar() Model {
 
 func (m Model) handleLogKeyE() Model {
 	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
-		newCol := wordEnd(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
-			m.logCursor++
-			newCol = wordEnd(m.logLines[m.logCursor], 0)
-			nextLineLen := len([]rune(m.logLines[m.logCursor]))
-			if newCol >= nextLineLen {
-				newCol = max(nextLineLen-1, 0)
-			}
-			m.logVisualCurCol = newCol
-			m.clampLogScroll()
-		} else {
-			m.logVisualCurCol = newCol
+	line, ok := m.logCursorLine()
+	if !ok {
+		return m
+	}
+	lineLen := len([]rune(line))
+	newCol := wordEnd(line, m.logVisualCurCol)
+	if newCol >= lineLen && m.logCursor < m.logCursorMax() {
+		m.logCursor++
+		nextLine, _ := m.logCursorLine()
+		newCol = wordEnd(nextLine, 0)
+		nextLineLen := len([]rune(nextLine))
+		if newCol >= nextLineLen {
+			newCol = max(nextLineLen-1, 0)
 		}
+		m.logVisualCurCol = newCol
+		m.clampLogScroll()
+	} else {
+		m.logVisualCurCol = newCol
 	}
 	return m
 }
 
 func (m Model) handleLogKeyB() Model {
 	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		newCol := prevWordStart(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol < 0 && m.logCursor > 0 {
-			m.logCursor--
-			lineLen := len([]rune(m.logLines[m.logCursor]))
-			newCol = prevWordStart(m.logLines[m.logCursor], lineLen)
-			if newCol < 0 {
-				newCol = 0
-			}
-			m.logVisualCurCol = newCol
-			m.clampLogScroll()
-		} else {
-			m.logVisualCurCol = max(newCol, 0)
+	line, ok := m.logCursorLine()
+	if !ok {
+		return m
+	}
+	newCol := prevWordStart(line, m.logVisualCurCol)
+	if newCol < 0 && m.logCursor > 0 {
+		m.logCursor--
+		prevLine, _ := m.logCursorLine()
+		lineLen := len([]rune(prevLine))
+		newCol = prevWordStart(prevLine, lineLen)
+		if newCol < 0 {
+			newCol = 0
 		}
+		m.logVisualCurCol = newCol
+		m.clampLogScroll()
+	} else {
+		m.logVisualCurCol = max(newCol, 0)
 	}
 	return m
 }
@@ -640,9 +704,25 @@ func (m Model) handleLogKeyCtrlV() Model {
 
 func (m Model) handleLogKeyF() Model {
 	m.logLineInput = ""
+	m.overlay = overlayLogFilter
+	m.logFilterModalOpen = true
+	// Open in list (nav) mode so the user can see existing rules and
+	// navigate with j/k. Press `a` to add a new rule.
+	m.logFilterFocusInput = false
+	m.logFilterEditingIdx = -1
+	m.logFilterInput.Set("")
+	// Position the cursor on the first user-editable row so we never
+	// land on the read-only severity slot when opening.
+	m.logFilterListCursor = firstEditableRuleIdx(m.logRules)
+	m.clampFilterCursor()
+	return m
+}
+
+func (m Model) handleLogKeyShiftF() Model {
+	m.logLineInput = ""
 	m.logFollow = !m.logFollow
 	if m.logFollow {
-		m.logCursor = len(m.logLines) - 1
+		m.logCursor = m.logCursorMax()
 		m.logScroll = m.logMaxScroll()
 	}
 	return m
@@ -655,93 +735,192 @@ func (m Model) handleLogKeyTab() Model {
 	return m
 }
 
+// handleLogKeyCycleSeverityUp cycles the severity floor forward:
+//
+//	off → DEBUG → INFO → WARN → ERROR → off
+//
+// Updates the single SeverityRule in m.logRules (adds or removes it), then
+// rebuilds the filter chain and visible-indices projection.
+func (m Model) handleLogKeyCycleSeverityUp() Model {
+	m.logLineInput = ""
+	return m.setSeverityFloor(nextSeverityFloor(m.currentSeverityFloor(), +1))
+}
+
+// handleLogKeyCycleSeverityDown cycles backward:
+//
+//	off → ERROR → WARN → INFO → DEBUG → off
+func (m Model) handleLogKeyCycleSeverityDown() Model {
+	m.logLineInput = ""
+	return m.setSeverityFloor(nextSeverityFloor(m.currentSeverityFloor(), -1))
+}
+
+// currentSeverityFloor returns the floor of the existing SeverityRule in
+// m.logRules, or SeverityUnknown (0) when none is active.
+func (m *Model) currentSeverityFloor() Severity {
+	for _, r := range m.logRules {
+		if sev, ok := r.(SeverityRule); ok {
+			return sev.Floor
+		}
+	}
+	return SeverityUnknown
+}
+
+// nextSeverityFloor returns the next floor in the cycle when step is +1
+// (forward, more restrictive) or -1 (backward, less restrictive).
+//
+// The cycle is:
+//
+//	off (Unknown) → DEBUG → INFO → WARN → ERROR → off
+//
+// Invalid step values are treated as +1.
+func nextSeverityFloor(cur Severity, step int) Severity {
+	order := []Severity{SeverityUnknown, SeverityDebug, SeverityInfo, SeverityWarn, SeverityError}
+	idx := 0
+	for i, s := range order {
+		if s == cur {
+			idx = i
+			break
+		}
+	}
+	if step < 0 {
+		idx = (idx - 1 + len(order)) % len(order)
+	} else {
+		idx = (idx + 1) % len(order)
+	}
+	return order[idx]
+}
+
+// setSeverityFloor replaces any existing SeverityRule in m.logRules with
+// a new one at floor, or removes the rule when floor is SeverityUnknown.
+// Rebuilds the filter chain and visible indices, clamps cursor/scroll,
+// and shows a brief status confirming the change.
+func (m Model) setSeverityFloor(floor Severity) Model {
+	// Build new rules slice (defensive copy).
+	newRules := make([]Rule, 0, len(m.logRules)+1)
+	for _, r := range m.logRules {
+		if _, ok := r.(SeverityRule); ok {
+			continue // drop existing severity rule
+		}
+		newRules = append(newRules, r)
+	}
+	if floor != SeverityUnknown {
+		newRules = append(newRules, SeverityRule{Floor: floor})
+	}
+	m.logRules = pinSeverityFirst(newRules)
+	// If the cursor was on the just-added / just-removed severity slot,
+	// push it to the first editable rule so we don't hover on the
+	// read-only severity.
+	m.clampFilterCursor()
+	m.logFilterChain = NewFilterChain(m.logRules, m.logIncludeMode, m.logSeverityDetector)
+	m.rebuildLogVisibleIndices()
+
+	if floor == SeverityUnknown {
+		m.setStatusMessage("Severity filter cleared", false)
+	} else {
+		m.setStatusMessage("Severity ≥ "+floor.String(), false)
+	}
+	return m
+}
+
 func (m Model) handleLogKeyW() Model {
 	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
-		newCol := nextWordStart(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
-			m.logCursor++
-			newCol = nextWordStart(m.logLines[m.logCursor], 0)
-			nextLineLen := len([]rune(m.logLines[m.logCursor]))
-			if newCol >= nextLineLen {
-				newCol = max(nextLineLen-1, 0)
-			}
-			m.logVisualCurCol = newCol
-			m.clampLogScroll()
-		} else {
-			m.logVisualCurCol = newCol
+	line, ok := m.logCursorLine()
+	if !ok {
+		return m
+	}
+	lineLen := len([]rune(line))
+	newCol := nextWordStart(line, m.logVisualCurCol)
+	if newCol >= lineLen && m.logCursor < m.logCursorMax() {
+		m.logCursor++
+		nextLine, _ := m.logCursorLine()
+		newCol = nextWordStart(nextLine, 0)
+		nextLineLen := len([]rune(nextLine))
+		if newCol >= nextLineLen {
+			newCol = max(nextLineLen-1, 0)
 		}
+		m.logVisualCurCol = newCol
+		m.clampLogScroll()
+	} else {
+		m.logVisualCurCol = newCol
 	}
 	return m
 }
 
 func (m Model) handleLogKeyW2() Model {
 	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
-		newCol := nextWORDStart(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
-			m.logCursor++
-			newCol = nextWORDStart(m.logLines[m.logCursor], 0)
-			nextLineLen := len([]rune(m.logLines[m.logCursor]))
-			if newCol >= nextLineLen {
-				newCol = max(nextLineLen-1, 0)
-			}
-			m.logVisualCurCol = newCol
-			m.clampLogScroll()
-		} else {
-			m.logVisualCurCol = newCol
+	line, ok := m.logCursorLine()
+	if !ok {
+		return m
+	}
+	lineLen := len([]rune(line))
+	newCol := nextWORDStart(line, m.logVisualCurCol)
+	if newCol >= lineLen && m.logCursor < m.logCursorMax() {
+		m.logCursor++
+		nextLine, _ := m.logCursorLine()
+		newCol = nextWORDStart(nextLine, 0)
+		nextLineLen := len([]rune(nextLine))
+		if newCol >= nextLineLen {
+			newCol = max(nextLineLen-1, 0)
 		}
+		m.logVisualCurCol = newCol
+		m.clampLogScroll()
+	} else {
+		m.logVisualCurCol = newCol
 	}
 	return m
 }
 
 func (m Model) handleLogKeyE2() Model {
 	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
-		newCol := WORDEnd(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
-			m.logCursor++
-			newCol = WORDEnd(m.logLines[m.logCursor], 0)
-			nextLineLen := len([]rune(m.logLines[m.logCursor]))
-			if newCol >= nextLineLen {
-				newCol = max(nextLineLen-1, 0)
-			}
-			m.logVisualCurCol = newCol
-			m.clampLogScroll()
-		} else {
-			m.logVisualCurCol = newCol
+	line, ok := m.logCursorLine()
+	if !ok {
+		return m
+	}
+	lineLen := len([]rune(line))
+	newCol := WORDEnd(line, m.logVisualCurCol)
+	if newCol >= lineLen && m.logCursor < m.logCursorMax() {
+		m.logCursor++
+		nextLine, _ := m.logCursorLine()
+		newCol = WORDEnd(nextLine, 0)
+		nextLineLen := len([]rune(nextLine))
+		if newCol >= nextLineLen {
+			newCol = max(nextLineLen-1, 0)
 		}
+		m.logVisualCurCol = newCol
+		m.clampLogScroll()
+	} else {
+		m.logVisualCurCol = newCol
 	}
 	return m
 }
 
 func (m Model) handleLogKeyB2() Model {
 	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		newCol := prevWORDStart(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol < 0 && m.logCursor > 0 {
-			m.logCursor--
-			lineLen := len([]rune(m.logLines[m.logCursor]))
-			newCol = prevWORDStart(m.logLines[m.logCursor], lineLen)
-			if newCol < 0 {
-				newCol = 0
-			}
-			m.logVisualCurCol = newCol
-			m.clampLogScroll()
-		} else {
-			m.logVisualCurCol = max(newCol, 0)
+	line, ok := m.logCursorLine()
+	if !ok {
+		return m
+	}
+	newCol := prevWORDStart(line, m.logVisualCurCol)
+	if newCol < 0 && m.logCursor > 0 {
+		m.logCursor--
+		prevLine, _ := m.logCursorLine()
+		lineLen := len([]rune(prevLine))
+		newCol = prevWORDStart(prevLine, lineLen)
+		if newCol < 0 {
+			newCol = 0
 		}
+		m.logVisualCurCol = newCol
+		m.clampLogScroll()
+	} else {
+		m.logVisualCurCol = max(newCol, 0)
 	}
 	return m
 }
 
 func (m Model) handleLogKeyCaret() Model {
 	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		m.logVisualCurCol = firstNonWhitespace(m.logLines[m.logCursor])
+	if line, ok := m.logCursorLine(); ok {
+		m.logVisualCurCol = firstNonWhitespace(line)
 	}
 	return m
 }
@@ -816,6 +995,7 @@ func (m Model) handleLogKeyC() (tea.Model, tea.Cmd) {
 		m.logHistoryCancel = nil
 	}
 	m.logLines = nil
+	m.logVisibleIndices = nil
 	m.logScroll = 0
 	m.logCursor = 0
 	m.logVisualMode = false
@@ -1196,4 +1376,131 @@ func (m Model) handleLogVisualKeyCaret() (tea.Model, tea.Cmd) {
 		m.logVisualCurCol = firstNonWhitespace(m.logLines[m.logCursor])
 	}
 	return m, nil
+}
+
+// rebuildLogVisibleIndices recomputes m.logVisibleIndices from scratch
+// based on the current logFilterChain and logLines. Called after any
+// rule add/edit/delete/reorder/mode-toggle.
+//
+// When the chain is inactive (no rules), logVisibleIndices is cleared to
+// nil so the renderer can short-circuit the projection path and render
+// m.logLines directly. This also keeps the contract that
+// "len(logVisibleIndices) == 0 && chain inactive" means "show everything,"
+// which the streaming append path below relies on.
+func (m *Model) rebuildLogVisibleIndices() {
+	if m.logFilterChain == nil || !m.logFilterChain.Active() {
+		m.logVisibleIndices = nil
+	} else {
+		m.logVisibleIndices = BuildVisibleIndices(m.logLines, m.logFilterChain)
+	}
+	m.clampLogCursorAndScroll()
+}
+
+// clampLogCursorAndScroll keeps logCursor and logScroll within the visible
+// range. Called after any operation that may shrink the visible set (rule
+// add/delete/reorder/mode toggle, preset apply) so the viewport doesn't
+// end up past the last visible line — which would render a blank view.
+func (m *Model) clampLogCursorAndScroll() {
+	max := m.logCursorMax()
+	if m.logCursor > max {
+		m.logCursor = max
+	}
+	if m.logCursor < 0 {
+		m.logCursor = 0
+	}
+	if m.logScroll > max {
+		m.logScroll = max
+	}
+	if m.logScroll < 0 {
+		m.logScroll = 0
+	}
+}
+
+// maybeAppendVisibleIndex evaluates the line at index idx against the filter
+// chain and appends idx to logVisibleIndices if it passes.
+//
+// When the chain is nil or inactive, logVisibleIndices stays nil so the
+// renderer short-circuits to the raw buffer. Attempting to grow it here
+// would produce a partial mirror of m.logLines that the renderer then
+// uses for projection — causing the "X of Y" title and slice projection
+// to compete with the unfiltered source.
+func (m *Model) maybeAppendVisibleIndex(idx int) {
+	if idx < 0 || idx >= len(m.logLines) {
+		return
+	}
+	if m.logFilterChain == nil || !m.logFilterChain.Active() {
+		return
+	}
+	if m.logFilterChain.Keep(m.logLines[idx]) {
+		m.logVisibleIndices = append(m.logVisibleIndices, idx)
+	}
+}
+
+// logCursorMax returns the max valid cursor position (inclusive).
+// When filter is active, this is len(visibleIndices)-1; otherwise len(logLines)-1.
+func (m *Model) logCursorMax() int {
+	n := m.logVisibleCount()
+	if n == 0 {
+		return 0
+	}
+	return n - 1
+}
+
+// logVisibleCount returns the count of visible lines.
+func (m *Model) logVisibleCount() int {
+	if m.logFilterChain != nil && m.logFilterChain.Active() {
+		return len(m.logVisibleIndices)
+	}
+	return len(m.logLines)
+}
+
+// logSourceLineAt returns the source-buffer index for a given visible cursor position.
+func (m *Model) logSourceLineAt(visiblePos int) int {
+	if m.logFilterChain != nil && m.logFilterChain.Active() {
+		if visiblePos >= 0 && visiblePos < len(m.logVisibleIndices) {
+			return m.logVisibleIndices[visiblePos]
+		}
+		return -1
+	}
+	return visiblePos
+}
+
+// logCursorLine returns the source log line that the cursor currently
+// points at, honouring filter projection. Returns ("", false) when the
+// cursor position is out of range for the current visible set.
+//
+// Always use this (or logSourceLineAt) instead of `m.logLines[m.logCursor]`
+// in cursor-movement handlers: when the filter is active, m.logCursor is
+// a *visible* position, not a source index, and direct indexing reads the
+// wrong line.
+func (m *Model) logCursorLine() (string, bool) {
+	src := m.logSourceLineAt(m.logCursor)
+	if src < 0 || src >= len(m.logLines) {
+		return "", false
+	}
+	return m.logLines[src], true
+}
+
+// jumpToSeverity moves the cursor to the next (dir>0) or previous (dir<0)
+// visible line whose detected severity matches sev. Wraps around if no
+// match found in the requested direction.
+func (m Model) jumpToSeverity(dir int, sev Severity) Model {
+	n := m.logVisibleCount()
+	if n == 0 {
+		return m
+	}
+	start := m.logCursor
+	for offset := 1; offset <= n; offset++ {
+		probe := (start + dir*offset + n) % n
+		srcIdx := m.logSourceLineAt(probe)
+		if srcIdx < 0 || srcIdx >= len(m.logLines) {
+			continue
+		}
+		if m.logSeverityDetector.Detect(m.logLines[srcIdx]) == sev {
+			m.logCursor = probe
+			m.ensureLogCursorVisible()
+			return m
+		}
+	}
+	return m
 }

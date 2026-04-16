@@ -171,7 +171,7 @@ func TestPush4HandleLogKeyF(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
 	m.logFollow = false
-	result, _ := m.handleLogKey(keyMsg("f"))
+	result, _ := m.handleLogKey(keyMsg("F"))
 	rm := result.(Model)
 	assert.True(t, rm.logFollow)
 }
@@ -299,7 +299,7 @@ func TestCovLogKeyToggleFollow(t *testing.T) {
 	m.mode = modeLogs
 	m.logFollow = false
 	m.logLines = []string{"l1"}
-	result, _ := m.handleLogKey(keyMsg("f"))
+	result, _ := m.handleLogKey(keyMsg("F"))
 	rm := result.(Model)
 	assert.True(t, rm.logFollow)
 }

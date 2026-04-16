@@ -75,12 +75,12 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("basic rendering contains title and lines", func(t *testing.T) {
 		lines := []string{"log entry 1", "log entry 2", "log entry 3"}
 		result := RenderLogViewer(
-			lines, 0, 80, 20,
+			lines, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"my-pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "my-pod")
 		assert.Contains(t, result, "log entry 1")
@@ -89,84 +89,84 @@ func TestRenderLogViewer(t *testing.T) {
 
 	t.Run("follow indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			true, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "FOLLOW")
 	})
 
 	t.Run("wrap indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, true, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "WRAP")
 	})
 
 	t.Run("line numbers indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, true, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "LINE#")
 	})
 
 	t.Run("timestamps indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, false, true, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "TIMESTAMPS")
 	})
 
 	t.Run("previous indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, false, false, true, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "PREVIOUS")
 	})
 
 	t.Run("search query shown in title", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"error log"}, 0, 80, 20,
+			[]string{"error log"}, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"pod", "error", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "/error")
 	})
 
 	t.Run("search active shows input prompt", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"pod", "", "err",
 			true, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "err")
 		assert.Contains(t, result, "enter:apply")
@@ -174,60 +174,60 @@ func TestRenderLogViewer(t *testing.T) {
 
 	t.Run("status message shown in footer", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"Saved to file", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "Saved to file")
 	})
 
 	t.Run("visual mode indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'V', 0, 0,
+			0, true, 0, 'V', 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "VISUAL LINE")
 	})
 
 	t.Run("visual char mode indicator", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'v', 0, 0,
+			0, true, 0, 'v', 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "VISUAL")
 	})
 
 	t.Run("visual block mode indicator", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'B', 0, 0,
+			0, true, 0, 'B', 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "VISUAL BLOCK")
 	})
 
 	t.Run("empty lines list renders without panic", func(t *testing.T) {
 		result := RenderLogViewer(
-			nil, 0, 80, 20,
+			nil, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "pod")
 		assert.Contains(t, result, "0 lines")
@@ -235,12 +235,12 @@ func TestRenderLogViewer(t *testing.T) {
 
 	t.Run("loading history indicator shown", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 80, 20,
+			[]string{"log"}, nil, 0, 80, 20,
 			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, true,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "LOADING HISTORY")
 	})
@@ -248,24 +248,24 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("switch pod hint shown when wide enough", func(t *testing.T) {
 		// Use a very wide terminal so the hint bar does not truncate.
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 400, 20,
+			[]string{"log"}, nil, 0, 400, 20,
 			false, false, false, false, false, false,
 			"pod", "", "",
 			false, true, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "switch pod")
 	})
 
 	t.Run("containers hint shown when wide enough", func(t *testing.T) {
 		result := RenderLogViewer(
-			[]string{"log"}, 0, 400, 20,
+			[]string{"log"}, nil, 0, 400, 20,
 			false, false, false, false, false, false,
 			"pod", "", "",
 			false, false, true, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "containers")
 	})
@@ -273,12 +273,12 @@ func TestRenderLogViewer(t *testing.T) {
 	t.Run("wrap mode uses wrapped renderer", func(t *testing.T) {
 		longLine := strings.Repeat("x", 100)
 		result := RenderLogViewer(
-			[]string{longLine}, 0, 40, 20,
+			[]string{longLine}, nil, 0, 40, 20,
 			false, true, false, false, false, false,
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, "",
 		)
 		assert.Contains(t, result, "WRAP")
 		// The long line should be visible (at least part of it).

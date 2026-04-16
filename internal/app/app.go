@@ -78,6 +78,7 @@ const (
 	overlayColumnToggle
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
 	overlayBackgroundTasks
+	overlayLogFilter
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -458,6 +459,30 @@ type Model struct {
 	logSearchActive bool
 	logSearchInput  TextInput
 	logSearchQuery  string // applied search
+
+	// Filter pipeline (Phase 1 of log preview overhaul).
+	logRules          []Rule      //nolint:unused // wired in subsequent Phase C tasks
+	logIncludeMode    IncludeMode //nolint:unused // wired in subsequent Phase C tasks
+	logVisibleIndices []int       //nolint:unused // wired in subsequent Phase C tasks
+	// Filter modal UI fields — populated in Phase D/E.
+	logFilterModalOpen  bool      //nolint:unused // populated in Phase D/E
+	logFilterInput      TextInput //nolint:unused // populated in Phase D/E
+	logFilterListCursor int       //nolint:unused // populated in Phase D/E
+	logFilterFocusInput bool      //nolint:unused // populated in Phase D/E
+	logFilterEditingIdx int       //nolint:unused // -1 = adding new; >=0 = editing existing rule index
+	logSavePresetPrompt bool      //nolint:unused // populated in Phase D/E
+	logLoadPresetOpen   bool      //nolint:unused // populated in Phase D/E
+	logLoadPresetCursor int       //nolint:unused // populated in Phase D/E
+
+	// Severity detector — initialized once at startup; reused for all log views.
+	logSeverityDetector *severityDetector //nolint:unused // wired in subsequent Phase C tasks
+
+	// Filter chain — rebuilt whenever logRules or logIncludeMode changes.
+	logFilterChain *FilterChain //nolint:unused // wired in subsequent Phase C tasks
+
+	// Pending bracket for two-keystroke jump-to-severity sequences (]e/[e/]w/[w).
+	// Set to ']' or '[' on the first keystroke; cleared on the next key.
+	logPendingBracket rune
 
 	// Describe viewer state.
 	describeContent      string
@@ -956,6 +981,10 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	m.helpSearchInput = textinput.New()
 	m.helpSearchInput.Prompt = ""
 	m.helpSearchInput.CharLimit = 100
+
+	m.logSeverityDetector, _ = newSeverityDetector(nil) // TODO Phase I: pass extras from config
+	m.logFilterChain = NewFilterChain(nil, IncludeAny, m.logSeverityDetector)
+	m.logFilterEditingIdx = -1
 
 	return m
 }

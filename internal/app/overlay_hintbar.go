@@ -111,6 +111,30 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "enter", Desc: "select"},
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayLogFilter:
+		if m.logFilterFocusInput {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "enter", Desc: "add"},
+				{Key: "-prefix", Desc: "exclude"},
+				{Key: ">warn", Desc: "severity"},
+				{Key: "~foo", Desc: "fuzzy"},
+				{Key: "(a AND b)", Desc: "group"},
+				{Key: "esc", Desc: "back"},
+			})
+		}
+		return m.renderHints([]ui.HintEntry{
+			{Key: "a", Desc: "add"},
+			{Key: "j/k", Desc: "nav"},
+			{Key: "ctrl+d/u", Desc: "page"},
+			{Key: "J/K", Desc: "reorder"},
+			{Key: "e", Desc: "edit"},
+			{Key: "d", Desc: "delete"},
+			{Key: "m", Desc: "any/all"},
+			{Key: ">/<", Desc: "severity"},
+			{Key: "S", Desc: "save"},
+			{Key: "L", Desc: "load"},
+			{Key: "esc", Desc: "close"},
+		})
 	case overlayPodSelect, overlayLogPodSelect:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "/", Desc: "filter"},

@@ -190,14 +190,18 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `gg` / `G` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` | Full page down / up |
-| `f` | Toggle follow mode (auto-scroll to new logs) |
-| `Tab` / `z` / `>` | Toggle line wrapping |
+| `f` | Open filter modal |
+| `F` | Toggle follow / auto-scroll |
+| `>` / `<` | Cycle severity floor (off → DEBUG → INFO → WARN → ERROR → off) |
+| `Tab` / `z` | Toggle line wrapping |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
 | `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
 | `/` | Search in logs |
 | `n` / `N` | Next / previous search match |
+| `]e` / `[e` | Jump to next/prev ERROR-severity visible line |
+| `]w` / `[w` | Jump to next/prev WARN-severity visible line |
 | `123G` | Jump to specific line number |
 | `S` | Save loaded logs to file |
 | `Ctrl+S` | Save all logs to file (full kubectl logs) |
@@ -210,6 +214,22 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `q` / `Esc` | Close log viewer |
 
 > **Tail-first loading**: Logs load the last 1000 lines initially with follow mode enabled. Scrolling to the top automatically loads older log history. Configure with `log_tail_lines` in config.
+
+> **Filter modal rule syntax** (press `f` in the log viewer, then type a rule and `Enter`):
+>
+> | Input | Result |
+> |---|---|
+> | `foo` | Include substring (regex auto-detected when metacharacters are present) |
+> | `~foo` | Include fuzzy |
+> | `-foo` | Exclude substring |
+> | `-~foo` | Exclude fuzzy |
+> | `>error` \| `>warn` \| `>info` \| `>debug` | Severity floor |
+> | `\-foo` | Include literal `-foo` |
+> | `(foo OR bar)` | Group rule combining children with OR (IncludeAny) |
+> | `(foo AND bar)` | Group rule combining children with AND (IncludeAll) |
+> | `(foo AND (bar OR baz))` | Nested groups — mix operators across levels, not within one level |
+>
+> Group operators `AND`/`OR` are case-insensitive whole words. Mixing them at the same level (e.g. `(a OR b AND c)`) is rejected — use nested parentheses instead. Severity floors are not allowed inside a group; add them as a separate top-level rule.
 
 ## Exec Mode (embedded terminal)
 

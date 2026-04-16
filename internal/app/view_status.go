@@ -367,6 +367,10 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		return content, min(55, m.width-10), min(5+len(m.pfAvailablePorts)+4, m.height-6), true
 	case overlayContainerSelect:
 		return ui.RenderContainerSelectOverlay(m.overlayItems, m.overlayCursor), min(50, m.width-10), min(15, m.height-6), true
+	case overlayLogFilter:
+		w := min(120, m.width-6)
+		h := min(24, m.height-6)
+		return ui.RenderLogFilterOverlay(m.logFilterOverlayState(), w, h), w, h, true
 	case overlayPodSelect, overlayLogPodSelect:
 		content := ui.RenderPodSelectOverlay(m.filteredLogPodItems(), m.overlayCursor, m.logPodFilterText, m.logPodFilterActive)
 		return content, min(60, m.width-10), min(20, m.height-6), true

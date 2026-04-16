@@ -15,8 +15,30 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 	Bold(true)
 
 // RenderLogViewer renders the full-screen log viewer.
-func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol int) string {
-	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery)
+// ruleCount is the number of active filter rules; when greater than zero a
+// `[FILTER: N]` chip is shown in the title bar.
+func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor string) string {
+	// Record the total number of lines before any filter projection so the
+	// title bar can render "[X of Y lines]" when filtering is active.
+	totalLines := lines
+	// If visibleIndices is non-nil, project lines through it so the renderer
+	// shows only the visible subset.
+	if visibleIndices != nil {
+		projected := make([]string, len(visibleIndices))
+		for i, idx := range visibleIndices {
+			if idx >= 0 && idx < len(lines) {
+				projected[i] = lines[idx]
+			}
+		}
+		lines = projected
+	}
+	// When filtering is active, pass the visible count; otherwise pass the
+	// full count so the "[X of Y]" branch is skipped.
+	visibleCount := len(totalLines)
+	if visibleIndices != nil {
+		visibleCount = len(visibleIndices)
+	}
+	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor)
 	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
 
 	// Content area: subtract border top + bottom (2 lines).
@@ -119,7 +141,11 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 }
 
 // renderLogTitleBar builds the title bar with status indicators for the log viewer.
-func renderLogTitleBar(title string, lines []string, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string) string {
+// visibleCount indicates how many of the `lines` are currently visible after
+// filtering. When it is less than len(lines), the title renders `[X of Y lines]`
+// instead of `[Y lines]`. ruleCount is the number of active filter rules; when
+// greater than zero a `[FILTER: N]` chip is appended to the indicators.
+func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor string) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -152,12 +178,25 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 	if searchQuery != "" {
 		indicators = append(indicators, HelpKeyStyle.Render("[/"+searchQuery+"]"))
 	}
+	// Severity floor is surfaced as its own chip so the user can tell at a
+	// glance whether severity filtering is narrowing the view, independent
+	// of the total rule count.
+	if severityFloor != "" {
+		indicators = append(indicators, HelpKeyStyle.Render("[≥ "+severityFloor+"]"))
+	}
+	if ruleCount > 0 {
+		indicators = append(indicators, HelpKeyStyle.Render(fmt.Sprintf("[FILTER: %d]", ruleCount)))
+	}
 
 	titleText := " " + title + " "
 	if len(indicators) > 0 {
 		titleText += " " + strings.Join(indicators, " ")
 	}
-	titleText += BarDimStyle.Render(fmt.Sprintf(" [%d lines]", len(lines)))
+	if visibleCount > 0 && visibleCount < len(lines) {
+		titleText += BarDimStyle.Render(fmt.Sprintf(" [%d of %d lines]", visibleCount, len(lines)))
+	} else {
+		titleText += BarDimStyle.Render(fmt.Sprintf(" [%d lines]", len(lines)))
+	}
 
 	maxTitleWidth := max(width-2, 10)
 	if ansi.StringWidth(titleText) > maxTitleWidth {
@@ -194,8 +233,10 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "j/k", Desc: "move"},
 		{Key: "ctrl+d/u", Desc: "half page"},
 		{Key: "ctrl+f/b", Desc: "page"},
-		{Key: "f", Desc: "follow"},
-		{Key: "tab/z/>", Desc: "wrap"},
+		{Key: "f", Desc: "filter"},
+		{Key: "F", Desc: "follow"},
+		{Key: ">/<", Desc: "severity"},
+		{Key: "tab/z", Desc: "wrap"},
 		{Key: "#", Desc: "line#"},
 		{Key: "s", Desc: "timestamps"},
 		{Key: "p", Desc: "prefixes"},
@@ -203,6 +244,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "/", Desc: "search"},
 		{Key: "n/N", Desc: "next/prev"},
+		{Key: "]e/]w", Desc: "next err/warn"},
 		{Key: "123G", Desc: "goto"},
 		{Key: "S", Desc: "save"},
 		{Key: "ctrl+s", Desc: "save all"},

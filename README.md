@@ -96,7 +96,7 @@
 - **YAML preview** in the right column with syntax highlighting
 - **Full-screen YAML viewer** with scrollable output, search, section folding (`Tab`/`z`), and in-place editing
 - **Resource details** summary in split preview (toggle with `Shift+P`)
-- **Inline log viewer** with streaming, search, line numbers, word wrap, follow mode, timestamps toggle, previous container logs, container filter, tail-first loading, and line jump
+- **Inline log viewer** with streaming, search, **persistent filter** with severity floor, exclude rules, and **boolean group expressions** (`(foo AND bar)`, `(foo AND (bar OR baz))`), **quick severity cycle** (`>` / `<`), line numbers, word wrap, follow mode, timestamps toggle, previous container logs, container filter, tail-first loading, and line jump
 - **Inline describe view** with scrollable output
 - **Secret viewing/editing** with decode toggle (`Ctrl+S`) and dedicated editor (`e`)
 - **Embedded terminal** (PTY mode) for exec and shell with tab switching — PTY keeps running in background when switching tabs
