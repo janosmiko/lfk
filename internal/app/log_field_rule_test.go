@@ -286,3 +286,150 @@ func TestFieldOpSerialise(t *testing.T) {
 func TestRuleFieldKindString(t *testing.T) {
 	assert.Equal(t, "FLD", RuleField.String())
 }
+
+func TestParseFieldRule(t *testing.T) {
+	cases := []struct {
+		name     string
+		input    string
+		wantPath []string
+		wantArr  bool
+		wantOp   FieldOp
+		wantVal  string
+	}{
+		{"eq single field", ".level=error", []string{"level"}, false, FieldOpEq, "error"},
+		{"neq single field", ".level!=debug", []string{"level"}, false, FieldOpNeq, "debug"},
+		{"gt numeric", ".user_id>42", []string{"user_id"}, false, FieldOpGt, "42"},
+		{"gte numeric", ".user_id>=42", []string{"user_id"}, false, FieldOpGte, "42"},
+		{"lt numeric", ".user_id<42", []string{"user_id"}, false, FieldOpLt, "42"},
+		{"lte numeric", ".user_id<=42", []string{"user_id"}, false, FieldOpLte, "42"},
+		{"match regex", ".msg~^start", []string{"msg"}, false, FieldOpMatch, "^start"},
+		{"nested path", ".user.id=42", []string{"user", "id"}, false, FieldOpEq, "42"},
+		{"array-any eq", ".tags[]=api", []string{"tags"}, true, FieldOpEq, "api"},
+		{"array-any match", ".tags[]~foo", []string{"tags"}, true, FieldOpMatch, "foo"},
+		{"array-any neq", ".tags[]!=admin", []string{"tags"}, true, FieldOpNeq, "admin"},
+		{"array-any gt", ".ports[]>80", []string{"ports"}, true, FieldOpGt, "80"},
+		{"value with spaces", ".msg=hello world", []string{"msg"}, false, FieldOpEq, "hello world"},
+		{"whitespace around op", ".level = error", []string{"level"}, false, FieldOpEq, "error"},
+		{"deep nested", ".a.b.c.d=x", []string{"a", "b", "c", "d"}, false, FieldOpEq, "x"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			r, err := ParseRuleInput(c.input)
+			require.NoError(t, err, "input %q should parse", c.input)
+			fr, ok := r.(*FieldRule)
+			require.True(t, ok, "expected *FieldRule, got %T", r)
+			assert.Equal(t, c.wantPath, fr.Path)
+			assert.Equal(t, c.wantArr, fr.ArrayAny)
+			assert.Equal(t, c.wantOp, fr.Op)
+			assert.Equal(t, c.wantVal, fr.Value)
+		})
+	}
+}
+
+func TestParseFieldRuleRejects(t *testing.T) {
+	cases := []struct {
+		name   string
+		input  string
+		errSub string // substring expected in the error message
+	}{
+		{
+			name:   "negated via leading dash",
+			input:  "-.foo=bar",
+			errSub: "negate",
+		},
+		{
+			name:   "just dot",
+			input:  ".",
+			errSub: "operator",
+		},
+		{
+			name:   "dot with only value",
+			input:  ".=bar",
+			errSub: "missing a path",
+		},
+		{
+			name:   "no operator",
+			input:  ".foo",
+			errSub: "operator",
+		},
+		{
+			name:   "no value",
+			input:  ".foo=",
+			errSub: "missing a value",
+		},
+		{
+			name:   "double dot path",
+			input:  ".foo..bar=x",
+			errSub: "empty segment",
+		},
+		{
+			name:   "bad regex for match op",
+			input:  ".msg~[unclosed",
+			errSub: "invalid regex",
+		},
+		{
+			name:   "missing value after array-any",
+			input:  ".tags[]=",
+			errSub: "missing a value",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, err := ParseRuleInput(c.input)
+			require.Error(t, err, "input %q should fail", c.input)
+			assert.Contains(t, err.Error(), c.errSub, "error message should mention %q, got: %v", c.errSub, err)
+		})
+	}
+}
+
+func TestRuleToInputStringFieldRule(t *testing.T) {
+	// Round-trip a representative FieldRule and verify the rendered
+	// input parses back to an equivalent rule.
+	r, err := NewFieldRule([]string{"user", "id"}, false, FieldOpGte, "42")
+	require.NoError(t, err)
+	input := RuleToInputString(r)
+	assert.Equal(t, ".user.id>=42", input)
+
+	parsed, err := ParseRuleInput(input)
+	require.NoError(t, err)
+	pr, ok := parsed.(*FieldRule)
+	require.True(t, ok)
+	assert.Equal(t, r.Path, pr.Path)
+	assert.Equal(t, r.Op, pr.Op)
+	assert.Equal(t, r.Value, pr.Value)
+
+	// Array-any preservation.
+	r2, err := NewFieldRule([]string{"tags"}, true, FieldOpEq, "api")
+	require.NoError(t, err)
+	input2 := RuleToInputString(r2)
+	assert.Equal(t, ".tags[]=api", input2)
+	parsed2, err := ParseRuleInput(input2)
+	require.NoError(t, err)
+	pr2 := parsed2.(*FieldRule)
+	assert.True(t, pr2.ArrayAny)
+	assert.Equal(t, r2.Path, pr2.Path)
+}
+
+// TestParseFieldRuleInsideGroup verifies a single-word (whitespace-
+// free) field rule still parses correctly when placed inside a group.
+// The group tokenizer treats whitespace as a term delimiter so a rule
+// like '.level=error' is fine but '.level = error' (with spaces) is
+// not — that's an accepted limitation of the group syntax documented
+// alongside the group parser.
+func TestParseFieldRuleInsideGroup(t *testing.T) {
+	r, err := ParseRuleInput("(.level=error AND .user_id>42)")
+	require.NoError(t, err)
+	g, ok := r.(*GroupRule)
+	require.True(t, ok)
+	require.Len(t, g.Children, 2)
+	assert.Equal(t, IncludeAll, g.Mode)
+
+	fr0, ok := g.Children[0].(*FieldRule)
+	require.True(t, ok)
+	assert.Equal(t, []string{"level"}, fr0.Path)
+
+	fr1, ok := g.Children[1].(*FieldRule)
+	require.True(t, ok)
+	assert.Equal(t, []string{"user_id"}, fr1.Path)
+	assert.Equal(t, FieldOpGt, fr1.Op)
+}

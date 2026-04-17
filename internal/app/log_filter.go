@@ -424,6 +424,19 @@ func parseLeafRule(s string) (Rule, error) {
 		// Falls through to be treated as include pattern.
 	}
 
+	// Field rule. A leading '.' routes into the field-rule parser which
+	// understands `.path[=|!=|<|<=|>|>=|~] value` plus `[]` array-any.
+	// Negating a field rule via a leading '-' is not the intended syntax
+	// — field rules negate via `!=` internally — so reject that
+	// specifically with a clear message rather than silently turning it
+	// into a substring exclude.
+	if strings.HasPrefix(s, "-.") {
+		return nil, fmt.Errorf(`to negate a field rule, use "!=" inside the rule (e.g. .level!=debug), not a leading "-"`)
+	}
+	if strings.HasPrefix(s, ".") {
+		return parseFieldRule(s)
+	}
+
 	// Escaped leading dash
 	if strings.HasPrefix(s, `\-`) {
 		return NewPatternRule(s[1:], PatternSubstring, false)
@@ -444,6 +457,106 @@ func parseLeafRule(s string) (Rule, error) {
 	}
 
 	return NewPatternRule(s, mode, negate)
+}
+
+// parseFieldRule parses a field-rule input string (already stripped of
+// outer whitespace) starting with '.'. Syntax:
+//
+//	.path                      → invalid (no operator)
+//	.path = value              → equality (case-insensitive for strings)
+//	.path != value             → inequality
+//	.path > value              → numeric greater-than (and <, <=, >=)
+//	.path ~ pattern            → regex or substring match
+//	.path[] OP value           → array-any: any element matches
+//	.nested.field = value      → dotted path for nested access
+//
+// Whitespace around the operator is allowed but not required. Values
+// on the right are taken verbatim (no quoting, spaces allowed); a
+// trailing '\n' is trimmed so the user can't trip over it.
+//
+// Errors (the strings here are the user-facing messages):
+//   - '.' alone or '.=x' → "field rule is missing a path after '.'"
+//   - '.field' (no op) → "field rule is missing an operator (use =, !=, <, <=, >, >=, or ~)"
+//   - '.field=' (no value) → "field rule is missing a value after the operator"
+//   - '.field..sub=x' → "field rule path contains an empty segment"
+//   - '.field~[unclosed' → "invalid regex ...".
+func parseFieldRule(s string) (Rule, error) {
+	if len(s) == 0 || s[0] != '.' {
+		return nil, fmt.Errorf("field rule must start with '.'")
+	}
+	body := s[1:] // drop the leading '.'
+
+	// Find the operator. Longest-match scan so '<=' beats '<', '!='
+	// beats '!' (which isn't a valid op anyway), and so on.
+	opStart, opEnd, op, err := findFieldOp(body)
+	if err != nil {
+		return nil, err
+	}
+
+	rawPath := strings.TrimSpace(body[:opStart])
+	value := strings.TrimSpace(body[opEnd:])
+
+	// Detect the optional "[]" array-any marker at the end of the path
+	// segment. It attaches to the path, NOT to the operator (which means
+	// ".tags[] = api" and ".tags[]= api" are both valid).
+	arrayAny := false
+	if strings.HasSuffix(rawPath, "[]") {
+		arrayAny = true
+		rawPath = rawPath[:len(rawPath)-2]
+	}
+
+	if rawPath == "" {
+		return nil, fmt.Errorf("field rule is missing a path after '.'")
+	}
+	if value == "" {
+		return nil, fmt.Errorf("field rule is missing a value after the operator")
+	}
+
+	// Split dotted path; empty segments (from '..') are an explicit error.
+	segments := strings.Split(rawPath, ".")
+	for _, seg := range segments {
+		if seg == "" {
+			return nil, fmt.Errorf("field rule path contains an empty segment")
+		}
+	}
+
+	return NewFieldRule(segments, arrayAny, op, value)
+}
+
+// findFieldOp returns the byte range [opStart, opEnd) of the first
+// operator in body along with the corresponding FieldOp. Returns a
+// user-friendly error when no operator is found.
+//
+// Scanning is left-to-right, longest-match at each position; the path
+// may contain runes like '[' / ']' that aren't part of an operator,
+// which is why the scan is byte-based rather than "find the first '='
+// in the string".
+func findFieldOp(body string) (int, int, FieldOp, error) {
+	for i := range len(body) {
+		switch body[i] {
+		case '=':
+			return i, i + 1, FieldOpEq, nil
+		case '!':
+			if i+1 < len(body) && body[i+1] == '=' {
+				return i, i + 2, FieldOpNeq, nil
+			}
+			// Bare '!' isn't a valid op — fall through to let the loop
+			// keep scanning; it will eventually hit EOF and error out.
+		case '>':
+			if i+1 < len(body) && body[i+1] == '=' {
+				return i, i + 2, FieldOpGte, nil
+			}
+			return i, i + 1, FieldOpGt, nil
+		case '<':
+			if i+1 < len(body) && body[i+1] == '=' {
+				return i, i + 2, FieldOpLte, nil
+			}
+			return i, i + 1, FieldOpLt, nil
+		case '~':
+			return i, i + 1, FieldOpMatch, nil
+		}
+	}
+	return 0, 0, 0, fmt.Errorf("field rule is missing an operator (use =, !=, <, <=, >, >=, or ~)")
 }
 
 // parseGroupExpr parses a group expression `(a OP b OP c ...)` into a
@@ -675,6 +788,14 @@ func RuleToInputString(r Rule) string {
 		return out
 	case SeverityRule:
 		return ">" + strings.ToLower(v.Floor.String())
+	case *FieldRule:
+		// Render without surrounding whitespace around the operator so
+		// the text is stable under parse → render → parse round-trips.
+		suffix := ""
+		if v.ArrayAny {
+			suffix = "[]"
+		}
+		return "." + strings.Join(v.Path, ".") + suffix + v.Op.String() + v.Value
 	}
 	return ""
 }
