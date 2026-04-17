@@ -502,6 +502,14 @@ type Model struct {
 	// Filter chain — rebuilt whenever logRules or logIncludeMode changes.
 	logFilterChain *FilterChain //nolint:unused // wired in subsequent Phase C tasks
 
+	// logJSONCache caches JSON-detection results for log lines. Keyed by
+	// the raw line's content hash (fnv64a of the line string) so entries
+	// survive slice reslicing of logLines but are automatically garbage-
+	// collected when lines roll out of the buffer via the eviction policy.
+	// Populated on the stream-append and history-prepend paths; read by
+	// jsonLineAt for callers that need the parsed JSON value.
+	logJSONCache *lruJSONCache
+
 	// Pending bracket for two-keystroke jump-to-severity sequences (]e/[e/]w/[w).
 	// Set to ']' or '[' on the first keystroke; cleared on the next key.
 	logPendingBracket rune
@@ -1007,6 +1015,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	m.logSeverityDetector, _ = newSeverityDetector(nil) // TODO Phase I: pass extras from config
 	m.logFilterChain = NewFilterChain(nil, IncludeAny, m.logSeverityDetector)
 	m.logFilterEditingIdx = -1
+	m.logJSONCache = newLRUJSONCache(defaultJSONCacheCap)
 
 	return m
 }

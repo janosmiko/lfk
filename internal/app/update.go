@@ -2063,6 +2063,10 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 					m.tabs[i].logLines = append(m.tabs[i].logLines, "--- stream ended ---")
 				} else {
 					m.tabs[i].logLines = append(m.tabs[i].logLines, msg.line)
+					// Warm the JSON cache with the new line so filter/render
+					// consumers don't re-parse later. Safe whether or not
+					// this is the active tab — the cache is process-global.
+					m.warmJSONCache(msg.line)
 					// Continue draining: re-issue waitForLogLine for that channel.
 					ch := msg.ch
 					return m, func() tea.Msg {
@@ -2087,6 +2091,7 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.logLines = append(m.logLines, msg.line)
+	m.warmJSONCache(msg.line)
 	m.maybeAppendVisibleIndex(len(m.logLines) - 1)
 	if m.logFollow {
 		m.logScroll = m.logMaxScroll()
@@ -2136,6 +2141,14 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	if len(newOlderLines) == 0 {
 		m.logHasMoreHistory = false
 		return m
+	}
+
+	// Warm the JSON cache for the prepended older lines so downstream
+	// consumers (filter/render) don't re-parse the same lines later.
+	// Runs before mutating logLines — this is on the slow history-load
+	// path so perf doesn't matter, correctness does.
+	for _, line := range newOlderLines {
+		m.warmJSONCache(line)
 	}
 
 	// Prepend and adjust scroll to maintain view position.

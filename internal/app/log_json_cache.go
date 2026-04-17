@@ -5,6 +5,11 @@ import (
 	"sync"
 )
 
+// defaultJSONCacheCap is the default size of the log-line JSON detection
+// cache. 5000 balances memory (~a few hundred KB for typical entries)
+// against the common "rolling window of recent log lines" access pattern.
+const defaultJSONCacheCap = 5000
+
 // lruJSONCacheNode is a doubly-linked-list node holding one cache entry.
 type lruJSONCacheNode struct {
 	key        uint64
@@ -147,4 +152,39 @@ func hashLine(line string) uint64 {
 	h := fnv.New64a()
 	_, _ = h.Write([]byte(line))
 	return h.Sum64()
+}
+
+// warmJSONCache runs DetectJSONLine on line and stores the result in the
+// model's JSON cache. Safe to call with a nil cache (no-op) so tests that
+// build a bare Model without calling NewModel don't need to remember to
+// initialise it.
+func (m *Model) warmJSONCache(line string) {
+	if m.logJSONCache == nil {
+		return
+	}
+	m.logJSONCache.Put(line, DetectJSONLine(line))
+}
+
+// jsonLineAt returns the cached JSONLine for m.logLines[idx], computing
+// and caching it on a cache miss. Returns a zero JSONLine when idx is
+// out of range so callers can blindly pass a cursor position without
+// bounds-checking.
+//
+// Later filter/render code paths call this instead of DetectJSONLine
+// directly so they reuse the parse work done by the stream-append
+// path; the cache is the memoisation layer for those consumers.
+func (m *Model) jsonLineAt(idx int) JSONLine {
+	if idx < 0 || idx >= len(m.logLines) {
+		return JSONLine{}
+	}
+	line := m.logLines[idx]
+	if m.logJSONCache == nil {
+		return DetectJSONLine(line)
+	}
+	if v, ok := m.logJSONCache.Get(line); ok {
+		return v
+	}
+	v := DetectJSONLine(line)
+	m.logJSONCache.Put(line, v)
+	return v
 }
