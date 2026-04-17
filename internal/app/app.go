@@ -198,7 +198,14 @@ type TabState struct {
 	logVisualStart    int  // anchor line where visual selection started
 	logVisualType     rune // 'V' = line, 'v' = char, 'B' = block
 	logVisualCol      int  // character column of anchor (for char and block modes)
-	logVisualCurCol   int  // current cursor column (for char and block modes)
+	logVisualCurCol   int  // character column where the cursor is now
+
+	// Log viewer: active filter rules and mode. Persisted per tab so
+	// switching tabs preserves the rule stack the user built up.
+	// logFilterChain and logVisibleIndices are rebuilt from logRules on
+	// tab load; no need to snapshot them.
+	logRules       []Rule
+	logIncludeMode IncludeMode
 
 	// Log viewer: parent resource context for pod re-selection.
 	logParentKind   string

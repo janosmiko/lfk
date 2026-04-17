@@ -713,6 +713,10 @@ func (m *Model) saveCurrentTab() {
 	t.logVisualType = m.logVisualType
 	t.logVisualCol = m.logVisualCol
 	t.logVisualCurCol = m.logVisualCurCol
+	// Filter state: snapshot rules + include mode. The chain and visible
+	// indices are rebuilt on tab load so we don't need to copy them.
+	t.logRules = append([]Rule(nil), m.logRules...)
+	t.logIncludeMode = m.logIncludeMode
 	t.logParentKind = m.logParentKind
 	t.logParentName = m.logParentName
 	t.logSavedPodName = m.logSavedPodName
@@ -815,6 +819,13 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.logVisualType = t.logVisualType
 	m.logVisualCol = t.logVisualCol
 	m.logVisualCurCol = t.logVisualCurCol
+	// Filter state: restore rules + include mode, then rebuild the chain
+	// and visible-indices projection so the log view reflects the
+	// tab's snapshot immediately.
+	m.logRules = append([]Rule(nil), t.logRules...)
+	m.logIncludeMode = t.logIncludeMode
+	m.logFilterChain = NewFilterChain(m.logRules, m.logIncludeMode, m.logSeverityDetector)
+	m.rebuildLogVisibleIndices()
 	m.logParentKind = t.logParentKind
 	m.logParentName = t.logParentName
 	m.logSavedPodName = t.logSavedPodName
@@ -934,6 +945,11 @@ func (m *Model) cloneCurrentTab() TabState {
 		logVisualType:          'V',
 		logVisualCol:           0,
 		logVisualCurCol:        0,
+		// Filter rules are NOT cloned across tabs — new tabs start with
+		// an empty rule stack (ANY mode) so the user can build a fresh
+		// filter without inheriting the previous tab's noise.
+		logRules:       nil,
+		logIncludeMode: IncludeAny,
 	}
 	// Deep copy leftItemsHistory.
 	newTab.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))
