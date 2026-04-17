@@ -20,6 +20,7 @@ const (
 	RuleExclude
 	RuleSeverity
 	RuleGroup
+	RuleField
 )
 
 func (k RuleKind) String() string {
@@ -32,6 +33,8 @@ func (k RuleKind) String() string {
 		return "SEV"
 	case RuleGroup:
 		return "GRP"
+	case RuleField:
+		return "FLD"
 	}
 	return "?"
 }
