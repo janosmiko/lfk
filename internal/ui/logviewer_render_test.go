@@ -3,6 +3,7 @@ package ui
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -80,7 +81,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"my-pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "my-pod")
 		assert.Contains(t, result, "log entry 1")
@@ -94,7 +95,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "FOLLOW")
 	})
@@ -106,7 +107,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "WRAP")
 	})
@@ -118,7 +119,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "LINE#")
 	})
@@ -130,7 +131,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "TIMESTAMPS")
 	})
@@ -142,7 +143,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "PREVIOUS")
 	})
@@ -154,7 +155,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "error", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "/error")
 	})
@@ -166,7 +167,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "err",
 			true, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "err")
 		assert.Contains(t, result, "enter:apply")
@@ -179,7 +180,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"Saved to file", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "Saved to file")
 	})
@@ -191,7 +192,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'V', 0, 0, 0, "", "",
+			0, true, 0, 'V', 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "VISUAL LINE")
 	})
@@ -203,7 +204,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'v', 0, 0, 0, "", "",
+			0, true, 0, 'v', 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "VISUAL")
 	})
@@ -215,7 +216,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'B', 0, 0, 0, "", "",
+			0, true, 0, 'B', 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "VISUAL BLOCK")
 	})
@@ -227,7 +228,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "pod")
 		assert.Contains(t, result, "0 lines")
@@ -240,7 +241,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, true,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "LOADING HISTORY")
 	})
@@ -253,7 +254,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, true, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "switch pod")
 	})
@@ -265,7 +266,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, true, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "containers")
 	})
@@ -278,11 +279,84 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "",
+			-1, false, 0, 0, 0, 0, 0, "", "", false,
 		)
 		assert.Contains(t, result, "WRAP")
 		// The long line should be visible (at least part of it).
 		assert.Contains(t, result, "xxx")
+	})
+}
+
+// --- RenderLogViewer relative timestamps ---
+
+// TestRenderLogViewerRelativeTimestamps pins `now` to a known value
+// via the package-level nowFunc, feeds in a log line with a timestamp
+// that is exactly 5 minutes in the past, and asserts:
+//  1. the rendered output contains "5m ago",
+//  2. it no longer contains the RFC3339 timestamp form.
+//
+// Also checks the subtle "[REL]" title-bar indicator is surfaced
+// while timestamps are on, and confirms relative rendering is a no-op
+// when timestamps are off (hidden altogether).
+func TestRenderLogViewerRelativeTimestamps(t *testing.T) {
+	// Pin `now` so the test is deterministic. Remember to restore.
+	now := time.Date(2026, 4, 16, 10, 5, 30, 0, time.UTC)
+	origNow := nowFunc
+	nowFunc = func() time.Time { return now }
+	t.Cleanup(func() { nowFunc = origNow })
+
+	// Timestamp exactly 5 minutes before `now`.
+	pastStamp := "2026-04-16T10:00:30Z"
+	line := pastStamp + " server started"
+
+	t.Run("renders relative form when timestamps and relativeTimestamps both on", func(t *testing.T) {
+		result := RenderLogViewer(
+			[]string{line}, nil, 0, 80, 20,
+			false, false, false, true, false, false, // timestamps=true
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", true, // relativeTimestamps=true
+		)
+		assert.Contains(t, result, "5m ago",
+			"relative form should replace the RFC3339 timestamp")
+		assert.NotContains(t, result, pastStamp,
+			"original RFC3339 timestamp should be gone from the rendered output")
+		assert.Contains(t, result, "REL",
+			"the subtle [REL] chip should surface in the title bar")
+	})
+
+	t.Run("relativeTimestamps is a no-op when timestamps is off", func(t *testing.T) {
+		result := RenderLogViewer(
+			[]string{line}, nil, 0, 80, 20,
+			false, false, false, false, false, false, // timestamps=false
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", true, // relativeTimestamps=true
+		)
+		// With timestamps off the renderer strips the prefix entirely,
+		// so neither the RFC3339 form nor "5m ago" should appear.
+		assert.NotContains(t, result, "5m ago",
+			"rel form must not render when timestamps are hidden")
+		assert.NotContains(t, result, pastStamp,
+			"timestamps-off stripping still applies")
+		assert.NotContains(t, result, "[REL]",
+			"[REL] chip must not appear when timestamps are off")
+	})
+
+	t.Run("relativeTimestamps off leaves the RFC3339 form intact", func(t *testing.T) {
+		result := RenderLogViewer(
+			[]string{line}, nil, 0, 80, 20,
+			false, false, false, true, false, false, // timestamps=true
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, // relativeTimestamps=false
+		)
+		assert.Contains(t, result, pastStamp,
+			"absolute form is unchanged when relativeTimestamps is off")
+		assert.NotContains(t, result, "5m ago")
 	})
 }
 

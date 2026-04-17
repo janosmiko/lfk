@@ -19,7 +19,10 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 // `[FILTER: N]` chip is shown in the title bar.
 // logSince is the currently applied --since window (e.g. "5m"); when
 // non-empty a `[SINCE: ...]` chip is appended to the title bar.
-func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor, logSince string) string {
+// relativeTimestamps, when true together with timestamps, rewrites the
+// leading RFC3339 timestamp on each visible line to a relative form
+// ("5m ago"); a subtle `[REL]` chip is shown alongside `[TIMESTAMPS]`.
+func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor, logSince string, relativeTimestamps bool) string {
 	// Record the total number of lines before any filter projection so the
 	// title bar can render "[X of Y lines]" when filtering is active.
 	totalLines := lines
@@ -40,7 +43,7 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 	if visibleIndices != nil {
 		visibleCount = len(visibleIndices)
 	}
-	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logSince)
+	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logSince, relativeTimestamps)
 	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
 
 	// Content area: subtract border top + bottom (2 lines).
@@ -66,18 +69,31 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 		scroll = 0
 	}
 
-	// Strip timestamps and/or pod prefixes from visible lines.
+	// Strip timestamps and/or pod prefixes from visible lines, or rewrite
+	// RFC3339 timestamps to their relative form when the caller asked for
+	// the "5m ago" view. The rewrite only runs when the absolute form is
+	// on (timestamps=true) — stripping wins otherwise, and it would be
+	// surprising to see relative timestamps appear after the user pressed
+	// `s` to hide them.
+	rewriteRelative := timestamps && relativeTimestamps
 	displayLines := lines
-	if (!timestamps || hidePrefixes) && len(lines) > 0 {
+	if (!timestamps || hidePrefixes || rewriteRelative) && len(lines) > 0 {
 		end := scroll + contentHeight
 		if end > len(lines) {
 			end = len(lines)
 		}
 		displayLines = make([]string, len(lines))
 		copy(displayLines, lines)
+		// Snapshot `now` once so every rewritten line in this frame uses
+		// the same reference point. Without this, the top of the window
+		// might say "5m ago" while the bottom says "5m 1s ago" for lines
+		// one scroll tick apart.
+		now := nowFunc()
 		for i := scroll; i < end; i++ {
 			if !timestamps {
 				displayLines[i] = StripTimestamp(lines[i])
+			} else if rewriteRelative {
+				displayLines[i] = RewriteLogLineTimestamp(lines[i], now)
 			}
 			if hidePrefixes {
 				displayLines[i] = StripPodPrefix(displayLines[i])
@@ -149,8 +165,10 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 // greater than zero a `[FILTER: N]` chip is appended to the indicators.
 // logSince is the currently applied --since window; when non-empty a
 // `[SINCE: ...]` chip is shown so the user can tell at a glance that the
-// view is time-bounded.
-func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor, logSince string) string {
+// view is time-bounded. relativeTimestamps only surfaces (as a subtle
+// `[REL]` chip) when timestamps is also on — mirroring the runtime
+// precedence in the per-line rendering loop.
+func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor, logSince string, relativeTimestamps bool) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -160,6 +178,7 @@ func renderLogTitleBar(title string, lines []string, visibleCount, width int, fo
 		{wrap, "WRAP"},
 		{lineNumbers, "LINE#"},
 		{timestamps, "TIMESTAMPS"},
+		{timestamps && relativeTimestamps, "REL"},
 		{hidePrefixes, "NO PREFIX"},
 		{previous, "PREVIOUS"},
 		{loadingHistory, "LOADING HISTORY..."},
@@ -249,6 +268,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "tab/z", Desc: "wrap"},
 		{Key: "#", Desc: "line#"},
 		{Key: "s", Desc: "timestamps"},
+		{Key: "R", Desc: "rel-ts"},
 		{Key: "p", Desc: "prefixes"},
 		{Key: "c", Desc: "previous"},
 		{Key: "t", Desc: "since"},

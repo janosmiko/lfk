@@ -339,6 +339,7 @@ func helpSections() []helpSection {
 				{"Tab/z", "Toggle line wrapping"},
 				{"#", "Toggle line numbers"},
 				{"s", "Toggle timestamps"},
+				{"R", "Toggle relative timestamps (5m ago) — requires s first"},
 				{"p", "Toggle pod/container prefixes"},
 				{"c", "Toggle previous container logs"},
 				{"t", "Set --since time window (e.g. 5m, 1h30m, 2d)"},

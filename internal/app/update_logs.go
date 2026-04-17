@@ -201,6 +201,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "S":
 		ret, cmd := m.handleLogKeyS2()
 		return ret, cmd, true
+	case "R":
+		ret, cmd := m.handleLogKeyShiftR()
+		return ret, cmd, true
 	case "ctrl+s":
 		ret, cmd := m.handleLogKeyCtrlS()
 		return ret, cmd, true
@@ -974,6 +977,26 @@ func (m Model) handleLogKeyS() Model {
 	m.logLineInput = ""
 	m.logTimestamps = !m.logTimestamps
 	return m
+}
+
+// handleLogKeyShiftR toggles the relative-timestamp rendering mode.
+// When m.logTimestamps is false the toggle is a no-op: rewriting the
+// leading timestamp only makes sense while the absolute form is on, so
+// we nudge the user to press `s` first rather than silently flipping a
+// hidden flag.
+func (m Model) handleLogKeyShiftR() (tea.Model, tea.Cmd) {
+	m.logLineInput = ""
+	if !m.logTimestamps {
+		m.setStatusMessage("enable timestamps first (press s)", false)
+		return m, scheduleStatusClear()
+	}
+	m.logRelativeTimestamps = !m.logRelativeTimestamps
+	if m.logRelativeTimestamps {
+		m.setStatusMessage("relative timestamps: on", false)
+	} else {
+		m.setStatusMessage("relative timestamps: off", false)
+	}
+	return m, scheduleStatusClear()
 }
 
 func (m Model) handleLogKeyS2() (tea.Model, tea.Cmd) {

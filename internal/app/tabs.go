@@ -699,6 +699,7 @@ func (m *Model) saveCurrentTab() {
 	t.logWrap = m.logWrap
 	t.logLineNumbers = m.logLineNumbers
 	t.logTimestamps = m.logTimestamps
+	t.logRelativeTimestamps = m.logRelativeTimestamps
 	t.logPrevious = m.logPrevious
 	t.logIsMulti = m.logIsMulti
 	t.logTitle = m.logTitle
@@ -806,6 +807,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.logWrap = t.logWrap
 	m.logLineNumbers = t.logLineNumbers
 	m.logTimestamps = t.logTimestamps
+	m.logRelativeTimestamps = t.logRelativeTimestamps
 	m.logPrevious = t.logPrevious
 	m.logIsMulti = t.logIsMulti
 	m.logTitle = t.logTitle

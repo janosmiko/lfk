@@ -196,6 +196,7 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `Tab` / `z` | Toggle line wrapping |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
+| `R` | Toggle relative timestamps (e.g. `5m ago`) — requires `s` on first |
 | `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
 | `t` | Set `--since` time window (e.g. `5m`, `1h30m`, `2d`; empty input clears) |
