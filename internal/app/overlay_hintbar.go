@@ -45,6 +45,12 @@ func (m Model) overlayHintBarDialog() string {
 			{Key: "Enter", Desc: "apply"},
 			{Key: "esc", Desc: "cancel"},
 		})
+	case overlayLogSinceInput:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "enter", Desc: "apply"},
+			{Key: "empty+enter", Desc: "clear"},
+			{Key: "esc", Desc: "cancel"},
+		})
 	case overlayPVCResize:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "Enter", Desc: "resize"},

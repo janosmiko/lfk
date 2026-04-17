@@ -79,6 +79,7 @@ const (
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
 	overlayBackgroundTasks
 	overlayLogFilter
+	overlayLogSinceInput
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -206,6 +207,12 @@ type TabState struct {
 	// tab load; no need to snapshot them.
 	logRules       []Rule
 	logIncludeMode IncludeMode
+
+	// Log viewer: active --since window (user-typed string, e.g. "5m").
+	// Empty means no --since filter.  Persisted per tab so switching
+	// tabs restores the setting; the stream is only restarted when the
+	// user commits via the overlay, not on tab switch.
+	logSinceDuration string
 
 	// Log viewer: parent resource context for pod re-selection.
 	logParentKind   string
@@ -480,6 +487,14 @@ type Model struct {
 	logSavePresetPrompt bool      //nolint:unused // populated in Phase D/E
 	logLoadPresetOpen   bool      //nolint:unused // populated in Phase D/E
 	logLoadPresetCursor int       //nolint:unused // populated in Phase D/E
+
+	// Log viewer: active --since window, displayed as a title-bar chip
+	// and appended to the kubectl logs args when non-empty.  Empty
+	// disables the filter.  Session-only — not persisted to disk.
+	logSinceDuration string
+
+	// Log viewer: transient textinput for the --since duration prompt.
+	logSinceInput TextInput
 
 	// Severity detector — initialized once at startup; reused for all log views.
 	logSeverityDetector *severityDetector //nolint:unused // wired in subsequent Phase C tasks

@@ -207,6 +207,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "c":
 		ret, cmd := m.handleLogKeyC()
 		return ret, cmd, true
+	case "t":
+		ret := m.handleLogKeyT()
+		return ret, nil, true
 	case "\\":
 		ret, cmd := m.handleLogKeyOther()
 		return ret, cmd, true
@@ -215,6 +218,17 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return ret, cmd, true
 	}
 	return m, nil, false
+}
+
+// handleLogKeyT opens the --since duration prompt.  Only reachable from
+// the log view's normal key dispatch — search, visual, pending-bracket,
+// and overlay modes all short-circuit before we get here, so the caller
+// doesn't need to re-check those states.
+func (m Model) handleLogKeyT() Model {
+	m.logLineInput = ""
+	m.overlay = overlayLogSinceInput
+	m.logSinceInput.Clear()
+	return m
 }
 
 func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

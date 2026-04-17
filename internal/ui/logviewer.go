@@ -17,7 +17,9 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 // RenderLogViewer renders the full-screen log viewer.
 // ruleCount is the number of active filter rules; when greater than zero a
 // `[FILTER: N]` chip is shown in the title bar.
-func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor string) string {
+// logSince is the currently applied --since window (e.g. "5m"); when
+// non-empty a `[SINCE: ...]` chip is appended to the title bar.
+func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor, logSince string) string {
 	// Record the total number of lines before any filter projection so the
 	// title bar can render "[X of Y lines]" when filtering is active.
 	totalLines := lines
@@ -38,7 +40,7 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 	if visibleIndices != nil {
 		visibleCount = len(visibleIndices)
 	}
-	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor)
+	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logSince)
 	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
 
 	// Content area: subtract border top + bottom (2 lines).
@@ -145,7 +147,10 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 // filtering. When it is less than len(lines), the title renders `[X of Y lines]`
 // instead of `[Y lines]`. ruleCount is the number of active filter rules; when
 // greater than zero a `[FILTER: N]` chip is appended to the indicators.
-func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor string) string {
+// logSince is the currently applied --since window; when non-empty a
+// `[SINCE: ...]` chip is shown so the user can tell at a glance that the
+// view is time-bounded.
+func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor, logSince string) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -186,6 +191,11 @@ func renderLogTitleBar(title string, lines []string, visibleCount, width int, fo
 	}
 	if ruleCount > 0 {
 		indicators = append(indicators, HelpKeyStyle.Render(fmt.Sprintf("[FILTER: %d]", ruleCount)))
+	}
+	// --since window chip: makes it obvious when the view is
+	// time-bounded, independent of any filter rules.
+	if logSince != "" {
+		indicators = append(indicators, HelpKeyStyle.Render("[SINCE: "+logSince+"]"))
 	}
 
 	titleText := " " + title + " "
@@ -241,6 +251,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "s", Desc: "timestamps"},
 		{Key: "p", Desc: "prefixes"},
 		{Key: "c", Desc: "previous"},
+		{Key: "t", Desc: "since"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "/", Desc: "search"},
 		{Key: "n/N", Desc: "next/prev"},

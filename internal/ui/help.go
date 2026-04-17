@@ -341,6 +341,7 @@ func helpSections() []helpSection {
 				{"s", "Toggle timestamps"},
 				{"p", "Toggle pod/container prefixes"},
 				{"c", "Toggle previous container logs"},
+				{"t", "Set --since time window (e.g. 5m, 1h30m, 2d)"},
 				{"/", "Search in logs"},
 				{"n", "Next search match"},
 				{"N", "Previous search match"},
