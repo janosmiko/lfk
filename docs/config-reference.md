@@ -23,6 +23,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context in `~/.local/state/lfk/pinned.yaml`). |
 | `tips` | bool | `true` | Show a random tip in the status bar on startup. Set to `false` to disable. |
 | `log_tail_lines` | int | `1000` | Number of log lines to load initially via `--tail`. Scrolling to the top loads older history. |
+| `log_severity_patterns` | map[string]list[string] | `{}` | Extend the built-in severity detection with custom regex patterns. See [Log severity patterns](#log-severity-patterns) below. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |
 | `mouse` | bool | `true` | Capture mouse input for click navigation, scroll, and tab switching. Set to `false` to allow native terminal text selection. Also available as `--no-mouse` CLI flag. |
@@ -355,6 +356,35 @@ filter_presets:
 | `restarts_gt` | Match pods with restart count greater than this number |
 | `column` | Column key to check (case-insensitive, e.g., "Node", "IP") |
 | `column_value` | Substring match against the column value (case-insensitive) |
+
+## Log Severity Patterns
+
+Extend the built-in severity detection used by the log viewer's filter
+overlay (press `f` in the log view) and the quick-cycle hotkeys (`>` /
+`<`). Patterns are case-insensitive regular expressions and **extend**
+the defaults — they don't replace them. Anything that doesn't match any
+pattern is classified as `unknown` and kept by default when a severity
+floor is active (spec §4.4).
+
+```yaml
+log_severity_patterns:
+  error:
+    - 'my-app: failed'
+    - 'opcode=0x80'
+  warn:
+    - 'legacy-warn-marker'
+```
+
+Severity buckets: `error`, `warn`, `info`, `debug`.
+
+Built-in patterns cover common log formats: bracketed levels (`[INFO]`,
+`[ERROR]`), structured logs (`level=error`, `"level":"warn"`), and klog
+format used by Kubernetes components (`I0412 12:34:56 …`, `E0412 …`).
+
+**Filter presets** live in a separate sidecar file at
+`$XDG_CONFIG_HOME/lfk/log_presets.yaml` (usually
+`~/.config/lfk/log_presets.yaml`), not in the main config. Create / save
+presets with `S` inside the filter modal; load with `L`.
 
 ## Terminal Mode
 

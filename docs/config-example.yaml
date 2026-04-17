@@ -47,6 +47,26 @@ log_path: /tmp/lfk.log
 # Default: 1000
 # log_tail_lines: 1000
 
+# ─── Log Severity Patterns ─────────────────────────────────────────────────────
+# Extend the built-in severity detection used by the log filter overlay
+# (press `f` in the log view) and the `>` / `<` quick-cycle hotkeys.
+# Patterns are case-insensitive regular expressions and EXTEND the defaults —
+# they do not replace them. Anything that doesn't match any pattern is
+# classified as "unknown" and kept by default when a severity floor is active.
+# Built-in patterns already cover bracketed levels ([INFO], [ERROR]),
+# structured logs (level=error, "level":"warn"), and klog format
+# (I0412 12:34:56.789 …) used by Kubernetes components.
+# log_severity_patterns:
+#   error:
+#     - 'opcode=0x80'
+#     - 'my-app: failed'
+#   warn:
+#     - 'legacy-warn-marker'
+#
+# NOTE: Filter PRESETS (saved rule stacks per resource kind) live in a
+# separate sidecar file at $XDG_CONFIG_HOME/lfk/log_presets.yaml, not here.
+# Save with `S` and load with `L` inside the filter modal.
+
 # ─── Dashboard ─────────────────────────────────────────────────────────────────
 # Show cluster overview dashboard when entering a context.
 # Set to false to go directly to the resource types list.

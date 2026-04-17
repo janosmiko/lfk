@@ -231,6 +231,41 @@ Bookmarks come in two flavors depending on the slot case you choose:
 >
 > Group operators `AND`/`OR` are case-insensitive whole words. Mixing them at the same level (e.g. `(a OR b AND c)`) is rejected — use nested parentheses instead. Severity floors are not allowed inside a group; add them as a separate top-level rule.
 
+### Filter modal (opened with `f`)
+
+The modal has two modes: **list** (nav) and **input** (typing). The mode affects which keys are bound.
+
+**List mode** (cursor is on a rule row):
+
+| Key | Action |
+|---|---|
+| `a` | Switch to input mode to add a new rule |
+| `j` / `k` / `↓` / `↑` | Move cursor up/down (skips the pinned severity row) |
+| `Ctrl+D` / `Ctrl+U` | Half-page down / up |
+| `Ctrl+F` / `Ctrl+B` | Full page down / up |
+| `g` / `G` | Jump to first editable rule / last rule |
+| `Shift+J` / `Shift+K` | Move selected rule down / up (reorder) |
+| `e` | Load the selected rule back into the input for editing |
+| `d` | Delete the selected rule |
+| `m` | Toggle include mode (ANY ↔ ALL — how non-group rules combine) |
+| `>` / `<` | Cycle severity floor (same as in the log view) |
+| `S` | Open the save-preset prompt |
+| `L` | Open the load-preset picker |
+| `Esc` / `q` / `Ctrl+C` | Close the overlay |
+
+**Input mode** (typing a rule):
+
+| Key | Action |
+|---|---|
+| `Enter` | Parse and commit the rule; return to list mode |
+| `Esc` | Exit input mode without committing; return to list mode |
+| `Tab` | Toggle focus between input and list |
+| `Backspace` | Delete previous character |
+| `Ctrl+W` | Delete previous word |
+| `Ctrl+U` | Delete everything before the cursor |
+
+> The pinned severity row (marked with `★` and `!`) is read-only in list mode — `d` and `e` are no-ops on it. Use `>` / `<` (in the overlay or the log view) to change the severity floor.
+
 ## Exec Mode (embedded terminal)
 
 `Ctrl+]` is a prefix key (like tmux's `Ctrl+b`). Press it once to activate, then press a follow-up key:
