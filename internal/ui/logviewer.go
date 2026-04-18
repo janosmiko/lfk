@@ -353,7 +353,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "H", Desc: "histogram"},
 		{Key: "p", Desc: "prefixes"},
 		{Key: "c", Desc: "previous"},
-		{Key: "t", Desc: "since"},
+		{Key: "T", Desc: "since"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "/", Desc: "search"},
 		{Key: "n/N", Desc: "next/prev"},

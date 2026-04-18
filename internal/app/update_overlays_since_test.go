@@ -80,10 +80,10 @@ func TestLogKeyTOpensSinceOverlay(t *testing.T) {
 	m.logSinceDuration = "1h"
 	m.logSinceInput.Set("stale") // should be cleared by the hotkey
 
-	result, cmd, handled := m.handleLogActionKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("t")})
+	result, cmd, handled := m.handleLogActionKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("T")})
 	rm := result.(Model)
 
-	assert.True(t, handled, "t must be handled by the log action key dispatch")
+	assert.True(t, handled, "T must be handled by the log action key dispatch")
 	assert.Nil(t, cmd, "opening the overlay should not schedule a command")
 	assert.Equal(t, overlayLogSinceInput, rm.overlay, "overlay should be open")
 	assert.Equal(t, "", rm.logSinceInput.Value, "input should be cleared on open")

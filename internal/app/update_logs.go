@@ -216,7 +216,11 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "c":
 		ret, cmd := m.handleLogKeyC()
 		return ret, cmd, true
-	case "t":
+	case "T":
+		// `t` (lowercase) is globally bound to NewTab via handleTabSwitchKey
+		// which runs BEFORE mode-specific dispatch, so it never reaches
+		// the log-view handler. Using Shift+T here keeps the since-prompt
+		// usable while leaving the tab shortcut intact.
 		ret := m.handleLogKeyT()
 		return ret, nil, true
 	case "\\":
