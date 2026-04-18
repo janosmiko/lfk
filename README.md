@@ -255,6 +255,14 @@ lfk --kubeconfig /path/to/kubeconfig
 # Disable mouse capture (enables native terminal text selection)
 lfk --no-mouse
 
+# Disable all colors (selection stays visible via bold/reverse video)
+lfk --no-color
+# Equivalent environment variable (https://no-color.org):
+NO_COLOR=1 lfk
+
+# Override the watch-mode polling interval (default 2s; clamped to [500ms, 10m])
+lfk --watch-interval 5s
+
 # Use a specific kubeconfig via environment variable
 KUBECONFIG=/path/to/config lfk
 
@@ -278,6 +286,32 @@ select text), you can disable mouse capture:
 > **Note:** macOS Terminal.app does not support shift+click text selection while
 > mouse capture is active. Use `--no-mouse` or switch to a terminal that handles
 > this correctly (iTerm2, Kitty, Alacritty, WezTerm, Ghostty).
+
+### No-Color Mode
+
+Disable all foreground and background colors while keeping selection and
+other highlights visible via bold, underline, and reverse-video SGR codes.
+Useful for monochrome terminals, piped output, or lower CPU usage.
+
+- **CLI flag:** `lfk --no-color`
+- **Environment variable:** `NO_COLOR=1 lfk` (any non-empty value; see
+  [no-color.org](https://no-color.org/))
+- **Config file:** Add `no_color: true` to `~/.config/lfk/config.yaml`
+
+Precedence: `--no-color` flag > `NO_COLOR` env var > config file.
+
+### Watch-Mode Interval
+
+Watch mode (toggle with `w`) polls the current resource list on an interval.
+The default 2-second interval is a good balance between freshness and API
+load. Tune it with:
+
+- **CLI flag:** `lfk --watch-interval 5s` (accepts Go durations: `500ms`,
+  `2s`, `1m`, ...)
+- **Config file:** Add `watch_interval: 5s` to `~/.config/lfk/config.yaml`
+
+Values outside `[500ms, 10m]` are clamped to the bounds; invalid values fall
+back to 2s.
 
 ## Navigation Hierarchy
 

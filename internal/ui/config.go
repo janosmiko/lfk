@@ -327,6 +327,23 @@ var ConfigTransparentBg bool
 // terminal text selection (shift+click, drag-to-select).
 var ConfigMouse = true
 
+// ConfigNoColor, when true, builds the theme without foreground or background
+// colors. Emphasis is conveyed with bold, underline, and reverse video so the
+// selection and other highlights remain visible in monochrome terminals.
+// Controlled by the NO_COLOR environment variable (https://no-color.org),
+// the no_color config field, or the --no-color CLI flag.
+var ConfigNoColor bool
+
+// SetNoColor updates ConfigNoColor and rebuilds the active theme so style
+// globals reflect the new setting. No-op when the value is unchanged.
+func SetNoColor(v bool) {
+	if v == ConfigNoColor {
+		return
+	}
+	ConfigNoColor = v
+	ApplyTheme(ActiveTheme)
+}
+
 type configFile struct {
 	// Colorscheme selects a built-in color scheme by name (e.g. "dracula", "nord").
 	// Custom theme overrides in the "theme" section are applied on top.
@@ -385,6 +402,11 @@ type configFile struct {
 	WatchInterval string `json:"watch_interval" yaml:"watch_interval"`
 	// Clusters maps context names to per-cluster configuration overrides.
 	Clusters map[string]clusterConfig `json:"clusters" yaml:"clusters"`
+	// NoColor, when true, strips foreground/background colors from all styles
+	// so the UI renders in terminal-native monochrome. Emphasis is preserved
+	// via bold/underline/reverse SGR codes. The NO_COLOR env var (per
+	// https://no-color.org) takes precedence over this field.
+	NoColor *bool `json:"no_color" yaml:"no_color"`
 }
 
 // clusterConfig holds per-cluster configuration overrides.
@@ -571,6 +593,15 @@ func applyConfigOptions(cfg configFile) {
 				ConfigWatchInterval = clamped
 			}
 		}
+	}
+	if cfg.NoColor != nil {
+		ConfigNoColor = *cfg.NoColor
+	}
+	if os.Getenv("NO_COLOR") != "" {
+		// Per https://no-color.org, the presence of NO_COLOR (regardless of
+		// value) disables color. Env takes precedence over the config file
+		// field; CLI flag is applied later in main.go.
+		ConfigNoColor = true
 	}
 }
 

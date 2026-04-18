@@ -45,6 +45,7 @@ File locations:
 	rootCmd.Flags().StringVar(&cliOpts.Kubeconfig, "kubeconfig", "", "Path to kubeconfig file (overrides default discovery)")
 	rootCmd.Flags().StringVarP(&cliOpts.Config, "config", "c", "", "Path to config file (overrides default ~/.config/lfk/config.yaml)")
 	rootCmd.Flags().BoolVar(&cliOpts.NoMouse, "no-mouse", false, "Disable mouse capture (enables native terminal text selection)")
+	rootCmd.Flags().BoolVar(&cliOpts.NoColor, "no-color", false, "Disable foreground/background colors; keep bold/reverse for visibility. Also honors the NO_COLOR env var.")
 	rootCmd.Flags().DurationVar(&cliOpts.WatchInterval, "watch-interval", 0, "Watch mode polling interval (e.g. 500ms, 2s, 1m). Clamped to [500ms, 10m]. Overrides config.")
 
 	rootCmd.Version = version.Full()
@@ -97,6 +98,11 @@ func runTUI(opts app.StartupOptions) error {
 	}
 
 	ui.LoadConfig(opts.Config)
+	// CLI --no-color flag can force monochrome even if config and env don't.
+	// (LoadConfig already honors the NO_COLOR env var and config field.)
+	if opts.NoColor {
+		ui.SetNoColor(true)
+	}
 	model.PinnedGroups = ui.ConfigPinnedGroups
 
 	if err := logger.Init(ui.ConfigLogPath); err != nil {

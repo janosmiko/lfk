@@ -9,6 +9,7 @@ type StartupOptions struct {
 	Kubeconfig    string
 	Config        string
 	NoMouse       bool
+	NoColor       bool          // --no-color: forces monochrome output regardless of env/config.
 	WatchInterval time.Duration // 0 means not set — fall back to config/default.
 }
 

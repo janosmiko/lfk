@@ -37,6 +37,16 @@ icons: auto
 # Default: true
 # mouse: true
 
+# ─── No Color ─────────────────────────────────────────────────────────────────
+# Disable foreground and background colors throughout the UI. Emphasis is
+# preserved via bold, underline, and reverse-video SGR attributes so the
+# current selection remains visible in monochrome terminals.
+# The NO_COLOR environment variable (https://no-color.org) takes precedence
+# over this field — set NO_COLOR to any non-empty value to force monochrome
+# without editing the config. Also available as --no-color CLI flag.
+# Default: false
+# no_color: false
+
 # ─── Log Path ──────────────────────────────────────────────────────────────────
 # Application log file location. Default: ~/.local/share/lfk/lfk.log
 log_path: /tmp/lfk.log
