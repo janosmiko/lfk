@@ -105,10 +105,12 @@ func (m *Model) startLogStream() tea.Cmd {
 		}
 
 		// Constrain the stream to a recent time window when the user
-		// set one via `t`.  --since is incompatible with --previous
+		// set one via `T`.  --since is incompatible with --previous
 		// (kubectl errors), so skip it in previous-container mode.
+		// Convert any `d` suffix to hours — kubectl doesn't understand
+		// "30d" directly but accepts "720h".
 		if sinceDuration != "" && !logPrevious {
-			args = append(args, "--since="+sinceDuration)
+			args = append(args, "--since="+kubectlSinceArg(sinceDuration))
 		}
 
 		// Always include --timestamps so toggling visibility doesn't need a restart.
@@ -347,7 +349,7 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		// is never set here (startMultiLogStream resets it), so no
 		// compatibility guard is needed.
 		if m.logSinceDuration != "" {
-			args = append(args, "--since="+m.logSinceDuration)
+			args = append(args, "--since="+kubectlSinceArg(m.logSinceDuration))
 		}
 
 		args = append(args, "--timestamps")
@@ -448,7 +450,7 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 		}
 
 		if m.logSinceDuration != "" {
-			args = append(args, "--since="+m.logSinceDuration)
+			args = append(args, "--since="+kubectlSinceArg(m.logSinceDuration))
 		}
 
 		args = append(args, "--timestamps")
@@ -558,7 +560,7 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 		// beyond the window is pointless since kubectl won't return
 		// anything older than the cutoff anyway.
 		if sinceDuration != "" {
-			args = append(args, "--since="+sinceDuration)
+			args = append(args, "--since="+kubectlSinceArg(sinceDuration))
 		}
 		args = append(args, "--timestamps")
 

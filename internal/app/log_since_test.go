@@ -107,3 +107,33 @@ func TestParseLogSinceDuration(t *testing.T) {
 		})
 	}
 }
+
+// TestKubectlSinceArg pins the user-typed → kubectl-compatible
+// conversion. The display value (what shows in the title chip) is the
+// user's input verbatim; kubectlSinceArg is what gets passed on the
+// command line. kubectl's --since doesn't understand "d", so the "d"
+// suffix must be converted to hours.
+func TestKubectlSinceArg(t *testing.T) {
+	cases := []struct {
+		in   string
+		want string
+	}{
+		{"30s", "30s"},
+		{"5m", "5m"},
+		{"1h30m", "1h30m"},
+		{"2d", "48h"},
+		{"30d", "720h"}, // the user-reported failing case
+		{"1.5d", "36h"},
+		{" 5m ", "5m"},
+		{"", ""},
+		// Unsupported / invalid inputs fall back to the raw string so
+		// kubectl emits a readable error the user can see.
+		{"bogus", "bogus"},
+		{"1d12h", "1d12h"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.in, func(t *testing.T) {
+			assert.Equal(t, tc.want, kubectlSinceArg(tc.in))
+		})
+	}
+}
