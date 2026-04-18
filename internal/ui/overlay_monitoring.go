@@ -85,10 +85,10 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 	colEnd := max(vp.VisualStartCol, vp.CursorCol)
 
 	// Level styles.
-	errLevelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5555")).Bold(true).Background(SurfaceBg)
-	wrnLevelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ffaa00")).Bold(true).Background(SurfaceBg)
-	infLevelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#888888")).Background(SurfaceBg)
-	dbgLevelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#6272a4")).Background(SurfaceBg)
+	errLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#ff5555")).Bold(true).Background(SurfaceBg)
+	wrnLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#ffaa00")).Bold(true).Background(SurfaceBg)
+	infLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#888888")).Background(SurfaceBg)
+	dbgLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#6272a4")).Background(SurfaceBg)
 
 	// Cursor line style: subtle highlight to show current position.
 	cursorLineStyle := lipgloss.NewStyle().Background(BaseBg).Bold(true)
@@ -377,13 +377,13 @@ func RenderPodStartupOverlay(entry PodStartupEntry) string {
 	}
 
 	// Phase color styles.
-	schedulingStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#7aa2f7")).Background(SurfaceBg) // blue
-	pullStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#e0af68")).Background(SurfaceBg)       // yellow
-	initStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#73daca")).Background(SurfaceBg)       // cyan
-	containerStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9ece6a")).Background(SurfaceBg)  // green
-	readinessStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#bb9af7")).Background(SurfaceBg)  // purple
-	inProgressStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff9e64")).Background(SurfaceBg) // orange
-	unknownStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#565f89")).Background(SurfaceBg)    // dim
+	schedulingStyle := lipgloss.NewStyle().Foreground(ThemeColor("#7aa2f7")).Background(SurfaceBg) // blue
+	pullStyle := lipgloss.NewStyle().Foreground(ThemeColor("#e0af68")).Background(SurfaceBg)       // yellow
+	initStyle := lipgloss.NewStyle().Foreground(ThemeColor("#73daca")).Background(SurfaceBg)       // cyan
+	containerStyle := lipgloss.NewStyle().Foreground(ThemeColor("#9ece6a")).Background(SurfaceBg)  // green
+	readinessStyle := lipgloss.NewStyle().Foreground(ThemeColor("#bb9af7")).Background(SurfaceBg)  // purple
+	inProgressStyle := lipgloss.NewStyle().Foreground(ThemeColor("#ff9e64")).Background(SurfaceBg) // orange
+	unknownStyle := lipgloss.NewStyle().Foreground(ThemeColor("#565f89")).Background(SurfaceBg)    // dim
 
 	// Max bar width (characters).
 	barWidth := 25
@@ -515,9 +515,9 @@ func RenderQuotaDashboardOverlay(quotas []QuotaEntry, width, height int) string 
 	}
 
 	// Severity color styles.
-	greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#9ece6a")).Background(SurfaceBg)
-	yellowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#e0af68")).Background(SurfaceBg)
-	redStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("#f7768e")).Background(SurfaceBg)
+	greenStyle := lipgloss.NewStyle().Foreground(ThemeColor("#9ece6a")).Background(SurfaceBg)
+	yellowStyle := lipgloss.NewStyle().Foreground(ThemeColor("#e0af68")).Background(SurfaceBg)
+	redStyle := lipgloss.NewStyle().Foreground(ThemeColor("#f7768e")).Background(SurfaceBg)
 
 	for i, q := range quotas {
 		if i > 0 {

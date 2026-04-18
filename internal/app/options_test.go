@@ -2,11 +2,13 @@ package app
 
 import (
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // --- HasCLIOverrides ---
@@ -174,6 +176,65 @@ func TestNewModel_CLIOverrideUsesCorrectContextForDefaultNamespace(t *testing.T)
 
 	// The test client has "test-ctx" with namespace "default".
 	assert.Equal(t, "default", m.namespace)
+}
+
+func TestNewModel_WatchIntervalPrecedence(t *testing.T) {
+	orig := ui.ConfigWatchInterval
+	t.Cleanup(func() { ui.ConfigWatchInterval = orig })
+
+	tests := []struct {
+		name       string
+		cfgValue   time.Duration
+		cliValue   time.Duration
+		wantModel  time.Duration
+		wantReason string
+	}{
+		{
+			name:       "no overrides uses default 2s",
+			cfgValue:   ui.DefaultWatchInterval,
+			cliValue:   0,
+			wantModel:  2 * time.Second,
+			wantReason: "default",
+		},
+		{
+			name:       "config value wins when no CLI",
+			cfgValue:   5 * time.Second,
+			cliValue:   0,
+			wantModel:  5 * time.Second,
+			wantReason: "config overrides default",
+		},
+		{
+			name:       "CLI value overrides config",
+			cfgValue:   5 * time.Second,
+			cliValue:   10 * time.Second,
+			wantModel:  10 * time.Second,
+			wantReason: "CLI wins over config",
+		},
+		{
+			name:       "CLI below min clamps to 500ms",
+			cfgValue:   2 * time.Second,
+			cliValue:   100 * time.Millisecond,
+			wantModel:  500 * time.Millisecond,
+			wantReason: "CLI clamped up",
+		},
+		{
+			name:       "CLI above max clamps to 10m",
+			cfgValue:   2 * time.Second,
+			cliValue:   15 * time.Minute,
+			wantModel:  10 * time.Minute,
+			wantReason: "CLI clamped down",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			ui.ConfigWatchInterval = tc.cfgValue
+			client := newTestClientForOptions(t)
+
+			m := NewModel(client, StartupOptions{WatchInterval: tc.cliValue})
+
+			assert.Equal(t, tc.wantModel, m.watchInterval, tc.wantReason)
+		})
+	}
 }
 
 func TestNewModel_BasicFieldsInitialized(t *testing.T) {
