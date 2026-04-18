@@ -4,6 +4,10 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// ActiveTheme holds the theme currently applied via ApplyTheme. SetNoColor
+// reads this when rebuilding style globals after toggling color mode.
+var ActiveTheme = DefaultTheme()
+
 // Theme defines the color palette for the application.
 type Theme struct {
 	Primary    string `json:"primary"`
@@ -51,7 +55,36 @@ func DefaultTheme() Theme {
 }
 
 // ApplyTheme updates all style variables with the given theme colors.
+// When ConfigNoColor is true, style globals are rebuilt without foreground
+// or background colors; emphasis is preserved via bold/underline/reverse.
 func ApplyTheme(t Theme) {
+	ActiveTheme = t
+	if ConfigNoColor {
+		applyNoColorTheme()
+		return
+	}
+	// Returning to color mode after no-color was active: restore whatever
+	// profile termenv originally detected (typically TrueColor in a normal
+	// terminal, Ascii when NO_COLOR was set externally) and restore the
+	// Color* theme variables that no-color blanked.
+	if originalColorProfileSaved {
+		lipgloss.DefaultRenderer().SetColorProfile(originalColorProfile)
+	}
+	ColorPrimary = defaultColorPrimary
+	ColorSecondary = defaultColorSecondary
+	ColorFile = defaultColorFile
+	ColorSelectedFg = defaultColorSelectedFg
+	ColorSelectedBg = defaultColorSelectedBg
+	ColorBorder = defaultColorBorder
+	ColorDimmed = defaultColorDimmed
+	ColorError = defaultColorError
+	ColorWarning = defaultColorWarning
+	ColorPurple = defaultColorPurple
+	ColorOrange = defaultColorOrange
+	ColorCyan = defaultColorCyan
+	ColorBase = defaultColorBase
+	ColorBarBg = defaultColorBarBg
+	ColorSurface = defaultColorSurface
 	// baseBg is applied to all column/content text styles so the theme
 	// background shows behind text (ANSI resets from inner styled content
 	// would otherwise clear the container background). NoColor when transparent.

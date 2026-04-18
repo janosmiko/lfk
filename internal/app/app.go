@@ -924,6 +924,15 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	}
 	defaultNS := client.DefaultNamespace(contextName)
 
+	// Watch interval precedence: CLI flag > config > default.
+	watchInterval := ui.ConfigWatchInterval
+	if opts.WatchInterval > 0 {
+		watchInterval = ui.ClampWatchInterval(opts.WatchInterval)
+	}
+	if watchInterval <= 0 {
+		watchInterval = ui.DefaultWatchInterval
+	}
+
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
 	m := Model{
@@ -936,7 +945,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		pinnedState:         pinnedSt,
 		namespace:           defaultNS,
 		spinner:             s,
-		watchInterval:       2 * time.Second,
+		watchInterval:       watchInterval,
 		splitPreview:        true,
 		allNamespaces:       true,
 		watchMode:           true,

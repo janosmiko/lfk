@@ -7,23 +7,61 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// Tokyonight Storm color palette (default theme).
+// Tokyonight Storm color palette default values. These back the mutable
+// Color* variables below; no-color mode blanks the variables so inline
+// lipgloss.Color(ColorX) calls scattered across the codebase yield
+// NoColor{} without touching any call site.
 const (
-	ColorPrimary    = "#7aa2f7" // Blue - borders, headers, breadcrumbs
-	ColorSecondary  = "#9ece6a" // Green - help keys, running status, success
-	ColorFile       = "#c0caf5" // Light purple - normal text
-	ColorSelectedFg = "#24283b" // Dark - selected item foreground
-	ColorSelectedBg = "#7aa2f7" // Blue - selected item background
-	ColorBorder     = "#4e5575" // Dark blue - inactive borders
-	ColorDimmed     = "#4e5575" // Muted purple - help text, placeholders
-	ColorError      = "#f7768e" // Red/Pink - errors, failures
-	ColorWarning    = "#e0af68" // Orange/Yellow - warnings, pending
-	ColorPurple     = "#bb9af7" // Purple - special values
-	ColorOrange     = "#ff9e64" // Orange - high usage warning
-	ColorCyan       = "#73daca" // Cyan - very new resources (< 1h)
-	ColorBase       = "#24283b" // Dark background base
-	ColorBarBg      = "#313446" // Slightly lighter bar background
-	ColorSurface    = "#2a2e40" // Surface background for overlays
+	defaultColorPrimary    = "#7aa2f7" // Blue - borders, headers, breadcrumbs
+	defaultColorSecondary  = "#9ece6a" // Green - help keys, running status, success
+	defaultColorFile       = "#c0caf5" // Light purple - normal text
+	defaultColorSelectedFg = "#24283b" // Dark - selected item foreground
+	defaultColorSelectedBg = "#7aa2f7" // Blue - selected item background
+	defaultColorBorder     = "#4e5575" // Dark blue - inactive borders
+	defaultColorDimmed     = "#4e5575" // Muted purple - help text, placeholders
+	defaultColorError      = "#f7768e" // Red/Pink - errors, failures
+	defaultColorWarning    = "#e0af68" // Orange/Yellow - warnings, pending
+	defaultColorPurple     = "#bb9af7" // Purple - special values
+	defaultColorOrange     = "#ff9e64" // Orange - high usage warning
+	defaultColorCyan       = "#73daca" // Cyan - very new resources (< 1h)
+	defaultColorBase       = "#24283b" // Dark background base
+	defaultColorBarBg      = "#313446" // Slightly lighter bar background
+	defaultColorSurface    = "#2a2e40" // Surface background for overlays
+)
+
+// ThemeColor returns a lipgloss color for hex when colors are enabled,
+// or NoColor{} when ConfigNoColor is active. Use this helper for inline
+// styles that reference raw hex literals (not the Color* slots), such as
+// the monitoring overlay's severity colors, so they also respect
+// no-color mode.
+func ThemeColor(hex string) lipgloss.TerminalColor {
+	if ConfigNoColor {
+		return lipgloss.NoColor{}
+	}
+	return lipgloss.Color(hex)
+}
+
+// Theme color slots used by inline lipgloss.Color(ColorX) calls throughout
+// the codebase. Overwritten by applyNoColorTheme (blanked) and by the
+// color branch of ApplyTheme (restored to defaults). They stay as package
+// variables so code that already references them keeps compiling
+// unchanged.
+var (
+	ColorPrimary    = defaultColorPrimary
+	ColorSecondary  = defaultColorSecondary
+	ColorFile       = defaultColorFile
+	ColorSelectedFg = defaultColorSelectedFg
+	ColorSelectedBg = defaultColorSelectedBg
+	ColorBorder     = defaultColorBorder
+	ColorDimmed     = defaultColorDimmed
+	ColorError      = defaultColorError
+	ColorWarning    = defaultColorWarning
+	ColorPurple     = defaultColorPurple
+	ColorOrange     = defaultColorOrange
+	ColorCyan       = defaultColorCyan
+	ColorBase       = defaultColorBase
+	ColorBarBg      = defaultColorBarBg
+	ColorSurface    = defaultColorSurface
 )
 
 var (

@@ -95,9 +95,11 @@ var NyanTick int
 // nyanPalette is the rainbow color cycle for nyan mode.
 var nyanPalette = []string{"#ff0000", "#ff8800", "#ffff00", "#00ff00", "#0088ff", "#8800ff"}
 
-// ActiveSelectedStyle returns SelectedStyle or a nyan rainbow style if nyan mode is active.
+// ActiveSelectedStyle returns SelectedStyle or a nyan rainbow style if nyan
+// mode is active. In no-color mode the nyan rainbow is suppressed (colors
+// would be stripped anyway) and SelectedStyle is used for visibility.
 func ActiveSelectedStyle(rowIdx int) lipgloss.Style {
-	if !NyanMode {
+	if !NyanMode || ConfigNoColor {
 		return SelectedStyle
 	}
 	bgColor := nyanPalette[(NyanTick+rowIdx)%len(nyanPalette)]
