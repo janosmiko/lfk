@@ -207,6 +207,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "J":
 		ret, cmd := m.handleLogKeyShiftJ()
 		return ret, cmd, true
+	case "H":
+		ret, cmd := m.handleLogKeyShiftH()
+		return ret, cmd, true
 	case "ctrl+s":
 		ret, cmd := m.handleLogKeyCtrlS()
 		return ret, cmd, true
@@ -1019,6 +1022,31 @@ func (m Model) handleLogKeyShiftJ() (tea.Model, tea.Cmd) {
 	// Switching modes changes how many visual rows each source line
 	// occupies, so the current scroll offset may land mid-block.
 	// Clamp so the viewport stays within the valid range.
+	m.clampLogScroll()
+	return m, scheduleStatusClear()
+}
+
+// handleLogKeyShiftH toggles the per-tab histogram strip. When on,
+// a 1-row sparkline of log-line density renders between the title
+// bar and the content area; the strip costs the content viewport
+// exactly one row. The toggle does NOT restart the log stream or
+// re-walk the buffer outside the per-frame BuildLogHistogram pass.
+//
+// Lines without a parseable RFC3339 timestamp are silently dropped
+// from the histogram counts (they cannot be bucketed). The footer
+// hint and help screen call this out so the user knows why mixed
+// buffers may show a low strip.
+func (m Model) handleLogKeyShiftH() (tea.Model, tea.Cmd) {
+	m.logLineInput = ""
+	m.logHistogram = !m.logHistogram
+	if m.logHistogram {
+		m.setStatusMessage("histogram: on", false)
+	} else {
+		m.setStatusMessage("histogram: off", false)
+	}
+	// Toggling the strip changes the content viewport height by 1, so
+	// the scroll offset may now land past the bottom. Clamp to the
+	// new range to keep the viewport valid.
 	m.clampLogScroll()
 	return m, scheduleStatusClear()
 }

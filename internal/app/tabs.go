@@ -719,6 +719,7 @@ func (m *Model) saveCurrentTab() {
 	t.logRules = append([]Rule(nil), m.logRules...)
 	t.logIncludeMode = m.logIncludeMode
 	t.logJSONPretty = m.logJSONPretty
+	t.logHistogram = m.logHistogram
 	t.logSinceDuration = m.logSinceDuration
 	t.logParentKind = m.logParentKind
 	t.logParentName = m.logParentName
@@ -829,6 +830,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.logRules = append([]Rule(nil), t.logRules...)
 	m.logIncludeMode = t.logIncludeMode
 	m.logJSONPretty = t.logJSONPretty
+	m.logHistogram = t.logHistogram
 	// Restore the --since window verbatim.  The stream is NOT
 	// auto-restarted on tab switch — it re-applies the next time the
 	// user explicitly commits via the overlay — so we only mirror the

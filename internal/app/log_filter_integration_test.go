@@ -124,7 +124,7 @@ func TestLogFilterOverlayEndToEnd(t *testing.T) {
 		m.logSearchActive, false, false, m.logHasMoreHistory, m.logLoadingHistory,
 		"", false,
 		m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType,
-		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil,
+		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil, ui.LogHistogramView{},
 	)
 	assert.NotContains(t, rendered, "/healthz",
 		"rendered log viewer must not contain filtered /healthz lines")
@@ -189,7 +189,7 @@ func TestLogFilterOverlayEndToEnd(t *testing.T) {
 		m.logSearchActive, false, false, m.logHasMoreHistory, m.logLoadingHistory,
 		"", false,
 		m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType,
-		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil,
+		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil, ui.LogHistogramView{},
 	)
 	assert.True(t, strings.Contains(rendered2, "/healthz"),
 		"after deleting the exclude rule, /healthz should render again")
@@ -249,7 +249,7 @@ func TestExcludeSubstringNoMatch(t *testing.T) {
 		m.logSearchActive, false, false, m.logHasMoreHistory, m.logLoadingHistory,
 		"", false,
 		m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType,
-		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil,
+		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil, ui.LogHistogramView{},
 	)
 	// Every line should still be present.
 	for _, line := range lines {
@@ -319,7 +319,7 @@ func TestExcludeSubstringWithStreamedLines(t *testing.T) {
 		m.logSearchActive, false, false, m.logHasMoreHistory, m.logLoadingHistory,
 		"", false,
 		m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType,
-		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil,
+		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil, ui.LogHistogramView{},
 	)
 	assert.NotContains(t, rendered, "/healthz", "excluded lines should not render")
 	assert.Contains(t, rendered, "starting up", "non-excluded lines should render")
@@ -651,7 +651,7 @@ func TestExcludeClampsCursorAndScroll(t *testing.T) {
 		m.logSearchActive, false, false, m.logHasMoreHistory, m.logLoadingHistory,
 		"", false,
 		m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType,
-		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil,
+		m.logVisualCol, m.logVisualCurCol, len(m.logRules), "", "", false, false, nil, ui.LogHistogramView{},
 	)
 	assert.Contains(t, rendered, "request",
 		"render must show the remaining lines after filter + clamp")

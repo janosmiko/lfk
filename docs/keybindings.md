@@ -198,6 +198,7 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `s` | Toggle timestamps |
 | `R` | Toggle relative timestamps (e.g. `5m ago`) — requires `s` on first |
 | `J` | Toggle JSON pretty-print (expands JSON log lines with 2-space indent; non-JSON lines unchanged) |
+| `H` | Toggle histogram strip (1-row time-density sparkline above content; lines without an RFC3339 timestamp are not counted) |
 | `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
 | `t` | Set `--since` time window (e.g. `5m`, `1h30m`, `2d`; empty input clears) |

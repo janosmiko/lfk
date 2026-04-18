@@ -81,7 +81,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"my-pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "my-pod")
 		assert.Contains(t, result, "log entry 1")
@@ -95,7 +95,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "FOLLOW")
 	})
@@ -107,7 +107,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "WRAP")
 	})
@@ -119,7 +119,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "LINE#")
 	})
@@ -131,7 +131,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "TIMESTAMPS")
 	})
@@ -143,7 +143,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "PREVIOUS")
 	})
@@ -155,7 +155,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "error", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "/error")
 	})
@@ -167,7 +167,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "err",
 			true, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "err")
 		assert.Contains(t, result, "enter:apply")
@@ -180,7 +180,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"Saved to file", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "Saved to file")
 	})
@@ -192,7 +192,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'V', 0, 0, 0, "", "", false, false, nil,
+			0, true, 0, 'V', 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "VISUAL LINE")
 	})
@@ -204,7 +204,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'v', 0, 0, 0, "", "", false, false, nil,
+			0, true, 0, 'v', 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "VISUAL")
 	})
@@ -216,7 +216,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'B', 0, 0, 0, "", "", false, false, nil,
+			0, true, 0, 'B', 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "VISUAL BLOCK")
 	})
@@ -228,7 +228,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "pod")
 		assert.Contains(t, result, "0 lines")
@@ -241,7 +241,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, true,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "LOADING HISTORY")
 	})
@@ -254,7 +254,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, true, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "switch pod")
 	})
@@ -266,7 +266,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, true, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "containers")
 	})
@@ -279,7 +279,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.Contains(t, result, "WRAP")
 		// The long line should be visible (at least part of it).
@@ -316,7 +316,7 @@ func TestRenderLogViewerRelativeTimestamps(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", true, false, nil, // relativeTimestamps=true
+			-1, false, 0, 0, 0, 0, 0, "", "", true, false, nil, LogHistogramView{}, // relativeTimestamps=true
 		)
 		assert.Contains(t, result, "5m ago",
 			"relative form should replace the RFC3339 timestamp")
@@ -333,7 +333,7 @@ func TestRenderLogViewerRelativeTimestamps(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", true, false, nil, // relativeTimestamps=true
+			-1, false, 0, 0, 0, 0, 0, "", "", true, false, nil, LogHistogramView{}, // relativeTimestamps=true
 		)
 		// With timestamps off the renderer strips the prefix entirely,
 		// so neither the RFC3339 form nor "5m ago" should appear.
@@ -352,7 +352,7 @@ func TestRenderLogViewerRelativeTimestamps(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, // relativeTimestamps=false
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{}, // relativeTimestamps=false
 		)
 		assert.Contains(t, result, pastStamp,
 			"absolute form is unchanged when relativeTimestamps is off")
@@ -376,7 +376,7 @@ func TestRenderLogViewerJSONPretty(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, true, pretty,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, true, pretty, LogHistogramView{},
 		)
 		// Each field on its own row + the opening `{` row + the
 		// closing `}` row → at least 3 separators between them.
@@ -398,7 +398,7 @@ func TestRenderLogViewerJSONPretty(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
 		)
 		assert.NotContains(t, result, "[JSON]",
 			"JSON chip must not appear when the mode is off")
@@ -412,9 +412,65 @@ func TestRenderLogViewerJSONPretty(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, true, pretty,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, true, pretty, LogHistogramView{},
 		)
 		assert.Contains(t, result, "hello plain")
+	})
+}
+
+// TestRenderLogViewerHistogramStrip exercises the wiring contract for
+// the Phase 3C histogram: when the caller passes a non-empty
+// LogHistogramView, the rendered output must contain the title-bar
+// chip ("[HIST: 5m]") AND the strip itself (presence of at least one
+// of the box-drawing block characters '▁'..'█'). When the view is
+// the zero value, neither must appear.
+func TestRenderLogViewerHistogramStrip(t *testing.T) {
+	t.Run("non-empty histogram renders strip and chip", func(t *testing.T) {
+		view := LogHistogramView{
+			Counts:        []int{1, 3, 7, 2, 5},
+			CursorBucket:  -1,
+			BucketStepStr: "5m",
+		}
+		result := RenderLogViewer(
+			[]string{"a", "b", "c"}, nil, 0, 80, 20,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, view,
+		)
+		assert.Contains(t, result, "HIST: 5m",
+			"title bar should surface the [HIST: <step>] chip when histogram is on")
+		// At least one box-drawing block character should appear in the
+		// rendered output. We don't pin which one — log scaling picks
+		// from '▁'..'█' depending on the bucket distribution.
+		hasBlock := false
+		for _, r := range "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588" {
+			if strings.ContainsRune(result, r) {
+				hasBlock = true
+				break
+			}
+		}
+		assert.True(t, hasBlock,
+			"rendered output should contain at least one box-drawing block character from the histogram strip")
+	})
+
+	t.Run("zero histogram skips strip and chip", func(t *testing.T) {
+		result := RenderLogViewer(
+			[]string{"a", "b", "c"}, nil, 0, 80, 20,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
+		)
+		assert.NotContains(t, result, "HIST:",
+			"chip must not appear when histogram view is empty")
+		// No box-drawing block char should appear in pure passthrough mode.
+		for _, r := range "\u2581\u2582\u2583\u2584\u2585\u2586\u2587\u2588" {
+			assert.NotContains(t, result, string(r),
+				"strip block characters must not appear when histogram is off")
+		}
 	})
 }
 

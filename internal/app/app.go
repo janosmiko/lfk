@@ -215,6 +215,13 @@ type TabState struct {
 	// display preference.
 	logJSONPretty bool
 
+	// Log viewer: histogram strip toggle. When true, a 1-row sparkline
+	// renders between the title bar and the content area showing
+	// log-line density over time (bucket counts as box-drawing block
+	// characters). Default OFF. Persisted per tab so switching tabs
+	// preserves the visibility preference.
+	logHistogram bool
+
 	// Log viewer: active --since window (user-typed string, e.g. "5m").
 	// Empty means no --since filter.  Persisted per tab so switching
 	// tabs restores the setting; the stream is only restarted when the
@@ -439,6 +446,7 @@ type Model struct {
 	logTimestamps         bool               // show timestamps (--timestamps)
 	logRelativeTimestamps bool               // render timestamps as "5m ago" when logTimestamps is true
 	logJSONPretty         bool               // expand JSON log lines to pretty-printed multi-line form
+	logHistogram          bool               // show 1-row time-density sparkline above the content area
 	logHidePrefixes       bool               // hide [pod/name/container] prefixes
 	logPrevious           bool               // show previous container logs (--previous)
 	logIsMulti            bool               // multi-log stream (for restart)

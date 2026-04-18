@@ -36,7 +36,69 @@ func (m Model) viewLogs() string {
 	// re-projected through visibleIndices so each entry sits at the
 	// same index as its corresponding filtered line.
 	prettyLines := m.buildPrettyLinesForRender()
-	return ui.RenderLogViewer(m.logLines, m.logVisibleIndices, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, len(m.logRules), severityFloor, m.logSinceDuration, m.logRelativeTimestamps, m.logJSONPretty, prettyLines)
+	histogram := m.buildHistogramViewForRender()
+	return ui.RenderLogViewer(m.logLines, m.logVisibleIndices, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, len(m.logRules), severityFloor, m.logSinceDuration, m.logRelativeTimestamps, m.logJSONPretty, prettyLines, histogram)
+}
+
+// buildHistogramViewForRender builds the LogHistogramView passed to
+// RenderLogViewer. Returns the zero value when the toggle is off OR
+// when there are no log lines to bucket — both cases tell the
+// renderer to skip the strip entirely.
+//
+// The cursor bucket is computed from the line under m.logCursor in
+// the post-filter projection (when a filter is active) so the strip
+// indicator follows the visible cursor, not the raw-buffer one.
+func (m *Model) buildHistogramViewForRender() ui.LogHistogramView {
+	if !m.logHistogram || len(m.logLines) == 0 {
+		return ui.LogHistogramView{}
+	}
+	// Bucket count: cap at the typical content width so the renderer
+	// never asks for more granularity than it can show. The renderer
+	// rebuckets again to fit the actual width on the fly, so this is
+	// a soft upper bound — a small constant (240) keeps the per-frame
+	// build cost bounded on huge buffers.
+	const maxBuckets = 240
+	hist := BuildLogHistogram(m.logLines, maxBuckets)
+	if len(hist.Counts) == 0 {
+		return ui.LogHistogramView{}
+	}
+	cursorBucket := -1
+	if m.logCursor >= 0 {
+		cursorLine := m.cursorSourceLine()
+		if cursorLine != "" {
+			cursorBucket = hist.CursorBucket(cursorLine)
+		}
+	}
+	return ui.LogHistogramView{
+		Counts:        hist.Counts,
+		CursorBucket:  cursorBucket,
+		BucketStepStr: hist.FormatBucketStep(),
+	}
+}
+
+// cursorSourceLine returns the raw log buffer line that the cursor
+// currently points at, accounting for the post-filter projection.
+// Returns the empty string when the cursor is out of range. Used by
+// the histogram builder to map the cursor's position back to a
+// timestamp without coupling the renderer to filter state.
+func (m *Model) cursorSourceLine() string {
+	if m.logCursor < 0 {
+		return ""
+	}
+	if m.logVisibleIndices == nil {
+		if m.logCursor < len(m.logLines) {
+			return m.logLines[m.logCursor]
+		}
+		return ""
+	}
+	if m.logCursor >= len(m.logVisibleIndices) {
+		return ""
+	}
+	idx := m.logVisibleIndices[m.logCursor]
+	if idx < 0 || idx >= len(m.logLines) {
+		return ""
+	}
+	return m.logLines[idx]
 }
 
 // buildPrettyLinesForRender returns a slice parallel to the projected
