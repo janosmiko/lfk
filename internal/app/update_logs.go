@@ -204,6 +204,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "R":
 		ret, cmd := m.handleLogKeyShiftR()
 		return ret, cmd, true
+	case "J":
+		ret, cmd := m.handleLogKeyShiftJ()
+		return ret, cmd, true
 	case "ctrl+s":
 		ret, cmd := m.handleLogKeyCtrlS()
 		return ret, cmd, true
@@ -996,6 +999,27 @@ func (m Model) handleLogKeyShiftR() (tea.Model, tea.Cmd) {
 	} else {
 		m.setStatusMessage("relative timestamps: off", false)
 	}
+	return m, scheduleStatusClear()
+}
+
+// handleLogKeyShiftJ toggles the per-tab JSON pretty-print mode.
+// When on, JSON log lines render as 2-space-indented multi-line
+// blocks; non-JSON lines remain unchanged. The toggle does NOT
+// restart the log stream or re-run the JSON detector — detection
+// results are cached, so the cost is just re-rendering the visible
+// window.
+func (m Model) handleLogKeyShiftJ() (tea.Model, tea.Cmd) {
+	m.logLineInput = ""
+	m.logJSONPretty = !m.logJSONPretty
+	if m.logJSONPretty {
+		m.setStatusMessage("JSON pretty-print: on", false)
+	} else {
+		m.setStatusMessage("JSON pretty-print: off", false)
+	}
+	// Switching modes changes how many visual rows each source line
+	// occupies, so the current scroll offset may land mid-block.
+	// Clamp so the viewport stays within the valid range.
+	m.clampLogScroll()
 	return m, scheduleStatusClear()
 }
 

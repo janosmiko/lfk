@@ -340,6 +340,7 @@ func helpSections() []helpSection {
 				{"#", "Toggle line numbers"},
 				{"s", "Toggle timestamps"},
 				{"R", "Toggle relative timestamps (5m ago) — requires s first"},
+				{"J", "Toggle JSON pretty-print (expand JSON lines with 2-space indent)"},
 				{"p", "Toggle pod/container prefixes"},
 				{"c", "Toggle previous container logs"},
 				{"t", "Set --since time window (e.g. 5m, 1h30m, 2d)"},

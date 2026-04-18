@@ -22,7 +22,34 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 // relativeTimestamps, when true together with timestamps, rewrites the
 // leading RFC3339 timestamp on each visible line to a relative form
 // ("5m ago"); a subtle `[REL]` chip is shown alongside `[TIMESTAMPS]`.
-func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor, logSince string, relativeTimestamps bool) string {
+// jsonPretty, when true, renders JSON log lines in expanded multi-line
+// form. The caller is responsible for producing the pretty-printed
+// representation and passing it as prettyLines (a parallel slice to
+// the post-projection lines; each element either equals the original
+// line or contains embedded newlines for JSON lines). When
+// prettyLines is nil, rendering falls back to the raw buffer even if
+// jsonPretty is true (useful for tests that exercise just the chip).
+// mergeJSONPrettyLines substitutes the expanded pretty-printed form
+// into `lines` for each index where `prettyLines[i] != ""`. When pretty
+// mode is off or the slice lengths don't match, returns the original
+// `lines` unchanged. Kept as a helper so RenderLogViewer's cyclomatic
+// complexity stays under the lint ceiling.
+func mergeJSONPrettyLines(lines, prettyLines []string, jsonPretty bool) []string {
+	if !jsonPretty || len(prettyLines) != len(lines) || len(lines) == 0 {
+		return lines
+	}
+	merged := make([]string, len(lines))
+	for i, line := range lines {
+		if p := prettyLines[i]; p != "" {
+			merged[i] = p
+		} else {
+			merged[i] = line
+		}
+	}
+	return merged
+}
+
+func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor, logSince string, relativeTimestamps, jsonPretty bool, prettyLines []string) string {
 	// Record the total number of lines before any filter projection so the
 	// title bar can render "[X of Y lines]" when filtering is active.
 	totalLines := lines
@@ -43,7 +70,7 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 	if visibleIndices != nil {
 		visibleCount = len(visibleIndices)
 	}
-	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logSince, relativeTimestamps)
+	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logSince, relativeTimestamps, jsonPretty)
 	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
 
 	// Content area: subtract border top + bottom (2 lines).
@@ -68,6 +95,8 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 	if scroll < 0 {
 		scroll = 0
 	}
+
+	lines = mergeJSONPrettyLines(lines, prettyLines, jsonPretty)
 
 	// Strip timestamps and/or pod prefixes from visible lines, or rewrite
 	// RFC3339 timestamps to their relative form when the caller asked for
@@ -120,9 +149,12 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 		selEnd = max(visualStart, cursor)
 	}
 
-	// Build visible lines, handling wrapping.
+	// Build visible lines, handling wrapping. JSON pretty-print forces
+	// the wrap-style renderer because pretty lines contain embedded
+	// newlines: the wrap renderer is the only path that handles one
+	// source line producing multiple visual rows.
 	var rendered []string
-	if wrap {
+	if wrap || jsonPretty {
 		rendered = renderWrappedLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
 	} else {
 		rendered = renderPlainLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
@@ -168,7 +200,7 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 // view is time-bounded. relativeTimestamps only surfaces (as a subtle
 // `[REL]` chip) when timestamps is also on — mirroring the runtime
 // precedence in the per-line rendering loop.
-func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor, logSince string, relativeTimestamps bool) string {
+func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor, logSince string, relativeTimestamps, jsonPretty bool) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -181,6 +213,7 @@ func renderLogTitleBar(title string, lines []string, visibleCount, width int, fo
 		{timestamps && relativeTimestamps, "REL"},
 		{hidePrefixes, "NO PREFIX"},
 		{previous, "PREVIOUS"},
+		{jsonPretty, "JSON"},
 		{loadingHistory, "LOADING HISTORY..."},
 	}
 	var indicators []string
@@ -269,6 +302,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "#", Desc: "line#"},
 		{Key: "s", Desc: "timestamps"},
 		{Key: "R", Desc: "rel-ts"},
+		{Key: "J", Desc: "json"},
 		{Key: "p", Desc: "prefixes"},
 		{Key: "c", Desc: "previous"},
 		{Key: "t", Desc: "since"},
@@ -394,7 +428,10 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 	for i := scroll; i < end && len(result) < height; i++ {
 		line := lines[i]
 		isSelected := selStart >= 0 && i >= selStart && i <= selEnd
-		wrapped := wrapLine(line, availWidth)
+		// splitAndWrapLine handles JSON pretty-printed content by
+		// splitting on embedded "\n" before width-wrapping. For lines
+		// without embedded newlines it is identical to wrapLine.
+		wrapped := splitAndWrapLine(line, availWidth)
 		for j, wl := range wrapped {
 			if len(result) >= height {
 				break
@@ -455,6 +492,24 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 // Exported for reuse in YAML, describe, and diff view wrapping.
 func WrapLine(line string, width int) []string {
 	return wrapLine(line, width)
+}
+
+// splitAndWrapLine first splits line on "\n" (to expand pretty-printed
+// JSON multi-line blocks) and then width-wraps each resulting fragment.
+// When the line contains no embedded newlines the behaviour is
+// identical to wrapLine. Used by the pretty-print render path to
+// reuse the wrap renderer's visual-row machinery without reinventing
+// variable-height scroll math.
+func splitAndWrapLine(line string, width int) []string {
+	if !strings.Contains(line, "\n") {
+		return wrapLine(line, width)
+	}
+	parts := strings.Split(line, "\n")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		out = append(out, wrapLine(p, width)...)
+	}
+	return out
 }
 
 // wrapLine splits a line into chunks of at most width runes.
@@ -582,7 +637,7 @@ func sanitizeLogLine(s string) string {
 	// Fast path: check if any sanitization is needed.
 	needsSanitize := false
 	for _, r := range s {
-		if r != '\t' && (r < 32 || r == 127) {
+		if r != '\t' && r != '\n' && (r < 32 || r == 127) {
 			needsSanitize = true
 			break
 		}
@@ -594,7 +649,7 @@ func sanitizeLogLine(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if r != '\t' && (r < 32 || r == 127) {
+		if r != '\t' && r != '\n' && (r < 32 || r == 127) {
 			b.WriteRune('\ufffd') // Unicode replacement character
 		} else {
 			b.WriteRune(r)

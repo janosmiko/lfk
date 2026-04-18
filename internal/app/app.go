@@ -209,6 +209,12 @@ type TabState struct {
 	logRules       []Rule
 	logIncludeMode IncludeMode
 
+	// Log viewer: JSON pretty-print mode. When true, JSON log lines
+	// render expanded with 2-space indentation; non-JSON lines are
+	// unchanged. Persisted per tab so switching tabs preserves the
+	// display preference.
+	logJSONPretty bool
+
 	// Log viewer: active --since window (user-typed string, e.g. "5m").
 	// Empty means no --since filter.  Persisted per tab so switching
 	// tabs restores the setting; the stream is only restarted when the
@@ -432,6 +438,7 @@ type Model struct {
 	logLineNumbers        bool               // show line numbers
 	logTimestamps         bool               // show timestamps (--timestamps)
 	logRelativeTimestamps bool               // render timestamps as "5m ago" when logTimestamps is true
+	logJSONPretty         bool               // expand JSON log lines to pretty-printed multi-line form
 	logHidePrefixes       bool               // hide [pod/name/container] prefixes
 	logPrevious           bool               // show previous container logs (--previous)
 	logIsMulti            bool               // multi-log stream (for restart)

@@ -30,7 +30,38 @@ func (m Model) viewLogs() string {
 			break
 		}
 	}
-	return ui.RenderLogViewer(m.logLines, m.logVisibleIndices, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, len(m.logRules), severityFloor, m.logSinceDuration, m.logRelativeTimestamps)
+	// Build the pretty-printed slice only when the mode is on. The
+	// result is parallel to the projected lines slice the renderer
+	// sees: identity transform when no filter is active, otherwise
+	// re-projected through visibleIndices so each entry sits at the
+	// same index as its corresponding filtered line.
+	prettyLines := m.buildPrettyLinesForRender()
+	return ui.RenderLogViewer(m.logLines, m.logVisibleIndices, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, len(m.logRules), severityFloor, m.logSinceDuration, m.logRelativeTimestamps, m.logJSONPretty, prettyLines)
+}
+
+// buildPrettyLinesForRender returns a slice parallel to the projected
+// log lines (post-filter if a filter is active, raw buffer otherwise)
+// with each entry containing the pretty-printed multi-line form for
+// JSON lines, or an empty string for non-JSON lines so the renderer
+// can skip them quickly. Returns nil when pretty mode is off.
+func (m *Model) buildPrettyLinesForRender() []string {
+	if !m.logJSONPretty || len(m.logLines) == 0 {
+		return nil
+	}
+	lookup := m.jsonLineAt
+	// First build parallel to the raw buffer, then re-project if a
+	// filter is active so the slice sits next to the post-filter lines.
+	rawPretty := BuildPrettyVisibleLines(m.logLines, nil, lookup)
+	if m.logVisibleIndices == nil {
+		return rawPretty
+	}
+	projected := make([]string, len(m.logVisibleIndices))
+	for i, idx := range m.logVisibleIndices {
+		if idx >= 0 && idx < len(rawPretty) {
+			projected[i] = rawPretty[idx]
+		}
+	}
+	return projected
 }
 
 func (m Model) viewDescribe() string {

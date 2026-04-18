@@ -81,7 +81,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"my-pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "my-pod")
 		assert.Contains(t, result, "log entry 1")
@@ -95,7 +95,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "FOLLOW")
 	})
@@ -107,7 +107,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "WRAP")
 	})
@@ -119,7 +119,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "LINE#")
 	})
@@ -131,7 +131,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "TIMESTAMPS")
 	})
@@ -143,7 +143,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "PREVIOUS")
 	})
@@ -155,7 +155,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "error", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "/error")
 	})
@@ -167,7 +167,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "err",
 			true, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "err")
 		assert.Contains(t, result, "enter:apply")
@@ -180,7 +180,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"Saved to file", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "Saved to file")
 	})
@@ -192,7 +192,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'V', 0, 0, 0, "", "", false,
+			0, true, 0, 'V', 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "VISUAL LINE")
 	})
@@ -204,7 +204,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'v', 0, 0, 0, "", "", false,
+			0, true, 0, 'v', 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "VISUAL")
 	})
@@ -216,7 +216,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'B', 0, 0, 0, "", "", false,
+			0, true, 0, 'B', 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "VISUAL BLOCK")
 	})
@@ -228,7 +228,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "pod")
 		assert.Contains(t, result, "0 lines")
@@ -241,7 +241,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, true,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "LOADING HISTORY")
 	})
@@ -254,7 +254,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, true, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "switch pod")
 	})
@@ -266,7 +266,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, true, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "containers")
 	})
@@ -279,7 +279,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
 		)
 		assert.Contains(t, result, "WRAP")
 		// The long line should be visible (at least part of it).
@@ -316,7 +316,7 @@ func TestRenderLogViewerRelativeTimestamps(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", true, // relativeTimestamps=true
+			-1, false, 0, 0, 0, 0, 0, "", "", true, false, nil, // relativeTimestamps=true
 		)
 		assert.Contains(t, result, "5m ago",
 			"relative form should replace the RFC3339 timestamp")
@@ -333,7 +333,7 @@ func TestRenderLogViewerRelativeTimestamps(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", true, // relativeTimestamps=true
+			-1, false, 0, 0, 0, 0, 0, "", "", true, false, nil, // relativeTimestamps=true
 		)
 		// With timestamps off the renderer strips the prefix entirely,
 		// so neither the RFC3339 form nor "5m ago" should appear.
@@ -352,11 +352,69 @@ func TestRenderLogViewerRelativeTimestamps(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0, "", "", false, // relativeTimestamps=false
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil, // relativeTimestamps=false
 		)
 		assert.Contains(t, result, pastStamp,
 			"absolute form is unchanged when relativeTimestamps is off")
 		assert.NotContains(t, result, "5m ago")
+	})
+}
+
+// TestRenderLogViewerJSONPretty verifies the jsonPretty toggle + the
+// prettyLines parallel slice produce multi-line output for JSON log
+// lines. The rendered output must contain multiple newlines between
+// the opening `{` and the closing `}` (one per expanded field) when
+// pretty mode is on. Without the mode (or without prettyLines) the
+// output is the raw single-line form.
+func TestRenderLogViewerJSONPretty(t *testing.T) {
+	t.Run("pretty mode expands json into multiple visual rows", func(t *testing.T) {
+		lines := []string{`{"a":1,"b":2}`}
+		pretty := []string{"{\n  \"a\": 1,\n  \"b\": 2\n}"}
+		result := RenderLogViewer(
+			lines, nil, 0, 80, 20,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, true, pretty,
+		)
+		// Each field on its own row + the opening `{` row + the
+		// closing `}` row → at least 3 separators between them.
+		idxOpen := strings.Index(result, "{")
+		idxClose := strings.LastIndex(result, "}")
+		require := result[idxOpen:idxClose]
+		assert.Greater(t, strings.Count(require, "\n"), 2,
+			"pretty mode should produce multiple visual rows between the braces")
+		assert.Contains(t, result, `"a": 1`)
+		assert.Contains(t, result, `"b": 2`)
+		assert.Contains(t, result, "JSON",
+			"title bar should show the JSON indicator chip")
+	})
+
+	t.Run("pretty indicator off when mode disabled", func(t *testing.T) {
+		result := RenderLogViewer(
+			[]string{`{"a":1}`}, nil, 0, 80, 20,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, false, nil,
+		)
+		assert.NotContains(t, result, "[JSON]",
+			"JSON chip must not appear when the mode is off")
+	})
+
+	t.Run("non-json plain line passes through unchanged", func(t *testing.T) {
+		pretty := []string{""} // empty entry → fall back to raw line
+		result := RenderLogViewer(
+			[]string{"hello plain"}, nil, 0, 80, 20,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, "", "", false, true, pretty,
+		)
+		assert.Contains(t, result, "hello plain")
 	})
 }
 
