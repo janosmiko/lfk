@@ -14,6 +14,24 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color(ColorBase)).
 	Bold(true)
 
+// LogTimeRangeView is the UI-layer representation of an active log
+// time-range window. The app layer owns the full LogTimeRange struct
+// (internal/app) but the layering rule "internal/ui cannot import
+// internal/app" forces this slimmer mirror: the renderer needs just
+// enough to decide whether to render the `[RANGE: …]` chip and what
+// text to put inside it.
+//
+// Callers build this from app.LogTimeRange's IsActive() and Display()
+// helpers — no business logic belongs here.
+type LogTimeRangeView struct {
+	// Display is the pre-rendered chip body (e.g. "-24h" or
+	// "2026-04-17 15:00 → -1h"). An empty string means "no chip".
+	Display string
+}
+
+// IsActive reports whether the view has content to render.
+func (v LogTimeRangeView) IsActive() bool { return v.Display != "" }
+
 // RenderLogViewer renders the full-screen log viewer.
 // ruleCount is the number of active filter rules; when greater than zero a
 // `[FILTER: N]` chip is shown in the title bar.
@@ -87,7 +105,13 @@ func applyLineRewrites(lines []string, scroll, contentHeight int, timestamps, hi
 	return out
 }
 
-func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor, logSince string, relativeTimestamps, jsonPretty bool, prettyLines []string, histogram LogHistogramView) string {
+// RenderLogViewer renders the full-screen log viewer.
+//
+// The `logTimeRange` parameter is the active log-viewer time window
+// (start + optional end), rendered as a `[RANGE: …]` title-bar chip
+// when Display is non-empty. Pass a zero LogTimeRangeView to suppress
+// the chip.
+func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor string, logTimeRange LogTimeRangeView, relativeTimestamps, jsonPretty bool, prettyLines []string, histogram LogHistogramView) string {
 	// Record the total number of lines before any filter projection so the
 	// title bar can render "[X of Y lines]" when filtering is active.
 	totalLines := lines
@@ -108,7 +132,7 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 	if visibleIndices != nil {
 		visibleCount = len(visibleIndices)
 	}
-	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logSince, relativeTimestamps, jsonPretty, histogram)
+	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logTimeRange, relativeTimestamps, jsonPretty, histogram)
 	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
 
 	// Histogram strip: when present, reclaim one row of content height
@@ -235,14 +259,14 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 // filtering. When it is less than len(lines), the title renders `[X of Y lines]`
 // instead of `[Y lines]`. ruleCount is the number of active filter rules; when
 // greater than zero a `[FILTER: N]` chip is appended to the indicators.
-// logSince is the currently applied --since window; when non-empty a
-// `[SINCE: ...]` chip is shown so the user can tell at a glance that the
-// view is time-bounded. relativeTimestamps only surfaces (as a subtle
-// `[REL]` chip) when timestamps is also on — mirroring the runtime
-// precedence in the per-line rendering loop. histogram, when non-empty,
-// surfaces a `[HIST: <step>]` chip showing the auto-picked bucket
-// width so the user knows the strip's time resolution at a glance.
-func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor, logSince string, relativeTimestamps, jsonPretty bool, histogram LogHistogramView) string {
+// logTimeRange carries the currently applied time window; when its Display
+// string is non-empty a `[RANGE: ...]` chip is shown so the user can tell
+// at a glance that the view is time-bounded. relativeTimestamps only
+// surfaces (as a subtle `[REL]` chip) when timestamps is also on — mirroring
+// the runtime precedence in the per-line rendering loop. histogram, when
+// non-empty, surfaces a `[HIST: <step>]` chip showing the auto-picked
+// bucket width so the user knows the strip's time resolution at a glance.
+func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor string, logTimeRange LogTimeRangeView, relativeTimestamps, jsonPretty bool, histogram LogHistogramView) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -286,10 +310,12 @@ func renderLogTitleBar(title string, lines []string, visibleCount, width int, fo
 	if ruleCount > 0 {
 		indicators = append(indicators, HelpKeyStyle.Render(fmt.Sprintf("[FILTER: %d]", ruleCount)))
 	}
-	// --since window chip: makes it obvious when the view is
-	// time-bounded, independent of any filter rules.
-	if logSince != "" {
-		indicators = append(indicators, HelpKeyStyle.Render("[SINCE: "+logSince+"]"))
+	// Time-range window chip: makes it obvious when the view is
+	// time-bounded, independent of any filter rules. The display body
+	// may include the arrow glyph (Start → End); the renderer passes
+	// that through as-is so users see exactly what they committed.
+	if logTimeRange.IsActive() {
+		indicators = append(indicators, HelpKeyStyle.Render("[RANGE: "+logTimeRange.Display+"]"))
 	}
 	// Histogram chip: shows the auto-picked bucket width so the user
 	// knows the time resolution of the strip without hovering.
@@ -353,7 +379,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "H", Desc: "histogram"},
 		{Key: "p", Desc: "prefixes"},
 		{Key: "c", Desc: "previous"},
-		{Key: "T", Desc: "since"},
+		{Key: "T", Desc: "range"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "/", Desc: "search"},
 		{Key: "n/N", Desc: "next/prev"},

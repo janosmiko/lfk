@@ -39,7 +39,9 @@ func (m *Model) startLogStream() tea.Cmd {
 	containerName := m.actionCtx.containerName
 	kubeconfigPaths := m.client.KubeconfigPaths()
 	logPrevious := m.logPrevious
-	sinceDuration := m.logSinceDuration
+	// Resolve the active time-range window to kubectl arguments up front
+	// so the goroutine below doesn't need to touch Model state.
+	sinceFlag, sinceValue := m.logTimeRange.KubectlSinceArg(time.Now())
 	tailLines := m.logTailLines
 	if tailLines == 0 {
 		tailLines = ui.ConfigLogTailLines
@@ -105,12 +107,12 @@ func (m *Model) startLogStream() tea.Cmd {
 		}
 
 		// Constrain the stream to a recent time window when the user
-		// set one via `T`.  --since is incompatible with --previous
-		// (kubectl errors), so skip it in previous-container mode.
-		// Convert any `d` suffix to hours — kubectl doesn't understand
-		// "30d" directly but accepts "720h".
-		if sinceDuration != "" && !logPrevious {
-			args = append(args, "--since="+kubectlSinceArg(sinceDuration))
+		// set one via `T`.  --since-time is incompatible with
+		// --previous (kubectl errors), so skip it in previous-container
+		// mode. The LogTimeRange helper emits an absolute RFC3339
+		// timestamp so reconnects don't drift the window.
+		if sinceFlag != "" && !logPrevious {
+			args = append(args, sinceFlag+"="+sinceValue)
 		}
 
 		// Always include --timestamps so toggling visibility doesn't need a restart.
@@ -344,12 +346,12 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 			args = append(args, fmt.Sprintf("--tail=%d", m.logTailLines))
 		}
 
-		// --since keeps the multi-stream bounded to the user-requested
-		// window, matching the single-stream behaviour.  Previous-mode
-		// is never set here (startMultiLogStream resets it), so no
-		// compatibility guard is needed.
-		if m.logSinceDuration != "" {
-			args = append(args, "--since="+kubectlSinceArg(m.logSinceDuration))
+		// --since-time keeps the multi-stream bounded to the
+		// user-requested window, matching the single-stream behaviour.
+		// Previous-mode is never set here (startMultiLogStream resets
+		// it), so no compatibility guard is needed.
+		if flag, value := m.logTimeRange.KubectlSinceArg(time.Now()); flag != "" {
+			args = append(args, flag+"="+value)
 		}
 
 		args = append(args, "--timestamps")
@@ -449,8 +451,8 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 			args = append(args, fmt.Sprintf("--tail=%d", m.logTailLines))
 		}
 
-		if m.logSinceDuration != "" {
-			args = append(args, "--since="+kubectlSinceArg(m.logSinceDuration))
+		if flag, value := m.logTimeRange.KubectlSinceArg(time.Now()); flag != "" {
+			args = append(args, flag+"="+value)
 		}
 
 		args = append(args, "--timestamps")
@@ -507,7 +509,8 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 	kctx := m.actionCtx.context
 	containerName := m.actionCtx.containerName
 	kubeconfigPaths := m.client.KubeconfigPaths()
-	sinceDuration := m.logSinceDuration
+	sinceFlag, sinceValue := m.logTimeRange.KubectlSinceArg(time.Now())
+	rangeActive := m.logTimeRange.IsActive()
 	newTail := m.logTailLines + ui.ConfigLogTailLines
 	prevTotal := len(m.logLines)
 	// Only filter client-side when in --all-containers mode (no -c flag).
@@ -556,12 +559,13 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 		}
 
 		args = append(args, fmt.Sprintf("--tail=%d", newTail))
-		// Honour the active --since window on back-scroll too; going
+		// Honour the active time-range window on back-scroll too; going
 		// beyond the window is pointless since kubectl won't return
 		// anything older than the cutoff anyway.
-		if sinceDuration != "" {
-			args = append(args, "--since="+kubectlSinceArg(sinceDuration))
+		if sinceFlag != "" {
+			args = append(args, sinceFlag+"="+sinceValue)
 		}
+		_ = rangeActive // reserved: callers may later suppress tail
 		args = append(args, "--timestamps")
 
 		kubeconfigEnv := "KUBECONFIG=" + kubeconfigPaths

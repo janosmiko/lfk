@@ -79,7 +79,7 @@ const (
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
 	overlayBackgroundTasks
 	overlayLogFilter
-	overlayLogSinceInput
+	overlayLogTimeRange
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -226,7 +226,18 @@ type TabState struct {
 	// Empty means no --since filter.  Persisted per tab so switching
 	// tabs restores the setting; the stream is only restarted when the
 	// user commits via the overlay, not on tab switch.
+	//
+	// Retained for one release so pre-migration session files load
+	// cleanly; code paths should consult logTimeRange instead.
 	logSinceDuration string
+
+	// Log viewer: active time-range window. Replaces logSinceDuration —
+	// a LogTimeRange carries both a start and an optional end endpoint,
+	// each either relative (offset from now) or absolute (wall-clock).
+	// Persisted per tab. When this is set, kubectlSinceArg is derived
+	// from r.KubectlSinceArg(now) and the End filter is applied
+	// client-side in updateLogLine / updateLogHistory.
+	logTimeRange LogTimeRange
 
 	// Log viewer: parent resource context for pod re-selection.
 	logParentKind   string
@@ -508,10 +519,34 @@ type Model struct {
 	// Log viewer: active --since window, displayed as a title-bar chip
 	// and appended to the kubectl logs args when non-empty.  Empty
 	// disables the filter.  Session-only — not persisted to disk.
+	//
+	// Retained for one release so pre-migration tab snapshots still
+	// load — populated into logTimeRange on loadTab and never set
+	// again by production code.
 	logSinceDuration string
 
-	// Log viewer: transient textinput for the --since duration prompt.
-	logSinceInput TextInput
+	// Log viewer: active time-range window (Phase 1+ replacement for
+	// logSinceDuration). A zero value disables the filter. Session-only
+	// — not persisted to disk beyond the tab-state snapshot.
+	logTimeRange LogTimeRange
+
+	// Log viewer: time-range picker state (overlayLogTimeRange).
+	//
+	// logTimeRangePresets is the list of presets shown in the left
+	// column of the picker; populated when the overlay opens so
+	// Today/Yesterday anchors use the correct "now". logTimeRangeCursor
+	// indexes into it. logTimeRangePendingRange holds the range the
+	// user has built up inside the picker but hasn't committed yet —
+	// Enter from the preset column writes it to logTimeRange; Esc
+	// discards it.
+	logTimeRangePresets      []LogTimeRangePreset
+	logTimeRangeCursor       int
+	logTimeRangePendingRange LogTimeRange
+	// logTimeRangeFocus selects which panel of the picker currently
+	// accepts keyboard input: Presets (default), Start editor, End
+	// editor. Phase 2/3 populate the editor focus values; Phase 1
+	// keeps it pinned on Presets.
+	logTimeRangeFocus logTimeRangeFocus
 
 	// Severity detector — initialized once at startup; reused for all log views.
 	logSeverityDetector *severityDetector //nolint:unused // wired in subsequent Phase C tasks

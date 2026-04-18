@@ -2062,6 +2062,19 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 				if msg.done {
 					m.tabs[i].logLines = append(m.tabs[i].logLines, "--- stream ended ---")
 				} else {
+					// Client-side End filter: drop lines past the upper
+					// bound on background tabs too, so switching back
+					// doesn't surface noise the user filtered out.
+					if keep := tabKeepsLine(m.tabs[i].logTimeRange, msg.line); !keep {
+						ch := msg.ch
+						return m, func() tea.Msg {
+							line, ok := <-ch
+							if !ok {
+								return logLineMsg{done: true, ch: ch}
+							}
+							return logLineMsg{line: line, ch: ch}
+						}
+					}
 					m.tabs[i].logLines = append(m.tabs[i].logLines, msg.line)
 					// Warm the JSON cache with the new line so filter/render
 					// consumers don't re-parse later. Safe whether or not
@@ -2090,6 +2103,12 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	}
+	// Client-side End filter: kubectl already clipped at Start, but the
+	// upper bound has no kubectl-side equivalent. Lines without a
+	// parseable timestamp are kept (matching KeepLine's contract).
+	if !tabKeepsLine(m.logTimeRange, msg.line) {
+		return m, m.waitForLogLine()
+	}
 	m.logLines = append(m.logLines, msg.line)
 	m.warmJSONCache(msg.line)
 	m.maybeAppendVisibleIndex(len(m.logLines) - 1)
@@ -2098,6 +2117,23 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		m.logCursor = len(m.logLines) - 1
 	}
 	return m, m.waitForLogLine()
+}
+
+// tabKeepsLine applies only the End (upper) bound of r to line, treating
+// a zero-value End as "no upper bound" and short-circuiting. Callers use
+// this to decide whether to append a newly-streamed line; the Start bound
+// is already enforced by kubectl --since-time so re-checking it here
+// would waste work.
+func tabKeepsLine(r LogTimeRange, line string) bool {
+	if r.End.IsZero() {
+		return true
+	}
+	ts, _, ok := parseLogLineTimestamp(line)
+	if !ok {
+		return true
+	}
+	upper := r.End.Resolve(time.Now())
+	return !ts.After(upper)
 }
 
 func (m Model) updateLogHistory(msg logHistoryMsg) Model {
@@ -2136,6 +2172,21 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	} else if overlapIdx == -1 && len(msg.lines) > 0 {
 		// No overlap found; prepend all (logs may have rotated).
 		newOlderLines = msg.lines
+	}
+
+	// Client-side End filter on the prepended batch: drop any older
+	// lines that sit above the user's upper bound so back-scroll and
+	// live-stream stay consistent. Lines without timestamps are kept.
+	if m.logTimeRange.End.IsZero() || len(newOlderLines) == 0 {
+		// no-op
+	} else {
+		filtered := newOlderLines[:0]
+		for _, line := range newOlderLines {
+			if tabKeepsLine(m.logTimeRange, line) {
+				filtered = append(filtered, line)
+			}
+		}
+		newOlderLines = filtered
 	}
 
 	if len(newOlderLines) == 0 {

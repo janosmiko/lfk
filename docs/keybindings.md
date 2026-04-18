@@ -201,7 +201,7 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `H` | Toggle histogram strip (1-row time-density sparkline above content; lines without an RFC3339 timestamp are not counted) |
 | `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
-| `T` | Set `--since` time window (e.g. `5m`, `1h30m`, `2d`; empty input clears). `t` is the global New Tab shortcut, so the log-view since-prompt uses `Shift+T`. |
+| `T` | Open the log time-range picker (Start + optional End; presets such as Last 5m / Last 24h / Today / Yesterday / "Last 24h excluding last 1h"). `t` is the global New Tab shortcut, so the log-view picker uses `Shift+T`. The title bar shows a `[RANGE: …]` chip while a window is active. |
 | `/` | Search in logs |
 | `n` / `N` | Next / previous search match |
 | `]e` / `[e` | Jump to next/prev ERROR-severity visible line |

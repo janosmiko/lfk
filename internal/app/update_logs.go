@@ -233,14 +233,13 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handleLogKeyT opens the --since duration prompt.  Only reachable from
+// handleLogKeyT opens the log time-range picker. Only reachable from
 // the log view's normal key dispatch — search, visual, pending-bracket,
 // and overlay modes all short-circuit before we get here, so the caller
 // doesn't need to re-check those states.
 func (m Model) handleLogKeyT() Model {
 	m.logLineInput = ""
-	m.overlay = overlayLogSinceInput
-	m.logSinceInput.Clear()
+	m.openLogTimeRangeOverlay()
 	return m
 }
 

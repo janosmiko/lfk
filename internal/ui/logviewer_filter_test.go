@@ -17,7 +17,7 @@ func TestRenderLogViewerWithVisibleIndices(t *testing.T) {
 		false, false, false, false, false, false,
 		"test", "", "",
 		false, false, false, false, false,
-		"", false, 0, false, 0, 'v', 0, 0, 0, "", "", false, false, nil, LogHistogramView{},
+		"", false, 0, false, 0, 'v', 0, 0, 0, "", LogTimeRangeView{}, false, false, nil, LogHistogramView{},
 	)
 
 	assert.Contains(t, out, "keep1")
@@ -30,13 +30,13 @@ func TestTitleBarShowsXofYWhenFiltered(t *testing.T) {
 	// flags: follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode
 	out := renderLogTitleBar("test", []string{"a", "b", "c", "d"}, 2, 80,
 		false, false, false, false, false, false, false,
-		'v', false, "", 0, "", "", false, false, LogHistogramView{},
+		'v', false, "", 0, "", LogTimeRangeView{}, false, false, LogHistogramView{},
 	)
 	assert.Contains(t, out, "[2 of 4 lines]")
 
 	out2 := renderLogTitleBar("test", []string{"a", "b", "c", "d"}, 4, 80,
 		false, false, false, false, false, false, false,
-		'v', false, "", 0, "", "", false, false, LogHistogramView{},
+		'v', false, "", 0, "", LogTimeRangeView{}, false, false, LogHistogramView{},
 	)
 	assert.Contains(t, out2, "[4 lines]")
 	assert.NotContains(t, out2, "of")
@@ -46,31 +46,31 @@ func TestTitleBarShowsFilterChip(t *testing.T) {
 	// ruleCount=3 should render a [FILTER: 3] chip.
 	out := renderLogTitleBar("test", []string{"a"}, 1, 80,
 		false, false, false, false, false, false, false,
-		'v', false, "", 3, "", "", false, false, LogHistogramView{},
+		'v', false, "", 3, "", LogTimeRangeView{}, false, false, LogHistogramView{},
 	)
 	assert.Contains(t, out, "[FILTER: 3]")
 
 	// ruleCount=0 should not render the chip.
 	out2 := renderLogTitleBar("test", []string{"a"}, 1, 80,
 		false, false, false, false, false, false, false,
-		'v', false, "", 0, "", "", false, false, LogHistogramView{},
+		'v', false, "", 0, "", LogTimeRangeView{}, false, false, LogHistogramView{},
 	)
 	assert.NotContains(t, out2, "FILTER")
 }
 
-// TestTitleBarShowsSinceChip is the Phase 3A title-bar contract: a
-// non-empty --since value surfaces as a `[SINCE: 5m]` chip next to
-// the filter chip.  Empty means no chip.
-func TestTitleBarShowsSinceChip(t *testing.T) {
+// TestTitleBarShowsRangeChip is the Phase 3A title-bar contract: a
+// non-empty LogTimeRangeView surfaces as a `[RANGE: …]` chip next to
+// the filter chip. A zero-value view means no chip.
+func TestTitleBarShowsRangeChip(t *testing.T) {
 	out := renderLogTitleBar("test", []string{"a"}, 1, 80,
 		false, false, false, false, false, false, false,
-		'v', false, "", 0, "", "5m", false, false, LogHistogramView{},
+		'v', false, "", 0, "", LogTimeRangeView{Display: "-24h"}, false, false, LogHistogramView{},
 	)
-	assert.Contains(t, out, "[SINCE: 5m]")
+	assert.Contains(t, out, "[RANGE: -24h]")
 
 	out2 := renderLogTitleBar("test", []string{"a"}, 1, 80,
 		false, false, false, false, false, false, false,
-		'v', false, "", 0, "", "", false, false, LogHistogramView{},
+		'v', false, "", 0, "", LogTimeRangeView{}, false, false, LogHistogramView{},
 	)
-	assert.NotContains(t, out2, "SINCE")
+	assert.NotContains(t, out2, "RANGE")
 }
