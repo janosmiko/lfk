@@ -1225,6 +1225,10 @@ func (m Model) updatePodLogSelect(msg podLogSelectMsg) (tea.Model, tea.Cmd) {
 			m.pendingAction = ""
 			m.logSavedPodName = ""
 			m.logLines = nil
+			m.logVisibleIndices = nil
+			m.logRules = nil
+			m.logIncludeMode = IncludeAny
+			m.logFilterChain = NewFilterChain(nil, IncludeAny, m.logSeverityDetector)
 			m.logScroll = 0
 			m.logFollow = true
 			m.logTailLines = ui.ConfigLogTailLines
@@ -2081,6 +2085,10 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 					m.tabs[i].logLines = append(m.tabs[i].logLines, "--- stream ended ---")
 				} else {
 					m.tabs[i].logLines = append(m.tabs[i].logLines, msg.line)
+					// Warm the JSON cache with the new line so filter/render
+					// consumers don't re-parse later. Safe whether or not
+					// this is the active tab — the cache is process-global.
+					m.warmJSONCache(msg.line)
 					// Continue draining: re-issue waitForLogLine for that channel.
 					ch := msg.ch
 					return m, func() tea.Msg {
@@ -2105,6 +2113,8 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.logLines = append(m.logLines, msg.line)
+	m.warmJSONCache(msg.line)
+	m.maybeAppendVisibleIndex(len(m.logLines) - 1)
 	if m.logFollow {
 		m.logScroll = m.logMaxScroll()
 		m.logCursor = len(m.logLines) - 1
@@ -2155,13 +2165,56 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 		return m
 	}
 
+	// Warm the JSON cache for the prepended older lines so downstream
+	// consumers (filter/render) don't re-parse the same lines later.
+	// Runs before mutating logLines — this is on the slow history-load
+	// path so perf doesn't matter, correctness does.
+	for _, line := range newOlderLines {
+		m.warmJSONCache(line)
+	}
+
 	// Prepend and adjust scroll to maintain view position.
 	prepended := len(newOlderLines)
-	m.logLines = append(newOlderLines, m.logLines...)
-	m.logScroll += prepended
-	if m.logCursor >= 0 {
-		m.logCursor += prepended
+	filterActive := m.logFilterChain != nil && m.logFilterChain.Active()
+
+	// Before mutating logLines, resolve the source-line index that the
+	// user was parked on. We'll re-anchor to the same source line after
+	// the new history is prepended and (if filter is active) the visible
+	// index is rebuilt.
+	anchorSrc := -1
+	if filterActive {
+		anchorSrc = m.logSourceLineAt(m.logCursor) // -1 if cursor is out of range
 	}
+
+	m.logLines = append(newOlderLines, m.logLines...)
+
+	if filterActive {
+		// Source indices shifted by `prepended`; rebuild visible indices
+		// from scratch so the filter evaluates the new historical lines.
+		m.rebuildLogVisibleIndices()
+		// Re-anchor cursor to the same source line (now at anchorSrc+prepended)
+		// in the new visible-indices slice.
+		if anchorSrc >= 0 {
+			newSrc := anchorSrc + prepended
+			visibleIdx := indexOf(m.logVisibleIndices, newSrc)
+			if visibleIdx >= 0 {
+				m.logCursor = visibleIdx
+			}
+		}
+		// Fresh ensureLogCursorVisible; clamp scroll/cursor into the new
+		// visible range (the whole filtered view just expanded by however
+		// many of the prepended lines passed the chain).
+		m.clampLogCursorAndScroll()
+		m.ensureLogCursorVisible()
+	} else {
+		// Unfiltered view: cursor and scroll are raw-source coordinates;
+		// shift by prepended so the user stays anchored to the same line.
+		m.logScroll += prepended
+		if m.logCursor >= 0 {
+			m.logCursor += prepended
+		}
+	}
+
 	m.logTailLines += ui.ConfigLogTailLines
 
 	// Cap total to prevent unbounded growth.
@@ -2170,6 +2223,16 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	}
 
 	return m
+}
+
+// indexOf returns the position of v in xs, or -1 if not found.
+func indexOf(xs []int, v int) int {
+	for i, x := range xs {
+		if x == v {
+			return i
+		}
+	}
+	return -1
 }
 
 func (m Model) updateLogSaveAll(msg logSaveAllMsg) (tea.Model, tea.Cmd) {

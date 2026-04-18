@@ -115,6 +115,8 @@ const (
 	overlayColumnToggle
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
 	overlayBackgroundTasks
+	overlayLogFilter
+	overlayLogSinceInput
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.
@@ -214,27 +216,54 @@ type TabState struct {
 	allGroupsExpanded bool   // override: show all groups expanded (toggled by hotkey)
 
 	// Per-tab view mode and fullscreen state.
-	mode              viewMode
-	logLines          []string
-	logScroll         int
-	logFollow         bool
-	logWrap           bool
-	logLineNumbers    bool
-	logTimestamps     bool
-	logPrevious       bool
-	logIsMulti        bool
-	logTitle          string
-	logCancel         context.CancelFunc
-	logCh             chan string
-	logTailLines      int  // current --tail value for the active stream
-	logHasMoreHistory bool // true if older lines may exist
-	logLoadingHistory bool // true while fetching older logs
-	logCursor         int  // cursor position (absolute line index), -1 when inactive
-	logVisualMode     bool // true when in visual line selection mode
-	logVisualStart    int  // anchor line where visual selection started
-	logVisualType     rune // 'V' = line, 'v' = char, 'B' = block
-	logVisualCol      int  // character column of anchor (for char and block modes)
-	logVisualCurCol   int  // current cursor column (for char and block modes)
+	mode                  viewMode
+	logLines              []string
+	logScroll             int
+	logFollow             bool
+	logWrap               bool
+	logLineNumbers        bool
+	logTimestamps         bool
+	logRelativeTimestamps bool
+	logPrevious           bool
+	logIsMulti            bool
+	logTitle              string
+	logCancel             context.CancelFunc
+	logCh                 chan string
+	logTailLines          int  // current --tail value for the active stream
+	logHasMoreHistory     bool // true if older lines may exist
+	logLoadingHistory     bool // true while fetching older logs
+	logCursor             int  // cursor position (absolute line index), -1 when inactive
+	logVisualMode         bool // true when in visual line selection mode
+	logVisualStart        int  // anchor line where visual selection started
+	logVisualType         rune // 'V' = line, 'v' = char, 'B' = block
+	logVisualCol          int  // character column of anchor (for char and block modes)
+	logVisualCurCol       int  // character column where the cursor is now
+
+	// Log viewer: active filter rules and mode. Persisted per tab so
+	// switching tabs preserves the rule stack the user built up.
+	// logFilterChain and logVisibleIndices are rebuilt from logRules on
+	// tab load; no need to snapshot them.
+	logRules       []Rule
+	logIncludeMode IncludeMode
+
+	// Log viewer: JSON pretty-print mode. When true, JSON log lines
+	// render expanded with 2-space indentation; non-JSON lines are
+	// unchanged. Persisted per tab so switching tabs preserves the
+	// display preference.
+	logJSONPretty bool
+
+	// Log viewer: histogram strip toggle. When true, a 1-row sparkline
+	// renders between the title bar and the content area showing
+	// log-line density over time (bucket counts as box-drawing block
+	// characters). Default OFF. Persisted per tab so switching tabs
+	// preserves the visibility preference.
+	logHistogram bool
+
+	// Log viewer: active --since window (user-typed string, e.g. "5m").
+	// Empty means no --since filter.  Persisted per tab so switching
+	// tabs restores the setting; the stream is only restarted when the
+	// user commits via the overlay, not on tab switch.
+	logSinceDuration string
 
 	// Log viewer: parent resource context for pod re-selection.
 	logParentKind   string
@@ -446,29 +475,32 @@ type Model struct {
 	searchPrevCursor int
 
 	// Log viewer state.
-	logLines          []string           // buffered log lines
-	logScroll         int                // scroll offset (top visible line)
-	logFollow         bool               // auto-scroll to bottom
-	logWrap           bool               // wrap long lines
-	logLineNumbers    bool               // show line numbers
-	logTimestamps     bool               // show timestamps (--timestamps)
-	logHidePrefixes   bool               // hide [pod/name/container] prefixes
-	logPrevious       bool               // show previous container logs (--previous)
-	logIsMulti        bool               // multi-log stream (for restart)
-	logMultiItems     []model.Item       // items for multi-log restart
-	logTitle          string             // title for the log overlay
-	logCancel         context.CancelFunc // cancel the kubectl log process
-	logCh             chan string        // channel for streaming log lines
-	logTailLines      int                // current --tail value for the active stream
-	logHasMoreHistory bool               // true if older lines may exist
-	logLoadingHistory bool               // true while fetching older logs
-	logHistoryCancel  context.CancelFunc // cancel for the history fetch
-	logCursor         int                // cursor position (absolute line index), -1 when inactive
-	logVisualMode     bool               // true when in visual line selection mode
-	logVisualStart    int                // anchor line where visual selection started
-	logVisualType     rune               // 'V' = line, 'v' = char, 'B' = block
-	logVisualCol      int                // character column of anchor (for char and block modes)
-	logVisualCurCol   int                // current cursor column (for char and block modes)
+	logLines              []string           // buffered log lines
+	logScroll             int                // scroll offset (top visible line)
+	logFollow             bool               // auto-scroll to bottom
+	logWrap               bool               // wrap long lines
+	logLineNumbers        bool               // show line numbers
+	logTimestamps         bool               // show timestamps (--timestamps)
+	logRelativeTimestamps bool               // render timestamps as "5m ago" when logTimestamps is true
+	logJSONPretty         bool               // expand JSON log lines to pretty-printed multi-line form
+	logHistogram          bool               // show 1-row time-density sparkline above the content area
+	logHidePrefixes       bool               // hide [pod/name/container] prefixes
+	logPrevious           bool               // show previous container logs (--previous)
+	logIsMulti            bool               // multi-log stream (for restart)
+	logMultiItems         []model.Item       // items for multi-log restart
+	logTitle              string             // title for the log overlay
+	logCancel             context.CancelFunc // cancel the kubectl log process
+	logCh                 chan string        // channel for streaming log lines
+	logTailLines          int                // current --tail value for the active stream
+	logHasMoreHistory     bool               // true if older lines may exist
+	logLoadingHistory     bool               // true while fetching older logs
+	logHistoryCancel      context.CancelFunc // cancel for the history fetch
+	logCursor             int                // cursor position (absolute line index), -1 when inactive
+	logVisualMode         bool               // true when in visual line selection mode
+	logVisualStart        int                // anchor line where visual selection started
+	logVisualType         rune               // 'V' = line, 'v' = char, 'B' = block
+	logVisualCol          int                // character column of anchor (for char and block modes)
+	logVisualCurCol       int                // current cursor column (for char and block modes)
 
 	// Log viewer: parent resource context for pod re-selection.
 	logParentKind   string // original parent resource kind (e.g., "Deployment")
@@ -495,6 +527,46 @@ type Model struct {
 	logSearchActive bool
 	logSearchInput  TextInput
 	logSearchQuery  string // applied search
+
+	// Filter pipeline (Phase 1 of log preview overhaul).
+	logRules          []Rule      //nolint:unused // wired in subsequent Phase C tasks
+	logIncludeMode    IncludeMode //nolint:unused // wired in subsequent Phase C tasks
+	logVisibleIndices []int       //nolint:unused // wired in subsequent Phase C tasks
+	// Filter modal UI fields — populated in Phase D/E.
+	logFilterModalOpen  bool      //nolint:unused // populated in Phase D/E
+	logFilterInput      TextInput //nolint:unused // populated in Phase D/E
+	logFilterListCursor int       //nolint:unused // populated in Phase D/E
+	logFilterFocusInput bool      //nolint:unused // populated in Phase D/E
+	logFilterEditingIdx int       //nolint:unused // -1 = adding new; >=0 = editing existing rule index
+	logSavePresetPrompt bool      //nolint:unused // populated in Phase D/E
+	logLoadPresetOpen   bool      //nolint:unused // populated in Phase D/E
+	logLoadPresetCursor int       //nolint:unused // populated in Phase D/E
+
+	// Log viewer: active --since window, displayed as a title-bar chip
+	// and appended to the kubectl logs args when non-empty.  Empty
+	// disables the filter.  Session-only — not persisted to disk.
+	logSinceDuration string
+
+	// Log viewer: transient textinput for the --since duration prompt.
+	logSinceInput TextInput
+
+	// Severity detector — initialized once at startup; reused for all log views.
+	logSeverityDetector *severityDetector //nolint:unused // wired in subsequent Phase C tasks
+
+	// Filter chain — rebuilt whenever logRules or logIncludeMode changes.
+	logFilterChain *FilterChain //nolint:unused // wired in subsequent Phase C tasks
+
+	// logJSONCache caches JSON-detection results for log lines. Keyed by
+	// the raw line's content hash (fnv64a of the line string) so entries
+	// survive slice reslicing of logLines but are automatically garbage-
+	// collected when lines roll out of the buffer via the eviction policy.
+	// Populated on the stream-append and history-prepend paths; read by
+	// jsonLineAt for callers that need the parsed JSON value.
+	logJSONCache *lruJSONCache
+
+	// Pending bracket for two-keystroke jump-to-severity sequences (]e/[e/]w/[w).
+	// Set to ']' or '[' on the first keystroke; cleared on the next key.
+	logPendingBracket rune
 
 	// Describe viewer state.
 	describeContent      string
@@ -1040,6 +1112,12 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		mgr, avail := currentSecurityHookState()
 		return buildSecuritySourceEntries(mgr, avail)
 	}
+
+	// Log filter pipeline: severity detector, filter chain, JSON line cache.
+	m.logSeverityDetector, _ = newSeverityDetector(nil) // TODO Phase I: pass extras from config
+	m.logFilterChain = NewFilterChain(nil, IncludeAny, m.logSeverityDetector)
+	m.logFilterEditingIdx = -1
+	m.logJSONCache = newLRUJSONCache(defaultJSONCacheCap)
 
 	return m
 }

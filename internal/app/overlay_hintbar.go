@@ -45,6 +45,12 @@ func (m Model) overlayHintBarDialog() string {
 			{Key: "Enter", Desc: "apply"},
 			{Key: "esc", Desc: "cancel"},
 		})
+	case overlayLogSinceInput:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "enter", Desc: "apply"},
+			{Key: "empty+enter", Desc: "clear"},
+			{Key: "esc", Desc: "cancel"},
+		})
 	case overlayPVCResize:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "Enter", Desc: "resize"},
@@ -109,6 +115,30 @@ func (m Model) overlayHintBarSelector() string {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "navigate"},
 			{Key: "enter", Desc: "select"},
+			{Key: "esc", Desc: "close"},
+		})
+	case overlayLogFilter:
+		if m.logFilterFocusInput {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "enter", Desc: "add"},
+				{Key: "-prefix", Desc: "exclude"},
+				{Key: ">warn", Desc: "severity"},
+				{Key: "~foo", Desc: "fuzzy"},
+				{Key: "(a AND b)", Desc: "group"},
+				{Key: "esc", Desc: "back"},
+			})
+		}
+		return m.renderHints([]ui.HintEntry{
+			{Key: "a", Desc: "add"},
+			{Key: "j/k", Desc: "nav"},
+			{Key: "ctrl+d/u", Desc: "page"},
+			{Key: "J/K", Desc: "reorder"},
+			{Key: "e", Desc: "edit"},
+			{Key: "d", Desc: "delete"},
+			{Key: "m", Desc: "any/all"},
+			{Key: ">/<", Desc: "severity"},
+			{Key: "S", Desc: "save"},
+			{Key: "L", Desc: "load"},
 			{Key: "esc", Desc: "close"},
 		})
 	case overlayPodSelect, overlayLogPodSelect:

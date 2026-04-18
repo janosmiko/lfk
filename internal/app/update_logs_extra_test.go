@@ -76,7 +76,7 @@ func TestLogKeyFTogglesFollow(t *testing.T) {
 		width:     80,
 		height:    40,
 	}
-	ret, _ := m.handleLogKey(runeKey('f'))
+	ret, _ := m.handleLogKey(runeKey('F'))
 	result := ret.(Model)
 	assert.True(t, result.logFollow)
 	assert.Equal(t, 2, result.logCursor)
@@ -1038,4 +1038,50 @@ func TestLogSearchKeyBackspace(t *testing.T) {
 	ret, _ := m.handleLogSearchKey(specialKey(tea.KeyBackspace))
 	result := ret.(Model)
 	assert.Equal(t, "ab", result.logSearchInput.Value)
+}
+
+func TestLowerFOpensFilterModal(t *testing.T) {
+	m := Model{
+		mode:     modeLogs,
+		logLines: []string{"a", "b"},
+		tabs:     []TabState{{}},
+		width:    80,
+		height:   40,
+	}
+	rm, _ := m.handleLogKey(runeKey('f'))
+	result := rm.(Model)
+	assert.Equal(t, overlayLogFilter, result.overlay)
+	assert.True(t, result.logFilterModalOpen)
+	// Overlay opens in list (nav) mode so the user sees existing rules;
+	// press `a` to add a new one.
+	assert.False(t, result.logFilterFocusInput)
+	assert.Equal(t, -1, result.logFilterEditingIdx)
+	assert.Equal(t, "", result.logFilterInput.Value)
+}
+
+func TestShiftFTogglesFollow(t *testing.T) {
+	m := Model{
+		mode:      modeLogs,
+		logLines:  []string{"a", "b", "c"},
+		logCursor: 0,
+		logFollow: false,
+		tabs:      []TabState{{}},
+		width:     80,
+		height:    40,
+	}
+	rm, _ := m.handleLogKey(runeKey('F'))
+	assert.True(t, rm.(Model).logFollow)
+	assert.Equal(t, 2, rm.(Model).logCursor)
+
+	m2 := Model{
+		mode:      modeLogs,
+		logLines:  []string{"a", "b", "c"},
+		logCursor: 0,
+		logFollow: true,
+		tabs:      []TabState{{}},
+		width:     80,
+		height:    40,
+	}
+	rm2, _ := m2.handleLogKey(runeKey('F'))
+	assert.False(t, rm2.(Model).logFollow)
 }

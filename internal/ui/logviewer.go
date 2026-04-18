@@ -15,12 +15,114 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 	Bold(true)
 
 // RenderLogViewer renders the full-screen log viewer.
-func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol int) string {
-	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery)
+// ruleCount is the number of active filter rules; when greater than zero a
+// `[FILTER: N]` chip is shown in the title bar.
+// logSince is the currently applied --since window (e.g. "5m"); when
+// non-empty a `[SINCE: ...]` chip is appended to the title bar.
+// relativeTimestamps, when true together with timestamps, rewrites the
+// leading RFC3339 timestamp on each visible line to a relative form
+// ("5m ago"); a subtle `[REL]` chip is shown alongside `[TIMESTAMPS]`.
+// jsonPretty, when true, renders JSON log lines in expanded multi-line
+// form. The caller is responsible for producing the pretty-printed
+// representation and passing it as prettyLines (a parallel slice to
+// the post-projection lines; each element either equals the original
+// line or contains embedded newlines for JSON lines). When
+// prettyLines is nil, rendering falls back to the raw buffer even if
+// jsonPretty is true (useful for tests that exercise just the chip).
+// histogram is the time-density sparkline view to splice between the
+// title bar and the content area. When histogram.Counts is empty the
+// strip is skipped entirely (no row consumed). Otherwise one row of
+// content height is reclaimed for the strip.
+// mergeJSONPrettyLines substitutes the expanded pretty-printed form
+// into `lines` for each index where `prettyLines[i] != ""`. When pretty
+// mode is off or the slice lengths don't match, returns the original
+// `lines` unchanged. Kept as a helper so RenderLogViewer's cyclomatic
+// complexity stays under the lint ceiling.
+func mergeJSONPrettyLines(lines, prettyLines []string, jsonPretty bool) []string {
+	if !jsonPretty || len(prettyLines) != len(lines) || len(lines) == 0 {
+		return lines
+	}
+	merged := make([]string, len(lines))
+	for i, line := range lines {
+		if p := prettyLines[i]; p != "" {
+			merged[i] = p
+		} else {
+			merged[i] = line
+		}
+	}
+	return merged
+}
+
+// applyLineRewrites copies `lines` and rewrites only the visible
+// window (`scroll`..scroll+contentHeight) according to the
+// timestamps / hidePrefixes / relativeTimestamps flags. Extracted from
+// RenderLogViewer so its cyclomatic complexity stays under the lint
+// ceiling. Returns the input slice unchanged when no rewrite is
+// needed (saves an allocation on the common "everything is on" path).
+func applyLineRewrites(lines []string, scroll, contentHeight int, timestamps, hidePrefixes, rewriteRelative bool) []string {
+	if (timestamps && !hidePrefixes && !rewriteRelative) || len(lines) == 0 {
+		return lines
+	}
+	end := scroll + contentHeight
+	if end > len(lines) {
+		end = len(lines)
+	}
+	out := make([]string, len(lines))
+	copy(out, lines)
+	// Snapshot `now` once so every rewritten line in this frame uses
+	// the same reference point. Without this, the top of the window
+	// might say "5m ago" while the bottom says "5m 1s ago" for lines
+	// one scroll tick apart.
+	now := nowFunc()
+	for i := scroll; i < end; i++ {
+		if !timestamps {
+			out[i] = StripTimestamp(lines[i])
+		} else if rewriteRelative {
+			out[i] = RewriteLogLineTimestamp(lines[i], now)
+		}
+		if hidePrefixes {
+			out[i] = StripPodPrefix(out[i])
+		}
+	}
+	return out
+}
+
+func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor, logSince string, relativeTimestamps, jsonPretty bool, prettyLines []string, histogram LogHistogramView) string {
+	// Record the total number of lines before any filter projection so the
+	// title bar can render "[X of Y lines]" when filtering is active.
+	totalLines := lines
+	// If visibleIndices is non-nil, project lines through it so the renderer
+	// shows only the visible subset.
+	if visibleIndices != nil {
+		projected := make([]string, len(visibleIndices))
+		for i, idx := range visibleIndices {
+			if idx >= 0 && idx < len(lines) {
+				projected[i] = lines[idx]
+			}
+		}
+		lines = projected
+	}
+	// When filtering is active, pass the visible count; otherwise pass the
+	// full count so the "[X of Y]" branch is skipped.
+	visibleCount := len(totalLines)
+	if visibleIndices != nil {
+		visibleCount = len(visibleIndices)
+	}
+	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logSince, relativeTimestamps, jsonPretty, histogram)
 	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
+
+	// Histogram strip: when present, reclaim one row of content height
+	// for the sparkline. The strip is rendered above the content area
+	// (just under the title bar) and inside the same border, so the
+	// border math stays unchanged.
+	histogramRow := ""
+	histogramVisible := len(histogram.Counts) > 0
 
 	// Content area: subtract border top + bottom (2 lines).
 	contentHeight := height - 2
+	if histogramVisible {
+		contentHeight--
+	}
 	if contentHeight < 1 {
 		contentHeight = 1
 	}
@@ -29,6 +131,10 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	contentWidth := width - 4
 	if contentWidth < 10 {
 		contentWidth = 10
+	}
+
+	if histogramVisible {
+		histogramRow = RenderLogHistogram(histogram, contentWidth)
 	}
 
 	// Calculate line number width if needed.
@@ -42,24 +148,17 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 		scroll = 0
 	}
 
-	// Strip timestamps and/or pod prefixes from visible lines.
-	displayLines := lines
-	if (!timestamps || hidePrefixes) && len(lines) > 0 {
-		end := scroll + contentHeight
-		if end > len(lines) {
-			end = len(lines)
-		}
-		displayLines = make([]string, len(lines))
-		copy(displayLines, lines)
-		for i := scroll; i < end; i++ {
-			if !timestamps {
-				displayLines[i] = StripTimestamp(lines[i])
-			}
-			if hidePrefixes {
-				displayLines[i] = StripPodPrefix(displayLines[i])
-			}
-		}
-	}
+	lines = mergeJSONPrettyLines(lines, prettyLines, jsonPretty)
+
+	// Strip timestamps and/or pod prefixes from visible lines, or rewrite
+	// RFC3339 timestamps to their relative form when the caller asked for
+	// the "5m ago" view. The rewrite only runs when the absolute form is
+	// on (timestamps=true) — stripping wins otherwise, and it would be
+	// surprising to see relative timestamps appear after the user pressed
+	// `s` to hide them. Extracted into a helper so this function's
+	// cyclomatic complexity stays under the lint ceiling.
+	rewriteRelative := timestamps && relativeTimestamps
+	displayLines := applyLineRewrites(lines, scroll, contentHeight, timestamps, hidePrefixes, rewriteRelative)
 
 	// Sanitize visible lines: replace non-printable characters (except common
 	// whitespace) that can break terminal width calculations and corrupt the layout.
@@ -80,9 +179,12 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 		selEnd = max(visualStart, cursor)
 	}
 
-	// Build visible lines, handling wrapping.
+	// Build visible lines, handling wrapping. JSON pretty-print forces
+	// the wrap-style renderer because pretty lines contain embedded
+	// newlines: the wrap renderer is the only path that handles one
+	// source line producing multiple visual rows.
 	var rendered []string
-	if wrap {
+	if wrap || jsonPretty {
 		rendered = renderWrappedLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
 	} else {
 		rendered = renderPlainLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
@@ -112,14 +214,35 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	// Fill each line's background so ANSI resets from styled segments
 	// (line numbers, search highlights) don't leave gaps in the theme bg.
 	bodyContent = FillLinesBg(bodyContent, contentWidth, BaseBg)
-	borderStyle := FullscreenBorderStyle(width, contentHeight)
+
+	// Splice the histogram strip in just above the content area when
+	// it's visible. The border height was inflated by 1 above to make
+	// room for it, so the join math here matches.
+	totalRows := contentHeight
+	if histogramVisible {
+		bodyContent = histogramRow + "\n" + bodyContent
+		totalRows++
+	}
+
+	borderStyle := FullscreenBorderStyle(width, totalRows)
 	body := borderStyle.Render(bodyContent)
 
 	return lipgloss.JoinVertical(lipgloss.Left, titleBar, body, footer)
 }
 
 // renderLogTitleBar builds the title bar with status indicators for the log viewer.
-func renderLogTitleBar(title string, lines []string, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string) string {
+// visibleCount indicates how many of the `lines` are currently visible after
+// filtering. When it is less than len(lines), the title renders `[X of Y lines]`
+// instead of `[Y lines]`. ruleCount is the number of active filter rules; when
+// greater than zero a `[FILTER: N]` chip is appended to the indicators.
+// logSince is the currently applied --since window; when non-empty a
+// `[SINCE: ...]` chip is shown so the user can tell at a glance that the
+// view is time-bounded. relativeTimestamps only surfaces (as a subtle
+// `[REL]` chip) when timestamps is also on — mirroring the runtime
+// precedence in the per-line rendering loop. histogram, when non-empty,
+// surfaces a `[HIST: <step>]` chip showing the auto-picked bucket
+// width so the user knows the strip's time resolution at a glance.
+func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor, logSince string, relativeTimestamps, jsonPretty bool, histogram LogHistogramView) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -129,8 +252,10 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 		{wrap, "WRAP"},
 		{lineNumbers, "LINE#"},
 		{timestamps, "TIMESTAMPS"},
+		{timestamps && relativeTimestamps, "REL"},
 		{hidePrefixes, "NO PREFIX"},
 		{previous, "PREVIOUS"},
+		{jsonPretty, "JSON"},
 		{loadingHistory, "LOADING HISTORY..."},
 	}
 	var indicators []string
@@ -152,12 +277,35 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 	if searchQuery != "" {
 		indicators = append(indicators, HelpKeyStyle.Render("[/"+searchQuery+"]"))
 	}
+	// Severity floor is surfaced as its own chip so the user can tell at a
+	// glance whether severity filtering is narrowing the view, independent
+	// of the total rule count.
+	if severityFloor != "" {
+		indicators = append(indicators, HelpKeyStyle.Render("[≥ "+severityFloor+"]"))
+	}
+	if ruleCount > 0 {
+		indicators = append(indicators, HelpKeyStyle.Render(fmt.Sprintf("[FILTER: %d]", ruleCount)))
+	}
+	// --since window chip: makes it obvious when the view is
+	// time-bounded, independent of any filter rules.
+	if logSince != "" {
+		indicators = append(indicators, HelpKeyStyle.Render("[SINCE: "+logSince+"]"))
+	}
+	// Histogram chip: shows the auto-picked bucket width so the user
+	// knows the time resolution of the strip without hovering.
+	if len(histogram.Counts) > 0 && histogram.BucketStepStr != "" {
+		indicators = append(indicators, HelpKeyStyle.Render("[HIST: "+histogram.BucketStepStr+"]"))
+	}
 
 	titleText := " " + title + " "
 	if len(indicators) > 0 {
 		titleText += " " + strings.Join(indicators, " ")
 	}
-	titleText += BarDimStyle.Render(fmt.Sprintf(" [%d lines]", len(lines)))
+	if visibleCount > 0 && visibleCount < len(lines) {
+		titleText += BarDimStyle.Render(fmt.Sprintf(" [%d of %d lines]", visibleCount, len(lines)))
+	} else {
+		titleText += BarDimStyle.Render(fmt.Sprintf(" [%d lines]", len(lines)))
+	}
 
 	maxTitleWidth := max(width-2, 10)
 	if ansi.StringWidth(titleText) > maxTitleWidth {
@@ -194,15 +342,22 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "j/k", Desc: "move"},
 		{Key: "ctrl+d/u", Desc: "half page"},
 		{Key: "ctrl+f/b", Desc: "page"},
-		{Key: "f", Desc: "follow"},
-		{Key: "tab/z/>", Desc: "wrap"},
+		{Key: "f", Desc: "filter"},
+		{Key: "F", Desc: "follow"},
+		{Key: ">/<", Desc: "severity"},
+		{Key: "tab/z", Desc: "wrap"},
 		{Key: "#", Desc: "line#"},
 		{Key: "s", Desc: "timestamps"},
+		{Key: "R", Desc: "rel-ts"},
+		{Key: "J", Desc: "json"},
+		{Key: "H", Desc: "histogram"},
 		{Key: "p", Desc: "prefixes"},
 		{Key: "c", Desc: "previous"},
+		{Key: "T", Desc: "since"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "/", Desc: "search"},
 		{Key: "n/N", Desc: "next/prev"},
+		{Key: "]e/]w", Desc: "next err/warn"},
 		{Key: "123G", Desc: "goto"},
 		{Key: "S", Desc: "save"},
 		{Key: "ctrl+s", Desc: "save all"},
@@ -321,7 +476,10 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 	for i := scroll; i < end && len(result) < height; i++ {
 		line := lines[i]
 		isSelected := selStart >= 0 && i >= selStart && i <= selEnd
-		wrapped := wrapLine(line, availWidth)
+		// splitAndWrapLine handles JSON pretty-printed content by
+		// splitting on embedded "\n" before width-wrapping. For lines
+		// without embedded newlines it is identical to wrapLine.
+		wrapped := splitAndWrapLine(line, availWidth)
 		for j, wl := range wrapped {
 			if len(result) >= height {
 				break
@@ -382,6 +540,24 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 // Exported for reuse in YAML, describe, and diff view wrapping.
 func WrapLine(line string, width int) []string {
 	return wrapLine(line, width)
+}
+
+// splitAndWrapLine first splits line on "\n" (to expand pretty-printed
+// JSON multi-line blocks) and then width-wraps each resulting fragment.
+// When the line contains no embedded newlines the behaviour is
+// identical to wrapLine. Used by the pretty-print render path to
+// reuse the wrap renderer's visual-row machinery without reinventing
+// variable-height scroll math.
+func splitAndWrapLine(line string, width int) []string {
+	if !strings.Contains(line, "\n") {
+		return wrapLine(line, width)
+	}
+	parts := strings.Split(line, "\n")
+	out := make([]string, 0, len(parts))
+	for _, p := range parts {
+		out = append(out, wrapLine(p, width)...)
+	}
+	return out
 }
 
 // wrapLine splits a line into chunks of at most width runes.
@@ -509,7 +685,7 @@ func sanitizeLogLine(s string) string {
 	// Fast path: check if any sanitization is needed.
 	needsSanitize := false
 	for _, r := range s {
-		if r != '\t' && (r < 32 || r == 127) {
+		if r != '\t' && r != '\n' && (r < 32 || r == 127) {
 			needsSanitize = true
 			break
 		}
@@ -521,7 +697,7 @@ func sanitizeLogLine(s string) string {
 	var b strings.Builder
 	b.Grow(len(s))
 	for _, r := range s {
-		if r != '\t' && (r < 32 || r == 127) {
+		if r != '\t' && r != '\n' && (r < 32 || r == 127) {
 			b.WriteRune('\ufffd') // Unicode replacement character
 		} else {
 			b.WriteRune(r)

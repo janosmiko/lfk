@@ -191,14 +191,22 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `gg` / `G` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` | Full page down / up |
-| `f` | Toggle follow mode (auto-scroll to new logs) |
-| `Tab` / `z` / `>` | Toggle line wrapping |
+| `f` | Open filter modal |
+| `F` | Toggle follow / auto-scroll |
+| `>` / `<` | Cycle severity floor (off → DEBUG → INFO → WARN → ERROR → off) |
+| `Tab` / `z` | Toggle line wrapping |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
+| `R` | Toggle relative timestamps (e.g. `5m ago`) — requires `s` on first |
+| `J` | Toggle JSON pretty-print (expands JSON log lines with 2-space indent; non-JSON lines unchanged) |
+| `H` | Toggle histogram strip (1-row time-density sparkline above content; lines without an RFC3339 timestamp are not counted) |
 | `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
+| `T` | Set `--since` time window (e.g. `5m`, `1h30m`, `2d`; empty input clears). `t` is the global New Tab shortcut, so the log-view since-prompt uses `Shift+T`. |
 | `/` | Search in logs |
 | `n` / `N` | Next / previous search match |
+| `]e` / `[e` | Jump to next/prev ERROR-severity visible line |
+| `]w` / `[w` | Jump to next/prev WARN-severity visible line |
 | `123G` | Jump to specific line number |
 | `S` | Save loaded logs to file |
 | `Ctrl+S` | Save all logs to file (full kubectl logs) |
@@ -211,6 +219,65 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `q` / `Esc` | Close log viewer |
 
 > **Tail-first loading**: Logs load the last 1000 lines initially with follow mode enabled. Scrolling to the top automatically loads older log history. Configure with `log_tail_lines` in config.
+
+> **Filter modal rule syntax** (press `f` in the log viewer, then type a rule and `Enter`):
+>
+> | Input | Result |
+> |---|---|
+> | `foo` | Include substring (regex auto-detected when metacharacters are present) |
+> | `~foo` | Include fuzzy |
+> | `-foo` | Exclude substring |
+> | `-~foo` | Exclude fuzzy |
+> | `>error` \| `>warn` \| `>info` \| `>debug` | Severity floor |
+> | `\-foo` | Include literal `-foo` |
+> | `(foo OR bar)` | Group rule combining children with OR (IncludeAny) |
+> | `(foo AND bar)` | Group rule combining children with AND (IncludeAll) |
+> | `(foo AND (bar OR baz))` | Nested groups — mix operators across levels, not within one level |
+> | `.level=error` | Field equality (case-insensitive for strings) |
+> | `.level!=debug` | Field inequality |
+> | `.user_id>42`, `>=`, `<`, `<=` | Numeric field comparisons (uses `json.Number` precision) |
+> | `.msg~^start` | Field regex / substring match (regex auto-detected) |
+> | `.tags[]=api` | Array-any: the field is an array, any element matches |
+> | `.nested.field=value` | Dotted path for nested JSON access |
+>
+> Group operators `AND`/`OR` are case-insensitive whole words. Mixing them at the same level (e.g. `(a OR b AND c)`) is rejected — use nested parentheses instead. Severity floors are not allowed inside a group; add them as a separate top-level rule.
+>
+> **Field rules and non-JSON lines.** The moment any `.field` rule is active in the chain, non-JSON log lines are dropped — field rules are a structured predicate and don't apply to free-form text. This gives a clean stream of structured events while you filter. To negate a field rule, use `!=` (or the opposite numeric operator) inside the rule — a leading `-` is reserved for pattern excludes, so `-.level=debug` is rejected with an explanatory error.
+
+### Filter modal (opened with `f`)
+
+The modal has two modes: **list** (nav) and **input** (typing). The mode affects which keys are bound.
+
+**List mode** (cursor is on a rule row):
+
+| Key | Action |
+|---|---|
+| `a` | Switch to input mode to add a new rule |
+| `j` / `k` / `↓` / `↑` | Move cursor up/down (skips the pinned severity row) |
+| `Ctrl+D` / `Ctrl+U` | Half-page down / up |
+| `Ctrl+F` / `Ctrl+B` | Full page down / up |
+| `g` / `G` | Jump to first editable rule / last rule |
+| `Shift+J` / `Shift+K` | Move selected rule down / up (reorder) |
+| `e` | Load the selected rule back into the input for editing |
+| `d` | Delete the selected rule |
+| `m` | Toggle include mode (ANY ↔ ALL — how non-group rules combine) |
+| `>` / `<` | Cycle severity floor (same as in the log view) |
+| `S` | Open the save-preset prompt |
+| `L` | Open the load-preset picker |
+| `Esc` / `q` / `Ctrl+C` | Close the overlay |
+
+**Input mode** (typing a rule):
+
+| Key | Action |
+|---|---|
+| `Enter` | Parse and commit the rule; return to list mode |
+| `Esc` | Exit input mode without committing; return to list mode |
+| `Tab` | Toggle focus between input and list |
+| `Backspace` | Delete previous character |
+| `Ctrl+W` | Delete previous word |
+| `Ctrl+U` | Delete everything before the cursor |
+
+> The pinned severity row (marked with `★` and `!`) is read-only in list mode — `d` and `e` are no-ops on it. Use `>` / `<` (in the overlay or the log view) to change the severity floor.
 
 ## Exec Mode (embedded terminal)
 

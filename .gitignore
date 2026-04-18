@@ -35,3 +35,6 @@ __debug_bin*
 
 # Downloaded theme sources (generated file is committed, raw themes are not)
 themes/ghostty/
+
+# Local-only design specs and brainstorming artifacts
+docs/superpowers/

@@ -20,7 +20,110 @@ func (m Model) viewLogs() string {
 		statusMsg = m.statusMessage
 		statusIsErr = m.statusMessageErr
 	}
-	return ui.RenderLogViewer(m.logLines, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol)
+	// Surface the active severity floor (if any) so the title bar can
+	// render a distinct chip — users set via `>` / `<` often lose track
+	// of whether a floor is active unless it's called out separately.
+	severityFloor := ""
+	for _, r := range m.logRules {
+		if sev, ok := r.(SeverityRule); ok {
+			severityFloor = sev.Floor.String()
+			break
+		}
+	}
+	// Build the pretty-printed slice only when the mode is on. The
+	// result is parallel to the projected lines slice the renderer
+	// sees: identity transform when no filter is active, otherwise
+	// re-projected through visibleIndices so each entry sits at the
+	// same index as its corresponding filtered line.
+	prettyLines := m.buildPrettyLinesForRender()
+	histogram := m.buildHistogramViewForRender()
+	return ui.RenderLogViewer(m.logLines, m.logVisibleIndices, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, len(m.logRules), severityFloor, m.logSinceDuration, m.logRelativeTimestamps, m.logJSONPretty, prettyLines, histogram)
+}
+
+// buildHistogramViewForRender builds the LogHistogramView passed to
+// RenderLogViewer. Returns the zero value when the toggle is off OR
+// when there are no log lines to bucket — both cases tell the
+// renderer to skip the strip entirely.
+//
+// The cursor bucket is computed from the line under m.logCursor in
+// the post-filter projection (when a filter is active) so the strip
+// indicator follows the visible cursor, not the raw-buffer one.
+func (m *Model) buildHistogramViewForRender() ui.LogHistogramView {
+	if !m.logHistogram || len(m.logLines) == 0 {
+		return ui.LogHistogramView{}
+	}
+	// Bucket count: cap at the typical content width so the renderer
+	// never asks for more granularity than it can show. The renderer
+	// rebuckets again to fit the actual width on the fly, so this is
+	// a soft upper bound — a small constant (240) keeps the per-frame
+	// build cost bounded on huge buffers.
+	const maxBuckets = 240
+	hist := BuildLogHistogram(m.logLines, maxBuckets)
+	if len(hist.Counts) == 0 {
+		return ui.LogHistogramView{}
+	}
+	cursorBucket := -1
+	if m.logCursor >= 0 {
+		cursorLine := m.cursorSourceLine()
+		if cursorLine != "" {
+			cursorBucket = hist.CursorBucket(cursorLine)
+		}
+	}
+	return ui.LogHistogramView{
+		Counts:        hist.Counts,
+		CursorBucket:  cursorBucket,
+		BucketStepStr: hist.FormatBucketStep(),
+	}
+}
+
+// cursorSourceLine returns the raw log buffer line that the cursor
+// currently points at, accounting for the post-filter projection.
+// Returns the empty string when the cursor is out of range. Used by
+// the histogram builder to map the cursor's position back to a
+// timestamp without coupling the renderer to filter state.
+func (m *Model) cursorSourceLine() string {
+	if m.logCursor < 0 {
+		return ""
+	}
+	if m.logVisibleIndices == nil {
+		if m.logCursor < len(m.logLines) {
+			return m.logLines[m.logCursor]
+		}
+		return ""
+	}
+	if m.logCursor >= len(m.logVisibleIndices) {
+		return ""
+	}
+	idx := m.logVisibleIndices[m.logCursor]
+	if idx < 0 || idx >= len(m.logLines) {
+		return ""
+	}
+	return m.logLines[idx]
+}
+
+// buildPrettyLinesForRender returns a slice parallel to the projected
+// log lines (post-filter if a filter is active, raw buffer otherwise)
+// with each entry containing the pretty-printed multi-line form for
+// JSON lines, or an empty string for non-JSON lines so the renderer
+// can skip them quickly. Returns nil when pretty mode is off.
+func (m *Model) buildPrettyLinesForRender() []string {
+	if !m.logJSONPretty || len(m.logLines) == 0 {
+		return nil
+	}
+	lookup := m.jsonLineAt
+	// First build parallel to the raw buffer, then re-project if a
+	// filter is active so the slice sits next to the post-filter lines.
+	rawPretty := BuildPrettyVisibleLines(m.logLines, nil, lookup)
+	if m.logVisibleIndices == nil {
+		return rawPretty
+	}
+	projected := make([]string, len(m.logVisibleIndices))
+	for i, idx := range m.logVisibleIndices {
+		if idx >= 0 && idx < len(rawPretty) {
+			projected[i] = rawPretty[idx]
+		}
+	}
+	return projected
 }
 
 func (m Model) viewDescribe() string {
@@ -289,20 +392,28 @@ func (m *Model) clampLogScroll() {
 		viewH = 1
 	}
 
+	// When filter is active, logScroll is a visible-coordinate — it indexes
+	// into logVisibleIndices, NOT logLines. The buffer walked for maxScroll
+	// must be the projected slice so logScroll can't exceed the visible set.
+	filterActive := m.logFilterChain != nil && m.logFilterChain.Active()
+	bufLen := len(m.logLines)
+	if filterActive {
+		bufLen = len(m.logVisibleIndices)
+	}
+
 	var maxScroll int
 	if m.logWrap {
 		// When wrapping, each source line may produce multiple visual lines.
-		// Walk backward from the end, accumulating visual lines until we
-		// exceed viewH. The first source line that pushes us over is the
-		// maximum scroll position.
+		// Walk backward from the end (of the projected buffer when filter is
+		// active), accumulating visual lines until we exceed viewH.
 		contentWidth := m.width - 4 // match logviewer.go contentWidth calculation
 		if contentWidth < 10 {
 			contentWidth = 10
 		}
 		// Account for cursor gutter (1) and line number gutter width.
 		lineNumWidth := 0
-		if m.logLineNumbers && len(m.logLines) > 0 {
-			lineNumWidth = len(fmt.Sprintf("%d", len(m.logLines))) + 1
+		if m.logLineNumbers && bufLen > 0 {
+			lineNumWidth = len(fmt.Sprintf("%d", bufLen)) + 1
 		}
 		availWidth := contentWidth - 1 - lineNumWidth // -1 for cursor gutter
 		if availWidth < 10 {
@@ -310,16 +421,17 @@ func (m *Model) clampLogScroll() {
 		}
 
 		visualLines := 0
-		maxScroll = len(m.logLines) // default: can scroll to end
-		for i := len(m.logLines) - 1; i >= 0; i-- {
-			visualLines += wrappedLineCount(m.logLines[i], availWidth)
+		maxScroll = bufLen // default: can scroll to end
+		for i := bufLen - 1; i >= 0; i-- {
+			line := m.lineAtBufferIndex(i, filterActive)
+			visualLines += wrappedLineCount(line, availWidth)
 			if visualLines >= viewH {
 				maxScroll = i
 				break
 			}
 		}
 	} else {
-		maxScroll = len(m.logLines) - viewH
+		maxScroll = bufLen - viewH
 	}
 	if maxScroll < 0 {
 		maxScroll = 0
@@ -332,14 +444,36 @@ func (m *Model) clampLogScroll() {
 	}
 }
 
+// lineAtBufferIndex returns the text of the line at position i in the
+// active buffer (projected through logVisibleIndices when filter is active,
+// raw logLines otherwise). Out-of-range returns "".
+func (m *Model) lineAtBufferIndex(i int, filterActive bool) string {
+	if filterActive {
+		if i < 0 || i >= len(m.logVisibleIndices) {
+			return ""
+		}
+		src := m.logVisibleIndices[i]
+		if src < 0 || src >= len(m.logLines) {
+			return ""
+		}
+		return m.logLines[src]
+	}
+	if i < 0 || i >= len(m.logLines) {
+		return ""
+	}
+	return m.logLines[i]
+}
+
 // ensureLogCursorVisible adjusts logScroll so the cursor is within the visible
 // content area with scrolloff margin.
 func (m *Model) ensureLogCursorVisible() {
 	if m.logCursor < 0 {
 		return
 	}
-	if len(m.logLines) > 0 && m.logCursor >= len(m.logLines) {
-		m.logCursor = len(m.logLines) - 1
+	// Clamp cursor against the visible buffer when filter is active
+	// (logCursor is a visible-coordinate in that case).
+	if max := m.logCursorMax(); max >= 0 && m.logCursor > max {
+		m.logCursor = max
 	}
 	viewH := m.logContentHeight()
 	if viewH < 1 {

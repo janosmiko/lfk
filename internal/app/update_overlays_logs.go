@@ -102,6 +102,10 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			m.logSelectedContainers = nil
 			m.logContainers = nil
 			m.logLines = nil
+			m.logVisibleIndices = nil
+			m.logRules = nil
+			m.logIncludeMode = IncludeAny
+			m.logFilterChain = NewFilterChain(nil, IncludeAny, m.logSeverityDetector)
 			m.logScroll = 0
 			m.logFollow = true
 			m.logTailLines = ui.ConfigLogTailLines
@@ -122,6 +126,10 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			m.logSelectedContainers = nil
 			m.logContainers = nil
 			m.logLines = nil
+			m.logVisibleIndices = nil
+			m.logRules = nil
+			m.logIncludeMode = IncludeAny
+			m.logFilterChain = NewFilterChain(nil, IncludeAny, m.logSeverityDetector)
 			m.logScroll = 0
 			m.logTailLines = ui.ConfigLogTailLines
 			m.logHasMoreHistory = true
@@ -378,6 +386,7 @@ func (m *Model) restartLogStreamForContainerFilter() tea.Cmd {
 	// which is required for the prefix-based container filtering to work.
 	m.actionCtx.containerName = ""
 	m.logLines = nil
+	m.logVisibleIndices = nil
 	m.logScroll = 0
 	m.logCursor = 0
 	m.logFollow = true

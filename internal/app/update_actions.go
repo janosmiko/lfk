@@ -829,6 +829,19 @@ func (m Model) executeActionLogs() (tea.Model, tea.Cmd) {
 	// Initialize log viewer state.
 	m.mode = modeLogs
 	m.logLines = nil
+	m.logVisibleIndices = nil
+	m.logRules = nil
+	m.logIncludeMode = IncludeAny
+	// Auto-apply the default preset for this Kind, if one exists.
+	if path, err := logPresetsPath(); err == nil {
+		if f, err := readPresetFile(path); err == nil {
+			if rules, mode, ok := defaultPresetForKind(f, m.actionCtx.kind); ok {
+				m.logRules = rules
+				m.logIncludeMode = mode
+			}
+		}
+	}
+	m.logFilterChain = NewFilterChain(m.logRules, m.logIncludeMode, m.logSeverityDetector)
 	m.logScroll = 0
 	m.logFollow = true
 	m.logWrap = false

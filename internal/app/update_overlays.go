@@ -113,6 +113,12 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 	case overlayFilterPreset:
 		mdl, cmd := m.handleFilterPresetOverlayKey(msg)
 		return mdl, cmd, true
+	case overlayLogFilter:
+		rm, cmd := m.handleLogFilterOverlayKey(msg)
+		return rm, cmd, true
+	case overlayLogSinceInput:
+		mdl, cmd := m.handleLogSinceInputKey(msg)
+		return mdl, cmd, true
 	}
 	return m, nil, false
 }
