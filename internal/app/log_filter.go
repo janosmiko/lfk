@@ -202,6 +202,9 @@ func (g *GroupRule) Matches(line string, detector *severityDetector) bool {
 // SeverityRule inside a group evaluates the floor against the detected
 // severity (without the Unknown-kept special-case — inside a group,
 // "severity >= X" is a pure predicate and Unknown lines fail it).
+// FieldRule inside a group parses the line as JSON on demand; non-JSON
+// lines fail every field-rule predicate inside a group, matching the
+// top-level "drop non-JSON when a FieldRule is active" gate.
 func evalRuleAsMatch(r Rule, line string, detector *severityDetector) bool {
 	switch rr := r.(type) {
 	case *PatternRule:
@@ -218,6 +221,12 @@ func evalRuleAsMatch(r Rule, line string, detector *severityDetector) bool {
 		}
 		sev := detector.Detect(line)
 		return sev >= rr.Floor
+	case *FieldRule:
+		j := DetectJSONLine(line)
+		if !j.IsJSON {
+			return false
+		}
+		return rr.MatchesJSON(j.Value)
 	}
 	return false
 }
@@ -231,7 +240,14 @@ type FilterChain struct {
 	// Pre-bucketed rule subsets (built once, queried per line).
 	severity *SeverityRule // at most one
 	excludes []*PatternRule
-	includes []Rule // *PatternRule (non-negated) or *GroupRule
+	includes []Rule // *PatternRule (non-negated), *GroupRule, or *FieldRule
+
+	// hasFieldRule is true when at least one top-level FieldRule was
+	// placed in the includes bucket. When true, Keep gates every line
+	// through DetectJSONLine and drops non-JSON lines — FieldRules are
+	// a structured predicate and can't meaningfully evaluate against
+	// free-form lines.
+	hasFieldRule bool
 }
 
 // NewFilterChain builds a chain from the given rules, include mode, and severity detector.
@@ -254,18 +270,37 @@ func NewFilterChain(rules []Rule, mode IncludeMode, detector *severityDetector) 
 			}
 		case *GroupRule:
 			c.includes = append(c.includes, v)
+		case *FieldRule:
+			c.includes = append(c.includes, v)
+			c.hasFieldRule = true
 		}
 	}
 	return c
 }
 
 // Keep returns true if the line should be visible after applying the chain.
-// Evaluation order: severity → excludes → includes (short-circuiting).
+// Evaluation order: severity → field-rule JSON gate → excludes → includes
+// (short-circuiting).
+//
+// When any FieldRule is active (hasFieldRule=true), non-JSON lines are
+// dropped as a hard gate before any further evaluation. This is the
+// documented trade-off: field rules are a structured predicate and
+// can't say anything meaningful about plain-text lines, so the cleanest
+// user experience is to show only structured events while they're
+// filtering by JSON fields.
 func (c *FilterChain) Keep(line string) bool {
 	// Severity
 	if c.severity != nil {
 		sev := c.detector.Detect(line)
 		if !c.severity.Allows(sev) {
+			return false
+		}
+	}
+	// Field-rule JSON gate. Detect once, then pass the parsed Value
+	// into evalRuleAsMatch so each FieldRule doesn't re-parse.
+	if c.hasFieldRule {
+		j := DetectJSONLine(line)
+		if !j.IsJSON {
 			return false
 		}
 	}

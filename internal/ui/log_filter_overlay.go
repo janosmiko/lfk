@@ -92,6 +92,8 @@ func kindColor(kind string) string {
 		return ColorSecondary // include = green/success
 	case "EXC":
 		return ColorWarning // exclude = warn/orange
+	case "FLD":
+		return ColorPurple // field = purple (structured / special)
 	}
 	return ColorDimmed
 }

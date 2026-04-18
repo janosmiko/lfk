@@ -386,6 +386,53 @@ format used by Kubernetes components (`I0412 12:34:56 …`, `E0412 …`).
 `~/.config/lfk/log_presets.yaml`), not in the main config. Create / save
 presets with `S` inside the filter modal; load with `L`.
 
+### Rule types in a preset
+
+Each entry under a preset's `rules:` list has a `type` field that
+selects its shape. The supported types are:
+
+| Type | Example fields | Notes |
+|---|---|---|
+| `include` | `pattern`, `mode` (`substring`/`regex`/`fuzzy`) | Substring/regex/fuzzy include |
+| `exclude` | `pattern`, `mode` | Drops lines matching the pattern |
+| `severity` | `floor` (`error`/`warn`/`info`/`debug`) | Severity floor |
+| `group` | `mode` (`any`/`all`), `children` | Boolean group of nested rules |
+| `field` | `path`, `field_op`, `value`, `array_any` | JSON-field predicate; see below |
+
+Field rules evaluate against JSON log lines and match when the nested
+field (dotted `path`) compares with `value` using `field_op`. When
+`array_any` is `true`, the field is treated as a collection and the
+comparison holds when any element matches (including scalar fields,
+which are treated as one-element arrays).
+
+Supported `field_op` values: `eq`, `neq`, `gt`, `gte`, `lt`, `lte`,
+`match`. When any field rule is active at runtime, non-JSON lines are
+dropped — field rules are a structured predicate.
+
+Example preset with a field rule:
+
+```yaml
+presets:
+  Pod:
+    - name: "api-5xx"
+      default: false
+      include_mode: all
+      rules:
+        - type: field
+          path: [level]
+          field_op: eq
+          value: error
+        - type: field
+          path: [status]
+          field_op: gte
+          value: "500"
+        - type: field
+          path: [tags]
+          array_any: true
+          field_op: eq
+          value: api
+```
+
 ## Terminal Mode
 
 Controls how exec and shell commands are executed.

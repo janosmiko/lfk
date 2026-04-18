@@ -70,6 +70,23 @@ func ruleToRowState(r Rule) ui.LogFilterRowState {
 			Mode:    v.Mode.String(),
 			Pattern: exprSummary(v),
 		}
+	case *FieldRule:
+		// Field rules render with the operator in the Mode column (the
+		// table already reserves a column for mode, and a field rule's
+		// operator is its most identifying moment) and the path-value
+		// pair in the Pattern column. The hard-gate semantics ("drops
+		// non-JSON lines") are documented alongside the syntax in
+		// docs/keybindings.md; the row itself is kept compact so the
+		// rules table scales with many field rules.
+		path := strings.Join(v.Path, ".")
+		if v.ArrayAny {
+			path += "[]"
+		}
+		return ui.LogFilterRowState{
+			Kind:    r.Kind().String(),
+			Mode:    v.Op.String(),
+			Pattern: "." + path + " " + v.Value,
+		}
 	}
 	return ui.LogFilterRowState{
 		Kind:    r.Kind().String(),
@@ -82,7 +99,9 @@ func ruleToRowState(r Rule) ui.LogFilterRowState {
 // a leading "~" for fuzzy mode and "!" when negated, regex is surfaced
 // as-is). SeverityRules re-use the canonical ">= LEVEL" form. GroupRules
 // are joined with " AND " (IncludeAll) or " OR " (IncludeAny) and wrapped
-// in parentheses — nested groups produce nested parens.
+// in parentheses — nested groups produce nested parens. FieldRules use
+// the canonical ".path OP value" form from RuleToInputString so the
+// summary matches what the user would type.
 func exprSummary(r Rule) string {
 	switch v := r.(type) {
 	case *PatternRule:
@@ -99,6 +118,8 @@ func exprSummary(r Rule) string {
 			op = " AND "
 		}
 		return "(" + strings.Join(parts, op) + ")"
+	case *FieldRule:
+		return RuleToInputString(v)
 	}
 	return r.Display()
 }

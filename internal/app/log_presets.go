@@ -36,11 +36,11 @@ type LogPreset struct {
 }
 
 // PresetRule is one rule entry within a preset. A single struct carries
-// all shapes (pattern, severity, group) so the YAML stays flat-ish and
-// old presets keep working — unused fields stay zero and are omitted
+// all shapes (pattern, severity, group, field) so the YAML stays flat-ish
+// and old presets keep working — unused fields stay zero and are omitted
 // via yaml:",omitempty".
 type PresetRule struct {
-	Type    string `yaml:"type"`              // "include" | "exclude" | "severity" | "group"
+	Type    string `yaml:"type"`              // "include" | "exclude" | "severity" | "group" | "field"
 	Pattern string `yaml:"pattern,omitempty"` // for include/exclude
 	Mode    string `yaml:"mode,omitempty"`    // include/exclude: "substring"|"regex"|"fuzzy". group: "any"|"all"
 	Floor   string `yaml:"floor,omitempty"`   // for severity
@@ -48,6 +48,12 @@ type PresetRule struct {
 	// Children are the nested rules of a group. Recursively typed so
 	// groups can nest arbitrarily. Only set when Type == "group".
 	Children []PresetRule `yaml:"children,omitempty"`
+
+	// Field-rule fields. Only set when Type == "field".
+	Path     []string `yaml:"path,omitempty"`      // dotted path segments, e.g. ["user", "id"]
+	ArrayAny bool     `yaml:"array_any,omitempty"` // true for the "[]" array-any form
+	FieldOp  string   `yaml:"field_op,omitempty"`  // "eq"|"neq"|"gt"|"gte"|"lt"|"lte"|"match"
+	Value    string   `yaml:"value,omitempty"`     // raw RHS value
 }
 
 // readPresetFile loads the preset sidecar file. A missing file is treated as
@@ -156,6 +162,16 @@ func presetRuleToRule(pr PresetRule) (Rule, error) {
 			return nil, fmt.Errorf("group: %w", err)
 		}
 		return &GroupRule{Mode: gmode, Children: children}, nil
+	case "field":
+		op, err := parseFieldOp(pr.FieldOp)
+		if err != nil {
+			return nil, fmt.Errorf("field rule: %w", err)
+		}
+		r, err := NewFieldRule(pr.Path, pr.ArrayAny, op, pr.Value)
+		if err != nil {
+			return nil, fmt.Errorf("field rule: %w", err)
+		}
+		return r, nil
 	default:
 		return nil, fmt.Errorf("unknown rule type %q", pr.Type)
 	}
@@ -235,6 +251,14 @@ func ruleToPresetRule(r Rule) PresetRule {
 			Type:     "group",
 			Mode:     v.Mode.String(),
 			Children: rulesToPresetRules(v.Children),
+		}
+	case *FieldRule:
+		return PresetRule{
+			Type:     "field",
+			Path:     append([]string(nil), v.Path...),
+			ArrayAny: v.ArrayAny,
+			FieldOp:  v.Op.serialisedOp(),
+			Value:    v.Value,
 		}
 	}
 	return PresetRule{}

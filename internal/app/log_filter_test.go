@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRuleKindString(t *testing.T) {
@@ -238,4 +239,126 @@ func TestBuildVisibleIndices(t *testing.T) {
 		idx := BuildVisibleIndices(nil, chain)
 		assert.Equal(t, []int{}, idx)
 	})
+}
+
+// TestFilterChainFieldRuleDropsNonJSON exercises the hard-gate
+// semantics: the moment any FieldRule lands in the chain, every
+// non-JSON line is dropped regardless of whether the line would
+// otherwise match any include / exclude rule. This is the documented
+// trade-off for structured filtering.
+func TestFilterChainFieldRuleDropsNonJSON(t *testing.T) {
+	d, _ := newSeverityDetector(nil)
+	lines := []string{
+		`{"level":"error","msg":"db dropped"}`,
+		`GET /api 200`, // not JSON — must be dropped with a field rule active
+		`{"level":"info","msg":"ok"}`,
+		`plain text log`, // also dropped
+	}
+
+	fr, err := NewFieldRule([]string{"level"}, false, FieldOpEq, "error")
+	require.NoError(t, err)
+	chain := NewFilterChain([]Rule{fr}, IncludeAny, d)
+
+	indices := BuildVisibleIndices(lines, chain)
+	// Only the JSON line whose level is "error" should survive.
+	assert.Equal(t, []int{0}, indices)
+}
+
+// TestFilterChainFieldRuleMatchesOnlyStructured validates the positive
+// case: a field rule correctly routes through includes and accepts the
+// matching JSON line.
+func TestFilterChainFieldRuleMatchesOnlyStructured(t *testing.T) {
+	d, _ := newSeverityDetector(nil)
+	lines := []string{
+		`{"level":"error","user_id":42}`,
+		`{"level":"warn","user_id":10}`,
+		`{"level":"error","user_id":100}`,
+		`plain text`, // dropped by the field-rule gate
+	}
+
+	fr, err := NewFieldRule([]string{"user_id"}, false, FieldOpGt, "50")
+	require.NoError(t, err)
+	chain := NewFilterChain([]Rule{fr}, IncludeAny, d)
+
+	indices := BuildVisibleIndices(lines, chain)
+	assert.Equal(t, []int{2}, indices)
+}
+
+// TestFilterChainFieldRuleWithGroupAndIncludes validates that a
+// FieldRule combines with a PatternRule inside a group, and that the
+// field-rule gate still drops non-JSON lines even when the group
+// would otherwise have matched through a plain-text predicate.
+func TestFilterChainFieldRuleWithGroupAndIncludes(t *testing.T) {
+	d, _ := newSeverityDetector(nil)
+
+	// Rules: (.level=error AND "db") — an ALL-group with a field rule
+	// and a substring pattern. The substring must be present AND the
+	// field must match. Non-JSON lines are dropped by the top-level
+	// field-rule gate before the group evaluates.
+	fr, err := NewFieldRule([]string{"level"}, false, FieldOpEq, "error")
+	require.NoError(t, err)
+	pr, err := NewPatternRule("db", PatternSubstring, false)
+	require.NoError(t, err)
+	group := &GroupRule{
+		Mode:     IncludeAll,
+		Children: []Rule{fr, pr},
+	}
+	chain := NewFilterChain([]Rule{group}, IncludeAny, d)
+
+	cases := []struct {
+		name string
+		line string
+		keep bool
+	}{
+		{
+			name: "JSON error with db mention",
+			line: `{"level":"error","msg":"db dropped"}`,
+			keep: true,
+		},
+		{
+			name: "JSON error without db mention",
+			line: `{"level":"error","msg":"cache cold"}`,
+			keep: false,
+		},
+		{
+			name: "JSON warn with db mention fails level predicate",
+			line: `{"level":"warn","msg":"db slow"}`,
+			keep: false,
+		},
+		{
+			name: "plain text with db mention dropped by field-rule gate",
+			line: `ERROR db dropped`,
+			keep: false,
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			assert.Equal(t, c.keep, chain.Keep(c.line))
+		})
+	}
+}
+
+// TestFilterChainFieldRuleCombinesWithSeverity checks that a severity
+// floor and a field rule cooperate without interfering: severity is
+// evaluated before the field-rule gate, so a JSON line that fails the
+// severity predicate is dropped without parsing JSON twice.
+//
+// Severity is detected from the JSON payload itself — the default
+// severity patterns recognise `"level":"error"` inside a JSON line, so
+// we can combine severity and field predicates on the same line.
+func TestFilterChainFieldRuleCombinesWithSeverity(t *testing.T) {
+	d, _ := newSeverityDetector(nil)
+	fr, err := NewFieldRule([]string{"user_id"}, false, FieldOpGt, "0")
+	require.NoError(t, err)
+	chain := NewFilterChain([]Rule{
+		SeverityRule{Floor: SeverityError},
+		fr,
+	}, IncludeAny, d)
+
+	// JSON error line with user_id > 0 → keep.
+	assert.True(t, chain.Keep(`{"level":"error","user_id":42,"msg":"db dropped"}`))
+	// JSON info line → dropped by severity floor.
+	assert.False(t, chain.Keep(`{"level":"info","user_id":42,"msg":"ok"}`))
+	// Non-JSON line with ERROR severity → dropped by field-rule gate.
+	assert.False(t, chain.Keep(`[ERROR] plain text`))
 }

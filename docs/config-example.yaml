@@ -66,6 +66,32 @@ log_path: /tmp/lfk.log
 # NOTE: Filter PRESETS (saved rule stacks per resource kind) live in a
 # separate sidecar file at $XDG_CONFIG_HOME/lfk/log_presets.yaml, not here.
 # Save with `S` and load with `L` inside the filter modal.
+#
+# A sidecar log_presets.yaml file looks like:
+#
+#   presets:
+#     Pod:
+#       - name: api-5xx
+#         default: false
+#         include_mode: all
+#         rules:
+#           - type: field
+#             path: [level]
+#             field_op: eq
+#             value: error
+#           - type: field
+#             path: [status]
+#             field_op: gte
+#             value: "500"
+#           - type: field
+#             path: [tags]
+#             array_any: true
+#             field_op: eq
+#             value: api
+#
+# Field rules (type: field) evaluate against JSON log lines; when any
+# field rule is active, non-JSON lines are dropped. Supported field_op
+# values: eq, neq, gt, gte, lt, lte, match.
 
 # ─── Dashboard ─────────────────────────────────────────────────────────────────
 # Show cluster overview dashboard when entering a context.

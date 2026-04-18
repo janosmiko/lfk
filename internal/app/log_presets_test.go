@@ -110,3 +110,67 @@ func TestApplyDefaultPresetForKind(t *testing.T) {
 	_, _, ok = defaultPresetForKind(f, "Deployment")
 	assert.False(t, ok)
 }
+
+func TestFieldRulePresetRoundTrip(t *testing.T) {
+	// Build a representative runtime FieldRule, serialise it, reload it
+	// from the serialised form, and verify equality on all surfaces a
+	// user would notice (path, op, value, array-any flag).
+	fr, err := NewFieldRule([]string{"user", "id"}, false, FieldOpGte, "42")
+	if err != nil {
+		t.Fatalf("NewFieldRule: %v", err)
+	}
+	farr, err := NewFieldRule([]string{"tags"}, true, FieldOpEq, "api")
+	if err != nil {
+		t.Fatalf("NewFieldRule: %v", err)
+	}
+
+	preset := rulesToPreset("api-errors", false, IncludeAll, []Rule{fr, farr})
+	assert.Equal(t, "all", preset.IncludeMode)
+	assert.Len(t, preset.Rules, 2)
+
+	// Inspect the serialised form directly — these are the fields the
+	// user's YAML file will contain.
+	assert.Equal(t, "field", preset.Rules[0].Type)
+	assert.Equal(t, []string{"user", "id"}, preset.Rules[0].Path)
+	assert.False(t, preset.Rules[0].ArrayAny)
+	assert.Equal(t, "gte", preset.Rules[0].FieldOp)
+	assert.Equal(t, "42", preset.Rules[0].Value)
+
+	assert.Equal(t, "field", preset.Rules[1].Type)
+	assert.True(t, preset.Rules[1].ArrayAny)
+	assert.Equal(t, "eq", preset.Rules[1].FieldOp)
+
+	// Reload the preset and verify the runtime rules match.
+	rules, mode, err := presetToRules(preset)
+	if err != nil {
+		t.Fatalf("presetToRules: %v", err)
+	}
+	assert.Equal(t, IncludeAll, mode)
+	assert.Len(t, rules, 2)
+
+	loaded1, ok := rules[0].(*FieldRule)
+	assert.True(t, ok, "expected *FieldRule, got %T", rules[0])
+	assert.Equal(t, fr.Path, loaded1.Path)
+	assert.Equal(t, fr.Op, loaded1.Op)
+	assert.Equal(t, fr.Value, loaded1.Value)
+	assert.Equal(t, fr.ArrayAny, loaded1.ArrayAny)
+
+	loaded2, ok := rules[1].(*FieldRule)
+	assert.True(t, ok)
+	assert.Equal(t, farr.Path, loaded2.Path)
+	assert.True(t, loaded2.ArrayAny)
+}
+
+// TestFieldRulePresetInvalidOp validates the reverse direction: a
+// preset entry with a garbage field_op surfaces a user-facing error
+// rather than silently defaulting to eq.
+func TestFieldRulePresetInvalidOp(t *testing.T) {
+	preset := LogPreset{
+		IncludeMode: "any",
+		Rules: []PresetRule{
+			{Type: "field", Path: []string{"level"}, FieldOp: "bogus", Value: "error"},
+		},
+	}
+	_, _, err := presetToRules(preset)
+	assert.Error(t, err)
+}

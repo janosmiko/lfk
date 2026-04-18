@@ -230,8 +230,16 @@ Bookmarks come in two flavors depending on the slot case you choose:
 > | `(foo OR bar)` | Group rule combining children with OR (IncludeAny) |
 > | `(foo AND bar)` | Group rule combining children with AND (IncludeAll) |
 > | `(foo AND (bar OR baz))` | Nested groups — mix operators across levels, not within one level |
+> | `.level=error` | Field equality (case-insensitive for strings) |
+> | `.level!=debug` | Field inequality |
+> | `.user_id>42`, `>=`, `<`, `<=` | Numeric field comparisons (uses `json.Number` precision) |
+> | `.msg~^start` | Field regex / substring match (regex auto-detected) |
+> | `.tags[]=api` | Array-any: the field is an array, any element matches |
+> | `.nested.field=value` | Dotted path for nested JSON access |
 >
 > Group operators `AND`/`OR` are case-insensitive whole words. Mixing them at the same level (e.g. `(a OR b AND c)`) is rejected — use nested parentheses instead. Severity floors are not allowed inside a group; add them as a separate top-level rule.
+>
+> **Field rules and non-JSON lines.** The moment any `.field` rule is active in the chain, non-JSON log lines are dropped — field rules are a structured predicate and don't apply to free-form text. This gives a clean stream of structured events while you filter. To negate a field rule, use `!=` (or the opposite numeric operator) inside the rule — a leading `-` is reserved for pattern excludes, so `-.level=debug` is rejected with an explanatory error.
 
 ### Filter modal (opened with `f`)
 
