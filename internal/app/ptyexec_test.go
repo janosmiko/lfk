@@ -146,6 +146,33 @@ func TestKeyToBytesAppCursorMode(t *testing.T) {
 	}
 }
 
+// TestKeyToBytesAppCursorFallthrough verifies that when appCursor=true but the
+// key is not an arrow key, keyToBytes falls through to keyBytesMap and returns
+// the normal sequence (DECCKM only affects cursor keys).
+func TestKeyToBytesAppCursorFallthrough(t *testing.T) {
+	tests := []struct {
+		name     string
+		msg      tea.KeyMsg
+		expected []byte
+	}{
+		{name: "runes unchanged", msg: tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'a'}}, expected: []byte("a")},
+		{name: "enter unchanged", msg: tea.KeyMsg{Type: tea.KeyEnter}, expected: []byte{'\r'}},
+		{name: "tab unchanged", msg: tea.KeyMsg{Type: tea.KeyTab}, expected: []byte{'\t'}},
+		{name: "home unchanged", msg: tea.KeyMsg{Type: tea.KeyHome}, expected: []byte{'\x1b', '[', 'H'}},
+		{name: "end unchanged", msg: tea.KeyMsg{Type: tea.KeyEnd}, expected: []byte{'\x1b', '[', 'F'}},
+		{name: "pgup unchanged", msg: tea.KeyMsg{Type: tea.KeyPgUp}, expected: []byte{'\x1b', '[', '5', '~'}},
+		{name: "pgdown unchanged", msg: tea.KeyMsg{Type: tea.KeyPgDown}, expected: []byte{'\x1b', '[', '6', '~'}},
+		{name: "delete unchanged", msg: tea.KeyMsg{Type: tea.KeyDelete}, expected: []byte{'\x1b', '[', '3', '~'}},
+		{name: "ctrl+c unchanged", msg: tea.KeyMsg{Type: tea.KeyCtrlC}, expected: []byte{'\x03'}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := keyToBytes(tt.msg, true)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
 func TestP4ExecKeyQ(t *testing.T) {
 	m := bp4()
 	m.mode = modeExec
