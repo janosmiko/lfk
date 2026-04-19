@@ -29,9 +29,9 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 
 ### Auto dark/light mode
 
-When `dark_colorscheme` and/or `light_colorscheme` are set, lfk subscribes to
-your terminal's operating system color-scheme preference via the standard
-CSI 2031/996 protocol:
+When `colorscheme` uses the `dark:X,light:Y` dual-mode syntax (either segment
+may be omitted), lfk subscribes to your terminal's operating system
+color-scheme preference via the standard CSI 2031/996 protocol:
 
 - On startup lfk sends `CSI ?2031h` (subscribe to notifications) and
   `CSI ?996n` (request current preference).
@@ -51,8 +51,8 @@ colorscheme: "dark:Rose Pine,light:Rose Pine Dawn"
 ```
 
 When only one side is configured the other side performs no automatic switch.
-The `colorscheme` field still sets the default theme applied at startup; the
-dark/light schemes override it as soon as the terminal reports its preference.
+Plain (non-dual) `colorscheme` values continue to work as before and disable
+automatic dark/light switching entirely.
 
 ### Icon mode auto-detection
 

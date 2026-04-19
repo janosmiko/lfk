@@ -181,6 +181,40 @@ func TestLoadConfig_DualColorscheme_DarkOnly(t *testing.T) {
 	require.Equal(t, "", ConfigLightColorscheme, "light scheme should be empty when not specified")
 }
 
+func TestApplyColorscheme_PlainSingleScheme(t *testing.T) {
+	orig := ActiveSchemeName
+	origDark := ConfigDarkColorscheme
+	origLight := ConfigLightColorscheme
+	t.Cleanup(func() {
+		ActiveSchemeName = orig
+		ConfigDarkColorscheme = origDark
+		ConfigLightColorscheme = origLight
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigDarkColorscheme = ""
+	ConfigLightColorscheme = ""
+
+	theme := DefaultTheme()
+	applyColorscheme(&theme, configFile{Colorscheme: "dracula"})
+
+	assert.Equal(t, "dracula", ActiveSchemeName)
+	assert.Empty(t, ConfigDarkColorscheme, "dark scheme must stay unset for plain syntax")
+	assert.Empty(t, ConfigLightColorscheme, "light scheme must stay unset for plain syntax")
+}
+
+func TestApplyColorscheme_PlainSingleScheme_WithSpaces(t *testing.T) {
+	orig := ActiveSchemeName
+	t.Cleanup(func() {
+		ActiveSchemeName = orig
+		ApplyTheme(DefaultTheme())
+	})
+
+	theme := DefaultTheme()
+	applyColorscheme(&theme, configFile{Colorscheme: "Rose Pine"})
+
+	assert.Equal(t, "rose-pine", ActiveSchemeName, "spaces should normalise to hyphens for plain syntax")
+}
+
 func TestParseDualColorscheme(t *testing.T) {
 	cases := []struct {
 		input string
