@@ -547,6 +547,13 @@ type Model struct {
 	// editor. Phase 2/3 populate the editor focus values; Phase 1
 	// keeps it pinned on Presets.
 	logTimeRangeFocus logTimeRangeFocus
+	// Start / End editor panels used in Phase 2+ for the Custom…
+	// workflow. Wired into commitLogTimeRange so Enter from a Start
+	// panel applies the current editor values and keeps the overlay
+	// open on the End panel; Enter from the End panel commits the
+	// full range.
+	logTimeRangeStart logTimeRangeEditor
+	logTimeRangeEnd   logTimeRangeEditor
 
 	// Severity detector — initialized once at startup; reused for all log views.
 	logSeverityDetector *severityDetector //nolint:unused // wired in subsequent Phase C tasks

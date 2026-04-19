@@ -109,21 +109,20 @@ func TestLogTimeRangeOverlayCClearsRange(t *testing.T) {
 	assert.False(t, rm.logTimeRange.IsActive(), "c should clear the range")
 }
 
-// TestLogTimeRangeOverlayCustomPresetNoopsForNow confirms the Custom…
-// preset (Phase 1 sentinel) doesn't overwrite state — it only shows a
-// status hint.
-func TestLogTimeRangeOverlayCustomPresetNoopsForNow(t *testing.T) {
+// TestLogTimeRangeOverlayCustomPresetDoesNotCommit confirms the Custom…
+// sentinel keeps the committed range untouched — it only shifts focus
+// to the editor panel.
+func TestLogTimeRangeOverlayCustomPresetDoesNotCommit(t *testing.T) {
 	m := timeRangeOverlayModel(t)
-	// Navigate to the last preset which is "Custom…".
 	m.logTimeRangeCursor = len(m.logTimeRangePresets) - 1
 	before := m.logTimeRange
 
 	result, _ := m.handleLogTimeRangeKey(tea.KeyMsg{Type: tea.KeyEnter})
 	rm := result.(Model)
 
-	assert.Equal(t, overlayLogTimeRange, rm.overlay, "overlay should stay open on Custom…")
+	assert.Equal(t, overlayLogTimeRange, rm.overlay)
 	assert.Equal(t, before, rm.logTimeRange, "Custom preset must not mutate logTimeRange")
-	assert.Contains(t, rm.statusMessage, "Phase 2", "status hint should explain the delay")
+	assert.Equal(t, logTimeRangeFocusStart, rm.logTimeRangeFocus, "Custom should focus Start editor")
 }
 
 // TestLogKeyTOpensTimeRangeOverlay pins the hotkey contract: Shift+T

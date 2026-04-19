@@ -47,7 +47,9 @@ func (m Model) overlayHintBarDialog() string {
 		})
 	case overlayLogTimeRange:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "j/k", Desc: "nav"},
+			{Key: "tab", Desc: "switch panel"},
+			{Key: "j/k", Desc: "adjust/nav"},
+			{Key: "h/l", Desc: "field"},
 			{Key: "enter", Desc: "apply"},
 			{Key: "c", Desc: "clear"},
 			{Key: "esc", Desc: "cancel"},
