@@ -71,7 +71,7 @@
 
 - **Multi-tab support**: Open multiple views side by side
 - **Multi-cluster/multi-context support** via merged kubeconfig loading
-- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive), and `KUBECONFIG` env var
+- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), and `KUBECONFIG` env var
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser
