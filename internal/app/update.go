@@ -53,6 +53,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("stderr: "+msg.message, true)
 		return m, tea.Batch(scheduleStatusClear(), m.waitForStderr())
 	default:
+		if dark, ok := ui.ParseColorModeMsg(msg); ok {
+			ui.SetColorMode(dark)
+			return m, nil
+		}
 		if mdl, cmd, ok := m.updateResourceMsg(msg); ok {
 			return mdl, cmd
 		}

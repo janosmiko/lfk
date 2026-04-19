@@ -132,6 +132,9 @@ func runTUI(opts app.StartupOptions) error {
 	if !opts.NoMouse && ui.ConfigMouse {
 		progOpts = append(progOpts, tea.WithMouseCellMotion())
 	}
+	if ui.ColorModeEnabled() {
+		defer ui.DisableColorModeNotifications()
+	}
 	p := tea.NewProgram(m, progOpts...)
 
 	if _, err := p.Run(); err != nil {

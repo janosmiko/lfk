@@ -9,6 +9,23 @@
 #   rose-pine, gruvbox-dark, everforest-dark, one-half-dark, ayu-dark, nightfox
 colorscheme: tokyonight
 
+# ─── Auto Dark/Light Mode ─────────────────────────────────────────────────────
+# Use Ghostty-style "dark:X,light:Y" syntax in the colorscheme field to enable
+# automatic switching based on the OS appearance reported by the terminal
+# (CSI 996/2031 protocol). Supported terminals: Ghostty, kitty >= 0.27,
+# Contour, WezTerm (recent nightlies). Other terminals silently ignore the
+# sequences.
+#
+# On startup lfk sends CSI ?2031h (subscribe) + CSI ?996n (query current pref).
+# The terminal responds with dark (CSI ?997;1n) or light (CSI ?997;2n).
+# Any later OS appearance change triggers a real-time switch.
+#
+# Either side may be omitted; segment order does not matter; spaces in scheme
+# names are normalised to hyphens automatically.
+#
+# colorscheme: "dark:catppuccin-mocha,light:catppuccin-latte"
+# colorscheme: "dark:Rose Pine,light:Rose Pine Dawn"
+
 # ─── Transparent Background ───────────────────────────────────────────────────
 # Use the terminal's own background instead of the theme's background colors
 # for title bar and status bar. Selection highlights remain opaque.

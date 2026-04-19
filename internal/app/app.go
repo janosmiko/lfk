@@ -1024,5 +1024,8 @@ func (m Model) Init() tea.Cmd {
 	if ui.ConfigTipsEnabled {
 		cmds = append(cmds, scheduleStartupTip())
 	}
+	if ui.ColorModeEnabled() {
+		cmds = append(cmds, ui.EnableColorModeCmd())
+	}
 	return tea.Batch(cmds...)
 }

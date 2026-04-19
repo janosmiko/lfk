@@ -6,7 +6,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `colorscheme` | string | `"tokyonight"` | Built-in color scheme name (460+ available). Press `T` in-app to browse. Custom `theme` overrides are applied on top. |
+| `colorscheme` | string | `"tokyonight"` | Built-in color scheme name (460+ available). Press `T` to browse. Supports dual-mode syntax for auto dark/light switching: `"dark:X,light:Y"`. Custom `theme` overrides are applied on top. |
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars. Selection highlights remain opaque. |
 | `icons` | string | `"auto"` | Icon display mode. One of: `"auto"` (detects Nerd Font terminals; default), `"unicode"`, `"nerdfont"` (Material Design Icons; requires Nerd Font in terminal), `"simple"` (ASCII labels), `"emoji"`, or `"none"`. Unknown values fall back to `"unicode"`. Can be overridden at runtime by the `LFK_ICONS` environment variable. |
 | `log_path` | string | `"~/.local/share/lfk/lfk.log"` | Path to the application log file. |
@@ -26,6 +26,33 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |
 | `mouse` | bool | `true` | Capture mouse input for click navigation, scroll, and tab switching. Set to `false` to allow native terminal text selection. Also available as `--no-mouse` CLI flag. |
+
+### Auto dark/light mode
+
+When `dark_colorscheme` and/or `light_colorscheme` are set, lfk subscribes to
+your terminal's operating system color-scheme preference via the standard
+CSI 2031/996 protocol:
+
+- On startup lfk sends `CSI ?2031h` (subscribe to notifications) and
+  `CSI ?996n` (request current preference).
+- The terminal responds with `CSI ?997;1n` (dark) or `CSI ?997;2n` (light).
+- Whenever the OS appearance changes, the terminal sends another notification
+  and lfk switches to the configured scheme in real time.
+
+**Supported terminals**: Ghostty, kitty ≥ 0.27, Contour, WezTerm (recent
+nightly builds). Other terminals silently ignore the sequences.
+
+```yaml
+# Example: dark → Catppuccin Mocha, light → Catppuccin Latte
+colorscheme: "dark:catppuccin-mocha,light:catppuccin-latte"
+
+# Spaces in scheme names are fine — they are normalised to hyphens internally:
+colorscheme: "dark:Rose Pine,light:Rose Pine Dawn"
+```
+
+When only one side is configured the other side performs no automatic switch.
+The `colorscheme` field still sets the default theme applied at startup; the
+dark/light schemes override it as soon as the terminal reports its preference.
 
 ### Icon mode auto-detection
 
