@@ -51,19 +51,16 @@ type logTimeRangeEditor struct {
 }
 
 // logTimeRangeAbsField names the 6 two-to-four-digit cells in the
-// absolute-datetime editor. Phase 3 wires this up; Phase 2 leaves
-// AbsField pinned to its zero value.
+// absolute-datetime editor.
 type logTimeRangeAbsField int
 
-// Phase 3 wires these in; declared here so the editor struct's
-// AbsField carries a typed value in Phase 2's zero state.
 const (
-	logTimeRangeAbsFieldYear   logTimeRangeAbsField = iota //nolint:unused // Phase 3
-	logTimeRangeAbsFieldMonth                              //nolint:unused // Phase 3
-	logTimeRangeAbsFieldDay                                //nolint:unused // Phase 3
-	logTimeRangeAbsFieldHour                               //nolint:unused // Phase 3
-	logTimeRangeAbsFieldMinute                             //nolint:unused // Phase 3
-	logTimeRangeAbsFieldSecond                             //nolint:unused // Phase 3
+	logTimeRangeAbsFieldYear logTimeRangeAbsField = iota
+	logTimeRangeAbsFieldMonth
+	logTimeRangeAbsFieldDay
+	logTimeRangeAbsFieldHour
+	logTimeRangeAbsFieldMinute
+	logTimeRangeAbsFieldSecond
 )
 
 // toPoint collapses an editor into the corresponding LogTimePoint so
@@ -192,4 +189,180 @@ func clampInt(v, lo, hi int) int {
 		return hi
 	}
 	return v
+}
+
+// absFieldLeft / absFieldRight cycle between the six datetime cells.
+// Movement clamps rather than wraps — matching the Relative editor's
+// h/l behaviour.
+func (e *logTimeRangeEditor) absFieldLeft() {
+	if e.AbsField > logTimeRangeAbsFieldYear {
+		e.AbsField--
+	}
+}
+
+func (e *logTimeRangeEditor) absFieldRight() {
+	if e.AbsField < logTimeRangeAbsFieldSecond {
+		e.AbsField++
+	}
+}
+
+// absFieldAdjust nudges the focused datetime cell by delta. Different
+// fields use different semantics to match the spec:
+//
+//   - Date fields (Y/M/D) clamp in-range and re-clamp Day when
+//     Year/Month change shrinks the month (e.g. switching from March
+//     to February while Day==30 pins Day to the month's last day —
+//     this is the "Feb 30 → Feb 28" case called out in the spec).
+//   - Time fields (H/M/S) use wrap-with-carry via time.Date so "25:00"
+//     rolls into the next day, mirroring the spec's "25:00 → 00:00
+//     next day".
+//
+// The second return value is a short status string describing the
+// clamp/carry event, or "" when the edit landed cleanly. Callers pipe
+// this into setStatusMessage so the user knows their input was
+// adjusted.
+func (e *logTimeRangeEditor) absFieldAdjust(delta int) string {
+	y, mo, d := e.AbsTime.Year(), int(e.AbsTime.Month()), e.AbsTime.Day()
+	h, mn, s := e.AbsTime.Hour(), e.AbsTime.Minute(), e.AbsTime.Second()
+	loc := e.AbsTime.Location()
+	if loc == nil {
+		loc = time.Local
+	}
+	switch e.AbsField {
+	case logTimeRangeAbsFieldYear:
+		newY := clampInt(y+delta, 1970, 9999)
+		d, _ = clampDayInMonth(newY, mo, d)
+		e.AbsTime = time.Date(newY, time.Month(mo), d, h, mn, s, 0, loc)
+		return ""
+	case logTimeRangeAbsFieldMonth:
+		newMo := clampInt(mo+delta, 1, 12)
+		var status string
+		d, status = clampDayInMonth(y, newMo, d)
+		e.AbsTime = time.Date(y, time.Month(newMo), d, h, mn, s, 0, loc)
+		return status
+	case logTimeRangeAbsFieldDay:
+		newD := d + delta
+		var status string
+		newD, status = clampDayInMonth(y, mo, newD)
+		e.AbsTime = time.Date(y, time.Month(mo), newD, h, mn, s, 0, loc)
+		return status
+	case logTimeRangeAbsFieldHour:
+		// Wrap-with-carry: time.Date normalizes hour overflow into
+		// the next day automatically.
+		wrapped := time.Date(y, time.Month(mo), d, h+delta, mn, s, 0, loc)
+		e.AbsTime = wrapped
+		if wrapped.Hour() != h+delta && (h+delta >= 24 || h+delta < 0) {
+			return "hour wrapped"
+		}
+		return ""
+	case logTimeRangeAbsFieldMinute:
+		wrapped := time.Date(y, time.Month(mo), d, h, mn+delta, s, 0, loc)
+		e.AbsTime = wrapped
+		if wrapped.Minute() != mn+delta && (mn+delta >= 60 || mn+delta < 0) {
+			return "minute wrapped"
+		}
+		return ""
+	case logTimeRangeAbsFieldSecond:
+		wrapped := time.Date(y, time.Month(mo), d, h, mn, s+delta, 0, loc)
+		e.AbsTime = wrapped
+		if wrapped.Second() != s+delta && (s+delta >= 60 || s+delta < 0) {
+			return "second wrapped"
+		}
+		return ""
+	}
+	return ""
+}
+
+// absFieldOverwriteDigit replaces the focused field with the digit the
+// user typed. For Y/M/D/h/mn/s we accumulate into a multi-digit slot
+// over multiple keystrokes is complex and error-prone; the editor
+// opts for "typing a digit replaces the last digit", identical to the
+// Relative editor's policy. Callers follow up with +/- for precise
+// moves. Returns a clamp status string, as absFieldAdjust does.
+func (e *logTimeRangeEditor) absFieldOverwriteDigit(d int) string {
+	if d < 0 || d > 9 {
+		return ""
+	}
+	y, mo, day := e.AbsTime.Year(), int(e.AbsTime.Month()), e.AbsTime.Day()
+	h, mn, s := e.AbsTime.Hour(), e.AbsTime.Minute(), e.AbsTime.Second()
+	loc := e.AbsTime.Location()
+	if loc == nil {
+		loc = time.Local
+	}
+	switch e.AbsField {
+	case logTimeRangeAbsFieldYear:
+		// Year has 4 digits; digit-overwrite shifts left to preserve
+		// the most-significant digits, so typing "2" onto 2026 gives
+		// 0262 — a surprising result. Instead, we multiply + mod: the
+		// typed digit becomes the new units place. Callers who want
+		// a full jump use +/-.
+		newY := (y/1000)*1000 + (y%1000/100)*100 + (y%100/10)*10 + d
+		if newY < 1970 {
+			newY = 1970
+		}
+		day, _ = clampDayInMonth(newY, mo, day)
+		e.AbsTime = time.Date(newY, time.Month(mo), day, h, mn, s, 0, loc)
+		return ""
+	case logTimeRangeAbsFieldMonth:
+		newMo := clampInt(d, 1, 12)
+		if d == 0 {
+			newMo = 1
+		}
+		var status string
+		day, status = clampDayInMonth(y, newMo, day)
+		e.AbsTime = time.Date(y, time.Month(newMo), day, h, mn, s, 0, loc)
+		return status
+	case logTimeRangeAbsFieldDay:
+		newD := d
+		if newD < 1 {
+			newD = 1
+		}
+		var status string
+		newD, status = clampDayInMonth(y, mo, newD)
+		e.AbsTime = time.Date(y, time.Month(mo), newD, h, mn, s, 0, loc)
+		return status
+	case logTimeRangeAbsFieldHour:
+		newH := clampInt(d, 0, 23)
+		e.AbsTime = time.Date(y, time.Month(mo), day, newH, mn, s, 0, loc)
+		return ""
+	case logTimeRangeAbsFieldMinute:
+		newMn := clampInt(d, 0, 59)
+		e.AbsTime = time.Date(y, time.Month(mo), day, h, newMn, s, 0, loc)
+		return ""
+	case logTimeRangeAbsFieldSecond:
+		newS := clampInt(d, 0, 59)
+		e.AbsTime = time.Date(y, time.Month(mo), day, h, mn, newS, 0, loc)
+		return ""
+	}
+	return ""
+}
+
+// clampDayInMonth pins day into [1, daysInMonth(year, month)]. Returns
+// the clamped day and a status string describing the adjustment ("" on
+// a clean value).
+func clampDayInMonth(year, month, day int) (int, string) {
+	mo := time.Month(month)
+	if mo < time.January {
+		mo = time.January
+	}
+	if mo > time.December {
+		mo = time.December
+	}
+	days := daysInMonth(year, mo)
+	if day < 1 {
+		return 1, "day clamped"
+	}
+	if day > days {
+		return days, "day clamped to last of month"
+	}
+	return day, ""
+}
+
+// daysInMonth returns the number of days in the given month/year
+// (handles Feb 29 on leap years).
+func daysInMonth(year int, month time.Month) int {
+	// First day of next month minus 1 day = last day of this month.
+	first := time.Date(year, month, 1, 0, 0, 0, 0, time.UTC)
+	last := first.AddDate(0, 1, -1)
+	return last.Day()
 }

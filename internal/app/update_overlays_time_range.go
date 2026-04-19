@@ -218,8 +218,36 @@ func (m Model) handleLogTimeRangeEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	switch ed.Mode {
 	case logTimeRangeModeRelative:
 		applyRelativeEditorKey(ed, msg)
+	case logTimeRangeModeAbsolute:
+		if status := applyAbsoluteEditorKey(ed, msg); status != "" {
+			m.setStatusMessage(status, false)
+		}
 	}
 	return m, nil
+}
+
+// applyAbsoluteEditorKey mutates the absolute-datetime editor in place.
+// Returns a status string ("" when nothing noteworthy happened) that
+// the caller surfaces in the status bar — the spec requires a visible
+// hint whenever a clamp or carry is applied so the user knows why
+// their typed value changed.
+func applyAbsoluteEditorKey(ed *logTimeRangeEditor, msg tea.KeyMsg) string {
+	switch msg.String() {
+	case "h", "left":
+		ed.absFieldLeft()
+		return ""
+	case "l", "right":
+		ed.absFieldRight()
+		return ""
+	case "j", "down", "-":
+		return ed.absFieldAdjust(-1)
+	case "k", "up", "+":
+		return ed.absFieldAdjust(1)
+	case "0", "1", "2", "3", "4", "5", "6", "7", "8", "9":
+		d := int(msg.String()[0] - '0')
+		return ed.absFieldOverwriteDigit(d)
+	}
+	return ""
 }
 
 // applyRelativeEditorKey mutates the spinner editor in place. Separate

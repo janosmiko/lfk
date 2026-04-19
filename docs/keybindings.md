@@ -201,7 +201,7 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `H` | Toggle histogram strip (1-row time-density sparkline above content; lines without an RFC3339 timestamp are not counted) |
 | `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
-| `T` | Open the log time-range picker (Start + optional End; presets such as Last 5m / Last 24h / Today / Yesterday / "Last 24h excluding last 1h"). `t` is the global New Tab shortcut, so the log-view picker uses `Shift+T`. The title bar shows a `[RANGE: …]` chip while a window is active. |
+| `T` | Open the log time-range picker (Start + optional End; presets such as Last 5m / Last 24h / Today / Yesterday / "Last 24h excluding last 1h"). Select `Custom…` or press `Tab` to reach the Start / End editor panels; each endpoint can be **Now**, **Relative** (three d/h/m spinner fields), or **Absolute** (6-cell YYYY-MM-DD HH:MM:SS datetime). Inside an editor: `h/l` move between fields, `j/k` (or `+`/`-`) adjust the value, digits overwrite, `Enter` advances Start→End or commits, `Esc` drops back to the preset panel. `c` clears the active range from any panel. `t` is the global New Tab shortcut, so the log-view picker uses `Shift+T`. The title bar shows a `[RANGE: …]` chip while a window is active. |
 | `/` | Search in logs |
 | `n` / `N` | Next / previous search match |
 | `]e` / `[e` | Jump to next/prev ERROR-severity visible line |
