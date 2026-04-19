@@ -71,7 +71,7 @@
 
 - **Multi-tab support**: Open multiple views side by side
 - **Multi-cluster/multi-context support** via merged kubeconfig loading
-- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive), and `KUBECONFIG` env var
+- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), and `KUBECONFIG` env var
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser
@@ -133,6 +133,7 @@
 
 - **460+ built-in color schemes** from [ghostty themes](https://github.com/ghostty-org/ghostty): Tokyonight, Catppuccin, Dracula, Nord, Rose Pine, Gruvbox, and many more. Transparent background support.
 - **Runtime theme switching**: Press `T` to preview and switch themes without restarting
+- **Auto dark/light mode**: configure a dark and a light scheme; lfk switches automatically when the OS appearance changes (requires CSI 996/2031 terminal support: Ghostty, kitty, Contour, …)
 - **Custom color themes** via config file (Tokyonight theme by default)
 - **Configurable keybindings** for direct actions
 - **Configurable search abbreviations**
@@ -427,7 +428,9 @@ Create `~/.config/lfk/config.yaml` to customize the application. All fields are 
 
 ```yaml
 # Color scheme (press T in-app to browse 460+ themes with live preview)
-colorscheme: catppuccin-mocha
+# Auto dark/light mode — Ghostty-style "dark:X,light:Y" syntax switches the
+# scheme when the OS appearance changes (CSI 996/2031; Ghostty, kitty >= 0.27, …)
+colorscheme: "dark:catppuccin-mocha,light:catppuccin-latte"
 
 # Use terminal's own background
 transparent_background: true

@@ -988,7 +988,7 @@ type ownedParentState struct {
 func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
+	s.Style = lipgloss.NewStyle().Foreground(ui.ThemeColor("62"))
 
 	contextName := client.CurrentContext()
 	if opts.Context != "" {
@@ -1259,6 +1259,9 @@ func (m Model) Init() tea.Cmd {
 	}
 	if ui.ConfigTipsEnabled {
 		cmds = append(cmds, scheduleStartupTip())
+	}
+	if ui.ColorModeEnabled() {
+		cmds = append(cmds, ui.EnableColorModeCmd())
 	}
 	return tea.Batch(cmds...)
 }

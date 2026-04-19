@@ -580,6 +580,7 @@ func (m Model) viewExecTerminal() string {
 		m.execMu.Lock()
 		cols, rows := m.execTerm.Size()
 		cursor := m.execTerm.Cursor()
+		cursorVisible := m.execTerm.CursorVisible()
 
 		// Calculate vertical scroll offset to keep the cursor visible.
 		// When the terminal buffer is taller than the viewport, show the
@@ -624,6 +625,11 @@ func (m Model) viewExecTerminal() string {
 				}
 				if g.Mode&1 != 0 { // reverse (attrReverse = 1)
 					style = style.Reverse(true)
+				}
+				// Cursor block: invert the cell at the cursor position
+				// (flipping any existing reverse so the block stands out).
+				if cursorVisible && x == cursor.X && y == cursor.Y {
+					style = style.Reverse(g.Mode&1 == 0)
 				}
 				line.WriteString(style.Render(string(ch)))
 			}

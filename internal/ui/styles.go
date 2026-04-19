@@ -29,16 +29,17 @@ const (
 	defaultColorSurface    = "#2a2e40" // Surface background for overlays
 )
 
-// ThemeColor returns a lipgloss color for hex when colors are enabled,
-// or NoColor{} when ConfigNoColor is active. Use this helper for inline
-// styles that reference raw hex literals (not the Color* slots), such as
-// the monitoring overlay's severity colors, so they also respect
+// ThemeColor returns a lipgloss color for the given spec when colors are
+// enabled, or NoColor{} when ConfigNoColor is active. Accepts any format
+// lipgloss.Color understands: hex ("#f7768e"), ANSI 256 number ("62"), or
+// 16-color ANSI number ("2"). Use this helper for inline styles that
+// reference raw color literals (not the Color* slots) so they also respect
 // no-color mode.
-func ThemeColor(hex string) lipgloss.TerminalColor {
+func ThemeColor(spec string) lipgloss.TerminalColor {
 	if ConfigNoColor {
 		return lipgloss.NoColor{}
 	}
-	return lipgloss.Color(hex)
+	return lipgloss.Color(spec)
 }
 
 // Theme color slots used by inline lipgloss.Color(ColorX) calls throughout

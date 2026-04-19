@@ -614,7 +614,8 @@ func stripTimestampRaw(s string) string {
 }
 
 // podPrefixColors is a palette of distinct colors for pod/container log prefixes.
-var podPrefixColors = []lipgloss.Color{
+// Values are routed through ThemeColor so ConfigNoColor strips them to NoColor{}.
+var podPrefixColors = []string{
 	"#7aa2f7", // blue
 	"#9ece6a", // green
 	"#bb9af7", // purple
@@ -660,7 +661,7 @@ func colorizePodPrefix(line string) string {
 		hash = hash*31 + uint32(c)
 	}
 	color := podPrefixColors[hash%uint32(len(podPrefixColors))]
-	style := lipgloss.NewStyle().Foreground(color)
+	style := lipgloss.NewStyle().Foreground(ThemeColor(color))
 
 	return style.Render("["+prefix+"]") + " " + rest
 }

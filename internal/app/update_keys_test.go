@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -1171,6 +1172,40 @@ func TestPush4HandleKeyToggleWatchMode(t *testing.T) {
 	result, _ := m.handleKey(keyMsg(kb.WatchMode))
 	rm := result.(Model)
 	assert.False(t, rm.watchMode)
+}
+
+func TestHandleKeyWatchModeMessageReflectsInterval(t *testing.T) {
+	// Each case sets the raw interval (as it would arrive from CLI/config),
+	// runs it through ClampWatchInterval (matching the real model-init flow),
+	// and asserts the status message reflects the effective value.
+	cases := []struct {
+		name    string
+		rawIn   time.Duration
+		want    string
+		comment string
+	}{
+		{"typical mid-range value", 5 * time.Second, "5s", "normal case"},
+		{"at minimum boundary", ui.MinWatchInterval, "500ms", "exact min"},
+		{"below minimum clamps up", 100 * time.Millisecond, "500ms", "sub-min input clamps to MinWatchInterval"},
+		{"at maximum boundary", ui.MaxWatchInterval, "10m0s", "exact max"},
+		{"above maximum clamps down", 30 * time.Minute, "10m0s", "super-max input clamps to MaxWatchInterval"},
+		{"one minute", 1 * time.Minute, "1m0s", "composite duration format"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := basePush4Model()
+			m.watchMode = false
+			m.watchInterval = ui.ClampWatchInterval(tc.rawIn)
+
+			result, _ := m.handleKeyWatchMode()
+			rm := result.(Model)
+
+			assert.True(t, rm.watchMode)
+			assert.Contains(t, rm.statusMessage, tc.want, tc.comment)
+			assert.NotContains(t, rm.statusMessage, "every 2s)",
+				"must not show hardcoded 2s default")
+		})
+	}
 }
 
 func TestPush4HandleKeyTogglePreview(t *testing.T) {

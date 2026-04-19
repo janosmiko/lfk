@@ -108,7 +108,7 @@ type DeploymentRevision struct {
 // NewClient creates a new Kubernetes client, loading configs from:
 // 1. KUBECONFIG env var
 // 2. ~/.kube/config
-// 3. All files in ~/.kube/config.d/ (recursively)
+// 3. All files in ~/.kube/config.d/ (recursively; symlinks to directories are followed)
 func NewClient(kubeconfigOverride string) (*Client, error) {
 	var kubeconfigPaths []string
 	if kubeconfigOverride != "" {
@@ -188,18 +188,42 @@ func buildKubeconfigPaths() []string {
 			paths = append(paths, defaultPath)
 		}
 
-		// config.d directory - recursively find all files.
-		configDir := filepath.Join(home, ".kube", "config.d")
-		_ = filepath.WalkDir(configDir, func(path string, d os.DirEntry, err error) error {
-			// skip errors (dir might not exist)
-			if err == nil && !d.IsDir() {
-				paths = append(paths, path)
-			}
-			return nil
-		})
+		// config.d directory - recursively find all files (follows symlinks).
+		paths = append(paths, collectConfigDirPaths(filepath.Join(home, ".kube", "config.d"))...)
 	}
 
 	return paths
+}
+
+// collectConfigDirPaths returns all file paths under dir. If dir is a symlink
+// to a directory, the symlink is followed so WalkDir can descend into the real
+// target. Returns nil when dir is missing, is not a directory, or is a
+// dangling symlink.
+//
+// Why EvalSymlinks first: filepath.WalkDir does not follow symbolic links;
+// when the root path is itself a symlink to a directory, its DirEntry reports
+// IsDir()=false (Lstat treats symlinks as non-directories), so the callback
+// would add the symlink path as a "file" and clientcmd would later fail with
+// "read ...: is a directory".
+func collectConfigDirPaths(dir string) []string {
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.IsDir() {
+		return nil
+	}
+	var out []string
+	_ = filepath.WalkDir(resolved, func(path string, d os.DirEntry, err error) error {
+		// Silently skip entries that can't be read (permission denied, etc.)
+		// so a single unreadable subdir doesn't abort the whole walk.
+		if err == nil && !d.IsDir() {
+			out = append(out, path)
+		}
+		return nil
+	})
+	return out
 }
 
 func containsPath(paths []string, target string) bool {

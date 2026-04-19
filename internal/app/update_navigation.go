@@ -270,8 +270,9 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.middleItems = nil
 		m.loading = true
 	}
+	m.setStatusMessage(fmt.Sprintf("Context: %s", sel.Name), false)
 	m.saveCurrentSession()
-	cmds := []tea.Cmd{m.loadPreview()}
+	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
 	if _, ok := m.discoveredResources[sel.Name]; !ok {
 		cmds = append(cmds, m.discoverAPIResources(sel.Name))
 	}

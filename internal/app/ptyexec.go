@@ -122,7 +122,10 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 
 	// Convert Bubbletea key to raw bytes for PTY.
-	raw := keyToBytes(msg)
+	// Pass the terminal's application cursor mode so arrow keys send the
+	// correct sequences (\x1bO vs \x1b[ depending on DECCKM state).
+	appCursor := m.execTerm != nil && m.execTerm.Mode()&vt10x.ModeAppCursor != 0
+	raw := keyToBytes(msg, appCursor)
 	if len(raw) > 0 {
 		_, _ = m.execPTY.Write(raw)
 	}
@@ -202,7 +205,7 @@ func startExecPTYReader(ptmx *os.File, term vt10x.Terminal, cmd *exec.Cmd, mu *s
 	}()
 }
 
-// keyBytesMap maps tea.KeyType to raw terminal byte sequences.
+// keyBytesMap maps tea.KeyType to raw terminal byte sequences (normal cursor mode).
 var keyBytesMap = map[tea.KeyType][]byte{
 	tea.KeyEnter:     {'\r'},
 	tea.KeyTab:       {'\t'},
@@ -243,10 +246,25 @@ var keyBytesMap = map[tea.KeyType][]byte{
 	tea.KeyCtrlZ:     {'\x1a'},
 }
 
+// keyBytesAppCursorMap overrides cursor-key sequences for application cursor
+// mode (DECCKM active): arrow keys send \x1bO_ instead of \x1b[_.
+var keyBytesAppCursorMap = map[tea.KeyType][]byte{
+	tea.KeyUp:    {'\x1b', 'O', 'A'},
+	tea.KeyDown:  {'\x1b', 'O', 'B'},
+	tea.KeyRight: {'\x1b', 'O', 'C'},
+	tea.KeyLeft:  {'\x1b', 'O', 'D'},
+}
+
 // keyToBytes converts a Bubbletea key message to raw terminal bytes.
-func keyToBytes(msg tea.KeyMsg) []byte {
+// appCursor should be true when the terminal has DECCKM active (ModeAppCursor).
+func keyToBytes(msg tea.KeyMsg, appCursor bool) []byte {
 	if msg.Type == tea.KeyRunes {
 		return []byte(string(msg.Runes))
+	}
+	if appCursor {
+		if b, ok := keyBytesAppCursorMap[msg.Type]; ok {
+			return b
+		}
 	}
 	if b, ok := keyBytesMap[msg.Type]; ok {
 		return b

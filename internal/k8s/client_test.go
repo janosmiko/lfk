@@ -882,6 +882,166 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 	})
 }
 
+// --- multi-kubeconfig context switching ---
+
+func TestMultiKubeconfigContextSwitching(t *testing.T) {
+	// Build two distinct kubeconfig files and verify that restConfigForContext
+	// correctly resolves each context's server URL when both files are merged
+	// via KUBECONFIG=c1:c2.
+	tmp := t.TempDir()
+
+	c1 := filepath.Join(tmp, "c1.yaml")
+	c2 := filepath.Join(tmp, "c2.yaml")
+	assert.NoError(t, os.WriteFile(c1, []byte(`apiVersion: v1
+kind: Config
+current-context: alpha
+clusters:
+- name: cluster-alpha
+  cluster:
+    server: https://alpha.example.test:6443
+    insecure-skip-tls-verify: true
+contexts:
+- name: alpha
+  context:
+    cluster: cluster-alpha
+    user: user-alpha
+users:
+- name: user-alpha
+  user:
+    token: alpha-token
+`), 0o600))
+	assert.NoError(t, os.WriteFile(c2, []byte(`apiVersion: v1
+kind: Config
+current-context: beta
+clusters:
+- name: cluster-beta
+  cluster:
+    server: https://beta.example.test:6443
+    insecure-skip-tls-verify: true
+contexts:
+- name: beta
+  context:
+    cluster: cluster-beta
+    user: user-beta
+users:
+- name: user-beta
+  user:
+    token: beta-token
+`), 0o600))
+
+	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
+
+	client, err := NewClient("")
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
+
+	t.Run("both contexts appear in list", func(t *testing.T) {
+		ctxs, err := client.GetContexts()
+		assert.NoError(t, err)
+		names := make(map[string]bool, len(ctxs))
+		for _, c := range ctxs {
+			names[c.Name] = true
+		}
+		assert.True(t, names["alpha"], "alpha context must be present")
+		assert.True(t, names["beta"], "beta context must be present")
+	})
+
+	t.Run("current context is from first file", func(t *testing.T) {
+		// clientcmd merge: the first file's current-context wins.
+		assert.Equal(t, "alpha", client.CurrentContext())
+	})
+
+	t.Run("restConfigForContext resolves alpha to alpha's server", func(t *testing.T) {
+		cfg, err := client.restConfigForContext("alpha")
+		assert.NoError(t, err)
+		assert.Equal(t, "https://alpha.example.test:6443", cfg.Host,
+			"alpha context must resolve to cluster-alpha's server")
+	})
+
+	t.Run("restConfigForContext resolves beta to beta's server", func(t *testing.T) {
+		cfg, err := client.restConfigForContext("beta")
+		assert.NoError(t, err)
+		assert.Equal(t, "https://beta.example.test:6443", cfg.Host,
+			"beta context must resolve to cluster-beta's server — regression: "+
+				"when two KUBECONFIG files are merged, switching to the second "+
+				"context must not keep routing traffic to the first cluster")
+	})
+
+	t.Run("KubeconfigPathForContext maps each context to its source file", func(t *testing.T) {
+		assert.Equal(t, c1, client.KubeconfigPathForContext("alpha"))
+		assert.Equal(t, c2, client.KubeconfigPathForContext("beta"))
+	})
+}
+
+// --- collectConfigDirPaths ---
+
+func TestCollectConfigDirPaths(t *testing.T) {
+	t.Run("regular directory returns contained files", func(t *testing.T) {
+		tmp := t.TempDir()
+		a := filepath.Join(tmp, "a.yaml")
+		b := filepath.Join(tmp, "b.yaml")
+		assert.NoError(t, os.WriteFile(a, []byte("{}"), 0o600))
+		assert.NoError(t, os.WriteFile(b, []byte("{}"), 0o600))
+
+		paths := collectConfigDirPaths(tmp)
+		assert.Len(t, paths, 2)
+	})
+
+	t.Run("symlink to directory is followed", func(t *testing.T) {
+		tmp := t.TempDir()
+		realDir := filepath.Join(tmp, "real-config-dir")
+		assert.NoError(t, os.MkdirAll(realDir, 0o755))
+		assert.NoError(t, os.WriteFile(filepath.Join(realDir, "cluster.yaml"), []byte("{}"), 0o600))
+
+		linkDir := filepath.Join(tmp, "config.d")
+		assert.NoError(t, os.Symlink(realDir, linkDir))
+
+		paths := collectConfigDirPaths(linkDir)
+		assert.Len(t, paths, 1, "symlink to directory should be followed")
+		// Every returned path must point to a real file, never the directory itself.
+		for _, p := range paths {
+			info, err := os.Stat(p)
+			assert.NoError(t, err)
+			assert.False(t, info.IsDir(), "returned path must not be a directory: %s", p)
+		}
+	})
+
+	t.Run("non-existent path returns empty", func(t *testing.T) {
+		tmp := t.TempDir()
+		paths := collectConfigDirPaths(filepath.Join(tmp, "nope"))
+		assert.Empty(t, paths)
+	})
+
+	t.Run("regular file at dir location returns empty", func(t *testing.T) {
+		tmp := t.TempDir()
+		notDir := filepath.Join(tmp, "not-dir")
+		assert.NoError(t, os.WriteFile(notDir, []byte("{}"), 0o600))
+
+		paths := collectConfigDirPaths(notDir)
+		assert.Empty(t, paths, "must not add a non-directory path")
+	})
+
+	t.Run("dangling symlink returns empty", func(t *testing.T) {
+		tmp := t.TempDir()
+		dangling := filepath.Join(tmp, "dangling")
+		assert.NoError(t, os.Symlink(filepath.Join(tmp, "missing"), dangling))
+
+		paths := collectConfigDirPaths(dangling)
+		assert.Empty(t, paths)
+	})
+
+	t.Run("nested files are discovered recursively", func(t *testing.T) {
+		tmp := t.TempDir()
+		sub := filepath.Join(tmp, "sub")
+		assert.NoError(t, os.MkdirAll(sub, 0o755))
+		assert.NoError(t, os.WriteFile(filepath.Join(tmp, "top.yaml"), []byte("{}"), 0o600))
+		assert.NoError(t, os.WriteFile(filepath.Join(sub, "nested.yaml"), []byte("{}"), 0o600))
+
+		paths := collectConfigDirPaths(tmp)
+		assert.Len(t, paths, 2)
+	})
+}
+
 // --- formatRelativeTime ---
 
 func TestFormatRelativeTime(t *testing.T) {

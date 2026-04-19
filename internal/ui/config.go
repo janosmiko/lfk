@@ -362,6 +362,14 @@ var ConfigMouse = true
 // the no_color config field, or the --no-color CLI flag.
 var ConfigNoColor bool
 
+// ConfigDarkColorscheme is the built-in scheme name applied when the terminal
+// reports dark mode. Populated by parsing the "dark:X" segment of colorscheme.
+var ConfigDarkColorscheme string
+
+// ConfigLightColorscheme is the built-in scheme name applied when the terminal
+// reports light mode. Populated by parsing the "light:X" segment of colorscheme.
+var ConfigLightColorscheme string
+
 // SetNoColor updates ConfigNoColor and rebuilds the active theme so style
 // globals reflect the new setting. No-op when the value is unchanged.
 func SetNoColor(v bool) {
@@ -373,7 +381,14 @@ func SetNoColor(v bool) {
 }
 
 type configFile struct {
-	// Colorscheme selects a built-in color scheme by name (e.g. "dracula", "nord").
+	// Colorscheme selects a built-in color scheme by name (e.g. "dracula",
+	// "nord"). Supports Ghostty-style dual-mode syntax to enable automatic
+	// dark/light switching via CSI 996/2031:
+	//
+	//   colorscheme: "dark:Rose Pine,light:Rose Pine Dawn"
+	//
+	// Either segment may be omitted. Without the prefix syntax the value is
+	// used as a plain scheme name and dark/light switching is disabled.
 	// Custom theme overrides in the "theme" section are applied on top.
 	Colorscheme   string            `json:"colorscheme" yaml:"colorscheme"`
 	Theme         Theme             `json:"theme" yaml:"theme"`
@@ -543,13 +558,61 @@ func loadConfigFile(configOverride string) (configFile, bool) {
 }
 
 // applyColorscheme selects a built-in colorscheme if specified in config.
+//
+// The colorscheme field supports two formats:
+//
+//  1. Plain name – "dracula"
+//     Applies the scheme and leaves dark/light switching disabled.
+//
+//  2. Ghostty-style dual-mode – "dark:Rose Pine,light:Rose Pine Dawn"
+//     Parses each comma-separated segment for a "dark:" or "light:" prefix.
+//     Both, one, or neither segment may be present; order does not matter.
+//     ConfigDarkColorscheme / ConfigLightColorscheme are set accordingly.
+//     No default scheme is applied immediately; the terminal's first CSI 997
+//     notification will trigger the initial switch.
 func applyColorscheme(theme *Theme, cfg configFile) {
-	if cfg.Colorscheme != "" {
-		if scheme, ok := BuiltinSchemes()[strings.ToLower(cfg.Colorscheme)]; ok {
-			*theme = scheme
-			ActiveSchemeName = strings.ToLower(cfg.Colorscheme)
+	if cfg.Colorscheme == "" {
+		return
+	}
+	dark, light, isDual := parseDualColorscheme(cfg.Colorscheme)
+	if isDual {
+		ConfigDarkColorscheme = dark
+		ConfigLightColorscheme = light
+		return
+	}
+	lower := normalizeScheme(cfg.Colorscheme)
+	if scheme, ok := BuiltinSchemes()[lower]; ok {
+		*theme = scheme
+		ActiveSchemeName = lower
+	}
+}
+
+// parseDualColorscheme parses a Ghostty-style "dark:X,light:Y" colorscheme
+// string. It returns the dark and light scheme names (normalized to lowercase
+// with spaces replaced by hyphens, matching built-in scheme map keys) and
+// isDual=true when the string contains at least one "dark:" or "light:" prefix.
+// Segment order and surrounding whitespace are both tolerated.
+func parseDualColorscheme(s string) (dark, light string, isDual bool) {
+	parts := strings.Split(s, ",")
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		lower := strings.ToLower(p)
+		switch {
+		case strings.HasPrefix(lower, "dark:"):
+			dark = normalizeScheme(p[len("dark:"):])
+			isDual = true
+		case strings.HasPrefix(lower, "light:"):
+			light = normalizeScheme(p[len("light:"):])
+			isDual = true
 		}
 	}
+	return dark, light, isDual
+}
+
+// normalizeScheme converts a user-supplied scheme name to the lowercase,
+// hyphenated form used as keys in BuiltinSchemes (e.g. "Rose Pine" → "rose-pine").
+func normalizeScheme(s string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(s)), " ", "-")
 }
 
 // applyConfigOptions applies scalar config options (icons, terminal, tips, etc.).
