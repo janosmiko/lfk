@@ -174,15 +174,15 @@ func completeBuiltin(tokens []token, m *Model) []ui.Suggestion {
 				candidates = append(candidates, ns)
 			}
 		}
-		return filterSuggestionsTyped(candidates, prefix, "namespace")
+		return filterSuggestionsFuzzy(candidates, prefix, "namespace")
 	case "context":
-		return filterSuggestionsTyped(m.contextNames(), prefix, "context")
+		return filterSuggestionsFuzzy(m.contextNames(), prefix, "context")
 	case "set":
-		return filterSuggestionsTyped(setOptions(), prefix, "option")
+		return filterSuggestionsFuzzy(setOptions(), prefix, "option")
 	case "sort":
-		return filterSuggestionsTyped(ui.ActiveSortableColumns, prefix, "column")
+		return filterSuggestionsFuzzy(ui.ActiveSortableColumns, prefix, "column")
 	case "export":
-		return filterSuggestionsTyped([]string{"yaml", "json"}, prefix, "format")
+		return filterSuggestionsFuzzy([]string{"yaml", "json"}, prefix, "format")
 	default:
 		return nil
 	}
@@ -221,9 +221,9 @@ func completeKubectl(tokens []token, m *Model) []ui.Suggestion {
 		prevToken := strings.ToLower(effective[len(effective)-2].text)
 		switch prevToken {
 		case "-n", "--namespace":
-			return filterSuggestionsTyped(m.namespaceNames(), prefix, "namespace")
+			return filterSuggestionsFuzzy(m.namespaceNames(), prefix, "namespace")
 		case "-o", "--output":
-			return filterSuggestionsTyped(outputFormatsComplete(), prefix, "format")
+			return filterSuggestionsFuzzy(outputFormatsComplete(), prefix, "format")
 		}
 	}
 
@@ -257,7 +257,7 @@ func completeKubectl(tokens []token, m *Model) []ui.Suggestion {
 		// matches the currently viewed resource type (names are only available
 		// for the resource type currently loaded in the explorer).
 		names := resourceNamesForKubectl(m, effective)
-		return filterSuggestionsTyped(names, prefix, "name")
+		return filterSuggestionsFuzzy(names, prefix, "name")
 	}
 }
 
@@ -302,7 +302,7 @@ func (m *Model) generateCommandBarSuggestions() []ui.Suggestion {
 					candidates = append(candidates, ns)
 				}
 			}
-			return filterSuggestionsTyped(candidates, prefix, "namespace")
+			return filterSuggestionsFuzzy(candidates, prefix, "namespace")
 		}
 		// First token: still show matching resource types.
 		return completeResourceJump(input, m.resourceTypeItems())

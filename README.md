@@ -86,7 +86,7 @@
 - **Resource sorting** by name, age, or status
 - **Filter and search**: Filter with `f`, search with `/` -- supports substring, regex (auto-detected), and fuzzy (`~` prefix) modes
 - **Abbreviated search**: Type `pvc`, `hpa`, `deploy` etc. to jump to resource types
-- **Command bar** (`:`) with vertical dropdown autocomplete: resource jumps (`:pod`, `:dep`), built-in commands (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl with `:k`/`:kubectl` prefix and flag/namespace completion, shell commands (`:!`)
+- **Command bar** (`:`) with vertical dropdown autocomplete: resource jumps (`:pod`, `:dep`), built-in commands (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl with `:k`/`:kubectl` prefix and flag/namespace completion, shell commands (`:!`). Value positions (namespace, context, resource name, option, column, format) accept fuzzy matches; command names stay on prefix.
 - **Watch mode**: Auto-refresh resources every 2 seconds (enabled by default)
 - **Owner/controller navigation**: Jump to the owner of any resource with `o`
 - **Events view** with warnings-only filter toggle and duplicate-event grouping (`z`)
