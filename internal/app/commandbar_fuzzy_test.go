@@ -81,15 +81,11 @@ func TestFilterSuggestionsFuzzy_Ranking(t *testing.T) {
 	cands := []string{"my-prod-cluster", "production", "prodigy", "staging"}
 	got := filterSuggestionsFuzzy(cands, "prod", "namespace")
 
-	assert.Len(t, got, 3, "'staging' should be excluded")
-	// production (prefix, shorter) should come before prodigy (prefix, shorter than production).
-	// But both are prefix matches; the tiebreak on length should put prodigy (7) > production (10).
-	// Then my-prod-cluster is substring.
+	// 'staging' has no match. Among prefix matches, the length bonus puts the
+	// shorter candidate first: prodigy (7) > production (10). The substring
+	// match (my-prod-cluster) ranks below both prefix matches.
 	texts := suggestionTexts(got)
-	assert.Equal(t, "my-prod-cluster", texts[len(texts)-1],
-		"substring match should rank below prefix matches")
-	assert.Contains(t, texts[:2], "production")
-	assert.Contains(t, texts[:2], "prodigy")
+	assert.Equal(t, []string{"prodigy", "production", "my-prod-cluster"}, texts)
 }
 
 func TestFilterSuggestionsFuzzy_SubsequenceMatch(t *testing.T) {
@@ -122,5 +118,14 @@ func TestFilterSuggestionsFuzzy_AlphabeticalTiebreak(t *testing.T) {
 func TestFilterSuggestionsFuzzy_EmptyQueryKeepsAll(t *testing.T) {
 	cands := []string{"alpha", "beta", "gamma"}
 	got := filterSuggestionsFuzzy(cands, "", "option")
-	assert.Len(t, got, 3)
+	assert.Equal(t, []string{"alpha", "beta", "gamma"}, suggestionTexts(got),
+		"empty query preserves input order")
+}
+
+func TestFilterSuggestionsFuzzy_EmptyQueryPreservesNonAlphabeticalOrder(t *testing.T) {
+	// Simulate a kubeconfig where contexts arrive in usage order, not
+	// alphabetical. With an empty query the upstream order must survive.
+	cands := []string{"prod-east", "default", "prod-west", "staging"}
+	got := filterSuggestionsFuzzy(cands, "", "context")
+	assert.Equal(t, cands, suggestionTexts(got))
 }

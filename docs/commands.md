@@ -67,7 +67,7 @@ Repeated completed tasks collapse with a `×N` suffix.
 :k describe pod nginx-abc
 ```
 
-Autocomplete offers subcommands, flags, resource types, and namespaces. Typing `:k` or `:kubectl` alone surfaces the subcommand list.
+Autocomplete offers subcommands, flags, resource types, and namespaces. Typing `:k` or `:kubectl` alone surfaces the subcommand list. Value positions (namespace, resource name, output format) accept fuzzy matches — exact > prefix > substring > subsequence — while command names themselves stay on prefix.
 
 ## Resource jumps
 
