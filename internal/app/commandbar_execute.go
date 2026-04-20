@@ -152,7 +152,11 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		}
 		m.nav.Context = arg
 		m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
-		return m, tea.Batch(m.loadResourceTypes(), scheduleStatusClear())
+		cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
+		if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return m, tea.Batch(cmds...)
 
 	case "set":
 		return m.executeSetCommand(arg)
@@ -393,6 +397,10 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 		return nil
 	}
 
+	// Decide this BEFORE injectKubectlDefaults adds `--context` / `-n`
+	// so the positional-arg detection sees the user's original shape.
+	affectsNamespaces := commandAffectsNamespaces(args)
+
 	args = m.injectKubectlDefaults(args)
 
 	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl %s", strings.Join(args, " ")))
@@ -413,8 +421,34 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	logger.Info("Running kubectl command", "cmd", shellCmd)
 
 	return tea.ExecProcess(c, func(err error) tea.Msg {
-		return actionResultMsg{err: err}
+		return actionResultMsg{err: err, invalidateNamespaceCache: affectsNamespaces}
 	})
+}
+
+// commandAffectsNamespaces reports whether a kubectl command (args
+// without the "kubectl"/"k" prefix) looks like it mutates the cluster's
+// Namespace list. Matches `create|delete|replace (ns|namespace|namespaces) ...`.
+// Read-only verbs (`get`, `describe`) are excluded so they don't force
+// an unnecessary cache refresh, and `apply -f <file>` is not inspected
+// (template applies invalidate unconditionally instead). False
+// positives only cost one extra GetNamespaces call, so the heuristic
+// favours breadth.
+func commandAffectsNamespaces(args []string) bool {
+	if len(args) < 2 {
+		return false
+	}
+	switch args[0] {
+	case "create", "delete", "replace":
+	default:
+		return false
+	}
+	for _, a := range args[1:] {
+		switch a {
+		case "ns", "namespace", "namespaces":
+			return true
+		}
+	}
+	return false
 }
 
 // injectKubectlDefaults scans the args for --context, -n/--namespace, and

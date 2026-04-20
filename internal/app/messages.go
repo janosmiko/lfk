@@ -87,6 +87,11 @@ type previewYAMLLoadedMsg struct {
 type actionResultMsg struct {
 	message string
 	err     error
+	// invalidateNamespaceCache, when true on a successful action,
+	// drops the current context's namespace completion cache so the
+	// next command bar open reflects the mutation (e.g. `:k create
+	// ns`, `:k delete ns`, or a template apply).
+	invalidateNamespaceCache bool
 }
 
 // triggerCronJobMsg carries the result of triggering a CronJob.

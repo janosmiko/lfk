@@ -836,14 +836,19 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 	// Cache namespace names for command bar autocompletion, keyed by the
 	// context the fetch was issued for. Keying avoids stale results when
 	// tabs / `:ctx` change nav.Context between the request and reply.
+	// Stamp fetchedAt so the next command bar open can decide whether
+	// the entry is still fresh or should trigger a background refresh.
 	if m.cachedNamespaces == nil {
-		m.cachedNamespaces = make(map[string][]string)
+		m.cachedNamespaces = make(map[string]namespaceCacheEntry)
 	}
 	names := make([]string, 0, len(msg.items))
 	for _, item := range msg.items {
 		names = append(names, item.Name)
 	}
-	m.cachedNamespaces[msg.context] = names
+	m.cachedNamespaces[msg.context] = namespaceCacheEntry{
+		names:     names,
+		fetchedAt: time.Now(),
+	}
 	if m.allNamespaces {
 		m.overlayCursor = 0
 	} else {
@@ -893,9 +898,16 @@ func (m Model) updateActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 	m.bulkMode = false
 	if msg.err != nil {
 		m.setErrorFromErr("Error: ", msg.err)
-	} else if msg.message != "" {
-		logger.Info("Action completed", "message", msg.message)
-		m.setStatusMessage(msg.message, false)
+	} else {
+		if msg.message != "" {
+			logger.Info("Action completed", "message", msg.message)
+			m.setStatusMessage(msg.message, false)
+		}
+		// Only invalidate when the action succeeded; a failed `create
+		// ns` or template apply did not actually mutate the cluster.
+		if msg.invalidateNamespaceCache {
+			m.invalidateNamespaceCache()
+		}
 	}
 	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }

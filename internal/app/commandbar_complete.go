@@ -645,13 +645,12 @@ func (m *Model) contextNames() []string {
 // context keeps completions correct across tab switches and `:ctx`
 // changes within a tab. The cache is populated asynchronously when the
 // command bar opens for a context that isn't cached yet.
+//
+// A stale entry (older than namespaceCacheTTL) is still returned here
+// so completions remain visible while a background refresh runs; the
+// refresh is scheduled from handleKeyCommandBar.
 func (m *Model) namespaceNames() []string {
-	kctx := m.nav.Context
-	if kctx == "" && m.client != nil {
-		kctx = m.client.CurrentContext()
-	}
-
-	return m.cachedNamespaces[kctx]
+	return m.cachedNamespaces[m.activeContext()].names
 }
 
 // resourceNames returns unique resource names from the middle column.

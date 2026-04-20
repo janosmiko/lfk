@@ -231,10 +231,10 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 }
 
 func (m Model) loadNamespaces() tea.Cmd {
-	kctx := m.nav.Context
-	if kctx == "" {
-		kctx = m.client.CurrentContext()
+	if m.client == nil {
+		return nil
 	}
+	kctx := m.activeContext()
 	// Use an independent context so namespace loading is never blocked or
 	// cancelled by in-flight resource requests.
 	return func() tea.Msg {
