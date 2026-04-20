@@ -239,7 +239,7 @@ func (m Model) loadNamespaces() tea.Cmd {
 	// cancelled by in-flight resource requests.
 	return func() tea.Msg {
 		items, err := m.client.GetNamespaces(context.Background(), kctx)
-		return namespacesLoadedMsg{items: items, err: err}
+		return namespacesLoadedMsg{context: kctx, items: items, err: err}
 	}
 }
 

@@ -763,8 +763,14 @@ func (m Model) handleKeyCommandBar() (Model, tea.Cmd) {
 	m.commandBarSuggestions = nil
 	m.commandBarSelectedSuggestion = 0
 	m.commandHistory.reset()
-	// Eagerly populate namespace cache if empty.
-	if len(m.cachedNamespaces) == 0 {
+	// Eagerly populate the namespace cache for the current tab's context
+	// if nothing is cached for it yet. Different tabs / `:ctx` switches
+	// each need their own fetch since the cache is keyed by context name.
+	kctx := m.nav.Context
+	if kctx == "" && m.client != nil {
+		kctx = m.client.CurrentContext()
+	}
+	if len(m.cachedNamespaces[kctx]) == 0 {
 		return m, m.loadNamespaces()
 	}
 	return m, nil

@@ -833,11 +833,17 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 	m.err = nil
 	allNsItem := model.Item{Name: "All Namespaces", Status: "all"}
 	m.overlayItems = append([]model.Item{allNsItem}, msg.items...)
-	// Cache namespace names for command bar autocompletion.
-	m.cachedNamespaces = make([]string, 0, len(msg.items))
-	for _, item := range msg.items {
-		m.cachedNamespaces = append(m.cachedNamespaces, item.Name)
+	// Cache namespace names for command bar autocompletion, keyed by the
+	// context the fetch was issued for. Keying avoids stale results when
+	// tabs / `:ctx` change nav.Context between the request and reply.
+	if m.cachedNamespaces == nil {
+		m.cachedNamespaces = make(map[string][]string)
 	}
+	names := make([]string, 0, len(msg.items))
+	for _, item := range msg.items {
+		names = append(names, item.Name)
+	}
+	m.cachedNamespaces[msg.context] = names
 	if m.allNamespaces {
 		m.overlayCursor = 0
 	} else {

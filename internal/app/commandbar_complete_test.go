@@ -144,7 +144,7 @@ func TestCompleteBuiltin_NamespaceArg(t *testing.T) {
 		{text: "kube", start: 3, end: 7},
 	}
 	m := baseModelCov()
-	m.cachedNamespaces = []string{"default", "kube-system", "production"}
+	m.cachedNamespaces = map[string][]string{"": {"default", "kube-system", "production"}}
 	got := completeBuiltin(tokens, &m)
 	assert.True(t, hasSuggestionCategory(got, "kube-system", "namespace"),
 		"should suggest 'kube-system' matching prefix 'kube'")
@@ -302,7 +302,7 @@ func TestCompleteKubectl_NamespaceFlag(t *testing.T) {
 		{text: "kube", start: 12, end: 16},
 	}
 	m := baseModelCov()
-	m.cachedNamespaces = []string{"default", "kube-system", "kube-public"}
+	m.cachedNamespaces = map[string][]string{"": {"default", "kube-system", "kube-public"}}
 	got := completeKubectl(tokens, &m)
 	assert.True(t, hasSuggestionCategory(got, "kube-system", "namespace"),
 		"should suggest 'kube-system' after -n flag")
@@ -382,7 +382,7 @@ func TestGenerateSuggestions_ShellCommand(t *testing.T) {
 func TestGenerateSuggestions_BuiltinNamespace(t *testing.T) {
 	m := baseModelCov()
 	m.commandBarInput.Value = "ns kube"
-	m.cachedNamespaces = []string{"default", "kube-system", "production"}
+	m.cachedNamespaces = map[string][]string{"": {"default", "kube-system", "production"}}
 	got := m.generateCommandBarSuggestions()
 	assert.True(t, hasSuggestionCategory(got, "kube-system", "namespace"),
 		"should suggest 'kube-system' for 'ns kube'")
@@ -518,7 +518,7 @@ func TestCompleteKubectl_LongNamespaceFlag(t *testing.T) {
 		{text: "def", start: 21, end: 24},
 	}
 	m := baseModelCov()
-	m.cachedNamespaces = []string{"default", "kube-system"}
+	m.cachedNamespaces = map[string][]string{"": {"default", "kube-system"}}
 	got := completeKubectl(tokens, &m)
 	assert.True(t, hasSuggestionCategory(got, "default", "namespace"),
 		"should suggest 'default' after --namespace flag")
@@ -555,12 +555,70 @@ func TestCompleteBuiltin_NamespaceEmptyPrefix(t *testing.T) {
 		{text: "", start: 10, end: 10},
 	}
 	m := baseModelCov()
-	m.cachedNamespaces = []string{"default", "kube-system"}
+	m.cachedNamespaces = map[string][]string{"": {"default", "kube-system"}}
 	got := completeBuiltin(tokens, &m)
 	assert.Len(t, got, 2)
 	for _, s := range got {
 		assert.Equal(t, "namespace", s.Category)
 	}
+}
+
+func TestNamespaceNames_ScopedByContext(t *testing.T) {
+	m := baseModelCov()
+	m.cachedNamespaces = map[string][]string{
+		"ctx-a": {"a-ns-1", "a-ns-2"},
+		"ctx-b": {"b-ns-1"},
+	}
+
+	m.nav.Context = "ctx-a"
+	assert.ElementsMatch(t, []string{"a-ns-1", "a-ns-2"}, m.namespaceNames(),
+		"nav.Context=ctx-a should read the ctx-a entry")
+
+	m.nav.Context = "ctx-b"
+	assert.ElementsMatch(t, []string{"b-ns-1"}, m.namespaceNames(),
+		"nav.Context=ctx-b should read the ctx-b entry, not leak from ctx-a")
+
+	m.nav.Context = "ctx-missing"
+	assert.Empty(t, m.namespaceNames(),
+		"unknown context should return nil so the command bar triggers a fresh load")
+}
+
+func TestCompleteBuiltin_NamespaceArg_PerContext(t *testing.T) {
+	// Cache holds entries for two contexts. Completing `:ns kube` under
+	// nav.Context=ctx-b must only see ctx-b's namespaces, even though
+	// ctx-a's cache contains a matching "kube-system".
+	tokens := []token{
+		{text: "ns", start: 0, end: 2},
+		{text: "kube", start: 3, end: 7},
+	}
+	m := baseModelCov()
+	m.nav.Context = "ctx-b"
+	m.cachedNamespaces = map[string][]string{
+		"ctx-a": {"kube-system", "kube-public"},
+		"ctx-b": {"default", "production"},
+	}
+
+	got := completeBuiltin(tokens, &m)
+	assert.False(t, hasSuggestion(got, "kube-system"),
+		"ctx-a's kube-system must not leak into ctx-b's completions")
+	assert.False(t, hasSuggestion(got, "kube-public"),
+		"ctx-a's kube-public must not leak into ctx-b's completions")
+}
+
+func TestUpdateNamespacesLoaded_StoresUnderMessageContext(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "ctx-current"
+	items := []model.Item{{Name: "ns-x"}, {Name: "ns-y"}}
+
+	// A fetch issued for ctx-other completes; its result must be stored
+	// under ctx-other even though the tab has since moved to ctx-current.
+	result, _ := m.Update(namespacesLoadedMsg{context: "ctx-other", items: items})
+	rm := result.(Model)
+
+	assert.ElementsMatch(t, []string{"ns-x", "ns-y"}, rm.cachedNamespaces["ctx-other"],
+		"stored under the message's context, not the model's current nav.Context")
+	assert.Empty(t, rm.cachedNamespaces["ctx-current"],
+		"current context must not pick up values fetched for another context")
 }
 
 func TestCompleteBuiltin_SortEmptyPrefix(t *testing.T) {

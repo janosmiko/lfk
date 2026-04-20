@@ -58,8 +58,9 @@ type resourceTreeLoadedMsg struct {
 }
 
 type namespacesLoadedMsg struct {
-	items []model.Item
-	err   error
+	context string
+	items   []model.Item
+	err     error
 }
 
 // yamlLoadedMsg delivers a full YAML document for the YAML view. The content

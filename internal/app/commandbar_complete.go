@@ -640,10 +640,18 @@ func (m *Model) contextNames() []string {
 	return names
 }
 
-// namespaceNames returns cached namespace names for completion.
-// The cache is populated asynchronously when the command bar opens.
+// namespaceNames returns cached namespace names for completion in the
+// current nav context. Each tab has its own nav.Context, so keying by
+// context keeps completions correct across tab switches and `:ctx`
+// changes within a tab. The cache is populated asynchronously when the
+// command bar opens for a context that isn't cached yet.
 func (m *Model) namespaceNames() []string {
-	return m.cachedNamespaces
+	kctx := m.nav.Context
+	if kctx == "" && m.client != nil {
+		kctx = m.client.CurrentContext()
+	}
+
+	return m.cachedNamespaces[kctx]
 }
 
 // resourceNames returns unique resource names from the middle column.

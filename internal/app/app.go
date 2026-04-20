@@ -747,8 +747,12 @@ type Model struct {
 	commandBarPreview            string // ghost text shown dimmed after cursor (tab preview)
 	commandHistory               *commandHistory
 
-	// Cached namespace names for command bar autocompletion.
-	cachedNamespaces []string
+	// Cached namespace names for command bar autocompletion, keyed by
+	// context name. Each tab may have its own nav.Context, so keying by
+	// context keeps completions correct when switching tabs or running
+	// `:ctx` within a tab without re-fetching a context's namespaces more
+	// than once.
+	cachedNamespaces map[string][]string
 
 	// Async resource name cache for cross-namespace kubectl completion.
 	// Key: "context/namespace/resource" -> list of resource names.
