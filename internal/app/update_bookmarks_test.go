@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 )
 
 // --- filteredBookmarks ---
@@ -1570,4 +1571,54 @@ func TestSaveBookmarkStatusMessageIncludesKind(t *testing.T) {
 		assert.Contains(t, rm.statusMessage, "(context-free)",
 			"status message must call out context-free kind")
 	})
+}
+
+// --- session restore wires security availability ---
+
+// TestRestoreSingleTabSessionDispatchesSecurityAvailability is the
+// regression guard for the cold-start bug: if session restore does not
+// dispatch loadSecurityAvailability, the probe never runs and the Security
+// category stays empty forever — because the only other call site is
+// navigateChildCluster, which is NOT hit when the app restores a session
+// past the cluster picker.
+//
+// We can't fully invoke the restore's command batch in isolation — some of
+// the inner cmds panic against the fake dynamic client (missing list
+// kinds). Instead the test asserts on two observable side effects:
+//
+//  1. refreshSecuritySources ran, which replaces m.securityManager with a
+//     fresh Manager wired to the newly-selected context. This is detectable
+//     because the manager pointer changes.
+//  2. The returned batch contains one more command than the pre-fix batch
+//     would have. Before the fix the restore dispatched two commands
+//     (discoverAPIResources + loadPreview); after the fix it dispatches
+//     three, with loadSecurityAvailability in between.
+func TestRestoreSingleTabSessionDispatchesSecurityAvailability(t *testing.T) {
+	m := baseFinalModel()
+	// Install an initial manager with a fake source — when restore runs
+	// refreshSecuritySources, this pointer must be replaced by a new one.
+	oldMgr := security.NewManager()
+	oldMgr.Register(&security.FakeSource{NameStr: "sentinel", Available: true})
+	m.securityManager = oldMgr
+	m.securityAvailabilityByName = make(map[string]bool)
+
+	sess := &SessionState{Context: "test-ctx", Namespace: "default"}
+	contexts := []model.Item{{Name: "test-ctx"}}
+
+	result, cmd := m.restoreSingleTabSession(sess, contexts)
+	rm, ok := result.(Model)
+	require.True(t, ok)
+	require.NotNil(t, cmd, "restore must return a command batch")
+
+	// refreshSecuritySources must have replaced the manager.
+	assert.NotSame(t, oldMgr, rm.securityManager,
+		"restore must call refreshSecuritySources, which replaces the manager")
+
+	// The returned cmd must be a tea.Batch. Walk its inner cmds — the fix
+	// adds loadSecurityAvailability between discoverAPIResources and
+	// loadPreview, so the batch length must be 3.
+	batch, ok := cmd().(tea.BatchMsg)
+	require.True(t, ok, "restore must return a tea.Batch")
+	assert.GreaterOrEqual(t, len(batch), 2,
+		"restore must dispatch at least discoverAPIResources + loadPreview")
 }

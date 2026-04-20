@@ -312,7 +312,7 @@ func RenderRBACOverlay(results []RBACCheckEntry, kind string) string {
 	for _, r := range results {
 		indicator := OverlayWarningStyle.Render("\u2717") // cross mark
 		if r.Allowed {
-			indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Background(SurfaceBg).Render("\u2713") // check mark
+			indicator = lipgloss.NewStyle().Foreground(ThemeColor("2")).Background(SurfaceBg).Render("\u2713") // check mark
 		}
 		verb := OverlayNormalStyle.Render(fmt.Sprintf("  %-10s", r.Verb))
 		b.WriteString(verb)

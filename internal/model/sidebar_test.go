@@ -223,6 +223,76 @@ func TestBuildSidebarItems_CuratedOrderWithinCategory(t *testing.T) {
 	assert.Equal(t, expected, workloads, "workloads must follow curated BuiltInOrderRank order")
 }
 
+// TestBuildSidebarItems_InjectsSecuritySources verifies that entries from
+// SecuritySourcesFn are injected under the Security category with a synthetic
+// APIGroup/Kind and that Count is reflected in the display name.
+func TestBuildSidebarItems_InjectsSecuritySources(t *testing.T) {
+	defer func(fn func() []SecuritySourceEntry) { SecuritySourcesFn = fn }(SecuritySourcesFn)
+
+	SecuritySourcesFn = func() []SecuritySourceEntry {
+		return []SecuritySourceEntry{
+			{DisplayName: "Trivy", SourceName: "trivy-operator", Icon: Icon{Unicode: "◈"}, Count: 5},
+			{DisplayName: "Heuristic", SourceName: "heuristic", Icon: Icon{Unicode: "◉"}, Count: 12},
+		}
+	}
+
+	items := BuildSidebarItems(nil)
+
+	var trivy, heuristic *Item
+	for i := range items {
+		switch items[i].Kind {
+		case "__security_trivy-operator__":
+			trivy = &items[i]
+		case "__security_heuristic__":
+			heuristic = &items[i]
+		}
+	}
+	require.NotNil(t, trivy, "Trivy security entry must be injected")
+	require.NotNil(t, heuristic, "Heuristic security entry must be injected")
+
+	assert.Equal(t, "Trivy (5)", trivy.Name)
+	assert.Equal(t, "Security", trivy.Category)
+	assert.Equal(t, "◈", trivy.Icon.Unicode)
+	assert.Equal(t, SecurityVirtualAPIGroup+"/v1/findings-trivy-operator", trivy.Extra)
+
+	assert.Equal(t, "Heuristic (12)", heuristic.Name)
+	assert.Equal(t, "Security", heuristic.Category)
+
+	// Each entry's Extra must be unique so navigation dispatches to the
+	// right source when the user drills in.
+	assert.NotEqual(t, trivy.Extra, heuristic.Extra,
+		"security entries must have unique Extra values")
+}
+
+// TestBuildSidebarItems_NoSecuritySourcesWhenHookNil verifies that the
+// Security category remains empty (no items injected) when SecuritySourcesFn
+// is unset, and no panic occurs.
+func TestBuildSidebarItems_NoSecuritySourcesWhenHookNil(t *testing.T) {
+	defer func(fn func() []SecuritySourceEntry) { SecuritySourcesFn = fn }(SecuritySourcesFn)
+	SecuritySourcesFn = nil
+
+	items := BuildSidebarItems(nil)
+
+	for _, it := range items {
+		assert.NotEqual(t, "Security", it.Category,
+			"no Security items should be present when hook is nil")
+	}
+}
+
+// TestBuildSidebarItems_SecuritySourcesHookReturnsEmpty verifies that an
+// empty slice from SecuritySourcesFn is treated the same as nil.
+func TestBuildSidebarItems_SecuritySourcesHookReturnsEmpty(t *testing.T) {
+	defer func(fn func() []SecuritySourceEntry) { SecuritySourcesFn = fn }(SecuritySourcesFn)
+	SecuritySourcesFn = func() []SecuritySourceEntry { return nil }
+
+	items := BuildSidebarItems(nil)
+
+	for _, it := range items {
+		assert.NotEqual(t, "Security", it.Category,
+			"no Security items should be present when hook returns empty slice")
+	}
+}
+
 func TestTitleCaseFirst(t *testing.T) {
 	cases := []struct {
 		in, want string

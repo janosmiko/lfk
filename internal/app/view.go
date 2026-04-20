@@ -244,6 +244,20 @@ func (m Model) viewExplorer() string {
 	ui.ActiveSelectedItems = m.selectedItems
 	defer func() { ui.ActiveSelectedItems = nil }()
 
+	// Set security badge state so RenderTable can decorate eligible rows.
+	// The badge is gated on any available security source so clusters without
+	// one see the same output they had before security was introduced.
+	ui.ActiveSecurityAvailable = m.securityAvailableAny()
+	if ui.ActiveSecurityAvailable && m.securityManager != nil {
+		ui.ActiveSecurityIndex = m.securityManager.Index()
+	} else {
+		ui.ActiveSecurityIndex = nil
+	}
+	defer func() {
+		ui.ActiveSecurityAvailable = false
+		ui.ActiveSecurityIndex = nil
+	}()
+
 	// Calculate column widths: left=12%, middle=51%, right=remainder (~37%).
 	usable := m.width - 6 // 3 columns x 2 border chars
 	var leftW, middleW, rightW int
@@ -257,10 +271,7 @@ func (m Model) viewExplorer() string {
 		rightW = max(10, usable-leftW-middleW)
 	}
 
-	contentHeight := m.height - 4 // room for title(1) + column borders(2) + status(1)
-	if contentHeight < 3 {
-		contentHeight = 3
-	}
+	contentHeight := max(3, m.height-4) // room for title(1) + column borders(2) + status(1)
 
 	// Tab bar (only shown with 2+ tabs).
 	var tabBar string
@@ -274,26 +285,14 @@ func (m Model) viewExplorer() string {
 	dropdownHeight := 0
 	if dropdown != "" {
 		dropdownHeight = strings.Count(dropdown, "\n") + 1
-		contentHeight -= dropdownHeight
-		if contentHeight < 3 {
-			contentHeight = 3
-		}
+		contentHeight = max(3, contentHeight-dropdownHeight)
 	}
 
 	// Column padding is 1 on each side, so inner content width is 2 less.
 	colPad := 2
-	leftInner := leftW - colPad
-	middleInner := middleW - colPad
-	rightInner := rightW - colPad
-	if leftInner < 5 {
-		leftInner = 5
-	}
-	if middleInner < 5 {
-		middleInner = 5
-	}
-	if rightInner < 5 {
-		rightInner = 5
-	}
+	leftInner := max(5, leftW-colPad)
+	middleInner := max(5, middleW-colPad)
+	rightInner := max(5, rightW-colPad)
 
 	// Only show error in the middle column when there are no items (first load failure).
 	// Otherwise errors are displayed in the status bar.
@@ -319,6 +318,17 @@ func (m Model) viewExplorer() string {
 
 	// Build columns.
 	middleHeader := m.middleColumnHeader()
+	if m.filterText != "" {
+		middleHeader += " (filtered: " + m.filterText + ")"
+	}
+	// Show hidden-ignore count when on a security view.
+	if !m.showSecurityIgnored && m.securityIgnores != nil &&
+		strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		hidden := countIgnoredGroups(m.securityIgnores, m.nav.Context)
+		if hidden > 0 {
+			middleHeader += fmt.Sprintf(" (%d hidden)", hidden)
+		}
+	}
 	var middleCol string
 	switch m.nav.Level {
 	case model.LevelResources, model.LevelOwned, model.LevelContainers:
@@ -463,6 +473,8 @@ func (m Model) viewExplorerDashboard(contentHeight int) string {
 	sel := m.selectedMiddleItem()
 	isMonitoring := sel != nil && sel.Extra == "__monitoring__"
 
+	fullW := m.width - 2
+
 	var dashContent string
 	if isMonitoring {
 		dashContent = m.monitoringPreview
@@ -476,7 +488,6 @@ func (m Model) viewExplorerDashboard(contentHeight int) string {
 		}
 	}
 
-	fullW := m.width - 2
 	if !isMonitoring && m.dashboardEventsPreview != "" {
 		return m.viewExplorerDashboardTwoCol(dashContent, fullW, contentHeight)
 	}

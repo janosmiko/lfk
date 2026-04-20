@@ -53,6 +53,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("stderr: "+msg.message, true)
 		return m, tea.Batch(scheduleStatusClear(), m.waitForStderr())
 	default:
+		if dark, ok := ui.ParseColorModeMsg(msg); ok {
+			ui.SetColorMode(dark)
+			return m, nil
+		}
 		if mdl, cmd, ok := m.updateResourceMsg(msg); ok {
 			return mdl, cmd
 		}
@@ -64,7 +68,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // updateResourceMsg handles resource-loading and navigation-related messages.
-func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nolint:gocyclo // message dispatch switch
 	switch msg := msg.(type) {
 	case contextsLoadedMsg:
 		mdl, cmd := m.updateContextsLoaded(msg)
@@ -150,6 +154,11 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case logContainersLoadedMsg:
 		mdl, cmd := m.updateLogContainersLoaded(msg)
 		return mdl, cmd, true
+	case securityAvailabilityLoadedMsg:
+		mdl, cmd := m.handleSecurityAvailabilityLoaded(msg)
+		return mdl, cmd, true
+	case securityFindingsScannedMsg:
+		return m.handleSecurityFindingsScanned(msg), nil, true
 	}
 
 	return m.updateEasterEggMsg(msg)
@@ -518,7 +527,16 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 
 func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.gen != m.requestGen {
-		return m, nil // stale response, discard
+		// Security resource loads are slow (FetchAll reads pod logs, CRDs).
+		// The gen may drift from cursor movement (invalidatePreviewForCursorChange)
+		// while the fetch is in flight. Accept the response if we're still
+		// on the same security resource type at LevelResources.
+		isSecurityMain := !msg.forPreview &&
+			m.nav.Level == model.LevelResources &&
+			strings.HasPrefix(m.nav.ResourceType.Kind, "__security_")
+		if !isSecurityMain {
+			return m, nil // stale response, discard
+		}
 	}
 	m.loading = false
 	if isContextCanceled(msg.err) {
@@ -1101,6 +1119,14 @@ func (m Model) updateStartupTip(msg startupTipMsg) (tea.Model, tea.Cmd) {
 func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	if !m.watchMode {
 		return m, nil
+	}
+	// Security findings are fetched via the security manager, not the k8s
+	// watch API. Watch-mode refreshes would call FetchAll which may return
+	// empty results (cache invalidated, sources still scanning), wiping
+	// the current list. Skip watch ticks for security resource types —
+	// findings are refreshed via the explicit `r` key or background scans.
+	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		return m, scheduleWatchTick(m.watchInterval)
 	}
 	// Mark this dispatch as a watch-tick refresh so the instrumented
 	// loaders called below (through refreshCurrentLevel) use

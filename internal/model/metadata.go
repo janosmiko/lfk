@@ -5,6 +5,7 @@ package model
 // be pinned or reordered by the user.
 var CoreCategories = []string{
 	"Dashboards",
+	"Security", // dynamically populated via model.SecuritySourcesFn
 	"Cluster",
 	"Workloads",
 	"Config",

@@ -5,6 +5,24 @@ import (
 	"time"
 )
 
+// SecurityVirtualAPIGroup is the APIGroup used by synthetic security
+// resource types. Client.GetResources dispatches on this value.
+const SecurityVirtualAPIGroup = "_security"
+
+// SecuritySourceEntry describes one entry shown under the Security category
+// in the middle column. Populated at startup by the app layer.
+type SecuritySourceEntry struct {
+	DisplayName string // "Trivy", "Kyverno", "Heuristic"
+	SourceName  string // matches security.SecuritySource.Name() — "trivy-operator", "heuristic", "policy-report"
+	Icon        Icon   // Icon variants for display (see icon.go)
+	Count       int    // populated from FindingIndex at render time
+}
+
+// SecuritySourcesFn returns the list of security source entries to display
+// in the Security category. Set by the app at startup. When nil or empty,
+// the Security category is still shown (it's a core category) but empty.
+var SecuritySourcesFn func() []SecuritySourceEntry
+
 // Level represents the current navigation depth in the owner-based hierarchy.
 type Level int
 
@@ -108,6 +126,18 @@ type Item struct {
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
 	GroupedRefs   []GroupedRef     // For grouped rows (Events): all underlying resource identifiers
+}
+
+// ColumnValue returns the value of the named column, or "" if the column
+// is not present. Used by callers that need to read fields out of an Item
+// without knowing the column's position.
+func (i Item) ColumnValue(key string) string {
+	for _, c := range i.Columns {
+		if c.Key == key {
+			return c.Value
+		}
+	}
+	return ""
 }
 
 // ResourceNode represents a node in a resource relationship tree.

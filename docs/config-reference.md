@@ -6,12 +6,13 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `colorscheme` | string | `"tokyonight"` | Built-in color scheme name (460+ available). Press `T` in-app to browse. Custom `theme` overrides are applied on top. |
+| `colorscheme` | string | `"tokyonight"` | Built-in color scheme name (460+ available). Press `T` to browse. Supports dual-mode syntax for auto dark/light switching: `"dark:X,light:Y"`. Custom `theme` overrides are applied on top. |
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars. Selection highlights remain opaque. |
 | `icons` | string | `"auto"` | Icon display mode. One of: `"auto"` (detects Nerd Font terminals; default), `"unicode"`, `"nerdfont"` (Material Design Icons; requires Nerd Font in terminal), `"simple"` (ASCII labels), `"emoji"`, or `"none"`. Unknown values fall back to `"unicode"`. Can be overridden at runtime by the `LFK_ICONS` environment variable. |
 | `log_path` | string | `"~/.local/share/lfk/lfk.log"` | Path to the application log file. |
 | `dashboard` | bool | `true` | Show cluster dashboard when entering a context. Set to `false` to go directly to resource types. |
 | `monitoring` | map[string]object | `{}` | Per-cluster monitoring endpoint configuration. Keys are context names or `"_global"`. See [Monitoring](#monitoring) section. |
+| `security` | map[string]object | *(see default)* | Per-cluster security findings browser configuration. Keys are context names or `"_global"`. See [Security](#security) section. |
 | `resource_columns` | map[string]list | `{}` | Per-resource-type column configuration. Keys are resource Kind names (case-insensitive). When not set for a kind, columns are auto-detected. |
 | `clusters` | map[string]object | `{}` | Per-cluster configuration overrides. Keys are context names. See [Clusters](#clusters) section. |
 | `theme` | object | *(see Theme section)* | Custom color theme overrides. |
@@ -27,6 +28,33 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |
 | `mouse` | bool | `true` | Capture mouse input for click navigation, scroll, and tab switching. Set to `false` to allow native terminal text selection. Also available as `--no-mouse` CLI flag. |
+
+### Auto dark/light mode
+
+When `colorscheme` uses the `dark:X,light:Y` dual-mode syntax (either segment
+may be omitted), lfk subscribes to your terminal's operating system
+color-scheme preference via the standard CSI 2031/996 protocol:
+
+- On startup lfk sends `CSI ?2031h` (subscribe to notifications) and
+  `CSI ?996n` (request current preference).
+- The terminal responds with `CSI ?997;1n` (dark) or `CSI ?997;2n` (light).
+- Whenever the OS appearance changes, the terminal sends another notification
+  and lfk switches to the configured scheme in real time.
+
+**Supported terminals**: Ghostty, kitty ≥ 0.27, Contour, WezTerm (recent
+nightly builds). Other terminals silently ignore the sequences.
+
+```yaml
+# Example: dark → Catppuccin Mocha, light → Catppuccin Latte
+colorscheme: "dark:catppuccin-mocha,light:catppuccin-latte"
+
+# Spaces in scheme names are fine — they are normalised to hyphens internally:
+colorscheme: "dark:Rose Pine,light:Rose Pine Dawn"
+```
+
+When only one side is configured the other side performs no automatic switch.
+Plain (non-dual) `colorscheme` values continue to work as before and disable
+automatic dark/light switching entirely.
 
 ### Icon mode auto-detection
 
@@ -95,6 +123,125 @@ When not configured, the following defaults are used for auto-discovery:
 |---|---|---|
 | Prometheus | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `prometheus-kube-prometheus-prometheus`, `prometheus-server`, `prometheus`, `prometheus-operated` |
 | Alertmanager | `monitoring`, `prometheus`, `observability`, `kube-prometheus-stack` | `alertmanager-operated`, `alertmanager`, `prometheus-kube-prometheus-alertmanager`, `alertmanager-main` |
+
+## Security
+
+Configure the security findings browser and SEC column. All fields are
+optional with sensible defaults. Keys are kubeconfig context names; the
+special key `"_global"` applies to any cluster without an explicit entry.
+
+```yaml
+security:
+  _global:
+    enabled: true
+    sec_column: true
+    ignored_namespaces:       # global: applies to ALL sources
+      - kube-system
+      - kube-node-lease
+    sources:
+      heuristic:
+        enabled: true
+        ignored_namespaces:   # per-source: additional exclusions
+          - monitoring
+          - falco
+      trivy_operator:
+        enabled: true
+      policy_report:
+        enabled: true
+      falco:
+        enabled: true
+      kube_bench:
+        enabled: false
+```
+
+Per-cluster overrides work the same way as the monitoring section:
+
+```yaml
+security:
+  my-prod-cluster:
+    sources:
+      falco:
+        enabled: false
+  _global:
+    enabled: true
+    sec_column: true
+    sources:
+      heuristic:
+        enabled: true
+      trivy_operator:
+        enabled: true
+      policy_report:
+        enabled: true
+      falco:
+        enabled: true
+      kube_bench:
+        enabled: false
+```
+
+### Fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | bool | `true` | Master switch for the entire security feature |
+| `sec_column` | bool | `true` | Show the SEC badge in the Workloads explorer table |
+| `ignored_namespaces` | list[string] | `[]` | Namespaces to exclude from ALL security sources. Findings for resources in these namespaces are dropped globally. Per-source `ignored_namespaces` are additive. |
+| `sources` | map | *(see default)* | Per-source configuration |
+
+### Source fields
+
+Each source entry under `sources:` accepts:
+
+| Field | Type | Description |
+|---|---|---|
+| `enabled` | bool | Opt-out toggle for the source |
+| `checks` | list[string] | (heuristic only) List of checks to run. Omit or set to `null` to run all built-in checks. |
+| `ignored_namespaces` | list[string] | Namespaces to exclude from scanning. Pods in these namespaces are skipped entirely. Useful for system namespaces like `kube-system`, `monitoring`, or `falco`. |
+
+Available heuristic checks: `privileged`, `host_namespaces`, `host_path`,
+`readonly_root_fs`, `run_as_root`, `allow_priv_esc`, `dangerous_caps`,
+`missing_resource_limits`, `default_sa`, `latest_tag`.
+
+### Source requirements
+
+| Source | Default | Requirements |
+|---|---|---|
+| `heuristic` | enabled | No external dependencies. Built-in pod security checks run against the Kubernetes API directly. |
+| `trivy_operator` | enabled | Requires [Trivy Operator](https://aquasecurity.github.io/trivy-operator/) installed in the cluster. Reads `VulnerabilityReport` and `ConfigAuditReport` CRDs from the `aquasecurity.github.io/v1alpha1` API group. Automatically disabled when those CRDs are not present. |
+| `policy_report` | enabled | Requires [Kyverno](https://kyverno.io/) or any implementation of the [Policy Reports API](https://github.com/kubernetes-sigs/wg-policy-prototypes). Reads `PolicyReport` and `ClusterPolicyReport` CRDs from the `wgpolicyk8s.io/v1alpha2` API group. Automatically disabled when those CRDs are not present. |
+| `falco` | enabled | Requires [Falco](https://falco.org/) DaemonSet installed with `json_output: true` (default in Helm chart). Reads alerts directly from Falco pod logs. Falls back to Kubernetes Events if falcosidekick has `policyreport` output enabled. Automatically disabled when Falco pods are not detected. |
+| `kube_bench` | disabled | Not yet implemented (placeholder). |
+
+### Ignoring findings
+
+Individual findings or entire finding groups can be ignored via the action menu (`x` key) when viewing security findings. Ignored findings are stored per cluster context in a state file:
+
+```
+~/.local/state/lfk/security_ignores.yaml
+```
+
+The file format:
+
+```yaml
+contexts:
+  my-cluster:
+    - source: "heuristic"
+      group_key: "privileged"
+      comment: "accepted risk for admin pods"
+      created_at: "2026-04-15T10:30:00Z"
+    - source: "trivy-operator"
+      group_key: "CVE-2024-1234"
+      resource: "default/Pod/web"
+      comment: "mitigated by network policy"
+      created_at: "2026-04-15T11:00:00Z"
+    - source: "falco"
+      group_key: "Terminal shell in container"
+      comment: "expected for debug pods"
+      created_at: "2026-04-15T12:00:00Z"
+```
+
+Each rule requires a `source` field (`heuristic`, `trivy-operator`, `policy-report`, `falco`) so ignores are scoped to their security source. When `resource` is empty, the rule ignores the entire finding group globally within that source. When set (format: `namespace/Kind/name`), it only ignores the finding for that specific resource.
+
+Use `Ctrl+I` to toggle visibility of ignored findings. When visible, ignored items show with an `[IGNORED]` tag.
 
 ## Clusters
 
@@ -165,6 +312,7 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `finalizer_search` | `ctrl+g` | Finalizer search and remove |
 | `terminal_toggle` | `ctrl+t` | Toggle terminal mode (pty/exec) |
 | `toggle_rare` | `H` | Toggle rarely used resource types in the sidebar |
+| `security_ignore_toggle` | `ctrl+i` | Toggle show/hide ignored security findings |
 
 ## Resource Columns
 

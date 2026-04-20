@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -83,6 +84,15 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 	m.clearSelection()
 	m.activeFilterPreset = nil
 	m.unfilteredMiddleItems = nil
+	m.pendingSecurityFilter = ""
+	// Clear the security filter only when leaving LevelResources (the
+	// finding groups list) back to LevelResourceTypes. Keep it when
+	// going from LevelOwned (affected resources) back to the groups so
+	// the user can see the same filtered view.
+	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") && m.nav.Level == model.LevelResources {
+		m.filterText = ""
+		m.filterActive = false
+	}
 
 	// Reset scroll positions when navigating to a new level.
 	ui.ActiveMiddleScroll = 0
@@ -241,6 +251,10 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
+	// Re-register security sources against the newly selected context so
+	// they use the right per-cluster clients. Safe to call even when the
+	// manager has no sources yet.
+	m.refreshSecuritySources()
 	m.applyPinnedGroups()
 	m.nav.Level = model.LevelResourceTypes
 	m.pushLeft()
@@ -256,10 +270,14 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.middleItems = nil
 		m.loading = true
 	}
+	m.setStatusMessage(fmt.Sprintf("Context: %s", sel.Name), false)
 	m.saveCurrentSession()
-	cmds := []tea.Cmd{m.loadPreview()}
+	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
 	if _, ok := m.discoveredResources[sel.Name]; !ok {
 		cmds = append(cmds, m.discoverAPIResources(sel.Name))
+	}
+	if cmd := m.loadSecurityAvailability(); cmd != nil {
+		cmds = append(cmds, cmd)
 	}
 	return m, tea.Batch(cmds...)
 }
@@ -304,6 +322,41 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.loading = true
 		return m, m.loadPreview()
 	}
+	// Virtual Security source entries are injected by BuildSidebarItems and
+	// are not present in discoveredResources, so FindResourceTypeIn cannot
+	// find them. Synthesize the RT from the Item's Kind/Extra fields so the
+	// standard load path (loadResources -> GetResources -> getSecurityFindings)
+	// still fires and the bgtask surfaces in the :tasks overlay.
+	if strings.HasPrefix(sel.Kind, "__security_") && sel.Kind != "__security_finding__" {
+		sourceName := strings.TrimSuffix(strings.TrimPrefix(sel.Kind, "__security_"), "__")
+		m.saveCursor()
+		m.nav.ResourceType = model.ResourceTypeEntry{
+			DisplayName: sel.Name,
+			Kind:        sel.Kind,
+			APIGroup:    model.SecurityVirtualAPIGroup,
+			APIVersion:  "v1",
+			Resource:    "findings-" + sourceName,
+			Namespaced:  true,
+		}
+		m.nav.Level = model.LevelResources
+		m.pushLeft()
+		m.clearRight()
+		m.saveCurrentSession()
+		if cached, ok := m.itemCache[m.navKey()]; ok {
+			m.middleItems = cached
+			m.restoreCursor()
+		} else {
+			m.middleItems = nil
+			m.setCursor(0)
+		}
+		m.loading = true
+		// Apply pending security filter from the "Security Findings" action.
+		if m.pendingSecurityFilter != "" {
+			m.filterText = m.pendingSecurityFilter
+			m.pendingSecurityFilter = ""
+		}
+		return m, m.loadResources(false)
+	}
 	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[m.nav.Context])
 	if !ok {
 		return m, nil
@@ -326,6 +379,24 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
+	// Security finding groups drill into affected resources at LevelOwned.
+	if sel.Kind == "__security_finding_group__" {
+		m.saveCursor()
+		m.nav.ResourceName = sel.Name
+		m.nav.Level = model.LevelOwned
+		m.pushLeft()
+		m.clearRight()
+		m.saveCurrentSession()
+		if cached, ok := m.itemCache[m.navKey()]; ok {
+			m.middleItems = cached
+			m.restoreCursor()
+		} else {
+			m.middleItems = nil
+			m.setCursor(0)
+		}
+		m.loading = true
+		return m, m.loadSecurityAffectedResources(sel.Extra)
+	}
 	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
 		return m, nil
 	}
@@ -417,6 +488,20 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 	sel := m.selectedMiddleItem()
 	if sel == nil {
 		return m, nil
+	}
+
+	// Security finding groups drill into affected resources via the standard
+	// navigateChild path which handles cancelAndReset + requestGen increment.
+	if sel.Kind == "__security_finding_group__" {
+		return m.navigateChild()
+	}
+	// Affected resources jump to the k8s resource view.
+	if sel.Kind == "__security_affected_resource__" {
+		return m.jumpToFindingResource(*sel)
+	}
+	// Legacy flat findings jump to the affected resource.
+	if sel.Kind == "__security_finding__" {
+		return m.jumpToFindingResource(*sel)
 	}
 
 	if m.nav.Level == model.LevelClusters || m.nav.Level == model.LevelResourceTypes {

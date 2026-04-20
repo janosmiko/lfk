@@ -1,6 +1,6 @@
 # :zap: LFK - Lightning Fast Kubernetes navigator
 
-[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) 
+[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk)
 
 **LFK** is a lightning-fast, keyboard-focused, yazi-inspired terminal user interface for navigating and managing Kubernetes clusters. Built for speed and efficiency, it brings a three-column Miller columns layout with an owner-based resource hierarchy to your terminal.
 
@@ -71,7 +71,7 @@
 
 - **Multi-tab support**: Open multiple views side by side
 - **Multi-cluster/multi-context support** via merged kubeconfig loading
-- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive), and `KUBECONFIG` env var
+- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), and `KUBECONFIG` env var
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser
@@ -110,6 +110,16 @@
 - **Session persistence**: Remembers last context/namespace/resource across restarts
 - **Command bar**: Press `:` for shell/kubectl commands with autocompletion
 
+### Security findings browser
+
+- **Grouped findings**: Press `#` to jump to the Security category. Findings are grouped by check, CVE, or rule name. Each group shows severity, affected resource count, and category. Drill into a group to see affected resources.
+- **Five security sources**: Heuristic (built-in pod security checks), Trivy Operator (CVE and misconfiguration scanning via CRDs), Kyverno (policy violations via PolicyReports), Falco (runtime security events), CIS (placeholder for kube-bench).
+- **Hierarchical navigation**: Security > Source > Finding Group > Affected Resources. From an affected resource, press `Enter` or `l` to jump to the corresponding Kubernetes resource in the explorer.
+- **SEC column badge**: Workload rows (Pods, Deployments, etc.) display a severity badge in the Name column. The badge aggregates both direct findings (e.g., heuristic checks on the Pod) and owner findings (e.g., Trivy results targeting the parent Deployment).
+- **Per-resource drill-in**: Press `x` on any resource, then `y` to jump to security findings for that resource. When multiple sources have results, a source picker overlay appears.
+- **Color-coded severity**: CRIT=red, HIGH=orange, MED=yellow, LOW=green in the Severity column.
+- **Refresh**: Press `R` to invalidate the security cache and re-fetch findings from all enabled sources.
+
 ### Integrations
 
 - **ArgoCD integration**: Browse Applications, sync, terminate sync, refresh, view managed resources
@@ -123,6 +133,7 @@
 
 - **460+ built-in color schemes** from [ghostty themes](https://github.com/ghostty-org/ghostty): Tokyonight, Catppuccin, Dracula, Nord, Rose Pine, Gruvbox, and many more. Transparent background support.
 - **Runtime theme switching**: Press `T` to preview and switch themes without restarting
+- **Auto dark/light mode**: configure a dark and a light scheme; lfk switches automatically when the OS appearance changes (requires CSI 996/2031 terminal support: Ghostty, kitty, Contour, …)
 - **Custom color themes** via config file (Tokyonight theme by default)
 - **Configurable keybindings** for direct actions
 - **Configurable search abbreviations**
@@ -417,7 +428,9 @@ Create `~/.config/lfk/config.yaml` to customize the application. All fields are 
 
 ```yaml
 # Color scheme (press T in-app to browse 460+ themes with live preview)
-colorscheme: catppuccin-mocha
+# Auto dark/light mode — Ghostty-style "dark:X,light:Y" syntax switches the
+# scheme when the OS appearance changes (CSI 996/2031; Ghostty, kitty >= 0.27, …)
+colorscheme: "dark:catppuccin-mocha,light:catppuccin-latte"
 
 # Use terminal's own background
 transparent_background: true

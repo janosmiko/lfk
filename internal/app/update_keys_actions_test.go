@@ -1,14 +1,17 @@
 package app
 
 import (
+	"context"
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -530,6 +533,152 @@ func TestP4ExplorerActionKeyComma(t *testing.T) {
 	if handled {
 		_ = result.(Model)
 	}
+}
+
+// --- handleExplorerActionKeySecurity: G4 ---
+
+func TestHandleExplorerActionKeySecurityJumpsToFirstEntry(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Monitoring", Extra: "__monitoring__"},
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
+		{Name: "Heuristic", Category: "Security", Extra: "_security/v1/findings-heuristic"},
+		{Name: "Workloads"},
+	}
+	updated, _, handled := m.handleExplorerActionKeySecurity()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, 1, mm.cursor())
+}
+
+func TestHandleExplorerActionKeySecurityNoSourcesAvailable(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Monitoring", Extra: "__monitoring__"},
+		{Name: "Workloads"},
+	}
+	updated, _, handled := m.handleExplorerActionKeySecurity()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Contains(t, mm.statusMessage, "No security sources available")
+}
+
+func TestHandleExplorerActionKeySecurityRequiresContext(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+
+	result, _, handled := m.handleExplorerActionKeySecurity()
+	assert.True(t, handled)
+	mm, ok := result.(Model)
+	require.True(t, ok)
+	assert.Contains(t, mm.statusMessage, "Select a cluster first")
+}
+
+// TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel verifies that
+// pressing # while at LevelResources (viewing a pod list) ascends back to
+// LevelResourceTypes and jumps to the first Security category entry.
+func TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel(t *testing.T) {
+	m := baseExplorerModel() // starts at LevelResources with middleItems = pods
+	m.leftItems = []model.Item{
+		{Name: "Monitoring", Extra: "__monitoring__"},
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
+		{Name: "Workloads"},
+	}
+
+	updated, _, handled := m.handleExplorerActionKeySecurity()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, model.LevelResourceTypes, mm.nav.Level,
+		"handler should ascend to LevelResourceTypes before jumping")
+	assert.Equal(t, 1, mm.cursor(),
+		"cursor should land on the Trivy entry (index 1) after ascension")
+}
+
+// TestHandleExplorerActionKeyMonitoringAscendsFromDeeperLevel verifies the
+// same fix applies to the monitoring @ hotkey (shared ascendToResourceTypes
+// helper).
+func TestHandleExplorerActionKeyMonitoringAscendsFromDeeperLevel(t *testing.T) {
+	m := baseExplorerModel()
+	m.leftItems = []model.Item{
+		{Name: "Cluster", Extra: "__overview__"},
+		{Name: "Monitoring", Extra: "__monitoring__"},
+		{Name: "Workloads"},
+	}
+
+	updated, _, handled := m.handleExplorerActionKeyMonitoring()
+	assert.True(t, handled)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Equal(t, model.LevelResourceTypes, mm.nav.Level)
+	assert.Equal(t, 1, mm.cursor())
+}
+
+// --- jumpToFindingResource: Enter on a finding ---
+
+func TestJumpToFindingResourceClusterScoped(t *testing.T) {
+	m := baseExplorerModel()
+	sel := model.Item{
+		Kind: "__security_finding__",
+		Columns: []model.KeyValue{
+			{Key: "Resource", Value: "(cluster-scoped)"},
+			{Key: "ResourceKind", Value: ""},
+		},
+	}
+	updated, _ := m.jumpToFindingResource(sel)
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Contains(t, mm.statusMessage, "No affected resource")
+}
+
+func TestJumpToFindingResourceMalformedResource(t *testing.T) {
+	m := baseExplorerModel()
+	sel := model.Item{
+		Kind: "__security_finding__",
+		Columns: []model.KeyValue{
+			{Key: "Resource", Value: "malformed-no-slash"},
+			{Key: "ResourceKind", Value: "Deployment"},
+		},
+	}
+	updated, _ := m.jumpToFindingResource(sel)
+	_, ok := updated.(Model)
+	assert.True(t, ok)
+}
+
+// --- directActionRefresh: security cache invalidation ---
+
+func TestHandleKeyRefreshInvalidatesSecurityCache(t *testing.T) {
+	mgr := security.NewManager()
+	mgr.SetRefreshTTL(1 * time.Hour)
+	fakeSrc := &security.FakeSource{
+		NameStr: "fake", Available: true,
+		Findings: []security.Finding{{ID: "1"}},
+	}
+	mgr.Register(fakeSrc)
+
+	_, _ = mgr.FetchAll(context.Background(), "kctx", "")
+	require.Equal(t, int32(1), fakeSrc.FetchCalls.Load())
+
+	_, _ = mgr.FetchAll(context.Background(), "kctx", "")
+	require.Equal(t, int32(1), fakeSrc.FetchCalls.Load())
+
+	m := baseExplorerModel()
+	m.securityManager = mgr
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind:     "__security_trivy-operator__",
+		APIGroup: model.SecurityVirtualAPIGroup,
+	}
+	m.nav.Context = "kctx"
+
+	_, _ = m.directActionRefresh()
+
+	_, _ = mgr.FetchAll(context.Background(), "kctx", "")
+	assert.Equal(t, int32(2), fakeSrc.FetchCalls.Load())
 }
 
 // --- handleExplorerActionKeyToggleRare ---

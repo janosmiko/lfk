@@ -62,35 +62,37 @@ type Keybindings struct {
 	JumpOwner      string `json:"jump_owner" yaml:"jump_owner"`
 
 	// Views and Modes
-	Help            string `json:"help" yaml:"help"`
-	Filter          string `json:"filter" yaml:"filter"`
-	Search          string `json:"search" yaml:"search"`
-	NextMatch       string `json:"next_match" yaml:"next_match"`
-	PrevMatch       string `json:"prev_match" yaml:"prev_match"`
-	TogglePreview   string `json:"toggle_preview" yaml:"toggle_preview"`
-	ResourceMap     string `json:"resource_map" yaml:"resource_map"`
-	Fullscreen      string `json:"fullscreen" yaml:"fullscreen"`
-	FilterPresets   string `json:"filter_presets" yaml:"filter_presets"`
-	ErrorLog        string `json:"error_log" yaml:"error_log"`
-	SecretToggle    string `json:"secret_toggle" yaml:"secret_toggle"`
-	FinalizerSearch string `json:"finalizer_search" yaml:"finalizer_search"`
-	APIExplorer     string `json:"api_explorer" yaml:"api_explorer"`
-	RBACBrowser     string `json:"rbac_browser" yaml:"rbac_browser"`
-	ThemeSelector   string `json:"theme_selector" yaml:"theme_selector"`
-	CommandBar      string `json:"command_bar" yaml:"command_bar"`
-	WatchMode       string `json:"watch_mode" yaml:"watch_mode"`
-	SortNext        string `json:"sort_next" yaml:"sort_next"`
-	SortPrev        string `json:"sort_prev" yaml:"sort_prev"`
-	SortFlip        string `json:"sort_flip" yaml:"sort_flip"`
-	SortReset       string `json:"sort_reset" yaml:"sort_reset"`
-	SaveResource    string `json:"save_resource" yaml:"save_resource"`
-	Monitoring      string `json:"monitoring" yaml:"monitoring"`
-	QuotaDashboard  string `json:"quota_dashboard" yaml:"quota_dashboard"`
-	TasksOverlay    string `json:"tasks_overlay" yaml:"tasks_overlay"`
-	ExpandCollapse  string `json:"expand_collapse" yaml:"expand_collapse"`
-	PinGroup        string `json:"pin_group" yaml:"pin_group"`
-	ColumnToggle    string `json:"column_toggle" yaml:"column_toggle"`
-	ToggleRare      string `json:"toggle_rare" yaml:"toggle_rare"`
+	Help                 string `json:"help" yaml:"help"`
+	Filter               string `json:"filter" yaml:"filter"`
+	Search               string `json:"search" yaml:"search"`
+	NextMatch            string `json:"next_match" yaml:"next_match"`
+	PrevMatch            string `json:"prev_match" yaml:"prev_match"`
+	TogglePreview        string `json:"toggle_preview" yaml:"toggle_preview"`
+	ResourceMap          string `json:"resource_map" yaml:"resource_map"`
+	Fullscreen           string `json:"fullscreen" yaml:"fullscreen"`
+	FilterPresets        string `json:"filter_presets" yaml:"filter_presets"`
+	ErrorLog             string `json:"error_log" yaml:"error_log"`
+	SecretToggle         string `json:"secret_toggle" yaml:"secret_toggle"`
+	FinalizerSearch      string `json:"finalizer_search" yaml:"finalizer_search"`
+	APIExplorer          string `json:"api_explorer" yaml:"api_explorer"`
+	RBACBrowser          string `json:"rbac_browser" yaml:"rbac_browser"`
+	ThemeSelector        string `json:"theme_selector" yaml:"theme_selector"`
+	CommandBar           string `json:"command_bar" yaml:"command_bar"`
+	WatchMode            string `json:"watch_mode" yaml:"watch_mode"`
+	SortNext             string `json:"sort_next" yaml:"sort_next"`
+	SortPrev             string `json:"sort_prev" yaml:"sort_prev"`
+	SortFlip             string `json:"sort_flip" yaml:"sort_flip"`
+	SortReset            string `json:"sort_reset" yaml:"sort_reset"`
+	SaveResource         string `json:"save_resource" yaml:"save_resource"`
+	Monitoring           string `json:"monitoring" yaml:"monitoring"`
+	Security             string `json:"security" yaml:"security"`
+	QuotaDashboard       string `json:"quota_dashboard" yaml:"quota_dashboard"`
+	TasksOverlay         string `json:"tasks_overlay" yaml:"tasks_overlay"`
+	ExpandCollapse       string `json:"expand_collapse" yaml:"expand_collapse"`
+	PinGroup             string `json:"pin_group" yaml:"pin_group"`
+	ColumnToggle         string `json:"column_toggle" yaml:"column_toggle"`
+	ToggleRare           string `json:"toggle_rare" yaml:"toggle_rare"`
+	SecurityIgnoreToggle string `json:"security_ignore_toggle" yaml:"security_ignore_toggle"`
 
 	// Actions
 	NamespaceSelector string `json:"namespace_selector" yaml:"namespace_selector"`
@@ -152,9 +154,11 @@ func DefaultKeybindings() Keybindings {
 		ThemeSelector: "T", CommandBar: ":", WatchMode: "w",
 		SortNext: ">", SortPrev: "<", SortFlip: "=", SortReset: "-",
 		SaveResource: "W", Monitoring: "@",
+		Security:       "#",
 		QuotaDashboard: "Q", TasksOverlay: "`",
 		ExpandCollapse: "z", PinGroup: "p",
 		ColumnToggle: ",", ToggleRare: "H",
+		SecurityIgnoreToggle: "ctrl+i",
 
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",
@@ -176,6 +180,26 @@ func DefaultKeybindings() Keybindings {
 
 		// Terminal mode
 		TerminalToggle: "ctrl+t",
+	}
+}
+
+// DefaultSecurityConfig returns the default security configuration applied
+// when no override is present.
+func DefaultSecurityConfig() model.SecurityConfig {
+	return model.SecurityConfig{
+		Enabled:   true,
+		SecColumn: true,
+		Sources: map[string]model.SecuritySourceCfg{
+			"heuristic": {Enabled: true, Checks: []string{
+				"privileged", "host_namespaces", "host_path", "readonly_root_fs",
+				"run_as_root", "allow_priv_esc", "dangerous_caps",
+				"missing_resource_limits", "default_sa", "latest_tag",
+			}},
+			"trivy_operator": {Enabled: true},
+			"policy_report":  {Enabled: true},
+			"kube_bench":     {Enabled: false},
+			"falco":          {Enabled: true},
+		},
 	}
 }
 
@@ -316,6 +340,10 @@ var ConfigLogTailLines = 1000
 // Used by all views with cursor-based navigation.
 var ConfigScrollOff = 5
 
+// ConfigSecurity holds the per-cluster security configuration map.
+// Keys are context names; "default" applies to unmatched clusters.
+var ConfigSecurity map[string]model.SecurityConfig
+
 // ActiveSchemeName holds the name of the currently active color scheme.
 var ActiveSchemeName = "tokyonight-storm"
 
@@ -334,6 +362,14 @@ var ConfigMouse = true
 // the no_color config field, or the --no-color CLI flag.
 var ConfigNoColor bool
 
+// ConfigDarkColorscheme is the built-in scheme name applied when the terminal
+// reports dark mode. Populated by parsing the "dark:X" segment of colorscheme.
+var ConfigDarkColorscheme string
+
+// ConfigLightColorscheme is the built-in scheme name applied when the terminal
+// reports light mode. Populated by parsing the "light:X" segment of colorscheme.
+var ConfigLightColorscheme string
+
 // SetNoColor updates ConfigNoColor and rebuilds the active theme so style
 // globals reflect the new setting. No-op when the value is unchanged.
 func SetNoColor(v bool) {
@@ -345,7 +381,14 @@ func SetNoColor(v bool) {
 }
 
 type configFile struct {
-	// Colorscheme selects a built-in color scheme by name (e.g. "dracula", "nord").
+	// Colorscheme selects a built-in color scheme by name (e.g. "dracula",
+	// "nord"). Supports Ghostty-style dual-mode syntax to enable automatic
+	// dark/light switching via CSI 996/2031:
+	//
+	//   colorscheme: "dark:Rose Pine,light:Rose Pine Dawn"
+	//
+	// Either segment may be omitted. Without the prefix syntax the value is
+	// used as a plain scheme name and dark/light switching is disabled.
 	// Custom theme overrides in the "theme" section are applied on top.
 	Colorscheme   string            `json:"colorscheme" yaml:"colorscheme"`
 	Theme         Theme             `json:"theme" yaml:"theme"`
@@ -375,6 +418,9 @@ type configFile struct {
 	// Monitoring maps cluster context names to custom monitoring endpoint config.
 	// The special key "_global" applies to clusters without explicit config.
 	Monitoring map[string]model.MonitoringConfig `json:"monitoring" yaml:"monitoring"`
+	// Security maps cluster context names to security findings browser configuration.
+	// The special key "default" applies to clusters without explicit config.
+	Security map[string]model.SecurityConfig `json:"security" yaml:"security"`
 	// Tips controls whether to show random tips on startup.
 	// Defaults to true. Set to false to disable.
 	Tips *bool `json:"tips" yaml:"tips"`
@@ -512,13 +558,61 @@ func loadConfigFile(configOverride string) (configFile, bool) {
 }
 
 // applyColorscheme selects a built-in colorscheme if specified in config.
+//
+// The colorscheme field supports two formats:
+//
+//  1. Plain name – "dracula"
+//     Applies the scheme and leaves dark/light switching disabled.
+//
+//  2. Ghostty-style dual-mode – "dark:Rose Pine,light:Rose Pine Dawn"
+//     Parses each comma-separated segment for a "dark:" or "light:" prefix.
+//     Both, one, or neither segment may be present; order does not matter.
+//     ConfigDarkColorscheme / ConfigLightColorscheme are set accordingly.
+//     No default scheme is applied immediately; the terminal's first CSI 997
+//     notification will trigger the initial switch.
 func applyColorscheme(theme *Theme, cfg configFile) {
-	if cfg.Colorscheme != "" {
-		if scheme, ok := BuiltinSchemes()[strings.ToLower(cfg.Colorscheme)]; ok {
-			*theme = scheme
-			ActiveSchemeName = strings.ToLower(cfg.Colorscheme)
+	if cfg.Colorscheme == "" {
+		return
+	}
+	dark, light, isDual := parseDualColorscheme(cfg.Colorscheme)
+	if isDual {
+		ConfigDarkColorscheme = dark
+		ConfigLightColorscheme = light
+		return
+	}
+	lower := normalizeScheme(cfg.Colorscheme)
+	if scheme, ok := BuiltinSchemes()[lower]; ok {
+		*theme = scheme
+		ActiveSchemeName = lower
+	}
+}
+
+// parseDualColorscheme parses a Ghostty-style "dark:X,light:Y" colorscheme
+// string. It returns the dark and light scheme names (normalized to lowercase
+// with spaces replaced by hyphens, matching built-in scheme map keys) and
+// isDual=true when the string contains at least one "dark:" or "light:" prefix.
+// Segment order and surrounding whitespace are both tolerated.
+func parseDualColorscheme(s string) (dark, light string, isDual bool) {
+	parts := strings.Split(s, ",")
+	for _, p := range parts {
+		p = strings.TrimSpace(p)
+		lower := strings.ToLower(p)
+		switch {
+		case strings.HasPrefix(lower, "dark:"):
+			dark = normalizeScheme(p[len("dark:"):])
+			isDual = true
+		case strings.HasPrefix(lower, "light:"):
+			light = normalizeScheme(p[len("light:"):])
+			isDual = true
 		}
 	}
+	return dark, light, isDual
+}
+
+// normalizeScheme converts a user-supplied scheme name to the lowercase,
+// hyphenated form used as keys in BuiltinSchemes (e.g. "Rose Pine" → "rose-pine").
+func normalizeScheme(s string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(s)), " ", "-")
 }
 
 // applyConfigOptions applies scalar config options (icons, terminal, tips, etc.).
@@ -636,5 +730,8 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 				ConfigClusterResourceColumns[ctx] = cols
 			}
 		}
+	}
+	if len(cfg.Security) > 0 {
+		ConfigSecurity = cfg.Security
 	}
 }

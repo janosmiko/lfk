@@ -35,6 +35,9 @@ func (m Model) middleColumnHeader() string {
 	case model.LevelResourceTypes:
 		return "RESOURCE TYPE"
 	case model.LevelResources:
+		if m.nav.ResourceType.DisplayName != "" {
+			return strings.ToUpper(m.nav.ResourceType.DisplayName)
+		}
 		return strings.ToUpper(m.nav.ResourceType.Kind)
 	case model.LevelOwned:
 		return strings.ToUpper(m.ownedItemKindLabel())
@@ -225,7 +228,8 @@ func (m Model) statusBar() string {
 	cur := m.cursor() + 1
 
 	if m.filterText != "" {
-		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d filtered: %d/%d]", cur, len(visible), len(visible), total)))
+		filterLabel := ui.HelpKeyStyle.Render("filter:" + m.filterText)
+		parts = append(parts, filterLabel+ui.BarDimStyle.Render(fmt.Sprintf(" [%d/%d] (Esc to clear)", len(visible), total)))
 	} else {
 		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d]", cur, total)))
 	}
@@ -234,42 +238,53 @@ func (m Model) statusBar() string {
 	parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
 
 	// Styled key hints -- show a reduced set for dashboard views.
+	parts = append(parts, ui.FormatHintParts(m.explorerHintEntries()))
+
+	content := strings.Join(parts, "  ")
+	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+}
+
+// explorerHintEntries returns the styled key hints displayed in the status bar
+// for the explorer (and related dashboard) views. Dashboard pseudo-resources
+// (overview/monitoring) get a reduced hint set.
+func (m Model) explorerHintEntries() []ui.HintEntry {
 	kb := ui.ActiveKeybindings
-	var hintEntries []ui.HintEntry
 	sel := m.selectedMiddleItem()
 	isDashboard := sel != nil && m.nav.Level == model.LevelResourceTypes &&
 		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__")
 	if isDashboard {
-		hintEntries = []ui.HintEntry{
+		return []ui.HintEntry{
 			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
 			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
 			{Key: kb.NewTab, Desc: "new tab"},
+			{Key: kb.Monitoring, Desc: "monitoring"},
+			{Key: kb.Security, Desc: "security"},
 			{Key: kb.Help, Desc: "help"},
 			{Key: "q", Desc: "quit"},
 		}
-	} else {
-		hintEntries = []ui.HintEntry{
-			{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
-			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
-			{Key: kb.Enter, Desc: "view"},
-			{Key: kb.NamespaceSelector, Desc: "namespace"},
-			{Key: kb.AllNamespaces, Desc: "all-ns"},
-			{Key: kb.ActionMenu, Desc: "actions"},
-			{Key: kb.CreateTemplate, Desc: "create"},
-			{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
-			{Key: kb.Filter, Desc: "filter"},
-			{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
-			{Key: kb.Help, Desc: "help"},
-			{Key: "q", Desc: "quit"},
-		}
-		// Add context-specific hints for Events resource type.
-		hintEntries = m.appendEventsHintEntries(hintEntries)
 	}
-	parts = append(parts, ui.FormatHintParts(hintEntries))
-
-	content := strings.Join(parts, "  ")
-	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+	hintEntries := []ui.HintEntry{
+		{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
+		{Key: kb.Down + "/" + kb.Up, Desc: "move"},
+		{Key: kb.Enter, Desc: "view"},
+		{Key: kb.NamespaceSelector, Desc: "namespace"},
+		{Key: kb.AllNamespaces, Desc: "all-ns"},
+		{Key: kb.ActionMenu, Desc: "actions"},
+		{Key: kb.CreateTemplate, Desc: "create"},
+		{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
+		{Key: kb.Filter, Desc: "filter"},
+		{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
+		{Key: kb.Monitoring, Desc: "monitoring"},
+		{Key: kb.Security, Desc: "security"},
+		{Key: kb.Help, Desc: "help"},
+		{Key: "q", Desc: "quit"},
+	}
+	// Add context-specific hints for Events resource type.
+	hintEntries = m.appendEventsHintEntries(hintEntries)
+	// Add context-specific hints for Security findings views.
+	hintEntries = m.appendSecurityHintEntries(hintEntries)
+	return hintEntries
 }
 
 // appendEventsHintEntries injects Events-view toggle hints (warnings-only,
@@ -301,6 +316,32 @@ func (m Model) appendEventsHintEntries(entries []ui.HintEntry) []ui.HintEntry {
 	}
 	// Insert before the trailing "quit" entry so the Events toggles sit next
 	// to the other contextual actions.
+	out := make([]ui.HintEntry, 0, len(entries)+len(extras))
+	out = append(out, entries[:len(entries)-1]...)
+	out = append(out, extras...)
+	out = append(out, entries[len(entries)-1])
+	return out
+}
+
+// appendSecurityHintEntries injects Security-view hints (ignore toggle,
+// action menu) just before the trailing "quit" entry. Returns the input
+// slice unchanged when the current view isn't a security findings list.
+func (m Model) appendSecurityHintEntries(entries []ui.HintEntry) []ui.HintEntry {
+	if !strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		return entries
+	}
+	kb := ui.ActiveKeybindings
+	toggleDesc := "show ignored"
+	if m.showSecurityIgnored {
+		toggleDesc = "hide ignored"
+	}
+	extras := []ui.HintEntry{
+		{Key: kb.SecurityIgnoreToggle, Desc: toggleDesc},
+		{Key: kb.ActionMenu, Desc: "ignore/actions"},
+	}
+	if len(entries) == 0 {
+		return extras
+	}
 	out := make([]ui.HintEntry, 0, len(entries)+len(extras))
 	out = append(out, entries[:len(entries)-1]...)
 	out = append(out, extras...)

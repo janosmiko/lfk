@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 )
 
 // Client wraps Kubernetes API access.
@@ -30,6 +31,32 @@ type Client struct {
 	// instead of building real clients from the kubeconfig.
 	testClientset interface{} // kubernetes.Interface (avoid import cycle in non-test code)
 	testDynClient interface{} // dynamic.Interface
+
+	// securityManager is injected by the app layer so GetResources can
+	// dispatch _security virtual APIGroup calls to it without creating an
+	// import cycle (internal/k8s must not import internal/security/heuristic
+	// or trivyop, but can import internal/security for the interface).
+	securityManager *security.Manager
+	ignoreChecker   IgnoreChecker
+	showIgnored     bool
+}
+
+// SetSecurityManager injects the security manager. Must be called before
+// GetResources is invoked on a _security APIGroup entry. Safe to call with
+// nil to clear the reference.
+func (c *Client) SetSecurityManager(mgr *security.Manager) {
+	c.securityManager = mgr
+}
+
+// SetIgnoreChecker sets the ignore checker used to filter security findings.
+func (c *Client) SetIgnoreChecker(checker IgnoreChecker) {
+	c.ignoreChecker = checker
+}
+
+// SetShowIgnored sets whether ignored findings are shown (with a visual tag)
+// or hidden entirely.
+func (c *Client) SetShowIgnored(show bool) {
+	c.showIgnored = show
 }
 
 // RBACCheck represents a single permission check result.
@@ -81,7 +108,7 @@ type DeploymentRevision struct {
 // NewClient creates a new Kubernetes client, loading configs from:
 // 1. KUBECONFIG env var
 // 2. ~/.kube/config
-// 3. All files in ~/.kube/config.d/ (recursively)
+// 3. All files in ~/.kube/config.d/ (recursively; symlinks to directories are followed)
 func NewClient(kubeconfigOverride string) (*Client, error) {
 	var kubeconfigPaths []string
 	if kubeconfigOverride != "" {
@@ -161,18 +188,42 @@ func buildKubeconfigPaths() []string {
 			paths = append(paths, defaultPath)
 		}
 
-		// config.d directory - recursively find all files.
-		configDir := filepath.Join(home, ".kube", "config.d")
-		_ = filepath.WalkDir(configDir, func(path string, d os.DirEntry, err error) error {
-			// skip errors (dir might not exist)
-			if err == nil && !d.IsDir() {
-				paths = append(paths, path)
-			}
-			return nil
-		})
+		// config.d directory - recursively find all files (follows symlinks).
+		paths = append(paths, collectConfigDirPaths(filepath.Join(home, ".kube", "config.d"))...)
 	}
 
 	return paths
+}
+
+// collectConfigDirPaths returns all file paths under dir. If dir is a symlink
+// to a directory, the symlink is followed so WalkDir can descend into the real
+// target. Returns nil when dir is missing, is not a directory, or is a
+// dangling symlink.
+//
+// Why EvalSymlinks first: filepath.WalkDir does not follow symbolic links;
+// when the root path is itself a symlink to a directory, its DirEntry reports
+// IsDir()=false (Lstat treats symlinks as non-directories), so the callback
+// would add the symlink path as a "file" and clientcmd would later fail with
+// "read ...: is a directory".
+func collectConfigDirPaths(dir string) []string {
+	resolved, err := filepath.EvalSymlinks(dir)
+	if err != nil {
+		return nil
+	}
+	info, err := os.Stat(resolved)
+	if err != nil || !info.IsDir() {
+		return nil
+	}
+	var out []string
+	_ = filepath.WalkDir(resolved, func(path string, d os.DirEntry, err error) error {
+		// Silently skip entries that can't be read (permission denied, etc.)
+		// so a single unreadable subdir doesn't abort the whole walk.
+		if err == nil && !d.IsDir() {
+			out = append(out, path)
+		}
+		return nil
+	})
+	return out
 }
 
 func containsPath(paths []string, target string) bool {
@@ -242,6 +293,10 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 // scopes to the given namespace; for cluster-scoped resources it lists globally.
 // When namespace is empty and the resource is namespaced, it lists across all namespaces.
 func (c *Client) GetResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+	// Virtual security resource types — dispatched to the injected manager.
+	if rt.APIGroup == model.SecurityVirtualAPIGroup {
+		return c.getSecurityFindings(ctx, contextName, namespace, rt)
+	}
 	// Special handling for virtual resource types.
 	if rt.APIGroup == "_helm" && rt.Resource == "releases" {
 		return c.GetHelmReleases(ctx, contextName, namespace)

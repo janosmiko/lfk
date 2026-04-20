@@ -622,7 +622,7 @@ func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
 func (m Model) handleKeyWatchMode() (tea.Model, tea.Cmd) {
 	m.watchMode = !m.watchMode
 	if m.watchMode {
-		m.setStatusMessage("Watch mode ON (refresh every 2s)", false)
+		m.setStatusMessage(fmt.Sprintf("Watch mode ON (refresh every %s)", m.watchInterval), false)
 		return m, tea.Batch(scheduleWatchTick(m.watchInterval), scheduleStatusClear())
 	}
 	m.setStatusMessage("Watch mode OFF", false)

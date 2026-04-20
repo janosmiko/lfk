@@ -245,6 +245,7 @@ func blockedColumnsForMode() map[string]bool {
 			"Health Message": true, "Keys": true,
 			"Service Account": true, "Images": true, "Image": true,
 			"Health": true, "Sync": true, "Path": true,
+			"Description": true, "References": true,
 			"Labels": true, "Finalizers": true, "Annotations": true,
 			"Used By": true, "Deletion": true, "Selector": true,
 		}
@@ -260,7 +261,7 @@ func blockedColumnsForMode() map[string]bool {
 		"Sync Message": true, "Sync Errors": true,
 		"OS": true, "Runtime": true,
 		"Hostname": true, "InternalIP": true, "ExternalIP": true,
-		"Source": true,
+		"Source": true, "Description": true, "References": true,
 		"Labels": true, "Finalizers": true, "Annotations": true,
 		"Used By": true, "Deletion": true, "Selector": true,
 	}
@@ -392,11 +393,15 @@ func styledRestartsCell(item model.Item, restartsW int, anyRecentRestart bool) s
 // restarts, status, age) are passed through since they have row-specific
 // handling upstream (e.g. the cursor row preprocesses restarts for arrow
 // alignment).
+//
+// When a security finding index is active and the item has matching findings,
+// a plain-text severity badge is appended inside the name column budget so the
+// row layout stays stable with the styled path.
 func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 	nameW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, item *model.Item,
 ) string {
-	row := padRight(Truncate(name, nameW-1), nameW)
+	row := plainNameCellWithBadge(name, item, nameW)
 	for _, key := range order {
 		if isBuiltinColumnKey(key) {
 			row += plainBuiltinCell(key, ns, ready, restarts, status, age,
@@ -437,15 +442,49 @@ func formatTableRowStyledOrdered(item model.Item,
 	return base
 }
 
+// plainNameCellWithBadge renders the name column for the plain-text path,
+// appending the security severity badge inside the budget when one applies.
+// Callers use this path for the cursor row so the highlighted background
+// does not clash with ANSI styling in the badge.
+func plainNameCellWithBadge(name string, item *model.Item, nameW int) string {
+	badge := ""
+	if item != nil {
+		badge = securityBadgePlainForItem(item)
+	}
+	if badge == "" {
+		return padRight(Truncate(name, nameW-1), nameW)
+	}
+	badgeW := lipgloss.Width(badge)
+	reserved := badgeW + 2 // 1 space separator + 1 column gap
+	if reserved >= nameW {
+		return padRight(Truncate(name, nameW-1), nameW)
+	}
+	nameMax := nameW - reserved
+	trimmed := Truncate(name, nameMax)
+	content := trimmed + " " + badge
+	return padRight(content, nameW)
+}
+
 // styledNameCell renders the Name column with optional icon and dimmed
 // styling for completed items. Pods in Succeeded or Completed status get
 // their name dimmed; otherwise NormalStyle is used. The active highlight
 // query is applied to the resolved display name.
+//
+// When a security finding index is active and the item has matching findings,
+// the styled severity badge is appended inside the column budget (name is
+// truncated to make room). Gated callers (ActiveSecurityAvailable == false)
+// get an empty badge and the row renders identically to the pre-security UI.
 func styledNameCell(item model.Item, nameW int) string {
 	isDimmed := item.Status == "Succeeded" || item.Status == "Completed"
 	nameStyle := NormalStyle
 	if isDimmed {
 		nameStyle = DimStyle
+	}
+	badge := securityBadgeForItem(&item)
+	badgeW := lipgloss.Width(badge)
+	badgeReserve := 0
+	if badgeW > 0 {
+		badgeReserve = badgeW + 1 // separator space
 	}
 	if resolvedIcon := resolveIcon(item.Icon); resolvedIcon != "" {
 		iconSt := IconStyle
@@ -454,29 +493,58 @@ func styledNameCell(item model.Item, nameW int) string {
 		}
 		icon := iconSt.Render(resolvedIcon) + " "
 		iconVisualW := lipgloss.Width(icon)
-		nameRemaining := nameW - iconVisualW - 1 // -1 reserves gap before next column
+		nameRemaining := nameW - iconVisualW - 1 - badgeReserve // -1 reserves gap before next column
 		if nameRemaining < 1 {
 			nameRemaining = 1
+		}
+		// Drop the badge when it would not fit alongside a readable name.
+		activeBadge := badge
+		if badgeReserve > 0 && nameW-iconVisualW-1 <= badgeReserve {
+			activeBadge = ""
+			nameRemaining = nameW - iconVisualW - 1
+			if nameRemaining < 1 {
+				nameRemaining = 1
+			}
 		}
 		namePart := Truncate(item.Name, nameRemaining)
 		if ActiveHighlightQuery != "" {
 			namePart = highlightName(namePart, ActiveHighlightQuery)
 		}
 		nameVisualW := lipgloss.Width(namePart)
-		pad := nameW - iconVisualW - nameVisualW
+		badgeSegment := ""
+		badgeSegmentW := 0
+		if activeBadge != "" {
+			badgeSegment = " " + activeBadge
+			badgeSegmentW = lipgloss.Width(badgeSegment)
+		}
+		pad := nameW - iconVisualW - nameVisualW - badgeSegmentW
 		if pad < 0 {
 			pad = 0
 		}
 		if isDimmed {
 			namePart = DimStyle.Render(namePart)
 		}
-		return icon + namePart + strings.Repeat(" ", pad)
+		return icon + namePart + badgeSegment + strings.Repeat(" ", pad)
 	}
-	displayName := Truncate(item.Name, nameW-1)
+	nameBudget := nameW - 1 - badgeReserve
+	if nameBudget < 1 {
+		// Badge cannot fit — fall back to pre-badge layout so the column
+		// stays readable on very narrow terminals.
+		displayName := Truncate(item.Name, nameW-1)
+		if ActiveHighlightQuery != "" {
+			displayName = highlightName(displayName, ActiveHighlightQuery)
+		}
+		return nameStyle.Render(padRight(displayName, nameW))
+	}
+	displayName := Truncate(item.Name, nameBudget)
 	if ActiveHighlightQuery != "" {
 		displayName = highlightName(displayName, ActiveHighlightQuery)
 	}
-	return nameStyle.Render(padRight(displayName, nameW))
+	styled := nameStyle.Render(displayName)
+	if badge != "" {
+		styled += " " + badge
+	}
+	return padRight(styled, nameW)
 }
 
 // resourceColumnStyle returns a style for extra columns, colorizing CPU/Mem columns.
@@ -490,6 +558,19 @@ func resourceColumnStyle(key, val string) lipgloss.Style {
 		return pctStyle(val)
 	case "CPU Req", "CPU Lim", "Mem Req", "Mem Lim", "CPU Alloc", "Mem Alloc":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Background(BaseBg)
+	case "Severity":
+		switch val {
+		case "CRIT":
+			return StatusFailed // red
+		case "HIGH":
+			return DeprecationStyle // orange
+		case "MED":
+			return StatusProgressing // yellow/blue
+		case "LOW":
+			return StatusRunning // green
+		default:
+			return DimStyle
+		}
 	case "Last Sync", "Health", "Sync", "Reason":
 		return StatusStyle(val)
 	case "Synced At":

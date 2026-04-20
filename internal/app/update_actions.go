@@ -10,7 +10,27 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// isSecurityActionEligibleKind reports whether a given resource kind is a
+// reasonable target for the "Security Findings" action. The security
+// dashboard indexes findings by (namespace, kind, name), so only kinds that
+// security sources actually emit findings for are worth offering. Cluster
+// menu virtual kinds (e.g. "__port_forwards__") and empty kinds are excluded.
+func isSecurityActionEligibleKind(kind string) bool {
+	if kind == "" {
+		return false
+	}
+	if strings.HasPrefix(kind, "__") {
+		return false
+	}
+	return true
+}
+
 func (m Model) openActionMenu() Model {
+	// Security findings get a tailored action menu instead of the k8s one.
+	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		return m.openSecurityActionMenu()
+	}
+
 	// Bulk mode: when items are selected, show bulk action menu.
 	if m.hasSelection() {
 		selectedList := m.selectedItemsList()
@@ -67,6 +87,11 @@ func (m Model) openActionMenu() Model {
 		return m
 	}
 
+	// Security findings and groups get a tailored action menu.
+	if strings.HasPrefix(sel.Kind, "__security_") {
+		return m.openSecurityActionMenu()
+	}
+
 	m.bulkMode = false
 	m.actionCtx = m.buildActionCtx(sel, kind)
 
@@ -89,6 +114,17 @@ func (m Model) openActionMenu() Model {
 				Key:         ca.Key,
 			})
 		}
+	}
+
+	// Append "Security Findings" when security sources are available for
+	// the current cluster. The action will be re-wired in Phase E of the
+	// security navigation revamp to jump to the Security category.
+	if m.securityAvailableAny() && isSecurityActionEligibleKind(kind) {
+		actions = append(actions, model.ActionMenuItem{
+			Label:       "Security Findings",
+			Description: "Show security findings for this resource",
+			Key:         "y",
+		})
 	}
 
 	items := make([]model.Item, 0, len(actions))
@@ -180,6 +216,14 @@ func (m Model) directActionLogs() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) directActionRefresh() (tea.Model, tea.Cmd) {
+	// On security source views, invalidate the Manager's fetch +
+	// availability caches so the subsequent loadResources does a real
+	// fetch instead of returning stale cached results.
+	if m.nav.Level == model.LevelResources &&
+		strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") &&
+		m.securityManager != nil {
+		m.securityManager.Invalidate()
+	}
 	m.cancelAndReset()
 	m.requestGen++
 	m.setStatusMessage("Refreshing...", false)
@@ -292,6 +336,24 @@ func (m Model) directActionScale() (tea.Model, tea.Cmd) {
 
 func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
+
+	// Security source picker: the user selected a source from the
+	// overlay shown by "Security Findings". Only applies when the
+	// current level is LevelResourceTypes (where the picker lands).
+	if m.pendingSecurityFilter != "" && m.nav.Level == model.LevelResourceTypes {
+		return m.navigateToSecuritySource(actionLabel)
+	}
+	m.pendingSecurityFilter = "" // clear stale filter
+
+	// Security ignore actions.
+	if strings.HasPrefix(actionLabel, "Ignore") || actionLabel == "Un-ignore" {
+		return m.executeSecurityIgnoreAction(actionLabel)
+	}
+	// "Refresh" from the security action menu — reuse the direct-action logic.
+	if actionLabel == "Refresh" && strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		ret, cmd := m.directActionRefresh()
+		return ret, cmd
+	}
 
 	// Handle bulk actions.
 	if m.bulkMode && len(m.bulkItems) > 0 {
@@ -440,8 +502,222 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Vuln Scan":
 		mdl, cmd := m.executeActionVulnScan()
 		return mdl, cmd, true
+	case "Security Findings":
+		mdl, cmd := m.executeActionSecurityFindings()
+		return mdl, cmd, true
 	}
 	return m, nil, false
+}
+
+// executeActionSecurityFindings handles the "Security Findings" action.
+// Shows an overlay listing available security sources (Heuristic, Trivy, etc.)
+// so the user can pick which one to view. On selection, navigates to that
+// source and applies a filter for the originally selected resource.
+func (m Model) executeActionSecurityFindings() (tea.Model, tea.Cmd) {
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil
+	}
+
+	// Build overlay items from available security sources.
+	m = m.ascendToResourceTypes()
+	var items []model.Item
+	for _, item := range m.middleItems {
+		if item.Category == "Security" && item.Extra != "" {
+			items = append(items, item)
+		}
+	}
+	if len(items) == 0 {
+		m.setStatusMessage("No security sources available", true)
+		return m, scheduleStatusClear()
+	}
+
+	// If only one source, go directly.
+	if len(items) == 1 {
+		m.pendingSecurityFilter = sel.Name
+		for i, it := range m.middleItems {
+			if it.Kind == items[0].Kind {
+				m.setCursor(i)
+				break
+			}
+		}
+		return m.navigateChild()
+	}
+
+	// Multiple sources — show a picker overlay.
+	m.pendingSecurityFilter = sel.Name
+	m.overlay = overlayAction
+	m.overlayItems = items
+	m.overlayCursor = 0
+	return m, nil
+}
+
+// navigateToSecuritySource handles the selection from the security source
+// picker overlay. Finds the matching source in middleItems, moves the
+// cursor to it, and drills in. The pendingSecurityFilter is consumed by
+// navigateChildResourceType to apply the resource name filter.
+func (m Model) navigateToSecuritySource(sourceName string) (tea.Model, tea.Cmd) {
+	// Find the source entry in middleItems by display name.
+	for i, item := range m.middleItems {
+		if item.Category == "Security" && item.Name == sourceName {
+			m.setCursor(i)
+			m.clampCursor()
+			return m.navigateChild()
+		}
+	}
+	// Not found — clear pending filter and show error.
+	m.pendingSecurityFilter = ""
+	m.setStatusMessage("Security source not found: "+sourceName, true)
+	return m, scheduleStatusClear()
+}
+
+// openSecurityActionMenu builds a context-sensitive action menu for security
+// finding groups and affected resources. Offers Ignore (Global), Ignore
+// (This Resource), Un-ignore, and Refresh.
+func (m Model) openSecurityActionMenu() Model {
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m
+	}
+
+	var items []model.Item
+	kctx := m.nav.Context
+	sourceName := strings.TrimSuffix(strings.TrimPrefix(m.nav.ResourceType.Kind, "__security_"), "__")
+
+	switch sel.Kind {
+	case "__security_finding_group__":
+		groupKey := sel.Extra
+		ignored := isGroupIgnored(m.securityIgnores, kctx, sourceName, groupKey)
+		if !ignored {
+			items = append(items, model.Item{
+				Name:   "Ignore (Global)",
+				Extra:  "Hide this finding group from results",
+				Status: "i",
+			})
+		} else {
+			items = append(items, model.Item{
+				Name:   "Un-ignore",
+				Extra:  "Stop ignoring this finding group",
+				Status: "u",
+			})
+		}
+
+	case "__security_affected_resource__":
+		groupKey := sel.Extra
+		resourceKey := sel.ColumnValue("__resource_key__")
+		groupIgnored := isGroupIgnored(m.securityIgnores, kctx, sourceName, groupKey)
+		resourceIgnored := isResourceIgnored(m.securityIgnores, kctx, sourceName, groupKey, resourceKey)
+		if !groupIgnored {
+			items = append(items, model.Item{
+				Name:   "Ignore (Global)",
+				Extra:  "Hide the parent finding group from results",
+				Status: "i",
+			})
+		}
+		if !resourceIgnored && !groupIgnored && resourceKey != "" {
+			items = append(items, model.Item{
+				Name:   "Ignore (This Resource)",
+				Extra:  "Hide this specific resource from the group",
+				Status: "r",
+			})
+		}
+		if resourceIgnored || groupIgnored {
+			items = append(items, model.Item{
+				Name:   "Un-ignore",
+				Extra:  "Stop ignoring this entry",
+				Status: "u",
+			})
+		}
+	}
+
+	items = append(items, model.Item{
+		Name:   "Refresh",
+		Extra:  "Reload security findings",
+		Status: "R",
+	})
+
+	m.overlay = overlayAction
+	m.overlayItems = items
+	m.overlayCursor = 0
+	return m
+}
+
+// executeSecurityIgnoreAction handles Ignore and Un-ignore actions from the
+// security action menu. It updates the persistent SecurityIgnoreState, saves
+// it to disk, re-wires the IgnoreChecker in the client, and refreshes.
+func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.Cmd) {
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil
+	}
+
+	kctx := m.nav.Context
+	groupKey := sel.Extra
+	sourceName := strings.TrimSuffix(strings.TrimPrefix(m.nav.ResourceType.Kind, "__security_"), "__")
+
+	switch actionLabel {
+	case "Ignore (Global)":
+		m.securityIgnores = addSecurityIgnore(m.securityIgnores, kctx, SecurityIgnoreRule{
+			Source:   sourceName,
+			GroupKey: groupKey,
+		})
+		if err := saveSecurityIgnores(m.securityIgnores); err != nil {
+			logger.Info("Failed to save security ignores", "error", err)
+			m.setStatusMessage("Failed to save ignore rule", true)
+			return m, scheduleStatusClear()
+		}
+		m.setStatusMessage("Ignored: "+groupKey, false)
+
+	case "Ignore (This Resource)":
+		resourceKey := sel.ColumnValue("__resource_key__")
+		if resourceKey == "" {
+			m.setStatusMessage("Cannot determine resource key", true)
+			return m, scheduleStatusClear()
+		}
+		m.securityIgnores = addSecurityIgnore(m.securityIgnores, kctx, SecurityIgnoreRule{
+			Source:   sourceName,
+			GroupKey: groupKey,
+			Resource: resourceKey,
+		})
+		if err := saveSecurityIgnores(m.securityIgnores); err != nil {
+			logger.Info("Failed to save security ignores", "error", err)
+			m.setStatusMessage("Failed to save ignore rule", true)
+			return m, scheduleStatusClear()
+		}
+		m.setStatusMessage("Ignored resource: "+resourceKey, false)
+
+	case "Un-ignore":
+		// Determine whether this is a group-level or resource-level un-ignore.
+		resourceKey := ""
+		if sel.Kind == "__security_affected_resource__" {
+			resourceKey = sel.ColumnValue("__resource_key__")
+			// If the resource itself is not individually ignored but the group
+			// is, un-ignore at the group level.
+			if !isResourceSpecificIgnored(m.securityIgnores, kctx, sourceName, groupKey, resourceKey) {
+				resourceKey = ""
+			}
+		}
+		m.securityIgnores = removeSecurityIgnore(m.securityIgnores, kctx, sourceName, groupKey, resourceKey)
+		if err := saveSecurityIgnores(m.securityIgnores); err != nil {
+			logger.Info("Failed to save security ignores", "error", err)
+			m.setStatusMessage("Failed to save ignore rule removal", true)
+			return m, scheduleStatusClear()
+		}
+		m.setStatusMessage("Un-ignored: "+groupKey, false)
+	}
+
+	// Re-wire the ignore checker so the client picks up the new state.
+	if m.client != nil {
+		m.client.SetIgnoreChecker(&modelIgnoreChecker{state: m.securityIgnores, ctx: kctx})
+	}
+
+	// Invalidate the security manager cache so the refresh does a real
+	// re-filter instead of returning stale results.
+	if m.securityManager != nil {
+		m.securityManager.Invalidate()
+	}
+
+	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }
 
 // executeActionExtended dispatches Argo, Helm, Flux, and other extended actions.
@@ -1272,6 +1548,19 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 		}
 		return m.loadResources(false)
 	case model.LevelOwned:
+		// Security finding groups use a dedicated loader; the generic
+		// loadOwned has no dispatch for virtual security kinds and would
+		// return nil items, wiping the affected resources list.
+		if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+			// Find the group key from leftItems (the grouped findings pushed
+			// when the user drilled in). nav.ResourceName holds the group title.
+			for _, it := range m.leftItems {
+				if it.Kind == "__security_finding_group__" && it.Name == m.nav.ResourceName {
+					return m.loadSecurityAffectedResources(it.Extra)
+				}
+			}
+			return nil
+		}
 		return m.loadOwned(false)
 	case model.LevelContainers:
 		return m.loadContainers(false)

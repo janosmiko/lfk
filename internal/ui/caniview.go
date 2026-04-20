@@ -190,7 +190,7 @@ func renderCanIResources(resources []model.CanIResource, width, maxLines, scroll
 			colW := canIVerbColWidth(v.label)
 			if r.Verbs[v.verb] {
 				padded := "\u2713" + strings.Repeat(" ", colW-1)
-				verbParts = append(verbParts, lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Background(BaseBg).Render(padded))
+				verbParts = append(verbParts, lipgloss.NewStyle().Foreground(ThemeColor("2")).Background(BaseBg).Render(padded))
 			} else {
 				padded := "\u00b7" + strings.Repeat(" ", colW-1)
 				verbParts = append(verbParts, DimStyle.Render(padded))

@@ -526,4 +526,27 @@ func TestColorizePodPrefix(t *testing.T) {
 		assert.Contains(t, r1, "pod/myapp-abc12/app")
 		assert.Contains(t, r2, "pod/myapp-abc12/sidecar")
 	})
+
+	t.Run("no-color mode emits no ANSI escape codes", func(t *testing.T) {
+		origNoColor := ConfigNoColor
+		t.Cleanup(func() { SetNoColor(origNoColor) })
+
+		SetNoColor(true)
+
+		// Try several pod names so we hit different palette indices;
+		// one of them is guaranteed to hash to the red/pink slot.
+		cases := []string{
+			"[pod/myapp-abc12/app] log line",
+			"[pod/web-xyz9k/server] request served",
+			"[pod/worker-1/proc] tick",
+			"[pod/redis-primary/redis] OK",
+		}
+		for _, line := range cases {
+			result := colorizePodPrefix(line)
+			assert.NotContains(t, result, "\x1b[",
+				"no-color must not emit ANSI escape codes; got: %q", result)
+			// Text content stays intact.
+			assert.Contains(t, result, line[1:strings.Index(line, "]")])
+		}
+	})
 }

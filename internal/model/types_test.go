@@ -290,6 +290,7 @@ func TestIsCoreCategory(t *testing.T) {
 		want     bool
 	}{
 		{"Dashboards", "Dashboards", true},
+		{"Security", "Security", true},
 		{"Workloads", "Workloads", true},
 		{"Config", "Config", true},
 		{"Networking", "Networking", true},
@@ -314,6 +315,14 @@ func TestIsCoreCategory(t *testing.T) {
 func TestAPICRDsIsCoreCategory(t *testing.T) {
 	assert.True(t, IsCoreCategory("API and CRDs"),
 		"API and CRDs should be a core category")
+}
+
+// TestSecurityIsCoreCategoryAlwaysShown guards against accidental removal of
+// the Security entry from CoreCategories. The Security category is dynamically
+// populated from SecuritySourcesFn at runtime, but the category itself must
+// always be a core category so it renders in the fixed order.
+func TestSecurityIsCoreCategoryAlwaysShown(t *testing.T) {
+	assert.True(t, IsCoreCategory("Security"), "Security must be a core category")
 }
 
 // --- Templates ---
@@ -373,4 +382,33 @@ func TestBookmarkIsContextAware(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- Security virtual API group ---
+
+func TestSecurityVirtualAPIGroupConstant(t *testing.T) {
+	assert.Equal(t, "_security", SecurityVirtualAPIGroup)
+}
+
+// --- Item.ColumnValue ---
+
+func TestItemColumnValuePresent(t *testing.T) {
+	it := Item{
+		Columns: []KeyValue{
+			{Key: "Severity", Value: "CRIT"},
+			{Key: "Title", Value: "CVE-2024-1234"},
+		},
+	}
+	assert.Equal(t, "CRIT", it.ColumnValue("Severity"))
+	assert.Equal(t, "CVE-2024-1234", it.ColumnValue("Title"))
+}
+
+func TestItemColumnValueAbsent(t *testing.T) {
+	it := Item{Columns: []KeyValue{{Key: "Severity", Value: "HIGH"}}}
+	assert.Equal(t, "", it.ColumnValue("Missing"))
+}
+
+func TestItemColumnValueEmptyColumns(t *testing.T) {
+	it := Item{}
+	assert.Equal(t, "", it.ColumnValue("anything"))
 }

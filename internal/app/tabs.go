@@ -82,8 +82,13 @@ func (m *Model) effectiveNamespace() string {
 
 // sortMiddleItems sorts middleItems based on the current sort column and direction.
 // At LevelResourceTypes and LevelClusters, items keep their original ordering.
+// Security findings are pre-sorted by severity/affected/name in groupFindings
+// and must not be re-sorted by the default Name column.
 func (m *Model) sortMiddleItems() {
 	if m.nav.Level == model.LevelResourceTypes || m.nav.Level == model.LevelClusters {
+		return
+	}
+	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
 		return
 	}
 
