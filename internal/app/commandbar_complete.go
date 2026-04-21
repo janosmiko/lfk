@@ -502,6 +502,7 @@ func setOptions() []string {
 		"linenumbers", "nolinenumbers",
 		"timestamps", "notimestamps",
 		"follow", "nofollow",
+		"ansi", "noansi",
 	}
 }
 

@@ -36,6 +36,7 @@ Column names match the table headers (case-sensitive): `Name`, `Namespace`, `Age
 | `linenumbers` / `nolinenumbers` | Line numbers |
 | `timestamps` / `notimestamps` | Timestamps |
 | `follow` / `nofollow` | Auto-scroll to tail |
+| `ansi` / `noansi` | Render ANSI SGR colours (bold, foreground, background) emitted by log producers. On by default. Turn off to replace every ESC byte with U+FFFD — useful if an application is emitting malformed sequences that misalign the viewer. Non-SGR CSI sequences (cursor movement, screen erase) are always replaced regardless of this flag. |
 
 ### `:tasks`
 

@@ -213,7 +213,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 
 // executeSetCommand handles the :set builtin command.
 // It toggles log viewer options: wrap/nowrap, linenumbers/nolinenumbers,
-// timestamps/notimestamps, follow/nofollow.
+// timestamps/notimestamps, follow/nofollow, ansi/noansi.
 func (m Model) executeSetCommand(option string) (tea.Model, tea.Cmd) {
 	switch strings.ToLower(strings.TrimSpace(option)) {
 	case "wrap":
@@ -240,6 +240,12 @@ func (m Model) executeSetCommand(option string) (tea.Model, tea.Cmd) {
 	case "nofollow":
 		m.logFollow = false
 		m.setStatusMessage("Log follow OFF", false)
+	case "ansi":
+		ui.ConfigLogRenderAnsi = true
+		m.setStatusMessage("Log ANSI rendering ON", false)
+	case "noansi":
+		ui.ConfigLogRenderAnsi = false
+		m.setStatusMessage("Log ANSI rendering OFF", false)
 	default:
 		m.setStatusMessage(fmt.Sprintf("Unknown set option: %s", option), true)
 	}

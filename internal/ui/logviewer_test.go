@@ -186,7 +186,10 @@ func TestStripTimestamp(t *testing.T) {
 
 // --- sanitizeLogLine ---
 
-func TestSanitizeLogLine(t *testing.T) {
+func TestSanitizeLogLine_RenderAnsiDisabled(t *testing.T) {
+	// renderAnsi=false preserves the legacy behaviour: every non-tab
+	// control byte (including the ESC that introduces ANSI sequences) is
+	// replaced, so badly-behaved producers can't hijack the terminal.
 	tests := []struct {
 		name     string
 		input    string
@@ -227,10 +230,70 @@ func TestSanitizeLogLine(t *testing.T) {
 			input:    "5.5.5-10.6.25-MariaDB\x00Z$~sD7*k]\x00\x00\x00o7cn",
 			expected: "5.5.5-10.6.25-MariaDB\ufffdZ$~sD7*k]\ufffd\ufffd\ufffdo7cn",
 		},
+		{
+			name:     "SGR escape is replaced when ANSI disabled",
+			input:    "\x1b[0;33mWARNING\x1b[0m rest",
+			expected: "\ufffd[0;33mWARNING\ufffd[0m rest",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, sanitizeLogLine(tt.input))
+			assert.Equal(t, tt.expected, sanitizeLogLine(tt.input, false))
 		})
 	}
+}
+
+func TestSanitizeLogLine_RenderAnsiEnabled_PreservesSGR(t *testing.T) {
+	// renderAnsi=true keeps complete CSI SGR sequences (the ones that
+	// set colour / bold / underline) verbatim so the terminal can colour
+	// the line as the log producer intended.
+	input := "\x1b[0;33mWARNING: CONFIGURATION: Long polling issues detected.\x1b[0m"
+	out := sanitizeLogLine(input, true)
+	assert.Equal(t, input, out, "SGR sequences must pass through untouched")
+}
+
+func TestSanitizeLogLine_RenderAnsiEnabled_StripsNonSGRCSI(t *testing.T) {
+	// Non-SGR CSI sequences (clear screen, cursor move) would corrupt
+	// the viewer layout, so they are treated as stray ESC bytes and
+	// replaced with U+FFFD even when renderAnsi is on.
+	cases := []struct {
+		name  string
+		input string
+	}{
+		{"clear screen", "before\x1b[2Jafter"},
+		{"cursor up", "line1\x1b[3Aline2"},
+		{"erase to end of line", "foo\x1b[Kbar"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			out := sanitizeLogLine(tc.input, true)
+			assert.NotContains(t, out, "\x1b",
+				"non-SGR escape bytes must be replaced, got %q", out)
+			assert.Contains(t, out, "\ufffd",
+				"replacement char must appear where ESC was, got %q", out)
+		})
+	}
+}
+
+func TestSanitizeLogLine_RenderAnsiEnabled_ReplacesBareESC(t *testing.T) {
+	// A bare ESC with no CSI introducer is treated the same as any
+	// other control byte; the replacement prevents the terminal from
+	// waiting on the next byte and mis-interpreting user output.
+	out := sanitizeLogLine("hello\x1bworld", true)
+	assert.Equal(t, "hello\ufffdworld", out)
+}
+
+func TestSanitizeLogLine_RenderAnsiEnabled_KeepsNullAndBinaryAsReplacements(t *testing.T) {
+	// Even with rendering on, actual binary (NUL, DEL, mid-range
+	// controls) must still be replaced — that's what the sanitizer
+	// exists for in the first place (MySQL handshake etc).
+	out := sanitizeLogLine("\x1b[32mok\x1b[0m\x00tail", true)
+	assert.Equal(t, "\x1b[32mok\x1b[0m\ufffdtail", out)
+}
+
+func TestSanitizeLogLine_RenderAnsiEnabled_PreservesMultibyte(t *testing.T) {
+	// UTF-8 multi-byte runes adjacent to SGR sequences must round-trip
+	// unchanged; a byte-oriented implementation mustn't fragment them.
+	input := "\x1b[34m☂ rain \x1b[0m日本語"
+	assert.Equal(t, input, sanitizeLogLine(input, true))
 }
