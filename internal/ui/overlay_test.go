@@ -217,7 +217,7 @@ func TestRenderPodSelectOverlay_FilterActive(t *testing.T) {
 
 func TestRenderBookmarkOverlay(t *testing.T) {
 	t.Run("no bookmarks", func(t *testing.T) {
-		result := RenderBookmarkOverlay(nil, "", 0, 0)
+		result := RenderBookmarkOverlay(nil, "", 0, 0, false)
 		assert.Contains(t, result, "No bookmarks yet")
 	})
 
@@ -226,7 +226,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "My Pods", Namespace: "default"},
 			{Name: "Deployments", Namespace: "staging"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "My Pods [default]")
 		assert.Contains(t, result, "Deployments [staging]")
 	})
@@ -236,20 +236,20 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "My Pods"},
 			{Name: "Deployments"},
 		}
-		result := RenderBookmarkOverlay(bms, "pod", 0, 1)
+		result := RenderBookmarkOverlay(bms, "pod", 0, 1, false)
 		assert.Contains(t, result, "filter>")
 		assert.Contains(t, result, "pod")
 	})
 
 	t.Run("filtered no match", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "Pods"}}
-		result := RenderBookmarkOverlay(bms, "zzz", 0, 0)
+		result := RenderBookmarkOverlay(bms, "zzz", 0, 0, false)
 		assert.Contains(t, result, "No matching bookmarks")
 	})
 
 	t.Run("bookmark with namespace shows bracket", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "My Pods", Namespace: "production"}}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "production")
 	})
 
@@ -259,7 +259,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "With Slot B", Slot: "b"},
 			{Name: "No Slot"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "a")
 		assert.Contains(t, result, "With Slot A")
 		assert.Contains(t, result, "b")
@@ -269,7 +269,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 
 	t.Run("normal mode shows bookmark content", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "Test"}}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "Test")
 	})
 
@@ -277,7 +277,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 		bms := []model.Bookmark{
 			{Name: "Context-aware Mark", Slot: "A", Context: "prod-cluster"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "Context-aware Mark")
 		assert.NotContains(t, result, "[L]",
 			"bookmark picker must not render the legacy [L] tag")
@@ -289,7 +289,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 		bms := []model.Bookmark{
 			{Name: "Context-free Mark", Slot: "a"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "Context-free Mark")
 		assert.NotContains(t, result, "[L]",
 			"bookmark picker must not render the legacy [L] tag")
@@ -303,7 +303,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "Context-free Deploys", Slot: "a"},
 			{Name: "Context-aware Svcs", Slot: "B", Context: "prod-cluster"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "Context-aware Pods")
 		assert.Contains(t, result, "Context-free Deploys")
 		assert.Contains(t, result, "Context-aware Svcs")

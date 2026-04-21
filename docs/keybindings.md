@@ -111,18 +111,28 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 
 lfk supports vim-style named marks for quick navigation. A bookmark stores a
 resource path (context + namespace + resource type + optional resource name)
-under a single-character slot.
+under a single-character slot. The namespace is always persisted; slot case
+only controls whether the jump switches clusters.
 
 Bookmarks come in two flavors depending on the slot case you choose:
 
 - **Context-aware** (lowercase `a-z` / digit `0-9`): remembers the kube
-  context you were in when you set it. Jumping to the bookmark switches
-  clusters if needed. Use this when you want the bookmark to point at a
-  specific environment (e.g., `a` for "production pods").
-- **Context-free** (uppercase `A-Z`): doesn't remember a context. Jumping
-  to the bookmark uses whatever cluster is currently active. Use this for
-  cluster-agnostic shortcuts (e.g., `P` for "whatever cluster I'm in, go
-  to Pods").
+  context you were in. Jumping switches clusters as needed. Use this
+  when the bookmark should return you to a specific environment.
+- **Context-free** (uppercase `A-Z`): doesn't remember a context.
+  Jumping uses the tab's current cluster. Use this for
+  cluster-agnostic shortcuts (e.g., `P` for "go to Pods in whatever
+  cluster I'm looking at").
+
+**Namespace on jump.** By default *no* bookmark overwrites the tab's
+current namespace scope — you always land on the bookmarked resource
+type in the namespace you were already viewing. The saved namespace
+stays in the record and can be replayed on demand: open the bookmarks
+list with `'`, press `Tab` to arm a `[LOAD NAMESPACE]` chip in the
+title, then press Enter (or the slot key) to jump with the saved
+namespace applied. The flag is consumed after the jump and cleared
+when you close the overlay, so every open starts in the default "keep
+my namespace" mode.
 
 | Key | Context | Action |
 |---|---|---|
@@ -132,6 +142,7 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `j` / `k` | Bookmark overlay | Navigate bookmarks |
 | `/` | Bookmark overlay | Filter bookmarks by name |
 | `Enter` | Bookmark overlay | Jump to selected bookmark |
+| `Tab` | Bookmark overlay | Toggle `[LOAD NAMESPACE]` — apply the bookmark's saved namespace scope on the next jump |
 | `Ctrl+X` | Bookmark overlay | Delete selected bookmark (with confirmation) |
 | `Alt+X` | Bookmark overlay | Delete all bookmarks (with confirmation) |
 
