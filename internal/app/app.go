@@ -518,6 +518,17 @@ type Model struct {
 	logParentName   string // original parent resource name
 	logSavedPodName string // saved pod name before overlay, for restoring on cancel
 
+	// Log viewer: auto-reconnect for multi-container Pods. When following all
+	// containers of a Pod, the kubectl stream ends as soon as the current set
+	// of containers all exit (e.g. an init container finishes before the next
+	// one has started). logAutoReconnectAttempt counts consecutive empty
+	// reconnects so we can give up when the pod is really terminated. It is
+	// reset to 0 every time a line arrives. logReconnecting tells
+	// startLogStream to suppress --tail so we don't re-fetch history we
+	// already have.
+	logAutoReconnectAttempt int
+	logReconnecting         bool
+
 	// Log viewer: container filter state.
 	logContainers         []string // available container names for current pod
 	logSelectedContainers []string // which containers are currently selected (empty = all)
@@ -738,6 +749,13 @@ type Model struct {
 	// Discovered CRDs per context: keyed by context name.
 	discoveredResources map[string][]model.ResourceTypeEntry
 
+	// Contexts with an in-flight API discovery call. Used to avoid
+	// spamming the cluster API (and its OIDC auth flow) when the user
+	// rapidly cursors through many contexts at the cluster list. Entries
+	// are added when discoverAPIResources is kicked off and removed in
+	// updateAPIResourceDiscovery when the result arrives.
+	discoveringContexts map[string]bool
+
 	// Preview scroll offset for the right column.
 	previewScroll int
 
@@ -906,8 +924,14 @@ type Model struct {
 	commandBarPreview            string // ghost text shown dimmed after cursor (tab preview)
 	commandHistory               *commandHistory
 
-	// Cached namespace names for command bar autocompletion.
-	cachedNamespaces []string
+	// Cached namespace names for command bar autocompletion, keyed by
+	// context name. Each tab may have its own nav.Context, so keying by
+	// context keeps completions correct when switching tabs or running
+	// `:ctx` within a tab. Entries carry a fetchedAt timestamp so the
+	// command bar can refresh them after namespaceCacheTTL without
+	// refetching on every open (stale-while-revalidate: the old entry
+	// stays visible while the refresh runs).
+	cachedNamespaces map[string]namespaceCacheEntry
 
 	// Async resource name cache for cross-namespace kubectl completion.
 	// Key: "context/namespace/resource" -> list of resource names.
@@ -1071,6 +1095,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		selectionAnchor:     -1,
 		yamlCollapsed:       make(map[string]bool),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		discoveringContexts: make(map[string]bool),
 		allGroupsExpanded:   true,
 		warningEventsOnly:   true,
 		eventGrouping:       true,
@@ -1190,11 +1215,8 @@ func (m *Model) refreshSecuritySources() {
 	// FindingIndex from a prior context cannot linger. NewManager resets
 	// everything to zero state.
 	mgr := security.NewManager()
-	kctx := m.nav.Context
+	kctx := m.activeContext()
 	if m.client != nil {
-		if kctx == "" {
-			kctx = m.client.CurrentContext()
-		}
 		// Apply global and per-source ignored namespaces from config.
 		if secCfg := resolveSecurityConfig(kctx); secCfg != nil {
 			mgr.SetIgnoredNamespaces(secCfg.IgnoredNamespaces)
@@ -1245,6 +1267,66 @@ func resolveSecurityConfig(kctx string) *model.SecurityConfig {
 		return &cfg
 	}
 	return nil
+}
+
+// namespaceCacheEntry holds the result of a namespace fetch plus the
+// time it completed. The fetchedAt timestamp lets the command bar
+// refresh stale entries without refetching on every open.
+type namespaceCacheEntry struct {
+	names     []string
+	fetchedAt time.Time
+}
+
+// namespaceCacheTTL is how long a cached namespace list stays fresh.
+// After this interval the command bar will trigger a background
+// refresh on next open so newly created namespaces show up in
+// completions without requiring an app restart. The stale entry stays
+// visible until the refresh lands (stale-while-revalidate), so the UI
+// never blinks between "has completions" and "empty".
+//
+// Actions that directly mutate namespaces (`:k create|delete ns ...`
+// and template applies) bypass the TTL via invalidateNamespaceCache,
+// so the common "I just made it" case is instant — the TTL is only a
+// backstop for changes made outside the TUI.
+const namespaceCacheTTL = 60 * time.Second
+
+// activeContext returns the kubectl context that queries on behalf of
+// the current tab should target. It prefers the tab-scoped nav.Context
+// and falls back to the client's current context; returns "" when the
+// client has not been initialised yet (e.g. in pre-startup tests) so
+// callers never panic on a nil client.
+func (m Model) activeContext() string {
+	if m.nav.Context != "" {
+		return m.nav.Context
+	}
+	if m.client != nil {
+		return m.client.CurrentContext()
+	}
+	return ""
+}
+
+// ensureNamespaceCacheFresh returns a command that refreshes the
+// namespace cache for the current context when the entry is missing,
+// empty, or older than namespaceCacheTTL; returns nil otherwise.
+// Context-open paths (drilling into a cluster, `:ctx`, bookmark
+// activation, session restore) batch it so the first `:` open in the
+// newly-opened context has completions ready without waiting for the
+// user's keystroke to trigger the fetch.
+func (m Model) ensureNamespaceCacheFresh() tea.Cmd {
+	entry, ok := m.cachedNamespaces[m.activeContext()]
+	if !ok || len(entry.names) == 0 || time.Since(entry.fetchedAt) > namespaceCacheTTL {
+		return m.loadNamespaces()
+	}
+	return nil
+}
+
+// invalidateNamespaceCache drops the cache entry for the current
+// context so the next command bar open triggers a fresh fetch. Called
+// after actions that mutate the cluster's namespace list (`:k create
+// ns`, `:k delete ns`, template applies) so the new state is reflected
+// in completions immediately instead of up to namespaceCacheTTL later.
+func (m *Model) invalidateNamespaceCache() {
+	delete(m.cachedNamespaces, m.activeContext())
 }
 
 // cancelAndReset cancels any in-flight API requests and creates a fresh

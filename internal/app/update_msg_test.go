@@ -163,6 +163,76 @@ func TestUpdateResourceTypesMsgAtClusterLevel(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// At LevelClusters, a seeded resourceTypesMsg (uncached preview of the
+// hovered context) must still populate the right pane so the user sees
+// "Pods, Deployments, ..." instead of "No resource types found".
+func TestUpdateResourceTypesMsg_AtClusterLevelShowsSeededItems(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelClusters},
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		width:         80,
+		height:        40,
+		execMu:        &sync.Mutex{},
+	}
+	items := []model.Item{{Name: "Pods"}, {Name: "Services"}}
+	result, _ := m.Update(resourceTypesMsg{items: items, seeded: true})
+	mdl := result.(Model)
+	assert.Len(t, mdl.rightItems, 2,
+		"right-pane preview must show seeded items at LevelClusters so the "+
+			"user isn't greeted with 'No resource types found'")
+}
+
+// At LevelResourceTypes, a seeded resourceTypesMsg arriving while discovery
+// is still in flight (m.loading=true) must NOT overwrite middleItems or
+// clear the loader — otherwise every watch-tick flashes basic resource
+// types and the discovery loader keeps disappearing (regression guard for
+// TODO 866).
+func TestUpdateResourceTypesMsg_AtResourceTypesSeededPreservesLoading(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelResourceTypes},
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		loading:       true,
+		width:         80,
+		height:        40,
+		execMu:        &sync.Mutex{},
+	}
+	seeded := []model.Item{{Name: "Pods"}, {Name: "Deployments"}}
+	result, _ := m.Update(resourceTypesMsg{items: seeded, seeded: true})
+	mdl := result.(Model)
+	assert.True(t, mdl.loading,
+		"seeded msg during discovery must preserve the middle-pane loader")
+	assert.Empty(t, mdl.middleItems,
+		"seeded msg during discovery must not clobber middleItems")
+}
+
+// Same level but real discovered items (seeded=false) — these come from
+// apiResourceDiscoveryMsg's successful path and must update the middle pane
+// and clear the loader.
+func TestUpdateResourceTypesMsg_AtResourceTypesRealItemsUpdate(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelResourceTypes},
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		loading:       true,
+		width:         80,
+		height:        40,
+		execMu:        &sync.Mutex{},
+	}
+	items := []model.Item{{Name: "Pods"}, {Name: "ConfigMaps"}, {Name: "MyCRDs"}}
+	result, _ := m.Update(resourceTypesMsg{items: items, seeded: false})
+	mdl := result.(Model)
+	assert.False(t, mdl.loading)
+	assert.Len(t, mdl.middleItems, 3)
+}
+
 // --- Update: startupTipMsg ---
 
 func TestUpdateStartupTipMsg(t *testing.T) {
@@ -869,7 +939,7 @@ func TestPush3UpdateLogLineMsgDone(t *testing.T) {
 	msg := logLineMsg{done: true}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
-	// Done flag appends stream ended marker.
+	// Done is handled silently — no sentinel marker appended.
 	_ = rm
 }
 

@@ -505,7 +505,11 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.searchActive = false
 
 	m.setStatusMessage("Jumped to: "+bm.Name, false)
-	return m, tea.Batch(m.loadResources(false), scheduleStatusClear())
+	cmds := []tea.Cmd{m.loadResources(false), scheduleStatusClear()}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 // restoreSession applies the pending session state after contexts have been loaded.
@@ -586,6 +590,9 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	// Dispatch the security availability probe so the Security category
 	// populates itself on cold start.
 	if cmd := m.loadSecurityAvailability(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 

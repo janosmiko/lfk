@@ -603,9 +603,20 @@ func wrapEventsColumn(rawLines []string, rightW int) []string {
 	return result
 }
 
+// leftColumnLoading reports whether the left column should display a
+// loading spinner. The left column represents the *parent* of the current
+// middle list (kubeconfig -> contexts -> resource types -> resources ...).
+// At LevelClusters there is no parent — the left column is empty by design
+// — so a spinner there would be misleading. Everywhere else the spinner
+// tracks m.loading so the parent header shows progress during discovery /
+// context switches.
+func (m Model) leftColumnLoading() bool {
+	return m.loading && m.nav.Level != model.LevelClusters
+}
+
 // viewExplorerThreeCol renders the standard three-column explorer layout.
 func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rightInner, contentHeight int) string {
-	leftCol := ui.RenderColumn(m.leftColumnHeader(), m.leftItems, m.parentIndex(), leftInner, contentHeight, false, m.loading, m.spinner.View(), "")
+	leftCol := ui.RenderColumn(m.leftColumnHeader(), m.leftItems, m.parentIndex(), leftInner, contentHeight, false, m.leftColumnLoading(), m.spinner.View(), "")
 	savedHighlight := ui.ActiveHighlightQuery
 	ui.ActiveHighlightQuery = ""
 	savedMiddleScroll := ui.ActiveMiddleScroll

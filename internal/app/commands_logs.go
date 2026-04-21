@@ -19,6 +19,62 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// Auto-reconnect constants for multi-container Pod log streams.
+//
+// When following all containers of a Pod, kubectl exits as soon as all
+// currently-running containers have finished. For a pod that is still in the
+// init phase, that happens every time an init container completes. We
+// restart the stream after a short delay so the next container is picked up
+// automatically.
+//
+// The delay is deliberately small: the init-container → next-container
+// transition typically takes well under a second, and every extra millisecond
+// between streams is log content we'll miss (`--tail=0` on reconnect means
+// any lines produced during the gap are gone). We cap retries so a fully
+// terminated pod doesn't spin forever.
+const (
+	logAutoReconnectMaxAttempts = 20
+	logAutoReconnectDelay       = 250 * time.Millisecond
+)
+
+// isKubectlTransientError recognizes noise that kubectl writes to stderr
+// (which startLogStream merges into stdout) while --ignore-errors keeps the
+// stream alive. These lines describe pending initialization, not real
+// application log output — surfacing them just clutters the viewer.
+func isKubectlTransientError(line string) bool {
+	// "error: container \"X\" in pod \"Y\" is waiting to start: PodInitializing"
+	// "error: container \"X\" in pod \"Y\" is waiting to start: ContainerCreating"
+	// etc.
+	if strings.HasPrefix(line, "error: container ") && strings.Contains(line, " is waiting to start: ") {
+		return true
+	}
+	// "Error from server (BadRequest): container X is not valid for pod Y"
+	// (kubectl emits this before an init container has been created)
+	if strings.HasPrefix(line, "Error from server (BadRequest):") && strings.Contains(line, " is not valid for pod ") {
+		return true
+	}
+	return false
+}
+
+// scheduleLogStreamRestart returns a tea.Cmd that waits for
+// logAutoReconnectDelay and then emits a logStreamRestartMsg carrying the
+// channel of the stream that just ended. The Update handler correlates on
+// that channel to ignore stale restarts after the user has switched pods or
+// exited logs mode.
+//
+// The wait is registered as a background task so the title-bar task
+// indicator shows it — that's the app-wide place for "something is
+// progressing" feedback, instead of injecting status lines into the log
+// viewer itself.
+func (m Model) scheduleLogStreamRestart(ch chan string) tea.Cmd {
+	reg := m.bgtasks
+	id := reg.Start(bgtasks.KindContainers, "Waiting for next container", "")
+	return tea.Tick(logAutoReconnectDelay, func(_ time.Time) tea.Msg {
+		reg.Finish(id)
+		return logStreamRestartMsg{ch: ch}
+	})
+}
+
 // --- Log streaming commands ---
 
 // startLogStream launches kubectl logs as a subprocess, creates a channel, and
@@ -55,6 +111,10 @@ func (m *Model) startLogStream() tea.Cmd {
 	if containerName == "" {
 		selectedContainers = append([]string(nil), m.logSelectedContainers...)
 	}
+
+	// On auto-reconnect, force --tail=0 so we only pick up new lines from
+	// the next container rather than re-pulling history we already have.
+	reconnecting := m.logReconnecting
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.logCancel = cancel
@@ -101,8 +161,17 @@ func (m *Model) startLogStream() tea.Cmd {
 			}
 		}
 
-		// Add --tail for initial loading (not for --previous mode since it's already finite).
-		if tailLines > 0 && !logPrevious {
+		// --tail handling:
+		//   * reconnect: always pass --tail=0 so we don't re-pull history
+		//     we already rendered for the previous container.
+		//   * --previous: already a finite backlog — no --tail.
+		//   * initial load: honor the configured tail size if positive.
+		switch {
+		case reconnecting:
+			args = append(args, "--tail=0")
+		case logPrevious:
+			// leave tail off
+		case tailLines > 0:
 			args = append(args, fmt.Sprintf("--tail=%d", tailLines))
 		}
 
@@ -139,10 +208,21 @@ func (m *Model) startLogStream() tea.Cmd {
 		}
 
 		defer cmd.Wait() //nolint:errcheck
+		// kubectl (with --ignore-errors) keeps re-emitting the same
+		// 'container X is waiting to start' line every retry. We want the
+		// user to see the message once so they know what's happening, but
+		// not a flood. Dedup within this kubectl run; reconnect resets.
+		seenTransient := map[string]bool{}
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
 		for scanner.Scan() {
 			line := scanner.Text()
+			if isKubectlTransientError(line) {
+				if seenTransient[line] {
+					continue
+				}
+				seenTransient[line] = true
+			}
 			// Filter by selected containers when using --prefix mode.
 			if len(selectedContainers) > 0 && !matchesContainerFilter(line, selectedContainers) {
 				continue

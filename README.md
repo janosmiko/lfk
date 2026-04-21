@@ -86,7 +86,7 @@
 - **Resource sorting** by name, age, or status
 - **Filter and search**: Filter with `f`, search with `/` -- supports substring, regex (auto-detected), and fuzzy (`~` prefix) modes
 - **Abbreviated search**: Type `pvc`, `hpa`, `deploy` etc. to jump to resource types
-- **Command bar** (`:`) with vertical dropdown autocomplete: resource jumps (`:pod`, `:dep`), built-in commands (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl with `:k`/`:kubectl` prefix and flag/namespace completion, shell commands (`:!`)
+- **Command bar** (`:`) with vertical dropdown autocomplete: resource jumps (`:pod`, `:dep`), built-in commands (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl with `:k`/`:kubectl` prefix and flag/namespace completion, shell commands (`:!`). Value positions (namespace, context, resource name, option, column, format) accept fuzzy matches; command names stay on prefix.
 - **Watch mode**: Auto-refresh resources every 2 seconds (enabled by default)
 - **Owner/controller navigation**: Jump to the owner of any resource with `o`
 - **Events view** with warnings-only filter toggle and duplicate-event grouping (`z`)
@@ -96,7 +96,7 @@
 - **YAML preview** in the right column with syntax highlighting
 - **Full-screen YAML viewer** with scrollable output, search, section folding (`Tab`/`z`), and in-place editing
 - **Resource details** summary in split preview (toggle with `Shift+P`)
-- **Inline log viewer** with streaming, search, **persistent filter** with severity floor, exclude rules, and **boolean group expressions** (`(foo AND bar)`, `(foo AND (bar OR baz))`), **quick severity cycle** (`>` / `<`), **time-range picker** (Start + optional End; presets such as Last 5m / Last 24h / Today / Yesterday, plus a Relative spinner and Absolute datetime editor for custom windows), line numbers, word wrap, follow mode, timestamps toggle, previous container logs, container filter, tail-first loading, and line jump
+- **Inline log viewer** with streaming, search, **persistent filter** with severity floor, exclude rules, and **boolean group expressions** (`(foo AND bar)`, `(foo AND (bar OR baz))`), **quick severity cycle** (`>` / `<`), **time-range picker** (Start + optional End; presets such as Last 5m / Last 24h / Today / Yesterday, plus a Relative spinner and Absolute datetime editor for custom windows), line numbers, word wrap, follow mode, timestamps toggle, previous container logs, container filter, tail-first loading, line jump, and automatic reconnect across init-container transitions (stays attached as each init container finishes and the next one starts)
 - **Inline describe view** with scrollable output
 - **Secret viewing/editing** with decode toggle (`Ctrl+S`) and dedicated editor (`e`)
 - **Embedded terminal** (PTY mode) for exec and shell with tab switching — PTY keeps running in background when switching tabs

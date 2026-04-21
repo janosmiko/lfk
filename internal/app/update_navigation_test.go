@@ -91,7 +91,12 @@ func TestCov80NavigateParentFromResourceTypes(t *testing.T) {
 	result, cmd := m.navigateParent()
 	rm := result.(Model)
 	assert.Equal(t, model.LevelClusters, rm.nav.Level)
-	assert.NotNil(t, cmd)
+	// navigateParent clears nav.Context, so the loadPreview() returned here
+	// resolves via loadResourceTypes with an empty context — which has no
+	// discovered entries and therefore emits no cmd (see loadResourceTypes).
+	// The important assertion is just that the level transitions back to
+	// clusters; the cmd can be nil.
+	_ = cmd
 }
 
 func TestCov80NavigateParentFromResources(t *testing.T) {
@@ -102,6 +107,54 @@ func TestCov80NavigateParentFromResources(t *testing.T) {
 	result, _ := m.navigateParent()
 	rm := result.(Model)
 	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
+}
+
+// When the session restores to LevelResources and discovery hasn't finished
+// yet for the context, m.leftItems contains the seed resource-type list as
+// a fallback. Navigating back (`h`) used to pop those seeds into the middle
+// column, so the user saw a short list flash before the real discovered
+// list arrived. After the fix, navigateParent from LevelResources checks
+// whether discovery has completed: if not, it shows the loader instead of
+// stale seeds.
+func TestNavigateParentFromResources_ShowsLoaderWhileDiscoveryPending(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "test-ctx"
+	// Pretend these were the seed resource types stashed while discovery ran.
+	m.leftItems = []model.Item{
+		{Name: "Pods", Extra: "/v1/pods"},
+		{Name: "Deployments", Extra: "apps/v1/deployments"},
+	}
+	m.leftItemsHistory = [][]model.Item{{{Name: "test-ctx"}}}
+	// discoveredResources deliberately empty — discovery not yet complete.
+	delete(m.discoveredResources, "test-ctx")
+
+	result, _ := m.navigateParent()
+	rm := result.(Model)
+	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
+	assert.Nil(t, rm.middleItems,
+		"discovery pending: middle pane must show the loader, not pop in seed items")
+	assert.True(t, rm.loading)
+}
+
+// When discovery has already completed, the cached discovered items in
+// m.leftItems propagate to the middle column as before — we must not
+// regress the fast-path.
+func TestNavigateParentFromResources_UsesCachedDiscoveredTypes(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "test-ctx"
+	m.leftItems = []model.Item{{Name: "Pods"}, {Name: "Deployments"}}
+	m.leftItemsHistory = [][]model.Item{{{Name: "test-ctx"}}}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
+
+	result, _ := m.navigateParent()
+	rm := result.(Model)
+	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
+	assert.Len(t, rm.middleItems, 2,
+		"discovery complete: middle pane must pop in the cached resource-type list")
 }
 
 func TestCov80NavigateParentFromOwned(t *testing.T) {

@@ -284,8 +284,16 @@ func (m Model) renderRightResourceTypes(width, height int) string {
 }
 
 func (m Model) renderRightClusters(width, height int) string {
+	// Discovery for the hovered context is orthogonal to m.loading — it
+	// runs in its own background task. While it is in flight we keep
+	// rightItems empty (see loadPreviewClusters) so the user sees a plain
+	// loader instead of a seeded placeholder list.
+	discovering := false
+	if sel := m.selectedMiddleItem(); sel != nil {
+		discovering = m.discoveringContexts[sel.Name]
+	}
 	if len(m.rightItems) == 0 {
-		if m.loading {
+		if m.loading || discovering {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading...")
 		}
 		return ui.DimStyle.Render("No resource types found")
@@ -312,9 +320,20 @@ func (m Model) renderRightResources(width, height int) string {
 	if (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod") && len(m.rightItems) > 0 {
 		return m.renderSplitPreview(width, height)
 	}
-	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
+	// No children to render (either the kind has no children, or a child-ful
+	// kind happens to have zero matching items like a Service with no pods
+	// behind its selector). Prefer rendering the selected item's details so
+	// the right pane stays stable — watch-tick refreshes set previewLoading
+	// on every interval, and branching on it here would flash a spinner and
+	// clear the details every tick.
+	if m.nav.ResourceType.Kind != "Pod" {
 		if sel != nil && len(sel.Columns) > 0 {
 			return ui.RenderResourceSummary(sel, "", width, height)
+		}
+		// No item selected yet (e.g., initial load before the list arrives):
+		// show the spinner instead of "No preview".
+		if m.loading || m.previewLoading {
+			return ui.DimStyle.Render(m.spinner.View() + " Loading...")
 		}
 		return m.renderFallbackYAML(width, height)
 	}

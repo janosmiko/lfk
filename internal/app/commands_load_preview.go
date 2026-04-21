@@ -24,7 +24,7 @@ func (m Model) loadPreview() tea.Cmd {
 
 	switch m.nav.Level {
 	case model.LevelClusters:
-		return m.loadResourceTypes()
+		return m.loadPreviewClusters(sel)
 	case model.LevelResourceTypes:
 		return m.loadPreviewResourceTypes(sel)
 	case model.LevelResources:
@@ -35,6 +35,50 @@ func (m Model) loadPreview() tea.Cmd {
 		return nil
 	}
 	return nil
+}
+
+// loadPreviewClusters handles preview loading at the cluster list.
+//
+// The right pane shows the resource types for the *hovered* context, not the
+// currently-active context (m.nav.Context is empty here after back-nav from
+// LevelResourceTypes). Behavior:
+//
+//   - Cached (discovery already completed for hoveredCtx): emit the real
+//     resource-type list so the right pane updates on cursor move.
+//   - Uncached: emit an empty list to clear any stale items from a
+//     previously-hovered context, and kick off discovery (unless one is
+//     already in flight). renderRightClusters will render the loader
+//     because rightItems is empty and m.discoveringContexts[hoveredCtx]
+//     is true. Once apiResourceDiscoveryMsg arrives,
+//     updateAPIResourceDiscovery replaces rightItems with the discovered
+//     list.
+func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
+	hoveredCtx := sel.Name
+	if hoveredCtx == "" {
+		return m.loadResourceTypes()
+	}
+	if discovered := m.discoveredResources[hoveredCtx]; len(discovered) > 0 {
+		items := model.BuildSidebarItems(discovered)
+		return func() tea.Msg {
+			return resourceTypesMsg{items: items}
+		}
+	}
+	// Clear rightItems so renderRightClusters falls into its loader branch.
+	cmds := []tea.Cmd{func() tea.Msg {
+		return resourceTypesMsg{items: nil}
+	}}
+	if !m.discoveringContexts[hoveredCtx] {
+		// discoveringContexts is a reference-type map, so writing here
+		// propagates back through the value receiver to the Update
+		// handler. The map is created in NewModel; if it is nil we skip
+		// the dedup rather than panic — callers in tests may not
+		// initialize it, but production always does.
+		if m.discoveringContexts != nil {
+			m.discoveringContexts[hoveredCtx] = true
+		}
+		cmds = append(cmds, m.discoverAPIResources(hoveredCtx))
+	}
+	return tea.Batch(cmds...)
 }
 
 // loadPreviewResourceTypes handles preview loading at the resource types level.

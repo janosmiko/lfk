@@ -588,6 +588,12 @@ func TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel(t *testing.T) {
 		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
 		{Name: "Workloads"},
 	}
+	// navigateParent only populates middleItems from leftItems when
+	// discovery has completed for the context; mark it as discovered
+	// so ascendToResourceTypes surfaces the Security entry.
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"test": {{Kind: "Pod", Resource: "pods"}},
+	}
 
 	updated, _, handled := m.handleExplorerActionKeySecurity()
 	assert.True(t, handled)
@@ -608,6 +614,12 @@ func TestHandleExplorerActionKeyMonitoringAscendsFromDeeperLevel(t *testing.T) {
 		{Name: "Cluster", Extra: "__overview__"},
 		{Name: "Monitoring", Extra: "__monitoring__"},
 		{Name: "Workloads"},
+	}
+	// navigateParent only populates middleItems from leftItems when
+	// discovery has completed for the context; mark it as discovered
+	// so ascendToResourceTypes surfaces the Monitoring entry.
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"test": {{Kind: "Pod", Resource: "pods"}},
 	}
 
 	updated, _, handled := m.handleExplorerActionKeyMonitoring()

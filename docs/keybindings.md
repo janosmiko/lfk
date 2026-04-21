@@ -279,6 +279,8 @@ The modal has two modes: **list** (nav) and **input** (typing). The mode affects
 
 > The pinned severity row (marked with `★` and `!`) is read-only in list mode — `d` and `e` are no-ops on it. Use `>` / `<` (in the overlay or the log view) to change the severity floor.
 
+> **Auto-reconnect across init containers**: When viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — for example as each init container finishes and the next one starts. The reconnect is silent: no sentinel markers are inserted into the log buffer. After several consecutive empty reconnects the viewer stops retrying (the pod is terminated).
+
 ## Exec Mode (embedded terminal)
 
 `Ctrl+]` is a prefix key (like tmux's `Ctrl+b`). Press it once to activate, then press a follow-up key:
