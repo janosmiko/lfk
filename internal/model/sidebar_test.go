@@ -235,7 +235,9 @@ func TestBuildSidebarItems_GroupFallbackCategorizesUnknownNetworking(t *testing.
 		// Not in BuiltInMetadata, but networking.k8s.io is in the fallback.
 		{Kind: "FutureNetResource", APIGroup: "networking.k8s.io", APIVersion: "v1alpha1", Resource: "futurenetresources", Namespaced: true},
 		// Not in BuiltInMetadata, but gateway.networking.k8s.io is in the fallback.
-		{Kind: "UDPRoute", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1alpha2", Resource: "udproutes", Namespaced: true},
+		// Use a synthetic name so the test keeps exercising the fallback path
+		// even if real upstream resources get curated into BuiltInMetadata.
+		{Kind: "FutureGatewayResource", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1alpha2", Resource: "futuregatewayresources", Namespaced: true},
 	}
 
 	items := BuildSidebarItems(discovered)
@@ -247,9 +249,9 @@ func TestBuildSidebarItems_GroupFallbackCategorizesUnknownNetworking(t *testing.
 	assert.Equal(t, "⧫", byName["Futurenetresources"].Icon.Unicode,
 		"fallback items use the generic CRD glyph")
 
-	require.Contains(t, byName, "Udproutes",
+	require.Contains(t, byName, "Futuregatewayresources",
 		"unknown gateway.networking.k8s.io resource must appear via group fallback")
-	assert.Equal(t, "Networking", byName["Udproutes"].Category)
+	assert.Equal(t, "Networking", byName["Futuregatewayresources"].Category)
 }
 
 // TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards verifies
@@ -262,7 +264,9 @@ func TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards(t *testing.T) 
 		ResourceTypeEntry{Kind: "Gateway", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1", Resource: "gateways", Namespaced: true},
 		ResourceTypeEntry{Kind: "HTTPRoute", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1", Resource: "httproutes", Namespaced: true},
 		// Unknown gateway API resource — must sort via group fallback.
-		ResourceTypeEntry{Kind: "UDPRoute", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1alpha2", Resource: "udproutes", Namespaced: true},
+		// Synthetic name so the test keeps exercising the fallback path
+		// independent of future BuiltInMetadata additions.
+		ResourceTypeEntry{Kind: "FutureGatewayResource", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1alpha2", Resource: "futuregatewayresources", Namespaced: true},
 	)
 
 	items := BuildSidebarItems(discovered)
@@ -275,22 +279,22 @@ func TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards(t *testing.T) 
 	}
 
 	// Known curated items must come first in their declared order.
-	// The unknown "Udproutes" must slot after them, before Port Forwards.
+	// The unknown resource must slot after them, before Port Forwards.
 	idxGateway := indexOf(networking, "Gateways")
 	idxHTTPRoute := indexOf(networking, "HTTPRoutes")
-	idxUDPRoute := indexOf(networking, "Udproutes")
+	idxFallback := indexOf(networking, "Futuregatewayresources")
 	idxPortFwd := indexOf(networking, "Port Forwards")
 	require.GreaterOrEqual(t, idxGateway, 0, "Gateways must appear")
 	require.GreaterOrEqual(t, idxHTTPRoute, 0, "HTTPRoutes must appear")
-	require.GreaterOrEqual(t, idxUDPRoute, 0, "Udproutes must appear via fallback")
+	require.GreaterOrEqual(t, idxFallback, 0, "Futuregatewayresources must appear via fallback")
 	require.GreaterOrEqual(t, idxPortFwd, 0, "Port Forwards must appear")
 
-	assert.Less(t, idxGateway, idxUDPRoute,
-		"curated Gateways must come before fallback Udproutes")
-	assert.Less(t, idxHTTPRoute, idxUDPRoute,
-		"curated HTTPRoutes must come before fallback Udproutes")
-	assert.Less(t, idxUDPRoute, idxPortFwd,
-		"fallback Udproutes must come before Port Forwards")
+	assert.Less(t, idxGateway, idxFallback,
+		"curated Gateways must come before the fallback entry")
+	assert.Less(t, idxHTTPRoute, idxFallback,
+		"curated HTTPRoutes must come before the fallback entry")
+	assert.Less(t, idxFallback, idxPortFwd,
+		"the fallback entry must come before Port Forwards")
 }
 
 func indexOf(xs []string, s string) int {
