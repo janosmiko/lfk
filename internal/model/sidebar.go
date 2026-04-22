@@ -56,6 +56,20 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 			})
 			continue
 		}
+		if cat, ok := GroupCategoryFallback[rt.APIGroup]; ok {
+			// Upstream introduced a resource that hasn't been curated in
+			// BuiltInMetadata yet — surface it in the mapped category with
+			// the generic CRD glyph so it's visible instead of hidden.
+			categorized = append(categorized, Item{
+				Name:       titleCaseFirst(rt.Resource),
+				Kind:       rt.Kind,
+				Extra:      rt.ResourceRef(),
+				Category:   cat,
+				Icon:       Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"},
+				Deprecated: rt.Deprecated,
+			})
+			continue
+		}
 		if CoreK8sGroups[rt.APIGroup] {
 			if !ShowRareResources {
 				continue // hide obscure built-ins unless the user asked to see them
@@ -185,6 +199,11 @@ func itemOrderRank(it Item) (int, bool) {
 		return 0, false
 	}
 	key := parts[0] + "/" + parts[2]
-	rank, ok := BuiltInOrderRank[key]
-	return rank, ok
+	if rank, ok := BuiltInOrderRank[key]; ok {
+		return rank, true
+	}
+	if rank, ok := GroupFallbackRank[parts[0]]; ok {
+		return rank, true
+	}
+	return 0, false
 }

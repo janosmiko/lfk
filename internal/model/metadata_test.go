@@ -57,6 +57,31 @@ func TestBuiltInMetadata_CoversCoreK8sResources(t *testing.T) {
 	}
 }
 
+// TestBuiltInMetadata_CoversGatewayAPI asserts that the full set of
+// Gateway API resources (gateway.networking.k8s.io/*) surfaced by LFK
+// are present in BuiltInMetadata and carry the Networking category, so
+// users can navigate to Gateways and all route kinds (HTTP, TLS, TCP,
+// gRPC) from the curated sidebar.
+func TestBuiltInMetadata_CoversGatewayAPI(t *testing.T) {
+	required := []string{
+		"gateway.networking.k8s.io/gatewayclasses",
+		"gateway.networking.k8s.io/gateways",
+		"gateway.networking.k8s.io/httproutes",
+		"gateway.networking.k8s.io/tlsroutes",
+		"gateway.networking.k8s.io/tcproutes",
+		"gateway.networking.k8s.io/grpcroutes",
+	}
+	for _, key := range required {
+		meta, ok := BuiltInMetadata[key]
+		if assert.True(t, ok, "BuiltInMetadata must contain %s", key) {
+			assert.Equal(t, "Networking", meta.Category,
+				"%s must be in the Networking category", key)
+		}
+		_, ranked := BuiltInOrderRank[key]
+		assert.True(t, ranked, "BuiltInOrderRank must contain %s", key)
+	}
+}
+
 // TestBuiltInMetadataCatalogIntegrity enforces that every entry in
 // BuiltInMetadata has all four curated Icon variants populated: the
 // canonical Unicode glyph, the ASCII Simple label, the Emoji glyph,

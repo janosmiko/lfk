@@ -101,11 +101,34 @@ var CoreK8sGroups = map[string]bool{
 	"gateway.networking.k8s.io":    true,
 }
 
+// GroupCategoryFallback places discovered resources from specific core
+// API groups into a predetermined sidebar category when they are not in
+// BuiltInMetadata. This is the safety net for upstream additions: a new
+// Kubernetes or Gateway API resource will surface in its natural
+// category (with the generic CRD glyph) instead of being hidden, even
+// before someone adds a curated BuiltInMetadata entry. Consulted by
+// partitionDiscovered after the BuiltInMetadata lookup fails.
+var GroupCategoryFallback = map[string]string{
+	"networking.k8s.io":         "Networking",
+	"gateway.networking.k8s.io": "Networking",
+}
+
+// GroupFallbackRank gives auto-categorized items a sort rank so they
+// slot into a predictable position within their category. All items
+// sharing a group use the same rank; ties fall back to alphabetical
+// by display name. Consulted by itemOrderRank when a key-level lookup
+// in BuiltInOrderRank misses.
+var GroupFallbackRank = map[string]int{
+	"networking.k8s.io":         65, // after curated Networking items, before port-forwards
+	"gateway.networking.k8s.io": 65,
+}
+
 // BuiltInMetadata maps "group/resource" to display metadata for the curated
 // sidebar. The key format is "<group>/<resource>" with an empty group for
 // core/v1 resources (e.g., "/pods", "/services"). Resources the cluster
-// serves but absent from this map are either hidden (if the group is in
-// CoreK8sGroups) or shown as generic CRD entries under their API group.
+// serves but absent from this map fall through to GroupCategoryFallback
+// (if the group is listed there), then to the CoreK8sGroups hide path,
+// and finally to generic CRD entries under their API group.
 //
 // This map is hand-maintained. Adding an entry here makes the corresponding
 // resource appear in the sidebar with the given category and icon whenever
@@ -151,8 +174,10 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"networking.k8s.io/ingressclasses":         {Category: "Networking", DisplayName: "IngressClasses", Icon: Icon{Unicode: "⏂", Simple: "[IC]", Emoji: "🔖", NerdFont: "\U000f0832"}},
 	"discovery.k8s.io/endpointslices":          {Category: "Networking", DisplayName: "EndpointSlices", Icon: Icon{Unicode: "⇶", Simple: "[Es]", Emoji: "⏭️", NerdFont: "\U000f0dbb"}},
 	"gateway.networking.k8s.io/gatewayclasses": {Category: "Networking", DisplayName: "GatewayClasses", Icon: Icon{Unicode: "⎁", Simple: "[GC]", Emoji: "🚪", NerdFont: "\U000f0299"}},
+	"gateway.networking.k8s.io/gateways":       {Category: "Networking", DisplayName: "Gateways", Icon: Icon{Unicode: "⎇", Simple: "[Ga]", Emoji: "⛩️", NerdFont: "\U000f0293"}},
 	"gateway.networking.k8s.io/httproutes":     {Category: "Networking", DisplayName: "HTTPRoutes", Icon: Icon{Unicode: "⟿", Simple: "[HR]", Emoji: "🛣️", NerdFont: "\U000f046a"}},
 	"gateway.networking.k8s.io/tlsroutes":      {Category: "Networking", DisplayName: "TLSRoutes", Icon: Icon{Unicode: "⇆", Simple: "[TR]", Emoji: "🔐", NerdFont: "\U000f0341"}},
+	"gateway.networking.k8s.io/tcproutes":      {Category: "Networking", DisplayName: "TCPRoutes", Icon: Icon{Unicode: "⤳", Simple: "[TC]", Emoji: "🧵", NerdFont: "\U000f0c46"}},
 	"gateway.networking.k8s.io/grpcroutes":     {Category: "Networking", DisplayName: "GRPCRoutes", Icon: Icon{Unicode: "⤒", Simple: "[GR]", Emoji: "🔩", NerdFont: "\U000f0295"}},
 
 	// ---- Storage ----
@@ -366,14 +391,19 @@ var BuiltInOrderRank = map[string]int{
 	"/services":                                50,
 	"/endpoints":                               51,
 	"discovery.k8s.io/endpointslices":          52,
-	"networking.k8s.io/ingresses":              53,
-	"networking.k8s.io/ingressclasses":         54,
-	"networking.k8s.io/networkpolicies":        55,
-	"gateway.networking.k8s.io/httproutes":     56,
-	"gateway.networking.k8s.io/tlsroutes":      57,
-	"gateway.networking.k8s.io/grpcroutes":     58,
-	"gateway.networking.k8s.io/gatewayclasses": 59,
-	"_portforward/portforwards":                60,
+	"networking.k8s.io/networkpolicies":        53,
+	"networking.k8s.io/ingresses":              54,
+	"networking.k8s.io/ingressclasses":         55,
+	"gateway.networking.k8s.io/gateways":       56,
+	"gateway.networking.k8s.io/httproutes":     57,
+	"gateway.networking.k8s.io/tlsroutes":      58,
+	"gateway.networking.k8s.io/grpcroutes":     59,
+	"gateway.networking.k8s.io/tcproutes":      60,
+	"gateway.networking.k8s.io/gatewayclasses": 61,
+	// Rank 65 is reserved for GroupFallbackRank — unknown
+	// networking.k8s.io / gateway.networking.k8s.io resources slot
+	// in here via itemOrderRank's group-level lookup.
+	"_portforward/portforwards": 69,
 
 	// Storage
 	"/persistentvolumeclaims":             70,

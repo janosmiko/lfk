@@ -223,6 +223,85 @@ func TestBuildSidebarItems_CuratedOrderWithinCategory(t *testing.T) {
 	assert.Equal(t, expected, workloads, "workloads must follow curated BuiltInOrderRank order")
 }
 
+// TestBuildSidebarItems_GroupFallbackCategorizesUnknownNetworking verifies
+// that discovered resources in networking.k8s.io or gateway.networking.k8s.io
+// that are not yet curated in BuiltInMetadata still surface under the
+// "Networking" category (with the generic CRD glyph) instead of being
+// hidden. This is the safety net so a new upstream resource is visible
+// without manual metadata maintenance.
+func TestBuildSidebarItems_GroupFallbackCategorizesUnknownNetworking(t *testing.T) {
+	discovered := []ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		// Not in BuiltInMetadata, but networking.k8s.io is in the fallback.
+		{Kind: "FutureNetResource", APIGroup: "networking.k8s.io", APIVersion: "v1alpha1", Resource: "futurenetresources", Namespaced: true},
+		// Not in BuiltInMetadata, but gateway.networking.k8s.io is in the fallback.
+		{Kind: "UDPRoute", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1alpha2", Resource: "udproutes", Namespaced: true},
+	}
+
+	items := BuildSidebarItems(discovered)
+	byName := collectByDisplay(items)
+
+	require.Contains(t, byName, "Futurenetresources",
+		"unknown networking.k8s.io resource must appear via group fallback")
+	assert.Equal(t, "Networking", byName["Futurenetresources"].Category)
+	assert.Equal(t, "⧫", byName["Futurenetresources"].Icon.Unicode,
+		"fallback items use the generic CRD glyph")
+
+	require.Contains(t, byName, "Udproutes",
+		"unknown gateway.networking.k8s.io resource must appear via group fallback")
+	assert.Equal(t, "Networking", byName["Udproutes"].Category)
+}
+
+// TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards verifies
+// that auto-categorized Networking items sort after curated Networking
+// entries but before the "Port Forwards" pseudo-resource, so new resources
+// slot into a sensible position without pushing the LFK-only tools around.
+func TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards(t *testing.T) {
+	discovered := append(PseudoResources(),
+		// Curated Gateway API entries.
+		ResourceTypeEntry{Kind: "Gateway", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1", Resource: "gateways", Namespaced: true},
+		ResourceTypeEntry{Kind: "HTTPRoute", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1", Resource: "httproutes", Namespaced: true},
+		// Unknown gateway API resource — must sort via group fallback.
+		ResourceTypeEntry{Kind: "UDPRoute", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1alpha2", Resource: "udproutes", Namespaced: true},
+	)
+
+	items := BuildSidebarItems(discovered)
+
+	var networking []string
+	for _, it := range items {
+		if it.Category == "Networking" {
+			networking = append(networking, it.Name)
+		}
+	}
+
+	// Known curated items must come first in their declared order.
+	// The unknown "Udproutes" must slot after them, before Port Forwards.
+	idxGateway := indexOf(networking, "Gateways")
+	idxHTTPRoute := indexOf(networking, "HTTPRoutes")
+	idxUDPRoute := indexOf(networking, "Udproutes")
+	idxPortFwd := indexOf(networking, "Port Forwards")
+	require.GreaterOrEqual(t, idxGateway, 0, "Gateways must appear")
+	require.GreaterOrEqual(t, idxHTTPRoute, 0, "HTTPRoutes must appear")
+	require.GreaterOrEqual(t, idxUDPRoute, 0, "Udproutes must appear via fallback")
+	require.GreaterOrEqual(t, idxPortFwd, 0, "Port Forwards must appear")
+
+	assert.Less(t, idxGateway, idxUDPRoute,
+		"curated Gateways must come before fallback Udproutes")
+	assert.Less(t, idxHTTPRoute, idxUDPRoute,
+		"curated HTTPRoutes must come before fallback Udproutes")
+	assert.Less(t, idxUDPRoute, idxPortFwd,
+		"fallback Udproutes must come before Port Forwards")
+}
+
+func indexOf(xs []string, s string) int {
+	for i, v := range xs {
+		if v == s {
+			return i
+		}
+	}
+	return -1
+}
+
 func TestTitleCaseFirst(t *testing.T) {
 	cases := []struct {
 		in, want string
