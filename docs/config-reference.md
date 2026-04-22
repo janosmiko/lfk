@@ -24,6 +24,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context in `~/.local/state/lfk/pinned.yaml`). |
 | `tips` | bool | `true` | Show a random tip in the status bar on startup. Set to `false` to disable. |
 | `log_tail_lines` | int | `1000` | Number of log lines to load initially via `--tail`. Scrolling to the top loads older history. |
+| `log_render_ansi` | bool | `true` | Render ANSI SGR sequences (colour, bold, underline) emitted by log producers. Set to `false` to strip them — the viewer replaces every ESC byte with `U+FFFD`, matching the original safe-but-noisy behaviour. Non-SGR CSI sequences (cursor movement, screen erase) are always stripped regardless. Toggle at runtime with `:set ansi` / `:set noansi`. |
 | `log_severity_patterns` | map[string]list[string] | `{}` | Extend the built-in severity detection with custom regex patterns. See [Log severity patterns](#log-severity-patterns) below. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |

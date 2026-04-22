@@ -359,7 +359,7 @@ func helpSections() []helpSection {
 				{"H", "Toggle histogram strip (time-density sparkline; lines without timestamps are not counted)"},
 				{"p", "Toggle pod/container prefixes"},
 				{"c", "Toggle previous container logs"},
-				{"T", "Set --since time window (e.g. 5m, 1h30m, 2d)"},
+				{"T", "Open log time-range picker (presets: Last 5m/24h/Today/Yesterday, plus Custom editor with Relative spinner and Absolute datetime — Tab cycles panels, h/l moves field, j/k adjusts, digits overwrite, Enter applies, c clears, Esc cancels)"},
 				{"/", "Search in logs"},
 				{"n", "Next search match"},
 				{"N", "Previous search match"},

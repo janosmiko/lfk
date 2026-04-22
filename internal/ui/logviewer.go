@@ -14,6 +14,24 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 	Foreground(lipgloss.Color(ColorBase)).
 	Bold(true)
 
+// LogTimeRangeView is the UI-layer representation of an active log
+// time-range window. The app layer owns the full LogTimeRange struct
+// (internal/app) but the layering rule "internal/ui cannot import
+// internal/app" forces this slimmer mirror: the renderer needs just
+// enough to decide whether to render the `[RANGE: …]` chip and what
+// text to put inside it.
+//
+// Callers build this from app.LogTimeRange's IsActive() and Display()
+// helpers — no business logic belongs here.
+type LogTimeRangeView struct {
+	// Display is the pre-rendered chip body (e.g. "-24h" or
+	// "2026-04-17 15:00 → -1h"). An empty string means "no chip".
+	Display string
+}
+
+// IsActive reports whether the view has content to render.
+func (v LogTimeRangeView) IsActive() bool { return v.Display != "" }
+
 // RenderLogViewer renders the full-screen log viewer.
 // ruleCount is the number of active filter rules; when greater than zero a
 // `[FILTER: N]` chip is shown in the title bar.
@@ -87,7 +105,13 @@ func applyLineRewrites(lines []string, scroll, contentHeight int, timestamps, hi
 	return out
 }
 
-func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor, logSince string, relativeTimestamps, jsonPretty bool, prettyLines []string, histogram LogHistogramView) string {
+// RenderLogViewer renders the full-screen log viewer.
+//
+// The `logTimeRange` parameter is the active log-viewer time window
+// (start + optional end), rendered as a `[RANGE: …]` title-bar chip
+// when Display is non-empty. Pass a zero LogTimeRangeView to suppress
+// the chip.
+func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, ruleCount int, severityFloor string, logTimeRange LogTimeRangeView, relativeTimestamps, jsonPretty bool, prettyLines []string, histogram LogHistogramView) string {
 	// Record the total number of lines before any filter projection so the
 	// title bar can render "[X of Y lines]" when filtering is active.
 	totalLines := lines
@@ -108,7 +132,7 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 	if visibleIndices != nil {
 		visibleCount = len(visibleIndices)
 	}
-	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logSince, relativeTimestamps, jsonPretty, histogram)
+	titleBar := renderLogTitleBar(title, totalLines, visibleCount, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, ruleCount, severityFloor, logTimeRange, relativeTimestamps, jsonPretty, histogram)
 	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
 
 	// Histogram strip: when present, reclaim one row of content height
@@ -161,14 +185,16 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 	displayLines := applyLineRewrites(lines, scroll, contentHeight, timestamps, hidePrefixes, rewriteRelative)
 
 	// Sanitize visible lines: replace non-printable characters (except common
-	// whitespace) that can break terminal width calculations and corrupt the layout.
+	// whitespace) that can break terminal width calculations and corrupt the
+	// layout. ANSI SGR sequences are preserved when ConfigLogRenderAnsi is on
+	// so colour output from log producers renders correctly.
 	{
 		end := scroll + contentHeight
 		if end > len(displayLines) {
 			end = len(displayLines)
 		}
 		for i := scroll; i < end; i++ {
-			displayLines[i] = sanitizeLogLine(displayLines[i])
+			displayLines[i] = sanitizeLogLine(displayLines[i], ConfigLogRenderAnsi)
 		}
 	}
 
@@ -235,14 +261,14 @@ func RenderLogViewer(lines []string, visibleIndices []int, scroll, width, height
 // filtering. When it is less than len(lines), the title renders `[X of Y lines]`
 // instead of `[Y lines]`. ruleCount is the number of active filter rules; when
 // greater than zero a `[FILTER: N]` chip is appended to the indicators.
-// logSince is the currently applied --since window; when non-empty a
-// `[SINCE: ...]` chip is shown so the user can tell at a glance that the
-// view is time-bounded. relativeTimestamps only surfaces (as a subtle
-// `[REL]` chip) when timestamps is also on — mirroring the runtime
-// precedence in the per-line rendering loop. histogram, when non-empty,
-// surfaces a `[HIST: <step>]` chip showing the auto-picked bucket
-// width so the user knows the strip's time resolution at a glance.
-func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor, logSince string, relativeTimestamps, jsonPretty bool, histogram LogHistogramView) string {
+// logTimeRange carries the currently applied time window; when its Display
+// string is non-empty a `[RANGE: ...]` chip is shown so the user can tell
+// at a glance that the view is time-bounded. relativeTimestamps only
+// surfaces (as a subtle `[REL]` chip) when timestamps is also on — mirroring
+// the runtime precedence in the per-line rendering loop. histogram, when
+// non-empty, surfaces a `[HIST: <step>]` chip showing the auto-picked
+// bucket width so the user knows the strip's time resolution at a glance.
+func renderLogTitleBar(title string, lines []string, visibleCount, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, ruleCount int, severityFloor string, logTimeRange LogTimeRangeView, relativeTimestamps, jsonPretty bool, histogram LogHistogramView) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -286,10 +312,12 @@ func renderLogTitleBar(title string, lines []string, visibleCount, width int, fo
 	if ruleCount > 0 {
 		indicators = append(indicators, HelpKeyStyle.Render(fmt.Sprintf("[FILTER: %d]", ruleCount)))
 	}
-	// --since window chip: makes it obvious when the view is
-	// time-bounded, independent of any filter rules.
-	if logSince != "" {
-		indicators = append(indicators, HelpKeyStyle.Render("[SINCE: "+logSince+"]"))
+	// Time-range window chip: makes it obvious when the view is
+	// time-bounded, independent of any filter rules. The display body
+	// may include the arrow glyph (Start → End); the renderer passes
+	// that through as-is so users see exactly what they committed.
+	if logTimeRange.IsActive() {
+		indicators = append(indicators, HelpKeyStyle.Render("[RANGE: "+logTimeRange.Display+"]"))
 	}
 	// Histogram chip: shows the auto-picked bucket width so the user
 	// knows the time resolution of the strip without hovering.
@@ -353,7 +381,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "H", Desc: "histogram"},
 		{Key: "p", Desc: "prefixes"},
 		{Key: "c", Desc: "previous"},
-		{Key: "T", Desc: "since"},
+		{Key: "T", Desc: "range"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "/", Desc: "search"},
 		{Key: "n/N", Desc: "next/prev"},
@@ -678,15 +706,24 @@ func StripPodPrefix(line string) string {
 	return line[closeBracket+2:]
 }
 
-// sanitizeLogLine replaces non-printable control characters (except tab) with
-// the Unicode replacement character. Binary data from processes like MySQL
-// handshakes contains bytes that break terminal width calculations and corrupt
-// the log viewer layout.
-func sanitizeLogLine(s string) string {
-	// Fast path: check if any sanitization is needed.
+// sanitizeLogLine replaces non-printable control bytes (NUL, DEL, the C0
+// control range minus tab) with the Unicode replacement character. Binary
+// data from processes like MySQL handshakes contains bytes that break
+// terminal width calculations and corrupt the viewer layout.
+//
+// When renderAnsi is true, valid CSI SGR sequences (ESC [ params m — the
+// ones that set colour, bold, underline, etc.) are preserved verbatim so
+// log producers that emit ANSI colours render as intended. Non-SGR CSI
+// sequences (cursor movement, screen erase) remain unsafe for an inline
+// viewer and are still replaced. A bare ESC with no valid CSI introducer
+// is replaced too; leaving it would cause terminals to wait for a
+// follow-up byte and mis-interpret subsequent output.
+func sanitizeLogLine(s string, renderAnsi bool) string {
+	// Fast path: no control bytes means no work to do.
 	needsSanitize := false
-	for _, r := range s {
-		if r != '\t' && r != '\n' && (r < 32 || r == 127) {
+	for i := range len(s) {
+		c := s[i]
+		if c != '\t' && c != '\n' && (c < 32 || c == 127) {
 			needsSanitize = true
 			break
 		}
@@ -697,12 +734,58 @@ func sanitizeLogLine(s string) string {
 
 	var b strings.Builder
 	b.Grow(len(s))
-	for _, r := range s {
-		if r != '\t' && r != '\n' && (r < 32 || r == 127) {
-			b.WriteRune('\ufffd') // Unicode replacement character
-		} else {
-			b.WriteRune(r)
+	i := 0
+	for i < len(s) {
+		c := s[i]
+		if renderAnsi && c == 0x1b {
+			if end := parseSGRSequence(s, i); end > i {
+				b.WriteString(s[i:end])
+				i = end
+				continue
+			}
 		}
+		if c == '\t' || c == '\n' || (c >= 32 && c != 127) {
+			// Printable ASCII, tab, newline, or UTF-8 leading/continuation
+			// byte. UTF-8 continuation bytes are all >= 0x80 so they
+			// land here on subsequent iterations and copy through intact.
+			// Newline is preserved so JSON-pretty expansion (which
+			// embeds \n inside a single logical line slot) renders as
+			// multiple visible rows instead of a single run of U+FFFDs.
+			b.WriteByte(c)
+			i++
+			continue
+		}
+		// Control byte (< 32 and not tab/newline, or DEL). Emit the
+		// replacement character and advance one byte.
+		b.WriteRune('\ufffd')
+		i++
 	}
 	return b.String()
+}
+
+// parseSGRSequence returns the index after a valid ESC [ ... m sequence
+// starting at s[i], or i if no valid sequence is present. Only SGR
+// (Select Graphic Rendition) finals are accepted because they set
+// colour and text attributes without moving the cursor or clearing the
+// screen — preserving them is safe in an inline viewer, whereas other
+// CSI finals would corrupt the layout.
+func parseSGRSequence(s string, i int) int {
+	if i+1 >= len(s) || s[i] != 0x1b || s[i+1] != '[' {
+		return i
+	}
+	j := i + 2
+	// Parameter bytes: 0x30-0x3F (digits and ; : < = > ?).
+	for j < len(s) && s[j] >= 0x30 && s[j] <= 0x3F {
+		j++
+	}
+	// Intermediate bytes: 0x20-0x2F (space and ! " # $ % & ' ( ) * + , - . /).
+	for j < len(s) && s[j] >= 0x20 && s[j] <= 0x2F {
+		j++
+	}
+	// SGR final byte is lowercase 'm'. Anything else is a CSI we can't
+	// safely forward to an inline viewer.
+	if j < len(s) && s[j] == 'm' {
+		return j + 1
+	}
+	return i
 }

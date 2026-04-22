@@ -74,6 +74,15 @@ log_path: /tmp/lfk.log
 # Default: 1000
 # log_tail_lines: 1000
 
+# ─── Log ANSI Rendering ──────────────────────────────────────────────────────
+# Render ANSI SGR escape sequences (colour, bold, underline) emitted by log
+# producers. When false, every ESC byte is replaced with U+FFFD (the original
+# safe-but-noisy behaviour). Non-SGR CSI sequences (cursor movement, screen
+# erase) are always stripped regardless — they would corrupt the viewer.
+# Toggle at runtime with `:set ansi` / `:set noansi`.
+# Default: true
+# log_render_ansi: true
+
 # ─── Log Severity Patterns ─────────────────────────────────────────────────────
 # Extend the built-in severity detection used by the log filter overlay
 # (press `f` in the log view) and the `>` / `<` quick-cycle hotkeys.

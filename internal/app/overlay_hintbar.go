@@ -45,10 +45,13 @@ func (m Model) overlayHintBarDialog() string {
 			{Key: "Enter", Desc: "apply"},
 			{Key: "esc", Desc: "cancel"},
 		})
-	case overlayLogSinceInput:
+	case overlayLogTimeRange:
 		return m.renderHints([]ui.HintEntry{
+			{Key: "tab", Desc: "switch panel"},
+			{Key: "j/k", Desc: "adjust/nav"},
+			{Key: "h/l", Desc: "field"},
 			{Key: "enter", Desc: "apply"},
-			{Key: "empty+enter", Desc: "clear"},
+			{Key: "c", Desc: "clear"},
 			{Key: "esc", Desc: "cancel"},
 		})
 	case overlayPVCResize:
@@ -260,9 +263,18 @@ func (m Model) overlayHintBarBookmarks() string {
 			{Key: "n", Desc: "cancel"},
 		})
 	default:
+		// tab desc flips with state: "load ns" when the user can arm
+		// the flag, "don't load" when it's already armed. That keeps
+		// the hint readable as the verb for the action Tab will
+		// perform next, matching what they see in the title chip.
+		tabDesc := "load ns"
+		if m.bookmarkLoadNamespace {
+			tabDesc = "don't load ns"
+		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "a-z/0-9", Desc: "jump"},
 			{Key: "enter", Desc: "jump"},
+			{Key: "tab", Desc: tabDesc},
 			{Key: "/", Desc: "filter"},
 			{Key: "ctrl+x", Desc: "delete"},
 			{Key: "alt+x", Desc: "delete all"},

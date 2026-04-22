@@ -645,7 +645,14 @@ func (m Model) applyTemplateFile(tmpFile, ctx, ns string) tea.Cmd {
 			logger.Error("kubectl apply failed", "cmd", cmd.String(), "error", err, "output", string(output))
 			return actionResultMsg{err: fmt.Errorf("kubectl apply: %s", strings.TrimSpace(string(output)))}
 		}
-		return actionResultMsg{message: strings.TrimSpace(string(output))}
+		// Templates are rare and may create a Namespace (either directly
+		// via the "Namespace" template or an edited YAML that adds one),
+		// so always invalidate on success. Worst case is one extra
+		// GetNamespaces round-trip per template apply.
+		return actionResultMsg{
+			message:                  strings.TrimSpace(string(output)),
+			invalidateNamespaceCache: true,
+		}
 	}
 }
 

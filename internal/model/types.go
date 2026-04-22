@@ -47,7 +47,32 @@ type ResourceTypeEntry struct {
 	Deprecated     bool   // true if this API version is deprecated
 	DeprecationMsg string // human-readable deprecation message
 
+	// Verbs is the set of verbs the API server reports for this resource
+	// (e.g. "get", "list", "watch", "create"). Populated from the discovery
+	// API. Empty for LFK pseudo-resources and entries constructed without
+	// discovery data — the sidebar treats empty Verbs as listable so those
+	// stay visible.
+	Verbs []string
+
 	PrinterColumns []PrinterColumn // additionalPrinterColumns from CRD spec
+}
+
+// CanList reports whether the API server supports LIST for this
+// resource. Entries without Verbs (pseudo-resources, seed entries) are
+// treated as listable so they remain visible. Otherwise the verb set
+// must explicitly contain "list" — this is what keeps create-only
+// Review APIs (tokenreviews, subjectaccessreviews, selfsubject*reviews)
+// out of the sidebar.
+func (e ResourceTypeEntry) CanList() bool {
+	if len(e.Verbs) == 0 {
+		return true
+	}
+	for _, v := range e.Verbs {
+		if v == "list" {
+			return true
+		}
+	}
+	return false
 }
 
 // PrinterColumn represents an additionalPrinterColumn from a CRD spec.

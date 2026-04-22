@@ -115,7 +115,19 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.saveCursor()
 		m.nav.Level = model.LevelResourceTypes
 		m.nav.ResourceType = model.ResourceTypeEntry{}
-		m.middleItems = m.leftItems
+		// When session restore puts us at LevelResources before API
+		// discovery has completed, m.leftItems holds the seed set
+		// (Pods/Deployments/...) as a fallback. Popping those into the
+		// middle column on back-navigation makes the user see a "short
+		// list" that then jumps to the full list when discovery arrives.
+		// Instead, show the loader until apiResourceDiscoveryMsg
+		// populates middleItems with the real CRD-inclusive set.
+		if discovered, ok := m.discoveredResources[m.nav.Context]; ok && len(discovered) > 0 {
+			m.middleItems = m.leftItems
+		} else {
+			m.middleItems = nil
+			m.loading = true
+		}
 		m.popLeft()
 		m.clearRight()
 		m.restoreCursor()
@@ -257,26 +269,53 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.refreshSecuritySources()
 	m.applyPinnedGroups()
 	m.nav.Level = model.LevelResourceTypes
+	// Capture whatever the right-pane preview was already displaying for
+	// this context (real discovery hit or seed fallback). We use this
+	// below to avoid a blank loader if navigation beats hover-discovery
+	// to the punch.
+	previewItems := append([]model.Item(nil), m.rightItems...)
 	m.pushLeft()
 	m.clearRight()
-	if discovered, ok := m.discoveredResources[sel.Name]; ok && len(discovered) > 0 {
-		m.middleItems = model.BuildSidebarItems(discovered)
+	switch {
+	case len(m.discoveredResources[sel.Name]) > 0:
+		// Discovery already completed while hovering — pop straight into
+		// the real list, no loader at all.
+		m.middleItems = model.BuildSidebarItems(m.discoveredResources[sel.Name])
 		m.itemCache[m.navKey()] = m.middleItems
 		m.restoreCursor()
 		m.syncExpandedGroup()
-	} else {
-		// Discovery not yet available: show loading spinner instead of
-		// seed resources to avoid the jarring pop-in when CRDs arrive.
+	case m.discoveringContexts[sel.Name] && len(previewItems) > 0:
+		// Hover-discovery is in flight and the right pane already had
+		// something to show (seed fallback). Reuse those items so the
+		// user sees content immediately; apiResourceDiscoveryMsg will
+		// replace them with the real list when discovery completes.
+		m.middleItems = previewItems
+		m.itemCache[m.navKey()] = m.middleItems
+		m.restoreCursor()
+		m.syncExpandedGroup()
+		m.loading = true
+	default:
+		// No preview content and no in-flight discovery — show the
+		// loader and kick off discovery below.
 		m.middleItems = nil
 		m.loading = true
 	}
 	m.setStatusMessage(fmt.Sprintf("Context: %s", sel.Name), false)
 	m.saveCurrentSession()
 	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
-	if _, ok := m.discoveredResources[sel.Name]; !ok {
+	// Fire discovery only if neither the result nor an in-flight call for
+	// this context already exists — hovering the context in the cluster
+	// list typically already kicked one off via loadPreviewClusters.
+	if _, ok := m.discoveredResources[sel.Name]; !ok && !m.discoveringContexts[sel.Name] {
+		if m.discoveringContexts != nil {
+			m.discoveringContexts[sel.Name] = true
+		}
 		cmds = append(cmds, m.discoverAPIResources(sel.Name))
 	}
 	if cmd := m.loadSecurityAvailability(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 	return m, tea.Batch(cmds...)

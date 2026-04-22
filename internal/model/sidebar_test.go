@@ -293,6 +293,128 @@ func TestBuildSidebarItems_SecuritySourcesHookReturnsEmpty(t *testing.T) {
 	}
 }
 
+// TestBuildSidebarItems_GroupFallbackCategorizesUnknownNetworking verifies
+// that discovered resources in networking.k8s.io or gateway.networking.k8s.io
+// that are not yet curated in BuiltInMetadata still surface under the
+// "Networking" category (with the generic CRD glyph) instead of being
+// hidden. This is the safety net so a new upstream resource is visible
+// without manual metadata maintenance.
+func TestBuildSidebarItems_GroupFallbackCategorizesUnknownNetworking(t *testing.T) {
+	discovered := []ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		// Not in BuiltInMetadata, but networking.k8s.io is in the fallback.
+		{Kind: "FutureNetResource", APIGroup: "networking.k8s.io", APIVersion: "v1alpha1", Resource: "futurenetresources", Namespaced: true},
+		// Not in BuiltInMetadata, but gateway.networking.k8s.io is in the fallback.
+		// Use a synthetic name so the test keeps exercising the fallback path
+		// even if real upstream resources get curated into BuiltInMetadata.
+		{Kind: "FutureGatewayResource", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1alpha2", Resource: "futuregatewayresources", Namespaced: true},
+	}
+
+	items := BuildSidebarItems(discovered)
+	byName := collectByDisplay(items)
+
+	require.Contains(t, byName, "Futurenetresources",
+		"unknown networking.k8s.io resource must appear via group fallback")
+	assert.Equal(t, "Networking", byName["Futurenetresources"].Category)
+	assert.Equal(t, "⧫", byName["Futurenetresources"].Icon.Unicode,
+		"fallback items use the generic CRD glyph")
+
+	require.Contains(t, byName, "Futuregatewayresources",
+		"unknown gateway.networking.k8s.io resource must appear via group fallback")
+	assert.Equal(t, "Networking", byName["Futuregatewayresources"].Category)
+}
+
+// TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards verifies
+// that auto-categorized Networking items sort after curated Networking
+// entries but before the "Port Forwards" pseudo-resource, so new resources
+// slot into a sensible position without pushing the LFK-only tools around.
+func TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards(t *testing.T) {
+	discovered := append(PseudoResources(),
+		// Curated Gateway API entries.
+		ResourceTypeEntry{Kind: "Gateway", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1", Resource: "gateways", Namespaced: true},
+		ResourceTypeEntry{Kind: "HTTPRoute", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1", Resource: "httproutes", Namespaced: true},
+		// Unknown gateway API resource — must sort via group fallback.
+		// Synthetic name so the test keeps exercising the fallback path
+		// independent of future BuiltInMetadata additions.
+		ResourceTypeEntry{Kind: "FutureGatewayResource", APIGroup: "gateway.networking.k8s.io", APIVersion: "v1alpha2", Resource: "futuregatewayresources", Namespaced: true},
+	)
+
+	items := BuildSidebarItems(discovered)
+
+	var networking []string
+	for _, it := range items {
+		if it.Category == "Networking" {
+			networking = append(networking, it.Name)
+		}
+	}
+
+	// Known curated items must come first in their declared order.
+	// The unknown resource must slot after them, before Port Forwards.
+	idxGateway := indexOf(networking, "Gateways")
+	idxHTTPRoute := indexOf(networking, "HTTPRoutes")
+	idxFallback := indexOf(networking, "Futuregatewayresources")
+	idxPortFwd := indexOf(networking, "Port Forwards")
+	require.GreaterOrEqual(t, idxGateway, 0, "Gateways must appear")
+	require.GreaterOrEqual(t, idxHTTPRoute, 0, "HTTPRoutes must appear")
+	require.GreaterOrEqual(t, idxFallback, 0, "Futuregatewayresources must appear via fallback")
+	require.GreaterOrEqual(t, idxPortFwd, 0, "Port Forwards must appear")
+
+	assert.Less(t, idxGateway, idxFallback,
+		"curated Gateways must come before the fallback entry")
+	assert.Less(t, idxHTTPRoute, idxFallback,
+		"curated HTTPRoutes must come before the fallback entry")
+	assert.Less(t, idxFallback, idxPortFwd,
+		"the fallback entry must come before Port Forwards")
+}
+
+func indexOf(xs []string, s string) int {
+	for i, v := range xs {
+		if v == s {
+			return i
+		}
+	}
+	return -1
+}
+
+// TestBuildSidebarItems_SkipsNonListableResources verifies that discovered
+// resources whose server-reported Verbs lack "list" are omitted from the
+// sidebar entirely — they cannot be listed, so surfacing them under
+// Advanced, Networking fallback, or anywhere else just produces 405
+// "method not allowed" errors when the user navigates to them.
+// Review APIs (tokenreviews, subjectaccessreviews, selfsubject*reviews)
+// are the canonical offenders.
+func TestBuildSidebarItems_SkipsNonListableResources(t *testing.T) {
+	defer func(orig bool) { ShowRareResources = orig }(ShowRareResources)
+	ShowRareResources = true // force Advanced surfacing so we can assert it's still skipped
+
+	discovered := []ResourceTypeEntry{
+		// Listable resource — must appear.
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true, Verbs: []string{"get", "list", "watch"}},
+		// Review APIs (create-only) — must be skipped everywhere.
+		{Kind: "TokenReview", APIGroup: "authentication.k8s.io", APIVersion: "v1", Resource: "tokenreviews", Namespaced: false, Verbs: []string{"create"}},
+		{Kind: "SubjectAccessReview", APIGroup: "authorization.k8s.io", APIVersion: "v1", Resource: "subjectaccessreviews", Namespaced: false, Verbs: []string{"create"}},
+		{Kind: "SelfSubjectReview", APIGroup: "authentication.k8s.io", APIVersion: "v1", Resource: "selfsubjectreviews", Namespaced: false, Verbs: []string{"create"}},
+		{Kind: "SelfSubjectAccessReview", APIGroup: "authorization.k8s.io", APIVersion: "v1", Resource: "selfsubjectaccessreviews", Namespaced: false, Verbs: []string{"create"}},
+		{Kind: "SelfSubjectRulesReview", APIGroup: "authorization.k8s.io", APIVersion: "v1", Resource: "selfsubjectrulesreviews", Namespaced: false, Verbs: []string{"create"}},
+		// Create-only CRD — should also be skipped.
+		{Kind: "WriteOnlyThing", APIGroup: "example.com", APIVersion: "v1", Resource: "writeonlythings", Namespaced: true, Verbs: []string{"create"}},
+		// Pseudo-resource style: empty Verbs — must still appear (LFK internal).
+		{Kind: "HelmRelease", APIGroup: "_helm", APIVersion: "v1", Resource: "releases", Namespaced: true},
+	}
+
+	items := BuildSidebarItems(discovered)
+	names := collectByDisplay(items)
+
+	assert.Contains(t, names, "Pods", "listable resource must appear")
+	assert.Contains(t, names, "Releases", "pseudo-resource with empty Verbs must appear")
+	assert.NotContains(t, names, "Tokenreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Subjectaccessreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Selfsubjectreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Selfsubjectaccessreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Selfsubjectrulesreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Writeonlythings", "non-listable CRD must be hidden")
+}
+
 func TestTitleCaseFirst(t *testing.T) {
 	cases := []struct {
 		in, want string

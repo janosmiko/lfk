@@ -502,6 +502,7 @@ func setOptions() []string {
 		"linenumbers", "nolinenumbers",
 		"timestamps", "notimestamps",
 		"follow", "nofollow",
+		"ansi", "noansi",
 	}
 }
 
@@ -640,10 +641,17 @@ func (m *Model) contextNames() []string {
 	return names
 }
 
-// namespaceNames returns cached namespace names for completion.
-// The cache is populated asynchronously when the command bar opens.
+// namespaceNames returns cached namespace names for completion in the
+// current nav context. Each tab has its own nav.Context, so keying by
+// context keeps completions correct across tab switches and `:ctx`
+// changes within a tab. The cache is populated asynchronously when the
+// command bar opens for a context that isn't cached yet.
+//
+// A stale entry (older than namespaceCacheTTL) is still returned here
+// so completions remain visible while a background refresh runs; the
+// refresh is scheduled from handleKeyCommandBar.
 func (m *Model) namespaceNames() []string {
-	return m.cachedNamespaces
+	return m.cachedNamespaces[m.activeContext()].names
 }
 
 // resourceNames returns unique resource names from the middle column.

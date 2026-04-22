@@ -557,10 +557,22 @@ func RenderPodSelectOverlay(items []model.Item, cursor int, filter string, filte
 }
 
 // RenderBookmarkOverlay renders the bookmark list overlay content.
-// mode: 0 = normal, 1 = filter. overlayH is the total overlay height for footer pinning.
-func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode int) string {
+// mode: 0 = normal, 1 = filter. loadNamespace, when true, signals that
+// the next jump will apply the bookmark's saved namespace scope
+// instead of keeping the tab's current one; it's surfaced as a
+// "[LOAD NAMESPACE]" chip alongside the title so the user can see
+// what Enter / slot-key will do.
+func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode int, loadNamespace bool) string {
 	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Bookmarks"))
+	// Chip sits on the same visual line as the title. Appending it
+	// AFTER OverlayTitleStyle.Render places the chip on the style's
+	// bottom-padding row, which reads as a stray line floating above
+	// the bookmark list — embed it inside the rendered title instead.
+	title := "Bookmarks"
+	if loadNamespace {
+		title += "   " + HelpKeyStyle.Render("[LOAD NAMESPACE]")
+	}
+	b.WriteString(OverlayTitleStyle.Render(title))
 	b.WriteString("\n")
 
 	// Show mode-specific input line.

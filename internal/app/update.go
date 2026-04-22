@@ -379,6 +379,9 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case logLineMsg:
 		mdl, cmd := m.updateLogLine(msg)
 		return mdl, cmd, true
+	case logStreamRestartMsg:
+		mdl, cmd := m.updateLogStreamRestart(msg)
+		return mdl, cmd, true
 	case logHistoryMsg:
 		mdl := m.updateLogHistory(msg)
 		return mdl, nil, true
@@ -461,12 +464,24 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 }
 
 func (m Model) updateResourceTypes(msg resourceTypesMsg) (tea.Model, tea.Cmd) {
-	m.loading = false
 	m.err = nil
 	if m.nav.Level == model.LevelClusters {
+		// Right-pane preview at the cluster list: always update so the user
+		// sees *something* (seeds or real) while hovering a context.
 		m.rightItems = msg.items
+		m.loading = false
 		return m, nil
 	}
+	// Middle pane at LevelResourceTypes: if discovery is still in flight
+	// and only seeds are available, don't clobber the loader with seeds
+	// — that would cause a one-tick flash of basic resource types every
+	// watch interval. Real discovery results (seeded=false) or an
+	// explicit seed fallback from updateAPIResourceDiscovery (which
+	// writes middleItems directly) take precedence via their own paths.
+	if msg.seeded && m.loading {
+		return m, nil
+	}
+	m.loading = false
 	m.middleItems = msg.items
 	m.itemCache[m.navKey()] = m.middleItems
 	m.clampCursor()
@@ -474,6 +489,10 @@ func (m Model) updateResourceTypes(msg resourceTypesMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
+	// Clear the in-flight flag for this context regardless of outcome so
+	// the user can retry (or hover again) without getting stuck on a
+	// permanently-deduplicated call.
+	delete(m.discoveringContexts, msg.context)
 	if isContextCanceled(msg.err) {
 		return m
 	}
@@ -495,8 +514,16 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 	// with real discovered resources.
 	entries := append(model.PseudoResources(), msg.entries...)
 	m.discoveredResources[msg.context] = entries
+	merged := model.BuildSidebarItems(entries)
+	// If the user is at LevelClusters and hovering this context, refresh
+	// the right-pane preview so the discovered list replaces the seed
+	// fallback that was emitted synchronously when loadPreviewClusters ran.
+	if m.nav.Level == model.LevelClusters {
+		if sel := m.selectedMiddleItem(); sel != nil && sel.Name == msg.context {
+			m.rightItems = merged
+		}
+	}
 	if m.nav.Context == msg.context {
-		merged := model.BuildSidebarItems(entries)
 		// Update the item cache for the resource types level.
 		rtCacheKey := msg.context
 		m.itemCache[rtCacheKey] = merged
@@ -506,7 +533,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 			m.middleItems = merged
 			m.restoreCursor()
 			m.syncExpandedGroup()
-		} else {
+		} else if m.nav.Level != model.LevelClusters {
 			// User is deeper: update leftItems so back-navigation shows CRDs.
 			m.leftItems = merged
 			// Update cursor memory for the resource types level so
@@ -847,10 +874,21 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 	m.err = nil
 	allNsItem := model.Item{Name: "All Namespaces", Status: "all"}
 	m.overlayItems = append([]model.Item{allNsItem}, msg.items...)
-	// Cache namespace names for command bar autocompletion.
-	m.cachedNamespaces = make([]string, 0, len(msg.items))
+	// Cache namespace names for command bar autocompletion, keyed by the
+	// context the fetch was issued for. Keying avoids stale results when
+	// tabs / `:ctx` change nav.Context between the request and reply.
+	// Stamp fetchedAt so the next command bar open can decide whether
+	// the entry is still fresh or should trigger a background refresh.
+	if m.cachedNamespaces == nil {
+		m.cachedNamespaces = make(map[string]namespaceCacheEntry)
+	}
+	names := make([]string, 0, len(msg.items))
 	for _, item := range msg.items {
-		m.cachedNamespaces = append(m.cachedNamespaces, item.Name)
+		names = append(names, item.Name)
+	}
+	m.cachedNamespaces[msg.context] = namespaceCacheEntry{
+		names:     names,
+		fetchedAt: time.Now(),
 	}
 	if m.allNamespaces {
 		m.overlayCursor = 0
@@ -901,9 +939,16 @@ func (m Model) updateActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 	m.bulkMode = false
 	if msg.err != nil {
 		m.setErrorFromErr("Error: ", msg.err)
-	} else if msg.message != "" {
-		logger.Info("Action completed", "message", msg.message)
-		m.setStatusMessage(msg.message, false)
+	} else {
+		if msg.message != "" {
+			logger.Info("Action completed", "message", msg.message)
+			m.setStatusMessage(msg.message, false)
+		}
+		// Only invalidate when the action succeeded; a failed `create
+		// ns` or template apply did not actually mutate the cluster.
+		if msg.invalidateNamespaceCache {
+			m.invalidateNamespaceCache()
+		}
 	}
 	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }
@@ -2088,6 +2133,19 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 				if msg.done {
 					m.tabs[i].logLines = append(m.tabs[i].logLines, "--- stream ended ---")
 				} else {
+					// Client-side End filter: drop lines past the upper
+					// bound on background tabs too, so switching back
+					// doesn't surface noise the user filtered out.
+					if keep := tabKeepsLine(m.tabs[i].logTimeRange, msg.line); !keep {
+						ch := msg.ch
+						return m, func() tea.Msg {
+							line, ok := <-ch
+							if !ok {
+								return logLineMsg{done: true, ch: ch}
+							}
+							return logLineMsg{line: line, ch: ch}
+						}
+					}
 					m.tabs[i].logLines = append(m.tabs[i].logLines, msg.line)
 					// Warm the JSON cache with the new line so filter/render
 					// consumers don't re-parse later. Safe whether or not
@@ -2109,12 +2167,29 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.done {
-		m.logLines = append(m.logLines, "--- stream ended ---")
-		if m.logFollow {
-			m.logScroll = m.logMaxScroll()
-			m.logCursor = len(m.logLines) - 1
+		// When following all containers of a single Pod, the stream ends as
+		// soon as the currently-running set of containers all exit. For a
+		// pod still in its init phase that's every init container
+		// transition — schedule an auto-reconnect so the next container
+		// streams in without manual action. Bail out after
+		// logAutoReconnectMaxAttempts consecutive empty reconnects so we
+		// don't spin forever once the pod is truly terminated.
+		if m.shouldAutoReconnectLogs() && m.logAutoReconnectAttempt < logAutoReconnectMaxAttempts {
+			m.logAutoReconnectAttempt++
+			return m, m.scheduleLogStreamRestart(msg.ch)
 		}
 		return m, nil
+	}
+	// Client-side End filter: kubectl already clipped at Start, but the
+	// upper bound has no kubectl-side equivalent. Lines without a
+	// parseable timestamp are kept (matching KeepLine's contract).
+	if !tabKeepsLine(m.logTimeRange, msg.line) {
+		return m, m.waitForLogLine()
+	}
+	// A line arrived — the stream is producing output, so any pending
+	// auto-reconnect backoff is no longer relevant.
+	if m.logAutoReconnectAttempt > 0 {
+		m.logAutoReconnectAttempt = 0
 	}
 	m.logLines = append(m.logLines, msg.line)
 	m.warmJSONCache(msg.line)
@@ -2124,6 +2199,54 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		m.logCursor = len(m.logLines) - 1
 	}
 	return m, m.waitForLogLine()
+}
+
+// tabKeepsLine applies only the End (upper) bound of r to line, treating
+// a zero-value End as "no upper bound" and short-circuiting. Callers use
+// this to decide whether to append a newly-streamed line; the Start bound
+// is already enforced by kubectl --since-time so re-checking it here
+// would waste work.
+func tabKeepsLine(r LogTimeRange, line string) bool {
+	if r.End.IsZero() {
+		return true
+	}
+	ts, _, ok := parseLogLineTimestamp(line)
+	if !ok {
+		return true
+	}
+	upper := r.End.Resolve(time.Now())
+	return !ts.After(upper)
+}
+
+// shouldAutoReconnectLogs reports whether the log stream should automatically
+// reconnect when it ends. Auto-reconnect is limited to single-Pod streams
+// following all containers while the user is still in follow mode — that's
+// the case where kubectl exits on every init-container transition.
+// Specific-container, multi-pod, previous-logs, and non-Pod flows either
+// have explicit end semantics (--previous) or use selector-based follows
+// where "done" doesn't necessarily mean a transition. If the user has
+// scrolled away from the tail (logFollow=false) they're reading history,
+// not watching live — no point re-arming the stream on their behalf.
+func (m Model) shouldAutoReconnectLogs() bool {
+	return m.mode == modeLogs &&
+		m.logFollow &&
+		!m.logIsMulti &&
+		!m.logPrevious &&
+		m.actionCtx.kind == "Pod" &&
+		m.actionCtx.containerName == ""
+}
+
+// updateLogStreamRestart fires when a scheduled auto-reconnect is due. If
+// the user has switched pods, exited logs mode, or the stream has been
+// replaced (e.g. by a manual action), the restart is silently dropped.
+func (m Model) updateLogStreamRestart(msg logStreamRestartMsg) (tea.Model, tea.Cmd) {
+	if m.mode != modeLogs || m.logCh != msg.ch || !m.shouldAutoReconnectLogs() {
+		return m, nil
+	}
+	m.logReconnecting = true
+	cmd := m.startLogStream()
+	m.logReconnecting = false
+	return m, cmd
 }
 
 func (m Model) updateLogHistory(msg logHistoryMsg) Model {
@@ -2162,6 +2285,21 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	} else if overlapIdx == -1 && len(msg.lines) > 0 {
 		// No overlap found; prepend all (logs may have rotated).
 		newOlderLines = msg.lines
+	}
+
+	// Client-side End filter on the prepended batch: drop any older
+	// lines that sit above the user's upper bound so back-scroll and
+	// live-stream stay consistent. Lines without timestamps are kept.
+	if m.logTimeRange.End.IsZero() || len(newOlderLines) == 0 {
+		// no-op
+	} else {
+		filtered := newOlderLines[:0]
+		for _, line := range newOlderLines {
+			if tabKeepsLine(m.logTimeRange, line) {
+				filtered = append(filtered, line)
+			}
+		}
+		newOlderLines = filtered
 	}
 
 	if len(newOlderLines) == 0 {

@@ -595,6 +595,201 @@ func TestSaveBookmark_OverwriteDoesNotCorruptOriginal(t *testing.T) {
 	assert.Equal(t, "bm-c", bookmarks[2].Name, "original bookmarks[2].Name should be 'bm-c'")
 }
 
+// TestNavigateToBookmark_ContextFreePreservesCurrentNamespace verifies that
+// jumping to a context-free bookmark (uppercase slot) keeps the tab's
+// current namespace instead of forcing the bookmark's saved value. A
+// context-free bookmark is a "wherever I am right now, go to this
+// resource type" shortcut; namespace scope is part of "wherever I am".
+func TestNavigateToBookmark_ContextFreePreservesCurrentNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+	m.allNamespaces = false
+	m.selectedNamespaces = map[string]bool{"staging": true}
+
+	// Context-free: no Context field. The bookmark's Namespace would have
+	// been captured as "default" under the old behaviour — under the new
+	// semantic we ignore it entirely.
+	bm := model.Bookmark{
+		Slot:         "P",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "default",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, "staging", rm.namespace,
+		"context-free jump must preserve the tab's current namespace")
+	assert.False(t, rm.allNamespaces,
+		"context-free jump must not flip the tab into all-namespaces mode")
+	assert.True(t, rm.selectedNamespaces["staging"],
+		"current namespace selection must survive the jump")
+}
+
+// TestNavigateToBookmark_ContextFreePreservesAllNamespaces covers the
+// other direction: when the tab is already in all-namespaces mode, a
+// context-free jump must not narrow it to the bookmark's saved ns.
+func TestNavigateToBookmark_ContextFreePreservesAllNamespaces(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.allNamespaces = true
+	m.selectedNamespaces = nil
+
+	bm := model.Bookmark{
+		Slot:         "P",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "prod", // saved ns must be ignored
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.True(t, rm.allNamespaces,
+		"all-namespaces mode must survive a context-free jump")
+}
+
+// TestNavigateToBookmark_ContextAwareDefaultIgnoresSavedNamespace is
+// the regression guard for the new default behaviour: without the
+// Tab "load namespace" toggle, no bookmark — regardless of slot case
+// — should overwrite the tab's current namespace scope.
+func TestNavigateToBookmark_ContextAwareDefaultIgnoresSavedNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+	m.allNamespaces = false
+
+	bm := model.Bookmark{
+		Slot:         "p",
+		Context:      "test-ctx",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "production",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, "staging", rm.namespace,
+		"default jumps must preserve the tab's namespace even for context-aware slots")
+	assert.False(t, rm.allNamespaces)
+}
+
+// TestBookmarkToSlot_ContextFreeStillCapturesNamespace verifies that
+// context-free slots persist the current namespace scope even though
+// jumps don't apply it by default. The namespace is available for an
+// opt-in load (Tab in the bookmark overlay); throwing it away at save
+// time would make that toggle useless.
+func TestBookmarkToSlot_ContextFreeStillCapturesNamespace(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		DisplayName: "Pods", Kind: "Pod", Resource: "pods",
+	}
+	m.namespace = "staging"
+	m.allNamespaces = false
+	m.selectedNamespaces = map[string]bool{"staging": true}
+
+	result, cmd := m.bookmarkToSlot("P") // uppercase -> context-free
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	require.Len(t, rm.bookmarks, 1)
+	saved := rm.bookmarks[0]
+	assert.Empty(t, saved.Context, "context-free slot must not record a context")
+	assert.Equal(t, "staging", saved.Namespace,
+		"context-free slot must still record the namespace so `Tab` can replay it")
+}
+
+// TestNavigateToBookmark_ContextFreeWithLoadAppliesSavedNamespace
+// covers the opt-in: when bookmarkLoadNamespace is set (Tab toggle
+// in the overlay), the saved namespace IS applied to a context-free
+// jump so the user can reach the exact scope the bookmark remembered.
+func TestNavigateToBookmark_ContextFreeWithLoadAppliesSavedNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+	m.bookmarkLoadNamespace = true
+
+	bm := model.Bookmark{
+		Slot:         "P",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "production",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, "production", rm.namespace,
+		"Tab-armed jumps must apply the saved namespace for context-free bookmarks")
+	assert.False(t, rm.bookmarkLoadNamespace,
+		"flag must be consumed after jumping so the next open starts clean")
+}
+
+// TestNavigateToBookmark_ContextAwareWithLoadAppliesSavedNamespace
+// verifies the flag applies uniformly across slot case — context-aware
+// bookmarks also load their saved namespace when the flag is armed.
+func TestNavigateToBookmark_ContextAwareWithLoadAppliesSavedNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+	m.bookmarkLoadNamespace = true
+
+	bm := model.Bookmark{
+		Slot:         "p",
+		Context:      "test-ctx",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "production",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, "production", rm.namespace,
+		"Tab-armed jumps must apply the saved namespace for context-aware bookmarks too")
+}
+
+// TestBookmarkOverlay_TabTogglesLoadNamespace verifies that Tab
+// pressed in the bookmark overlay flips the "load namespace" chip,
+// so the next jump (Enter or slot key) applies the saved namespace.
+func TestBookmarkOverlay_TabTogglesLoadNamespace(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarks = []model.Bookmark{{Slot: "a", Name: "x"}}
+
+	result, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	rm := result.(Model)
+	assert.True(t, rm.bookmarkLoadNamespace, "first Tab must arm the load flag")
+
+	result, _ = rm.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	rm = result.(Model)
+	assert.False(t, rm.bookmarkLoadNamespace, "second Tab must disarm the flag")
+}
+
+// TestBookmarkOverlay_EscapeResetsLoadNamespace verifies that closing
+// the overlay without jumping discards any pending Tab arming, so
+// reopening the overlay presents a clean default state.
+func TestBookmarkOverlay_EscapeResetsLoadNamespace(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkLoadNamespace = true
+
+	result, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	rm := result.(Model)
+	assert.False(t, rm.bookmarkLoadNamespace,
+		"closing the overlay must reset the flag so it doesn't leak into the next open")
+}
+
 func TestNavigateToBookmark_LocalResourceNotFound(t *testing.T) {
 	// Use a custom CRD ref that doesn't exist anywhere.
 	// With an empty discoveredResources for the current cluster, the function
@@ -1403,7 +1598,13 @@ func TestFinalNavigateToBookmarkAllNamespaces(t *testing.T) {
 	m := baseFinalModel()
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	// Namespace application only runs when the user has armed the
+	// "load namespace" flag (Tab in the overlay). A bookmark with no
+	// saved namespace then widens the scope to all-namespaces.
+	m.bookmarkLoadNamespace = true
 	bm := model.Bookmark{
+		Slot:         "a",
+		Context:      "test-ctx",
 		ResourceType: podRT.ResourceRef(),
 		Namespace:    "",
 	}
@@ -1417,7 +1618,11 @@ func TestFinalNavigateToBookmarkMultiNS(t *testing.T) {
 	m := baseFinalModel()
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	// Namespace list replay requires the "load namespace" flag.
+	m.bookmarkLoadNamespace = true
 	bm := model.Bookmark{
+		Slot:         "a",
+		Context:      "test-ctx",
 		ResourceType: podRT.ResourceRef(),
 		Namespaces:   []string{"ns1", "ns2"},
 	}
@@ -1432,7 +1637,11 @@ func TestFinalNavigateToBookmarkSingleNS(t *testing.T) {
 	m := baseFinalModel()
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	// Saved single namespace replay requires the "load namespace" flag.
+	m.bookmarkLoadNamespace = true
 	bm := model.Bookmark{
+		Slot:         "a",
+		Context:      "test-ctx",
 		ResourceType: podRT.ResourceRef(),
 		Namespace:    "production",
 	}
@@ -1462,7 +1671,11 @@ func TestFinalNavigateToBookmarkSingleNamespaceInList(t *testing.T) {
 	m := baseFinalModel()
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	// Context-aware: single-item namespace list is only honoured on
+	// context-aware jumps.
 	bm := model.Bookmark{
+		Slot:         "a",
+		Context:      "test-ctx",
 		ResourceType: podRT.ResourceRef(),
 		Namespaces:   []string{"only-ns"},
 	}

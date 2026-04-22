@@ -361,6 +361,10 @@ func TestCov80DiscoverAPIResources(t *testing.T) {
 }
 
 func TestCov80LoadResourceTypesNoCRDs(t *testing.T) {
+	// When no CRDs have been discovered yet for this context, loadResourceTypes
+	// still emits the seed list (Pods/Deployments/...) so the right-pane
+	// preview at LevelClusters has something to show. The seeded flag is set
+	// so the middle-pane handler can ignore it while discovery is in flight.
 	m := basePush80Model()
 	cmd := m.loadResourceTypes()
 	require.NotNil(t, cmd)
@@ -368,6 +372,8 @@ func TestCov80LoadResourceTypesNoCRDs(t *testing.T) {
 	rmsg, ok := msg.(resourceTypesMsg)
 	require.True(t, ok)
 	assert.NotEmpty(t, rmsg.items)
+	assert.True(t, rmsg.seeded,
+		"items came from SeedResources — middle-pane must know not to clobber the loader")
 }
 
 func TestCov80LoadResourceTypesWithCRDs(t *testing.T) {
@@ -402,7 +408,14 @@ func TestCovLoadResourceTypesWithCRDs(t *testing.T) {
 func TestCovLoadResourceTypesNoCRDs(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "ctx"
-	assert.NotNil(t, m.loadResourceTypes())
+	cmd := m.loadResourceTypes()
+	require.NotNil(t, cmd)
+	msg := cmd()
+	rmsg, ok := msg.(resourceTypesMsg)
+	require.True(t, ok)
+	assert.True(t, rmsg.seeded,
+		"uncached context must mark emitted items as seeded so the middle "+
+			"pane can preserve its loading state")
 }
 
 func TestCovLoadResourcesForPreviewNil(t *testing.T) {
@@ -592,6 +605,9 @@ func TestCovLoadContexts(t *testing.T) {
 
 func TestCovLoadResourceTypes(t *testing.T) {
 	m := baseModelWithFakeClient()
+	m.discoveredResources[m.nav.Context] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	cmd := m.loadResourceTypes()
 	msg := execCmd(t, cmd)
 	result, ok := msg.(resourceTypesMsg)

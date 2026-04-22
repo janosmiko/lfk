@@ -722,6 +722,9 @@ func (m Model) handleKeyOpenMarks() Model {
 	m.overlay = overlayBookmarks
 	m.overlayCursor = 0
 	m.bookmarkFilter.Clear()
+	// Every open starts with "don't load namespace"; a prior
+	// session's Tab toggle must not leak in.
+	m.bookmarkLoadNamespace = false
 	return m
 }
 
@@ -763,11 +766,12 @@ func (m Model) handleKeyCommandBar() (Model, tea.Cmd) {
 	m.commandBarSuggestions = nil
 	m.commandBarSelectedSuggestion = 0
 	m.commandHistory.reset()
-	// Eagerly populate namespace cache if empty.
-	if len(m.cachedNamespaces) == 0 {
-		return m, m.loadNamespaces()
-	}
-	return m, nil
+	// Refresh the namespace cache if stale so namespaces created since
+	// the last fetch (inside or outside the TUI) surface in completions.
+	// The existing entry stays readable via namespaceNames() while the
+	// refresh is in flight, keeping completions non-blank across the
+	// TTL boundary.
+	return m, m.ensureNamespaceCacheFresh()
 }
 
 func (m Model) handleKeyColumnToggle() Model {

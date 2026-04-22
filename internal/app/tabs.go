@@ -726,6 +726,7 @@ func (m *Model) saveCurrentTab() {
 	t.logJSONPretty = m.logJSONPretty
 	t.logHistogram = m.logHistogram
 	t.logSinceDuration = m.logSinceDuration
+	t.logTimeRange = m.logTimeRange
 	t.logParentKind = m.logParentKind
 	t.logParentName = m.logParentName
 	t.logSavedPodName = m.logSavedPodName
@@ -841,6 +842,19 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	// user explicitly commits via the overlay — so we only mirror the
 	// string back onto the Model here.
 	m.logSinceDuration = t.logSinceDuration
+	m.logTimeRange = t.logTimeRange
+	// Migration: pre-existing tab-state that only carries the legacy
+	// logSinceDuration string is upgraded to a LogTimeRange on load.
+	// Once migrated, logSinceDuration is cleared so subsequent saves
+	// don't keep re-migrating — logTimeRange is the source of truth.
+	if !m.logTimeRange.IsActive() && m.logSinceDuration != "" {
+		if d, _, err := parseLogSinceDuration(m.logSinceDuration); err == nil {
+			m.logTimeRange = LogTimeRange{
+				Start: LogTimePoint{Kind: TimeRelative, Relative: -d},
+			}
+		}
+		m.logSinceDuration = ""
+	}
 	m.logFilterChain = NewFilterChain(m.logRules, m.logIncludeMode, m.logSeverityDetector)
 	m.rebuildLogVisibleIndices()
 	m.logParentKind = t.logParentKind

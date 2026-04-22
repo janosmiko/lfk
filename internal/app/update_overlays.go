@@ -116,8 +116,8 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 	case overlayLogFilter:
 		rm, cmd := m.handleLogFilterOverlayKey(msg)
 		return rm, cmd, true
-	case overlayLogSinceInput:
-		mdl, cmd := m.handleLogSinceInputKey(msg)
+	case overlayLogTimeRange:
+		mdl, cmd := m.handleLogTimeRangeKey(msg)
 		return mdl, cmd, true
 	}
 	return m, nil, false

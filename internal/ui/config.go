@@ -336,6 +336,15 @@ var ConfigConfirmOnExit = true
 // ConfigLogTailLines controls how many log lines are initially loaded via --tail.
 var ConfigLogTailLines = 1000
 
+// ConfigLogRenderAnsi controls whether the log viewer preserves ANSI SGR
+// escape sequences (colour, bold, underline) emitted by log producers.
+// When true, the sanitizer keeps valid SGR runs verbatim so coloured
+// output from applications renders in the viewer. When false, ESC bytes
+// are treated the same as other control bytes and replaced with U+FFFD,
+// matching the historical safe-but-noisy behaviour. Toggle at runtime
+// with `:set ansi` / `:set noansi`.
+var ConfigLogRenderAnsi = true
+
 // ConfigScrollOff is the number of lines to keep visible above/below the cursor.
 // Used by all views with cursor-based navigation.
 var ConfigScrollOff = 5
@@ -428,6 +437,12 @@ type configFile struct {
 	// When the user scrolls to the top, older logs are fetched in the background.
 	// Defaults to 1000.
 	LogTailLines *int `json:"log_tail_lines" yaml:"log_tail_lines"`
+	// LogRenderAnsi controls whether ANSI SGR sequences (colour, bold,
+	// underline) emitted by log producers are rendered in the viewer.
+	// Defaults to true. Set to false to strip all ANSI escapes, matching
+	// the historical behaviour where the sanitizer replaced every ESC
+	// byte with U+FFFD.
+	LogRenderAnsi *bool `json:"log_render_ansi" yaml:"log_render_ansi"`
 	// ScrollOff is the number of lines to keep visible above/below the cursor.
 	// Defaults to 5.
 	ScrollOff *int `json:"scrolloff" yaml:"scrolloff"`
@@ -668,6 +683,9 @@ func applyConfigOptions(cfg configFile) {
 	}
 	if cfg.LogTailLines != nil && *cfg.LogTailLines > 0 {
 		ConfigLogTailLines = *cfg.LogTailLines
+	}
+	if cfg.LogRenderAnsi != nil {
+		ConfigLogRenderAnsi = *cfg.LogRenderAnsi
 	}
 	if cfg.ScrollOff != nil && *cfg.ScrollOff >= 0 {
 		ConfigScrollOff = *cfg.ScrollOff

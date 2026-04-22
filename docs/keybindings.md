@@ -112,18 +112,28 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 
 lfk supports vim-style named marks for quick navigation. A bookmark stores a
 resource path (context + namespace + resource type + optional resource name)
-under a single-character slot.
+under a single-character slot. The namespace is always persisted; slot case
+only controls whether the jump switches clusters.
 
 Bookmarks come in two flavors depending on the slot case you choose:
 
 - **Context-aware** (lowercase `a-z` / digit `0-9`): remembers the kube
-  context you were in when you set it. Jumping to the bookmark switches
-  clusters if needed. Use this when you want the bookmark to point at a
-  specific environment (e.g., `a` for "production pods").
-- **Context-free** (uppercase `A-Z`): doesn't remember a context. Jumping
-  to the bookmark uses whatever cluster is currently active. Use this for
-  cluster-agnostic shortcuts (e.g., `P` for "whatever cluster I'm in, go
-  to Pods").
+  context you were in. Jumping switches clusters as needed. Use this
+  when the bookmark should return you to a specific environment.
+- **Context-free** (uppercase `A-Z`): doesn't remember a context.
+  Jumping uses the tab's current cluster. Use this for
+  cluster-agnostic shortcuts (e.g., `P` for "go to Pods in whatever
+  cluster I'm looking at").
+
+**Namespace on jump.** By default *no* bookmark overwrites the tab's
+current namespace scope — you always land on the bookmarked resource
+type in the namespace you were already viewing. The saved namespace
+stays in the record and can be replayed on demand: open the bookmarks
+list with `'`, press `Tab` to arm a `[LOAD NAMESPACE]` chip in the
+title, then press Enter (or the slot key) to jump with the saved
+namespace applied. The flag is consumed after the jump and cleared
+when you close the overlay, so every open starts in the default "keep
+my namespace" mode.
 
 | Key | Context | Action |
 |---|---|---|
@@ -133,6 +143,7 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `j` / `k` | Bookmark overlay | Navigate bookmarks |
 | `/` | Bookmark overlay | Filter bookmarks by name |
 | `Enter` | Bookmark overlay | Jump to selected bookmark |
+| `Tab` | Bookmark overlay | Toggle `[LOAD NAMESPACE]` — apply the bookmark's saved namespace scope on the next jump |
 | `Ctrl+X` | Bookmark overlay | Delete selected bookmark (with confirmation) |
 | `Alt+X` | Bookmark overlay | Delete all bookmarks (with confirmation) |
 
@@ -202,7 +213,7 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `H` | Toggle histogram strip (1-row time-density sparkline above content; lines without an RFC3339 timestamp are not counted) |
 | `p` | Toggle pod/container prefixes |
 | `c` | Toggle previous container logs |
-| `T` | Set `--since` time window (e.g. `5m`, `1h30m`, `2d`; empty input clears). `t` is the global New Tab shortcut, so the log-view since-prompt uses `Shift+T`. |
+| `T` | Open the log time-range picker (Start + optional End; presets such as Last 5m / Last 24h / Today / Yesterday / "Last 24h excluding last 1h"). Select `Custom…` or press `Tab` to reach the Start / End editor panels; each endpoint can be **Now**, **Relative** (three d/h/m spinner fields), or **Absolute** (6-cell YYYY-MM-DD HH:MM:SS datetime). Inside an editor: `h/l` move between fields, `j/k` (or `+`/`-`) adjust the value, digits overwrite, `Enter` advances Start→End or commits, `Esc` drops back to the preset panel. `c` clears the active range from any panel. `t` is the global New Tab shortcut, so the log-view picker uses `Shift+T`. The title bar shows a `[RANGE: …]` chip while a window is active. |
 | `/` | Search in logs |
 | `n` / `N` | Next / previous search match |
 | `]e` / `[e` | Jump to next/prev ERROR-severity visible line |
@@ -278,6 +289,8 @@ The modal has two modes: **list** (nav) and **input** (typing). The mode affects
 | `Ctrl+U` | Delete everything before the cursor |
 
 > The pinned severity row (marked with `★` and `!`) is read-only in list mode — `d` and `e` are no-ops on it. Use `>` / `<` (in the overlay or the log view) to change the severity floor.
+
+> **Auto-reconnect across init containers**: When viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — for example as each init container finishes and the next one starts. The reconnect is silent: no sentinel markers are inserted into the log buffer. After several consecutive empty reconnects the viewer stops retrying (the pod is terminated).
 
 ## Exec Mode (embedded terminal)
 

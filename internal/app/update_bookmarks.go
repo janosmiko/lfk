@@ -79,19 +79,23 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	}
 	name := strings.Join(parts, " > ")
 
+	// Always capture the current namespace scope so it's available for
+	// an opt-in override at jump time (Tab in the bookmark overlay).
+	// Context-free slots still ignore it on a default jump — the slot
+	// case controls defaults, not persistence.
 	var ns string
 	var nsList []string
-	if m.allNamespaces {
+	switch {
+	case m.allNamespaces:
 		ns = ""
-	} else if len(m.selectedNamespaces) > 1 {
-		// Multiple namespaces selected — store them all.
+	case len(m.selectedNamespaces) > 1:
 		nsList = make([]string, 0, len(m.selectedNamespaces))
 		for n := range m.selectedNamespaces {
 			nsList = append(nsList, n)
 		}
 		sort.Strings(nsList)
 		ns = nsList[0] // primary namespace for backward compat display
-	} else {
+	default:
 		ns = m.namespace
 	}
 
@@ -261,6 +265,15 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 		m.overlay = overlayNone
 		m.bookmarkFilter.Clear()
 		m.bookmarkSearchMode = bookmarkModeNormal
+		// Discard any pending "load namespace" flag so the next open
+		// starts from the default (don't load).
+		m.bookmarkLoadNamespace = false
+		return m, nil
+	case "tab":
+		// Arm the "load saved namespace" flag for the next jump. The
+		// title bar picks this up via the [LOAD NAMESPACE] chip so
+		// the user sees what Enter / slot-key will do.
+		m.bookmarkLoadNamespace = !m.bookmarkLoadNamespace
 		return m, nil
 	case "enter":
 		if len(filtered) > 0 && m.overlayCursor >= 0 && m.overlayCursor < len(filtered) {
@@ -426,27 +439,36 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.monitoringPreview = ""
 	m.applyPinnedGroups()
 
-	// Set namespace(s).
-	if bm.Namespace == "" && len(bm.Namespaces) == 0 {
-		m.allNamespaces = true
-		m.selectedNamespaces = nil
-	} else if len(bm.Namespaces) > 1 {
-		// Multiple namespaces stored.
-		m.allNamespaces = false
-		m.namespace = bm.Namespaces[0]
-		m.selectedNamespaces = make(map[string]bool, len(bm.Namespaces))
-		for _, ns := range bm.Namespaces {
-			m.selectedNamespaces[ns] = true
+	// Apply the bookmark's saved namespace only when the user asked
+	// for it via Tab in the overlay. Default behaviour is "jump to
+	// the resource type in my current namespace scope", regardless of
+	// slot case; the saved namespace stays in the record so the
+	// override can replay it on demand. Consume the flag right after
+	// reading so it can't leak into the next open.
+	applyNs := m.bookmarkLoadNamespace
+	m.bookmarkLoadNamespace = false
+
+	if applyNs {
+		switch {
+		case bm.Namespace == "" && len(bm.Namespaces) == 0:
+			m.allNamespaces = true
+			m.selectedNamespaces = nil
+		case len(bm.Namespaces) > 1:
+			m.allNamespaces = false
+			m.namespace = bm.Namespaces[0]
+			m.selectedNamespaces = make(map[string]bool, len(bm.Namespaces))
+			for _, ns := range bm.Namespaces {
+				m.selectedNamespaces[ns] = true
+			}
+		default:
+			m.allNamespaces = false
+			ns := bm.Namespace
+			if len(bm.Namespaces) == 1 {
+				ns = bm.Namespaces[0]
+			}
+			m.namespace = ns
+			m.selectedNamespaces = map[string]bool{ns: true}
 		}
-	} else {
-		// Single namespace (legacy or single-select).
-		m.allNamespaces = false
-		ns := bm.Namespace
-		if len(bm.Namespaces) == 1 {
-			ns = bm.Namespaces[0]
-		}
-		m.namespace = ns
-		m.selectedNamespaces = map[string]bool{ns: true}
 	}
 
 	// Navigate to resource type level first, then optionally deeper.
@@ -505,7 +527,11 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.searchActive = false
 
 	m.setStatusMessage("Jumped to: "+bm.Name, false)
-	return m, tea.Batch(m.loadResources(false), scheduleStatusClear())
+	cmds := []tea.Cmd{m.loadResources(false), scheduleStatusClear()}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 // restoreSession applies the pending session state after contexts have been loaded.
@@ -586,6 +612,9 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	// Dispatch the security availability probe so the Security category
 	// populates itself on cold start.
 	if cmd := m.loadSecurityAvailability(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 

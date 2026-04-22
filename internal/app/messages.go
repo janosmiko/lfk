@@ -21,6 +21,14 @@ type contextsLoadedMsg struct {
 
 type resourceTypesMsg struct {
 	items []model.Item
+	// seeded is true when items came from model.SeedResources rather than
+	// from actual API discovery. The middle-pane handler uses this flag to
+	// preserve the loading spinner while discovery is still in flight —
+	// overwriting middleItems with seeds on every watch-tick refresh would
+	// clobber the loader set by navigateChildCluster. The right-pane
+	// preview at LevelClusters still displays seeded items so the user
+	// sees *something* while hovering a context.
+	seeded bool
 }
 
 type resourcesLoadedMsg struct {
@@ -58,8 +66,9 @@ type resourceTreeLoadedMsg struct {
 }
 
 type namespacesLoadedMsg struct {
-	items []model.Item
-	err   error
+	context string
+	items   []model.Item
+	err     error
 }
 
 // yamlLoadedMsg delivers a full YAML document for the YAML view. The content
@@ -86,6 +95,11 @@ type previewYAMLLoadedMsg struct {
 type actionResultMsg struct {
 	message string
 	err     error
+	// invalidateNamespaceCache, when true on a successful action,
+	// drops the current context's namespace completion cache so the
+	// next command bar open reflects the mutation (e.g. `:k create
+	// ns`, `:k delete ns`, or a template apply).
+	invalidateNamespaceCache bool
 }
 
 // triggerCronJobMsg carries the result of triggering a CronJob.
@@ -142,6 +156,15 @@ type logLineMsg struct {
 	line string
 	done bool        // true when the log stream has ended
 	ch   chan string // the channel this line came from (for tab identity)
+}
+
+// logStreamRestartMsg triggers an automatic reconnect of the log stream when
+// the previous stream ended (e.g. an init container completed and the next
+// one hasn't produced output yet). The ch field correlates the restart with
+// the stream it was scheduled for: if m.logCh no longer points at this
+// channel (user switched pods or exited logs mode), the restart is dropped.
+type logStreamRestartMsg struct {
+	ch chan string
 }
 
 // podSelectMsg carries the pod list for exec/attach pod selection on parent resources.

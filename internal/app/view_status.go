@@ -401,8 +401,8 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		return ui.RenderConfirmTypeOverlay(m.confirmTitle, m.confirmQuestion, m.confirmTypeInput.Value), min(55, m.width-10), min(10, m.height-6), true
 	case overlayScaleInput:
 		return ui.RenderScaleOverlay(m.scaleInput.Value), min(45, m.width-10), min(8, m.height-6), true
-	case overlayLogSinceInput:
-		return ui.RenderLogSinceOverlay(m.logSinceInput.Value, m.logSinceDuration), min(50, m.width-10), min(10, m.height-6), true
+	case overlayLogTimeRange:
+		return ui.RenderLogTimeRangeOverlay(m.buildLogTimeRangeOverlayState(), min(60, m.width-10), min(24, m.height-6)), min(60, m.width-10), min(24, m.height-6), true
 	case overlayPVCResize:
 		return ui.RenderPVCResizeOverlay(m.scaleInput.Value, m.pvcCurrentSize), min(45, m.width-10), min(10, m.height-6), true
 	case overlayPortForward:
@@ -422,7 +422,7 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		return content, min(60, m.width-10), min(len(m.filteredLogContainerItems())+9, m.height-6), true
 	case overlayBookmarks:
 		w, h := min(90, m.width-10), min(25, m.height-6)
-		return ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode)), w, h, true
+		return ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode), m.bookmarkLoadNamespace), w, h, true
 	case overlayTemplates:
 		w, h := min(60, m.width-10), min(25, m.height-6)
 		return ui.RenderTemplateOverlay(m.filteredTemplates(), m.templateFilter.Value, m.templateCursor, m.templateSearchMode, h), w, h, true

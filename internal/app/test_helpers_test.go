@@ -165,6 +165,7 @@ func baseModelCov() Model {
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
+		discoveringContexts: make(map[string]bool),
 		width:               80,
 		height:              40,
 		execMu:              &sync.Mutex{},

@@ -208,6 +208,9 @@ func TestPush2RefreshCurrentLevelClusters(t *testing.T) {
 func TestPush2RefreshCurrentLevelResourceTypes(t *testing.T) {
 	m := basePush80v2Model()
 	m.nav.Level = model.LevelResourceTypes
+	m.discoveredResources[m.nav.Context] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	cmd := m.refreshCurrentLevel()
 	require.NotNil(t, cmd)
 }
@@ -580,6 +583,9 @@ func TestCovRefreshCurrentLevelResourceTypes(t *testing.T) {
 	m := baseModelActions()
 	m.nav.Level = model.LevelResourceTypes
 	m.nav.Context = "ctx"
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	cmd := m.refreshCurrentLevel()
 	assert.NotNil(t, cmd)
 }
@@ -693,6 +699,9 @@ func TestCovRefreshCurrentLevelClustersFakeClient(t *testing.T) {
 func TestCovRefreshCurrentLevelResourceTypesFakeClient(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.nav.Level = model.LevelResourceTypes
+	m.discoveredResources[m.nav.Context] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	cmd := m.refreshCurrentLevel()
 	assert.NotNil(t, cmd)
 }
@@ -2201,6 +2210,12 @@ func TestExecuteActionSecurityFindingsFiltersToResource(t *testing.T) {
 	}
 	m.leftItems = []model.Item{
 		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
+	}
+	// navigateParent (called via ascendToResourceTypes) only copies
+	// leftItems into middleItems when discovery has completed, so mark
+	// it discovered for the test context.
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"test": {{Kind: "Deployment", Resource: "deployments"}},
 	}
 
 	updated, _ := m.executeActionSecurityFindings()
