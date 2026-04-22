@@ -722,6 +722,9 @@ func (m Model) handleKeyOpenMarks() Model {
 	m.overlay = overlayBookmarks
 	m.overlayCursor = 0
 	m.bookmarkFilter.Clear()
+	// Every open starts with "don't load namespace"; a prior
+	// session's Tab toggle must not leak in.
+	m.bookmarkLoadNamespace = false
 	return m
 }
 

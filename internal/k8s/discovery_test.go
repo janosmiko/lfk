@@ -75,20 +75,43 @@ func TestConvertAPIResourceLists_SkipsSubresources(t *testing.T) {
 
 func TestConvertAPIResourceLists_KeepsReviewAPIs(t *testing.T) {
 	// Review APIs are create-only but still must appear in the discovered
-	// set so they remain resolvable. The sidebar hides them because no
-	// BuiltInMetadata entry exists for them; that happens in a different
-	// layer and is not convertAPIResourceLists' concern.
+	// set so they remain resolvable. The sidebar hides them via the
+	// listability filter (empty/no-list Verbs → hidden) which is a
+	// different layer and not convertAPIResourceLists' concern.
 	lists := []*metav1.APIResourceList{
 		{
 			GroupVersion: "authentication.k8s.io/v1",
 			APIResources: []metav1.APIResource{
-				{Name: "tokenreviews", Namespaced: false, Kind: "TokenReview"},
-				{Name: "selfsubjectreviews", Namespaced: false, Kind: "SelfSubjectReview"},
+				{Name: "tokenreviews", Namespaced: false, Kind: "TokenReview", Verbs: metav1.Verbs{"create"}},
+				{Name: "selfsubjectreviews", Namespaced: false, Kind: "SelfSubjectReview", Verbs: metav1.Verbs{"create"}},
 			},
 		},
 	}
 	entries := convertAPIResourceLists(lists)
 	require.Len(t, entries, 2)
+	// Verbs from the discovery API are preserved so the sidebar layer
+	// can filter out non-listable resources without re-querying.
+	for _, e := range entries {
+		assert.Equal(t, []string{"create"}, e.Verbs, "review API %s must retain create-only verbs", e.Resource)
+		assert.False(t, e.CanList(), "review API %s must not be listable", e.Resource)
+	}
+}
+
+func TestConvertAPIResourceLists_PopulatesVerbs(t *testing.T) {
+	lists := []*metav1.APIResourceList{
+		{
+			GroupVersion: "v1",
+			APIResources: []metav1.APIResource{
+				{Name: "pods", Namespaced: true, Kind: "Pod", Verbs: metav1.Verbs{"get", "list", "watch", "create", "update", "patch", "delete"}},
+			},
+		},
+	}
+	entries := convertAPIResourceLists(lists)
+	require.Len(t, entries, 1)
+	assert.ElementsMatch(t,
+		[]string{"get", "list", "watch", "create", "update", "patch", "delete"},
+		entries[0].Verbs)
+	assert.True(t, entries[0].CanList())
 }
 
 func TestDiscoverAPIResources_MergesPrinterColumns(t *testing.T) {

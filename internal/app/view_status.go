@@ -422,7 +422,7 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		return content, min(60, m.width-10), min(len(m.filteredLogContainerItems())+9, m.height-6), true
 	case overlayBookmarks:
 		w, h := min(90, m.width-10), min(25, m.height-6)
-		return ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode)), w, h, true
+		return ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode), m.bookmarkLoadNamespace), w, h, true
 	case overlayTemplates:
 		w, h := min(60, m.width-10), min(25, m.height-6)
 		return ui.RenderTemplateOverlay(m.filteredTemplates(), m.templateFilter.Value, m.templateCursor, m.templateSearchMode, h), w, h, true

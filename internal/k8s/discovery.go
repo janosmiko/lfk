@@ -42,6 +42,7 @@ func convertAPIResourceLists(lists []*metav1.APIResourceList) []model.ResourceTy
 				APIVersion: gv.Version,
 				Resource:   r.Name,
 				Namespaced: r.Namespaced,
+				Verbs:      append([]string(nil), r.Verbs...),
 			})
 		}
 	}
