@@ -41,6 +41,15 @@ func BuildSidebarItems(discovered []ResourceTypeEntry) []Item {
 // appear under the synthetic "Advanced" category.
 func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups []Item) {
 	for _, rt := range discovered {
+		// Skip resources the server cannot list. Review APIs
+		// (tokenreviews, subjectaccessreviews, selfsubject*reviews) are
+		// create-only, so surfacing them anywhere in the sidebar just
+		// produces 405 "method not allowed" errors when the user
+		// navigates to them. Entries with empty Verbs (pseudo-resources,
+		// seed data) are treated as listable.
+		if !rt.CanList() {
+			continue
+		}
 		key := rt.APIGroup + "/" + rt.Resource
 		if meta, ok := BuiltInMetadata[key]; ok {
 			if meta.Rare && !ShowRareResources {

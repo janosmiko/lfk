@@ -306,6 +306,45 @@ func indexOf(xs []string, s string) int {
 	return -1
 }
 
+// TestBuildSidebarItems_SkipsNonListableResources verifies that discovered
+// resources whose server-reported Verbs lack "list" are omitted from the
+// sidebar entirely — they cannot be listed, so surfacing them under
+// Advanced, Networking fallback, or anywhere else just produces 405
+// "method not allowed" errors when the user navigates to them.
+// Review APIs (tokenreviews, subjectaccessreviews, selfsubject*reviews)
+// are the canonical offenders.
+func TestBuildSidebarItems_SkipsNonListableResources(t *testing.T) {
+	defer func(orig bool) { ShowRareResources = orig }(ShowRareResources)
+	ShowRareResources = true // force Advanced surfacing so we can assert it's still skipped
+
+	discovered := []ResourceTypeEntry{
+		// Listable resource — must appear.
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true, Verbs: []string{"get", "list", "watch"}},
+		// Review APIs (create-only) — must be skipped everywhere.
+		{Kind: "TokenReview", APIGroup: "authentication.k8s.io", APIVersion: "v1", Resource: "tokenreviews", Namespaced: false, Verbs: []string{"create"}},
+		{Kind: "SubjectAccessReview", APIGroup: "authorization.k8s.io", APIVersion: "v1", Resource: "subjectaccessreviews", Namespaced: false, Verbs: []string{"create"}},
+		{Kind: "SelfSubjectReview", APIGroup: "authentication.k8s.io", APIVersion: "v1", Resource: "selfsubjectreviews", Namespaced: false, Verbs: []string{"create"}},
+		{Kind: "SelfSubjectAccessReview", APIGroup: "authorization.k8s.io", APIVersion: "v1", Resource: "selfsubjectaccessreviews", Namespaced: false, Verbs: []string{"create"}},
+		{Kind: "SelfSubjectRulesReview", APIGroup: "authorization.k8s.io", APIVersion: "v1", Resource: "selfsubjectrulesreviews", Namespaced: false, Verbs: []string{"create"}},
+		// Create-only CRD — should also be skipped.
+		{Kind: "WriteOnlyThing", APIGroup: "example.com", APIVersion: "v1", Resource: "writeonlythings", Namespaced: true, Verbs: []string{"create"}},
+		// Pseudo-resource style: empty Verbs — must still appear (LFK internal).
+		{Kind: "HelmRelease", APIGroup: "_helm", APIVersion: "v1", Resource: "releases", Namespaced: true},
+	}
+
+	items := BuildSidebarItems(discovered)
+	names := collectByDisplay(items)
+
+	assert.Contains(t, names, "Pods", "listable resource must appear")
+	assert.Contains(t, names, "Releases", "pseudo-resource with empty Verbs must appear")
+	assert.NotContains(t, names, "Tokenreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Subjectaccessreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Selfsubjectreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Selfsubjectaccessreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Selfsubjectrulesreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "Writeonlythings", "non-listable CRD must be hidden")
+}
+
 func TestTitleCaseFirst(t *testing.T) {
 	cases := []struct {
 		in, want string
