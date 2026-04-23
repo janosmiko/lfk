@@ -1286,6 +1286,33 @@ func TestFinal2UpdateContainersLoadedMsgStale(t *testing.T) {
 	_ = result.(Model)
 }
 
+// TestUpdateContainersLoadedClearsPreviewLoadingAtLevelContainers locks in
+// the fix for the stuck "Loading..." bug when drilling into a pod with
+// several containers. At LevelContainers, loadPreview() always returns nil
+// (containers have no right-pane preview load of their own), so
+// previewLoading — armed by clearRight() on navigation — must be cleared
+// here. Without this, the right pane renders "Loading..." forever because
+// nothing downstream ever clears the flag.
+func TestUpdateContainersLoadedClearsPreviewLoadingAtLevelContainers(t *testing.T) {
+	m := baseFinalModel()
+	m.nav.Level = model.LevelContainers
+	m.nav.ResourceName = "pod-1"
+	m.nav.OwnedName = "pod-1"
+	m.requestGen = 1
+	m.previewLoading = true
+	m.loading = true
+
+	items := []model.Item{
+		{Name: "app", Kind: "Container"},
+		{Name: "sidecar", Kind: "Container"},
+	}
+	result, _ := m.Update(containersLoadedMsg{items: items, gen: 1})
+	rm := result.(Model)
+	assert.False(t, rm.loading, "loading must be cleared after containers load")
+	assert.False(t, rm.previewLoading, "previewLoading must be cleared at LevelContainers because loadPreview returns nil there")
+	assert.Equal(t, items, rm.middleItems)
+}
+
 func TestFinal2UpdateNamespacesLoadedMsg(t *testing.T) {
 	m := baseFinalModel()
 	m.loading = true

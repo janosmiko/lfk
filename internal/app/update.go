@@ -861,11 +861,14 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	if msg.silent {
 		m.suppressBgtasks = true
 	}
-	// Mark the preview pane as loading (see updateResourcesLoadedMain).
+	// Align previewLoading with whether a preview fetch is actually in
+	// flight. clearRight() armed the flag to true on navigation; at
+	// LevelContainers loadPreview returns nil, so leaving it armed would
+	// make the right pane render "Loading..." forever. Conversely, when a
+	// preview cmd is dispatched the flag must stay true so the spinner
+	// keeps showing until the reply clears it.
 	previewCmd := m.loadPreview()
-	if previewCmd != nil {
-		m.previewLoading = true
-	}
+	m.previewLoading = previewCmd != nil
 	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
