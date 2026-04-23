@@ -1,0 +1,134 @@
+name: Bug report
+description: Report a bug or unexpected behavior in lfk
+title: "[bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a bug report. Please fill out the
+        details below so we can reproduce and fix the issue quickly.
+
+        Before filing, please search existing issues to avoid duplicates and
+        make sure no secrets, tokens, or private cluster data appear in your
+        report.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Describe the bug
+      description: A clear and concise description of what the bug is.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Minimal reproduction steps.
+      placeholder: |
+        1. Start lfk with `lfk --context my-cluster`
+        2. Navigate to `Workloads` -> `Deployments`
+        3. Press `x` -> `Scale`
+        4. Observe the error
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+      description: Include the full error message when available.
+    validations:
+      required: true
+
+  - type: input
+    id: version
+    attributes:
+      label: lfk version
+      description: Output of `lfk --version`, or the release tag / commit SHA if built from source.
+      placeholder: v0.x.y
+    validations:
+      required: true
+
+  - type: dropdown
+    id: install_source
+    attributes:
+      label: Installation source
+      options:
+        - Homebrew
+        - Binary release
+        - Docker
+        - go install
+        - Built from source
+        - Other
+    validations:
+      required: true
+
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      placeholder: macOS 14.5 / Ubuntu 24.04 / Windows 11 + WSL2 / ...
+    validations:
+      required: true
+
+  - type: input
+    id: terminal
+    attributes:
+      label: Terminal emulator
+      placeholder: Ghostty 1.0 / Kitty / iTerm2 / Alacritty / WezTerm / Terminal.app / ...
+    validations:
+      required: true
+
+  - type: input
+    id: kubectl
+    attributes:
+      label: kubectl version
+      description: Output of `kubectl version --short` (or `kubectl version --client`).
+
+  - type: input
+    id: kubernetes
+    attributes:
+      label: Kubernetes server version
+      placeholder: v1.30.2 / EKS 1.29 / GKE 1.29 / kind / minikube / ...
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config
+      description: Paste the relevant portion of `~/.config/lfk/config.yaml`. Redact any secrets.
+      render: yaml
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: |
+        Paste error messages, panics, or log excerpts. Toggle the in-app error
+        log with `!`. Redact any tokens, kubeconfig contents, or cluster names
+        you consider sensitive.
+      render: shell
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Screenshots, screen recordings, or anything else that helps us understand the issue.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true
+        - label: I redacted any secrets, tokens, or personal data from this report.
+          required: true
