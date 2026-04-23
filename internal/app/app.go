@@ -138,6 +138,7 @@ type TabState struct {
 	leftScroll             int // persistent scroll position for left column (vim-style scrolloff)
 	cursorMemory           map[string]int
 	itemCache              map[string][]model.Item
+	cacheFingerprints      map[string]string
 	yamlContent            string
 	yamlScroll             int
 	yamlCursor             int // cursor position in visible lines (relative to scroll)
@@ -264,6 +265,18 @@ type Model struct {
 
 	// Item cache: maps navigation path to loaded items for faster back navigation.
 	itemCache map[string][]model.Item
+
+	// cacheFingerprints maps the same keys as itemCache to a fingerprint
+	// of the fetch-affecting state (namespace, allNamespaces,
+	// selectedNamespaces) that was in effect when the entry was written.
+	// loadResources uses it to decide whether a primed cache entry is
+	// still applicable: if the current fingerprint matches, the fetch can
+	// be served from cache instead of hitting the API. This is populated
+	// only by updateResourcesLoadedPreview and updateResourcesLoadedMain
+	// — the paths that fetch data under the current state. Other writers
+	// (session restore, bookmarks, toggleRare rebuild) leave the entry
+	// without a fingerprint, which safely defaults to a real fetch.
+	cacheFingerprints map[string]string
 
 	// Preview / YAML content for the right column or full screen view.
 	yamlContent    string
@@ -941,6 +954,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		sortAscending:       true,
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		selectedItems:       make(map[string]bool),
 		selectionAnchor:     -1,
 		yamlCollapsed:       make(map[string]bool),
@@ -966,6 +980,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			allGroupsExpanded:  true,
 			cursorMemory:       make(map[string]int),
 			itemCache:          make(map[string][]model.Item),
+			cacheFingerprints:  make(map[string]string),
 			selectedItems:      make(map[string]bool),
 			selectionAnchor:    -1,
 			selectedNamespaces: nil,
@@ -1049,7 +1064,11 @@ func (m Model) activeContext() string {
 func (m Model) ensureNamespaceCacheFresh() tea.Cmd {
 	entry, ok := m.cachedNamespaces[m.activeContext()]
 	if !ok || len(entry.names) == 0 || time.Since(entry.fetchedAt) > namespaceCacheTTL {
-		return m.loadNamespaces()
+		// Silent: this is a background cache refresh, not an overlay-
+		// triggered load. The handler must NOT clear m.loading or we
+		// race with in-flight API discovery on session restore and
+		// produce a "No items" flash in the resource-types list.
+		return m.loadNamespacesSilent(true)
 	}
 	return nil
 }

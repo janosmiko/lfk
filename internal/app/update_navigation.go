@@ -354,7 +354,12 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.pushLeft()
 	m.clearRight()
 	m.saveCurrentSession()
-	if cached, ok := m.itemCache[m.navKey()]; ok {
+	// Show the cached list immediately while loadResources decides
+	// whether to serve from cache (fresh-cache shortcut) or issue a real
+	// fetch. The cache-then-refresh UX is unchanged; the refetch-suppression
+	// now lives in loadResources, which compares the cache's freshness
+	// fingerprint against the current fetch parameters.
+	if cached, cacheHit := m.itemCache[m.navKey()]; cacheHit {
 		m.middleItems = cached
 		m.restoreCursor()
 	} else {

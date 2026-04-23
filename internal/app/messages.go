@@ -41,6 +41,11 @@ type resourcesLoadedMsg struct {
 	// preview/metrics cmds in updateResourcesLoadedMain must also run
 	// suppressed so the title-bar indicator doesn't flash every 2 seconds.
 	silent bool
+	// rt is the resource type the load was issued for. When forPreview is
+	// true this identifies the hovered sidebar item so the preview handler
+	// can prime itemCache under the drill-in navKey (context/resource) and
+	// skip a redundant refetch when the user actually drills in.
+	rt model.ResourceTypeEntry
 }
 
 type ownedLoadedMsg struct {
@@ -69,6 +74,13 @@ type namespacesLoadedMsg struct {
 	context string
 	items   []model.Item
 	err     error
+	// silent marks this load as a background cache refresh (e.g., fired
+	// by ensureNamespaceCacheFresh on session restore or context open).
+	// The handler must not flip m.loading in this mode because that flag
+	// belongs to the middle-column / resource-types load; clearing it
+	// asynchronously while discovery is still in flight causes a "No
+	// items" flash between the loader and the populated list.
+	silent bool
 }
 
 // yamlLoadedMsg delivers a full YAML document for the YAML view. The content
