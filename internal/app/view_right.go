@@ -411,10 +411,19 @@ func (m Model) resourceTypeHasChildren() bool {
 // This is used both at LevelResources (to decide whether right-arrow navigates
 // into owned view) and at LevelOwned (to allow nested drill-down, e.g.,
 // ArgoCD Application -> Deployment -> Pods).
+//
+// PersistentVolumeClaim is listed here even though the ownership is
+// logically reversed (pods reference PVCs, not the other way around): it
+// lets the right-pane preview lazily show which pods are using the
+// selected PVC, and it lets right-arrow drill into that pod list. The
+// alternative — populating a "Used By" column on every PVC during the
+// list fetch — issued one pod-list call per PVC and could take 6+ seconds
+// on large namespaces.
 func kindHasOwnedChildren(kind string) bool {
 	switch kind {
 	case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob",
-		"Service", "Application", "HelmRelease", "Kustomization", "Node":
+		"Service", "Application", "HelmRelease", "Kustomization", "Node",
+		"PersistentVolumeClaim":
 		return true
 	default:
 		return false

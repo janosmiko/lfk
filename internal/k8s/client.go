@@ -299,7 +299,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 
 	items := make([]model.Item, 0, len(list.Items))
 	for _, item := range list.Items {
-		ti := c.buildResourceItem(ctx, contextName, &item, &rt)
+		ti := c.buildResourceItem(&item, &rt)
 		items = append(items, ti)
 	}
 	// Sort events by most recent observation first (LastSeen, not CreatedAt).
@@ -316,7 +316,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 }
 
 // buildResourceItem converts a single unstructured resource into a model.Item.
-func (c *Client) buildResourceItem(ctx context.Context, contextName string, item *unstructured.Unstructured, rt *model.ResourceTypeEntry) model.Item {
+func (c *Client) buildResourceItem(item *unstructured.Unstructured, rt *model.ResourceTypeEntry) model.Item {
 	ti := model.Item{
 		Name:   item.GetName(),
 		Kind:   item.GetKind(),
@@ -351,12 +351,11 @@ func (c *Client) buildResourceItem(ctx context.Context, contextName string, item
 	// Override status to "Terminating" for resources marked for deletion.
 	applyDeletionStatus(&ti)
 
-	// Add "Used By" column for PVCs showing which pods reference the claim.
-	if rt.Kind == "PersistentVolumeClaim" {
-		if pods, err := c.GetPodsUsingPVC(ctx, contextName, ti.Namespace, ti.Name); err == nil && len(pods) > 0 {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Used By", Value: strings.Join(pods, ", ")})
-		}
-	}
+	// "Used By" (pods referencing the PVC) used to be populated here, but
+	// that required a per-PVC pod-list call (N+1). The info is now loaded
+	// lazily as the PVC's owned children via GetOwnedResources when the
+	// user selects or drills into a PVC — see resources.go's
+	// getPodsUsingPVC and view_right.go's kindHasOwnedChildren.
 
 	// Evaluate CRD additionalPrinterColumns if present.
 	populatePrinterColumns(&ti, item.Object, rt.PrinterColumns)

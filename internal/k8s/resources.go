@@ -46,8 +46,14 @@ func (c *Client) GetOwnedResources(ctx context.Context, contextName, namespace s
 		return c.getHelmManagedResources(ctx, contextName, namespace, parentName)
 	case "Node":
 		return c.getPodsOnNode(ctx, dynClient, parentName)
+	case "PersistentVolumeClaim":
+		// A PVC's "children" are the pods referencing it. Previously this
+		// was computed eagerly for every PVC row in GetResources, which
+		// turned a single list call into N+1 pod list calls. Now it's
+		// deferred until the user selects or drills into a specific PVC.
+		return c.getPodsUsingPVC(ctx, dynClient, namespace, parentName)
 	default:
-		// For ConfigMaps, Secrets, Ingresses, PVCs - no children, show YAML preview
+		// For ConfigMaps, Secrets, Ingresses - no children, show YAML preview
 		return nil, nil
 	}
 }
@@ -804,6 +810,68 @@ func (c *Client) getPodsOnNode(ctx context.Context, dynClient dynamic.Interface,
 
 	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
 	return items, nil
+}
+
+// getPodsUsingPVC returns the pods in the given namespace that mount the
+// named PVC, as model.Item values suitable for the owned-resources view.
+// It is the lazy replacement for the old "Used By" list-column: the
+// per-PVC pod lookup now runs only when the user actually selects or
+// drills into a PVC, collapsing the previous N+1 cost on the PVC list
+// load into a single list call on demand.
+func (c *Client) getPodsUsingPVC(ctx context.Context, dynClient dynamic.Interface, namespace, pvcName string) ([]model.Item, error) {
+	podGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	podList, err := dynClient.Resource(podGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	if err != nil {
+		return nil, fmt.Errorf("listing pods: %w", err)
+	}
+	items := make([]model.Item, 0)
+	for _, pod := range podList.Items {
+		if !podReferencesPVC(pod.Object, pvcName) {
+			continue
+		}
+		ti := model.Item{
+			Name:      pod.GetName(),
+			Namespace: pod.GetNamespace(),
+			Kind:      "Pod",
+			Status:    extractStatus(pod.Object),
+		}
+		creationTS := pod.GetCreationTimestamp()
+		if !creationTS.IsZero() {
+			ti.CreatedAt = creationTS.Time
+			ti.Age = formatAge(time.Since(creationTS.Time))
+		}
+		populateResourceDetails(&ti, pod.Object, "Pod")
+		items = append(items, ti)
+	}
+	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
+	return items, nil
+}
+
+// podReferencesPVC reports whether a pod spec includes a volume backed by
+// the given PVC claim name.
+func podReferencesPVC(podObj map[string]any, pvcName string) bool {
+	spec, ok := podObj["spec"].(map[string]any)
+	if !ok {
+		return false
+	}
+	volumes, ok := spec["volumes"].([]any)
+	if !ok {
+		return false
+	}
+	for _, v := range volumes {
+		vol, ok := v.(map[string]any)
+		if !ok {
+			continue
+		}
+		pvc, ok := vol["persistentVolumeClaim"].(map[string]any)
+		if !ok {
+			continue
+		}
+		if claim, _ := pvc["claimName"].(string); claim == pvcName {
+			return true
+		}
+	}
+	return false
 }
 
 func (c *Client) getJobsByOwner(ctx context.Context, dynClient dynamic.Interface, namespace, cronJobName string) ([]model.Item, error) {
