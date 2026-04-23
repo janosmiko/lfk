@@ -67,8 +67,14 @@ func (c *Client) GetResourceYAML(ctx context.Context, contextName, namespace str
 
 // GetPodYAML returns the YAML for a pod.
 func (c *Client) GetPodYAML(ctx context.Context, contextName, namespace, podName string) (string, error) {
+	// Pods are namespaced; without Namespaced: true, GetResourceYAML
+	// falls through to the cluster-scoped branch (dynClient.Resource(gvr)
+	// with no .Namespace(...)), which hits /api/v1/pods/<name> — an
+	// endpoint that does not exist on the API server. The API replies
+	// with "the server could not find the requested resource", which
+	// the caller surfaces as the YAML-load error.
 	return c.GetResourceYAML(ctx, contextName, namespace, model.ResourceTypeEntry{
-		APIGroup: "", APIVersion: "v1", Resource: "pods",
+		APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true,
 	}, podName)
 }
 
