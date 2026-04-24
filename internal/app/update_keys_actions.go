@@ -40,9 +40,9 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		return m.handleExplorerActionKeyPageDown()
 	case kb.PageUp:
 		return m.handleExplorerActionKeyPageUp()
-	case kb.PageForward:
+	case kb.PageForward, "pgdown":
 		return m.handleExplorerActionKeyPageForward()
-	case kb.PageBack:
+	case kb.PageBack, "pgup":
 		return m.handleExplorerActionKeyPageBack()
 	case kb.LevelCluster:
 		return m.handleExplorerActionKeyLevelCluster()

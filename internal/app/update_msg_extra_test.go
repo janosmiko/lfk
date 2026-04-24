@@ -135,6 +135,26 @@ func TestUpdateNamespacesLoadedError(t *testing.T) {
 	assert.NotNil(t, cmd) // scheduleStatusClear
 }
 
+// TestUpdateNamespacesLoadedSilentPreservesLoading verifies that a
+// silent namespace-cache refresh (fired by ensureNamespaceCacheFresh
+// during session restore) does not clear m.loading. The loading flag
+// belongs to the resource-types list; clearing it while API discovery
+// is still in flight produces a "No items" flash between the loader
+// and the populated sidebar.
+func TestUpdateNamespacesLoadedSilentPreservesLoading(t *testing.T) {
+	m := baseModel()
+	m.loading = true
+
+	items := []model.Item{{Name: "default"}, {Name: "kube-system"}}
+	result, _ := m.Update(namespacesLoadedMsg{items: items, silent: true})
+	mdl := result.(Model)
+
+	assert.True(t, mdl.loading, "silent namespace refresh must leave the loading flag alone so discovery can own it")
+	// The cache is still updated even in silent mode — that's the whole
+	// point of the background refresh.
+	assert.NotEmpty(t, mdl.cachedNamespaces)
+}
+
 // --- resourcesLoadedMsg ---
 
 func TestUpdateResourcesLoadedForPreview(t *testing.T) {

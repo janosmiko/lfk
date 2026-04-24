@@ -1,0 +1,75 @@
+name: Feature request
+description: Suggest a new feature or enhancement for lfk
+title: "[feat]: "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a feature! Please describe the problem you are
+        trying to solve and your proposed solution so we can evaluate scope
+        and fit.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem / motivation
+      description: What problem are you trying to solve? Who benefits? Which workflow is painful today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: |
+        Describe the feature you would like. Be specific about UX details when
+        possible: keybindings, menu entries, config keys, command-bar syntax,
+        visible columns, etc.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Other approaches you thought about and why you ruled them out.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      description: Which part of lfk does this touch? (Best guess is fine.)
+      multiple: true
+      options:
+        - Navigation / layout
+        - Resource list / preview
+        - Action menu
+        - Log viewer
+        - YAML viewer / editor
+        - Describe / diff
+        - Command bar
+        - Search / filter
+        - ArgoCD / Argo Workflows integration
+        - Helm integration
+        - KEDA / External Secrets integration
+        - Theme / color scheme
+        - Configuration
+        - Keybindings
+        - Other
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+      description: Mockups, links to similar tools (k9s, lazygit, yazi, ...), related issues, screenshots.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight checks
+      options:
+        - label: I searched existing issues and did not find a duplicate.
+          required: true

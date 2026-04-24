@@ -1,0 +1,65 @@
+#!/bin/sh
+# Pre-push hook: when a vX.Y.Z tag is being pushed, refuse the push if
+# flake.nix's baseVersion does not match the tag. This catches the same
+# mismatch the CI `verify-flake-version` job enforces, but locally and
+# before any bytes leave the machine — so you don't wait on a CI run
+# only to discover you forgot to run `make bump-version`.
+#
+# Stdin format (one line per ref being pushed):
+#   <local_ref> <local_sha> <remote_ref> <remote_sha>
+
+set -eu
+
+flake_file="flake.nix"
+
+# If the flake isn't present, nothing to check.
+if [ ! -f "$flake_file" ]; then
+    exit 0
+fi
+
+while read -r local_ref local_sha remote_ref remote_sha; do
+    # Only care about version tags of the form refs/tags/vX.Y.Z[-suffix].
+    case "$local_ref" in
+        refs/tags/v[0-9]*) : ;;
+        *) continue ;;
+    esac
+
+    tag_name="${local_ref#refs/tags/}"
+    tag_version="${tag_name#v}"
+    # Strip pre-release suffix (-nightly, -rc, -beta, etc.) — compare base X.Y.Z.
+    base_tag="${tag_version%%-*}"
+
+    # Read the baseVersion from flake.nix at the tagged commit, so we validate
+    # what's actually being shipped (not the current working tree).
+    flake_version=$(git show "$local_sha:$flake_file" 2>/dev/null \
+        | grep -E '^\s*baseVersion\s*=' \
+        | sed -E 's/.*"([^"]+)".*/\1/' \
+        | head -n1 || true)
+
+    if [ -z "$flake_version" ]; then
+        echo "pre-push: warning: could not read baseVersion from $flake_file at $local_sha; skipping check for $tag_name" >&2
+        continue
+    fi
+
+    if [ "$base_tag" != "$flake_version" ]; then
+        cat >&2 <<EOF
+pre-push: refusing to push $tag_name
+  tag base version:    $base_tag
+  flake.nix baseVersion at $local_sha: $flake_version
+
+These must match. Recommended:
+  make release VERSION=$base_tag   # bumps flake.nix, commits, re-tags
+  git push && git push --tags
+
+Or manually:
+  git tag -d $tag_name
+  make bump-version VERSION=$base_tag
+  git add flake.nix && git commit -m "chore: bump version to v$base_tag"
+  git tag $tag_name
+  git push && git push --tags
+EOF
+        exit 1
+    fi
+done
+
+exit 0

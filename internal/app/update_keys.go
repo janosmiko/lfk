@@ -266,8 +266,11 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.JumpTop:
 		mdl, cmd := m.handleExplorerJumpTop()
 		return mdl, cmd, true
-	case kb.JumpBottom:
+	case kb.JumpBottom, "end":
 		mdl, cmd := m.handleExplorerJumpBottom()
+		return mdl, cmd, true
+	case "home":
+		mdl, cmd := m.handleExplorerHome()
 		return mdl, cmd, true
 	case kb.SelectRange:
 		mdl := m.handleKeySelectRange()
@@ -372,6 +375,21 @@ func (m Model) handleExplorerJumpBottom() (tea.Model, tea.Cmd) {
 	if len(visible) > 0 {
 		m.setCursor(len(visible) - 1)
 	}
+	m.syncExpandedGroup()
+	return m, m.loadPreview()
+}
+
+// handleExplorerHome handles the Home key (jump to top) in explorer mode.
+// Unlike JumpTop (vim "gg") this is a single-press action and does not
+// participate in the pendingG two-key sequence.
+func (m Model) handleExplorerHome() (tea.Model, tea.Cmd) {
+	m.pendingG = false
+	if m.fullscreenDashboard {
+		m.previewScroll = 0
+		return m, nil
+	}
+	m.setCursor(0)
+	m.clampCursor()
 	m.syncExpandedGroup()
 	return m, m.loadPreview()
 }

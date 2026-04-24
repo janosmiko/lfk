@@ -30,6 +30,7 @@ func baseFinalModel() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -68,6 +69,7 @@ func baseFinalModelWithDynamic() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -102,6 +104,7 @@ func baseModelActions() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               80,
 		height:              40,
@@ -129,6 +132,7 @@ func baseModelBoost2() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -164,6 +168,7 @@ func baseModelCov() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		discoveringContexts: make(map[string]bool),
 		width:               80,
@@ -179,6 +184,7 @@ func baseModelDescribe() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               80,
 		height:              40,
@@ -196,6 +202,7 @@ func baseModelExplain() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               80,
 		height:              40,
@@ -221,6 +228,7 @@ func baseModelFinalizer() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               80,
 		height:              40,
@@ -243,6 +251,7 @@ func baseModelHandlers2() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               80,
 		height:              40,
@@ -265,6 +274,7 @@ func baseModelNav() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               80,
 		height:              40,
@@ -287,6 +297,7 @@ func baseModelOverlay() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               80,
 		height:              40,
@@ -302,6 +313,7 @@ func baseModelSearch() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               80,
 		height:              40,
@@ -321,6 +333,7 @@ func baseModelUpdate() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -378,6 +391,7 @@ func basePush4Model() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -410,6 +424,7 @@ func basePush80Model() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -445,6 +460,7 @@ func basePush80v2Model() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -480,6 +496,7 @@ func basePush80v3Model() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -514,6 +531,7 @@ func baseRichModel() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,
@@ -548,6 +566,7 @@ func bp4() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120, height: 40, execMu: &sync.Mutex{}, namespace: "default",
 		reqCtx: context.Background(),
@@ -598,6 +617,14 @@ func keyMsg(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyCtrlP}
 	case "ctrl+v":
 		return tea.KeyMsg{Type: tea.KeyCtrlV}
+	case "pgup":
+		return tea.KeyMsg{Type: tea.KeyPgUp}
+	case "pgdown":
+		return tea.KeyMsg{Type: tea.KeyPgDown}
+	case "home":
+		return tea.KeyMsg{Type: tea.KeyHome}
+	case "end":
+		return tea.KeyMsg{Type: tea.KeyEnd}
 	default:
 		if len(s) == 1 {
 			return tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(s)}
@@ -769,6 +796,7 @@ func testModelExec() Model {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		width:               120,
 		height:              40,

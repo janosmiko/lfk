@@ -183,6 +183,8 @@ func (m *Model) canIVisibleGroups() []int {
 
 // handleCanIKey handles keyboard input in the can-i browser mode.
 // The left column (API groups) is the only interactive column.
+//
+//nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// If search is active, delegate to the search key handler.
 	if m.canISearchActive {
@@ -287,16 +289,32 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.canIResourceScroll = 0
 		return m, nil
 
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.canIGroupCursor = min(m.canIGroupCursor+visibleLines, max(groupCount-1, 0))
 		maxScroll := max(groupCount-visibleLines, 0)
 		m.canIGroupScroll = min(m.canIGroupScroll+visibleLines, maxScroll)
 		m.canIResourceScroll = 0
 		return m, nil
 
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.canIGroupCursor = max(m.canIGroupCursor-visibleLines, 0)
 		m.canIGroupScroll = max(m.canIGroupScroll-visibleLines, 0)
+		m.canIResourceScroll = 0
+		return m, nil
+
+	case "home":
+		m.pendingG = false
+		m.canIGroupCursor = 0
+		m.canIGroupScroll = 0
+		m.canIResourceScroll = 0
+		return m, nil
+
+	case "end":
+		if groupCount > 0 {
+			m.canIGroupCursor = groupCount - 1
+			maxScroll := max(groupCount-visibleLines, 0)
+			m.canIGroupScroll = maxScroll
+		}
 		m.canIResourceScroll = 0
 		return m, nil
 
@@ -385,12 +403,32 @@ func (m Model) handleCanISubjectNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, len(items)-1)
 		return m, nil
 
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 20, len(items)-1)
 		return m, nil
 
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -20, len(items)-1)
+		return m, nil
+
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.overlayCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+
+	case "G", "end":
+		if len(items) > 0 {
+			m.overlayCursor = len(items) - 1
+		}
+		return m, nil
+
+	case "home":
+		m.pendingG = false
+		m.overlayCursor = 0
 		return m, nil
 
 	case "ctrl+c":

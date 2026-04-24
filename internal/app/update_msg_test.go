@@ -1286,6 +1286,64 @@ func TestFinal2UpdateContainersLoadedMsgStale(t *testing.T) {
 	_ = result.(Model)
 }
 
+// TestUpdateContainersLoadedClearsPreviewLoadingAtLevelContainers locks in
+// the fix for the stuck "Loading..." bug when drilling into a pod with
+// several containers. At LevelContainers, loadPreview() always returns nil
+// (containers have no right-pane preview load of their own), so
+// previewLoading — armed by clearRight() on navigation — must be cleared
+// here. Without this, the right pane renders "Loading..." forever because
+// nothing downstream ever clears the flag.
+func TestUpdateContainersLoadedClearsPreviewLoadingAtLevelContainers(t *testing.T) {
+	m := baseFinalModel()
+	m.nav.Level = model.LevelContainers
+	m.nav.ResourceName = "pod-1"
+	m.nav.OwnedName = "pod-1"
+	m.requestGen = 1
+	m.previewLoading = true
+	m.loading = true
+
+	items := []model.Item{
+		{Name: "app", Kind: "Container"},
+		{Name: "sidecar", Kind: "Container"},
+	}
+	result, _ := m.Update(containersLoadedMsg{items: items, gen: 1})
+	rm := result.(Model)
+	assert.False(t, rm.loading, "loading must be cleared after containers load")
+	assert.False(t, rm.previewLoading, "previewLoading must be cleared at LevelContainers because loadPreview returns nil there")
+	assert.Equal(t, items, rm.middleItems)
+}
+
+// TestUpdateYamlLoadedErrorClearsLoadingPlaceholder locks in the fix for
+// issue #34: pressing Enter on a resource kicks off the full-screen YAML
+// view with m.yamlContent="Loading..." as an initial placeholder.
+// updateYamlLoaded previously bailed out on any error (including
+// context.Canceled) without touching yamlContent, so the viewer stayed
+// stuck on "Loading..." forever. The status-bar error flashed briefly
+// and was lost. The fix: replace the placeholder with an error message
+// so the user sees what happened instead of an eternal loader.
+func TestUpdateYamlLoadedErrorClearsLoadingPlaceholder(t *testing.T) {
+	m := baseFinalModel()
+	m.mode = modeYAML
+	m.yamlContent = "Loading..."
+	result, _ := m.Update(yamlLoadedMsg{err: assert.AnError})
+	rm := result.(Model)
+	assert.NotEqual(t, "Loading...", rm.yamlContent, "yamlContent must not stay on the Loading placeholder when the fetch errors")
+	assert.Contains(t, rm.yamlContent, assert.AnError.Error(), "yamlContent should surface the error message so users can see what went wrong")
+}
+
+// TestUpdateYamlLoadedContextCanceledClearsPlaceholder covers the
+// context.Canceled branch specifically — a cancellation that races the
+// viewer transition must still clear the "Loading..." placeholder,
+// otherwise every mid-load navigation leaves a stuck YAML view behind.
+func TestUpdateYamlLoadedContextCanceledClearsPlaceholder(t *testing.T) {
+	m := baseFinalModel()
+	m.mode = modeYAML
+	m.yamlContent = "Loading..."
+	result, _ := m.Update(yamlLoadedMsg{err: context.Canceled})
+	rm := result.(Model)
+	assert.NotEqual(t, "Loading...", rm.yamlContent, "yamlContent must not stay on the Loading placeholder when the request is canceled")
+}
+
 func TestFinal2UpdateNamespacesLoadedMsg(t *testing.T) {
 	m := baseFinalModel()
 	m.loading = true
@@ -2501,4 +2559,66 @@ func TestCovUpdatePortForwardUpdate(t *testing.T) {
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__port_forwards__"}
 	result, _ := m.Update(portForwardUpdateMsg{})
 	_ = result
+}
+
+// TestUpdateResourcesLoadedPreviewPrimesItemCache verifies that a preview
+// load for a drillable resource type also primes m.itemCache under the
+// future drill-in navKey (context/resource) so navigateChildResourceType
+// can serve the cached list without issuing a second API fetch. The
+// previewSatisfiedNavKey + fingerprint pair act as a one-shot marker
+// consumed on drill-in; the fingerprint is a digest of the fetch-affecting
+// state (namespace, allNamespaces, selectedNamespaces) so later changes
+// to any of those invalidate the shortcut without relying on requestGen
+// (which navigateChild always bumps before the child handler runs).
+func TestUpdateResourcesLoadedPreviewPrimesItemCache(t *testing.T) {
+	m := baseFinalModel()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.namespace = "default"
+	m.requestGen = 5
+	items := []model.Item{{Name: "pvc-1", Kind: "PersistentVolumeClaim", Namespace: "default"}}
+	pvcRT := model.ResourceTypeEntry{
+		Kind:       "PersistentVolumeClaim",
+		Resource:   "persistentvolumeclaims",
+		APIVersion: "v1",
+		Namespaced: true,
+	}
+	result, _ := m.Update(resourcesLoadedMsg{
+		items:      items,
+		rt:         pvcRT,
+		forPreview: true,
+		gen:        5,
+	})
+	rm := result.(Model)
+
+	expectedKey := "test-ctx/persistentvolumeclaims"
+	cached, ok := rm.itemCache[expectedKey]
+	assert.True(t, ok, "itemCache must be primed at drill-in navKey %q", expectedKey)
+	assert.Equal(t, items, cached, "cached items must match preview payload")
+	assert.Equal(t, rm.fetchFingerprint(), rm.cacheFingerprints[expectedKey],
+		"cacheFingerprints must snapshot the fetch-affecting state at prime time for this key")
+	// The existing rightItems behavior still runs — preview pane shows the
+	// filtered items.
+	assert.Equal(t, items, rm.rightItems)
+}
+
+// TestUpdateResourcesLoadedPreviewNoPrimeWhenMissingRT verifies that the
+// cache-prime logic is skipped when the preview msg does not carry an rt
+// (e.g., synthetic port-forward previews). Without this guard the handler
+// would write an empty resource key like "test-ctx/".
+func TestUpdateResourcesLoadedPreviewNoPrimeWhenMissingRT(t *testing.T) {
+	m := baseFinalModel()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.requestGen = 3
+	items := []model.Item{{Name: "pf-1", Kind: "PortForward"}}
+	result, _ := m.Update(resourcesLoadedMsg{
+		items:      items,
+		forPreview: true,
+		gen:        3,
+		// rt left zero-valued on purpose
+	})
+	rm := result.(Model)
+
+	_, hasEmptyKey := rm.itemCache["test-ctx/"]
+	assert.False(t, hasEmptyKey, "must not prime cache under an empty-resource key")
+	assert.Empty(t, rm.cacheFingerprints, "must not record a fingerprint without an rt")
 }

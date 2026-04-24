@@ -80,6 +80,34 @@ func (m *Model) effectiveNamespace() string {
 	return m.namespace
 }
 
+// fetchFingerprint returns a stable digest of the parameters that
+// determine what a resource list fetch returns: effective namespace, the
+// allNamespaces toggle, and the selectedNamespaces multi-select filter.
+// It is used by the preview-cache shortcut in navigateChildResourceType
+// to decide whether a primed cache entry is still applicable. Context and
+// resource are not included because they are already part of the navKey
+// the fingerprint is paired with.
+func (m *Model) fetchFingerprint() string {
+	var b strings.Builder
+	if m.allNamespaces {
+		b.WriteString("A|")
+	} else {
+		b.WriteString("ns=")
+		b.WriteString(m.namespace)
+		b.WriteString("|")
+	}
+	if len(m.selectedNamespaces) > 0 {
+		keys := make([]string, 0, len(m.selectedNamespaces))
+		for k := range m.selectedNamespaces {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		b.WriteString("sel=")
+		b.WriteString(strings.Join(keys, ","))
+	}
+	return b.String()
+}
+
 // sortMiddleItems sorts middleItems based on the current sort column and direction.
 // At LevelResourceTypes and LevelClusters, items keep their original ordering.
 // Security findings are pre-sorted by severity/affected/name in groupFindings
@@ -668,6 +696,7 @@ func (m *Model) saveCurrentTab() {
 	t.leftScroll = ui.ActiveLeftScroll
 	t.cursorMemory = copyMapStringInt(m.cursorMemory)
 	t.itemCache = copyItemCache(m.itemCache)
+	t.cacheFingerprints = copyMapStringString(m.cacheFingerprints)
 	t.yamlContent = m.yamlContent
 	t.yamlScroll = m.yamlScroll
 	t.yamlCursor = m.yamlCursor
@@ -777,6 +806,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	ui.ActiveLeftScroll = t.leftScroll
 	m.cursorMemory = copyMapStringInt(t.cursorMemory)
 	m.itemCache = copyItemCache(t.itemCache)
+	m.cacheFingerprints = copyMapStringString(t.cacheFingerprints)
 	m.yamlContent = t.yamlContent
 	m.yamlScroll = t.yamlScroll
 	m.yamlCursor = t.yamlCursor
@@ -946,6 +976,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		leftScroll:             ui.ActiveLeftScroll,
 		cursorMemory:           copyMapStringInt(m.cursorMemory),
 		itemCache:              copyItemCache(m.itemCache),
+		cacheFingerprints:      copyMapStringString(m.cacheFingerprints),
 		yamlContent:            m.yamlContent,
 		yamlCollapsed:          copyMapStringBool(m.yamlCollapsed),
 		splitPreview:           m.splitPreview,
@@ -1022,6 +1053,20 @@ func copyItemCache(m map[string][]model.Item) map[string][]model.Item {
 	c := make(map[string][]model.Item, len(m))
 	for k, v := range m {
 		c[k] = append([]model.Item(nil), v...)
+	}
+	return c
+}
+
+// copyMapStringString returns a shallow copy of a string-to-string map.
+// A nil input yields a non-nil empty map so callers can write into it
+// without a second nil check.
+func copyMapStringString(m map[string]string) map[string]string {
+	if m == nil {
+		return make(map[string]string)
+	}
+	c := make(map[string]string, len(m))
+	for k, v := range m {
+		c[k] = v
 	}
 	return c
 }

@@ -125,13 +125,33 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		}
 		rt = found
 	}
+	// Fresh-cache shortcut: if itemCache already holds a list for this rt
+	// that was fetched under the current fetch parameters (namespace,
+	// allNamespaces, selectedNamespaces), synthesize the corresponding
+	// msg directly from cache instead of hitting the API. Lookup is keyed
+	// by (context, resource) so hovering back and forth between multiple
+	// rts each gets its own cached fingerprint — no single-slot eviction.
+	// The same shortcut applies to both the main-load path (drill-in) and
+	// the preview-load path (sidebar hover), so a round-trip back to the
+	// sidebar or a hover cycle between PVC and PV doesn't refetch.
+	if rt.Resource != "" {
+		cacheKey := kctx + "/" + rt.Resource
+		if cached, ok := m.itemCache[cacheKey]; ok &&
+			m.cacheFingerprints[cacheKey] == m.fetchFingerprint() {
+			items := cached
+			rtCopy := rt
+			return func() tea.Msg {
+				return resourcesLoadedMsg{items: items, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+			}
+		}
+	}
 	return m.trackBgTask(
 		bgtasks.KindResourceList,
 		"List "+model.DisplayNameFor(rt),
 		bgtaskTarget(kctx, ns),
 		func() tea.Msg {
 			items, err := m.client.GetResources(reqCtx, kctx, ns, rt)
-			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
+			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
 		},
 	)
 }
@@ -246,6 +266,17 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 }
 
 func (m Model) loadNamespaces() tea.Cmd {
+	return m.loadNamespacesSilent(false)
+}
+
+// loadNamespacesSilent issues the same namespace fetch as loadNamespaces
+// but tags the resulting msg as a background refresh. Silent loads must
+// not clear m.loading in the handler — the namespace cache is
+// independent of the middle-column/resource-types load the loading flag
+// tracks. Used by ensureNamespaceCacheFresh on session restore and other
+// context-open paths so the fast namespace reply doesn't race with
+// still-in-flight API discovery and produce a "No items" flash.
+func (m Model) loadNamespacesSilent(silent bool) tea.Cmd {
 	if m.client == nil {
 		return nil
 	}
@@ -254,7 +285,7 @@ func (m Model) loadNamespaces() tea.Cmd {
 	// cancelled by in-flight resource requests.
 	return func() tea.Msg {
 		items, err := m.client.GetNamespaces(context.Background(), kctx)
-		return namespacesLoadedMsg{context: kctx, items: items, err: err}
+		return namespacesLoadedMsg{context: kctx, items: items, err: err, silent: silent}
 	}
 }
 

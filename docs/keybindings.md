@@ -10,11 +10,11 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `l` / `Right` | Navigate into selected item |
 | `j` / `Down` | Move cursor down |
 | `k` / `Up` | Move cursor up |
-| `gg` | Jump to top of list |
-| `G` | Jump to bottom of list |
+| `gg` / `Home` | Jump to top of list |
+| `G` / `End` | Jump to bottom of list |
 | `Enter` | Open full-screen YAML view / navigate into |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping in the Events list |
 | `p` | Pin/unpin CRD group (at resource types level) |
 | `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar (resets each launch) |
@@ -159,10 +159,11 @@ my namespace" mode.
 | `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `Home` | Jump to top |
+| `G` / `End` | Jump to bottom |
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `/` | Search in YAML |
 | `n` / `N` | Next / previous search match |
 | `v` | Character visual selection (from cursor column) |
@@ -181,9 +182,9 @@ my namespace" mode.
 | Key | Action |
 |---|---|
 | `j` / `k` | Scroll up/down |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
 | `q` / `Esc` | Back to explorer |
 
@@ -199,9 +200,10 @@ my namespace" mode.
 | `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `Home` | Jump to top |
+| `G` / `End` | Jump to bottom |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
-| `Ctrl+F` / `Ctrl+B` | Full page down / up |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
 | `f` | Open filter modal |
 | `F` | Toggle follow / auto-scroll |
 | `>` / `<` | Cycle severity floor (off → DEBUG → INFO → WARN → ERROR → off) |
@@ -318,10 +320,10 @@ All other keys are forwarded to the PTY process. The PTY session continues runni
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
 | `Tab` | Switch cursor side (side-by-side mode) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `/` | Search in diff |
 | `n` / `N` | Next / previous search match |
 | `v` | Character visual selection |
@@ -417,9 +419,9 @@ view to switch between the labels pane and the annotations pane.
 | `/` | Search fields |
 | `n` / `N` | Next / previous search match (recursive: auto-drills into children / searches parent) |
 | `r` | Recursive field browser (browse all nested fields with filter) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` | Close API explorer |
 | `Esc` | Go back one level / close at root |
 
@@ -432,9 +434,9 @@ view to switch between the labels pane and the annotations pane.
 | `/` | Search/filter groups by name |
 | `a` | Toggle all/allowed-only permissions |
 | `s` | Switch subject (User/Group/SA) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` / `Esc` | Clear search / close |
 
 The title bar shows the namespace scope (`ns:...`) used for the permission check, so you can see whether permissions are cluster-wide or namespaced. When checking a service account, its own namespace is used automatically. Users and groups are discovered from ClusterRoleBindings and RoleBindings.
@@ -445,8 +447,9 @@ The title bar shows the namespace scope (`ns:...`) used for the permission check
 |---|---|
 | `j` / `k` | Navigate subjects |
 | `/` | Filter subjects by name |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `Enter` | Select subject |
 | `Esc` | Clear filter / close |
 
@@ -455,9 +458,9 @@ The title bar shows the namespace scope (`ns:...`) used for the permission check
 | Key | Action |
 |---|---|
 | `j` / `k` | Scroll up/down |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` / `Esc` | Close visualizer |
 
 ## Security findings browser
@@ -482,9 +485,9 @@ Press `#` to jump to the Security category. Navigate through sources, finding gr
 | Key | Action |
 |---|---|
 | `j` / `k` | Move cursor up/down |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `V` | Line visual selection |
 | `v` | Character visual selection |
 | `h` / `l` | Move cursor column left/right (in character visual mode) |

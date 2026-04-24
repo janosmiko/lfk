@@ -188,7 +188,13 @@ func (m Model) loadPreviewOwned(sel *model.Item) tea.Cmd {
 		}
 		return tea.Batch(cmds...)
 	}
-	if kindHasOwnedChildren(sel.Kind) {
+	// PVC is listed in kindHasOwnedChildren so the right-pane preview at
+	// LevelResources can lazily show which pods use it, but at LevelOwned
+	// the existing UX is to show the PVC's YAML (e.g., user is drilled
+	// into a Helm release's children and hovers a PVC). Preserve that by
+	// letting PVC fall through to the YAML path here even though it
+	// reports "has children".
+	if kindHasOwnedChildren(sel.Kind) && sel.Kind != "PersistentVolumeClaim" {
 		return nil
 	}
 	if m.fullYAMLPreview {
