@@ -604,6 +604,9 @@ func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) (tea.Model, 
 	// navigateChild bumps before child handlers even run.
 	if msg.rt.Resource != "" {
 		drillInKey := m.nav.Context + "/" + msg.rt.Resource
+		if msg.rt.Namespaced {
+			drillInKey += "/ns:" + m.effectiveNamespace()
+		}
 		m.itemCache[drillInKey] = msg.items
 		m.cacheFingerprints[drillInKey] = m.fetchFingerprint()
 	}

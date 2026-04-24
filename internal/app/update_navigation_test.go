@@ -552,7 +552,7 @@ func TestNavigateChildResourceType_ReusesPreviewCacheWithoutRefetch(t *testing.T
 		{Name: "pvc-a", Kind: "PersistentVolumeClaim", Namespace: "default"},
 		{Name: "pvc-b", Kind: "PersistentVolumeClaim", Namespace: "default"},
 	}
-	drillInKey := "test-ctx/persistentvolumeclaims"
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
 	m.itemCache[drillInKey] = cachedItems
 	m.cacheFingerprints[drillInKey] = m.fetchFingerprint()
 
@@ -588,11 +588,17 @@ func TestNavigateChildResourceType_ReusesPreviewCacheWithoutRefetch(t *testing.T
 
 // TestNavigateChildResourceType_FetchesWhenFingerprintStale verifies that
 // the shortcut does NOT trigger when the fetch-affecting state has
-// changed since prime time (namespace switch, allNamespaces toggle,
-// multi-select update). The marker must remain intact so the next real
-// preview can re-arm it, and the drill-in must fall back to the normal
-// loadResources refresh. This is the safety net against serving stale
-// data after a namespace switch between preview and drill-in.
+// changed since prime time (selectedNamespaces toggle, etc). The marker
+// must remain intact so the next real preview can re-arm it, and the
+// drill-in must fall back to the normal loadResources refresh. This is
+// the safety net against serving stale data after a filter change.
+//
+// Note: this branch bakes the effective namespace into the cache key
+// (navKey includes /ns:<ns> for namespaced resources), so a plain
+// "namespace switch" scenario manifests as a cache miss, not a
+// fingerprint mismatch. We trigger fingerprint staleness here via a
+// selectedNamespaces toggle that preserves the effective namespace
+// (and thus the key) but alters the fingerprint.
 func TestNavigateChildResourceType_FetchesWhenFingerprintStale(t *testing.T) {
 	m := basePush80Model()
 	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
@@ -605,16 +611,16 @@ func TestNavigateChildResourceType_FetchesWhenFingerprintStale(t *testing.T) {
 		Namespaced: true,
 	}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
-	drillInKey := "test-ctx/persistentvolumeclaims"
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
 	staleItems := []model.Item{{Name: "stale-pvc"}}
 	m.itemCache[drillInKey] = staleItems
-	// Record the fingerprint as if it was captured on a DIFFERENT
-	// namespace, then flip back to "default". The stored fingerprint
-	// won't match fetchFingerprint() for "default".
-	m.namespace = "other"
+	// Record the fingerprint as captured before any selectedNamespaces
+	// filter, then introduce a size-1 selectedNamespaces that resolves
+	// to the same effective namespace. The key stays "ns:default" but
+	// the fingerprint gains a sel= segment, so it won't match anymore.
 	staleFingerprint := m.fetchFingerprint()
 	m.cacheFingerprints[drillInKey] = staleFingerprint
-	m.namespace = "default"
+	m.selectedNamespaces = map[string]bool{"default": true}
 
 	m.leftItems = []model.Item{{Name: "test-ctx"}}
 	m.leftItemsHistory = [][]model.Item{{{Name: "root"}}}
@@ -624,8 +630,8 @@ func TestNavigateChildResourceType_FetchesWhenFingerprintStale(t *testing.T) {
 	rm := result.(Model)
 
 	// The shortcut must NOT trigger on fingerprint mismatch: the stored
-	// fingerprint entry stays intact so once a fresh fetch completes for
-	// the new namespace it will overwrite it with a matching one.
+	// fingerprint entry stays intact so once a fresh fetch completes it
+	// will overwrite it with a matching one.
 	assert.Equal(t, staleFingerprint, rm.cacheFingerprints[drillInKey],
 		"stale fingerprint entry is preserved; a fresh fetch will overwrite it")
 	// Cached items still populate middleItems (show-cache-while-refresh UX),
@@ -711,7 +717,7 @@ func TestNavigateChild_ShortcutSurvivesGenBump(t *testing.T) {
 	m.setCursor(0)
 
 	// Simulate: preview completed, cache + fingerprint primed.
-	drillInKey := "test-ctx/persistentvolumeclaims"
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
 	cachedItems := []model.Item{
 		{Name: "pvc-1", Kind: "PersistentVolumeClaim", Namespace: "default"},
 	}
@@ -765,7 +771,7 @@ func TestLoadResources_PreviewShortcutAfterNavigateOut(t *testing.T) {
 	cachedItems := []model.Item{
 		{Name: "pvc-a", Kind: "PersistentVolumeClaim", Namespace: "default"},
 	}
-	cacheKey := "test-ctx/persistentvolumeclaims"
+	cacheKey := "test-ctx/persistentvolumeclaims/ns:default"
 	m.itemCache[cacheKey] = cachedItems
 	// Fingerprint left over from the drill-in's main load.
 	m.cacheFingerprints[cacheKey] = m.fetchFingerprint()
@@ -809,7 +815,7 @@ func TestLoadResources_PreviewFetchesWhenNoMarker(t *testing.T) {
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
 	// Cache has data but marker is NOT armed (e.g., data from a stale
 	// prior session). Shortcut must not trigger.
-	m.itemCache["test-ctx/persistentvolumeclaims"] = []model.Item{{Name: "stale"}}
+	m.itemCache["test-ctx/persistentvolumeclaims/ns:default"] = []model.Item{{Name: "stale"}}
 
 	pvcSidebarItem := model.Item{
 		Name:  "PersistentVolumeClaims",
@@ -853,9 +859,10 @@ func TestLoadResources_PreviewShortcutForMultipleResources(t *testing.T) {
 
 	pvcItems := []model.Item{{Name: "pvc-1", Kind: "PersistentVolumeClaim", Namespace: "default"}}
 	pvItems := []model.Item{{Name: "pv-1", Kind: "PersistentVolume"}}
-	m.itemCache["test-ctx/persistentvolumeclaims"] = pvcItems
+	// PVC is namespaced, PV is cluster-scoped; keys match navKey() output.
+	m.itemCache["test-ctx/persistentvolumeclaims/ns:default"] = pvcItems
 	m.itemCache["test-ctx/persistentvolumes"] = pvItems
-	m.cacheFingerprints["test-ctx/persistentvolumeclaims"] = m.fetchFingerprint()
+	m.cacheFingerprints["test-ctx/persistentvolumeclaims/ns:default"] = m.fetchFingerprint()
 	m.cacheFingerprints["test-ctx/persistentvolumes"] = m.fetchFingerprint()
 
 	pvcSidebar := model.Item{Name: "PersistentVolumeClaims", Kind: "PersistentVolumeClaim", Extra: pvcRT.ResourceRef()}

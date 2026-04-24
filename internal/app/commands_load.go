@@ -136,6 +136,9 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 	// sidebar or a hover cycle between PVC and PV doesn't refetch.
 	if rt.Resource != "" {
 		cacheKey := kctx + "/" + rt.Resource
+		if rt.Namespaced {
+			cacheKey += "/ns:" + ns
+		}
 		if cached, ok := m.itemCache[cacheKey]; ok &&
 			m.cacheFingerprints[cacheKey] == m.fetchFingerprint() {
 			items := cached
