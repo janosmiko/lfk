@@ -9,24 +9,50 @@ import (
 )
 
 // parentIndex returns the index of the parent item in leftItems, or -1 if none.
+//
+// At LevelResources the match uses the ResourceRef (group/version/resource)
+// stored on Item.Extra rather than DisplayName. API-discovery-produced
+// ResourceTypeEntry values leave DisplayName empty — only pseudo-resources
+// (Port Forwards, Helm Releases) and the curated BuiltInMetadata table
+// carry one — so matching on DisplayName silently drops the highlight for
+// every real-world resource. ResourceRef is populated for every sidebar
+// item and is the canonical identity of a resource type.
 func (m *Model) parentIndex() int {
-	var parentName string
 	switch m.nav.Level {
 	case model.LevelResourceTypes:
-		parentName = m.nav.Context
+		return indexByName(m.leftItems, m.nav.Context)
 	case model.LevelResources:
-		if m.nav.ResourceType.DisplayName != "" {
-			parentName = m.nav.ResourceType.DisplayName
-		}
+		return indexByExtra(m.leftItems, m.nav.ResourceType.ResourceRef())
 	case model.LevelOwned:
-		parentName = m.nav.ResourceName
+		return indexByName(m.leftItems, m.nav.ResourceName)
 	case model.LevelContainers:
-		parentName = m.nav.OwnedName
+		return indexByName(m.leftItems, m.nav.OwnedName)
 	default:
 		return -1
 	}
-	for i, item := range m.leftItems {
-		if item.Name == parentName {
+}
+
+func indexByName(items []model.Item, name string) int {
+	if name == "" {
+		return -1
+	}
+	for i, item := range items {
+		if item.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+func indexByExtra(items []model.Item, extra string) int {
+	// A zero-value ResourceTypeEntry produces the sentinel "//", which no
+	// real sidebar item carries — reject it explicitly so the linear scan
+	// cannot accidentally match a malformed entry.
+	if extra == "" || extra == "//" {
+		return -1
+	}
+	for i, item := range items {
+		if item.Extra == extra {
 			return i
 		}
 	}

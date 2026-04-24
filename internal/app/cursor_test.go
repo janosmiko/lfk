@@ -498,16 +498,53 @@ func TestParentIndex(t *testing.T) {
 	t.Run("LevelResources returns resource type match", func(t *testing.T) {
 		m := Model{
 			nav: model.NavigationState{
-				Level:        model.LevelResources,
-				ResourceType: model.ResourceTypeEntry{DisplayName: "Deployments"},
+				Level: model.LevelResources,
+				ResourceType: model.ResourceTypeEntry{
+					DisplayName: "Deployments",
+					APIGroup:    "apps",
+					APIVersion:  "v1",
+					Resource:    "deployments",
+				},
 			},
 			leftItems: []model.Item{
-				{Name: "Pods"},
-				{Name: "Deployments"},
-				{Name: "Services"},
+				{Name: "Pods", Extra: "/v1/pods"},
+				{Name: "Deployments", Extra: "apps/v1/deployments"},
+				{Name: "Services", Extra: "/v1/services"},
 			},
 		}
 		assert.Equal(t, 1, m.parentIndex())
+	})
+
+	// Regression: when the user drills from Resource Types into a resource list,
+	// navigateChildResourceType stores the API-discovery-produced
+	// ResourceTypeEntry in m.nav.ResourceType. Discovery does NOT populate
+	// DisplayName on that struct — only pseudo-resources (Port Forwards, Helm
+	// Releases) and the curated metadata table carry one. The parent column in
+	// leftItems still renders the resource types, and the correct entry must
+	// stay highlighted. Matching on DisplayName silently drops the highlight
+	// for every real-world resource; matching on the stable ResourceRef
+	// (APIGroup/APIVersion/Resource, stored in Item.Extra) survives the empty
+	// DisplayName.
+	t.Run("LevelResources matches discovery entry with empty DisplayName", func(t *testing.T) {
+		discovered := []model.ResourceTypeEntry{
+			{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+			{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+			{Kind: "Service", APIGroup: "", APIVersion: "v1", Resource: "services", Namespaced: true},
+		}
+		items := model.BuildSidebarItems(discovered)
+		rt, ok := model.FindResourceTypeIn("apps/v1/deployments", discovered)
+		require.True(t, ok)
+		assert.Empty(t, rt.DisplayName, "discovery must not populate DisplayName (guards the bug we are testing)")
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelResources,
+				ResourceType: rt,
+			},
+			leftItems: items,
+		}
+		got := m.parentIndex()
+		require.GreaterOrEqual(t, got, 0, "expected the parent Deployments row to be highlighted")
+		assert.Equal(t, "Deployments", items[got].Name)
 	})
 
 	t.Run("LevelOwned returns resource name match", func(t *testing.T) {
@@ -1919,8 +1956,11 @@ func TestCovParentIndex(t *testing.T) {
 	assert.Equal(t, 1, m.parentIndex())
 
 	m.nav.Level = model.LevelResources
-	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods"}
-	m.leftItems = []model.Item{{Name: "Deployments"}, {Name: "Pods"}}
+	m.nav.ResourceType = model.ResourceTypeEntry{APIVersion: "v1", Resource: "pods"}
+	m.leftItems = []model.Item{
+		{Name: "Deployments", Extra: "apps/v1/deployments"},
+		{Name: "Pods", Extra: "/v1/pods"},
+	}
 	assert.Equal(t, 1, m.parentIndex())
 
 	m.nav.Level = model.LevelOwned
