@@ -1,0 +1,38 @@
+# Validates pull request metadata.
+#
+# Fails fast when a contributor opens a PR from the `main` or `master` branch
+# of their fork. Merging such PRs pollutes the fork's default branch and makes
+# it hard to keep the fork in sync with upstream. Contributors should always
+# work on a feature branch (see README -> Contributing).
+#
+# Only workflow-level expressions reference `github.head_ref`; the branch name
+# is never expanded into shell input, avoiding script-injection risks.
+name: Validate PR
+
+on:
+  pull_request:
+    types: [opened, reopened, synchronize, edited]
+
+permissions:
+  contents: read
+
+jobs:
+  reject-main-source-branch:
+    name: Reject PRs from fork's main/master
+    if: github.head_ref == 'main' || github.head_ref == 'master'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Fail with guidance
+        run: |
+          echo "::error title=PR source branch not allowed::Pull requests must not be opened from the 'main' or 'master' branch of your fork."
+          echo ""
+          echo "To fix this:"
+          echo "  1. On your fork, sync main and create a feature branch:"
+          echo "       git checkout main && git pull upstream main"
+          echo "       git checkout -b feature/my-change"
+          echo "  2. Move your commits to the new branch and push it:"
+          echo "       git push -u origin feature/my-change"
+          echo "  3. Close this PR and open a new one from that branch."
+          echo ""
+          echo "See the Contributing section in README.md for the full workflow."
+          exit 1

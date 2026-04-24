@@ -153,6 +153,39 @@
 brew install janosmiko/tap/lfk
 ```
 
+### Nix (flake)
+
+Requires Nix ≥ 2.4 with flakes enabled (`experimental-features = nix-command flakes` in `~/.config/nix/nix.conf`).
+
+**Try without installing:**
+
+```bash
+nix run github:janosmiko/lfk
+# pinned to a release:
+nix run github:janosmiko/lfk/v0.9.22
+```
+
+**Install into your profile:**
+
+```bash
+nix profile install github:janosmiko/lfk
+# or a specific release:
+nix profile install github:janosmiko/lfk/v0.9.22
+```
+
+**Use as a flake input** (e.g. in a NixOS / home-manager config):
+
+```nix
+{
+  inputs.lfk.url = "github:janosmiko/lfk";
+
+  outputs = { self, nixpkgs, lfk, ... }: {
+    # ...
+    environment.systemPackages = [ lfk.packages.${system}.default ];
+  };
+}
+```
+
 ### Binary releases
 
 Download pre-built binaries from the [GitHub Releases](https://github.com/janosmiko/lfk/releases) page.
@@ -359,10 +392,10 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `l` / `Right` | Navigate into selected item |
 | `j` / `Down` | Move cursor down |
 | `k` / `Up` | Move cursor up |
-| `gg` | Jump to top of list |
-| `G` | Jump to bottom of list |
+| `gg` / `Home` | Jump to top of list |
+| `G` / `End` | Jump to bottom of list |
 | `Ctrl+D` / `Ctrl+U` | Half-page scroll down/up |
-| `Ctrl+F` / `Ctrl+B` | Full-page scroll down/up |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page scroll down/up |
 | `Enter` | Open full-screen YAML view / navigate into |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping (Events view) |
 | `p` | Pin/unpin CRD group (at resource types level) |

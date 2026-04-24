@@ -1677,18 +1677,25 @@ func TestFindAffectedPods_WithPods(t *testing.T) {
 // =====================================================================
 
 func TestGetPodYAML(t *testing.T) {
-	// GetPodYAML delegates to GetResourceYAML with a non-namespaced ResourceTypeEntry.
-	// We test it with a cluster-scoped object since that's how the delegation works.
+	// Regression for #34: GetPodYAML delegates to GetResourceYAML and
+	// MUST mark the ResourceTypeEntry as Namespaced: true. Pods are
+	// namespaced; a cluster-scoped Get on /api/v1/pods/<name> does not
+	// exist on the API server and returns "the server could not find
+	// the requested resource". Using a pod with an explicit namespace
+	// here locks in the namespaced fetch path so the bug does not
+	// regress.
 	obj := &unstructured.Unstructured{
 		Object: map[string]interface{}{
 			"apiVersion": "v1",
 			"kind":       "Pod",
 			"metadata": map[string]interface{}{
-				"name": "my-pod",
+				"name":      "my-pod",
+				"namespace": "default",
 			},
 			"spec": map[string]interface{}{
 				"containers": []interface{}{
 					map[string]interface{}{"name": "app", "image": "nginx"},
+					map[string]interface{}{"name": "sidecar", "image": "envoy"},
 				},
 			},
 		},
@@ -1696,7 +1703,9 @@ func TestGetPodYAML(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	yamlStr, err := c.GetPodYAML(context.Background(), "", "", "my-pod")
+	yamlStr, err := c.GetPodYAML(context.Background(), "", "default", "my-pod")
 	require.NoError(t, err)
 	assert.Contains(t, yamlStr, "kind: Pod")
+	assert.Contains(t, yamlStr, "name: my-pod")
+	assert.Contains(t, yamlStr, "namespace: default")
 }

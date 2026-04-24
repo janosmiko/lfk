@@ -16,6 +16,7 @@ func (m Model) handleNamespaceOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.handleNamespaceNormalMode(msg)
 }
 
+//nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	items := m.filteredOverlayItems()
 
@@ -120,12 +121,32 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, len(items)-1)
 		return m, nil
 
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 20, len(items)-1)
 		return m, nil
 
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -20, len(items)-1)
+		return m, nil
+
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.overlayCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+
+	case "G", "end":
+		if len(items) > 0 {
+			m.overlayCursor = len(items) - 1
+		}
+		return m, nil
+
+	case "home":
+		m.pendingG = false
+		m.overlayCursor = 0
 		return m, nil
 
 	case "ctrl+c":
@@ -203,11 +224,21 @@ func (m Model) handleTemplateOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, -10, len(filtered)-1)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, 20, len(filtered)-1)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, -20, len(filtered)-1)
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.templateCursor = 0
+		return m, nil
+	case "end":
+		m.pendingG = false
+		if len(filtered) > 0 {
+			m.templateCursor = len(filtered) - 1
+		}
 		return m, nil
 	case "g":
 		if m.pendingG {
@@ -300,11 +331,28 @@ func (m Model) handleRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, -10, len(m.rollbackRevisions)-1)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, 20, len(m.rollbackRevisions)-1)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, -20, len(m.rollbackRevisions)-1)
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.rollbackCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G", "end":
+		if len(m.rollbackRevisions) > 0 {
+			m.rollbackCursor = len(m.rollbackRevisions) - 1
+		}
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.rollbackCursor = 0
 		return m, nil
 	case "enter":
 		if m.rollbackCursor >= 0 && m.rollbackCursor < len(m.rollbackRevisions) {
@@ -339,11 +387,28 @@ func (m Model) handleHelmRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case "ctrl+u":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, -10, len(m.helmRollbackRevisions)-1)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, 20, len(m.helmRollbackRevisions)-1)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, -20, len(m.helmRollbackRevisions)-1)
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.helmRollbackCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G", "end":
+		if len(m.helmRollbackRevisions) > 0 {
+			m.helmRollbackCursor = len(m.helmRollbackRevisions) - 1
+		}
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.helmRollbackCursor = 0
 		return m, nil
 	case "enter":
 		if m.helmRollbackCursor >= 0 && m.helmRollbackCursor < len(m.helmRollbackRevisions) {
@@ -381,11 +446,28 @@ func (m Model) handleHelmHistoryOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "ctrl+u":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, -10, len(m.helmHistoryRevisions)-1)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, 20, len(m.helmHistoryRevisions)-1)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, -20, len(m.helmHistoryRevisions)-1)
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.helmHistoryCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G", "end":
+		if len(m.helmHistoryRevisions) > 0 {
+			m.helmHistoryCursor = len(m.helmHistoryRevisions) - 1
+		}
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.helmHistoryCursor = 0
 		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -463,13 +545,29 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.schemeCursor = clampOverlayCursor(m.schemeCursor, 20, selectableCount-1)
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.schemeCursor = clampOverlayCursor(m.schemeCursor, -20, selectableCount-1)
+		m.previewSchemeAtCursor(filtered)
+		return m, nil
+
+	case "home":
+		m.pendingG = false
+		m.schemeCursor = 0
+		ui.ResetOverlaySchemeScroll()
+		m.previewSchemeAtCursor(filtered)
+		return m, nil
+
+	case "end":
+		m.pendingG = false
+		if selectableCount > 0 {
+			m.schemeCursor = selectableCount - 1
+		}
+		ui.ResetOverlaySchemeScroll()
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 

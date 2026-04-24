@@ -593,6 +593,20 @@ func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) (tea.Model, 
 		}
 		msg.items = filtered
 	}
+	// Prime itemCache under the drill-in navKey so loadResources can serve
+	// the list instantly and skip a redundant fetch when the user drills
+	// in or re-hovers this rt later. Only do this when msg.rt carries a
+	// real resource — synthetic previews (port-forwards, dashboards) have
+	// a zero-valued rt and must not write an empty-resource key. The
+	// fingerprint records the fetch-affecting state so the shortcut can
+	// detect later invalidations (namespace switch, allNS toggle,
+	// multi-select update) without relying on requestGen, which
+	// navigateChild bumps before child handlers even run.
+	if msg.rt.Resource != "" {
+		drillInKey := m.nav.Context + "/" + msg.rt.Resource
+		m.itemCache[drillInKey] = msg.items
+		m.cacheFingerprints[drillInKey] = m.fetchFingerprint()
+	}
 	m.rightItems = msg.items
 	// Filter events in children view to warnings-only when enabled.
 	if m.warningEventsOnly && len(m.rightItems) > 0 && m.rightItems[0].Kind == "Event" {
@@ -638,7 +652,17 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 		m.carryOverMetricsColumns(msg.items)
 	}
 	m.middleItems = msg.items
-	m.itemCache[m.navKey()] = m.middleItems
+	mainCacheKey := m.navKey()
+	m.itemCache[mainCacheKey] = m.middleItems
+	// Record the cache-freshness fingerprint so a subsequent load for the
+	// same resource (drill-in from the sidebar, preview on navigate-out-
+	// then-hover, or a hover-cycle between sibling rts) can serve from
+	// cache instead of refetching. Only record for actual resource lists;
+	// __port_forwards__ is synthetic (sourced from the in-process manager)
+	// and doesn't go through GetResources.
+	if m.nav.ResourceType.Resource != "" && m.nav.ResourceType.Kind != "__port_forwards__" {
+		m.cacheFingerprints[mainCacheKey] = m.fetchFingerprint()
+	}
 	// Always sort: the k8s layer uses a non-stable single-key sort that
 	// shuffles ties between refreshes (e.g. Helm releases with the same
 	// name in different namespaces). Running sortMiddleItems guarantees
@@ -851,17 +875,28 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	if msg.silent {
 		m.suppressBgtasks = true
 	}
-	// Mark the preview pane as loading (see updateResourcesLoadedMain).
+	// Align previewLoading with whether a preview fetch is actually in
+	// flight. clearRight() armed the flag to true on navigation; at
+	// LevelContainers loadPreview returns nil, so leaving it armed would
+	// make the right pane render "Loading..." forever. Conversely, when a
+	// preview cmd is dispatched the flag must stay true so the spinner
+	// keeps showing until the reply clears it.
 	previewCmd := m.loadPreview()
-	if previewCmd != nil {
-		m.previewLoading = true
-	}
+	m.previewLoading = previewCmd != nil
 	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
 
 func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.Cmd) {
-	m.loading = false
+	// Only clear the global loading flag for overlay-triggered loads.
+	// Background cache refreshes (session restore, context open) must not
+	// touch it — it belongs to the middle-column/resource-types load and
+	// clearing it asynchronously while API discovery is still in flight
+	// produces a "No items" flash between the loader and the populated
+	// list.
+	if !msg.silent {
+		m.loading = false
+	}
 	if isContextCanceled(msg.err) {
 		return m, nil
 	}
@@ -905,12 +940,22 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 
 func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 	m.loading = false
+	// enterFullView sets yamlContent="Loading..." as a placeholder; we
+	// must replace it on every reply path (success, cancel, error) so the
+	// viewer never renders the loader indefinitely. The canceled case can
+	// fire when a mid-load navigation tears down reqCtx — show an empty
+	// body so the user understands the fetch did not complete rather than
+	// being stuck on the spinner.
 	if isContextCanceled(msg.err) {
+		m.yamlContent = ""
+		m.yamlSections = nil
 		return m, nil
 	}
 	if msg.err != nil {
 		m.err = msg.err
 		m.setErrorFromErr("Warning: ", msg.err)
+		m.yamlContent = "# Error loading resource\n# " + msg.err.Error()
+		m.yamlSections = nil
 		return m, scheduleStatusClear()
 	}
 	m.err = nil

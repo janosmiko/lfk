@@ -1988,6 +1988,57 @@ func TestGetPodsUsingPVC_NoPods(t *testing.T) {
 	assert.Empty(t, names)
 }
 
+// TestGetOwnedResources_PersistentVolumeClaim verifies the lazy
+// replacement for the former eager "Used By" column: requesting owned
+// resources for a PVC returns Pod items for every pod that mounts it,
+// ready to render in the right-pane preview. The earlier design
+// performed this lookup for *every* PVC during the list fetch (N+1);
+// the test here exercises the on-demand path that runs only when the
+// user selects a specific PVC.
+func TestGetOwnedResources_PersistentVolumeClaim(t *testing.T) {
+	mounting := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "mounter", "namespace": "default"},
+			"spec": map[string]interface{}{
+				"volumes": []interface{}{
+					map[string]interface{}{
+						"name": "data",
+						"persistentVolumeClaim": map[string]interface{}{
+							"claimName": "target-pvc",
+						},
+					},
+				},
+			},
+		},
+	}
+	unrelated := &unstructured.Unstructured{
+		Object: map[string]interface{}{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]interface{}{"name": "unrelated", "namespace": "default"},
+			"spec": map[string]interface{}{
+				"volumes": []interface{}{
+					map[string]interface{}{
+						"name":     "tmp",
+						"emptyDir": map[string]interface{}{},
+					},
+				},
+			},
+		},
+	}
+	dc := newFakeDynClient(mounting, unrelated)
+	c := newFakeClient(nil, dc)
+
+	items, err := c.GetOwnedResources(context.Background(), "", "default", "PersistentVolumeClaim", "target-pvc")
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "mounter", items[0].Name)
+	assert.Equal(t, "Pod", items[0].Kind)
+	assert.Equal(t, "default", items[0].Namespace)
+}
+
 // --- PatchLabels ---
 
 func TestPatchLabels_Namespaced(t *testing.T) {

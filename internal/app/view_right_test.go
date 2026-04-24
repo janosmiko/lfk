@@ -125,6 +125,12 @@ func TestKindHasOwnedChildren(t *testing.T) {
 	hasChildren := []string{
 		"Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob",
 		"Service", "Application", "HelmRelease", "Kustomization", "Node",
+		// PVC is listed here so the right-pane preview can lazily show
+		// which pods reference the selected PVC. The previous eager
+		// "Used By" column in GetResources issued one pod list call per
+		// PVC (N+1) — on large namespaces the PVC list took 6+ seconds
+		// to arrive.
+		"PersistentVolumeClaim",
 	}
 	for _, kind := range hasChildren {
 		t.Run(kind+"_true", func(t *testing.T) {
@@ -133,7 +139,7 @@ func TestKindHasOwnedChildren(t *testing.T) {
 	}
 
 	noChildren := []string{
-		"ConfigMap", "Secret", "PersistentVolumeClaim", "Namespace",
+		"ConfigMap", "Secret", "Namespace",
 		"ServiceAccount", "Ingress", "NetworkPolicy", "SomeCRD",
 	}
 	for _, kind := range noChildren {

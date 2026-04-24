@@ -239,13 +239,24 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 		return m, true
 	case "ctrl+u":
 		return m.handleEventTimelineOverlayKeyCtrlU(), true
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.eventTimelineLineInput = ""
 		m.eventTimelineCursor = min(m.eventTimelineCursor+m.eventContentHeight(), maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		return m.handleEventTimelineOverlayKeyCtrlB(), true
+	case "home":
+		m.eventTimelineLineInput = ""
+		m.pendingG = false
+		m.eventTimelineCursor = 0
+		m.ensureEventCursorVisible()
+		return m, true
+	case "end":
+		m.eventTimelineLineInput = ""
+		m.eventTimelineCursor = maxIdx
+		m.ensureEventCursorVisible()
+		return m, true
 	case "g":
 		return m.handleEventTimelineOverlayKeyG(), true
 	case "G":

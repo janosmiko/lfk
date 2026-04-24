@@ -95,18 +95,24 @@ func (m Model) handleLogMovementKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "ctrl+u":
 		ret, cmd := m.handleLogKeyCtrlU()
 		return ret, cmd, true
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		ret := m.handleLogKeyCtrlF()
 		return ret, nil, true
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		ret, cmd := m.handleLogKeyCtrlB()
 		return ret, cmd, true
-	case "G":
+	case "G", "end":
 		ret := m.handleLogKeyG()
 		return ret, nil, true
 	case "g":
 		ret, cmd := m.handleLogKeyG2()
 		return ret, cmd, true
+	case "home":
+		m.pendingG = false
+		m.logCursor = 0
+		m.logScroll = 0
+		m.logFollow = false
+		return m, nil, true
 	case "h", "left":
 		ret := m.handleLogKeyH()
 		return ret, nil, true

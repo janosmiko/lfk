@@ -346,11 +346,21 @@ func (m Model) handleBookmarkNavKey(msg tea.KeyMsg, filtered []model.Bookmark) (
 	case "ctrl+u":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, maxIdx)
 		return m, true
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 20, maxIdx)
 		return m, true
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -20, maxIdx)
+		return m, true
+	case "home":
+		m.pendingG = false
+		m.overlayCursor = 0
+		return m, true
+	case "end":
+		m.pendingG = false
+		if len(filtered) > 0 {
+			m.overlayCursor = maxIdx
+		}
 		return m, true
 	}
 	return m, false

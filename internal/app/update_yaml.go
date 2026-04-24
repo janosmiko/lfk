@@ -451,15 +451,19 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyK()
 	case "g":
 		return m.handleYAMLKeyG()
-	case "G":
+	case "G", "end":
 		return m.handleYAMLNormalG(totalVisible, maxScroll)
+	case "home":
+		m.yamlCursor = 0
+		m.ensureYAMLCursorVisible()
+		return m, nil
 	case "ctrl+d":
 		return m.handleYAMLNormalHalfPageDown(totalVisible)
 	case "ctrl+u":
 		return m.handleYAMLKeyCtrlU()
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		return m.handleYAMLNormalPageDown(totalVisible)
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		return m.handleYAMLKeyCtrlB()
 	default:
 		m.yamlLineInput = ""

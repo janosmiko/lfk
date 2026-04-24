@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: GitHub Sponsors
+    url: https://github.com/sponsors/janosmiko
+    about: Support ongoing development of lfk.
+  - name: Buy Me a Coffee
+    url: https://buymeacoffee.com/janosmiko
+    about: One-off support for the maintainer.

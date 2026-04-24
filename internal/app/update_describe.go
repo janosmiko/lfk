@@ -24,6 +24,8 @@ func (m Model) handleDescribeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleDescribeNormalKey handles key events in normal describe view mode.
+//
+//nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	lines := strings.Split(m.describeContent, "\n")
 	maxIdx := max(len(lines)-1, 0)
@@ -80,8 +82,23 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.describeLineInput = ""
 		m.describeWordMotion(key, lines)
 		return m, nil
-	case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b":
+	case "ctrl+d", "ctrl+u":
 		return m.describePageMoveByKey(key, maxIdx)
+	case "ctrl+f", "pgdown":
+		return m.describePageMove(m.describeContentHeight(), maxIdx)
+	case "ctrl+b", "pgup":
+		return m.describePageMove(-m.describeContentHeight(), maxIdx)
+	case "home":
+		m.describeLineInput = ""
+		m.pendingG = false
+		m.describeCursor = 0
+		m.ensureDescribeCursorVisible()
+		return m, nil
+	case "end":
+		m.describeLineInput = ""
+		m.describeCursor = maxIdx
+		m.ensureDescribeCursorVisible()
+		return m, nil
 	case "g":
 		m.describeLineInput = ""
 		if m.pendingG {
@@ -613,6 +630,8 @@ func (m Model) handleDiffSearchInput(msg tea.KeyMsg, foldRegions []ui.DiffFoldRe
 }
 
 // handleDiffNormalKey handles key events in normal diff view mode.
+//
+//nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
 	maxCursor := max(totalLines-1, 0)
 
@@ -666,7 +685,18 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		return m, nil
 	case "G":
 		return m.handleDiffG(maxCursor, visibleLines, maxScroll)
-	case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b":
+	case "end":
+		m.diffLineInput = ""
+		m.diffCursor = maxCursor
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.diffLineInput = ""
+		m.diffCursor = 0
+		m.diffScroll = 0
+		return m, nil
+	case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b", "pgdown", "pgup":
 		return m.diffPageMoveByKey(msg.String(), maxCursor, visibleLines, maxScroll)
 	case "0":
 		if m.diffLineInput != "" {
@@ -826,9 +856,9 @@ func (m Model) diffPageMoveByKey(key string, maxCursor, visibleLines, maxScroll 
 		m.diffCursor = min(m.diffCursor+m.height/2, maxCursor)
 	case "ctrl+u":
 		m.diffCursor = max(m.diffCursor-m.height/2, 0)
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.diffCursor = min(m.diffCursor+m.height, maxCursor)
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.diffCursor = max(m.diffCursor-m.height, 0)
 	}
 	m.ensureDiffCursorVisible(visibleLines, maxScroll)
@@ -925,11 +955,11 @@ func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		m.diffCursor = max(m.diffCursor-m.height/2, 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.diffCursor = min(m.diffCursor+m.height, maxCursor)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.diffCursor = max(m.diffCursor-m.height, 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil

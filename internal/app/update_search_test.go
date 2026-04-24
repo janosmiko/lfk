@@ -396,6 +396,61 @@ func TestPush4HandleFilterKeyEnter(t *testing.T) {
 	assert.False(t, rm.filterActive)
 }
 
+// TestHandleFilterKeyEnterInvalidatesPreview verifies that confirming a
+// filter (Enter) invalidates the right pane: rightItems cleared,
+// previewLoading armed, and requestGen bumped. Without this, the cursor
+// jumps to the first filter match but the right pane keeps rendering the
+// previous selection's children for several seconds until the new
+// preview fetch returns — the regression the user reported as "search
+// for pvc, jump on it, but it still shows services for 3-4 seconds".
+func TestHandleFilterKeyEnterInvalidatesPreview(t *testing.T) {
+	m := basePush4Model()
+	m.filterActive = true
+	m.requestGen = 5
+	m.rightItems = []model.Item{{Name: "services-preview"}}
+	m.previewLoading = false
+
+	result, _ := m.handleFilterKey(keyMsg("enter"))
+	rm := result.(Model)
+
+	assert.Nil(t, rm.rightItems, "stale preview items from the prior cursor must be cleared")
+	assert.True(t, rm.previewLoading, "previewLoading must be armed so the spinner shows during the new fetch")
+	assert.Greater(t, rm.requestGen, uint64(5), "requestGen must bump so any in-flight pre-filter preview is discarded")
+}
+
+// TestHandleFilterKeyEscInvalidatesPreview mirrors the Enter case for the
+// Esc path: clearing the filter resets the cursor, and the preview must
+// refresh for the new cursor position.
+func TestHandleFilterKeyEscInvalidatesPreview(t *testing.T) {
+	m := basePush4Model()
+	m.filterActive = true
+	m.requestGen = 3
+	m.rightItems = []model.Item{{Name: "old-preview"}}
+
+	result, _ := m.handleFilterKey(keyMsg("esc"))
+	rm := result.(Model)
+
+	assert.Nil(t, rm.rightItems, "rightItems must clear when esc resets the cursor")
+	assert.True(t, rm.previewLoading, "previewLoading must be armed")
+	assert.Greater(t, rm.requestGen, uint64(3))
+}
+
+// TestHandleSearchKeyEnterInvalidatesPreview covers the search-mode
+// (slash) analogue of the filter Enter case.
+func TestHandleSearchKeyEnterInvalidatesPreview(t *testing.T) {
+	m := basePush4Model()
+	m.searchActive = true
+	m.requestGen = 7
+	m.rightItems = []model.Item{{Name: "prev-preview"}}
+
+	result, _ := m.handleSearchKey(keyMsg("enter"))
+	rm := result.(Model)
+
+	assert.Nil(t, rm.rightItems, "confirming search must drop stale preview")
+	assert.True(t, rm.previewLoading)
+	assert.Greater(t, rm.requestGen, uint64(7))
+}
+
 func TestPush4HandleSearchKeyEsc(t *testing.T) {
 	m := basePush4Model()
 	m.searchActive = true

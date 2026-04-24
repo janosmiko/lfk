@@ -252,15 +252,23 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
 		if m.netpolScroll < 0 {
 			m.netpolScroll = 0
 		}
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.netpolLineInput = ""
 		m.netpolScroll += m.height
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.netpolLineInput = ""
 		m.netpolScroll -= m.height
 		if m.netpolScroll < 0 {
 			m.netpolScroll = 0
 		}
+	case "home":
+		m.pendingG = false
+		m.netpolLineInput = ""
+		m.netpolScroll = 0
+	case "end":
+		m.netpolLineInput = ""
+		// Jump to bottom: will be clamped during rendering (matches G behavior).
+		m.netpolScroll = 9999
 	default:
 		m.netpolLineInput = ""
 	}
@@ -386,16 +394,29 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
 
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.errorLogLineInput = ""
 		m.errorLogCursorLine = min(m.errorLogCursorLine+maxVisible, maxCursor)
 		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
 
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.errorLogLineInput = ""
 		m.errorLogCursorLine = max(m.errorLogCursorLine-maxVisible, 0)
 		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
+		return m, nil
+
+	case "home":
+		m.pendingG = false
+		m.errorLogLineInput = ""
+		m.errorLogCursorLine = 0
+		m.errorLogScroll = 0
+		return m, nil
+
+	case "end":
+		m.errorLogLineInput = ""
+		m.errorLogCursorLine = maxCursor
+		m.errorLogScroll = maxScroll
 		return m, nil
 
 	default:

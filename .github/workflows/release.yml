@@ -42,7 +42,34 @@ jobs:
             echo "nightly_date=" >> "$GITHUB_OUTPUT"
           fi
 
+  # Runs first (no needs) so a mismatched flake.nix fails the pipeline
+  # in seconds instead of waiting on build/test/lint/govulncheck.
+  verify-flake-version:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Verify flake.nix version matches tag
+        env:
+          TAG_REF: ${{ github.ref }}
+        run: |
+          TAG="${TAG_REF#refs/tags/}"
+          TAG_VERSION="${TAG#v}"
+          # Nightly/pre-release tags carry a suffix (e.g. 1.2.3-nightly.20260414);
+          # the flake version is the bare X.Y.Z.
+          BASE_TAG="${TAG_VERSION%%-*}"
+          FLAKE_VERSION=$(grep -E '^\s*baseVersion\s*=' flake.nix | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "Tag:   $BASE_TAG"
+          echo "Flake: $FLAKE_VERSION"
+          if [ "$BASE_TAG" != "$FLAKE_VERSION" ]; then
+            echo "::error::flake.nix baseVersion ($FLAKE_VERSION) does not match tag ($BASE_TAG)."
+            echo "::error::Run 'make release VERSION=$BASE_TAG' (or 'make bump-version') on the commit you want to tag, commit the change, then re-tag."
+            exit 1
+          fi
+
   build-and-test:
+    needs: [verify-flake-version]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -60,6 +87,7 @@ jobs:
         run: go test ./...
 
   lint:
+    needs: [verify-flake-version]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -76,6 +104,7 @@ jobs:
           version: latest
 
   govulncheck:
+    needs: [verify-flake-version]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -93,7 +122,7 @@ jobs:
         run: govulncheck ./...
 
   release:
-    needs: [detect, build-and-test, lint, govulncheck]
+    needs: [detect, build-and-test, lint, govulncheck, verify-flake-version]
     runs-on: ubuntu-latest
     permissions:
       contents: write

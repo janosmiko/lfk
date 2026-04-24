@@ -65,14 +65,21 @@ func (m Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.helpScroll = 0
 		}
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.helpScroll += m.height
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.helpScroll -= m.height
 		if m.helpScroll < 0 {
 			m.helpScroll = 0
 		}
+		return m, nil
+	case "home":
+		m.helpScroll = 0
+		m.pendingG = false
+		return m, nil
+	case "end":
+		m.helpScroll = 9999
 		return m, nil
 	case "/":
 		m.helpSearchActive = true
@@ -107,6 +114,13 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filterActive = false
 		m.setCursor(0)
 		m.clampCursor()
+		// The cursor now points at the first filter match — a different
+		// item than before. Without invalidation the right pane keeps
+		// rendering the previous selection's rightItems (and skips the
+		// loader), so the user sees stale children for several seconds
+		// until the new preview fetch returns. Bumping requestGen also
+		// discards any in-flight preview from the pre-filter cursor.
+		m.invalidatePreviewForCursorChange()
 		return m, m.loadPreview()
 	case "esc":
 		m.filterActive = false
@@ -114,6 +128,7 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filterText = ""
 		m.setCursor(0)
 		m.clampCursor()
+		m.invalidatePreviewForCursorChange()
 		return m, m.loadPreview()
 	case "backspace":
 		if len(m.filterInput.Value) > 0 {
@@ -179,6 +194,11 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.searchActive = false
 		m.syncExpandedGroup()
+		// Confirming the search lands the cursor on a different item than
+		// when search started. Invalidate so the right pane drops the
+		// stale preview, arms the spinner, and a fresh fetch routes to
+		// the new cursor instead of the pre-search one.
+		m.invalidatePreviewForCursorChange()
 		return m, m.loadPreview()
 	case "esc":
 		m.searchActive = false
@@ -186,6 +206,10 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setCursor(m.searchPrevCursor)
 		m.clampCursor()
 		m.syncExpandedGroup()
+		// Restoring the cursor to the pre-search position is also a
+		// cursor change from the user's last jumpToSearchMatch target,
+		// so the preview must invalidate here too.
+		m.invalidatePreviewForCursorChange()
 		return m, m.loadPreview()
 	case "backspace":
 		if len(m.searchInput.Value) > 0 {
