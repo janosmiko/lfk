@@ -1774,12 +1774,13 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 		return m
 	}
 	// Enrich middle items with CPU/Memory usage + percentage columns.
+	// Key format: "namespace/name". GetAllPodMetrics uses the same format
+	// regardless of query scope (all-namespaces vs single-namespace), so
+	// this lookup is consistent. For cluster-scoped items (no namespace)
+	// the key collapses to "/name" on both sides.
 	for i := range m.middleItems {
 		item := &m.middleItems[i]
-		key := item.Name
-		if item.Namespace != "" {
-			key = item.Namespace + "/" + item.Name
-		}
+		key := item.Namespace + "/" + item.Name
 		pm, ok := msg.metrics[key]
 		if !ok {
 			continue
@@ -1834,11 +1835,20 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 		memReqPct := ui.ComputePctStr(pm.Memory, memReqStr, false)
 		memLimPct := ui.ComputePctStr(pm.Memory, memLimStr, false)
 
-		// Rebuild columns: replace old CPU/Mem columns with new compact format.
+		// Rebuild columns: replace old CPU/Mem percentage columns with the
+		// freshly computed ones. The raw "CPU Req", "CPU Lim", "Mem Req",
+		// "Mem Lim" columns are DELIBERATELY preserved — they are always
+		// blocked from auto-detected table display (see
+		// internal/ui/explorer_format.go) so they do not show up as extra
+		// headers, and the next metrics tick reads them to recompute the
+		// percentages. Dropping them here was the cause of a regression
+		// where CPU/R, CPU/L, MEM/R, MEM/L showed real values on the first
+		// tick and flipped to "n/a" on every subsequent tick, because the
+		// source data was gone.
 		removeCols := map[string]bool{
-			"CPU Use": true, "CPU Req": true, "CPU Lim": true,
-			"Mem Use": true, "Mem Req": true, "Mem Lim": true,
-			"CPU/R": true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
+			"CPU Use": true,
+			"Mem Use": true,
+			"CPU/R":   true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
 		}
 		var newCols []model.KeyValue
 		newCols = append(newCols,
