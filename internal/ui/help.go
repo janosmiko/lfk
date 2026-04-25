@@ -510,12 +510,33 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 	if boxW < 50 {
 		boxW = 50
 	}
+	// Mirror HelpVisibleLines so outer height stays in sync with the
+	// inner row budget — lipgloss pads short content to this height,
+	// stopping the box from shrinking when filter narrows results or
+	// from growing when long lines wrap.
+	boxH := screenHeight * 80 / 100
+	if boxH < 20 {
+		boxH = 20
+	}
 
 	contentW := boxW - 6 // account for border + padding
 
 	title := OverlayTitleStyle.Render("Keybindings")
 
 	lines := buildHelpLines(filter, contextMode)
+	// Truncate each line to the inner-panel content width so one entry
+	// in `lines` always renders as exactly one row. Lipgloss's
+	// auto-wrap behavior would otherwise silently expand long
+	// descriptions to two rows, the rendered row count would diverge
+	// from len(lines), and the outer box height would drift — making
+	// a filter that narrows results visibly shrink the window.
+	innerW := contentW - 2
+	if innerW < 10 {
+		innerW = 10
+	}
+	for i, line := range lines {
+		lines[i] = Truncate(line, innerW)
+	}
 	if search != "" {
 		for i, line := range lines {
 			lines[i] = HighlightMatchStyled(line, search, SearchHighlightStyle)
@@ -544,6 +565,14 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 	end := min(scroll+visibleLines, totalLines)
 	visible := lines[scroll:end]
 
+	// Pad the visible window to exactly visibleLines rows so a filter
+	// that narrows results doesn't shrink the box. Without this the
+	// outer overlay box collapses to fit the short content and the user
+	// sees the window resize on every keystroke.
+	for len(visible) < visibleLines {
+		visible = append(visible, "")
+	}
+
 	// Build final lines with indicators.
 	var displayLines []string
 	// Always include indicator lines (empty when not scrollable) to keep height stable.
@@ -570,5 +599,6 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 
 	return OverlayStyle.
 		Width(boxW).
+		Height(boxH).
 		Render(body)
 }

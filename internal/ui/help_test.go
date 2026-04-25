@@ -22,18 +22,28 @@ func TestRenderHelpScreen_FilterApplied(t *testing.T) {
 }
 
 func TestRenderHelpScreen_FilterFiltersEntries(t *testing.T) {
-	// With a filter that matches specific entries, unmatched entries should be excluded.
-	full := RenderHelpScreen(120, 100, 0, "", "", "")
+	// Filter excludes non-matching entries from the visible content.
+	// Box height stays constant (covered by FilterDoesNotShrinkBox);
+	// what changes is which lines render.
 	filtered := RenderHelpScreen(120, 100, 0, "bookmark", "", "")
+	assert.Contains(t, filtered, "Bookmark",
+		"filter must keep matching sections visible")
+	// A keybinding far from the bookmark section shouldn't appear in
+	// the visible window after filtering.
+	assert.NotContains(t, filtered, "Toggle help screen",
+		"filter must hide non-matching entries")
+}
 
-	// The filtered output should be shorter than the full output.
+// Filtering down to a tiny match set must not shrink the overlay
+// box — the row count must match the unfiltered render so the user
+// doesn't see the window collapse on each keystroke.
+func TestRenderHelpScreen_FilterDoesNotShrinkBox(t *testing.T) {
+	full := RenderHelpScreen(120, 100, 0, "", "", "")
+	narrowed := RenderHelpScreen(120, 100, 0, "thereisnokeycontainingthisstring", "", "")
 	fullLines := strings.Split(full, "\n")
-	filteredLines := strings.Split(filtered, "\n")
-	assert.Less(t, len(filteredLines), len(fullLines),
-		"filtered help should have fewer lines than unfiltered")
-
-	// Filtered output should contain "Bookmark" section.
-	assert.Contains(t, filtered, "Bookmark")
+	narrowedLines := strings.Split(narrowed, "\n")
+	assert.Equal(t, len(fullLines), len(narrowedLines),
+		"filter that narrows results must not shrink the box height")
 }
 
 func TestRenderHelpScreen_SearchHighlightsButDoesNotFilter(t *testing.T) {
