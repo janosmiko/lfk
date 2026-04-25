@@ -527,22 +527,22 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 		m.itemCache[rtCacheKey] = merged
 		if m.nav.Level == model.LevelResourceTypes {
 			// User is on resource types level: update the visible list.
-			// Use clampCursor (not restoreCursor) so the user's current
-			// position is preserved across periodic re-discovery (watch
-			// ticks, shift+r). restoreCursor would fall back to the
-			// cursorMemory entry — typically 0 at this level since
-			// cursorMemory is only saved on drill-in — and the cursor
-			// would jump back to the top every refresh interval.
-			wasLoading := m.loading
+			//
+			// Distinguish initial discovery (no list yet) from periodic
+			// re-discovery (watch tick / shift+r): the initial path
+			// honors cursorMemory so context-switch / session-resume land
+			// on the user's previous position, while subsequent refreshes
+			// preserve the live cursor via clampCursor. m.loading is NOT
+			// a reliable signal because invalidatePreviewForCursorChange
+			// flips it true on every cursor move at this level — using
+			// it would reset the cursor every watch interval after any
+			// j/k press.
+			wasInitial := len(m.middleItems) == 0
 			m.loading = false
 			m.middleItems = merged
-			if wasLoading {
-				// Initial discovery (came from a loader pending state):
-				// honor cursorMemory in case the user is returning to a
-				// context they've drilled into before.
+			if wasInitial {
 				m.restoreCursor()
 			} else {
-				// Subsequent refresh: keep the cursor where the user put it.
 				m.clampCursor()
 			}
 			m.syncExpandedGroup()
