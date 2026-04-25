@@ -917,6 +917,29 @@ func TestCovHandleBookmarkConfirmDelete(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
+func TestBookmarkConfirmDeleteEnterConfirms(t *testing.T) {
+	// Enter must trigger the delete (consistency with quit/confirm overlays).
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDelete
+	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
+	r, cmd := m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.NotNil(t, cmd, "Enter should issue the delete command, not the no-op cancel path")
+	assert.Empty(t, r.(Model).bookmarks, "bookmark should be deleted")
+}
+
+func TestBookmarkConfirmDeleteEscCancels(t *testing.T) {
+	// Esc must cancel without deleting.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDelete
+	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
+	r, _ := m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyEsc})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.Len(t, r.(Model).bookmarks, 1, "bookmark must remain after cancel")
+}
+
 func TestCovHandleBookmarkConfirmDeleteAll(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	m := baseModelCov()
@@ -929,6 +952,27 @@ func TestCovHandleBookmarkConfirmDeleteAll(t *testing.T) {
 	r, cmd = m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.NotNil(t, cmd)
+}
+
+func TestBookmarkConfirmDeleteAllEnterConfirms(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
+	m.bookmarks = []model.Bookmark{{Name: "a", Slot: "a"}, {Name: "b", Slot: "b"}}
+	r, cmd := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.NotNil(t, cmd, "Enter should issue the delete-all command")
+	assert.Empty(t, r.(Model).bookmarks, "all bookmarks should be deleted")
+}
+
+func TestBookmarkConfirmDeleteAllEscCancels(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
+	m.bookmarks = []model.Bookmark{{Name: "a", Slot: "a"}, {Name: "b", Slot: "b"}}
+	r, _ := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyEsc})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.Len(t, r.(Model).bookmarks, 2, "bookmarks must remain after cancel")
 }
 
 func TestCovBuildSessionTabState(t *testing.T) {

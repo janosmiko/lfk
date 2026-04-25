@@ -171,10 +171,10 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	return m, nil, false
 }
 
-// handlePasteConfirmKey handles the y/n confirmation for multiline paste.
+// handlePasteConfirmKey handles the Enter/y / Esc/n confirmation for multiline paste.
 func (m Model) handlePasteConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		m.overlay = overlayNone
 		if target := m.resolvePasteTarget(m.pasteTargetID); target != nil && m.pendingPaste != "" {
 			flattened := strings.ReplaceAll(strings.TrimRight(m.pendingPaste, "\n"), "\n", " ")
@@ -731,7 +731,7 @@ func (m Model) handleActionOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		m.overlay = overlayNone
 		m.loading = true
 		action := m.pendingAction
@@ -1081,7 +1081,7 @@ func (m Model) handleContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.C
 // handleQuitConfirmOverlayKey handles keyboard input for the quit confirmation overlay.
 func (m Model) handleQuitConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		m.overlay = overlayNone
 		if m.portForwardMgr != nil {
 			m.portForwardMgr.StopAll()

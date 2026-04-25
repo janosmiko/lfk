@@ -118,7 +118,7 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	for _, b := range m.bookmarks {
 		if b.Slot == slot {
 			m.pendingBookmark = &bm
-			m.setStatusMessage(fmt.Sprintf("Mark '%s' exists (%s). Overwrite? (y/n)", slot, b.Name), true)
+			m.setStatusMessage(fmt.Sprintf("Mark '%s' exists (%s). Overwrite? (Enter/Esc)", slot, b.Name), true)
 			return m, nil
 		}
 	}
@@ -294,7 +294,7 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 				label = fmt.Sprintf("'%s' (%s)", target.Slot, target.Name)
 			}
 			m.bookmarkSearchMode = bookmarkModeConfirmDelete
-			m.setStatusMessage(fmt.Sprintf("Delete mark %s? (y/n)", label), true)
+			m.setStatusMessage(fmt.Sprintf("Delete mark %s? (Enter/Esc)", label), true)
 		}
 		return m, nil
 	case "alt+x":
@@ -303,7 +303,7 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 		if len(filtered) > 0 {
 			count := len(filtered)
 			m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
-			m.setStatusMessage(fmt.Sprintf("Delete %d bookmark(s)? (y/n)", count), true)
+			m.setStatusMessage(fmt.Sprintf("Delete %d bookmark(s)? (Enter/Esc)", count), true)
 		}
 		return m, nil
 	case "ctrl+c":
@@ -398,11 +398,11 @@ func (m Model) handleBookmarkFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleBookmarkConfirmDelete handles y/n confirmation for single bookmark deletion.
+// handleBookmarkConfirmDelete handles Enter/y / Esc/n confirmation for single bookmark deletion.
 func (m Model) handleBookmarkConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.bookmarkSearchMode = bookmarkModeNormal
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		cmd := m.bookmarkDeleteCurrent()
 		return m, cmd
 	default:
@@ -411,11 +411,11 @@ func (m Model) handleBookmarkConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	}
 }
 
-// handleBookmarkConfirmDeleteAll handles y/n confirmation for deleting all bookmarks.
+// handleBookmarkConfirmDeleteAll handles Enter/y / Esc/n confirmation for deleting all bookmarks.
 func (m Model) handleBookmarkConfirmDeleteAll(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.bookmarkSearchMode = bookmarkModeNormal
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		cmd := m.bookmarkDeleteAll()
 		return m, cmd
 	default:

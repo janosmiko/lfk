@@ -195,11 +195,12 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Bookmark overwrite confirmation: y accepts, anything else cancels.
+	// Bookmark overwrite confirmation: Enter/y accepts, anything else cancels.
 	if m.pendingBookmark != nil {
 		bm := m.pendingBookmark
 		m.pendingBookmark = nil
-		if msg.String() == "y" || msg.String() == "Y" {
+		switch msg.String() {
+		case "enter", "y", "Y":
 			return m.saveBookmark(*bm)
 		}
 		m.setStatusMessage("Cancelled", false)

@@ -353,7 +353,13 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		w := min(70, m.width-10)
 		return ui.RenderActionOverlay(m.overlayItems, m.overlayCursor, w), w, min(15, m.height-6), true
 	case overlayQuitConfirm:
-		return ui.RenderQuitConfirmOverlay(), min(40, m.width-10), min(7, m.height-6), true
+		// Box outer 32x7. Inside (after 2 border + 4/2 padding):
+		//   inner width  = 32 - 2 - 4 = 26
+		//   inner height =  7 - 2 - 2 =  3
+		// The renderer centers the line both axes within that inner area.
+		qw := min(32, m.width-10)
+		qh := min(7, m.height-6)
+		return ui.RenderQuitConfirmOverlay(qw-6, qh-4), qw, qh, true
 	case overlayConfirm:
 		return ui.RenderConfirmOverlay(m.confirmAction), min(50, m.width-10), min(8, m.height-6), true
 	case overlayConfirmType:

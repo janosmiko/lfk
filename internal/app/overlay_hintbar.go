@@ -27,13 +27,13 @@ func (m Model) overlayHintBarDialog() string {
 	switch m.overlay {
 	case overlayConfirm:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "y", Desc: "confirm"},
-			{Key: "n", Desc: "cancel"},
+			{Key: "Enter", Desc: "confirm"},
+			{Key: "Esc", Desc: "cancel"},
 		})
 	case overlayQuitConfirm:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "y", Desc: "quit"},
-			{Key: "n", Desc: "cancel"},
+			{Key: "Enter", Desc: "quit"},
+			{Key: "Esc", Desc: "cancel"},
 		})
 	case overlayConfirmType:
 		return m.renderHints([]ui.HintEntry{
@@ -221,13 +221,13 @@ func (m Model) overlayHintBarBookmarks() string {
 		})
 	case bookmarkModeConfirmDelete:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "y", Desc: "confirm delete"},
-			{Key: "n", Desc: "cancel"},
+			{Key: "Enter", Desc: "delete"},
+			{Key: "Esc", Desc: "cancel"},
 		})
 	case bookmarkModeConfirmDeleteAll:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "y", Desc: "confirm delete all"},
-			{Key: "n", Desc: "cancel"},
+			{Key: "Enter", Desc: "delete all"},
+			{Key: "Esc", Desc: "cancel"},
 		})
 	default:
 		// tab desc flips with state: "load ns" when the user can arm

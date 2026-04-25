@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -9,23 +10,33 @@ import (
 // --- RenderQuitConfirmOverlay ---
 
 func TestRenderQuitConfirmOverlay(t *testing.T) {
-	tests := []struct {
-		name       string
-		wantSubstr []string
-	}{
-		{
-			name:       "contains quit title and confirmation prompts",
-			wantSubstr: []string{"Quit", "Quit lfk?"},
-		},
+	// Single question, centered both horizontally and vertically within
+	// (innerWidth, innerHeight). The previous two-line layout (title +
+	// question) was being misread as a menu, so it was dropped.
+	result := RenderQuitConfirmOverlay(26, 3)
+	assert.Contains(t, result, "Quit lfk?", "should show the question")
+
+	// Vertical centering: 3 rows total, 1 row of question → 1 blank row
+	// above and below.
+	lines := strings.Split(result, "\n")
+	assert.Equal(t, 3, len(lines), "should fill innerHeight rows")
+	questionRow := -1
+	for i, line := range lines {
+		if strings.Contains(stripANSI(line), "Quit lfk?") {
+			questionRow = i
+		}
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := RenderQuitConfirmOverlay()
-			for _, sub := range tt.wantSubstr {
-				assert.Contains(t, result, sub, "result should contain %q", sub)
-			}
-		})
+	assert.Equal(t, 1, questionRow, "question must sit on the middle row")
+
+	// Horizontal centering: roughly equal leading/trailing whitespace.
+	plain := stripANSI(lines[questionRow])
+	leading := len(plain) - len(strings.TrimLeft(plain, " "))
+	trailing := len(plain) - len(strings.TrimRight(plain, " "))
+	diff := leading - trailing
+	if diff < 0 {
+		diff = -diff
 	}
+	assert.LessOrEqual(t, diff, 1, "text should be horizontally centered (leading=%d trailing=%d)", leading, trailing)
 }
 
 // --- RenderConfirmTypeOverlay ---

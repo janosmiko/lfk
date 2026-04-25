@@ -956,6 +956,31 @@ func TestPush4HandleKeyPendingBookmarkCancel(t *testing.T) {
 	assert.Contains(t, rm.statusMessage, "Cancelled")
 }
 
+func TestPush4HandleKeyPendingBookmarkConfirmEnter(t *testing.T) {
+	// Enter must accept the overwrite — consistency with quit/delete confirms.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := basePush4Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods", Kind: "Pod", Resource: "pods"}
+	bm := model.Bookmark{Name: "test", Slot: "a", ResourceType: "/v1/pods"}
+	m.pendingBookmark = &bm
+	result, _ := m.handleKey(specialKey(tea.KeyEnter))
+	rm := result.(Model)
+	assert.Nil(t, rm.pendingBookmark, "Enter should accept and clear pending")
+	assert.NotContains(t, rm.statusMessage, "Cancelled", "Enter must not be treated as cancel")
+}
+
+func TestPush4HandleKeyPendingBookmarkCancelEsc(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := basePush4Model()
+	bm := model.Bookmark{Name: "test", Slot: "a"}
+	m.pendingBookmark = &bm
+	result, _ := m.handleKey(specialKey(tea.KeyEsc))
+	rm := result.(Model)
+	assert.Nil(t, rm.pendingBookmark)
+	assert.Contains(t, rm.statusMessage, "Cancelled")
+}
+
 func TestPush4HandleKeyDismissStartupTip(t *testing.T) {
 	m := basePush4Model()
 	m.statusMessageTip = true

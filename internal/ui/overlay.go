@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -266,13 +267,19 @@ func RenderConfirmOverlay(action string) string {
 	return b.String()
 }
 
-// RenderQuitConfirmOverlay renders the quit confirmation overlay content.
-func RenderQuitConfirmOverlay() string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Quit"))
-	b.WriteString("\n\n")
-	b.WriteString(OverlayNormalStyle.Render("Quit lfk?"))
-	return b.String()
+// RenderQuitConfirmOverlay renders the quit confirmation overlay content
+// centered both horizontally and vertically within (innerWidth, innerHeight),
+// using the title color for emphasis. The dimensions should be the overlay
+// box's content area (overlayW/H minus border + padding). Single line —
+// a separate "Quit" title used to read as a second option in a two-line
+// layout, so it was dropped.
+func RenderQuitConfirmOverlay(innerWidth, innerHeight int) string {
+	return OverlayTitleStyle.
+		Padding(0).
+		Width(innerWidth).
+		Height(innerHeight).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render("Quit lfk?")
 }
 
 // RenderPasteConfirmOverlay renders the multiline paste confirmation overlay.
