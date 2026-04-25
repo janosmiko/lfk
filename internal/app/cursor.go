@@ -474,12 +474,19 @@ func (m *Model) filteredExplainRecursiveResults() []model.ExplainField {
 }
 
 // filteredOverlayItems returns overlay items matching the current filter.
+//
+// Allocates a non-nil empty slice when the filter matches nothing so
+// downstream renderers (e.g. RenderNamespaceOverlay) can distinguish
+// "filter excluded everything" (empty) from "fetch still in flight"
+// (nil). Without the upfront allocation, a no-match filter slipped
+// through as nil and the namespace overlay rendered "Loading
+// namespaces..." indefinitely.
 func (m *Model) filteredOverlayItems() []model.Item {
 	if m.overlayFilter.Value == "" {
 		return m.overlayItems
 	}
 	rawQuery := m.overlayFilter.Value
-	var filtered []model.Item
+	filtered := []model.Item{}
 	for _, item := range m.overlayItems {
 		if ui.MatchLine(item.Name, rawQuery) {
 			filtered = append(filtered, item)

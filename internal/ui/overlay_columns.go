@@ -104,5 +104,9 @@ func RenderColumnToggleOverlay(entries []ColumnToggleEntry, cursor int, filter s
 			b.WriteString("\n")
 		}
 	}
+	if ind := RenderScrollIndicator(scrollOffset, endIdx-scrollOffset, len(entries), innerW); ind != "" {
+		b.WriteString("\n")
+		b.WriteString(ind)
+	}
 	return b.String()
 }

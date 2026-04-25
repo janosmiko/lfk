@@ -218,6 +218,11 @@ func RenderNamespaceOverlay(items []model.Item, filter string, cursor int, curre
 		}
 	}
 
+	if ind := RenderScrollIndicator(start, end-start, len(items), 0); ind != "" {
+		b.WriteString("\n")
+		b.WriteString(ind)
+	}
+
 	return b.String()
 }
 
@@ -491,6 +496,11 @@ func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedCon
 		}
 	}
 
+	if ind := RenderScrollIndicator(start, end-start, len(items), 0); ind != "" {
+		b.WriteString("\n")
+		b.WriteString(ind)
+	}
+
 	return b.String()
 }
 
@@ -558,6 +568,11 @@ func RenderPodSelectOverlay(items []model.Item, cursor int, filter string, filte
 		if i < end-1 {
 			b.WriteString("\n")
 		}
+	}
+
+	if ind := RenderScrollIndicator(start, end-start, len(items), 0); ind != "" {
+		b.WriteString("\n")
+		b.WriteString(ind)
 	}
 
 	return b.String()
@@ -673,6 +688,11 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 		}
 	}
 
+	if ind := RenderScrollIndicator(start, end-start, len(bookmarks), 0); ind != "" {
+		b.WriteString("\n")
+		b.WriteString(ind)
+	}
+
 	return b.String()
 }
 
@@ -728,6 +748,11 @@ func RenderTemplateOverlay(templates []model.ResourceTemplate, filter string, cu
 		if i < end-1 {
 			b.WriteString("\n")
 		}
+	}
+
+	if ind := RenderScrollIndicator(start, end-start, len(templates), 0); ind != "" {
+		b.WriteString("\n")
+		b.WriteString(ind)
 	}
 
 	return b.String()

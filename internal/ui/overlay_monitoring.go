@@ -268,6 +268,11 @@ func RenderColorschemeOverlay(entries []SchemeEntry, filter string, cursor int, 
 	}
 	b.WriteString(strings.Join(lines, "\n"))
 
+	if ind := RenderScrollIndicator(start, end-start, len(items), 0); ind != "" {
+		b.WriteString("\n")
+		b.WriteString(ind)
+	}
+
 	return b.String()
 }
 
