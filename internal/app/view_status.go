@@ -111,15 +111,25 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 
-	// Show filter/search input in status bar when active.
+	// Show filter/search input in status bar when active. The "(all)"
+	// suffix appears when broad mode is on (Tab toggle), so the user
+	// can tell whether the matcher reaches column values.
 	if m.filterActive {
 		filterModeInd := ui.SearchModeIndicator(m.filterInput.Value)
-		prompt := ui.HelpKeyStyle.Render("filter") + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(filterModeInd) + renderInputWithCursor(m.filterInput.Value, m.filterInput.Cursor)
+		label := "filter"
+		if m.filterBroadMode {
+			label = "filter (all)"
+		}
+		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(filterModeInd) + renderInputWithCursor(m.filterInput.Value, m.filterInput.Cursor)
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 	if m.searchActive {
 		searchModeInd := ui.SearchModeIndicator(m.searchInput.Value)
-		prompt := ui.HelpKeyStyle.Render("search") + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(searchModeInd) + renderInputWithCursor(m.searchInput.Value, m.searchInput.Cursor)
+		label := "search"
+		if m.searchBroadMode {
+			label = "search (all)"
+		}
+		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(searchModeInd) + renderInputWithCursor(m.searchInput.Value, m.searchInput.Cursor)
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 	// When a status message is active, show it exclusively (hide key hints).

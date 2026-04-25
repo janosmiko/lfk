@@ -58,6 +58,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 |---|---|
 | `f` | Start filter mode (filter items in current view) |
 | `/` | Start search mode (search and jump to match) |
+| `Tab` | Inside `/` or `f`: toggle broad mode — also matches against column values (annotations, labels, finalizers, CRD printer columns, custom user columns). Prompt shows `filter (all):` / `search (all):` while on. Resets on Enter/Esc. |
 | `n` | Jump to next search match |
 | `N` | Jump to previous search match |
 | `Esc` | Clear filter / cancel search |

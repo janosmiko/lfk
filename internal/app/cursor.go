@@ -339,6 +339,21 @@ func (m *Model) visibleMiddleItems() []model.Item {
 			}
 			if ui.MatchLine(searchText, rawQuery) {
 				filtered = append(filtered, item)
+				continue
+			}
+			// Broad mode: also scan column values (annotations, labels,
+			// finalizers, CRD printer columns, custom user columns).
+			// Internal-prefix columns stay excluded.
+			if m.filterBroadMode {
+				for _, kv := range item.Columns {
+					if isInternalColumnKey(kv.Key) {
+						continue
+					}
+					if ui.MatchLine(kv.Value, rawQuery) {
+						filtered = append(filtered, item)
+						break
+					}
+				}
 			}
 		}
 		items = filtered

@@ -412,14 +412,16 @@ type Model struct {
 	helpSearchInput  textinput.Model
 
 	// Resource filter state (/ key).
-	filterText   string    // applied filter for middle column
-	filterActive bool      // whether the filter input is being typed
-	filterInput  TextInput // what user is currently typing
+	filterText      string    // applied filter for middle column
+	filterActive    bool      // whether the filter input is being typed
+	filterInput     TextInput // what user is currently typing
+	filterBroadMode bool      // Tab toggle: also match column values (annotations, labels, ...)
 
 	// Search state (s key).
 	searchActive     bool
 	searchInput      TextInput
 	searchPrevCursor int
+	searchBroadMode  bool // Tab toggle inside search input: also match column values
 
 	// Log viewer state.
 	logLines          []string           // buffered log lines

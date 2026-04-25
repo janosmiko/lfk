@@ -112,6 +112,7 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter":
 		m.filterText = m.filterInput.Value
 		m.filterActive = false
+		m.filterBroadMode = false // each filter session starts in name-only
 		m.setCursor(0)
 		m.clampCursor()
 		// The cursor now points at the first filter match — a different
@@ -124,12 +125,21 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.loadPreview()
 	case "esc":
 		m.filterActive = false
+		m.filterBroadMode = false
 		m.filterInput.Clear()
 		m.filterText = ""
 		m.setCursor(0)
 		m.clampCursor()
 		m.invalidatePreviewForCursorChange()
 		return m, m.loadPreview()
+	case "tab":
+		// Toggle broad mode: also match against column values
+		// (annotations, labels, finalizers, CRD printer columns, ...).
+		m.filterBroadMode = !m.filterBroadMode
+		// Reset cursor since the visible set may change shape.
+		m.setCursor(0)
+		m.clampCursor()
+		return m, nil
 	case "backspace":
 		if len(m.filterInput.Value) > 0 {
 			m.filterInput.Backspace()
@@ -193,6 +203,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.searchActive = false
+		m.searchBroadMode = false // each search session starts in name-only
 		m.syncExpandedGroup()
 		// Confirming the search lands the cursor on a different item than
 		// when search started. Invalidate so the right pane drops the
@@ -202,6 +213,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, m.loadPreview()
 	case "esc":
 		m.searchActive = false
+		m.searchBroadMode = false
 		m.searchInput.Clear()
 		m.setCursor(m.searchPrevCursor)
 		m.clampCursor()
@@ -211,6 +223,11 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// so the preview must invalidate here too.
 		m.invalidatePreviewForCursorChange()
 		return m, m.loadPreview()
+	case "tab":
+		// Toggle broad mode: searchMatchesItem also walks column values.
+		m.searchBroadMode = !m.searchBroadMode
+		m.jumpToSearchMatch(0)
+		return m, nil
 	case "backspace":
 		if len(m.searchInput.Value) > 0 {
 			m.searchInput.Backspace()
@@ -275,7 +292,12 @@ func (m *Model) searchMatches(name string, queries []string) bool {
 	return false
 }
 
-// searchMatchesItem checks if an item matches the search query by name or category.
+// searchMatchesItem checks if an item matches the search query by name or
+// category. When searchBroadMode is on (Tab toggle inside the search input),
+// also scans every visible column value (annotations, labels, finalizers,
+// CRD additionalPrinterColumns, custom user columns). Internal-prefix
+// columns stay excluded — they hold render-only metadata, not text the
+// user would search for.
 func (m *Model) searchMatchesItem(item model.Item, queries []string) bool {
 	if m.searchMatches(item.Name, queries) {
 		return true
@@ -283,7 +305,33 @@ func (m *Model) searchMatchesItem(item model.Item, queries []string) bool {
 	if item.Category != "" && m.searchMatches(item.Category, queries) {
 		return true
 	}
+	if m.searchBroadMode {
+		for _, kv := range item.Columns {
+			if isInternalColumnKey(kv.Key) {
+				continue
+			}
+			if m.searchMatches(kv.Value, queries) {
+				return true
+			}
+		}
+	}
 	return false
+}
+
+// isInternalColumnKey identifies column keys that hold render-only
+// metadata (deletion timestamps, secret payloads, owner refs, condition
+// objects, etc.) rather than text the user would type in a filter. Kept
+// in sync with the same exclusion set used by collectExtraToggleEntries
+// in update_column_toggle.go and the broad-filter path in
+// visibleMiddleItems.
+func isInternalColumnKey(key string) bool {
+	return strings.HasPrefix(key, "__") ||
+		strings.HasPrefix(key, "secret:") ||
+		strings.HasPrefix(key, "data:") ||
+		strings.HasPrefix(key, "owner:") ||
+		strings.HasPrefix(key, "condition:") ||
+		strings.HasPrefix(key, "step:") ||
+		strings.HasPrefix(key, "cond:")
 }
 
 func (m *Model) jumpToSearchMatch(startIdx int) {
