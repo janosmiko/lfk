@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // New help-screen contract:
@@ -149,6 +151,23 @@ func TestHelpScrollClampsAfterG(t *testing.T) {
 	// thousands means we never clamped.
 	assert.Less(t, rm.helpScroll, 1000,
 		"G must clamp to actual max scroll, not park the model at 9999")
+}
+
+// G must scroll all the way to the bottom — the renderer's "↓ more
+// below" indicator should disappear after the jump. Reproduces a
+// clamp-formula drift where helpVisibleLines was computed differently
+// than the renderer's, so the clamp stopped short and the "more
+// below" indicator stayed visible.
+func TestHelpScrollGReachesActualBottom(t *testing.T) {
+	m := newHelpModel()
+	r, _ := m.handleHelpKey(keyMsg("G"))
+	rm := r.(Model)
+
+	// Render with the post-clamp scroll value and confirm the renderer
+	// no longer signals more content below.
+	out := ui.RenderHelpScreen(rm.width, rm.height-1, rm.helpScroll, rm.helpFilter.Value, rm.helpSearchQuery, rm.helpContextMode)
+	assert.NotContains(t, out, "more below",
+		"G must clamp to the renderer's actual max so the bottom indicator disappears")
 }
 
 func TestHelpScrollClampsAfterCtrlDPastEnd(t *testing.T) {

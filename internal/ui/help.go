@@ -425,6 +425,27 @@ func BuildHelpLines(filter, contextMode string) []string {
 	return buildHelpLines(filter, contextMode)
 }
 
+// HelpVisibleLines returns the number of help-content rows that fit
+// inside the overlay box for a given screen height. Mirrors the same
+// boxH / maxLines / visibleLines arithmetic RenderHelpScreen uses, so
+// callers (clamp helpers, scroll-to-match positioning) compute the
+// same maxScroll the renderer enforces.
+func HelpVisibleLines(screenHeight int) int {
+	boxH := screenHeight * 80 / 100
+	if boxH < 20 {
+		boxH = 20
+	}
+	maxLines := boxH - 6
+	if maxLines < 5 {
+		maxLines = 5
+	}
+	visibleLines := maxLines - 2
+	if visibleLines < 1 {
+		visibleLines = 1
+	}
+	return visibleLines
+}
+
 // buildHelpLines is the internal implementation kept unexported to
 // avoid forcing callers to import context-specific styling state.
 func buildHelpLines(filter, contextMode string) []string {
@@ -486,12 +507,8 @@ func buildHelpLines(filter, contextMode string) []string {
 // limits sections to the current view (empty = explorer).
 func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, contextMode string) string {
 	boxW := screenWidth * 70 / 100
-	boxH := screenHeight * 80 / 100
 	if boxW < 50 {
 		boxW = 50
-	}
-	if boxH < 20 {
-		boxH = 20
 	}
 
 	contentW := boxW - 6 // account for border + padding
@@ -506,11 +523,9 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 	}
 	totalLines := len(lines)
 
-	// Calculate visible area: title, borders, padding, help line.
-	// Always reserve 2 lines for scroll indicators so the window height
-	// stays constant regardless of scroll position.
-	maxLines := max(boxH-6, 5)
-	visibleLines := max(maxLines-2, 1)
+	// Calculate visible area via shared helper so app-layer clamps see
+	// the same maxScroll the renderer enforces.
+	visibleLines := HelpVisibleLines(screenHeight)
 
 	// Clamp scroll.
 	maxScroll := max(totalLines-visibleLines, 0)

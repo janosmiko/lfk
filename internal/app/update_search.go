@@ -240,15 +240,17 @@ func (m *Model) helpScrollToMatch() {
 	}
 }
 
-// helpVisibleLines approximates the number of help-content rows that
-// fit in the current viewport (terminal height minus the overlay
-// chrome — borders, title, scroll indicators).
+// helpVisibleLines returns the number of help-content rows that fit
+// inside the overlay box. Defers to ui.HelpVisibleLines so the app's
+// clamp/scroll-to-match math matches the renderer's display clamp
+// exactly — when the formulas drift, "↓ more below" never disappears
+// because the clamp stops short of the renderer's actual bottom.
+//
+// Pass the same screen height view.go passes to RenderHelpScreen
+// (m.height - 1), not m.height — the bottom row is reserved for the
+// status bar.
 func (m *Model) helpVisibleLines() int {
-	v := m.height - 6
-	if v < 4 {
-		return 4
-	}
-	return v
+	return ui.HelpVisibleLines(m.height - 1)
 }
 
 // clampHelpScroll bounds m.helpScroll to [0, max] where max is the
