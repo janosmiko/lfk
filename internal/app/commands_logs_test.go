@@ -245,3 +245,31 @@ func TestFinalMaybeLoadMoreHistoryPrevious(t *testing.T) {
 	cmd := m.maybeLoadMoreHistory()
 	assert.Nil(t, cmd)
 }
+
+// In Tail Logs mode the loaded buffer (typically 10 lines) is smaller
+// than the viewport, so logScroll is pinned at 0 from startup. The
+// auto-load must NOT fire just because the user moved the cursor up by
+// a line — it should fire only once the cursor has reached the top of
+// the loaded buffer ("Scrolling to the top auto-loads older history",
+// per the docs).
+func TestFinalMaybeLoadMoreHistoryCursorNotAtTop(t *testing.T) {
+	m := baseFinalModel()
+	m.logLines = []string{"l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9", "l10"}
+	m.logScroll = 0
+	m.logCursor = 5 // mid-buffer — user navigated up but not to the top
+	m.logHasMoreHistory = true
+	cmd := m.maybeLoadMoreHistory()
+	assert.Nil(t, cmd, "should not fire fetchOlderLogs when cursor is mid-buffer")
+	assert.False(t, m.logLoadingHistory, "logLoadingHistory must not flip when load was skipped")
+}
+
+func TestFinalMaybeLoadMoreHistoryCursorAtTopFires(t *testing.T) {
+	m := baseFinalModel()
+	m.logLines = []string{"l1", "l2", "l3"}
+	m.logScroll = 0
+	m.logCursor = 0 // user reached the top of the loaded buffer
+	m.logHasMoreHistory = true
+	cmd := m.maybeLoadMoreHistory()
+	assert.NotNil(t, cmd, "should fire fetchOlderLogs when cursor is at the top")
+	assert.True(t, m.logLoadingHistory, "logLoadingHistory must be set to deduplicate concurrent triggers")
+}

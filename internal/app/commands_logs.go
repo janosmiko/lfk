@@ -638,8 +638,14 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 
 // maybeLoadMoreHistory triggers a background fetch of older log lines
 // when the user has scrolled to the top and more history may be available.
+//
+// The trigger requires the cursor to be at line 0, not just logScroll==0.
+// In Tail Logs mode (10 lines into a ~30-line viewport) logScroll is pinned
+// at 0 from startup, so without this guard every up-navigation — k, ctrl+u,
+// ctrl+b, gg, mouse wheel up — would immediately fetch older history even
+// when the user has only moved a single line up from the bottom.
 func (m *Model) maybeLoadMoreHistory() tea.Cmd {
-	if m.logScroll == 0 && m.logHasMoreHistory && !m.logLoadingHistory && !m.logPrevious {
+	if m.logScroll == 0 && m.logCursor <= 0 && m.logHasMoreHistory && !m.logLoadingHistory && !m.logPrevious {
 		m.logLoadingHistory = true
 		return m.fetchOlderLogs()
 	}
