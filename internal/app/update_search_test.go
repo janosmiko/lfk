@@ -39,26 +39,42 @@ func TestSearchMatches(t *testing.T) {
 // --- searchMatchesItem ---
 
 func TestSearchMatchesItem(t *testing.T) {
-	m := Model{
-		nav: model.NavigationState{Level: model.LevelResources},
-	}
-
 	t.Run("matches by name", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
 		item := model.Item{Name: "nginx-deployment"}
 		assert.True(t, m.searchMatchesItem(item, []string{"nginx"}))
 	})
 
-	t.Run("matches by category", func(t *testing.T) {
+	t.Run("matches by category at LevelResourceTypes", func(t *testing.T) {
+		// Categories render as visible bars at the resource-types
+		// level (Workloads, Argo CD, ...). The renderer highlights
+		// matching text in those bars, so n/N jumping to items under
+		// a matching category makes sense — the user sees the marked
+		// bar and lands on the matching group.
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		item := model.Item{Name: "Applications", Category: "Argo CD"}
+		assert.True(t, m.searchMatchesItem(item, []string{"argo"}),
+			"search at resource-types level must reach the visible category bar")
+	})
+
+	t.Run("does NOT match by category at deeper levels", func(t *testing.T) {
+		// At LevelResources items still carry a Category from the
+		// data model, but the bar isn't rendered there — matching it
+		// would jump n/N to a row with no visible highlight.
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
 		item := model.Item{Name: "my-pod", Category: "Workloads"}
-		assert.True(t, m.searchMatchesItem(item, []string{"workloads"}))
+		assert.False(t, m.searchMatchesItem(item, []string{"workloads"}),
+			"category match outside LevelResourceTypes would jump to non-highlighted rows")
 	})
 
 	t.Run("does not match by namespace alone", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
 		item := model.Item{Name: "my-pod", Namespace: "production"}
 		assert.False(t, m.searchMatchesItem(item, []string{"production"}))
 	})
 
 	t.Run("no match", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
 		item := model.Item{Name: "nginx"}
 		assert.False(t, m.searchMatchesItem(item, []string{"redis"}))
 	})

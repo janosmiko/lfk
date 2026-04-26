@@ -494,9 +494,13 @@ func buildHelpLines(filter, contextMode string) []string {
 
 // RenderHelpScreen renders a full help overlay with all keybindings.
 // filter narrows the visible lines (f key). search highlights matches
-// in the visible lines without removing them (/ key). contextMode
-// limits sections to the current view (empty = explorer).
-func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, contextMode string) string {
+// in the visible lines without removing them (/ key). currentMatchLine
+// is the index (in the post-filter line list) of the line under the
+// n/N navigation cursor — that line gets a distinct "selected match"
+// style so the user can see which match is current. Pass -1 when
+// there's no active navigation. contextMode limits sections to the
+// current view (empty = explorer).
+func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, contextMode string, currentMatchLine int) string {
 	boxW := max(screenWidth*70/100, 50)
 	// Mirror HelpVisibleLines so outer height stays in sync with the
 	// inner row budget — lipgloss pads short content to this height,
@@ -521,7 +525,13 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 	}
 	if search != "" {
 		for i, line := range lines {
-			lines[i] = HighlightMatchStyled(line, search, SearchHighlightStyle)
+			style := SearchHighlightStyle
+			if i == currentMatchLine {
+				// Distinct "selected match" style so the user can see
+				// which match the next n/N press will move from.
+				style = SelectedSearchHighlightStyle
+			}
+			lines[i] = HighlightMatchStyled(line, search, style)
 		}
 	}
 	totalLines := len(lines)

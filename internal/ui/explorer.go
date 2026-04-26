@@ -452,6 +452,14 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 					headerText = "▾ " + item.Category
 				}
 			}
+			// Highlight matching text in the header so a search like
+			// "argo" visibly marks the "Argo CD" bar — keeping the
+			// visible highlight aligned with what searchMatchesItem
+			// considers a match (which jumps n/N to items in this
+			// category).
+			if ActiveHighlightQuery != "" {
+				headerText = highlightName(headerText, ActiveHighlightQuery)
+			}
 			// Highlight category header when cursor is on a collapsed group placeholder.
 			if e.isPlaceholder && e.itemIdx == cursor && isActive {
 				line := Truncate(headerText, width)

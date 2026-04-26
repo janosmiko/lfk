@@ -98,7 +98,7 @@ func (m Model) View() string {
 			}
 			view = strings.Join(viewLines, "\n")
 
-			overlay := ui.RenderHelpScreen(m.width, fullHeight-1, m.helpScroll, m.helpFilter.Value, m.helpSearchQuery, m.helpContextMode)
+			overlay := ui.RenderHelpScreen(m.width, fullHeight-1, m.helpScroll, m.helpFilter.Value, m.helpSearchQuery, m.helpContextMode, m.helpCurrentMatchLine())
 			view = ui.PlaceOverlay(m.width, fullHeight, overlay, view)
 		}
 
@@ -131,7 +131,7 @@ func (m Model) View() string {
 	// The status bar (bottom line) already renders the help search prompt,
 	// so size the overlay to leave the bottom line uncovered.
 	if m.mode == modeHelp {
-		overlay := ui.RenderHelpScreen(m.width, m.height-1, m.helpScroll, m.helpFilter.Value, m.helpSearchQuery, m.helpContextMode)
+		overlay := ui.RenderHelpScreen(m.width, m.height-1, m.helpScroll, m.helpFilter.Value, m.helpSearchQuery, m.helpContextMode, m.helpCurrentMatchLine())
 		view = ui.PlaceOverlay(m.width, m.height, overlay, view)
 	}
 
@@ -210,9 +210,13 @@ func (m Model) rightColumnKind() string {
 }
 
 func (m Model) viewExplorer() string {
-	// Set highlight query for search/filter term highlighting.
+	// Set highlight query for search/filter term highlighting. Search
+	// query takes precedence over filter when both are set, and it
+	// persists past Enter (m.searchInput.Value stays populated until
+	// Esc clears it) so highlights stay visible while n/N navigation
+	// is meaningful.
 	ui.ActiveHighlightQuery = m.filterText
-	if m.searchActive {
+	if m.searchInput.Value != "" {
 		ui.ActiveHighlightQuery = m.searchInput.Value
 	}
 	defer func() { ui.ActiveHighlightQuery = "" }()
@@ -586,10 +590,17 @@ func (m Model) leftColumnLoading() bool {
 }
 
 // viewExplorerThreeCol renders the standard three-column explorer layout.
+//
+// The search/filter highlight is scoped to the middle column only —
+// neither the left (parent context: resource-type categories,
+// kubeconfigs, …) nor the right (child preview) should light up just
+// because the user typed `/workload`. The middle was already rendered
+// upstream with ActiveHighlightQuery active; we clear it here before
+// touching either side column and restore at the end.
 func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rightInner, contentHeight int) string {
-	leftCol := ui.RenderColumn(m.leftColumnHeader(), m.leftItems, m.parentIndex(), leftInner, contentHeight, false, m.leftColumnLoading(), m.spinner.View(), "")
 	savedHighlight := ui.ActiveHighlightQuery
 	ui.ActiveHighlightQuery = ""
+	leftCol := ui.RenderColumn(m.leftColumnHeader(), m.leftItems, m.parentIndex(), leftInner, contentHeight, false, m.leftColumnLoading(), m.spinner.View(), "")
 	savedMiddleScroll := ui.ActiveMiddleScroll
 	savedLeftScroll := ui.ActiveLeftScroll
 	ui.ActiveMiddleScroll = -1

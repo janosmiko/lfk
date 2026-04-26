@@ -145,6 +145,23 @@ func TestHandleSearchKeyTabTogglesBroadMode(t *testing.T) {
 	assert.False(t, rm2.searchBroadMode)
 }
 
+// Confirming a search must NOT clear searchInput.Value — the highlight
+// query in viewExplorer reads from there, and n/N navigation re-runs
+// jumpToSearchMatch which also depends on it. Past iterations
+// effectively cleared highlights on Enter by gating
+// ActiveHighlightQuery on m.searchActive; the value is now derived
+// from the input value so it survives commit.
+func TestHandleSearchKeyEnterPreservesQueryForHighlight(t *testing.T) {
+	m := baseModelCov()
+	m.searchActive = true
+	m.searchInput.Value = "nginx"
+	r, _ := m.handleSearchKey(tea.KeyMsg{Type: tea.KeyEnter})
+	rm := r.(Model)
+	assert.False(t, rm.searchActive, "Enter exits the input")
+	assert.Equal(t, "nginx", rm.searchInput.Value,
+		"Enter must keep searchInput.Value so highlights and n/N stay armed")
+}
+
 func TestHandleSearchKeyEnterPreservesBroadMode(t *testing.T) {
 	// User reproduction: search with Tab on, press Enter, then n/N.
 	// jumpToSearchMatch reads m.searchBroadMode, so resetting on Enter

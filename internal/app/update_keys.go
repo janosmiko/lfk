@@ -307,16 +307,23 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handleExplorerEsc handles the Escape key in explorer mode.
+// handleExplorerEsc handles the Escape key in explorer mode. Cascades
+// from transient content state (selection, search, filter) down to
+// viewport state (fullscreen) and finally to navigation. Content state
+// is what the user just did — peeling it off first matches the
+// intent of "undo the most recent thing"; fullscreen is a more
+// persistent toggle that the user is less likely to want exited
+// before their search/filter work.
 func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
-	if m.fullscreenDashboard {
-		m.fullscreenDashboard = false
-		m.previewScroll = 0
-		m.setStatusMessage("Dashboard fullscreen OFF", false)
-		return m, scheduleStatusClear()
-	}
 	if m.hasSelection() {
 		m.clearSelection()
+		return m, nil
+	}
+	if m.searchInput.Value != "" {
+		// Persisted search query (set by / + Enter) — clear it so the
+		// match highlights and n/N navigation arm both disappear, but
+		// stay on the current level.
+		m.searchInput.Clear()
 		return m, nil
 	}
 	if m.filterText != "" {
@@ -324,6 +331,12 @@ func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
 		m.setCursor(0)
 		m.clampCursor()
 		return m, m.loadPreview()
+	}
+	if m.fullscreenDashboard {
+		m.fullscreenDashboard = false
+		m.previewScroll = 0
+		m.setStatusMessage("Dashboard fullscreen OFF", false)
+		return m, scheduleStatusClear()
 	}
 	if m.nav.Level == model.LevelClusters {
 		if len(m.tabs) > 1 {

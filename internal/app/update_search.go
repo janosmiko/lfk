@@ -237,6 +237,19 @@ func (m *Model) helpScrollToMatch() {
 	m.helpScroll = max(target-visible/2, 0)
 }
 
+// helpCurrentMatchLine returns the line index in the current
+// (post-filter) help line list of the match the n/N cursor sits on,
+// or -1 when there is no active search match. The renderer uses this
+// to render the current match with the distinct
+// SelectedSearchHighlightStyle so the user can tell which match the
+// next n/N press will move from.
+func (m *Model) helpCurrentMatchLine() int {
+	if len(m.helpMatchLines) == 0 || m.helpMatchIdx < 0 || m.helpMatchIdx >= len(m.helpMatchLines) {
+		return -1
+	}
+	return m.helpMatchLines[m.helpMatchIdx]
+}
+
 // helpVisibleLines returns the number of help-content rows that fit
 // inside the overlay box. Defers to ui.HelpVisibleLines so the app's
 // clamp/scroll-to-match math matches the renderer's display clamp
@@ -473,17 +486,24 @@ func (m *Model) searchMatches(name string, queries []string) bool {
 	return false
 }
 
-// searchMatchesItem checks if an item matches the search query by name or
-// category. When searchBroadMode is on (Tab toggle inside the search input),
-// also scans every visible column value (annotations, labels, finalizers,
+// searchMatchesItem checks if an item matches the search query by
+// what's visibly highlighted on screen — name and (at
+// LevelResourceTypes) the category bar above the row. When
+// searchBroadMode is on (Tab toggle inside the search input), also
+// scans every visible column value (annotations, labels, finalizers,
 // CRD additionalPrinterColumns, custom user columns). Internal-prefix
-// columns stay excluded — they hold render-only metadata, not text the
-// user would search for.
+// columns stay excluded.
+//
+// Category match is gated on LevelResourceTypes because that's where
+// categories actually render as visible headers ("Workloads", "Argo
+// CD", ...). At deeper levels item.Category is sometimes set but not
+// shown, so a category match there would jump the cursor to a row
+// with no visible highlight.
 func (m *Model) searchMatchesItem(item model.Item, queries []string) bool {
 	if m.searchMatches(item.Name, queries) {
 		return true
 	}
-	if item.Category != "" && m.searchMatches(item.Category, queries) {
+	if m.nav.Level == model.LevelResourceTypes && item.Category != "" && m.searchMatches(item.Category, queries) {
 		return true
 	}
 	if m.searchBroadMode {

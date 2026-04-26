@@ -165,7 +165,7 @@ func TestHelpScrollGReachesActualBottom(t *testing.T) {
 
 	// Render with the post-clamp scroll value and confirm the renderer
 	// no longer signals more content below.
-	out := ui.RenderHelpScreen(rm.width, rm.height-1, rm.helpScroll, rm.helpFilter.Value, rm.helpSearchQuery, rm.helpContextMode)
+	out := ui.RenderHelpScreen(rm.width, rm.height-1, rm.helpScroll, rm.helpFilter.Value, rm.helpSearchQuery, rm.helpContextMode, rm.helpCurrentMatchLine())
 	assert.NotContains(t, out, "more below",
 		"G must clamp to the renderer's actual max so the bottom indicator disappears")
 }
