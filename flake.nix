@@ -22,7 +22,7 @@
         # `make bump-version VERSION=X.Y.Z` before tagging; the release
         # workflow verifies that this matches the pushed tag so the two
         # can't drift. See docs/RELEASE.md for the full flow.
-        baseVersion = "0.9.24";
+        baseVersion = "0.9.26";
         commit = self.shortRev or self.dirtyShortRev or "unknown";
         version = "${baseVersion}-${commit}";
       in
