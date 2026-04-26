@@ -9,6 +9,18 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// broadModeSuffix names the extra match dimension Tab opens at the
+// current level. At LevelResourceTypes Tab adds category-bar matches
+// ("+groups"); everywhere else it scans column values ("+columns").
+// Returned with parentheses so the caller can drop it next to the
+// "filter"/"search" label without ad-hoc spacing logic.
+func (m Model) broadModeSuffix() string {
+	if m.nav.Level == model.LevelResourceTypes {
+		return "(+groups)"
+	}
+	return "(+columns)"
+}
+
 // leftColumnHeader returns the header label for the left (parent) column.
 func (m Model) leftColumnHeader() string {
 	switch m.nav.Level {
@@ -108,14 +120,16 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 
-	// Show filter/search input in status bar when active. The "(all)"
-	// suffix appears when broad mode is on (Tab toggle), so the user
-	// can tell whether the matcher reaches column values.
+	// Show filter/search input in status bar when active. The
+	// broad-mode suffix names what Tab actually adds at this level —
+	// "+groups" at LevelResourceTypes (category bars), "+columns"
+	// elsewhere (annotations, labels, CRD printer columns, custom
+	// columns) — so the user knows what they just opted into.
 	if m.filterActive {
 		filterModeInd := ui.SearchModeIndicator(m.filterInput.Value)
 		label := "filter"
 		if m.filterBroadMode {
-			label = "filter (all)"
+			label = "filter " + m.broadModeSuffix()
 		}
 		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(filterModeInd) + renderInputWithCursor(m.filterInput.Value, m.filterInput.Cursor)
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
@@ -124,7 +138,7 @@ func (m Model) statusBar() string {
 		searchModeInd := ui.SearchModeIndicator(m.searchInput.Value)
 		label := "search"
 		if m.searchBroadMode {
-			label = "search (all)"
+			label = "search " + m.broadModeSuffix()
 		}
 		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(searchModeInd) + renderInputWithCursor(m.searchInput.Value, m.searchInput.Cursor)
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)

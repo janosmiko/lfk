@@ -487,25 +487,23 @@ func (m *Model) searchMatches(name string, queries []string) bool {
 }
 
 // searchMatchIndices returns the items indices that n/N navigation
-// should visit, with two-pass priority semantics:
+// should visit. Two passes:
 //
-//  1. Try name matches first (and broad-mode column matches when on).
-//     If any are found, that's the answer — category membership is
-//     ignored. So "/ing" on a resource-types listing returns Ingresses
-//     (and any other name-matchers) but not Services even though
-//     Services lives under "Networking".
+//  1. Name matches (and broad-mode column matches when on, via
+//     searchMatchesItem). This is the default behaviour — typing
+//     `/foo` matches resource type names only.
 //
-//  2. If pass 1 finds nothing, fall back at LevelResourceTypes only:
-//     for each category whose name matches the query, include exactly
-//     one item — the first one in the list. So "/argo" on a listing
-//     with no resource type whose name contains "argo" lands on the
-//     first item under "Argo CD" (Applications), giving the user a
-//     way to jump to a category by name without iterating every
-//     resource under it.
+//  2. Broad-mode-only category fallback at LevelResourceTypes: when
+//     pass 1 finds nothing AND searchBroadMode is on (Tab inside the
+//     search input), include exactly the FIRST item of each category
+//     whose name matches the query. So `/argo` + Tab lands on
+//     Applications (first item under "Argo CD") instead of returning
+//     nothing — without making n/N tour every member of the group.
 //
-// At deeper levels the category bar isn't rendered, so the fallback
-// is suppressed there to avoid landing on a row with no visible
-// highlight.
+// The fallback is gated on both broad mode AND LevelResourceTypes:
+// at deeper levels the category bar isn't rendered, so a category
+// match would jump n/N to a row with no visible highlight; and
+// without broad mode the user is asking for a strict name search.
 func (m *Model) searchMatchIndices(items []model.Item, queries []string) []int {
 	var nameMatches []int
 	for i := range items {
@@ -519,7 +517,7 @@ func (m *Model) searchMatchIndices(items []model.Item, queries []string) []int {
 	if len(nameMatches) > 0 {
 		return nameMatches
 	}
-	if m.nav.Level != model.LevelResourceTypes {
+	if !m.searchBroadMode || m.nav.Level != model.LevelResourceTypes {
 		return nil
 	}
 	var catMatches []int

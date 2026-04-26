@@ -447,17 +447,26 @@ func TestVisibleMiddleItemsAllGroupsExpanded(t *testing.T) {
 }
 
 func TestVisibleMiddleItemsCategoryFilterIncludesAll(t *testing.T) {
+	// Category-expansion is now gated on broad mode (Tab) AND
+	// LevelResourceTypes — see filter_category_broad_mode_test.go for
+	// the full contract. Switch this case to the LevelResourceTypes +
+	// broad-mode shape where the expansion is meant to fire; the
+	// previous unconditional expansion was the source of the "f ing
+	// pulls in every Networking item" complaint.
 	m := Model{
-		nav: model.NavigationState{Level: model.LevelResources},
+		nav: model.NavigationState{Level: model.LevelResourceTypes},
 		middleItems: []model.Item{
 			{Name: "Pods", Category: "Workloads"},
 			{Name: "Deployments", Category: "Workloads"},
 			{Name: "Services", Category: "Networking"},
 		},
-		filterText: "Workloads",
+		filterText:        "Workloads",
+		filterBroadMode:   true,
+		allGroupsExpanded: true,
 	}
 	visible := m.visibleMiddleItems()
-	// Category match should include all items in the "Workloads" category.
+	// Category match (broad mode + LevelResourceTypes) includes every
+	// item under "Workloads".
 	assert.Len(t, visible, 2)
 }
 

@@ -96,12 +96,22 @@ func TestSearchMatchIndices(t *testing.T) {
 		{Name: "Monitoring", Category: "Dashboards"},
 	}
 
-	t.Run("name matches present: only name matches returned (not category)", func(t *testing.T) {
+	t.Run("default mode: only name matches, no category fallback", func(t *testing.T) {
+		// Plain `/argo` (no Tab) at LevelResourceTypes: no resource
+		// type name contains "argo" so nothing matches. Without Tab
+		// (broad mode off) the category fallback stays dormant.
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		got := m.searchMatchIndices(items, []string{"argo"})
+		assert.Empty(t, got,
+			"default search must NOT fall back to categories — Tab is the explicit opt-in")
+	})
+
+	t.Run("default mode: name matches present, category not pulled in", func(t *testing.T) {
 		// "/ing" matches Ingresses and Monitoring by NAME. Services
 		// and NetworkPolicies are in Networking (whose name contains
 		// "ing") but their NAMES do not match — they must NOT appear
-		// in the result. This is the regression the user reported as
-		// "iterates through all networking group items".
+		// in the result. This is the original "iterates through all
+		// networking items" regression.
 		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
 		got := m.searchMatchIndices(items, []string{"ing"})
 
@@ -112,34 +122,50 @@ func TestSearchMatchIndices(t *testing.T) {
 				"Services and NetworkPolicies (Networking) must not be included")
 	})
 
-	t.Run("no name matches: fall back to first item per matched category", func(t *testing.T) {
-		// "/argo" doesn't match any resource-type name. Fall back to
-		// category-first-item: "Argo CD" category matches → first
-		// Argo CD item is Applications (index 5). No other matched
-		// category, so result is just [5].
-		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+	t.Run("broad mode at LevelResourceTypes: category fallback fires when no name match", func(t *testing.T) {
+		// Tab + `/argo`: no resource type name contains "argo", so
+		// the broad-mode category fallback kicks in. "Argo CD"
+		// category matches → first Argo CD item is Applications
+		// (index 5).
+		m := Model{
+			nav:             model.NavigationState{Level: model.LevelResourceTypes},
+			searchBroadMode: true,
+		}
 		got := m.searchMatchIndices(items, []string{"argo"})
 
 		assert.Equal(t, []int{5}, got,
-			"with no name match, fall back to the FIRST item of each "+
-				"matched category — not every item under it")
+			"with broad mode on, no name match should fall back to the FIRST "+
+				"item of each matched category — not every item under it")
 	})
 
-	t.Run("no name matches: multiple matched categories yield one entry each", func(t *testing.T) {
-		// Construct a case where two categories match the query and
-		// no names do. Each matched category contributes its first
-		// item only.
+	t.Run("broad mode at LevelResourceTypes: name match still wins over category", func(t *testing.T) {
+		// Even with Tab on, name matches take priority — "/ing"
+		// returns name matches, never expanding into Networking
+		// members via the category branch.
+		m := Model{
+			nav:             model.NavigationState{Level: model.LevelResourceTypes},
+			searchBroadMode: true,
+		}
+		got := m.searchMatchIndices(items, []string{"ing"})
+		assert.Equal(t, []int{3, 7}, got,
+			"category fallback only fires when there are zero name matches")
+	})
+
+	t.Run("broad mode at LevelResourceTypes: multiple matched categories yield one entry each", func(t *testing.T) {
 		multiCat := []model.Item{
 			{Name: "AAA", Category: "Group-X"},
 			{Name: "BBB", Category: "Group-X"},
 			{Name: "CCC", Category: "Group-Y"},
 			{Name: "DDD", Category: "Group-Y"},
 		}
-		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		m := Model{
+			nav:             model.NavigationState{Level: model.LevelResourceTypes},
+			searchBroadMode: true,
+		}
 		got := m.searchMatchIndices(multiCat, []string{"group"})
 
-		assert.Equal(t, []int{0, 2}, got,
-			"each matched category contributes exactly its first item")
+		assert.Equal(t, []int{0, 2},
+			got, "each matched category contributes exactly its first item")
 	})
 
 	t.Run("no matches at all returns nil", func(t *testing.T) {
@@ -148,18 +174,22 @@ func TestSearchMatchIndices(t *testing.T) {
 		assert.Nil(t, got)
 	})
 
-	t.Run("category fallback only at LevelResourceTypes", func(t *testing.T) {
-		// At deeper levels the category bar isn't rendered, so a
-		// category-only fallback would jump to a row with no visible
-		// highlight. Don't fall back there.
-		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
+	t.Run("broad mode outside LevelResourceTypes: category fallback stays off", func(t *testing.T) {
+		// At deeper levels the category bar isn't rendered. Tab there
+		// means "also match column values" via searchMatchesItem; the
+		// category fallback must NOT fire even when broad mode is on.
+		m := Model{
+			nav:             model.NavigationState{Level: model.LevelResources},
+			searchBroadMode: true,
+		}
 		levelItems := []model.Item{
 			{Name: "alpha", Category: "Argo CD"},
 			{Name: "beta", Category: "Argo CD"},
 		}
 		got := m.searchMatchIndices(levelItems, []string{"argo"})
 		assert.Empty(t, got,
-			"category fallback must stay disabled outside LevelResourceTypes")
+			"category fallback must stay disabled outside LevelResourceTypes "+
+				"even with broad mode on")
 	})
 
 	t.Run("does not match by namespace alone", func(t *testing.T) {

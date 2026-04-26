@@ -314,18 +314,28 @@ func (m *Model) visibleMiddleItems() []model.Item {
 	if m.filterText != "" {
 		rawQuery := m.filterText
 
-		// First pass: determine which categories match the filter.
+		// Category expansion is gated on broad mode (Tab) and only at
+		// LevelResourceTypes where the category bar actually renders.
+		// Plain `f ing` matches resource type names only — typing it
+		// must not pull in every Networking member just because the
+		// category name contains the substring.
+		expandByCategory := m.filterBroadMode && m.nav.Level == model.LevelResourceTypes
+
+		// First pass: determine which categories match the filter
+		// (only used when expandByCategory is on).
 		matchedCategories := make(map[string]bool)
-		for _, item := range items {
-			if item.Category != "" && ui.MatchLine(item.Category, rawQuery) {
-				matchedCategories[item.Category] = true
+		if expandByCategory {
+			for _, item := range items {
+				if item.Category != "" && ui.MatchLine(item.Category, rawQuery) {
+					matchedCategories[item.Category] = true
+				}
 			}
 		}
 
 		// Second pass: include items that match by name OR belong to a matched category.
 		var filtered []model.Item
 		for _, item := range items {
-			if item.Category != "" && matchedCategories[item.Category] {
+			if expandByCategory && item.Category != "" && matchedCategories[item.Category] {
 				filtered = append(filtered, item)
 				continue
 			}
@@ -340,7 +350,9 @@ func (m *Model) visibleMiddleItems() []model.Item {
 			}
 			// Broad mode: also scan column values (annotations, labels,
 			// finalizers, CRD printer columns, custom user columns).
-			// Internal-prefix columns stay excluded.
+			// Internal-prefix columns stay excluded. Outside
+			// LevelResourceTypes this is what Tab does — the category
+			// branch above is a no-op there.
 			if m.filterBroadMode {
 				for _, kv := range item.Columns {
 					if isInternalColumnKey(kv.Key) {
