@@ -52,12 +52,10 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 	}
 
 	m.invalidatePreviewForCursorChange()
-	// Reload resource map if active.
 	if m.mapView {
 		m.resourceTree = nil
-		return m, tea.Batch(m.loadPreview(), m.loadResourceTree())
 	}
-	return m, m.loadPreview()
+	return m, schedulePreviewDebounce(m.previewDebounceGen)
 }
 
 // invalidatePreviewForCursorChange resets the right-column state and bumps
@@ -65,8 +63,12 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 // position is discarded by its message handler instead of being applied to
 // the wrong selection (which causes stale items to appear, followed by a
 // brief "No resources found" flash before the new load returns).
+//
+// Does not cancel reqCtx: cancelling on cursor moves storms Bubble Tea's
+// msg channel with context.Canceled deliveries that crowd out KeyMsgs.
 func (m *Model) invalidatePreviewForCursorChange() {
 	m.requestGen++
+	m.previewDebounceGen++
 	m.rightItems = nil
 	m.previewYAML = ""
 	m.previewScroll = 0

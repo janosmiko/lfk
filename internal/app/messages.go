@@ -129,6 +129,8 @@ type startupTipMsg struct{ tip string }
 // watchTickMsg triggers a periodic refresh in watch mode.
 type watchTickMsg struct{}
 
+type previewDebounceTickMsg struct{ gen uint64 }
+
 // describeRefreshTickMsg triggers a periodic refresh in the describe viewer.
 type describeRefreshTickMsg struct{}
 

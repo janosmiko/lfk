@@ -119,8 +119,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case startupTipMsg:
 		mdl, cmd := m.updateStartupTip(msg)
 		return mdl, cmd, true
-	case watchTickMsg:
-		mdl, cmd := m.updateWatchTick(msg)
+	case watchTickMsg, previewDebounceTickMsg:
+		mdl, cmd := m.dispatchNavigationTick(msg)
 		return mdl, cmd, true
 	case podSelectMsg:
 		mdl, cmd := m.updatePodSelect(msg)
@@ -1232,6 +1232,27 @@ func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	cmd := tea.Batch(m.refreshCurrentLevel(), scheduleWatchTick(m.watchInterval))
 	m.suppressBgtasks = false
 	return m, cmd
+}
+
+func (m Model) dispatchNavigationTick(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case watchTickMsg:
+		return m.updateWatchTick(msg)
+	case previewDebounceTickMsg:
+		return m.updatePreviewDebounceTick(msg)
+	}
+	return m, nil
+}
+
+func (m Model) updatePreviewDebounceTick(msg previewDebounceTickMsg) (tea.Model, tea.Cmd) {
+	if msg.gen != m.previewDebounceGen {
+		return m, nil
+	}
+	if m.mapView {
+		m.resourceTree = nil
+		return m, tea.Batch(m.loadPreview(), m.loadResourceTree())
+	}
+	return m, m.loadPreview()
 }
 
 func (m Model) updatePodSelect(msg podSelectMsg) (tea.Model, tea.Cmd) {

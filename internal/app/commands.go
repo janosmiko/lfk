@@ -75,6 +75,14 @@ func scheduleWatchTick(interval time.Duration) tea.Cmd {
 	})
 }
 
+const previewDebounceDelay = 300 * time.Millisecond
+
+func schedulePreviewDebounce(gen uint64) tea.Cmd {
+	return tea.Tick(previewDebounceDelay, func(_ time.Time) tea.Msg {
+		return previewDebounceTickMsg{gen: gen}
+	})
+}
+
 // scheduleDescribeRefresh returns a command that sends a describeRefreshTickMsg after 2 seconds.
 func scheduleDescribeRefresh() tea.Cmd {
 	return tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
