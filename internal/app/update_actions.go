@@ -1308,10 +1308,35 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 	return nil
 }
 
+func (m *Model) cancelAllTabLogStreams() {
+	if m.logCancel != nil {
+		m.logCancel()
+		m.logCancel = nil
+	}
+	if m.logHistoryCancel != nil {
+		m.logHistoryCancel()
+		m.logHistoryCancel = nil
+	}
+	for i := range m.tabs {
+		if m.tabs[i].logCancel != nil {
+			m.tabs[i].logCancel()
+			m.tabs[i].logCancel = nil
+		}
+	}
+}
+
 // closeTabOrQuit closes the current tab if multiple tabs are open,
 // otherwise quits the application (with optional confirmation).
 func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 	if len(m.tabs) > 1 {
+		if m.logCancel != nil {
+			m.logCancel()
+			m.logCancel = nil
+		}
+		if m.logHistoryCancel != nil {
+			m.logHistoryCancel()
+			m.logHistoryCancel = nil
+		}
 		m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
 		if m.activeTab > 0 {
 			m.activeTab--
@@ -1334,6 +1359,7 @@ func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 	if m.portForwardMgr != nil {
 		m.portForwardMgr.StopAll()
 	}
+	m.cancelAllTabLogStreams()
 	m.saveCurrentSession()
 	return m, tea.Quit
 }
