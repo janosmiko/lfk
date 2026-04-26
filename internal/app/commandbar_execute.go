@@ -124,6 +124,16 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 
 	switch canonical {
 	case "quit":
+		// Mirror the cleanup the other quit paths (closeTabOrQuit,
+		// handleQuitConfirmOverlayKey) perform before tea.Quit so that
+		// kubectl log streams started from any tab don't outlive the
+		// process. Without this, `:q` / `:q!` / `:quit` leaks the
+		// kubectl subprocess and its reader goroutine — issue #48.
+		if m.portForwardMgr != nil {
+			m.portForwardMgr.StopAll()
+		}
+		m.cancelAllTabLogStreams()
+		m.saveCurrentSession()
 		return m, tea.Quit
 
 	case "namespace":

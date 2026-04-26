@@ -1308,7 +1308,11 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 	return nil
 }
 
-func (m *Model) cancelAllTabLogStreams() {
+// cancelActiveTabLogStreams cancels the live (Model-level) log stream
+// and history-fetch contexts. Used by tab-close paths so the closing
+// tab's kubectl subprocess + reader goroutine exit immediately, while
+// sibling tabs' streams (held in TabState.logCancel) keep running.
+func (m *Model) cancelActiveTabLogStreams() {
 	if m.logCancel != nil {
 		m.logCancel()
 		m.logCancel = nil
@@ -1317,6 +1321,14 @@ func (m *Model) cancelAllTabLogStreams() {
 		m.logHistoryCancel()
 		m.logHistoryCancel = nil
 	}
+}
+
+// cancelAllTabLogStreams cancels every log stream owned by the Model:
+// the active tab's stream + history (held on Model) and every inactive
+// tab's stream (held in TabState.logCancel). Used by quit paths so no
+// kubectl subprocess or reader goroutine outlives the lfk process.
+func (m *Model) cancelAllTabLogStreams() {
+	m.cancelActiveTabLogStreams()
 	for i := range m.tabs {
 		if m.tabs[i].logCancel != nil {
 			m.tabs[i].logCancel()
@@ -1329,14 +1341,7 @@ func (m *Model) cancelAllTabLogStreams() {
 // otherwise quits the application (with optional confirmation).
 func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 	if len(m.tabs) > 1 {
-		if m.logCancel != nil {
-			m.logCancel()
-			m.logCancel = nil
-		}
-		if m.logHistoryCancel != nil {
-			m.logHistoryCancel()
-			m.logHistoryCancel = nil
-		}
+		m.cancelActiveTabLogStreams()
 		m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
 		if m.activeTab > 0 {
 			m.activeTab--

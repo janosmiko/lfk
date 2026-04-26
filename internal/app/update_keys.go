@@ -327,14 +327,7 @@ func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
 	}
 	if m.nav.Level == model.LevelClusters {
 		if len(m.tabs) > 1 {
-			if m.logCancel != nil {
-				m.logCancel()
-				m.logCancel = nil
-			}
-			if m.logHistoryCancel != nil {
-				m.logHistoryCancel()
-				m.logHistoryCancel = nil
-			}
+			m.cancelActiveTabLogStreams()
 			m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
 			if m.activeTab > 0 {
 				m.activeTab--
