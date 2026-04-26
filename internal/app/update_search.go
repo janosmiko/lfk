@@ -352,6 +352,11 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.filterText = m.filterInput.Value
 			m.setCursor(0)
 			m.clampCursor()
+			// Editing a recalled entry leaves history navigation: the
+			// edited text becomes the new draft, so a later Down past
+			// newest restores the edits, not the original pre-recall
+			// draft.
+			m.queryHistory.reset()
 		}
 		return m, nil
 	case "ctrl+w":
@@ -359,12 +364,14 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.filterText = m.filterInput.Value
 		m.setCursor(0)
 		m.clampCursor()
+		m.queryHistory.reset()
 		return m, nil
 	case "ctrl+u":
 		m.filterInput.DeleteLine()
 		m.filterText = m.filterInput.Value
 		m.setCursor(0)
 		m.clampCursor()
+		m.queryHistory.reset()
 		return m, nil
 	case "ctrl+a":
 		m.filterInput.Home()
@@ -387,6 +394,7 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.filterText = m.filterInput.Value
 			m.setCursor(0)
 			m.clampCursor()
+			m.queryHistory.reset()
 		}
 		return m, nil
 	}
@@ -450,15 +458,20 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.searchInput.Value) > 0 {
 			m.searchInput.Backspace()
 			m.jumpToSearchMatch(0)
+			// Editing a recalled entry leaves history navigation; see
+			// the analogous comment in handleFilterKey for rationale.
+			m.queryHistory.reset()
 		}
 		return m, nil
 	case "ctrl+w":
 		m.searchInput.DeleteWord()
 		m.jumpToSearchMatch(0)
+		m.queryHistory.reset()
 		return m, nil
 	case "ctrl+u":
 		m.searchInput.DeleteLine()
 		m.jumpToSearchMatch(0)
+		m.queryHistory.reset()
 		return m, nil
 	case "ctrl+a":
 		m.searchInput.Home()
@@ -485,6 +498,7 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
 			m.searchInput.Insert(key)
 			m.jumpToSearchMatch(0)
+			m.queryHistory.reset()
 		}
 		return m, nil
 	}
