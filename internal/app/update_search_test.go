@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -756,6 +757,110 @@ func TestHandleKeySearchResetsHistoryCursor(t *testing.T) {
 
 	assert.Equal(t, -1, rm.queryHistory.cursor)
 	assert.Empty(t, rm.queryHistory.draft)
+}
+
+// TestHandleFilterKeyEditAfterRecallPreservesEdits pins the fix for the
+// "edits to a recalled query are silently dropped" UX bug. Sequence:
+// type a draft, Up to recall an entry, edit the recalled text, Down past
+// the newest entry. The expected behavior is that Down restores the
+// edited text — not the pre-recall draft. Without resetting the cursor
+// on a typing keystroke, the history navigation state lingers and the
+// edits get overwritten.
+func TestHandleFilterKeyEditAfterRecallPreservesEdits(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("default")
+	m.filterActive = true
+	m.filterInput.Set("ngi")
+
+	// Up: recall "default", original draft "ngi" is saved.
+	result, _ := m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	require.Equal(t, "default", m.filterInput.Value)
+
+	// User edits the recalled text by typing one character. This should
+	// "leave" history navigation — cursor reset, original draft cleared.
+	result, _ = m.handleFilterKey(keyMsg("x"))
+	m = result.(Model)
+	assert.Equal(t, "defaultx", m.filterInput.Value)
+	assert.Equal(t, -1, m.queryHistory.cursor, "typing must reset history cursor")
+
+	// Up again now saves "defaultx" as the new draft and jumps to the
+	// most-recent entry.
+	result, _ = m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	assert.Equal(t, "default", m.filterInput.Value)
+
+	// Down past newest must restore the edited text, not "ngi".
+	result, _ = m.handleFilterKey(keyMsg("down"))
+	m = result.(Model)
+	assert.Equal(t, "defaultx", m.filterInput.Value)
+}
+
+// TestHandleFilterKeyBackspaceAfterRecallResetsHistory: backspace is
+// also an edit and must reset the history cursor. Same rationale as
+// TestHandleFilterKeyEditAfterRecallPreservesEdits.
+func TestHandleFilterKeyBackspaceAfterRecallResetsHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("default")
+	m.filterActive = true
+	m.filterInput.Set("ngi")
+
+	result, _ := m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	require.Equal(t, "default", m.filterInput.Value)
+
+	result, _ = m.handleFilterKey(keyMsg("backspace"))
+	m = result.(Model)
+	assert.Equal(t, "defaul", m.filterInput.Value)
+	assert.Equal(t, -1, m.queryHistory.cursor, "backspace must reset history cursor")
+}
+
+// TestHandleSearchKeyEditAfterRecallPreservesEdits is the / search
+// counterpart to the filter test.
+func TestHandleSearchKeyEditAfterRecallPreservesEdits(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("redis")
+	m.searchActive = true
+	m.searchInput.Set("ngi")
+
+	result, _ := m.handleSearchKey(keyMsg("up"))
+	m = result.(Model)
+	require.Equal(t, "redis", m.searchInput.Value)
+
+	result, _ = m.handleSearchKey(keyMsg("x"))
+	m = result.(Model)
+	assert.Equal(t, "redisx", m.searchInput.Value)
+	assert.Equal(t, -1, m.queryHistory.cursor, "typing must reset history cursor")
+
+	result, _ = m.handleSearchKey(keyMsg("up"))
+	m = result.(Model)
+	assert.Equal(t, "redis", m.searchInput.Value)
+
+	result, _ = m.handleSearchKey(keyMsg("down"))
+	m = result.(Model)
+	assert.Equal(t, "redisx", m.searchInput.Value)
+}
+
+// TestHandleSearchKeyBackspaceAfterRecallResetsHistory: backspace must
+// also reset history navigation in / search mode.
+func TestHandleSearchKeyBackspaceAfterRecallResetsHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("redis")
+	m.searchActive = true
+	m.searchInput.Set("ngi")
+
+	result, _ := m.handleSearchKey(keyMsg("up"))
+	m = result.(Model)
+	require.Equal(t, "redis", m.searchInput.Value)
+
+	result, _ = m.handleSearchKey(keyMsg("backspace"))
+	m = result.(Model)
+	assert.Equal(t, "redi", m.searchInput.Value)
+	assert.Equal(t, -1, m.queryHistory.cursor, "backspace must reset history cursor")
 }
 
 func TestCovHandleFilterKeyEnter(t *testing.T) {
