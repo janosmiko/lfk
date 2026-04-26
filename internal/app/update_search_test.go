@@ -79,6 +79,88 @@ func TestSearchMatchesItem(t *testing.T) {
 		assert.True(t, m.searchMatchesItem(item, []string{"ing"}),
 			"name match must still fire when category also contains the query")
 	})
+}
+
+// --- searchMatchIndices: two-pass match (name first, category fallback) ---
+
+func TestSearchMatchIndices(t *testing.T) {
+	// Realistic LevelResourceTypes listing — sorted into categories.
+	items := []model.Item{
+		{Name: "Pods", Category: "Workloads"},
+		{Name: "Deployments", Category: "Workloads"},
+		{Name: "Services", Category: "Networking"},
+		{Name: "Ingresses", Category: "Networking"},
+		{Name: "NetworkPolicies", Category: "Networking"},
+		{Name: "Applications", Category: "Argo CD"},
+		{Name: "ApplicationSets", Category: "Argo CD"},
+		{Name: "Monitoring", Category: "Dashboards"},
+	}
+
+	t.Run("name matches present: only name matches returned (not category)", func(t *testing.T) {
+		// "/ing" matches Ingresses and Monitoring by NAME. Services
+		// and NetworkPolicies are in Networking (whose name contains
+		// "ing") but their NAMES do not match — they must NOT appear
+		// in the result. This is the regression the user reported as
+		// "iterates through all networking group items".
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		got := m.searchMatchIndices(items, []string{"ing"})
+
+		// Pods=0, Deployments=1, Services=2, Ingresses=3, NetworkPolicies=4,
+		// Applications=5, ApplicationSets=6, Monitoring=7.
+		assert.Equal(t, []int{3, 7}, got,
+			"only items whose Name contains 'ing' should match — "+
+				"Services and NetworkPolicies (Networking) must not be included")
+	})
+
+	t.Run("no name matches: fall back to first item per matched category", func(t *testing.T) {
+		// "/argo" doesn't match any resource-type name. Fall back to
+		// category-first-item: "Argo CD" category matches → first
+		// Argo CD item is Applications (index 5). No other matched
+		// category, so result is just [5].
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		got := m.searchMatchIndices(items, []string{"argo"})
+
+		assert.Equal(t, []int{5}, got,
+			"with no name match, fall back to the FIRST item of each "+
+				"matched category — not every item under it")
+	})
+
+	t.Run("no name matches: multiple matched categories yield one entry each", func(t *testing.T) {
+		// Construct a case where two categories match the query and
+		// no names do. Each matched category contributes its first
+		// item only.
+		multiCat := []model.Item{
+			{Name: "AAA", Category: "Group-X"},
+			{Name: "BBB", Category: "Group-X"},
+			{Name: "CCC", Category: "Group-Y"},
+			{Name: "DDD", Category: "Group-Y"},
+		}
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		got := m.searchMatchIndices(multiCat, []string{"group"})
+
+		assert.Equal(t, []int{0, 2}, got,
+			"each matched category contributes exactly its first item")
+	})
+
+	t.Run("no matches at all returns nil", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		got := m.searchMatchIndices(items, []string{"zzz-no-match"})
+		assert.Nil(t, got)
+	})
+
+	t.Run("category fallback only at LevelResourceTypes", func(t *testing.T) {
+		// At deeper levels the category bar isn't rendered, so a
+		// category-only fallback would jump to a row with no visible
+		// highlight. Don't fall back there.
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
+		levelItems := []model.Item{
+			{Name: "alpha", Category: "Argo CD"},
+			{Name: "beta", Category: "Argo CD"},
+		}
+		got := m.searchMatchIndices(levelItems, []string{"argo"})
+		assert.Empty(t, got,
+			"category fallback must stay disabled outside LevelResourceTypes")
+	})
 
 	t.Run("does not match by namespace alone", func(t *testing.T) {
 		m := Model{nav: model.NavigationState{Level: model.LevelResources}}

@@ -486,6 +486,60 @@ func (m *Model) searchMatches(name string, queries []string) bool {
 	return false
 }
 
+// searchMatchIndices returns the items indices that n/N navigation
+// should visit, with two-pass priority semantics:
+//
+//  1. Try name matches first (and broad-mode column matches when on).
+//     If any are found, that's the answer — category membership is
+//     ignored. So "/ing" on a resource-types listing returns Ingresses
+//     (and any other name-matchers) but not Services even though
+//     Services lives under "Networking".
+//
+//  2. If pass 1 finds nothing, fall back at LevelResourceTypes only:
+//     for each category whose name matches the query, include exactly
+//     one item — the first one in the list. So "/argo" on a listing
+//     with no resource type whose name contains "argo" lands on the
+//     first item under "Argo CD" (Applications), giving the user a
+//     way to jump to a category by name without iterating every
+//     resource under it.
+//
+// At deeper levels the category bar isn't rendered, so the fallback
+// is suppressed there to avoid landing on a row with no visible
+// highlight.
+func (m *Model) searchMatchIndices(items []model.Item, queries []string) []int {
+	var nameMatches []int
+	for i := range items {
+		if items[i].Kind == "__collapsed_group__" {
+			continue
+		}
+		if m.searchMatchesItem(items[i], queries) {
+			nameMatches = append(nameMatches, i)
+		}
+	}
+	if len(nameMatches) > 0 {
+		return nameMatches
+	}
+	if m.nav.Level != model.LevelResourceTypes {
+		return nil
+	}
+	var catMatches []int
+	seenCat := make(map[string]bool)
+	for i := range items {
+		if items[i].Kind == "__collapsed_group__" {
+			continue
+		}
+		cat := items[i].Category
+		if cat == "" || seenCat[cat] {
+			continue
+		}
+		if m.searchMatches(cat, queries) {
+			catMatches = append(catMatches, i)
+			seenCat[cat] = true
+		}
+	}
+	return catMatches
+}
+
 // searchMatchesItem checks if an item matches the search query by
 // what's visibly highlighted on screen — the item's name. When
 // searchBroadMode is on (Tab toggle inside the search input), also
@@ -493,9 +547,8 @@ func (m *Model) searchMatches(name string, queries []string) bool {
 // CRD additionalPrinterColumns, custom user columns). Internal-prefix
 // columns stay excluded.
 //
-// Category is intentionally NOT matched. The renderer still
-// highlights matching text inside category bars (Networking,
-// Workloads, …) on its own, but counting every item under a
+// Category is intentionally NOT matched here — that lives in
+// searchMatchIndices' fallback pass. Counting every item under a
 // category-matched bar as a search hit turned n/N into a tour of
 // every resource in that group — e.g. "/ing" would step through
 // every Networking item because the category name contains "ing".
@@ -545,18 +598,17 @@ func (m *Model) jumpToSearchMatch(startIdx int) {
 	}
 
 	visible := m.visibleMiddleItems()
-	for i := startIdx; i < len(visible); i++ {
-		if m.searchMatchesItem(visible[i], queries) {
-			m.setCursor(i)
+	matches := m.searchMatchIndices(visible, queries)
+	if len(matches) == 0 {
+		return
+	}
+	for _, mi := range matches {
+		if mi >= startIdx {
+			m.setCursor(mi)
 			return
 		}
 	}
-	for i := 0; i < startIdx && i < len(visible); i++ {
-		if m.searchMatchesItem(visible[i], queries) {
-			m.setCursor(i)
-			return
-		}
-	}
+	m.setCursor(matches[0])
 }
 
 func (m *Model) jumpToPrevSearchMatch(startIdx int) {
@@ -572,20 +624,17 @@ func (m *Model) jumpToPrevSearchMatch(startIdx int) {
 	}
 
 	visible := m.visibleMiddleItems()
-	// Search backwards from startIdx.
-	for i := startIdx; i >= 0; i-- {
-		if m.searchMatchesItem(visible[i], queries) {
-			m.setCursor(i)
+	matches := m.searchMatchIndices(visible, queries)
+	if len(matches) == 0 {
+		return
+	}
+	for i := len(matches) - 1; i >= 0; i-- {
+		if matches[i] <= startIdx {
+			m.setCursor(matches[i])
 			return
 		}
 	}
-	// Wrap around from the end.
-	for i := len(visible) - 1; i > startIdx; i-- {
-		if m.searchMatchesItem(visible[i], queries) {
-			m.setCursor(i)
-			return
-		}
-	}
+	m.setCursor(matches[len(matches)-1])
 }
 
 // searchAllItems searches through ALL middleItems (including collapsed groups)
@@ -634,30 +683,24 @@ func (m *Model) searchAllItems(queries []string, startIdx int, forward bool) {
 
 // searchAllItemsFind finds the matching item index in forward or backward direction.
 func (m *Model) searchAllItemsFind(allItems []model.Item, queries []string, start int, forward bool) int {
+	matches := m.searchMatchIndices(allItems, queries)
+	if len(matches) == 0 {
+		return -1
+	}
 	if forward {
-		for i := start; i < len(allItems); i++ {
-			if allItems[i].Kind != "__collapsed_group__" && m.searchMatchesItem(allItems[i], queries) {
-				return i
+		for _, mi := range matches {
+			if mi >= start {
+				return mi
 			}
 		}
-		for i := 0; i < start && i < len(allItems); i++ {
-			if allItems[i].Kind != "__collapsed_group__" && m.searchMatchesItem(allItems[i], queries) {
-				return i
-			}
-		}
-	} else {
-		for i := start; i >= 0; i-- {
-			if allItems[i].Kind != "__collapsed_group__" && m.searchMatchesItem(allItems[i], queries) {
-				return i
-			}
-		}
-		for i := len(allItems) - 1; i > start; i-- {
-			if allItems[i].Kind != "__collapsed_group__" && m.searchMatchesItem(allItems[i], queries) {
-				return i
-			}
+		return matches[0]
+	}
+	for i := len(matches) - 1; i >= 0; i-- {
+		if matches[i] <= start {
+			return matches[i]
 		}
 	}
-	return -1
+	return matches[len(matches)-1]
 }
 
 // handleCommandBarKey processes key events when the command bar is active.
