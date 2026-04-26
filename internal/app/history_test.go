@@ -252,3 +252,67 @@ func TestCovCommandHistorySaveLoad(t *testing.T) {
 	assert.Equal(t, "test command 1", h2.entries[0])
 	assert.Equal(t, "test command 2", h2.entries[1])
 }
+
+// --- loadInputHistory: per-name files stay isolated ---
+
+// TestLoadInputHistoryIsolatesQueryFromCommand pins the one separation
+// that still matters after `/` and `f` were merged into a single
+// query-history: kubectl-shaped `:` command bar entries must not appear
+// when recalling `/`/`f` queries. Without isolation, pressing Up in `/`
+// would surface ":get pods" as a suggested resource-name pattern.
+func TestLoadInputHistoryIsolatesQueryFromCommand(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+
+	qh := loadInputHistory(historyFileQuery)
+	qh.add("nginx")
+	qh.save()
+
+	ch := loadCommandHistory()
+	ch.add(":get pods")
+	ch.save()
+
+	// Reload from disk and verify no cross-contamination between the two
+	// distinct files.
+	gotQuery := loadInputHistory(historyFileQuery)
+	gotCmd := loadCommandHistory()
+
+	assert.Equal(t, []string{"nginx"}, gotQuery.entries)
+	assert.Equal(t, []string{":get pods"}, gotCmd.entries)
+}
+
+// TestSavePreservesFilenameAcrossSaves verifies a loaded instance keeps
+// writing back to the same file, rather than silently defaulting to
+// "history" after the first save.
+func TestSavePreservesFilenameAcrossSaves(t *testing.T) {
+	tmp := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", tmp)
+
+	h := loadInputHistory(historyFileQuery)
+	h.add("first")
+	h.save()
+	h.add("second")
+	h.save()
+
+	// File must exist at the query-history path, NOT at "history".
+	_, err := os.Stat(filepath.Join(tmp, "lfk", historyFileQuery))
+	require.NoError(t, err, "query-history file must exist after save")
+
+	_, err = os.Stat(filepath.Join(tmp, "lfk", historyFileCommand))
+	assert.Error(t, err, "command history file must NOT be created by query saves")
+}
+
+// --- nil-safe methods ---
+
+// Nil receiver tolerance lets test models that don't initialize history
+// pointers exercise the filter/search Enter/Esc paths without panicking.
+// This mirrors how the rest of the Model fields are partially-init in
+// test factories — a regression here would fail dozens of tests at once.
+func TestCommandHistoryNilSafe(t *testing.T) {
+	var h *commandHistory
+
+	assert.NotPanics(t, func() { h.add("anything") })
+	assert.NotPanics(t, func() { h.save() })
+	assert.NotPanics(t, func() { h.reset() })
+	assert.Equal(t, "draft", h.up("draft"))
+	assert.Empty(t, h.down())
+}

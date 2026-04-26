@@ -483,6 +483,155 @@ func TestPush4HandleSearchKeyEnter(t *testing.T) {
 	assert.False(t, rm.searchActive)
 }
 
+// --- search/filter history navigation (up/down) ---
+
+// TestHandleFilterKeyUpRecallsHistory exercises the user-facing feature:
+// pressing Up while the filter input is open replaces the input with the
+// most-recent persisted query. Primary acceptance test for query recall.
+func TestHandleFilterKeyUpRecallsHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("kube-system")
+	m.queryHistory.add("default")
+	m.filterActive = true
+
+	result, _ := m.handleFilterKey(keyMsg("up"))
+	rm := result.(Model)
+
+	// Most recent entry surfaces first; filterText must mirror the input
+	// so visibleMiddleItems narrows immediately, not on the next keystroke.
+	assert.Equal(t, "default", rm.filterInput.Value)
+	assert.Equal(t, "default", rm.filterText)
+}
+
+// TestHandleFilterKeyUpDownCycles walks the full up/up/down sequence to
+// pin the cycling semantics: Up moves to older entries, Down moves
+// toward newer + finally restores the draft when past the newest.
+func TestHandleFilterKeyUpDownCycles(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("first")
+	m.queryHistory.add("second")
+	m.filterActive = true
+	m.filterInput.Set("partial-typed")
+
+	// Up: most recent → "second", original input saved as draft.
+	result, _ := m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	assert.Equal(t, "second", m.filterInput.Value)
+
+	// Up again: older → "first".
+	result, _ = m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	assert.Equal(t, "first", m.filterInput.Value)
+
+	// Down: back toward newer → "second".
+	result, _ = m.handleFilterKey(keyMsg("down"))
+	m = result.(Model)
+	assert.Equal(t, "second", m.filterInput.Value)
+
+	// Down past newest: draft restored.
+	result, _ = m.handleFilterKey(keyMsg("down"))
+	m = result.(Model)
+	assert.Equal(t, "partial-typed", m.filterInput.Value)
+}
+
+// TestHandleFilterKeyEnterPersistsToHistory pins the contract that
+// Enter both confirms the filter AND records it for next session — the
+// "people search the same things" motivation for persistence.
+func TestHandleFilterKeyEnterPersistsToHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.filterActive = true
+	m.filterInput.Set("nginx")
+
+	result, _ := m.handleFilterKey(keyMsg("enter"))
+	rm := result.(Model)
+
+	assert.Equal(t, []string{"nginx"}, rm.queryHistory.entries)
+}
+
+// TestHandleSearchKeyUpRecallsHistory is the analogue for the / search
+// path: Up replaces the search input with the most-recent saved query.
+func TestHandleSearchKeyUpRecallsHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("redis")
+	m.queryHistory.add("nginx")
+	m.searchActive = true
+
+	result, _ := m.handleSearchKey(keyMsg("up"))
+	rm := result.(Model)
+
+	assert.Equal(t, "nginx", rm.searchInput.Value)
+}
+
+// TestHandleSearchKeyEnterPersistsToHistory pins the / search Enter
+// path: confirming a search saves it for recall in a later session.
+func TestHandleSearchKeyEnterPersistsToHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.searchActive = true
+	m.searchInput.Set("payments")
+
+	result, _ := m.handleSearchKey(keyMsg("enter"))
+	rm := result.(Model)
+
+	assert.Equal(t, []string{"payments"}, rm.queryHistory.entries)
+}
+
+// TestSearchAndFilterShareHistory pins the design decision that `/` and
+// `f` write to and read from a single shared history. A query confirmed
+// in one mode must be recallable from the other — without this, users
+// who happen to remember "I typed nginx as a search" vs. "as a filter"
+// see different recall results, which was the awkwardness the merge was
+// meant to remove.
+func TestSearchAndFilterShareHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+
+	// Confirm a query in filter mode.
+	m.filterActive = true
+	m.filterInput.Set("nginx")
+	result, _ := m.handleFilterKey(keyMsg("enter"))
+	m = result.(Model)
+
+	// Now switch to search mode and press Up — must recall the filter
+	// query. Validates a single shared store backs both inputs.
+	m.searchActive = true
+	m.searchInput.Clear()
+	result, _ = m.handleSearchKey(keyMsg("up"))
+	rm := result.(Model)
+
+	assert.Equal(t, "nginx", rm.searchInput.Value, "search must recall a query confirmed in filter mode")
+}
+
+// TestHandleKeyFilterResetsHistoryCursor guards the "fresh session"
+// invariant: opening the filter with `f` resets the history cursor so
+// the first Up always starts from the newest entry, not from wherever
+// a prior session left off.
+func TestHandleKeyFilterResetsHistoryCursor(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: 0, draft: "stale"}
+
+	rm := m.handleKeyFilter()
+
+	assert.Equal(t, -1, rm.queryHistory.cursor)
+	assert.Empty(t, rm.queryHistory.draft)
+}
+
+// TestHandleKeySearchResetsHistoryCursor mirrors the filter case for
+// the / search entry point.
+func TestHandleKeySearchResetsHistoryCursor(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: 2, draft: "stale"}
+
+	rm := m.handleKeySearch()
+
+	assert.Equal(t, -1, rm.queryHistory.cursor)
+	assert.Empty(t, rm.queryHistory.draft)
+}
+
 func TestCovHandleFilterKeyEnter(t *testing.T) {
 	m := baseModelCov()
 	m.cursors = [5]int{}

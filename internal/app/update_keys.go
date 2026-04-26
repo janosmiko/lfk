@@ -785,6 +785,7 @@ func (m Model) handleKeyFilter() Model {
 	m.filterText = ""
 	m.setCursor(0)
 	m.clampCursor()
+	m.queryHistory.reset()
 	return m
 }
 
@@ -793,6 +794,7 @@ func (m Model) handleKeySearch() Model {
 	m.searchBroadMode = false // each fresh search session starts in name-only
 	m.searchInput.Clear()
 	m.searchPrevCursor = m.cursor()
+	m.queryHistory.reset()
 	return m
 }
 

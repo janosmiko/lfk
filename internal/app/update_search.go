@@ -307,6 +307,8 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// input starts via handleKeyFilter.
 		m.setCursor(0)
 		m.clampCursor()
+		m.queryHistory.add(m.filterInput.Value)
+		m.queryHistory.save()
 		// The cursor now points at the first filter match — a different
 		// item than before. Without invalidation the right pane keeps
 		// rendering the previous selection's rightItems (and skips the
@@ -324,6 +326,18 @@ func (m Model) handleFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.clampCursor()
 		m.invalidatePreviewForCursorChange()
 		return m, m.loadPreview()
+	case "up":
+		m.filterInput.Set(m.queryHistory.up(m.filterInput.Value))
+		m.filterText = m.filterInput.Value
+		m.setCursor(0)
+		m.clampCursor()
+		return m, nil
+	case "down":
+		m.filterInput.Set(m.queryHistory.down())
+		m.filterText = m.filterInput.Value
+		m.setCursor(0)
+		m.clampCursor()
+		return m, nil
 	case "tab":
 		// Toggle broad mode: also match against column values
 		// (annotations, labels, finalizers, CRD printer columns, ...).
@@ -398,6 +412,8 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Keep searchBroadMode as-is so n/N (jumpToSearchMatch reads
 		// this flag) stay in the same scope as the just-confirmed query.
 		// Reset on Esc or when a new search starts via handleKeySearch.
+		m.queryHistory.add(m.searchInput.Value)
+		m.queryHistory.save()
 		m.syncExpandedGroup()
 		// Confirming the search lands the cursor on a different item than
 		// when search started. Invalidate so the right pane drops the
@@ -417,6 +433,14 @@ func (m Model) handleSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// so the preview must invalidate here too.
 		m.invalidatePreviewForCursorChange()
 		return m, m.loadPreview()
+	case "up":
+		m.searchInput.Set(m.queryHistory.up(m.searchInput.Value))
+		m.jumpToSearchMatch(0)
+		return m, nil
+	case "down":
+		m.searchInput.Set(m.queryHistory.down())
+		m.jumpToSearchMatch(0)
+		return m, nil
 	case "tab":
 		// Toggle broad mode: searchMatchesItem also walks column values.
 		m.searchBroadMode = !m.searchBroadMode

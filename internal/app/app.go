@@ -797,6 +797,7 @@ type Model struct {
 	commandBarSelectedSuggestion int
 	commandBarPreview            string // ghost text shown dimmed after cursor (tab preview)
 	commandHistory               *commandHistory
+	queryHistory                 *commandHistory // shared by explorer / search and f filter
 
 	// Cached namespace names for command bar autocompletion, keyed by
 	// context name. Each tab may have its own nav.Context, so keying by
@@ -959,6 +960,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		pendingSession:      loadSession(),
 		pendingPortForwards: loadPortForwardState(),
 		commandHistory:      loadCommandHistory(),
+		queryHistory:        loadInputHistory(historyFileQuery),
 		pinnedState:         pinnedSt,
 		namespace:           defaultNS,
 		spinner:             s,

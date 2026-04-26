@@ -59,11 +59,14 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `f` | Start filter mode (filter items in current view) |
 | `/` | Start search mode (search and jump to match) |
 | `Tab` | Inside `/` or `f`: toggle broad mode — also matches against column values (annotations, labels, finalizers, CRD printer columns, custom user columns). Prompt shows `filter (all):` / `search (all):` while on. Resets on Enter/Esc. |
+| `Up` / `Down` | Inside `/` or `f`: cycle through previous queries (shared persistent history). |
 | `n` | Jump to next search match |
 | `N` | Jump to previous search match |
 | `Esc` | Clear filter / cancel search |
 
 Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
+
+`/` and `f` share one persistent history at `$XDG_STATE_HOME/lfk/query-history` (default `~/.local/state/lfk/query-history`) — both inputs accept the same query syntax and match against the same fields, so a query confirmed in one mode is recallable from the other. The `:` command bar keeps its own `history` file because its inputs are kubectl-shaped commands rather than resource-name queries.
 
 ## Actions
 
