@@ -558,6 +558,8 @@ type Model struct {
 	// they were created with and are discarded if it no longer matches.
 	requestGen uint64
 
+	previewDebounceGen uint64
+
 	// Context cancellation for in-flight API requests. Cancelled on every
 	// navigation change so stale requests are aborted early instead of
 	// running to completion.

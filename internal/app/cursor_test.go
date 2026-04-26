@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -1099,7 +1100,7 @@ func TestCov80MoveCursorUpFromZero(t *testing.T) {
 	result, cmd := m.moveCursor(-1)
 	rm := result.(Model)
 	assert.Equal(t, 0, rm.cursor())
-	assert.NotNil(t, cmd) // loadPreview
+	assert.NotNil(t, cmd)
 }
 
 func TestCov80MoveCursorDownPastEnd(t *testing.T) {
@@ -1259,6 +1260,59 @@ func TestMoveCursorBumpsRequestGenAndDiscardsStalePreview(t *testing.T) {
 	am := after.(Model)
 	assert.True(t, am.loading, "stale preview must not clear loading flag")
 	assert.Nil(t, am.rightItems, "stale preview must not populate rightItems")
+}
+
+func TestMoveCursorDoesNotCancelInFlightReqCtx(t *testing.T) {
+	m := basePush80Model()
+	m.reqCtx, m.reqCancel = context.WithCancel(context.Background())
+	oldCtx := m.reqCtx
+	m.setCursor(0)
+
+	result, _ := m.moveCursor(1)
+	rm := result.(Model)
+
+	assert.NoError(t, oldCtx.Err())
+	assert.Equal(t, oldCtx, rm.reqCtx)
+}
+
+func TestMoveCursorDebounceCoalescesRapidBursts(t *testing.T) {
+	m := basePush80Model()
+	m.middleItems = []model.Item{
+		{Name: "pod-1", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-2", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-3", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-4", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-5", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-6", Namespace: "default", Kind: "Pod"},
+	}
+	m.setCursor(0)
+
+	startGen := m.previewDebounceGen
+	scheduledGens := make([]uint64, 0, 5)
+	for range 5 {
+		result, cmd := m.moveCursor(1)
+		m = result.(Model)
+		require.NotNil(t, cmd)
+		msg := cmd()
+		tick, ok := msg.(previewDebounceTickMsg)
+		require.True(t, ok)
+		scheduledGens = append(scheduledGens, tick.gen)
+	}
+
+	assert.Equal(t, startGen+5, m.previewDebounceGen)
+	for i := 1; i < len(scheduledGens); i++ {
+		assert.Greater(t, scheduledGens[i], scheduledGens[i-1])
+	}
+
+	for _, staleGen := range scheduledGens[:4] {
+		_, cmd := m.Update(previewDebounceTickMsg{gen: staleGen})
+		assert.Nilf(t, cmd, "stale gen %d must be dropped (current %d)", staleGen, m.previewDebounceGen)
+	}
+
+	finalGen := scheduledGens[4]
+	require.Equal(t, m.previewDebounceGen, finalGen)
+	_, cmd := m.Update(previewDebounceTickMsg{gen: finalGen})
+	assert.NotNil(t, cmd)
 }
 
 func TestCov80MoveCursorEmptyItems(t *testing.T) {
