@@ -993,19 +993,27 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 			// Selected row: plain text, no inner styles.
 			row := markerPrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, LiveAge(item),
 				nameW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
+			highlighted := false
 			// Apply search/filter highlight on the selected row with
 			// contrasting style. Pass the cursor-row outer style so
 			// the inner highlight's reset doesn't kill the cursor bg
 			// for the post-match part of the row.
 			if ActiveHighlightQuery != "" {
 				row = highlightNameSelectedOver(row, ActiveHighlightQuery, ActiveSelectedStyle(i))
+				highlighted = true
 			}
 			// Pad to full width for clean highlight.
 			lineW := lipgloss.Width(row)
 			if lineW < width {
 				row += strings.Repeat(" ", width-lineW)
 			}
-			b.WriteString(ActiveSelectedStyle(i).MaxWidth(width).Render(row))
+			if highlighted {
+				// Avoid lipgloss.Render fragmenting embedded inner
+				// highlight ANSI per-character — see RenderOverPrestyled.
+				b.WriteString(RenderOverPrestyled(row, ActiveSelectedStyle(i)))
+			} else {
+				b.WriteString(ActiveSelectedStyle(i).MaxWidth(width).Render(row))
+			}
 		} else {
 			// Selection marker (styled for non-cursor rows).
 			markerPrefix := ""

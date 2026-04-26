@@ -485,18 +485,31 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 			// line so the inner highlight's reset doesn't kill the
 			// bar's background for the post-match segment.
 			if e.isPlaceholder && e.itemIdx == cursor && isActive {
+				highlighted := false
 				if ActiveHighlightCategories && ActiveHighlightQuery != "" {
 					headerText = highlightNameOver(headerText, ActiveHighlightQuery, ActiveSelectedStyle(e.itemIdx))
+					highlighted = true
 				}
 				line := Truncate(headerText, width)
 				lineWidth := lipgloss.Width(line)
 				if lineWidth < width {
 					line += strings.Repeat(" ", width-lineWidth)
 				}
-				b.WriteString(ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line))
+				if highlighted {
+					// Use manual outer-wrap: lipgloss.Render fragments
+					// embedded inner ANSI per-character, producing
+					// malformed sequences that NO_COLOR terminals
+					// display as literal "[1;7m..." text and that
+					// throw off visible width.
+					b.WriteString(RenderOverPrestyled(line, ActiveSelectedStyle(e.itemIdx)))
+				} else {
+					b.WriteString(ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line))
+				}
 			} else {
+				highlighted := false
 				if ActiveHighlightCategories && ActiveHighlightQuery != "" {
 					headerText = highlightNameOver(headerText, ActiveHighlightQuery, CategoryBarStyle)
+					highlighted = true
 				}
 				// Render the category header as a full-width "bar"
 				// with a distinct style so groups are visually
@@ -506,7 +519,11 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 				if lineWidth < width {
 					line += strings.Repeat(" ", width-lineWidth)
 				}
-				b.WriteString(CategoryBarStyle.Render(line))
+				if highlighted {
+					b.WriteString(RenderOverPrestyled(line, CategoryBarStyle))
+				} else {
+					b.WriteString(CategoryBarStyle.Render(line))
+				}
 			}
 			first = false
 		}
@@ -523,19 +540,27 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 		switch {
 		case e.itemIdx == cursor && isActive:
 			line = FormatItemPlain(item, width)
+			highlighted := false
 			// Apply search/filter highlight on the selected item with
 			// contrasting style. Pass the outer cursor style so the
 			// inner highlight's reset doesn't kill the cursor bg for
 			// the post-match part of the row.
 			if ActiveHighlightQuery != "" {
 				line = highlightNameSelectedOver(line, ActiveHighlightQuery, ActiveSelectedStyle(e.itemIdx))
+				highlighted = true
 			}
 			// Pad line to full column width for consistent background.
 			lineWidth := lipgloss.Width(line)
 			if lineWidth < width {
 				line += strings.Repeat(" ", width-lineWidth)
 			}
-			line = ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line)
+			if highlighted {
+				// Avoid lipgloss.Render fragmenting embedded inner
+				// highlight ANSI — see RenderOverPrestyled doc.
+				line = RenderOverPrestyled(line, ActiveSelectedStyle(e.itemIdx))
+			} else {
+				line = ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line)
+			}
 		case e.itemIdx == cursor && cursor >= 0:
 			// Parent column highlight (dimmer than active selection).
 			line = FormatItemNameOnlyPlain(item, width)

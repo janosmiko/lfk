@@ -185,6 +185,35 @@ func styleOpenCodes(style lipgloss.Style) string {
 	return open
 }
 
+// ansiReset is the SGR reset sequence emitted at the end of a rendered
+// run. Matches what lipgloss appends to its own Render output.
+const ansiReset = "\x1b[0m"
+
+// RenderOverPrestyled wraps a line that may already contain inner ANSI
+// codes (from a prior HighlightMatchStyledOver pass) with outerStyle's
+// open/close SGR codes, bypassing lipgloss.Render.
+//
+// This exists because lipgloss.Render fragments any embedded ANSI in
+// its input — every byte of the embedded escape sequences gets wrapped
+// with outerStyle individually, doubling the ESC introducer and
+// producing malformed output of the form "\x1b\x1b[0m...". Most
+// terminals tolerate that, but in NO_COLOR / ANSI profile mode some
+// terminals render the second sequence as literal text ("[1;7mNetw[0m"),
+// and the visible-width calculation goes off so the line wraps.
+//
+// The manual SGR open + content + reset path keeps the inner
+// highlights intact and produces a stream the terminal can parse
+// uniformly.
+//
+// Returns line unchanged when outerStyle has no open codes.
+func RenderOverPrestyled(line string, outerStyle lipgloss.Style) string {
+	open := styleOpenCodes(outerStyle)
+	if open == "" {
+		return line
+	}
+	return open + line + ansiReset
+}
+
 // highlightSubstring highlights all occurrences of query in line
 // (case-insensitive). When restoreCodes is non-empty it's emitted
 // after each inner highlight reset so a wrapping outer style's
