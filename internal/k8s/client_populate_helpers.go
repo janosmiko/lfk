@@ -11,22 +11,33 @@ import (
 	"github.com/robfig/cron/v3"
 )
 
+// nextCronFire returns the next time a CronJob with the given crontab
+// schedule will fire. timeZone follows spec.timeZone semantics: when
+// empty, the schedule is evaluated in UTC — the same default
+// kube-controller-manager uses for CronJobs without spec.timeZone, so
+// the displayed time matches what the cluster will actually do
+// regardless of the user's local timezone.
+//
+// Returns ok=false when schedule is empty, when timeZone fails to load,
+// or when schedule fails to parse. Accepts standard 5-field crontabs
+// and the predefined descriptors (`@hourly`, `@daily`, …).
 func nextCronFire(schedule, timeZone string, now time.Time) (time.Time, bool) {
 	if schedule == "" {
 		return time.Time{}, false
 	}
+	loc := time.UTC
 	if timeZone != "" {
-		loc, err := time.LoadLocation(timeZone)
+		l, err := time.LoadLocation(timeZone)
 		if err != nil {
 			return time.Time{}, false
 		}
-		now = now.In(loc)
+		loc = l
 	}
 	parsed, err := cron.ParseStandard(schedule)
 	if err != nil {
 		return time.Time{}, false
 	}
-	return parsed.Next(now), true
+	return parsed.Next(now.In(loc)), true
 }
 
 // populateMetadataFields extracts labels, finalizers, and annotations from the

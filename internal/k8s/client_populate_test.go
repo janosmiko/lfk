@@ -1305,8 +1305,16 @@ func TestPopulateResourceDetails_CronJob_Next(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ti := &model.Item{}
 			populateResourceDetails(ti, tt.obj, "CronJob")
-			_, hasNext := columnsToMap(ti.Columns)["Next"]
+			val, hasNext := columnsToMap(ti.Columns)["Next"]
 			assert.Equal(t, tt.wantNext, hasNext, "Next column presence mismatch")
+			if hasNext {
+				// Verify the value is a formatAge-shaped duration string
+				// (digits followed by s/m/h/d/y) so a regression that
+				// drops formatAge or changes the key would surface here,
+				// not just at runtime.
+				assert.Regexp(t, `^\d+[smhdy]$`, val,
+					"Next column value must be a formatAge duration like 4m, 2h, 3d")
+			}
 		})
 	}
 }
