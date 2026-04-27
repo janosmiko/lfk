@@ -348,7 +348,8 @@ func (m *Model) findNextLogMatchForward(rawQuery string, start int) {
 		dl := m.logDisplayLine(start)
 		runes := []rune(dl)
 		// Clamp: logVisualCurCol carries the column from a previously
-		// focused line and may exceed this line's rune length.
+		// focused line and may exceed this line's rune length. Forward
+		// uses +1 because the search starts after (not at) the cursor.
 		end := min(m.logVisualCurCol+1, len(runes))
 		curBytePos := len(string(runes[:end]))
 		if curBytePos < len(dl) {
@@ -376,8 +377,8 @@ func (m *Model) findNextLogMatchBackward(rawQuery string, start int) {
 	if start >= 0 && start < len(m.logLines) {
 		dl := m.logDisplayLine(start)
 		runes := []rune(dl)
-		// Clamp: logVisualCurCol carries the column from a previously
-		// focused line and may exceed this line's rune length.
+		// Clamp: logVisualCurCol may exceed this line's rune length;
+		// backward search ends at (excluding) the cursor.
 		end := min(m.logVisualCurCol, len(runes))
 		curBytePos := len(string(runes[:end]))
 		if curBytePos > 0 {
