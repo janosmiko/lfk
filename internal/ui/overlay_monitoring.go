@@ -50,6 +50,50 @@ func ErrorLogEntryPlainText(e ErrorLogEntry) string {
 	return fmt.Sprintf("%s [%s] %s", e.Time.Format("15:04:05"), e.Level, e.Message)
 }
 
+// errorLogLevelPalette returns the (foreground hex, bold) pair for a given
+// log level. Unknown levels fall through to INF styling.
+func errorLogLevelPalette(level string) (color, label string, bold bool) {
+	switch level {
+	case "ERR":
+		return "#ff5555", "ERR", true
+	case "WRN":
+		return "#ffaa00", "WRN", true
+	case "DBG":
+		return "#6272a4", "DBG", false
+	default:
+		return "#888888", "INF", false
+	}
+}
+
+// renderErrorLogLine formats a single error-log row: indicator + timestamp +
+// styled level + message. When cursorBg is true, every segment inherits the
+// cursor-line background so the level fg color stays visible while the row
+// is highlighted.
+func renderErrorLogLine(entry ErrorLogEntry, cursorBg bool) string {
+	color, label, bold := errorLogLevelPalette(entry.Level)
+
+	if cursorBg {
+		base := lipgloss.NewStyle().Background(BaseBg).Bold(true)
+		lvlStyle := lipgloss.NewStyle().Inherit(base).Foreground(ThemeColor(color))
+		if bold {
+			lvlStyle = lvlStyle.Bold(true)
+		}
+		ts := base.Render(entry.Time.Format("15:04:05"))
+		lvl := lvlStyle.Render(label)
+		msg := base.Render(entry.Message)
+		sep := base.Render(" ")
+		return base.Render(">") + sep + ts + sep + lvl + sep + msg
+	}
+
+	ts := OverlayDimStyle.Render(entry.Time.Format("15:04:05"))
+	lvlStyle := lipgloss.NewStyle().Foreground(ThemeColor(color)).Background(SurfaceBg)
+	if bold {
+		lvlStyle = lvlStyle.Bold(true)
+	}
+	lvl := lvlStyle.Render(label)
+	return fmt.Sprintf("  %s %s %s", ts, lvl, OverlayNormalStyle.Render(entry.Message))
+}
+
 // RenderErrorLogOverlay renders the application log overlay showing timestamped
 // log entries with level indicators. The scroll parameter controls which portion is visible.
 // When showDebug is false, DBG entries are filtered out.
@@ -84,15 +128,6 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 	colStart := min(vp.VisualStartCol, vp.CursorCol)
 	colEnd := max(vp.VisualStartCol, vp.CursorCol)
 
-	// Level styles.
-	errLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#ff5555")).Bold(true).Background(SurfaceBg)
-	wrnLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#ffaa00")).Bold(true).Background(SurfaceBg)
-	infLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#888888")).Background(SurfaceBg)
-	dbgLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#6272a4")).Background(SurfaceBg)
-
-	// Cursor line style: subtle highlight to show current position.
-	cursorLineStyle := lipgloss.NewStyle().Background(BaseBg).Bold(true)
-
 	for i := scroll; i < end; i++ {
 		entry := reversed[i]
 		plainText := ErrorLogEntryPlainText(entry)
@@ -111,23 +146,13 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 			)
 			b.WriteString("  " + rendered)
 		} else if isCursorLine && vp.VisualMode == 0 {
-			// Cursor line indicator (outside visual mode).
-			b.WriteString(cursorLineStyle.Render("> " + plainText))
+			// Cursor line indicator (outside visual mode). Preserve the
+			// level fg color by composing per-segment styles that inherit
+			// the cursor-line bg, so red/orange ERR/WRN markers stay
+			// visible when the user navigates through the overlay.
+			b.WriteString(renderErrorLogLine(entry, true))
 		} else {
-			ts := OverlayDimStyle.Render(entry.Time.Format("15:04:05"))
-			var lvl string
-			switch entry.Level {
-			case "ERR":
-				lvl = errLevelStyle.Render("ERR")
-			case "WRN":
-				lvl = wrnLevelStyle.Render("WRN")
-			case "DBG":
-				lvl = dbgLevelStyle.Render("DBG")
-			default:
-				lvl = infLevelStyle.Render("INF")
-			}
-			line := fmt.Sprintf("  %s %s %s", ts, lvl, OverlayNormalStyle.Render(entry.Message))
-			b.WriteString(line)
+			b.WriteString(renderErrorLogLine(entry, false))
 		}
 		if i < end-1 {
 			b.WriteString("\n")
