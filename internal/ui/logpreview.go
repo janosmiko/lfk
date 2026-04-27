@@ -69,7 +69,8 @@ func ParseLogLine(line string) ParsedLogPreview {
 
 // splitLeadingTimestamp returns the leading RFC3339Nano timestamp and the
 // remainder, or ("", s, false) when s does not start with a timestamp.
-// Mirrors the detection in stripTimestampRaw.
+// This is the canonical primitive; stripTimestampRaw delegates to it.
+// Minimum length: "2024-01-15T10:30:00Z " = 21 chars.
 func splitLeadingTimestamp(s string) (string, string, bool) {
 	if len(s) < 21 || s[4] != '-' || s[10] != 'T' {
 		return "", s, false
