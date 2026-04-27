@@ -42,6 +42,7 @@ func (m Model) viewYAML() string {
 			{Key: "ctrl+d/u", Desc: "half page"},
 			{Key: "ctrl+f/b", Desc: "page"},
 			{Key: "/", Desc: "search"},
+			{Key: "123G", Desc: "goto"},
 			{Key: "v/V/ctrl+v", Desc: "visual select"},
 			{Key: "tab/z", Desc: "fold"},
 			{Key: "ctrl+w/>", Desc: "wrap"},
@@ -61,7 +62,11 @@ func (m Model) viewYAML() string {
 		if len(m.yamlMatchLines) == 0 {
 			matchInfo = " [no matches]"
 		}
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.yamlSearchText.Value) + ui.BarDimStyle.Render(matchInfo)
+		nav := ""
+		if len(m.yamlMatchLines) > 0 {
+			nav = ui.BarDimStyle.Render(" | ") + ui.HelpKeyStyle.Render("n/N") + ui.BarDimStyle.Render(": next/prev")
+		}
+		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.yamlSearchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
