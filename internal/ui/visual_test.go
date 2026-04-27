@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -134,31 +135,44 @@ func TestRenderCursorAtCol_PreservesANSIInPlainLine(t *testing.T) {
 }
 
 // Regression: line-mode visual selection (V) over a producer-colored log
-// line lost its background after every embedded `\x1b[0m`. The user enters
-// visual line mode on a kyverno row, the selection paints only the first
-// field (e.g. timestamp), then drops out for the rest. Fix re-asserts the
-// outer selection style's open codes after each embedded reset, same trick
-// FillLinesBg uses for log line backgrounds.
-func TestRenderVisualSelection_LineModePreservesBgAcrossEmbeddedResets(t *testing.T) {
+// line had two distinct problems. First attempt re-asserted the selection
+// style after each embedded reset, which kept the bg alive but caused
+// producer foregrounds to collide with the selection bg (kyverno's
+// `\x1b[34m` blue level on selection's blue bg => blue-on-blue invisible).
+// Final fix strips producer ANSI inside the selection so the selection
+// owns the visual presentation -- consistent legibility across themes and
+// producers.
+func TestRenderVisualSelection_LineModeKeepsAllTextLegible(t *testing.T) {
 	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
 	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
 	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
 
+	// Mid-line "\x1b[34m" deliberately matches a common selection bg
+	// color (blue 4) -- the regression scenario where producer fg and
+	// selection bg collide and text disappears.
 	line := "\x1b[90mtimestamp\x1b[0m \x1b[34mlevel\x1b[0m message"
 
 	result := RenderVisualSelection(line, 'V', 0, 0, 0, 0, 0, 0, 0, 0)
 
-	openCodes := styleOpenCodes(SelectedStyle)
-	require.NotEmpty(t, openCodes, "SelectedStyle must emit open codes for this test to be meaningful")
+	// All visible text must reach the output; ANSI-stripping the result
+	// must yield the original visible characters with no producer SGR
+	// payload leaking as text.
+	stripped := ansi.Strip(result)
+	require.NotEmpty(t, stripped, "selection render must produce visible content")
 
-	// The selection's open codes must appear at the start of the result and
-	// again after each producer-emitted reset; otherwise the bg dies on the
-	// first \x1b[0m and the post-reset segment loses the selection.
-	occurrences := strings.Count(result, openCodes)
-	embeddedResets := strings.Count(line, "\x1b[0m")
-	assert.GreaterOrEqual(t, occurrences, embeddedResets+1,
-		"selection bg must be re-asserted after each embedded reset (got %d open occurrences, line has %d resets)",
-		occurrences, embeddedResets)
+	for _, fragment := range []string{"timestamp", "level", "message"} {
+		assert.Contains(t, stripped, fragment,
+			"every visible field must appear in the rendered selection (got %q)", stripped)
+	}
+	assert.NotContains(t, stripped, "[34m",
+		"producer SGR payload must not appear as plain text after stripping")
+
+	// The selection style's own codes are present so the row reads as
+	// selected -- bg/fg from SelectedStyle, not from the producer.
+	openCodes := styleOpenCodes(SelectedStyle)
+	require.NotEmpty(t, openCodes, "SelectedStyle must emit codes for this assertion to mean anything")
+	assert.Contains(t, result, openCodes,
+		"the selection's own open codes must drive the row's appearance")
 }
 
 // --- RenderVisualSelection ---

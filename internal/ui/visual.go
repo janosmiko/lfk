@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
@@ -58,21 +56,16 @@ func RenderVisualSelection(line string, visualType rune, lineIdx, selStart, selE
 	case 'B': // Block (column) visual mode
 		return renderBlockSelection(runes, lineLen, colStart, colEnd)
 	default: // 'V' or zero value: Line visual mode
-		return renderOuterStyleAcrossEmbeddedANSI(line, SelectedStyle)
+		// Strip producer-emitted ANSI before rendering: when the user is
+		// in selection mode the selection style owns the visual, and
+		// preserving the producer's colors creates collisions (kyverno's
+		// blue level on selection's blue bg becomes invisible blue-on-blue,
+		// dim grey timestamps on selection bg drop legibility, etc.).
+		// Restoring producer color across embedded resets — the previous
+		// approach — kept the bg alive but couldn't avoid these
+		// foreground/background collisions.
+		return SelectedStyle.Render(ansi.Strip(line))
 	}
-}
-
-// renderOuterStyleAcrossEmbeddedANSI wraps content with outerStyle's open
-// codes and re-asserts them after every embedded \x1b[0m so producer-emitted
-// resets (kyverno, klog, etc. between fields) don't kill the outer style for
-// the rest of the segment. Mirrors the trick FillLinesBg uses to keep a row
-// background alive across embedded ANSI.
-func renderOuterStyleAcrossEmbeddedANSI(content string, outerStyle lipgloss.Style) string {
-	open := styleOpenCodes(outerStyle)
-	if open == "" {
-		return outerStyle.Render(content)
-	}
-	return open + strings.ReplaceAll(content, ansiReset, ansiReset+open) + ansiReset
 }
 
 // renderCharSelection highlights a character-level selection range.
