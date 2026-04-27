@@ -87,30 +87,42 @@ func renderErrorLogLine(entry ErrorLogEntry, cursorBg bool) string {
 		return base.Render(">") + sep + ts + sep + lvl + sep + msg
 	}
 
-	ts := OverlayDimStyle.Render(entry.Time.Format("15:04:05"))
+	// Strip the surfaceBg the theme bakes into OverlayDimStyle and
+	// OverlayNormalStyle so FillLinesBg can paint whichever bg fits
+	// the surrounding box (SurfaceBg in the overlay form, BaseBg in
+	// the fullscreen form). Otherwise the inner segments keep
+	// SurfaceBg and clash with a BaseBg-filled fullscreen frame.
+	ts := OverlayDimStyle.UnsetBackground().Render(entry.Time.Format("15:04:05"))
 	lvlStyle := lipgloss.NewStyle().Foreground(ThemeColor(color))
 	if bold {
 		lvlStyle = lvlStyle.Bold(true)
 	}
 	lvl := lvlStyle.Render(label)
-	return fmt.Sprintf("  %s %s %s", ts, lvl, OverlayNormalStyle.Render(entry.Message))
+	return fmt.Sprintf("  %s %s %s", ts, lvl, OverlayNormalStyle.UnsetBackground().Render(entry.Message))
 }
 
 // RenderErrorLogOverlay renders the application log overlay showing timestamped
 // log entries with level indicators. The scroll parameter controls which portion is visible.
 // When showDebug is false, DBG entries are filtered out.
 func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, showDebug bool, vp ErrorLogVisualParams) string {
+	// Use bg-stripped variants of the overlay styles so the caller's
+	// FillLinesBg pass paints whichever bg fits the surrounding box —
+	// SurfaceBg for the bordered overlay form, BaseBg when this same
+	// content is rendered as a fullscreen viewExplorer column.
+	titleStyle := OverlayTitleStyle.UnsetBackground()
+	dimStyle := OverlayDimStyle.UnsetBackground()
+
 	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Application Log"))
+	b.WriteString(titleStyle.Render("Application Log"))
 	b.WriteString("\n")
 
 	reversed := FilteredErrorLogEntries(entries, showDebug)
 
 	if len(reversed) == 0 {
 		if len(entries) > 0 && !showDebug {
-			b.WriteString(OverlayDimStyle.Render("No entries (debug logs hidden, press d to show)"))
+			b.WriteString(dimStyle.Render("No entries (debug logs hidden, press d to show)"))
 		} else {
-			b.WriteString(OverlayDimStyle.Render("No log entries"))
+			b.WriteString(dimStyle.Render("No log entries"))
 		}
 		return b.String()
 	}
@@ -179,7 +191,7 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 		}
 		scrollInfo += " | " + modeLabel
 	}
-	b.WriteString(OverlayDimStyle.Render(scrollInfo))
+	b.WriteString(dimStyle.Render(scrollInfo))
 
 	return b.String()
 }

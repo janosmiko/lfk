@@ -15,14 +15,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.statusMessageTip = false
 	}
 
-	// Handle error log overlay first (independent of regular overlays).
-	if m.overlayErrorLog {
-		return m.handleErrorLogOverlayKey(msg)
-	}
-
-	// Handle overlays first.
+	// Handle regular overlays first so when an overlay (e.g. the theme
+	// selector) is opened on top of the error log, its own keys —
+	// including j/k navigation and Esc — reach handleOverlayKey instead
+	// of being eaten by the error log handler.
 	if m.overlay != overlayNone {
 		return m.handleOverlayKey(msg)
+	}
+
+	// Handle error log overlay (independent of regular overlays).
+	if m.overlayErrorLog {
+		return m.handleErrorLogOverlayKey(msg)
 	}
 
 	// Handle command bar input mode.
