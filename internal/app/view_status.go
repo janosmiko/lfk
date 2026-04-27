@@ -759,7 +759,7 @@ func (m Model) renderErrorLogOverlay(background string) string {
 		// so inner content width is width-4 (2 border + 2 padding).
 		contentHeight := max(boxHeight-2, 1)
 		contentWidth := max(m.width-4, 10)
-		content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, contentHeight+2, m.showDebugLogs, vp)
+		content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, contentHeight, m.showDebugLogs, vp)
 		content = clampErrorLogLines(content, contentWidth, contentHeight)
 		// Pad to contentHeight so the box doesn't shrink on short content.
 		bodyLines := strings.Split(content, "\n")

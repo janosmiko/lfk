@@ -68,7 +68,9 @@ func errorLogLevelPalette(level string) (color, label string, bold bool) {
 // renderErrorLogLine formats a single error-log row: indicator + timestamp +
 // styled level + message. When cursorBg is true, every segment inherits the
 // cursor-line background so the level fg color stays visible while the row
-// is highlighted.
+// is highlighted. Non-cursor segments deliberately omit a background so the
+// caller's FillLinesBg pass paints whichever bg fits the surrounding box
+// (SurfaceBg in overlay mode, BaseBg in fullscreen).
 func renderErrorLogLine(entry ErrorLogEntry, cursorBg bool) string {
 	color, label, bold := errorLogLevelPalette(entry.Level)
 
@@ -86,7 +88,7 @@ func renderErrorLogLine(entry ErrorLogEntry, cursorBg bool) string {
 	}
 
 	ts := OverlayDimStyle.Render(entry.Time.Format("15:04:05"))
-	lvlStyle := lipgloss.NewStyle().Foreground(ThemeColor(color)).Background(SurfaceBg)
+	lvlStyle := lipgloss.NewStyle().Foreground(ThemeColor(color))
 	if bold {
 		lvlStyle = lvlStyle.Bold(true)
 	}

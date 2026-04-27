@@ -286,6 +286,31 @@ func (m Model) errorLogVisibleCount() (visibleCount, maxVisible, maxScroll int) 
 }
 
 // handleErrorLogOverlayKey handles keyboard input when the error log overlay is open.
+// errorLogForwardGlobalKey forwards a small set of "global" navigation keys
+// (new/next/prev tab, theme selector) to the underlying explorer handlers so
+// users can keep the error log overlay visible while switching tabs or open
+// the theme selector. Tab keys leave the overlay visible across the switch;
+// theme selector closes it to avoid stacking two top-level overlays.
+// Returns handled=false for non-matching keys so the regular overlay key
+// dispatch can run. Visual mode disables the forwarding so 't' / 'T' inside
+// a selection stay local.
+func (m Model) errorLogForwardGlobalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if m.errorLogVisualMode != 0 {
+		return m, nil, false
+	}
+	kb := ui.ActiveKeybindings
+	switch msg.String() {
+	case kb.NewTab, kb.NextTab, kb.PrevTab:
+		if mdl, cmd, ok := m.handleExplorerActionKey(msg); ok {
+			return mdl, cmd, true
+		}
+	case kb.ThemeSelector:
+		m.overlayErrorLog = false
+		return m.handleKeyThemeSelector(), nil, true
+	}
+	return m, nil, false
+}
+
 func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	visibleCount, maxVisible, maxScroll := m.errorLogVisibleCount()
 	maxCursor := max(visibleCount-1, 0)
@@ -295,6 +320,12 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Toggle: pressing the error log hotkey again closes the overlay.
 	if key == ui.ActiveKeybindings.ErrorLog {
 		return m.handleErrorLogOverlayKeyEsc()
+	}
+
+	// Allow tab switching and theme selector to work while the overlay
+	// is up — extracted to keep this function under the gocyclo cap.
+	if mdl, cmd, handled := m.errorLogForwardGlobalKey(msg); handled {
+		return mdl, cmd
 	}
 
 	// In visual mode, Esc cancels visual mode instead of closing.
