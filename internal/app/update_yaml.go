@@ -647,9 +647,14 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 	}
 	line := visibleLines[m.yamlCursor]
 
+	runes := []rune(line)
 	if forward {
 		// Search for a match after the current cursor position.
-		curBytePos := len(string([]rune(line)[:m.yamlVisualCurCol+1]))
+		// Clamp: yamlVisualCurCol carries the column from a previously
+		// focused line and may exceed this line's rune length. Forward
+		// uses +1 because the search starts after (not at) the cursor.
+		end := min(m.yamlVisualCurCol+1, len(runes))
+		curBytePos := len(string(runes[:end]))
 		if curBytePos < len(line) {
 			remainder := line[curBytePos:]
 			col := ui.FindColumnInLine(remainder, rawQuery)
@@ -660,7 +665,10 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 		}
 	} else {
 		// Search for a match before the current cursor position.
-		curBytePos := len(string([]rune(line)[:m.yamlVisualCurCol]))
+		// Clamp: yamlVisualCurCol may exceed this line's rune length;
+		// backward search ends at (excluding) the cursor.
+		end := min(m.yamlVisualCurCol, len(runes))
+		curBytePos := len(string(runes[:end]))
 		if curBytePos > 0 {
 			prefix := line[:curBytePos]
 			// For backward search, find the last match in the prefix.
