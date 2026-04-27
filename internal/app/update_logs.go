@@ -346,7 +346,11 @@ func (m *Model) findNextLogMatchForward(rawQuery string, start int) {
 	// Check for another match on the current line after the cursor.
 	if start >= 0 && start < len(m.logLines) {
 		dl := m.logDisplayLine(start)
-		curBytePos := len(string([]rune(dl)[:m.logVisualCurCol+1]))
+		runes := []rune(dl)
+		// Clamp: logVisualCurCol carries the column from a previously
+		// focused line and may exceed this line's rune length.
+		end := min(m.logVisualCurCol+1, len(runes))
+		curBytePos := len(string(runes[:end]))
 		if curBytePos < len(dl) {
 			col := ui.FindColumnInLine(dl[curBytePos:], rawQuery)
 			if col >= 0 {
@@ -371,7 +375,11 @@ func (m *Model) findNextLogMatchBackward(rawQuery string, start int) {
 	// Check for a match on the current line before the cursor.
 	if start >= 0 && start < len(m.logLines) {
 		dl := m.logDisplayLine(start)
-		curBytePos := len(string([]rune(dl)[:m.logVisualCurCol]))
+		runes := []rune(dl)
+		// Clamp: logVisualCurCol carries the column from a previously
+		// focused line and may exceed this line's rune length.
+		end := min(m.logVisualCurCol, len(runes))
+		curBytePos := len(string(runes[:end]))
 		if curBytePos > 0 {
 			lastCol := findLastMatchInStr(dl[:curBytePos], rawQuery)
 			if lastCol >= 0 {

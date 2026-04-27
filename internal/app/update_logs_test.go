@@ -101,6 +101,39 @@ func TestFindNextLogMatch(t *testing.T) {
 		assert.Equal(t, 1, m.logCursor)
 	})
 
+	t.Run("forward does not panic when cursor col exceeds line length", func(t *testing.T) {
+		// Regression: logVisualCurCol carries over from a previously
+		// focused long line. When `n` triggers a forward search and the
+		// current (start) line is shorter than logVisualCurCol+1, the
+		// rune-slice indexing must not panic.
+		m := Model{
+			height:          30,
+			width:           80,
+			tabs:            []TabState{{}},
+			logLines:        []string{"short", "info: target here"},
+			logSearchQuery:  "target",
+			logCursor:       0,
+			logVisualCurCol: 900, // far beyond "short"
+		}
+		assert.NotPanics(t, func() { m.findNextLogMatch(true) })
+		assert.Equal(t, 1, m.logCursor)
+	})
+
+	t.Run("backward does not panic when cursor col exceeds line length", func(t *testing.T) {
+		// Same regression for the backward path (N / shift-n).
+		m := Model{
+			height:          30,
+			width:           80,
+			tabs:            []TabState{{}},
+			logLines:        []string{"info: target here", "short"},
+			logSearchQuery:  "target",
+			logCursor:       1,
+			logVisualCurCol: 900, // far beyond "short"
+		}
+		assert.NotPanics(t, func() { m.findNextLogMatch(false) })
+		assert.Equal(t, 0, m.logCursor)
+	})
+
 	t.Run("disables log follow on match", func(t *testing.T) {
 		m := Model{
 			height:         30,
