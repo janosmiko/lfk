@@ -189,6 +189,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "#", Desc: "line#"},
 		{Key: "s", Desc: "timestamps"},
 		{Key: "p", Desc: "prefixes"},
+		{Key: "P", Desc: "preview"},
 		{Key: "c", Desc: "previous"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "/", Desc: "search"},

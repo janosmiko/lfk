@@ -20,7 +20,20 @@ func (m Model) viewLogs() string {
 		statusMsg = m.statusMessage
 		statusIsErr = m.statusMessageErr
 	}
-	return ui.RenderLogViewer(m.logLines, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, m.logWrapTopSkip)
+
+	logWidth := m.width
+	previewWidth := 0
+	if m.logPreviewVisible {
+		logWidth, previewWidth = splitLogPreviewWidth(m.width)
+	}
+
+	logView := ui.RenderLogViewer(m.logLines, m.logScroll, logWidth, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, m.logWrapTopSkip)
+
+	if previewWidth > 0 {
+		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH)
+		return lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
+	}
+	return logView
 }
 
 func (m Model) viewDescribe() string {
@@ -424,9 +437,11 @@ func (m *Model) logMaxScrollAndSkip() (int, int) {
 
 // logWrapAvailWidth returns the per-line content width used when computing
 // wrap counts. Mirrors the logviewer's renderWrappedLines availWidth math
-// (border + padding + cursor gutter + line-number gutter).
+// (border + padding + cursor gutter + line-number gutter). Uses the
+// effective viewer width so wrap math stays correct when the preview pane
+// is open and the log column has been narrowed.
 func (m *Model) logWrapAvailWidth() int {
-	contentWidth := max(m.width-4, 10)
+	contentWidth := max(m.logEffectiveWidth()-4, 10)
 	lineNumWidth := 0
 	if m.logLineNumbers && len(m.logLines) > 0 {
 		lineNumWidth = len(fmt.Sprintf("%d", len(m.logLines))) + 1

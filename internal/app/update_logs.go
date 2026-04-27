@@ -142,6 +142,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "p":
 		ret := m.handleLogKeyP()
 		return ret, nil, true
+	case "P":
+		ret := m.handleLogKeyP2()
+		return ret, nil, true
 	case "#":
 		ret := m.handleLogKeyHash()
 		return ret, nil, true
@@ -782,6 +785,15 @@ func (m Model) handleLogKeyN2() Model {
 func (m Model) handleLogKeyP() Model {
 	m.logLineInput = ""
 	m.logHidePrefixes = !m.logHidePrefixes
+	return m
+}
+
+func (m Model) handleLogKeyP2() Model {
+	m.logLineInput = ""
+	m.logPreviewVisible = !m.logPreviewVisible
+	// Effective viewer width changes when the panel toggles, so wrap-aware
+	// scroll/skip values need recomputing for the new geometry.
+	m.ensureLogCursorVisible()
 	return m
 }
 

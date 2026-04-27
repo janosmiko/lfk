@@ -228,6 +228,7 @@ my namespace" mode.
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
 | `p` | Toggle pod/container prefixes |
+| `P` | Toggle structured preview side panel (JSON / logfmt / plain text) |
 | `c` | Toggle previous container logs |
 | `/` | Search in logs |
 | `n` / `N` | Next / previous search match |
