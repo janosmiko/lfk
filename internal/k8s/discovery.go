@@ -62,11 +62,10 @@ func convertAPIResourceLists(lists []*metav1.APIResourceList) []model.ResourceTy
 // succeed) are logged and the successful subset is returned. A complete
 // failure to reach the discovery endpoint returns an error.
 func (c *Client) DiscoverAPIResources(ctx context.Context, contextName string) ([]model.ResourceTypeEntry, error) {
-	cs, err := c.clientsetForContext(contextName)
+	dc, err := c.discoveryForContext(contextName)
 	if err != nil {
-		return nil, fmt.Errorf("getting clientset: %w", err)
+		return nil, fmt.Errorf("getting discovery client: %w", err)
 	}
-	dc := cs.Discovery()
 
 	lists, err := discovery.ServerPreferredResources(dc)
 	if err != nil {
