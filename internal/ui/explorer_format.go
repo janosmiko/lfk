@@ -634,26 +634,21 @@ func padRight(s string, w int) string {
 	return s + strings.Repeat(" ", w-vis)
 }
 
-// Truncate truncates a string to maxW runes, appending "~" if truncated.
+// Truncate truncates a string to maxW visual columns, appending "~" if
+// truncated. ANSI escape sequences are preserved so styled text keeps its
+// foreground/background colors when shortened — `ansi.Truncate` is grapheme-
+// and width-aware and never cuts inside an escape sequence.
 func Truncate(s string, maxW int) string {
 	if maxW <= 0 {
 		return ""
 	}
-	// Use lipgloss.Width to measure the visual width, which correctly
-	// ignores ANSI escape sequences in styled text.
 	if lipgloss.Width(s) <= maxW {
 		return s
 	}
 	if maxW <= 1 {
 		return "~"
 	}
-	// Strip ANSI codes, truncate the visible content, then append the marker.
-	// This avoids cutting in the middle of an escape sequence.
-	runes := []rune(ansi.Strip(s))
-	if len(runes) <= maxW {
-		return s
-	}
-	return string(runes[:maxW-1]) + "~"
+	return ansi.Truncate(s, maxW-1, "") + "~"
 }
 
 // truncateNoMarker truncates a string to maxW runes without appending any marker.
