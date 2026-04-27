@@ -49,10 +49,14 @@ func loadPortForwardState() *PortForwardStates {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warn("Failed to read port-forward state", "error", err, "path", path)
+		}
 		return &PortForwardStates{}
 	}
 	var s PortForwardStates
 	if err := yaml.Unmarshal(data, &s); err != nil {
+		logger.Warn("Port-forward state file is corrupt; ignoring", "error", err, "path", path)
 		return &PortForwardStates{}
 	}
 	return &s
@@ -90,7 +94,9 @@ func (m *Model) saveCurrentPortForwards() {
 			})
 		}
 	}
-	_ = savePortForwardState(&PortForwardStates{PortForwards: states})
+	if err := savePortForwardState(&PortForwardStates{PortForwards: states}); err != nil {
+		logger.Error("Failed to persist port-forward state", "error", err, "count", len(states))
+	}
 }
 
 // restorePortForwards re-establishes saved port forwards from the previous session.

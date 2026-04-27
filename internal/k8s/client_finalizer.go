@@ -12,6 +12,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -119,6 +120,12 @@ func (c *Client) RemoveFinalizerFromResource(
 	contextName string,
 	match FinalizerMatch,
 ) error {
+	logger.Info("Removing finalizer",
+		"context", contextName,
+		"namespace", match.Namespace,
+		"name", match.Name,
+		"kind", match.Kind,
+		"finalizer", match.Matched)
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err

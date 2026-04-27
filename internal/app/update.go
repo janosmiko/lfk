@@ -1068,12 +1068,21 @@ func (m Model) updatePortForwardStopped(msg portForwardStoppedMsg) (tea.Model, t
 func (m Model) updatePortForwardUpdate(msg portForwardUpdateMsg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.waitForPortForwardUpdate()}
 	if msg.err != nil {
+		// Mirror to slog so the failure survives an lfk close/restart, not
+		// just the in-memory errorLog overlay.
+		logger.Error("Port-forward update error", "error", msg.err)
 		m.addLogEntry("ERR", msg.err.Error())
 	}
 	// Log newly failed port forwards.
 	for _, e := range m.portForwardMgr.Entries() {
 		if e.Status == k8s.PortForwardFailed && e.Error != "" {
 			if _, seen := m.pfLoggedErrors[e.ID]; !seen {
+				logger.Error("Port-forward failed",
+					"id", e.ID,
+					"resource", fmt.Sprintf("%s/%s", e.ResourceKind, e.ResourceName),
+					"namespace", e.Namespace,
+					"context", e.Context,
+					"error", e.Error)
 				m.addLogEntry("ERR", fmt.Sprintf("Port forward %s/%s failed: %s", e.ResourceKind, e.ResourceName, e.Error))
 				if m.pfLoggedErrors == nil {
 					m.pfLoggedErrors = make(map[int]struct{})

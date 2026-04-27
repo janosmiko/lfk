@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -193,7 +194,9 @@ func (m *Model) bookmarkDeleteCurrent() tea.Cmd {
 			break
 		}
 	}
-	_ = saveBookmarks(m.bookmarks)
+	if err := saveBookmarks(m.bookmarks); err != nil {
+		logger.Error("Failed to persist bookmarks after delete", "error", err, "slot", target.Slot)
+	}
 	newFiltered := m.filteredBookmarks()
 	m.overlayCursor = clampOverlayCursor(m.overlayCursor, 0, len(newFiltered)-1)
 	m.setStatusMessage("Removed bookmark: "+target.Name, false)
@@ -227,7 +230,9 @@ func (m *Model) bookmarkDeleteAll() tea.Cmd {
 		}
 		m.bookmarks = remaining
 	}
-	_ = saveBookmarks(m.bookmarks)
+	if err := saveBookmarks(m.bookmarks); err != nil {
+		logger.Error("Failed to persist bookmarks after bulk delete", "error", err, "removed", len(filtered))
+	}
 	m.overlayCursor = 0
 	count := len(filtered)
 	m.setStatusMessage(fmt.Sprintf("Removed %d bookmark(s)", count), false)

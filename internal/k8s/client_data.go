@@ -16,6 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -47,6 +48,7 @@ func (c *Client) GetSecretData(ctx context.Context, contextName, namespace, name
 
 // UpdateSecretData updates a secret's data with the provided values.
 func (c *Client) UpdateSecretData(contextName, namespace, name string, data map[string]string) error {
+	logger.Info("Updating Secret data", "context", contextName, "namespace", namespace, "name", name, "keys", sortedKeys(data))
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
@@ -67,6 +69,17 @@ func (c *Client) UpdateSecretData(contextName, namespace, name string, data map[
 		return fmt.Errorf("updating secret: %w", err)
 	}
 	return nil
+}
+
+// sortedKeys returns the keys of m as a deterministic slice for logging.
+// Values are deliberately not logged (Secret values are sensitive).
+func sortedKeys(m map[string]string) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 // GetConfigMapData fetches a ConfigMap and returns its key-value pairs.
@@ -97,6 +110,7 @@ func (c *Client) GetConfigMapData(ctx context.Context, contextName, namespace, n
 
 // UpdateConfigMapData updates a ConfigMap's data with the provided values.
 func (c *Client) UpdateConfigMapData(contextName, namespace, name string, data map[string]string) error {
+	logger.Info("Updating ConfigMap data", "context", contextName, "namespace", namespace, "name", name, "keys", sortedKeys(data))
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
@@ -172,6 +186,13 @@ func (c *Client) GetLabelAnnotationData(ctx context.Context, contextName string,
 // UpdateLabelAnnotationData updates labels and annotations for any resource.
 // Deleted keys are set to null in the merge patch so the API server removes them.
 func (c *Client) UpdateLabelAnnotationData(ctx context.Context, contextName string, rt model.ResourceTypeEntry, namespace, name string, labels, annotations map[string]string) error {
+	logger.Info("Updating labels/annotations",
+		"context", contextName,
+		"namespace", namespace,
+		"name", name,
+		"kind", rt.Kind,
+		"labels", len(labels),
+		"annotations", len(annotations))
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
@@ -267,6 +288,7 @@ func (c *Client) GetPodResourceRequests(ctx context.Context, contextName, namesp
 
 // TriggerCronJob creates a Job from a CronJob template.
 func (c *Client) TriggerCronJob(ctx context.Context, contextName, namespace, cronJobName string) (string, error) {
+	logger.Info("Triggering CronJob", "context", contextName, "namespace", namespace, "cronjob", cronJobName)
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return "", err

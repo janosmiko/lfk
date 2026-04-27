@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/janosmiko/lfk/internal/logger"
 )
 
 const maxHistoryEntries = 500
@@ -116,10 +118,13 @@ func (h *commandHistory) save() {
 		return
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		logger.Warn("Failed to create history directory", "error", err, "path", path)
 		return
 	}
 	content := strings.Join(h.entries, "\n") + "\n"
-	_ = os.WriteFile(path, []byte(content), 0o644)
+	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+		logger.Warn("Failed to write history file", "error", err, "path", path)
+	}
 }
 
 // up navigates to the previous (older) history entry.

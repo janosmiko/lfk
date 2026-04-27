@@ -405,7 +405,9 @@ func (m Model) loadHelmValues(allValues bool) tea.Cmd {
 		logger.Info("Running helm command", "cmd", cmd.String())
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			logger.Error("helm get values failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
+			// Helm chart values commonly embed secrets/passwords; redact
+			// the captured output before persisting it to lfk.log.
+			logger.Error("helm get values failed", "cmd", cmd.String(), "error", cmdErr, "output", logger.Redact(string(output)))
 			return helmValuesLoadedMsg{
 				title: title,
 				err:   fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),

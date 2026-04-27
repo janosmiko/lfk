@@ -512,11 +512,13 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(kctx))
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
+			logger.Error("Failed to open kubectl logs stdout pipe (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs)
 			continue
 		}
 		cmd.Stderr = cmd.Stdout
 
 		if err := cmd.Start(); err != nil {
+			logger.Error("Failed to start kubectl logs (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "cmd", cmd.String())
 			continue
 		}
 
@@ -715,6 +717,9 @@ func (m *Model) saveAllLogs() tea.Cmd {
 
 		cmd := exec.CommandContext(context.Background(), kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+		// Match commands_exec.go convention: log every kubectl invocation
+		// before running so the slog file records what we actually ran.
+		logger.Info("Running kubectl command", "cmd", cmd.String())
 		output, err := cmd.Output()
 		if err != nil {
 			return logSaveAllMsg{err: err}

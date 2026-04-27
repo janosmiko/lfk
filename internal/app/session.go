@@ -6,6 +6,8 @@ import (
 	"slices"
 
 	"sigs.k8s.io/yaml"
+
+	"github.com/janosmiko/lfk/internal/logger"
 )
 
 // SessionTab represents the persisted navigation state for a single tab.
@@ -85,6 +87,7 @@ func loadSession() *SessionState {
 	}
 	var s SessionState
 	if err := yaml.Unmarshal(data, &s); err != nil {
+		logger.Warn("Session file is corrupt; starting fresh", "error", err, "path", path)
 		return nil
 	}
 	// A session without a context is not useful.
@@ -149,6 +152,10 @@ func (m *Model) saveCurrentSession() {
 		s.Context = s.Tabs[s.ActiveTab].Context
 	}
 
-	// Fire and forget; session persistence is best-effort.
-	_ = saveSession(s)
+	// Session persistence is best-effort, but a write failure means the
+	// next start won't restore the active context — log it so users can
+	// diagnose disk-full / permissions issues from lfk.log.
+	if err := saveSession(s); err != nil {
+		logger.Error("Failed to persist session state", "error", err)
+	}
 }

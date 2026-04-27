@@ -18,6 +18,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -81,6 +82,7 @@ func (c *Client) GetPodYAML(ctx context.Context, contextName, namespace, podName
 
 // DeleteResource deletes a Kubernetes resource by type and name.
 func (c *Client) DeleteResource(contextName, namespace string, rt model.ResourceTypeEntry, name string) error {
+	logger.Info("Deleting resource", "context", contextName, "namespace", namespace, "kind", rt.Kind, "name", name)
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
@@ -108,6 +110,7 @@ func (c *Client) DeleteResource(contextName, namespace string, rt model.Resource
 
 // ScaleResource scales a Deployment, StatefulSet, or ReplicaSet to the specified replica count.
 func (c *Client) ScaleResource(contextName, namespace, name, kind string, replicas int32) error {
+	logger.Info("Scaling resource", "context", contextName, "namespace", namespace, "kind", kind, "name", name, "replicas", replicas)
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
@@ -155,6 +158,7 @@ func (c *Client) ScaleResource(contextName, namespace, name, kind string, replic
 
 // ResizePVC patches a PersistentVolumeClaim's spec.resources.requests.storage to the given size.
 func (c *Client) ResizePVC(contextName, namespace, name, newSize string) error {
+	logger.Info("Resizing PVC", "context", contextName, "namespace", namespace, "name", name, "size", newSize)
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
@@ -173,6 +177,7 @@ func (c *Client) ResizePVC(contextName, namespace, name, newSize string) error {
 
 // RestartResource performs a rolling restart by patching the pod template annotation.
 func (c *Client) RestartResource(contextName, namespace, name, kind string) error {
+	logger.Info("Restarting resource", "context", contextName, "namespace", namespace, "kind", kind, "name", name)
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
@@ -216,6 +221,7 @@ func (c *Client) RestartResource(contextName, namespace, name, kind string) erro
 
 // RollbackDeployment rolls back a deployment to a specific revision.
 func (c *Client) RollbackDeployment(ctx context.Context, contextName, namespace, name string, revision int64) error {
+	logger.Info("Rolling back Deployment", "context", contextName, "namespace", namespace, "name", name, "revision", revision)
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
