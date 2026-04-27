@@ -668,7 +668,10 @@ func populatePVCDetails(ti *model.Item, status, spec map[string]any) {
 	}
 }
 
-// populateCronJobDetails extracts schedule, suspend, and last/next schedule time for a CronJob.
+// populateCronJobDetails extracts schedule, suspend, and last/next schedule
+// time for a CronJob. Columns are emitted in the order they should appear:
+// Schedule (what), Last Schedule (when it last ran), Next (when it runs next),
+// Suspend (operational state — least likely to need at a glance).
 func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
 	var (
 		schedule string
@@ -685,7 +688,6 @@ func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
 		}
 		if s, ok := spec["suspend"].(bool); ok {
 			suspend = s
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", s)})
 		}
 	}
 	if status != nil {
@@ -698,10 +700,22 @@ func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Next", Value: formatAge(time.Until(next))})
 		}
 	}
+	if spec != nil {
+		if _, ok := spec["suspend"].(bool); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", suspend)})
+		}
+	}
 }
 
-// populateJobDetails extracts succeeded/failed counts and completions for a Job.
+// populateJobDetails extracts succeeded/failed counts, completions target, and
+// suspend state for a Job. Columns ordered to match user attention: progress
+// counts first, then operational state.
 func populateJobDetails(ti *model.Item, status, spec map[string]any) {
+	if spec != nil {
+		if completions, ok := spec["completions"].(float64); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Completions", Value: fmt.Sprintf("%d", int64(completions))})
+		}
+	}
 	if status != nil {
 		if succeeded, ok := status["succeeded"].(float64); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Succeeded", Value: fmt.Sprintf("%d", int64(succeeded))})
@@ -711,8 +725,8 @@ func populateJobDetails(ti *model.Item, status, spec map[string]any) {
 		}
 	}
 	if spec != nil {
-		if completions, ok := spec["completions"].(float64); ok {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Completions", Value: fmt.Sprintf("%d", int64(completions))})
+		if suspend, ok := spec["suspend"].(bool); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", suspend)})
 		}
 	}
 }
