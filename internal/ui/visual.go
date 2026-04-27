@@ -47,38 +47,37 @@ func RenderCursorAtCol(styledLine, plainLine string, col int) string {
 //   - anchorCol, cursorCol: the column positions of the anchor and cursor
 //   - colStart, colEnd: min/max of anchorCol and cursorCol (precomputed)
 func RenderVisualSelection(line string, visualType rune, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol, colStart, colEnd int) string {
-	runes := []rune(line)
-	lineLen := len(runes)
+	lineWidth := ansi.StringWidth(line)
 
 	switch visualType {
 	case 'v': // Character visual mode
-		return renderCharSelection(runes, lineLen, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol)
+		return renderCharSelection(line, lineWidth, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol)
 	case 'B': // Block (column) visual mode
-		return renderBlockSelection(runes, lineLen, colStart, colEnd)
+		return renderBlockSelection(line, lineWidth, colStart, colEnd)
 	default: // 'V' or zero value: Line visual mode
 		// Strip producer-emitted ANSI before rendering: when the user is
 		// in selection mode the selection style owns the visual, and
 		// preserving the producer's colors creates collisions (kyverno's
 		// blue level on selection's blue bg becomes invisible blue-on-blue,
 		// dim grey timestamps on selection bg drop legibility, etc.).
-		// Restoring producer color across embedded resets — the previous
-		// approach — kept the bg alive but couldn't avoid these
-		// foreground/background collisions.
 		return SelectedStyle.Render(ansi.Strip(line))
 	}
 }
 
-// renderCharSelection highlights a character-level selection range.
-// anchorLine is the original (non-min/maxed) anchor line for direction detection.
-// On the anchor line, highlight from anchorCol to end of line (downward) or start of line (upward).
-// On the cursor line, the opposite. Middle lines are fully highlighted.
-// When anchor and cursor are on the same line, highlight between the two columns.
-func renderCharSelection(runes []rune, lineLen, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol int) string {
+// renderCharSelection highlights a character-level selection range. Columns
+// are visual columns; embedded ANSI escape sequences in line are treated as
+// zero-width so cursor and selection address the same positions.
+//
+// On the anchor line, highlight from anchorCol to end of line (downward) or
+// start of line (upward). On the cursor line, the opposite. Middle lines are
+// fully highlighted. When anchor and cursor are on the same line, highlight
+// between the two columns.
+func renderCharSelection(line string, lineWidth, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol int) string {
 	if selStart == selEnd {
 		// Single line: highlight between the two column positions.
 		cStart := min(anchorCol, cursorCol)
 		cEnd := max(anchorCol, cursorCol) + 1
-		return highlightColumnRange(runes, lineLen, cStart, cEnd)
+		return highlightColumnRange(line, lineWidth, cStart, cEnd)
 	}
 
 	// Determine direction: anchor is at selStart (downward) or selEnd (upward).
@@ -95,44 +94,45 @@ func renderCharSelection(runes []rune, lineLen, lineIdx, selStart, selEnd, ancho
 	}
 
 	if lineIdx == selStart {
-		return highlightColumnRange(runes, lineLen, startCol, lineLen)
+		return highlightColumnRange(line, lineWidth, startCol, lineWidth)
 	}
 	if lineIdx == selEnd {
-		return highlightColumnRange(runes, lineLen, 0, endCol+1)
+		return highlightColumnRange(line, lineWidth, 0, endCol+1)
 	}
-	// Middle line: fully highlighted.
-	return SelectedStyle.Render(string(runes))
+	// Middle line: fully highlighted. Strip producer ANSI so the selection
+	// style owns the visual presentation (same rule as line-mode V).
+	return SelectedStyle.Render(ansi.Strip(line))
 }
 
-// renderBlockSelection highlights a rectangular column range on the line.
-func renderBlockSelection(runes []rune, lineLen, colStart, colEnd int) string {
-	return highlightColumnRange(runes, lineLen, colStart, colEnd+1)
+// renderBlockSelection highlights a rectangular visual-column range on the line.
+func renderBlockSelection(line string, lineWidth, colStart, colEnd int) string {
+	return highlightColumnRange(line, lineWidth, colStart, colEnd+1)
 }
 
-// highlightColumnRange highlights characters from colStart (inclusive) to colEnd (exclusive).
-func highlightColumnRange(runes []rune, lineLen, colStart, colEnd int) string {
+// highlightColumnRange highlights visible characters from colStart (inclusive)
+// to colEnd (exclusive). The line may carry producer SGR sequences; the
+// before/after segments keep their original styling (ansi.Truncate /
+// TruncateLeft preserve embedded ANSI), while the selected slice is rendered
+// through SelectedStyle on stripped text so the selection's fg/bg pair
+// applies cleanly without colliding with producer colors.
+func highlightColumnRange(line string, lineWidth, colStart, colEnd int) string {
 	if colStart < 0 {
 		colStart = 0
 	}
-	if colEnd > lineLen {
-		colEnd = lineLen
+	if colEnd > lineWidth {
+		colEnd = lineWidth
 	}
-	if colStart >= lineLen {
-		// Selection is beyond the line; just render the line with padding.
-		return string(runes) + SelectedStyle.Render(" ")
+	if colStart >= lineWidth {
+		// Selection is beyond the line; render the line with a padded
+		// selection cell so the user sees where their cursor parked.
+		return line + SelectedStyle.Render(" ")
 	}
 	if colEnd <= colStart {
-		// No selection on this line.
-		return string(runes)
+		return line
 	}
 
-	var result string
-	if colStart > 0 {
-		result += string(runes[:colStart])
-	}
-	result += SelectedStyle.Render(string(runes[colStart:colEnd]))
-	if colEnd < lineLen {
-		result += string(runes[colEnd:])
-	}
-	return result
+	before := ansi.Truncate(line, colStart, "")
+	selected := ansi.Strip(ansi.Cut(line, colStart, colEnd))
+	after := ansi.TruncateLeft(line, colEnd, "")
+	return before + SelectedStyle.Render(selected) + after
 }

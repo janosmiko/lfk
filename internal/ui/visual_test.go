@@ -365,8 +365,7 @@ func TestHighlightColumnRange(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			runes := []rune(tt.line)
-			result := highlightColumnRange(runes, len(runes), tt.colStart, tt.colEnd)
+			result := highlightColumnRange(tt.line, ansi.StringWidth(tt.line), tt.colStart, tt.colEnd)
 			for _, sub := range tt.wantSubstr {
 				assert.Contains(t, result, sub, "result should contain %q", sub)
 			}
@@ -378,8 +377,8 @@ func TestHighlightColumnRange(t *testing.T) {
 
 func TestRenderBlockSelection(t *testing.T) {
 	t.Run("block selection highlights columns inclusively", func(t *testing.T) {
-		runes := []rune("abcdefghij")
-		result := renderBlockSelection(runes, len(runes), 2, 5)
+		line := "abcdefghij"
+		result := renderBlockSelection(line, ansi.StringWidth(line), 2, 5)
 		// Columns 2 through 5 inclusive should be highlighted.
 		assert.Contains(t, result, "ab")
 		assert.Contains(t, result, "cdef")
@@ -391,8 +390,8 @@ func TestRenderBlockSelection(t *testing.T) {
 
 func TestRenderCharSelection(t *testing.T) {
 	t.Run("single line selection", func(t *testing.T) {
-		runes := []rune("hello world")
-		result := renderCharSelection(runes, len(runes), 5, 5, 5, 5, 2, 7)
+		line := "hello world"
+		result := renderCharSelection(line, ansi.StringWidth(line), 5, 5, 5, 5, 2, 7)
 		// Single line: highlight between cols 2 and 7.
 		assert.Contains(t, result, "he")
 		assert.Contains(t, result, "llo wo")
@@ -400,16 +399,42 @@ func TestRenderCharSelection(t *testing.T) {
 	})
 
 	t.Run("multi-line start line downward", func(t *testing.T) {
-		runes := []rune("start line content")
-		result := renderCharSelection(runes, len(runes), 3, 3, 7, 3, 5, 8)
+		line := "start line content"
+		result := renderCharSelection(line, ansi.StringWidth(line), 3, 3, 7, 3, 5, 8)
 		// Line at selStart: highlight from anchorCol (5) to end.
 		assert.True(t, strings.Contains(result, "start"), "should contain pre-selection text")
 	})
 
 	t.Run("multi-line middle line", func(t *testing.T) {
-		runes := []rune("fully selected")
-		result := renderCharSelection(runes, len(runes), 5, 3, 7, 3, 2, 8)
+		line := "fully selected"
+		result := renderCharSelection(line, ansi.StringWidth(line), 5, 3, 7, 3, 2, 8)
 		// Middle line: fully selected.
 		assert.Contains(t, result, "fully selected")
 	})
+}
+
+// Regression: char/block visual selection now treats anchorCol/cursorCol as
+// visual columns and preserves embedded ANSI on the unselected segments while
+// stripping it inside the selection (so producer fg can't collide with
+// selection bg). On a kyverno-style line, selecting visual cols 0–8 should
+// highlight the timestamp and leave the rest of the row in its producer
+// colors with no broken SGR fragments leaking as plain text.
+func TestHighlightColumnRange_ANSIAware(t *testing.T) {
+	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
+	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI)
+
+	line := "\x1b[90mtimestamp\x1b[0m \x1b[34mlevel\x1b[0m message"
+	width := ansi.StringWidth(line)
+
+	result := highlightColumnRange(line, width, 0, 9) // selects "timestamp"
+
+	stripped := ansi.Strip(result)
+	assert.Equal(t, "timestamp level message", stripped,
+		"stripped result must equal stripped original — no characters lost or duplicated")
+
+	assert.NotRegexp(t, `(^|[^\x1b])\[34m`, result,
+		"producer SGR introducer must remain intact across the selection split")
+	assert.NotRegexp(t, `(^|[^\x1b])\[0m`, result,
+		"closing reset must keep its leading ESC byte")
 }
