@@ -9,11 +9,13 @@ import (
 	"slices"
 	"sort"
 	"strings"
+	"sync"
 	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/tools/clientcmd"
 	"k8s.io/client-go/tools/clientcmd/api"
@@ -78,6 +80,11 @@ type Client struct {
 	// of being pulled up-front. Configured via the secret_lazy_loading
 	// option; off by default so the list behaves like every other resource.
 	secretLazyLoading bool
+
+	// Guarded by discoveryMu; concurrent tea.Cmd goroutines may discover
+	// across different contexts.
+	discoveryMu      sync.Mutex
+	discoveryClients map[string]*disk.CachedDiscoveryClient
 }
 
 // SetSecretLazyLoading toggles the metadata-only list path for Secrets.

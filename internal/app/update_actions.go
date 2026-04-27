@@ -1282,6 +1282,8 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 			if m.discoveringContexts != nil {
 				m.discoveringContexts[m.nav.Context] = true
 			}
+			// Force a round-trip; otherwise shift+r would serve stale cache.
+			m.client.InvalidateDiscoveryCache(m.nav.Context)
 			cmds = append(cmds, m.discoverAPIResources(m.nav.Context))
 		}
 		// Always emit the current cached list too so the UI repaints
