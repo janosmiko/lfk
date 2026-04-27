@@ -1,4 +1,4 @@
-.PHONY: setup lint lint-fix test coverage build generate-themes sonar bump-version release
+.PHONY: setup lint lint-fix test coverage build generate-themes sonar bump-version refresh-vendor-hash release
 
 setup:
 	git config core.hooksPath .githooks
@@ -12,6 +12,30 @@ bump-version: ## Bump flake.nix baseVersion to $(VERSION) (usage: make bump-vers
 	fi
 	@sed -i.bak -E 's/^(\s*baseVersion = )"[0-9]+\.[0-9]+\.[0-9]+";/\1"$(VERSION)";/' flake.nix && rm flake.nix.bak
 	@grep -n "baseVersion =" flake.nix
+
+# Recomputes vendorHash by setting it to lib.fakeHash, running `nix build`, and
+# parsing the "got: sha256-..." line from the resulting hash mismatch. Run this
+# whenever go.mod/go.sum changes -- the hash is content-addressed by the vendored
+# module set, so any dep bump invalidates it.
+refresh-vendor-hash: ## Recompute vendorHash in flake.nix from current go.sum (requires nix)
+	@command -v nix >/dev/null 2>&1 || { \
+		echo "error: nix is required to refresh vendorHash (https://nixos.org/download)"; exit 1; \
+	}
+	@cp flake.nix flake.nix.orig
+	@sed -i.bak -E 's|^(\s*vendorHash = )"[^"]*";|\1"sha256-AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA=";|' flake.nix && rm flake.nix.bak
+	@echo "Computing vendorHash via nix build (this may take a minute)..."
+	@NEW_HASH=$$(nix build .#default --no-link --extra-experimental-features 'nix-command flakes' 2>&1 \
+		| awk '/^[[:space:]]*got:/ {print $$2; exit}'); \
+	if [ -z "$$NEW_HASH" ]; then \
+		mv flake.nix.orig flake.nix; \
+		echo "error: could not extract vendorHash from nix build output."; \
+		echo "       try running 'nix build .#default' manually to diagnose."; \
+		exit 1; \
+	fi; \
+	sed -i.bak -E "s|^(\s*vendorHash = )\"[^\"]*\";|\1\"$$NEW_HASH\";|" flake.nix && rm flake.nix.bak; \
+	rm flake.nix.orig; \
+	echo "Updated vendorHash to $$NEW_HASH"
+	@grep -n "vendorHash" flake.nix
 
 release: setup ## Bump version, commit, and create tag in one step (usage: make release VERSION=0.9.23)
 	@if [ -z "$(VERSION)" ]; then \

@@ -68,6 +68,33 @@ jobs:
             exit 1
           fi
 
+  # Builds the Nix flake to confirm vendorHash matches the vendored module set.
+  # If a release ships with a stale hash, `nix build` from a tag fails for users
+  # (see issue #62). Catching that here is faster than fielding a bug report.
+  verify-flake-build:
+    needs: [verify-flake-version]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build flake
+        id: build
+        run: nix build .#default --no-link 2>&1 | tee build.log
+
+      - name: Explain stale-hash failure
+        if: failure() && steps.build.outcome == 'failure'
+        run: |
+          if grep -q "hash mismatch" build.log; then
+            echo "::error::Nix flake vendorHash is stale. Run 'make refresh-vendor-hash' locally, commit flake.nix, then re-tag."
+          fi
+
   build-and-test:
     needs: [verify-flake-version]
     runs-on: ubuntu-latest
@@ -122,7 +149,7 @@ jobs:
         run: govulncheck ./...
 
   release:
-    needs: [detect, build-and-test, lint, govulncheck, verify-flake-version]
+    needs: [detect, build-and-test, lint, govulncheck, verify-flake-version, verify-flake-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
