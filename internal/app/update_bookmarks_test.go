@@ -439,6 +439,47 @@ func TestNavigateToBookmark_LocalKeepsContext_FailsInWrongCluster(t *testing.T) 
 		"context-free bookmark should not change context when resource is not found")
 }
 
+// Regression: opening lfk into a previous session restored at LevelResources
+// (e.g. pods) means the seed list resolves Pods/Deployments synchronously,
+// but CRD discovery is still in flight when the user pops the bookmark
+// overlay. A bookmark that targets a CRD-backed type (ArgoCD Application,
+// etc.) used to fail outright with "Resource type not found in current
+// cluster" -- the user had to navigate out to the resource types level to
+// trigger a refresh, then re-open the bookmark.
+//
+// Now: when discoveredResources has no entry for the effective context yet,
+// stash the bookmark and let updateAPIResourceDiscovery replay it once the
+// discovery message lands.
+func TestNavigateToBookmark_StashesUntilDiscoveryArrives(t *testing.T) {
+	crd := customCRDResourceType()
+	m := Model{
+		nav: model.NavigationState{
+			Context: "cluster-A",
+		},
+		// Empty map -- key for cluster-A is absent, signalling "discovery
+		// hasn't run yet" (as distinct from "ran but cluster has no such CRD").
+		discoveredResources: map[string][]model.ResourceTypeEntry{},
+		discoveringContexts: map[string]bool{},
+	}
+
+	bm := model.Bookmark{
+		ResourceType: crd.ResourceRef(),
+		Namespace:    "default",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	resultModel := result.(Model)
+
+	require.NotNil(t, resultModel.bookmarkAwaitingDiscovery, "bookmark must be stashed when discovery hasn't run")
+	assert.Equal(t, crd.ResourceRef(), resultModel.bookmarkAwaitingDiscovery.ResourceType,
+		"stashed bookmark must be the one we asked to navigate to")
+	assert.True(t, resultModel.discoveringContexts["cluster-A"],
+		"discovery must be marked in-flight so updateAPIResourceDiscovery clears it on arrival")
+	assert.NotContains(t, resultModel.statusMessage, "not found",
+		"a queued bookmark must not show the user a 'not found' error")
+	assert.NotNil(t, cmd, "navigateToBookmark must return the discovery cmd so the bookmark can replay")
+}
+
 func TestNavigateToBookmark_GlobalSwitchesContext(t *testing.T) {
 	// The custom CRD exists only in cluster-B (the bookmark's context).
 	// A context-aware bookmark should look up resources in the bookmark's
@@ -1628,6 +1669,10 @@ func TestFinalBuildSessionTabStateNSOnly(t *testing.T) {
 
 func TestFinalNavigateToBookmarkResourceNotFound(t *testing.T) {
 	m := baseFinalModel()
+	// Mark discovery as completed for test-ctx with an empty type list so
+	// navigateToBookmark surfaces the "not found" path rather than stashing
+	// the bookmark for a pending discovery (which is the absent-key path).
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{}
 	bm := model.Bookmark{
 		ResourceType: "nonexistent",
 	}

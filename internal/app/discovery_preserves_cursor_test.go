@@ -51,7 +51,7 @@ func TestDiscoveryCompletionPreservesCursorPosition(t *testing.T) {
 	// Note: cursorMemory has NO entry for navKey — the user moved the
 	// cursor interactively. restoreCursor would fall back to 0.
 
-	updated := m.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{
+	updated, _ := m.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{
 		context: "test-ctx",
 		entries: entries,
 	})

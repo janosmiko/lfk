@@ -78,8 +78,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		mdl, cmd := m.updateResourceTypes(msg)
 		return mdl, cmd, true
 	case apiResourceDiscoveryMsg:
-		mdl := m.updateAPIResourceDiscovery(msg)
-		return mdl, nil, true
+		mdl, cmd := m.updateAPIResourceDiscovery(msg)
+		return mdl, cmd, true
 	case resourcesLoadedMsg:
 		mdl, cmd := m.updateResourcesLoaded(msg)
 		return mdl, cmd, true
@@ -487,13 +487,13 @@ func (m Model) updateResourceTypes(msg resourceTypesMsg) (tea.Model, tea.Cmd) {
 	return m, m.loadPreview()
 }
 
-func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
+func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, tea.Cmd) {
 	// Clear the in-flight flag for this context regardless of outcome so
 	// the user can retry (or hover again) without getting stuck on a
 	// permanently-deduplicated call.
 	delete(m.discoveringContexts, msg.context)
 	if isContextCanceled(msg.err) {
-		return m
+		return m, nil
 	}
 	if msg.err != nil {
 		// API resource discovery failed (permissions, etc.) -- fall back to
@@ -506,7 +506,14 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 			m.restoreCursor()
 			m.syncExpandedGroup()
 		}
-		return m
+		// On discovery failure, drop any queued bookmark so we don't loop
+		// retrying. The user can re-open the overlay and try again.
+		if m.bookmarkAwaitingDiscovery != nil {
+			m.bookmarkAwaitingDiscovery = nil
+			m.setStatusMessage("Resource type not found in current cluster", true)
+			return m, scheduleStatusClear()
+		}
+		return m, nil
 	}
 	// Prepend LFK pseudo-resources (helm releases, port forwards) so they
 	// resolve via FindResourceType* and appear in the sidebar uniformly
@@ -563,7 +570,23 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 			}
 		}
 	}
-	return m
+	// Replay a bookmark that was queued waiting on this context's discovery.
+	// IsContextAware switches the bookmark's effective context; for context-free
+	// bookmarks the effective context is the model's current context, which we
+	// match against msg.context so we only replay when the right discovery lands.
+	if m.bookmarkAwaitingDiscovery != nil {
+		bm := *m.bookmarkAwaitingDiscovery
+		effective := bm.Context
+		if !bm.IsContextAware() {
+			effective = m.nav.Context
+		}
+		if effective == msg.context {
+			m.bookmarkAwaitingDiscovery = nil
+			result, cmd := m.navigateToBookmark(bm)
+			return result.(Model), cmd
+		}
+	}
+	return m, nil
 }
 
 func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {

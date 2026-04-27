@@ -443,6 +443,28 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 
 	rt, ok := model.FindResourceTypeIn(bm.ResourceType, m.discoveredResources[effectiveContext])
 	if !ok {
+		// Distinguish "discovery hasn't run yet" (key absent from the map)
+		// from "discovered, type genuinely not in cluster" (key present, type
+		// missing). The former is the session-restore case for CRD-backed
+		// bookmarks: stash the bookmark and let updateAPIResourceDiscovery
+		// replay it once the discovery message arrives. Without this, popping
+		// a bookmark for an ArgoCD Application right after launching lfk
+		// failed outright until the user navigated out and back to force a
+		// resource-types refresh.
+		if _, discovered := m.discoveredResources[effectiveContext]; !discovered {
+			bmCopy := bm
+			m.bookmarkAwaitingDiscovery = &bmCopy
+			m.setStatusMessage("Discovering resources...", false)
+			cmds := []tea.Cmd{scheduleStatusClear()}
+			if !m.discoveringContexts[effectiveContext] {
+				if m.discoveringContexts == nil {
+					m.discoveringContexts = make(map[string]bool)
+				}
+				m.discoveringContexts[effectiveContext] = true
+				cmds = append(cmds, m.discoverAPIResources(effectiveContext))
+			}
+			return m, tea.Batch(cmds...)
+		}
 		m.setStatusMessage("Resource type not found in current cluster", true)
 		return m, scheduleStatusClear()
 	}

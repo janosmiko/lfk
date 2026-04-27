@@ -651,6 +651,16 @@ type Model struct {
 	// updateAPIResourceDiscovery when the result arrives.
 	discoveringContexts map[string]bool
 
+	// bookmarkAwaitingDiscovery holds a bookmark whose target resource type
+	// can't be resolved yet because API discovery for the effective context
+	// hasn't completed (typical at session restore — the seed list resolves
+	// Pods/Deployments synchronously but CRDs like ArgoCD Applications are
+	// only known after the discovery round-trip lands). Set by
+	// navigateToBookmark, consumed by updateAPIResourceDiscovery, which
+	// replays the navigation once the matching context's entries arrive.
+	// Distinct from pendingBookmark (which gates save-overwrite confirmation).
+	bookmarkAwaitingDiscovery *model.Bookmark
+
 	// Preview scroll offset for the right column.
 	previewScroll int
 

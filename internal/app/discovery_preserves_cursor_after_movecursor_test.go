@@ -47,7 +47,7 @@ func TestDiscoveryAfterCursorMovePreservesCursor(t *testing.T) {
 	// — restoreCursor would fall back to it and reset to 0.
 	m.cursorMemory[m.navKey()] = 0
 
-	updated := m.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{
+	updated, _ := m.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{
 		context: "test-ctx",
 		entries: entries,
 	})
