@@ -1234,6 +1234,9 @@ func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
+// dispatchNavigationTick fans out tick messages whose handlers belong with
+// cursor/navigation state. Kept as a wrapper so updateResourceMsg's switch
+// stays under the gocyclo threshold (see .golangci config).
 func (m Model) dispatchNavigationTick(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case watchTickMsg:
@@ -1249,7 +1252,6 @@ func (m Model) updatePreviewDebounceTick(msg previewDebounceTickMsg) (tea.Model,
 		return m, nil
 	}
 	if m.mapView {
-		m.resourceTree = nil
 		return m, tea.Batch(m.loadPreview(), m.loadResourceTree())
 	}
 	return m, m.loadPreview()

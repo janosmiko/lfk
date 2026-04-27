@@ -1288,31 +1288,29 @@ func TestMoveCursorDebounceCoalescesRapidBursts(t *testing.T) {
 	m.setCursor(0)
 
 	startGen := m.previewDebounceGen
-	scheduledGens := make([]uint64, 0, 5)
 	for range 5 {
 		result, cmd := m.moveCursor(1)
 		m = result.(Model)
-		require.NotNil(t, cmd)
-		msg := cmd()
-		tick, ok := msg.(previewDebounceTickMsg)
-		require.True(t, ok)
-		scheduledGens = append(scheduledGens, tick.gen)
+		require.NotNil(t, cmd, "moveCursor must return a debounce cmd")
 	}
 
 	assert.Equal(t, startGen+5, m.previewDebounceGen)
-	for i := 1; i < len(scheduledGens); i++ {
-		assert.Greater(t, scheduledGens[i], scheduledGens[i-1])
-	}
 
-	for _, staleGen := range scheduledGens[:4] {
+	for staleGen := startGen + 1; staleGen < m.previewDebounceGen; staleGen++ {
 		_, cmd := m.Update(previewDebounceTickMsg{gen: staleGen})
 		assert.Nilf(t, cmd, "stale gen %d must be dropped (current %d)", staleGen, m.previewDebounceGen)
 	}
 
-	finalGen := scheduledGens[4]
-	require.Equal(t, m.previewDebounceGen, finalGen)
-	_, cmd := m.Update(previewDebounceTickMsg{gen: finalGen})
-	assert.NotNil(t, cmd)
+	_, cmd := m.Update(previewDebounceTickMsg{gen: m.previewDebounceGen})
+	assert.NotNil(t, cmd, "current gen must trigger preview load")
+}
+
+func TestSchedulePreviewDebounceCarriesGen(t *testing.T) {
+	cmd := schedulePreviewDebounce(42)
+	require.NotNil(t, cmd)
+	tick, ok := cmd().(previewDebounceTickMsg)
+	require.True(t, ok)
+	assert.Equal(t, uint64(42), tick.gen)
 }
 
 func TestCov80MoveCursorEmptyItems(t *testing.T) {

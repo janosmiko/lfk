@@ -52,9 +52,6 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 	}
 
 	m.invalidatePreviewForCursorChange()
-	if m.mapView {
-		m.resourceTree = nil
-	}
 	return m, schedulePreviewDebounce(m.previewDebounceGen)
 }
 
@@ -72,6 +69,7 @@ func (m *Model) invalidatePreviewForCursorChange() {
 	m.rightItems = nil
 	m.previewYAML = ""
 	m.previewScroll = 0
+	m.resourceTree = nil
 	m.loading = true
 	m.previewLoading = true
 }
