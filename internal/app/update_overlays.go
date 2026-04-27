@@ -288,9 +288,11 @@ func (m Model) errorLogVisibleCount() (visibleCount, maxVisible, maxScroll int) 
 // handleErrorLogOverlayKey handles keyboard input when the error log overlay is open.
 // errorLogForwardGlobalKey forwards a small set of "global" navigation keys
 // (new/next/prev tab, theme selector) to the underlying explorer handlers so
-// users can keep the error log overlay visible while switching tabs or open
-// the theme selector. Tab keys leave the overlay visible across the switch;
-// theme selector closes it to avoid stacking two top-level overlays.
+// users can keep the error log overlay visible while switching tabs or while
+// opening the theme selector on top. The error log overlay state is left
+// alone — fullscreen + theme selector should layer the way the dashboard
+// fullscreen + theme selector does, with the error log staying behind the
+// colorscheme overlay until it closes.
 // Returns handled=false for non-matching keys so the regular overlay key
 // dispatch can run. Visual mode disables the forwarding so 't' / 'T' inside
 // a selection stay local.
@@ -305,7 +307,6 @@ func (m Model) errorLogForwardGlobalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, boo
 			return mdl, cmd, true
 		}
 	case kb.ThemeSelector:
-		m.overlayErrorLog = false
 		return m.handleKeyThemeSelector(), nil, true
 	}
 	return m, nil, false

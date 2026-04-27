@@ -515,7 +515,17 @@ func (m Model) viewErrorLogFullscreen(contentHeight int) string {
 	content = clampErrorLogLines(content, innerW, contentHeight)
 	content = ui.PadToHeight(content, contentHeight)
 	content = ui.FillLinesBg(content, innerW, ui.BaseBg)
-	return ui.ActiveColumnStyle.Width(fullW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(content)
+	// Apply BaseBg to the column wrapper too so the 1-char padding lipgloss
+	// adds inside the rounded border doesn't render with the terminal's
+	// default background — that's the "background looks different" gap
+	// users see between the inner BaseBg-filled content and the border.
+	style := ui.ActiveColumnStyle.
+		Width(fullW).
+		Height(contentHeight).
+		MaxHeight(contentHeight + 2).
+		Background(ui.BaseBg).
+		BorderBackground(ui.BaseBg)
+	return style.Render(content)
 }
 
 // viewExplorerDashboardSingleCol renders a single-column fullscreen dashboard.
