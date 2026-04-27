@@ -381,21 +381,23 @@ func WrapLine(line string, width int) []string {
 }
 
 // wrapLine splits a line into chunks of at most width runes.
+// wrapLine hard-wraps a log line to width visual columns. Uses ansi.Hardwrap
+// so embedded SGR sequences (kyverno timestamps, klog level colors, etc.)
+// stay intact across the split — rune-slicing instead would split mid-CSI
+// and leak "0m"/"[NNm" as literal text or chop real content because escape
+// bytes are zero-width but consume rune budget.
 func wrapLine(line string, width int) []string {
 	if width <= 0 {
 		return []string{line}
 	}
-	runes := []rune(line)
-	if len(runes) == 0 {
+	if line == "" {
 		return []string{""}
 	}
-	var parts []string
-	for len(runes) > width {
-		parts = append(parts, string(runes[:width]))
-		runes = runes[width:]
-	}
-	parts = append(parts, string(runes))
-	return parts
+	// preserveSpace=true keeps a leading space at the start of a wrapped
+	// sub-line. Log content like "level message" must wrap to ["level", " ",
+	// "message"] not ["level", "message"], otherwise field separation goes
+	// missing visually -- and the existing rune-slicer kept the space too.
+	return strings.Split(ansi.Hardwrap(line, width, true), "\n")
 }
 
 // StripTimestamp removes a leading kubectl timestamp (RFC3339Nano + space) from a log line.

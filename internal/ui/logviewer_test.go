@@ -1,8 +1,10 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -74,6 +76,38 @@ func TestWrapLine(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			assert.Equal(t, tt.expected, wrapLine(tt.line, tt.width))
 		})
+	}
+}
+
+// Regression: producer-colored kyverno-style log rows in wrap mode lost
+// text mid-line. wrapLine rune-sliced the input, but ANSI escape sequences
+// occupy several rune slots while contributing zero visual width. A wrap
+// at `width` runes regularly cut mid-SGR (e.g. between `\x1b[` and `90m`)
+// or chopped real text early because the rune budget was eaten by the
+// invisible escape bytes. Both cases manifested as missing characters or
+// raw "[NNm" leaks once the terminal hit the malformed sequence.
+//
+// Wrap must split by visual columns and never break ANSI sequences.
+func TestWrapLine_PreservesANSIAndSplitsByVisualWidth(t *testing.T) {
+	// 24-char visible content: "timestamp level message1" plus producer
+	// SGR runs around each field. ANSI bytes are zero-width and must not
+	// consume the wrap budget.
+	line := "\x1b[90mtimestamp\x1b[0m \x1b[34mlevel\x1b[0m message1"
+	parts := wrapLine(line, 16)
+
+	// Stripped concatenation of the wrap parts must equal the stripped
+	// original (no characters lost mid-line).
+	var sb strings.Builder
+	for _, p := range parts {
+		sb.WriteString(ansi.Strip(p))
+	}
+	assert.Equal(t, ansi.Strip(line), sb.String(),
+		"wrapping must preserve every visible character (got parts %q)", parts)
+
+	// Each wrap part must visually fit the limit.
+	for _, p := range parts {
+		assert.LessOrEqual(t, ansi.StringWidth(p), 16,
+			"wrap part exceeds visual width budget: %q", p)
 	}
 }
 
