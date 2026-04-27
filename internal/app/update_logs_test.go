@@ -134,6 +134,36 @@ func TestFindNextLogMatch(t *testing.T) {
 		assert.Equal(t, 0, m.logCursor)
 	})
 
+	t.Run("does not panic on multi-byte rune lines when cursor col exceeds rune count", func(t *testing.T) {
+		// The bug is fundamentally about rune vs byte length divergence:
+		// `[]rune(line)[:n]` panics when n > len(runes). Multi-byte content
+		// (e.g. `こんにちは` is 5 runes / 15 bytes) exercises the rune path
+		// distinct from len(line). Verify both forward and backward.
+		m := Model{
+			height:          30,
+			width:           80,
+			tabs:            []TabState{{}},
+			logLines:        []string{"こんにちは", "info: target here"},
+			logSearchQuery:  "target",
+			logCursor:       0,
+			logVisualCurCol: 900, // far beyond 5 runes
+		}
+		assert.NotPanics(t, func() { m.findNextLogMatch(true) })
+		assert.Equal(t, 1, m.logCursor)
+
+		m2 := Model{
+			height:          30,
+			width:           80,
+			tabs:            []TabState{{}},
+			logLines:        []string{"info: target here", "こんにちは"},
+			logSearchQuery:  "target",
+			logCursor:       1,
+			logVisualCurCol: 900,
+		}
+		assert.NotPanics(t, func() { m2.findNextLogMatch(false) })
+		assert.Equal(t, 0, m2.logCursor)
+	})
+
 	t.Run("disables log follow on match", func(t *testing.T) {
 		m := Model{
 			height:         30,
