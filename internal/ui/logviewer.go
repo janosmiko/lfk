@@ -414,22 +414,12 @@ func StripTimestamp(line string) string {
 }
 
 // stripTimestampRaw removes a leading RFC3339Nano timestamp from a string.
+// Delegates to splitLeadingTimestamp so detection rules stay in one place.
 func stripTimestampRaw(s string) string {
-	// Quick check: RFC3339Nano timestamps start with a digit and contain 'T'.
-	// Minimum length: "2024-01-15T10:30:00Z " = 21 chars.
-	if len(s) < 21 || s[4] != '-' {
-		return s
+	if _, rest, ok := splitLeadingTimestamp(s); ok {
+		return rest
 	}
-	// Find the space after the timestamp.
-	spaceIdx := strings.IndexByte(s, ' ')
-	if spaceIdx < 20 || spaceIdx > 35 {
-		return s
-	}
-	// Verify it looks like a timestamp (contains 'T' between date and time).
-	if s[10] != 'T' {
-		return s
-	}
-	return s[spaceIdx+1:]
+	return s
 }
 
 // podPrefixColors is a palette of distinct colors for pod/container log prefixes.

@@ -35,6 +35,68 @@ func TestParseLogLine_JSON(t *testing.T) {
 	}
 }
 
+func TestJSONKeyRank(t *testing.T) {
+	cases := []struct {
+		key  string
+		want int
+	}{
+		// Time bucket.
+		{"time", 0},
+		{"timestamp", 0},
+		{"ts", 0},
+		{"@timestamp", 0},
+		// Level bucket.
+		{"level", 1},
+		{"lvl", 1},
+		{"severity", 1},
+		// Message bucket.
+		{"msg", 2},
+		{"message", 2},
+		// Source bucket.
+		{"logger", 3},
+		{"caller", 3},
+		{"source", 3},
+		// Error bucket.
+		{"error", 4},
+		{"err", 4},
+		// Case-insensitive matching for any of the above.
+		{"LEVEL", 1},
+		{"Msg", 2},
+		{"@TimeStamp", 0},
+		// Anything else falls into the catch-all bucket.
+		{"port", 100},
+		{"trace_id", 100},
+		{"", 100},
+	}
+	for _, tc := range cases {
+		if got := jsonKeyRank(tc.key); got != tc.want {
+			t.Errorf("jsonKeyRank(%q) = %d, want %d", tc.key, got, tc.want)
+		}
+	}
+}
+
+func TestParseLogLine_JSONFieldOrderUsesAliases(t *testing.T) {
+	// Mixed aliases must produce the canonical rank order:
+	// time(0) < level(1) < msg(2) < logger(3) < error(4) < others(100).
+	p := ParseLogLine(`{"trace_id":"x","err":"boom","caller":"main.go:1","lvl":"info","message":"hi","@timestamp":"now"}`)
+	if p.Kind != LogPreviewJSON {
+		t.Fatalf("kind = %v, want JSON", p.Kind)
+	}
+	gotKeys := make([]string, len(p.Fields))
+	for i, f := range p.Fields {
+		gotKeys[i] = f.Key
+	}
+	wantKeys := []string{"@timestamp", "lvl", "message", "caller", "err", "trace_id"}
+	if len(gotKeys) != len(wantKeys) {
+		t.Fatalf("got %d fields, want %d", len(gotKeys), len(wantKeys))
+	}
+	for i := range wantKeys {
+		if gotKeys[i] != wantKeys[i] {
+			t.Errorf("field[%d] = %q, want %q (full order: %v)", i, gotKeys[i], wantKeys[i], gotKeys)
+		}
+	}
+}
+
 func TestParseLogLine_JSONNested(t *testing.T) {
 	p := ParseLogLine(`{"event":{"name":"x","count":3}}`)
 	if p.Kind != LogPreviewJSON {
