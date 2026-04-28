@@ -349,6 +349,24 @@ load. Tune it with:
 Values outside `[500ms, 10m]` are clamped to the bounds; invalid values fall
 back to 2s.
 
+### Discovery Cache
+
+API discovery (the list of resource types and CRDs the server exposes) is
+cached on disk under `~/.kube/cache/discovery/<host>/` with a 5-minute TTL.
+Layout matches `kubectl` and `k9s` so the same cache is shared across all
+three tools — a cold start hits zero discovery round-trips when the cache
+is warm. On busy clusters with many CRDs this is a measurable launch-time
+win and removes redundant load on the API server.
+
+- **Override location:** Set `KUBECACHEDIR` (same env var `kubectl`
+  honors) to relocate `<KUBECACHEDIR>/discovery/...` and
+  `<KUBECACHEDIR>/http/...`.
+- **Force refresh:** Press `R` (Shift+r) at the resource types level to
+  invalidate the cache and re-run discovery — newly installed or removed
+  CRDs show up immediately without restarting `lfk`.
+- **TTL:** 5 minutes. Stale entries are refetched automatically on the
+  next discovery request.
+
 ### Secret Lazy Loading
 
 On clusters with many Helm releases or large TLS secrets, listing the

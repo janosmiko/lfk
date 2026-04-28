@@ -16,6 +16,10 @@ import (
 const discoveryCacheTTL = 5 * time.Minute
 
 // Layout matches kubectl/k9s so all three tools share ~/.kube/cache/discovery.
+// Pattern is copied verbatim from kubectl's overlyCautiousIllegalFileCharacters:
+// the literal '(' and ')' inside the character class are intentional and kept
+// for on-disk-cache compatibility — they're filename-safe anyway, so allowing
+// them through is harmless.
 var toCacheHostDir = regexp.MustCompile(`[^(\w/.)]`)
 
 func cacheHostDir(host string) string {
@@ -72,6 +76,13 @@ func (c *Client) discoveryForContext(displayName string) (discovery.DiscoveryInt
 
 // InvalidateDiscoveryCache forces the next discovery call to re-fetch.
 // Nil-safe so test models without a real client can call it.
+//
+// Note: this only flips the in-memory client's invalidated flag. A *fresh*
+// client created later (e.g. first-time discovery for a context) won't see
+// the flag and will read from disk if the cache is still warm. That's fine
+// in practice because shift+r at LevelResourceTypes can only be reached
+// after an initial discovery has already created the client — see the
+// caller in app/update_actions.go's refreshCurrentLevel.
 func (c *Client) InvalidateDiscoveryCache(displayName string) {
 	if c == nil {
 		return
