@@ -950,3 +950,52 @@ func TestColorschemeFilterModeEnterCommits(t *testing.T) {
 	result := ret.(Model)
 	assert.False(t, result.schemeFilterMode)
 }
+
+// Filter narrows to a single scheme: Enter must apply it and close the
+// overlay so the user does not have to press Enter again on a one-row list.
+func TestColorschemeFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
+	entries := []ui.SchemeEntry{
+		{Name: "Dark Themes", IsHeader: true},
+		{Name: "dracula"},
+		{Name: "gruvbox-dark"},
+	}
+	m := Model{
+		overlay:          overlayColorscheme,
+		schemeEntries:    entries,
+		schemeFilterMode: true,
+		schemeFilter:     TextInput{Value: "drac"},
+		tabs:             []TabState{{}},
+		width:            80,
+		height:           40,
+	}
+	ret, cmd := m.handleColorschemeFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.schemeFilterMode)
+	assert.Equal(t, overlayNone, result.overlay, "overlay must close")
+	assert.Empty(t, result.schemeFilter.Value, "filter must be cleared after commit")
+	assert.NotNil(t, cmd, "scheduleStatusClear command must be returned")
+}
+
+// Two filtered results: Enter must keep the legacy behavior — exit filter
+// mode and let the user pick. Auto-applying would be a guess.
+func TestColorschemeFilterModeEnterPreservesMultipleResults(t *testing.T) {
+	entries := []ui.SchemeEntry{
+		{Name: "Dark Themes", IsHeader: true},
+		{Name: "gruvbox-dark"},
+		{Name: "gruvbox-darkhard"},
+	}
+	m := Model{
+		overlay:          overlayColorscheme,
+		schemeEntries:    entries,
+		schemeFilterMode: true,
+		schemeFilter:     TextInput{Value: "gruv"},
+		tabs:             []TabState{{}},
+		width:            80,
+		height:           40,
+	}
+	ret, _ := m.handleColorschemeFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.schemeFilterMode)
+	assert.Equal(t, overlayColorscheme, result.overlay, "overlay must stay open")
+	assert.Equal(t, "gruv", result.schemeFilter.Value, "filter must be preserved")
+}

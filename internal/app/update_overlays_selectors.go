@@ -693,7 +693,24 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.schemeFilterMode = false
 		m.schemeCursor = 0
 		ui.ResetOverlaySchemeScroll()
-		m.previewSchemeAtCursor(m.filteredSchemeNames())
+		filtered := m.filteredSchemeNames()
+		// When the filter narrows to a single scheme, Enter is unambiguous:
+		// commit it and close. The live preview already applied the theme on
+		// each keystroke; here we lock it in with a status message so the
+		// user does not have to press Enter again on a one-row list.
+		if len(filtered) == 1 {
+			name := filtered[0]
+			schemes := ui.BuiltinSchemes()
+			if theme, ok := schemes[name]; ok {
+				ui.ApplyTheme(theme)
+				ui.ActiveSchemeName = name
+				m.setStatusMessage("Color scheme: "+name, false)
+			}
+			m.overlay = overlayNone
+			m.schemeFilter.Clear()
+			return m, scheduleStatusClear()
+		}
+		m.previewSchemeAtCursor(filtered)
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()
