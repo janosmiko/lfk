@@ -1022,6 +1022,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		allGroupsExpanded:   true,
 		warningEventsOnly:   true,
 		eventGrouping:       true,
+		logPreviewVisible:   true,
 		bgtasks:             bgtasks.New(bgtasks.DefaultThreshold),
 		diffLineNumbers:     true,
 		reqCtx:              reqCtx,

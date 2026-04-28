@@ -139,6 +139,14 @@ func TestNewModel_NoCLIOverrides(t *testing.T) {
 		"pendingSession should be nil (from loadSession) when no CLI overrides are given")
 }
 
+func TestNewModel_LogPreviewVisibleByDefault(t *testing.T) {
+	client := newTestClientForOptions(t)
+	m := NewModel(client, StartupOptions{})
+
+	assert.True(t, m.logPreviewVisible,
+		"log preview side panel should be visible by default; users can toggle off with P")
+}
+
 func TestNewModel_CLIOverrideSingleNamespace(t *testing.T) {
 	client := newTestClientForOptions(t)
 
