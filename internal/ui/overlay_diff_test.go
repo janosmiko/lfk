@@ -96,12 +96,55 @@ func TestRenderUnifiedDiffView(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := RenderUnifiedDiffView(tt.left, tt.right, tt.leftName, tt.rightName, tt.scroll, tt.width, tt.height, tt.lineNums, false, "", nil, nil, false, "", 0, DiffVisualParams{})
+			result := RenderUnifiedDiffView(tt.left, tt.right, tt.leftName, tt.rightName, tt.scroll, tt.width, tt.height, tt.lineNums, false, "", nil, nil, false, "", 0, DiffVisualParams{}, "")
 			for _, sub := range tt.wantSubstr {
 				assert.Contains(t, result, sub, "result should contain %q", sub)
 			}
 		})
 	}
+}
+
+// --- footerOverride ---
+
+// When the caller passes a non-empty footerOverride, the renderer must use
+// it verbatim in place of the default key-binding hint bar. This lets the
+// caller paint copy feedback / status messages in the footer slot without
+// resorting to splitting the rendered output and overwriting its last
+// line — that trick was fragile against multi-line hints and trailing
+// newlines.
+func TestRenderDiffViewHonorsFooterOverride(t *testing.T) {
+	override := "[STATUS] Copied 1 line"
+	result := RenderDiffView(
+		"a: 1", "a: 2", "before", "after",
+		0, 140, 30, false, false, "", nil, nil, false, "", 0,
+		DiffVisualParams{}, override,
+	)
+	assert.Contains(t, result, override, "override must appear in the rendered output")
+	assert.NotContains(t, result, "side", "default 'side' hint must not also be drawn")
+	assert.NotContains(t, result, "q/esc", "default 'q/esc' hint must not also be drawn")
+}
+
+func TestRenderUnifiedDiffViewHonorsFooterOverride(t *testing.T) {
+	override := "[STATUS] Copied 1 line"
+	result := RenderUnifiedDiffView(
+		"a: 1", "a: 2", "before", "after",
+		0, 140, 30, false, false, "", nil, nil, false, "", 0,
+		DiffVisualParams{}, override,
+	)
+	assert.Contains(t, result, override, "override must appear in the rendered output")
+	assert.NotContains(t, result, "side-by-side", "default 'side-by-side' hint must not also be drawn")
+	assert.NotContains(t, result, "q/esc", "default 'q/esc' hint must not also be drawn")
+}
+
+// Empty override means "use the default hint bar" — important for the
+// majority of callers that don't paint a status message.
+func TestRenderDiffViewEmptyOverrideUsesDefault(t *testing.T) {
+	result := RenderDiffView(
+		"a: 1", "a: 2", "before", "after",
+		0, 140, 30, false, false, "", nil, nil, false, "", 0,
+		DiffVisualParams{}, "",
+	)
+	assert.Contains(t, result, "side", "default hint must be drawn when override is empty")
 }
 
 // --- UnifiedDiffViewTotalLines ---

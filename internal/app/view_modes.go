@@ -262,30 +262,20 @@ func (m Model) viewDiff() string {
 		VisualStart: m.diffVisualStart,
 		VisualCol:   m.diffVisualCol,
 	}
-	var view string
+	// The diff renderer paints its own bottom hint bar inside the ui
+	// package, so the only safe way to surface a status message there is
+	// to hand it to the renderer as a footer override and let it slot the
+	// override in instead of building the default hint. Anything that
+	// post-processes the rendered output by splitting on \n is fragile
+	// against multi-line hints and trailing newlines.
+	var footerOverride string
+	if m.hasStatusMessage() {
+		footerOverride = m.renderStatusHint()
+	}
 	if m.diffUnified {
-		view = ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
-	} else {
-		view = ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp, footerOverride)
 	}
-	return m.replaceFooterWithStatus(view)
-}
-
-// replaceFooterWithStatus swaps the bottom hint line of a fullscreen viewer
-// for the status message when one is active. The diff viewer builds its
-// hint inside the ui package, so the only point we can paint copy feedback
-// is by overwriting the last rendered line — same trick view.go uses for
-// overlay hint bars (view.go:79-85).
-func (m Model) replaceFooterWithStatus(view string) string {
-	if !m.hasStatusMessage() {
-		return view
-	}
-	lines := strings.Split(view, "\n")
-	if len(lines) == 0 {
-		return view
-	}
-	lines[len(lines)-1] = m.renderStatusHint()
-	return strings.Join(lines, "\n")
+	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp, footerOverride)
 }
 
 func (m Model) logViewHeight() int {
