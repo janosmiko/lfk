@@ -155,7 +155,32 @@ func TestTemplateFilterModeEscExitsAndClears(t *testing.T) {
 
 // --- handleTemplateFilterMode: enter confirms filter ---
 
-func TestTemplateFilterModeEnterConfirms(t *testing.T) {
+// "config" matches two sample templates (ConfigMap, Secret), so Enter must
+// keep the legacy behavior: exit filter mode and preserve the filter text so
+// the user can navigate the narrowed list. Auto-applying would be a guess.
+func TestTemplateFilterModeEnterConfirmsWithMultipleResults(t *testing.T) {
+	m := Model{
+		overlay:            overlayTemplates,
+		templateItems:      sampleTemplates(),
+		templateSearchMode: true,
+		templateFilter:     TextInput{Value: "config"},
+		templateCursor:     0,
+		tabs:               []TabState{{}},
+		width:              80,
+		height:             40,
+	}
+	ret, cmd := m.handleTemplateFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.templateSearchMode)
+	assert.Equal(t, overlayTemplates, result.overlay, "overlay must stay open")
+	// Filter text is preserved after enter
+	assert.Equal(t, "config", result.templateFilter.Value)
+	assert.Nil(t, cmd, "no command must be issued when more than one match")
+}
+
+// Filter narrows to a single template: Enter must apply it and close the
+// overlay so the user does not have to press Enter again on a one-row list.
+func TestTemplateFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
 	m := Model{
 		overlay:            overlayTemplates,
 		templateItems:      sampleTemplates(),
@@ -166,11 +191,12 @@ func TestTemplateFilterModeEnterConfirms(t *testing.T) {
 		width:              80,
 		height:             40,
 	}
-	ret, _ := m.handleTemplateFilterMode(specialKey(tea.KeyEnter))
+	ret, cmd := m.handleTemplateFilterMode(specialKey(tea.KeyEnter))
 	result := ret.(Model)
 	assert.False(t, result.templateSearchMode)
-	// Filter text is preserved after enter
-	assert.Equal(t, "deploy", result.templateFilter.Value)
+	assert.Equal(t, overlayNone, result.overlay, "overlay must close")
+	assert.Empty(t, result.templateFilter.Value, "filter must be cleared after commit")
+	assert.NotNil(t, cmd, "applyTemplate command must be returned")
 }
 
 // --- handleTemplateFilterMode: ctrl+w deletes word ---

@@ -320,6 +320,16 @@ func (m Model) handleTemplateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case filterAccept:
 		m.templateSearchMode = false
+		// When the filter narrows to a single template, Enter is unambiguous:
+		// apply it and close. Without this, the user has to press Enter twice
+		// (once to leave filter mode, once to commit) on a one-row list.
+		filtered := m.filteredTemplates()
+		if len(filtered) == 1 {
+			tmpl := filtered[0]
+			m.overlay = overlayNone
+			m.templateFilter.Clear()
+			return m, m.applyTemplate(tmpl)
+		}
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()
