@@ -64,6 +64,18 @@ icons: auto
 # Default: false
 # no_color: false
 
+# ─── Read-Only Mode ────────────────────────────────────────────────────────────
+# Globally disable all mutating actions (delete, edit, scale, restart, exec,
+# port-forward, drain, cordon, etc.). Useful as a safety default for shared
+# kubeconfigs or audit-mode browsing of production clusters.
+# Per-context overrides under clusters.<name>.read_only beat this field; the
+# --read-only CLI flag wins over both.
+# In-app: Ctrl+R toggles read-only — at the cluster picker it flips the
+# highlighted row's [RO] marker (session-scoped, wins over config); inside
+# a context it locks/unlocks the current tab.
+# Default: false
+# read_only: false
+
 # ─── Log Path ──────────────────────────────────────────────────────────────────
 # Application log file location. Default: ~/.local/share/lfk/lfk.log
 log_path: /tmp/lfk.log
@@ -121,10 +133,11 @@ resource_columns:
 
 # ─── Per-Cluster Overrides ─────────────────────────────────────────────────────
 # Override settings per kubeconfig context name.
-# Currently supports per-cluster resource_columns (same format as global).
-# Per-cluster columns take precedence over the global resource_columns setting.
+# Supports per-cluster resource_columns and read_only.
+# Per-cluster overrides take precedence over the matching global setting.
 clusters:
 # my-prod-cluster:
+#   read_only: true                       # lock production against mutations
 #   resource_columns:
 #     Pod: ["IP", "Node", "Image", "CPU", "MEM"]
 #     Deployment: ["Replicas", "Available"]
@@ -216,16 +229,23 @@ abbreviations:
 #
 # Commands are executed via `sh -c` with KUBECONFIG set.
 # Interactive commands (ssh, etc.) hand over the terminal.
+#
+# Set read_only_safe: true on actions that don't change cluster state so
+# they remain available in read-only mode. Without this flag custom
+# actions are treated as mutating (defensive default) and blocked when
+# read-only is active.
 custom_actions:
 # Pod:
 #   - label: "SSH to Node"
 #     command: "ssh {Node}"
 #     key: "S"
 #     description: "SSH into the pod's node"
+#     # No read_only_safe -> blocked in read-only mode (SSH could mutate).
 #   - label: "Copy Logs"
 #     command: "kubectl logs {name} -n {namespace} --context {context} > /tmp/{name}.log"
 #     key: "C"
 #     description: "Copy pod logs to file"
+#     read_only_safe: true   # logs only, safe in read-only mode
 #   - label: "Tcpdump"
 #     command: "kubectl exec -it {name} -n {namespace} --context {context} -- tcpdump -i any -w /tmp/capture.pcap"
 #     key: "T"
@@ -235,6 +255,7 @@ custom_actions:
 #     command: "kubectl rollout history deployment/{name} -n {namespace} --context {context}"
 #     key: "H"
 #     description: "Show deployment rollout history"
+#     read_only_safe: true   # rollout history is read-only
 # Service:
 #   - label: "Curl Endpoint"
 #     command: "kubectl run curl-test --rm -it --image=curlimages/curl --restart=Never -n {namespace} --context {context} -- curl -s http://{name}"

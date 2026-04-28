@@ -623,9 +623,18 @@ func FormatItem(item model.Item, width int) string {
 		name += DeprecationStyle.Render(" ⚠")
 	}
 
-	// Mark current context with a star.
+	// Mark current context with a star and (optionally) prefix the
+	// read-only badge. Order: "* [RO] name". Both are styled prefixes so
+	// the renderer's ANSI tracking (lipgloss.Width) keeps the visible
+	// width correct even when the marker is colored.
 	if item.Status == "current" {
-		return Truncate(CurrentMarkerStyle.Render("* ")+name, width)
+		return Truncate(CurrentMarkerStyle.Render("* ")+readOnlyPrefix(item)+name, width)
+	}
+
+	// Non-current read-only rows: prepend "[RO] " so the marker is
+	// visible regardless of column width.
+	if item.ReadOnly {
+		return Truncate(readOnlyPrefix(item)+name, width)
 	}
 
 	// Build detail columns: ready, restarts, age.
@@ -697,6 +706,30 @@ func FormatItem(item model.Item, width int) string {
 	return Truncate(name, width)
 }
 
+// readOnlyPrefix returns the "[RO] " prefix for read-only context rows,
+// styled with ReadOnlyMarkerStyle (foreground-only, same visual weight as
+// the "* " current-context marker). Empty string when item is not
+// read-only so callers can always concatenate. The loud
+// ReadOnlyBadgeStyle is reserved for the title-bar header where it
+// indicates the active session's state.
+func readOnlyPrefix(item model.Item) string {
+	if !item.ReadOnly {
+		return ""
+	}
+	return ReadOnlyMarkerStyle.Render("[RO]") + " "
+}
+
+// readOnlyPrefixPlain returns the "[RO] " prefix without ANSI styling. Used
+// by FormatItemPlain and FormatItemNameOnlyPlain (selected/highlighted rows)
+// so the selection background renders cleanly over the prefix instead of
+// being interrupted by a nested ANSI reset.
+func readOnlyPrefixPlain(item model.Item) string {
+	if !item.ReadOnly {
+		return ""
+	}
+	return "[RO] "
+}
+
 // FormatItemPlain formats a single item for display WITHOUT any inner ANSI styling.
 // Used for the selected item so the selection background renders cleanly.
 func FormatItemPlain(item model.Item, width int) string {
@@ -720,9 +753,23 @@ func FormatItemPlain(item model.Item, width int) string {
 		name += " ⚠"
 	}
 
-	// Mark current context with a star (plain text, no CurrentMarkerStyle).
+	// Mark current context with a star (plain text, no CurrentMarkerStyle)
+	// and prepend a "[RO] " prefix when the row is read-only. Order:
+	// "* [RO] name" so the star stays the leftmost glyph and the marker
+	// sits next to it like a tag.
 	if item.Status == "current" {
-		return Truncate("* "+name, width)
+		return Truncate("* "+readOnlyPrefixPlain(item)+name, width)
+	}
+
+	// Non-current read-only rows: prepend "[RO] " so the marker is
+	// visible regardless of column width and the standard right-side
+	// info path can still render details / status when applicable.
+	if item.ReadOnly {
+		// Fall through to the standard formatting with a prefix attached
+		// so that any right-side details (currently unused for context
+		// rows but possible for other read-only resources in the future)
+		// remain consistent.
+		return Truncate(readOnlyPrefixPlain(item)+name, width)
 	}
 
 	// Build detail columns: ready, restarts, age.

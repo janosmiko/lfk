@@ -128,6 +128,7 @@ type Item struct {
 	Selected      bool             // Whether this item is part of a multi-selection
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
+	ReadOnly      bool             // Whether this item represents a context locked in read-only mode (renders as a [RO] suffix in the picker)
 	GroupedRefs   []GroupedRef     // For grouped rows (Events): all underlying resource identifiers
 }
 

@@ -160,3 +160,67 @@ func TestApplyConfigOptionsIconResolution(t *testing.T) {
 		})
 	}
 }
+
+func TestResolveReadOnly_PrecedenceCLIOverConfig(t *testing.T) {
+	prevGlobal := ConfigReadOnly
+	prevCluster := ConfigClusterReadOnly
+	t.Cleanup(func() {
+		ConfigReadOnly = prevGlobal
+		ConfigClusterReadOnly = prevCluster
+	})
+
+	ConfigReadOnly = false
+	ConfigClusterReadOnly = map[string]bool{}
+
+	// CLI flag wins regardless of config.
+	assert.True(t, ResolveReadOnly("any", true))
+
+	// No CLI, no config -> false.
+	assert.False(t, ResolveReadOnly("any", false))
+
+	// Global config only.
+	ConfigReadOnly = true
+	assert.True(t, ResolveReadOnly("any", false))
+	assert.True(t, ResolveReadOnly("prod", false))
+
+	// Per-context override beats global (false beats true).
+	ConfigClusterReadOnly = map[string]bool{"dev": false}
+	assert.False(t, ResolveReadOnly("dev", false), "dev override should disable read-only")
+	assert.True(t, ResolveReadOnly("prod", false), "prod still inherits global")
+
+	// Per-context override beats global (true beats false).
+	ConfigReadOnly = false
+	ConfigClusterReadOnly = map[string]bool{"prod": true}
+	assert.True(t, ResolveReadOnly("prod", false))
+	assert.False(t, ResolveReadOnly("dev", false))
+}
+
+func TestApplyConfigOptions_ReadOnlyGlobalAndPerCluster(t *testing.T) {
+	prevGlobal := ConfigReadOnly
+	prevCluster := ConfigClusterReadOnly
+	t.Cleanup(func() {
+		ConfigReadOnly = prevGlobal
+		ConfigClusterReadOnly = prevCluster
+	})
+	ConfigReadOnly = false
+	ConfigClusterReadOnly = map[string]bool{}
+
+	tru := true
+	fls := false
+	cfg := configFile{
+		ReadOnly: &tru,
+		Clusters: map[string]clusterConfig{
+			"prod": {ReadOnly: &tru},
+			"dev":  {ReadOnly: &fls},
+			"void": {}, // no override
+		},
+	}
+	applyConfigOptions(cfg)
+	applyConfigMaps(cfg, map[string]string{})
+
+	assert.True(t, ConfigReadOnly, "global read_only must be applied")
+	assert.True(t, ConfigClusterReadOnly["prod"])
+	assert.False(t, ConfigClusterReadOnly["dev"])
+	_, hasVoid := ConfigClusterReadOnly["void"]
+	assert.False(t, hasVoid, "clusters without an explicit read_only must not register an entry")
+}

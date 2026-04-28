@@ -468,6 +468,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 
 	// Switch context (context-aware bookmarks change cluster, context-free bookmarks keep current).
 	m.nav.Context = effectiveContext
+	m.recomputeReadOnly(effectiveContext)
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
@@ -608,6 +609,7 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 
 	// Navigate into the saved context (same as navigateChild at LevelClusters).
 	m.nav.Context = sess.Context
+	m.recomputeReadOnly(sess.Context)
 	m.applyPinnedGroups()
 	m.nav.Level = model.LevelResourceTypes
 

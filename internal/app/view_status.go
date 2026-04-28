@@ -271,8 +271,17 @@ func (m Model) statusBar() string {
 		if m.nav.Level != model.LevelClusters {
 			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
 		}
+		// At the cluster picker, advertise the row-level RO toggle so users
+		// can discover it without reading docs.
+		if m.nav.Level == model.LevelClusters {
+			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ReadOnlyToggle, Desc: "toggle RO"})
+		}
+		// "create" runs `kubectl apply` from a template. Hide it in
+		// read-only mode since it would be blocked anyway.
+		if !m.readOnly {
+			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"})
+		}
 		hintEntries = append(hintEntries,
-			ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"},
 			ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
 			ui.HintEntry{Key: kb.Filter, Desc: "filter"},
 			ui.HintEntry{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},

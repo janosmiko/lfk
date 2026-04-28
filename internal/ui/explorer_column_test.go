@@ -352,6 +352,25 @@ func TestFormatItem(t *testing.T) {
 		result := FormatItem(item, 40)
 		assert.Contains(t, result, "pod")
 	})
+
+	t.Run("read-only context shows [RO] marker", func(t *testing.T) {
+		// Regression test: a read-only context row must render the [RO]
+		// marker in FormatItem (the non-cursor path), not just in
+		// FormatItemPlain. Without this, j/k cursor moves would drop the
+		// marker on the row that just lost focus.
+		item := model.Item{Name: "prod", ReadOnly: true}
+		result := FormatItem(item, 40)
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, result, "[RO]")
+	})
+
+	t.Run("current read-only context shows star and [RO]", func(t *testing.T) {
+		item := model.Item{Name: "prod", Status: "current", ReadOnly: true}
+		result := FormatItem(item, 40)
+		assert.Contains(t, result, "*")
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, result, "[RO]")
+	})
 }
 
 // --- FormatItemPlain ---

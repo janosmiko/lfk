@@ -455,6 +455,23 @@ The title bar shows the namespace scope (`ns:...`) used for the permission check
 | `]` | Next tab |
 | `[` | Previous tab |
 
+## Read-Only Mode
+
+| Key | Action |
+|---|---|
+| `Ctrl+R` (inside a context) | Toggle read-only mode for the current tab. Session-scoped — does not write to config and does not leak across context switches. |
+| `Ctrl+R` (at the cluster picker) | Toggle the `[RO]` marker on the highlighted context row. Stored as a session override that wins over per-context config and is honored on context entry. Blocked when `--read-only` is set (the CLI flag forces every context RO). |
+
+The `[RO]` badge appears in the title bar only when you're inside a
+context that's locked. At the cluster picker each row shows a `[RO]`
+suffix for contexts configured read-only (per-context config, global
+config, or the `--read-only` CLI flag). Mutating actions (delete, edit,
+scale, restart, exec, port-forward, drain, cordon, etc.) are filtered
+out of the action menu and gated at the dispatcher with a "Read-only
+mode: X disabled" toast. See [Read-Only Mode](usage.md#read-only-mode)
+for the full precedence rules across the CLI flag, per-context config,
+and global config.
+
 ## Mouse
 
 | Input | Action |
@@ -646,4 +663,7 @@ keybindings:
   # Bookmarks
   set_mark: "m"          # Set mark
   open_marks: "'"        # Open bookmarks
+
+  # Read-only mode
+  readonly_toggle: "ctrl+r"  # At cluster picker: toggle highlighted row's [RO] marker. Inside a context: toggle the current tab.
 ```

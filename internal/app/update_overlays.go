@@ -761,6 +761,16 @@ func (m Model) handleActionOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter", "y", "Y":
+		// Read-only safety net: if RO was toggled on while a confirm overlay
+		// was already showing, refuse to commit the mutation.
+		if m.readOnly && isMutatingAction(m.pendingAction) {
+			m.overlay = overlayNone
+			label := m.pendingAction
+			m.pendingAction = ""
+			m.confirmAction = ""
+			m.setStatusMessage(readOnlyBlockedMessage(label), true)
+			return m, scheduleStatusClear()
+		}
 		m.overlay = overlayNone
 		m.loading = true
 		action := m.pendingAction
@@ -821,6 +831,18 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return m.closeTabOrQuit()
 	case "enter":
 		if m.confirmTypeInput.Value == "DELETE" {
+			// Read-only safety net for force-delete / finalizer-remove paths.
+			if m.readOnly && isMutatingAction(m.pendingAction) {
+				m.overlay = overlayNone
+				label := m.pendingAction
+				m.pendingAction = ""
+				m.confirmAction = ""
+				m.confirmTitle = ""
+				m.confirmQuestion = ""
+				m.confirmTypeInput.Clear()
+				m.setStatusMessage(readOnlyBlockedMessage(label), true)
+				return m, scheduleStatusClear()
+			}
 			m.overlay = overlayNone
 			m.loading = true
 			action := m.pendingAction
