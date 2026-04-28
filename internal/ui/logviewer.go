@@ -17,7 +17,7 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 // RenderLogViewer renders the full-screen log viewer.
 func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, wrapTopSkip int) string {
 	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery)
-	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
+	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers)
 
 	// Content area: subtract border top + bottom (2 lines).
 	contentHeight := max(height-2, 1)
@@ -171,7 +171,12 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 }
 
 // renderLogFooter builds the footer bar for the log viewer.
-func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput string, visualMode, canSwitchPod, canFilterContainers bool) string {
+//
+// searchQuery is the *committed* search query (empty until the user presses
+// enter on the search prompt). The n/N next/prev hint is only surfaced once
+// a query has been committed \u2014 advertising it on a fresh viewer with no
+// search would be a no-op chord and a confusing claim.
+func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool) string {
 	if statusMsg != "" {
 		style := HelpKeyStyle
 		if statusIsErr {
@@ -208,11 +213,15 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "c", Desc: "previous"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "/", Desc: "search"},
-		{Key: "n/N", Desc: "next/prev"},
-		{Key: "123G", Desc: "goto"},
-		{Key: "S", Desc: "save"},
-		{Key: "ctrl+s", Desc: "save all"},
 	}
+	if searchQuery != "" {
+		hints = append(hints, HintEntry{Key: "n/N", Desc: "next/prev"})
+	}
+	hints = append(hints,
+		HintEntry{Key: "123G", Desc: "goto"},
+		HintEntry{Key: "S", Desc: "save"},
+		HintEntry{Key: "ctrl+s", Desc: "save all"},
+	)
 	if canSwitchPod {
 		hints = append(hints, HintEntry{"\\", "switch pod"})
 	} else if canFilterContainers {
