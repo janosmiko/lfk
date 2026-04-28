@@ -255,12 +255,15 @@ func (m Model) handleLogSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.logSearchActive = false
 		m.logSearchInput.Clear()
+		m.logSearchQuery = ""
 	case "backspace":
 		if len(m.logSearchInput.Value) > 0 {
 			m.logSearchInput.Backspace()
 		}
+		m.logSearchQuery = m.logSearchInput.Value
 	case "ctrl+w":
 		m.logSearchInput.DeleteWord()
+		m.logSearchQuery = m.logSearchInput.Value
 	case "ctrl+a":
 		m.logSearchInput.Home()
 	case "ctrl+e":
@@ -275,6 +278,11 @@ func (m Model) handleLogSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		key := msg.String()
 		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
 			m.logSearchInput.Insert(key)
+			// Live-update the highlight query so matches paint as the user
+			// types. Enter still "commits" search-input mode and triggers
+			// findNextLogMatch; before that the user only saw the input
+			// echo with no feedback on whether the query matches anything.
+			m.logSearchQuery = m.logSearchInput.Value
 		}
 	}
 	return m, nil

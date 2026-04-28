@@ -435,12 +435,15 @@ func (m Model) handleDescribeSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.describeSearchActive = false
 		m.describeSearchInput.Clear()
+		m.describeSearchQuery = ""
 	case "backspace":
 		if len(m.describeSearchInput.Value) > 0 {
 			m.describeSearchInput.Backspace()
 		}
+		m.describeSearchQuery = m.describeSearchInput.Value
 	case "ctrl+w":
 		m.describeSearchInput.DeleteWord()
+		m.describeSearchQuery = m.describeSearchInput.Value
 	case "ctrl+a":
 		m.describeSearchInput.Home()
 	case "ctrl+e":
@@ -455,6 +458,9 @@ func (m Model) handleDescribeSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		key := msg.String()
 		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
 			m.describeSearchInput.Insert(key)
+			// Live-update the highlight query so matches paint as the
+			// user types instead of waiting for Enter to commit.
+			m.describeSearchQuery = m.describeSearchInput.Value
 		}
 	}
 	return m, nil

@@ -508,6 +508,32 @@ func TestCovLogSearchKeyTyping(t *testing.T) {
 	assert.Equal(t, "x", rm.logSearchInput.Value)
 }
 
+// Regression: typing into the log-viewer search input now updates
+// logSearchQuery alongside logSearchInput so the highlight overlay
+// paints in real time. Previously the highlight only appeared once the
+// user pressed Enter to "commit" the query.
+func TestLogSearchTypingUpdatesQueryLive(t *testing.T) {
+	m := baseModelNav()
+	m.mode = modeLogs
+	m.logSearchActive = true
+	m.logLines = []string{"some error here"}
+
+	result, _ := m.handleLogKey(keyMsg("e"))
+	rm := result.(Model)
+	assert.Equal(t, "e", rm.logSearchInput.Value)
+	assert.Equal(t, "e", rm.logSearchQuery,
+		"logSearchQuery must mirror logSearchInput while typing so highlights paint live")
+
+	result, _ = rm.handleLogKey(keyMsg("r"))
+	rm = result.(Model)
+	assert.Equal(t, "er", rm.logSearchQuery)
+
+	result, _ = rm.handleLogKey(keyMsg("backspace"))
+	rm = result.(Model)
+	assert.Equal(t, "e", rm.logSearchQuery,
+		"backspace must keep logSearchQuery in sync, not leave the highlight stale")
+}
+
 func TestCovLogVisualKeyEsc(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs

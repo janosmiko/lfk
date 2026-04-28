@@ -934,6 +934,29 @@ func TestCovDescribeSearchKeyBackspace(t *testing.T) {
 	assert.Equal(t, "a", rm.describeSearchInput.Value)
 }
 
+// Regression: typing into the describe-view search input now updates
+// describeSearchQuery on every keystroke so the highlight overlay paints
+// in real time rather than waiting for Enter to commit.
+func TestDescribeSearchTypingUpdatesQueryLive(t *testing.T) {
+	m := baseModelDescribe()
+	m.describeSearchActive = true
+
+	result, _ := m.handleDescribeSearchKey(keyMsg("a"))
+	rm := result.(Model)
+	assert.Equal(t, "a", rm.describeSearchInput.Value)
+	assert.Equal(t, "a", rm.describeSearchQuery,
+		"describeSearchQuery must mirror describeSearchInput while typing so highlights paint live")
+
+	result, _ = rm.handleDescribeSearchKey(keyMsg("b"))
+	rm = result.(Model)
+	assert.Equal(t, "ab", rm.describeSearchQuery)
+
+	result, _ = rm.handleDescribeSearchKey(keyMsg("backspace"))
+	rm = result.(Model)
+	assert.Equal(t, "a", rm.describeSearchQuery,
+		"backspace must keep describeSearchQuery in sync with the input")
+}
+
 func TestCovDescribeSearchKeyCtrlW(t *testing.T) {
 	m := baseModelDescribe()
 	m.describeSearchActive = true

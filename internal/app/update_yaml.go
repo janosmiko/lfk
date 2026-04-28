@@ -38,6 +38,12 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleYAMLSearchInput handles key events when the YAML search input is active.
+//
+// Match highlights update on every keystroke so the user sees results land
+// in real time instead of having to commit with Enter just to see whether
+// the query matches anything. Enter still ends search-input mode and
+// scrolls to the first match -- it's the "commit" action; typing only
+// drives the live highlight overlay.
 func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	viewportLines := m.yamlViewportLines()
 
@@ -60,9 +66,11 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.yamlSearchText.Value) > 0 {
 			m.yamlSearchText.Backspace()
 		}
+		m.updateYAMLSearchMatches()
 		return m, nil
 	case "ctrl+w":
 		m.yamlSearchText.DeleteWord()
+		m.updateYAMLSearchMatches()
 		return m, nil
 	case "ctrl+a":
 		m.yamlSearchText.Home()
@@ -84,6 +92,7 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		if len(msg.String()) == 1 || msg.String() == " " {
 			m.yamlSearchText.Insert(msg.String())
+			m.updateYAMLSearchMatches()
 		}
 		return m, nil
 	}
