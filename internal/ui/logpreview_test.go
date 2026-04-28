@@ -699,3 +699,259 @@ func TestRenderLogPreviewPane_ZapTitleIndicator(t *testing.T) {
 		}
 	}
 }
+
+// --- NGINX/Apache/Traefik Combined Log Format ---
+//
+//	host - user [DD/Mon/YYYY:HH:MM:SS +ZZZZ] "METHOD path HTTP/v" status bytes "referer" "ua"
+
+func TestParseLogLine_Nginx_Combined(t *testing.T) {
+	in := `192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] "GET /api/v1/pods HTTP/1.1" 200 1234 "https://example.com" "Mozilla/5.0 (X11; Linux x86_64)"`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewNginx {
+		t.Fatalf("kind = %v, want Nginx", p.Kind)
+	}
+	want := map[string]string{
+		"method":     "GET",
+		"path":       "/api/v1/pods",
+		"status":     "200",
+		"bytes":      "1234",
+		"protocol":   "HTTP/1.1",
+		"referer":    "https://example.com",
+		"user_agent": "Mozilla/5.0 (X11; Linux x86_64)",
+		"client":     "192.168.1.1",
+		"user":       "-",
+		"time":       "15/Jan/2024:10:30:00 +0000",
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("field %q = %q, want %q", k, got[k], v)
+		}
+	}
+	if len(p.Fields) != len(want) {
+		t.Errorf("got %d fields (%v), want %d", len(p.Fields), p.Fields, len(want))
+	}
+}
+
+func TestParseLogLine_Nginx_FieldOrderPutsRequestSummaryFirst(t *testing.T) {
+	in := `10.0.0.1 - alice [15/Jan/2024:10:30:00 +0000] "POST /login HTTP/2.0" 401 0 "-" "curl/8.5.0"`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewNginx {
+		t.Fatalf("kind = %v, want Nginx", p.Kind)
+	}
+	keys := make([]string, len(p.Fields))
+	for i, f := range p.Fields {
+		keys[i] = f.Key
+	}
+	// "What happened" first: method, path, status. Then bytes, then context.
+	want := []string{"method", "path", "status"}
+	for i, w := range want {
+		if i >= len(keys) || keys[i] != w {
+			t.Errorf("key[%d] = %q, want %q (full order: %v)", i, keys[i], w, keys)
+		}
+	}
+}
+
+func TestParseLogLine_Nginx_PodPrefixStripped(t *testing.T) {
+	in := `[pod/ingress-nginx-controller-x/controller] 192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] "GET / HTTP/1.1" 200 0 "-" "kube-probe/1.30"`
+	p := ParseLogLine(in)
+	if p.Prefix != "[pod/ingress-nginx-controller-x/controller]" {
+		t.Errorf("prefix = %q", p.Prefix)
+	}
+	if p.Kind != LogPreviewNginx {
+		t.Fatalf("kind = %v, want Nginx after prefix strip", p.Kind)
+	}
+}
+
+func TestParseLogLine_Nginx_BytesDashAccepted(t *testing.T) {
+	// Some configs emit "-" for body_bytes_sent on empty responses.
+	in := `1.2.3.4 - - [15/Jan/2024:10:30:00 +0000] "HEAD /healthz HTTP/1.1" 204 - "-" "kube-probe/1.30"`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewNginx {
+		t.Fatalf("kind = %v, want Nginx (bytes='-')", p.Kind)
+	}
+}
+
+func TestParseLogLine_Nginx_RejectsNonNginx(t *testing.T) {
+	cases := []string{
+		// Missing the bracketed Apache-style timestamp.
+		`192.168.1.1 - - GET / HTTP/1.1 200`,
+		// Missing the quoted request line.
+		`192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] GET / 200`,
+		// Wrong timestamp format (RFC3339, not Apache).
+		`192.168.1.1 - - [2024-01-15T10:30:00Z] "GET / HTTP/1.1" 200 0 "-" "-"`,
+		// Missing the second quoted block (combined needs both referer and ua).
+		`192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] "GET / HTTP/1.1" 200 1234 "https://example.com"`,
+	}
+	for _, in := range cases {
+		t.Run(in, func(t *testing.T) {
+			p := ParseLogLine(in)
+			if p.Kind == LogPreviewNginx {
+				t.Errorf("misclassified as Nginx: %q -> %v", in, p.Fields)
+			}
+		})
+	}
+}
+
+func TestParseLogLine_Nginx_BeatsLogfmtForQuerystringPairs(t *testing.T) {
+	// A request URL with query-string pairs would satisfy logfmt's >=2-pair
+	// detector. The nginx parser must run first so the structural
+	// classification wins.
+	in := `192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] "GET /api?foo=bar&baz=qux HTTP/1.1" 200 1234 "-" "-"`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewNginx {
+		t.Fatalf("kind = %v, want Nginx (must beat logfmt)", p.Kind)
+	}
+}
+
+func TestRenderLogPreviewPane_NginxTitleIndicator(t *testing.T) {
+	in := `192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] "GET /api HTTP/1.1" 200 1234 "-" "curl/8"`
+	out := RenderLogPreviewPane(in, 100, 20, 0)
+	if !strings.Contains(out, "[NGINX]") {
+		t.Fatalf("expected [NGINX] kind indicator in title; got:\n%s", out)
+	}
+	for _, want := range []string{"method", "GET", "path", "/api", "status", "200"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("nginx preview missing %q; got:\n%s", want, out)
+		}
+	}
+}
+
+// --- Envoy access log (default text format) ---
+//
+//	[RFC3339] "METHOD path proto" status flags bytes_recv bytes_sent dur ust "xff" "ua" "rid" "auth" "upstream"
+
+func TestParseLogLine_Envoy_DefaultAccessLog(t *testing.T) {
+	in := `[2024-01-15T10:30:00.123Z] "GET /api/v1/pods HTTP/1.1" 200 - 0 1234 5 4 "192.168.1.1" "curl/7.81" "abc-123-def" "api.example.com" "10.0.0.5:8080"`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewEnvoy {
+		t.Fatalf("kind = %v, want Envoy", p.Kind)
+	}
+	want := map[string]string{
+		"method":          "GET",
+		"path":            "/api/v1/pods",
+		"protocol":        "HTTP/1.1",
+		"status":          "200",
+		"response_flags":  "-",
+		"bytes_received":  "0",
+		"bytes_sent":      "1234",
+		"duration_ms":     "5",
+		"upstream_time":   "4",
+		"x_forwarded_for": "192.168.1.1",
+		"user_agent":      "curl/7.81",
+		"request_id":      "abc-123-def",
+		"authority":       "api.example.com",
+		"upstream_host":   "10.0.0.5:8080",
+		"time":            "2024-01-15T10:30:00.123Z",
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("field %q = %q, want %q", k, got[k], v)
+		}
+	}
+	if len(p.Fields) != len(want) {
+		t.Errorf("got %d fields (%v), want %d", len(p.Fields), p.Fields, len(want))
+	}
+}
+
+func TestParseLogLine_Envoy_ResponseFlagAndDashUpstream(t *testing.T) {
+	// Real Istio output for a request that never reached an upstream:
+	// response_flags="UH" (upstream healthy unavailable), upstream time "-",
+	// upstream host "-".
+	in := `[2024-01-15T10:30:00.000Z] "GET /missing HTTP/1.1" 503 UH 0 91 0 - "10.244.0.1" "kube-probe/1.30" "req-x" "svc.ns.svc.cluster.local" "-"`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewEnvoy {
+		t.Fatalf("kind = %v, want Envoy", p.Kind)
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	if got["response_flags"] != "UH" {
+		t.Errorf("response_flags = %q, want UH", got["response_flags"])
+	}
+	if got["upstream_time"] != "-" {
+		t.Errorf("upstream_time = %q, want -", got["upstream_time"])
+	}
+	if got["upstream_host"] != "-" {
+		t.Errorf("upstream_host = %q, want -", got["upstream_host"])
+	}
+}
+
+func TestParseLogLine_Envoy_FieldOrderPutsRequestSummaryFirst(t *testing.T) {
+	in := `[2024-01-15T10:30:00.000Z] "POST /login HTTP/2" 401 - 12 0 1 - "-" "-" "-" "-" "-"`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewEnvoy {
+		t.Fatalf("kind = %v, want Envoy", p.Kind)
+	}
+	keys := make([]string, len(p.Fields))
+	for i, f := range p.Fields {
+		keys[i] = f.Key
+	}
+	want := []string{"method", "path", "status"}
+	for i, w := range want {
+		if i >= len(keys) || keys[i] != w {
+			t.Errorf("key[%d] = %q, want %q (full order: %v)", i, keys[i], w, keys)
+		}
+	}
+}
+
+func TestParseLogLine_Envoy_PodPrefixStripped(t *testing.T) {
+	in := `[pod/istio-proxy-x/istio-proxy] [2024-01-15T10:30:00.000Z] "GET / HTTP/1.1" 200 - 0 0 0 - "-" "-" "-" "-" "-"`
+	p := ParseLogLine(in)
+	if p.Prefix != "[pod/istio-proxy-x/istio-proxy]" {
+		t.Errorf("prefix = %q", p.Prefix)
+	}
+	if p.Kind != LogPreviewEnvoy {
+		t.Fatalf("kind = %v, want Envoy after prefix strip", p.Kind)
+	}
+}
+
+func TestParseLogLine_Envoy_RejectsNonEnvoy(t *testing.T) {
+	cases := []string{
+		// Missing the leading bracketed RFC3339.
+		`"GET / HTTP/1.1" 200 - 0 0 0 - "-" "-" "-" "-" "-"`,
+		// Missing the trailing quoted blocks (only 3 of 5).
+		`[2024-01-15T10:30:00.000Z] "GET / HTTP/1.1" 200 - 0 0 0 - "-" "-" "-"`,
+		// NGINX-style timestamp inside brackets.
+		`[15/Jan/2024:10:30:00 +0000] "GET / HTTP/1.1" 200 - 0 0 0 - "-" "-" "-" "-" "-"`,
+		// Random bracketed prefix that isn't a timestamp.
+		`[some-tag] "GET / HTTP/1.1" 200 - 0 0 0 - "-" "-" "-" "-" "-"`,
+	}
+	for _, in := range cases {
+		t.Run(in, func(t *testing.T) {
+			p := ParseLogLine(in)
+			if p.Kind == LogPreviewEnvoy {
+				t.Errorf("misclassified as Envoy: %q -> %v", in, p.Fields)
+			}
+		})
+	}
+}
+
+func TestParseLogLine_Envoy_BeatsLogfmtForQuerystringPairs(t *testing.T) {
+	in := `[2024-01-15T10:30:00.000Z] "GET /api?foo=bar&baz=qux HTTP/1.1" 200 - 0 1234 5 4 "-" "-" "-" "-" "-"`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewEnvoy {
+		t.Fatalf("kind = %v, want Envoy (must beat logfmt)", p.Kind)
+	}
+}
+
+func TestRenderLogPreviewPane_EnvoyTitleIndicator(t *testing.T) {
+	in := `[2024-01-15T10:30:00.000Z] "GET /api HTTP/1.1" 200 - 0 1234 5 4 "192.168.1.1" "curl/8" "rid" "host" "10.0.0.5:8080"`
+	out := RenderLogPreviewPane(in, 120, 25, 0)
+	if !strings.Contains(out, "[ENVOY]") {
+		t.Fatalf("expected [ENVOY] kind indicator in title; got:\n%s", out)
+	}
+	for _, want := range []string{"method", "GET", "status", "200", "duration_ms", "upstream_host"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("envoy preview missing %q; got:\n%s", want, out)
+		}
+	}
+}

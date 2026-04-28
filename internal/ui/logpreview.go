@@ -28,6 +28,14 @@ const (
 	// context (controller name, namespace, reconcileID, ...) appears
 	// flat in the preview pane.
 	LogPreviewZap
+	// LogPreviewNginx covers the NCSA "Combined Log Format" emitted by
+	// nginx, Apache, Traefik, and most ingress controllers:
+	// `host - user [DD/Mon/YYYY:HH:MM:SS +ZZZZ] "METHOD path proto" status bytes "referer" "ua"`.
+	LogPreviewNginx
+	// LogPreviewEnvoy covers the Envoy/Istio default text access log
+	// format (15 positional fields after a bracketed RFC3339 timestamp):
+	// `[time] "METHOD path proto" status flags rx tx dur upstream_time "xff" "ua" "rid" "auth" "upstream_host"`.
+	LogPreviewEnvoy
 )
 
 // LogPreviewField is a single key/value pair extracted from a structured log line.
@@ -51,7 +59,12 @@ type ParsedLogPreview struct {
 func ParseLogLine(line string) ParsedLogPreview {
 	p := ParsedLogPreview{Kind: LogPreviewText, Body: line}
 	rest := line
-	if len(rest) > 0 && rest[0] == '[' {
+	// Pod prefixes are kubectl-shape: "[pod/<name>/<container>] ". The
+	// "[pod/" gate is required to avoid eating any leading bracketed
+	// token — Envoy access logs lead with a bracketed RFC3339 timestamp
+	// (`[2024-01-15T10:30:00.000Z] ...`) that would otherwise be
+	// misclassified as a pod prefix and starve the structural parsers.
+	if strings.HasPrefix(rest, "[pod/") {
 		if i := strings.Index(rest, "] "); i > 0 {
 			p.Prefix = rest[:i+1]
 			rest = rest[i+2:]
@@ -85,6 +98,20 @@ func ParseLogLine(line string) ParsedLogPreview {
 	// could carry stray `key=value` fragments and hijack classification.
 	if fields, ok := parseZapFields(rest); ok {
 		p.Kind = LogPreviewZap
+		p.Fields = fields
+		return p
+	}
+	// HTTP access logs (NGINX/Apache Combined and Envoy/Istio default)
+	// must precede logfmt: a request URL with a query string carries
+	// `key=value` pairs that the loose logfmt detector would otherwise
+	// claim, hiding the request method/status/bytes structure.
+	if fields, ok := parseNginxFields(rest); ok {
+		p.Kind = LogPreviewNginx
+		p.Fields = fields
+		return p
+	}
+	if fields, ok := parseEnvoyFields(rest); ok {
+		p.Kind = LogPreviewEnvoy
 		p.Fields = fields
 		return p
 	}
@@ -182,6 +209,79 @@ func parseZapFields(s string) ([]LogPreviewField, bool) {
 	out = append(out, LogPreviewField{Key: "message", Value: message})
 	out = append(out, jsonFields...)
 	return out, true
+}
+
+// nginxCombined matches the NCSA "Combined Log Format" used by nginx,
+// Apache, Traefik, and most ingress controllers as their default access
+// log line:
+//
+//	host - user [DD/Mon/YYYY:HH:MM:SS +ZZZZ] "METHOD path proto" status bytes "referer" "ua"
+//
+// host is permissive (\S+) so IPv4, IPv6, and DNS names all match. The
+// quoted referer/user_agent blocks are required (Combined, not the
+// shorter Common Log Format) so 7-field "common" lines are rejected.
+var nginxCombined = regexp.MustCompile(`^(\S+) \S+ (\S+) \[(\d{2}/[A-Z][a-z]{2}/\d{4}:\d{2}:\d{2}:\d{2} [+-]\d{4})\] "([A-Z]+) (\S+) (HTTP/[\d.]+)" (\d+) (\d+|-) "([^"]*)" "([^"]*)"$`)
+
+// parseNginxFields extracts request method, path, status, bytes, and
+// the surrounding metadata from an NCSA Combined log line. Field order
+// puts the request summary (method, path, status) first so the most
+// useful information sits at the top of the preview pane.
+func parseNginxFields(s string) ([]LogPreviewField, bool) {
+	m := nginxCombined.FindStringSubmatch(s)
+	if m == nil {
+		return nil, false
+	}
+	return []LogPreviewField{
+		{Key: "method", Value: m[4]},
+		{Key: "path", Value: m[5]},
+		{Key: "status", Value: m[7]},
+		{Key: "bytes", Value: m[8]},
+		{Key: "protocol", Value: m[6]},
+		{Key: "referer", Value: m[9]},
+		{Key: "user_agent", Value: m[10]},
+		{Key: "client", Value: m[1]},
+		{Key: "user", Value: m[2]},
+		{Key: "time", Value: m[3]},
+	}, true
+}
+
+// envoyAccessLog matches Envoy's default text-format access log (also
+// emitted by Istio sidecars):
+//
+//	[RFC3339] "METHOD path proto" status flags rx tx duration upstream_time "xff" "ua" "rid" "auth" "upstream_host"
+//
+// response_flags is a short alphabetic token (e.g. UH, NR, DI, FI) or
+// "-". upstream_time is a number or "-" when no upstream was contacted.
+// The five trailing quoted blocks are required, so partial Envoy
+// configurations with fewer columns are rejected rather than misparsed.
+var envoyAccessLog = regexp.MustCompile(`^\[(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d+Z)\] "([A-Z]+) (\S+) (HTTP/[\d.]+)" (\d+) (\S+) (\d+) (\d+) (\d+|-) (\d+|-) "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)" "([^"]*)"$`)
+
+// parseEnvoyFields extracts the 15-positional Envoy default access log.
+// Field order surfaces the request summary first, then the
+// quantitative fields (flags, bytes, durations), then the upstream and
+// identity context.
+func parseEnvoyFields(s string) ([]LogPreviewField, bool) {
+	m := envoyAccessLog.FindStringSubmatch(s)
+	if m == nil {
+		return nil, false
+	}
+	return []LogPreviewField{
+		{Key: "method", Value: m[2]},
+		{Key: "path", Value: m[3]},
+		{Key: "status", Value: m[5]},
+		{Key: "response_flags", Value: m[6]},
+		{Key: "bytes_received", Value: m[7]},
+		{Key: "bytes_sent", Value: m[8]},
+		{Key: "duration_ms", Value: m[9]},
+		{Key: "upstream_time", Value: m[10]},
+		{Key: "protocol", Value: m[4]},
+		{Key: "user_agent", Value: m[12]},
+		{Key: "x_forwarded_for", Value: m[11]},
+		{Key: "request_id", Value: m[13]},
+		{Key: "authority", Value: m[14]},
+		{Key: "upstream_host", Value: m[15]},
+		{Key: "time", Value: m[1]},
+	}, true
 }
 
 // parseKlogFields extracts level, time, message, caller, and thread from
@@ -338,6 +438,10 @@ func RenderLogPreviewPane(line string, width, height, scroll int) string {
 		titleText += HelpKeyStyle.Render("[KLOG]")
 	case LogPreviewZap:
 		titleText += HelpKeyStyle.Render("[ZAP]")
+	case LogPreviewNginx:
+		titleText += HelpKeyStyle.Render("[NGINX]")
+	case LogPreviewEnvoy:
+		titleText += HelpKeyStyle.Render("[ENVOY]")
 	default:
 		titleText += HelpKeyStyle.Render("[TEXT]")
 	}
