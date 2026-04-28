@@ -21,6 +21,13 @@ const (
 	// kube-proxy, leaderelection, and most controller binaries:
 	// `LMMDD HH:MM:SS.uuuuuu threadid file:line] msg`.
 	LogPreviewKlog
+	// LogPreviewZap covers the zap dev/console encoder shape that
+	// controller-runtime emits (after a leading RFC3339 timestamp):
+	// `LEVEL\t[LOGGER\t]MESSAGE[\t{JSON_FIELDS}]`. The optional trailing
+	// JSON object is unpacked into individual fields so the structured
+	// context (controller name, namespace, reconcileID, ...) appears
+	// flat in the preview pane.
+	LogPreviewZap
 )
 
 // LogPreviewField is a single key/value pair extracted from a structured log line.
@@ -72,6 +79,15 @@ func ParseLogLine(line string) ParsedLogPreview {
 		p.Fields = fields
 		return p
 	}
+	// zap (controller-runtime dev/console encoder) must also run before
+	// logfmt — its embedded JSON fields contain colon-bearing values that
+	// the loose logfmt regex never matches, but the message body alone
+	// could carry stray `key=value` fragments and hijack classification.
+	if fields, ok := parseZapFields(rest); ok {
+		p.Kind = LogPreviewZap
+		p.Fields = fields
+		return p
+	}
 	if fields, ok := parseLogfmtFields(rest); ok {
 		p.Kind = LogPreviewLogfmt
 		p.Fields = fields
@@ -98,6 +114,76 @@ var klogLevelName = map[byte]string{
 	'F': "Fatal",
 }
 
+// zapLevelName maps the uppercase zap level tokens emitted by zap's
+// CapitalLevelEncoder (the controller-runtime default) to display names.
+// DPANIC and PANIC collapse to Fatal because to a log reader they signal
+// the same "process is in trouble" severity.
+var zapLevelName = map[string]string{
+	"DEBUG":   "Debug",
+	"INFO":    "Info",
+	"WARN":    "Warning",
+	"WARNING": "Warning",
+	"ERROR":   "Error",
+	"DPANIC":  "Fatal",
+	"PANIC":   "Fatal",
+	"FATAL":   "Fatal",
+}
+
+// parseZapFields recognises the zap dev/console encoder shape:
+//
+//	LEVEL\t[LOGGER\t]MESSAGE[\t{JSON_FIELDS}]
+//
+// produced by controller-runtime after a leading RFC3339 timestamp.
+// LEVEL must be a known token (see zapLevelName); the trailing JSON
+// object, when present and parseable, is unpacked so structured context
+// (controller, namespace, reconcileID, ...) appears flat in the preview.
+//
+// The parser refuses anything outside the LEVEL[\tLOGGER]\tMESSAGE[\tJSON]
+// shape: too many tab segments, an unknown level token, or an empty
+// message all return false rather than risk a sloppy match that loses
+// structural information.
+func parseZapFields(s string) ([]LogPreviewField, bool) {
+	parts := strings.Split(s, "\t")
+	if len(parts) < 2 {
+		return nil, false
+	}
+	levelName, ok := zapLevelName[parts[0]]
+	if !ok {
+		return nil, false
+	}
+	end := len(parts)
+	var jsonFields []LogPreviewField
+	last := strings.TrimSpace(parts[end-1])
+	if len(last) >= 2 && last[0] == '{' && last[len(last)-1] == '}' {
+		if jf, jOk := parseJSONFields(last); jOk {
+			jsonFields = jf
+			end--
+		}
+	}
+	middle := parts[1:end]
+	var logger, message string
+	switch len(middle) {
+	case 1:
+		message = middle[0]
+	case 2:
+		logger, message = middle[0], middle[1]
+	default:
+		// 0 or 3+ middle parts: not the zap shape we recognise.
+		return nil, false
+	}
+	if message == "" {
+		return nil, false
+	}
+	out := make([]LogPreviewField, 0, 3+len(jsonFields))
+	out = append(out, LogPreviewField{Key: "level", Value: levelName})
+	if logger != "" {
+		out = append(out, LogPreviewField{Key: "logger", Value: logger})
+	}
+	out = append(out, LogPreviewField{Key: "message", Value: message})
+	out = append(out, jsonFields...)
+	return out, true
+}
+
 // parseKlogFields extracts level, time, message, caller, and thread from
 // a klog-formatted line. Field order is fixed (time, level, message,
 // caller, thread) so the preview pane shows the most useful information
@@ -120,15 +206,19 @@ func parseKlogFields(s string) ([]LogPreviewField, bool) {
 // remainder, or ("", s, false) when s does not start with a timestamp.
 // This is the canonical primitive; stripTimestampRaw delegates to it.
 // Minimum length: "2024-01-15T10:30:00Z " = 21 chars.
+//
+// The separator after the timestamp may be either a space (kubectl logs)
+// or a tab (controller-runtime/zap dev encoder). Both producers are
+// common in a Kubernetes context.
 func splitLeadingTimestamp(s string) (string, string, bool) {
 	if len(s) < 21 || s[4] != '-' || s[10] != 'T' {
 		return "", s, false
 	}
-	spaceIdx := strings.IndexByte(s, ' ')
-	if spaceIdx < 20 || spaceIdx > 35 {
+	sepIdx := strings.IndexFunc(s, func(r rune) bool { return r == ' ' || r == '\t' })
+	if sepIdx < 20 || sepIdx > 35 {
 		return "", s, false
 	}
-	return s[:spaceIdx], s[spaceIdx+1:], true
+	return s[:sepIdx], s[sepIdx+1:], true
 }
 
 func parseJSONFields(s string) ([]LogPreviewField, bool) {
@@ -246,6 +336,8 @@ func RenderLogPreviewPane(line string, width, height, scroll int) string {
 		titleText += HelpKeyStyle.Render("[LOGFMT]")
 	case LogPreviewKlog:
 		titleText += HelpKeyStyle.Render("[KLOG]")
+	case LogPreviewZap:
+		titleText += HelpKeyStyle.Render("[ZAP]")
 	default:
 		titleText += HelpKeyStyle.Render("[TEXT]")
 	}

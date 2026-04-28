@@ -342,7 +342,7 @@ func helpSections() []helpSection {
 				{"#", "Toggle line numbers"},
 				{"s", "Toggle timestamps"},
 				{"p", "Toggle pod/container prefixes"},
-				{"P", "Toggle structured preview side panel (JSON / logfmt / klog / text)"},
+				{"P", "Toggle structured preview side panel (JSON / logfmt / klog / zap / text)"},
 				{"J/K", "Scroll preview side panel down/up (when visible)"},
 				{"c", "Toggle previous container logs"},
 				{"/", "Search in logs"},

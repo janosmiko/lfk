@@ -540,3 +540,162 @@ func TestRenderLogPreviewPane_KlogTitleIndicator(t *testing.T) {
 		}
 	}
 }
+
+// --- zap dev/console encoder (TIMESTAMP\tLEVEL\t[LOGGER\t]MESSAGE[\t{JSON}]) ---
+
+func TestParseLogLine_Zap_LevelLoggerMessageJSON(t *testing.T) {
+	// Real controller-runtime emission:
+	// timestamp + tab + level + tab + logger + tab + message + tab + JSON.
+	// Pod prefix and timestamp are stripped first so the parser sees the
+	// LEVEL\tLOGGER\tMESSAGE\tJSON tail.
+	in := "[pod/dragonfly-operator-x/manager] 2026-04-27T16:06:59Z\tINFO\tcontroller-runtime.metrics\tServing metrics server\t{\"bindAddress\": \"127.0.0.1:8080\", \"secure\": false}"
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewZap {
+		t.Fatalf("kind = %v, want Zap", p.Kind)
+	}
+	if p.Prefix != "[pod/dragonfly-operator-x/manager]" {
+		t.Errorf("prefix = %q", p.Prefix)
+	}
+	if p.Time == "" {
+		t.Errorf("expected RFC3339 timestamp to be extracted into p.Time, got empty")
+	}
+	want := []LogPreviewField{
+		{Key: "level", Value: "Info"},
+		{Key: "logger", Value: "controller-runtime.metrics"},
+		{Key: "message", Value: "Serving metrics server"},
+		// Embedded JSON fields preserve their natural ordering (jsonKeyRank
+		// applies — bindAddress and secure both rank 100, so alpha order).
+		{Key: "bindAddress", Value: "127.0.0.1:8080"},
+		{Key: "secure", Value: "false"},
+	}
+	if len(p.Fields) != len(want) {
+		t.Fatalf("got %d fields, want %d (%v)", len(p.Fields), len(want), p.Fields)
+	}
+	for i, w := range want {
+		if p.Fields[i].Key != w.Key || p.Fields[i].Value != w.Value {
+			t.Errorf("field[%d] = {%q, %q}, want {%q, %q}",
+				i, p.Fields[i].Key, p.Fields[i].Value, w.Key, w.Value)
+		}
+	}
+}
+
+func TestParseLogLine_Zap_NoLoggerNoJSON(t *testing.T) {
+	// Bare zap line: level + message only. No logger, no fields JSON.
+	in := "INFO\tstarting manager"
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewZap {
+		t.Fatalf("kind = %v, want Zap", p.Kind)
+	}
+	if len(p.Fields) != 2 {
+		t.Fatalf("got %d fields, want 2 (%v)", len(p.Fields), p.Fields)
+	}
+	if p.Fields[0].Key != "level" || p.Fields[0].Value != "Info" {
+		t.Errorf("field[0] = %+v, want {level Info}", p.Fields[0])
+	}
+	if p.Fields[1].Key != "message" || p.Fields[1].Value != "starting manager" {
+		t.Errorf("field[1] = %+v, want {message starting manager}", p.Fields[1])
+	}
+}
+
+func TestParseLogLine_Zap_MessageWithoutLoggerButWithJSON(t *testing.T) {
+	// Common controller-runtime pattern: no logger, message + JSON fields.
+	// Tab-split gives [LEVEL, MESSAGE, JSON_TEXT]. The detector must treat
+	// the middle token as the message because the last token parses as JSON.
+	in := `INFO	reconciling dragonfly instance	{"controller": "Dragonfly", "namespace": "m2community-stage", "name": "redis"}`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewZap {
+		t.Fatalf("kind = %v, want Zap", p.Kind)
+	}
+	keys := make([]string, len(p.Fields))
+	for i, f := range p.Fields {
+		keys[i] = f.Key
+	}
+	// level first, then message (no logger), then JSON-derived fields.
+	if len(keys) < 2 || keys[0] != "level" || keys[1] != "message" {
+		t.Fatalf("first two keys = %v, want [level message ...]", keys)
+	}
+	// JSON-derived field values must be present.
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	if got["controller"] != "Dragonfly" {
+		t.Errorf("expected controller=Dragonfly from embedded JSON, got %q", got["controller"])
+	}
+	if got["namespace"] != "m2community-stage" {
+		t.Errorf("expected namespace=m2community-stage, got %q", got["namespace"])
+	}
+}
+
+func TestParseLogLine_Zap_AllLevels(t *testing.T) {
+	cases := []struct {
+		token, name string
+	}{
+		{"DEBUG", "Debug"},
+		{"INFO", "Info"},
+		{"WARN", "Warning"},
+		{"WARNING", "Warning"},
+		{"ERROR", "Error"},
+		{"DPANIC", "Fatal"},
+		{"PANIC", "Fatal"},
+		{"FATAL", "Fatal"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.token, func(t *testing.T) {
+			in := tc.token + "\thello"
+			p := ParseLogLine(in)
+			if p.Kind != LogPreviewZap {
+				t.Fatalf("kind = %v, want Zap for %q", p.Kind, tc.token)
+			}
+			if p.Fields[0].Value != tc.name {
+				t.Errorf("level for %q = %q, want %q", tc.token, p.Fields[0].Value, tc.name)
+			}
+		})
+	}
+}
+
+func TestParseLogLine_Zap_RejectsNonZap(t *testing.T) {
+	cases := []string{
+		"plain text without tabs",
+		"INFO no tab follows",   // level token but no tab
+		"NOTALEVEL\tsome text",  // first token is not a known level
+		"\tleading tab",         // empty level token
+		"info\tlowercase level", // real controller-runtime/zap uses uppercase tokens
+		// Falls through to existing parsers.
+		"key1=v1 key2=v2 key3=v3",
+		`{"level":"info","msg":"x"}`,
+	}
+	for _, in := range cases {
+		t.Run(in, func(t *testing.T) {
+			p := ParseLogLine(in)
+			if p.Kind == LogPreviewZap {
+				t.Errorf("misclassified as Zap: %q -> %v", in, p.Fields)
+			}
+		})
+	}
+}
+
+func TestParseLogLine_Zap_TooManyTabSegmentsRejected(t *testing.T) {
+	// More than LEVEL + LOGGER + MESSAGE + JSON (= 4 tab-separated parts)
+	// is not the controller-runtime/zap shape; refuse to claim the format
+	// rather than silently lose data into a single 'message' field.
+	in := "INFO\tlogger\tmsg\textra\t{\"k\":\"v\"}"
+	p := ParseLogLine(in)
+	if p.Kind == LogPreviewZap {
+		t.Errorf("unexpected Zap classification for %d tab segments: %v",
+			len(strings.Split(in, "\t")), p.Fields)
+	}
+}
+
+func TestRenderLogPreviewPane_ZapTitleIndicator(t *testing.T) {
+	in := "[pod/x/manager] 2026-04-27T16:06:59Z\tINFO\tsetup\tstarting manager"
+	out := RenderLogPreviewPane(in, 80, 20, 0)
+	if !strings.Contains(out, "[ZAP]") {
+		t.Fatalf("expected [ZAP] kind indicator in title; got:\n%s", out)
+	}
+	for _, want := range []string{"level", "Info", "logger", "setup", "message", "starting manager"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("zap preview missing %q; got:\n%s", want, out)
+		}
+	}
+}

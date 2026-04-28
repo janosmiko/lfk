@@ -164,6 +164,15 @@ func TestStripTimestampRaw(t *testing.T) {
 			input:    "2024-01-15T10:30 remainder",
 			expected: "2024-01-15T10:30 remainder",
 		},
+		{
+			// Real controller-runtime/zap output uses a tab as the
+			// separator between the leading RFC3339 timestamp and the
+			// LEVEL token. The splitter must accept it so the zap
+			// preview formatter sees the tab-tokenised tail.
+			name:     "tab separator after RFC3339 timestamp stripped",
+			input:    "2026-04-27T16:06:59Z\tINFO\tsetup\tstarting manager",
+			expected: "INFO\tsetup\tstarting manager",
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
