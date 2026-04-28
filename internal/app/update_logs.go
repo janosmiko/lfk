@@ -819,7 +819,15 @@ func (m Model) handleLogKeyJ2() Model {
 	if previewW == 0 {
 		return m
 	}
-	maxScroll := ui.LogPreviewMaxScroll(m.logPreviewLine(), previewW, m.logViewHeight())
+	// LogPreviewMaxScroll's `height` arg is the outer panel height — it
+	// subtracts 2 internally for the border to reach the inner content
+	// height. logContentHeight already gives that inner height (it
+	// accounts for the View()-time app title / tab bar reductions that
+	// m.logViewHeight() can't see from Update context), so add 2 to map
+	// back. Using logViewHeight here would over-count by 1 (or 2 with
+	// tabs) and clip the last body rows off the user's viewport.
+	previewH := m.logContentHeight() + 2
+	maxScroll := ui.LogPreviewMaxScroll(m.logPreviewLine(), previewW, previewH)
 	if m.logPreviewScroll < maxScroll {
 		m.logPreviewScroll++
 	}

@@ -203,7 +203,10 @@ func TestLogKeyJCapitalClampsAtMax(t *testing.T) {
 		m = ret.(Model)
 	}
 	_, previewW := splitLogPreviewWidth(m.width)
-	wantMax := ui.LogPreviewMaxScroll(m.logPreviewLine(), previewW, m.logViewHeight())
+	// Mirror the handler: maxScroll is computed from the inner content
+	// height (logContentHeight), and LogPreviewMaxScroll's height arg is
+	// the outer panel size, so add 2 for the border.
+	wantMax := ui.LogPreviewMaxScroll(m.logPreviewLine(), previewW, m.logContentHeight()+2)
 	assert.Equal(t, wantMax, m.logPreviewScroll, "J spam must clamp at LogPreviewMaxScroll")
 }
 
@@ -237,6 +240,48 @@ func TestEnsureLogCursorVisibleResetsPreviewScroll(t *testing.T) {
 	}
 	m.ensureLogCursorVisible()
 	assert.Equal(t, 0, m.logPreviewScroll, "ensureLogCursorVisible must reset preview scroll")
+}
+
+func TestScrollToMaxRevealsLastBodyRowInRenderedView(t *testing.T) {
+	// Regression: the J handler computes maxScroll from m.logContentHeight()
+	// because m.logViewHeight() depends on View()'s mutation of m.height
+	// for the app title bar (and optional tab bar). Using the wrong height
+	// makes maxScroll 1-2 short and hides the last body rows from the user.
+	//
+	// This test mirrors the user-visible flow: build a body that overflows,
+	// spam J to reach max, then assert the last body line appears in the
+	// rendered viewLogs output. View() reduces m.height by 1 before
+	// dispatching, so we mimic that reduction in the test setup so viewLogs
+	// sees the same height the real app pipeline would give it.
+	const sentinel = "END_OF_BODY_MARKER"
+	// Many fields so body line count exceeds the panel height regardless
+	// of which side of the off-by-one bug we're on.
+	jsonLine := `{"a":"1","b":"2","c":"3","d":"4","e":"5","f":"6","g":"7","h":"8","i":"9","j":"10","k":"11","l":"12","m":"13","n":"14","o":"15","p":"16","q":"17","r":"18","s":"19","t":"20","u":"21","v":"22","w":"23","x":"24","y":"25","z_last_field":"` + sentinel + `"}`
+	terminalH := 16
+	m := Model{
+		mode:              modeLogs,
+		logLines:          []string{jsonLine},
+		logCursor:         0,
+		logPreviewVisible: true,
+		tabs:              []TabState{{}}, // single tab → no tab bar
+		width:             140,
+		height:            terminalH, // Update-context: untouched terminal height
+		logTitle:          "Logs",
+	}
+	// Spam J more times than there could possibly be body rows so we land
+	// at whatever maxScroll the handler considers final.
+	for range 100 {
+		ret, _ := m.handleLogKey(runeKey('J'))
+		m = ret.(Model)
+	}
+	// Render viewLogs the same way View() would: with m.height reduced by
+	// 1 for the app title bar.
+	m.height = terminalH - 1
+	out := m.viewLogs()
+	assert.Contains(t, out, sentinel,
+		"after spamming J the last body row must be visible in viewLogs output; "+
+			"if maxScroll is computed against the wrong height the handler stops "+
+			"short and the user sees the bottom of the body clipped off-screen")
 }
 
 func TestLogKeyJLowercaseResetsPreviewScroll(t *testing.T) {
