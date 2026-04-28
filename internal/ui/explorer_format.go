@@ -104,7 +104,13 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 			if strings.HasPrefix(kv.Value, "↑ ") || strings.HasPrefix(kv.Value, "↓ ") {
 				info.hasArrow = true
 			}
-			valW := lipgloss.Width(kv.Value)
+			// Measure the display value, not the raw API representation:
+			// columns like "CPU Alloc" / "Mem Alloc" store "7700m" /
+			// "15377156Ki" but render as "7.7" / "14 GiB", so sizing on
+			// the raw form would over-allocate width and squeeze the
+			// neighboring NAME column for nothing.
+			displayed := formatExtraColumnValue(kv.Key, kv.Value)
+			valW := lipgloss.Width(displayed)
 			if valW > info.maxValW {
 				info.maxValW = valW
 			}
@@ -356,6 +362,36 @@ var columnHeaderAliases = map[string]string{
 	"Default Backend":     "Backend",
 	"Last Transition":     "Transition",
 	"Service Account":     "SA",
+	// Node capacity surfaced as "Avail" so users don't have to remember
+	// whether "Alloc" means allocatable (capacity available for pods) or
+	// allocated (sum of requests). Pairs visually with the existing CPU /
+	// MEM usage columns ("usage / available").
+	"CPU Alloc": "CPU Avail",
+	"Mem Alloc": "MEM Avail",
+}
+
+// formatExtraColumnValue applies display-time formatting to specific column
+// keys whose stored value is a raw K8s API representation. Keeping the raw
+// string in item.Columns lets parsers (commands_dashboard.go, the
+// percentage math in update.go) read the canonical form, while the table
+// renders the human-readable units the user expects -- e.g. "7.7" instead
+// of "7700m" for CPU, "14 GiB" instead of "15377156Ki" for memory. Returns
+// the original value when no transform applies.
+func formatExtraColumnValue(key, val string) string {
+	if val == "" {
+		return val
+	}
+	switch key {
+	case "CPU Alloc":
+		if cores := ParseResourceValue(val, true); cores > 0 {
+			return FormatCPU(cores)
+		}
+	case "Mem Alloc":
+		if bytes := ParseResourceValue(val, false); bytes > 0 {
+			return FormatMemory(bytes)
+		}
+	}
+	return val
 }
 
 // columnHeaderLabel returns the uppercase display label for a column key,
@@ -377,7 +413,7 @@ func plainExtraCell(ec extraColumn, item *model.Item) string {
 	if item == nil {
 		val = columnHeaderLabel(ec.key) + sortIndicatorForColumn(ec.key)
 	} else {
-		val = getExtraColumnValue(item, ec.key)
+		val = formatExtraColumnValue(ec.key, getExtraColumnValue(item, ec.key))
 	}
 	switch {
 	case strings.HasPrefix(val, "↑ ") || strings.HasPrefix(val, "↓ "):
@@ -393,7 +429,7 @@ func plainExtraCell(ec extraColumn, item *model.Item) string {
 
 // styledExtraCell builds the styled cell for a single extra column.
 func styledExtraCell(ec extraColumn, item *model.Item) string {
-	val := getExtraColumnValue(item, ec.key)
+	val := formatExtraColumnValue(ec.key, getExtraColumnValue(item, ec.key))
 	style := resourceColumnStyle(ec.key, val)
 	switch {
 	case strings.HasPrefix(val, "↑ "):

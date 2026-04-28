@@ -830,6 +830,70 @@ func TestRenderTable_NodeNamesNotTruncatedEarly(t *testing.T) {
 	})
 }
 
+// Regression: Node CPU Alloc / Mem Alloc stored the raw K8s API
+// representation ("7700m", "15377156Ki") but the table rendered the
+// values verbatim, while the neighboring CPU / MEM columns showed
+// human-readable "385m" / "5.9Gi". The result was a confusing mix of
+// units the user couldn't compare at a glance. The renderer now applies
+// FormatCPU / FormatMemory at display time and the header swaps to the
+// "Avail" alias so it's clear the value is allocatable capacity.
+func TestRenderTable_NodeAllocColumnsHumanReadable(t *testing.T) {
+	origMS := ActiveMiddleScroll
+	ActiveMiddleScroll = -1
+	t.Cleanup(func() { ActiveMiddleScroll = origMS })
+
+	origQuery := ActiveHighlightQuery
+	ActiveHighlightQuery = ""
+	t.Cleanup(func() { ActiveHighlightQuery = origQuery })
+
+	origSel := ActiveSelectedItems
+	ActiveSelectedItems = nil
+	t.Cleanup(func() { ActiveSelectedItems = origSel })
+
+	origLayout := ActiveTableLayout
+	ActiveTableLayout = nil
+	t.Cleanup(func() { ActiveTableLayout = origLayout })
+
+	// Use a session-column override to opt into showing CPU Alloc / Mem
+	// Alloc -- they're auto-blocked otherwise, but the user explicitly
+	// surfaced them in the report.
+	origCols := ActiveSessionColumns
+	ActiveSessionColumns = []string{"CPU Alloc", "Mem Alloc"}
+	t.Cleanup(func() { ActiveSessionColumns = origCols })
+
+	items := []model.Item{
+		{
+			Name: "node-a", Kind: "Node", Status: "Ready", Age: "107d",
+			Columns: []model.KeyValue{
+				{Key: "CPU Alloc", Value: "7700m"},
+				{Key: "Mem Alloc", Value: "15377156Ki"},
+			},
+		},
+		{
+			Name: "node-b", Kind: "Node", Status: "Ready", Age: "35d",
+			Columns: []model.KeyValue{
+				{Key: "CPU Alloc", Value: "15700m"},
+				{Key: "Mem Alloc", Value: "31475892Ki"},
+			},
+		},
+	}
+
+	out := stripANSI(RenderTable("NAME", items, 0, 200, 20, false, "", ""))
+
+	assert.Contains(t, out, "CPU AVAIL",
+		"header must read AVAIL so users don't have to guess between allocatable and allocated")
+	assert.Contains(t, out, "MEM AVAIL",
+		"header must read AVAIL for memory too")
+
+	// Raw K8s representations must not leak into the display.
+	assert.NotContains(t, out, "7700m", "raw 7700m must format to 7.7 cores")
+	assert.NotContains(t, out, "15377156Ki", "raw 15377156Ki must format to a Gi value")
+
+	assert.Contains(t, out, "7.7", "CPU Alloc 7700m must render as 7.7 (cores)")
+	assert.Contains(t, out, "15.7", "CPU Alloc 15700m must render as 15.7 (cores)")
+	assert.Contains(t, out, "Gi", "Mem Alloc must format with Gi units")
+}
+
 // Regression: long Pod statuses (PodInitializing, ContainerCreating,
 // Succeeded, ...) used to burn enough STATUS-column width on narrow
 // layouts to force NAME / NAMESPACE truncation. Now the column shrinks
