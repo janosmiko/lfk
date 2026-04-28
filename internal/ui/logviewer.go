@@ -15,9 +15,18 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 	Bold(true)
 
 // RenderLogViewer renders the full-screen log viewer.
-func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, wrapTopSkip int) string {
+//
+// omitFooter, when true, suppresses the internal hotkey hint bar so the caller
+// can render a full-terminal-width footer below a JoinHorizontal'd composition
+// (e.g. with the side preview pane). The output is one row shorter than the
+// default rendering. Callers that pass omitFooter=true must render their own
+// footer via RenderLogFooter.
+func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, wrapTopSkip int, omitFooter bool) string {
 	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery)
-	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers)
+	var footer string
+	if !omitFooter {
+		footer = RenderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers)
+	}
 
 	// Content area: subtract border top + bottom (2 lines).
 	contentHeight := max(height-2, 1)
@@ -119,6 +128,9 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	borderStyle := FullscreenBorderStyle(width, contentHeight)
 	body := borderStyle.Render(bodyContent)
 
+	if omitFooter {
+		return lipgloss.JoinVertical(lipgloss.Left, titleBar, body)
+	}
 	return lipgloss.JoinVertical(lipgloss.Left, titleBar, body, footer)
 }
 
@@ -170,13 +182,17 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 	return FillLinesBg(TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(titleText), width, BarBg)
 }
 
-// renderLogFooter builds the footer bar for the log viewer.
+// RenderLogFooter builds the footer bar for the log viewer.
 //
 // searchQuery is the *committed* search query (empty until the user presses
 // enter on the search prompt). The n/N next/prev hint is only surfaced once
 // a query has been committed \u2014 advertising it on a fresh viewer with no
 // search would be a no-op chord and a confusing claim.
-func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool) string {
+//
+// Exported so callers can render the footer at a wider terminal width than the
+// log column itself (e.g. when the side preview pane is on and the hint bar
+// must span the full screen below the JoinHorizontal'd panes \u2014 issue #71).
+func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool) string {
 	if statusMsg != "" {
 		style := HelpKeyStyle
 		if statusIsErr {

@@ -27,11 +27,19 @@ func (m Model) viewLogs() string {
 		logWidth, previewWidth = splitLogPreviewWidth(m.width)
 	}
 
-	logView := ui.RenderLogViewer(m.logLines, m.logScroll, logWidth, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, m.logWrapTopSkip)
+	// When the preview pane is visible the hotkey hint bar is rendered once
+	// across the full terminal width below the JoinHorizontal'd panes, so each
+	// pane omits its internal footer (issue #71). Otherwise the log viewer
+	// keeps its built-in footer for the standalone (no-preview) layout.
+	omitInnerFooter := previewWidth > 0
+
+	logView := ui.RenderLogViewer(m.logLines, m.logScroll, logWidth, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, m.logWrapTopSkip, omitInnerFooter)
 
 	if previewWidth > 0 {
-		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logPreviewScroll)
-		return lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
+		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logPreviewScroll, true)
+		panes := lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
+		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logSearchActive, m.logSearchInput.Value, m.logSearchQuery, m.logVisualMode, canSwitchPod, canFilterContainers)
+		return lipgloss.JoinVertical(lipgloss.Left, panes, footer)
 	}
 	return logView
 }

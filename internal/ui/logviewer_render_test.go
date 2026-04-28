@@ -80,7 +80,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"my-pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "my-pod")
 		assert.Contains(t, result, "log entry 1")
@@ -94,7 +94,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "FOLLOW")
 	})
@@ -106,7 +106,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "WRAP")
 	})
@@ -118,7 +118,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "LINE#")
 	})
@@ -130,7 +130,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "TIMESTAMPS")
 	})
@@ -142,7 +142,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "PREVIOUS")
 	})
@@ -154,7 +154,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "error", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "/error")
 	})
@@ -166,7 +166,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "err",
 			true, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "err")
 		assert.Contains(t, result, "enter:apply")
@@ -179,7 +179,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"Saved to file", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "Saved to file")
 	})
@@ -191,7 +191,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'V', 0, 0, 0,
+			0, true, 0, 'V', 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "VISUAL LINE")
 	})
@@ -203,7 +203,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'v', 0, 0, 0,
+			0, true, 0, 'v', 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "VISUAL")
 	})
@@ -215,7 +215,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'B', 0, 0, 0,
+			0, true, 0, 'B', 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "VISUAL BLOCK")
 	})
@@ -227,7 +227,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "pod")
 		assert.Contains(t, result, "0 lines")
@@ -240,7 +240,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, true,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "LOADING HISTORY")
 	})
@@ -253,7 +253,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, true, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "switch pod")
 	})
@@ -265,7 +265,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, true, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "containers")
 	})
@@ -278,7 +278,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "WRAP")
 		// The long line should be visible (at least part of it).
@@ -293,7 +293,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		// "/" search hint must still be there; "n/N" must not.
 		assert.Contains(t, result, "search")
@@ -308,7 +308,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "error", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "n/N")
 		assert.Contains(t, result, "next/prev")
@@ -323,7 +323,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "error", "err",
 			true, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "enter:apply")
 		assert.NotContains(t, result, "n/N")
@@ -350,7 +350,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		// Layout: title (1) + bordered body (contentHeight+2 = height) +
 		// footer (1) = height + 2 rows total. lipgloss re-wrapping a

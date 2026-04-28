@@ -1,8 +1,10 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/ui"
@@ -282,6 +284,56 @@ func TestScrollToMaxRevealsLastBodyRowInRenderedView(t *testing.T) {
 		"after spamming J the last body row must be visible in viewLogs output; "+
 			"if maxScroll is computed against the wrong height the handler stops "+
 			"short and the user sees the bottom of the body clipped off-screen")
+}
+
+// TestViewLogs_PreviewVisible_HotkeyHintFullWidth is the regression test for
+// issue #71: when the log preview side panel is on, the bottom hotkey hint bar
+// gets clipped because it is rendered inside the (narrower) log column instead
+// of spanning the full terminal width. The fix renders the hint bar across
+// the entire viewLogs() output below the JoinHorizontal'd panes.
+func TestViewLogs_PreviewVisible_HotkeyHintFullWidth(t *testing.T) {
+	const terminalW = 300
+	base := Model{
+		mode:     modeLogs,
+		logLines: []string{"sample log line"},
+		tabs:     []TabState{{}},
+		width:    terminalW,
+		height:   30 - 1, // mimic View()'s app title decrement
+		logTitle: "Logs",
+	}
+	off := base
+	off.logPreviewVisible = false
+	on := base
+	on.logPreviewVisible = true
+
+	outOff := off.viewLogs()
+	outOn := on.viewLogs()
+
+	// Pick a hint near the END of the bar — this only fits when the bar is
+	// rendered at the full terminal width, not at the narrower logWidth.
+	const lateHint = "save all"
+
+	// Sanity check: the test depends on this hint fitting at full width.
+	if !strings.Contains(outOff, lateHint) {
+		t.Skipf("baseline hint set changed: %q no longer fits at width=%d; "+
+			"adjust the test or the hint set", lateHint, terminalW)
+	}
+
+	assert.Contains(t, outOn, lateHint,
+		"with preview on, late hotkey hints must remain visible — the hint bar "+
+			"must span m.width, not the narrower logWidth (issue #71)")
+
+	// Belt and braces: the bottom line of the rendered output must be exactly
+	// terminalW visual cells. Both with and without preview.
+	bottomOff := lastLine(outOff)
+	bottomOn := lastLine(outOn)
+	assert.Equal(t, terminalW, ansi.StringWidth(bottomOff), "footer width without preview")
+	assert.Equal(t, terminalW, ansi.StringWidth(bottomOn), "footer width with preview")
+}
+
+func lastLine(s string) string {
+	lines := strings.Split(s, "\n")
+	return lines[len(lines)-1]
 }
 
 func TestLogKeyJLowercaseResetsPreviewScroll(t *testing.T) {

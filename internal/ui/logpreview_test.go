@@ -182,7 +182,7 @@ func TestParseLogLine_EmptyJSON(t *testing.T) {
 }
 
 func TestRenderLogPreviewPane_Dimensions(t *testing.T) {
-	out := RenderLogPreviewPane(`{"level":"info","msg":"hi"}`, 40, 20, 0)
+	out := RenderLogPreviewPane(`{"level":"info","msg":"hi"}`, 40, 20, 0, false)
 	lines := strings.Split(out, "\n")
 	// Title (1) + border-wrapped body (height-2 + 2 border lines = height) + footer (1) = height + 2.
 	want := 22
@@ -192,22 +192,22 @@ func TestRenderLogPreviewPane_Dimensions(t *testing.T) {
 }
 
 func TestRenderLogPreviewPane_EmptyLine(t *testing.T) {
-	out := RenderLogPreviewPane("", 40, 10, 0)
+	out := RenderLogPreviewPane("", 40, 10, 0, false)
 	if !strings.Contains(out, "no log line selected") {
 		t.Fatalf("expected empty-state hint, got: %s", out)
 	}
 }
 
 func TestRenderLogPreviewPane_KindLabel(t *testing.T) {
-	jsonOut := RenderLogPreviewPane(`{"a":"b","c":"d"}`, 40, 10, 0)
+	jsonOut := RenderLogPreviewPane(`{"a":"b","c":"d"}`, 40, 10, 0, false)
 	if !strings.Contains(jsonOut, "JSON") {
 		t.Fatalf("JSON label missing: %s", jsonOut)
 	}
-	logfmtOut := RenderLogPreviewPane(`a=b c=d`, 40, 10, 0)
+	logfmtOut := RenderLogPreviewPane(`a=b c=d`, 40, 10, 0, false)
 	if !strings.Contains(logfmtOut, "LOGFMT") {
 		t.Fatalf("LOGFMT label missing: %s", logfmtOut)
 	}
-	textOut := RenderLogPreviewPane(`free form`, 40, 10, 0)
+	textOut := RenderLogPreviewPane(`free form`, 40, 10, 0, false)
 	if !strings.Contains(textOut, "TEXT") {
 		t.Fatalf("TEXT label missing: %s", textOut)
 	}
@@ -215,7 +215,7 @@ func TestRenderLogPreviewPane_KindLabel(t *testing.T) {
 
 func TestRenderLogPreviewPane_NarrowDoesNotPanic(t *testing.T) {
 	// Tiny dimensions must clamp gracefully.
-	_ = RenderLogPreviewPane("hello", 1, 1, 0)
+	_ = RenderLogPreviewPane("hello", 1, 1, 0, false)
 }
 
 // scrollOverflowJSON is a JSON line whose pretty-printed body easily
@@ -245,8 +245,8 @@ func TestLogPreviewMaxScroll(t *testing.T) {
 func TestRenderLogPreviewPane_ScrollHidesEarlierRows(t *testing.T) {
 	// Render the same content at scroll 0 vs scroll 2. The first body
 	// row at scroll 0 must not appear in the scroll-2 output.
-	at0 := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0)
-	at2 := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 2)
+	at0 := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0, false)
+	at2 := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 2, false)
 	if at0 == at2 {
 		t.Fatal("scrolled and unscrolled output should differ")
 	}
@@ -265,16 +265,16 @@ func TestRenderLogPreviewPane_ScrollClampsToMax(t *testing.T) {
 	// Scroll past the end clamps; output must equal what render at the
 	// computed maxScroll produces.
 	maxScroll := LogPreviewMaxScroll(scrollOverflowJSON, 60, 5)
-	atMax := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, maxScroll)
-	atOverflow := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, maxScroll+10)
+	atMax := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, maxScroll, false)
+	atOverflow := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, maxScroll+10, false)
 	if atMax != atOverflow {
 		t.Fatal("scroll beyond max should clamp and produce identical output")
 	}
 }
 
 func TestRenderLogPreviewPane_NegativeScrollClampsToZero(t *testing.T) {
-	at0 := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0)
-	atNeg := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, -5)
+	at0 := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0, false)
+	atNeg := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, -5, false)
 	if at0 != atNeg {
 		t.Fatal("negative scroll should clamp to 0 and produce identical output")
 	}
@@ -290,7 +290,7 @@ func TestRenderLogPreviewPane_AtMaxScrollLastBodyRowIsVisible(t *testing.T) {
 	if maxScroll == 0 {
 		t.Fatal("test setup error: pick dimensions/content that overflow")
 	}
-	out := RenderLogPreviewPane(json, width, height, maxScroll)
+	out := RenderLogPreviewPane(json, width, height, maxScroll, false)
 	if !strings.Contains(out, "z_last_bucket") {
 		t.Fatalf("at max scroll the last body row (key 'z_last_bucket') must be visible:\n%s", out)
 	}
@@ -301,7 +301,7 @@ func TestRenderLogPreviewPane_AtMaxScrollLastBodyRowIsVisible(t *testing.T) {
 
 func TestRenderLogPreviewPane_TitleShowsPositionWhenScrollable(t *testing.T) {
 	// Short pane → overflow → "N/M" position label appears in the title.
-	out := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0)
+	out := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0, false)
 	if !strings.Contains(out, "1/") {
 		t.Fatalf("expected position label like '1/N' in scrollable output:\n%s", out)
 	}
@@ -309,7 +309,7 @@ func TestRenderLogPreviewPane_TitleShowsPositionWhenScrollable(t *testing.T) {
 
 func TestRenderLogPreviewPane_NoPositionLabelWhenContentFits(t *testing.T) {
 	// Tall pane → no overflow → no position label.
-	out := RenderLogPreviewPane(`{"a":"1","b":"2"}`, 60, 30, 0)
+	out := RenderLogPreviewPane(`{"a":"1","b":"2"}`, 60, 30, 0, false)
 	for _, frag := range []string{"1/", "2/", "3/"} {
 		if strings.Contains(out, frag) {
 			t.Fatalf("non-scrollable pane should not show position label %q:\n%s", frag, out)
@@ -320,7 +320,7 @@ func TestRenderLogPreviewPane_NoPositionLabelWhenContentFits(t *testing.T) {
 func TestRenderLogPreviewPane_FooterHasNoLegend(t *testing.T) {
 	// The P binding is shown in the main log hint bar; the preview footer
 	// must not duplicate it.
-	out := RenderLogPreviewPane(`{"a":"b","c":"d"}`, 40, 10, 0)
+	out := RenderLogPreviewPane(`{"a":"b","c":"d"}`, 40, 10, 0, false)
 	if strings.Contains(out, "close preview") {
 		t.Fatalf("preview footer should not repeat the P legend: %s", out)
 	}
@@ -354,7 +354,7 @@ func TestTruncateKeyForPreview(t *testing.T) {
 }
 
 func TestRenderLogPreviewPane_TruncatedKeyShowsEllipsis(t *testing.T) {
-	out := RenderLogPreviewPane(`{"extremely_long_key_name":"v","b":"c"}`, 40, 10, 0)
+	out := RenderLogPreviewPane(`{"extremely_long_key_name":"v","b":"c"}`, 40, 10, 0, false)
 	if !strings.Contains(out, "…") {
 		t.Fatalf("expected ellipsis on truncated key, got: %s", out)
 	}
@@ -365,14 +365,14 @@ func TestRenderLogPreviewPane_SanitizesControlChars(t *testing.T) {
 	// scrubbed so the panel layout cannot be corrupted by producer output.
 	// (ConfigLogRenderAnsi defaults to false during tests.)
 	in := "{\"msg\":\"before\x1b[2Jafter\"}"
-	out := RenderLogPreviewPane(in, 60, 10, 0)
+	out := RenderLogPreviewPane(in, 60, 10, 0, false)
 	if strings.Contains(out, "\x1b[2J") {
 		t.Fatalf("preview must scrub raw CSI sequences from values, got: %q", out)
 	}
 }
 
 func TestRenderLogPreviewPane_SanitizesPlainTextBody(t *testing.T) {
-	out := RenderLogPreviewPane("plain\x00body", 40, 10, 0)
+	out := RenderLogPreviewPane("plain\x00body", 40, 10, 0, false)
 	if strings.Contains(out, "\x00") {
 		t.Fatalf("preview must scrub NUL bytes from plain-text body")
 	}
@@ -380,7 +380,7 @@ func TestRenderLogPreviewPane_SanitizesPlainTextBody(t *testing.T) {
 
 func TestRenderLogPreviewPane_NestedJSONKeepsLineBreaks(t *testing.T) {
 	in := `{"event":{"type":"order","actor":{"id":"u1","role":"admin"}}}`
-	out := RenderLogPreviewPane(in, 80, 20, 0)
+	out := RenderLogPreviewPane(in, 80, 20, 0, false)
 	if strings.Contains(out, "�") {
 		t.Fatalf("nested JSON value must not contain replacement chars; got:\n%s", out)
 	}
@@ -530,7 +530,7 @@ func TestParseLogLine_Klog_BeatsLogfmtForMessageBody(t *testing.T) {
 
 func TestRenderLogPreviewPane_KlogTitleIndicator(t *testing.T) {
 	in := `W0415 12:40:18.037168       1 mount_helper_common.go:142] Warning: x`
-	out := RenderLogPreviewPane(in, 80, 20, 0)
+	out := RenderLogPreviewPane(in, 80, 20, 0, false)
 	if !strings.Contains(out, "[KLOG]") {
 		t.Fatalf("expected [KLOG] kind indicator in title; got:\n%s", out)
 	}
@@ -689,7 +689,7 @@ func TestParseLogLine_Zap_TooManyTabSegmentsRejected(t *testing.T) {
 
 func TestRenderLogPreviewPane_ZapTitleIndicator(t *testing.T) {
 	in := "[pod/x/manager] 2026-04-27T16:06:59Z\tINFO\tsetup\tstarting manager"
-	out := RenderLogPreviewPane(in, 80, 20, 0)
+	out := RenderLogPreviewPane(in, 80, 20, 0, false)
 	if !strings.Contains(out, "[ZAP]") {
 		t.Fatalf("expected [ZAP] kind indicator in title; got:\n%s", out)
 	}
@@ -809,7 +809,7 @@ func TestParseLogLine_Nginx_BeatsLogfmtForQuerystringPairs(t *testing.T) {
 
 func TestRenderLogPreviewPane_NginxTitleIndicator(t *testing.T) {
 	in := `192.168.1.1 - - [15/Jan/2024:10:30:00 +0000] "GET /api HTTP/1.1" 200 1234 "-" "curl/8"`
-	out := RenderLogPreviewPane(in, 100, 20, 0)
+	out := RenderLogPreviewPane(in, 100, 20, 0, false)
 	if !strings.Contains(out, "[NGINX]") {
 		t.Fatalf("expected [NGINX] kind indicator in title; got:\n%s", out)
 	}
@@ -945,7 +945,7 @@ func TestParseLogLine_Envoy_BeatsLogfmtForQuerystringPairs(t *testing.T) {
 
 func TestRenderLogPreviewPane_EnvoyTitleIndicator(t *testing.T) {
 	in := `[2024-01-15T10:30:00.000Z] "GET /api HTTP/1.1" 200 - 0 1234 5 4 "192.168.1.1" "curl/8" "rid" "host" "10.0.0.5:8080"`
-	out := RenderLogPreviewPane(in, 120, 25, 0)
+	out := RenderLogPreviewPane(in, 120, 25, 0, false)
 	if !strings.Contains(out, "[ENVOY]") {
 		t.Fatalf("expected [ENVOY] kind indicator in title; got:\n%s", out)
 	}
@@ -1075,7 +1075,7 @@ func TestParseLogLine_Java_RejectsNonJava(t *testing.T) {
 
 func TestRenderLogPreviewPane_JavaTitleIndicator(t *testing.T) {
 	in := `2024-01-15T10:30:00.123+00:00  INFO 12345 --- [main] c.e.MyService : Server started on port 8080`
-	out := RenderLogPreviewPane(in, 100, 20, 0)
+	out := RenderLogPreviewPane(in, 100, 20, 0, false)
 	if !strings.Contains(out, "[JAVA]") {
 		t.Fatalf("expected [JAVA] kind indicator in title; got:\n%s", out)
 	}
@@ -1171,7 +1171,7 @@ func TestParseLogLine_Postgres_RejectsNonPostgres(t *testing.T) {
 
 func TestRenderLogPreviewPane_PostgresTitleIndicator(t *testing.T) {
 	in := `2024-01-15 10:30:00.123 UTC [1234] ERROR:  relation "foo" does not exist`
-	out := RenderLogPreviewPane(in, 100, 20, 0)
+	out := RenderLogPreviewPane(in, 100, 20, 0, false)
 	if !strings.Contains(out, "[POSTGRES]") {
 		t.Fatalf("expected [POSTGRES] kind indicator in title; got:\n%s", out)
 	}

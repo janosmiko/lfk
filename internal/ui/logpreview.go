@@ -529,7 +529,12 @@ func parseLogfmtFields(s string) ([]LogPreviewField, bool) {
 // body rows to skip from the top; it is clamped to [0, max] internally so
 // callers can pass an unclamped value and rely on LogPreviewMaxScroll for
 // the upper bound when they need it (e.g. to gate key handlers).
-func RenderLogPreviewPane(line string, width, height, scroll int) string {
+//
+// omitFooter, when true, suppresses the empty status-bar padding row at the
+// bottom so the caller can JoinVertical a full-width footer below the
+// JoinHorizontal'd panes (see RenderLogFooter and issue #71). The output is
+// one row shorter than the default rendering when omitFooter=true.
+func RenderLogPreviewPane(line string, width, height, scroll int, omitFooter bool) string {
 	if width < 10 {
 		width = 10
 	}
@@ -588,6 +593,10 @@ func RenderLogPreviewPane(line string, width, height, scroll int) string {
 	bodyContent := strings.Join(bodyLines, "\n")
 	bodyContent = FillLinesBg(bodyContent, contentWidth, BaseBg)
 	body := FullscreenBorderStyle(width, contentHeight).Render(bodyContent)
+
+	if omitFooter {
+		return lipgloss.JoinVertical(lipgloss.Left, titleBar, body)
+	}
 
 	// Empty status bar keeps the panel's row count aligned with the log
 	// viewer's title + body + footer layout so JoinHorizontal stays clean.
