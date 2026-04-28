@@ -376,6 +376,25 @@ func (m Model) handleLogContainerFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case filterAccept:
 		m.logContainerFilterActive = false
 		m.overlayCursor = 0
+		// When the filter narrows to a single container and the user hasn't
+		// been Space-toggling selections, Enter is unambiguous: apply that
+		// container and restart the stream. Multi-select via Space is
+		// preserved: if the user already toggled selections, Enter still
+		// just exits filter mode without replacing them.
+		if !m.logContainerSelectionModified {
+			items := m.filteredLogContainerItems()
+			if len(items) == 1 {
+				if items[0].Status == "all" {
+					m.logSelectedContainers = nil
+				} else {
+					m.logSelectedContainers = []string{items[0].Name}
+				}
+				m.overlay = overlayNone
+				m.logContainerFilterText = ""
+				cmd := m.restartLogStreamForContainerFilter()
+				return m, cmd
+			}
+		}
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()

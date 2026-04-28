@@ -245,6 +245,78 @@ func TestCovLogContainerSelectEnterModified(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
+// Filter narrows to a single container: Enter must apply it and close the
+// overlay so the user does not have to press Enter again on a one-row list.
+func TestLogContainerFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayLogContainerSelect
+	m.logContainers = []string{"main", "sidecar", "init"}
+	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logContainerFilterActive = true
+	m.logContainerFilterText = "side"
+	result, cmd := m.handleLogContainerFilterMode(keyMsg("enter"))
+	rm := result.(Model)
+	assert.False(t, rm.logContainerFilterActive)
+	assert.Equal(t, overlayNone, rm.overlay, "overlay must close")
+	assert.Equal(t, []string{"sidecar"}, rm.logSelectedContainers, "sole filter match must be applied")
+	assert.Empty(t, rm.logContainerFilterText, "filter text must be cleared after commit")
+	assert.NotNil(t, cmd, "restart log stream command must be returned")
+}
+
+// Two filtered container results: Enter must keep the legacy behavior —
+// exit filter mode and let the user pick. Auto-applying would be a guess.
+func TestLogContainerFilterModeEnterPreservesMultipleResults(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayLogContainerSelect
+	m.logContainers = []string{"web-main", "web-side", "init"}
+	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logContainerFilterActive = true
+	m.logContainerFilterText = "web"
+	result, cmd := m.handleLogContainerFilterMode(keyMsg("enter"))
+	rm := result.(Model)
+	assert.False(t, rm.logContainerFilterActive)
+	assert.Equal(t, overlayLogContainerSelect, rm.overlay, "overlay must stay open")
+	assert.Equal(t, "web", rm.logContainerFilterText, "filter text must be preserved")
+	assert.Nil(t, cmd, "no command must be issued when more than one match")
+}
+
+// User has been Space-toggling container selections then opens filter to
+// refine. Even if the filter narrows to one result, do not silently
+// replace their in-progress multi-selection.
+func TestLogContainerFilterModeEnterPreservesMultiSelect(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayLogContainerSelect
+	m.logContainers = []string{"main", "sidecar", "init"}
+	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logContainerSelectionModified = true
+	m.logSelectedContainers = []string{"main"}
+	m.logContainerFilterActive = true
+	m.logContainerFilterText = "side"
+	result, cmd := m.handleLogContainerFilterMode(keyMsg("enter"))
+	rm := result.(Model)
+	assert.False(t, rm.logContainerFilterActive)
+	assert.Equal(t, overlayLogContainerSelect, rm.overlay, "overlay must stay open")
+	assert.Equal(t, []string{"main"}, rm.logSelectedContainers, "Space-toggled selection must survive")
+	assert.Nil(t, cmd, "no command must be issued during in-progress multi-select")
+}
+
+// Filter narrows to the "All Containers" virtual row only: fast-path must
+// reset to the all-containers stream (logSelectedContainers = nil).
+func TestLogContainerFilterModeEnterAutoSelectsSoleAllContainersResult(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayLogContainerSelect
+	m.logContainers = []string{"main"}
+	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logSelectedContainers = []string{"main"}
+	m.logContainerFilterActive = true
+	m.logContainerFilterText = "All"
+	result, cmd := m.handleLogContainerFilterMode(keyMsg("enter"))
+	rm := result.(Model)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.Nil(t, rm.logSelectedContainers, "sole 'All Containers' match must reset to all")
+	assert.NotNil(t, cmd)
+}
+
 func TestCovLogContainerSelectSlash(t *testing.T) {
 	m := baseModelBoost2()
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("/"))
