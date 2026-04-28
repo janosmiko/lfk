@@ -187,6 +187,31 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case filterAccept:
 		m.nsFilterMode = false
 		m.overlayCursor = 0
+		// When the filter narrows to a single result and the user hasn't
+		// been multi-selecting with Space, Enter is unambiguous: apply
+		// that result and close. Without this, the user has to press
+		// Enter twice (once to leave filter mode, once to commit) on a
+		// list that has only one row — the second Enter is busy work.
+		if !m.nsSelectionModified {
+			items := m.filteredOverlayItems()
+			if len(items) == 1 {
+				if items[0].Status == "all" {
+					m.selectedNamespaces = nil
+					m.allNamespaces = true
+				} else {
+					ns := items[0].Name
+					m.selectedNamespaces = map[string]bool{ns: true}
+					m.namespace = ns
+					m.allNamespaces = false
+				}
+				m.overlay = overlayNone
+				m.overlayFilter.Clear()
+				m.saveCurrentSession()
+				m.cancelAndReset()
+				m.requestGen++
+				return m, m.refreshCurrentLevel()
+			}
+		}
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()

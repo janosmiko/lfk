@@ -219,6 +219,90 @@ func TestNamespaceFilterModeEnterCommits(t *testing.T) {
 	// Filter text is preserved after enter
 }
 
+// Filter narrows the list to a single concrete namespace: Enter must apply
+// it and close the overlay so the user does not have to press Enter again
+// on a one-row list.
+func TestNamespaceFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
+	items := []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default"},
+		{Name: "kube-system"},
+	}
+	m := Model{
+		overlay:       overlayNamespace,
+		nsFilterMode:  true,
+		overlayItems:  items,
+		overlayFilter: TextInput{Value: "kube"},
+		allNamespaces: true,
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
+	}
+	ret, cmd := m.handleNamespaceFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.nsFilterMode)
+	assert.Equal(t, overlayNone, result.overlay)
+	assert.Equal(t, "kube-system", result.namespace)
+	assert.True(t, result.selectedNamespaces["kube-system"])
+	assert.False(t, result.allNamespaces)
+	assert.NotNil(t, cmd)
+}
+
+// Two filtered results: Enter must keep the legacy behavior — exit filter
+// mode and let the user pick. Auto-applying would be a guess.
+func TestNamespaceFilterModeEnterDoesNotAutoApplyMultipleResults(t *testing.T) {
+	items := []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "kube-system"},
+		{Name: "kube-public"},
+	}
+	m := Model{
+		overlay:       overlayNamespace,
+		nsFilterMode:  true,
+		overlayItems:  items,
+		overlayFilter: TextInput{Value: "kube"},
+		allNamespaces: true,
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
+	}
+	ret, _ := m.handleNamespaceFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.nsFilterMode)
+	assert.Equal(t, overlayNamespace, result.overlay)
+	assert.Empty(t, result.selectedNamespaces)
+	assert.True(t, result.allNamespaces)
+}
+
+// User has been Space-toggling selections and then opens filter to refine.
+// Even if the filter narrows to one result, do not silently replace their
+// in-progress multi-selection — they pressed Enter to exit filter mode,
+// not to abandon the selections they already made.
+func TestNamespaceFilterModeEnterPreservesMultiSelect(t *testing.T) {
+	items := []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default"},
+		{Name: "kube-system"},
+	}
+	m := Model{
+		overlay:             overlayNamespace,
+		nsFilterMode:        true,
+		nsSelectionModified: true,
+		selectedNamespaces:  map[string]bool{"default": true},
+		overlayItems:        items,
+		overlayFilter:       TextInput{Value: "kube"},
+		tabs:                []TabState{{}},
+		width:               80,
+		height:              40,
+	}
+	ret, _ := m.handleNamespaceFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.nsFilterMode)
+	assert.Equal(t, overlayNamespace, result.overlay)
+	assert.True(t, result.selectedNamespaces["default"], "existing Space-toggled selection must survive")
+	assert.False(t, result.selectedNamespaces["kube-system"], "single filter match must not be auto-applied during multi-select")
+}
+
 func TestNamespaceFilterModeTyping(t *testing.T) {
 	m := Model{
 		overlay:       overlayNamespace,
