@@ -328,6 +328,45 @@ func TestRenderLogViewer(t *testing.T) {
 		assert.Contains(t, result, "enter:apply")
 		assert.NotContains(t, result, "n/N")
 	})
+
+	t.Run("tab-bearing controller-runtime line keeps total height", func(t *testing.T) {
+		// Regression: dragonfly-operator (controller-runtime/zap) emits
+		// tab-separated fields. lipgloss.Width treats '\t' as zero-width
+		// while the terminal renders it as a tab-stop jump, so the
+		// contentWidth guard inside RenderLogViewer used to undercount and
+		// let the line slip through. lipgloss then re-wrapped it
+		// internally and pushed the bottom border off-screen, inflating
+		// the total rendered height beyond title+body+footer. After tab
+		// expansion in sanitizeLogLine the measured width matches what
+		// the terminal will paint, so the layout stays at the expected
+		// row count and the bottom border lands where the footer can sit
+		// directly below it.
+		const width, height = 60, 12
+		// Long tab-separated line whose expanded width exceeds contentWidth.
+		line := strings.Repeat("2026-04-27T16:06:59Z\tINFO\tsetup\tstarting manager", 3)
+		result := RenderLogViewer(
+			[]string{line}, 0, width, height,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0,
+		)
+		// Layout: title (1) + bordered body (contentHeight+2 = height) +
+		// footer (1) = height + 2 rows total. lipgloss re-wrapping a
+		// tab-bearing line that slipped past the truncation guard would
+		// inflate this past the expected count.
+		lines := strings.Split(result, "\n")
+		assert.Len(t, lines, height+2,
+			"tab-bearing line must not inflate the rendered height (got %d, want %d)",
+			len(lines), height+2)
+		// Bottom border (╰) should sit on the row right above the footer.
+		// If a body row got re-wrapped, the border is pushed down and this
+		// row would still be content (│ ... │).
+		assert.Contains(t, lines[len(lines)-2], "╰",
+			"bottom border row must sit directly above the footer; got %q",
+			lines[len(lines)-2])
+	})
 }
 
 // --- colorizePodPrefix ---

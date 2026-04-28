@@ -521,10 +521,27 @@ func StripPodPrefix(line string) string {
 	return after
 }
 
+// logTabWidth is the column step used when expanding tab characters in
+// log lines. 8 matches the default tab stop on virtually every terminal,
+// so the post-expansion text aligns the way a user pasting the same line
+// into their shell would expect.
+const logTabWidth = 8
+
 // sanitizeLogLine replaces non-printable control bytes (NUL, DEL, the C0
-// control range minus tab) with the Unicode replacement character. Binary
-// data from processes like MySQL handshakes contains bytes that break
-// terminal width calculations and corrupt the viewer layout.
+// control range minus tab) with the Unicode replacement character and
+// expands tab characters to spaces using a logTabWidth-column tab stop.
+// Binary data from processes like MySQL handshakes contains bytes that
+// break terminal width calculations and corrupt the viewer layout.
+//
+// Tab expansion is required because lipgloss.Width treats '\t' as
+// zero-width while the terminal renders it as a jump to the next tab
+// stop. The viewer's contentWidth-overflow guard (in RenderLogViewer)
+// uses lipgloss.Width to decide when to truncate; without expansion,
+// tab-bearing lines slip through with an undercounted width, get
+// re-wrapped internally by lipgloss, and push the bottom border off the
+// visible area. Reported on dragonfly-operator (controller-runtime/zap)
+// logs in particular - those use tabs to separate timestamp / level /
+// logger / message.
 //
 // When renderAnsi is true, valid CSI SGR sequences (ESC [ params m — the
 // ones that set colour, bold, underline, etc.) are preserved verbatim so
@@ -534,11 +551,12 @@ func StripPodPrefix(line string) string {
 // is replaced too; leaving it would cause terminals to wait for a
 // follow-up byte and mis-interpret subsequent output.
 func sanitizeLogLine(s string, renderAnsi bool) string {
-	// Fast path: no control bytes means no work to do.
+	// Fast path: no control bytes (incl. tabs that need expansion) means
+	// no work to do.
 	needsSanitize := false
 	for i := range len(s) {
 		c := s[i]
-		if c != '\t' && (c < 32 || c == 127) {
+		if c < 32 || c == 127 {
 			needsSanitize = true
 			break
 		}
@@ -549,21 +567,40 @@ func sanitizeLogLine(s string, renderAnsi bool) string {
 
 	var b strings.Builder
 	b.Grow(len(s))
+	col := 0
 	i := 0
 	for i < len(s) {
 		c := s[i]
 		if renderAnsi && c == 0x1b {
 			if end := parseSGRSequence(s, i); end > i {
+				// SGR sequences are zero-width; do not advance col.
 				b.WriteString(s[i:end])
 				i = end
 				continue
 			}
 		}
-		if c == '\t' || c >= 32 && c != 127 {
+		if c == '\t' {
+			n := logTabWidth - col%logTabWidth
+			for range n {
+				b.WriteByte(' ')
+			}
+			col += n
+			i++
+			continue
+		}
+		if c >= 32 && c != 127 {
 			// Printable ASCII or UTF-8 leading/continuation byte.
 			// UTF-8 continuation bytes are all >= 0x80 so they land
 			// here on subsequent iterations and copy through intact.
+			// Column tracking treats every UTF-8 leading byte and
+			// every ASCII printable as one cell; an approximation
+			// that is fine for tab-stop alignment (CJK in log lines
+			// is rare and the worst case is a 1-cell off-stop nudge,
+			// not a width undercount).
 			b.WriteByte(c)
+			if c < 0x80 || c >= 0xC0 {
+				col++
+			}
 			i++
 			continue
 		}

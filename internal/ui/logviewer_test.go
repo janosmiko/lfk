@@ -240,9 +240,32 @@ func TestSanitizeLogLine_RenderAnsiDisabled(t *testing.T) {
 			expected: "",
 		},
 		{
-			name:     "tab preserved",
+			// Tabs are expanded to spaces because lipgloss.Width treats
+			// '\t' as zero-width while the terminal renders it as a jump
+			// to the next 8-column tab stop. The discrepancy let
+			// tab-bearing lines slip past RenderLogViewer's contentWidth
+			// truncation guard, force lipgloss to re-wrap them, and push
+			// the bottom border off-screen — reported on dragonfly-operator
+			// (controller-runtime/zap) logs which are tab-separated.
+			name:     "tab expanded to next 8-column tab stop",
 			input:    "key\tvalue",
-			expected: "key\tvalue",
+			expected: "key     value", // 'key' (col 3) + 5 spaces -> col 8 + 'value'
+		},
+		{
+			name:     "leading tab expands to full tab stop",
+			input:    "\thello",
+			expected: "        hello", // col 0 -> col 8 = 8 spaces
+		},
+		{
+			name:     "consecutive tabs each advance to next stop",
+			input:    "a\t\tb",
+			expected: "a               b", // col 1 + 7 sp (to 8) + 8 sp (to 16) + 'b'
+		},
+		{
+			name:     "dragonfly-style controller-runtime log",
+			input:    "2026-04-27T16:06:59Z\tINFO\tsetup\tstarting manager",
+			expected: "2026-04-27T16:06:59Z    INFO    setup   starting manager",
+			// 20 chars -> col 24 (4 sp), +4 -> col 32 (4 sp), +5 -> col 40 (3 sp), +msg
 		},
 		{
 			name:     "null bytes replaced",
