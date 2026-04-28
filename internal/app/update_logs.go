@@ -946,6 +946,12 @@ func (m Model) handleLogKeyOther() (tea.Model, tea.Cmd) {
 		// Single pod: show container selector for filtering.
 		m.overlay = overlayLogContainerSelect
 		m.overlayCursor = 0
+		// Clear leftover items so the renderer doesn't briefly show stale
+		// content (e.g. namespace entries from a prior namespace selector
+		// use) for the few hundred ms before the container list loads.
+		// Mirrors how handleKeyNamespaceSelector nils overlayItems before
+		// its own load.
+		m.overlayItems = nil
 		m.logContainerFilterText = ""
 		m.logContainerFilterActive = false
 		m.logContainerSelectionModified = false

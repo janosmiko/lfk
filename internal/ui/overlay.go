@@ -449,6 +449,10 @@ func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedCon
 	}
 	b.WriteString("\n\n")
 
+	if items == nil {
+		b.WriteString(OverlayDimStyle.Render("Loading containers..."))
+		return b.String()
+	}
 	if len(items) == 0 {
 		b.WriteString(OverlayDimStyle.Render("No matching containers"))
 		return b.String()

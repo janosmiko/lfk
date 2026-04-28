@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 )
@@ -597,6 +598,33 @@ func TestHandleLogKeyS2CopiesPathToClipboard(t *testing.T) {
 	assert.Contains(t, rm.statusMessage, "(copied to clipboard)",
 		"status should announce the clipboard copy so the user knows the path is recoverable")
 	assert.NotNil(t, cmd, "cmd should batch the clipboard write with the status-clear timer")
+}
+
+// Pressing \ in the log viewer for a single Pod opens the container filter
+// overlay. The handler sets m.overlay = overlayLogContainerSelect immediately
+// and dispatches the load asynchronously, so for the few hundred ms before
+// containers arrive the renderer reads m.overlayItems. If those items still
+// hold leftover namespace entries from an earlier namespace selector use,
+// the user sees the container overlay flash with namespace names in it —
+// reading as "the namespace selector appears for a moment". Mirrors how
+// handleKeyNamespaceSelector clears m.overlayItems before its own load.
+func TestHandleLogKeyOtherSinglePodClearsStaleOverlayItems(t *testing.T) {
+	m := baseModel()
+	m.mode = modeLogs
+	m.actionCtx.kind = "Pod"
+	m.actionCtx.name = "my-pod"
+	// Stale items from a previous namespace selector use.
+	m.overlayItems = []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default"},
+		{Name: "kube-system"},
+	}
+	ret, _ := m.handleLogKeyOther()
+	rm := ret.(Model)
+	assert.Equal(t, overlayLogContainerSelect, rm.overlay,
+		"single-pod \\ must open the container filter overlay")
+	assert.Nil(t, rm.overlayItems,
+		"stale overlay items must be cleared so the renderer does not briefly show old namespace data")
 }
 
 func TestHandleLogKeyS2ErrorPathDoesNotCopy(t *testing.T) {
