@@ -438,6 +438,7 @@ type Model struct {
 	logTimestamps     bool               // show timestamps (--timestamps)
 	logHidePrefixes   bool               // hide [pod/name/container] prefixes
 	logPreviewVisible bool               // show structured preview side panel
+	logPreviewScroll  int                // body-row offset within the preview pane (J/K)
 	logPrevious       bool               // show previous container logs (--previous)
 	logIsMulti        bool               // multi-log stream (for restart)
 	logMultiItems     []model.Item       // items for multi-log restart
