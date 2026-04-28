@@ -18,11 +18,12 @@
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (pkgs) lib;
 
-        # Single source of truth for the release version. Bumped by
-        # `make bump-version VERSION=X.Y.Z` before tagging; the release
-        # workflow verifies that this matches the pushed tag so the two
-        # can't drift. See docs/RELEASE.md for the full flow.
-        baseVersion = "0.9.32";
+        # Single source of truth for the release version. Updated automatically
+        # by the release-please bot on every Release PR via the marker comment
+        # below; release.yml then verifies this matches the pushed tag so the
+        # two can't drift. `make bump-version VERSION=X.Y.Z` remains available
+        # for emergency manual bumps.
+        baseVersion = "0.9.32"; # x-release-please-version
         commit = self.shortRev or self.dirtyShortRev or "unknown";
         version = "${baseVersion}-${commit}";
       in

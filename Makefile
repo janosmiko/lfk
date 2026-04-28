@@ -10,7 +10,7 @@ bump-version: ## Bump flake.nix baseVersion to $(VERSION) (usage: make bump-vers
 	@if ! echo "$(VERSION)" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+$$'; then \
 		echo "error: VERSION must be X.Y.Z (no leading v, no suffix); got: $(VERSION)"; exit 1; \
 	fi
-	@sed -i.bak -E 's/^(\s*baseVersion = )"[0-9]+\.[0-9]+\.[0-9]+";/\1"$(VERSION)";/' flake.nix && rm flake.nix.bak
+	@sed -i.bak -E 's/^(\s*baseVersion = )"[0-9]+\.[0-9]+\.[0-9]+"/\1"$(VERSION)"/' flake.nix && rm flake.nix.bak
 	@grep -n "baseVersion =" flake.nix
 
 # Recomputes vendorHash by setting it to lib.fakeHash, running `nix build`, and
