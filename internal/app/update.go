@@ -520,6 +520,17 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 	// with real discovered resources.
 	entries := append(model.PseudoResources(), msg.entries...)
 	m.discoveredResources[msg.context] = entries
+	if m.discoveryRefreshedContexts == nil {
+		m.discoveryRefreshedContexts = make(map[string]bool)
+	}
+	m.discoveryRefreshedContexts[msg.context] = true
+	// Persist the cluster-reported entries (without pseudo-resources, which
+	// are runtime-only) so the next launch can prefill discoveredResources
+	// from disk. Best-effort: a write failure leaves the in-memory state
+	// authoritative for this session.
+	if err := updateDiscoveryCacheContext(msg.context, msg.entries); err != nil {
+		logger.Warn("Could not persist discovery cache", "context", msg.context, "error", err)
+	}
 	merged := model.BuildSidebarItems(entries)
 	// If the user is at LevelClusters and hovering this context, refresh
 	// the right-pane preview so the discovered list replaces the seed

@@ -651,6 +651,14 @@ type Model struct {
 	// updateAPIResourceDiscovery when the result arrives.
 	discoveringContexts map[string]bool
 
+	// Contexts whose discoveredResources entries have been refreshed
+	// (i.e. live-fetched) during this session. NewModel prefills
+	// discoveredResources from the on-disk discovery cache for instant
+	// first paint, so the bare presence of an entry no longer implies
+	// "fresh" — this flag is the source of truth for stale-while-revalidate
+	// gating in the lazy discovery triggers.
+	discoveryRefreshedContexts map[string]bool
+
 	// bookmarkAwaitingDiscovery holds a bookmark whose target resource type
 	// can't be resolved yet because API discovery for the effective context
 	// hasn't completed (typical at session restore — the seed list resolves
@@ -994,40 +1002,41 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
 	m := Model{
-		client:              client,
-		nav:                 model.NavigationState{Level: model.LevelClusters},
-		bookmarks:           loadBookmarks(),
-		pendingSession:      loadSession(),
-		pendingPortForwards: loadPortForwardState(),
-		commandHistory:      loadCommandHistory(),
-		queryHistory:        loadInputHistory(historyFileQuery),
-		pinnedState:         pinnedSt,
-		namespace:           defaultNS,
-		spinner:             s,
-		watchInterval:       watchInterval,
-		splitPreview:        true,
-		allNamespaces:       true,
-		watchMode:           true,
-		sortColumnName:      sortColDefault,
-		sortAscending:       true,
-		cursorMemory:        make(map[string]int),
-		itemCache:           make(map[string][]model.Item),
-		cacheFingerprints:   make(map[string]string),
-		selectedItems:       make(map[string]bool),
-		selectionAnchor:     -1,
-		yamlCollapsed:       make(map[string]bool),
-		discoveredResources: make(map[string][]model.ResourceTypeEntry),
-		discoveringContexts: make(map[string]bool),
-		secretPreviewCache:  make(map[string]*model.SecretData),
-		allGroupsExpanded:   true,
-		warningEventsOnly:   true,
-		eventGrouping:       true,
-		logPreviewVisible:   true,
-		bgtasks:             bgtasks.New(bgtasks.DefaultThreshold),
-		diffLineNumbers:     true,
-		reqCtx:              reqCtx,
-		reqCancel:           reqCancel,
-		middleTableRenderer: ui.NewTableRenderer(),
+		client:                     client,
+		nav:                        model.NavigationState{Level: model.LevelClusters},
+		bookmarks:                  loadBookmarks(),
+		pendingSession:             loadSession(),
+		pendingPortForwards:        loadPortForwardState(),
+		commandHistory:             loadCommandHistory(),
+		queryHistory:               loadInputHistory(historyFileQuery),
+		pinnedState:                pinnedSt,
+		namespace:                  defaultNS,
+		spinner:                    s,
+		watchInterval:              watchInterval,
+		splitPreview:               true,
+		allNamespaces:              true,
+		watchMode:                  true,
+		sortColumnName:             sortColDefault,
+		sortAscending:              true,
+		cursorMemory:               make(map[string]int),
+		itemCache:                  make(map[string][]model.Item),
+		cacheFingerprints:          make(map[string]string),
+		selectedItems:              make(map[string]bool),
+		selectionAnchor:            -1,
+		yamlCollapsed:              make(map[string]bool),
+		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
+		discoveringContexts:        make(map[string]bool),
+		secretPreviewCache:         make(map[string]*model.SecretData),
+		discoveryRefreshedContexts: make(map[string]bool),
+		allGroupsExpanded:          true,
+		warningEventsOnly:          true,
+		eventGrouping:              true,
+		logPreviewVisible:          true,
+		bgtasks:                    bgtasks.New(bgtasks.DefaultThreshold),
+		diffLineNumbers:            true,
+		reqCtx:                     reqCtx,
+		reqCancel:                  reqCancel,
+		middleTableRenderer:        ui.NewTableRenderer(),
 		tabs: []TabState{{
 			nav:                model.NavigationState{Level: model.LevelClusters},
 			namespace:          defaultNS,
@@ -1049,6 +1058,22 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		activeTab:      0,
 		execMu:         &sync.Mutex{},
 		portForwardMgr: k8s.NewPortForwardManager(),
+	}
+
+	// Stale-while-revalidate: seed discoveredResources from the on-disk
+	// snapshot so the sidebar paints instantly on first frame instead of
+	// waiting for a live discovery roundtrip. The lazy-trigger sites still
+	// fire fresh discovery (gated by m.discoveryRefreshedContexts), so the
+	// cached values are replaced as soon as the live result lands.
+	if cache := loadDiscoveryCache(); cache != nil {
+		pseudo := model.PseudoResources()
+		for ctx, snap := range cache.Contexts {
+			cached := modelEntriesFromDiscoveryCache(snap.Entries)
+			merged := make([]model.ResourceTypeEntry, 0, len(pseudo)+len(cached))
+			merged = append(merged, pseudo...)
+			merged = append(merged, cached...)
+			m.discoveredResources[ctx] = merged
+		}
 	}
 
 	// When CLI flags are provided, replace the file-loaded session with a

@@ -301,13 +301,14 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.setStatusMessage(fmt.Sprintf("Context: %s", sel.Name), false)
 	m.saveCurrentSession()
 	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
-	// Fire discovery only if neither the result nor an in-flight call for
-	// this context already exists — hovering the context in the cluster
-	// list typically already kicked one off via loadPreviewClusters.
-	if _, ok := m.discoveredResources[sel.Name]; !ok && !m.discoveringContexts[sel.Name] {
-		if m.discoveringContexts != nil {
-			m.discoveringContexts[sel.Name] = true
-		}
+	// Fire discovery once per session per context. The disk cache may have
+	// prefilled m.discoveredResources, but stale-while-revalidate still
+	// wants a live refresh on the user's first interaction with the
+	// context. shouldFireDiscoveryFor handles both the prefilled-but-stale
+	// case and the in-flight dedup. loadPreviewClusters typically already
+	// fires this on hover, so navigation usually no-ops here.
+	if m.shouldFireDiscoveryFor(sel.Name) {
+		m.markDiscoveryStarted(sel.Name)
 		cmds = append(cmds, m.discoverAPIResources(sel.Name))
 	}
 	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
