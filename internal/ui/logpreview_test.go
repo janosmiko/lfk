@@ -280,6 +280,25 @@ func TestRenderLogPreviewPane_NegativeScrollClampsToZero(t *testing.T) {
 	}
 }
 
+func TestRenderLogPreviewPane_AtMaxScrollLastBodyRowIsVisible(t *testing.T) {
+	// Regression: scrolling to max must actually reveal the last body row.
+	// We pick a key (z_last_bucket) that ranks at the catch-all 100 bucket
+	// AND sorts alphabetically last, so we know which token must appear.
+	json := `{"a":"1","b":"2","c":"3","d":"4","e":"5","f":"6","g":"7","z_last_bucket":"END"}`
+	width, height := 60, 5
+	maxScroll := LogPreviewMaxScroll(json, width, height)
+	if maxScroll == 0 {
+		t.Fatal("test setup error: pick dimensions/content that overflow")
+	}
+	out := RenderLogPreviewPane(json, width, height, maxScroll)
+	if !strings.Contains(out, "z_last_bucket") {
+		t.Fatalf("at max scroll the last body row (key 'z_last_bucket') must be visible:\n%s", out)
+	}
+	if !strings.Contains(out, "END") {
+		t.Fatalf("at max scroll the value 'END' of the last body row must be visible:\n%s", out)
+	}
+}
+
 func TestRenderLogPreviewPane_TitleShowsPositionWhenScrollable(t *testing.T) {
 	// Short pane → overflow → "N/M" position label appears in the title.
 	out := RenderLogPreviewPane(scrollOverflowJSON, 60, 5, 0)
