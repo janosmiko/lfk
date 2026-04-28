@@ -429,4 +429,23 @@ func TestFormatItemPlain(t *testing.T) {
 		// In plain mode, icon is plain text (no styled IconStyle).
 		assert.Contains(t, result, "⬤")
 	})
+
+	t.Run("read-only context shows [RO] marker in plain", func(t *testing.T) {
+		// Mirror of the FormatItem test. The plain variant is used when the
+		// row is highlighted/selected; the [RO] marker must still render so
+		// the user does not lose the cue when moving the cursor onto the
+		// row.
+		item := model.Item{Name: "prod", ReadOnly: true}
+		result := FormatItemPlain(item, 40)
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, result, "[RO]")
+	})
+
+	t.Run("current read-only context shows star and [RO] in plain", func(t *testing.T) {
+		item := model.Item{Name: "prod", Status: "current", ReadOnly: true}
+		result := FormatItemPlain(item, 40)
+		assert.Contains(t, result, "*")
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, result, "[RO]")
+	})
 }

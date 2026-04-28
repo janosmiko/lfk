@@ -12,7 +12,8 @@ import (
 
 func TestIsMutatingAction(t *testing.T) {
 	mutating := []string{
-		"Delete", "Force Delete", "Force Finalize",
+		// Core kubectl mutations.
+		"Delete", "Force Delete", "Force Finalize", "Finalizer Remove",
 		"Edit", "Secret Editor", "ConfigMap Editor",
 		"Scale", "Restart", "Rollback",
 		"Exec", "Attach", "Shell",
@@ -23,6 +24,20 @@ func TestIsMutatingAction(t *testing.T) {
 		"Trigger", "Stop", "Remove",
 		"Labels / Annotations",
 		"Permissions",
+		// ArgoCD application / sync.
+		"Configure AutoSync", "Auto Sync",
+		"Sync", "Sync (Apply Only)", "Terminate Sync",
+		// Argo Workflows lifecycle.
+		"Suspend Workflow", "Resume Workflow",
+		"Stop Workflow", "Terminate Workflow",
+		"Resubmit Workflow", "Submit Workflow",
+		"Suspend CronWorkflow", "Resume CronWorkflow",
+		// cert-manager / ExternalSecrets / KEDA / Flux.
+		"Force Renew", "Force Refresh",
+		"Pause", "Unpause",
+		"Reconcile", "Suspend", "Resume",
+		// Helm.
+		"Edit Values", "Upgrade",
 	}
 	for _, label := range mutating {
 		assert.True(t, isMutatingAction(label), "%q should be classified mutating", label)
@@ -33,9 +48,39 @@ func TestIsMutatingAction(t *testing.T) {
 		"Resize", "Go to Pod", "Open in Browser",
 		"Startup Analysis", "Alerts", "Visualize", "Vuln Scan",
 		"", "unknown action", "Diff",
+		// Watch is observation-only, not a mutation.
+		"Watch Workflow",
+		// Helm read-only views.
+		"Values", "All Values", "History", "Refresh",
 	}
 	for _, label := range readOnly {
 		assert.False(t, isMutatingAction(label), "%q must not be classified mutating", label)
+	}
+}
+
+// TestExecuteActionExtended_ReadOnly_BlocksMutating asserts every label that
+// executeActionExtended dispatches to a state-changing handler is gated.
+// This catches future additions to executeActionExtended that forget to
+// register their label in mutatingActions.
+func TestExecuteActionExtended_ReadOnly_BlocksMutating(t *testing.T) {
+	mutating := []string{
+		"Configure AutoSync",
+		"Sync", "Sync (Apply Only)", "Terminate Sync",
+		"Suspend Workflow", "Resume Workflow",
+		"Stop Workflow", "Terminate Workflow",
+		"Resubmit Workflow", "Submit Workflow",
+		"Suspend CronWorkflow", "Resume CronWorkflow",
+		"Force Renew", "Force Refresh",
+		"Pause", "Unpause",
+		"Reconcile", "Suspend", "Resume",
+		"Edit Values", "Upgrade",
+	}
+	for _, label := range mutating {
+		t.Run(label, func(t *testing.T) {
+			assert.True(t, isMutatingAction(label),
+				"%q is dispatched by executeActionExtended; it must be in mutatingActions or it bypasses --read-only",
+				label)
+		})
 	}
 }
 
@@ -285,6 +330,57 @@ func TestHandleKeyReadOnlyToggle_AtClusterPicker_TogglesRowMarker(t *testing.T) 
 	assert.False(t, result2.middleItems[1].ReadOnly, "second press clears the row marker")
 	assert.False(t, result2.contextROOverrides["dev"])
 	assert.Contains(t, result2.statusMessage, "dev read-only: OFF")
+}
+
+func TestHandleKeyReadOnlyToggle_InsideContext_CliFlagBlocks(t *testing.T) {
+	// Sticky --read-only must hold inside a context too. Without this the
+	// in-context Ctrl+R could turn off read-only for the active tab and
+	// the gate would only re-assert on the next context switch — defeating
+	// the documented "sticky for the process" guarantee in usage.md.
+	m := Model{
+		nav:         model.NavigationState{Level: model.LevelResources, Context: "prod"},
+		readOnly:    true,
+		cliReadOnly: true,
+		tabs:        []TabState{{}}, width: 80, height: 40,
+	}
+	ret, _ := m.handleKeyReadOnlyToggle()
+	result := ret.(Model)
+	assert.True(t, result.readOnly, "in-context Ctrl+R must not flip readOnly when --read-only is set")
+	assert.True(t, result.statusMessageErr)
+	assert.Contains(t, result.statusMessage, "--read-only")
+}
+
+func TestHandleKeyReadOnlyToggle_AtClusterPicker_UpdatesMiddleItemsByIndex(t *testing.T) {
+	// Regression: the toggle must update m.middleItems[i].ReadOnly by
+	// index, not via the pointer returned from selectedMiddleItem. The
+	// selectedMiddleItem fallback path can return a pointer into a
+	// transient filtered slice; writing through it would not reach
+	// m.middleItems and the cached items would be stale until the next
+	// refreshContextReadOnlyMarkers call.
+	m := Model{
+		nav: model.NavigationState{Level: model.LevelClusters},
+		middleItems: []model.Item{
+			{Name: "prod"},
+			{Name: "dev"},
+			{Name: "audit"},
+		},
+		cursors:           [5]int{2, 0, 0, 0, 0}, // highlight "audit"
+		tabs:              []TabState{{}},
+		itemCache:         map[string][]model.Item{},
+		cacheFingerprints: map[string]string{},
+		width:             80, height: 40,
+	}
+	ret, _ := m.handleKeyReadOnlyToggle()
+	result := ret.(Model)
+
+	// The override map records the toggle.
+	assert.True(t, result.contextROOverrides["audit"])
+	// m.middleItems[2] reflects the new state by index — not via a stale
+	// pointer.
+	assert.True(t, result.middleItems[2].ReadOnly, "audit row must reflect the toggle in m.middleItems")
+	// The cache is in sync so back-navigation re-shows the fresh marker.
+	require.Contains(t, result.itemCache, "")
+	assert.True(t, result.itemCache[""][2].ReadOnly)
 }
 
 func TestHandleKeyReadOnlyToggle_AtClusterPicker_CliFlagBlocks(t *testing.T) {

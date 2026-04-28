@@ -668,6 +668,58 @@ func TestFormatItemNameOnlyPlain_WithIcons(t *testing.T) {
 	})
 }
 
+// --- FormatItemNameOnly read-only ---
+
+func TestFormatItemNameOnly_ReadOnly(t *testing.T) {
+	t.Run("read-only context shows [RO] marker", func(t *testing.T) {
+		item := model.Item{Name: "prod", ReadOnly: true}
+		result := FormatItemNameOnly(item, 40)
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, result, "[RO]")
+	})
+
+	t.Run("current read-only context shows star and [RO]", func(t *testing.T) {
+		item := model.Item{Name: "prod", Status: "current", ReadOnly: true}
+		result := FormatItemNameOnly(item, 40)
+		assert.Contains(t, result, "*")
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, result, "[RO]")
+	})
+
+	t.Run("non-read-only row does not get marker", func(t *testing.T) {
+		item := model.Item{Name: "dev"}
+		result := FormatItemNameOnly(item, 40)
+		assert.Contains(t, result, "dev")
+		assert.NotContains(t, result, "[RO]")
+	})
+}
+
+// --- FormatItemNameOnlyPlain read-only ---
+
+func TestFormatItemNameOnlyPlain_ReadOnly(t *testing.T) {
+	t.Run("read-only context shows [RO] marker in plain", func(t *testing.T) {
+		item := model.Item{Name: "prod", ReadOnly: true}
+		result := FormatItemNameOnlyPlain(item, 40)
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, result, "[RO]")
+	})
+
+	t.Run("current read-only context shows star and [RO] in plain", func(t *testing.T) {
+		item := model.Item{Name: "prod", Status: "current", ReadOnly: true}
+		result := FormatItemNameOnlyPlain(item, 40)
+		assert.Contains(t, result, "*")
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, result, "[RO]")
+	})
+
+	t.Run("non-read-only row does not get marker", func(t *testing.T) {
+		item := model.Item{Name: "dev"}
+		result := FormatItemNameOnlyPlain(item, 40)
+		assert.Contains(t, result, "dev")
+		assert.NotContains(t, result, "[RO]")
+	})
+}
+
 // --- wrapExtraValue ---
 
 func TestWrapExtraValue(t *testing.T) {

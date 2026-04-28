@@ -271,9 +271,16 @@ func (m Model) statusBar() string {
 		if m.nav.Level != model.LevelClusters {
 			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
 		}
-		// At the cluster picker, advertise the row-level RO toggle so users
-		// can discover it without reading docs.
+		// Advertise the read-only toggle on every level so users can
+		// discover it without reading docs. Wording differs by level:
+		// at the cluster picker it flips a row marker, inside a context
+		// it locks/unlocks the active tab.
 		if m.nav.Level == model.LevelClusters {
+			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ReadOnlyToggle, Desc: "toggle RO"})
+		} else if !m.cliReadOnly {
+			// Inside a context: the in-context toggle is meaningless when
+			// --read-only is set (the gate rejects it), so suppress the
+			// hint to avoid advertising a no-op.
 			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ReadOnlyToggle, Desc: "toggle RO"})
 		}
 		// "create" runs `kubectl apply` from a template. Hide it in

@@ -131,16 +131,19 @@ tab when created and re-evaluate on context switch.
   process exit. Blocked when `--read-only` is set.
 - **Inside a context**: flips read-only for the current tab.
   Session-scoped — does not write to the config file, and does not leak
-  across context switches. If `--read-only` was passed on the command
-  line, toggling off lets you mutate within the current context, but
-  switching contexts re-applies the CLI flag.
+  across context switches. Blocked when `--read-only` is set; the CLI
+  flag is the strongest precedence level and cannot be defeated within
+  the running process.
 
 ### CLI flag
 
 ```sh
-lfk --read-only
-lfk --read-only --context prod   # combine with explicit context
+lfk --read-only            # all contexts read-only for the session
+lfk --context prod --read-only
 ```
+
+`--read-only` is process-wide. `--context` only selects the starting
+context; it does not scope the read-only flag.
 
 ### Discovery
 

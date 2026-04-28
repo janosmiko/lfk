@@ -16,9 +16,11 @@ import (
 // mutating action without listing it here is a silent escape from read-only
 // mode; the readonly_test.go suite asserts membership for every known label.
 var mutatingActions = map[string]bool{
+	// Core kubectl mutations.
 	"Delete":               true,
 	"Force Delete":         true,
 	"Force Finalize":       true,
+	"Finalizer Remove":     true,
 	"Edit":                 true,
 	"Secret Editor":        true,
 	"ConfigMap Editor":     true,
@@ -42,6 +44,36 @@ var mutatingActions = map[string]bool{
 	"Remove":               true,
 	"Labels / Annotations": true,
 	"Permissions":          true,
+
+	// ArgoCD application / sync state mutations.
+	"Configure AutoSync": true,
+	"Auto Sync":          true,
+	"Sync":               true,
+	"Sync (Apply Only)":  true,
+	"Terminate Sync":     true,
+
+	// Argo Workflows lifecycle mutations.
+	"Suspend Workflow":     true,
+	"Resume Workflow":      true,
+	"Stop Workflow":        true,
+	"Terminate Workflow":   true,
+	"Resubmit Workflow":    true,
+	"Submit Workflow":      true,
+	"Suspend CronWorkflow": true,
+	"Resume CronWorkflow":  true,
+
+	// cert-manager / ExternalSecrets / KEDA / Flux mutations.
+	"Force Renew":   true,
+	"Force Refresh": true,
+	"Pause":         true,
+	"Unpause":       true,
+	"Reconcile":     true,
+	"Suspend":       true,
+	"Resume":        true,
+
+	// Helm release mutations.
+	"Edit Values": true,
+	"Upgrade":     true,
 }
 
 // isMutatingAction reports whether a given action label changes cluster state
@@ -155,10 +187,10 @@ func (m *Model) recomputeReadOnly(ctx string) {
 //     state. Session-scoped, local to that context, and does not leak
 //     across context switches.
 //
-// CLI flag stickiness is preserved at both levels: when --read-only was
-// passed, the picker toggle is rejected with a hint (the flag forces RO
-// on every context), and the in-context toggle's "off" state is
-// re-asserted on the next context switch.
+// CLI flag stickiness is absolute: when --read-only was passed, both the
+// picker toggle and the in-context toggle are rejected with a status
+// hint. The flag is the strongest level of the precedence chain and
+// cannot be defeated within the running process.
 func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 	if m.nav.Level == model.LevelClusters {
 		if m.cliReadOnly {
@@ -174,7 +206,17 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 			m.contextROOverrides = make(map[string]bool)
 		}
 		m.contextROOverrides[sel.Name] = newState
-		sel.ReadOnly = newState
+		// Update m.middleItems by index rather than via the sel pointer.
+		// selectedMiddleItem may return a pointer into a transient filtered
+		// slice on its fallback path; writing through that pointer would
+		// not reach the cached middleItems below, leaving the [RO] marker
+		// stale until the next refresh.
+		for i := range m.middleItems {
+			if m.middleItems[i].Name == sel.Name {
+				m.middleItems[i].ReadOnly = newState
+				break
+			}
+		}
 		// Refresh the cached items so the marker survives back-navigation
 		// to the picker without a context reload.
 		m.itemCache[m.navKey()] = m.middleItems
@@ -183,6 +225,10 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 			state = "ON"
 		}
 		m.setStatusMessage(sel.Name+" read-only: "+state, false)
+		return m, scheduleStatusClear()
+	}
+	if m.cliReadOnly {
+		m.setStatusMessage("--read-only forces all contexts read-only", true)
 		return m, scheduleStatusClear()
 	}
 	m.readOnly = !m.readOnly

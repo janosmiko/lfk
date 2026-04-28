@@ -670,6 +670,14 @@ func (m Model) handleBatchLabelOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.batchLabelInput.Value == "" {
 			return m, nil
 		}
+		// Belt-and-suspenders read-only gate: the dispatcher already blocks
+		// "Labels / Annotations" upstream, but a user who toggled RO on
+		// while this overlay was open could otherwise commit a mutation.
+		if m.readOnly {
+			m.overlay = overlayNone
+			m.setStatusMessage(readOnlyBlockedMessage("Labels / Annotations"), true)
+			return m, scheduleStatusClear()
+		}
 		isAnnotation := m.batchLabelMode == 1
 		// Parse input: "key=value" for add, "key" for remove.
 		var labelKey, labelValue string
@@ -914,6 +922,15 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Invalid replica count", true)
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
+			return m, scheduleStatusClear()
+		}
+		// Belt-and-suspenders read-only gate: the dispatcher already blocks
+		// "Scale" upstream, but a user who toggled RO on while this overlay
+		// was open could otherwise commit a scale operation.
+		if m.readOnly {
+			m.overlay = overlayNone
+			m.scaleInput.Clear()
+			m.setStatusMessage(readOnlyBlockedMessage("Scale"), true)
 			return m, scheduleStatusClear()
 		}
 		m.overlay = overlayNone
