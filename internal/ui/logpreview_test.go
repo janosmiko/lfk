@@ -391,3 +391,152 @@ func TestRenderLogPreviewPane_NestedJSONKeepsLineBreaks(t *testing.T) {
 		}
 	}
 }
+
+// --- klog (LMMDD HH:MM:SS.uuuuuu threadid file:line] msg) ---
+
+func TestParseLogLine_Klog_Warning(t *testing.T) {
+	in := `W0415 12:40:18.037168       1 mount_helper_common.go:142] Warning: "/var/lib/kubelet/pods/abc/mount" is not a mountpoint, deleting`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewKlog {
+		t.Fatalf("kind = %v, want Klog", p.Kind)
+	}
+	want := map[string]string{
+		"level":   "Warning",
+		"time":    "0415 12:40:18.037168",
+		"thread":  "1",
+		"caller":  "mount_helper_common.go:142",
+		"message": `Warning: "/var/lib/kubelet/pods/abc/mount" is not a mountpoint, deleting`,
+	}
+	if len(p.Fields) != len(want) {
+		t.Fatalf("got %d fields, want %d (%v)", len(p.Fields), len(want), p.Fields)
+	}
+	for _, f := range p.Fields {
+		if w, ok := want[f.Key]; !ok {
+			t.Errorf("unexpected field key %q (value %q)", f.Key, f.Value)
+		} else if f.Value != w {
+			t.Errorf("field %q = %q, want %q", f.Key, f.Value, w)
+		}
+	}
+}
+
+func TestParseLogLine_Klog_AllLevels(t *testing.T) {
+	cases := []struct {
+		letter, name string
+	}{
+		{"I", "Info"},
+		{"W", "Warning"},
+		{"E", "Error"},
+		{"F", "Fatal"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			in := tc.letter + `0427 16:06:59.211543       1 leaderelection.go:257] hi`
+			p := ParseLogLine(in)
+			if p.Kind != LogPreviewKlog {
+				t.Fatalf("%s: kind = %v, want Klog", tc.letter, p.Kind)
+			}
+			var got string
+			for _, f := range p.Fields {
+				if f.Key == "level" {
+					got = f.Value
+				}
+			}
+			if got != tc.name {
+				t.Errorf("level for %q = %q, want %q", tc.letter, got, tc.name)
+			}
+		})
+	}
+}
+
+func TestParseLogLine_Klog_KeyOrderIsTimeLevelMessageCallerThread(t *testing.T) {
+	// Display order is dictated by the Fields slice; the parser must put
+	// the most useful information first so the user sees it without
+	// scrolling. Order: time, level, message, caller, thread.
+	p := ParseLogLine(`E0427 16:06:59.212862       1 leaderelection.go:436] error retrieving resource lock`)
+	if p.Kind != LogPreviewKlog {
+		t.Fatalf("kind = %v, want Klog", p.Kind)
+	}
+	gotKeys := make([]string, len(p.Fields))
+	for i, f := range p.Fields {
+		gotKeys[i] = f.Key
+	}
+	wantKeys := []string{"time", "level", "message", "caller", "thread"}
+	if len(gotKeys) != len(wantKeys) {
+		t.Fatalf("got %d fields (%v), want %d (%v)", len(gotKeys), gotKeys, len(wantKeys), wantKeys)
+	}
+	for i := range wantKeys {
+		if gotKeys[i] != wantKeys[i] {
+			t.Errorf("field[%d] = %q, want %q (full order: %v)", i, gotKeys[i], wantKeys[i], gotKeys)
+		}
+	}
+}
+
+func TestParseLogLine_Klog_WithPodPrefix(t *testing.T) {
+	// Pod prefix stripping happens before structured parsing, so a
+	// klog line wearing a kubectl bracket prefix still resolves to Klog
+	// kind and the prefix lands in p.Prefix for the preview header.
+	in := `[pod/kubelet/main] W0415 12:40:18.037168       1 mount_helper_common.go:142] Warning: x`
+	p := ParseLogLine(in)
+	if p.Prefix != "[pod/kubelet/main]" {
+		t.Fatalf("prefix = %q, want [pod/kubelet/main]", p.Prefix)
+	}
+	if p.Kind != LogPreviewKlog {
+		t.Fatalf("kind = %v, want Klog after prefix strip", p.Kind)
+	}
+}
+
+func TestParseLogLine_Klog_RejectsNonKlog(t *testing.T) {
+	// These should NOT be misclassified as klog. The parser must be
+	// strict about the leading L<digits> shape so plain text starting
+	// with a capital letter doesn't get co-opted.
+	cases := []string{
+		"W is the 23rd letter",                    // letter-then-text, no digits
+		"INFO server started",                     // word, not single-letter level
+		"X0415 12:40:18.000000 1 a.go:1] x",       // unknown level letter
+		"W04 12:40:18.000000 1 a.go:1] x",         // mmdd too short
+		"W0415 12:40 1 a.go:1] x",                 // time missing seconds/micros
+		"W0415 12:40:18.000000 a.go:1] no thread", // missing thread id
+		"W0415 12:40:18.000000 1 a.go:NaN] x",     // non-numeric line
+		"W0415 12:40:18.000000 1 a.go:1 missing-bracket",
+	}
+	for _, in := range cases {
+		t.Run(in, func(t *testing.T) {
+			p := ParseLogLine(in)
+			if p.Kind == LogPreviewKlog {
+				t.Errorf("misclassified as Klog: %q -> fields=%v", in, p.Fields)
+			}
+		})
+	}
+}
+
+func TestParseLogLine_Klog_BeatsLogfmtForMessageBody(t *testing.T) {
+	// A klog body that happens to contain key=value fragments must be
+	// classified as klog, not promoted to logfmt by the >=2-pair detector.
+	in := `I0427 16:07:22.000000       1 controller.go:99] reconciling foo=bar baz=qux`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewKlog {
+		t.Fatalf("kind = %v, want Klog (must beat logfmt)", p.Kind)
+	}
+	var msg string
+	for _, f := range p.Fields {
+		if f.Key == "message" {
+			msg = f.Value
+		}
+	}
+	if msg != "reconciling foo=bar baz=qux" {
+		t.Fatalf("message = %q, want full klog body", msg)
+	}
+}
+
+func TestRenderLogPreviewPane_KlogTitleIndicator(t *testing.T) {
+	in := `W0415 12:40:18.037168       1 mount_helper_common.go:142] Warning: x`
+	out := RenderLogPreviewPane(in, 80, 20, 0)
+	if !strings.Contains(out, "[KLOG]") {
+		t.Fatalf("expected [KLOG] kind indicator in title; got:\n%s", out)
+	}
+	for _, want := range []string{"level", "Warning", "caller", "mount_helper_common.go:142"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("klog preview missing %q; got:\n%s", want, out)
+		}
+	}
+}

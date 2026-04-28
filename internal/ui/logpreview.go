@@ -17,6 +17,10 @@ const (
 	LogPreviewText LogPreviewKind = iota
 	LogPreviewJSON
 	LogPreviewLogfmt
+	// LogPreviewKlog covers the klog/glog format used by kubelet,
+	// kube-proxy, leaderelection, and most controller binaries:
+	// `LMMDD HH:MM:SS.uuuuuu threadid file:line] msg`.
+	LogPreviewKlog
 )
 
 // LogPreviewField is a single key/value pair extracted from a structured log line.
@@ -60,12 +64,56 @@ func ParseLogLine(line string) ParsedLogPreview {
 			return p
 		}
 	}
+	// klog must run before logfmt: a klog message body that contains
+	// `key=value` fragments would otherwise be promoted to logfmt and
+	// the structural metadata (level, caller, thread) would be lost.
+	if fields, ok := parseKlogFields(rest); ok {
+		p.Kind = LogPreviewKlog
+		p.Fields = fields
+		return p
+	}
 	if fields, ok := parseLogfmtFields(rest); ok {
 		p.Kind = LogPreviewLogfmt
 		p.Fields = fields
 		return p
 	}
 	return p
+}
+
+// klogLine matches a klog/glog formatted log line:
+//
+//	LMMDD HH:MM:SS.uuuuuu threadid file:line] msg
+//
+// L is one of I/W/E/F (Info/Warning/Error/Fatal). The thread id is
+// right-aligned with leading whitespace in real klog output, so \s+ is
+// used between the time and the thread id. The trailing `]` after the
+// file:line is the signature element that distinguishes klog from
+// free-form text that happens to start with a capital letter.
+var klogLine = regexp.MustCompile(`^([IWEF])(\d{4}) (\d{2}:\d{2}:\d{2}\.\d+)\s+(\d+)\s+([^:\s]+:\d+)\]\s*(.*)$`)
+
+var klogLevelName = map[byte]string{
+	'I': "Info",
+	'W': "Warning",
+	'E': "Error",
+	'F': "Fatal",
+}
+
+// parseKlogFields extracts level, time, message, caller, and thread from
+// a klog-formatted line. Field order is fixed (time, level, message,
+// caller, thread) so the preview pane shows the most useful information
+// at the top — RenderLogPreviewPane preserves the slice order.
+func parseKlogFields(s string) ([]LogPreviewField, bool) {
+	m := klogLine.FindStringSubmatch(s)
+	if m == nil {
+		return nil, false
+	}
+	return []LogPreviewField{
+		{Key: "time", Value: m[2] + " " + m[3]},
+		{Key: "level", Value: klogLevelName[m[1][0]]},
+		{Key: "message", Value: m[6]},
+		{Key: "caller", Value: m[5]},
+		{Key: "thread", Value: m[4]},
+	}, true
 }
 
 // splitLeadingTimestamp returns the leading RFC3339Nano timestamp and the
@@ -196,6 +244,8 @@ func RenderLogPreviewPane(line string, width, height, scroll int) string {
 		titleText += HelpKeyStyle.Render("[JSON]")
 	case LogPreviewLogfmt:
 		titleText += HelpKeyStyle.Render("[LOGFMT]")
+	case LogPreviewKlog:
+		titleText += HelpKeyStyle.Render("[KLOG]")
 	default:
 		titleText += HelpKeyStyle.Render("[TEXT]")
 	}
