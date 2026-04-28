@@ -2,6 +2,7 @@ package ui
 
 import (
 	"encoding/json"
+	"fmt"
 	"regexp"
 	"sort"
 	"strings"
@@ -166,8 +167,11 @@ func parseLogfmtFields(s string) ([]LogPreviewField, bool) {
 // RenderLogPreviewPane renders a side panel showing the parsed view of a
 // single log line. Output is exactly width columns wide and height+2 rows
 // tall (matching RenderLogViewer's title + body + footer layout) so it can
-// be JoinHorizontal'd next to the main log view.
-func RenderLogPreviewPane(line string, width, height int) string {
+// be JoinHorizontal'd next to the main log view. scroll is the number of
+// body rows to skip from the top; it is clamped to [0, max] internally so
+// callers can pass an unclamped value and rely on LogPreviewMaxScroll for
+// the upper bound when they need it (e.g. to gate key handlers).
+func RenderLogPreviewPane(line string, width, height, scroll int) string {
 	if width < 10 {
 		width = 10
 	}
@@ -175,6 +179,16 @@ func RenderLogPreviewPane(line string, width, height int) string {
 		height = 3
 	}
 	parsed := ParseLogLine(line)
+
+	contentHeight := max(height-2, 1)
+	contentWidth := max(width-4, 10) // border 2 + padding 2
+
+	bodyLines := buildPreviewBody(parsed, contentWidth)
+	totalLines := len(bodyLines)
+	scroll = clampPreviewScroll(scroll, totalLines, contentHeight)
+	if scroll > 0 {
+		bodyLines = bodyLines[scroll:]
+	}
 
 	titleText := " PREVIEW "
 	switch parsed.Kind {
@@ -185,14 +199,14 @@ func RenderLogPreviewPane(line string, width, height int) string {
 	default:
 		titleText += HelpKeyStyle.Render("[TEXT]")
 	}
+	if totalLines > contentHeight {
+		// Show "topVisibleRow/totalRows" so the user can see how far they
+		// have scrolled and how much body content is still hidden.
+		titleText += "  " + DimStyle.Render(scrollPositionLabel(scroll, totalLines))
+	}
 	titleBar := FillLinesBg(
 		TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(titleText),
 		width, BarBg)
-
-	contentHeight := max(height-2, 1)
-	contentWidth := max(width-4, 10) // border 2 + padding 2
-
-	bodyLines := buildPreviewBody(parsed, contentWidth)
 
 	if len(bodyLines) > contentHeight {
 		bodyLines = bodyLines[:contentHeight]
@@ -207,10 +221,44 @@ func RenderLogPreviewPane(line string, width, height int) string {
 
 	// Empty status bar keeps the panel's row count aligned with the log
 	// viewer's title + body + footer layout so JoinHorizontal stays clean.
-	// The P binding is already shown in the main log hint bar.
+	// The P / J / K bindings are advertised in the main log hint bar.
 	footer := StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render("")
 
 	return lipgloss.JoinVertical(lipgloss.Left, titleBar, body, footer)
+}
+
+// LogPreviewMaxScroll returns the largest valid scroll offset for
+// RenderLogPreviewPane given the same line and dimensions. Callers use this
+// to clamp scroll-down handlers without re-rendering.
+func LogPreviewMaxScroll(line string, width, height int) int {
+	if width < 10 {
+		width = 10
+	}
+	if height < 3 {
+		height = 3
+	}
+	parsed := ParseLogLine(line)
+	contentHeight := max(height-2, 1)
+	contentWidth := max(width-4, 10)
+	bodyLines := buildPreviewBody(parsed, contentWidth)
+	return max(0, len(bodyLines)-contentHeight)
+}
+
+func clampPreviewScroll(scroll, total, contentHeight int) int {
+	if scroll < 0 {
+		return 0
+	}
+	maxScroll := max(0, total-contentHeight)
+	if scroll > maxScroll {
+		return maxScroll
+	}
+	return scroll
+}
+
+func scrollPositionLabel(scroll, total int) string {
+	// scroll is 0-based row index of the top visible row. Show 1-based to
+	// match how editors present line counters.
+	return fmt.Sprintf("%d/%d", scroll+1, total)
 }
 
 func buildPreviewBody(parsed ParsedLogPreview, contentWidth int) []string {

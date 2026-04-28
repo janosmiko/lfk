@@ -30,7 +30,7 @@ func (m Model) viewLogs() string {
 	logView := ui.RenderLogViewer(m.logLines, m.logScroll, logWidth, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, m.logWrapTopSkip)
 
 	if previewWidth > 0 {
-		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH)
+		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logPreviewScroll)
 		return lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
 	}
 	return logView
@@ -304,6 +304,12 @@ func (m *Model) clampLogScroll() {
 // classic source-line scrolloff. logFollow always wins: it snaps to the
 // (maxScroll, topSkip) pair that pins the most recent sub-line to the bottom.
 func (m *Model) ensureLogCursorVisible() {
+	// Cursor movement implies the previewed line just changed (or is about
+	// to), so any prior preview scroll is now relative to stale content.
+	// Resetting here covers j/k/ctrl+d/u/ctrl+f/b/G/g/search-next as well
+	// as the toggle, which all reach this function.
+	m.logPreviewScroll = 0
+
 	if m.logCursor < 0 {
 		return
 	}

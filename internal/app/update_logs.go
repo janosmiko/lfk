@@ -145,6 +145,18 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "P":
 		ret := m.handleLogKeyP2()
 		return ret, nil, true
+	case "J":
+		if !m.logPreviewVisible {
+			return m, nil, false
+		}
+		ret := m.handleLogKeyJ2()
+		return ret, nil, true
+	case "K":
+		if !m.logPreviewVisible {
+			return m, nil, false
+		}
+		ret := m.handleLogKeyK2()
+		return ret, nil, true
 	case "#":
 		ret := m.handleLogKeyHash()
 		return ret, nil, true
@@ -791,9 +803,35 @@ func (m Model) handleLogKeyP() Model {
 func (m Model) handleLogKeyP2() Model {
 	m.logLineInput = ""
 	m.logPreviewVisible = !m.logPreviewVisible
+	m.logPreviewScroll = 0
 	// Effective viewer width changes when the panel toggles, so wrap-aware
 	// scroll/skip values need recomputing for the new geometry.
 	m.ensureLogCursorVisible()
+	return m
+}
+
+// handleLogKeyJ2 scrolls the structured preview pane down by one body row.
+// Caller is responsible for checking m.logPreviewVisible — this only runs
+// when the panel is on, so it is safe to assume a valid preview width.
+func (m Model) handleLogKeyJ2() Model {
+	m.logLineInput = ""
+	_, previewW := splitLogPreviewWidth(m.width)
+	if previewW == 0 {
+		return m
+	}
+	maxScroll := ui.LogPreviewMaxScroll(m.logPreviewLine(), previewW, m.logViewHeight())
+	if m.logPreviewScroll < maxScroll {
+		m.logPreviewScroll++
+	}
+	return m
+}
+
+// handleLogKeyK2 scrolls the structured preview pane up by one body row.
+func (m Model) handleLogKeyK2() Model {
+	m.logLineInput = ""
+	if m.logPreviewScroll > 0 {
+		m.logPreviewScroll--
+	}
 	return m
 }
 
