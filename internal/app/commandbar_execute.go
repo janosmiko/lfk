@@ -189,15 +189,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		return m.executeSetCommand(arg)
 
 	case "sort":
-		if arg == "" {
-			m.setStatusMessage("Usage: :sort <column>", true)
-			return m, scheduleStatusClear()
-		}
-		m.sortColumnName = arg
-		m.sortMiddleItems()
-		m.clampCursor()
-		m.setStatusMessage(fmt.Sprintf("Sort by %s", arg), false)
-		return m, scheduleStatusClear()
+		return m.executeSortCommand(arg)
 
 	case "export":
 		lower := strings.ToLower(arg)
@@ -270,6 +262,27 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.setStatusMessage(fmt.Sprintf("Unknown command: %s", canonical), true)
 		return m, scheduleStatusClear()
 	}
+}
+
+// executeSortCommand handles the :sort builtin command. At LevelClusters
+// and LevelResourceTypes the sort engine early-returns, so accepting :sort
+// silently would mutate sortColumnName and emit a misleading "Sort by ..."
+// status while items stayed put. Surface that as an explicit error so the
+// user understands why the typed command had no effect.
+func (m Model) executeSortCommand(arg string) (tea.Model, tea.Cmd) {
+	if arg == "" {
+		m.setStatusMessage("Usage: :sort <column>", true)
+		return m, scheduleStatusClear()
+	}
+	if !m.sortApplies() {
+		m.setStatusMessage("Sort is not available at this level", true)
+		return m, scheduleStatusClear()
+	}
+	m.sortColumnName = arg
+	m.sortMiddleItems()
+	m.clampCursor()
+	m.setStatusMessage(fmt.Sprintf("Sort by %s", arg), false)
+	return m, scheduleStatusClear()
 }
 
 // executeSetCommand handles the :set builtin command.

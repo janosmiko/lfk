@@ -153,6 +153,9 @@ func findSortableCol(name string) int {
 // from click X to column key always matches the actual rendered order, even when
 // the user has reordered columns via the column-toggle overlay.
 func (m Model) handleHeaderClick(relX int) (tea.Model, tea.Cmd) {
+	if !m.sortApplies() {
+		return m, nil
+	}
 	items := m.visibleMiddleItems()
 	if len(items) == 0 || len(ui.ActiveSortableColumns) == 0 || len(ui.ActiveMiddleColumnLayout) == 0 {
 		return m, nil

@@ -217,6 +217,12 @@ func TestActionKeySortNextNoOpAtResourceTypes(t *testing.T) {
 	m.nav.Level = model.LevelResourceTypes
 	m.sortColumnName = "Name"
 	m.sortAscending = true
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+	})
 	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
 	ui.ActiveSortableColumnCount = 3
 
@@ -233,6 +239,12 @@ func TestActionKeySortPrevNoOpAtResourceTypes(t *testing.T) {
 	m := baseExplorerModel()
 	m.nav.Level = model.LevelResourceTypes
 	m.sortColumnName = "Name"
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+	})
 	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
 	ui.ActiveSortableColumnCount = 3
 
