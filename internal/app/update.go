@@ -525,10 +525,12 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 	}
 	m.discoveryRefreshedContexts[msg.context] = true
 	// Persist the cluster-reported entries (without pseudo-resources, which
-	// are runtime-only) so the next launch can prefill discoveredResources
-	// from disk. Best-effort: a write failure leaves the in-memory state
-	// authoritative for this session.
-	if err := updateDiscoveryCacheContext(msg.context, msg.entries); err != nil {
+	// are runtime-only) into the per-host file under ~/.kube/cache/discovery
+	// so the next launch can prefill discoveredResources from disk and so
+	// `kubectl api-resources --invalidate-cache` wipes lfk's snapshot too.
+	// Best-effort: a write failure leaves the in-memory state authoritative
+	// for this session.
+	if err := updateDiscoveryCacheForContext(m.client, msg.context, msg.entries); err != nil {
 		logger.Warn("Could not persist discovery cache", "context", msg.context, "error", err)
 	}
 	merged := model.BuildSidebarItems(entries)

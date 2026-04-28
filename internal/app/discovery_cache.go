@@ -1,21 +1,35 @@
 package app
 
 import (
+	"errors"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
 
 	"sigs.k8s.io/yaml"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
 // discoveryCacheSchemaVersion bumps whenever the on-disk shape changes.
-// loadDiscoveryCache rejects unknown versions so older binaries don't trip
-// on a forward-incompat write from a newer one — the worst case is one
+// loadDiscoveryCacheForHost rejects unknown versions so older binaries don't
+// trip on a forward-incompat write from a newer one — the worst case is one
 // extra discovery roundtrip on first launch after upgrade.
-const discoveryCacheSchemaVersion = 1
+//
+// v2: per-host file layout (one yaml per ~/.kube/cache/discovery/<host>/)
+// replacing the v1 single-file XDG-state design — shares lifecycle with
+// kubectl/k9s so `kubectl api-resources --invalidate-cache` wipes lfk's
+// cache too. v1 files in the old XDG location are abandoned (the previous
+// build was unreleased).
+const discoveryCacheSchemaVersion = 2
+
+// discoveryCacheFilename is the basename of lfk's enriched cache inside each
+// per-host kubectl-cache dir. Distinct from kubectl's per-group/version JSON
+// files so the two formats can coexist in the same directory.
+const discoveryCacheFilename = "lfk-enriched.yaml"
 
 // DiscoveryCacheEntry is the serialized form of a single ResourceTypeEntry.
 // It mirrors model.ResourceTypeEntry but carries explicit JSON tags so the
@@ -50,74 +64,77 @@ type DiscoveryCacheIcon struct {
 	NerdFont string `json:"nerd_font,omitempty"`
 }
 
-// DiscoveryCacheContext is the per-context block — a snapshot of the API
-// resources the cluster reported, plus the wall-clock time of capture.
-type DiscoveryCacheContext struct {
-	UpdatedAt time.Time             `json:"updated_at"`
-	Entries   []DiscoveryCacheEntry `json:"entries"`
+// DiscoveryCacheHostState is the on-disk shape: one file per cluster API
+// host. Multiple kubeconfig contexts pointing at the same host share one
+// file because cluster-level discovery output is host-keyed, not
+// context-keyed.
+type DiscoveryCacheHostState struct {
+	SchemaVersion int                   `json:"schema_version"`
+	Host          string                `json:"host"`
+	UpdatedAt     time.Time             `json:"updated_at"`
+	Entries       []DiscoveryCacheEntry `json:"entries"`
 }
 
-// DiscoveryCacheState is the top-level on-disk document.
-type DiscoveryCacheState struct {
-	SchemaVersion int                              `json:"schema_version"`
-	Contexts      map[string]DiscoveryCacheContext `json:"contexts,omitempty"`
-}
-
-// discoveryCacheFilePath returns the path to the discovery cache file.
-// Uses the same XDG state directory as session.yaml so cleanup tools that
-// already understand lfk's state dir cover it without extra config.
-func discoveryCacheFilePath() string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+// discoveryCacheFilePathForHost returns the per-host cache file path:
+// $KUBECACHEDIR/discovery/<host>/lfk-enriched.yaml (with $KUBECACHEDIR
+// defaulting to ~/.kube/cache). Returns "" for an empty host or an
+// unresolvable home dir; callers treat that as "skip caching".
+func discoveryCacheFilePathForHost(host string) string {
+	if host == "" {
+		return ""
 	}
-	return filepath.Join(stateDir, "lfk", "discovery-cache.yaml")
+	base := k8s.DiscoveryCacheBaseDir()
+	if base == "" {
+		return ""
+	}
+	return filepath.Join(base, "discovery", k8s.CacheHostDir(host), discoveryCacheFilename)
 }
 
-// loadDiscoveryCache reads the cache file. Returns nil on any failure —
-// missing file, corrupt YAML, unknown schema. Callers fall through to a
-// live discovery, so a nil result is recoverable.
-func loadDiscoveryCache() *DiscoveryCacheState {
-	path := discoveryCacheFilePath()
+// loadDiscoveryCacheForHost reads one host's enriched cache. Returns nil on
+// any failure — missing file, corrupt YAML, schema mismatch — so callers
+// can treat a nil result as "fall through to live discovery".
+func loadDiscoveryCacheForHost(host string) *DiscoveryCacheHostState {
+	path := discoveryCacheFilePathForHost(host)
 	if path == "" {
 		return nil
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if !errors.Is(err, fs.ErrNotExist) {
+			logger.Warn("Discovery cache read failed", "host", host, "error", err)
+		}
 		return nil
 	}
-	var s DiscoveryCacheState
+	var s DiscoveryCacheHostState
 	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Discovery cache is corrupt; ignoring", "error", err, "path", path)
+		logger.Warn("Discovery cache is corrupt; ignoring", "host", host, "error", err)
 		return nil
 	}
 	if s.SchemaVersion != discoveryCacheSchemaVersion {
 		logger.Info("Discovery cache schema version mismatch; ignoring",
-			"got", s.SchemaVersion, "want", discoveryCacheSchemaVersion)
+			"host", host, "got", s.SchemaVersion, "want", discoveryCacheSchemaVersion)
 		return nil
-	}
-	if s.Contexts == nil {
-		s.Contexts = make(map[string]DiscoveryCacheContext)
 	}
 	return &s
 }
 
-// saveDiscoveryCache writes the full cache document atomically (write to a
-// sibling .tmp then rename) so a crash mid-write can't leave a half-written
-// file that loadDiscoveryCache would discard.
-func saveDiscoveryCache(state DiscoveryCacheState) error {
-	path := discoveryCacheFilePath()
+// saveDiscoveryCacheForHost writes one host's enriched cache atomically
+// (sibling .tmp + rename) so a crash mid-write can't leave a half-written
+// file that loadDiscoveryCacheForHost would discard.
+func saveDiscoveryCacheForHost(host string, entries []model.ResourceTypeEntry) error {
+	path := discoveryCacheFilePathForHost(host)
 	if path == "" {
 		return nil
 	}
 	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
 		return err
 	}
-	state.SchemaVersion = discoveryCacheSchemaVersion
+	state := DiscoveryCacheHostState{
+		SchemaVersion: discoveryCacheSchemaVersion,
+		Host:          host,
+		UpdatedAt:     time.Now().UTC(),
+		Entries:       discoveryCacheEntriesFromModel(entries),
+	}
 	data, err := yaml.Marshal(state)
 	if err != nil {
 		return err
@@ -129,30 +146,53 @@ func saveDiscoveryCache(state DiscoveryCacheState) error {
 	return os.Rename(tmp, path)
 }
 
-// updateDiscoveryCacheContext is the single mutator: it loads the current
-// state (or starts an empty one), replaces a context's entry list with
-// `entries`, and writes the result back to disk. Other contexts in the file
-// are preserved untouched so cluster-level updates don't trash unrelated
-// snapshots.
-func updateDiscoveryCacheContext(contextName string, entries []model.ResourceTypeEntry) error {
-	if contextName == "" {
+// loadAllDiscoveryCaches enumerates every kubeconfig context known to client,
+// resolves each to a host, reads each unique host's cache file once, and
+// returns a map from context display name to cached resource entries ready
+// to plug into m.discoveredResources. Contexts with unresolvable hosts or
+// missing cache files are silently skipped — they fall through to live
+// discovery on first interaction.
+func loadAllDiscoveryCaches(client *k8s.Client) map[string][]model.ResourceTypeEntry {
+	if client == nil {
 		return nil
 	}
-	state := loadDiscoveryCache()
-	if state == nil {
-		state = &DiscoveryCacheState{
-			SchemaVersion: discoveryCacheSchemaVersion,
-			Contexts:      make(map[string]DiscoveryCacheContext),
+	contexts, err := client.GetContexts()
+	if err != nil {
+		return nil
+	}
+	out := make(map[string][]model.ResourceTypeEntry)
+	hostCache := make(map[string]*DiscoveryCacheHostState)
+	for _, ctx := range contexts {
+		host := client.HostForContext(ctx.Name)
+		if host == "" {
+			continue
 		}
+		snap, ok := hostCache[host]
+		if !ok {
+			snap = loadDiscoveryCacheForHost(host)
+			hostCache[host] = snap
+		}
+		if snap == nil {
+			continue
+		}
+		out[ctx.Name] = modelEntriesFromDiscoveryCache(snap.Entries)
 	}
-	if state.Contexts == nil {
-		state.Contexts = make(map[string]DiscoveryCacheContext)
+	return out
+}
+
+// updateDiscoveryCacheForContext is the single mutator used by the discovery
+// success path: resolve the context to its host, write the host's enriched
+// snapshot. No-op when the host can't be resolved — the live data is still
+// authoritative for this session.
+func updateDiscoveryCacheForContext(client *k8s.Client, contextName string, entries []model.ResourceTypeEntry) error {
+	if client == nil || contextName == "" {
+		return nil
 	}
-	state.Contexts[contextName] = DiscoveryCacheContext{
-		UpdatedAt: time.Now().UTC(),
-		Entries:   discoveryCacheEntriesFromModel(entries),
+	host := client.HostForContext(contextName)
+	if host == "" {
+		return nil
 	}
-	return saveDiscoveryCache(*state)
+	return saveDiscoveryCacheForHost(host, entries)
 }
 
 // discoveryCacheEntriesFromModel converts the model's domain types to the
@@ -197,42 +237,6 @@ func discoveryCacheColsFromModel(cols []model.PrinterColumn) []DiscoveryCacheCol
 	return out
 }
 
-// shouldFireDiscoveryFor reports whether a fresh discovery call should be
-// kicked off for contextName. Returns false when (a) a discovery is already
-// in flight for that context — deduplication — or (b) discovery has already
-// completed during this session, in which case re-fetching would just hit
-// the cluster API for nothing.
-//
-// This is the gate that makes stale-while-revalidate work: NewModel prefills
-// m.discoveredResources from disk, but the first hover/navigate of a context
-// returns true here so a live refresh kicks off behind the cached view.
-func (m *Model) shouldFireDiscoveryFor(contextName string) bool {
-	if contextName == "" {
-		return false
-	}
-	if m.discoveringContexts[contextName] {
-		return false
-	}
-	if m.discoveryRefreshedContexts[contextName] {
-		return false
-	}
-	return true
-}
-
-// markDiscoveryStarted records that a discovery call is now in flight for
-// contextName so subsequent shouldFireDiscoveryFor calls deduplicate. Safe
-// to call when discoveringContexts is nil — the function is the canonical
-// place to lazily allocate the map.
-func (m *Model) markDiscoveryStarted(contextName string) {
-	if contextName == "" {
-		return
-	}
-	if m.discoveringContexts == nil {
-		m.discoveringContexts = make(map[string]bool)
-	}
-	m.discoveringContexts[contextName] = true
-}
-
 // modelEntriesFromDiscoveryCache is the inverse: turn a cached snapshot back
 // into model types ready to plug into m.discoveredResources.
 func modelEntriesFromDiscoveryCache(entries []DiscoveryCacheEntry) []model.ResourceTypeEntry {
@@ -270,4 +274,40 @@ func modelColsFromDiscoveryCache(cols []DiscoveryCacheCol) []model.PrinterColumn
 		out = append(out, model.PrinterColumn{Name: c.Name, Type: c.Type, JSONPath: c.JSONPath})
 	}
 	return out
+}
+
+// shouldFireDiscoveryFor reports whether a fresh discovery call should be
+// kicked off for contextName. Returns false when (a) a discovery is already
+// in flight for that context — deduplication — or (b) discovery has already
+// completed during this session, in which case re-fetching would just hit
+// the cluster API for nothing.
+//
+// This is the gate that makes stale-while-revalidate work: NewModel prefills
+// m.discoveredResources from disk, but the first hover/navigate of a context
+// returns true here so a live refresh kicks off behind the cached view.
+func (m *Model) shouldFireDiscoveryFor(contextName string) bool {
+	if contextName == "" {
+		return false
+	}
+	if m.discoveringContexts[contextName] {
+		return false
+	}
+	if m.discoveryRefreshedContexts[contextName] {
+		return false
+	}
+	return true
+}
+
+// markDiscoveryStarted records that a discovery call is now in flight for
+// contextName so subsequent shouldFireDiscoveryFor calls deduplicate. Safe
+// to call when discoveringContexts is nil — the function is the canonical
+// place to lazily allocate the map.
+func (m *Model) markDiscoveryStarted(contextName string) {
+	if contextName == "" {
+		return
+	}
+	if m.discoveringContexts == nil {
+		m.discoveringContexts = make(map[string]bool)
+	}
+	m.discoveringContexts[contextName] = true
 }

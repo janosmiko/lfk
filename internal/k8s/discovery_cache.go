@@ -22,10 +22,35 @@ const discoveryCacheTTL = 5 * time.Minute
 // them through is harmless.
 var toCacheHostDir = regexp.MustCompile(`[^(\w/.)]`)
 
+// CacheHostDir returns the directory name kubectl/k9s/lfk all use to namespace
+// per-host cache data under ~/.kube/cache/discovery/<dir>/. Exposed so other
+// packages (e.g. lfk's enriched discovery cache) can write into the same
+// per-host layout and inherit the same `kubectl api-resources --invalidate-cache`
+// lifecycle.
+func CacheHostDir(host string) string {
+	return cacheHostDir(host)
+}
+
 func cacheHostDir(host string) string {
 	h := strings.Replace(host, "https://", "", 1)
 	h = strings.Replace(h, "http://", "", 1)
 	return toCacheHostDir.ReplaceAllString(h, "_")
+}
+
+// DiscoveryCacheBaseDir returns the on-disk base for per-host discovery
+// caches: $KUBECACHEDIR or ~/.kube/cache. Returns "" if the home directory
+// can't be resolved (extremely rare; the same fallback the standard
+// disk-cached discovery client uses internally). lfk's enriched cache layers
+// on top of this same root.
+func DiscoveryCacheBaseDir() string {
+	if base := os.Getenv("KUBECACHEDIR"); base != "" {
+		return base
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	return filepath.Join(home, ".kube", "cache")
 }
 
 // discoveryForContext returns a per-context disk-cached discovery client,

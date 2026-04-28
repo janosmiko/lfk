@@ -8,12 +8,24 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
-func TestDiscoveryCacheRoundTrip(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+// withKubeCacheDir points KUBECACHEDIR at a fresh temp dir so each test
+// gets an isolated discovery cache without touching the user's home
+// directory or the kubectl-shared layout. Returns the dir for assertions.
+func withKubeCacheDir(t *testing.T) string {
+	t.Helper()
+	dir := t.TempDir()
+	t.Setenv("KUBECACHEDIR", dir)
+	return dir
+}
 
+func TestDiscoveryCacheRoundTripPerHost(t *testing.T) {
+	withKubeCacheDir(t)
+
+	host := "https://dev.example.com:6443"
 	entries := []model.ResourceTypeEntry{
 		{
 			DisplayName: "Pods",
@@ -32,141 +44,182 @@ func TestDiscoveryCacheRoundTrip(t *testing.T) {
 			APIVersion:  "v1alpha1",
 			Resource:    "applications",
 			Namespaced:  true,
-			Verbs:       []string{"get", "list", "watch"},
 			PrinterColumns: []model.PrinterColumn{
 				{Name: "Sync Status", Type: "string", JSONPath: ".status.sync.status"},
 			},
 		},
-		{
-			DisplayName:    "ReplicationControllers",
-			Kind:           "ReplicationController",
-			APIGroup:       "",
-			APIVersion:     "v1",
-			Resource:       "replicationcontrollers",
-			Namespaced:     true,
-			Deprecated:     true,
-			DeprecationMsg: "use Deployments",
-		},
 	}
 
-	require.NoError(t, updateDiscoveryCacheContext("dev-cluster", entries))
-	require.NoError(t, updateDiscoveryCacheContext("prod-cluster", entries[:1]))
+	require.NoError(t, saveDiscoveryCacheForHost(host, entries))
 
-	loaded := loadDiscoveryCache()
+	loaded := loadDiscoveryCacheForHost(host)
 	require.NotNil(t, loaded)
-	require.Contains(t, loaded.Contexts, "dev-cluster")
-	require.Contains(t, loaded.Contexts, "prod-cluster")
-
-	dev := loaded.Contexts["dev-cluster"]
-	require.Len(t, dev.Entries, 3)
-	assert.Equal(t, "Pod", dev.Entries[0].Kind)
-	assert.Equal(t, "v1", dev.Entries[0].APIVersion)
-	assert.True(t, dev.Entries[0].Namespaced)
-	assert.Equal(t, []string{"get", "list", "watch"}, dev.Entries[0].Verbs)
-	assert.Equal(t, "□", dev.Entries[0].Icon.Unicode)
-
-	assert.Equal(t, "argoproj.io", dev.Entries[1].APIGroup)
-	require.Len(t, dev.Entries[1].PrinterColumns, 1)
-	assert.Equal(t, "Sync Status", dev.Entries[1].PrinterColumns[0].Name)
-	assert.Equal(t, ".status.sync.status", dev.Entries[1].PrinterColumns[0].JSONPath)
-
-	assert.True(t, dev.Entries[2].Deprecated)
-	assert.Equal(t, "use Deployments", dev.Entries[2].DeprecationMsg)
-
-	assert.Len(t, loaded.Contexts["prod-cluster"].Entries, 1)
+	assert.Equal(t, host, loaded.Host)
+	require.Len(t, loaded.Entries, 2)
+	assert.Equal(t, "Pod", loaded.Entries[0].Kind)
+	assert.Equal(t, "□", loaded.Entries[0].Icon.Unicode)
+	assert.Equal(t, "argoproj.io", loaded.Entries[1].APIGroup)
+	require.Len(t, loaded.Entries[1].PrinterColumns, 1)
+	assert.Equal(t, ".status.sync.status", loaded.Entries[1].PrinterColumns[0].JSONPath)
 }
 
-func TestDiscoveryCacheUpdatePreservesOtherContexts(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+func TestDiscoveryCacheLivesUnderKubeCacheDir(t *testing.T) {
+	dir := withKubeCacheDir(t)
 
-	require.NoError(t, updateDiscoveryCacheContext("a", []model.ResourceTypeEntry{
+	host := "https://prod.example.com:6443"
+	require.NoError(t, saveDiscoveryCacheForHost(host, []model.ResourceTypeEntry{
 		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods"},
 	}))
-	require.NoError(t, updateDiscoveryCacheContext("b", []model.ResourceTypeEntry{
+
+	// Layout must match kubectl/k9s so `kubectl api-resources --invalidate-cache`
+	// wipes lfk's snapshot too. Path: <KUBECACHEDIR>/discovery/<hostHash>/lfk-enriched.yaml
+	expected := filepath.Join(dir, "discovery", k8s.CacheHostDir(host), "lfk-enriched.yaml")
+	_, err := os.Stat(expected)
+	assert.NoError(t, err, "cache file must live under <KUBECACHEDIR>/discovery/<host>/, got path: %s", expected)
+}
+
+func TestDiscoveryCacheMultipleHostsAreIndependent(t *testing.T) {
+	withKubeCacheDir(t)
+
+	require.NoError(t, saveDiscoveryCacheForHost("https://a.example:6443", []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods"},
+	}))
+	require.NoError(t, saveDiscoveryCacheForHost("https://b.example:6443", []model.ResourceTypeEntry{
 		{Kind: "Service", APIGroup: "", APIVersion: "v1", Resource: "services"},
-	}))
-
-	// Updating "a" must not erase "b".
-	require.NoError(t, updateDiscoveryCacheContext("a", []model.ResourceTypeEntry{
-		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods"},
 		{Kind: "ConfigMap", APIGroup: "", APIVersion: "v1", Resource: "configmaps"},
 	}))
 
-	loaded := loadDiscoveryCache()
-	require.NotNil(t, loaded)
-	assert.Len(t, loaded.Contexts["a"].Entries, 2, "context a was updated")
-	assert.Len(t, loaded.Contexts["b"].Entries, 1, "context b must survive untouched")
-	assert.Equal(t, "Service", loaded.Contexts["b"].Entries[0].Kind)
+	a := loadDiscoveryCacheForHost("https://a.example:6443")
+	require.NotNil(t, a)
+	require.Len(t, a.Entries, 1)
+	assert.Equal(t, "Pod", a.Entries[0].Kind)
+
+	b := loadDiscoveryCacheForHost("https://b.example:6443")
+	require.NotNil(t, b)
+	require.Len(t, b.Entries, 2)
+	assert.Equal(t, "Service", b.Entries[0].Kind)
 }
 
 func TestLoadDiscoveryCacheMissingFile(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-
-	loaded := loadDiscoveryCache()
-	assert.Nil(t, loaded, "missing file should return nil, not error")
+	withKubeCacheDir(t)
+	assert.Nil(t, loadDiscoveryCacheForHost("https://nope.example:6443"),
+		"missing file should return nil, not error")
 }
 
 func TestLoadDiscoveryCacheCorruptFile(t *testing.T) {
-	stateDir := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", stateDir)
+	withKubeCacheDir(t)
 
-	path := discoveryCacheFilePath()
+	host := "https://corrupt.example:6443"
+	path := discoveryCacheFilePathForHost(host)
+	require.NotEmpty(t, path)
 	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
 	require.NoError(t, os.WriteFile(path, []byte("not: [valid: yaml"), 0o644))
 
-	loaded := loadDiscoveryCache()
-	assert.Nil(t, loaded, "corrupt file should return nil so the app starts fresh")
+	assert.Nil(t, loadDiscoveryCacheForHost(host),
+		"corrupt file should return nil so the app starts fresh")
 }
 
-func TestNavigateClusterFiresDiscoveryWhenCachePrefillIsStale(t *testing.T) {
-	// Stale-while-revalidate: cache prefills discoveredResources, but the
-	// first navigation/hover within the session must still kick off a live
-	// discovery so the user sees fresh data after the brief stale window.
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-	require.NoError(t, updateDiscoveryCacheContext("dev-cluster", []model.ResourceTypeEntry{
+func TestLoadDiscoveryCacheRejectsFutureSchemaVersion(t *testing.T) {
+	withKubeCacheDir(t)
+
+	host := "https://future.example:6443"
+	path := discoveryCacheFilePathForHost(host)
+	require.NotEmpty(t, path)
+	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
+	// schema_version 99 is from the future — must be ignored gracefully.
+	require.NoError(t, os.WriteFile(path, []byte("schema_version: 99\nhost: x\nentries: []\n"), 0o644))
+
+	assert.Nil(t, loadDiscoveryCacheForHost(host),
+		"unknown schema version must be ignored, not crash")
+}
+
+func TestLoadAllDiscoveryCachesMapsContextsToHostFiles(t *testing.T) {
+	withKubeCacheDir(t)
+
+	hostA := "https://a.example:6443"
+	hostB := "https://b.example:6443"
+
+	// Two contexts share host A — both must populate from the single file.
+	// One context points at host B — gets its own file.
+	require.NoError(t, saveDiscoveryCacheForHost(hostA, []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods"},
+	}))
+	require.NoError(t, saveDiscoveryCacheForHost(hostB, []model.ResourceTypeEntry{
+		{Kind: "Service", APIGroup: "", APIVersion: "v1", Resource: "services"},
+	}))
+
+	client := k8s.NewTestClient(nil, nil)
+	client.AddTestContext("alpha", hostA)
+	client.AddTestContext("beta", hostA) // same host as alpha
+	client.AddTestContext("gamma", hostB)
+
+	loaded := loadAllDiscoveryCaches(client)
+	require.Len(t, loaded["alpha"], 1)
+	require.Len(t, loaded["beta"], 1)
+	require.Len(t, loaded["gamma"], 1)
+	assert.Equal(t, "Pod", loaded["alpha"][0].Kind)
+	assert.Equal(t, "Pod", loaded["beta"][0].Kind, "two contexts on same host share the file")
+	assert.Equal(t, "Service", loaded["gamma"][0].Kind)
+}
+
+func TestLoadAllDiscoveryCachesSkipsContextsWithUnresolvableHost(t *testing.T) {
+	withKubeCacheDir(t)
+
+	// orphan-ctx exists but has no host registered — must not crash and
+	// must not appear in the result map.
+	client := k8s.NewTestClient(nil, nil)
+	client.AddTestContext("alpha", "https://a.example:6443")
+	require.NoError(t, saveDiscoveryCacheForHost("https://a.example:6443", []model.ResourceTypeEntry{
 		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods"},
 	}))
 
+	loaded := loadAllDiscoveryCaches(client)
+	require.NotNil(t, loaded["alpha"])
+	assert.NotContains(t, loaded, "test-ctx",
+		"the default test-ctx had no cached host file — must not show up here")
+}
+
+func TestNewModelPrefillsDiscoveredResourcesFromCache(t *testing.T) {
+	withKubeCacheDir(t)
+
+	host := "https://dev.example:6443"
+	require.NoError(t, saveDiscoveryCacheForHost(host, []model.ResourceTypeEntry{
+		{Kind: "Application", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "applications", Namespaced: true},
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}))
+
 	client := newTestClientForOptions(t)
+	client.AddTestContext("dev-cluster", host)
+
 	m := NewModel(client, StartupOptions{})
 
-	require.NotEmpty(t, m.discoveredResources["dev-cluster"], "cache prefill missing")
-	require.False(t, m.discoveryRefreshedContexts["dev-cluster"], "cache prefill must not pose as fresh")
-	require.False(t, m.discoveringContexts["dev-cluster"], "no discovery should be in flight yet")
+	entries, ok := m.discoveredResources["dev-cluster"]
+	require.True(t, ok, "cached context must populate discoveredResources at NewModel time")
+	require.GreaterOrEqual(t, len(entries), 2)
 
-	assert.True(t, m.shouldFireDiscoveryFor("dev-cluster"),
-		"a context that exists only in the disk cache must still trigger live discovery")
-}
+	kinds := make(map[string]bool)
+	for _, e := range entries {
+		kinds[e.Kind] = true
+	}
+	assert.True(t, kinds["Application"], "ArgoCD Application from cache must be present")
+	assert.True(t, kinds["Pod"], "Pod from cache must be present")
 
-func TestNavigateClusterSkipsDiscoveryAfterRefresh(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-
-	m := NewModel(newTestClientForOptions(t), StartupOptions{})
-	m.discoveryRefreshedContexts["dev-cluster"] = true
-
-	assert.False(t, m.shouldFireDiscoveryFor("dev-cluster"),
-		"a context refreshed earlier this session must not re-fire on subsequent hovers")
-}
-
-func TestNavigateClusterSkipsDiscoveryWhileInFlight(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-
-	m := NewModel(newTestClientForOptions(t), StartupOptions{})
-	m.discoveringContexts["dev-cluster"] = true
-
-	assert.False(t, m.shouldFireDiscoveryFor("dev-cluster"),
-		"deduplication must keep an in-flight discovery from being kicked off twice")
+	assert.False(t, m.discoveryRefreshedContexts["dev-cluster"],
+		"cached prefill must not be marked as refreshed — live discovery still has to run")
 }
 
 func TestUpdateAPIResourceDiscoveryWritesCache(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	withKubeCacheDir(t)
+
+	host := "https://dev.example:6443"
+	client := k8s.NewTestClient(nil, nil)
+	client.AddTestContext("dev-cluster", host)
 
 	m := Model{
+		client:                     client,
 		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
 		discoveringContexts:        map[string]bool{"dev-cluster": true},
 		discoveryRefreshedContexts: make(map[string]bool),
-		// nav.Context = "" so this test exercises the write path even when
-		// the user isn't currently looking at the cluster.
 	}
 
 	entries := []model.ResourceTypeEntry{
@@ -179,32 +232,33 @@ func TestUpdateAPIResourceDiscoveryWritesCache(t *testing.T) {
 	assert.True(t, updated.discoveryRefreshedContexts["dev-cluster"],
 		"successful discovery must mark context as freshly refreshed this session")
 
-	cache := loadDiscoveryCache()
-	require.NotNil(t, cache, "discovery success must write a cache file")
-	require.Contains(t, cache.Contexts, "dev-cluster")
-
-	cached := cache.Contexts["dev-cluster"]
-	require.Len(t, cached.Entries, 2)
-	// Pseudo-resources (helm-releases, port-forwards) must NOT bleed into
-	// the persisted snapshot — those are prepended at runtime.
-	for _, e := range cached.Entries {
+	cache := loadDiscoveryCacheForHost(host)
+	require.NotNil(t, cache, "discovery success must write a cache file at the host's path")
+	assert.Equal(t, host, cache.Host)
+	require.Len(t, cache.Entries, 2)
+	for _, e := range cache.Entries {
 		assert.NotEqual(t, "_helm", e.APIGroup, "pseudo-resource leaked into cache")
 		assert.NotEqual(t, "_portforward", e.APIGroup, "pseudo-resource leaked into cache")
 	}
 }
 
 func TestUpdateAPIResourceDiscoveryFailureDoesNotWriteCache(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	withKubeCacheDir(t)
 
-	// Pre-populate a cache so we can verify the failed call leaves it alone.
-	require.NoError(t, updateDiscoveryCacheContext("dev-cluster", []model.ResourceTypeEntry{
+	host := "https://dev.example:6443"
+	client := k8s.NewTestClient(nil, nil)
+	client.AddTestContext("dev-cluster", host)
+
+	// Pre-populate so we can verify the failed call leaves it alone.
+	require.NoError(t, saveDiscoveryCacheForHost(host, []model.ResourceTypeEntry{
 		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods"},
 	}))
-	before := loadDiscoveryCache()
+	before := loadDiscoveryCacheForHost(host)
 	require.NotNil(t, before)
-	beforeUpdated := before.Contexts["dev-cluster"].UpdatedAt
+	beforeUpdated := before.UpdatedAt
 
 	m := Model{
+		client:                     client,
 		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
 		discoveringContexts:        map[string]bool{"dev-cluster": true},
 		discoveryRefreshedContexts: make(map[string]bool),
@@ -219,9 +273,9 @@ func TestUpdateAPIResourceDiscoveryFailureDoesNotWriteCache(t *testing.T) {
 	assert.False(t, updated.discoveryRefreshedContexts["dev-cluster"],
 		"failed discovery must NOT mark the context as refreshed")
 
-	after := loadDiscoveryCache()
+	after := loadDiscoveryCacheForHost(host)
 	require.NotNil(t, after)
-	assert.Equal(t, beforeUpdated, after.Contexts["dev-cluster"].UpdatedAt,
+	assert.Equal(t, beforeUpdated, after.UpdatedAt,
 		"failed discovery must not overwrite the previous good snapshot")
 }
 
@@ -229,51 +283,3 @@ func TestUpdateAPIResourceDiscoveryFailureDoesNotWriteCache(t *testing.T) {
 type assertSimpleError string
 
 func (e assertSimpleError) Error() string { return string(e) }
-
-func TestNewModelPrefillsDiscoveredResourcesFromCache(t *testing.T) {
-	t.Setenv("XDG_STATE_HOME", t.TempDir())
-
-	require.NoError(t, updateDiscoveryCacheContext("dev-cluster", []model.ResourceTypeEntry{
-		{Kind: "Application", APIGroup: "argoproj.io", APIVersion: "v1alpha1", Resource: "applications", Namespaced: true},
-		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
-	}))
-
-	client := newTestClientForOptions(t)
-	m := NewModel(client, StartupOptions{})
-
-	// Sidebar must paint immediately from the cache rather than wait for a
-	// fresh discovery round-trip — that's the entire point of stale-while-
-	// revalidate.
-	entries, ok := m.discoveredResources["dev-cluster"]
-	require.True(t, ok, "cached context must populate discoveredResources at NewModel time")
-
-	// Pseudo-resources (helm releases, port forwards) are prepended at
-	// runtime; the cache stores the cluster-reported set verbatim, so the
-	// loaded length is pseudo + cached.
-	require.GreaterOrEqual(t, len(entries), 2)
-
-	kinds := make(map[string]bool)
-	for _, e := range entries {
-		kinds[e.Kind] = true
-	}
-	assert.True(t, kinds["Application"], "ArgoCD Application from cache must be present")
-	assert.True(t, kinds["Pod"], "Pod from cache must be present")
-
-	// discoveryRefreshedContexts stays empty: the data is from disk, not
-	// from a live API call this session.
-	assert.False(t, m.discoveryRefreshedContexts["dev-cluster"],
-		"cached prefill must not be marked as refreshed — live discovery still has to run")
-}
-
-func TestLoadDiscoveryCacheRejectsFutureSchemaVersion(t *testing.T) {
-	stateDir := t.TempDir()
-	t.Setenv("XDG_STATE_HOME", stateDir)
-
-	path := discoveryCacheFilePath()
-	require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o755))
-	// schema_version 99 is from the future — must be ignored gracefully.
-	require.NoError(t, os.WriteFile(path, []byte("schema_version: 99\ncontexts: {}\n"), 0o644))
-
-	loaded := loadDiscoveryCache()
-	assert.Nil(t, loaded, "unknown schema version must be ignored, not crash")
-}

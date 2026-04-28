@@ -1060,18 +1060,18 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		portForwardMgr: k8s.NewPortForwardManager(),
 	}
 
-	// Stale-while-revalidate: seed discoveredResources from the on-disk
-	// snapshot so the sidebar paints instantly on first frame instead of
-	// waiting for a live discovery roundtrip. The lazy-trigger sites still
-	// fire fresh discovery (gated by m.discoveryRefreshedContexts), so the
-	// cached values are replaced as soon as the live result lands.
-	if cache := loadDiscoveryCache(); cache != nil {
+	// Stale-while-revalidate: seed discoveredResources from the per-host
+	// snapshots under ~/.kube/cache/discovery/<host>/lfk-enriched.yaml so
+	// the sidebar paints instantly on first frame instead of waiting for a
+	// live discovery roundtrip. The lazy-trigger sites still fire fresh
+	// discovery (gated by m.discoveryRefreshedContexts), so the cached
+	// values are replaced as soon as the live result lands.
+	if cached := loadAllDiscoveryCaches(client); cached != nil {
 		pseudo := model.PseudoResources()
-		for ctx, snap := range cache.Contexts {
-			cached := modelEntriesFromDiscoveryCache(snap.Entries)
-			merged := make([]model.ResourceTypeEntry, 0, len(pseudo)+len(cached))
+		for ctx, entries := range cached {
+			merged := make([]model.ResourceTypeEntry, 0, len(pseudo)+len(entries))
 			merged = append(merged, pseudo...)
-			merged = append(merged, cached...)
+			merged = append(merged, entries...)
 			m.discoveredResources[ctx] = merged
 		}
 	}

@@ -75,6 +75,13 @@ type Client struct {
 	testDynClient  any // dynamic.Interface
 	testMetaClient any // metadata.Interface
 
+	// testHostByDisplay, when set, lets tests bypass kubeconfig host
+	// resolution in HostForContext. Most fake test clients are constructed
+	// without Cluster definitions (no server URL), so a real
+	// restConfigForContext call would fail; this map provides synthetic
+	// answers keyed by display name.
+	testHostByDisplay map[string]string
+
 	// secretLazyLoading, when true, routes Secret listing through the
 	// metadata-only API so decoded values are lazy-fetched on hover instead
 	// of being pulled up-front. Configured via the secret_lazy_loading
@@ -353,6 +360,28 @@ func (c *Client) OriginalContextName(displayName string) string {
 		return info.original
 	}
 	return displayName
+}
+
+// HostForContext returns the API server URL recorded in the kubeconfig for
+// the given lfk display name, or "" when the rest config can't be built (no
+// matching cluster, malformed kubeconfig, etc.). Used to key per-host disk
+// caches under ~/.kube/cache/discovery so they share the same lifecycle as
+// kubectl/k9s — `kubectl api-resources --invalidate-cache` wipes both.
+//
+// Tests can pre-seed c.testHostByDisplay to bypass kubeconfig resolution
+// entirely (most fake clients have no Cluster definition with a server URL).
+func (c *Client) HostForContext(displayName string) string {
+	if c == nil {
+		return ""
+	}
+	if h, ok := c.testHostByDisplay[displayName]; ok {
+		return h
+	}
+	cfg, err := c.restConfigForContext(displayName)
+	if err != nil || cfg == nil {
+		return ""
+	}
+	return cfg.Host
 }
 
 // buildKubeconfigPaths assembles the list of kubeconfig file paths to load.
