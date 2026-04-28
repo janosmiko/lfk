@@ -207,6 +207,27 @@ func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 	return m, nil
 }
 
+// handleYAMLNormalCopy copies the original YAML line under the cursor to the
+// clipboard. Mirrors the describe view's normal-mode `y` so users get the same
+// vim-style yank behaviour across all read-only viewers.
+func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
+	m.yamlLineInput = ""
+	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	if m.yamlCursor < 0 || m.yamlCursor >= len(mapping) {
+		return m, nil
+	}
+	origIdx := mapping[m.yamlCursor]
+	if origIdx < 0 {
+		return m, nil
+	}
+	origLines := strings.Split(m.yamlContent, "\n")
+	if origIdx >= len(origLines) {
+		return m, nil
+	}
+	m.setStatusMessage("Copied 1 line", false)
+	return m, tea.Batch(copyToSystemClipboard(origLines[origIdx]), scheduleStatusClear())
+}
+
 // handleYAMLVisualCopy copies the visually selected content to the clipboard.
 func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
 	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
@@ -406,6 +427,8 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyShiftN(viewportLines)
 	case "ctrl+e":
 		return m.handleYAMLKeyCtrlE()
+	case "y":
+		return m.handleYAMLNormalCopy()
 	case "ctrl+w", ">":
 		m.yamlWrap = !m.yamlWrap
 		return m, nil

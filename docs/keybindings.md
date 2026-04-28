@@ -189,7 +189,7 @@ my namespace" mode.
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
-| `y` | Copy selected text (in visual mode) |
+| `y` | Copy line under cursor (or selection in visual mode) |
 | `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
@@ -200,10 +200,20 @@ my namespace" mode.
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Scroll up/down |
+| `j` / `k` | Move cursor up/down |
+| `h` / `l` | Move cursor column left/right |
+| `0` / `$` / `^` | Move cursor to line start / end / first non-whitespace |
+| `w` / `b` / `e` / `W` / `B` / `E` | Word / WORD motions |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
+| `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
+| `/` | Search in content |
+| `n` / `N` | Next / previous search match |
+| `v` | Character visual selection |
+| `V` | Visual line selection |
+| `Ctrl+V` | Block (column) visual selection |
+| `y` | Copy line under cursor (or selection in visual mode) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
 | `q` / `Esc` | Back to explorer |
 
@@ -240,7 +250,7 @@ my namespace" mode.
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
-| `y` | Copy selected text (in visual mode) |
+| `y` | Copy line under cursor (or selection in visual mode) |
 | `\` | Switch pod / filter containers (space: select, enter: apply, / to filter) |
 | `q` / `Esc` | Close log viewer |
 
@@ -284,7 +294,7 @@ All other keys are forwarded to the PTY process. The PTY session continues runni
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection |
 | `h` / `l` | Move selection column left/right (in visual mode) |
-| `y` | Copy selected text (in visual mode) |
+| `y` | Copy line under cursor (or selection in visual mode) |
 | `z` | Toggle fold unchanged section at cursor |
 | `Z` | Toggle all folds |
 | `#` | Toggle line numbers |

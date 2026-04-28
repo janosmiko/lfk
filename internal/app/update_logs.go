@@ -124,6 +124,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "ctrl+v":
 		ret := m.handleLogKeyCtrlV()
 		return ret, nil, true
+	case "y":
+		ret, cmd := m.handleLogNormalCopy()
+		return ret, cmd, true
 	case "f":
 		ret := m.handleLogKeyF()
 		return ret, nil, true
@@ -998,6 +1001,19 @@ func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 	m.logVisualMode = false
 	m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+}
+
+// handleLogNormalCopy copies the log line at the cursor (in display form, so
+// timestamps and pod prefixes follow the user's toggles) to the clipboard.
+// Mirrors the describe view's normal-mode `y`.
+func (m Model) handleLogNormalCopy() (tea.Model, tea.Cmd) {
+	m.logLineInput = ""
+	if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+		return m, nil
+	}
+	line := m.logDisplayLine(m.logCursor)
+	m.setStatusMessage("Copied 1 line", false)
+	return m, tea.Batch(copyToSystemClipboard(line), scheduleStatusClear())
 }
 
 // buildLogYankText returns the clipboard text and selection size for the

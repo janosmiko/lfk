@@ -703,6 +703,8 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 	case "v", "V", "ctrl+v":
 		modeMap := map[string]rune{"v": 'v', "V": 'V', "ctrl+v": 'B'}
 		return m.diffEnterVisual(modeMap[msg.String()])
+	case "y":
+		return m.handleDiffNormalCopy(foldRegions)
 	case "u":
 		m.diffLineInput = ""
 		m.diffUnified = !m.diffUnified
@@ -963,6 +965,18 @@ func (m Model) diffVisualToggle(mode rune) (tea.Model, tea.Cmd) {
 		m.diffVisualType = mode
 	}
 	return m, nil
+}
+
+// handleDiffNormalCopy copies the diff line at the cursor (on the active
+// side) to the clipboard. Mirrors the describe view's normal-mode `y`.
+func (m Model) handleDiffNormalCopy(foldRegions []ui.DiffFoldRegion) (tea.Model, tea.Cmd) {
+	m.diffLineInput = ""
+	lineText := m.diffCurrentLineText(foldRegions)
+	if lineText == "" {
+		return m, nil
+	}
+	m.setStatusMessage("Copied 1 line", false)
+	return m, tea.Batch(copyToSystemClipboard(lineText), scheduleStatusClear())
 }
 
 // diffVisualCopy copies the visually selected diff text to the clipboard.

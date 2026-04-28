@@ -88,10 +88,10 @@ func TestRenderUnifiedDiffView(t *testing.T) {
 			leftName:   "x",
 			rightName:  "y",
 			scroll:     0,
-			width:      120,
+			width:      140,
 			height:     30,
 			lineNums:   false,
-			wantSubstr: []string{"j/k", "scroll", "q/esc", "back", "side-by-side"},
+			wantSubstr: []string{"j/k", "scroll", "q/esc", "back", "side-by-side", "y"},
 		},
 	}
 	for _, tt := range tests {
