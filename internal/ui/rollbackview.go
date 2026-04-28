@@ -42,7 +42,7 @@ func RenderRollbackOverlay(revisions []k8s.DeploymentRevision, cursor int, scree
 				img += fmt.Sprintf(" +%d", len(rev.Images)-1)
 			}
 		}
-		age := formatAge(rev.CreatedAt)
+		age := FormatAge(rev.CreatedAt)
 		line := fmt.Sprintf("  %-8d  %-30s  %-8d  %-30s  %s",
 			rev.Revision, Truncate(rev.Name, 30), rev.Replicas, Truncate(img, 30), age)
 
@@ -126,8 +126,8 @@ func RenderHelmRollbackOverlay(revisions []HelmRevision, cursor int, screenWidth
 		Render(body)
 }
 
-// formatAge returns a human-readable age string.
-func formatAge(t time.Time) string {
+// FormatAge returns a human-readable age string.
+func FormatAge(t time.Time) string {
 	if t.IsZero() {
 		return "-"
 	}
