@@ -955,3 +955,229 @@ func TestRenderLogPreviewPane_EnvoyTitleIndicator(t *testing.T) {
 		}
 	}
 }
+
+// --- Java: Spring Boot default and plain Logback ---
+
+func TestParseLogLine_Java_SpringBootDefault(t *testing.T) {
+	// Spring Boot's default ConsoleAppender pattern (since 2.x):
+	// %d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX}  %5p ${PID:- } --- [%t] %-40.40c{1.} : %m%n
+	in := `2024-01-15T10:30:00.123+00:00  INFO 12345 --- [main] c.e.MyService : Server started on port 8080`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewJava {
+		t.Fatalf("kind = %v, want Java", p.Kind)
+	}
+	// Leading RFC3339 timestamp is extracted to p.Time by the shared
+	// splitLeadingTimestamp helper (same as zap), so the parser sees
+	// only the level-onwards tail and Fields does not duplicate time.
+	if p.Time != "2024-01-15T10:30:00.123+00:00" {
+		t.Errorf("p.Time = %q, want the RFC3339 prefix", p.Time)
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	want := map[string]string{
+		"level":   "Info",
+		"logger":  "c.e.MyService",
+		"message": "Server started on port 8080",
+		"thread":  "main",
+		"pid":     "12345",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("field %q = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
+func TestParseLogLine_Java_PlainLogbackDefault(t *testing.T) {
+	// Logback BasicConfigurator default pattern:
+	// HH:mm:ss.SSS [thread] LEVEL logger - msg
+	in := `10:30:00.123 [main] INFO com.example.MyService - Connecting to database`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewJava {
+		t.Fatalf("kind = %v, want Java", p.Kind)
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	if got["level"] != "Info" || got["logger"] != "com.example.MyService" ||
+		got["message"] != "Connecting to database" || got["thread"] != "main" ||
+		got["time"] != "10:30:00.123" {
+		t.Errorf("logback fields wrong: %v", got)
+	}
+}
+
+func TestParseLogLine_Java_AllLevels(t *testing.T) {
+	cases := []struct {
+		token, name string
+	}{
+		{"TRACE", "Trace"},
+		{"DEBUG", "Debug"},
+		{"INFO", "Info"},
+		{"WARN", "Warning"},
+		{"WARNING", "Warning"},
+		{"ERROR", "Error"},
+		{"FATAL", "Fatal"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.token, func(t *testing.T) {
+			in := `10:30:00.123 [main] ` + tc.token + ` com.x.Y - hello`
+			p := ParseLogLine(in)
+			if p.Kind != LogPreviewJava {
+				t.Fatalf("%s: kind = %v, want Java", tc.token, p.Kind)
+			}
+			var got string
+			for _, f := range p.Fields {
+				if f.Key == "level" {
+					got = f.Value
+				}
+			}
+			if got != tc.name {
+				t.Errorf("level for %q = %q, want %q", tc.token, got, tc.name)
+			}
+		})
+	}
+}
+
+func TestParseLogLine_Java_PodPrefixStripped(t *testing.T) {
+	in := `[pod/api-server-x/api] 2024-01-15T10:30:00.123+00:00  WARN 12345 --- [http-nio-8080-exec-1] o.s.web.servlet : ` +
+		`Resolved [org.springframework.web.HttpRequestMethodNotSupportedException]`
+	p := ParseLogLine(in)
+	if p.Prefix != "[pod/api-server-x/api]" {
+		t.Errorf("prefix = %q", p.Prefix)
+	}
+	if p.Kind != LogPreviewJava {
+		t.Fatalf("kind = %v, want Java after prefix strip", p.Kind)
+	}
+}
+
+func TestParseLogLine_Java_RejectsNonJava(t *testing.T) {
+	cases := []string{
+		`plain text without any structure`,
+		`10:30:00 [main] INFO Foo - bar`,         // missing milliseconds (Logback always emits .SSS)
+		`10:30:00.123 main INFO Foo - bar`,       // thread not bracketed
+		`10:30:00.123 [main] NOTLEVEL Foo - bar`, // unknown level token
+		`10:30:00.123 [main] INFO Foo bar`,       // missing " - " separator
+		`{"level":"info","msg":"x"}`,             // JSON wins
+		`I0427 16:06:59 1 file.go:1] klog wins`,  // klog wins
+	}
+	for _, in := range cases {
+		t.Run(in, func(t *testing.T) {
+			p := ParseLogLine(in)
+			if p.Kind == LogPreviewJava {
+				t.Errorf("misclassified as Java: %q -> %v", in, p.Fields)
+			}
+		})
+	}
+}
+
+func TestRenderLogPreviewPane_JavaTitleIndicator(t *testing.T) {
+	in := `2024-01-15T10:30:00.123+00:00  INFO 12345 --- [main] c.e.MyService : Server started on port 8080`
+	out := RenderLogPreviewPane(in, 100, 20, 0)
+	if !strings.Contains(out, "[JAVA]") {
+		t.Fatalf("expected [JAVA] kind indicator in title; got:\n%s", out)
+	}
+	for _, want := range []string{"level", "Info", "logger", "c.e.MyService", "message", "Server started"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("java preview missing %q; got:\n%s", want, out)
+		}
+	}
+}
+
+// --- PostgreSQL: default log_line_prefix='%m [%p] ' ---
+
+func TestParseLogLine_Postgres_DefaultLine(t *testing.T) {
+	in := `2024-01-15 10:30:00.123 UTC [1234] LOG:  database system is ready to accept connections`
+	p := ParseLogLine(in)
+	if p.Kind != LogPreviewPostgres {
+		t.Fatalf("kind = %v, want Postgres", p.Kind)
+	}
+	got := map[string]string{}
+	for _, f := range p.Fields {
+		got[f.Key] = f.Value
+	}
+	want := map[string]string{
+		"severity": "LOG",
+		"message":  "database system is ready to accept connections",
+		"pid":      "1234",
+		"time":     "2024-01-15 10:30:00.123 UTC",
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Errorf("field %q = %q, want %q", k, got[k], v)
+		}
+	}
+}
+
+func TestParseLogLine_Postgres_AllSeverities(t *testing.T) {
+	cases := []string{
+		"DEBUG1", "DEBUG2", "DEBUG3", "DEBUG4", "DEBUG5",
+		"INFO", "NOTICE", "WARNING", "ERROR", "LOG", "FATAL", "PANIC",
+		"STATEMENT", "DETAIL", "HINT", "CONTEXT", "QUERY", "LOCATION",
+	}
+	for _, sev := range cases {
+		t.Run(sev, func(t *testing.T) {
+			in := `2024-01-15 10:30:00.123 UTC [1234] ` + sev + `:  some message`
+			p := ParseLogLine(in)
+			if p.Kind != LogPreviewPostgres {
+				t.Fatalf("%s: kind = %v, want Postgres", sev, p.Kind)
+			}
+			var got string
+			for _, f := range p.Fields {
+				if f.Key == "severity" {
+					got = f.Value
+				}
+			}
+			if got != sev {
+				t.Errorf("severity for %q = %q, want %q", sev, got, sev)
+			}
+		})
+	}
+}
+
+func TestParseLogLine_Postgres_PodPrefixStripped(t *testing.T) {
+	in := `[pod/postgres-0/postgres] 2024-01-15 10:30:00.123 UTC [1234] ERROR:  relation "foo" does not exist`
+	p := ParseLogLine(in)
+	if p.Prefix != "[pod/postgres-0/postgres]" {
+		t.Errorf("prefix = %q", p.Prefix)
+	}
+	if p.Kind != LogPreviewPostgres {
+		t.Fatalf("kind = %v, want Postgres after prefix strip", p.Kind)
+	}
+}
+
+func TestParseLogLine_Postgres_RejectsNonPostgres(t *testing.T) {
+	cases := []string{
+		`plain text`,
+		`2024-01-15 10:30:00 [1234] LOG:  missing milliseconds`,            // need .SSS
+		`2024-01-15 10:30:00.123 UTC LOG:  no pid bracket`,                 // missing [pid]
+		`2024-01-15 10:30:00.123 UTC [abc] LOG:  pid not numeric`,          // pid must be digits
+		`2024-01-15 10:30:00.123 UTC [1234] BOGUS:  unknown severity`,      // not a postgres severity
+		`2024-01-15 10:30:00.123 UTC [1234] LOG without colon and message`, // no colon after severity
+		// klog wins for klog-shaped lines.
+		`I0427 16:06:59 1 file.go:1] klog wins`,
+	}
+	for _, in := range cases {
+		t.Run(in, func(t *testing.T) {
+			p := ParseLogLine(in)
+			if p.Kind == LogPreviewPostgres {
+				t.Errorf("misclassified as Postgres: %q -> %v", in, p.Fields)
+			}
+		})
+	}
+}
+
+func TestRenderLogPreviewPane_PostgresTitleIndicator(t *testing.T) {
+	in := `2024-01-15 10:30:00.123 UTC [1234] ERROR:  relation "foo" does not exist`
+	out := RenderLogPreviewPane(in, 100, 20, 0)
+	if !strings.Contains(out, "[POSTGRES]") {
+		t.Fatalf("expected [POSTGRES] kind indicator in title; got:\n%s", out)
+	}
+	for _, want := range []string{"severity", "ERROR", "message", "relation"} {
+		if !strings.Contains(out, want) {
+			t.Errorf("postgres preview missing %q; got:\n%s", want, out)
+		}
+	}
+}

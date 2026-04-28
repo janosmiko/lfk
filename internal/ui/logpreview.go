@@ -36,6 +36,14 @@ const (
 	// format (15 positional fields after a bracketed RFC3339 timestamp):
 	// `[time] "METHOD path proto" status flags rx tx dur upstream_time "xff" "ua" "rid" "auth" "upstream_host"`.
 	LogPreviewEnvoy
+	// LogPreviewJava covers Spring Boot's default console pattern and
+	// the plain Logback BasicConfigurator default. Together these cover
+	// the vast majority of JVM workloads in a Kubernetes cluster.
+	LogPreviewJava
+	// LogPreviewPostgres covers the PostgreSQL server log produced by
+	// the default `log_line_prefix='%m [%p] '` setting (the value used
+	// by the upstream postgres Docker image).
+	LogPreviewPostgres
 )
 
 // LogPreviewField is a single key/value pair extracted from a structured log line.
@@ -112,6 +120,16 @@ func ParseLogLine(line string) ParsedLogPreview {
 	}
 	if fields, ok := parseEnvoyFields(rest); ok {
 		p.Kind = LogPreviewEnvoy
+		p.Fields = fields
+		return p
+	}
+	if fields, ok := parsePostgresFields(rest); ok {
+		p.Kind = LogPreviewPostgres
+		p.Fields = fields
+		return p
+	}
+	if fields, ok := parseJavaFields(rest); ok {
+		p.Kind = LogPreviewJava
 		p.Fields = fields
 		return p
 	}
@@ -284,6 +302,108 @@ func parseEnvoyFields(s string) ([]LogPreviewField, bool) {
 	}, true
 }
 
+// javaLevelName normalises the SLF4J / Logback / Spring Boot level
+// tokens (the only frameworks worth recognising here cover all of
+// these). DEBUG and INFO are common; FATAL is rare in pure Logback but
+// emitted by some shims.
+var javaLevelName = map[string]string{
+	"TRACE":   "Trace",
+	"DEBUG":   "Debug",
+	"INFO":    "Info",
+	"WARN":    "Warning",
+	"WARNING": "Warning",
+	"ERROR":   "Error",
+	"FATAL":   "Fatal",
+}
+
+// javaSpringBoot matches Spring Boot's default ConsoleAppender pattern
+// after the leading RFC3339 timestamp has been peeled off by the shared
+// splitLeadingTimestamp helper. The full pattern is:
+//
+//	%d{yyyy-MM-dd'T'HH:mm:ss.SSSXXX} %5p ${PID:- } --- [%t] %-40.40c{1.} : %m
+//
+// produced as e.g.
+//
+//	2024-01-15T10:30:00.123+00:00  INFO 12345 --- [main] c.e.MyService : Server started
+//
+// After timestamp strip the parser sees `<spaces>INFO 12345 --- [main]
+// c.e.MyService : Server started`. The "--- [thread]" sentinel is the
+// strongest distinguishing marker for Spring Boot output and rarely
+// collides with anything else.
+var javaSpringBoot = regexp.MustCompile(`^\s*(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\s+(\d+)\s+---\s+\[([^\]]+)\]\s+([\w.$]+)\s*:\s*(.*)$`)
+
+// javaLogback matches Logback's BasicConfigurator default pattern:
+//
+//	%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg
+//
+// produced as e.g.
+//
+//	10:30:00.123 [main] INFO com.example.MyService - Connecting to database
+//
+// The " - " separator before the message is part of the canonical
+// pattern; lines without it are rejected to avoid claiming free-form
+// text that happens to contain a level word.
+var javaLogback = regexp.MustCompile(`^(\d{2}:\d{2}:\d{2}[.,]\d{3,})\s+\[([^\]]+)\]\s+(TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL)\s+([\w.$]+)\s+-\s+(.*)$`)
+
+// parseJavaFields tries the Spring Boot pattern first, then the plain
+// Logback pattern. Field order leads with the level, logger, and
+// message because those are what a developer scans for; thread, pid,
+// and time follow. For Spring Boot the leading RFC3339 timestamp is
+// extracted earlier by splitLeadingTimestamp and lives in p.Time, so
+// time does not appear in the returned Fields. For Logback the pattern
+// emits only `HH:mm:ss.SSS` (no date), which the timestamp helper
+// rejects, so the time stays in the parsed body and the parser
+// includes it in Fields.
+func parseJavaFields(s string) ([]LogPreviewField, bool) {
+	if m := javaSpringBoot.FindStringSubmatch(s); m != nil {
+		return []LogPreviewField{
+			{Key: "level", Value: javaLevelName[m[1]]},
+			{Key: "logger", Value: m[4]},
+			{Key: "message", Value: m[5]},
+			{Key: "thread", Value: m[3]},
+			{Key: "pid", Value: m[2]},
+		}, true
+	}
+	if m := javaLogback.FindStringSubmatch(s); m != nil {
+		return []LogPreviewField{
+			{Key: "level", Value: javaLevelName[m[3]]},
+			{Key: "logger", Value: m[4]},
+			{Key: "message", Value: m[5]},
+			{Key: "thread", Value: m[2]},
+			{Key: "time", Value: m[1]},
+		}, true
+	}
+	return nil, false
+}
+
+// postgresLine matches the PostgreSQL server log produced by the
+// default `log_line_prefix='%m [%p] '`:
+//
+//	YYYY-MM-DD HH:MM:SS.SSS TZ [pid] SEVERITY:  message
+//
+// Severity covers the standard production levels plus the
+// continuation tags (STATEMENT, DETAIL, HINT, CONTEXT, QUERY,
+// LOCATION) that postgres emits as separate lines after a primary log
+// entry.
+var postgresLine = regexp.MustCompile(`^(\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d+ \w+) \[(\d+)\] (DEBUG[1-5]|INFO|NOTICE|WARNING|ERROR|LOG|FATAL|PANIC|STATEMENT|DETAIL|HINT|CONTEXT|QUERY|LOCATION):\s+(.*)$`)
+
+// parsePostgresFields extracts severity, message, pid, and time from a
+// PostgreSQL server log line. Severity is preserved verbatim (LOG,
+// ERROR, WARNING, ...) rather than normalised because the labels are
+// already the conventional names a postgres operator scans for.
+func parsePostgresFields(s string) ([]LogPreviewField, bool) {
+	m := postgresLine.FindStringSubmatch(s)
+	if m == nil {
+		return nil, false
+	}
+	return []LogPreviewField{
+		{Key: "severity", Value: m[3]},
+		{Key: "message", Value: m[4]},
+		{Key: "pid", Value: m[2]},
+		{Key: "time", Value: m[1]},
+	}, true
+}
+
 // parseKlogFields extracts level, time, message, caller, and thread from
 // a klog-formatted line. Field order is fixed (time, level, message,
 // caller, thread) so the preview pane shows the most useful information
@@ -442,6 +562,10 @@ func RenderLogPreviewPane(line string, width, height, scroll int) string {
 		titleText += HelpKeyStyle.Render("[NGINX]")
 	case LogPreviewEnvoy:
 		titleText += HelpKeyStyle.Render("[ENVOY]")
+	case LogPreviewJava:
+		titleText += HelpKeyStyle.Render("[JAVA]")
+	case LogPreviewPostgres:
+		titleText += HelpKeyStyle.Render("[POSTGRES]")
 	default:
 		titleText += HelpKeyStyle.Render("[TEXT]")
 	}
