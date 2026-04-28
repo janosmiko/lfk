@@ -205,6 +205,36 @@ func TestStatusBarDashboardHints(t *testing.T) {
 	assert.Contains(t, stripped, "namespace")
 }
 
+// --- statusBar: cluster-list hints omit "actions" ---
+
+func TestStatusBarClusterListOmitsActionsHint(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelClusters},
+		middleItems:   []model.Item{{Name: "ctx-a"}},
+		width:         200,
+		height:        40,
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+	}
+	stripped := stripANSI(m.statusBar())
+	assert.NotContains(t, stripped, "actions")
+	assert.Contains(t, stripped, "create")
+	assert.Contains(t, stripped, "filter")
+}
+
+func TestStatusBarResourceListShowsActionsHint(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelResources},
+		middleItems:   []model.Item{{Name: "pod"}},
+		width:         200,
+		height:        40,
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+	}
+	stripped := stripANSI(m.statusBar())
+	assert.Contains(t, stripped, "actions")
+}
+
 // --- statusBar: small width ---
 
 func TestStatusBarSmallWidth(t *testing.T) {

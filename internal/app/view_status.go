@@ -259,14 +259,20 @@ func (m Model) statusBar() string {
 			{Key: kb.Enter, Desc: "view"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
 			{Key: kb.AllNamespaces, Desc: "all-ns"},
-			{Key: kb.ActionMenu, Desc: "actions"},
-			{Key: kb.CreateTemplate, Desc: "create"},
-			{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
-			{Key: kb.Filter, Desc: "filter"},
-			{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
-			{Key: kb.Help, Desc: "help"},
-			{Key: "q", Desc: "quit"},
 		}
+		// The action menu has no entries at the kubeconfig list level, so
+		// hide the hint there to avoid advertising a no-op key.
+		if m.nav.Level != model.LevelClusters {
+			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
+		}
+		hintEntries = append(hintEntries,
+			ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"},
+			ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
+			ui.HintEntry{Key: kb.Filter, Desc: "filter"},
+			ui.HintEntry{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
+			ui.HintEntry{Key: kb.Help, Desc: "help"},
+			ui.HintEntry{Key: "q", Desc: "quit"},
+		)
 		// Add context-specific hints for Events resource type.
 		hintEntries = m.appendEventsHintEntries(hintEntries)
 	}
