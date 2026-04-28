@@ -240,8 +240,12 @@ func (m Model) statusBar() string {
 		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d]", cur, total)))
 	}
 
-	// Sort mode indicator.
-	parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
+	// Sort mode indicator. Hidden at picker levels where sortMiddleItems
+	// early-returns — claiming a sort there would mislead the user about
+	// the row ordering.
+	if m.sortApplies() {
+		parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
+	}
 
 	// Styled key hints -- show a reduced set for dashboard views.
 	kb := ui.ActiveKeybindings
@@ -266,14 +270,20 @@ func (m Model) statusBar() string {
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
 			{Key: kb.AllNamespaces, Desc: "all-ns"},
 		}
-		// The action menu has no entries at the kubeconfig list level, so
-		// hide the hint there to avoid advertising a no-op key.
-		if m.nav.Level != model.LevelClusters {
+		// At the cluster picker and resource-type browser, both the action
+		// menu and column sort are no-ops: selectedResourceKind() returns
+		// "" so openActionMenu() bails out, and sortMiddleItems() early-
+		// returns so </> doesn't reorder anything. Hide both hints there
+		// to avoid advertising dead keys.
+		hasResourceContext := m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
+		if hasResourceContext {
 			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
 		}
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"})
+		if hasResourceContext {
+			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"})
+		}
 		hintEntries = append(hintEntries,
-			ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"},
-			ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
 			ui.HintEntry{Key: kb.Filter, Desc: "filter"},
 			ui.HintEntry{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
 			ui.HintEntry{Key: kb.Help, Desc: "help"},

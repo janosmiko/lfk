@@ -109,10 +109,20 @@ func (m *Model) fetchFingerprint() string {
 	return b.String()
 }
 
+// sortApplies reports whether sort keybindings (>, <, =, -) have any
+// effect at the current navigation level. False at the cluster picker
+// and resource type browser, where items keep their original ordering.
+// Callers in the key-handler layer must short-circuit before mutating
+// sort state so the bar doesn't lie that sort changed when items stay
+// put.
+func (m *Model) sortApplies() bool {
+	return m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
+}
+
 // sortMiddleItems sorts middleItems based on the current sort column and direction.
 // At LevelResourceTypes and LevelClusters, items keep their original ordering.
 func (m *Model) sortMiddleItems() {
-	if m.nav.Level == model.LevelResourceTypes || m.nav.Level == model.LevelClusters {
+	if !m.sortApplies() {
 		return
 	}
 

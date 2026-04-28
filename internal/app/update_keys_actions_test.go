@@ -205,6 +205,73 @@ func TestActionKeyLessCyclesSortPrev(t *testing.T) {
 	assert.Equal(t, "Status", result.sortColumnName)
 }
 
+// --- handleExplorerActionKey: sort keys are no-ops at picker levels ---
+//
+// At LevelClusters and LevelResourceTypes, sortMiddleItems() early-returns,
+// so >, <, =, - mutating sort state and emitting "Sort: ..." status messages
+// is misleading: the bar lies that sort changed when items are unmoved.
+// These keys must short-circuit silently at those levels.
+
+func TestActionKeySortNextNoOpAtResourceTypes(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.sortColumnName = "Name"
+	m.sortAscending = true
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	ui.ActiveSortableColumnCount = 3
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('>'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Name", result.sortColumnName, "sort column must not change at LevelResourceTypes")
+	assert.True(t, result.sortAscending)
+	assert.Empty(t, result.statusMessage, "no misleading status message")
+	assert.Nil(t, cmd)
+}
+
+func TestActionKeySortPrevNoOpAtResourceTypes(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.sortColumnName = "Name"
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	ui.ActiveSortableColumnCount = 3
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('<'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Name", result.sortColumnName)
+	assert.Empty(t, result.statusMessage)
+	assert.Nil(t, cmd)
+}
+
+func TestActionKeySortFlipNoOpAtClusters(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+	m.sortAscending = true
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('='))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.True(t, result.sortAscending, "sortAscending must not toggle at LevelClusters")
+	assert.Empty(t, result.statusMessage)
+	assert.Nil(t, cmd)
+}
+
+func TestActionKeySortResetNoOpAtResourceTypes(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.sortColumnName = "Status"
+	m.sortAscending = false
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('-'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Status", result.sortColumnName, "reset must not clobber column at LevelResourceTypes")
+	assert.False(t, result.sortAscending, "reset must not flip ascending at LevelResourceTypes")
+	assert.Empty(t, result.statusMessage)
+	assert.Nil(t, cmd)
+}
+
 // --- handleExplorerActionKey: y copies resource name ---
 
 func TestActionKeyYCopiesResourceName(t *testing.T) {
