@@ -407,10 +407,39 @@ func (m Model) handleRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.rollbackDeployment(rev.Revision)
 		}
 		return m, nil
+	case "y":
+		return m.handleRollbackOverlayCopy()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	}
 	return m, nil
+}
+
+// handleRollbackOverlayCopy yanks the cursor revision row to the clipboard
+// as tab-separated columns matching the on-screen header. Mirrors the
+// vim-style `y` behaviour added to the read-only viewers and uses the same
+// relative-age format the renderer paints, so what the user copies is
+// exactly what they see.
+func (m Model) handleRollbackOverlayCopy() (tea.Model, tea.Cmd) {
+	if m.rollbackCursor < 0 || m.rollbackCursor >= len(m.rollbackRevisions) {
+		return m, nil
+	}
+	rev := m.rollbackRevisions[m.rollbackCursor]
+	row := joinTSV(
+		fmt.Sprintf("%d", rev.Revision),
+		rev.Name,
+		fmt.Sprintf("%d", rev.Replicas),
+		strings.Join(rev.Images, ","),
+		ui.FormatAge(rev.CreatedAt),
+	)
+	m.setStatusMessage(fmt.Sprintf("Copied revision %d", rev.Revision), false)
+	return m, tea.Batch(copyToSystemClipboard(row), scheduleStatusClear())
+}
+
+// joinTSV joins string columns with a tab separator. Empty values are
+// preserved so column positions stay aligned when pasted into a sheet.
+func joinTSV(cols ...string) string {
+	return strings.Join(cols, "\t")
 }
 
 // handleHelmRollbackOverlayKey handles keyboard input for the Helm rollback overlay.
@@ -463,10 +492,31 @@ func (m Model) handleHelmRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			return m, m.rollbackHelmRelease(rev.Revision)
 		}
 		return m, nil
+	case "y":
+		return m.handleHelmRollbackOverlayCopy()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	}
 	return m, nil
+}
+
+// handleHelmRollbackOverlayCopy yanks the cursor revision row to the
+// clipboard as tab-separated columns matching the on-screen header.
+func (m Model) handleHelmRollbackOverlayCopy() (tea.Model, tea.Cmd) {
+	if m.helmRollbackCursor < 0 || m.helmRollbackCursor >= len(m.helmRollbackRevisions) {
+		return m, nil
+	}
+	rev := m.helmRollbackRevisions[m.helmRollbackCursor]
+	row := joinTSV(
+		fmt.Sprintf("%d", rev.Revision),
+		rev.Status,
+		rev.Chart,
+		rev.AppVersion,
+		rev.Description,
+		rev.Updated,
+	)
+	m.setStatusMessage(fmt.Sprintf("Copied revision %d", rev.Revision), false)
+	return m, tea.Batch(copyToSystemClipboard(row), scheduleStatusClear())
 }
 
 // handleHelmHistoryOverlayKey handles keyboard input for the read-only Helm
@@ -514,10 +564,33 @@ func (m Model) handleHelmHistoryOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.pendingG = false
 		m.helmHistoryCursor = 0
 		return m, nil
+	case "y":
+		return m.handleHelmHistoryOverlayCopy()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	}
 	return m, nil
+}
+
+// handleHelmHistoryOverlayCopy yanks the cursor revision row to the
+// clipboard as tab-separated columns matching the on-screen header.
+// Identical shape to the helm rollback variant — the two overlays share
+// the same row schema, only Enter behaviour differs.
+func (m Model) handleHelmHistoryOverlayCopy() (tea.Model, tea.Cmd) {
+	if m.helmHistoryCursor < 0 || m.helmHistoryCursor >= len(m.helmHistoryRevisions) {
+		return m, nil
+	}
+	rev := m.helmHistoryRevisions[m.helmHistoryCursor]
+	row := joinTSV(
+		fmt.Sprintf("%d", rev.Revision),
+		rev.Status,
+		rev.Chart,
+		rev.AppVersion,
+		rev.Description,
+		rev.Updated,
+	)
+	m.setStatusMessage(fmt.Sprintf("Copied revision %d", rev.Revision), false)
+	return m, tea.Batch(copyToSystemClipboard(row), scheduleStatusClear())
 }
 
 // handleColorschemeOverlayKey handles keyboard input for the color scheme selector overlay.

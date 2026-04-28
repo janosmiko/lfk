@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -974,6 +975,130 @@ func TestColorschemeFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
 	assert.Equal(t, overlayNone, result.overlay, "overlay must close")
 	assert.Empty(t, result.schemeFilter.Value, "filter must be cleared after commit")
 	assert.NotNil(t, cmd, "scheduleStatusClear command must be returned")
+}
+
+// --- y to copy cursor row from rollback overlays ---
+
+// The user is sizing up a rollback (deciding which revision to roll back to)
+// and wants to paste the row into a ticket / Slack. y must yank the cursor
+// row as a tab-separated line and keep the overlay open — pressing Enter
+// would actually trigger the rollback, which is destructive.
+func TestRollbackOverlayYCopiesCursorRow(t *testing.T) {
+	created := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	revisions := []k8s.DeploymentRevision{
+		{Revision: 1, Name: "rs-1", Replicas: 3, Images: []string{"nginx:1"}, CreatedAt: created},
+		{Revision: 2, Name: "rs-2", Replicas: 5, Images: []string{"nginx:2"}, CreatedAt: created},
+	}
+	m := Model{
+		overlay:           overlayRollback,
+		rollbackRevisions: revisions,
+		rollbackCursor:    1,
+		tabs:              []TabState{{}},
+		width:             80,
+		height:            40,
+	}
+	ret, cmd := m.handleRollbackOverlayKey(runeKey('y'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayRollback, result.overlay, "overlay must stay open after copy")
+	assert.True(t, result.hasStatusMessage())
+	assert.Contains(t, result.statusMessage, "Copied revision 2")
+	assert.NotNil(t, cmd, "tea.Batch(copy, scheduleStatusClear) must be returned")
+}
+
+func TestRollbackOverlayYNoOpWhenEmpty(t *testing.T) {
+	m := Model{
+		overlay:           overlayRollback,
+		rollbackRevisions: nil,
+		tabs:              []TabState{{}},
+		width:             80,
+		height:            40,
+	}
+	ret, _ := m.handleRollbackOverlayKey(runeKey('y'))
+	result := ret.(Model)
+	assert.False(t, result.hasStatusMessage(), "no message when there is no row to copy")
+}
+
+func TestHelmRollbackOverlayYCopiesCursorRow(t *testing.T) {
+	revisions := []ui.HelmRevision{
+		{Revision: 1, Status: "deployed", Chart: "argo-cd-5.0.0", AppVersion: "2.4.0", Description: "Install complete", Updated: "2026-04-27"},
+		{Revision: 2, Status: "superseded", Chart: "argo-cd-5.1.0", AppVersion: "2.5.0", Description: "Upgrade complete", Updated: "2026-04-28"},
+	}
+	m := Model{
+		overlay:               overlayHelmRollback,
+		helmRollbackRevisions: revisions,
+		helmRollbackCursor:    1,
+		tabs:                  []TabState{{}},
+		width:                 80,
+		height:                40,
+	}
+	ret, cmd := m.handleHelmRollbackOverlayKey(runeKey('y'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayHelmRollback, result.overlay, "overlay must stay open after copy")
+	assert.True(t, result.hasStatusMessage())
+	assert.Contains(t, result.statusMessage, "Copied revision 2")
+	assert.NotNil(t, cmd)
+}
+
+func TestHelmRollbackOverlayYNoOpWhenEmpty(t *testing.T) {
+	m := Model{
+		overlay:               overlayHelmRollback,
+		helmRollbackRevisions: nil,
+		tabs:                  []TabState{{}},
+		width:                 80,
+		height:                40,
+	}
+	ret, _ := m.handleHelmRollbackOverlayKey(runeKey('y'))
+	result := ret.(Model)
+	assert.False(t, result.hasStatusMessage())
+}
+
+// Helm Release History overlay shares the row schema with Helm Rollback
+// but is read-only (no Enter binding). y must still copy the cursor row
+// so users can paste a revision into a ticket without first arming the
+// destructive overlay.
+func TestHelmHistoryOverlayYCopiesCursorRow(t *testing.T) {
+	revisions := []ui.HelmRevision{
+		{Revision: 1, Status: "deployed", Chart: "argo-cd-5.0.0", AppVersion: "2.4.0", Description: "Install complete", Updated: "2026-04-27"},
+		{Revision: 2, Status: "superseded", Chart: "argo-cd-5.1.0", AppVersion: "2.5.0", Description: "Upgrade complete", Updated: "2026-04-28"},
+	}
+	m := Model{
+		overlay:              overlayHelmHistory,
+		helmHistoryRevisions: revisions,
+		helmHistoryCursor:    1,
+		tabs:                 []TabState{{}},
+		width:                80,
+		height:               40,
+	}
+	ret, cmd := m.handleHelmHistoryOverlayKey(runeKey('y'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayHelmHistory, result.overlay, "overlay must stay open after copy")
+	assert.True(t, result.hasStatusMessage())
+	assert.Contains(t, result.statusMessage, "Copied revision 2")
+	assert.NotNil(t, cmd)
+}
+
+func TestHelmHistoryOverlayYNoOpWhenEmpty(t *testing.T) {
+	m := Model{
+		overlay:              overlayHelmHistory,
+		helmHistoryRevisions: nil,
+		tabs:                 []TabState{{}},
+		width:                80,
+		height:               40,
+	}
+	ret, _ := m.handleHelmHistoryOverlayKey(runeKey('y'))
+	result := ret.(Model)
+	assert.False(t, result.hasStatusMessage())
+}
+
+// joinTSV is the contract the copy handlers depend on for paste-into-spreadsheet
+// behaviour. Empty values must be preserved (so column positions stay aligned)
+// and the separator must be a literal tab.
+func TestJoinTSVPreservesEmptyColumns(t *testing.T) {
+	got := joinTSV("a", "", "c")
+	assert.Equal(t, "a\t\tc", got)
 }
 
 // Two filtered results: Enter must keep the legacy behavior — exit filter
