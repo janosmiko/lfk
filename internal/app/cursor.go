@@ -533,15 +533,19 @@ func (m *Model) filteredLogPodItems() []model.Item {
 }
 
 // filteredLogContainerItems returns overlay items matching the current log container filter.
+//
+// The "All Containers" virtual row is filtered by name like every other
+// entry — keeping it pinned would clutter the narrowed list and break the
+// muscle-memory consistency with the namespace and log pod selectors.
+// Users can still reach all-containers by clearing the filter.
 func (m *Model) filteredLogContainerItems() []model.Item {
 	if m.logContainerFilterText == "" {
 		return m.overlayItems
 	}
 	rawQuery := m.logContainerFilterText
-	var filtered []model.Item
+	filtered := []model.Item{}
 	for _, item := range m.overlayItems {
-		// Always include the "All Containers" virtual item.
-		if item.Status == "all" || ui.MatchLine(item.Name, rawQuery) {
+		if ui.MatchLine(item.Name, rawQuery) {
 			filtered = append(filtered, item)
 		}
 	}
