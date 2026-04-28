@@ -212,6 +212,7 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "J/K", Desc: "preview scroll"},
 		{Key: "c", Desc: "previous"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
+		{Key: "y", Desc: "copy"},
 		{Key: "/", Desc: "search"},
 	}
 	if searchQuery != "" {

@@ -84,6 +84,20 @@ func (m Model) breadcrumb() string {
 	return strings.Join(parts, " > ")
 }
 
+// renderStatusHint paints m.statusMessage in the status-bar style at full
+// width, suitable as a drop-in replacement for the bottom hint line of any
+// fullscreen viewer. The caller must check hasStatusMessage() first.
+func (m Model) renderStatusHint() string {
+	innerWidth := max(m.width-2, 10)
+	msg := m.sanitizeMessage(m.statusMessage)
+	style := ui.StatusMessageOkStyle
+	if m.statusMessageErr {
+		style = ui.StatusMessageErrStyle
+	}
+	styled := ui.Truncate(style.Render(msg), innerWidth)
+	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(styled)
+}
+
 func (m Model) statusBar() string {
 	// StatusBarBgStyle has Padding(0, 1) which adds 2 chars of horizontal padding.
 	// Use MaxWidth on the content to prevent overflow.
@@ -145,15 +159,7 @@ func (m Model) statusBar() string {
 	}
 	// When a status message is active, show it exclusively (hide key hints).
 	if m.hasStatusMessage() {
-		msg := m.sanitizeMessage(m.statusMessage)
-		var styled string
-		if m.statusMessageErr {
-			styled = ui.StatusMessageErrStyle.Render(msg)
-		} else {
-			styled = ui.StatusMessageOkStyle.Render(msg)
-		}
-		styled = ui.Truncate(styled, innerWidth)
-		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(styled)
+		return m.renderStatusHint()
 	}
 
 	// When an overlay is active, show overlay-specific hints instead of explorer hints.

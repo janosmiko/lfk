@@ -129,6 +129,12 @@ func openInBrowser(url string) tea.Cmd {
 }
 
 // copyToSystemClipboard copies text to the system clipboard using platform-specific tools.
+//
+// Returns nil on success: every caller already calls setStatusMessage with a
+// context-specific message (e.g. "Copied 1 line", "Copied value of <key>")
+// before dispatching this command. Returning a generic "Copied to clipboard"
+// here would race back through updateActionResult and overwrite the more
+// useful caller message — visible to the user as a flicker.
 func copyToSystemClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
@@ -144,7 +150,7 @@ func copyToSystemClipboard(text string) tea.Cmd {
 		if err := cmd.Run(); err != nil {
 			return actionResultMsg{err: fmt.Errorf("clipboard: %w", err)}
 		}
-		return actionResultMsg{message: "Copied to clipboard"}
+		return nil
 	}
 }
 

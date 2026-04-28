@@ -44,6 +44,7 @@ func (m Model) viewYAML() string {
 			{Key: "/", Desc: "search"},
 			{Key: "123G", Desc: "goto"},
 			{Key: "v/V/ctrl+v", Desc: "visual select"},
+			{Key: "y", Desc: "copy"},
 			{Key: "tab/z", Desc: "fold"},
 			{Key: "ctrl+w/>", Desc: "wrap"},
 			{Key: "ctrl+e", Desc: "edit"},
@@ -52,12 +53,16 @@ func (m Model) viewYAML() string {
 	}
 	hint := ui.RenderHintBar(yamlHints, m.width)
 
-	// If search is active, show search bar instead of hints.
-	if m.yamlSearchMode {
+	// Status messages (e.g. copy feedback) take precedence over the hint
+	// bar and any search prompt \u2014 same pattern the log viewer uses.
+	switch {
+	case m.hasStatusMessage():
+		hint = m.renderStatusHint()
+	case m.yamlSearchMode:
 		yamlModeInd := ui.SearchModeIndicator(m.yamlSearchText.Value)
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlSearchText.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.yamlSearchText.CursorRight())
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
-	} else if m.yamlSearchText.Value != "" {
+	case m.yamlSearchText.Value != "":
 		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlMatchIdx+1, len(m.yamlMatchLines))
 		if len(m.yamlMatchLines) == 0 {
 			matchInfo = " [no matches]"

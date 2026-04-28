@@ -54,13 +54,16 @@ func (m Model) viewDescribe() string {
 		hints = append(hints, ui.HintEntry{Key: "LIVE", Desc: "auto-refresh"})
 	}
 	var hint string
-	if m.describeSearchActive {
+	switch {
+	case m.hasStatusMessage():
+		hint = m.renderStatusHint()
+	case m.describeSearchActive:
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeSearchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.describeSearchInput.CursorRight())
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
-	} else if m.describeSearchQuery != "" {
+	case m.describeSearchQuery != "":
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeSearchQuery)
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
-	} else {
+	default:
 		hint = ui.RenderHintBar(hints, m.width)
 	}
 
@@ -259,10 +262,30 @@ func (m Model) viewDiff() string {
 		VisualStart: m.diffVisualStart,
 		VisualCol:   m.diffVisualCol,
 	}
+	var view string
 	if m.diffUnified {
-		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+		view = ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+	} else {
+		view = ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
 	}
-	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+	return m.replaceFooterWithStatus(view)
+}
+
+// replaceFooterWithStatus swaps the bottom hint line of a fullscreen viewer
+// for the status message when one is active. The diff viewer builds its
+// hint inside the ui package, so the only point we can paint copy feedback
+// is by overwriting the last rendered line — same trick view.go uses for
+// overlay hint bars (view.go:79-85).
+func (m Model) replaceFooterWithStatus(view string) string {
+	if !m.hasStatusMessage() {
+		return view
+	}
+	lines := strings.Split(view, "\n")
+	if len(lines) == 0 {
+		return view
+	}
+	lines[len(lines)-1] = m.renderStatusHint()
+	return strings.Join(lines, "\n")
 }
 
 func (m Model) logViewHeight() int {
@@ -637,6 +660,9 @@ func viewModeIndicators(wrap bool, visualMode rune, searchQuery string) string {
 
 // eventViewerHintBar returns the hint bar for the event viewer.
 func (m Model) eventViewerHintBar() string {
+	if m.hasStatusMessage() {
+		return m.renderStatusHint()
+	}
 	if m.eventTimelineSearchActive {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorRight())
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
