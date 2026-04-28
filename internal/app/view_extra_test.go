@@ -136,6 +136,57 @@ func TestViewYAMLModeSearchNoMatches(t *testing.T) {
 	output := m.View()
 	stripped := stripANSI(output)
 	assert.Contains(t, stripped, "no matches")
+	// n/N has no matches to navigate, so the nav suffix must not appear.
+	assert.NotContains(t, stripped, "n/N")
+	assert.NotContains(t, stripped, "next/prev")
+}
+
+func TestViewYAMLModeDefaultHintsListGotoAndOmitSearchNav(t *testing.T) {
+	// No search has been committed and we are not in search-input mode, so
+	// the default hint bar is rendered. It must advertise the goto chord
+	// (123G) but must not advertise n/N — there are no matches to step
+	// through yet.
+	m := Model{
+		width:         200, // wide enough so hints don't truncate
+		height:        30,
+		mode:          modeYAML,
+		nav:           model.NavigationState{Level: model.LevelResources},
+		namespace:     "default",
+		middleItems:   []model.Item{{Name: "test"}},
+		yamlContent:   "apiVersion: v1\nkind: ConfigMap",
+		yamlCollapsed: make(map[string]bool),
+		tabs:          []TabState{{}},
+	}
+	output := m.View()
+	stripped := stripANSI(output)
+	assert.Contains(t, stripped, "123G")
+	assert.Contains(t, stripped, "goto")
+	assert.NotContains(t, stripped, "n/N")
+	assert.NotContains(t, stripped, "next/prev")
+}
+
+func TestViewYAMLModeSearchResultsShowNavHint(t *testing.T) {
+	// A committed search with at least one match should expose the n/N
+	// next/prev navigation hint alongside the [hit/total] indicator.
+	m := Model{
+		width:          200,
+		height:         30,
+		mode:           modeYAML,
+		nav:            model.NavigationState{Level: model.LevelResources},
+		namespace:      "default",
+		middleItems:    []model.Item{{Name: "test"}},
+		yamlContent:    "apiVersion: v1\nkind: ConfigMap\napiVersion: apps/v1",
+		yamlCollapsed:  make(map[string]bool),
+		yamlSearchText: TextInput{Value: "apiVersion"},
+		yamlMatchLines: []int{0, 2},
+		yamlMatchIdx:   0,
+		tabs:           []TabState{{}},
+	}
+	output := m.View()
+	stripped := stripANSI(output)
+	assert.Contains(t, stripped, "1/2")
+	assert.Contains(t, stripped, "n/N")
+	assert.Contains(t, stripped, "next/prev")
 }
 
 func TestViewYAMLModeSmallHeight(t *testing.T) {

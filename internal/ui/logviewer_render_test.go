@@ -284,6 +284,50 @@ func TestRenderLogViewer(t *testing.T) {
 		// The long line should be visible (at least part of it).
 		assert.Contains(t, result, "xxx")
 	})
+
+	t.Run("n/N hidden in default hint bar when no committed search", func(t *testing.T) {
+		// Wide terminal so the hint bar is not truncated.
+		result := RenderLogViewer(
+			[]string{"log"}, 0, 400, 20,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0,
+		)
+		// "/" search hint must still be there; "n/N" must not.
+		assert.Contains(t, result, "search")
+		assert.NotContains(t, result, "n/N")
+		assert.NotContains(t, result, "next/prev")
+	})
+
+	t.Run("n/N shown in default hint bar when search is committed", func(t *testing.T) {
+		result := RenderLogViewer(
+			[]string{"error log"}, 0, 400, 20,
+			false, false, false, false, false, false,
+			"pod", "error", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0,
+		)
+		assert.Contains(t, result, "n/N")
+		assert.Contains(t, result, "next/prev")
+	})
+
+	t.Run("n/N hidden during search input regardless of prior committed search", func(t *testing.T) {
+		// searchActive=true means user is typing in the search prompt; the
+		// footer is the prompt bar, not the default hints.
+		result := RenderLogViewer(
+			[]string{"err"}, 0, 400, 20,
+			false, false, false, false, false, false,
+			"pod", "error", "err",
+			true, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0,
+		)
+		assert.Contains(t, result, "enter:apply")
+		assert.NotContains(t, result, "n/N")
+	})
 }
 
 // --- colorizePodPrefix ---
