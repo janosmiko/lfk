@@ -1,0 +1,37 @@
+# Maintains a long-lived "Release PR" that aggregates conventional commits
+# landed on main into a pending changelog and version bump. When a maintainer
+# merges the Release PR, the action tags the merge commit (e.g. v0.9.33),
+# which is what the existing release.yml workflow picks up to publish
+# binaries, container images, the Homebrew tap, and signed artifacts.
+#
+# The bot updates flake.nix's baseVersion via the x-release-please-version
+# marker on that line, so version stays in lockstep with the tag.
+#
+# Token note:
+#   - With the default GITHUB_TOKEN, the bot's PR is created but CI workflows
+#     on that PR will NOT trigger automatically (GitHub safeguard against
+#     recursive runs). To get CI on the Release PR, set a fine-grained PAT
+#     as the RELEASE_PLEASE_TOKEN secret. See the PR description for the
+#     scopes required.
+name: release-please
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  release-please:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Run release-please
+        uses: googleapis/release-please-action@8b8fd2cc23b2e18957157a9d923d75aa0c6f6ad5 # v4
+        with:
+          token: ${{ secrets.RELEASE_PLEASE_TOKEN || secrets.GITHUB_TOKEN }}
+          config-file: release-please-config.json
+          manifest-file: .release-please-manifest.json

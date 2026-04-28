@@ -62,3 +62,16 @@ The application follows a standard Go project layout:
 4. Ensure the project builds cleanly (`go build ./...`)
 5. Commit your changes with a descriptive message
 6. Push to your fork and open a Pull Request
+
+## Releasing (maintainers)
+
+Releases are driven by [release-please](https://github.com/googleapis/release-please). The bot keeps a long-lived "Release PR" open on `main` that aggregates conventional commits since the last tag into a pending changelog and version bump.
+
+Typical flow:
+
+1. Land conventional commits on `main` (`feat:`, `fix:`, `perf:`, `refactor:`, etc.).
+2. The `release-please` workflow opens or updates a Release PR with the next version, an updated `flake.nix` `baseVersion`, and a `CHANGELOG.md` entry.
+3. If `go.sum` changed since the last release, check out the Release PR locally and run `make refresh-vendor-hash` so `vendorHash` matches the new vendored module set, then push the change to the PR branch. (`verify-flake-build` in `release.yml` will catch a stale hash if you forget.)
+4. Merge the Release PR. release-please tags the merge commit (e.g. `v0.9.33`), and `release.yml` takes over to publish the release.
+
+For emergency manual releases (skipping the bot), `make bump-version VERSION=X.Y.Z` and `make release VERSION=X.Y.Z` remain available; the `verify-flake-version` job in `release.yml` is the safety net that prevents a tag/`flake.nix` mismatch.
