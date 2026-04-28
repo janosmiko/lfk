@@ -456,11 +456,8 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 			m.bookmarkAwaitingDiscovery = &bmCopy
 			m.setStatusMessage("Discovering resources...", false)
 			cmds := []tea.Cmd{scheduleStatusClear()}
-			if !m.discoveringContexts[effectiveContext] {
-				if m.discoveringContexts == nil {
-					m.discoveringContexts = make(map[string]bool)
-				}
-				m.discoveringContexts[effectiveContext] = true
+			if m.shouldFireDiscoveryFor(effectiveContext) {
+				m.markDiscoveryStarted(effectiveContext)
 				cmds = append(cmds, m.discoverAPIResources(effectiveContext))
 			}
 			return m, tea.Batch(cmds...)
@@ -633,9 +630,14 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces)
 
 	var cmds []tea.Cmd
-	needsDiscovery := false
-	if _, ok := m.discoveredResources[sess.Context]; !ok {
-		needsDiscovery = true
+	// "Needs discovery" means: the saved type ref might not resolve from
+	// the data we have on hand and a live discovery is going to land soon
+	// (or already in flight). Both the cache-prefill case and the
+	// no-data-at-all case set this — the difference is whether the user
+	// sees stale-but-correct data immediately versus a loader.
+	needsDiscovery := m.shouldFireDiscoveryFor(sess.Context)
+	if needsDiscovery {
+		m.markDiscoveryStarted(sess.Context)
 		cmds = append(cmds, m.discoverAPIResources(sess.Context))
 	}
 	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {

@@ -163,17 +163,18 @@ func baseModelBoost2() Model {
 // baseModelCov returns a minimal Model for coverage tests.
 func baseModelCov() Model {
 	return Model{
-		nav:                 model.NavigationState{Level: model.LevelResources},
-		tabs:                []TabState{{}},
-		selectedItems:       make(map[string]bool),
-		cursorMemory:        make(map[string]int),
-		itemCache:           make(map[string][]model.Item),
-		cacheFingerprints:   make(map[string]string),
-		discoveredResources: make(map[string][]model.ResourceTypeEntry),
-		discoveringContexts: make(map[string]bool),
-		width:               80,
-		height:              40,
-		execMu:              &sync.Mutex{},
+		nav:                        model.NavigationState{Level: model.LevelResources},
+		tabs:                       []TabState{{}},
+		selectedItems:              make(map[string]bool),
+		cursorMemory:               make(map[string]int),
+		itemCache:                  make(map[string][]model.Item),
+		cacheFingerprints:          make(map[string]string),
+		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
+		discoveringContexts:        make(map[string]bool),
+		discoveryRefreshedContexts: make(map[string]bool),
+		width:                      80,
+		height:                     40,
+		execMu:                     &sync.Mutex{},
 	}
 }
 

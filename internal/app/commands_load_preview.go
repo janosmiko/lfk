@@ -59,23 +59,26 @@ func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
 	}
 	if discovered := m.discoveredResources[hoveredCtx]; len(discovered) > 0 {
 		items := model.BuildSidebarItems(discovered)
-		return func() tea.Msg {
+		// If the discovered slice came from the disk cache (prefilled at
+		// startup) and discovery hasn't run live yet this session, we
+		// still want to kick one off behind the cached view — the user
+		// gets instant paint plus an asynchronous refresh.
+		var cmds []tea.Cmd
+		cmds = append(cmds, func() tea.Msg {
 			return resourceTypesMsg{items: items}
+		})
+		if m.shouldFireDiscoveryFor(hoveredCtx) {
+			m.markDiscoveryStarted(hoveredCtx)
+			cmds = append(cmds, m.discoverAPIResources(hoveredCtx))
 		}
+		return tea.Batch(cmds...)
 	}
 	// Clear rightItems so renderRightClusters falls into its loader branch.
 	cmds := []tea.Cmd{func() tea.Msg {
 		return resourceTypesMsg{items: nil}
 	}}
-	if !m.discoveringContexts[hoveredCtx] {
-		// discoveringContexts is a reference-type map, so writing here
-		// propagates back through the value receiver to the Update
-		// handler. The map is created in NewModel; if it is nil we skip
-		// the dedup rather than panic — callers in tests may not
-		// initialize it, but production always does.
-		if m.discoveringContexts != nil {
-			m.discoveringContexts[hoveredCtx] = true
-		}
+	if m.shouldFireDiscoveryFor(hoveredCtx) {
+		m.markDiscoveryStarted(hoveredCtx)
 		cmds = append(cmds, m.discoverAPIResources(hoveredCtx))
 	}
 	return tea.Batch(cmds...)

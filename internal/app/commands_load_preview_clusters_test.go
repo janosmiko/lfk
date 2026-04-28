@@ -30,16 +30,41 @@ func TestLoadPreviewClusters_UncachedTriggersDiscoveryAndClearsRightItems(t *tes
 		"must mark the hovered context as discovering to dedupe subsequent hovers")
 }
 
-// When the hovered context already has discovered resources, we emit them
-// directly and do NOT re-trigger discovery — important so repeated cursoring
-// through already-visited contexts doesn't keep re-auth'ing.
-func TestLoadPreviewClusters_CachedDoesNotTriggerDiscovery(t *testing.T) {
+// When the hovered context has discovered resources from a previous session
+// (cache prefill) we emit them immediately for instant paint AND fire a
+// fresh discovery behind the scenes (stale-while-revalidate). Once that
+// session-fresh discovery has completed, repeated hovers must not re-fire —
+// otherwise cursoring through already-visited contexts would keep re-auth'ing.
+func TestLoadPreviewClusters_CachedFiresRevalidationOnFirstHover(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.nav.Level = model.LevelClusters
 	m.nav.Context = ""
 	m.discoveredResources["visited-ctx"] = []model.ResourceTypeEntry{
 		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
 	}
+	m = withMiddleItem(m, model.Item{Name: "visited-ctx"})
+
+	cmd := m.loadPreview()
+	require.NotNil(t, cmd)
+	// The cached items must still be emitted so the right pane paints
+	// immediately. shouldFireDiscoveryFor returns true here because no
+	// session-fresh discovery has run, so a Batch (cached emit + discovery)
+	// is expected — drain it and verify the resourceTypesMsg is in flight.
+	assert.True(t, m.discoveringContexts["visited-ctx"],
+		"first hover of a cache-prefilled context must trigger background revalidation")
+}
+
+// After this session has already done a live discovery for the context,
+// further hovers must not re-fire — that's the dedup the OIDC-auth-loop
+// regression test is guarding against.
+func TestLoadPreviewClusters_CachedSkipsAfterSessionRefresh(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.nav.Level = model.LevelClusters
+	m.nav.Context = ""
+	m.discoveredResources["visited-ctx"] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
+	m.discoveryRefreshedContexts["visited-ctx"] = true
 	m = withMiddleItem(m, model.Item{Name: "visited-ctx"})
 
 	cmd := m.loadPreview()
@@ -51,7 +76,7 @@ func TestLoadPreviewClusters_CachedDoesNotTriggerDiscovery(t *testing.T) {
 	assert.False(t, rmsg.seeded,
 		"discovered entries must not be tagged seeded")
 	assert.False(t, m.discoveringContexts["visited-ctx"],
-		"already-discovered context must not be marked discovering")
+		"context already refreshed this session must not be marked discovering again")
 }
 
 // If discovery is already in-flight for the hovered context, don't fire a
