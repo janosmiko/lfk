@@ -82,6 +82,7 @@
 
 ### Resource Operations
 
+- **Read-only mode**: Lock a session against destructive actions (delete, edit, scale, restart, exec, port-forward, drain, etc.). Enable with `--read-only`, the `read_only: true` config field, per-context `clusters.<name>.read_only`, or the in-app `Ctrl+R` toggle (toggles the highlighted row's `[RO]` marker at the cluster picker; toggles the current tab inside a context). A `[RO]` badge in the title bar marks active sessions. See [Read-Only Mode](docs/usage.md#read-only-mode).
 - **Context-aware action menus**: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward, vuln scan, PVC resize
 - **Custom user-defined actions**: Define custom shell commands per resource type in config
 - **Multi-select with bulk actions**: Select multiple resources with Space, range-select with Ctrl+Space, perform bulk delete, scale, restart, and ArgoCD bulk sync/refresh
@@ -168,7 +169,7 @@ lfk --kubeconfig /path/to/kubeconfig
 KUBECONFIG=/path/to/config1:/path/to/config2 lfk
 ```
 
-> See [docs/usage.md](docs/usage.md) for the full CLI reference and runtime tuning options: mouse capture, no-color mode, watch-mode interval, discovery cache (`KUBECACHEDIR`), and Secret lazy loading.
+> See [docs/usage.md](docs/usage.md) for the full CLI reference and runtime tuning options: mouse capture, no-color mode, read-only mode, watch-mode interval, discovery cache (`KUBECACHEDIR`), and Secret lazy loading.
 
 ## Navigation Hierarchy
 

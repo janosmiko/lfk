@@ -28,6 +28,8 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |
 | `mouse` | bool | `true` | Capture mouse input for click navigation, scroll, and tab switching. Set to `false` to allow native terminal text selection. Also available as `--no-mouse` CLI flag. |
+| `read_only` | bool | `false` | Disable all mutating actions (delete, edit, scale, restart, exec, port-forward, drain, cordon, etc.) globally. Per-context overrides under `clusters.<name>.read_only` and the `--read-only` CLI flag take precedence. See [Read-Only Mode](usage.md#read-only-mode). |
+| `clusters.<name>.read_only` | bool | _(unset)_ | Per-context read-only override. Wins over the global `read_only` so you can mark specific clusters (e.g. `prod`) read-only while leaving others mutable. |
 | `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. Much faster in clusters with many Helm release secrets (each release is a multi-hundred-KB Secret) or large TLS payloads, at the cost of an extra GET per hovered Secret. When `false` (default), Secrets list like every other resource type — full objects are pulled and `data` is eagerly decoded, so the Type column and decoded values are visible immediately. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
 | `min_contrast_ratio` | float | `0.0` | Normalized readability knob in `[0.0, 1.0]`. When above zero, foreground colors are nudged in HSL lightness space to meet a minimum WCAG contrast ratio against their paired background. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
 
@@ -306,11 +308,13 @@ custom_actions:
       command: "kubectl logs {name} -n {namespace} --context {context} > /tmp/{name}.log"
       key: "C"
       description: "Copy pod logs to /tmp"
+      read_only_safe: true   # safe to run when read-only mode is on
   Deployment:
     - label: "Image History"
       command: "kubectl rollout history deployment/{name} -n {namespace} --context {context}"
       key: "H"
       description: "Show rollout history"
+      read_only_safe: true
 ```
 
 ### Custom Action Fields
@@ -321,6 +325,7 @@ custom_actions:
 | `command` | Yes | Shell command to execute (supports template variables) |
 | `key` | Yes | Shortcut key in the action menu |
 | `description` | No | Description shown next to the action |
+| `read_only_safe` | No | When `true`, the action remains available in read-only mode. Defaults to `false` (treated as mutating and blocked) so destructive shell commands don't silently bypass the read-only gate. Set to `true` for view-only commands like `kubectl describe`, `kubectl logs`, `kubectl rollout history`. |
 
 ### Template Variables
 

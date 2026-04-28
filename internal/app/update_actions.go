@@ -44,6 +44,9 @@ func (m Model) openActionMenu() Model {
 		}
 		var items []model.Item
 		for _, a := range actions {
+			if m.readOnly && isMutatingAction(a.Label) {
+				continue
+			}
 			items = append(items, model.Item{
 				Name:   a.Label,
 				Extra:  fmt.Sprintf("%s (%d items)", a.Description, len(selectedList)),
@@ -93,6 +96,11 @@ func (m Model) openActionMenu() Model {
 
 	items := make([]model.Item, 0, len(actions))
 	for _, a := range actions {
+		// Use the kind-aware variant so custom actions are filtered based
+		// on their ReadOnlySafe opt-in (defaults to false / mutating).
+		if m.readOnly && isMutatingActionForKind(kind, a.Label) {
+			continue
+		}
 		items = append(items, model.Item{
 			Name:   a.Label,
 			Extra:  a.Description,
@@ -296,6 +304,12 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	// Handle bulk actions.
 	if m.bulkMode && len(m.bulkItems) > 0 {
 		return m.executeBulkAction(actionLabel)
+	}
+
+	if m.readOnly && isMutatingAction(actionLabel) {
+		logger.Info("Blocked by read-only mode", "action", actionLabel, "context", m.actionCtx.context)
+		m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
+		return m, scheduleStatusClear()
 	}
 
 	logger.Info("Executing action",
@@ -1200,6 +1214,12 @@ func (m Model) openBulkActionDirect(actionLabel string) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
+	if m.readOnly && isMutatingAction(actionLabel) {
+		logger.Info("Blocked by read-only mode (bulk)", "action", actionLabel, "count", len(m.bulkItems))
+		m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
+		return m, scheduleStatusClear()
+	}
+
 	logger.Info("Executing bulk action",
 		"action", actionLabel,
 		"count", len(m.bulkItems),
@@ -1399,6 +1419,16 @@ func (m Model) executeActionVisualize() (tea.Model, tea.Cmd) {
 
 func (m Model) executeActionDefault(actionLabel string) (tea.Model, tea.Cmd) {
 	if ca, ok := findCustomAction(m.actionCtx.kind, actionLabel); ok {
+		// Custom actions are arbitrary shell commands. Block them in
+		// read-only mode unless the user explicitly marked the action
+		// safe via read_only_safe: true. The dispatcher gate at the top
+		// of executeAction only checks the static mutatingActions set,
+		// which doesn't know about user-defined labels — this is the
+		// last chance to refuse.
+		if m.readOnly && !ca.ReadOnlySafe {
+			m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
+			return m, scheduleStatusClear()
+		}
 		expandedCmd := expandCustomActionTemplate(ca.Command, m.actionCtx)
 		m.addLogEntry("DBG", fmt.Sprintf("$ sh -c %q", expandedCmd))
 		return m, m.execCustomAction(expandedCmd)

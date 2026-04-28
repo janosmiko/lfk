@@ -670,6 +670,14 @@ func (m Model) handleBatchLabelOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.batchLabelInput.Value == "" {
 			return m, nil
 		}
+		// Belt-and-suspenders read-only gate: the dispatcher already blocks
+		// "Labels / Annotations" upstream, but a user who toggled RO on
+		// while this overlay was open could otherwise commit a mutation.
+		if m.readOnly {
+			m.overlay = overlayNone
+			m.setStatusMessage(readOnlyBlockedMessage("Labels / Annotations"), true)
+			return m, scheduleStatusClear()
+		}
 		isAnnotation := m.batchLabelMode == 1
 		// Parse input: "key=value" for add, "key" for remove.
 		var labelKey, labelValue string
@@ -761,6 +769,16 @@ func (m Model) handleActionOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter", "y", "Y":
+		// Read-only safety net: if RO was toggled on while a confirm overlay
+		// was already showing, refuse to commit the mutation.
+		if m.readOnly && isMutatingAction(m.pendingAction) {
+			m.overlay = overlayNone
+			label := m.pendingAction
+			m.pendingAction = ""
+			m.confirmAction = ""
+			m.setStatusMessage(readOnlyBlockedMessage(label), true)
+			return m, scheduleStatusClear()
+		}
 		m.overlay = overlayNone
 		m.loading = true
 		action := m.pendingAction
@@ -821,6 +839,18 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return m.closeTabOrQuit()
 	case "enter":
 		if m.confirmTypeInput.Value == "DELETE" {
+			// Read-only safety net for force-delete / finalizer-remove paths.
+			if m.readOnly && isMutatingAction(m.pendingAction) {
+				m.overlay = overlayNone
+				label := m.pendingAction
+				m.pendingAction = ""
+				m.confirmAction = ""
+				m.confirmTitle = ""
+				m.confirmQuestion = ""
+				m.confirmTypeInput.Clear()
+				m.setStatusMessage(readOnlyBlockedMessage(label), true)
+				return m, scheduleStatusClear()
+			}
 			m.overlay = overlayNone
 			m.loading = true
 			action := m.pendingAction
@@ -892,6 +922,15 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Invalid replica count", true)
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
+			return m, scheduleStatusClear()
+		}
+		// Belt-and-suspenders read-only gate: the dispatcher already blocks
+		// "Scale" upstream, but a user who toggled RO on while this overlay
+		// was open could otherwise commit a scale operation.
+		if m.readOnly {
+			m.overlay = overlayNone
+			m.scaleInput.Clear()
+			m.setStatusMessage(readOnlyBlockedMessage("Scale"), true)
 			return m, scheduleStatusClear()
 		}
 		m.overlay = overlayNone

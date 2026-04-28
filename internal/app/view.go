@@ -397,6 +397,15 @@ func (m Model) renderTitleBar() string {
 		watchIndicator = ui.HelpKeyStyle.Render(" \u27f3 ")
 	}
 
+	var readOnlyIndicator string
+	// At the cluster picker (LevelClusters) the user has not entered a
+	// specific context yet, so a global "RO" header would be ambiguous —
+	// per-row [RO] markers in the picker do that job. Once inside a
+	// context, the header badge tracks the current tab's state.
+	if m.readOnly && m.nav.Level != model.LevelClusters {
+		readOnlyIndicator = ui.ReadOnlyBadgeStyle.Render("RO")
+	}
+
 	var mutationProgress, tasksIndicator string
 	if m.bgtasks != nil && m.bgtasks.Len() > 0 {
 		snap := m.bgtasks.Snapshot()
@@ -432,7 +441,7 @@ func (m Model) renderTitleBar() string {
 	}
 
 	// Calculate available width for breadcrumb.
-	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
+	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(readOnlyIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	maxBcWidth := max(
 		// -1 for minimum gap
 		innerWidth-fixedWidth-1, 10)
@@ -446,10 +455,10 @@ func (m Model) renderTitleBar() string {
 	}
 	bc := ui.TitleBreadcrumbStyle.Render(bcText)
 
-	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
+	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(readOnlyIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	gap := max(innerWidth-contentWidth, 0)
 
-	barContent := bc + watchIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + mutationProgress + tasksIndicator + nsLabel + versionLabel
+	barContent := bc + watchIndicator + readOnlyIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + mutationProgress + tasksIndicator + nsLabel + versionLabel
 	return ui.TitleBarStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(barContent)
 }
 

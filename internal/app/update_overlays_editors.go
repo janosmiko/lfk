@@ -68,6 +68,10 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.secretDataOriginal = nil
 			return m, nil
 		}
+		if m.readOnly {
+			m.setStatusMessage(readOnlyBlockedMessage("Secret Editor"), true)
+			return m, scheduleStatusClear()
+		}
 		return m, m.saveSecretData()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -129,6 +133,10 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.configMapDataOriginal = nil
 			return m, nil
 		}
+		if m.readOnly {
+			m.setStatusMessage(readOnlyBlockedMessage("ConfigMap Editor"), true)
+			return m, scheduleStatusClear()
+		}
 		return m, m.saveConfigMapData()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -166,6 +174,10 @@ func (m Model) handleAutoSyncKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "enter", "ctrl+s":
+		if m.readOnly {
+			m.setStatusMessage(readOnlyBlockedMessage("Auto Sync"), true)
+			return m, scheduleStatusClear()
+		}
 		return m, m.saveAutoSyncConfig()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -259,6 +271,10 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.labelLabelsOriginal = nil
 			m.labelAnnotationsOriginal = nil
 			return m, nil
+		}
+		if m.readOnly {
+			m.setStatusMessage(readOnlyBlockedMessage("Labels / Annotations"), true)
+			return m, scheduleStatusClear()
 		}
 		return m, m.saveLabelData()
 	case "ctrl+c":

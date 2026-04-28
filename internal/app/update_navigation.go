@@ -262,6 +262,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	logger.Info("Context selected", "context", sel.Name)
 	m.saveCursor()
 	m.nav.Context = sel.Name
+	m.recomputeReadOnly(sel.Name)
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""

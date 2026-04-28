@@ -247,14 +247,24 @@ func (m Model) statusBar() string {
 		parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
 	}
 
-	// Styled key hints -- show a reduced set for dashboard views.
+	parts = append(parts, ui.FormatHintParts(m.explorerHintEntries()))
+
+	content := strings.Join(parts, "  ")
+	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+}
+
+// explorerHintEntries builds the bottom hint bar for explorer views (cluster
+// picker, resource-type browser, resource list). Extracted from statusBar to
+// keep that function under the gocyclo budget. Dashboard views use a reduced
+// set; standard explorer views use the full set with conditional hides for
+// keys that are no-ops at the current level.
+func (m Model) explorerHintEntries() []ui.HintEntry {
 	kb := ui.ActiveKeybindings
-	var hintEntries []ui.HintEntry
 	sel := m.selectedMiddleItem()
 	isDashboard := sel != nil && m.nav.Level == model.LevelResourceTypes &&
 		(sel.Extra == "__overview__" || sel.Extra == "__monitoring__")
 	if isDashboard {
-		hintEntries = []ui.HintEntry{
+		return []ui.HintEntry{
 			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
 			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
@@ -262,40 +272,47 @@ func (m Model) statusBar() string {
 			{Key: kb.Help, Desc: "help"},
 			{Key: "q", Desc: "quit"},
 		}
-	} else {
-		hintEntries = []ui.HintEntry{
-			{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
-			{Key: kb.Down + "/" + kb.Up, Desc: "move"},
-			{Key: kb.Enter, Desc: "view"},
-			{Key: kb.NamespaceSelector, Desc: "namespace"},
-			{Key: kb.AllNamespaces, Desc: "all-ns"},
-		}
-		// At the cluster picker and resource-type browser, both the action
-		// menu and column sort are no-ops: selectedResourceKind() returns
-		// "" so openActionMenu() bails out, and sortMiddleItems() early-
-		// returns so </> doesn't reorder anything. Hide both hints there
-		// to avoid advertising dead keys.
-		hasResourceContext := m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
-		if hasResourceContext {
-			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
-		}
-		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"})
-		if hasResourceContext {
-			hintEntries = append(hintEntries, ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"})
-		}
-		hintEntries = append(hintEntries,
-			ui.HintEntry{Key: kb.Filter, Desc: "filter"},
-			ui.HintEntry{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
-			ui.HintEntry{Key: kb.Help, Desc: "help"},
-			ui.HintEntry{Key: "q", Desc: "quit"},
-		)
-		// Add context-specific hints for Events resource type.
-		hintEntries = m.appendEventsHintEntries(hintEntries)
 	}
-	parts = append(parts, ui.FormatHintParts(hintEntries))
 
-	content := strings.Join(parts, "  ")
-	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
+	hintEntries := []ui.HintEntry{
+		{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
+		{Key: kb.Down + "/" + kb.Up, Desc: "move"},
+		{Key: kb.Enter, Desc: "view"},
+		{Key: kb.NamespaceSelector, Desc: "namespace"},
+		{Key: kb.AllNamespaces, Desc: "all-ns"},
+	}
+	// At the cluster picker and resource-type browser, both the action
+	// menu and column sort are no-ops: selectedResourceKind() returns
+	// "" so openActionMenu() bails out, and sortMiddleItems() early-
+	// returns so </> doesn't reorder anything. Hide both hints there
+	// to avoid advertising dead keys.
+	hasResourceContext := m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
+	if hasResourceContext {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
+	}
+	// Advertise the read-only toggle on every level so users can
+	// discover it without reading docs. At the cluster picker it
+	// flips a row marker; inside a context it locks/unlocks the
+	// active tab. Hidden inside a context when --read-only is set,
+	// since the gate rejects the toggle.
+	if m.nav.Level == model.LevelClusters || !m.cliReadOnly {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ReadOnlyToggle, Desc: "toggle RO"})
+	}
+	// "create" runs `kubectl apply` from a template. Hide it in
+	// read-only mode since it would be blocked anyway.
+	if !m.readOnly {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"})
+	}
+	if hasResourceContext {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"})
+	}
+	hintEntries = append(hintEntries,
+		ui.HintEntry{Key: kb.Filter, Desc: "filter"},
+		ui.HintEntry{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
+		ui.HintEntry{Key: kb.Help, Desc: "help"},
+		ui.HintEntry{Key: "q", Desc: "quit"},
+	)
+	return m.appendEventsHintEntries(hintEntries)
 }
 
 // appendEventsHintEntries injects Events-view toggle hints (warnings-only,

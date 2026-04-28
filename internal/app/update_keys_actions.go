@@ -85,6 +85,10 @@ func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)
 	case kb.CopyYAML:
 		return m.handleExplorerActionKeyCopyYAML()
 	case kb.PasteApply:
+		if m.readOnly {
+			m.setStatusMessage(readOnlyBlockedMessage("Paste & Apply"), true)
+			return m, scheduleStatusClear(), true
+		}
 		return m, m.applyFromClipboard(), true
 	case kb.NewTab:
 		return m.handleExplorerActionKeyNewTab()
@@ -548,6 +552,10 @@ func (m Model) handleExplorerActionKeyPrevTab() (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleExplorerActionKeyCreateTemplate() (tea.Model, tea.Cmd, bool) {
+	if m.readOnly {
+		m.setStatusMessage(readOnlyBlockedMessage("Create from template"), true)
+		return m, scheduleStatusClear(), true
+	}
 	templates := model.BuiltinTemplates()
 	currentKind := m.nav.ResourceType.Kind
 	if currentKind != "" {

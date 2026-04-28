@@ -1004,6 +1004,28 @@ func TestScaleOverlayEnterInvalidInput(t *testing.T) {
 	assert.NotNil(t, cmd) // scheduleStatusClear
 }
 
+// TestScaleOverlayEnter_ReadOnly_Blocks covers the race where a user opens
+// the scale overlay (not in RO) and then toggles RO on before pressing
+// Enter. The dispatcher already gates "Scale" upstream; this is the
+// belt-and-suspenders check at the overlay's commit point.
+func TestScaleOverlayEnter_ReadOnly_Blocks(t *testing.T) {
+	m := Model{
+		overlay:    overlayScaleInput,
+		scaleInput: TextInput{Value: "3"},
+		readOnly:   true,
+		tabs:       []TabState{{}},
+		width:      80,
+		height:     40,
+	}
+	ret, cmd := m.handleScaleOverlayKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay)
+	assert.False(t, result.loading, "must not enter loading state when blocked")
+	assert.Equal(t, readOnlyBlockedMessage("Scale"), result.statusMessage)
+	assert.True(t, result.statusMessageErr)
+	assert.NotNil(t, cmd) // scheduleStatusClear
+}
+
 func TestScaleOverlayBackspace(t *testing.T) {
 	m := Model{
 		overlay:    overlayScaleInput,
@@ -1566,6 +1588,28 @@ func TestBatchLabelOverlayEnterInvalidFormat(t *testing.T) {
 	result := ret.(Model)
 	assert.Contains(t, result.statusMessage, "Format: key=value")
 	assert.NotNil(t, cmd)
+}
+
+// TestBatchLabelOverlayEnter_ReadOnly_Blocks covers the race where a user
+// opens the batch label overlay (not in RO) and then toggles RO on before
+// pressing Enter. Belt-and-suspenders at the overlay's commit point — the
+// dispatcher already gates "Labels / Annotations" upstream.
+func TestBatchLabelOverlayEnter_ReadOnly_Blocks(t *testing.T) {
+	m := Model{
+		overlay:         overlayBatchLabel,
+		batchLabelInput: TextInput{Value: "team=platform"},
+		readOnly:        true,
+		tabs:            []TabState{{}},
+		width:           80,
+		height:          40,
+	}
+	ret, cmd := m.handleBatchLabelOverlayKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay)
+	assert.False(t, result.loading, "must not enter loading state when blocked")
+	assert.Equal(t, readOnlyBlockedMessage("Labels / Annotations"), result.statusMessage)
+	assert.True(t, result.statusMessageErr)
+	assert.NotNil(t, cmd) // scheduleStatusClear
 }
 
 func TestBatchLabelOverlayInputNavigation(t *testing.T) {

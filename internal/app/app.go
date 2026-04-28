@@ -128,34 +128,37 @@ type TabState struct {
 	// a full refreshCurrentLevel instead of the lighter loadPreview.
 	needsLoad bool
 
-	nav                    model.NavigationState
-	leftItems              []model.Item
-	middleItems            []model.Item
-	rightItems             []model.Item
-	leftItemsHistory       [][]model.Item
-	cursors                [5]int
-	middleScroll           int // persistent scroll position for middle column (vim-style scrolloff)
-	leftScroll             int // persistent scroll position for left column (vim-style scrolloff)
-	cursorMemory           map[string]int
-	itemCache              map[string][]model.Item
-	cacheFingerprints      map[string]string
-	yamlContent            string
-	yamlScroll             int
-	yamlCursor             int // cursor position in visible lines (relative to scroll)
-	yamlSearchText         TextInput
-	yamlMatchLines         []int
-	yamlMatchIdx           int
-	yamlCollapsed          map[string]bool // collapsed state for YAML sections
-	splitPreview           bool
-	fullYAMLPreview        bool
-	previewYAML            string
-	namespace              string
-	allNamespaces          bool
-	selectedNamespaces     map[string]bool
-	sortColumnName         string // column name to sort by (e.g. "Name", "Age", "CPU")
-	sortAscending          bool
-	filterText             string
-	watchMode              bool
+	nav                model.NavigationState
+	leftItems          []model.Item
+	middleItems        []model.Item
+	rightItems         []model.Item
+	leftItemsHistory   [][]model.Item
+	cursors            [5]int
+	middleScroll       int // persistent scroll position for middle column (vim-style scrolloff)
+	leftScroll         int // persistent scroll position for left column (vim-style scrolloff)
+	cursorMemory       map[string]int
+	itemCache          map[string][]model.Item
+	cacheFingerprints  map[string]string
+	yamlContent        string
+	yamlScroll         int
+	yamlCursor         int // cursor position in visible lines (relative to scroll)
+	yamlSearchText     TextInput
+	yamlMatchLines     []int
+	yamlMatchIdx       int
+	yamlCollapsed      map[string]bool // collapsed state for YAML sections
+	splitPreview       bool
+	fullYAMLPreview    bool
+	previewYAML        string
+	namespace          string
+	allNamespaces      bool
+	selectedNamespaces map[string]bool
+	sortColumnName     string // column name to sort by (e.g. "Name", "Age", "CPU")
+	sortAscending      bool
+	filterText         string
+	watchMode          bool
+	// readOnly blocks all mutating actions for this tab. Re-evaluated on
+	// context switch from CLI flag, per-context config, and global config.
+	readOnly               bool
 	requestGen             uint64
 	selectedItems          map[string]bool
 	selectionAnchor        int // anchor index for region selection (-1 = unset)
@@ -403,6 +406,19 @@ type Model struct {
 	// Watch mode: auto-refresh the current view on a timer.
 	watchMode     bool
 	watchInterval time.Duration
+
+	// Read-only mode: blocks all mutating actions for the active tab. Mirrors
+	// the active TabState.readOnly; re-evaluated on context switch and tab
+	// switch.
+	readOnly bool
+	// cliReadOnly is the value of --read-only at startup. Sticky for the life
+	// of the process so context switches can't drop it.
+	cliReadOnly bool
+	// contextROOverrides holds session-scoped per-context read-only state set
+	// by the user via Ctrl+R on a row in the cluster picker. A present entry
+	// wins over per-context and global config when entering that context;
+	// CLI --read-only still wins over both.
+	contextROOverrides map[string]bool
 
 	// Help screen state.
 	helpScroll       int
@@ -1016,6 +1032,9 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		splitPreview:               true,
 		allNamespaces:              true,
 		watchMode:                  true,
+		readOnly:                   ui.ResolveReadOnly(contextName, opts.ReadOnly),
+		cliReadOnly:                opts.ReadOnly,
+		contextROOverrides:         make(map[string]bool),
 		sortColumnName:             sortColDefault,
 		sortAscending:              true,
 		cursorMemory:               make(map[string]int),
@@ -1043,6 +1062,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			splitPreview:       true,
 			allNamespaces:      true,
 			watchMode:          true,
+			readOnly:           ui.ResolveReadOnly(contextName, opts.ReadOnly),
 			sortColumnName:     sortColDefault,
 			sortAscending:      true,
 			warningEventsOnly:  true,

@@ -178,6 +178,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 			return m, scheduleStatusClear()
 		}
 		m.nav.Context = arg
+		m.recomputeReadOnly(arg)
 		m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
 		cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
 		if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
