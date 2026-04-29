@@ -10,6 +10,53 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// --- handleMouse: exec-mode scrollback ---
+
+func TestMouseWheelInExecModeScrollsScrollback(t *testing.T) {
+	sb := newScrollback(200)
+	for range 100 {
+		_, _ = sb.Write([]byte("line\n"))
+	}
+	// height 24, no tab bar -> execViewportRows = 24-1-4 = 19 ->
+	// max usable offset = 100 - 19 = 81.
+	m := Model{
+		mode:           modeExec,
+		height:         24,
+		tabs:           []TabState{{}},
+		execScrollback: sb,
+	}
+
+	t.Run("wheel up scrolls 1 line into history", func(t *testing.T) {
+		ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+		assert.Equal(t, 1, ret.(Model).execScrollOffset)
+	})
+
+	t.Run("wheel down clamps at live", func(t *testing.T) {
+		m := m
+		m.execScrollOffset = 1
+		ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
+		assert.Equal(t, 0, ret.(Model).execScrollOffset, "wheel down past live clamps to 0")
+	})
+
+	t.Run("wheel up clamps so a full viewport stays visible", func(t *testing.T) {
+		m := m
+		m.execScrollOffset = 81
+		ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+		assert.Equal(t, 81, ret.(Model).execScrollOffset, "max offset = Len - viewH so the oldest line still fits at the top")
+	})
+
+	t.Run("wheel up does nothing when scrollback fits in the viewport", func(t *testing.T) {
+		smallSB := newScrollback(50)
+		for range 5 {
+			_, _ = smallSB.Write([]byte("line\n"))
+		}
+		// Len=5, viewH=19 -> maxOffset=0; no scrolling possible.
+		mm := Model{mode: modeExec, height: 24, tabs: []TabState{{}}, execScrollback: smallSB}
+		ret, _ := mm.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
+		assert.Equal(t, 0, ret.(Model).execScrollOffset)
+	})
+}
+
 // --- handleMouse: explorer mode scroll ---
 
 func TestMouseWheelUpMovesUp(t *testing.T) {

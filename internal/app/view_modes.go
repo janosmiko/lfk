@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -489,31 +490,83 @@ func wrappedLineCount(line string, width int) int {
 	return (n + width - 1) / width
 }
 
+// renderScrollbackView formats the visible window of the scrollback ring
+// for the PTY pane while the user is scrolled back. Each line is
+// right-truncated to viewW. If the visible window is smaller than viewH
+// (we're sitting at the oldest captured line), the resulting block is
+// shorter — the borderStyle wrapping in viewExecTerminal pads to viewH
+// via lipgloss Height, so we don't pad here.
+//
+// Lines are rendered in the default style. The hint bar's "scrolled N"
+// indicator is enough signal that the user is in history mode; dimming
+// the body just made it harder to read without adding new information.
+func renderScrollbackView(sb *scrollback, offset, viewH, viewW int) string {
+	lines := sb.Snapshot()
+	end := max(len(lines)-offset, 0)
+	start := max(end-viewH, 0)
+	if end <= start {
+		return ""
+	}
+	out := make([]string, 0, end-start)
+	for i := start; i < end; i++ {
+		line := lines[i]
+		if r := []rune(line); len(r) > viewW {
+			line = string(r[:viewW])
+		}
+		out = append(out, line)
+	}
+	return strings.Join(out, "\n")
+}
+
 // viewExecTerminal renders the embedded PTY terminal view.
 func (m Model) viewExecTerminal() string {
 	title := ui.TitleStyle.Render(m.execTitle)
 
-	// Render hints.
+	// Render hints. shift+drag is a host-terminal shortcut, not an lfk
+	// binding, but it's the only way to copy text out of an embedded PTY
+	// without entering exec mode — call it out for discoverability.
 	hints := []struct{ key, desc string }{
 		{"ctrl+] ctrl+]", "exit"},
 		{"ctrl+] ]/[", "switch tab"},
 		{"ctrl+] t", "new tab"},
+		{"ctrl+] ctrl+u/d", "half-page"},
+		{"ctrl+] ctrl+b/f", "page"},
+		{"ctrl+] g/G", "top/live"},
+		{"shift+drag", "select"},
 	}
-	hintParts := make([]string, 0, len(hints))
+	hintParts := make([]string, 0, len(hints)+1)
 	for _, h := range hints {
 		hintParts = append(hintParts, ui.HelpKeyStyle.Render(h.key)+" "+ui.BarDimStyle.Render(h.desc))
 	}
+	if m.execScrollOffset > 0 {
+		// Tell the user they're not looking at live output and how to get back.
+		hintParts = append(hintParts,
+			ui.HelpKeyStyle.Render("scrolled "+strconv.Itoa(m.execScrollOffset))+" "+ui.BarDimStyle.Render("ctrl+] G to live"),
+		)
+	}
 	hintLine := "  " + strings.Join(hintParts, "  ")
+	// When the shell has exited, replace the hint line with a status
+	// banner. We MUST NOT append the message to termContent — lipgloss's
+	// borderStyle.Height is a minimum, not a clamp, so extra rows would
+	// push the bordered region past viewH+2 and the title + tab bar
+	// would scroll off the top of the terminal.
+	if m.execDone != nil && m.execDone.Load() {
+		hintLine = "  " + ui.HelpKeyStyle.Render("Process exited") + "  " + ui.BarDimStyle.Render("press any key to return")
+	}
 
 	// Render terminal content. Overhead: exec title (1) + border top/bottom (2) + hint line (1) = 4.
 	// The outer View() already subtracted the main title bar and tab bar from m.height.
+	//
+	// Width is full m.width: the PTY pane has only top/bottom horizontal rules
+	// — no side bars — so a host-terminal shift+drag captures clean text
+	// without picking up vertical box-drawing chars (issue #81).
 	viewH := max(m.height-4, 3)
-	viewW := max(
-		// border left/right + padding
-		m.width-4, 10)
+	viewW := max(m.width, 10)
 
 	var termContent string
-	if m.execTerm != nil {
+	if m.execScrollOffset > 0 && m.execScrollback != nil {
+		termContent = renderScrollbackView(m.execScrollback, m.execScrollOffset, viewH, viewW)
+	} else if m.execTerm != nil {
 		m.execMu.Lock()
 		cols, rows := m.execTerm.Size()
 		cursor := m.execTerm.Cursor()
@@ -575,16 +628,15 @@ func (m Model) viewExecTerminal() string {
 		termContent = ui.DimStyle.Render("Terminal not initialized")
 	}
 
-	if m.execDone != nil && m.execDone.Load() {
-		termContent += "\n\n" + ui.DimStyle.Render("  Process exited. Press any key to return.")
-	}
-
-	// Wrap terminal content in a rounded border.
+	// Wrap terminal content in horizontal rules only (top + bottom). Side
+	// bars are intentionally omitted so that host-terminal text selection
+	// (shift+drag) does not capture vertical box-drawing characters around
+	// each line of shell output. See issue #81.
 	borderStyle := lipgloss.NewStyle().
-		Border(lipgloss.RoundedBorder()).
+		Border(lipgloss.NormalBorder(), true, false, true, false).
 		BorderForeground(lipgloss.Color(ui.ColorPrimary)).
 		Padding(0, 0).
-		Width(m.width - 2).
+		Width(m.width).
 		Height(viewH)
 	bordered := borderStyle.Render(termContent)
 

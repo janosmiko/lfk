@@ -771,6 +771,8 @@ func (m *Model) saveCurrentTab() {
 	t.execTitle = m.execTitle
 	t.execDone = m.execDone
 	t.execMu = m.execMu
+	t.execScrollback = m.execScrollback
+	t.execScrollOffset = m.execScrollOffset
 	t.explainFields = append([]model.ExplainField(nil), m.explainFields...)
 	t.explainDesc = m.explainDesc
 	t.explainPath = m.explainPath
@@ -876,6 +878,8 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.execTitle = t.execTitle
 	m.execDone = t.execDone
 	m.execMu = t.execMu
+	m.execScrollback = t.execScrollback
+	m.execScrollOffset = t.execScrollOffset
 	m.explainFields = append([]model.ExplainField(nil), t.explainFields...)
 	m.explainDesc = t.explainDesc
 	m.explainPath = t.explainPath

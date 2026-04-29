@@ -195,7 +195,7 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `sort_reset` | `-` | Reset sort to default |
 | `error_log` | `!` | Error log overlay |
 | `finalizer_search` | `ctrl+g` | Finalizer search and remove |
-| `terminal_toggle` | `ctrl+t` | Toggle terminal mode (pty/exec) |
+| `terminal_toggle` | `ctrl+t` | Cycle terminal mode (pty/exec/mux) |
 | `toggle_rare` | `H` | Toggle rarely used resource types in the sidebar |
 
 ## Resource Columns
@@ -498,7 +498,8 @@ min_contrast_ratio: 0.175
 
 ## Terminal Mode
 
-Controls how exec and shell commands are executed.
+Controls how interactive shells (`exec`, `attach`, `debug`, debug pods,
+node shell) run.
 
 ```yaml
 terminal: pty
@@ -506,8 +507,72 @@ terminal: pty
 
 | Value | Description |
 |---|---|
-| `pty` (default) | Embedded in the TUI — command output appears inside the application |
-| `exec` | Takes over the terminal — the TUI suspends and the command runs in the foreground |
+| `pty` (default) | Embedded in the TUI via an internal vt10x terminal — output appears inside lfk |
+| `exec` | Hands the host terminal to the shell via `tea.ExecProcess`; lfk suspends until the shell exits |
+| `mux` | Opens the shell in a new window (tmux) or floating pane (zellij) of the surrounding multiplexer; lfk stays foregrounded alongside it |
+
+`Ctrl+T` cycles modes at runtime: `pty -> exec -> mux -> pty`. The `mux`
+step is skipped automatically when no tmux/zellij is detected, so the
+cycle becomes `pty -> exec -> pty` in that case. Setting `terminal:` in
+the config picks the default at startup.
+
+### Selecting and copying text in `pty` mode
+
+Inside the embedded PTY view, the host terminal handles text selection.
+`shift+drag` copies a region; on macOS, `shift+option+drag` (or `alt+drag`
+on Linux/Windows) selects a rectangular block, which is useful when
+several panes share the screen.
+
+For lines that have already scrolled off the visible viewport, lfk keeps
+an in-app scrollback ring (~5000 lines per PTY tab, ANSI-stripped). Use
+`Ctrl+]` `Ctrl+U` / `Ctrl+D` to scroll by half a viewport, `Ctrl+]`
+`Ctrl+B` / `Ctrl+F` for full-viewport pages, `Ctrl+]` `g` to jump to the
+oldest captured line, `Ctrl+]` `G` to snap back to live. Typing a real
+character also snaps to live so subsequent input goes to the visible prompt.
+
+The scrollback ring is populated from the byte stream, not the rendered
+screen, so full-screen curses programs (vim, less, htop) that paint
+absolute screen positions will produce noisy history while running. If
+you need precise scrollback, cycle to `exec` or `mux` mode for the next
+shell — the host terminal's own scrollback then takes over.
+
+### `mux` mode requirements
+
+`mux` mode requires lfk to be running inside `tmux` or `zellij` and the
+corresponding binary to be on `PATH`. lfk detects this via the `$TMUX` /
+`$ZELLIJ` env vars. When the requirement isn't met, an interactive shell
+attempt under `terminal: mux` fails fast with an error in the status bar
+— either set the env, install the binary, or cycle to `exec`/`pty`.
+
+KUBECONFIG and any other per-context env that lfk passes to subprocesses
+are forwarded to the new pane via inline shell variable assignments,
+since neither tmux nor zellij propagate parent env reliably across
+their spawn APIs.
+
+## PTY Scrollback
+
+`scrollback_lines` sets the per-tab capacity of the embedded PTY
+scrollback ring buffer (in lines). Only applies to `pty` mode — `exec`
+and `mux` delegate scrollback to the host terminal.
+
+```yaml
+scrollback_lines: 5000
+```
+
+| Field | Default | Range | Description |
+|---|---|---|---|
+| `scrollback_lines` | `5000` | `[100, 100000]` | Per-tab line cap for the captured PTY scrollback. Out-of-range values are clamped and a warning is logged. |
+
+Memory budget is roughly `scrollback_lines × average_line_length` per
+PTY tab. With the default and ~120-character lines, that's around
+600 KiB per tab — safe to leave at default for most users. Bump it if
+you frequently `cat` large logs from inside the embedded shell and
+want to scroll back through them; lower it on very memory-constrained
+systems.
+
+Navigate the captured scrollback with `Ctrl+]` `Ctrl+U`/`Ctrl+D` (half
+page), `Ctrl+]` `Ctrl+B`/`Ctrl+F` (full page), `Ctrl+]` `g`/`G`
+(oldest/live), or the mouse wheel (1 line per tick).
 
 ## Color Schemes
 

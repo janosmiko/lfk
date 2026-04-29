@@ -227,11 +227,13 @@ type TabState struct {
 	diffUnified   bool
 
 	// Exec PTY state (per-tab).
-	execPTY   *os.File
-	execTerm  vt10x.Terminal
-	execTitle string
-	execDone  *atomic.Bool
-	execMu    *sync.Mutex
+	execPTY          *os.File
+	execTerm         vt10x.Terminal
+	execTitle        string
+	execDone         *atomic.Bool
+	execMu           *sync.Mutex
+	execScrollback   *scrollback // line ring captured from the PTY byte stream
+	execScrollOffset int         // 0 = live; >0 = N rows scrolled back into history
 
 	// Explain view state (per-tab).
 	explainFields      []model.ExplainField
@@ -551,12 +553,14 @@ type Model struct {
 	diffVisualCurCol int    // current cursor column
 
 	// Embedded terminal state (PTY mode).
-	execPTY        *os.File       // PTY master file descriptor
-	execTerm       vt10x.Terminal // Virtual terminal emulator
-	execTitle      string         // Title for the exec session
-	execDone       *atomic.Bool   // Process has exited (shared across copies)
-	execMu         *sync.Mutex    // Protects execTerm access
-	execEscPressed bool           // Ctrl+] prefix pressed, waiting for follow-up key
+	execPTY          *os.File       // PTY master file descriptor
+	execTerm         vt10x.Terminal // Virtual terminal emulator
+	execTitle        string         // Title for the exec session
+	execDone         *atomic.Bool   // Process has exited (shared across copies)
+	execMu           *sync.Mutex    // Protects execTerm access
+	execEscPressed   bool           // Ctrl+] prefix pressed, waiting for follow-up key
+	execScrollback   *scrollback    // Line ring captured from the PTY byte stream for scrollback
+	execScrollOffset int            // 0 = live; >0 = N rows scrolled back into history
 
 	// Multi-selection state: maps "namespace/name" keys to selected status.
 	selectedItems   map[string]bool

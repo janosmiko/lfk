@@ -706,13 +706,48 @@ func (m Model) handleExplorerActionKeyErrorLog() (tea.Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
+// nextTerminalMode computes the next mode in the Ctrl+T cycle. Split out
+// from the handler so the rotation logic can be unit-tested without
+// stubbing OS lookups: hasMux is whether a tmux/zellij multiplexer is
+// currently detected.
+//
+// The cycle is pty -> exec -> mux -> pty when a multiplexer is available,
+// and pty -> exec -> pty otherwise — Ctrl+T never lands the user in mux
+// when it would just error on the next interactive shell.
+func nextTerminalMode(current string, hasMux bool) string {
+	switch current {
+	case ui.TerminalModePTY:
+		return ui.TerminalModeExec
+	case ui.TerminalModeExec:
+		if hasMux {
+			return ui.TerminalModeMux
+		}
+		return ui.TerminalModePTY
+	case ui.TerminalModeMux:
+		return ui.TerminalModePTY
+	default:
+		return ui.TerminalModePTY
+	}
+}
+
 func (m Model) handleExplorerActionKeyTerminalToggle() (tea.Model, tea.Cmd, bool) {
-	if ui.ConfigTerminalMode == "pty" {
-		ui.ConfigTerminalMode = "exec"
-		m.setStatusMessage("Terminal mode: exec (takes over terminal)", false)
-	} else {
-		ui.ConfigTerminalMode = "pty"
-		m.setStatusMessage("Terminal mode: pty (embedded)", false)
+	mx := detectMultiplexer(nil, nil)
+	ui.ConfigTerminalMode = nextTerminalMode(ui.ConfigTerminalMode, mx != nil)
+
+	switch ui.ConfigTerminalMode {
+	case ui.TerminalModeExec:
+		m.setStatusMessage("Terminal mode: exec (takes over the terminal)", false)
+	case ui.TerminalModeMux:
+		// nextTerminalMode only returns mux when hasMux was true, so mx
+		// is non-nil here. Guard anyway so a future refactor that
+		// bypasses nextTerminalMode can't trip a nil deref.
+		muxName := "multiplexer"
+		if mx != nil {
+			muxName = mx.name
+		}
+		m.setStatusMessage("Terminal mode: mux (new "+muxName+" window or pane)", false)
+	default:
+		m.setStatusMessage("Terminal mode: pty (embedded in lfk)", false)
 	}
 	return m, scheduleStatusClear(), true
 }

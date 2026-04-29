@@ -45,7 +45,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `W` | Save resource to file / toggle warnings-only filter (Events view) |
 | | Events list also groups duplicate events (same Type/Reason/Message/Object) by default; press `z` to toggle grouping |
 | `T` | Switch color scheme (live preview, not persisted) |
-| `Ctrl+T` | Toggle terminal mode (pty embedded / exec takeover) |
+| `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
 | `Ctrl+G` | Finalizer search and remove |
 | `@` | Monitoring overview (active Prometheus alerts) |
 | `Q` | Namespace resource quota dashboard |
@@ -270,8 +270,39 @@ my namespace" mode.
 | `Ctrl+]` `]` | Next tab (PTY keeps running in background) |
 | `Ctrl+]` `[` | Previous tab (PTY keeps running in background) |
 | `Ctrl+]` `t` | New tab (clone current context) |
+| `Ctrl+]` `Ctrl+U` / `Ctrl+D` | Scroll back / forward by half a viewport |
+| `Ctrl+]` `Ctrl+B` / `Ctrl+F` | Scroll back / forward by a full viewport |
+| `Ctrl+]` `g` / `G` | Jump to oldest captured line / back to live |
+| Mouse wheel | Scroll the PTY scrollback (1 line per tick) |
 
-All other keys are forwarded to the PTY process. The PTY session continues running when you switch tabs, so you can return to it later.
+All other keys are forwarded to the PTY process. The PTY session continues running when you switch tabs, so you can return to it later. Typing any character snaps the view back to the live shell so you don't accidentally type into history.
+
+### Scrollback
+
+Each PTY tab keeps a ring of up to 5000 ANSI-stripped lines captured from the byte stream. Use `Ctrl+]` then `Ctrl+U` / `Ctrl+D` / `Ctrl+B` / `Ctrl+F` to navigate it; `Ctrl+]` `g` / `G` jump to the oldest captured line / back to live. The hint bar shows `scrolled N` while you're not at the live tail. Full-screen curses programs (vim, less, htop) write absolute-position output that the line-stream capture can't reconstruct cleanly — their scrollback view will look messy while they're running, but normal output cleans up afterward. If you need precise scrollback, switch to `exec` or `mux` mode (`Ctrl+T`) so the host terminal's own scrollback handles it.
+
+### Selecting and copying text
+
+Inside the embedded PTY view the host terminal handles selection. Use
+`Shift+Drag` for a normal selection; on macOS, `Shift+Option+Drag` (or
+`Alt+Drag` on Linux/Windows) selects a rectangular block.
+
+If you need full host-terminal capabilities (scrollback, native search,
+unrestricted copy), cycle to `exec` or `mux` mode with `Ctrl+T`, or set
+the desired default in the config (`terminal: exec` or `terminal: mux`).
+
+### Terminal modes
+
+| Mode | What happens when an interactive shell runs |
+|---|---|
+| `pty` (default) | Shell embeds inside lfk via an internal vt10x terminal. Selection works via `Shift+Drag`. |
+| `exec` | lfk hands the host terminal to the shell via `tea.ExecProcess` and resumes once it exits. |
+| `mux` | Shell opens in a new window (tmux) or floating pane (zellij) of the surrounding multiplexer. lfk stays foregrounded alongside. Errors out if no multiplexer is detected. |
+
+`Ctrl+T` cycles `pty -> exec -> mux -> pty`. Mux is skipped automatically
+when no tmux/zellij is detected, so the cycle becomes `pty -> exec ->
+pty` in that case. The mode is process-local — restart-persistence comes
+from `terminal:` in the config.
 
 ## Diff View
 
@@ -480,7 +511,8 @@ and global config.
 |---|---|
 | Click | Select item / navigate |
 | Scroll | Navigate up/down |
-| Shift+Drag | Select text (terminal native) |
+| Shift+Drag | Select text (host terminal) |
+| Shift+Option+Drag (macOS) / Alt+Drag (Linux, Windows) | Block-select text inside the embedded PTY |
 
 ## Command Bar
 
@@ -628,7 +660,7 @@ keybindings:
   filter_presets: "."    # Quick filter presets
   monitoring: "@"        # Monitoring dashboard
   quota_dashboard: "Q"   # Quota dashboard
-  terminal_toggle: "ctrl+t"  # Toggle terminal mode (pty/exec)
+  terminal_toggle: "ctrl+t"  # Cycle terminal mode (pty/exec/mux)
 
   # Actions
   action_menu: "x"       # Action menu

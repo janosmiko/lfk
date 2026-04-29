@@ -17,6 +17,75 @@ import (
 
 // --- Action commands ---
 
+// runInteractiveShellExec returns a tea.Cmd that runs an interactive shell
+// command. The behaviour is selected by ui.ConfigTerminalMode:
+//
+//   - TerminalModeExec: hand the host terminal to cmd via tea.ExecProcess
+//     (lfk suspends for the duration). clearBefore controls whether cmd is
+//     wrapped in clearBeforeExec to flush TUI artifacts before the shell
+//     paints.
+//   - TerminalModeMux: open cmd in a new window/pane of the surrounding
+//     multiplexer (tmux or zellij). lfk stays foregrounded. Returns an
+//     actionResultMsg error if no multiplexer is detected.
+//
+// TerminalModePTY is handled separately by the callers (startPTYExecCmd)
+// and never reaches this helper.
+//
+// title is the window/tab name when the multiplexer supports one;
+// sessionLabel is used for status messages ("Exec", "Attach", "Debug",
+// "Debug pod", "Node shell").
+func runInteractiveShellExec(cmd *exec.Cmd, title, sessionLabel string, clearBefore bool) tea.Cmd {
+	if ui.ConfigTerminalMode == ui.TerminalModeMux {
+		mx := detectMultiplexer(nil, nil)
+		if mx == nil {
+			return func() tea.Msg {
+				return actionResultMsg{
+					err: fmt.Errorf("terminal mode 'mux' requires running inside tmux or zellij — none detected; switch to pty/exec or set TMUX/ZELLIJ"),
+				}
+			}
+		}
+		wrapped := mx.wrap(cmd, title, os.Environ())
+		mxName := mx.name
+		// tmux groups panes into windows; zellij's `run` opens a floating
+		// pane within the current tab. Use the term that matches the
+		// multiplexer the user is in so the status message matches what
+		// they actually see.
+		paneNoun := "window"
+		if mxName == "zellij" {
+			paneNoun = "pane"
+		}
+		return func() tea.Msg {
+			logExecCmd("Opening "+sessionLabel+" in "+mxName, wrapped)
+			output, err := wrapped.CombinedOutput()
+			if err != nil {
+				logger.Error(sessionLabel+" multiplexer spawn failed", "error", err, "output", string(output))
+				return actionResultMsg{
+					err: fmt.Errorf("opening %s in new %s %s: %w: %s",
+						sessionLabel, mxName, paneNoun, err, strings.TrimSpace(string(output))),
+				}
+			}
+			return actionResultMsg{
+				message: fmt.Sprintf("%s opened in new %s %s", sessionLabel, mxName, paneNoun),
+			}
+		}
+	}
+	// TerminalModeExec (and any unrecognised value): suspend lfk and hand
+	// the host terminal to cmd.
+	fallback := cmd
+	if clearBefore {
+		fallback = clearBeforeExec(cmd)
+	}
+	return tea.ExecProcess(fallback, func(err error) tea.Msg {
+		if err != nil {
+			logger.Error(sessionLabel+" session failed", "cmd", cmd.String(), "error", err)
+		}
+		return actionResultMsg{
+			message: sessionLabel + " session ended",
+			err:     err,
+		}
+	})
+}
+
 func (m Model) execKubectlExec() tea.Cmd {
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
@@ -36,8 +105,8 @@ func (m Model) execKubectlExec() tea.Cmd {
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 
-	if ui.ConfigTerminalMode == "pty" {
-		cols := m.width - 4
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		cols := m.width
 		rows := m.height - 6
 		if cols < 20 {
 			cols = 80
@@ -49,9 +118,8 @@ func (m Model) execKubectlExec() tea.Cmd {
 		return startPTYExecCmd(cmd, title, cols, rows)
 	}
 
-	return tea.ExecProcess(clearBeforeExec(cmd), func(err error) tea.Msg {
-		return actionResultMsg{message: "Exec session ended", err: err}
-	})
+	title := fmt.Sprintf("Exec: %s/%s", m.actionNamespace(), m.actionCtx.name)
+	return runInteractiveShellExec(cmd, title, "Exec", true)
 }
 
 func (m Model) execKubectlAttach() tea.Cmd {
@@ -72,8 +140,8 @@ func (m Model) execKubectlAttach() tea.Cmd {
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 	logExecCmd("Running kubectl command", cmd)
 
-	if ui.ConfigTerminalMode == "pty" {
-		cols := m.width - 4
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		cols := m.width
 		rows := m.height - 6
 		if cols < 20 {
 			cols = 80
@@ -85,9 +153,8 @@ func (m Model) execKubectlAttach() tea.Cmd {
 		return startPTYExecCmd(cmd, title, cols, rows)
 	}
 
-	return tea.ExecProcess(clearBeforeExec(cmd), func(err error) tea.Msg {
-		return actionResultMsg{message: "Attach session ended", err: err}
-	})
+	title := fmt.Sprintf("Attach: %s/%s", m.actionNamespace(), m.actionCtx.name)
+	return runInteractiveShellExec(cmd, title, "Attach", true)
 }
 
 func (m Model) execKubectlEdit() tea.Cmd {
@@ -170,8 +237,8 @@ func (m Model) execKubectlDebug() tea.Cmd {
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 	logExecCmd("Running kubectl command", cmd)
 
-	if ui.ConfigTerminalMode == "pty" {
-		cols := m.width - 4
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		cols := m.width
 		rows := m.height - 6
 		if cols < 20 {
 			cols = 80
@@ -183,9 +250,11 @@ func (m Model) execKubectlDebug() tea.Cmd {
 		return startPTYExecCmd(cmd, title, cols, rows)
 	}
 
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		return actionResultMsg{message: "Debug session ended", err: err}
-	})
+	title := fmt.Sprintf("Debug: %s/%s", m.actionNamespace(), m.actionCtx.name)
+	// `kubectl debug` already clears before attaching to the ephemeral
+	// container; an extra clearBeforeExec would briefly flash the TUI's
+	// reset sequence over the ephemeral session start.
+	return runInteractiveShellExec(cmd, title, "Debug", false)
 }
 
 // runDebugPod runs a standalone alpine debug pod in the target namespace.
@@ -212,8 +281,8 @@ func (m Model) runDebugPod() tea.Cmd {
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 
-	if ui.ConfigTerminalMode == "pty" {
-		cols := m.width - 4
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		cols := m.width
 		rows := m.height - 6
 		if cols < 20 {
 			cols = 80
@@ -225,12 +294,8 @@ func (m Model) runDebugPod() tea.Cmd {
 		return startPTYExecCmd(cmd, title, cols, rows)
 	}
 
-	return tea.ExecProcess(clearBeforeExec(cmd), func(err error) tea.Msg {
-		if err != nil {
-			logger.Error("kubectl run debug pod failed", "cmd", cmd.String(), "error", err)
-		}
-		return actionResultMsg{message: "Debug pod session ended", err: err}
-	})
+	title := fmt.Sprintf("Debug Pod: %s/%s", ns, podName)
+	return runInteractiveShellExec(cmd, title, "Debug pod", true)
 }
 
 // randomSuffix generates a random lowercase alphanumeric string of the given length.
@@ -287,8 +352,8 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)
 
-	if ui.ConfigTerminalMode == "pty" {
-		cols := m.width - 4
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		cols := m.width
 		rows := m.height - 6
 		if cols < 20 {
 			cols = 80
@@ -300,12 +365,8 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 		return startPTYExecCmd(cmd, title, cols, rows)
 	}
 
-	return tea.ExecProcess(clearBeforeExec(cmd), func(err error) tea.Msg {
-		if err != nil {
-			logger.Error("kubectl run debug pod with PVC failed", "cmd", cmd.String(), "error", err)
-		}
-		return actionResultMsg{message: "Debug pod session ended", err: err}
-	})
+	title := fmt.Sprintf("Debug PVC: %s/%s → %s", ns, pvcName, podName)
+	return runInteractiveShellExec(cmd, title, "Debug pod", true)
 }
 
 // --- Resource management commands ---
@@ -957,8 +1018,8 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)
 
-	if ui.ConfigTerminalMode == "pty" {
-		cols := m.width - 4
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		cols := m.width
 		rows := m.height - 6
 		if cols < 20 {
 			cols = 80
@@ -970,12 +1031,11 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 		return startPTYExecCmd(cmd, title, cols, rows)
 	}
 
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			return actionResultMsg{err: fmt.Errorf("node shell: %w", err)}
-		}
-		return actionResultMsg{message: "Node shell session ended"}
-	})
+	title := fmt.Sprintf("Node Shell: %s", nodeName)
+	// `kubectl debug node/...` already takes the terminal cleanly via
+	// chroot — clearBeforeExec is unnecessary and would race with the
+	// debug pod's own startup output.
+	return runInteractiveShellExec(cmd, title, "Node shell", false)
 }
 
 // --- Explain commands ---

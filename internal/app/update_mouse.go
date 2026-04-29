@@ -7,6 +7,21 @@ import (
 )
 
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	// Mouse wheel inside the embedded PTY pane scrolls the scrollback
+	// ring (when present). One line per tick matches what most native
+	// terminals do for their own scrollback. We only intercept the
+	// wheel — clicks and other mouse input fall through so tab-bar
+	// clicks and host-terminal selection (shift+drag) keep working.
+	if m.mode == modeExec {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			return m.execScrollBy(-1), nil
+		case tea.MouseButtonWheelDown:
+			return m.execScrollBy(1), nil
+		}
+		// Fall through for non-wheel mouse events (tab-bar clicks etc.)
+	}
+
 	// Handle mouse scroll in log viewer mode.
 	if m.mode == modeLogs {
 		switch msg.Button {

@@ -326,9 +326,21 @@ confirm_on_exit: true
 
 # ─── Terminal Mode ────────────────────────────────────────────────────────────
 # How exec and shell commands are executed.
-# "pty" (default): Embedded in the TUI
-# "exec": Takes over the terminal (TUI suspends)
+# "pty" (default): Embedded in the TUI — host shift+drag selects text
+# "exec": Takes over the terminal (lfk suspends until the shell exits)
+# "mux": Opens in a new tmux/zellij window or pane (requires lfk to be running
+#        inside a supported multiplexer; lfk stays foregrounded alongside it)
+# Cycle at runtime with Ctrl+T (mux is skipped when no multiplexer is detected).
 # terminal: pty
+
+# ─── PTY Scrollback ───────────────────────────────────────────────────────────
+# Per-tab capacity of the embedded PTY scrollback ring (in lines). Only
+# affects pty mode; exec and mux delegate scrollback to the host terminal.
+# Clamped to [100, 100000]. Default 5000 covers an extended interactive
+# session without bloating memory. Use Ctrl+] Ctrl+U/Ctrl+D (half page),
+# Ctrl+] Ctrl+B/Ctrl+F (full page), Ctrl+] g/G (oldest/live), or the
+# mouse wheel (1 line per tick) to navigate.
+# scrollback_lines: 5000
 
 # ─── Watch Interval ───────────────────────────────────────────────────────────
 # Polling interval used when watch mode is active (press 'w' to toggle).

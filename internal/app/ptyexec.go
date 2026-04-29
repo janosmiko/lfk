@@ -71,15 +71,24 @@ func (m *Model) cleanupExecPTY() {
 	}
 	m.execTerm = nil
 	m.execDone = nil
+	m.execScrollback = nil
+	m.execScrollOffset = 0
 }
 
 // handleExecKey forwards key presses to the embedded PTY.
-// Ctrl+] is a prefix key (like tmux's Ctrl+b):
-//   - Ctrl+] then ] = next tab
-//   - Ctrl+] then [ = previous tab
-//   - Ctrl+] then t = new tab
-//   - Ctrl+] then Ctrl+] = exit terminal
-//   - Ctrl+] then any other key = cancel, return to PTY
+// Ctrl+] is a prefix key (like tmux's Ctrl+b). Scroll bindings use
+// Ctrl+<letter> so they share the prefix's modifier convention and
+// don't collide with letters the user might want to forward to the
+// PTY (e.g. typing `u` at a shell prompt):
+//   - Ctrl+] then ]                = next tab
+//   - Ctrl+] then [                = previous tab
+//   - Ctrl+] then t                = new tab
+//   - Ctrl+] then Ctrl+U / Ctrl+D  = scroll up/down half a viewport
+//   - Ctrl+] then Ctrl+B / Ctrl+F  = scroll up/down a full viewport
+//   - Ctrl+] then g                = jump to top of scrollback
+//   - Ctrl+] then G                = jump back to live (offset 0)
+//   - Ctrl+] then Ctrl+]           = exit terminal
+//   - Ctrl+] then any other key    = cancel, return to PTY
 func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// If process has exited, any key returns to explorer.
 	if m.execDone != nil && m.execDone.Load() {
@@ -104,6 +113,19 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.execSwitchTab((m.activeTab - 1 + len(m.tabs)) % len(m.tabs))
 		case "t":
 			return m.execNewTab()
+		case "ctrl+u":
+			return m.execScrollBy(-(m.execViewportRows() / 2)), nil
+		case "ctrl+d":
+			return m.execScrollBy(m.execViewportRows() / 2), nil
+		case "ctrl+b":
+			return m.execScrollBy(-m.execViewportRows()), nil
+		case "ctrl+f":
+			return m.execScrollBy(m.execViewportRows()), nil
+		case "g":
+			return m.execScrollToTop(), nil
+		case "G":
+			m.execScrollOffset = 0
+			return m, nil
 		default:
 			// Cancel prefix — key is swallowed (not forwarded).
 			return m, nil
@@ -113,13 +135,17 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Ctrl+] pressed: set prefix flag and show hint.
 	if msg.String() == "ctrl+]" {
 		m.execEscPressed = true
-		m.setStatusMessage("Ctrl+]: ]/[ switch tab, t new tab, Ctrl+] exit", false)
+		m.setStatusMessage("Ctrl+]: ]/[ tabs, t new, Ctrl+U/D half-page, Ctrl+B/F page, g/G top/live, Ctrl+] exit", false)
 		return m, nil
 	}
 
 	if m.execPTY == nil {
 		return m, nil
 	}
+
+	// Forwarding a real key into the PTY snaps back to live so the user
+	// sees the prompt their input is going into.
+	m.execScrollOffset = 0
 
 	// Convert Bubbletea key to raw bytes for PTY.
 	// Pass the terminal's application cursor mode so arrow keys send the
@@ -130,6 +156,54 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		_, _ = m.execPTY.Write(raw)
 	}
 	return m, nil
+}
+
+// execViewportRows reports the number of PTY rows the user can see in
+// the current window — the same value viewExecTerminal uses for its
+// viewH. The handlers and the renderer must agree on this number; if
+// the scroll clamp uses a larger viewport than the renderer, the
+// oldest few lines get trimmed off the top when the user scrolls all
+// the way back.
+//
+// The render path receives m.height already reduced by view.go (1 row
+// for the outer title bar, plus 1 more if the tab bar is visible).
+// Update-path handlers see the raw terminal height, so we replicate
+// the reductions here.
+func (m Model) execViewportRows() int {
+	h := m.height - 1 // outer title bar (always present in modeExec)
+	if len(m.tabs) > 1 {
+		h-- // outer tab bar
+	}
+	// exec title (1) + top border (1) + bottom border (1) + hint line (1)
+	h -= 4
+	return max(h, 3)
+}
+
+// execScrollBy adjusts the scrollback offset by delta lines (negative =
+// scroll back into history, positive = scroll forward toward live). The
+// offset is clamped to [0, max(Len - viewH, 0)] — i.e. the oldest line
+// can sit at the top of the viewport, but never further; otherwise the
+// rendered window slides past the start of scrollback and shows blanks.
+func (m Model) execScrollBy(delta int) Model {
+	if m.execScrollback == nil {
+		return m
+	}
+	maxOffset := max(m.execScrollback.Len()-m.execViewportRows(), 0)
+	target := max(m.execScrollOffset-delta, 0)
+	target = min(target, maxOffset)
+	m.execScrollOffset = target
+	return m
+}
+
+// execScrollToTop sets the scroll offset so the oldest captured line is
+// at the top of the viewport. When fewer lines are captured than fit in
+// the viewport, this is equivalent to live (offset 0).
+func (m Model) execScrollToTop() Model {
+	if m.execScrollback == nil {
+		return m
+	}
+	m.execScrollOffset = max(m.execScrollback.Len()-m.execViewportRows(), 0)
+	return m
 }
 
 // execSwitchTab saves the current tab and switches to the target tab index.
@@ -177,10 +251,14 @@ func (m Model) execNewTab() (tea.Model, tea.Cmd) {
 }
 
 // startExecPTYReader launches the background goroutine that reads from PTY
-// output and feeds it into the virtual terminal emulator. It also waits for
-// the process to exit and sets the done flag.
-// The done atomic and mu allow the goroutine to signal the correct tab's state.
-func startExecPTYReader(ptmx *os.File, term vt10x.Terminal, cmd *exec.Cmd, mu *sync.Mutex, done *atomic.Bool) {
+// output and feeds it into the virtual terminal emulator. The same byte
+// stream is also tee'd into sb (the scrollback ring) so users can scroll
+// past what fits in the live viewport. The reader also waits for the
+// process to exit and sets the done flag.
+//
+// done and mu allow the goroutine to signal the correct tab's state when
+// switched into the background. sb may be nil (no scrollback capture).
+func startExecPTYReader(ptmx *os.File, term vt10x.Terminal, sb *scrollback, cmd *exec.Cmd, mu *sync.Mutex, done *atomic.Bool) {
 	go func() {
 		buf := make([]byte, 4096)
 		for {
@@ -189,6 +267,10 @@ func startExecPTYReader(ptmx *os.File, term vt10x.Terminal, cmd *exec.Cmd, mu *s
 				mu.Lock()
 				_, _ = term.Write(buf[:n])
 				mu.Unlock()
+				// Capture scrollback outside term's lock — sb has its
+				// own mutex and the order of these writes is fixed by
+				// the single-reader goroutine.
+				_, _ = sb.Write(buf[:n])
 			}
 			if err != nil {
 				if err != io.EOF {

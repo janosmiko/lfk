@@ -243,7 +243,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `=` | Toggle sort direction (ascending/descending) |
 | `-` | Reset sort to default (Name ascending) |
 | `W` | Save resource to file / toggle warnings-only (Events) |
-| `Ctrl+T` | Toggle terminal mode (pty embedded / exec takeover) |
+| `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
 | `@` | Monitoring overview (active Prometheus alerts) |
 | `Q` | Namespace resource quota dashboard |
 

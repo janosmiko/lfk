@@ -9,6 +9,7 @@ import (
 
 	"sigs.k8s.io/yaml"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -331,8 +332,44 @@ var ConfigSecretLazyLoading bool
 // saturation are preserved at moderate values.
 var ConfigMinContrastRatio float64
 
-// ConfigTerminalMode controls how exec/shell commands run.
-var ConfigTerminalMode = "pty"
+// Terminal-mode constants control how exec/shell commands run. They are
+// the only valid values for ConfigTerminalMode and the `terminal:` config
+// key.
+const (
+	// TerminalModePTY embeds the shell in lfk's TUI via an internal vt10x
+	// terminal. Output stays inside lfk; selection works via host-terminal
+	// shift+drag. Default.
+	TerminalModePTY = "pty"
+	// TerminalModeExec hands the host terminal to the shell via
+	// tea.ExecProcess and resumes lfk after the shell exits. Selection,
+	// scrollback, and copy/paste work natively but lfk is suspended for
+	// the duration.
+	TerminalModeExec = "exec"
+	// TerminalModeMux opens the shell in a new window/pane of the
+	// surrounding multiplexer (tmux or zellij), so lfk stays foregrounded
+	// alongside the shell. Errors out if no multiplexer is detected — use
+	// pty or exec in that case.
+	TerminalModeMux = "mux"
+)
+
+// ConfigTerminalMode controls how exec/shell commands run. One of
+// TerminalModePTY, TerminalModeExec, TerminalModeMux.
+var ConfigTerminalMode = TerminalModePTY
+
+// ScrollbackLines clamps for the embedded PTY scrollback ring. The
+// default of 5000 covers an extended interactive session without
+// running the parent process out of memory; the floor stops a typo in
+// the config from disabling scrollback entirely; the ceiling caps
+// memory at roughly 10MB even with very long lines.
+const (
+	ScrollbackLinesDefault = 5000
+	ScrollbackLinesMin     = 100
+	ScrollbackLinesMax     = 100_000
+)
+
+// ConfigScrollbackLines is the per-tab capacity of the PTY scrollback
+// ring (in lines). Set via the `scrollback_lines:` config key.
+var ConfigScrollbackLines = ScrollbackLinesDefault
 
 // CustomAction represents a user-defined action for a specific resource kind.
 type CustomAction struct {
@@ -466,8 +503,16 @@ type configFile struct {
 	// FilterPresets maps resource Kind names (case-insensitive, e.g. "Pod", "Deployment")
 	// to user-defined quick filter presets that appear alongside the built-in presets.
 	FilterPresets map[string][]ConfigFilterPreset `json:"filter_presets" yaml:"filter_presets"`
-	// Terminal controls how exec/shell commands run: "exec" (takes over terminal) or "pty" (embedded in TUI).
+	// Terminal controls how exec/shell commands run: "pty" (embedded in
+	// TUI), "exec" (takes over the terminal), or "mux" (open in a new
+	// tmux/zellij window or pane — requires lfk to be running inside a
+	// supported multiplexer).
 	Terminal string `json:"terminal" yaml:"terminal"`
+	// ScrollbackLines is the per-tab capacity of the embedded PTY
+	// scrollback ring buffer. Default 5000; clamped to
+	// [ScrollbackLinesMin, ScrollbackLinesMax]. Only meaningful in pty
+	// mode — exec and mux delegate scrollback to the host terminal.
+	ScrollbackLines int `json:"scrollback_lines" yaml:"scrollback_lines"`
 	// PinnedGroups lists CRD API groups that should appear prominently
 	// right after built-in categories. Example: ["karpenter.sh", "monitoring.coreos.com"]
 	PinnedGroups []string `json:"pinned_groups" yaml:"pinned_groups"`
@@ -736,10 +781,33 @@ func applyConfigOptions(cfg configFile) {
 		ConfigDashboard = *cfg.Dashboard
 	}
 	if cfg.Terminal != "" {
-		switch strings.ToLower(cfg.Terminal) {
-		case "pty", "exec":
-			ConfigTerminalMode = strings.ToLower(cfg.Terminal)
+		mode := strings.ToLower(cfg.Terminal)
+		switch mode {
+		case TerminalModePTY, TerminalModeExec, TerminalModeMux:
+			ConfigTerminalMode = mode
+		default:
+			logger.Warn("unrecognised terminal mode in config; falling back to default",
+				"value", cfg.Terminal,
+				"valid", []string{TerminalModePTY, TerminalModeExec, TerminalModeMux},
+				"default", ConfigTerminalMode)
 		}
+	}
+	if cfg.ScrollbackLines != 0 {
+		v := cfg.ScrollbackLines
+		clamped := v
+		if v < ScrollbackLinesMin {
+			clamped = ScrollbackLinesMin
+		} else if v > ScrollbackLinesMax {
+			clamped = ScrollbackLinesMax
+		}
+		if clamped != v {
+			logger.Warn("scrollback_lines out of range; clamped",
+				"value", v,
+				"min", ScrollbackLinesMin,
+				"max", ScrollbackLinesMax,
+				"applied", clamped)
+		}
+		ConfigScrollbackLines = clamped
 	}
 	if len(cfg.PinnedGroups) > 0 {
 		ConfigPinnedGroups = cfg.PinnedGroups

@@ -397,7 +397,7 @@ func (m Model) updateWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.clampAllCursors()
 	// Resize the embedded PTY terminal if active.
 	if m.mode == modeExec && m.execTerm != nil && m.execPTY != nil {
-		cols := m.width - 4
+		cols := m.width
 		rows := m.height - 6
 		if cols < 20 {
 			cols = 20
@@ -2377,10 +2377,16 @@ func (m Model) updateExecPTYStart(msg execPTYStartMsg) (tea.Model, tea.Cmd) {
 	m.execTitle = msg.title
 	m.execDone = &atomic.Bool{}
 	m.execMu = &sync.Mutex{}
+	// Configurable via ui.ConfigScrollbackLines (default
+	// ui.ScrollbackLinesDefault = 5000) — generous for typical sessions,
+	// bounded memory for long-running shells. The reader writes here in
+	// lock-step with the vt10x terminal so scroll offsets line up.
+	m.execScrollback = newScrollback(ui.ConfigScrollbackLines)
+	m.execScrollOffset = 0
 	m.mode = modeExec
 
 	// Start background reader goroutine.
-	startExecPTYReader(msg.ptmx, msg.term, msg.cmd, m.execMu, m.execDone)
+	startExecPTYReader(msg.ptmx, msg.term, m.execScrollback, msg.cmd, m.execMu, m.execDone)
 
 	return m, m.scheduleExecTick()
 }
