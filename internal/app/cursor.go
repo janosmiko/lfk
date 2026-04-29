@@ -217,11 +217,18 @@ func (m *Model) middleColumnKind() string {
 }
 
 // navKey builds a unique key from the current navigation state, used for
-// cursor memory and item caching.
+// cursor memory and item caching. For namespaced resource types, the
+// effective namespace is included so that items cached for one namespace
+// are not served when the user switches to another namespace (especially
+// important for security findings whose content varies per namespace).
 func (m *Model) navKey() string {
 	parts := []string{m.nav.Context}
 	if m.nav.ResourceType.Resource != "" {
 		parts = append(parts, m.nav.ResourceType.Resource)
+		if m.nav.ResourceType.Namespaced {
+			ns := m.effectiveNamespace()
+			parts = append(parts, "ns:"+ns)
+		}
 	}
 	if m.nav.ResourceName != "" {
 		parts = append(parts, m.nav.ResourceName)
@@ -356,6 +363,12 @@ func (m *Model) visibleMiddleItems() []model.Item {
 			searchText := item.Name
 			if item.Namespace != "" {
 				searchText = item.Namespace + "/" + searchText
+			}
+			// For security group items, also search the hidden __resources__
+			// column so filtering by a resource name (e.g., "web") matches
+			// groups that affect that resource.
+			if res := item.ColumnValue("__resources__"); res != "" {
+				searchText = searchText + " " + res
 			}
 			if ui.MatchLine(searchText, rawQuery) {
 				filtered = append(filtered, item)

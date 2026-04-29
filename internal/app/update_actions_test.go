@@ -2190,3 +2190,57 @@ func TestFinalExecuteActionExplain(t *testing.T) {
 	_ = result.(Model)
 	_ = cmd
 }
+
+// --- executeActionSecurityFindings: action menu → navigate + filter ---
+
+func TestExecuteActionSecurityFindingsFiltersToResource(t *testing.T) {
+	prev := model.SecuritySourcesFn
+	t.Cleanup(func() { model.SecuritySourcesFn = prev })
+	model.SecuritySourcesFn = func() []model.SecuritySourceEntry {
+		return []model.SecuritySourceEntry{
+			{DisplayName: "Trivy", SourceName: "trivy-operator", Icon: model.Icon{Unicode: "◈"}},
+		}
+	}
+
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "test-ctx"
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment"}
+	// navigateParent (called by ascendToResourceTypes) shows the loader
+	// instead of m.leftItems unless discoveredResources for the context
+	// is non-empty — without this the security-source list ends up empty
+	// after the ascend and the action bails out with "No sources".
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"test-ctx": {
+			{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+		},
+	}
+	m.middleItems = []model.Item{
+		{Name: "api", Kind: "Deployment", Namespace: "prod"},
+	}
+	m.leftItems = []model.Item{
+		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
+	}
+
+	updated, _ := m.executeActionSecurityFindings()
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	// The filter is stored as pending and applied when the user drills
+	// into a specific security source.
+	assert.Equal(t, "api", mm.pendingSecurityFilter)
+}
+
+func TestExecuteActionSecurityFindingsNoSources(t *testing.T) {
+	prev := model.SecuritySourcesFn
+	t.Cleanup(func() { model.SecuritySourcesFn = prev })
+	model.SecuritySourcesFn = nil
+
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.middleItems = []model.Item{{Name: "api"}}
+	m.leftItems = []model.Item{}
+	updated, _ := m.executeActionSecurityFindings()
+	mm, ok := updated.(Model)
+	require.True(t, ok)
+	assert.Contains(t, mm.statusMessage, "No security sources available")
+}

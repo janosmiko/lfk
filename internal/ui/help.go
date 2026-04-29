@@ -119,6 +119,7 @@ func helpSections() []helpSection {
 				{kb.WatchMode, "Toggle watch mode (auto-refresh)"},
 				{helpKeyDisplay(kb.ReadOnlyToggle), "Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab)"},
 				{kb.Monitoring, "Monitoring overview (active Prometheus alerts)"},
+				{kb.Security, "Jump to Security category (heuristic + trivy-operator findings)"},
 				{kb.QuotaDashboard, "Namespace resource quota dashboard"},
 				{kb.TasksOverlay, "Background tasks overlay (Tab toggles running/completed history)"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down/up"},
@@ -322,6 +323,20 @@ func helpSections() []helpSection {
 				{"Ctrl+D/U", "Page down/up (half page)"},
 				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"q/Esc", "Close visualizer"},
+			},
+		},
+		{
+			title: "Security findings browser",
+			bindings: []helpEntry{
+				{kb.Security, "Jump to the Security category"},
+				{"x then y", "Go to security findings for selected resource"},
+				{"Enter", "Jump to the affected resource (on a finding)"},
+				{"o", "Owner jump (same effect)"},
+				{"r", "Refresh findings (invalidates cache)"},
+				{"/", "Search findings"},
+				{"f", "Filter findings"},
+				{kb.SecurityIgnoreToggle, "Toggle show/hide ignored findings"},
+				{"x", "Action menu (ignore/un-ignore a finding)"},
 			},
 		},
 		{

@@ -48,6 +48,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+T` | Toggle terminal mode (pty embedded / exec takeover) |
 | `Ctrl+G` | Finalizer search and remove |
 | `@` | Monitoring overview (active Prometheus alerts) |
+| `#` | Jump to Security category |
 | `Q` | Namespace resource quota dashboard |
 | `` ` `` | Background tasks overlay (Tab toggles running / completed history) |
 | `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`, `:tasks`), kubectl (`:k get pod`), shell (`:! cmd`) |
@@ -427,6 +428,23 @@ The title bar shows the namespace scope (`ns:...`) used for the permission check
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` / `Esc` | Close visualizer |
 
+## Security findings browser
+
+Press `#` to jump to the Security category. Navigate through sources, finding groups, and affected resources:
+
+| Key | Action |
+|---|---|
+| `#` | Jump to Security category |
+| `Enter` / `l` | Drill into finding group (shows affected resources) or jump to Kubernetes resource (from affected resource level) |
+| `h` | Navigate back to parent level |
+| `R` | Refresh (invalidates security cache, re-fetches from all enabled sources) |
+| `x` then `y` | From any resource: show security findings for that resource (source picker if multiple sources available) |
+| `x` | Action menu on security items: Ignore (Global), Ignore (This Resource), Un-ignore |
+| `Ctrl+I` | Toggle show/hide ignored findings |
+| `j` / `k` | Move cursor up/down |
+| `/` | Search findings |
+| `f` | Filter findings |
+
 ## Error Log (`!`)
 
 | Key | Action |
@@ -625,6 +643,7 @@ keybindings:
   sort_reset: "-"        # Reset sort to default
   filter_presets: "."    # Quick filter presets
   monitoring: "@"        # Monitoring dashboard
+  security: "#"           # Jump to Security category
   quota_dashboard: "Q"   # Quota dashboard
   terminal_toggle: "ctrl+t"  # Toggle terminal mode (pty/exec)
 

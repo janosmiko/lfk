@@ -8,7 +8,12 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+	"k8s.io/apimachinery/pkg/runtime"
+	dynfake "k8s.io/client-go/dynamic/fake"
+	k8sfake "k8s.io/client-go/kubernetes/fake"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -400,4 +405,70 @@ func TestCov80ExpandCustomActionTemplate(t *testing.T) {
 	assert.Contains(t, result, "default")
 	assert.Contains(t, result, "prod")
 	assert.Contains(t, result, "worker-1")
+}
+
+// --- H1: security manager initialization ---
+
+func TestNewModelHasSecurityManagerAfterInit(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
+	client := k8s.NewTestClient(cs, dyn)
+
+	m := NewModel(client, StartupOptions{})
+	require.NotNil(t, m.securityManager,
+		"NewModel must initialize securityManager so async security commands have a target")
+}
+
+func TestNewModelRegistersSecuritySourcesWhenClientsAvailable(t *testing.T) {
+	// When both a clientset and a dynamic client are available for the
+	// test context, refreshSecuritySources should register the heuristic
+	// and trivy-operator sources.
+	cs := k8sfake.NewClientset()
+	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
+	client := k8s.NewTestClient(cs, dyn)
+
+	m := NewModel(client, StartupOptions{})
+	sources := m.securityManager.Sources()
+	// Collect source names to be order-independent.
+	names := make(map[string]bool, len(sources))
+	for _, s := range sources {
+		names[s.Name()] = true
+	}
+	assert.True(t, names["heuristic"], "heuristic source should be registered")
+	assert.True(t, names["trivy-operator"], "trivy-operator source should be registered")
+}
+
+func TestRefreshSecuritySourcesRebuildsOnContextChange(t *testing.T) {
+	cs := k8sfake.NewClientset()
+	dyn := dynfake.NewSimpleDynamicClient(runtime.NewScheme())
+	client := k8s.NewTestClient(cs, dyn)
+
+	m := NewModel(client, StartupOptions{})
+	originalMgr := m.securityManager
+	require.NotNil(t, originalMgr)
+
+	// Simulate a switch to a different cluster and re-register.
+	m.nav.Context = "another-context"
+	m.refreshSecuritySources()
+	require.NotNil(t, m.securityManager,
+		"securityManager must remain non-nil after refresh")
+
+	// The manager should have been replaced (pointer identity changes) so
+	// stale sources cannot linger across context switches.
+	assert.NotSame(t, originalMgr, m.securityManager,
+		"refreshSecuritySources must replace the manager instance")
+	// With fake clients injected, both sources are still registered because
+	// NewTestClient returns the same fake for any context name.
+	sources := m.securityManager.Sources()
+	assert.Len(t, sources, 4, "all sources should re-register when clients are available")
+}
+
+func TestRefreshSecuritySourcesNilClient(t *testing.T) {
+	// Defensive: refreshSecuritySources must not panic when m.client is
+	// nil (e.g., during early test fixtures).
+	m := Model{}
+	m.refreshSecuritySources()
+	require.NotNil(t, m.securityManager,
+		"securityManager should still be initialized")
+	assert.Empty(t, m.securityManager.Sources())
 }

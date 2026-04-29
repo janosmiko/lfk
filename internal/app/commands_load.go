@@ -134,7 +134,13 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 	// instant because update_navigation.go renders the cached entry
 	// synchronously while this fetch runs in the background.
 	if forPreview && rt.Resource != "" {
+		// Match the key shape used by m.navKey() so the shortcut sees the
+		// entries written by navigateChildResourceType / loadResources for
+		// namespaced resources (which include the effective namespace).
 		cacheKey := kctx + "/" + rt.Resource
+		if rt.Namespaced {
+			cacheKey += "/ns:" + ns
+		}
 		if cached, ok := m.itemCache[cacheKey]; ok &&
 			m.cacheFingerprints[cacheKey] == m.fetchFingerprint() {
 			items := cached

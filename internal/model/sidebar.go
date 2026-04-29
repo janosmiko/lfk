@@ -20,12 +20,70 @@ import (
 // flow through the same metadata-overlay path as real API resources.
 func BuildSidebarItems(discovered []ResourceTypeEntry) []Item {
 	items := injectPseudoCategoryHeaders()
+	items = append(items, injectSecuritySourceItems()...)
 
 	categorized, crdGroups := partitionDiscovered(discovered)
 	items = append(items, categorized...)
 	items = append(items, crdGroups...)
 
 	return sortSidebarItems(items)
+}
+
+// injectSecuritySourceItems returns one sidebar Item per registered security
+// source (e.g., Trivy, Heuristic). The items are built from the live
+// SecuritySourcesFn hook; when the hook is unset (no sources registered)
+// the Security category remains empty but still reserved in CoreCategories.
+//
+// Each entry uses the virtual _security APIGroup and a synthetic Kind like
+// "__security_trivy-operator__". Client.GetResources recognises this group
+// and dispatches to the security.Manager.
+func injectSecuritySourceItems() []Item {
+	if SecuritySourcesFn == nil {
+		return nil
+	}
+	entries := SecuritySourcesFn()
+	if len(entries) == 0 {
+		return nil
+	}
+	items := make([]Item, 0, len(entries))
+	for _, src := range entries {
+		displayName := src.DisplayName
+		if src.Count >= 0 {
+			displayName = src.DisplayName + " (" + intToStr(src.Count) + ")"
+		}
+		items = append(items, Item{
+			Name:     displayName,
+			Kind:     "__security_" + src.SourceName + "__",
+			Extra:    SecurityVirtualAPIGroup + "/v1/findings-" + src.SourceName,
+			Category: "Security",
+			Icon:     src.Icon,
+		})
+	}
+	return items
+}
+
+// intToStr is a small fmt-free int-to-string helper. Avoids pulling fmt
+// into this package just for a single Sprintf in the security injector.
+func intToStr(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
 }
 
 // partitionDiscovered walks the discovered set and produces two slices:

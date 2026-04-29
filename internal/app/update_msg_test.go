@@ -2590,7 +2590,7 @@ func TestUpdateResourcesLoadedPreviewPrimesItemCache(t *testing.T) {
 	})
 	rm := result.(Model)
 
-	expectedKey := "test-ctx/persistentvolumeclaims"
+	expectedKey := "test-ctx/persistentvolumeclaims/ns:default"
 	cached, ok := rm.itemCache[expectedKey]
 	assert.True(t, ok, "itemCache must be primed at drill-in navKey %q", expectedKey)
 	assert.Equal(t, items, cached, "cached items must match preview payload")

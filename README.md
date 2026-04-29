@@ -2,7 +2,7 @@
 
 # :zap: LFK - Lightning Fast Kubernetes navigator
 
-[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677) 
+[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677)
 
 **LFK** is a lightning-fast, keyboard-focused, yazi-inspired terminal user interface for navigating and managing Kubernetes clusters. Built for speed and efficiency, it brings a three-column Miller columns layout with an owner-based resource hierarchy to your terminal.
 
@@ -112,6 +112,16 @@
 - **Bookmarks**: Save favorite resource paths for quick navigation
 - **Session persistence**: Remembers last context/namespace/resource across restarts
 - **Command bar**: Press `:` for shell/kubectl commands with autocompletion
+
+### Security findings browser
+
+- **Grouped findings**: Press `#` to jump to the Security category. Findings are grouped by check, CVE, or rule name. Each group shows severity, affected resource count, and category. Drill into a group to see affected resources.
+- **Five security sources**: Heuristic (built-in pod security checks), Trivy Operator (CVE and misconfiguration scanning via CRDs), Kyverno (policy violations via PolicyReports), Falco (runtime security events), CIS (placeholder for kube-bench).
+- **Hierarchical navigation**: Security > Source > Finding Group > Affected Resources. From an affected resource, press `Enter` or `l` to jump to the corresponding Kubernetes resource in the explorer.
+- **SEC column badge**: Workload rows (Pods, Deployments, etc.) display a severity badge in the Name column. The badge aggregates both direct findings (e.g., heuristic checks on the Pod) and owner findings (e.g., Trivy results targeting the parent Deployment).
+- **Per-resource drill-in**: Press `x` on any resource, then `y` to jump to security findings for that resource. When multiple sources have results, a source picker overlay appears.
+- **Color-coded severity**: CRIT=red, HIGH=orange, MED=yellow, LOW=green in the Severity column.
+- **Refresh**: Press `R` to invalidate the security cache and re-fetch findings from all enabled sources.
 
 ### Integrations
 

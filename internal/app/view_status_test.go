@@ -233,8 +233,9 @@ func TestStatusBarShowsFilterCount(t *testing.T) {
 	}
 	bar := m.statusBar()
 	stripped := stripANSI(bar)
-	assert.Contains(t, stripped, "filtered")
+	assert.Contains(t, stripped, "filter:nginx")
 	assert.Contains(t, stripped, "2/3")
+	assert.Contains(t, stripped, "Esc to clear")
 }
 
 func TestStatusBarShowsSortMode(t *testing.T) {
@@ -274,9 +275,13 @@ func TestStatusBarShowsSelectionCount(t *testing.T) {
 
 func TestStatusBarKeyHints(t *testing.T) {
 	m := Model{
-		nav:           model.NavigationState{Level: model.LevelResources},
-		middleItems:   []model.Item{{Name: "pod"}},
-		width:         200,
+		nav:         model.NavigationState{Level: model.LevelResources},
+		middleItems: []model.Item{{Name: "pod"}},
+		// Wide enough to fit the post-merge hint set: main added the
+		// read-only toggle and security-dashboard added monitoring/
+		// security hints. Width 200 elides "help" and "quit" off the
+		// right edge.
+		width:         260,
 		height:        40,
 		tabs:          []TabState{{}},
 		selectedItems: make(map[string]bool),

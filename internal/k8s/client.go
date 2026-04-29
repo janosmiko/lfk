@@ -21,6 +21,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 )
 
 // secretGVR is the GroupVersionResource for Kubernetes Secrets.
@@ -92,12 +93,38 @@ type Client struct {
 	// across different contexts.
 	discoveryMu      sync.Mutex
 	discoveryClients map[string]*disk.CachedDiscoveryClient
+
+	// securityManager is injected by the app layer so GetResources can
+	// dispatch _security virtual APIGroup calls to it without creating an
+	// import cycle (internal/k8s must not import internal/security/heuristic
+	// or trivyop, but can import internal/security for the interface).
+	securityManager *security.Manager
+	ignoreChecker   IgnoreChecker
+	showIgnored     bool
 }
 
 // SetSecretLazyLoading toggles the metadata-only list path for Secrets.
 // Typically called once at startup after loading the config file.
 func (c *Client) SetSecretLazyLoading(enabled bool) {
 	c.secretLazyLoading = enabled
+}
+
+// SetSecurityManager injects the security manager. Must be called before
+// GetResources is invoked on a _security APIGroup entry. Safe to call with
+// nil to clear the reference.
+func (c *Client) SetSecurityManager(mgr *security.Manager) {
+	c.securityManager = mgr
+}
+
+// SetIgnoreChecker sets the ignore checker used to filter security findings.
+func (c *Client) SetIgnoreChecker(checker IgnoreChecker) {
+	c.ignoreChecker = checker
+}
+
+// SetShowIgnored sets whether ignored findings are shown (with a visual tag)
+// or hidden entirely.
+func (c *Client) SetShowIgnored(show bool) {
+	c.showIgnored = show
 }
 
 // RBACCheck represents a single permission check result.
@@ -565,6 +592,10 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 // "secret:<key>" data columns and no "Type" column. Per-secret data is loaded
 // lazily by the UI layer when the user selects a specific secret.
 func (c *Client) GetResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+	// Virtual security resource types — dispatched to the injected manager.
+	if rt.APIGroup == model.SecurityVirtualAPIGroup {
+		return c.getSecurityFindings(ctx, contextName, namespace, rt)
+	}
 	// Special handling for virtual resource types.
 	if rt.APIGroup == "_helm" && rt.Resource == "releases" {
 		return c.GetHelmReleases(ctx, contextName, namespace)

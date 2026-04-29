@@ -897,6 +897,30 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 
 	// Name column gets all remaining space so the table fills the full width.
 	nameW := max(width-nsW-readyW-restartsW-ageW-statusW-markerColW-extraTotalW, 10)
+	// Cap name column when names are short (e.g., CVE IDs ~15 chars).
+	// Redistribute the surplus to the last extra column (typically Title
+	// or the most descriptive column) so it can show more content instead
+	// of padding the name with whitespace.
+	if len(items) > 0 && len(extraCols) > 0 {
+		maxName := len(headerLabel)
+		for i := range items {
+			n := len(items[i].Name)
+			if badge := securityBadgePlainForItem(&items[i]); badge != "" {
+				n += len(badge) + 1
+			}
+			if n > maxName {
+				maxName = n
+			}
+		}
+		maxName += 3 // padding
+		if nameW > maxName && maxName > 10 {
+			surplus := nameW - maxName
+			nameW = maxName
+			// Give all surplus to the last extra column (the widest /
+			// most descriptive one, e.g., Title).
+			extraCols[len(extraCols)-1].width += surplus
+		}
+	}
 
 	// Render header with sort indicators fitted within column widths.
 	if headerLabel == "" {

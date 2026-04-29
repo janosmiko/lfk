@@ -47,6 +47,9 @@ func (m Model) middleColumnHeader() string {
 	case model.LevelResourceTypes:
 		return "RESOURCE TYPE"
 	case model.LevelResources:
+		if m.nav.ResourceType.DisplayName != "" {
+			return strings.ToUpper(m.nav.ResourceType.DisplayName)
+		}
 		return strings.ToUpper(m.nav.ResourceType.Kind)
 	case model.LevelOwned:
 		return strings.ToUpper(m.ownedItemKindLabel())
@@ -235,7 +238,8 @@ func (m Model) statusBar() string {
 	cur := m.cursor() + 1
 
 	if m.filterText != "" {
-		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d filtered: %d/%d]", cur, len(visible), len(visible), total)))
+		filterLabel := ui.HelpKeyStyle.Render("filter:" + m.filterText)
+		parts = append(parts, filterLabel+ui.BarDimStyle.Render(fmt.Sprintf(" [%d/%d] (Esc to clear)", len(visible), total)))
 	} else {
 		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d]", cur, total)))
 	}
@@ -247,6 +251,7 @@ func (m Model) statusBar() string {
 		parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
 	}
 
+	// Styled key hints -- show a reduced set for dashboard views.
 	parts = append(parts, ui.FormatHintParts(m.explorerHintEntries()))
 
 	content := strings.Join(parts, "  ")
@@ -255,9 +260,10 @@ func (m Model) statusBar() string {
 
 // explorerHintEntries builds the bottom hint bar for explorer views (cluster
 // picker, resource-type browser, resource list). Extracted from statusBar to
-// keep that function under the gocyclo budget. Dashboard views use a reduced
-// set; standard explorer views use the full set with conditional hides for
-// keys that are no-ops at the current level.
+// keep that function under the gocyclo budget. Dashboard pseudo-resources
+// (overview/monitoring) get a reduced hint set; standard explorer views use
+// the full set with conditional hides for keys that are no-ops at the
+// current level.
 func (m Model) explorerHintEntries() []ui.HintEntry {
 	kb := ui.ActiveKeybindings
 	sel := m.selectedMiddleItem()
@@ -269,11 +275,18 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 			{Key: kb.PageDown + "/" + kb.PageUp, Desc: "scroll"},
 			{Key: kb.NamespaceSelector, Desc: "namespace"},
 			{Key: kb.NewTab, Desc: "new tab"},
+			{Key: kb.Monitoring, Desc: "monitoring"},
+			{Key: kb.Security, Desc: "security"},
 			{Key: kb.Help, Desc: "help"},
 			{Key: "q", Desc: "quit"},
 		}
 	}
 
+	// Non-dashboard case. At the cluster picker and resource-type browser,
+	// both the action menu and column sort are no-ops: selectedResourceKind()
+	// returns "" so openActionMenu() bails out, and sortMiddleItems() early-
+	// returns so </> doesn't reorder anything. Hide both hints there to
+	// avoid advertising dead keys.
 	hintEntries := []ui.HintEntry{
 		{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
 		{Key: kb.Down + "/" + kb.Up, Desc: "move"},
@@ -281,11 +294,6 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 		{Key: kb.NamespaceSelector, Desc: "namespace"},
 		{Key: kb.AllNamespaces, Desc: "all-ns"},
 	}
-	// At the cluster picker and resource-type browser, both the action
-	// menu and column sort are no-ops: selectedResourceKind() returns
-	// "" so openActionMenu() bails out, and sortMiddleItems() early-
-	// returns so </> doesn't reorder anything. Hide both hints there
-	// to avoid advertising dead keys.
 	hasResourceContext := m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
 	if hasResourceContext {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
@@ -309,10 +317,15 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	hintEntries = append(hintEntries,
 		ui.HintEntry{Key: kb.Filter, Desc: "filter"},
 		ui.HintEntry{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
+		ui.HintEntry{Key: kb.Monitoring, Desc: "monitoring"},
+		ui.HintEntry{Key: kb.Security, Desc: "security"},
 		ui.HintEntry{Key: kb.Help, Desc: "help"},
 		ui.HintEntry{Key: "q", Desc: "quit"},
 	)
-	return m.appendEventsHintEntries(hintEntries)
+	// Add context-specific hints for Events resource type.
+	hintEntries = m.appendEventsHintEntries(hintEntries)
+	// Add context-specific hints for Security findings views.
+	return m.appendSecurityHintEntries(hintEntries)
 }
 
 // appendEventsHintEntries injects Events-view toggle hints (warnings-only,
@@ -344,6 +357,32 @@ func (m Model) appendEventsHintEntries(entries []ui.HintEntry) []ui.HintEntry {
 	}
 	// Insert before the trailing "quit" entry so the Events toggles sit next
 	// to the other contextual actions.
+	out := make([]ui.HintEntry, 0, len(entries)+len(extras))
+	out = append(out, entries[:len(entries)-1]...)
+	out = append(out, extras...)
+	out = append(out, entries[len(entries)-1])
+	return out
+}
+
+// appendSecurityHintEntries injects Security-view hints (ignore toggle,
+// action menu) just before the trailing "quit" entry. Returns the input
+// slice unchanged when the current view isn't a security findings list.
+func (m Model) appendSecurityHintEntries(entries []ui.HintEntry) []ui.HintEntry {
+	if !strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		return entries
+	}
+	kb := ui.ActiveKeybindings
+	toggleDesc := "show ignored"
+	if m.showSecurityIgnored {
+		toggleDesc = "hide ignored"
+	}
+	extras := []ui.HintEntry{
+		{Key: kb.SecurityIgnoreToggle, Desc: toggleDesc},
+		{Key: kb.ActionMenu, Desc: "ignore/actions"},
+	}
+	if len(entries) == 0 {
+		return extras
+	}
 	out := make([]ui.HintEntry, 0, len(entries)+len(extras))
 	out = append(out, entries[:len(entries)-1]...)
 	out = append(out, extras...)

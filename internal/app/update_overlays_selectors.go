@@ -59,7 +59,9 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.saveCurrentSession()
 		m.cancelAndReset()
 		m.requestGen++
-		return m, m.refreshCurrentLevel()
+		// Re-scan security findings for the new namespace scope.
+		secCmd := m.loadSecurityFindings()
+		return m, tea.Batch(m.refreshCurrentLevel(), secCmd)
 
 	case " ":
 		m.nsSelectionModified = true

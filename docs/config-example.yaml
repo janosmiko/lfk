@@ -122,6 +122,18 @@ monitoring:
 #     namespaces: ["monitoring", "observability"]
 #     services: ["prometheus-server", "prometheus"]
 
+# ─── Security findings browser ────────────────────────────────────────────────
+# Security findings browser. All fields are optional.
+# security:
+#   default:
+#     enabled: true
+#     sec_column: true
+#     sources:
+#       heuristic:
+#         enabled: true
+#       trivy_operator:
+#         enabled: true
+
 # ─── Per-Resource-Type Columns ─────────────────────────────────────────────────
 # Configure visible columns for specific resource types (Kind names, case-insensitive).
 # When not set for a kind, columns are auto-detected from resource data.

@@ -470,6 +470,58 @@ func TestCovNavigateChildEmpty(t *testing.T) {
 	_ = result.(Model) // no panic
 }
 
+// --- navigateChildResourceType: synthetic security sources ---
+
+// TestNavigateChildResourceTypeSynthesizesSecurityRT verifies that clicking a
+// virtual Security source Item (Kind prefixed with __security_ and Extra
+// carrying the _security/v1/findings-<name> ref) produces a navigation into
+// LevelResources with a fully-populated ResourceTypeEntry. Security sources
+// are not present in discoveredResources, so the handler has to synthesize
+// the RT from the Item's Kind/Extra fields; otherwise FindResourceTypeIn
+// silently fails and the user cannot enter the Security category at all.
+func TestNavigateChildResourceTypeSynthesizesSecurityRT(t *testing.T) {
+	m := baseModelBoost2()
+	m.nav.Level = model.LevelResourceTypes
+	m.nav.Context = "test-ctx"
+	sel := model.Item{
+		Name:     "Trivy (5)",
+		Kind:     "__security_trivy-operator__",
+		Extra:    model.SecurityVirtualAPIGroup + "/v1/findings-trivy-operator",
+		Category: "Security",
+		Icon:     model.Icon{Unicode: "◈"},
+	}
+	m.middleItems = []model.Item{sel}
+
+	result, cmd := m.navigateChildResourceType(&sel)
+	rm, ok := result.(Model)
+	require.True(t, ok)
+	require.NotNil(t, cmd, "security navigation must produce a load command")
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+	assert.Equal(t, "__security_trivy-operator__", rm.nav.ResourceType.Kind)
+	assert.Equal(t, model.SecurityVirtualAPIGroup, rm.nav.ResourceType.APIGroup)
+	assert.Equal(t, "findings-trivy-operator", rm.nav.ResourceType.Resource)
+	assert.Equal(t, "Trivy (5)", rm.nav.ResourceType.DisplayName)
+}
+
+// TestNavigateChildResourceTypeSecurityFallsThroughWhenNoPrefix verifies that
+// items whose Kind lacks the __security_ prefix still go through the normal
+// FindResourceTypeIn path, so existing navigation is untouched.
+func TestNavigateChildResourceTypeSecurityFallsThroughWhenNoPrefix(t *testing.T) {
+	m := baseModelBoost2()
+	m.nav.Level = model.LevelResourceTypes
+	m.nav.Context = "test-ctx"
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	}
+	sel := model.Item{Name: "Pods", Kind: "Pod", Extra: "/v1/pods"}
+	m.middleItems = []model.Item{sel}
+
+	result, cmd := m.navigateChildResourceType(&sel)
+	rm := result.(Model)
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "Pod", rm.nav.ResourceType.Kind)
+}
+
 // TestNavigateChildResourceType_RendersCacheImmediatelyAndRefetches
 // verifies the post-fix UX: drilling in renders the previously primed
 // preview cache synchronously (so the user sees the list with no
@@ -498,7 +550,7 @@ func TestNavigateChildResourceType_RendersCacheImmediatelyAndRefetches(t *testin
 		{Name: "pvc-a", Kind: "PersistentVolumeClaim", Namespace: "default"},
 		{Name: "pvc-b", Kind: "PersistentVolumeClaim", Namespace: "default"},
 	}
-	drillInKey := "test-ctx/persistentvolumeclaims"
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
 	m.itemCache[drillInKey] = cachedItems
 	m.cacheFingerprints[drillInKey] = m.fetchFingerprint()
 
@@ -545,7 +597,7 @@ func TestNavigateChildResourceType_FetchesWhenFingerprintStale(t *testing.T) {
 		Namespaced: true,
 	}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
-	drillInKey := "test-ctx/persistentvolumeclaims"
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
 	staleItems := []model.Item{{Name: "stale-pvc"}}
 	m.itemCache[drillInKey] = staleItems
 	// Record the fingerprint as if it was captured on a DIFFERENT
@@ -651,7 +703,7 @@ func TestNavigateChild_ShortcutSurvivesGenBump(t *testing.T) {
 	m.setCursor(0)
 
 	// Simulate: preview completed, cache + fingerprint primed.
-	drillInKey := "test-ctx/persistentvolumeclaims"
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
 	cachedItems := []model.Item{
 		{Name: "pvc-1", Kind: "PersistentVolumeClaim", Namespace: "default"},
 	}
@@ -705,7 +757,7 @@ func TestLoadResources_PreviewShortcutAfterNavigateOut(t *testing.T) {
 	cachedItems := []model.Item{
 		{Name: "pvc-a", Kind: "PersistentVolumeClaim", Namespace: "default"},
 	}
-	cacheKey := "test-ctx/persistentvolumeclaims"
+	cacheKey := "test-ctx/persistentvolumeclaims/ns:default"
 	m.itemCache[cacheKey] = cachedItems
 	// Fingerprint left over from the drill-in's main load.
 	m.cacheFingerprints[cacheKey] = m.fetchFingerprint()
@@ -749,7 +801,7 @@ func TestLoadResources_PreviewFetchesWhenNoMarker(t *testing.T) {
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
 	// Cache has data but marker is NOT armed (e.g., data from a stale
 	// prior session). Shortcut must not trigger.
-	m.itemCache["test-ctx/persistentvolumeclaims"] = []model.Item{{Name: "stale"}}
+	m.itemCache["test-ctx/persistentvolumeclaims/ns:default"] = []model.Item{{Name: "stale"}}
 
 	pvcSidebarItem := model.Item{
 		Name:  "PersistentVolumeClaims",
@@ -793,9 +845,9 @@ func TestLoadResources_PreviewShortcutForMultipleResources(t *testing.T) {
 
 	pvcItems := []model.Item{{Name: "pvc-1", Kind: "PersistentVolumeClaim", Namespace: "default"}}
 	pvItems := []model.Item{{Name: "pv-1", Kind: "PersistentVolume"}}
-	m.itemCache["test-ctx/persistentvolumeclaims"] = pvcItems
+	m.itemCache["test-ctx/persistentvolumeclaims/ns:default"] = pvcItems
 	m.itemCache["test-ctx/persistentvolumes"] = pvItems
-	m.cacheFingerprints["test-ctx/persistentvolumeclaims"] = m.fetchFingerprint()
+	m.cacheFingerprints["test-ctx/persistentvolumeclaims/ns:default"] = m.fetchFingerprint()
 	m.cacheFingerprints["test-ctx/persistentvolumes"] = m.fetchFingerprint()
 
 	pvcSidebar := model.Item{Name: "PersistentVolumeClaims", Kind: "PersistentVolumeClaim", Extra: pvcRT.ResourceRef()}

@@ -68,6 +68,8 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		return m.handleExplorerActionKeySortReset()
 	case kb.Monitoring:
 		return m.handleExplorerActionKeyMonitoring()
+	case kb.Security:
+		return m.handleExplorerActionKeySecurity()
 	case kb.TasksOverlay:
 		return m.handleExplorerActionKeyTasksOverlay()
 	}
@@ -182,12 +184,35 @@ func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 func (m Model) handleExplorerDirectActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 	key := msg.String()
+	// Refresh works everywhere, including security findings.
+	if key == kb.Refresh {
+		ret, cmd := m.directActionRefresh()
+		return ret, cmd, true
+	}
+	// Toggle show/hide of ignored security findings.
+	if key == kb.SecurityIgnoreToggle {
+		m.showSecurityIgnored = !m.showSecurityIgnored
+		if m.client != nil {
+			m.client.SetShowIgnored(m.showSecurityIgnored)
+		}
+		if m.showSecurityIgnored {
+			m.setStatusMessage("Showing ignored findings", false)
+		} else {
+			m.setStatusMessage("Hiding ignored findings", false)
+		}
+		// Refresh if on a security view.
+		if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+			return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear()), true
+		}
+		return m, scheduleStatusClear(), true
+	}
+	// Security findings are virtual — other k8s resource actions don't apply.
+	if sel := m.selectedMiddleItem(); sel != nil && strings.HasPrefix(sel.Kind, "__security_") {
+		return m, nil, false
+	}
 	switch key {
 	case kb.Logs:
 		ret, cmd := m.directActionLogs()
-		return ret, cmd, true
-	case kb.Refresh:
-		ret, cmd := m.directActionRefresh()
 		return ret, cmd, true
 	case kb.Edit:
 		ret, cmd := m.directActionEdit()
@@ -218,7 +243,10 @@ func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool)
 	}
 	m.cancelAndReset()
 	m.requestGen++
-	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear()), true
+	// Re-scan security findings for the new namespace scope so the SEC
+	// column badge reflects the correct findings.
+	secCmd := m.loadSecurityFindings()
+	return m, tea.Batch(m.refreshCurrentLevel(), secCmd, scheduleStatusClear()), true
 }
 
 func (m Model) handleExplorerActionKeyQuotaDashboard() (tea.Model, tea.Cmd, bool) {
@@ -665,11 +693,28 @@ func (m Model) handleExplorerActionKeyTerminalToggle() (tea.Model, tea.Cmd, bool
 	return m, scheduleStatusClear(), true
 }
 
+// ascendToResourceTypes navigates the model back up to LevelResourceTypes.
+// Used by dashboard hotkeys (# and @) that must operate at the resource-types
+// level but can be invoked from any deeper level. Discards per-step tea.Cmds
+// because the caller issues a fresh loadPreview after landing.
+func (m Model) ascendToResourceTypes() Model {
+	for m.nav.Level > model.LevelResourceTypes {
+		mdl, _ := m.navigateParent()
+		mm, ok := mdl.(Model)
+		if !ok {
+			break
+		}
+		m = mm
+	}
+	return m
+}
+
 func (m Model) handleExplorerActionKeyMonitoring() (tea.Model, tea.Cmd, bool) {
 	if m.nav.Level < model.LevelResourceTypes {
 		m.setStatusMessage("Select a cluster first", true)
 		return m, scheduleStatusClear(), true
 	}
+	m = m.ascendToResourceTypes()
 	// Find the Monitoring item in the middle column and select it.
 	for i, item := range m.middleItems {
 		if item.Extra == "__monitoring__" {
@@ -679,4 +724,41 @@ func (m Model) handleExplorerActionKeyMonitoring() (tea.Model, tea.Cmd, bool) {
 		}
 	}
 	return m, nil, true
+}
+
+func (m Model) handleExplorerActionKeySecurity() (tea.Model, tea.Cmd, bool) {
+	if m.nav.Level < model.LevelResourceTypes {
+		m.setStatusMessage("Select a cluster first", true)
+		return m, scheduleStatusClear(), true
+	}
+	m = m.ascendToResourceTypes()
+	// Jump to the first entry in the Security category.
+	for i, item := range m.middleItems {
+		if item.Category == "Security" && item.Extra != "" {
+			m.setCursor(i)
+			m.clampCursor()
+			return m, m.loadPreview(), true
+		}
+	}
+	m.setStatusMessage("No security sources available", true)
+	return m, scheduleStatusClear(), true
+}
+
+// jumpToFindingResource navigates from a selected security finding item to
+// the Kubernetes resource it was attached to. Reads the resource kind from
+// the "ResourceKind" column (full k8s kind, not the short abbreviation)
+// and the name from the "Resource" column's "shortKind/name" format.
+func (m Model) jumpToFindingResource(sel model.Item) (tea.Model, tea.Cmd) {
+	kind := sel.ColumnValue("ResourceKind")
+	resource := sel.ColumnValue("Resource")
+	if kind == "" || resource == "" || resource == "(cluster-scoped)" {
+		m.setStatusMessage("No affected resource for this finding", true)
+		return m, scheduleStatusClear()
+	}
+	parts := strings.SplitN(resource, "/", 2)
+	if len(parts) != 2 {
+		return m, nil
+	}
+	name := parts[1]
+	return m.navigateToOwner(kind, name)
 }
