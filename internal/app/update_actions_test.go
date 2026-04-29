@@ -823,11 +823,18 @@ func TestCovExecuteActionDebugMount(t *testing.T) {
 }
 
 func TestCovExecuteActionForceDelete(t *testing.T) {
+	// Regression for #89: action-menu Force Delete must request typed
+	// confirmation, mirroring directActionForceDelete and the bulk path,
+	// so an accidental x->X (or wrong list cursor) cannot nuke a pod.
 	m := testModelExec()
 	result, cmd := m.executeAction("Force Delete")
 	rm := result.(Model)
-	assert.NotNil(t, cmd)
-	assert.True(t, rm.loading)
+	assert.Nil(t, cmd)
+	assert.False(t, rm.loading)
+	assert.Equal(t, overlayConfirmType, rm.overlay)
+	assert.Equal(t, "Force Delete", rm.pendingAction)
+	assert.Contains(t, rm.confirmTitle, "Force Delete")
+	assert.Contains(t, rm.confirmQuestion, "--force --grace-period=0")
 }
 
 func TestCovExecuteActionForceFinalize(t *testing.T) {
@@ -1698,11 +1705,15 @@ func TestFinalExecuteActionConfigMapEditor(t *testing.T) {
 }
 
 func TestFinalExecuteActionForceDelete(t *testing.T) {
+	// Regression for #89: action-menu Force Delete must request typed
+	// confirmation, not fire kubectl delete --force directly.
 	m := baseFinalModel()
 	result, cmd := m.executeAction("Force Delete")
-	require.NotNil(t, cmd)
+	assert.Nil(t, cmd)
 	rm := result.(Model)
-	assert.True(t, rm.loading)
+	assert.False(t, rm.loading)
+	assert.Equal(t, overlayConfirmType, rm.overlay)
+	assert.Equal(t, "Force Delete", rm.pendingAction)
 }
 
 func TestFinalExecuteActionForceFinalize(t *testing.T) {

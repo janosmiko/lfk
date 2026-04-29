@@ -882,19 +882,18 @@ func (m Model) executeActionSimpleLoading(verb string, cmdFn func() tea.Cmd) (te
 	return m, cmdFn()
 }
 
-// executeActionForceDelete handles the "Force Delete" action.
-func (m Model) executeActionForceDelete() (tea.Model, tea.Cmd) {
-	ns := m.actionCtx.namespace
-	name := m.actionCtx.name
-	ctx := m.actionCtx.context
-	rt := m.actionCtx.resourceType
-	nsArg := ""
-	if rt.Namespaced {
-		nsArg = " -n " + ns
-	}
-	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --grace-period=0 --force%s --context %s", rt.Resource, name, nsArg, ctx))
-	m.loading = true
-	return m, m.forceDeleteResource()
+// executeActionForceDelete handles the "Force Delete" action from the action
+// menu. Mirrors directActionForceDelete and the bulk Force Delete path: opens
+// a typed-confirmation overlay (user must type DELETE + Enter) so a stray
+// x->X cannot nuke a pod without explicit acknowledgement (#89).
+func (m Model) executeActionForceDelete() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	m.confirmAction = m.actionCtx.name + " (FORCE)"
+	m.confirmTitle = "Confirm Force Delete"
+	m.confirmQuestion = fmt.Sprintf("Force delete %s? (--force --grace-period=0)", m.actionCtx.name)
+	m.confirmTypeInput.Clear()
+	m.overlay = overlayConfirmType
+	m.pendingAction = "Force Delete"
+	return m, nil
 }
 
 // executeActionForceFinalize handles the "Force Finalize" action.
