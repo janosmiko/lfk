@@ -491,6 +491,20 @@ func (m Model) handleExplorerActionKeyOpenBrowser() (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleExplorerActionKeyCopyName() (tea.Model, tea.Cmd, bool) {
+	// hasSelection looks at the raw map, but selectedItemsList only returns
+	// visible items — they diverge when the user filters away every selected
+	// row. Fall through to cursor in that case rather than copying nothing.
+	if m.hasSelection() {
+		if items := m.selectedItemsList(); len(items) > 0 {
+			names := make([]string, len(items))
+			for i, it := range items {
+				names[i] = it.Name
+			}
+			joined := strings.Join(names, "\n")
+			m.setStatusMessage(fmt.Sprintf("Copied %d names", len(names)), false)
+			return m, tea.Batch(copyToSystemClipboard(joined), scheduleStatusClear()), true
+		}
+	}
 	sel := m.selectedMiddleItem()
 	if sel != nil {
 		m.setStatusMessage("Copied: "+sel.Name, false)
@@ -499,12 +513,27 @@ func (m Model) handleExplorerActionKeyCopyName() (tea.Model, tea.Cmd, bool) {
 	return m, nil, true
 }
 
+// maxBulkYAMLCopy caps `Y` bulk copy: client-go's default rate limiter
+// (QPS=5/Burst=10) serializes per-item Gets regardless of goroutine count.
+const maxBulkYAMLCopy = 50
+
 func (m Model) handleExplorerActionKeyCopyYAML() (tea.Model, tea.Cmd, bool) {
-	sel := m.selectedMiddleItem()
-	if sel != nil {
-		return m, m.copyYAMLToClipboard(), true
+	// See handleExplorerActionKeyCopyName for the n==0 rationale.
+	if m.hasSelection() {
+		n := len(m.selectedItemsList())
+		if n > maxBulkYAMLCopy {
+			m.setStatusMessage(fmt.Sprintf("Max %d exceeded for bulk YAML copy", maxBulkYAMLCopy), true)
+			return m, scheduleStatusClear(), true
+		}
+		if n > 0 {
+			m.setStatusMessage(fmt.Sprintf("Fetching %d manifests...", n), false)
+			return m, m.copyYAMLToClipboard(), true
+		}
 	}
-	return m, nil, true
+	if m.selectedMiddleItem() == nil {
+		return m, nil, true
+	}
+	return m, m.copyYAMLToClipboard(), true
 }
 
 func (m Model) handleExplorerActionKeyNewTab() (tea.Model, tea.Cmd, bool) {

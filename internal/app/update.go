@@ -1497,7 +1497,11 @@ func (m Model) updateYamlClipboard(msg yamlClipboardMsg) (tea.Model, tea.Cmd) {
 		m.setErrorFromErr("Error: ", msg.err)
 		return m, scheduleStatusClear()
 	}
-	m.setStatusMessage("YAML copied to clipboard", false)
+	if msg.count > 1 {
+		m.setStatusMessage(fmt.Sprintf("Copied %d manifests to clipboard", msg.count), false)
+	} else {
+		m.setStatusMessage("YAML copied to clipboard", false)
+	}
 	return m, tea.Batch(copyToSystemClipboard(msg.content), scheduleStatusClear())
 }
 

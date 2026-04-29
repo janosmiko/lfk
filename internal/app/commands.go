@@ -700,11 +700,41 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 
 	switch m.nav.Level {
 	case model.LevelResources:
+		rt := m.nav.ResourceType
+		// Gate on visible selection, not raw hasSelection() — selected rows
+		// can be filtered out of view, in which case we want the single-item
+		// (cursor) path, not an empty multi-doc fetch.
+		if items := m.selectedItemsList(); len(items) > 0 {
+			type fetchTarget struct {
+				ns, name string
+			}
+			targets := make([]fetchTarget, len(items))
+			for i, it := range items {
+				itemNs := ns
+				if it.Namespace != "" {
+					itemNs = it.Namespace
+				}
+				targets[i] = fetchTarget{ns: itemNs, name: it.Name}
+			}
+			return func() tea.Msg {
+				docs := make([]string, 0, len(targets))
+				for _, t := range targets {
+					content, err := m.client.GetResourceYAML(context.Background(), kctx, t.ns, rt, t.name)
+					if err != nil {
+						return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", t.ns, t.name, err)}
+					}
+					docs = append(docs, strings.TrimRight(content, "\n"))
+				}
+				return yamlClipboardMsg{
+					content: strings.Join(docs, "\n---\n") + "\n",
+					count:   len(docs),
+				}
+			}
+		}
 		sel := m.selectedMiddleItem()
 		if sel == nil {
 			return nil
 		}
-		rt := m.nav.ResourceType
 		name := sel.Name
 		itemNs := ns
 		if sel.Namespace != "" {
@@ -712,7 +742,7 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 		}
 		return func() tea.Msg {
 			content, err := m.client.GetResourceYAML(context.Background(), kctx, itemNs, rt, name)
-			return yamlClipboardMsg{content: content, err: err}
+			return yamlClipboardMsg{content: content, count: 1, err: err}
 		}
 	case model.LevelOwned:
 		sel := m.selectedMiddleItem()
@@ -727,7 +757,7 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 		if sel.Kind == "Pod" {
 			return func() tea.Msg {
 				content, err := m.client.GetPodYAML(context.Background(), kctx, itemNs, name)
-				return yamlClipboardMsg{content: content, err: err}
+				return yamlClipboardMsg{content: content, count: 1, err: err}
 			}
 		}
 		rt, ok := m.resolveOwnedResourceType(sel)
@@ -738,13 +768,13 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 		}
 		return func() tea.Msg {
 			content, err := m.client.GetResourceYAML(context.Background(), kctx, itemNs, rt, name)
-			return yamlClipboardMsg{content: content, err: err}
+			return yamlClipboardMsg{content: content, count: 1, err: err}
 		}
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
 		return func() tea.Msg {
 			content, err := m.client.GetPodYAML(context.Background(), kctx, ns, podName)
-			return yamlClipboardMsg{content: content, err: err}
+			return yamlClipboardMsg{content: content, count: 1, err: err}
 		}
 	}
 	return nil

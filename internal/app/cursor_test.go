@@ -1772,6 +1772,9 @@ func TestCov80CopyYAMLLevelOwnedPod(t *testing.T) {
 	m.setCursor(0)
 	cmd := m.copyYAMLToClipboard()
 	require.NotNil(t, cmd)
+	ymsg, ok := cmd().(yamlClipboardMsg)
+	require.True(t, ok)
+	assert.Equal(t, 1, ymsg.count, "single-item path must tag count=1")
 }
 
 func TestCov80CopyYAMLLevelOwnedKnownKind(t *testing.T) {
@@ -1804,6 +1807,9 @@ func TestCov80CopyYAMLLevelContainers(t *testing.T) {
 	m.setCursor(0)
 	cmd := m.copyYAMLToClipboard()
 	require.NotNil(t, cmd)
+	ymsg, ok := cmd().(yamlClipboardMsg)
+	require.True(t, ok)
+	assert.Equal(t, 1, ymsg.count, "single-item path must tag count=1")
 }
 
 func TestCov80LoadYAMLLevelResources(t *testing.T) {

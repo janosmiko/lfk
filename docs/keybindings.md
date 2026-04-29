@@ -96,9 +96,11 @@ Resource-specific actions (exec, scale, restart, secret editor, etc.) are availa
 
 | Key | Action |
 |---|---|
-| `y` | Copy resource name to clipboard |
-| `Y` | Copy resource YAML to clipboard |
+| `y` | Copy resource name to clipboard (with multi-selection: newline-joined names of all selected items) |
+| `Y` | Copy resource YAML to clipboard (with multi-selection: multi-doc YAML, items joined with `---`) |
 | `Ctrl+P` | Apply resource from clipboard (`kubectl apply`) |
+
+When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y` and `Y` operate on the selection rather than the cursor row — mirroring the precedence used by `D` (delete) and other bulk actions. `Y` is capped at 50 manifests per copy (client-go's default rate limiter serializes the per-item fetches).
 
 ## Multi-Selection
 

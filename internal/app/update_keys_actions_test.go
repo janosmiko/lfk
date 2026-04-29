@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -734,4 +735,189 @@ func TestActionKeyToggleRareAtLevelResourcesUpdatesCursorMemory(t *testing.T) {
 	require.GreaterOrEqual(t, podIdx, 0, "Pod must be present in rebuilt leftItems")
 	assert.Equal(t, podIdx, rm.cursorMemory["test"],
 		"cursorMemory[context] must point at the current resource type after rebuild")
+}
+
+// --- y / Y bulk copy: selection wins over cursor (mirrors directActionDelete) ---
+
+// TestCopyNameBulkUsesSelectionOverCursor verifies pressing `y` with N items
+// multi-selected joins their names, copies them, and reports the count —
+// rather than copying just the cursor row. Mirrors the precedence used by
+// directActionDelete.
+func TestCopyNameBulkUsesSelectionOverCursor(t *testing.T) {
+	m := basePush80Model()
+	m.toggleSelection(m.middleItems[0]) // pod-1
+	m.toggleSelection(m.middleItems[2]) // pod-3
+	m.setCursor(1)                      // cursor on pod-2 — must be ignored
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyName()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Equal(t, "Copied 2 names", rm.statusMessage)
+	assert.NotNil(t, cmd, "must dispatch a clipboard cmd")
+}
+
+// TestCopyNameNoSelectionFallsBackToCursor guards the single-item fallback —
+// without a selection, `y` still copies just the cursor row.
+func TestCopyNameNoSelectionFallsBackToCursor(t *testing.T) {
+	m := basePush80Model()
+	m.setCursor(0)
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyName()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Equal(t, "Copied: pod-1", rm.statusMessage)
+	assert.NotNil(t, cmd)
+}
+
+// TestCopyNameSelectionFilteredOutFallsBack guards the n==0 edge case: a
+// selection survives in the raw map but every selected row is currently
+// filtered out of view, so selectedItemsList returns empty. `y` must fall
+// through to copy the cursor row rather than emit an empty clipboard write.
+func TestCopyNameSelectionFilteredOutFallsBack(t *testing.T) {
+	m := basePush80Model()
+	// Forge a "ghost" selection — a key not present in middleItems, so
+	// hasSelection() == true but selectedItemsList() == [].
+	m.selectedItems["ghost-ns/ghost-pod"] = true
+	m.setCursor(0)
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyName()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Equal(t, "Copied: pod-1", rm.statusMessage,
+		"must fall through to cursor when selection has no visible items")
+	assert.NotNil(t, cmd)
+}
+
+// TestCopyYAMLSelectionFilteredOutFallsBack mirrors the above for `Y`.
+// The single-item cursor path dispatches silently — no bulk "Fetching..."
+// or cap "Max ..." status is set before the fetch resolves. Asserting
+// statusMessage is empty pins down the "took the cursor branch silently"
+// intent rather than just "didn't take the bulk branch."
+func TestCopyYAMLSelectionFilteredOutFallsBack(t *testing.T) {
+	m := basePush80Model()
+	m.selectedItems["ghost-ns/ghost-pod"] = true
+	m.setCursor(0)
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Empty(t, rm.statusMessage,
+		"cursor path dispatches silently; status only updates once the fetch resolves")
+	assert.NotNil(t, cmd, "must still dispatch single-item fetch from cursor")
+}
+
+// TestCopyYAMLBulkErrorWrapsNamespaceName checks that the bulk fetch path
+// surfaces fetch errors tagged with the offending ns/name — the marker that
+// proves the bulk branch ran (vs the single-item path, which would emit an
+// unwrapped error). The successful join + count is exercised by
+// TestUpdateYamlClipboardCountAwareStatus/bulk against the receiver directly.
+func TestCopyYAMLBulkErrorWrapsNamespaceName(t *testing.T) {
+	m := basePush80Model()
+	m.toggleSelection(m.middleItems[0]) // default/pod-1
+	m.toggleSelection(m.middleItems[1]) // ns-2/pod-2
+
+	cmd := m.copyYAMLToClipboard()
+	require.NotNil(t, cmd)
+
+	ymsg, ok := cmd().(yamlClipboardMsg)
+	require.True(t, ok)
+	require.Error(t, ymsg.err, "fake client has no pods seeded; first fetch must fail")
+	assert.Contains(t, ymsg.err.Error(), "default/pod-1",
+		"bulk path must wrap errors with ns/name")
+	assert.Equal(t, 0, ymsg.count, "early-return on error keeps count at zero")
+}
+
+// TestCopyYAMLBulkSetsFetchingStatus checks the wrapper surfaces a
+// "Fetching N manifests..." hint before dispatching, so the user has
+// feedback during the sequential fetch (client-go's default rate limiter
+// serializes the per-item Gets — see maxBulkYAMLCopy comment).
+func TestCopyYAMLBulkSetsFetchingStatus(t *testing.T) {
+	m := basePush80Model()
+	m.toggleSelection(m.middleItems[0])
+	m.toggleSelection(m.middleItems[1])
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Equal(t, "Fetching 2 manifests...", rm.statusMessage)
+	assert.NotNil(t, cmd)
+}
+
+// TestCopyYAMLBulkRejectsOverCap verifies selections larger than
+// maxBulkYAMLCopy bail out with an error toast and no fetch is dispatched
+// — protects the UI from multi-second stalls behind the rate limiter.
+func TestCopyYAMLBulkRejectsOverCap(t *testing.T) {
+	m := basePush80Model()
+	m.middleItems = make([]model.Item, maxBulkYAMLCopy+1)
+	for i := range m.middleItems {
+		m.middleItems[i] = model.Item{
+			Name:      fmt.Sprintf("pod-%d", i),
+			Namespace: "default",
+			Kind:      "Pod",
+		}
+		m.toggleSelection(m.middleItems[i])
+	}
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Equal(t, fmt.Sprintf("Max %d exceeded for bulk YAML copy", maxBulkYAMLCopy), rm.statusMessage)
+	assert.True(t, rm.statusMessageErr, "must surface as error toast")
+	// Cmd is the auto-clear timer, not a fetch.
+	assert.NotNil(t, cmd)
+}
+
+// TestCopyYAMLBulkAtCapDispatches confirms the boundary case (exactly N=cap)
+// is allowed through.
+func TestCopyYAMLBulkAtCapDispatches(t *testing.T) {
+	m := basePush80Model()
+	m.middleItems = make([]model.Item, maxBulkYAMLCopy)
+	for i := range m.middleItems {
+		m.middleItems[i] = model.Item{
+			Name:      fmt.Sprintf("pod-%d", i),
+			Namespace: "default",
+			Kind:      "Pod",
+		}
+		m.toggleSelection(m.middleItems[i])
+	}
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Contains(t, rm.statusMessage, "Fetching")
+	assert.False(t, rm.statusMessageErr)
+	assert.NotNil(t, cmd)
+}
+
+// TestUpdateYamlClipboardCountAwareStatus verifies the receiver picks the
+// "Copied N manifests" message when count > 1, and the legacy single-item
+// message otherwise.
+func TestUpdateYamlClipboardCountAwareStatus(t *testing.T) {
+	t.Run("bulk", func(t *testing.T) {
+		m := basePush80Model()
+		ret, cmd := m.updateYamlClipboard(yamlClipboardMsg{
+			content: "a\n---\nb\n",
+			count:   3,
+		})
+		rm := ret.(Model)
+		assert.Equal(t, "Copied 3 manifests to clipboard", rm.statusMessage)
+		assert.NotNil(t, cmd)
+	})
+	t.Run("single", func(t *testing.T) {
+		m := basePush80Model()
+		ret, cmd := m.updateYamlClipboard(yamlClipboardMsg{
+			content: "a\n",
+			count:   1,
+		})
+		rm := ret.(Model)
+		assert.Equal(t, "YAML copied to clipboard", rm.statusMessage)
+		assert.NotNil(t, cmd)
+	})
 }

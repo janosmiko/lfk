@@ -154,8 +154,10 @@ type monitoringDashboardMsg struct {
 }
 
 // yamlClipboardMsg carries YAML content to be copied to clipboard.
+// count is the number of manifests joined into content (1 for single).
 type yamlClipboardMsg struct {
 	content string
+	count   int
 	err     error
 }
 
