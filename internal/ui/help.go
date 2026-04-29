@@ -117,6 +117,7 @@ func helpSections() []helpSection {
 				{kb.SortFlip, "Toggle sort direction (ascending/descending)"},
 				{kb.SortReset, "Reset sort to default (Name ascending)"},
 				{kb.WatchMode, "Toggle watch mode (auto-refresh)"},
+				{helpKeyDisplay(kb.ReadOnlyToggle), "Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab)"},
 				{kb.Monitoring, "Monitoring overview (active Prometheus alerts)"},
 				{kb.Security, "Jump to Security category (heuristic + trivy-operator findings)"},
 				{kb.QuotaDashboard, "Namespace resource quota dashboard"},

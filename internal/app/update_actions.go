@@ -31,50 +31,8 @@ func (m Model) openActionMenu() Model {
 		return m.openSecurityActionMenu()
 	}
 
-	// Bulk mode: when items are selected, show bulk action menu.
 	if m.hasSelection() {
-		selectedList := m.selectedItemsList()
-		if len(selectedList) == 0 {
-			return m
-		}
-		m.bulkMode = true
-		m.bulkItems = selectedList
-
-		// Build action context from first selected item (for resource type info).
-		kind := m.selectedResourceKind()
-		if kind == "" {
-			return m
-		}
-		m.actionCtx = m.buildActionCtx(&selectedList[0], kind)
-
-		actions := model.ActionsForBulk(kind)
-		// Filter out actions that don't apply to the selected resource kind.
-		if !model.IsScaleableKind(kind) || !model.IsRestartableKind(kind) {
-			filtered := actions[:0]
-			for _, a := range actions {
-				if a.Label == "Scale" && !model.IsScaleableKind(kind) {
-					continue
-				}
-				if a.Label == "Restart" && !model.IsRestartableKind(kind) {
-					continue
-				}
-				filtered = append(filtered, a)
-			}
-			actions = filtered
-		}
-		var items []model.Item
-		for _, a := range actions {
-			items = append(items, model.Item{
-				Name:   a.Label,
-				Extra:  fmt.Sprintf("%s (%d items)", a.Description, len(selectedList)),
-				Status: a.Key,
-			})
-		}
-
-		m.overlay = overlayAction
-		m.overlayItems = items
-		m.overlayCursor = 0
-		return m
+		return m.openBulkActionMenu()
 	}
 
 	kind := m.selectedResourceKind()
@@ -129,6 +87,11 @@ func (m Model) openActionMenu() Model {
 
 	items := make([]model.Item, 0, len(actions))
 	for _, a := range actions {
+		// Use the kind-aware variant so custom actions are filtered based
+		// on their ReadOnlySafe opt-in (defaults to false / mutating).
+		if m.readOnly && isMutatingActionForKind(kind, a.Label) {
+			continue
+		}
 		items = append(items, model.Item{
 			Name:   a.Label,
 			Extra:  a.Description,
@@ -150,6 +113,57 @@ func (m Model) openActionMenu() Model {
 				break
 			}
 		}
+	}
+
+	m.overlay = overlayAction
+	m.overlayItems = items
+	m.overlayCursor = 0
+	return m
+}
+
+// openBulkActionMenu populates the action overlay with bulk-applicable
+// actions for the multi-selected items. Extracted from openActionMenu to
+// keep that function under the gocyclo budget.
+func (m Model) openBulkActionMenu() Model {
+	selectedList := m.selectedItemsList()
+	if len(selectedList) == 0 {
+		return m
+	}
+	m.bulkMode = true
+	m.bulkItems = selectedList
+
+	// Build action context from first selected item (for resource type info).
+	kind := m.selectedResourceKind()
+	if kind == "" {
+		return m
+	}
+	m.actionCtx = m.buildActionCtx(&selectedList[0], kind)
+
+	actions := model.ActionsForBulk(kind)
+	// Filter out actions that don't apply to the selected resource kind.
+	if !model.IsScaleableKind(kind) || !model.IsRestartableKind(kind) {
+		filtered := actions[:0]
+		for _, a := range actions {
+			if a.Label == "Scale" && !model.IsScaleableKind(kind) {
+				continue
+			}
+			if a.Label == "Restart" && !model.IsRestartableKind(kind) {
+				continue
+			}
+			filtered = append(filtered, a)
+		}
+		actions = filtered
+	}
+	var items []model.Item
+	for _, a := range actions {
+		if m.readOnly && isMutatingAction(a.Label) {
+			continue
+		}
+		items = append(items, model.Item{
+			Name:   a.Label,
+			Extra:  fmt.Sprintf("%s (%d items)", a.Description, len(selectedList)),
+			Status: a.Key,
+		})
 	}
 
 	m.overlay = overlayAction
@@ -358,6 +372,12 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	// Handle bulk actions.
 	if m.bulkMode && len(m.bulkItems) > 0 {
 		return m.executeBulkAction(actionLabel)
+	}
+
+	if m.readOnly && isMutatingAction(actionLabel) {
+		logger.Info("Blocked by read-only mode", "action", actionLabel, "context", m.actionCtx.context)
+		m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
+		return m, scheduleStatusClear()
 	}
 
 	logger.Info("Executing action",
@@ -1476,6 +1496,12 @@ func (m Model) openBulkActionDirect(actionLabel string) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
+	if m.readOnly && isMutatingAction(actionLabel) {
+		logger.Info("Blocked by read-only mode (bulk)", "action", actionLabel, "count", len(m.bulkItems))
+		m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
+		return m, scheduleStatusClear()
+	}
+
 	logger.Info("Executing bulk action",
 		"action", actionLabel,
 		"count", len(m.bulkItems),
@@ -1688,6 +1714,16 @@ func (m Model) executeActionVisualize() (tea.Model, tea.Cmd) {
 
 func (m Model) executeActionDefault(actionLabel string) (tea.Model, tea.Cmd) {
 	if ca, ok := findCustomAction(m.actionCtx.kind, actionLabel); ok {
+		// Custom actions are arbitrary shell commands. Block them in
+		// read-only mode unless the user explicitly marked the action
+		// safe via read_only_safe: true. The dispatcher gate at the top
+		// of executeAction only checks the static mutatingActions set,
+		// which doesn't know about user-defined labels — this is the
+		// last chance to refuse.
+		if m.readOnly && !ca.ReadOnlySafe {
+			m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
+			return m, scheduleStatusClear()
+		}
 		expandedCmd := expandCustomActionTemplate(ca.Command, m.actionCtx)
 		m.addLogEntry("DBG", fmt.Sprintf("$ sh -c %q", expandedCmd))
 		return m, m.execCustomAction(expandedCmd)

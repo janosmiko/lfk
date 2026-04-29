@@ -371,6 +371,12 @@ func FormatItemNameOnly(item model.Item, width int) string {
 		deprecationW = lipgloss.Width(deprecationSuffix)
 	}
 
+	// Read-only marker is rendered as a styled "[RO] " prefix (after the
+	// "* " star, before the icon) so it sits like a tag next to the name
+	// and won't wrap to a new line at narrow column widths.
+	roPrefix := readOnlyPrefix(item)
+	roPrefixW := lipgloss.Width(roPrefix)
+
 	resolvedIcon := resolveIcon(item.Icon)
 
 	if item.Status == "current" {
@@ -379,22 +385,22 @@ func FormatItemNameOnly(item model.Item, width int) string {
 		if resolvedIcon != "" {
 			icon := IconStyle.Render(resolvedIcon + " ")
 			iconW := lipgloss.Width(icon)
-			remaining := max(width-prefixW-iconW-deprecationW, 1)
-			return prefix + icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
+			remaining := max(width-prefixW-roPrefixW-iconW-deprecationW, 1)
+			return prefix + roPrefix + icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 		}
-		remaining := max(width-prefixW-deprecationW, 1)
-		return prefix + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
+		remaining := max(width-prefixW-roPrefixW-deprecationW, 1)
+		return prefix + roPrefix + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 	}
 
 	if resolvedIcon != "" {
 		icon := IconStyle.Render(resolvedIcon + " ")
 		iconW := lipgloss.Width(icon)
-		remaining := max(width-iconW-deprecationW, 1)
-		return icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
+		remaining := max(width-roPrefixW-iconW-deprecationW, 1)
+		return roPrefix + icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 	}
 
-	remaining := max(width-deprecationW, 1)
-	return NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
+	remaining := max(width-roPrefixW-deprecationW, 1)
+	return roPrefix + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 }
 
 // FormatItemNameOnlyPlain formats an item showing only name and icon, without ANSI styling.
@@ -413,6 +419,11 @@ func FormatItemNameOnlyPlain(item model.Item, width int) string {
 		deprecationW = lipgloss.Width(deprecationSuffix)
 	}
 
+	// Plain "[RO] " prefix — no ANSI styling so the outer selection
+	// background renders cleanly.
+	roPrefix := readOnlyPrefixPlain(item)
+	roPrefixW := lipgloss.Width(roPrefix)
+
 	resolvedIcon := resolveIcon(item.Icon)
 
 	if item.Status == "current" {
@@ -421,22 +432,22 @@ func FormatItemNameOnlyPlain(item model.Item, width int) string {
 		if resolvedIcon != "" {
 			icon := resolvedIcon + " "
 			iconW := lipgloss.Width(icon)
-			remaining := max(width-prefixW-iconW-deprecationW, 1)
-			return prefix + icon + Truncate(displayName, remaining) + deprecationSuffix
+			remaining := max(width-prefixW-roPrefixW-iconW-deprecationW, 1)
+			return prefix + roPrefix + icon + Truncate(displayName, remaining) + deprecationSuffix
 		}
-		remaining := max(width-prefixW-deprecationW, 1)
-		return prefix + Truncate(displayName, remaining) + deprecationSuffix
+		remaining := max(width-prefixW-roPrefixW-deprecationW, 1)
+		return prefix + roPrefix + Truncate(displayName, remaining) + deprecationSuffix
 	}
 
 	if resolvedIcon != "" {
 		icon := resolvedIcon + " "
 		iconW := lipgloss.Width(icon)
-		remaining := max(width-iconW-deprecationW, 1)
-		return icon + Truncate(displayName, remaining) + deprecationSuffix
+		remaining := max(width-roPrefixW-iconW-deprecationW, 1)
+		return roPrefix + icon + Truncate(displayName, remaining) + deprecationSuffix
 	}
 
-	remaining := max(width-deprecationW, 1)
-	return Truncate(displayName, remaining) + deprecationSuffix
+	remaining := max(width-roPrefixW-deprecationW, 1)
+	return roPrefix + Truncate(displayName, remaining) + deprecationSuffix
 }
 
 // wrapExtraValue splits a value into continuation-line chunks of the given width.

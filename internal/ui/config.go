@@ -143,6 +143,9 @@ type Keybindings struct {
 
 	// Terminal mode
 	TerminalToggle string `json:"terminal_toggle" yaml:"terminal_toggle"`
+
+	// Read-only mode
+	ReadOnlyToggle string `json:"readonly_toggle" yaml:"readonly_toggle"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -191,6 +194,9 @@ func DefaultKeybindings() Keybindings {
 
 		// Terminal mode
 		TerminalToggle: "ctrl+t",
+
+		// Read-only mode
+		ReadOnlyToggle: "ctrl+r",
 	}
 }
 
@@ -358,6 +364,11 @@ type CustomAction struct {
 	Command     string `json:"command" yaml:"command"`
 	Key         string `json:"key" yaml:"key"`
 	Description string `json:"description" yaml:"description"`
+	// ReadOnlySafe declares the action does not change cluster state.
+	// Defaults to false (treated as mutating) so custom actions are blocked
+	// in read-only mode unless the user explicitly opts in. Set to true for
+	// view-only commands (port-forward listings, "kubectl describe", etc.).
+	ReadOnlySafe bool `json:"read_only_safe" yaml:"read_only_safe"`
 }
 
 // ConfigCustomActions maps resource kinds to user-defined custom actions.
@@ -407,6 +418,26 @@ var ConfigTransparentBg bool
 // Defaults to true. Set to false to disable mouse capture, allowing native
 // terminal text selection (shift+click, drag-to-select).
 var ConfigMouse = true
+
+// ConfigReadOnly is the global default for read-only mode. When true, every
+// mutating action is blocked unless overridden per-context.
+var ConfigReadOnly bool
+
+// ConfigClusterReadOnly maps context names to per-cluster read-only overrides.
+// A value here takes precedence over ConfigReadOnly for that specific context.
+var ConfigClusterReadOnly = map[string]bool{}
+
+// ResolveReadOnly returns the effective read-only state for a given context.
+// Precedence: CLI flag > per-context config > global config.
+func ResolveReadOnly(context string, cliFlag bool) bool {
+	if cliFlag {
+		return true
+	}
+	if v, ok := ConfigClusterReadOnly[context]; ok {
+		return v
+	}
+	return ConfigReadOnly
+}
 
 // ConfigNoColor, when true, builds the theme without foreground or background
 // colors. Emphasis is conveyed with bold, underline, and reverse video so the
@@ -533,11 +564,20 @@ type configFile struct {
 	// Examples: 0.175 ≈ WCAG AA (4.5:1), 0.3 ≈ AAA (7.0:1), 1.0 = maximum.
 	// Values outside [0, 1] are clamped. Hue and saturation are preserved.
 	MinContrastRatio *float64 `json:"min_contrast_ratio" yaml:"min_contrast_ratio"`
+	// ReadOnly disables all mutating actions (delete, edit, scale, restart,
+	// exec, port-forward, drain, cordon, etc.) for every context. Per-context
+	// overrides under clusters.<name>.read_only take precedence; the
+	// --read-only CLI flag wins over both.
+	ReadOnly *bool `json:"read_only" yaml:"read_only"`
 }
 
 // clusterConfig holds per-cluster configuration overrides.
 type clusterConfig struct {
 	ResourceColumns map[string][]string `json:"resource_columns" yaml:"resource_columns"`
+	// ReadOnly, when set, overrides the global read_only setting for this
+	// context only. Useful for marking specific clusters (e.g. "prod") as
+	// read-only while leaving others mutable.
+	ReadOnly *bool `json:"read_only" yaml:"read_only"`
 }
 
 // DefaultAbbreviations returns the default search abbreviation map.
@@ -778,6 +818,9 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.MinContrastRatio != nil {
 		ConfigMinContrastRatio = clamp01(*cfg.MinContrastRatio)
 	}
+	if cfg.ReadOnly != nil {
+		ConfigReadOnly = *cfg.ReadOnly
+	}
 	if os.Getenv("NO_COLOR") != "" {
 		// Per https://no-color.org, the presence of NO_COLOR (regardless of
 		// value) disables color. Env takes precedence over the config file
@@ -808,6 +851,7 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 	}
 	if len(cfg.Clusters) > 0 {
 		ConfigClusterResourceColumns = make(map[string]map[string][]string, len(cfg.Clusters))
+		ConfigClusterReadOnly = make(map[string]bool, len(cfg.Clusters))
 		for ctx, cc := range cfg.Clusters {
 			if len(cc.ResourceColumns) > 0 {
 				cols := make(map[string][]string, len(cc.ResourceColumns))
@@ -815,6 +859,9 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 					cols[strings.ToLower(k)] = v
 				}
 				ConfigClusterResourceColumns[ctx] = cols
+			}
+			if cc.ReadOnly != nil {
+				ConfigClusterReadOnly[ctx] = *cc.ReadOnly
 			}
 		}
 	}

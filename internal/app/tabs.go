@@ -722,6 +722,7 @@ func (m *Model) saveCurrentTab() {
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
 	t.watchMode = m.watchMode
+	t.readOnly = m.readOnly
 	t.requestGen = m.requestGen
 	t.selectedItems = copyMapStringBool(m.selectedItems)
 	t.selectionAnchor = m.selectionAnchor
@@ -824,6 +825,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.sortAscending = t.sortAscending
 	m.filterText = t.filterText
 	m.watchMode = t.watchMode
+	m.readOnly = t.readOnly
 	m.requestGen = t.requestGen
 	m.selectedItems = copyMapStringBool(t.selectedItems)
 	m.selectionAnchor = t.selectionAnchor
@@ -895,6 +897,13 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.searchActive = false
 	m.err = nil
 
+	// Re-annotate cluster picker rows with the current effective read-only
+	// state. The override map is per-Model (shared across tabs), but
+	// middleItems was captured per-tab — so a Ctrl+R toggle in another tab
+	// can leave this tab's [RO] markers stale until the next context
+	// reload. This brings them in sync immediately on tab switch.
+	m.refreshContextReadOnlyMarkers()
+
 	// If this tab was restored from a session but never loaded, clear the
 	// flag, set up the navigation column structure, and return a command
 	// that fetches the tab's data.
@@ -962,6 +971,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		sortAscending:          m.sortAscending,
 		filterText:             m.filterText,
 		watchMode:              m.watchMode,
+		readOnly:               m.readOnly,
 		requestGen:             m.requestGen,
 		selectedItems:          copyMapStringBool(m.selectedItems),
 		selectionAnchor:        m.selectionAnchor,

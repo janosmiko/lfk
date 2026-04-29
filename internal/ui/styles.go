@@ -142,6 +142,20 @@ var (
 				Bold(true).
 				Padding(0, 1)
 
+	// Read-only badge in title bar. Warning color so it's hard to miss.
+	ReadOnlyBadgeStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorSelectedFg)).
+				Background(lipgloss.Color(ColorWarning)).
+				Bold(true).
+				Padding(0, 1)
+
+	// Subtle [RO] marker for list rows. Foreground-only so it doesn't
+	// compete with the row content the way a solid-background badge does.
+	// Same visual weight as CurrentMarkerStyle (* prefix).
+	ReadOnlyMarkerStyle = lipgloss.NewStyle().
+				Foreground(lipgloss.Color(ColorWarning)).
+				Bold(true)
+
 	// Column header with underline and icon.
 	HeaderStyle = lipgloss.NewStyle().
 			Bold(true).

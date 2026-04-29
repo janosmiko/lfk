@@ -35,6 +35,9 @@ lfk --no-color
 # Equivalent environment variable (https://no-color.org):
 NO_COLOR=1 lfk
 
+# Disable all mutating actions (delete, edit, scale, restart, exec, etc.)
+lfk --read-only
+
 # Override the watch-mode polling interval (default 2s; clamped to [500ms, 10m])
 lfk --watch-interval 5s
 
@@ -74,6 +77,78 @@ Useful for monochrome terminals, piped output, or lower CPU usage.
 - **Config file:** Add `no_color: true` to `~/.config/lfk/config.yaml`
 
 Precedence: `--no-color` flag > `NO_COLOR` env var > config file.
+
+## Read-Only Mode
+
+Read-only mode disables every action that changes cluster state — delete,
+edit, scale, restart, rollback, exec, attach, port-forward, drain, cordon,
+taint, label/annotation edits, secret/configmap edits, paste-apply, and
+template create. Listing, describing, viewing logs, viewing YAML, diff,
+and other read paths still work.
+
+Read-only is per-context (and per-tab). The UI surfaces it in two places:
+
+- **Inside a context** (any level deeper than the cluster picker): the
+  title bar shows a `[RO]` badge for the current tab, and mutating
+  shortcuts are filtered out of the action menu and hint bar.
+- **At the cluster picker**: each context row shows a `[RO]` suffix when
+  it is configured read-only (per-context config, global config, or the
+  `--read-only` CLI flag). The title-bar badge is suppressed here — it
+  has no specific context to refer to. The per-row marker is the
+  declarative view of which clusters are locked.
+
+Read-only is opt-in at four levels (precedence highest first):
+
+1. **CLI flag (sticky):** `lfk --read-only`. Once set, the flag stays on
+   for the life of the process — context switches cannot drop it, and
+   the picker row toggle is rejected with a status hint.
+2. **Session row toggle (`Ctrl+R` at the cluster picker):** highlights
+   a context and presses `Ctrl+R` to flip its `[RO]` marker. The toggle
+   is recorded for the session, persists across re-navigation to the
+   picker, and is honored when entering that context.
+3. **Per-context config:** lock specific clusters by name.
+   ```yaml
+   clusters:
+     prod:
+       read_only: true
+     audit-cluster:
+       read_only: true
+   ```
+4. **Global config:** `read_only: true` at the top level applies to every
+   context.
+
+Read-only state is per-tab. New tabs inherit the setting from the active
+tab when created and re-evaluate on context switch.
+
+### In-app toggle
+
+`Ctrl+R` behavior depends on where you are:
+
+- **At the cluster picker**: flips the `[RO]` marker on the highlighted
+  context row. The toggle is stored as a session override that wins
+  over per-context and global config when entering that context.
+  Persists across back-and-forth navigation to the picker; cleared on
+  process exit. Blocked when `--read-only` is set.
+- **Inside a context**: flips read-only for the current tab.
+  Session-scoped — does not write to the config file, and does not leak
+  across context switches. Blocked when `--read-only` is set; the CLI
+  flag is the strongest precedence level and cannot be defeated within
+  the running process.
+
+### CLI flag
+
+```sh
+lfk --read-only            # all contexts read-only for the session
+lfk --context prod --read-only
+```
+
+`--read-only` is process-wide. `--context` only selects the starting
+context; it does not scope the read-only flag.
+
+### Discovery
+
+The cluster picker hint bar advertises `Ctrl+R toggle RO` so users
+can find the row toggle without reading docs.
 
 ## Watch-Mode Interval
 

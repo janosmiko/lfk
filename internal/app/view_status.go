@@ -258,9 +258,12 @@ func (m Model) statusBar() string {
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }
 
-// explorerHintEntries returns the styled key hints displayed in the status bar
-// for the explorer (and related dashboard) views. Dashboard pseudo-resources
-// (overview/monitoring) get a reduced hint set.
+// explorerHintEntries builds the bottom hint bar for explorer views (cluster
+// picker, resource-type browser, resource list). Extracted from statusBar to
+// keep that function under the gocyclo budget. Dashboard pseudo-resources
+// (overview/monitoring) get a reduced hint set; standard explorer views use
+// the full set with conditional hides for keys that are no-ops at the
+// current level.
 func (m Model) explorerHintEntries() []ui.HintEntry {
 	kb := ui.ActiveKeybindings
 	sel := m.selectedMiddleItem()
@@ -295,7 +298,19 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	if hasResourceContext {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
 	}
-	hintEntries = append(hintEntries, ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"})
+	// Advertise the read-only toggle on every level so users can
+	// discover it without reading docs. At the cluster picker it
+	// flips a row marker; inside a context it locks/unlocks the
+	// active tab. Hidden inside a context when --read-only is set,
+	// since the gate rejects the toggle.
+	if m.nav.Level == model.LevelClusters || !m.cliReadOnly {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ReadOnlyToggle, Desc: "toggle RO"})
+	}
+	// "create" runs `kubectl apply` from a template. Hide it in
+	// read-only mode since it would be blocked anyway.
+	if !m.readOnly {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"})
+	}
 	if hasResourceContext {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"})
 	}
@@ -310,8 +325,7 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	// Add context-specific hints for Events resource type.
 	hintEntries = m.appendEventsHintEntries(hintEntries)
 	// Add context-specific hints for Security findings views.
-	hintEntries = m.appendSecurityHintEntries(hintEntries)
-	return hintEntries
+	return m.appendSecurityHintEntries(hintEntries)
 }
 
 // appendEventsHintEntries injects Events-view toggle hints (warnings-only,

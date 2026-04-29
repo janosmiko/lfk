@@ -511,6 +511,10 @@ func (m Model) handleYAMLKeyCtrlE() (tea.Model, tea.Cmd) {
 	kind := m.selectedResourceKind()
 	sel := m.selectedMiddleItem()
 	if kind != "" && sel != nil {
+		if m.readOnly {
+			m.setStatusMessage(readOnlyBlockedMessage("Edit"), true)
+			return m, scheduleStatusClear()
+		}
 		m.actionCtx = m.buildActionCtx(sel, kind)
 		return m, m.execKubectlEdit()
 	}

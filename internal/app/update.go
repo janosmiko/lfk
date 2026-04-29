@@ -438,6 +438,13 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
+	// Annotate each context row with its effective read-only state. CLI
+	// flag wins, then per-context session override (set by Ctrl+R on a
+	// row), then per-context/global config. Re-applying overrides here
+	// ensures Ctrl+R toggles survive a context list refresh.
+	for i := range msg.items {
+		msg.items[i].ReadOnly = m.effectiveContextReadOnly(msg.items[i].Name)
+	}
 	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
 	m.leftItems = nil
