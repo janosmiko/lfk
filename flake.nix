@@ -23,7 +23,7 @@
         # below; release.yml then verifies this matches the pushed tag so the
         # two can't drift. `make bump-version VERSION=X.Y.Z` remains available
         # for emergency manual bumps.
-        baseVersion = "0.9.34"; # x-release-please-version
+        baseVersion = "0.9.35"; # x-release-please-version
         commit = self.shortRev or self.dirtyShortRev or "unknown";
         version = "${baseVersion}-${commit}";
       in
