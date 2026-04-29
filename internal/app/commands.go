@@ -745,6 +745,58 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 			return yamlClipboardMsg{content: content, count: 1, err: err}
 		}
 	case model.LevelOwned:
+		// Bulk path mirrors LevelResources: gate on visible selection so a
+		// selection that's been filtered out of view falls through to the
+		// cursor branch instead of dispatching an empty fetch. Per-item Kind
+		// dispatch (Pod -> GetPodYAML; others -> resolveOwnedResourceType +
+		// GetResourceYAML) is resolved before the closure runs to keep the
+		// goroutine off the model.
+		if items := m.selectedItemsList(); len(items) > 0 {
+			type fetchTarget struct {
+				ns, name string
+				isPod    bool
+				rt       model.ResourceTypeEntry
+				resolved bool
+				kind     string
+			}
+			targets := make([]fetchTarget, len(items))
+			for i, it := range items {
+				itemNs := ns
+				if it.Namespace != "" {
+					itemNs = it.Namespace
+				}
+				t := fetchTarget{ns: itemNs, name: it.Name, kind: it.Kind, isPod: it.Kind == "Pod"}
+				if !t.isPod {
+					t.rt, t.resolved = m.resolveOwnedResourceType(&items[i])
+				}
+				targets[i] = t
+			}
+			return func() tea.Msg {
+				docs := make([]string, 0, len(targets))
+				for _, t := range targets {
+					var (
+						content string
+						err     error
+					)
+					switch {
+					case t.isPod:
+						content, err = m.client.GetPodYAML(context.Background(), kctx, t.ns, t.name)
+					case t.resolved:
+						content, err = m.client.GetResourceYAML(context.Background(), kctx, t.ns, t.rt, t.name)
+					default:
+						err = fmt.Errorf("unknown resource type: %s", t.kind)
+					}
+					if err != nil {
+						return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", t.ns, t.name, err)}
+					}
+					docs = append(docs, strings.TrimRight(content, "\n"))
+				}
+				return yamlClipboardMsg{
+					content: strings.Join(docs, "\n---\n") + "\n",
+					count:   len(docs),
+				}
+			}
+		}
 		sel := m.selectedMiddleItem()
 		if sel == nil {
 			return nil

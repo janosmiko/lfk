@@ -921,3 +921,77 @@ func TestUpdateYamlClipboardCountAwareStatus(t *testing.T) {
 		assert.NotNil(t, cmd)
 	})
 }
+
+// TestCopyYAMLBulkLevelOwnedWrapsErrorWithNamespaceName guards bulk Y at
+// LevelOwned. Multi-select is allowed at LevelOwned (>= LevelResources) and
+// bulk delete works there, so bulk YAML must too — otherwise the dispatcher
+// shows "Fetching N manifests..." but the cmd silently returns just the
+// cursor row's YAML (count=1) and the user gets one manifest when the toast
+// promised N. The bulk branch wraps fetch errors with ns/name and tags
+// count=0 on early-return; the single-item path does neither, so this
+// assertion pins down which branch ran.
+func TestCopyYAMLBulkLevelOwnedWrapsErrorWithNamespaceName(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelOwned
+	m.toggleSelection(m.middleItems[0]) // default/pod-1
+	m.toggleSelection(m.middleItems[1]) // ns-2/pod-2
+
+	cmd := m.copyYAMLToClipboard()
+	require.NotNil(t, cmd)
+
+	ymsg, ok := cmd().(yamlClipboardMsg)
+	require.True(t, ok)
+	require.Error(t, ymsg.err, "fake client has no pods seeded; first fetch must fail")
+	assert.Contains(t, ymsg.err.Error(), "default/pod-1",
+		"bulk path must wrap errors with ns/name (single-item path does not)")
+	assert.Equal(t, 0, ymsg.count, "early-return on error keeps count at zero")
+}
+
+// TestCopyYAMLBulkLevelOwnedDispatcherShowsFetchingStatus confirms the
+// dispatcher's "Fetching N manifests..." pre-fetch status applies at
+// LevelOwned the same as LevelResources.
+func TestCopyYAMLBulkLevelOwnedDispatcherShowsFetchingStatus(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelOwned
+	m.toggleSelection(m.middleItems[0])
+	m.toggleSelection(m.middleItems[1])
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Equal(t, "Fetching 2 manifests...", rm.statusMessage)
+	assert.NotNil(t, cmd)
+}
+
+// TestCopyYAMLLevelContainersIgnoresSelection guards LevelContainers, where
+// the cmd unconditionally fetches the parent Pod's YAML — bulk doesn't
+// apply (containers don't have separate YAML). With selection, the
+// dispatcher must skip the misleading "Fetching N manifests..." status and
+// fall through to the single-pod path silently. Without this gate, a user
+// who multi-selects two containers and presses `Y` sees a "Fetching 2..."
+// toast but the clipboard ends up with the parent Pod's YAML once and the
+// final status flips to "YAML copied" — promising N, delivering 1.
+func TestCopyYAMLLevelContainersIgnoresSelection(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelContainers
+	m.nav.OwnedName = "pod-1"
+	m.middleItems = []model.Item{
+		{Name: "container-1", Kind: "Container", Namespace: "default"},
+		{Name: "container-2", Kind: "Container", Namespace: "default"},
+	}
+	m.toggleSelection(m.middleItems[0])
+	m.toggleSelection(m.middleItems[1])
+
+	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	require.True(t, handled)
+	rm := ret.(Model)
+
+	assert.Empty(t, rm.statusMessage,
+		"LevelContainers does not support bulk; dispatcher must take the cursor branch silently")
+	require.NotNil(t, cmd, "must still dispatch a single-pod fetch")
+
+	ymsg, ok := cmd().(yamlClipboardMsg)
+	require.True(t, ok)
+	assert.Equal(t, 1, ymsg.count, "single-pod fetch must be tagged count=1")
+}

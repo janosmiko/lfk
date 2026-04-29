@@ -517,9 +517,20 @@ func (m Model) handleExplorerActionKeyCopyName() (tea.Model, tea.Cmd, bool) {
 // (QPS=5/Burst=10) serializes per-item Gets regardless of goroutine count.
 const maxBulkYAMLCopy = 50
 
+// supportsBulkYAMLCopy reports whether copyYAMLToClipboard implements a
+// per-selection bulk fetch at the current navigation level. LevelContainers
+// is single-Pod-by-OwnedName (containers don't have separate YAML), so its
+// dispatcher must fall through to the cursor branch even with a selection
+// — otherwise the user sees a "Fetching N..." toast but the clipboard ends
+// up with one Pod's YAML. Keep this in sync with the bulk branches in
+// copyYAMLToClipboard.
+func (m Model) supportsBulkYAMLCopy() bool {
+	return m.nav.Level == model.LevelResources || m.nav.Level == model.LevelOwned
+}
+
 func (m Model) handleExplorerActionKeyCopyYAML() (tea.Model, tea.Cmd, bool) {
 	// See handleExplorerActionKeyCopyName for the n==0 rationale.
-	if m.hasSelection() {
+	if m.hasSelection() && m.supportsBulkYAMLCopy() {
 		n := len(m.selectedItemsList())
 		if n > maxBulkYAMLCopy {
 			m.setStatusMessage(fmt.Sprintf("Max %d exceeded for bulk YAML copy", maxBulkYAMLCopy), true)
