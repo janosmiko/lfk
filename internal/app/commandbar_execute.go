@@ -195,7 +195,11 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 	case "export":
 		lower := strings.ToLower(arg)
 		if lower == "yaml" || lower == "json" || lower == "" {
-			return m, m.copyYAMLToClipboard()
+			// Share the bulk-or-cursor dispatcher with the `Y` keybinding
+			// so multi-selection (cap, "Fetching N..." status, level gating)
+			// behaves the same whether the user types `:export yaml` or
+			// hits `Y`.
+			return m.dispatchYAMLClipboardCopy()
 		}
 		m.setStatusMessage(fmt.Sprintf("Unknown export format: %s", arg), true)
 		return m, scheduleStatusClear()

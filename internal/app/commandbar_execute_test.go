@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"slices"
 	"testing"
 
@@ -368,6 +369,107 @@ func TestExecuteBuiltinCommand(t *testing.T) {
 		m := baseModelCov()
 		result, _ := m.executeBuiltinCommand("notabuiltin")
 		rm := result.(Model)
+		assert.True(t, rm.statusMessageErr)
+	})
+
+	// `:export yaml` shares the multi-selection bulk path with the `Y` key.
+	// Without this hookup the command-bar route silently dispatches a bulk
+	// fetch (which can hit dozens of items at QPS=5) with no progress
+	// indicator and no over-cap protection, so the user is left staring at
+	// a blank toast for ~10s.
+	t.Run("export_yaml_with_selection_shows_fetching_status", func(t *testing.T) {
+		m := basePush80Model()
+		m.toggleSelection(m.middleItems[0])
+		m.toggleSelection(m.middleItems[1])
+
+		result, cmd := m.executeBuiltinCommand("export yaml")
+		rm := result.(Model)
+
+		assert.Equal(t, "Fetching 2 manifests...", rm.statusMessage,
+			":export must mirror Y's bulk dispatcher status")
+		assert.NotNil(t, cmd)
+	})
+
+	// Cap protection: `:export yaml` past maxBulkYAMLCopy must reject with
+	// the same error toast the Y key path uses, not silently kick off a
+	// 100-item sequential fetch behind the rate limiter.
+	t.Run("export_yaml_over_cap_rejects", func(t *testing.T) {
+		m := basePush80Model()
+		m.middleItems = make([]model.Item, maxBulkYAMLCopy+1)
+		for i := range m.middleItems {
+			m.middleItems[i] = model.Item{
+				Name:      fmt.Sprintf("pod-%d", i),
+				Namespace: "default",
+				Kind:      "Pod",
+			}
+			m.toggleSelection(m.middleItems[i])
+		}
+
+		result, cmd := m.executeBuiltinCommand("export yaml")
+		rm := result.(Model)
+
+		assert.Equal(t, fmt.Sprintf("Max %d exceeded for bulk YAML copy", maxBulkYAMLCopy), rm.statusMessage)
+		assert.True(t, rm.statusMessageErr, "must surface as error toast")
+		assert.NotNil(t, cmd, "auto-clear timer is still dispatched")
+	})
+
+	// No selection: `:export yaml` falls through to the cursor-row single-
+	// item fetch — no "Fetching N..." status (that's reserved for the bulk
+	// path). The cmd is still non-nil so the YAML still goes to clipboard.
+	t.Run("export_yaml_no_selection_uses_cursor", func(t *testing.T) {
+		m := basePush80Model()
+		m.setCursor(0)
+
+		result, cmd := m.executeBuiltinCommand("export yaml")
+		rm := result.(Model)
+
+		assert.Empty(t, rm.statusMessage,
+			"single-item path dispatches silently; status is set only when the fetch resolves")
+		assert.NotNil(t, cmd)
+	})
+
+	// `:export json` is treated as an alias for yaml in the existing impl
+	// (the format toggle is a no-op today). Pin the alias to keep the bulk
+	// hookup symmetric.
+	t.Run("export_json_with_selection_shows_fetching_status", func(t *testing.T) {
+		m := basePush80Model()
+		m.toggleSelection(m.middleItems[0])
+		m.toggleSelection(m.middleItems[1])
+
+		result, cmd := m.executeBuiltinCommand("export json")
+		rm := result.(Model)
+
+		assert.Equal(t, "Fetching 2 manifests...", rm.statusMessage)
+		assert.NotNil(t, cmd)
+	})
+
+	// LevelContainers must NOT show "Fetching N...": copyYAMLToClipboard
+	// fetches the parent Pod by OwnedName regardless of selection (containers
+	// don't have separate YAML), so the bulk indicator would be a lie.
+	t.Run("export_yaml_at_level_containers_falls_back_silently", func(t *testing.T) {
+		m := basePush80Model()
+		m.nav.Level = model.LevelContainers
+		m.nav.OwnedName = "pod-1"
+		m.middleItems = []model.Item{
+			{Name: "container-1", Kind: "Container", Namespace: "default"},
+			{Name: "container-2", Kind: "Container", Namespace: "default"},
+		}
+		m.toggleSelection(m.middleItems[0])
+		m.toggleSelection(m.middleItems[1])
+
+		result, cmd := m.executeBuiltinCommand("export yaml")
+		rm := result.(Model)
+
+		assert.Empty(t, rm.statusMessage,
+			"LevelContainers cmd ignores selection; dispatcher must skip the bulk indicator")
+		assert.NotNil(t, cmd)
+	})
+
+	t.Run("export_unknown_format_returns_error", func(t *testing.T) {
+		m := basePush80Model()
+		result, _ := m.executeBuiltinCommand("export csv")
+		rm := result.(Model)
+		assert.Contains(t, rm.statusMessage, "Unknown export format")
 		assert.True(t, rm.statusMessageErr)
 	})
 }

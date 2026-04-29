@@ -528,23 +528,35 @@ func (m Model) supportsBulkYAMLCopy() bool {
 	return m.nav.Level == model.LevelResources || m.nav.Level == model.LevelOwned
 }
 
-func (m Model) handleExplorerActionKeyCopyYAML() (tea.Model, tea.Cmd, bool) {
-	// See handleExplorerActionKeyCopyName for the n==0 rationale.
+// dispatchYAMLClipboardCopy routes Y / `:export yaml` to either the
+// multi-selection bulk path (with cap + "Fetching N..." status) or the
+// cursor-row single-item path. Shared so the command-bar entry behaves
+// identically to the explorer keybinding — without it, `:export` would
+// silently kick off uncapped sequential fetches behind the rate limiter
+// with no progress indicator.
+//
+// See handleExplorerActionKeyCopyName for the n==0 rationale.
+func (m Model) dispatchYAMLClipboardCopy() (tea.Model, tea.Cmd) {
 	if m.hasSelection() && m.supportsBulkYAMLCopy() {
 		n := len(m.selectedItemsList())
 		if n > maxBulkYAMLCopy {
 			m.setStatusMessage(fmt.Sprintf("Max %d exceeded for bulk YAML copy", maxBulkYAMLCopy), true)
-			return m, scheduleStatusClear(), true
+			return m, scheduleStatusClear()
 		}
 		if n > 0 {
 			m.setStatusMessage(fmt.Sprintf("Fetching %d manifests...", n), false)
-			return m, m.copyYAMLToClipboard(), true
+			return m, m.copyYAMLToClipboard()
 		}
 	}
 	if m.selectedMiddleItem() == nil {
-		return m, nil, true
+		return m, nil
 	}
-	return m, m.copyYAMLToClipboard(), true
+	return m, m.copyYAMLToClipboard()
+}
+
+func (m Model) handleExplorerActionKeyCopyYAML() (tea.Model, tea.Cmd, bool) {
+	ret, cmd := m.dispatchYAMLClipboardCopy()
+	return ret, cmd, true
 }
 
 func (m Model) handleExplorerActionKeyNewTab() (tea.Model, tea.Cmd, bool) {
