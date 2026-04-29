@@ -29,8 +29,8 @@ func (c *Client) getArgoManagedResources(ctx context.Context, dynClient dynamic.
 		return nil, fmt.Errorf("getting application %s: %w", appName, err)
 	}
 
-	statusMap, _ := app.Object["status"].(map[string]interface{})
-	resources, _ := statusMap["resources"].([]interface{})
+	statusMap, _ := app.Object["status"].(map[string]any)
+	resources, _ := statusMap["resources"].([]any)
 
 	if len(resources) > 0 {
 		items := argoStatusResourcesToItems(resources)
@@ -56,10 +56,10 @@ func (c *Client) getArgoManagedResources(ctx context.Context, dynClient dynamic.
 
 // argoStatusResourcesToItems converts status.resources entries from an ArgoCD
 // Application into model.Item entries.
-func argoStatusResourcesToItems(resources []interface{}) []model.Item {
+func argoStatusResourcesToItems(resources []any) []model.Item {
 	var items []model.Item
 	for _, r := range resources {
-		res, ok := r.(map[string]interface{})
+		res, ok := r.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -71,7 +71,7 @@ func argoStatusResourcesToItems(resources []interface{}) []model.Item {
 		syncStatus, _ := res["status"].(string)
 
 		healthStatus := ""
-		if health, ok := res["health"].(map[string]interface{}); ok {
+		if health, ok := res["health"].(map[string]any); ok {
 			healthStatus, _ = health["status"].(string)
 		}
 
@@ -114,8 +114,8 @@ func argoStatusResourcesToItems(resources []interface{}) []model.Item {
 // argoDestinationNamespace extracts the destination namespace from an ArgoCD
 // Application spec, falling back to the given default.
 func argoDestinationNamespace(app *unstructured.Unstructured, defaultNs string) string {
-	if specMap, ok := app.Object["spec"].(map[string]interface{}); ok {
-		if dest, ok := specMap["destination"].(map[string]interface{}); ok {
+	if specMap, ok := app.Object["spec"].(map[string]any); ok {
+		if dest, ok := specMap["destination"].(map[string]any); ok {
 			if dns, ok := dest["namespace"].(string); ok && dns != "" {
 				return dns
 			}
@@ -237,18 +237,18 @@ func (c *Client) SyncArgoApp(contextName, namespace, name string, applyOnly bool
 			strategy = "apply"
 		}
 
-		syncBlock := map[string]interface{}{
-			"syncStrategy": map[string]interface{}{
-				strategy: map[string]interface{}{},
+		syncBlock := map[string]any{
+			"syncStrategy": map[string]any{
+				strategy: map[string]any{},
 			},
 		}
 
-		if spec, ok := app.Object["spec"].(map[string]interface{}); ok {
-			if syncPolicy, ok := spec["syncPolicy"].(map[string]interface{}); ok {
-				if syncOptions, ok := syncPolicy["syncOptions"].([]interface{}); ok && len(syncOptions) > 0 {
+		if spec, ok := app.Object["spec"].(map[string]any); ok {
+			if syncPolicy, ok := spec["syncPolicy"].(map[string]any); ok {
+				if syncOptions, ok := syncPolicy["syncOptions"].([]any); ok && len(syncOptions) > 0 {
 					syncBlock["syncOptions"] = syncOptions
 				}
-				if automated, ok := syncPolicy["automated"].(map[string]interface{}); ok {
+				if automated, ok := syncPolicy["automated"].(map[string]any); ok {
 					if prune, ok := automated["prune"].(bool); ok {
 						syncBlock["prune"] = prune
 					}
@@ -258,10 +258,10 @@ func (c *Client) SyncArgoApp(contextName, namespace, name string, applyOnly bool
 
 		// Clear stale syncStrategy from operationState to prevent ArgoCD from
 		// merging the old strategy into the new sync.
-		if status, ok := app.Object["status"].(map[string]interface{}); ok {
-			if opState, ok := status["operationState"].(map[string]interface{}); ok {
-				if op, ok := opState["operation"].(map[string]interface{}); ok {
-					if syncMap, ok := op["sync"].(map[string]interface{}); ok {
+		if status, ok := app.Object["status"].(map[string]any); ok {
+			if opState, ok := status["operationState"].(map[string]any); ok {
+				if op, ok := opState["operation"].(map[string]any); ok {
+					if syncMap, ok := op["sync"].(map[string]any); ok {
 						delete(syncMap, "syncStrategy")
 					}
 				}
@@ -269,8 +269,8 @@ func (c *Client) SyncArgoApp(contextName, namespace, name string, applyOnly bool
 		}
 
 		// Set operation with exactly one syncStrategy key.
-		app.Object["operation"] = map[string]interface{}{
-			"initiatedBy": map[string]interface{}{
+		app.Object["operation"] = map[string]any{
+			"initiatedBy": map[string]any{
 				"username": "lfk",
 			},
 			"sync": syncBlock,
@@ -305,11 +305,11 @@ func (c *Client) TerminateArgoSync(contextName, namespace, name string) error {
 		return fmt.Errorf("getting application %s: %w", name, err)
 	}
 
-	status, _ := app.Object["status"].(map[string]interface{})
+	status, _ := app.Object["status"].(map[string]any)
 	if status == nil {
 		return fmt.Errorf("no sync operation in progress")
 	}
-	opState, _ := status["operationState"].(map[string]interface{})
+	opState, _ := status["operationState"].(map[string]any)
 	if opState == nil {
 		return fmt.Errorf("no sync operation in progress")
 	}
@@ -419,18 +419,18 @@ func (c *Client) UpdateAutoSyncConfig(ctx context.Context, contextName, namespac
 	var patchData []byte
 	if !enabled {
 		// Remove automated section entirely.
-		patchData, err = json.Marshal(map[string]interface{}{
-			"spec": map[string]interface{}{
-				"syncPolicy": map[string]interface{}{
+		patchData, err = json.Marshal(map[string]any{
+			"spec": map[string]any{
+				"syncPolicy": map[string]any{
 					"automated": nil,
 				},
 			},
 		})
 	} else {
-		patchData, err = json.Marshal(map[string]interface{}{
-			"spec": map[string]interface{}{
-				"syncPolicy": map[string]interface{}{
-					"automated": map[string]interface{}{
+		patchData, err = json.Marshal(map[string]any{
+			"spec": map[string]any{
+				"syncPolicy": map[string]any{
+					"automated": map[string]any{
 						"selfHeal": selfHeal,
 						"prune":    prune,
 					},
@@ -465,24 +465,24 @@ func (c *Client) getFluxManagedResources(ctx context.Context, dynClient dynamic.
 		return nil, err
 	}
 
-	status, ok := obj.Object["status"].(map[string]interface{})
+	status, ok := obj.Object["status"].(map[string]any)
 	if !ok {
 		return nil, nil
 	}
 
-	inventory, ok := status["inventory"].(map[string]interface{})
+	inventory, ok := status["inventory"].(map[string]any)
 	if !ok {
 		return nil, nil
 	}
 
-	entries, ok := inventory["entries"].([]interface{})
+	entries, ok := inventory["entries"].([]any)
 	if !ok || len(entries) == 0 {
 		return nil, nil
 	}
 
 	items := make([]model.Item, 0, len(entries))
 	for _, entry := range entries {
-		e, ok := entry.(map[string]interface{})
+		e, ok := entry.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -561,7 +561,7 @@ func (c *Client) ReconcileFluxResource(contextName, namespace, name string, gvr 
 	}
 
 	now := time.Now().Format(time.RFC3339Nano)
-	patch := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"reconcile.fluxcd.io/requestedAt":"%s"}}}`, now))
+	patch := fmt.Appendf(nil, `{"metadata":{"annotations":{"reconcile.fluxcd.io/requestedAt":"%s"}}}`, now)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
 		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
 	)
@@ -687,10 +687,10 @@ func (c *Client) ResubmitArgoWorkflow(contextName, namespace, name string) (stri
 	}
 
 	newName := name + "-resubmit-" + time.Now().Format("20060102-150405")
-	newWf := map[string]interface{}{
+	newWf := map[string]any{
 		"apiVersion": "argoproj.io/v1alpha1",
 		"kind":       "Workflow",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      newName,
 			"namespace": namespace,
 		},
@@ -716,21 +716,21 @@ func (c *Client) SubmitWorkflowFromTemplate(contextName, namespace, templateName
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
 	wfName := templateName + "-" + time.Now().Format("20060102-150405")
 
-	ref := map[string]interface{}{
+	ref := map[string]any{
 		"name": templateName,
 	}
 	if clusterScope {
 		ref["clusterScope"] = true
 	}
 
-	newWf := map[string]interface{}{
+	newWf := map[string]any{
 		"apiVersion": "argoproj.io/v1alpha1",
 		"kind":       "Workflow",
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"name":      wfName,
 			"namespace": namespace,
 		},
-		"spec": map[string]interface{}{
+		"spec": map[string]any{
 			"workflowTemplateRef": ref,
 		},
 	}
@@ -757,7 +757,7 @@ func (c *Client) GetWorkflowStatus(contextName, namespace, name string) (string,
 		return "", false, fmt.Errorf("getting workflow %s: %w", name, err)
 	}
 
-	status, _ := wf.Object["status"].(map[string]interface{})
+	status, _ := wf.Object["status"].(map[string]any)
 	phase, _ := status["phase"].(string)
 	startedAt, _ := status["startedAt"].(string)
 	finishedAt, _ := status["finishedAt"].(string)
@@ -778,7 +778,7 @@ func (c *Client) GetWorkflowStatus(contextName, namespace, name string) (string,
 	b.WriteString("\n")
 
 	// Format nodes table, ordered by DAG/steps execution order.
-	nodes, _ := status["nodes"].(map[string]interface{})
+	nodes, _ := status["nodes"].(map[string]any)
 	if len(nodes) > 0 {
 		fmt.Fprintf(&b, "%-45s %-15s %-12s %s\n", "NODE", "TYPE", "PHASE", "DURATION")
 		b.WriteString(strings.Repeat("-", 90))
@@ -789,7 +789,7 @@ func (c *Client) GetWorkflowStatus(contextName, namespace, name string) (string,
 		var rootID string
 		childrenOf := make(map[string][]string, len(nodes))
 		for id, n := range nodes {
-			node, ok := n.(map[string]interface{})
+			node, ok := n.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -797,7 +797,7 @@ func (c *Client) GetWorkflowStatus(contextName, namespace, name string) (string,
 			if nodeName == name {
 				rootID = id
 			}
-			if kids, ok := node["children"].([]interface{}); ok {
+			if kids, ok := node["children"].([]any); ok {
 				for _, k := range kids {
 					if s, ok := k.(string); ok {
 						childrenOf[id] = append(childrenOf[id], s)
@@ -828,7 +828,7 @@ func (c *Client) GetWorkflowStatus(contextName, namespace, name string) (string,
 		}
 
 		for _, key := range orderedKeys {
-			node, ok := nodes[key].(map[string]interface{})
+			node, ok := nodes[key].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -940,7 +940,7 @@ func (c *Client) ForceRefreshExternalSecret(contextName, namespace, name string,
 	}
 
 	now := time.Now().Format(time.RFC3339Nano)
-	patch := []byte(fmt.Sprintf(`{"metadata":{"annotations":{"force-sync.external-secrets.io/force-sync":"%s"}}}`, now))
+	patch := fmt.Appendf(nil, `{"metadata":{"annotations":{"force-sync.external-secrets.io/force-sync":"%s"}}}`, now)
 
 	var patchErr error
 	if namespace != "" {

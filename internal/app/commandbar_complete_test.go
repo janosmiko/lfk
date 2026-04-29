@@ -4,12 +4,25 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// freshNsCache wraps plain context→names data as cache entries with a
+// current timestamp, so tests that only care about the contents don't
+// need to spell out the fetchedAt on every line.
+func freshNsCache(entries map[string][]string) map[string]namespaceCacheEntry {
+	out := make(map[string]namespaceCacheEntry, len(entries))
+	now := time.Now()
+	for ctx, names := range entries {
+		out[ctx] = namespaceCacheEntry{names: names, fetchedAt: now}
+	}
+	return out
+}
 
 // --- helpers ---
 
@@ -144,7 +157,7 @@ func TestCompleteBuiltin_NamespaceArg(t *testing.T) {
 		{text: "kube", start: 3, end: 7},
 	}
 	m := baseModelCov()
-	m.cachedNamespaces = []string{"default", "kube-system", "production"}
+	m.cachedNamespaces = freshNsCache(map[string][]string{"": {"default", "kube-system", "production"}})
 	got := completeBuiltin(tokens, &m)
 	assert.True(t, hasSuggestionCategory(got, "kube-system", "namespace"),
 		"should suggest 'kube-system' matching prefix 'kube'")
@@ -302,7 +315,7 @@ func TestCompleteKubectl_NamespaceFlag(t *testing.T) {
 		{text: "kube", start: 12, end: 16},
 	}
 	m := baseModelCov()
-	m.cachedNamespaces = []string{"default", "kube-system", "kube-public"}
+	m.cachedNamespaces = freshNsCache(map[string][]string{"": {"default", "kube-system", "kube-public"}})
 	got := completeKubectl(tokens, &m)
 	assert.True(t, hasSuggestionCategory(got, "kube-system", "namespace"),
 		"should suggest 'kube-system' after -n flag")
@@ -382,7 +395,7 @@ func TestGenerateSuggestions_ShellCommand(t *testing.T) {
 func TestGenerateSuggestions_BuiltinNamespace(t *testing.T) {
 	m := baseModelCov()
 	m.commandBarInput.Value = "ns kube"
-	m.cachedNamespaces = []string{"default", "kube-system", "production"}
+	m.cachedNamespaces = freshNsCache(map[string][]string{"": {"default", "kube-system", "production"}})
 	got := m.generateCommandBarSuggestions()
 	assert.True(t, hasSuggestionCategory(got, "kube-system", "namespace"),
 		"should suggest 'kube-system' for 'ns kube'")
@@ -518,7 +531,7 @@ func TestCompleteKubectl_LongNamespaceFlag(t *testing.T) {
 		{text: "def", start: 21, end: 24},
 	}
 	m := baseModelCov()
-	m.cachedNamespaces = []string{"default", "kube-system"}
+	m.cachedNamespaces = freshNsCache(map[string][]string{"": {"default", "kube-system"}})
 	got := completeKubectl(tokens, &m)
 	assert.True(t, hasSuggestionCategory(got, "default", "namespace"),
 		"should suggest 'default' after --namespace flag")
@@ -555,12 +568,251 @@ func TestCompleteBuiltin_NamespaceEmptyPrefix(t *testing.T) {
 		{text: "", start: 10, end: 10},
 	}
 	m := baseModelCov()
-	m.cachedNamespaces = []string{"default", "kube-system"}
+	m.cachedNamespaces = freshNsCache(map[string][]string{"": {"default", "kube-system"}})
 	got := completeBuiltin(tokens, &m)
 	assert.Len(t, got, 2)
 	for _, s := range got {
 		assert.Equal(t, "namespace", s.Category)
 	}
+}
+
+func TestNamespaceNames_ScopedByContext(t *testing.T) {
+	m := baseModelCov()
+	m.cachedNamespaces = freshNsCache(map[string][]string{
+		"ctx-a": {"a-ns-1", "a-ns-2"},
+		"ctx-b": {"b-ns-1"},
+	})
+
+	m.nav.Context = "ctx-a"
+	assert.ElementsMatch(t, []string{"a-ns-1", "a-ns-2"}, m.namespaceNames(),
+		"nav.Context=ctx-a should read the ctx-a entry")
+
+	m.nav.Context = "ctx-b"
+	assert.ElementsMatch(t, []string{"b-ns-1"}, m.namespaceNames(),
+		"nav.Context=ctx-b should read the ctx-b entry, not leak from ctx-a")
+
+	m.nav.Context = "ctx-missing"
+	assert.Empty(t, m.namespaceNames(),
+		"unknown context should return nil so the command bar triggers a fresh load")
+}
+
+func TestCompleteBuiltin_NamespaceArg_PerContext(t *testing.T) {
+	// Cache holds entries for two contexts. Completing `:ns kube` under
+	// nav.Context=ctx-b must only see ctx-b's namespaces, even though
+	// ctx-a's cache contains a matching "kube-system".
+	tokens := []token{
+		{text: "ns", start: 0, end: 2},
+		{text: "kube", start: 3, end: 7},
+	}
+	m := baseModelCov()
+	m.nav.Context = "ctx-b"
+	m.cachedNamespaces = freshNsCache(map[string][]string{
+		"ctx-a": {"kube-system", "kube-public"},
+		"ctx-b": {"default", "production"},
+	})
+
+	got := completeBuiltin(tokens, &m)
+	assert.False(t, hasSuggestion(got, "kube-system"),
+		"ctx-a's kube-system must not leak into ctx-b's completions")
+	assert.False(t, hasSuggestion(got, "kube-public"),
+		"ctx-a's kube-public must not leak into ctx-b's completions")
+}
+
+func TestUpdateNamespacesLoaded_StoresUnderMessageContext(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "ctx-current"
+	items := []model.Item{{Name: "ns-x"}, {Name: "ns-y"}}
+
+	// A fetch issued for ctx-other completes; its result must be stored
+	// under ctx-other even though the tab has since moved to ctx-current.
+	result, _ := m.Update(namespacesLoadedMsg{context: "ctx-other", items: items})
+	rm := result.(Model)
+
+	assert.ElementsMatch(t, []string{"ns-x", "ns-y"}, rm.cachedNamespaces["ctx-other"].names,
+		"stored under the message's context, not the model's current nav.Context")
+	_, hasCurrent := rm.cachedNamespaces["ctx-current"]
+	assert.False(t, hasCurrent,
+		"current context must not pick up values fetched for another context")
+}
+
+func TestUpdateNamespacesLoaded_StampsFetchedAt(t *testing.T) {
+	m := baseModelCov()
+	items := []model.Item{{Name: "ns-1"}}
+	before := time.Now()
+
+	result, _ := m.Update(namespacesLoadedMsg{context: "ctx-x", items: items})
+	rm := result.(Model)
+
+	entry := rm.cachedNamespaces["ctx-x"]
+	assert.Equal(t, []string{"ns-1"}, entry.names)
+	assert.False(t, entry.fetchedAt.Before(before),
+		"fetchedAt must be >= the time immediately before Update")
+	assert.Less(t, time.Since(entry.fetchedAt), time.Second,
+		"fetchedAt should be recent enough to register as fresh")
+}
+
+func TestActiveContext_PrefersNavContext(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "tab-ctx"
+	// No client set; helper must not dereference it.
+	assert.Equal(t, "tab-ctx", m.activeContext())
+}
+
+func TestActiveContext_NilClientReturnsEmpty(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = ""
+	m.client = nil
+	assert.Equal(t, "", m.activeContext(),
+		"nil client with empty nav.Context must not panic")
+}
+
+func TestHandleKeyCommandBar_FreshCacheSkipsFetch(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.commandHistory = &commandHistory{cursor: -1}
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		"test-ctx": {names: []string{"default"}, fetchedAt: time.Now()},
+	}
+	_, cmd := m.handleKeyCommandBar()
+	assert.Nil(t, cmd, "fresh cache entry must not trigger a background refresh")
+}
+
+func TestHandleKeyCommandBar_StaleCacheTriggersFetch(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.commandHistory = &commandHistory{cursor: -1}
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		"test-ctx": {
+			names:     []string{"default"},
+			fetchedAt: time.Now().Add(-2 * namespaceCacheTTL),
+		},
+	}
+	_, cmd := m.handleKeyCommandBar()
+	assert.NotNil(t, cmd, "entry older than TTL must trigger a background refresh")
+}
+
+func TestHandleKeyCommandBar_MissingCacheTriggersFetch(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.commandHistory = &commandHistory{cursor: -1}
+	// No cachedNamespaces entry for test-ctx.
+	_, cmd := m.handleKeyCommandBar()
+	assert.NotNil(t, cmd, "missing entry must trigger a fetch")
+}
+
+func TestNamespaceNames_StaleEntryStillVisibleDuringRefresh(t *testing.T) {
+	// Stale-while-revalidate: a refresh will run in the background, but
+	// until it completes the existing entry must still be returned so
+	// command-bar completions never go blank on the 60s boundary.
+	m := baseModelCov()
+	m.nav.Context = "ctx-a"
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		"ctx-a": {
+			names:     []string{"default", "legacy-ns"},
+			fetchedAt: time.Now().Add(-2 * namespaceCacheTTL),
+		},
+	}
+	assert.ElementsMatch(t, []string{"default", "legacy-ns"}, m.namespaceNames(),
+		"stale entry should still be shown until the refresh lands")
+}
+
+func TestEnsureNamespaceCacheFresh_FreshReturnsNil(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		"test-ctx": {names: []string{"default"}, fetchedAt: time.Now()},
+	}
+	assert.Nil(t, m.ensureNamespaceCacheFresh(),
+		"fresh cache must not schedule a fetch on context-open paths")
+}
+
+func TestEnsureNamespaceCacheFresh_StaleReturnsFetch(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		"test-ctx": {
+			names:     []string{"default"},
+			fetchedAt: time.Now().Add(-2 * namespaceCacheTTL),
+		},
+	}
+	assert.NotNil(t, m.ensureNamespaceCacheFresh(),
+		"stale entry must schedule a background refresh on context-open paths")
+}
+
+func TestEnsureNamespaceCacheFresh_MissingReturnsFetch(t *testing.T) {
+	m := baseModelWithFakeClient()
+	// No cache entry: opening this context must eagerly warm the cache.
+	assert.NotNil(t, m.ensureNamespaceCacheFresh())
+}
+
+func TestInvalidateNamespaceCache_DeletesCurrentContextOnly(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "ctx-a"
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		"ctx-a": {names: []string{"default"}, fetchedAt: time.Now()},
+		"ctx-b": {names: []string{"default"}, fetchedAt: time.Now()},
+	}
+
+	m.invalidateNamespaceCache()
+
+	_, stillHasA := m.cachedNamespaces["ctx-a"]
+	assert.False(t, stillHasA, "current-context entry must be removed so the next open refetches")
+	_, stillHasB := m.cachedNamespaces["ctx-b"]
+	assert.True(t, stillHasB, "other contexts must not be affected by a current-context invalidation")
+}
+
+func TestCommandAffectsNamespaces(t *testing.T) {
+	cases := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{"create ns", []string{"create", "ns", "foo"}, true},
+		{"create namespace", []string{"create", "namespace", "foo"}, true},
+		{"delete ns", []string{"delete", "ns", "foo"}, true},
+		{"delete namespaces plural", []string{"delete", "namespaces", "foo"}, true},
+		{"replace ns", []string{"replace", "ns", "foo"}, true},
+		{"get pods", []string{"get", "pods"}, false},
+		{"get ns is read only", []string{"get", "ns"}, false},
+		{"create pod", []string{"create", "pod", "foo"}, false},
+		{"empty args", []string{}, false},
+		{"verb only", []string{"create"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, commandAffectsNamespaces(tc.args))
+		})
+	}
+}
+
+func TestUpdateActionResult_InvalidatesCacheOnSuccessFlag(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "ctx-a"
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		"ctx-a": {names: []string{"default"}, fetchedAt: time.Now()},
+	}
+
+	result, _ := m.updateActionResult(actionResultMsg{
+		message:                  "ok",
+		invalidateNamespaceCache: true,
+	})
+	rm := result.(Model)
+
+	_, still := rm.cachedNamespaces["ctx-a"]
+	assert.False(t, still, "successful action with invalidate flag must clear the current-context entry")
+}
+
+func TestUpdateActionResult_DoesNotInvalidateOnError(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "ctx-a"
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		"ctx-a": {names: []string{"default"}, fetchedAt: time.Now()},
+	}
+
+	result, _ := m.updateActionResult(actionResultMsg{
+		err:                      assert.AnError,
+		invalidateNamespaceCache: true,
+	})
+	rm := result.(Model)
+
+	_, still := rm.cachedNamespaces["ctx-a"]
+	assert.True(t, still,
+		"failed action must not clear the cache even when the flag is set (the mutation never happened)")
 }
 
 func TestCompleteBuiltin_SortEmptyPrefix(t *testing.T) {

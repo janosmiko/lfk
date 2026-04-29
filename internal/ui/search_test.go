@@ -196,31 +196,31 @@ func TestHighlightMatch(t *testing.T) {
 }
 
 func TestHighlightSubstring(t *testing.T) {
-	result := highlightSubstring("Hello World Hello", "hello", LogSearchHighlightStyle)
+	result := highlightSubstring("Hello World Hello", "hello", LogSearchHighlightStyle, "")
 	// Should contain the original text (preserve case).
 	if !strings.Contains(result, "Hello") {
 		t.Error("highlight should preserve original case")
 	}
 	// Non-matching should return unchanged.
-	result = highlightSubstring("all good", "missing", LogSearchHighlightStyle)
+	result = highlightSubstring("all good", "missing", LogSearchHighlightStyle, "")
 	if result != "all good" {
 		t.Errorf("non-matching highlight should return unchanged, got %q", result)
 	}
 }
 
 func TestHighlightRegex(t *testing.T) {
-	result := highlightRegex("error42 and error99", "error[0-9]+", LogSearchHighlightStyle)
+	result := highlightRegex("error42 and error99", "error[0-9]+", LogSearchHighlightStyle, "")
 	// Should contain the original content.
 	if !strings.Contains(result, "and") {
 		t.Error("regex highlight should preserve non-matching parts")
 	}
 	// Invalid regex should fallback gracefully.
-	result = highlightRegex("error.*stuff", "[invalid(", LogSearchHighlightStyle)
+	result = highlightRegex("error.*stuff", "[invalid(", LogSearchHighlightStyle, "")
 	if result == "" {
 		t.Error("invalid regex fallback should not return empty")
 	}
 	// Non-matching should return unchanged.
-	result = highlightRegex("all good", "error[0-9]+", LogSearchHighlightStyle)
+	result = highlightRegex("all good", "error[0-9]+", LogSearchHighlightStyle, "")
 	if result != "all good" {
 		t.Errorf("non-matching regex should return unchanged, got %q", result)
 	}
@@ -228,12 +228,12 @@ func TestHighlightRegex(t *testing.T) {
 
 func TestHighlightFuzzy(t *testing.T) {
 	// Non-matching fuzzy should return unchanged.
-	result := highlightFuzzy("deployment", "xyz", LogSearchHighlightStyle)
+	result := highlightFuzzy("deployment", "xyz", LogSearchHighlightStyle, "")
 	if result != "deployment" {
 		t.Error("non-matching fuzzy should return unchanged line")
 	}
 	// Matching fuzzy should contain the original characters.
-	result = highlightFuzzy("deployment", "dplmnt", LogSearchHighlightStyle)
+	result = highlightFuzzy("deployment", "dplmnt", LogSearchHighlightStyle, "")
 	if !strings.Contains(result, "e") {
 		t.Error("fuzzy highlight should preserve non-matched characters")
 	}

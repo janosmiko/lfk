@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -45,6 +46,10 @@ func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			if m.pendingAction == "Logs" {
 				m.pendingAction = ""
 				return m.executeAction("Logs")
+			}
+			if m.pendingAction == "Tail Logs" {
+				m.pendingAction = ""
+				return m.executeAction("Tail Logs")
 			}
 			return m, m.loadContainersForAction()
 		}
@@ -113,37 +118,8 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		return m, nil
 	case "enter":
 		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
-			sel := items[m.overlayCursor]
-			m.overlay = overlayNone
-			m.pendingAction = ""
-			m.logSavedPodName = ""
-			m.logPodFilterText = ""
-			m.logPodFilterActive = false
-			m.logSelectedContainers = nil
-			m.logContainers = nil
-			m.logLines = nil
-			m.logScroll = 0
-			m.logTailLines = ui.ConfigLogTailLines
-			m.logHasMoreHistory = true
-			m.logLoadingHistory = false
-
-			if sel.Status == "all" {
-				// "All Pods" selected: stream all pods using the parent resource.
-				m.actionCtx.kind = m.logParentKind
-				m.actionCtx.name = m.logParentName
-				m.actionCtx.containerName = ""
-				m.logTitle = fmt.Sprintf("Logs: %s/%s (all pods)", m.actionNamespace(), m.logParentName)
-			} else {
-				// Specific pod selected.
-				m.actionCtx.name = sel.Name
-				m.actionCtx.kind = "Pod"
-				if sel.Namespace != "" {
-					m.actionCtx.namespace = sel.Namespace
-				}
-				m.actionCtx.containerName = ""
-				m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
-			}
-			return m, m.startLogStream()
+			cmd := m.applyLogPodSelection(items[m.overlayCursor])
+			return m, cmd
 		}
 		return m, nil
 	case "/":
@@ -166,6 +142,43 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		return m.closeTabOrQuit()
 	}
 	return m, nil
+}
+
+// applyLogPodSelection switches the log viewer to the given pod selection
+// and returns a fresh log stream command. Shared by the normal-mode Enter
+// handler and the filter-mode single-result fast-path so both commit
+// paths stay in lockstep.
+func (m *Model) applyLogPodSelection(sel model.Item) tea.Cmd {
+	m.overlay = overlayNone
+	m.pendingAction = ""
+	m.logSavedPodName = ""
+	m.logPodFilterText = ""
+	m.logPodFilterActive = false
+	m.logSelectedContainers = nil
+	m.logContainers = nil
+	m.logLines = nil
+	m.logScroll = 0
+	m.logTailLines = ui.ConfigLogTailLines
+	m.logHasMoreHistory = true
+	m.logLoadingHistory = false
+
+	if sel.Status == "all" {
+		// "All Pods" selected: stream all pods using the parent resource.
+		m.actionCtx.kind = m.logParentKind
+		m.actionCtx.name = m.logParentName
+		m.actionCtx.containerName = ""
+		m.logTitle = fmt.Sprintf("Logs: %s/%s (all pods)", m.actionNamespace(), m.logParentName)
+	} else {
+		// Specific pod selected.
+		m.actionCtx.name = sel.Name
+		m.actionCtx.kind = "Pod"
+		if sel.Namespace != "" {
+			m.actionCtx.namespace = sel.Namespace
+		}
+		m.actionCtx.containerName = ""
+		m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+	}
+	return m.startLogStream()
 }
 
 // handleLogPodFilterMode handles keyboard input while the pod selector filter is active.
@@ -192,6 +205,15 @@ func (m Model) handleLogPodFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case filterAccept:
 		m.logPodFilterActive = false
 		m.overlayCursor = 0
+		// When the filter narrows to a single pod, Enter is unambiguous:
+		// apply it and start streaming. Without this, the user has to press
+		// Enter twice (once to leave filter mode, once to commit) on a
+		// one-row list.
+		items := m.filteredLogPodItems()
+		if len(items) == 1 {
+			cmd := m.applyLogPodSelection(items[0])
+			return m, cmd
+		}
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()
@@ -354,6 +376,25 @@ func (m Model) handleLogContainerFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case filterAccept:
 		m.logContainerFilterActive = false
 		m.overlayCursor = 0
+		// When the filter narrows to a single container and the user hasn't
+		// been Space-toggling selections, Enter is unambiguous: apply that
+		// container and restart the stream. Multi-select via Space is
+		// preserved: if the user already toggled selections, Enter still
+		// just exits filter mode without replacing them.
+		if !m.logContainerSelectionModified {
+			items := m.filteredLogContainerItems()
+			if len(items) == 1 {
+				if items[0].Status == "all" {
+					m.logSelectedContainers = nil
+				} else {
+					m.logSelectedContainers = []string{items[0].Name}
+				}
+				m.overlay = overlayNone
+				m.logContainerFilterText = ""
+				cmd := m.restartLogStreamForContainerFilter()
+				return m, cmd
+			}
+		}
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()

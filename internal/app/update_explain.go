@@ -102,10 +102,7 @@ func (m *Model) exitExplainView() {
 // handleExplainKey handles keyboard input in the explain view mode.
 func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	fieldCount := len(m.explainFields)
-	visibleLines := m.height - 6
-	if visibleLines < 3 {
-		visibleLines = 3
-	}
+	visibleLines := max(m.height-6, 3)
 
 	switch msg.String() {
 	case "?", "f1":
@@ -139,10 +136,23 @@ func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleExplainPageMove(visibleLines/2, fieldCount, visibleLines)
 	case "ctrl+u":
 		return m.handleExplainPageMove(-visibleLines/2, fieldCount, visibleLines)
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		return m.handleExplainPageMove(visibleLines, fieldCount, visibleLines)
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		return m.handleExplainPageMove(-visibleLines, fieldCount, visibleLines)
+	case "home":
+		m.pendingG = false
+		m.explainLineInput = ""
+		m.explainCursor = 0
+		m.explainScroll = 0
+		return m, nil
+	case "end":
+		m.explainLineInput = ""
+		if fieldCount > 0 {
+			m.explainCursor = fieldCount - 1
+			m.explainScroll = max(fieldCount-visibleLines, 0)
+		}
+		return m, nil
 	case "l", "right", "enter":
 		return m.handleExplainKeyDrill(fieldCount)
 	case "h", "left", "backspace":

@@ -15,14 +15,17 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.statusMessageTip = false
 	}
 
-	// Handle error log overlay first (independent of regular overlays).
-	if m.overlayErrorLog {
-		return m.handleErrorLogOverlayKey(msg)
-	}
-
-	// Handle overlays first.
+	// Handle regular overlays first so when an overlay (e.g. the theme
+	// selector) is opened on top of the error log, its own keys —
+	// including j/k navigation and Esc — reach handleOverlayKey instead
+	// of being eaten by the error log handler.
 	if m.overlay != overlayNone {
 		return m.handleOverlayKey(msg)
+	}
+
+	// Handle error log overlay (independent of regular overlays).
+	if m.overlayErrorLog {
+		return m.handleErrorLogOverlayKey(msg)
 	}
 
 	// Handle command bar input mode.
@@ -195,11 +198,12 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Bookmark overwrite confirmation: y accepts, anything else cancels.
+	// Bookmark overwrite confirmation: Enter/y accepts, anything else cancels.
 	if m.pendingBookmark != nil {
 		bm := m.pendingBookmark
 		m.pendingBookmark = nil
-		if msg.String() == "y" || msg.String() == "Y" {
+		switch msg.String() {
+		case "enter", "y", "Y":
 			return m.saveBookmark(*bm)
 		}
 		m.setStatusMessage("Cancelled", false)
@@ -266,8 +270,11 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.JumpTop:
 		mdl, cmd := m.handleExplorerJumpTop()
 		return mdl, cmd, true
-	case kb.JumpBottom:
+	case kb.JumpBottom, "end":
 		mdl, cmd := m.handleExplorerJumpBottom()
+		return mdl, cmd, true
+	case "home":
+		mdl, cmd := m.handleExplorerHome()
 		return mdl, cmd, true
 	case kb.SelectRange:
 		mdl := m.handleKeySelectRange()
@@ -303,16 +310,28 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	return m, nil, false
 }
 
-// handleExplorerEsc handles the Escape key in explorer mode.
+// handleExplorerEsc handles the Escape key in explorer mode. Cascades
+// from transient content state (selection, search, filter) through
+// viewport state (fullscreen). Esc is intentionally NOT bound to
+// navigation -- pressing Esc on a pod list used to walk back up to
+// resource types and then to clusters, which conflicted with Esc's
+// "cancel / dismiss" semantics elsewhere in the app. Use h / Left or
+// the parent navigation key to drill back out.
+//
+// At LevelClusters with multiple tabs Esc still closes the active tab
+// (a "dismiss this tab" action, consistent with cancel semantics). On
+// a single-tab cluster level Esc is a no-op; use q to quit, which goes
+// through the standard confirmation overlay.
 func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
-	if m.fullscreenDashboard {
-		m.fullscreenDashboard = false
-		m.previewScroll = 0
-		m.setStatusMessage("Dashboard fullscreen OFF", false)
-		return m, scheduleStatusClear()
-	}
 	if m.hasSelection() {
 		m.clearSelection()
+		return m, nil
+	}
+	if m.searchInput.Value != "" {
+		// Persisted search query (set by / + Enter) — clear it so the
+		// match highlights and n/N navigation arm both disappear, but
+		// stay on the current level.
+		m.searchInput.Clear()
 		return m, nil
 	}
 	if m.filterText != "" {
@@ -321,22 +340,26 @@ func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
 		m.clampCursor()
 		return m, m.loadPreview()
 	}
-	if m.nav.Level == model.LevelClusters {
-		if len(m.tabs) > 1 {
-			m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
-			if m.activeTab > 0 {
-				m.activeTab--
-			}
-			cmd := m.loadTab(m.activeTab)
-			m.saveCurrentSession()
-			if cmd != nil {
-				return m, cmd
-			}
-			return m, m.loadPreview()
-		}
-		return m, tea.Quit
+	if m.fullscreenDashboard {
+		m.fullscreenDashboard = false
+		m.previewScroll = 0
+		m.setStatusMessage("Dashboard fullscreen OFF", false)
+		return m, scheduleStatusClear()
 	}
-	return m.navigateParent()
+	if m.nav.Level == model.LevelClusters && len(m.tabs) > 1 {
+		m.cancelActiveTabLogStreams()
+		m.tabs = append(m.tabs[:m.activeTab], m.tabs[m.activeTab+1:]...)
+		if m.activeTab > 0 {
+			m.activeTab--
+		}
+		cmd := m.loadTab(m.activeTab)
+		m.saveCurrentSession()
+		if cmd != nil {
+			return m, cmd
+		}
+		return m, m.loadPreview()
+	}
+	return m, nil
 }
 
 // handleExplorerJumpTop handles g/gg (jump to top) in explorer mode.
@@ -372,6 +395,21 @@ func (m Model) handleExplorerJumpBottom() (tea.Model, tea.Cmd) {
 	if len(visible) > 0 {
 		m.setCursor(len(visible) - 1)
 	}
+	m.syncExpandedGroup()
+	return m, m.loadPreview()
+}
+
+// handleExplorerHome handles the Home key (jump to top) in explorer mode.
+// Unlike JumpTop (vim "gg") this is a single-press action and does not
+// participate in the pendingG two-key sequence.
+func (m Model) handleExplorerHome() (tea.Model, tea.Cmd) {
+	m.pendingG = false
+	if m.fullscreenDashboard {
+		m.previewScroll = 0
+		return m, nil
+	}
+	m.setCursor(0)
+	m.clampCursor()
 	m.syncExpandedGroup()
 	return m, m.loadPreview()
 }
@@ -542,6 +580,7 @@ func (m Model) handleKeySelectRange() Model {
 	for i := lo; i <= hi && i < len(items); i++ {
 		m.selectedItems[selectionKey(items[i])] = true
 	}
+	m.selectionRev++
 	return m
 }
 
@@ -583,6 +622,7 @@ func (m Model) handleKeySelectAll() Model {
 			for _, item := range visible {
 				m.selectedItems[selectionKey(item)] = true
 			}
+			m.selectionRev++
 		}
 		m.selectionAnchor = -1
 		return m
@@ -622,7 +662,7 @@ func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
 func (m Model) handleKeyWatchMode() (tea.Model, tea.Cmd) {
 	m.watchMode = !m.watchMode
 	if m.watchMode {
-		m.setStatusMessage("Watch mode ON (refresh every 2s)", false)
+		m.setStatusMessage(fmt.Sprintf("Watch mode ON (refresh every %s)", m.watchInterval), false)
 		return m, tea.Batch(scheduleWatchTick(m.watchInterval), scheduleStatusClear())
 	}
 	m.setStatusMessage("Watch mode OFF", false)
@@ -722,6 +762,9 @@ func (m Model) handleKeyOpenMarks() Model {
 	m.overlay = overlayBookmarks
 	m.overlayCursor = 0
 	m.bookmarkFilter.Clear()
+	// Every open starts with "don't load namespace"; a prior
+	// session's Tab toggle must not leak in.
+	m.bookmarkLoadNamespace = false
 	return m
 }
 
@@ -743,17 +786,21 @@ func (m Model) handleKeyHelp() Model {
 
 func (m Model) handleKeyFilter() Model {
 	m.filterActive = true
+	m.filterBroadMode = false // each fresh filter session starts in name-only
 	m.filterInput.Clear()
 	m.filterText = ""
 	m.setCursor(0)
 	m.clampCursor()
+	m.queryHistory.reset()
 	return m
 }
 
 func (m Model) handleKeySearch() Model {
 	m.searchActive = true
+	m.searchBroadMode = false // each fresh search session starts in name-only
 	m.searchInput.Clear()
 	m.searchPrevCursor = m.cursor()
+	m.queryHistory.reset()
 	return m
 }
 
@@ -763,11 +810,12 @@ func (m Model) handleKeyCommandBar() (Model, tea.Cmd) {
 	m.commandBarSuggestions = nil
 	m.commandBarSelectedSuggestion = 0
 	m.commandHistory.reset()
-	// Eagerly populate namespace cache if empty.
-	if len(m.cachedNamespaces) == 0 {
-		return m, m.loadNamespaces()
-	}
-	return m, nil
+	// Refresh the namespace cache if stale so namespaces created since
+	// the last fetch (inside or outside the TUI) surface in completions.
+	// The existing entry stays readable via namespaceNames() while the
+	// refresh is in flight, keeping completions non-blank across the
+	// TTL boundary.
+	return m, m.ensureNamespaceCacheFresh()
 }
 
 func (m Model) handleKeyColumnToggle() Model {

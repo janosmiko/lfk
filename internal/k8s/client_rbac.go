@@ -72,9 +72,9 @@ func (c *Client) GetSelfRulesAs(ctx context.Context, contextName, namespace, asU
 	}
 
 	if asUser != "" {
-		if strings.HasPrefix(asUser, "group:") {
+		if after, ok := strings.CutPrefix(asUser, "group:"); ok {
 			// Group impersonation: set a neutral user and the group.
-			groupName := strings.TrimPrefix(asUser, "group:")
+			groupName := after
 			cfg.Impersonate = rest.ImpersonationConfig{
 				UserName: "system:anonymous",
 				Groups:   []string{groupName},
@@ -347,13 +347,13 @@ func (c *Client) GetNamespaceQuotas(ctx context.Context, kubeCtx, namespace stri
 			Namespace: item.GetNamespace(),
 		}
 
-		spec, _ := item.Object["spec"].(map[string]interface{})
-		status, _ := item.Object["status"].(map[string]interface{})
+		spec, _ := item.Object["spec"].(map[string]any)
+		status, _ := item.Object["status"].(map[string]any)
 
-		hardMap, _ := spec["hard"].(map[string]interface{})
-		usedMap := map[string]interface{}{}
+		hardMap, _ := spec["hard"].(map[string]any)
+		usedMap := map[string]any{}
 		if status != nil {
-			usedMap, _ = status["used"].(map[string]interface{})
+			usedMap, _ = status["used"].(map[string]any)
 		}
 
 		// Collect resource names from hard limits.
@@ -542,20 +542,20 @@ func (c *Client) GetPodsUsingPVC(ctx context.Context, kubeCtx, namespace, pvcNam
 
 	var podNames []string
 	for _, item := range list.Items {
-		spec, ok := item.Object["spec"].(map[string]interface{})
+		spec, ok := item.Object["spec"].(map[string]any)
 		if !ok {
 			continue
 		}
-		volumes, ok := spec["volumes"].([]interface{})
+		volumes, ok := spec["volumes"].([]any)
 		if !ok {
 			continue
 		}
 		for _, v := range volumes {
-			vol, ok := v.(map[string]interface{})
+			vol, ok := v.(map[string]any)
 			if !ok {
 				continue
 			}
-			pvc, ok := vol["persistentVolumeClaim"].(map[string]interface{})
+			pvc, ok := vol["persistentVolumeClaim"].(map[string]any)
 			if !ok {
 				continue
 			}
@@ -571,14 +571,14 @@ func (c *Client) GetPodsUsingPVC(ctx context.Context, kubeCtx, namespace, pvcNam
 }
 
 // PatchLabels patches the labels on a resource using a merge patch.
-func (c *Client) PatchLabels(ctx context.Context, contextName, namespace, name string, gvr schema.GroupVersionResource, labels map[string]interface{}) error {
+func (c *Client) PatchLabels(ctx context.Context, contextName, namespace, name string, gvr schema.GroupVersionResource, labels map[string]any) error {
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
 	}
 
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
+	patch := map[string]any{
+		"metadata": map[string]any{
 			"labels": labels,
 		},
 	}
@@ -597,14 +597,14 @@ func (c *Client) PatchLabels(ctx context.Context, contextName, namespace, name s
 }
 
 // PatchAnnotations patches the annotations on a resource using a merge patch.
-func (c *Client) PatchAnnotations(ctx context.Context, contextName, namespace, name string, gvr schema.GroupVersionResource, annotations map[string]interface{}) error {
+func (c *Client) PatchAnnotations(ctx context.Context, contextName, namespace, name string, gvr schema.GroupVersionResource, annotations map[string]any) error {
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
 	}
 
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
+	patch := map[string]any{
+		"metadata": map[string]any{
 			"annotations": annotations,
 		},
 	}

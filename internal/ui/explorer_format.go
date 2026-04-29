@@ -33,10 +33,9 @@ func headerWithIndicator(label string, colName string, colWidth int) string {
 		return padRight(label, colWidth)
 	}
 	// Truncate label to make room for the indicator.
-	maxLabel := colWidth - 2 // space + indicator
-	if maxLabel < 1 {
-		maxLabel = 1
-	}
+	maxLabel := max(
+		// space + indicator
+		colWidth-2, 1)
 	if len(label) > maxLabel {
 		label = label[:maxLabel]
 	}
@@ -122,14 +121,56 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 		return nil
 	}
 
-	// Calculate available width for extra columns (leave at least 20 chars for name).
-	minNameW := 20
-	available := totalWidth - usedWidth - minNameW
+	// Reserve budget for the Name column based on the longest item name
+	// so resource names with long identifiers (Ingress hostnames, Node
+	// FQDNs, helm releases, generated suffixes) don't get squeezed to a
+	// 20-char floor while extras (HOSTS, ADDRESS, ROLE, …) eat the rest.
+	// See issue #53 and the follow-up node truncation report.
+	//
+	// Budgeting rule:
+	//   1. Default: longestName + 1 spacing column.
+	//   2. If that fits in (totalWidth - usedWidth) — i.e. name + builtins
+	//      already fit even without any extras — keep the full reservation.
+	//      Whatever room is left flows to extras; if it's not enough for a
+	//      column, the loop below drops them and Name gets the slack via
+	//      the caller's nameW computation. This is the case the user hit:
+	//      a 52-char Node FQDN on a 97-char middle column was getting
+	//      truncated to 50 chars + "~" because the previous totalWidth/2
+	//      cap (48) kicked in even though the full name fits comfortably.
+	//   3. Otherwise (name is too long to fit alongside builtins): cap at
+	//      totalWidth - usedWidth - minExtrasBudget so a pathologically
+	//      long name (e.g. 200 chars on a 120-char column) still surfaces
+	//      at least one extra column.
+	//   4. Floor at 20 to preserve prior behaviour when names are short.
+	//
+	// minExtrasBudget = capped column (maxColW + spacing). Tracks the
+	// same maxColW used below so the budget scales with fullscreen mode.
+	const nameFloor = 20
+	maxColWForBudget := 20
+	if ActiveFullscreenMode {
+		maxColWForBudget = 40
+	}
+	minExtrasBudget := maxColWForBudget + 1
+	longestName := 0
+	for _, item := range items {
+		if w := lipgloss.Width(item.Name); w > longestName {
+			longestName = w
+		}
+	}
+	nameReserve := longestName + 1 // +1 for column spacing
+	if nameReserve+usedWidth > totalWidth {
+		// Can't fit the full name even after dropping every extra. Cap
+		// the reservation so at least one extra gets a fair budget.
+		nameReserve = max(totalWidth-usedWidth-minExtrasBudget, nameFloor)
+	}
+	nameReserve = max(nameReserve, nameFloor)
+	available := totalWidth - usedWidth - nameReserve
 	if available < 8 {
 		return nil
 	}
 
 	result := make([]extraColumn, 0, len(candidates))
+	naturalW := make([]int, 0, len(candidates)) // pre-cap desired width including spacing
 	remainingW := available
 	maxColW := 20
 	if ActiveFullscreenMode {
@@ -149,6 +190,7 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 		if maxVal > colW {
 			colW = maxVal
 		}
+		natural := colW + 1 // pre-cap natural width (with spacing)
 		if colW > maxColW {
 			colW = maxColW
 		}
@@ -157,12 +199,33 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 			break
 		}
 		result = append(result, extraColumn{key: key, width: colW, hasArrow: info.hasArrow})
+		naturalW = append(naturalW, natural)
 		remainingW -= colW
 	}
 
-	// Remaining width is not assigned to extra columns — it flows back to the
-	// NAME column via the caller's width calculation, keeping resource names
-	// readable instead of padding the last extra column.
+	// Redistribute remaining budget round-robin to columns that were capped
+	// below their natural width. This avoids the failure mode where NAME gets
+	// a large empty pad while Ports/Cluster IP/etc. are still truncated.
+	// Growth stops at each column's natural width, so columns that already fit
+	// don't get inflated — leftover beyond that flows back to NAME via the
+	// caller's width calculation, preserving readable resource names.
+	for remainingW > 0 {
+		grew := false
+		for i := range result {
+			if result[i].width >= naturalW[i] {
+				continue
+			}
+			result[i].width++
+			remainingW--
+			grew = true
+			if remainingW == 0 {
+				break
+			}
+		}
+		if !grew {
+			break
+		}
+	}
 
 	return result
 }
@@ -210,10 +273,7 @@ func autoDetectColumns(seen map[string]*colInfo, order []string, items []model.I
 		blocked[k] = true
 	}
 
-	threshold := len(items) / 5
-	if threshold < 1 {
-		threshold = 1
-	}
+	threshold := max(len(items)/5, 1)
 	alwaysShow := map[string]bool{"Condition": true}
 	var candidates []string
 	for _, key := range order {
@@ -280,13 +340,43 @@ func getExtraColumnValue(item *model.Item, key string) string {
 	return ""
 }
 
+// columnHeaderAliases shortens column header labels without renaming the
+// underlying Column key. Renaming the key would silently break user session
+// state, persisted column configs, and the column-visibility overlay; the
+// header alias is purely cosmetic. Names listed here either:
+//   - duplicate the resource type's name (Ingress -> "Ingress Class" =>
+//     "Class"; the user already knows it's an Ingress).
+//   - are unnecessarily verbose given typical column-width budgets.
+var columnHeaderAliases = map[string]string{
+	"Ingress Class":       "Class",
+	"Storage Class":       "Class",
+	"Disruptions Allowed": "Allowed",
+	"Reclaim Policy":      "Reclaim",
+	"Session Affinity":    "Affinity",
+	"Image Pull Secrets":  "Pull Secrets",
+	"Default Backend":     "Backend",
+	"Last Transition":     "Transition",
+	"Service Account":     "SA",
+}
+
+// columnHeaderLabel returns the uppercase display label for a column key,
+// applying any alias from columnHeaderAliases. Used by plainExtraCell so
+// internal Column keys can stay descriptive while the rendered table header
+// stays compact.
+func columnHeaderLabel(key string) string {
+	if alias, ok := columnHeaderAliases[key]; ok {
+		return strings.ToUpper(alias)
+	}
+	return strings.ToUpper(key)
+}
+
 // plainExtraCell builds the plain-text cell for a single extra column.
 // When item is nil, the cell renders a header value (uppercased key plus
 // sort indicator).
 func plainExtraCell(ec extraColumn, item *model.Item) string {
 	var val string
 	if item == nil {
-		val = strings.ToUpper(ec.key) + sortIndicatorForColumn(ec.key)
+		val = columnHeaderLabel(ec.key) + sortIndicatorForColumn(ec.key)
 	} else {
 		val = getExtraColumnValue(item, ec.key)
 	}
@@ -322,6 +412,41 @@ func styledExtraCell(ec extraColumn, item *model.Item) string {
 
 // plainBuiltinCell builds the plain-text cell for a single built-in column.
 // Values are the already-resolved display strings for this row (e.g. ns with
+// statusAbbreviations maps long-form Pod-ish status strings to a compact
+// label used when the STATUS column has been shrunk under width pressure.
+// Entries here are status values that are otherwise too verbose for narrow
+// layouts; status values not in the map render as-is and rely on the
+// width-aware Truncate fallback. AbbreviateStatusForWidth picks between
+// the full string and the abbreviation based on the column's width budget.
+var statusAbbreviations = map[string]string{
+	"PodInitializing":            "Init",
+	"ContainerCreating":          "Creating",
+	"Terminating":                "Term",
+	"CrashLoopBackOff":           "CrashLoop",
+	"ImagePullBackOff":           "ImgPull",
+	"ErrImagePull":               "ImgPull",
+	"InvalidImageName":           "BadImage",
+	"CreateContainerConfigError": "CfgErr",
+	"CreateContainerError":       "CtrErr",
+	"Succeeded":                  "Done",
+	"Completed":                  "Done",
+}
+
+// AbbreviateStatusForWidth returns a status label that fits within w
+// visible columns. Returns the full status when it already fits; otherwise
+// looks up a curated abbreviation; otherwise falls back to the original
+// (the caller will then truncate it). Pure function so the layout pass
+// and the cell renderer can both use it.
+func AbbreviateStatusForWidth(status string, w int) string {
+	if len(status) <= w {
+		return status
+	}
+	if abbrev, ok := statusAbbreviations[status]; ok {
+		return abbrev
+	}
+	return status
+}
+
 // dash fallback, preprocessed restarts with arrow prefix).
 func plainBuiltinCell(key string, ns, ready, restarts, status, age string,
 	nsW, readyW, restartsW, statusW, ageW int,
@@ -334,7 +459,7 @@ func plainBuiltinCell(key string, ns, ready, restarts, status, age string,
 	case "Restarts":
 		return padRight(restarts, restartsW)
 	case "Status":
-		return padRight(Truncate(status, statusW-1), statusW)
+		return padRight(Truncate(AbbreviateStatusForWidth(status, statusW-1), statusW-1), statusW)
 	case "Age":
 		return padRight(age, ageW)
 	}
@@ -360,9 +485,11 @@ func styledBuiltinCell(key string, item model.Item,
 	case "Restarts":
 		return styledRestartsCell(item, restartsW, anyRecentRestart)
 	case "Status":
-		return StatusStyle(item.Status).Render(padRight(Truncate(item.Status, statusW-1), statusW))
+		val := AbbreviateStatusForWidth(item.Status, statusW-1)
+		return StatusStyle(val).Render(padRight(Truncate(val, statusW-1), statusW))
 	case "Age":
-		return AgeStyle(item.Age).Render(padRight(item.Age, ageW))
+		age := LiveAge(item)
+		return AgeStyle(age).Render(padRight(age, ageW))
 	}
 	return ""
 }
@@ -401,22 +528,23 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 	nameW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, item *model.Item,
 ) string {
-	row := plainNameCellWithBadge(name, item, nameW)
+	var row strings.Builder
+	row.WriteString(plainNameCellWithBadge(name, item, nameW))
 	for _, key := range order {
 		if isBuiltinColumnKey(key) {
-			row += plainBuiltinCell(key, ns, ready, restarts, status, age,
-				nsW, readyW, restartsW, statusW, ageW)
+			row.WriteString(plainBuiltinCell(key, ns, ready, restarts, status, age,
+				nsW, readyW, restartsW, statusW, ageW))
 			continue
 		}
 		// Extra column: look up metadata and emit via plainExtraCell.
 		for _, ec := range extraCols {
 			if ec.key == key {
-				row += plainExtraCell(ec, item)
+				row.WriteString(plainExtraCell(ec, item))
 				break
 			}
 		}
 	}
-	return row
+	return row.String()
 }
 
 // formatTableRowStyledOrdered builds a styled table row using the given
@@ -426,20 +554,21 @@ func formatTableRowStyledOrdered(item model.Item,
 	nameW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, anyRecentRestart bool,
 ) string {
-	base := styledNameCell(item, nameW)
+	var base strings.Builder
+	base.WriteString(styledNameCell(item, nameW))
 	for _, key := range order {
 		if isBuiltinColumnKey(key) {
-			base += styledBuiltinCell(key, item, nsW, readyW, restartsW, statusW, ageW, anyRecentRestart)
+			base.WriteString(styledBuiltinCell(key, item, nsW, readyW, restartsW, statusW, ageW, anyRecentRestart))
 			continue
 		}
 		for _, ec := range extraCols {
 			if ec.key == key {
-				base += styledExtraCell(ec, &item)
+				base.WriteString(styledExtraCell(ec, &item))
 				break
 			}
 		}
 	}
-	return base
+	return base.String()
 }
 
 // plainNameCellWithBadge renders the name column for the plain-text path,
@@ -493,18 +622,13 @@ func styledNameCell(item model.Item, nameW int) string {
 		}
 		icon := iconSt.Render(resolvedIcon) + " "
 		iconVisualW := lipgloss.Width(icon)
-		nameRemaining := nameW - iconVisualW - 1 - badgeReserve // -1 reserves gap before next column
-		if nameRemaining < 1 {
-			nameRemaining = 1
-		}
+		// -1 reserves gap before next column.
+		nameRemaining := max(nameW-iconVisualW-1-badgeReserve, 1)
 		// Drop the badge when it would not fit alongside a readable name.
 		activeBadge := badge
 		if badgeReserve > 0 && nameW-iconVisualW-1 <= badgeReserve {
 			activeBadge = ""
-			nameRemaining = nameW - iconVisualW - 1
-			if nameRemaining < 1 {
-				nameRemaining = 1
-			}
+			nameRemaining = max(nameW-iconVisualW-1, 1)
 		}
 		namePart := Truncate(item.Name, nameRemaining)
 		if ActiveHighlightQuery != "" {
@@ -517,10 +641,7 @@ func styledNameCell(item model.Item, nameW int) string {
 			badgeSegment = " " + activeBadge
 			badgeSegmentW = lipgloss.Width(badgeSegment)
 		}
-		pad := nameW - iconVisualW - nameVisualW - badgeSegmentW
-		if pad < 0 {
-			pad = 0
-		}
+		pad := max(nameW-iconVisualW-nameVisualW-badgeSegmentW, 0)
 		if isDimmed {
 			namePart = DimStyle.Render(namePart)
 		}
@@ -620,8 +741,8 @@ func ParseResourceValue(val string, isCPU bool) int64 {
 	}
 	if isCPU {
 		// CPU: "100m" or "1.5" (cores)
-		if strings.HasSuffix(val, "m") {
-			n, _ := strconv.ParseFloat(strings.TrimSuffix(val, "m"), 64)
+		if before, ok := strings.CutSuffix(val, "m"); ok {
+			n, _ := strconv.ParseFloat(before, 64)
 			return int64(n)
 		}
 		n, _ := strconv.ParseFloat(val, 64)
@@ -656,26 +777,21 @@ func padRight(s string, w int) string {
 	return s + strings.Repeat(" ", w-vis)
 }
 
-// Truncate truncates a string to maxW runes, appending "~" if truncated.
+// Truncate truncates a string to maxW visual columns, appending "~" if
+// truncated. ANSI escape sequences are preserved so styled text keeps its
+// foreground/background colors when shortened — `ansi.Truncate` is grapheme-
+// and width-aware and never cuts inside an escape sequence.
 func Truncate(s string, maxW int) string {
 	if maxW <= 0 {
 		return ""
 	}
-	// Use lipgloss.Width to measure the visual width, which correctly
-	// ignores ANSI escape sequences in styled text.
 	if lipgloss.Width(s) <= maxW {
 		return s
 	}
 	if maxW <= 1 {
 		return "~"
 	}
-	// Strip ANSI codes, truncate the visible content, then append the marker.
-	// This avoids cutting in the middle of an escape sequence.
-	runes := []rune(ansi.Strip(s))
-	if len(runes) <= maxW {
-		return s
-	}
-	return string(runes[:maxW-1]) + "~"
+	return ansi.Truncate(s, maxW-1, "") + "~"
 }
 
 // truncateNoMarker truncates a string to maxW runes without appending any marker.
@@ -711,10 +827,7 @@ func RenderTabBar(tabLabels []string, activeTab, width int) string {
 	maxBarW := width - 2
 
 	// Truncate long labels.
-	maxLabelLen := maxBarW / max(1, len(tabLabels))
-	if maxLabelLen < 8 {
-		maxLabelLen = 8
-	}
+	maxLabelLen := max(maxBarW/max(1, len(tabLabels)), 8)
 
 	type renderedTab struct {
 		text  string

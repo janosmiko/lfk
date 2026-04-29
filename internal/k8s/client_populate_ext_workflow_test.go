@@ -22,13 +22,13 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("empty status returns no columns", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		populateArgoWorkflow(ti, map[string]interface{}{})
+		populateArgoWorkflow(ti, map[string]any{})
 		assert.Empty(t, ti.Columns)
 	})
 
 	t.Run("progress field is extracted", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
+		status := map[string]any{
 			"progress": "2/5",
 		}
 		populateArgoWorkflow(ti, status)
@@ -42,7 +42,7 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 		finished := started.Add(3 * time.Minute)
 
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
+		status := map[string]any{
 			"startedAt":  started.Format(time.RFC3339),
 			"finishedAt": finished.Format(time.RFC3339),
 		}
@@ -56,7 +56,7 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 		started := time.Now().Add(-2 * time.Minute)
 
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
+		status := map[string]any{
 			"startedAt": started.Format(time.RFC3339),
 		}
 		populateArgoWorkflow(ti, status)
@@ -69,7 +69,7 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("message field is extracted", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
+		status := map[string]any{
 			"message": "workflow failed at step X",
 		}
 		populateArgoWorkflow(ti, status)
@@ -80,14 +80,14 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("conditions are extracted", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
-			"conditions": []interface{}{
-				map[string]interface{}{
+		status := map[string]any{
+			"conditions": []any{
+				map[string]any{
 					"type":    "SpecWarning",
 					"status":  "True",
 					"message": "deprecated feature used",
 				},
-				map[string]interface{}{
+				map[string]any{
 					"type":    "PodRunning",
 					"status":  "True",
 					"message": "",
@@ -105,10 +105,10 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("conditions skips non-map entries", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
-			"conditions": []interface{}{
+		status := map[string]any{
+			"conditions": []any{
 				"not-a-map",
-				map[string]interface{}{
+				map[string]any{
 					"type":   "PodRunning",
 					"status": "True",
 				},
@@ -122,9 +122,9 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("conditions with empty type is skipped", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
-			"conditions": []interface{}{
-				map[string]interface{}{
+		status := map[string]any{
+			"conditions": []any{
+				map[string]any{
 					"type":   "",
 					"status": "True",
 				},
@@ -137,27 +137,27 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("workflow nodes are walked in BFS order", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
-			"nodes": map[string]interface{}{
-				"root-id": map[string]interface{}{
+		status := map[string]any{
+			"nodes": map[string]any{
+				"root-id": map[string]any{
 					"name":        "my-wf",
 					"displayName": "my-wf",
 					"phase":       "Succeeded",
-					"children":    []interface{}{"step-1", "step-2"},
+					"children":    []any{"step-1", "step-2"},
 				},
-				"step-1": map[string]interface{}{
+				"step-1": map[string]any{
 					"name":        "my-wf.step-1",
 					"displayName": "build",
 					"phase":       "Succeeded",
-					"children":    []interface{}{"step-1a"},
+					"children":    []any{"step-1a"},
 				},
-				"step-2": map[string]interface{}{
+				"step-2": map[string]any{
 					"name":        "my-wf.step-2",
 					"displayName": "deploy",
 					"phase":       "Running",
 					"message":     "deploying",
 				},
-				"step-1a": map[string]interface{}{
+				"step-1a": map[string]any{
 					"name":        "my-wf.step-1.sub",
 					"displayName": "compile",
 					"phase":       "Succeeded",
@@ -185,14 +185,14 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("node without displayName falls back to name", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
-			"nodes": map[string]interface{}{
-				"root-id": map[string]interface{}{
+		status := map[string]any{
+			"nodes": map[string]any{
+				"root-id": map[string]any{
 					"name":     "my-wf",
 					"phase":    "Succeeded",
-					"children": []interface{}{"step-1"},
+					"children": []any{"step-1"},
 				},
-				"step-1": map[string]interface{}{
+				"step-1": map[string]any{
 					"name":  "my-wf.step-1",
 					"phase": "Succeeded",
 				},
@@ -212,12 +212,12 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("non-map node entries are skipped", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
-			"nodes": map[string]interface{}{
-				"root-id": map[string]interface{}{
+		status := map[string]any{
+			"nodes": map[string]any{
+				"root-id": map[string]any{
 					"name":     "my-wf",
 					"phase":    "Succeeded",
-					"children": []interface{}{"step-1"},
+					"children": []any{"step-1"},
 				},
 				"step-1":   "not-a-map",
 				"step-bad": 42,
@@ -237,14 +237,14 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("non-string children entries are skipped", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
-			"nodes": map[string]interface{}{
-				"root-id": map[string]interface{}{
+		status := map[string]any{
+			"nodes": map[string]any{
+				"root-id": map[string]any{
 					"name":     "my-wf",
 					"phase":    "Succeeded",
-					"children": []interface{}{42, "step-1"},
+					"children": []any{42, "step-1"},
 				},
-				"step-1": map[string]interface{}{
+				"step-1": map[string]any{
 					"name":        "my-wf.step-1",
 					"displayName": "build",
 					"phase":       "Running",
@@ -268,24 +268,24 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 		finished := started.Add(8 * time.Minute)
 
 		ti := &model.Item{Name: "full-wf"}
-		status := map[string]interface{}{
+		status := map[string]any{
 			"progress":   "5/5",
 			"startedAt":  started.Format(time.RFC3339),
 			"finishedAt": finished.Format(time.RFC3339),
 			"message":    "workflow completed",
-			"conditions": []interface{}{
-				map[string]interface{}{
+			"conditions": []any{
+				map[string]any{
 					"type":   "Completed",
 					"status": "True",
 				},
 			},
-			"nodes": map[string]interface{}{
-				"root": map[string]interface{}{
+			"nodes": map[string]any{
+				"root": map[string]any{
 					"name":     "full-wf",
 					"phase":    "Succeeded",
-					"children": []interface{}{"s1"},
+					"children": []any{"s1"},
 				},
-				"s1": map[string]interface{}{
+				"s1": map[string]any{
 					"displayName": "final-step",
 					"phase":       "Succeeded",
 				},
@@ -305,7 +305,7 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 
 	t.Run("invalid startedAt is ignored", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
+		status := map[string]any{
 			"startedAt": "not-a-date",
 		}
 		populateArgoWorkflow(ti, status)
@@ -318,7 +318,7 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 	t.Run("invalid finishedAt uses now", func(t *testing.T) {
 		started := time.Now().Add(-1 * time.Minute)
 		ti := &model.Item{Name: "my-wf"}
-		status := map[string]interface{}{
+		status := map[string]any{
 			"startedAt":  started.Format(time.RFC3339),
 			"finishedAt": "not-a-date",
 		}

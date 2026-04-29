@@ -206,10 +206,7 @@ func (m Model) viewCredits() string {
 		if screenY >= 0 && screenY < contentHeight {
 			// Center the line horizontally.
 			lineWidth := lipgloss.Width(line)
-			pad := (contentWidth - lineWidth) / 2
-			if pad < 0 {
-				pad = 0
-			}
+			pad := max((contentWidth-lineWidth)/2, 0)
 
 			// Style the title line differently.
 			var styled string

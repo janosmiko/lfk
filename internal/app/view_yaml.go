@@ -42,7 +42,9 @@ func (m Model) viewYAML() string {
 			{Key: "ctrl+d/u", Desc: "half page"},
 			{Key: "ctrl+f/b", Desc: "page"},
 			{Key: "/", Desc: "search"},
+			{Key: "123G", Desc: "goto"},
 			{Key: "v/V/ctrl+v", Desc: "visual select"},
+			{Key: "y", Desc: "copy"},
 			{Key: "tab/z", Desc: "fold"},
 			{Key: "ctrl+w/>", Desc: "wrap"},
 			{Key: "ctrl+e", Desc: "edit"},
@@ -51,24 +53,29 @@ func (m Model) viewYAML() string {
 	}
 	hint := ui.RenderHintBar(yamlHints, m.width)
 
-	// If search is active, show search bar instead of hints.
-	if m.yamlSearchMode {
+	// Status messages (e.g. copy feedback) take precedence over the hint
+	// bar and any search prompt \u2014 same pattern the log viewer uses.
+	switch {
+	case m.hasStatusMessage():
+		hint = m.renderStatusHint()
+	case m.yamlSearchMode:
 		yamlModeInd := ui.SearchModeIndicator(m.yamlSearchText.Value)
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlSearchText.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.yamlSearchText.CursorRight())
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
-	} else if m.yamlSearchText.Value != "" {
+	case m.yamlSearchText.Value != "":
 		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlMatchIdx+1, len(m.yamlMatchLines))
 		if len(m.yamlMatchLines) == 0 {
 			matchInfo = " [no matches]"
 		}
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.yamlSearchText.Value) + ui.BarDimStyle.Render(matchInfo)
+		nav := ""
+		if len(m.yamlMatchLines) > 0 {
+			nav = ui.BarDimStyle.Render(" | ") + ui.HelpKeyStyle.Render("n/N") + ui.BarDimStyle.Render(": next/prev")
+		}
+		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.yamlSearchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
-	maxLines := m.height - 4
-	if maxLines < 3 {
-		maxLines = 3
-	}
+	maxLines := max(m.height-4, 3)
 
 	// Build visible lines with fold indicators, respecting collapsed sections.
 	visLines, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
@@ -87,10 +94,7 @@ func (m Model) viewYAML() string {
 
 	// Compute line number gutter width.
 	totalOrigLines := len(strings.Split(m.yamlContent, "\n"))
-	gutterWidth := len(fmt.Sprintf("%d", totalOrigLines))
-	if gutterWidth < 2 {
-		gutterWidth = 2
-	}
+	gutterWidth := max(len(fmt.Sprintf("%d", totalOrigLines)), 2)
 
 	// Build a set of original matching lines for search highlight.
 	matchSet := make(map[int]bool)
@@ -130,10 +134,9 @@ func (m Model) viewYAML() string {
 	}
 
 	// Content width for wrapping/truncation.
-	contentWidth := m.width - 4 // border (2) + padding (2)
-	if contentWidth < 10 {
-		contentWidth = 10
-	}
+	contentWidth := max(
+		// border (2) + padding (2)
+		m.width-4, 10)
 
 	// Apply YAML highlighting to visible lines, with search highlights and cursor.
 	renderCtx := yamlRenderCtx{
@@ -295,10 +298,7 @@ func yamlPrependGutter(content, lineNum, foldPrefix string, isCursor, isSelected
 // renderYAMLWrappedLine renders a single YAML line with word wrapping.
 func renderYAMLWrappedLine(result []string, contentLine, foldPrefix string, visIdx, origLine int, ctx yamlRenderCtx) []string {
 	gutterOverhead := 1 + ctx.gutterWidth + 1 + yamlFoldPrefixLen
-	wrapWidth := ctx.contentWidth - gutterOverhead
-	if wrapWidth < 10 {
-		wrapWidth = 10
-	}
+	wrapWidth := max(ctx.contentWidth-gutterOverhead, 10)
 	subLines := ui.WrapLine(contentLine, wrapWidth)
 	for si, sub := range subLines {
 		hl := yamlApplySearchHighlight(sub, ctx.searchQuery, origLine, ctx.currentMatch, ctx.matchSet)

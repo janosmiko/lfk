@@ -27,6 +27,22 @@ func scheduleStatusClear() tea.Cmd {
 	})
 }
 
+// logExecCmd emits a structured Info entry for a subprocess invocation,
+// recording the full command line plus the KUBECONFIG path extracted from
+// cmd.Env so postmortems can tell which kubeconfig was active when the
+// command ran. label distinguishes event kinds (e.g. "Running kubectl
+// command", "Running helm command").
+func logExecCmd(label string, cmd *exec.Cmd) {
+	var kubeconfig string
+	for _, e := range cmd.Env {
+		if rest, ok := strings.CutPrefix(e, "KUBECONFIG="); ok {
+			kubeconfig = rest
+			break
+		}
+	}
+	logger.Info(label, "cmd", cmd.String(), "kubeconfig", kubeconfig)
+}
+
 // startupTips is the list of tips shown randomly on startup.
 var startupTips = []string{
 	"Press ? to see all keybindings",
@@ -76,6 +92,14 @@ func scheduleWatchTick(interval time.Duration) tea.Cmd {
 	})
 }
 
+const previewDebounceDelay = 300 * time.Millisecond
+
+func schedulePreviewDebounce(gen uint64) tea.Cmd {
+	return tea.Tick(previewDebounceDelay, func(_ time.Time) tea.Msg {
+		return previewDebounceTickMsg{gen: gen}
+	})
+}
+
 // scheduleDescribeRefresh returns a command that sends a describeRefreshTickMsg after 2 seconds.
 func scheduleDescribeRefresh() tea.Cmd {
 	return tea.Tick(2*time.Second, func(_ time.Time) tea.Msg {
@@ -106,6 +130,12 @@ func openInBrowser(url string) tea.Cmd {
 }
 
 // copyToSystemClipboard copies text to the system clipboard using platform-specific tools.
+//
+// Returns nil on success: every caller already calls setStatusMessage with a
+// context-specific message (e.g. "Copied 1 line", "Copied value of <key>")
+// before dispatching this command. Returning a generic "Copied to clipboard"
+// here would race back through updateActionResult and overwrite the more
+// useful caller message — visible to the user as a flicker.
 func copyToSystemClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
 		var cmd *exec.Cmd
@@ -121,7 +151,7 @@ func copyToSystemClipboard(text string) tea.Cmd {
 		if err := cmd.Run(); err != nil {
 			return actionResultMsg{err: fmt.Errorf("clipboard: %w", err)}
 		}
-		return actionResultMsg{message: "Copied to clipboard"}
+		return nil
 	}
 }
 
@@ -151,20 +181,20 @@ func (m Model) loadPodsForLogAction() tea.Cmd {
 	kind := m.actionCtx.kind
 	name := m.actionCtx.name
 	kctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
 	return func() tea.Msg {
 		// Get the selector for this parent resource.
-		selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx)
+		selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, m.kubectlContext(kctx))
 		if selector == "" {
 			return podLogSelectMsg{err: fmt.Errorf("could not determine pod selector for %s/%s", kind, name)}
 		}
 
 		// Fetch pods matching the selector.
-		args := []string{"get", "pods", "-l", selector, "-n", ns, "--context", kctx, "-o", "json"}
+		args := []string{"get", "pods", "-l", selector, "-n", ns, "--context", m.kubectlContext(kctx), "-o", "json"}
 		cmd := exec.Command(kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logger.Info("Running kubectl command", "cmd", cmd.String())
+		logExecCmd("Running kubectl command", cmd)
 		out, err := cmd.Output()
 		if err != nil {
 			logger.Error("kubectl get pods failed", "cmd", cmd.String(), "error", err)
@@ -322,30 +352,38 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			}
 			logger.Info("Bulk force deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs)
 
+			// Resolve KUBECONFIG to just the file that defines actionCtx so
+			// that overlapping cluster/user names across kubeconfigs do not
+			// route this command to the wrong cluster — see issue #23. Also
+			// translate the lfk display name back to the literal kubeconfig
+			// context name for the --context flag.
+			kubeconfigPath := client.KubeconfigPathForContext(actionCtx)
+			kubectlCtx := client.OriginalContextName(actionCtx)
+
 			// Remove finalizers first.
 			patchArgs := []string{
-				"patch", rt.Resource, ref.Name, "--context", actionCtx,
+				"patch", rt.Resource, ref.Name, "--context", kubectlCtx,
 				"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`,
 			}
 			if rt.Namespaced {
 				patchArgs = append(patchArgs, "-n", itemNs)
 			}
 			patchCmd := exec.Command(kubectlPath, patchArgs...)
-			patchCmd.Env = append(os.Environ(), "KUBECONFIG="+client.KubeconfigPaths())
-			logger.Info("Running kubectl command", "cmd", patchCmd.String())
+			patchCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
+			logExecCmd("Running kubectl command", patchCmd)
 			patchCmd.Run() //nolint:errcheck
 
 			// Force delete.
 			deleteArgs := []string{
-				"delete", rt.Resource, ref.Name, "--context", actionCtx,
+				"delete", rt.Resource, ref.Name, "--context", kubectlCtx,
 				"--grace-period=0", "--force",
 			}
 			if rt.Namespaced {
 				deleteArgs = append(deleteArgs, "-n", itemNs)
 			}
 			cmd := exec.Command(kubectlPath, deleteArgs...)
-			cmd.Env = append(os.Environ(), "KUBECONFIG="+client.KubeconfigPaths())
-			logger.Info("Running kubectl command", "cmd", cmd.String())
+			cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
+			logExecCmd("Running kubectl command", cmd)
 			if output, err := cmd.CombinedOutput(); err != nil {
 				logger.Error("kubectl bulk force delete failed", "cmd", cmd.String(), "error", err, "output", string(output))
 				failed++
@@ -469,11 +507,11 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 			if ctx.Err() != nil {
 				break
 			}
-			var patch map[string]interface{}
+			var patch map[string]any
 			if remove {
-				patch = map[string]interface{}{key: nil}
+				patch = map[string]any{key: nil}
 			} else {
-				patch = map[string]interface{}{key: value}
+				patch = map[string]any{key: value}
 			}
 			itemNs := item.Namespace
 			if itemNs == "" {
@@ -633,19 +671,26 @@ func (m Model) applyTemplateFile(tmpFile, ctx, ns string) tea.Cmd {
 	return func() tea.Msg {
 		defer func() { _ = os.Remove(tmpFile) }()
 
-		args := []string{"apply", "-f", tmpFile, "--context", ctx}
+		args := []string{"apply", "-f", tmpFile, "--context", m.kubectlContext(ctx)}
 		if ns != "" {
 			args = append(args, "-n", ns)
 		}
 		cmd := exec.Command(kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-		logger.Info("Running kubectl command", "cmd", cmd.String())
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
+		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Error("kubectl apply failed", "cmd", cmd.String(), "error", err, "output", string(output))
 			return actionResultMsg{err: fmt.Errorf("kubectl apply: %s", strings.TrimSpace(string(output)))}
 		}
-		return actionResultMsg{message: strings.TrimSpace(string(output))}
+		// Templates are rare and may create a Namespace (either directly
+		// via the "Namespace" template or an edited YAML that adds one),
+		// so always invalidate on success. Worst case is one extra
+		// GetNamespaces round-trip per template apply.
+		return actionResultMsg{
+			message:                  strings.TrimSpace(string(output)),
+			invalidateNamespaceCache: true,
+		}
 	}
 }
 

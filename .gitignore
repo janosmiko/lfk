@@ -1,5 +1,5 @@
 # Binary
-/lft
+/lfk
 
 # IDE
 .idea/
@@ -35,3 +35,6 @@ __debug_bin*
 
 # Downloaded theme sources (generated file is committed, raw themes are not)
 themes/ghostty/
+
+# Worktrees
+.worktrees/

@@ -14,14 +14,8 @@ func RenderRollbackOverlay(revisions []k8s.DeploymentRevision, cursor int, scree
 		return OverlayStyle.Render(DimStyle.Render("No revisions found"))
 	}
 
-	boxW := screenWidth * 70 / 100
-	if boxW < 50 {
-		boxW = 50
-	}
-	boxH := screenHeight * 60 / 100
-	if boxH < 10 {
-		boxH = 10
-	}
+	boxW := max(screenWidth*70/100, 50)
+	boxH := max(screenHeight*60/100, 10)
 
 	title := OverlayTitleStyle.Render("Rollback Deployment")
 
@@ -30,18 +24,14 @@ func RenderRollbackOverlay(revisions []k8s.DeploymentRevision, cursor int, scree
 	hdr := fmt.Sprintf("  %-8s  %-30s  %-8s  %-30s  %s", "REV", "REPLICASET", "PODS", "IMAGE", "AGE")
 	lines = append(lines, DimStyle.Bold(true).Render(hdr))
 
-	contentH := boxH - 6 // borders, title, help
-	if contentH < 3 {
-		contentH = 3
-	}
+	contentH := max(
+		// borders, title, help
+		boxH-6, 3)
 	start := 0
 	if cursor >= contentH {
 		start = cursor - contentH + 1
 	}
-	end := start + contentH
-	if end > len(revisions) {
-		end = len(revisions)
-	}
+	end := min(start+contentH, len(revisions))
 
 	for i := start; i < end; i++ {
 		rev := revisions[i]
@@ -52,7 +42,7 @@ func RenderRollbackOverlay(revisions []k8s.DeploymentRevision, cursor int, scree
 				img += fmt.Sprintf(" +%d", len(rev.Images)-1)
 			}
 		}
-		age := formatAge(rev.CreatedAt)
+		age := FormatAge(rev.CreatedAt)
 		line := fmt.Sprintf("  %-8d  %-30s  %-8d  %-30s  %s",
 			rev.Revision, Truncate(rev.Name, 30), rev.Replicas, Truncate(img, 30), age)
 
@@ -92,14 +82,8 @@ func RenderHelmRollbackOverlay(revisions []HelmRevision, cursor int, screenWidth
 		return OverlayStyle.Render(DimStyle.Render("No revisions found"))
 	}
 
-	boxW := screenWidth * 80 / 100
-	if boxW < 60 {
-		boxW = 60
-	}
-	boxH := screenHeight * 60 / 100
-	if boxH < 10 {
-		boxH = 10
-	}
+	boxW := max(screenWidth*80/100, 60)
+	boxH := max(screenHeight*60/100, 10)
 
 	title := OverlayTitleStyle.Render("Rollback Helm Release")
 
@@ -109,18 +93,14 @@ func RenderHelmRollbackOverlay(revisions []HelmRevision, cursor int, screenWidth
 		"REV", "STATUS", "CHART", "APP VER", "DESCRIPTION", "UPDATED")
 	lines = append(lines, DimStyle.Bold(true).Render(hdr))
 
-	contentH := boxH - 6 // borders, title, help
-	if contentH < 3 {
-		contentH = 3
-	}
+	contentH := max(
+		// borders, title, help
+		boxH-6, 3)
 	start := 0
 	if cursor >= contentH {
 		start = cursor - contentH + 1
 	}
-	end := start + contentH
-	if end > len(revisions) {
-		end = len(revisions)
-	}
+	end := min(start+contentH, len(revisions))
 
 	for i := start; i < end; i++ {
 		rev := revisions[i]
@@ -146,20 +126,13 @@ func RenderHelmRollbackOverlay(revisions []HelmRevision, cursor int, screenWidth
 		Render(body)
 }
 
-// formatAge returns a human-readable age string.
-func formatAge(t time.Time) string {
+// FormatAge returns a human-readable age string for a timestamp. Zero time
+// renders as "-"; otherwise delegates to k8s.FormatAge so deployment-rollback
+// rows match the format used everywhere else in the app (including the year
+// suffix once a revision is older than ~12 months).
+func FormatAge(t time.Time) string {
 	if t.IsZero() {
 		return "-"
 	}
-	d := time.Since(t)
-	switch {
-	case d < time.Minute:
-		return fmt.Sprintf("%ds", int(d.Seconds()))
-	case d < time.Hour:
-		return fmt.Sprintf("%dm", int(d.Minutes()))
-	case d < 24*time.Hour:
-		return fmt.Sprintf("%dh", int(d.Hours()))
-	default:
-		return fmt.Sprintf("%dd", int(d.Hours()/24))
-	}
+	return k8s.FormatAge(time.Since(t))
 }

@@ -11,12 +11,12 @@ import (
 )
 
 // preferredCRDVersion extracts the preferred or first served version from a CRD object.
-func preferredCRDVersion(spec, obj map[string]interface{}) string {
+func preferredCRDVersion(spec, obj map[string]any) string {
 	// Try spec.versions (v1 CRDs): pick the first one marked as "served", preferring "storage".
-	if versions, ok := spec["versions"].([]interface{}); ok && len(versions) > 0 {
+	if versions, ok := spec["versions"].([]any); ok && len(versions) > 0 {
 		var firstServed, storageVersion string
 		for _, v := range versions {
-			vm, ok := v.(map[string]interface{})
+			vm, ok := v.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -39,8 +39,8 @@ func preferredCRDVersion(spec, obj map[string]interface{}) string {
 	}
 
 	// Fallback: status.storedVersions.
-	if status, ok := obj["status"].(map[string]interface{}); ok {
-		if stored, ok := status["storedVersions"].([]interface{}); ok && len(stored) > 0 {
+	if status, ok := obj["status"].(map[string]any); ok {
+		if stored, ok := status["storedVersions"].([]any); ok && len(stored) > 0 {
 			if v, ok := stored[0].(string); ok && v != "" {
 				return v
 			}
@@ -53,15 +53,15 @@ func preferredCRDVersion(spec, obj map[string]interface{}) string {
 // extractCRDPrinterColumns extracts additionalPrinterColumns from the CRD spec
 // for the given preferred version. It skips the "Age" column since age is already
 // computed by the application.
-func extractCRDPrinterColumns(spec map[string]interface{}, preferredVersion string) []model.PrinterColumn {
-	versions, ok := spec["versions"].([]interface{})
+func extractCRDPrinterColumns(spec map[string]any, preferredVersion string) []model.PrinterColumn {
+	versions, ok := spec["versions"].([]any)
 	if !ok {
 		return nil
 	}
 
 	// Find the version entry matching the preferred version.
 	for _, v := range versions {
-		vm, ok := v.(map[string]interface{})
+		vm, ok := v.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -70,14 +70,14 @@ func extractCRDPrinterColumns(spec map[string]interface{}, preferredVersion stri
 			continue
 		}
 
-		cols, ok := vm["additionalPrinterColumns"].([]interface{})
+		cols, ok := vm["additionalPrinterColumns"].([]any)
 		if !ok || len(cols) == 0 {
 			return nil
 		}
 
 		var result []model.PrinterColumn
 		for _, c := range cols {
-			cm, ok := c.(map[string]interface{})
+			cm, ok := c.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -225,27 +225,27 @@ func containerStateString(ready bool, waiting *corev1.ContainerStateWaiting, run
 
 // extractContainerNotReadyReason extracts the reason why a container is not ready
 // from container statuses (e.g., CrashLoopBackOff, ImagePullBackOff, OOMKilled).
-func extractContainerNotReadyReason(containerStatuses []interface{}) string {
+func extractContainerNotReadyReason(containerStatuses []any) string {
 	for _, cs := range containerStatuses {
-		csMap, ok := cs.(map[string]interface{})
+		csMap, ok := cs.(map[string]any)
 		if !ok {
 			continue
 		}
 		if ready, ok := csMap["ready"].(bool); ok && ready {
 			continue
 		}
-		state, _ := csMap["state"].(map[string]interface{})
+		state, _ := csMap["state"].(map[string]any)
 		if state == nil {
 			continue
 		}
 		// Check waiting state.
-		if waiting, ok := state["waiting"].(map[string]interface{}); ok {
+		if waiting, ok := state["waiting"].(map[string]any); ok {
 			if reason, ok := waiting["reason"].(string); ok && reason != "" {
 				return reason
 			}
 		}
 		// Check terminated state.
-		if terminated, ok := state["terminated"].(map[string]interface{}); ok {
+		if terminated, ok := state["terminated"].(map[string]any); ok {
 			if reason, ok := terminated["reason"].(string); ok && reason != "" {
 				return reason
 			}
@@ -255,12 +255,12 @@ func extractContainerNotReadyReason(containerStatuses []interface{}) string {
 }
 
 // extractStatus pulls a human-readable status string from an unstructured object.
-func extractStatus(obj map[string]interface{}) string {
+func extractStatus(obj map[string]any) string {
 	status, ok := obj["status"]
 	if !ok {
 		return ""
 	}
-	statusMap, ok := status.(map[string]interface{})
+	statusMap, ok := status.(map[string]any)
 	if !ok {
 		return ""
 	}
@@ -268,9 +268,9 @@ func extractStatus(obj map[string]interface{}) string {
 		return phase
 	}
 	// ArgoCD Application: prefer health status + sync status.
-	if health, ok := statusMap["health"].(map[string]interface{}); ok {
+	if health, ok := statusMap["health"].(map[string]any); ok {
 		if healthStatus, ok := health["status"].(string); ok {
-			if sync, ok := statusMap["sync"].(map[string]interface{}); ok {
+			if sync, ok := statusMap["sync"].(map[string]any); ok {
 				if syncStatus, ok := sync["status"].(string); ok {
 					return healthStatus + "/" + syncStatus
 				}
@@ -279,17 +279,17 @@ func extractStatus(obj map[string]interface{}) string {
 		}
 	}
 	// FluxCD resources: check suspend and Ready condition.
-	if spec, ok := obj["spec"].(map[string]interface{}); ok {
+	if spec, ok := obj["spec"].(map[string]any); ok {
 		if suspended, ok := spec["suspend"].(bool); ok && suspended {
 			return "Suspended"
 		}
 	}
-	if conditions, ok := statusMap["conditions"].([]interface{}); ok && len(conditions) > 0 {
+	if conditions, ok := statusMap["conditions"].([]any); ok && len(conditions) > 0 {
 		// Prefer "Available" or "Ready" condition with status "True".
 		// Track the last True condition and last condition overall.
 		var lastTrueType, lastType string
 		for _, c := range conditions {
-			cond, ok := c.(map[string]interface{})
+			cond, ok := c.(map[string]any)
 			if !ok {
 				continue
 			}

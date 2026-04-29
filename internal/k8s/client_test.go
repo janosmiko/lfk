@@ -50,19 +50,19 @@ func TestFormatAge(t *testing.T) {
 func TestGetInt(t *testing.T) {
 	tests := []struct {
 		name     string
-		m        map[string]interface{}
+		m        map[string]any
 		key      string
 		expected int64
 	}{
-		{"int64 value", map[string]interface{}{"count": int64(42)}, "count", 42},
-		{"float64 value", map[string]interface{}{"count": float64(99.9)}, "count", 99},
-		{"missing key", map[string]interface{}{"other": int64(1)}, "count", 0},
+		{"int64 value", map[string]any{"count": int64(42)}, "count", 42},
+		{"float64 value", map[string]any{"count": float64(99.9)}, "count", 99},
+		{"missing key", map[string]any{"other": int64(1)}, "count", 0},
 		{"nil map", nil, "count", 0},
-		{"wrong type string", map[string]interface{}{"count": "hello"}, "count", 0},
-		{"wrong type bool", map[string]interface{}{"count": true}, "count", 0},
-		{"zero int64", map[string]interface{}{"count": int64(0)}, "count", 0},
-		{"negative int64", map[string]interface{}{"count": int64(-5)}, "count", -5},
-		{"negative float64", map[string]interface{}{"count": float64(-3.7)}, "count", -3},
+		{"wrong type string", map[string]any{"count": "hello"}, "count", 0},
+		{"wrong type bool", map[string]any{"count": true}, "count", 0},
+		{"zero int64", map[string]any{"count": int64(0)}, "count", 0},
+		{"negative int64", map[string]any{"count": int64(-5)}, "count", -5},
+		{"negative float64", map[string]any{"count": float64(-3.7)}, "count", -3},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -75,7 +75,7 @@ func TestGetInt(t *testing.T) {
 
 func TestParseEventTimestamp(t *testing.T) {
 	t.Run("valid RFC3339", func(t *testing.T) {
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"lastTimestamp": "2024-01-15T10:30:00Z",
 		}
 		result := parseEventTimestamp(obj, "lastTimestamp")
@@ -86,7 +86,7 @@ func TestParseEventTimestamp(t *testing.T) {
 	})
 
 	t.Run("valid RFC3339Nano", func(t *testing.T) {
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"eventTime": "2024-01-15T10:30:00.123456789Z",
 		}
 		result := parseEventTimestamp(obj, "eventTime")
@@ -94,31 +94,31 @@ func TestParseEventTimestamp(t *testing.T) {
 	})
 
 	t.Run("missing field", func(t *testing.T) {
-		obj := map[string]interface{}{}
+		obj := map[string]any{}
 		result := parseEventTimestamp(obj, "lastTimestamp")
 		assert.True(t, result.IsZero())
 	})
 
 	t.Run("nil value", func(t *testing.T) {
-		obj := map[string]interface{}{"lastTimestamp": nil}
+		obj := map[string]any{"lastTimestamp": nil}
 		result := parseEventTimestamp(obj, "lastTimestamp")
 		assert.True(t, result.IsZero())
 	})
 
 	t.Run("empty string", func(t *testing.T) {
-		obj := map[string]interface{}{"lastTimestamp": ""}
+		obj := map[string]any{"lastTimestamp": ""}
 		result := parseEventTimestamp(obj, "lastTimestamp")
 		assert.True(t, result.IsZero())
 	})
 
 	t.Run("invalid format", func(t *testing.T) {
-		obj := map[string]interface{}{"lastTimestamp": "not-a-date"}
+		obj := map[string]any{"lastTimestamp": "not-a-date"}
 		result := parseEventTimestamp(obj, "lastTimestamp")
 		assert.True(t, result.IsZero())
 	})
 
 	t.Run("non-string type", func(t *testing.T) {
-		obj := map[string]interface{}{"lastTimestamp": 12345}
+		obj := map[string]any{"lastTimestamp": 12345}
 		result := parseEventTimestamp(obj, "lastTimestamp")
 		assert.True(t, result.IsZero())
 	})
@@ -128,8 +128,8 @@ func TestParseEventTimestamp(t *testing.T) {
 
 func TestExtractStatus(t *testing.T) {
 	t.Run("phase field", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
 				"phase": "Running",
 			},
 		}
@@ -137,12 +137,12 @@ func TestExtractStatus(t *testing.T) {
 	})
 
 	t.Run("ArgoCD health+sync", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"health": map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"health": map[string]any{
 					"status": "Healthy",
 				},
-				"sync": map[string]interface{}{
+				"sync": map[string]any{
 					"status": "Synced",
 				},
 			},
@@ -151,9 +151,9 @@ func TestExtractStatus(t *testing.T) {
 	})
 
 	t.Run("ArgoCD health only", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"health": map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"health": map[string]any{
 					"status": "Degraded",
 				},
 			},
@@ -162,14 +162,14 @@ func TestExtractStatus(t *testing.T) {
 	})
 
 	t.Run("conditions with Available", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Progressing",
 						"status": "True",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "Available",
 						"status": "True",
 					},
@@ -180,14 +180,14 @@ func TestExtractStatus(t *testing.T) {
 	})
 
 	t.Run("conditions fallback to last", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Initialized",
 						"status": "True",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "Ready",
 						"status": "False",
 					},
@@ -198,14 +198,14 @@ func TestExtractStatus(t *testing.T) {
 	})
 
 	t.Run("Available condition with False status", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Available",
 						"status": "False",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "Progressing",
 						"status": "True",
 					},
@@ -217,30 +217,30 @@ func TestExtractStatus(t *testing.T) {
 	})
 
 	t.Run("no status field", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"metadata": map[string]interface{}{},
+		obj := map[string]any{
+			"metadata": map[string]any{},
 		}
 		assert.Equal(t, "", extractStatus(obj))
 	})
 
 	t.Run("status is not a map", func(t *testing.T) {
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"status": "something",
 		}
 		assert.Equal(t, "", extractStatus(obj))
 	})
 
 	t.Run("empty status map", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{},
+		obj := map[string]any{
+			"status": map[string]any{},
 		}
 		assert.Equal(t, "", extractStatus(obj))
 	})
 
 	t.Run("empty conditions array", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{},
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{},
 			},
 		}
 		assert.Equal(t, "", extractStatus(obj))
@@ -351,20 +351,20 @@ func indexOf(s, substr string) int {
 
 func TestPopulateResourceDetails_LastRestartAt(t *testing.T) {
 	t.Run("sets LastRestartAt from container lastState.terminated.finishedAt", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "app"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "app"},
 				},
 			},
-			"status": map[string]interface{}{
-				"containerStatuses": []interface{}{
-					map[string]interface{}{
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
 						"name":         "app",
 						"ready":        true,
 						"restartCount": float64(3),
-						"lastState": map[string]interface{}{
-							"terminated": map[string]interface{}{
+						"lastState": map[string]any{
+							"terminated": map[string]any{
 								"finishedAt": "2025-06-15T12:30:00Z",
 							},
 						},
@@ -381,31 +381,31 @@ func TestPopulateResourceDetails_LastRestartAt(t *testing.T) {
 	})
 
 	t.Run("picks the most recent LastRestartAt across containers", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "app"},
-					map[string]interface{}{"name": "sidecar"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "app"},
+					map[string]any{"name": "sidecar"},
 				},
 			},
-			"status": map[string]interface{}{
-				"containerStatuses": []interface{}{
-					map[string]interface{}{
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
 						"name":         "app",
 						"ready":        true,
 						"restartCount": float64(1),
-						"lastState": map[string]interface{}{
-							"terminated": map[string]interface{}{
+						"lastState": map[string]any{
+							"terminated": map[string]any{
 								"finishedAt": "2025-06-15T10:00:00Z",
 							},
 						},
 					},
-					map[string]interface{}{
+					map[string]any{
 						"name":         "sidecar",
 						"ready":        true,
 						"restartCount": float64(2),
-						"lastState": map[string]interface{}{
-							"terminated": map[string]interface{}{
+						"lastState": map[string]any{
+							"terminated": map[string]any{
 								"finishedAt": "2025-06-15T14:00:00Z",
 							},
 						},
@@ -421,15 +421,15 @@ func TestPopulateResourceDetails_LastRestartAt(t *testing.T) {
 	})
 
 	t.Run("zero LastRestartAt when no lastState", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "app"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "app"},
 				},
 			},
-			"status": map[string]interface{}{
-				"containerStatuses": []interface{}{
-					map[string]interface{}{
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
 						"name":         "app",
 						"ready":        true,
 						"restartCount": float64(0),
@@ -444,20 +444,20 @@ func TestPopulateResourceDetails_LastRestartAt(t *testing.T) {
 	})
 
 	t.Run("zero LastRestartAt when lastState has no terminated", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "app"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "app"},
 				},
 			},
-			"status": map[string]interface{}{
-				"containerStatuses": []interface{}{
-					map[string]interface{}{
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
 						"name":         "app",
 						"ready":        false,
 						"restartCount": float64(1),
-						"lastState": map[string]interface{}{
-							"waiting": map[string]interface{}{
+						"lastState": map[string]any{
+							"waiting": map[string]any{
 								"reason": "CrashLoopBackOff",
 							},
 						},
@@ -503,27 +503,27 @@ func TestComputeQuotaPercent(t *testing.T) {
 // --- evaluateSimpleJSONPath ---
 
 func TestEvaluateSimpleJSONPath(t *testing.T) {
-	obj := map[string]interface{}{
-		"status": map[string]interface{}{
+	obj := map[string]any{
+		"status": map[string]any{
 			"phase": "Running",
-			"conditions": []interface{}{
-				map[string]interface{}{
+			"conditions": []any{
+				map[string]any{
 					"type":   "Ready",
 					"status": "True",
 				},
-				map[string]interface{}{
+				map[string]any{
 					"type":   "Initialized",
 					"status": "True",
 				},
 			},
 		},
-		"spec": map[string]interface{}{
-			"source": map[string]interface{}{
+		"spec": map[string]any{
+			"source": map[string]any{
 				"repoURL": "https://github.com/example/repo",
 			},
 			"replicas": float64(3),
 		},
-		"metadata": map[string]interface{}{
+		"metadata": map[string]any{
 			"creationTimestamp": "2025-01-15T10:30:00Z",
 		},
 	}
@@ -531,7 +531,7 @@ func TestEvaluateSimpleJSONPath(t *testing.T) {
 	tests := []struct {
 		name    string
 		path    string
-		wantVal interface{}
+		wantVal any
 		wantOK  bool
 	}{
 		{"simple field", ".status.phase", "Running", true},
@@ -563,7 +563,7 @@ func TestEvaluateSimpleJSONPath(t *testing.T) {
 func TestFormatPrinterValue(t *testing.T) {
 	tests := []struct {
 		name    string
-		val     interface{}
+		val     any
 		colType string
 		want    string
 	}{
@@ -596,23 +596,23 @@ func TestFormatPrinterValue(t *testing.T) {
 
 func TestExtractCRDPrinterColumns(t *testing.T) {
 	t.Run("extracts columns from matching version", func(t *testing.T) {
-		spec := map[string]interface{}{
-			"versions": []interface{}{
-				map[string]interface{}{
+		spec := map[string]any{
+			"versions": []any{
+				map[string]any{
 					"name":   "v1alpha1",
 					"served": true,
-					"additionalPrinterColumns": []interface{}{
-						map[string]interface{}{
+					"additionalPrinterColumns": []any{
+						map[string]any{
 							"name":     "Status",
 							"type":     "string",
 							"jsonPath": ".status.phase",
 						},
-						map[string]interface{}{
+						map[string]any{
 							"name":     "Repo",
 							"type":     "string",
 							"jsonPath": ".spec.source.repoURL",
 						},
-						map[string]interface{}{
+						map[string]any{
 							"name":     "Age",
 							"type":     "date",
 							"jsonPath": ".metadata.creationTimestamp",
@@ -631,13 +631,13 @@ func TestExtractCRDPrinterColumns(t *testing.T) {
 	})
 
 	t.Run("returns nil for non-matching version", func(t *testing.T) {
-		spec := map[string]interface{}{
-			"versions": []interface{}{
-				map[string]interface{}{
+		spec := map[string]any{
+			"versions": []any{
+				map[string]any{
 					"name":   "v1",
 					"served": true,
-					"additionalPrinterColumns": []interface{}{
-						map[string]interface{}{
+					"additionalPrinterColumns": []any{
+						map[string]any{
 							"name":     "Status",
 							"type":     "string",
 							"jsonPath": ".status.phase",
@@ -651,15 +651,15 @@ func TestExtractCRDPrinterColumns(t *testing.T) {
 	})
 
 	t.Run("returns nil when no versions", func(t *testing.T) {
-		spec := map[string]interface{}{}
+		spec := map[string]any{}
 		cols := extractCRDPrinterColumns(spec, "v1")
 		assert.Nil(t, cols)
 	})
 
 	t.Run("returns nil when no additionalPrinterColumns", func(t *testing.T) {
-		spec := map[string]interface{}{
-			"versions": []interface{}{
-				map[string]interface{}{
+		spec := map[string]any{
+			"versions": []any{
+				map[string]any{
 					"name":   "v1",
 					"served": true,
 				},
@@ -670,23 +670,23 @@ func TestExtractCRDPrinterColumns(t *testing.T) {
 	})
 
 	t.Run("skips columns with empty name or jsonPath", func(t *testing.T) {
-		spec := map[string]interface{}{
-			"versions": []interface{}{
-				map[string]interface{}{
+		spec := map[string]any{
+			"versions": []any{
+				map[string]any{
 					"name":   "v1",
 					"served": true,
-					"additionalPrinterColumns": []interface{}{
-						map[string]interface{}{
+					"additionalPrinterColumns": []any{
+						map[string]any{
 							"name":     "",
 							"type":     "string",
 							"jsonPath": ".status.phase",
 						},
-						map[string]interface{}{
+						map[string]any{
 							"name":     "Status",
 							"type":     "string",
 							"jsonPath": "",
 						},
-						map[string]interface{}{
+						map[string]any{
 							"name":     "Valid",
 							"type":     "string",
 							"jsonPath": ".status.phase",
@@ -706,13 +706,13 @@ func TestExtractCRDPrinterColumns(t *testing.T) {
 func TestExtractGenericConditions(t *testing.T) {
 	t.Run("prefers Ready condition", func(t *testing.T) {
 		ti := &model.Item{}
-		conditions := []interface{}{
-			map[string]interface{}{
+		conditions := []any{
+			map[string]any{
 				"type":   "Initialized",
 				"status": "True",
 				"reason": "InitDone",
 			},
-			map[string]interface{}{
+			map[string]any{
 				"type":               "Ready",
 				"status":             "True",
 				"reason":             "AllGood",
@@ -732,12 +732,12 @@ func TestExtractGenericConditions(t *testing.T) {
 
 	t.Run("falls back to last condition", func(t *testing.T) {
 		ti := &model.Item{}
-		conditions := []interface{}{
-			map[string]interface{}{
+		conditions := []any{
+			map[string]any{
 				"type":   "Initialized",
 				"status": "True",
 			},
-			map[string]interface{}{
+			map[string]any{
 				"type":    "Available",
 				"status":  "False",
 				"reason":  "MinimumReplicasUnavailable",
@@ -753,15 +753,15 @@ func TestExtractGenericConditions(t *testing.T) {
 
 	t.Run("truncates long messages", func(t *testing.T) {
 		ti := &model.Item{}
-		longMsg := ""
+		var longMsg strings.Builder
 		for i := range 100 {
-			longMsg += fmt.Sprintf("x%d", i)
+			fmt.Fprintf(&longMsg, "x%d", i)
 		}
-		conditions := []interface{}{
-			map[string]interface{}{
+		conditions := []any{
+			map[string]any{
 				"type":    "Ready",
 				"status":  "False",
-				"message": longMsg,
+				"message": longMsg.String(),
 			},
 		}
 		extractGenericConditions(ti, conditions)
@@ -776,7 +776,7 @@ func TestExtractGenericConditions(t *testing.T) {
 
 	t.Run("empty conditions", func(t *testing.T) {
 		ti := &model.Item{}
-		extractGenericConditions(ti, []interface{}{})
+		extractGenericConditions(ti, []any{})
 		assert.Empty(t, ti.Columns)
 	})
 }
@@ -879,6 +879,726 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		paths := buildKubeconfigPaths()
 
 		assert.NotEmpty(t, paths, "should return at least the default kubeconfig path")
+	})
+
+	t.Run("dedups KUBECONFIG entries that point at the same file", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		cfg := filepath.Join(tmpDir, "config.yaml")
+		assert.NoError(t, os.WriteFile(cfg, []byte(""), 0o600))
+		// Reference the same file via two cosmetically different paths.
+		via := filepath.Join(tmpDir, ".", "config.yaml")
+		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+via)
+
+		paths := buildKubeconfigPaths()
+		count := 0
+		for _, p := range paths {
+			if p == cfg || p == via {
+				count++
+			}
+		}
+		assert.Equal(t, 1, count,
+			"dedup should collapse path/./path duplicates so contexts aren't loaded twice")
+	})
+
+	t.Run("dedups KUBECONFIG entry that overlaps with config.d walk", func(t *testing.T) {
+		// Regression: the same kubeconfig listed in KUBECONFIG and also
+		// living under ~/.kube/config.d/ (when both happen, e.g. a user
+		// symlinks their environment file into config.d) was being loaded
+		// twice, so each context inside it appeared as two disambiguated
+		// rows in the cluster list.
+		tmpDir := t.TempDir()
+		cfg := filepath.Join(tmpDir, "shared.yaml")
+		assert.NoError(t, os.WriteFile(cfg, []byte(""), 0o600))
+		viaSymlink := filepath.Join(tmpDir, "shared-link.yaml")
+		assert.NoError(t, os.Symlink(cfg, viaSymlink))
+		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+viaSymlink)
+
+		paths := buildKubeconfigPaths()
+		// Both entries point at the same underlying file; only one should
+		// remain after dedup. Compare via EvalSymlinks on both sides so
+		// we don't trip over /tmp → /private/tmp on macOS.
+		canonCfg, err := filepath.EvalSymlinks(cfg)
+		assert.NoError(t, err)
+		seenReal := 0
+		for _, p := range paths {
+			if resolved, err := filepath.EvalSymlinks(p); err == nil && resolved == canonCfg {
+				seenReal++
+			}
+		}
+		assert.Equal(t, 1, seenReal,
+			"symlinked duplicates should collapse so collectContexts doesn't see the file twice")
+	})
+}
+
+func TestDedupKubeconfigPaths(t *testing.T) {
+	t.Run("preserves order, drops later duplicates", func(t *testing.T) {
+		tmp := t.TempDir()
+		a := filepath.Join(tmp, "a.yaml")
+		b := filepath.Join(tmp, "b.yaml")
+		assert.NoError(t, os.WriteFile(a, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(b, []byte(""), 0o600))
+		got := dedupKubeconfigPaths([]string{a, b, a, b})
+		assert.Equal(t, []string{a, b}, got)
+	})
+
+	t.Run("keeps unresolvable paths as-is", func(t *testing.T) {
+		// Missing/dangling paths should still pass through (clientcmd will
+		// surface a clear error later) — they shouldn't crash the dedup.
+		got := dedupKubeconfigPaths([]string{"/no/such/file", "/no/such/file", "/another"})
+		assert.Equal(t, []string{"/no/such/file", "/another"}, got)
+	})
+}
+
+// --- multi-kubeconfig context switching ---
+
+func TestMultiKubeconfigContextSwitching(t *testing.T) {
+	// Build two distinct kubeconfig files and verify that restConfigForContext
+	// correctly resolves each context's server URL when both files are merged
+	// via KUBECONFIG=c1:c2.
+	tmp := t.TempDir()
+
+	c1 := filepath.Join(tmp, "c1.yaml")
+	c2 := filepath.Join(tmp, "c2.yaml")
+	assert.NoError(t, os.WriteFile(c1, []byte(`apiVersion: v1
+kind: Config
+current-context: alpha
+clusters:
+- name: cluster-alpha
+  cluster:
+    server: https://alpha.example.test:6443
+    insecure-skip-tls-verify: true
+contexts:
+- name: alpha
+  context:
+    cluster: cluster-alpha
+    user: user-alpha
+users:
+- name: user-alpha
+  user:
+    token: alpha-token
+`), 0o600))
+	assert.NoError(t, os.WriteFile(c2, []byte(`apiVersion: v1
+kind: Config
+current-context: beta
+clusters:
+- name: cluster-beta
+  cluster:
+    server: https://beta.example.test:6443
+    insecure-skip-tls-verify: true
+contexts:
+- name: beta
+  context:
+    cluster: cluster-beta
+    user: user-beta
+users:
+- name: user-beta
+  user:
+    token: beta-token
+`), 0o600))
+
+	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
+
+	client, err := NewClient("")
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
+
+	t.Run("both contexts appear in list", func(t *testing.T) {
+		ctxs, err := client.GetContexts()
+		assert.NoError(t, err)
+		names := make(map[string]bool, len(ctxs))
+		for _, c := range ctxs {
+			names[c.Name] = true
+		}
+		assert.True(t, names["alpha"], "alpha context must be present")
+		assert.True(t, names["beta"], "beta context must be present")
+	})
+
+	t.Run("current context is from first file", func(t *testing.T) {
+		// clientcmd merge: the first file's current-context wins.
+		assert.Equal(t, "alpha", client.CurrentContext())
+	})
+
+	t.Run("restConfigForContext resolves alpha to alpha's server", func(t *testing.T) {
+		cfg, err := client.restConfigForContext("alpha")
+		assert.NoError(t, err)
+		assert.Equal(t, "https://alpha.example.test:6443", cfg.Host,
+			"alpha context must resolve to cluster-alpha's server")
+	})
+
+	t.Run("restConfigForContext resolves beta to beta's server", func(t *testing.T) {
+		cfg, err := client.restConfigForContext("beta")
+		assert.NoError(t, err)
+		assert.Equal(t, "https://beta.example.test:6443", cfg.Host,
+			"beta context must resolve to cluster-beta's server — regression: "+
+				"when two KUBECONFIG files are merged, switching to the second "+
+				"context must not keep routing traffic to the first cluster")
+	})
+
+	t.Run("KubeconfigPathForContext maps each context to its source file", func(t *testing.T) {
+		assert.Equal(t, c1, client.KubeconfigPathForContext("alpha"))
+		assert.Equal(t, c2, client.KubeconfigPathForContext("beta"))
+	})
+}
+
+// TestMultiKubeconfigOverlappingNames verifies that multiple kubeconfigs sharing
+// the same cluster and user names (but distinct context names) still resolve to
+// each context's correct cluster and user. Reproduces issue #23: all five
+// configs in ~/.kube/config.d declared cluster "k0s" and user "root", so the
+// clientcmd merge collapsed them and every context routed traffic to the
+// last-merged cluster.
+func TestMultiKubeconfigOverlappingNames(t *testing.T) {
+	tmp := t.TempDir()
+
+	c1 := filepath.Join(tmp, "cluster-one.yaml")
+	c2 := filepath.Join(tmp, "cluster-two.yaml")
+	// Both files declare the same cluster name ("k0s") and user name ("root")
+	// but point at different servers and tokens. Distinct context names are
+	// the only thing keeping them apart.
+	assert.NoError(t, os.WriteFile(c1, []byte(`apiVersion: v1
+kind: Config
+current-context: one
+clusters:
+- name: k0s
+  cluster:
+    server: https://one.example.test:6443
+    insecure-skip-tls-verify: true
+contexts:
+- name: one
+  context:
+    cluster: k0s
+    user: root
+users:
+- name: root
+  user:
+    token: one-token
+`), 0o600))
+	assert.NoError(t, os.WriteFile(c2, []byte(`apiVersion: v1
+kind: Config
+current-context: two
+clusters:
+- name: k0s
+  cluster:
+    server: https://two.example.test:6443
+    insecure-skip-tls-verify: true
+contexts:
+- name: two
+  context:
+    cluster: k0s
+    user: root
+users:
+- name: root
+  user:
+    token: two-token
+`), 0o600))
+
+	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
+
+	client, err := NewClient("")
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
+
+	t.Run("both contexts visible despite shared cluster/user names", func(t *testing.T) {
+		ctxs, err := client.GetContexts()
+		assert.NoError(t, err)
+		names := make(map[string]bool, len(ctxs))
+		for _, c := range ctxs {
+			names[c.Name] = true
+		}
+		assert.True(t, names["one"], "context 'one' must be present")
+		assert.True(t, names["two"], "context 'two' must be present")
+	})
+
+	t.Run("one context resolves to one's server", func(t *testing.T) {
+		cfg, err := client.restConfigForContext("one")
+		assert.NoError(t, err)
+		assert.Equal(t, "https://one.example.test:6443", cfg.Host,
+			"context 'one' must route to cluster-one's server even though "+
+				"cluster name 'k0s' is shared with cluster-two")
+		assert.Equal(t, "one-token", cfg.BearerToken,
+			"context 'one' must use one's token even though "+
+				"user name 'root' is shared with cluster-two")
+	})
+
+	t.Run("two context resolves to two's server", func(t *testing.T) {
+		cfg, err := client.restConfigForContext("two")
+		assert.NoError(t, err)
+		assert.Equal(t, "https://two.example.test:6443", cfg.Host,
+			"context 'two' must route to cluster-two's server even though "+
+				"cluster name 'k0s' is shared with cluster-one")
+		assert.Equal(t, "two-token", cfg.BearerToken,
+			"context 'two' must use two's token even though "+
+				"user name 'root' is shared with cluster-one")
+	})
+
+	t.Run("KubeconfigPathForContext returns the per-context source file", func(t *testing.T) {
+		// Subprocess invocations (kubectl, helm, port-forward) rely on this
+		// being the single source file so the merge bug doesn't recur.
+		assert.Equal(t, c1, client.KubeconfigPathForContext("one"))
+		assert.Equal(t, c2, client.KubeconfigPathForContext("two"))
+	})
+
+	t.Run("KubeconfigPathForContext caches lookups", func(t *testing.T) {
+		// Second call must still resolve correctly after the first populated
+		// the contextOrigin cache. Catches regressions where the cache key or
+		// value is wrong.
+		assert.Equal(t, c1, client.KubeconfigPathForContext("one"))
+		assert.Equal(t, c2, client.KubeconfigPathForContext("two"))
+	})
+}
+
+// TestMultiKubeconfigIdenticalContextNames verifies that when several
+// kubeconfig files declare the *same* context name (so the user can't
+// distinguish them by name alone), every file is still surfaced as a
+// selectable, disambiguated context. Reproduces the second half of issue #23,
+// where ~/.kube/config.d/{dev-envs,itg-k8s,prod-envs}.yaml all declared
+// context "dev"/cluster "dev"/user "dev" pointing at distinct servers, so
+// clientcmd's first-writer-wins merge made only one "dev" visible and routed
+// every drill-down to the first file's cluster.
+func TestMultiKubeconfigIdenticalContextNames(t *testing.T) {
+	tmp := t.TempDir()
+	// Isolate HOME so the developer's real ~/.kube/config and
+	// ~/.kube/config.d/* don't get merged into the test's loading rules and
+	// pollute the visible context list.
+	t.Setenv("HOME", tmp)
+
+	dev := filepath.Join(tmp, "dev-envs.yaml")
+	itg := filepath.Join(tmp, "itg-k8s.yaml")
+	prod := filepath.Join(tmp, "prod-envs.yaml")
+	for path, server := range map[string]string{
+		dev:  "https://dev.example.test:6443",
+		itg:  "https://itg.example.test:6443",
+		prod: "https://prod.example.test:6443",
+	} {
+		assert.NoError(t, os.WriteFile(path, fmt.Appendf(nil, `apiVersion: v1
+kind: Config
+current-context: dev
+clusters:
+- name: dev
+  cluster:
+    server: %s
+    insecure-skip-tls-verify: true
+contexts:
+- name: dev
+  context:
+    cluster: dev
+    user: dev
+users:
+- name: dev
+  user:
+    token: %s-token
+`, server, filepath.Base(path)), 0o600))
+	}
+
+	t.Setenv("KUBECONFIG",
+		dev+string(os.PathListSeparator)+itg+string(os.PathListSeparator)+prod)
+
+	client, err := NewClient("")
+	assert.NoError(t, err)
+	assert.NotNil(t, client)
+
+	t.Run("all three contexts appear with disambiguated display names", func(t *testing.T) {
+		ctxs, err := client.GetContexts()
+		assert.NoError(t, err)
+		got := make([]string, 0, len(ctxs))
+		for _, c := range ctxs {
+			got = append(got, c.Name)
+		}
+		// One entry per source file is required — three files, three entries.
+		assert.Len(t, got, 3, "got contexts: %v", got)
+		// Each file must be addressable; the suffix encodes the source file.
+		assertContains := func(needle string) {
+			for _, name := range got {
+				if strings.Contains(name, needle) {
+					return
+				}
+			}
+			t.Errorf("no context display name contains %q; got: %v", needle, got)
+		}
+		assertContains("dev-envs")
+		assertContains("itg-k8s")
+		assertContains("prod-envs")
+	})
+
+	t.Run("each disambiguated context routes to its own server", func(t *testing.T) {
+		ctxs, _ := client.GetContexts()
+		// Build a name → expected-server expectation by parsing the source-file
+		// hint embedded in the display name.
+		for _, c := range ctxs {
+			var expected string
+			switch {
+			case strings.Contains(c.Name, "dev-envs"):
+				expected = "https://dev.example.test:6443"
+			case strings.Contains(c.Name, "itg-k8s"):
+				expected = "https://itg.example.test:6443"
+			case strings.Contains(c.Name, "prod-envs"):
+				expected = "https://prod.example.test:6443"
+			default:
+				t.Fatalf("unexpected context name %q", c.Name)
+			}
+
+			cfg, err := client.restConfigForContext(c.Name)
+			assert.NoError(t, err, "restConfigForContext(%q)", c.Name)
+			assert.Equal(t, expected, cfg.Host,
+				"context %q must route to its own file's server", c.Name)
+		}
+	})
+
+	t.Run("OriginalContextName recovers the kubectl --context value", func(t *testing.T) {
+		ctxs, _ := client.GetContexts()
+		// Every disambiguated display name maps back to the literal "dev" that
+		// kubectl sees in the underlying kubeconfig file.
+		for _, c := range ctxs {
+			assert.Equal(t, "dev", client.OriginalContextName(c.Name),
+				"display name %q must translate to kubectl context 'dev'", c.Name)
+		}
+	})
+
+	t.Run("KubeconfigPathForContext returns the matching source file", func(t *testing.T) {
+		ctxs, _ := client.GetContexts()
+		for _, c := range ctxs {
+			path := client.KubeconfigPathForContext(c.Name)
+			switch {
+			case strings.Contains(c.Name, "dev-envs"):
+				assert.Equal(t, dev, path)
+			case strings.Contains(c.Name, "itg-k8s"):
+				assert.Equal(t, itg, path)
+			case strings.Contains(c.Name, "prod-envs"):
+				assert.Equal(t, prod, path)
+			}
+		}
+	})
+}
+
+// TestKubeconfigOverlapPermutations is a matrix test that exercises every
+// reasonable combination of context-name, cluster-name, and user-name overlap
+// across one or more kubeconfig files. Each row builds a fresh KUBECONFIG
+// loadout, asserts the visible-context list, and verifies that every
+// disambiguated context resolves to its own server/token through the
+// in-process API.
+//
+// Why this exists: issue #23 surfaced two distinct merge problems
+// (cluster/user collision with distinct contexts; full-collision with
+// identical contexts). Spelling out the permutations makes it harder for a
+// future refactor to silently regress on any of them.
+func TestKubeconfigOverlapPermutations(t *testing.T) {
+	type fileSpec struct {
+		filename       string
+		contextName    string
+		clusterName    string
+		userName       string
+		server         string
+		token          string
+		currentContext string
+	}
+
+	type expected struct {
+		// hint is a substring that must appear in the disambiguated display
+		// name; "" means "name must equal contextName exactly".
+		hint   string
+		server string
+		token  string
+		// kubectl is the name we must emit for kubectl --context (the
+		// original kubeconfig context name).
+		kubectl string
+	}
+
+	tests := []struct {
+		name   string
+		files  []fileSpec
+		expect []expected
+	}{
+		{
+			name: "single file, multiple distinct contexts",
+			files: []fileSpec{
+				{
+					filename:       "all.yaml",
+					contextName:    "alpha",
+					clusterName:    "cluster-a",
+					userName:       "user-a",
+					server:         "https://a.example.test:6443",
+					token:          "a-token",
+					currentContext: "alpha",
+				},
+				// A second file simulating a multi-context single config by
+				// referencing a separate cluster/user from another source. We
+				// represent the "single file, multiple contexts" idea
+				// via a second cleanly-distinct file because YAML can't have
+				// two top-level Configs in one stream — what matters is that
+				// no name collides.
+				{
+					filename:    "extra.yaml",
+					contextName: "beta",
+					clusterName: "cluster-b",
+					userName:    "user-b",
+					server:      "https://b.example.test:6443",
+					token:       "b-token",
+				},
+			},
+			expect: []expected{
+				{server: "https://a.example.test:6443", token: "a-token", kubectl: "alpha"},
+				{server: "https://b.example.test:6443", token: "b-token", kubectl: "beta"},
+			},
+		},
+		{
+			name: "context overlap only (clusters and users distinct)",
+			files: []fileSpec{
+				{filename: "a.yaml", contextName: "ctx", clusterName: "cluster-a", userName: "user-a", server: "https://a.example.test:6443", token: "a-token", currentContext: "ctx"},
+				{filename: "b.yaml", contextName: "ctx", clusterName: "cluster-b", userName: "user-b", server: "https://b.example.test:6443", token: "b-token"},
+			},
+			expect: []expected{
+				{hint: "a", server: "https://a.example.test:6443", token: "a-token", kubectl: "ctx"},
+				{hint: "b", server: "https://b.example.test:6443", token: "b-token", kubectl: "ctx"},
+			},
+		},
+		{
+			name: "cluster overlap only (contexts and users distinct)",
+			files: []fileSpec{
+				{filename: "a.yaml", contextName: "alpha", clusterName: "shared", userName: "user-a", server: "https://a.example.test:6443", token: "a-token", currentContext: "alpha"},
+				{filename: "b.yaml", contextName: "beta", clusterName: "shared", userName: "user-b", server: "https://b.example.test:6443", token: "b-token"},
+			},
+			expect: []expected{
+				{server: "https://a.example.test:6443", token: "a-token", kubectl: "alpha"},
+				{server: "https://b.example.test:6443", token: "b-token", kubectl: "beta"},
+			},
+		},
+		{
+			name: "user overlap only (contexts and clusters distinct)",
+			files: []fileSpec{
+				{filename: "a.yaml", contextName: "alpha", clusterName: "cluster-a", userName: "shared", server: "https://a.example.test:6443", token: "a-token", currentContext: "alpha"},
+				{filename: "b.yaml", contextName: "beta", clusterName: "cluster-b", userName: "shared", server: "https://b.example.test:6443", token: "b-token"},
+			},
+			expect: []expected{
+				{server: "https://a.example.test:6443", token: "a-token", kubectl: "alpha"},
+				{server: "https://b.example.test:6443", token: "b-token", kubectl: "beta"},
+			},
+		},
+		{
+			name: "all three overlap, three files (issue #23 main case)",
+			files: []fileSpec{
+				{filename: "dev-envs.yaml", contextName: "dev", clusterName: "k0s", userName: "root", server: "https://dev.example.test:6443", token: "dev-token", currentContext: "dev"},
+				{filename: "itg-k8s.yaml", contextName: "dev", clusterName: "k0s", userName: "root", server: "https://itg.example.test:6443", token: "itg-token"},
+				{filename: "prod-envs.yaml", contextName: "dev", clusterName: "k0s", userName: "root", server: "https://prod.example.test:6443", token: "prod-token"},
+			},
+			expect: []expected{
+				{hint: "dev-envs", server: "https://dev.example.test:6443", token: "dev-token", kubectl: "dev"},
+				{hint: "itg-k8s", server: "https://itg.example.test:6443", token: "itg-token", kubectl: "dev"},
+				{hint: "prod-envs", server: "https://prod.example.test:6443", token: "prod-token", kubectl: "dev"},
+			},
+		},
+		{
+			name: "cluster + user overlap with distinct contexts",
+			files: []fileSpec{
+				{filename: "a.yaml", contextName: "alpha", clusterName: "k0s", userName: "root", server: "https://a.example.test:6443", token: "a-token", currentContext: "alpha"},
+				{filename: "b.yaml", contextName: "beta", clusterName: "k0s", userName: "root", server: "https://b.example.test:6443", token: "b-token"},
+			},
+			expect: []expected{
+				{server: "https://a.example.test:6443", token: "a-token", kubectl: "alpha"},
+				{server: "https://b.example.test:6443", token: "b-token", kubectl: "beta"},
+			},
+		},
+		{
+			name: "context + cluster overlap, distinct users",
+			files: []fileSpec{
+				{filename: "a.yaml", contextName: "ctx", clusterName: "k0s", userName: "user-a", server: "https://a.example.test:6443", token: "a-token", currentContext: "ctx"},
+				{filename: "b.yaml", contextName: "ctx", clusterName: "k0s", userName: "user-b", server: "https://b.example.test:6443", token: "b-token"},
+			},
+			expect: []expected{
+				{hint: "a", server: "https://a.example.test:6443", token: "a-token", kubectl: "ctx"},
+				{hint: "b", server: "https://b.example.test:6443", token: "b-token", kubectl: "ctx"},
+			},
+		},
+		{
+			name: "context + user overlap, distinct clusters",
+			files: []fileSpec{
+				{filename: "a.yaml", contextName: "ctx", clusterName: "cluster-a", userName: "root", server: "https://a.example.test:6443", token: "a-token", currentContext: "ctx"},
+				{filename: "b.yaml", contextName: "ctx", clusterName: "cluster-b", userName: "root", server: "https://b.example.test:6443", token: "b-token"},
+			},
+			expect: []expected{
+				{hint: "a", server: "https://a.example.test:6443", token: "a-token", kubectl: "ctx"},
+				{hint: "b", server: "https://b.example.test:6443", token: "b-token", kubectl: "ctx"},
+			},
+		},
+		{
+			name: "mixed: one shared name, one distinct",
+			files: []fileSpec{
+				{filename: "a.yaml", contextName: "shared", clusterName: "cluster-a", userName: "user-a", server: "https://a.example.test:6443", token: "a-token", currentContext: "shared"},
+				{filename: "b.yaml", contextName: "shared", clusterName: "cluster-b", userName: "user-b", server: "https://b.example.test:6443", token: "b-token"},
+				{filename: "c.yaml", contextName: "unique", clusterName: "cluster-c", userName: "user-c", server: "https://c.example.test:6443", token: "c-token"},
+			},
+			expect: []expected{
+				{hint: "a", server: "https://a.example.test:6443", token: "a-token", kubectl: "shared"},
+				{hint: "b", server: "https://b.example.test:6443", token: "b-token", kubectl: "shared"},
+				{server: "https://c.example.test:6443", token: "c-token", kubectl: "unique"},
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tmp := t.TempDir()
+			t.Setenv("HOME", tmp)
+
+			paths := make([]string, 0, len(tt.files))
+			for _, f := range tt.files {
+				path := filepath.Join(tmp, f.filename)
+				current := ""
+				if f.currentContext != "" {
+					current = "current-context: " + f.currentContext + "\n"
+				}
+				body := fmt.Sprintf(`apiVersion: v1
+kind: Config
+%sclusters:
+- name: %s
+  cluster:
+    server: %s
+    insecure-skip-tls-verify: true
+contexts:
+- name: %s
+  context:
+    cluster: %s
+    user: %s
+users:
+- name: %s
+  user:
+    token: %s
+`, current, f.clusterName, f.server, f.contextName, f.clusterName, f.userName, f.userName, f.token)
+				assert.NoError(t, os.WriteFile(path, []byte(body), 0o600))
+				paths = append(paths, path)
+			}
+
+			t.Setenv("KUBECONFIG", strings.Join(paths, string(os.PathListSeparator)))
+
+			client, err := NewClient("")
+			assert.NoError(t, err)
+			assert.NotNil(t, client)
+
+			ctxs, err := client.GetContexts()
+			assert.NoError(t, err)
+			assert.Len(t, ctxs, len(tt.expect),
+				"context count mismatch; visible names: %v", ctxNames(ctxs))
+
+			// Build a map of expected outcomes keyed by the disambiguating
+			// hint so the assertions are order-independent.
+			matched := make(map[string]bool, len(ctxs))
+			for _, want := range tt.expect {
+				display := findDisplayName(t, ctxs, want.hint, want.kubectl)
+				if display == "" {
+					t.Fatalf("no context matched hint=%q kubectl=%q; got: %v", want.hint, want.kubectl, ctxNames(ctxs))
+				}
+				matched[display] = true
+
+				cfg, err := client.restConfigForContext(display)
+				assert.NoError(t, err, "restConfigForContext(%q)", display)
+				assert.Equal(t, want.server, cfg.Host,
+					"context %q must route to %s", display, want.server)
+				assert.Equal(t, want.token, cfg.BearerToken,
+					"context %q must use the file's own token", display)
+				assert.Equal(t, want.kubectl, client.OriginalContextName(display),
+					"context %q must translate to kubectl --context %q", display, want.kubectl)
+			}
+			assert.Len(t, matched, len(ctxs),
+				"every visible context must be claimed exactly once by an expectation")
+		})
+	}
+}
+
+// ctxNames extracts the Name field from each item for diagnostic output.
+func ctxNames(items []model.Item) []string {
+	out := make([]string, len(items))
+	for i, it := range items {
+		out[i] = it.Name
+	}
+	return out
+}
+
+// findDisplayName picks the visible context that matches the given hint
+// (substring of the disambiguated name) and falls back to an exact match on
+// the original name when hint is empty (no collision was expected).
+func findDisplayName(t *testing.T, items []model.Item, hint, exactKubectlName string) string {
+	t.Helper()
+	if hint == "" {
+		// No collision expected — display name should equal kubectl name.
+		for _, it := range items {
+			if it.Name == exactKubectlName {
+				return it.Name
+			}
+		}
+		return ""
+	}
+	for _, it := range items {
+		if strings.Contains(it.Name, hint) {
+			return it.Name
+		}
+	}
+	return ""
+}
+
+// --- collectConfigDirPaths ---
+
+func TestCollectConfigDirPaths(t *testing.T) {
+	t.Run("regular directory returns contained files", func(t *testing.T) {
+		tmp := t.TempDir()
+		a := filepath.Join(tmp, "a.yaml")
+		b := filepath.Join(tmp, "b.yaml")
+		assert.NoError(t, os.WriteFile(a, []byte("{}"), 0o600))
+		assert.NoError(t, os.WriteFile(b, []byte("{}"), 0o600))
+
+		paths := collectConfigDirPaths(tmp)
+		assert.Len(t, paths, 2)
+	})
+
+	t.Run("symlink to directory is followed", func(t *testing.T) {
+		tmp := t.TempDir()
+		realDir := filepath.Join(tmp, "real-config-dir")
+		assert.NoError(t, os.MkdirAll(realDir, 0o755))
+		assert.NoError(t, os.WriteFile(filepath.Join(realDir, "cluster.yaml"), []byte("{}"), 0o600))
+
+		linkDir := filepath.Join(tmp, "config.d")
+		assert.NoError(t, os.Symlink(realDir, linkDir))
+
+		paths := collectConfigDirPaths(linkDir)
+		assert.Len(t, paths, 1, "symlink to directory should be followed")
+		// Every returned path must point to a real file, never the directory itself.
+		for _, p := range paths {
+			info, err := os.Stat(p)
+			assert.NoError(t, err)
+			assert.False(t, info.IsDir(), "returned path must not be a directory: %s", p)
+		}
+	})
+
+	t.Run("non-existent path returns empty", func(t *testing.T) {
+		tmp := t.TempDir()
+		paths := collectConfigDirPaths(filepath.Join(tmp, "nope"))
+		assert.Empty(t, paths)
+	})
+
+	t.Run("regular file at dir location returns empty", func(t *testing.T) {
+		tmp := t.TempDir()
+		notDir := filepath.Join(tmp, "not-dir")
+		assert.NoError(t, os.WriteFile(notDir, []byte("{}"), 0o600))
+
+		paths := collectConfigDirPaths(notDir)
+		assert.Empty(t, paths, "must not add a non-directory path")
+	})
+
+	t.Run("dangling symlink returns empty", func(t *testing.T) {
+		tmp := t.TempDir()
+		dangling := filepath.Join(tmp, "dangling")
+		assert.NoError(t, os.Symlink(filepath.Join(tmp, "missing"), dangling))
+
+		paths := collectConfigDirPaths(dangling)
+		assert.Empty(t, paths)
+	})
+
+	t.Run("nested files are discovered recursively", func(t *testing.T) {
+		tmp := t.TempDir()
+		sub := filepath.Join(tmp, "sub")
+		assert.NoError(t, os.MkdirAll(sub, 0o755))
+		assert.NoError(t, os.WriteFile(filepath.Join(tmp, "top.yaml"), []byte("{}"), 0o600))
+		assert.NoError(t, os.WriteFile(filepath.Join(sub, "nested.yaml"), []byte("{}"), 0o600))
+
+		paths := collectConfigDirPaths(tmp)
+		assert.Len(t, paths, 2)
 	})
 }
 

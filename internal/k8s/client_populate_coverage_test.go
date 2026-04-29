@@ -13,32 +13,32 @@ import (
 // --- Pod status override branches (not covered by existing tests) ---
 
 func TestPopulate_PodInitContainerFailureOverride(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"containers": []interface{}{
-				map[string]interface{}{"name": "app"},
+	obj := map[string]any{
+		"spec": map[string]any{
+			"containers": []any{
+				map[string]any{"name": "app"},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"phase": "Pending",
-			"containerStatuses": []interface{}{
-				map[string]interface{}{
+			"containerStatuses": []any{
+				map[string]any{
 					"name":         "app",
 					"ready":        false,
 					"restartCount": float64(0),
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "PodInitializing",
 						},
 					},
 				},
 			},
-			"initContainerStatuses": []interface{}{
-				map[string]interface{}{
+			"initContainerStatuses": []any{
+				map[string]any{
 					"name":  "init",
 					"ready": false,
-					"state": map[string]interface{}{
-						"terminated": map[string]interface{}{
+					"state": map[string]any{
+						"terminated": map[string]any{
 							"reason": "Error",
 						},
 					},
@@ -52,22 +52,22 @@ func TestPopulate_PodInitContainerFailureOverride(t *testing.T) {
 }
 
 func TestPopulate_PodRunningNotReadyBecomesNotReady(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"containers": []interface{}{
-				map[string]interface{}{"name": "app"},
-				map[string]interface{}{"name": "sidecar"},
+	obj := map[string]any{
+		"spec": map[string]any{
+			"containers": []any{
+				map[string]any{"name": "app"},
+				map[string]any{"name": "sidecar"},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"phase": "Running",
-			"containerStatuses": []interface{}{
-				map[string]interface{}{
+			"containerStatuses": []any{
+				map[string]any{
 					"name":         "app",
 					"ready":        true,
 					"restartCount": float64(0),
 				},
-				map[string]interface{}{
+				map[string]any{
 					"name":         "sidecar",
 					"ready":        false,
 					"restartCount": float64(0),
@@ -81,16 +81,16 @@ func TestPopulate_PodRunningNotReadyBecomesNotReady(t *testing.T) {
 }
 
 func TestPopulate_PodSucceededKeepsStatus(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"containers": []interface{}{
-				map[string]interface{}{"name": "app"},
+	obj := map[string]any{
+		"spec": map[string]any{
+			"containers": []any{
+				map[string]any{"name": "app"},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"phase": "Succeeded",
-			"containerStatuses": []interface{}{
-				map[string]interface{}{
+			"containerStatuses": []any{
+				map[string]any{
 					"name":         "app",
 					"ready":        false,
 					"restartCount": float64(0),
@@ -104,32 +104,32 @@ func TestPopulate_PodSucceededKeepsStatus(t *testing.T) {
 }
 
 func TestPopulate_PodFailedPreferredOverPodInitializing(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"containers": []interface{}{
-				map[string]interface{}{"name": "app"},
+	obj := map[string]any{
+		"spec": map[string]any{
+			"containers": []any{
+				map[string]any{"name": "app"},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"phase": "Failed",
-			"containerStatuses": []interface{}{
-				map[string]interface{}{
+			"containerStatuses": []any{
+				map[string]any{
 					"name":         "app",
 					"ready":        false,
 					"restartCount": float64(0),
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "PodInitializing",
 						},
 					},
 				},
 			},
-			"initContainerStatuses": []interface{}{
-				map[string]interface{}{
+			"initContainerStatuses": []any{
+				map[string]any{
 					"name":  "init",
 					"ready": false,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "PodInitializing",
 						},
 					},
@@ -145,10 +145,10 @@ func TestPopulate_PodFailedPreferredOverPodInitializing(t *testing.T) {
 }
 
 func TestPopulate_PodNilStatusReturnsEarly(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"containers": []interface{}{
-				map[string]interface{}{"name": "app"},
+	obj := map[string]any{
+		"spec": map[string]any{
+			"containers": []any{
+				map[string]any{"name": "app"},
 			},
 		},
 	}
@@ -158,15 +158,15 @@ func TestPopulate_PodNilStatusReturnsEarly(t *testing.T) {
 }
 
 func TestPopulate_PodRestartCountInt64(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"containers": []interface{}{
-				map[string]interface{}{"name": "app"},
+	obj := map[string]any{
+		"spec": map[string]any{
+			"containers": []any{
+				map[string]any{"name": "app"},
 			},
 		},
-		"status": map[string]interface{}{
-			"containerStatuses": []interface{}{
-				map[string]interface{}{
+		"status": map[string]any{
+			"containerStatuses": []any{
+				map[string]any{
 					"name":         "app",
 					"ready":        true,
 					"restartCount": int64(5),
@@ -182,14 +182,14 @@ func TestPopulate_PodRestartCountInt64(t *testing.T) {
 // --- Service: additional branches ---
 
 func TestPopulate_ServiceLoadBalancerHostname(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"type": "LoadBalancer",
 		},
-		"status": map[string]interface{}{
-			"loadBalancer": map[string]interface{}{
-				"ingress": []interface{}{
-					map[string]interface{}{"hostname": "my-lb.example.com"},
+		"status": map[string]any{
+			"loadBalancer": map[string]any{
+				"ingress": []any{
+					map[string]any{"hostname": "my-lb.example.com"},
 				},
 			},
 		},
@@ -202,10 +202,10 @@ func TestPopulate_ServiceLoadBalancerHostname(t *testing.T) {
 }
 
 func TestPopulate_ServiceExternalIPs(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"type":        "ClusterIP",
-			"externalIPs": []interface{}{"1.2.3.4", "5.6.7.8"},
+			"externalIPs": []any{"1.2.3.4", "5.6.7.8"},
 		},
 	}
 	ti := model.Item{}
@@ -217,8 +217,8 @@ func TestPopulate_ServiceExternalIPs(t *testing.T) {
 }
 
 func TestPopulate_ServiceSessionAffinityClientIP(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"type":            "ClusterIP",
 			"sessionAffinity": "ClientIP",
 		},
@@ -231,8 +231,8 @@ func TestPopulate_ServiceSessionAffinityClientIP(t *testing.T) {
 }
 
 func TestPopulate_ServiceSessionAffinityNoneOmitted(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"type":            "ClusterIP",
 			"sessionAffinity": "None",
 		},
@@ -246,7 +246,7 @@ func TestPopulate_ServiceSessionAffinityNoneOmitted(t *testing.T) {
 }
 
 func TestPopulate_ServiceNilSpec(t *testing.T) {
-	obj := map[string]interface{}{}
+	obj := map[string]any{}
 	ti := model.Item{}
 	populateResourceDetails(&ti, obj, "Service")
 	assert.Empty(t, ti.Columns)
@@ -255,12 +255,12 @@ func TestPopulate_ServiceNilSpec(t *testing.T) {
 // --- Ingress: additional branches ---
 
 func TestPopulate_IngressDefaultBackendPortNumber(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"defaultBackend": map[string]interface{}{
-				"service": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"defaultBackend": map[string]any{
+				"service": map[string]any{
 					"name": "backend-svc",
-					"port": map[string]interface{}{
+					"port": map[string]any{
 						"number": float64(8080),
 					},
 				},
@@ -275,12 +275,12 @@ func TestPopulate_IngressDefaultBackendPortNumber(t *testing.T) {
 }
 
 func TestPopulate_IngressDefaultBackendPortName(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"defaultBackend": map[string]interface{}{
-				"service": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"defaultBackend": map[string]any{
+				"service": map[string]any{
 					"name": "api-svc",
-					"port": map[string]interface{}{
+					"port": map[string]any{
 						"name": "http",
 					},
 				},
@@ -295,10 +295,10 @@ func TestPopulate_IngressDefaultBackendPortName(t *testing.T) {
 }
 
 func TestPopulate_IngressDefaultBackendNoPort(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"defaultBackend": map[string]interface{}{
-				"service": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"defaultBackend": map[string]any{
+				"service": map[string]any{
 					"name": "simple-svc",
 				},
 			},
@@ -312,23 +312,23 @@ func TestPopulate_IngressDefaultBackendNoPort(t *testing.T) {
 }
 
 func TestPopulate_IngressTLSAndURL(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"rules": []interface{}{
-				map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"rules": []any{
+				map[string]any{
 					"host": "app.example.com",
-					"http": map[string]interface{}{
-						"paths": []interface{}{
-							map[string]interface{}{
+					"http": map[string]any{
+						"paths": []any{
+							map[string]any{
 								"path": "/api",
 							},
 						},
 					},
 				},
 			},
-			"tls": []interface{}{
-				map[string]interface{}{
-					"hosts": []interface{}{"app.example.com"},
+			"tls": []any{
+				map[string]any{
+					"hosts": []any{"app.example.com"},
 				},
 			},
 		},
@@ -342,10 +342,10 @@ func TestPopulate_IngressTLSAndURL(t *testing.T) {
 }
 
 func TestPopulate_IngressHTTPUrlNoTLS(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"rules": []interface{}{
-				map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"rules": []any{
+				map[string]any{
 					"host": "plain.example.com",
 				},
 			},
@@ -359,12 +359,12 @@ func TestPopulate_IngressHTTPUrlNoTLS(t *testing.T) {
 }
 
 func TestPopulate_IngressLBHostname(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{},
-		"status": map[string]interface{}{
-			"loadBalancer": map[string]interface{}{
-				"ingress": []interface{}{
-					map[string]interface{}{"hostname": "lb.aws.com"},
+	obj := map[string]any{
+		"spec": map[string]any{},
+		"status": map[string]any{
+			"loadBalancer": map[string]any{
+				"ingress": []any{
+					map[string]any{"hostname": "lb.aws.com"},
 				},
 			},
 		},
@@ -379,8 +379,8 @@ func TestPopulate_IngressLBHostname(t *testing.T) {
 // --- ConfigMap ---
 
 func TestPopulate_ConfigMapData(t *testing.T) {
-	obj := map[string]interface{}{
-		"data": map[string]interface{}{
+	obj := map[string]any{
+		"data": map[string]any{
 			"config.yaml": "key: value\n",
 			"app.conf":    "setting=1",
 		},
@@ -396,9 +396,9 @@ func TestPopulate_ConfigMapData(t *testing.T) {
 // --- Secret ---
 
 func TestPopulate_SecretBase64(t *testing.T) {
-	obj := map[string]interface{}{
+	obj := map[string]any{
 		"type": "Opaque",
-		"data": map[string]interface{}{
+		"data": map[string]any{
 			"password": base64.StdEncoding.EncodeToString([]byte("s3cr3t")),
 		},
 	}
@@ -411,9 +411,9 @@ func TestPopulate_SecretBase64(t *testing.T) {
 }
 
 func TestPopulate_SecretInvalidBase64Skipped(t *testing.T) {
-	obj := map[string]interface{}{
+	obj := map[string]any{
 		"type": "Opaque",
-		"data": map[string]interface{}{
+		"data": map[string]any{
 			"broken": "!!!not-valid-base64!!!",
 		},
 	}
@@ -428,35 +428,35 @@ func TestPopulate_SecretInvalidBase64Skipped(t *testing.T) {
 // --- Node ---
 
 func TestPopulate_NodeRolesAndTaints(t *testing.T) {
-	obj := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"labels": map[string]interface{}{
+	obj := map[string]any{
+		"metadata": map[string]any{
+			"labels": map[string]any{
 				"node-role.kubernetes.io/control-plane": "",
 				"node-role.kubernetes.io/worker":        "",
 			},
 		},
-		"spec": map[string]interface{}{
-			"taints": []interface{}{
-				map[string]interface{}{
+		"spec": map[string]any{
+			"taints": []any{
+				map[string]any{
 					"key":    "node-role.kubernetes.io/control-plane",
 					"effect": "NoSchedule",
 				},
-				map[string]interface{}{
+				map[string]any{
 					"key":    "dedicated",
 					"value":  "gpu",
 					"effect": "NoExecute",
 				},
 			},
 		},
-		"status": map[string]interface{}{
-			"addresses": []interface{}{
-				map[string]interface{}{"type": "InternalIP", "address": "10.0.0.5"},
+		"status": map[string]any{
+			"addresses": []any{
+				map[string]any{"type": "InternalIP", "address": "10.0.0.5"},
 			},
-			"allocatable": map[string]interface{}{
+			"allocatable": map[string]any{
 				"cpu":    "4",
 				"memory": "8Gi",
 			},
-			"nodeInfo": map[string]interface{}{
+			"nodeInfo": map[string]any{
 				"kubeletVersion":          "v1.29.0",
 				"osImage":                 "Ubuntu 22.04",
 				"containerRuntimeVersion": "containerd://1.7.2",
@@ -479,13 +479,13 @@ func TestPopulate_NodeRolesAndTaints(t *testing.T) {
 }
 
 func TestPopulate_NodeEmptyRoleSuffix(t *testing.T) {
-	obj := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"labels": map[string]interface{}{
+	obj := map[string]any{
+		"metadata": map[string]any{
+			"labels": map[string]any{
 				"node-role.kubernetes.io/": "",
 			},
 		},
-		"status": map[string]interface{}{},
+		"status": map[string]any{},
 	}
 	ti := model.Item{}
 	populateResourceDetails(&ti, obj, "Node")
@@ -498,21 +498,21 @@ func TestPopulate_NodeEmptyRoleSuffix(t *testing.T) {
 // --- PVC ---
 
 func TestPopulate_PVCBound(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"resources": map[string]interface{}{
-				"requests": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"resources": map[string]any{
+				"requests": map[string]any{
 					"storage": "10Gi",
 				},
 			},
 			"volumeName":       "pv-123",
-			"accessModes":      []interface{}{"ReadWriteOnce"},
+			"accessModes":      []any{"ReadWriteOnce"},
 			"storageClassName": "standard",
 			"volumeMode":       "Filesystem",
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"phase": "Bound",
-			"capacity": map[string]interface{}{
+			"capacity": map[string]any{
 				"storage": "10Gi",
 			},
 		},
@@ -533,12 +533,12 @@ func TestPopulate_PVCBound(t *testing.T) {
 // --- CronJob ---
 
 func TestPopulate_CronJobFields(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"schedule": "*/5 * * * *",
 			"suspend":  false,
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"lastScheduleTime": "2026-03-22T10:00:00Z",
 		},
 	}
@@ -554,8 +554,8 @@ func TestPopulate_CronJobFields(t *testing.T) {
 // --- Job ---
 
 func TestPopulate_JobZeroFailuresOmitted(t *testing.T) {
-	obj := map[string]interface{}{
-		"status": map[string]interface{}{
+	obj := map[string]any{
+		"status": map[string]any{
 			"failed":    float64(0),
 			"succeeded": float64(1),
 		},
@@ -571,34 +571,34 @@ func TestPopulate_JobZeroFailuresOmitted(t *testing.T) {
 // --- HPA: additional metric type branches ---
 
 func TestPopulate_HPAPodsMetric(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"maxReplicas": float64(5),
-			"metrics": []interface{}{
-				map[string]interface{}{
+			"metrics": []any{
+				map[string]any{
 					"type": "Pods",
-					"pods": map[string]interface{}{
-						"metric": map[string]interface{}{
+					"pods": map[string]any{
+						"metric": map[string]any{
 							"name": "requests_per_second",
 						},
-						"target": map[string]interface{}{
+						"target": map[string]any{
 							"averageValue": "100",
 						},
 					},
 				},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentReplicas": float64(3),
 			"desiredReplicas": float64(3),
-			"currentMetrics": []interface{}{
-				map[string]interface{}{
+			"currentMetrics": []any{
+				map[string]any{
 					"type": "Pods",
-					"pods": map[string]interface{}{
-						"metric": map[string]interface{}{
+					"pods": map[string]any{
+						"metric": map[string]any{
 							"name": "requests_per_second",
 						},
-						"current": map[string]interface{}{
+						"current": map[string]any{
 							"averageValue": "85",
 						},
 					},
@@ -615,24 +615,24 @@ func TestPopulate_HPAPodsMetric(t *testing.T) {
 }
 
 func TestPopulate_HPAObjectMetric(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"maxReplicas": float64(10),
-			"metrics": []interface{}{
-				map[string]interface{}{
+			"metrics": []any{
+				map[string]any{
 					"type": "Object",
-					"object": map[string]interface{}{
-						"metric": map[string]interface{}{
+					"object": map[string]any{
+						"metric": map[string]any{
 							"name": "queue_depth",
 						},
-						"target": map[string]interface{}{
+						"target": map[string]any{
 							"value": "50",
 						},
 					},
 				},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentReplicas": float64(1),
 			"desiredReplicas": float64(1),
 		},
@@ -645,17 +645,17 @@ func TestPopulate_HPAObjectMetric(t *testing.T) {
 }
 
 func TestPopulate_HPANonMapMetricSkipped(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"maxReplicas": float64(5),
-			"metrics": []interface{}{
+			"metrics": []any{
 				"not-a-map",
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentReplicas": float64(1),
 			"desiredReplicas": float64(1),
-			"currentMetrics": []interface{}{
+			"currentMetrics": []any{
 				"not-a-map",
 			},
 		},
@@ -666,15 +666,15 @@ func TestPopulate_HPANonMapMetricSkipped(t *testing.T) {
 }
 
 func TestPopulate_HPAScalingLimitedFalseIgnored(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"maxReplicas": float64(5),
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentReplicas": float64(1),
 			"desiredReplicas": float64(1),
-			"conditions": []interface{}{
-				map[string]interface{}{
+			"conditions": []any{
+				map[string]any{
 					"type":   "ScalingLimited",
 					"status": "False",
 				},
@@ -690,15 +690,15 @@ func TestPopulate_HPAScalingLimitedFalseIgnored(t *testing.T) {
 }
 
 func TestPopulate_HPAResourceAverageValue(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"maxReplicas": float64(5),
-			"metrics": []interface{}{
-				map[string]interface{}{
+			"metrics": []any{
+				map[string]any{
 					"type": "Resource",
-					"resource": map[string]interface{}{
+					"resource": map[string]any{
 						"name": "memory",
-						"target": map[string]interface{}{
+						"target": map[string]any{
 							"type":         "AverageValue",
 							"averageValue": "500Mi",
 						},
@@ -706,15 +706,15 @@ func TestPopulate_HPAResourceAverageValue(t *testing.T) {
 				},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentReplicas": float64(1),
 			"desiredReplicas": float64(1),
-			"currentMetrics": []interface{}{
-				map[string]interface{}{
+			"currentMetrics": []any{
+				map[string]any{
 					"type": "Resource",
-					"resource": map[string]interface{}{
+					"resource": map[string]any{
 						"name": "memory",
-						"current": map[string]interface{}{
+						"current": map[string]any{
 							"averageValue": "256Mi",
 						},
 					},
@@ -733,10 +733,10 @@ func TestPopulate_HPAResourceAverageValue(t *testing.T) {
 // --- Unknown kind falls through to ext ---
 
 func TestPopulate_UnknownKindFallsToExt(t *testing.T) {
-	obj := map[string]interface{}{
-		"status": map[string]interface{}{
-			"conditions": []interface{}{
-				map[string]interface{}{
+	obj := map[string]any{
+		"status": map[string]any{
+			"conditions": []any{
+				map[string]any{
 					"type":   "Ready",
 					"status": "True",
 				},

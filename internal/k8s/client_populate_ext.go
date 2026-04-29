@@ -12,7 +12,7 @@ import (
 // populateResourceDetailsExt handles extended resource kinds not covered by the core
 // populateResourceDetails switch: FluxCD, cert-manager, ArgoCD, Events, storage types,
 // RBAC-related types, and generic CRD fallback.
-func populateResourceDetailsExt(ti *model.Item, obj map[string]interface{}, kind string, status, spec map[string]interface{}) {
+func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string, status, spec map[string]any) {
 	switch kind {
 	case "Kustomization", "GitRepository", "HelmRepository", "HelmChart", "OCIRepository", "Bucket",
 		"Alert", "Provider", "Receiver", "ImageRepository", "ImagePolicy", "ImageUpdateAutomation":
@@ -51,6 +51,12 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]interface{}, kind
 	case "ServiceAccount":
 		populateServiceAccount(ti, obj)
 
+	case "Endpoints":
+		populateEndpoints(ti, obj)
+
+	case "EndpointSlice":
+		populateEndpointSlice(ti, obj)
+
 	case "PriorityClass":
 		if val, ok := spec["globalDefault"].(bool); ok && val {
 			ti.Name += " (default)"
@@ -66,8 +72,8 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]interface{}, kind
 }
 
 // populateFluxCDResource extracts conditions-based status for FluxCD resources.
-func populateFluxCDResource(ti *model.Item, obj map[string]interface{}, status map[string]interface{}) {
-	if spec, ok := obj["spec"].(map[string]interface{}); ok {
+func populateFluxCDResource(ti *model.Item, obj map[string]any, status map[string]any) {
+	if spec, ok := obj["spec"].(map[string]any); ok {
 		if suspended, ok := spec["suspend"].(bool); ok && suspended {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspended", Value: "True"})
 		}
@@ -77,7 +83,7 @@ func populateFluxCDResource(ti *model.Item, obj map[string]interface{}, status m
 	}
 	// Extract Ready condition; fall back to generic extraction when
 	// no Ready condition exists (e.g., helm.cattle.io HelmCharts).
-	if conditions, ok := status["conditions"].([]interface{}); ok {
+	if conditions, ok := status["conditions"].([]any); ok {
 		if !extractReadyCondition(ti, conditions) && len(conditions) > 0 {
 			extractGenericConditions(ti, conditions)
 		}
@@ -87,9 +93,9 @@ func populateFluxCDResource(ti *model.Item, obj map[string]interface{}, status m
 
 // extractReadyCondition finds and extracts the "Ready" condition from a conditions
 // array. Returns true if a Ready condition was found.
-func extractReadyCondition(ti *model.Item, conditions []interface{}) bool {
+func extractReadyCondition(ti *model.Item, conditions []any) bool {
 	for _, c := range conditions {
-		cond, ok := c.(map[string]interface{})
+		cond, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -118,13 +124,13 @@ func extractReadyCondition(ti *model.Item, conditions []interface{}) bool {
 }
 
 // populateFluxRevision extracts the last applied revision from FluxCD status.
-func populateFluxRevision(ti *model.Item, status map[string]interface{}) {
+func populateFluxRevision(ti *model.Item, status map[string]any) {
 	if rev, ok := status["lastAppliedRevision"].(string); ok && rev != "" {
 		if len(rev) > 12 {
 			rev = rev[:12]
 		}
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Revision", Value: rev})
-	} else if artifact, ok := status["artifact"].(map[string]interface{}); ok {
+	} else if artifact, ok := status["artifact"].(map[string]any); ok {
 		if rev, ok := artifact["revision"].(string); ok && rev != "" {
 			if len(rev) > 12 {
 				rev = rev[:12]
@@ -136,9 +142,9 @@ func populateFluxRevision(ti *model.Item, status map[string]interface{}) {
 
 // populateCertManagerResource extracts conditions-based status and certificate-specific
 // fields for cert-manager resources.
-func populateCertManagerResource(ti *model.Item, status, spec map[string]interface{}) {
+func populateCertManagerResource(ti *model.Item, status, spec map[string]any) {
 	if status != nil {
-		if conditions, ok := status["conditions"].([]interface{}); ok {
+		if conditions, ok := status["conditions"].([]any); ok {
 			extractReadyCondition(ti, conditions)
 		}
 		if notAfter, ok := status["notAfter"].(string); ok && notAfter != "" {
@@ -157,7 +163,7 @@ func populateCertManagerResource(ti *model.Item, status, spec map[string]interfa
 
 // populateArgoCDApplication extracts health, sync, operation state, conditions,
 // auto-sync, destination, and source information for ArgoCD Applications.
-func populateArgoCDApplication(ti *model.Item, _ map[string]interface{}, status, spec map[string]interface{}, kind string) {
+func populateArgoCDApplication(ti *model.Item, _ map[string]any, status, spec map[string]any, kind string) {
 	if status != nil {
 		populateArgoCDHealthAndSync(ti, status)
 		populateArgoCDOperationState(ti, status)
@@ -167,13 +173,13 @@ func populateArgoCDApplication(ti *model.Item, _ map[string]interface{}, status,
 }
 
 // populateArgoCDHealthAndSync extracts health message and sync revision from ArgoCD status.
-func populateArgoCDHealthAndSync(ti *model.Item, status map[string]interface{}) {
-	if health, ok := status["health"].(map[string]interface{}); ok {
+func populateArgoCDHealthAndSync(ti *model.Item, status map[string]any) {
+	if health, ok := status["health"].(map[string]any); ok {
 		if msg, ok := health["message"].(string); ok && msg != "" {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Health Message", Value: msg})
 		}
 	}
-	if sync, ok := status["sync"].(map[string]interface{}); ok {
+	if sync, ok := status["sync"].(map[string]any); ok {
 		if rev, ok := sync["revision"].(string); ok && rev != "" {
 			if len(rev) > 8 {
 				rev = rev[:8]
@@ -184,8 +190,8 @@ func populateArgoCDHealthAndSync(ti *model.Item, status map[string]interface{}) 
 }
 
 // populateArgoCDOperationState extracts operation state details from ArgoCD status.
-func populateArgoCDOperationState(ti *model.Item, status map[string]interface{}) {
-	opState, ok := status["operationState"].(map[string]interface{})
+func populateArgoCDOperationState(ti *model.Item, status map[string]any) {
+	opState, ok := status["operationState"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -208,18 +214,18 @@ func populateArgoCDOperationState(ti *model.Item, status map[string]interface{})
 }
 
 // populateArgoCDSyncErrors extracts sync errors from the operation state's syncResult.
-func populateArgoCDSyncErrors(ti *model.Item, opState map[string]interface{}) {
-	syncResult, ok := opState["syncResult"].(map[string]interface{})
+func populateArgoCDSyncErrors(ti *model.Item, opState map[string]any) {
+	syncResult, ok := opState["syncResult"].(map[string]any)
 	if !ok {
 		return
 	}
-	resources, ok := syncResult["resources"].([]interface{})
+	resources, ok := syncResult["resources"].([]any)
 	if !ok {
 		return
 	}
 	var errs []string
 	for _, r := range resources {
-		rMap, ok := r.(map[string]interface{})
+		rMap, ok := r.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -239,14 +245,14 @@ func populateArgoCDSyncErrors(ti *model.Item, opState map[string]interface{}) {
 }
 
 // populateArgoCDConditions extracts conditions from ArgoCD Application status.
-func populateArgoCDConditions(ti *model.Item, status map[string]interface{}) {
-	conditions, ok := status["conditions"].([]interface{})
+func populateArgoCDConditions(ti *model.Item, status map[string]any) {
+	conditions, ok := status["conditions"].([]any)
 	if !ok {
 		return
 	}
 	var condTypes []string
 	for _, c := range conditions {
-		cond, ok := c.(map[string]interface{})
+		cond, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -284,7 +290,7 @@ func populateArgoCDConditions(ti *model.Item, status map[string]interface{}) {
 }
 
 // populateArgoCDSpec extracts auto-sync, destination, and source info from ArgoCD spec.
-func populateArgoCDSpec(ti *model.Item, spec map[string]interface{}, kind string) {
+func populateArgoCDSpec(ti *model.Item, spec map[string]any, kind string) {
 	if spec == nil {
 		return
 	}
@@ -292,7 +298,7 @@ func populateArgoCDSpec(ti *model.Item, spec map[string]interface{}, kind string
 	if kind == "Application" {
 		populateArgoCDAutoSync(ti, spec)
 	}
-	if dest, ok := spec["destination"].(map[string]interface{}); ok {
+	if dest, ok := spec["destination"].(map[string]any); ok {
 		if ns, ok := dest["namespace"].(string); ok && ns != "" {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Dest NS", Value: ns})
 		}
@@ -300,7 +306,7 @@ func populateArgoCDSpec(ti *model.Item, spec map[string]interface{}, kind string
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Dest Server", Value: server})
 		}
 	}
-	if source, ok := spec["source"].(map[string]interface{}); ok {
+	if source, ok := spec["source"].(map[string]any); ok {
 		if repo, ok := source["repoURL"].(string); ok && repo != "" {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Repo", Value: repo})
 		}
@@ -311,10 +317,10 @@ func populateArgoCDSpec(ti *model.Item, spec map[string]interface{}, kind string
 }
 
 // populateArgoCDAutoSync extracts the auto-sync configuration from ArgoCD spec.
-func populateArgoCDAutoSync(ti *model.Item, spec map[string]interface{}) {
+func populateArgoCDAutoSync(ti *model.Item, spec map[string]any) {
 	autoSyncVal := "Off"
-	if syncPolicy, ok := spec["syncPolicy"].(map[string]interface{}); ok {
-		if automated, ok := syncPolicy["automated"].(map[string]interface{}); ok && automated != nil {
+	if syncPolicy, ok := spec["syncPolicy"].(map[string]any); ok {
+		if automated, ok := syncPolicy["automated"].(map[string]any); ok && automated != nil {
 			autoSyncVal = "On"
 			if sh, ok := automated["selfHeal"].(bool); ok && sh {
 				autoSyncVal += "/SH"
@@ -328,9 +334,9 @@ func populateArgoCDAutoSync(ti *model.Item, spec map[string]interface{}) {
 }
 
 // populateIngressClass handles IngressClass resources.
-func populateIngressClass(ti *model.Item, obj map[string]interface{}) {
-	metadata, _ := obj["metadata"].(map[string]interface{})
-	annotations, _ := metadata["annotations"].(map[string]interface{})
+func populateIngressClass(ti *model.Item, obj map[string]any) {
+	metadata, _ := obj["metadata"].(map[string]any)
+	annotations, _ := metadata["annotations"].(map[string]any)
 	if val, ok := annotations["ingressclass.kubernetes.io/is-default-class"].(string); ok && val == "true" {
 		ti.Name += " (default)"
 		ti.Status = "default"
@@ -338,9 +344,9 @@ func populateIngressClass(ti *model.Item, obj map[string]interface{}) {
 }
 
 // populateStorageClass handles StorageClass resources.
-func populateStorageClass(ti *model.Item, obj map[string]interface{}) {
-	metadata, _ := obj["metadata"].(map[string]interface{})
-	annotations, _ := metadata["annotations"].(map[string]interface{})
+func populateStorageClass(ti *model.Item, obj map[string]any) {
+	metadata, _ := obj["metadata"].(map[string]any)
+	annotations, _ := metadata["annotations"].(map[string]any)
 	if val, ok := annotations["storageclass.kubernetes.io/is-default-class"].(string); ok && val == "true" {
 		ti.Name += " (default)"
 		ti.Status = "default"
@@ -360,9 +366,9 @@ func populateStorageClass(ti *model.Item, obj map[string]interface{}) {
 }
 
 // populateServiceAccount handles ServiceAccount resources.
-func populateServiceAccount(ti *model.Item, obj map[string]interface{}) {
+func populateServiceAccount(ti *model.Item, obj map[string]any) {
 	// Secrets count.
-	if secrets, ok := obj["secrets"].([]interface{}); ok {
+	if secrets, ok := obj["secrets"].([]any); ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Secrets", Value: fmt.Sprintf("%d", len(secrets))})
 	}
 	// Automount token.
@@ -370,10 +376,10 @@ func populateServiceAccount(ti *model.Item, obj map[string]interface{}) {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Automount Token", Value: fmt.Sprintf("%v", automount)})
 	}
 	// Image pull secrets.
-	if ips, ok := obj["imagePullSecrets"].([]interface{}); ok && len(ips) > 0 {
+	if ips, ok := obj["imagePullSecrets"].([]any); ok && len(ips) > 0 {
 		var names []string
 		for _, s := range ips {
-			if sMap, ok := s.(map[string]interface{}); ok {
+			if sMap, ok := s.(map[string]any); ok {
 				if name, ok := sMap["name"].(string); ok {
 					names = append(names, name)
 				}
@@ -386,7 +392,7 @@ func populateServiceAccount(ti *model.Item, obj map[string]interface{}) {
 }
 
 // populateGenericCRDResource extracts top-level status fields for unknown/CRD resources.
-func populateGenericCRDResource(ti *model.Item, status map[string]interface{}) {
+func populateGenericCRDResource(ti *model.Item, status map[string]any) {
 	if status == nil {
 		return
 	}
@@ -395,7 +401,7 @@ func populateGenericCRDResource(ti *model.Item, status map[string]interface{}) {
 		if v, ok := status[key]; ok {
 			label := strings.ToUpper(key[:1]) + key[1:]
 			switch val := v.(type) {
-			case map[string]interface{}:
+			case map[string]any:
 				for subKey, subVal := range val {
 					subLabel := label + " " + strings.ToUpper(subKey[:1]) + subKey[1:]
 					ti.Columns = append(ti.Columns, model.KeyValue{Key: subLabel, Value: fmt.Sprintf("%v", subVal)})
@@ -411,12 +417,12 @@ func populateGenericCRDResource(ti *model.Item, status map[string]interface{}) {
 		}
 	}
 
-	if conditions, ok := status["conditions"].([]interface{}); ok && len(conditions) > 0 {
+	if conditions, ok := status["conditions"].([]any); ok && len(conditions) > 0 {
 		extractGenericConditions(ti, conditions)
 	}
 }
 
-func populateArgoWorkflow(ti *model.Item, status map[string]interface{}) {
+func populateArgoWorkflow(ti *model.Item, status map[string]any) {
 	if status == nil {
 		return
 	}
@@ -442,7 +448,7 @@ func populateArgoWorkflow(ti *model.Item, status map[string]interface{}) {
 }
 
 // populateArgoWorkflowDuration computes and adds the Duration column for an Argo Workflow.
-func populateArgoWorkflowDuration(ti *model.Item, status map[string]interface{}) {
+func populateArgoWorkflowDuration(ti *model.Item, status map[string]any) {
 	startedStr, _ := status["startedAt"].(string)
 	finishedStr, _ := status["finishedAt"].(string)
 	if startedStr == "" {
@@ -463,13 +469,13 @@ func populateArgoWorkflowDuration(ti *model.Item, status map[string]interface{})
 }
 
 // populateArgoWorkflowConditions extracts conditions from Argo Workflow status.
-func populateArgoWorkflowConditions(ti *model.Item, status map[string]interface{}) {
-	conditions, ok := status["conditions"].([]interface{})
+func populateArgoWorkflowConditions(ti *model.Item, status map[string]any) {
+	conditions, ok := status["conditions"].([]any)
 	if !ok {
 		return
 	}
 	for _, c := range conditions {
-		cond, ok := c.(map[string]interface{})
+		cond, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -488,8 +494,8 @@ func populateArgoWorkflowConditions(ti *model.Item, status map[string]interface{
 
 // populateArgoWorkflowSteps walks the status.nodes DAG via children arrays
 // to preserve execution order (not sorted by timestamp which jumps).
-func populateArgoWorkflowSteps(ti *model.Item, status map[string]interface{}) {
-	nodes, ok := status["nodes"].(map[string]interface{})
+func populateArgoWorkflowSteps(ti *model.Item, status map[string]any) {
+	nodes, ok := status["nodes"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -501,7 +507,7 @@ func populateArgoWorkflowSteps(ti *model.Item, status map[string]interface{}) {
 	nodeMap := make(map[string]nodeInfo, len(nodes))
 	var rootID string
 	for id, n := range nodes {
-		node, ok := n.(map[string]interface{})
+		node, ok := n.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -512,7 +518,7 @@ func populateArgoWorkflowSteps(ti *model.Item, status map[string]interface{}) {
 		}
 		info.phase, _ = node["phase"].(string)
 		info.message, _ = node["message"].(string)
-		if kids, ok := node["children"].([]interface{}); ok {
+		if kids, ok := node["children"].([]any); ok {
 			for _, k := range kids {
 				if s, ok := k.(string); ok {
 					info.children = append(info.children, s)
@@ -577,7 +583,7 @@ func FormatAge(d time.Duration) string {
 	return formatAge(d)
 }
 
-func populateEvent(ti *model.Item, obj map[string]interface{}) {
+func populateEvent(ti *model.Item, obj map[string]any) {
 	if eventType, ok := obj["type"].(string); ok {
 		ti.Status = eventType
 	}
@@ -611,7 +617,7 @@ func populateEvent(ti *model.Item, obj map[string]interface{}) {
 		ti.LastSeen = lastTime
 	}
 
-	if involvedObj, ok := obj["involvedObject"].(map[string]interface{}); ok {
+	if involvedObj, ok := obj["involvedObject"].(map[string]any); ok {
 		objKind, _ := involvedObj["kind"].(string)
 		objName, _ := involvedObj["name"].(string)
 		if objKind != "" && objName != "" {
@@ -631,7 +637,7 @@ func populateEvent(ti *model.Item, obj map[string]interface{}) {
 		eventCount = int64(countF)
 	}
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: EventColCount, Value: fmt.Sprintf("%d", eventCount)})
-	if source, ok := obj["source"].(map[string]interface{}); ok {
+	if source, ok := obj["source"].(map[string]any); ok {
 		if component, ok := source["component"].(string); ok && component != "" {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: EventColSource, Value: component})
 		}
@@ -641,14 +647,14 @@ func populateEvent(ti *model.Item, obj map[string]interface{}) {
 	}
 }
 
-func populatePersistentVolume(ti *model.Item, status, spec map[string]interface{}) {
+func populatePersistentVolume(ti *model.Item, status, spec map[string]any) {
 	if spec != nil {
-		if cap, ok := spec["capacity"].(map[string]interface{}); ok {
+		if cap, ok := spec["capacity"].(map[string]any); ok {
 			if storage, ok := cap["storage"].(string); ok {
 				ti.Columns = append(ti.Columns, model.KeyValue{Key: "Capacity", Value: storage})
 			}
 		}
-		if am, ok := spec["accessModes"].([]interface{}); ok {
+		if am, ok := spec["accessModes"].([]any); ok {
 			var modes []string
 			for _, m := range am {
 				if s, ok := m.(string); ok {
@@ -668,7 +674,7 @@ func populatePersistentVolume(ti *model.Item, status, spec map[string]interface{
 		if vm, ok := spec["volumeMode"].(string); ok && vm != "" {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Volume Mode", Value: vm})
 		}
-		if claimRef, ok := spec["claimRef"].(map[string]interface{}); ok {
+		if claimRef, ok := spec["claimRef"].(map[string]any); ok {
 			claimNS, _ := claimRef["namespace"].(string)
 			claimName, _ := claimRef["name"].(string)
 			if claimName != "" {
@@ -690,10 +696,10 @@ func populatePersistentVolume(ti *model.Item, status, spec map[string]interface{
 	}
 }
 
-func populateResourceQuota(ti *model.Item, status, spec map[string]interface{}) {
+func populateResourceQuota(ti *model.Item, status, spec map[string]any) {
 	if status != nil {
-		hard, _ := status["hard"].(map[string]interface{})
-		used, _ := status["used"].(map[string]interface{})
+		hard, _ := status["hard"].(map[string]any)
+		used, _ := status["used"].(map[string]any)
 		if hard != nil {
 			quotaKeys := make([]string, 0, len(hard))
 			for k := range hard {
@@ -715,7 +721,7 @@ func populateResourceQuota(ti *model.Item, status, spec map[string]interface{}) 
 			}
 		}
 	} else if spec != nil {
-		if hard, ok := spec["hard"].(map[string]interface{}); ok {
+		if hard, ok := spec["hard"].(map[string]any); ok {
 			quotaKeys := make([]string, 0, len(hard))
 			for k := range hard {
 				quotaKeys = append(quotaKeys, k)
@@ -731,16 +737,16 @@ func populateResourceQuota(ti *model.Item, status, spec map[string]interface{}) 
 	}
 }
 
-func populateLimitRange(ti *model.Item, spec map[string]interface{}) {
+func populateLimitRange(ti *model.Item, spec map[string]any) {
 	if spec == nil {
 		return
 	}
-	limits, ok := spec["limits"].([]interface{})
+	limits, ok := spec["limits"].([]any)
 	if !ok {
 		return
 	}
 	for _, l := range limits {
-		lMap, ok := l.(map[string]interface{})
+		lMap, ok := l.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -749,7 +755,7 @@ func populateLimitRange(ti *model.Item, spec map[string]interface{}) {
 		if prefix == "" {
 			prefix = "Unknown"
 		}
-		if def, ok := lMap["default"].(map[string]interface{}); ok {
+		if def, ok := lMap["default"].(map[string]any); ok {
 			for resource, val := range def {
 				ti.Columns = append(ti.Columns, model.KeyValue{
 					Key:   fmt.Sprintf("%s Default %s", prefix, resource),
@@ -757,7 +763,7 @@ func populateLimitRange(ti *model.Item, spec map[string]interface{}) {
 				})
 			}
 		}
-		if defReq, ok := lMap["defaultRequest"].(map[string]interface{}); ok {
+		if defReq, ok := lMap["defaultRequest"].(map[string]any); ok {
 			for resource, val := range defReq {
 				ti.Columns = append(ti.Columns, model.KeyValue{
 					Key:   fmt.Sprintf("%s Default Req %s", prefix, resource),
@@ -765,7 +771,7 @@ func populateLimitRange(ti *model.Item, spec map[string]interface{}) {
 				})
 			}
 		}
-		if max, ok := lMap["max"].(map[string]interface{}); ok {
+		if max, ok := lMap["max"].(map[string]any); ok {
 			for resource, val := range max {
 				ti.Columns = append(ti.Columns, model.KeyValue{
 					Key:   fmt.Sprintf("%s Max %s", prefix, resource),
@@ -773,7 +779,7 @@ func populateLimitRange(ti *model.Item, spec map[string]interface{}) {
 				})
 			}
 		}
-		if min, ok := lMap["min"].(map[string]interface{}); ok {
+		if min, ok := lMap["min"].(map[string]any); ok {
 			for resource, val := range min {
 				ti.Columns = append(ti.Columns, model.KeyValue{
 					Key:   fmt.Sprintf("%s Min %s", prefix, resource),
@@ -784,7 +790,7 @@ func populateLimitRange(ti *model.Item, spec map[string]interface{}) {
 	}
 }
 
-func populatePodDisruptionBudget(ti *model.Item, status, spec map[string]interface{}) {
+func populatePodDisruptionBudget(ti *model.Item, status, spec map[string]any) {
 	if spec != nil {
 		if minAvail, ok := spec["minAvailable"]; ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Min Available", Value: fmt.Sprintf("%v", minAvail)})
@@ -792,8 +798,8 @@ func populatePodDisruptionBudget(ti *model.Item, status, spec map[string]interfa
 		if maxUnavail, ok := spec["maxUnavailable"]; ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Max Unavailable", Value: fmt.Sprintf("%v", maxUnavail)})
 		}
-		if selector, ok := spec["selector"].(map[string]interface{}); ok {
-			if matchLabels, ok := selector["matchLabels"].(map[string]interface{}); ok {
+		if selector, ok := spec["selector"].(map[string]any); ok {
+			if matchLabels, ok := selector["matchLabels"].(map[string]any); ok {
 				parts := make([]string, 0, len(matchLabels))
 				for k, v := range matchLabels {
 					parts = append(parts, fmt.Sprintf("%s=%v", k, v))
@@ -821,12 +827,12 @@ func populatePodDisruptionBudget(ti *model.Item, status, spec map[string]interfa
 	}
 }
 
-func populateNetworkPolicy(ti *model.Item, spec map[string]interface{}) {
+func populateNetworkPolicy(ti *model.Item, spec map[string]any) {
 	if spec == nil {
 		return
 	}
-	if selector, ok := spec["podSelector"].(map[string]interface{}); ok {
-		if matchLabels, ok := selector["matchLabels"].(map[string]interface{}); ok {
+	if selector, ok := spec["podSelector"].(map[string]any); ok {
+		if matchLabels, ok := selector["matchLabels"].(map[string]any); ok {
 			var parts []string
 			for k, v := range matchLabels {
 				parts = append(parts, fmt.Sprintf("%s=%v", k, v))
@@ -839,7 +845,7 @@ func populateNetworkPolicy(ti *model.Item, spec map[string]interface{}) {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Pod Selector", Value: "(all pods)"})
 		}
 	}
-	if policyTypes, ok := spec["policyTypes"].([]interface{}); ok {
+	if policyTypes, ok := spec["policyTypes"].([]any); ok {
 		var types []string
 		for _, pt := range policyTypes {
 			if s, ok := pt.(string); ok {
@@ -850,10 +856,148 @@ func populateNetworkPolicy(ti *model.Item, spec map[string]interface{}) {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Policy Types", Value: strings.Join(types, ", ")})
 		}
 	}
-	if ingress, ok := spec["ingress"].([]interface{}); ok {
+	if ingress, ok := spec["ingress"].([]any); ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ingress Rules", Value: fmt.Sprintf("%d", len(ingress))})
 	}
-	if egress, ok := spec["egress"].([]interface{}); ok {
+	if egress, ok := spec["egress"].([]any); ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Egress Rules", Value: fmt.Sprintf("%d", len(egress))})
+	}
+}
+
+// populateEndpoints surfaces the actual endpoint addresses and ports for a
+// classic v1 Endpoints object. The summary collapses subsets so the table
+// shows a count plus a sample, and per-row columns let the user spot
+// "service has zero ready endpoints" at a glance.
+func populateEndpoints(ti *model.Item, obj map[string]any) {
+	subsets, ok := obj["subsets"].([]any)
+	if !ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Endpoints", Value: "<none>"})
+		return
+	}
+	var addrs, notReady, portStrs []string
+	for _, s := range subsets {
+		subset, ok := s.(map[string]any)
+		if !ok {
+			continue
+		}
+		if list, ok := subset["addresses"].([]any); ok {
+			for _, a := range list {
+				if amap, ok := a.(map[string]any); ok {
+					if ip, ok := amap["ip"].(string); ok {
+						addrs = append(addrs, ip)
+					}
+				}
+			}
+		}
+		if list, ok := subset["notReadyAddresses"].([]any); ok {
+			for _, a := range list {
+				if amap, ok := a.(map[string]any); ok {
+					if ip, ok := amap["ip"].(string); ok {
+						notReady = append(notReady, ip)
+					}
+				}
+			}
+		}
+		if list, ok := subset["ports"].([]any); ok {
+			for _, p := range list {
+				if pmap, ok := p.(map[string]any); ok {
+					portStrs = append(portStrs, formatEndpointPort(pmap))
+				}
+			}
+		}
+	}
+	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ready", Value: fmt.Sprintf("%d", len(addrs))})
+	if len(notReady) > 0 {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Not Ready", Value: fmt.Sprintf("%d", len(notReady))})
+	}
+	if v := summarizeEndpointAddresses(addrs); v != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Addresses", Value: v})
+	}
+	if len(portStrs) > 0 {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ports", Value: strings.Join(portStrs, ", ")})
+	}
+}
+
+// populateEndpointSlice mirrors populateEndpoints for the discovery.k8s.io/v1
+// EndpointSlice resource. Reads ready/serving conditions per endpoint so a
+// slice carrying half-degraded backends shows up plainly in the list.
+func populateEndpointSlice(ti *model.Item, obj map[string]any) {
+	if t, ok := obj["addressType"].(string); ok && t != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Type", Value: t})
+	}
+	endpoints, _ := obj["endpoints"].([]any)
+	var ready, notReady, addrs []string
+	for _, e := range endpoints {
+		ep, ok := e.(map[string]any)
+		if !ok {
+			continue
+		}
+		isReady := false
+		if cond, ok := ep["conditions"].(map[string]any); ok {
+			if r, ok := cond["ready"].(bool); ok && r {
+				isReady = true
+			}
+		}
+		if as, ok := ep["addresses"].([]any); ok {
+			for _, a := range as {
+				if s, ok := a.(string); ok {
+					addrs = append(addrs, s)
+					if isReady {
+						ready = append(ready, s)
+					} else {
+						notReady = append(notReady, s)
+					}
+				}
+			}
+		}
+	}
+	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ready", Value: fmt.Sprintf("%d", len(ready))})
+	if len(notReady) > 0 {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Not Ready", Value: fmt.Sprintf("%d", len(notReady))})
+	}
+	if v := summarizeEndpointAddresses(addrs); v != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Addresses", Value: v})
+	}
+	if ports, ok := obj["ports"].([]any); ok {
+		var portStrs []string
+		for _, p := range ports {
+			if pmap, ok := p.(map[string]any); ok {
+				portStrs = append(portStrs, formatEndpointPort(pmap))
+			}
+		}
+		if len(portStrs) > 0 {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ports", Value: strings.Join(portStrs, ", ")})
+		}
+	}
+}
+
+// formatEndpointPort renders a port spec map as "name:port/protocol" or
+// "port/protocol" when no name is set. Falls back to the bare port number
+// if the map shape is unexpected.
+func formatEndpointPort(p map[string]any) string {
+	port, _ := p["port"].(float64)
+	proto, _ := p["protocol"].(string)
+	name, _ := p["name"].(string)
+	if proto == "" {
+		proto = "TCP"
+	}
+	if name != "" {
+		return fmt.Sprintf("%s:%d/%s", name, int64(port), proto)
+	}
+	return fmt.Sprintf("%d/%s", int64(port), proto)
+}
+
+// summarizeEndpointAddresses returns a comma-joined preview of up to three
+// addresses, with a "+N more" tail when the list is longer. Empty list
+// returns an empty string so the caller can skip emitting the column.
+func summarizeEndpointAddresses(addrs []string) string {
+	const maxShown = 3
+	switch {
+	case len(addrs) == 0:
+		return ""
+	case len(addrs) <= maxShown:
+		return strings.Join(addrs, ", ")
+	default:
+		return strings.Join(addrs[:maxShown], ", ") + fmt.Sprintf(" +%d more", len(addrs)-maxShown)
 	}
 }

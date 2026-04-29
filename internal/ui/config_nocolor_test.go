@@ -140,6 +140,20 @@ func TestNoColor_StripsAgeStyleColors(t *testing.T) {
 	assert.NotContains(t, errStyle, "38;",
 		"no-color must strip fg color from ThemeColor hex style; got: %q", errStyle)
 
+	// ANSI numeric specs must also be stripped (spinner uses "62", check
+	// marks use "2"). These bypass the Color* slots, so ThemeColor is the
+	// only thing standing between them and leaked SGR.
+	ansiNumStyle := lipgloss.NewStyle().
+		Foreground(ThemeColor("2")).
+		Render("\u2713")
+	assert.NotContains(t, ansiNumStyle, "\x1b[",
+		"no-color must strip ANSI numeric ThemeColor style; got: %q", ansiNumStyle)
+	spinnerStyle := lipgloss.NewStyle().
+		Foreground(ThemeColor("62")).
+		Render("spinner")
+	assert.NotContains(t, spinnerStyle, "\x1b[",
+		"no-color must strip ANSI256 numeric ThemeColor style; got: %q", spinnerStyle)
+
 	SetNoColor(false)
 	// After leaving no-color mode the same style should emit color (proof
 	// that the defaults were restored, not permanently blanked).

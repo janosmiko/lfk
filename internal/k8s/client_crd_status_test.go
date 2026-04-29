@@ -10,14 +10,14 @@ import (
 
 func TestExtractStatus_NegativeConditionPrefersTrueCondition(t *testing.T) {
 	t.Run("last condition is Failed:False, prefer True condition", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "JobCreated",
 						"status": "True",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "Failed",
 						"status": "False",
 					},
@@ -30,14 +30,14 @@ func TestExtractStatus_NegativeConditionPrefersTrueCondition(t *testing.T) {
 	})
 
 	t.Run("last condition is Error:False, prefer True condition", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Reconciling",
 						"status": "True",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "InternalError",
 						"status": "False",
 					},
@@ -48,14 +48,14 @@ func TestExtractStatus_NegativeConditionPrefersTrueCondition(t *testing.T) {
 	})
 
 	t.Run("last condition is Degraded:False, prefer True condition", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Healthy",
 						"status": "True",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "Degraded",
 						"status": "False",
 					},
@@ -66,14 +66,14 @@ func TestExtractStatus_NegativeConditionPrefersTrueCondition(t *testing.T) {
 	})
 
 	t.Run("last condition is negative but no True condition, return last type", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Initialized",
 						"status": "False",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "Failed",
 						"status": "False",
 					},
@@ -85,14 +85,14 @@ func TestExtractStatus_NegativeConditionPrefersTrueCondition(t *testing.T) {
 	})
 
 	t.Run("last condition is non-negative, return lastType", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "JobCreated",
 						"status": "True",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "Progressing",
 						"status": "False",
 					},
@@ -104,12 +104,12 @@ func TestExtractStatus_NegativeConditionPrefersTrueCondition(t *testing.T) {
 	})
 
 	t.Run("ArgoCD health with sync that has no status key", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"health": map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"health": map[string]any{
 					"status": "Healthy",
 				},
-				"sync": map[string]interface{}{
+				"sync": map[string]any{
 					"revision": "abc123",
 				},
 			},
@@ -119,9 +119,9 @@ func TestExtractStatus_NegativeConditionPrefersTrueCondition(t *testing.T) {
 	})
 
 	t.Run("health map with no status key", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"health": map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"health": map[string]any{
 					"message": "degraded",
 				},
 			},
@@ -131,14 +131,14 @@ func TestExtractStatus_NegativeConditionPrefersTrueCondition(t *testing.T) {
 	})
 
 	t.Run("conditions with Ready:True returns immediately", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Ready",
 						"status": "True",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"type":   "Failed",
 						"status": "True",
 					},

@@ -9,6 +9,18 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// broadModeSuffix names the extra match dimension Tab opens at the
+// current level. At LevelResourceTypes Tab adds category-bar matches
+// ("+groups"); everywhere else it scans column values ("+columns").
+// Returned with parentheses so the caller can drop it next to the
+// "filter"/"search" label without ad-hoc spacing logic.
+func (m Model) broadModeSuffix() string {
+	if m.nav.Level == model.LevelResourceTypes {
+		return "(+groups)"
+	}
+	return "(+columns)"
+}
+
 // leftColumnHeader returns the header label for the left (parent) column.
 func (m Model) leftColumnHeader() string {
 	switch m.nav.Level {
@@ -75,13 +87,24 @@ func (m Model) breadcrumb() string {
 	return strings.Join(parts, " > ")
 }
 
+// renderStatusHint paints m.statusMessage in the status-bar style at full
+// width, suitable as a drop-in replacement for the bottom hint line of any
+// fullscreen viewer. The caller must check hasStatusMessage() first.
+func (m Model) renderStatusHint() string {
+	innerWidth := max(m.width-2, 10)
+	msg := m.sanitizeMessage(m.statusMessage)
+	style := ui.StatusMessageOkStyle
+	if m.statusMessageErr {
+		style = ui.StatusMessageErrStyle
+	}
+	styled := ui.Truncate(style.Render(msg), innerWidth)
+	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(styled)
+}
+
 func (m Model) statusBar() string {
 	// StatusBarBgStyle has Padding(0, 1) which adds 2 chars of horizontal padding.
 	// Use MaxWidth on the content to prevent overflow.
-	innerWidth := m.width - 2
-	if innerWidth < 10 {
-		innerWidth = 10
-	}
+	innerWidth := max(m.width-2, 10)
 
 	// Show command bar when active.
 	if m.commandBarActive {
@@ -114,28 +137,32 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 
-	// Show filter/search input in status bar when active.
+	// Show filter/search input in status bar when active. The
+	// broad-mode suffix names what Tab actually adds at this level —
+	// "+groups" at LevelResourceTypes (category bars), "+columns"
+	// elsewhere (annotations, labels, CRD printer columns, custom
+	// columns) — so the user knows what they just opted into.
 	if m.filterActive {
 		filterModeInd := ui.SearchModeIndicator(m.filterInput.Value)
-		prompt := ui.HelpKeyStyle.Render("filter") + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(filterModeInd) + renderInputWithCursor(m.filterInput.Value, m.filterInput.Cursor)
+		label := "filter"
+		if m.filterBroadMode {
+			label = "filter " + m.broadModeSuffix()
+		}
+		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(filterModeInd) + renderInputWithCursor(m.filterInput.Value, m.filterInput.Cursor)
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 	if m.searchActive {
 		searchModeInd := ui.SearchModeIndicator(m.searchInput.Value)
-		prompt := ui.HelpKeyStyle.Render("search") + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(searchModeInd) + renderInputWithCursor(m.searchInput.Value, m.searchInput.Cursor)
+		label := "search"
+		if m.searchBroadMode {
+			label = "search " + m.broadModeSuffix()
+		}
+		prompt := ui.HelpKeyStyle.Render(label) + ui.BarDimStyle.Render(": ") + ui.BarDimStyle.Render(searchModeInd) + renderInputWithCursor(m.searchInput.Value, m.searchInput.Cursor)
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).Render(prompt)
 	}
 	// When a status message is active, show it exclusively (hide key hints).
 	if m.hasStatusMessage() {
-		msg := m.sanitizeMessage(m.statusMessage)
-		var styled string
-		if m.statusMessageErr {
-			styled = ui.StatusMessageErrStyle.Render(msg)
-		} else {
-			styled = ui.StatusMessageOkStyle.Render(msg)
-		}
-		styled = ui.Truncate(styled, innerWidth)
-		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(styled)
+		return m.renderStatusHint()
 	}
 
 	// When an overlay is active, show overlay-specific hints instead of explorer hints.
@@ -146,24 +173,7 @@ func (m Model) statusBar() string {
 
 	// When the help screen is active, show help-specific hints.
 	if m.mode == modeHelp {
-		var helpHint string
-		switch {
-		case m.helpSearchActive:
-			helpHint = ui.HelpKeyStyle.Render("search") + ui.BarDimStyle.Render(": ") + m.helpSearchInput.View()
-		case m.helpFilter.Value != "":
-			helpHint = ui.BarDimStyle.Render("filter: ") +
-				ui.HelpKeyStyle.Render(m.helpFilter.Value) + "  " +
-				ui.HelpKeyStyle.Render("/") + ui.BarDimStyle.Render(" edit") + "  " +
-				ui.HelpKeyStyle.Render("Esc") + ui.BarDimStyle.Render(" close")
-		default:
-			helpHint = m.renderHints([]ui.HintEntry{
-				{Key: "j/k", Desc: "scroll"},
-				{Key: "^d/^u", Desc: "half-page"},
-				{Key: "/", Desc: "search"},
-				{Key: "Esc/?/q", Desc: "close"},
-			})
-		}
-		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(helpHint)
+		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(m.helpHintBar())
 	}
 
 	// When the error log overlay is active, show error log hints.
@@ -234,8 +244,12 @@ func (m Model) statusBar() string {
 		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d]", cur, total)))
 	}
 
-	// Sort mode indicator.
-	parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
+	// Sort mode indicator. Hidden at picker levels where sortMiddleItems
+	// early-returns — claiming a sort there would mislead the user about
+	// the row ordering.
+	if m.sortApplies() {
+		parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
+	}
 
 	// Styled key hints -- show a reduced set for dashboard views.
 	parts = append(parts, ui.FormatHintParts(m.explorerHintEntries()))
@@ -264,22 +278,35 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 			{Key: "q", Desc: "quit"},
 		}
 	}
+
+	// Non-dashboard case. At the cluster picker and resource-type browser,
+	// both the action menu and column sort are no-ops: selectedResourceKind()
+	// returns "" so openActionMenu() bails out, and sortMiddleItems() early-
+	// returns so </> doesn't reorder anything. Hide both hints there to
+	// avoid advertising dead keys.
 	hintEntries := []ui.HintEntry{
 		{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
 		{Key: kb.Down + "/" + kb.Up, Desc: "move"},
 		{Key: kb.Enter, Desc: "view"},
 		{Key: kb.NamespaceSelector, Desc: "namespace"},
 		{Key: kb.AllNamespaces, Desc: "all-ns"},
-		{Key: kb.ActionMenu, Desc: "actions"},
-		{Key: kb.CreateTemplate, Desc: "create"},
-		{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"},
-		{Key: kb.Filter, Desc: "filter"},
-		{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
-		{Key: kb.Monitoring, Desc: "monitoring"},
-		{Key: kb.Security, Desc: "security"},
-		{Key: kb.Help, Desc: "help"},
-		{Key: "q", Desc: "quit"},
 	}
+	hasResourceContext := m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
+	if hasResourceContext {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
+	}
+	hintEntries = append(hintEntries, ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"})
+	if hasResourceContext {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.SortNext + "/" + kb.SortPrev, Desc: "sort"})
+	}
+	hintEntries = append(hintEntries,
+		ui.HintEntry{Key: kb.Filter, Desc: "filter"},
+		ui.HintEntry{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
+		ui.HintEntry{Key: kb.Monitoring, Desc: "monitoring"},
+		ui.HintEntry{Key: kb.Security, Desc: "security"},
+		ui.HintEntry{Key: kb.Help, Desc: "help"},
+		ui.HintEntry{Key: "q", Desc: "quit"},
+	)
 	// Add context-specific hints for Events resource type.
 	hintEntries = m.appendEventsHintEntries(hintEntries)
 	// Add context-specific hints for Security findings views.
@@ -394,7 +421,13 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		w := min(70, m.width-10)
 		return ui.RenderActionOverlay(m.overlayItems, m.overlayCursor, w), w, min(15, m.height-6), true
 	case overlayQuitConfirm:
-		return ui.RenderQuitConfirmOverlay(), min(40, m.width-10), min(7, m.height-6), true
+		// Box outer 32x7. Inside (after 2 border + 4/2 padding):
+		//   inner width  = 32 - 2 - 4 = 26
+		//   inner height =  7 - 2 - 2 =  3
+		// The renderer centers the line both axes within that inner area.
+		qw := min(32, m.width-10)
+		qh := min(7, m.height-6)
+		return ui.RenderQuitConfirmOverlay(qw-6, qh-4), qw, qh, true
 	case overlayConfirm:
 		return ui.RenderConfirmOverlay(m.confirmAction), min(50, m.width-10), min(8, m.height-6), true
 	case overlayConfirmType:
@@ -416,7 +449,7 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		return content, min(60, m.width-10), min(len(m.filteredLogContainerItems())+9, m.height-6), true
 	case overlayBookmarks:
 		w, h := min(90, m.width-10), min(25, m.height-6)
-		return ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode)), w, h, true
+		return ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode), m.bookmarkLoadNamespace), w, h, true
 	case overlayTemplates:
 		w, h := min(60, m.width-10), min(25, m.height-6)
 		return ui.RenderTemplateOverlay(m.filteredTemplates(), m.templateFilter.Value, m.templateCursor, m.templateSearchMode, h), w, h, true
@@ -647,8 +680,16 @@ func (m Model) renderOverlayColumnToggle() (string, int, int) {
 	for i, e := range filtered {
 		entries[i] = ui.ColumnToggleEntry{Key: e.key, Visible: e.visible}
 	}
-	return ui.RenderColumnToggleOverlay(entries, m.columnToggleCursor, m.columnToggleFilter, m.columnToggleFilterActive, m.width, m.height),
-		min(50, m.width-10), min(20, m.height-6)
+	// Pass the overlay box dimensions (not the full screen) so the
+	// renderer's maxVisible cap matches what fits inside the box.
+	// Otherwise on a tall terminal the renderer emits ~34 lines into a
+	// 20-tall box; the box visibly grew on overflow and "shrank" back
+	// as the filter narrowed results — looked like the window was
+	// resizing.
+	overlayW := min(50, m.width-10)
+	overlayH := min(20, m.height-6)
+	return ui.RenderColumnToggleOverlay(entries, m.columnToggleCursor, m.columnToggleFilter, m.columnToggleFilterActive, overlayW, overlayH),
+		overlayW, overlayH
 }
 
 func (m Model) renderOverlayFinalizerSearch() (string, int, int) {
@@ -753,12 +794,11 @@ func (m Model) renderErrorLogOverlay(background string) string {
 	}
 
 	if m.errorLogFullscreen {
-		// Fullscreen: use full terminal dimensions, no overlay border.
-		content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, m.height-1, m.showDebugLogs, vp)
-		// Truncate each line to terminal width so long messages do not wrap
-		// and push content off the bottom of the screen.
-		content = clampErrorLogLines(content, m.width, m.height-1)
-		return content
+		// Fullscreen rendering is handled by viewExplorer via the
+		// viewErrorLogFullscreen helper (same pattern as the dashboard
+		// fullscreen). The background passed in here is already that
+		// composed view, so just return it unchanged.
+		return background
 	}
 
 	overlayW := min(140, m.width-4)
@@ -822,4 +862,44 @@ func renderInputWithCursor(value string, cursor int) string {
 		return value + ui.CursorBlockStyle.Render(" ")
 	}
 	return value[:cursor] + ui.CursorBlockStyle.Render(string(value[cursor])) + value[cursor+1:]
+}
+
+// helpHintBar renders the status-bar hint line for the help screen,
+// switching shape based on which input/applied state is active.
+// Extracted from statusBar to keep that function under the gocyclo
+// budget; the help screen has five distinct prompt shapes.
+func (m Model) helpHintBar() string {
+	switch {
+	case m.helpSearchActive:
+		// Live search input — show the typed query plus a hint that
+		// ctrl+n/p navigate matches in real time.
+		return ui.HelpKeyStyle.Render("search") + ui.BarDimStyle.Render(": ") + m.helpSearchInput.View() +
+			"  " + ui.HelpKeyStyle.Render("^n/^p") + ui.BarDimStyle.Render(" next/prev") +
+			"  " + ui.HelpKeyStyle.Render("Enter") + ui.BarDimStyle.Render(" apply") +
+			"  " + ui.HelpKeyStyle.Render("Esc") + ui.BarDimStyle.Render(" cancel")
+	case m.helpFilterActive:
+		return ui.HelpKeyStyle.Render("filter") + ui.BarDimStyle.Render(": ") + m.helpSearchInput.View() +
+			"  " + ui.HelpKeyStyle.Render("Enter") + ui.BarDimStyle.Render(" apply") +
+			"  " + ui.HelpKeyStyle.Render("Esc") + ui.BarDimStyle.Render(" cancel")
+	case m.helpSearchQuery != "":
+		// Search applied — n/N navigates persisted matches.
+		return ui.BarDimStyle.Render("search: ") +
+			ui.HelpKeyStyle.Render(m.helpSearchQuery) + "  " +
+			ui.HelpKeyStyle.Render("n/N") + ui.BarDimStyle.Render(" next/prev") + "  " +
+			ui.HelpKeyStyle.Render("/") + ui.BarDimStyle.Render(" edit") + "  " +
+			ui.HelpKeyStyle.Render("Esc") + ui.BarDimStyle.Render(" clear")
+	case m.helpFilter.Value != "":
+		return ui.BarDimStyle.Render("filter: ") +
+			ui.HelpKeyStyle.Render(m.helpFilter.Value) + "  " +
+			ui.HelpKeyStyle.Render("f") + ui.BarDimStyle.Render(" edit") + "  " +
+			ui.HelpKeyStyle.Render("Esc") + ui.BarDimStyle.Render(" close")
+	default:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "scroll"},
+			{Key: "^d/^u", Desc: "half-page"},
+			{Key: "/", Desc: "search"},
+			{Key: "f", Desc: "filter"},
+			{Key: "Esc/?/q", Desc: "close"},
+		})
+	}
 }

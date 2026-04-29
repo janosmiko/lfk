@@ -46,14 +46,8 @@ func RenderLabelEditorOverlay(
 	titleH := 2 // title + tab bar
 	gapH := 1
 
-	panelContentH := boxH - outerPadH - innerPadH - titleH - gapH
-	if panelContentH < 3 {
-		panelContentH = 3
-	}
-	panelContentW := boxW - outerPadW - innerPadW
-	if panelContentW < 20 {
-		panelContentW = 20
-	}
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH, 3)
+	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
 	title := OverlayTitleStyle.Render("Label / Annotation Editor")
@@ -109,10 +103,7 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 		keyColW = width / 2
 	}
 
-	valColW := width - keyColW - 10
-	if valColW < 8 {
-		valColW = 8
-	}
+	valColW := max(width-keyColW-10, 8)
 
 	var lines []string
 	keyPadded := fmt.Sprintf("%-*s", keyColW, "Key")
@@ -121,18 +112,12 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 	lines = append(lines, headerLine)
 	lines = append(lines, DimStyle.Render(separator))
 
-	tableHeight := height - 2
-	if tableHeight < 1 {
-		tableHeight = 1
-	}
+	tableHeight := max(height-2, 1)
 	start := 0
 	if selectedIdx >= tableHeight {
 		start = selectedIdx - tableHeight + 1
 	}
-	end := start + tableHeight
-	if end > len(keys) {
-		end = len(keys)
-	}
+	end := min(start+tableHeight, len(keys))
 
 	for i := start; i < end; i++ {
 		k := keys[i]
@@ -149,10 +134,7 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 			if editColumn == 0 {
 				editDisplay := editKey + DimStyle.Render("\u2588")
 				editW := lipgloss.Width(editDisplay)
-				pad := keyColW - editW
-				if pad < 0 {
-					pad = 0
-				}
+				pad := max(keyColW-editW, 0)
 				valDisplay := Truncate(editValue, valColW)
 				line = HelpKeyStyle.Render("> ") + editDisplay + strings.Repeat(" ", pad) + "  |  " + valDisplay
 			} else {

@@ -27,8 +27,8 @@ func TestOverlayHintBar_ReturnsNonEmpty(t *testing.T) {
 	}{
 		{"Namespace", overlayNamespace, nil, "esc"},
 		{"Action", overlayAction, nil, "enter"},
-		{"Confirm", overlayConfirm, nil, "y"},
-		{"QuitConfirm", overlayQuitConfirm, nil, "y"},
+		{"Confirm", overlayConfirm, nil, "Enter"},
+		{"QuitConfirm", overlayQuitConfirm, nil, "Enter"},
 		{"ConfirmType", overlayConfirmType, nil, "DELETE"},
 		{"ScaleInput", overlayScaleInput, nil, "Enter"},
 		{"PortForward", overlayPortForward, nil, "enter"},

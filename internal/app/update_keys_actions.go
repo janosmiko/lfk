@@ -40,9 +40,9 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		return m.handleExplorerActionKeyPageDown()
 	case kb.PageUp:
 		return m.handleExplorerActionKeyPageUp()
-	case kb.PageForward:
+	case kb.PageForward, "pgdown":
 		return m.handleExplorerActionKeyPageForward()
-	case kb.PageBack:
+	case kb.PageBack, "pgup":
 		return m.handleExplorerActionKeyPageBack()
 	case kb.LevelCluster:
 		return m.handleExplorerActionKeyLevelCluster()
@@ -148,7 +148,7 @@ func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 		// cursor identity so they don't lose their place when entries
 		// appear or disappear.
 		prevName, prevNs, prevExtra, prevKind := m.cursorItemKey()
-		m.middleItems = merged
+		m.setMiddleItems(merged)
 		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
 	default:
 		// User is deeper (LevelResources / LevelOwned / LevelContainers):
@@ -295,10 +295,7 @@ func (m Model) handleExplorerActionKeyPageUp() (tea.Model, tea.Cmd, bool) {
 	}
 	visible := m.visibleMiddleItems()
 	halfPage := (m.height - 4) / 2
-	c := m.cursor() - halfPage
-	if c < 0 {
-		c = 0
-	}
+	c := max(m.cursor()-halfPage, 0)
 	if c >= len(visible) {
 		c = len(visible) - 1
 	}
@@ -341,10 +338,7 @@ func (m Model) handleExplorerActionKeyPageBack() (tea.Model, tea.Cmd, bool) {
 	}
 	visible := m.visibleMiddleItems()
 	fullPage := m.height - 4
-	c := m.cursor() - fullPage
-	if c < 0 {
-		c = 0
-	}
+	c := max(m.cursor()-fullPage, 0)
 	if c >= len(visible) {
 		c = len(visible) - 1
 	}
@@ -451,6 +445,9 @@ func (m Model) handleExplorerActionKeyJumpOwner() (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleExplorerActionKeySortNext() (tea.Model, tea.Cmd, bool) {
+	if !m.sortApplies() {
+		return m, nil, true
+	}
 	colCount := ui.ActiveSortableColumnCount
 	if colCount > 0 {
 		idx := sortColumnIndex(m.sortColumnName)
@@ -464,6 +461,9 @@ func (m Model) handleExplorerActionKeySortNext() (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleExplorerActionKeySortPrev() (tea.Model, tea.Cmd, bool) {
+	if !m.sortApplies() {
+		return m, nil, true
+	}
 	colCount := ui.ActiveSortableColumnCount
 	if colCount > 0 {
 		idx := sortColumnIndex(m.sortColumnName)
@@ -477,6 +477,9 @@ func (m Model) handleExplorerActionKeySortPrev() (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleExplorerActionKeySortFlip() (tea.Model, tea.Cmd, bool) {
+	if !m.sortApplies() {
+		return m, nil, true
+	}
 	m.sortAscending = !m.sortAscending
 	m.sortMiddleItems()
 	m.clampCursor()
@@ -485,6 +488,9 @@ func (m Model) handleExplorerActionKeySortFlip() (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleExplorerActionKeySortReset() (tea.Model, tea.Cmd, bool) {
+	if !m.sortApplies() {
+		return m, nil, true
+	}
 	m.sortColumnName = sortColDefault
 	m.sortAscending = true
 	m.sortMiddleItems()
@@ -633,7 +639,7 @@ func (m Model) handleExplorerActionKeyFilterPresets() (tea.Model, tea.Cmd, bool)
 		// Clear the active filter preset and restore the full list.
 		name := m.activeFilterPreset.Name
 		m.activeFilterPreset = nil
-		m.middleItems = m.unfilteredMiddleItems
+		m.setMiddleItems(m.unfilteredMiddleItems)
 		m.unfilteredMiddleItems = nil
 		m.setCursor(0)
 		m.clampCursor()

@@ -85,7 +85,7 @@ type klogWriter struct{}
 func (klogWriter) Write(p []byte) (n int, err error) {
 	msg := strings.TrimSpace(string(p))
 	if msg != "" {
-		Logger.Warn(msg, "source", "klog")
+		Logger.Warn(Redact(msg), "source", "klog")
 	}
 	return len(p), nil
 }
@@ -153,10 +153,15 @@ func (sc *StderrCapture) readLoop() {
 		if n > 0 {
 			msg := strings.TrimSpace(string(buf[:n]))
 			if msg != "" {
-				Logger.Error(msg, "source", "stderr")
-				// Non-blocking send to the message channel for the TUI to pick up.
+				// Redact tokens/credentials before logging or surfacing to the
+				// TUI. Exec credential plugins (AWS SSO, gke-gcloud-auth-plugin,
+				// OIDC helpers) routinely emit short-lived tokens to stderr,
+				// and the TUI message also flows through setStatusMessage which
+				// re-logs it — so we must redact at the source.
+				redacted := Redact(msg)
+				Logger.Error(redacted, "source", "stderr")
 				select {
-				case sc.MsgChan <- msg:
+				case sc.MsgChan <- redacted:
 				default:
 					// Channel full, drop the message (it's still logged).
 				}

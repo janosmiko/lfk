@@ -19,10 +19,7 @@ func (m Model) yamlViewportLines() int {
 	if len(m.tabs) > 1 {
 		overhead = 6
 	}
-	lines := m.height - overhead
-	if lines < 3 {
-		lines = 3
-	}
+	lines := max(m.height-overhead, 3)
 	return lines
 }
 
@@ -41,6 +38,12 @@ func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleYAMLSearchInput handles key events when the YAML search input is active.
+//
+// Match highlights update on every keystroke so the user sees results land
+// in real time instead of having to commit with Enter just to see whether
+// the query matches anything. Enter still ends search-input mode and
+// scrolls to the first match -- it's the "commit" action; typing only
+// drives the live highlight overlay.
 func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	viewportLines := m.yamlViewportLines()
 
@@ -63,9 +66,11 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if len(m.yamlSearchText.Value) > 0 {
 			m.yamlSearchText.Backspace()
 		}
+		m.updateYAMLSearchMatches()
 		return m, nil
 	case "ctrl+w":
 		m.yamlSearchText.DeleteWord()
+		m.updateYAMLSearchMatches()
 		return m, nil
 	case "ctrl+a":
 		m.yamlSearchText.Home()
@@ -87,6 +92,7 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		if len(msg.String()) == 1 || msg.String() == " " {
 			m.yamlSearchText.Insert(msg.String())
+			m.updateYAMLSearchMatches()
 		}
 		return m, nil
 	}
@@ -192,19 +198,34 @@ func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 		if lineNum > 0 {
 			lineNum--
 		}
-		m.yamlCursor = min(lineNum, totalVisible-1)
-		if m.yamlCursor < 0 {
-			m.yamlCursor = 0
-		}
+		m.yamlCursor = max(min(lineNum, totalVisible-1), 0)
 		m.ensureYAMLCursorVisible()
 	} else {
-		m.yamlCursor = totalVisible - 1
-		if m.yamlCursor < 0 {
-			m.yamlCursor = 0
-		}
+		m.yamlCursor = max(totalVisible-1, 0)
 		m.yamlScroll = maxScroll
 	}
 	return m, nil
+}
+
+// handleYAMLNormalCopy copies the original YAML line under the cursor to the
+// clipboard. Mirrors the describe view's normal-mode `y` so users get the same
+// vim-style yank behaviour across all read-only viewers.
+func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
+	m.yamlLineInput = ""
+	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	if m.yamlCursor < 0 || m.yamlCursor >= len(mapping) {
+		return m, nil
+	}
+	origIdx := mapping[m.yamlCursor]
+	if origIdx < 0 {
+		return m, nil
+	}
+	origLines := strings.Split(m.yamlContent, "\n")
+	if origIdx >= len(origLines) {
+		return m, nil
+	}
+	m.setStatusMessage("Copied 1 line", false)
+	return m, tea.Batch(copyToSystemClipboard(origLines[origIdx]), scheduleStatusClear())
 }
 
 // handleYAMLVisualCopy copies the visually selected content to the clipboard.
@@ -260,16 +281,10 @@ func (m Model) yamlVisualCopyChar(selStart, selEnd int, mapping []int, origLines
 			}
 			parts = append(parts, string(runes[cs:ce]))
 		} else if i == selStart {
-			cs := startCol
-			if cs > len(runes) {
-				cs = len(runes)
-			}
+			cs := min(startCol, len(runes))
 			parts = append(parts, string(runes[cs:]))
 		} else if i == selEnd {
-			ce := endCol + 1
-			if ce > len(runes) {
-				ce = len(runes)
-			}
+			ce := min(endCol+1, len(runes))
 			parts = append(parts, string(runes[:ce]))
 		} else {
 			parts = append(parts, line)
@@ -328,10 +343,7 @@ func (m Model) handleYAMLVisualWordMotion(key string) (tea.Model, tea.Cmd) {
 			m.yamlVisualCurCol = lineLen - 1
 		}
 	case "^":
-		col := firstNonWhitespace(visLines[m.yamlCursor])
-		if col < yamlFoldPrefixLen {
-			col = yamlFoldPrefixLen
-		}
+		col := max(firstNonWhitespace(visLines[m.yamlCursor]), yamlFoldPrefixLen)
 		m.yamlVisualCurCol = col
 	case "w":
 		m.yamlWordForward(visLines, nextWordStart)
@@ -373,10 +385,7 @@ func (m *Model) yamlWordBackward(visLines []string, motionFn func(string, int) i
 	if newCol < 0 && m.yamlCursor > 0 {
 		m.yamlCursor--
 		lineLen := len([]rune(visLines[m.yamlCursor]))
-		newCol = motionFn(visLines[m.yamlCursor], lineLen)
-		if newCol < 0 {
-			newCol = 0
-		}
+		newCol = max(motionFn(visLines[m.yamlCursor], lineLen), 0)
 		m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
 		m.ensureYAMLCursorVisible()
 	} else {
@@ -387,10 +396,7 @@ func (m *Model) yamlWordBackward(visLines []string, motionFn func(string, int) i
 // yamlMaxScroll returns the maximum scroll offset for the YAML viewer.
 func (m Model) yamlMaxScroll(totalVisible int) int {
 	viewportLines := m.yamlViewportLines()
-	maxScroll := totalVisible - viewportLines
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
+	maxScroll := max(totalVisible-viewportLines, 0)
 	return maxScroll
 }
 
@@ -421,6 +427,8 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyShiftN(viewportLines)
 	case "ctrl+e":
 		return m.handleYAMLKeyCtrlE()
+	case "y":
+		return m.handleYAMLNormalCopy()
 	case "ctrl+w", ">":
 		m.yamlWrap = !m.yamlWrap
 		return m, nil
@@ -451,15 +459,19 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyK()
 	case "g":
 		return m.handleYAMLKeyG()
-	case "G":
+	case "G", "end":
 		return m.handleYAMLNormalG(totalVisible, maxScroll)
+	case "home":
+		m.yamlCursor = 0
+		m.ensureYAMLCursorVisible()
+		return m, nil
 	case "ctrl+d":
 		return m.handleYAMLNormalHalfPageDown(totalVisible)
 	case "ctrl+u":
 		return m.handleYAMLKeyCtrlU()
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		return m.handleYAMLNormalPageDown(totalVisible)
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		return m.handleYAMLKeyCtrlB()
 	default:
 		m.yamlLineInput = ""
@@ -556,10 +568,7 @@ func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	}
-	m.yamlCursor = totalVisible - 1
-	if m.yamlCursor < 0 {
-		m.yamlCursor = 0
-	}
+	m.yamlCursor = max(totalVisible-1, 0)
 	m.yamlScroll = maxScroll
 	return m, nil
 }
@@ -590,10 +599,7 @@ func (m Model) handleYAMLNormalPageDown(totalVisible int) (tea.Model, tea.Cmd) {
 // with scrolloff margin.
 func (m *Model) ensureYAMLCursorVisible() {
 	maxLines := m.yamlViewportLines()
-	so := ui.ConfigScrollOff
-	if so > maxLines/2 {
-		so = maxLines / 2
-	}
+	so := min(ui.ConfigScrollOff, maxLines/2)
 	if m.yamlCursor < m.yamlScroll+so {
 		m.yamlScroll = m.yamlCursor - so
 	}
@@ -609,10 +615,7 @@ func (m *Model) ensureYAMLCursorVisible() {
 func (m *Model) clampYAMLScroll() {
 	totalVisible := visibleLineCount(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	viewportLines := m.yamlViewportLines()
-	maxScroll := totalVisible - viewportLines
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
+	maxScroll := max(totalVisible-viewportLines, 0)
 	if m.yamlScroll > maxScroll {
 		m.yamlScroll = maxScroll
 	}
@@ -644,10 +647,7 @@ func (m *Model) yamlScrollToMatchFolded(viewportLines int) {
 	}
 
 	totalVisible := len(mapping)
-	maxScroll := totalVisible - viewportLines
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
+	maxScroll := max(totalVisible-viewportLines, 0)
 
 	// Move cursor to the match and center it in the viewport.
 	m.yamlCursor = visIdx
@@ -660,13 +660,7 @@ func (m *Model) yamlScrollToMatchFolded(viewportLines int) {
 			m.yamlVisualCurCol = col
 		}
 	}
-	m.yamlScroll = visIdx - viewportLines/2
-	if m.yamlScroll > maxScroll {
-		m.yamlScroll = maxScroll
-	}
-	if m.yamlScroll < 0 {
-		m.yamlScroll = 0
-	}
+	m.yamlScroll = max(min(visIdx-viewportLines/2, maxScroll), 0)
 }
 
 // yamlNextIntraLineMatch checks for another match on the current YAML line
@@ -685,9 +679,14 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 	}
 	line := visibleLines[m.yamlCursor]
 
+	runes := []rune(line)
 	if forward {
 		// Search for a match after the current cursor position.
-		curBytePos := len(string([]rune(line)[:m.yamlVisualCurCol+1]))
+		// Clamp: yamlVisualCurCol carries the column from a previously
+		// focused line and may exceed this line's rune length. Forward
+		// uses +1 because the search starts after (not at) the cursor.
+		end := min(m.yamlVisualCurCol+1, len(runes))
+		curBytePos := len(string(runes[:end]))
 		if curBytePos < len(line) {
 			remainder := line[curBytePos:]
 			col := ui.FindColumnInLine(remainder, rawQuery)
@@ -698,7 +697,10 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 		}
 	} else {
 		// Search for a match before the current cursor position.
-		curBytePos := len(string([]rune(line)[:m.yamlVisualCurCol]))
+		// Clamp: yamlVisualCurCol may exceed this line's rune length;
+		// backward search ends at (excluding) the cursor.
+		end := min(m.yamlVisualCurCol, len(runes))
+		curBytePos := len(string(runes[:end]))
 		if curBytePos > 0 {
 			prefix := line[:curBytePos]
 			// For backward search, find the last match in the prefix.

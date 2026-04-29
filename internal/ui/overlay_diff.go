@@ -102,7 +102,11 @@ type DiffVisualParams struct {
 
 // RenderDiffView renders a side-by-side YAML diff view with search highlighting
 // and fold support.
-func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams) string { //nolint:gocyclo // rendering function with inherent layout complexity
+// footerOverride, when non-empty, is rendered as the bottom hint line
+// verbatim in place of the default key-binding hint bar. Callers use this
+// to surface status messages (copy feedback, errors) without resorting
+// to post-render line surgery.
+func RenderDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -121,10 +125,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 
 	// Calculate column widths: split the available content area in half with a separator.
 	// -1 for cursor gutter (> or space).
-	colWidth := (width - 8 - gutterWidth*2) / 2
-	if colWidth < 10 {
-		colWidth = 10
-	}
+	colWidth := max((width-8-gutterWidth*2)/2, 10)
 
 	// Build header.
 	gutterPad := strings.Repeat(" ", gutterWidth)
@@ -133,17 +134,11 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 	header := gutterPad + padToWidth(leftHeader, colWidth) + separatorStyle.Render(" | ") + gutterPad + padToWidth(rightHeader, colWidth)
 
 	// Reserve lines for title, hint bar, border (top+bottom), header, and separator.
-	maxLines := height - 6
-	if maxLines < 3 {
-		maxLines = 3
-	}
+	maxLines := max(height-6, 3)
 
 	// Clamp scroll.
 	totalLines := len(visLines)
-	maxScroll := totalLines - maxLines
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
+	maxScroll := max(totalLines-maxLines, 0)
 	if scroll > maxScroll {
 		scroll = maxScroll
 	}
@@ -323,16 +318,21 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		MaxHeight(maxLines + 4)
 	body := borderStyle.Render(bodyContent)
 
-	// Hint bar.
+	// Hint bar. A non-empty footerOverride wins over the default hint and
+	// any search/visual-mode bars so callers can paint status messages
+	// (e.g. copy feedback) in this slot without post-render line surgery.
 	var hint string
-	if searchMode {
+	switch {
+	case footerOverride != "":
+		hint = footerOverride
+	case searchMode:
 		diffModeInd := SearchModeIndicator(searchInput)
 		searchBar := HelpKeyStyle.Render("type: search") + BarDimStyle.Render(" | ") +
 			HelpKeyStyle.Render("enter") + BarDimStyle.Render(": apply | ") +
 			HelpKeyStyle.Render("esc") + BarDimStyle.Render(": cancel") +
 			BarDimStyle.Render("  /") + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(searchBar)
-	} else if vp.VisualMode {
+	case vp.VisualMode:
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "extend"},
 			{Key: "h/l", Desc: "column"},
@@ -342,12 +342,13 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		})
 		scrollInfo := BarDimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(hintContent + scrollInfo)
-	} else {
+	default:
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
 			{Key: "/", Desc: "search"},
 			{Key: "v/V", Desc: "select"},
+			{Key: "y", Desc: "copy"},
 			{Key: "tab", Desc: "side"},
 			{Key: "z", Desc: "fold"},
 			{Key: "#", Desc: "lines"},
@@ -363,8 +364,9 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 }
 
 // RenderUnifiedDiffView renders a unified diff view of two YAML resources
-// with search highlighting and fold support.
-func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams) string { //nolint:gocyclo // rendering function with inherent layout complexity
+// with search highlighting and fold support. footerOverride behaves the
+// same as in RenderDiffView.
+func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, width, height int, lineNumbers, wrap bool, searchQuery string, foldRegions []DiffFoldRegion, foldState []bool, searchMode bool, searchInput string, cursor int, vp DiffVisualParams, footerOverride string) string { //nolint:gocyclo // rendering function with inherent layout complexity
 	rawDiffLines := computeDiff(left, right)
 	visLines := BuildVisibleDiffLines(rawDiffLines, foldRegions, foldState)
 
@@ -483,10 +485,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 	title := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(titleText)
 
 	// Reserve lines for title, hint bar, and border (top+bottom).
-	maxLines := height - 4
-	if maxLines < 3 {
-		maxLines = 3
-	}
+	maxLines := max(height-4, 3)
 
 	// Separate headers (always visible) from scrollable content.
 	var headerLines []unifiedLine
@@ -500,17 +499,11 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 	}
 
 	// Content area = maxLines minus header lines.
-	contentMaxLines := maxLines - len(headerLines)
-	if contentMaxLines < 1 {
-		contentMaxLines = 1
-	}
+	contentMaxLines := max(maxLines-len(headerLines), 1)
 
 	// Clamp scroll on content lines only.
 	totalContent := len(contentLines)
-	maxScroll := totalContent - contentMaxLines
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
+	maxScroll := max(totalContent-contentMaxLines, 0)
 	if scroll > maxScroll {
 		scroll = maxScroll
 	}
@@ -547,16 +540,19 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 	borderStyle := FullscreenBorderStyle(width, maxLines)
 	body := borderStyle.Render(bodyContent)
 
-	// Hint bar.
+	// Hint bar. footerOverride wins over default hints \u2014 see RenderDiffView.
 	var hint string
-	if searchMode {
+	switch {
+	case footerOverride != "":
+		hint = footerOverride
+	case searchMode:
 		diffModeInd := SearchModeIndicator(searchInput)
 		searchBar := HelpKeyStyle.Render("type: search") + BarDimStyle.Render(" | ") +
 			HelpKeyStyle.Render("enter") + BarDimStyle.Render(": apply | ") +
 			HelpKeyStyle.Render("esc") + BarDimStyle.Render(": cancel") +
 			BarDimStyle.Render("  /") + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(searchBar)
-	} else if vp.VisualMode {
+	case vp.VisualMode:
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "extend"},
 			{Key: "h/l", Desc: "column"},
@@ -566,12 +562,13 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		})
 		scrollInfo := BarDimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(hintContent + scrollInfo)
-	} else {
+	default:
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
 			{Key: "/", Desc: "search"},
 			{Key: "v/V", Desc: "select"},
+			{Key: "y", Desc: "copy"},
 			{Key: "z", Desc: "fold"},
 			{Key: "#", Desc: "lines"},
 			{Key: ">", Desc: "wrap"},

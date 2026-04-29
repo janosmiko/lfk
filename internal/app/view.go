@@ -98,7 +98,7 @@ func (m Model) View() string {
 			}
 			view = strings.Join(viewLines, "\n")
 
-			overlay := ui.RenderHelpScreen(m.width, fullHeight-1, m.helpScroll, m.helpFilter.Value, m.helpContextMode)
+			overlay := ui.RenderHelpScreen(m.width, fullHeight-1, m.helpScroll, m.helpFilter.Value, m.helpSearchQuery, m.helpContextMode, m.helpCurrentMatchLine())
 			view = ui.PlaceOverlay(m.width, fullHeight, overlay, view)
 		}
 
@@ -131,7 +131,7 @@ func (m Model) View() string {
 	// The status bar (bottom line) already renders the help search prompt,
 	// so size the overlay to leave the bottom line uncovered.
 	if m.mode == modeHelp {
-		overlay := ui.RenderHelpScreen(m.width, m.height-1, m.helpScroll, m.helpFilter.Value, m.helpContextMode)
+		overlay := ui.RenderHelpScreen(m.width, m.height-1, m.helpScroll, m.helpFilter.Value, m.helpSearchQuery, m.helpContextMode, m.helpCurrentMatchLine())
 		view = ui.PlaceOverlay(m.width, m.height, overlay, view)
 	}
 
@@ -209,13 +209,36 @@ func (m Model) rightColumnKind() string {
 	return ""
 }
 
+// shouldHighlightCategories reports whether the resource-types sidebar
+// should light up category bars on top of normal name highlighting.
+// Only fires at LevelResourceTypes (where the bars render) and only
+// when the user has explicitly opted in via the Tab "include groups"
+// toggle on the active search or filter input — plain `/foo` / `f foo`
+// stays name-only.
+func (m Model) shouldHighlightCategories() bool {
+	if m.nav.Level != model.LevelResourceTypes {
+		return false
+	}
+	if m.searchInput.Value != "" {
+		return m.searchBroadMode
+	}
+	return m.filterText != "" && m.filterBroadMode
+}
+
 func (m Model) viewExplorer() string {
-	// Set highlight query for search/filter term highlighting.
+	// Set highlight query for search/filter term highlighting. Search
+	// query takes precedence over filter when both are set, and it
+	// persists past Enter (m.searchInput.Value stays populated until
+	// Esc clears it) so highlights stay visible while n/N navigation
+	// is meaningful.
 	ui.ActiveHighlightQuery = m.filterText
-	if m.searchActive {
+	if m.searchInput.Value != "" {
 		ui.ActiveHighlightQuery = m.searchInput.Value
 	}
 	defer func() { ui.ActiveHighlightQuery = "" }()
+
+	ui.ActiveHighlightCategories = m.shouldHighlightCategories()
+	defer func() { ui.ActiveHighlightCategories = false }()
 
 	// Set secret values visibility for rendering.
 	ui.ActiveShowSecretValues = m.showSecretValues
@@ -332,7 +355,11 @@ func (m Model) viewExplorer() string {
 	var middleCol string
 	switch m.nav.Level {
 	case model.LevelResources, model.LevelOwned, model.LevelContainers:
-		middleCol = ui.RenderTable(middleHeader, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, m.loading, m.spinner.View(), middleErrMsg)
+		if m.middleTableRenderer != nil {
+			middleCol = m.middleTableRenderer.Render(middleHeader, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, m.loading, m.spinner.View(), middleErrMsg, m.middleItemsRev, m.selectionRev)
+		} else {
+			middleCol = ui.RenderTable(middleHeader, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, m.loading, m.spinner.View(), middleErrMsg)
+		}
 	default:
 		middleCol = ui.RenderColumn(middleHeader, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, true, m.loading, m.spinner.View(), middleErrMsg)
 	}
@@ -342,15 +369,7 @@ func (m Model) viewExplorer() string {
 	middleCol = ui.FillLinesBg(middleCol, middleInner, ui.BaseBg)
 	middle := ui.ActiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(middleCol)
 
-	var columns string
-	switch {
-	case m.fullscreenDashboard:
-		columns = m.viewExplorerDashboard(contentHeight)
-	case m.fullscreenMiddle:
-		columns = middle
-	default:
-		columns = m.viewExplorerThreeCol(middle, leftW, leftInner, rightW, rightInner, contentHeight)
-	}
+	columns := m.viewExplorerColumns(middle, leftW, leftInner, rightW, rightInner, contentHeight)
 
 	// Title bar with namespace indicator on the right.
 	title := ui.FillLinesBg(m.renderTitleBar(), m.width, ui.BarBg)
@@ -378,14 +397,7 @@ func (m Model) commandBarDropdown() string {
 		return ""
 	}
 
-	maxHeight := m.height / 2
-	if maxHeight > 10 {
-		maxHeight = 10
-	}
-
-	if maxHeight < 1 {
-		maxHeight = 1
-	}
+	maxHeight := max(min(m.height/2, 10), 1)
 
 	return ui.RenderCommandDropdown(
 		m.commandBarSuggestions,
@@ -398,10 +410,7 @@ func (m Model) commandBarDropdown() string {
 func (m Model) renderTitleBar() string {
 	// TitleBarStyle has Padding(0, 1) which adds 2 chars of horizontal padding.
 	// The inner content area is m.width - 2.
-	innerWidth := m.width - 2
-	if innerWidth < 10 {
-		innerWidth = 10
-	}
+	innerWidth := max(m.width-2, 10)
 
 	var watchIndicator string
 	if m.watchMode {
@@ -444,10 +453,9 @@ func (m Model) renderTitleBar() string {
 
 	// Calculate available width for breadcrumb.
 	fixedWidth := lipgloss.Width(watchIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
-	maxBcWidth := innerWidth - fixedWidth - 1 // -1 for minimum gap
-	if maxBcWidth < 10 {
-		maxBcWidth = 10
-	}
+	maxBcWidth := max(
+		// -1 for minimum gap
+		innerWidth-fixedWidth-1, 10)
 
 	bcText := " " + m.breadcrumb() + " "
 	if lipgloss.Width(bcText) > maxBcWidth {
@@ -459,10 +467,7 @@ func (m Model) renderTitleBar() string {
 	bc := ui.TitleBreadcrumbStyle.Render(bcText)
 
 	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
-	gap := innerWidth - contentWidth
-	if gap < 0 {
-		gap = 0
-	}
+	gap := max(innerWidth-contentWidth, 0)
 
 	barContent := bc + watchIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + mutationProgress + tasksIndicator + nsLabel + versionLabel
 	return ui.TitleBarStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(barContent)
@@ -494,6 +499,56 @@ func (m Model) viewExplorerDashboard(contentHeight int) string {
 	return m.viewExplorerDashboardSingleCol(dashContent, fullW, contentHeight)
 }
 
+// viewExplorerColumns picks which view fills the explorer's columns slot.
+// Fullscreen variants (error log, dashboard, single middle column) take
+// precedence over the three-column layout. Extracted so viewExplorer
+// itself stays under the gocyclo cap.
+func (m Model) viewExplorerColumns(middle string, leftW, leftInner, rightW, rightInner, contentHeight int) string {
+	switch {
+	case m.overlayErrorLog && m.errorLogFullscreen:
+		return m.viewErrorLogFullscreen(contentHeight)
+	case m.fullscreenDashboard:
+		return m.viewExplorerDashboard(contentHeight)
+	case m.fullscreenMiddle:
+		return middle
+	default:
+		return m.viewExplorerThreeCol(middle, leftW, leftInner, rightW, rightInner, contentHeight)
+	}
+}
+
+// viewErrorLogFullscreen renders the in-app error log as the columns slot
+// of viewExplorer when the user has fullscreened it. This reuses the same
+// fullscreen pattern as viewExplorerDashboard so the surrounding title
+// bar, tab bar, and status bar (with the overlayErrorLog-specific hints)
+// stay consistent — instead of doing custom slice-and-rebuild that would
+// drop background fills and break global keys like the theme selector.
+func (m Model) viewErrorLogFullscreen(contentHeight int) string {
+	vp := ui.ErrorLogVisualParams{
+		VisualMode:     m.errorLogVisualMode,
+		VisualStart:    m.errorLogVisualStart,
+		VisualStartCol: m.errorLogVisualStartCol,
+		CursorLine:     m.errorLogCursorLine,
+		CursorCol:      m.errorLogCursorCol,
+	}
+	fullW := m.width - 2
+	innerW := max(fullW-2, 1) // minus column padding
+	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, contentHeight, m.showDebugLogs, vp)
+	content = clampErrorLogLines(content, innerW, contentHeight)
+	content = ui.PadToHeight(content, contentHeight)
+	content = ui.FillLinesBg(content, innerW, ui.BaseBg)
+	// Apply BaseBg to the column wrapper too so the 1-char padding lipgloss
+	// adds inside the rounded border doesn't render with the terminal's
+	// default background — that's the "background looks different" gap
+	// users see between the inner BaseBg-filled content and the border.
+	style := ui.ActiveColumnStyle.
+		Width(fullW).
+		Height(contentHeight).
+		MaxHeight(contentHeight + 2).
+		Background(ui.BaseBg).
+		BorderBackground(ui.BaseBg)
+	return style.Render(content)
+}
+
 // viewExplorerDashboardSingleCol renders a single-column fullscreen dashboard.
 func (m Model) viewExplorerDashboardSingleCol(dashContent string, fullW, contentHeight int) string {
 	if m.previewScroll > 0 {
@@ -514,7 +569,7 @@ func (m Model) viewExplorerDashboardSingleCol(dashContent string, fullW, content
 // viewExplorerDashboardTwoCol renders a two-column fullscreen dashboard.
 func (m Model) viewExplorerDashboardTwoCol(dashContent string, fullW, contentHeight int) string {
 	leftW := fullW / 2
-	for _, line := range strings.Split(dashContent, "\n") {
+	for line := range strings.SplitSeq(dashContent, "\n") {
 		if w := lipgloss.Width(line); w+2 > leftW {
 			leftW = w + 2
 		}
@@ -582,10 +637,7 @@ func scrollContent(content string, scroll int) string {
 // wrapEventsColumn word-wraps event lines to fit the right column width.
 func wrapEventsColumn(rawLines []string, rightW int) []string {
 	pad := "  "
-	maxContentW := rightW - 4
-	if maxContentW < 10 {
-		maxContentW = 10
-	}
+	maxContentW := max(rightW-4, 10)
 	wrapStyle := lipgloss.NewStyle().Width(maxContentW)
 	result := make([]string, 0, len(rawLines))
 	for _, line := range rawLines {
@@ -595,7 +647,7 @@ func wrapEventsColumn(rawLines []string, rightW int) []string {
 			result = append(result, pad+line)
 		} else {
 			wrapped := wrapStyle.Render(line)
-			for _, wl := range strings.Split(wrapped, "\n") {
+			for wl := range strings.SplitSeq(wrapped, "\n") {
 				result = append(result, pad+wl)
 			}
 		}
@@ -603,11 +655,29 @@ func wrapEventsColumn(rawLines []string, rightW int) []string {
 	return result
 }
 
+// leftColumnLoading reports whether the left column should display a
+// loading spinner. The left column represents the *parent* of the current
+// middle list (kubeconfig -> contexts -> resource types -> resources ...).
+// At LevelClusters there is no parent — the left column is empty by design
+// — so a spinner there would be misleading. Everywhere else the spinner
+// tracks m.loading so the parent header shows progress during discovery /
+// context switches.
+func (m Model) leftColumnLoading() bool {
+	return m.loading && m.nav.Level != model.LevelClusters
+}
+
 // viewExplorerThreeCol renders the standard three-column explorer layout.
+//
+// The search/filter highlight is scoped to the middle column only —
+// neither the left (parent context: resource-type categories,
+// kubeconfigs, …) nor the right (child preview) should light up just
+// because the user typed `/workload`. The middle was already rendered
+// upstream with ActiveHighlightQuery active; we clear it here before
+// touching either side column and restore at the end.
 func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rightInner, contentHeight int) string {
-	leftCol := ui.RenderColumn(m.leftColumnHeader(), m.leftItems, m.parentIndex(), leftInner, contentHeight, false, m.loading, m.spinner.View(), "")
 	savedHighlight := ui.ActiveHighlightQuery
 	ui.ActiveHighlightQuery = ""
+	leftCol := ui.RenderColumn(m.leftColumnHeader(), m.leftItems, m.parentIndex(), leftInner, contentHeight, false, m.leftColumnLoading(), m.spinner.View(), "")
 	savedMiddleScroll := ui.ActiveMiddleScroll
 	savedLeftScroll := ui.ActiveLeftScroll
 	ui.ActiveMiddleScroll = -1

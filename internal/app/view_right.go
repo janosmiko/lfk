@@ -16,10 +16,9 @@ func (m *Model) clampPreviewScroll() {
 	innerW := rightW - 2
 
 	// Compute the column height exactly as the View function does.
-	colHeight := m.height - 4 // title + status bar + column borders
-	if colHeight < 3 {
-		colHeight = 3
-	}
+	colHeight := max(
+		// title + status bar + column borders
+		m.height-4, 3)
 	if len(m.tabs) > 1 {
 		colHeight-- // tab bar
 	}
@@ -33,16 +32,10 @@ func (m *Model) clampPreviewScroll() {
 	}
 
 	// Compute scrollable viewport height (must match renderRightColumn).
-	scrollableH := colHeight - footerLines
-	if scrollableH < 3 {
-		scrollableH = 3
-	}
+	scrollableH := max(colHeight-footerLines, 3)
 
 	if m.hasSplitPreview() {
-		childrenHeight := (scrollableH - 2) / 3
-		if childrenHeight < 2 {
-			childrenHeight = 2
-		}
+		childrenHeight := max((scrollableH-2)/3, 2)
 		childLabel := strings.ToUpper(m.ownedChildKindLabel())
 		pinnedHeader := m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
 			return ui.RenderTable(childLabel, m.rightItems, -1, innerW, childrenHeight, m.loading, m.spinner.View(), "", false)
@@ -57,10 +50,9 @@ func (m *Model) clampPreviewScroll() {
 
 	// Get the scrollable content line count.
 	// Use the actual scrollable height (not 10000) to avoid inflated YAML fill.
-	measureH := scrollableH * 3 // enough headroom for scroll, but not inflated
-	if measureH < 200 {
-		measureH = 200
-	}
+	measureH := max(
+		// enough headroom for scroll, but not inflated
+		scrollableH*3, 200)
 	var totalLines int
 	if m.hasSplitPreview() {
 		fullContent := m.renderDetailsOnly(innerW, measureH)
@@ -75,10 +67,7 @@ func (m *Model) clampPreviewScroll() {
 		totalLines += 1 + strings.Count(m.previewEventsContent, "\n") + 1 // separator + event lines
 	}
 
-	maxScroll := totalLines - scrollableH
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
+	maxScroll := max(totalLines-scrollableH, 0)
 	if m.previewScroll > maxScroll {
 		m.previewScroll = maxScroll
 	}
@@ -100,19 +89,13 @@ func (m Model) renderRightColumn(width, height int) string {
 		footer = strings.Join(footerParts, "\n")
 		footerLines = strings.Count(footer, "\n") + 1
 	}
-	contentHeight := height - footerLines
-	if contentHeight < 3 {
-		contentHeight = 3
-	}
+	contentHeight := max(height-footerLines, 3)
 
 	// Pin children table at the top when in split preview mode.
 	pinnedHeader := ""
 	pinnedHeaderLines := 0
 	if m.hasSplitPreview() {
-		childrenHeight := (contentHeight - 2) / 3
-		if childrenHeight < 2 {
-			childrenHeight = 2
-		}
+		childrenHeight := max((contentHeight-2)/3, 2)
 		childLabel := strings.ToUpper(m.ownedChildKindLabel())
 		pinnedHeader = m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
 			return ui.RenderTable(childLabel, m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
@@ -194,10 +177,7 @@ func (m Model) hasSplitPreview() bool {
 func (m Model) renderDetailsOnly(width, height int) string {
 	sel := m.selectedMiddleItem()
 	detailsHeader := ui.DimStyle.Bold(true).Render("DETAILS")
-	bodyHeight := height - 1
-	if bodyHeight < 1 {
-		bodyHeight = 1
-	}
+	bodyHeight := max(height-1, 1)
 	var bottomContent string
 	if sel != nil && len(sel.Columns) > 0 {
 		bottomContent = ui.RenderResourceSummary(sel, "", width, bodyHeight)
@@ -284,8 +264,16 @@ func (m Model) renderRightResourceTypes(width, height int) string {
 }
 
 func (m Model) renderRightClusters(width, height int) string {
+	// Discovery for the hovered context is orthogonal to m.loading — it
+	// runs in its own background task. While it is in flight we keep
+	// rightItems empty (see loadPreviewClusters) so the user sees a plain
+	// loader instead of a seeded placeholder list.
+	discovering := false
+	if sel := m.selectedMiddleItem(); sel != nil {
+		discovering = m.discoveringContexts[sel.Name]
+	}
 	if len(m.rightItems) == 0 {
-		if m.loading {
+		if m.loading || discovering {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading...")
 		}
 		return ui.DimStyle.Render("No resource types found")
@@ -312,9 +300,20 @@ func (m Model) renderRightResources(width, height int) string {
 	if (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod") && len(m.rightItems) > 0 {
 		return m.renderSplitPreview(width, height)
 	}
-	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
-		if sel != nil && len(sel.Columns) > 0 {
+	// No children to render (either the kind has no children, or a child-ful
+	// kind happens to have zero matching items like a Service with no pods
+	// behind its selector). Prefer rendering the selected item's details so
+	// the right pane stays stable — watch-tick refreshes set previewLoading
+	// on every interval, and branching on it here would flash a spinner and
+	// clear the details every tick.
+	if m.nav.ResourceType.Kind != "Pod" {
+		if sel != nil && (len(sel.Columns) > 0 || m.secretDataCachedFor(sel)) {
 			return ui.RenderResourceSummary(sel, "", width, height)
+		}
+		// No item selected yet (e.g., initial load before the list arrives):
+		// show the spinner instead of "No preview".
+		if m.loading || m.previewLoading {
+			return ui.DimStyle.Render(m.spinner.View() + " Loading...")
 		}
 		return m.renderFallbackYAML(width, height)
 	}
@@ -358,14 +357,8 @@ func (m Model) renderRightDefault(width, height int) string {
 // group: affected resources table on top, group details on the bottom — the
 // same layout as Deployment > Pods.
 func (m Model) renderSecurityGroupSplitPreview(sel *model.Item, width, height int) string {
-	childrenHeight := (height - 2) / 3
-	if childrenHeight < 2 {
-		childrenHeight = 2
-	}
-	detailsHeight := height - childrenHeight - 2
-	if detailsHeight < 1 {
-		detailsHeight = 1
-	}
+	childrenHeight := max((height-2)/3, 2)
+	detailsHeight := max(height-childrenHeight-2, 1)
 
 	childrenContent := ui.RenderTable("AFFECTED RESOURCES", m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
 	separator := ui.DimStyle.Render(strings.Repeat("\u2500", width))
@@ -376,14 +369,14 @@ func (m Model) renderSecurityGroupSplitPreview(sel *model.Item, width, height in
 
 // renderSplitPreview renders the right column as a split: top children table, bottom details.
 func (m Model) renderSplitPreview(width, height int) string {
-	childrenHeight := (height - 2) / 3 // -2 for separator + details header
-	if childrenHeight < 2 {
-		childrenHeight = 2 // at least header + 1 row
-	}
-	detailsHeight := height - childrenHeight - 2 // separator + details header
-	if detailsHeight < 1 {
-		detailsHeight = 1
-	}
+	childrenHeight := max(
+		// -2 for separator + details header
+		(height-2)/3,
+		// at least header + 1 row
+		2)
+	detailsHeight := max(
+		// separator + details header
+		height-childrenHeight-2, 1)
 
 	// Render children as table (same format as middle column). Scope the
 	// session column config to the child kind so pod/container configs
@@ -439,10 +432,19 @@ func (m Model) resourceTypeHasChildren() bool {
 // This is used both at LevelResources (to decide whether right-arrow navigates
 // into owned view) and at LevelOwned (to allow nested drill-down, e.g.,
 // ArgoCD Application -> Deployment -> Pods).
+//
+// PersistentVolumeClaim is listed here even though the ownership is
+// logically reversed (pods reference PVCs, not the other way around): it
+// lets the right-pane preview lazily show which pods are using the
+// selected PVC, and it lets right-arrow drill into that pod list. The
+// alternative — populating a "Used By" column on every PVC during the
+// list fetch — issued one pod-list call per PVC and could take 6+ seconds
+// on large namespaces.
 func kindHasOwnedChildren(kind string) bool {
 	switch kind {
 	case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob",
-		"Service", "Application", "HelmRelease", "Kustomization", "Node":
+		"Service", "Application", "HelmRelease", "Kustomization", "Node",
+		"PersistentVolumeClaim":
 		return true
 	default:
 		return false

@@ -58,8 +58,8 @@ func RenderContainerDetail(item *model.Item, width, height int) string {
 	if item.Restarts != "" {
 		rows = append(rows, row{"Restarts", item.Restarts, valueStyle})
 	}
-	if item.Age != "" {
-		rows = append(rows, row{"Age", item.Age, AgeStyle(item.Age)})
+	if age := LiveAge(*item); age != "" {
+		rows = append(rows, row{"Age", age, AgeStyle(age)})
 	}
 
 	// Additional columns (reason, message, resources, ports, etc.).
@@ -325,21 +325,34 @@ func findInlineComment(s string) int {
 	return -1
 }
 
-// HighlightSearchInLine highlights search matches in a line.
-// If isCurrent is true, uses a more prominent style for the current match.
-// Supports substring, regex, and fuzzy search modes.
+// HighlightSearchInLine highlights search matches in a YAML line, applying
+// the YAML syntax styling first and then overlaying the search highlight on
+// the styled output. Two passes are needed:
+//
+//  1. YAML syntax: keys/values/punctuation/comments each get their own SGR
+//     pair. Without this, matched lines used to render as plain text — the
+//     old code returned HighlightMatchStyled(line, ...) directly when a
+//     match existed, bypassing HighlightYAMLLine entirely.
+//
+//  2. Search overlay via HighlightMatchInline: re-asserts the YAML token's
+//     active open SGR after each highlight's reset so the rest of the token
+//     after the match keeps its color. Without re-assertion the post-match
+//     tail of the matched word dropped to terminal default — the user saw
+//     "ngi" highlighted in yellow but "nx" rendered in plain white.
+//
+// When isCurrent is true, uses a more prominent style for the current match.
+// Supports substring (the YAML preview's main path) plus regex/fuzzy via
+// fallback to HighlightMatchStyled.
 func HighlightSearchInLine(line, query string, isCurrent bool) string {
-	if query == "" {
-		return HighlightYAMLLine(line)
+	styled := HighlightYAMLLine(line)
+	if query == "" || !MatchLine(line, query) {
+		return styled
 	}
-	if !MatchLine(line, query) {
-		return HighlightYAMLLine(line)
-	}
-	style := SearchHighlightStyle
+	highlight := SearchHighlightStyle
 	if isCurrent {
-		style = SelectedSearchHighlightStyle
+		highlight = SelectedSearchHighlightStyle
 	}
-	return HighlightMatchStyled(line, query, style)
+	return HighlightMatchInline(styled, query, highlight)
 }
 
 // FormatItemNameOnly formats an item showing only its name and icon (no status, age, etc.).
@@ -366,33 +379,21 @@ func FormatItemNameOnly(item model.Item, width int) string {
 		if resolvedIcon != "" {
 			icon := IconStyle.Render(resolvedIcon + " ")
 			iconW := lipgloss.Width(icon)
-			remaining := width - prefixW - iconW - deprecationW
-			if remaining < 1 {
-				remaining = 1
-			}
+			remaining := max(width-prefixW-iconW-deprecationW, 1)
 			return prefix + icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 		}
-		remaining := width - prefixW - deprecationW
-		if remaining < 1 {
-			remaining = 1
-		}
+		remaining := max(width-prefixW-deprecationW, 1)
 		return prefix + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 	}
 
 	if resolvedIcon != "" {
 		icon := IconStyle.Render(resolvedIcon + " ")
 		iconW := lipgloss.Width(icon)
-		remaining := width - iconW - deprecationW
-		if remaining < 1 {
-			remaining = 1
-		}
+		remaining := max(width-iconW-deprecationW, 1)
 		return icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 	}
 
-	remaining := width - deprecationW
-	if remaining < 1 {
-		remaining = 1
-	}
+	remaining := max(width-deprecationW, 1)
 	return NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 }
 
@@ -420,33 +421,21 @@ func FormatItemNameOnlyPlain(item model.Item, width int) string {
 		if resolvedIcon != "" {
 			icon := resolvedIcon + " "
 			iconW := lipgloss.Width(icon)
-			remaining := width - prefixW - iconW - deprecationW
-			if remaining < 1 {
-				remaining = 1
-			}
+			remaining := max(width-prefixW-iconW-deprecationW, 1)
 			return prefix + icon + Truncate(displayName, remaining) + deprecationSuffix
 		}
-		remaining := width - prefixW - deprecationW
-		if remaining < 1 {
-			remaining = 1
-		}
+		remaining := max(width-prefixW-deprecationW, 1)
 		return prefix + Truncate(displayName, remaining) + deprecationSuffix
 	}
 
 	if resolvedIcon != "" {
 		icon := resolvedIcon + " "
 		iconW := lipgloss.Width(icon)
-		remaining := width - iconW - deprecationW
-		if remaining < 1 {
-			remaining = 1
-		}
+		remaining := max(width-iconW-deprecationW, 1)
 		return icon + Truncate(displayName, remaining) + deprecationSuffix
 	}
 
-	remaining := width - deprecationW
-	if remaining < 1 {
-		remaining = 1
-	}
+	remaining := max(width-deprecationW, 1)
 	return Truncate(displayName, remaining) + deprecationSuffix
 }
 
@@ -462,10 +451,7 @@ func wrapExtraValue(val string, width int) []string {
 	}
 	var lines []string
 	for i := width; i < len(runes); i += width {
-		end := i + width
-		if end > len(runes) {
-			end = len(runes)
-		}
+		end := min(i+width, len(runes))
 		lines = append(lines, string(runes[i:end]))
 	}
 	return lines
@@ -592,7 +578,7 @@ func headerCellForKey(key string, extraCols []extraColumn,
 	}
 	for _, ec := range extraCols {
 		if ec.key == key {
-			return headerWithIndicator(strings.ToUpper(ec.key), ec.key, ec.width)
+			return headerWithIndicator(columnHeaderLabel(ec.key), ec.key, ec.width)
 		}
 	}
 	return ""
@@ -615,116 +601,201 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		return b.String()
 	}
 
-	// Detect which detail columns have data.
-	hasNs, hasReady, hasRestarts, hasAge, hasStatus := false, false, false, false, false
-	for _, item := range items {
-		if item.Namespace != "" {
-			hasNs = true
-		}
-		if item.Ready != "" {
-			hasReady = true
-		}
-		if item.Restarts != "" {
-			hasRestarts = true
-		}
-		if item.Age != "" {
-			hasAge = true
-		}
-		if item.Status != "" {
-			hasStatus = true
-		}
-	}
+	var hasNs, hasReady, hasRestarts, hasAge, hasStatus bool
+	var nsW, readyW, restartsW, ageW, statusW int
+	var anyRecentRestart bool
 
-	// Apply user-chosen built-in column suppression from the column toggle
-	// overlay. Only the middle column honors this — child/right previews do
-	// not use ActiveHiddenBuiltinColumns so their layout stays stable.
-	if ActiveMiddleScroll >= 0 && ActiveHiddenBuiltinColumns != nil {
-		if ActiveHiddenBuiltinColumns["Namespace"] {
-			hasNs = false
-		}
-		if ActiveHiddenBuiltinColumns["Ready"] {
-			hasReady = false
-		}
-		if ActiveHiddenBuiltinColumns["Restarts"] {
-			hasRestarts = false
-		}
-		if ActiveHiddenBuiltinColumns["Age"] {
-			hasAge = false
-		}
-		if ActiveHiddenBuiltinColumns["Status"] {
-			hasStatus = false
-		}
-	}
-
-	// Content-aware column widths: size each column based on actual data,
-	// then give all remaining space to the name column so the table fills
-	// the full available width.
-	nsW, readyW, restartsW, ageW, statusW := 0, 0, 0, 0, 0
-	if hasNs {
-		nsW = len("NAMESPACE") // minimum: header width
+	if ActiveTableLayout != nil && ActiveTableLayout.Computed {
+		hasNs = ActiveTableLayout.HasNs
+		hasReady = ActiveTableLayout.HasReady
+		hasRestarts = ActiveTableLayout.HasRestarts
+		hasAge = ActiveTableLayout.HasAge
+		hasStatus = ActiveTableLayout.HasStatus
+		nsW = ActiveTableLayout.NsW
+		readyW = ActiveTableLayout.ReadyW
+		restartsW = ActiveTableLayout.RestartsW
+		ageW = ActiveTableLayout.AgeW
+		statusW = ActiveTableLayout.StatusW
+		anyRecentRestart = ActiveTableLayout.AnyRecentRestart
+	} else {
+		// Detect which detail columns have data.
 		for _, item := range items {
-			if w := len(item.Namespace); w > nsW {
-				nsW = w
+			if item.Namespace != "" {
+				hasNs = true
+			}
+			if item.Ready != "" {
+				hasReady = true
+			}
+			if item.Restarts != "" {
+				hasRestarts = true
+			}
+			if item.Age != "" {
+				hasAge = true
+			}
+			if item.Status != "" {
+				hasStatus = true
 			}
 		}
-		nsW++ // spacing
-		// Cap to avoid extremely long namespaces dominating the layout.
-		if nsW > 30 {
-			nsW = 30
-		}
-	}
-	if hasReady {
-		readyW = len("READY") // 5
-		for _, item := range items {
-			if w := len(item.Ready); w > readyW {
-				readyW = w
+
+		// Apply user-chosen built-in column suppression from the column toggle
+		// overlay. Only the middle column honors this — child/right previews do
+		// not use ActiveHiddenBuiltinColumns so their layout stays stable.
+		if ActiveMiddleScroll >= 0 && ActiveHiddenBuiltinColumns != nil {
+			if ActiveHiddenBuiltinColumns["Namespace"] {
+				hasNs = false
+			}
+			if ActiveHiddenBuiltinColumns["Ready"] {
+				hasReady = false
+			}
+			if ActiveHiddenBuiltinColumns["Restarts"] {
+				hasRestarts = false
+			}
+			if ActiveHiddenBuiltinColumns["Age"] {
+				hasAge = false
+			}
+			if ActiveHiddenBuiltinColumns["Status"] {
+				hasStatus = false
 			}
 		}
-		readyW++ // spacing
-	}
-	// Check if any item has a recent restart — if so, reserve arrow space for all.
-	anyRecentRestart := false
-	if hasRestarts {
-		restartsW = len("RS") + 1 // 3
-		for _, item := range items {
-			if rc, _ := strconv.Atoi(item.Restarts); rc > 0 {
-				if !item.LastRestartAt.IsZero() && time.Since(item.LastRestartAt) < time.Hour {
-					anyRecentRestart = true
-					break
+
+		// Content-aware column widths: size each column based on actual data,
+		// then give all remaining space to the name column so the table fills
+		// the full available width.
+		if hasNs {
+			nsW = len("NAMESPACE") // minimum: header width
+			for _, item := range items {
+				if w := len(item.Namespace); w > nsW {
+					nsW = w
+				}
+			}
+			nsW++ // spacing
+			if nsW > 30 {
+				nsW = 30
+			}
+		}
+		if hasReady {
+			readyW = len("READY") // 5
+			for _, item := range items {
+				if w := len(item.Ready); w > readyW {
+					readyW = w
+				}
+			}
+			readyW++ // spacing
+		}
+		// Check if any item has a recent restart — if so, reserve arrow space for all.
+		if hasRestarts {
+			restartsW = len("RS") + 1 // 3
+			for _, item := range items {
+				if rc, _ := strconv.Atoi(item.Restarts); rc > 0 {
+					if !item.LastRestartAt.IsZero() && time.Since(item.LastRestartAt) < time.Hour {
+						anyRecentRestart = true
+						break
+					}
+				}
+			}
+			for _, item := range items {
+				w := len(item.Restarts)
+				if anyRecentRestart {
+					w++ // reserve space for "↑" indicator (or placeholder)
+				}
+				if w >= restartsW {
+					restartsW = w + 1
 				}
 			}
 		}
-		for _, item := range items {
-			w := len(item.Restarts)
-			if anyRecentRestart {
-				w++ // reserve space for "↑" indicator (or placeholder)
+		if hasAge {
+			ageW = len("AGE") + 1 // 4
+			for _, item := range items {
+				if w := len(LiveAge(item)); w >= ageW {
+					ageW = w + 1
+				}
 			}
-			if w >= restartsW {
-				restartsW = w + 1
+			if ageW > 10 {
+				ageW = 10
+			}
+		}
+		if hasStatus {
+			statusW = len("STATUS") // minimum for header
+			for _, item := range items {
+				if w := len(item.Status); w > statusW {
+					statusW = w
+				}
+			}
+			statusW++ // spacing
+			if statusW > 20 {
+				statusW = 20
 			}
 		}
 	}
-	if hasAge {
-		ageW = len("AGE") + 1 // 4
+
+	// Prefer keeping the full Name visible over a content-sized Namespace.
+	// Pods can have long names (5-suffix generated, plus deployment template
+	// hashes) and a single 28-char namespace would otherwise burn ~29 cols on
+	// NAMESPACE while the name column truncates. Shrink nsW down toward its
+	// header width when doing so keeps the longest name from being cut.
+	if hasNs && (ActiveTableLayout == nil || !ActiveTableLayout.Computed) {
+		longestName := 0
 		for _, item := range items {
-			if w := len(item.Age); w >= ageW {
-				ageW = w + 1
+			if w := len(item.Name); w > longestName {
+				longestName = w
 			}
 		}
-		if ageW > 10 {
-			ageW = 10
+		// Marker col is reserved later but also counts toward the layout
+		// budget — include it so the floor matches what nameW will see.
+		markerW := 0
+		if len(showMarker) == 0 || showMarker[0] {
+			markerW = 2
+		}
+		fixedOther := readyW + restartsW + ageW + statusW + markerW
+		nsHeaderW := len("NAMESPACE") + 1
+		// Largest nsW that still leaves room for the longest name (+1
+		// spacing) without truncation, floored at the NAMESPACE header.
+		targetNs := max(width-fixedOther-(longestName+1), nsHeaderW)
+		if targetNs < nsW {
+			nsW = targetNs
 		}
 	}
-	if hasStatus {
-		statusW = len("STATUS") // minimum for header
+	// Same idea for STATUS: when the width budget is tight enough that
+	// names would still truncate even after the namespace shrink above,
+	// fall back to abbreviated status labels (PodInitializing → Init,
+	// Succeeded → Done) so the saved cells flow into NAME instead of
+	// being burned on long status strings the layout can't drop. Skipped
+	// when no status value would actually shrink, since recomputing here
+	// would otherwise undo a wider cap users had set explicitly.
+	if hasStatus && (ActiveTableLayout == nil || !ActiveTableLayout.Computed) {
+		longestName := 0
 		for _, item := range items {
-			if w := len(item.Status); w > statusW {
-				statusW = w
+			if w := len(item.Name); w > longestName {
+				longestName = w
 			}
 		}
-		statusW++ // spacing
-		if statusW > 20 {
-			statusW = 20
+		markerW := 0
+		if len(showMarker) == 0 || showMarker[0] {
+			markerW = 2
+		}
+		// What's the smallest STATUS width if every value used its
+		// abbreviation? The header floor still applies.
+		abbrevMaxW := len("STATUS")
+		willShrinkAny := false
+		for _, item := range items {
+			abbr := AbbreviateStatusForWidth(item.Status, 0)
+			if abbr != item.Status {
+				willShrinkAny = true
+			}
+			if w := len(abbr); w > abbrevMaxW {
+				abbrevMaxW = w
+			}
+		}
+		abbrevStatusW := abbrevMaxW + 1 // matches the +1 spacing applied above
+		if willShrinkAny && abbrevStatusW < statusW {
+			fixedOther := readyW + restartsW + ageW + markerW
+			minNsW := 0
+			if hasNs {
+				minNsW = min(len("NAMESPACE")+1, nsW)
+			}
+			if width-fixedOther-statusW-minNsW-(longestName+1) < 0 {
+				statusW = abbrevStatusW
+			}
 		}
 	}
 	// Reserve space for the selection marker column in the focus pane
@@ -735,24 +806,45 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		markerColW = 2
 	}
 
-	// Collect extra columns from item data (additionalPrinterColumns).
-	// Derive the resource kind from the first item (all items in a table share the same kind).
-	tableKind := ""
-	if len(items) > 0 {
-		tableKind = items[0].Kind
-	}
-	extraCols := collectExtraColumns(items, width, nsW+readyW+restartsW+ageW+statusW+markerColW, tableKind)
+	var extraCols []extraColumn
+	if ActiveTableLayout != nil && ActiveTableLayout.Computed {
+		extraCols = ActiveTableLayout.ExtraCols
+	} else {
+		// Collect extra columns from item data (additionalPrinterColumns).
+		tableKind := ""
+		if len(items) > 0 {
+			tableKind = items[0].Kind
+		}
+		extraCols = collectExtraColumns(items, width, nsW+readyW+restartsW+ageW+statusW+markerColW, tableKind)
 
-	// Drop any extras that collide with a built-in key so the built-in always
-	// wins (matches the existing ActiveSortableColumns de-dup precedent) and
-	// keeps column-order serialization simple (bare keys, no disambiguation).
-	filtered := extraCols[:0]
-	for _, ec := range extraCols {
-		if !isBuiltinColumnKey(ec.key) {
-			filtered = append(filtered, ec)
+		// Drop any extras that collide with a built-in key so the built-in always
+		// wins (matches the existing ActiveSortableColumns de-dup precedent) and
+		// keeps column-order serialization simple (bare keys, no disambiguation).
+		filtered := extraCols[:0]
+		for _, ec := range extraCols {
+			if !isBuiltinColumnKey(ec.key) {
+				filtered = append(filtered, ec)
+			}
+		}
+		extraCols = filtered
+
+		// Populate the layout cache so subsequent renders skip the O(N) work.
+		if ActiveTableLayout != nil {
+			ActiveTableLayout.HasNs = hasNs
+			ActiveTableLayout.HasReady = hasReady
+			ActiveTableLayout.HasRestarts = hasRestarts
+			ActiveTableLayout.HasAge = hasAge
+			ActiveTableLayout.HasStatus = hasStatus
+			ActiveTableLayout.NsW = nsW
+			ActiveTableLayout.ReadyW = readyW
+			ActiveTableLayout.RestartsW = restartsW
+			ActiveTableLayout.AgeW = ageW
+			ActiveTableLayout.StatusW = statusW
+			ActiveTableLayout.AnyRecentRestart = anyRecentRestart
+			ActiveTableLayout.ExtraCols = extraCols
+			ActiveTableLayout.Computed = true
 		}
 	}
-	extraCols = filtered
 
 	// Populate ActiveExtraColumnKeys for the column toggle overlay.
 	// Only the active middle column is authoritative — child/right table
@@ -793,10 +885,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	}
 
 	// Name column gets all remaining space so the table fills the full width.
-	nameW := width - nsW - readyW - restartsW - ageW - statusW - markerColW - extraTotalW
-	if nameW < 10 {
-		nameW = 10
-	}
+	nameW := max(width-nsW-readyW-restartsW-ageW-statusW-markerColW-extraTotalW, 10)
 	// Cap name column when names are short (e.g., CVE IDs ~15 chars).
 	// Redistribute the surplus to the last extra column (typically Title
 	// or the most descriptive column) so it can show more content instead
@@ -940,10 +1029,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				}
 			}
 			if cursor-scrollOff >= 0 && startIdx > cursor-scrollOff {
-				startIdx = cursor - scrollOff
-				if startIdx < 0 {
-					startIdx = 0
-				}
+				startIdx = max(cursor-scrollOff, 0)
 			}
 			// Check the new position BEFORE decrementing so we
 			// don't overshoot when an earlier row has 2 display
@@ -1048,30 +1134,49 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 				}
 			}
 			// Selected row: plain text, no inner styles.
-			row := markerPrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, item.Age,
+			row := markerPrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, LiveAge(item),
 				nameW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
-			// Apply search/filter highlight on the selected row with contrasting style.
+			highlighted := false
+			// Apply search/filter highlight on the selected row with
+			// contrasting style. Pass the cursor-row outer style so
+			// the inner highlight's reset doesn't kill the cursor bg
+			// for the post-match part of the row.
 			if ActiveHighlightQuery != "" {
-				row = highlightNameSelected(row, ActiveHighlightQuery)
+				row = highlightNameSelectedOver(row, ActiveHighlightQuery, ActiveSelectedStyle(i))
+				highlighted = true
 			}
 			// Pad to full width for clean highlight.
 			lineW := lipgloss.Width(row)
 			if lineW < width {
 				row += strings.Repeat(" ", width-lineW)
 			}
-			b.WriteString(ActiveSelectedStyle(i).MaxWidth(width).Render(row))
+			if highlighted {
+				// Avoid lipgloss.Render fragmenting embedded inner
+				// highlight ANSI per-character — see RenderOverPrestyled.
+				b.WriteString(RenderOverPrestyled(row, ActiveSelectedStyle(i)))
+			} else {
+				b.WriteString(ActiveSelectedStyle(i).MaxWidth(width).Render(row))
+			}
 		} else {
-			// Selection marker (styled for non-cursor rows).
-			markerPrefix := ""
-			if wantMarker {
-				markerPrefix = "  "
-				if selected {
-					markerPrefix = SelectionMarkerStyle.Render(selectionMarker)
+			var rendered string
+			if ActiveRowCache != nil {
+				rendered = ActiveRowCache[i]
+			}
+			if rendered == "" {
+				markerPrefix := ""
+				if wantMarker {
+					markerPrefix = "  "
+					if selected {
+						markerPrefix = SelectionMarkerStyle.Render(selectionMarker)
+					}
+				}
+				rendered = markerPrefix + formatTableRowStyledOrdered(item, nameW, nsW, readyW, restartsW, statusW, ageW,
+					order, extraCols, anyRecentRestart)
+				if ActiveRowCache != nil {
+					ActiveRowCache[i] = rendered
 				}
 			}
-			// Non-selected row: apply styling.
-			b.WriteString(markerPrefix + formatTableRowStyledOrdered(item, nameW, nsW, readyW, restartsW, statusW, ageW,
-				order, extraCols, anyRecentRestart))
+			b.WriteString(rendered)
 		}
 
 	}

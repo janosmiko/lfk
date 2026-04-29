@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"sync"
 	"testing"
 
@@ -447,17 +448,26 @@ func TestVisibleMiddleItemsAllGroupsExpanded(t *testing.T) {
 }
 
 func TestVisibleMiddleItemsCategoryFilterIncludesAll(t *testing.T) {
+	// Category-expansion is now gated on broad mode (Tab) AND
+	// LevelResourceTypes — see filter_category_broad_mode_test.go for
+	// the full contract. Switch this case to the LevelResourceTypes +
+	// broad-mode shape where the expansion is meant to fire; the
+	// previous unconditional expansion was the source of the "f ing
+	// pulls in every Networking item" complaint.
 	m := Model{
-		nav: model.NavigationState{Level: model.LevelResources},
+		nav: model.NavigationState{Level: model.LevelResourceTypes},
 		middleItems: []model.Item{
 			{Name: "Pods", Category: "Workloads"},
 			{Name: "Deployments", Category: "Workloads"},
 			{Name: "Services", Category: "Networking"},
 		},
-		filterText: "Workloads",
+		filterText:        "Workloads",
+		filterBroadMode:   true,
+		allGroupsExpanded: true,
 	}
 	visible := m.visibleMiddleItems()
-	// Category match should include all items in the "Workloads" category.
+	// Category match (broad mode + LevelResourceTypes) includes every
+	// item under "Workloads".
 	assert.Len(t, visible, 2)
 }
 
@@ -498,16 +508,53 @@ func TestParentIndex(t *testing.T) {
 	t.Run("LevelResources returns resource type match", func(t *testing.T) {
 		m := Model{
 			nav: model.NavigationState{
-				Level:        model.LevelResources,
-				ResourceType: model.ResourceTypeEntry{DisplayName: "Deployments"},
+				Level: model.LevelResources,
+				ResourceType: model.ResourceTypeEntry{
+					DisplayName: "Deployments",
+					APIGroup:    "apps",
+					APIVersion:  "v1",
+					Resource:    "deployments",
+				},
 			},
 			leftItems: []model.Item{
-				{Name: "Pods"},
-				{Name: "Deployments"},
-				{Name: "Services"},
+				{Name: "Pods", Extra: "/v1/pods"},
+				{Name: "Deployments", Extra: "apps/v1/deployments"},
+				{Name: "Services", Extra: "/v1/services"},
 			},
 		}
 		assert.Equal(t, 1, m.parentIndex())
+	})
+
+	// Regression: when the user drills from Resource Types into a resource list,
+	// navigateChildResourceType stores the API-discovery-produced
+	// ResourceTypeEntry in m.nav.ResourceType. Discovery does NOT populate
+	// DisplayName on that struct — only pseudo-resources (Port Forwards, Helm
+	// Releases) and the curated metadata table carry one. The parent column in
+	// leftItems still renders the resource types, and the correct entry must
+	// stay highlighted. Matching on DisplayName silently drops the highlight
+	// for every real-world resource; matching on the stable ResourceRef
+	// (APIGroup/APIVersion/Resource, stored in Item.Extra) survives the empty
+	// DisplayName.
+	t.Run("LevelResources matches discovery entry with empty DisplayName", func(t *testing.T) {
+		discovered := []model.ResourceTypeEntry{
+			{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+			{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+			{Kind: "Service", APIGroup: "", APIVersion: "v1", Resource: "services", Namespaced: true},
+		}
+		items := model.BuildSidebarItems(discovered)
+		rt, ok := model.FindResourceTypeIn("apps/v1/deployments", discovered)
+		require.True(t, ok)
+		assert.Empty(t, rt.DisplayName, "discovery must not populate DisplayName (guards the bug we are testing)")
+		m := Model{
+			nav: model.NavigationState{
+				Level:        model.LevelResources,
+				ResourceType: rt,
+			},
+			leftItems: items,
+		}
+		got := m.parentIndex()
+		require.GreaterOrEqual(t, got, 0, "expected the parent Deployments row to be highlighted")
+		assert.Equal(t, "Deployments", items[got].Name)
 	})
 
 	t.Run("LevelOwned returns resource name match", func(t *testing.T) {
@@ -556,6 +603,19 @@ func TestParentIndex(t *testing.T) {
 	})
 }
 
+// --- setMiddleItems ---
+
+func TestSetMiddleItemsBumpsRev(t *testing.T) {
+	m := Model{middleItemsRev: 7}
+	m.setMiddleItems([]model.Item{{Name: "x"}})
+	assert.Equal(t, uint64(8), m.middleItemsRev, "rev must bump on reassignment")
+	assert.Equal(t, []model.Item{{Name: "x"}}, m.middleItems)
+
+	m.setMiddleItems(nil)
+	assert.Equal(t, uint64(9), m.middleItemsRev, "rev must bump even when items go nil")
+	assert.Nil(t, m.middleItems)
+}
+
 // --- carryOverMetricsColumns ---
 
 func TestCarryOverMetricsColumns(t *testing.T) {
@@ -590,7 +650,11 @@ func TestCarryOverMetricsColumns(t *testing.T) {
 		assert.Equal(t, "Status", newItems[0].Columns[3].Key)
 	})
 
-	t.Run("no carryover when old items have no real usage", func(t *testing.T) {
+	t.Run("zero-value metrics columns still carry across ticks", func(t *testing.T) {
+		// Behavior changed deliberately so the metrics column set stays
+		// visually stable across watch ticks even when a pod/node has zero
+		// load or only "n/a" placeholders. Values get refreshed when the
+		// next podMetricsEnrichedMsg / nodeMetricsEnrichedMsg arrives.
 		m := Model{
 			middleItems: []model.Item{
 				{
@@ -611,8 +675,10 @@ func TestCarryOverMetricsColumns(t *testing.T) {
 			},
 		}
 		m.carryOverMetricsColumns(newItems)
-		assert.Len(t, newItems[0].Columns, 1)
-		assert.Equal(t, "Status", newItems[0].Columns[0].Key)
+		assert.Len(t, newItems[0].Columns, 3)
+		assert.Equal(t, "CPU", newItems[0].Columns[0].Key)
+		assert.Equal(t, "MEM", newItems[0].Columns[1].Key)
+		assert.Equal(t, "Status", newItems[0].Columns[2].Key)
 	})
 
 	t.Run("no carryover for unmatched items", func(t *testing.T) {
@@ -823,12 +889,22 @@ func TestFilteredLogContainerItems(t *testing.T) {
 		assert.Len(t, result, 3)
 	})
 
-	t.Run("filter matches plus always includes All Containers", func(t *testing.T) {
+	// Filter applies to the All Containers virtual row like every other entry,
+	// matching the namespace and log pod selectors. Keeping it always-visible
+	// clutters the filtered list and breaks the muscle-memory consistency
+	// across selectors.
+	t.Run("filter excludes All Containers when name does not match", func(t *testing.T) {
 		m.logContainerFilterText = "nginx"
 		result := m.filteredLogContainerItems()
-		assert.Len(t, result, 2)
+		assert.Len(t, result, 1)
+		assert.Equal(t, "nginx", result[0].Name)
+	})
+
+	t.Run("filter matches All Containers by name", func(t *testing.T) {
+		m.logContainerFilterText = "All"
+		result := m.filteredLogContainerItems()
+		assert.Len(t, result, 1)
 		assert.Equal(t, "All Containers", result[0].Name)
-		assert.Equal(t, "nginx", result[1].Name)
 	})
 }
 
@@ -1053,7 +1129,7 @@ func TestCov80MoveCursorUpFromZero(t *testing.T) {
 	result, cmd := m.moveCursor(-1)
 	rm := result.(Model)
 	assert.Equal(t, 0, rm.cursor())
-	assert.NotNil(t, cmd) // loadPreview
+	assert.NotNil(t, cmd)
 }
 
 func TestCov80MoveCursorDownPastEnd(t *testing.T) {
@@ -1213,6 +1289,57 @@ func TestMoveCursorBumpsRequestGenAndDiscardsStalePreview(t *testing.T) {
 	am := after.(Model)
 	assert.True(t, am.loading, "stale preview must not clear loading flag")
 	assert.Nil(t, am.rightItems, "stale preview must not populate rightItems")
+}
+
+func TestMoveCursorDoesNotCancelInFlightReqCtx(t *testing.T) {
+	m := basePush80Model()
+	m.reqCtx, m.reqCancel = context.WithCancel(context.Background())
+	oldCtx := m.reqCtx
+	m.setCursor(0)
+
+	result, _ := m.moveCursor(1)
+	rm := result.(Model)
+
+	assert.NoError(t, oldCtx.Err())
+	assert.Equal(t, oldCtx, rm.reqCtx)
+}
+
+func TestMoveCursorDebounceCoalescesRapidBursts(t *testing.T) {
+	m := basePush80Model()
+	m.middleItems = []model.Item{
+		{Name: "pod-1", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-2", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-3", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-4", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-5", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-6", Namespace: "default", Kind: "Pod"},
+	}
+	m.setCursor(0)
+
+	startGen := m.previewDebounceGen
+	for range 5 {
+		result, cmd := m.moveCursor(1)
+		m = result.(Model)
+		require.NotNil(t, cmd, "moveCursor must return a debounce cmd")
+	}
+
+	assert.Equal(t, startGen+5, m.previewDebounceGen)
+
+	for staleGen := startGen + 1; staleGen < m.previewDebounceGen; staleGen++ {
+		_, cmd := m.Update(previewDebounceTickMsg{gen: staleGen})
+		assert.Nilf(t, cmd, "stale gen %d must be dropped (current %d)", staleGen, m.previewDebounceGen)
+	}
+
+	_, cmd := m.Update(previewDebounceTickMsg{gen: m.previewDebounceGen})
+	assert.NotNil(t, cmd, "current gen must trigger preview load")
+}
+
+func TestSchedulePreviewDebounceCarriesGen(t *testing.T) {
+	cmd := schedulePreviewDebounce(42)
+	require.NotNil(t, cmd)
+	tick, ok := cmd().(previewDebounceTickMsg)
+	require.True(t, ok)
+	assert.Equal(t, uint64(42), tick.gen)
 }
 
 func TestCov80MoveCursorEmptyItems(t *testing.T) {
@@ -1919,8 +2046,11 @@ func TestCovParentIndex(t *testing.T) {
 	assert.Equal(t, 1, m.parentIndex())
 
 	m.nav.Level = model.LevelResources
-	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods"}
-	m.leftItems = []model.Item{{Name: "Deployments"}, {Name: "Pods"}}
+	m.nav.ResourceType = model.ResourceTypeEntry{APIVersion: "v1", Resource: "pods"}
+	m.leftItems = []model.Item{
+		{Name: "Deployments", Extra: "apps/v1/deployments"},
+		{Name: "Pods", Extra: "/v1/pods"},
+	}
 	assert.Equal(t, 1, m.parentIndex())
 
 	m.nav.Level = model.LevelOwned
@@ -2193,7 +2323,14 @@ func TestCovCarryOverMetricsColumns(t *testing.T) {
 	assert.Len(t, newItems[1].Columns, 1)
 }
 
-func TestCovCarryOverMetricsNoUsage(t *testing.T) {
+func TestCovCarryOverMetricsZeroValuesStillCarry(t *testing.T) {
+	// Behavior changed deliberately: the carryover used to drop any item
+	// whose CPU and MEM were "0" / empty. That kept the metrics columns
+	// flickering out and back in whenever a node had zero load — and
+	// blocked "n/a" placeholders from surviving across watch ticks. Now
+	// the carryover always persists existing metrics columns so the
+	// column set stays stable; the actual values get refreshed on the
+	// next podMetricsEnrichedMsg / nodeMetricsEnrichedMsg.
 	m := baseModelCov()
 	m.middleItems = []model.Item{
 		{
@@ -2211,8 +2348,10 @@ func TestCovCarryOverMetricsNoUsage(t *testing.T) {
 	}
 
 	m.carryOverMetricsColumns(newItems)
-	// No usage data, so no carryover.
-	assert.Empty(t, newItems[0].Columns)
+	assert.Equal(t, []model.KeyValue{
+		{Key: "CPU", Value: "0"},
+		{Key: "MEM", Value: "0"},
+	}, newItems[0].Columns)
 }
 
 func TestCovClampAllCursors(t *testing.T) {

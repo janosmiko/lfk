@@ -5,6 +5,8 @@ import (
 	"path/filepath"
 
 	"sigs.k8s.io/yaml"
+
+	"github.com/janosmiko/lfk/internal/logger"
 )
 
 // PinnedState stores per-context pinned CRD groups.
@@ -33,10 +35,14 @@ func loadPinnedState() *PinnedState {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warn("Failed to read pinned-groups state", "error", err, "path", path)
+		}
 		return &PinnedState{Contexts: make(map[string][]string)}
 	}
 	var s PinnedState
 	if err := yaml.Unmarshal(data, &s); err != nil {
+		logger.Warn("Pinned-groups file is corrupt; starting fresh", "error", err, "path", path)
 		return &PinnedState{Contexts: make(map[string][]string)}
 	}
 	if s.Contexts == nil {

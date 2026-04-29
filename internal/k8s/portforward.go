@@ -92,7 +92,13 @@ func (m *PortForwardManager) ActiveCount() int {
 // It returns the entry ID for tracking. The port forward starts in PortForwardStarting
 // status and transitions to PortForwardRunning only after kubectl confirms readiness
 // by writing "Forwarding from" to stdout.
-func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, resourceName, namespace, kctx, localPort, remotePort string) (int, error) {
+//
+// displayContext is the lfk-side name (potentially disambiguated when several
+// kubeconfigs share a context name) used in the entry/UI; kubectlContext is
+// the literal name from the source kubeconfig and is what we hand to
+// `kubectl --context`. When the two are equal, callers can pass the same
+// value twice. See issue #23.
+func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, resourceName, namespace, displayContext, kubectlContext, localPort, remotePort string) (int, error) {
 	m.mu.Lock()
 	id := m.nextID
 	m.nextID++
@@ -100,7 +106,7 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 
 	target := resourceKind + "/" + resourceName
 	portMapping := localPort + ":" + remotePort
-	args := []string{"port-forward", target, portMapping, "-n", namespace, "--context", kctx}
+	args := []string{"port-forward", target, portMapping, "-n", namespace, "--context", kubectlContext}
 
 	ctx, cancel := context.WithCancel(context.Background())
 	cmd := exec.CommandContext(ctx, kubectlPath, args...)
@@ -122,7 +128,7 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 		ResourceKind: resourceKind,
 		ResourceName: resourceName,
 		Namespace:    namespace,
-		Context:      kctx,
+		Context:      displayContext,
 		LocalPort:    localPort,
 		RemotePort:   remotePort,
 		Status:       PortForwardStarting,
@@ -131,7 +137,7 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 		cancel:       cancel,
 	}
 
-	logger.Info("Running kubectl command", "cmd", cmd.String())
+	logger.Info("Running kubectl command", "cmd", cmd.String(), "kubeconfig", kubeconfigPaths)
 	if err := cmd.Start(); err != nil {
 		cancel()
 		logger.Error("kubectl port-forward failed to start", "cmd", cmd.String(), "error", err)
@@ -227,6 +233,13 @@ func (m *PortForwardManager) Stop(id int) error {
 			}
 			e.cancel()
 			e.Status = PortForwardStopped
+			logger.Info("Port-forward stopped",
+				"id", id,
+				"resource", fmt.Sprintf("%s/%s", e.ResourceKind, e.ResourceName),
+				"namespace", e.Namespace,
+				"context", e.Context,
+				"localPort", e.LocalPort,
+				"remotePort", e.RemotePort)
 			if m.onUpdate != nil {
 				m.onUpdate()
 			}
@@ -244,10 +257,17 @@ func (m *PortForwardManager) Remove(id int) {
 	for i, e := range m.entries {
 		if e.ID == id {
 			// Stop it first if still running or starting.
-			if e.Status == PortForwardRunning || e.Status == PortForwardStarting {
+			wasRunning := e.Status == PortForwardRunning || e.Status == PortForwardStarting
+			if wasRunning {
 				e.cancel()
 			}
 			m.entries = append(m.entries[:i], m.entries[i+1:]...)
+			logger.Info("Port-forward removed",
+				"id", id,
+				"resource", fmt.Sprintf("%s/%s", e.ResourceKind, e.ResourceName),
+				"namespace", e.Namespace,
+				"context", e.Context,
+				"wasRunning", wasRunning)
 			if m.onUpdate != nil {
 				m.onUpdate()
 			}

@@ -14,6 +14,73 @@ import (
 // the overlay matches the header row.
 var builtinColumnOrder = []string{"Namespace", "Ready", "Restarts", "Status", "Age"}
 
+// columnToggleSnapshot captures the pre-overlay column-config state for
+// a single kind so Esc can revert after live-apply edits. The hasX
+// flags distinguish "no map entry" (auto-detect) from "explicit empty
+// slice" (user said no extras), which sessionColumns relies on.
+type columnToggleSnapshot struct {
+	kind       string
+	session    []string
+	hasSession bool
+	hidden     []string
+	hasHidden  bool
+	order      []string
+	hasOrder   bool
+}
+
+// captureColumnToggleSnapshot deep-copies the current per-kind column
+// config so a later restoreColumnToggleSnapshot can undo any live-apply
+// edits the user made while the overlay was open.
+func captureColumnToggleSnapshot(m *Model, kind string) columnToggleSnapshot {
+	snap := columnToggleSnapshot{kind: kind}
+	if v, ok := m.sessionColumns[kind]; ok {
+		snap.hasSession = true
+		snap.session = append([]string(nil), v...)
+	}
+	if v, ok := m.hiddenBuiltinColumns[kind]; ok {
+		snap.hasHidden = true
+		snap.hidden = append([]string(nil), v...)
+	}
+	if v, ok := m.columnOrder[kind]; ok {
+		snap.hasOrder = true
+		snap.order = append([]string(nil), v...)
+	}
+	return snap
+}
+
+// restoreColumnToggleSnapshot puts the maps back to the snapshot taken
+// at overlay open. Called when the user presses Esc to discard the
+// live-applied changes.
+func restoreColumnToggleSnapshot(m *Model, snap columnToggleSnapshot) {
+	if snap.kind == "" {
+		return
+	}
+	if snap.hasSession {
+		if m.sessionColumns == nil {
+			m.sessionColumns = make(map[string][]string)
+		}
+		m.sessionColumns[snap.kind] = snap.session
+	} else {
+		delete(m.sessionColumns, snap.kind)
+	}
+	if snap.hasHidden {
+		if m.hiddenBuiltinColumns == nil {
+			m.hiddenBuiltinColumns = make(map[string][]string)
+		}
+		m.hiddenBuiltinColumns[snap.kind] = snap.hidden
+	} else {
+		delete(m.hiddenBuiltinColumns, snap.kind)
+	}
+	if snap.hasOrder {
+		if m.columnOrder == nil {
+			m.columnOrder = make(map[string][]string)
+		}
+		m.columnOrder[snap.kind] = snap.order
+	} else {
+		delete(m.columnOrder, snap.kind)
+	}
+}
+
 // openColumnToggle populates the column toggle overlay from the current
 // resource list. It enumerates both built-in columns (backed by Item fields)
 // and extra columns (from Item.Columns), pre-selecting entries to reflect
@@ -38,6 +105,9 @@ func (m *Model) openColumnToggle() {
 	m.columnToggleCursor = 0
 	m.columnToggleFilter = ""
 	m.columnToggleFilterActive = false
+	// Snapshot the current per-kind config so Esc can undo the
+	// live-applied edits the user is about to make in the overlay.
+	m.columnToggleSnapshot = captureColumnToggleSnapshot(m, kind)
 	m.overlay = overlayColumnToggle
 }
 
@@ -212,7 +282,7 @@ func (m Model) handleColumnToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case " ":
-		// Toggle visibility and advance cursor.
+		// Toggle visibility, persist live, then advance cursor.
 		if m.columnToggleCursor >= 0 && m.columnToggleCursor < len(items) {
 			key := items[m.columnToggleCursor].key
 			for i := range m.columnToggleItems {
@@ -222,6 +292,7 @@ func (m Model) handleColumnToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				}
 			}
 		}
+		m.applyColumnToggleState()
 		if m.columnToggleCursor < maxIdx {
 			m.columnToggleCursor++
 		}
@@ -248,11 +319,13 @@ func (m Model) handleColumnToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleColumnToggleKeyR()
 
 	case "c":
-		// Clear: uncheck every entry without closing the overlay, so the
-		// user can pick a fresh set from scratch. Apply with Enter to save.
+		// Clear: uncheck every entry without closing the overlay so the
+		// user can pick a fresh set. Live-apply persists the empty state
+		// — Esc reverts via the snapshot, Enter just closes.
 		for i := range m.columnToggleItems {
 			m.columnToggleItems[i].visible = false
 		}
+		m.applyColumnToggleState()
 		return m, nil
 
 	case "ctrl+c":
@@ -324,8 +397,13 @@ func (m Model) handleColumnToggleKeyEsc() (tea.Model, tea.Cmd) {
 		m.columnToggleCursor = 0
 		return m, nil
 	}
+	// Discard live-applied edits by reverting to the snapshot taken at
+	// openColumnToggle. Without this, Esc would silently keep whatever
+	// the user toggled while exploring.
+	restoreColumnToggleSnapshot(&m, m.columnToggleSnapshot)
 	m.overlay = overlayNone
 	m.columnToggleItems = nil
+	m.columnToggleSnapshot = columnToggleSnapshot{}
 	return m, nil
 }
 
@@ -344,6 +422,7 @@ func (m Model) handleColumnToggleKeyJ() (tea.Model, tea.Cmd) {
 		i := m.columnToggleCursor
 		m.columnToggleItems[i], m.columnToggleItems[i+1] = m.columnToggleItems[i+1], m.columnToggleItems[i]
 		m.columnToggleCursor++
+		m.applyColumnToggleState()
 	}
 	return m, nil
 }
@@ -356,19 +435,23 @@ func (m Model) handleColumnToggleKeyK2() (tea.Model, tea.Cmd) {
 		i := m.columnToggleCursor
 		m.columnToggleItems[i], m.columnToggleItems[i-1] = m.columnToggleItems[i-1], m.columnToggleItems[i]
 		m.columnToggleCursor--
+		m.applyColumnToggleState()
 	}
 	return m, nil
 }
 
-func (m Model) handleColumnToggleKeyEnter() (tea.Model, tea.Cmd) {
+// applyColumnToggleState writes the overlay's current entry list to
+// sessionColumns / hiddenBuiltinColumns / columnOrder for the current
+// kind WITHOUT closing the overlay. Called after every Space/J/K/c so
+// the table behind the overlay reflects edits live. handleColumnToggleKeyEnter
+// is now just "apply + close"; Esc reverts via restoreColumnToggleSnapshot.
+//
+// Pointer receiver because we may need to assign newly-allocated maps
+// when the caller's map fields are nil — a value receiver would only
+// update the local copy.
+func (m *Model) applyColumnToggleState() {
 	kind := m.middleColumnKind()
 
-	// Walk the current overlay order to collect three parallel views of the
-	// user's selection:
-	//   - visibleExtras: ordered visible extras (persisted to sessionColumns)
-	//   - hiddenBuiltins: built-in keys the user unchecked
-	//   - fullOrder: all visible entries in overlay order (persisted to
-	//     columnOrder so the next render honors the user's interleaving)
 	var visibleExtras []string
 	var hiddenBuiltins []string
 	var fullOrder []string
@@ -389,27 +472,21 @@ func (m Model) handleColumnToggleKeyEnter() (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// If the user unselected absolutely everything, interpret it as "revert
-	// to defaults" instead of leaving the table completely empty. This is
-	// equivalent to pressing R and matches the more intuitive behavior.
+	// Total clear: drop all per-kind entries so the table renders defaults.
+	// The behavior matches a hypothetical R reset, but the overlay STAYS
+	// open under the new live-apply contract — only Enter or Esc close it.
 	if visibleCount == 0 {
 		delete(m.sessionColumns, kind)
 		delete(m.hiddenBuiltinColumns, kind)
 		delete(m.columnOrder, kind)
-		m.overlay = overlayNone
-		m.columnToggleItems = nil
-		return m, nil
+		return
 	}
 
 	if m.sessionColumns == nil {
 		m.sessionColumns = make(map[string][]string)
 	}
-	// Always save the extras list, even if empty, so the user's explicit
-	// "no extras" choice is preserved. A non-nil empty slice is the signal
-	// that the user configured this kind; selectColumnCandidates treats nil
-	// (no entry in the map) as "auto-detect" and an empty slice as "show
-	// no extras". Without this, unselecting all extras would fall back to
-	// auto-detect and re-add columns like CPU/MEM.
+	// Non-nil empty slice = "user explicitly configured no extras" so the
+	// auto-detect path doesn't re-add CPU/MEM next render.
 	if visibleExtras == nil {
 		visibleExtras = []string{}
 	}
@@ -432,9 +509,19 @@ func (m Model) handleColumnToggleKeyEnter() (tea.Model, tea.Cmd) {
 	} else {
 		m.columnOrder[kind] = fullOrder
 	}
+}
 
+func (m Model) handleColumnToggleKeyEnter() (tea.Model, tea.Cmd) {
+	// Idempotent commit: live-apply already wrote the same state on each
+	// Space/J/K/c, so calling apply here is usually a no-op — but it also
+	// covers programmatic flows that mutate columnToggleItems directly
+	// without going through the keystroke handlers. Then close and drop
+	// the snapshot so a future Esc-after-reopen doesn't restore stale
+	// state.
+	m.applyColumnToggleState()
 	m.overlay = overlayNone
 	m.columnToggleItems = nil
+	m.columnToggleSnapshot = columnToggleSnapshot{}
 	return m, nil
 }
 

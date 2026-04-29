@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"maps"
 	"os"
 	"os/exec"
 	"strings"
@@ -51,16 +52,31 @@ func (m Model) loadContexts() tea.Cmd {
 }
 
 func (m Model) loadResourceTypes() tea.Cmd {
-	kctx := m.nav.Context
+	return m.loadResourceTypesFor(m.nav.Context)
+}
+
+// loadResourceTypesFor emits a resourceTypesMsg for a specific context.
+// Used by the LevelClusters preview path so the right pane can show the
+// resource types for the *hovered* context, not the currently-active one
+// (m.nav.Context is "" after back-navigation from LevelResourceTypes).
+func (m Model) loadResourceTypesFor(kctx string) tea.Cmd {
 	discovered := m.discoveredResources[kctx]
 	var items []model.Item
+	var seeded bool
 	if len(discovered) > 0 {
 		items = model.BuildSidebarItems(discovered)
 	} else {
+		// Discovery hasn't completed yet for this context. Emit the seed
+		// list (Pods, Deployments, ...) so the right-pane preview at
+		// LevelClusters has something to show while hovering a context.
+		// The middle-pane (LevelResourceTypes) handler will *ignore*
+		// seeded messages while it's still waiting for discovery — see
+		// updateResourceTypes — so the loader there is preserved.
 		items = model.BuildSidebarItems(model.SeedResources())
+		seeded = true
 	}
 	return func() tea.Msg {
-		return resourceTypesMsg{items: items}
+		return resourceTypesMsg{items: items, seeded: seeded}
 	}
 }
 
@@ -110,13 +126,37 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		}
 		rt = found
 	}
+	// Fresh-cache shortcut: serve preview hover-cycles between sibling
+	// resource types without hitting the API. Restricted to forPreview
+	// because main-list loads (drill-in, navigate-back, watch tick,
+	// shift+r) must always re-fetch — without that, deleted pods linger
+	// in the list and Age never moves forward. Navigation still feels
+	// instant because update_navigation.go renders the cached entry
+	// synchronously while this fetch runs in the background.
+	if forPreview && rt.Resource != "" {
+		// Match the key shape used by m.navKey() so the shortcut sees the
+		// entries written by navigateChildResourceType / loadResources for
+		// namespaced resources (which include the effective namespace).
+		cacheKey := kctx + "/" + rt.Resource
+		if rt.Namespaced {
+			cacheKey += "/ns:" + ns
+		}
+		if cached, ok := m.itemCache[cacheKey]; ok &&
+			m.cacheFingerprints[cacheKey] == m.fetchFingerprint() {
+			items := cached
+			rtCopy := rt
+			return func() tea.Msg {
+				return resourcesLoadedMsg{items: items, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+			}
+		}
+	}
 	return m.trackBgTask(
 		bgtasks.KindResourceList,
 		"List "+model.DisplayNameFor(rt),
 		bgtaskTarget(kctx, ns),
 		func() tea.Msg {
 			items, err := m.client.GetResources(reqCtx, kctx, ns, rt)
-			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
+			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
 		},
 	)
 }
@@ -231,15 +271,26 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 }
 
 func (m Model) loadNamespaces() tea.Cmd {
-	kctx := m.nav.Context
-	if kctx == "" {
-		kctx = m.client.CurrentContext()
+	return m.loadNamespacesSilent(false)
+}
+
+// loadNamespacesSilent issues the same namespace fetch as loadNamespaces
+// but tags the resulting msg as a background refresh. Silent loads must
+// not clear m.loading in the handler — the namespace cache is
+// independent of the middle-column/resource-types load the loading flag
+// tracks. Used by ensureNamespaceCacheFresh on session restore and other
+// context-open paths so the fast namespace reply doesn't race with
+// still-in-flight API discovery and produce a "No items" flash.
+func (m Model) loadNamespacesSilent(silent bool) tea.Cmd {
+	if m.client == nil {
+		return nil
 	}
+	kctx := m.activeContext()
 	// Use an independent context so namespace loading is never blocked or
 	// cancelled by in-flight resource requests.
 	return func() tea.Msg {
 		items, err := m.client.GetNamespaces(context.Background(), kctx)
-		return namespacesLoadedMsg{items: items, err: err}
+		return namespacesLoadedMsg{context: kctx, items: items, err: err, silent: silent}
 	}
 }
 
@@ -638,9 +689,7 @@ func (m Model) saveSecretData() tea.Cmd {
 	}
 	name := sel.Name
 	data := make(map[string]string, len(m.secretData.Data))
-	for k, v := range m.secretData.Data {
-		data[k] = v
-	}
+	maps.Copy(data, m.secretData.Data)
 	client := m.client
 
 	return func() tea.Msg {
@@ -688,9 +737,7 @@ func (m Model) saveConfigMapData() tea.Cmd {
 	}
 	name := sel.Name
 	data := make(map[string]string, len(m.configMapData.Data))
-	for k, v := range m.configMapData.Data {
-		data[k] = v
-	}
+	maps.Copy(data, m.configMapData.Data)
 	client := m.client
 
 	return func() tea.Msg {
@@ -738,13 +785,9 @@ func (m Model) saveLabelData() tea.Cmd {
 	name := sel.Name
 	rt := m.labelResourceType
 	labels := make(map[string]string, len(m.labelData.Labels))
-	for k, v := range m.labelData.Labels {
-		labels[k] = v
-	}
+	maps.Copy(labels, m.labelData.Labels)
 	annotations := make(map[string]string, len(m.labelData.Annotations))
-	for k, v := range m.labelData.Annotations {
-		annotations[k] = v
-	}
+	maps.Copy(annotations, m.labelData.Annotations)
 	client := m.client
 
 	return func() tea.Msg {
@@ -786,7 +829,7 @@ func fetchHelmHistory(helmPath, name, ns, kubeCtx, kubeconfigPaths string) ([]ui
 	args := []string{"history", name, "-n", ns, "--kube-context", kubeCtx, "-o", "json", "--max", "50"}
 	cmd := exec.CommandContext(ctx, helmPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-	logger.Info("Running helm command", "cmd", cmd.String())
+	logExecCmd("Running helm command", cmd)
 	output, cmdErr := cmd.CombinedOutput()
 	if cmdErr != nil {
 		truncated := truncateHelmOutput(output)
@@ -836,10 +879,10 @@ func (m Model) loadHelmRevisions() tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
 	return func() tea.Msg {
-		revisions, err := fetchHelmHistory(helmPath, name, ns, ctx, kubeconfigPaths)
+		revisions, err := fetchHelmHistory(helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths)
 		if err != nil {
 			return helmRevisionListMsg{err: err}
 		}
@@ -861,10 +904,10 @@ func (m Model) loadHelmHistory() tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
 	return func() tea.Msg {
-		revisions, err := fetchHelmHistory(helmPath, name, ns, ctx, kubeconfigPaths)
+		revisions, err := fetchHelmHistory(helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths)
 		if err != nil {
 			return helmHistoryListMsg{err: err}
 		}

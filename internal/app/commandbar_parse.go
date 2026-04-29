@@ -41,6 +41,11 @@ var builtinCommands = map[string]string{
 	"kubetris":  "kubetris",
 	"credits":   "credits",
 	"tasks":     "tasks",
+	"errors":    "errors",
+	"warnings":  "errors",
+	"bookmarks": "bookmarks",
+	"reload":    "reload",
+	"refresh":   "reload",
 }
 
 // kubectlSubcommandSet contains known kubectl subcommands.

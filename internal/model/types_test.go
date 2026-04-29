@@ -7,6 +7,28 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// --- ResourceTypeEntry.CanList ---
+
+func TestResourceTypeEntry_CanList(t *testing.T) {
+	cases := []struct {
+		name  string
+		verbs []string
+		want  bool
+	}{
+		{"empty verbs treated as listable (pseudo-resources)", nil, true},
+		{"full verb set", []string{"get", "list", "watch", "create", "update", "patch", "delete"}, true},
+		{"only list", []string{"list"}, true},
+		{"review API: create-only", []string{"create"}, false},
+		{"no list verb", []string{"get", "watch"}, false},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			e := ResourceTypeEntry{Verbs: tc.verbs}
+			assert.Equal(t, tc.want, e.CanList())
+		})
+	}
+}
+
 // --- ResourceTypeEntry.ResourceRef ---
 
 func TestResourceRef(t *testing.T) {

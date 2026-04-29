@@ -49,10 +49,14 @@ func loadPortForwardState() *PortForwardStates {
 	}
 	data, err := os.ReadFile(path)
 	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warn("Failed to read port-forward state", "error", err, "path", path)
+		}
 		return &PortForwardStates{}
 	}
 	var s PortForwardStates
 	if err := yaml.Unmarshal(data, &s); err != nil {
+		logger.Warn("Port-forward state file is corrupt; ignoring", "error", err, "path", path)
 		return &PortForwardStates{}
 	}
 	return &s
@@ -90,7 +94,9 @@ func (m *Model) saveCurrentPortForwards() {
 			})
 		}
 	}
-	_ = savePortForwardState(&PortForwardStates{PortForwards: states})
+	if err := savePortForwardState(&PortForwardStates{PortForwards: states}); err != nil {
+		logger.Error("Failed to persist port-forward state", "error", err, "count", len(states))
+	}
 }
 
 // restorePortForwards re-establishes saved port forwards from the previous session.
@@ -102,14 +108,15 @@ func (m *Model) restorePortForwards() []tea.Cmd {
 		m.addLogEntry("ERR", fmt.Sprintf("Cannot restore port forwards: kubectl not found: %v", err))
 		return nil
 	}
-	kubeconfigPaths := m.client.KubeconfigPaths()
 	mgr := m.portForwardMgr
 
 	cmds := make([]tea.Cmd, 0, len(m.pendingPortForwards.PortForwards))
 	for _, pf := range m.pendingPortForwards.PortForwards {
+		kubeconfigPath := m.client.KubeconfigPathForContext(pf.Context)
+		kubectlContext := m.client.OriginalContextName(pf.Context)
 		cmds = append(cmds, func() tea.Msg {
 			// Reuse the saved local port so users get the same port on restart.
-			id, err := mgr.Start(kubectlPath, kubeconfigPaths, pf.ResourceKind, pf.ResourceName, pf.Namespace, pf.Context, pf.LocalPort, pf.RemotePort)
+			id, err := mgr.Start(kubectlPath, kubeconfigPath, pf.ResourceKind, pf.ResourceName, pf.Namespace, pf.Context, kubectlContext, pf.LocalPort, pf.RemotePort)
 			if err != nil {
 				logger.Error("Failed to restore port forward",
 					"resource", fmt.Sprintf("%s/%s", pf.ResourceKind, pf.ResourceName),

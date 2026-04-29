@@ -10,11 +10,11 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `l` / `Right` | Navigate into selected item |
 | `j` / `Down` | Move cursor down |
 | `k` / `Up` | Move cursor up |
-| `gg` | Jump to top of list |
-| `G` | Jump to bottom of list |
+| `gg` / `Home` | Jump to top of list |
+| `G` / `End` | Jump to bottom of list |
 | `Enter` | Open full-screen YAML view / navigate into |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping in the Events list |
 | `p` | Pin/unpin CRD group (at resource types level) |
 | `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar (resets each launch) |
@@ -59,11 +59,15 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 |---|---|
 | `f` | Start filter mode (filter items in current view) |
 | `/` | Start search mode (search and jump to match) |
+| `Tab` | Inside `/` or `f`: toggle broad mode — also matches against column values (annotations, labels, finalizers, CRD printer columns, custom user columns). Prompt shows `filter (all):` / `search (all):` while on. Resets on Enter/Esc. |
+| `Up` / `Down` | Inside `/` or `f`: cycle through previous queries (shared persistent history). |
 | `n` | Jump to next search match |
 | `N` | Jump to previous search match |
 | `Esc` | Clear filter / cancel search |
 
 Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
+
+`/` and `f` share one persistent history at `$XDG_STATE_HOME/lfk/query-history` (default `~/.local/state/lfk/query-history`) — both inputs accept the same query syntax and match against the same fields, so a query confirmed in one mode is recallable from the other. The `:` command bar keeps its own `history` file because its inputs are kubectl-shaped commands rather than resource-name queries.
 
 ## Actions
 
@@ -71,7 +75,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 |---|---|---|
 | `x` | Open action menu (bulk actions when items selected) | `action_menu` |
 | `\` | Open namespace selector | `namespace_selector` |
-| `A` | Toggle all-namespaces mode | `all_namespaces` |
+| `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
 | `L` | View logs for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
 | `E` | Edit selected resource in $EDITOR | `edit` |
@@ -112,18 +116,28 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 
 lfk supports vim-style named marks for quick navigation. A bookmark stores a
 resource path (context + namespace + resource type + optional resource name)
-under a single-character slot.
+under a single-character slot. The namespace is always persisted; slot case
+only controls whether the jump switches clusters.
 
 Bookmarks come in two flavors depending on the slot case you choose:
 
 - **Context-aware** (lowercase `a-z` / digit `0-9`): remembers the kube
-  context you were in when you set it. Jumping to the bookmark switches
-  clusters if needed. Use this when you want the bookmark to point at a
-  specific environment (e.g., `a` for "production pods").
-- **Context-free** (uppercase `A-Z`): doesn't remember a context. Jumping
-  to the bookmark uses whatever cluster is currently active. Use this for
-  cluster-agnostic shortcuts (e.g., `P` for "whatever cluster I'm in, go
-  to Pods").
+  context you were in. Jumping switches clusters as needed. Use this
+  when the bookmark should return you to a specific environment.
+- **Context-free** (uppercase `A-Z`): doesn't remember a context.
+  Jumping uses the tab's current cluster. Use this for
+  cluster-agnostic shortcuts (e.g., `P` for "go to Pods in whatever
+  cluster I'm looking at").
+
+**Namespace on jump.** By default *no* bookmark overwrites the tab's
+current namespace scope — you always land on the bookmarked resource
+type in the namespace you were already viewing. The saved namespace
+stays in the record and can be replayed on demand: open the bookmarks
+list with `'`, press `Tab` to arm a `[LOAD NAMESPACE]` chip in the
+title, then press Enter (or the slot key) to jump with the saved
+namespace applied. The flag is consumed after the jump and cleared
+when you close the overlay, so every open starts in the default "keep
+my namespace" mode.
 
 | Key | Context | Action |
 |---|---|---|
@@ -133,8 +147,25 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `j` / `k` | Bookmark overlay | Navigate bookmarks |
 | `/` | Bookmark overlay | Filter bookmarks by name |
 | `Enter` | Bookmark overlay | Jump to selected bookmark |
+| `Tab` | Bookmark overlay | Toggle `[LOAD NAMESPACE]` — apply the bookmark's saved namespace scope on the next jump |
 | `Ctrl+X` | Bookmark overlay | Delete selected bookmark (with confirmation) |
 | `Alt+X` | Bookmark overlay | Delete all bookmarks (with confirmation) |
+
+## Help View
+
+| Key | Action |
+|---|---|
+| `/` | Search — highlights matches inline without removing non-matching lines |
+| `Ctrl+N` / `Ctrl+P` | Next / previous match while typing the search input |
+| `Enter` | Apply search (closes input, keeps highlights, arms `n`/`N`) |
+| `n` / `N` | Jump to next / previous search match (after Enter) |
+| `f` | Filter — narrows the visible list to lines matching the query |
+| `Esc` | Cascades: clear active search → clear active filter → close help |
+| `j` / `k` | Scroll down/up |
+| `Ctrl+D` / `Ctrl+U` | Half-page scroll down/up |
+| `Ctrl+F` / `Ctrl+B` / `PgDown` / `PgUp` | Full-page scroll |
+| `g` / `G` | Jump to top / bottom |
+| `q` / `?` / `F1` | Close help |
 
 ## YAML View
 
@@ -148,17 +179,18 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `Home` | Jump to top |
+| `G` / `End` | Jump to bottom |
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `/` | Search in YAML |
 | `n` / `N` | Next / previous search match |
 | `v` | Character visual selection (from cursor column) |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
-| `y` | Copy selected text (in visual mode) |
+| `y` | Copy line under cursor (or selection in visual mode) |
 | `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
@@ -169,10 +201,20 @@ Bookmarks come in two flavors depending on the slot case you choose:
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Scroll up/down |
-| `gg` / `G` | Jump to top / bottom |
+| `j` / `k` | Move cursor up/down |
+| `h` / `l` | Move cursor column left/right |
+| `0` / `$` / `^` | Move cursor to line start / end / first non-whitespace |
+| `w` / `b` / `e` / `W` / `B` / `E` | Word / WORD motions |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
+| `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
+| `/` | Search in content |
+| `n` / `N` | Next / previous search match |
+| `v` | Character visual selection |
+| `V` | Visual line selection |
+| `Ctrl+V` | Block (column) visual selection |
+| `y` | Copy line under cursor (or selection in visual mode) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
 | `q` / `Esc` | Back to explorer |
 
@@ -188,29 +230,34 @@ Bookmarks come in two flavors depending on the slot case you choose:
 | `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `Home` | Jump to top |
+| `G` / `End` | Jump to bottom |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
-| `Ctrl+F` / `Ctrl+B` | Full page down / up |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
 | `f` | Toggle follow mode (auto-scroll to new logs) |
 | `Tab` / `z` / `>` | Toggle line wrapping |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
 | `p` | Toggle pod/container prefixes |
+| `P` | Toggle structured preview side panel (JSON / logfmt / klog / zap / nginx / envoy / java / postgres / plain text) |
+| `J` / `K` | Scroll the preview side panel down / up (one row, no-op when panel is hidden) |
 | `c` | Toggle previous container logs |
 | `/` | Search in logs |
 | `n` / `N` | Next / previous search match |
 | `123G` | Jump to specific line number |
-| `S` | Save loaded logs to file |
-| `Ctrl+S` | Save all logs to file (full kubectl logs) |
+| `S` | Save loaded logs to file (path copied to clipboard) |
+| `Ctrl+S` | Save all logs to file, full kubectl logs (path copied to clipboard) |
 | `v` | Character visual selection (from cursor column) |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
-| `y` | Copy selected text (in visual mode) |
+| `y` | Copy line under cursor (or selection in visual mode) |
 | `\` | Switch pod / filter containers (space: select, enter: apply, / to filter) |
 | `q` / `Esc` | Close log viewer |
 
-> **Tail-first loading**: Logs load the last 1000 lines initially with follow mode enabled. Scrolling to the top automatically loads older log history. Configure with `log_tail_lines` in config.
+> **Tail-first loading**: Full Logs (`L` key or action menu `L`) load the last 1000 lines initially (configurable via `log_tail_lines`). Tail Logs (action menu `l`) load only the last 10 lines (configurable via `log_tail_lines_short`) — useful for a quick peek without the full history hit. Scrolling to the top automatically loads older log history in both modes.
+
+> **Auto-reconnect across init containers**: When viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — for example as each init container finishes and the next one starts. The reconnect is silent: no sentinel markers are inserted into the log buffer. After several consecutive empty reconnects the viewer stops retrying (the pod is terminated).
 
 ## Exec Mode (embedded terminal)
 
@@ -238,17 +285,17 @@ All other keys are forwarded to the PTY process. The PTY session continues runni
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
 | `Tab` | Switch cursor side (side-by-side mode) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `/` | Search in diff |
 | `n` / `N` | Next / previous search match |
 | `v` | Character visual selection |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection |
 | `h` / `l` | Move selection column left/right (in visual mode) |
-| `y` | Copy selected text (in visual mode) |
+| `y` | Copy line under cursor (or selection in visual mode) |
 | `z` | Toggle fold unchanged section at cursor |
 | `Z` | Toggle all folds |
 | `#` | Toggle line numbers |
@@ -337,9 +384,9 @@ view to switch between the labels pane and the annotations pane.
 | `/` | Search fields |
 | `n` / `N` | Next / previous search match (recursive: auto-drills into children / searches parent) |
 | `r` | Recursive field browser (browse all nested fields with filter) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` | Close API explorer |
 | `Esc` | Go back one level / close at root |
 
@@ -352,9 +399,9 @@ view to switch between the labels pane and the annotations pane.
 | `/` | Search/filter groups by name |
 | `a` | Toggle all/allowed-only permissions |
 | `s` | Switch subject (User/Group/SA) |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` / `Esc` | Clear search / close |
 
 The title bar shows the namespace scope (`ns:...`) used for the permission check, so you can see whether permissions are cluster-wide or namespaced. When checking a service account, its own namespace is used automatically. Users and groups are discovered from ClusterRoleBindings and RoleBindings.
@@ -365,8 +412,9 @@ The title bar shows the namespace scope (`ns:...`) used for the permission check
 |---|---|
 | `j` / `k` | Navigate subjects |
 | `/` | Filter subjects by name |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `Enter` | Select subject |
 | `Esc` | Clear filter / close |
 
@@ -375,9 +423,9 @@ The title bar shows the namespace scope (`ns:...`) used for the permission check
 | Key | Action |
 |---|---|
 | `j` / `k` | Scroll up/down |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` / `Esc` | Close visualizer |
 
 ## Security findings browser
@@ -402,9 +450,9 @@ Press `#` to jump to the Security category. Navigate through sources, finding gr
 | Key | Action |
 |---|---|
 | `j` / `k` | Move cursor up/down |
-| `gg` / `G` | Jump to top / bottom |
+| `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
-| `Ctrl+F` / `Ctrl+B` | Page down / up (full page) |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `V` | Line visual selection |
 | `v` | Character visual selection |
 | `h` / `l` | Move cursor column left/right (in character visual mode) |
@@ -482,19 +530,19 @@ Press `:` to open the command bar. It supports four types of input:
 The action menu (`x` key) shows context-specific actions based on the resource type:
 
 ### Pod Actions
-`l` Logs, `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `S` Startup Analysis, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `S` Startup Analysis, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events
 
 ### Deployment Actions
-`l` Logs, `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### StatefulSet Actions
-`l` Logs, `s` Exec, `A` Attach, `S` Scale, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### DaemonSet Actions
-`l` Logs, `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Service Actions
-`l` Logs, `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Secret Actions
 `e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `b` Debug Pod, `V` Events
@@ -506,10 +554,10 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 `c` Cordon, `u` Uncordon, `n` Drain, `t` Taint, `T` Untaint, `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
 ### Job Actions
-`l` Logs, `s` Exec, `A` Attach, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 
 ### CronJob Actions
-`l` Logs, `s` Exec, `A` Attach, `t` Trigger (create Job), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `t` Trigger (create Job), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### ArgoCD Application Actions
 `s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events

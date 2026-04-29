@@ -50,21 +50,79 @@ func ErrorLogEntryPlainText(e ErrorLogEntry) string {
 	return fmt.Sprintf("%s [%s] %s", e.Time.Format("15:04:05"), e.Level, e.Message)
 }
 
+// errorLogLevelPalette returns the (foreground hex, bold) pair for a given
+// log level. Unknown levels fall through to INF styling.
+func errorLogLevelPalette(level string) (color, label string, bold bool) {
+	switch level {
+	case "ERR":
+		return "#ff5555", "ERR", true
+	case "WRN":
+		return "#ffaa00", "WRN", true
+	case "DBG":
+		return "#6272a4", "DBG", false
+	default:
+		return "#888888", "INF", false
+	}
+}
+
+// renderErrorLogLine formats a single error-log row: indicator + timestamp +
+// styled level + message. When cursorBg is true, every segment inherits the
+// cursor-line background so the level fg color stays visible while the row
+// is highlighted. Non-cursor segments deliberately omit a background so the
+// caller's FillLinesBg pass paints whichever bg fits the surrounding box
+// (SurfaceBg in overlay mode, BaseBg in fullscreen).
+func renderErrorLogLine(entry ErrorLogEntry, cursorBg bool) string {
+	color, label, bold := errorLogLevelPalette(entry.Level)
+
+	if cursorBg {
+		base := lipgloss.NewStyle().Background(BaseBg).Bold(true)
+		lvlStyle := lipgloss.NewStyle().Inherit(base).Foreground(ThemeColor(color))
+		if bold {
+			lvlStyle = lvlStyle.Bold(true)
+		}
+		ts := base.Render(entry.Time.Format("15:04:05"))
+		lvl := lvlStyle.Render(label)
+		msg := base.Render(entry.Message)
+		sep := base.Render(" ")
+		return base.Render(">") + sep + ts + sep + lvl + sep + msg
+	}
+
+	// Strip the surfaceBg the theme bakes into OverlayDimStyle and
+	// OverlayNormalStyle so FillLinesBg can paint whichever bg fits
+	// the surrounding box (SurfaceBg in the overlay form, BaseBg in
+	// the fullscreen form). Otherwise the inner segments keep
+	// SurfaceBg and clash with a BaseBg-filled fullscreen frame.
+	ts := OverlayDimStyle.UnsetBackground().Render(entry.Time.Format("15:04:05"))
+	lvlStyle := lipgloss.NewStyle().Foreground(ThemeColor(color))
+	if bold {
+		lvlStyle = lvlStyle.Bold(true)
+	}
+	lvl := lvlStyle.Render(label)
+	return fmt.Sprintf("  %s %s %s", ts, lvl, OverlayNormalStyle.UnsetBackground().Render(entry.Message))
+}
+
 // RenderErrorLogOverlay renders the application log overlay showing timestamped
 // log entries with level indicators. The scroll parameter controls which portion is visible.
 // When showDebug is false, DBG entries are filtered out.
 func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, showDebug bool, vp ErrorLogVisualParams) string {
+	// Use bg-stripped variants of the overlay styles so the caller's
+	// FillLinesBg pass paints whichever bg fits the surrounding box —
+	// SurfaceBg for the bordered overlay form, BaseBg when this same
+	// content is rendered as a fullscreen viewExplorer column.
+	titleStyle := OverlayTitleStyle.UnsetBackground()
+	dimStyle := OverlayDimStyle.UnsetBackground()
+
 	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Application Log"))
+	b.WriteString(titleStyle.Render("Application Log"))
 	b.WriteString("\n")
 
 	reversed := FilteredErrorLogEntries(entries, showDebug)
 
 	if len(reversed) == 0 {
 		if len(entries) > 0 && !showDebug {
-			b.WriteString(OverlayDimStyle.Render("No entries (debug logs hidden, press d to show)"))
+			b.WriteString(dimStyle.Render("No entries (debug logs hidden, press d to show)"))
 		} else {
-			b.WriteString(OverlayDimStyle.Render("No log entries"))
+			b.WriteString(dimStyle.Render("No log entries"))
 		}
 		return b.String()
 	}
@@ -84,15 +142,6 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 	colStart := min(vp.VisualStartCol, vp.CursorCol)
 	colEnd := max(vp.VisualStartCol, vp.CursorCol)
 
-	// Level styles.
-	errLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#ff5555")).Bold(true).Background(SurfaceBg)
-	wrnLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#ffaa00")).Bold(true).Background(SurfaceBg)
-	infLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#888888")).Background(SurfaceBg)
-	dbgLevelStyle := lipgloss.NewStyle().Foreground(ThemeColor("#6272a4")).Background(SurfaceBg)
-
-	// Cursor line style: subtle highlight to show current position.
-	cursorLineStyle := lipgloss.NewStyle().Background(BaseBg).Bold(true)
-
 	for i := scroll; i < end; i++ {
 		entry := reversed[i]
 		plainText := ErrorLogEntryPlainText(entry)
@@ -111,23 +160,13 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 			)
 			b.WriteString("  " + rendered)
 		} else if isCursorLine && vp.VisualMode == 0 {
-			// Cursor line indicator (outside visual mode).
-			b.WriteString(cursorLineStyle.Render("> " + plainText))
+			// Cursor line indicator (outside visual mode). Preserve the
+			// level fg color by composing per-segment styles that inherit
+			// the cursor-line bg, so red/orange ERR/WRN markers stay
+			// visible when the user navigates through the overlay.
+			b.WriteString(renderErrorLogLine(entry, true))
 		} else {
-			ts := OverlayDimStyle.Render(entry.Time.Format("15:04:05"))
-			var lvl string
-			switch entry.Level {
-			case "ERR":
-				lvl = errLevelStyle.Render("ERR")
-			case "WRN":
-				lvl = wrnLevelStyle.Render("WRN")
-			case "DBG":
-				lvl = dbgLevelStyle.Render("DBG")
-			default:
-				lvl = infLevelStyle.Render("INF")
-			}
-			line := fmt.Sprintf("  %s %s %s", ts, lvl, OverlayNormalStyle.Render(entry.Message))
-			b.WriteString(line)
+			b.WriteString(renderErrorLogLine(entry, false))
 		}
 		if i < end-1 {
 			b.WriteString("\n")
@@ -152,7 +191,7 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 		}
 		scrollInfo += " | " + modeLabel
 	}
-	b.WriteString(OverlayDimStyle.Render(scrollInfo))
+	b.WriteString(dimStyle.Render(scrollInfo))
 
 	return b.String()
 }
@@ -234,10 +273,10 @@ func RenderColorschemeOverlay(entries []SchemeEntry, filter string, cursor int, 
 	start := VimScrollOff(overlaySchemeScroll, cursorDisplayIdx, len(items), maxVisible, scrollOff, displayLines)
 	overlaySchemeScroll = start
 
-	end := start + maxVisible
-	if end > len(items) {
-		end = len(items)
-	}
+	end := min(start+maxVisible, len(items))
+
+	b.WriteString(RenderScrollAbove(start, end-start, len(items), 0))
+	b.WriteString("\n")
 
 	var lines []string
 	for i := start; i < end; i++ {
@@ -267,6 +306,9 @@ func RenderColorschemeOverlay(entries []SchemeEntry, filter string, cursor int, 
 		lines = lines[:maxVisible]
 	}
 	b.WriteString(strings.Join(lines, "\n"))
+
+	b.WriteString("\n")
+	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
 
 	return b.String()
 }
@@ -312,7 +354,7 @@ func RenderRBACOverlay(results []RBACCheckEntry, kind string) string {
 	for _, r := range results {
 		indicator := OverlayWarningStyle.Render("\u2717") // cross mark
 		if r.Allowed {
-			indicator = lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Background(SurfaceBg).Render("\u2713") // check mark
+			indicator = lipgloss.NewStyle().Foreground(ThemeColor("2")).Background(SurfaceBg).Render("\u2713") // check mark
 		}
 		verb := OverlayNormalStyle.Render(fmt.Sprintf("  %-10s", r.Verb))
 		b.WriteString(verb)
@@ -506,13 +548,7 @@ func RenderQuotaDashboardOverlay(quotas []QuotaEntry, width, height int) string 
 	b.WriteString("\n")
 
 	// Bar width adapts to the overlay width. Reserve space for label, percentage, and values.
-	barWidth := width - 40
-	if barWidth < 10 {
-		barWidth = 10
-	}
-	if barWidth > 40 {
-		barWidth = 40
-	}
+	barWidth := min(max(width-40, 10), 40)
 
 	// Severity color styles.
 	greenStyle := lipgloss.NewStyle().Foreground(ThemeColor("#9ece6a")).Background(SurfaceBg)
@@ -532,13 +568,7 @@ func RenderQuotaDashboardOverlay(quotas []QuotaEntry, width, height int) string 
 			b.WriteString(OverlayNormalStyle.Render(nameLabel))
 
 			// Build the usage bar.
-			filled := int(res.Percent / 100.0 * float64(barWidth))
-			if filled > barWidth {
-				filled = barWidth
-			}
-			if filled < 0 {
-				filled = 0
-			}
+			filled := max(min(int(res.Percent/100.0*float64(barWidth)), barWidth), 0)
 			empty := barWidth - filled
 
 			filledStr := strings.Repeat("\u2588", filled)
@@ -795,13 +825,7 @@ func RenderEventViewer(p EventViewerParams) string {
 
 	// Clamp scroll.
 	maxScroll := max(len(p.Lines)-maxVisible, 0)
-	scroll := p.Scroll
-	if scroll > maxScroll {
-		scroll = maxScroll
-	}
-	if scroll < 0 {
-		scroll = 0
-	}
+	scroll := max(min(p.Scroll, maxScroll), 0)
 
 	end := min(scroll+maxVisible, len(p.Lines))
 

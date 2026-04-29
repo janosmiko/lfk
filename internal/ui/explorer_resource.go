@@ -24,12 +24,15 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	var lines []string
 
 	// Skip metrics keys and keys already shown as standard table columns.
+	// CPU Alloc / Mem Alloc are deliberately NOT in this list -- they carry
+	// raw K8s resource quantity strings ("4000m", "8388608Ki") that the user
+	// asked to see in the preview, formatted to human-readable units. The
+	// summary loop below formats them when they appear.
 	metricsKeys := map[string]bool{
 		"CPU": true, "CPU/R": true, "CPU/L": true,
 		"MEM": true, "MEM/R": true, "MEM/L": true,
 		"CPU%": true, "MEM%": true,
 		"CPU Req": true, "CPU Lim": true, "Mem Req": true, "Mem Lim": true,
-		"CPU Alloc": true, "Mem Alloc": true,
 	}
 	tableKeys := map[string]bool{
 		"Status": true, "Reason": true,
@@ -93,7 +96,21 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			multiLineFields = append(multiLineFields, kv)
 			continue
 		}
-		row := detailRow{strings.ToUpper(kv.Key), kv.Value}
+		val := kv.Value
+		// Convert K8s resource quantity strings ("4000m" / "8388608Ki") to
+		// human-readable units so the node preview shows "4" / "8 GiB" instead
+		// of leaking the raw API representation.
+		switch kv.Key {
+		case "CPU Alloc":
+			if cores := ParseResourceValue(val, true); cores > 0 {
+				val = FormatCPU(cores)
+			}
+		case "Mem Alloc":
+			if bytes := ParseResourceValue(val, false); bytes > 0 {
+				val = FormatMemory(bytes)
+			}
+		}
+		row := detailRow{strings.ToUpper(kv.Key), val}
 		switch {
 		case statusKeys[kv.Key]:
 			statusRows = append(statusRows, row)

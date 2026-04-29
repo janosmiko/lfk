@@ -24,6 +24,17 @@ const (
 // app.NewModel.
 var ConfigWatchInterval = DefaultWatchInterval
 
+// clamp01 restricts v to [0.0, 1.0].
+func clamp01(v float64) float64 {
+	if v < 0 {
+		return 0
+	}
+	if v > 1 {
+		return 1
+	}
+	return v
+}
+
 // ClampWatchInterval restricts d to [MinWatchInterval, MaxWatchInterval].
 // A zero or negative duration is returned unchanged so callers can treat it
 // as "unset" and fall back to a default.
@@ -310,6 +321,34 @@ func ColumnsForKind(kind, context string) []string {
 // ConfigDashboard controls whether to show a cluster dashboard when entering a context.
 var ConfigDashboard = true
 
+// ConfigSecretLazyLoading controls how Secret resources are listed.
+// When false (default), Secret lists fetch full objects and eagerly decode
+// their data into item columns — matching the behaviour of every other
+// resource type.
+// When true, Secret lists fetch metadata only (no data payload over the
+// wire) and decoded values are lazy-loaded on hover. This is much faster in
+// clusters with many Helm release secrets or large TLS payloads, at the
+// cost of an extra GET per hovered secret and a brief empty-data window
+// between hover and fetch completion.
+var ConfigSecretLazyLoading bool
+
+// ConfigMinContrastRatio is the normalized readability knob in [0.0, 1.0].
+// When greater than zero, ApplyTheme nudges foreground colors in HSL lightness
+// space so each fg/bg pair meets a minimum WCAG contrast ratio. The mapping is:
+//
+//	wcagTarget = 1.0 + value * 20.0
+//
+// Concrete examples:
+//
+//	0.0   off (default) — theme colors used as-is
+//	0.175 approx. WCAG AA threshold (4.5:1) for normal text
+//	0.3   approx. WCAG AAA threshold (7.0:1)
+//	1.0   maximum — forces fg toward pure black or white against any bg
+//
+// Values outside [0, 1] are clamped. Only HSL lightness is adjusted; hue and
+// saturation are preserved at moderate values.
+var ConfigMinContrastRatio float64
+
 // ConfigTerminalMode controls how exec/shell commands run.
 var ConfigTerminalMode = "pty"
 
@@ -335,6 +374,20 @@ var ConfigConfirmOnExit = true
 
 // ConfigLogTailLines controls how many log lines are initially loaded via --tail.
 var ConfigLogTailLines = 1000
+
+// ConfigLogTailLinesShort is the tail line count used by the "Tail Logs" action
+// menu entry. It intentionally defaults to a small value (10) so users get a
+// lightweight peek at recent output without the full 1000-line hit.
+var ConfigLogTailLinesShort = 10
+
+// ConfigLogRenderAnsi controls whether the log viewer preserves ANSI SGR
+// escape sequences (colour, bold, underline) emitted by log producers.
+// When true, the sanitizer keeps valid SGR runs verbatim so coloured
+// output from applications renders in the viewer. When false, ESC bytes
+// are treated the same as other control bytes and replaced with U+FFFD,
+// matching the historical safe-but-noisy behaviour. Toggle at runtime
+// with `:set ansi` / `:set noansi`.
+var ConfigLogRenderAnsi = true
 
 // ConfigScrollOff is the number of lines to keep visible above/below the cursor.
 // Used by all views with cursor-based navigation.
@@ -362,6 +415,14 @@ var ConfigMouse = true
 // the no_color config field, or the --no-color CLI flag.
 var ConfigNoColor bool
 
+// ConfigDarkColorscheme is the built-in scheme name applied when the terminal
+// reports dark mode. Populated by parsing the "dark:X" segment of colorscheme.
+var ConfigDarkColorscheme string
+
+// ConfigLightColorscheme is the built-in scheme name applied when the terminal
+// reports light mode. Populated by parsing the "light:X" segment of colorscheme.
+var ConfigLightColorscheme string
+
 // SetNoColor updates ConfigNoColor and rebuilds the active theme so style
 // globals reflect the new setting. No-op when the value is unchanged.
 func SetNoColor(v bool) {
@@ -373,7 +434,14 @@ func SetNoColor(v bool) {
 }
 
 type configFile struct {
-	// Colorscheme selects a built-in color scheme by name (e.g. "dracula", "nord").
+	// Colorscheme selects a built-in color scheme by name (e.g. "dracula",
+	// "nord"). Supports Ghostty-style dual-mode syntax to enable automatic
+	// dark/light switching via CSI 996/2031:
+	//
+	//   colorscheme: "dark:Rose Pine,light:Rose Pine Dawn"
+	//
+	// Either segment may be omitted. Without the prefix syntax the value is
+	// used as a plain scheme name and dark/light switching is disabled.
 	// Custom theme overrides in the "theme" section are applied on top.
 	Colorscheme   string            `json:"colorscheme" yaml:"colorscheme"`
 	Theme         Theme             `json:"theme" yaml:"theme"`
@@ -413,6 +481,16 @@ type configFile struct {
 	// When the user scrolls to the top, older logs are fetched in the background.
 	// Defaults to 1000.
 	LogTailLines *int `json:"log_tail_lines" yaml:"log_tail_lines"`
+	// LogTailLinesShort controls how many log lines the "Tail Logs" action menu
+	// entry loads via --tail. Intended for quick peeks without the full history
+	// hit. Defaults to 10. Non-positive values are ignored (default is kept).
+	LogTailLinesShort *int `json:"log_tail_lines_short" yaml:"log_tail_lines_short"`
+	// LogRenderAnsi controls whether ANSI SGR sequences (colour, bold,
+	// underline) emitted by log producers are rendered in the viewer.
+	// Defaults to true. Set to false to strip all ANSI escapes, matching
+	// the historical behaviour where the sanitizer replaced every ESC
+	// byte with U+FFFD.
+	LogRenderAnsi *bool `json:"log_render_ansi" yaml:"log_render_ansi"`
 	// ScrollOff is the number of lines to keep visible above/below the cursor.
 	// Defaults to 5.
 	ScrollOff *int `json:"scrolloff" yaml:"scrolloff"`
@@ -438,6 +516,23 @@ type configFile struct {
 	// via bold/underline/reverse SGR codes. The NO_COLOR env var (per
 	// https://no-color.org) takes precedence over this field.
 	NoColor *bool `json:"no_color" yaml:"no_color"`
+	// SecretLazyLoading controls how Secret resources are fetched. When false
+	// (default), Secrets behave like every other resource type: full objects
+	// are pulled and data is eagerly decoded into the list. When true, only
+	// metadata is fetched for the list and decoded values are loaded on hover.
+	// Turn on in clusters with many Helm release secrets to cut list latency;
+	// the trade-off is a per-hover GET and a brief blank-data frame until the
+	// fetch resolves.
+	SecretLazyLoading *bool `json:"secret_lazy_loading" yaml:"secret_lazy_loading"`
+	// MinContrastRatio is a normalized readability knob in [0.0, 1.0]. When set
+	// above zero, ApplyTheme nudges each foreground color's HSL lightness until
+	// the fg/bg pair meets the derived WCAG contrast ratio:
+	//
+	//   wcagTarget = 1.0 + value * 20.0
+	//
+	// Examples: 0.175 ≈ WCAG AA (4.5:1), 0.3 ≈ AAA (7.0:1), 1.0 = maximum.
+	// Values outside [0, 1] are clamped. Hue and saturation are preserved.
+	MinContrastRatio *float64 `json:"min_contrast_ratio" yaml:"min_contrast_ratio"`
 }
 
 // clusterConfig holds per-cluster configuration overrides.
@@ -543,47 +638,90 @@ func loadConfigFile(configOverride string) (configFile, bool) {
 }
 
 // applyColorscheme selects a built-in colorscheme if specified in config.
+//
+// The colorscheme field supports two formats:
+//
+//  1. Plain name – "dracula"
+//     Applies the scheme and leaves dark/light switching disabled.
+//
+//  2. Ghostty-style dual-mode – "dark:Rose Pine,light:Rose Pine Dawn"
+//     Parses each comma-separated segment for a "dark:" or "light:" prefix.
+//     Both, one, or neither segment may be present; order does not matter.
+//     ConfigDarkColorscheme / ConfigLightColorscheme are set accordingly.
+//     No default scheme is applied immediately; the terminal's first CSI 997
+//     notification will trigger the initial switch.
 func applyColorscheme(theme *Theme, cfg configFile) {
-	if cfg.Colorscheme != "" {
-		if scheme, ok := BuiltinSchemes()[strings.ToLower(cfg.Colorscheme)]; ok {
-			*theme = scheme
-			ActiveSchemeName = strings.ToLower(cfg.Colorscheme)
+	if cfg.Colorscheme == "" {
+		return
+	}
+	dark, light, isDual := parseDualColorscheme(cfg.Colorscheme)
+	if isDual {
+		ConfigDarkColorscheme = dark
+		ConfigLightColorscheme = light
+		return
+	}
+	lower := normalizeScheme(cfg.Colorscheme)
+	if scheme, ok := BuiltinSchemes()[lower]; ok {
+		*theme = scheme
+		ActiveSchemeName = lower
+	}
+}
+
+// parseDualColorscheme parses a Ghostty-style "dark:X,light:Y" colorscheme
+// string. It returns the dark and light scheme names (normalized to lowercase
+// with spaces replaced by hyphens, matching built-in scheme map keys) and
+// isDual=true when the string contains at least one "dark:" or "light:" prefix.
+// Segment order and surrounding whitespace are both tolerated.
+func parseDualColorscheme(s string) (dark, light string, isDual bool) {
+	parts := strings.SplitSeq(s, ",")
+	for p := range parts {
+		p = strings.TrimSpace(p)
+		lower := strings.ToLower(p)
+		switch {
+		case strings.HasPrefix(lower, "dark:"):
+			dark = normalizeScheme(p[len("dark:"):])
+			isDual = true
+		case strings.HasPrefix(lower, "light:"):
+			light = normalizeScheme(p[len("light:"):])
+			isDual = true
 		}
 	}
+	return dark, light, isDual
+}
+
+// normalizeScheme converts a user-supplied scheme name to the lowercase,
+// hyphenated form used as keys in BuiltinSchemes (e.g. "Rose Pine" → "rose-pine").
+func normalizeScheme(s string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(s)), " ", "-")
+}
+
+// resolveIconMode determines the icon mode from the environment and config.
+// Priority:
+//  1. LFK_ICONS env var (if valid) — unconditional override.
+//  2. cfg.Icons if explicit non-auto.
+//  3. Otherwise, detectIconMode() for auto.
+//  4. Fallback: unicode.
+func resolveIconMode(cfgIcons string) string {
+	if envMode := strings.ToLower(os.Getenv("LFK_ICONS")); envMode != "" {
+		switch envMode {
+		case "unicode", "nerdfont", "simple", "emoji", "none":
+			return envMode
+		}
+	}
+	cfgMode := strings.ToLower(cfgIcons)
+	if cfgMode == "" || cfgMode == "auto" {
+		return detectIconMode()
+	}
+	switch cfgMode {
+	case "unicode", "nerdfont", "simple", "emoji", "none":
+		return cfgMode
+	}
+	return "unicode"
 }
 
 // applyConfigOptions applies scalar config options (icons, terminal, tips, etc.).
 func applyConfigOptions(cfg configFile) {
-	// Icon mode resolution:
-	//   1. LFK_ICONS env var (if valid) — unconditional override.
-	//   2. cfg.Icons if explicit non-auto.
-	//   3. Otherwise, detectIconMode() for auto.
-	//   4. Fallback: unicode.
-	resolvedIcons := ""
-	if envMode := strings.ToLower(os.Getenv("LFK_ICONS")); envMode != "" {
-		switch envMode {
-		case "unicode", "nerdfont", "simple", "emoji", "none":
-			resolvedIcons = envMode
-		}
-	}
-	if resolvedIcons == "" {
-		cfgMode := strings.ToLower(cfg.Icons)
-		if cfgMode == "" {
-			cfgMode = "auto"
-		}
-		if cfgMode == "auto" {
-			resolvedIcons = detectIconMode()
-		} else {
-			switch cfgMode {
-			case "unicode", "nerdfont", "simple", "emoji", "none":
-				resolvedIcons = cfgMode
-			}
-		}
-	}
-	if resolvedIcons == "" {
-		resolvedIcons = "unicode"
-	}
-	IconMode = resolvedIcons
+	IconMode = resolveIconMode(cfg.Icons)
 
 	if cfg.Dashboard != nil {
 		ConfigDashboard = *cfg.Dashboard
@@ -606,6 +744,12 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.LogTailLines != nil && *cfg.LogTailLines > 0 {
 		ConfigLogTailLines = *cfg.LogTailLines
 	}
+	if cfg.LogTailLinesShort != nil && *cfg.LogTailLinesShort > 0 {
+		ConfigLogTailLinesShort = *cfg.LogTailLinesShort
+	}
+	if cfg.LogRenderAnsi != nil {
+		ConfigLogRenderAnsi = *cfg.LogRenderAnsi
+	}
 	if cfg.ScrollOff != nil && *cfg.ScrollOff >= 0 {
 		ConfigScrollOff = *cfg.ScrollOff
 	}
@@ -627,6 +771,12 @@ func applyConfigOptions(cfg configFile) {
 	}
 	if cfg.NoColor != nil {
 		ConfigNoColor = *cfg.NoColor
+	}
+	if cfg.SecretLazyLoading != nil {
+		ConfigSecretLazyLoading = *cfg.SecretLazyLoading
+	}
+	if cfg.MinContrastRatio != nil {
+		ConfigMinContrastRatio = clamp01(*cfg.MinContrastRatio)
 	}
 	if os.Getenv("NO_COLOR") != "" {
 		// Per https://no-color.org, the presence of NO_COLOR (regardless of

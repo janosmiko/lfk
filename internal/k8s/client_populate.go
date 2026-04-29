@@ -5,9 +5,9 @@ import (
 )
 
 // populateResourceDetails fills in Ready and Restarts fields for specific resource kinds.
-func populateResourceDetails(ti *model.Item, obj map[string]interface{}, kind string) {
-	status, _ := obj["status"].(map[string]interface{})
-	spec, _ := obj["spec"].(map[string]interface{})
+func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
+	status, _ := obj["status"].(map[string]any)
+	spec, _ := obj["spec"].(map[string]any)
 
 	switch kind {
 	case "Pod":

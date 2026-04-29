@@ -158,6 +158,90 @@ func TestRenderRightColumnContentNoRightItemsLoading(t *testing.T) {
 	assert.Contains(t, result, "Loading")
 }
 
+func TestRenderRightColumnContentServiceNoMatchingPods(t *testing.T) {
+	// A Service (kind with children) with no matching pods should render
+	// the Service's details, not "No resources found".
+	m := Model{
+		nav: model.NavigationState{
+			Level:        model.LevelResources,
+			ResourceType: model.ResourceTypeEntry{Kind: "Service"},
+		},
+		middleItems: []model.Item{
+			{
+				Name:      "prefect-app-postgresql",
+				Kind:      "Service",
+				Namespace: "prefect-server",
+				Columns: []model.KeyValue{
+					{Key: "Type", Value: "ClusterIP"},
+					{Key: "Cluster-IP", Value: "172.20.252.55"},
+					{Key: "Port(s)", Value: "5432/TCP"},
+				},
+			},
+		},
+	}
+	result := m.renderRightColumnContent(80, 20)
+	assert.NotContains(t, result, "No resources found",
+		"Service with no matching pods should not show 'No resources found'")
+	assert.Contains(t, result, "ClusterIP",
+		"Service details (Type=ClusterIP) should be rendered")
+}
+
+func TestRenderRightColumnContentDeploymentNoPodsFallsBackToDetails(t *testing.T) {
+	// A Deployment with zero matching pods (e.g., replicas=0) should show
+	// its details, not "No resources found".
+	m := Model{
+		nav: model.NavigationState{
+			Level:        model.LevelResources,
+			ResourceType: model.ResourceTypeEntry{Kind: "Deployment"},
+		},
+		middleItems: []model.Item{
+			{
+				Name:      "scaled-down-deploy",
+				Kind:      "Deployment",
+				Namespace: "default",
+				Columns: []model.KeyValue{
+					{Key: "Ready", Value: "0/0"},
+					{Key: "Strategy", Value: "RollingUpdate"},
+				},
+			},
+		},
+	}
+	result := m.renderRightColumnContent(80, 20)
+	assert.NotContains(t, result, "No resources found")
+	assert.Contains(t, result, "RollingUpdate")
+}
+
+func TestRenderRightColumnContentServiceNoPodsDuringWatchTickKeepsDetails(t *testing.T) {
+	// Regression: on every watch-tick refresh, updateResourcesLoadedMain
+	// sets m.previewLoading = true before re-fetching children. A Service
+	// whose selector matches zero pods must keep showing its details
+	// across the refresh — not clear them to a "Loading..." spinner and
+	// re-render, which produces a flicker every watch interval.
+	m := Model{
+		nav: model.NavigationState{
+			Level:        model.LevelResources,
+			ResourceType: model.ResourceTypeEntry{Kind: "Service"},
+		},
+		middleItems: []model.Item{
+			{
+				Name:      "prefect-app-postgresql",
+				Kind:      "Service",
+				Namespace: "prefect-server",
+				Columns: []model.KeyValue{
+					{Key: "Type", Value: "ClusterIP"},
+					{Key: "Cluster-IP", Value: "172.20.252.55"},
+				},
+			},
+		},
+		previewLoading: true, // mid-watch-tick refresh
+	}
+	result := m.renderRightColumnContent(80, 20)
+	assert.NotContains(t, result, "Loading",
+		"details must remain stable during watch-tick preview refresh, not flash a spinner")
+	assert.Contains(t, result, "ClusterIP",
+		"Service details must be rendered continuously across watch ticks")
+}
+
 // --- renderRightColumn with events and metrics ---
 
 func TestRenderRightColumnWithEvents(t *testing.T) {

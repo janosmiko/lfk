@@ -15,15 +15,15 @@ import (
 func TestParsePodMetrics(t *testing.T) {
 	t.Run("single container with CPU and memory", func(t *testing.T) {
 		obj := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			Object: map[string]any{
+				"metadata": map[string]any{
 					"name":      "my-pod",
 					"namespace": "default",
 				},
-				"containers": []interface{}{
-					map[string]interface{}{
+				"containers": []any{
+					map[string]any{
 						"name": "app",
-						"usage": map[string]interface{}{
+						"usage": map[string]any{
 							"cpu":    "250m",
 							"memory": "128Mi",
 						},
@@ -42,22 +42,22 @@ func TestParsePodMetrics(t *testing.T) {
 
 	t.Run("multiple containers summed", func(t *testing.T) {
 		obj := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			Object: map[string]any{
+				"metadata": map[string]any{
 					"name":      "multi-pod",
 					"namespace": "kube-system",
 				},
-				"containers": []interface{}{
-					map[string]interface{}{
+				"containers": []any{
+					map[string]any{
 						"name": "app",
-						"usage": map[string]interface{}{
+						"usage": map[string]any{
 							"cpu":    "100m",
 							"memory": "64Mi",
 						},
 					},
-					map[string]interface{}{
+					map[string]any{
 						"name": "sidecar",
-						"usage": map[string]interface{}{
+						"usage": map[string]any{
 							"cpu":    "50m",
 							"memory": "32Mi",
 						},
@@ -74,8 +74,8 @@ func TestParsePodMetrics(t *testing.T) {
 
 	t.Run("no containers returns error", func(t *testing.T) {
 		obj := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			Object: map[string]any{
+				"metadata": map[string]any{
 					"name": "empty-pod",
 				},
 			},
@@ -88,16 +88,16 @@ func TestParsePodMetrics(t *testing.T) {
 
 	t.Run("container entry not a map is skipped", func(t *testing.T) {
 		obj := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			Object: map[string]any{
+				"metadata": map[string]any{
 					"name":      "pod",
 					"namespace": "ns",
 				},
-				"containers": []interface{}{
+				"containers": []any{
 					"not-a-map",
-					map[string]interface{}{
+					map[string]any{
 						"name": "app",
-						"usage": map[string]interface{}{
+						"usage": map[string]any{
 							"cpu": "100m",
 						},
 					},
@@ -112,18 +112,18 @@ func TestParsePodMetrics(t *testing.T) {
 
 	t.Run("container without usage is skipped", func(t *testing.T) {
 		obj := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			Object: map[string]any{
+				"metadata": map[string]any{
 					"name":      "pod",
 					"namespace": "ns",
 				},
-				"containers": []interface{}{
-					map[string]interface{}{
+				"containers": []any{
+					map[string]any{
 						"name": "no-usage",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"name": "with-usage",
-						"usage": map[string]interface{}{
+						"usage": map[string]any{
 							"memory": "256Mi",
 						},
 					},
@@ -139,15 +139,15 @@ func TestParsePodMetrics(t *testing.T) {
 
 	t.Run("container with only CPU no memory", func(t *testing.T) {
 		obj := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			Object: map[string]any{
+				"metadata": map[string]any{
 					"name":      "pod",
 					"namespace": "ns",
 				},
-				"containers": []interface{}{
-					map[string]interface{}{
+				"containers": []any{
+					map[string]any{
 						"name": "app",
-						"usage": map[string]interface{}{
+						"usage": map[string]any{
 							"cpu": "500m",
 						},
 					},
@@ -163,15 +163,15 @@ func TestParsePodMetrics(t *testing.T) {
 
 	t.Run("unparseable quantity is ignored", func(t *testing.T) {
 		obj := &unstructured.Unstructured{
-			Object: map[string]interface{}{
-				"metadata": map[string]interface{}{
+			Object: map[string]any{
+				"metadata": map[string]any{
 					"name":      "pod",
 					"namespace": "ns",
 				},
-				"containers": []interface{}{
-					map[string]interface{}{
+				"containers": []any{
+					map[string]any{
 						"name": "app",
-						"usage": map[string]interface{}{
+						"usage": map[string]any{
 							"cpu":    "not-a-quantity",
 							"memory": "also-invalid",
 						},

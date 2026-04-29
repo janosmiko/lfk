@@ -13,31 +13,31 @@ import (
 func TestPopulateResourceDetails_Pod_InitializingFailedStatus(t *testing.T) {
 	// When init container reason is "PodInitializing" and pod status is "Failed",
 	// the reason should be cleared (line 81-83).
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"containers": []interface{}{
-				map[string]interface{}{"name": "app"},
+	obj := map[string]any{
+		"spec": map[string]any{
+			"containers": []any{
+				map[string]any{"name": "app"},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"phase": "Failed",
-			"initContainerStatuses": []interface{}{
-				map[string]interface{}{
+			"initContainerStatuses": []any{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "PodInitializing",
 						},
 					},
 				},
 			},
-			"containerStatuses": []interface{}{
-				map[string]interface{}{
+			"containerStatuses": []any{
+				map[string]any{
 					"name":         "app",
 					"ready":        false,
 					"restartCount": float64(0),
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "PodInitializing",
 						},
 					},
@@ -57,10 +57,10 @@ func TestPopulateResourceDetails_Pod_InitializingFailedStatus(t *testing.T) {
 
 func TestPopulateResourceDetails_Ingress_DefaultBackendServiceNameOnly(t *testing.T) {
 	// When a default backend has a service with name but no port map (line 336-338).
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"defaultBackend": map[string]interface{}{
-				"service": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"defaultBackend": map[string]any{
+				"service": map[string]any{
 					"name": "my-backend",
 				},
 			},
@@ -76,12 +76,12 @@ func TestPopulateResourceDetails_Ingress_DefaultBackendServiceNameOnly(t *testin
 
 func TestPopulateResourceDetails_Ingress_DefaultBackendPortName(t *testing.T) {
 	// When a default backend has a service with a named port instead of numeric (line 333-334).
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"defaultBackend": map[string]interface{}{
-				"service": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"defaultBackend": map[string]any{
+				"service": map[string]any{
 					"name": "my-backend",
-					"port": map[string]interface{}{
+					"port": map[string]any{
 						"name": "https",
 					},
 				},
@@ -98,18 +98,18 @@ func TestPopulateResourceDetails_Ingress_DefaultBackendPortName(t *testing.T) {
 
 func TestPopulateResourceDetails_Ingress_LoadBalancerHostname(t *testing.T) {
 	// When a load balancer ingress entry has hostname instead of IP (line 392-394).
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"rules": []interface{}{
-				map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"rules": []any{
+				map[string]any{
 					"host": "example.com",
 				},
 			},
 		},
-		"status": map[string]interface{}{
-			"loadBalancer": map[string]interface{}{
-				"ingress": []interface{}{
-					map[string]interface{}{
+		"status": map[string]any{
+			"loadBalancer": map[string]any{
+				"ingress": []any{
+					map[string]any{
 						"hostname": "lb.example.com",
 					},
 				},
@@ -128,16 +128,16 @@ func TestPopulateResourceDetails_Ingress_LoadBalancerHostname(t *testing.T) {
 
 func TestPopulateResourceDetails_HPA_NonMapSpecMetric(t *testing.T) {
 	// Non-map metric entries in spec.metrics should be skipped (line 632-633).
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"maxReplicas": float64(5),
-			"metrics": []interface{}{
+			"metrics": []any{
 				"not-a-map",
-				map[string]interface{}{
+				map[string]any{
 					"type": "Resource",
-					"resource": map[string]interface{}{
+					"resource": map[string]any{
 						"name": "cpu",
-						"target": map[string]interface{}{
+						"target": map[string]any{
 							"type":               "Utilization",
 							"averageUtilization": float64(70),
 						},
@@ -145,7 +145,7 @@ func TestPopulateResourceDetails_HPA_NonMapSpecMetric(t *testing.T) {
 				},
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentReplicas": float64(1),
 			"desiredReplicas": float64(1),
 		},
@@ -160,20 +160,20 @@ func TestPopulateResourceDetails_HPA_NonMapSpecMetric(t *testing.T) {
 
 func TestPopulateResourceDetails_HPA_NonMapCurrentMetric(t *testing.T) {
 	// Non-map metric entries in status.currentMetrics should be skipped (line 705-706).
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"maxReplicas": float64(5),
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentReplicas": float64(1),
 			"desiredReplicas": float64(1),
-			"currentMetrics": []interface{}{
+			"currentMetrics": []any{
 				"not-a-map",
-				map[string]interface{}{
+				map[string]any{
 					"type": "Resource",
-					"resource": map[string]interface{}{
+					"resource": map[string]any{
 						"name": "cpu",
-						"current": map[string]interface{}{
+						"current": map[string]any{
 							"averageUtilization": float64(45),
 						},
 					},
@@ -191,16 +191,16 @@ func TestPopulateResourceDetails_HPA_NonMapCurrentMetric(t *testing.T) {
 
 func TestPopulateResourceDetails_HPA_NonMapCondition(t *testing.T) {
 	// Non-map condition entries in status.conditions should be skipped (line 749-750).
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"maxReplicas": float64(3),
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentReplicas": float64(3),
 			"desiredReplicas": float64(3),
-			"conditions": []interface{}{
+			"conditions": []any{
 				"not-a-map",
-				map[string]interface{}{
+				map[string]any{
 					"type":    "ScalingLimited",
 					"status":  "True",
 					"message": "limited",

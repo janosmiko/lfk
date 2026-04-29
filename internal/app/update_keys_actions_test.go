@@ -208,6 +208,85 @@ func TestActionKeyLessCyclesSortPrev(t *testing.T) {
 	assert.Equal(t, "Status", result.sortColumnName)
 }
 
+// --- handleExplorerActionKey: sort keys are no-ops at picker levels ---
+//
+// At LevelClusters and LevelResourceTypes, sortMiddleItems() early-returns,
+// so >, <, =, - mutating sort state and emitting "Sort: ..." status messages
+// is misleading: the bar lies that sort changed when items are unmoved.
+// These keys must short-circuit silently at those levels.
+
+func TestActionKeySortNextNoOpAtResourceTypes(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.sortColumnName = "Name"
+	m.sortAscending = true
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+	})
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	ui.ActiveSortableColumnCount = 3
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('>'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Name", result.sortColumnName, "sort column must not change at LevelResourceTypes")
+	assert.True(t, result.sortAscending)
+	assert.Empty(t, result.statusMessage, "no misleading status message")
+	assert.Nil(t, cmd)
+}
+
+func TestActionKeySortPrevNoOpAtResourceTypes(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.sortColumnName = "Name"
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+	})
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	ui.ActiveSortableColumnCount = 3
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('<'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Name", result.sortColumnName)
+	assert.Empty(t, result.statusMessage)
+	assert.Nil(t, cmd)
+}
+
+func TestActionKeySortFlipNoOpAtClusters(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+	m.sortAscending = true
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('='))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.True(t, result.sortAscending, "sortAscending must not toggle at LevelClusters")
+	assert.Empty(t, result.statusMessage)
+	assert.Nil(t, cmd)
+}
+
+func TestActionKeySortResetNoOpAtResourceTypes(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.sortColumnName = "Status"
+	m.sortAscending = false
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('-'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Status", result.sortColumnName, "reset must not clobber column at LevelResourceTypes")
+	assert.False(t, result.sortAscending, "reset must not flip ascending at LevelResourceTypes")
+	assert.Empty(t, result.statusMessage)
+	assert.Nil(t, cmd)
+}
+
 // --- handleExplorerActionKey: y copies resource name ---
 
 func TestActionKeyYCopiesResourceName(t *testing.T) {
@@ -583,6 +662,14 @@ func TestHandleExplorerActionKeySecurityRequiresContext(t *testing.T) {
 // LevelResourceTypes and jumps to the first Security category entry.
 func TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel(t *testing.T) {
 	m := baseExplorerModel() // starts at LevelResources with middleItems = pods
+	// navigateParent only repopulates middleItems from leftItems when the
+	// current context has discovered resources; otherwise it shows the
+	// loader. Provide a trivial discovered set so the ascend repopulates.
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		m.nav.Context: {
+			{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		},
+	}
 	m.leftItems = []model.Item{
 		{Name: "Monitoring", Extra: "__monitoring__"},
 		{Name: "Trivy", Category: "Security", Extra: "_security/v1/findings-trivy-operator"},
@@ -604,6 +691,14 @@ func TestHandleExplorerActionKeySecurityAscendsFromDeeperLevel(t *testing.T) {
 // helper).
 func TestHandleExplorerActionKeyMonitoringAscendsFromDeeperLevel(t *testing.T) {
 	m := baseExplorerModel()
+	// See the security variant above: navigateParent only repopulates
+	// middleItems from leftItems when the context has discovered
+	// resources; provide a trivial set.
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		m.nav.Context: {
+			{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		},
+	}
 	m.leftItems = []model.Item{
 		{Name: "Cluster", Extra: "__overview__"},
 		{Name: "Monitoring", Extra: "__monitoring__"},

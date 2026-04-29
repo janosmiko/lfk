@@ -12,7 +12,7 @@ import (
 func TestRenderWrappedLines(t *testing.T) {
 	t.Run("basic wrapping", func(t *testing.T) {
 		lines := []string{"hello world this is a long line", "short"}
-		result := renderWrappedLines(lines, 0, 10, 15, false, 0, -1, -1, -1, -1, 0, 0, 0)
+		result := renderWrappedLines(lines, 0, 10, 15, false, 0, -1, -1, -1, -1, 0, 0, 0, 0)
 		// Should have multiple wrapped sub-lines for the first long line.
 		assert.Greater(t, len(result), 2)
 		joined := strings.Join(result, "\n")
@@ -22,7 +22,7 @@ func TestRenderWrappedLines(t *testing.T) {
 
 	t.Run("scroll skips initial lines", func(t *testing.T) {
 		lines := []string{"line1", "line2", "line3", "line4"}
-		result := renderWrappedLines(lines, 2, 3, 40, false, 0, -1, -1, -1, -1, 0, 0, 0)
+		result := renderWrappedLines(lines, 2, 3, 40, false, 0, -1, -1, -1, -1, 0, 0, 0, 0)
 		joined := strings.Join(result, "\n")
 		assert.Contains(t, joined, "line3")
 		assert.Contains(t, joined, "line4")
@@ -31,18 +31,18 @@ func TestRenderWrappedLines(t *testing.T) {
 
 	t.Run("height limits output", func(t *testing.T) {
 		lines := []string{"a", "b", "c", "d", "e"}
-		result := renderWrappedLines(lines, 0, 3, 40, false, 0, -1, -1, -1, -1, 0, 0, 0)
+		result := renderWrappedLines(lines, 0, 3, 40, false, 0, -1, -1, -1, -1, 0, 0, 0, 0)
 		assert.LessOrEqual(t, len(result), 3)
 	})
 
 	t.Run("empty lines list", func(t *testing.T) {
-		result := renderWrappedLines(nil, 0, 5, 40, false, 0, -1, -1, -1, -1, 0, 0, 0)
+		result := renderWrappedLines(nil, 0, 5, 40, false, 0, -1, -1, -1, -1, 0, 0, 0, 0)
 		assert.Empty(t, result)
 	})
 
 	t.Run("line numbers shown", func(t *testing.T) {
 		lines := []string{"line1", "line2"}
-		result := renderWrappedLines(lines, 0, 2, 40, true, 3, -1, -1, -1, -1, 0, 0, 0)
+		result := renderWrappedLines(lines, 0, 2, 40, true, 3, -1, -1, -1, -1, 0, 0, 0, 0)
 		joined := strings.Join(result, "\n")
 		assert.Contains(t, joined, "1")
 		assert.Contains(t, joined, "2")
@@ -50,20 +50,20 @@ func TestRenderWrappedLines(t *testing.T) {
 
 	t.Run("cursor line gets indicator glyph", func(t *testing.T) {
 		lines := []string{"hello", "world"}
-		result := renderWrappedLines(lines, 0, 2, 40, false, 0, 0, -1, -1, -1, 0, 0, 0)
+		result := renderWrappedLines(lines, 0, 2, 40, false, 0, 0, -1, -1, -1, 0, 0, 0, 0)
 		assert.Contains(t, result[0], "\u258e")
 	})
 
 	t.Run("non-cursor lines start with space", func(t *testing.T) {
 		lines := []string{"hello", "world"}
-		result := renderWrappedLines(lines, 0, 2, 40, false, 0, 0, -1, -1, -1, 0, 0, 0)
+		result := renderWrappedLines(lines, 0, 2, 40, false, 0, 0, -1, -1, -1, 0, 0, 0, 0)
 		assert.True(t, strings.HasPrefix(result[1], " "), "non-cursor line should start with space")
 	})
 
 	t.Run("very long line wraps to multiple sub-lines", func(t *testing.T) {
 		longLine := strings.Repeat("x", 100)
 		lines := []string{longLine}
-		result := renderWrappedLines(lines, 0, 20, 20, false, 0, -1, -1, -1, -1, 0, 0, 0)
+		result := renderWrappedLines(lines, 0, 20, 20, false, 0, -1, -1, -1, -1, 0, 0, 0, 0)
 		// 100 chars / (20-1 gutter) = ~6 wrapped lines.
 		assert.Greater(t, len(result), 1)
 	})
@@ -80,7 +80,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"my-pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "my-pod")
 		assert.Contains(t, result, "log entry 1")
@@ -94,7 +94,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "FOLLOW")
 	})
@@ -106,7 +106,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "WRAP")
 	})
@@ -118,7 +118,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "LINE#")
 	})
@@ -130,7 +130,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "TIMESTAMPS")
 	})
@@ -142,7 +142,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "PREVIOUS")
 	})
@@ -154,7 +154,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "error", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "/error")
 	})
@@ -166,7 +166,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "err",
 			true, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "err")
 		assert.Contains(t, result, "enter:apply")
@@ -179,7 +179,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"Saved to file", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "Saved to file")
 	})
@@ -191,7 +191,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'V', 0, 0,
+			0, true, 0, 'V', 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "VISUAL LINE")
 	})
@@ -203,7 +203,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'v', 0, 0,
+			0, true, 0, 'v', 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "VISUAL")
 	})
@@ -215,7 +215,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			0, true, 0, 'B', 0, 0,
+			0, true, 0, 'B', 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "VISUAL BLOCK")
 	})
@@ -227,7 +227,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "pod")
 		assert.Contains(t, result, "0 lines")
@@ -240,7 +240,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, true,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "LOADING HISTORY")
 	})
@@ -253,7 +253,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, true, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "switch pod")
 	})
@@ -265,7 +265,7 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, true, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "containers")
 	})
@@ -278,11 +278,94 @@ func TestRenderLogViewer(t *testing.T) {
 			"pod", "", "",
 			false, false, false, false, false,
 			"", false,
-			-1, false, 0, 0, 0, 0,
+			-1, false, 0, 0, 0, 0, 0, false,
 		)
 		assert.Contains(t, result, "WRAP")
 		// The long line should be visible (at least part of it).
 		assert.Contains(t, result, "xxx")
+	})
+
+	t.Run("n/N hidden in default hint bar when no committed search", func(t *testing.T) {
+		// Wide terminal so the hint bar is not truncated.
+		result := RenderLogViewer(
+			[]string{"log"}, 0, 400, 20,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, false,
+		)
+		// "/" search hint must still be there; "n/N" must not.
+		assert.Contains(t, result, "search")
+		assert.NotContains(t, result, "n/N")
+		assert.NotContains(t, result, "next/prev")
+	})
+
+	t.Run("n/N shown in default hint bar when search is committed", func(t *testing.T) {
+		result := RenderLogViewer(
+			[]string{"error log"}, 0, 400, 20,
+			false, false, false, false, false, false,
+			"pod", "error", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, false,
+		)
+		assert.Contains(t, result, "n/N")
+		assert.Contains(t, result, "next/prev")
+	})
+
+	t.Run("n/N hidden during search input regardless of prior committed search", func(t *testing.T) {
+		// searchActive=true means user is typing in the search prompt; the
+		// footer is the prompt bar, not the default hints.
+		result := RenderLogViewer(
+			[]string{"err"}, 0, 400, 20,
+			false, false, false, false, false, false,
+			"pod", "error", "err",
+			true, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, false,
+		)
+		assert.Contains(t, result, "enter:apply")
+		assert.NotContains(t, result, "n/N")
+	})
+
+	t.Run("tab-bearing controller-runtime line keeps total height", func(t *testing.T) {
+		// Regression: dragonfly-operator (controller-runtime/zap) emits
+		// tab-separated fields. lipgloss.Width treats '\t' as zero-width
+		// while the terminal renders it as a tab-stop jump, so the
+		// contentWidth guard inside RenderLogViewer used to undercount and
+		// let the line slip through. lipgloss then re-wrapped it
+		// internally and pushed the bottom border off-screen, inflating
+		// the total rendered height beyond title+body+footer. After tab
+		// expansion in sanitizeLogLine the measured width matches what
+		// the terminal will paint, so the layout stays at the expected
+		// row count and the bottom border lands where the footer can sit
+		// directly below it.
+		const width, height = 60, 12
+		// Long tab-separated line whose expanded width exceeds contentWidth.
+		line := strings.Repeat("2026-04-27T16:06:59Z\tINFO\tsetup\tstarting manager", 3)
+		result := RenderLogViewer(
+			[]string{line}, 0, width, height,
+			false, false, false, false, false, false,
+			"pod", "", "",
+			false, false, false, false, false,
+			"", false,
+			-1, false, 0, 0, 0, 0, 0, false,
+		)
+		// Layout: title (1) + bordered body (contentHeight+2 = height) +
+		// footer (1) = height + 2 rows total. lipgloss re-wrapping a
+		// tab-bearing line that slipped past the truncation guard would
+		// inflate this past the expected count.
+		lines := strings.Split(result, "\n")
+		assert.Len(t, lines, height+2,
+			"tab-bearing line must not inflate the rendered height (got %d, want %d)",
+			len(lines), height+2)
+		// Bottom border (╰) should sit on the row right above the footer.
+		// If a body row got re-wrapped, the border is pushed down and this
+		// row would still be content (│ ... │).
+		assert.Contains(t, lines[len(lines)-2], "╰",
+			"bottom border row must sit directly above the footer; got %q",
+			lines[len(lines)-2])
 	})
 }
 
@@ -337,5 +420,28 @@ func TestColorizePodPrefix(t *testing.T) {
 		// but verify both process correctly.
 		assert.Contains(t, r1, "pod/myapp-abc12/app")
 		assert.Contains(t, r2, "pod/myapp-abc12/sidecar")
+	})
+
+	t.Run("no-color mode emits no ANSI escape codes", func(t *testing.T) {
+		origNoColor := ConfigNoColor
+		t.Cleanup(func() { SetNoColor(origNoColor) })
+
+		SetNoColor(true)
+
+		// Try several pod names so we hit different palette indices;
+		// one of them is guaranteed to hash to the red/pink slot.
+		cases := []string{
+			"[pod/myapp-abc12/app] log line",
+			"[pod/web-xyz9k/server] request served",
+			"[pod/worker-1/proc] tick",
+			"[pod/redis-primary/redis] OK",
+		}
+		for _, line := range cases {
+			result := colorizePodPrefix(line)
+			assert.NotContains(t, result, "\x1b[",
+				"no-color must not emit ANSI escape codes; got: %q", result)
+			// Text content stays intact.
+			assert.Contains(t, result, line[1:strings.Index(line, "]")])
+		}
 	})
 }

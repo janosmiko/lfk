@@ -11,9 +11,20 @@ import (
 // --- RenderLogContainerSelectOverlay ---
 
 func TestRenderLogContainerSelectOverlay(t *testing.T) {
-	t.Run("empty items shows message", func(t *testing.T) {
+	// Nil items signals "fetch in flight" — distinguish from empty (which
+	// means "filter excluded everything") so the user gets a Loading hint
+	// instead of a misleading No-matches message during the initial load.
+	// Mirrors RenderNamespaceOverlay and RenderPodSelectOverlay.
+	t.Run("nil items shows loading message", func(t *testing.T) {
 		ResetOverlayContainerScroll()
 		result := RenderLogContainerSelectOverlay(nil, 0, nil, "", false, false)
+		assert.Contains(t, result, "Filter Containers")
+		assert.Contains(t, result, "Loading containers...")
+	})
+
+	t.Run("empty items shows no-match message", func(t *testing.T) {
+		ResetOverlayContainerScroll()
+		result := RenderLogContainerSelectOverlay([]model.Item{}, 0, nil, "", false, false)
 		assert.Contains(t, result, "Filter Containers")
 		assert.Contains(t, result, "No matching containers")
 	})

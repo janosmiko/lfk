@@ -45,7 +45,7 @@ func parseVulnerabilityReport(u *unstructured.Unstructured) []security.Finding {
 	}
 	findings := make([]security.Finding, 0, len(vulns))
 	for _, v := range vulns {
-		m, ok := v.(map[string]interface{})
+		m, ok := v.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -103,7 +103,7 @@ func parseConfigAuditReport(u *unstructured.Unstructured) []security.Finding {
 	}
 	var findings []security.Finding
 	for _, c := range checks {
-		m, ok := c.(map[string]interface{})
+		m, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}

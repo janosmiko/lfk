@@ -68,14 +68,14 @@ func (c *Client) GetNetworkPolicyInfo(ctx context.Context, kubeCtx, namespace, n
 		Namespace: namespace,
 	}
 
-	spec, _ := obj.Object["spec"].(map[string]interface{})
+	spec, _ := obj.Object["spec"].(map[string]any)
 	if spec == nil {
 		return info, nil
 	}
 
 	// Extract podSelector.
-	if podSel, ok := spec["podSelector"].(map[string]interface{}); ok {
-		if matchLabels, ok := podSel["matchLabels"].(map[string]interface{}); ok {
+	if podSel, ok := spec["podSelector"].(map[string]any); ok {
+		if matchLabels, ok := podSel["matchLabels"].(map[string]any); ok {
 			info.PodSelector = make(map[string]string, len(matchLabels))
 			for k, v := range matchLabels {
 				info.PodSelector[k] = fmt.Sprintf("%v", v)
@@ -84,21 +84,21 @@ func (c *Client) GetNetworkPolicyInfo(ctx context.Context, kubeCtx, namespace, n
 	}
 
 	// Extract policyTypes.
-	if types, ok := spec["policyTypes"].([]interface{}); ok {
+	if types, ok := spec["policyTypes"].([]any); ok {
 		for _, t := range types {
 			info.PolicyTypes = append(info.PolicyTypes, fmt.Sprintf("%v", t))
 		}
 	}
 
 	// Extract ingress rules.
-	if ingress, ok := spec["ingress"].([]interface{}); ok {
+	if ingress, ok := spec["ingress"].([]any); ok {
 		for _, rule := range ingress {
 			info.IngressRules = append(info.IngressRules, parseNetpolRule(rule, "from"))
 		}
 	}
 
 	// Extract egress rules.
-	if egress, ok := spec["egress"].([]interface{}); ok {
+	if egress, ok := spec["egress"].([]any); ok {
 		for _, rule := range egress {
 			info.EgressRules = append(info.EgressRules, parseNetpolRule(rule, "to"))
 		}
@@ -112,8 +112,8 @@ func (c *Client) GetNetworkPolicyInfo(ctx context.Context, kubeCtx, namespace, n
 
 // parseNetpolRule extracts ports and peers from a single ingress/egress rule.
 // peerField is "from" for ingress rules and "to" for egress rules.
-func parseNetpolRule(rule interface{}, peerField string) NetpolRule {
-	ruleMap, ok := rule.(map[string]interface{})
+func parseNetpolRule(rule any, peerField string) NetpolRule {
+	ruleMap, ok := rule.(map[string]any)
 	if !ok {
 		return NetpolRule{}
 	}
@@ -121,9 +121,9 @@ func parseNetpolRule(rule interface{}, peerField string) NetpolRule {
 	var result NetpolRule
 
 	// Parse ports.
-	if ports, ok := ruleMap["ports"].([]interface{}); ok {
+	if ports, ok := ruleMap["ports"].([]any); ok {
 		for _, p := range ports {
-			portMap, ok := p.(map[string]interface{})
+			portMap, ok := p.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -141,9 +141,9 @@ func parseNetpolRule(rule interface{}, peerField string) NetpolRule {
 	}
 
 	// Parse peers (from/to).
-	if peers, ok := ruleMap[peerField].([]interface{}); ok {
+	if peers, ok := ruleMap[peerField].([]any); ok {
 		for _, p := range peers {
-			peerMap, ok := p.(map[string]interface{})
+			peerMap, ok := p.(map[string]any)
 			if !ok {
 				continue
 			}
@@ -160,16 +160,16 @@ func parseNetpolRule(rule interface{}, peerField string) NetpolRule {
 }
 
 // parsePeer extracts a single peer (podSelector, namespaceSelector, or ipBlock).
-func parsePeer(peerMap map[string]interface{}) NetpolPeer {
+func parsePeer(peerMap map[string]any) NetpolPeer {
 	peer := NetpolPeer{}
 
 	// Check for ipBlock (mutually exclusive with selectors).
-	if ipBlock, ok := peerMap["ipBlock"].(map[string]interface{}); ok {
+	if ipBlock, ok := peerMap["ipBlock"].(map[string]any); ok {
 		peer.Type = "CIDR"
 		if cidr, ok := ipBlock["cidr"]; ok {
 			peer.CIDR = fmt.Sprintf("%v", cidr)
 		}
-		if except, ok := ipBlock["except"].([]interface{}); ok {
+		if except, ok := ipBlock["except"].([]any); ok {
 			for _, e := range except {
 				peer.Except = append(peer.Except, fmt.Sprintf("%v", e))
 			}
@@ -181,9 +181,9 @@ func parsePeer(peerMap map[string]interface{}) NetpolPeer {
 	hasPodSel := false
 
 	// Check for namespace selector.
-	if nsSel, ok := peerMap["namespaceSelector"].(map[string]interface{}); ok {
+	if nsSel, ok := peerMap["namespaceSelector"].(map[string]any); ok {
 		hasNsSel = true
-		if matchLabels, ok := nsSel["matchLabels"].(map[string]interface{}); ok {
+		if matchLabels, ok := nsSel["matchLabels"].(map[string]any); ok {
 			nsLabels := make(map[string]string, len(matchLabels))
 			for k, v := range matchLabels {
 				nsLabels[k] = fmt.Sprintf("%v", v)
@@ -195,9 +195,9 @@ func parsePeer(peerMap map[string]interface{}) NetpolPeer {
 	}
 
 	// Check for pod selector.
-	if podSel, ok := peerMap["podSelector"].(map[string]interface{}); ok {
+	if podSel, ok := peerMap["podSelector"].(map[string]any); ok {
 		hasPodSel = true
-		if matchLabels, ok := podSel["matchLabels"].(map[string]interface{}); ok {
+		if matchLabels, ok := podSel["matchLabels"].(map[string]any); ok {
 			peer.Selector = make(map[string]string, len(matchLabels))
 			for k, v := range matchLabels {
 				peer.Selector[k] = fmt.Sprintf("%v", v)

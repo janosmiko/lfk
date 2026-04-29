@@ -20,7 +20,7 @@ func TestSourceFetch(t *testing.T) {
 			Spec: corev1.PodSpec{
 				Containers: []corev1.Container{{
 					Name: "c", Image: "nginx:latest",
-					SecurityContext: &corev1.SecurityContext{Privileged: boolPtr(true)},
+					SecurityContext: &corev1.SecurityContext{Privileged: new(true)},
 				}},
 			},
 		},
@@ -31,10 +31,10 @@ func TestSourceFetch(t *testing.T) {
 				Containers: []corev1.Container{{
 					Name: "c", Image: "nginx@sha256:abcdef",
 					SecurityContext: &corev1.SecurityContext{
-						Privileged:               boolPtr(false),
-						AllowPrivilegeEscalation: boolPtr(false),
-						ReadOnlyRootFilesystem:   boolPtr(true),
-						RunAsNonRoot:             boolPtr(true),
+						Privileged:               new(false),
+						AllowPrivilegeEscalation: new(false),
+						ReadOnlyRootFilesystem:   new(true),
+						RunAsNonRoot:             new(true),
 					},
 					Resources: corev1.ResourceRequirements{Limits: corev1.ResourceList{
 						corev1.ResourceCPU:    resourceQuantity("100m"),
@@ -72,11 +72,11 @@ func TestSourceFetchNamespaceFilter(t *testing.T) {
 	client := fake.NewSimpleClientset(
 		&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p1"},
-			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: boolPtr(true)}}}},
+			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)}}}},
 		},
 		&corev1.Pod{
 			ObjectMeta: metav1.ObjectMeta{Namespace: "staging", Name: "p2"},
-			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: boolPtr(true)}}}},
+			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)}}}},
 		},
 	)
 

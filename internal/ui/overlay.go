@@ -6,6 +6,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -188,10 +189,10 @@ func RenderNamespaceOverlay(items []model.Item, filter string, cursor int, curre
 	start := VimScrollOff(overlayNsScroll, cursor, len(items), maxVisible, scrollOff, displayLines)
 	overlayNsScroll = start
 
-	end := start + maxVisible
-	if end > len(items) {
-		end = len(items)
-	}
+	end := min(start+maxVisible, len(items))
+
+	b.WriteString(RenderScrollAbove(start, end-start, len(items), 0))
+	b.WriteString("\n")
 
 	for i := start; i < end; i++ {
 		item := items[i]
@@ -217,16 +218,16 @@ func RenderNamespaceOverlay(items []model.Item, filter string, cursor int, curre
 		}
 	}
 
+	b.WriteString("\n")
+	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
+
 	return b.String()
 }
 
 // RenderActionOverlay renders the action menu overlay content.
 func RenderActionOverlay(items []model.Item, cursor int, width int) string {
 	// Account for overlay border (1 each side) + padding (2 each side) = 6 total.
-	innerW := width - 6
-	if innerW < 20 {
-		innerW = 20
-	}
+	innerW := max(width-6, 20)
 
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Actions"))
@@ -266,13 +267,19 @@ func RenderConfirmOverlay(action string) string {
 	return b.String()
 }
 
-// RenderQuitConfirmOverlay renders the quit confirmation overlay content.
-func RenderQuitConfirmOverlay() string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Quit"))
-	b.WriteString("\n\n")
-	b.WriteString(OverlayNormalStyle.Render("Quit lfk?"))
-	return b.String()
+// RenderQuitConfirmOverlay renders the quit confirmation overlay content
+// centered both horizontally and vertically within (innerWidth, innerHeight),
+// using the title color for emphasis. The dimensions should be the overlay
+// box's content area (overlayW/H minus border + padding). Single line —
+// a separate "Quit" title used to read as a second option in a two-line
+// layout, so it was dropped.
+func RenderQuitConfirmOverlay(innerWidth, innerHeight int) string {
+	return OverlayTitleStyle.
+		Padding(0).
+		Width(innerWidth).
+		Height(innerHeight).
+		Align(lipgloss.Center, lipgloss.Center).
+		Render("Quit lfk?")
 }
 
 // RenderPasteConfirmOverlay renders the multiline paste confirmation overlay.
@@ -442,6 +449,10 @@ func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedCon
 	}
 	b.WriteString("\n\n")
 
+	if items == nil {
+		b.WriteString(OverlayDimStyle.Render("Loading containers..."))
+		return b.String()
+	}
 	if len(items) == 0 {
 		b.WriteString(OverlayDimStyle.Render("No matching containers"))
 		return b.String()
@@ -460,6 +471,9 @@ func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedCon
 	overlayContainerScroll = start
 
 	end := min(start+maxVisible, len(items))
+
+	b.WriteString(RenderScrollAbove(start, end-start, len(items), 0))
+	b.WriteString("\n")
 
 	for i := start; i < end; i++ {
 		item := items[i]
@@ -483,6 +497,9 @@ func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedCon
 			b.WriteString("\n")
 		}
 	}
+
+	b.WriteString("\n")
+	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
 
 	return b.String()
 }
@@ -527,6 +544,9 @@ func RenderPodSelectOverlay(items []model.Item, cursor int, filter string, filte
 
 	end := min(start+maxVisible, len(items))
 
+	b.WriteString(RenderScrollAbove(start, end-start, len(items), 0))
+	b.WriteString("\n")
+
 	for i := start; i < end; i++ {
 		item := items[i]
 		line := fmt.Sprintf("  %s", item.Name)
@@ -553,14 +573,29 @@ func RenderPodSelectOverlay(items []model.Item, cursor int, filter string, filte
 		}
 	}
 
+	b.WriteString("\n")
+	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
+
 	return b.String()
 }
 
 // RenderBookmarkOverlay renders the bookmark list overlay content.
-// mode: 0 = normal, 1 = filter. overlayH is the total overlay height for footer pinning.
-func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode int) string {
+// mode: 0 = normal, 1 = filter. loadNamespace, when true, signals that
+// the next jump will apply the bookmark's saved namespace scope
+// instead of keeping the tab's current one; it's surfaced as a
+// "[LOAD NAMESPACE]" chip alongside the title so the user can see
+// what Enter / slot-key will do.
+func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode int, loadNamespace bool) string {
 	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Bookmarks"))
+	// Chip sits on the same visual line as the title. Appending it
+	// AFTER OverlayTitleStyle.Render places the chip on the style's
+	// bottom-padding row, which reads as a stray line floating above
+	// the bookmark list — embed it inside the rendered title instead.
+	title := "Bookmarks"
+	if loadNamespace {
+		title += "   " + HelpKeyStyle.Render("[LOAD NAMESPACE]")
+	}
+	b.WriteString(OverlayTitleStyle.Render(title))
 	b.WriteString("\n")
 
 	// Show mode-specific input line.
@@ -607,10 +642,10 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 	if cursor >= maxVisible {
 		start = cursor - maxVisible + 1
 	}
-	end := start + maxVisible
-	if end > len(bookmarks) {
-		end = len(bookmarks)
-	}
+	end := min(start+maxVisible, len(bookmarks))
+
+	b.WriteString(RenderScrollAbove(start, end-start, len(bookmarks), 0))
+	b.WriteString("\n")
 
 	for i := start; i < end; i++ {
 		bm := bookmarks[i]
@@ -654,6 +689,9 @@ func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor,
 		}
 	}
 
+	b.WriteString("\n")
+	b.WriteString(RenderScrollBelow(start, end-start, len(bookmarks), 0))
+
 	return b.String()
 }
 
@@ -682,21 +720,19 @@ func RenderTemplateOverlay(templates []model.ResourceTemplate, filter string, cu
 
 	// Fixed-height list: title(1) + filter(1) = 2 header lines + padding(2).
 	interiorH := overlayH - 2
-	maxVisible := interiorH - 3 // 2 header lines + 1 blank
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
-	if maxVisible > len(templates) {
-		maxVisible = len(templates)
-	}
+	maxVisible := min(
+		// 2 header lines + 1 blank, with a floor of 1
+		max(interiorH-3, 1),
+		len(templates),
+	)
 	start := 0
 	if cursor >= maxVisible {
 		start = cursor - maxVisible + 1
 	}
-	end := start + maxVisible
-	if end > len(templates) {
-		end = len(templates)
-	}
+	end := min(start+maxVisible, len(templates))
+
+	b.WriteString(RenderScrollAbove(start, end-start, len(templates), 0))
+	b.WriteString("\n")
 
 	for i := start; i < end; i++ {
 		tmpl := templates[i]
@@ -710,6 +746,9 @@ func RenderTemplateOverlay(templates []model.ResourceTemplate, filter string, cu
 			b.WriteString("\n")
 		}
 	}
+
+	b.WriteString("\n")
+	b.WriteString(RenderScrollBelow(start, end-start, len(templates), 0))
 
 	return b.String()
 }

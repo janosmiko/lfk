@@ -140,6 +140,104 @@ func HighlightMatch(line, rawQuery string) string {
 // HighlightMatchStyled returns the line with the matched portion highlighted
 // using the given style. The rawQuery is the original user input.
 func HighlightMatchStyled(line, rawQuery string, style lipgloss.Style) string {
+	return HighlightMatchStyledOver(line, rawQuery, style, lipgloss.Style{})
+}
+
+// HighlightMatchStyledOver behaves like HighlightMatchStyled but
+// re-asserts outerStyle's open codes after each inner highlight's
+// reset. Use this when the returned string will be wrapped by
+// outerStyle.Render(...) and the inner highlights' resets would
+// otherwise wipe the outer background for the rest of the line —
+// e.g. a search hit inside a cursor row's selection bg, or a match
+// inside a category bar.
+//
+// Pass an empty (zero-value) outerStyle to opt out of the
+// re-assertion and get the legacy single-pass behaviour.
+func HighlightMatchStyledOver(line, rawQuery string, style, outerStyle lipgloss.Style) string {
+	if rawQuery == "" {
+		return line
+	}
+	mode, query := DetectSearchMode(rawQuery)
+	if query == "" {
+		return line
+	}
+	restore := styleOpenCodes(outerStyle)
+	switch mode {
+	case SearchRegex:
+		return highlightRegex(line, query, style, restore)
+	case SearchFuzzy:
+		return highlightFuzzy(line, query, style, restore)
+	default:
+		return highlightSubstring(line, query, style, restore)
+	}
+}
+
+// styleOpenCodes extracts just the SGR open sequence a style emits
+// when rendering. Returns "" when the style produces no codes (zero
+// value or color-less). Used by HighlightMatchStyledOver to splice
+// the outer style back in after each inner highlight reset, and by
+// RenderOverPrestyled to re-open the outer style around an already-
+// highlighted line.
+//
+// Implementation note: a single ASCII character is used as the marker
+// because lipgloss in some profile/attribute combinations (notably
+// Underline(true) under termenv.ANSI — the NO_COLOR profile) renders
+// each input character through a fresh open/close SGR pair. A
+// multi-character marker would be split across those per-char wraps
+// and never appear contiguously in the output, so the search would
+// fall through and return "" — yielding a missing outer style (e.g.
+// the Bold+Underline category bar losing its underline whenever
+// search highlighting was active under NO_COLOR).
+func styleOpenCodes(style lipgloss.Style) string {
+	const marker = "x"
+	open, _, found := strings.Cut(style.Render(marker), marker)
+	if !found {
+		return ""
+	}
+	return open
+}
+
+// ansiReset is the SGR reset sequence emitted at the end of a rendered
+// run. Matches what lipgloss appends to its own Render output.
+const ansiReset = "\x1b[0m"
+
+// RenderOverPrestyled wraps a line that may already contain inner ANSI
+// codes (from a prior HighlightMatchStyledOver pass) with outerStyle's
+// open/close SGR codes, bypassing lipgloss.Render.
+//
+// This exists because lipgloss.Render fragments any embedded ANSI in
+// its input — every byte of the embedded escape sequences gets wrapped
+// with outerStyle individually, doubling the ESC introducer and
+// producing malformed output of the form "\x1b\x1b[0m...". Most
+// terminals tolerate that, but in NO_COLOR / ANSI profile mode some
+// terminals render the second sequence as literal text ("[1;7mNetw[0m"),
+// and the visible-width calculation goes off so the line wraps.
+//
+// The manual SGR open + content + reset path keeps the inner
+// highlights intact and produces a stream the terminal can parse
+// uniformly.
+//
+// Returns line unchanged when outerStyle has no open codes.
+func RenderOverPrestyled(line string, outerStyle lipgloss.Style) string {
+	open := styleOpenCodes(outerStyle)
+	if open == "" {
+		return line
+	}
+	return open + line + ansiReset
+}
+
+// HighlightMatchInline overlays hlStyle on each occurrence of query in a
+// line that already contains inline SGR codes (e.g. YAML syntax styling).
+// After each match's reset it re-emits the SGR sequence that was active
+// just before the match so the rest of the surrounding token keeps its
+// styling — without this, hlStyle.Render's trailing "\x1b[0m" cancels the
+// outer token's open codes and the post-match segment renders in the
+// terminal default.
+//
+// Substring mode only. Skips ANSI escape sequences while scanning for
+// matches and refuses matches whose byte range crosses an ESC byte, so a
+// query like "[33m" can't latch onto an SGR introducer.
+func HighlightMatchInline(line, rawQuery string, hlStyle lipgloss.Style) string {
 	if rawQuery == "" {
 		return line
 	}
@@ -148,17 +246,76 @@ func HighlightMatchStyled(line, rawQuery string, style lipgloss.Style) string {
 		return line
 	}
 	switch mode {
-	case SearchRegex:
-		return highlightRegex(line, query, style)
-	case SearchFuzzy:
-		return highlightFuzzy(line, query, style)
-	default:
-		return highlightSubstring(line, query, style)
+	case SearchRegex, SearchFuzzy:
+		// Regex / fuzzy don't get the inline-aware treatment yet; fall
+		// back to the plain substring path so they keep the existing
+		// behavior. The YAML preview's main caller uses substring.
+		return HighlightMatchStyled(line, rawQuery, hlStyle)
 	}
+
+	queryLen := len(query)
+	var b strings.Builder
+	b.Grow(len(line))
+	activeOpen := ""
+
+	i := 0
+	for i < len(line) {
+		// Pass through ANSI CSI sequences and update the active SGR state.
+		if i+1 < len(line) && line[i] == 0x1b && line[i+1] == '[' {
+			j := i + 2
+			for j < len(line) && line[j] >= 0x30 && line[j] <= 0x3F {
+				j++
+			}
+			for j < len(line) && line[j] >= 0x20 && line[j] <= 0x2F {
+				j++
+			}
+			if j < len(line) && line[j] >= 0x40 && line[j] <= 0x7E {
+				seq := line[i : j+1]
+				b.WriteString(seq)
+				if line[j] == 'm' {
+					if seq == ansiReset || seq == "\x1b[m" {
+						activeOpen = ""
+					} else {
+						activeOpen = seq
+					}
+				}
+				i = j + 1
+				continue
+			}
+		}
+		// Try matching the query at this byte position.
+		if i+queryLen <= len(line) {
+			tail := line[i : i+queryLen]
+			hasEsc := false
+			for k := range len(tail) {
+				if tail[k] == 0x1b {
+					hasEsc = true
+					break
+				}
+			}
+			if !hasEsc && strings.EqualFold(tail, query) {
+				b.WriteString(hlStyle.Render(tail))
+				// Re-assert the active outer SGR so the rest of the
+				// token reads in its original color instead of dropping
+				// to terminal default after hlStyle's reset.
+				if activeOpen != "" {
+					b.WriteString(activeOpen)
+				}
+				i += queryLen
+				continue
+			}
+		}
+		b.WriteByte(line[i])
+		i++
+	}
+	return b.String()
 }
 
-// highlightSubstring highlights all occurrences of query in line (case-insensitive).
-func highlightSubstring(line, query string, style lipgloss.Style) string {
+// highlightSubstring highlights all occurrences of query in line
+// (case-insensitive). When restoreCodes is non-empty it's emitted
+// after each inner highlight reset so a wrapping outer style's
+// background stays visible for the post-match segment.
+func highlightSubstring(line, query string, style lipgloss.Style, restoreCodes string) string {
 	queryLower := strings.ToLower(query)
 	lineLower := strings.ToLower(line)
 	if !strings.Contains(lineLower, queryLower) {
@@ -174,16 +331,18 @@ func highlightSubstring(line, query string, style lipgloss.Style) string {
 		}
 		b.WriteString(line[pos : pos+idx])
 		b.WriteString(style.Render(line[pos+idx : pos+idx+len(query)]))
+		b.WriteString(restoreCodes)
 		pos = pos + idx + len(query)
 	}
 	return b.String()
 }
 
-// highlightRegex highlights all regex matches in the line.
-func highlightRegex(line, query string, style lipgloss.Style) string {
+// highlightRegex highlights all regex matches in the line. See
+// highlightSubstring for the restoreCodes contract.
+func highlightRegex(line, query string, style lipgloss.Style, restoreCodes string) string {
 	re, err := regexp.Compile("(?i)" + query)
 	if err != nil {
-		return highlightSubstring(line, query, style) // fallback
+		return highlightSubstring(line, query, style, restoreCodes) // fallback
 	}
 	matches := re.FindAllStringIndex(line, -1)
 	if len(matches) == 0 {
@@ -196,6 +355,7 @@ func highlightRegex(line, query string, style lipgloss.Style) string {
 			b.WriteString(line[pos:m[0]])
 		}
 		b.WriteString(style.Render(line[m[0]:m[1]]))
+		b.WriteString(restoreCodes)
 		pos = m[1]
 	}
 	if pos < len(line) {
@@ -205,7 +365,8 @@ func highlightRegex(line, query string, style lipgloss.Style) string {
 }
 
 // highlightFuzzy highlights the matched characters in a fuzzy match.
-func highlightFuzzy(line, query string, style lipgloss.Style) string {
+// See highlightSubstring for the restoreCodes contract.
+func highlightFuzzy(line, query string, style lipgloss.Style, restoreCodes string) string {
 	lineLower := strings.ToLower(line)
 	queryLower := strings.ToLower(query)
 	lineRunes := []rune(line)
@@ -242,6 +403,7 @@ func highlightFuzzy(line, query string, style lipgloss.Style) string {
 		} else {
 			if inHighlight {
 				b.WriteString(style.Render(string(lineRunes[highlightStart:i])))
+				b.WriteString(restoreCodes)
 				inHighlight = false
 			}
 			b.WriteRune(r)
@@ -249,6 +411,7 @@ func highlightFuzzy(line, query string, style lipgloss.Style) string {
 	}
 	if inHighlight {
 		b.WriteString(style.Render(string(lineRunes[highlightStart:])))
+		b.WriteString(restoreCodes)
 	}
 	return b.String()
 }

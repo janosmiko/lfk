@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"slices"
 	"sort"
 	"strings"
 
@@ -91,12 +92,7 @@ func renderNetpolTargetLabel(info NetworkPolicyEntry) string {
 
 // hasPolicyType returns true if the policy types list contains the given type.
 func hasPolicyType(types []string, target string) bool {
-	for _, pt := range types {
-		if pt == target {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(types, target)
 }
 
 // renderNetpolDirectionRules renders ingress and egress rule sections.
@@ -327,10 +323,7 @@ func renderTwoBoxes(leftContent, rightContent []string, arrow string, borderStyl
 	if maxWidth > 0 {
 		// Overhead: left border(1) + space(1) + space(1) + right border(1) = 4 per box.
 		overhead := 4 + arrowW + 4
-		available := maxWidth - overhead
-		if available < 2 {
-			available = 2
-		}
+		available := max(maxWidth-overhead, 2)
 		if leftW+rightW > available {
 			// Split available space proportionally, each gets at least half of minimum (7).
 			half := available / 2

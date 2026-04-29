@@ -18,15 +18,15 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "default",
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"initContainers": []interface{}{
-					map[string]interface{}{"name": "init-db"},
-					map[string]interface{}{"name": "init-config"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"initContainers": []any{
+					map[string]any{"name": "init-db"},
+					map[string]any{"name": "init-config"},
 				},
-				"containers": []interface{}{
-					map[string]interface{}{"name": "app"},
-					map[string]interface{}{"name": "sidecar"},
+				"containers": []any{
+					map[string]any{"name": "app"},
+					map[string]any{"name": "sidecar"},
 				},
 			},
 		}
@@ -48,7 +48,7 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "default",
 		}
-		obj := map[string]interface{}{}
+		obj := map[string]any{}
 
 		appendContainerNodes(podNode, obj)
 
@@ -61,7 +61,7 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "default",
 		}
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"spec": nil,
 		}
 
@@ -76,10 +76,10 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "ns",
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "web"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "web"},
 				},
 			},
 		}
@@ -96,10 +96,10 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "ns",
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"initContainers": []interface{}{
-					map[string]interface{}{"name": "setup"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"initContainers": []any{
+					map[string]any{"name": "setup"},
 				},
 			},
 		}
@@ -116,12 +116,12 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "ns",
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
 					"not-a-map",
 					42,
-					map[string]interface{}{"name": "valid"},
+					map[string]any{"name": "valid"},
 				},
 			},
 		}
@@ -138,11 +138,11 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "ns",
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": ""},
-					map[string]interface{}{"name": "valid"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": ""},
+					map[string]any{"name": "valid"},
 				},
 			},
 		}
@@ -159,11 +159,11 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "ns",
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"image": "nginx"},
-					map[string]interface{}{"name": "named"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"image": "nginx"},
+					map[string]any{"name": "named"},
 				},
 			},
 		}
@@ -180,10 +180,10 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "custom-ns",
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "app"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "app"},
 				},
 			},
 		}
@@ -200,8 +200,8 @@ func TestAppendContainerNodes(t *testing.T) {
 			Kind:      "Pod",
 			Namespace: "ns",
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{
 				"containers": "not-a-slice",
 			},
 		}
@@ -219,10 +219,10 @@ func TestAppendContainerNodes(t *testing.T) {
 			Namespace: "ns",
 			Children:  []*model.ResourceNode{existing},
 		}
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "app"},
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "app"},
 				},
 			},
 		}

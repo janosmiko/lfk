@@ -171,10 +171,10 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	return m, nil, false
 }
 
-// handlePasteConfirmKey handles the y/n confirmation for multiline paste.
+// handlePasteConfirmKey handles the Enter/y / Esc/n confirmation for multiline paste.
 func (m Model) handlePasteConfirmKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		m.overlay = overlayNone
 		if target := m.resolvePasteTarget(m.pasteTargetID); target != nil && m.pendingPaste != "" {
 			flattened := strings.ReplaceAll(strings.TrimRight(m.pendingPaste, "\n"), "\n", " ")
@@ -246,15 +246,23 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
 		if m.netpolScroll < 0 {
 			m.netpolScroll = 0
 		}
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.netpolLineInput = ""
 		m.netpolScroll += m.height
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.netpolLineInput = ""
 		m.netpolScroll -= m.height
 		if m.netpolScroll < 0 {
 			m.netpolScroll = 0
 		}
+	case "home":
+		m.pendingG = false
+		m.netpolLineInput = ""
+		m.netpolScroll = 0
+	case "end":
+		m.netpolLineInput = ""
+		// Jump to bottom: will be clamped during rendering (matches G behavior).
+		m.netpolScroll = 9999
 	default:
 		m.netpolLineInput = ""
 	}
@@ -278,6 +286,32 @@ func (m Model) errorLogVisibleCount() (visibleCount, maxVisible, maxScroll int) 
 }
 
 // handleErrorLogOverlayKey handles keyboard input when the error log overlay is open.
+// errorLogForwardGlobalKey forwards a small set of "global" navigation keys
+// (new/next/prev tab, theme selector) to the underlying explorer handlers so
+// users can keep the error log overlay visible while switching tabs or while
+// opening the theme selector on top. The error log overlay state is left
+// alone — fullscreen + theme selector should layer the way the dashboard
+// fullscreen + theme selector does, with the error log staying behind the
+// colorscheme overlay until it closes.
+// Returns handled=false for non-matching keys so the regular overlay key
+// dispatch can run. Visual mode disables the forwarding so 't' / 'T' inside
+// a selection stay local.
+func (m Model) errorLogForwardGlobalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if m.errorLogVisualMode != 0 {
+		return m, nil, false
+	}
+	kb := ui.ActiveKeybindings
+	switch msg.String() {
+	case kb.NewTab, kb.NextTab, kb.PrevTab:
+		if mdl, cmd, ok := m.handleExplorerActionKey(msg); ok {
+			return mdl, cmd, true
+		}
+	case kb.ThemeSelector:
+		return m.handleKeyThemeSelector(), nil, true
+	}
+	return m, nil, false
+}
+
 func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	visibleCount, maxVisible, maxScroll := m.errorLogVisibleCount()
 	maxCursor := max(visibleCount-1, 0)
@@ -287,6 +321,12 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Toggle: pressing the error log hotkey again closes the overlay.
 	if key == ui.ActiveKeybindings.ErrorLog {
 		return m.handleErrorLogOverlayKeyEsc()
+	}
+
+	// Allow tab switching and theme selector to work while the overlay
+	// is up — extracted to keep this function under the gocyclo cap.
+	if mdl, cmd, handled := m.errorLogForwardGlobalKey(msg); handled {
+		return mdl, cmd
 	}
 
 	// In visual mode, Esc cancels visual mode instead of closing.
@@ -380,16 +420,29 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
 
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.errorLogLineInput = ""
 		m.errorLogCursorLine = min(m.errorLogCursorLine+maxVisible, maxCursor)
 		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
 
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.errorLogLineInput = ""
 		m.errorLogCursorLine = max(m.errorLogCursorLine-maxVisible, 0)
 		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
+		return m, nil
+
+	case "home":
+		m.pendingG = false
+		m.errorLogLineInput = ""
+		m.errorLogCursorLine = 0
+		m.errorLogScroll = 0
+		return m, nil
+
+	case "end":
+		m.errorLogLineInput = ""
+		m.errorLogCursorLine = maxCursor
+		m.errorLogScroll = maxScroll
 		return m, nil
 
 	default:
@@ -402,10 +455,7 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // visible window with scrolloff margin.
 func (m Model) errorLogEnsureCursorVisible(maxVisible, maxScroll int) int {
 	scroll := m.errorLogScroll
-	so := ui.ConfigScrollOff
-	if so > maxVisible/2 {
-		so = maxVisible / 2
-	}
+	so := min(ui.ConfigScrollOff, maxVisible/2)
 	if m.errorLogCursorLine < scroll+so {
 		scroll = m.errorLogCursorLine - so
 	}
@@ -524,7 +574,7 @@ func (m Model) applyFilterPreset(preset FilterPreset) (tea.Model, tea.Cmd) {
 			filtered = append(filtered, item)
 		}
 	}
-	m.middleItems = filtered
+	m.setMiddleItems(filtered)
 	m.activeFilterPreset = &preset
 	m.setCursor(0)
 	m.clampCursor()
@@ -710,7 +760,7 @@ func (m Model) handleActionOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		m.overlay = overlayNone
 		m.loading = true
 		action := m.pendingAction
@@ -1060,11 +1110,12 @@ func (m Model) handleContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.C
 // handleQuitConfirmOverlayKey handles keyboard input for the quit confirmation overlay.
 func (m Model) handleQuitConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		m.overlay = overlayNone
 		if m.portForwardMgr != nil {
 			m.portForwardMgr.StopAll()
 		}
+		m.cancelAllTabLogStreams()
 		m.saveCurrentSession()
 		return m, tea.Quit
 	case "n", "N", "esc", "q":

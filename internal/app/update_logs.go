@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -47,18 +48,24 @@ func (m Model) handleLogMovementKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "ctrl+u":
 		ret, cmd := m.handleLogKeyCtrlU()
 		return ret, cmd, true
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		ret := m.handleLogKeyCtrlF()
 		return ret, nil, true
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		ret, cmd := m.handleLogKeyCtrlB()
 		return ret, cmd, true
-	case "G":
+	case "G", "end":
 		ret := m.handleLogKeyG()
 		return ret, nil, true
 	case "g":
 		ret, cmd := m.handleLogKeyG2()
 		return ret, cmd, true
+	case "home":
+		m.pendingG = false
+		m.logCursor = 0
+		m.logScroll = 0
+		m.logFollow = false
+		return m, nil, true
 	case "h", "left":
 		ret := m.handleLogKeyH()
 		return ret, nil, true
@@ -117,6 +124,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "ctrl+v":
 		ret := m.handleLogKeyCtrlV()
 		return ret, nil, true
+	case "y":
+		ret, cmd := m.handleLogNormalCopy()
+		return ret, cmd, true
 	case "f":
 		ret := m.handleLogKeyF()
 		return ret, nil, true
@@ -134,6 +144,21 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return ret, nil, true
 	case "p":
 		ret := m.handleLogKeyP()
+		return ret, nil, true
+	case "P":
+		ret := m.handleLogKeyP2()
+		return ret, nil, true
+	case "J":
+		if !m.logPreviewVisible {
+			return m, nil, false
+		}
+		ret := m.handleLogKeyJ2()
+		return ret, nil, true
+	case "K":
+		if !m.logPreviewVisible {
+			return m, nil, false
+		}
+		ret := m.handleLogKeyK2()
 		return ret, nil, true
 	case "#":
 		ret := m.handleLogKeyHash()
@@ -233,12 +258,15 @@ func (m Model) handleLogSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.logSearchActive = false
 		m.logSearchInput.Clear()
+		m.logSearchQuery = ""
 	case "backspace":
 		if len(m.logSearchInput.Value) > 0 {
 			m.logSearchInput.Backspace()
 		}
+		m.logSearchQuery = m.logSearchInput.Value
 	case "ctrl+w":
 		m.logSearchInput.DeleteWord()
+		m.logSearchQuery = m.logSearchInput.Value
 	case "ctrl+a":
 		m.logSearchInput.Home()
 	case "ctrl+e":
@@ -253,6 +281,11 @@ func (m Model) handleLogSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		key := msg.String()
 		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
 			m.logSearchInput.Insert(key)
+			// Live-update the highlight query so matches paint as the user
+			// types. Enter still "commits" search-input mode and triggers
+			// findNextLogMatch; before that the user only saw the input
+			// echo with no feedback on whether the query matches anything.
+			m.logSearchQuery = m.logSearchInput.Value
 		}
 	}
 	return m, nil
@@ -340,7 +373,12 @@ func (m *Model) findNextLogMatchForward(rawQuery string, start int) {
 	// Check for another match on the current line after the cursor.
 	if start >= 0 && start < len(m.logLines) {
 		dl := m.logDisplayLine(start)
-		curBytePos := len(string([]rune(dl)[:m.logVisualCurCol+1]))
+		runes := []rune(dl)
+		// Clamp: logVisualCurCol carries the column from a previously
+		// focused line and may exceed this line's rune length. Forward
+		// uses +1 because the search starts after (not at) the cursor.
+		end := min(m.logVisualCurCol+1, len(runes))
+		curBytePos := len(string(runes[:end]))
 		if curBytePos < len(dl) {
 			col := ui.FindColumnInLine(dl[curBytePos:], rawQuery)
 			if col >= 0 {
@@ -365,7 +403,11 @@ func (m *Model) findNextLogMatchBackward(rawQuery string, start int) {
 	// Check for a match on the current line before the cursor.
 	if start >= 0 && start < len(m.logLines) {
 		dl := m.logDisplayLine(start)
-		curBytePos := len(string([]rune(dl)[:m.logVisualCurCol]))
+		runes := []rune(dl)
+		// Clamp: logVisualCurCol may exceed this line's rune length;
+		// backward search ends at (excluding) the cursor.
+		end := min(m.logVisualCurCol, len(runes))
+		curBytePos := len(string(runes[:end]))
 		if curBytePos > 0 {
 			lastCol := findLastMatchInStr(dl[:curBytePos], rawQuery)
 			if lastCol >= 0 {
@@ -589,10 +631,7 @@ func (m Model) handleLogKeyB() Model {
 		if newCol < 0 && m.logCursor > 0 {
 			m.logCursor--
 			lineLen := len([]rune(m.logLines[m.logCursor]))
-			newCol = prevWordStart(m.logLines[m.logCursor], lineLen)
-			if newCol < 0 {
-				newCol = 0
-			}
+			newCol = max(prevWordStart(m.logLines[m.logCursor], lineLen), 0)
 			m.logVisualCurCol = newCol
 			m.clampLogScroll()
 		} else {
@@ -643,7 +682,7 @@ func (m Model) handleLogKeyF() Model {
 	m.logFollow = !m.logFollow
 	if m.logFollow {
 		m.logCursor = len(m.logLines) - 1
-		m.logScroll = m.logMaxScroll()
+		m.logScroll, m.logWrapTopSkip = m.logMaxScrollAndSkip()
 	}
 	return m
 }
@@ -651,7 +690,11 @@ func (m Model) handleLogKeyF() Model {
 func (m Model) handleLogKeyTab() Model {
 	m.logLineInput = ""
 	m.logWrap = !m.logWrap
-	m.clampLogScroll()
+	// Re-pin to the bottom on toggle: maxScroll and topSkip both depend on
+	// wrap mode, so the previous values are stale. ensureLogCursorVisible
+	// snaps to the follow position when m.logFollow is true and otherwise
+	// just clamps + clears the sub-line skip.
+	m.ensureLogCursorVisible()
 	return m
 }
 
@@ -725,10 +768,7 @@ func (m Model) handleLogKeyB2() Model {
 		if newCol < 0 && m.logCursor > 0 {
 			m.logCursor--
 			lineLen := len([]rune(m.logLines[m.logCursor]))
-			newCol = prevWORDStart(m.logLines[m.logCursor], lineLen)
-			if newCol < 0 {
-				newCol = 0
-			}
+			newCol = max(prevWORDStart(m.logLines[m.logCursor], lineLen), 0)
 			m.logVisualCurCol = newCol
 			m.clampLogScroll()
 		} else {
@@ -771,6 +811,49 @@ func (m Model) handleLogKeyP() Model {
 	return m
 }
 
+func (m Model) handleLogKeyP2() Model {
+	m.logLineInput = ""
+	m.logPreviewVisible = !m.logPreviewVisible
+	m.logPreviewScroll = 0
+	// Effective viewer width changes when the panel toggles, so wrap-aware
+	// scroll/skip values need recomputing for the new geometry.
+	m.ensureLogCursorVisible()
+	return m
+}
+
+// handleLogKeyJ2 scrolls the structured preview pane down by one body row.
+// Caller is responsible for checking m.logPreviewVisible — this only runs
+// when the panel is on, so it is safe to assume a valid preview width.
+func (m Model) handleLogKeyJ2() Model {
+	m.logLineInput = ""
+	_, previewW := splitLogPreviewWidth(m.width)
+	if previewW == 0 {
+		return m
+	}
+	// LogPreviewMaxScroll's `height` arg is the outer panel height — it
+	// subtracts 2 internally for the border to reach the inner content
+	// height. logContentHeight already gives that inner height (it
+	// accounts for the View()-time app title / tab bar reductions that
+	// m.logViewHeight() can't see from Update context), so add 2 to map
+	// back. Using logViewHeight here would over-count by 1 (or 2 with
+	// tabs) and clip the last body rows off the user's viewport.
+	previewH := m.logContentHeight() + 2
+	maxScroll := ui.LogPreviewMaxScroll(m.logPreviewLine(), previewW, previewH)
+	if m.logPreviewScroll < maxScroll {
+		m.logPreviewScroll++
+	}
+	return m
+}
+
+// handleLogKeyK2 scrolls the structured preview pane up by one body row.
+func (m Model) handleLogKeyK2() Model {
+	m.logLineInput = ""
+	if m.logPreviewScroll > 0 {
+		m.logPreviewScroll--
+	}
+	return m
+}
+
 func (m Model) handleLogKeyHash() Model {
 	m.logLineInput = ""
 	m.logLineNumbers = !m.logLineNumbers
@@ -790,8 +873,9 @@ func (m Model) handleLogKeyS2() (tea.Model, tea.Cmd) {
 		m.setErrorFromErr("Log save failed: ", err)
 		return m, scheduleStatusClear()
 	}
-	m.setStatusMessage("Loaded logs saved to "+path, false)
-	return m, scheduleStatusClear()
+	logger.Info("Saved loaded logs", "path", path)
+	m.setStatusMessage("Loaded logs saved to "+path+" (copied to clipboard)", false)
+	return m, tea.Batch(copyToSystemClipboard(path), scheduleStatusClear())
 }
 
 func (m Model) handleLogKeyCtrlS() (tea.Model, tea.Cmd) {
@@ -862,13 +946,16 @@ func (m Model) handleLogKeyOther() (tea.Model, tea.Cmd) {
 		return m, m.loadPodsForLogAction()
 	}
 	if m.actionCtx.kind == "Pod" {
-		// Single pod: show container selector for filtering.
-		m.overlay = overlayLogContainerSelect
-		m.overlayCursor = 0
-		m.logContainerFilterText = ""
-		m.logContainerFilterActive = false
-		m.logContainerSelectionModified = false
-		ui.ResetOverlayContainerScroll()
+		// Single pod: load the container list, then open the filter overlay
+		// once the data is ready. Setting m.overlay = overlayLogContainerSelect
+		// before the load completes used to flash the empty/loading overlay
+		// (and any leftover overlayItems from a prior selector use, often
+		// namespaces) for the few hundred ms while kubectl returned. Mirror
+		// the group-resource branch above and the existing pattern in
+		// handleKeyNamespaceSelector: defer the overlay until data lands.
+		m.overlayItems = nil
+		m.loading = true
+		m.setStatusMessage("Loading containers...", false)
 		return m, m.loadContainersForLogFilter()
 	}
 	return m, nil
@@ -913,6 +1000,33 @@ func (m Model) handleLogVisualKeyCtrlV() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
+	clipText, lineCount := m.buildLogYankText()
+	m.logVisualMode = false
+	m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
+	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+}
+
+// handleLogNormalCopy copies the log line at the cursor (in display form, so
+// timestamps and pod prefixes follow the user's toggles) to the clipboard.
+// Mirrors the describe view's normal-mode `y`.
+func (m Model) handleLogNormalCopy() (tea.Model, tea.Cmd) {
+	m.logLineInput = ""
+	if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+		return m, nil
+	}
+	line := m.logDisplayLine(m.logCursor)
+	m.setStatusMessage("Copied 1 line", false)
+	return m, tea.Batch(copyToSystemClipboard(line), scheduleStatusClear())
+}
+
+// buildLogYankText returns the clipboard text and selection size for the
+// active visual selection in the log viewer. Lines are returned in
+// display form — timestamps and pod prefixes stripped per the user's
+// toggles, mirroring ui.applyLineRewrites — so the clipboard matches
+// what the user sees on screen. Char- and block-mode column positions
+// are interpreted in display-line space (after stripping), which is
+// where the cursor lives.
+func (m *Model) buildLogYankText() (string, int) {
 	selStart := min(m.logVisualStart, m.logCursor)
 	selEnd := max(m.logVisualStart, m.logCursor)
 	if selStart < 0 {
@@ -921,45 +1035,42 @@ func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 	if selEnd >= len(m.logLines) {
 		selEnd = len(m.logLines) - 1
 	}
+	if selStart > selEnd {
+		return "", 0
+	}
+
+	displayed := make([]string, selEnd-selStart+1)
+	for i := selStart; i <= selEnd; i++ {
+		displayed[i-selStart] = m.logDisplayLine(i)
+	}
+
 	var clipText string
 	switch m.logVisualType {
 	case 'v': // Character mode: partial first/last lines.
-		var parts []string
 		anchorCol := m.logVisualCol
 		cursorCol := m.logVisualCurCol
-		// Determine direction: assign columns to selStart/selEnd lines.
+		// Direction: when the user dragged upward, the start-of-selection
+		// column is the cursor's, not the anchor's.
 		startCol, endCol := anchorCol, cursorCol
 		if m.logVisualStart > m.logCursor {
-			// Upward selection: cursor is at selStart, anchor at selEnd.
 			startCol, endCol = cursorCol, anchorCol
 		}
-		for i := selStart; i <= selEnd; i++ {
-			line := m.logLines[i]
+		parts := make([]string, 0, len(displayed))
+		for j, line := range displayed {
 			runes := []rune(line)
-			if selStart == selEnd {
-				// Single line: extract column range.
+			switch {
+			case len(displayed) == 1:
 				cs := min(anchorCol, cursorCol)
 				ce := max(anchorCol, cursorCol) + 1
-				if cs > len(runes) {
-					cs = len(runes)
-				}
-				if ce > len(runes) {
-					ce = len(runes)
-				}
+				cs, ce = clampSliceBounds(cs, ce, len(runes))
 				parts = append(parts, string(runes[cs:ce]))
-			} else if i == selStart {
-				cs := startCol
-				if cs > len(runes) {
-					cs = len(runes)
-				}
+			case j == 0:
+				cs := min(startCol, len(runes))
 				parts = append(parts, string(runes[cs:]))
-			} else if i == selEnd {
-				ce := endCol + 1
-				if ce > len(runes) {
-					ce = len(runes)
-				}
+			case j == len(displayed)-1:
+				ce := min(endCol+1, len(runes))
 				parts = append(parts, string(runes[:ce]))
-			} else {
+			default:
 				parts = append(parts, line)
 			}
 		}
@@ -967,32 +1078,28 @@ func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 	case 'B': // Block mode: rectangular column range.
 		colStart := min(m.logVisualCol, m.logVisualCurCol)
 		colEnd := max(m.logVisualCol, m.logVisualCurCol) + 1
-		var parts []string
-		for i := selStart; i <= selEnd; i++ {
-			line := m.logLines[i]
+		parts := make([]string, 0, len(displayed))
+		for _, line := range displayed {
 			runes := []rune(line)
-			cs := colStart
-			ce := colEnd
-			if cs > len(runes) {
-				cs = len(runes)
-			}
-			if ce > len(runes) {
-				ce = len(runes)
-			}
+			cs, ce := clampSliceBounds(colStart, colEnd, len(runes))
 			parts = append(parts, string(runes[cs:ce]))
 		}
 		clipText = strings.Join(parts, "\n")
 	default: // Line mode: whole lines.
-		var selected []string
-		for i := selStart; i <= selEnd; i++ {
-			selected = append(selected, m.logLines[i])
-		}
-		clipText = strings.Join(selected, "\n")
+		clipText = strings.Join(displayed, "\n")
 	}
-	lineCount := selEnd - selStart + 1
-	m.logVisualMode = false
-	m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
-	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
+	return clipText, len(displayed)
+}
+
+// clampSliceBounds returns cs/ce clamped to [0, n], preserving cs <= ce.
+func clampSliceBounds(cs, ce, n int) (int, int) {
+	if cs > n {
+		cs = n
+	}
+	if ce > n {
+		ce = n
+	}
+	return cs, ce
 }
 
 func (m Model) handleLogVisualKeyH() (tea.Model, tea.Cmd) {
@@ -1099,10 +1206,7 @@ func (m Model) handleLogVisualKeyB() (tea.Model, tea.Cmd) {
 		if newCol < 0 && m.logCursor > 0 {
 			m.logCursor--
 			lineLen := len([]rune(m.logLines[m.logCursor]))
-			newCol = prevWordStart(m.logLines[m.logCursor], lineLen)
-			if newCol < 0 {
-				newCol = 0
-			}
+			newCol = max(prevWordStart(m.logLines[m.logCursor], lineLen), 0)
 			m.logVisualCurCol = newCol
 			m.ensureLogCursorVisible()
 		} else {
@@ -1178,10 +1282,7 @@ func (m Model) handleLogVisualKeyB2() (tea.Model, tea.Cmd) {
 		if newCol < 0 && m.logCursor > 0 {
 			m.logCursor--
 			lineLen := len([]rune(m.logLines[m.logCursor]))
-			newCol = prevWORDStart(m.logLines[m.logCursor], lineLen)
-			if newCol < 0 {
-				newCol = 0
-			}
+			newCol = max(prevWORDStart(m.logLines[m.logCursor], lineLen), 0)
 			m.logVisualCurCol = newCol
 			m.ensureLogCursorVisible()
 		} else {

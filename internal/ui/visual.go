@@ -1,29 +1,40 @@
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+)
 
 // CursorBlockStyle is the reverse-video style used to render a block cursor at a column position.
 var CursorBlockStyle = lipgloss.NewStyle().Reverse(true)
 
-// RenderCursorAtCol renders a block cursor at the given column position within a line.
-// If the column is at or beyond the line length, the cursor is shown as a highlighted space
-// appended to the line. The styledLine parameter is the already-styled version of the line
-// (with syntax highlighting etc.), and plainLine is the raw text used for column counting.
-// When the cursor is at a negative column the original styled line is returned unchanged.
-func RenderCursorAtCol(styledLine, plainLine string, col int) string {
+// RenderCursorAtCol renders a block cursor at the given visual column within a
+// line. If the column is at or beyond the line's visual width, the cursor is
+// shown as a highlighted space appended to the line. styledLine is the source
+// of truth for both visual width and the rendered body — it carries the
+// already-applied YAML syntax highlighting / diff coloring / log producer
+// ANSI codes that we need to preserve around the cursor. plainLine is kept
+// as a parameter for legacy call sites; the function no longer reads it
+// because slicing plainLine destroyed any styling around the cursor row
+// (matched lines lost their YAML colors the moment the cursor sat on them).
+// When the cursor is at a negative column the styled line is returned as-is.
+//
+// The split is ANSI-aware: rune-indexing across an SGR sequence would land
+// the cursor on the ESC byte or a payload digit, and lipgloss strips bare
+// ESC bytes when wrapping content with reverse-video codes. The remaining
+// "[NNm" payload then leaks as literal text in front of the line.
+func RenderCursorAtCol(styledLine, _ string, col int) string {
 	if col < 0 {
 		return styledLine
 	}
-	runes := []rune(plainLine)
-	if col >= len(runes) {
+	visualWidth := ansi.StringWidth(styledLine)
+	if col >= visualWidth {
 		// Cursor is past end of line: append a highlighted space.
 		return styledLine + CursorBlockStyle.Render(" ")
 	}
-	// Rebuild the line with the cursor character highlighted.
-	// Use plain text to get precise column positions, then rebuild with the cursor.
-	before := string(runes[:col])
-	cursorChar := string(runes[col : col+1])
-	after := string(runes[col+1:])
+	before := ansi.Truncate(styledLine, col, "")
+	cursorChar := ansi.Strip(ansi.Cut(styledLine, col, col+1))
+	after := ansi.TruncateLeft(styledLine, col+1, "")
 	return before + CursorBlockStyle.Render(cursorChar) + after
 }
 
@@ -39,30 +50,37 @@ func RenderCursorAtCol(styledLine, plainLine string, col int) string {
 //   - anchorCol, cursorCol: the column positions of the anchor and cursor
 //   - colStart, colEnd: min/max of anchorCol and cursorCol (precomputed)
 func RenderVisualSelection(line string, visualType rune, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol, colStart, colEnd int) string {
-	runes := []rune(line)
-	lineLen := len(runes)
+	lineWidth := ansi.StringWidth(line)
 
 	switch visualType {
 	case 'v': // Character visual mode
-		return renderCharSelection(runes, lineLen, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol)
+		return renderCharSelection(line, lineWidth, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol)
 	case 'B': // Block (column) visual mode
-		return renderBlockSelection(runes, lineLen, colStart, colEnd)
+		return renderBlockSelection(line, lineWidth, colStart, colEnd)
 	default: // 'V' or zero value: Line visual mode
-		return SelectedStyle.Render(line)
+		// Strip producer-emitted ANSI before rendering: when the user is
+		// in selection mode the selection style owns the visual, and
+		// preserving the producer's colors creates collisions (kyverno's
+		// blue level on selection's blue bg becomes invisible blue-on-blue,
+		// dim grey timestamps on selection bg drop legibility, etc.).
+		return SelectedStyle.Render(ansi.Strip(line))
 	}
 }
 
-// renderCharSelection highlights a character-level selection range.
-// anchorLine is the original (non-min/maxed) anchor line for direction detection.
-// On the anchor line, highlight from anchorCol to end of line (downward) or start of line (upward).
-// On the cursor line, the opposite. Middle lines are fully highlighted.
-// When anchor and cursor are on the same line, highlight between the two columns.
-func renderCharSelection(runes []rune, lineLen, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol int) string {
+// renderCharSelection highlights a character-level selection range. Columns
+// are visual columns; embedded ANSI escape sequences in line are treated as
+// zero-width so cursor and selection address the same positions.
+//
+// On the anchor line, highlight from anchorCol to end of line (downward) or
+// start of line (upward). On the cursor line, the opposite. Middle lines are
+// fully highlighted. When anchor and cursor are on the same line, highlight
+// between the two columns.
+func renderCharSelection(line string, lineWidth, lineIdx, selStart, selEnd, anchorLine, anchorCol, cursorCol int) string {
 	if selStart == selEnd {
 		// Single line: highlight between the two column positions.
 		cStart := min(anchorCol, cursorCol)
 		cEnd := max(anchorCol, cursorCol) + 1
-		return highlightColumnRange(runes, lineLen, cStart, cEnd)
+		return highlightColumnRange(line, lineWidth, cStart, cEnd)
 	}
 
 	// Determine direction: anchor is at selStart (downward) or selEnd (upward).
@@ -79,44 +97,45 @@ func renderCharSelection(runes []rune, lineLen, lineIdx, selStart, selEnd, ancho
 	}
 
 	if lineIdx == selStart {
-		return highlightColumnRange(runes, lineLen, startCol, lineLen)
+		return highlightColumnRange(line, lineWidth, startCol, lineWidth)
 	}
 	if lineIdx == selEnd {
-		return highlightColumnRange(runes, lineLen, 0, endCol+1)
+		return highlightColumnRange(line, lineWidth, 0, endCol+1)
 	}
-	// Middle line: fully highlighted.
-	return SelectedStyle.Render(string(runes))
+	// Middle line: fully highlighted. Strip producer ANSI so the selection
+	// style owns the visual presentation (same rule as line-mode V).
+	return SelectedStyle.Render(ansi.Strip(line))
 }
 
-// renderBlockSelection highlights a rectangular column range on the line.
-func renderBlockSelection(runes []rune, lineLen, colStart, colEnd int) string {
-	return highlightColumnRange(runes, lineLen, colStart, colEnd+1)
+// renderBlockSelection highlights a rectangular visual-column range on the line.
+func renderBlockSelection(line string, lineWidth, colStart, colEnd int) string {
+	return highlightColumnRange(line, lineWidth, colStart, colEnd+1)
 }
 
-// highlightColumnRange highlights characters from colStart (inclusive) to colEnd (exclusive).
-func highlightColumnRange(runes []rune, lineLen, colStart, colEnd int) string {
+// highlightColumnRange highlights visible characters from colStart (inclusive)
+// to colEnd (exclusive). The line may carry producer SGR sequences; the
+// before/after segments keep their original styling (ansi.Truncate /
+// TruncateLeft preserve embedded ANSI), while the selected slice is rendered
+// through SelectedStyle on stripped text so the selection's fg/bg pair
+// applies cleanly without colliding with producer colors.
+func highlightColumnRange(line string, lineWidth, colStart, colEnd int) string {
 	if colStart < 0 {
 		colStart = 0
 	}
-	if colEnd > lineLen {
-		colEnd = lineLen
+	if colEnd > lineWidth {
+		colEnd = lineWidth
 	}
-	if colStart >= lineLen {
-		// Selection is beyond the line; just render the line with padding.
-		return string(runes) + SelectedStyle.Render(" ")
+	if colStart >= lineWidth {
+		// Selection is beyond the line; render the line with a padded
+		// selection cell so the user sees where their cursor parked.
+		return line + SelectedStyle.Render(" ")
 	}
 	if colEnd <= colStart {
-		// No selection on this line.
-		return string(runes)
+		return line
 	}
 
-	var result string
-	if colStart > 0 {
-		result += string(runes[:colStart])
-	}
-	result += SelectedStyle.Render(string(runes[colStart:colEnd]))
-	if colEnd < lineLen {
-		result += string(runes[colEnd:])
-	}
-	return result
+	before := ansi.Truncate(line, colStart, "")
+	selected := ansi.Strip(ansi.Cut(line, colStart, colEnd))
+	after := ansi.TruncateLeft(line, colEnd, "")
+	return before + SelectedStyle.Render(selected) + after
 }

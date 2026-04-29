@@ -13,10 +13,12 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
 	"sigs.k8s.io/yaml"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -67,13 +69,20 @@ func (c *Client) GetResourceYAML(ctx context.Context, contextName, namespace str
 
 // GetPodYAML returns the YAML for a pod.
 func (c *Client) GetPodYAML(ctx context.Context, contextName, namespace, podName string) (string, error) {
+	// Pods are namespaced; without Namespaced: true, GetResourceYAML
+	// falls through to the cluster-scoped branch (dynClient.Resource(gvr)
+	// with no .Namespace(...)), which hits /api/v1/pods/<name> — an
+	// endpoint that does not exist on the API server. The API replies
+	// with "the server could not find the requested resource", which
+	// the caller surfaces as the YAML-load error.
 	return c.GetResourceYAML(ctx, contextName, namespace, model.ResourceTypeEntry{
-		APIGroup: "", APIVersion: "v1", Resource: "pods",
+		APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true,
 	}, podName)
 }
 
 // DeleteResource deletes a Kubernetes resource by type and name.
 func (c *Client) DeleteResource(contextName, namespace string, rt model.ResourceTypeEntry, name string) error {
+	logger.Info("Deleting resource", "context", contextName, "namespace", namespace, "kind", rt.Kind, "name", name)
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
@@ -101,6 +110,7 @@ func (c *Client) DeleteResource(contextName, namespace string, rt model.Resource
 
 // ScaleResource scales a Deployment, StatefulSet, or ReplicaSet to the specified replica count.
 func (c *Client) ScaleResource(contextName, namespace, name, kind string, replicas int32) error {
+	logger.Info("Scaling resource", "context", contextName, "namespace", namespace, "kind", kind, "name", name, "replicas", replicas)
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
@@ -148,13 +158,14 @@ func (c *Client) ScaleResource(contextName, namespace, name, kind string, replic
 
 // ResizePVC patches a PersistentVolumeClaim's spec.resources.requests.storage to the given size.
 func (c *Client) ResizePVC(contextName, namespace, name, newSize string) error {
+	logger.Info("Resizing PVC", "context", contextName, "namespace", namespace, "name", name, "size", newSize)
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
 	}
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "persistentvolumeclaims"}
-	patch := []byte(fmt.Sprintf(`{"spec":{"resources":{"requests":{"storage":"%s"}}}}`, newSize))
+	patch := fmt.Appendf(nil, `{"spec":{"resources":{"requests":{"storage":"%s"}}}}`, newSize)
 	_, err = dynClient.Resource(gvr).Namespace(namespace).Patch(
 		context.Background(), name, k8stypes.MergePatchType, patch, metav1.PatchOptions{},
 	)
@@ -166,16 +177,17 @@ func (c *Client) ResizePVC(contextName, namespace, name, newSize string) error {
 
 // RestartResource performs a rolling restart by patching the pod template annotation.
 func (c *Client) RestartResource(contextName, namespace, name, kind string) error {
+	logger.Info("Restarting resource", "context", contextName, "namespace", namespace, "kind", kind, "name", name)
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
 	}
 
-	patch := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"template": map[string]interface{}{
-				"metadata": map[string]interface{}{
-					"annotations": map[string]interface{}{
+	patch := map[string]any{
+		"spec": map[string]any{
+			"template": map[string]any{
+				"metadata": map[string]any{
+					"annotations": map[string]any{
 						"kubectl.kubernetes.io/restartedAt": time.Now().Format(time.RFC3339),
 					},
 				},
@@ -209,6 +221,7 @@ func (c *Client) RestartResource(contextName, namespace, name, kind string) erro
 
 // RollbackDeployment rolls back a deployment to a specific revision.
 func (c *Client) RollbackDeployment(ctx context.Context, contextName, namespace, name string, revision int64) error {
+	logger.Info("Rolling back Deployment", "context", contextName, "namespace", namespace, "name", name, "revision", revision)
 	cs, err := c.clientsetForContext(contextName)
 	if err != nil {
 		return err
@@ -242,8 +255,8 @@ func (c *Client) RollbackDeployment(ctx context.Context, contextName, namespace,
 		rev, _ := strconv.ParseInt(rs.Annotations["deployment.kubernetes.io/revision"], 10, 64)
 		if rev == revision {
 			// Patch the deployment with this RS's pod template.
-			patchData, err := json.Marshal(map[string]interface{}{
-				"spec": map[string]interface{}{
+			patchData, err := json.Marshal(map[string]any{
+				"spec": map[string]any{
 					"template": rs.Spec.Template,
 				},
 			})
@@ -319,12 +332,30 @@ func (c *Client) GetDeploymentRevisions(ctx context.Context, contextName, namesp
 
 // --- internal helpers ---
 
-func (c *Client) restConfigForContext(contextName string) (*rest.Config, error) {
-	overrides := &clientcmd.ConfigOverrides{CurrentContext: contextName}
-	cc := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(c.loadingRules, overrides)
+func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) {
+	// Load only the kubeconfig file that defines the requested context. When
+	// multiple files are merged via clientcmd, clusters and users sharing a
+	// name across files collapse into a single entry — issue #23: every
+	// ~/.kube/config.d/*.yaml declared cluster "dev" and user "dev", so
+	// every context routed to the same cluster after the merge. Loading the
+	// origin file in isolation keeps each context's clusters/users intact.
+	//
+	// displayName is the lfk-side identifier (potentially disambiguated to
+	// "name (basename)"). The override below uses the *original* name from
+	// the source kubeconfig because that's what's recorded inside the file.
+	rules := c.loadingRules
+	overrideName := displayName
+	if info, ok := c.contexts[displayName]; ok {
+		rules = &clientcmd.ClientConfigLoadingRules{Precedence: []string{info.sourcePath}}
+		overrideName = info.original
+	} else if path := c.KubeconfigPathForContext(displayName); path != "" {
+		rules = &clientcmd.ClientConfigLoadingRules{Precedence: []string{path}}
+	}
+	overrides := &clientcmd.ConfigOverrides{CurrentContext: overrideName}
+	cc := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides)
 	cfg, err := cc.ClientConfig()
 	if err != nil {
-		return nil, fmt.Errorf("building rest config for context %q: %w", contextName, err)
+		return nil, fmt.Errorf("building rest config for context %q: %w", displayName, err)
 	}
 	return cfg, nil
 }
@@ -413,4 +444,24 @@ func (c *Client) RawDynamicForContext(contextName string) dynamic.Interface {
 		return nil
 	}
 	return dc
+}
+
+// metadataForContext returns a metadata-only client for the given context.
+// When testMetaClient is set (tests), it is returned directly.
+func (c *Client) metadataForContext(contextName string) (metadata.Interface, error) {
+	// Allow tests to inject a fake metadata client.
+	if c.testMetaClient != nil {
+		if mc, ok := c.testMetaClient.(metadata.Interface); ok {
+			return mc, nil
+		}
+	}
+	cfg, err := c.restConfigForContext(contextName)
+	if err != nil {
+		return nil, err
+	}
+	mc, err := metadata.NewForConfig(cfg)
+	if err != nil {
+		return nil, fmt.Errorf("creating metadata client: %w", err)
+	}
+	return mc, nil
 }

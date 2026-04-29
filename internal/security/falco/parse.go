@@ -14,13 +14,13 @@ import (
 
 // falcoLogEntry represents a single JSON line from Falco's stdout output.
 type falcoLogEntry struct {
-	Output       string                 `json:"output"`
-	Priority     string                 `json:"priority"`
-	Rule         string                 `json:"rule"`
-	Time         string                 `json:"time"`
-	Source       string                 `json:"source"`
-	Tags         []string               `json:"tags"`
-	OutputFields map[string]interface{} `json:"output_fields"`
+	Output       string         `json:"output"`
+	Priority     string         `json:"priority"`
+	Rule         string         `json:"rule"`
+	Time         string         `json:"time"`
+	Source       string         `json:"source"`
+	Tags         []string       `json:"tags"`
+	OutputFields map[string]any `json:"output_fields"`
 }
 
 // parseLogLine parses a single JSON log line from Falco stdout.
@@ -153,7 +153,7 @@ func formatFalcoOutput(entry falcoLogEntry) (summary, details string) {
 // extractRefFromOutputFields reads k8s resource info from Falco's
 // output_fields map. Common field names: k8s.ns.name, k8s.pod.name,
 // k8s.deployment.name, container.name.
-func extractRefFromOutputFields(fields map[string]interface{}) security.ResourceRef {
+func extractRefFromOutputFields(fields map[string]any) security.ResourceRef {
 	str := func(key string) string {
 		v, _ := fields[key].(string)
 		if v != "" {

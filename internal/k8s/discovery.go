@@ -42,6 +42,7 @@ func convertAPIResourceLists(lists []*metav1.APIResourceList) []model.ResourceTy
 				APIVersion: gv.Version,
 				Resource:   r.Name,
 				Namespaced: r.Namespaced,
+				Verbs:      append([]string(nil), r.Verbs...),
 			})
 		}
 	}
@@ -61,11 +62,10 @@ func convertAPIResourceLists(lists []*metav1.APIResourceList) []model.ResourceTy
 // succeed) are logged and the successful subset is returned. A complete
 // failure to reach the discovery endpoint returns an error.
 func (c *Client) DiscoverAPIResources(ctx context.Context, contextName string) ([]model.ResourceTypeEntry, error) {
-	cs, err := c.clientsetForContext(contextName)
+	dc, err := c.discoveryForContext(contextName)
 	if err != nil {
-		return nil, fmt.Errorf("getting clientset: %w", err)
+		return nil, fmt.Errorf("getting discovery client: %w", err)
 	}
-	dc := cs.Discovery()
 
 	lists, err := discovery.ServerPreferredResources(dc)
 	if err != nil {
@@ -137,12 +137,12 @@ func (c *Client) fetchCRDPrinterColumns(ctx context.Context, contextName string)
 
 	out := make(map[string][]model.PrinterColumn, len(list.Items))
 	for _, item := range list.Items {
-		spec, ok := item.Object["spec"].(map[string]interface{})
+		spec, ok := item.Object["spec"].(map[string]any)
 		if !ok {
 			continue
 		}
 		group, _ := spec["group"].(string)
-		names, ok := spec["names"].(map[string]interface{})
+		names, ok := spec["names"].(map[string]any)
 		if !ok {
 			continue
 		}

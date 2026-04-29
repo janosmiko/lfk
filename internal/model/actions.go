@@ -3,7 +3,8 @@ package model
 // ActionsForContainer returns the action menu items for a container.
 func ActionsForContainer() []ActionMenuItem {
 	return []ActionMenuItem{
-		{Label: "Logs", Description: "View container logs", Key: "l"},
+		{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+		{Label: "Logs", Description: "View container logs", Key: "L"},
 		{Label: "Exec", Description: "Execute command in container", Key: "s"},
 		{Label: "Attach", Description: "Attach to running container", Key: "A"},
 		{Label: "Vuln Scan", Description: "Scan container image for vulnerabilities", Key: "V"},
@@ -63,7 +64,8 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 	switch kind {
 	case "Pod":
 		return []ActionMenuItem{
-			{Label: "Logs", Description: "View pod logs", Key: "l"},
+			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+			{Label: "Logs", Description: "View pod logs", Key: "L"},
 			{Label: "Exec", Description: "Execute command in container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Debug", Description: "Debug pod with ephemeral container", Key: "B"},
@@ -91,7 +93,8 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 		}, true
 	case "Service":
 		return []ActionMenuItem{
-			{Label: "Logs", Description: "View aggregated pod logs", Key: "l"},
+			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
 			{Label: "Exec", Description: "Exec into pod behind service", Key: "s"},
 			{Label: "Attach", Description: "Attach to pod behind service", Key: "A"},
 			{Label: "Port Forward", Description: "Forward local port to service", Key: "p"},
@@ -163,12 +166,13 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 	switch kind {
 	case "Deployment":
 		return []ActionMenuItem{
-			{Label: "Logs", Description: "View aggregated pod logs", Key: "l"},
+			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Scale", Description: "Scale replica count", Key: "S"},
 			{Label: "Restart", Description: "Rolling restart", Key: "r"},
-			{Label: "Rollback", Description: "Rollback to previous revision", Key: "R"},
+			{Label: "Rollback", Description: "Pick from revision history to apply rollback", Key: "R"},
 			{Label: "Port Forward", Description: "Forward local port to deployment pod", Key: "p"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
@@ -196,7 +200,8 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		}, true
 	case "StatefulSet":
 		return []ActionMenuItem{
-			{Label: "Logs", Description: "View aggregated pod logs", Key: "l"},
+			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Scale", Description: "Scale replica count", Key: "S"},
@@ -210,7 +215,8 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		}, true
 	case "DaemonSet":
 		return []ActionMenuItem{
-			{Label: "Logs", Description: "View aggregated pod logs", Key: "l"},
+			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+			{Label: "Logs", Description: "View aggregated pod logs", Key: "L"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Restart", Description: "Rolling restart", Key: "r"},
@@ -223,7 +229,8 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		}, true
 	case "Job":
 		return []ActionMenuItem{
-			{Label: "Logs", Description: "View job logs", Key: "l"},
+			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+			{Label: "Logs", Description: "View job logs", Key: "L"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
@@ -235,7 +242,8 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		}, true
 	case "CronJob":
 		return []ActionMenuItem{
-			{Label: "Logs", Description: "View cronjob logs", Key: "l"},
+			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+			{Label: "Logs", Description: "View cronjob logs", Key: "L"},
 			{Label: "Exec", Description: "Execute command in pod container", Key: "s"},
 			{Label: "Attach", Description: "Attach to running container", Key: "A"},
 			{Label: "Trigger", Description: "Create a Job from this CronJob", Key: "t"},
@@ -252,7 +260,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Edit Values", Description: "Edit values in $EDITOR", Key: "E"},
 			{Label: "Diff", Description: "Compare default vs user-supplied values", Key: "d"},
 			{Label: "Upgrade", Description: "Upgrade release to latest chart version", Key: "U"},
-			{Label: "Rollback", Description: "Rollback to previous revision", Key: "R"},
+			{Label: "Rollback", Description: "Pick from revision history to apply rollback", Key: "R"},
 			{Label: "History", Description: "Show release revision history", Key: "h"},
 			{Label: "Describe", Description: "Show release info", Key: "v"},
 			{Label: "Delete", Description: "Uninstall this release", Key: "D"},
@@ -274,7 +282,8 @@ func actionsForGitOpsKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Stop Workflow", Description: "Stop workflow (allow exit handlers)", Key: "S"},
 			{Label: "Terminate Workflow", Description: "Immediately terminate workflow", Key: "T"},
 			{Label: "Resubmit Workflow", Description: "Create new workflow from this spec", Key: "R"},
-			{Label: "Logs", Description: "View workflow pod logs", Key: "l"},
+			{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
+			{Label: "Logs", Description: "View workflow pod logs", Key: "L"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this workflow", Key: "D"},

@@ -48,14 +48,8 @@ func RenderSecretEditorOverlay(
 	titleH := 1
 	gapH := 1
 
-	panelContentH := boxH - outerPadH - innerPadH - titleH - gapH
-	if panelContentH < 3 {
-		panelContentH = 3
-	}
-	panelContentW := boxW - outerPadW - innerPadW
-	if panelContentW < 20 {
-		panelContentW = 20
-	}
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH, 3)
+	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
 	// Title.
@@ -106,10 +100,7 @@ func renderSecretEditorTable(
 		keyColW = width / 3
 	}
 
-	valColW := width - keyColW - 10
-	if valColW < 8 {
-		valColW = 8
-	}
+	valColW := max(width-keyColW-10, 8)
 
 	var lines []string
 
@@ -120,18 +111,12 @@ func renderSecretEditorTable(
 	lines = append(lines, headerLine)
 	lines = append(lines, DimStyle.Render(separator))
 
-	tableHeight := height - 2
-	if tableHeight < 1 {
-		tableHeight = 1
-	}
+	tableHeight := max(height-2, 1)
 	start := 0
 	if selectedIdx >= tableHeight {
 		start = selectedIdx - tableHeight + 1
 	}
-	end := start + tableHeight
-	if end > len(secret.Keys) {
-		end = len(secret.Keys)
-	}
+	end := min(start+tableHeight, len(secret.Keys))
 
 	for i := start; i < end; i++ {
 		k := secret.Keys[i]
@@ -148,10 +133,7 @@ func renderSecretEditorTable(
 				valDisplay := Truncate(editValue, valColW)
 				editDisplay := editKey + DimStyle.Render("\u2588")
 				editW := lipgloss.Width(editDisplay)
-				pad := keyColW - editW
-				if pad < 0 {
-					pad = 0
-				}
+				pad := max(keyColW-editW, 0)
 				line = HelpKeyStyle.Render("> ") + editDisplay + strings.Repeat(" ", pad) + "  |  " + valDisplay
 			} else {
 				// Editing value, key column shows the in-progress edit key.

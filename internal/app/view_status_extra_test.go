@@ -205,6 +205,82 @@ func TestStatusBarDashboardHints(t *testing.T) {
 	assert.Contains(t, stripped, "namespace")
 }
 
+// --- statusBar: cluster-list hints omit "actions" ---
+
+func TestStatusBarClusterListOmitsActionsHint(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelClusters},
+		middleItems:   []model.Item{{Name: "ctx-a"}},
+		width:         200,
+		height:        40,
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+	}
+	stripped := stripANSI(m.statusBar())
+	assert.NotContains(t, stripped, "actions")
+	assert.Contains(t, stripped, "create")
+	assert.Contains(t, stripped, "filter")
+}
+
+func TestStatusBarResourceListShowsActionsHint(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelResources},
+		middleItems:   []model.Item{{Name: "pod"}},
+		width:         200,
+		height:        40,
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+	}
+	stripped := stripANSI(m.statusBar())
+	assert.Contains(t, stripped, "actions")
+	assert.Contains(t, stripped, ">/<: sort")
+	assert.Contains(t, stripped, "sort:", "sort indicator must show where sort applies")
+}
+
+// --- statusBar: resource-type picker hints omit "actions" and "sort" ---
+//
+// At LevelResourceTypes (the RESOURCE TYPE column listing Pod, Deployment,
+// etc.) selectedResourceKind() returns "" so openActionMenu() is a no-op,
+// and sortMiddleItems() early-returns so </> doesn't reorder anything.
+// Both the hint and the "sort:<col>" indicator must stay hidden so the
+// bar doesn't advertise dead keys or claim a sort that isn't enforced.
+func TestStatusBarResourceTypePickerOmitsActionsAndSort(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelResourceTypes},
+		middleItems:   []model.Item{{Name: "Pod", Extra: "/v1/pods"}},
+		width:         200,
+		height:        40,
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+	}
+	stripped := stripANSI(m.statusBar())
+	assert.NotContains(t, stripped, "actions")
+	assert.NotContains(t, stripped, ">/<: sort")
+	assert.NotContains(t, stripped, "sort:", "sort indicator must hide where sort is a no-op")
+	assert.Contains(t, stripped, "create")
+	assert.Contains(t, stripped, "filter")
+	assert.Contains(t, stripped, "marks")
+}
+
+// --- statusBar: cluster-list hints also omit "sort" ---
+//
+// sortMiddleItems() early-returns at LevelClusters too, so the </> hint
+// and the "sort:<col>" indicator are just as misleading there as they
+// are at LevelResourceTypes.
+func TestStatusBarClusterListOmitsSortHint(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelClusters},
+		middleItems:   []model.Item{{Name: "ctx-a"}},
+		width:         200,
+		height:        40,
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+	}
+	stripped := stripANSI(m.statusBar())
+	assert.NotContains(t, stripped, ">/<: sort")
+	assert.NotContains(t, stripped, "sort:")
+}
+
 // --- statusBar: small width ---
 
 func TestStatusBarSmallWidth(t *testing.T) {

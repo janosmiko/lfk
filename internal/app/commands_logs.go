@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"slices"
 	"sort"
 	"strings"
 	"sync"
@@ -18,6 +19,62 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// Auto-reconnect constants for multi-container Pod log streams.
+//
+// When following all containers of a Pod, kubectl exits as soon as all
+// currently-running containers have finished. For a pod that is still in the
+// init phase, that happens every time an init container completes. We
+// restart the stream after a short delay so the next container is picked up
+// automatically.
+//
+// The delay is deliberately small: the init-container → next-container
+// transition typically takes well under a second, and every extra millisecond
+// between streams is log content we'll miss (`--tail=0` on reconnect means
+// any lines produced during the gap are gone). We cap retries so a fully
+// terminated pod doesn't spin forever.
+const (
+	logAutoReconnectMaxAttempts = 20
+	logAutoReconnectDelay       = 250 * time.Millisecond
+)
+
+// isKubectlTransientError recognizes noise that kubectl writes to stderr
+// (which startLogStream merges into stdout) while --ignore-errors keeps the
+// stream alive. These lines describe pending initialization, not real
+// application log output — surfacing them just clutters the viewer.
+func isKubectlTransientError(line string) bool {
+	// "error: container \"X\" in pod \"Y\" is waiting to start: PodInitializing"
+	// "error: container \"X\" in pod \"Y\" is waiting to start: ContainerCreating"
+	// etc.
+	if strings.HasPrefix(line, "error: container ") && strings.Contains(line, " is waiting to start: ") {
+		return true
+	}
+	// "Error from server (BadRequest): container X is not valid for pod Y"
+	// (kubectl emits this before an init container has been created)
+	if strings.HasPrefix(line, "Error from server (BadRequest):") && strings.Contains(line, " is not valid for pod ") {
+		return true
+	}
+	return false
+}
+
+// scheduleLogStreamRestart returns a tea.Cmd that waits for
+// logAutoReconnectDelay and then emits a logStreamRestartMsg carrying the
+// channel of the stream that just ended. The Update handler correlates on
+// that channel to ignore stale restarts after the user has switched pods or
+// exited logs mode.
+//
+// The wait is registered as a background task so the title-bar task
+// indicator shows it — that's the app-wide place for "something is
+// progressing" feedback, instead of injecting status lines into the log
+// viewer itself.
+func (m Model) scheduleLogStreamRestart(ch chan string) tea.Cmd {
+	reg := m.bgtasks
+	id := reg.Start(bgtasks.KindContainers, "Waiting for next container", "")
+	return tea.Tick(logAutoReconnectDelay, func(_ time.Time) tea.Msg {
+		reg.Finish(id)
+		return logStreamRestartMsg{ch: ch}
+	})
+}
 
 // --- Log streaming commands ---
 
@@ -37,7 +94,7 @@ func (m *Model) startLogStream() tea.Cmd {
 	name := m.actionCtx.name
 	kctx := m.actionCtx.context
 	containerName := m.actionCtx.containerName
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 	logPrevious := m.logPrevious
 	tailLines := m.logTailLines
 	if tailLines == 0 {
@@ -52,6 +109,10 @@ func (m *Model) startLogStream() tea.Cmd {
 	if containerName == "" {
 		selectedContainers = append([]string(nil), m.logSelectedContainers...)
 	}
+
+	// On auto-reconnect, force --tail=0 so we only pick up new lines from
+	// the next container rather than re-pulling history we already have.
+	reconnecting := m.logReconnecting
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.logCancel = cancel
@@ -73,22 +134,22 @@ func (m *Model) startLogStream() tea.Cmd {
 		case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob", "Service":
 			// Try to get the pod selector via kubectl so we can follow ALL pods.
 			// kubectl logs deployment/<name> only follows a single pod.
-			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx)
+			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, m.kubectlContext(kctx))
 			if selector != "" {
 				args = []string{
 					"logs", "-l", selector, "--all-containers=true", "--prefix", followFlag,
-					"--max-log-requests=20", "--ignore-errors", "-n", ns, "--context", kctx,
+					"--max-log-requests=20", "--ignore-errors", "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			} else {
 				// Fallback: use resource reference (follows only one pod).
 				resourceRef := strings.ToLower(kind) + "/" + name
 				args = []string{
 					"logs", resourceRef, "--all-containers=true", "--prefix", followFlag,
-					"--max-log-requests=20", "--ignore-errors", "-n", ns, "--context", kctx,
+					"--max-log-requests=20", "--ignore-errors", "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			}
 		default:
-			args = []string{"logs", followFlag, name, "-n", ns, "--context", kctx}
+			args = []string{"logs", followFlag, name, "-n", ns, "--context", m.kubectlContext(kctx)}
 			if containerName != "" {
 				args = append(args, "-c", containerName)
 			} else if kind == "Pod" {
@@ -98,15 +159,24 @@ func (m *Model) startLogStream() tea.Cmd {
 			}
 		}
 
-		// Add --tail for initial loading (not for --previous mode since it's already finite).
-		if tailLines > 0 && !logPrevious {
+		// --tail handling:
+		//   * reconnect: always pass --tail=0 so we don't re-pull history
+		//     we already rendered for the previous container.
+		//   * --previous: already a finite backlog — no --tail.
+		//   * initial load: honor the configured tail size if positive.
+		switch {
+		case reconnecting:
+			args = append(args, "--tail=0")
+		case logPrevious:
+			// leave tail off
+		case tailLines > 0:
 			args = append(args, fmt.Sprintf("--tail=%d", tailLines))
 		}
 
 		// Always include --timestamps so toggling visibility doesn't need a restart.
 		args = append(args, "--timestamps")
 
-		logger.Info("Starting kubectl logs", "args", strings.Join(args, " "))
+		logger.Info("Starting kubectl logs", "args", strings.Join(args, " "), "kubeconfig", kubeconfigPaths)
 
 		cmd := exec.CommandContext(ctx, kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
@@ -127,10 +197,21 @@ func (m *Model) startLogStream() tea.Cmd {
 		}
 
 		defer cmd.Wait() //nolint:errcheck
+		// kubectl (with --ignore-errors) keeps re-emitting the same
+		// 'container X is waiting to start' line every retry. We want the
+		// user to see the message once so they know what's happening, but
+		// not a flood. Dedup within this kubectl run; reconnect resets.
+		seenTransient := map[string]bool{}
 		scanner := bufio.NewScanner(stdout)
 		scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
 		for scanner.Scan() {
 			line := scanner.Text()
+			if isKubectlTransientError(line) {
+				if seenTransient[line] {
+					continue
+				}
+				seenTransient[line] = true
+			}
 			// Filter by selected containers when using --prefix mode.
 			if len(selectedContainers) > 0 && !matchesContainerFilter(line, selectedContainers) {
 				continue
@@ -150,6 +231,11 @@ func (m *Model) startLogStream() tea.Cmd {
 // parent resource (Deployment, StatefulSet, etc.). It uses kubectl rather than
 // the Go client so that OIDC tokens are discovered/cached by the same credential
 // helper that kubectl uses, avoiding a separate browser auth flow.
+//
+// kctx must be the kubeconfig's *original* context name (the one kubectl will
+// recognise), not lfk's potentially disambiguated display name. Callers in
+// the app package should use Model.kubectlContext to translate before
+// invoking this helper.
 func kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx string) string {
 	// For CronJobs there's no direct pod selector.
 	if kind == "CronJob" {
@@ -166,7 +252,7 @@ func kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx st
 
 	cmd := exec.Command(kubectlPath, getArgs...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-	logger.Info("Running kubectl command", "cmd", cmd.String())
+	logExecCmd("Running kubectl command", cmd)
 	out, err := cmd.Output()
 	if err != nil {
 		logger.Error("Failed to get pod selector via kubectl", "cmd", cmd.String(), "resource", resourceRef, "error", err)
@@ -235,12 +321,7 @@ func matchesContainerFilter(line string, selectedContainers []string) bool {
 		return true // unexpected format
 	}
 	containerName := prefix[lastSlash+1:]
-	for _, sc := range selectedContainers {
-		if sc == containerName {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(selectedContainers, containerName)
 }
 
 // waitForLogLine returns a tea.Cmd that reads the next line from the log channel.
@@ -315,13 +396,13 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		case "Pod":
 			args = []string{
 				"logs", item.Name, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", kctx,
+				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(kctx),
 			}
 		default:
 			resourceRef := strings.ToLower(kind) + "/" + item.Name
 			args = []string{
 				"logs", resourceRef, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", kctx,
+				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(kctx),
 			}
 		}
 
@@ -332,11 +413,14 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 
 		args = append(args, "--timestamps")
 
-		logger.Info("Starting multi-log kubectl", "item", item.Name, "args", strings.Join(args, " "))
 		m.addLogEntry("DBG", "kubectl "+strings.Join(args, " "))
 
 		cmd := exec.CommandContext(ctx, kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(kctx))
+		logger.Info("Starting multi-log kubectl",
+			"item", item.Name,
+			"cmd", cmd.String(),
+			"kubeconfig", m.client.KubeconfigPathForContext(kctx))
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			logger.Error("Failed to create stdout pipe for multi-log", "item", item.Name, "error", err)
@@ -349,9 +433,7 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 			continue
 		}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer cmd.Wait() //nolint:errcheck
 			scanner := bufio.NewScanner(stdout)
 			scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
@@ -362,7 +444,7 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	// Close the channel once all goroutines finish.
@@ -412,13 +494,13 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 		case "Pod":
 			args = []string{
 				"logs", item.Name, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", kctx,
+				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(kctx),
 			}
 		default:
 			resourceRef := strings.ToLower(kind) + "/" + item.Name
 			args = []string{
 				"logs", resourceRef, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", kctx,
+				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(kctx),
 			}
 		}
 
@@ -430,20 +512,20 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 		args = append(args, "--timestamps")
 
 		cmd := exec.CommandContext(ctx, kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(kctx))
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
+			logger.Error("Failed to open kubectl logs stdout pipe (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs)
 			continue
 		}
 		cmd.Stderr = cmd.Stdout
 
 		if err := cmd.Start(); err != nil {
+			logger.Error("Failed to start kubectl logs (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "cmd", cmd.String())
 			continue
 		}
 
-		wg.Add(1)
-		go func() {
-			defer wg.Done()
+		wg.Go(func() {
 			defer cmd.Wait() //nolint:errcheck
 			scanner := bufio.NewScanner(stdout)
 			scanner.Buffer(make([]byte, 0, 256*1024), 1024*1024)
@@ -454,7 +536,7 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 					return
 				}
 			}
-		}()
+		})
 	}
 
 	go func() {
@@ -480,7 +562,7 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 	name := m.actionCtx.name
 	kctx := m.actionCtx.context
 	containerName := m.actionCtx.containerName
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 	newTail := m.logTailLines + ui.ConfigLogTailLines
 	prevTotal := len(m.logLines)
 	// Only filter client-side when in --all-containers mode (no -c flag).
@@ -498,17 +580,17 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 		var args []string //nolint:prealloc
 		switch kind {
 		case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob", "Service":
-			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx)
+			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, m.kubectlContext(kctx))
 			if selector != "" {
 				args = []string{
 					"logs", "-l", selector, "--all-containers=true", "--prefix",
-					"--max-log-requests=20", "-n", ns, "--context", kctx,
+					"--max-log-requests=20", "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			} else {
 				resourceRef := strings.ToLower(kind) + "/" + name
 				args = []string{
 					"logs", resourceRef, "--all-containers=true", "--prefix",
-					"--max-log-requests=20", "-n", ns, "--context", kctx,
+					"--max-log-requests=20", "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			}
 		case "Pod":
@@ -517,11 +599,11 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 			if len(selectedContainers) > 0 || containerName == "" {
 				args = []string{
 					"logs", name, "--all-containers=true", "--prefix",
-					"--max-log-requests=20", "-n", ns, "--context", kctx,
+					"--max-log-requests=20", "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			} else {
 				args = []string{
-					"logs", name, "-c", containerName, "-n", ns, "--context", kctx,
+					"logs", name, "-c", containerName, "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			}
 		default:
@@ -541,7 +623,7 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 		}
 
 		var lines []string
-		for _, line := range strings.Split(string(output), "\n") {
+		for line := range strings.SplitSeq(string(output), "\n") {
 			if line == "" {
 				continue
 			}
@@ -558,8 +640,14 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 
 // maybeLoadMoreHistory triggers a background fetch of older log lines
 // when the user has scrolled to the top and more history may be available.
+//
+// The trigger requires the cursor to be at line 0, not just logScroll==0.
+// In Tail Logs mode (10 lines into a ~30-line viewport) logScroll is pinned
+// at 0 from startup, so without this guard every up-navigation — k, ctrl+u,
+// ctrl+b, gg, mouse wheel up — would immediately fetch older history even
+// when the user has only moved a single line up from the bottom.
 func (m *Model) maybeLoadMoreHistory() tea.Cmd {
-	if m.logScroll == 0 && m.logHasMoreHistory && !m.logLoadingHistory && !m.logPrevious {
+	if m.logScroll == 0 && m.logCursor <= 0 && m.logHasMoreHistory && !m.logLoadingHistory && !m.logPrevious {
 		m.logLoadingHistory = true
 		return m.fetchOlderLogs()
 	}
@@ -589,7 +677,7 @@ func (m *Model) saveAllLogs() tea.Cmd {
 	name := m.actionCtx.name
 	kctx := m.actionCtx.context
 	containerName := m.actionCtx.containerName
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 	logPrevious := m.logPrevious
 	sanitized := sanitizeFilename(name)
 
@@ -597,29 +685,29 @@ func (m *Model) saveAllLogs() tea.Cmd {
 		var args []string
 		switch kind {
 		case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob", "Service":
-			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, kctx)
+			selector := kubectlGetPodSelector(kubectlPath, kubeconfigPaths, ns, kind, name, m.kubectlContext(kctx))
 			if selector != "" {
 				args = []string{
 					"logs", "-l", selector, "--all-containers=true", "--prefix",
-					"--max-log-requests=20", "--timestamps", "-n", ns, "--context", kctx,
+					"--max-log-requests=20", "--timestamps", "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			} else {
 				resourceRef := strings.ToLower(kind) + "/" + name
 				args = []string{
 					"logs", resourceRef, "--all-containers=true", "--prefix",
-					"--timestamps", "--max-log-requests=20", "-n", ns, "--context", kctx,
+					"--timestamps", "--max-log-requests=20", "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			}
 		case "Pod":
 			if containerName != "" {
 				args = []string{
 					"logs", name, "-c", containerName, "--prefix", "--timestamps",
-					"-n", ns, "--context", kctx,
+					"-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			} else {
 				args = []string{
 					"logs", name, "--all-containers=true", "--prefix", "--timestamps",
-					"--max-log-requests=20", "-n", ns, "--context", kctx,
+					"--max-log-requests=20", "-n", ns, "--context", m.kubectlContext(kctx),
 				}
 			}
 		default:
@@ -632,6 +720,9 @@ func (m *Model) saveAllLogs() tea.Cmd {
 
 		cmd := exec.CommandContext(context.Background(), kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+		// Match commands_exec.go convention: log every kubectl invocation
+		// before running so the slog file records what we actually ran.
+		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.Output()
 		if err != nil {
 			return logSaveAllMsg{err: err}

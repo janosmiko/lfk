@@ -18,14 +18,8 @@ func RenderHelmHistoryOverlay(revisions []HelmRevision, cursor int, screenWidth,
 		return OverlayStyle.Render(DimStyle.Render("No revisions found"))
 	}
 
-	boxW := screenWidth * 80 / 100
-	if boxW < 60 {
-		boxW = 60
-	}
-	boxH := screenHeight * 60 / 100
-	if boxH < 10 {
-		boxH = 10
-	}
+	boxW := max(screenWidth*80/100, 60)
+	boxH := max(screenHeight*60/100, 10)
 
 	title := OverlayTitleStyle.Render("Helm Release History")
 
@@ -34,18 +28,12 @@ func RenderHelmHistoryOverlay(revisions []HelmRevision, cursor int, screenWidth,
 		"REV", "STATUS", "CHART", "APP VER", "DESCRIPTION", "UPDATED")
 	lines = append(lines, DimStyle.Bold(true).Render(hdr))
 
-	contentH := boxH - 6
-	if contentH < 3 {
-		contentH = 3
-	}
+	contentH := max(boxH-6, 3)
 	start := 0
 	if cursor >= contentH {
 		start = cursor - contentH + 1
 	}
-	end := start + contentH
-	if end > len(revisions) {
-		end = len(revisions)
-	}
+	end := min(start+contentH, len(revisions))
 
 	for i := start; i < end; i++ {
 		rev := revisions[i]

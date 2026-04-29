@@ -12,6 +12,7 @@ import (
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -119,6 +120,12 @@ func (c *Client) RemoveFinalizerFromResource(
 	contextName string,
 	match FinalizerMatch,
 ) error {
+	logger.Info("Removing finalizer",
+		"context", contextName,
+		"namespace", match.Namespace,
+		"name", match.Name,
+		"kind", match.Kind,
+		"finalizer", match.Matched)
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return err
@@ -155,8 +162,8 @@ func (c *Client) RemoveFinalizerFromResource(
 	// Use a merge patch that sets the entire finalizers list.
 	// Since finalizers is a simple list of strings, replacing the whole list
 	// is the safest approach to avoid partial updates.
-	patchData, err := json.Marshal(map[string]interface{}{
-		"metadata": map[string]interface{}{
+	patchData, err := json.Marshal(map[string]any{
+		"metadata": map[string]any{
 			"finalizers": newFinalizers,
 		},
 	})

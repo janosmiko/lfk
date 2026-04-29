@@ -1218,11 +1218,11 @@ func TestCov80SanitizeMessage(t *testing.T) {
 func TestCov80SanitizeMessageTruncation(t *testing.T) {
 	m := basePush80Model()
 	m.width = 20
-	long := ""
+	var long strings.Builder
 	for range 100 {
-		long += "x"
+		long.WriteString("x")
 	}
-	s := m.sanitizeMessage(long)
+	s := m.sanitizeMessage(long.String())
 	assert.True(t, len(s) <= 43)
 }
 

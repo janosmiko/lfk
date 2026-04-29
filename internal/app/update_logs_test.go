@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 )
@@ -99,6 +100,69 @@ func TestFindNextLogMatch(t *testing.T) {
 		}
 		m.findNextLogMatch(true)
 		assert.Equal(t, 1, m.logCursor)
+	})
+
+	t.Run("forward does not panic when cursor col exceeds line length", func(t *testing.T) {
+		// Regression: logVisualCurCol carries over from a previously
+		// focused long line. When `n` triggers a forward search and the
+		// current (start) line is shorter than logVisualCurCol+1, the
+		// rune-slice indexing must not panic.
+		m := Model{
+			height:          30,
+			width:           80,
+			tabs:            []TabState{{}},
+			logLines:        []string{"short", "info: target here"},
+			logSearchQuery:  "target",
+			logCursor:       0,
+			logVisualCurCol: 900, // far beyond "short"
+		}
+		assert.NotPanics(t, func() { m.findNextLogMatch(true) })
+		assert.Equal(t, 1, m.logCursor)
+	})
+
+	t.Run("backward does not panic when cursor col exceeds line length", func(t *testing.T) {
+		// Same regression for the backward path (N / shift-n).
+		m := Model{
+			height:          30,
+			width:           80,
+			tabs:            []TabState{{}},
+			logLines:        []string{"info: target here", "short"},
+			logSearchQuery:  "target",
+			logCursor:       1,
+			logVisualCurCol: 900, // far beyond "short"
+		}
+		assert.NotPanics(t, func() { m.findNextLogMatch(false) })
+		assert.Equal(t, 0, m.logCursor)
+	})
+
+	t.Run("does not panic on multi-byte rune lines when cursor col exceeds rune count", func(t *testing.T) {
+		// The bug is fundamentally about rune vs byte length divergence:
+		// `[]rune(line)[:n]` panics when n > len(runes). Multi-byte content
+		// (e.g. `こんにちは` is 5 runes / 15 bytes) exercises the rune path
+		// distinct from len(line). Verify both forward and backward.
+		m := Model{
+			height:          30,
+			width:           80,
+			tabs:            []TabState{{}},
+			logLines:        []string{"こんにちは", "info: target here"},
+			logSearchQuery:  "target",
+			logCursor:       0,
+			logVisualCurCol: 900, // far beyond 5 runes
+		}
+		assert.NotPanics(t, func() { m.findNextLogMatch(true) })
+		assert.Equal(t, 1, m.logCursor)
+
+		m2 := Model{
+			height:          30,
+			width:           80,
+			tabs:            []TabState{{}},
+			logLines:        []string{"info: target here", "こんにちは"},
+			logSearchQuery:  "target",
+			logCursor:       1,
+			logVisualCurCol: 900,
+		}
+		assert.NotPanics(t, func() { m2.findNextLogMatch(false) })
+		assert.Equal(t, 0, m2.logCursor)
 	})
 
 	t.Run("disables log follow on match", func(t *testing.T) {
@@ -445,6 +509,32 @@ func TestCovLogSearchKeyTyping(t *testing.T) {
 	assert.Equal(t, "x", rm.logSearchInput.Value)
 }
 
+// Regression: typing into the log-viewer search input now updates
+// logSearchQuery alongside logSearchInput so the highlight overlay
+// paints in real time. Previously the highlight only appeared once the
+// user pressed Enter to "commit" the query.
+func TestLogSearchTypingUpdatesQueryLive(t *testing.T) {
+	m := baseModelNav()
+	m.mode = modeLogs
+	m.logSearchActive = true
+	m.logLines = []string{"some error here"}
+
+	result, _ := m.handleLogKey(keyMsg("e"))
+	rm := result.(Model)
+	assert.Equal(t, "e", rm.logSearchInput.Value)
+	assert.Equal(t, "e", rm.logSearchQuery,
+		"logSearchQuery must mirror logSearchInput while typing so highlights paint live")
+
+	result, _ = rm.handleLogKey(keyMsg("r"))
+	rm = result.(Model)
+	assert.Equal(t, "er", rm.logSearchQuery)
+
+	result, _ = rm.handleLogKey(keyMsg("backspace"))
+	rm = result.(Model)
+	assert.Equal(t, "e", rm.logSearchQuery,
+		"backspace must keep logSearchQuery in sync, not leave the highlight stale")
+}
+
 func TestCovLogVisualKeyEsc(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
@@ -486,4 +576,78 @@ func TestCovLogVisualKeyUp(t *testing.T) {
 	result, _ := m.handleLogKey(keyMsg("k"))
 	rm := result.(Model)
 	assert.Equal(t, 1, rm.logCursor)
+}
+
+// --- handleLogKeyS2: Save loaded logs (S) ---
+
+func TestHandleLogKeyS2CopiesPathToClipboard(t *testing.T) {
+	// Issue #61: when the user presses S to save the loaded log buffer,
+	// the destination path should be auto-copied to the system clipboard
+	// so it survives the 5s status-clear, and the status message should
+	// announce that explicitly.
+	m := baseModel()
+	m.mode = modeLogs
+	m.logLines = []string{"line1", "line2"}
+	m.actionCtx = actionContext{name: "test-pod"}
+
+	ret, cmd := m.handleLogKeyS2()
+	rm := ret.(Model)
+
+	assert.False(t, rm.statusMessageErr, "save success should not be an error status")
+	assert.Contains(t, rm.statusMessage, "Loaded logs saved to ")
+	assert.Contains(t, rm.statusMessage, "(copied to clipboard)",
+		"status should announce the clipboard copy so the user knows the path is recoverable")
+	assert.NotNil(t, cmd, "cmd should batch the clipboard write with the status-clear timer")
+}
+
+// Pressing \ in the log viewer for a single Pod must NOT open the container
+// filter overlay until the container list has loaded. Setting the overlay
+// up-front and rendering it with empty/loading state caused a visible
+// flash before the real data arrived; users perceived the brief overlay
+// (especially when stale items from a prior namespace selector use were
+// still in m.overlayItems) as "the namespace selector flashing". Mirrors
+// the group-resource branch which only sets overlayLogPodSelect from
+// updatePodLogSelect after the pods have loaded.
+func TestHandleLogKeyOtherSinglePodDefersOverlayUntilContainersLoad(t *testing.T) {
+	m := baseModel()
+	m.mode = modeLogs
+	m.actionCtx.kind = "Pod"
+	m.actionCtx.name = "my-pod"
+	// Stale items from a previous namespace selector use must not bleed
+	// into the next overlay either.
+	m.overlayItems = []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default"},
+		{Name: "kube-system"},
+	}
+	ret, cmd := m.handleLogKeyOther()
+	rm := ret.(Model)
+	assert.Equal(t, overlayNone, rm.overlay,
+		"overlay must stay closed while the container list is loading; updateLogContainersLoaded opens it once data arrives")
+	assert.Nil(t, rm.overlayItems,
+		"stale overlay items must be cleared so any later overlay open does not see leftover content")
+	assert.True(t, rm.loading,
+		"loading flag must be set so the user gets visual feedback that work is happening")
+	assert.Contains(t, rm.statusMessage, "Loading containers",
+		"status bar must announce the load so the user knows something is happening")
+	assert.NotNil(t, cmd, "loadContainersForLogFilter command must be returned")
+}
+
+func TestHandleLogKeyS2ErrorPathDoesNotCopy(t *testing.T) {
+	// On save failure there is nothing useful to copy; the status should
+	// still report the error and the cmd should remain just the clear timer.
+	m := baseModel()
+	m.mode = modeLogs
+	// actionCtx.name is empty; saveLoadedLogs will still try /tmp/lfk-logs--<unix>.log
+	// which works on writable filesystems, so we instead force a write failure by
+	// pointing TMPDIR at a non-existent directory.
+	t.Setenv("TMPDIR", "/this/path/does/not/exist/lfk-test")
+	m.logLines = []string{"line1"}
+
+	ret, _ := m.handleLogKeyS2()
+	rm := ret.(Model)
+
+	assert.True(t, rm.statusMessageErr, "save failure should set the error flag")
+	assert.NotContains(t, rm.statusMessage, "(copied to clipboard)",
+		"clipboard suffix only makes sense on success")
 }

@@ -10,10 +10,10 @@ import (
 
 func TestParseNetpolRule_PortEntryNotMap(t *testing.T) {
 	// A port entry that is not a map should be skipped (line 127-128).
-	rule := parseNetpolRule(map[string]interface{}{
-		"ports": []interface{}{
+	rule := parseNetpolRule(map[string]any{
+		"ports": []any{
 			"not-a-map",
-			map[string]interface{}{
+			map[string]any{
 				"port": 80,
 			},
 		},
@@ -26,12 +26,12 @@ func TestParseNetpolRule_PortEntryNotMap(t *testing.T) {
 
 func TestParseNetpolRule_PeerEntryNotMap(t *testing.T) {
 	// A peer entry that is not a map should be skipped (line 148-149).
-	rule := parseNetpolRule(map[string]interface{}{
-		"from": []interface{}{
+	rule := parseNetpolRule(map[string]any{
+		"from": []any{
 			"not-a-map",
-			map[string]interface{}{
-				"podSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+			map[string]any{
+				"podSelector": map[string]any{
+					"matchLabels": map[string]any{
 						"app": "web",
 					},
 				},
@@ -45,18 +45,18 @@ func TestParseNetpolRule_PeerEntryNotMap(t *testing.T) {
 
 func TestParseNetpolRule_EgressDirection(t *testing.T) {
 	// Ensure the "to" peerField works correctly for egress rules.
-	rule := parseNetpolRule(map[string]interface{}{
-		"to": []interface{}{
-			map[string]interface{}{
-				"podSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+	rule := parseNetpolRule(map[string]any{
+		"to": []any{
+			map[string]any{
+				"podSelector": map[string]any{
+					"matchLabels": map[string]any{
 						"role": "db",
 					},
 				},
 			},
 		},
-		"ports": []interface{}{
-			map[string]interface{}{
+		"ports": []any{
+			map[string]any{
 				"protocol": "UDP",
 				"port":     5432,
 			},
@@ -75,15 +75,15 @@ func TestParseNetpolRule_EgressDirection(t *testing.T) {
 
 func TestParsePeer_EmptyPeerMap(t *testing.T) {
 	// A completely empty peer map should resolve to "All" type (line 216-217).
-	peer := parsePeer(map[string]interface{}{})
+	peer := parsePeer(map[string]any{})
 	assert.Equal(t, "All", peer.Type)
 }
 
 func TestParsePeer_PodSelectorWithoutMatchLabels(t *testing.T) {
 	// A podSelector without matchLabels should still be typed as "Pod"
 	// but have no Selector labels (line 198-206).
-	peer := parsePeer(map[string]interface{}{
-		"podSelector": map[string]interface{}{},
+	peer := parsePeer(map[string]any{
+		"podSelector": map[string]any{},
 	})
 	assert.Equal(t, "Pod", peer.Type)
 	assert.Nil(t, peer.Selector, "pod selector without matchLabels should have nil Selector")
@@ -91,8 +91,8 @@ func TestParsePeer_PodSelectorWithoutMatchLabels(t *testing.T) {
 
 func TestParsePeer_CIDRWithoutExcept(t *testing.T) {
 	// An ipBlock with cidr but no except list.
-	peer := parsePeer(map[string]interface{}{
-		"ipBlock": map[string]interface{}{
+	peer := parsePeer(map[string]any{
+		"ipBlock": map[string]any{
 			"cidr": "172.16.0.0/12",
 		},
 	})
@@ -103,8 +103,8 @@ func TestParsePeer_CIDRWithoutExcept(t *testing.T) {
 
 func TestParsePeer_CIDRWithoutCidrField(t *testing.T) {
 	// An ipBlock map exists but has no "cidr" key.
-	peer := parsePeer(map[string]interface{}{
-		"ipBlock": map[string]interface{}{},
+	peer := parsePeer(map[string]any{
+		"ipBlock": map[string]any{},
 	})
 	assert.Equal(t, "CIDR", peer.Type)
 	assert.Equal(t, "", peer.CIDR)
@@ -112,9 +112,9 @@ func TestParsePeer_CIDRWithoutCidrField(t *testing.T) {
 
 func TestParsePeer_NamespaceAndPodSelectorBothEmpty(t *testing.T) {
 	// Both selectors present but with empty matchLabels.
-	peer := parsePeer(map[string]interface{}{
-		"namespaceSelector": map[string]interface{}{},
-		"podSelector":       map[string]interface{}{},
+	peer := parsePeer(map[string]any{
+		"namespaceSelector": map[string]any{},
+		"podSelector":       map[string]any{},
 	})
 	assert.Equal(t, "Namespace+Pod", peer.Type)
 	assert.Equal(t, "(all namespaces)", peer.Namespace)

@@ -10,13 +10,13 @@ import (
 
 func TestExtractCRDPrinterColumns_NonMapVersionEntry(t *testing.T) {
 	// A version entry that is not a map should be skipped (line 148-149).
-	spec := map[string]interface{}{
-		"versions": []interface{}{
+	spec := map[string]any{
+		"versions": []any{
 			"not-a-map",
-			map[string]interface{}{
+			map[string]any{
 				"name": "v1",
-				"additionalPrinterColumns": []interface{}{
-					map[string]interface{}{
+				"additionalPrinterColumns": []any{
+					map[string]any{
 						"name":     "Status",
 						"type":     "string",
 						"jsonPath": ".status.phase",
@@ -32,13 +32,13 @@ func TestExtractCRDPrinterColumns_NonMapVersionEntry(t *testing.T) {
 
 func TestExtractCRDPrinterColumns_NonMapColumnEntry(t *testing.T) {
 	// A column entry that is not a map should be skipped (line 164-165).
-	spec := map[string]interface{}{
-		"versions": []interface{}{
-			map[string]interface{}{
+	spec := map[string]any{
+		"versions": []any{
+			map[string]any{
 				"name": "v1",
-				"additionalPrinterColumns": []interface{}{
+				"additionalPrinterColumns": []any{
 					"not-a-map",
-					map[string]interface{}{
+					map[string]any{
 						"name":     "Phase",
 						"type":     "string",
 						"jsonPath": ".status.phase",
@@ -54,11 +54,11 @@ func TestExtractCRDPrinterColumns_NonMapColumnEntry(t *testing.T) {
 
 func TestExtractCRDPrinterColumns_EmptyColumnsList(t *testing.T) {
 	// An empty additionalPrinterColumns list should return nil.
-	spec := map[string]interface{}{
-		"versions": []interface{}{
-			map[string]interface{}{
+	spec := map[string]any{
+		"versions": []any{
+			map[string]any{
 				"name":                     "v1",
-				"additionalPrinterColumns": []interface{}{},
+				"additionalPrinterColumns": []any{},
 			},
 		},
 	}
@@ -68,17 +68,17 @@ func TestExtractCRDPrinterColumns_EmptyColumnsList(t *testing.T) {
 
 func TestExtractCRDPrinterColumns_CaseInsensitiveAgeSkip(t *testing.T) {
 	// "age" (lowercase) should also be skipped due to EqualFold.
-	spec := map[string]interface{}{
-		"versions": []interface{}{
-			map[string]interface{}{
+	spec := map[string]any{
+		"versions": []any{
+			map[string]any{
 				"name": "v1",
-				"additionalPrinterColumns": []interface{}{
-					map[string]interface{}{
+				"additionalPrinterColumns": []any{
+					map[string]any{
 						"name":     "age",
 						"type":     "date",
 						"jsonPath": ".metadata.creationTimestamp",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"name":     "Ready",
 						"type":     "string",
 						"jsonPath": ".status.ready",

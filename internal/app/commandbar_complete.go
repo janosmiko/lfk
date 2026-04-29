@@ -174,15 +174,15 @@ func completeBuiltin(tokens []token, m *Model) []ui.Suggestion {
 				candidates = append(candidates, ns)
 			}
 		}
-		return filterSuggestionsTyped(candidates, prefix, "namespace")
+		return filterSuggestionsFuzzy(candidates, prefix, "namespace")
 	case "context":
-		return filterSuggestionsTyped(m.contextNames(), prefix, "context")
+		return filterSuggestionsFuzzy(m.contextNames(), prefix, "context")
 	case "set":
-		return filterSuggestionsTyped(setOptions(), prefix, "option")
+		return filterSuggestionsFuzzy(setOptions(), prefix, "option")
 	case "sort":
-		return filterSuggestionsTyped(ui.ActiveSortableColumns, prefix, "column")
+		return filterSuggestionsFuzzy(ui.ActiveSortableColumns, prefix, "column")
 	case "export":
-		return filterSuggestionsTyped([]string{"yaml", "json"}, prefix, "format")
+		return filterSuggestionsFuzzy([]string{"yaml", "json"}, prefix, "format")
 	default:
 		return nil
 	}
@@ -221,9 +221,9 @@ func completeKubectl(tokens []token, m *Model) []ui.Suggestion {
 		prevToken := strings.ToLower(effective[len(effective)-2].text)
 		switch prevToken {
 		case "-n", "--namespace":
-			return filterSuggestionsTyped(m.namespaceNames(), prefix, "namespace")
+			return filterSuggestionsFuzzy(m.namespaceNames(), prefix, "namespace")
 		case "-o", "--output":
-			return filterSuggestionsTyped(outputFormatsComplete(), prefix, "format")
+			return filterSuggestionsFuzzy(outputFormatsComplete(), prefix, "format")
 		}
 	}
 
@@ -257,7 +257,7 @@ func completeKubectl(tokens []token, m *Model) []ui.Suggestion {
 		// matches the currently viewed resource type (names are only available
 		// for the resource type currently loaded in the explorer).
 		names := resourceNamesForKubectl(m, effective)
-		return filterSuggestionsTyped(names, prefix, "name")
+		return filterSuggestionsFuzzy(names, prefix, "name")
 	}
 }
 
@@ -302,7 +302,7 @@ func (m *Model) generateCommandBarSuggestions() []ui.Suggestion {
 					candidates = append(candidates, ns)
 				}
 			}
-			return filterSuggestionsTyped(candidates, prefix, "namespace")
+			return filterSuggestionsFuzzy(candidates, prefix, "namespace")
 		}
 		// First token: still show matching resource types.
 		return completeResourceJump(input, m.resourceTypeItems())
@@ -502,6 +502,7 @@ func setOptions() []string {
 		"linenumbers", "nolinenumbers",
 		"timestamps", "notimestamps",
 		"follow", "nofollow",
+		"ansi", "noansi",
 	}
 }
 
@@ -640,10 +641,17 @@ func (m *Model) contextNames() []string {
 	return names
 }
 
-// namespaceNames returns cached namespace names for completion.
-// The cache is populated asynchronously when the command bar opens.
+// namespaceNames returns cached namespace names for completion in the
+// current nav context. Each tab has its own nav.Context, so keying by
+// context keeps completions correct across tab switches and `:ctx`
+// changes within a tab. The cache is populated asynchronously when the
+// command bar opens for a context that isn't cached yet.
+//
+// A stale entry (older than namespaceCacheTTL) is still returned here
+// so completions remain visible while a background refresh runs; the
+// refresh is scheduled from handleKeyCommandBar.
 func (m *Model) namespaceNames() []string {
-	return m.cachedNamespaces
+	return m.cachedNamespaces[m.activeContext()].names
 }
 
 // resourceNames returns unique resource names from the middle column.

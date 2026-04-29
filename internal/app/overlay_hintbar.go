@@ -27,13 +27,13 @@ func (m Model) overlayHintBarDialog() string {
 	switch m.overlay {
 	case overlayConfirm:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "y", Desc: "confirm"},
-			{Key: "n", Desc: "cancel"},
+			{Key: "Enter", Desc: "confirm"},
+			{Key: "Esc", Desc: "cancel"},
 		})
 	case overlayQuitConfirm:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "y", Desc: "quit"},
-			{Key: "n", Desc: "cancel"},
+			{Key: "Enter", Desc: "quit"},
+			{Key: "Esc", Desc: "cancel"},
 		})
 	case overlayConfirmType:
 		return m.renderHints([]ui.HintEntry{
@@ -71,11 +71,13 @@ func (m Model) overlayHintBarDialog() string {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "jk", Desc: "nav"},
 			{Key: "Enter", Desc: "rollback"},
+			{Key: "y", Desc: "copy"},
 			{Key: "esc", Desc: "cancel"},
 		})
 	case overlayHelmHistory:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "jk", Desc: "nav"},
+			{Key: "y", Desc: "copy"},
 			{Key: "esc", Desc: "close"},
 		})
 	}
@@ -88,7 +90,7 @@ func (m Model) overlayHintBarSelector() string {
 	case overlayNamespace:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "space", Desc: "select"},
-			{Key: "c", Desc: "clear"},
+			{Key: "A", Desc: "all"},
 			{Key: "enter", Desc: "apply"},
 			{Key: "/", Desc: "filter"},
 			{Key: "esc", Desc: "close"},
@@ -221,18 +223,27 @@ func (m Model) overlayHintBarBookmarks() string {
 		})
 	case bookmarkModeConfirmDelete:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "y", Desc: "confirm delete"},
-			{Key: "n", Desc: "cancel"},
+			{Key: "Enter", Desc: "delete"},
+			{Key: "Esc", Desc: "cancel"},
 		})
 	case bookmarkModeConfirmDeleteAll:
 		return m.renderHints([]ui.HintEntry{
-			{Key: "y", Desc: "confirm delete all"},
-			{Key: "n", Desc: "cancel"},
+			{Key: "Enter", Desc: "delete all"},
+			{Key: "Esc", Desc: "cancel"},
 		})
 	default:
+		// tab desc flips with state: "load ns" when the user can arm
+		// the flag, "don't load" when it's already armed. That keeps
+		// the hint readable as the verb for the action Tab will
+		// perform next, matching what they see in the title chip.
+		tabDesc := "load ns"
+		if m.bookmarkLoadNamespace {
+			tabDesc = "don't load ns"
+		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "a-z/0-9", Desc: "jump"},
 			{Key: "enter", Desc: "jump"},
+			{Key: "tab", Desc: tabDesc},
 			{Key: "/", Desc: "filter"},
 			{Key: "ctrl+x", Desc: "delete"},
 			{Key: "alt+x", Desc: "delete all"},
@@ -421,10 +432,10 @@ func (m Model) overlayHintBarOverlayColumnToggle() string {
 	return m.renderHints([]ui.HintEntry{
 		{Key: "space", Desc: "toggle"},
 		{Key: "J/K", Desc: "reorder"},
-		{Key: "enter", Desc: "apply"},
 		{Key: "c", Desc: "clear"},
 		{Key: "R", Desc: "reset"},
 		{Key: "/", Desc: "filter"},
-		{Key: "esc", Desc: "close"},
+		{Key: "Enter", Desc: "save"},
+		{Key: "Esc", Desc: "discard"},
 	})
 }

@@ -72,45 +72,45 @@ func TestIsFailingResult(t *testing.T) {
 
 func TestParsePolicyReport(t *testing.T) {
 	pr := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "wgpolicyk8s.io/v1alpha2",
 			"kind":       "PolicyReport",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": "prod",
 				"name":      "polr-ns-prod",
 			},
-			"results": []interface{}{
-				map[string]interface{}{
+			"results": []any{
+				map[string]any{
 					"policy":   "require-labels",
 					"rule":     "check-team-label",
 					"result":   "fail",
 					"severity": "high",
 					"message":  "label 'team' is required",
 					"category": "Best Practices",
-					"resources": []interface{}{
-						map[string]interface{}{
+					"resources": []any{
+						map[string]any{
 							"kind":      "Deployment",
 							"name":      "api",
 							"namespace": "prod",
 						},
 					},
 				},
-				map[string]interface{}{
+				map[string]any{
 					"policy":   "disallow-latest",
 					"rule":     "validate-image-tag",
 					"result":   "pass",
 					"severity": "medium",
 					"message":  "image tag is not latest",
 				},
-				map[string]interface{}{
+				map[string]any{
 					"policy":   "restrict-host-ports",
 					"rule":     "no-host-ports",
 					"result":   "fail",
 					"severity": "critical",
 					"message":  "host ports are not allowed",
 					"category": "security",
-					"resources": []interface{}{
-						map[string]interface{}{
+					"resources": []any{
+						map[string]any{
 							"kind":      "Pod",
 							"name":      "web",
 							"namespace": "prod",
@@ -147,27 +147,27 @@ func TestParsePolicyReport(t *testing.T) {
 // absent, the report-level scope field is used (Kyverno sets this).
 func TestParsePolicyReportWithScope(t *testing.T) {
 	pr := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "wgpolicyk8s.io/v1alpha2",
 			"kind":       "PolicyReport",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": "prod",
 				"name":      "polr-deploy-api",
 			},
-			"scope": map[string]interface{}{
+			"scope": map[string]any{
 				"kind":      "Deployment",
 				"name":      "api",
 				"namespace": "prod",
 			},
-			"results": []interface{}{
-				map[string]interface{}{
+			"results": []any{
+				map[string]any{
 					"policy":   "require-labels",
 					"rule":     "check-team-label",
 					"result":   "fail",
 					"severity": "high",
 					"message":  "label 'team' is required",
 				},
-				map[string]interface{}{
+				map[string]any{
 					"policy":   "disallow-latest",
 					"rule":     "validate-image-tag",
 					"result":   "fail",
@@ -190,11 +190,11 @@ func TestParsePolicyReportWithScope(t *testing.T) {
 
 func TestParsePolicyReportEmptyResults(t *testing.T) {
 	pr := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "wgpolicyk8s.io/v1alpha2",
 			"kind":       "PolicyReport",
-			"metadata":   map[string]interface{}{"namespace": "default", "name": "empty"},
-			"results":    []interface{}{},
+			"metadata":   map[string]any{"namespace": "default", "name": "empty"},
+			"results":    []any{},
 		},
 	}
 	assert.Nil(t, parsePolicyReport(pr))
@@ -202,22 +202,22 @@ func TestParsePolicyReportEmptyResults(t *testing.T) {
 
 func TestFetchWithFakeClient(t *testing.T) {
 	pr := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "wgpolicyk8s.io/v1alpha2",
 			"kind":       "PolicyReport",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": "default",
 				"name":      "polr-1",
 			},
-			"results": []interface{}{
-				map[string]interface{}{
+			"results": []any{
+				map[string]any{
 					"policy":   "require-ro-rootfs",
 					"rule":     "check-ro-rootfs",
 					"result":   "fail",
 					"severity": "medium",
 					"message":  "root filesystem must be read-only",
-					"resources": []interface{}{
-						map[string]interface{}{
+					"resources": []any{
+						map[string]any{
 							"kind": "Pod", "name": "app", "namespace": "default",
 						},
 					},

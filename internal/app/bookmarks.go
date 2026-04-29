@@ -48,7 +48,9 @@ func loadBookmarks() []model.Bookmark {
 	if bm := loadBookmarksFromFile(bakPath); bm != nil {
 		logger.Info("Loaded bookmarks from backup file", "path", bakPath)
 		// Restore the primary file from backup.
-		_ = saveBookmarks(bm)
+		if err := saveBookmarks(bm); err != nil {
+			logger.Error("Failed to restore bookmarks from backup", "error", err, "path", path)
+		}
 		return bm
 	}
 	return nil
@@ -57,11 +59,18 @@ func loadBookmarks() []model.Bookmark {
 // loadBookmarksFromFile reads and parses bookmarks from a specific file path.
 func loadBookmarksFromFile(path string) []model.Bookmark {
 	data, err := os.ReadFile(path)
-	if err != nil || len(data) == 0 {
+	if err != nil {
+		if !os.IsNotExist(err) {
+			logger.Warn("Failed to read bookmarks", "error", err, "path", path)
+		}
+		return nil
+	}
+	if len(data) == 0 {
 		return nil
 	}
 	var bookmarks []model.Bookmark
 	if err := yaml.Unmarshal(data, &bookmarks); err != nil {
+		logger.Warn("Bookmarks file is corrupt; trying backup", "error", err, "path", path)
 		return nil
 	}
 	return bookmarks

@@ -110,10 +110,15 @@ func (c *Client) GetAllPodMetrics(ctx context.Context, contextName, namespace st
 			if err != nil {
 				continue
 			}
-			key := pm.Name
-			if namespace == "" {
-				key = pm.Namespace + "/" + pm.Name
-			}
+			// Always key by "namespace/name" so callers can build lookup
+			// keys the same way regardless of whether the query was scoped
+			// to a single namespace or ran across all namespaces. The
+			// metrics-enrichment handler on the app side always builds
+			// its keys from the item's Namespace + Name, and a previous
+			// conditional key format here silently broke enrichment in
+			// single-namespace mode (map had bare "pod-a" but the lookup
+			// was "default/pod-a").
+			key := pm.Namespace + "/" + pm.Name
 			result[key] = *pm
 		}
 		return result, nil

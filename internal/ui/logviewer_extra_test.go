@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // --- highlightSearchMatches ---
@@ -189,5 +191,53 @@ func TestRenderPlainLines(t *testing.T) {
 		lines := []string{"a", "b"}
 		result := renderPlainLines(lines, 5, 3, 80, false, 0, -1, -1, -1, -1, 0, 0, 0)
 		assert.Empty(t, result)
+	})
+
+	// Regression: visual selection over a kyverno-style log row used to
+	// rune-truncate the line before handing it to RenderVisualSelection.
+	// Each embedded "\x1b[NNm" costs 4-5 rune slots while contributing zero
+	// visual width, so the rune cap chopped lines off way before the
+	// configured width budget — visible content was replaced by trailing
+	// spaces from FillLinesBg's pad-to-width pass and "0m" / "[NNm"
+	// fragments leaked from the cut-mid-CSI tail.
+	t.Run("selection over ANSI-heavy line keeps full visible width", func(t *testing.T) {
+		// Real kyverno log row: every field is wrapped in its own SGR pair,
+		// so the rune count balloons past the visual width budget. With
+		// rune-based truncation at width=120 the line was cut around
+		// character 80 of visible content (the first ~40 rune slots get
+		// eaten by ANSI bytes), and FillLinesBg padded the rest with
+		// spaces. The user reported seeing the row chop off mid-word.
+		line := "\x1b[90m2026-04-27T16:07:08Z \x1b[0m \x1b[34mTRC \x1b[0m " +
+			"\x1b[1mgithub.com/kyverno/kyverno/pkg/controllers/admissionpolicygenerator/cpol.go:12 " +
+			"\x1b[0m \x1b[36m > \x1b[0m policy created \x1b[36mkind=\x1b[0mClusterPolicy"
+
+		// Width tight enough that we'd lose the ClusterPolicy tail to a
+		// rune-based truncate (rune count exceeds the budget) but loose
+		// enough that the visible content still fits within the visual
+		// budget.
+		const width = 170
+		require.Greater(t, len([]rune(line)), width,
+			"test premise: rune count must exceed width so the OLD rune-truncate would have chopped the line")
+		require.LessOrEqual(t, ansi.StringWidth(line), width-1,
+			"test premise: visible width must fit so the NEW visual-truncate keeps every char")
+
+		result := renderPlainLines(
+			[]string{line},
+			0, 1, width,
+			false, 0,
+			0,    // cursor
+			0, 0, // selStart, selEnd (single-line selection)
+			0,    // visualStart
+			'V',  // visualType: line mode
+			0, 0, // visualCol, visualCurCol
+		)
+		require.Len(t, result, 1)
+
+		stripped := strings.TrimSpace(ansi.Strip(result[0]))
+		// The full visible payload — including the trailing ClusterPolicy
+		// — must reach the output even though the line carries lots of
+		// embedded ANSI.
+		assert.Contains(t, stripped, "ClusterPolicy",
+			"trailing visible content must survive the visual-width-aware pre-trim (got %q)", stripped)
 	})
 }

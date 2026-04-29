@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -39,26 +40,168 @@ func TestSearchMatches(t *testing.T) {
 // --- searchMatchesItem ---
 
 func TestSearchMatchesItem(t *testing.T) {
-	m := Model{
-		nav: model.NavigationState{Level: model.LevelResources},
-	}
-
 	t.Run("matches by name", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
 		item := model.Item{Name: "nginx-deployment"}
 		assert.True(t, m.searchMatchesItem(item, []string{"nginx"}))
 	})
 
-	t.Run("matches by category", func(t *testing.T) {
+	t.Run("does NOT match by category at LevelResourceTypes", func(t *testing.T) {
+		// Categories render as visible bars at the resource-types
+		// level (Workloads, Networking, Argo CD, …) and the renderer
+		// highlights matching text in those bars independently of
+		// searchMatchesItem. But matching every item that *belongs*
+		// to a matched category turned n/N into a tour of every
+		// resource type under it — e.g. "/ing" visited every item
+		// in "Networking" because the category name contains "ing".
+		// User-reported nonsense: don't multiply matches by category
+		// membership. Bar highlight stays (renderer path), n/N only
+		// hops between name matches.
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		item := model.Item{Name: "Services", Category: "Networking"}
+		assert.False(t, m.searchMatchesItem(item, []string{"ing"}),
+			"category match would make n/N visit every Networking item "+
+				"when searching for a substring in the category name")
+	})
+
+	t.Run("does NOT match by category at deeper levels either", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
 		item := model.Item{Name: "my-pod", Category: "Workloads"}
-		assert.True(t, m.searchMatchesItem(item, []string{"workloads"}))
+		assert.False(t, m.searchMatchesItem(item, []string{"workloads"}),
+			"category match outside LevelResourceTypes would jump to non-highlighted rows")
+	})
+
+	t.Run("name match still works under a matching category", func(t *testing.T) {
+		// Sanity: removing the category branch must not block name
+		// matches for items that happen to also share a category
+		// with the query. Searching "ing" still finds Ingress.
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		item := model.Item{Name: "Ingresses", Category: "Networking"}
+		assert.True(t, m.searchMatchesItem(item, []string{"ing"}),
+			"name match must still fire when category also contains the query")
+	})
+}
+
+// --- searchMatchIndices: two-pass match (name first, category fallback) ---
+
+func TestSearchMatchIndices(t *testing.T) {
+	// Realistic LevelResourceTypes listing — sorted into categories.
+	items := []model.Item{
+		{Name: "Pods", Category: "Workloads"},
+		{Name: "Deployments", Category: "Workloads"},
+		{Name: "Services", Category: "Networking"},
+		{Name: "Ingresses", Category: "Networking"},
+		{Name: "NetworkPolicies", Category: "Networking"},
+		{Name: "Applications", Category: "Argo CD"},
+		{Name: "ApplicationSets", Category: "Argo CD"},
+		{Name: "Monitoring", Category: "Dashboards"},
+	}
+
+	t.Run("default mode: only name matches, no category fallback", func(t *testing.T) {
+		// Plain `/argo` (no Tab) at LevelResourceTypes: no resource
+		// type name contains "argo" so nothing matches. Without Tab
+		// (broad mode off) the category fallback stays dormant.
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		got := m.searchMatchIndices(items, []string{"argo"})
+		assert.Empty(t, got,
+			"default search must NOT fall back to categories — Tab is the explicit opt-in")
+	})
+
+	t.Run("default mode: name matches present, category not pulled in", func(t *testing.T) {
+		// "/ing" matches Ingresses and Monitoring by NAME. Services
+		// and NetworkPolicies are in Networking (whose name contains
+		// "ing") but their NAMES do not match — they must NOT appear
+		// in the result. This is the original "iterates through all
+		// networking items" regression.
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		got := m.searchMatchIndices(items, []string{"ing"})
+
+		// Pods=0, Deployments=1, Services=2, Ingresses=3, NetworkPolicies=4,
+		// Applications=5, ApplicationSets=6, Monitoring=7.
+		assert.Equal(t, []int{3, 7}, got,
+			"only items whose Name contains 'ing' should match — "+
+				"Services and NetworkPolicies (Networking) must not be included")
+	})
+
+	t.Run("broad mode at LevelResourceTypes: category match yields all members", func(t *testing.T) {
+		// Tab + `/argo`: no resource type name contains "argo", but
+		// the "Argo CD" category matches → cycle through every item
+		// under it. Both Applications and ApplicationSets are in.
+		m := Model{
+			nav:             model.NavigationState{Level: model.LevelResourceTypes},
+			searchBroadMode: true,
+		}
+		got := m.searchMatchIndices(items, []string{"argo"})
+
+		// Applications=5, ApplicationSets=6.
+		assert.Equal(t, []int{5, 6}, got,
+			"with broad mode on, every item of a matched category should be a "+
+				"hit so n/N cycles through them all")
+	})
+
+	t.Run("broad mode at LevelResourceTypes: name matches + category members combined", func(t *testing.T) {
+		// Tab + `/ing`: name matches (Ingresses=3, Monitoring=7) UNION
+		// every item of categories whose name matches "ing"
+		// (Networking → Services=2, Ingresses=3, NetworkPolicies=4).
+		// Result is the union, sorted by item index, deduplicated.
+		m := Model{
+			nav:             model.NavigationState{Level: model.LevelResourceTypes},
+			searchBroadMode: true,
+		}
+		got := m.searchMatchIndices(items, []string{"ing"})
+		assert.Equal(t, []int{2, 3, 4, 7}, got,
+			"broad mode unions name matches with all members of matched categories")
+	})
+
+	t.Run("broad mode at LevelResourceTypes: multiple matched categories include all their items", func(t *testing.T) {
+		multiCat := []model.Item{
+			{Name: "AAA", Category: "Group-X"},
+			{Name: "BBB", Category: "Group-X"},
+			{Name: "CCC", Category: "Group-Y"},
+			{Name: "DDD", Category: "Group-Y"},
+		}
+		m := Model{
+			nav:             model.NavigationState{Level: model.LevelResourceTypes},
+			searchBroadMode: true,
+		}
+		got := m.searchMatchIndices(multiCat, []string{"group"})
+
+		assert.Equal(t, []int{0, 1, 2, 3}, got,
+			"every member of every matched category is included")
+	})
+
+	t.Run("no matches at all returns nil", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResourceTypes}}
+		got := m.searchMatchIndices(items, []string{"zzz-no-match"})
+		assert.Nil(t, got)
+	})
+
+	t.Run("broad mode outside LevelResourceTypes: category fallback stays off", func(t *testing.T) {
+		// At deeper levels the category bar isn't rendered. Tab there
+		// means "also match column values" via searchMatchesItem; the
+		// category fallback must NOT fire even when broad mode is on.
+		m := Model{
+			nav:             model.NavigationState{Level: model.LevelResources},
+			searchBroadMode: true,
+		}
+		levelItems := []model.Item{
+			{Name: "alpha", Category: "Argo CD"},
+			{Name: "beta", Category: "Argo CD"},
+		}
+		got := m.searchMatchIndices(levelItems, []string{"argo"})
+		assert.Empty(t, got,
+			"category fallback must stay disabled outside LevelResourceTypes "+
+				"even with broad mode on")
 	})
 
 	t.Run("does not match by namespace alone", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
 		item := model.Item{Name: "my-pod", Namespace: "production"}
 		assert.False(t, m.searchMatchesItem(item, []string{"production"}))
 	})
 
 	t.Run("no match", func(t *testing.T) {
+		m := Model{nav: model.NavigationState{Level: model.LevelResources}}
 		item := model.Item{Name: "nginx"}
 		assert.False(t, m.searchMatchesItem(item, []string{"redis"}))
 	})
@@ -396,6 +539,61 @@ func TestPush4HandleFilterKeyEnter(t *testing.T) {
 	assert.False(t, rm.filterActive)
 }
 
+// TestHandleFilterKeyEnterInvalidatesPreview verifies that confirming a
+// filter (Enter) invalidates the right pane: rightItems cleared,
+// previewLoading armed, and requestGen bumped. Without this, the cursor
+// jumps to the first filter match but the right pane keeps rendering the
+// previous selection's children for several seconds until the new
+// preview fetch returns — the regression the user reported as "search
+// for pvc, jump on it, but it still shows services for 3-4 seconds".
+func TestHandleFilterKeyEnterInvalidatesPreview(t *testing.T) {
+	m := basePush4Model()
+	m.filterActive = true
+	m.requestGen = 5
+	m.rightItems = []model.Item{{Name: "services-preview"}}
+	m.previewLoading = false
+
+	result, _ := m.handleFilterKey(keyMsg("enter"))
+	rm := result.(Model)
+
+	assert.Nil(t, rm.rightItems, "stale preview items from the prior cursor must be cleared")
+	assert.True(t, rm.previewLoading, "previewLoading must be armed so the spinner shows during the new fetch")
+	assert.Greater(t, rm.requestGen, uint64(5), "requestGen must bump so any in-flight pre-filter preview is discarded")
+}
+
+// TestHandleFilterKeyEscInvalidatesPreview mirrors the Enter case for the
+// Esc path: clearing the filter resets the cursor, and the preview must
+// refresh for the new cursor position.
+func TestHandleFilterKeyEscInvalidatesPreview(t *testing.T) {
+	m := basePush4Model()
+	m.filterActive = true
+	m.requestGen = 3
+	m.rightItems = []model.Item{{Name: "old-preview"}}
+
+	result, _ := m.handleFilterKey(keyMsg("esc"))
+	rm := result.(Model)
+
+	assert.Nil(t, rm.rightItems, "rightItems must clear when esc resets the cursor")
+	assert.True(t, rm.previewLoading, "previewLoading must be armed")
+	assert.Greater(t, rm.requestGen, uint64(3))
+}
+
+// TestHandleSearchKeyEnterInvalidatesPreview covers the search-mode
+// (slash) analogue of the filter Enter case.
+func TestHandleSearchKeyEnterInvalidatesPreview(t *testing.T) {
+	m := basePush4Model()
+	m.searchActive = true
+	m.requestGen = 7
+	m.rightItems = []model.Item{{Name: "prev-preview"}}
+
+	result, _ := m.handleSearchKey(keyMsg("enter"))
+	rm := result.(Model)
+
+	assert.Nil(t, rm.rightItems, "confirming search must drop stale preview")
+	assert.True(t, rm.previewLoading)
+	assert.Greater(t, rm.requestGen, uint64(7))
+}
+
 func TestPush4HandleSearchKeyEsc(t *testing.T) {
 	m := basePush4Model()
 	m.searchActive = true
@@ -410,6 +608,259 @@ func TestPush4HandleSearchKeyEnter(t *testing.T) {
 	result, _ := m.handleSearchKey(keyMsg("enter"))
 	rm := result.(Model)
 	assert.False(t, rm.searchActive)
+}
+
+// --- search/filter history navigation (up/down) ---
+
+// TestHandleFilterKeyUpRecallsHistory exercises the user-facing feature:
+// pressing Up while the filter input is open replaces the input with the
+// most-recent persisted query. Primary acceptance test for query recall.
+func TestHandleFilterKeyUpRecallsHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("kube-system")
+	m.queryHistory.add("default")
+	m.filterActive = true
+
+	result, _ := m.handleFilterKey(keyMsg("up"))
+	rm := result.(Model)
+
+	// Most recent entry surfaces first; filterText must mirror the input
+	// so visibleMiddleItems narrows immediately, not on the next keystroke.
+	assert.Equal(t, "default", rm.filterInput.Value)
+	assert.Equal(t, "default", rm.filterText)
+}
+
+// TestHandleFilterKeyUpDownCycles walks the full up/up/down sequence to
+// pin the cycling semantics: Up moves to older entries, Down moves
+// toward newer + finally restores the draft when past the newest.
+func TestHandleFilterKeyUpDownCycles(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("first")
+	m.queryHistory.add("second")
+	m.filterActive = true
+	m.filterInput.Set("partial-typed")
+
+	// Up: most recent → "second", original input saved as draft.
+	result, _ := m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	assert.Equal(t, "second", m.filterInput.Value)
+
+	// Up again: older → "first".
+	result, _ = m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	assert.Equal(t, "first", m.filterInput.Value)
+
+	// Down: back toward newer → "second".
+	result, _ = m.handleFilterKey(keyMsg("down"))
+	m = result.(Model)
+	assert.Equal(t, "second", m.filterInput.Value)
+
+	// Down past newest: draft restored.
+	result, _ = m.handleFilterKey(keyMsg("down"))
+	m = result.(Model)
+	assert.Equal(t, "partial-typed", m.filterInput.Value)
+}
+
+// TestHandleFilterKeyEnterPersistsToHistory pins the contract that
+// Enter both confirms the filter AND records it for next session — the
+// "people search the same things" motivation for persistence.
+func TestHandleFilterKeyEnterPersistsToHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.filterActive = true
+	m.filterInput.Set("nginx")
+
+	result, _ := m.handleFilterKey(keyMsg("enter"))
+	rm := result.(Model)
+
+	assert.Equal(t, []string{"nginx"}, rm.queryHistory.entries)
+}
+
+// TestHandleSearchKeyUpRecallsHistory is the analogue for the / search
+// path: Up replaces the search input with the most-recent saved query.
+func TestHandleSearchKeyUpRecallsHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("redis")
+	m.queryHistory.add("nginx")
+	m.searchActive = true
+
+	result, _ := m.handleSearchKey(keyMsg("up"))
+	rm := result.(Model)
+
+	assert.Equal(t, "nginx", rm.searchInput.Value)
+}
+
+// TestHandleSearchKeyEnterPersistsToHistory pins the / search Enter
+// path: confirming a search saves it for recall in a later session.
+func TestHandleSearchKeyEnterPersistsToHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.searchActive = true
+	m.searchInput.Set("payments")
+
+	result, _ := m.handleSearchKey(keyMsg("enter"))
+	rm := result.(Model)
+
+	assert.Equal(t, []string{"payments"}, rm.queryHistory.entries)
+}
+
+// TestSearchAndFilterShareHistory pins the design decision that `/` and
+// `f` write to and read from a single shared history. A query confirmed
+// in one mode must be recallable from the other — without this, users
+// who happen to remember "I typed nginx as a search" vs. "as a filter"
+// see different recall results, which was the awkwardness the merge was
+// meant to remove.
+func TestSearchAndFilterShareHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+
+	// Confirm a query in filter mode.
+	m.filterActive = true
+	m.filterInput.Set("nginx")
+	result, _ := m.handleFilterKey(keyMsg("enter"))
+	m = result.(Model)
+
+	// Now switch to search mode and press Up — must recall the filter
+	// query. Validates a single shared store backs both inputs.
+	m.searchActive = true
+	m.searchInput.Clear()
+	result, _ = m.handleSearchKey(keyMsg("up"))
+	rm := result.(Model)
+
+	assert.Equal(t, "nginx", rm.searchInput.Value, "search must recall a query confirmed in filter mode")
+}
+
+// TestHandleKeyFilterResetsHistoryCursor guards the "fresh session"
+// invariant: opening the filter with `f` resets the history cursor so
+// the first Up always starts from the newest entry, not from wherever
+// a prior session left off.
+func TestHandleKeyFilterResetsHistoryCursor(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: 0, draft: "stale"}
+
+	rm := m.handleKeyFilter()
+
+	assert.Equal(t, -1, rm.queryHistory.cursor)
+	assert.Empty(t, rm.queryHistory.draft)
+}
+
+// TestHandleKeySearchResetsHistoryCursor mirrors the filter case for
+// the / search entry point.
+func TestHandleKeySearchResetsHistoryCursor(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: 2, draft: "stale"}
+
+	rm := m.handleKeySearch()
+
+	assert.Equal(t, -1, rm.queryHistory.cursor)
+	assert.Empty(t, rm.queryHistory.draft)
+}
+
+// TestHandleFilterKeyEditAfterRecallPreservesEdits pins the fix for the
+// "edits to a recalled query are silently dropped" UX bug. Sequence:
+// type a draft, Up to recall an entry, edit the recalled text, Down past
+// the newest entry. The expected behavior is that Down restores the
+// edited text — not the pre-recall draft. Without resetting the cursor
+// on a typing keystroke, the history navigation state lingers and the
+// edits get overwritten.
+func TestHandleFilterKeyEditAfterRecallPreservesEdits(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("default")
+	m.filterActive = true
+	m.filterInput.Set("ngi")
+
+	// Up: recall "default", original draft "ngi" is saved.
+	result, _ := m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	require.Equal(t, "default", m.filterInput.Value)
+
+	// User edits the recalled text by typing one character. This should
+	// "leave" history navigation — cursor reset, original draft cleared.
+	result, _ = m.handleFilterKey(keyMsg("x"))
+	m = result.(Model)
+	assert.Equal(t, "defaultx", m.filterInput.Value)
+	assert.Equal(t, -1, m.queryHistory.cursor, "typing must reset history cursor")
+
+	// Up again now saves "defaultx" as the new draft and jumps to the
+	// most-recent entry.
+	result, _ = m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	assert.Equal(t, "default", m.filterInput.Value)
+
+	// Down past newest must restore the edited text, not "ngi".
+	result, _ = m.handleFilterKey(keyMsg("down"))
+	m = result.(Model)
+	assert.Equal(t, "defaultx", m.filterInput.Value)
+}
+
+// TestHandleFilterKeyBackspaceAfterRecallResetsHistory: backspace is
+// also an edit and must reset the history cursor. Same rationale as
+// TestHandleFilterKeyEditAfterRecallPreservesEdits.
+func TestHandleFilterKeyBackspaceAfterRecallResetsHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("default")
+	m.filterActive = true
+	m.filterInput.Set("ngi")
+
+	result, _ := m.handleFilterKey(keyMsg("up"))
+	m = result.(Model)
+	require.Equal(t, "default", m.filterInput.Value)
+
+	result, _ = m.handleFilterKey(keyMsg("backspace"))
+	m = result.(Model)
+	assert.Equal(t, "defaul", m.filterInput.Value)
+	assert.Equal(t, -1, m.queryHistory.cursor, "backspace must reset history cursor")
+}
+
+// TestHandleSearchKeyEditAfterRecallPreservesEdits is the / search
+// counterpart to the filter test.
+func TestHandleSearchKeyEditAfterRecallPreservesEdits(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("redis")
+	m.searchActive = true
+	m.searchInput.Set("ngi")
+
+	result, _ := m.handleSearchKey(keyMsg("up"))
+	m = result.(Model)
+	require.Equal(t, "redis", m.searchInput.Value)
+
+	result, _ = m.handleSearchKey(keyMsg("x"))
+	m = result.(Model)
+	assert.Equal(t, "redisx", m.searchInput.Value)
+	assert.Equal(t, -1, m.queryHistory.cursor, "typing must reset history cursor")
+
+	result, _ = m.handleSearchKey(keyMsg("up"))
+	m = result.(Model)
+	assert.Equal(t, "redis", m.searchInput.Value)
+
+	result, _ = m.handleSearchKey(keyMsg("down"))
+	m = result.(Model)
+	assert.Equal(t, "redisx", m.searchInput.Value)
+}
+
+// TestHandleSearchKeyBackspaceAfterRecallResetsHistory: backspace must
+// also reset history navigation in / search mode.
+func TestHandleSearchKeyBackspaceAfterRecallResetsHistory(t *testing.T) {
+	m := basePush4Model()
+	m.queryHistory = &commandHistory{cursor: -1}
+	m.queryHistory.add("redis")
+	m.searchActive = true
+	m.searchInput.Set("ngi")
+
+	result, _ := m.handleSearchKey(keyMsg("up"))
+	m = result.(Model)
+	require.Equal(t, "redis", m.searchInput.Value)
+
+	result, _ = m.handleSearchKey(keyMsg("backspace"))
+	m = result.(Model)
+	assert.Equal(t, "redi", m.searchInput.Value)
+	assert.Equal(t, -1, m.queryHistory.cursor, "backspace must reset history cursor")
 }
 
 func TestCovHandleFilterKeyEnter(t *testing.T) {
@@ -484,13 +935,17 @@ func TestCovHandleFilterKeyInsert(t *testing.T) {
 }
 
 func TestCovHelpKeySearchEsc(t *testing.T) {
+	// Under the new search-vs-filter split: Esc inside the / search
+	// input cancels the search (clears helpSearchQuery) and exits the
+	// input. The filter is independent and untouched.
 	m := baseModelSearch()
 	m.helpSearchActive = true
-	m.helpFilter.Insert("test")
+	m.helpSearchQuery = "test"
+	m.helpSearchInput.SetValue("test")
 	result, _ := m.handleHelpKey(keyMsg("esc"))
 	rm := result.(Model)
 	assert.False(t, rm.helpSearchActive)
-	assert.Empty(t, rm.helpFilter.Value)
+	assert.Empty(t, rm.helpSearchQuery)
 }
 
 func TestCovHelpKeySearchEnter(t *testing.T) {
@@ -558,10 +1013,15 @@ func TestCovHelpKeyGG(t *testing.T) {
 }
 
 func TestCovHelpKeyBigG(t *testing.T) {
+	// G clamps to the actual max scroll (totalLines - viewport) so a
+	// follow-up ctrl+u responds on the first press. The old impl parked
+	// the model at the 9999 sentinel and required dozens of ctrl+u
+	// keystrokes to undo phantom scroll.
 	m := baseModelSearch()
 	result, _ := m.handleHelpKey(keyMsg("G"))
 	rm := result.(Model)
-	assert.Equal(t, 9999, rm.helpScroll)
+	assert.Less(t, rm.helpScroll, 9999, "G must clamp the sentinel to actual max")
+	assert.Greater(t, rm.helpScroll, 0, "G should still scroll past the top")
 }
 
 func TestCovHelpKeyCtrlD(t *testing.T) {

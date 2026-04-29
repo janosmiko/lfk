@@ -12,12 +12,12 @@ import (
 
 func TestPopulateResourceDetailsExt_FluxCD_NonMapCondition(t *testing.T) {
 	// A non-map condition entry in FluxCD status should be skipped (line 76-77).
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{},
-		"status": map[string]interface{}{
-			"conditions": []interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{},
+		"status": map[string]any{
+			"conditions": []any{
 				"not-a-map",
-				map[string]interface{}{
+				map[string]any{
 					"type":   "Ready",
 					"status": "True",
 					"reason": "Success",
@@ -25,8 +25,8 @@ func TestPopulateResourceDetailsExt_FluxCD_NonMapCondition(t *testing.T) {
 			},
 		},
 	}
-	status, _ := obj["status"].(map[string]interface{})
-	spec, _ := obj["spec"].(map[string]interface{})
+	status, _ := obj["status"].(map[string]any)
+	spec, _ := obj["spec"].(map[string]any)
 	ti := &model.Item{}
 	populateResourceDetailsExt(ti, obj, "GitRepository", status, spec)
 
@@ -39,17 +39,17 @@ func TestPopulateResourceDetailsExt_FluxCD_NonMapCondition(t *testing.T) {
 
 func TestPopulateResourceDetailsExt_Event(t *testing.T) {
 	// The Event case should dispatch to populateEvent (line 116-117).
-	obj := map[string]interface{}{
+	obj := map[string]any{
 		"type":          "Warning",
 		"reason":        "FailedScheduling",
 		"message":       "0/3 nodes are available",
 		"lastTimestamp": "2026-01-15T10:00:00Z",
 		"count":         float64(5),
-		"involvedObject": map[string]interface{}{
+		"involvedObject": map[string]any{
 			"kind": "Pod",
 			"name": "my-pod",
 		},
-		"source": map[string]interface{}{
+		"source": map[string]any{
 			"component": "default-scheduler",
 		},
 	}
@@ -69,20 +69,20 @@ func TestPopulateResourceDetailsExt_Event(t *testing.T) {
 
 func TestPopulateArgoCDApplication_SyncResultNonMapResource(t *testing.T) {
 	// A non-map resource entry in syncResult should be skipped (line 255-256).
-	obj := map[string]interface{}{}
-	status := map[string]interface{}{
-		"health": map[string]interface{}{
+	obj := map[string]any{}
+	status := map[string]any{
+		"health": map[string]any{
 			"status": "Healthy",
 		},
-		"sync": map[string]interface{}{
+		"sync": map[string]any{
 			"status": "Synced",
 		},
-		"operationState": map[string]interface{}{
+		"operationState": map[string]any{
 			"phase": "Succeeded",
-			"syncResult": map[string]interface{}{
-				"resources": []interface{}{
+			"syncResult": map[string]any{
+				"resources": []any{
 					"not-a-map",
-					map[string]interface{}{
+					map[string]any{
 						"kind":    "Deployment",
 						"name":    "my-app",
 						"status":  "SyncFailed",
@@ -103,12 +103,12 @@ func TestPopulateArgoCDApplication_SyncResultNonMapResource(t *testing.T) {
 
 func TestPopulateLimitRange_NonMapLimitEntry(t *testing.T) {
 	// A non-map limit entry should be skipped (line 448-449).
-	spec := map[string]interface{}{
-		"limits": []interface{}{
+	spec := map[string]any{
+		"limits": []any{
 			"not-a-map",
-			map[string]interface{}{
+			map[string]any{
 				"type": "Pod",
-				"max": map[string]interface{}{
+				"max": map[string]any{
 					"cpu": "2",
 				},
 			},
@@ -126,22 +126,22 @@ func TestPopulateLimitRange_NonMapLimitEntry(t *testing.T) {
 // --- populateResourceDetailsExt: cert-manager non-map condition ---
 
 func TestPopulateResourceDetailsExt_CertManager_NonMapCondition(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"secretName": "tls-secret",
 		},
-		"status": map[string]interface{}{
-			"conditions": []interface{}{
+		"status": map[string]any{
+			"conditions": []any{
 				"not-a-map",
-				map[string]interface{}{
+				map[string]any{
 					"type":   "Ready",
 					"status": "True",
 				},
 			},
 		},
 	}
-	status, _ := obj["status"].(map[string]interface{})
-	spec, _ := obj["spec"].(map[string]interface{})
+	status, _ := obj["status"].(map[string]any)
+	spec, _ := obj["spec"].(map[string]any)
 	ti := &model.Item{}
 	populateResourceDetailsExt(ti, obj, "Certificate", status, spec)
 

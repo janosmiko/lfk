@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -162,20 +163,29 @@ func TestNamespaceOverlaySpaceOnAllClearsSelection(t *testing.T) {
 	assert.True(t, result.allNamespaces)
 }
 
-func TestNamespaceOverlayCClearsSelection(t *testing.T) {
+// A inside the namespace selector mirrors A outside (kb.AllNamespaces):
+// flip to all-namespaces mode. The user expectation is muscle memory —
+// the same key shouldn't change meaning just because the overlay is open.
+// The cursor must also jump to the All-Namespaces row, otherwise a
+// follow-up Enter will treat the cursor's previous position as a
+// single-namespace selection and undo the all-ns flip.
+func TestNamespaceOverlayAEnablesAllNamespaces(t *testing.T) {
 	m := Model{
 		overlay:            overlayNamespace,
-		overlayItems:       []model.Item{{Name: "default"}},
+		overlayItems:       []model.Item{{Name: "All Namespaces", Status: "all"}, {Name: "default"}, {Name: "kube-system"}},
 		selectedNamespaces: map[string]bool{"default": true},
 		allNamespaces:      false,
+		overlayCursor:      2, // standing on "kube-system"
 		tabs:               []TabState{{}},
 		width:              80,
 		height:             40,
 	}
-	ret, _ := m.handleNamespaceNormalMode(runeKey('c'))
+	ret, _ := m.handleNamespaceNormalMode(runeKey('A'))
 	result := ret.(Model)
-	assert.Nil(t, result.selectedNamespaces)
-	assert.True(t, result.allNamespaces)
+	assert.Nil(t, result.selectedNamespaces, "A must clear individual selections")
+	assert.True(t, result.allNamespaces, "A must enable all-namespaces mode")
+	assert.Equal(t, 0, result.overlayCursor,
+		"A must move cursor to the All-Namespaces row so Enter applies all-ns")
 }
 
 // --- handleNamespaceFilterMode ---
@@ -208,6 +218,90 @@ func TestNamespaceFilterModeEnterCommits(t *testing.T) {
 	result := ret.(Model)
 	assert.False(t, result.nsFilterMode)
 	// Filter text is preserved after enter
+}
+
+// Filter narrows the list to a single concrete namespace: Enter must apply
+// it and close the overlay so the user does not have to press Enter again
+// on a one-row list.
+func TestNamespaceFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
+	items := []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default"},
+		{Name: "kube-system"},
+	}
+	m := Model{
+		overlay:       overlayNamespace,
+		nsFilterMode:  true,
+		overlayItems:  items,
+		overlayFilter: TextInput{Value: "kube"},
+		allNamespaces: true,
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
+	}
+	ret, cmd := m.handleNamespaceFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.nsFilterMode)
+	assert.Equal(t, overlayNone, result.overlay)
+	assert.Equal(t, "kube-system", result.namespace)
+	assert.True(t, result.selectedNamespaces["kube-system"])
+	assert.False(t, result.allNamespaces)
+	assert.NotNil(t, cmd)
+}
+
+// Two filtered results: Enter must keep the legacy behavior — exit filter
+// mode and let the user pick. Auto-applying would be a guess.
+func TestNamespaceFilterModeEnterDoesNotAutoApplyMultipleResults(t *testing.T) {
+	items := []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "kube-system"},
+		{Name: "kube-public"},
+	}
+	m := Model{
+		overlay:       overlayNamespace,
+		nsFilterMode:  true,
+		overlayItems:  items,
+		overlayFilter: TextInput{Value: "kube"},
+		allNamespaces: true,
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
+	}
+	ret, _ := m.handleNamespaceFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.nsFilterMode)
+	assert.Equal(t, overlayNamespace, result.overlay)
+	assert.Empty(t, result.selectedNamespaces)
+	assert.True(t, result.allNamespaces)
+}
+
+// User has been Space-toggling selections and then opens filter to refine.
+// Even if the filter narrows to one result, do not silently replace their
+// in-progress multi-selection — they pressed Enter to exit filter mode,
+// not to abandon the selections they already made.
+func TestNamespaceFilterModeEnterPreservesMultiSelect(t *testing.T) {
+	items := []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default"},
+		{Name: "kube-system"},
+	}
+	m := Model{
+		overlay:             overlayNamespace,
+		nsFilterMode:        true,
+		nsSelectionModified: true,
+		selectedNamespaces:  map[string]bool{"default": true},
+		overlayItems:        items,
+		overlayFilter:       TextInput{Value: "kube"},
+		tabs:                []TabState{{}},
+		width:               80,
+		height:              40,
+	}
+	ret, _ := m.handleNamespaceFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.nsFilterMode)
+	assert.Equal(t, overlayNamespace, result.overlay)
+	assert.True(t, result.selectedNamespaces["default"], "existing Space-toggled selection must survive")
+	assert.False(t, result.selectedNamespaces["kube-system"], "single filter match must not be auto-applied during multi-select")
 }
 
 func TestNamespaceFilterModeTyping(t *testing.T) {
@@ -856,4 +950,177 @@ func TestColorschemeFilterModeEnterCommits(t *testing.T) {
 	ret, _ := m.handleColorschemeFilterMode(specialKey(tea.KeyEnter))
 	result := ret.(Model)
 	assert.False(t, result.schemeFilterMode)
+}
+
+// Filter narrows to a single scheme: Enter must apply it and close the
+// overlay so the user does not have to press Enter again on a one-row list.
+func TestColorschemeFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
+	entries := []ui.SchemeEntry{
+		{Name: "Dark Themes", IsHeader: true},
+		{Name: "dracula"},
+		{Name: "gruvbox-dark"},
+	}
+	m := Model{
+		overlay:          overlayColorscheme,
+		schemeEntries:    entries,
+		schemeFilterMode: true,
+		schemeFilter:     TextInput{Value: "drac"},
+		tabs:             []TabState{{}},
+		width:            80,
+		height:           40,
+	}
+	ret, cmd := m.handleColorschemeFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.schemeFilterMode)
+	assert.Equal(t, overlayNone, result.overlay, "overlay must close")
+	assert.Empty(t, result.schemeFilter.Value, "filter must be cleared after commit")
+	assert.NotNil(t, cmd, "scheduleStatusClear command must be returned")
+}
+
+// --- y to copy cursor row from rollback overlays ---
+
+// The user is sizing up a rollback (deciding which revision to roll back to)
+// and wants to paste the row into a ticket / Slack. y must yank the cursor
+// row as a tab-separated line and keep the overlay open — pressing Enter
+// would actually trigger the rollback, which is destructive.
+func TestRollbackOverlayYCopiesCursorRow(t *testing.T) {
+	created := time.Date(2026, 4, 28, 12, 0, 0, 0, time.UTC)
+	revisions := []k8s.DeploymentRevision{
+		{Revision: 1, Name: "rs-1", Replicas: 3, Images: []string{"nginx:1"}, CreatedAt: created},
+		{Revision: 2, Name: "rs-2", Replicas: 5, Images: []string{"nginx:2"}, CreatedAt: created},
+	}
+	m := Model{
+		overlay:           overlayRollback,
+		rollbackRevisions: revisions,
+		rollbackCursor:    1,
+		tabs:              []TabState{{}},
+		width:             80,
+		height:            40,
+	}
+	ret, cmd := m.handleRollbackOverlayKey(runeKey('y'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayRollback, result.overlay, "overlay must stay open after copy")
+	assert.True(t, result.hasStatusMessage())
+	assert.Contains(t, result.statusMessage, "Copied revision 2")
+	assert.NotNil(t, cmd, "tea.Batch(copy, scheduleStatusClear) must be returned")
+}
+
+func TestRollbackOverlayYNoOpWhenEmpty(t *testing.T) {
+	m := Model{
+		overlay:           overlayRollback,
+		rollbackRevisions: nil,
+		tabs:              []TabState{{}},
+		width:             80,
+		height:            40,
+	}
+	ret, _ := m.handleRollbackOverlayKey(runeKey('y'))
+	result := ret.(Model)
+	assert.False(t, result.hasStatusMessage(), "no message when there is no row to copy")
+}
+
+func TestHelmRollbackOverlayYCopiesCursorRow(t *testing.T) {
+	revisions := []ui.HelmRevision{
+		{Revision: 1, Status: "deployed", Chart: "argo-cd-5.0.0", AppVersion: "2.4.0", Description: "Install complete", Updated: "2026-04-27"},
+		{Revision: 2, Status: "superseded", Chart: "argo-cd-5.1.0", AppVersion: "2.5.0", Description: "Upgrade complete", Updated: "2026-04-28"},
+	}
+	m := Model{
+		overlay:               overlayHelmRollback,
+		helmRollbackRevisions: revisions,
+		helmRollbackCursor:    1,
+		tabs:                  []TabState{{}},
+		width:                 80,
+		height:                40,
+	}
+	ret, cmd := m.handleHelmRollbackOverlayKey(runeKey('y'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayHelmRollback, result.overlay, "overlay must stay open after copy")
+	assert.True(t, result.hasStatusMessage())
+	assert.Contains(t, result.statusMessage, "Copied revision 2")
+	assert.NotNil(t, cmd)
+}
+
+func TestHelmRollbackOverlayYNoOpWhenEmpty(t *testing.T) {
+	m := Model{
+		overlay:               overlayHelmRollback,
+		helmRollbackRevisions: nil,
+		tabs:                  []TabState{{}},
+		width:                 80,
+		height:                40,
+	}
+	ret, _ := m.handleHelmRollbackOverlayKey(runeKey('y'))
+	result := ret.(Model)
+	assert.False(t, result.hasStatusMessage())
+}
+
+// Helm Release History overlay shares the row schema with Helm Rollback
+// but is read-only (no Enter binding). y must still copy the cursor row
+// so users can paste a revision into a ticket without first arming the
+// destructive overlay.
+func TestHelmHistoryOverlayYCopiesCursorRow(t *testing.T) {
+	revisions := []ui.HelmRevision{
+		{Revision: 1, Status: "deployed", Chart: "argo-cd-5.0.0", AppVersion: "2.4.0", Description: "Install complete", Updated: "2026-04-27"},
+		{Revision: 2, Status: "superseded", Chart: "argo-cd-5.1.0", AppVersion: "2.5.0", Description: "Upgrade complete", Updated: "2026-04-28"},
+	}
+	m := Model{
+		overlay:              overlayHelmHistory,
+		helmHistoryRevisions: revisions,
+		helmHistoryCursor:    1,
+		tabs:                 []TabState{{}},
+		width:                80,
+		height:               40,
+	}
+	ret, cmd := m.handleHelmHistoryOverlayKey(runeKey('y'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayHelmHistory, result.overlay, "overlay must stay open after copy")
+	assert.True(t, result.hasStatusMessage())
+	assert.Contains(t, result.statusMessage, "Copied revision 2")
+	assert.NotNil(t, cmd)
+}
+
+func TestHelmHistoryOverlayYNoOpWhenEmpty(t *testing.T) {
+	m := Model{
+		overlay:              overlayHelmHistory,
+		helmHistoryRevisions: nil,
+		tabs:                 []TabState{{}},
+		width:                80,
+		height:               40,
+	}
+	ret, _ := m.handleHelmHistoryOverlayKey(runeKey('y'))
+	result := ret.(Model)
+	assert.False(t, result.hasStatusMessage())
+}
+
+// joinTSV is the contract the copy handlers depend on for paste-into-spreadsheet
+// behaviour. Empty values must be preserved (so column positions stay aligned)
+// and the separator must be a literal tab.
+func TestJoinTSVPreservesEmptyColumns(t *testing.T) {
+	got := joinTSV("a", "", "c")
+	assert.Equal(t, "a\t\tc", got)
+}
+
+// Two filtered results: Enter must keep the legacy behavior — exit filter
+// mode and let the user pick. Auto-applying would be a guess.
+func TestColorschemeFilterModeEnterPreservesMultipleResults(t *testing.T) {
+	entries := []ui.SchemeEntry{
+		{Name: "Dark Themes", IsHeader: true},
+		{Name: "gruvbox-dark"},
+		{Name: "gruvbox-darkhard"},
+	}
+	m := Model{
+		overlay:          overlayColorscheme,
+		schemeEntries:    entries,
+		schemeFilterMode: true,
+		schemeFilter:     TextInput{Value: "gruv"},
+		tabs:             []TabState{{}},
+		width:            80,
+		height:           40,
+	}
+	ret, _ := m.handleColorschemeFilterMode(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.schemeFilterMode)
+	assert.Equal(t, overlayColorscheme, result.overlay, "overlay must stay open")
+	assert.Equal(t, "gruv", result.schemeFilter.Value, "filter must be preserved")
 }

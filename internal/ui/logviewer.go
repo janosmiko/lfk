@@ -15,21 +15,24 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 	Bold(true)
 
 // RenderLogViewer renders the full-screen log viewer.
-func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol int) string {
+//
+// omitFooter, when true, suppresses the internal hotkey hint bar so the caller
+// can render a full-terminal-width footer below a JoinHorizontal'd composition
+// (e.g. with the side preview pane). The output is one row shorter than the
+// default rendering. Callers that pass omitFooter=true must render their own
+// footer via RenderLogFooter.
+func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, wrapTopSkip int, omitFooter bool) string {
 	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery)
-	footer := renderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, visualMode, canSwitchPod, canFilterContainers)
+	var footer string
+	if !omitFooter {
+		footer = RenderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers)
+	}
 
 	// Content area: subtract border top + bottom (2 lines).
-	contentHeight := height - 2
-	if contentHeight < 1 {
-		contentHeight = 1
-	}
+	contentHeight := max(height-2, 1)
 
 	// Content width accounting for border (2) + padding (2).
-	contentWidth := width - 4
-	if contentWidth < 10 {
-		contentWidth = 10
-	}
+	contentWidth := max(width-4, 10)
 
 	// Calculate line number width if needed.
 	lineNumWidth := 0
@@ -45,10 +48,7 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	// Strip timestamps and/or pod prefixes from visible lines.
 	displayLines := lines
 	if (!timestamps || hidePrefixes) && len(lines) > 0 {
-		end := scroll + contentHeight
-		if end > len(lines) {
-			end = len(lines)
-		}
+		end := min(scroll+contentHeight, len(lines))
 		displayLines = make([]string, len(lines))
 		copy(displayLines, lines)
 		for i := scroll; i < end; i++ {
@@ -62,14 +62,13 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	}
 
 	// Sanitize visible lines: replace non-printable characters (except common
-	// whitespace) that can break terminal width calculations and corrupt the layout.
+	// whitespace) that can break terminal width calculations and corrupt the
+	// layout. ANSI SGR sequences are preserved when ConfigLogRenderAnsi is on
+	// so colour output from log producers renders correctly.
 	{
-		end := scroll + contentHeight
-		if end > len(displayLines) {
-			end = len(displayLines)
-		}
+		end := min(scroll+contentHeight, len(displayLines))
 		for i := scroll; i < end; i++ {
-			displayLines[i] = sanitizeLogLine(displayLines[i])
+			displayLines[i] = sanitizeLogLine(displayLines[i], ConfigLogRenderAnsi)
 		}
 	}
 
@@ -83,7 +82,7 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	// Build visible lines, handling wrapping.
 	var rendered []string
 	if wrap {
-		rendered = renderWrappedLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
+		rendered = renderWrappedLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol, wrapTopSkip)
 	} else {
 		rendered = renderPlainLines(displayLines, scroll, contentHeight, contentWidth, lineNumbers, lineNumWidth, cursor, selStart, selEnd, visualStart, visualType, visualCol, visualCurCol)
 	}
@@ -93,7 +92,14 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 		rendered = highlightSearchMatches(rendered, searchQuery)
 	}
 
-	// Pad to fill content height.
+	// Pad to fill content height. Cap at contentHeight too: if the line
+	// renderers ever return more rows than the body can hold (a wrap
+	// underestimate, a stray newline embedded in a producer log line, etc.)
+	// the surplus rows would push the bottom border off the visible area.
+	// User-reported on dragonfly-operator logs in particular.
+	if len(rendered) > contentHeight {
+		rendered = rendered[:contentHeight]
+	}
 	for len(rendered) < contentHeight {
 		rendered = append(rendered, "")
 	}
@@ -101,8 +107,15 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	// Ensure no rendered line exceeds contentWidth visual cells. Wrapped lines
 	// or FillLinesBg padding can occasionally produce lines wider than the border
 	// container expects, causing lipgloss to re-wrap them internally and push the
-	// bottom border out of view.
+	// bottom border out of view. Same defense extends to lines that contain an
+	// embedded newline (a sanitize gap or a producer with unusual control bytes)
+	// — strip those so each row stays a single visible row before lipgloss
+	// counts heights.
 	for i, line := range rendered {
+		if strings.ContainsRune(line, '\n') {
+			line = strings.ReplaceAll(line, "\n", " ")
+			rendered[i] = line
+		}
 		if lipgloss.Width(line) > contentWidth {
 			rendered[i] = ansi.Truncate(line, contentWidth, "")
 		}
@@ -115,6 +128,9 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	borderStyle := FullscreenBorderStyle(width, contentHeight)
 	body := borderStyle.Render(bodyContent)
 
+	if omitFooter {
+		return lipgloss.JoinVertical(lipgloss.Left, titleBar, body)
+	}
 	return lipgloss.JoinVertical(lipgloss.Left, titleBar, body, footer)
 }
 
@@ -166,8 +182,17 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 	return FillLinesBg(TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(titleText), width, BarBg)
 }
 
-// renderLogFooter builds the footer bar for the log viewer.
-func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput string, visualMode, canSwitchPod, canFilterContainers bool) string {
+// RenderLogFooter builds the footer bar for the log viewer.
+//
+// searchQuery is the *committed* search query (empty until the user presses
+// enter on the search prompt). The n/N next/prev hint is only surfaced once
+// a query has been committed \u2014 advertising it on a fresh viewer with no
+// search would be a no-op chord and a confusing claim.
+//
+// Exported so callers can render the footer at a wider terminal width than the
+// log column itself (e.g. when the side preview pane is on and the hint bar
+// must span the full screen below the JoinHorizontal'd panes \u2014 issue #71).
+func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool) string {
 	if statusMsg != "" {
 		style := HelpKeyStyle
 		if statusIsErr {
@@ -199,14 +224,21 @@ func renderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "#", Desc: "line#"},
 		{Key: "s", Desc: "timestamps"},
 		{Key: "p", Desc: "prefixes"},
+		{Key: "P", Desc: "preview"},
+		{Key: "J/K", Desc: "preview scroll"},
 		{Key: "c", Desc: "previous"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
+		{Key: "y", Desc: "copy"},
 		{Key: "/", Desc: "search"},
-		{Key: "n/N", Desc: "next/prev"},
-		{Key: "123G", Desc: "goto"},
-		{Key: "S", Desc: "save"},
-		{Key: "ctrl+s", Desc: "save all"},
 	}
+	if searchQuery != "" {
+		hints = append(hints, HintEntry{Key: "n/N", Desc: "next/prev"})
+	}
+	hints = append(hints,
+		HintEntry{Key: "123G", Desc: "goto"},
+		HintEntry{Key: "S", Desc: "save"},
+		HintEntry{Key: "ctrl+s", Desc: "save all"},
+	)
 	if canSwitchPod {
 		hints = append(hints, HintEntry{"\\", "switch pod"})
 	} else if canFilterContainers {
@@ -229,16 +261,10 @@ func highlightSearchMatches(lines []string, query string) []string {
 func renderPlainLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol int) []string {
 	var result []string
 
-	end := scroll + height
-	if end > len(lines) {
-		end = len(lines)
-	}
+	end := min(scroll+height, len(lines))
 
 	// Reserve 1 column for cursor gutter.
-	effectiveWidth := width - 1
-	if effectiveWidth < 10 {
-		effectiveWidth = 10
-	}
+	effectiveWidth := max(width-1, 10)
 
 	for i := scroll; i < end; i++ {
 		line := lines[i]
@@ -249,13 +275,21 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 		if isSelected {
 			// Build plain text for selection highlight on raw content (no line numbers).
 			// Line numbers are prepended after highlighting to avoid column offset mismatch.
+			//
+			// Use ansi.Truncate (visual-width aware) for the pre-trim instead
+			// of rune-slicing. On a kyverno-style log row each embedded SGR
+			// sequence costs 4-5 rune slots while contributing zero visual
+			// width; the rune-based cap chopped lines off mid-content (and
+			// often mid-CSI), which downstream let "0m" / "[NNm" leak as
+			// literal text and the visible payload was replaced by trailing
+			// spaces from FillLinesBg's pad-to-width pass.
 			plainLine := lines[i]
 			selEffWidth := effectiveWidth
 			if lineNumbers {
 				selEffWidth -= lineNumWidth
 			}
-			if len([]rune(plainLine)) > selEffWidth {
-				plainLine = string([]rune(plainLine)[:selEffWidth])
+			if ansi.StringWidth(plainLine) > selEffWidth {
+				plainLine = ansi.Truncate(plainLine, selEffWidth, "")
 			}
 			line = RenderVisualSelection(plainLine, visualType, i, selStart, selEnd, visualStart, visualCol, visualCurCol, min(visualCol, visualCurCol), max(visualCol, visualCurCol))
 			if lineNumbers {
@@ -302,7 +336,11 @@ func renderPlainLines(lines []string, scroll, height, width int, lineNumbers boo
 }
 
 // renderWrappedLines renders lines with wrapping, accounting for scroll position.
-func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol int) []string {
+// topSkip drops that many wrapped sub-lines from the top of lines[scroll], so
+// the renderer can pin a too-tall final source line's tail to the bottom row
+// when following — without it, long log lines wrapping past viewH lose their
+// most recent sub-lines off the bottom.
+func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers bool, lineNumWidth int, cursor int, selStart, selEnd, visualStart int, visualType rune, visualCol, visualCurCol, topSkip int) []string {
 	// Reserve 1 column for cursor gutter.
 	gutterWidth := 1
 	availWidth := width - gutterWidth
@@ -314,15 +352,21 @@ func renderWrappedLines(lines []string, scroll, height, width int, lineNumbers b
 	}
 
 	// We need to figure out which source lines and which wrapped sub-lines
-	// correspond to the scroll offset. For wrapping, scroll refers to source lines.
+	// correspond to the scroll offset. For wrapping, scroll refers to source
+	// lines; topSkip drops sub-lines from the very top of lines[scroll].
 	var result []string
 
+	skipped := 0
 	end := len(lines)
 	for i := scroll; i < end && len(result) < height; i++ {
 		line := lines[i]
 		isSelected := selStart >= 0 && i >= selStart && i <= selEnd
 		wrapped := wrapLine(line, availWidth)
 		for j, wl := range wrapped {
+			if skipped < topSkip {
+				skipped++
+				continue
+			}
 			if len(result) >= height {
 				break
 			}
@@ -385,21 +429,23 @@ func WrapLine(line string, width int) []string {
 }
 
 // wrapLine splits a line into chunks of at most width runes.
+// wrapLine hard-wraps a log line to width visual columns. Uses ansi.Hardwrap
+// so embedded SGR sequences (kyverno timestamps, klog level colors, etc.)
+// stay intact across the split — rune-slicing instead would split mid-CSI
+// and leak "0m"/"[NNm" as literal text or chop real content because escape
+// bytes are zero-width but consume rune budget.
 func wrapLine(line string, width int) []string {
 	if width <= 0 {
 		return []string{line}
 	}
-	runes := []rune(line)
-	if len(runes) == 0 {
+	if line == "" {
 		return []string{""}
 	}
-	var parts []string
-	for len(runes) > width {
-		parts = append(parts, string(runes[:width]))
-		runes = runes[width:]
-	}
-	parts = append(parts, string(runes))
-	return parts
+	// preserveSpace=true keeps a leading space at the start of a wrapped
+	// sub-line. Log content like "level message" must wrap to ["level", " ",
+	// "message"] not ["level", "message"], otherwise field separation goes
+	// missing visually -- and the existing rune-slicer kept the space too.
+	return strings.Split(ansi.Hardwrap(line, width, true), "\n")
 }
 
 // StripTimestamp removes a leading kubectl timestamp (RFC3339Nano + space) from a log line.
@@ -419,26 +465,17 @@ func StripTimestamp(line string) string {
 }
 
 // stripTimestampRaw removes a leading RFC3339Nano timestamp from a string.
+// Delegates to splitLeadingTimestamp so detection rules stay in one place.
 func stripTimestampRaw(s string) string {
-	// Quick check: RFC3339Nano timestamps start with a digit and contain 'T'.
-	// Minimum length: "2024-01-15T10:30:00Z " = 21 chars.
-	if len(s) < 21 || s[4] != '-' {
-		return s
+	if _, rest, ok := splitLeadingTimestamp(s); ok {
+		return rest
 	}
-	// Find the space after the timestamp.
-	spaceIdx := strings.IndexByte(s, ' ')
-	if spaceIdx < 20 || spaceIdx > 35 {
-		return s
-	}
-	// Verify it looks like a timestamp (contains 'T' between date and time).
-	if s[10] != 'T' {
-		return s
-	}
-	return s[spaceIdx+1:]
+	return s
 }
 
 // podPrefixColors is a palette of distinct colors for pod/container log prefixes.
-var podPrefixColors = []lipgloss.Color{
+// Values are routed through ThemeColor so ConfigNoColor strips them to NoColor{}.
+var podPrefixColors = []string{
 	"#7aa2f7", // blue
 	"#9ece6a", // green
 	"#bb9af7", // purple
@@ -469,8 +506,8 @@ func colorizePodPrefix(line string) string {
 
 	// Extract pod name for color hashing (between first and last slash).
 	podName := prefix
-	if firstSlash := strings.Index(prefix, "/"); firstSlash >= 0 {
-		afterFirst := prefix[firstSlash+1:]
+	if _, after, ok := strings.Cut(prefix, "/"); ok {
+		afterFirst := after
 		if lastSlash := strings.LastIndex(afterFirst, "/"); lastSlash >= 0 {
 			podName = afterFirst[:lastSlash]
 		} else {
@@ -484,7 +521,7 @@ func colorizePodPrefix(line string) string {
 		hash = hash*31 + uint32(c)
 	}
 	color := podPrefixColors[hash%uint32(len(podPrefixColors))]
-	style := lipgloss.NewStyle().Foreground(color)
+	style := lipgloss.NewStyle().Foreground(ThemeColor(color))
 
 	return style.Render("["+prefix+"]") + " " + rest
 }
@@ -494,22 +531,49 @@ func StripPodPrefix(line string) string {
 	if len(line) == 0 || line[0] != '[' {
 		return line
 	}
-	closeBracket := strings.Index(line, "] ")
-	if closeBracket < 0 {
+	_, after, ok := strings.Cut(line, "] ")
+	if !ok {
 		return line
 	}
-	return line[closeBracket+2:]
+	return after
 }
 
-// sanitizeLogLine replaces non-printable control characters (except tab) with
-// the Unicode replacement character. Binary data from processes like MySQL
-// handshakes contains bytes that break terminal width calculations and corrupt
-// the log viewer layout.
-func sanitizeLogLine(s string) string {
-	// Fast path: check if any sanitization is needed.
+// logTabWidth is the column step used when expanding tab characters in
+// log lines. 8 matches the default tab stop on virtually every terminal,
+// so the post-expansion text aligns the way a user pasting the same line
+// into their shell would expect.
+const logTabWidth = 8
+
+// sanitizeLogLine replaces non-printable control bytes (NUL, DEL, the C0
+// control range minus tab) with the Unicode replacement character and
+// expands tab characters to spaces using a logTabWidth-column tab stop.
+// Binary data from processes like MySQL handshakes contains bytes that
+// break terminal width calculations and corrupt the viewer layout.
+//
+// Tab expansion is required because lipgloss.Width treats '\t' as
+// zero-width while the terminal renders it as a jump to the next tab
+// stop. The viewer's contentWidth-overflow guard (in RenderLogViewer)
+// uses lipgloss.Width to decide when to truncate; without expansion,
+// tab-bearing lines slip through with an undercounted width, get
+// re-wrapped internally by lipgloss, and push the bottom border off the
+// visible area. Reported on dragonfly-operator (controller-runtime/zap)
+// logs in particular - those use tabs to separate timestamp / level /
+// logger / message.
+//
+// When renderAnsi is true, valid CSI SGR sequences (ESC [ params m — the
+// ones that set colour, bold, underline, etc.) are preserved verbatim so
+// log producers that emit ANSI colours render as intended. Non-SGR CSI
+// sequences (cursor movement, screen erase) remain unsafe for an inline
+// viewer and are still replaced. A bare ESC with no valid CSI introducer
+// is replaced too; leaving it would cause terminals to wait for a
+// follow-up byte and mis-interpret subsequent output.
+func sanitizeLogLine(s string, renderAnsi bool) string {
+	// Fast path: no control bytes (incl. tabs that need expansion) means
+	// no work to do.
 	needsSanitize := false
-	for _, r := range s {
-		if r != '\t' && (r < 32 || r == 127) {
+	for i := range len(s) {
+		c := s[i]
+		if c < 32 || c == 127 {
 			needsSanitize = true
 			break
 		}
@@ -520,12 +584,74 @@ func sanitizeLogLine(s string) string {
 
 	var b strings.Builder
 	b.Grow(len(s))
-	for _, r := range s {
-		if r != '\t' && (r < 32 || r == 127) {
-			b.WriteRune('\ufffd') // Unicode replacement character
-		} else {
-			b.WriteRune(r)
+	col := 0
+	i := 0
+	for i < len(s) {
+		c := s[i]
+		if renderAnsi && c == 0x1b {
+			if end := parseSGRSequence(s, i); end > i {
+				// SGR sequences are zero-width; do not advance col.
+				b.WriteString(s[i:end])
+				i = end
+				continue
+			}
 		}
+		if c == '\t' {
+			n := logTabWidth - col%logTabWidth
+			for range n {
+				b.WriteByte(' ')
+			}
+			col += n
+			i++
+			continue
+		}
+		if c >= 32 && c != 127 {
+			// Printable ASCII or UTF-8 leading/continuation byte.
+			// UTF-8 continuation bytes are all >= 0x80 so they land
+			// here on subsequent iterations and copy through intact.
+			// Column tracking treats every UTF-8 leading byte and
+			// every ASCII printable as one cell; an approximation
+			// that is fine for tab-stop alignment (CJK in log lines
+			// is rare and the worst case is a 1-cell off-stop nudge,
+			// not a width undercount).
+			b.WriteByte(c)
+			if c < 0x80 || c >= 0xC0 {
+				col++
+			}
+			i++
+			continue
+		}
+		// Control byte (< 32 and not tab, or DEL). Emit the
+		// replacement character and advance one byte.
+		b.WriteRune('\ufffd')
+		i++
 	}
 	return b.String()
+}
+
+// parseSGRSequence returns the index after a valid ESC [ ... m sequence
+// starting at s[i], or i if no valid sequence is present. Only SGR
+// (Select Graphic Rendition) finals are accepted because they set
+// colour and text attributes without moving the cursor or clearing the
+// screen — preserving them is safe in an inline viewer, whereas other
+// CSI finals would corrupt the layout.
+func parseSGRSequence(s string, i int) int {
+	if i+1 >= len(s) || s[i] != 0x1b || s[i+1] != '[' {
+		return i
+	}
+	j := i + 2
+	// Parameter bytes: 0x30-0x3F (digits and ; : < = > ?).
+	for j < len(s) && s[j] >= 0x30 && s[j] <= 0x3F {
+		j++
+	}
+	// Intermediate bytes: 0x20-0x2F (space and ! " # $ % & ' ( ) * + , - . /).
+	for j < len(s) && s[j] >= 0x20 && s[j] <= 0x2F {
+		j++
+	}
+	// SGR final byte is lowercase 'm'. Anything else is a CSI we can't
+	// safely forward to an inline viewer.
+	if j < len(s) && s[j] == 'm' {
+		return j + 1
+	}
+	return i
 }

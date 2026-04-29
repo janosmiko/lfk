@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -14,14 +15,14 @@ import (
 func TestEvaluateSimpleJSONPath_ExtraBranches(t *testing.T) {
 	tests := []struct {
 		name    string
-		obj     map[string]interface{}
+		obj     map[string]any
 		path    string
-		wantVal interface{}
+		wantVal any
 		wantOK  bool
 	}{
 		{
 			name: "array index on non-array returns false",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"items": "not-an-array",
 			},
 			path:    ".items[0]",
@@ -30,7 +31,7 @@ func TestEvaluateSimpleJSONPath_ExtraBranches(t *testing.T) {
 		},
 		{
 			name: "nil intermediate value returns false",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"status": nil,
 			},
 			path:    ".status.phase",
@@ -39,10 +40,10 @@ func TestEvaluateSimpleJSONPath_ExtraBranches(t *testing.T) {
 		},
 		{
 			name: "deeply nested path",
-			obj: map[string]interface{}{
-				"a": map[string]interface{}{
-					"b": map[string]interface{}{
-						"c": map[string]interface{}{
+			obj: map[string]any{
+				"a": map[string]any{
+					"b": map[string]any{
+						"c": map[string]any{
 							"d": 42,
 						},
 					},
@@ -54,23 +55,23 @@ func TestEvaluateSimpleJSONPath_ExtraBranches(t *testing.T) {
 		},
 		{
 			name: "bracket without valid index treats field as non-indexed",
-			obj: map[string]interface{}{
-				"items": []interface{}{"a"},
+			obj: map[string]any{
+				"items": []any{"a"},
 			},
 			path:    ".items[]",
-			wantVal: []interface{}{"a"},
+			wantVal: []any{"a"},
 			wantOK:  true,
 		},
 		{
 			name:    "path with only dot returns false",
-			obj:     map[string]interface{}{"x": 1},
+			obj:     map[string]any{"x": 1},
 			path:    ".",
 			wantVal: nil,
 			wantOK:  false,
 		},
 		{
 			name: "non-map intermediate value returns false",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"status": "a-string-not-a-map",
 			},
 			path:    ".status.phase",
@@ -95,7 +96,7 @@ func TestEvaluateSimpleJSONPath_ExtraBranches(t *testing.T) {
 func TestFormatPrinterValue_ExtraBranches(t *testing.T) {
 	tests := []struct {
 		name    string
-		val     interface{}
+		val     any
 		colType string
 		want    string
 	}{
@@ -150,8 +151,8 @@ func TestFormatPrinterValue_ExtraBranches(t *testing.T) {
 func TestExtractGenericConditions_MissingBranches(t *testing.T) {
 	t.Run("no Ready condition falls back to last condition", func(t *testing.T) {
 		ti := &model.Item{}
-		conditions := []interface{}{
-			map[string]interface{}{
+		conditions := []any{
+			map[string]any{
 				"type":    "Available",
 				"status":  "True",
 				"reason":  "MinPods",
@@ -171,9 +172,9 @@ func TestExtractGenericConditions_MissingBranches(t *testing.T) {
 
 	t.Run("non-map condition entries are skipped", func(t *testing.T) {
 		ti := &model.Item{}
-		conditions := []interface{}{
+		conditions := []any{
 			"not-a-map",
-			map[string]interface{}{
+			map[string]any{
 				"type":   "Ready",
 				"status": "False",
 				"reason": "NotReady",
@@ -188,7 +189,7 @@ func TestExtractGenericConditions_MissingBranches(t *testing.T) {
 
 	t.Run("all non-map conditions produces no output", func(t *testing.T) {
 		ti := &model.Item{}
-		conditions := []interface{}{
+		conditions := []any{
 			"not-a-map",
 			42,
 		}
@@ -200,8 +201,8 @@ func TestExtractGenericConditions_MissingBranches(t *testing.T) {
 
 	t.Run("message shown when status is not True", func(t *testing.T) {
 		ti := &model.Item{}
-		conditions := []interface{}{
-			map[string]interface{}{
+		conditions := []any{
+			map[string]any{
 				"type":    "Ready",
 				"status":  "False",
 				"message": "Pod is not ready",
@@ -215,16 +216,16 @@ func TestExtractGenericConditions_MissingBranches(t *testing.T) {
 	})
 
 	t.Run("long message is truncated", func(t *testing.T) {
-		longMsg := ""
+		var longMsg strings.Builder
 		for range 100 {
-			longMsg += "x"
+			longMsg.WriteString("x")
 		}
 		ti := &model.Item{}
-		conditions := []interface{}{
-			map[string]interface{}{
+		conditions := []any{
+			map[string]any{
 				"type":    "Ready",
 				"status":  "False",
-				"message": longMsg,
+				"message": longMsg.String(),
 			},
 		}
 
@@ -237,8 +238,8 @@ func TestExtractGenericConditions_MissingBranches(t *testing.T) {
 
 	t.Run("condition with empty type and status produces no type column", func(t *testing.T) {
 		ti := &model.Item{}
-		conditions := []interface{}{
-			map[string]interface{}{
+		conditions := []any{
+			map[string]any{
 				"reason": "SomeReason",
 			},
 		}
@@ -256,11 +257,11 @@ func TestExtractGenericConditions_MissingBranches(t *testing.T) {
 // --- extractTemplateResources: missing no-containers-in-spec branch ---
 
 func TestExtractTemplateResources_NoContainersInTemplateSpec(t *testing.T) {
-	spec := map[string]interface{}{
-		"template": map[string]interface{}{
-			"spec": map[string]interface{}{
+	spec := map[string]any{
+		"template": map[string]any{
+			"spec": map[string]any{
 				// No "containers" key at all.
-				"nodeSelector": map[string]interface{}{"zone": "us-east"},
+				"nodeSelector": map[string]any{"zone": "us-east"},
 			},
 		},
 	}
@@ -277,9 +278,9 @@ func TestExtractTemplateResources_NoContainersInTemplateSpec(t *testing.T) {
 
 func TestPopulateContainerImages_NonSliceContainers(t *testing.T) {
 	ti := &model.Item{}
-	spec := map[string]interface{}{
-		"template": map[string]interface{}{
-			"spec": map[string]interface{}{
+	spec := map[string]any{
+		"template": map[string]any{
+			"spec": map[string]any{
 				"containers": "not-a-slice",
 			},
 		},
@@ -292,8 +293,8 @@ func TestPopulateContainerImages_NonSliceContainers(t *testing.T) {
 
 func TestPopulateContainerImages_NonMapTemplateSpec(t *testing.T) {
 	ti := &model.Item{}
-	spec := map[string]interface{}{
-		"template": map[string]interface{}{
+	spec := map[string]any{
+		"template": map[string]any{
 			"spec": "not-a-map",
 		},
 	}

@@ -20,8 +20,8 @@ func podWith(container corev1.Container) *corev1.Pod {
 	}
 }
 
-func boolPtr(b bool) *bool    { return &b }
-func int64Ptr(i int64) *int64 { return &i }
+//go:fix inline
+func int64Ptr(i int64) *int64 { return new(i) }
 
 func TestSourceMetadata(t *testing.T) {
 	s := NewWithClient(fake.NewSimpleClientset())
@@ -64,10 +64,10 @@ func TestCheckPrivileged(t *testing.T) {
 		wantSev   security.Severity
 	}{
 		{"privileged true", corev1.Container{
-			Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: boolPtr(true)},
+			Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(true)},
 		}, 1, security.SeverityCritical},
 		{"privileged false", corev1.Container{
-			Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: boolPtr(false)},
+			Name: "c", SecurityContext: &corev1.SecurityContext{Privileged: new(false)},
 		}, 0, security.SeverityUnknown},
 		{"no security context", corev1.Container{Name: "c"}, 0, security.SeverityUnknown},
 	}
@@ -142,10 +142,10 @@ func TestCheckHostPath(t *testing.T) {
 func TestCheckReadOnlyRootFilesystem(t *testing.T) {
 	writable := corev1.Container{Name: "c"}
 	explicitFalse := corev1.Container{Name: "c", SecurityContext: &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: boolPtr(false),
+		ReadOnlyRootFilesystem: new(false),
 	}}
 	readOnly := corev1.Container{Name: "c", SecurityContext: &corev1.SecurityContext{
-		ReadOnlyRootFilesystem: boolPtr(true),
+		ReadOnlyRootFilesystem: new(true),
 	}}
 	pod := &corev1.Pod{ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"}}
 
@@ -165,8 +165,8 @@ func TestCheckRunAsRoot(t *testing.T) {
 		{"no context -> flag", corev1.PodSecurityContext{}, corev1.SecurityContext{}, 1},
 		{"runAsUser:0 -> flag", corev1.PodSecurityContext{}, corev1.SecurityContext{RunAsUser: int64Ptr(0)}, 1},
 		{"runAsUser:1000 -> clean", corev1.PodSecurityContext{}, corev1.SecurityContext{RunAsUser: int64Ptr(1000)}, 0},
-		{"pod runAsNonRoot:true -> clean", corev1.PodSecurityContext{RunAsNonRoot: boolPtr(true)}, corev1.SecurityContext{}, 0},
-		{"container runAsNonRoot:true -> clean", corev1.PodSecurityContext{}, corev1.SecurityContext{RunAsNonRoot: boolPtr(true)}, 0},
+		{"pod runAsNonRoot:true -> clean", corev1.PodSecurityContext{RunAsNonRoot: new(true)}, corev1.SecurityContext{}, 0},
+		{"container runAsNonRoot:true -> clean", corev1.PodSecurityContext{}, corev1.SecurityContext{RunAsNonRoot: new(true)}, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -189,8 +189,8 @@ func TestCheckAllowPrivilegeEscalation(t *testing.T) {
 	}{
 		{"nil context -> flag", nil, 1},
 		{"unset -> flag", &corev1.SecurityContext{}, 1},
-		{"true -> flag", &corev1.SecurityContext{AllowPrivilegeEscalation: boolPtr(true)}, 1},
-		{"false -> clean", &corev1.SecurityContext{AllowPrivilegeEscalation: boolPtr(false)}, 0},
+		{"true -> flag", &corev1.SecurityContext{AllowPrivilegeEscalation: new(true)}, 1},
+		{"false -> clean", &corev1.SecurityContext{AllowPrivilegeEscalation: new(false)}, 0},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

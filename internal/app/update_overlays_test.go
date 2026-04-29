@@ -739,7 +739,40 @@ func TestActionOverlayKeyNavigation(t *testing.T) {
 	})
 }
 
-// --- handleConfirmOverlayKey (y/n for regular delete, drain) ---
+// --- handlePasteConfirmKey ---
+
+func TestPasteConfirmEnterConfirms(t *testing.T) {
+	// Enter should flatten + paste, matching the y key.
+	m := Model{
+		overlay:       overlayPasteConfirm,
+		pendingPaste:  "line1\nline2",
+		pasteTargetID: pasteTargetNone,
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
+	}
+	ret, _ := m.handlePasteConfirmKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay)
+	assert.Empty(t, result.pendingPaste, "should clear pending paste after confirm")
+}
+
+func TestPasteConfirmEscCancels(t *testing.T) {
+	m := Model{
+		overlay:       overlayPasteConfirm,
+		pendingPaste:  "line1\nline2",
+		pasteTargetID: pasteTargetNone,
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
+	}
+	ret, _ := m.handlePasteConfirmKey(specialKey(tea.KeyEsc))
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay)
+	assert.Empty(t, result.pendingPaste, "should clear pending paste after cancel")
+}
+
+// --- handleConfirmOverlayKey (Enter/y/n for regular delete, drain) ---
 
 func TestConfirmOverlayKeyDeclines(t *testing.T) {
 	tests := []struct {
@@ -766,6 +799,36 @@ func TestConfirmOverlayKeyDeclines(t *testing.T) {
 			assert.Equal(t, overlayNone, result.overlay)
 			assert.Empty(t, result.confirmAction)
 			assert.Empty(t, result.pendingAction)
+		})
+	}
+}
+
+func TestConfirmOverlayKeyConfirms(t *testing.T) {
+	// Enter must confirm — consistency with quit overlay and every other
+	// confirmable input. y/Y kept as silent muscle-memory aliases.
+	tests := []struct {
+		name string
+		key  tea.KeyMsg
+	}{
+		{name: "Enter confirms", key: specialKey(tea.KeyEnter)},
+		{name: "y confirms", key: runeKey('y')},
+		{name: "Y confirms", key: runeKey('Y')},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := Model{
+				overlay:       overlayConfirm,
+				pendingAction: "Delete",
+				confirmAction: "delete pod",
+				actionCtx:     actionContext{name: "p", namespace: "default"},
+				tabs:          []TabState{{}},
+				width:         80,
+				height:        40,
+			}
+			ret, _ := m.handleConfirmOverlayKey(tt.key)
+			result := ret.(Model)
+			assert.Equal(t, overlayNone, result.overlay)
+			assert.True(t, result.loading, "should mark loading after confirm")
 		})
 	}
 }
@@ -1190,6 +1253,33 @@ func TestQuitConfirmOverlayDeclines(t *testing.T) {
 			result := ret.(Model)
 			assert.Equal(t, overlayNone, result.overlay)
 			assert.Nil(t, cmd)
+		})
+	}
+}
+
+func TestQuitConfirmOverlayConfirms(t *testing.T) {
+	// Enter must confirm — this matches every other confirmable input in lfk
+	// (filter Enter, search Enter, scale apply, etc.). y/Y kept as aliases.
+	tests := []struct {
+		name string
+		key  tea.KeyMsg
+	}{
+		{name: "Enter confirms", key: specialKey(tea.KeyEnter)},
+		{name: "y confirms", key: runeKey('y')},
+		{name: "Y confirms", key: runeKey('Y')},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := Model{
+				overlay: overlayQuitConfirm,
+				tabs:    []TabState{{}},
+				width:   80,
+				height:  40,
+			}
+			ret, cmd := m.handleQuitConfirmOverlayKey(tt.key)
+			result := ret.(Model)
+			assert.Equal(t, overlayNone, result.overlay)
+			assert.NotNil(t, cmd, "should issue tea.Quit")
 		})
 	}
 }

@@ -8,18 +8,48 @@ import (
 	"time"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/robfig/cron/v3"
 )
+
+// nextCronFire returns the next time a CronJob with the given crontab
+// schedule will fire. timeZone follows spec.timeZone semantics: when
+// empty, the schedule is evaluated in UTC — the same default
+// kube-controller-manager uses for CronJobs without spec.timeZone, so
+// the displayed time matches what the cluster will actually do
+// regardless of the user's local timezone.
+//
+// Returns ok=false when schedule is empty, when timeZone fails to load,
+// or when schedule fails to parse. Accepts standard 5-field crontabs
+// and the predefined descriptors (`@hourly`, `@daily`, …).
+func nextCronFire(schedule, timeZone string, now time.Time) (time.Time, bool) {
+	if schedule == "" {
+		return time.Time{}, false
+	}
+	loc := time.UTC
+	if timeZone != "" {
+		l, err := time.LoadLocation(timeZone)
+		if err != nil {
+			return time.Time{}, false
+		}
+		loc = l
+	}
+	parsed, err := cron.ParseStandard(schedule)
+	if err != nil {
+		return time.Time{}, false
+	}
+	return parsed.Next(now.In(loc)), true
+}
 
 // populateMetadataFields extracts labels, finalizers, and annotations from the
 // object metadata and appends them as columns for preview display.
-func populateMetadataFields(ti *model.Item, obj map[string]interface{}) {
-	metadata, _ := obj["metadata"].(map[string]interface{})
+func populateMetadataFields(ti *model.Item, obj map[string]any) {
+	metadata, _ := obj["metadata"].(map[string]any)
 	if metadata == nil {
 		return
 	}
 
 	// Labels: extract key=value pairs, skip noisy labels.
-	if labels, ok := metadata["labels"].(map[string]interface{}); ok && len(labels) > 0 {
+	if labels, ok := metadata["labels"].(map[string]any); ok && len(labels) > 0 {
 		var labelPairs []string
 		for k, v := range labels {
 			if k == "helm.sh/chart" || strings.HasPrefix(k, "app.kubernetes.io/managed-by") {
@@ -34,7 +64,7 @@ func populateMetadataFields(ti *model.Item, obj map[string]interface{}) {
 	}
 
 	// Finalizers: important for debugging stuck deletions.
-	if finalizers, ok := metadata["finalizers"].([]interface{}); ok && len(finalizers) > 0 {
+	if finalizers, ok := metadata["finalizers"].([]any); ok && len(finalizers) > 0 {
 		var fins []string
 		for _, f := range finalizers {
 			if s, ok := f.(string); ok {
@@ -47,7 +77,7 @@ func populateMetadataFields(ti *model.Item, obj map[string]interface{}) {
 	}
 
 	// Annotations: store key=value pairs (sorted, noisy ones filtered).
-	if annotations, ok := metadata["annotations"].(map[string]interface{}); ok && len(annotations) > 0 {
+	if annotations, ok := metadata["annotations"].(map[string]any); ok && len(annotations) > 0 {
 		var annPairs []string
 		for k, v := range annotations {
 			// Skip very long values (e.g., kubectl.kubernetes.io/last-applied-configuration).
@@ -68,10 +98,10 @@ func populateMetadataFields(ti *model.Item, obj map[string]interface{}) {
 // extractGenericConditions extracts condition information from a status.conditions
 // array for generic CRD resources. It prefers the "Ready" condition; if not found,
 // it falls back to the last condition in the array.
-func extractGenericConditions(ti *model.Item, conditions []interface{}) {
-	var readyCond, trueCond, lastCond map[string]interface{}
+func extractGenericConditions(ti *model.Item, conditions []any) {
+	var readyCond, trueCond, lastCond map[string]any
 	for _, c := range conditions {
-		cond, ok := c.(map[string]interface{})
+		cond, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -159,22 +189,22 @@ func isNegativeConditionType(condType string) bool {
 }
 
 // populateContainerImages extracts container images from a pod template spec.
-func populateContainerImages(ti *model.Item, spec map[string]interface{}) {
-	tmpl, ok := spec["template"].(map[string]interface{})
+func populateContainerImages(ti *model.Item, spec map[string]any) {
+	tmpl, ok := spec["template"].(map[string]any)
 	if !ok {
 		return
 	}
-	tmplSpec, ok := tmpl["spec"].(map[string]interface{})
+	tmplSpec, ok := tmpl["spec"].(map[string]any)
 	if !ok {
 		return
 	}
-	containers, ok := tmplSpec["containers"].([]interface{})
+	containers, ok := tmplSpec["containers"].([]any)
 	if !ok {
 		return
 	}
 	var images []string
 	for _, c := range containers {
-		if cMap, ok := c.(map[string]interface{}); ok {
+		if cMap, ok := c.(map[string]any); ok {
 			if img, ok := cMap["image"].(string); ok {
 				images = append(images, img)
 			}
@@ -187,18 +217,18 @@ func populateContainerImages(ti *model.Item, spec map[string]interface{}) {
 
 // extractContainerResources sums CPU and memory requests/limits from a list of container specs.
 // Returns cpuReq, cpuLim, memReq, memLim as human-readable strings.
-func extractContainerResources(containers []interface{}) (cpuReq, cpuLim, memReq, memLim string) {
+func extractContainerResources(containers []any) (cpuReq, cpuLim, memReq, memLim string) {
 	var cpuReqs, cpuLims, memReqs, memLims []string
 	for _, c := range containers {
-		cMap, ok := c.(map[string]interface{})
+		cMap, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}
-		resources, ok := cMap["resources"].(map[string]interface{})
+		resources, ok := cMap["resources"].(map[string]any)
 		if !ok {
 			continue
 		}
-		if requests, ok := resources["requests"].(map[string]interface{}); ok {
+		if requests, ok := resources["requests"].(map[string]any); ok {
 			if v, ok := requests["cpu"].(string); ok {
 				cpuReqs = append(cpuReqs, v)
 			}
@@ -206,7 +236,7 @@ func extractContainerResources(containers []interface{}) (cpuReq, cpuLim, memReq
 				memReqs = append(memReqs, v)
 			}
 		}
-		if limits, ok := resources["limits"].(map[string]interface{}); ok {
+		if limits, ok := resources["limits"].(map[string]any); ok {
 			if v, ok := limits["cpu"].(string); ok {
 				cpuLims = append(cpuLims, v)
 			}
@@ -231,16 +261,16 @@ func extractContainerResources(containers []interface{}) (cpuReq, cpuLim, memReq
 }
 
 // extractTemplateResources navigates spec.template.spec.containers and extracts resource requests/limits.
-func extractTemplateResources(spec map[string]interface{}) (cpuReq, cpuLim, memReq, memLim string) {
-	tmpl, ok := spec["template"].(map[string]interface{})
+func extractTemplateResources(spec map[string]any) (cpuReq, cpuLim, memReq, memLim string) {
+	tmpl, ok := spec["template"].(map[string]any)
 	if !ok {
 		return
 	}
-	tmplSpec, ok := tmpl["spec"].(map[string]interface{})
+	tmplSpec, ok := tmpl["spec"].(map[string]any)
 	if !ok {
 		return
 	}
-	containers, ok := tmplSpec["containers"].([]interface{})
+	containers, ok := tmplSpec["containers"].([]any)
 	if !ok {
 		return
 	}
@@ -264,7 +294,7 @@ func addResourceColumns(ti *model.Item, cpuReq, cpuLim, memReq, memLim string) {
 }
 
 // getInt extracts an integer value from a map, handling both int64 and float64.
-func getInt(m map[string]interface{}, key string) int64 {
+func getInt(m map[string]any, key string) int64 {
 	if v, ok := m[key].(int64); ok {
 		return v
 	}
@@ -275,7 +305,7 @@ func getInt(m map[string]interface{}, key string) int64 {
 }
 
 // parseEventTimestamp extracts a timestamp from a top-level event field (e.g., "lastTimestamp", "eventTime").
-func parseEventTimestamp(obj map[string]interface{}, field string) time.Time {
+func parseEventTimestamp(obj map[string]any, field string) time.Time {
 	val, ok := obj[field]
 	if !ok || val == nil {
 		return time.Time{}
@@ -299,7 +329,7 @@ func parseEventTimestamp(obj map[string]interface{}, field string) time.Time {
 // dot-notation JSONPath expression like ".status.phase" or ".status.conditions[0].type".
 // It returns the value found and a boolean indicating success.
 // This does NOT handle complex JSONPath features (wildcards, filters, etc.).
-func evaluateSimpleJSONPath(obj map[string]interface{}, path string) (interface{}, bool) {
+func evaluateSimpleJSONPath(obj map[string]any, path string) (any, bool) {
 	// Strip leading dot.
 	path = strings.TrimPrefix(path, ".")
 	if path == "" {
@@ -307,7 +337,7 @@ func evaluateSimpleJSONPath(obj map[string]interface{}, path string) (interface{
 	}
 
 	parts := strings.Split(path, ".")
-	var current interface{} = obj
+	var current any = obj
 
 	for _, part := range parts {
 		if current == nil {
@@ -329,7 +359,7 @@ func evaluateSimpleJSONPath(obj map[string]interface{}, path string) (interface{
 		}
 
 		// Navigate into the map.
-		m, ok := current.(map[string]interface{})
+		m, ok := current.(map[string]any)
 		if !ok {
 			return nil, false
 		}
@@ -340,7 +370,7 @@ func evaluateSimpleJSONPath(obj map[string]interface{}, path string) (interface{
 
 		// If we need to index into an array.
 		if arrayIdx >= 0 {
-			arr, ok := val.([]interface{})
+			arr, ok := val.([]any)
 			if !ok || arrayIdx >= len(arr) {
 				return nil, false
 			}
@@ -354,7 +384,7 @@ func evaluateSimpleJSONPath(obj map[string]interface{}, path string) (interface{
 }
 
 // formatPrinterValue formats a value from a CRD printer column based on its type.
-func formatPrinterValue(val interface{}, colType string) string {
+func formatPrinterValue(val any, colType string) string {
 	if val == nil {
 		return ""
 	}

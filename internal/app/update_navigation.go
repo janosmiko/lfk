@@ -12,10 +12,7 @@ import (
 
 func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 	visible := m.visibleMiddleItems()
-	c := m.cursor() + delta
-	if c < 0 {
-		c = 0
-	}
+	c := max(m.cursor()+delta, 0)
 	if c >= len(visible) {
 		c = len(visible) - 1
 	}
@@ -56,12 +53,7 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 	}
 
 	m.invalidatePreviewForCursorChange()
-	// Reload resource map if active.
-	if m.mapView {
-		m.resourceTree = nil
-		return m, tea.Batch(m.loadPreview(), m.loadResourceTree())
-	}
-	return m, m.loadPreview()
+	return m, schedulePreviewDebounce(m.previewDebounceGen)
 }
 
 // invalidatePreviewForCursorChange resets the right-column state and bumps
@@ -69,11 +61,16 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 // position is discarded by its message handler instead of being applied to
 // the wrong selection (which causes stale items to appear, followed by a
 // brief "No resources found" flash before the new load returns).
+//
+// Does not cancel reqCtx: cancelling on cursor moves storms Bubble Tea's
+// msg channel with context.Canceled deliveries that crowd out KeyMsgs.
 func (m *Model) invalidatePreviewForCursorChange() {
 	m.requestGen++
+	m.previewDebounceGen++
 	m.rightItems = nil
 	m.previewYAML = ""
 	m.previewScroll = 0
+	m.resourceTree = nil
 	m.loading = true
 	m.previewLoading = true
 }
@@ -94,6 +91,13 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.filterActive = false
 	}
 
+	// Clear search highlight on level change so it doesn't bleed onto
+	// the parent level (issue requested fix). The Esc cascade clears
+	// search as its own step before navigating, so this only fires for
+	// programmatic navigateParent paths (h/left key, owner-jump back,
+	// etc.) where the search step hasn't already run.
+	m.searchInput.Clear()
+
 	// Reset scroll positions when navigating to a new level.
 	ui.ActiveMiddleScroll = 0
 	ui.ActiveLeftScroll = 0
@@ -105,7 +109,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.saveCursor()
 		m.nav.Level = model.LevelClusters
 		m.nav.Context = ""
-		m.middleItems = m.leftItems
+		m.setMiddleItems(m.leftItems)
 		m.popLeft()
 		m.clearRight()
 		m.restoreCursor()
@@ -115,7 +119,19 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.saveCursor()
 		m.nav.Level = model.LevelResourceTypes
 		m.nav.ResourceType = model.ResourceTypeEntry{}
-		m.middleItems = m.leftItems
+		// When session restore puts us at LevelResources before API
+		// discovery has completed, m.leftItems holds the seed set
+		// (Pods/Deployments/...) as a fallback. Popping those into the
+		// middle column on back-navigation makes the user see a "short
+		// list" that then jumps to the full list when discovery arrives.
+		// Instead, show the loader until apiResourceDiscoveryMsg
+		// populates middleItems with the real CRD-inclusive set.
+		if discovered, ok := m.discoveredResources[m.nav.Context]; ok && len(discovered) > 0 {
+			m.setMiddleItems(m.leftItems)
+		} else {
+			m.setMiddleItems(nil)
+			m.loading = true
+		}
 		m.popLeft()
 		m.clearRight()
 		m.restoreCursor()
@@ -134,9 +150,9 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 			m.nav.Namespace = parent.namespace
 			// Stay at LevelOwned — we're returning to the parent's owned view.
 			if cached, ok := m.itemCache[m.navKey()]; ok {
-				m.middleItems = cached
+				m.setMiddleItems(cached)
 			} else {
-				m.middleItems = m.leftItems
+				m.setMiddleItems(m.leftItems)
 			}
 			m.popLeft()
 			m.clearRight()
@@ -146,9 +162,9 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.nav.Level = model.LevelResources
 		m.nav.ResourceName = ""
 		if cached, ok := m.itemCache[m.navKey()]; ok {
-			m.middleItems = cached
+			m.setMiddleItems(cached)
 		} else {
-			m.middleItems = m.leftItems
+			m.setMiddleItems(m.leftItems)
 		}
 		m.popLeft()
 		m.clearRight()
@@ -167,9 +183,9 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 			m.nav.OwnedName = ""
 		}
 		if cached, ok := m.itemCache[m.navKey()]; ok {
-			m.middleItems = cached
+			m.setMiddleItems(cached)
 		} else {
-			m.middleItems = m.leftItems
+			m.setMiddleItems(m.leftItems)
 		}
 		m.popLeft()
 		m.clearRight()
@@ -229,6 +245,14 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 	m.activeFilterPreset = nil
 	m.unfilteredMiddleItems = nil
 
+	// Clear search highlight on level change so it doesn't bleed onto
+	// the child level — opening a resource is a "fresh start" for the
+	// user (issue requested fix). The Esc cascade in handleExplorerEsc
+	// already clears search as its own step before navigating parent,
+	// but programmatic navigateChild/navigateParent paths previously
+	// preserved searchInput.Value, leaving the highlight stuck.
+	m.searchInput.Clear()
+
 	switch m.nav.Level {
 	case model.LevelClusters:
 		return m.navigateChildCluster(sel)
@@ -257,25 +281,54 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.refreshSecuritySources()
 	m.applyPinnedGroups()
 	m.nav.Level = model.LevelResourceTypes
+	// Capture whatever the right-pane preview was already displaying for
+	// this context (real discovery hit or seed fallback). We use this
+	// below to avoid a blank loader if navigation beats hover-discovery
+	// to the punch.
+	previewItems := append([]model.Item(nil), m.rightItems...)
 	m.pushLeft()
 	m.clearRight()
-	if discovered, ok := m.discoveredResources[sel.Name]; ok && len(discovered) > 0 {
-		m.middleItems = model.BuildSidebarItems(discovered)
+	switch {
+	case len(m.discoveredResources[sel.Name]) > 0:
+		// Discovery already completed while hovering — pop straight into
+		// the real list, no loader at all.
+		m.setMiddleItems(model.BuildSidebarItems(m.discoveredResources[sel.Name]))
 		m.itemCache[m.navKey()] = m.middleItems
 		m.restoreCursor()
 		m.syncExpandedGroup()
-	} else {
-		// Discovery not yet available: show loading spinner instead of
-		// seed resources to avoid the jarring pop-in when CRDs arrive.
-		m.middleItems = nil
+	case m.discoveringContexts[sel.Name] && len(previewItems) > 0:
+		// Hover-discovery is in flight and the right pane already had
+		// something to show (seed fallback). Reuse those items so the
+		// user sees content immediately; apiResourceDiscoveryMsg will
+		// replace them with the real list when discovery completes.
+		m.setMiddleItems(previewItems)
+		m.itemCache[m.navKey()] = m.middleItems
+		m.restoreCursor()
+		m.syncExpandedGroup()
+		m.loading = true
+	default:
+		// No preview content and no in-flight discovery — show the
+		// loader and kick off discovery below.
+		m.setMiddleItems(nil)
 		m.loading = true
 	}
+	m.setStatusMessage(fmt.Sprintf("Context: %s", sel.Name), false)
 	m.saveCurrentSession()
-	cmds := []tea.Cmd{m.loadPreview()}
-	if _, ok := m.discoveredResources[sel.Name]; !ok {
+	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
+	// Fire discovery once per session per context. The disk cache may have
+	// prefilled m.discoveredResources, but stale-while-revalidate still
+	// wants a live refresh on the user's first interaction with the
+	// context. shouldFireDiscoveryFor handles both the prefilled-but-stale
+	// case and the in-flight dedup. loadPreviewClusters typically already
+	// fires this on hover, so navigation usually no-ops here.
+	if m.shouldFireDiscoveryFor(sel.Name) {
+		m.markDiscoveryStarted(sel.Name)
 		cmds = append(cmds, m.discoverAPIResources(sel.Name))
 	}
 	if cmd := m.loadSecurityAvailability(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 	return m, tea.Batch(cmds...)
@@ -301,7 +354,7 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.nav.Level = model.LevelResources
 		m.pushLeft()
 		m.clearRight()
-		m.middleItems = m.portForwardItems()
+		m.setMiddleItems(m.portForwardItems())
 		m.setCursor(0)
 		m.clampCursor()
 		m.saveCurrentSession()
@@ -366,11 +419,16 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.pushLeft()
 	m.clearRight()
 	m.saveCurrentSession()
-	if cached, ok := m.itemCache[m.navKey()]; ok {
-		m.middleItems = cached
+	// Show the cached list immediately while loadResources decides
+	// whether to serve from cache (fresh-cache shortcut) or issue a real
+	// fetch. The cache-then-refresh UX is unchanged; the refetch-suppression
+	// now lives in loadResources, which compares the cache's freshness
+	// fingerprint against the current fetch parameters.
+	if cached, cacheHit := m.itemCache[m.navKey()]; cacheHit {
+		m.setMiddleItems(cached)
 		m.restoreCursor()
 	} else {
-		m.middleItems = nil
+		m.setMiddleItems(nil)
 		m.setCursor(0)
 	}
 	m.loading = true
@@ -413,10 +471,10 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.pushLeft()
 		m.clearRight()
 		if cached, ok := m.itemCache[m.navKey()]; ok {
-			m.middleItems = cached
+			m.setMiddleItems(cached)
 			m.restoreCursor()
 		} else {
-			m.middleItems = nil
+			m.setMiddleItems(nil)
 			m.setCursor(0)
 		}
 		m.loading = true
@@ -426,10 +484,10 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.pushLeft()
 	m.clearRight()
 	if cached, ok := m.itemCache[m.navKey()]; ok {
-		m.middleItems = cached
+		m.setMiddleItems(cached)
 		m.restoreCursor()
 	} else {
-		m.middleItems = nil
+		m.setMiddleItems(nil)
 		m.setCursor(0)
 	}
 	m.loading = true
@@ -447,10 +505,10 @@ func (m Model) navigateChildOwned(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.pushLeft()
 		m.clearRight()
 		if cached, ok := m.itemCache[m.navKey()]; ok {
-			m.middleItems = cached
+			m.setMiddleItems(cached)
 			m.restoreCursor()
 		} else {
-			m.middleItems = nil
+			m.setMiddleItems(nil)
 			m.setCursor(0)
 		}
 		m.loading = true
@@ -471,10 +529,10 @@ func (m Model) navigateChildOwned(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.pushLeft()
 		m.clearRight()
 		if cached, ok := m.itemCache[m.navKey()]; ok {
-			m.middleItems = cached
+			m.setMiddleItems(cached)
 			m.restoreCursor()
 		} else {
-			m.middleItems = nil
+			m.setMiddleItems(nil)
 			m.setCursor(0)
 		}
 		m.loading = true

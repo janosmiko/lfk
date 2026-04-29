@@ -175,6 +175,7 @@ type TabState struct {
 	leftScroll             int // persistent scroll position for left column (vim-style scrolloff)
 	cursorMemory           map[string]int
 	itemCache              map[string][]model.Item
+	cacheFingerprints      map[string]string
 	yamlContent            string
 	yamlScroll             int
 	yamlCursor             int // cursor position in visible lines (relative to scroll)
@@ -217,6 +218,7 @@ type TabState struct {
 	mode              viewMode
 	logLines          []string
 	logScroll         int
+	logWrapTopSkip    int
 	logFollow         bool
 	logWrap           bool
 	logLineNumbers    bool
@@ -301,6 +303,18 @@ type Model struct {
 
 	// Item cache: maps navigation path to loaded items for faster back navigation.
 	itemCache map[string][]model.Item
+
+	// cacheFingerprints maps the same keys as itemCache to a fingerprint
+	// of the fetch-affecting state (namespace, allNamespaces,
+	// selectedNamespaces) that was in effect when the entry was written.
+	// loadResources uses it to decide whether a primed cache entry is
+	// still applicable: if the current fingerprint matches, the fetch can
+	// be served from cache instead of hitting the API. This is populated
+	// only by updateResourcesLoadedPreview and updateResourcesLoadedMain
+	// — the paths that fetch data under the current state. Other writers
+	// (session restore, bookmarks, toggleRare rebuild) leave the entry
+	// without a fingerprint, which safely defaults to a real fetch.
+	cacheFingerprints map[string]string
 
 	// Preview / YAML content for the right column or full screen view.
 	yamlContent    string
@@ -429,30 +443,39 @@ type Model struct {
 
 	// Help screen state.
 	helpScroll       int
-	helpFilter       TextInput
-	helpSearchActive bool
-	helpContextMode  string   // section to highlight (e.g. "YAML View", "Log Viewer")
-	helpPreviousMode viewMode // mode to return to when help is closed
+	helpFilter       TextInput // applied filter (f key) — narrows visible lines
+	helpFilterActive bool      // whether the f filter input is being typed
+	helpSearchActive bool      // whether the / search input is being typed
+	helpSearchQuery  string    // applied search query (/ key) — highlights matches without filtering
+	helpMatchLines   []int     // line indices in the filtered list that contain helpSearchQuery
+	helpMatchIdx     int       // current position within helpMatchLines for n/N navigation
+	helpContextMode  string    // section to highlight (e.g. "YAML View", "Log Viewer")
+	helpPreviousMode viewMode  // mode to return to when help is closed
 	helpSearchInput  textinput.Model
 
 	// Resource filter state (/ key).
-	filterText   string    // applied filter for middle column
-	filterActive bool      // whether the filter input is being typed
-	filterInput  TextInput // what user is currently typing
+	filterText      string    // applied filter for middle column
+	filterActive    bool      // whether the filter input is being typed
+	filterInput     TextInput // what user is currently typing
+	filterBroadMode bool      // Tab toggle: also match column values (annotations, labels, ...)
 
 	// Search state (s key).
 	searchActive     bool
 	searchInput      TextInput
 	searchPrevCursor int
+	searchBroadMode  bool // Tab toggle inside search input: also match column values
 
 	// Log viewer state.
 	logLines          []string           // buffered log lines
-	logScroll         int                // scroll offset (top visible line)
+	logScroll         int                // scroll offset (top visible source line)
+	logWrapTopSkip    int                // wrap mode: number of sub-lines to skip from the top of logLines[logScroll]
 	logFollow         bool               // auto-scroll to bottom
 	logWrap           bool               // wrap long lines
 	logLineNumbers    bool               // show line numbers
 	logTimestamps     bool               // show timestamps (--timestamps)
 	logHidePrefixes   bool               // hide [pod/name/container] prefixes
+	logPreviewVisible bool               // show structured preview side panel
+	logPreviewScroll  int                // body-row offset within the preview pane (J/K)
 	logPrevious       bool               // show previous container logs (--previous)
 	logIsMulti        bool               // multi-log stream (for restart)
 	logMultiItems     []model.Item       // items for multi-log restart
@@ -474,6 +497,17 @@ type Model struct {
 	logParentKind   string // original parent resource kind (e.g., "Deployment")
 	logParentName   string // original parent resource name
 	logSavedPodName string // saved pod name before overlay, for restoring on cancel
+
+	// Log viewer: auto-reconnect for multi-container Pods. When following all
+	// containers of a Pod, the kubectl stream ends as soon as the current set
+	// of containers all exit (e.g. an init container finishes before the next
+	// one has started). logAutoReconnectAttempt counts consecutive empty
+	// reconnects so we can give up when the pod is really terminated. It is
+	// reset to 0 every time a line arrives. logReconnecting tells
+	// startLogStream to suppress --tail so we don't re-fetch history we
+	// already have.
+	logAutoReconnectAttempt int
+	logReconnecting         bool
 
 	// Log viewer: container filter state.
 	logContainers         []string // available container names for current pod
@@ -565,6 +599,20 @@ type Model struct {
 	// they were created with and are discarded if it no longer matches.
 	requestGen uint64
 
+	// middleItemsRev is the authoritative cache-invalidation signal for the
+	// middle-column TableRenderer. It MUST be bumped whenever a render of
+	// the same indices would produce different output: in-place element
+	// mutation AND every slice reassignment (use setMiddleItems for the
+	// latter). itemsPtr in the fingerprint is only a fast-path safety net.
+	middleItemsRev uint64
+	// selectionRev is bumped on every change to selectedItems so the row
+	// cache invalidates and the selection marker on non-cursor rows updates.
+	selectionRev uint64
+
+	middleTableRenderer *ui.TableRenderer
+
+	previewDebounceGen uint64
+
 	// Context cancellation for in-flight API requests. Cancelled on every
 	// navigation change so stale requests are aborted early instead of
 	// running to completion.
@@ -579,6 +627,15 @@ type Model struct {
 	bookmarks          []model.Bookmark
 	bookmarkFilter     TextInput           // filter text (f mode) for bookmark overlay
 	bookmarkSearchMode bookmarkOverlayMode // current interaction mode for bookmark overlay
+	// bookmarkLoadNamespace, when true, instructs the next jump issued
+	// from the bookmark overlay to apply the bookmark's saved namespace
+	// scope. By default bookmark jumps ignore the saved namespace and
+	// keep the tab's current scope (slot case only controls context
+	// switching, not namespace handling). Toggled by Tab inside the
+	// overlay and shown as a `[LOAD NAMESPACE]` chip in the title.
+	// Reset on overlay close and consumed after each jump so it never
+	// leaks between opens.
+	bookmarkLoadNamespace bool
 
 	// Template overlay state.
 	templateItems      []model.ResourceTemplate
@@ -623,6 +680,43 @@ type Model struct {
 
 	// Discovered CRDs per context: keyed by context name.
 	discoveredResources map[string][]model.ResourceTypeEntry
+
+	// Contexts with an in-flight API discovery call. Used to avoid
+	// spamming the cluster API (and its OIDC auth flow) when the user
+	// rapidly cursors through many contexts at the cluster list. Entries
+	// are added when discoverAPIResources is kicked off and removed in
+	// updateAPIResourceDiscovery when the result arrives.
+	discoveringContexts map[string]bool
+
+	// Contexts whose discoveredResources entries have been refreshed
+	// (i.e. live-fetched) during this session. NewModel prefills
+	// discoveredResources from the on-disk discovery cache for instant
+	// first paint, so the bare presence of an entry no longer implies
+	// "fresh" — this flag is the source of truth for stale-while-revalidate
+	// gating in the lazy discovery triggers.
+	discoveryRefreshedContexts map[string]bool
+
+	// bookmarkAwaitingDiscovery holds a bookmark whose target resource type
+	// can't be resolved yet because API discovery for the effective context
+	// hasn't completed (typical at session restore — the seed list resolves
+	// Pods/Deployments synchronously but CRDs like ArgoCD Applications are
+	// only known after the discovery round-trip lands). Set by
+	// navigateToBookmark, consumed by updateAPIResourceDiscovery, which
+	// replays the navigation once the matching context's entries arrive.
+	// Distinct from pendingBookmark (which gates save-overwrite confirmation).
+	bookmarkAwaitingDiscovery *model.Bookmark
+
+	// sessionResourceTypeAwaitingDiscovery captures the resource type ref a
+	// just-restored session wants to land on when the type wasn't yet known
+	// to the seed list (CRD-backed views like ArgoCD Application). The
+	// matching apiResourceDiscoveryMsg consumes it and navigates to the
+	// resource type so the user lands back on the view they quit from
+	// instead of being dumped at the resource types level.
+	sessionResourceTypeAwaitingDiscovery string
+	// sessionResourceNameAwaitingDiscovery is the resource name to land on
+	// once the type-await above resolves. Mirrors pendingTarget but is only
+	// armed when the type itself was deferred.
+	sessionResourceNameAwaitingDiscovery string
 
 	// Preview scroll offset for the right column.
 	previewScroll int
@@ -680,6 +774,11 @@ type Model struct {
 	schemeFilter       TextInput
 	schemeFilterMode   bool   // true when typing into filter
 	schemeOriginalName string // scheme name before opening overlay, for cancel restore
+
+	// secretPreviewCache stores fetched secret data keyed by
+	// "ctx/namespace/name" to avoid redundant API calls when hovering the same
+	// secret after a list refresh. Invalidated on successful secret save.
+	secretPreviewCache map[string]*model.SecretData
 
 	// Secret editor state.
 	secretData         *model.SecretData
@@ -791,9 +890,16 @@ type Model struct {
 	commandBarSelectedSuggestion int
 	commandBarPreview            string // ghost text shown dimmed after cursor (tab preview)
 	commandHistory               *commandHistory
+	queryHistory                 *commandHistory // shared by explorer / search and f filter
 
-	// Cached namespace names for command bar autocompletion.
-	cachedNamespaces []string
+	// Cached namespace names for command bar autocompletion, keyed by
+	// context name. Each tab may have its own nav.Context, so keying by
+	// context keeps completions correct when switching tabs or running
+	// `:ctx` within a tab. Entries carry a fetchedAt timestamp so the
+	// command bar can refresh them after namespaceCacheTTL without
+	// refetching on every open (stale-while-revalidate: the old entry
+	// stays visible while the refresh runs).
+	cachedNamespaces map[string]namespaceCacheEntry
 
 	// Async resource name cache for cross-namespace kubectl completion.
 	// Key: "context/namespace/resource" -> list of resource names.
@@ -878,9 +984,14 @@ type Model struct {
 	columnToggleCursor       int
 	columnToggleFilter       string
 	columnToggleFilterActive bool
-	sessionColumns           map[string][]string // kind -> ordered visible extra column keys (session-only)
-	hiddenBuiltinColumns     map[string][]string // kind -> hidden built-in column keys (session-only)
-	columnOrder              map[string][]string // kind -> ordered column keys (built-ins + extras interleaved; Name is implicit)
+	// columnToggleSnapshot captures the pre-overlay values of session/
+	// hidden/order maps for the current kind so Esc can revert when the
+	// user explored toggles live and changed their mind. Captured at
+	// openColumnToggle, consumed at handleColumnToggleKeyEsc.
+	columnToggleSnapshot columnToggleSnapshot
+	sessionColumns       map[string][]string // kind -> ordered visible extra column keys (session-only)
+	hiddenBuiltinColumns map[string][]string // kind -> hidden built-in column keys (session-only)
+	columnOrder          map[string][]string // kind -> ordered column keys (built-ins + extras interleaved; Name is implicit)
 
 	// Easter egg state.
 	konamiProgress int  // current position in the Konami Code sequence
@@ -916,7 +1027,7 @@ type ownedParentState struct {
 func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("62"))
+	s.Style = lipgloss.NewStyle().Foreground(ui.ThemeColor("62"))
 
 	contextName := client.CurrentContext()
 	if opts.Context != "" {
@@ -936,34 +1047,41 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
 	m := Model{
-		client:              client,
-		nav:                 model.NavigationState{Level: model.LevelClusters},
-		bookmarks:           loadBookmarks(),
-		pendingSession:      loadSession(),
-		pendingPortForwards: loadPortForwardState(),
-		commandHistory:      loadCommandHistory(),
-		pinnedState:         pinnedSt,
-		namespace:           defaultNS,
-		spinner:             s,
-		watchInterval:       watchInterval,
-		splitPreview:        true,
-		allNamespaces:       true,
-		watchMode:           true,
-		sortColumnName:      sortColDefault,
-		sortAscending:       true,
-		cursorMemory:        make(map[string]int),
-		itemCache:           make(map[string][]model.Item),
-		selectedItems:       make(map[string]bool),
-		selectionAnchor:     -1,
-		yamlCollapsed:       make(map[string]bool),
-		discoveredResources: make(map[string][]model.ResourceTypeEntry),
-		allGroupsExpanded:   true,
-		warningEventsOnly:   true,
-		eventGrouping:       true,
-		bgtasks:             bgtasks.New(bgtasks.DefaultThreshold),
-		diffLineNumbers:     true,
-		reqCtx:              reqCtx,
-		reqCancel:           reqCancel,
+		client:                     client,
+		nav:                        model.NavigationState{Level: model.LevelClusters},
+		bookmarks:                  loadBookmarks(),
+		pendingSession:             loadSession(),
+		pendingPortForwards:        loadPortForwardState(),
+		commandHistory:             loadCommandHistory(),
+		queryHistory:               loadInputHistory(historyFileQuery),
+		pinnedState:                pinnedSt,
+		namespace:                  defaultNS,
+		spinner:                    s,
+		watchInterval:              watchInterval,
+		splitPreview:               true,
+		allNamespaces:              true,
+		watchMode:                  true,
+		sortColumnName:             sortColDefault,
+		sortAscending:              true,
+		cursorMemory:               make(map[string]int),
+		itemCache:                  make(map[string][]model.Item),
+		cacheFingerprints:          make(map[string]string),
+		selectedItems:              make(map[string]bool),
+		selectionAnchor:            -1,
+		yamlCollapsed:              make(map[string]bool),
+		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
+		discoveringContexts:        make(map[string]bool),
+		secretPreviewCache:         make(map[string]*model.SecretData),
+		discoveryRefreshedContexts: make(map[string]bool),
+		allGroupsExpanded:          true,
+		warningEventsOnly:          true,
+		eventGrouping:              true,
+		logPreviewVisible:          true,
+		bgtasks:                    bgtasks.New(bgtasks.DefaultThreshold),
+		diffLineNumbers:            true,
+		reqCtx:                     reqCtx,
+		reqCancel:                  reqCancel,
+		middleTableRenderer:        ui.NewTableRenderer(),
 		tabs: []TabState{{
 			nav:                model.NavigationState{Level: model.LevelClusters},
 			namespace:          defaultNS,
@@ -977,6 +1095,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			allGroupsExpanded:  true,
 			cursorMemory:       make(map[string]int),
 			itemCache:          make(map[string][]model.Item),
+			cacheFingerprints:  make(map[string]string),
 			selectedItems:      make(map[string]bool),
 			selectionAnchor:    -1,
 			selectedNamespaces: nil,
@@ -984,6 +1103,22 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		activeTab:      0,
 		execMu:         &sync.Mutex{},
 		portForwardMgr: k8s.NewPortForwardManager(),
+	}
+
+	// Stale-while-revalidate: seed discoveredResources from the per-host
+	// snapshots under ~/.kube/cache/discovery/<host>/lfk-enriched.yaml so
+	// the sidebar paints instantly on first frame instead of waiting for a
+	// live discovery roundtrip. The lazy-trigger sites still fire fresh
+	// discovery (gated by m.discoveryRefreshedContexts), so the cached
+	// values are replaced as soon as the live result lands.
+	if cached := loadAllDiscoveryCaches(client); cached != nil {
+		pseudo := model.PseudoResources()
+		for ctx, entries := range cached {
+			merged := make([]model.ResourceTypeEntry, 0, len(pseudo)+len(entries))
+			merged = append(merged, pseudo...)
+			merged = append(merged, entries...)
+			m.discoveredResources[ctx] = merged
+		}
 	}
 
 	// When CLI flags are provided, replace the file-loaded session with a
@@ -1127,6 +1262,70 @@ func resolveSecurityConfig(kctx string) *model.SecurityConfig {
 	return nil
 }
 
+// namespaceCacheEntry holds the result of a namespace fetch plus the
+// time it completed. The fetchedAt timestamp lets the command bar
+// refresh stale entries without refetching on every open.
+type namespaceCacheEntry struct {
+	names     []string
+	fetchedAt time.Time
+}
+
+// namespaceCacheTTL is how long a cached namespace list stays fresh.
+// After this interval the command bar will trigger a background
+// refresh on next open so newly created namespaces show up in
+// completions without requiring an app restart. The stale entry stays
+// visible until the refresh lands (stale-while-revalidate), so the UI
+// never blinks between "has completions" and "empty".
+//
+// Actions that directly mutate namespaces (`:k create|delete ns ...`
+// and template applies) bypass the TTL via invalidateNamespaceCache,
+// so the common "I just made it" case is instant — the TTL is only a
+// backstop for changes made outside the TUI.
+const namespaceCacheTTL = 60 * time.Second
+
+// activeContext returns the kubectl context that queries on behalf of
+// the current tab should target. It prefers the tab-scoped nav.Context
+// and falls back to the client's current context; returns "" when the
+// client has not been initialised yet (e.g. in pre-startup tests) so
+// callers never panic on a nil client.
+func (m Model) activeContext() string {
+	if m.nav.Context != "" {
+		return m.nav.Context
+	}
+	if m.client != nil {
+		return m.client.CurrentContext()
+	}
+	return ""
+}
+
+// ensureNamespaceCacheFresh returns a command that refreshes the
+// namespace cache for the current context when the entry is missing,
+// empty, or older than namespaceCacheTTL; returns nil otherwise.
+// Context-open paths (drilling into a cluster, `:ctx`, bookmark
+// activation, session restore) batch it so the first `:` open in the
+// newly-opened context has completions ready without waiting for the
+// user's keystroke to trigger the fetch.
+func (m Model) ensureNamespaceCacheFresh() tea.Cmd {
+	entry, ok := m.cachedNamespaces[m.activeContext()]
+	if !ok || len(entry.names) == 0 || time.Since(entry.fetchedAt) > namespaceCacheTTL {
+		// Silent: this is a background cache refresh, not an overlay-
+		// triggered load. The handler must NOT clear m.loading or we
+		// race with in-flight API discovery on session restore and
+		// produce a "No items" flash in the resource-types list.
+		return m.loadNamespacesSilent(true)
+	}
+	return nil
+}
+
+// invalidateNamespaceCache drops the cache entry for the current
+// context so the next command bar open triggers a fresh fetch. Called
+// after actions that mutate the cluster's namespace list (`:k create
+// ns`, `:k delete ns`, template applies) so the new state is reflected
+// in completions immediately instead of up to namespaceCacheTTL later.
+func (m *Model) invalidateNamespaceCache() {
+	delete(m.cachedNamespaces, m.activeContext())
+}
+
 // cancelAndReset cancels any in-flight API requests and creates a fresh
 // context for subsequent requests. Safe to call multiple times.
 func (m *Model) cancelAndReset() {
@@ -1181,6 +1380,9 @@ func (m Model) Init() tea.Cmd {
 	}
 	if ui.ConfigTipsEnabled {
 		cmds = append(cmds, scheduleStartupTip())
+	}
+	if ui.ColorModeEnabled() {
+		cmds = append(cmds, ui.EnableColorModeCmd())
 	}
 	return tea.Batch(cmds...)
 }

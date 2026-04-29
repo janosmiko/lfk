@@ -58,6 +58,31 @@ func DefaultTheme() Theme {
 // When ConfigNoColor is true, style globals are rebuilt without foreground
 // or background colors; emphasis is preserved via bold/underline/reverse.
 func ApplyTheme(t Theme) {
+	// Apply minimum contrast enforcement before storing the active theme.
+	// t is passed by value so mutations here are local to this function and
+	// do not affect the caller's Theme struct. ActiveTheme receives the
+	// adjusted copy so external code always sees the actual rendered colors.
+	if ConfigMinContrastRatio > 0 {
+		t.Text = EnforceMinContrast(t.Text, t.Base, ConfigMinContrastRatio)
+		t.Dimmed = EnforceMinContrast(t.Dimmed, t.Base, ConfigMinContrastRatio)
+		t.Error = EnforceMinContrast(t.Error, t.Base, ConfigMinContrastRatio)
+		t.Warning = EnforceMinContrast(t.Warning, t.Base, ConfigMinContrastRatio)
+		t.Secondary = EnforceMinContrast(t.Secondary, t.Base, ConfigMinContrastRatio)
+		t.Primary = EnforceMinContrast(t.Primary, t.Base, ConfigMinContrastRatio)
+		t.Purple = EnforceMinContrast(t.Purple, t.Base, ConfigMinContrastRatio)
+		// Border is intentionally NOT enforced as a foreground color.
+		// Its visible roles in the app are decorative (column box-drawing
+		// characters) AND structural (the background of
+		// ParentHighlightStyle — the LEFT pane's selected-row highlight
+		// rendering t.Text on t.Border). Forcing Border to meet text-
+		// readability contrast against Base drives it toward the fg end
+		// of the spectrum, which is exactly where Text already lives —
+		// Text on Border then collapses into invisibility in the parent
+		// pane. Leaving Border at the designer's chosen luminance keeps
+		// it a subtle bg while the Text→Base enforcement above ensures
+		// Text-on-Border stays readable.
+		t.SelectedFg = EnforceMinContrast(t.SelectedFg, t.SelectedBg, ConfigMinContrastRatio)
+	}
 	ActiveTheme = t
 	if ConfigNoColor {
 		applyNoColorTheme()
@@ -354,9 +379,11 @@ func ApplyTheme(t Theme) {
 		Foreground(lipgloss.Color(t.Base)).
 		Bold(true)
 
+	// Same dark fg as SearchHighlightStyle for legibility on the warning
+	// bg across themes; underline is the differentiator for "current match".
 	SelectedSearchHighlightStyle = lipgloss.NewStyle().
 		Background(lipgloss.Color(t.Warning)).
-		Foreground(lipgloss.Color(t.SelectedBg)).
+		Foreground(lipgloss.Color(t.Base)).
 		Bold(true).
 		Underline(true)
 

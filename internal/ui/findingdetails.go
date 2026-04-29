@@ -18,13 +18,7 @@ func RenderFindingDetails(item model.Item, width, height int) string {
 	severity := item.ColumnValue("Severity")
 	title := item.ColumnValue("Title")
 	fmt.Fprintf(&b, "%s  %s\n", styleSeverityBadge(severity), title)
-	sepWidth := width
-	if sepWidth < 1 {
-		sepWidth = 1
-	}
-	if sepWidth > 120 {
-		sepWidth = 120
-	}
+	sepWidth := min(max(width, 1), 120)
 	b.WriteString(strings.Repeat("─", sepWidth))
 	b.WriteString("\n\n")
 
@@ -70,10 +64,7 @@ func RenderFindingDetails(item model.Item, width, height int) string {
 
 	if desc := item.ColumnValue("Description"); desc != "" {
 		b.WriteString("\n  Description:\n")
-		wrapWidth := width - 4
-		if wrapWidth < 20 {
-			wrapWidth = 20
-		}
+		wrapWidth := max(width-4, 20)
 		for _, line := range wrapLines(desc, wrapWidth) {
 			fmt.Fprintf(&b, "    %s\n", line)
 		}
@@ -81,7 +72,7 @@ func RenderFindingDetails(item model.Item, width, height int) string {
 
 	if refs := item.ColumnValue("References"); refs != "" {
 		b.WriteString("\n  References:\n")
-		for _, ref := range strings.Split(refs, "\n") {
+		for ref := range strings.SplitSeq(refs, "\n") {
 			fmt.Fprintf(&b, "    %s\n", ref)
 		}
 	}
@@ -100,13 +91,7 @@ func RenderFindingGroupDetails(group model.Item, affected []model.Item, width, h
 	severity := group.ColumnValue("Severity")
 	title := group.Name
 	fmt.Fprintf(&b, "%s  %s\n", styleSeverityBadge(severity), title)
-	sepWidth := width
-	if sepWidth < 1 {
-		sepWidth = 1
-	}
-	if sepWidth > 120 {
-		sepWidth = 120
-	}
+	sepWidth := min(max(width, 1), 120)
 	b.WriteString(strings.Repeat("─", sepWidth))
 	b.WriteString("\n\n")
 
@@ -126,10 +111,7 @@ func RenderFindingGroupDetails(group model.Item, affected []model.Item, width, h
 
 	if desc := group.ColumnValue("Description"); desc != "" {
 		b.WriteString("\n  Description:\n")
-		wrapWidth := width - 4
-		if wrapWidth < 20 {
-			wrapWidth = 20
-		}
+		wrapWidth := max(width-4, 20)
 		for _, line := range wrapLines(desc, wrapWidth) {
 			fmt.Fprintf(&b, "    %s\n", line)
 		}
@@ -137,20 +119,14 @@ func RenderFindingGroupDetails(group model.Item, affected []model.Item, width, h
 
 	if refs := group.ColumnValue("References"); refs != "" {
 		b.WriteString("\n  References:\n")
-		for _, ref := range strings.Split(refs, "\n") {
+		for ref := range strings.SplitSeq(refs, "\n") {
 			fmt.Fprintf(&b, "    %s\n", ref)
 		}
 	}
 
 	if len(affected) > 0 {
 		b.WriteString("\n  Affected resources:\n")
-		maxShow := height / 2
-		if maxShow < 5 {
-			maxShow = 5
-		}
-		if maxShow > len(affected) {
-			maxShow = len(affected)
-		}
+		maxShow := min(max(height/2, 5), len(affected))
 		for i := range maxShow {
 			it := affected[i]
 			sev := it.ColumnValue("Severity")
@@ -179,13 +155,7 @@ func RenderAffectedResourceDetails(item model.Item, width, height int) string {
 	severity := item.ColumnValue("Severity")
 	resource := item.ColumnValue("Resource")
 	fmt.Fprintf(&b, "%s  %s\n", styleSeverityBadge(severity), resource)
-	sepWidth := width
-	if sepWidth < 1 {
-		sepWidth = 1
-	}
-	if sepWidth > 120 {
-		sepWidth = 120
-	}
+	sepWidth := min(max(width, 1), 120)
 	b.WriteString(strings.Repeat("─", sepWidth))
 	b.WriteString("\n\n")
 
@@ -205,10 +175,7 @@ func RenderAffectedResourceDetails(item model.Item, width, height int) string {
 
 	if desc := item.ColumnValue("Description"); desc != "" {
 		b.WriteString("\n  Details:\n")
-		wrapWidth := width - 4
-		if wrapWidth < 20 {
-			wrapWidth = 20
-		}
+		wrapWidth := max(width-4, 20)
 		for _, line := range wrapLines(desc, wrapWidth) {
 			fmt.Fprintf(&b, "    %s\n", line)
 		}
@@ -240,7 +207,7 @@ func styleSeverityBadge(sev string) string {
 // input by splitting on "\n" first and wrapping each paragraph independently.
 func wrapLines(s string, width int) []string {
 	var out []string
-	for _, para := range strings.Split(s, "\n") {
+	for para := range strings.SplitSeq(s, "\n") {
 		if para == "" {
 			out = append(out, "")
 			continue

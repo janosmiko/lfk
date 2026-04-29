@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"maps"
 	"os"
 	"strconv"
 	"strings"
@@ -53,6 +54,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("stderr: "+msg.message, true)
 		return m, tea.Batch(scheduleStatusClear(), m.waitForStderr())
 	default:
+		if dark, ok := ui.ParseColorModeMsg(msg); ok {
+			ui.SetColorMode(dark)
+			return m, nil
+		}
 		if mdl, cmd, ok := m.updateResourceMsg(msg); ok {
 			return mdl, cmd
 		}
@@ -73,8 +78,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 		mdl, cmd := m.updateResourceTypes(msg)
 		return mdl, cmd, true
 	case apiResourceDiscoveryMsg:
-		mdl := m.updateAPIResourceDiscovery(msg)
-		return mdl, nil, true
+		mdl, cmd := m.updateAPIResourceDiscovery(msg)
+		return mdl, cmd, true
 	case resourcesLoadedMsg:
 		mdl, cmd := m.updateResourcesLoaded(msg)
 		return mdl, cmd, true
@@ -114,8 +119,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case startupTipMsg:
 		mdl, cmd := m.updateStartupTip(msg)
 		return mdl, cmd, true
-	case watchTickMsg:
-		mdl, cmd := m.updateWatchTick(msg)
+	case watchTickMsg, previewDebounceTickMsg:
+		mdl, cmd := m.dispatchNavigationTick(msg)
 		return mdl, cmd, true
 	case podSelectMsg:
 		mdl, cmd := m.updatePodSelect(msg)
@@ -134,6 +139,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 		return mdl, nil, true
 	case previewEventsLoadedMsg:
 		mdl := m.updatePreviewEventsLoaded(msg)
+		return mdl, nil, true
+	case previewSecretDataLoadedMsg:
+		mdl := m.updatePreviewSecretDataLoaded(msg)
 		return mdl, nil, true
 	case podMetricsEnrichedMsg:
 		mdl := m.updatePodMetricsEnriched(msg)
@@ -375,6 +383,9 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case logLineMsg:
 		mdl, cmd := m.updateLogLine(msg)
 		return mdl, cmd, true
+	case logStreamRestartMsg:
+		mdl, cmd := m.updateLogStreamRestart(msg)
+		return mdl, cmd, true
 	case logHistoryMsg:
 		mdl := m.updateLogHistory(msg)
 		return mdl, nil, true
@@ -427,7 +438,7 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
-	m.middleItems = msg.items
+	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
 	m.leftItems = nil
 	m.clearRight()
@@ -457,21 +468,37 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 }
 
 func (m Model) updateResourceTypes(msg resourceTypesMsg) (tea.Model, tea.Cmd) {
-	m.loading = false
 	m.err = nil
 	if m.nav.Level == model.LevelClusters {
+		// Right-pane preview at the cluster list: always update so the user
+		// sees *something* (seeds or real) while hovering a context.
 		m.rightItems = msg.items
+		m.loading = false
 		return m, nil
 	}
-	m.middleItems = msg.items
+	// Middle pane at LevelResourceTypes: if discovery is still in flight
+	// and only seeds are available, don't clobber the loader with seeds
+	// — that would cause a one-tick flash of basic resource types every
+	// watch interval. Real discovery results (seeded=false) or an
+	// explicit seed fallback from updateAPIResourceDiscovery (which
+	// writes middleItems directly) take precedence via their own paths.
+	if msg.seeded && m.loading {
+		return m, nil
+	}
+	m.loading = false
+	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
 	m.clampCursor()
 	return m, m.loadPreview()
 }
 
-func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
+func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, tea.Cmd) {
+	// Clear the in-flight flag for this context regardless of outcome so
+	// the user can retry (or hover again) without getting stuck on a
+	// permanently-deduplicated call.
+	delete(m.discoveringContexts, msg.context)
 	if isContextCanceled(msg.err) {
-		return m
+		return m, nil
 	}
 	if msg.err != nil {
 		// API resource discovery failed (permissions, etc.) -- fall back to
@@ -479,30 +506,73 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 		logger.Info("API resource discovery failed", "context", msg.context, "error", msg.err.Error())
 		if m.nav.Context == msg.context && m.loading {
 			m.loading = false
-			m.middleItems = model.BuildSidebarItems(model.SeedResources())
+			m.setMiddleItems(model.BuildSidebarItems(model.SeedResources()))
 			m.itemCache[m.navKey()] = m.middleItems
 			m.restoreCursor()
 			m.syncExpandedGroup()
 		}
-		return m
+		// On discovery failure, drop any queued bookmark so we don't loop
+		// retrying. The user can re-open the overlay and try again.
+		if m.bookmarkAwaitingDiscovery != nil {
+			m.bookmarkAwaitingDiscovery = nil
+			m.setStatusMessage("Resource type not found in current cluster", true)
+			return m, scheduleStatusClear()
+		}
+		return m, nil
 	}
 	// Prepend LFK pseudo-resources (helm releases, port forwards) so they
 	// resolve via FindResourceType* and appear in the sidebar uniformly
 	// with real discovered resources.
 	entries := append(model.PseudoResources(), msg.entries...)
 	m.discoveredResources[msg.context] = entries
+	if m.discoveryRefreshedContexts == nil {
+		m.discoveryRefreshedContexts = make(map[string]bool)
+	}
+	m.discoveryRefreshedContexts[msg.context] = true
+	// Persist the cluster-reported entries (without pseudo-resources, which
+	// are runtime-only) into the per-host file under ~/.kube/cache/discovery
+	// so the next launch can prefill discoveredResources from disk and so
+	// `kubectl api-resources --invalidate-cache` wipes lfk's snapshot too.
+	// Best-effort: a write failure leaves the in-memory state authoritative
+	// for this session.
+	if err := updateDiscoveryCacheForContext(m.client, msg.context, msg.entries); err != nil {
+		logger.Warn("Could not persist discovery cache", "context", msg.context, "error", err)
+	}
+	merged := model.BuildSidebarItems(entries)
+	// If the user is at LevelClusters and hovering this context, refresh
+	// the right-pane preview so the discovered list replaces the seed
+	// fallback that was emitted synchronously when loadPreviewClusters ran.
+	if m.nav.Level == model.LevelClusters {
+		if sel := m.selectedMiddleItem(); sel != nil && sel.Name == msg.context {
+			m.rightItems = merged
+		}
+	}
 	if m.nav.Context == msg.context {
-		merged := model.BuildSidebarItems(entries)
 		// Update the item cache for the resource types level.
 		rtCacheKey := msg.context
 		m.itemCache[rtCacheKey] = merged
 		if m.nav.Level == model.LevelResourceTypes {
 			// User is on resource types level: update the visible list.
+			//
+			// Distinguish initial discovery (no list yet) from periodic
+			// re-discovery (watch tick / shift+r): the initial path
+			// honors cursorMemory so context-switch / session-resume land
+			// on the user's previous position, while subsequent refreshes
+			// preserve the live cursor via clampCursor. m.loading is NOT
+			// a reliable signal because invalidatePreviewForCursorChange
+			// flips it true on every cursor move at this level — using
+			// it would reset the cursor every watch interval after any
+			// j/k press.
+			wasInitial := len(m.middleItems) == 0
 			m.loading = false
-			m.middleItems = merged
-			m.restoreCursor()
+			m.setMiddleItems(merged)
+			if wasInitial {
+				m.restoreCursor()
+			} else {
+				m.clampCursor()
+			}
 			m.syncExpandedGroup()
-		} else {
+		} else if m.nav.Level != model.LevelClusters {
 			// User is deeper: update leftItems so back-navigation shows CRDs.
 			m.leftItems = merged
 			// Update cursor memory for the resource types level so
@@ -518,7 +588,58 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) Model {
 			}
 		}
 	}
-	return m
+	// Replay a bookmark that was queued waiting on this context's discovery.
+	// IsContextAware switches the bookmark's effective context; for context-free
+	// bookmarks the effective context is the model's current context, which we
+	// match against msg.context so we only replay when the right discovery lands.
+	if m.bookmarkAwaitingDiscovery != nil {
+		bm := *m.bookmarkAwaitingDiscovery
+		effective := bm.Context
+		if !bm.IsContextAware() {
+			effective = m.nav.Context
+		}
+		if effective == msg.context {
+			m.bookmarkAwaitingDiscovery = nil
+			result, cmd := m.navigateToBookmark(bm)
+			return result.(Model), cmd
+		}
+	}
+	// Resume a deferred session restore that was holding for this context's
+	// CRD discovery. Without this, quitting on an ArgoCD Application view
+	// and re-opening lfk drops the user at the resource types level instead
+	// of the saved view.
+	if m.sessionResourceTypeAwaitingDiscovery != "" && msg.context == m.nav.Context {
+		ref := m.sessionResourceTypeAwaitingDiscovery
+		name := m.sessionResourceNameAwaitingDiscovery
+		m.sessionResourceTypeAwaitingDiscovery = ""
+		m.sessionResourceNameAwaitingDiscovery = ""
+		if rt, ok := model.FindResourceTypeIn(ref, entries); ok {
+			rtRef := rt.ResourceRef()
+			for i, item := range merged {
+				if item.Extra == rtRef {
+					m.cursorMemory[m.nav.Context] = i
+					break
+				}
+			}
+			m.leftItemsHistory = append(m.leftItemsHistory[:0:0], m.leftItemsHistory...)
+			if len(m.leftItemsHistory) == 0 {
+				contexts, _ := m.client.GetContexts()
+				m.leftItemsHistory = [][]model.Item{contexts}
+			}
+			m.leftItems = merged
+			m.nav.ResourceType = rt
+			m.nav.Level = model.LevelResources
+			m.setMiddleItems(nil)
+			m.clearRight()
+			m.setCursor(0)
+			m.loading = true
+			if name != "" {
+				m.pendingTarget = name
+			}
+			return m, m.loadResources(false)
+		}
+	}
+	return m, nil
 }
 
 func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {
@@ -561,6 +682,26 @@ func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) (tea.Model, 
 			}
 		}
 		msg.items = filtered
+	}
+	// Prime itemCache under the drill-in navKey so loadResources can serve
+	// the list instantly and skip a redundant fetch when the user drills
+	// in or re-hovers this rt later. Only do this when msg.rt carries a
+	// real resource — synthetic previews (port-forwards, dashboards) have
+	// a zero-valued rt and must not write an empty-resource key. The
+	// fingerprint records the fetch-affecting state so the shortcut can
+	// detect later invalidations (namespace switch, allNS toggle,
+	// multi-select update) without relying on requestGen, which
+	// navigateChild bumps before child handlers even run.
+	if msg.rt.Resource != "" {
+		// Same shape as m.navKey() so the loadResources preview shortcut
+		// (which also derives the key from kctx + resource [+ ns]) can
+		// find what we wrote here.
+		drillInKey := m.nav.Context + "/" + msg.rt.Resource
+		if msg.rt.Namespaced {
+			drillInKey += "/ns:" + m.effectiveNamespace()
+		}
+		m.itemCache[drillInKey] = msg.items
+		m.cacheFingerprints[drillInKey] = m.fetchFingerprint()
 	}
 	m.rightItems = msg.items
 	// Filter events in children view to warnings-only when enabled.
@@ -606,8 +747,18 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	if (kind == "Pod" || kind == "Node") && len(m.middleItems) > 0 {
 		m.carryOverMetricsColumns(msg.items)
 	}
-	m.middleItems = msg.items
-	m.itemCache[m.navKey()] = m.middleItems
+	m.setMiddleItems(msg.items)
+	mainCacheKey := m.navKey()
+	m.itemCache[mainCacheKey] = m.middleItems
+	// Record the cache-freshness fingerprint so a subsequent load for the
+	// same resource (drill-in from the sidebar, preview on navigate-out-
+	// then-hover, or a hover-cycle between sibling rts) can serve from
+	// cache instead of refetching. Only record for actual resource lists;
+	// __port_forwards__ is synthetic (sourced from the in-process manager)
+	// and doesn't go through GetResources.
+	if m.nav.ResourceType.Resource != "" && m.nav.ResourceType.Kind != "__port_forwards__" {
+		m.cacheFingerprints[mainCacheKey] = m.fetchFingerprint()
+	}
 	// Always sort: the k8s layer uses a non-stable single-key sort that
 	// shuffles ties between refreshes (e.g. Helm releases with the same
 	// name in different namespaces). Running sortMiddleItems guarantees
@@ -664,7 +815,7 @@ func (m *Model) applyWarningEventsFilter() {
 				filtered = append(filtered, item)
 			}
 		}
-		m.middleItems = filtered
+		m.setMiddleItems(filtered)
 	}
 }
 
@@ -675,7 +826,7 @@ func (m *Model) applyEventGrouping() {
 	if !m.eventGrouping || m.nav.ResourceType.Kind != "Event" {
 		return
 	}
-	m.middleItems = groupEvents(m.middleItems)
+	m.setMiddleItems(groupEvents(m.middleItems))
 }
 
 // rebuildEventsFromCache re-derives the visible Event list from the raw cache
@@ -688,7 +839,7 @@ func (m *Model) rebuildEventsFromCache() {
 	if !ok {
 		return
 	}
-	m.middleItems = append([]model.Item(nil), cached...)
+	m.setMiddleItems(append([]model.Item(nil), cached...))
 	m.applyWarningEventsFilter()
 	m.applyEventGrouping()
 	m.reapplyFilterPreset()
@@ -704,7 +855,7 @@ func (m *Model) reapplyFilterPreset() {
 				filtered = append(filtered, item)
 			}
 		}
-		m.middleItems = filtered
+		m.setMiddleItems(filtered)
 	}
 }
 
@@ -738,7 +889,7 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	prevName, prevNs, prevExtra, prevKind := m.cursorItemKey()
-	m.middleItems = msg.items
+	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
 	// Sort with the app-level tiebreaker on every load (see
 	// updateResourcesLoadedMain for rationale): the k8s layer returns
@@ -755,7 +906,7 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 				filtered = append(filtered, item)
 			}
 		}
-		m.middleItems = filtered
+		m.setMiddleItems(filtered)
 		m.itemCache[m.navKey()] = m.middleItems
 	}
 	m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
@@ -807,7 +958,7 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 		m.rightItems = msg.items
 		return m, nil
 	}
-	m.middleItems = msg.items
+	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
 	// Sort with the app-level tiebreaker on every container-list load
 	// (see updateResourcesLoadedMain for rationale): container rows use
@@ -820,17 +971,28 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	if msg.silent {
 		m.suppressBgtasks = true
 	}
-	// Mark the preview pane as loading (see updateResourcesLoadedMain).
+	// Align previewLoading with whether a preview fetch is actually in
+	// flight. clearRight() armed the flag to true on navigation; at
+	// LevelContainers loadPreview returns nil, so leaving it armed would
+	// make the right pane render "Loading..." forever. Conversely, when a
+	// preview cmd is dispatched the flag must stay true so the spinner
+	// keeps showing until the reply clears it.
 	previewCmd := m.loadPreview()
-	if previewCmd != nil {
-		m.previewLoading = true
-	}
+	m.previewLoading = previewCmd != nil
 	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
 
 func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.Cmd) {
-	m.loading = false
+	// Only clear the global loading flag for overlay-triggered loads.
+	// Background cache refreshes (session restore, context open) must not
+	// touch it — it belongs to the middle-column/resource-types load and
+	// clearing it asynchronously while API discovery is still in flight
+	// produces a "No items" flash between the loader and the populated
+	// list.
+	if !msg.silent {
+		m.loading = false
+	}
 	if isContextCanceled(msg.err) {
 		return m, nil
 	}
@@ -843,10 +1005,21 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 	m.err = nil
 	allNsItem := model.Item{Name: "All Namespaces", Status: "all"}
 	m.overlayItems = append([]model.Item{allNsItem}, msg.items...)
-	// Cache namespace names for command bar autocompletion.
-	m.cachedNamespaces = make([]string, 0, len(msg.items))
+	// Cache namespace names for command bar autocompletion, keyed by the
+	// context the fetch was issued for. Keying avoids stale results when
+	// tabs / `:ctx` change nav.Context between the request and reply.
+	// Stamp fetchedAt so the next command bar open can decide whether
+	// the entry is still fresh or should trigger a background refresh.
+	if m.cachedNamespaces == nil {
+		m.cachedNamespaces = make(map[string]namespaceCacheEntry)
+	}
+	names := make([]string, 0, len(msg.items))
 	for _, item := range msg.items {
-		m.cachedNamespaces = append(m.cachedNamespaces, item.Name)
+		names = append(names, item.Name)
+	}
+	m.cachedNamespaces[msg.context] = namespaceCacheEntry{
+		names:     names,
+		fetchedAt: time.Now(),
 	}
 	if m.allNamespaces {
 		m.overlayCursor = 0
@@ -863,12 +1036,22 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 
 func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 	m.loading = false
+	// enterFullView sets yamlContent="Loading..." as a placeholder; we
+	// must replace it on every reply path (success, cancel, error) so the
+	// viewer never renders the loader indefinitely. The canceled case can
+	// fire when a mid-load navigation tears down reqCtx — show an empty
+	// body so the user understands the fetch did not complete rather than
+	// being stuck on the spinner.
 	if isContextCanceled(msg.err) {
+		m.yamlContent = ""
+		m.yamlSections = nil
 		return m, nil
 	}
 	if msg.err != nil {
 		m.err = msg.err
 		m.setErrorFromErr("Warning: ", msg.err)
+		m.yamlContent = "# Error loading resource\n# " + msg.err.Error()
+		m.yamlSections = nil
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
@@ -897,9 +1080,16 @@ func (m Model) updateActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 	m.bulkMode = false
 	if msg.err != nil {
 		m.setErrorFromErr("Error: ", msg.err)
-	} else if msg.message != "" {
-		logger.Info("Action completed", "message", msg.message)
-		m.setStatusMessage(msg.message, false)
+	} else {
+		if msg.message != "" {
+			logger.Info("Action completed", "message", msg.message)
+			m.setStatusMessage(msg.message, false)
+		}
+		// Only invalidate when the action succeeded; a failed `create
+		// ns` or template apply did not actually mutate the cluster.
+		if msg.invalidateNamespaceCache {
+			m.invalidateNamespaceCache()
+		}
 	}
 	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }
@@ -969,12 +1159,21 @@ func (m Model) updatePortForwardStopped(msg portForwardStoppedMsg) (tea.Model, t
 func (m Model) updatePortForwardUpdate(msg portForwardUpdateMsg) (tea.Model, tea.Cmd) {
 	cmds := []tea.Cmd{m.waitForPortForwardUpdate()}
 	if msg.err != nil {
+		// Mirror to slog so the failure survives an lfk close/restart, not
+		// just the in-memory errorLog overlay.
+		logger.Error("Port-forward update error", "error", msg.err)
 		m.addLogEntry("ERR", msg.err.Error())
 	}
 	// Log newly failed port forwards.
 	for _, e := range m.portForwardMgr.Entries() {
 		if e.Status == k8s.PortForwardFailed && e.Error != "" {
 			if _, seen := m.pfLoggedErrors[e.ID]; !seen {
+				logger.Error("Port-forward failed",
+					"id", e.ID,
+					"resource", fmt.Sprintf("%s/%s", e.ResourceKind, e.ResourceName),
+					"namespace", e.Namespace,
+					"context", e.Context,
+					"error", e.Error)
 				m.addLogEntry("ERR", fmt.Sprintf("Port forward %s/%s failed: %s", e.ResourceKind, e.ResourceName, e.Error))
 				if m.pfLoggedErrors == nil {
 					m.pfLoggedErrors = make(map[int]struct{})
@@ -997,7 +1196,7 @@ func (m Model) updatePortForwardUpdate(msg portForwardUpdateMsg) (tea.Model, tea
 		}
 	}
 	if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "__port_forwards__" {
-		m.middleItems = m.portForwardItems()
+		m.setMiddleItems(m.portForwardItems())
 		m.clampCursor()
 	}
 	return m, tea.Batch(cmds...)
@@ -1141,6 +1340,29 @@ func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	cmd := tea.Batch(m.refreshCurrentLevel(), scheduleWatchTick(m.watchInterval))
 	m.suppressBgtasks = false
 	return m, cmd
+}
+
+// dispatchNavigationTick fans out tick messages whose handlers belong with
+// cursor/navigation state. Kept as a wrapper so updateResourceMsg's switch
+// stays under the gocyclo threshold (see .golangci config).
+func (m Model) dispatchNavigationTick(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case watchTickMsg:
+		return m.updateWatchTick(msg)
+	case previewDebounceTickMsg:
+		return m.updatePreviewDebounceTick(msg)
+	}
+	return m, nil
+}
+
+func (m Model) updatePreviewDebounceTick(msg previewDebounceTickMsg) (tea.Model, tea.Cmd) {
+	if msg.gen != m.previewDebounceGen {
+		return m, nil
+	}
+	if m.mapView {
+		return m, tea.Batch(m.loadPreview(), m.loadResourceTree())
+	}
+	return m, m.loadPreview()
 }
 
 func (m Model) updatePodSelect(msg podSelectMsg) (tea.Model, tea.Cmd) {
@@ -1551,6 +1773,7 @@ func (m Model) updateExplainRecursive(msg explainRecursiveMsg) (tea.Model, tea.C
 }
 
 func (m Model) updateLogContainersLoaded(msg logContainersLoadedMsg) (tea.Model, tea.Cmd) {
+	m.loading = false
 	if msg.err != nil {
 		m.setErrorFromErr("Failed to load containers: ", msg.err)
 		m.overlay = overlayNone
@@ -1573,6 +1796,14 @@ func (m Model) updateLogContainersLoaded(msg logContainersLoadedMsg) (tea.Model,
 		items = append(items, model.Item{Name: c})
 	}
 	m.overlayItems = items
+	// Open the overlay only now that the data is ready, so the user never
+	// sees a flashing empty/loading overlay before the real content arrives.
+	m.overlay = overlayLogContainerSelect
+	m.overlayCursor = 0
+	m.logContainerFilterText = ""
+	m.logContainerFilterActive = false
+	m.logContainerSelectionModified = false
+	ui.ResetOverlayContainerScroll()
 	return m, nil
 }
 
@@ -1587,10 +1818,9 @@ func (m Model) updateMetricsLoaded(msg metricsLoadedMsg) Model {
 	// Calculate available width for the metrics bar.
 	usable := m.width - 6
 	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
-	innerW := rightW - 4 // column padding + border
-	if innerW < 20 {
-		innerW = 20
-	}
+	innerW := max(
+		// column padding + border
+		rightW-4, 20)
 	m.metricsContent = ui.RenderResourceUsage(
 		msg.cpuUsed, msg.cpuReq, msg.cpuLim,
 		msg.memUsed, msg.memReq, msg.memLim,
@@ -1610,10 +1840,7 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 	// Calculate available width for the events section.
 	usable := m.width - 6
 	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
-	innerW := rightW - 4
-	if innerW < 20 {
-		innerW = 20
-	}
+	innerW := max(rightW-4, 20)
 	entries := make([]ui.EventTimelineEntry, len(msg.events))
 	for i, e := range msg.events {
 		entries[i] = ui.EventTimelineEntry{
@@ -1631,6 +1858,67 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 	return m
 }
 
+func (m Model) updatePreviewSecretDataLoaded(msg previewSecretDataLoadedMsg) Model {
+	if msg.gen != m.requestGen {
+		return m // stale response; discard. A newer load is still in flight,
+		// so leave previewLoading armed for the next reply.
+	}
+	// The fetch is no longer in flight for the current gen. Clear the spinner
+	// regardless of outcome so the right pane stops saying "Loading...".
+	m.previewLoading = false
+	if msg.err != nil {
+		logger.Info("preview secret data load error", "name", msg.name, "err", msg.err)
+		return m // do not cache failures
+	}
+	if msg.data == nil {
+		return m
+	}
+
+	// Store in cache so subsequent hovers on the same key (after list refresh)
+	// skip the network round-trip.
+	if m.secretPreviewCache == nil {
+		m.secretPreviewCache = make(map[string]*model.SecretData)
+	}
+	key := secretPreviewCacheKey(msg.ctx, msg.ns, msg.name)
+	m.secretPreviewCache[key] = msg.data
+
+	// Inject secret:<key> columns into every matching middleItems entry.
+	m.middleItemsRev++
+	for i := range m.middleItems {
+		item := &m.middleItems[i]
+		if item.Name != msg.name {
+			continue
+		}
+		itemNS := item.Namespace
+		if itemNS == "" {
+			itemNS = m.namespace
+		}
+		if itemNS != msg.ns {
+			continue
+		}
+
+		// Remove any stale secret: columns first to avoid duplicates when
+		// the secret data has been updated between fetches.
+		filtered := item.Columns[:0]
+		for _, kv := range item.Columns {
+			if !strings.HasPrefix(kv.Key, "secret:") {
+				filtered = append(filtered, kv)
+			}
+		}
+		item.Columns = filtered
+
+		// Append decoded secret entries in key order.
+		for _, k := range msg.data.Keys {
+			item.Columns = append(item.Columns, model.KeyValue{
+				Key:   "secret:" + k,
+				Value: msg.data.Data[k],
+			})
+		}
+	}
+
+	return m
+}
+
 func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response
@@ -1639,12 +1927,14 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 		return m
 	}
 	// Enrich middle items with CPU/Memory usage + percentage columns.
+	// Key format: "namespace/name". GetAllPodMetrics uses the same format
+	// regardless of query scope (all-namespaces vs single-namespace), so
+	// this lookup is consistent. For cluster-scoped items (no namespace)
+	// the key collapses to "/name" on both sides.
+	m.middleItemsRev++
 	for i := range m.middleItems {
 		item := &m.middleItems[i]
-		key := item.Name
-		if item.Namespace != "" {
-			key = item.Namespace + "/" + item.Name
-		}
+		key := item.Namespace + "/" + item.Name
 		pm, ok := msg.metrics[key]
 		if !ok {
 			continue
@@ -1699,11 +1989,20 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 		memReqPct := ui.ComputePctStr(pm.Memory, memReqStr, false)
 		memLimPct := ui.ComputePctStr(pm.Memory, memLimStr, false)
 
-		// Rebuild columns: replace old CPU/Mem columns with new compact format.
+		// Rebuild columns: replace old CPU/Mem percentage columns with the
+		// freshly computed ones. The raw "CPU Req", "CPU Lim", "Mem Req",
+		// "Mem Lim" columns are DELIBERATELY preserved — they are always
+		// blocked from auto-detected table display (see
+		// internal/ui/explorer_format.go) so they do not show up as extra
+		// headers, and the next metrics tick reads them to recompute the
+		// percentages. Dropping them here was the cause of a regression
+		// where CPU/R, CPU/L, MEM/R, MEM/L showed real values on the first
+		// tick and flipped to "n/a" on every subsequent tick, because the
+		// source data was gone.
 		removeCols := map[string]bool{
-			"CPU Use": true, "CPU Req": true, "CPU Lim": true,
-			"Mem Use": true, "Mem Req": true, "Mem Lim": true,
-			"CPU/R": true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
+			"CPU Use": true,
+			"Mem Use": true,
+			"CPU/R":   true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
 		}
 		var newCols []model.KeyValue
 		newCols = append(newCols,
@@ -1731,17 +2030,39 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 	return m
 }
 
+// ensureNodeMetricsColumnsPlaceholder adds CPU/CPU%/MEM/MEM% columns to a node
+// item using "n/a" placeholders when metrics-server returned no data for it.
+// Stable column visibility is the contract — without these placeholders,
+// autoDetectColumns drops the metrics columns whenever every visible row
+// lacks them, and the user sees the column set blink in and out as
+// metrics-server health fluctuates.
+func ensureNodeMetricsColumnsPlaceholder(item *model.Item) {
+	wanted := map[string]bool{"CPU": true, "CPU%": true, "MEM": true, "MEM%": true}
+	for _, kv := range item.Columns {
+		delete(wanted, kv.Key)
+	}
+	for _, key := range []string{"CPU", "CPU%", "MEM", "MEM%"} {
+		if wanted[key] {
+			item.Columns = append(item.Columns, model.KeyValue{Key: key, Value: "n/a"})
+		}
+	}
+}
+
 func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m
 	}
-	if len(msg.metrics) == 0 {
-		return m
-	}
+	m.middleItemsRev++
 	for i := range m.middleItems {
 		item := &m.middleItems[i]
 		nm, ok := msg.metrics[item.Name]
 		if !ok {
+			// Metrics-server didn't return data for this node (or not yet).
+			// Touch the item so CPU/CPU%/MEM/MEM% columns exist with "n/a"
+			// values; otherwise autoDetectColumns hides the columns
+			// entirely whenever metrics are unavailable, and they pop
+			// in/out as metrics-server churns.
+			ensureNodeMetricsColumnsPlaceholder(item)
 			continue
 		}
 
@@ -1788,9 +2109,14 @@ func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
 		cpuPct := ui.ComputePctStr(nm.CPU, cpuAllocStr, true)
 		memPct := ui.ComputePctStr(nm.Memory, memAllocStr, false)
 
+		// Strip only the columns we're about to re-emit. CPU Alloc / Mem Alloc
+		// stay in place: they're populator-supplied capacity data the right-
+		// pane summary needs whenever the user navigates to a node, and
+		// removing them used to leave a window after metrics enrichment but
+		// before the next watch-tick list refresh where the preview had no
+		// alloc info to render.
 		removeCols := map[string]bool{
 			"CPU": true, "CPU%": true, "MEM": true, "MEM%": true,
-			"CPU Alloc": true, "Mem Alloc": true,
 		}
 		var newCols []model.KeyValue
 		newCols = append(newCols,
@@ -1823,9 +2149,7 @@ func (m Model) updateSecretDataLoaded(msg secretDataLoadedMsg) (tea.Model, tea.C
 	m.secretData = msg.data
 	// Snapshot the original data for dirty detection on save.
 	m.secretDataOriginal = make(map[string]string, len(msg.data.Data))
-	for k, v := range msg.data.Data {
-		m.secretDataOriginal[k] = v
-	}
+	maps.Copy(m.secretDataOriginal, msg.data.Data)
 	m.secretCursor = 0
 	m.secretRevealed = make(map[string]bool)
 	m.secretAllRevealed = false
@@ -1856,6 +2180,18 @@ func (m Model) updateSecretSaved(msg secretSavedMsg) (tea.Model, tea.Cmd) {
 	} else {
 		m.setStatusMessage("Secret saved", false)
 		m.overlay = overlayNone
+
+		// Invalidate the preview cache for this secret so the next hover
+		// re-fetches fresh data after the save.
+		if sel := m.selectedMiddleItem(); sel != nil {
+			kctx := m.nav.Context
+			ns := m.resolveNamespace()
+			if sel.Namespace != "" {
+				ns = sel.Namespace
+			}
+			key := secretPreviewCacheKey(kctx, ns, sel.Name)
+			delete(m.secretPreviewCache, key)
+		}
 	}
 	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }
@@ -1868,9 +2204,7 @@ func (m Model) updateConfigMapDataLoaded(msg configMapDataLoadedMsg) (tea.Model,
 	m.configMapData = msg.data
 	// Snapshot the original data for dirty detection on save.
 	m.configMapDataOriginal = make(map[string]string, len(msg.data.Data))
-	for k, v := range msg.data.Data {
-		m.configMapDataOriginal[k] = v
-	}
+	maps.Copy(m.configMapDataOriginal, msg.data.Data)
 	m.configMapCursor = 0
 	m.configMapEditing = false
 	m.configMapEditColumn = -1
@@ -1896,13 +2230,9 @@ func (m Model) updateLabelDataLoaded(msg labelDataLoadedMsg) (tea.Model, tea.Cmd
 	m.labelData = msg.data
 	// Snapshot both maps for dirty detection on save.
 	m.labelLabelsOriginal = make(map[string]string, len(msg.data.Labels))
-	for k, v := range msg.data.Labels {
-		m.labelLabelsOriginal[k] = v
-	}
+	maps.Copy(m.labelLabelsOriginal, msg.data.Labels)
 	m.labelAnnotationsOriginal = make(map[string]string, len(msg.data.Annotations))
-	for k, v := range msg.data.Annotations {
-		m.labelAnnotationsOriginal[k] = v
-	}
+	maps.Copy(m.labelAnnotationsOriginal, msg.data.Annotations)
 	m.labelCursor = 0
 	m.labelTab = 0
 	m.labelEditing = false
@@ -2077,9 +2407,7 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		// Message from a background tab's log stream — buffer it into that tab's state.
 		for i := range m.tabs {
 			if m.tabs[i].logCh == msg.ch {
-				if msg.done {
-					m.tabs[i].logLines = append(m.tabs[i].logLines, "--- stream ended ---")
-				} else {
+				if !msg.done {
 					m.tabs[i].logLines = append(m.tabs[i].logLines, msg.line)
 					// Continue draining: re-issue waitForLogLine for that channel.
 					ch := msg.ch
@@ -2097,19 +2425,61 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.done {
-		m.logLines = append(m.logLines, "--- stream ended ---")
-		if m.logFollow {
-			m.logScroll = m.logMaxScroll()
-			m.logCursor = len(m.logLines) - 1
+		// When following all containers of a single Pod, the stream ends as
+		// soon as the currently-running set of containers all exit. For a
+		// pod still in its init phase that's every init container
+		// transition — schedule an auto-reconnect so the next container
+		// streams in without manual action. Bail out after
+		// logAutoReconnectMaxAttempts consecutive empty reconnects so we
+		// don't spin forever once the pod is truly terminated.
+		if m.shouldAutoReconnectLogs() && m.logAutoReconnectAttempt < logAutoReconnectMaxAttempts {
+			m.logAutoReconnectAttempt++
+			return m, m.scheduleLogStreamRestart(msg.ch)
 		}
 		return m, nil
 	}
+	// A line arrived — the stream is producing output, so any pending
+	// auto-reconnect backoff is no longer relevant.
+	if m.logAutoReconnectAttempt > 0 {
+		m.logAutoReconnectAttempt = 0
+	}
 	m.logLines = append(m.logLines, msg.line)
 	if m.logFollow {
-		m.logScroll = m.logMaxScroll()
+		m.logScroll, m.logWrapTopSkip = m.logMaxScrollAndSkip()
 		m.logCursor = len(m.logLines) - 1
 	}
 	return m, m.waitForLogLine()
+}
+
+// shouldAutoReconnectLogs reports whether the log stream should automatically
+// reconnect when it ends. Auto-reconnect is limited to single-Pod streams
+// following all containers while the user is still in follow mode — that's
+// the case where kubectl exits on every init-container transition.
+// Specific-container, multi-pod, previous-logs, and non-Pod flows either
+// have explicit end semantics (--previous) or use selector-based follows
+// where "done" doesn't necessarily mean a transition. If the user has
+// scrolled away from the tail (logFollow=false) they're reading history,
+// not watching live — no point re-arming the stream on their behalf.
+func (m Model) shouldAutoReconnectLogs() bool {
+	return m.mode == modeLogs &&
+		m.logFollow &&
+		!m.logIsMulti &&
+		!m.logPrevious &&
+		m.actionCtx.kind == "Pod" &&
+		m.actionCtx.containerName == ""
+}
+
+// updateLogStreamRestart fires when a scheduled auto-reconnect is due. If
+// the user has switched pods, exited logs mode, or the stream has been
+// replaced (e.g. by a manual action), the restart is silently dropped.
+func (m Model) updateLogStreamRestart(msg logStreamRestartMsg) (tea.Model, tea.Cmd) {
+	if m.mode != modeLogs || m.logCh != msg.ch || !m.shouldAutoReconnectLogs() {
+		return m, nil
+	}
+	m.logReconnecting = true
+	cmd := m.startLogStream()
+	m.logReconnecting = false
+	return m, cmd
 }
 
 func (m Model) updateLogHistory(msg logHistoryMsg) Model {
@@ -2177,6 +2547,7 @@ func (m Model) updateLogSaveAll(msg logSaveAllMsg) (tea.Model, tea.Cmd) {
 		m.setErrorFromErr("Log save failed: ", msg.err)
 		return m, scheduleStatusClear()
 	}
-	m.setStatusMessage("All logs saved to "+msg.path, false)
-	return m, scheduleStatusClear()
+	logger.Info("Saved all logs", "path", msg.path)
+	m.setStatusMessage("All logs saved to "+msg.path+" (copied to clipboard)", false)
+	return m, tea.Batch(copyToSystemClipboard(msg.path), scheduleStatusClear())
 }

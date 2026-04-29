@@ -87,10 +87,7 @@ func canITotalVerbWidth() int {
 // renderCanIMiddleHeader builds the header line aligned with the resource columns.
 func renderCanIMiddleHeader(width int) string {
 	verbWidth := canITotalVerbWidth()
-	nameWidth := width - verbWidth - 4
-	if nameWidth < 8 {
-		nameWidth = 8
-	}
+	nameWidth := max(width-verbWidth-4, 8)
 
 	// Build verb header with per-column widths matching the indicators.
 	verbLabels := make([]string, len(canIVerbs))
@@ -172,10 +169,7 @@ func renderCanIResources(resources []model.CanIResource, width, maxLines, scroll
 
 	// Calculate name width: leave room for verb indicators + prefix (2) + gap (2).
 	verbWidth := canITotalVerbWidth()
-	nameWidth := width - verbWidth - 4
-	if nameWidth < 8 {
-		nameWidth = 8
-	}
+	nameWidth := max(width-verbWidth-4, 8)
 
 	for i := scroll; i < end; i++ {
 		r := resources[i]
@@ -190,7 +184,7 @@ func renderCanIResources(resources []model.CanIResource, width, maxLines, scroll
 			colW := canIVerbColWidth(v.label)
 			if r.Verbs[v.verb] {
 				padded := "\u2713" + strings.Repeat(" ", colW-1)
-				verbParts = append(verbParts, lipgloss.NewStyle().Foreground(lipgloss.Color("2")).Background(BaseBg).Render(padded))
+				verbParts = append(verbParts, lipgloss.NewStyle().Foreground(ThemeColor("2")).Background(BaseBg).Render(padded))
 			} else {
 				padded := "\u00b7" + strings.Repeat(" ", colW-1)
 				verbParts = append(verbParts, DimStyle.Render(padded))
@@ -250,10 +244,7 @@ func RenderCanISubjectOverlay(items []model.Item, filter string, cursor int, fil
 	start := VimScrollOff(overlayCanISubjectScroll, cursor, len(items), maxVisible, scrollOff, displayLines)
 	overlayCanISubjectScroll = start
 
-	end := start + maxVisible
-	if end > len(items) {
-		end = len(items)
-	}
+	end := min(start+maxVisible, len(items))
 
 	for i := start; i < end; i++ {
 		item := items[i]

@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"fmt"
+	"maps"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -50,9 +51,7 @@ func (m Model) bulkRemoveFinalizer() tea.Cmd {
 	client := m.client
 	kctx := m.nav.Context
 	selected := make(map[string]bool, len(m.finalizerSearchSelected))
-	for k, v := range m.finalizerSearchSelected {
-		selected[k] = v
-	}
+	maps.Copy(selected, m.finalizerSearchSelected)
 
 	// Collect the matching results for selected items.
 	var targets []finalizerTarget

@@ -3,6 +3,7 @@ package app
 
 import (
 	"context"
+	"maps"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -65,9 +66,7 @@ func (m Model) handleSecurityAvailabilityLoaded(msg securityAvailabilityLoadedMs
 	if m.securityAvailabilityByName == nil {
 		m.securityAvailabilityByName = make(map[string]bool)
 	}
-	for k, v := range msg.availability {
-		m.securityAvailabilityByName[k] = v
-	}
+	maps.Copy(m.securityAvailabilityByName, msg.availability)
 	// Publish the updated availability map so SecuritySourcesFn reads it
 	// on the next BuildSidebarItems call.
 	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)

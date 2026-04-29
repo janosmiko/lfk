@@ -9,7 +9,7 @@ import (
 )
 
 // yamlUnmarshal is a test helper to parse YAML config data.
-func yamlUnmarshal(data []byte, v interface{}) error {
+func yamlUnmarshal(data []byte, v any) error {
 	return yaml.Unmarshal(data, v)
 }
 

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -80,12 +81,50 @@ func (m *Model) effectiveNamespace() string {
 	return m.namespace
 }
 
+// fetchFingerprint returns a stable digest of the parameters that
+// determine what a resource list fetch returns: effective namespace, the
+// allNamespaces toggle, and the selectedNamespaces multi-select filter.
+// It is used by the preview-cache shortcut in navigateChildResourceType
+// to decide whether a primed cache entry is still applicable. Context and
+// resource are not included because they are already part of the navKey
+// the fingerprint is paired with.
+func (m *Model) fetchFingerprint() string {
+	var b strings.Builder
+	if m.allNamespaces {
+		b.WriteString("A|")
+	} else {
+		b.WriteString("ns=")
+		b.WriteString(m.namespace)
+		b.WriteString("|")
+	}
+	if len(m.selectedNamespaces) > 0 {
+		keys := make([]string, 0, len(m.selectedNamespaces))
+		for k := range m.selectedNamespaces {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		b.WriteString("sel=")
+		b.WriteString(strings.Join(keys, ","))
+	}
+	return b.String()
+}
+
+// sortApplies reports whether sort keybindings (>, <, =, -) have any
+// effect at the current navigation level. False at the cluster picker
+// and resource type browser, where items keep their original ordering.
+// Callers in the key-handler layer must short-circuit before mutating
+// sort state so the bar doesn't lie that sort changed when items stay
+// put.
+func (m *Model) sortApplies() bool {
+	return m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
+}
+
 // sortMiddleItems sorts middleItems based on the current sort column and direction.
 // At LevelResourceTypes and LevelClusters, items keep their original ordering.
 // Security findings are pre-sorted by severity/affected/name in groupFindings
 // and must not be re-sorted by the default Name column.
 func (m *Model) sortMiddleItems() {
-	if m.nav.Level == model.LevelResourceTypes || m.nav.Level == model.LevelClusters {
+	if !m.sortApplies() {
 		return
 	}
 	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
@@ -116,6 +155,7 @@ func (m *Model) sortMiddleItems() {
 		colName = sortColEventLastSeen
 	}
 
+	m.middleItemsRev++
 	sort.SliceStable(m.middleItems, func(i, j int) bool {
 		a, b := m.middleItems[i], m.middleItems[j]
 
@@ -424,10 +464,7 @@ func (m *Model) sanitizeError(err error) string {
 	for strings.Contains(s, "  ") {
 		s = strings.ReplaceAll(s, "  ", " ")
 	}
-	maxLen := m.width - 20
-	if maxLen < 40 {
-		maxLen = 40
-	}
+	maxLen := max(m.width-20, 40)
 	if len(s) > maxLen {
 		s = s[:maxLen-3] + "..."
 	}
@@ -448,10 +485,9 @@ func fullErrorMessage(err error) string {
 func (m *Model) sanitizeMessage(s string) string {
 	s = strings.ReplaceAll(s, "\n", " ")
 	s = strings.ReplaceAll(s, "\r", " ")
-	maxLen := m.width - 6 // account for status bar padding
-	if maxLen < 40 {
-		maxLen = 40
-	}
+	maxLen := max(
+		// account for status bar padding
+		m.width-6, 40)
 	runes := []rune(s)
 	if len(runes) > maxLen {
 		s = string(runes[:maxLen-3]) + "..."
@@ -580,7 +616,7 @@ func (m *Model) navigateToPortForwards() {
 	m.leftItemsHistory = [][]model.Item{contexts}
 	m.leftItems = resourceTypes
 	m.clearRight()
-	m.middleItems = m.portForwardItems()
+	m.setMiddleItems(m.portForwardItems())
 	m.setCursor(0)
 	// Try to position cursor on the newly created port forward.
 	if m.pfLastCreatedID > 0 {
@@ -668,6 +704,7 @@ func (m *Model) saveCurrentTab() {
 	t.leftScroll = ui.ActiveLeftScroll
 	t.cursorMemory = copyMapStringInt(m.cursorMemory)
 	t.itemCache = copyItemCache(m.itemCache)
+	t.cacheFingerprints = copyMapStringString(m.cacheFingerprints)
 	t.yamlContent = m.yamlContent
 	t.yamlScroll = m.yamlScroll
 	t.yamlCursor = m.yamlCursor
@@ -700,6 +737,7 @@ func (m *Model) saveCurrentTab() {
 	t.mode = m.mode
 	t.logLines = append([]string(nil), m.logLines...)
 	t.logScroll = m.logScroll
+	t.logWrapTopSkip = m.logWrapTopSkip
 	t.logFollow = m.logFollow
 	t.logWrap = m.logWrap
 	t.logLineNumbers = m.logLineNumbers
@@ -757,7 +795,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.activeTab = idx
 	m.nav = t.nav
 	m.leftItems = append([]model.Item(nil), t.leftItems...)
-	m.middleItems = append([]model.Item(nil), t.middleItems...)
+	m.setMiddleItems(append([]model.Item(nil), t.middleItems...))
 	m.rightItems = append([]model.Item(nil), t.rightItems...)
 	m.leftItemsHistory = make([][]model.Item, len(t.leftItemsHistory))
 	for i, hist := range t.leftItemsHistory {
@@ -768,6 +806,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	ui.ActiveLeftScroll = t.leftScroll
 	m.cursorMemory = copyMapStringInt(t.cursorMemory)
 	m.itemCache = copyItemCache(t.itemCache)
+	m.cacheFingerprints = copyMapStringString(t.cacheFingerprints)
 	m.yamlContent = t.yamlContent
 	m.yamlScroll = t.yamlScroll
 	m.yamlCursor = t.yamlCursor
@@ -802,6 +841,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.mode = t.mode
 	m.logLines = append([]string(nil), t.logLines...)
 	m.logScroll = t.logScroll
+	m.logWrapTopSkip = t.logWrapTopSkip
 	m.logFollow = t.logFollow
 	m.logWrap = t.logWrap
 	m.logLineNumbers = t.logLineNumbers
@@ -874,7 +914,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 			// At resources level: left = resource types, history = [contexts].
 			m.leftItemsHistory = [][]model.Item{contexts}
 			m.leftItems = resourceTypes
-			m.middleItems = nil
+			m.setMiddleItems(nil)
 			m.clearRight()
 			m.setCursor(0)
 			m.loading = true
@@ -883,7 +923,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 			// At resource types level: left = contexts, middle = resource types.
 			m.leftItemsHistory = nil
 			m.leftItems = contexts
-			m.middleItems = resourceTypes
+			m.setMiddleItems(resourceTypes)
 			m.itemCache[m.navKey()] = m.middleItems
 			m.clearRight()
 			m.clampCursor()
@@ -909,6 +949,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		leftScroll:             ui.ActiveLeftScroll,
 		cursorMemory:           copyMapStringInt(m.cursorMemory),
 		itemCache:              copyItemCache(m.itemCache),
+		cacheFingerprints:      copyMapStringString(m.cacheFingerprints),
 		yamlContent:            m.yamlContent,
 		yamlCollapsed:          copyMapStringBool(m.yamlCollapsed),
 		splitPreview:           m.splitPreview,
@@ -954,9 +995,7 @@ func copyMapStringInt(m map[string]int) map[string]int {
 		return make(map[string]int)
 	}
 	c := make(map[string]int, len(m))
-	for k, v := range m {
-		c[k] = v
-	}
+	maps.Copy(c, m)
 	return c
 }
 
@@ -966,9 +1005,7 @@ func copyMapStringBool(m map[string]bool) map[string]bool {
 		return make(map[string]bool)
 	}
 	c := make(map[string]bool, len(m))
-	for k, v := range m {
-		c[k] = v
-	}
+	maps.Copy(c, m)
 	return c
 }
 
@@ -981,6 +1018,18 @@ func copyItemCache(m map[string][]model.Item) map[string][]model.Item {
 	for k, v := range m {
 		c[k] = append([]model.Item(nil), v...)
 	}
+	return c
+}
+
+// copyMapStringString returns a shallow copy of a string-to-string map.
+// A nil input yields a non-nil empty map so callers can write into it
+// without a second nil check.
+func copyMapStringString(m map[string]string) map[string]string {
+	if m == nil {
+		return make(map[string]string)
+	}
+	c := make(map[string]string, len(m))
+	maps.Copy(c, m)
 	return c
 }
 

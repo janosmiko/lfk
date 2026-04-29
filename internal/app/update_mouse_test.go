@@ -186,6 +186,72 @@ func TestHandleHeaderClickNameColumn(t *testing.T) {
 	assert.Equal(t, "Name", result.sortColumnName) // clicks Name column
 }
 
+// At LevelClusters and LevelResourceTypes, sortMiddleItems() early-returns,
+// so a column-header click that mutates sort state and emits "Sort: ..."
+// would mislead the user about the row ordering. The handler must short-
+// circuit silently before touching state.
+func TestHandleHeaderClickNoOpAtClustersLevel(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+	m.sortColumnName = "Age"
+	m.sortAscending = true
+	m.middleItems = []model.Item{{Name: "ctx-a"}}
+
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	oldLayout := ui.ActiveMiddleColumnLayout
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+		ui.ActiveMiddleColumnLayout = oldLayout
+	})
+	ui.ActiveSortableColumns = []string{"Name", "Age"}
+	ui.ActiveSortableColumnCount = 2
+	ui.ActiveMiddleColumnLayout = []ui.MiddleColumnRegion{
+		{Key: "Name", StartX: 0, EndX: 10},
+		{Key: "Age", StartX: 10, EndX: 20},
+	}
+
+	ret, cmd := m.handleHeaderClick(5)
+	result := ret.(Model)
+
+	assert.Equal(t, "Age", result.sortColumnName, "sort column must not change at LevelClusters")
+	assert.True(t, result.sortAscending, "sortAscending must not toggle at LevelClusters")
+	assert.Empty(t, result.statusMessage, "no misleading status message")
+	assert.Nil(t, cmd)
+}
+
+func TestHandleHeaderClickNoOpAtResourceTypesLevel(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.sortColumnName = "Age"
+	m.sortAscending = true
+	m.middleItems = []model.Item{{Name: "Pod"}}
+
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	oldLayout := ui.ActiveMiddleColumnLayout
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+		ui.ActiveMiddleColumnLayout = oldLayout
+	})
+	ui.ActiveSortableColumns = []string{"Name", "Age"}
+	ui.ActiveSortableColumnCount = 2
+	ui.ActiveMiddleColumnLayout = []ui.MiddleColumnRegion{
+		{Key: "Name", StartX: 0, EndX: 10},
+		{Key: "Age", StartX: 10, EndX: 20},
+	}
+
+	ret, cmd := m.handleHeaderClick(5)
+	result := ret.(Model)
+
+	assert.Equal(t, "Age", result.sortColumnName)
+	assert.True(t, result.sortAscending)
+	assert.Empty(t, result.statusMessage)
+	assert.Nil(t, cmd)
+}
+
 func TestP4MouseClickLeftColumn(t *testing.T) {
 	m := bp4()
 	m.mode = modeExplorer

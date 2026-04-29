@@ -3,6 +3,7 @@ package app
 import (
 	"strings"
 	"testing"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
@@ -207,13 +208,15 @@ func TestHandleKeyEscExitsFullscreenDashboard(t *testing.T) {
 	assert.False(t, result.fullscreenDashboard)
 }
 
-func TestHandleKeyEscNavigatesParent(t *testing.T) {
+func TestHandleKeyEscDoesNotNavigateParent(t *testing.T) {
+	// Esc is reserved for cancel-style actions (clearing selection /
+	// search / filter, exiting fullscreen, dismissing a tab) and is
+	// intentionally NOT a navigation key. Use h/Left to walk back.
 	m := baseExplorerModel()
-	// At resources level with no filter/selection, esc navigates parent.
 	ret, _ := m.handleKey(specialKey(tea.KeyEsc))
 	result := ret.(Model)
-	// Should have navigated to resource types level.
-	assert.Equal(t, model.LevelResourceTypes, result.nav.Level)
+	assert.Equal(t, model.LevelResources, result.nav.Level,
+		"Esc on a resource list with no transient state to clear must stay put, not walk back to resource types")
 }
 
 // --- handleKey: h/left navigates parent ---
@@ -848,12 +851,15 @@ func TestPush4HandleKeyEscClearFilter(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
-func TestPush4HandleKeyEscAtClusterLevel(t *testing.T) {
+func TestPush4HandleKeyEscAtClusterLevelSingleTab(t *testing.T) {
+	// Esc at LevelClusters with a single tab is a no-op: quitting via
+	// Esc was surprising and conflicted with Esc's "cancel / dismiss"
+	// semantics elsewhere. Use q (which goes through the confirm
+	// overlay) to quit lfk.
 	m := basePush4Model()
 	m.nav.Level = model.LevelClusters
 	_, cmd := m.handleKey(keyMsg("esc"))
-	// Should try to quit.
-	assert.NotNil(t, cmd)
+	assert.Nil(t, cmd, "Esc at single-tab cluster level must not fire a quit cmd")
 }
 
 func TestPush4HandleKeyDownFullscreenDashboard(t *testing.T) {
@@ -950,6 +956,31 @@ func TestPush4HandleKeyPendingBookmarkCancel(t *testing.T) {
 	bm := model.Bookmark{Name: "test", Slot: "a"}
 	m.pendingBookmark = &bm
 	result, _ := m.handleKey(keyMsg("n"))
+	rm := result.(Model)
+	assert.Nil(t, rm.pendingBookmark)
+	assert.Contains(t, rm.statusMessage, "Cancelled")
+}
+
+func TestPush4HandleKeyPendingBookmarkConfirmEnter(t *testing.T) {
+	// Enter must accept the overwrite — consistency with quit/delete confirms.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := basePush4Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{DisplayName: "Pods", Kind: "Pod", Resource: "pods"}
+	bm := model.Bookmark{Name: "test", Slot: "a", ResourceType: "/v1/pods"}
+	m.pendingBookmark = &bm
+	result, _ := m.handleKey(specialKey(tea.KeyEnter))
+	rm := result.(Model)
+	assert.Nil(t, rm.pendingBookmark, "Enter should accept and clear pending")
+	assert.NotContains(t, rm.statusMessage, "Cancelled", "Enter must not be treated as cancel")
+}
+
+func TestPush4HandleKeyPendingBookmarkCancelEsc(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := basePush4Model()
+	bm := model.Bookmark{Name: "test", Slot: "a"}
+	m.pendingBookmark = &bm
+	result, _ := m.handleKey(specialKey(tea.KeyEsc))
 	rm := result.(Model)
 	assert.Nil(t, rm.pendingBookmark)
 	assert.Contains(t, rm.statusMessage, "Cancelled")
@@ -1171,6 +1202,40 @@ func TestPush4HandleKeyToggleWatchMode(t *testing.T) {
 	result, _ := m.handleKey(keyMsg(kb.WatchMode))
 	rm := result.(Model)
 	assert.False(t, rm.watchMode)
+}
+
+func TestHandleKeyWatchModeMessageReflectsInterval(t *testing.T) {
+	// Each case sets the raw interval (as it would arrive from CLI/config),
+	// runs it through ClampWatchInterval (matching the real model-init flow),
+	// and asserts the status message reflects the effective value.
+	cases := []struct {
+		name    string
+		rawIn   time.Duration
+		want    string
+		comment string
+	}{
+		{"typical mid-range value", 5 * time.Second, "5s", "normal case"},
+		{"at minimum boundary", ui.MinWatchInterval, "500ms", "exact min"},
+		{"below minimum clamps up", 100 * time.Millisecond, "500ms", "sub-min input clamps to MinWatchInterval"},
+		{"at maximum boundary", ui.MaxWatchInterval, "10m0s", "exact max"},
+		{"above maximum clamps down", 30 * time.Minute, "10m0s", "super-max input clamps to MaxWatchInterval"},
+		{"one minute", 1 * time.Minute, "1m0s", "composite duration format"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := basePush4Model()
+			m.watchMode = false
+			m.watchInterval = ui.ClampWatchInterval(tc.rawIn)
+
+			result, _ := m.handleKeyWatchMode()
+			rm := result.(Model)
+
+			assert.True(t, rm.watchMode)
+			assert.Contains(t, rm.statusMessage, tc.want, tc.comment)
+			assert.NotContains(t, rm.statusMessage, "every 2s)",
+				"must not show hardcoded 2s default")
+		})
+	}
 }
 
 func TestPush4HandleKeyTogglePreview(t *testing.T) {

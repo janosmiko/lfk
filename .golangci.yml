@@ -21,6 +21,7 @@ linters:
     - ineffassign
     - intrange
     - misspell
+    - modernize
     - nilerr
     - prealloc
     - staticcheck

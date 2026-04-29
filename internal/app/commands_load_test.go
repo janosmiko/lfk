@@ -361,6 +361,10 @@ func TestCov80DiscoverAPIResources(t *testing.T) {
 }
 
 func TestCov80LoadResourceTypesNoCRDs(t *testing.T) {
+	// When no CRDs have been discovered yet for this context, loadResourceTypes
+	// still emits the seed list (Pods/Deployments/...) so the right-pane
+	// preview at LevelClusters has something to show. The seeded flag is set
+	// so the middle-pane handler can ignore it while discovery is in flight.
 	m := basePush80Model()
 	cmd := m.loadResourceTypes()
 	require.NotNil(t, cmd)
@@ -368,6 +372,8 @@ func TestCov80LoadResourceTypesNoCRDs(t *testing.T) {
 	rmsg, ok := msg.(resourceTypesMsg)
 	require.True(t, ok)
 	assert.NotEmpty(t, rmsg.items)
+	assert.True(t, rmsg.seeded,
+		"items came from SeedResources — middle-pane must know not to clobber the loader")
 }
 
 func TestCov80LoadResourceTypesWithCRDs(t *testing.T) {
@@ -402,7 +408,14 @@ func TestCovLoadResourceTypesWithCRDs(t *testing.T) {
 func TestCovLoadResourceTypesNoCRDs(t *testing.T) {
 	m := baseModelCov()
 	m.nav.Context = "ctx"
-	assert.NotNil(t, m.loadResourceTypes())
+	cmd := m.loadResourceTypes()
+	require.NotNil(t, cmd)
+	msg := cmd()
+	rmsg, ok := msg.(resourceTypesMsg)
+	require.True(t, ok)
+	assert.True(t, rmsg.seeded,
+		"uncached context must mark emitted items as seeded so the middle "+
+			"pane can preserve its loading state")
 }
 
 func TestCovLoadResourcesForPreviewNil(t *testing.T) {
@@ -592,6 +605,9 @@ func TestCovLoadContexts(t *testing.T) {
 
 func TestCovLoadResourceTypes(t *testing.T) {
 	m := baseModelWithFakeClient()
+	m.discoveredResources[m.nav.Context] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	cmd := m.loadResourceTypes()
 	msg := execCmd(t, cmd)
 	result, ok := msg.(resourceTypesMsg)
@@ -823,6 +839,41 @@ func TestCovLoadYAMLContainersReturnsCmd(t *testing.T) {
 	cmd := m.loadYAML()
 	// Verifies the LevelContainers branch is reached and returns a cmd.
 	assert.NotNil(t, cmd)
+}
+
+// TestLoadYAMLLevelContainersFetchesNamespacedPod locks in the fix for
+// issue #34: pressing Enter on a container (LevelContainers) fetches the
+// parent pod's YAML via GetPodYAML. Before the fix, GetPodYAML omitted
+// Namespaced: true from the ResourceTypeEntry it passed to
+// GetResourceYAML, so the dynamic client performed a cluster-scoped GET
+// on /api/v1/pods/<name> — a non-existent endpoint that the API server
+// rejects with "the server could not find the requested resource".
+// Symptom surfaced by aa313cd as "Error loading resource" in the YAML
+// view; cause lives in client_operations.go.
+func TestLoadYAMLLevelContainersFetchesNamespacedPod(t *testing.T) {
+	gvr := schema.GroupVersionResource{Version: "v1", Resource: "pods"}
+	pod := &unstructured.Unstructured{}
+	pod.SetGroupVersionKind(schema.GroupVersionKind{Version: "v1", Kind: "Pod"})
+	pod.SetName("multi-container-pod")
+	pod.SetNamespace("default")
+	_ = unstructured.SetNestedSlice(pod.Object, []any{
+		map[string]any{"name": "app", "image": "myapp:v1"},
+		map[string]any{"name": "sidecar", "image": "envoy:v1"},
+	}, "spec", "containers")
+
+	gvrToListKind := map[schema.GroupVersionResource]string{gvr: "PodList"}
+	m := baseModelWithFakeDynamic(gvrToListKind, pod)
+	m.nav.Level = model.LevelContainers
+	m.nav.OwnedName = "multi-container-pod"
+	m.nav.Namespace = "default"
+
+	cmd := m.loadYAML()
+	require.NotNil(t, cmd)
+	msg := execCmd(t, cmd)
+	loaded, ok := msg.(yamlLoadedMsg)
+	require.True(t, ok, "expected yamlLoadedMsg, got %T", msg)
+	assert.NoError(t, loaded.err, "GetPodYAML must fetch the pod as namespaced")
+	assert.Contains(t, loaded.content, "multi-container-pod")
 }
 
 func TestCovLoadYAMLNilSelection(t *testing.T) {

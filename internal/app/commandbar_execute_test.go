@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -333,6 +334,36 @@ func TestExecuteBuiltinCommand(t *testing.T) {
 		assert.Equal(t, "Name", rm.sortColumnName)
 	})
 
+	// :sort at picker levels (LevelClusters, LevelResourceTypes) is a no-op
+	// because sortMiddleItems() early-returns there. The command must not
+	// mutate sort state silently — it must signal the user with an error
+	// status so they understand why typing :sort had no visible effect.
+	t.Run("sort_no_op_at_clusters_level", func(t *testing.T) {
+		m := baseModelCov()
+		m.nav.Level = model.LevelClusters
+		m.sortColumnName = "Name"
+		m.sortAscending = true
+
+		result, _ := m.executeBuiltinCommand("sort Age")
+		rm := result.(Model)
+
+		assert.Equal(t, "Name", rm.sortColumnName, "sort column must not change at LevelClusters")
+		assert.True(t, rm.sortAscending, "sortAscending must not change at LevelClusters")
+		assert.True(t, rm.statusMessageErr, "must signal error to user who explicitly invoked :sort")
+	})
+
+	t.Run("sort_no_op_at_resource_types_level", func(t *testing.T) {
+		m := baseModelCov()
+		m.nav.Level = model.LevelResourceTypes
+		m.sortColumnName = "Name"
+
+		result, _ := m.executeBuiltinCommand("sort Age")
+		rm := result.(Model)
+
+		assert.Equal(t, "Name", rm.sortColumnName, "sort column must not change at LevelResourceTypes")
+		assert.True(t, rm.statusMessageErr, "must signal error to user who explicitly invoked :sort")
+	})
+
 	t.Run("unknown_builtin_returns_error", func(t *testing.T) {
 		m := baseModelCov()
 		result, _ := m.executeBuiltinCommand("notabuiltin")
@@ -385,10 +416,5 @@ func TestExtractShellCommandNoPrefix(t *testing.T) {
 
 // containsFlag checks if a flag exists in a slice of args.
 func containsFlag(args []string, flag string) bool {
-	for _, a := range args {
-		if a == flag {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(args, flag)
 }

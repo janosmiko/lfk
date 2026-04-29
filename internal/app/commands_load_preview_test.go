@@ -22,6 +22,9 @@ func TestCovBoost2LoadPreviewNilSelection(t *testing.T) {
 func TestCovBoost2LoadPreviewClusters(t *testing.T) {
 	m := baseModelBoost2()
 	m.nav.Level = model.LevelClusters
+	m.discoveredResources[m.nav.Context] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	m.middleItems = []model.Item{{Name: "test-ctx"}}
 	cmd := m.loadPreview()
 	assert.NotNil(t, cmd)
@@ -189,6 +192,9 @@ func TestCovLoadPreview(t *testing.T) {
 func TestCovLoadPreviewClusters(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.nav.Level = model.LevelClusters
+	m.discoveredResources[m.nav.Context] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	m = withMiddleItem(m, model.Item{Name: "test-ctx"})
 	cmd := m.loadPreview()
 	assert.NotNil(t, cmd)

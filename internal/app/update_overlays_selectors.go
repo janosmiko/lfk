@@ -16,6 +16,7 @@ func (m Model) handleNamespaceOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.handleNamespaceNormalMode(msg)
 }
 
+//nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	items := m.filteredOverlayItems()
 
@@ -92,11 +93,23 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 1, len(items)-1)
 		return m, nil
 
-	case "c":
+	case ui.ActiveKeybindings.AllNamespaces:
+		// Same key the user already uses outside the overlay to flip to
+		// all-namespaces mode (default "A"). Drops individual selections
+		// and enables all-ns. Cursor jumps to the "All Namespaces" row
+		// so a follow-up Enter falls into the default branch (apply
+		// all-ns) instead of the "cursor on a real namespace → apply
+		// that single namespace" branch, which would silently undo what
+		// the user just asked for.
 		m.nsSelectionModified = true
-		// Clear all namespace selections (reset to all namespaces).
 		m.selectedNamespaces = nil
 		m.allNamespaces = true
+		for i, item := range items {
+			if item.Status == "all" {
+				m.overlayCursor = i
+				break
+			}
+		}
 		return m, nil
 
 	case "/":
@@ -120,12 +133,32 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, len(items)-1)
 		return m, nil
 
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 20, len(items)-1)
 		return m, nil
 
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -20, len(items)-1)
+		return m, nil
+
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.overlayCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+
+	case "G", "end":
+		if len(items) > 0 {
+			m.overlayCursor = len(items) - 1
+		}
+		return m, nil
+
+	case "home":
+		m.pendingG = false
+		m.overlayCursor = 0
 		return m, nil
 
 	case "ctrl+c":
@@ -156,6 +189,31 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case filterAccept:
 		m.nsFilterMode = false
 		m.overlayCursor = 0
+		// When the filter narrows to a single result and the user hasn't
+		// been multi-selecting with Space, Enter is unambiguous: apply
+		// that result and close. Without this, the user has to press
+		// Enter twice (once to leave filter mode, once to commit) on a
+		// list that has only one row — the second Enter is busy work.
+		if !m.nsSelectionModified {
+			items := m.filteredOverlayItems()
+			if len(items) == 1 {
+				if items[0].Status == "all" {
+					m.selectedNamespaces = nil
+					m.allNamespaces = true
+				} else {
+					ns := items[0].Name
+					m.selectedNamespaces = map[string]bool{ns: true}
+					m.namespace = ns
+					m.allNamespaces = false
+				}
+				m.overlay = overlayNone
+				m.overlayFilter.Clear()
+				m.saveCurrentSession()
+				m.cancelAndReset()
+				m.requestGen++
+				return m, m.refreshCurrentLevel()
+			}
+		}
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()
@@ -203,11 +261,21 @@ func (m Model) handleTemplateOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, -10, len(filtered)-1)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, 20, len(filtered)-1)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, -20, len(filtered)-1)
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.templateCursor = 0
+		return m, nil
+	case "end":
+		m.pendingG = false
+		if len(filtered) > 0 {
+			m.templateCursor = len(filtered) - 1
+		}
 		return m, nil
 	case "g":
 		if m.pendingG {
@@ -254,6 +322,16 @@ func (m Model) handleTemplateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case filterAccept:
 		m.templateSearchMode = false
+		// When the filter narrows to a single template, Enter is unambiguous:
+		// apply it and close. Without this, the user has to press Enter twice
+		// (once to leave filter mode, once to commit) on a one-row list.
+		filtered := m.filteredTemplates()
+		if len(filtered) == 1 {
+			tmpl := filtered[0]
+			m.overlay = overlayNone
+			m.templateFilter.Clear()
+			return m, m.applyTemplate(tmpl)
+		}
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()
@@ -300,11 +378,28 @@ func (m Model) handleRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, -10, len(m.rollbackRevisions)-1)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, 20, len(m.rollbackRevisions)-1)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, -20, len(m.rollbackRevisions)-1)
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.rollbackCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G", "end":
+		if len(m.rollbackRevisions) > 0 {
+			m.rollbackCursor = len(m.rollbackRevisions) - 1
+		}
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.rollbackCursor = 0
 		return m, nil
 	case "enter":
 		if m.rollbackCursor >= 0 && m.rollbackCursor < len(m.rollbackRevisions) {
@@ -314,10 +409,39 @@ func (m Model) handleRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, m.rollbackDeployment(rev.Revision)
 		}
 		return m, nil
+	case "y":
+		return m.handleRollbackOverlayCopy()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	}
 	return m, nil
+}
+
+// handleRollbackOverlayCopy yanks the cursor revision row to the clipboard
+// as tab-separated columns matching the on-screen header. Mirrors the
+// vim-style `y` behaviour added to the read-only viewers and uses the same
+// relative-age format the renderer paints, so what the user copies is
+// exactly what they see.
+func (m Model) handleRollbackOverlayCopy() (tea.Model, tea.Cmd) {
+	if m.rollbackCursor < 0 || m.rollbackCursor >= len(m.rollbackRevisions) {
+		return m, nil
+	}
+	rev := m.rollbackRevisions[m.rollbackCursor]
+	row := joinTSV(
+		fmt.Sprintf("%d", rev.Revision),
+		rev.Name,
+		fmt.Sprintf("%d", rev.Replicas),
+		strings.Join(rev.Images, ","),
+		ui.FormatAge(rev.CreatedAt),
+	)
+	m.setStatusMessage(fmt.Sprintf("Copied revision %d", rev.Revision), false)
+	return m, tea.Batch(copyToSystemClipboard(row), scheduleStatusClear())
+}
+
+// joinTSV joins string columns with a tab separator. Empty values are
+// preserved so column positions stay aligned when pasted into a sheet.
+func joinTSV(cols ...string) string {
+	return strings.Join(cols, "\t")
 }
 
 // handleHelmRollbackOverlayKey handles keyboard input for the Helm rollback overlay.
@@ -339,11 +463,28 @@ func (m Model) handleHelmRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case "ctrl+u":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, -10, len(m.helmRollbackRevisions)-1)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, 20, len(m.helmRollbackRevisions)-1)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, -20, len(m.helmRollbackRevisions)-1)
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.helmRollbackCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G", "end":
+		if len(m.helmRollbackRevisions) > 0 {
+			m.helmRollbackCursor = len(m.helmRollbackRevisions) - 1
+		}
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.helmRollbackCursor = 0
 		return m, nil
 	case "enter":
 		if m.helmRollbackCursor >= 0 && m.helmRollbackCursor < len(m.helmRollbackRevisions) {
@@ -353,10 +494,31 @@ func (m Model) handleHelmRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			return m, m.rollbackHelmRelease(rev.Revision)
 		}
 		return m, nil
+	case "y":
+		return m.handleHelmRollbackOverlayCopy()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	}
 	return m, nil
+}
+
+// handleHelmRollbackOverlayCopy yanks the cursor revision row to the
+// clipboard as tab-separated columns matching the on-screen header.
+func (m Model) handleHelmRollbackOverlayCopy() (tea.Model, tea.Cmd) {
+	if m.helmRollbackCursor < 0 || m.helmRollbackCursor >= len(m.helmRollbackRevisions) {
+		return m, nil
+	}
+	rev := m.helmRollbackRevisions[m.helmRollbackCursor]
+	row := joinTSV(
+		fmt.Sprintf("%d", rev.Revision),
+		rev.Status,
+		rev.Chart,
+		rev.AppVersion,
+		rev.Description,
+		rev.Updated,
+	)
+	m.setStatusMessage(fmt.Sprintf("Copied revision %d", rev.Revision), false)
+	return m, tea.Batch(copyToSystemClipboard(row), scheduleStatusClear())
 }
 
 // handleHelmHistoryOverlayKey handles keyboard input for the read-only Helm
@@ -381,16 +543,56 @@ func (m Model) handleHelmHistoryOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "ctrl+u":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, -10, len(m.helmHistoryRevisions)-1)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, 20, len(m.helmHistoryRevisions)-1)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, -20, len(m.helmHistoryRevisions)-1)
 		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.helmHistoryCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G", "end":
+		if len(m.helmHistoryRevisions) > 0 {
+			m.helmHistoryCursor = len(m.helmHistoryRevisions) - 1
+		}
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.helmHistoryCursor = 0
+		return m, nil
+	case "y":
+		return m.handleHelmHistoryOverlayCopy()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	}
 	return m, nil
+}
+
+// handleHelmHistoryOverlayCopy yanks the cursor revision row to the
+// clipboard as tab-separated columns matching the on-screen header.
+// Identical shape to the helm rollback variant — the two overlays share
+// the same row schema, only Enter behaviour differs.
+func (m Model) handleHelmHistoryOverlayCopy() (tea.Model, tea.Cmd) {
+	if m.helmHistoryCursor < 0 || m.helmHistoryCursor >= len(m.helmHistoryRevisions) {
+		return m, nil
+	}
+	rev := m.helmHistoryRevisions[m.helmHistoryCursor]
+	row := joinTSV(
+		fmt.Sprintf("%d", rev.Revision),
+		rev.Status,
+		rev.Chart,
+		rev.AppVersion,
+		rev.Description,
+		rev.Updated,
+	)
+	m.setStatusMessage(fmt.Sprintf("Copied revision %d", rev.Revision), false)
+	return m, tea.Batch(copyToSystemClipboard(row), scheduleStatusClear())
 }
 
 // handleColorschemeOverlayKey handles keyboard input for the color scheme selector overlay.
@@ -463,13 +665,29 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.schemeCursor = clampOverlayCursor(m.schemeCursor, 20, selectableCount-1)
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.schemeCursor = clampOverlayCursor(m.schemeCursor, -20, selectableCount-1)
+		m.previewSchemeAtCursor(filtered)
+		return m, nil
+
+	case "home":
+		m.pendingG = false
+		m.schemeCursor = 0
+		ui.ResetOverlaySchemeScroll()
+		m.previewSchemeAtCursor(filtered)
+		return m, nil
+
+	case "end":
+		m.pendingG = false
+		if selectableCount > 0 {
+			m.schemeCursor = selectableCount - 1
+		}
+		ui.ResetOverlaySchemeScroll()
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
@@ -550,7 +768,24 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.schemeFilterMode = false
 		m.schemeCursor = 0
 		ui.ResetOverlaySchemeScroll()
-		m.previewSchemeAtCursor(m.filteredSchemeNames())
+		filtered := m.filteredSchemeNames()
+		// When the filter narrows to a single scheme, Enter is unambiguous:
+		// commit it and close. The live preview already applied the theme on
+		// each keystroke; here we lock it in with a status message so the
+		// user does not have to press Enter again on a one-row list.
+		if len(filtered) == 1 {
+			name := filtered[0]
+			schemes := ui.BuiltinSchemes()
+			if theme, ok := schemes[name]; ok {
+				ui.ApplyTheme(theme)
+				ui.ActiveSchemeName = name
+				m.setStatusMessage("Color scheme: "+name, false)
+			}
+			m.overlay = overlayNone
+			m.schemeFilter.Clear()
+			return m, scheduleStatusClear()
+		}
+		m.previewSchemeAtCursor(filtered)
 		return m, nil
 	case filterClose:
 		return m.closeTabOrQuit()
@@ -603,10 +838,7 @@ func (m *Model) filteredSchemeNames() []string {
 func (m *Model) schemeFirstVisibleSelectable() int {
 	items := m.schemeDisplayItems()
 	start := ui.GetOverlaySchemeScroll()
-	end := start + ui.SchemeOverlayMaxVisible
-	if end > len(items) {
-		end = len(items)
-	}
+	end := min(start+ui.SchemeOverlayMaxVisible, len(items))
 	for i := start; i < end; i++ {
 		if items[i].selectIdx >= 0 {
 			return items[i].selectIdx
@@ -620,10 +852,7 @@ func (m *Model) schemeFirstVisibleSelectable() int {
 func (m *Model) schemeLastVisibleSelectable() int {
 	items := m.schemeDisplayItems()
 	start := ui.GetOverlaySchemeScroll()
-	end := start + ui.SchemeOverlayMaxVisible
-	if end > len(items) {
-		end = len(items)
-	}
+	end := min(start+ui.SchemeOverlayMaxVisible, len(items))
 	for i := end - 1; i >= start; i-- {
 		if items[i].selectIdx >= 0 {
 			return items[i].selectIdx

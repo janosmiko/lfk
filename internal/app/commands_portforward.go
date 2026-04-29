@@ -35,13 +35,14 @@ func (m Model) execKubectlPortForward(portMapping string) tea.Cmd {
 	}
 
 	mgr := m.portForwardMgr
-	kubeconfigPaths := m.client.KubeconfigPaths()
 	name := m.actionCtx.name
 	kctx := m.actionCtx.context
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
+	kubectlKctx := m.kubectlContext(kctx)
 
 	logger.Info("Running kubectl port-forward", "resource", resourceKind+"/"+name, "localPort", localPort, "remotePort", remotePort, "namespace", ns, "context", kctx)
 	return func() tea.Msg {
-		id, err := mgr.Start(kubectlPath, kubeconfigPaths, resourceKind, name, ns, kctx, localPort, remotePort)
+		id, err := mgr.Start(kubectlPath, kubeconfigPaths, resourceKind, name, ns, kctx, kubectlKctx, localPort, remotePort)
 		if err != nil {
 			logger.Error("kubectl port-forward failed", "resource", resourceKind+"/"+name, "error", err)
 		}
@@ -74,11 +75,12 @@ func (m Model) restartPortForward(id int) tea.Cmd {
 			return portForwardStartedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
 		}
 	}
-	kubeconfigPaths := m.client.KubeconfigPaths()
 	resourceKind := entry.ResourceKind
 	name := entry.ResourceName
 	ns := entry.Namespace
 	kctx := entry.Context
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
+	kubectlKctx := m.kubectlContext(kctx)
 	remotePort := entry.RemotePort
 	// Use "0" for local port to get a fresh random port assignment.
 	localPort := "0"
@@ -86,7 +88,7 @@ func (m Model) restartPortForward(id int) tea.Cmd {
 	mgr.Remove(id)
 
 	return func() tea.Msg {
-		newID, err := mgr.Start(kubectlPath, kubeconfigPaths, resourceKind, name, ns, kctx, localPort, remotePort)
+		newID, err := mgr.Start(kubectlPath, kubeconfigPaths, resourceKind, name, ns, kctx, kubectlKctx, localPort, remotePort)
 		if err != nil {
 			logger.Error("kubectl port-forward restart failed", "resource", resourceKind+"/"+name, "error", err)
 		}

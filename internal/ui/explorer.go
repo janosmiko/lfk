@@ -12,6 +12,14 @@ import (
 // ActiveHighlightQuery is set by the app to highlight matching text in item names.
 var ActiveHighlightQuery string
 
+// ActiveHighlightCategories opts-in to highlighting matching text in
+// the category bars too. Only set when the user explicitly opted into
+// category-aware search/filter (Tab inside the input at
+// LevelResourceTypes); otherwise category bars stay un-highlighted
+// even when ActiveHighlightQuery is non-empty, so plain `/foo` doesn't
+// flash a category that the user hasn't asked to navigate into.
+var ActiveHighlightCategories bool
+
 // ActiveFullscreenMode is set by the app to indicate fullscreen middle column mode.
 // In fullscreen mode, more columns (IP, Node, etc.) are shown.
 var ActiveFullscreenMode bool
@@ -57,6 +65,23 @@ var ActiveCollapsedCategories map[string]bool
 // vim-style scrolloff logic instead of recalculating from scratch each frame.
 // A value of -1 means "no persistent scroll, calculate from scratch".
 var ActiveMiddleScroll int
+
+// ActiveRowCache and ActiveTableLayout, when non-nil, let RenderTable reuse
+// pre-rendered row strings and pre-computed column widths across calls.
+// TableRenderer owns the lifetime — it sets these before each RenderTable
+// call and restores them after. Nil disables caching for direct callers.
+var ActiveRowCache map[int]string
+
+type TableLayoutCache struct {
+	Computed bool
+
+	HasNs, HasReady, HasRestarts, HasAge, HasStatus bool
+	NsW, ReadyW, RestartsW, AgeW, StatusW           int
+	AnyRecentRestart                                bool
+	ExtraCols                                       []extraColumn
+}
+
+var ActiveTableLayout *TableLayoutCache
 
 // ActiveLeftScroll is the persistent scroll position for the left column.
 // Same semantics as ActiveMiddleScroll.
@@ -124,10 +149,7 @@ func VimScrollOff(scroll, cursor, numEntries, height, scrollOff int, displayLine
 		scrollOff = maxSO
 	}
 
-	startEntry := scroll
-	if startEntry < 0 {
-		startEntry = 0
-	}
+	startEntry := max(scroll, 0)
 	if startEntry >= numEntries {
 		startEntry = numEntries - 1
 	}
@@ -157,10 +179,7 @@ func VimScrollOff(scroll, cursor, numEntries, height, scrollOff int, displayLine
 	}
 
 	// Top scrolloff: ensure cursor is at least scrollOff entries from the top.
-	topTarget := cursor - scrollOff
-	if topTarget < 0 {
-		topTarget = 0
-	}
+	topTarget := max(cursor-scrollOff, 0)
 	if startEntry > topTarget {
 		startEntry = topTarget
 	}
@@ -240,10 +259,24 @@ func highlightName(name, query string) string {
 	return HighlightMatchStyled(name, query, SearchHighlightStyle)
 }
 
+// highlightNameOver behaves like highlightName but re-asserts
+// outerStyle's open codes after each match's reset, so the
+// surrounding category-bar / cursor-row background isn't wiped out
+// for the post-match part of the line.
+func highlightNameOver(name, query string, outerStyle lipgloss.Style) string {
+	return HighlightMatchStyledOver(name, query, SearchHighlightStyle, outerStyle)
+}
+
 // highlightNameSelected highlights matched portions of query in name
 // using SelectedSearchHighlightStyle (for items under the cursor).
 func highlightNameSelected(name, query string) string {
 	return HighlightMatchStyled(name, query, SelectedSearchHighlightStyle)
+}
+
+// highlightNameSelectedOver behaves like highlightNameSelected but
+// re-asserts outerStyle's open codes after each match's reset.
+func highlightNameSelectedOver(name, query string, outerStyle lipgloss.Style) string {
+	return HighlightMatchStyledOver(name, query, SelectedSearchHighlightStyle, outerStyle)
 }
 
 // RenderColumn renders a single column with optional header, item list, and cursor highlight.
@@ -368,10 +401,7 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 				}
 			}
 			if cursor-scrollOff >= 0 && startEntry > cursor-scrollOff {
-				startEntry = cursor - scrollOff
-				if startEntry < 0 {
-					startEntry = 0
-				}
+				startEntry = max(cursor-scrollOff, 0)
 			}
 			// Check the new position BEFORE decrementing so we
 			// don't overshoot when an earlier entry has 2-3
@@ -461,15 +491,43 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 					headerText = "▾ " + item.Category
 				}
 			}
-			// Highlight category header when cursor is on a collapsed group placeholder.
+			// Highlight matching text in the header only when the
+			// user opted into category-aware search/filter via Tab
+			// (ActiveHighlightCategories). Without it, plain `/foo`
+			// would visibly mark "Argo CD" or "Networking" without
+			// actually treating those categories as match targets,
+			// confusing the user about what n/N will do.
+			//
+			// We pass the same outer style that's about to wrap the
+			// line so the inner highlight's reset doesn't kill the
+			// bar's background for the post-match segment.
 			if e.isPlaceholder && e.itemIdx == cursor && isActive {
+				highlighted := false
+				if ActiveHighlightCategories && ActiveHighlightQuery != "" {
+					headerText = highlightNameOver(headerText, ActiveHighlightQuery, ActiveSelectedStyle(e.itemIdx))
+					highlighted = true
+				}
 				line := Truncate(headerText, width)
 				lineWidth := lipgloss.Width(line)
 				if lineWidth < width {
 					line += strings.Repeat(" ", width-lineWidth)
 				}
-				b.WriteString(ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line))
+				if highlighted {
+					// Use manual outer-wrap: lipgloss.Render fragments
+					// embedded inner ANSI per-character, producing
+					// malformed sequences that NO_COLOR terminals
+					// display as literal "[1;7m..." text and that
+					// throw off visible width.
+					b.WriteString(RenderOverPrestyled(line, ActiveSelectedStyle(e.itemIdx)))
+				} else {
+					b.WriteString(ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line))
+				}
 			} else {
+				highlighted := false
+				if ActiveHighlightCategories && ActiveHighlightQuery != "" {
+					headerText = highlightNameOver(headerText, ActiveHighlightQuery, CategoryBarStyle)
+					highlighted = true
+				}
 				// Render the category header as a full-width "bar"
 				// with a distinct style so groups are visually
 				// separated without needing a blank row above.
@@ -478,7 +536,11 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 				if lineWidth < width {
 					line += strings.Repeat(" ", width-lineWidth)
 				}
-				b.WriteString(CategoryBarStyle.Render(line))
+				if highlighted {
+					b.WriteString(RenderOverPrestyled(line, CategoryBarStyle))
+				} else {
+					b.WriteString(CategoryBarStyle.Render(line))
+				}
 			}
 			first = false
 		}
@@ -495,16 +557,27 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 		switch {
 		case e.itemIdx == cursor && isActive:
 			line = FormatItemPlain(item, width)
-			// Apply search/filter highlight on the selected item with contrasting style.
+			highlighted := false
+			// Apply search/filter highlight on the selected item with
+			// contrasting style. Pass the outer cursor style so the
+			// inner highlight's reset doesn't kill the cursor bg for
+			// the post-match part of the row.
 			if ActiveHighlightQuery != "" {
-				line = highlightNameSelected(line, ActiveHighlightQuery)
+				line = highlightNameSelectedOver(line, ActiveHighlightQuery, ActiveSelectedStyle(e.itemIdx))
+				highlighted = true
 			}
 			// Pad line to full column width for consistent background.
 			lineWidth := lipgloss.Width(line)
 			if lineWidth < width {
 				line += strings.Repeat(" ", width-lineWidth)
 			}
-			line = ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line)
+			if highlighted {
+				// Avoid lipgloss.Render fragmenting embedded inner
+				// highlight ANSI — see RenderOverPrestyled doc.
+				line = RenderOverPrestyled(line, ActiveSelectedStyle(e.itemIdx))
+			} else {
+				line = ActiveSelectedStyle(e.itemIdx).MaxWidth(width).Render(line)
+			}
 		case e.itemIdx == cursor && cursor >= 0:
 			// Parent column highlight (dimmer than active selection).
 			line = FormatItemNameOnlyPlain(item, width)
@@ -563,8 +636,8 @@ func FormatItem(item model.Item, width int) string {
 	if item.Restarts != "" {
 		detailParts = append(detailParts, DimStyle.Render(item.Restarts))
 	}
-	if item.Age != "" {
-		detailParts = append(detailParts, AgeStyle(item.Age).Render(item.Age))
+	if age := LiveAge(item); age != "" {
+		detailParts = append(detailParts, AgeStyle(age).Render(age))
 	}
 
 	// Build the right-side info: details + status.
@@ -582,10 +655,7 @@ func FormatItem(item model.Item, width int) string {
 
 	if rightSide != "" {
 		rightW := lipgloss.Width(rightSide)
-		maxNameW := width - rightW - 2
-		if maxNameW < 8 {
-			maxNameW = 8
-		}
+		maxNameW := max(width-rightW-2, 8)
 		visualName := name
 		if lipgloss.Width(visualName) > maxNameW {
 			rawName := displayName
@@ -594,10 +664,7 @@ func FormatItem(item model.Item, width int) string {
 				iconPrefix = IconStyle.Render(icon) + " "
 			}
 			iconW := lipgloss.Width(iconPrefix)
-			available := maxNameW - iconW
-			if available < 4 {
-				available = 4
-			}
+			available := max(maxNameW-iconW, 4)
 			if len(rawName) > available {
 				rawName = rawName[:available-1] + "~"
 			}
@@ -614,10 +681,7 @@ func FormatItem(item model.Item, width int) string {
 			visualName = iconPrefix + highlightName(displayName, ActiveHighlightQuery)
 		}
 		nameW := lipgloss.Width(visualName)
-		padding := width - nameW - rightW - 1
-		if padding < 1 {
-			padding = 1
-		}
+		padding := max(width-nameW-rightW-1, 1)
 		return visualName + strings.Repeat(" ", padding) + rightSide
 	}
 
@@ -669,8 +733,8 @@ func FormatItemPlain(item model.Item, width int) string {
 	if item.Restarts != "" {
 		detailParts = append(detailParts, item.Restarts)
 	}
-	if item.Age != "" {
-		detailParts = append(detailParts, item.Age)
+	if age := LiveAge(item); age != "" {
+		detailParts = append(detailParts, age)
 	}
 
 	// Build the right-side info: details + status (all plain text).
@@ -688,10 +752,7 @@ func FormatItemPlain(item model.Item, width int) string {
 
 	if rightSide != "" {
 		rightW := lipgloss.Width(rightSide)
-		maxNameW := width - rightW - 2
-		if maxNameW < 8 {
-			maxNameW = 8
-		}
+		maxNameW := max(width-rightW-2, 8)
 		visualName := name
 		if lipgloss.Width(visualName) > maxNameW {
 			rawName := displayName
@@ -700,20 +761,14 @@ func FormatItemPlain(item model.Item, width int) string {
 				iconPrefix = icon + " "
 			}
 			iconW := lipgloss.Width(iconPrefix)
-			available := maxNameW - iconW
-			if available < 4 {
-				available = 4
-			}
+			available := max(maxNameW-iconW, 4)
 			if len(rawName) > available {
 				rawName = rawName[:available-1] + "~"
 			}
 			visualName = iconPrefix + rawName
 		}
 		nameW := lipgloss.Width(visualName)
-		padding := width - nameW - rightW - 1
-		if padding < 1 {
-			padding = 1
-		}
+		padding := max(width-nameW-rightW-1, 1)
 		return visualName + strings.Repeat(" ", padding) + rightSide
 	}
 

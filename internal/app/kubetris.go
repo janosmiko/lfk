@@ -710,10 +710,7 @@ func (g *kubetrisGame) tickIntervalMs() int {
 		33,  // level 19
 		17,  // level 20+
 	}
-	idx := g.level - 1
-	if idx < 0 {
-		idx = 0
-	}
+	idx := max(g.level-1, 0)
 	if idx >= len(table) {
 		return table[len(table)-1]
 	}
@@ -844,5 +841,5 @@ func (g *kubetrisGame) saveHighScore() {
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return
 	}
-	_ = os.WriteFile(path, []byte(fmt.Sprintf("%d\n", g.highScore)), 0o644)
+	_ = os.WriteFile(path, fmt.Appendf(nil, "%d\n", g.highScore), 0o644)
 }

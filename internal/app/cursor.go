@@ -9,24 +9,50 @@ import (
 )
 
 // parentIndex returns the index of the parent item in leftItems, or -1 if none.
+//
+// At LevelResources the match uses the ResourceRef (group/version/resource)
+// stored on Item.Extra rather than DisplayName. API-discovery-produced
+// ResourceTypeEntry values leave DisplayName empty — only pseudo-resources
+// (Port Forwards, Helm Releases) and the curated BuiltInMetadata table
+// carry one — so matching on DisplayName silently drops the highlight for
+// every real-world resource. ResourceRef is populated for every sidebar
+// item and is the canonical identity of a resource type.
 func (m *Model) parentIndex() int {
-	var parentName string
 	switch m.nav.Level {
 	case model.LevelResourceTypes:
-		parentName = m.nav.Context
+		return indexByName(m.leftItems, m.nav.Context)
 	case model.LevelResources:
-		if m.nav.ResourceType.DisplayName != "" {
-			parentName = m.nav.ResourceType.DisplayName
-		}
+		return indexByExtra(m.leftItems, m.nav.ResourceType.ResourceRef())
 	case model.LevelOwned:
-		parentName = m.nav.ResourceName
+		return indexByName(m.leftItems, m.nav.ResourceName)
 	case model.LevelContainers:
-		parentName = m.nav.OwnedName
+		return indexByName(m.leftItems, m.nav.OwnedName)
 	default:
 		return -1
 	}
-	for i, item := range m.leftItems {
-		if item.Name == parentName {
+}
+
+func indexByName(items []model.Item, name string) int {
+	if name == "" {
+		return -1
+	}
+	for i, item := range items {
+		if item.Name == name {
+			return i
+		}
+	}
+	return -1
+}
+
+func indexByExtra(items []model.Item, extra string) int {
+	// A zero-value ResourceTypeEntry produces the sentinel "//", which no
+	// real sidebar item carries — reject it explicitly so the linear scan
+	// cannot accidentally match a malformed entry.
+	if extra == "" || extra == "//" {
+		return -1
+	}
+	for i, item := range items {
+		if item.Extra == extra {
 			return i
 		}
 	}
@@ -45,10 +71,7 @@ func (m *Model) setCursor(v int) {
 
 // clampCursor ensures the cursor is within bounds for visible (filtered) middleItems.
 func (m *Model) clampCursor() {
-	c := m.cursor()
-	if c < 0 {
-		c = 0
-	}
+	c := max(m.cursor(), 0)
 	visible := m.visibleMiddleItems()
 	if len(visible) > 0 && c >= len(visible) {
 		c = len(visible) - 1
@@ -91,6 +114,16 @@ func (m *Model) restoreCursorToItem(name, namespace, extra, kind string) {
 	m.clampCursor()
 }
 
+// setMiddleItems replaces the middleItems slice and bumps the row-cache rev.
+// Every path that swaps middleItems (full replace, filter-and-replace,
+// append-and-replace, nil-out) must go through this helper so the
+// TableRenderer fingerprint invalidates. Slice reassignment alone is not
+// enough — itemsPtr is only a fast-path; rev is the authoritative signal.
+func (m *Model) setMiddleItems(items []model.Item) {
+	m.middleItems = items
+	m.middleItemsRev++
+}
+
 // carryOverMetricsColumns copies metrics columns (CPU, CPU/R, CPU/L, MEM, MEM/R, MEM/L)
 // from existing middle items to new items by matching on name+namespace.
 // This prevents blinking during watch mode refreshes while metrics load async.
@@ -101,21 +134,22 @@ func (m *Model) carryOverMetricsColumns(newItems []model.Item) {
 		"MEM": true, "MEM/R": true, "MEM/L": true,
 		"CPU%": true, "MEM%": true,
 	}
-	// Build lookup from old items -- only if they have real usage data.
+	// Build lookup from old items. Carry over whatever metrics columns the
+	// item already had so the column set stays visually stable across watch
+	// ticks -- including "n/a" placeholders set by the node enrichment path
+	// when metrics-server returned nothing. The previous hasUsage gate
+	// dropped the carryover whenever every value was empty/zero, which made
+	// the metrics columns flicker out and back in on each refresh.
 	type itemKey struct{ ns, name string }
 	oldMetrics := make(map[itemKey][]model.KeyValue)
 	for _, item := range m.middleItems {
 		var cols []model.KeyValue
-		hasUsage := false
 		for _, kv := range item.Columns {
 			if metricsKeys[kv.Key] {
 				cols = append(cols, kv)
-				if (kv.Key == "CPU" || kv.Key == "MEM") && kv.Value != "" && kv.Value != "0" && kv.Value != "0m" && kv.Value != "0B" {
-					hasUsage = true
-				}
 			}
 		}
-		if hasUsage && len(cols) > 0 {
+		if len(cols) > 0 {
 			oldMetrics[itemKey{item.Namespace, item.Name}] = cols
 		}
 	}
@@ -264,12 +298,14 @@ func (m *Model) toggleSelection(item model.Item) {
 	} else {
 		m.selectedItems[key] = true
 	}
+	m.selectionRev++
 }
 
 // clearSelection removes all items from the multi-selection set and resets the region anchor.
 func (m *Model) clearSelection() {
 	m.selectedItems = make(map[string]bool)
 	m.selectionAnchor = -1
+	m.selectionRev++
 }
 
 // hasSelection returns true if any items are selected.
@@ -298,18 +334,28 @@ func (m *Model) visibleMiddleItems() []model.Item {
 	if m.filterText != "" {
 		rawQuery := m.filterText
 
-		// First pass: determine which categories match the filter.
+		// Category expansion is gated on broad mode (Tab) and only at
+		// LevelResourceTypes where the category bar actually renders.
+		// Plain `f ing` matches resource type names only — typing it
+		// must not pull in every Networking member just because the
+		// category name contains the substring.
+		expandByCategory := m.filterBroadMode && m.nav.Level == model.LevelResourceTypes
+
+		// First pass: determine which categories match the filter
+		// (only used when expandByCategory is on).
 		matchedCategories := make(map[string]bool)
-		for _, item := range items {
-			if item.Category != "" && ui.MatchLine(item.Category, rawQuery) {
-				matchedCategories[item.Category] = true
+		if expandByCategory {
+			for _, item := range items {
+				if item.Category != "" && ui.MatchLine(item.Category, rawQuery) {
+					matchedCategories[item.Category] = true
+				}
 			}
 		}
 
 		// Second pass: include items that match by name OR belong to a matched category.
 		var filtered []model.Item
 		for _, item := range items {
-			if item.Category != "" && matchedCategories[item.Category] {
+			if expandByCategory && item.Category != "" && matchedCategories[item.Category] {
 				filtered = append(filtered, item)
 				continue
 			}
@@ -326,6 +372,23 @@ func (m *Model) visibleMiddleItems() []model.Item {
 			}
 			if ui.MatchLine(searchText, rawQuery) {
 				filtered = append(filtered, item)
+				continue
+			}
+			// Broad mode: also scan column values (annotations, labels,
+			// finalizers, CRD printer columns, custom user columns).
+			// Internal-prefix columns stay excluded. Outside
+			// LevelResourceTypes this is what Tab does — the category
+			// branch above is a no-op there.
+			if m.filterBroadMode {
+				for _, kv := range item.Columns {
+					if isInternalColumnKey(kv.Key) {
+						continue
+					}
+					if ui.MatchLine(kv.Value, rawQuery) {
+						filtered = append(filtered, item)
+						break
+					}
+				}
 			}
 		}
 		items = filtered
@@ -446,12 +509,19 @@ func (m *Model) filteredExplainRecursiveResults() []model.ExplainField {
 }
 
 // filteredOverlayItems returns overlay items matching the current filter.
+//
+// Allocates a non-nil empty slice when the filter matches nothing so
+// downstream renderers (e.g. RenderNamespaceOverlay) can distinguish
+// "filter excluded everything" (empty) from "fetch still in flight"
+// (nil). Without the upfront allocation, a no-match filter slipped
+// through as nil and the namespace overlay rendered "Loading
+// namespaces..." indefinitely.
 func (m *Model) filteredOverlayItems() []model.Item {
 	if m.overlayFilter.Value == "" {
 		return m.overlayItems
 	}
 	rawQuery := m.overlayFilter.Value
-	var filtered []model.Item
+	filtered := []model.Item{}
 	for _, item := range m.overlayItems {
 		if ui.MatchLine(item.Name, rawQuery) {
 			filtered = append(filtered, item)
@@ -476,15 +546,19 @@ func (m *Model) filteredLogPodItems() []model.Item {
 }
 
 // filteredLogContainerItems returns overlay items matching the current log container filter.
+//
+// The "All Containers" virtual row is filtered by name like every other
+// entry — keeping it pinned would clutter the narrowed list and break the
+// muscle-memory consistency with the namespace and log pod selectors.
+// Users can still reach all-containers by clearing the filter.
 func (m *Model) filteredLogContainerItems() []model.Item {
 	if m.logContainerFilterText == "" {
 		return m.overlayItems
 	}
 	rawQuery := m.logContainerFilterText
-	var filtered []model.Item
+	filtered := []model.Item{}
 	for _, item := range m.overlayItems {
-		// Always include the "All Containers" virtual item.
-		if item.Status == "all" || ui.MatchLine(item.Name, rawQuery) {
+		if ui.MatchLine(item.Name, rawQuery) {
 			filtered = append(filtered, item)
 		}
 	}

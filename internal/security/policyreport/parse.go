@@ -46,10 +46,10 @@ func isFailingResult(status string) bool {
 // extractResourceRef builds a ResourceRef from a result or scope object.
 // Tries the result's resources[0] first, then falls back to the
 // report-level scope (Kyverno sets scope on the report, not per-result).
-func extractResourceRef(result map[string]interface{}, scope security.ResourceRef) security.ResourceRef {
-	resources, ok := result["resources"].([]interface{})
+func extractResourceRef(result map[string]any, scope security.ResourceRef) security.ResourceRef {
+	resources, ok := result["resources"].([]any)
 	if ok && len(resources) > 0 {
-		if res, ok := resources[0].(map[string]interface{}); ok {
+		if res, ok := resources[0].(map[string]any); ok {
 			ref := refFromMap(res, scope.Namespace)
 			if ref.Kind != "" && ref.Name != "" {
 				return ref
@@ -71,7 +71,7 @@ func extractScope(u *unstructured.Unstructured) security.ResourceRef {
 }
 
 // refFromMap extracts a ResourceRef from a map with kind/name/namespace keys.
-func refFromMap(m map[string]interface{}, fallbackNs string) security.ResourceRef {
+func refFromMap(m map[string]any, fallbackNs string) security.ResourceRef {
 	kind, _ := m["kind"].(string)
 	name, _ := m["name"].(string)
 	ns, _ := m["namespace"].(string)
@@ -108,7 +108,7 @@ func parsePolicyReport(u *unstructured.Unstructured) []security.Finding {
 	var findings []security.Finding
 
 	for _, r := range results {
-		m, ok := r.(map[string]interface{})
+		m, ok := r.(map[string]any)
 		if !ok {
 			continue
 		}

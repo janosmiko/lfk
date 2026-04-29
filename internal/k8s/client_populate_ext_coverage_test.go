@@ -13,9 +13,9 @@ import (
 
 func TestPopulateExt_IngressClassCoverage(t *testing.T) {
 	t.Run("default ingress class", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{
 					"ingressclass.kubernetes.io/is-default-class": "true",
 				},
 			},
@@ -27,9 +27,9 @@ func TestPopulateExt_IngressClassCoverage(t *testing.T) {
 	})
 
 	t.Run("non-default ingress class", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{
 					"ingressclass.kubernetes.io/is-default-class": "false",
 				},
 			},
@@ -44,9 +44,9 @@ func TestPopulateExt_IngressClassCoverage(t *testing.T) {
 
 func TestPopulateExt_StorageClassCoverage(t *testing.T) {
 	t.Run("default storage class with all fields", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{
 					"storageclass.kubernetes.io/is-default-class": "true",
 				},
 			},
@@ -69,8 +69,8 @@ func TestPopulateExt_StorageClassCoverage(t *testing.T) {
 	})
 
 	t.Run("storage class without default annotation", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"metadata":    map[string]interface{}{},
+		obj := map[string]any{
+			"metadata":    map[string]any{},
 			"provisioner": "ebs.csi.aws.com",
 		}
 		ti := &model.Item{Name: "gp3"}
@@ -86,14 +86,14 @@ func TestPopulateExt_StorageClassCoverage(t *testing.T) {
 
 func TestPopulateExt_ServiceAccountCoverage(t *testing.T) {
 	t.Run("service account with secrets and image pull secrets", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"secrets": []interface{}{
-				map[string]interface{}{"name": "sa-token-abc"},
+		obj := map[string]any{
+			"secrets": []any{
+				map[string]any{"name": "sa-token-abc"},
 			},
 			"automountServiceAccountToken": true,
-			"imagePullSecrets": []interface{}{
-				map[string]interface{}{"name": "registry-creds"},
-				map[string]interface{}{"name": "docker-hub"},
+			"imagePullSecrets": []any{
+				map[string]any{"name": "registry-creds"},
+				map[string]any{"name": "docker-hub"},
 			},
 		}
 		ti := &model.Item{}
@@ -107,7 +107,7 @@ func TestPopulateExt_ServiceAccountCoverage(t *testing.T) {
 	})
 
 	t.Run("service account with automount false", func(t *testing.T) {
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"automountServiceAccountToken": false,
 		}
 		ti := &model.Item{}
@@ -122,26 +122,26 @@ func TestPopulateExt_ServiceAccountCoverage(t *testing.T) {
 
 func TestPopulateExt_PriorityClassCoverage(t *testing.T) {
 	t.Run("default priority class", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{
 				"globalDefault": true,
 			},
 		}
 		ti := &model.Item{Name: "high-priority"}
-		spec := obj["spec"].(map[string]interface{})
+		spec := obj["spec"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, spec)
 		assert.Equal(t, "high-priority (default)", ti.Name)
 		assert.Equal(t, "default", ti.Status)
 	})
 
 	t.Run("non-default priority class", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{
 				"globalDefault": false,
 			},
 		}
 		ti := &model.Item{Name: "low-priority"}
-		spec := obj["spec"].(map[string]interface{})
+		spec := obj["spec"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "PriorityClass", nil, spec)
 		assert.Equal(t, "low-priority", ti.Name)
 	})
@@ -151,13 +151,13 @@ func TestPopulateExt_PriorityClassCoverage(t *testing.T) {
 
 func TestPopulateExt_FluxCDCoverage(t *testing.T) {
 	t.Run("kustomization with Ready condition and revision", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{
 				"suspend": false,
 			},
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Ready",
 						"status": "True",
 						"reason": "ReconciliationSucceeded",
@@ -167,8 +167,8 @@ func TestPopulateExt_FluxCDCoverage(t *testing.T) {
 			},
 		}
 		ti := &model.Item{}
-		status := obj["status"].(map[string]interface{})
-		spec := obj["spec"].(map[string]interface{})
+		status := obj["status"].(map[string]any)
+		spec := obj["spec"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "Kustomization", status, spec)
 
 		colMap := columnsToMap(ti.Columns)
@@ -178,15 +178,15 @@ func TestPopulateExt_FluxCDCoverage(t *testing.T) {
 	})
 
 	t.Run("kustomization suspended", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{
 				"suspend": true,
 			},
-			"status": map[string]interface{}{},
+			"status": map[string]any{},
 		}
 		ti := &model.Item{}
-		status := obj["status"].(map[string]interface{})
-		spec := obj["spec"].(map[string]interface{})
+		status := obj["status"].(map[string]any)
+		spec := obj["spec"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "Kustomization", status, spec)
 
 		colMap := columnsToMap(ti.Columns)
@@ -194,15 +194,15 @@ func TestPopulateExt_FluxCDCoverage(t *testing.T) {
 	})
 
 	t.Run("git repository with artifact revision fallback", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"artifact": map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"artifact": map[string]any{
 					"revision": "sha256:abcdef123456",
 				},
 			},
 		}
 		ti := &model.Item{}
-		status := obj["status"].(map[string]interface{})
+		status := obj["status"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "GitRepository", status, nil)
 
 		colMap := columnsToMap(ti.Columns)
@@ -210,13 +210,13 @@ func TestPopulateExt_FluxCDCoverage(t *testing.T) {
 	})
 
 	t.Run("flux resource with short revision (no truncation needed)", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
 				"lastAppliedRevision": "short",
 			},
 		}
 		ti := &model.Item{}
-		status := obj["status"].(map[string]interface{})
+		status := obj["status"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "HelmChart", status, nil)
 
 		colMap := columnsToMap(ti.Columns)
@@ -224,10 +224,10 @@ func TestPopulateExt_FluxCDCoverage(t *testing.T) {
 	})
 
 	t.Run("flux Ready False with message", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":    "Ready",
 						"status":  "False",
 						"message": "reconciliation failed",
@@ -236,7 +236,7 @@ func TestPopulateExt_FluxCDCoverage(t *testing.T) {
 			},
 		}
 		ti := &model.Item{}
-		status := obj["status"].(map[string]interface{})
+		status := obj["status"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "HelmRepository", status, nil)
 
 		colMap := columnsToMap(ti.Columns)
@@ -249,13 +249,13 @@ func TestPopulateExt_FluxCDCoverage(t *testing.T) {
 
 func TestPopulateExt_CertManagerCoverage(t *testing.T) {
 	t.Run("certificate with Ready, expiry, and secret", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{
 				"secretName": "tls-cert",
 			},
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Ready",
 						"status": "True",
 						"reason": "Ready",
@@ -266,8 +266,8 @@ func TestPopulateExt_CertManagerCoverage(t *testing.T) {
 			},
 		}
 		ti := &model.Item{}
-		status := obj["status"].(map[string]interface{})
-		spec := obj["spec"].(map[string]interface{})
+		status := obj["status"].(map[string]any)
+		spec := obj["spec"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "Certificate", status, spec)
 
 		colMap := columnsToMap(ti.Columns)
@@ -279,10 +279,10 @@ func TestPopulateExt_CertManagerCoverage(t *testing.T) {
 	})
 
 	t.Run("certificate not Ready with message", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":    "Ready",
 						"status":  "False",
 						"message": "certificate issuance failed",
@@ -291,7 +291,7 @@ func TestPopulateExt_CertManagerCoverage(t *testing.T) {
 			},
 		}
 		ti := &model.Item{}
-		status := obj["status"].(map[string]interface{})
+		status := obj["status"].(map[string]any)
 		populateResourceDetailsExt(ti, obj, "CertificateRequest", status, nil)
 
 		colMap := columnsToMap(ti.Columns)
@@ -304,12 +304,12 @@ func TestPopulateExt_CertManagerCoverage(t *testing.T) {
 
 func TestPopulateExt_DefaultCRDCoverage(t *testing.T) {
 	t.Run("unknown CRD with top-level status fields", func(t *testing.T) {
-		status := map[string]interface{}{
+		status := map[string]any{
 			"phase":   "Active",
 			"message": "all good",
 			"reason":  "Reconciled",
 		}
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"status": status,
 		}
 		ti := &model.Item{}
@@ -322,13 +322,13 @@ func TestPopulateExt_DefaultCRDCoverage(t *testing.T) {
 	})
 
 	t.Run("unknown CRD with map status fields", func(t *testing.T) {
-		status := map[string]interface{}{
-			"health": map[string]interface{}{
+		status := map[string]any{
+			"health": map[string]any{
 				"status":  "Healthy",
 				"message": "all components OK",
 			},
 		}
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"status": status,
 		}
 		ti := &model.Item{}
@@ -340,15 +340,15 @@ func TestPopulateExt_DefaultCRDCoverage(t *testing.T) {
 	})
 
 	t.Run("unknown CRD with conditions falls back to generic extraction", func(t *testing.T) {
-		status := map[string]interface{}{
-			"conditions": []interface{}{
-				map[string]interface{}{
+		status := map[string]any{
+			"conditions": []any{
+				map[string]any{
 					"type":   "Ready",
 					"status": "True",
 				},
 			},
 		}
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"status": status,
 		}
 		ti := &model.Item{}
@@ -359,7 +359,7 @@ func TestPopulateExt_DefaultCRDCoverage(t *testing.T) {
 	})
 
 	t.Run("nil status does nothing", func(t *testing.T) {
-		obj := map[string]interface{}{}
+		obj := map[string]any{}
 		ti := &model.Item{}
 		populateResourceDetailsExt(ti, obj, "UnknownCRD", nil, nil)
 		assert.Empty(t, ti.Columns)
@@ -370,11 +370,11 @@ func TestPopulateExt_DefaultCRDCoverage(t *testing.T) {
 
 func TestPopulateExt_EventCoverage(t *testing.T) {
 	t.Run("event populates status and columns", func(t *testing.T) {
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"type":    "Warning",
 			"reason":  "FailedScheduling",
 			"message": "0/3 nodes are available",
-			"involvedObject": map[string]interface{}{
+			"involvedObject": map[string]any{
 				"kind": "Pod",
 				"name": "my-pod",
 			},

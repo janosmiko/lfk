@@ -23,10 +23,9 @@ func RenderFinalizerSearchOverlay(
 	filterActive, loading bool,
 	width, height int,
 ) string {
-	innerW := width - 6 // account for overlay padding and borders
-	if innerW < 20 {
-		innerW = 20
-	}
+	innerW := max(
+		// account for overlay padding and borders
+		width-6, 20)
 
 	// Initial search prompt: no pattern entered yet.
 	if pattern == "" {
@@ -63,20 +62,14 @@ func RenderFinalizerSearchOverlay(
 	// Calculate visible area.
 	headerLines := 2 // title + blank line
 	footerLines := 2 // blank + filter/hints
-	maxVisible := height - headerLines - footerLines - 4
-	if maxVisible < 1 {
-		maxVisible = 1
-	}
+	maxVisible := max(height-headerLines-footerLines-4, 1)
 
 	// Determine scroll window with scrolloff margin.
 	scrollOff := ConfigScrollOff
 	if maxVisible < 8 {
 		scrollOff = 0
 	}
-	scrollOffset := 0
-	if cursor-scrollOff < scrollOffset {
-		scrollOffset = cursor - scrollOff
-	}
+	scrollOffset := min(cursor-scrollOff, 0)
 	if cursor+scrollOff >= scrollOffset+maxVisible {
 		scrollOffset = cursor + scrollOff - maxVisible + 1
 	}
@@ -85,15 +78,9 @@ func RenderFinalizerSearchOverlay(
 	}
 	// Don't leave empty space at the bottom.
 	if scrollOffset+maxVisible > len(results) {
-		scrollOffset = len(results) - maxVisible
-		if scrollOffset < 0 {
-			scrollOffset = 0
-		}
+		scrollOffset = max(len(results)-maxVisible, 0)
 	}
-	endIdx := scrollOffset + maxVisible
-	if endIdx > len(results) {
-		endIdx = len(results)
-	}
+	endIdx := min(scrollOffset+maxVisible, len(results))
 
 	// Column widths for alignment.
 	nsWidth := 0
@@ -119,19 +106,10 @@ func RenderFinalizerSearchOverlay(
 	}
 	// Split remaining space between resource name and finalizer name.
 	fixedCols := 2 + nsWidth + 1 + kindWidth + 1 + 2 + 5 // checkmark+space + ns + kind + gaps + age
-	remaining := innerW - fixedCols
-	if remaining < 20 {
-		remaining = 20
-	}
+	remaining := max(innerW-fixedCols, 20)
 	// Give 40% to name, 60% to finalizer.
-	nameWidth = min(nameWidth, remaining*40/100)
-	if nameWidth < 10 {
-		nameWidth = 10
-	}
-	finalizerW := remaining - nameWidth
-	if finalizerW < 10 {
-		finalizerW = 10
-	}
+	nameWidth = max(min(nameWidth, remaining*40/100), 10)
+	finalizerW := max(remaining-nameWidth, 10)
 
 	var lines []string
 	for i := scrollOffset; i < endIdx; i++ {

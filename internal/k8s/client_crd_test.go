@@ -17,134 +17,134 @@ import (
 func TestPreferredCRDVersion(t *testing.T) {
 	tests := []struct {
 		name string
-		spec map[string]interface{}
-		obj  map[string]interface{}
+		spec map[string]any
+		obj  map[string]any
 		want string
 	}{
 		{
 			name: "picks storage+served version",
-			spec: map[string]interface{}{
-				"versions": []interface{}{
-					map[string]interface{}{"name": "v1alpha1", "served": true, "storage": false},
-					map[string]interface{}{"name": "v1", "served": true, "storage": true},
+			spec: map[string]any{
+				"versions": []any{
+					map[string]any{"name": "v1alpha1", "served": true, "storage": false},
+					map[string]any{"name": "v1", "served": true, "storage": true},
 				},
 			},
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 			want: "v1",
 		},
 		{
 			name: "first served when no storage",
-			spec: map[string]interface{}{
-				"versions": []interface{}{
-					map[string]interface{}{"name": "v1beta1", "served": true, "storage": false},
-					map[string]interface{}{"name": "v1alpha1", "served": true, "storage": false},
+			spec: map[string]any{
+				"versions": []any{
+					map[string]any{"name": "v1beta1", "served": true, "storage": false},
+					map[string]any{"name": "v1alpha1", "served": true, "storage": false},
 				},
 			},
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 			want: "v1beta1",
 		},
 		{
 			name: "storage takes priority over first served",
-			spec: map[string]interface{}{
-				"versions": []interface{}{
-					map[string]interface{}{"name": "v1alpha1", "served": true, "storage": false},
-					map[string]interface{}{"name": "v2", "served": true, "storage": true},
-					map[string]interface{}{"name": "v1", "served": true, "storage": false},
+			spec: map[string]any{
+				"versions": []any{
+					map[string]any{"name": "v1alpha1", "served": true, "storage": false},
+					map[string]any{"name": "v2", "served": true, "storage": true},
+					map[string]any{"name": "v1", "served": true, "storage": false},
 				},
 			},
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 			want: "v2",
 		},
 		{
 			name: "skips non-served versions",
-			spec: map[string]interface{}{
-				"versions": []interface{}{
-					map[string]interface{}{"name": "v1alpha1", "served": false, "storage": false},
-					map[string]interface{}{"name": "v1", "served": true, "storage": false},
+			spec: map[string]any{
+				"versions": []any{
+					map[string]any{"name": "v1alpha1", "served": false, "storage": false},
+					map[string]any{"name": "v1", "served": true, "storage": false},
 				},
 			},
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 			want: "v1",
 		},
 		{
 			name: "skips entries with empty name",
-			spec: map[string]interface{}{
-				"versions": []interface{}{
-					map[string]interface{}{"name": "", "served": true, "storage": true},
-					map[string]interface{}{"name": "v1", "served": true, "storage": false},
+			spec: map[string]any{
+				"versions": []any{
+					map[string]any{"name": "", "served": true, "storage": true},
+					map[string]any{"name": "v1", "served": true, "storage": false},
 				},
 			},
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 			want: "v1",
 		},
 		{
 			name: "skips non-map entries",
-			spec: map[string]interface{}{
-				"versions": []interface{}{
+			spec: map[string]any{
+				"versions": []any{
 					"not-a-map",
-					map[string]interface{}{"name": "v1", "served": true, "storage": false},
+					map[string]any{"name": "v1", "served": true, "storage": false},
 				},
 			},
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 			want: "v1",
 		},
 		{
 			name: "falls back to status.storedVersions",
-			spec: map[string]interface{}{},
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"storedVersions": []interface{}{"v1beta2", "v1beta1"},
+			spec: map[string]any{},
+			obj: map[string]any{
+				"status": map[string]any{
+					"storedVersions": []any{"v1beta2", "v1beta1"},
 				},
 			},
 			want: "v1beta2",
 		},
 		{
 			name: "storedVersions skips empty first element",
-			spec: map[string]interface{}{},
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"storedVersions": []interface{}{"", "v1"},
+			spec: map[string]any{},
+			obj: map[string]any{
+				"status": map[string]any{
+					"storedVersions": []any{"", "v1"},
 				},
 			},
 			want: "v1",
 		},
 		{
 			name: "defaults to v1 when nothing found",
-			spec: map[string]interface{}{},
-			obj:  map[string]interface{}{},
+			spec: map[string]any{},
+			obj:  map[string]any{},
 			want: "v1",
 		},
 		{
 			name: "defaults to v1 with empty versions list",
-			spec: map[string]interface{}{
-				"versions": []interface{}{},
+			spec: map[string]any{
+				"versions": []any{},
 			},
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 			want: "v1",
 		},
 		{
 			name: "defaults to v1 when all versions have empty names",
-			spec: map[string]interface{}{
-				"versions": []interface{}{
-					map[string]interface{}{"name": "", "served": true, "storage": true},
+			spec: map[string]any{
+				"versions": []any{
+					map[string]any{"name": "", "served": true, "storage": true},
 				},
 			},
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"storedVersions": []interface{}{},
+			obj: map[string]any{
+				"status": map[string]any{
+					"storedVersions": []any{},
 				},
 			},
 			want: "v1",
 		},
 		{
 			name: "storage must also be served",
-			spec: map[string]interface{}{
-				"versions": []interface{}{
-					map[string]interface{}{"name": "v2", "served": false, "storage": true},
-					map[string]interface{}{"name": "v1", "served": true, "storage": false},
+			spec: map[string]any{
+				"versions": []any{
+					map[string]any{"name": "v2", "served": false, "storage": true},
+					map[string]any{"name": "v1", "served": true, "storage": false},
 				},
 			},
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 			want: "v1",
 		},
 	}
@@ -230,16 +230,16 @@ func TestContainerStateString(t *testing.T) {
 func TestExtractContainerNotReadyReason(t *testing.T) {
 	tests := []struct {
 		name              string
-		containerStatuses []interface{}
+		containerStatuses []any
 		want              string
 	}{
 		{
 			name: "waiting with CrashLoopBackOff",
-			containerStatuses: []interface{}{
-				map[string]interface{}{
+			containerStatuses: []any{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "CrashLoopBackOff",
 						},
 					},
@@ -249,11 +249,11 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name: "waiting with ImagePullBackOff",
-			containerStatuses: []interface{}{
-				map[string]interface{}{
+			containerStatuses: []any{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "ImagePullBackOff",
 						},
 					},
@@ -263,11 +263,11 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name: "terminated with OOMKilled",
-			containerStatuses: []interface{}{
-				map[string]interface{}{
+			containerStatuses: []any{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"terminated": map[string]interface{}{
+					"state": map[string]any{
+						"terminated": map[string]any{
 							"reason": "OOMKilled",
 						},
 					},
@@ -277,19 +277,19 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name: "skips ready containers",
-			containerStatuses: []interface{}{
-				map[string]interface{}{
+			containerStatuses: []any{
+				map[string]any{
 					"ready": true,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "ShouldBeSkipped",
 						},
 					},
 				},
-				map[string]interface{}{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "ErrImagePull",
 						},
 					},
@@ -299,19 +299,19 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name: "returns first not-ready container reason",
-			containerStatuses: []interface{}{
-				map[string]interface{}{
+			containerStatuses: []any{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "CrashLoopBackOff",
 						},
 					},
 				},
-				map[string]interface{}{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"terminated": map[string]interface{}{
+					"state": map[string]any{
+						"terminated": map[string]any{
 							"reason": "OOMKilled",
 						},
 					},
@@ -321,7 +321,7 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name:              "empty container statuses",
-			containerStatuses: []interface{}{},
+			containerStatuses: []any{},
 			want:              "",
 		},
 		{
@@ -331,12 +331,12 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name: "non-map entry is skipped",
-			containerStatuses: []interface{}{
+			containerStatuses: []any{
 				"not-a-map",
-				map[string]interface{}{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "ContainerCreating",
 						},
 					},
@@ -346,8 +346,8 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name: "no state field returns empty",
-			containerStatuses: []interface{}{
-				map[string]interface{}{
+			containerStatuses: []any{
+				map[string]any{
 					"ready": false,
 				},
 			},
@@ -355,8 +355,8 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name: "nil state returns empty",
-			containerStatuses: []interface{}{
-				map[string]interface{}{
+			containerStatuses: []any{
+				map[string]any{
 					"ready": false,
 					"state": nil,
 				},
@@ -365,14 +365,14 @@ func TestExtractContainerNotReadyReason(t *testing.T) {
 		},
 		{
 			name: "waiting with empty reason skips to terminated",
-			containerStatuses: []interface{}{
-				map[string]interface{}{
+			containerStatuses: []any{
+				map[string]any{
 					"ready": false,
-					"state": map[string]interface{}{
-						"waiting": map[string]interface{}{
+					"state": map[string]any{
+						"waiting": map[string]any{
 							"reason": "",
 						},
-						"terminated": map[string]interface{}{
+						"terminated": map[string]any{
 							"reason": "Error",
 						},
 					},
@@ -615,32 +615,32 @@ func columnsToMap(cols []model.KeyValue) map[string]string {
 // --- extractStatus (Suspended / FluxCD) ---
 
 func TestExtractStatus_Suspended(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"suspend": true,
 		},
-		"status": map[string]interface{}{},
+		"status": map[string]any{},
 	}
 	assert.Equal(t, "Suspended", extractStatus(obj))
 }
 
 func TestExtractStatus_NotSuspended(t *testing.T) {
 	// suspend is false, no conditions, no phase, should return empty.
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"suspend": false,
 		},
-		"status": map[string]interface{}{},
+		"status": map[string]any{},
 	}
 	assert.Equal(t, "", extractStatus(obj))
 }
 
 func TestExtractStatus_ConditionsWithInvalidEntry(t *testing.T) {
-	obj := map[string]interface{}{
-		"status": map[string]interface{}{
-			"conditions": []interface{}{
+	obj := map[string]any{
+		"status": map[string]any{
+			"conditions": []any{
 				"not-a-map",
-				map[string]interface{}{
+				map[string]any{
 					"type":   "Ready",
 					"status": "True",
 				},

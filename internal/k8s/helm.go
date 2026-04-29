@@ -206,7 +206,7 @@ func (c *Client) GetHelmReleaseYAML(ctx context.Context, contextName, namespace,
 	}
 
 	// Build a summary (not the compressed data).
-	info := map[string]interface{}{
+	info := map[string]any{
 		"name":      latest.Labels["name"],
 		"namespace": latest.Namespace,
 		"version":   latest.Labels["version"],

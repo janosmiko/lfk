@@ -107,6 +107,32 @@ changelog:
 checksum:
   name_template: "checksums.txt"
 
+# Keyless cosign signing via Sigstore + GitHub OIDC.
+# Requires `id-token: write` permission and `sigstore/cosign-installer` in CI.
+signs:
+  - cmd: cosign
+    certificate: "${artifact}.pem"
+    args:
+      - sign-blob
+      - "--output-certificate=${certificate}"
+      - "--output-signature=${signature}"
+      - "${artifact}"
+      - "--yes"
+    artifacts: checksum
+    output: true
+
+docker_signs:
+  - cmd: cosign
+    artifacts: manifests
+    output: true
+    args:
+      - sign
+      - "${artifact}@${digest}"
+      - "--yes"
+
+sboms:
+  - artifacts: archive
+
 release:
   github:
     owner: janosmiko

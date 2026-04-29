@@ -1,22 +1,24 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 // yamlContent helper: 50 lines to ensure scrolling works with default height 40.
 func makeYAMLContent(n int) string {
-	var lines string
+	var lines strings.Builder
 	for i := range n {
 		if i > 0 {
-			lines += "\n"
+			lines.WriteString("\n")
 		}
-		lines += "  key: value"
+		lines.WriteString("  key: value")
 	}
-	return lines
+	return lines.String()
 }
 
 func baseYAMLModel() Model {
@@ -161,6 +163,37 @@ func TestYAMLKeySlashEntersSearch(t *testing.T) {
 	result := ret.(Model)
 	assert.True(t, result.yamlSearchMode)
 	assert.Equal(t, "", result.yamlSearchText.Value)
+}
+
+// Regression: typing into the YAML search input now updates
+// yamlMatchLines on every keystroke so the highlight overlay paints
+// in real time. Previously yamlMatchLines stayed nil until Enter, so
+// the user had no feedback on whether their query matched anything
+// while typing.
+func TestYAMLSearchTypingUpdatesMatchesLive(t *testing.T) {
+	m := baseYAMLModel()
+	// Content with a known matching pattern.
+	m.yamlContent = "apiVersion: v1\nkind: Pod\nmetadata:\n  name: nginx\n  namespace: default\nspec:\n  containers:\n  - name: nginx\n    image: nginx:1.27\n"
+	m.yamlSearchMode = true
+
+	// Type "n" → nginx + namespace + name lines should be matched.
+	result, _ := m.handleYAMLKey(runeKey('n'))
+	rm := result.(Model)
+	assert.Equal(t, "n", rm.yamlSearchText.Value)
+	assert.NotEmpty(t, rm.yamlMatchLines,
+		"yamlMatchLines must populate on first keystroke so highlights paint live")
+
+	// Type "g" → "n" + "g" filters down to nginx-bearing lines.
+	result, _ = rm.handleYAMLKey(runeKey('g'))
+	rm = result.(Model)
+	assert.Equal(t, "ng", rm.yamlSearchText.Value)
+	require.NotEmpty(t, rm.yamlMatchLines)
+
+	// Backspace must keep the match set in sync, not leave stale state.
+	result, _ = rm.handleYAMLKey(specialKey(tea.KeyBackspace))
+	rm = result.(Model)
+	assert.Equal(t, "n", rm.yamlSearchText.Value)
+	assert.NotEmpty(t, rm.yamlMatchLines, "matches must recompute after backspace")
 }
 
 func TestYAMLKeyHLMoveCursorColumn(t *testing.T) {

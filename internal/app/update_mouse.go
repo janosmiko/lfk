@@ -28,6 +28,20 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Wheel scroll in the other full-screen viewer modes (YAML, Describe,
+	// Diff, Help, Explain). Synthesize 3 j/k key presses per tick so the
+	// existing per-mode scroll logic — cursor advance, ensure-visible,
+	// clamps, page-X tracking, sub-mode dispatch — runs unchanged.
+	// Other mouse buttons fall through so tab-bar clicks still work.
+	if isViewerMode(m.mode) {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			return m.dispatchWheelKey("k")
+		case tea.MouseButtonWheelDown:
+			return m.dispatchWheelKey("j")
+		}
+	}
+
 	// Handle tab bar clicks in any mode.
 	if len(m.tabs) > 1 && msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress && msg.Y == 1 {
 		if tab := m.tabAtX(msg.X); tab >= 0 && tab != m.activeTab {
@@ -139,6 +153,9 @@ func findSortableCol(name string) int {
 // from click X to column key always matches the actual rendered order, even when
 // the user has reordered columns via the column-toggle overlay.
 func (m Model) handleHeaderClick(relX int) (tea.Model, tea.Cmd) {
+	if !m.sortApplies() {
+		return m, nil
+	}
 	items := m.visibleMiddleItems()
 	if len(items) == 0 || len(ui.ActiveSortableColumns) == 0 || len(ui.ActiveMiddleColumnLayout) == 0 {
 		return m, nil
@@ -196,6 +213,36 @@ func (m *Model) tabAtX(x int) int {
 		pos += tabW + 3 // separator " | "
 	}
 	return -1
+}
+
+// isViewerMode returns true for full-screen content viewers that don't
+// have native wheel-scroll handling. modeLogs and modeExplorer have
+// their own wheel paths and are handled separately.
+func isViewerMode(mode viewMode) bool {
+	switch mode {
+	case modeYAML, modeDescribe, modeDiff, modeHelp, modeExplain:
+		return true
+	}
+	return false
+}
+
+// dispatchWheelKey synthesizes 3 presses of key (typically "j" or "k")
+// through handleKey so each viewer mode's existing scroll logic runs
+// unchanged. The model is threaded between iterations; the last cmd is
+// returned (per-mode scroll handlers are pure state mutations and
+// typically return nil, so dropping intermediate cmds is safe).
+func (m Model) dispatchWheelKey(key string) (tea.Model, tea.Cmd) {
+	const wheelStep = 3
+	var lastCmd tea.Cmd
+	runes := []rune(key)
+	for range wheelStep {
+		mdl, cmd := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: runes})
+		m = mdl.(Model)
+		if cmd != nil {
+			lastCmd = cmd
+		}
+	}
+	return m, lastCmd
 }
 
 // switchToTab saves the current tab and loads the target tab.

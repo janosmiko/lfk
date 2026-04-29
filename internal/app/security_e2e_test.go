@@ -29,8 +29,6 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func boolPE2E(b bool) *bool { return &b }
-
 // TestSecurityNavigationFlowEndToEnd exercises the revamp's navigation
 // pipeline from keypress through the render layer.
 func TestSecurityNavigationFlowEndToEnd(t *testing.T) {
@@ -43,7 +41,7 @@ func TestSecurityNavigationFlowEndToEnd(t *testing.T) {
 				Name:  "c",
 				Image: "nginx:latest",
 				SecurityContext: &corev1.SecurityContext{
-					Privileged: boolPE2E(true),
+					Privileged: new(true),
 				},
 			}},
 		},
@@ -53,21 +51,21 @@ func TestSecurityNavigationFlowEndToEnd(t *testing.T) {
 	// Fake dynamic client with one VulnerabilityReport (will produce a
 	// trivy-operator finding).
 	vuln := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "aquasecurity.github.io/v1alpha1",
 			"kind":       "VulnerabilityReport",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": "prod",
 				"name":      "vr1",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"trivy-operator.resource.kind":  "Deployment",
 					"trivy-operator.resource.name":  "api",
 					"trivy-operator.container.name": "app",
 				},
 			},
-			"report": map[string]interface{}{
-				"vulnerabilities": []interface{}{
-					map[string]interface{}{
+			"report": map[string]any{
+				"vulnerabilities": []any{
+					map[string]any{
 						"vulnerabilityID": "CVE-2024-1234",
 						"severity":        "CRITICAL",
 						"resource":        "openssl",

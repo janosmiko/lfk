@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"maps"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -45,9 +46,7 @@ func newFakeDynClientWith(extraGVRs map[schema.GroupVersionResource]string, obje
 		{Group: "kustomize.toolkit.fluxcd.io", Version: "v1", Resource: "kustomizations"}: "KustomizationList",
 		{Group: "cert-manager.io", Version: "v1", Resource: "certificates"}:               "CertificateList",
 	}
-	for k, v := range extraGVRs {
-		gvrs[k] = v
-	}
+	maps.Copy(gvrs, extraGVRs)
 	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrs, objects...)
 }
 
@@ -57,14 +56,14 @@ func newFakeDynClientWith(extraGVRs map[schema.GroupVersionResource]string, obje
 
 func TestSyncArgoApp(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"spec": map[string]interface{}{
-				"syncPolicy": map[string]interface{}{
-					"syncOptions": []interface{}{"CreateNamespace=true"},
-					"automated":   map[string]interface{}{"prune": true},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"spec": map[string]any{
+				"syncPolicy": map[string]any{
+					"syncOptions": []any{"CreateNamespace=true"},
+					"automated":   map[string]any{"prune": true},
 				},
 			},
 		},
@@ -78,11 +77,11 @@ func TestSyncArgoApp(t *testing.T) {
 
 func TestSyncArgoApp_ApplyOnly(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"spec":       map[string]interface{}{},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"spec":       map[string]any{},
 		},
 	}
 	dc := newFakeDynClient(app)
@@ -94,11 +93,11 @@ func TestSyncArgoApp_ApplyOnly(t *testing.T) {
 
 func TestSyncArgoApp_OperationInProgress(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"operation":  map[string]interface{}{"sync": map[string]interface{}{}},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"operation":  map[string]any{"sync": map[string]any{}},
 		},
 	}
 	dc := newFakeDynClient(app)
@@ -111,16 +110,16 @@ func TestSyncArgoApp_OperationInProgress(t *testing.T) {
 
 func TestSyncArgoApp_ClearsStaleOperationState(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"spec":       map[string]interface{}{},
-			"status": map[string]interface{}{
-				"operationState": map[string]interface{}{
-					"operation": map[string]interface{}{
-						"sync": map[string]interface{}{
-							"syncStrategy": map[string]interface{}{"hook": map[string]interface{}{}},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"spec":       map[string]any{},
+			"status": map[string]any{
+				"operationState": map[string]any{
+					"operation": map[string]any{
+						"sync": map[string]any{
+							"syncStrategy": map[string]any{"hook": map[string]any{}},
 						},
 					},
 				},
@@ -136,12 +135,12 @@ func TestSyncArgoApp_ClearsStaleOperationState(t *testing.T) {
 
 func TestTerminateArgoSync(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"status": map[string]interface{}{
-				"operationState": map[string]interface{}{"phase": "Running"},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"status": map[string]any{
+				"operationState": map[string]any{"phase": "Running"},
 			},
 		},
 	}
@@ -154,10 +153,10 @@ func TestTerminateArgoSync(t *testing.T) {
 
 func TestTerminateArgoSync_NoOperation(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
 		},
 	}
 	dc := newFakeDynClient(app)
@@ -170,12 +169,12 @@ func TestTerminateArgoSync_NoOperation(t *testing.T) {
 
 func TestTerminateArgoSync_WrongPhase(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"status": map[string]interface{}{
-				"operationState": map[string]interface{}{"phase": "Succeeded"},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"status": map[string]any{
+				"operationState": map[string]any{"phase": "Succeeded"},
 			},
 		},
 	}
@@ -189,10 +188,10 @@ func TestTerminateArgoSync_WrongPhase(t *testing.T) {
 
 func TestRefreshArgoApp(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
 		},
 	}
 	dc := newFakeDynClient(app)
@@ -204,10 +203,10 @@ func TestRefreshArgoApp(t *testing.T) {
 
 func TestRefreshArgoAppSet(t *testing.T) {
 	appset := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "ApplicationSet",
-			"metadata":   map[string]interface{}{"name": "my-appset", "namespace": "argocd"},
+			"metadata":   map[string]any{"name": "my-appset", "namespace": "argocd"},
 		},
 	}
 	dc := newFakeDynClientWith(map[schema.GroupVersionResource]string{
@@ -221,13 +220,13 @@ func TestRefreshArgoAppSet(t *testing.T) {
 
 func TestGetAutoSyncConfig_Enabled(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"spec": map[string]interface{}{
-				"syncPolicy": map[string]interface{}{
-					"automated": map[string]interface{}{"selfHeal": true, "prune": true},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"spec": map[string]any{
+				"syncPolicy": map[string]any{
+					"automated": map[string]any{"selfHeal": true, "prune": true},
 				},
 			},
 		},
@@ -244,11 +243,11 @@ func TestGetAutoSyncConfig_Enabled(t *testing.T) {
 
 func TestGetAutoSyncConfig_Disabled(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"spec":       map[string]interface{}{},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"spec":       map[string]any{},
 		},
 	}
 	dc := newFakeDynClient(app)
@@ -261,11 +260,11 @@ func TestGetAutoSyncConfig_Disabled(t *testing.T) {
 
 func TestUpdateAutoSyncConfig_Enable(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"spec":       map[string]interface{}{},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"spec":       map[string]any{},
 		},
 	}
 	dc := newFakeDynClient(app)
@@ -277,13 +276,13 @@ func TestUpdateAutoSyncConfig_Enable(t *testing.T) {
 
 func TestUpdateAutoSyncConfig_Disable(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"spec": map[string]interface{}{
-				"syncPolicy": map[string]interface{}{
-					"automated": map[string]interface{}{"selfHeal": true},
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"spec": map[string]any{
+				"syncPolicy": map[string]any{
+					"automated": map[string]any{"selfHeal": true},
 				},
 			},
 		},
@@ -301,10 +300,10 @@ func TestUpdateAutoSyncConfig_Disable(t *testing.T) {
 
 func TestReconcileFluxResource(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
 		},
 	}
 	dc := newFakeDynClient(ks)
@@ -317,10 +316,10 @@ func TestReconcileFluxResource(t *testing.T) {
 
 func TestSuspendFluxResource(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
 		},
 	}
 	dc := newFakeDynClient(ks)
@@ -333,10 +332,10 @@ func TestSuspendFluxResource(t *testing.T) {
 
 func TestResumeFluxResource(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
 		},
 	}
 	dc := newFakeDynClient(ks)
@@ -349,10 +348,10 @@ func TestResumeFluxResource(t *testing.T) {
 
 func TestForceRenewCertificate(t *testing.T) {
 	cert := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "cert-manager.io/v1",
 			"kind":       "Certificate",
-			"metadata":   map[string]interface{}{"name": "my-cert", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-cert", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClient(cert)
@@ -364,10 +363,10 @@ func TestForceRenewCertificate(t *testing.T) {
 
 func TestForceRefreshExternalSecret(t *testing.T) {
 	es := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "external-secrets.io/v1beta1",
 			"kind":       "ExternalSecret",
-			"metadata":   map[string]interface{}{"name": "my-es", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-es", "namespace": "default"},
 		},
 	}
 	gvr := schema.GroupVersionResource{Group: "external-secrets.io", Version: "v1beta1", Resource: "externalsecrets"}
@@ -386,10 +385,10 @@ func TestForceRefreshExternalSecret(t *testing.T) {
 
 func TestSuspendArgoWorkflow(t *testing.T) {
 	wf := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Workflow",
-			"metadata":   map[string]interface{}{"name": "my-wf", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-wf", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClient(wf)
@@ -401,10 +400,10 @@ func TestSuspendArgoWorkflow(t *testing.T) {
 
 func TestResumeArgoWorkflow(t *testing.T) {
 	wf := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Workflow",
-			"metadata":   map[string]interface{}{"name": "my-wf", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-wf", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClient(wf)
@@ -416,10 +415,10 @@ func TestResumeArgoWorkflow(t *testing.T) {
 
 func TestStopArgoWorkflow(t *testing.T) {
 	wf := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Workflow",
-			"metadata":   map[string]interface{}{"name": "my-wf", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-wf", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClient(wf)
@@ -431,10 +430,10 @@ func TestStopArgoWorkflow(t *testing.T) {
 
 func TestTerminateArgoWorkflow(t *testing.T) {
 	wf := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Workflow",
-			"metadata":   map[string]interface{}{"name": "my-wf", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-wf", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClient(wf)
@@ -446,11 +445,11 @@ func TestTerminateArgoWorkflow(t *testing.T) {
 
 func TestResubmitArgoWorkflow(t *testing.T) {
 	wf := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Workflow",
-			"metadata":   map[string]interface{}{"name": "my-wf", "namespace": "default"},
-			"spec":       map[string]interface{}{"entrypoint": "main"},
+			"metadata":   map[string]any{"name": "my-wf", "namespace": "default"},
+			"spec":       map[string]any{"entrypoint": "main"},
 		},
 	}
 	dc := newFakeDynClient(wf)
@@ -463,10 +462,10 @@ func TestResubmitArgoWorkflow(t *testing.T) {
 
 func TestSuspendCronWorkflow(t *testing.T) {
 	cw := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "CronWorkflow",
-			"metadata":   map[string]interface{}{"name": "my-cw", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-cw", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClient(cw)
@@ -478,10 +477,10 @@ func TestSuspendCronWorkflow(t *testing.T) {
 
 func TestResumeCronWorkflow(t *testing.T) {
 	cw := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "CronWorkflow",
-			"metadata":   map[string]interface{}{"name": "my-cw", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-cw", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClient(cw)
@@ -493,10 +492,10 @@ func TestResumeCronWorkflow(t *testing.T) {
 
 func TestPauseKEDAResource(t *testing.T) {
 	so := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "keda.sh/v1alpha1",
 			"kind":       "ScaledObject",
-			"metadata":   map[string]interface{}{"name": "my-so", "namespace": "default"},
+			"metadata":   map[string]any{"name": "my-so", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClientWith(map[schema.GroupVersionResource]string{
@@ -511,13 +510,13 @@ func TestPauseKEDAResource(t *testing.T) {
 
 func TestUnpauseKEDAResource(t *testing.T) {
 	so := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "keda.sh/v1alpha1",
 			"kind":       "ScaledObject",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":        "my-so",
 				"namespace":   "default",
-				"annotations": map[string]interface{}{"autoscaling.keda.sh/paused": "true"},
+				"annotations": map[string]any{"autoscaling.keda.sh/paused": "true"},
 			},
 		},
 	}
@@ -533,17 +532,17 @@ func TestUnpauseKEDAResource(t *testing.T) {
 
 func TestGetWorkflowStatus(t *testing.T) {
 	wf := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Workflow",
-			"metadata":   map[string]interface{}{"name": "my-wf", "namespace": "default"},
-			"status": map[string]interface{}{
+			"metadata":   map[string]any{"name": "my-wf", "namespace": "default"},
+			"status": map[string]any{
 				"phase":      "Succeeded",
 				"startedAt":  "2026-01-01T00:00:00Z",
 				"finishedAt": "2026-01-01T00:05:00Z",
 				"progress":   "3/3",
-				"nodes": map[string]interface{}{
-					"node1": map[string]interface{}{
+				"nodes": map[string]any{
+					"node1": map[string]any{
 						"displayName": "main",
 						"phase":       "Succeeded",
 						"type":        "Steps",
@@ -587,29 +586,29 @@ func TestSubmitWorkflowFromTemplate_ClusterScope(t *testing.T) {
 
 func TestBuildDeploymentTree(t *testing.T) {
 	rs := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "ReplicaSet",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "deploy-abc", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "Deployment", "name": "deploy"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "Deployment", "name": "deploy"},
 				},
 			},
 		},
 	}
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "deploy-abc-xyz", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "ReplicaSet", "name": "deploy-abc"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "ReplicaSet", "name": "deploy-abc"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "app"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
 			},
 		},
 	}
@@ -626,17 +625,17 @@ func TestBuildDeploymentTree(t *testing.T) {
 
 func TestBuildPodOwnerTree(t *testing.T) {
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "sts-0", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "StatefulSet", "name": "my-sts"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "StatefulSet", "name": "my-sts"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "db"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "db"}},
 			},
 		},
 	}
@@ -652,13 +651,13 @@ func TestBuildPodOwnerTree(t *testing.T) {
 
 func TestBuildCronJobTree(t *testing.T) {
 	job := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "batch/v1",
 			"kind":       "Job",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "cron-12345", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "CronJob", "name": "my-cron"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "CronJob", "name": "my-cron"},
 				},
 			},
 		},
@@ -675,32 +674,32 @@ func TestBuildCronJobTree(t *testing.T) {
 
 func TestGetPodsViaReplicaSets(t *testing.T) {
 	rs := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "ReplicaSet",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "deploy-abc", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "Deployment", "name": "deploy"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "Deployment", "name": "deploy"},
 				},
 			},
 		},
 	}
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "deploy-abc-xyz", "namespace": "default",
 				"creationTimestamp": "2026-01-01T00:00:00Z",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "ReplicaSet", "name": "deploy-abc"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "ReplicaSet", "name": "deploy-abc"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "app"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
 			},
-			"status": map[string]interface{}{"phase": "Running"},
+			"status": map[string]any{"phase": "Running"},
 		},
 	}
 	dc := newFakeDynClient(rs, pod)
@@ -714,20 +713,20 @@ func TestGetPodsViaReplicaSets(t *testing.T) {
 
 func TestGetPodsByOwner(t *testing.T) {
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "sts-0", "namespace": "default",
 				"creationTimestamp": "2026-01-01T00:00:00Z",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "StatefulSet", "name": "my-sts"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "StatefulSet", "name": "my-sts"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "app"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
 			},
-			"status": map[string]interface{}{"phase": "Running"},
+			"status": map[string]any{"phase": "Running"},
 		},
 	}
 	dc := newFakeDynClient(pod)
@@ -740,13 +739,13 @@ func TestGetPodsByOwner(t *testing.T) {
 
 func TestGetJobsByOwner(t *testing.T) {
 	job := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "batch/v1",
 			"kind":       "Job",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "cron-12345", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "CronJob", "name": "my-cron"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "CronJob", "name": "my-cron"},
 				},
 			},
 		},
@@ -761,29 +760,29 @@ func TestGetJobsByOwner(t *testing.T) {
 
 func TestBuildGenericOwnerTree(t *testing.T) {
 	sts := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "StatefulSet",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "cluster-sts", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "Cluster", "name": "my-cluster"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "Cluster", "name": "my-cluster"},
 				},
 			},
 		},
 	}
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "cluster-sts-0", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "StatefulSet", "name": "cluster-sts"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "StatefulSet", "name": "cluster-sts"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "pg"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "pg"}},
 			},
 		},
 	}
@@ -802,36 +801,36 @@ func TestBuildGenericOwnerTree(t *testing.T) {
 
 func TestGetNetworkPolicyInfo(t *testing.T) {
 	np := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "networking.k8s.io/v1",
 			"kind":       "NetworkPolicy",
-			"metadata":   map[string]interface{}{"name": "my-np", "namespace": "default"},
-			"spec": map[string]interface{}{
-				"podSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{"app": "web"},
+			"metadata":   map[string]any{"name": "my-np", "namespace": "default"},
+			"spec": map[string]any{
+				"podSelector": map[string]any{
+					"matchLabels": map[string]any{"app": "web"},
 				},
-				"policyTypes": []interface{}{"Ingress", "Egress"},
-				"ingress": []interface{}{
-					map[string]interface{}{
-						"from": []interface{}{
-							map[string]interface{}{
-								"podSelector": map[string]interface{}{
-									"matchLabels": map[string]interface{}{"role": "frontend"},
+				"policyTypes": []any{"Ingress", "Egress"},
+				"ingress": []any{
+					map[string]any{
+						"from": []any{
+							map[string]any{
+								"podSelector": map[string]any{
+									"matchLabels": map[string]any{"role": "frontend"},
 								},
 							},
 						},
-						"ports": []interface{}{
-							map[string]interface{}{"protocol": "TCP", "port": float64(80)},
+						"ports": []any{
+							map[string]any{"protocol": "TCP", "port": float64(80)},
 						},
 					},
 				},
-				"egress": []interface{}{
-					map[string]interface{}{
-						"to": []interface{}{
-							map[string]interface{}{
-								"ipBlock": map[string]interface{}{
+				"egress": []any{
+					map[string]any{
+						"to": []any{
+							map[string]any{
+								"ipBlock": map[string]any{
 									"cidr":   "10.0.0.0/8",
-									"except": []interface{}{"10.0.0.1/32"},
+									"except": []any{"10.0.0.1/32"},
 								},
 							},
 						},
@@ -842,12 +841,12 @@ func TestGetNetworkPolicyInfo(t *testing.T) {
 	}
 	// Also add a pod that matches the selector so findAffectedPods covers the list path.
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "web-pod", "namespace": "default",
-				"labels": map[string]interface{}{"app": "web"},
+				"labels": map[string]any{"app": "web"},
 			},
 		},
 	}
@@ -867,10 +866,10 @@ func TestGetNetworkPolicyInfo(t *testing.T) {
 
 func TestGetNetworkPolicyInfo_NoSpec(t *testing.T) {
 	np := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "networking.k8s.io/v1",
 			"kind":       "NetworkPolicy",
-			"metadata":   map[string]interface{}{"name": "empty-np", "namespace": "default"},
+			"metadata":   map[string]any{"name": "empty-np", "namespace": "default"},
 		},
 	}
 	dc := newFakeDynClient(np)
@@ -946,18 +945,18 @@ func TestRollbackDeployment_RevisionNotFound(t *testing.T) {
 
 func TestGetFluxManagedResources(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
-			"status": map[string]interface{}{
-				"inventory": map[string]interface{}{
-					"entries": []interface{}{
-						map[string]interface{}{"id": "default_my-deploy_apps_Deployment", "v": "v1"},
-						map[string]interface{}{"id": "default_my-svc__Service", "v": "v1"},
-						map[string]interface{}{"id": "default_my-cm__ConfigMap", "v": "v1"},
-						map[string]interface{}{"id": "default_my-secret__Secret", "v": "v1"},
-						map[string]interface{}{"id": "kube-system_my-ds_apps_DaemonSet", "v": "v1"},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
+			"status": map[string]any{
+				"inventory": map[string]any{
+					"entries": []any{
+						map[string]any{"id": "default_my-deploy_apps_Deployment", "v": "v1"},
+						map[string]any{"id": "default_my-svc__Service", "v": "v1"},
+						map[string]any{"id": "default_my-cm__ConfigMap", "v": "v1"},
+						map[string]any{"id": "default_my-secret__Secret", "v": "v1"},
+						map[string]any{"id": "kube-system_my-ds_apps_DaemonSet", "v": "v1"},
 					},
 				},
 			},
@@ -984,15 +983,15 @@ func TestGetFluxManagedResources_PreservesK8sNameForCrossNamespace(t *testing.T)
 	// different namespace (cilium-secrets) so the cross-namespace path is
 	// exercised.
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
-			"status": map[string]interface{}{
-				"inventory": map[string]interface{}{
-					"entries": []interface{}{
-						map[string]interface{}{"id": "cilium-secrets_cilium-operator-tlsinterception-secrets__Secret", "v": "v1"},
-						map[string]interface{}{"id": "flux-system_local-cm__ConfigMap", "v": "v1"},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
+			"status": map[string]any{
+				"inventory": map[string]any{
+					"entries": []any{
+						map[string]any{"id": "cilium-secrets_cilium-operator-tlsinterception-secrets__Secret", "v": "v1"},
+						map[string]any{"id": "flux-system_local-cm__ConfigMap", "v": "v1"},
 					},
 				},
 			},
@@ -1026,10 +1025,10 @@ func TestGetFluxManagedResources_PreservesK8sNameForCrossNamespace(t *testing.T)
 
 func TestGetFluxManagedResources_NoStatus(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
 		},
 	}
 	dc := newFakeDynClient(ks)
@@ -1042,11 +1041,11 @@ func TestGetFluxManagedResources_NoStatus(t *testing.T) {
 
 func TestGetFluxManagedResources_NoInventory(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
-			"status":     map[string]interface{}{},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
+			"status":     map[string]any{},
 		},
 	}
 	dc := newFakeDynClient(ks)
@@ -1059,13 +1058,13 @@ func TestGetFluxManagedResources_NoInventory(t *testing.T) {
 
 func TestGetFluxManagedResources_EmptyEntries(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
-			"status": map[string]interface{}{
-				"inventory": map[string]interface{}{
-					"entries": []interface{}{},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
+			"status": map[string]any{
+				"inventory": map[string]any{
+					"entries": []any{},
 				},
 			},
 		},
@@ -1080,19 +1079,19 @@ func TestGetFluxManagedResources_EmptyEntries(t *testing.T) {
 
 func TestGetFluxManagedResources_IconMapping(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "flux-system"},
-			"status": map[string]interface{}{
-				"inventory": map[string]interface{}{
-					"entries": []interface{}{
-						map[string]interface{}{"id": "default_pod1__Pod", "v": "v1"},
-						map[string]interface{}{"id": "default_sts1_apps_StatefulSet", "v": "v1"},
-						map[string]interface{}{"id": "default_ing1_networking.k8s.io_Ingress", "v": "v1"},
-						map[string]interface{}{"id": "default_sa1__ServiceAccount", "v": "v1"},
-						map[string]interface{}{"id": "_ns1__Namespace", "v": "v1"},
-						map[string]interface{}{"id": "default_crd1_example.com_CustomResource", "v": "v1"},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "flux-system"},
+			"status": map[string]any{
+				"inventory": map[string]any{
+					"entries": []any{
+						map[string]any{"id": "default_pod1__Pod", "v": "v1"},
+						map[string]any{"id": "default_sts1_apps_StatefulSet", "v": "v1"},
+						map[string]any{"id": "default_ing1_networking.k8s.io_Ingress", "v": "v1"},
+						map[string]any{"id": "default_sa1__ServiceAccount", "v": "v1"},
+						map[string]any{"id": "_ns1__Namespace", "v": "v1"},
+						map[string]any{"id": "default_crd1_example.com_CustomResource", "v": "v1"},
 					},
 				},
 			},
@@ -1112,18 +1111,18 @@ func TestGetFluxManagedResources_IconMapping(t *testing.T) {
 
 func TestGetArgoManagedResources_WithStatusResources(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"status": map[string]interface{}{
-				"resources": []interface{}{
-					map[string]interface{}{
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"status": map[string]any{
+				"resources": []any{
+					map[string]any{
 						"name": "my-deploy", "kind": "Deployment", "namespace": "default",
 						"group": "apps", "version": "v1", "status": "Synced",
-						"health": map[string]interface{}{"status": "Healthy"},
+						"health": map[string]any{"status": "Healthy"},
 					},
-					map[string]interface{}{
+					map[string]any{
 						"name": "my-svc", "kind": "Service", "namespace": "default",
 						"group": "", "version": "v1", "status": "Synced",
 					},
@@ -1147,16 +1146,16 @@ func TestGetArgoManagedResources_WithStatusResources(t *testing.T) {
 
 func TestGetArgoManagedResources_FallbackToLabels(t *testing.T) {
 	app := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "argoproj.io/v1alpha1",
 			"kind":       "Application",
-			"metadata":   map[string]interface{}{"name": "my-app", "namespace": "argocd"},
-			"spec": map[string]interface{}{
-				"destination": map[string]interface{}{
+			"metadata":   map[string]any{"name": "my-app", "namespace": "argocd"},
+			"spec": map[string]any{
+				"destination": map[string]any{
 					"namespace": "production",
 				},
 			},
-			"status": map[string]interface{}{},
+			"status": map[string]any{},
 		},
 	}
 	dep := &appsv1.Deployment{
@@ -1213,18 +1212,18 @@ func TestGetPodsOnNode(t *testing.T) {
 	// test that the function processes results correctly (it returns whatever
 	// the list gives). Create a pod that matches.
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "pod-on-node", "namespace": "kube-system",
 				"creationTimestamp": "2026-01-01T00:00:00Z",
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"nodeName":   "node-1",
-				"containers": []interface{}{map[string]interface{}{"name": "kubelet"}},
+				"containers": []any{map[string]any{"name": "kubelet"}},
 			},
-			"status": map[string]interface{}{"phase": "Running"},
+			"status": map[string]any{"phase": "Running"},
 		},
 	}
 	dc := newFakeDynClient(pod)
@@ -1238,16 +1237,16 @@ func TestGetPodsOnNode(t *testing.T) {
 
 func TestBuildNodeTree(t *testing.T) {
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "pod-on-node", "namespace": "kube-system",
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"nodeName": "node-1",
 			},
-			"status": map[string]interface{}{"phase": "Running"},
+			"status": map[string]any{"phase": "Running"},
 		},
 	}
 	dc := newFakeDynClient(pod)
@@ -1262,22 +1261,22 @@ func TestBuildNodeTree(t *testing.T) {
 func TestWrapWithOwners(t *testing.T) {
 	// Create a ReplicaSet owned by a Deployment, so wrapWithOwners can walk upward.
 	rs := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "ReplicaSet",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "deploy-abc", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "Deployment", "name": "my-deploy"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "Deployment", "name": "my-deploy"},
 				},
 			},
 		},
 	}
 	deploy := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "Deployment",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "my-deploy", "namespace": "default",
 			},
 		},
@@ -1334,31 +1333,31 @@ func TestWrapWithOwners_EmptyChain(t *testing.T) {
 
 func TestGetOwnedResources_Deployment(t *testing.T) {
 	rs := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "ReplicaSet",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "deploy-abc", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "Deployment", "name": "my-deploy"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "Deployment", "name": "my-deploy"},
 				},
 			},
 		},
 	}
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "deploy-abc-xyz", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "ReplicaSet", "name": "deploy-abc"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "ReplicaSet", "name": "deploy-abc"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "app"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
 			},
-			"status": map[string]interface{}{"phase": "Running"},
+			"status": map[string]any{"phase": "Running"},
 		},
 	}
 	dc := newFakeDynClient(rs, pod)
@@ -1372,19 +1371,19 @@ func TestGetOwnedResources_Deployment(t *testing.T) {
 
 func TestGetOwnedResources_StatefulSet(t *testing.T) {
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "sts-0", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "StatefulSet", "name": "my-sts"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "StatefulSet", "name": "my-sts"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "db"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "db"}},
 			},
-			"status": map[string]interface{}{"phase": "Running"},
+			"status": map[string]any{"phase": "Running"},
 		},
 	}
 	dc := newFakeDynClient(pod)
@@ -1397,16 +1396,16 @@ func TestGetOwnedResources_StatefulSet(t *testing.T) {
 
 func TestGetOwnedResources_Node(t *testing.T) {
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "kubelet-pod", "namespace": "kube-system",
 			},
-			"spec": map[string]interface{}{
+			"spec": map[string]any{
 				"nodeName": "node-1",
 			},
-			"status": map[string]interface{}{"phase": "Running"},
+			"status": map[string]any{"phase": "Running"},
 		},
 	}
 	dc := newFakeDynClient(pod)
@@ -1444,13 +1443,13 @@ func TestGetOwnedResources_Service(t *testing.T) {
 
 func TestGetResourceTree_Deployment(t *testing.T) {
 	rs := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "apps/v1",
 			"kind":       "ReplicaSet",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "deploy-abc", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "Deployment", "name": "my-deploy"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "Deployment", "name": "my-deploy"},
 				},
 			},
 		},
@@ -1552,14 +1551,14 @@ func TestGetResourceTree_DaemonSet(t *testing.T) {
 
 func TestGetOwnedResources_Kustomization(t *testing.T) {
 	ks := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "kustomize.toolkit.fluxcd.io/v1",
 			"kind":       "Kustomization",
-			"metadata":   map[string]interface{}{"name": "my-ks", "namespace": "default"},
-			"status": map[string]interface{}{
-				"inventory": map[string]interface{}{
-					"entries": []interface{}{
-						map[string]interface{}{"id": "default_svc1__Service", "v": "v1"},
+			"metadata":   map[string]any{"name": "my-ks", "namespace": "default"},
+			"status": map[string]any{
+				"inventory": map[string]any{
+					"entries": []any{
+						map[string]any{"id": "default_svc1__Service", "v": "v1"},
 					},
 				},
 			},
@@ -1575,17 +1574,17 @@ func TestGetOwnedResources_Kustomization(t *testing.T) {
 
 func TestGetOwnedResources_Job(t *testing.T) {
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "job-pod", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "Job", "name": "my-job"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "Job", "name": "my-job"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "worker"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "worker"}},
 			},
 		},
 	}
@@ -1599,17 +1598,17 @@ func TestGetOwnedResources_Job(t *testing.T) {
 
 func TestGetOwnedResources_DaemonSet(t *testing.T) {
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "ds-pod", "namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{"kind": "DaemonSet", "name": "my-ds"},
+				"ownerReferences": []any{
+					map[string]any{"kind": "DaemonSet", "name": "my-ds"},
 				},
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{map[string]interface{}{"name": "agent"}},
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "agent"}},
 			},
 		},
 	}
@@ -1658,12 +1657,12 @@ func TestFindAffectedPods_Empty(t *testing.T) {
 
 func TestFindAffectedPods_WithPods(t *testing.T) {
 	pod := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "web-pod", "namespace": "default",
-				"labels": map[string]interface{}{"app": "web"},
+				"labels": map[string]any{"app": "web"},
 			},
 		},
 	}
@@ -1677,18 +1676,25 @@ func TestFindAffectedPods_WithPods(t *testing.T) {
 // =====================================================================
 
 func TestGetPodYAML(t *testing.T) {
-	// GetPodYAML delegates to GetResourceYAML with a non-namespaced ResourceTypeEntry.
-	// We test it with a cluster-scoped object since that's how the delegation works.
+	// Regression for #34: GetPodYAML delegates to GetResourceYAML and
+	// MUST mark the ResourceTypeEntry as Namespaced: true. Pods are
+	// namespaced; a cluster-scoped Get on /api/v1/pods/<name> does not
+	// exist on the API server and returns "the server could not find
+	// the requested resource". Using a pod with an explicit namespace
+	// here locks in the namespaced fetch path so the bug does not
+	// regress.
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata": map[string]interface{}{
-				"name": "my-pod",
+			"metadata": map[string]any{
+				"name":      "my-pod",
+				"namespace": "default",
 			},
-			"spec": map[string]interface{}{
-				"containers": []interface{}{
-					map[string]interface{}{"name": "app", "image": "nginx"},
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "app", "image": "nginx"},
+					map[string]any{"name": "sidecar", "image": "envoy"},
 				},
 			},
 		},
@@ -1696,7 +1702,9 @@ func TestGetPodYAML(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	yamlStr, err := c.GetPodYAML(context.Background(), "", "", "my-pod")
+	yamlStr, err := c.GetPodYAML(context.Background(), "", "default", "my-pod")
 	require.NoError(t, err)
 	assert.Contains(t, yamlStr, "kind: Pod")
+	assert.Contains(t, yamlStr, "name: my-pod")
+	assert.Contains(t, yamlStr, "namespace: default")
 }

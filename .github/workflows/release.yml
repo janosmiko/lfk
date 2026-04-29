@@ -42,14 +42,68 @@ jobs:
             echo "nightly_date=" >> "$GITHUB_OUTPUT"
           fi
 
-  build-and-test:
+  # Runs first (no needs) so a mismatched flake.nix fails the pipeline
+  # in seconds instead of waiting on build/test/lint/govulncheck.
+  verify-flake-version:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Verify flake.nix version matches tag
+        env:
+          TAG_REF: ${{ github.ref }}
+        run: |
+          TAG="${TAG_REF#refs/tags/}"
+          TAG_VERSION="${TAG#v}"
+          # Nightly/pre-release tags carry a suffix (e.g. 1.2.3-nightly.20260414);
+          # the flake version is the bare X.Y.Z.
+          BASE_TAG="${TAG_VERSION%%-*}"
+          FLAKE_VERSION=$(grep -E '^\s*baseVersion\s*=' flake.nix | sed -E 's/.*"([^"]+)".*/\1/')
+          echo "Tag:   $BASE_TAG"
+          echo "Flake: $FLAKE_VERSION"
+          if [ "$BASE_TAG" != "$FLAKE_VERSION" ]; then
+            echo "::error::flake.nix baseVersion ($FLAKE_VERSION) does not match tag ($BASE_TAG)."
+            echo "::error::Run 'make release VERSION=$BASE_TAG' (or 'make bump-version') on the commit you want to tag, commit the change, then re-tag."
+            exit 1
+          fi
+
+  # Builds the Nix flake to confirm vendorHash matches the vendored module set.
+  # If a release ships with a stale hash, `nix build` from a tag fails for users
+  # (see issue #62). Catching that here is faster than fielding a bug report.
+  verify-flake-build:
+    needs: [verify-flake-version]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Install Nix
+        uses: cachix/install-nix-action@08dcb3a5e62fa31e2da3d490afc4176ef55ecd72 # v30
+        with:
+          extra_nix_config: |
+            experimental-features = nix-command flakes
+
+      - name: Build flake
+        id: build
+        run: nix build .#default --no-link 2>&1 | tee build.log
+
+      - name: Explain stale-hash failure
+        if: failure() && steps.build.outcome == 'failure'
+        run: |
+          if grep -q "hash mismatch" build.log; then
+            echo "::error::Nix flake vendorHash is stale. Run 'make refresh-vendor-hash' locally, commit flake.nix, then re-tag."
+          fi
+
+  build-and-test:
+    needs: [verify-flake-version]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
 
@@ -60,68 +114,78 @@ jobs:
         run: go test ./...
 
   lint:
+    needs: [verify-flake-version]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
 
       - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v9
+        uses: golangci/golangci-lint-action@1e7e51e771db61008b38414a730f564565cf7c20 # v9
         with:
           version: latest
 
   govulncheck:
+    needs: [verify-flake-version]
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
 
       - name: Install govulncheck
-        run: go install golang.org/x/vuln/cmd/govulncheck@latest
+        run: go install golang.org/x/vuln/cmd/govulncheck@v1.3.0
 
       - name: Run govulncheck
         run: govulncheck ./...
 
   release:
-    needs: [detect, build-and-test, lint, govulncheck]
+    needs: [detect, build-and-test, lint, govulncheck, verify-flake-version, verify-flake-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      # id-token is required for keyless cosign signing via Sigstore OIDC.
+      id-token: write
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
         with:
           fetch-depth: 0
 
       - name: Set up Go
-        uses: actions/setup-go@v6
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
         with:
           go-version-file: go.mod
 
+      - name: Install cosign
+        uses: sigstore/cosign-installer@398d4b0eeef1380460a10c8013a76f728fb906ac # v3
+
+      - name: Install syft (SBOM)
+        uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
+
       - name: Set up QEMU
-        uses: docker/setup-qemu-action@v4
+        uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v4
+        uses: docker/setup-buildx-action@4d04d5d9486b7bd6fa91e7baf45bbb4f8b9deedd # v4
 
       - name: Login to Docker Hub
-        uses: docker/login-action@v4
+        uses: docker/login-action@4907a6ddec9925e35a0a9e82d7399ccc52663121 # v4
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
       - name: Run GoReleaser
-        uses: goreleaser/goreleaser-action@v7
+        uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # v7
         with:
           distribution: goreleaser
           version: "~> v2"

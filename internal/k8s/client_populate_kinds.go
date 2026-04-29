@@ -12,19 +12,19 @@ import (
 
 // populatePodDetails extracts ready count, restarts, container status,
 // resource requests/limits, and additional metadata columns for a Pod.
-func populatePodDetails(ti *model.Item, obj map[string]interface{}, status, spec map[string]interface{}) {
+func populatePodDetails(ti *model.Item, obj map[string]any, status, spec map[string]any) {
 	if status == nil {
 		return
 	}
-	containerStatuses, _ := status["containerStatuses"].([]interface{})
+	containerStatuses, _ := status["containerStatuses"].([]any)
 	totalContainers := len(containerStatuses)
-	if containers, ok := spec["containers"].([]interface{}); ok {
+	if containers, ok := spec["containers"].([]any); ok {
 		totalContainers = len(containers)
 	}
 	readyCount := 0
 	restartCount := int64(0)
 	for _, cs := range containerStatuses {
-		csMap, ok := cs.(map[string]interface{})
+		csMap, ok := cs.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -49,7 +49,7 @@ func populatePodDetails(ti *model.Item, obj map[string]interface{}, status, spec
 	}
 
 	// Resource requests/limits from container specs.
-	if containers, ok := spec["containers"].([]interface{}); ok {
+	if containers, ok := spec["containers"].([]any); ok {
 		cpuReq, cpuLim, memReq, memLim := extractContainerResources(containers)
 		addResourceColumns(ti, cpuReq, cpuLim, memReq, memLim)
 	}
@@ -58,18 +58,18 @@ func populatePodDetails(ti *model.Item, obj map[string]interface{}, status, spec
 }
 
 // findLastRestartTime finds the most recent restart time from container lastState.
-func findLastRestartTime(containerStatuses []interface{}) time.Time {
+func findLastRestartTime(containerStatuses []any) time.Time {
 	var lastRestart time.Time
 	for _, cs := range containerStatuses {
-		csMap, ok := cs.(map[string]interface{})
+		csMap, ok := cs.(map[string]any)
 		if !ok {
 			continue
 		}
-		lastState, _ := csMap["lastState"].(map[string]interface{})
+		lastState, _ := csMap["lastState"].(map[string]any)
 		if lastState == nil {
 			continue
 		}
-		if terminated, ok := lastState["terminated"].(map[string]interface{}); ok {
+		if terminated, ok := lastState["terminated"].(map[string]any); ok {
 			if finishedAt, ok := terminated["finishedAt"].(string); ok {
 				if t, err := time.Parse(time.RFC3339, finishedAt); err == nil {
 					if t.After(lastRestart) {
@@ -83,10 +83,10 @@ func findLastRestartTime(containerStatuses []interface{}) time.Time {
 }
 
 // overridePodStatus sets the pod status based on init/container readiness reasons.
-func overridePodStatus(ti *model.Item, status map[string]interface{}, containerStatuses []interface{}) {
+func overridePodStatus(ti *model.Item, status map[string]any, containerStatuses []any) {
 	// Check init container statuses first -- when an init container fails,
 	// regular containers show "PodInitializing" which hides the real reason.
-	initContainerStatuses, _ := status["initContainerStatuses"].([]interface{})
+	initContainerStatuses, _ := status["initContainerStatuses"].([]any)
 	reason := extractContainerNotReadyReason(initContainerStatuses)
 	if reason == "" || reason == "PodInitializing" {
 		reason = extractContainerNotReadyReason(containerStatuses)
@@ -105,7 +105,7 @@ func overridePodStatus(ti *model.Item, status map[string]interface{}, containerS
 
 // populatePodExtraColumns adds QoS, service account, images, priority class,
 // and node columns to a Pod item.
-func populatePodExtraColumns(ti *model.Item, _ map[string]interface{}, status, spec map[string]interface{}) {
+func populatePodExtraColumns(ti *model.Item, _ map[string]any, status, spec map[string]any) {
 	if qos, ok := status["qosClass"].(string); ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "QoS", Value: qos})
 	}
@@ -115,10 +115,10 @@ func populatePodExtraColumns(ti *model.Item, _ map[string]interface{}, status, s
 	if podIP, ok := status["podIP"].(string); ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Pod IP", Value: podIP})
 	}
-	if containers, ok := spec["containers"].([]interface{}); ok {
+	if containers, ok := spec["containers"].([]any); ok {
 		var images []string
 		for _, c := range containers {
-			if cMap, ok := c.(map[string]interface{}); ok {
+			if cMap, ok := c.(map[string]any); ok {
 				if img, ok := cMap["image"].(string); ok {
 					images = append(images, img)
 				}
@@ -139,7 +139,7 @@ func populatePodExtraColumns(ti *model.Item, _ map[string]interface{}, status, s
 }
 
 // populateDeploymentDetails extracts replica counts, strategy, and resource info for a Deployment.
-func populateDeploymentDetails(ti *model.Item, status, spec map[string]interface{}) {
+func populateDeploymentDetails(ti *model.Item, status, spec map[string]any) {
 	if status == nil || spec == nil {
 		return
 	}
@@ -158,7 +158,7 @@ func populateDeploymentDetails(ti *model.Item, status, spec map[string]interface
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	// Additional columns.
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Replicas", Value: fmt.Sprintf("%d", specReplicas)})
-	if strategy, ok := spec["strategy"].(map[string]interface{}); ok {
+	if strategy, ok := spec["strategy"].(map[string]any); ok {
 		if t, ok := strategy["type"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Strategy", Value: t})
 		}
@@ -176,7 +176,7 @@ func populateDeploymentDetails(ti *model.Item, status, spec map[string]interface
 }
 
 // populateStatefulSetDetails extracts replica counts and resource info for a StatefulSet.
-func populateStatefulSetDetails(ti *model.Item, status, spec map[string]interface{}) {
+func populateStatefulSetDetails(ti *model.Item, status, spec map[string]any) {
 	if status == nil || spec == nil {
 		return
 	}
@@ -201,7 +201,7 @@ func populateStatefulSetDetails(ti *model.Item, status, spec map[string]interfac
 }
 
 // populateDaemonSetDetails extracts desired/ready counts and resource info for a DaemonSet.
-func populateDaemonSetDetails(ti *model.Item, status, spec map[string]interface{}) {
+func populateDaemonSetDetails(ti *model.Item, status, spec map[string]any) {
 	if status == nil {
 		return
 	}
@@ -226,7 +226,7 @@ func populateDaemonSetDetails(ti *model.Item, status, spec map[string]interface{
 }
 
 // populateReplicaSetDetails extracts replica counts for a ReplicaSet.
-func populateReplicaSetDetails(ti *model.Item, status, spec map[string]interface{}) {
+func populateReplicaSetDetails(ti *model.Item, status, spec map[string]any) {
 	if status == nil || spec == nil {
 		return
 	}
@@ -247,7 +247,7 @@ func populateReplicaSetDetails(ti *model.Item, status, spec map[string]interface
 
 // populateServiceDetails extracts type, cluster IP, ports, external IPs,
 // load balancer addresses, selector, and session affinity for a Service.
-func populateServiceDetails(ti *model.Item, status, spec map[string]interface{}) {
+func populateServiceDetails(ti *model.Item, status, spec map[string]any) {
 	if spec == nil {
 		return
 	}
@@ -269,19 +269,28 @@ func populateServiceDetails(ti *model.Item, status, spec map[string]interface{})
 }
 
 // populateServicePorts extracts port information from a Service spec.
-func populateServicePorts(ti *model.Item, spec map[string]interface{}) {
-	ports, ok := spec["ports"].([]interface{})
+// Format mirrors kubectl when nodePort is set ("port:nodePort/protocol"),
+// while preserving lfk's targetPort visibility ("port→targetPort/protocol",
+// or combined: "port:nodePort→targetPort/protocol").
+func populateServicePorts(ti *model.Item, spec map[string]any) {
+	ports, ok := spec["ports"].([]any)
 	if !ok {
 		return
 	}
 	var portStrs []string
 	for _, p := range ports {
-		if pMap, ok := p.(map[string]interface{}); ok {
+		if pMap, ok := p.(map[string]any); ok {
 			port := getInt(pMap, "port")
+			nodePort := getInt(pMap, "nodePort")
+			targetPort := getInt(pMap, "targetPort")
 			proto, _ := pMap["protocol"].(string)
-			s := fmt.Sprintf("%d/%s", port, proto)
-			if tp := getInt(pMap, "targetPort"); tp > 0 && tp != port {
-				s = fmt.Sprintf("%d→%d/%s", port, tp, proto)
+			head := fmt.Sprintf("%d", port)
+			if nodePort > 0 {
+				head = fmt.Sprintf("%d:%d", port, nodePort)
+			}
+			s := fmt.Sprintf("%s/%s", head, proto)
+			if targetPort > 0 && targetPort != port {
+				s = fmt.Sprintf("%s→%d/%s", head, targetPort, proto)
 			}
 			portStrs = append(portStrs, s)
 		}
@@ -292,8 +301,8 @@ func populateServicePorts(ti *model.Item, spec map[string]interface{}) {
 }
 
 // populateServiceExternalIPs extracts external IPs from a Service spec.
-func populateServiceExternalIPs(ti *model.Item, spec map[string]interface{}) {
-	extIPs, ok := spec["externalIPs"].([]interface{})
+func populateServiceExternalIPs(ti *model.Item, spec map[string]any) {
+	extIPs, ok := spec["externalIPs"].([]any)
 	if !ok || len(extIPs) == 0 {
 		return
 	}
@@ -310,21 +319,21 @@ func populateServiceExternalIPs(ti *model.Item, spec map[string]interface{}) {
 
 // populateLoadBalancerAddresses extracts IP/hostname addresses from
 // status.loadBalancer.ingress and appends them with the given column key.
-func populateLoadBalancerAddresses(ti *model.Item, status map[string]interface{}, columnKey string) {
+func populateLoadBalancerAddresses(ti *model.Item, status map[string]any, columnKey string) {
 	if status == nil {
 		return
 	}
-	lb, ok := status["loadBalancer"].(map[string]interface{})
+	lb, ok := status["loadBalancer"].(map[string]any)
 	if !ok {
 		return
 	}
-	ingress, ok := lb["ingress"].([]interface{})
+	ingress, ok := lb["ingress"].([]any)
 	if !ok {
 		return
 	}
 	var addrs []string
 	for _, i := range ingress {
-		if iMap, ok := i.(map[string]interface{}); ok {
+		if iMap, ok := i.(map[string]any); ok {
 			if ip, ok := iMap["ip"].(string); ok {
 				addrs = append(addrs, ip)
 			} else if host, ok := iMap["hostname"].(string); ok {
@@ -338,8 +347,8 @@ func populateLoadBalancerAddresses(ti *model.Item, status map[string]interface{}
 }
 
 // populateServiceSelector extracts and formats the selector from a Service spec.
-func populateServiceSelector(ti *model.Item, spec map[string]interface{}) {
-	selector, ok := spec["selector"].(map[string]interface{})
+func populateServiceSelector(ti *model.Item, spec map[string]any) {
+	selector, ok := spec["selector"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -355,7 +364,7 @@ func populateServiceSelector(ti *model.Item, spec map[string]interface{}) {
 
 // populateIngressDetails extracts ingress class, rules, hosts, default backend,
 // TLS hosts, URL, and load balancer addresses for an Ingress.
-func populateIngressDetails(ti *model.Item, status, spec map[string]interface{}) {
+func populateIngressDetails(ti *model.Item, status, spec map[string]any) {
 	if spec == nil {
 		return
 	}
@@ -371,15 +380,15 @@ func populateIngressDetails(ti *model.Item, status, spec map[string]interface{})
 }
 
 // populateIngressRulesAndHosts extracts rule count and host names from an Ingress spec.
-func populateIngressRulesAndHosts(ti *model.Item, spec map[string]interface{}) {
-	rules, ok := spec["rules"].([]interface{})
+func populateIngressRulesAndHosts(ti *model.Item, spec map[string]any) {
+	rules, ok := spec["rules"].([]any)
 	if !ok {
 		return
 	}
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Rules", Value: fmt.Sprintf("%d", len(rules))})
 	var hosts []string
 	for _, r := range rules {
-		if rMap, ok := r.(map[string]interface{}); ok {
+		if rMap, ok := r.(map[string]any); ok {
 			if host, ok := rMap["host"].(string); ok {
 				hosts = append(hosts, host)
 			}
@@ -391,17 +400,17 @@ func populateIngressRulesAndHosts(ti *model.Item, spec map[string]interface{}) {
 }
 
 // populateIngressDefaultBackend extracts the default backend from an Ingress spec.
-func populateIngressDefaultBackend(ti *model.Item, spec map[string]interface{}) {
-	defBackend, ok := spec["defaultBackend"].(map[string]interface{})
+func populateIngressDefaultBackend(ti *model.Item, spec map[string]any) {
+	defBackend, ok := spec["defaultBackend"].(map[string]any)
 	if !ok {
 		return
 	}
-	svc, ok := defBackend["service"].(map[string]interface{})
+	svc, ok := defBackend["service"].(map[string]any)
 	if !ok {
 		return
 	}
 	svcName, _ := svc["name"].(string)
-	if port, ok := svc["port"].(map[string]interface{}); ok {
+	if port, ok := svc["port"].(map[string]any); ok {
 		if num, ok := port["number"].(float64); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Default Backend", Value: fmt.Sprintf("%s:%d", svcName, int64(num))})
 		} else if name, ok := port["name"].(string); ok {
@@ -414,16 +423,16 @@ func populateIngressDefaultBackend(ti *model.Item, spec map[string]interface{}) 
 
 // populateIngressTLSHosts extracts TLS hosts from an Ingress spec and returns
 // the set of TLS-enabled hosts for URL scheme detection.
-func populateIngressTLSHosts(ti *model.Item, spec map[string]interface{}) map[string]bool {
-	tls, ok := spec["tls"].([]interface{})
+func populateIngressTLSHosts(ti *model.Item, spec map[string]any) map[string]bool {
+	tls, ok := spec["tls"].([]any)
 	if !ok || len(tls) == 0 {
 		return nil
 	}
 	tlsHostSet := make(map[string]bool)
 	var tlsHosts []string
 	for _, t := range tls {
-		if tMap, ok := t.(map[string]interface{}); ok {
-			if hosts, ok := tMap["hosts"].([]interface{}); ok {
+		if tMap, ok := t.(map[string]any); ok {
+			if hosts, ok := tMap["hosts"].([]any); ok {
 				for _, h := range hosts {
 					if s, ok := h.(string); ok {
 						tlsHosts = append(tlsHosts, s)
@@ -440,12 +449,12 @@ func populateIngressTLSHosts(ti *model.Item, spec map[string]interface{}) map[st
 }
 
 // populateIngressURL builds a URL from the first rule's host and path for "Open in Browser".
-func populateIngressURL(ti *model.Item, spec map[string]interface{}, tlsHostSet map[string]bool) {
-	rules, ok := spec["rules"].([]interface{})
+func populateIngressURL(ti *model.Item, spec map[string]any, tlsHostSet map[string]bool) {
+	rules, ok := spec["rules"].([]any)
 	if !ok || len(rules) == 0 {
 		return
 	}
-	firstRule, ok := rules[0].(map[string]interface{})
+	firstRule, ok := rules[0].(map[string]any)
 	if !ok {
 		return
 	}
@@ -458,9 +467,9 @@ func populateIngressURL(ti *model.Item, spec map[string]interface{}, tlsHostSet 
 		scheme = "https"
 	}
 	path := ""
-	if httpBlock, ok := firstRule["http"].(map[string]interface{}); ok {
-		if paths, ok := httpBlock["paths"].([]interface{}); ok && len(paths) > 0 {
-			if firstPath, ok := paths[0].(map[string]interface{}); ok {
+	if httpBlock, ok := firstRule["http"].(map[string]any); ok {
+		if paths, ok := httpBlock["paths"].([]any); ok && len(paths) > 0 {
+			if firstPath, ok := paths[0].(map[string]any); ok {
 				if p, ok := firstPath["path"].(string); ok && p != "" && p != "/" {
 					path = p
 				}
@@ -471,8 +480,8 @@ func populateIngressURL(ti *model.Item, spec map[string]interface{}, tlsHostSet 
 }
 
 // populateConfigMapDetails extracts data keys and values from a ConfigMap.
-func populateConfigMapDetails(ti *model.Item, obj map[string]interface{}) {
-	data, ok := obj["data"].(map[string]interface{})
+func populateConfigMapDetails(ti *model.Item, obj map[string]any) {
+	data, ok := obj["data"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -490,8 +499,8 @@ func populateConfigMapDetails(ti *model.Item, obj map[string]interface{}) {
 }
 
 // populateSecretDetails extracts and decodes secret data from a Secret.
-func populateSecretDetails(ti *model.Item, obj map[string]interface{}) {
-	if data, ok := obj["data"].(map[string]interface{}); ok {
+func populateSecretDetails(ti *model.Item, obj map[string]any) {
+	if data, ok := obj["data"].(map[string]any); ok {
 		keys := make([]string, 0, len(data))
 		for k := range data {
 			keys = append(keys, k)
@@ -514,26 +523,26 @@ func populateSecretDetails(ti *model.Item, obj map[string]interface{}) {
 
 // populateNodeDetails extracts roles, addresses, allocatable resources,
 // node info, and taints for a Node.
-func populateNodeDetails(ti *model.Item, obj map[string]interface{}, status, spec map[string]interface{}) {
+func populateNodeDetails(ti *model.Item, obj map[string]any, status, spec map[string]any) {
 	populateNodeRoles(ti, obj)
 	populateNodeStatus(ti, status)
 	populateNodeTaints(ti, spec)
 }
 
 // populateNodeRoles extracts node roles from labels.
-func populateNodeRoles(ti *model.Item, obj map[string]interface{}) {
-	metadata, ok := obj["metadata"].(map[string]interface{})
+func populateNodeRoles(ti *model.Item, obj map[string]any) {
+	metadata, ok := obj["metadata"].(map[string]any)
 	if !ok {
 		return
 	}
-	labels, ok := metadata["labels"].(map[string]interface{})
+	labels, ok := metadata["labels"].(map[string]any)
 	if !ok {
 		return
 	}
 	var roles []string
 	for k := range labels {
-		if strings.HasPrefix(k, "node-role.kubernetes.io/") {
-			role := strings.TrimPrefix(k, "node-role.kubernetes.io/")
+		if after, ok0 := strings.CutPrefix(k, "node-role.kubernetes.io/"); ok0 {
+			role := after
 			if role != "" {
 				roles = append(roles, role)
 			}
@@ -547,13 +556,13 @@ func populateNodeRoles(ti *model.Item, obj map[string]interface{}) {
 
 // populateNodeStatus extracts addresses, allocatable resources, and node info
 // from the Node status.
-func populateNodeStatus(ti *model.Item, status map[string]interface{}) {
+func populateNodeStatus(ti *model.Item, status map[string]any) {
 	if status == nil {
 		return
 	}
-	if addrs, ok := status["addresses"].([]interface{}); ok {
+	if addrs, ok := status["addresses"].([]any); ok {
 		for _, a := range addrs {
-			if aMap, ok := a.(map[string]interface{}); ok {
+			if aMap, ok := a.(map[string]any); ok {
 				addrType, _ := aMap["type"].(string)
 				addr, _ := aMap["address"].(string)
 				if addrType != "" && addr != "" {
@@ -563,7 +572,7 @@ func populateNodeStatus(ti *model.Item, status map[string]interface{}) {
 		}
 	}
 	// Add allocatable CPU/Memory as hidden data columns for metrics enrichment.
-	if alloc, ok := status["allocatable"].(map[string]interface{}); ok {
+	if alloc, ok := status["allocatable"].(map[string]any); ok {
 		if cpu, ok := alloc["cpu"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "CPU Alloc", Value: cpu})
 		}
@@ -571,7 +580,7 @@ func populateNodeStatus(ti *model.Item, status map[string]interface{}) {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Mem Alloc", Value: mem})
 		}
 	}
-	if nodeInfo, ok := status["nodeInfo"].(map[string]interface{}); ok {
+	if nodeInfo, ok := status["nodeInfo"].(map[string]any); ok {
 		if v, ok := nodeInfo["kubeletVersion"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Version", Value: v})
 		}
@@ -585,17 +594,17 @@ func populateNodeStatus(ti *model.Item, status map[string]interface{}) {
 }
 
 // populateNodeTaints extracts taints from the Node spec.
-func populateNodeTaints(ti *model.Item, spec map[string]interface{}) {
+func populateNodeTaints(ti *model.Item, spec map[string]any) {
 	if spec == nil {
 		return
 	}
-	taints, ok := spec["taints"].([]interface{})
+	taints, ok := spec["taints"].([]any)
 	if !ok || len(taints) == 0 {
 		return
 	}
 	var taintStrs []string
 	for _, t := range taints {
-		if tMap, ok := t.(map[string]interface{}); ok {
+		if tMap, ok := t.(map[string]any); ok {
 			key, _ := tMap["key"].(string)
 			value, _ := tMap["value"].(string)
 			effect, _ := tMap["effect"].(string)
@@ -614,14 +623,14 @@ func populateNodeTaints(ti *model.Item, spec map[string]interface{}) {
 
 // populatePVCDetails extracts phase, capacity, request, volume name,
 // access modes, storage class, and volume mode for a PersistentVolumeClaim.
-func populatePVCDetails(ti *model.Item, status, spec map[string]interface{}) {
+func populatePVCDetails(ti *model.Item, status, spec map[string]any) {
 	// Phase/status -- set ti.Status only; the built-in Status column displays it.
 	if status != nil {
 		if phase, ok := status["phase"].(string); ok {
 			ti.Status = phase
 		}
 		// Actual capacity from status (may differ from requested).
-		if cap, ok := status["capacity"].(map[string]interface{}); ok {
+		if cap, ok := status["capacity"].(map[string]any); ok {
 			if storage, ok := cap["storage"].(string); ok {
 				ti.Columns = append(ti.Columns, model.KeyValue{Key: "Capacity", Value: storage})
 			}
@@ -631,8 +640,8 @@ func populatePVCDetails(ti *model.Item, status, spec map[string]interface{}) {
 		return
 	}
 	// Requested storage (show if no status capacity yet).
-	if res, ok := spec["resources"].(map[string]interface{}); ok {
-		if req, ok := res["requests"].(map[string]interface{}); ok {
+	if res, ok := spec["resources"].(map[string]any); ok {
+		if req, ok := res["requests"].(map[string]any); ok {
 			if storage, ok := req["storage"].(string); ok {
 				ti.Columns = append(ti.Columns, model.KeyValue{Key: "Request", Value: storage})
 			}
@@ -642,7 +651,7 @@ func populatePVCDetails(ti *model.Item, status, spec map[string]interface{}) {
 	if vol, ok := spec["volumeName"].(string); ok && vol != "" {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Volume", Value: vol})
 	}
-	if am, ok := spec["accessModes"].([]interface{}); ok {
+	if am, ok := spec["accessModes"].([]any); ok {
 		var modes []string
 		for _, m := range am {
 			if s, ok := m.(string); ok {
@@ -659,14 +668,26 @@ func populatePVCDetails(ti *model.Item, status, spec map[string]interface{}) {
 	}
 }
 
-// populateCronJobDetails extracts schedule, suspend, and last schedule time for a CronJob.
-func populateCronJobDetails(ti *model.Item, status, spec map[string]interface{}) {
+// populateCronJobDetails extracts schedule, suspend, and last/next schedule
+// time for a CronJob. Columns are emitted in the order they should appear:
+// Schedule (what), Last Schedule (when it last ran), Next (when it runs next),
+// Suspend (operational state — least likely to need at a glance).
+func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
+	var (
+		schedule string
+		timeZone string
+		suspend  bool
+	)
 	if spec != nil {
 		if sched, ok := spec["schedule"].(string); ok {
+			schedule = sched
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Schedule", Value: sched})
 		}
-		if suspend, ok := spec["suspend"].(bool); ok {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", suspend)})
+		if tz, ok := spec["timeZone"].(string); ok {
+			timeZone = tz
+		}
+		if s, ok := spec["suspend"].(bool); ok {
+			suspend = s
 		}
 	}
 	if status != nil {
@@ -674,10 +695,27 @@ func populateCronJobDetails(ti *model.Item, status, spec map[string]interface{})
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Last Schedule", Value: lastSchedule})
 		}
 	}
+	if !suspend && schedule != "" {
+		if next, ok := nextCronFire(schedule, timeZone, time.Now()); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Next", Value: formatAge(time.Until(next))})
+		}
+	}
+	if spec != nil {
+		if _, ok := spec["suspend"].(bool); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", suspend)})
+		}
+	}
 }
 
-// populateJobDetails extracts succeeded/failed counts and completions for a Job.
-func populateJobDetails(ti *model.Item, status, spec map[string]interface{}) {
+// populateJobDetails extracts succeeded/failed counts, completions target, and
+// suspend state for a Job. Columns ordered to match user attention: progress
+// counts first, then operational state.
+func populateJobDetails(ti *model.Item, status, spec map[string]any) {
+	if spec != nil {
+		if completions, ok := spec["completions"].(float64); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Completions", Value: fmt.Sprintf("%d", int64(completions))})
+		}
+	}
 	if status != nil {
 		if succeeded, ok := status["succeeded"].(float64); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Succeeded", Value: fmt.Sprintf("%d", int64(succeeded))})
@@ -687,22 +725,22 @@ func populateJobDetails(ti *model.Item, status, spec map[string]interface{}) {
 		}
 	}
 	if spec != nil {
-		if completions, ok := spec["completions"].(float64); ok {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Completions", Value: fmt.Sprintf("%d", int64(completions))})
+		if suspend, ok := spec["suspend"].(bool); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", suspend)})
 		}
 	}
 }
 
 // populateHPADetails extracts replica counts, targets, metrics, and conditions
 // for a HorizontalPodAutoscaler.
-func populateHPADetails(ti *model.Item, status, spec map[string]interface{}) {
+func populateHPADetails(ti *model.Item, status, spec map[string]any) {
 	populateHPAReady(ti, status, spec)
 	populateHPASpecColumns(ti, spec)
 	populateHPAStatusColumns(ti, status)
 }
 
 // populateHPAReady sets the Ready field to show current/desired replicas for an HPA.
-func populateHPAReady(ti *model.Item, status, spec map[string]interface{}) {
+func populateHPAReady(ti *model.Item, status, spec map[string]any) {
 	if status == nil {
 		return
 	}
@@ -728,12 +766,12 @@ func populateHPAReady(ti *model.Item, status, spec map[string]interface{}) {
 
 // populateHPASpecColumns extracts target reference, min/max replicas, and metric
 // targets from an HPA spec.
-func populateHPASpecColumns(ti *model.Item, spec map[string]interface{}) {
+func populateHPASpecColumns(ti *model.Item, spec map[string]any) {
 	if spec == nil {
 		return
 	}
 	// Target reference.
-	if scaleTargetRef, ok := spec["scaleTargetRef"].(map[string]interface{}); ok {
+	if scaleTargetRef, ok := spec["scaleTargetRef"].(map[string]any); ok {
 		refKind, _ := scaleTargetRef["kind"].(string)
 		refName, _ := scaleTargetRef["name"].(string)
 		if refKind != "" && refName != "" {
@@ -747,15 +785,15 @@ func populateHPASpecColumns(ti *model.Item, spec map[string]interface{}) {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Max Replicas", Value: fmt.Sprintf("%d", int64(maxR))})
 	}
 	// Metrics from spec (target values).
-	if metrics, ok := spec["metrics"].([]interface{}); ok {
+	if metrics, ok := spec["metrics"].([]any); ok {
 		populateHPASpecMetrics(ti, metrics)
 	}
 }
 
 // populateHPASpecMetrics extracts metric target values from the HPA spec metrics array.
-func populateHPASpecMetrics(ti *model.Item, metrics []interface{}) {
+func populateHPASpecMetrics(ti *model.Item, metrics []any) {
 	for _, m := range metrics {
-		mMap, ok := m.(map[string]interface{})
+		mMap, ok := m.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -772,13 +810,13 @@ func populateHPASpecMetrics(ti *model.Item, metrics []interface{}) {
 }
 
 // populateHPAResourceMetric extracts a Resource metric (CPU/memory utilization or average value).
-func populateHPAResourceMetric(ti *model.Item, mMap map[string]interface{}, prefix string) {
-	res, ok := mMap["resource"].(map[string]interface{})
+func populateHPAResourceMetric(ti *model.Item, mMap map[string]any, prefix string) {
+	res, ok := mMap["resource"].(map[string]any)
 	if !ok {
 		return
 	}
 	resName, _ := res["name"].(string)
-	target, ok := res["target"].(map[string]interface{})
+	target, ok := res["target"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -802,16 +840,16 @@ func populateHPAResourceMetric(ti *model.Item, mMap map[string]interface{}, pref
 }
 
 // populateHPAPodsMetric extracts a Pods metric value.
-func populateHPAPodsMetric(ti *model.Item, mMap map[string]interface{}, dataKey, prefix string) {
-	pods, ok := mMap["pods"].(map[string]interface{})
+func populateHPAPodsMetric(ti *model.Item, mMap map[string]any, dataKey, prefix string) {
+	pods, ok := mMap["pods"].(map[string]any)
 	if !ok {
 		return
 	}
 	metricName := ""
-	if mn, ok := pods["metric"].(map[string]interface{}); ok {
+	if mn, ok := pods["metric"].(map[string]any); ok {
 		metricName, _ = mn["name"].(string)
 	}
-	data, ok := pods[dataKey].(map[string]interface{})
+	data, ok := pods[dataKey].(map[string]any)
 	if !ok {
 		return
 	}
@@ -824,16 +862,16 @@ func populateHPAPodsMetric(ti *model.Item, mMap map[string]interface{}, dataKey,
 }
 
 // populateHPAObjectMetric extracts an Object metric value.
-func populateHPAObjectMetric(ti *model.Item, mMap map[string]interface{}) {
-	object, ok := mMap["object"].(map[string]interface{})
+func populateHPAObjectMetric(ti *model.Item, mMap map[string]any) {
+	object, ok := mMap["object"].(map[string]any)
 	if !ok {
 		return
 	}
 	metricName := ""
-	if mn, ok := object["metric"].(map[string]interface{}); ok {
+	if mn, ok := object["metric"].(map[string]any); ok {
 		metricName, _ = mn["name"].(string)
 	}
-	target, ok := object["target"].(map[string]interface{})
+	target, ok := object["target"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -847,7 +885,7 @@ func populateHPAObjectMetric(ti *model.Item, mMap map[string]interface{}) {
 
 // populateHPAStatusColumns extracts current replicas, desired replicas,
 // current metrics, and conditions from the HPA status.
-func populateHPAStatusColumns(ti *model.Item, status map[string]interface{}) {
+func populateHPAStatusColumns(ti *model.Item, status map[string]any) {
 	if status == nil {
 		return
 	}
@@ -858,19 +896,19 @@ func populateHPAStatusColumns(ti *model.Item, status map[string]interface{}) {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Desired Replicas", Value: fmt.Sprintf("%d", int64(desired))})
 	}
 	// Current metrics from status.
-	if currentMetrics, ok := status["currentMetrics"].([]interface{}); ok {
+	if currentMetrics, ok := status["currentMetrics"].([]any); ok {
 		populateHPACurrentMetrics(ti, currentMetrics)
 	}
 	// Conditions summary.
-	if conditions, ok := status["conditions"].([]interface{}); ok {
+	if conditions, ok := status["conditions"].([]any); ok {
 		populateHPAConditions(ti, conditions)
 	}
 }
 
 // populateHPACurrentMetrics extracts current metric values from the HPA status.
-func populateHPACurrentMetrics(ti *model.Item, currentMetrics []interface{}) {
+func populateHPACurrentMetrics(ti *model.Item, currentMetrics []any) {
 	for _, m := range currentMetrics {
-		mMap, ok := m.(map[string]interface{})
+		mMap, ok := m.(map[string]any)
 		if !ok {
 			continue
 		}
@@ -885,13 +923,13 @@ func populateHPACurrentMetrics(ti *model.Item, currentMetrics []interface{}) {
 }
 
 // populateHPACurrentResourceMetric extracts the current value for a Resource metric.
-func populateHPACurrentResourceMetric(ti *model.Item, mMap map[string]interface{}) {
-	res, ok := mMap["resource"].(map[string]interface{})
+func populateHPACurrentResourceMetric(ti *model.Item, mMap map[string]any) {
+	res, ok := mMap["resource"].(map[string]any)
 	if !ok {
 		return
 	}
 	resName, _ := res["name"].(string)
-	current, ok := res["current"].(map[string]interface{})
+	current, ok := res["current"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -909,16 +947,16 @@ func populateHPACurrentResourceMetric(ti *model.Item, mMap map[string]interface{
 }
 
 // populateHPACurrentPodsMetric extracts the current value for a Pods metric.
-func populateHPACurrentPodsMetric(ti *model.Item, mMap map[string]interface{}) {
-	pods, ok := mMap["pods"].(map[string]interface{})
+func populateHPACurrentPodsMetric(ti *model.Item, mMap map[string]any) {
+	pods, ok := mMap["pods"].(map[string]any)
 	if !ok {
 		return
 	}
 	metricName := ""
-	if mn, ok := pods["metric"].(map[string]interface{}); ok {
+	if mn, ok := pods["metric"].(map[string]any); ok {
 		metricName, _ = mn["name"].(string)
 	}
-	current, ok := pods["current"].(map[string]interface{})
+	current, ok := pods["current"].(map[string]any)
 	if !ok {
 		return
 	}
@@ -931,9 +969,9 @@ func populateHPACurrentPodsMetric(ti *model.Item, mMap map[string]interface{}) {
 }
 
 // populateHPAConditions extracts the ScalingLimited condition from HPA status.
-func populateHPAConditions(ti *model.Item, conditions []interface{}) {
+func populateHPAConditions(ti *model.Item, conditions []any) {
 	for _, c := range conditions {
-		cMap, ok := c.(map[string]interface{})
+		cMap, ok := c.(map[string]any)
 		if !ok {
 			continue
 		}

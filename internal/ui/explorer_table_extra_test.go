@@ -367,6 +367,33 @@ func TestRenderTable(t *testing.T) {
 		assert.GreaterOrEqual(t, nsIdx, 0)
 		assert.Less(t, nameIdx, nsIdx, "NAME before NAMESPACE")
 	})
+
+	t.Run("namespace shrinks so long pod names render without truncation", func(t *testing.T) {
+		// Regression: a 28-char namespace burned ~29 columns on the
+		// NAMESPACE column at the default cap, leaving the NAME column
+		// too narrow for a 35-char pod name even though the row had
+		// plenty of total width. Now nsW shrinks toward its header
+		// width so name fits when the budget allows it.
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = -1
+		defer func() { ActiveMiddleScroll = origMS }()
+		origLayout := ActiveTableLayout
+		ActiveTableLayout = nil
+		defer func() { ActiveTableLayout = origLayout }()
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		longName := "nginx-deployment-7c9f8d8f6c-x9k2m" // 33 chars
+		longNs := "kube-system-very-long-name"          // 26 chars
+		items := []model.Item{
+			{Name: longName, Namespace: longNs, Status: "Running", Ready: "1/1", Age: "5m"},
+		}
+		result := RenderTable("NAME", items, 0, 100, 20, false, "", "")
+		plain := stripANSI(result)
+		assert.Contains(t, plain, longName,
+			"long pod name must render in full when total width allows it")
+	})
 }
 
 // --- collectExtraColumns ---
@@ -458,6 +485,64 @@ func TestCollectExtraColumns(t *testing.T) {
 		}
 	})
 
+	t.Run("capped column grows into surplus budget instead of padding NAME", func(t *testing.T) {
+		// Reproduces the bug where Service PORTS get truncated (e.g. "443:3~")
+		// while NAME ends up with a huge empty pad. The 20-char cap prevented
+		// Ports from using available leftover budget that flowed to NAME.
+		items := []model.Item{
+			{Name: "svc1", Kind: "Service", Columns: []model.KeyValue{
+				{Key: "Type", Value: "LoadBalancer"},
+				{Key: "Ports", Value: "80:31539/TCP, 443:31443/TCP"}, // 27 chars
+			}},
+			{Name: "svc2", Kind: "Service", Columns: []model.KeyValue{
+				{Key: "Type", Value: "ClusterIP"},
+				{Key: "Ports", Value: "80/TCP"},
+			}},
+		}
+		origFS := ActiveFullscreenMode
+		ActiveFullscreenMode = false
+		defer func() { ActiveFullscreenMode = origFS }()
+
+		// 200-wide table, usedWidth=30. Plenty of surplus.
+		result := collectExtraColumns(items, 200, 30, "Service")
+
+		var portsW int
+		for _, col := range result {
+			if col.key == "Ports" {
+				portsW = col.width
+			}
+		}
+		// Natural width = 27 (value) + 1 (spacing) = 28. Should grow up to that
+		// instead of being capped at 20+1=21 while NAME absorbs the slack.
+		assert.GreaterOrEqual(t, portsW, 28,
+			"Ports column should grow to fit content when surplus is available")
+	})
+
+	t.Run("surplus growth respects natural width (no over-padding)", func(t *testing.T) {
+		// Even with abundant width, columns that already fit should not grow
+		// past their natural size — slack still flows to NAME for short content.
+		items := []model.Item{
+			{Name: "pod1", Kind: "Pod", Columns: []model.KeyValue{
+				{Key: "CPU", Value: "10m"},
+				{Key: "MEM", Value: "64Mi"},
+			}},
+		}
+		origFS := ActiveFullscreenMode
+		ActiveFullscreenMode = false
+		defer func() { ActiveFullscreenMode = origFS }()
+
+		result := collectExtraColumns(items, 200, 30, "Pod")
+		for _, col := range result {
+			// Header is the longest of {key, value+1}; +1 spacing column.
+			natural := len(col.key)
+			if col.key == "MEM" && natural < 5 {
+				natural = 5 // value "64Mi" is 4, +1 arrow buffer not in play here
+			}
+			assert.LessOrEqual(t, col.width, natural+1+1,
+				"column %q grew beyond natural width", col.key)
+		}
+	})
+
 	t.Run("Deletion column excluded from table in both modes", func(t *testing.T) {
 		items := []model.Item{
 			{Name: "pod1", Kind: "Pod", Columns: []model.KeyValue{
@@ -528,5 +613,273 @@ func TestCollectExtraColumns(t *testing.T) {
 					"Used By should be blocked from table (fullscreen=%v)", fs)
 			}
 		}
+	})
+}
+
+// TestCollectExtraColumns_NameReservationGrowsWithLongestName is the
+// regression test for issue #53: when item names are long, the Name
+// column gets squeezed to the 20-char floor while extras (HOSTS,
+// TLS HOSTS, ADDRESS, …) fill the rest. Reserve more for Name when
+// items have long names so the Name column gets the space it needs and
+// extras fall back to their cap (or get dropped) instead of always
+// winning the budget.
+func TestCollectExtraColumns_NameReservationGrowsWithLongestName(t *testing.T) {
+	// Identical extras, identical width budget — only Name length differs.
+	// Extras' natural total exceeds the post-Name-reserve budget so the
+	// difference between long and short Name reservation actually shows
+	// up at the wire.
+	extras := []model.KeyValue{
+		{Key: "HOSTS", Value: "very-long-ingress-host.example.com"},
+		{Key: "TLS HOSTS", Value: "another-long-tls-host.example.com"},
+		{Key: "ADDRESS", Value: "ingress.aws.elb.example.com"},
+		{Key: "INGRESS CLASS", Value: "nginx-public-ingress-controller"},
+	}
+	longName := "very-long-ingress-name-that-needs-room" // 39 chars
+	shortName := "ing-1"                                 // 5 chars
+
+	longItems := []model.Item{{Name: longName, Kind: "Ingress", Columns: extras}}
+	shortItems := []model.Item{{Name: shortName, Kind: "Ingress", Columns: extras}}
+
+	const totalWidth, usedWidth = 180, 25
+
+	origFS := ActiveFullscreenMode
+	ActiveFullscreenMode = true
+	t.Cleanup(func() { ActiveFullscreenMode = origFS })
+
+	sumWidths := func(cols []extraColumn) int {
+		total := 0
+		for _, c := range cols {
+			total += c.width
+		}
+		return total
+	}
+
+	longResult := collectExtraColumns(longItems, totalWidth, usedWidth, "Ingress")
+	shortResult := collectExtraColumns(shortItems, totalWidth, usedWidth, "Ingress")
+
+	longTotal := sumWidths(longResult)
+	shortTotal := sumWidths(shortResult)
+
+	assert.Less(t, longTotal, shortTotal,
+		"long item names must shrink the budget available to extra columns "+
+			"(longTotal=%d, shortTotal=%d) so the Name column gets the "+
+			"space it needs — issue #53", longTotal, shortTotal)
+
+	// And the Name column (computed by the caller as totalWidth - usedWidth -
+	// extraTotal) must end up wider than the legacy 20-char floor in the
+	// long-name case.
+	longNameW := totalWidth - usedWidth - longTotal
+	assert.Greater(t, longNameW, 20,
+		"with long item names, the residual Name column must exceed the "+
+			"old 20-char hard floor (got %d)", longNameW)
+}
+
+// TestCollectExtraColumns_NameReservationCappedAtHalfWidth guards against
+// over-correction: a single pathologically long name (200 chars) must
+// not eat the entire budget. Cap the Name reservation at half the total
+// width so extras still get a fair share.
+func TestCollectExtraColumns_NameReservationCappedAtHalfWidth(t *testing.T) {
+	extras := []model.KeyValue{
+		{Key: "HOSTS", Value: "small.example.com"},
+	}
+	hugeName := strings.Repeat("a", 200)
+	items := []model.Item{{Name: hugeName, Kind: "Ingress", Columns: extras}}
+
+	origFS := ActiveFullscreenMode
+	ActiveFullscreenMode = true
+	t.Cleanup(func() { ActiveFullscreenMode = origFS })
+
+	const totalWidth, usedWidth = 120, 25
+	result := collectExtraColumns(items, totalWidth, usedWidth, "Ingress")
+
+	assert.NotEmpty(t, result,
+		"a single very long name must not starve extras to nothing — "+
+			"Name reservation has to be capped so HOSTS still appears")
+}
+
+// TestRenderTable_NodeNamesNotTruncatedEarly is a regression test for the
+// reported "node names still get truncated" bug: realistic Node items with
+// FQDN-style names plus the columns that populateNodeDetails attaches (Role,
+// Version, Taints, address types in fullscreen) must not be cut off when the
+// terminal is wide enough to show them in full.
+//
+// The previous fix (commit 1331bd2) reserved longestName+1 for the Name
+// column inside collectExtraColumns. Long node names re-surface the bug when
+// an aggressive extras column (Role with several comma-separated values,
+// Taints with NoSchedule/NoExecute markers) inflates beyond the cap, eating
+// the Name budget.
+func TestRenderTable_NodeNamesNotTruncatedEarly(t *testing.T) {
+	origMS := ActiveMiddleScroll
+	ActiveMiddleScroll = -1
+	t.Cleanup(func() { ActiveMiddleScroll = origMS })
+
+	origQuery := ActiveHighlightQuery
+	ActiveHighlightQuery = ""
+	t.Cleanup(func() { ActiveHighlightQuery = origQuery })
+
+	origSel := ActiveSelectedItems
+	ActiveSelectedItems = nil
+	t.Cleanup(func() { ActiveSelectedItems = origSel })
+
+	// Realistic node names: long FQDN format common on managed K8s. These
+	// are 50+ chars; the regression hides exactly when names are long.
+	names := []string{
+		"ip-10-0-1-100.eu-west-1.compute.internal",
+		"prod-eu-west-1-worker-pool-spot-instance-12345-67890",
+		"gke-cluster-default-pool-1a2b3c4d-abcd",
+	}
+	items := make([]model.Item, 0, len(names))
+	for _, n := range names {
+		items = append(items, model.Item{
+			Name:   n,
+			Kind:   "Node",
+			Status: "Ready",
+			Ready:  "True",
+			Age:    "10d",
+			Columns: []model.KeyValue{
+				{Key: "Role", Value: "control-plane,master,etcd"},
+				{Key: "Version", Value: "v1.28.5+rke2r1"},
+				{Key: "Taints", Value: "node-role.kubernetes.io/control-plane:=NoSchedule, node.kubernetes.io/disk-pressure:=NoSchedule"},
+				{Key: "InternalIP", Value: "10.0.1.100"},
+				{Key: "ExternalIP", Value: "54.123.45.67"},
+				{Key: "Hostname", Value: "ip-10-0-1-100"},
+			},
+		})
+	}
+
+	t.Run("normal mode 200 columns: full names visible", func(t *testing.T) {
+		origFS := ActiveFullscreenMode
+		ActiveFullscreenMode = false
+		t.Cleanup(func() { ActiveFullscreenMode = origFS })
+
+		out := stripANSI(RenderTable("NAME", items, 0, 200, 20, false, "", ""))
+		for _, n := range names {
+			assert.Contains(t, out, n,
+				"node name %q must appear in full at 200 cols (truncated form would have a trailing ~)", n)
+		}
+	})
+
+	t.Run("fullscreen 200 columns: full names visible", func(t *testing.T) {
+		origFS := ActiveFullscreenMode
+		ActiveFullscreenMode = true
+		t.Cleanup(func() { ActiveFullscreenMode = origFS })
+
+		out := stripANSI(RenderTable("NAME", items, 0, 200, 20, false, "", ""))
+		for _, n := range names {
+			assert.Contains(t, out, n,
+				"node name %q must appear in full at 200 cols in fullscreen mode", n)
+		}
+	})
+
+	t.Run("normal mode 140 columns: longest name still visible", func(t *testing.T) {
+		origFS := ActiveFullscreenMode
+		ActiveFullscreenMode = false
+		t.Cleanup(func() { ActiveFullscreenMode = origFS })
+
+		out := stripANSI(RenderTable("NAME", items, 0, 140, 20, false, "", ""))
+		for _, n := range names {
+			assert.Contains(t, out, n,
+				"node name %q must appear in full at 140 cols", n)
+		}
+	})
+
+	t.Run("middle column 100 columns: longest name still visible", func(t *testing.T) {
+		origFS := ActiveFullscreenMode
+		ActiveFullscreenMode = false
+		t.Cleanup(func() { ActiveFullscreenMode = origFS })
+
+		out := stripANSI(RenderTable("NAME", items, 0, 100, 20, false, "", ""))
+		for _, n := range names {
+			assert.Contains(t, out, n,
+				"node name %q must appear in full at 100 cols", n)
+		}
+	})
+
+	// Realistic middle-column widths: at 51% of total, a 200-char terminal
+	// gives the middle column ~97 chars; a 160-char terminal gives ~80;
+	// a 120-char terminal gives ~58. The middle column is where Nodes
+	// actually render in the user's three-column layout.
+	t.Run("middle column at 200-col terminal (~97 wide)", func(t *testing.T) {
+		origFS := ActiveFullscreenMode
+		ActiveFullscreenMode = false
+		t.Cleanup(func() { ActiveFullscreenMode = origFS })
+
+		out := stripANSI(RenderTable("NAME", items, 0, 97, 20, false, "", ""))
+		for _, n := range names {
+			assert.Contains(t, out, n,
+				"node name %q must appear in full at 97 cols (middle col of 200-wide terminal)", n)
+		}
+	})
+
+	t.Run("middle column at 160-col terminal (~80 wide): names up to ~50 chars fit", func(t *testing.T) {
+		origFS := ActiveFullscreenMode
+		ActiveFullscreenMode = false
+		t.Cleanup(func() { ActiveFullscreenMode = origFS })
+
+		// Drop the 52-char outlier — at 80 cols the budget genuinely
+		// can't accommodate it once builtins (~19) and one extras
+		// column (~22) are reserved. Asserting the 38- and 40-char
+		// names still fit captures the real complaint: moderate
+		// names should not be truncated.
+		shorter := []model.Item{items[0], items[2]} // 40-char + 38-char
+		out := stripANSI(RenderTable("NAME", shorter, 0, 80, 20, false, "", ""))
+		assert.Contains(t, out, "ip-10-0-1-100.eu-west-1.compute.internal",
+			"40-char node name must appear in full at 80 cols")
+		assert.Contains(t, out, "gke-cluster-default-pool-1a2b3c4d-abcd",
+			"38-char node name must appear in full at 80 cols")
+	})
+}
+
+// Regression: long Pod statuses (PodInitializing, ContainerCreating,
+// Succeeded, ...) used to burn enough STATUS-column width on narrow
+// layouts to force NAME / NAMESPACE truncation. Now the column shrinks
+// to its abbreviated cap when the budget would otherwise truncate names,
+// and the renderer swaps to the abbreviation for affected rows.
+func TestRenderTable_PodStatusAbbreviatesUnderWidthPressure(t *testing.T) {
+	origMS := ActiveMiddleScroll
+	ActiveMiddleScroll = -1
+	t.Cleanup(func() { ActiveMiddleScroll = origMS })
+
+	origQuery := ActiveHighlightQuery
+	ActiveHighlightQuery = ""
+	t.Cleanup(func() { ActiveHighlightQuery = origQuery })
+
+	origSel := ActiveSelectedItems
+	ActiveSelectedItems = nil
+	t.Cleanup(func() { ActiveSelectedItems = origSel })
+
+	origLayout := ActiveTableLayout
+	ActiveTableLayout = nil
+	t.Cleanup(func() { ActiveTableLayout = origLayout })
+
+	// Realistic pod-list snapshot mirroring the user's report.
+	items := []model.Item{
+		{Name: "magento-cron-29622472-abcde", Namespace: "m2communityteam-lkajzltdo", Kind: "Pod", Status: "PodInitializing", Ready: "0/1", Restarts: "0", Age: "45s"},
+		{Name: "magento-cron-29622472-fghij", Namespace: "m2communityteam-lkajzltdo", Kind: "Pod", Status: "Succeeded", Ready: "0/1", Restarts: "0", Age: "1m"},
+		{Name: "magento-cron-29622473-klmno", Namespace: "m2commerceteam-zxywvutsr", Kind: "Pod", Status: "PodInitializing", Ready: "0/1", Restarts: "0", Age: "7s"},
+		{Name: "magento-pwa-69dc46b76-pqrst", Namespace: "good360uat-12345", Kind: "Pod", Status: "Running", Ready: "1/1", Restarts: "0", Age: "12d"},
+	}
+
+	t.Run("narrow layout abbreviates long statuses", func(t *testing.T) {
+		// 65-col middle column reproduces the user's report: the longest
+		// pod name (~30 chars) won't fit alongside a 20-char namespace
+		// header, READY, RS, STATUS=PodInitializing, AGE, and gutter.
+		ActiveTableLayout = nil
+		out := stripANSI(RenderTable("NAME", items, 0, 65, 20, false, "", ""))
+		assert.Contains(t, out, "Init",
+			"PodInitializing must abbreviate to Init when layout is too narrow")
+		assert.Contains(t, out, "Done",
+			"Succeeded must abbreviate to Done when layout is too narrow")
+		assert.NotContains(t, out, "PodInitializing",
+			"full PodInitializing must NOT appear once the layout has shrunk STATUS")
+	})
+
+	t.Run("wide layout keeps full status labels", func(t *testing.T) {
+		ActiveTableLayout = nil
+		out := stripANSI(RenderTable("NAME", items, 0, 200, 20, false, "", ""))
+		assert.Contains(t, out, "PodInitializing",
+			"full PodInitializing must remain at 200 cols where there's no width pressure")
+		assert.Contains(t, out, "Succeeded",
+			"full Succeeded must remain at 200 cols")
 	})
 }

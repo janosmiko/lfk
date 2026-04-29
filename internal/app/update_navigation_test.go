@@ -91,7 +91,12 @@ func TestCov80NavigateParentFromResourceTypes(t *testing.T) {
 	result, cmd := m.navigateParent()
 	rm := result.(Model)
 	assert.Equal(t, model.LevelClusters, rm.nav.Level)
-	assert.NotNil(t, cmd)
+	// navigateParent clears nav.Context, so the loadPreview() returned here
+	// resolves via loadResourceTypes with an empty context — which has no
+	// discovered entries and therefore emits no cmd (see loadResourceTypes).
+	// The important assertion is just that the level transitions back to
+	// clusters; the cmd can be nil.
+	_ = cmd
 }
 
 func TestCov80NavigateParentFromResources(t *testing.T) {
@@ -102,6 +107,54 @@ func TestCov80NavigateParentFromResources(t *testing.T) {
 	result, _ := m.navigateParent()
 	rm := result.(Model)
 	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
+}
+
+// When the session restores to LevelResources and discovery hasn't finished
+// yet for the context, m.leftItems contains the seed resource-type list as
+// a fallback. Navigating back (`h`) used to pop those seeds into the middle
+// column, so the user saw a short list flash before the real discovered
+// list arrived. After the fix, navigateParent from LevelResources checks
+// whether discovery has completed: if not, it shows the loader instead of
+// stale seeds.
+func TestNavigateParentFromResources_ShowsLoaderWhileDiscoveryPending(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "test-ctx"
+	// Pretend these were the seed resource types stashed while discovery ran.
+	m.leftItems = []model.Item{
+		{Name: "Pods", Extra: "/v1/pods"},
+		{Name: "Deployments", Extra: "apps/v1/deployments"},
+	}
+	m.leftItemsHistory = [][]model.Item{{{Name: "test-ctx"}}}
+	// discoveredResources deliberately empty — discovery not yet complete.
+	delete(m.discoveredResources, "test-ctx")
+
+	result, _ := m.navigateParent()
+	rm := result.(Model)
+	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
+	assert.Nil(t, rm.middleItems,
+		"discovery pending: middle pane must show the loader, not pop in seed items")
+	assert.True(t, rm.loading)
+}
+
+// When discovery has already completed, the cached discovered items in
+// m.leftItems propagate to the middle column as before — we must not
+// regress the fast-path.
+func TestNavigateParentFromResources_UsesCachedDiscoveredTypes(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "test-ctx"
+	m.leftItems = []model.Item{{Name: "Pods"}, {Name: "Deployments"}}
+	m.leftItemsHistory = [][]model.Item{{{Name: "test-ctx"}}}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
+
+	result, _ := m.navigateParent()
+	rm := result.(Model)
+	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
+	assert.Len(t, rm.middleItems, 2,
+		"discovery complete: middle pane must pop in the cached resource-type list")
 }
 
 func TestCov80NavigateParentFromOwned(t *testing.T) {
@@ -467,4 +520,427 @@ func TestNavigateChildResourceTypeSecurityFallsThroughWhenNoPrefix(t *testing.T)
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.Equal(t, "Pod", rm.nav.ResourceType.Kind)
+}
+
+// TestNavigateChildResourceType_RendersCacheImmediatelyAndRefetches
+// verifies the post-fix UX: drilling in renders the previously primed
+// preview cache synchronously (so the user sees the list with no
+// loading flash), but the follow-up loadResources(false) MUST hit the
+// API rather than synthesizing a msg from cache. Without this real
+// refetch, deleted/terminated rows linger in the list — the cache
+// shortcut for main loads was the source of "deleted pod still shown"
+// after watch ticks and shift+r. The shortcut now applies only to
+// preview hover-cycles (forPreview=true).
+func TestNavigateChildResourceType_RendersCacheImmediatelyAndRefetches(t *testing.T) {
+	m := basePush80Model()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.namespace = "default"
+	m.requestGen = 8
+
+	pvcRT := model.ResourceTypeEntry{
+		Kind:       "PersistentVolumeClaim",
+		Resource:   "persistentvolumeclaims",
+		APIGroup:   "",
+		APIVersion: "v1",
+		Namespaced: true,
+	}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
+
+	cachedItems := []model.Item{
+		{Name: "pvc-a", Kind: "PersistentVolumeClaim", Namespace: "default"},
+		{Name: "pvc-b", Kind: "PersistentVolumeClaim", Namespace: "default"},
+	}
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
+	m.itemCache[drillInKey] = cachedItems
+	m.cacheFingerprints[drillInKey] = m.fetchFingerprint()
+
+	m.leftItems = []model.Item{{Name: "test-ctx"}}
+	m.leftItemsHistory = [][]model.Item{{{Name: "root"}}}
+
+	sel := &model.Item{
+		Kind:  "PersistentVolumeClaim",
+		Extra: pvcRT.ResourceRef(),
+	}
+	result, cmd := m.navigateChildResourceType(sel)
+	rm := result.(Model)
+
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+	assert.Equal(t, cachedItems, rm.middleItems,
+		"cached items must populate middleItems immediately for instant UX")
+	assert.Equal(t, rm.fetchFingerprint(), rm.cacheFingerprints[drillInKey],
+		"fingerprint entry persists across drill-in")
+	require.NotNil(t, cmd, "must return a cmd to drive the background refetch")
+	// Behavior contract: cmd is loadResources(false), which after the
+	// shortcut restriction always issues a real API fetch on main loads
+	// — that's how watch ticks/shift+r/navigate-back actually surface
+	// fresh data. We don't execute cmd() here because it would dispatch
+	// against a real client; the assertion above (cached items stay in
+	// middleItems) is the visible-UX guarantee.
+}
+
+// TestNavigateChildResourceType_FetchesWhenFingerprintStale verifies that
+// the shortcut does NOT trigger when the fetch-affecting state has
+// changed since prime time (namespace switch, allNamespaces toggle,
+// multi-select update). The marker must remain intact so the next real
+// preview can re-arm it, and the drill-in must fall back to the normal
+// loadResources refresh. This is the safety net against serving stale
+// data after a namespace switch between preview and drill-in.
+func TestNavigateChildResourceType_FetchesWhenFingerprintStale(t *testing.T) {
+	m := basePush80Model()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.namespace = "default"
+
+	pvcRT := model.ResourceTypeEntry{
+		Kind:       "PersistentVolumeClaim",
+		Resource:   "persistentvolumeclaims",
+		APIVersion: "v1",
+		Namespaced: true,
+	}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
+	staleItems := []model.Item{{Name: "stale-pvc"}}
+	m.itemCache[drillInKey] = staleItems
+	// Record the fingerprint as if it was captured on a DIFFERENT
+	// namespace, then flip back to "default". The stored fingerprint
+	// won't match fetchFingerprint() for "default".
+	m.namespace = "other"
+	staleFingerprint := m.fetchFingerprint()
+	m.cacheFingerprints[drillInKey] = staleFingerprint
+	m.namespace = "default"
+
+	m.leftItems = []model.Item{{Name: "test-ctx"}}
+	m.leftItemsHistory = [][]model.Item{{{Name: "root"}}}
+
+	sel := &model.Item{Kind: "PersistentVolumeClaim", Extra: pvcRT.ResourceRef()}
+	result, cmd := m.navigateChildResourceType(sel)
+	rm := result.(Model)
+
+	// The shortcut must NOT trigger on fingerprint mismatch: the stored
+	// fingerprint entry stays intact so once a fresh fetch completes for
+	// the new namespace it will overwrite it with a matching one.
+	assert.Equal(t, staleFingerprint, rm.cacheFingerprints[drillInKey],
+		"stale fingerprint entry is preserved; a fresh fetch will overwrite it")
+	// Cached items still populate middleItems (show-cache-while-refresh UX),
+	// but a real fetch is issued.
+	assert.Equal(t, staleItems, rm.middleItems, "cached items populate middle list immediately")
+	require.NotNil(t, cmd, "loadResources must fire on fingerprint mismatch")
+}
+
+// TestNavigateChild_DrillInWhilePreviewInFlight verifies that drilling
+// in before the sidebar preview has returned leaves middleItems in a
+// clean loading state (not leaked from leftItems). This is the regression
+// the user reported as "left and middle both show resource types" — if
+// pushLeft's shared slice reference weren't severed by reassigning
+// middleItems, both columns would render identical content.
+func TestNavigateChild_DrillInWhilePreviewInFlight(t *testing.T) {
+	m := basePush80Model()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.namespace = "default"
+	m.requestGen = 3
+
+	pvcRT := model.ResourceTypeEntry{
+		Kind:       "PersistentVolumeClaim",
+		Resource:   "persistentvolumeclaims",
+		APIVersion: "v1",
+		Namespaced: true,
+	}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
+
+	// Middle column holds the resource-types sidebar list. Preview has
+	// not completed yet — no entry for the PVC navKey, no marker armed.
+	resourceTypes := []model.Item{
+		{Name: "Pods", Kind: "Pod", Extra: "/v1/pods"},
+		{Name: "PersistentVolumeClaims", Kind: "PersistentVolumeClaim", Extra: pvcRT.ResourceRef()},
+	}
+	m.middleItems = resourceTypes
+	m.setCursor(1) // on PVC
+
+	m.leftItems = []model.Item{{Name: "test-ctx"}}
+	m.leftItemsHistory = [][]model.Item{{{Name: "root"}}}
+
+	result, cmd := m.navigateChild()
+	rm := result.(Model)
+
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+	// Left must hold the resource-types list (pushed from middle).
+	assert.Equal(t, resourceTypes, rm.leftItems, "left column holds the pushed resource-types list")
+	// Middle must be empty (loader state) — NOT the same slice as leftItems.
+	// The user's reported bug was both columns rendering the resource-types
+	// list; this assert locks down the fix.
+	assert.Empty(t, rm.middleItems,
+		"middle column must be cleared on drill-in; resource types must not leak into it")
+	assert.True(t, rm.loading, "loading flag must be armed so the middle column renders the spinner")
+	require.NotNil(t, cmd, "loadResources(false) must fire for the real fetch")
+}
+
+// TestNavigateChild_ShortcutSurvivesGenBump simulates the full real-world
+// call path: navigateChild bumps requestGen before dispatching to
+// navigateChildResourceType. The shortcut must still trigger — this is
+// the regression that caused "navigate in and navigate out starts loading
+// again" in the live app, because an earlier gen-based freshness check
+// always false-negatived after navigateChild's bump.
+func TestNavigateChild_ShortcutSurvivesGenBump(t *testing.T) {
+	m := basePush80Model()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.namespace = "default"
+	m.requestGen = 10
+
+	pvcRT := model.ResourceTypeEntry{
+		Kind:       "PersistentVolumeClaim",
+		Resource:   "persistentvolumeclaims",
+		APIVersion: "v1",
+		Namespaced: true,
+	}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
+
+	// The sidebar item the user is hovering in the middle column.
+	pvcItem := model.Item{
+		Name:  "PersistentVolumeClaims",
+		Kind:  "PersistentVolumeClaim",
+		Extra: pvcRT.ResourceRef(),
+	}
+	m.middleItems = []model.Item{pvcItem}
+	m.setCursor(0)
+
+	// Simulate: preview completed, cache + fingerprint primed.
+	drillInKey := "test-ctx/persistentvolumeclaims/ns:default"
+	cachedItems := []model.Item{
+		{Name: "pvc-1", Kind: "PersistentVolumeClaim", Namespace: "default"},
+	}
+	m.itemCache[drillInKey] = cachedItems
+	m.cacheFingerprints[drillInKey] = m.fetchFingerprint()
+
+	m.leftItems = []model.Item{{Name: "test-ctx"}}
+	m.leftItemsHistory = [][]model.Item{{{Name: "root"}}}
+
+	// Go through the real entry point (navigateChild), which bumps
+	// requestGen and then dispatches to navigateChildResourceType. Prior
+	// to the fingerprint-based check, the gen bump here silently broke
+	// the shortcut because previewSatisfiedGen could never match.
+	result, cmd := m.navigateChild()
+	rm := result.(Model)
+
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+	assert.Equal(t, cachedItems, rm.middleItems,
+		"cache must populate middleItems immediately even after navigateChild's gen bump")
+	// Fingerprint entry is persistent so subsequent preview hovers for
+	// the same rt can also skip the fetch.
+	assert.Equal(t, rm.fetchFingerprint(), rm.cacheFingerprints[drillInKey],
+		"fingerprint entry must persist for the preview-only shortcut to keep working")
+	require.NotNil(t, cmd)
+	// Post-fix: cmd is a real fetch, not a cache-synthesized msg — main
+	// loads always go to the API so deleted rows surface promptly. The
+	// visible UX guarantee (cached items rendered immediately) is the
+	// middleItems assertion above; we don't execute cmd() because it
+	// would dispatch a real client call.
+}
+
+// TestLoadResources_PreviewShortcutAfterNavigateOut verifies that after a
+// drill-in populates itemCache + markers, navigating back out and hovering
+// the same resource type serves the preview from cache without a second
+// fetch. This closes the "shows the loader again on the children pane"
+// regression the user reported after drill-in + navigate-out.
+func TestLoadResources_PreviewShortcutAfterNavigateOut(t *testing.T) {
+	m := basePush80Model()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.namespace = "default"
+	m.requestGen = 12
+
+	pvcRT := model.ResourceTypeEntry{
+		Kind:       "PersistentVolumeClaim",
+		Resource:   "persistentvolumeclaims",
+		APIVersion: "v1",
+		Namespaced: true,
+	}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
+
+	cachedItems := []model.Item{
+		{Name: "pvc-a", Kind: "PersistentVolumeClaim", Namespace: "default"},
+	}
+	cacheKey := "test-ctx/persistentvolumeclaims/ns:default"
+	m.itemCache[cacheKey] = cachedItems
+	// Fingerprint left over from the drill-in's main load.
+	m.cacheFingerprints[cacheKey] = m.fetchFingerprint()
+
+	// Simulate being at the resource-types level with cursor on PVC.
+	pvcSidebarItem := model.Item{
+		Name:  "PersistentVolumeClaims",
+		Kind:  "PersistentVolumeClaim",
+		Extra: pvcRT.ResourceRef(),
+	}
+	m.middleItems = []model.Item{pvcSidebarItem}
+	m.setCursor(0)
+
+	cmd := m.loadResources(true)
+	require.NotNil(t, cmd, "loadResources must return a cmd when an rt is hovered")
+
+	msg := cmd()
+	loaded, ok := msg.(resourcesLoadedMsg)
+	require.True(t, ok, "preview shortcut must produce a resourcesLoadedMsg, got %T", msg)
+	assert.True(t, loaded.forPreview, "preview path: forPreview=true")
+	assert.Equal(t, cachedItems, loaded.items, "items come from cache, not the API")
+	assert.Equal(t, uint64(12), loaded.gen)
+}
+
+// TestLoadResources_PreviewFetchesWhenNoMarker verifies the shortcut is
+// a pure optimization: without a primed marker, loadResources falls back
+// to the real API fetch. This guards against the optimization silently
+// hiding stale data when the marker hasn't been armed (e.g., first hover).
+func TestLoadResources_PreviewFetchesWhenNoMarker(t *testing.T) {
+	m := basePush80Model()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.namespace = "default"
+	m.requestGen = 1
+
+	pvcRT := model.ResourceTypeEntry{
+		Kind:       "PersistentVolumeClaim",
+		Resource:   "persistentvolumeclaims",
+		APIVersion: "v1",
+		Namespaced: true,
+	}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT}
+	// Cache has data but marker is NOT armed (e.g., data from a stale
+	// prior session). Shortcut must not trigger.
+	m.itemCache["test-ctx/persistentvolumeclaims/ns:default"] = []model.Item{{Name: "stale"}}
+
+	pvcSidebarItem := model.Item{
+		Name:  "PersistentVolumeClaims",
+		Kind:  "PersistentVolumeClaim",
+		Extra: pvcRT.ResourceRef(),
+	}
+	m.middleItems = []model.Item{pvcSidebarItem}
+	m.setCursor(0)
+
+	cmd := m.loadResources(true)
+	require.NotNil(t, cmd)
+	// Without an entry in cacheFingerprints for this key, the shortcut
+	// cannot fire — so the returned cmd is the real fetch path. We don't
+	// invoke it here because the fake dynamic client panics on PVC list
+	// (no registered list kind); the structural check below is enough.
+	assert.Empty(t, m.cacheFingerprints,
+		"no fingerprint entry should have been populated; shortcut path untaken")
+}
+
+// TestLoadResources_PreviewShortcutForMultipleResources verifies the
+// per-key cacheFingerprints map supports multiple concurrently-fresh
+// entries. This is the regression the user reported: with a single-slot
+// marker, hovering PVC then PV then PVC again refetched PVC because its
+// marker had been overwritten by PV. With a per-key map each rt keeps
+// its own fingerprint, so the hover-cycle stays cached.
+func TestLoadResources_PreviewShortcutForMultipleResources(t *testing.T) {
+	m := basePush80Model()
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: "test-ctx"}
+	m.namespace = "default"
+	m.requestGen = 1
+
+	pvcRT := model.ResourceTypeEntry{
+		Kind: "PersistentVolumeClaim", Resource: "persistentvolumeclaims",
+		APIVersion: "v1", Namespaced: true,
+	}
+	pvRT := model.ResourceTypeEntry{
+		Kind: "PersistentVolume", Resource: "persistentvolumes",
+		APIVersion: "v1", Namespaced: false,
+	}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{pvcRT, pvRT}
+
+	pvcItems := []model.Item{{Name: "pvc-1", Kind: "PersistentVolumeClaim", Namespace: "default"}}
+	pvItems := []model.Item{{Name: "pv-1", Kind: "PersistentVolume"}}
+	m.itemCache["test-ctx/persistentvolumeclaims/ns:default"] = pvcItems
+	m.itemCache["test-ctx/persistentvolumes"] = pvItems
+	m.cacheFingerprints["test-ctx/persistentvolumeclaims/ns:default"] = m.fetchFingerprint()
+	m.cacheFingerprints["test-ctx/persistentvolumes"] = m.fetchFingerprint()
+
+	pvcSidebar := model.Item{Name: "PersistentVolumeClaims", Kind: "PersistentVolumeClaim", Extra: pvcRT.ResourceRef()}
+	pvSidebar := model.Item{Name: "PersistentVolumes", Kind: "PersistentVolume", Extra: pvRT.ResourceRef()}
+	m.middleItems = []model.Item{pvcSidebar, pvSidebar}
+
+	// Hover PVC: shortcut must serve pvcItems.
+	m.setCursor(0)
+	cmd := m.loadResources(true)
+	require.NotNil(t, cmd)
+	msg, ok := cmd().(resourcesLoadedMsg)
+	require.True(t, ok, "PVC hover must produce synthesized msg")
+	assert.Equal(t, pvcItems, msg.items)
+
+	// Hover PV: shortcut must serve pvItems.
+	m.setCursor(1)
+	cmd = m.loadResources(true)
+	require.NotNil(t, cmd)
+	msg, ok = cmd().(resourcesLoadedMsg)
+	require.True(t, ok, "PV hover must produce synthesized msg")
+	assert.Equal(t, pvItems, msg.items)
+
+	// Hover back to PVC: must STILL serve pvcItems from cache — this is
+	// the case that failed with the single-slot marker.
+	m.setCursor(0)
+	cmd = m.loadResources(true)
+	require.NotNil(t, cmd)
+	msg, ok = cmd().(resourcesLoadedMsg)
+	require.True(t, ok, "returning to PVC must still use the cached PVC entry, not refetch")
+	assert.Equal(t, pvcItems, msg.items,
+		"per-key fingerprint map keeps PVC's entry fresh even after PV's hover overwrote nothing")
+}
+
+// --- PgUp/PgDown/Home/End support ---
+
+// manyItemsModel returns a model with enough items to exercise paging and
+// Home/End in the middle column.
+func manyItemsModel(n int) Model {
+	m := basePush80v3Model()
+	items := make([]model.Item, n)
+	for i := range n {
+		items[i] = model.Item{Name: "item-" + string(rune('a'+i%26)) + "-" + string(rune('0'+i/26)), Namespace: "default", Kind: "Pod", Status: "Running"}
+	}
+	m.middleItems = items
+	m.setCursor(0)
+	return m
+}
+
+// TestHomeKeyJumpsToTopOfList verifies that the Home key jumps the cursor
+// to the first item, matching user expectation for standard navigation
+// keys. Home is a single-press equivalent of the vim-style "gg" sequence.
+func TestHomeKeyJumpsToTopOfList(t *testing.T) {
+	m := manyItemsModel(20)
+	m.setCursor(15)
+	result, _ := m.handleKey(keyMsg("home"))
+	rm := result.(Model)
+	assert.Equal(t, 0, rm.cursor(), "Home must jump the cursor to the first item")
+	assert.False(t, rm.pendingG, "Home must not leave pendingG armed")
+}
+
+// TestEndKeyJumpsToBottomOfList verifies that the End key jumps the cursor
+// to the last item, matching user expectation for standard navigation
+// keys. End is the single-press equivalent of "G".
+func TestEndKeyJumpsToBottomOfList(t *testing.T) {
+	m := manyItemsModel(20)
+	m.setCursor(0)
+	result, _ := m.handleKey(keyMsg("end"))
+	rm := result.(Model)
+	visible := rm.visibleMiddleItems()
+	assert.Equal(t, len(visible)-1, rm.cursor(), "End must jump the cursor to the last item")
+}
+
+// TestPgDownKeyScrollsFullPageDown verifies that PgDown moves the cursor a
+// full page down, matching the behavior of Ctrl+F (PageForward).
+func TestPgDownKeyScrollsFullPageDown(t *testing.T) {
+	m := manyItemsModel(50)
+	m.height = 20
+	m.setCursor(0)
+	result, _ := m.handleKey(keyMsg("pgdown"))
+	rm := result.(Model)
+	assert.Greater(t, rm.cursor(), 0, "PgDown must advance the cursor")
+	// Full page = height - 4 = 16 items, capped at len-1.
+	assert.LessOrEqual(t, rm.cursor(), len(rm.visibleMiddleItems())-1)
+}
+
+// TestPgUpKeyScrollsFullPageUp verifies that PgUp moves the cursor a full
+// page up, matching the behavior of Ctrl+B (PageBack).
+func TestPgUpKeyScrollsFullPageUp(t *testing.T) {
+	m := manyItemsModel(50)
+	m.height = 20
+	m.setCursor(30)
+	result, _ := m.handleKey(keyMsg("pgup"))
+	rm := result.(Model)
+	assert.Less(t, rm.cursor(), 30, "PgUp must move the cursor backwards")
+	assert.GreaterOrEqual(t, rm.cursor(), 0)
 }

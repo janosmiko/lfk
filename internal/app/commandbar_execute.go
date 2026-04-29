@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -21,16 +20,34 @@ func (m Model) kubectlEnv() []string {
 		if ctx == "" {
 			ctx = m.client.CurrentContext()
 		}
-		// Use only the kubeconfig file that defines the current context.
+		// Use only the kubeconfig file that defines the current context so
+		// kubectl doesn't trip over collapsed cluster/user names from a
+		// multi-file merge — see issue #23.
 		kubeconfigPath := m.client.KubeconfigPathForContext(ctx)
 		if kubeconfigPath != "" {
 			env = append(env, "KUBECONFIG="+kubeconfigPath)
 		}
+		// KUBECTL_CONTEXT is consumed by the helper that runs `:!` shell
+		// commands and forwarded as kubectl's default context. It must be
+		// the kubeconfig's *original* name, not lfk's potentially
+		// disambiguated display name.
 		if ctx != "" {
-			env = append(env, "KUBECTL_CONTEXT="+ctx)
+			env = append(env, "KUBECTL_CONTEXT="+m.client.OriginalContextName(ctx))
 		}
 	}
 	return env
+}
+
+// kubectlContext maps an lfk display name back to the kubectl/helm --context
+// argument it should be passed as. When two kubeconfigs declare the same
+// context name, lfk disambiguates the display name (e.g. "dev (dev-envs)");
+// this reverses that so subprocess invocations receive the literal name
+// kubectl knows.
+func (m Model) kubectlContext(displayName string) string {
+	if m.client == nil {
+		return displayName
+	}
+	return m.client.OriginalContextName(displayName)
 }
 
 // executeCommandBarInput is the main entry point for command bar execution.
@@ -124,6 +141,16 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 
 	switch canonical {
 	case "quit":
+		// Mirror the cleanup the other quit paths (closeTabOrQuit,
+		// handleQuitConfirmOverlayKey) perform before tea.Quit so that
+		// kubectl log streams started from any tab don't outlive the
+		// process. Without this, `:q` / `:q!` / `:quit` leaks the
+		// kubectl subprocess and its reader goroutine — issue #48.
+		if m.portForwardMgr != nil {
+			m.portForwardMgr.StopAll()
+		}
+		m.cancelAllTabLogStreams()
+		m.saveCurrentSession()
 		return m, tea.Quit
 
 	case "namespace":
@@ -152,21 +179,17 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		}
 		m.nav.Context = arg
 		m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
-		return m, tea.Batch(m.loadResourceTypes(), scheduleStatusClear())
+		cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
+		if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
+			cmds = append(cmds, cmd)
+		}
+		return m, tea.Batch(cmds...)
 
 	case "set":
 		return m.executeSetCommand(arg)
 
 	case "sort":
-		if arg == "" {
-			m.setStatusMessage("Usage: :sort <column>", true)
-			return m, scheduleStatusClear()
-		}
-		m.sortColumnName = arg
-		m.sortMiddleItems()
-		m.clampCursor()
-		m.setStatusMessage(fmt.Sprintf("Sort by %s", arg), false)
-		return m, scheduleStatusClear()
+		return m.executeSortCommand(arg)
 
 	case "export":
 		lower := strings.ToLower(arg)
@@ -201,15 +224,70 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.tasksOverlayScroll = 0
 		return m, nil
 
+	// Quick aliases for hotkey-only behaviors so they're discoverable via
+	// command-palette autocomplete without forcing the user to memorize
+	// single-letter chords.
+	case "errors", "warnings":
+		// Equivalent to the `!` hotkey on the Events list -- toggles the
+		// "warnings only" filter. No-op (with status hint) when invoked
+		// outside the Events view since there's nothing to filter.
+		if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "Event" {
+			m.warningEventsOnly = !m.warningEventsOnly
+			m.rebuildEventsFromCache()
+			if m.warningEventsOnly {
+				m.setStatusMessage("Showing warnings only", false)
+			} else {
+				m.setStatusMessage("Showing all events", false)
+			}
+			return m, scheduleStatusClear()
+		}
+		m.setStatusMessage(":errors only applies to the Events view", true)
+		return m, scheduleStatusClear()
+
+	case "bookmarks":
+		m.overlay = overlayBookmarks
+		m.bookmarkSearchMode = bookmarkModeNormal
+		m.bookmarkFilter.Clear()
+		m.bookmarkLoadNamespace = false
+		return m, nil
+
+	case "reload", "refresh":
+		// Force-fetch the current resource list -- equivalent to Shift+R.
+		// Useful when watch mode is off or the user wants an immediate
+		// refresh after a kubectl apply outside lfk.
+		m.setStatusMessage("Reloading...", false)
+		return m, tea.Batch(m.loadResources(false), scheduleStatusClear())
+
 	default:
 		m.setStatusMessage(fmt.Sprintf("Unknown command: %s", canonical), true)
 		return m, scheduleStatusClear()
 	}
 }
 
+// executeSortCommand handles the :sort builtin command. At LevelClusters
+// and LevelResourceTypes the sort engine early-returns, so accepting :sort
+// silently would mutate sortColumnName and emit a misleading "Sort by ..."
+// status while items stayed put. Surface that as an explicit error so the
+// user understands why the typed command had no effect.
+func (m Model) executeSortCommand(arg string) (tea.Model, tea.Cmd) {
+	if arg == "" {
+		m.setStatusMessage("Usage: :sort <column>", true)
+		return m, scheduleStatusClear()
+	}
+	if !m.sortApplies() {
+		m.setStatusMessage("Sort is not available at this level", true)
+		return m, scheduleStatusClear()
+	}
+	m.sortColumnName = arg
+	m.sortMiddleItems()
+	m.clampCursor()
+	m.setStatusMessage(fmt.Sprintf("Sort by %s", arg), false)
+	return m, scheduleStatusClear()
+}
+
 // executeSetCommand handles the :set builtin command.
 // It toggles log viewer options: wrap/nowrap, linenumbers/nolinenumbers,
-// timestamps/notimestamps, follow/nofollow.
+// timestamps/notimestamps, follow/nofollow, ansi/noansi.
 func (m Model) executeSetCommand(option string) (tea.Model, tea.Cmd) {
 	switch strings.ToLower(strings.TrimSpace(option)) {
 	case "wrap":
@@ -236,6 +314,12 @@ func (m Model) executeSetCommand(option string) (tea.Model, tea.Cmd) {
 	case "nofollow":
 		m.logFollow = false
 		m.setStatusMessage("Log follow OFF", false)
+	case "ansi":
+		ui.ConfigLogRenderAnsi = true
+		m.setStatusMessage("Log ANSI rendering ON", false)
+	case "noansi":
+		ui.ConfigLogRenderAnsi = false
+		m.setStatusMessage("Log ANSI rendering OFF", false)
 	default:
 		m.setStatusMessage(fmt.Sprintf("Unknown set option: %s", option), true)
 	}
@@ -393,6 +477,10 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 		return nil
 	}
 
+	// Decide this BEFORE injectKubectlDefaults adds `--context` / `-n`
+	// so the positional-arg detection sees the user's original shape.
+	affectsNamespaces := commandAffectsNamespaces(args)
+
 	args = m.injectKubectlDefaults(args)
 
 	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl %s", strings.Join(args, " ")))
@@ -410,11 +498,37 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	c := exec.Command("sh", "-c", shellCmd)
 	c.Env = m.kubectlEnv()
 
-	logger.Info("Running kubectl command", "cmd", shellCmd)
+	logExecCmd("Running kubectl command", c)
 
 	return tea.ExecProcess(c, func(err error) tea.Msg {
-		return actionResultMsg{err: err}
+		return actionResultMsg{err: err, invalidateNamespaceCache: affectsNamespaces}
 	})
+}
+
+// commandAffectsNamespaces reports whether a kubectl command (args
+// without the "kubectl"/"k" prefix) looks like it mutates the cluster's
+// Namespace list. Matches `create|delete|replace (ns|namespace|namespaces) ...`.
+// Read-only verbs (`get`, `describe`) are excluded so they don't force
+// an unnecessary cache refresh, and `apply -f <file>` is not inspected
+// (template applies invalidate unconditionally instead). False
+// positives only cost one extra GetNamespaces call, so the heuristic
+// favours breadth.
+func commandAffectsNamespaces(args []string) bool {
+	if len(args) < 2 {
+		return false
+	}
+	switch args[0] {
+	case "create", "delete", "replace":
+	default:
+		return false
+	}
+	for _, a := range args[1:] {
+		switch a {
+		case "ns", "namespace", "namespaces":
+			return true
+		}
+	}
+	return false
 }
 
 // injectKubectlDefaults scans the args for --context, -n/--namespace, and
@@ -440,7 +554,7 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 	copy(result, args)
 
 	if !hasContext && m.nav.Context != "" {
-		result = append(result, "--context", m.nav.Context)
+		result = append(result, "--context", m.kubectlContext(m.nav.Context))
 	}
 
 	if !hasNamespace && !hasAllNamespaces {

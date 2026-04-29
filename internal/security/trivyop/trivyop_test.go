@@ -50,21 +50,21 @@ func TestIsAvailableCRDReachable(t *testing.T) {
 
 func TestParseVulnerabilityReport(t *testing.T) {
 	u := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "aquasecurity.github.io/v1alpha1",
 			"kind":       "VulnerabilityReport",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": "prod",
 				"name":      "deployment-api-container-app",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"trivy-operator.resource.kind":  "Deployment",
 					"trivy-operator.resource.name":  "api",
 					"trivy-operator.container.name": "app",
 				},
 			},
-			"report": map[string]interface{}{
-				"vulnerabilities": []interface{}{
-					map[string]interface{}{
+			"report": map[string]any{
+				"vulnerabilities": []any{
+					map[string]any{
 						"vulnerabilityID":  "CVE-2024-0001",
 						"severity":         "CRITICAL",
 						"resource":         "openssl",
@@ -74,7 +74,7 @@ func TestParseVulnerabilityReport(t *testing.T) {
 						"description":      "A flaw was found...",
 						"primaryLink":      "https://nvd.nist.gov/vuln/detail/CVE-2024-0001",
 					},
-					map[string]interface{}{
+					map[string]any{
 						"vulnerabilityID":  "CVE-2024-0002",
 						"severity":         "HIGH",
 						"resource":         "glibc",
@@ -104,42 +104,42 @@ func TestParseVulnerabilityReport(t *testing.T) {
 }
 
 func TestParseVulnerabilityReportEmpty(t *testing.T) {
-	u := &unstructured.Unstructured{Object: map[string]interface{}{
-		"report": map[string]interface{}{"vulnerabilities": []interface{}{}},
+	u := &unstructured.Unstructured{Object: map[string]any{
+		"report": map[string]any{"vulnerabilities": []any{}},
 	}}
 	findings := parseVulnerabilityReport(u)
 	assert.Empty(t, findings)
 }
 
 func TestParseVulnerabilityReportMalformed(t *testing.T) {
-	u := &unstructured.Unstructured{Object: map[string]interface{}{"weird": 123}}
+	u := &unstructured.Unstructured{Object: map[string]any{"weird": 123}}
 	findings := parseVulnerabilityReport(u)
 	assert.Empty(t, findings, "malformed report must not panic and must return empty")
 }
 
 func TestParseConfigAuditReport(t *testing.T) {
 	u := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "aquasecurity.github.io/v1alpha1",
 			"kind":       "ConfigAuditReport",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": "prod",
 				"name":      "daemonset-agent",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"trivy-operator.resource.kind": "DaemonSet",
 					"trivy-operator.resource.name": "agent",
 				},
 			},
-			"report": map[string]interface{}{
-				"checks": []interface{}{
-					map[string]interface{}{
+			"report": map[string]any{
+				"checks": []any{
+					map[string]any{
 						"checkID":     "KSV001",
 						"severity":    "HIGH",
 						"title":       "Process can elevate its own privileges",
 						"description": "A program inside the container can elevate its own privileges...",
 						"success":     false,
 					},
-					map[string]interface{}{
+					map[string]any{
 						"checkID":  "KSV002",
 						"severity": "LOW",
 						"title":    "Default AppArmor profile not set",
@@ -162,20 +162,20 @@ func TestParseConfigAuditReport(t *testing.T) {
 
 func TestFetchAggregatesBothCRDs(t *testing.T) {
 	vuln := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "aquasecurity.github.io/v1alpha1",
 			"kind":       "VulnerabilityReport",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": "prod", "name": "v1",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"trivy-operator.resource.kind":  "Deployment",
 					"trivy-operator.resource.name":  "api",
 					"trivy-operator.container.name": "app",
 				},
 			},
-			"report": map[string]interface{}{
-				"vulnerabilities": []interface{}{
-					map[string]interface{}{
+			"report": map[string]any{
+				"vulnerabilities": []any{
+					map[string]any{
 						"vulnerabilityID": "CVE-1", "severity": "CRITICAL", "resource": "openssl",
 					},
 				},
@@ -183,19 +183,19 @@ func TestFetchAggregatesBothCRDs(t *testing.T) {
 		},
 	}
 	audit := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "aquasecurity.github.io/v1alpha1",
 			"kind":       "ConfigAuditReport",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"namespace": "prod", "name": "a1",
-				"labels": map[string]interface{}{
+				"labels": map[string]any{
 					"trivy-operator.resource.kind": "Deployment",
 					"trivy-operator.resource.name": "api",
 				},
 			},
-			"report": map[string]interface{}{
-				"checks": []interface{}{
-					map[string]interface{}{
+			"report": map[string]any{
+				"checks": []any{
+					map[string]any{
 						"checkID": "KSV001", "severity": "HIGH", "title": "Priv esc", "success": false,
 					},
 				},
@@ -225,19 +225,19 @@ func TestFetchAggregatesBothCRDs(t *testing.T) {
 func TestFetchNamespaceFilter(t *testing.T) {
 	make := func(ns, name string) *unstructured.Unstructured {
 		return &unstructured.Unstructured{
-			Object: map[string]interface{}{
+			Object: map[string]any{
 				"apiVersion": "aquasecurity.github.io/v1alpha1",
 				"kind":       "VulnerabilityReport",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"namespace": ns, "name": name,
-					"labels": map[string]interface{}{
+					"labels": map[string]any{
 						"trivy-operator.resource.kind": "Deployment",
 						"trivy-operator.resource.name": name,
 					},
 				},
-				"report": map[string]interface{}{
-					"vulnerabilities": []interface{}{
-						map[string]interface{}{
+				"report": map[string]any{
+					"vulnerabilities": []any{
+						map[string]any{
 							"vulnerabilityID": "CVE-X", "severity": "HIGH",
 						},
 					},

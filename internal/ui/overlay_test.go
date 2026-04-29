@@ -217,7 +217,7 @@ func TestRenderPodSelectOverlay_FilterActive(t *testing.T) {
 
 func TestRenderBookmarkOverlay(t *testing.T) {
 	t.Run("no bookmarks", func(t *testing.T) {
-		result := RenderBookmarkOverlay(nil, "", 0, 0)
+		result := RenderBookmarkOverlay(nil, "", 0, 0, false)
 		assert.Contains(t, result, "No bookmarks yet")
 	})
 
@@ -226,7 +226,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "My Pods", Namespace: "default"},
 			{Name: "Deployments", Namespace: "staging"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "My Pods [default]")
 		assert.Contains(t, result, "Deployments [staging]")
 	})
@@ -236,20 +236,20 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "My Pods"},
 			{Name: "Deployments"},
 		}
-		result := RenderBookmarkOverlay(bms, "pod", 0, 1)
+		result := RenderBookmarkOverlay(bms, "pod", 0, 1, false)
 		assert.Contains(t, result, "filter>")
 		assert.Contains(t, result, "pod")
 	})
 
 	t.Run("filtered no match", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "Pods"}}
-		result := RenderBookmarkOverlay(bms, "zzz", 0, 0)
+		result := RenderBookmarkOverlay(bms, "zzz", 0, 0, false)
 		assert.Contains(t, result, "No matching bookmarks")
 	})
 
 	t.Run("bookmark with namespace shows bracket", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "My Pods", Namespace: "production"}}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "production")
 	})
 
@@ -259,7 +259,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "With Slot B", Slot: "b"},
 			{Name: "No Slot"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "a")
 		assert.Contains(t, result, "With Slot A")
 		assert.Contains(t, result, "b")
@@ -269,7 +269,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 
 	t.Run("normal mode shows bookmark content", func(t *testing.T) {
 		bms := []model.Bookmark{{Name: "Test"}}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "Test")
 	})
 
@@ -277,7 +277,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 		bms := []model.Bookmark{
 			{Name: "Context-aware Mark", Slot: "A", Context: "prod-cluster"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "Context-aware Mark")
 		assert.NotContains(t, result, "[L]",
 			"bookmark picker must not render the legacy [L] tag")
@@ -289,7 +289,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 		bms := []model.Bookmark{
 			{Name: "Context-free Mark", Slot: "a"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "Context-free Mark")
 		assert.NotContains(t, result, "[L]",
 			"bookmark picker must not render the legacy [L] tag")
@@ -303,7 +303,7 @@ func TestRenderBookmarkOverlay(t *testing.T) {
 			{Name: "Context-free Deploys", Slot: "a"},
 			{Name: "Context-aware Svcs", Slot: "B", Context: "prod-cluster"},
 		}
-		result := RenderBookmarkOverlay(bms, "", 0, 0)
+		result := RenderBookmarkOverlay(bms, "", 0, 0, false)
 		assert.Contains(t, result, "Context-aware Pods")
 		assert.Contains(t, result, "Context-free Deploys")
 		assert.Contains(t, result, "Context-aware Svcs")
@@ -965,7 +965,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 func TestRenderDiffView(t *testing.T) {
 	t.Run("identical content shows no colored lines", func(t *testing.T) {
 		yaml := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test"
-		result := RenderDiffView(yaml, yaml, "pod-a", "pod-b", 0, 80, 30, false, false, "", nil, nil, false, "", 0, DiffVisualParams{})
+		result := RenderDiffView(yaml, yaml, "pod-a", "pod-b", 0, 80, 30, false, false, "", nil, nil, false, "", 0, DiffVisualParams{}, "")
 		assert.Contains(t, result, "Resource Diff")
 		assert.Contains(t, result, "pod-a")
 		assert.Contains(t, result, "pod-b")
@@ -975,7 +975,7 @@ func TestRenderDiffView(t *testing.T) {
 	t.Run("different content shows both sides", func(t *testing.T) {
 		left := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: left-pod"
 		right := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: right-pod"
-		result := RenderDiffView(left, right, "left", "right", 0, 80, 30, false, false, "", nil, nil, false, "", 0, DiffVisualParams{})
+		result := RenderDiffView(left, right, "left", "right", 0, 80, 30, false, false, "", nil, nil, false, "", 0, DiffVisualParams{}, "")
 		assert.Contains(t, result, "Resource Diff")
 		assert.Contains(t, result, "left")
 		assert.Contains(t, result, "right")
@@ -984,7 +984,7 @@ func TestRenderDiffView(t *testing.T) {
 	})
 
 	t.Run("empty content renders without panic", func(t *testing.T) {
-		result := RenderDiffView("", "", "a", "b", 0, 80, 20, false, false, "", nil, nil, false, "", 0, DiffVisualParams{})
+		result := RenderDiffView("", "", "a", "b", 0, 80, 20, false, false, "", nil, nil, false, "", 0, DiffVisualParams{}, "")
 		assert.Contains(t, result, "Resource Diff")
 	})
 
@@ -994,8 +994,8 @@ func TestRenderDiffView(t *testing.T) {
 			lines = append(lines, fmt.Sprintf("line-%d: value", i))
 		}
 		yaml := strings.Join(lines, "\n")
-		result0 := RenderDiffView(yaml, yaml, "a", "b", 0, 80, 20, false, false, "", nil, nil, false, "", 0, DiffVisualParams{})
-		result10 := RenderDiffView(yaml, yaml, "a", "b", 10, 80, 20, false, false, "", nil, nil, false, "", 0, DiffVisualParams{})
+		result0 := RenderDiffView(yaml, yaml, "a", "b", 0, 80, 20, false, false, "", nil, nil, false, "", 0, DiffVisualParams{}, "")
+		result10 := RenderDiffView(yaml, yaml, "a", "b", 10, 80, 20, false, false, "", nil, nil, false, "", 0, DiffVisualParams{}, "")
 		// First line visible at scroll 0 should differ from scroll 10.
 		assert.Contains(t, result0, "line-0")
 		assert.NotContains(t, result10, "line-0")
@@ -1003,7 +1003,7 @@ func TestRenderDiffView(t *testing.T) {
 	})
 
 	t.Run("shows hint bar", func(t *testing.T) {
-		result := RenderDiffView("a: 1", "a: 2", "x", "y", 0, 140, 20, false, false, "", nil, nil, false, "", 0, DiffVisualParams{})
+		result := RenderDiffView("a: 1", "a: 2", "x", "y", 0, 140, 20, false, false, "", nil, nil, false, "", 0, DiffVisualParams{}, "")
 		assert.Contains(t, result, "j/k")
 		assert.Contains(t, result, "q/esc")
 	})

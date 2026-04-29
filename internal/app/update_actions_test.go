@@ -208,6 +208,9 @@ func TestPush2RefreshCurrentLevelClusters(t *testing.T) {
 func TestPush2RefreshCurrentLevelResourceTypes(t *testing.T) {
 	m := basePush80v2Model()
 	m.nav.Level = model.LevelResourceTypes
+	m.discoveredResources[m.nav.Context] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	cmd := m.refreshCurrentLevel()
 	require.NotNil(t, cmd)
 }
@@ -580,6 +583,9 @@ func TestCovRefreshCurrentLevelResourceTypes(t *testing.T) {
 	m := baseModelActions()
 	m.nav.Level = model.LevelResourceTypes
 	m.nav.Context = "ctx"
+	m.discoveredResources["ctx"] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	cmd := m.refreshCurrentLevel()
 	assert.NotNil(t, cmd)
 }
@@ -693,6 +699,9 @@ func TestCovRefreshCurrentLevelClustersFakeClient(t *testing.T) {
 func TestCovRefreshCurrentLevelResourceTypesFakeClient(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.nav.Level = model.LevelResourceTypes
+	m.discoveredResources[m.nav.Context] = []model.ResourceTypeEntry{
+		{DisplayName: "Pods", Kind: "Pod", APIVersion: "v1", Resource: "pods"},
+	}
 	cmd := m.refreshCurrentLevel()
 	assert.NotNil(t, cmd)
 }
@@ -2195,7 +2204,17 @@ func TestExecuteActionSecurityFindingsFiltersToResource(t *testing.T) {
 
 	m := baseExplorerModel()
 	m.nav.Level = model.LevelResources
+	m.nav.Context = "test-ctx"
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment"}
+	// navigateParent (called by ascendToResourceTypes) shows the loader
+	// instead of m.leftItems unless discoveredResources for the context
+	// is non-empty — without this the security-source list ends up empty
+	// after the ascend and the action bails out with "No sources".
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"test-ctx": {
+			{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+		},
+	}
 	m.middleItems = []model.Item{
 		{Name: "api", Kind: "Deployment", Namespace: "prod"},
 	}

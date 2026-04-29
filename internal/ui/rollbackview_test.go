@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// --- formatAge ---
+// --- FormatAge ---
 
 func TestFormatAge(t *testing.T) {
 	tests := []struct {
@@ -29,12 +29,12 @@ func TestFormatAge(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := formatAge(time.Now().Add(-tt.offset))
+			result := FormatAge(time.Now().Add(-tt.offset))
 			assert.Equal(t, tt.expected, result)
 		})
 	}
 
 	t.Run("zero time returns dash", func(t *testing.T) {
-		assert.Equal(t, "-", formatAge(time.Time{}))
+		assert.Equal(t, "-", FormatAge(time.Time{}))
 	})
 }

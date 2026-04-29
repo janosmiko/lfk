@@ -215,3 +215,38 @@ func TestYAMLScrollToMatchFolded(t *testing.T) {
 		assert.Equal(t, 0, m.yamlCursor) // unchanged
 	})
 }
+
+// --- yamlNextIntraLineMatch ---
+
+func TestYamlNextIntraLineMatch(t *testing.T) {
+	t.Run("forward does not panic when cursor col exceeds line length", func(t *testing.T) {
+		// Regression: yamlVisualCurCol carries over from a previously
+		// focused long line. When `n` triggers an intra-line search and
+		// the current line is shorter than yamlVisualCurCol+1, the
+		// rune-slice indexing must not panic.
+		m := Model{
+			yamlContent:      "short\nfoo: target here",
+			yamlCursor:       0,
+			yamlVisualCurCol: 900, // far beyond "short"
+			yamlSearchText:   TextInput{Value: "target"},
+			yamlCollapsed:    map[string]bool{},
+		}
+		var found bool
+		assert.NotPanics(t, func() { found = m.yamlNextIntraLineMatch(true) })
+		assert.False(t, found, "no match expected on the short current line")
+	})
+
+	t.Run("backward does not panic when cursor col exceeds line length", func(t *testing.T) {
+		// Same regression for the backward path (N / shift-n).
+		m := Model{
+			yamlContent:      "foo: target here\nshort",
+			yamlCursor:       1,
+			yamlVisualCurCol: 900, // far beyond "short"
+			yamlSearchText:   TextInput{Value: "target"},
+			yamlCollapsed:    map[string]bool{},
+		}
+		var found bool
+		assert.NotPanics(t, func() { found = m.yamlNextIntraLineMatch(false) })
+		assert.False(t, found, "no match expected on the short current line")
+	})
+}

@@ -99,6 +99,15 @@ func intToStr(n int) string {
 // appear under the synthetic "Advanced" category.
 func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups []Item) {
 	for _, rt := range discovered {
+		// Skip resources the server cannot list. Review APIs
+		// (tokenreviews, subjectaccessreviews, selfsubject*reviews) are
+		// create-only, so surfacing them anywhere in the sidebar just
+		// produces 405 "method not allowed" errors when the user
+		// navigates to them. Entries with empty Verbs (pseudo-resources,
+		// seed data) are treated as listable.
+		if !rt.CanList() {
+			continue
+		}
 		key := rt.APIGroup + "/" + rt.Resource
 		if meta, ok := BuiltInMetadata[key]; ok {
 			if meta.Rare && !ShowRareResources {
@@ -110,6 +119,20 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 				Extra:      rt.ResourceRef(),
 				Category:   meta.Category,
 				Icon:       meta.Icon,
+				Deprecated: rt.Deprecated,
+			})
+			continue
+		}
+		if cat, ok := GroupCategoryFallback[rt.APIGroup]; ok {
+			// Upstream introduced a resource that hasn't been curated in
+			// BuiltInMetadata yet — surface it in the mapped category with
+			// the generic CRD glyph so it's visible instead of hidden.
+			categorized = append(categorized, Item{
+				Name:       titleCaseFirst(rt.Resource),
+				Kind:       rt.Kind,
+				Extra:      rt.ResourceRef(),
+				Category:   cat,
+				Icon:       Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"},
 				Deprecated: rt.Deprecated,
 			})
 			continue
@@ -243,6 +266,11 @@ func itemOrderRank(it Item) (int, bool) {
 		return 0, false
 	}
 	key := parts[0] + "/" + parts[2]
-	rank, ok := BuiltInOrderRank[key]
-	return rank, ok
+	if rank, ok := BuiltInOrderRank[key]; ok {
+		return rank, true
+	}
+	if rank, ok := GroupFallbackRank[parts[0]]; ok {
+		return rank, true
+	}
+	return 0, false
 }

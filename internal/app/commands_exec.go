@@ -26,7 +26,7 @@ func (m Model) execKubectlExec() tea.Cmd {
 	}
 
 	ns := m.actionNamespace()
-	args := []string{"exec", "-it", m.actionCtx.name, "-n", ns, "--context", m.actionCtx.context}
+	args := []string{"exec", "-it", m.actionCtx.name, "-n", ns, "--context", m.kubectlContext(m.actionCtx.context)}
 	if m.actionCtx.containerName != "" {
 		args = append(args, "-c", m.actionCtx.containerName)
 	}
@@ -34,7 +34,7 @@ func (m Model) execKubectlExec() tea.Cmd {
 
 	logger.Info("Starting kubectl exec", "args", strings.Join(args, " "))
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 
 	if ui.ConfigTerminalMode == "pty" {
 		cols := m.width - 4
@@ -63,14 +63,14 @@ func (m Model) execKubectlAttach() tea.Cmd {
 	}
 
 	ns := m.actionNamespace()
-	args := []string{"attach", "-it", m.actionCtx.name, "-n", ns, "--context", m.actionCtx.context}
+	args := []string{"attach", "-it", m.actionCtx.name, "-n", ns, "--context", m.kubectlContext(m.actionCtx.context)}
 	if m.actionCtx.containerName != "" {
 		args = append(args, "-c", m.actionCtx.containerName)
 	}
 
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-	logger.Info("Running kubectl command", "cmd", cmd.String())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
+	logExecCmd("Running kubectl command", cmd)
 
 	if ui.ConfigTerminalMode == "pty" {
 		cols := m.width - 4
@@ -100,14 +100,14 @@ func (m Model) execKubectlEdit() tea.Cmd {
 
 	ns := m.actionNamespace()
 	rt := m.actionCtx.resourceType
-	args := []string{"edit", rt.Resource, m.actionCtx.name, "--context", m.actionCtx.context}
+	args := []string{"edit", rt.Resource, m.actionCtx.name, "--context", m.kubectlContext(m.actionCtx.context)}
 	if rt.Namespaced {
 		args = append(args, "-n", ns)
 	}
 
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-	logger.Info("Running kubectl command", "cmd", cmd.String())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
+	logExecCmd("Running kubectl command", cmd)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			logger.Error("kubectl edit failed", "cmd", cmd.String(), "error", err)
@@ -127,7 +127,7 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 	ns := m.actionNamespace()
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
-	args := []string{"describe", rt.Resource, name, "--context", m.actionCtx.context}
+	args := []string{"describe", rt.Resource, name, "--context", m.kubectlContext(m.actionCtx.context)}
 	if rt.Namespaced {
 		args = append(args, "-n", ns)
 	}
@@ -136,8 +136,8 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 
 	return m.trackBgTask(bgtasks.KindSubprocess, title, bgtaskTarget(m.actionCtx.context, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-		logger.Info("Running kubectl command", "cmd", cmd.String())
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
+		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Error("kubectl describe failed", "cmd", cmd.String(), "error", err, "output", string(output))
@@ -164,11 +164,11 @@ func (m Model) execKubectlDebug() tea.Cmd {
 	}
 
 	ns := m.actionNamespace()
-	args := []string{"debug", m.actionCtx.name, "-it", "--image=busybox", "--context", m.actionCtx.context, "-n", ns}
+	args := []string{"debug", m.actionCtx.name, "-it", "--image=busybox", "--context", m.kubectlContext(m.actionCtx.context), "-n", ns}
 
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-	logger.Info("Running kubectl command", "cmd", cmd.String())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
+	logExecCmd("Running kubectl command", cmd)
 
 	if ui.ConfigTerminalMode == "pty" {
 		cols := m.width - 4
@@ -204,13 +204,13 @@ func (m Model) runDebugPod() tea.Cmd {
 
 	args := []string{
 		"run", podName, "--image=alpine", "--rm", "-it",
-		"--restart=Never", "-n", ns, "--context", ctx, "--", "sh",
+		"--restart=Never", "-n", ns, "--context", m.kubectlContext(ctx), "--", "sh",
 	}
 
 	logger.Info("Running debug pod", "pod", podName, "namespace", ns, "context", ctx)
 
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 
 	if ui.ConfigTerminalMode == "pty" {
 		cols := m.width - 4
@@ -279,13 +279,13 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 	// Use kubectl run with overrides to mount the PVC.
 	args := []string{
 		"run", podName, "--image=alpine", "-it", "--rm",
-		"--restart=Never", "--context", ctx, "-n", ns,
+		"--restart=Never", "--context", m.kubectlContext(ctx), "-n", ns,
 		"--overrides", manifest, "--", "sh",
 	}
 
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-	logger.Info("Running kubectl command", "cmd", cmd.String())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
+	logExecCmd("Running kubectl command", cmd)
 
 	if ui.ConfigTerminalMode == "pty" {
 		cols := m.width - 4
@@ -345,7 +345,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 	logger.Info("Force deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
 
 	deleteArgs := []string{
-		"delete", rt.Resource, name, "--context", ctx,
+		"delete", rt.Resource, name, "--context", m.kubectlContext(ctx),
 		"--grace-period=0", "--force",
 	}
 	if rt.Namespaced {
@@ -354,8 +354,8 @@ func (m Model) forceDeleteResource() tea.Cmd {
 
 	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Force delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, deleteArgs...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-		logger.Info("Running kubectl command", "cmd", cmd.String())
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
+		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			logger.Error("kubectl force delete failed", "cmd", cmd.String(), "error", err, "output", string(output))
 			return actionResultMsg{err: fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))}
@@ -379,7 +379,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 	logger.Info("Removing finalizers from resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
 
 	patchArgs := []string{
-		"patch", rt.Resource, name, "--context", ctx,
+		"patch", rt.Resource, name, "--context", m.kubectlContext(ctx),
 		"--type", "merge", "-p", `{"metadata":{"finalizers":null}}`,
 	}
 	if rt.Namespaced {
@@ -388,8 +388,8 @@ func (m Model) removeFinalizers() tea.Cmd {
 
 	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Remove finalizers: %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, patchArgs...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-		logger.Info("Running kubectl command", "cmd", cmd.String())
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
+		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
 			logger.Error("kubectl patch failed", "cmd", cmd.String(), "error", err, "output", string(output))
 			return actionResultMsg{err: fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))}
@@ -411,10 +411,10 @@ func (m Model) uninstallHelmRelease() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	args := []string{"uninstall", name, "-n", ns, "--kube-context", ctx}
+	args := []string{"uninstall", name, "-n", ns, "--kube-context", m.kubectlContext(ctx)}
 
 	cmd := exec.Command(helmPath, args...)
-	logger.Info("Running helm command", "cmd", cmd.String())
+	logExecCmd("Running helm command", cmd)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			logger.Error("helm uninstall failed", "cmd", cmd.String(), "error", err)
@@ -437,7 +437,10 @@ func (m Model) editHelmValues() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
+	// helm only knows the kubeconfig's literal context name, not lfk's
+	// disambiguated display form, so translate before embedding the script.
+	helmCtx := m.kubectlContext(ctx)
 
 	// Build a shell script that: gets values -> writes to temp file -> opens editor ->
 	// checks for changes -> applies with helm upgrade --reuse-values using the
@@ -496,7 +499,7 @@ if ! $HELM upgrade "$RELEASE" "$CHART_NAME" -n "$NS" --kube-context "$CTX" --reu
 fi
 rm -f "$TMPFILE"
 `,
-		helmPath, name, ns, ctx, kubeconfigPaths,
+		helmPath, name, ns, helmCtx, kubeconfigPaths,
 	)
 
 	cmd := exec.Command("sh", "-c", script)
@@ -527,13 +530,13 @@ func (m Model) helmDiff() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
 	return m.trackBgTask(bgtasks.KindSubprocess, "Helm diff: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
 		env := append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 
 		// Resolve bare chart name from the release (e.g. "cilium-1.16.0" -> "cilium").
-		chartName := resolveHelmChartName(helmPath, name, ns, ctx, kubeconfigPaths)
+		chartName := resolveHelmChartName(helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths)
 
 		// Try to get true default values via "helm show values <repo/chart>".
 		defaultOut, leftLabel := helmShowDefaultValues(helmPath, chartName, env)
@@ -541,7 +544,7 @@ func (m Model) helmDiff() tea.Cmd {
 		// If we couldn't get true defaults, fall back to merged values.
 		if defaultOut == "" {
 			logger.Info("helm show values unavailable, falling back to --all", "chart", chartName)
-			allArgs := []string{"get", "values", name, "--all", "-n", ns, "--kube-context", ctx, "-o", "yaml"}
+			allArgs := []string{"get", "values", name, "--all", "-n", ns, "--kube-context", m.kubectlContext(ctx), "-o", "yaml"}
 			allCmd := exec.Command(helmPath, allArgs...)
 			allCmd.Env = env
 			allOut, allErr := allCmd.CombinedOutput()
@@ -553,10 +556,10 @@ func (m Model) helmDiff() tea.Cmd {
 		}
 
 		// Get user-supplied values only.
-		userArgs := []string{"get", "values", name, "-n", ns, "--kube-context", ctx, "-o", "yaml"}
+		userArgs := []string{"get", "values", name, "-n", ns, "--kube-context", m.kubectlContext(ctx), "-o", "yaml"}
 		userCmd := exec.Command(helmPath, userArgs...)
 		userCmd.Env = env
-		logger.Info("Running helm command", "cmd", userCmd.String())
+		logExecCmd("Running helm command", userCmd)
 		userOut, userErr := userCmd.CombinedOutput()
 		if userErr != nil {
 			return diffLoadedMsg{err: fmt.Errorf("getting user values: %w: %s", userErr, strings.TrimSpace(string(userOut)))}
@@ -572,7 +575,8 @@ func (m Model) helmDiff() tea.Cmd {
 }
 
 // resolveHelmChartName extracts the bare chart name from "helm list" output.
-// Returns empty string on failure.
+// Returns empty string on failure. ctx must already be the kubeconfig's
+// literal context name (callers should translate via Model.kubectlContext).
 func resolveHelmChartName(helmPath, release, ns, ctx, kubeconfigPaths string) string {
 	args := []string{"list", "-n", ns, "--kube-context", ctx, "--filter", "^" + release + "$", "-o", "json"}
 	cmd := exec.Command(helmPath, args...)
@@ -612,7 +616,7 @@ func helmShowDefaultValues(helmPath, chartName string, env []string) (string, st
 	searchArgs := []string{"search", "repo", chartName, "-o", "json"}
 	searchCmd := exec.Command(helmPath, searchArgs...)
 	searchCmd.Env = env
-	logger.Info("Running helm command", "cmd", searchCmd.String())
+	logExecCmd("Running helm command", searchCmd)
 	searchOut, searchErr := searchCmd.CombinedOutput()
 	if searchErr != nil {
 		return "", ""
@@ -628,7 +632,7 @@ func helmShowDefaultValues(helmPath, chartName string, env []string) (string, st
 	showArgs := []string{"show", "values", repoChart}
 	showCmd := exec.Command(helmPath, showArgs...)
 	showCmd.Env = env
-	logger.Info("Running helm command", "cmd", showCmd.String())
+	logExecCmd("Running helm command", showCmd)
 	showOut, showErr := showCmd.CombinedOutput()
 	if showErr != nil {
 		return "", ""
@@ -670,7 +674,7 @@ func (m Model) helmUpgrade() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
 	// Build a shell script that resolves the chart and runs helm upgrade --reuse-values.
 	script := fmt.Sprintf(`
@@ -693,7 +697,7 @@ fi
 echo "Upgrading $RELEASE with chart $CHART_NAME..."
 $HELM upgrade "$RELEASE" "$CHART_NAME" -n "$NS" --kube-context "$CTX" --reuse-values
 `,
-		helmPath, name, ns, ctx, kubeconfigPaths,
+		helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths,
 	)
 
 	cmd := exec.Command("sh", "-c", script)
@@ -728,7 +732,7 @@ func (m Model) vulnScanImage(image string) tea.Cmd {
 		args := []string{"image", "--scanners", "vuln", "--format", "table", "--no-progress", image}
 		cmd := exec.Command(trivyPath, args...)
 		cmd.Env = os.Environ()
-		logger.Info("Running trivy command", "cmd", cmd.String())
+		logExecCmd("Running trivy command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		content := cleanANSI(strings.TrimSpace(string(output)))
 		if cmdErr != nil {
@@ -843,13 +847,13 @@ func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
 	return m.trackBgTask(bgtasks.KindSubprocess, fmt.Sprintf("Helm rollback: %s@%d", name, revision), bgtaskTarget(ctx, ns), func() tea.Msg {
-		args := []string{"rollback", name, fmt.Sprintf("%d", revision), "-n", ns, "--kube-context", ctx}
+		args := []string{"rollback", name, fmt.Sprintf("%d", revision), "-n", ns, "--kube-context", m.kubectlContext(ctx)}
 		cmd := exec.Command(helmPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logger.Info("Running helm command", "cmd", cmd.String())
+		logExecCmd("Running helm command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			logger.Error("helm rollback failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
@@ -878,13 +882,13 @@ func (m Model) execKubectlDrain() tea.Cmd {
 	}
 	name := m.actionCtx.name
 	args := []string{
-		"drain", name, "--context", m.actionCtx.context,
+		"drain", name, "--context", m.kubectlContext(m.actionCtx.context),
 		"--ignore-daemonsets", "--delete-emptydir-data",
 	}
 
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-	logger.Info("Running kubectl command", "cmd", cmd.String())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
+	logExecCmd("Running kubectl command", cmd)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			logger.Error("kubectl drain failed", "cmd", cmd.String(), "error", err)
@@ -902,12 +906,12 @@ func (m Model) execKubectlNodeCmd(subcmd string) tea.Cmd {
 		}
 	}
 	name := m.actionCtx.name
-	args := []string{subcmd, name, "--context", m.actionCtx.context}
+	args := []string{subcmd, name, "--context", m.kubectlContext(m.actionCtx.context)}
 
 	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("%s node: %s", subcmd, name), m.actionCtx.context, func() tea.Msg {
 		cmd := exec.Command(kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-		logger.Info("Running kubectl command", "cmd", cmd.String())
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
+		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Error("kubectl node command failed", "cmd", cmd.String(), "error", err, "output", string(output))
@@ -945,13 +949,13 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 	args := []string{
 		"debug", "node/" + nodeName, "-it",
 		"--image=busybox",
-		"--context", ctx,
+		"--context", m.kubectlContext(ctx),
 		"--", "chroot", "/host", "/bin/sh",
 	}
 
 	cmd := exec.Command(kubectlPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-	logger.Info("Running kubectl command", "cmd", cmd.String())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
+	logExecCmd("Running kubectl command", cmd)
 
 	if ui.ConfigTerminalMode == "pty" {
 		cols := m.width - 4
@@ -988,7 +992,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 	}
 
 	kctx := m.nav.Context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
 	target := resource
 	if fieldPath != "" {
@@ -1004,13 +1008,13 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 	}
 
 	return m.trackBgTask(bgtasks.KindSubprocess, "Explain: "+target, kctx, func() tea.Msg {
-		args := []string{"explain", target, "--context", kctx}
+		args := []string{"explain", target, "--context", m.kubectlContext(kctx)}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
 		cmd := exec.Command(kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logger.Info("Running kubectl command", "cmd", cmd.String())
+		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			logger.Error("kubectl explain failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
@@ -1039,16 +1043,16 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 	}
 
 	kctx := m.nav.Context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
 	return m.trackBgTask(bgtasks.KindSubprocess, "Explain (recursive): "+resource, kctx, func() tea.Msg {
-		args := []string{"explain", resource, "--recursive", "--context", kctx}
+		args := []string{"explain", resource, "--recursive", "--context", m.kubectlContext(kctx)}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
 		}
 		cmd := exec.Command(kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logger.Info("Running kubectl command", "cmd", cmd.String())
+		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
 			return explainRecursiveMsg{
@@ -1067,9 +1071,13 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 // The command is executed with the terminal handed over via tea.ExecProcess,
 // allowing interactive commands to work properly.
 func (m Model) execCustomAction(expandedCmd string) tea.Cmd {
+	ctx := m.actionCtx.context
+	if ctx == "" {
+		ctx = m.nav.Context
+	}
 	cmd := exec.Command("sh", "-c", expandedCmd)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPaths())
-	logger.Info("Running custom action", "cmd", cmd.String())
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
+	logExecCmd("Running custom action", cmd)
 
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {

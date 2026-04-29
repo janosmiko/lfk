@@ -1,6 +1,8 @@
+<img src="docs/imgs/github-header.png" alt="lfk">
+
 # :zap: LFK - Lightning Fast Kubernetes navigator
 
-[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk)
+[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677)
 
 **LFK** is a lightning-fast, keyboard-focused, yazi-inspired terminal user interface for navigating and managing Kubernetes clusters. Built for speed and efficiency, it brings a three-column Miller columns layout with an owner-based resource hierarchy to your terminal.
 
@@ -71,7 +73,7 @@
 
 - **Multi-tab support**: Open multiple views side by side
 - **Multi-cluster/multi-context support** via merged kubeconfig loading
-- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive), and `KUBECONFIG` env var
+- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), and `KUBECONFIG` env var
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser
@@ -86,7 +88,7 @@
 - **Resource sorting** by name, age, or status
 - **Filter and search**: Filter with `f`, search with `/` -- supports substring, regex (auto-detected), and fuzzy (`~` prefix) modes
 - **Abbreviated search**: Type `pvc`, `hpa`, `deploy` etc. to jump to resource types
-- **Command bar** (`:`) with vertical dropdown autocomplete: resource jumps (`:pod`, `:dep`), built-in commands (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl with `:k`/`:kubectl` prefix and flag/namespace completion, shell commands (`:!`)
+- **Command bar** (`:`) with vertical dropdown autocomplete: resource jumps (`:pod`, `:dep`), built-in commands (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl with `:k`/`:kubectl` prefix and flag/namespace completion, shell commands (`:!`). Value positions (namespace, context, resource name, option, column, format) accept fuzzy matches; command names stay on prefix.
 - **Watch mode**: Auto-refresh resources every 2 seconds (enabled by default)
 - **Owner/controller navigation**: Jump to the owner of any resource with `o`
 - **Events view** with warnings-only filter toggle and duplicate-event grouping (`z`)
@@ -96,7 +98,7 @@
 - **YAML preview** in the right column with syntax highlighting
 - **Full-screen YAML viewer** with scrollable output, search, section folding (`Tab`/`z`), and in-place editing
 - **Resource details** summary in split preview (toggle with `Shift+P`)
-- **Inline log viewer** with streaming, search, line numbers, word wrap, follow mode, timestamps toggle, previous container logs, container filter, tail-first loading, and line jump
+- **Inline log viewer** with streaming, search, line numbers, word wrap, follow mode, timestamps toggle, previous container logs, container filter, tail-first loading, line jump, structured preview pane (`P`: parses the selected line as JSON or logfmt, falls back to plain text), and automatic reconnect across init-container transitions (stays attached as each init container finishes and the next one starts)
 - **Inline describe view** with scrollable output
 - **Secret viewing/editing** with decode toggle (`Ctrl+S`) and dedicated editor (`e`)
 - **Embedded terminal** (PTY mode) for exec and shell with tab switching — PTY keeps running in background when switching tabs
@@ -133,6 +135,7 @@
 
 - **460+ built-in color schemes** from [ghostty themes](https://github.com/ghostty-org/ghostty): Tokyonight, Catppuccin, Dracula, Nord, Rose Pine, Gruvbox, and many more. Transparent background support.
 - **Runtime theme switching**: Press `T` to preview and switch themes without restarting
+- **Auto dark/light mode**: configure a dark and a light scheme; lfk switches automatically when the OS appearance changes (requires CSI 996/2031 terminal support: Ghostty, kitty, Contour, …)
 - **Custom color themes** via config file (Tokyonight theme by default)
 - **Configurable keybindings** for direct actions
 - **Configurable search abbreviations**
@@ -146,96 +149,20 @@
 
 ## Installation
 
-### Homebrew (macOS / Linux)
-
 ```bash
+# Homebrew (macOS / Linux)
 brew install janosmiko/tap/lfk
-```
 
-### Binary releases
-
-Download pre-built binaries from the [GitHub Releases](https://github.com/janosmiko/lfk/releases) page.
-
-### From source
-
-```bash
+# Go
 go install github.com/janosmiko/lfk@latest
+
+# Nix
+nix run github:janosmiko/lfk
 ```
 
-### Build from source
+`kubectl` is required and must be configured. `helm` and `trivy` are optional (Helm management, image vulnerability scanning).
 
-```bash
-git clone https://github.com/janosmiko/lfk.git
-cd lfk
-go build -o lfk .
-```
-
-### Docker
-
-```bash
-docker run -it --rm \
-  -v ~/.kube:/home/lfk/.kube:ro \
-  janosmiko/lfk
-```
-
-To use a specific kubeconfig:
-
-```bash
-docker run -it --rm \
-  -v /path/to/kubeconfig:/home/lfk/.kube/config:ro \
-  janosmiko/lfk
-```
-
-For port forwarding, add `--net=host`:
-
-```bash
-docker run -it --rm \
-  --net=host \
-  -v ~/.kube:/home/lfk/.kube:ro \
-  janosmiko/lfk
-```
-
-### Nightly Builds
-
-Nightly builds track the latest development work and are published as GitHub
-pre-releases with every `v*-nightly*` tag.
-
-**Homebrew:**
-
-```bash
-brew install janosmiko/tap/lfk-nightly
-```
-
-**Docker:**
-
-```bash
-# Latest nightly
-docker run -it --rm \
-  -v ~/.kube:/home/lfk/.kube:ro \
-  janosmiko/lfk:nightly
-
-# Specific nightly date
-docker run -it --rm \
-  -v ~/.kube:/home/lfk/.kube:ro \
-  janosmiko/lfk:nightly-20260414
-```
-
-**Binary releases:**
-
-Download from [GitHub Releases](https://github.com/janosmiko/lfk/releases) (look for pre-release tags).
-
-### External Dependencies
-
-**Required:**
-- `kubectl` - Kubernetes CLI (must be configured and in PATH)
-
-**Optional** (needed only for specific features):
-| Command | Feature |
-|---------|---------|
-| `helm` | Helm release management (values, diff, upgrade, rollback, uninstall) |
-| `trivy` | Container image vulnerability scanning ([install](https://aquasecurity.github.io/trivy)) |
-
-All other features (KEDA, External Secrets, Argo Workflows, cert-manager, ArgoCD, FluxCD, PVC resize, etc.) use the Kubernetes API directly and require no additional CLI tools.
+> See [docs/installation.md](docs/installation.md) for Docker, nightly builds, NixOS/home-manager flake input, building from source, and the full list of optional CLI dependencies.
 
 ## Usage
 
@@ -243,85 +170,15 @@ All other features (KEDA, External Secrets, Argo Workflows, cert-manager, ArgoCD
 # Use default kubeconfig (~/.kube/config + ~/.kube/config.d/*)
 lfk
 
-# Start in a specific context
-lfk --context my-cluster
+# Start in a specific context / namespace
+lfk --context my-cluster -n kube-system
 
-# Start in a specific namespace (disables all-namespaces mode)
-lfk -n kube-system
-
-# Start with multiple namespaces selected
-lfk -n default -n kube-system
-
-# Combine context and namespace
-lfk --context production -n monitoring
-
-# Use a specific config file (overrides ~/.config/lfk/config.yaml)
-lfk -c /path/to/config.yaml
-lfk --config /path/to/config.yaml
-
-# Use a specific kubeconfig file (overrides default discovery)
+# Use a specific kubeconfig
 lfk --kubeconfig /path/to/kubeconfig
-
-# Disable mouse capture (enables native terminal text selection)
-lfk --no-mouse
-
-# Disable all colors (selection stays visible via bold/reverse video)
-lfk --no-color
-# Equivalent environment variable (https://no-color.org):
-NO_COLOR=1 lfk
-
-# Override the watch-mode polling interval (default 2s; clamped to [500ms, 10m])
-lfk --watch-interval 5s
-
-# Use a specific kubeconfig via environment variable
-KUBECONFIG=/path/to/config lfk
-
-# Use multiple kubeconfigs via environment variable
 KUBECONFIG=/path/to/config1:/path/to/config2 lfk
 ```
 
-When `--context` or `--namespace` flags are provided, the saved session state is
-ignored and the app opens directly in the specified context/namespace. The user
-can still change the namespace during the session.
-
-### Mouse Support
-
-By default, lfk captures mouse input for click navigation, scroll, and tab
-switching. If you need native terminal text selection (e.g., shift+click to
-select text), you can disable mouse capture:
-
-- **CLI flag:** `lfk --no-mouse`
-- **Config file:** Add `mouse: false` to `~/.config/lfk/config.yaml`
-
-> **Note:** macOS Terminal.app does not support shift+click text selection while
-> mouse capture is active. Use `--no-mouse` or switch to a terminal that handles
-> this correctly (iTerm2, Kitty, Alacritty, WezTerm, Ghostty).
-
-### No-Color Mode
-
-Disable all foreground and background colors while keeping selection and
-other highlights visible via bold, underline, and reverse-video SGR codes.
-Useful for monochrome terminals, piped output, or lower CPU usage.
-
-- **CLI flag:** `lfk --no-color`
-- **Environment variable:** `NO_COLOR=1 lfk` (any non-empty value; see
-  [no-color.org](https://no-color.org/))
-- **Config file:** Add `no_color: true` to `~/.config/lfk/config.yaml`
-
-Precedence: `--no-color` flag > `NO_COLOR` env var > config file.
-
-### Watch-Mode Interval
-
-Watch mode (toggle with `w`) polls the current resource list on an interval.
-The default 2-second interval is a good balance between freshness and API
-load. Tune it with:
-
-- **CLI flag:** `lfk --watch-interval 5s` (accepts Go durations: `500ms`,
-  `2s`, `1m`, ...)
-- **Config file:** Add `watch_interval: 5s` to `~/.config/lfk/config.yaml`
-
-Values outside `[500ms, 10m]` are clamped to the bounds; invalid values fall
-back to 2s.
+> See [docs/usage.md](docs/usage.md) for the full CLI reference and runtime tuning options: mouse capture, no-color mode, watch-mode interval, discovery cache (`KUBECACHEDIR`), and Secret lazy loading.
 
 ## Navigation Hierarchy
 
@@ -358,10 +215,10 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `l` / `Right` | Navigate into selected item |
 | `j` / `Down` | Move cursor down |
 | `k` / `Up` | Move cursor up |
-| `gg` | Jump to top of list |
-| `G` | Jump to bottom of list |
+| `gg` / `Home` | Jump to top of list |
+| `G` / `End` | Jump to bottom of list |
 | `Ctrl+D` / `Ctrl+U` | Half-page scroll down/up |
-| `Ctrl+F` / `Ctrl+B` | Full-page scroll down/up |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page scroll down/up |
 | `Enter` | Open full-screen YAML view / navigate into |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping (Events view) |
 | `p` | Pin/unpin CRD group (at resource types level) |
@@ -427,7 +284,9 @@ Create `~/.config/lfk/config.yaml` to customize the application. All fields are 
 
 ```yaml
 # Color scheme (press T in-app to browse 460+ themes with live preview)
-colorscheme: catppuccin-mocha
+# Auto dark/light mode — Ghostty-style "dark:X,light:Y" syntax switches the
+# scheme when the OS appearance changes (CSI 996/2031; Ghostty, kitty >= 0.27, …)
+colorscheme: "dark:catppuccin-mocha,light:catppuccin-latte"
 
 # Use terminal's own background
 transparent_background: true
@@ -464,70 +323,11 @@ All search and filter inputs support three modes, auto-detected from the query s
 
 **Clipboard paste**: All search, filter, and command bar inputs accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). Multiline paste shows a confirmation dialog.
 
+**Recall previous queries**: While the `f` filter or `/` search input is open, press `Up` / `Down` to cycle through previous queries. `/` and `f` share one history (the matcher and matched fields are identical between them), kept separate from the `:` command bar. Both persist across sessions under `$XDG_STATE_HOME/lfk/` (default `~/.local/state/lfk/`) — `query-history` for `/` and `f`, `history` for the command bar.
+
 ## Contributing
 
-Contributions are welcome! Here is how to get started.
-
-### Prerequisites
-
-- Go 1.26.2 or later
-- Access to a Kubernetes cluster (for testing)
-- `kubectl` configured and working
-- `golangci-lint` ([install](https://golangci-lint.run/welcome/install/))
-
-### Development Setup
-
-```bash
-# Clone the repository
-git clone https://github.com/janosmiko/lfk.git
-cd lfk
-
-# Set up git hooks and install dependencies
-make setup
-go mod download
-
-# Build the binary
-make build
-
-# Run it
-./lfk
-```
-
-### Building and Testing
-
-```bash
-# Build
-go build -o lfk .
-
-# Run tests (if available)
-go test ./...
-
-# Run with race detector
-go build -race -o lfk . && ./lfk
-
-# Lint (if you have golangci-lint installed)
-golangci-lint run
-```
-
-### Project Structure
-
-The application follows a standard Go project layout:
-
-- `main.go` - Entry point, initializes the Kubernetes client, loads config, and starts the Bubbletea program
-- `internal/app/` - Core application logic: the Bubbletea model, update loop, async commands, and bookmarks
-- `internal/k8s/` - Kubernetes client wrapper handling API calls, owner resolution, and CRD discovery
-- `internal/model/` - Shared types, actions, navigation state, and resource templates
-- `internal/ui/` - All rendering: columns, overlays, styles, themes, help screen, and log viewer
-- `internal/logger/` - Application logging
-
-### Submitting Changes
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/my-feature`)
-3. Make your changes
-4. Ensure the project builds cleanly (`go build ./...`)
-5. Commit your changes with a descriptive message
-6. Push to your fork and open a Pull Request
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, development setup, build/test commands, project layout, and the PR submission flow.
 
 ## Support
 

@@ -7,7 +7,7 @@ import (
 )
 
 func TestParseNetpolRule_EmptyRule(t *testing.T) {
-	rule := parseNetpolRule(map[string]interface{}{}, "from")
+	rule := parseNetpolRule(map[string]any{}, "from")
 	assert.Empty(t, rule.Ports)
 	assert.Len(t, rule.Peers, 1, "empty rule should have one 'All' peer")
 	assert.Equal(t, "All", rule.Peers[0].Type)
@@ -20,13 +20,13 @@ func TestParseNetpolRule_InvalidInput(t *testing.T) {
 }
 
 func TestParseNetpolRule_WithPorts(t *testing.T) {
-	rule := parseNetpolRule(map[string]interface{}{
-		"ports": []interface{}{
-			map[string]interface{}{
+	rule := parseNetpolRule(map[string]any{
+		"ports": []any{
+			map[string]any{
 				"protocol": "TCP",
 				"port":     8080,
 			},
-			map[string]interface{}{
+			map[string]any{
 				"port": "https",
 			},
 		},
@@ -41,11 +41,11 @@ func TestParseNetpolRule_WithPorts(t *testing.T) {
 }
 
 func TestParseNetpolRule_WithPodSelector(t *testing.T) {
-	rule := parseNetpolRule(map[string]interface{}{
-		"from": []interface{}{
-			map[string]interface{}{
-				"podSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+	rule := parseNetpolRule(map[string]any{
+		"from": []any{
+			map[string]any{
+				"podSelector": map[string]any{
+					"matchLabels": map[string]any{
 						"app": "frontend",
 					},
 				},
@@ -59,11 +59,11 @@ func TestParseNetpolRule_WithPodSelector(t *testing.T) {
 }
 
 func TestParseNetpolRule_WithNamespaceSelector(t *testing.T) {
-	rule := parseNetpolRule(map[string]interface{}{
-		"from": []interface{}{
-			map[string]interface{}{
-				"namespaceSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+	rule := parseNetpolRule(map[string]any{
+		"from": []any{
+			map[string]any{
+				"namespaceSelector": map[string]any{
+					"matchLabels": map[string]any{
 						"env": "production",
 					},
 				},
@@ -77,16 +77,16 @@ func TestParseNetpolRule_WithNamespaceSelector(t *testing.T) {
 }
 
 func TestParseNetpolRule_WithNamespaceAndPodSelector(t *testing.T) {
-	rule := parseNetpolRule(map[string]interface{}{
-		"from": []interface{}{
-			map[string]interface{}{
-				"namespaceSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+	rule := parseNetpolRule(map[string]any{
+		"from": []any{
+			map[string]any{
+				"namespaceSelector": map[string]any{
+					"matchLabels": map[string]any{
 						"env": "staging",
 					},
 				},
-				"podSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+				"podSelector": map[string]any{
+					"matchLabels": map[string]any{
 						"role": "api",
 					},
 				},
@@ -101,12 +101,12 @@ func TestParseNetpolRule_WithNamespaceAndPodSelector(t *testing.T) {
 }
 
 func TestParseNetpolRule_WithCIDR(t *testing.T) {
-	rule := parseNetpolRule(map[string]interface{}{
-		"to": []interface{}{
-			map[string]interface{}{
-				"ipBlock": map[string]interface{}{
+	rule := parseNetpolRule(map[string]any{
+		"to": []any{
+			map[string]any{
+				"ipBlock": map[string]any{
 					"cidr": "10.0.0.0/8",
-					"except": []interface{}{
+					"except": []any{
 						"10.0.1.0/24",
 						"10.0.2.0/24",
 					},
@@ -122,21 +122,21 @@ func TestParseNetpolRule_WithCIDR(t *testing.T) {
 }
 
 func TestParseNetpolRule_MultiplePeers(t *testing.T) {
-	rule := parseNetpolRule(map[string]interface{}{
-		"from": []interface{}{
-			map[string]interface{}{
-				"podSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{"app": "web"},
+	rule := parseNetpolRule(map[string]any{
+		"from": []any{
+			map[string]any{
+				"podSelector": map[string]any{
+					"matchLabels": map[string]any{"app": "web"},
 				},
 			},
-			map[string]interface{}{
-				"ipBlock": map[string]interface{}{
+			map[string]any{
+				"ipBlock": map[string]any{
 					"cidr": "192.168.0.0/16",
 				},
 			},
 		},
-		"ports": []interface{}{
-			map[string]interface{}{
+		"ports": []any{
+			map[string]any{
 				"protocol": "TCP",
 				"port":     443,
 			},
@@ -151,8 +151,8 @@ func TestParseNetpolRule_MultiplePeers(t *testing.T) {
 }
 
 func TestParsePeer_EmptyNamespaceSelector(t *testing.T) {
-	peer := parsePeer(map[string]interface{}{
-		"namespaceSelector": map[string]interface{}{},
+	peer := parsePeer(map[string]any{
+		"namespaceSelector": map[string]any{},
 	})
 	assert.Equal(t, "Namespace", peer.Type)
 	assert.Equal(t, "(all namespaces)", peer.Namespace)

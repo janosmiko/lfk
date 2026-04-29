@@ -24,6 +24,8 @@ func (m Model) handleDescribeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 // handleDescribeNormalKey handles key events in normal describe view mode.
+//
+//nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	lines := strings.Split(m.describeContent, "\n")
 	maxIdx := max(len(lines)-1, 0)
@@ -80,8 +82,23 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.describeLineInput = ""
 		m.describeWordMotion(key, lines)
 		return m, nil
-	case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b":
+	case "ctrl+d", "ctrl+u":
 		return m.describePageMoveByKey(key, maxIdx)
+	case "ctrl+f", "pgdown":
+		return m.describePageMove(m.describeContentHeight(), maxIdx)
+	case "ctrl+b", "pgup":
+		return m.describePageMove(-m.describeContentHeight(), maxIdx)
+	case "home":
+		m.describeLineInput = ""
+		m.pendingG = false
+		m.describeCursor = 0
+		m.ensureDescribeCursorVisible()
+		return m, nil
+	case "end":
+		m.describeLineInput = ""
+		m.describeCursor = maxIdx
+		m.ensureDescribeCursorVisible()
+		return m, nil
 	case "g":
 		m.describeLineInput = ""
 		if m.pendingG {
@@ -375,16 +392,10 @@ func visualCopyChar(lines []string, selStart, selEnd, anchorCol, cursorCol int, 
 			}
 			parts = append(parts, string(runes[cs:ce]))
 		} else if i == selStart {
-			cs := startCol
-			if cs > len(runes) {
-				cs = len(runes)
-			}
+			cs := min(startCol, len(runes))
 			parts = append(parts, string(runes[cs:]))
 		} else if i == selEnd {
-			ce := endCol + 1
-			if ce > len(runes) {
-				ce = len(runes)
-			}
+			ce := min(endCol+1, len(runes))
 			parts = append(parts, string(runes[:ce]))
 		} else {
 			parts = append(parts, line)
@@ -424,12 +435,15 @@ func (m Model) handleDescribeSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.describeSearchActive = false
 		m.describeSearchInput.Clear()
+		m.describeSearchQuery = ""
 	case "backspace":
 		if len(m.describeSearchInput.Value) > 0 {
 			m.describeSearchInput.Backspace()
 		}
+		m.describeSearchQuery = m.describeSearchInput.Value
 	case "ctrl+w":
 		m.describeSearchInput.DeleteWord()
+		m.describeSearchQuery = m.describeSearchInput.Value
 	case "ctrl+a":
 		m.describeSearchInput.Home()
 	case "ctrl+e":
@@ -444,6 +458,9 @@ func (m Model) handleDescribeSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		key := msg.String()
 		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
 			m.describeSearchInput.Insert(key)
+			// Live-update the highlight query so matches paint as the
+			// user types instead of waiting for Enter to commit.
+			m.describeSearchQuery = m.describeSearchInput.Value
 		}
 	}
 	return m, nil
@@ -451,10 +468,7 @@ func (m Model) handleDescribeSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // describeContentHeight returns the visible content height for the describe view.
 func (m *Model) describeContentHeight() int {
-	h := m.height - 4
-	if h < 3 {
-		h = 3
-	}
+	h := max(m.height-4, 3)
 	return h
 }
 
@@ -470,10 +484,7 @@ func (m *Model) ensureDescribeCursorVisible() {
 		m.describeCursor = 0
 	}
 	viewH := m.describeContentHeight()
-	so := ui.ConfigScrollOff
-	if so > viewH/2 {
-		so = viewH / 2
-	}
+	so := min(ui.ConfigScrollOff, viewH/2)
 	if m.describeCursor < m.describeScroll+so {
 		m.describeScroll = m.describeCursor - so
 	}
@@ -553,10 +564,7 @@ func (m Model) diffViewMetrics(foldRegions []ui.DiffFoldRegion) (totalLines, vis
 	if visibleLines < 3 {
 		visibleLines = 3
 	}
-	maxScroll = totalLines - visibleLines
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
+	maxScroll = max(totalLines-visibleLines, 0)
 	return totalLines, visibleLines, maxScroll
 }
 
@@ -613,6 +621,8 @@ func (m Model) handleDiffSearchInput(msg tea.KeyMsg, foldRegions []ui.DiffFoldRe
 }
 
 // handleDiffNormalKey handles key events in normal diff view mode.
+//
+//nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
 	maxCursor := max(totalLines-1, 0)
 
@@ -666,7 +676,18 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		return m, nil
 	case "G":
 		return m.handleDiffG(maxCursor, visibleLines, maxScroll)
-	case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b":
+	case "end":
+		m.diffLineInput = ""
+		m.diffCursor = maxCursor
+		m.ensureDiffCursorVisible(visibleLines, maxScroll)
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.diffLineInput = ""
+		m.diffCursor = 0
+		m.diffScroll = 0
+		return m, nil
+	case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b", "pgdown", "pgup":
 		return m.diffPageMoveByKey(msg.String(), maxCursor, visibleLines, maxScroll)
 	case "0":
 		if m.diffLineInput != "" {
@@ -682,6 +703,8 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 	case "v", "V", "ctrl+v":
 		modeMap := map[string]rune{"v": 'v', "V": 'V', "ctrl+v": 'B'}
 		return m.diffEnterVisual(modeMap[msg.String()])
+	case "y":
+		return m.handleDiffNormalCopy(foldRegions)
 	case "u":
 		m.diffLineInput = ""
 		m.diffUnified = !m.diffUnified
@@ -779,18 +802,12 @@ func (m *Model) diffWordMotion(key string, foldRegions []ui.DiffFoldRegion) {
 		}
 	case "b":
 		if lineText != "" {
-			newCol := prevWordStart(lineText, m.diffVisualCurCol)
-			if newCol < 0 {
-				newCol = 0
-			}
+			newCol := max(prevWordStart(lineText, m.diffVisualCurCol), 0)
 			m.diffVisualCurCol = newCol
 		}
 	case "B":
 		if lineText != "" {
-			newCol := prevWORDStart(lineText, m.diffVisualCurCol)
-			if newCol < 0 {
-				newCol = 0
-			}
+			newCol := max(prevWORDStart(lineText, m.diffVisualCurCol), 0)
 			m.diffVisualCurCol = newCol
 		}
 	case "e":
@@ -826,9 +843,9 @@ func (m Model) diffPageMoveByKey(key string, maxCursor, visibleLines, maxScroll 
 		m.diffCursor = min(m.diffCursor+m.height/2, maxCursor)
 	case "ctrl+u":
 		m.diffCursor = max(m.diffCursor-m.height/2, 0)
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.diffCursor = min(m.diffCursor+m.height, maxCursor)
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.diffCursor = max(m.diffCursor-m.height, 0)
 	}
 	m.ensureDiffCursorVisible(visibleLines, maxScroll)
@@ -925,11 +942,11 @@ func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		m.diffCursor = max(m.diffCursor-m.height/2, 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.diffCursor = min(m.diffCursor+m.height, maxCursor)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.diffCursor = max(m.diffCursor-m.height, 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
@@ -948,6 +965,18 @@ func (m Model) diffVisualToggle(mode rune) (tea.Model, tea.Cmd) {
 		m.diffVisualType = mode
 	}
 	return m, nil
+}
+
+// handleDiffNormalCopy copies the diff line at the cursor (on the active
+// side) to the clipboard. Mirrors the describe view's normal-mode `y`.
+func (m Model) handleDiffNormalCopy(foldRegions []ui.DiffFoldRegion) (tea.Model, tea.Cmd) {
+	m.diffLineInput = ""
+	lineText := m.diffCurrentLineText(foldRegions)
+	if lineText == "" {
+		return m, nil
+	}
+	m.setStatusMessage("Copied 1 line", false)
+	return m, tea.Batch(copyToSystemClipboard(lineText), scheduleStatusClear())
 }
 
 // diffVisualCopy copies the visually selected diff text to the clipboard.
@@ -984,10 +1013,7 @@ func (m *Model) ensureDiffFoldState(regions []ui.DiffFoldRegion) {
 
 // ensureDiffCursorVisible adjusts diffScroll so the cursor is within the viewport.
 func (m *Model) ensureDiffCursorVisible(viewportLines, maxScroll int) {
-	so := ui.ConfigScrollOff
-	if so > viewportLines/2 {
-		so = viewportLines / 2
-	}
+	so := min(ui.ConfigScrollOff, viewportLines/2)
 	if m.diffCursor < m.diffScroll+so {
 		m.diffScroll = m.diffCursor - so
 	}
@@ -1016,10 +1042,7 @@ func (m *Model) diffScrollToMatch(foldRegions []ui.DiffFoldRegion, viewportLines
 
 	// Move cursor line and center in viewport.
 	m.diffCursor = visIdx
-	m.diffScroll = visIdx - viewportLines/2
-	if m.diffScroll < 0 {
-		m.diffScroll = 0
-	}
+	m.diffScroll = max(visIdx-viewportLines/2, 0)
 
 	// Move cursor column to the match position on the active side.
 	lineText := m.diffCurrentLineText(foldRegions)

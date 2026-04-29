@@ -1348,10 +1348,10 @@ func newFakeDynClient(objects ...runtime.Object) *dynamicfake.FakeDynamicClient 
 func TestGetResources_EventsSortedByLastSeen(t *testing.T) {
 	mkEvent := func(name, first, last string) *unstructured.Unstructured {
 		return &unstructured.Unstructured{
-			Object: map[string]interface{}{
+			Object: map[string]any{
 				"apiVersion": "v1",
 				"kind":       "Event",
-				"metadata": map[string]interface{}{
+				"metadata": map[string]any{
 					"name":      name,
 					"namespace": "default",
 				},
@@ -1361,7 +1361,7 @@ func TestGetResources_EventsSortedByLastSeen(t *testing.T) {
 				"firstTimestamp": first,
 				"lastTimestamp":  last,
 				"count":          int64(1),
-				"involvedObject": map[string]interface{}{
+				"involvedObject": map[string]any{
 					"kind": "Pod",
 					"name": name,
 				},
@@ -1431,16 +1431,16 @@ func TestDeleteResource_ClusterScoped(t *testing.T) {
 
 func TestResizePVC(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "PersistentVolumeClaim",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "my-pvc",
 				"namespace": "default",
 			},
-			"spec": map[string]interface{}{
-				"resources": map[string]interface{}{
-					"requests": map[string]interface{}{
+			"spec": map[string]any{
+				"resources": map[string]any{
+					"requests": map[string]any{
 						"storage": "10Gi",
 					},
 				},
@@ -1458,14 +1458,14 @@ func TestResizePVC(t *testing.T) {
 
 func TestGetResourceYAML_Namespaced(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "my-cm",
 				"namespace": "default",
 			},
-			"data": map[string]interface{}{
+			"data": map[string]any{
 				"key": "value",
 			},
 		},
@@ -1483,10 +1483,10 @@ func TestGetResourceYAML_Namespaced(t *testing.T) {
 
 func TestGetResourceYAML_ClusterScoped(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "my-ns",
 			},
 		},
@@ -1539,14 +1539,14 @@ func TestGetResourceYAML_PortForwardVirtualType(t *testing.T) {
 
 func TestGetLabelAnnotationData_Namespaced(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":        "my-cm",
 				"namespace":   "default",
-				"labels":      map[string]interface{}{"app": "test", "env": "prod"},
-				"annotations": map[string]interface{}{"note": "important"},
+				"labels":      map[string]any{"app": "test", "env": "prod"},
+				"annotations": map[string]any{"note": "important"},
 			},
 		},
 	}
@@ -1566,12 +1566,12 @@ func TestGetLabelAnnotationData_Namespaced(t *testing.T) {
 
 func TestGetLabelAnnotationData_ClusterScoped(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":   "my-ns",
-				"labels": map[string]interface{}{"env": "staging"},
+				"labels": map[string]any{"env": "staging"},
 			},
 		},
 	}
@@ -1588,10 +1588,10 @@ func TestGetLabelAnnotationData_ClusterScoped(t *testing.T) {
 
 func TestGetLabelAnnotationData_NoLabelsOrAnnotations(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "bare-cm",
 				"namespace": "default",
 			},
@@ -1613,14 +1613,14 @@ func TestGetLabelAnnotationData_NoLabelsOrAnnotations(t *testing.T) {
 
 func TestUpdateLabelAnnotationData_Namespaced(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":        "my-cm",
 				"namespace":   "default",
-				"labels":      map[string]interface{}{"old-label": "val", "keep": "yes"},
-				"annotations": map[string]interface{}{"old-annot": "val"},
+				"labels":      map[string]any{"old-label": "val", "keep": "yes"},
+				"annotations": map[string]any{"old-annot": "val"},
 			},
 		},
 	}
@@ -1638,12 +1638,12 @@ func TestUpdateLabelAnnotationData_Namespaced(t *testing.T) {
 
 func TestUpdateLabelAnnotationData_ClusterScoped(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":   "my-ns",
-				"labels": map[string]interface{}{"env": "old"},
+				"labels": map[string]any{"env": "old"},
 			},
 		},
 	}
@@ -1663,22 +1663,22 @@ func TestUpdateLabelAnnotationData_ClusterScoped(t *testing.T) {
 
 func TestFindResourcesWithFinalizer(t *testing.T) {
 	obj1 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":              "cm-with-finalizer",
 				"namespace":         "default",
-				"finalizers":        []interface{}{"my.finalizer.io/cleanup"},
+				"finalizers":        []any{"my.finalizer.io/cleanup"},
 				"creationTimestamp": "2026-01-01T00:00:00Z",
 			},
 		},
 	}
 	obj2 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "cm-no-finalizer",
 				"namespace": "default",
 			},
@@ -1714,13 +1714,13 @@ func TestFindResourcesWithFinalizer_SkipsVirtualTypes(t *testing.T) {
 
 func TestFindResourcesWithFinalizer_CaseInsensitive(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":       "cm1",
 				"namespace":  "default",
-				"finalizers": []interface{}{"MyFinalizer.IO/Cleanup"},
+				"finalizers": []any{"MyFinalizer.IO/Cleanup"},
 			},
 		},
 	}
@@ -1740,13 +1740,13 @@ func TestFindResourcesWithFinalizer_CaseInsensitive(t *testing.T) {
 
 func TestRemoveFinalizerFromResource(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":       "cm1",
 				"namespace":  "default",
-				"finalizers": []interface{}{"keep.this/finalizer", "remove.this/finalizer"},
+				"finalizers": []any{"keep.this/finalizer", "remove.this/finalizer"},
 			},
 		},
 	}
@@ -1770,12 +1770,12 @@ func TestRemoveFinalizerFromResource(t *testing.T) {
 
 func TestRemoveFinalizerFromResource_ClusterScoped(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":       "stuck-ns",
-				"finalizers": []interface{}{"kubernetes"},
+				"finalizers": []any{"kubernetes"},
 			},
 		},
 	}
@@ -1800,14 +1800,14 @@ func TestRemoveFinalizerFromResource_ClusterScoped(t *testing.T) {
 
 func TestGetResourceEvents(t *testing.T) {
 	event1 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Event",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "ev1",
 				"namespace": "default",
 			},
-			"involvedObject": map[string]interface{}{
+			"involvedObject": map[string]any{
 				"name": "my-deploy",
 				"kind": "Deployment",
 			},
@@ -1816,19 +1816,19 @@ func TestGetResourceEvents(t *testing.T) {
 			"message":       "Scaled up replica set my-deploy-abc to 1",
 			"lastTimestamp": "2026-03-22T10:00:00Z",
 			"count":         int64(1),
-			"source":        map[string]interface{}{"component": "deployment-controller"},
+			"source":        map[string]any{"component": "deployment-controller"},
 		},
 	}
 	// Prefix-match event (pod owned by deployment).
 	event2 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Event",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "ev2",
 				"namespace": "default",
 			},
-			"involvedObject": map[string]interface{}{
+			"involvedObject": map[string]any{
 				"name": "my-deploy-abc-xyz",
 				"kind": "Pod",
 			},
@@ -1841,14 +1841,14 @@ func TestGetResourceEvents(t *testing.T) {
 	}
 	// Unrelated event.
 	event3 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Event",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "ev3",
 				"namespace": "default",
 			},
-			"involvedObject": map[string]interface{}{
+			"involvedObject": map[string]any{
 				"name": "other-deploy",
 				"kind": "Deployment",
 			},
@@ -1881,15 +1881,15 @@ func TestGetResourceEvents_NoEvents(t *testing.T) {
 func TestGetResourceEvents_EventTimeAndCreationFallback(t *testing.T) {
 	// Event with eventTime instead of lastTimestamp.
 	ev := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Event",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":              "ev-eventtime",
 				"namespace":         "default",
 				"creationTimestamp": "2026-03-22T08:00:00Z",
 			},
-			"involvedObject": map[string]interface{}{
+			"involvedObject": map[string]any{
 				"name": "my-pod",
 				"kind": "Pod",
 			},
@@ -1910,14 +1910,14 @@ func TestGetResourceEvents_EventTimeAndCreationFallback(t *testing.T) {
 
 func TestGetResourceEvents_ReportingComponentFallback(t *testing.T) {
 	ev := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Event",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "ev-reporting",
 				"namespace": "default",
 			},
-			"involvedObject": map[string]interface{}{
+			"involvedObject": map[string]any{
 				"name": "my-pod",
 				"kind": "Pod",
 			},
@@ -1940,15 +1940,15 @@ func TestGetResourceEvents_ReportingComponentFallback(t *testing.T) {
 
 func TestGetPodsUsingPVC(t *testing.T) {
 	pod1 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata":   map[string]interface{}{"name": "pod-using-pvc", "namespace": "default"},
-			"spec": map[string]interface{}{
-				"volumes": []interface{}{
-					map[string]interface{}{
+			"metadata":   map[string]any{"name": "pod-using-pvc", "namespace": "default"},
+			"spec": map[string]any{
+				"volumes": []any{
+					map[string]any{
 						"name": "data",
-						"persistentVolumeClaim": map[string]interface{}{
+						"persistentVolumeClaim": map[string]any{
 							"claimName": "my-pvc",
 						},
 					},
@@ -1957,15 +1957,15 @@ func TestGetPodsUsingPVC(t *testing.T) {
 		},
 	}
 	pod2 := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Pod",
-			"metadata":   map[string]interface{}{"name": "pod-no-pvc", "namespace": "default"},
-			"spec": map[string]interface{}{
-				"volumes": []interface{}{
-					map[string]interface{}{
+			"metadata":   map[string]any{"name": "pod-no-pvc", "namespace": "default"},
+			"spec": map[string]any{
+				"volumes": []any{
+					map[string]any{
 						"name":     "config",
-						"emptyDir": map[string]interface{}{},
+						"emptyDir": map[string]any{},
 					},
 				},
 			},
@@ -1988,14 +1988,65 @@ func TestGetPodsUsingPVC_NoPods(t *testing.T) {
 	assert.Empty(t, names)
 }
 
+// TestGetOwnedResources_PersistentVolumeClaim verifies the lazy
+// replacement for the former eager "Used By" column: requesting owned
+// resources for a PVC returns Pod items for every pod that mounts it,
+// ready to render in the right-pane preview. The earlier design
+// performed this lookup for *every* PVC during the list fetch (N+1);
+// the test here exercises the on-demand path that runs only when the
+// user selects a specific PVC.
+func TestGetOwnedResources_PersistentVolumeClaim(t *testing.T) {
+	mounting := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]any{"name": "mounter", "namespace": "default"},
+			"spec": map[string]any{
+				"volumes": []any{
+					map[string]any{
+						"name": "data",
+						"persistentVolumeClaim": map[string]any{
+							"claimName": "target-pvc",
+						},
+					},
+				},
+			},
+		},
+	}
+	unrelated := &unstructured.Unstructured{
+		Object: map[string]any{
+			"apiVersion": "v1",
+			"kind":       "Pod",
+			"metadata":   map[string]any{"name": "unrelated", "namespace": "default"},
+			"spec": map[string]any{
+				"volumes": []any{
+					map[string]any{
+						"name":     "tmp",
+						"emptyDir": map[string]any{},
+					},
+				},
+			},
+		},
+	}
+	dc := newFakeDynClient(mounting, unrelated)
+	c := newFakeClient(nil, dc)
+
+	items, err := c.GetOwnedResources(context.Background(), "", "default", "PersistentVolumeClaim", "target-pvc")
+	require.NoError(t, err)
+	require.Len(t, items, 1)
+	assert.Equal(t, "mounter", items[0].Name)
+	assert.Equal(t, "Pod", items[0].Kind)
+	assert.Equal(t, "default", items[0].Namespace)
+}
+
 // --- PatchLabels ---
 
 func TestPatchLabels_Namespaced(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "my-cm",
 				"namespace": "default",
 			},
@@ -2005,7 +2056,7 @@ func TestPatchLabels_Namespaced(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
-	err := c.PatchLabels(context.Background(), "", "default", "my-cm", gvr, map[string]interface{}{
+	err := c.PatchLabels(context.Background(), "", "default", "my-cm", gvr, map[string]any{
 		"env": "prod",
 	})
 	require.NoError(t, err)
@@ -2013,10 +2064,10 @@ func TestPatchLabels_Namespaced(t *testing.T) {
 
 func TestPatchLabels_ClusterScoped(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "my-ns",
 			},
 		},
@@ -2025,7 +2076,7 @@ func TestPatchLabels_ClusterScoped(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
-	err := c.PatchLabels(context.Background(), "", "", "my-ns", gvr, map[string]interface{}{
+	err := c.PatchLabels(context.Background(), "", "", "my-ns", gvr, map[string]any{
 		"env": "prod",
 	})
 	require.NoError(t, err)
@@ -2035,10 +2086,10 @@ func TestPatchLabels_ClusterScoped(t *testing.T) {
 
 func TestPatchAnnotations_Namespaced(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ConfigMap",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "my-cm",
 				"namespace": "default",
 			},
@@ -2048,7 +2099,7 @@ func TestPatchAnnotations_Namespaced(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
-	err := c.PatchAnnotations(context.Background(), "", "default", "my-cm", gvr, map[string]interface{}{
+	err := c.PatchAnnotations(context.Background(), "", "default", "my-cm", gvr, map[string]any{
 		"note": "important",
 	})
 	require.NoError(t, err)
@@ -2056,10 +2107,10 @@ func TestPatchAnnotations_Namespaced(t *testing.T) {
 
 func TestPatchAnnotations_ClusterScoped(t *testing.T) {
 	obj := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "Namespace",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name": "my-ns",
 			},
 		},
@@ -2068,7 +2119,7 @@ func TestPatchAnnotations_ClusterScoped(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
-	err := c.PatchAnnotations(context.Background(), "", "", "my-ns", gvr, map[string]interface{}{
+	err := c.PatchAnnotations(context.Background(), "", "", "my-ns", gvr, map[string]any{
 		"note": "important",
 	})
 	require.NoError(t, err)
@@ -2078,22 +2129,22 @@ func TestPatchAnnotations_ClusterScoped(t *testing.T) {
 
 func TestGetNamespaceQuotas(t *testing.T) {
 	quota := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ResourceQuota",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "my-quota",
 				"namespace": "default",
 			},
-			"spec": map[string]interface{}{
-				"hard": map[string]interface{}{
+			"spec": map[string]any{
+				"hard": map[string]any{
 					"pods":   "10",
 					"cpu":    "4",
 					"memory": "8Gi",
 				},
 			},
-			"status": map[string]interface{}{
-				"used": map[string]interface{}{
+			"status": map[string]any{
+				"used": map[string]any{
 					"pods":   "5",
 					"cpu":    "2",
 					"memory": "4Gi",
@@ -2122,15 +2173,15 @@ func TestGetNamespaceQuotas(t *testing.T) {
 
 func TestGetNamespaceQuotas_NoStatus(t *testing.T) {
 	quota := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ResourceQuota",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "new-quota",
 				"namespace": "default",
 			},
-			"spec": map[string]interface{}{
-				"hard": map[string]interface{}{
+			"spec": map[string]any{
+				"hard": map[string]any{
 					"pods": "10",
 				},
 			},
@@ -2148,15 +2199,15 @@ func TestGetNamespaceQuotas_NoStatus(t *testing.T) {
 
 func TestGetNamespaceQuotas_AllNamespaces(t *testing.T) {
 	quota := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "v1",
 			"kind":       "ResourceQuota",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "global-quota",
 				"namespace": "production",
 			},
-			"spec": map[string]interface{}{
-				"hard": map[string]interface{}{"pods": "100"},
+			"spec": map[string]any{
+				"hard": map[string]any{"pods": "100"},
 			},
 		},
 	}
@@ -2311,22 +2362,22 @@ func TestGetOwnedResources_DefaultReturnsNil(t *testing.T) {
 
 func TestGetOwnedResources_CronJob(t *testing.T) {
 	job := &unstructured.Unstructured{
-		Object: map[string]interface{}{
+		Object: map[string]any{
 			"apiVersion": "batch/v1",
 			"kind":       "Job",
-			"metadata": map[string]interface{}{
+			"metadata": map[string]any{
 				"name":      "my-cron-12345",
 				"namespace": "default",
-				"ownerReferences": []interface{}{
-					map[string]interface{}{
+				"ownerReferences": []any{
+					map[string]any{
 						"kind": "CronJob",
 						"name": "my-cron",
 					},
 				},
 			},
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{"type": "Complete", "status": "True"},
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{"type": "Complete", "status": "True"},
 				},
 			},
 		},
@@ -2352,4 +2403,6 @@ func TestGetResourceTree_UnknownKind(t *testing.T) {
 }
 
 // helper
-func int32Ptr(i int32) *int32 { return &i }
+//
+//go:fix inline
+func int32Ptr(i int32) *int32 { return new(i) }

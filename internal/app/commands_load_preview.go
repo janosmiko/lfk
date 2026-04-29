@@ -24,7 +24,7 @@ func (m Model) loadPreview() tea.Cmd {
 
 	switch m.nav.Level {
 	case model.LevelClusters:
-		return m.loadResourceTypes()
+		return m.loadPreviewClusters(sel)
 	case model.LevelResourceTypes:
 		return m.loadPreviewResourceTypes(sel)
 	case model.LevelResources:
@@ -35,6 +35,53 @@ func (m Model) loadPreview() tea.Cmd {
 		return nil
 	}
 	return nil
+}
+
+// loadPreviewClusters handles preview loading at the cluster list.
+//
+// The right pane shows the resource types for the *hovered* context, not the
+// currently-active context (m.nav.Context is empty here after back-nav from
+// LevelResourceTypes). Behavior:
+//
+//   - Cached (discovery already completed for hoveredCtx): emit the real
+//     resource-type list so the right pane updates on cursor move.
+//   - Uncached: emit an empty list to clear any stale items from a
+//     previously-hovered context, and kick off discovery (unless one is
+//     already in flight). renderRightClusters will render the loader
+//     because rightItems is empty and m.discoveringContexts[hoveredCtx]
+//     is true. Once apiResourceDiscoveryMsg arrives,
+//     updateAPIResourceDiscovery replaces rightItems with the discovered
+//     list.
+func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
+	hoveredCtx := sel.Name
+	if hoveredCtx == "" {
+		return m.loadResourceTypes()
+	}
+	if discovered := m.discoveredResources[hoveredCtx]; len(discovered) > 0 {
+		items := model.BuildSidebarItems(discovered)
+		// If the discovered slice came from the disk cache (prefilled at
+		// startup) and discovery hasn't run live yet this session, we
+		// still want to kick one off behind the cached view — the user
+		// gets instant paint plus an asynchronous refresh.
+		var cmds []tea.Cmd
+		cmds = append(cmds, func() tea.Msg {
+			return resourceTypesMsg{items: items}
+		})
+		if m.shouldFireDiscoveryFor(hoveredCtx) {
+			m.markDiscoveryStarted(hoveredCtx)
+			cmds = append(cmds, m.discoverAPIResources(hoveredCtx))
+		}
+		return tea.Batch(cmds...)
+	}
+	// Clear rightItems so renderRightClusters falls into its loader branch.
+	cmds := []tea.Cmd{func() tea.Msg {
+		return resourceTypesMsg{items: nil}
+	}}
+	if m.shouldFireDiscoveryFor(hoveredCtx) {
+		m.markDiscoveryStarted(hoveredCtx)
+		cmds = append(cmds, m.discoverAPIResources(hoveredCtx))
+	}
+	return tea.Batch(cmds...)
 }
 
 // loadPreviewResourceTypes handles preview loading at the resource types level.
@@ -118,6 +165,13 @@ func (m Model) loadPreviewResources() tea.Cmd {
 	if eventsCmd := m.loadPreviewEvents(); eventsCmd != nil {
 		cmds = append(cmds, eventsCmd)
 	}
+	// loadPreviewSecretData is itself gated on kind and the lazy-loading
+	// config flag; call it unconditionally and let it no-op when not
+	// applicable. Keeping the gate centralised there makes the contract
+	// testable without reaching into tea.Batch internals here.
+	if secretCmd := m.loadPreviewSecretData(); secretCmd != nil {
+		cmds = append(cmds, secretCmd)
+	}
 	if len(cmds) == 0 {
 		return nil
 	}
@@ -144,7 +198,13 @@ func (m Model) loadPreviewOwned(sel *model.Item) tea.Cmd {
 		}
 		return tea.Batch(cmds...)
 	}
-	if kindHasOwnedChildren(sel.Kind) {
+	// PVC is listed in kindHasOwnedChildren so the right-pane preview at
+	// LevelResources can lazily show which pods use it, but at LevelOwned
+	// the existing UX is to show the PVC's YAML (e.g., user is drilled
+	// into a Helm release's children and hovers a PVC). Preserve that by
+	// letting PVC fall through to the YAML path here even though it
+	// reports "has children".
+	if kindHasOwnedChildren(sel.Kind) && sel.Kind != "PersistentVolumeClaim" {
 		return nil
 	}
 	if m.fullYAMLPreview {
@@ -366,9 +426,9 @@ func (m Model) loadHelmValues(allValues bool) tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPaths()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
-	args := []string{"get", "values", name, "-n", ns, "--kube-context", ctx, "-o", "yaml"}
+	args := []string{"get", "values", name, "-n", ns, "--kube-context", m.kubectlContext(ctx), "-o", "yaml"}
 	titleSuffix := "User Values"
 	if allValues {
 		args = append(args, "--all")
@@ -380,10 +440,12 @@ func (m Model) loadHelmValues(allValues bool) tea.Cmd {
 	return m.trackBgTask(bgtasks.KindSubprocess, title, bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(helmPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-		logger.Info("Running helm command", "cmd", cmd.String())
+		logExecCmd("Running helm command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			logger.Error("helm get values failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
+			// Helm chart values commonly embed secrets/passwords; redact
+			// the captured output before persisting it to lfk.log.
+			logger.Error("helm get values failed", "cmd", cmd.String(), "error", cmdErr, "output", logger.Redact(string(output)))
 			return helmValuesLoadedMsg{
 				title: title,
 				err:   fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
@@ -427,6 +489,92 @@ func (m Model) loadContainerPorts() tea.Cmd {
 		}
 		return containerPortsLoadedMsg{ports: ports, err: err}
 	})
+}
+
+// secretPreviewCacheKey returns the cache key for secret preview data.
+// Format: "ctx/namespace/name".
+func secretPreviewCacheKey(ctx, ns, name string) string {
+	return ctx + "/" + ns + "/" + name
+}
+
+// secretDataCachedFor reports whether the lazily-fetched data for the given
+// item is already in the preview cache. Used by the right-pane renderer to
+// distinguish "fetch still in flight" (show spinner) from "fetch completed,
+// just no data rows to show" (render the metadata summary anyway) — needed
+// because Secret items come from the metadata-only list path and have empty
+// Columns until/unless the hover fetch injects data.
+func (m Model) secretDataCachedFor(sel *model.Item) bool {
+	if sel == nil || m.nav.ResourceType.Kind != "Secret" {
+		return false
+	}
+	ns := m.resolveNamespace()
+	if sel.Namespace != "" {
+		ns = sel.Namespace
+	}
+	_, ok := m.secretPreviewCache[secretPreviewCacheKey(m.nav.Context, ns, sel.Name)]
+	return ok
+}
+
+// loadPreviewSecretData lazily fetches decoded secret data for the currently
+// hovered secret at LevelResources. On cache hit it synthesizes an immediate
+// message so the update handler can inject columns into freshly-rebuilt items
+// after a list refresh. On cache miss it dispatches a background task.
+//
+// Returns nil when:
+//   - the current resource type is not Secret,
+//   - secret_lazy_loading is off in config (the list path already eagerly
+//     decoded values into the item, so a hover GET would be redundant), or
+//   - no middle item is selected.
+func (m Model) loadPreviewSecretData() tea.Cmd {
+	if m.nav.ResourceType.Kind != "Secret" || !ui.ConfigSecretLazyLoading {
+		return nil
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return nil
+	}
+
+	kctx := m.nav.Context
+	ns := m.resolveNamespace()
+	if sel.Namespace != "" {
+		ns = sel.Namespace
+	}
+	name := sel.Name
+	gen := m.requestGen
+
+	key := secretPreviewCacheKey(kctx, ns, name)
+	if cached := m.secretPreviewCache[key]; cached != nil {
+		// Cache hit: emit immediately so the handler can inject columns into
+		// items rebuilt after a list refresh, without touching the network.
+		return func() tea.Msg {
+			return previewSecretDataLoadedMsg{
+				gen:  gen,
+				ctx:  kctx,
+				ns:   ns,
+				name: name,
+				data: cached,
+			}
+		}
+	}
+
+	// Cache miss: fetch in the background.
+	reqCtx := m.reqCtx
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"Secret data: "+name,
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			data, err := m.client.GetSecretData(reqCtx, kctx, ns, name)
+			return previewSecretDataLoadedMsg{
+				gen:  gen,
+				ctx:  kctx,
+				ns:   ns,
+				name: name,
+				data: data,
+				err:  err,
+			}
+		},
+	)
 }
 
 // waitForStderr listens for captured stderr output and returns it as a message.

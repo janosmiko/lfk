@@ -20,7 +20,28 @@ func (m Model) viewLogs() string {
 		statusMsg = m.statusMessage
 		statusIsErr = m.statusMessageErr
 	}
-	return ui.RenderLogViewer(m.logLines, m.logScroll, m.width, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol)
+
+	logWidth := m.width
+	previewWidth := 0
+	if m.logPreviewVisible {
+		logWidth, previewWidth = splitLogPreviewWidth(m.width)
+	}
+
+	// When the preview pane is visible the hotkey hint bar is rendered once
+	// across the full terminal width below the JoinHorizontal'd panes, so each
+	// pane omits its internal footer (issue #71). Otherwise the log viewer
+	// keeps its built-in footer for the standalone (no-preview) layout.
+	omitInnerFooter := previewWidth > 0
+
+	logView := ui.RenderLogViewer(m.logLines, m.logScroll, logWidth, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, m.logWrapTopSkip, omitInnerFooter)
+
+	if previewWidth > 0 {
+		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logPreviewScroll, true)
+		panes := lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
+		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logSearchActive, m.logSearchInput.Value, m.logSearchQuery, m.logVisualMode, canSwitchPod, canFilterContainers)
+		return lipgloss.JoinVertical(lipgloss.Left, panes, footer)
+	}
+	return logView
 }
 
 func (m Model) viewDescribe() string {
@@ -41,33 +62,31 @@ func (m Model) viewDescribe() string {
 		hints = append(hints, ui.HintEntry{Key: "LIVE", Desc: "auto-refresh"})
 	}
 	var hint string
-	if m.describeSearchActive {
+	switch {
+	case m.hasStatusMessage():
+		hint = m.renderStatusHint()
+	case m.describeSearchActive:
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeSearchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.describeSearchInput.CursorRight())
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
-	} else if m.describeSearchQuery != "" {
+	case m.describeSearchQuery != "":
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeSearchQuery)
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
-	} else {
+	default:
 		hint = ui.RenderHintBar(hints, m.width)
 	}
 
 	lines := strings.Split(m.describeContent, "\n")
 
-	maxLines := m.height - 4
-	if maxLines < 3 {
-		maxLines = 3
-	}
+	maxLines := max(m.height-4, 3)
 
 	// Content width for wrapping/truncation.
 	// Account for cursor gutter (1 char).
-	contentWidth := m.width - 4 // border (2) + padding (2)
-	if contentWidth < 10 {
-		contentWidth = 10
-	}
-	lineContentWidth := contentWidth - 1 // -1 for cursor gutter
-	if lineContentWidth < 10 {
-		lineContentWidth = 10
-	}
+	contentWidth := max(
+		// border (2) + padding (2)
+		m.width-4, 10)
+	lineContentWidth := max(
+		// -1 for cursor gutter
+		contentWidth-1, 10)
 
 	scroll := m.describeScroll
 	if scroll > len(lines) {
@@ -193,10 +212,7 @@ func highlightDescribeSearchLine(line, lowerQuery string) string {
 		if idx > 0 {
 			result.WriteString(line[pos : pos+idx])
 		}
-		matchEnd := pos + idx + len(lowerQuery)
-		if matchEnd > len(line) {
-			matchEnd = len(line)
-		}
+		matchEnd := min(pos+idx+len(lowerQuery), len(line))
 		result.WriteString(matchStyle.Render(line[pos+idx : matchEnd]))
 		pos = matchEnd
 	}
@@ -254,17 +270,26 @@ func (m Model) viewDiff() string {
 		VisualStart: m.diffVisualStart,
 		VisualCol:   m.diffVisualCol,
 	}
-	if m.diffUnified {
-		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+	// The diff renderer paints its own bottom hint bar inside the ui
+	// package, so the only safe way to surface a status message there is
+	// to hand it to the renderer as a footer override and let it slot the
+	// override in instead of building the default hint. Anything that
+	// post-processes the rendered output by splitting on \n is fragile
+	// against multi-line hints and trailing newlines.
+	var footerOverride string
+	if m.hasStatusMessage() {
+		footerOverride = m.renderStatusHint()
 	}
-	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp)
+	if m.diffUnified {
+		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp, footerOverride)
+	}
+	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp, footerOverride)
 }
 
 func (m Model) logViewHeight() int {
-	h := m.height - 2 // title + footer (border is handled inside RenderLogViewer)
-	if h < 3 {
-		h = 3
-	}
+	h := max(
+		// title + footer (border is handled inside RenderLogViewer)
+		m.height-2, 3)
 	return h
 }
 
@@ -284,46 +309,7 @@ func (m *Model) logContentHeight() int {
 }
 
 func (m *Model) clampLogScroll() {
-	viewH := m.logContentHeight()
-	if viewH < 1 {
-		viewH = 1
-	}
-
-	var maxScroll int
-	if m.logWrap {
-		// When wrapping, each source line may produce multiple visual lines.
-		// Walk backward from the end, accumulating visual lines until we
-		// exceed viewH. The first source line that pushes us over is the
-		// maximum scroll position.
-		contentWidth := m.width - 4 // match logviewer.go contentWidth calculation
-		if contentWidth < 10 {
-			contentWidth = 10
-		}
-		// Account for cursor gutter (1) and line number gutter width.
-		lineNumWidth := 0
-		if m.logLineNumbers && len(m.logLines) > 0 {
-			lineNumWidth = len(fmt.Sprintf("%d", len(m.logLines))) + 1
-		}
-		availWidth := contentWidth - 1 - lineNumWidth // -1 for cursor gutter
-		if availWidth < 10 {
-			availWidth = 10
-		}
-
-		visualLines := 0
-		maxScroll = len(m.logLines) // default: can scroll to end
-		for i := len(m.logLines) - 1; i >= 0; i-- {
-			visualLines += wrappedLineCount(m.logLines[i], availWidth)
-			if visualLines >= viewH {
-				maxScroll = i
-				break
-			}
-		}
-	} else {
-		maxScroll = len(m.logLines) - viewH
-	}
-	if maxScroll < 0 {
-		maxScroll = 0
-	}
+	maxScroll := m.logMaxScroll()
 	if m.logScroll > maxScroll {
 		m.logScroll = maxScroll
 	}
@@ -333,72 +319,161 @@ func (m *Model) clampLogScroll() {
 }
 
 // ensureLogCursorVisible adjusts logScroll so the cursor is within the visible
-// content area with scrolloff margin.
+// content area. In wrap mode the math accounts for visual rows (each source
+// line may produce multiple wrapped sub-lines) so the cursor doesn't drift
+// off-screen when intermediate lines wrap heavily; outside wrap mode it's
+// classic source-line scrolloff. logFollow always wins: it snaps to the
+// (maxScroll, topSkip) pair that pins the most recent sub-line to the bottom.
 func (m *Model) ensureLogCursorVisible() {
+	// Cursor movement implies the previewed line just changed (or is about
+	// to), so any prior preview scroll is now relative to stale content.
+	// Resetting here covers j/k/ctrl+d/u/ctrl+f/b/G/g/search-next as well
+	// as the toggle, which all reach this function.
+	m.logPreviewScroll = 0
+
 	if m.logCursor < 0 {
 		return
 	}
 	if len(m.logLines) > 0 && m.logCursor >= len(m.logLines) {
 		m.logCursor = len(m.logLines) - 1
 	}
-	viewH := m.logContentHeight()
-	if viewH < 1 {
-		viewH = 1
+	if m.logFollow {
+		m.logScroll, m.logWrapTopSkip = m.logMaxScrollAndSkip()
+		return
 	}
-	so := ui.ConfigScrollOff
-	if so > viewH/2 {
-		so = viewH / 2
+	viewH := max(m.logContentHeight(), 1)
+	so := min(ui.ConfigScrollOff, viewH/2)
+
+	if m.logWrap {
+		m.adjustLogScrollForCursorWrap(viewH)
+		return
 	}
-	// Scroll up if cursor is above viewport (with scrolloff).
+
 	if m.logCursor < m.logScroll+so {
 		m.logScroll = m.logCursor - so
 	}
-	// Scroll down if cursor is below viewport (with scrolloff).
 	if m.logCursor >= m.logScroll+viewH-so {
 		m.logScroll = m.logCursor - viewH + so + 1
 	}
+	m.logWrapTopSkip = 0
 	m.clampLogScroll()
+}
+
+// adjustLogScrollForCursorWrap positions logScroll/logWrapTopSkip so that
+// the cursor's source line (and ideally all of its wrapped sub-lines) is
+// inside the visible viewport, in visual-row terms. Pins cursor's bottom
+// sub-line to the viewport's bottom row when scrolling down; cursor's first
+// sub-line to row 0 when scrolling up. Drops scrolloff for simplicity.
+func (m *Model) adjustLogScrollForCursorWrap(viewH int) {
+	availWidth := m.logWrapAvailWidth()
+
+	// Cursor above scroll → snap top.
+	if m.logCursor < m.logScroll {
+		m.logScroll = m.logCursor
+		m.logWrapTopSkip = 0
+		m.clampLogScroll()
+		return
+	}
+
+	// Compute the visual row where cursor's first wrapped sub-line will
+	// land given the current (logScroll, logWrapTopSkip).
+	cursorTopRow := -m.logWrapTopSkip
+	for i := m.logScroll; i < m.logCursor && i < len(m.logLines); i++ {
+		cursorTopRow += wrappedLineCount(m.logDisplayLine(i), availWidth)
+	}
+	cursorWrap := wrappedLineCount(m.logDisplayLine(m.logCursor), availWidth)
+	cursorBottomRow := cursorTopRow + cursorWrap - 1
+
+	if cursorBottomRow < viewH {
+		return // already visible
+	}
+
+	// Cursor's last sub-line is off the bottom. Place it at viewH-1 by
+	// walking back from cursor and accumulating wrap counts until the
+	// rows above sum to (viewH - cursorWrap).
+	target := viewH - cursorWrap
+	if target <= 0 {
+		// Cursor itself wraps to more than viewH rows: show its first
+		// viewH sub-lines so the cursor indicator (always on sub-line 0)
+		// stays visible at the top.
+		m.logScroll = m.logCursor
+		m.logWrapTopSkip = 0
+		m.clampLogScroll()
+		return
+	}
+	accumulated := 0
+	for i := m.logCursor - 1; i >= 0; i-- {
+		wc := wrappedLineCount(m.logDisplayLine(i), availWidth)
+		if accumulated+wc >= target {
+			m.logScroll = i
+			m.logWrapTopSkip = accumulated + wc - target
+			m.clampLogScroll()
+			return
+		}
+		accumulated += wc
+	}
+	m.logScroll = 0
+	m.logWrapTopSkip = 0
 }
 
 // logMaxScroll returns the maximum valid scroll offset for the log viewer.
 // It is wrap-aware when logWrap is enabled.
 func (m *Model) logMaxScroll() int {
-	viewH := m.logContentHeight()
+	maxScroll, _ := m.logMaxScrollAndSkip()
+	return maxScroll
+}
+
+// logMaxScrollAndSkip returns the (maxScroll, topSkip) pair that pins the
+// most recent log content to the bottom of the viewport in wrap mode. The
+// sub-line skip is non-zero only when the chosen source line wraps to more
+// rows than the renderer can show — in that case the renderer drops the
+// first topSkip wrapped sub-lines so the tail of the line lands at the
+// bottom row instead of falling off-screen. Outside wrap mode, topSkip is
+// always 0 and the math collapses to the classic source-line offset.
+func (m *Model) logMaxScrollAndSkip() (int, int) {
+	viewH := max(m.logContentHeight(), 1)
 
 	if m.logWrap {
-		contentWidth := m.width - 4
-		if contentWidth < 10 {
-			contentWidth = 10
-		}
-		lineNumWidth := 0
-		if m.logLineNumbers && len(m.logLines) > 0 {
-			lineNumWidth = len(fmt.Sprintf("%d", len(m.logLines))) + 1
-		}
-		availWidth := contentWidth - 1 - lineNumWidth // -1 for cursor gutter
-		if availWidth < 10 {
-			availWidth = 10
-		}
-
+		availWidth := m.logWrapAvailWidth()
 		visualLines := 0
-		maxScroll := len(m.logLines)
+		// Default: everything fits, scroll stays at the top with no skip.
+		maxScroll, topSkip := 0, 0
 		for i := len(m.logLines) - 1; i >= 0; i-- {
-			visualLines += wrappedLineCount(m.logLines[i], availWidth)
+			// Use the displayed line (timestamps and pod prefixes
+			// stripped to match the renderer) so the wrap count reflects
+			// what the viewer actually paints — otherwise the raw line
+			// is longer than the rendered one and we'd overestimate
+			// wraps, shrinking maxScroll and pushing the tail off the
+			// bottom when following.
+			visualLines += wrappedLineCount(m.logDisplayLine(i), availWidth)
 			if visualLines >= viewH {
 				maxScroll = i
+				topSkip = visualLines - viewH
 				break
 			}
 		}
-		if maxScroll < 0 {
-			return 0
-		}
-		return maxScroll
+		return maxScroll, topSkip
 	}
 
 	ms := len(m.logLines) - viewH
 	if ms < 0 {
-		return 0
+		return 0, 0
 	}
-	return ms
+	return ms, 0
+}
+
+// logWrapAvailWidth returns the per-line content width used when computing
+// wrap counts. Mirrors the logviewer's renderWrappedLines availWidth math
+// (border + padding + cursor gutter + line-number gutter). Uses the
+// effective viewer width so wrap math stays correct when the preview pane
+// is open and the log column has been narrowed.
+func (m *Model) logWrapAvailWidth() int {
+	contentWidth := max(m.logEffectiveWidth()-4, 10)
+	lineNumWidth := 0
+	if m.logLineNumbers && len(m.logLines) > 0 {
+		lineNumWidth = len(fmt.Sprintf("%d", len(m.logLines))) + 1
+	}
+	return max(contentWidth-1-lineNumWidth, 10)
 }
 
 // wrappedLineCount returns how many visual lines a source line produces
@@ -432,20 +507,17 @@ func (m Model) viewExecTerminal() string {
 
 	// Render terminal content. Overhead: exec title (1) + border top/bottom (2) + hint line (1) = 4.
 	// The outer View() already subtracted the main title bar and tab bar from m.height.
-	viewH := m.height - 4
-	if viewH < 3 {
-		viewH = 3
-	}
-	viewW := m.width - 4 // border left/right + padding
-	if viewW < 10 {
-		viewW = 10
-	}
+	viewH := max(m.height-4, 3)
+	viewW := max(
+		// border left/right + padding
+		m.width-4, 10)
 
 	var termContent string
 	if m.execTerm != nil {
 		m.execMu.Lock()
 		cols, rows := m.execTerm.Size()
 		cursor := m.execTerm.Cursor()
+		cursorVisible := m.execTerm.CursorVisible()
 
 		// Calculate vertical scroll offset to keep the cursor visible.
 		// When the terminal buffer is taller than the viewport, show the
@@ -455,10 +527,7 @@ func (m Model) viewExecTerminal() string {
 		if rows > viewH {
 			renderH = viewH
 			// Ensure cursor row is within the visible portion.
-			startY = cursor.Y - viewH + 1
-			if startY < 0 {
-				startY = 0
-			}
+			startY = max(cursor.Y-viewH+1, 0)
 			if startY+viewH > rows {
 				startY = rows - viewH
 			}
@@ -490,6 +559,11 @@ func (m Model) viewExecTerminal() string {
 				}
 				if g.Mode&1 != 0 { // reverse (attrReverse = 1)
 					style = style.Reverse(true)
+				}
+				// Cursor block: invert the cell at the cursor position
+				// (flipping any existing reverse so the block stands out).
+				if cursorVisible && x == cursor.X && y == cursor.Y {
+					style = style.Reverse(g.Mode&1 == 0)
 				}
 				line.WriteString(style.Render(string(ch)))
 			}
@@ -584,6 +658,9 @@ func viewModeIndicators(wrap bool, visualMode rune, searchQuery string) string {
 
 // eventViewerHintBar returns the hint bar for the event viewer.
 func (m Model) eventViewerHintBar() string {
+	if m.hasStatusMessage() {
+		return m.renderStatusHint()
+	}
 	if m.eventTimelineSearchActive {
 		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorRight())
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)

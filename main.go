@@ -104,6 +104,7 @@ func runTUI(opts app.StartupOptions) error {
 		ui.SetNoColor(true)
 	}
 	model.PinnedGroups = ui.ConfigPinnedGroups
+	client.SetSecretLazyLoading(ui.ConfigSecretLazyLoading)
 
 	if err := logger.Init(ui.ConfigLogPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not initialize logger: %v\n", err)
@@ -131,6 +132,9 @@ func runTUI(opts app.StartupOptions) error {
 	progOpts := []tea.ProgramOption{tea.WithAltScreen()}
 	if !opts.NoMouse && ui.ConfigMouse {
 		progOpts = append(progOpts, tea.WithMouseCellMotion())
+	}
+	if ui.ColorModeEnabled() {
+		defer ui.DisableColorModeNotifications()
 	}
 	p := tea.NewProgram(m, progOpts...)
 

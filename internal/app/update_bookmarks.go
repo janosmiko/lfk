@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -79,19 +80,23 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	}
 	name := strings.Join(parts, " > ")
 
+	// Always capture the current namespace scope so it's available for
+	// an opt-in override at jump time (Tab in the bookmark overlay).
+	// Context-free slots still ignore it on a default jump — the slot
+	// case controls defaults, not persistence.
 	var ns string
 	var nsList []string
-	if m.allNamespaces {
+	switch {
+	case m.allNamespaces:
 		ns = ""
-	} else if len(m.selectedNamespaces) > 1 {
-		// Multiple namespaces selected — store them all.
+	case len(m.selectedNamespaces) > 1:
 		nsList = make([]string, 0, len(m.selectedNamespaces))
 		for n := range m.selectedNamespaces {
 			nsList = append(nsList, n)
 		}
 		sort.Strings(nsList)
 		ns = nsList[0] // primary namespace for backward compat display
-	} else {
+	default:
 		ns = m.namespace
 	}
 
@@ -114,7 +119,7 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	for _, b := range m.bookmarks {
 		if b.Slot == slot {
 			m.pendingBookmark = &bm
-			m.setStatusMessage(fmt.Sprintf("Mark '%s' exists (%s). Overwrite? (y/n)", slot, b.Name), true)
+			m.setStatusMessage(fmt.Sprintf("Mark '%s' exists (%s). Overwrite? (Enter/Esc)", slot, b.Name), true)
 			return m, nil
 		}
 	}
@@ -189,7 +194,9 @@ func (m *Model) bookmarkDeleteCurrent() tea.Cmd {
 			break
 		}
 	}
-	_ = saveBookmarks(m.bookmarks)
+	if err := saveBookmarks(m.bookmarks); err != nil {
+		logger.Error("Failed to persist bookmarks after delete", "error", err, "slot", target.Slot)
+	}
 	newFiltered := m.filteredBookmarks()
 	m.overlayCursor = clampOverlayCursor(m.overlayCursor, 0, len(newFiltered)-1)
 	m.setStatusMessage("Removed bookmark: "+target.Name, false)
@@ -223,7 +230,9 @@ func (m *Model) bookmarkDeleteAll() tea.Cmd {
 		}
 		m.bookmarks = remaining
 	}
-	_ = saveBookmarks(m.bookmarks)
+	if err := saveBookmarks(m.bookmarks); err != nil {
+		logger.Error("Failed to persist bookmarks after bulk delete", "error", err, "removed", len(filtered))
+	}
 	m.overlayCursor = 0
 	count := len(filtered)
 	m.setStatusMessage(fmt.Sprintf("Removed %d bookmark(s)", count), false)
@@ -261,6 +270,15 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 		m.overlay = overlayNone
 		m.bookmarkFilter.Clear()
 		m.bookmarkSearchMode = bookmarkModeNormal
+		// Discard any pending "load namespace" flag so the next open
+		// starts from the default (don't load).
+		m.bookmarkLoadNamespace = false
+		return m, nil
+	case "tab":
+		// Arm the "load saved namespace" flag for the next jump. The
+		// title bar picks this up via the [LOAD NAMESPACE] chip so
+		// the user sees what Enter / slot-key will do.
+		m.bookmarkLoadNamespace = !m.bookmarkLoadNamespace
 		return m, nil
 	case "enter":
 		if len(filtered) > 0 && m.overlayCursor >= 0 && m.overlayCursor < len(filtered) {
@@ -281,7 +299,7 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 				label = fmt.Sprintf("'%s' (%s)", target.Slot, target.Name)
 			}
 			m.bookmarkSearchMode = bookmarkModeConfirmDelete
-			m.setStatusMessage(fmt.Sprintf("Delete mark %s? (y/n)", label), true)
+			m.setStatusMessage(fmt.Sprintf("Delete mark %s? (Enter/Esc)", label), true)
 		}
 		return m, nil
 	case "alt+x":
@@ -290,7 +308,7 @@ func (m Model) handleBookmarkNormalMode(msg tea.KeyMsg, filtered []model.Bookmar
 		if len(filtered) > 0 {
 			count := len(filtered)
 			m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
-			m.setStatusMessage(fmt.Sprintf("Delete %d bookmark(s)? (y/n)", count), true)
+			m.setStatusMessage(fmt.Sprintf("Delete %d bookmark(s)? (Enter/Esc)", count), true)
 		}
 		return m, nil
 	case "ctrl+c":
@@ -333,11 +351,21 @@ func (m Model) handleBookmarkNavKey(msg tea.KeyMsg, filtered []model.Bookmark) (
 	case "ctrl+u":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, maxIdx)
 		return m, true
-	case "ctrl+f":
+	case "ctrl+f", "pgdown":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 20, maxIdx)
 		return m, true
-	case "ctrl+b":
+	case "ctrl+b", "pgup":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -20, maxIdx)
+		return m, true
+	case "home":
+		m.pendingG = false
+		m.overlayCursor = 0
+		return m, true
+	case "end":
+		m.pendingG = false
+		if len(filtered) > 0 {
+			m.overlayCursor = maxIdx
+		}
 		return m, true
 	}
 	return m, false
@@ -375,11 +403,11 @@ func (m Model) handleBookmarkFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleBookmarkConfirmDelete handles y/n confirmation for single bookmark deletion.
+// handleBookmarkConfirmDelete handles Enter/y / Esc/n confirmation for single bookmark deletion.
 func (m Model) handleBookmarkConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.bookmarkSearchMode = bookmarkModeNormal
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		cmd := m.bookmarkDeleteCurrent()
 		return m, cmd
 	default:
@@ -388,11 +416,11 @@ func (m Model) handleBookmarkConfirmDelete(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	}
 }
 
-// handleBookmarkConfirmDeleteAll handles y/n confirmation for deleting all bookmarks.
+// handleBookmarkConfirmDeleteAll handles Enter/y / Esc/n confirmation for deleting all bookmarks.
 func (m Model) handleBookmarkConfirmDeleteAll(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m.bookmarkSearchMode = bookmarkModeNormal
 	switch msg.String() {
-	case "y", "Y":
+	case "enter", "y", "Y":
 		cmd := m.bookmarkDeleteAll()
 		return m, cmd
 	default:
@@ -415,6 +443,25 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 
 	rt, ok := model.FindResourceTypeIn(bm.ResourceType, m.discoveredResources[effectiveContext])
 	if !ok {
+		// Distinguish "discovery hasn't run yet" (key absent from the map)
+		// from "discovered, type genuinely not in cluster" (key present, type
+		// missing). The former is the session-restore case for CRD-backed
+		// bookmarks: stash the bookmark and let updateAPIResourceDiscovery
+		// replay it once the discovery message arrives. Without this, popping
+		// a bookmark for an ArgoCD Application right after launching lfk
+		// failed outright until the user navigated out and back to force a
+		// resource-types refresh.
+		if _, discovered := m.discoveredResources[effectiveContext]; !discovered {
+			bmCopy := bm
+			m.bookmarkAwaitingDiscovery = &bmCopy
+			m.setStatusMessage("Discovering resources...", false)
+			cmds := []tea.Cmd{scheduleStatusClear()}
+			if m.shouldFireDiscoveryFor(effectiveContext) {
+				m.markDiscoveryStarted(effectiveContext)
+				cmds = append(cmds, m.discoverAPIResources(effectiveContext))
+			}
+			return m, tea.Batch(cmds...)
+		}
 		m.setStatusMessage("Resource type not found in current cluster", true)
 		return m, scheduleStatusClear()
 	}
@@ -426,27 +473,36 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.monitoringPreview = ""
 	m.applyPinnedGroups()
 
-	// Set namespace(s).
-	if bm.Namespace == "" && len(bm.Namespaces) == 0 {
-		m.allNamespaces = true
-		m.selectedNamespaces = nil
-	} else if len(bm.Namespaces) > 1 {
-		// Multiple namespaces stored.
-		m.allNamespaces = false
-		m.namespace = bm.Namespaces[0]
-		m.selectedNamespaces = make(map[string]bool, len(bm.Namespaces))
-		for _, ns := range bm.Namespaces {
-			m.selectedNamespaces[ns] = true
+	// Apply the bookmark's saved namespace only when the user asked
+	// for it via Tab in the overlay. Default behaviour is "jump to
+	// the resource type in my current namespace scope", regardless of
+	// slot case; the saved namespace stays in the record so the
+	// override can replay it on demand. Consume the flag right after
+	// reading so it can't leak into the next open.
+	applyNs := m.bookmarkLoadNamespace
+	m.bookmarkLoadNamespace = false
+
+	if applyNs {
+		switch {
+		case bm.Namespace == "" && len(bm.Namespaces) == 0:
+			m.allNamespaces = true
+			m.selectedNamespaces = nil
+		case len(bm.Namespaces) > 1:
+			m.allNamespaces = false
+			m.namespace = bm.Namespaces[0]
+			m.selectedNamespaces = make(map[string]bool, len(bm.Namespaces))
+			for _, ns := range bm.Namespaces {
+				m.selectedNamespaces[ns] = true
+			}
+		default:
+			m.allNamespaces = false
+			ns := bm.Namespace
+			if len(bm.Namespaces) == 1 {
+				ns = bm.Namespaces[0]
+			}
+			m.namespace = ns
+			m.selectedNamespaces = map[string]bool{ns: true}
 		}
-	} else {
-		// Single namespace (legacy or single-select).
-		m.allNamespaces = false
-		ns := bm.Namespace
-		if len(bm.Namespaces) == 1 {
-			ns = bm.Namespaces[0]
-		}
-		m.namespace = ns
-		m.selectedNamespaces = map[string]bool{ns: true}
 	}
 
 	// Navigate to resource type level first, then optionally deeper.
@@ -463,7 +519,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	// Reset column data and history; we'll rebuild from the target level.
 	m.leftItems = nil
 	m.leftItemsHistory = nil
-	m.middleItems = nil
+	m.setMiddleItems(nil)
 	m.rightItems = nil
 	m.clearRight()
 
@@ -505,7 +561,11 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.searchActive = false
 
 	m.setStatusMessage("Jumped to: "+bm.Name, false)
-	return m, tea.Batch(m.loadResources(false), scheduleStatusClear())
+	cmds := []tea.Cmd{m.loadResources(false), scheduleStatusClear()}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	return m, tea.Batch(cmds...)
 }
 
 // restoreSession applies the pending session state after contexts have been loaded.
@@ -567,9 +627,9 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	// completed for this context, use the full list; otherwise show a loader
 	// and let updateAPIResourceDiscovery populate it when ready.
 	if discovered, ok := m.discoveredResources[sess.Context]; ok && len(discovered) > 0 {
-		m.middleItems = model.BuildSidebarItems(discovered)
+		m.setMiddleItems(model.BuildSidebarItems(discovered))
 	} else {
-		m.middleItems = model.BuildSidebarItems(model.SeedResources())
+		m.setMiddleItems(model.BuildSidebarItems(model.SeedResources()))
 	}
 	m.itemCache[m.navKey()] = m.middleItems
 	m.clearRight()
@@ -578,14 +638,22 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces)
 
 	var cmds []tea.Cmd
-	needsDiscovery := false
-	if _, ok := m.discoveredResources[sess.Context]; !ok {
-		needsDiscovery = true
+	// "Needs discovery" means: the saved type ref might not resolve from
+	// the data we have on hand and a live discovery is going to land soon
+	// (or already in flight). Both the cache-prefill case and the
+	// no-data-at-all case set this — the difference is whether the user
+	// sees stale-but-correct data immediately versus a loader.
+	needsDiscovery := m.shouldFireDiscoveryFor(sess.Context)
+	if needsDiscovery {
+		m.markDiscoveryStarted(sess.Context)
 		cmds = append(cmds, m.discoverAPIResources(sess.Context))
 	}
 	// Dispatch the security availability probe so the Security category
 	// populates itself on cold start.
 	if cmd := m.loadSecurityAvailability(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 
@@ -596,6 +664,16 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 		// (Pods, Deployments, Services, etc.) still resolve and the user
 		// lands back on their saved view instead of the resource types list.
 		rt, ok := resolveSessionResourceType(sess.ResourceType, m.discoveredResources[sess.Context])
+		if !ok && needsDiscovery {
+			// Type ref isn't in the seed list (CRD-backed view like ArgoCD
+			// Application) and discovery is in flight. Park the deeper
+			// navigation; updateAPIResourceDiscovery will resume it once
+			// the discovered set lands. Without this the user is dropped
+			// at the resource types level even though their saved view
+			// would have resolved a moment later.
+			m.sessionResourceTypeAwaitingDiscovery = sess.ResourceType
+			m.sessionResourceNameAwaitingDiscovery = sess.ResourceName
+		}
 		if ok {
 			// Save cursor position at the resource types level so navigating
 			// back (h) restores the cursor to the correct resource type.
@@ -613,7 +691,7 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 			m.leftItems = m.middleItems
 			m.nav.ResourceType = rt
 			m.nav.Level = model.LevelResources
-			m.middleItems = nil
+			m.setMiddleItems(nil)
 			m.clearRight()
 			m.setCursor(0)
 			m.loading = true
@@ -630,7 +708,7 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	// No resource type or not found: stay at resource types level.
 	// Show loader while discovery is in-flight.
 	if needsDiscovery {
-		m.middleItems = nil
+		m.setMiddleItems(nil)
 		m.loading = true
 	}
 	m.clampCursor()

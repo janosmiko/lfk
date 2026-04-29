@@ -440,6 +440,86 @@ func TestNavigateToBookmark_LocalKeepsContext_FailsInWrongCluster(t *testing.T) 
 		"context-free bookmark should not change context when resource is not found")
 }
 
+// Regression: opening lfk into a previous session restored at LevelResources
+// (e.g. pods) means the seed list resolves Pods/Deployments synchronously,
+// but CRD discovery is still in flight when the user pops the bookmark
+// overlay. A bookmark that targets a CRD-backed type (ArgoCD Application,
+// etc.) used to fail outright with "Resource type not found in current
+// cluster" -- the user had to navigate out to the resource types level to
+// trigger a refresh, then re-open the bookmark.
+//
+// Now: when discoveredResources has no entry for the effective context yet,
+// stash the bookmark and let updateAPIResourceDiscovery replay it once the
+// discovery message lands.
+// Regression: when lfk quits on a CRD-backed resource view (e.g. ArgoCD
+// Application) and is reopened, the seed list resolves only built-in K8s
+// resources at restore time, so resolveSessionResourceType returned false
+// and the user was dropped at the resource types level. updateAPIResource-
+// Discovery now resumes the deferred deeper navigation when the matching
+// context's entries arrive.
+func TestUpdateAPIResourceDiscovery_ResumesDeferredSessionRestore(t *testing.T) {
+	crd := customCRDResourceType()
+	rtRef := crd.ResourceRef()
+
+	m := baseFinalModel()
+	m.nav.Context = "test-ctx"
+	m.nav.Level = model.LevelResourceTypes
+	// Empty leftItemsHistory triggers GetContexts() — pre-seed it with what
+	// the live session restore would have populated so the test focuses on
+	// the deferred-deeper-navigation path.
+	m.leftItemsHistory = [][]model.Item{{}}
+	// Arm the deferred-restore state the way restoreSession would.
+	m.sessionResourceTypeAwaitingDiscovery = rtRef
+	m.sessionResourceNameAwaitingDiscovery = "my-app"
+
+	result, cmd := m.updateAPIResourceDiscovery(apiResourceDiscoveryMsg{
+		context: "test-ctx",
+		entries: []model.ResourceTypeEntry{crd},
+	})
+
+	assert.Equal(t, "", result.sessionResourceTypeAwaitingDiscovery,
+		"deferred type ref must be cleared once consumed")
+	assert.Equal(t, "", result.sessionResourceNameAwaitingDiscovery,
+		"deferred name must be cleared once consumed")
+	assert.Equal(t, model.LevelResources, result.nav.Level,
+		"navigation must drill from resource types into resources level")
+	assert.Equal(t, crd.Resource, result.nav.ResourceType.Resource,
+		"navigation must land on the CRD that just became known")
+	assert.Equal(t, "my-app", result.pendingTarget,
+		"saved resource name must roll into pendingTarget so loadResources lands on it")
+	assert.NotNil(t, cmd, "loadResources cmd must be returned to fetch the deeper level")
+}
+
+func TestNavigateToBookmark_StashesUntilDiscoveryArrives(t *testing.T) {
+	crd := customCRDResourceType()
+	m := Model{
+		nav: model.NavigationState{
+			Context: "cluster-A",
+		},
+		// Empty map -- key for cluster-A is absent, signalling "discovery
+		// hasn't run yet" (as distinct from "ran but cluster has no such CRD").
+		discoveredResources: map[string][]model.ResourceTypeEntry{},
+		discoveringContexts: map[string]bool{},
+	}
+
+	bm := model.Bookmark{
+		ResourceType: crd.ResourceRef(),
+		Namespace:    "default",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	resultModel := result.(Model)
+
+	require.NotNil(t, resultModel.bookmarkAwaitingDiscovery, "bookmark must be stashed when discovery hasn't run")
+	assert.Equal(t, crd.ResourceRef(), resultModel.bookmarkAwaitingDiscovery.ResourceType,
+		"stashed bookmark must be the one we asked to navigate to")
+	assert.True(t, resultModel.discoveringContexts["cluster-A"],
+		"discovery must be marked in-flight so updateAPIResourceDiscovery clears it on arrival")
+	assert.NotContains(t, resultModel.statusMessage, "not found",
+		"a queued bookmark must not show the user a 'not found' error")
+	assert.NotNil(t, cmd, "navigateToBookmark must return the discovery cmd so the bookmark can replay")
+}
+
 func TestNavigateToBookmark_GlobalSwitchesContext(t *testing.T) {
 	// The custom CRD exists only in cluster-B (the bookmark's context).
 	// A context-aware bookmark should look up resources in the bookmark's
@@ -595,6 +675,201 @@ func TestSaveBookmark_OverwriteDoesNotCorruptOriginal(t *testing.T) {
 	assert.Equal(t, "bm-c", bookmarks[2].Name, "original bookmarks[2].Name should be 'bm-c'")
 }
 
+// TestNavigateToBookmark_ContextFreePreservesCurrentNamespace verifies that
+// jumping to a context-free bookmark (uppercase slot) keeps the tab's
+// current namespace instead of forcing the bookmark's saved value. A
+// context-free bookmark is a "wherever I am right now, go to this
+// resource type" shortcut; namespace scope is part of "wherever I am".
+func TestNavigateToBookmark_ContextFreePreservesCurrentNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+	m.allNamespaces = false
+	m.selectedNamespaces = map[string]bool{"staging": true}
+
+	// Context-free: no Context field. The bookmark's Namespace would have
+	// been captured as "default" under the old behaviour — under the new
+	// semantic we ignore it entirely.
+	bm := model.Bookmark{
+		Slot:         "P",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "default",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, "staging", rm.namespace,
+		"context-free jump must preserve the tab's current namespace")
+	assert.False(t, rm.allNamespaces,
+		"context-free jump must not flip the tab into all-namespaces mode")
+	assert.True(t, rm.selectedNamespaces["staging"],
+		"current namespace selection must survive the jump")
+}
+
+// TestNavigateToBookmark_ContextFreePreservesAllNamespaces covers the
+// other direction: when the tab is already in all-namespaces mode, a
+// context-free jump must not narrow it to the bookmark's saved ns.
+func TestNavigateToBookmark_ContextFreePreservesAllNamespaces(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.allNamespaces = true
+	m.selectedNamespaces = nil
+
+	bm := model.Bookmark{
+		Slot:         "P",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "prod", // saved ns must be ignored
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.True(t, rm.allNamespaces,
+		"all-namespaces mode must survive a context-free jump")
+}
+
+// TestNavigateToBookmark_ContextAwareDefaultIgnoresSavedNamespace is
+// the regression guard for the new default behaviour: without the
+// Tab "load namespace" toggle, no bookmark — regardless of slot case
+// — should overwrite the tab's current namespace scope.
+func TestNavigateToBookmark_ContextAwareDefaultIgnoresSavedNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+	m.allNamespaces = false
+
+	bm := model.Bookmark{
+		Slot:         "p",
+		Context:      "test-ctx",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "production",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, "staging", rm.namespace,
+		"default jumps must preserve the tab's namespace even for context-aware slots")
+	assert.False(t, rm.allNamespaces)
+}
+
+// TestBookmarkToSlot_ContextFreeStillCapturesNamespace verifies that
+// context-free slots persist the current namespace scope even though
+// jumps don't apply it by default. The namespace is available for an
+// opt-in load (Tab in the bookmark overlay); throwing it away at save
+// time would make that toggle useless.
+func TestBookmarkToSlot_ContextFreeStillCapturesNamespace(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseFinalModel()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		DisplayName: "Pods", Kind: "Pod", Resource: "pods",
+	}
+	m.namespace = "staging"
+	m.allNamespaces = false
+	m.selectedNamespaces = map[string]bool{"staging": true}
+
+	result, cmd := m.bookmarkToSlot("P") // uppercase -> context-free
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	require.Len(t, rm.bookmarks, 1)
+	saved := rm.bookmarks[0]
+	assert.Empty(t, saved.Context, "context-free slot must not record a context")
+	assert.Equal(t, "staging", saved.Namespace,
+		"context-free slot must still record the namespace so `Tab` can replay it")
+}
+
+// TestNavigateToBookmark_ContextFreeWithLoadAppliesSavedNamespace
+// covers the opt-in: when bookmarkLoadNamespace is set (Tab toggle
+// in the overlay), the saved namespace IS applied to a context-free
+// jump so the user can reach the exact scope the bookmark remembered.
+func TestNavigateToBookmark_ContextFreeWithLoadAppliesSavedNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+	m.bookmarkLoadNamespace = true
+
+	bm := model.Bookmark{
+		Slot:         "P",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "production",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, "production", rm.namespace,
+		"Tab-armed jumps must apply the saved namespace for context-free bookmarks")
+	assert.False(t, rm.bookmarkLoadNamespace,
+		"flag must be consumed after jumping so the next open starts clean")
+}
+
+// TestNavigateToBookmark_ContextAwareWithLoadAppliesSavedNamespace
+// verifies the flag applies uniformly across slot case — context-aware
+// bookmarks also load their saved namespace when the flag is armed.
+func TestNavigateToBookmark_ContextAwareWithLoadAppliesSavedNamespace(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+	m.bookmarkLoadNamespace = true
+
+	bm := model.Bookmark{
+		Slot:         "p",
+		Context:      "test-ctx",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "production",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, "production", rm.namespace,
+		"Tab-armed jumps must apply the saved namespace for context-aware bookmarks too")
+}
+
+// TestBookmarkOverlay_TabTogglesLoadNamespace verifies that Tab
+// pressed in the bookmark overlay flips the "load namespace" chip,
+// so the next jump (Enter or slot key) applies the saved namespace.
+func TestBookmarkOverlay_TabTogglesLoadNamespace(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarks = []model.Bookmark{{Slot: "a", Name: "x"}}
+
+	result, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	rm := result.(Model)
+	assert.True(t, rm.bookmarkLoadNamespace, "first Tab must arm the load flag")
+
+	result, _ = rm.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	rm = result.(Model)
+	assert.False(t, rm.bookmarkLoadNamespace, "second Tab must disarm the flag")
+}
+
+// TestBookmarkOverlay_EscapeResetsLoadNamespace verifies that closing
+// the overlay without jumping discards any pending Tab arming, so
+// reopening the overlay presents a clean default state.
+func TestBookmarkOverlay_EscapeResetsLoadNamespace(t *testing.T) {
+	m := baseFinalModel()
+	m.overlay = overlayBookmarks
+	m.bookmarkLoadNamespace = true
+
+	result, _ := m.handleBookmarkOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	rm := result.(Model)
+	assert.False(t, rm.bookmarkLoadNamespace,
+		"closing the overlay must reset the flag so it doesn't leak into the next open")
+}
+
 func TestNavigateToBookmark_LocalResourceNotFound(t *testing.T) {
 	// Use a custom CRD ref that doesn't exist anywhere.
 	// With an empty discoveredResources for the current cluster, the function
@@ -723,6 +998,29 @@ func TestCovHandleBookmarkConfirmDelete(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
+func TestBookmarkConfirmDeleteEnterConfirms(t *testing.T) {
+	// Enter must trigger the delete (consistency with quit/confirm overlays).
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDelete
+	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
+	r, cmd := m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.NotNil(t, cmd, "Enter should issue the delete command, not the no-op cancel path")
+	assert.Empty(t, r.(Model).bookmarks, "bookmark should be deleted")
+}
+
+func TestBookmarkConfirmDeleteEscCancels(t *testing.T) {
+	// Esc must cancel without deleting.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDelete
+	m.bookmarks = []model.Bookmark{{Name: "test", Slot: "a"}}
+	r, _ := m.handleBookmarkConfirmDelete(tea.KeyMsg{Type: tea.KeyEsc})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.Len(t, r.(Model).bookmarks, 1, "bookmark must remain after cancel")
+}
+
 func TestCovHandleBookmarkConfirmDeleteAll(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	m := baseModelCov()
@@ -735,6 +1033,27 @@ func TestCovHandleBookmarkConfirmDeleteAll(t *testing.T) {
 	r, cmd = m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'n'}})
 	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
 	assert.NotNil(t, cmd)
+}
+
+func TestBookmarkConfirmDeleteAllEnterConfirms(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
+	m.bookmarks = []model.Bookmark{{Name: "a", Slot: "a"}, {Name: "b", Slot: "b"}}
+	r, cmd := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyEnter})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.NotNil(t, cmd, "Enter should issue the delete-all command")
+	assert.Empty(t, r.(Model).bookmarks, "all bookmarks should be deleted")
+}
+
+func TestBookmarkConfirmDeleteAllEscCancels(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelCov()
+	m.bookmarkSearchMode = bookmarkModeConfirmDeleteAll
+	m.bookmarks = []model.Bookmark{{Name: "a", Slot: "a"}, {Name: "b", Slot: "b"}}
+	r, _ := m.handleBookmarkConfirmDeleteAll(tea.KeyMsg{Type: tea.KeyEsc})
+	assert.Equal(t, bookmarkModeNormal, r.(Model).bookmarkSearchMode)
+	assert.Len(t, r.(Model).bookmarks, 2, "bookmarks must remain after cancel")
 }
 
 func TestCovBuildSessionTabState(t *testing.T) {
@@ -1390,6 +1709,10 @@ func TestFinalBuildSessionTabStateNSOnly(t *testing.T) {
 
 func TestFinalNavigateToBookmarkResourceNotFound(t *testing.T) {
 	m := baseFinalModel()
+	// Mark discovery as completed for test-ctx with an empty type list so
+	// navigateToBookmark surfaces the "not found" path rather than stashing
+	// the bookmark for a pending discovery (which is the absent-key path).
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{}
 	bm := model.Bookmark{
 		ResourceType: "nonexistent",
 	}
@@ -1403,7 +1726,13 @@ func TestFinalNavigateToBookmarkAllNamespaces(t *testing.T) {
 	m := baseFinalModel()
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	// Namespace application only runs when the user has armed the
+	// "load namespace" flag (Tab in the overlay). A bookmark with no
+	// saved namespace then widens the scope to all-namespaces.
+	m.bookmarkLoadNamespace = true
 	bm := model.Bookmark{
+		Slot:         "a",
+		Context:      "test-ctx",
 		ResourceType: podRT.ResourceRef(),
 		Namespace:    "",
 	}
@@ -1417,7 +1746,11 @@ func TestFinalNavigateToBookmarkMultiNS(t *testing.T) {
 	m := baseFinalModel()
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	// Namespace list replay requires the "load namespace" flag.
+	m.bookmarkLoadNamespace = true
 	bm := model.Bookmark{
+		Slot:         "a",
+		Context:      "test-ctx",
 		ResourceType: podRT.ResourceRef(),
 		Namespaces:   []string{"ns1", "ns2"},
 	}
@@ -1432,7 +1765,11 @@ func TestFinalNavigateToBookmarkSingleNS(t *testing.T) {
 	m := baseFinalModel()
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	// Saved single namespace replay requires the "load namespace" flag.
+	m.bookmarkLoadNamespace = true
 	bm := model.Bookmark{
+		Slot:         "a",
+		Context:      "test-ctx",
 		ResourceType: podRT.ResourceRef(),
 		Namespace:    "production",
 	}
@@ -1462,7 +1799,11 @@ func TestFinalNavigateToBookmarkSingleNamespaceInList(t *testing.T) {
 	m := baseFinalModel()
 	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	// Context-aware: single-item namespace list is only honoured on
+	// context-aware jumps.
 	bm := model.Bookmark{
+		Slot:         "a",
+		Context:      "test-ctx",
 		ResourceType: podRT.ResourceRef(),
 		Namespaces:   []string{"only-ns"},
 	}

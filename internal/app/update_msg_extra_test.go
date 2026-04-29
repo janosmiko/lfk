@@ -9,6 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
@@ -133,6 +134,26 @@ func TestUpdateNamespacesLoadedError(t *testing.T) {
 	assert.NotNil(t, mdl.err)
 	assert.Equal(t, overlayNone, mdl.overlay)
 	assert.NotNil(t, cmd) // scheduleStatusClear
+}
+
+// TestUpdateNamespacesLoadedSilentPreservesLoading verifies that a
+// silent namespace-cache refresh (fired by ensureNamespaceCacheFresh
+// during session restore) does not clear m.loading. The loading flag
+// belongs to the resource-types list; clearing it while API discovery
+// is still in flight produces a "No items" flash between the loader
+// and the populated sidebar.
+func TestUpdateNamespacesLoadedSilentPreservesLoading(t *testing.T) {
+	m := baseModel()
+	m.loading = true
+
+	items := []model.Item{{Name: "default"}, {Name: "kube-system"}}
+	result, _ := m.Update(namespacesLoadedMsg{items: items, silent: true})
+	mdl := result.(Model)
+
+	assert.True(t, mdl.loading, "silent namespace refresh must leave the loading flag alone so discovery can own it")
+	// The cache is still updated even in silent mode — that's the whole
+	// point of the background refresh.
+	assert.NotEmpty(t, mdl.cachedNamespaces)
 }
 
 // --- resourcesLoadedMsg ---
@@ -768,17 +789,28 @@ func TestUpdateLogContainersLoadedSingleContainer(t *testing.T) {
 	assert.NotNil(t, cmd) // scheduleStatusClear
 }
 
+// The handler is the one that opens the overlay so the user never sees
+// an empty/loading flicker — handleLogKeyOther dispatches the load
+// without setting m.overlay, and the overlay is set here only once the
+// container items are ready to render.
 func TestUpdateLogContainersLoadedMultiple(t *testing.T) {
 	m := baseModel()
-	m.overlay = overlayLogContainerSelect
+	// Overlay starts closed; the handler opens it.
 
 	result, cmd := m.Update(logContainersLoadedMsg{
 		containers: []string{"app", "sidecar", "init"},
 	})
 	mdl := result.(Model)
+	assert.Equal(t, overlayLogContainerSelect, mdl.overlay,
+		"handler must open the overlay once containers have loaded")
 	assert.Equal(t, "app", mdl.logContainers[0])
 	assert.Len(t, mdl.overlayItems, 4) // "All Containers" + 3
 	assert.Equal(t, "All Containers", mdl.overlayItems[0].Name)
+	assert.Equal(t, 0, mdl.overlayCursor, "cursor must reset to top of new overlay")
+	assert.Empty(t, mdl.logContainerFilterText, "filter text must be clear when overlay opens")
+	assert.False(t, mdl.logContainerFilterActive, "filter must be inactive when overlay opens")
+	assert.False(t, mdl.logContainerSelectionModified, "modified flag must be false on a fresh open")
+	assert.False(t, mdl.loading, "loading flag must be cleared once data is ready")
 	assert.Nil(t, cmd)
 }
 
@@ -1509,6 +1541,119 @@ func TestUpdatePodMetricsEnrichedWithData(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// TestUpdatePodMetricsEnrichedDoesNotDropRawRequestsOnRepeatedTicks reproduces
+// a bug where opening the Pods view showed CPU/R, CPU/L, MEM/R, MEM/L with
+// real percentages for a second and then all of them flipped to "n/a".
+//
+// Root cause: the first metrics tick reads CPU Req / CPU Lim / Mem Req /
+// Mem Lim from item.Columns to compute the percentages, then destructively
+// REMOVES those raw columns when rebuilding (they were in the removeCols
+// set). On the next metrics tick (watch refresh, ~2s later) the handler
+// finds those columns empty, so ComputePctStr returns "n/a" for every
+// percentage cell — the values the user was seeing vanish.
+//
+// The fix is to preserve the raw request/limit columns across metrics
+// ticks. They are always blocked from auto-detected table display
+// (internal/ui/explorer_format.go:209), so leaving them on the item has
+// no visible side effects, but keeps the source data available for
+// subsequent recomputations until the list refresh next repopulates them.
+func TestUpdatePodMetricsEnrichedDoesNotDropRawRequestsOnRepeatedTicks(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{
+		{
+			Name:      "pod-1",
+			Namespace: "default",
+			Columns: []model.KeyValue{
+				{Key: "CPU Req", Value: "100m"},
+				{Key: "CPU Lim", Value: "500m"},
+				{Key: "Mem Req", Value: "128Mi"},
+				{Key: "Mem Lim", Value: "512Mi"},
+			},
+		},
+	}
+
+	metrics := map[string]model.PodMetrics{
+		"default/pod-1": {Name: "pod-1", CPU: 50, Memory: 64 * 1024 * 1024},
+	}
+
+	// First tick — produces real percentages.
+	result, _ := m.Update(podMetricsEnrichedMsg{metrics: metrics, gen: 0})
+	m1 := result.(Model)
+
+	pctAfterFirst := func(key string) string {
+		for _, kv := range m1.middleItems[0].Columns {
+			if kv.Key == key {
+				return kv.Value
+			}
+		}
+		return ""
+	}
+
+	// Sanity: first tick should have computed real percentages, not n/a.
+	require.NotEqual(t, "n/a", pctAfterFirst("CPU/R"), "first tick must compute a real CPU/R; baseline for the regression assertion below")
+	require.NotEqual(t, "n/a", pctAfterFirst("MEM/L"), "first tick must compute a real MEM/L; baseline for the regression assertion below")
+
+	// Second tick — must not collapse to n/a because the raw req/lim columns
+	// should still be present. This is the actual regression guard.
+	result2, _ := m1.Update(podMetricsEnrichedMsg{metrics: metrics, gen: 0})
+	m2 := result2.(Model)
+
+	pct := func(key string) string {
+		for _, kv := range m2.middleItems[0].Columns {
+			if kv.Key == key {
+				return kv.Value
+			}
+		}
+		return "<missing>"
+	}
+
+	assert.NotEqual(t, "n/a", pct("CPU/R"), "CPU/R must remain computable on the 2nd tick; raw CPU Req was dropped after 1st tick")
+	assert.NotEqual(t, "n/a", pct("CPU/L"), "CPU/L must remain computable on the 2nd tick")
+	assert.NotEqual(t, "n/a", pct("MEM/R"), "MEM/R must remain computable on the 2nd tick")
+	assert.NotEqual(t, "n/a", pct("MEM/L"), "MEM/L must remain computable on the 2nd tick")
+}
+
+// TestUpdatePodMetricsEnrichedSingleNamespaceKeyFormat reproduces a bug
+// where CPU/R, CPU/L, MEM/R, MEM/L columns never appeared in the Pods
+// table (not even in the `,` column toggle overlay) when viewing a single
+// namespace rather than all-namespaces. The metrics lookup key must have
+// the same shape on both sides of the map — "namespace/name" — or every
+// lookup misses and every pod is skipped in enrichment.
+func TestUpdatePodMetricsEnrichedSingleNamespaceKeyFormat(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{
+		{
+			Name:      "pod-a",
+			Namespace: "default",
+			Columns: []model.KeyValue{
+				{Key: "CPU Req", Value: "100m"},
+				{Key: "CPU Lim", Value: "500m"},
+				{Key: "Mem Req", Value: "128Mi"},
+				{Key: "Mem Lim", Value: "512Mi"},
+			},
+		},
+	}
+
+	// Map keyed by "namespace/name" — the canonical format the k8s
+	// layer's GetAllPodMetrics now always uses, independent of query
+	// scope.
+	metrics := map[string]model.PodMetrics{
+		"default/pod-a": {Name: "pod-a", Namespace: "default", CPU: 25, Memory: 32 * 1024 * 1024},
+	}
+
+	result, _ := m.Update(podMetricsEnrichedMsg{metrics: metrics, gen: 0})
+	mdl := result.(Model)
+
+	keys := map[string]string{}
+	for _, kv := range mdl.middleItems[0].Columns {
+		keys[kv.Key] = kv.Value
+	}
+	for _, want := range []string{"CPU", "CPU/R", "CPU/L", "MEM", "MEM/R", "MEM/L"} {
+		_, ok := keys[want]
+		assert.True(t, ok, "enrichment must add %q to the item so the column toggle can surface it; had keys=%v", want, keys)
+	}
+}
+
 // --- nodeMetricsEnrichedMsg ---
 
 func TestUpdateNodeMetricsEnrichedStaleGen(t *testing.T) {
@@ -1611,7 +1756,10 @@ func TestUpdateLogSaveAllSuccess(t *testing.T) {
 	result, cmd := m.Update(logSaveAllMsg{path: "/tmp/logs.txt"})
 	mdl := result.(Model)
 	assert.Contains(t, mdl.statusMessage, "/tmp/logs.txt")
-	assert.NotNil(t, cmd) // scheduleStatusClear
+	// Issue #61: status should announce the clipboard copy so the user
+	// knows the path is recoverable after the 5s status-clear.
+	assert.Contains(t, mdl.statusMessage, "(copied to clipboard)")
+	assert.NotNil(t, cmd) // tea.Batch(copyToSystemClipboard, scheduleStatusClear)
 }
 
 func TestUpdateLogSaveAllError(t *testing.T) {

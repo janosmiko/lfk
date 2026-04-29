@@ -48,8 +48,10 @@ func helpSections() []helpSection {
 				{kb.Right + " / Right", "Go to child"},
 				{kb.Down + " / Down", "Move down"},
 				{kb.Up + " / Up", "Move up"},
-				{kb.JumpTop + kb.JumpTop, "Jump to top"},
-				{kb.JumpBottom, "Jump to bottom"},
+				{kb.JumpTop + kb.JumpTop + " / Home", "Jump to top"},
+				{kb.JumpBottom + " / End", "Jump to bottom"},
+				{helpKeyDisplay(kb.PageDown) + " / " + helpKeyDisplay(kb.PageUp), "Half-page scroll down / up"},
+				{helpKeyDisplay(kb.PageForward) + " / " + helpKeyDisplay(kb.PageBack) + " / PgDn / PgUp", "Full-page scroll down / up"},
 				{kb.Enter, "Open YAML view / navigate into"},
 				{kb.ExpandCollapse, "Toggle expand/collapse all resource groups / toggle event grouping (Events)"},
 				{kb.PinGroup, "Pin/unpin CRD group (at resource types level)"},
@@ -62,6 +64,7 @@ func helpSections() []helpSection {
 				{kb.Help + " / F1", "Toggle help screen"},
 				{kb.Filter, "Filter items (~prefix: fuzzy, regex auto-detected, \\prefix: literal)"},
 				{kb.Search, "Search and jump to match (~fuzzy, regex auto, \\literal)"},
+				{"", "Up/Down inside filter or search recalls previous queries (shared, persistent across sessions)."},
 				{"", "Paste from clipboard: Cmd+V (macOS) / Ctrl+Shift+V (Linux). Multiline asks to confirm."},
 				{kb.NextMatch, "Next search match"},
 				{kb.PrevMatch, "Previous search match"},
@@ -95,8 +98,8 @@ func helpSections() []helpSection {
 			bindings: []helpEntry{
 				{kb.NamespaceSelector, "Select namespace"},
 				{kb.AllNamespaces, "Toggle all-namespaces mode"},
-				{kb.ActionMenu, "Action menu (logs, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, RBAC permissions)"},
-				{kb.Logs, "View logs for selected resource"},
+				{kb.ActionMenu, "Action menu: l=tail logs (last 10 lines + follow), L=full logs, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, RBAC permissions"},
+				{kb.Logs, "View full logs for selected resource"},
 				{kb.SecretEditor, "Secret/ConfigMap editor (inline key-value editing)"},
 				{kb.Edit, "Edit selected resource in $EDITOR"},
 				{kb.LabelEditor, "Edit labels/annotations for selected resource"},
@@ -169,9 +172,9 @@ func helpSections() []helpSection {
 			title: "Error Log (" + kb.ErrorLog + ")", context: "Error Log",
 			bindings: []helpEntry{
 				{"j/k", "Scroll up/down"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
-				{"Ctrl+F/B", "Page down/up (full page)"},
+				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"V", "Enter line visual selection mode"},
 				{"v", "Enter character visual selection mode"},
 				{"y", "Copy selected lines (visual) or all entries (normal)"},
@@ -192,10 +195,10 @@ func helpSections() []helpSection {
 				{"W/B", "Move cursor to next/previous WORD start"},
 				{"e", "Move cursor to end of word"},
 				{"E", "Move cursor to end of WORD"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"123G", "Jump to line number"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
-				{"Ctrl+F/B", "Page down/up (full page)"},
+				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"/", "Search in YAML"},
 				{"n", "Next search match"},
 				{"N", "Previous search match"},
@@ -203,7 +206,7 @@ func helpSections() []helpSection {
 				{"V", "Visual line selection"},
 				{"Ctrl+V", "Block (column) visual selection (from cursor column)"},
 				{"h/l", "Move selection column (in visual mode)"},
-				{"y", "Copy selected text (in visual mode)"},
+				{"y", "Copy line (or selection in visual mode)"},
 				{"z", "Toggle fold on section under cursor"},
 				{"Z", "Toggle all folds (collapse/expand)"},
 				{"Ctrl+W / >", "Toggle line wrapping"},
@@ -222,10 +225,10 @@ func helpSections() []helpSection {
 				{"W/B", "Move cursor to next/previous WORD start"},
 				{"e", "Move cursor to end of word"},
 				{"E", "Move cursor to end of WORD"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"123G", "Jump to line number"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
-				{"Ctrl+F/B", "Page down/up (full page)"},
+				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"/", "Search in content"},
 				{"n/N", "Next/previous match"},
 				{"v", "Character visual selection"},
@@ -248,17 +251,17 @@ func helpSections() []helpSection {
 				{"e", "Move cursor to end of word"},
 				{"E", "Move cursor to end of WORD"},
 				{"Tab", "Switch cursor side (side-by-side mode)"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"123G", "Jump to line number"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
-				{"Ctrl+F/B", "Page down/up (full page)"},
+				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"/", "Search in diff"},
 				{"n/N", "Next/previous match"},
 				{"v", "Character visual selection"},
 				{"V", "Visual line selection"},
 				{"Ctrl+V", "Block (column) visual selection"},
 				{"h/l", "Move selection column (in visual mode)"},
-				{"y", "Copy selected text (in visual mode)"},
+				{"y", "Copy line (or selection in visual mode)"},
 				{"z", "Toggle fold unchanged section at cursor"},
 				{"Z", "Toggle all folds"},
 				{"#", "Toggle line numbers"},
@@ -277,9 +280,9 @@ func helpSections() []helpSection {
 				{"n", "Next match (auto-drills into children)"},
 				{"N", "Previous match (searches parent)"},
 				{"r", "Recursive field browser (browse all nested fields with filter)"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
-				{"Ctrl+F/B", "Page down/up (full page)"},
+				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"q", "Close API explorer"},
 				{"Esc", "Go back one level / close at root"},
 			},
@@ -293,9 +296,9 @@ func helpSections() []helpSection {
 				{"a", "Toggle all/allowed-only permissions"},
 				{"s", "Switch subject (User/Group/SA)"},
 				{"", "Title shows namespace scope (ns:...) for permission context"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
-				{"Ctrl+F/B", "Page down/up (full page)"},
+				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"q/Esc", "Clear search / close"},
 			},
 		},
@@ -304,8 +307,9 @@ func helpSections() []helpSection {
 			bindings: []helpEntry{
 				{"j/k", "Navigate subjects"},
 				{"/", "Filter subjects by name"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
+				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"Enter", "Select subject"},
 				{"Esc", "Clear filter / close"},
 			},
@@ -314,9 +318,9 @@ func helpSections() []helpSection {
 			title: "Network Policy Visualizer", context: "Network Policy",
 			bindings: []helpEntry{
 				{"j/k", "Scroll up/down"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
-				{"Ctrl+F/B", "Page down/up (full page)"},
+				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
 				{"q/Esc", "Close visualizer"},
 			},
 		},
@@ -345,28 +349,30 @@ func helpSections() []helpSection {
 				{"W/B", "Move cursor to next/previous WORD start"},
 				{"e", "Move cursor to end of word"},
 				{"E", "Move cursor to end of WORD"},
-				{"gg/G", "Top/bottom"},
+				{"gg/G / Home/End", "Top/bottom"},
 				{"Ctrl+D/U", "Half page down/up"},
-				{"Ctrl+F/B", "Full page down/up"},
+				{"Ctrl+F/B / PgDn/PgUp", "Full page down/up"},
 				{"f", "Toggle follow mode (auto-scroll)"},
 				{"Tab/z/>", "Toggle line wrapping"},
 				{"#", "Toggle line numbers"},
 				{"s", "Toggle timestamps"},
 				{"p", "Toggle pod/container prefixes"},
+				{"P", "Toggle structured preview side panel (JSON / logfmt / klog / zap / nginx / envoy / java / postgres / text)"},
+				{"J/K", "Scroll preview side panel down/up (when visible)"},
 				{"c", "Toggle previous container logs"},
 				{"/", "Search in logs"},
 				{"n", "Next search match"},
 				{"N", "Previous search match"},
 				{"123G", "Jump to line number"},
-				{"S", "Save loaded logs to file"},
-				{"Ctrl+S", "Save all logs to file"},
+				{"S", "Save loaded logs to file (path copied to clipboard)"},
+				{"Ctrl+S", "Save all logs to file (path copied to clipboard)"},
 				{"v", "Character visual selection (from cursor column)"},
 				{"V", "Visual line selection"},
 				{"Ctrl+V", "Block (column) visual selection (from cursor column)"},
 				{"h/l", "Move selection column (in visual mode)"},
-				{"y", "Copy selected text (in visual mode)"},
+				{"y", "Copy line (or selection in visual mode)"},
 				{"\\", "Switch pod / filter containers"},
-				{"", "Loads last 1000 lines initially; scroll up to load older logs"},
+				{"", "Full logs load last 1000 lines initially (log_tail_lines); tail logs load last 10 (log_tail_lines_short). Scroll up for older history."},
 				{"q/Esc", "Close log viewer"},
 			},
 		},
@@ -398,6 +404,17 @@ func helpSections() []helpSection {
 			},
 		},
 		{
+			title: "Help View",
+			bindings: []helpEntry{
+				{"/", "Search — highlights matches inline without filtering"},
+				{"Ctrl+N / Ctrl+P", "Next / previous match while typing the search"},
+				{"Enter", "Apply search (keep highlights and arm n/N)"},
+				{"n / N", "Jump to next / previous search match (after Enter)"},
+				{"f", "Filter — narrows the visible list to matching lines"},
+				{"Esc", "Cascades: clear search → clear filter → close help"},
+			},
+		},
+		{
 			title: "General",
 			bindings: []helpEntry{
 				{kb.ThemeSelector, "Switch color scheme (" + kb.NewTab + ": toggle transparent bg)"},
@@ -417,8 +434,29 @@ func helpSections() []helpSection {
 	}
 }
 
-// buildHelpLines builds the formatted help lines, optionally filtering by a query string.
-// contextMode limits sections to those matching the current view (empty = explorer).
+// BuildHelpLines builds the formatted help lines, optionally filtering
+// by a query string. contextMode limits sections to those matching the
+// current view (empty = explorer). Exported so the app layer can run
+// the same line-building pipeline to compute search match indices for
+// n/N navigation.
+func BuildHelpLines(filter, contextMode string) []string {
+	return buildHelpLines(filter, contextMode)
+}
+
+// HelpVisibleLines returns the number of help-content rows that fit
+// inside the overlay box for a given screen height. Mirrors the same
+// boxH / maxLines / visibleLines arithmetic RenderHelpScreen uses, so
+// callers (clamp helpers, scroll-to-match positioning) compute the
+// same maxScroll the renderer enforces.
+func HelpVisibleLines(screenHeight int) int {
+	boxH := max(screenHeight*80/100, 20)
+	maxLines := max(boxH-6, 5)
+	visibleLines := max(maxLines-2, 1)
+	return visibleLines
+}
+
+// buildHelpLines is the internal implementation kept unexported to
+// avoid forcing callers to import context-specific styling state.
 func buildHelpLines(filter, contextMode string) []string {
 	sections := helpSections()
 	lines := make([]string, 0, 64)
@@ -473,30 +511,52 @@ func buildHelpLines(filter, contextMode string) []string {
 }
 
 // RenderHelpScreen renders a full help overlay with all keybindings.
-// It supports scrolling via the scroll parameter and filtering via the filter parameter.
-// contextMode limits sections to the current view (empty = explorer).
-func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, contextMode string) string {
-	boxW := screenWidth * 70 / 100
-	boxH := screenHeight * 80 / 100
-	if boxW < 50 {
-		boxW = 50
-	}
-	if boxH < 20 {
-		boxH = 20
-	}
+// filter narrows the visible lines (f key). search highlights matches
+// in the visible lines without removing them (/ key). currentMatchLine
+// is the index (in the post-filter line list) of the line under the
+// n/N navigation cursor — that line gets a distinct "selected match"
+// style so the user can see which match is current. Pass -1 when
+// there's no active navigation. contextMode limits sections to the
+// current view (empty = explorer).
+func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, contextMode string, currentMatchLine int) string {
+	boxW := max(screenWidth*70/100, 50)
+	// Mirror HelpVisibleLines so outer height stays in sync with the
+	// inner row budget — lipgloss pads short content to this height,
+	// stopping the box from shrinking when filter narrows results or
+	// from growing when long lines wrap.
+	boxH := max(screenHeight*80/100, 20)
 
 	contentW := boxW - 6 // account for border + padding
 
 	title := OverlayTitleStyle.Render("Keybindings")
 
 	lines := buildHelpLines(filter, contextMode)
+	// Truncate each line to the inner-panel content width so one entry
+	// in `lines` always renders as exactly one row. Lipgloss's
+	// auto-wrap behavior would otherwise silently expand long
+	// descriptions to two rows, the rendered row count would diverge
+	// from len(lines), and the outer box height would drift — making
+	// a filter that narrows results visibly shrink the window.
+	innerW := max(contentW-2, 10)
+	for i, line := range lines {
+		lines[i] = Truncate(line, innerW)
+	}
+	if search != "" {
+		for i, line := range lines {
+			style := SearchHighlightStyle
+			if i == currentMatchLine {
+				// Distinct "selected match" style so the user can see
+				// which match the next n/N press will move from.
+				style = SelectedSearchHighlightStyle
+			}
+			lines[i] = HighlightMatchStyled(line, search, style)
+		}
+	}
 	totalLines := len(lines)
 
-	// Calculate visible area: title, borders, padding, help line.
-	// Always reserve 2 lines for scroll indicators so the window height
-	// stays constant regardless of scroll position.
-	maxLines := max(boxH-6, 5)
-	visibleLines := max(maxLines-2, 1)
+	// Calculate visible area via shared helper so app-layer clamps see
+	// the same maxScroll the renderer enforces.
+	visibleLines := HelpVisibleLines(screenHeight)
 
 	// Clamp scroll.
 	maxScroll := max(totalLines-visibleLines, 0)
@@ -514,6 +574,14 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, contextMode
 	// Slice visible portion.
 	end := min(scroll+visibleLines, totalLines)
 	visible := lines[scroll:end]
+
+	// Pad the visible window to exactly visibleLines rows so a filter
+	// that narrows results doesn't shrink the box. Without this the
+	// outer overlay box collapses to fit the short content and the user
+	// sees the window resize on every keystroke.
+	for len(visible) < visibleLines {
+		visible = append(visible, "")
+	}
 
 	// Build final lines with indicators.
 	var displayLines []string
@@ -541,5 +609,6 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, contextMode
 
 	return OverlayStyle.
 		Width(boxW).
+		Height(boxH).
 		Render(body)
 }

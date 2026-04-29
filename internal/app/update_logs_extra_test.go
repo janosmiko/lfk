@@ -975,6 +975,142 @@ func TestLogVisualKeyYankBlockMode(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
+// --- buildLogYankText: clipboard mirrors what the user sees ---
+//
+// The renderer strips timestamps and pod prefixes per the user's toggles
+// (see ui.applyLineRewrites); the yank handler must apply the same
+// transformations so the clipboard mirrors the on-screen display.
+
+func TestBuildLogYankTextLineModeStripsTimestampWhenOff(t *testing.T) {
+	m := Model{
+		mode: modeLogs,
+		logLines: []string{
+			"2024-01-15T10:30:00.000000000Z first line",
+			"2024-01-15T10:30:01.000000000Z second line",
+		},
+		logVisualMode:   true,
+		logVisualType:   'V',
+		logCursor:       1,
+		logVisualStart:  0,
+		logTimestamps:   false,
+		logHidePrefixes: false,
+	}
+	clip, count := m.buildLogYankText()
+	assert.Equal(t, 2, count)
+	assert.Equal(t, "first line\nsecond line", clip,
+		"timestamps must be stripped from clipboard when logTimestamps is off")
+}
+
+func TestBuildLogYankTextLineModeStripsPrefixWhenHidden(t *testing.T) {
+	m := Model{
+		mode: modeLogs,
+		logLines: []string{
+			"[pod/api/main] first line",
+			"[pod/api/main] second line",
+		},
+		logVisualMode:   true,
+		logVisualType:   'V',
+		logCursor:       1,
+		logVisualStart:  0,
+		logTimestamps:   true,
+		logHidePrefixes: true,
+	}
+	clip, count := m.buildLogYankText()
+	assert.Equal(t, 2, count)
+	assert.Equal(t, "first line\nsecond line", clip,
+		"pod prefixes must be stripped from clipboard when logHidePrefixes is on")
+}
+
+func TestBuildLogYankTextLineModeStripsBothWhenOff(t *testing.T) {
+	m := Model{
+		mode: modeLogs,
+		logLines: []string{
+			"[pod/api/main] 2024-01-15T10:30:00.000000000Z first line",
+			"[pod/api/main] 2024-01-15T10:30:01.000000000Z second line",
+		},
+		logVisualMode:   true,
+		logVisualType:   'V',
+		logCursor:       1,
+		logVisualStart:  0,
+		logTimestamps:   false,
+		logHidePrefixes: true,
+	}
+	clip, count := m.buildLogYankText()
+	assert.Equal(t, 2, count)
+	assert.Equal(t, "first line\nsecond line", clip,
+		"both timestamps and prefixes must be stripped when both toggles are off")
+}
+
+func TestBuildLogYankTextLineModeKeepsBothWhenOn(t *testing.T) {
+	raw := []string{
+		"[pod/api/main] 2024-01-15T10:30:00.000000000Z first line",
+		"[pod/api/main] 2024-01-15T10:30:01.000000000Z second line",
+	}
+	m := Model{
+		mode:            modeLogs,
+		logLines:        raw,
+		logVisualMode:   true,
+		logVisualType:   'V',
+		logCursor:       1,
+		logVisualStart:  0,
+		logTimestamps:   true,
+		logHidePrefixes: false,
+	}
+	clip, count := m.buildLogYankText()
+	assert.Equal(t, 2, count)
+	assert.Equal(t, raw[0]+"\n"+raw[1], clip,
+		"raw lines must be preserved when both toggles are on")
+}
+
+func TestBuildLogYankTextCharModeOperatesOnDisplayedForm(t *testing.T) {
+	// Char-mode column positions are in display-line space (the line
+	// after stripping). Selecting cols 0-4 of "hello world" should yield
+	// "hello" even though the raw line begins with "[pod/x/y] 2024-...".
+	m := Model{
+		mode: modeLogs,
+		logLines: []string{
+			"[pod/x/y] 2024-01-15T10:30:00.000000000Z hello world",
+		},
+		logVisualMode:   true,
+		logVisualType:   'v',
+		logCursor:       0,
+		logVisualStart:  0,
+		logVisualCol:    0,
+		logVisualCurCol: 4,
+		logTimestamps:   false,
+		logHidePrefixes: true,
+	}
+	clip, count := m.buildLogYankText()
+	assert.Equal(t, 1, count)
+	assert.Equal(t, "hello", clip,
+		"char-mode column slice must operate on the displayed form")
+}
+
+func TestBuildLogYankTextBlockModeOperatesOnDisplayedForm(t *testing.T) {
+	// Block-mode column positions are in display-line space. Three lines
+	// "abc" / "def" / "ghi" with timestamps & prefix stripped, slice cols 0-1.
+	m := Model{
+		mode: modeLogs,
+		logLines: []string{
+			"[pod/x/y] 2024-01-15T10:30:00.000000000Z abc",
+			"[pod/x/y] 2024-01-15T10:30:01.000000000Z def",
+			"[pod/x/y] 2024-01-15T10:30:02.000000000Z ghi",
+		},
+		logVisualMode:   true,
+		logVisualType:   'B',
+		logCursor:       2,
+		logVisualStart:  0,
+		logVisualCol:    0,
+		logVisualCurCol: 1,
+		logTimestamps:   false,
+		logHidePrefixes: true,
+	}
+	clip, count := m.buildLogYankText()
+	assert.Equal(t, 3, count)
+	assert.Equal(t, "ab\nde\ngh", clip,
+		"block-mode column slice must operate on the displayed form")
+}
+
 // --- handleLogSearchKey ---
 
 func TestLogSearchKeyEnterCommitsSearch(t *testing.T) {

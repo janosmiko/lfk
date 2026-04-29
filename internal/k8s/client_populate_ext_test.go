@@ -20,11 +20,11 @@ func TestPopulateResourceDetailsExt_FluxCD(t *testing.T) {
 
 	for _, kind := range fluxKinds {
 		t.Run(kind+"/ready with revision", func(t *testing.T) {
-			obj := map[string]interface{}{
-				"spec": map[string]interface{}{},
-				"status": map[string]interface{}{
-					"conditions": []interface{}{
-						map[string]interface{}{
+			obj := map[string]any{
+				"spec": map[string]any{},
+				"status": map[string]any{
+					"conditions": []any{
+						map[string]any{
 							"type":               "Ready",
 							"status":             "True",
 							"reason":             "ReconciliationSucceeded",
@@ -34,8 +34,8 @@ func TestPopulateResourceDetailsExt_FluxCD(t *testing.T) {
 					"lastAppliedRevision": "main@sha1:abc123def456789",
 				},
 			}
-			status, _ := obj["status"].(map[string]interface{})
-			spec, _ := obj["spec"].(map[string]interface{})
+			status, _ := obj["status"].(map[string]any)
+			spec, _ := obj["spec"].(map[string]any)
 			ti := &model.Item{}
 			populateResourceDetailsExt(ti, obj, kind, status, spec)
 
@@ -48,11 +48,11 @@ func TestPopulateResourceDetailsExt_FluxCD(t *testing.T) {
 	}
 
 	t.Run("FluxCD with Ready=False shows message", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{},
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{},
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":    "Ready",
 						"status":  "False",
 						"reason":  "ReconciliationFailed",
@@ -61,8 +61,8 @@ func TestPopulateResourceDetailsExt_FluxCD(t *testing.T) {
 				},
 			},
 		}
-		status, _ := obj["status"].(map[string]interface{})
-		spec, _ := obj["spec"].(map[string]interface{})
+		status, _ := obj["status"].(map[string]any)
+		spec, _ := obj["spec"].(map[string]any)
 		ti := &model.Item{}
 		populateResourceDetailsExt(ti, obj, "GitRepository", status, spec)
 
@@ -72,14 +72,14 @@ func TestPopulateResourceDetailsExt_FluxCD(t *testing.T) {
 	})
 
 	t.Run("FluxCD suspended", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{
 				"suspend": true,
 			},
-			"status": map[string]interface{}{},
+			"status": map[string]any{},
 		}
-		status, _ := obj["status"].(map[string]interface{})
-		spec, _ := obj["spec"].(map[string]interface{})
+		status, _ := obj["status"].(map[string]any)
+		spec, _ := obj["spec"].(map[string]any)
 		ti := &model.Item{}
 		populateResourceDetailsExt(ti, obj, "Kustomization", status, spec)
 
@@ -88,16 +88,16 @@ func TestPopulateResourceDetailsExt_FluxCD(t *testing.T) {
 	})
 
 	t.Run("FluxCD revision from artifact fallback", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{},
-			"status": map[string]interface{}{
-				"artifact": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{},
+			"status": map[string]any{
+				"artifact": map[string]any{
 					"revision": "v1.0.0/sha256:abcdef123456",
 				},
 			},
 		}
-		status, _ := obj["status"].(map[string]interface{})
-		spec, _ := obj["spec"].(map[string]interface{})
+		status, _ := obj["status"].(map[string]any)
+		spec, _ := obj["spec"].(map[string]any)
 		ti := &model.Item{}
 		populateResourceDetailsExt(ti, obj, "HelmChart", status, spec)
 
@@ -106,14 +106,14 @@ func TestPopulateResourceDetailsExt_FluxCD(t *testing.T) {
 	})
 
 	t.Run("FluxCD short revision not truncated", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{},
-			"status": map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{},
+			"status": map[string]any{
 				"lastAppliedRevision": "v1.0.0",
 			},
 		}
-		status, _ := obj["status"].(map[string]interface{})
-		spec, _ := obj["spec"].(map[string]interface{})
+		status, _ := obj["status"].(map[string]any)
+		spec, _ := obj["spec"].(map[string]any)
 		ti := &model.Item{}
 		populateResourceDetailsExt(ti, obj, "HelmRepository", status, spec)
 
@@ -131,13 +131,13 @@ func TestPopulateResourceDetailsExt_CertManager(t *testing.T) {
 
 	for _, kind := range certManagerKinds {
 		t.Run(kind+"/ready with expiry", func(t *testing.T) {
-			obj := map[string]interface{}{
-				"spec": map[string]interface{}{
+			obj := map[string]any{
+				"spec": map[string]any{
 					"secretName": "tls-secret",
 				},
-				"status": map[string]interface{}{
-					"conditions": []interface{}{
-						map[string]interface{}{
+				"status": map[string]any{
+					"conditions": []any{
+						map[string]any{
 							"type":               "Ready",
 							"status":             "True",
 							"reason":             "Ready",
@@ -148,8 +148,8 @@ func TestPopulateResourceDetailsExt_CertManager(t *testing.T) {
 					"renewalTime": "2025-06-10T12:00:00Z",
 				},
 			}
-			status, _ := obj["status"].(map[string]interface{})
-			spec, _ := obj["spec"].(map[string]interface{})
+			status, _ := obj["status"].(map[string]any)
+			spec, _ := obj["spec"].(map[string]any)
 			ti := &model.Item{}
 			populateResourceDetailsExt(ti, obj, kind, status, spec)
 
@@ -164,11 +164,11 @@ func TestPopulateResourceDetailsExt_CertManager(t *testing.T) {
 	}
 
 	t.Run("cert-manager with failed condition", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"spec": map[string]interface{}{},
-			"status": map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+		obj := map[string]any{
+			"spec": map[string]any{},
+			"status": map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":    "Ready",
 						"status":  "False",
 						"reason":  "DoesNotExist",
@@ -177,8 +177,8 @@ func TestPopulateResourceDetailsExt_CertManager(t *testing.T) {
 				},
 			},
 		}
-		status, _ := obj["status"].(map[string]interface{})
-		spec, _ := obj["spec"].(map[string]interface{})
+		status, _ := obj["status"].(map[string]any)
+		spec, _ := obj["spec"].(map[string]any)
 		ti := &model.Item{}
 		populateResourceDetailsExt(ti, obj, "Certificate", status, spec)
 
@@ -194,32 +194,32 @@ func TestPopulateResourceDetailsExt_CertManager(t *testing.T) {
 func TestPopulateArgoCDApplication(t *testing.T) {
 	tests := []struct {
 		name     string
-		obj      map[string]interface{}
+		obj      map[string]any
 		wantCols map[string]string
 	}{
 		{
 			name: "healthy and synced application",
-			obj: map[string]interface{}{
-				"spec": map[string]interface{}{
-					"destination": map[string]interface{}{
+			obj: map[string]any{
+				"spec": map[string]any{
+					"destination": map[string]any{
 						"namespace": "production",
 						"server":    "https://kubernetes.default.svc",
 					},
-					"source": map[string]interface{}{
+					"source": map[string]any{
 						"repoURL": "https://github.com/example/repo",
 						"path":    "deploy/production",
 					},
 				},
-				"status": map[string]interface{}{
-					"health": map[string]interface{}{
+				"status": map[string]any{
+					"health": map[string]any{
 						"status": "Healthy",
 					},
-					"sync": map[string]interface{}{
+					"sync": map[string]any{
 						"status":   "Synced",
 						"revision": "abc123def456",
 					},
-					"summary": map[string]interface{}{
-						"images": []interface{}{"myapp:v1.0"},
+					"summary": map[string]any{
+						"images": []any{"myapp:v1.0"},
 					},
 				},
 			},
@@ -234,9 +234,9 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 		},
 		{
 			name: "application with health message",
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"health": map[string]interface{}{
+			obj: map[string]any{
+				"status": map[string]any{
+					"health": map[string]any{
 						"status":  "Degraded",
 						"message": "container failed health check",
 					},
@@ -248,9 +248,9 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 		},
 		{
 			name: "application with operationState",
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"operationState": map[string]interface{}{
+			obj: map[string]any{
+				"status": map[string]any{
+					"operationState": map[string]any{
 						"phase":      "Succeeded",
 						"message":    "sync completed",
 						"finishedAt": "2025-01-15T10:00:00Z",
@@ -264,19 +264,19 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 		},
 		{
 			name: "application with sync errors",
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"operationState": map[string]interface{}{
+			obj: map[string]any{
+				"status": map[string]any{
+					"operationState": map[string]any{
 						"phase": "Failed",
-						"syncResult": map[string]interface{}{
-							"resources": []interface{}{
-								map[string]interface{}{
+						"syncResult": map[string]any{
+							"resources": []any{
+								map[string]any{
 									"kind":    "Deployment",
 									"name":    "my-app",
 									"status":  "SyncFailed",
 									"message": "error applying",
 								},
-								map[string]interface{}{
+								map[string]any{
 									"kind":   "Service",
 									"name":   "my-svc",
 									"status": "Synced",
@@ -292,9 +292,9 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 		},
 		{
 			name: "short revision not truncated",
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"sync": map[string]interface{}{
+			obj: map[string]any{
+				"status": map[string]any{
+					"sync": map[string]any{
 						"status":   "Synced",
 						"revision": "abc",
 					},
@@ -306,21 +306,21 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 		},
 		{
 			name: "nil status and spec",
-			obj:  map[string]interface{}{},
+			obj:  map[string]any{},
 		},
 		{
 			name: "application with conditions",
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"health": map[string]interface{}{
+			obj: map[string]any{
+				"status": map[string]any{
+					"health": map[string]any{
 						"status": "Degraded",
 					},
-					"conditions": []interface{}{
-						map[string]interface{}{
+					"conditions": []any{
+						map[string]any{
 							"type":    "ComparisonError",
 							"message": "rpc error: code = NotFound desc = repo not found",
 						},
-						map[string]interface{}{
+						map[string]any{
 							"type":               "SyncError",
 							"message":            "sync failed: manifest generation error",
 							"lastTransitionTime": "2025-01-15T10:00:00Z",
@@ -335,10 +335,10 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 		},
 		{
 			name: "application with condition without message",
-			obj: map[string]interface{}{
-				"status": map[string]interface{}{
-					"conditions": []interface{}{
-						map[string]interface{}{
+			obj: map[string]any{
+				"status": map[string]any{
+					"conditions": []any{
+						map[string]any{
 							"type": "OrphanedResourceWarning",
 						},
 					},
@@ -353,8 +353,8 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			status, _ := tt.obj["status"].(map[string]interface{})
-			spec, _ := tt.obj["spec"].(map[string]interface{})
+			status, _ := tt.obj["status"].(map[string]any)
+			spec, _ := tt.obj["spec"].(map[string]any)
 			ti := &model.Item{}
 			populateArgoCDApplication(ti, tt.obj, status, spec, "Application")
 
@@ -373,23 +373,23 @@ func TestPopulateArgoCDApplication(t *testing.T) {
 func TestPopulateEvent(t *testing.T) {
 	tests := []struct {
 		name       string
-		obj        map[string]interface{}
+		obj        map[string]any
 		wantStatus string
 		wantCols   map[string]string
 	}{
 		{
 			name: "normal event with all fields",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"type":          "Normal",
 				"lastTimestamp": "2025-01-15T10:00:00Z",
-				"involvedObject": map[string]interface{}{
+				"involvedObject": map[string]any{
 					"kind": "Pod",
 					"name": "my-pod",
 				},
 				"reason":  "Scheduled",
 				"message": "Successfully assigned default/my-pod to node-1",
 				"count":   float64(1),
-				"source": map[string]interface{}{
+				"source": map[string]any{
 					"component": "default-scheduler",
 				},
 			},
@@ -404,10 +404,10 @@ func TestPopulateEvent(t *testing.T) {
 		},
 		{
 			name: "warning event with high count",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"type":  "Warning",
 				"count": int64(42),
-				"involvedObject": map[string]interface{}{
+				"involvedObject": map[string]any{
 					"kind": "Deployment",
 					"name": "broken-app",
 				},
@@ -423,9 +423,9 @@ func TestPopulateEvent(t *testing.T) {
 		},
 		{
 			name: "event with eventTime fallback",
-			obj: map[string]interface{}{
+			obj: map[string]any{
 				"eventTime": "2025-01-15T10:00:00.123456789Z",
-				"involvedObject": map[string]interface{}{
+				"involvedObject": map[string]any{
 					"kind": "Node",
 					"name": "worker-1",
 				},
@@ -438,8 +438,8 @@ func TestPopulateEvent(t *testing.T) {
 		},
 		{
 			name: "event with default count of 1",
-			obj: map[string]interface{}{
-				"involvedObject": map[string]interface{}{},
+			obj: map[string]any{
+				"involvedObject": map[string]any{},
 			},
 			wantCols: map[string]string{
 				"Count": "1",
@@ -470,7 +470,7 @@ func TestPopulateEvent(t *testing.T) {
 // Last Seen column is populated.
 func TestPopulateEventTimestamps(t *testing.T) {
 	t.Run("both first and last timestamps", func(t *testing.T) {
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"firstTimestamp": "2026-04-10T08:00:00Z",
 			"lastTimestamp":  "2026-04-10T11:30:00Z",
 			"reason":         "BackOff",
@@ -486,7 +486,7 @@ func TestPopulateEventTimestamps(t *testing.T) {
 	})
 
 	t.Run("only lastTimestamp falls back to first=last", func(t *testing.T) {
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"lastTimestamp": "2026-04-10T11:30:00Z",
 		}
 		ti := &model.Item{}
@@ -498,7 +498,7 @@ func TestPopulateEventTimestamps(t *testing.T) {
 	})
 
 	t.Run("only eventTime (events.k8s.io v1)", func(t *testing.T) {
-		obj := map[string]interface{}{
+		obj := map[string]any{
 			"eventTime": "2026-04-10T11:30:00.123Z",
 		}
 		ti := &model.Item{}
@@ -515,27 +515,27 @@ func TestPopulateEventTimestamps(t *testing.T) {
 func TestPopulatePersistentVolume(t *testing.T) {
 	tests := []struct {
 		name       string
-		status     map[string]interface{}
-		spec       map[string]interface{}
+		status     map[string]any
+		spec       map[string]any
 		wantStatus string
 		wantCols   map[string]string
 	}{
 		{
 			name: "bound PV with full spec",
-			spec: map[string]interface{}{
-				"capacity": map[string]interface{}{
+			spec: map[string]any{
+				"capacity": map[string]any{
 					"storage": "100Gi",
 				},
-				"accessModes":                   []interface{}{"ReadWriteOnce", "ReadOnlyMany"},
+				"accessModes":                   []any{"ReadWriteOnce", "ReadOnlyMany"},
 				"persistentVolumeReclaimPolicy": "Retain",
 				"storageClassName":              "gp3",
 				"volumeMode":                    "Filesystem",
-				"claimRef": map[string]interface{}{
+				"claimRef": map[string]any{
 					"namespace": "default",
 					"name":      "my-pvc",
 				},
 			},
-			status: map[string]interface{}{
+			status: map[string]any{
 				"phase": "Bound",
 			},
 			wantStatus: "Bound",
@@ -550,8 +550,8 @@ func TestPopulatePersistentVolume(t *testing.T) {
 		},
 		{
 			name: "released PV with reason",
-			spec: map[string]interface{}{},
-			status: map[string]interface{}{
+			spec: map[string]any{},
+			status: map[string]any{
 				"phase":  "Released",
 				"reason": "Manually released",
 			},
@@ -562,8 +562,8 @@ func TestPopulatePersistentVolume(t *testing.T) {
 		},
 		{
 			name: "PV with claim without namespace",
-			spec: map[string]interface{}{
-				"claimRef": map[string]interface{}{
+			spec: map[string]any{
+				"claimRef": map[string]any{
 					"name": "standalone-pvc",
 				},
 			},
@@ -599,19 +599,19 @@ func TestPopulatePersistentVolume(t *testing.T) {
 func TestPopulateResourceQuota(t *testing.T) {
 	tests := []struct {
 		name     string
-		status   map[string]interface{}
-		spec     map[string]interface{}
+		status   map[string]any
+		spec     map[string]any
 		wantCols map[string]string
 	}{
 		{
 			name: "quota with status hard and used",
-			status: map[string]interface{}{
-				"hard": map[string]interface{}{
+			status: map[string]any{
+				"hard": map[string]any{
 					"cpu":    "4",
 					"memory": "8Gi",
 					"pods":   "20",
 				},
-				"used": map[string]interface{}{
+				"used": map[string]any{
 					"cpu":    "2",
 					"memory": "4Gi",
 					"pods":   "10",
@@ -625,8 +625,8 @@ func TestPopulateResourceQuota(t *testing.T) {
 		},
 		{
 			name: "quota with status hard but no used defaults to 0",
-			status: map[string]interface{}{
-				"hard": map[string]interface{}{
+			status: map[string]any{
+				"hard": map[string]any{
 					"pods": "10",
 				},
 			},
@@ -636,8 +636,8 @@ func TestPopulateResourceQuota(t *testing.T) {
 		},
 		{
 			name: "quota with only spec hard (no status)",
-			spec: map[string]interface{}{
-				"hard": map[string]interface{}{
+			spec: map[string]any{
+				"hard": map[string]any{
 					"cpu": "8",
 				},
 			},
@@ -672,28 +672,28 @@ func TestPopulateResourceQuota(t *testing.T) {
 func TestPopulateLimitRange(t *testing.T) {
 	tests := []struct {
 		name     string
-		spec     map[string]interface{}
+		spec     map[string]any
 		wantCols map[string]string
 	}{
 		{
 			name: "limit range with all fields",
-			spec: map[string]interface{}{
-				"limits": []interface{}{
-					map[string]interface{}{
+			spec: map[string]any{
+				"limits": []any{
+					map[string]any{
 						"type": "Container",
-						"default": map[string]interface{}{
+						"default": map[string]any{
 							"cpu":    "500m",
 							"memory": "256Mi",
 						},
-						"defaultRequest": map[string]interface{}{
+						"defaultRequest": map[string]any{
 							"cpu":    "100m",
 							"memory": "128Mi",
 						},
-						"max": map[string]interface{}{
+						"max": map[string]any{
 							"cpu":    "2",
 							"memory": "1Gi",
 						},
-						"min": map[string]interface{}{
+						"min": map[string]any{
 							"cpu":    "50m",
 							"memory": "64Mi",
 						},
@@ -713,10 +713,10 @@ func TestPopulateLimitRange(t *testing.T) {
 		},
 		{
 			name: "limit range with unknown type prefix",
-			spec: map[string]interface{}{
-				"limits": []interface{}{
-					map[string]interface{}{
-						"default": map[string]interface{}{
+			spec: map[string]any{
+				"limits": []any{
+					map[string]any{
+						"default": map[string]any{
 							"cpu": "100m",
 						},
 					},
@@ -731,7 +731,7 @@ func TestPopulateLimitRange(t *testing.T) {
 		},
 		{
 			name: "spec without limits produces no columns",
-			spec: map[string]interface{}{},
+			spec: map[string]any{},
 		},
 	}
 
@@ -757,22 +757,22 @@ func TestPopulateLimitRange(t *testing.T) {
 func TestPopulatePodDisruptionBudget(t *testing.T) {
 	tests := []struct {
 		name     string
-		status   map[string]interface{}
-		spec     map[string]interface{}
+		status   map[string]any
+		spec     map[string]any
 		wantCols map[string]string
 	}{
 		{
 			name: "PDB with all fields",
-			spec: map[string]interface{}{
+			spec: map[string]any{
 				"minAvailable":   1,
 				"maxUnavailable": 2,
-				"selector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+				"selector": map[string]any{
+					"matchLabels": map[string]any{
 						"app": "web",
 					},
 				},
 			},
-			status: map[string]interface{}{
+			status: map[string]any{
 				"currentHealthy":     float64(3),
 				"desiredHealthy":     float64(2),
 				"disruptionsAllowed": float64(1),
@@ -790,7 +790,7 @@ func TestPopulatePodDisruptionBudget(t *testing.T) {
 		},
 		{
 			name: "PDB with only spec",
-			spec: map[string]interface{}{
+			spec: map[string]any{
 				"minAvailable": "50%",
 			},
 			wantCols: map[string]string{
@@ -823,21 +823,21 @@ func TestPopulatePodDisruptionBudget(t *testing.T) {
 func TestPopulateNetworkPolicy(t *testing.T) {
 	tests := []struct {
 		name     string
-		spec     map[string]interface{}
+		spec     map[string]any
 		wantCols map[string]string
 	}{
 		{
 			name: "network policy with all fields",
-			spec: map[string]interface{}{
-				"podSelector": map[string]interface{}{
-					"matchLabels": map[string]interface{}{
+			spec: map[string]any{
+				"podSelector": map[string]any{
+					"matchLabels": map[string]any{
 						"app":  "web",
 						"tier": "frontend",
 					},
 				},
-				"policyTypes": []interface{}{"Ingress", "Egress"},
-				"ingress":     []interface{}{map[string]interface{}{}, map[string]interface{}{}},
-				"egress":      []interface{}{map[string]interface{}{}},
+				"policyTypes": []any{"Ingress", "Egress"},
+				"ingress":     []any{map[string]any{}, map[string]any{}},
+				"egress":      []any{map[string]any{}},
 			},
 			wantCols: map[string]string{
 				"Pod Selector":  "app=web, tier=frontend",
@@ -848,8 +848,8 @@ func TestPopulateNetworkPolicy(t *testing.T) {
 		},
 		{
 			name: "network policy with empty podSelector selects all",
-			spec: map[string]interface{}{
-				"podSelector": map[string]interface{}{},
+			spec: map[string]any{
+				"podSelector": map[string]any{},
 			},
 			wantCols: map[string]string{
 				"Pod Selector": "(all pods)",
@@ -881,9 +881,9 @@ func TestPopulateNetworkPolicy(t *testing.T) {
 
 func TestPopulateResourceDetailsExt_IngressClass(t *testing.T) {
 	t.Run("default IngressClass", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{
 					"ingressclass.kubernetes.io/is-default-class": "true",
 				},
 			},
@@ -896,9 +896,9 @@ func TestPopulateResourceDetailsExt_IngressClass(t *testing.T) {
 	})
 
 	t.Run("non-default IngressClass", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{},
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{},
 			},
 		}
 		ti := &model.Item{Name: "nginx"}
@@ -912,9 +912,9 @@ func TestPopulateResourceDetailsExt_IngressClass(t *testing.T) {
 
 func TestPopulateResourceDetailsExt_StorageClass(t *testing.T) {
 	t.Run("default StorageClass with all fields", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"metadata": map[string]interface{}{
-				"annotations": map[string]interface{}{
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{
 					"storageclass.kubernetes.io/is-default-class": "true",
 				},
 			},
@@ -941,14 +941,14 @@ func TestPopulateResourceDetailsExt_StorageClass(t *testing.T) {
 
 func TestPopulateResourceDetailsExt_ServiceAccount(t *testing.T) {
 	t.Run("service account with secrets and image pull secrets", func(t *testing.T) {
-		obj := map[string]interface{}{
-			"secrets": []interface{}{
-				map[string]interface{}{"name": "sa-token-abc"},
+		obj := map[string]any{
+			"secrets": []any{
+				map[string]any{"name": "sa-token-abc"},
 			},
 			"automountServiceAccountToken": true,
-			"imagePullSecrets": []interface{}{
-				map[string]interface{}{"name": "docker-registry"},
-				map[string]interface{}{"name": "gcr-creds"},
+			"imagePullSecrets": []any{
+				map[string]any{"name": "docker-registry"},
+				map[string]any{"name": "gcr-creds"},
 			},
 		}
 		ti := &model.Item{}
@@ -966,10 +966,10 @@ func TestPopulateResourceDetailsExt_ServiceAccount(t *testing.T) {
 func TestPopulateResourceDetailsExt_PriorityClass(t *testing.T) {
 	t.Run("default PriorityClass", func(t *testing.T) {
 		ti := &model.Item{Name: "high-priority"}
-		spec := map[string]interface{}{
+		spec := map[string]any{
 			"globalDefault": true,
 		}
-		populateResourceDetailsExt(ti, map[string]interface{}{}, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
 
 		assert.Equal(t, "high-priority (default)", ti.Name)
 		assert.Equal(t, "default", ti.Status)
@@ -977,10 +977,10 @@ func TestPopulateResourceDetailsExt_PriorityClass(t *testing.T) {
 
 	t.Run("non-default PriorityClass", func(t *testing.T) {
 		ti := &model.Item{Name: "low-priority"}
-		spec := map[string]interface{}{
+		spec := map[string]any{
 			"globalDefault": false,
 		}
-		populateResourceDetailsExt(ti, map[string]interface{}{}, "PriorityClass", nil, spec)
+		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
 
 		assert.Equal(t, "low-priority", ti.Name)
 	})
@@ -991,12 +991,12 @@ func TestPopulateResourceDetailsExt_PriorityClass(t *testing.T) {
 func TestPopulateResourceDetailsExt_GenericCRDFallback(t *testing.T) {
 	tests := []struct {
 		name     string
-		status   map[string]interface{}
+		status   map[string]any
 		wantCols map[string]string
 	}{
 		{
 			name: "extracts top-level status fields",
-			status: map[string]interface{}{
+			status: map[string]any{
 				"phase":   "Active",
 				"message": "all good",
 			},
@@ -1007,8 +1007,8 @@ func TestPopulateResourceDetailsExt_GenericCRDFallback(t *testing.T) {
 		},
 		{
 			name: "nested map status field expands sub-keys",
-			status: map[string]interface{}{
-				"health": map[string]interface{}{
+			status: map[string]any{
+				"health": map[string]any{
 					"status":  "Healthy",
 					"message": "ok",
 				},
@@ -1020,9 +1020,9 @@ func TestPopulateResourceDetailsExt_GenericCRDFallback(t *testing.T) {
 		},
 		{
 			name: "conditions are extracted",
-			status: map[string]interface{}{
-				"conditions": []interface{}{
-					map[string]interface{}{
+			status: map[string]any{
+				"conditions": []any{
+					map[string]any{
 						"type":   "Ready",
 						"status": "True",
 					},
@@ -1037,7 +1037,7 @@ func TestPopulateResourceDetailsExt_GenericCRDFallback(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			ti := &model.Item{}
-			populateResourceDetailsExt(ti, map[string]interface{}{}, "MyCustomResource", tt.status, nil)
+			populateResourceDetailsExt(ti, map[string]any{}, "MyCustomResource", tt.status, nil)
 
 			colMap := columnsToMap(ti.Columns)
 			for k, v := range tt.wantCols {
@@ -1053,17 +1053,17 @@ func TestPopulateResourceDetailsExt_ArgoCD(t *testing.T) {
 	argoKinds := []string{"Application", "ApplicationSet"}
 	for _, kind := range argoKinds {
 		t.Run(fmt.Sprintf("%s dispatches to ArgoCD handler", kind), func(t *testing.T) {
-			obj := map[string]interface{}{
-				"status": map[string]interface{}{
-					"health": map[string]interface{}{
+			obj := map[string]any{
+				"status": map[string]any{
+					"health": map[string]any{
 						"status": "Healthy",
 					},
-					"sync": map[string]interface{}{
+					"sync": map[string]any{
 						"status": "Synced",
 					},
 				},
 			}
-			status, _ := obj["status"].(map[string]interface{})
+			status, _ := obj["status"].(map[string]any)
 			ti := &model.Item{}
 			populateResourceDetailsExt(ti, obj, kind, status, nil)
 
@@ -1077,18 +1077,18 @@ func TestPopulateResourceDetailsExt_ArgoCD(t *testing.T) {
 // --- populateResourceDetailsExt: PersistentVolume dispatches ---
 
 func TestPopulateResourceDetailsExt_PVDispatch(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"capacity": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"capacity": map[string]any{
 				"storage": "50Gi",
 			},
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"phase": "Available",
 		},
 	}
-	status, _ := obj["status"].(map[string]interface{})
-	spec, _ := obj["spec"].(map[string]interface{})
+	status, _ := obj["status"].(map[string]any)
+	spec, _ := obj["spec"].(map[string]any)
 	ti := &model.Item{}
 	populateResourceDetailsExt(ti, obj, "PersistentVolume", status, spec)
 
@@ -1100,13 +1100,13 @@ func TestPopulateResourceDetailsExt_PVDispatch(t *testing.T) {
 // --- populateResourceDetailsExt: ResourceQuota dispatches ---
 
 func TestPopulateResourceDetailsExt_ResourceQuotaDispatch(t *testing.T) {
-	obj := map[string]interface{}{
-		"status": map[string]interface{}{
-			"hard": map[string]interface{}{"pods": "10"},
-			"used": map[string]interface{}{"pods": "5"},
+	obj := map[string]any{
+		"status": map[string]any{
+			"hard": map[string]any{"pods": "10"},
+			"used": map[string]any{"pods": "5"},
 		},
 	}
-	status, _ := obj["status"].(map[string]interface{})
+	status, _ := obj["status"].(map[string]any)
 	ti := &model.Item{}
 	populateResourceDetailsExt(ti, obj, "ResourceQuota", status, nil)
 
@@ -1117,19 +1117,19 @@ func TestPopulateResourceDetailsExt_ResourceQuotaDispatch(t *testing.T) {
 // --- populateResourceDetailsExt: LimitRange dispatches ---
 
 func TestPopulateResourceDetailsExt_LimitRangeDispatch(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"limits": []interface{}{
-				map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
+			"limits": []any{
+				map[string]any{
 					"type": "Pod",
-					"max": map[string]interface{}{
+					"max": map[string]any{
 						"cpu": "4",
 					},
 				},
 			},
 		},
 	}
-	spec, _ := obj["spec"].(map[string]interface{})
+	spec, _ := obj["spec"].(map[string]any)
 	ti := &model.Item{}
 	populateResourceDetailsExt(ti, obj, "LimitRange", nil, spec)
 
@@ -1140,16 +1140,16 @@ func TestPopulateResourceDetailsExt_LimitRangeDispatch(t *testing.T) {
 // --- populateResourceDetailsExt: PodDisruptionBudget dispatches ---
 
 func TestPopulateResourceDetailsExt_PDBDispatch(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
+	obj := map[string]any{
+		"spec": map[string]any{
 			"minAvailable": float64(1),
 		},
-		"status": map[string]interface{}{
+		"status": map[string]any{
 			"currentHealthy": float64(3),
 		},
 	}
-	status, _ := obj["status"].(map[string]interface{})
-	spec, _ := obj["spec"].(map[string]interface{})
+	status, _ := obj["status"].(map[string]any)
+	spec, _ := obj["spec"].(map[string]any)
 	ti := &model.Item{}
 	populateResourceDetailsExt(ti, obj, "PodDisruptionBudget", status, spec)
 
@@ -1161,13 +1161,13 @@ func TestPopulateResourceDetailsExt_PDBDispatch(t *testing.T) {
 // --- populateResourceDetailsExt: NetworkPolicy dispatches ---
 
 func TestPopulateResourceDetailsExt_NetworkPolicyDispatch(t *testing.T) {
-	obj := map[string]interface{}{
-		"spec": map[string]interface{}{
-			"podSelector": map[string]interface{}{},
-			"policyTypes": []interface{}{"Ingress"},
+	obj := map[string]any{
+		"spec": map[string]any{
+			"podSelector": map[string]any{},
+			"policyTypes": []any{"Ingress"},
 		},
 	}
-	spec, _ := obj["spec"].(map[string]interface{})
+	spec, _ := obj["spec"].(map[string]any)
 	ti := &model.Item{}
 	populateResourceDetailsExt(ti, obj, "NetworkPolicy", nil, spec)
 

@@ -9,10 +9,7 @@ import (
 
 // RenderAutoSyncOverlay renders the ArgoCD autosync configuration overlay.
 func RenderAutoSyncOverlay(enabled, selfHeal, prune bool, cursor, screenWidth, screenHeight int) string {
-	boxW := 46
-	if boxW > screenWidth-4 {
-		boxW = screenWidth - 4
-	}
+	boxW := min(46, screenWidth-4)
 
 	title := OverlayTitleStyle.Render("Configure AutoSync")
 

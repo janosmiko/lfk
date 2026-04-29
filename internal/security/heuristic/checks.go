@@ -198,10 +198,10 @@ func checkLatestImageTag(pod *corev1.Pod, c corev1.Container) []security.Finding
 	if last >= 0 {
 		rest = img[last+1:]
 	}
-	colon := strings.Index(rest, ":")
+	_, after, ok := strings.Cut(rest, ":")
 	tag := ""
-	if colon >= 0 {
-		tag = rest[colon+1:]
+	if ok {
+		tag = after
 	}
 	if tag != "" && tag != "latest" {
 		return nil

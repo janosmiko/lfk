@@ -21,6 +21,14 @@ type contextsLoadedMsg struct {
 
 type resourceTypesMsg struct {
 	items []model.Item
+	// seeded is true when items came from model.SeedResources rather than
+	// from actual API discovery. The middle-pane handler uses this flag to
+	// preserve the loading spinner while discovery is still in flight —
+	// overwriting middleItems with seeds on every watch-tick refresh would
+	// clobber the loader set by navigateChildCluster. The right-pane
+	// preview at LevelClusters still displays seeded items so the user
+	// sees *something* while hovering a context.
+	seeded bool
 }
 
 type resourcesLoadedMsg struct {
@@ -33,6 +41,11 @@ type resourcesLoadedMsg struct {
 	// preview/metrics cmds in updateResourcesLoadedMain must also run
 	// suppressed so the title-bar indicator doesn't flash every 2 seconds.
 	silent bool
+	// rt is the resource type the load was issued for. When forPreview is
+	// true this identifies the hovered sidebar item so the preview handler
+	// can prime itemCache under the drill-in navKey (context/resource) and
+	// skip a redundant refetch when the user actually drills in.
+	rt model.ResourceTypeEntry
 }
 
 type ownedLoadedMsg struct {
@@ -58,8 +71,16 @@ type resourceTreeLoadedMsg struct {
 }
 
 type namespacesLoadedMsg struct {
-	items []model.Item
-	err   error
+	context string
+	items   []model.Item
+	err     error
+	// silent marks this load as a background cache refresh (e.g., fired
+	// by ensureNamespaceCacheFresh on session restore or context open).
+	// The handler must not flip m.loading in this mode because that flag
+	// belongs to the middle-column / resource-types load; clearing it
+	// asynchronously while discovery is still in flight causes a "No
+	// items" flash between the loader and the populated list.
+	silent bool
 }
 
 // yamlLoadedMsg delivers a full YAML document for the YAML view. The content
@@ -86,6 +107,11 @@ type previewYAMLLoadedMsg struct {
 type actionResultMsg struct {
 	message string
 	err     error
+	// invalidateNamespaceCache, when true on a successful action,
+	// drops the current context's namespace completion cache so the
+	// next command bar open reflects the mutation (e.g. `:k create
+	// ns`, `:k delete ns`, or a template apply).
+	invalidateNamespaceCache bool
 }
 
 // triggerCronJobMsg carries the result of triggering a CronJob.
@@ -102,6 +128,8 @@ type startupTipMsg struct{ tip string }
 
 // watchTickMsg triggers a periodic refresh in watch mode.
 type watchTickMsg struct{}
+
+type previewDebounceTickMsg struct{ gen uint64 }
 
 // describeRefreshTickMsg triggers a periodic refresh in the describe viewer.
 type describeRefreshTickMsg struct{}
@@ -142,6 +170,15 @@ type logLineMsg struct {
 	line string
 	done bool        // true when the log stream has ended
 	ch   chan string // the channel this line came from (for tab identity)
+}
+
+// logStreamRestartMsg triggers an automatic reconnect of the log stream when
+// the previous stream ended (e.g. an init container completed and the next
+// one hasn't produced output yet). The ch field correlates the restart with
+// the stream it was scheduled for: if m.logCh no longer points at this
+// channel (user switched pods or exited logs mode), the restart is dropped.
+type logStreamRestartMsg struct {
+	ch chan string
 }
 
 // podSelectMsg carries the pod list for exec/attach pod selection on parent resources.
@@ -428,4 +465,16 @@ type finalizerRemoveResultMsg struct {
 type commandBarNamesFetchedMsg struct {
 	cacheKey string
 	names    []string
+}
+
+// previewSecretDataLoadedMsg carries lazily-fetched secret data for the hover
+// preview pane at LevelResources. The gen field guards against stale responses;
+// handlers must discard messages where gen != m.requestGen.
+type previewSecretDataLoadedMsg struct {
+	gen  uint64
+	ctx  string
+	ns   string
+	name string
+	data *model.SecretData
+	err  error
 }
