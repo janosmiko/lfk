@@ -75,7 +75,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this pod", Key: "D"},
-			{Label: "Force Delete", Description: "Force delete this pod (grace-period=0)", Key: "X"},
+			{Label: "Force Delete", Description: "Force delete this pod", Key: "X"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}, true
 	case "Node":
@@ -236,7 +236,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this job", Key: "D"},
-			{Label: "Force Delete", Description: "Force delete this job (grace-period=0)", Key: "X"},
+			{Label: "Force Delete", Description: "Force delete this job", Key: "X"},
 			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}, true

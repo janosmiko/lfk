@@ -183,7 +183,7 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `exec` | `s` | Exec into container (action menu only) |
 | `describe` | `v` | Describe selected resource |
 | `delete` | `D` | Delete resource (force delete Pod/Job if already deleting) |
-| `force_delete` | `X` | Force delete with --grace-period=0 (Pod/Job only) |
+| `force_delete` | `X` | Force delete (Pod/Job only) |
 | `scale` | `S` | Scale resource (deployments, statefulsets, daemonsets) |
 | `edit` | `E` | Edit selected resource in $EDITOR |
 | `label_editor` | `i` | Edit labels/annotations |

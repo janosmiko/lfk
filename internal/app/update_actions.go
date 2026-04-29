@@ -114,7 +114,7 @@ func (m Model) openActionMenu() Model {
 			if item.Name == "Delete" {
 				if model.IsForceDeleteableKind(kind) {
 					items[i].Name = "Force Delete"
-					items[i].Extra = "Force delete (--force --grace-period=0)"
+					items[i].Extra = "Force delete this " + strings.ToLower(kind)
 				} else {
 					items[i].Name = "Force Finalize"
 					items[i].Extra = "Remove finalizers to force finalize"
@@ -238,10 +238,10 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 		m.confirmTypeInput.Clear()
 		m.overlay = overlayConfirmType
 		if model.IsForceDeleteableKind(kind) {
-			// Pod/Job: offer force delete (--force --grace-period=0).
+			// Pod/Job: offer force delete.
 			m.confirmAction = sel.Name + " (FORCE)"
 			m.confirmTitle = "Confirm Force Delete"
-			m.confirmQuestion = fmt.Sprintf("Force delete %s? (--force --grace-period=0)", sel.Name)
+			m.confirmQuestion = fmt.Sprintf("Force delete %s?", sel.Name)
 			m.pendingAction = "Force Delete"
 		} else {
 			// Other kinds: offer force finalize (remove finalizers).
@@ -889,7 +889,7 @@ func (m Model) executeActionSimpleLoading(verb string, cmdFn func() tea.Cmd) (te
 func (m Model) executeActionForceDelete() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
 	m.confirmAction = m.actionCtx.name + " (FORCE)"
 	m.confirmTitle = "Confirm Force Delete"
-	m.confirmQuestion = fmt.Sprintf("Force delete %s? (--force --grace-period=0)", m.actionCtx.name)
+	m.confirmQuestion = fmt.Sprintf("Force delete %s?", m.actionCtx.name)
 	m.confirmTypeInput.Clear()
 	m.overlay = overlayConfirmType
 	m.pendingAction = "Force Delete"

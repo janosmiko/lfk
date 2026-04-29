@@ -81,7 +81,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `R` | Refresh current view | `refresh` |
 | `v` | Describe selected resource | `describe` |
 | `D` | Delete resource (force delete Pod/Job if already deleting, force finalize others) | `delete` |
-| `X` | Force delete with grace-period=0 (Pod/Job only) | `force_delete` |
+| `X` | Force delete (Pod/Job only) | `force_delete` |
 | `S` | Scale / Export resource YAML to file | `scale` / `save_resource` |
 | `Ctrl+O` | Open ingress host in browser | `open_browser` |
 | `i` | Edit labels/annotations | `label_editor` |

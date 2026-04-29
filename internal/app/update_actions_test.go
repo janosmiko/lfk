@@ -29,7 +29,7 @@ func TestDirectActionDelete_DeletingPod_ForceDeletes(t *testing.T) {
 	assert.Equal(t, overlayConfirmType, result.overlay)
 	assert.Equal(t, "Force Delete", result.pendingAction)
 	assert.Contains(t, result.confirmTitle, "Force Delete")
-	assert.Contains(t, result.confirmQuestion, "--force --grace-period=0")
+	assert.Contains(t, result.confirmQuestion, "Force delete stuck-pod")
 }
 
 func TestDirectActionDelete_DeletingDeployment_ForceFinalize(t *testing.T) {
@@ -108,7 +108,7 @@ func TestOpenActionMenu_DeletingPod_ShowsForceDelete(t *testing.T) {
 	for _, item := range result.overlayItems {
 		if item.Name == "Force Delete" {
 			found = true
-			assert.Contains(t, item.Extra, "--force --grace-period=0")
+			assert.Contains(t, item.Extra, "Force delete this pod")
 			break
 		}
 	}
@@ -834,7 +834,7 @@ func TestCovExecuteActionForceDelete(t *testing.T) {
 	assert.Equal(t, overlayConfirmType, rm.overlay)
 	assert.Equal(t, "Force Delete", rm.pendingAction)
 	assert.Contains(t, rm.confirmTitle, "Force Delete")
-	assert.Contains(t, rm.confirmQuestion, "--force --grace-period=0")
+	assert.Contains(t, rm.confirmQuestion, "Force delete")
 }
 
 func TestCovExecuteActionForceFinalize(t *testing.T) {
