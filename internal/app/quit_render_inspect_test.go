@@ -25,10 +25,7 @@ func TestQuitOverlayCentersTextOnMiddleRow(t *testing.T) {
 	out := m.renderOverlay(bg)
 	lines := strings.Split(out, "\n")
 
-	var topBorder, bottomBorder, textRow int
-	topBorder = -1
-	bottomBorder = -1
-	textRow = -1
+	topBorder, bottomBorder, textRow := -1, -1, -1
 	for i, line := range lines {
 		stripped := ansi.Strip(line)
 		switch {

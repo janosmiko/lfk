@@ -260,8 +260,9 @@ func RenderActionOverlay(items []model.Item, cursor int, width int) string {
 // for standard destructive actions (delete, drain).
 //
 // Keymap hints live in overlayHintBarDialog (Enter/Esc); do not add inline
-// `[y] yes [n] no` text here. The hint bar is the single source of truth for
-// confirm dialogs — see CONTRIBUTING.md "UI conventions" and PRs #80, #97.
+// `[y] yes [n] no` text here. The hint bar is the single source of truth
+// for confirm dialogs — PRs #80, #97 proposed inline hints and were closed
+// as inconsistent.
 func RenderConfirmOverlay(action string) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Confirm Delete"))
@@ -279,8 +280,9 @@ func RenderConfirmOverlay(action string) string {
 // layout, so it was dropped.
 //
 // Keymap hints live in overlayHintBarDialog (Enter/Esc); do not add inline
-// `[y] yes [n] no` text here. The hint bar is the single source of truth for
-// confirm dialogs — see CONTRIBUTING.md "UI conventions" and PRs #80, #97.
+// `[y] yes [n] no` text here. The hint bar is the single source of truth
+// for confirm dialogs — PRs #80, #97 proposed inline hints and were closed
+// as inconsistent.
 func RenderQuitConfirmOverlay(innerWidth, innerHeight int) string {
 	return OverlayTitleStyle.
 		Padding(0).
@@ -294,8 +296,9 @@ func RenderQuitConfirmOverlay(innerWidth, innerHeight int) string {
 // lineCount is the number of lines in the pasted text.
 //
 // Keymap hints live in overlayHintBarDialog (Enter/Esc); do not add inline
-// `[y] yes [n] no` text here. The hint bar is the single source of truth for
-// confirm dialogs — see CONTRIBUTING.md "UI conventions" and PRs #80, #97.
+// `[y] yes [n] no` text here. The hint bar is the single source of truth
+// for confirm dialogs — PRs #80, #97 proposed inline hints and were closed
+// as inconsistent.
 func RenderPasteConfirmOverlay(lineCount int) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Paste"))

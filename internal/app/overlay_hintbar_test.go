@@ -115,13 +115,17 @@ func TestOverlayHintBar_ConfirmDialogsAdvertiseYAndN(t *testing.T) {
 			if got == "" {
 				t.Fatalf("overlayHintBar() returned empty for %s", tc.name)
 			}
-			// Both halves of the pair must appear. We check substring
-			// presence rather than exact form so that future renaming
-			// (e.g. "Enter/y" → "y/Enter") still keeps the contract.
-			for _, want := range []string{"Enter", "y", "Esc", "n"} {
-				if !strings.Contains(got, want) {
-					t.Errorf("overlayHintBar() for %s missing %q in %q", tc.name, want, got)
-				}
+			// Both halves of the pair must appear, slash-grouped. Plain
+			// "n" / "y" substring matches would be satisfied by "Enter"
+			// or "cancel" alone, so we lock in the slash form (or its
+			// reverse) instead.
+			confirm := strings.Contains(got, "Enter/y") || strings.Contains(got, "y/Enter")
+			cancel := strings.Contains(got, "Esc/n") || strings.Contains(got, "n/Esc")
+			if !confirm {
+				t.Errorf("overlayHintBar() for %s missing Enter/y pair in %q", tc.name, got)
+			}
+			if !cancel {
+				t.Errorf("overlayHintBar() for %s missing Esc/n pair in %q", tc.name, got)
 			}
 		})
 	}

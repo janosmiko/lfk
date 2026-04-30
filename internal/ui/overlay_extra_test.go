@@ -11,9 +11,8 @@ import (
 
 // Paste confirm overlay must NOT include inline `[y] yes [n] no` text.
 // Keymap hints belong in the bottom hint bar (overlayHintBarDialog) so all
-// confirm overlays share one convention. See CONTRIBUTING.md "UI conventions"
-// and PRs #80, #97 — both proposed the same inline-hint addition and were
-// closed as inconsistent with the design.
+// confirm overlays share one convention. PRs #80 and #97 both proposed the
+// same inline-hint addition and were closed as inconsistent with the design.
 func TestRenderPasteConfirmOverlayHasNoInlineKeyHints(t *testing.T) {
 	result := stripANSI(RenderPasteConfirmOverlay(7))
 	assert.Contains(t, result, "Paste", "should show the title")
