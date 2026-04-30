@@ -162,9 +162,22 @@ func (m Model) statusBar() string {
 		return m.renderStatusHint()
 	}
 
-	// When an overlay is active, show overlay-specific hints instead of explorer hints.
+	// When an overlay is active, show overlay-specific hints instead of
+	// explorer hints. During a bulk action — the overlay was opened with
+	// multiple items selected, e.g. bulk delete/drain confirms, the
+	// confirm-type force-delete prompt, batch label editor — also pin
+	// the selection-count badge to the right edge so the user keeps
+	// "how many am I about to affect?" in view while reading the
+	// confirm. Other overlays (theme picker, namespace selector, etc.)
+	// do not carry that context, so the badge stays scoped to bulkMode.
 	if hint := m.overlayHintBar(); hint != "" {
-		content := ui.Truncate(hint, innerWidth)
+		var content string
+		if m.bulkMode && len(m.bulkItems) > 0 {
+			right := ui.SelectionCountStyle.Render(fmt.Sprintf(" %d selected ", len(m.bulkItems)))
+			content = ui.JoinStatusBar(hint, right, innerWidth)
+		} else {
+			content = ui.Truncate(hint, innerWidth)
+		}
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 	}
 

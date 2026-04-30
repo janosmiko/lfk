@@ -351,6 +351,55 @@ func TestStatusBarChipsSurviveLargeSelection(t *testing.T) {
 		"the counter chip swaps out for the selection badge; both must not appear together")
 }
 
+// While a bulk-action confirm overlay is open the user must keep their
+// "how many am I about to affect?" indicator. The overlay branch of
+// statusBar() normally suppresses chips and shows just the overlay's
+// keymap, but when bulkMode is set (i.e. the overlay was triggered with
+// multiple items selected) the selection badge is pinned to the right
+// edge alongside the overlay keymap.
+func TestStatusBarBulkActionOverlayKeepsSelectionBadge(t *testing.T) {
+	items := []model.Item{{Name: "pod-1"}, {Name: "pod-2"}, {Name: "pod-3"}}
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelResources},
+		middleItems:   items,
+		overlay:       overlayConfirm,
+		confirmAction: "3 resources",
+		bulkMode:      true,
+		bulkItems:     items,
+		selectedItems: map[string]bool{"pod-1": true, "pod-2": true, "pod-3": true},
+		width:         120,
+		height:        40,
+		tabs:          []TabState{{}},
+	}
+	stripped := stripANSI(m.statusBar())
+
+	assert.Contains(t, stripped, "Enter", "overlay keymap must still be present")
+	assert.Contains(t, stripped, "3 selected",
+		"bulk action overlays must keep the selection-count badge visible on the right")
+}
+
+// Non-bulk overlays (theme picker, namespace selector, paste confirm,
+// etc.) do not carry "how many am I about to affect?" context. The
+// selection badge is scoped to bulkMode so it does not bleed into
+// unrelated overlays — even when the user happens to have a stale
+// selection from before opening the overlay.
+func TestStatusBarNonBulkOverlayHidesSelectionBadge(t *testing.T) {
+	m := Model{
+		nav:           model.NavigationState{Level: model.LevelResources},
+		middleItems:   []model.Item{{Name: "pod-1"}, {Name: "pod-2"}},
+		overlay:       overlayColorscheme, // not a bulk action
+		bulkMode:      false,
+		selectedItems: map[string]bool{"pod-1": true, "pod-2": true},
+		width:         120,
+		height:        40,
+		tabs:          []TabState{{}},
+	}
+	stripped := stripANSI(m.statusBar())
+
+	assert.NotContains(t, stripped, "selected",
+		"non-bulk overlays must not show the selection badge — the chip is scoped to bulkMode")
+}
+
 // --- View ---
 
 func TestViewLoadingScreen(t *testing.T) {
