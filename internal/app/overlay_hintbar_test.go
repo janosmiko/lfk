@@ -81,6 +81,52 @@ func TestOverlayHintBar_ReturnsNonEmpty(t *testing.T) {
 	}
 }
 
+// Confirm-style dialogs advertise both halves of the key pair the
+// handlers accept — Enter/y for confirm and Esc/n for cancel. Users
+// who reach for y or n shouldn't have to read source to find them.
+// PRs #80 and #97 surfaced this gap by trying to add inline `[y] yes
+// [n] no` text inside the overlay; the hint bar is now the place
+// these letters live.
+func TestOverlayHintBar_ConfirmDialogsAdvertiseYAndN(t *testing.T) {
+	cases := []struct {
+		name  string
+		setup func() Model
+	}{
+		{"Confirm", func() Model {
+			return Model{overlay: overlayConfirm, width: 120}
+		}},
+		{"QuitConfirm", func() Model {
+			return Model{overlay: overlayQuitConfirm, width: 120}
+		}},
+		{"PasteConfirm", func() Model {
+			return Model{overlay: overlayPasteConfirm, width: 120}
+		}},
+		{"BookmarkConfirmDelete", func() Model {
+			return Model{overlay: overlayBookmarks, bookmarkSearchMode: bookmarkModeConfirmDelete, width: 120}
+		}},
+		{"BookmarkConfirmDeleteAll", func() Model {
+			return Model{overlay: overlayBookmarks, bookmarkSearchMode: bookmarkModeConfirmDeleteAll, width: 120}
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.setup().overlayHintBar()
+			if got == "" {
+				t.Fatalf("overlayHintBar() returned empty for %s", tc.name)
+			}
+			// Both halves of the pair must appear. We check substring
+			// presence rather than exact form so that future renaming
+			// (e.g. "Enter/y" → "y/Enter") still keeps the contract.
+			for _, want := range []string{"Enter", "y", "Esc", "n"} {
+				if !strings.Contains(got, want) {
+					t.Errorf("overlayHintBar() for %s missing %q in %q", tc.name, want, got)
+				}
+			}
+		})
+	}
+}
+
 // TestStatusBar_ShowsOverlayHints verifies the status bar uses overlay hints when an overlay is active.
 func TestStatusBar_ShowsOverlayHints(t *testing.T) {
 	m := Model{
