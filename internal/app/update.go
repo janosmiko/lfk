@@ -990,7 +990,6 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
-	m.overlayItems = buildNamespaceOverlayItems(msg.items)
 	// Cache namespace items + names for command-bar autocompletion and
 	// for synchronous overlay seeding on subsequent opens. Keyed by the
 	// context the fetch was issued for so tabs / `:ctx` switching the
@@ -1009,6 +1008,16 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 		names:     names,
 		fetchedAt: time.Now(),
 	}
+	// Silent loads are background cache refreshes (stale-while-revalidate
+	// after an overlay open, session restore, `:ctx` switch). They must
+	// not mutate overlayItems / overlayCursor: the user may be navigating
+	// the open namespace overlay right now, and overwriting the items
+	// would yank the cursor off whatever they're hovering. The next open
+	// will pick up the freshly cached entry.
+	if msg.silent {
+		return m, nil
+	}
+	m.overlayItems = buildNamespaceOverlayItems(msg.items)
 	m.overlayCursor = namespaceOverlayCursor(m.overlayItems, m.namespace, m.allNamespaces)
 	return m, nil
 }

@@ -654,7 +654,6 @@ func (m Model) handleKeyPrevMatch() (tea.Model, tea.Cmd) {
 func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNamespace
 	m.overlayFilter.Clear()
-	m.overlayCursor = 0
 	ui.ResetOverlayNsScroll()
 	m.nsSelectionModified = false
 
@@ -672,13 +671,14 @@ func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
 		m.loading = false
 		// ensureNamespaceCacheFresh returns nil when the entry is fresh
 		// (cache hit, no work) and a silent loader when it has aged past
-		// namespaceCacheTTL — the silent flag keeps the spinner off so
-		// the already-shown overlay is not blanked while the refresh is
-		// in flight.
+		// namespaceCacheTTL — the silent flag keeps the spinner off and
+		// makes updateNamespacesLoaded skip the overlay-state rewrite, so
+		// the user's cursor and item list survive the background refresh.
 		return m, m.ensureNamespaceCacheFresh()
 	}
 
 	m.overlayItems = nil // populated when namespacesLoadedMsg arrives
+	m.overlayCursor = 0
 	m.loading = true
 	return m, m.loadNamespaces()
 }

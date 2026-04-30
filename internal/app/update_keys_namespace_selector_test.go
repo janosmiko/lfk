@@ -97,36 +97,28 @@ func TestHandleKeyNamespaceSelector_AllNamespacesParksCursorOnHeader(t *testing.
 	assert.Equal(t, "All Namespaces", result.overlayItems[0].Name)
 }
 
-// TestHandleKeyNamespaceSelector_StaleCacheStillSeedsAndRefreshes is
-// the stale-while-revalidate path: an aged entry must still populate
-// the overlay immediately so the open feels instant, while a silent
-// refresh fires in the background to swap in fresh data. The user
-// never sees a spinner here either — the silent flag keeps loading
-// off so the overlay isn't blanked under them.
-func TestHandleKeyNamespaceSelector_StaleCacheStillSeedsAndRefreshes(t *testing.T) {
+// TestHandleKeyNamespaceSelector_StaleCacheStillSeedsOverlay covers the
+// synchronous half of the stale-while-revalidate path: an aged entry
+// must still populate the overlay immediately so the open feels
+// instant, with no spinner. The cmd-side wiring (silent refresh
+// scheduled) is asserted separately in
+// TestHandleKeyNamespaceSelector_StaleCacheSchedulesBackgroundRefresh,
+// which uses a real fake client.
+func TestHandleKeyNamespaceSelector_StaleCacheStillSeedsOverlay(t *testing.T) {
 	m := nsSelectorModel()
-	m.client = nil // ensureNamespaceCacheFresh's silent loader returns nil if client is nil
-	// Use a fake client placeholder via the loader path: leave client nil
-	// is fine because the test only asserts on the synchronous result.
 	m.cachedNamespaces[m.activeContext()] = namespaceCacheEntry{
 		items:     []model.Item{{Name: "default"}, {Name: "kube-system"}},
 		names:     []string{"default", "kube-system"},
 		fetchedAt: time.Now().Add(-2 * namespaceCacheTTL),
 	}
 
-	ret, cmd := m.handleKeyNamespaceSelector()
+	ret, _ := m.handleKeyNamespaceSelector()
 	result := ret.(Model)
 
 	assert.Equal(t, overlayNamespace, result.overlay)
 	assert.False(t, result.loading, "stale cache hit must not blank the already-shown overlay")
 	require.Len(t, result.overlayItems, 3,
 		"stale entry should still seed the overlay synchronously")
-	// loadNamespacesSilent returns nil when m.client is nil, so the cmd
-	// returned here is nil — but that's fine: the assertion above
-	// (overlay seeded synchronously) is the behavioural change we care
-	// about, and the refresh wiring is exercised separately by tests
-	// covering ensureNamespaceCacheFresh.
-	_ = cmd
 }
 
 // TestHandleKeyNamespaceSelector_EmptyCacheFallsBackToLoadingSpinner
@@ -150,4 +142,105 @@ func TestHandleKeyNamespaceSelector_EmptyCacheFallsBackToLoadingSpinner(t *testi
 	if m.client != nil {
 		assert.NotNil(t, cmd, "empty cache must schedule a load command")
 	}
+}
+
+// TestHandleKeyNamespaceSelector_StaleCacheSchedulesBackgroundRefresh is
+// the integration counterpart to the stale-cache seed test: with a real
+// client wired in, the stale cache hit must seed the overlay AND return
+// a non-nil refresh cmd (the silent loader). Without this assertion the
+// stale-while-revalidate wiring could regress without any test failure
+// — the cache would be stuck on stale data forever.
+func TestHandleKeyNamespaceSelector_StaleCacheSchedulesBackgroundRefresh(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.cachedNamespaces = map[string]namespaceCacheEntry{
+		m.activeContext(): {
+			items:     []model.Item{{Name: "default"}, {Name: "kube-system"}},
+			names:     []string{"default", "kube-system"},
+			fetchedAt: time.Now().Add(-2 * namespaceCacheTTL),
+		},
+	}
+
+	ret, cmd := m.handleKeyNamespaceSelector()
+	result := ret.(Model)
+
+	require.Len(t, result.overlayItems, 3, "stale cache must still seed the overlay")
+	assert.False(t, result.loading, "stale cache hit must not blank the overlay")
+	assert.NotNil(t, cmd, "stale cache must schedule a silent refresh command")
+}
+
+// TestUpdateNamespacesLoaded_SilentPreservesOverlayCursor guards the
+// race between the user navigating an open overlay and the silent
+// stale-while-revalidate refresh landing. Without this guard, the
+// cursor jumps back to the active namespace under the user's hand
+// every time the silent refresh lands during an overlay session.
+func TestUpdateNamespacesLoaded_SilentPreservesOverlayCursor(t *testing.T) {
+	m := nsSelectorModel()
+	m.namespace = "default"
+	m.allNamespaces = false
+	m.overlay = overlayNamespace
+	m.overlayItems = []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default"},
+		{Name: "kube-system"},
+		{Name: "production"},
+	}
+	// User has navigated to "production" (index 3); a non-silent load
+	// would snap the cursor back to row 1 ("default").
+	m.overlayCursor = 3
+
+	ret, _ := m.Update(namespacesLoadedMsg{
+		context: m.activeContext(),
+		items: []model.Item{
+			{Name: "default"},
+			{Name: "kube-system"},
+			{Name: "production"},
+		},
+		silent: true,
+	})
+	result := ret.(Model)
+
+	assert.Equal(t, 3, result.overlayCursor,
+		"silent refresh must not yank the cursor away from the user")
+}
+
+// TestUpdateNamespacesLoaded_SilentLeavesOverlayItemsAlone is the
+// companion to the cursor test: a silent refresh that lands while a
+// non-namespace overlay is open (or while the user is mid-interaction
+// in the namespace overlay) must not rewrite m.overlayItems either.
+// The cache is updated for the next open; the currently-displayed
+// overlay is left untouched.
+func TestUpdateNamespacesLoaded_SilentLeavesOverlayItemsAlone(t *testing.T) {
+	m := nsSelectorModel()
+	original := []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default", Status: "Active"},
+		{Name: "kube-system", Status: "Active"},
+	}
+	m.overlay = overlayNamespace
+	m.overlayItems = original
+	m.overlayCursor = 2
+
+	ret, _ := m.Update(namespacesLoadedMsg{
+		context: m.activeContext(),
+		// Refreshed list: a brand-new namespace appeared and "default"
+		// is now Terminating. Silent path must not splice this in
+		// under the user's open overlay.
+		items: []model.Item{
+			{Name: "default", Status: "Terminating"},
+			{Name: "kube-system", Status: "Active"},
+			{Name: "newly-created", Status: "Active"},
+		},
+		silent: true,
+	})
+	result := ret.(Model)
+
+	assert.Equal(t, original, result.overlayItems,
+		"silent refresh must leave the visible overlay items alone")
+	// The cache must still be updated so the next overlay open sees
+	// the fresh data — that's the whole point of the background refresh.
+	entry, ok := result.cachedNamespaces[m.activeContext()]
+	require.True(t, ok)
+	require.Len(t, entry.items, 3)
+	assert.Equal(t, "newly-created", entry.items[2].Name,
+		"silent refresh must still update the per-context cache")
 }
