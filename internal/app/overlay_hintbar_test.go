@@ -29,6 +29,7 @@ func TestOverlayHintBar_ReturnsNonEmpty(t *testing.T) {
 		{"Action", overlayAction, nil, "enter"},
 		{"Confirm", overlayConfirm, nil, "Enter"},
 		{"QuitConfirm", overlayQuitConfirm, nil, "Enter"},
+		{"PasteConfirm", overlayPasteConfirm, nil, "paste"},
 		{"ConfirmType", overlayConfirmType, nil, "DELETE"},
 		{"ScaleInput", overlayScaleInput, nil, "Enter"},
 		{"PortForward", overlayPortForward, nil, "enter"},
@@ -75,6 +76,56 @@ func TestOverlayHintBar_ReturnsNonEmpty(t *testing.T) {
 			}
 			if !strings.Contains(got, tt.wantKey) {
 				t.Errorf("overlayHintBar() for %s missing key %q in %q", tt.name, tt.wantKey, got)
+			}
+		})
+	}
+}
+
+// Confirm-style dialogs advertise both halves of the key pair the
+// handlers accept — Enter/y for confirm and Esc/n for cancel. Users
+// who reach for y or n shouldn't have to read source to find them.
+// PRs #80 and #97 surfaced this gap by trying to add inline `[y] yes
+// [n] no` text inside the overlay; the hint bar is now the place
+// these letters live.
+func TestOverlayHintBar_ConfirmDialogsAdvertiseYAndN(t *testing.T) {
+	cases := []struct {
+		name  string
+		setup func() Model
+	}{
+		{"Confirm", func() Model {
+			return Model{overlay: overlayConfirm, width: 120}
+		}},
+		{"QuitConfirm", func() Model {
+			return Model{overlay: overlayQuitConfirm, width: 120}
+		}},
+		{"PasteConfirm", func() Model {
+			return Model{overlay: overlayPasteConfirm, width: 120}
+		}},
+		{"BookmarkConfirmDelete", func() Model {
+			return Model{overlay: overlayBookmarks, bookmarkSearchMode: bookmarkModeConfirmDelete, width: 120}
+		}},
+		{"BookmarkConfirmDeleteAll", func() Model {
+			return Model{overlay: overlayBookmarks, bookmarkSearchMode: bookmarkModeConfirmDeleteAll, width: 120}
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got := tc.setup().overlayHintBar()
+			if got == "" {
+				t.Fatalf("overlayHintBar() returned empty for %s", tc.name)
+			}
+			// Both halves of the pair must appear, slash-grouped. Plain
+			// "n" / "y" substring matches would be satisfied by "Enter"
+			// or "cancel" alone, so we lock in the slash form (or its
+			// reverse) instead.
+			confirm := strings.Contains(got, "Enter/y") || strings.Contains(got, "y/Enter")
+			cancel := strings.Contains(got, "Esc/n") || strings.Contains(got, "n/Esc")
+			if !confirm {
+				t.Errorf("overlayHintBar() for %s missing Enter/y pair in %q", tc.name, got)
+			}
+			if !cancel {
+				t.Errorf("overlayHintBar() for %s missing Esc/n pair in %q", tc.name, got)
 			}
 		})
 	}
