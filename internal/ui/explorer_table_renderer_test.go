@@ -113,6 +113,46 @@ func TestTableRendererInvalidatesOnIconModeChange(t *testing.T) {
 	assert.Equal(t, "none", r.fp.iconMode)
 }
 
+// Reproduces the "middle column applies the new theme with a slight
+// delay" report. The colourscheme picker calls ApplyTheme on every
+// cursor move, but the table-renderer fingerprint did not include any
+// theme identity — so the cache held row strings with the *old* theme's
+// ANSI sequences baked in until something else (data tick, age bucket
+// roll, resize, no-color toggle) changed.
+//
+// We plant a sentinel that can only survive if Render decides r.fp is
+// unchanged and reuses r.rows. After ApplyTheme to a visibly different
+// palette, the next Render must invalidate the cache and clear the
+// sentinel.
+func TestTableRendererInvalidatesOnApplyTheme(t *testing.T) {
+	prevTheme := ActiveTheme
+	t.Cleanup(func() { ApplyTheme(prevTheme) })
+
+	ApplyTheme(DefaultTheme())
+
+	r := NewTableRenderer()
+	items := tableRendererTestItems()
+	_ = r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+	require.NotEmpty(t, r.rows, "first render must populate the cache")
+
+	const sentinelKey = -1
+	r.rows[sentinelKey] = "sentinel"
+
+	other := DefaultTheme()
+	other.Text = "#ff00ff" // visibly different so style globals diverge
+	other.Primary = "#00ff00"
+	other.Dimmed = "#ffaa00"
+	ApplyTheme(other)
+
+	_ = r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+
+	_, present := r.rows[sentinelKey]
+	assert.False(t, present,
+		"ApplyTheme between renders must invalidate the row cache; sentinel survived, "+
+			"so the middle column would keep painting the previous theme until something else "+
+			"in the fingerprint changed")
+}
+
 func TestTableRendererRestoresGlobalsAfterRender(t *testing.T) {
 	sentinelCache := map[int]string{99: "sentinel"}
 	sentinelLayout := &TableLayoutCache{Computed: true}

@@ -34,6 +34,7 @@ type tableFingerprint struct {
 	itemsLen     int
 	middleRev    uint64
 	selRev       uint64
+	themeRev     uint64
 	ageBucket    int64
 	width        int
 	height       int
@@ -56,6 +57,7 @@ func (r *TableRenderer) Render(headerLabel string, items []model.Item, cursor in
 		itemsLen:     len(items),
 		middleRev:    middleRev,
 		selRev:       selRev,
+		themeRev:     ThemeRev,
 		ageBucket:    time.Now().Unix() / ageBucketSeconds,
 		width:        width,
 		height:       height,

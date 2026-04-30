@@ -8,6 +8,15 @@ import (
 // reads this when rebuilding style globals after toggling color mode.
 var ActiveTheme = DefaultTheme()
 
+// ThemeRev is bumped on every ApplyTheme call. Render caches that bake
+// styled strings (e.g. TableRenderer's row cache for the middle column)
+// must include this in their fingerprint so a theme switch invalidates
+// them on the very next frame instead of waiting for an unrelated field
+// (data tick, age bucket roll, resize) to change. Treated as a UI-thread
+// scalar — same race posture as the other Active* / Config* globals
+// touched by Update and read by View.
+var ThemeRev uint64
+
 // Theme defines the color palette for the application.
 type Theme struct {
 	Primary    string `json:"primary"`
@@ -84,6 +93,7 @@ func ApplyTheme(t Theme) {
 		t.SelectedFg = EnforceMinContrast(t.SelectedFg, t.SelectedBg, ConfigMinContrastRatio)
 	}
 	ActiveTheme = t
+	ThemeRev++
 	if ConfigNoColor {
 		applyNoColorTheme()
 		return

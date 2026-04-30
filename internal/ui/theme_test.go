@@ -287,3 +287,23 @@ func TestTransparentBgConfig(t *testing.T) {
 		assert.False(t, isNoColor, "SelectedStyle should keep background in transparent mode")
 	})
 }
+
+// ApplyTheme must bump ThemeRev so cache fingerprints (notably the
+// middle-column row cache in TableRenderer) invalidate immediately
+// instead of waiting for an unrelated field to change.
+func TestApplyThemeBumpsThemeRev(t *testing.T) {
+	prevTheme := ActiveTheme
+	prevRev := ThemeRev
+	t.Cleanup(func() {
+		ApplyTheme(prevTheme)
+		ThemeRev = prevRev
+	})
+
+	ApplyTheme(DefaultTheme())
+	first := ThemeRev
+
+	ApplyTheme(DefaultTheme())
+	assert.Greater(t, ThemeRev, first,
+		"ApplyTheme must bump ThemeRev on every call so style-keyed caches invalidate; "+
+			"this is the contract that fixes the middle-column theme-apply delay")
+}
