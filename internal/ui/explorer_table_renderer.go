@@ -57,7 +57,7 @@ func (r *TableRenderer) Render(headerLabel string, items []model.Item, cursor in
 		itemsLen:     len(items),
 		middleRev:    middleRev,
 		selRev:       selRev,
-		themeRev:     ThemeRev,
+		themeRev:     ThemeRev.Load(),
 		ageBucket:    time.Now().Unix() / ageBucketSeconds,
 		width:        width,
 		height:       height,

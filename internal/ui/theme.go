@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"sync/atomic"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -12,10 +14,12 @@ var ActiveTheme = DefaultTheme()
 // styled strings (e.g. TableRenderer's row cache for the middle column)
 // must include this in their fingerprint so a theme switch invalidates
 // them on the very next frame instead of waiting for an unrelated field
-// (data tick, age bucket roll, resize) to change. Treated as a UI-thread
-// scalar — same race posture as the other Active* / Config* globals
-// touched by Update and read by View.
-var ThemeRev uint64
+// (data tick, age bucket roll, resize) to change. Atomic because the
+// other Active* / Config* globals are bound by an undocumented
+// "UI-thread only" contract; making this one self-enforcing eliminates
+// a torn-read class of bug if a future caller invokes ApplyTheme from
+// an informer callback or other background goroutine.
+var ThemeRev atomic.Uint64
 
 // Theme defines the color palette for the application.
 type Theme struct {
@@ -93,7 +97,7 @@ func ApplyTheme(t Theme) {
 		t.SelectedFg = EnforceMinContrast(t.SelectedFg, t.SelectedBg, ConfigMinContrastRatio)
 	}
 	ActiveTheme = t
-	ThemeRev++
+	ThemeRev.Add(1)
 	if ConfigNoColor {
 		applyNoColorTheme()
 		return

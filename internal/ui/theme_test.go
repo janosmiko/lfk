@@ -290,20 +290,18 @@ func TestTransparentBgConfig(t *testing.T) {
 
 // ApplyTheme must bump ThemeRev so cache fingerprints (notably the
 // middle-column row cache in TableRenderer) invalidate immediately
-// instead of waiting for an unrelated field to change.
+// instead of waiting for an unrelated field to change. The contract is
+// monotonic growth, not absolute values, so we only restore ActiveTheme
+// — letting ApplyTheme own the counter via its sole sanctioned writer.
 func TestApplyThemeBumpsThemeRev(t *testing.T) {
 	prevTheme := ActiveTheme
-	prevRev := ThemeRev
-	t.Cleanup(func() {
-		ApplyTheme(prevTheme)
-		ThemeRev = prevRev
-	})
+	t.Cleanup(func() { ApplyTheme(prevTheme) })
 
 	ApplyTheme(DefaultTheme())
-	first := ThemeRev
+	first := ThemeRev.Load()
 
 	ApplyTheme(DefaultTheme())
-	assert.Greater(t, ThemeRev, first,
+	assert.Greater(t, ThemeRev.Load(), first,
 		"ApplyTheme must bump ThemeRev on every call so style-keyed caches invalidate; "+
 			"this is the contract that fixes the middle-column theme-apply delay")
 }
