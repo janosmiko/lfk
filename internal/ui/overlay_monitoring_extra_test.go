@@ -1,17 +1,21 @@
 package ui
 
 import (
+	"strings"
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 )
 
 // --- RenderFilterPresetOverlay ---
 
 func TestRenderFilterPresetOverlay(t *testing.T) {
+	const w = 60
+
 	t.Run("empty presets shows message", func(t *testing.T) {
-		result := RenderFilterPresetOverlay(nil, 0, "")
+		result := RenderFilterPresetOverlay(nil, 0, "", w)
 		assert.Contains(t, result, "Quick Filters")
 		assert.Contains(t, result, "No filter presets available")
 	})
@@ -21,7 +25,7 @@ func TestRenderFilterPresetOverlay(t *testing.T) {
 			{Name: "Running", Description: "Show running pods", Key: "r"},
 			{Name: "Failed", Description: "Show failed pods", Key: "f"},
 		}
-		result := RenderFilterPresetOverlay(presets, 0, "")
+		result := RenderFilterPresetOverlay(presets, 0, "", w)
 		assert.Contains(t, result, "Quick Filters")
 		assert.Contains(t, result, "Running")
 		assert.Contains(t, result, "Show running pods")
@@ -35,7 +39,7 @@ func TestRenderFilterPresetOverlay(t *testing.T) {
 			{Name: "A", Description: "desc a", Key: "a"},
 			{Name: "B", Description: "desc b", Key: "b"},
 		}
-		result := RenderFilterPresetOverlay(presets, 1, "")
+		result := RenderFilterPresetOverlay(presets, 1, "", w)
 		assert.Contains(t, result, "B")
 	})
 
@@ -43,7 +47,7 @@ func TestRenderFilterPresetOverlay(t *testing.T) {
 		presets := []FilterPresetEntry{
 			{Name: "Running", Description: "desc", Key: "r"},
 		}
-		result := RenderFilterPresetOverlay(presets, 0, "Running")
+		result := RenderFilterPresetOverlay(presets, 0, "Running", w)
 		assert.Contains(t, result, "\u2713")
 	})
 
@@ -51,7 +55,7 @@ func TestRenderFilterPresetOverlay(t *testing.T) {
 		presets := []FilterPresetEntry{
 			{Name: "Running", Description: "desc", Key: "r"},
 		}
-		result := RenderFilterPresetOverlay(presets, 0, "Other")
+		result := RenderFilterPresetOverlay(presets, 0, "Other", w)
 		// The check mark should not appear for the Running preset.
 		assert.NotContains(t, result, "\u2713 ")
 	})
@@ -59,9 +63,50 @@ func TestRenderFilterPresetOverlay(t *testing.T) {
 	t.Run("footer hints removed from overlay body", func(t *testing.T) {
 		// Hints now live in the main status bar, not inline.
 		presets := []FilterPresetEntry{{Name: "P", Description: "d", Key: "p"}}
-		result := RenderFilterPresetOverlay(presets, 0, "")
+		result := RenderFilterPresetOverlay(presets, 0, "", w)
 		assert.NotContains(t, result, "enter: apply")
 		assert.NotContains(t, result, "esc: close")
+	})
+
+	t.Run("selected row visible width matches inner width", func(t *testing.T) {
+		// Cursor row should be padded to the full content width so the
+		// selected background extends across the entire row, not just
+		// the text segments.
+		presets := []FilterPresetEntry{
+			{Name: "Short", Description: "x", Key: "s"},
+		}
+		result := RenderFilterPresetOverlay(presets, 0, "", w)
+		var line string
+		for l := range strings.SplitSeq(result, "\n") {
+			if strings.Contains(l, "Short") {
+				line = l
+				break
+			}
+		}
+		assert.NotEmpty(t, line, "expected to find selected line")
+		assert.Equal(t, w, lipgloss.Width(line),
+			"selected row should be padded to full content width")
+	})
+
+	t.Run("non-selected row keeps short visible width", func(t *testing.T) {
+		// Non-selected rows are not padded, so embedded styling
+		// (filter color on key, dim color on description) is preserved
+		// without forcing a full-width background.
+		presets := []FilterPresetEntry{
+			{Name: "Short", Description: "x", Key: "s"},
+			{Name: "Other", Description: "y", Key: "o"},
+		}
+		result := RenderFilterPresetOverlay(presets, 0, "", w)
+		var nonSelected string
+		for l := range strings.SplitSeq(result, "\n") {
+			if strings.Contains(l, "Other") {
+				nonSelected = l
+				break
+			}
+		}
+		assert.NotEmpty(t, nonSelected)
+		assert.Less(t, lipgloss.Width(nonSelected), w,
+			"non-selected row should not be padded to full width")
 	})
 }
 
