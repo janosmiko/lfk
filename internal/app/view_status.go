@@ -396,13 +396,20 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		w := min(70, m.width-10)
 		return ui.RenderActionOverlay(m.overlayItems, m.overlayCursor, w), w, min(15, m.height-6), true
 	case overlayQuitConfirm:
-		// Box outer 32x7. Inside (after 2 border + 4/2 padding):
-		//   inner width  = 32 - 2 - 4 = 26
-		//   inner height =  7 - 2 - 2 =  3
-		// The renderer centers the line both axes within that inner area.
+		// Width: outer 32, inner = 32 − 2(border) − 4(left+right padding) = 26.
+		//
+		// Height is trickier than the comment used to claim. OverlayStyle
+		// renders with Height(qh) and a Border, but `Height` in lipgloss
+		// counts the inner area + padding (NOT the border) — so the visible
+		// outer height is qh+2. To land "Quit lfk?" on the visual middle
+		// row we ship a content slice that exactly fills the inner area
+		// (qh − 2 rows after the 1+1 padding), letting the renderer's own
+		// `Align(Center, Center)` do the vertical centering. Setting qh=3
+		// gives a 5-row outer box: border / padding / Quit lfk? / padding
+		// / border, with the text on the middle row.
 		qw := min(32, m.width-10)
-		qh := min(7, m.height-6)
-		return ui.RenderQuitConfirmOverlay(qw-6, qh-4), qw, qh, true
+		qh := min(3, m.height-6)
+		return ui.RenderQuitConfirmOverlay(qw-6, qh-2), qw, qh, true
 	case overlayConfirm:
 		return ui.RenderConfirmOverlay(m.confirmAction), min(50, m.width-10), min(8, m.height-6), true
 	case overlayConfirmType:

@@ -258,6 +258,10 @@ func RenderActionOverlay(items []model.Item, cursor int, width int) string {
 
 // RenderConfirmOverlay renders the y/n confirmation overlay content
 // for standard destructive actions (delete, drain).
+//
+// Keymap hints live in overlayHintBarDialog (Enter/Esc); do not add inline
+// `[y] yes [n] no` text here. The hint bar is the single source of truth for
+// confirm dialogs — see CONTRIBUTING.md "UI conventions" and PRs #80, #97.
 func RenderConfirmOverlay(action string) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Confirm Delete"))
@@ -273,6 +277,10 @@ func RenderConfirmOverlay(action string) string {
 // box's content area (overlayW/H minus border + padding). Single line —
 // a separate "Quit" title used to read as a second option in a two-line
 // layout, so it was dropped.
+//
+// Keymap hints live in overlayHintBarDialog (Enter/Esc); do not add inline
+// `[y] yes [n] no` text here. The hint bar is the single source of truth for
+// confirm dialogs — see CONTRIBUTING.md "UI conventions" and PRs #80, #97.
 func RenderQuitConfirmOverlay(innerWidth, innerHeight int) string {
 	return OverlayTitleStyle.
 		Padding(0).
@@ -284,15 +292,17 @@ func RenderQuitConfirmOverlay(innerWidth, innerHeight int) string {
 
 // RenderPasteConfirmOverlay renders the multiline paste confirmation overlay.
 // lineCount is the number of lines in the pasted text.
+//
+// Keymap hints live in overlayHintBarDialog (Enter/Esc); do not add inline
+// `[y] yes [n] no` text here. The hint bar is the single source of truth for
+// confirm dialogs — see CONTRIBUTING.md "UI conventions" and PRs #80, #97.
 func RenderPasteConfirmOverlay(lineCount int) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Paste"))
 	b.WriteString("\n\n")
 	b.WriteString(OverlayNormalStyle.Render(fmt.Sprintf("Paste contains %d lines.", lineCount)))
 	b.WriteString("\n")
-	b.WriteString(OverlayNormalStyle.Render("Flatten to single line and insert?"))
-	b.WriteString("\n\n")
-	b.WriteString(OverlayDimStyle.Render("[y] yes  [n] no"))
+	b.WriteString(OverlayNormalStyle.Render("Flatten and paste?"))
 	return b.String()
 }
 

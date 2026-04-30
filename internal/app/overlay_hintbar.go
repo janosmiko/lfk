@@ -35,6 +35,11 @@ func (m Model) overlayHintBarDialog() string {
 			{Key: "Enter", Desc: "quit"},
 			{Key: "Esc", Desc: "cancel"},
 		})
+	case overlayPasteConfirm:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "Enter", Desc: "paste"},
+			{Key: "Esc", Desc: "cancel"},
+		})
 	case overlayConfirmType:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "type DELETE", Desc: "confirm"},
