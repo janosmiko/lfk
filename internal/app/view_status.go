@@ -213,43 +213,51 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
 	}
 
-	var parts []string
-
-	// Show selection count when items are selected.
-	if m.hasSelection() {
-		parts = append(parts, ui.SelectionCountStyle.Render(fmt.Sprintf(" %d selected ", len(m.selectedItems))))
-	}
-
-	// Show active filter preset indicator.
-	if m.activeFilterPreset != nil {
-		parts = append(parts, ui.HelpKeyStyle.Render("[filter: "+m.activeFilterPreset.Name+"]"))
-	}
-
-	// Show nyan mode indicator.
-	if m.nyanMode {
-		parts = append(parts, ui.HelpKeyStyle.Render("[NYAN]"))
-	}
+	// Layout: keymap hints anchor the LEFT edge; the informational chip
+	// group (sort, counter / selected count, filter preset, NYAN) anchors
+	// the FAR RIGHT. JoinStatusBar treats the right side as priority — on
+	// overflow the keymap is the part that truncates, so the at-a-glance
+	// state indicators always remain visible. Overlay hint bars use a
+	// separate code path above and are unaffected.
+	left := ui.FormatHintParts(m.explorerHintEntries())
 
 	visible := m.visibleMiddleItems()
 	total := len(m.middleItems)
 	cur := m.cursor() + 1
 
-	if m.filterText != "" {
-		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d filtered: %d/%d]", cur, len(visible), len(visible), total)))
-	} else {
-		parts = append(parts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d]", cur, total)))
-	}
+	var rightParts []string
 
-	// Sort mode indicator. Hidden at picker levels where sortMiddleItems
-	// early-returns — claiming a sort there would mislead the user about
-	// the row ordering.
 	if m.sortApplies() {
-		parts = append(parts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
+		rightParts = append(rightParts, ui.BarDimStyle.Render("sort:"+m.sortModeName()))
+	}
+	// Counter ↔ selection swap. By default we surface the cursor position
+	// inside the visible item list ("[1/47]"); the moment the user marks
+	// at least one item we replace that chip with the selection-count
+	// badge ("3 selected"). Showing both was redundant — the user knows
+	// they're in bulk mode the second they kick off a selection — and the
+	// stacked chips made the bar grow noticeably wider, which in turn
+	// pushed the keymap into truncation territory and was perceived as
+	// "the hint bar gets trimmed when I select items".
+	if m.hasSelection() {
+		rightParts = append(rightParts, ui.SelectionCountStyle.Render(fmt.Sprintf(" %d selected ", len(m.selectedItems))))
+	} else if m.filterText != "" {
+		rightParts = append(rightParts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d filtered: %d/%d]", cur, len(visible), len(visible), total)))
+	} else {
+		rightParts = append(rightParts, ui.BarDimStyle.Render(fmt.Sprintf("[%d/%d]", cur, total)))
 	}
 
-	parts = append(parts, ui.FormatHintParts(m.explorerHintEntries()))
+	// Filter preset and NYAN are decorations rather than primary signals,
+	// so they sit at the far-right tail — first to be visually pushed
+	// against the right edge, last in the chip group's reading order.
+	if m.activeFilterPreset != nil {
+		rightParts = append(rightParts, ui.HelpKeyStyle.Render("[filter: "+m.activeFilterPreset.Name+"]"))
+	}
+	if m.nyanMode {
+		rightParts = append(rightParts, ui.HelpKeyStyle.Render("[NYAN]"))
+	}
 
-	content := strings.Join(parts, "  ")
+	right := strings.Join(rightParts, "  ")
+	content := ui.JoinStatusBar(left, right, innerWidth)
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }
 

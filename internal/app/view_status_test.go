@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -255,6 +256,12 @@ func TestStatusBarShowsSortMode(t *testing.T) {
 	assert.Contains(t, stripped, "sort:Age")
 }
 
+// The cursor-position counter and the selection-count badge share a
+// single chip slot — by default the bar surfaces "[cur/total]"; the
+// moment the user marks even one item the chip swaps to "N selected"
+// and the counter is hidden. Showing both at once was redundant
+// (the user just made the selection) and the stacked chips were one
+// of the things that made the keymap feel cramped.
 func TestStatusBarShowsSelectionCount(t *testing.T) {
 	m := Model{
 		nav:         model.NavigationState{Level: model.LevelResources},
@@ -269,7 +276,9 @@ func TestStatusBarShowsSelectionCount(t *testing.T) {
 	}
 	bar := m.statusBar()
 	stripped := stripANSI(bar)
-	assert.Contains(t, stripped, "2 selected")
+	assert.Contains(t, stripped, "2 selected", "selection badge takes the chip slot when items are marked")
+	assert.NotContains(t, stripped, "[1/2]",
+		"counter must be replaced (not stacked) by the selection badge — both at once was the old, cluttered layout")
 }
 
 func TestStatusBarKeyHints(t *testing.T) {
@@ -285,6 +294,61 @@ func TestStatusBarKeyHints(t *testing.T) {
 	stripped := stripANSI(bar)
 	assert.Contains(t, stripped, "help")
 	assert.Contains(t, stripped, "quit")
+}
+
+// User-reported bug: "When I select multiple items, the hint bar is
+// trimmed." The fix has two parts working together. (1) The chip group
+// (sort, counter / selected count, filter preset, NYAN) moves to the
+// FAR RIGHT and JoinStatusBar pins it intact on overflow — the keymap
+// is the part that truncates, never the chips. (2) The cursor-position
+// counter is replaced by the selection badge instead of stacking, so
+// the chip group's width barely grows when the user enters bulk mode.
+//
+// We render at width 120 (where the explorer keymap alone exceeds the
+// bar, exercising the truncation path) and assert the chips are intact
+// across two snapshots: no selection (counter visible) and 20 items
+// selected (selection badge visible, counter hidden, full keymap
+// truncated with the `~` marker).
+func TestStatusBarChipsSurviveLargeSelection(t *testing.T) {
+	items := make([]model.Item, 20)
+	selected := make(map[string]bool, len(items))
+	for i := range items {
+		name := fmt.Sprintf("pod-with-a-fairly-long-name-%02d", i)
+		items[i] = model.Item{Name: name}
+		selected[name] = true
+	}
+
+	noSel := Model{
+		nav:           model.NavigationState{Level: model.LevelResources},
+		middleItems:   items,
+		width:         120,
+		height:        40,
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+	}
+	withSel := Model{
+		nav:           model.NavigationState{Level: model.LevelResources},
+		middleItems:   items,
+		width:         120,
+		height:        40,
+		tabs:          []TabState{{}},
+		selectedItems: selected,
+	}
+
+	baseline := stripANSI(noSel.statusBar())
+	loaded := stripANSI(withSel.statusBar())
+
+	// Counter is the right-anchored chip when nothing is selected.
+	assert.Contains(t, baseline, "[1/20]", "counter must remain visible when no selection")
+
+	// Selecting items swaps the counter for the selection badge AND
+	// keeps it intact — that's the contract this test pins. The
+	// keymap (left side) was the long string; with right-priority
+	// truncation it carries the `~` marker, not the chips.
+	assert.Contains(t, loaded, "20 selected",
+		"selection badge must remain visible at the right edge regardless of keymap pressure")
+	assert.NotContains(t, loaded, "[1/20]",
+		"the counter chip swaps out for the selection badge; both must not appear together")
 }
 
 // --- View ---

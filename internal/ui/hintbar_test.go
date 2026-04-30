@@ -3,6 +3,9 @@ package ui
 import (
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestRenderHintBar_SingleHint(t *testing.T) {
@@ -105,4 +108,72 @@ func TestFormatHintParts_Empty(t *testing.T) {
 	if got != "" {
 		t.Errorf("expected empty string for nil hints, got: %q", got)
 	}
+}
+
+func TestJoinStatusBar(t *testing.T) {
+	t.Run("returns empty for non-positive width", func(t *testing.T) {
+		assert.Equal(t, "", JoinStatusBar("left", "right", 0))
+		assert.Equal(t, "", JoinStatusBar("left", "right", -5))
+	})
+
+	t.Run("returns empty when both sides empty", func(t *testing.T) {
+		assert.Equal(t, "", JoinStatusBar("", "", 80))
+	})
+
+	t.Run("right-aligns hints with elastic spacer when both fit", func(t *testing.T) {
+		out := JoinStatusBar("LEFT", "RIGHT", 20)
+		assert.Equal(t, 20, lipgloss.Width(out), "must fill exactly width columns")
+		assert.True(t, strings.HasPrefix(out, "LEFT"), "left content sits at the left edge")
+		assert.True(t, strings.HasSuffix(out, "RIGHT"), "right content sits at the right edge")
+		// Middle is whitespace-only.
+		middle := out[len("LEFT") : len(out)-len("RIGHT")]
+		assert.Equal(t, strings.Repeat(" ", len(middle)), middle, "spacer must be pure whitespace")
+	})
+
+	t.Run("only-left content padded to fill width", func(t *testing.T) {
+		out := JoinStatusBar("LEFT", "", 10)
+		assert.Equal(t, 10, lipgloss.Width(out))
+		assert.True(t, strings.HasPrefix(out, "LEFT"))
+		assert.Equal(t, "      ", out[len("LEFT"):], "trailing spaces fill the bar")
+	})
+
+	t.Run("only-right content padded to fill width with leading spaces", func(t *testing.T) {
+		out := JoinStatusBar("", "HINTS", 10)
+		assert.Equal(t, 10, lipgloss.Width(out))
+		assert.True(t, strings.HasSuffix(out, "HINTS"))
+		assert.Equal(t, "     ", out[:len(out)-len("HINTS")], "leading spaces right-align the hints")
+	})
+
+	t.Run("left truncated with marker when combined exceeds width", func(t *testing.T) {
+		// Left is 30 cols, right is 15 cols, width is 30. Right must stay
+		// intact; left must shrink (and pick up the truncate marker).
+		left := strings.Repeat("L", 30)
+		right := strings.Repeat("R", 15)
+		out := JoinStatusBar(left, right, 30)
+		assert.Equal(t, 30, lipgloss.Width(out), "must fill exactly width columns")
+		assert.True(t, strings.HasSuffix(out, right), "info chips (right) must survive intact")
+		assert.Contains(t, out, "~", "truncated left should pick up the truncate marker")
+	})
+
+	t.Run("right truncated when alone wider than width", func(t *testing.T) {
+		left := "DROPPED"
+		right := strings.Repeat("R", 30)
+		out := JoinStatusBar(left, right, 10)
+		assert.Equal(t, 10, lipgloss.Width(out), "must not exceed width")
+		assert.NotContains(t, out, "DROPPED", "left chunk dropped when right alone overflows")
+	})
+
+	t.Run("info chips survive a long keymap — explorer bar contract", func(t *testing.T) {
+		// The explorer's full keymap is ~165 cols on its own. JoinStatusBar
+		// pins the right-anchored info chips (sort, counter / selected, etc.)
+		// to the right edge and truncates the keymap on overflow so the
+		// user keeps the at-a-glance state indicators intact even on a
+		// terminal narrow enough to clip the hint list.
+		bigLeft := strings.Repeat("hint | ", 25) // ~175 cols
+		chips := "sort:name  [42/100]"
+		out := JoinStatusBar(bigLeft, chips, 60)
+		assert.Equal(t, 60, lipgloss.Width(out))
+		assert.True(t, strings.HasSuffix(out, chips),
+			"chips must remain at the right edge in full; got %q", out)
+	})
 }
