@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -226,14 +228,12 @@ func (m Model) statusBar() string {
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(hint)
 	}
 
-	// Layout: keymap hints anchor the LEFT edge; the informational chip
-	// group (sort, counter / selected count, filter preset, NYAN) anchors
-	// the FAR RIGHT. JoinStatusBar treats the right side as priority — on
-	// overflow the keymap is the part that truncates, so the at-a-glance
-	// state indicators always remain visible. Overlay hint bars use a
-	// separate code path above and are unaffected.
-	left := ui.FormatHintParts(m.explorerHintEntries())
-
+	// Layout: the informational chip group (sort, counter / selected
+	// count, filter preset, NYAN) anchors the FAR RIGHT; the keymap
+	// hints fill the remaining space on the left. JoinStatusBar treats
+	// the right side as priority — on overflow the keymap is the part
+	// that yields. Overlay hint bars use a separate code path above and
+	// are unaffected by this layout.
 	visible := m.visibleMiddleItems()
 	total := len(m.middleItems)
 	cur := m.cursor() + 1
@@ -270,6 +270,16 @@ func (m Model) statusBar() string {
 	}
 
 	right := strings.Join(rightParts, "  ")
+
+	// Pre-fit the keymap to the left budget so JoinStatusBar never has to
+	// hard-cut a hint mid-description. FormatHintPartsFit drops any entry
+	// that wouldn't fit whole and continues scanning later entries — so the
+	// reader sees only complete `key: desc` units, and the gap between the
+	// keymap and the chip group is whitespace, never a stray `~`. Reserve
+	// 2 columns of separator (matches the elastic-spacer minimum).
+	leftBudget := max(innerWidth-lipgloss.Width(right)-2, 0)
+	left := ui.FormatHintPartsFit(m.explorerHintEntries(), leftBudget)
+
 	content := ui.JoinStatusBar(left, right, innerWidth)
 	return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(content)
 }

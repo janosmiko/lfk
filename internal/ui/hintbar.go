@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // HintEntry represents a single key-description pair for a hint bar.
@@ -27,6 +28,45 @@ func FormatHintParts(hints []HintEntry) string {
 	return strings.Join(parts, BarDimStyle.Render(" | "))
 }
 
+// FormatHintPartsFit builds the same styled content as FormatHintParts but
+// constrained to maxWidth visual columns. Each hint entry is included as a
+// whole unit — keys and descriptions are never split mid-character, so the
+// reader never sees a half-cut "naviga…" or "ctrl+r: toggle R~". Entries
+// that don't fit are skipped; subsequent shorter entries can still be
+// appended. The list's left-to-right reading order is preserved.
+//
+// Returns "" when no entry fits in maxWidth, or when hints is empty / the
+// width is non-positive.
+func FormatHintPartsFit(hints []HintEntry, maxWidth int) string {
+	if len(hints) == 0 || maxWidth <= 0 {
+		return ""
+	}
+	sep := BarDimStyle.Render(" | ")
+	sepW := lipgloss.Width(sep)
+
+	var b strings.Builder
+	used := 0
+	first := true
+	for _, h := range hints {
+		entry := HelpKeyStyle.Render(h.Key) + BarDimStyle.Render(": "+h.Desc)
+		entryW := lipgloss.Width(entry)
+		add := entryW
+		if !first {
+			add += sepW
+		}
+		if used+add > maxWidth {
+			continue // skip this entry; a shorter later one might still fit
+		}
+		if !first {
+			b.WriteString(sep)
+		}
+		b.WriteString(entry)
+		used += add
+		first = false
+	}
+	return b.String()
+}
+
 // RenderHintBar builds a full-width status bar from hint entries using the
 // standard HelpKeyStyle + BarDimStyle pattern. This is the single source of
 // truth for hint bar styling -- if the style needs to change, only this
@@ -40,17 +80,15 @@ func RenderHintBar(hints []HintEntry, width int) string {
 // edge and `right` content anchored to the right edge, separated by an elastic
 // run of spaces so the bar exactly fills `width` visual columns.
 //
-// When the combined width exceeds `width`, the RIGHT side gets priority — the
-// left chunk is truncated (with `~`) to make room for the right intact. This
-// matches the explorer's bottom bar contract: the right-anchored info chips
-// (sort, counter / selected count, filter preset, NYAN) are stable, compact
-// state indicators that the user expects to see at a glance, while the
-// keymap hints on the left are a long, mostly-static list that degrades
-// gracefully when truncated. Overlay hint bars do not use this helper —
-// they render hints alone via a separate code path — so the right-priority
-// rule is scoped to the chip-bearing explorer bar.
+// When the combined width exceeds `width`, the RIGHT side gets priority and
+// the left chunk is hard-cut (no truncate marker) to make room for the right
+// intact. The cut is unmarked deliberately: the separator between the two
+// halves is whitespace only, never a stray `~`, so the eye cleanly reads the
+// info chips on the right. Callers passing hint-entry content as `left`
+// should pre-fit it with FormatHintPartsFit so the cut here is only ever
+// a safety fallback for non-entry content.
 //
-// If the right alone exceeds `width`, the right is truncated and the left
+// If the right alone exceeds `width`, the right is hard-cut and the left
 // is dropped entirely. width <= 0 returns "".
 func JoinStatusBar(left, right string, width int) string {
 	if width <= 0 {
@@ -69,9 +107,9 @@ func JoinStatusBar(left, right string, width int) string {
 		return left + strings.Repeat(" ", spacer) + right
 	}
 
-	// Right alone exceeds available width — truncate right, drop left.
+	// Right alone exceeds available width — hard-cut right, drop left.
 	if rightW >= width {
-		return Truncate(right, width)
+		return ansi.Truncate(right, width, "")
 	}
 
 	// Left needs trimming to fit alongside the right with one separating space.
@@ -80,7 +118,7 @@ func JoinStatusBar(left, right string, width int) string {
 		// No room for any left content; pad to right edge.
 		return strings.Repeat(" ", width-rightW) + right
 	}
-	truncatedLeft := Truncate(left, leftMax)
+	truncatedLeft := ansi.Truncate(left, leftMax, "")
 	spacer := max(width-lipgloss.Width(truncatedLeft)-rightW, 1)
 	return truncatedLeft + strings.Repeat(" ", spacer) + right
 }

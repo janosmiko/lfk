@@ -110,6 +110,64 @@ func TestFormatHintParts_Empty(t *testing.T) {
 	}
 }
 
+func TestFormatHintPartsFit(t *testing.T) {
+	hints := []HintEntry{
+		{Key: "j/k", Desc: "move"},
+		{Key: "enter", Desc: "view"},
+		{Key: "ctrl+r", Desc: "toggle RO"},
+		{Key: "a", Desc: "create"},
+		{Key: "?", Desc: "help"},
+	}
+
+	t.Run("empty hints returns empty", func(t *testing.T) {
+		assert.Equal(t, "", FormatHintPartsFit(nil, 80))
+	})
+
+	t.Run("non-positive width returns empty", func(t *testing.T) {
+		assert.Equal(t, "", FormatHintPartsFit(hints, 0))
+		assert.Equal(t, "", FormatHintPartsFit(hints, -1))
+	})
+
+	t.Run("all entries fit returns full join", func(t *testing.T) {
+		got := FormatHintPartsFit(hints, 200)
+		full := FormatHintParts(hints)
+		assert.Equal(t, full, got, "with ample width all entries appear in full")
+	})
+
+	t.Run("first entry doesn't fit returns empty", func(t *testing.T) {
+		assert.Equal(t, "", FormatHintPartsFit(hints, 5))
+	})
+
+	t.Run("greedy fit lands exactly on entry boundary", func(t *testing.T) {
+		two := FormatHintParts(hints[:2])
+		got := FormatHintPartsFit(hints, lipgloss.Width(two))
+		assert.Equal(t, two, got, "must fit exactly the first two entries")
+	})
+
+	t.Run("never cuts mid-description", func(t *testing.T) {
+		two := FormatHintParts(hints[:2])
+		budget := lipgloss.Width(two) + 5 // mid-third entry territory
+		got := FormatHintPartsFit(hints, budget)
+		stripped := stripANSI(got)
+		assert.NotContains(t, stripped, "ctrl+r:", "third entry must not appear partially")
+		assert.NotContains(t, stripped, "toggle", "no fragment of the third entry's desc")
+		assert.Contains(t, stripped, "j/k: move")
+		assert.Contains(t, stripped, "enter: view")
+	})
+
+	t.Run("skips a too-large entry but keeps later shorter ones", func(t *testing.T) {
+		// Width 35 fits j/k + enter + (skip ctrl+r, too wide) + a.
+		got := FormatHintPartsFit(hints, 35)
+		stripped := stripANSI(got)
+		assert.Contains(t, stripped, "j/k: move")
+		assert.Contains(t, stripped, "enter: view")
+		assert.NotContains(t, stripped, "ctrl+r: toggle RO",
+			"the wide entry that doesn't fit must be skipped")
+		assert.Contains(t, stripped, "a: create",
+			"a shorter later entry must be picked up after a skip")
+	})
+}
+
 func TestJoinStatusBar(t *testing.T) {
 	t.Run("returns empty for non-positive width", func(t *testing.T) {
 		assert.Equal(t, "", JoinStatusBar("left", "right", 0))
@@ -144,15 +202,18 @@ func TestJoinStatusBar(t *testing.T) {
 		assert.Equal(t, "     ", out[:len(out)-len("HINTS")], "leading spaces right-align the hints")
 	})
 
-	t.Run("left truncated with marker when combined exceeds width", func(t *testing.T) {
+	t.Run("left hard-cut without marker when combined exceeds width", func(t *testing.T) {
 		// Left is 30 cols, right is 15 cols, width is 30. Right must stay
-		// intact; left must shrink (and pick up the truncate marker).
+		// intact; left must shrink. The cut is unmarked — the gap between
+		// the truncated left and the right is whitespace-only, never a `~`,
+		// because the explorer status bar relies on a clean visual gutter
+		// between the keymap and the chip group.
 		left := strings.Repeat("L", 30)
 		right := strings.Repeat("R", 15)
 		out := JoinStatusBar(left, right, 30)
 		assert.Equal(t, 30, lipgloss.Width(out), "must fill exactly width columns")
 		assert.True(t, strings.HasSuffix(out, right), "info chips (right) must survive intact")
-		assert.Contains(t, out, "~", "truncated left should pick up the truncate marker")
+		assert.NotContains(t, out, "~", "no truncate marker may bleed into the separator")
 	})
 
 	t.Run("right truncated when alone wider than width", func(t *testing.T) {

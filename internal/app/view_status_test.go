@@ -342,13 +342,21 @@ func TestStatusBarChipsSurviveLargeSelection(t *testing.T) {
 	assert.Contains(t, baseline, "[1/20]", "counter must remain visible when no selection")
 
 	// Selecting items swaps the counter for the selection badge AND
-	// keeps it intact — that's the contract this test pins. The
-	// keymap (left side) was the long string; with right-priority
-	// truncation it carries the `~` marker, not the chips.
+	// keeps it intact — that's the contract this test pins.
 	assert.Contains(t, loaded, "20 selected",
 		"selection badge must remain visible at the right edge regardless of keymap pressure")
 	assert.NotContains(t, loaded, "[1/20]",
 		"the counter chip swaps out for the selection badge; both must not appear together")
+
+	// The keymap is fitted entry-by-entry to its budget, so the gap
+	// between the truncated keymap and the chip group on the right is
+	// pure whitespace. A stray `~` between the two would mean the bar
+	// hard-cut a hint mid-description, which is the regression this
+	// pair of assertions guards against.
+	assert.NotContains(t, baseline, "~",
+		"baseline bar must use a clean separator, not a truncate marker")
+	assert.NotContains(t, loaded, "~",
+		"selected bar must use a clean separator, not a truncate marker")
 }
 
 // While a bulk-action confirm overlay is open the user must keep their
