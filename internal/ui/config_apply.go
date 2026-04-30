@@ -153,6 +153,9 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.ConfirmOnExit != nil {
 		ConfigConfirmOnExit = *cfg.ConfirmOnExit
 	}
+	if cfg.DimOverlay != nil {
+		ConfigDimOverlay = *cfg.DimOverlay
+	}
 	if cfg.TransparentBg != nil {
 		ConfigTransparentBg = *cfg.TransparentBg
 	}

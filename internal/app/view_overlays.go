@@ -19,6 +19,35 @@ import (
 // centered overlay box via renderOverlayContent.
 
 func (m Model) renderOverlay(background string) string {
+	// Fade the screen behind every overlay so the box stands out and the
+	// bottom hint bar (kept un-faded) carries the keymap. Applied here at
+	// the dispatch entry so all paths — fullscreen, CanI/Subject,
+	// NetworkPolicy, standard — inherit the same treatment.
+	//
+	// DimBackground wraps each line with the SGR 2 (faint) attribute,
+	// preserving the line's existing foreground, background, and bold
+	// styling so theme colours, the BarBg / SurfaceBg fills behind the
+	// breadcrumb, and the bold weight on selection highlights all keep
+	// their tint — the explorer fades without going gray. Stacked
+	// overlays (CanISubject on top of CanI) re-enter this function via
+	// the layered recursion below; an extra faint wrap on an
+	// already-faint line is a visual no-op (the terminal just sees more
+	// SGR 2 markers), so the recursive call composes safely.
+	//
+	// Skipped when overlay==None: callers occasionally route the explorer
+	// view through this function as a no-op. Dimming a no-overlay frame
+	// would blank the screen.
+	//
+	// Skipped for the colourscheme picker: that overlay's whole point is
+	// previewing themes against the live explorer, so the background must
+	// stay bright for the side-by-side comparison to read.
+	//
+	// DimBackground itself short-circuits when ConfigNoColor is on, so we
+	// don't need a separate guard here for the no-color contract.
+	if ui.ConfigDimOverlay && m.overlay != overlayNone && m.overlay != overlayColorscheme {
+		background = ui.DimBackground(ui.PadToHeight(background, m.height), 1)
+	}
+
 	// Layered overlays: when the current overlay was opened on top of
 	// another (e.g. the namespace selector launched from inside the
 	// RBAC overlay), draw the parent first so it stays visible behind

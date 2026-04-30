@@ -224,3 +224,32 @@ func TestApplyConfigOptions_ReadOnlyGlobalAndPerCluster(t *testing.T) {
 	_, hasVoid := ConfigClusterReadOnly["void"]
 	assert.False(t, hasVoid, "clusters without an explicit read_only must not register an entry")
 }
+
+func TestApplyConfigOptions_DimOverlay(t *testing.T) {
+	prev := ConfigDimOverlay
+	t.Cleanup(func() { ConfigDimOverlay = prev })
+
+	t.Run("absent key preserves the current value", func(t *testing.T) {
+		ConfigDimOverlay = true
+		applyConfigOptions(configFile{})
+		assert.True(t, ConfigDimOverlay, "absent key must not flip an already-on value")
+
+		ConfigDimOverlay = false
+		applyConfigOptions(configFile{})
+		assert.False(t, ConfigDimOverlay, "absent key must not flip an already-off value")
+	})
+
+	t.Run("explicit true is applied", func(t *testing.T) {
+		ConfigDimOverlay = false
+		tru := true
+		applyConfigOptions(configFile{DimOverlay: &tru})
+		assert.True(t, ConfigDimOverlay)
+	})
+
+	t.Run("explicit false overrides default-on", func(t *testing.T) {
+		ConfigDimOverlay = true
+		fls := false
+		applyConfigOptions(configFile{DimOverlay: &fls})
+		assert.False(t, ConfigDimOverlay)
+	})
+}

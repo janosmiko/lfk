@@ -325,6 +325,13 @@ var ConfigTipsEnabled = true
 // ConfigConfirmOnExit controls whether ctrl+c on the last tab shows a quit confirmation.
 var ConfigConfirmOnExit = true
 
+// ConfigDimOverlay controls whether the rest of the screen fades to a dim
+// foreground colour while ANY overlay is up, leaving only the bottom hint
+// bar at full intensity. On by default — flip to false via the
+// `dim_overlay:` config key for terminals where the SGR faint attribute
+// looks awkward.
+var ConfigDimOverlay = true
+
 // ConfigLogTailLines controls how many log lines are initially loaded via --tail.
 var ConfigLogTailLines = 1000
 

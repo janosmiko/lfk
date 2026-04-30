@@ -345,6 +345,11 @@ tips: true
 # Set to false to exit immediately on ctrl+c.
 confirm_on_exit: true
 
+# ─── Dim Overlay ─────────────────────────────────────────────────────────────
+# Fade the rest of the screen while any overlay is up. Enabled by default;
+# uncomment to opt out (e.g. for terminals where SGR faint looks awkward).
+# dim_overlay: false
+
 # ─── Terminal Mode ────────────────────────────────────────────────────────────
 # How exec and shell commands are executed.
 # "pty" (default): Embedded in the TUI — host shift+drag selects text
