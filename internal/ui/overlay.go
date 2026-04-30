@@ -270,16 +270,19 @@ func RenderConfirmOverlay(action string) string {
 // RenderQuitConfirmOverlay renders the quit confirmation overlay content
 // centered both horizontally and vertically within (innerWidth, innerHeight),
 // using the title color for emphasis. The dimensions should be the overlay
-// box's content area (overlayW/H minus border + padding). Single line —
-// a separate "Quit" title used to read as a second option in a two-line
-// layout, so it was dropped.
+// box's content area (overlayW/H minus border + padding).
 func RenderQuitConfirmOverlay(innerWidth, innerHeight int) string {
-	return OverlayTitleStyle.
-		Padding(0).
+	var b strings.Builder
+	b.WriteString("\n")
+	b.WriteString(OverlayTitleStyle.Render("Quit lfk?"))
+	b.WriteString("\n")
+	b.WriteString(OverlayDimStyle.Render("[y] yes  [n] no"))
+
+	return lipgloss.NewStyle().
 		Width(innerWidth).
 		Height(innerHeight).
 		Align(lipgloss.Center, lipgloss.Center).
-		Render("Quit lfk?")
+		Render(b.String())
 }
 
 // RenderPasteConfirmOverlay renders the multiline paste confirmation overlay.
