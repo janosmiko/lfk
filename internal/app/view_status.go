@@ -480,7 +480,10 @@ func (m Model) renderOverlayFilterPreset() (string, int, int) {
 	for i, p := range m.filterPresets {
 		entries[i] = ui.FilterPresetEntry{Name: p.Name, Description: p.Description, Key: p.Key}
 	}
-	return ui.RenderFilterPresetOverlay(entries, m.overlayCursor, activePresetName), min(55, m.width-10), min(15, m.height-6)
+	overlayW := min(72, m.width-10)
+	// OverlayStyle reserves 4 cells horizontally for Padding(1, 2).
+	contentW := max(overlayW-4, 0)
+	return ui.RenderFilterPresetOverlay(entries, m.overlayCursor, activePresetName, contentW), overlayW, min(15, m.height-6)
 }
 
 func (m Model) renderOverlayRBAC() (string, int, int) {

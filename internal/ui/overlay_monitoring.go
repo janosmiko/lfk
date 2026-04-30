@@ -315,7 +315,9 @@ func RenderColorschemeOverlay(entries []SchemeEntry, filter string, cursor int, 
 
 // RenderFilterPresetOverlay renders the quick filter preset selection overlay content.
 // activePresetName is the name of the currently active preset (empty if none).
-func RenderFilterPresetOverlay(presets []FilterPresetEntry, cursor int, activePresetName string) string {
+// width is the inner content width used to pad the cursor row so the
+// selection background spans the entire line.
+func RenderFilterPresetOverlay(presets []FilterPresetEntry, cursor int, activePresetName string, width int) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render("Quick Filters"))
 	b.WriteString("\n\n")
@@ -326,15 +328,24 @@ func RenderFilterPresetOverlay(presets []FilterPresetEntry, cursor int, activePr
 	}
 
 	for i, preset := range presets {
-		keyHint := OverlayFilterStyle.Render("[" + preset.Key + "]")
-		activeMarker := "  "
-		if preset.Name == activePresetName {
-			activeMarker = OverlayFilterStyle.Render("\u2713 ")
-		}
-		line := fmt.Sprintf("  %s%s %s  %s", activeMarker, keyHint, preset.Name, OverlayDimStyle.Render(preset.Description))
 		if i == cursor {
-			b.WriteString(OverlaySelectedStyle.Render(line))
+			// Selected row: render as plain text with a single uniform
+			// style so the highlight background covers the whole line
+			// (embedded styles would otherwise punch holes in the
+			// selection background).
+			activeMarker := "  "
+			if preset.Name == activePresetName {
+				activeMarker = "\u2713 "
+			}
+			line := fmt.Sprintf("  %s[%s] %s  %s", activeMarker, preset.Key, preset.Name, preset.Description)
+			b.WriteString(OverlaySelectedStyle.Width(width).Render(line))
 		} else {
+			keyHint := OverlayFilterStyle.Render("[" + preset.Key + "]")
+			activeMarker := "  "
+			if preset.Name == activePresetName {
+				activeMarker = OverlayFilterStyle.Render("\u2713 ")
+			}
+			line := fmt.Sprintf("  %s%s %s  %s", activeMarker, keyHint, preset.Name, OverlayDimStyle.Render(preset.Description))
 			b.WriteString(OverlayNormalStyle.Render(line))
 		}
 		if i < len(presets)-1 {
