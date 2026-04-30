@@ -80,6 +80,10 @@ func RenderHintBar(hints []HintEntry, width int) string {
 // edge and `right` content anchored to the right edge, separated by an elastic
 // run of spaces so the bar exactly fills `width` visual columns.
 //
+// A single-column gutter between the two halves is always preserved: when
+// `leftW + rightW == width` (a perfect fit with no gap), the left side is
+// trimmed by 1 column rather than rendering the two halves butted together.
+//
 // When the combined width exceeds `width`, the RIGHT side gets priority and
 // the left chunk is hard-cut (no truncate marker) to make room for the right
 // intact. The cut is unmarked deliberately: the separator between the two
