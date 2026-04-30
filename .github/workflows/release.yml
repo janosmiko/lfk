@@ -155,6 +155,9 @@ jobs:
       contents: write
       # id-token is required for keyless cosign signing via Sigstore OIDC.
       id-token: write
+      # attestations is required for actions/attest-build-provenance to publish
+      # SLSA provenance attestations on the release artifacts.
+      attestations: write
     steps:
       - name: Checkout
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
@@ -194,3 +197,18 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
           NIGHTLY_DATE: ${{ needs.detect.outputs.nightly_date }}
+
+      # Generates SLSA build provenance attestations for every release artifact.
+      # GitHub publishes the attestations alongside the release so downstream
+      # tools (e.g. OpenSSF Scorecard, `gh attestation verify`) can prove the
+      # artifacts were built from this repo at this commit.
+      - name: Attest build provenance
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2.4.0
+        with:
+          subject-path: |
+            dist/*.tar.gz
+            dist/*.zip
+            dist/*.deb
+            dist/*.rpm
+            dist/*.sbom.json
+            dist/checksums.txt
