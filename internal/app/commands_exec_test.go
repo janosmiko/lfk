@@ -1,6 +1,7 @@
 package app
 
 import (
+	"encoding/json"
 	"os/exec"
 	"strings"
 	"testing"
@@ -119,6 +120,93 @@ func TestPush3ExecKubectlNodeShellNoKubectl(t *testing.T) {
 	cmd := m.execKubectlNodeShell()
 	require.NotNil(t, cmd)
 	// This returns a tea.ExecProcess or error cmd.
+}
+
+// Node shell must launch via `kubectl run --overrides` with a clean pod spec
+// — same pattern k9s and Lens use. Going through `kubectl debug node` adds a
+// hostPath /host volume that on SELinux-enforcing distros (openSUSE MicroOS,
+// Talos, Bottlerocket) leaves the container in `container_t` and blocks
+// nsenter's access to `/proc/1/ns/*`. The standalone privileged pod gets
+// labelled `spc_t`, where nsenter into PID 1 succeeds.
+func TestNodeShellArgsUseRunWithCleanOverrides(t *testing.T) {
+	podName := "lfk-node-shell-abc12"
+	overrides, err := nodeShellOverrides(podName, "node-1")
+	require.NoError(t, err)
+
+	args := nodeShellArgs(podName, "test-ctx", overrides)
+
+	require.Equal(t, "run", args[0], "must use `kubectl run`, not `kubectl debug`")
+	require.Equal(t, podName, args[1])
+	assert.Contains(t, args, "--rm")
+	assert.Contains(t, args, "-it")
+	assert.Contains(t, args, "--restart=Never")
+	assert.Contains(t, args, "--image=busybox")
+	assert.Contains(t, args, "--context")
+	assert.Contains(t, args, "test-ctx")
+
+	for _, a := range args {
+		assert.NotEqual(t, "debug", a, "kubectl debug pulls in /host mount which breaks SELinux")
+		assert.NotContains(t, a, "chroot", "chroot leaves shell in container's MAC domain")
+		assert.NotContains(t, a, "/host", "host-root mount must not appear")
+	}
+
+	var overridesArg string
+	for _, a := range args {
+		if rest, ok := strings.CutPrefix(a, "--overrides="); ok {
+			overridesArg = rest
+			break
+		}
+	}
+	require.NotEmpty(t, overridesArg, "args must contain --overrides=<json>")
+
+	var spec struct {
+		Spec struct {
+			HostPID     bool   `json:"hostPID"`
+			HostIPC     bool   `json:"hostIPC"`
+			HostNetwork bool   `json:"hostNetwork"`
+			NodeName    string `json:"nodeName"`
+			Tolerations []struct {
+				Operator string `json:"operator"`
+			} `json:"tolerations"`
+			Containers []struct {
+				Name            string   `json:"name"`
+				Image           string   `json:"image"`
+				Stdin           bool     `json:"stdin"`
+				TTY             bool     `json:"tty"`
+				Command         []string `json:"command"`
+				SecurityContext struct {
+					Privileged bool `json:"privileged"`
+				} `json:"securityContext"`
+			} `json:"containers"`
+		} `json:"spec"`
+	}
+	require.NoError(t, json.Unmarshal([]byte(overridesArg), &spec))
+
+	assert.True(t, spec.Spec.HostPID, "hostPID required so nsenter sees host's PID 1")
+	assert.True(t, spec.Spec.HostIPC, "hostIPC required for nsenter --ipc")
+	assert.True(t, spec.Spec.HostNetwork)
+	assert.Equal(t, "node-1", spec.Spec.NodeName, "pod must pin to the target node")
+	require.Len(t, spec.Spec.Tolerations, 1, "must tolerate all taints to land on control-plane nodes")
+	assert.Equal(t, "Exists", spec.Spec.Tolerations[0].Operator)
+
+	require.Len(t, spec.Spec.Containers, 1)
+	c := spec.Spec.Containers[0]
+	assert.Equal(t, podName, c.Name, "container name must match pod name so kubectl can attach")
+	assert.Equal(t, "busybox", c.Image)
+	assert.True(t, c.Stdin)
+	assert.True(t, c.TTY)
+	assert.True(t, c.SecurityContext.Privileged, "privileged required for nsenter")
+
+	require.NotEmpty(t, c.Command)
+	assert.Equal(t, "nsenter", c.Command[0])
+	assert.Contains(t, c.Command, "--target")
+	assert.Contains(t, c.Command, "1")
+	for _, flag := range []string{"--mount", "--uts", "--ipc", "--net", "--pid"} {
+		assert.Contains(t, c.Command, flag, "missing namespace flag %s", flag)
+	}
+	for _, short := range []string{"-t", "-m", "-u", "-i", "-n", "-p"} {
+		assert.NotContains(t, c.Command, short, "expected long flag instead of %s", short)
+	}
 }
 
 func TestPush3ExecKubectlDescribeNoKubectl(t *testing.T) {

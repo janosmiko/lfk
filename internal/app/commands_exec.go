@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"math/rand/v2"
 	"os"
@@ -995,7 +996,68 @@ func (m Model) triggerCronJob() tea.Cmd {
 	})
 }
 
-// execKubectlNodeShell opens a debug shell on a node using kubectl debug.
+// nodeShellOverrides builds the JSON pod-spec override that kubectl run
+// applies to the auto-generated pod. The pod is privileged with hostPID,
+// hostIPC, and hostNetwork enabled, pinned to the target node, and runs
+// nsenter into PID 1's namespaces.
+//
+// Why we don't use `kubectl debug node/<name>`: that path's profiles all
+// mount `hostPath: /` at `/host` so callers can `chroot /host`. On
+// SELinux-enforcing distros (openSUSE MicroOS, Talos, Bottlerocket) the
+// host-root mount keeps the container labelled `container_t`, where
+// `nsenter` cannot read `/proc/1/ns/*` (EPERM). A clean privileged pod
+// without that mount gets labelled `spc_t` (super privileged container)
+// where namespace entry succeeds. This is the same shape k9s and Lens
+// produce for their node shell feature.
+func nodeShellOverrides(podName, nodeName string) (string, error) {
+	spec := map[string]any{
+		"apiVersion": "v1",
+		"spec": map[string]any{
+			"hostPID":     true,
+			"hostIPC":     true,
+			"hostNetwork": true,
+			"nodeName":    nodeName,
+			"tolerations": []map[string]any{{"operator": "Exists"}},
+			"containers": []map[string]any{{
+				"name":  podName,
+				"image": "busybox",
+				"stdin": true,
+				"tty":   true,
+				"securityContext": map[string]any{
+					"privileged": true,
+				},
+				"command": []string{
+					"nsenter",
+					"--target", "1",
+					"--mount", "--uts", "--ipc", "--net", "--pid",
+					"--", "/bin/sh",
+				},
+			}},
+		},
+	}
+	b, err := json.Marshal(spec)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal node shell pod spec: %w", err)
+	}
+	return string(b), nil
+}
+
+// nodeShellArgs builds the kubectl-run arguments that, combined with the
+// override JSON, launch a privileged debug pod on the target node and
+// attach to it. See nodeShellOverrides for why we avoid `kubectl debug`.
+func nodeShellArgs(podName, kctx, overrides string) []string {
+	return []string{
+		"run", podName,
+		"-n", "default",
+		"--rm", "-it", "--restart=Never",
+		"--image=busybox",
+		"--context", kctx,
+		"--overrides=" + overrides,
+	}
+}
+
+// execKubectlNodeShell launches a privileged debug pod on the target node
+// and attaches the user's terminal to a shell entered via nsenter.
 func (m Model) execKubectlNodeShell() tea.Cmd {
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
@@ -1006,14 +1068,16 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 
 	nodeName := m.actionCtx.name
 	ctx := m.actionCtx.context
+	podName := "lfk-node-shell-" + randomSuffix(5)
 
-	args := []string{
-		"debug", "node/" + nodeName, "-it",
-		"--image=busybox",
-		"--context", m.kubectlContext(ctx),
-		"--", "chroot", "/host", "/bin/sh",
+	overrides, err := nodeShellOverrides(podName, nodeName)
+	if err != nil {
+		return func() tea.Msg {
+			return actionResultMsg{err: err}
+		}
 	}
 
+	args := nodeShellArgs(podName, m.kubectlContext(ctx), overrides)
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)
@@ -1032,10 +1096,7 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 	}
 
 	title := fmt.Sprintf("Node Shell: %s", nodeName)
-	// `kubectl debug node/...` already takes the terminal cleanly via
-	// chroot — clearBeforeExec is unnecessary and would race with the
-	// debug pod's own startup output.
-	return runInteractiveShellExec(cmd, title, "Node shell", false)
+	return runInteractiveShellExec(cmd, title, "Node shell", true)
 }
 
 // --- Explain commands ---
