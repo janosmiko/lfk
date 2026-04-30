@@ -10,25 +10,34 @@ import (
 // --- RenderQuitConfirmOverlay ---
 
 func TestRenderQuitConfirmOverlay(t *testing.T) {
-	// Single question, centered both horizontally and vertically within
-	// (innerWidth, innerHeight). The previous two-line layout (title +
-	// question) was being misread as a menu, so it was dropped.
-	result := RenderQuitConfirmOverlay(26, 3)
+	// Two-line layout: question + key hint, separated by a blank
+	// spacer row, centered both horizontally and vertically within
+	// (innerWidth, innerHeight).
+	result := RenderQuitConfirmOverlay(26, 5)
 	assert.Contains(t, result, "Quit lfk?", "should show the question")
+	assert.Contains(t, result, "[y] yes", "should show the yes hint")
+	assert.Contains(t, result, "[n] no", "should show the no hint")
 
-	// Vertical centering: 3 rows total, 1 row of question → 1 blank row
-	// above and below.
+	// Vertical centering: 5 rows total. Content is 3 rows (question,
+	// blank spacer, hint), leaving 1 blank row above and 1 below.
 	lines := strings.Split(result, "\n")
-	assert.Equal(t, 3, len(lines), "should fill innerHeight rows")
-	questionRow := -1
+	assert.Equal(t, 5, len(lines), "should fill innerHeight rows")
+
+	questionRow, hintRow := -1, -1
 	for i, line := range lines {
-		if strings.Contains(stripANSI(line), "Quit lfk?") {
+		plain := stripANSI(line)
+		if strings.Contains(plain, "Quit lfk?") {
 			questionRow = i
 		}
+		if strings.Contains(plain, "[y] yes") {
+			hintRow = i
+		}
 	}
-	assert.Equal(t, 1, questionRow, "question must sit on the middle row")
+	assert.Equal(t, 1, questionRow, "question must sit on the second row")
+	assert.Equal(t, 3, hintRow, "hint must sit two rows below the question")
 
-	// Horizontal centering: roughly equal leading/trailing whitespace.
+	// Horizontal centering of the question line: roughly equal
+	// leading/trailing whitespace.
 	plain := stripANSI(lines[questionRow])
 	leading := len(plain) - len(strings.TrimLeft(plain, " "))
 	trailing := len(plain) - len(strings.TrimRight(plain, " "))
