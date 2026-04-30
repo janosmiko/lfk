@@ -19,16 +19,44 @@ import (
 // accepts both the legacy bool form (true → "always", false → "off") and
 // the named-mode form ("off" / "auto" / "always"). Resolved during
 // LoadConfig and stored in ConfigInformerCacheMode.
+//
+// UnmarshalJSON is deliberately tolerant: a typo or unsupported shape is
+// captured in raw + invalid rather than aborting the whole config load.
+// applyConfigOptions then surfaces a single logger.Warn and falls back to
+// the default — same pattern terminal/scrollback_lines use, so a bad
+// informer_cache value never silently nukes unrelated keys like
+// keybindings or colorscheme.
 type informerCacheSetting struct {
-	mode string
+	mode    string
+	raw     string
+	invalid bool
 }
 
-// UnmarshalJSON accepts either a bool or one of the recognised mode strings.
-// LoadConfig goes through sigs.k8s.io/yaml, which converts YAML to JSON
-// before unmarshalling — so the unmarshaler hooks here are also what handle
-// YAML config files. Unknown strings fail loudly so a typo in the config
-// surfaces at startup instead of silently falling back to a default the
-// user did not pick.
+// applyInformerCacheSetting writes the resolved mode into
+// ConfigInformerCacheMode, or warns and falls back to the default if the
+// user supplied an unrecognised shape. Extracted from applyConfigOptions
+// to keep that function under the project's cyclomatic-complexity cap.
+func applyInformerCacheSetting(s *informerCacheSetting) {
+	if s == nil {
+		return
+	}
+	if s.invalid {
+		logger.Warn("unrecognised informer_cache value in config; falling back to default",
+			"value", s.raw,
+			"valid", []string{InformerCacheOff, InformerCacheAuto, InformerCacheAlways},
+			"default", ConfigInformerCacheMode)
+		return
+	}
+	if s.mode != "" {
+		ConfigInformerCacheMode = s.mode
+	}
+}
+
+// UnmarshalJSON parses the bool / string union forms into mode. Anything
+// else (unknown string, number, object) is recorded on raw + invalid so
+// applyConfigOptions can warn-and-fallback. LoadConfig goes through
+// sigs.k8s.io/yaml, which converts YAML to JSON before unmarshalling — so
+// the unmarshaler hook here is also what handles YAML config files.
 func (s *informerCacheSetting) UnmarshalJSON(data []byte) error {
 	var b bool
 	if err := json.Unmarshal(data, &b); err == nil {
@@ -41,14 +69,27 @@ func (s *informerCacheSetting) UnmarshalJSON(data []byte) error {
 	}
 	var raw string
 	if err := json.Unmarshal(data, &raw); err == nil {
-		switch strings.ToLower(strings.TrimSpace(raw)) {
-		case InformerCacheOff, InformerCacheAuto, InformerCacheAlways:
-			s.mode = strings.ToLower(strings.TrimSpace(raw))
+		trimmed := strings.ToLower(strings.TrimSpace(raw))
+		// An explicit empty value is treated as "key absent", not a typo —
+		// users sometimes leave keys present-but-empty when scaffolding a
+		// config file from a template.
+		if trimmed == "" {
 			return nil
 		}
-		return fmt.Errorf("informer_cache: unknown mode %q (want off, auto, or always)", raw)
+		switch trimmed {
+		case InformerCacheOff, InformerCacheAuto, InformerCacheAlways:
+			s.mode = trimmed
+			return nil
+		}
+		s.raw = raw
+		s.invalid = true
+		return nil
 	}
-	return fmt.Errorf("informer_cache: must be a bool or one of off/auto/always")
+	// Truly unparseable shape (number, object, array). Keep the raw bytes
+	// so the warning log shows the user what they actually wrote.
+	s.raw = strings.TrimSpace(string(data))
+	s.invalid = true
+	return nil
 }
 
 // Watch interval bounds.
@@ -750,6 +791,13 @@ func loadConfigFile(configOverride string) (configFile, bool) {
 
 	var cfg configFile
 	if err := yaml.Unmarshal(data, &cfg); err != nil {
+		// Surface YAML parse errors directly to stderr: LoadConfig runs
+		// before logger.Init in main.go, so logger.Warn here would go to
+		// io.Discard. Dropping the entire config silently was the previous
+		// behaviour and made typos very hard to debug.
+		fmt.Fprintf(os.Stderr,
+			"lfk: could not parse config %s: %v\nfalling back to built-in defaults\n",
+			configPath, err)
 		return configFile{}, false
 	}
 	return cfg, true
@@ -916,13 +964,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.SecretLazyLoading != nil {
 		ConfigSecretLazyLoading = *cfg.SecretLazyLoading
 	}
-	if cfg.InformerCache != nil {
-		// UnmarshalJSON guarantees mode is one of off/auto/always when it
-		// returned nil; an unknown value would have aborted LoadConfig
-		// before we reached applyConfigOptions, so a single-leg check is
-		// enough — no need for a redundant empty-string guard.
-		ConfigInformerCacheMode = cfg.InformerCache.mode
-	}
+	applyInformerCacheSetting(cfg.InformerCache)
 	if cfg.MinContrastRatio != nil {
 		ConfigMinContrastRatio = clamp01(*cfg.MinContrastRatio)
 	}

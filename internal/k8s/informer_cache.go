@@ -25,12 +25,14 @@ import (
 // new information beyond what the watch already delivers.
 const informerResyncPeriod = time.Duration(0)
 
-// initialSyncTimeout caps how long the first GetResources call after enabling
-// the cache will block waiting for the informer's initial LIST to complete.
-// On a sluggish API server this prevents the UI from hanging indefinitely on
-// the first namespace switch — instead we fall back to a direct list and try
-// the cache again on the next request, by which time it has typically synced.
-const initialSyncTimeout = 30 * time.Second
+// defaultInitialSyncTimeout caps how long the first GetResources call after
+// enabling the cache will block waiting for the informer's initial LIST to
+// complete. On a sluggish API server this prevents the UI from hanging
+// indefinitely on the first namespace switch — instead we fall back to a
+// direct list and try the cache again on the next request, by which time it
+// has typically synced. Stored on informerCache so tests can dial it down
+// without hard-coding a long sleep into the suite.
+const defaultInitialSyncTimeout = 30 * time.Second
 
 // InformerCacheMode controls how GetResources is routed: never use the cache,
 // always use it, or auto-promote to it on large lists and auto-demote back
@@ -134,6 +136,12 @@ type informerCache struct {
 	demoteBelow  int
 	demoteAfterN int
 
+	// initialSyncTimeout is the wall-clock cap waitForSync enforces on the
+	// first list per (context, GVR). Tests dial it down to milliseconds so
+	// the timeout-fallback path is exercisable without parking the suite
+	// for the production 30s.
+	initialSyncTimeout time.Duration
+
 	// wg counts the inf.Run + cache-sync goroutines launched in
 	// getOrStart. Stop blocks on it so the docstring's "blocks until all
 	// informer goroutines have exited" promise is real, not aspirational.
@@ -147,13 +155,14 @@ type informerCache struct {
 // tests inject a fake dynamic client without going through kubeconfig.
 func newInformerCache(clientFactory func(string) (dynamic.Interface, error)) *informerCache {
 	return &informerCache{
-		clientFactory: clientFactory,
-		clients:       make(map[string]dynamic.Interface),
-		entries:       make(map[string]map[schema.GroupVersionResource]*informerEntry),
-		auto:          make(map[string]map[schema.GroupVersionResource]*gvrAutoState),
-		promoteAt:     autoPromoteAt,
-		demoteBelow:   autoDemoteBelow,
-		demoteAfterN:  autoDemoteAfterN,
+		clientFactory:      clientFactory,
+		clients:            make(map[string]dynamic.Interface),
+		entries:            make(map[string]map[schema.GroupVersionResource]*informerEntry),
+		auto:               make(map[string]map[schema.GroupVersionResource]*gvrAutoState),
+		promoteAt:          autoPromoteAt,
+		demoteBelow:        autoDemoteBelow,
+		demoteAfterN:       autoDemoteAfterN,
+		initialSyncTimeout: defaultInitialSyncTimeout,
 	}
 }
 
@@ -292,7 +301,7 @@ func (ic *informerCache) listItems(ctx context.Context, contextName string, gvr 
 	if err != nil {
 		return nil, 0, err
 	}
-	if err := waitForSync(ctx, entry); err != nil {
+	if err := waitForSync(ctx, entry, ic.initialSyncTimeout); err != nil {
 		return nil, 0, err
 	}
 
@@ -465,22 +474,22 @@ func (ic *informerCache) getOrStart(contextName string, gvr schema.GroupVersionR
 
 // waitForSync blocks until the informer's initial LIST has completed, the
 // informer is stopped (Stop or auto-demote), the caller's context is
-// cancelled, or initialSyncTimeout elapses. The timeout is a safety valve
-// for slow API servers: rather than freezing the UI on the first namespace
-// switch, we surface an error and the caller falls back to a direct list,
-// by which time the watch has usually caught up in the background.
+// cancelled, or timeout elapses. The timeout is a safety valve for slow
+// API servers: rather than freezing the UI on the first namespace switch,
+// we surface an error and the caller falls back to a direct list, by
+// which time the watch has usually caught up in the background.
 //
 // The stopCh case keeps Shutdown responsive — without it a list() blocked
 // here would have to ride out the full timeout before returning, which
 // would also stall ic.wg.Wait inside Stop.
-func waitForSync(ctx context.Context, entry *informerEntry) error {
+func waitForSync(ctx context.Context, entry *informerEntry, timeout time.Duration) error {
 	select {
 	case <-entry.synced:
 		return nil
 	default:
 	}
 
-	timer := time.NewTimer(initialSyncTimeout)
+	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
 	select {
@@ -491,7 +500,7 @@ func waitForSync(ctx context.Context, entry *informerEntry) error {
 	case <-ctx.Done():
 		return ctx.Err()
 	case <-timer.C:
-		return fmt.Errorf("informer cache: initial sync timed out after %s", initialSyncTimeout)
+		return fmt.Errorf("informer cache: initial sync timed out after %s", timeout)
 	}
 }
 
