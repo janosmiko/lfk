@@ -93,15 +93,31 @@ type Client struct {
 	discoveryMu      sync.Mutex
 	discoveryClients map[string]*disk.CachedDiscoveryClient
 
+	// informerMu guards informerMode + informers. Writes happen at most
+	// once (SetInformerCacheMode at startup); reads happen on every
+	// GetResources. RWMutex is overkill for the call rate but documents
+	// the intent — and a future runtime config-reload path can flip the
+	// mode safely without retrofitting synchronization across callers.
+	informerMu sync.RWMutex
 	// informerMode selects the routing strategy for GetResources. See
 	// InformerCacheMode for the three values; default (zero value "") is
 	// treated as InformerCacheAuto so users get the issue #86 win without
-	// any config change.
+	// any config change. Read via informerSnapshot.
 	informerMode InformerCacheMode
 	// informers is built lazily the first time the mode resolves to
 	// anything other than InformerCacheOff. Stays nil for tests that do not
 	// touch the cache, keeping the existing fake-client surface unchanged.
+	// Read via informerSnapshot.
 	informers *informerCache
+}
+
+// informerSnapshot returns the current routing config as a single
+// consistent pair so callers don't observe a half-updated state if a
+// future SetInformerCacheMode lands between reads.
+func (c *Client) informerSnapshot() (InformerCacheMode, *informerCache) {
+	c.informerMu.RLock()
+	defer c.informerMu.RUnlock()
+	return c.informerMode, c.informers
 }
 
 // SetSecretLazyLoading toggles the metadata-only list path for Secrets.
@@ -127,9 +143,12 @@ func (c *Client) SetSecretLazyLoading(enabled bool) {
 // lists fall below 500. The hysteresis prevents flapping when a list size
 // hovers near the threshold.
 //
-// Typically called once at startup after loading the config file.
+// Typically called once at startup after loading the config file. Safe
+// to call concurrently with GetResources thanks to informerMu.
 func (c *Client) SetInformerCacheMode(mode InformerCacheMode) {
 	normalized := InformerCacheMode(strings.ToLower(strings.TrimSpace(string(mode))))
+	c.informerMu.Lock()
+	defer c.informerMu.Unlock()
 	switch normalized {
 	case InformerCacheOff, InformerCacheAuto, InformerCacheAlways:
 		c.informerMode = normalized
@@ -145,8 +164,9 @@ func (c *Client) SetInformerCacheMode(mode InformerCacheMode) {
 // future stream subscribers). Idempotent and safe to call from a defer in
 // main.go even when no informers were ever started.
 func (c *Client) Shutdown() {
-	if c.informers != nil {
-		c.informers.Stop()
+	_, infs := c.informerSnapshot()
+	if infs != nil {
+		infs.Stop()
 	}
 }
 
@@ -651,14 +671,15 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// busy cluster only the few churning pods rebuild; the rest hit the
 	// memo. That's what removes the residual ~300ms per-call cost on a
 	// 6k-pod list when the cluster has background churn.
-	if c.cacheEnabled() && c.shouldUseCache(contextName, gvr) {
+	mode, infs := c.informerSnapshot()
+	if cacheEnabled(mode, infs) && shouldUseCache(mode, infs, contextName, gvr) {
 		build := func(obj *unstructured.Unstructured) model.Item {
 			return c.buildResourceItem(obj, &rt)
 		}
-		items, _, cerr := c.informers.listItems(ctx, contextName, gvr, namespace, build)
+		items, _, cerr := infs.listItems(ctx, contextName, gvr, namespace, build)
 		if cerr == nil {
 			items = sortResourceItems(items, rt.Kind)
-			c.informers.observeCachedListSize(contextName, gvr, len(items))
+			infs.observeCachedListSize(contextName, gvr, len(items))
 			return items, nil
 		}
 	}
@@ -690,28 +711,30 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// observed result size. Crossing the threshold flips the (context, GVR)
 	// to cache-backed for the *next* GetResources call, which is what makes
 	// subsequent namespace switches on a 7k-pod list feel instant.
-	if c.informerMode == InformerCacheAuto && c.informers != nil {
-		c.informers.observeDirectListSize(contextName, gvr, len(items))
+	if mode == InformerCacheAuto && infs != nil {
+		infs.observeDirectListSize(contextName, gvr, len(items))
 	}
 	return sortResourceItems(items, rt.Kind), nil
 }
 
 // cacheEnabled reports whether the informer cache is wired up at all. False
 // in InformerCacheOff or when SetInformerCacheMode has not been called.
-func (c *Client) cacheEnabled() bool {
-	return c.informers != nil && c.informerMode != InformerCacheOff
+// Pure helper on a snapshot — callers must already have taken
+// informerSnapshot so the mode + pointer are consistent.
+func cacheEnabled(mode InformerCacheMode, infs *informerCache) bool {
+	return infs != nil && mode != InformerCacheOff
 }
 
 // shouldUseCache decides — for the current call — whether to take the
 // informer-backed path or fall through to a direct list. Always-mode
 // short-circuits to true; auto-mode consults the per-(context, GVR) state
 // machine maintained by observeDirectListSize / observeCachedListSize.
-func (c *Client) shouldUseCache(contextName string, gvr schema.GroupVersionResource) bool {
-	if c.informerMode == InformerCacheAlways {
+func shouldUseCache(mode InformerCacheMode, infs *informerCache, contextName string, gvr schema.GroupVersionResource) bool {
+	if mode == InformerCacheAlways {
 		return true
 	}
-	if c.informerMode == InformerCacheAuto {
-		return c.informers.isPromoted(contextName, gvr)
+	if mode == InformerCacheAuto {
+		return infs.isPromoted(contextName, gvr)
 	}
 	return false
 }

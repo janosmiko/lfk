@@ -207,34 +207,79 @@ func TestInformerCache_StopIsIdempotent(t *testing.T) {
 // the second one panics with "close of closed channel". The
 // ic.stopped early-out in stopOne is what prevents that, and this test
 // is the regression guard — run with -race for full effect.
+//
+// The barrier + iteration loop give the runtime plenty of opportunities
+// to schedule the two goroutines in interleaved orders. A single shot
+// would still trip -race if the close-vs-close path were broken, but
+// repeated runs make a CI flake far less likely to silently hide a
+// regression where the race detector never observed both orderings.
 func TestInformerCache_ConcurrentStopAndDemoteNoPanic(t *testing.T) {
-	// One pod per call so cached lists trivially fall under any
-	// reasonable demote threshold.
+	for iter := range 20 {
+		dc := newFakeDynClient(pod("a", "ns"))
+		c := NewTestClient(nil, dc)
+		c.SetInformerCacheMode(InformerCacheAuto)
+		withTunedThresholds(c, 1, 5, 1)
+
+		// Warm up: promotes on first list (1 item >= promoteAt=1).
+		_, err := c.GetResources(context.Background(), "", "", podRT)
+		require.NoError(t, err, "iter %d", iter)
+		require.True(t, c.informers.isPromoted("", podGVR()), "iter %d", iter)
+
+		// Race: one goroutine triggers a cached list (which auto-demotes,
+		// trying to stopOne), another calls Shutdown (which Stop()s every
+		// remaining entry). Both want to close the same stopCh — the
+		// barrier ensures both arrive simultaneously rather than the
+		// second one finding ic.stopped already set on the cheap path.
+		barrier := make(chan struct{})
+		var wg sync.WaitGroup
+		wg.Add(2)
+		go func() {
+			defer wg.Done()
+			<-barrier
+			_, _ = c.GetResources(context.Background(), "", "", podRT)
+		}()
+		go func() {
+			defer wg.Done()
+			<-barrier
+			c.Shutdown()
+		}()
+		close(barrier)
+		wg.Wait()
+		// Reaching this line without a panic is the assertion.
+	}
+}
+
+// TestInformerCache_WaitForSyncTimeoutFallsBack exercises the safety
+// valve when the informer's initial LIST never completes (slow / hung
+// apiserver). The waitForSync timeout must surface an error to listItems
+// rather than freeze the UI on the first namespace switch — and
+// GetResources must then fall through to a direct list so the user
+// always gets data. Without an injectable timeout this path was
+// untestable at production-realistic timescales.
+func TestInformerCache_WaitForSyncTimeoutFallsBack(t *testing.T) {
 	dc := newFakeDynClient(pod("a", "ns"))
 	c := NewTestClient(nil, dc)
-	c.SetInformerCacheMode(InformerCacheAuto)
-	withTunedThresholds(c, 1, 5, 1)
+	c.SetInformerCacheMode(InformerCacheAlways)
+	t.Cleanup(c.Shutdown)
 
-	// Warm up: promotes on first list (1 item >= promoteAt=1).
-	_, err := c.GetResources(context.Background(), "", "", podRT)
+	entry, err := c.informers.getOrStart("", podGVR())
 	require.NoError(t, err)
-	require.True(t, c.informers.isPromoted("", podGVR()))
+	// Synthetic stuck-sync: drop the synced channel without ever closing
+	// it, simulating an apiserver that never returns the initial LIST.
+	// The real informer goroutine is still running but its sync watcher
+	// goroutine will never fire close(synced), so waitForSync must rely
+	// on the timeout path.
+	entry.synced = make(chan struct{})
 
-	// Race: one goroutine triggers a cached list (which auto-demotes,
-	// trying to stopOne), another calls Shutdown (which Stop()s every
-	// remaining entry). Both want to close the same stopCh.
-	var wg sync.WaitGroup
-	wg.Add(2)
-	go func() {
-		defer wg.Done()
-		_, _ = c.GetResources(context.Background(), "", "", podRT)
-	}()
-	go func() {
-		defer wg.Done()
-		c.Shutdown()
-	}()
-	wg.Wait()
-	// Reaching this line without a panic is the assertion.
+	start := time.Now()
+	err = waitForSync(context.Background(), entry, 10*time.Millisecond)
+	elapsed := time.Since(start)
+
+	require.Error(t, err, "expected timeout error when sync never completes")
+	assert.Contains(t, err.Error(), "timed out",
+		"timeout error must mention what happened so logs are debuggable")
+	assert.Less(t, elapsed, 500*time.Millisecond,
+		"the timeout must actually fire — a 10ms cap should not park the test for half a second")
 }
 
 // TestInformerCache_StopWaitsForGoroutines verifies the docstring promise
