@@ -655,10 +655,31 @@ func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNamespace
 	m.overlayFilter.Clear()
 	m.overlayCursor = 0
-	m.overlayItems = nil // will be populated when namespacesLoadedMsg arrives
 	ui.ResetOverlayNsScroll()
-	m.loading = true
 	m.nsSelectionModified = false
+
+	// Reuse the existing per-context namespace cache (also used by the
+	// command-bar autocompleter). When a cached entry exists we seed the
+	// overlay synchronously so it opens instantly — even when the entry
+	// is stale we show its rows immediately and rely on the
+	// stale-while-revalidate refresh to swap in fresh data shortly after.
+	// Only the empty/missing-cache case still pays the loading-spinner +
+	// API round-trip path the original implementation always took.
+	entry, ok := m.cachedNamespaces[m.activeContext()]
+	if ok && len(entry.items) > 0 {
+		m.overlayItems = buildNamespaceOverlayItems(entry.items)
+		m.overlayCursor = namespaceOverlayCursor(m.overlayItems, m.namespace, m.allNamespaces)
+		m.loading = false
+		// ensureNamespaceCacheFresh returns nil when the entry is fresh
+		// (cache hit, no work) and a silent loader when it has aged past
+		// namespaceCacheTTL — the silent flag keeps the spinner off so
+		// the already-shown overlay is not blanked while the refresh is
+		// in flight.
+		return m, m.ensureNamespaceCacheFresh()
+	}
+
+	m.overlayItems = nil // populated when namespacesLoadedMsg arrives
+	m.loading = true
 	return m, m.loadNamespaces()
 }
 

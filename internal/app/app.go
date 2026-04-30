@@ -1131,7 +1131,14 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 // namespaceCacheEntry holds the result of a namespace fetch plus the
 // time it completed. The fetchedAt timestamp lets the command bar
 // refresh stale entries without refetching on every open.
+//
+// items is the full model.Item slice (Name + Status), so the namespace
+// selector overlay can reuse the cache without losing the Active /
+// Terminating status colour. names is a parallel slice kept for the
+// command-bar autocompleter, which only needs the strings — the small
+// duplication is cheaper than re-extracting names on every keystroke.
 type namespaceCacheEntry struct {
+	items     []model.Item
 	names     []string
 	fetchedAt time.Time
 }

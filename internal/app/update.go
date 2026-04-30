@@ -990,13 +990,13 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
-	allNsItem := model.Item{Name: "All Namespaces", Status: "all"}
-	m.overlayItems = append([]model.Item{allNsItem}, msg.items...)
-	// Cache namespace names for command bar autocompletion, keyed by the
-	// context the fetch was issued for. Keying avoids stale results when
-	// tabs / `:ctx` change nav.Context between the request and reply.
-	// Stamp fetchedAt so the next command bar open can decide whether
-	// the entry is still fresh or should trigger a background refresh.
+	m.overlayItems = buildNamespaceOverlayItems(msg.items)
+	// Cache namespace items + names for command-bar autocompletion and
+	// for synchronous overlay seeding on subsequent opens. Keyed by the
+	// context the fetch was issued for so tabs / `:ctx` switching the
+	// nav.Context between request and reply doesn't leak stale results.
+	// fetchedAt stamps the entry so callers can decide whether to use
+	// it as-is or trigger a background refresh.
 	if m.cachedNamespaces == nil {
 		m.cachedNamespaces = make(map[string]namespaceCacheEntry)
 	}
@@ -1005,20 +1005,40 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 		names = append(names, item.Name)
 	}
 	m.cachedNamespaces[msg.context] = namespaceCacheEntry{
+		items:     msg.items,
 		names:     names,
 		fetchedAt: time.Now(),
 	}
-	if m.allNamespaces {
-		m.overlayCursor = 0
-	} else {
-		for i, item := range m.overlayItems {
-			if item.Name == m.namespace {
-				m.overlayCursor = i
-				break
-			}
+	m.overlayCursor = namespaceOverlayCursor(m.overlayItems, m.namespace, m.allNamespaces)
+	return m, nil
+}
+
+// buildNamespaceOverlayItems prepends the synthetic "All Namespaces" header
+// to a fetched namespace list so the same shape is produced whether items
+// come from a fresh API call or from cachedNamespaces.
+func buildNamespaceOverlayItems(items []model.Item) []model.Item {
+	allNsItem := model.Item{Name: "All Namespaces", Status: "all"}
+	out := make([]model.Item, 0, len(items)+1)
+	out = append(out, allNsItem)
+	out = append(out, items...)
+	return out
+}
+
+// namespaceOverlayCursor returns the row index the overlay cursor should
+// land on when first opened: the "All Namespaces" header when the user is
+// in all-ns mode, otherwise the row matching the active namespace name.
+// Falls back to 0 when no match is found, which keeps the cursor on the
+// "All Namespaces" header instead of leaving it at -1.
+func namespaceOverlayCursor(items []model.Item, currentNs string, allNamespaces bool) int {
+	if allNamespaces {
+		return 0
+	}
+	for i, item := range items {
+		if item.Name == currentNs {
+			return i
 		}
 	}
-	return m, nil
+	return 0
 }
 
 func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
