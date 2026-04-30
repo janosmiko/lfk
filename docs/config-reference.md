@@ -31,6 +31,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `read_only` | bool | `false` | Disable all mutating actions (delete, edit, scale, restart, exec, port-forward, drain, cordon, etc.) globally. Per-context overrides under `clusters.<name>.read_only` and the `--read-only` CLI flag take precedence. See [Read-Only Mode](usage.md#read-only-mode). |
 | `clusters.<name>.read_only` | bool | _(unset)_ | Per-context read-only override. Wins over the global `read_only` so you can mark specific clusters (e.g. `prod`) read-only while leaving others mutable. |
 | `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. Much faster in clusters with many Helm release secrets (each release is a multi-hundred-KB Secret) or large TLS payloads, at the cost of an extra GET per hovered Secret. When `false` (default), Secrets list like every other resource type — full objects are pulled and `data` is eagerly decoded, so the Type column and decoded values are visible immediately. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
+| `informer_cache` | bool or string | `auto` | Selects the list strategy. Accepts `off` (round-trip every list — matches kubectl), `auto` (default; promote a resource type to a shared informer once a list crosses 1000 items, demote when sustained below 500), and `always` (open a watch eagerly on first use). Legacy bool form is still accepted: `true` → `always`, `false` → `off`. See [Informer cache](#informer-cache) for trade-offs. |
 | `min_contrast_ratio` | float | `0.0` | Normalized readability knob in `[0.0, 1.0]`. When above zero, foreground colors are nudged in HSL lightness space to meet a minimum WCAG contrast ratio against their paired background. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
 
 ### Auto dark/light mode
@@ -427,6 +428,63 @@ this option is designed to fix.
 
 ```yaml
 secret_lazy_loading: true
+```
+
+## Informer cache
+
+Without the cache, every navigation event in the resource list — drill-in,
+namespace switch, watch tick, `shift+r` refresh — issues a fresh `LIST`
+against the API server. On large clusters this becomes visible: a 7k-pod
+list takes 1–2 seconds to round-trip, and switching the namespace filter
+re-pays that cost every time even though filtering is conceptually a
+client-side operation against an already-known list (issue #86).
+
+The `informer_cache` knob has three modes:
+
+- **`off`** — every list round-trips to the API server, matching kubectl
+  semantics. Pick this when the apiserver is sensitive to extra watch
+  connections or when you are debugging server-side behaviour.
+- **`auto`** (default) — start in `off` mode per `(context, resource type)`,
+  but the moment a list returns ≥ 1000 items, promote that resource type
+  to a [shared informer](https://pkg.go.dev/k8s.io/client-go/dynamic/dynamicinformer).
+  Subsequent lists for that resource type — including namespace switches —
+  are served from the in-memory index. Once cached size has stayed below
+  500 for three consecutive cached calls, the watch is closed and the
+  resource type goes back to direct lists. Hysteresis between the promote
+  (1000) and demote (500) thresholds prevents flapping when a list size
+  hovers near the edge.
+- **`always`** — every resource type starts a watch on first use,
+  regardless of size. Use when you know the cluster is large and want to
+  skip the one-time direct list before promotion.
+
+Promoted resource types serve namespace switches as in-memory walks; the
+watch keeps the cache fresh so deleted pods drop out and `Age` advances on
+the next render even though we never re-issue a `LIST`.
+
+### Trade-offs
+
+| | `off` | `auto` (default) | `always` |
+|---|---|---|---|
+| Namespace switch on 7k-pod list | 1–2 s API round trip | In-process walk (after first list) | In-process walk (after first list) |
+| API server load (small clusters) | One LIST per nav | One LIST per nav (never promoted) | One LIST + one watch per opened type |
+| API server load (large clusters) | One LIST per nav | One initial LIST then one watch per promoted type | Same as `auto` |
+| Memory in lfk | View only | Cached objects for promoted types | Cached objects for every opened type |
+| One-off large list strands a watch | n/a | No (auto-demote closes it) | Yes (until shutdown) |
+
+The legacy bool form is still accepted for backward compatibility:
+
+- `informer_cache: true` is treated as `always`.
+- `informer_cache: false` is treated as `off`.
+
+```yaml
+# Default — adapts per resource type without configuration:
+informer_cache: auto
+
+# Force everything through informers:
+# informer_cache: always
+
+# Disable entirely (kubectl-equivalent semantics):
+# informer_cache: off
 ```
 
 ## Minimum Contrast Ratio

@@ -92,12 +92,62 @@ type Client struct {
 	// across different contexts.
 	discoveryMu      sync.Mutex
 	discoveryClients map[string]*disk.CachedDiscoveryClient
+
+	// informerMode selects the routing strategy for GetResources. See
+	// InformerCacheMode for the three values; default (zero value "") is
+	// treated as InformerCacheAuto so users get the issue #86 win without
+	// any config change.
+	informerMode InformerCacheMode
+	// informers is built lazily the first time the mode resolves to
+	// anything other than InformerCacheOff. Stays nil for tests that do not
+	// touch the cache, keeping the existing fake-client surface unchanged.
+	informers *informerCache
 }
 
 // SetSecretLazyLoading toggles the metadata-only list path for Secrets.
 // Typically called once at startup after loading the config file.
 func (c *Client) SetSecretLazyLoading(enabled bool) {
 	c.secretLazyLoading = enabled
+}
+
+// SetInformerCacheMode selects how GetResources routes its list requests.
+// See InformerCacheMode for the three values: off, auto, and always. Unknown
+// values fall back to auto — that's the safest default because auto-mode
+// stays out of the way until a list is actually large.
+//
+// The mode argument is normalized (trimmed + lower-cased) before matching,
+// so callers passing "Always" or "  off " resolve to the same modes the
+// YAML unmarshaler accepts. Without that, programmatic callers would get
+// silently dropped to the auto fallback on a casing mismatch.
+//
+// Issue #86: on a 7k-pod cluster the cached path turns each namespace switch
+// from a 1–2s round trip into an in-process slice walk. Auto-mode promotes
+// to the cache automatically once a list crosses 1000 items, and demotes
+// back to a direct list (closing the watch) after three consecutive cached
+// lists fall below 500. The hysteresis prevents flapping when a list size
+// hovers near the threshold.
+//
+// Typically called once at startup after loading the config file.
+func (c *Client) SetInformerCacheMode(mode InformerCacheMode) {
+	normalized := InformerCacheMode(strings.ToLower(strings.TrimSpace(string(mode))))
+	switch normalized {
+	case InformerCacheOff, InformerCacheAuto, InformerCacheAlways:
+		c.informerMode = normalized
+	default:
+		c.informerMode = InformerCacheAuto
+	}
+	if c.informerMode != InformerCacheOff && c.informers == nil {
+		c.informers = newInformerCache(c.dynamicForContext)
+	}
+}
+
+// Shutdown closes any background watches the client started (informer cache,
+// future stream subscribers). Idempotent and safe to call from a defer in
+// main.go even when no informers were ever started.
+func (c *Client) Shutdown() {
+	if c.informers != nil {
+		c.informers.Stop()
+	}
 }
 
 // RBACCheck represents a single permission check result.
@@ -582,15 +632,40 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 		return c.listSecretsMetadata(ctx, contextName, namespace, rt)
 	}
 
-	dynClient, err := c.dynamicForContext(contextName)
-	if err != nil {
-		return nil, err
-	}
-
 	gvr := schema.GroupVersionResource{
 		Group:    rt.APIGroup,
 		Version:  rt.APIVersion,
 		Resource: rt.Resource,
+	}
+
+	// Issue #86: route through the informer cache when it makes sense.
+	// "always" forces every list through the cache; "auto" promotes a
+	// (context, GVR) on the first large list and demotes it back to direct
+	// once cached size has stayed below the demote threshold for several
+	// calls. Cache miss (sync timeout) falls through to the direct path so
+	// the UI always gets a result.
+	//
+	// listItems memoizes per-item by namespace/name + the object's own
+	// resourceVersion: items unchanged since the last call are reused
+	// without re-running buildResourceItem or copying anything. On a
+	// busy cluster only the few churning pods rebuild; the rest hit the
+	// memo. That's what removes the residual ~300ms per-call cost on a
+	// 6k-pod list when the cluster has background churn.
+	if c.cacheEnabled() && c.shouldUseCache(contextName, gvr) {
+		build := func(obj *unstructured.Unstructured) model.Item {
+			return c.buildResourceItem(obj, &rt)
+		}
+		items, _, cerr := c.informers.listItems(ctx, contextName, gvr, namespace, build)
+		if cerr == nil {
+			items = sortResourceItems(items, rt.Kind)
+			c.informers.observeCachedListSize(contextName, gvr, len(items))
+			return items, nil
+		}
+	}
+
+	dynClient, err := c.dynamicForContext(contextName)
+	if err != nil {
+		return nil, err
 	}
 
 	var lister dynamic.ResourceInterface
@@ -606,21 +681,53 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	}
 
 	items := make([]model.Item, 0, len(list.Items))
-	for _, item := range list.Items {
-		ti := c.buildResourceItem(&item, &rt)
+	for i := range list.Items {
+		ti := c.buildResourceItem(&list.Items[i], &rt)
 		items = append(items, ti)
 	}
-	// Sort events by most recent observation first (LastSeen, not CreatedAt).
-	// CreatedAt holds the firstTimestamp — sorting on it would push recurring
-	// incidents to the bottom even when their latest report is the freshest
-	// thing in the list. Users expect "what happened most recently" at the top.
-	// All other resources sort alphabetically by name.
-	if rt.Kind == "Event" {
+
+	// Auto-mode promotion fires after the direct list, when we know the
+	// observed result size. Crossing the threshold flips the (context, GVR)
+	// to cache-backed for the *next* GetResources call, which is what makes
+	// subsequent namespace switches on a 7k-pod list feel instant.
+	if c.informerMode == InformerCacheAuto && c.informers != nil {
+		c.informers.observeDirectListSize(contextName, gvr, len(items))
+	}
+	return sortResourceItems(items, rt.Kind), nil
+}
+
+// cacheEnabled reports whether the informer cache is wired up at all. False
+// in InformerCacheOff or when SetInformerCacheMode has not been called.
+func (c *Client) cacheEnabled() bool {
+	return c.informers != nil && c.informerMode != InformerCacheOff
+}
+
+// shouldUseCache decides — for the current call — whether to take the
+// informer-backed path or fall through to a direct list. Always-mode
+// short-circuits to true; auto-mode consults the per-(context, GVR) state
+// machine maintained by observeDirectListSize / observeCachedListSize.
+func (c *Client) shouldUseCache(contextName string, gvr schema.GroupVersionResource) bool {
+	if c.informerMode == InformerCacheAlways {
+		return true
+	}
+	if c.informerMode == InformerCacheAuto {
+		return c.informers.isPromoted(contextName, gvr)
+	}
+	return false
+}
+
+// sortResourceItems applies the canonical row order GetResources uses
+// regardless of whether the items came from a fresh apiserver LIST or from
+// the informer cache. Events sort by most recent observation (LastSeen, not
+// CreatedAt) so a recurring incident's latest report stays on top; everything
+// else sorts alphabetically by Name.
+func sortResourceItems(items []model.Item, kind string) []model.Item {
+	if kind == "Event" {
 		sort.Slice(items, func(i, j int) bool { return items[i].LastSeen.After(items[j].LastSeen) })
 	} else {
 		sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
 	}
-	return items, nil
+	return items
 }
 
 // listSecretsMetadata fetches the Secret list using the metadata-only API,

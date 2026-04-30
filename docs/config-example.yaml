@@ -350,3 +350,15 @@ confirm_on_exit: true
 # Override with the --watch-interval CLI flag.
 # Default: 2s
 # watch_interval: 2s
+
+# ─── Informer Cache ───────────────────────────────────────────────────────────
+# How resource list calls are routed:
+#   "off"     - round-trip every list to the API server (matches kubectl).
+#   "auto"    - default; per resource type, start in direct-list mode and
+#               promote to a shared informer once a list returns >= 1000
+#               items. Demote back to direct lists when the cached size
+#               stays below 500 for three consecutive calls. Recommended.
+#   "always"  - open a watch eagerly on first use of each resource type.
+# Legacy bool form: true → "always", false → "off".
+# Default: auto
+# informer_cache: auto

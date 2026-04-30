@@ -106,6 +106,8 @@ func runTUI(opts app.StartupOptions) error {
 	}
 	model.PinnedGroups = ui.ConfigPinnedGroups
 	client.SetSecretLazyLoading(ui.ConfigSecretLazyLoading)
+	client.SetInformerCacheMode(k8s.InformerCacheMode(ui.ConfigInformerCacheMode))
+	defer client.Shutdown()
 
 	if err := logger.Init(ui.ConfigLogPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not initialize logger: %v\n", err)
@@ -114,7 +116,11 @@ func runTUI(opts app.StartupOptions) error {
 
 	// Now that the logger is initialized, redirect klog output to our application log.
 	klog.SetOutput(logger.KlogWriter())
-	logger.Info("Application started")
+	logger.Info("Application started",
+		"informer_cache", ui.ConfigInformerCacheMode,
+		"secret_lazy_loading", ui.ConfigSecretLazyLoading,
+		"config_path", opts.Config,
+	)
 
 	// Redirect os.Stderr to capture output from exec credential plugins (e.g., AWS SSO
 	// errors from `aws eks get-token`). Without this, subprocess stderr output goes

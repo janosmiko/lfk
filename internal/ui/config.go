@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -12,6 +14,42 @@ import (
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// informerCacheSetting holds the parsed informer_cache config value. It
+// accepts both the legacy bool form (true → "always", false → "off") and
+// the named-mode form ("off" / "auto" / "always"). Resolved during
+// LoadConfig and stored in ConfigInformerCacheMode.
+type informerCacheSetting struct {
+	mode string
+}
+
+// UnmarshalJSON accepts either a bool or one of the recognised mode strings.
+// LoadConfig goes through sigs.k8s.io/yaml, which converts YAML to JSON
+// before unmarshalling — so the unmarshaler hooks here are also what handle
+// YAML config files. Unknown strings fail loudly so a typo in the config
+// surfaces at startup instead of silently falling back to a default the
+// user did not pick.
+func (s *informerCacheSetting) UnmarshalJSON(data []byte) error {
+	var b bool
+	if err := json.Unmarshal(data, &b); err == nil {
+		if b {
+			s.mode = InformerCacheAlways
+		} else {
+			s.mode = InformerCacheOff
+		}
+		return nil
+	}
+	var raw string
+	if err := json.Unmarshal(data, &raw); err == nil {
+		switch strings.ToLower(strings.TrimSpace(raw)) {
+		case InformerCacheOff, InformerCacheAuto, InformerCacheAlways:
+			s.mode = strings.ToLower(strings.TrimSpace(raw))
+			return nil
+		}
+		return fmt.Errorf("informer_cache: unknown mode %q (want off, auto, or always)", raw)
+	}
+	return fmt.Errorf("informer_cache: must be a bool or one of off/auto/always")
+}
 
 // Watch interval bounds.
 const (
@@ -315,6 +353,22 @@ var ConfigDashboard = true
 // between hover and fetch completion.
 var ConfigSecretLazyLoading bool
 
+// Recognised string values for the informer_cache config knob. The Go
+// constants are duplicated from internal/k8s.InformerCacheMode to keep the
+// ui package free of a k8s dependency — main.go does the conversion.
+const (
+	InformerCacheOff    = "off"
+	InformerCacheAuto   = "auto"
+	InformerCacheAlways = "always"
+)
+
+// ConfigInformerCacheMode resolves to one of "off"/"auto"/"always" after
+// LoadConfig. Default "auto" so users on large clusters (issue #86) get the
+// namespace-switch perf win for free; small clusters pay nothing because
+// auto-mode only promotes a (context, GVR) to the cache once a list crosses
+// 1000 items, and demotes it again when the list shrinks.
+var ConfigInformerCacheMode = InformerCacheAuto
+
 // ConfigMinContrastRatio is the normalized readability knob in [0.0, 1.0].
 // When greater than zero, ApplyTheme nudges foreground colors in HSL lightness
 // space so each fg/bg pair meets a minimum WCAG contrast ratio. The mapping is:
@@ -569,6 +623,16 @@ type configFile struct {
 	// the trade-off is a per-hover GET and a brief blank-data frame until the
 	// fetch resolves.
 	SecretLazyLoading *bool `json:"secret_lazy_loading" yaml:"secret_lazy_loading"`
+	// InformerCache controls how lists are routed: "off" round-trips every
+	// time (matches kubectl), "auto" (default) starts in direct mode per
+	// (context, GVR) and promotes to a shared informer once a list crosses
+	// 1000 items — demoting again when the list shrinks below 500 for three
+	// consecutive cached calls — and "always" eagerly opens a watch on the
+	// first list. Accepts the legacy bool form for compatibility: `true`
+	// maps to "always", `false` maps to "off". Issue #86 was the original
+	// motivation: on a 7k-pod cluster a namespace switch goes from a 1–2s
+	// round trip to an in-process slice walk under "auto"/"always".
+	InformerCache *informerCacheSetting `json:"informer_cache" yaml:"informer_cache"`
 	// MinContrastRatio is a normalized readability knob in [0.0, 1.0]. When set
 	// above zero, ApplyTheme nudges each foreground color's HSL lightness until
 	// the fg/bg pair meets the derived WCAG contrast ratio:
@@ -851,6 +915,13 @@ func applyConfigOptions(cfg configFile) {
 	}
 	if cfg.SecretLazyLoading != nil {
 		ConfigSecretLazyLoading = *cfg.SecretLazyLoading
+	}
+	if cfg.InformerCache != nil {
+		// UnmarshalJSON guarantees mode is one of off/auto/always when it
+		// returned nil; an unknown value would have aborted LoadConfig
+		// before we reached applyConfigOptions, so a single-leg check is
+		// enough — no need for a redundant empty-string guard.
+		ConfigInformerCacheMode = cfg.InformerCache.mode
 	}
 	if cfg.MinContrastRatio != nil {
 		ConfigMinContrastRatio = clamp01(*cfg.MinContrastRatio)
