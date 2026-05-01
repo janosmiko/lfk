@@ -3,6 +3,11 @@ package ui
 import (
 	"strings"
 	"testing"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
+	"github.com/stretchr/testify/assert"
 )
 
 func TestDetectSearchMode(t *testing.T) {
@@ -236,6 +241,73 @@ func TestHighlightFuzzy(t *testing.T) {
 	result = highlightFuzzy("deployment", "dplmnt", LogSearchHighlightStyle, "")
 	if !strings.Contains(result, "e") {
 		t.Error("fuzzy highlight should preserve non-matched characters")
+	}
+}
+
+// Each highlight helper used to slice its `line` argument by raw byte
+// offsets, so a query that happened to match a byte inside an SGR
+// escape (e.g. the "1" in "\x1b[33;1m") split the escape sequence and
+// the terminal printed "[33;" / ";1m" as visible text. The helpers
+// now find matches on the ANSI-stripped form and splice highlights at
+// visual columns, so any styled input is safe.
+//
+// These tests pass styled input directly so the regression is caught
+// in isolation, even if the help-overlay caller ever stops feeding
+// them plain text again.
+func TestHighlightHelpers_StyledInputDoesNotLeakSGRFragments(t *testing.T) {
+	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
+	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
+
+	// Force a real color profile so styled output actually contains
+	// SGR escape sequences with digit parameters — the surface that
+	// the old highlighters' byte-indexed slicing corrupted. Without
+	// this, lipgloss runs in the test harness's stripped profile and
+	// renders plain text, so the test would pass vacuously.
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+
+	// Use Reverse() for the highlight so the output contains visible
+	// SGR codes regardless of color profile decisions.
+	hl := lipgloss.NewStyle().Reverse(true).Bold(true)
+	keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("11")).Bold(true)
+	descStyle := lipgloss.NewStyle().Foreground(lipgloss.Color("8"))
+
+	// Compose a styled line: "<key>L</key>  <desc>Toggle help screen</desc>".
+	styled := keyStyle.Render("L") + "  " + descStyle.Render("Toggle help screen")
+
+	// The plain form is what the user sees on screen.
+	plain := ansi.Strip(styled)
+
+	helpers := []struct {
+		name string
+		fn   func(line, query string) string
+	}{
+		{"highlightSubstring", func(line, q string) string { return highlightSubstring(line, q, hl, "") }},
+		{"highlightRegex", func(line, q string) string { return highlightRegex(line, q, hl, "") }},
+		{"highlightFuzzy", func(line, q string) string { return highlightFuzzy(line, q, hl, "") }},
+	}
+
+	// Digit queries that previously matched bytes inside SGR
+	// parameters. "1" was the user-reported case; the others guard
+	// against SGR codes containing those digits in different palettes.
+	queries := []string{"1", "0", "8"}
+
+	for _, h := range helpers {
+		for _, q := range queries {
+			t.Run(h.name+"_query="+q, func(t *testing.T) {
+				out := h.fn(styled, q)
+
+				// Visible characters must be unchanged — the helpers add
+				// highlight color, never visible text.
+				assert.Equal(t, plain, ansi.Strip(out),
+					"%s with query %q corrupted visible text", h.name, q)
+
+				// Doubled-ESC is the smoking gun for fragmented SGR
+				// sequences (the highlight wrapper landed inside an
+				// escape and lipgloss double-introducer'd the result).
+				assert.NotContains(t, out, "\x1b\x1b",
+					"%s with query %q produced doubled-ESC bytes — SGR fragmentation: %q", h.name, q, out)
+			})
+		}
 	}
 }
 
