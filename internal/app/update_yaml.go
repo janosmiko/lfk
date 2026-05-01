@@ -213,7 +213,7 @@ func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 // markers are skipped so a count that straddles a fold still copies real
 // content.
 func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
-	n := consumeYankCount(m.yamlLineInput)
+	n := parseYankCount(m.yamlLineInput)
 	m.yamlLineInput = ""
 	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	if m.yamlCursor < 0 || m.yamlCursor >= len(mapping) {

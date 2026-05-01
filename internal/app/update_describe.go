@@ -121,7 +121,7 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+v":
 		return m.describeEnterVisual('B')
 	case "y":
-		n := consumeYankCount(m.describeLineInput)
+		n := parseYankCount(m.describeLineInput)
 		m.describeLineInput = ""
 		if m.describeCursor < 0 || m.describeCursor >= len(lines) {
 			return m, nil
@@ -706,7 +706,7 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		modeMap := map[string]rune{"v": 'v', "V": 'V', "ctrl+v": 'B'}
 		return m.diffEnterVisual(modeMap[msg.String()])
 	case "y":
-		return m.handleDiffNormalCopy(foldRegions)
+		return m.handleDiffNormalCopy(foldRegions, totalLines)
 	case "u":
 		m.diffLineInput = ""
 		m.diffUnified = !m.diffUnified
@@ -973,13 +973,9 @@ func (m Model) diffVisualToggle(mode rune) (tea.Model, tea.Cmd) {
 // active side) to the clipboard. A digit prefix (e.g. `123y`) yanks that
 // many lines; an empty buffer falls back to a single line. Empty-side lines
 // are skipped so a count that straddles them still copies real content.
-func (m Model) handleDiffNormalCopy(foldRegions []ui.DiffFoldRegion) (tea.Model, tea.Cmd) {
-	n := consumeYankCount(m.diffLineInput)
+func (m Model) handleDiffNormalCopy(foldRegions []ui.DiffFoldRegion, totalLines int) (tea.Model, tea.Cmd) {
+	n := parseYankCount(m.diffLineInput)
 	m.diffLineInput = ""
-	totalLines := ui.DiffViewTotalLines(m.diffLeft, m.diffRight, foldRegions, m.diffFoldState)
-	if m.diffUnified {
-		totalLines = ui.UnifiedDiffViewTotalLines(m.diffLeft, m.diffRight, foldRegions, m.diffFoldState)
-	}
 	end := min(m.diffCursor+n, totalLines)
 	parts := make([]string, 0, end-m.diffCursor)
 	for i := m.diffCursor; i < end; i++ {

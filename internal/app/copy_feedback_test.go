@@ -227,6 +227,57 @@ func TestEventTimelineNormalCopyClampsAtEnd(t *testing.T) {
 	assert.Equal(t, "Copied 2 lines", rm.statusMessage)
 }
 
+// When a YAML section is collapsed, its child lines drop out of the
+// visible mapping entirely — `Ny` clamps to the visible reach, not the
+// raw line count, so the status reports fewer lines than requested.
+// Regression guard for the doc-comment claim that a count "straddling
+// a fold still copies real content".
+func TestYAMLNormalCopyCountSkipsCollapsedSection(t *testing.T) {
+	content := "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test\n  labels:\n    app: nginx\nspec:\n  replicas: 3"
+	sections := parseYAMLSections(content)
+	collapsed := map[string]bool{}
+	for _, sec := range sections {
+		if sec.key == "metadata" {
+			collapsed[sec.key] = true
+		}
+	}
+	m := Model{
+		width: 80, height: 30, mode: modeYAML,
+		yamlContent:   content,
+		yamlSections:  sections,
+		yamlCollapsed: collapsed,
+		yamlCursor:    0,
+		yamlLineInput: "100",
+		tabs:          []TabState{{}},
+	}
+	ret, _ := m.handleYAMLKey(keyMsg("y"))
+	rm := ret.(Model)
+	_, mapping := buildVisibleLines(content, sections, collapsed)
+	assert.Less(t, len(mapping), strings.Count(content, "\n")+1,
+		"fixture must actually fold something for this test to be meaningful")
+	assert.Equal(t, formatCopiedLines(len(mapping)), rm.statusMessage)
+}
+
+// Side-by-side diff with insertions on the right side leaves the active
+// (left) side empty for the inserted rows. `Ny` skips those empty rows
+// so the status reports only the lines that have real content on the
+// active side.
+func TestDiffNormalCopySkipsEmptySideLines(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, mode: modeDiff,
+		diffLeft: "a\nb\nc", diffRight: "a\nx\ny\nb\nc",
+		diffLeftName: "before", diffRightName: "after",
+		diffCursorSide: 0,
+		diffCursor:     0,
+		diffLineInput:  "100",
+		tabs:           []TabState{{}},
+	}
+	ret, _ := m.handleDiffKey(keyMsg("y"))
+	rm := ret.(Model)
+	assert.Equal(t, "Copied 3 lines", rm.statusMessage,
+		"left side has 3 real lines; the 2 insert rows must be skipped")
+}
+
 // Regression guard: copyToSystemClipboard must not return a generic
 // "Copied to clipboard" message — every caller has already set a
 // context-specific status. Returning the generic one races back via

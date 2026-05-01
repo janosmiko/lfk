@@ -690,7 +690,7 @@ func (m Model) handleEventTimelineOverlayKeyCtrlV() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleEventTimelineOverlayKeyY() (tea.Model, tea.Cmd) {
-	n := consumeYankCount(m.eventTimelineLineInput)
+	n := parseYankCount(m.eventTimelineLineInput)
 	m.eventTimelineLineInput = ""
 	if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
 		return m, nil

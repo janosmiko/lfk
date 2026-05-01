@@ -5,10 +5,10 @@ import (
 	"strconv"
 )
 
-// consumeYankCount parses the digit-prefix buffer that powers count-prefixed
+// parseYankCount parses the digit-prefix buffer that powers count-prefixed
 // motions (e.g. `123y`, `123G`) and returns the count to apply. An empty or
 // invalid buffer falls back to 1 so plain `y` keeps yanking a single line.
-func consumeYankCount(buf string) int {
+func parseYankCount(buf string) int {
 	if buf == "" {
 		return 1
 	}
@@ -19,9 +19,9 @@ func consumeYankCount(buf string) int {
 	return n
 }
 
-// formatCopiedLines returns the status message for an N-line yank, keeping
-// the singular phrasing the read-only viewers used before count prefixes
-// existed so existing tests and muscle memory aren't disturbed.
+// formatCopiedLines returns the status message for an N-line yank.
+// Singular for n=1, plural otherwise — preserves the existing
+// "Copied 1 line" string for the unprefixed `y` path.
 func formatCopiedLines(n int) string {
 	if n == 1 {
 		return "Copied 1 line"
