@@ -1006,17 +1006,23 @@ func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 
-// handleLogNormalCopy copies the log line at the cursor (in display form, so
-// timestamps and pod prefixes follow the user's toggles) to the clipboard.
-// Mirrors the describe view's normal-mode `y`.
+// handleLogNormalCopy copies log lines at and below the cursor (in display
+// form, so timestamps and pod prefixes follow the user's toggles) to the
+// clipboard. A digit prefix (e.g. `123y`) yanks that many lines; an empty
+// buffer falls back to a single line.
 func (m Model) handleLogNormalCopy() (tea.Model, tea.Cmd) {
+	n := consumeYankCount(m.logLineInput)
 	m.logLineInput = ""
 	if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
 		return m, nil
 	}
-	line := m.logDisplayLine(m.logCursor)
-	m.setStatusMessage("Copied 1 line", false)
-	return m, tea.Batch(copyToSystemClipboard(line), scheduleStatusClear())
+	end := min(m.logCursor+n, len(m.logLines))
+	parts := make([]string, 0, end-m.logCursor)
+	for i := m.logCursor; i < end; i++ {
+		parts = append(parts, m.logDisplayLine(i))
+	}
+	m.setStatusMessage(formatCopiedLines(len(parts)), false)
+	return m, tea.Batch(copyToSystemClipboard(strings.Join(parts, "\n")), scheduleStatusClear())
 }
 
 // buildLogYankText returns the clipboard text and selection size for the
