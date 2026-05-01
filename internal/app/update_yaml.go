@@ -208,24 +208,32 @@ func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 }
 
 // handleYAMLNormalCopy copies the original YAML line under the cursor to the
-// clipboard. Mirrors the describe view's normal-mode `y` so users get the same
-// vim-style yank behaviour across all read-only viewers.
+// clipboard. A digit prefix (e.g. `123y`) yanks that many visible lines
+// starting at the cursor; an empty buffer falls back to a single line.
+// Counts operate on the visible-line mapping, so folded children are simply
+// not in scope — a count that reaches a folded section jumps over its hidden
+// children and continues with the lines that follow.
 func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
-	m.yamlLineInput = ""
+	n := consumeYankCount(&m.yamlLineInput)
 	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	if m.yamlCursor < 0 || m.yamlCursor >= len(mapping) {
 		return m, nil
 	}
-	origIdx := mapping[m.yamlCursor]
-	if origIdx < 0 {
-		return m, nil
-	}
 	origLines := strings.Split(m.yamlContent, "\n")
-	if origIdx >= len(origLines) {
+	end := min(m.yamlCursor+n, len(mapping))
+	parts := make([]string, 0, end-m.yamlCursor)
+	for i := m.yamlCursor; i < end; i++ {
+		origIdx := mapping[i]
+		if origIdx < 0 || origIdx >= len(origLines) {
+			continue
+		}
+		parts = append(parts, origLines[origIdx])
+	}
+	if len(parts) == 0 {
 		return m, nil
 	}
-	m.setStatusMessage("Copied 1 line", false)
-	return m, tea.Batch(copyToSystemClipboard(origLines[origIdx]), scheduleStatusClear())
+	m.setStatusMessage(formatCopiedLines(len(parts)), false)
+	return m, tea.Batch(copyToSystemClipboard(strings.Join(parts, "\n")), scheduleStatusClear())
 }
 
 // handleYAMLVisualCopy copies the visually selected content to the clipboard.

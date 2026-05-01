@@ -690,13 +690,14 @@ func (m Model) handleEventTimelineOverlayKeyCtrlV() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleEventTimelineOverlayKeyY() (tea.Model, tea.Cmd) {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
-		text := m.eventTimelineLines[m.eventTimelineCursor]
-		m.setStatusMessage("Copied 1 line", false)
-		return m, tea.Batch(copyToSystemClipboard(text), scheduleStatusClear())
+	n := consumeYankCount(&m.eventTimelineLineInput)
+	if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+		return m, nil
 	}
-	return m, nil
+	end := min(m.eventTimelineCursor+n, len(m.eventTimelineLines))
+	text := strings.Join(m.eventTimelineLines[m.eventTimelineCursor:end], "\n")
+	m.setStatusMessage(formatCopiedLines(end-m.eventTimelineCursor), false)
+	return m, tea.Batch(copyToSystemClipboard(text), scheduleStatusClear())
 }
 
 func (m Model) handleEventTimelineOverlayKeySlash() (tea.Model, tea.Cmd) {

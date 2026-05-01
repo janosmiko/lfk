@@ -121,13 +121,14 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+v":
 		return m.describeEnterVisual('B')
 	case "y":
-		m.describeLineInput = ""
-		if m.describeCursor >= 0 && m.describeCursor < len(lines) {
-			text := lines[m.describeCursor]
-			m.setStatusMessage("Copied 1 line", false)
-			return m, tea.Batch(copyToSystemClipboard(text), scheduleStatusClear())
+		n := consumeYankCount(&m.describeLineInput)
+		if m.describeCursor < 0 || m.describeCursor >= len(lines) {
+			return m, nil
 		}
-		return m, nil
+		end := min(m.describeCursor+n, len(lines))
+		text := strings.Join(lines[m.describeCursor:end], "\n")
+		m.setStatusMessage(formatCopiedLines(end-m.describeCursor), false)
+		return m, tea.Batch(copyToSystemClipboard(text), scheduleStatusClear())
 	case "/":
 		m.describeLineInput = ""
 		m.describeSearchActive = true
@@ -704,7 +705,7 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		modeMap := map[string]rune{"v": 'v', "V": 'V', "ctrl+v": 'B'}
 		return m.diffEnterVisual(modeMap[msg.String()])
 	case "y":
-		return m.handleDiffNormalCopy(foldRegions)
+		return m.handleDiffNormalCopy(foldRegions, totalLines)
 	case "u":
 		m.diffLineInput = ""
 		m.diffUnified = !m.diffUnified
@@ -967,16 +968,26 @@ func (m Model) diffVisualToggle(mode rune) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleDiffNormalCopy copies the diff line at the cursor (on the active
-// side) to the clipboard. Mirrors the describe view's normal-mode `y`.
-func (m Model) handleDiffNormalCopy(foldRegions []ui.DiffFoldRegion) (tea.Model, tea.Cmd) {
-	m.diffLineInput = ""
-	lineText := m.diffCurrentLineText(foldRegions)
-	if lineText == "" {
+// handleDiffNormalCopy copies diff lines at and below the cursor (on the
+// active side) to the clipboard. A digit prefix (e.g. `123y`) yanks that
+// many lines; an empty buffer falls back to a single line. Empty-side lines
+// are skipped so a count that straddles them still copies real content.
+func (m Model) handleDiffNormalCopy(foldRegions []ui.DiffFoldRegion, totalLines int) (tea.Model, tea.Cmd) {
+	n := consumeYankCount(&m.diffLineInput)
+	end := min(m.diffCursor+n, totalLines)
+	parts := make([]string, 0, end-m.diffCursor)
+	for i := m.diffCursor; i < end; i++ {
+		lineText := ui.DiffLineTextAt(m.diffLeft, m.diffRight, foldRegions, m.diffFoldState, i, m.diffCursorSide, m.diffUnified)
+		if lineText == "" {
+			continue
+		}
+		parts = append(parts, lineText)
+	}
+	if len(parts) == 0 {
 		return m, nil
 	}
-	m.setStatusMessage("Copied 1 line", false)
-	return m, tea.Batch(copyToSystemClipboard(lineText), scheduleStatusClear())
+	m.setStatusMessage(formatCopiedLines(len(parts)), false)
+	return m, tea.Batch(copyToSystemClipboard(strings.Join(parts, "\n")), scheduleStatusClear())
 }
 
 // diffVisualCopy copies the visually selected diff text to the clipboard.

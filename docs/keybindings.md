@@ -192,6 +192,7 @@ my namespace" mode.
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
 | `y` | Copy line under cursor (or selection in visual mode) |
+| `123y` | Copy number of lines from cursor (count-prefixed yank; folds skipped) |
 | `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
@@ -216,6 +217,7 @@ my namespace" mode.
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection |
 | `y` | Copy line under cursor (or selection in visual mode) |
+| `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
 | `q` / `Esc` | Back to explorer |
 
@@ -253,6 +255,7 @@ my namespace" mode.
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
 | `y` | Copy line under cursor (or selection in visual mode) |
+| `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `\` | Switch pod / filter containers (space: select, enter: apply, / to filter) |
 | `q` / `Esc` | Close log viewer |
 
@@ -328,6 +331,7 @@ from `terminal:` in the config.
 | `Ctrl+V` | Block (column) visual selection |
 | `h` / `l` | Move selection column left/right (in visual mode) |
 | `y` | Copy line under cursor (or selection in visual mode) |
+| `123y` | Copy number of lines from cursor (count-prefixed yank; empty-side lines skipped) |
 | `z` | Toggle fold unchanged section at cursor |
 | `Z` | Toggle all folds |
 | `#` | Toggle line numbers |
