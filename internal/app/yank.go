@@ -19,6 +19,16 @@ func parseYankCount(buf string) int {
 	return n
 }
 
+// consumeYankCount parses the digit-prefix buffer and clears it in one step.
+// Every count-prefixed yank handler must consume the buffer (so the digits
+// don't leak into the next command), so doing parse + clear together keeps
+// the call sites symmetric and prevents anyone forgetting the second half.
+func consumeYankCount(buf *string) int {
+	n := parseYankCount(*buf)
+	*buf = ""
+	return n
+}
+
 // formatCopiedLines returns the status message for an N-line yank.
 // Singular for n=1, plural otherwise — preserves the existing
 // "Copied 1 line" string for the unprefixed `y` path.

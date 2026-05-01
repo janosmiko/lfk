@@ -1011,8 +1011,7 @@ func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 // clipboard. A digit prefix (e.g. `123y`) yanks that many lines; an empty
 // buffer falls back to a single line.
 func (m Model) handleLogNormalCopy() (tea.Model, tea.Cmd) {
-	n := parseYankCount(m.logLineInput)
-	m.logLineInput = ""
+	n := consumeYankCount(&m.logLineInput)
 	if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
 		return m, nil
 	}

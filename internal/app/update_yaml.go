@@ -208,13 +208,13 @@ func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 }
 
 // handleYAMLNormalCopy copies the original YAML line under the cursor to the
-// clipboard. A digit prefix (e.g. `123y`) yanks that many lines starting at
-// the cursor; an empty buffer falls back to a single line. Folded section
-// markers are skipped so a count that straddles a fold still copies real
-// content.
+// clipboard. A digit prefix (e.g. `123y`) yanks that many visible lines
+// starting at the cursor; an empty buffer falls back to a single line.
+// Counts operate on the visible-line mapping, so folded children are simply
+// not in scope — a count that reaches a folded section jumps over its hidden
+// children and continues with the lines that follow.
 func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
-	n := parseYankCount(m.yamlLineInput)
-	m.yamlLineInput = ""
+	n := consumeYankCount(&m.yamlLineInput)
 	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	if m.yamlCursor < 0 || m.yamlCursor >= len(mapping) {
 		return m, nil

@@ -121,8 +121,7 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+v":
 		return m.describeEnterVisual('B')
 	case "y":
-		n := parseYankCount(m.describeLineInput)
-		m.describeLineInput = ""
+		n := consumeYankCount(&m.describeLineInput)
 		if m.describeCursor < 0 || m.describeCursor >= len(lines) {
 			return m, nil
 		}
@@ -974,8 +973,7 @@ func (m Model) diffVisualToggle(mode rune) (tea.Model, tea.Cmd) {
 // many lines; an empty buffer falls back to a single line. Empty-side lines
 // are skipped so a count that straddles them still copies real content.
 func (m Model) handleDiffNormalCopy(foldRegions []ui.DiffFoldRegion, totalLines int) (tea.Model, tea.Cmd) {
-	n := parseYankCount(m.diffLineInput)
-	m.diffLineInput = ""
+	n := consumeYankCount(&m.diffLineInput)
 	end := min(m.diffCursor+n, totalLines)
 	parts := make([]string, 0, end-m.diffCursor)
 	for i := m.diffCursor; i < end; i++ {
