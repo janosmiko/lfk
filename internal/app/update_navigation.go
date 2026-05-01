@@ -81,6 +81,15 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 	m.activeFilterPreset = nil
 	m.unfilteredMiddleItems = nil
 
+	// Clear filter when navigating to a parent. Without this, a filter
+	// committed at a child level (e.g. "deploy" at LevelResourceTypes)
+	// stays in m.filterText and visibleMiddleItems silently filters out
+	// every parent-level item whose name doesn't match — making the
+	// cluster picker look empty after backing out of a filtered view.
+	m.filterText = ""
+	m.filterInput.Clear()
+	m.filterActive = false
+
 	// Clear search highlight on level change so it doesn't bleed onto
 	// the parent level (issue requested fix). The Esc cascade clears
 	// search as its own step before navigating, so this only fires for
