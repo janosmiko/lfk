@@ -131,6 +131,12 @@ func TestRenderHelpScreen_DigitSearchDoesNotLeakEscapeFragments(t *testing.T) {
 	ConfigNoColor = false
 	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 	ApplyTheme(DefaultTheme())
+	// ApplyTheme can re-detect/restore the color profile from
+	// originalColorProfile (theme.go:109-110), so re-force TrueColor
+	// here. Without this, the test runs under the harness's default
+	// stripped profile, lipgloss emits no SGR digits, and the
+	// regression we're guarding against — digit-query corruption
+	// inside SGR sequences — could not occur in the first place.
 	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
 	plain := RenderHelpScreen(120, 200, 0, "", "", "", -1)
@@ -160,7 +166,25 @@ func TestRenderHelpScreen_DigitSearchDoesNotLeakEscapeFragments(t *testing.T) {
 //
 // Asserts: the plain lines BuildHelpLines now returns contain no ESC
 // bytes, so MatchLine sees only the visible characters.
+//
+// Forces a TrueColor profile so lipgloss actually emits SGR escapes
+// for any styling it would apply — without this, the test harness's
+// default stripped profile makes lipgloss render plain text anyway
+// and the assertion would pass vacuously even if BuildHelpLines went
+// back to returning styled output.
 func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
+	original := lipgloss.DefaultRenderer().ColorProfile()
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		lipgloss.DefaultRenderer().SetColorProfile(original)
+		ConfigNoColor = originalNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+	ApplyTheme(DefaultTheme())
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+
 	lines := BuildHelpLines("", "")
 	for i, line := range lines {
 		assert.NotContains(t, line, "\x1b",

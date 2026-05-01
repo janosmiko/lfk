@@ -316,7 +316,7 @@ func HighlightMatchInline(line, rawQuery string, hlStyle lipgloss.Style) string 
 // spans inside a (possibly already-styled) line. Spans are positions
 // in ansi.Strip(line); they're mapped to visual columns and spliced
 // back into the styled line via ansi.Cut / ansi.TruncateLeft so the
-// surrounding ANSI is preserved between matches.
+// surrounding ANSI between matches is preserved.
 //
 // The previous helpers sliced the styled line by raw byte offsets, so
 // a query that happened to match bytes inside an SGR escape (e.g. the
@@ -324,6 +324,17 @@ func HighlightMatchInline(line, rawQuery string, hlStyle lipgloss.Style) string 
 // terminal printed the orphan parameters as visible "[33;" text.
 // Operating on plain text first eliminates that class of bug for
 // every caller.
+//
+// Restriction: the matched span itself is rendered from plain text
+// (style.Render(plain[s:e])), so any per-character inner styling
+// inside the span is dropped — only the outer style around the span
+// survives via the ansi.Cut bridges. Today's callers all pass either
+// plain text (help.go path) or text whose inner styling is uniform
+// (search-bar paths), so this is a non-issue in practice. A future
+// caller passing a syntax-highlighted line (e.g. log content with
+// per-token colors) would lose styling on matched characters; in
+// that case use HighlightMatchInline (search.go) which tracks
+// activeOpen across the highlighted segment.
 //
 // restoreCodes is emitted after each highlight reset so an outer
 // style wrapping the result keeps its background through the

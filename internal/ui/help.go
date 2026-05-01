@@ -500,7 +500,7 @@ const helpKeyColumnWidth = 14
 func buildHelpSpecs(filter, contextMode string) []helpLineSpec {
 	sections := helpSections()
 	specs := make([]helpLineSpec, 0, 64)
-	for si, section := range sections {
+	for _, section := range sections {
 		// Context filtering: when a context is active, show only sections
 		// that match that context. When no context (explorer), show only
 		// sections with empty context (explorer sections).
@@ -533,10 +533,8 @@ func buildHelpSpecs(filter, contextMode string) []helpLineSpec {
 			continue
 		}
 
-		if len(specs) > 0 || si > 0 {
-			if len(specs) > 0 {
-				specs = append(specs, helpLineSpec{kind: helpLineBlank})
-			}
+		if len(specs) > 0 {
+			specs = append(specs, helpLineSpec{kind: helpLineBlank})
 		}
 		specs = append(specs, helpLineSpec{kind: helpLineSectionHeader, text: section.title})
 		specs = append(specs, entries...)
