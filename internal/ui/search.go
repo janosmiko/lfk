@@ -6,6 +6,7 @@ import (
 	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // SearchMode represents the type of search being performed.
@@ -311,77 +312,123 @@ func HighlightMatchInline(line, rawQuery string, hlStyle lipgloss.Style) string 
 	return b.String()
 }
 
-// highlightSubstring highlights all occurrences of query in line
-// (case-insensitive). When restoreCodes is non-empty it's emitted
-// after each inner highlight reset so a wrapping outer style's
-// background stays visible for the post-match segment.
-func highlightSubstring(line, query string, style lipgloss.Style, restoreCodes string) string {
-	queryLower := strings.ToLower(query)
-	lineLower := strings.ToLower(line)
-	if !strings.Contains(lineLower, queryLower) {
+// highlightSpans applies style to a list of [start, end) plain-byte
+// spans inside a (possibly already-styled) line. Spans are positions
+// in ansi.Strip(line); they're mapped to visual columns and spliced
+// back into the styled line via ansi.Cut / ansi.TruncateLeft so the
+// surrounding ANSI is preserved between matches.
+//
+// The previous helpers sliced the styled line by raw byte offsets, so
+// a query that happened to match bytes inside an SGR escape (e.g. the
+// "1" in "\x1b[33;1m") would split the escape sequence and the
+// terminal printed the orphan parameters as visible "[33;" text.
+// Operating on plain text first eliminates that class of bug for
+// every caller.
+//
+// restoreCodes is emitted after each highlight reset so an outer
+// style wrapping the result keeps its background through the
+// post-match segment.
+func highlightSpans(line, plain string, spans [][2]int, style lipgloss.Style, restoreCodes string) string {
+	if len(spans) == 0 {
 		return line
 	}
 	var b strings.Builder
-	pos := 0
-	for pos < len(line) {
-		idx := strings.Index(strings.ToLower(line[pos:]), queryLower)
-		if idx < 0 {
-			b.WriteString(line[pos:])
-			break
+	pos := 0 // plain byte offset
+	for _, sp := range spans {
+		s, e := sp[0], sp[1]
+		if s > pos {
+			posCol := ansi.StringWidth(plain[:pos])
+			startCol := ansi.StringWidth(plain[:s])
+			b.WriteString(ansi.Cut(line, posCol, startCol))
 		}
-		b.WriteString(line[pos : pos+idx])
-		b.WriteString(style.Render(line[pos+idx : pos+idx+len(query)]))
+		b.WriteString(style.Render(plain[s:e]))
 		b.WriteString(restoreCodes)
-		pos = pos + idx + len(query)
+		pos = e
+	}
+	if pos < len(plain) {
+		posCol := ansi.StringWidth(plain[:pos])
+		b.WriteString(ansi.TruncateLeft(line, posCol, ""))
 	}
 	return b.String()
 }
 
+// highlightSubstring highlights all occurrences of query in line
+// (case-insensitive). When restoreCodes is non-empty it's emitted
+// after each inner highlight reset so a wrapping outer style's
+// background stays visible for the post-match segment.
+//
+// Match-finding runs against the ANSI-stripped plain form of line,
+// so a digit query never matches bytes inside an SGR escape.
+func highlightSubstring(line, query string, style lipgloss.Style, restoreCodes string) string {
+	if query == "" {
+		return line
+	}
+	plain := ansi.Strip(line)
+	plainLower := strings.ToLower(plain)
+	queryLower := strings.ToLower(query)
+	if !strings.Contains(plainLower, queryLower) {
+		return line
+	}
+	var spans [][2]int
+	pos := 0
+	for {
+		idx := strings.Index(plainLower[pos:], queryLower)
+		if idx < 0 {
+			break
+		}
+		s := pos + idx
+		e := s + len(queryLower)
+		spans = append(spans, [2]int{s, e})
+		pos = e
+	}
+	return highlightSpans(line, plain, spans, style, restoreCodes)
+}
+
 // highlightRegex highlights all regex matches in the line. See
-// highlightSubstring for the restoreCodes contract.
+// highlightSubstring for the restoreCodes contract. Match-finding
+// runs against the plain form so the regex sees the same characters
+// the user sees on screen, never ANSI bytes.
 func highlightRegex(line, query string, style lipgloss.Style, restoreCodes string) string {
 	re, err := regexp.Compile("(?i)" + query)
 	if err != nil {
 		return highlightSubstring(line, query, style, restoreCodes) // fallback
 	}
-	matches := re.FindAllStringIndex(line, -1)
+	plain := ansi.Strip(line)
+	matches := re.FindAllStringIndex(plain, -1)
 	if len(matches) == 0 {
 		return line
 	}
-	var b strings.Builder
-	pos := 0
-	for _, m := range matches {
-		if m[0] > pos {
-			b.WriteString(line[pos:m[0]])
-		}
-		b.WriteString(style.Render(line[m[0]:m[1]]))
-		b.WriteString(restoreCodes)
-		pos = m[1]
+	spans := make([][2]int, len(matches))
+	for i, m := range matches {
+		spans[i] = [2]int{m[0], m[1]}
 	}
-	if pos < len(line) {
-		b.WriteString(line[pos:])
-	}
-	return b.String()
+	return highlightSpans(line, plain, spans, style, restoreCodes)
 }
 
 // highlightFuzzy highlights the matched characters in a fuzzy match.
-// See highlightSubstring for the restoreCodes contract.
+// See highlightSubstring for the restoreCodes contract. Walks the
+// plain (ANSI-stripped) runes so query characters can't accidentally
+// match bytes inside an SGR escape sequence.
 func highlightFuzzy(line, query string, style lipgloss.Style, restoreCodes string) string {
-	lineLower := strings.ToLower(line)
+	if query == "" {
+		return line
+	}
+	plain := ansi.Strip(line)
+	plainLower := strings.ToLower(plain)
 	queryLower := strings.ToLower(query)
-	lineRunes := []rune(line)
-	lineLowerRunes := []rune(lineLower)
+	plainRunes := []rune(plain)
+	plainLowerRunes := []rune(plainLower)
 	queryRunes := []rune(queryLower)
 
 	if len(queryRunes) == 0 {
 		return line
 	}
 
-	// Find matching positions.
-	matchPositions := make([]bool, len(lineRunes))
+	// Find matching rune indices in the plain form.
+	matchPositions := make([]bool, len(plainRunes))
 	qi := 0
-	for li := 0; li < len(lineLowerRunes) && qi < len(queryRunes); li++ {
-		if lineLowerRunes[li] == queryRunes[qi] {
+	for li := 0; li < len(plainLowerRunes) && qi < len(queryRunes); li++ {
+		if plainLowerRunes[li] == queryRunes[qi] {
 			matchPositions[li] = true
 			qi++
 		}
@@ -390,30 +437,36 @@ func highlightFuzzy(line, query string, style lipgloss.Style, restoreCodes strin
 		return line // No full match.
 	}
 
-	// Build highlighted string, grouping consecutive matched characters.
-	var b strings.Builder
-	inHighlight := false
-	highlightStart := 0
-	for i, r := range lineRunes {
+	// Convert rune indices to plain byte offsets so highlightSpans can
+	// map them to visual columns. range over plain yields the byte
+	// offset of each rune; the trailing len(plain) closes the last
+	// run.
+	runeByteOff := make([]int, 0, len(plainRunes)+1)
+	for byteOff := range plain {
+		runeByteOff = append(runeByteOff, byteOff)
+	}
+	runeByteOff = append(runeByteOff, len(plain))
+
+	// Group consecutive matched runes into spans.
+	var spans [][2]int
+	inSpan := false
+	spanStart := 0
+	for i := range plainRunes {
 		if matchPositions[i] {
-			if !inHighlight {
-				inHighlight = true
-				highlightStart = i
+			if !inSpan {
+				inSpan = true
+				spanStart = i
 			}
-		} else {
-			if inHighlight {
-				b.WriteString(style.Render(string(lineRunes[highlightStart:i])))
-				b.WriteString(restoreCodes)
-				inHighlight = false
-			}
-			b.WriteRune(r)
+		} else if inSpan {
+			spans = append(spans, [2]int{runeByteOff[spanStart], runeByteOff[i]})
+			inSpan = false
 		}
 	}
-	if inHighlight {
-		b.WriteString(style.Render(string(lineRunes[highlightStart:])))
-		b.WriteString(restoreCodes)
+	if inSpan {
+		spans = append(spans, [2]int{runeByteOff[spanStart], runeByteOff[len(plainRunes)]})
 	}
-	return b.String()
+
+	return highlightSpans(line, plain, spans, style, restoreCodes)
 }
 
 // SearchModeIndicator returns a short string to show in the search bar

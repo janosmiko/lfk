@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
@@ -105,4 +106,64 @@ func TestRenderHelpScreen_CurrentMatchStyledDifferently(t *testing.T) {
 		}
 	}
 	t.Fatalf("no line index produced a different render — current-match style is not applied")
+}
+
+// Searching for a digit must not corrupt the rendered output.
+//
+// The previous "/" search path ran HighlightMatchStyled on the
+// already-styled, already-truncated help lines. SGR sequences carry
+// digits as parameters (e.g. \x1b[33;1m for bold + yellow fg), so a
+// byte-indexed search for "1" matched bytes inside the escape
+// sequences and the highlight wrapper split them into fragments
+// terminals rendered as literal "[33;" / ";1m" text on screen.
+//
+// Asserts: stripping ANSI from the rendered output produces the same
+// visible characters whether the user typed a digit query or no
+// query at all. Search adds highlight color but never visible chars.
+func TestRenderHelpScreen_DigitSearchDoesNotLeakEscapeFragments(t *testing.T) {
+	original := lipgloss.DefaultRenderer().ColorProfile()
+	originalNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		lipgloss.DefaultRenderer().SetColorProfile(original)
+		ConfigNoColor = originalNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+	ApplyTheme(DefaultTheme())
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+
+	plain := RenderHelpScreen(120, 200, 0, "", "", "", -1)
+
+	// Each digit query exercises a different byte that the old code
+	// could match inside SGR parameters. "1" was the most visible in
+	// the user report; the others guard against regressions in the
+	// other common SGR digits.
+	for _, q := range []string{"1", "0", "5", "33"} {
+		t.Run("query="+q, func(t *testing.T) {
+			searched := RenderHelpScreen(120, 200, 0, "", q, "", -1)
+
+			assert.Equal(t, ansi.Strip(plain), ansi.Strip(searched),
+				"digit search must not change the visible characters in the help screen — only the highlight color")
+
+			assert.NotContains(t, searched, "\x1b\x1b",
+				"rendered output must not contain doubled-ESC bytes (smoking gun for fragmented SGR sequences)")
+		})
+	}
+}
+
+// helpRecomputeMatches in the app layer iterates over BuildHelpLines
+// and counts hits via MatchLine. When BuildHelpLines returned styled
+// strings, a "1" query would substring-match bytes inside SGR codes
+// (e.g. the "1" in \x1b[33;1m) and inflate the match count to roughly
+// every styled row, pointing n/N at rows with no visible "1".
+//
+// Asserts: the plain lines BuildHelpLines now returns contain no ESC
+// bytes, so MatchLine sees only the visible characters.
+func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
+	lines := BuildHelpLines("", "")
+	for i, line := range lines {
+		assert.NotContains(t, line, "\x1b",
+			"BuildHelpLines must return plain text (no ANSI escapes) — line %d: %q", i, line)
+	}
 }

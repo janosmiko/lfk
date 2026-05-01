@@ -432,8 +432,20 @@ func helpSections() []helpSection {
 // current view (empty = explorer). Exported so the app layer can run
 // the same line-building pipeline to compute search match indices for
 // n/N navigation.
+//
+// Returns plain (un-styled) text in the same row order RenderHelpScreen
+// will display. Plain text is what app-layer search routines need:
+// running MatchLine / strings.Contains over a styled line lets a
+// digit query match bytes that live inside an SGR escape (e.g. the
+// "1" in "\x1b[33;1m"), inflating match counts and pointing n/N at
+// rows with no visible match.
 func BuildHelpLines(filter, contextMode string) []string {
-	return buildHelpLines(filter, contextMode)
+	specs := buildHelpSpecs(filter, contextMode)
+	out := make([]string, len(specs))
+	for i, s := range specs {
+		out[i] = helpSpecPlain(s)
+	}
+	return out
 }
 
 // HelpVisibleLines returns the number of help-content rows that fit
@@ -448,12 +460,46 @@ func HelpVisibleLines(screenHeight int) int {
 	return visibleLines
 }
 
-// buildHelpLines is the internal implementation kept unexported to
-// avoid forcing callers to import context-specific styling state.
-func buildHelpLines(filter, contextMode string) []string {
+// helpLineKind labels each logical row in the help screen so the
+// renderer can pick the correct outer style for that row's plain text.
+type helpLineKind int
+
+const (
+	helpLineBlank helpLineKind = iota
+	helpLineSectionHeader
+	helpLineEntry
+	helpLineMessage
+)
+
+// helpLineSpec is the structural form of a help row, kept un-styled
+// so the renderer can splice the search highlight into plain text
+// before applying the outer styles. The pre-style highlight path
+// avoids the bug where a "/" search query containing digits matched
+// bytes inside an SGR escape sequence on the already-styled line —
+// terminals rendered the leftover sequence fragments as literal
+// "[33;" / ";1m" text on screen.
+type helpLineSpec struct {
+	kind helpLineKind
+	// text is the plain content for header and message rows.
+	text string
+	// key is the padded plain key column for entry rows.
+	key string
+	// desc is the plain description column for entry rows.
+	desc string
+}
+
+// helpKeyColumnWidth is the fixed-width key column so descriptions
+// align vertically across every entry row.
+const helpKeyColumnWidth = 14
+
+// buildHelpSpecs walks the help sections and produces structural
+// specs (un-styled) in the exact display order. Used by both
+// BuildHelpLines and RenderHelpScreen so the plain match indices
+// computed by the app layer line up 1:1 with the styled rows on
+// screen.
+func buildHelpSpecs(filter, contextMode string) []helpLineSpec {
 	sections := helpSections()
-	lines := make([]string, 0, 64)
-	keyW := 14
+	specs := make([]helpLineSpec, 0, 64)
 	for si, section := range sections {
 		// Context filtering: when a context is active, show only sections
 		// that match that context. When no context (explorer), show only
@@ -468,39 +514,91 @@ func buildHelpLines(filter, contextMode string) []string {
 			}
 		}
 
-		var sectionLines []string
+		var entries []helpLineSpec
 		for _, b := range section.bindings {
 			if filter != "" {
 				if !MatchLine(b.key, filter) && !MatchLine(b.desc, filter) {
 					continue
 				}
 			}
-			keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
-			keyPart := keyStyle.Render(fmt.Sprintf("%-*s", keyW, b.key))
-			descPart := OverlayDimStyle.Render(b.desc)
-			sectionLines = append(sectionLines, "    "+keyPart+"  "+descPart)
+			entries = append(entries, helpLineSpec{
+				kind: helpLineEntry,
+				key:  fmt.Sprintf("%-*s", helpKeyColumnWidth, b.key),
+				desc: b.desc,
+			})
 		}
 
 		// Only include sections that have matching bindings.
-		if len(sectionLines) == 0 {
+		if len(entries) == 0 {
 			continue
 		}
 
-		if len(lines) > 0 || si > 0 {
-			if len(lines) > 0 {
-				lines = append(lines, "")
+		if len(specs) > 0 || si > 0 {
+			if len(specs) > 0 {
+				specs = append(specs, helpLineSpec{kind: helpLineBlank})
 			}
 		}
-		header := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorPrimary)).Underline(true).Background(SurfaceBg).Render(section.title)
-		lines = append(lines, "  "+header)
-		lines = append(lines, sectionLines...)
+		specs = append(specs, helpLineSpec{kind: helpLineSectionHeader, text: section.title})
+		specs = append(specs, entries...)
 	}
 
-	if filter != "" && len(lines) == 0 {
-		lines = append(lines, OverlayDimStyle.Render("  No matching keybindings"))
+	if filter != "" && len(specs) == 0 {
+		specs = append(specs, helpLineSpec{kind: helpLineMessage, text: "No matching keybindings"})
 	}
 
-	return lines
+	return specs
+}
+
+// helpSpecPlain returns the un-styled visible form of a help-line
+// spec. The plain form is what the app-layer match counter sees, so
+// substring/regex/fuzzy queries match the same characters the user
+// reads on screen — never bytes hidden inside an ANSI SGR sequence.
+func helpSpecPlain(s helpLineSpec) string {
+	switch s.kind {
+	case helpLineBlank:
+		return ""
+	case helpLineSectionHeader:
+		return "  " + s.text
+	case helpLineEntry:
+		return "    " + s.key + "  " + s.desc
+	case helpLineMessage:
+		return "  " + s.text
+	}
+	return ""
+}
+
+// helpSpecStyled renders a help-line spec to its final styled form.
+// When search is non-empty the inline highlight is applied to plain
+// key/desc/text first via HighlightMatchStyledOver, then wrapped with
+// the segment's outer style via RenderOverPrestyled. Highlighting on
+// plain segments keeps the match-finder away from any ANSI bytes —
+// fixing the "/ search of a digit prints raw [33;1m" report.
+//
+// isCurrent flips the row's highlight to SelectedSearchHighlightStyle
+// so n/N navigation can mark the active match distinctly.
+func helpSpecStyled(s helpLineSpec, search string, isCurrent bool) string {
+	hl := SearchHighlightStyle
+	if isCurrent {
+		hl = SelectedSearchHighlightStyle
+	}
+	switch s.kind {
+	case helpLineBlank:
+		return ""
+	case helpLineSectionHeader:
+		headerStyle := lipgloss.NewStyle().Bold(true).Foreground(lipgloss.Color(ColorPrimary)).Underline(true).Background(SurfaceBg)
+		inner := HighlightMatchStyledOver(s.text, search, hl, headerStyle)
+		return "  " + RenderOverPrestyled(inner, headerStyle)
+	case helpLineEntry:
+		keyStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(SurfaceBg)
+		descStyle := OverlayDimStyle
+		keyInner := HighlightMatchStyledOver(s.key, search, hl, keyStyle)
+		descInner := HighlightMatchStyledOver(s.desc, search, hl, descStyle)
+		return "    " + RenderOverPrestyled(keyInner, keyStyle) + "  " + RenderOverPrestyled(descInner, descStyle)
+	case helpLineMessage:
+		inner := HighlightMatchStyledOver(s.text, search, hl, OverlayDimStyle)
+		return "  " + RenderOverPrestyled(inner, OverlayDimStyle)
+	}
+	return ""
 }
 
 // RenderHelpScreen renders a full help overlay with all keybindings.
@@ -523,7 +621,14 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 
 	title := OverlayTitleStyle.Render("Keybindings")
 
-	lines := buildHelpLines(filter, contextMode)
+	// Build structural specs once, then render each row with the
+	// search highlight pre-spliced into the plain segments before the
+	// outer style is applied. Highlighting on plain text keeps the
+	// match-finder away from ANSI escape bytes — the previous
+	// "highlight on already-styled, already-truncated line" path could
+	// match a digit query inside an SGR like \x1b[33;1m, which broke
+	// the sequence and printed "[33;" / ";1m" as visible text.
+	specs := buildHelpSpecs(filter, contextMode)
 	// Truncate each line to the inner-panel content width so one entry
 	// in `lines` always renders as exactly one row. Lipgloss's
 	// auto-wrap behavior would otherwise silently expand long
@@ -531,19 +636,9 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 	// from len(lines), and the outer box height would drift — making
 	// a filter that narrows results visibly shrink the window.
 	innerW := max(contentW-2, 10)
-	for i, line := range lines {
-		lines[i] = Truncate(line, innerW)
-	}
-	if search != "" {
-		for i, line := range lines {
-			style := SearchHighlightStyle
-			if i == currentMatchLine {
-				// Distinct "selected match" style so the user can see
-				// which match the next n/N press will move from.
-				style = SelectedSearchHighlightStyle
-			}
-			lines[i] = HighlightMatchStyled(line, search, style)
-		}
+	lines := make([]string, len(specs))
+	for i, s := range specs {
+		lines[i] = Truncate(helpSpecStyled(s, search, i == currentMatchLine), innerW)
 	}
 	totalLines := len(lines)
 
