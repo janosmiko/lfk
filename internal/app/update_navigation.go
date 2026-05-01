@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -32,8 +33,8 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 
 				if delta < 0 {
 					// Moving UP into a group: land on the LAST item of that group.
-					for i := len(newVisible) - 1; i >= 0; i-- {
-						if newVisible[i].Category == newCat && newVisible[i].Kind != "__collapsed_group__" {
+					for i, item := range slices.Backward(newVisible) {
+						if item.Category == newCat && item.Kind != "__collapsed_group__" {
 							m.setCursor(i)
 							break
 						}
