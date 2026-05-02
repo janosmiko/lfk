@@ -1627,7 +1627,7 @@ func TestGetOwnedResources_HelmRelease(t *testing.T) {
 			Labels: map[string]string{"app.kubernetes.io/instance": "myrel"},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: int32Ptr(1),
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "test"}},

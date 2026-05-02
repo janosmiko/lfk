@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strings"
 
 	"github.com/charmbracelet/bubbles/textinput"
@@ -691,9 +692,9 @@ func (m *Model) jumpToPrevSearchMatch(startIdx int) {
 	if len(matches) == 0 {
 		return
 	}
-	for i := len(matches) - 1; i >= 0; i-- {
-		if matches[i] <= startIdx {
-			m.setCursor(matches[i])
+	for _, mi := range slices.Backward(matches) {
+		if mi <= startIdx {
+			m.setCursor(mi)
 			return
 		}
 	}
@@ -758,9 +759,9 @@ func (m *Model) searchAllItemsFind(allItems []model.Item, queries []string, star
 		}
 		return matches[0]
 	}
-	for i := len(matches) - 1; i >= 0; i-- {
-		if matches[i] <= start {
-			return matches[i]
+	for _, mi := range slices.Backward(matches) {
+		if mi <= start {
+			return mi
 		}
 	}
 	return matches[len(matches)-1]

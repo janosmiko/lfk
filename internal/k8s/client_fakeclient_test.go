@@ -2324,7 +2324,7 @@ func TestGetHelmManagedResources(t *testing.T) {
 			Labels:    map[string]string{"app.kubernetes.io/instance": "myapp"},
 		},
 		Spec: appsv1.DeploymentSpec{
-			Replicas: int32Ptr(1),
+			Replicas: new(int32(1)),
 			Selector: &metav1.LabelSelector{MatchLabels: map[string]string{"app": "test"}},
 			Template: corev1.PodTemplateSpec{
 				ObjectMeta: metav1.ObjectMeta{Labels: map[string]string{"app": "test"}},
@@ -2401,8 +2401,3 @@ func TestGetResourceTree_UnknownKind(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "my-cm", root.Name)
 }
-
-// helper
-//
-//go:fix inline
-func int32Ptr(i int32) *int32 { return new(i) }

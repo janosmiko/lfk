@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -439,7 +440,7 @@ func (m *Model) logMaxScrollAndSkip() (int, int) {
 		visualLines := 0
 		// Default: everything fits, scroll stays at the top with no skip.
 		maxScroll, topSkip := 0, 0
-		for i := len(m.logLines) - 1; i >= 0; i-- {
+		for i := range slices.Backward(m.logLines) {
 			// Use the displayed line (timestamps and pod prefixes
 			// stripped to match the renderer) so the wrap count reflects
 			// what the viewer actually paints — otherwise the raw line

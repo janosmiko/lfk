@@ -246,7 +246,7 @@ func TestGetHelmManagedResources_ManifestPath(t *testing.T) {
 			Name:      "cilium-operator",
 			Namespace: "default",
 		},
-		Spec: appsv1.DeploymentSpec{Replicas: int32Ptr(2)},
+		Spec: appsv1.DeploymentSpec{Replicas: new(int32(2))},
 		Status: appsv1.DeploymentStatus{
 			AvailableReplicas: 2,
 			ReadyReplicas:     2,
@@ -324,7 +324,7 @@ func TestGetHelmManagedResources_EmptyManifestFallsBackToLabels(t *testing.T) {
 			Namespace: "default",
 			Labels:    map[string]string{"app.kubernetes.io/instance": "legacy"},
 		},
-		Spec: appsv1.DeploymentSpec{Replicas: int32Ptr(1)},
+		Spec: appsv1.DeploymentSpec{Replicas: new(int32(1))},
 		Status: appsv1.DeploymentStatus{
 			AvailableReplicas: 1,
 			ReadyReplicas:     1,

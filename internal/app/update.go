@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"maps"
 	"os"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -2522,8 +2523,8 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 		}
 	} else if len(m.logLines) > 0 && len(msg.lines) > 0 {
 		// Single-line fallback.
-		for i := len(msg.lines) - 1; i >= 0; i-- {
-			if msg.lines[i] == m.logLines[0] {
+		for i, line := range slices.Backward(msg.lines) {
+			if line == m.logLines[0] {
 				overlapIdx = i
 				break
 			}
