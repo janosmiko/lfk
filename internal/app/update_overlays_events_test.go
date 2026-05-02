@@ -298,6 +298,43 @@ func TestEventTimelineDigitBufferG(t *testing.T) {
 	assert.Equal(t, 9, result3.eventTimelineCursor) // 0-indexed
 }
 
+func TestEventTimelineQuestionOpensHelpFromOverlay(t *testing.T) {
+	m := newEventModel(5)
+	m.mode = modeExplorer
+	m.eventTimelineLineInput = "12"
+
+	ret, _ := m.handleEventTimelineOverlayKey(runeKey('?'))
+	result := ret.(Model)
+	assert.Equal(t, modeHelp, result.mode, "? must open help mode")
+	assert.Equal(t, modeExplorer, result.helpPreviousMode, "overlay path returns to explorer")
+	assert.Equal(t, "Event Timeline", result.helpContextMode)
+	assert.Equal(t, overlayEventTimeline, result.overlay, "overlay state preserved so user returns to it")
+	assert.Equal(t, "", result.eventTimelineLineInput, "digit buffer cleared so it does not leak across help")
+}
+
+func TestEventTimelineF1OpensHelp(t *testing.T) {
+	m := newEventModel(5)
+	m.mode = modeExplorer
+
+	ret, _ := m.handleEventTimelineOverlayKey(specialKey(tea.KeyF1))
+	result := ret.(Model)
+	assert.Equal(t, modeHelp, result.mode, "F1 is the alternate help binding")
+	assert.Equal(t, "Event Timeline", result.helpContextMode)
+}
+
+func TestEventTimelineQuestionFromFullscreenReturnsToFullscreen(t *testing.T) {
+	m := newEventModel(5)
+	m.mode = modeEventViewer
+	m.overlay = overlayNone
+
+	ret, _ := m.handleEventViewerModeKey(runeKey('?'))
+	result := ret.(Model)
+	assert.Equal(t, modeHelp, result.mode)
+	assert.Equal(t, modeEventViewer, result.helpPreviousMode,
+		"fullscreen path must restore modeEventViewer when help closes")
+	assert.Equal(t, "Event Timeline", result.helpContextMode)
+}
+
 func TestFindNextEventMatchWraps(t *testing.T) {
 	m := newEventModel(5)
 	m.eventTimelineSearchQuery = "event"

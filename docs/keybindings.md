@@ -343,6 +343,40 @@ from `terminal:` in the config.
 | `u` | Toggle unified/side-by-side view |
 | `q` / `Esc` | Back to explorer |
 
+## Event Timeline
+
+Press `V` on a resource (or open the Events list and press `Enter` on an event) to open the Event Timeline overlay. Press `f` to toggle between the overlay and a fullscreen viewer that takes over the whole window.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Move cursor down/up |
+| `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
+| `h` / `l` / `Left` / `Right` | Move cursor column left/right |
+| `0` / `$` | Move cursor to line start/end |
+| `^` | Move cursor to first non-whitespace |
+| `w` / `b` | Move cursor to next/previous word start |
+| `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
+| `e` | Move cursor to end of word |
+| `E` | Move cursor to end of WORD (whitespace-delimited) |
+| `gg` / `Home` | Jump to top |
+| `G` / `End` | Jump to bottom |
+| `123G` | Jump to specific line number |
+| `Ctrl+D` / `Ctrl+U` | Half page down / up |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
+| `f` | Toggle fullscreen event viewer |
+| `Tab` / `z` / `>` | Toggle line wrapping |
+| `/` | Search in events |
+| `n` / `N` | Next / previous search match |
+| `v` | Character visual selection (from cursor column) |
+| `V` | Visual line selection |
+| `Ctrl+V` | Block (column) visual selection (from cursor column) |
+| `y` | Copy line under cursor (or selection in visual mode) |
+| `123y` | Copy N lines from cursor (count-prefixed yank) |
+| `?` / `F1` | Open this help, scrolled to the Event Timeline section |
+| `q` / `Esc` | Close overlay (or exit fullscreen back to overlay) |
+
+> Events are pulled from the cluster, correlated to the selected resource (or shown cluster-wide on the timeline overlay), and grouped when their Type/Reason/Message/Object match. The line buffer (1-9 then a motion key) is consumed after each motion, so `5j 3k` jumps down 5 then up 3 without any digit leaking into the next command.
+
 ## Column Toggle Overlay
 
 Press `,` in the resource list to open the column toggle overlay. It lists

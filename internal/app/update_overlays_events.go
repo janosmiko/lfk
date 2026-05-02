@@ -155,6 +155,8 @@ func (m Model) handleEventTimelineOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	// Try action keys.
 	key := msg.String()
 	switch key {
+	case "?", "f1":
+		return m.handleEventTimelineOverlayKeyQuestion()
 	case "esc":
 		return m.handleEventTimelineOverlayKeyEsc()
 	case "q":
@@ -521,6 +523,21 @@ func (m Model) handleEventTimelineOverlayKeyEsc() (tea.Model, tea.Cmd) {
 	m.eventTimelineFullscreen = false
 	m.eventTimelineVisualMode = 0
 	m.overlay = overlayNone
+	return m, nil
+}
+
+// handleEventTimelineOverlayKeyQuestion opens the help overlay scrolled to
+// the Event Timeline section. helpPreviousMode is captured so q/?/Esc on the
+// help screen returns to whichever Event Timeline view was active (overlay
+// when m.mode is modeExplorer, fullscreen when m.mode is modeEventViewer).
+func (m Model) handleEventTimelineOverlayKeyQuestion() (tea.Model, tea.Cmd) {
+	m.eventTimelineLineInput = ""
+	m.helpPreviousMode = m.mode
+	m.mode = modeHelp
+	m.helpScroll = 0
+	m.helpFilter.Clear()
+	m.helpSearchActive = false
+	m.helpContextMode = "Event Timeline"
 	return m, nil
 }
 
