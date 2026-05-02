@@ -148,6 +148,7 @@ func TestLogsNormalCountPrefixJumpsDown(t *testing.T) {
 		width: 80, height: 30, mode: modeLogs,
 		logLines:     []string{"a", "b", "c", "d", "e", "f"},
 		logCursor:    0,
+		logFollow:    true,
 		logLineInput: "3",
 		tabs:         []TabState{{}},
 	}

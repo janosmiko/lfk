@@ -18,6 +18,8 @@ func TestParseCountPrefix(t *testing.T) {
 		{"non-numeric falls back to 1", "abc", 1},
 		{"zero falls back to 1", "0", 1},
 		{"negative-looking string falls back to 1", "-3", 1},
+		{"value at cap is preserved", "1000000", maxCountPrefix},
+		{"value above cap saturates", "9999999999", maxCountPrefix},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
