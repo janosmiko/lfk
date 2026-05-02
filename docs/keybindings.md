@@ -173,6 +173,7 @@ my namespace" mode.
 | Key | Action |
 |---|---|
 | `j` / `k` | Scroll up/down |
+| `123j` / `123k` | Move cursor down/up N visible lines (count-prefixed motion; folds skipped) |
 | `h` / `l` | Move cursor column left/right |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace character |
@@ -204,6 +205,7 @@ my namespace" mode.
 | Key | Action |
 |---|---|
 | `j` / `k` | Move cursor up/down |
+| `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
 | `h` / `l` | Move cursor column left/right |
 | `0` / `$` / `^` | Move cursor to line start / end / first non-whitespace |
 | `w` / `b` / `e` / `W` / `B` / `E` | Word / WORD motions |
@@ -226,6 +228,7 @@ my namespace" mode.
 | Key | Action |
 |---|---|
 | `j` / `k` | Move cursor up/down |
+| `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
 | `h` / `l` / `Left` / `Right` | Move cursor column left/right |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace character |
@@ -312,6 +315,7 @@ from `terminal:` in the config.
 | Key | Action |
 |---|---|
 | `j` / `k` | Move cursor up/down |
+| `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
 | `h` / `l` | Move cursor column left/right |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace |

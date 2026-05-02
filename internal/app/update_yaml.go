@@ -214,7 +214,7 @@ func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 // not in scope — a count that reaches a folded section jumps over its hidden
 // children and continues with the lines that follow.
 func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
-	n := consumeYankCount(&m.yamlLineInput)
+	n := consumeCountPrefix(&m.yamlLineInput)
 	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	if m.yamlCursor < 0 || m.yamlCursor >= len(mapping) {
 		return m, nil
@@ -457,10 +457,8 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "$", "w", "b", "e", "E", "B", "W", "^":
 		return m.handleYAMLVisualWordMotion(msg.String())
 	case "j", "down":
-		m.yamlLineInput = ""
-		if m.yamlCursor < totalVisible-1 {
-			m.yamlCursor++
-		}
+		n := consumeCountPrefix(&m.yamlLineInput)
+		m.yamlCursor = min(m.yamlCursor+n, max(totalVisible-1, 0))
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	case "k", "up":
@@ -883,10 +881,8 @@ func (m Model) handleYAMLKeyZero() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLKeyK() (tea.Model, tea.Cmd) {
-	m.yamlLineInput = ""
-	if m.yamlCursor > 0 {
-		m.yamlCursor--
-	}
+	n := consumeCountPrefix(&m.yamlLineInput)
+	m.yamlCursor = max(m.yamlCursor-n, 0)
 	m.ensureYAMLCursorVisible()
 	return m, nil
 }

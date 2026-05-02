@@ -48,17 +48,13 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "q", "esc":
 		return m.handleDescribeQuit()
 	case "j", "down":
-		m.describeLineInput = ""
-		if m.describeCursor < maxIdx {
-			m.describeCursor++
-		}
+		n := consumeCountPrefix(&m.describeLineInput)
+		m.describeCursor = min(m.describeCursor+n, maxIdx)
 		m.ensureDescribeCursorVisible()
 		return m, nil
 	case "k", "up":
-		m.describeLineInput = ""
-		if m.describeCursor > 0 {
-			m.describeCursor--
-		}
+		n := consumeCountPrefix(&m.describeLineInput)
+		m.describeCursor = max(m.describeCursor-n, 0)
 		m.ensureDescribeCursorVisible()
 		return m, nil
 	case "h", "left":
@@ -121,7 +117,7 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+v":
 		return m.describeEnterVisual('B')
 	case "y":
-		n := consumeYankCount(&m.describeLineInput)
+		n := consumeCountPrefix(&m.describeLineInput)
 		if m.describeCursor < 0 || m.describeCursor >= len(lines) {
 			return m, nil
 		}
@@ -642,17 +638,13 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 	case "q", "esc":
 		return m.handleDiffQuit()
 	case "j", "down":
-		m.diffLineInput = ""
-		if m.diffCursor < maxCursor {
-			m.diffCursor++
-		}
+		n := consumeCountPrefix(&m.diffLineInput)
+		m.diffCursor = min(m.diffCursor+n, maxCursor)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
 	case "k", "up":
-		m.diffLineInput = ""
-		if m.diffCursor > 0 {
-			m.diffCursor--
-		}
+		n := consumeCountPrefix(&m.diffLineInput)
+		m.diffCursor = max(m.diffCursor-n, 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
 	case "h", "left":
@@ -973,7 +965,7 @@ func (m Model) diffVisualToggle(mode rune) (tea.Model, tea.Cmd) {
 // many lines; an empty buffer falls back to a single line. Empty-side lines
 // are skipped so a count that straddles them still copies real content.
 func (m Model) handleDiffNormalCopy(foldRegions []ui.DiffFoldRegion, totalLines int) (tea.Model, tea.Cmd) {
-	n := consumeYankCount(&m.diffLineInput)
+	n := consumeCountPrefix(&m.diffLineInput)
 	end := min(m.diffCursor+n, totalLines)
 	parts := make([]string, 0, end-m.diffCursor)
 	for i := m.diffCursor; i < end; i++ {

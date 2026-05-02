@@ -482,20 +482,16 @@ func (m Model) handleLogKeyQ() Model {
 
 func (m Model) handleLogKeyJ() Model {
 	m.logFollow = false
-	m.logLineInput = ""
-	if m.logCursor < len(m.logLines)-1 {
-		m.logCursor++
-	}
+	n := consumeCountPrefix(&m.logLineInput)
+	m.logCursor = min(m.logCursor+n, max(len(m.logLines)-1, 0))
 	m.ensureLogCursorVisible()
 	return m
 }
 
 func (m Model) handleLogKeyK() (tea.Model, tea.Cmd) {
 	m.logFollow = false
-	m.logLineInput = ""
-	if m.logCursor > 0 {
-		m.logCursor--
-	}
+	n := consumeCountPrefix(&m.logLineInput)
+	m.logCursor = max(m.logCursor-n, 0)
 	m.ensureLogCursorVisible()
 	cmd := m.maybeLoadMoreHistory()
 	return m, cmd
@@ -1011,7 +1007,7 @@ func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 // clipboard. A digit prefix (e.g. `123y`) yanks that many lines; an empty
 // buffer falls back to a single line.
 func (m Model) handleLogNormalCopy() (tea.Model, tea.Cmd) {
-	n := consumeYankCount(&m.logLineInput)
+	n := consumeCountPrefix(&m.logLineInput)
 	if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
 		return m, nil
 	}

@@ -188,6 +188,7 @@ func helpSections() []helpSection {
 			title: "YAML View", context: "YAML View",
 			bindings: []helpEntry{
 				{"j/k", "Scroll up/down"},
+				{"123j/123k", "Move cursor down/up N visible lines (count-prefixed; folds skipped)"},
 				{"h/l", "Move cursor column left/right"},
 				{"0/$", "Move cursor to line start/end"},
 				{"^", "Move cursor to first non-whitespace"},
@@ -219,6 +220,7 @@ func helpSections() []helpSection {
 			title: "Describe View", context: "Describe View",
 			bindings: []helpEntry{
 				{"j/k", "Move cursor up/down"},
+				{"123j/123k", "Move cursor down/up N lines (count-prefixed)"},
 				{"h/l", "Move cursor column left/right"},
 				{"0/$", "Move cursor to line start/end"},
 				{"^", "Move cursor to first non-whitespace"},
@@ -245,6 +247,7 @@ func helpSections() []helpSection {
 			title: "Diff View", context: "Diff View",
 			bindings: []helpEntry{
 				{"j/k", "Move cursor up/down"},
+				{"123j/123k", "Move cursor down/up N lines (count-prefixed)"},
 				{"h/l", "Move cursor column left/right"},
 				{"0/$", "Move cursor to line start/end"},
 				{"^", "Move cursor to first non-whitespace"},
@@ -331,6 +334,7 @@ func helpSections() []helpSection {
 			title: "Log Viewer", context: "Log Viewer",
 			bindings: []helpEntry{
 				{"j/k", "Move cursor up/down"},
+				{"123j/123k", "Move cursor down/up N lines (count-prefixed)"},
 				{"h/l/left/right", "Move cursor column left/right"},
 				{"0/$", "Move cursor to line start/end"},
 				{"^", "Move cursor to first non-whitespace"},

@@ -194,10 +194,8 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 	maxIdx := max(len(m.eventTimelineLines)-1, 0)
 	switch key {
 	case "j", "down":
-		m.eventTimelineLineInput = ""
-		if m.eventTimelineCursor < maxIdx {
-			m.eventTimelineCursor++
-		}
+		n := consumeCountPrefix(&m.eventTimelineLineInput)
+		m.eventTimelineCursor = min(m.eventTimelineCursor+n, maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
 	case "k", "up":
@@ -535,10 +533,8 @@ func (m Model) handleEventTimelineOverlayKeyQ() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleEventTimelineOverlayKeyK() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor > 0 {
-		m.eventTimelineCursor--
-	}
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	m.eventTimelineCursor = max(m.eventTimelineCursor-n, 0)
 	m.ensureEventCursorVisible()
 	return m
 }
@@ -690,7 +686,7 @@ func (m Model) handleEventTimelineOverlayKeyCtrlV() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleEventTimelineOverlayKeyY() (tea.Model, tea.Cmd) {
-	n := consumeYankCount(&m.eventTimelineLineInput)
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
 	if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
 		return m, nil
 	}
