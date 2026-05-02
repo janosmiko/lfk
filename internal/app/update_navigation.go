@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"slices"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -32,8 +33,8 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 
 				if delta < 0 {
 					// Moving UP into a group: land on the LAST item of that group.
-					for i := len(newVisible) - 1; i >= 0; i-- {
-						if newVisible[i].Category == newCat && newVisible[i].Kind != "__collapsed_group__" {
+					for i, item := range slices.Backward(newVisible) {
+						if item.Category == newCat && item.Kind != "__collapsed_group__" {
 							m.setCursor(i)
 							break
 						}
@@ -80,6 +81,15 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 	m.clearSelection()
 	m.activeFilterPreset = nil
 	m.unfilteredMiddleItems = nil
+
+	// Clear filter when navigating to a parent. Without this, a filter
+	// committed at a child level (e.g. "deploy" at LevelResourceTypes)
+	// stays in m.filterText and visibleMiddleItems silently filters out
+	// every parent-level item whose name doesn't match — making the
+	// cluster picker look empty after backing out of a filtered view.
+	m.filterText = ""
+	m.filterInput.Clear()
+	m.filterActive = false
 
 	// Clear search highlight on level change so it doesn't bleed onto
 	// the parent level (issue requested fix). The Esc cascade clears
