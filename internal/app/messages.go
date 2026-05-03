@@ -480,3 +480,17 @@ type previewSecretDataLoadedMsg struct {
 	data *model.SecretData
 	err  error
 }
+
+// previewServiceEndpointsLoadedMsg carries the lazily-fetched
+// EndpointSlice rollup for the hovered Service at LevelResources.
+// Same gen guard as the secret variant — handlers discard messages
+// where gen != m.requestGen so a fresh hover doesn't get clobbered by
+// the response from the previous one.
+type previewServiceEndpointsLoadedMsg struct {
+	gen  uint64
+	ctx  string
+	ns   string
+	name string
+	data *k8s.ServiceEndpoints
+	err  error
+}

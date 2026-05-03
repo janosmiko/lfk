@@ -243,9 +243,27 @@ when `targetRef` (no target pod) or `nodeName` (host-network endpoints)
 is absent. Multiple addresses on a single EndpointSlice entry (dual-stack
 IPv4/IPv6 setups) each get their own line.
 
-For a Service's effective endpoints, press `v` (Describe) — `kubectl
-describe service` lists the resolved Endpoints inline as today. A
-dedicated rollup in the Service preview is on the roadmap.
+The **Service** preview includes its own rollup, fetched lazily on hover
+from the matching `EndpointSlice` resources (label
+`kubernetes.io/service-name=<svc>`):
+
+```text
+BACKING ENDPOINTS  3 ready / 1 not ready
+
+ENDPOINTS
+  10.0.0.1  → pod/foo-7d9         on node-a
+  10.0.0.2  → pod/foo-7d9-9fr     on node-b
+  10.0.0.3  → pod/foo-7d9-2qx     on node-a
+  10.0.0.4  → pod/foo-7d9-broken  on node-c   (NotReady)
+```
+
+The fetch is cached per `ctx/namespace/name`, so subsequent hovers on
+the same Service skip the network roundtrip until the next list refresh.
+Headless Services (`clusterIP: None`) and `ExternalName` Services are
+skipped — they have no backing EndpointSlices to roll up.
+
+For a fuller `kubectl describe`-style view of a Service (events,
+session affinity, etc.), press `v` (Describe).
 
 ## Secret Lazy Loading
 

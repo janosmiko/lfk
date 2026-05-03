@@ -141,6 +141,11 @@ func (m Model) loadPreviewResources() tea.Cmd {
 	if secretCmd := m.loadPreviewSecretData(); secretCmd != nil {
 		cmds = append(cmds, secretCmd)
 	}
+	// Same pattern for the per-Service endpoint rollup — gated on Service
+	// kind + headless/ExternalName skip inside the helper.
+	if epCmd := m.loadPreviewServiceEndpoints(); epCmd != nil {
+		cmds = append(cmds, epCmd)
+	}
 	if len(cmds) == 0 {
 		return nil
 	}
@@ -460,6 +465,101 @@ func (m Model) loadContainerPorts() tea.Cmd {
 // Format: "ctx/namespace/name".
 func secretPreviewCacheKey(ctx, ns, name string) string {
 	return ctx + "/" + ns + "/" + name
+}
+
+// serviceEndpointsCacheKey returns the cache key for the per-Service
+// endpoint rollup. Same shape as secretPreviewCacheKey so the two
+// caches can share the eviction story (clear on context switch / list
+// refresh) if we ever centralise it.
+func serviceEndpointsCacheKey(ctx, ns, name string) string {
+	return ctx + "/" + ns + "/" + name
+}
+
+// loadPreviewServiceEndpoints lazily fetches the EndpointSlice rollup
+// for the currently hovered Service at LevelResources. Mirrors
+// loadPreviewSecretData's pattern: cache hit emits an immediate
+// message so the handler can re-inject the column after a list refresh
+// without touching the network; cache miss dispatches a background
+// task tracked via bgtasks for the title-bar spinner.
+//
+// Returns nil when:
+//   - the current resource type is not Service,
+//   - no middle item is selected,
+//   - the selected Service is Headless or ExternalName (no backing
+//     EndpointSlices to roll up — skipping here saves an empty fetch
+//     and a meaningless "0 ready" preview row).
+func (m Model) loadPreviewServiceEndpoints() tea.Cmd {
+	if m.nav.ResourceType.Kind != "Service" {
+		return nil
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil || isServiceWithoutEndpoints(sel) {
+		return nil
+	}
+
+	kctx := m.nav.Context
+	ns := m.resolveNamespace()
+	if sel.Namespace != "" {
+		ns = sel.Namespace
+	}
+	name := sel.Name
+	gen := m.requestGen
+
+	key := serviceEndpointsCacheKey(kctx, ns, name)
+	if cached := m.serviceEndpointsCache[key]; cached != nil {
+		return func() tea.Msg {
+			return previewServiceEndpointsLoadedMsg{
+				gen:  gen,
+				ctx:  kctx,
+				ns:   ns,
+				name: name,
+				data: cached,
+			}
+		}
+	}
+
+	reqCtx := m.reqCtx
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"Service endpoints: "+name,
+		bgtaskTarget(kctx, ns),
+		func() tea.Msg {
+			data, err := m.client.GetServiceEndpoints(reqCtx, kctx, ns, name)
+			return previewServiceEndpointsLoadedMsg{
+				gen:  gen,
+				ctx:  kctx,
+				ns:   ns,
+				name: name,
+				data: data,
+				err:  err,
+			}
+		},
+	)
+}
+
+// isServiceWithoutEndpoints reports whether the selected Service has
+// no backing EndpointSlices to roll up — Headless services
+// (clusterIP=None) and ExternalName services. Both surface their type
+// in the populated "Type" column already; reading it back avoids a
+// round-trip to fetch the spec just for the gating check.
+func isServiceWithoutEndpoints(sel *model.Item) bool {
+	for _, kv := range sel.Columns {
+		if kv.Key != "Type" {
+			continue
+		}
+		switch kv.Value {
+		case "ExternalName":
+			return true
+		}
+	}
+	for _, kv := range sel.Columns {
+		// Headless is encoded as Cluster IP == "None" rather than a
+		// distinct Type value.
+		if kv.Key == "Cluster IP" && kv.Value == "None" {
+			return true
+		}
+	}
+	return false
 }
 
 // secretDataCachedFor reports whether the lazily-fetched data for the given
