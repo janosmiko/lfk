@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func TestUpdateContextsLoaded_AnnotatesPerContextColor(t *testing.T) {
@@ -45,17 +46,19 @@ func TestOpenActionMenu_AtClusterPickerListsSetColor(t *testing.T) {
 	m := newClusterPickerModel(t)
 	result := m.openActionMenu()
 	assert.Equal(t, overlayAction, result.overlay, "x at Level=Clusters opens the action menu")
-	require.Len(t, result.overlayItems, 1, "today only one entry — Set color…")
-	assert.Equal(t, "Set color…", result.overlayItems[0].Name)
+	require.Len(t, result.overlayItems, 1, "today only one entry — Set color")
+	assert.Equal(t, "Set color", result.overlayItems[0].Name)
+	assert.Equal(t, ui.ActiveKeybindings.ClusterColorPicker, result.overlayItems[0].Status,
+		"Status carries the keybinding so the action menu renders [L] Set color and the in-menu shortcut matches the global one")
 }
 
 func TestExecuteAction_SetColorAtClusterPickerOpensColorOverlay(t *testing.T) {
 	m := newClusterPickerModel(t)
 	m.overlay = overlayAction
-	ret, _ := m.executeAction("Set color…")
+	ret, _ := m.executeAction("Set color")
 	result := ret.(Model)
 	assert.Equal(t, overlayClusterColor, result.overlay,
-		"selecting Set color… from the action menu hands off to the color picker overlay")
+		"selecting Set color from the action menu hands off to the color picker overlay")
 	assert.Equal(t, "prod-eu", result.clusterColorOverlayContext)
 }
 
