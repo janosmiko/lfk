@@ -94,10 +94,22 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 		// seed resources so the user can still navigate.
 		logger.Info("API resource discovery failed", "context", msg.context, "error", msg.err.Error())
 		if m.nav.Context == msg.context && m.loading {
+			// Mirror the success branch's wasInitial guard. m.loading alone
+			// is unreliable as an "is this the initial discovery" signal
+			// because invalidatePreviewForCursorChange flips it true on
+			// every j/k. Without this guard, a discovery retry that lands
+			// while the user is mid-scroll calls restoreCursor and snaps
+			// the cursor back to cursorMemory[ctx] (e.g., the resource type
+			// saved by session-restore), undoing the user's navigation.
+			wasInitial := len(m.middleItems) == 0
 			m.loading = false
 			m.setMiddleItems(model.BuildSidebarItems(model.SeedResources()))
 			m.itemCache[m.navKey()] = m.middleItems
-			m.restoreCursor()
+			if wasInitial {
+				m.restoreCursor()
+			} else {
+				m.clampCursor()
+			}
 			m.syncExpandedGroup()
 		}
 		// On discovery failure, drop any queued bookmark so we don't loop
