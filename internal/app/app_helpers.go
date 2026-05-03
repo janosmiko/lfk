@@ -105,6 +105,23 @@ func (m *Model) cancelInFlightRequests() {
 	}
 }
 
+// performQuitCleanup runs every shutdown side effect that must happen
+// before tea.Quit is dispatched: stop port-forwards, cancel log
+// streams, cancel in-flight API requests, and persist session state.
+// Centralising this here keeps the three quit entry points
+// (handleQuitConfirmOverlayKey, closeTabOrQuit's last-tab branch, and
+// the :quit command) in lockstep so adding a fourth path — or a new
+// cleanup step — does not require remembering the full sequence at
+// every call site.
+func (m *Model) performQuitCleanup() {
+	if m.portForwardMgr != nil {
+		m.portForwardMgr.StopAll()
+	}
+	m.cancelAllTabLogStreams()
+	m.cancelInFlightRequests()
+	m.saveCurrentSession()
+}
+
 // applyPinnedGroups merges config-level pinned groups with per-context pinned groups
 // and sets model.PinnedGroups.
 func (m *Model) applyPinnedGroups() {
