@@ -1,9 +1,11 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -58,6 +60,72 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 	}
 	m.previewEventsContent = ui.RenderPreviewEvents(entries, innerW)
 	return m
+}
+
+// updatePreviewServiceEndpointsLoaded caches the rollup and injects an
+// "Endpoints" multi-line KV (plus a one-line "Backing Endpoints" summary
+// row) into every matching middleItems entry so the renderer surfaces
+// the per-endpoint info on the next paint. Same skeleton as the secret
+// data handler — stale gen check, no-cache-on-error, refresh
+// middleItems by index, bump middleItemsRev so the right pane redraws.
+func (m Model) updatePreviewServiceEndpointsLoaded(msg previewServiceEndpointsLoadedMsg) Model {
+	if msg.gen != m.requestGen {
+		return m // stale response; the caller's m.previewLoading stays armed
+	}
+	if msg.err != nil {
+		logger.Info("preview service endpoints load error", "name", msg.name, "err", msg.err)
+		return m // do not cache failures
+	}
+	if msg.data == nil {
+		return m
+	}
+
+	if m.serviceEndpointsCache == nil {
+		m.serviceEndpointsCache = make(map[string]*k8s.ServiceEndpoints)
+	}
+	key := serviceEndpointsCacheKey(msg.ctx, msg.ns, msg.name)
+	m.serviceEndpointsCache[key] = msg.data
+
+	m.middleItemsRev++
+	for i := range m.middleItems {
+		item := &m.middleItems[i]
+		if item.Name != msg.name {
+			continue
+		}
+		itemNS := item.Namespace
+		if itemNS == "" {
+			itemNS = m.namespace
+		}
+		if itemNS != msg.ns {
+			continue
+		}
+		injectServiceEndpointColumns(item, msg.data)
+	}
+
+	return m
+}
+
+// injectServiceEndpointColumns rewrites the Service item's Backing
+// Endpoints summary + per-endpoint Endpoints multi-line KV. Removes
+// any prior values (handles rollup refresh after pods come and go) so
+// the column ordering stays stable across hovers.
+func injectServiceEndpointColumns(item *model.Item, data *k8s.ServiceEndpoints) {
+	filtered := item.Columns[:0]
+	for _, kv := range item.Columns {
+		if kv.Key == "Backing Endpoints" || kv.Key == "Endpoints" {
+			continue
+		}
+		filtered = append(filtered, kv)
+	}
+	item.Columns = filtered
+
+	summary := fmt.Sprintf("%d ready / %d not ready", data.Ready, data.NotReady)
+	item.Columns = append(item.Columns,
+		model.KeyValue{Key: "Backing Endpoints", Value: summary})
+	if data.Block != "" {
+		item.Columns = append(item.Columns,
+			model.KeyValue{Key: "Endpoints", Value: data.Block})
+	}
 }
 
 func (m Model) updatePreviewSecretDataLoaded(msg previewSecretDataLoadedMsg) Model {

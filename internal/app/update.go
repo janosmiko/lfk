@@ -59,7 +59,7 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 
 // updateResourceMsg handles resource-loading and navigation-related messages.
-func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nolint:gocyclo // flat type-switch dispatcher: complexity is "number of message types we route", not branching depth
 	switch msg := msg.(type) {
 	case contextsLoadedMsg:
 		mdl, cmd := m.updateContextsLoaded(msg)
@@ -132,6 +132,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 		return mdl, nil, true
 	case previewSecretDataLoadedMsg:
 		mdl := m.updatePreviewSecretDataLoaded(msg)
+		return mdl, nil, true
+	case previewServiceEndpointsLoadedMsg:
+		mdl := m.updatePreviewServiceEndpointsLoaded(msg)
 		return mdl, nil, true
 	case podMetricsEnrichedMsg:
 		mdl := m.updatePodMetricsEnriched(msg)
