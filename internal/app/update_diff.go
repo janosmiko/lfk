@@ -348,7 +348,13 @@ func diffClampCol(col int, lineText string) int {
 }
 
 // diffEnterVisual enters visual selection mode in diff view.
+//
+// diffLineInput must be cleared on entry: visual-mode page/word handlers
+// don't call consumeCountPrefix, so a stale digit prefix typed before `v`
+// (e.g. `5v<Esc>j`) would otherwise leak into the next normal-mode motion
+// and silently multiply it. Mirrors handleLogKeyV/V2/CtrlV.
 func (m Model) diffEnterVisual(mode rune) (tea.Model, tea.Cmd) {
+	m.diffLineInput = ""
 	m.diffVisualMode = true
 	m.diffVisualType = mode
 	m.diffVisualStart = m.diffCursor
