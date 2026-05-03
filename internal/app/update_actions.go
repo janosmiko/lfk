@@ -742,12 +742,7 @@ func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 		m.overlay = overlayQuitConfirm
 		return m, nil
 	}
-	// Stop all active port forwards before quitting.
-	if m.portForwardMgr != nil {
-		m.portForwardMgr.StopAll()
-	}
-	m.cancelAllTabLogStreams()
-	m.saveCurrentSession()
+	m.performQuitCleanup()
 	return m, tea.Quit
 }
 

@@ -399,11 +399,7 @@ func (m Model) handleQuitConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	switch msg.String() {
 	case "enter", "y", "Y":
 		m.overlay = overlayNone
-		if m.portForwardMgr != nil {
-			m.portForwardMgr.StopAll()
-		}
-		m.cancelAllTabLogStreams()
-		m.saveCurrentSession()
+		m.performQuitCleanup()
 		return m, tea.Quit
 	case "n", "N", "esc", "q":
 		m.overlay = overlayNone
