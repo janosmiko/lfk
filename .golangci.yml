@@ -24,6 +24,7 @@ linters:
     - modernize
     - nilerr
     - prealloc
+    - revive
     - staticcheck
     - unconvert
     - unparam
@@ -36,9 +37,28 @@ linters:
         - style
         - experimental
         - opinionated
+    revive:
+      # Enforce CLAUDE.md "200-400 typical, 800 max per production file".
+      # Test files and generated files are exempt via the exclusions block below.
+      rules:
+        - name: file-length-limit
+          arguments:
+            - max: 800
+              skipComments: false
+              skipBlankLines: false
   exclusions:
     paths:
       - vendor
+    rules:
+      # File-length cap applies to production source only; tests and generated
+      # files are out of scope. Revive currently has no other rules enabled,
+      # so excluding the linter here is equivalent to excluding the rule.
+      - path: '_test\.go$'
+        linters:
+          - revive
+      - path: '_gen\.go$'
+        linters:
+          - revive
 
 issues:
   max-issues-per-linter: 0
