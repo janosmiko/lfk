@@ -721,3 +721,99 @@ func TestDiffCaretClearsBuffer(t *testing.T) {
 	assert.Empty(t, rm.diffLineInput, "^ must consume the digit buffer")
 	assert.Equal(t, 2, rm.diffVisualCurCol)
 }
+
+func TestLogsDollarClearsBuffer(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, mode: modeLogs,
+		logLines:        []string{"hello world"},
+		logCursor:       0,
+		logVisualCurCol: 0,
+		logLineInput:    "5",
+		tabs:            []TabState{{}},
+	}
+	ret, _ := m.handleLogKey(keyMsg("$"))
+	rm := ret.(Model)
+	assert.Empty(t, rm.logLineInput, "$ must consume the digit buffer")
+	assert.Equal(t, len([]rune("hello world"))-1, rm.logVisualCurCol)
+}
+
+func TestLogsCaretClearsBuffer(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, mode: modeLogs,
+		logLines:        []string{"  hello"},
+		logCursor:       0,
+		logVisualCurCol: 6,
+		logLineInput:    "9",
+		tabs:            []TabState{{}},
+	}
+	ret, _ := m.handleLogKey(keyMsg("^"))
+	rm := ret.(Model)
+	assert.Empty(t, rm.logLineInput, "^ must consume the digit buffer")
+	assert.Equal(t, 2, rm.logVisualCurCol)
+}
+
+func TestEventTimelineDollarClearsBuffer(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, mode: modeEventViewer,
+		eventTimelineLines:     []string{"hello world"},
+		eventTimelineCursor:    0,
+		eventTimelineCursorCol: 0,
+		eventTimelineLineInput: "5",
+		tabs:                   []TabState{{}},
+	}
+	ret, _ := m.handleEventTimelineOverlayKey(keyMsg("$"))
+	rm := ret.(Model)
+	assert.Empty(t, rm.eventTimelineLineInput, "$ must consume the digit buffer")
+	assert.Equal(t, len([]rune("hello world"))-1, rm.eventTimelineCursorCol)
+}
+
+func TestEventTimelineCaretClearsBuffer(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, mode: modeEventViewer,
+		eventTimelineLines:     []string{"  hello"},
+		eventTimelineCursor:    0,
+		eventTimelineCursorCol: 6,
+		eventTimelineLineInput: "9",
+		tabs:                   []TabState{{}},
+	}
+	ret, _ := m.handleEventTimelineOverlayKey(keyMsg("^"))
+	rm := ret.(Model)
+	assert.Empty(t, rm.eventTimelineLineInput, "^ must consume the digit buffer")
+	assert.Equal(t, 2, rm.eventTimelineCursorCol)
+}
+
+// Companion to TestLogsCountPrefixColumnRight: `Nh` must clamp at column 0
+// rather than walking negative.
+func TestLogsCountPrefixColumnLeftClampsAtZero(t *testing.T) {
+	m := Model{
+		width: 80, height: 30, mode: modeLogs,
+		logLines:        []string{"hello world from logs"},
+		logCursor:       0,
+		logVisualCurCol: 3,
+		logLineInput:    "100",
+		tabs:            []TabState{{}},
+	}
+	ret, _ := m.handleLogKey(keyMsg("h"))
+	rm := ret.(Model)
+	assert.Equal(t, 0, rm.logVisualCurCol)
+	assert.Empty(t, rm.logLineInput)
+}
+
+// Pins the diffEnterVisual fix: a digit buffer typed before `v` must not leak
+// past the visual-mode toggle. Visual-mode page/word handlers don't consume
+// counts, so a stale prefix would otherwise multiply the next normal-mode
+// motion after `<Esc>`.
+func TestDiffEnterVisualClearsBuffer(t *testing.T) {
+	m := Model{
+		width: 80, height: 40, mode: modeDiff,
+		diffLeft: "a\nb\nc\nd\ne", diffRight: "a\nb\nc\nd\ne",
+		diffLeftName: "before", diffRightName: "after",
+		diffCursor:    0,
+		diffLineInput: "5",
+		tabs:          []TabState{{}},
+	}
+	ret, _ := m.handleDiffKey(keyMsg("v"))
+	rm := ret.(Model)
+	assert.True(t, rm.diffVisualMode)
+	assert.Empty(t, rm.diffLineInput, "entering visual mode must consume the digit buffer")
+}
