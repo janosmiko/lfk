@@ -552,7 +552,6 @@ type Model struct {
 	schemeFilterMode   bool   // true when typing into filter
 	schemeOriginalName string // scheme name before opening overlay, for cancel restore
 
-	serviceEndpointsCache map[string]*k8s.ServiceEndpoints // lazy Service endpoint rollup; see commands_load_preview.go and update_metrics_msgs.go
 	// secretPreviewCache caches decoded secret data keyed "ctx/ns/name" to skip
 	// redundant API calls on hover-after-refresh; invalidated on successful save.
 	secretPreviewCache map[string]*model.SecretData

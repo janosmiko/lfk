@@ -5,7 +5,6 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
@@ -47,33 +46,14 @@ func TestUpdatePreviewServiceEndpointsLoaded_InjectsRollupColumns(t *testing.T) 
 		"per-endpoint multi-line block is injected as the existing Endpoints renderer key — same column the Endpoints/EndpointSlices preview uses, so the layout matches")
 }
 
-func TestUpdatePreviewServiceEndpointsLoaded_CachesResult(t *testing.T) {
-	m := Model{
-		requestGen:            3,
-		namespace:             "default",
-		middleItems:           []model.Item{{Name: "my-svc", Namespace: "default"}},
-		serviceEndpointsCache: map[string]*k8s.ServiceEndpoints{},
-	}
-	msg := previewServiceEndpointsLoadedMsg{
-		gen: 3, ctx: "kctx", ns: "default", name: "my-svc",
-		data: &k8s.ServiceEndpoints{Ready: 1, Block: "10.0.0.1 → pod/foo"},
-	}
-	result := m.updatePreviewServiceEndpointsLoaded(msg)
-
-	cached, ok := result.serviceEndpointsCache[serviceEndpointsCacheKey("kctx", "default", "my-svc")]
-	require.True(t, ok, "successful fetch must populate the cache so re-hovers skip the network roundtrip")
-	assert.Equal(t, 1, cached.Ready)
-}
-
 func TestUpdatePreviewServiceEndpointsLoaded_StaleGenIgnored(t *testing.T) {
-	// Stale response from a prior hover must NOT touch the cache or the
-	// items — the user has already moved on. Mirrors the secret-data
-	// handler's stale-gen check.
+	// Stale response from a prior hover must NOT touch the items — the
+	// user has already moved on. Mirrors the secret-data handler's
+	// stale-gen check.
 	m := Model{
-		requestGen:            10,
-		namespace:             "default",
-		middleItems:           []model.Item{{Name: "my-svc", Namespace: "default"}},
-		serviceEndpointsCache: map[string]*k8s.ServiceEndpoints{},
+		requestGen:  10,
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "my-svc", Namespace: "default"}},
 	}
 	msg := previewServiceEndpointsLoadedMsg{
 		gen: 1, // stale
@@ -81,28 +61,62 @@ func TestUpdatePreviewServiceEndpointsLoaded_StaleGenIgnored(t *testing.T) {
 		data: &k8s.ServiceEndpoints{Ready: 99},
 	}
 	result := m.updatePreviewServiceEndpointsLoaded(msg)
-	assert.Empty(t, result.serviceEndpointsCache, "stale response must not poison the cache")
 	assert.Empty(t, findCol(&result.middleItems[0], "Backing Endpoints"),
-		"stale response must not inject columns either")
+		"stale response must not inject columns")
 }
 
-func TestUpdatePreviewServiceEndpointsLoaded_ErrorNotCached(t *testing.T) {
-	// Failed fetches must not populate the cache — otherwise the next
-	// hover would skip the network and silently keep the failure visible
-	// instead of retrying.
+func TestUpdatePreviewServiceEndpointsLoaded_ErrorIgnored(t *testing.T) {
+	// Failed fetches must not write anything to the items — keep the
+	// previous (possibly empty) state until the next successful fetch.
 	m := Model{
-		requestGen:            5,
-		serviceEndpointsCache: map[string]*k8s.ServiceEndpoints{},
-		middleItems:           []model.Item{{Name: "my-svc", Namespace: "default"}},
-		namespace:             "default",
+		requestGen:  5,
+		middleItems: []model.Item{{Name: "my-svc", Namespace: "default"}},
+		namespace:   "default",
 	}
 	msg := previewServiceEndpointsLoadedMsg{
 		gen: 5, ctx: "kctx", ns: "default", name: "my-svc",
 		err: errors.New("boom"),
 	}
 	result := m.updatePreviewServiceEndpointsLoaded(msg)
-	assert.Empty(t, result.serviceEndpointsCache,
-		"errors must not be cached so the user gets a fresh attempt on the next hover")
+	assert.Empty(t, findCol(&result.middleItems[0], "Backing Endpoints"),
+		"failed fetches must not inject anything")
+}
+
+// Regression for the stale-cache bug the user hit: deleting both pods
+// behind a Service used to leave the rollup showing them as ready
+// because the cached ServiceEndpoints was returned on the next hover.
+// Cache was removed; this test pins that the handler injects whatever
+// the latest message carries — so a fresh fetch after pod churn always
+// overwrites the prior column with the new state.
+func TestUpdatePreviewServiceEndpointsLoaded_FreshFetchReplacesStaleData(t *testing.T) {
+	item := model.Item{
+		Name: "my-svc", Namespace: "default",
+		Columns: []model.KeyValue{
+			{Key: "Backing Endpoints", Value: "2 ready / 0 not ready"},
+			{Key: "Endpoints", Value: "10.0.0.1 → pod/old-1\n10.0.0.2 → pod/old-2"},
+		},
+	}
+	m := Model{
+		requestGen:  4,
+		namespace:   "default",
+		middleItems: []model.Item{item},
+	}
+	// Pods just got recreated; the new EndpointSlice has them as not-
+	// ready while they pass startup probes. The fresh fetch must
+	// replace the prior 2-ready snapshot.
+	msg := previewServiceEndpointsLoadedMsg{
+		gen: 4, ctx: "kctx", ns: "default", name: "my-svc",
+		data: &k8s.ServiceEndpoints{
+			Ready: 0, NotReady: 2,
+			Block: "10.0.0.3 → pod/new-1 (NotReady)\n10.0.0.4 → pod/new-2 (NotReady)",
+		},
+	}
+	result := m.updatePreviewServiceEndpointsLoaded(msg)
+	assert.Equal(t, "0 ready / 2 not ready",
+		findCol(&result.middleItems[0], "Backing Endpoints"),
+		"fresh fetch after pod churn must overwrite the stale ready count")
+	assert.NotContains(t, findCol(&result.middleItems[0], "Endpoints"), "pod/old-1",
+		"old pod entries must not survive the rebuild")
 }
 
 func TestUpdatePreviewServiceEndpointsLoaded_RefreshOverwritesPriorColumns(t *testing.T) {

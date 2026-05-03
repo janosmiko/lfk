@@ -257,8 +257,12 @@ ENDPOINTS
   10.0.0.4  → pod/foo-7d9-broken  on node-c   (NotReady)
 ```
 
-The fetch is cached per `ctx/namespace/name`, so subsequent hovers on
-the same Service skip the network roundtrip until the next list refresh.
+The fetch fires fresh on every hover-settle (gated by the same preview
+debounce as YAML / events / metrics). No cache is in front: pod churn
+changes the rollup constantly, and a stale-cache hit could render
+just-restarted pods as ready before they pass startup probes. The
+debounce keeps the per-hover cost bounded.
+
 Headless Services (`clusterIP: None`) and `ExternalName` Services are
 skipped — they have no backing EndpointSlices to roll up.
 
