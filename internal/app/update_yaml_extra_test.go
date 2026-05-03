@@ -497,6 +497,9 @@ func TestYAMLVisualModeZero(t *testing.T) {
 }
 
 func TestYAMLVisualModeCtrlDU(t *testing.T) {
+	// Visual-mode <C-d>/<C-u> share the sticky 'scroll' option but don't
+	// consume counts themselves. With no prior counted press, fall back to
+	// vim's default (yamlViewportLines/2).
 	t.Run("ctrl+d in visual mode", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlVisualMode = true
@@ -504,7 +507,7 @@ func TestYAMLVisualModeCtrlDU(t *testing.T) {
 		m.yamlCursor = 0
 		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlD})
 		result := ret.(Model)
-		assert.Equal(t, 20, result.yamlCursor)
+		assert.Equal(t, m.yamlViewportLines()/2, result.yamlCursor)
 	})
 
 	t.Run("ctrl+u in visual mode", func(t *testing.T) {
@@ -514,7 +517,7 @@ func TestYAMLVisualModeCtrlDU(t *testing.T) {
 		m.yamlCursor = 30
 		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlU})
 		result := ret.(Model)
-		assert.Equal(t, 10, result.yamlCursor)
+		assert.Equal(t, 30-m.yamlViewportLines()/2, result.yamlCursor)
 	})
 }
 

@@ -231,10 +231,8 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 	case "E":
 		return m.handleEventTimelineOverlayKeyE2(), true
 	case "ctrl+d":
-		n := consumeCountPrefix(&m.eventTimelineLineInput)
-		// Round the half-page step before scaling: see handleLogKeyCtrlD for why.
-		step := m.eventContentHeight() / 2
-		m.eventTimelineCursor = min(m.eventTimelineCursor+n*step, maxIdx)
+		step := vimScrollStep(&m.eventTimelineLineInput, &m.eventTimelineScrollOption, m.eventContentHeight())
+		m.eventTimelineCursor = min(m.eventTimelineCursor+step, maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
 	case "ctrl+u":
@@ -334,10 +332,10 @@ func (m *Model) handleEventTimelineVisualMovement(key string, maxIdx int) {
 			m.pendingG = true
 		}
 	case "ctrl+d":
-		m.eventTimelineCursor = min(m.eventTimelineCursor+m.eventContentHeight()/2, maxIdx)
+		m.eventTimelineCursor = min(m.eventTimelineCursor+scrollStep(m.eventTimelineScrollOption, m.eventContentHeight()), maxIdx)
 		m.ensureEventCursorVisible()
 	case "ctrl+u":
-		m.eventTimelineCursor = max(m.eventTimelineCursor-m.eventContentHeight()/2, 0)
+		m.eventTimelineCursor = max(m.eventTimelineCursor-scrollStep(m.eventTimelineScrollOption, m.eventContentHeight()), 0)
 		m.ensureEventCursorVisible()
 	default:
 		m.handleEventTimelineVisualWordMotion(key)
@@ -614,9 +612,8 @@ func (m Model) handleEventTimelineOverlayKeyE2() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyCtrlU() Model {
-	n := consumeCountPrefix(&m.eventTimelineLineInput)
-	step := m.eventContentHeight() / 2
-	m.eventTimelineCursor -= n * step
+	step := vimScrollStep(&m.eventTimelineLineInput, &m.eventTimelineScrollOption, m.eventContentHeight())
+	m.eventTimelineCursor -= step
 	if m.eventTimelineCursor < 0 {
 		m.eventTimelineCursor = 0
 	}

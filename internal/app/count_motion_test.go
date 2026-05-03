@@ -354,10 +354,6 @@ func TestLogsCountPrefixWordForward(t *testing.T) {
 
 func TestDescribeCountPrefixHalfPageDown(t *testing.T) {
 	m := baseModelDescribe()
-	// describeContentHeight = max(height-4, 3) = 36 with height=40,
-	// so half-page = 18. With a 10-line fixture and 100-line cursor max
-	// the count clamps at the end; use a longer fixture to exercise the
-	// multiplier without clamping.
 	lines := make([]string, 200)
 	for i := range lines {
 		lines[i] = "line"
@@ -367,19 +363,22 @@ func TestDescribeCountPrefixHalfPageDown(t *testing.T) {
 	m.describeLineInput = "2"
 	ret, _ := m.handleDescribeKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
-	// 2 * (40-4)/2 = 36 lines.
-	assert.Equal(t, 36, rm.describeCursor)
+	// Vim semantics: `[count]<C-d>` moves exactly count lines (clamped to
+	// viewport) and stores count as the sticky 'scroll' option for future
+	// uncounted <C-d>/<C-u> presses.
+	assert.Equal(t, 2, rm.describeCursor)
+	assert.Equal(t, 2, rm.describeScrollOption)
 	assert.Empty(t, rm.describeLineInput)
 }
 
-// Regression: when content height is odd, `2<C-d>` must land at exactly
-// `2 * (h/2)`, not `(2*h)/2`. With describeContentHeight = max(h-4, 3) = 5
-// for height=9, single-step half-page is 2, so two presses should land at 4.
-// The buggy `n*h/2` arithmetic would land at 5 (= 2*5/2), over-shooting by
-// floor(n/2) lines.
-func TestDescribeCountHalfPageOddHeightMatchesSingleSteps(t *testing.T) {
+// Vim's `[count]<C-d>` does NOT equal repeated single presses. A counted
+// press sets the sticky 'scroll' to count and moves count lines. Plain
+// presses then reuse the sticky value. So `2<C-d>` moves 2; `<C-d><C-d>`
+// (no count, default = half-viewport) moves twice the half-viewport. They
+// only coincide if count happens to equal the default. Pin both paths so a
+// future regression toward "count multiplies the step" gets caught.
+func TestDescribeVimScrollSemantics(t *testing.T) {
 	m := baseModelDescribe()
-	m.height = 9 // describeContentHeight = 5 (odd); single half-page = 2.
 	lines := make([]string, 200)
 	for i := range lines {
 		lines[i] = "line"
@@ -387,21 +386,28 @@ func TestDescribeCountHalfPageOddHeightMatchesSingleSteps(t *testing.T) {
 	m.describeContent = strings.Join(lines, "\n")
 	m.describeCursor = 0
 
-	// Reference path: two single Ctrl+D presses.
+	// Counted: 2<C-d> moves exactly 2 lines, sets sticky=2.
+	m.describeLineInput = "2"
+	ret, _ := m.handleDescribeKey(keyMsg("ctrl+d"))
+	counted := ret.(Model)
+	assert.Equal(t, 2, counted.describeCursor)
+	assert.Equal(t, 2, counted.describeScrollOption)
+
+	// Subsequent plain <C-d> reuses sticky scroll=2 (vim's stickiness).
+	ret, _ = counted.handleDescribeKey(keyMsg("ctrl+d"))
+	stuck := ret.(Model)
+	assert.Equal(t, 4, stuck.describeCursor, "plain <C-d> must reuse sticky scroll value")
+
+	// Reference: two un-counted presses use the default (half-viewport).
 	ref := m
-	ret, _ := ref.handleDescribeKey(keyMsg("ctrl+d"))
+	ref.describeLineInput = ""
+	ref.describeScrollOption = 0
+	ret, _ = ref.handleDescribeKey(keyMsg("ctrl+d"))
 	ref = ret.(Model)
 	ret, _ = ref.handleDescribeKey(keyMsg("ctrl+d"))
 	ref = ret.(Model)
-	expected := ref.describeCursor
-
-	// Counted path: one `2<C-d>`.
-	m.describeLineInput = "2"
-	ret, _ = m.handleDescribeKey(keyMsg("ctrl+d"))
-	got := ret.(Model).describeCursor
-
-	assert.Equal(t, expected, got, "2<C-d> must land where two single C-d presses do")
-	assert.Equal(t, 4, got, "with content height 5, two half-pages of 2 = 4")
+	half := ref.describeContentHeight() / 2
+	assert.Equal(t, 2*half, ref.describeCursor, "two plain <C-d> = 2 * half-viewport")
 }
 
 func TestLogsCountPrefixFullPageDown(t *testing.T) {
@@ -494,8 +500,9 @@ func TestEventTimelineCountPrefixHalfPageDown(t *testing.T) {
 	}
 	ret, _ := m.handleEventTimelineOverlayKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
-	step := m.eventContentHeight() / 2
-	assert.Equal(t, 3*step, rm.eventTimelineCursor)
+	// Vim semantics: 3<C-d> moves 3 lines and sets sticky scroll=3.
+	assert.Equal(t, 3, rm.eventTimelineCursor)
+	assert.Equal(t, 3, rm.eventTimelineScrollOption)
 	assert.Empty(t, rm.eventTimelineLineInput)
 }
 
@@ -532,8 +539,9 @@ func TestDiffCountPrefixHalfPageDown(t *testing.T) {
 	}
 	ret, _ := m.handleDiffKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
-	// 2 * height/2 = 40 lines.
-	assert.Equal(t, 40, rm.diffCursor)
+	// Vim semantics: 2<C-d> moves 2 lines and sets sticky scroll=2.
+	assert.Equal(t, 2, rm.diffCursor)
+	assert.Equal(t, 2, rm.diffScrollOption)
 	assert.Empty(t, rm.diffLineInput)
 }
 
@@ -569,12 +577,9 @@ func TestYAMLCountPrefixHalfPageDown(t *testing.T) {
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
-	// Step is yamlViewportLines()/2, not m.height/2: the YAML viewer
-	// reserves 5 rows of overhead (title/tabs/border/hint), so the
-	// viewport at height=40 is 35 and the half-page is 17. 2 * 17 = 34.
-	step := m.yamlViewportLines() / 2
-	assert.Equal(t, 2*step, rm.yamlCursor)
-	assert.Equal(t, 34, rm.yamlCursor, "viewport=35, half=17, 2*17=34")
+	// Vim semantics: 2<C-d> moves 2 lines and sets sticky scroll=2.
+	assert.Equal(t, 2, rm.yamlCursor)
+	assert.Equal(t, 2, rm.yamlScrollOption)
 	assert.Empty(t, rm.yamlLineInput)
 }
 
@@ -816,4 +821,97 @@ func TestDiffEnterVisualClearsBuffer(t *testing.T) {
 	rm := ret.(Model)
 	assert.True(t, rm.diffVisualMode)
 	assert.Empty(t, rm.diffLineInput, "entering visual mode must consume the digit buffer")
+}
+
+// --- Vim 'scroll' semantics for [count]<C-d>/<C-u> ---
+//
+// Vim's [count]<C-d> first sets 'scroll' to min(count, winheight), then
+// scrolls by that amount. The new value is sticky: subsequent uncounted
+// <C-d>/<C-u> presses reuse it, until another counted press (on either key)
+// replaces it. The same option is shared between <C-d> and <C-u>.
+//
+// Empirically verified against vim 9.1 and nvim 0.12: in a 23-line window
+// `5<C-d>` moves 5 lines and sets &scroll=5; subsequent `<C-d>` moves 5 more;
+// `<C-u>` moves 5 back; `999<C-d>` clamps to winheight.
+
+func longLogModel() Model {
+	lines := make([]string, 1000)
+	for i := range lines {
+		lines[i] = "x"
+	}
+	return Model{
+		width: 80, height: 40, mode: modeLogs,
+		logLines: lines,
+		tabs:     []TabState{{}},
+	}
+}
+
+// Plain <C-d> with no prior counted press uses the default 'scroll' value
+// (half the viewport), matching vim's `default: half a screen`.
+func TestLogsCtrlDDefaultsToHalfViewport(t *testing.T) {
+	m := longLogModel()
+	m.logCursor = 0
+	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
+	rm := ret.(Model)
+	assert.Equal(t, m.logContentHeight()/2, rm.logCursor)
+	assert.Equal(t, 0, rm.logScrollOption, "plain <C-d> must not change the sticky option")
+}
+
+// 5<C-d> sets sticky scroll=5 and moves 5 lines. The next plain <C-d> reuses
+// 5. The next plain <C-u> moves 5 back up. Then 8<C-u> replaces sticky=8 and
+// moves 8. The next plain <C-d> uses the new 8.
+func TestLogsCtrlDStickyAndShared(t *testing.T) {
+	m := longLogModel()
+	m.logCursor = 0
+
+	m.logLineInput = "5"
+	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
+	a := ret.(Model)
+	assert.Equal(t, 5, a.logCursor)
+	assert.Equal(t, 5, a.logScrollOption)
+
+	ret, _ = a.handleLogKey(keyMsg("ctrl+d"))
+	b := ret.(Model)
+	assert.Equal(t, 10, b.logCursor, "plain <C-d> reuses sticky=5")
+	assert.Equal(t, 5, b.logScrollOption)
+
+	ret, _ = b.handleLogKey(keyMsg("ctrl+u"))
+	c := ret.(Model)
+	assert.Equal(t, 5, c.logCursor, "plain <C-u> shares the same sticky")
+
+	c.logLineInput = "8"
+	ret, _ = c.handleLogKey(keyMsg("ctrl+u"))
+	d := ret.(Model)
+	assert.Equal(t, 0, d.logCursor, "8<C-u> from line 5 clamps at top")
+	assert.Equal(t, 8, d.logScrollOption, "counted <C-u> replaces sticky")
+
+	ret, _ = d.handleLogKey(keyMsg("ctrl+d"))
+	e := ret.(Model)
+	assert.Equal(t, 8, e.logCursor, "plain <C-d> uses new sticky=8")
+}
+
+// Vim caps 'scroll' at winheight; mirror that with the lfk viewport.
+func TestLogsCtrlDClampsToViewport(t *testing.T) {
+	m := longLogModel()
+	m.logCursor = 0
+	m.logLineInput = "999"
+	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
+	rm := ret.(Model)
+	viewport := m.logContentHeight()
+	assert.Equal(t, viewport, rm.logCursor, "999<C-d> caps at viewport")
+	assert.Equal(t, viewport, rm.logScrollOption, "sticky cap matches viewport")
+}
+
+// The scroll option is per-viewer: setting log's sticky must not change the
+// describe / yaml / diff / events sticky values.
+func TestScrollOptionIsPerViewer(t *testing.T) {
+	m := longLogModel()
+	m.logLineInput = "7"
+	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
+	rm := ret.(Model)
+	assert.Equal(t, 7, rm.logScrollOption)
+	assert.Equal(t, 0, rm.describeScrollOption)
+	assert.Equal(t, 0, rm.yamlScrollOption)
+	assert.Equal(t, 0, rm.diffScrollOption)
+	assert.Equal(t, 0, rm.eventTimelineScrollOption)
 }

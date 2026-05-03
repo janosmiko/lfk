@@ -122,7 +122,7 @@ func (m Model) handleLogVisualKeyG2() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleLogVisualKeyCtrlD() (tea.Model, tea.Cmd) {
-	m.logCursor += m.logContentHeight() / 2
+	m.logCursor += scrollStep(m.logScrollOption, m.logContentHeight())
 	if m.logCursor >= len(m.logLines) {
 		m.logCursor = len(m.logLines) - 1
 	}
@@ -131,7 +131,7 @@ func (m Model) handleLogVisualKeyCtrlD() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleLogVisualKeyCtrlU() (tea.Model, tea.Cmd) {
-	m.logCursor -= m.logContentHeight() / 2
+	m.logCursor -= scrollStep(m.logScrollOption, m.logContentHeight())
 	if m.logCursor < 0 {
 		m.logCursor = 0
 	}

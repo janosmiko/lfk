@@ -320,19 +320,24 @@ func (m Model) handleDiffSearchNav(key string, foldRegions []ui.DiffFoldRegion, 
 }
 
 // diffPageMoveByKey moves the diff cursor by a page amount based on the key pressed.
+//
+// `<C-d>`/`<C-u>` follow vim's `[count]<C-d>` semantics via vimScrollStep:
+// counted presses set a sticky 'scroll' option, plain presses reuse it (or
+// fall back to half-viewport). `<C-f>`/`<C-b>` scroll `count` full pages.
 func (m Model) diffPageMoveByKey(key string, maxCursor, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.diffLineInput)
-	// Round the half-page step before scaling: see handleLogKeyCtrlD for why.
-	halfStep := m.height / 2
 	switch key {
 	case "ctrl+d":
-		m.diffCursor = min(m.diffCursor+n*halfStep, maxCursor)
+		step := vimScrollStep(&m.diffLineInput, &m.diffScrollOption, visibleLines)
+		m.diffCursor = min(m.diffCursor+step, maxCursor)
 	case "ctrl+u":
-		m.diffCursor = max(m.diffCursor-n*halfStep, 0)
+		step := vimScrollStep(&m.diffLineInput, &m.diffScrollOption, visibleLines)
+		m.diffCursor = max(m.diffCursor-step, 0)
 	case "ctrl+f", "pgdown":
-		m.diffCursor = min(m.diffCursor+n*m.height, maxCursor)
+		n := consumeCountPrefix(&m.diffLineInput)
+		m.diffCursor = min(m.diffCursor+n*visibleLines, maxCursor)
 	case "ctrl+b", "pgup":
-		m.diffCursor = max(m.diffCursor-n*m.height, 0)
+		n := consumeCountPrefix(&m.diffLineInput)
+		m.diffCursor = max(m.diffCursor-n*visibleLines, 0)
 	}
 	m.ensureDiffCursorVisible(visibleLines, maxScroll)
 	return m, nil
@@ -427,19 +432,19 @@ func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
 	case "ctrl+d":
-		m.diffCursor = min(m.diffCursor+m.height/2, maxCursor)
+		m.diffCursor = min(m.diffCursor+scrollStep(m.diffScrollOption, visibleLines), maxCursor)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
 	case "ctrl+u":
-		m.diffCursor = max(m.diffCursor-m.height/2, 0)
+		m.diffCursor = max(m.diffCursor-scrollStep(m.diffScrollOption, visibleLines), 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
 	case "ctrl+f", "pgdown":
-		m.diffCursor = min(m.diffCursor+m.height, maxCursor)
+		m.diffCursor = min(m.diffCursor+visibleLines, maxCursor)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
 	case "ctrl+b", "pgup":
-		m.diffCursor = max(m.diffCursor-m.height, 0)
+		m.diffCursor = max(m.diffCursor-visibleLines, 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
 	case "ctrl+c":

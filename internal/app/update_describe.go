@@ -85,14 +85,11 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "ctrl+d":
-		count := consumeCountPrefix(&m.describeLineInput)
-		// Round the half-page step before scaling: see handleLogKeyCtrlD for why.
-		step := m.describeContentHeight() / 2
-		return m.describePageMove(count*step, maxIdx)
+		step := vimScrollStep(&m.describeLineInput, &m.describeScrollOption, m.describeContentHeight())
+		return m.describePageMove(step, maxIdx)
 	case "ctrl+u":
-		count := consumeCountPrefix(&m.describeLineInput)
-		step := m.describeContentHeight() / 2
-		return m.describePageMove(-count*step, maxIdx)
+		step := vimScrollStep(&m.describeLineInput, &m.describeScrollOption, m.describeContentHeight())
+		return m.describePageMove(-step, maxIdx)
 	case "ctrl+f", "pgdown":
 		count := consumeCountPrefix(&m.describeLineInput)
 		return m.describePageMove(count*m.describeContentHeight(), maxIdx)
@@ -306,13 +303,13 @@ func (m Model) handleDescribeVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.pendingG = true
 		}
 	case "ctrl+d":
-		m.describeCursor += m.describeContentHeight() / 2
+		m.describeCursor += scrollStep(m.describeScrollOption, m.describeContentHeight())
 		if m.describeCursor > maxIdx {
 			m.describeCursor = maxIdx
 		}
 		m.ensureDescribeCursorVisible()
 	case "ctrl+u":
-		m.describeCursor -= m.describeContentHeight() / 2
+		m.describeCursor -= scrollStep(m.describeScrollOption, m.describeContentHeight())
 		if m.describeCursor < 0 {
 			m.describeCursor = 0
 		}

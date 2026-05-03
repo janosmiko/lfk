@@ -35,3 +35,39 @@ func consumeCountPrefix(buf *string) int {
 	*buf = ""
 	return n
 }
+
+// vimScrollStep mirrors vim's `[count]CTRL-D` / `[count]CTRL-U` semantics. Vim
+// keeps a per-window 'scroll' option (default: half the window height) that
+// drives both keys; an explicit count first sets 'scroll' to min(count,
+// winheight), then scrolls by that amount. Subsequent uncounted presses reuse
+// the new value (sticky), and the same option is shared between CTRL-D and
+// CTRL-U so `5CTRL-D` then `CTRL-U` moves 5 lines back up.
+//
+// buf is the viewer's count-prefix buffer (consumed unconditionally). option
+// points to the viewer's sticky 'scroll' field, updated in place when a count
+// is given. viewport is the visible content height (analogous to vim's
+// w_height); the count is clamped to it so 999<C-d> in a 30-line viewport
+// behaves like vim's empirical cap (no scroll past one screen per press).
+//
+// option == 0 is the "default" sentinel: no counted press has happened yet,
+// so plain <C-d>/<C-u> falls back to viewport/2 — vim's default.
+func vimScrollStep(buf *string, option *int, viewport int) int {
+	hadCount := *buf != ""
+	n := consumeCountPrefix(buf)
+	if hadCount {
+		clamped := min(n, max(viewport, 1))
+		*option = clamped
+		return clamped
+	}
+	return scrollStep(*option, viewport)
+}
+
+// scrollStep returns the current sticky `<C-d>/<C-u>` step value, falling back
+// to viewport/2 when no counted press has set it yet. Used by visual mode and
+// any other call site that doesn't consume a count itself.
+func scrollStep(option, viewport int) int {
+	if option > 0 {
+		return option
+	}
+	return max(viewport/2, 1)
+}

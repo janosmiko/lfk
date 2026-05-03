@@ -142,6 +142,7 @@ type TabState struct {
 	yamlContent        string
 	yamlScroll         int
 	yamlCursor         int // cursor position in visible lines (relative to scroll)
+	yamlScrollOption   int // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
 	yamlSearchText     TextInput
 	yamlMatchLines     []int
 	yamlMatchIdx       int
@@ -203,6 +204,7 @@ type TabState struct {
 	logVisualType     rune // 'V' = line, 'v' = char, 'B' = block
 	logVisualCol      int  // character column of anchor (for char and block modes)
 	logVisualCurCol   int  // current cursor column (for char and block modes)
+	logScrollOption   int  // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
 
 	// Log viewer: parent resource context for pod re-selection.
 	logParentKind   string
@@ -285,14 +287,15 @@ type Model struct {
 	cacheFingerprints map[string]string
 
 	// Preview / YAML content for the right column or full screen view.
-	yamlContent    string
-	yamlScroll     int
-	yamlCursor     int       // cursor line in visible-line space
-	yamlLineInput  string    // digit buffer for 123G jump-to-line
-	yamlSearchMode bool      // true when typing in the search bar
-	yamlSearchText TextInput // current search query
-	yamlMatchLines []int     // line indices matching the search
-	yamlMatchIdx   int       // current match index in yamlMatchLines
+	yamlContent      string
+	yamlScroll       int
+	yamlCursor       int       // cursor line in visible-line space
+	yamlScrollOption int       // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
+	yamlLineInput    string    // digit buffer for 123G jump-to-line
+	yamlSearchMode   bool      // true when typing in the search bar
+	yamlSearchText   TextInput // current search query
+	yamlMatchLines   []int     // line indices matching the search
+	yamlMatchIdx     int       // current match index in yamlMatchLines
 
 	// Visual selection in YAML view.
 	yamlVisualMode   bool // true when in visual line selection mode
@@ -473,6 +476,7 @@ type Model struct {
 	logVisualType     rune               // 'V' = line, 'v' = char, 'B' = block
 	logVisualCol      int                // character column of anchor (for char and block modes)
 	logVisualCurCol   int                // current cursor column (for char and block modes)
+	logScrollOption   int                // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
 
 	// Log viewer: parent resource context for pod re-selection.
 	logParentKind   string // original parent resource kind (e.g., "Deployment")
@@ -525,6 +529,7 @@ type Model struct {
 	describeVisualMode   byte           // 0=off, 'v'=char, 'V'=line, 'B'=block
 	describeVisualStart  int            // anchor line for visual selection
 	describeVisualCol    int            // anchor column for visual mode
+	describeScrollOption int            // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
 	describeSearchActive bool
 	describeSearchInput  TextInput
 	describeSearchQuery  string
@@ -552,6 +557,7 @@ type Model struct {
 	diffVisualStart  int    // anchor line (visible-line index)
 	diffVisualCol    int    // anchor column
 	diffVisualCurCol int    // current cursor column
+	diffScrollOption int    // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
 
 	// Embedded terminal state (PTY mode).
 	execPTY          *os.File       // PTY master file descriptor
@@ -855,6 +861,7 @@ type Model struct {
 	eventTimelineVisualStart  int             // anchor line for visual selection
 	eventTimelineVisualCol    int             // anchor column for char visual mode
 	eventTimelineCursorCol    int             // cursor column for char visual mode
+	eventTimelineScrollOption int             // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
 	eventTimelineSearchActive bool
 	eventTimelineSearchInput  TextInput
 	eventTimelineSearchQuery  string

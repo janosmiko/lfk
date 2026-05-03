@@ -152,14 +152,14 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "G":
 		return m.handleYAMLVisualG(totalVisible, maxScroll)
 	case "ctrl+d":
-		m.yamlCursor += m.height / 2
+		m.yamlCursor += scrollStep(m.yamlScrollOption, m.yamlViewportLines())
 		if m.yamlCursor >= totalVisible {
 			m.yamlCursor = totalVisible - 1
 		}
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	case "ctrl+u":
-		m.yamlCursor -= m.height / 2
+		m.yamlCursor -= scrollStep(m.yamlScrollOption, m.yamlViewportLines())
 		if m.yamlCursor < 0 {
 			m.yamlCursor = 0
 		}
@@ -617,14 +617,13 @@ func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 }
 
 // handleYAMLNormalHalfPageDown handles ctrl+d (half page down) in normal YAML mode.
+//
+// Vim semantics via vimScrollStep: a counted press sets the sticky 'scroll'
+// option to min(count, viewport); plain presses reuse the sticky value
+// (defaulting to viewport/2). The same option is shared with ctrl+u.
 func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.yamlLineInput)
-	// Step from the visible viewport, not raw m.height: the YAML viewer
-	// reserves rows for the title bar, tab bar, borders, and hint bar. Using
-	// m.height over-shoots by the overhead. Round the half-page step before
-	// scaling: see handleLogKeyCtrlD for why.
-	step := m.yamlViewportLines() / 2
-	m.yamlCursor += n * step
+	step := vimScrollStep(&m.yamlLineInput, &m.yamlScrollOption, m.yamlViewportLines())
+	m.yamlCursor += step
 	if m.yamlCursor >= totalVisible {
 		m.yamlCursor = totalVisible - 1
 	}
@@ -937,9 +936,8 @@ func (m Model) handleYAMLKeyG() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLKeyCtrlU() (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.yamlLineInput)
-	step := m.yamlViewportLines() / 2
-	m.yamlCursor -= n * step
+	step := vimScrollStep(&m.yamlLineInput, &m.yamlScrollOption, m.yamlViewportLines())
+	m.yamlCursor -= step
 	if m.yamlCursor < 0 {
 		m.yamlCursor = 0
 	}

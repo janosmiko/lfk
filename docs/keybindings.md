@@ -188,7 +188,8 @@ my namespace" mode.
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in YAML |
 | `n` / `N` | Next / previous search match |
 | `123n` / `123N` | Jump to Nth next / previous search match |
@@ -219,7 +220,8 @@ my namespace" mode.
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in content |
 | `n` / `N` | Next / previous search match |
 | `123n` / `123N` | Jump to Nth next / previous search match |
@@ -250,7 +252,8 @@ my namespace" mode.
 | `G` / `End` | Jump to bottom |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
-| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `f` | Toggle follow mode (auto-scroll to new logs) |
 | `Tab` / `z` / `>` | Toggle line wrapping |
 | `#` | Toggle line numbers |
@@ -345,7 +348,8 @@ from `terminal:` in the config.
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in diff |
 | `n` / `N` | Next / previous search match |
 | `123n` / `123N` | Jump to Nth next / previous search match |
@@ -384,7 +388,8 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `123G` | Jump to specific line number |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
-| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
+| `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
+| `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `f` | Toggle fullscreen event viewer |
 | `Tab` / `z` / `>` | Toggle line wrapping |
 | `/` | Search in events |
