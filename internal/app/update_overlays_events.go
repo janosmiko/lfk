@@ -455,65 +455,10 @@ func (m Model) handleEventTimelineVisualKeyY() (tea.Model, tea.Cmd) {
 	if selEnd >= len(m.eventTimelineLines) {
 		selEnd = len(m.eventTimelineLines) - 1
 	}
-	var clipText string
-	switch m.eventTimelineVisualMode {
-	case 'v': // Character mode: partial first/last lines.
-		var parts []string
-		anchorCol := m.eventTimelineVisualCol
-		cursorCol := m.eventTimelineCursorCol
-		startCol, endCol := anchorCol, cursorCol
-		if m.eventTimelineVisualStart > m.eventTimelineCursor {
-			startCol, endCol = cursorCol, anchorCol
-		}
-		for i := selStart; i <= selEnd; i++ {
-			line := m.eventTimelineLines[i]
-			runes := []rune(line)
-			if selStart == selEnd {
-				cs := min(anchorCol, cursorCol)
-				ce := max(anchorCol, cursorCol) + 1
-				if cs > len(runes) {
-					cs = len(runes)
-				}
-				if ce > len(runes) {
-					ce = len(runes)
-				}
-				parts = append(parts, string(runes[cs:ce]))
-			} else if i == selStart {
-				cs := min(startCol, len(runes))
-				parts = append(parts, string(runes[cs:]))
-			} else if i == selEnd {
-				ce := min(endCol+1, len(runes))
-				parts = append(parts, string(runes[:ce]))
-			} else {
-				parts = append(parts, line)
-			}
-		}
-		clipText = strings.Join(parts, "\n")
-	case 'B': // Block mode: rectangular column range.
-		colStart := min(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
-		colEnd := max(m.eventTimelineVisualCol, m.eventTimelineCursorCol) + 1
-		var parts []string
-		for i := selStart; i <= selEnd; i++ {
-			line := m.eventTimelineLines[i]
-			runes := []rune(line)
-			cs := colStart
-			ce := colEnd
-			if cs > len(runes) {
-				cs = len(runes)
-			}
-			if ce > len(runes) {
-				ce = len(runes)
-			}
-			parts = append(parts, string(runes[cs:ce]))
-		}
-		clipText = strings.Join(parts, "\n")
-	default: // Line mode: whole lines.
-		var parts []string
-		for i := selStart; i <= selEnd; i++ {
-			parts = append(parts, m.eventTimelineLines[i])
-		}
-		clipText = strings.Join(parts, "\n")
-	}
+	clipText := visualCopyText(m.eventTimelineLines, selStart, selEnd,
+		rune(m.eventTimelineVisualMode),
+		m.eventTimelineVisualCol, m.eventTimelineCursorCol,
+		m.eventTimelineVisualStart > m.eventTimelineCursor)
 	lineCount := selEnd - selStart + 1
 	m.eventTimelineVisualMode = 0
 	m.setStatusMessage(fmt.Sprintf("Copied %d line(s)", lineCount), false)
