@@ -71,6 +71,22 @@ func TestCloseTabOrQuit_LastTab_CancelsInFlightRequests(t *testing.T) {
 		"closeTabOrQuit's last-tab branch must cancel m.reqCtx before tea.Quit")
 }
 
+// Third quit entry point: the :quit command bar (also :q, :q!).
+// Mirrors the overlay-confirm and ctrl+c paths — must cancel reqCtx
+// before tea.Quit so in-flight goroutines abort.
+func TestExecuteBuiltinCommand_Quit_CancelsInFlightRequests(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.tabs = []TabState{{}}
+	reqCtx := armReqCtx(&m)
+
+	_, cmd := m.executeBuiltinCommand("q")
+	require.NotNil(t, cmd, ":quit must dispatch tea.Quit")
+
+	assert.ErrorIs(t, reqCtx.Err(), context.Canceled,
+		":quit (and :q, :q!) must cancel m.reqCtx before tea.Quit so "+
+			"in-flight API requests abort instead of riding out TCP timeouts")
+}
+
 // Multi-tab close (not a quit) must NOT cancel reqCtx — surviving
 // tabs need the request context to stay live for their loads.
 func TestCloseTabOrQuit_MultiTab_PreservesReqCtx(t *testing.T) {
