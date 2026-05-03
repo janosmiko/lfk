@@ -125,9 +125,11 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response
 	}
-	if len(msg.metrics) == 0 {
-		return m
-	}
+	// Don't bail on an empty payload — every visible row still needs to
+	// drop into the missing-key branch below so prior CPU/MEM values get
+	// reset to "n/a" via clearStalePodMetricsColumns. Returning early here
+	// used to leave the previous tick's usage on screen indefinitely
+	// whenever metrics-server fell over.
 	// Enrich middle items with CPU/Memory usage + percentage columns.
 	// Key format: "namespace/name". GetAllPodMetrics uses the same format
 	// regardless of query scope (all-namespaces vs single-namespace), so
