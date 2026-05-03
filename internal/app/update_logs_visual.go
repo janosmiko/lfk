@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -66,62 +65,10 @@ func (m *Model) buildLogYankText() (string, int) {
 		displayed[i-selStart] = m.logDisplayLine(i)
 	}
 
-	var clipText string
-	switch m.logVisualType {
-	case 'v': // Character mode: partial first/last lines.
-		anchorCol := m.logVisualCol
-		cursorCol := m.logVisualCurCol
-		// Direction: when the user dragged upward, the start-of-selection
-		// column is the cursor's, not the anchor's.
-		startCol, endCol := anchorCol, cursorCol
-		if m.logVisualStart > m.logCursor {
-			startCol, endCol = cursorCol, anchorCol
-		}
-		parts := make([]string, 0, len(displayed))
-		for j, line := range displayed {
-			runes := []rune(line)
-			switch {
-			case len(displayed) == 1:
-				cs := min(anchorCol, cursorCol)
-				ce := max(anchorCol, cursorCol) + 1
-				cs, ce = clampSliceBounds(cs, ce, len(runes))
-				parts = append(parts, string(runes[cs:ce]))
-			case j == 0:
-				cs := min(startCol, len(runes))
-				parts = append(parts, string(runes[cs:]))
-			case j == len(displayed)-1:
-				ce := min(endCol+1, len(runes))
-				parts = append(parts, string(runes[:ce]))
-			default:
-				parts = append(parts, line)
-			}
-		}
-		clipText = strings.Join(parts, "\n")
-	case 'B': // Block mode: rectangular column range.
-		colStart := min(m.logVisualCol, m.logVisualCurCol)
-		colEnd := max(m.logVisualCol, m.logVisualCurCol) + 1
-		parts := make([]string, 0, len(displayed))
-		for _, line := range displayed {
-			runes := []rune(line)
-			cs, ce := clampSliceBounds(colStart, colEnd, len(runes))
-			parts = append(parts, string(runes[cs:ce]))
-		}
-		clipText = strings.Join(parts, "\n")
-	default: // Line mode: whole lines.
-		clipText = strings.Join(displayed, "\n")
-	}
+	clipText := visualCopyText(displayed, 0, len(displayed)-1,
+		m.logVisualType, m.logVisualCol, m.logVisualCurCol,
+		m.logVisualStart > m.logCursor)
 	return clipText, len(displayed)
-}
-
-// clampSliceBounds returns cs/ce clamped to [0, n], preserving cs <= ce.
-func clampSliceBounds(cs, ce, n int) (int, int) {
-	if cs > n {
-		cs = n
-	}
-	if ce > n {
-		ce = n
-	}
-	return cs, ce
 }
 
 func (m Model) handleLogVisualKeyH() (tea.Model, tea.Cmd) {

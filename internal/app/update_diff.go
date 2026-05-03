@@ -491,9 +491,8 @@ func (m Model) diffVisualCopy(foldRegions []ui.DiffFoldRegion) (tea.Model, tea.C
 	clipText := visualCopyText(diffLines, 0, len(diffLines)-1,
 		m.diffVisualType, m.diffVisualCol, m.diffVisualCurCol,
 		m.diffVisualStart > m.diffCursor)
-	lineCount := selEnd - selStart + 1
 	m.diffVisualMode = false
-	m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
+	m.setStatusMessage(fmt.Sprintf("Copied %d lines", len(diffLines)), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 

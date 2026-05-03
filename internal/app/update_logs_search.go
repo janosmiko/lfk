@@ -41,23 +41,7 @@ func (m *Model) logFindLastMatch(lineIdx int, query string) bool {
 	if !ui.MatchLine(dl, query) {
 		return false
 	}
-	lastCol := -1
-	remaining := dl
-	offset := 0
-	for {
-		col := ui.FindColumnInLine(remaining, query)
-		if col < 0 {
-			break
-		}
-		lastCol = offset + col
-		advanceRunes := col + 1
-		runes := []rune(remaining)
-		if advanceRunes >= len(runes) {
-			break
-		}
-		remaining = string(runes[advanceRunes:])
-		offset += advanceRunes
-	}
+	lastCol := findLastMatchInStr(dl, query)
 	if lastCol < 0 {
 		return false
 	}
