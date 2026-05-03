@@ -36,6 +36,44 @@ func TestClusterColorTitleBarStyle_KnownColorSetsBg(t *testing.T) {
 	assert.True(t, style.GetBold(), "title bar tint should be bold so badges stay legible against bright backgrounds")
 }
 
+func TestClusterColorBg_ThemeMappedColorsFollowTheme(t *testing.T) {
+	// Theme-mapped colour names must resolve through the active theme
+	// tokens so a colorscheme switch propagates. Smoke test by mutating
+	// ColorError and observing clusterColorBg("red") change.
+	prev := ColorError
+	t.Cleanup(func() { ColorError = prev })
+
+	ColorError = "#abcdef"
+	bg, ok := clusterColorBg("red").(lipgloss.Color)
+	if assert.True(t, ok, "red must resolve to a concrete lipgloss.Color") {
+		assert.Equal(t, "#abcdef", string(bg),
+			"red must read the *current* ColorError so theme switches propagate")
+	}
+}
+
+func TestClusterColorBg_AnsiMappedColorsAreFixed(t *testing.T) {
+	// magenta/cyan/white/gray are deliberately NOT theme-mapped — they
+	// give the user a stable palette-relative escape hatch when none of
+	// the theme accent colours fit. Mutating theme tokens must not
+	// touch them.
+	prev := ColorError
+	t.Cleanup(func() { ColorError = prev })
+
+	ColorError = "#abcdef"
+	for _, name := range []string{"magenta", "cyan", "white", "gray"} {
+		bg, ok := clusterColorBg(name).(lipgloss.Color)
+		if assert.True(t, ok, "%s must resolve to a concrete lipgloss.Color", name) {
+			assert.NotEqual(t, "#abcdef", string(bg),
+				"%s must NOT pick up theme.Error — palette-relative colours stay independent", name)
+		}
+	}
+}
+
+func TestClusterColorBg_UnknownNameReturnsNil(t *testing.T) {
+	assert.Nil(t, clusterColorBg("chartreuse"), "unknown colour name resolves to nil so callers can no-op")
+	assert.Nil(t, clusterColorBg(""), "unset (empty) name resolves to nil — same as no tint")
+}
+
 func TestClusterColorTitleBarStyle_UnknownColorIsZeroStyle(t *testing.T) {
 	style := ClusterColorTitleBarStyle("chartreuse")
 	// Zero style: GetBackground() returns NoColor{} for an unset background,

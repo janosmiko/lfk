@@ -74,11 +74,12 @@ func formatClusterColorRow(colorName, label string, labelW, swatchW int, selecte
 // clusterColorSwatchBgN returns a swatchW-cell coloured block rendered
 // as a background tint on whitespace. Empty / unknown name returns plain
 // spaces so the "None" row stays aligned with the colour rows without
-// adding a visible swatch.
+// adding a visible swatch. Routes through clusterColorBg so theme-mapped
+// names (red/yellow/green/blue) follow the active colorscheme.
 func clusterColorSwatchBgN(name string, swatchW int) string {
-	code, ok := ansiCodeForClusterColor[name]
-	if !ok {
+	bg := clusterColorBg(name)
+	if bg == nil {
 		return strings.Repeat(" ", swatchW)
 	}
-	return lipgloss.NewStyle().Background(lipgloss.Color(code)).Render(strings.Repeat(" ", swatchW))
+	return lipgloss.NewStyle().Background(bg).Render(strings.Repeat(" ", swatchW))
 }

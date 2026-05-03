@@ -588,8 +588,11 @@ the entire title bar so it's impossible to miss which environment you're
 acting on. Contexts without a color render a neutral placeholder in the
 swatch column so all rows stay aligned.
 
-The colour palette uses ANSI bright colors (codes 8–15) so each tint
-maps to your terminal's palette and looks consistent across themes.
+Four colours (`red`, `yellow`, `green`, `blue`) follow lfk's active
+theme tokens (`theme.Error`, `theme.Warning`, `theme.Secondary`,
+`theme.Primary`) so a colorscheme switch re-skins them. The remaining
+four (`magenta`, `cyan`, `white`, `gray`) stay on ANSI bright codes
+(8, 13–15) and look the same regardless of theme.
 
 ## Mouse
 

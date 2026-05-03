@@ -174,10 +174,20 @@ when a stray `D` would do real damage.
   Unknown color names in the file are ignored on load (with a warning
   written to the lfk log) so a typo doesn't poison neighbouring entries.
 
-The colour palette uses ANSI bright codes (8–15) so each tint maps to
-your terminal's own palette. That keeps prod-red recognisable across
-themes and avoids hardcoded hex values that can clash with the active
-colorscheme.
+Four of the colours follow lfk's active theme so they re-skin when you
+switch colorschemes:
+
+| Picker name | Theme token             |
+| ----------- | ----------------------- |
+| `red`       | `theme.Error`           |
+| `yellow`    | `theme.Warning`         |
+| `green`     | `theme.Secondary`       |
+| `blue`      | `theme.Primary`         |
+
+The remaining four (`magenta`, `cyan`, `white`, `gray`) stay on ANSI
+bright codes so they look the same regardless of which lfk theme is
+active — useful when none of the theme accent colours fit a particular
+cluster's identity.
 
 ## Watch-Mode Interval
 

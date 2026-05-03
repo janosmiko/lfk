@@ -1,17 +1,20 @@
 package ui
 
-import "github.com/charmbracelet/lipgloss"
+import (
+	"slices"
+
+	"github.com/charmbracelet/lipgloss"
+)
 
 // ClusterColorNames lists every colour name accepted by saveClusterColors and
 // rendered by ClusterColorTitleBarStyle. Order is the canonical order used in
 // the picker overlay (top-to-bottom).
 //
-// We deliberately use ANSI named colours instead of theme tokens or hex
-// values: ANSI maps to the user's terminal palette so a "red" cluster looks
-// red in every terminal scheme (Solarized, Tokyo Night, etc.) while staying
-// recognisable across dark and light backgrounds. The bright variants
-// (ANSI 9–15) keep the tint loud enough that "I'm in prod" is unmissable
-// even when the title bar shares the row with other badges.
+// Four of the names are theme-mapped (red / yellow / green / blue → the
+// existing Error / Warning / Secondary / Primary theme tokens) so they
+// adapt as the user switches lfk colorschemes. The remaining four are
+// palette-relative ANSI bright codes — recognisable across every
+// terminal scheme but unaffected by lfk's theme.
 var ClusterColorNames = []string{
 	"red",
 	"yellow",
@@ -23,14 +26,10 @@ var ClusterColorNames = []string{
 	"gray",
 }
 
-// ansiCodeForClusterColor maps each named colour to its bright ANSI code.
-// Bright variants stand out against typical dark themes; gray uses ANSI 8
-// (bright black) so a "neutral" cluster has a distinct but quiet badge.
+// ansiCodeForClusterColor holds the ANSI bright codes for the four
+// non-theme-mapped colours. red/yellow/green/blue are intentionally
+// absent — they resolve via clusterColorBg's theme path.
 var ansiCodeForClusterColor = map[string]string{
-	"red":     "9",
-	"yellow":  "11",
-	"green":   "10",
-	"blue":    "12",
 	"magenta": "13",
 	"cyan":    "14",
 	"white":   "15",
@@ -42,50 +41,84 @@ var ansiCodeForClusterColor = map[string]string{
 // the sentinel for "no colour assigned" and is rejected here — callers must
 // treat the absence of a key in the colors map as the unset state instead.
 func IsValidClusterColor(name string) bool {
-	_, ok := ansiCodeForClusterColor[name]
-	return ok
+	return slices.Contains(ClusterColorNames, name)
+}
+
+// clusterColorBg resolves the named colour to a lipgloss background.
+// Theme-mapped names (red/yellow/green/blue) resolve to the current
+// theme tokens so they propagate when the user switches colorschemes;
+// the rest map to ANSI bright codes that follow the terminal palette.
+// ThemeColor wraps both paths with the no-color check, so this also
+// no-ops automatically when ConfigNoColor is set.
+func clusterColorBg(name string) lipgloss.TerminalColor {
+	switch name {
+	case "red":
+		return ThemeColor(ColorError)
+	case "yellow":
+		return ThemeColor(ColorWarning)
+	case "green":
+		return ThemeColor(ColorSecondary)
+	case "blue":
+		return ThemeColor(ColorPrimary)
+	}
+	if code, ok := ansiCodeForClusterColor[name]; ok {
+		return ThemeColor(code)
+	}
+	return nil
+}
+
+// clusterColorFg picks a contrasting foreground for the named colour.
+// Theme-mapped names get ColorSelectedFg (designed to contrast with the
+// theme's accent backgrounds); ANSI-mapped names get ANSI black, which
+// is universally legible on every bright ANSI background.
+func clusterColorFg(name string) lipgloss.TerminalColor {
+	switch name {
+	case "red", "yellow", "green", "blue":
+		return ThemeColor(ColorSelectedFg)
+	case "magenta", "cyan", "white", "gray":
+		return ThemeColor("0")
+	}
+	return nil
 }
 
 // ClusterColorTitleBarStyle returns a lipgloss style for tinting the title
-// bar background to the named colour. Foreground is forced to black so text
-// stays legible on every bright background. Empty / unknown name returns
+// bar background to the named colour. Empty / unknown name returns
 // the zero style so the caller can compose unconditionally.
 func ClusterColorTitleBarStyle(name string) lipgloss.Style {
-	code, ok := ansiCodeForClusterColor[name]
-	if !ok {
+	bg := clusterColorBg(name)
+	if bg == nil {
 		return lipgloss.NewStyle()
 	}
 	return lipgloss.NewStyle().
-		Background(lipgloss.Color(code)).
-		Foreground(lipgloss.Color("0")). // ANSI black for contrast on every bright bg
+		Background(bg).
+		Foreground(clusterColorFg(name)).
 		Bold(true)
 }
 
-// ClusterColorSwatch returns a 2-cell coloured block used inside the
-// picker overlay rows where the surrounding style sets only a foreground
-// (no competing background). Empty / unknown name returns two
-// dim-coloured cells so rows without a colour stay aligned with rows
-// that have one.
+// ClusterColorSwatch returns a 2-cell coloured block (foreground glyph)
+// for use in contexts where the surrounding style sets only a
+// foreground. Empty / unknown name returns two dim cells so rows
+// without a colour stay aligned.
 func ClusterColorSwatch(name string) string {
-	code, ok := ansiCodeForClusterColor[name]
-	if !ok {
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed)).Render("··")
+	fg := clusterColorBg(name) // re-use the resolver — same colour, used as fg here
+	if fg == nil {
+		return lipgloss.NewStyle().Foreground(ThemeColor(ColorDimmed)).Render("··")
 	}
-	return lipgloss.NewStyle().Foreground(lipgloss.Color(code)).Render("██")
+	return lipgloss.NewStyle().Foreground(fg).Render("██")
 }
 
 // ClusterColorSwatchBg returns a 2-cell coloured block rendered as a
-// background tint on whitespace, intended for use inside the cluster
-// picker rows where the row may be wrapped in a selection-highlight
-// style. Background-as-colour wins over the outer style's foreground,
-// so the colour stays visible whether or not the row is selected.
+// background tint on whitespace, intended for use inside rows that may
+// be wrapped in a selection-highlight style. Background-as-colour wins
+// over the outer style's foreground so the colour stays visible
+// whether or not the row is selected.
 //
 // Empty / unknown name returns two regular spaces (no background), so
-// rows without a colour add no visual noise to the right edge.
+// rows without a colour add no visual noise.
 func ClusterColorSwatchBg(name string) string {
-	code, ok := ansiCodeForClusterColor[name]
-	if !ok {
+	bg := clusterColorBg(name)
+	if bg == nil {
 		return "  "
 	}
-	return lipgloss.NewStyle().Background(lipgloss.Color(code)).Render("  ")
+	return lipgloss.NewStyle().Background(bg).Render("  ")
 }
