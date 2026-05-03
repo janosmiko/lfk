@@ -118,6 +118,7 @@ func helpSections() []helpSection {
 				{kb.SortReset, "Reset sort to default (Name ascending)"},
 				{kb.WatchMode, "Toggle watch mode (auto-refresh)"},
 				{helpKeyDisplay(kb.ReadOnlyToggle), "Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab)"},
+				{helpKeyDisplay(kb.ClusterColorPicker), "Cluster color picker (cluster picker only): tint title bar + add row swatch; persisted across restarts"},
 				{kb.Monitoring, "Monitoring overview (active Prometheus alerts)"},
 				{kb.QuotaDashboard, "Namespace resource quota dashboard"},
 				{kb.TasksOverlay, "Background tasks overlay (Tab toggles running/completed history)"},

@@ -462,17 +462,27 @@ func FormatItem(item model.Item, width int) string {
 	}
 
 	// Mark current context with a star and (optionally) prefix the
-	// read-only badge. Order: "* [RO] name". Both are styled prefixes so
-	// the renderer's ANSI tracking (lipgloss.Width) keeps the visible
-	// width correct even when the marker is colored.
+	// read-only badge and cluster-color swatch. Order:
+	// "* [RO] ██ name" — star first (current), [RO] next (process-wide
+	// safety hint), then the cluster-color swatch (per-cluster identity).
+	// All three are styled prefixes so the renderer's ANSI tracking
+	// (lipgloss.Width) keeps the visible width correct even when the
+	// markers are coloured.
 	if item.Status == "current" {
-		return Truncate(CurrentMarkerStyle.Render("* ")+readOnlyPrefix(item)+name, width)
+		return Truncate(CurrentMarkerStyle.Render("* ")+readOnlyPrefix(item)+clusterColorPrefix(item)+name, width)
 	}
 
 	// Non-current read-only rows: prepend "[RO] " so the marker is
-	// visible regardless of column width.
+	// visible regardless of column width. Cluster-color swatch follows.
 	if item.ReadOnly {
-		return Truncate(readOnlyPrefix(item)+name, width)
+		return Truncate(readOnlyPrefix(item)+clusterColorPrefix(item)+name, width)
+	}
+
+	// Non-current, non-read-only rows: still surface the cluster-color
+	// swatch so unentered contexts can be identified at a glance from
+	// the picker.
+	if item.ClusterColor != "" {
+		return Truncate(clusterColorPrefix(item)+name, width)
 	}
 
 	// Build detail columns: ready, restarts, age.
@@ -568,11 +578,12 @@ func FormatItemPlain(item model.Item, width int) string {
 	}
 
 	// Mark current context with a star (plain text, no CurrentMarkerStyle)
-	// and prepend a "[RO] " prefix when the row is read-only. Order:
-	// "* [RO] name" so the star stays the leftmost glyph and the marker
-	// sits next to it like a tag.
+	// and prepend a "[RO] " plus cluster-color swatch when applicable.
+	// Order: "* [RO] ██ name" so the star stays the leftmost glyph and
+	// the marker sits next to it like a tag. Plain variants are used so
+	// the row's selection background paints without nested ANSI resets.
 	if item.Status == "current" {
-		return Truncate("* "+readOnlyPrefixPlain(item)+name, width)
+		return Truncate("* "+readOnlyPrefixPlain(item)+clusterColorPrefixPlain(item)+name, width)
 	}
 
 	// Non-current read-only rows: prepend "[RO] " so the marker is
@@ -583,7 +594,14 @@ func FormatItemPlain(item model.Item, width int) string {
 		// so that any right-side details (currently unused for context
 		// rows but possible for other read-only resources in the future)
 		// remain consistent.
-		return Truncate(readOnlyPrefixPlain(item)+name, width)
+		return Truncate(readOnlyPrefixPlain(item)+clusterColorPrefixPlain(item)+name, width)
+	}
+
+	// Non-current, non-read-only rows: still surface the cluster-color
+	// swatch so unentered contexts can be identified at a glance from
+	// the picker.
+	if item.ClusterColor != "" {
+		return Truncate(clusterColorPrefixPlain(item)+name, width)
 	}
 
 	// Build detail columns: ready, restarts, age.

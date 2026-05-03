@@ -459,6 +459,17 @@ func (m Model) renderTitleBar() string {
 	gap := max(innerWidth-contentWidth, 0)
 
 	barContent := bc + watchIndicator + readOnlyIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + mutationProgress + tasksIndicator + nsLabel + versionLabel
+	if tint := m.clusterColorForActiveContext(); tint != "" {
+		// Inside a context with a stored colour: tint the whole title bar
+		// background so the operator cannot miss which environment they
+		// are about to act on. Renders the bar background directly with
+		// the cluster-color style and lets the existing badges keep their
+		// own foregrounds — the bold-on-bright contrast keeps them legible.
+		return ui.ClusterColorTitleBarStyle(tint).
+			Width(m.width).MaxWidth(m.width).MaxHeight(1).
+			Padding(0, 1).
+			Render(barContent)
+	}
 	return ui.TitleBarStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(barContent)
 }
 

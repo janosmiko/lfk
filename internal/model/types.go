@@ -129,6 +129,7 @@ type Item struct {
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
 	ReadOnly      bool             // Whether this item represents a context locked in read-only mode (renders as a [RO] suffix in the picker)
+	ClusterColor  string           // Optional named color (one of ui.ClusterColorNames) for context rows; empty = no swatch.
 	GroupedRefs   []GroupedRef     // For grouped rows (Events): all underlying resource identifiers
 }
 

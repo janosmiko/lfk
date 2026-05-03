@@ -194,6 +194,22 @@ type Model struct {
 	// CLI --read-only still wins over both.
 	contextROOverrides map[string]bool
 
+	// clusterColors holds per-context background-tint assignments set by the
+	// user via Ctrl+L on a row in the cluster picker. Persisted to
+	// $XDG_STATE_HOME/lfk/cluster-colors.yaml so the tint survives restarts.
+	// Absent key means "no tint"; values are validated against
+	// ui.ClusterColorNames at load and save time.
+	clusterColors map[string]string
+
+	// clusterColorOverlay state: cursor position within the picker's color
+	// rows. Captured as Model state (not closures) so the same overlay code
+	// can be re-rendered on every Update tick.
+	clusterColorOverlayCursor int
+	// clusterColorOverlayContext is the context name the overlay was opened
+	// against — captured at open so a later refresh of m.middleItems can't
+	// retarget the save to the wrong row.
+	clusterColorOverlayContext string
+
 	// Help screen state.
 	helpScroll       int
 	helpFilter       TextInput // applied filter (f key) — narrows visible lines

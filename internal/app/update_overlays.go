@@ -164,6 +164,9 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	case overlayPasteConfirm:
 		mdl, cmd := m.handlePasteConfirmKey(msg)
 		return mdl, cmd, true
+	case overlayClusterColor:
+		mdl, cmd := m.handleClusterColorOverlayKey(msg.String())
+		return mdl, cmd, true
 	}
 	return m, nil, false
 }

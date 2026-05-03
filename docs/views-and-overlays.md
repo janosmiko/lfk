@@ -67,6 +67,7 @@ exclusive — opening a new one replaces any prior open overlay.
 | `overlayExplainSearch`   | `:explain` start                    | Type/field search for kubectl explain.   |
 | `overlayFinalizerSearch` | finalizer-edit flow                 | Pick a finalizer to remove.              |
 | `overlayColumnToggle`    | column-visibility key               | Show/hide table columns per kind.        |
+| `overlayClusterColor`    | `Ctrl+L` at cluster picker          | Pick a background tint for the highlighted cluster row (persisted to `$XDG_STATE_HOME/lfk/cluster-colors.yaml`; also reachable from the action menu → "Set color…"). |
 
 ### Editors / Forms
 

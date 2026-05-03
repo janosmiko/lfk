@@ -70,6 +70,7 @@ const (
 	overlayColumnToggle
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
 	overlayBackgroundTasks
+	overlayClusterColor // pick a color tint for the highlighted cluster row
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.

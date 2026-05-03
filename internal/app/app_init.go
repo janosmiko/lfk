@@ -56,6 +56,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		readOnly:                   ui.ResolveReadOnly(contextName, opts.ReadOnly),
 		cliReadOnly:                opts.ReadOnly,
 		contextROOverrides:         make(map[string]bool),
+		clusterColors:              loadClusterColors(),
 		sortColumnName:             sortColDefault,
 		sortAscending:              true,
 		cursorMemory:               make(map[string]int),

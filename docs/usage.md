@@ -150,6 +150,35 @@ context; it does not scope the read-only flag.
 The cluster picker hint bar advertises `Ctrl+R toggle RO` so users
 can find the row toggle without reading docs.
 
+## Cluster Color Coding
+
+Tag any cluster with a background color so the title bar tints the
+moment you enter it — useful for "I am unmistakably in prod" feedback
+when a stray `D` would do real damage.
+
+- **Open the picker**: at the cluster picker, highlight a row and press
+  `Ctrl+L`. Same overlay opens from the action menu (`x` →
+  "Set color…").
+- **Pick a color**: 8 named choices (`red`, `yellow`, `green`, `blue`,
+  `magenta`, `cyan`, `white`, `gray`) plus `None` to clear. The cursor
+  pre-seeds on the cluster's current color, or on `None` if it has none.
+- **Visual treatment**: the picker row gets a `██` swatch in the chosen
+  color so all your clusters are recognizable at a glance, and entering
+  the context tints the entire title-bar background with the same color
+  while the existing badges (`[RO]`, watch indicator, namespace, etc.)
+  stay legible on top.
+- **Persistence**: the assignment is saved to
+  `$XDG_STATE_HOME/lfk/cluster-colors.yaml` (defaults to
+  `~/.local/state/lfk/cluster-colors.yaml`) so colors survive restarts.
+  The file is lfk-managed — don't hand-edit; use the in-app picker.
+  Unknown color names in the file are dropped silently on load so a typo
+  doesn't poison neighbouring entries.
+
+The colour palette uses ANSI bright codes (8–15) so each tint maps to
+your terminal's own palette. That keeps prod-red recognisable across
+themes and avoids hardcoded hex values that can clash with the active
+colorscheme.
+
 ## Watch-Mode Interval
 
 Watch mode (toggle with `w`) polls the current resource list on an interval.

@@ -191,3 +191,26 @@ func readOnlyPrefixPlain(item model.Item) string {
 	}
 	return "[RO] "
 }
+
+// clusterColorPrefix returns a coloured swatch for context rows that have a
+// cluster colour assigned. The swatch is foreground-only so the cursor
+// highlight can paint over it cleanly. Empty string for items without a
+// colour so the caller can always concatenate.
+func clusterColorPrefix(item model.Item) string {
+	if item.ClusterColor == "" {
+		return ""
+	}
+	return ClusterColorSwatch(item.ClusterColor) + " "
+}
+
+// clusterColorPrefixPlain returns the same swatch width as
+// clusterColorPrefix but unstyled, so a selected-row background can paint
+// across it without nested ANSI resets. The two-cell width plus trailing
+// space must match clusterColorPrefix exactly so name truncation produces
+// identical results in both styled and plain paths.
+func clusterColorPrefixPlain(item model.Item) string {
+	if item.ClusterColor == "" {
+		return ""
+	}
+	return "██ "
+}

@@ -123,6 +123,9 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.ReadOnlyToggle:
 		mdl, cmd := m.handleKeyReadOnlyToggle()
 		return mdl, cmd, true
+	case kb.ClusterColorPicker:
+		mdl, cmd := m.handleKeyClusterColorPicker()
+		return mdl, cmd, true
 	case kb.Right, "right":
 		mdl, cmd := m.navigateChild()
 		return mdl, cmd, true

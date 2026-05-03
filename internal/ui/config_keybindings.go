@@ -95,6 +95,10 @@ type Keybindings struct {
 
 	// Read-only mode
 	ReadOnlyToggle string `json:"readonly_toggle" yaml:"readonly_toggle"`
+
+	// Cluster color picker (Level=Clusters only): assigns a background tint
+	// to the highlighted cluster row, persisted across restarts.
+	ClusterColorPicker string `json:"cluster_color_picker" yaml:"cluster_color_picker"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -144,6 +148,9 @@ func DefaultKeybindings() Keybindings {
 
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",
+
+		// Cluster color picker
+		ClusterColorPicker: "ctrl+l",
 	}
 }
 
