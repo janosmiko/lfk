@@ -321,6 +321,14 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	if (kind == "Pod" || kind == "Node") && len(m.middleItems) > 0 {
 		m.carryOverMetricsColumns(msg.items)
 	}
+	if kind == "Service" && len(m.middleItems) > 0 {
+		// Same anti-flash carry-over: keeps the lazily-fetched
+		// "Backing Endpoints" + per-endpoint "Endpoints" rollup
+		// columns visible across watch-tick refreshes, so the right
+		// pane doesn't blank between setMiddleItems and the next
+		// loadPreviewServiceEndpoints message landing.
+		m.carryOverServiceEndpointColumns(msg.items)
+	}
 	m.setMiddleItems(msg.items)
 	mainCacheKey := m.navKey()
 	m.itemCache[mainCacheKey] = m.middleItems

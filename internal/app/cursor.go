@@ -178,6 +178,65 @@ func (m *Model) carryOverMetricsColumns(newItems []model.Item) {
 	}
 }
 
+// carryOverServiceEndpointColumns copies the lazily-fetched Service
+// rollup columns ("Backing Endpoints" + the multi-line "Endpoints"
+// block) from the existing middleItems into the freshly-loaded ones,
+// matched on name+namespace.
+//
+// Without this carry-over, every watch-tick refresh would replace the
+// whole middleItems slice with new objects whose Columns don't yet
+// have the rollup, and the table would render once without those rows
+// before the async fetch lands ~100ms later — a visible flash and
+// layout jump in the right pane. The carry-over keeps the previous
+// values in place so the next render is identical to the prior one
+// until the fresh fetch updates the columns from
+// updatePreviewServiceEndpointsLoaded.
+//
+// Same reasoning as carryOverMetricsColumns above.
+func (m *Model) carryOverServiceEndpointColumns(newItems []model.Item) {
+	endpointKeys := map[string]bool{
+		"Backing Endpoints": true,
+		"Endpoints":         true,
+	}
+	type itemKey struct{ ns, name string }
+	old := make(map[itemKey][]model.KeyValue)
+	for _, item := range m.middleItems {
+		var cols []model.KeyValue
+		for _, kv := range item.Columns {
+			if endpointKeys[kv.Key] {
+				cols = append(cols, kv)
+			}
+		}
+		if len(cols) > 0 {
+			old[itemKey{item.Namespace, item.Name}] = cols
+		}
+	}
+	if len(old) == 0 {
+		return
+	}
+	for i := range newItems {
+		key := itemKey{newItems[i].Namespace, newItems[i].Name}
+		cols, ok := old[key]
+		if !ok {
+			continue
+		}
+		// Drop any rollup columns that arrived on the new item (the
+		// populator only writes "Type / Cluster IP / ..." for Services,
+		// so this loop is a no-op today — but keeping it makes the
+		// helper safe if the populator ever starts writing them too).
+		var kept []model.KeyValue
+		for _, kv := range newItems[i].Columns {
+			if !endpointKeys[kv.Key] {
+				kept = append(kept, kv)
+			}
+		}
+		merged := make([]model.KeyValue, 0, len(kept)+len(cols))
+		merged = append(merged, kept...)
+		merged = append(merged, cols...)
+		newItems[i].Columns = merged
+	}
+}
+
 // clampAllCursors ensures all cursor positions are within bounds after resize.
 func (m *Model) clampAllCursors() {
 	m.clampCursor()
