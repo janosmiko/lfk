@@ -114,12 +114,16 @@ func TestYAMLKeyGScrollsToBottom(t *testing.T) {
 }
 
 func TestYAMLKeyCtrlDU(t *testing.T) {
+	// Step is yamlViewportLines()/2 for ctrl+d/u: height 40 minus 5 rows of
+	// overhead (title bar, yaml title, border*2, hint) gives a 35-line
+	// viewport; half-page = 17.
 	t.Run("ctrl+d moves down half page", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlCursor = 0
 		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlD})
 		result := ret.(Model)
-		assert.Equal(t, 20, result.yamlCursor) // height 40 / 2 = 20
+		assert.Equal(t, m.yamlViewportLines()/2, result.yamlCursor)
+		assert.Equal(t, 17, result.yamlCursor)
 	})
 
 	t.Run("ctrl+u moves up half page", func(t *testing.T) {
@@ -127,7 +131,8 @@ func TestYAMLKeyCtrlDU(t *testing.T) {
 		m.yamlCursor = 30
 		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlU})
 		result := ret.(Model)
-		assert.Equal(t, 10, result.yamlCursor) // 30 - 20 = 10
+		assert.Equal(t, 30-m.yamlViewportLines()/2, result.yamlCursor)
+		assert.Equal(t, 13, result.yamlCursor)
 	})
 
 	t.Run("ctrl+u clamps at zero", func(t *testing.T) {
@@ -140,12 +145,15 @@ func TestYAMLKeyCtrlDU(t *testing.T) {
 }
 
 func TestYAMLKeyCtrlFB(t *testing.T) {
+	// Full-page step is yamlViewportLines() (35 with the base-model height of
+	// 40 and a single tab), not raw m.height.
 	t.Run("ctrl+f moves down full page", func(t *testing.T) {
 		m := baseYAMLModel()
 		m.yamlCursor = 0
 		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlF})
 		result := ret.(Model)
-		assert.Equal(t, 40, result.yamlCursor) // height = 40
+		assert.Equal(t, m.yamlViewportLines(), result.yamlCursor)
+		assert.Equal(t, 35, result.yamlCursor)
 	})
 
 	t.Run("ctrl+b moves up full page", func(t *testing.T) {
@@ -153,7 +161,8 @@ func TestYAMLKeyCtrlFB(t *testing.T) {
 		m.yamlCursor = 45
 		ret, _ := m.handleYAMLKey(tea.KeyMsg{Type: tea.KeyCtrlB})
 		result := ret.(Model)
-		assert.Equal(t, 5, result.yamlCursor) // 45 - 40 = 5
+		assert.Equal(t, 45-m.yamlViewportLines(), result.yamlCursor)
+		assert.Equal(t, 10, result.yamlCursor)
 	})
 }
 

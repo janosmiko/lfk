@@ -569,8 +569,12 @@ func TestYAMLCountPrefixHalfPageDown(t *testing.T) {
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
-	// 2 * height/2 = 40 lines.
-	assert.Equal(t, 40, rm.yamlCursor)
+	// Step is yamlViewportLines()/2, not m.height/2: the YAML viewer
+	// reserves 5 rows of overhead (title/tabs/border/hint), so the
+	// viewport at height=40 is 35 and the half-page is 17. 2 * 17 = 34.
+	step := m.yamlViewportLines() / 2
+	assert.Equal(t, 2*step, rm.yamlCursor)
+	assert.Equal(t, 34, rm.yamlCursor, "viewport=35, half=17, 2*17=34")
 	assert.Empty(t, rm.yamlLineInput)
 }
 

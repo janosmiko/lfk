@@ -619,8 +619,11 @@ func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 // handleYAMLNormalHalfPageDown handles ctrl+d (half page down) in normal YAML mode.
 func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.yamlLineInput)
-	// Round the half-page step before scaling: see handleLogKeyCtrlD for why.
-	step := m.height / 2
+	// Step from the visible viewport, not raw m.height: the YAML viewer
+	// reserves rows for the title bar, tab bar, borders, and hint bar. Using
+	// m.height over-shoots by the overhead. Round the half-page step before
+	// scaling: see handleLogKeyCtrlD for why.
+	step := m.yamlViewportLines() / 2
 	m.yamlCursor += n * step
 	if m.yamlCursor >= totalVisible {
 		m.yamlCursor = totalVisible - 1
@@ -632,7 +635,7 @@ func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cm
 // handleYAMLNormalPageDown handles ctrl+f (full page down) in normal YAML mode.
 func (m Model) handleYAMLNormalPageDown(totalVisible int) (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.yamlLineInput)
-	m.yamlCursor += n * m.height
+	m.yamlCursor += n * m.yamlViewportLines()
 	if m.yamlCursor >= totalVisible {
 		m.yamlCursor = totalVisible - 1
 	}
@@ -935,7 +938,7 @@ func (m Model) handleYAMLKeyG() (tea.Model, tea.Cmd) {
 
 func (m Model) handleYAMLKeyCtrlU() (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.yamlLineInput)
-	step := m.height / 2
+	step := m.yamlViewportLines() / 2
 	m.yamlCursor -= n * step
 	if m.yamlCursor < 0 {
 		m.yamlCursor = 0
@@ -946,7 +949,7 @@ func (m Model) handleYAMLKeyCtrlU() (tea.Model, tea.Cmd) {
 
 func (m Model) handleYAMLKeyCtrlB() (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.yamlLineInput)
-	m.yamlCursor -= n * m.height
+	m.yamlCursor -= n * m.yamlViewportLines()
 	if m.yamlCursor < 0 {
 		m.yamlCursor = 0
 	}
