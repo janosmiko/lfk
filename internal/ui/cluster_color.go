@@ -45,21 +45,27 @@ func IsValidClusterColor(name string) bool {
 }
 
 // clusterColorBg resolves the named colour to a lipgloss background.
-// Theme-mapped names (red/yellow/green/blue) resolve to the current
-// theme tokens so they propagate when the user switches colorschemes;
-// the rest map to ANSI bright codes that follow the terminal palette.
+// Theme-mapped names (red/yellow/green/blue) read directly from
+// ActiveTheme so a colorscheme switch propagates on the next render —
+// the package-level Color* slots are stuck on Tokyo Night defaults
+// (they only branch between "default" and "no-color blanked" inside
+// ApplyTheme; they never receive the active theme's actual values), so
+// using them here would have left the cluster tints frozen on the
+// boot-time palette regardless of which theme the user picked.
+//
+// The rest map to ANSI bright codes that follow the terminal palette.
 // ThemeColor wraps both paths with the no-color check, so this also
 // no-ops automatically when ConfigNoColor is set.
 func clusterColorBg(name string) lipgloss.TerminalColor {
 	switch name {
 	case "red":
-		return ThemeColor(ColorError)
+		return ThemeColor(ActiveTheme.Error)
 	case "yellow":
-		return ThemeColor(ColorWarning)
+		return ThemeColor(ActiveTheme.Warning)
 	case "green":
-		return ThemeColor(ColorSecondary)
+		return ThemeColor(ActiveTheme.Secondary)
 	case "blue":
-		return ThemeColor(ColorPrimary)
+		return ThemeColor(ActiveTheme.Primary)
 	}
 	if code, ok := ansiCodeForClusterColor[name]; ok {
 		return ThemeColor(code)
@@ -68,13 +74,13 @@ func clusterColorBg(name string) lipgloss.TerminalColor {
 }
 
 // clusterColorFg picks a contrasting foreground for the named colour.
-// Theme-mapped names get ColorSelectedFg (designed to contrast with the
-// theme's accent backgrounds); ANSI-mapped names get ANSI black, which
-// is universally legible on every bright ANSI background.
+// Theme-mapped names get ActiveTheme.SelectedFg (designed to contrast
+// with the theme's accent backgrounds); ANSI-mapped names get ANSI
+// black, which is universally legible on every bright ANSI background.
 func clusterColorFg(name string) lipgloss.TerminalColor {
 	switch name {
 	case "red", "yellow", "green", "blue":
-		return ThemeColor(ColorSelectedFg)
+		return ThemeColor(ActiveTheme.SelectedFg)
 	case "magenta", "cyan", "white", "gray":
 		return ThemeColor("0")
 	}

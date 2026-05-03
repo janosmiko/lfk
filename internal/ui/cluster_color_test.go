@@ -37,17 +37,17 @@ func TestClusterColorTitleBarStyle_KnownColorSetsBg(t *testing.T) {
 }
 
 func TestClusterColorBg_ThemeMappedColorsFollowTheme(t *testing.T) {
-	// Theme-mapped colour names must resolve through the active theme
-	// tokens so a colorscheme switch propagates. Smoke test by mutating
-	// ColorError and observing clusterColorBg("red") change.
-	prev := ColorError
-	t.Cleanup(func() { ColorError = prev })
+	// Theme-mapped colour names must resolve through ActiveTheme so a
+	// colorscheme switch propagates. Smoke test by mutating
+	// ActiveTheme.Error and observing clusterColorBg("red") change.
+	prev := ActiveTheme.Error
+	t.Cleanup(func() { ActiveTheme.Error = prev })
 
-	ColorError = "#abcdef"
+	ActiveTheme.Error = "#abcdef"
 	bg, ok := clusterColorBg("red").(lipgloss.Color)
 	if assert.True(t, ok, "red must resolve to a concrete lipgloss.Color") {
 		assert.Equal(t, "#abcdef", string(bg),
-			"red must read the *current* ColorError so theme switches propagate")
+			"red must read the *current* ActiveTheme.Error so theme switches propagate")
 	}
 }
 
@@ -56,10 +56,10 @@ func TestClusterColorBg_AnsiMappedColorsAreFixed(t *testing.T) {
 	// give the user a stable palette-relative escape hatch when none of
 	// the theme accent colours fit. Mutating theme tokens must not
 	// touch them.
-	prev := ColorError
-	t.Cleanup(func() { ColorError = prev })
+	prev := ActiveTheme.Error
+	t.Cleanup(func() { ActiveTheme.Error = prev })
 
-	ColorError = "#abcdef"
+	ActiveTheme.Error = "#abcdef"
 	for _, name := range []string{"magenta", "cyan", "white", "gray"} {
 		bg, ok := clusterColorBg(name).(lipgloss.Color)
 		if assert.True(t, ok, "%s must resolve to a concrete lipgloss.Color", name) {
