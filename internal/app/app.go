@@ -194,11 +194,9 @@ type Model struct {
 	// CLI --read-only still wins over both.
 	contextROOverrides map[string]bool
 
-	// clusterColors holds per-context background-tint assignments set by the
-	// user via Ctrl+L on a row in the cluster picker. Persisted to
-	// $XDG_STATE_HOME/lfk/cluster-colors.yaml so the tint survives restarts.
-	// Absent key means "no tint"; values are validated against
-	// ui.ClusterColorNames at load and save time.
+	// clusterColors: per-context tint assignments set via Ctrl+L; persisted
+	// to $XDG_STATE_HOME/lfk/cluster-colors.yaml. Values validated against
+	// ui.ClusterColorNames; absent key = no tint.
 	clusterColors map[string]string
 
 	// clusterColorOverlay state: cursor position within the picker's color
@@ -737,16 +735,18 @@ type Model struct {
 	canIGroups            []model.CanIGroup
 	canIGroupCursor       int // selected group in left column
 	canIGroupScroll       int
-	canIResourceScroll    int       // scroll offset for the resource column
-	canISubject           string    // "" = current user, or "system:serviceaccount:ns:name"
-	canISubjectName       string    // display name for the subject ("Current User" or "sa/name")
-	canIServiceAccounts   []string  // cached SA list for the selector
-	canISearchActive      bool      // true when typing in search bar
-	canISearchInput       TextInput // current search input
-	canISearchQuery       string    // confirmed search query for filtering
-	canISubjectFilterMode bool      // true when typing in subject filter bar
-	canIAllowedOnly       bool      // true = show only allowed permissions
-	canINamespaces        []string  // namespaces used for SelfSubjectRulesReview
+	canIResourceScroll    int          // scroll offset for the resource column
+	canISubject           string       // "" = current user, or "system:serviceaccount:ns:name"
+	canISubjectName       string       // display name for the subject ("Current User" or "sa/name")
+	canIServiceAccounts   []string     // cached SA list for the selector
+	canISearchActive      bool         // true when typing in search bar
+	canISearchInput       TextInput    // current search input
+	canISearchQuery       string       // confirmed search query for filtering
+	canISubjectFilterMode bool         // true when typing in subject filter bar
+	canIAllowedOnly       bool         // true = show only allowed permissions
+	canINamespaces        []string     // namespaces used for SelfSubjectRulesReview
+	canIMode              canIViewMode // forward Can-I or reverse Who-Can (Tab toggle)
+	whoCan                whoCanState  // reverse-RBAC overlay state; see update_whocan.go
 
 	// Finalizer search overlay state.
 	finalizerSearchPattern      string

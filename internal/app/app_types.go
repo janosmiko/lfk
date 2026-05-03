@@ -8,6 +8,7 @@ import (
 
 	"github.com/hinshun/vt10x"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -71,6 +72,31 @@ const (
 	overlayPasteConfirm // y/n confirmation for multiline paste into search/filter
 	overlayBackgroundTasks
 	overlayClusterColor // pick a color tint for the highlighted cluster row
+)
+
+// whoCanState groups the reverse-RBAC ("Who-Can") fields so they live
+// together on Model without bloating the main struct over the
+// file-length cap. Mutated by handlers in update_whocan.go.
+type whoCanState struct {
+	verbCursor           int                 // index into ui.WhoCanVerbs
+	resource             string              // committed resource name (e.g. "pods")
+	resourceFilterActive bool                // true while typing into the / filter
+	resourceFilter       TextInput           // live filter buffer
+	subjects             []k8s.WhoCanSubject // last fetch result
+	subjectsScroll       int                 // scroll offset into subjects table
+	loading              bool                // fetch in flight
+}
+
+// canIViewMode toggles the Can-I overlay between its forward view
+// (subject → permissions, the original Can-I browser) and the
+// reverse view (verb + resource → subjects, "Who-Can"). Tab cycles
+// between them so users can pivot between "what can I do" and
+// "who else can do this" without re-opening the overlay.
+type canIViewMode int
+
+const (
+	canIModeForward canIViewMode = iota // subject -> permissions (Can-I)
+	canIModeWhoCan                      // verb + resource -> subjects (Who-Can)
 )
 
 // bookmarkOverlayMode tracks the interaction mode for the bookmark overlay.

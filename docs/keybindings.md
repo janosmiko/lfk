@@ -504,9 +504,35 @@ view to switch between the labels pane and the annotations pane.
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
+| `Tab` | Toggle to **Who-Can** (reverse RBAC: verb + resource → subjects) |
 | `q` / `Esc` | Clear search / close |
 
 The title bar shows the namespace scope (`ns:...`) used for the permission check, so you can see whether permissions are cluster-wide or namespaced. When checking a service account, its own namespace is used automatically. Users and groups are discovered from ClusterRoleBindings and RoleBindings.
+
+## Who-Can (Reverse RBAC)
+
+Reachable from the Can-I browser via `Tab`. Inverts the question: instead
+of "what can this subject do", asks "who can do this verb on this
+resource". Pure RBAC scan — walks every `ClusterRoleBinding` plus the
+`RoleBinding`s in the active namespace scope, resolves their roles, and
+lists subjects whose bound rules match.
+
+| Key | Action |
+|---|---|
+| `←` / `→` (or `h` / `l`) | Cycle the verb chip (`get` `list` `watch` `create` `update` `patch` `delete` `*`) |
+| `/` | Filter resource (Enter to commit, Esc to discard) |
+| `j` / `k` | Scroll subjects table |
+| `A` | Toggle namespace scope (all-namespaces ⇄ active namespace) |
+| `Tab` | Back to forward Can-I view |
+| `q` / `Esc` | Close overlay |
+
+The result table shows `SUBJECT | KIND | NAMESPACE | VIA`. The `VIA`
+column records the binding chain (`ClusterRoleBinding/foo → ClusterRole/bar`
+or `RoleBinding/ns/foo → Role/bar`) so a user can audit *why* a subject
+has access.
+
+ClusterRoleBindings always count regardless of namespace scope (cluster-wide
+grants apply everywhere); RoleBindings outside the active scope are excluded.
 
 ## Can-I Subject Selector
 

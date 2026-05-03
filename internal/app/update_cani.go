@@ -186,6 +186,14 @@ func (m *Model) canIVisibleGroups() []int {
 //
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Reverse-RBAC mode: dedicated dispatcher in update_whocan.go.
+	if m.canIMode == canIModeWhoCan {
+		return m.handleWhoCanKey(msg)
+	}
+	// Tab from forward (Can-I) view enters Who-Can mode.
+	if msg.String() == "tab" {
+		return m.enterWhoCanMode()
+	}
 	// If search is active, delegate to the search key handler.
 	if m.canISearchActive {
 		return m.handleCanISearchKey(msg)

@@ -386,8 +386,14 @@ func convertNetpolRule(r k8s.NetpolRule) ui.NetpolRuleEntry {
 	return re
 }
 
-// renderCanIOverlay renders the Can-I browser overlay on top of the given background.
+// renderCanIOverlay renders the Can-I browser overlay on top of the
+// given background. In Who-Can mode the same overlay frame hosts the
+// reverse-RBAC view via renderWhoCanInner — same dimensions, same wrap,
+// just different content.
 func (m Model) renderCanIOverlay(background string) string {
+	if m.canIMode == canIModeWhoCan {
+		return m.renderWhoCanOverlay(background)
+	}
 	visibleGroupIdxs := m.canIVisibleGroups()
 	groupNames := make([]string, len(visibleGroupIdxs))
 	for i, idx := range visibleGroupIdxs {

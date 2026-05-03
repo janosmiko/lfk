@@ -136,6 +136,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case previewServiceEndpointsLoadedMsg:
 		mdl := m.updatePreviewServiceEndpointsLoaded(msg)
 		return mdl, nil, true
+	case whoCanLoadedMsg:
+		mdl := m.updateWhoCanLoaded(msg)
+		return mdl, nil, true
 	case podMetricsEnrichedMsg:
 		mdl := m.updatePodMetricsEnriched(msg)
 		return mdl, nil, true
