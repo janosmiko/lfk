@@ -467,20 +467,13 @@ func secretPreviewCacheKey(ctx, ns, name string) string {
 	return ctx + "/" + ns + "/" + name
 }
 
-// serviceEndpointsCacheKey returns the cache key for the per-Service
-// endpoint rollup. Same shape as secretPreviewCacheKey so the two
-// caches can share the eviction story (clear on context switch / list
-// refresh) if we ever centralise it.
-func serviceEndpointsCacheKey(ctx, ns, name string) string {
-	return ctx + "/" + ns + "/" + name
-}
-
-// loadPreviewServiceEndpoints lazily fetches the EndpointSlice rollup
-// for the currently hovered Service at LevelResources. Mirrors
-// loadPreviewSecretData's pattern: cache hit emits an immediate
-// message so the handler can re-inject the column after a list refresh
-// without touching the network; cache miss dispatches a background
-// task tracked via bgtasks for the title-bar spinner.
+// loadPreviewServiceEndpoints fetches the EndpointSlice rollup for the
+// currently hovered Service at LevelResources. Always fetches fresh —
+// no cache, on purpose: pod churn (delete + recreate, rolling update,
+// HPA scale) changes the rollup constantly and a cache hit on stale
+// data would show pods as ready that aren't actually serving yet. The
+// cost is one extra List call per hover-settle, which the existing
+// preview debounce already keeps reasonable.
 //
 // Returns nil when:
 //   - the current resource type is not Service,
@@ -504,20 +497,6 @@ func (m Model) loadPreviewServiceEndpoints() tea.Cmd {
 	}
 	name := sel.Name
 	gen := m.requestGen
-
-	key := serviceEndpointsCacheKey(kctx, ns, name)
-	if cached := m.serviceEndpointsCache[key]; cached != nil {
-		return func() tea.Msg {
-			return previewServiceEndpointsLoadedMsg{
-				gen:  gen,
-				ctx:  kctx,
-				ns:   ns,
-				name: name,
-				data: cached,
-			}
-		}
-	}
-
 	reqCtx := m.reqCtx
 	return m.trackBgTask(
 		bgtasks.KindResourceList,

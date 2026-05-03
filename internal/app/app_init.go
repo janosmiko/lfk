@@ -68,7 +68,6 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
 		discoveringContexts:        make(map[string]bool),
 		secretPreviewCache:         make(map[string]*model.SecretData),
-		serviceEndpointsCache:      make(map[string]*k8s.ServiceEndpoints),
 		discoveryRefreshedContexts: make(map[string]bool),
 		allGroupsExpanded:          true,
 		warningEventsOnly:          true,

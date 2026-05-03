@@ -62,29 +62,26 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 	return m
 }
 
-// updatePreviewServiceEndpointsLoaded caches the rollup and injects an
-// "Endpoints" multi-line KV (plus a one-line "Backing Endpoints" summary
-// row) into every matching middleItems entry so the renderer surfaces
-// the per-endpoint info on the next paint. Same skeleton as the secret
-// data handler — stale gen check, no-cache-on-error, refresh
-// middleItems by index, bump middleItemsRev so the right pane redraws.
+// updatePreviewServiceEndpointsLoaded injects the rollup into every
+// matching middleItems entry as a "Backing Endpoints" summary KV plus
+// the multi-line "Endpoints" KV the renderer formats per-line.
+//
+// Deliberately NOT cached: pod churn changes the rollup constantly
+// (delete + recreate, rolling updates, HPA scale), and a cache hit on
+// stale data would render newly-restarted pods as ready before they
+// can actually serve. The fetch is gated by the preview debounce, so
+// the per-hover cost is bounded.
 func (m Model) updatePreviewServiceEndpointsLoaded(msg previewServiceEndpointsLoadedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response; the caller's m.previewLoading stays armed
 	}
 	if msg.err != nil {
 		logger.Info("preview service endpoints load error", "name", msg.name, "err", msg.err)
-		return m // do not cache failures
+		return m
 	}
 	if msg.data == nil {
 		return m
 	}
-
-	if m.serviceEndpointsCache == nil {
-		m.serviceEndpointsCache = make(map[string]*k8s.ServiceEndpoints)
-	}
-	key := serviceEndpointsCacheKey(msg.ctx, msg.ns, msg.name)
-	m.serviceEndpointsCache[key] = msg.data
 
 	m.middleItemsRev++
 	for i := range m.middleItems {
