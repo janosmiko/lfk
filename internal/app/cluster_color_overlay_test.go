@@ -40,33 +40,36 @@ func TestHandleKeyClusterColorPicker_AtClusterPickerOpensOverlay(t *testing.T) {
 	assert.Equal(t, "prod-eu", result.clusterColorOverlayContext, "overlay captures the highlighted context name")
 }
 
-// TestHandleKey_C_RoutesToClusterColorPicker is the regression test for
-// the bug the user hit with Ctrl+L and Ctrl+K: every Ctrl+letter we
-// tried got intercepted by either the terminal emulator (Ctrl+L =
+// TestHandleKey_ShiftL_RoutesToClusterColorPicker is the regression
+// test for the bug the user hit with Ctrl+L / Ctrl+K: every Ctrl+letter
+// we tried got intercepted by either the terminal emulator (Ctrl+L =
 // redraw screen) or the shell input layer (Ctrl+K = kill-to-eol in
-// readline/ZLE), so the binding moved to a bare "c". The handler
-// self-gates on Level=Clusters so the bare letter is a no-op in any
-// other context and doesn't shadow in-context behaviours.
-func TestHandleKey_C_RoutesToClusterColorPicker(t *testing.T) {
+// readline/ZLE). Capital "L" works because the picker only exists at
+// Level=Clusters where Logs has no resource to act on — the dispatch
+// case is gated on Level=Clusters and breaks out at deeper levels so
+// "L" continues to open Logs everywhere else.
+func TestHandleKey_ShiftL_RoutesToClusterColorPicker(t *testing.T) {
 	m := newClusterPickerModel(t)
-	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}})
 	result := ret.(Model)
 	assert.Equal(t, overlayClusterColor, result.overlay,
-		"'c' at the cluster picker must route through handleKey to the cluster-color overlay")
+		"Shift+L at the cluster picker must route through handleKey to the cluster-color overlay")
 	assert.Equal(t, "prod-eu", result.clusterColorOverlayContext)
 }
 
-// TestHandleKey_C_NoOpAboveClusterPicker ensures the handler's level
-// gate keeps the bare "c" key inert outside the cluster picker so it
-// doesn't accidentally consume keypresses elsewhere.
-func TestHandleKey_C_NoOpAboveClusterPicker(t *testing.T) {
+// TestHandleKey_ShiftL_FallsThroughAboveClusterPicker ensures the
+// dispatch's level gate lets "L" keep its Logs binding at deeper
+// levels — pressing "L" on a Pod must reach the Logs handler instead
+// of being eaten by the (gated) cluster-colour case.
+func TestHandleKey_ShiftL_FallsThroughAboveClusterPicker(t *testing.T) {
 	m := newClusterPickerModel(t)
 	m.nav.Level = model.LevelResources
 	m.nav.Context = "prod-eu"
 	before := m.overlay
-	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'L'}})
 	result := ret.(Model)
-	assert.Equal(t, before, result.overlay, "above the cluster picker, 'c' must not open the colour overlay")
+	assert.Equal(t, before, result.overlay,
+		"above the cluster picker, Shift+L must fall through the cluster-colour case so the existing Logs handler still fires")
 }
 
 func TestHandleKeyClusterColorPicker_AbovePickerLevelIsNoOp(t *testing.T) {

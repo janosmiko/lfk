@@ -149,14 +149,13 @@ func DefaultKeybindings() Keybindings {
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",
 
-		// Cluster color picker. Bare "c" rather than a Ctrl+ combination
-		// because Ctrl+L is intercepted by most terminals as "redraw
-		// screen", Ctrl+K and Ctrl+Y are used by readline / ZLE in many
-		// terminal-emulator setups, and Ctrl+H / Ctrl+J map to
-		// backspace / newline at the keyboard layer. The handler self-
-		// gates on Level=Clusters so plain "c" is a no-op everywhere
-		// else and doesn't shadow other in-context behaviours.
-		ClusterColorPicker: "c",
+		// Cluster color picker. Bound to Shift+L because the picker only
+		// exists at Level=Clusters and "L" is otherwise the Logs action
+		// (which has no meaning at the cluster picker — no pods to
+		// stream from). The dispatch case is gated on Level=Clusters
+		// and breaks out at deeper levels so "L" continues to open
+		// Logs everywhere else.
+		ClusterColorPicker: "L",
 	}
 }
 
