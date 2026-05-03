@@ -710,6 +710,7 @@ func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 		m.portForwardMgr.StopAll()
 	}
 	m.cancelAllTabLogStreams()
+	m.cancelInFlightRequests()
 	m.saveCurrentSession()
 	return m, tea.Quit
 }

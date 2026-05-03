@@ -403,6 +403,7 @@ func (m Model) handleQuitConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			m.portForwardMgr.StopAll()
 		}
 		m.cancelAllTabLogStreams()
+		m.cancelInFlightRequests()
 		m.saveCurrentSession()
 		return m, tea.Quit
 	case "n", "N", "esc", "q":

@@ -90,6 +90,21 @@ func (m *Model) cancelAndReset() {
 	m.reqCtx, m.reqCancel = context.WithCancel(context.Background())
 }
 
+// cancelInFlightRequests cancels every outstanding API request (lists,
+// discovery, YAML fetches, etc.) without creating a fresh context. Used
+// by the quit paths so in-flight goroutines abort with context.Canceled
+// rather than riding out kernel TCP timeouts on an unreachable cluster
+// — which can stretch the apparent "quit" wait to a minute or more
+// while the process waits for those goroutines to release the
+// resources held in main's deferred cleanup (informer wg, stderr-pipe
+// reader, etc.). cancelAndReset would also work here, but allocating a
+// fresh context we never use is wasted motion at shutdown.
+func (m *Model) cancelInFlightRequests() {
+	if m.reqCancel != nil {
+		m.reqCancel()
+	}
+}
+
 // applyPinnedGroups merges config-level pinned groups with per-context pinned groups
 // and sets model.PinnedGroups.
 func (m *Model) applyPinnedGroups() {

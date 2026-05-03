@@ -150,6 +150,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 			m.portForwardMgr.StopAll()
 		}
 		m.cancelAllTabLogStreams()
+		m.cancelInFlightRequests()
 		m.saveCurrentSession()
 		return m, tea.Quit
 
