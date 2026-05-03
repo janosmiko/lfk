@@ -157,7 +157,7 @@ moment you enter it — useful for "I am unmistakably in prod" feedback
 when a stray `D` would do real damage.
 
 - **Open the picker**: at the cluster picker, highlight a row and press
-  `Ctrl+L`. Same overlay opens from the action menu (`x` →
+  `Ctrl+K`. Same overlay opens from the action menu (`x` →
   "Set color…").
 - **Pick a color**: 8 named choices (`red`, `yellow`, `green`, `blue`,
   `magenta`, `cyan`, `white`, `gray`) plus `None` to clear. The cursor

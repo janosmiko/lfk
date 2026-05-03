@@ -435,9 +435,23 @@ func (m Model) renderTitleBar() string {
 	}
 	nsLabel := ui.NamespaceBadgeStyle.Render(" ns: " + nsText + " ")
 
+	// Resolve cluster-tint up front so the breadcrumb / gap / version
+	// segments below can use the tint as their *own* background instead
+	// of leaning on the outer wrapping style. Wrapping a string of
+	// pre-styled segments in an outer Background only fills cells that
+	// don't already have a background — and every segment here has one
+	// (barBg or a badge bg). Without per-segment overrides, only the
+	// wrapper's Padding cells would show the tint.
+	tint := m.clusterColorForActiveContext()
+	tintStyle := ui.ClusterColorTitleBarStyle(tint)
+
 	var versionLabel string
 	if m.version != "" {
-		versionLabel = ui.BarDimStyle.Render(" " + m.version)
+		if tint != "" {
+			versionLabel = tintStyle.Render(" " + m.version)
+		} else {
+			versionLabel = ui.BarDimStyle.Render(" " + m.version)
+		}
 	}
 
 	// Calculate available width for breadcrumb.
@@ -453,19 +467,32 @@ func (m Model) renderTitleBar() string {
 			bcText = string(runes[:maxBcWidth-2]) + "~ "
 		}
 	}
-	bc := ui.TitleBreadcrumbStyle.Render(bcText)
+	var bc string
+	if tint != "" {
+		// Bold black-on-bright matches ClusterColorTitleBarStyle and keeps
+		// the breadcrumb path legible against every named tint.
+		bc = tintStyle.Render(bcText)
+	} else {
+		bc = ui.TitleBreadcrumbStyle.Render(bcText)
+	}
 
 	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(readOnlyIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	gap := max(innerWidth-contentWidth, 0)
 
-	barContent := bc + watchIndicator + readOnlyIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + mutationProgress + tasksIndicator + nsLabel + versionLabel
-	if tint := m.clusterColorForActiveContext(); tint != "" {
-		// Inside a context with a stored colour: tint the whole title bar
-		// background so the operator cannot miss which environment they
-		// are about to act on. Renders the bar background directly with
-		// the cluster-color style and lets the existing badges keep their
-		// own foregrounds — the bold-on-bright contrast keeps them legible.
-		return ui.ClusterColorTitleBarStyle(tint).
+	var gapContent string
+	if tint != "" {
+		gapContent = tintStyle.Render(strings.Repeat(" ", gap))
+	} else {
+		gapContent = ui.BarDimStyle.Render(strings.Repeat(" ", gap))
+	}
+
+	barContent := bc + watchIndicator + readOnlyIndicator + gapContent + mutationProgress + tasksIndicator + nsLabel + versionLabel
+	if tint != "" {
+		// Outer wrap also uses the tint so the Padding(0, 1) cells share
+		// the bar background — the inner segments each carry the tint
+		// explicitly so it spans every column even with the [RO] / ns /
+		// watch badges layered on top with their own backgrounds.
+		return tintStyle.
 			Width(m.width).MaxWidth(m.width).MaxHeight(1).
 			Padding(0, 1).
 			Render(barContent)

@@ -61,13 +61,31 @@ func ClusterColorTitleBarStyle(name string) lipgloss.Style {
 		Bold(true)
 }
 
-// ClusterColorSwatch returns a 2-cell coloured block used as a row prefix in
-// the cluster picker. Empty / unknown name returns two dim-coloured cells so
-// rows without a colour stay aligned with rows that have one.
+// ClusterColorSwatch returns a 2-cell coloured block used inside the
+// picker overlay rows where the surrounding style sets only a foreground
+// (no competing background). Empty / unknown name returns two
+// dim-coloured cells so rows without a colour stay aligned with rows
+// that have one.
 func ClusterColorSwatch(name string) string {
 	code, ok := ansiCodeForClusterColor[name]
 	if !ok {
 		return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorDimmed)).Render("··")
 	}
 	return lipgloss.NewStyle().Foreground(lipgloss.Color(code)).Render("██")
+}
+
+// ClusterColorSwatchBg returns a 2-cell coloured block rendered as a
+// background tint on whitespace, intended for use inside the cluster
+// picker rows where the row may be wrapped in a selection-highlight
+// style. Background-as-colour wins over the outer style's foreground,
+// so the colour stays visible whether or not the row is selected.
+//
+// Empty / unknown name returns two regular spaces (no background), so
+// rows without a colour add no visual noise to the right edge.
+func ClusterColorSwatchBg(name string) string {
+	code, ok := ansiCodeForClusterColor[name]
+	if !ok {
+		return "  "
+	}
+	return lipgloss.NewStyle().Background(lipgloss.Color(code)).Render("  ")
 }

@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -37,6 +38,22 @@ func TestHandleKeyClusterColorPicker_AtClusterPickerOpensOverlay(t *testing.T) {
 	result := ret.(Model)
 	assert.Equal(t, overlayClusterColor, result.overlay, "Ctrl+L at Level=Clusters opens the picker overlay")
 	assert.Equal(t, "prod-eu", result.clusterColorOverlayContext, "overlay captures the highlighted context name")
+}
+
+// TestHandleKey_CtrlK_RoutesToClusterColorPicker is the regression test
+// for the bug the user hit when the default was Ctrl+L: most terminals
+// intercept Ctrl+L for "redraw screen" before the app sees the key, so
+// the binding moved to Ctrl+K which is terminal-safe across macOS
+// Terminal, iTerm2, Alacritty, Ghostty, and gnome-terminal. Going
+// through tea.KeyCtrlK (not the test-helper string fallback) catches
+// dispatch wiring failures the direct-handler tests miss.
+func TestHandleKey_CtrlK_RoutesToClusterColorPicker(t *testing.T) {
+	m := newClusterPickerModel(t)
+	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlK})
+	result := ret.(Model)
+	assert.Equal(t, overlayClusterColor, result.overlay,
+		"Ctrl+K at the cluster picker must route through handleKey to the cluster-color overlay")
+	assert.Equal(t, "prod-eu", result.clusterColorOverlayContext)
 }
 
 func TestHandleKeyClusterColorPicker_AbovePickerLevelIsNoOp(t *testing.T) {
