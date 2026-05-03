@@ -387,34 +387,34 @@ func TestCommandBarApplySuggestion(t *testing.T) {
 		expected   string
 	}{
 		{
-			name:       "empty input appends suggestion",
+			name:       "empty input appends suggestion with trailing space",
 			input:      "",
 			suggestion: "get",
-			expected:   "get",
+			expected:   "get ",
 		},
 		{
-			name:       "input ending with space appends",
+			name:       "input ending with space appends with trailing space",
 			input:      "kubectl ",
 			suggestion: "get",
-			expected:   "kubectl get",
+			expected:   "kubectl get ",
 		},
 		{
-			name:       "replaces last partial word",
+			name:       "replaces last partial word with trailing space",
 			input:      "kubectl ge",
 			suggestion: "get",
-			expected:   "kubectl get",
+			expected:   "kubectl get ",
 		},
 		{
-			name:       "single partial word replaces",
+			name:       "single partial word replaces with trailing space",
 			input:      "ge",
 			suggestion: "get",
-			expected:   "get",
+			expected:   "get ",
 		},
 		{
-			name:       "replaces last word of multi-word input",
+			name:       "replaces last word of multi-word input with trailing space",
 			input:      "kubectl get po",
 			suggestion: "pod",
-			expected:   "kubectl get pod",
+			expected:   "kubectl get pod ",
 		},
 	}
 	for _, tt := range tests {

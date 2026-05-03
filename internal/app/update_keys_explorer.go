@@ -349,7 +349,10 @@ func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
 			return m, scheduleStatusClear()
 		}
 		pinned := togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category)
-		_ = savePinnedState(m.pinnedState)
+		if err := savePinnedState(m.pinnedState); err != nil {
+			m.setStatusMessage(fmt.Sprintf("Failed to save pinned groups: %v", err), true)
+			return m, scheduleStatusClear()
+		}
 		m.applyPinnedGroups()
 		if pinned {
 			m.setStatusMessage(fmt.Sprintf("Pinned: %s", sel.Category), false)

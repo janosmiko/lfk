@@ -109,6 +109,9 @@ func (m Model) commandBarCycleForward(key string) (tea.Model, tea.Cmd) {
 
 func (m Model) commandBarCycleBackward(key string) (tea.Model, tea.Cmd) {
 	if len(m.commandBarSuggestions) > 0 {
+		if m.commandBarActionableSuggestionCount() == 0 {
+			return m, nil
+		}
 		m.commandBarCycleSuggestion(-1)
 		for m.commandBarSuggestions[m.commandBarSelectedSuggestion].Category == "status" {
 			m.commandBarCycleSuggestion(-1)
@@ -231,16 +234,17 @@ func (m Model) commandBarRefreshSuggestions() (Model, tea.Cmd) {
 }
 
 // commandBarApplySuggestion replaces the current partial word in the input
-// with the accepted suggestion, followed by a trailing space.
+// with the accepted suggestion, followed by a trailing space so the next
+// token is not glued to the accepted one.
 func (m Model) commandBarApplySuggestion(suggestion string) string {
 	input := m.commandBarInput.Value
 	// If input ends with a space, append the suggestion as a new word.
 	if strings.HasSuffix(input, " ") || input == "" {
-		return input + suggestion
+		return input + suggestion + " "
 	}
 	// Otherwise replace the last partial word.
 	if idx := strings.LastIndex(input, " "); idx >= 0 {
-		return input[:idx+1] + suggestion
+		return input[:idx+1] + suggestion + " "
 	}
-	return suggestion
+	return suggestion + " "
 }

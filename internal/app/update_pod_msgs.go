@@ -112,14 +112,20 @@ func (m Model) updatePodLogSelect(msg podLogSelectMsg) (tea.Model, tea.Cmd) {
 	}
 
 	if len(pods) == 1 {
-		// Only one pod, start log streaming directly.
+		// Only one pod, start log streaming directly. Preserve the originally
+		// requested action (e.g., "Tail Logs") instead of always dispatching
+		// "Logs".
 		m.actionCtx.name = pods[0].Name
 		m.actionCtx.kind = "Pod"
 		if pods[0].Namespace != "" {
 			m.actionCtx.namespace = pods[0].Namespace
 		}
+		action := m.pendingAction
+		if action == "" {
+			action = "Logs"
+		}
 		m.pendingAction = ""
-		return m.executeAction("Logs")
+		return m.executeAction(action)
 	}
 	// Multiple pods, show picker.
 	m.overlayItems = pods
@@ -175,14 +181,15 @@ func (m Model) updateLogContainersLoaded(msg logContainersLoadedMsg) (tea.Model,
 		return m, scheduleStatusClear()
 	}
 	if len(msg.containers) <= 1 {
-		// Only one container (or none), no need for a selector.
+		// Only one container (or none), no need for a selector — fall through
+		// to the log stream so the action does not stall on this fast path.
 		m.overlay = overlayNone
-		name := "this pod"
 		if len(msg.containers) == 1 {
-			name = msg.containers[0]
+			m.actionCtx.containerName = msg.containers[0]
+		} else {
+			m.actionCtx.containerName = ""
 		}
-		m.setStatusMessage(fmt.Sprintf("Only one container: %s", name), false)
-		return m, scheduleStatusClear()
+		return m, m.startLogStream()
 	}
 	m.logContainers = msg.containers
 	// Build overlay items with "All Containers" virtual item at the top.

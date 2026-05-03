@@ -232,6 +232,7 @@ func (m *Model) helpScrollToMatch() {
 	target := m.helpMatchLines[m.helpMatchIdx]
 	visible := m.helpVisibleLines()
 	m.helpScroll = max(target-visible/2, 0)
+	m.clampHelpScroll()
 }
 
 // helpCurrentMatchLine returns the line index in the current

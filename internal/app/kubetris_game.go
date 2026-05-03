@@ -6,7 +6,13 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+
+	"github.com/janosmiko/lfk/internal/logger"
 )
+
+// tPieceIndex is the index of the T-shaped piece in the tetrominoes table.
+// T-spin detection is only valid for this piece.
+const tPieceIndex = 2
 
 func clearLabel(lines int, tSpin bool) string {
 	if tSpin {
@@ -73,7 +79,7 @@ func (g *kubetrisGame) clearLines() int {
 }
 
 func (g *kubetrisGame) checkTSpin() bool {
-	if g.currentPiece != 2 {
+	if g.currentPiece != tPieceIndex {
 		return false
 	}
 	if !g.lastActionWasRotation {
@@ -272,7 +278,10 @@ func (g *kubetrisGame) saveHighScore() {
 	}
 	dir := filepath.Dir(path)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
+		logger.Error("kubetris: failed to create high score dir", "dir", dir, "error", err)
 		return
 	}
-	_ = os.WriteFile(path, fmt.Appendf(nil, "%d\n", g.highScore), 0o644)
+	if err := os.WriteFile(path, fmt.Appendf(nil, "%d\n", g.highScore), 0o644); err != nil {
+		logger.Error("kubetris: failed to write high score", "path", path, "error", err)
+	}
 }

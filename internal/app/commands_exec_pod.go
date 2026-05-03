@@ -247,10 +247,13 @@ func nodeShellOverrides(podName, nodeName string) (string, error) {
 	return string(b), nil
 }
 
-func nodeShellArgs(podName, kctx, overrides string) []string {
+func nodeShellArgs(podName, namespace, kctx, overrides string) []string {
+	if namespace == "" {
+		namespace = "default"
+	}
 	return []string{
 		"run", podName,
-		"-n", "default",
+		"-n", namespace,
 		"--rm", "-it", "--restart=Never",
 		"--image=busybox",
 		"--context", kctx,
@@ -277,7 +280,7 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 		}
 	}
 
-	args := nodeShellArgs(podName, m.kubectlContext(ctx), overrides)
+	args := nodeShellArgs(podName, m.actionNamespace(), m.kubectlContext(ctx), overrides)
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)

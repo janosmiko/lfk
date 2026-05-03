@@ -202,6 +202,8 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 		// tick and flipped to "n/a" on every subsequent tick, because the
 		// source data was gone.
 		removeCols := map[string]bool{
+			"CPU":     true,
+			"MEM":     true,
 			"CPU Use": true,
 			"Mem Use": true,
 			"CPU/R":   true, "CPU/L": true, "MEM/R": true, "MEM/L": true,

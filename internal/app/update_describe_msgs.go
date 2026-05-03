@@ -87,6 +87,9 @@ func (m Model) updateExplainRecursive(msg explainRecursiveMsg) (tea.Model, tea.C
 		return m, scheduleStatusClear()
 	}
 	if len(msg.matches) == 0 {
+		m.explainRecursiveResults = nil
+		m.explainRecursiveCursor = 0
+		m.explainRecursiveScroll = 0
 		m.setStatusMessage("No fields found", true)
 		return m, scheduleStatusClear()
 	}

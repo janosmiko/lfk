@@ -133,7 +133,7 @@ func TestNodeShellArgsUseRunWithCleanOverrides(t *testing.T) {
 	overrides, err := nodeShellOverrides(podName, "node-1")
 	require.NoError(t, err)
 
-	args := nodeShellArgs(podName, "test-ctx", overrides)
+	args := nodeShellArgs(podName, "test-ns", "test-ctx", overrides)
 
 	require.Equal(t, "run", args[0], "must use `kubectl run`, not `kubectl debug`")
 	require.Equal(t, podName, args[1])
@@ -143,6 +143,8 @@ func TestNodeShellArgsUseRunWithCleanOverrides(t *testing.T) {
 	assert.Contains(t, args, "--image=busybox")
 	assert.Contains(t, args, "--context")
 	assert.Contains(t, args, "test-ctx")
+	assert.Contains(t, args, "-n")
+	assert.Contains(t, args, "test-ns", "namespace must be threaded through, not pinned to default")
 
 	for _, a := range args {
 		assert.NotEqual(t, "debug", a, "kubectl debug pulls in /host mount which breaks SELinux")
@@ -207,6 +209,15 @@ func TestNodeShellArgsUseRunWithCleanOverrides(t *testing.T) {
 	for _, short := range []string{"-t", "-m", "-u", "-i", "-n", "-p"} {
 		assert.NotContains(t, c.Command, short, "expected long flag instead of %s", short)
 	}
+}
+
+// nodeShellArgs falls back to the "default" namespace when the caller passes
+// an empty string, so the helper stays safe even before action context is set.
+func TestNodeShellArgsEmptyNamespaceFallsBackToDefault(t *testing.T) {
+	overrides, err := nodeShellOverrides("p", "n")
+	require.NoError(t, err)
+	args := nodeShellArgs("p", "", "ctx", overrides)
+	assert.Contains(t, args, "default")
 }
 
 func TestPush3ExecKubectlDescribeNoKubectl(t *testing.T) {

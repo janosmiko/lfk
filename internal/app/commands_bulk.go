@@ -252,6 +252,7 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 	return func() tea.Msg {
 		defer registry.Finish(id)
 		var succeeded, failed int
+		var errors []string
 		for i, item := range items {
 			if ctx.Err() != nil {
 				break
@@ -274,11 +275,12 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 			}
 			if err != nil {
 				failed++
+				errors = append(errors, fmt.Sprintf("%s: %v", item.Name, err))
 			} else {
 				succeeded++
 			}
 			registry.UpdateProgress(id, i+1, total)
 		}
-		return bulkActionResultMsg{succeeded: succeeded, failed: failed}
+		return bulkActionResultMsg{succeeded: succeeded, failed: failed, errors: errors}
 	}
 }

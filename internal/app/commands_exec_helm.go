@@ -300,7 +300,7 @@ func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
 		}
 	}
 
-	ns := m.actionCtx.namespace
+	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
 	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)

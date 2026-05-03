@@ -779,14 +779,31 @@ func TestUpdatePodSelectMultiplePods(t *testing.T) {
 
 // --- logContainersLoadedMsg ---
 
+// When only one container exists, the handler must skip the picker AND start
+// the log stream — earlier behavior stalled with just a status message,
+// requiring the user to manually retry the action.
 func TestUpdateLogContainersLoadedSingleContainer(t *testing.T) {
-	m := baseModel()
+	m := newTestModelWithClient(t)
+	m.actionCtx = actionContext{kind: "Pod", name: "my-pod", namespace: "default", context: "test-ctx"}
 
 	result, cmd := m.Update(logContainersLoadedMsg{containers: []string{"app"}})
 	mdl := result.(Model)
 	assert.Equal(t, overlayNone, mdl.overlay)
-	assert.Contains(t, mdl.statusMessage, "app")
-	assert.NotNil(t, cmd) // scheduleStatusClear
+	assert.Equal(t, "app", mdl.actionCtx.containerName, "containerName must be set so the log stream targets the right container")
+	assert.NotNil(t, cmd, "log stream command must be returned, not just a status message")
+}
+
+// Zero-container case: clear the container filter and still kick off the
+// stream so kubectl surfaces the empty-pod error to the user.
+func TestUpdateLogContainersLoadedNoContainers(t *testing.T) {
+	m := newTestModelWithClient(t)
+	m.actionCtx = actionContext{kind: "Pod", name: "my-pod", namespace: "default", context: "test-ctx", containerName: "stale"}
+
+	result, cmd := m.Update(logContainersLoadedMsg{containers: nil})
+	mdl := result.(Model)
+	assert.Equal(t, overlayNone, mdl.overlay)
+	assert.Equal(t, "", mdl.actionCtx.containerName, "stale containerName must be cleared")
+	assert.NotNil(t, cmd)
 }
 
 // The handler is the one that opens the overlay so the user never sees

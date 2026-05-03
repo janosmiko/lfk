@@ -59,7 +59,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
-			logger.Error("kubectl force delete failed", "cmd", cmd.String(), "error", err, "output", string(output))
+			logger.Error("kubectl force delete failed", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx, "error", err)
 			return actionResultMsg{err: fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Force deleted %s/%s", rt.Resource, name)}
@@ -93,7 +93,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
 		if output, err := cmd.CombinedOutput(); err != nil {
-			logger.Error("kubectl patch failed", "cmd", cmd.String(), "error", err, "output", string(output))
+			logger.Error("kubectl patch failed", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx, "error", err)
 			return actionResultMsg{err: fmt.Errorf("%w: %s", err, strings.TrimSpace(string(output)))}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Finalizers removed from %s/%s", rt.Resource, name)}
@@ -120,7 +120,7 @@ func (m Model) vulnScanImage(image string) tea.Cmd {
 		output, cmdErr := cmd.CombinedOutput()
 		content := cleanANSI(strings.TrimSpace(string(output)))
 		if cmdErr != nil {
-			logger.Error("trivy scan failed", "cmd", cmd.String(), "error", cmdErr, "output", content)
+			logger.Error("trivy scan failed", "image", image, "error", cmdErr)
 			if content == "" {
 				return describeLoadedMsg{title: title, err: fmt.Errorf("trivy scan failed: %w", cmdErr)}
 			}
@@ -215,7 +215,7 @@ func (m Model) execKubectlDrain() tea.Cmd {
 	logExecCmd("Running kubectl command", cmd)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
-			logger.Error("kubectl drain failed", "cmd", cmd.String(), "error", err)
+			logger.Error("kubectl drain failed", "node", name, "context", m.actionCtx.context, "error", err)
 			return actionResultMsg{err: fmt.Errorf("drain %s: %w", name, err)}
 		}
 		return actionResultMsg{message: fmt.Sprintf("Drained %s", name)}
@@ -238,7 +238,7 @@ func (m Model) execKubectlNodeCmd(subcmd string) tea.Cmd {
 		logExecCmd("Running kubectl command", cmd)
 		output, err := cmd.CombinedOutput()
 		if err != nil {
-			logger.Error("kubectl node command failed", "cmd", cmd.String(), "error", err, "output", string(output))
+			logger.Error("kubectl node command failed", "subcmd", subcmd, "name", name, "context", m.actionCtx.context, "error", err)
 			return actionResultMsg{err: fmt.Errorf("%s %s: %s", subcmd, name, strings.TrimSpace(string(output)))}
 		}
 		return actionResultMsg{message: strings.TrimSpace(string(output))}
@@ -268,7 +268,7 @@ func (m Model) execCustomAction(expandedCmd string) tea.Cmd {
 
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
-			logger.Error("Custom action failed", "cmd", cmd.String(), "error", err)
+			logger.Error("Custom action failed", "context", ctx, "error", err)
 			return actionResultMsg{err: fmt.Errorf("custom action failed: %w", err)}
 		}
 		return actionResultMsg{message: "Custom action completed"}

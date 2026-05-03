@@ -233,6 +233,12 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.scaleInput.Clear()
 			return m, scheduleStatusClear()
 		}
+		if m.readOnly {
+			m.overlay = overlayNone
+			m.scaleInput.Clear()
+			m.setStatusMessage(readOnlyBlockedMessage("Resize PVC"), true)
+			return m, scheduleStatusClear()
+		}
 		m.overlay = overlayNone
 		m.loading = true
 		m.addLogEntry("DBG", fmt.Sprintf("Resizing PVC %s to %s in %s", m.actionCtx.name, newSize, m.actionNamespace()))
