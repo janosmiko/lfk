@@ -486,11 +486,18 @@ type previewSecretDataLoadedMsg struct {
 // Same gen guard as the secret variant — handlers discard messages
 // where gen != m.requestGen so a fresh hover doesn't get clobbered by
 // the response from the previous one.
+//
+// fromCache distinguishes a stale-while-revalidate cache emit from a
+// fresh-fetch response. Cache emits use the flag to decline writing
+// the cache and to skip the inject when a fresher fetch has already
+// updated it (the unlikely race where the fresh response beats the
+// cache emit's tea.Batch goroutine to the runtime).
 type previewServiceEndpointsLoadedMsg struct {
-	gen  uint64
-	ctx  string
-	ns   string
-	name string
-	data *k8s.ServiceEndpoints
-	err  error
+	gen       uint64
+	ctx       string
+	ns        string
+	name      string
+	data      *k8s.ServiceEndpoints
+	err       error
+	fromCache bool
 }
