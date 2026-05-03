@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -22,16 +24,47 @@ func (m Model) clusterColorForActiveContext() string {
 	return m.clusterColors[m.nav.Context]
 }
 
-// clusterColorPickerNoneIndex is the cursor index of the "None / clear"
-// row in the picker — always one past the last named colour.
-func clusterColorPickerNoneIndex() int { return len(ui.ClusterColorNames) }
+// filteredClusterColorNames returns the colour-name list filtered by the
+// current overlay filter input. Filter is a case-insensitive substring
+// match. Empty filter returns all names. The "None" row is appended by
+// the caller — it stays anchored at the bottom regardless of the
+// filter so users can always reach the clear-action.
+func (m Model) filteredClusterColorNames() []string {
+	q := strings.ToLower(strings.TrimSpace(m.clusterColorFilter.Value))
+	if q == "" {
+		out := make([]string, len(ui.ClusterColorNames))
+		copy(out, ui.ClusterColorNames)
+		return out
+	}
+	out := make([]string, 0, len(ui.ClusterColorNames))
+	for _, n := range ui.ClusterColorNames {
+		if strings.Contains(n, q) {
+			out = append(out, n)
+		}
+	}
+	return out
+}
+
+// clusterColorOverlayRowCount returns the total number of rows the
+// overlay will render: filtered colours plus the "None" row.
+func (m Model) clusterColorOverlayRowCount() int {
+	return len(m.filteredClusterColorNames()) + 1
+}
+
+// clusterColorOverlayNoneIndex returns the cursor index of the "None"
+// row in the *currently filtered* view (always one past the last
+// matching colour).
+func (m Model) clusterColorOverlayNoneIndex() int {
+	return len(m.filteredClusterColorNames())
+}
 
 // handleKeyClusterColorPicker opens the cluster-color overlay over the
-// highlighted row in the cluster picker. Only valid at Level=Clusters; at
-// any other level the keypress is silently ignored so users who stash
-// Ctrl+L muscle memory don't get confused by half-applied state inside a
-// context. Pre-seeds the cursor on the cluster's current color (or the
-// "None" row when the cluster has no color set yet).
+// highlighted row in the cluster picker. Only valid at Level=Clusters;
+// at any other level the keypress is silently ignored so users who
+// stash the muscle memory don't get confused by half-applied state
+// inside a context. Pre-seeds the cursor on the cluster's current
+// colour (or the "None" row when the cluster has no colour set yet),
+// and clears any leftover filter from a previous open.
 func (m Model) handleKeyClusterColorPicker() (tea.Model, tea.Cmd) {
 	if m.nav.Level != model.LevelClusters {
 		return m, nil
@@ -42,7 +75,9 @@ func (m Model) handleKeyClusterColorPicker() (tea.Model, tea.Cmd) {
 	}
 	m.overlay = overlayClusterColor
 	m.clusterColorOverlayContext = sel.Name
-	m.clusterColorOverlayCursor = clusterColorPickerNoneIndex()
+	m.clusterColorFilter.Clear()
+	m.clusterColorFilterMode = false
+	m.clusterColorOverlayCursor = m.clusterColorOverlayNoneIndex()
 	if current, ok := m.clusterColors[sel.Name]; ok {
 		for i, c := range ui.ClusterColorNames {
 			if c == current {
@@ -55,20 +90,38 @@ func (m Model) handleKeyClusterColorPicker() (tea.Model, tea.Cmd) {
 }
 
 // handleClusterColorOverlayKey services key events while the picker is
-// open. Up/Down move the cursor with wrap-around, Enter applies the
-// highlighted color (deleting the entry when the cursor is on the "None"
-// row), Esc cancels without persisting. Other keys are ignored so the
-// overlay can't be dismissed by accident.
+// open. Splits between filter-input mode (typing into the / filter)
+// and normal mode (navigation / selection). The hint bar sits on the
+// status bar via overlayHintBarSelector — no inline hints in the
+// overlay box itself.
 func (m Model) handleClusterColorOverlayKey(key string) (tea.Model, tea.Cmd) {
-	rows := clusterColorPickerNoneIndex() + 1
+	if m.clusterColorFilterMode {
+		return m.handleClusterColorOverlayFilterKey(key), nil
+	}
+	rows := m.clusterColorOverlayRowCount()
 	switch key {
 	case "down", "j":
-		m.clusterColorOverlayCursor = (m.clusterColorOverlayCursor + 1) % rows
+		if rows > 0 {
+			m.clusterColorOverlayCursor = (m.clusterColorOverlayCursor + 1) % rows
+		}
 		return m, nil
 	case "up", "k":
-		m.clusterColorOverlayCursor = (m.clusterColorOverlayCursor - 1 + rows) % rows
+		if rows > 0 {
+			m.clusterColorOverlayCursor = (m.clusterColorOverlayCursor - 1 + rows) % rows
+		}
+		return m, nil
+	case "/":
+		m.clusterColorFilterMode = true
 		return m, nil
 	case "esc":
+		// First Esc clears an active filter; second Esc closes the overlay
+		// (mirrors the colorscheme overlay pattern so muscle memory carries
+		// across pickers).
+		if m.clusterColorFilter.Value != "" {
+			m.clusterColorFilter.Clear()
+			m.clusterColorOverlayCursor = m.clusterColorOverlayNoneIndex()
+			return m, nil
+		}
 		m.overlay = overlayNone
 		m.clusterColorOverlayContext = ""
 		return m, nil
@@ -80,6 +133,32 @@ func (m Model) handleClusterColorOverlayKey(key string) (tea.Model, tea.Cmd) {
 		return mdl, nil
 	}
 	return m, nil
+}
+
+// handleClusterColorOverlayFilterKey processes keystrokes while the
+// user is typing into the / filter input. Enter / Esc exit the filter
+// mode (Enter keeps the current filter, Esc clears it); other keys
+// edit the buffer via the shared FilterInput helper.
+func (m Model) handleClusterColorOverlayFilterKey(key string) Model {
+	action := handleFilterKey(&m.clusterColorFilter, key)
+	switch action {
+	case filterContinue, filterNavigate:
+		// Reset cursor to the first row of the new filtered view so the
+		// highlight doesn't land on a stale index when the list shrinks.
+		m.clusterColorOverlayCursor = 0
+	case filterAccept:
+		m.clusterColorFilterMode = false
+	case filterEscape:
+		m.clusterColorFilter.Clear()
+		m.clusterColorFilterMode = false
+		m.clusterColorOverlayCursor = m.clusterColorOverlayNoneIndex()
+	case filterClose:
+		m.clusterColorFilter.Clear()
+		m.clusterColorFilterMode = false
+		m.overlay = overlayNone
+		m.clusterColorOverlayContext = ""
+	}
+	return m
 }
 
 // applyClusterColorSelection writes the cursor's color to the in-memory
@@ -99,11 +178,13 @@ func (m Model) applyClusterColorSelection() (Model, bool) {
 	if m.clusterColors == nil {
 		m.clusterColors = make(map[string]string)
 	}
+	filtered := m.filteredClusterColorNames()
+	noneIdx := len(filtered)
 	var newColor string
-	if m.clusterColorOverlayCursor == clusterColorPickerNoneIndex() {
+	if m.clusterColorOverlayCursor == noneIdx {
 		delete(m.clusterColors, ctx)
-	} else if m.clusterColorOverlayCursor >= 0 && m.clusterColorOverlayCursor < len(ui.ClusterColorNames) {
-		newColor = ui.ClusterColorNames[m.clusterColorOverlayCursor]
+	} else if m.clusterColorOverlayCursor >= 0 && m.clusterColorOverlayCursor < len(filtered) {
+		newColor = filtered[m.clusterColorOverlayCursor]
 		m.clusterColors[ctx] = newColor
 	}
 	// Stamp the row in m.middleItems by index so the swatch updates
@@ -127,5 +208,7 @@ func (m Model) applyClusterColorSelection() (Model, bool) {
 	}
 	m.overlay = overlayNone
 	m.clusterColorOverlayContext = ""
+	m.clusterColorFilter.Clear()
+	m.clusterColorFilterMode = false
 	return m, saveErr != nil
 }

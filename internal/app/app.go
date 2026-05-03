@@ -209,6 +209,16 @@ type Model struct {
 	// against — captured at open so a later refresh of m.middleItems can't
 	// retarget the save to the wrong row.
 	clusterColorOverlayContext string
+	// clusterColorFilter holds the in-overlay / filter input so the picker
+	// can narrow the visible colour list. Mirrors the schemeFilter /
+	// templateFilter pattern so the standard FilterInput / handleFilterKey
+	// helpers handle paste, ctrl+w, etc. uniformly.
+	clusterColorFilter TextInput
+	// clusterColorFilterMode is true while the user is typing into the
+	// filter input; in this mode every keystroke goes to the input and
+	// navigation keys (j/k/enter) are deferred until Enter or Esc exits
+	// filter mode.
+	clusterColorFilterMode bool
 
 	// Help screen state.
 	helpScroll       int

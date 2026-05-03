@@ -16,28 +16,44 @@ const clusterColorPickerNoneRow = "None  (clear)"
 // raw, unwrapped content; the caller is expected to wrap it in
 // OverlayStyle (renderOverlay does this for every standard overlay).
 //
+// Hints live on the bottom-of-screen status bar (overlayHintBarSelector
+// in internal/app/overlay_hintbar.go) — there is no inline hint row
+// here so the overlay matches every other selector in lfk.
+//
 // Layout:
 //
 //	Set color for prod-eu
+//	/ red█                     ← filter input (visible only when typing or non-empty)
 //
 //	▶ red          █████
 //	  yellow       █████
 //	  ...
 //	  None  (clear)
 //
-//	↑↓ navigate | enter: apply | esc/c: cancel
-//
-// The cursor uses a "▶" prefix marker rather than a row-wide background
-// highlight so the swatch's own colour stays visible without fighting
-// an outer style. The swatch is rendered with the named colour as a
-// *background* on five spaces so it shows up even when the terminal
-// renders foregrounds as muted.
-func RenderClusterColorOverlay(contextName string, cursor int) string {
+// names is the post-filter list of colour names, cursor is the row
+// index within (names + the trailing "None" row), filter is the
+// current filter buffer (visible regardless of mode so the user can
+// see what's narrowing the list), filterMode toggles the cursor glyph
+// after the filter so they know typing is active.
+func RenderClusterColorOverlay(contextName string, names []string, cursor int, filter string, filterMode bool) string {
 	titleText := "Set color for " + contextName
 	if contextName == "" {
 		titleText = "Set cluster color"
 	}
 	title := OverlayTitleStyle.Render(titleText)
+
+	// Filter line: matches the OverlayFilterStyle / OverlayDimStyle
+	// pattern used by RenderColorschemeOverlay so the picker's filter
+	// row looks identical to every other overlay's.
+	var filterLine string
+	switch {
+	case filterMode:
+		filterLine = OverlayFilterStyle.Render("/ " + filter + "█")
+	case filter != "":
+		filterLine = OverlayFilterStyle.Render("/ " + filter)
+	default:
+		filterLine = OverlayDimStyle.Render("/ to filter")
+	}
 
 	const (
 		labelW   = 14 // "None  (clear)" is the longest entry; magenta etc fit comfortably
@@ -46,14 +62,17 @@ func RenderClusterColorOverlay(contextName string, cursor int) string {
 		markerNo = "  "
 	)
 
-	rows := make([]string, 0, len(ClusterColorNames)+1)
-	for i, name := range ClusterColorNames {
-		rows = append(rows, formatClusterColorRow(name, name, labelW, swatchW, i == cursor, markerOn, markerNo))
+	rows := make([]string, 0, len(names)+1)
+	if len(names) == 0 {
+		rows = append(rows, OverlayDimStyle.Render("  No matching colors"))
+	} else {
+		for i, name := range names {
+			rows = append(rows, formatClusterColorRow(name, name, labelW, swatchW, i == cursor, markerOn, markerNo))
+		}
 	}
-	rows = append(rows, formatClusterColorRow("", clusterColorPickerNoneRow, labelW, swatchW, cursor == len(ClusterColorNames), markerOn, markerNo))
+	rows = append(rows, formatClusterColorRow("", clusterColorPickerNoneRow, labelW, swatchW, cursor == len(names), markerOn, markerNo))
 
-	hints := OverlayDimStyle.Render("↑↓ navigate | enter: apply | esc/c: cancel")
-	return title + "\n" + strings.Join(rows, "\n") + "\n\n" + hints
+	return title + "\n" + filterLine + "\n\n" + strings.Join(rows, "\n")
 }
 
 // formatClusterColorRow assembles one picker row as marker + label +

@@ -174,6 +174,110 @@ func TestClusterColorOverlay_NoneRowClearsAndPersists(t *testing.T) {
 	assert.False(t, persistedPresent, "deletion is persisted to the state file")
 }
 
+func TestClusterColorOverlay_SlashEntersFilterMode(t *testing.T) {
+	m := newClusterPickerModel(t)
+	ret, _ := m.handleKeyClusterColorPicker()
+	m = ret.(Model)
+	require.False(t, m.clusterColorFilterMode, "filter mode is off by default when the overlay opens")
+
+	ret, _ = m.handleClusterColorOverlayKey("/")
+	result := ret.(Model)
+	assert.True(t, result.clusterColorFilterMode,
+		"`/` flips into filter-input mode so the next keystrokes go into the filter buffer")
+}
+
+func TestClusterColorOverlay_FilterNarrowsList(t *testing.T) {
+	m := newClusterPickerModel(t)
+	ret, _ := m.handleKeyClusterColorPicker()
+	m = ret.(Model)
+
+	// Type "/", then two keys spelling "ll" — substring match against
+	// the names list narrows down to "yellow" only. Single letters
+	// match too liberally for an assertable test ("y" matches yellow,
+	// cyan, gray) so use a longer disambiguating substring.
+	ret, _ = m.handleClusterColorOverlayKey("/")
+	m = ret.(Model)
+	ret, _ = m.handleClusterColorOverlayKey("l")
+	m = ret.(Model)
+	ret, _ = m.handleClusterColorOverlayKey("l")
+	result := ret.(Model)
+
+	filtered := result.filteredClusterColorNames()
+	assert.Equal(t, []string{"yellow"}, filtered,
+		"substring filter must narrow the visible colour list to matches against the colour names")
+	assert.Equal(t, 0, result.clusterColorOverlayCursor,
+		"cursor resets to the first row when the filter changes so the highlight doesn't land on a stale index")
+}
+
+func TestClusterColorOverlay_FilterModeEscClearsFilter(t *testing.T) {
+	m := newClusterPickerModel(t)
+	ret, _ := m.handleKeyClusterColorPicker()
+	m = ret.(Model)
+	ret, _ = m.handleClusterColorOverlayKey("/")
+	m = ret.(Model)
+	ret, _ = m.handleClusterColorOverlayKey("y")
+	m = ret.(Model)
+
+	ret, _ = m.handleClusterColorOverlayKey("esc")
+	result := ret.(Model)
+	assert.False(t, result.clusterColorFilterMode, "Esc in filter mode exits filter mode")
+	assert.Empty(t, result.clusterColorFilter.Value, "Esc in filter mode clears the buffer")
+	assert.Equal(t, overlayClusterColor, result.overlay,
+		"Esc in filter mode does NOT close the overlay — only clears the filter")
+}
+
+func TestClusterColorOverlay_NormalModeEscClearsFilterFirstThenCloses(t *testing.T) {
+	// Mirrors the colorscheme overlay's two-stage Esc: with a filter
+	// active, first Esc clears the filter; second Esc closes.
+	m := newClusterPickerModel(t)
+	ret, _ := m.handleKeyClusterColorPicker()
+	m = ret.(Model)
+	ret, _ = m.handleClusterColorOverlayKey("/")
+	m = ret.(Model)
+	ret, _ = m.handleClusterColorOverlayKey("y")
+	m = ret.(Model)
+	// Exit filter mode with Enter so we're back in normal mode but with
+	// the filter buffer still set.
+	ret, _ = m.handleClusterColorOverlayKey("enter")
+	m = ret.(Model)
+	require.NotEmpty(t, m.clusterColorFilter.Value, "filter buffer survives an Enter from filter mode")
+
+	// First Esc in normal mode: clears the filter, leaves overlay open.
+	ret, _ = m.handleClusterColorOverlayKey("esc")
+	m = ret.(Model)
+	assert.Empty(t, m.clusterColorFilter.Value)
+	assert.Equal(t, overlayClusterColor, m.overlay)
+
+	// Second Esc: closes.
+	ret, _ = m.handleClusterColorOverlayKey("esc")
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay)
+}
+
+func TestClusterColorOverlay_FilterAffectsApply(t *testing.T) {
+	// With the filter narrowed to "yellow", cursor=0 must apply
+	// "yellow", not "red" (which would be index 0 in the unfiltered
+	// list). Catches the off-by-everything bug where Apply would read
+	// from the unfiltered slice.
+	m := newClusterPickerModel(t)
+	ret, _ := m.handleKeyClusterColorPicker()
+	m = ret.(Model)
+	ret, _ = m.handleClusterColorOverlayKey("/")
+	m = ret.(Model)
+	ret, _ = m.handleClusterColorOverlayKey("y")
+	m = ret.(Model)
+	// Exit filter mode but keep the filter active.
+	ret, _ = m.handleClusterColorOverlayKey("enter")
+	m = ret.(Model)
+	// Cursor is at 0 = first filtered match = "yellow".
+	require.Equal(t, 0, m.clusterColorOverlayCursor)
+
+	ret, _ = m.handleClusterColorOverlayKey("enter")
+	result := ret.(Model)
+	assert.Equal(t, "yellow", result.clusterColors["prod-eu"],
+		"Apply with a filter active must read from the filtered list, not from ClusterColorNames directly")
+}
+
 func TestClusterColorOverlay_EscDoesNotMutate(t *testing.T) {
 	m := newClusterPickerModel(t)
 	m.clusterColors = map[string]string{"prod-eu": "yellow"}
