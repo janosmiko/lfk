@@ -1,117 +1,183 @@
 # Views and Overlays
 
-Reference list of every full-screen view and overlay lfk renders. Use this
-to find the responsible code path when changing UI behavior, to keep the
-help screen in sync, or to remember which mode owns which keymap.
+Reference list of every view, fullscreen flag, and overlay lfk renders.
+Use this when:
 
-The two concepts are distinct in code:
+- finding the responsible code path while changing UI behavior,
+- keeping the help screen in sync, or
+- remembering which mode owns which keymap.
 
-- A **view** is a top-level screen mode. Only one is active at a time and
-  it owns the keyboard. Switching between views replaces the visible UI
-  (e.g. opening logs leaves the explorer entirely).
-- An **overlay** is a modal panel that floats over the current view. The
+## Concepts
+
+lfk's UI is built from three layered concepts:
+
+- **View** (`viewMode`) — top-level screen mode. Only one is active at a
+  time and it owns the keyboard. Switching between views replaces the
+  visible UI (e.g. opening logs leaves the explorer entirely). Stored
+  per tab on `TabState.mode` and mirrored to `Model.mode`.
+- **Fullscreen flag** — boolean on `Model` (and sometimes `TabState`)
+  that lets a sub-pane take the whole screen *without* leaving
+  `modeExplorer`. Multiple flags can coexist; precedence is decided in
+  `viewExplorerColumns` (see [`internal/app/view.go`](../internal/app/view.go)).
+- **Overlay** — modal panel that floats over the current view. The
   underlying view is dimmed but stays mounted. Overlays own the keyboard
-  while open and dismiss back to the view they appeared over.
+  while open and dismiss back to the view they appeared over. Most are
+  typed via `overlayKind` and mutually exclusive; a few live as
+  independent boolean fields on `Model` so they can stack on top of an
+  `overlayKind` overlay (see [Boolean overlays](#boolean-overlays)).
 
-Source of truth: [`internal/app/app.go`](../internal/app/app.go) defines
-`viewMode` (line ~22) and `overlayKind` (line ~40). Keep this doc in
-sync when those enums change.
+Source of truth for the enums:
+[`internal/app/app_types.go`](../internal/app/app_types.go) — `viewMode`
+(line ~14) and `overlayKind` (line ~31). When those enums change, update
+this doc and [`internal/ui/help.go`](../internal/ui/help.go).
 
-## Views (top-level modes)
+Default trigger keys below come from
+[`internal/ui/config_keybindings.go`](../internal/ui/config_keybindings.go);
+users can rebind any of them — see [keybindings.md](./keybindings.md)
+for the full reference.
 
-| Mode             | Trigger / Source            | Purpose                                        |
-| ---------------- | --------------------------- | ---------------------------------------------- |
-| `modeExplorer`   | default                     | Three-column resource browser (clusters → resource types → resources). |
-| `modeYAML`       | `Enter` on a resource       | Full-screen YAML preview with search and copy. |
-| `modeHelp`       | `?`                         | Searchable, filterable keybinding reference.   |
-| `modeLogs`       | `l` on a pod / container    | Log viewer with follow, wrap, search, visual selection. |
-| `modeDescribe`   | `d` on a resource           | `kubectl describe`-style detail view.          |
-| `modeDiff`       | drift / yaml comparisons    | Side-by-side diff (e.g. ArgoCD live vs. desired). |
-| `modeExec`       | `x` (exec into container)   | Embedded PTY shell session.                    |
-| `modeExplain`    | `:explain <type>`           | `kubectl explain` field tree.                  |
-| `modeEventViewer`| Event timeline overlay → drill | Full-screen event viewer with grouping.   |
-| `modeKubetris`   | `:kubetris`                 | Easter-egg game.                               |
-| `modeCredits`    | `:credits`                  | Scrolling credits screen.                      |
+## Views (`viewMode`)
 
-## Fullscreen view variants
+Listed in `viewMode` declaration order.
 
-These flip a flag while staying inside `modeExplorer`; the explorer's
-right pane (or middle, depending on flag) takes the whole screen.
+| Mode              | Default trigger                       | Purpose                                                                |
+| ----------------- | ------------------------------------- | ---------------------------------------------------------------------- |
+| `modeExplorer`    | default                               | Three-column resource browser (clusters → resource types → resources). |
+| `modeYAML`        | `Enter` on a resource                 | Full-screen YAML preview with search and copy.                         |
+| `modeHelp`        | `?`                                   | Searchable, filterable keybinding reference.                           |
+| `modeLogs`        | `L` on a pod / workload               | Log viewer with follow, wrap, search, visual selection.                |
+| `modeDescribe`    | `v` on a resource                     | `kubectl describe`-style detail view.                                  |
+| `modeDiff`        | `d` between two selected resources    | Side-by-side diff (e.g. ArgoCD live vs. desired).                      |
+| `modeExec`        | action menu → `s`                     | Embedded PTY shell session.                                            |
+| `modeExplain`     | `I`, `:explain <type>`                | `kubectl explain` field tree.                                          |
+| `modeEventViewer` | event timeline overlay → drill-in     | Full-screen event viewer with grouping.                                |
+| `modeKubetris`    | `:kubetris`                           | Easter-egg game.                                                       |
+| `modeCredits`     | `:credits`                            | Scrolling credits screen.                                              |
 
-| Flag                   | Trigger                  | What it shows                                |
-| ---------------------- | ------------------------ | -------------------------------------------- |
-| `fullscreenDashboard`  | `Enter` on `[Dashboard]` | Cluster dashboard (nodes, pods, namespaces, alerts). |
-| `fullscreenMonitoring` | `Enter` on `[Monitoring]`| Monitoring dashboard (Prometheus alerts, etc.). |
-| `errorLogFullscreen`   | from error notifications | Process stderr / lfk log buffer in full screen. |
+## Fullscreen flags inside `modeExplorer`
 
-## Overlays (modal panels)
+These are boolean fields, not enum values. They take over the explorer
+screen while staying inside `modeExplorer`. Multiple flags can be set at
+once — `viewExplorerColumns` (in `internal/app/view.go`) decides which
+wins.
 
-Listed in the order they appear in `overlayKind`. Overlays are mutually
-exclusive — opening a new one replaces any prior open overlay.
+| Flag                      | Scope    | Default trigger                       | What it shows                                                                                                                |
+| ------------------------- | -------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `fullscreenMiddle`        | per-tab  | `F`                                   | Hides left and right columns; the middle resource list takes the whole screen.                                                |
+| `fullscreenDashboard`     | per-tab  | `Enter` on `[Dashboard]`, `@`         | Cluster dashboard *or* monitoring dashboard, picked by the cursor's `Extra` marker (`__monitoring__`) — see `viewExplorerDashboard`. |
+| `errorLogFullscreen`      | global   | inside the error-log overlay (`F`)    | Promotes the error-log overlay to a full-screen log buffer.                                                                   |
+| `eventTimelineFullscreen` | global   | inside the event-timeline overlay     | Promotes the event timeline overlay to a full-screen viewer (also reachable via the `modeEventViewer` drill).                 |
 
-### Selectors
+> Note: there is **no** separate `fullscreenMonitoring` flag — Monitoring
+> shares `fullscreenDashboard` and is distinguished by the selected
+> item's `Extra == "__monitoring__"` (see `viewExplorerDashboard` in
+> `internal/app/view.go`).
 
-| Overlay                  | Trigger                             | Purpose                                  |
-| ------------------------ | ----------------------------------- | ---------------------------------------- |
-| `overlayNamespace`       | `n` (or `:namespace`)               | Pick / multi-select namespaces.          |
-| `overlayContainerSelect` | `c` in pod log view                 | Pick container when a pod has multiples. |
-| `overlayPodSelect`       | `\` in log view                     | Switch to a sibling pod's logs.          |
-| `overlayBookmarks`       | `b` (or `:bookmarks`)               | Saved navigation slots, with filter.     |
-| `overlayTemplates`       | `T` in resource type list           | Pick a built-in resource template.       |
-| `overlayColorscheme`     | `Shift+T`                           | Theme picker (search + preview).         |
-| `overlayFilterPreset`    | filter preset key                   | Saved filter expressions.                |
-| `overlayLogPodSelect`    | `\` in log fullscreen               | Switch pods within fullscreen log mode.  |
-| `overlayLogContainerSelect` | `\` in log fullscreen           | Container picker within log mode.        |
-| `overlayCanISubject`     | `:can-i` flow                       | Pick the user/SA to evaluate as.         |
-| `overlayCanI`            | `:can-i` flow                       | Display can-i evaluation results.        |
-| `overlayExplainSearch`   | `:explain` start                    | Type/field search for kubectl explain.   |
-| `overlayFinalizerSearch` | finalizer-edit flow                 | Pick a finalizer to remove.              |
-| `overlayColumnToggle`    | column-visibility key               | Show/hide table columns per kind.        |
+## Overlays (`overlayKind`)
+
+Mutually exclusive — opening a new one replaces any prior open overlay.
+Tables below follow `overlayKind` declaration order within each
+category, and every entry maps to a constant in `app_types.go`.
+
+### Pickers (single-shot select-then-act)
+
+| Overlay                     | Default trigger                  | Purpose                                          |
+| --------------------------- | -------------------------------- | ------------------------------------------------ |
+| `overlayNamespace`          | `\`, `:namespace`                | Pick / multi-select namespaces.                  |
+| `overlayContainerSelect`    | `c` in pod log view              | Pick container when a pod has multiples.         |
+| `overlayPodSelect`          | `\` in log view                  | Switch to a sibling pod's logs.                  |
+| `overlayTemplates`          | template-create flow             | Pick a built-in resource template.               |
+| `overlayColorscheme`        | `T`                              | Theme picker (search + preview).                 |
+| `overlayFilterPreset`       | `.`                              | Saved filter expressions.                        |
+| `overlayCanISubject`        | `:can-i` flow                    | Pick the user / SA to evaluate as.               |
+| `overlayExplainSearch`      | search inside `modeExplain`      | Type / field search for `kubectl explain`.       |
+| `overlayLogPodSelect`       | `\` in fullscreen log mode       | Switch pods within fullscreen log mode.          |
+| `overlayLogContainerSelect` | container key in fullscreen logs | Container picker within log mode.                |
+| `overlayFinalizerSearch`    | `Ctrl+G`                         | Pick a finalizer to remove.                      |
+| `overlayColumnToggle`       | `,`                              | Show / hide table columns per kind.              |
+
+### Navigators (jump-driven)
+
+| Overlay            | Default trigger      | Purpose                              |
+| ------------------ | -------------------- | ------------------------------------ |
+| `overlayBookmarks` | `'`, `:bookmarks`    | Saved navigation slots, with filter. |
 
 ### Editors / Forms
 
-| Overlay                  | Trigger                            | Purpose                                |
-| ------------------------ | ---------------------------------- | -------------------------------------- |
-| `overlayScaleInput`      | `s` on workload                    | Replica count input.                   |
-| `overlayPortForward`     | `p` on Service / Pod               | Port-forward destination input.        |
-| `overlaySecretEditor`    | edit on Secret                     | Inline edit of decoded secret values.  |
-| `overlayConfigMapEditor` | edit on ConfigMap                  | Inline edit of CM keys.                |
-| `overlayLabelEditor`     | label-edit flow                    | Add / remove labels.                   |
-| `overlayBatchLabel`      | bulk label-edit                    | Apply labels to selected items.        |
-| `overlayPVCResize`       | resize on PVC                      | New size input.                        |
+| Overlay                  | Default trigger                | Purpose                                            |
+| ------------------------ | ------------------------------ | -------------------------------------------------- |
+| `overlayScaleInput`      | `S` on workload                | Replica count input.                                |
+| `overlayPortForward`     | `p` on Service / Pod           | Port-forward destination input.                     |
+| `overlaySecretEditor`    | `e` on Secret                  | Inline edit of decoded secret values.               |
+| `overlayConfigMapEditor` | `e` on ConfigMap               | Inline edit of CM keys.                             |
+| `overlayLabelEditor`     | `i` on a resource              | Add / remove labels and annotations.                |
+| `overlayBatchLabel`      | `i` with multi-selection       | Apply labels and annotations to selected items.     |
+| `overlayPVCResize`       | resize on PVC (action menu)    | New PVC size input.                                 |
 
-### Action Menus / Confirmations
+### Action menus
 
-| Overlay              | Trigger                       | Purpose                                       |
-| -------------------- | ----------------------------- | --------------------------------------------- |
-| `overlayAction`      | `a`                           | Resource-kind-specific action menu.           |
-| `overlayConfirm`     | delete / drain                | y/n confirmation for reversible actions.      |
-| `overlayConfirmType` | force delete / force finalize | Requires typing `DELETE` for destructive ops. |
-| `overlayQuitConfirm` | `q`                           | Confirm before exiting lfk.                   |
-| `overlayPasteConfirm`| paste into search/filter      | Confirm multi-line paste.                     |
-| `overlayAutoSync`    | ArgoCD app                    | Toggle auto-sync settings.                    |
-| `overlayRollback`    | `Ctrl+r` on deploy/sts        | Pick revision to roll back to.                |
-| `overlayHelmRollback`| Helm release                  | Pick Helm revision to roll back.              |
-| `overlayHelmHistory` | Helm release                  | Browse Helm release history.                  |
+| Overlay         | Default trigger | Purpose                                                       |
+| --------------- | --------------- | ------------------------------------------------------------- |
+| `overlayAction` | `x`             | Resource-kind-specific action menu (delete, rollback, etc.).  |
 
-### Information / Telemetry
+### Confirmations
 
-| Overlay                  | Trigger                            | Purpose                                |
-| ------------------------ | ---------------------------------- | -------------------------------------- |
-| `overlayQuotaDashboard`  | `:quota`                           | Per-namespace ResourceQuota usage.     |
-| `overlayEventTimeline`   | event timeline key                 | Cluster-wide events grouped by object. |
-| `overlayAlerts`          | alert pop-out                      | Active Prometheus alerts.              |
-| `overlayNetworkPolicy`   | netpol pop-out                     | Visualize selected NetworkPolicy.      |
-| `overlayPodStartup`      | pod startup view                   | Pod init / readiness gantt.            |
-| `overlayRBAC`            | RBAC view                          | RBAC subject/role browser.             |
-| `overlayBackgroundTasks` | `:tasks`                           | In-flight + recent background tasks.   |
+| Overlay              | Default trigger                  | Purpose                                                      |
+| -------------------- | -------------------------------- | ------------------------------------------------------------ |
+| `overlayConfirm`     | delete / drain                   | y/n confirmation for reversible actions.                      |
+| `overlayConfirmType` | force delete / force finalize    | Requires typing `DELETE` for destructive ops.                 |
+| `overlayQuitConfirm` | `q`                              | Confirm before exiting lfk.                                   |
+| `overlayPasteConfirm`| paste into search / filter       | Confirm multi-line paste.                                     |
 
-## Adding a new view or overlay
+### Information panels
 
-1. Define the new constant in `viewMode` / `overlayKind` (in
-   [`internal/app/app.go`](../internal/app/app.go)).
-2. Wire the trigger key in `update_keys*.go`.
-3. Add the renderer in `internal/ui/`.
-4. Update this doc and [`docs/keybindings.md`](./keybindings.md).
-5. Surface the binding in the `?` help screen content
-   (`internal/ui/help.go`).
+| Overlay                  | Default trigger                 | Purpose                                                        |
+| ------------------------ | ------------------------------- | -------------------------------------------------------------- |
+| `overlayRollback`        | action menu → `R` on Deploy/STS | Pick revision to roll back to.                                 |
+| `overlayHelmRollback`    | action menu → `R` on Helm       | Pick Helm revision to roll back.                               |
+| `overlayHelmHistory`     | action menu → `h` on Helm       | Browse Helm release history.                                   |
+| `overlayRBAC`            | `U`                             | RBAC subject / role browser.                                   |
+| `overlayPodStartup`      | action menu → `S` on Pod        | Pod init / readiness gantt.                                    |
+| `overlayQuotaDashboard`  | `Q`, `:quota`                   | Per-namespace ResourceQuota usage.                              |
+| `overlayEventTimeline`   | `V`                             | Cluster-wide events grouped by object.                          |
+| `overlayAlerts`          | from monitoring view            | Active Prometheus alerts.                                       |
+| `overlayNetworkPolicy`   | from netpol view                | Visualize selected NetworkPolicy.                               |
+| `overlayCanI`            | `:can-i` flow (after subject)   | Display can-i evaluation results.                               |
+| `overlayAutoSync`        | ArgoCD app                      | Toggle auto-sync settings.                                      |
+| `overlayBackgroundTasks` | `` ` ``, `:tasks`               | In-flight + recent background tasks.                            |
+
+## Boolean overlays
+
+A few overlay-like states live as plain booleans on `Model` rather than
+inside `overlayKind`. They can stack with a normal `overlayKind` overlay
+and follow their own dismissal rules.
+
+| Field              | Default trigger | Purpose                                                                                                               |
+| ------------------ | --------------- | --------------------------------------------------------------------------------------------------------------------- |
+| `overlayErrorLog`  | `!`             | Application error log overlay (lfk's own error buffer). Has its own `errorLogFullscreen` toggle for full-screen mode. |
+| `commandBarActive` | `:`             | Bottom-of-screen `:command [args]` input with autocomplete, history, and ghost-text preview.                          |
+
+## Adding a new view, fullscreen flag, or overlay
+
+1. Pick the right shape:
+   - **`viewMode`** — the new screen has its own keymap and replaces the
+     explorer entirely (e.g. exec, logs).
+   - **Fullscreen flag** on `TabState` and/or `Model` — the new screen
+     lives inside `modeExplorer` and shares its tab state.
+   - **`overlayKind`** — modal panel over the current view, mutually
+     exclusive with other overlays.
+   - **Boolean overlay** — *only* when the new state must coexist with
+     another overlay (mirror `overlayErrorLog`'s pattern).
+2. Add the constant in
+   [`internal/app/app_types.go`](../internal/app/app_types.go), or the
+   boolean field on `Model` / `TabState` in
+   [`internal/app/app.go`](../internal/app/app.go).
+3. Wire the trigger key in `internal/app/update_keys*.go`. If the
+   trigger is user-facing, reserve a binding in
+   [`internal/ui/config_keybindings.go`](../internal/ui/config_keybindings.go).
+4. Add the renderer in `internal/ui/`.
+5. For a fullscreen flag, plug it into `viewExplorerColumns`'s
+   precedence switch in `internal/app/view.go`.
+6. Update this doc and [`docs/keybindings.md`](./keybindings.md).
+7. Surface the binding in the `?` help screen
+   ([`internal/ui/help.go`](../internal/ui/help.go)).
