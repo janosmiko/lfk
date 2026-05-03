@@ -76,6 +76,11 @@ func (m Model) updatePreviewServiceEndpointsLoaded(msg previewServiceEndpointsLo
 	if msg.gen != m.requestGen {
 		return m // stale response; the caller's m.previewLoading stays armed
 	}
+	// The fetch is no longer in flight for the current gen. Clear the
+	// spinner regardless of outcome so the right pane stops saying
+	// "Loading..." even when nothing else (events, metrics, …) is
+	// co-loading for this Service. Mirrors the secret data handler.
+	m.previewLoading = false
 	if msg.err != nil {
 		logger.Info("preview service endpoints load error", "name", msg.name, "err", msg.err)
 		return m

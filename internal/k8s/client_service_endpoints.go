@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"sort"
 	"strings"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -56,7 +57,11 @@ func (c *Client) GetServiceEndpoints(ctx context.Context, contextName, namespace
 		return out, nil
 	}
 
-	var lines []string
+	// Collect entries first so dedupeEndpointEntries can drop the
+	// repeats produced when a pod backs more than one port — both v1
+	// Endpoints (multi-subset) and EndpointSlices (multi-slice) stripe
+	// by port and would otherwise list the same address per port.
+	var entries []endpointEntry
 	for _, slice := range list.Items {
 		for _, ep := range slice.Endpoints {
 			// Per discovery.k8s.io/v1 spec: nil conditions.ready means
@@ -79,15 +84,32 @@ func (c *Client) GetServiceEndpoints(ctx context.Context, contextName, namespace
 				if addr == "" {
 					continue
 				}
-				lines = append(lines, formatEndpointLine(addr, targetKind, targetName, nodeName, ready))
-				if ready {
-					out.Ready++
-				} else {
-					out.NotReady++
-				}
+				entries = append(entries, endpointEntry{
+					addr:       addr,
+					targetKind: targetKind,
+					targetName: targetName,
+					nodeName:   nodeName,
+					ready:      ready,
+				})
 			}
 		}
 	}
+	entries = dedupeEndpointEntries(entries)
+	lines := make([]string, 0, len(entries))
+	for _, e := range entries {
+		lines = append(lines, formatEndpointLine(e.addr, e.targetKind, e.targetName, e.nodeName, e.ready))
+		if e.ready {
+			out.Ready++
+		} else {
+			out.NotReady++
+		}
+	}
+	// API list order across slices isn't guaranteed stable between
+	// fetches — without sorting, the same Service can shuffle endpoint
+	// rows on every hover-refresh and the user can't tell whether a
+	// real change happened or just a paint reorder. Sort lexically so
+	// reorders only happen when something actually changes.
+	sort.Strings(lines)
 	out.Block = strings.Join(lines, "\n")
 	return out, nil
 }

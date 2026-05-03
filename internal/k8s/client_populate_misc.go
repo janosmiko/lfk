@@ -453,11 +453,39 @@ func collectV1EndpointAddresses(subset map[string]any, key string, ready bool) [
 	return out
 }
 
+// dedupeEndpointEntries removes duplicate entries (same address /
+// targetRef / nodeName / ready). v1 Endpoints can list the same
+// address in multiple subsets when a pod backs more than one port,
+// and EndpointSlices stripe by port the same way. For the per-
+// endpoint preview, the user wants ONE line per (address, target,
+// state) regardless of how many ports it serves — the Ports column
+// already summarises the port list separately.
+//
+// endpointEntry is a struct of comparable fields (strings + bool), so
+// it works directly as a map key without a hash helper.
+func dedupeEndpointEntries(entries []endpointEntry) []endpointEntry {
+	if len(entries) == 0 {
+		return entries
+	}
+	seen := make(map[endpointEntry]struct{}, len(entries))
+	out := entries[:0]
+	for _, e := range entries {
+		if _, dup := seen[e]; dup {
+			continue
+		}
+		seen[e] = struct{}{}
+		out = append(out, e)
+	}
+	return out
+}
+
 // emitEndpointPreviewColumns appends the Ready / Not Ready / Endpoints /
 // Ports preview columns from a fully-collected entry slice. Shared by
 // both populateEndpoints and populateEndpointSlice so the two kinds
 // stay visually identical even though they read different API shapes.
+// Deduplicates first so multi-port subsets don't double-count rows.
 func emitEndpointPreviewColumns(ti *model.Item, entries []endpointEntry, portStrs []string) {
+	entries = dedupeEndpointEntries(entries)
 	var ready, notReady int
 	for _, e := range entries {
 		if e.ready {
