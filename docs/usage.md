@@ -257,11 +257,13 @@ ENDPOINTS
   10.0.0.4  → pod/foo-7d9-broken  on node-c   (NotReady)
 ```
 
-The fetch fires fresh on every hover-settle (gated by the same preview
-debounce as YAML / events / metrics). No cache is in front: pod churn
-changes the rollup constantly, and a stale-cache hit could render
-just-restarted pods as ready before they pass startup probes. The
-debounce keeps the per-hover cost bounded.
+The fetch follows a stale-while-revalidate pattern: on every hover or
+watch-tick refresh, the cached rollup is painted instantly so the row
+doesn't blank during the rebuild, *and* a fresh fetch fires in parallel
+so pod churn (delete + recreate, rolling updates, HPA scale) is always
+reflected within one watch tick. Pure cache-only would show stale
+ready state after pod restart; pure fetch-only would flash a blank
+row every watch tick.
 
 Headless Services (`clusterIP: None`) and `ExternalName` Services are
 skipped — they have no backing EndpointSlices to roll up.

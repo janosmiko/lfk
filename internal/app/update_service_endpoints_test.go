@@ -84,32 +84,34 @@ func TestUpdatePreviewServiceEndpointsLoaded_ErrorIgnored(t *testing.T) {
 
 // Regression for the stale-cache bug the user hit: deleting both pods
 // behind a Service used to leave the rollup showing them as ready
-// because the cached ServiceEndpoints was returned on the next hover.
-// Cache was removed; this test pins that the handler injects whatever
-// the latest message carries — so a fresh fetch after pod churn always
-// overwrites the prior column with the new state.
+// because the cache was never revalidated. Pins that fresh-fetch
+// (fromCache=false) ALWAYS overwrites prior columns and updates the
+// cache — even when the new value differs from what's already cached.
 func TestUpdatePreviewServiceEndpointsLoaded_FreshFetchReplacesStaleData(t *testing.T) {
+	stale := &k8s.ServiceEndpoints{
+		Ready: 2, Block: "10.0.0.1 → pod/old-1\n10.0.0.2 → pod/old-2",
+	}
 	item := model.Item{
 		Name: "my-svc", Namespace: "default",
 		Columns: []model.KeyValue{
 			{Key: "Backing Endpoints", Value: "2 ready / 0 not ready"},
-			{Key: "Endpoints", Value: "10.0.0.1 → pod/old-1\n10.0.0.2 → pod/old-2"},
+			{Key: "Endpoints", Value: stale.Block},
 		},
 	}
 	m := Model{
-		requestGen:  4,
-		namespace:   "default",
-		middleItems: []model.Item{item},
+		requestGen:            4,
+		namespace:             "default",
+		middleItems:           []model.Item{item},
+		serviceEndpointsCache: map[string]*k8s.ServiceEndpoints{serviceEndpointsCacheKey("kctx", "default", "my-svc"): stale},
 	}
-	// Pods just got recreated; the new EndpointSlice has them as not-
-	// ready while they pass startup probes. The fresh fetch must
-	// replace the prior 2-ready snapshot.
+	fresh := &k8s.ServiceEndpoints{
+		Ready: 0, NotReady: 2,
+		Block: "10.0.0.3 → pod/new-1 (NotReady)\n10.0.0.4 → pod/new-2 (NotReady)",
+	}
 	msg := previewServiceEndpointsLoadedMsg{
 		gen: 4, ctx: "kctx", ns: "default", name: "my-svc",
-		data: &k8s.ServiceEndpoints{
-			Ready: 0, NotReady: 2,
-			Block: "10.0.0.3 → pod/new-1 (NotReady)\n10.0.0.4 → pod/new-2 (NotReady)",
-		},
+		data: fresh,
+		// fromCache:false — this is a fresh fetch response.
 	}
 	result := m.updatePreviewServiceEndpointsLoaded(msg)
 	assert.Equal(t, "0 ready / 2 not ready",
@@ -117,6 +119,73 @@ func TestUpdatePreviewServiceEndpointsLoaded_FreshFetchReplacesStaleData(t *test
 		"fresh fetch after pod churn must overwrite the stale ready count")
 	assert.NotContains(t, findCol(&result.middleItems[0], "Endpoints"), "pod/old-1",
 		"old pod entries must not survive the rebuild")
+	assert.Same(t, fresh, result.serviceEndpointsCache[serviceEndpointsCacheKey("kctx", "default", "my-svc")],
+		"fresh fetch must update the cache so the next watch-tick rebuild paints from the new value")
+}
+
+func TestUpdatePreviewServiceEndpointsLoaded_CacheEmitInjectsWithoutWriting(t *testing.T) {
+	// Stale-while-revalidate: a cache emit (fromCache=true) injects the
+	// cached columns instantly so the watch-tick rebuild doesn't blank
+	// the rollup row, but it does NOT write the cache (the value is
+	// already there) so the cache stays a true reflection of the last
+	// fresh fetch.
+	cached := &k8s.ServiceEndpoints{Ready: 1, Block: "10.0.0.1 → pod/foo"}
+	key := serviceEndpointsCacheKey("kctx", "default", "my-svc")
+	m := Model{
+		requestGen:            7,
+		namespace:             "default",
+		middleItems:           []model.Item{{Name: "my-svc", Namespace: "default"}},
+		serviceEndpointsCache: map[string]*k8s.ServiceEndpoints{key: cached},
+	}
+	msg := previewServiceEndpointsLoadedMsg{
+		gen: 7, ctx: "kctx", ns: "default", name: "my-svc",
+		data:      cached,
+		fromCache: true,
+	}
+	result := m.updatePreviewServiceEndpointsLoaded(msg)
+	assert.Equal(t, "1 ready / 0 not ready",
+		findCol(&result.middleItems[0], "Backing Endpoints"),
+		"cache emit injects the cached rollup so the row paints instantly during the watch-tick rebuild")
+	assert.Same(t, cached, result.serviceEndpointsCache[key],
+		"cache emit must not change the cached pointer")
+}
+
+func TestUpdatePreviewServiceEndpointsLoaded_CacheEmitSkippedWhenFreshAlreadyWon(t *testing.T) {
+	// Race guard: in the unlikely case the fresh fetch beats the cache
+	// emit to the runtime (sub-millisecond LAN cluster), the fresh
+	// handler already wrote a NEW cache value and injected fresh
+	// columns. The late cache emit must NOT inject its (now-stale)
+	// data, otherwise it would clobber the just-injected fresh
+	// columns until the next watch tick.
+	stale := &k8s.ServiceEndpoints{Ready: 5, Block: "old"}
+	fresh := &k8s.ServiceEndpoints{Ready: 7, Block: "new"}
+	key := serviceEndpointsCacheKey("kctx", "default", "my-svc")
+	item := model.Item{
+		Name: "my-svc", Namespace: "default",
+		Columns: []model.KeyValue{
+			{Key: "Backing Endpoints", Value: "7 ready / 0 not ready"},
+			{Key: "Endpoints", Value: "new"},
+		},
+	}
+	m := Model{
+		requestGen:  9,
+		namespace:   "default",
+		middleItems: []model.Item{item},
+		// The fresh fetch already updated the cache to `fresh`.
+		serviceEndpointsCache: map[string]*k8s.ServiceEndpoints{key: fresh},
+	}
+	// Late cache emit carrying the stale pointer.
+	msg := previewServiceEndpointsLoadedMsg{
+		gen: 9, ctx: "kctx", ns: "default", name: "my-svc",
+		data:      stale,
+		fromCache: true,
+	}
+	result := m.updatePreviewServiceEndpointsLoaded(msg)
+	assert.Equal(t, "7 ready / 0 not ready",
+		findCol(&result.middleItems[0], "Backing Endpoints"),
+		"fresher fetch's columns must survive the late cache emit")
+	assert.Same(t, fresh, result.serviceEndpointsCache[key],
+		"cache must still hold the fresh value; the late emit must not roll it back")
 }
 
 func TestUpdatePreviewServiceEndpointsLoaded_RefreshOverwritesPriorColumns(t *testing.T) {

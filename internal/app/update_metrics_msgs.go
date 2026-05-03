@@ -66,11 +66,12 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 // matching middleItems entry as a "Backing Endpoints" summary KV plus
 // the multi-line "Endpoints" KV the renderer formats per-line.
 //
-// Deliberately NOT cached: pod churn changes the rollup constantly
-// (delete + recreate, rolling updates, HPA scale), and a cache hit on
-// stale data would render newly-restarted pods as ready before they
-// can actually serve. The fetch is gated by the preview debounce, so
-// the per-hover cost is bounded.
+// Cache stores the latest fresh fetch so the next watch-tick rebuild
+// can paint the rollup row immediately from the cache while the new
+// fetch lands — see loadPreviewServiceEndpoints's stale-while-
+// revalidate pattern. Cache writes only happen on fresh fetches: a
+// cache-emit message carries the same pointer that's already in the
+// map, so the assignment is a no-op for those.
 func (m Model) updatePreviewServiceEndpointsLoaded(msg previewServiceEndpointsLoadedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response; the caller's m.previewLoading stays armed
@@ -81,6 +82,27 @@ func (m Model) updatePreviewServiceEndpointsLoaded(msg previewServiceEndpointsLo
 	}
 	if msg.data == nil {
 		return m
+	}
+
+	if m.serviceEndpointsCache == nil {
+		m.serviceEndpointsCache = make(map[string]*k8s.ServiceEndpoints)
+	}
+	key := serviceEndpointsCacheKey(msg.ctx, msg.ns, msg.name)
+	if msg.fromCache {
+		// Cache-emit path: the cache entry is the source of msg.data, so
+		// only inject if it's still the cache's current value. A fresher
+		// fetch may have already updated the cache (extremely rare race
+		// where the fresh response beats the tea.Batch goroutine
+		// scheduling); in that case its handler already injected and
+		// this stale emit must not clobber it. Don't write the cache
+		// either — it already holds msg.data when the guard passes.
+		if existing, ok := m.serviceEndpointsCache[key]; !ok || existing != msg.data {
+			return m
+		}
+	} else {
+		// Fresh-fetch path: always update the cache so the next watch-
+		// tick rebuild can paint instantly from it.
+		m.serviceEndpointsCache[key] = msg.data
 	}
 
 	m.middleItemsRev++

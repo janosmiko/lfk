@@ -467,13 +467,22 @@ func secretPreviewCacheKey(ctx, ns, name string) string {
 	return ctx + "/" + ns + "/" + name
 }
 
+// serviceEndpointsCacheKey returns the cache key for the per-Service
+// endpoint rollup. Same shape as secretPreviewCacheKey.
+func serviceEndpointsCacheKey(ctx, ns, name string) string {
+	return ctx + "/" + ns + "/" + name
+}
+
 // loadPreviewServiceEndpoints fetches the EndpointSlice rollup for the
-// currently hovered Service at LevelResources. Always fetches fresh —
-// no cache, on purpose: pod churn (delete + recreate, rolling update,
-// HPA scale) changes the rollup constantly and a cache hit on stale
-// data would show pods as ready that aren't actually serving yet. The
-// cost is one extra List call per hover-settle, which the existing
-// preview debounce already keeps reasonable.
+// currently hovered Service at LevelResources, with a stale-while-
+// revalidate cache: on cache hit we emit the cached value immediately
+// (so the watch-tick rebuild doesn't blank the rollup row before the
+// network call returns) AND fire a fresh background fetch (so pod
+// churn — restart, rolling update, HPA scale — is always reflected
+// within one watch tick). Pure cache-only would show stale ready
+// state after pod restart; pure fetch-only would flash a blank row
+// every watch tick. Both run in parallel; the fresh response normally
+// arrives last and overwrites the cache emit.
 //
 // Returns nil when:
 //   - the current resource type is not Service,
@@ -498,7 +507,8 @@ func (m Model) loadPreviewServiceEndpoints() tea.Cmd {
 	name := sel.Name
 	gen := m.requestGen
 	reqCtx := m.reqCtx
-	return m.trackBgTask(
+
+	fetch := m.trackBgTask(
 		bgtasks.KindResourceList,
 		"Service endpoints: "+name,
 		bgtaskTarget(kctx, ns),
@@ -514,6 +524,29 @@ func (m Model) loadPreviewServiceEndpoints() tea.Cmd {
 			}
 		},
 	)
+
+	key := serviceEndpointsCacheKey(kctx, ns, name)
+	cached := m.serviceEndpointsCache[key]
+	if cached == nil {
+		return fetch
+	}
+	// Cache hit: emit immediately AND fire fresh fetch in parallel so
+	// the rollup paints without a flash while the latest data lands.
+	// fromCache=true tells the handler this is the stale-while-
+	// revalidate path: don't write the cache (the value is already
+	// there) and skip injection if a fresher fetch beat us to the
+	// runtime.
+	emit := func() tea.Msg {
+		return previewServiceEndpointsLoadedMsg{
+			gen:       gen,
+			ctx:       kctx,
+			ns:        ns,
+			name:      name,
+			data:      cached,
+			fromCache: true,
+		}
+	}
+	return tea.Batch(emit, fetch)
 }
 
 // isServiceWithoutEndpoints reports whether the selected Service has
