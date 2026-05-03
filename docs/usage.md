@@ -157,7 +157,7 @@ moment you enter it — useful for "I am unmistakably in prod" feedback
 when a stray `D` would do real damage.
 
 - **Open the picker**: at the cluster picker, highlight a row and press
-  `Ctrl+K`. Same overlay opens from the action menu (`x` →
+  `c`. Same overlay opens from the action menu (`x` →
   "Set color…").
 - **Pick a color**: 8 named choices (`red`, `yellow`, `green`, `blue`,
   `magenta`, `cyan`, `white`, `gray`) plus `None` to clear. The cursor
@@ -171,8 +171,8 @@ when a stray `D` would do real damage.
   `$XDG_STATE_HOME/lfk/cluster-colors.yaml` (defaults to
   `~/.local/state/lfk/cluster-colors.yaml`) so colors survive restarts.
   The file is lfk-managed — don't hand-edit; use the in-app picker.
-  Unknown color names in the file are dropped silently on load so a typo
-  doesn't poison neighbouring entries.
+  Unknown color names in the file are ignored on load (with a warning
+  written to the lfk log) so a typo doesn't poison neighbouring entries.
 
 The colour palette uses ANSI bright codes (8–15) so each tint maps to
 your terminal's own palette. That keeps prod-red recognisable across

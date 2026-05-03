@@ -103,9 +103,36 @@ func saveClusterColors(colors map[string]string) error {
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, data, 0o644); err != nil {
+	// Use os.CreateTemp with a unique suffix instead of a fixed ".tmp"
+	// sibling so two concurrent saves can't collide on the temp filename
+	// — a fixed suffix would race in the (admittedly unusual) case of
+	// two lfk instances saving to the same XDG state dir at the same
+	// moment, leaving one with a half-written file or a botched rename.
+	tmpFile, err := os.CreateTemp(filepath.Dir(path), filepath.Base(path)+".tmp.*")
+	if err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	tmpPath := tmpFile.Name()
+	// Best-effort cleanup if anything below fails: the temp file is
+	// orphaned and will not be retried on next save.
+	cleanup := func() { _ = os.Remove(tmpPath) }
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		cleanup()
+		return err
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		cleanup()
+		return err
+	}
+	if err := tmpFile.Close(); err != nil {
+		cleanup()
+		return err
+	}
+	if err := os.Rename(tmpPath, path); err != nil {
+		cleanup()
+		return err
+	}
+	return nil
 }

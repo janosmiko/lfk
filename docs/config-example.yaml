@@ -174,7 +174,7 @@ keybindings:
   delete: "D" # Delete resource (default: D)
   force_delete: "X" # Force delete resource (default: X)
   scale: "S" # Scale resource (default: S)
-  cluster_color_picker: "ctrl+k" # Open cluster-color picker at the cluster picker (default: ctrl+k; not ctrl+l because most terminals eat ctrl+l for "redraw screen")
+  cluster_color_picker: "c" # Open cluster-color picker at the cluster picker (default: bare "c" — Ctrl+L/K/Y/H/J are all intercepted by terminals or readline; the handler is gated to Level=Clusters so it's a no-op elsewhere)
 
 # ─── Search Abbreviations ─────────────────────────────────────────────────────
 # Short names for resource types used in search/filter.

@@ -3,6 +3,8 @@ package app
 import (
 	"fmt"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -49,6 +51,39 @@ func renderMutationProgress(spinnerFrame string, snapshot []bgtasks.Task) string
 		label := shortMutationLabel(t.Name)
 		text := fmt.Sprintf(" %s %d/%d %s ", label, t.Current, t.Total, spinnerFrame)
 		return ui.StatusMessageOkStyle.Render(text)
+	}
+	return ""
+}
+
+// renderTasksIndicatorOverrideBg is renderTasksIndicator with the
+// background colour swapped to bg. Used by the title-bar render path
+// when a cluster colour tint is active, so the background of the
+// indicator matches the rest of the bar instead of leaking the default
+// barBg through.
+func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []bgtasks.Task, bg lipgloss.TerminalColor) string {
+	n := 0
+	for _, t := range snapshot {
+		if t.Kind == bgtasks.KindMutation && t.Total > 0 {
+			continue
+		}
+		n++
+	}
+	if n == 0 {
+		return ""
+	}
+	return ui.BarDimStyle.Background(bg).Render(" " + spinnerFrame + " ")
+}
+
+// renderMutationProgressOverrideBg is renderMutationProgress with the
+// background colour swapped to bg. See renderTasksIndicatorOverrideBg.
+func renderMutationProgressOverrideBg(spinnerFrame string, snapshot []bgtasks.Task, bg lipgloss.TerminalColor) string {
+	for _, t := range snapshot {
+		if t.Kind != bgtasks.KindMutation || t.Total == 0 {
+			continue
+		}
+		label := shortMutationLabel(t.Name)
+		text := fmt.Sprintf(" %s %d/%d %s ", label, t.Current, t.Total, spinnerFrame)
+		return ui.StatusMessageOkStyle.Background(bg).Render(text)
 	}
 	return ""
 }

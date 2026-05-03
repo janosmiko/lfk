@@ -392,9 +392,22 @@ func (m Model) renderTitleBar() string {
 	// The inner content area is m.width - 2.
 	innerWidth := max(m.width-2, 10)
 
+	// Resolve cluster-tint up front: when set, every segment that
+	// normally carries barBg needs to swap to the tint colour as its
+	// background instead \u2014 otherwise the tint only fills cells without
+	// an explicit bg (the wrapper's Padding cells), leaving badges /
+	// breadcrumb / gap looking untinted.
+	tint := m.clusterColorForActiveContext()
+	tintStyle := ui.ClusterColorTitleBarStyle(tint)
+	tintBg := tintStyle.GetBackground()
+
 	var watchIndicator string
 	if m.watchMode {
-		watchIndicator = ui.HelpKeyStyle.Render(" \u27f3 ")
+		st := ui.HelpKeyStyle
+		if tint != "" {
+			st = st.Background(tintBg)
+		}
+		watchIndicator = st.Render(" \u27f3 ")
 	}
 
 	var readOnlyIndicator string
@@ -409,8 +422,13 @@ func (m Model) renderTitleBar() string {
 	var mutationProgress, tasksIndicator string
 	if m.bgtasks != nil && m.bgtasks.Len() > 0 {
 		snap := m.bgtasks.Snapshot()
-		mutationProgress = renderMutationProgress(m.spinner.View(), snap)
-		tasksIndicator = renderTasksIndicator(m.spinner.View(), snap)
+		if tint != "" {
+			mutationProgress = renderMutationProgressOverrideBg(m.spinner.View(), snap, tintBg)
+			tasksIndicator = renderTasksIndicatorOverrideBg(m.spinner.View(), snap, tintBg)
+		} else {
+			mutationProgress = renderMutationProgress(m.spinner.View(), snap)
+			tasksIndicator = renderTasksIndicator(m.spinner.View(), snap)
+		}
 	}
 
 	nsText := m.namespace
@@ -434,16 +452,6 @@ func (m Model) renderTitleBar() string {
 		}
 	}
 	nsLabel := ui.NamespaceBadgeStyle.Render(" ns: " + nsText + " ")
-
-	// Resolve cluster-tint up front so the breadcrumb / gap / version
-	// segments below can use the tint as their *own* background instead
-	// of leaning on the outer wrapping style. Wrapping a string of
-	// pre-styled segments in an outer Background only fills cells that
-	// don't already have a background — and every segment here has one
-	// (barBg or a badge bg). Without per-segment overrides, only the
-	// wrapper's Padding cells would show the tint.
-	tint := m.clusterColorForActiveContext()
-	tintStyle := ui.ClusterColorTitleBarStyle(tint)
 
 	var versionLabel string
 	if m.version != "" {

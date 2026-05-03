@@ -149,11 +149,14 @@ func DefaultKeybindings() Keybindings {
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",
 
-		// Cluster color picker. Ctrl+K (not Ctrl+L) because most terminals
-		// intercept Ctrl+L for "redraw screen" / "clear" before bubbletea
-		// ever sees it; Ctrl+K is generally untouched on macOS Terminal,
-		// iTerm2, Alacritty, Ghostty, and gnome-terminal.
-		ClusterColorPicker: "ctrl+k",
+		// Cluster color picker. Bare "c" rather than a Ctrl+ combination
+		// because Ctrl+L is intercepted by most terminals as "redraw
+		// screen", Ctrl+K and Ctrl+Y are used by readline / ZLE in many
+		// terminal-emulator setups, and Ctrl+H / Ctrl+J map to
+		// backspace / newline at the keyboard layer. The handler self-
+		// gates on Level=Clusters so plain "c" is a no-op everywhere
+		// else and doesn't shadow other in-context behaviours.
+		ClusterColorPicker: "c",
 	}
 }
 

@@ -46,6 +46,10 @@ func TestClusterColors_LivesUnderXDGStateHome(t *testing.T) {
 func TestLoadClusterColors_MissingFileReturnsEmpty(t *testing.T) {
 	withClusterColorsStateDir(t)
 	got := loadClusterColors()
+	// NotNil + Empty: callers always range over the returned map, so it
+	// must be a real (empty) map and not nil — defends the contract
+	// loadClusterColors documents.
+	assert.NotNil(t, got, "missing file must yield a real map, not nil")
 	assert.Empty(t, got, "missing file should yield an empty map (graceful fallback)")
 }
 
@@ -56,6 +60,7 @@ func TestLoadClusterColors_CorruptFileReturnsEmpty(t *testing.T) {
 	require.NoError(t, os.WriteFile(path, []byte("this: is: not: yaml: ::"), 0o644))
 
 	got := loadClusterColors()
+	assert.NotNil(t, got, "corrupt file must yield a real map, not nil")
 	assert.Empty(t, got, "corrupt YAML must not panic and must fall back to empty map")
 }
 
@@ -69,6 +74,7 @@ contexts:
 `), 0o644))
 
 	got := loadClusterColors()
+	assert.NotNil(t, got, "future schema must yield a real map, not nil")
 	assert.Empty(t, got, "unknown schema version must be ignored so older binaries don't trip on a forward-incompat write")
 }
 

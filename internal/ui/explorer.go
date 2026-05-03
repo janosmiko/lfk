@@ -480,7 +480,16 @@ func FormatItem(item model.Item, width int) string {
 	// Non-current, non-read-only rows: still surface the cluster-color
 	// swatch so unentered contexts can be identified at a glance from
 	// the picker — appended to the name, not prepended, for alignment.
+	// Also apply ActiveHighlightQuery so /search highlighting still
+	// works on coloured rows (the current / read-only branches above
+	// inherit the pre-existing limitation that they don't highlight).
 	if item.ClusterColor != "" {
+		if ActiveHighlightQuery != "" {
+			name = NormalStyle.Render(highlightName(displayName, ActiveHighlightQuery))
+			if icon := resolveIcon(item.Icon); icon != "" {
+				name = IconStyle.Render(icon+" ") + name
+			}
+		}
 		return TruncateWithSuffix(name, clusterColorSuffix(item), width)
 	}
 

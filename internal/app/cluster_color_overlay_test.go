@@ -40,20 +40,33 @@ func TestHandleKeyClusterColorPicker_AtClusterPickerOpensOverlay(t *testing.T) {
 	assert.Equal(t, "prod-eu", result.clusterColorOverlayContext, "overlay captures the highlighted context name")
 }
 
-// TestHandleKey_CtrlK_RoutesToClusterColorPicker is the regression test
-// for the bug the user hit when the default was Ctrl+L: most terminals
-// intercept Ctrl+L for "redraw screen" before the app sees the key, so
-// the binding moved to Ctrl+K which is terminal-safe across macOS
-// Terminal, iTerm2, Alacritty, Ghostty, and gnome-terminal. Going
-// through tea.KeyCtrlK (not the test-helper string fallback) catches
-// dispatch wiring failures the direct-handler tests miss.
-func TestHandleKey_CtrlK_RoutesToClusterColorPicker(t *testing.T) {
+// TestHandleKey_C_RoutesToClusterColorPicker is the regression test for
+// the bug the user hit with Ctrl+L and Ctrl+K: every Ctrl+letter we
+// tried got intercepted by either the terminal emulator (Ctrl+L =
+// redraw screen) or the shell input layer (Ctrl+K = kill-to-eol in
+// readline/ZLE), so the binding moved to a bare "c". The handler
+// self-gates on Level=Clusters so the bare letter is a no-op in any
+// other context and doesn't shadow in-context behaviours.
+func TestHandleKey_C_RoutesToClusterColorPicker(t *testing.T) {
 	m := newClusterPickerModel(t)
-	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyCtrlK})
+	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
 	result := ret.(Model)
 	assert.Equal(t, overlayClusterColor, result.overlay,
-		"Ctrl+K at the cluster picker must route through handleKey to the cluster-color overlay")
+		"'c' at the cluster picker must route through handleKey to the cluster-color overlay")
 	assert.Equal(t, "prod-eu", result.clusterColorOverlayContext)
+}
+
+// TestHandleKey_C_NoOpAboveClusterPicker ensures the handler's level
+// gate keeps the bare "c" key inert outside the cluster picker so it
+// doesn't accidentally consume keypresses elsewhere.
+func TestHandleKey_C_NoOpAboveClusterPicker(t *testing.T) {
+	m := newClusterPickerModel(t)
+	m.nav.Level = model.LevelResources
+	m.nav.Context = "prod-eu"
+	before := m.overlay
+	ret, _ := m.handleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
+	result := ret.(Model)
+	assert.Equal(t, before, result.overlay, "above the cluster picker, 'c' must not open the colour overlay")
 }
 
 func TestHandleKeyClusterColorPicker_AbovePickerLevelIsNoOp(t *testing.T) {

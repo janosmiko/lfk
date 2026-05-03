@@ -4,10 +4,25 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// forceANSIRendering switches lipgloss to the ANSI colour profile so
+// styled strings actually emit colour SGR codes during the test —
+// otherwise lipgloss strips colour when stdout isn't a TTY (the
+// `go test` default), which makes it impossible to distinguish a
+// tinted from an untinted render by string comparison.
+func forceANSIRendering(t *testing.T) {
+	t.Helper()
+	r := lipgloss.DefaultRenderer()
+	prev := r.ColorProfile()
+	r.SetColorProfile(termenv.ANSI)
+	t.Cleanup(func() { r.SetColorProfile(prev) })
+}
 
 func TestClusterColorForActiveContext_ReturnsAssignedColor(t *testing.T) {
 	m := Model{
@@ -37,23 +52,30 @@ func TestClusterColorForActiveContext_EmptyForUnknownContext(t *testing.T) {
 }
 
 func TestRenderTitleBar_TintedWhenContextHasColor(t *testing.T) {
-	m := minimalRenderableModel()
-	m.nav = model.NavigationState{Level: model.LevelResources, Context: "prod-eu"}
-	m.clusterColors = map[string]string{"prod-eu": "red"}
-	out := m.renderTitleBar()
+	// lipgloss strips colour when not on a TTY, so without forcing the
+	// ANSI profile here the tinted and untinted renders would produce
+	// identical plain-text strings and the NotEqual would be a
+	// tautology even with the test fix CodeRabbit suggested.
+	forceANSIRendering(t)
 
-	// The tinted title bar must include the breadcrumb and namespace badge
-	// — i.e. the existing structure must keep working — and additionally
-	// the bar background must be the tinted style. We probe the latter by
-	// confirming the rendered output is *different* between the tinted and
-	// untinted variants.
-	mUnt := minimalRenderableModel()
-	mUnt.nav = model.NavigationState{Level: model.LevelResources, Context: "scratch"}
-	untinted := mUnt.renderTitleBar()
+	// Both variants use the SAME context so any difference in output is
+	// attributable to the cluster-color tint rather than incidental
+	// breadcrumb / context text differences. CodeRabbit caught the prior
+	// version using different contexts which made NotEqual a tautology.
+	mTinted := minimalRenderableModel()
+	mTinted.nav = model.NavigationState{Level: model.LevelResources, Context: "prod-eu"}
+	mTinted.clusterColors = map[string]string{"prod-eu": "red"}
+	tinted := mTinted.renderTitleBar()
 
-	assert.NotEqual(t, untinted, out, "tinted title bar must differ visually from the untinted variant")
-	assert.True(t, strings.Contains(out, "scratch") || strings.Contains(out, "prod-eu") || true,
-		"sanity: the breadcrumb section must still render (placeholder check)")
+	mPlain := minimalRenderableModel()
+	mPlain.nav = model.NavigationState{Level: model.LevelResources, Context: "prod-eu"}
+	mPlain.clusterColors = nil // same context, no color: only the tint can differ
+	plain := mPlain.renderTitleBar()
+
+	assert.NotEqual(t, plain, tinted,
+		"tinted title bar must differ visually from the untinted variant when only the colour assignment changes")
+	assert.True(t, strings.Contains(tinted, "prod-eu"),
+		"sanity: the breadcrumb section must still render the context name in the tinted variant")
 }
 
 func TestRenderTitleBar_NotTintedAtClusterPicker(t *testing.T) {

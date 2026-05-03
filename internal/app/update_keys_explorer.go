@@ -124,6 +124,12 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		mdl, cmd := m.handleKeyReadOnlyToggle()
 		return mdl, cmd, true
 	case kb.ClusterColorPicker:
+		// Gate on Level=Clusters so the bare-letter default "c" doesn't
+		// silently shadow other handlers at deeper levels — the handler
+		// also self-gates as a defensive belt-and-braces measure.
+		if m.nav.Level != model.LevelClusters {
+			break
+		}
 		mdl, cmd := m.handleKeyClusterColorPicker()
 		return mdl, cmd, true
 	case kb.Right, "right":
