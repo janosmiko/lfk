@@ -489,10 +489,18 @@ func populateEndpointSlice(ti *model.Item, obj map[string]any) {
 		if !ok {
 			continue
 		}
-		isReady := false
+		// Per discovery.k8s.io/v1: a missing or null conditions.ready is
+		// "unknown" and consumers should interpret unknown as *ready*
+		// (per the upstream API spec — older API versions didn't
+		// populate the field, so absence means "not enough info to
+		// declare not-ready"). Default to true and only flip to false
+		// when ready is explicitly present and false. The previous
+		// inverted default would have flagged every endpoint on an
+		// older slice as (NotReady).
+		isReady := true
 		if cond, ok := ep["conditions"].(map[string]any); ok {
-			if r, ok := cond["ready"].(bool); ok && r {
-				isReady = true
+			if r, ok := cond["ready"].(bool); ok {
+				isReady = r
 			}
 		}
 		nodeName, _ := ep["nodeName"].(string)

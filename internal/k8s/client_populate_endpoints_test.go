@@ -167,6 +167,70 @@ func TestPopulateEndpointSlice_EmitsEndpointsMultiLine(t *testing.T) {
 	assert.Contains(t, lines[1], "192.168.1.6 → pod/foo-7d9-broken (NotReady)")
 }
 
+// Regression for the previous inverted default: per
+// discovery.k8s.io/v1, an absent / null conditions.ready means
+// "unknown" and must be interpreted as *ready*. The previous default
+// of false was flagging every endpoint on a slice without an explicit
+// ready field as (NotReady) — including the slices written by older
+// API versions that don't populate the field.
+func TestPopulateEndpointSlice_MissingConditionsTreatedAsReady(t *testing.T) {
+	obj := map[string]any{
+		"addressType": "IPv4",
+		"endpoints": []any{
+			map[string]any{
+				"addresses": []any{"192.168.1.5"},
+				// conditions absent: API spec says treat as ready.
+				"targetRef": map[string]any{"kind": "Pod", "name": "foo"},
+			},
+			map[string]any{
+				"addresses":  []any{"192.168.1.6"},
+				"conditions": map[string]any{},
+				// conditions.ready absent: API spec says treat as ready.
+				"targetRef": map[string]any{"kind": "Pod", "name": "bar"},
+			},
+			map[string]any{
+				"addresses":  []any{"192.168.1.7"},
+				"conditions": map[string]any{"ready": nil},
+				// conditions.ready explicitly null: API spec says treat as ready.
+				"targetRef": map[string]any{"kind": "Pod", "name": "baz"},
+			},
+		},
+	}
+	ti := &model.Item{}
+	populateEndpointSlice(ti, obj)
+
+	value := findColumnValue(ti.Columns, "Endpoints")
+	for i, line := range strings.Split(value, "\n") {
+		assert.NotContains(t, line, "NotReady",
+			"row %d (%q): missing/null conditions.ready must be treated as Ready, not (NotReady)",
+			i, line)
+	}
+	assert.Equal(t, "3", findColumnValue(ti.Columns, "Ready"),
+		"all three endpoints with absent/empty/null conditions count as Ready")
+	assert.Empty(t, findColumnValue(ti.Columns, "Not Ready"),
+		"no Not Ready column when every endpoint is treated as ready")
+}
+
+func TestPopulateEndpointSlice_ExplicitlyFalseConditionsAreNotReady(t *testing.T) {
+	// Symmetric check: when conditions.ready *is* set and is false, the
+	// endpoint must still flag as (NotReady) — the missing-treated-as-
+	// ready fix above must not also swallow explicit false.
+	obj := map[string]any{
+		"addressType": "IPv4",
+		"endpoints": []any{
+			map[string]any{
+				"addresses":  []any{"192.168.1.5"},
+				"conditions": map[string]any{"ready": false},
+				"targetRef":  map[string]any{"kind": "Pod", "name": "broken"},
+			},
+		},
+	}
+	ti := &model.Item{}
+	populateEndpointSlice(ti, obj)
+	assert.Contains(t, findColumnValue(ti.Columns, "Endpoints"), "(NotReady)")
+	assert.Equal(t, "1", findColumnValue(ti.Columns, "Not Ready"))
+}
+
 func TestPopulateEndpointSlice_MultipleAddressesPerEndpointEmitOneLineEach(t *testing.T) {
 	// EndpointSlice entries can carry multiple addresses (rare for IPv4, normal
 	// for IPv4/IPv6 dual-stack). Each address must get its own preview line so

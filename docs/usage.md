@@ -225,7 +225,7 @@ win and removes redundant load on the API server.
 The right-pane preview for the **Endpoints** and **EndpointSlices** kinds
 shows every endpoint individually, with target pod, node, and ready state:
 
-```
+```text
 READY      3
 NOT READY  1
 PORTS      http:80/TCP
