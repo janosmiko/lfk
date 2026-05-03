@@ -350,6 +350,10 @@ func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
 		}
 		pinned := togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category)
 		if err := savePinnedState(m.pinnedState); err != nil {
+			// Roll back the in-memory toggle so runtime state matches what
+			// is actually persisted to disk; togglePinnedGroup is its own
+			// inverse, so calling it again undoes the mutation.
+			_ = togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category)
 			m.setStatusMessage(fmt.Sprintf("Failed to save pinned groups: %v", err), true)
 			return m, scheduleStatusClear()
 		}

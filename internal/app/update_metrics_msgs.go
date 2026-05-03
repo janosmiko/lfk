@@ -139,6 +139,12 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 		key := item.Namespace + "/" + item.Name
 		pm, ok := msg.metrics[key]
 		if !ok {
+			// No fresh metrics for this pod — clear any prior CPU/MEM
+			// values so the UI does not keep showing the previous tick's
+			// usage as if it were current. Leave non-metrics columns
+			// (e.g., raw "CPU Req" / "Mem Lim") untouched so the next
+			// successful tick can recompute percentages.
+			clearStalePodMetricsColumns(item)
 			continue
 		}
 
@@ -234,6 +240,36 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 	return m
 }
 
+// clearStalePodMetricsColumns rebuilds an item's column list with fresh
+// "n/a" placeholders for the pod metrics keys, dropping any prior values
+// supplied by an earlier tick. Raw "CPU Req"/"CPU Lim"/"Mem Req"/"Mem Lim"
+// values are preserved so the next successful tick can recompute the
+// percentage columns.
+func clearStalePodMetricsColumns(item *model.Item) {
+	removeCols := map[string]bool{
+		"CPU":     true,
+		"MEM":     true,
+		"CPU Use": true,
+		"Mem Use": true,
+		"CPU/R":   true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
+	}
+	filtered := item.Columns[:0]
+	for _, kv := range item.Columns {
+		if !removeCols[kv.Key] {
+			filtered = append(filtered, kv)
+		}
+	}
+	filtered = append(filtered,
+		model.KeyValue{Key: "CPU", Value: "n/a"},
+		model.KeyValue{Key: "CPU/R", Value: "n/a"},
+		model.KeyValue{Key: "CPU/L", Value: "n/a"},
+		model.KeyValue{Key: "MEM", Value: "n/a"},
+		model.KeyValue{Key: "MEM/R", Value: "n/a"},
+		model.KeyValue{Key: "MEM/L", Value: "n/a"},
+	)
+	item.Columns = filtered
+}
+
 // ensureNodeMetricsColumnsPlaceholder adds CPU/CPU%/MEM/MEM% columns to a node
 // item using "n/a" placeholders when metrics-server returned no data for it.
 // Stable column visibility is the contract — without these placeholders,
@@ -241,15 +277,24 @@ func (m Model) updatePodMetricsEnriched(msg podMetricsEnrichedMsg) Model {
 // lacks them, and the user sees the column set blink in and out as
 // metrics-server health fluctuates.
 func ensureNodeMetricsColumnsPlaceholder(item *model.Item) {
-	wanted := map[string]bool{"CPU": true, "CPU%": true, "MEM": true, "MEM%": true}
+	// Strip any prior CPU/CPU%/MEM/MEM% values so a node that has just
+	// dropped out of metrics-server output does not keep showing stale
+	// numbers from the previous tick — autoDetectColumns already keeps
+	// the columns visible thanks to the placeholders we re-append below.
+	removeCols := map[string]bool{"CPU": true, "CPU%": true, "MEM": true, "MEM%": true}
+	filtered := item.Columns[:0]
 	for _, kv := range item.Columns {
-		delete(wanted, kv.Key)
-	}
-	for _, key := range []string{"CPU", "CPU%", "MEM", "MEM%"} {
-		if wanted[key] {
-			item.Columns = append(item.Columns, model.KeyValue{Key: key, Value: "n/a"})
+		if !removeCols[kv.Key] {
+			filtered = append(filtered, kv)
 		}
 	}
+	filtered = append(filtered,
+		model.KeyValue{Key: "CPU", Value: "n/a"},
+		model.KeyValue{Key: "CPU%", Value: "n/a"},
+		model.KeyValue{Key: "MEM", Value: "n/a"},
+		model.KeyValue{Key: "MEM%", Value: "n/a"},
+	)
+	item.Columns = filtered
 }
 
 func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {

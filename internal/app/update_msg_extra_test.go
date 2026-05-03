@@ -1671,6 +1671,48 @@ func TestUpdatePodMetricsEnrichedSingleNamespaceKeyFormat(t *testing.T) {
 	}
 }
 
+// When a pod was present in the prior tick but is missing from the new
+// metrics payload, the handler must clear the prior CPU/MEM column values
+// instead of leaving them visible as if they were current.
+func TestUpdatePodMetricsEnrichedClearsStaleRowOnMissingPod(t *testing.T) {
+	m := baseModel()
+	m.middleItems = []model.Item{
+		{
+			Name:      "pod-x",
+			Namespace: "default",
+			Columns: []model.KeyValue{
+				{Key: "CPU Req", Value: "100m"},
+				{Key: "CPU", Value: "42m"},
+				{Key: "MEM", Value: "100Mi"},
+				{Key: "CPU/R", Value: "50%"},
+			},
+		},
+	}
+
+	// Empty for pod-x but non-empty overall, so the early return for an empty
+	// payload does not short-circuit the enrichment loop.
+	result, _ := m.Update(podMetricsEnrichedMsg{
+		metrics: map[string]model.PodMetrics{
+			"default/other-pod": {Name: "other-pod", CPU: 1, Memory: 1},
+		},
+		gen: 0,
+	})
+	mdl := result.(Model)
+
+	col := func(key string) string {
+		for _, kv := range mdl.middleItems[0].Columns {
+			if kv.Key == key {
+				return kv.Value
+			}
+		}
+		return "<missing>"
+	}
+	assert.Equal(t, "n/a", col("CPU"), "stale CPU must reset to n/a when the pod drops out of the payload")
+	assert.Equal(t, "n/a", col("MEM"), "stale MEM must reset to n/a when the pod drops out of the payload")
+	assert.Equal(t, "n/a", col("CPU/R"), "stale CPU/R must reset to n/a")
+	assert.Equal(t, "100m", col("CPU Req"), "raw request column must survive so the next successful tick can recompute")
+}
+
 // --- nodeMetricsEnrichedMsg ---
 
 func TestUpdateNodeMetricsEnrichedStaleGen(t *testing.T) {

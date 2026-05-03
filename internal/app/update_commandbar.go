@@ -139,6 +139,17 @@ func (m Model) commandBarScrollSuggestions(key string, amount int) (tea.Model, t
 		delta = -amount
 	}
 	m.commandBarCycleSuggestion(delta)
+	if m.commandBarActionableSuggestionCount() == 0 {
+		m.commandBarPreview = ""
+		return m, nil
+	}
+	step := 1
+	if delta < 0 {
+		step = -1
+	}
+	for m.commandBarSuggestions[m.commandBarSelectedSuggestion].Category == "status" {
+		m.commandBarCycleSuggestion(step)
+	}
 	m.commandBarPreview = m.commandBarSuggestions[m.commandBarSelectedSuggestion].Text
 	return m, nil
 }

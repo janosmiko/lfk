@@ -117,7 +117,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			if rt.Namespaced {
 				patchArgs = append(patchArgs, "-n", itemNs)
 			}
-			patchCmd := exec.Command(kubectlPath, patchArgs...)
+			patchCmd := exec.CommandContext(ctx, kubectlPath, patchArgs...)
 			patchCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", patchCmd)
 			patchCmd.Run() //nolint:errcheck
@@ -130,13 +130,17 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			if rt.Namespaced {
 				deleteArgs = append(deleteArgs, "-n", itemNs)
 			}
-			cmd := exec.Command(kubectlPath, deleteArgs...)
+			cmd := exec.CommandContext(ctx, kubectlPath, deleteArgs...)
 			cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", cmd)
-			if output, err := cmd.CombinedOutput(); err != nil {
-				logger.Error("kubectl bulk force delete failed", "cmd", cmd.String(), "error", err, "output", string(output))
+			if _, err := cmd.CombinedOutput(); err != nil {
+				logger.Error("kubectl bulk force delete failed", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", actionCtx, "error", err)
 				failed++
-				errors = append(errors, fmt.Sprintf("%s: %s", ref.Name, strings.TrimSpace(string(output))))
+				msg := strings.TrimSpace(err.Error())
+				if msg == "" {
+					msg = "force delete failed"
+				}
+				errors = append(errors, fmt.Sprintf("%s: %s", ref.Name, msg))
 			} else {
 				succeeded++
 			}
@@ -236,7 +240,7 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 		Resource: rt.Resource,
 	}
 	client := m.client
-	ns := m.namespace
+	ns := m.actionNamespace()
 	registry := m.bgtasks
 	total := len(items)
 
@@ -266,6 +270,12 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 			itemNs := item.Namespace
 			if itemNs == "" {
 				itemNs = ns
+			}
+			// Cluster-scoped resources must be patched at cluster scope —
+			// supplying a namespace here triggers a "namespace specified for
+			// non-namespaced resource" error from the apiserver.
+			if !rt.Namespaced {
+				itemNs = ""
 			}
 			var err error
 			if isAnnotation {
