@@ -349,8 +349,13 @@ func TestLogsCountPrefixWordForward(t *testing.T) {
 
 // --- Page motion: Ctrl+D / Ctrl+F with count ---
 //
-// `N<C-d>` and `N<C-f>` scale the half/full page step by N. We pick a viewport
-// that gives a known step size and check the count multiplies it.
+// `N<C-d>` follows vim's sticky-scroll semantics: it moves exactly N lines
+// (clamped to viewport) and remembers N as the 'scroll' value for future
+// uncounted <C-d>/<C-u> presses. `N<C-f>` scales full-page motion by N.
+// The dedicated stickiness / clamp / default tests below
+// (TestLogsCtrlD*, TestDescribeVimScrollSemantics) pin the rest of the
+// behavior; the per-viewer tests in this section only assert the basic
+// "counted press moves count lines and sets sticky=count" contract.
 
 func TestDescribeCountPrefixHalfPageDown(t *testing.T) {
 	m := baseModelDescribe()
