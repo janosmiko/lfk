@@ -390,6 +390,36 @@ func Truncate(s string, maxW int) string {
 	return ansi.Truncate(s, maxW-1, "") + "~"
 }
 
+// TruncateWithSuffix truncates body so that body + suffix fits within maxW
+// visual columns, then right-pads with spaces so the suffix lands flush
+// against the right edge. Empty suffix degrades to plain Truncate.
+//
+// Used by the cluster picker to render the per-row colour swatch at the
+// end of the line: putting it before the name added a leading-space gap
+// that made uncoloured rows look ragged. With the swatch as a suffix the
+// name column stays aligned and the colour still ends up in a consistent,
+// scannable position.
+func TruncateWithSuffix(body, suffix string, maxW int) string {
+	if suffix == "" {
+		return Truncate(body, maxW)
+	}
+	if maxW <= 0 {
+		return ""
+	}
+	suffixW := lipgloss.Width(suffix)
+	if suffixW >= maxW {
+		// Suffix would consume the entire row — drop the body and just
+		// truncate the suffix so we don't accidentally hide the colour.
+		return Truncate(suffix, maxW)
+	}
+	// Reserve room for the suffix plus one space of separation from the
+	// body so the swatch isn't visually glued to the name.
+	bodyMaxW := max(maxW-suffixW-1, 1)
+	truncated := Truncate(body, bodyMaxW)
+	pad := max(maxW-lipgloss.Width(truncated)-suffixW, 1)
+	return truncated + strings.Repeat(" ", pad) + suffix
+}
+
 // truncateNoMarker truncates a string to maxW runes without appending any marker.
 // Used for wrappable columns where the remaining content continues on the next line.
 func truncateNoMarker(s string, maxW int) string {

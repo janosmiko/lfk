@@ -575,6 +575,25 @@ mode: X disabled" toast. See [Read-Only Mode](usage.md#read-only-mode)
 for the full precedence rules across the CLI flag, per-context config,
 and global config.
 
+## Cluster Color Coding
+
+| Key | Action |
+|---|---|
+| `L` (Shift+L) (at the cluster picker) | Open the color picker overlay for the highlighted cluster row. Pick one of 8 named colors (`red`, `yellow`, `green`, `blue`, `magenta`, `cyan`, `white`, `gray`) or `None` to clear. The selection is saved to `$XDG_STATE_HOME/lfk/cluster-colors.yaml` and survives restarts. Same overlay is reachable from the action menu (`x` → "Set color…") at the cluster picker. |
+
+When a context has a color assigned, the cluster picker row shows a
+small background-tinted suffix swatch on the right edge in that color,
+and entering the context applies the same color as a background tint to
+the entire title bar so it's impossible to miss which environment you're
+acting on. Contexts without a color render a neutral placeholder in the
+swatch column so all rows stay aligned.
+
+Four colours (`red`, `yellow`, `green`, `blue`) follow lfk's active
+theme tokens (`theme.Error`, `theme.Warning`, `theme.Secondary`,
+`theme.Primary`) so a colorscheme switch re-skins them. The remaining
+four (`magenta`, `cyan`, `white`, `gray`) stay on ANSI bright codes
+(8, 13–15) and look the same regardless of theme.
+
 ## Mouse
 
 | Input | Action |
@@ -770,4 +789,7 @@ keybindings:
 
   # Read-only mode
   readonly_toggle: "ctrl+r"  # At cluster picker: toggle highlighted row's [RO] marker. Inside a context: toggle the current tab.
+
+  # Cluster color picker (cluster picker only)
+  cluster_color_picker: "L"
 ```

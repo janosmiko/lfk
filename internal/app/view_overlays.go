@@ -139,6 +139,15 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayPasteConfirm:
 		lineCount := strings.Count(strings.TrimRight(m.pendingPaste, "\n"), "\n") + 1
 		return ui.RenderPasteConfirmOverlay(lineCount), min(45, m.width-10), min(8, m.height-6), true
+	case overlayClusterColor:
+		content := ui.RenderClusterColorOverlay(
+			m.clusterColorOverlayContext,
+			m.filteredClusterColorNames(),
+			m.clusterColorOverlayCursor,
+			m.clusterColorFilter.Value,
+			m.clusterColorFilterMode,
+		)
+		return content, min(40, m.width-10), min(15, m.height-6), true
 	}
 	return "", 0, 0, false
 }

@@ -191,3 +191,20 @@ func readOnlyPrefixPlain(item model.Item) string {
 	}
 	return "[RO] "
 }
+
+// clusterColorSuffix returns a coloured swatch for context rows that have
+// a cluster colour assigned, intended to be rendered at the *end* of the
+// row by TruncateWithSuffix. Foreground-only so the cursor highlight can
+// paint over it cleanly. Empty string for items without a colour so the
+// caller can always concatenate.
+//
+// The suffix uses a background-coloured 2-cell block (rather than the
+// foreground glyph used by ClusterColorSwatch) so the colour shows up
+// even when the row's selection background paints over it: the inner
+// background wins over the outer fg-only highlight.
+func clusterColorSuffix(item model.Item) string {
+	if item.ClusterColor == "" {
+		return ""
+	}
+	return ClusterColorSwatchBg(item.ClusterColor)
+}

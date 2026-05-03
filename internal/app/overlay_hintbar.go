@@ -159,6 +159,19 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "/", Desc: "filter"},
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayClusterColor:
+		if m.clusterColorFilterMode {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "enter", Desc: "accept filter"},
+				{Key: "esc", Desc: "clear filter"},
+			})
+		}
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "/", Desc: "filter"},
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "close"},
+		})
 	}
 	return ""
 }

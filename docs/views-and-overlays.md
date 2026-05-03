@@ -81,20 +81,21 @@ category, and every entry maps to a constant in `app_types.go`.
 
 ### Pickers (single-shot select-then-act)
 
-| Overlay                     | Default trigger                  | Purpose                                          |
-| --------------------------- | -------------------------------- | ------------------------------------------------ |
-| `overlayNamespace`          | `\`, `:namespace`                | Pick / multi-select namespaces.                  |
-| `overlayContainerSelect`    | `c` in pod log view              | Pick container when a pod has multiples.         |
-| `overlayPodSelect`          | `\` in log view                  | Switch to a sibling pod's logs.                  |
-| `overlayTemplates`          | template-create flow             | Pick a built-in resource template.               |
-| `overlayColorscheme`        | `T`                              | Theme picker (search + preview).                 |
-| `overlayFilterPreset`       | `.`                              | Saved filter expressions.                        |
-| `overlayCanISubject`        | `:can-i` flow                    | Pick the user / SA to evaluate as.               |
-| `overlayExplainSearch`      | search inside `modeExplain`      | Type / field search for `kubectl explain`.       |
-| `overlayLogPodSelect`       | `\` in fullscreen log mode       | Switch pods within fullscreen log mode.          |
-| `overlayLogContainerSelect` | container key in fullscreen logs | Container picker within log mode.                |
-| `overlayFinalizerSearch`    | `Ctrl+G`                         | Pick a finalizer to remove.                      |
-| `overlayColumnToggle`       | `,`                              | Show / hide table columns per kind.              |
+| Overlay                     | Default trigger                  | Purpose                                                                                                                                                                                                              |
+| --------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `overlayNamespace`          | `\`, `:namespace`                | Pick / multi-select namespaces.                                                                                                                                                                                      |
+| `overlayContainerSelect`    | `c` in pod log view              | Pick container when a pod has multiples.                                                                                                                                                                             |
+| `overlayPodSelect`          | `\` in log view                  | Switch to a sibling pod's logs.                                                                                                                                                                                      |
+| `overlayTemplates`          | template-create flow             | Pick a built-in resource template.                                                                                                                                                                                   |
+| `overlayColorscheme`        | `T`                              | Theme picker (search + preview).                                                                                                                                                                                     |
+| `overlayFilterPreset`       | `.`                              | Saved filter expressions.                                                                                                                                                                                            |
+| `overlayCanISubject`        | `:can-i` flow                    | Pick the user / SA to evaluate as.                                                                                                                                                                                   |
+| `overlayExplainSearch`      | search inside `modeExplain`      | Type / field search for `kubectl explain`.                                                                                                                                                                           |
+| `overlayLogPodSelect`       | `\` in fullscreen log mode       | Switch pods within fullscreen log mode.                                                                                                                                                                              |
+| `overlayLogContainerSelect` | container key in fullscreen logs | Container picker within log mode.                                                                                                                                                                                    |
+| `overlayFinalizerSearch`    | `Ctrl+G`                         | Pick a finalizer to remove.                                                                                                                                                                                          |
+| `overlayColumnToggle`       | `,`                              | Show / hide table columns per kind.                                                                                                                                                                                  |
+| `overlayClusterColor`       | `L` (Shift+L) at cluster picker  | Pick a background tint for the highlighted cluster row. Reuses the Logs key — at deeper levels `L` still opens Logs as usual. Persisted to `$XDG_STATE_HOME/lfk/cluster-colors.yaml`; also reachable from the action menu → "Set color…". |
 
 ### Navigators (jump-driven)
 

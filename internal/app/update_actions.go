@@ -60,6 +60,35 @@ func (m Model) openActionMenu() Model {
 		return m
 	}
 
+	// At the cluster picker, the action menu is a tiny per-cluster
+	// metadata menu. Today only "Set color…" lives there; Ctrl+R remains
+	// the hotkey for read-only. The dedicated branch keeps the kind-based
+	// `selectedResourceKind` machinery below from firing on a level that
+	// has no resource type.
+	if m.nav.Level == model.LevelClusters {
+		sel := m.selectedMiddleItem()
+		if sel == nil {
+			return m
+		}
+		m.bulkMode = false
+		m.overlay = overlayAction
+		m.overlayItems = []model.Item{
+			{
+				Name: "Set color",
+				// "Status" doubles as the in-menu hotkey hint
+				// rendered as "[L] Set color - …" by RenderActionOverlay.
+				// Using the same key the global handler uses
+				// (kb.ClusterColorPicker) keeps the menu and the bare
+				// keypress in sync, so users who learn one path
+				// automatically know the other.
+				Status: ui.ActiveKeybindings.ClusterColorPicker,
+				Extra:  "Assign a background tint to this context",
+			},
+		}
+		m.overlayCursor = 0
+		return m
+	}
+
 	kind := m.selectedResourceKind()
 	if kind == "" {
 		return m
@@ -300,6 +329,14 @@ func (m Model) directActionScale() (tea.Model, tea.Cmd) {
 
 func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
+
+	// Cluster-picker actions live outside the kind-based machinery: they
+	// don't have an actionCtx and there is no resource type at this level.
+	// Dispatch them by label and short-circuit before the read-only check
+	// fires on a label that has no kind to consult.
+	if m.nav.Level == model.LevelClusters && actionLabel == "Set color" {
+		return m.handleKeyClusterColorPicker()
+	}
 
 	// Handle bulk actions.
 	if m.bulkMode && len(m.bulkItems) > 0 {

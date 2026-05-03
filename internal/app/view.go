@@ -392,9 +392,22 @@ func (m Model) renderTitleBar() string {
 	// The inner content area is m.width - 2.
 	innerWidth := max(m.width-2, 10)
 
+	// Resolve cluster-tint up front: when set, every segment that
+	// normally carries barBg needs to swap to the tint colour as its
+	// background instead \u2014 otherwise the tint only fills cells without
+	// an explicit bg (the wrapper's Padding cells), leaving badges /
+	// breadcrumb / gap looking untinted.
+	tint := m.clusterColorForActiveContext()
+	tintStyle := ui.ClusterColorTitleBarStyle(tint)
+	tintBg := tintStyle.GetBackground()
+
 	var watchIndicator string
 	if m.watchMode {
-		watchIndicator = ui.HelpKeyStyle.Render(" \u27f3 ")
+		st := ui.HelpKeyStyle
+		if tint != "" {
+			st = st.Background(tintBg)
+		}
+		watchIndicator = st.Render(" \u27f3 ")
 	}
 
 	var readOnlyIndicator string
@@ -409,8 +422,13 @@ func (m Model) renderTitleBar() string {
 	var mutationProgress, tasksIndicator string
 	if m.bgtasks != nil && m.bgtasks.Len() > 0 {
 		snap := m.bgtasks.Snapshot()
-		mutationProgress = renderMutationProgress(m.spinner.View(), snap)
-		tasksIndicator = renderTasksIndicator(m.spinner.View(), snap)
+		if tint != "" {
+			mutationProgress = renderMutationProgressOverrideBg(m.spinner.View(), snap, tintBg)
+			tasksIndicator = renderTasksIndicatorOverrideBg(m.spinner.View(), snap, tintBg)
+		} else {
+			mutationProgress = renderMutationProgress(m.spinner.View(), snap)
+			tasksIndicator = renderTasksIndicator(m.spinner.View(), snap)
+		}
 	}
 
 	nsText := m.namespace
@@ -437,7 +455,11 @@ func (m Model) renderTitleBar() string {
 
 	var versionLabel string
 	if m.version != "" {
-		versionLabel = ui.BarDimStyle.Render(" " + m.version)
+		if tint != "" {
+			versionLabel = tintStyle.Render(" " + m.version)
+		} else {
+			versionLabel = ui.BarDimStyle.Render(" " + m.version)
+		}
 	}
 
 	// Calculate available width for breadcrumb.
@@ -453,12 +475,36 @@ func (m Model) renderTitleBar() string {
 			bcText = string(runes[:maxBcWidth-2]) + "~ "
 		}
 	}
-	bc := ui.TitleBreadcrumbStyle.Render(bcText)
+	var bc string
+	if tint != "" {
+		// Bold black-on-bright matches ClusterColorTitleBarStyle and keeps
+		// the breadcrumb path legible against every named tint.
+		bc = tintStyle.Render(bcText)
+	} else {
+		bc = ui.TitleBreadcrumbStyle.Render(bcText)
+	}
 
 	contentWidth := lipgloss.Width(bc) + lipgloss.Width(watchIndicator) + lipgloss.Width(readOnlyIndicator) + lipgloss.Width(mutationProgress) + lipgloss.Width(tasksIndicator) + lipgloss.Width(nsLabel) + lipgloss.Width(versionLabel)
 	gap := max(innerWidth-contentWidth, 0)
 
-	barContent := bc + watchIndicator + readOnlyIndicator + ui.BarDimStyle.Render(strings.Repeat(" ", gap)) + mutationProgress + tasksIndicator + nsLabel + versionLabel
+	var gapContent string
+	if tint != "" {
+		gapContent = tintStyle.Render(strings.Repeat(" ", gap))
+	} else {
+		gapContent = ui.BarDimStyle.Render(strings.Repeat(" ", gap))
+	}
+
+	barContent := bc + watchIndicator + readOnlyIndicator + gapContent + mutationProgress + tasksIndicator + nsLabel + versionLabel
+	if tint != "" {
+		// Outer wrap also uses the tint so the Padding(0, 1) cells share
+		// the bar background — the inner segments each carry the tint
+		// explicitly so it spans every column even with the [RO] / ns /
+		// watch badges layered on top with their own backgrounds.
+		return tintStyle.
+			Width(m.width).MaxWidth(m.width).MaxHeight(1).
+			Padding(0, 1).
+			Render(barContent)
+	}
 	return ui.TitleBarStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(barContent)
 }
 

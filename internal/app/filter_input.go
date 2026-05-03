@@ -118,6 +118,7 @@ const (
 	pasteTargetBookmarkFilter
 	pasteTargetLogPodFilter
 	pasteTargetLogContainerFilter
+	pasteTargetClusterColorFilter
 )
 
 // triggerPasteConfirm sets up the paste confirmation overlay for multiline input.
@@ -142,6 +143,8 @@ func (m *Model) resolvePasteTarget(id pasteTarget) FilterInput {
 		return &m.templateFilter
 	case pasteTargetSchemeFilter:
 		return &m.schemeFilter
+	case pasteTargetClusterColorFilter:
+		return &m.clusterColorFilter
 	case pasteTargetBookmarkFilter:
 		return &m.bookmarkFilter
 	case pasteTargetLogPodFilter:
