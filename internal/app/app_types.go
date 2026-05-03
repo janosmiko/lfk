@@ -150,6 +150,14 @@ type TabState struct {
 	dashboardPreview       string
 	dashboardEventsPreview string // warning events for two-column dashboard
 	monitoringPreview      string
+	// metricsContent and previewEventsContent are right-pane footers
+	// rendered below the children list. They have to live per-tab —
+	// otherwise switching from a Pods tab (which has metrics) to a
+	// Services tab (which doesn't) leaves the Pods metrics rendered
+	// at the bottom of the Services preview because no loader fires
+	// to clear them.
+	metricsContent       string
+	previewEventsContent string
 
 	// Toggle to show only Warning events in Event list view.
 	warningEventsOnly bool

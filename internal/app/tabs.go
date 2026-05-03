@@ -414,6 +414,8 @@ func (m *Model) saveCurrentTab() {
 	t.dashboardPreview = m.dashboardPreview
 	t.dashboardEventsPreview = m.dashboardEventsPreview
 	t.monitoringPreview = m.monitoringPreview
+	t.metricsContent = m.metricsContent
+	t.previewEventsContent = m.previewEventsContent
 	t.warningEventsOnly = m.warningEventsOnly
 	t.eventGrouping = m.eventGrouping
 	t.expandedGroup = m.expandedGroup
@@ -521,6 +523,10 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.dashboardPreview = t.dashboardPreview
 	m.dashboardEventsPreview = t.dashboardEventsPreview
 	m.monitoringPreview = t.monitoringPreview
+	// Restore the right-pane footers so the new tab paints with its own
+	// metrics / events instead of leaking the previous tab's values.
+	m.metricsContent = t.metricsContent
+	m.previewEventsContent = t.previewEventsContent
 	m.warningEventsOnly = t.warningEventsOnly
 	m.eventGrouping = t.eventGrouping
 	m.expandedGroup = t.expandedGroup
@@ -670,6 +676,8 @@ func (m *Model) cloneCurrentTab() TabState {
 		dashboardPreview:       m.dashboardPreview,
 		dashboardEventsPreview: m.dashboardEventsPreview,
 		monitoringPreview:      m.monitoringPreview,
+		metricsContent:         m.metricsContent,
+		previewEventsContent:   m.previewEventsContent,
 		warningEventsOnly:      m.warningEventsOnly,
 		eventGrouping:          m.eventGrouping,
 		expandedGroup:          m.expandedGroup,
