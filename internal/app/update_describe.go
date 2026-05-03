@@ -58,14 +58,12 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.ensureDescribeCursorVisible()
 		return m, nil
 	case "h", "left":
-		m.describeLineInput = ""
-		if m.describeCursorCol > 0 {
-			m.describeCursorCol--
-		}
+		n := consumeCountPrefix(&m.describeLineInput)
+		m.describeCursorCol = max(m.describeCursorCol-n, 0)
 		return m, nil
 	case "l", "right":
-		m.describeLineInput = ""
-		m.describeCursorCol++
+		n := consumeCountPrefix(&m.describeLineInput)
+		m.describeCursorCol += n
 		return m, nil
 	case "0":
 		if m.describeLineInput != "" {
@@ -74,16 +72,30 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		m.describeCursorCol = 0
 		return m, nil
-	case "$", "^", "w", "W", "b", "B", "e", "E":
-		m.describeLineInput = ""
+	case "$", "^":
+		// Absolute-position motions ignore counts but still consume the
+		// buffer so a stray digit prefix doesn't leak forward.
+		consumeCountPrefix(&m.describeLineInput)
 		m.describeWordMotion(key, lines)
 		return m, nil
-	case "ctrl+d", "ctrl+u":
-		return m.describePageMoveByKey(key, maxIdx)
+	case "w", "W", "b", "B", "e", "E":
+		count := consumeCountPrefix(&m.describeLineInput)
+		for range count {
+			m.describeWordMotion(key, lines)
+		}
+		return m, nil
+	case "ctrl+d":
+		count := consumeCountPrefix(&m.describeLineInput)
+		return m.describePageMove(count*m.describeContentHeight()/2, maxIdx)
+	case "ctrl+u":
+		count := consumeCountPrefix(&m.describeLineInput)
+		return m.describePageMove(-count*m.describeContentHeight()/2, maxIdx)
 	case "ctrl+f", "pgdown":
-		return m.describePageMove(m.describeContentHeight(), maxIdx)
+		count := consumeCountPrefix(&m.describeLineInput)
+		return m.describePageMove(count*m.describeContentHeight(), maxIdx)
 	case "ctrl+b", "pgup":
-		return m.describePageMove(-m.describeContentHeight(), maxIdx)
+		count := consumeCountPrefix(&m.describeLineInput)
+		return m.describePageMove(-count*m.describeContentHeight(), maxIdx)
 	case "home":
 		m.describeLineInput = ""
 		m.pendingG = false
@@ -131,12 +143,16 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.describeSearchInput.Clear()
 		return m, nil
 	case "n":
-		m.describeLineInput = ""
-		m.findNextDescribeMatch(true)
+		count := consumeCountPrefix(&m.describeLineInput)
+		for range count {
+			m.findNextDescribeMatch(true)
+		}
 		return m, nil
 	case "N":
-		m.describeLineInput = ""
-		m.findNextDescribeMatch(false)
+		count := consumeCountPrefix(&m.describeLineInput)
+		for range count {
+			m.findNextDescribeMatch(false)
+		}
 		return m, nil
 	case "ctrl+c":
 		m.describeLineInput = ""
@@ -198,22 +214,6 @@ func (m *Model) describeWordMotion(key string, lines []string) {
 	case "E":
 		m.describeCursorCol = WORDEnd(line, m.describeCursorCol)
 	}
-}
-
-// describePageMoveByKey moves the cursor by a page amount based on the key pressed.
-func (m Model) describePageMoveByKey(key string, maxIdx int) (tea.Model, tea.Cmd) {
-	h := m.describeContentHeight()
-	switch key {
-	case "ctrl+d":
-		return m.describePageMove(h/2, maxIdx)
-	case "ctrl+u":
-		return m.describePageMove(-h/2, maxIdx)
-	case "ctrl+f":
-		return m.describePageMove(h, maxIdx)
-	case "ctrl+b":
-		return m.describePageMove(-h, maxIdx)
-	}
-	return m, nil
 }
 
 // describePageMove moves the cursor by delta lines and clamps.
@@ -648,14 +648,12 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
 	case "h", "left":
-		m.diffLineInput = ""
-		if m.diffVisualCurCol > 0 {
-			m.diffVisualCurCol--
-		}
+		n := consumeCountPrefix(&m.diffLineInput)
+		m.diffVisualCurCol = max(m.diffVisualCurCol-n, 0)
 		return m, nil
 	case "l", "right":
-		m.diffLineInput = ""
-		m.diffVisualCurCol++
+		n := consumeCountPrefix(&m.diffLineInput)
+		m.diffVisualCurCol += n
 		return m, nil
 	case "g":
 		if m.pendingG {
@@ -689,9 +687,17 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 			m.diffVisualCurCol = 0
 		}
 		return m, nil
-	case "$", "^", "w", "b", "e", "E", "W", "B":
-		m.diffLineInput = ""
+	case "$", "^":
+		// Absolute-position motions ignore counts but still consume the
+		// buffer so a stray digit prefix doesn't leak forward.
+		consumeCountPrefix(&m.diffLineInput)
 		m.diffWordMotion(msg.String(), foldRegions)
+		return m, nil
+	case "w", "b", "e", "E", "W", "B":
+		count := consumeCountPrefix(&m.diffLineInput)
+		for range count {
+			m.diffWordMotion(msg.String(), foldRegions)
+		}
 		return m, nil
 	case "v", "V", "ctrl+v":
 		modeMap := map[string]rune{"v": 'v', "V": 'V', "ctrl+v": 'B'}
@@ -816,30 +822,33 @@ func (m *Model) diffWordMotion(key string, foldRegions []ui.DiffFoldRegion) {
 
 // handleDiffSearchNav handles n/N (next/prev search match) in diff view.
 func (m Model) handleDiffSearchNav(key string, foldRegions []ui.DiffFoldRegion, visibleLines int) (tea.Model, tea.Cmd) {
-	m.diffLineInput = ""
-	if len(m.diffMatchLines) > 0 {
+	count := consumeCountPrefix(&m.diffLineInput)
+	if len(m.diffMatchLines) == 0 {
+		return m, nil
+	}
+	for range count {
 		if key == "n" {
 			m.diffMatchIdx = (m.diffMatchIdx + 1) % len(m.diffMatchLines)
 		} else {
 			m.diffMatchIdx = (m.diffMatchIdx - 1 + len(m.diffMatchLines)) % len(m.diffMatchLines)
 		}
-		m.diffScrollToMatch(foldRegions, visibleLines)
 	}
+	m.diffScrollToMatch(foldRegions, visibleLines)
 	return m, nil
 }
 
 // diffPageMoveByKey moves the diff cursor by a page amount based on the key pressed.
 func (m Model) diffPageMoveByKey(key string, maxCursor, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
-	m.diffLineInput = ""
+	n := consumeCountPrefix(&m.diffLineInput)
 	switch key {
 	case "ctrl+d":
-		m.diffCursor = min(m.diffCursor+m.height/2, maxCursor)
+		m.diffCursor = min(m.diffCursor+n*m.height/2, maxCursor)
 	case "ctrl+u":
-		m.diffCursor = max(m.diffCursor-m.height/2, 0)
+		m.diffCursor = max(m.diffCursor-n*m.height/2, 0)
 	case "ctrl+f", "pgdown":
-		m.diffCursor = min(m.diffCursor+m.height, maxCursor)
+		m.diffCursor = min(m.diffCursor+n*m.height, maxCursor)
 	case "ctrl+b", "pgup":
-		m.diffCursor = max(m.diffCursor-m.height, 0)
+		m.diffCursor = max(m.diffCursor-n*m.height, 0)
 	}
 	m.ensureDiffCursorVisible(visibleLines, maxScroll)
 	return m, nil

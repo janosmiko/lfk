@@ -518,8 +518,8 @@ func (m Model) handleLogKeyK() (tea.Model, tea.Cmd) {
 
 func (m Model) handleLogKeyCtrlD() Model {
 	m.logFollow = false
-	m.logLineInput = ""
-	m.logCursor += m.logContentHeight() / 2
+	n := consumeCountPrefix(&m.logLineInput)
+	m.logCursor += n * m.logContentHeight() / 2
 	if m.logCursor >= len(m.logLines) {
 		m.logCursor = len(m.logLines) - 1
 	}
@@ -529,8 +529,8 @@ func (m Model) handleLogKeyCtrlD() Model {
 
 func (m Model) handleLogKeyCtrlU() (tea.Model, tea.Cmd) {
 	m.logFollow = false
-	m.logLineInput = ""
-	m.logCursor -= m.logContentHeight() / 2
+	n := consumeCountPrefix(&m.logLineInput)
+	m.logCursor -= n * m.logContentHeight() / 2
 	if m.logCursor < 0 {
 		m.logCursor = 0
 	}
@@ -541,8 +541,8 @@ func (m Model) handleLogKeyCtrlU() (tea.Model, tea.Cmd) {
 
 func (m Model) handleLogKeyCtrlF() Model {
 	m.logFollow = false
-	m.logLineInput = ""
-	m.logCursor += m.logContentHeight()
+	n := consumeCountPrefix(&m.logLineInput)
+	m.logCursor += n * m.logContentHeight()
 	if m.logCursor >= len(m.logLines) {
 		m.logCursor = len(m.logLines) - 1
 	}
@@ -552,8 +552,8 @@ func (m Model) handleLogKeyCtrlF() Model {
 
 func (m Model) handleLogKeyCtrlB() (tea.Model, tea.Cmd) {
 	m.logFollow = false
-	m.logLineInput = ""
-	m.logCursor -= m.logContentHeight()
+	n := consumeCountPrefix(&m.logLineInput)
+	m.logCursor -= n * m.logContentHeight()
 	if m.logCursor < 0 {
 		m.logCursor = 0
 	}
@@ -594,16 +594,14 @@ func (m Model) handleLogKeyG2() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleLogKeyH() Model {
-	m.logLineInput = ""
-	if m.logVisualCurCol > 0 {
-		m.logVisualCurCol--
-	}
+	n := consumeCountPrefix(&m.logLineInput)
+	m.logVisualCurCol = max(m.logVisualCurCol-n, 0)
 	return m
 }
 
 func (m Model) handleLogKeyL() Model {
-	m.logLineInput = ""
-	m.logVisualCurCol++
+	n := consumeCountPrefix(&m.logLineInput)
+	m.logVisualCurCol += n
 	return m
 }
 
@@ -619,8 +617,11 @@ func (m Model) handleLogKeyDollar() Model {
 }
 
 func (m Model) handleLogKeyE() Model {
-	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+	n := consumeCountPrefix(&m.logLineInput)
+	for range n {
+		if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+			break
+		}
 		lineLen := len([]rune(m.logLines[m.logCursor]))
 		newCol := wordEnd(m.logLines[m.logCursor], m.logVisualCurCol)
 		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
@@ -640,8 +641,11 @@ func (m Model) handleLogKeyE() Model {
 }
 
 func (m Model) handleLogKeyB() Model {
-	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+	n := consumeCountPrefix(&m.logLineInput)
+	for range n {
+		if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+			break
+		}
 		newCol := prevWordStart(m.logLines[m.logCursor], m.logVisualCurCol)
 		if newCol < 0 && m.logCursor > 0 {
 			m.logCursor--
@@ -714,8 +718,11 @@ func (m Model) handleLogKeyTab() Model {
 }
 
 func (m Model) handleLogKeyW() Model {
-	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+	n := consumeCountPrefix(&m.logLineInput)
+	for range n {
+		if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+			break
+		}
 		lineLen := len([]rune(m.logLines[m.logCursor]))
 		newCol := nextWordStart(m.logLines[m.logCursor], m.logVisualCurCol)
 		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
@@ -735,8 +742,11 @@ func (m Model) handleLogKeyW() Model {
 }
 
 func (m Model) handleLogKeyW2() Model {
-	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+	n := consumeCountPrefix(&m.logLineInput)
+	for range n {
+		if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+			break
+		}
 		lineLen := len([]rune(m.logLines[m.logCursor]))
 		newCol := nextWORDStart(m.logLines[m.logCursor], m.logVisualCurCol)
 		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
@@ -756,8 +766,11 @@ func (m Model) handleLogKeyW2() Model {
 }
 
 func (m Model) handleLogKeyE2() Model {
-	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+	n := consumeCountPrefix(&m.logLineInput)
+	for range n {
+		if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+			break
+		}
 		lineLen := len([]rune(m.logLines[m.logCursor]))
 		newCol := WORDEnd(m.logLines[m.logCursor], m.logVisualCurCol)
 		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
@@ -777,8 +790,11 @@ func (m Model) handleLogKeyE2() Model {
 }
 
 func (m Model) handleLogKeyB2() Model {
-	m.logLineInput = ""
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
+	n := consumeCountPrefix(&m.logLineInput)
+	for range n {
+		if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+			break
+		}
 		newCol := prevWORDStart(m.logLines[m.logCursor], m.logVisualCurCol)
 		if newCol < 0 && m.logCursor > 0 {
 			m.logCursor--
@@ -810,14 +826,18 @@ func (m Model) handleLogKeySlash() Model {
 }
 
 func (m Model) handleLogKeyN() Model {
-	m.logLineInput = ""
-	m.findNextLogMatch(true)
+	n := consumeCountPrefix(&m.logLineInput)
+	for range n {
+		m.findNextLogMatch(true)
+	}
 	return m
 }
 
 func (m Model) handleLogKeyN2() Model {
-	m.logLineInput = ""
-	m.findNextLogMatch(false)
+	n := consumeCountPrefix(&m.logLineInput)
+	for range n {
+		m.findNextLogMatch(false)
+	}
 	return m
 }
 

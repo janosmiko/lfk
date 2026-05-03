@@ -175,19 +175,23 @@ my namespace" mode.
 | `j` / `k` | Scroll up/down |
 | `123j` / `123k` | Move cursor down/up N visible lines (count-prefixed motion; folds skipped) |
 | `h` / `l` | Move cursor column left/right |
+| `123h` / `123l` | Move cursor column left/right by N runes |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace character |
 | `w` / `b` | Move cursor to next/previous word start |
 | `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
+| `123w` / `123b` / `123e` (and capitals) | Apply word/WORD motion N times |
 | `gg` / `Home` | Jump to top |
 | `G` / `End` | Jump to bottom |
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
+| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in YAML |
 | `n` / `N` | Next / previous search match |
+| `123n` / `123N` | Jump to Nth next / previous search match |
 | `v` | Character visual selection (from cursor column) |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
@@ -207,14 +211,18 @@ my namespace" mode.
 | `j` / `k` | Move cursor up/down |
 | `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
 | `h` / `l` | Move cursor column left/right |
+| `123h` / `123l` | Move cursor column left/right by N runes |
 | `0` / `$` / `^` | Move cursor to line start / end / first non-whitespace |
 | `w` / `b` / `e` / `W` / `B` / `E` | Word / WORD motions |
+| `123w` / `123b` / `123e` (and capitals) | Apply word/WORD motion N times |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
+| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in content |
 | `n` / `N` | Next / previous search match |
+| `123n` / `123N` | Jump to Nth next / previous search match |
 | `v` | Character visual selection |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection |
@@ -230,16 +238,19 @@ my namespace" mode.
 | `j` / `k` | Move cursor up/down |
 | `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
 | `h` / `l` / `Left` / `Right` | Move cursor column left/right |
+| `123h` / `123l` | Move cursor column left/right by N runes |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace character |
 | `w` / `b` | Move cursor to next/previous word start |
 | `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
+| `123w` / `123b` / `123e` (and capitals) | Apply word/WORD motion N times |
 | `gg` / `Home` | Jump to top |
 | `G` / `End` | Jump to bottom |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
+| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `f` | Toggle follow mode (auto-scroll to new logs) |
 | `Tab` / `z` / `>` | Toggle line wrapping |
 | `#` | Toggle line numbers |
@@ -251,6 +262,7 @@ my namespace" mode.
 | `/` | Search in logs |
 | `Up` / `Down` | Inside `/`: cycle through previous log search queries (persistent history). |
 | `n` / `N` | Next / previous search match |
+| `123n` / `123N` | Jump to Nth next / previous search match |
 | `123G` | Jump to specific line number |
 | `S` | Save loaded logs to file (path copied to clipboard) |
 | `Ctrl+S` | Save all logs to file, full kubectl logs (path copied to clipboard) |
@@ -320,19 +332,23 @@ from `terminal:` in the config.
 | `j` / `k` | Move cursor up/down |
 | `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
 | `h` / `l` | Move cursor column left/right |
+| `123h` / `123l` | Move cursor column left/right by N runes |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace |
 | `w` / `b` | Move cursor to next/previous word start |
 | `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
+| `123w` / `123b` / `123e` (and capitals) | Apply word/WORD motion N times |
 | `Tab` | Switch cursor side (side-by-side mode) |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `123G` | Jump to line number |
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
+| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `/` | Search in diff |
 | `n` / `N` | Next / previous search match |
+| `123n` / `123N` | Jump to Nth next / previous search match |
 | `v` | Character visual selection |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection |
@@ -355,21 +371,25 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `j` / `k` | Move cursor down/up |
 | `123j` / `123k` | Move cursor down/up N lines (count-prefixed motion) |
 | `h` / `l` / `Left` / `Right` | Move cursor column left/right |
+| `123h` / `123l` | Move cursor column left/right by N runes |
 | `0` / `$` | Move cursor to line start/end |
 | `^` | Move cursor to first non-whitespace |
 | `w` / `b` | Move cursor to next/previous word start |
 | `W` / `B` | Move cursor to next/previous WORD start (whitespace-delimited) |
 | `e` | Move cursor to end of word |
 | `E` | Move cursor to end of WORD (whitespace-delimited) |
+| `123w` / `123b` / `123e` (and capitals) | Apply word/WORD motion N times |
 | `gg` / `Home` | Jump to top |
 | `G` / `End` | Jump to bottom |
 | `123G` | Jump to specific line number |
 | `Ctrl+D` / `Ctrl+U` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
+| `123 Ctrl+D` / `123 Ctrl+U` / `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `f` | Toggle fullscreen event viewer |
 | `Tab` / `z` / `>` | Toggle line wrapping |
 | `/` | Search in events |
 | `n` / `N` | Next / previous search match |
+| `123n` / `123N` | Jump to Nth next / previous search match |
 | `v` | Character visual selection (from cursor column) |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |

@@ -172,11 +172,15 @@ func (m Model) handleEventTimelineOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	case "/":
 		return m.handleEventTimelineOverlayKeySlash()
 	case "n":
-		m.eventTimelineLineInput = ""
-		m.findNextEventMatch(true)
+		count := consumeCountPrefix(&m.eventTimelineLineInput)
+		for range count {
+			m.findNextEventMatch(true)
+		}
 	case "N":
-		m.eventTimelineLineInput = ""
-		m.findNextEventMatch(false)
+		count := consumeCountPrefix(&m.eventTimelineLineInput)
+		for range count {
+			m.findNextEventMatch(false)
+		}
 	case "f":
 		return m.handleEventTimelineOverlayKeyF()
 	case "tab", "z", ">":
@@ -205,8 +209,8 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 	case "h", "left":
 		return m.handleEventTimelineOverlayKeyH(), true
 	case "l", "right":
-		m.eventTimelineLineInput = ""
-		m.eventTimelineCursorCol++
+		n := consumeCountPrefix(&m.eventTimelineLineInput)
+		m.eventTimelineCursorCol += n
 		return m, true
 	case "0":
 		return m.handleEventTimelineOverlayKeyZero(), true
@@ -227,15 +231,15 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 	case "E":
 		return m.handleEventTimelineOverlayKeyE2(), true
 	case "ctrl+d":
-		m.eventTimelineLineInput = ""
-		m.eventTimelineCursor = min(m.eventTimelineCursor+m.eventContentHeight()/2, maxIdx)
+		n := consumeCountPrefix(&m.eventTimelineLineInput)
+		m.eventTimelineCursor = min(m.eventTimelineCursor+n*m.eventContentHeight()/2, maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
 	case "ctrl+u":
 		return m.handleEventTimelineOverlayKeyCtrlU(), true
 	case "ctrl+f", "pgdown":
-		m.eventTimelineLineInput = ""
-		m.eventTimelineCursor = min(m.eventTimelineCursor+m.eventContentHeight(), maxIdx)
+		n := consumeCountPrefix(&m.eventTimelineLineInput)
+		m.eventTimelineCursor = min(m.eventTimelineCursor+n*m.eventContentHeight(), maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
 	case "ctrl+b", "pgup":
@@ -557,10 +561,8 @@ func (m Model) handleEventTimelineOverlayKeyK() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyH() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursorCol > 0 {
-		m.eventTimelineCursorCol--
-	}
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	m.eventTimelineCursorCol = max(m.eventTimelineCursorCol-n, 0)
 	return m
 }
 
@@ -593,24 +595,33 @@ func (m Model) handleEventTimelineOverlayKeyCaret() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyW() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		m.eventTimelineCursorCol = nextWordStart(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 	}
 	return m
 }
 
 func (m Model) handleEventTimelineOverlayKeyW2() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		m.eventTimelineCursorCol = nextWORDStart(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 	}
 	return m
 }
 
 func (m Model) handleEventTimelineOverlayKeyB() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		nc := prevWordStart(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 		if nc >= 0 {
 			m.eventTimelineCursorCol = nc
@@ -620,8 +631,11 @@ func (m Model) handleEventTimelineOverlayKeyB() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyB2() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		nc := prevWORDStart(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 		if nc >= 0 {
 			m.eventTimelineCursorCol = nc
@@ -631,24 +645,30 @@ func (m Model) handleEventTimelineOverlayKeyB2() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyE() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		m.eventTimelineCursorCol = wordEnd(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 	}
 	return m
 }
 
 func (m Model) handleEventTimelineOverlayKeyE2() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		m.eventTimelineCursorCol = WORDEnd(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 	}
 	return m
 }
 
 func (m Model) handleEventTimelineOverlayKeyCtrlU() Model {
-	m.eventTimelineLineInput = ""
-	m.eventTimelineCursor -= m.eventContentHeight() / 2
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	m.eventTimelineCursor -= n * m.eventContentHeight() / 2
 	if m.eventTimelineCursor < 0 {
 		m.eventTimelineCursor = 0
 	}
@@ -657,8 +677,8 @@ func (m Model) handleEventTimelineOverlayKeyCtrlU() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyCtrlB() Model {
-	m.eventTimelineLineInput = ""
-	m.eventTimelineCursor -= m.eventContentHeight()
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	m.eventTimelineCursor -= n * m.eventContentHeight()
 	if m.eventTimelineCursor < 0 {
 		m.eventTimelineCursor = 0
 	}

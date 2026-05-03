@@ -336,12 +336,32 @@ func (m Model) yamlVisualCopyLine(selStart, selEnd int, mapping []int, origLines
 	return strings.Join(selected, "\n")
 }
 
+// handleYAMLNormalWordMotion applies a w/b/e/W/B/E motion N times, where N is
+// the digit-prefix count (defaulting to 1). Each iteration mutates m via the
+// pointer-receiver step so the loop avoids per-iteration Model copies — only
+// the value-receiver method boundary copy remains.
+func (m Model) handleYAMLNormalWordMotion(key string) (tea.Model, tea.Cmd) {
+	n := consumeCountPrefix(&m.yamlLineInput)
+	for range n {
+		m.yamlWordMotionStep(key)
+	}
+	return m, nil
+}
+
 // handleYAMLVisualWordMotion handles word/WORD motion and cursor position keys
 // in visual mode ($, w, b, e, E, B, W, ^).
 func (m Model) handleYAMLVisualWordMotion(key string) (tea.Model, tea.Cmd) {
+	m.yamlWordMotionStep(key)
+	return m, nil
+}
+
+// yamlWordMotionStep applies a single word/cursor-position motion. Shared by
+// the count-prefixed normal-mode wrapper and the single-step visual-mode
+// handler so they stay in lockstep.
+func (m *Model) yamlWordMotionStep(key string) {
 	visLines, _ := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	if m.yamlCursor < 0 || m.yamlCursor >= len(visLines) {
-		return m, nil
+		return
 	}
 
 	switch key {
@@ -366,7 +386,6 @@ func (m Model) handleYAMLVisualWordMotion(key string) (tea.Model, tea.Cmd) {
 	case "E":
 		m.yamlWordForward(visLines, WORDEnd)
 	}
-	return m, nil
 }
 
 // yamlWordForward moves the cursor forward using the given word-motion function.
@@ -447,15 +466,21 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "h", "left":
 		return m.handleYAMLKeyH()
 	case "l", "right":
-		m.yamlVisualCurCol++
+		n := consumeCountPrefix(&m.yamlLineInput)
+		m.yamlVisualCurCol += n
 		return m, nil
 	case "0":
 		return m.handleYAMLKeyZero()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		m.yamlLineInput += msg.String()
 		return m, nil
-	case "$", "w", "b", "e", "E", "B", "W", "^":
+	case "$", "^":
+		// $ / ^ are absolute-position motions and ignore counts, but still
+		// consume the buffer so a stray digit prefix doesn't leak forward.
+		consumeCountPrefix(&m.yamlLineInput)
 		return m.handleYAMLVisualWordMotion(msg.String())
+	case "w", "b", "e", "E", "B", "W":
+		return m.handleYAMLNormalWordMotion(msg.String())
 	case "j", "down":
 		n := consumeCountPrefix(&m.yamlLineInput)
 		m.yamlCursor = min(m.yamlCursor+n, max(totalVisible-1, 0))
@@ -487,9 +512,13 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 // handleYAMLKeyN handles the 'n' key (next search match) in normal YAML mode.
 func (m Model) handleYAMLKeyN(viewportLines int) (tea.Model, tea.Cmd) {
-	if len(m.yamlMatchLines) > 0 {
+	count := consumeCountPrefix(&m.yamlLineInput)
+	for range count {
+		if len(m.yamlMatchLines) == 0 {
+			break
+		}
 		if m.yamlNextIntraLineMatch(true) {
-			return m, nil
+			continue
 		}
 		m.yamlMatchIdx = (m.yamlMatchIdx + 1) % len(m.yamlMatchLines)
 		m.yamlScrollToMatchFolded(viewportLines)
@@ -499,9 +528,13 @@ func (m Model) handleYAMLKeyN(viewportLines int) (tea.Model, tea.Cmd) {
 
 // handleYAMLKeyShiftN handles the 'N' key (previous search match) in normal YAML mode.
 func (m Model) handleYAMLKeyShiftN(viewportLines int) (tea.Model, tea.Cmd) {
-	if len(m.yamlMatchLines) > 0 {
+	count := consumeCountPrefix(&m.yamlLineInput)
+	for range count {
+		if len(m.yamlMatchLines) == 0 {
+			break
+		}
 		if m.yamlNextIntraLineMatch(false) {
-			return m, nil
+			continue
 		}
 		m.yamlMatchIdx--
 		if m.yamlMatchIdx < 0 {
@@ -585,8 +618,8 @@ func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 
 // handleYAMLNormalHalfPageDown handles ctrl+d (half page down) in normal YAML mode.
 func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cmd) {
-	m.yamlLineInput = ""
-	m.yamlCursor += m.height / 2
+	n := consumeCountPrefix(&m.yamlLineInput)
+	m.yamlCursor += n * m.height / 2
 	if m.yamlCursor >= totalVisible {
 		m.yamlCursor = totalVisible - 1
 	}
@@ -596,8 +629,8 @@ func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cm
 
 // handleYAMLNormalPageDown handles ctrl+f (full page down) in normal YAML mode.
 func (m Model) handleYAMLNormalPageDown(totalVisible int) (tea.Model, tea.Cmd) {
-	m.yamlLineInput = ""
-	m.yamlCursor += m.height
+	n := consumeCountPrefix(&m.yamlLineInput)
+	m.yamlCursor += n * m.height
 	if m.yamlCursor >= totalVisible {
 		m.yamlCursor = totalVisible - 1
 	}
@@ -865,9 +898,8 @@ func (m Model) handleYAMLKeyZ() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLKeyH() (tea.Model, tea.Cmd) {
-	if m.yamlVisualCurCol > yamlFoldPrefixLen {
-		m.yamlVisualCurCol--
-	}
+	n := consumeCountPrefix(&m.yamlLineInput)
+	m.yamlVisualCurCol = max(m.yamlVisualCurCol-n, yamlFoldPrefixLen)
 	return m, nil
 }
 
@@ -900,8 +932,8 @@ func (m Model) handleYAMLKeyG() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLKeyCtrlU() (tea.Model, tea.Cmd) {
-	m.yamlLineInput = ""
-	m.yamlCursor -= m.height / 2
+	n := consumeCountPrefix(&m.yamlLineInput)
+	m.yamlCursor -= n * m.height / 2
 	if m.yamlCursor < 0 {
 		m.yamlCursor = 0
 	}
@@ -910,8 +942,8 @@ func (m Model) handleYAMLKeyCtrlU() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLKeyCtrlB() (tea.Model, tea.Cmd) {
-	m.yamlLineInput = ""
-	m.yamlCursor -= m.height
+	n := consumeCountPrefix(&m.yamlLineInput)
+	m.yamlCursor -= n * m.height
 	if m.yamlCursor < 0 {
 		m.yamlCursor = 0
 	}
