@@ -188,6 +188,50 @@ func TestUpdatePreviewServiceEndpointsLoaded_CacheEmitSkippedWhenFreshAlreadyWon
 		"cache must still hold the fresh value; the late emit must not roll it back")
 }
 
+func TestCarryOverServiceEndpointColumns_PreservesRollupAcrossWatchTick(t *testing.T) {
+	// Anti-flash: between setMiddleItems on a watch tick and the next
+	// loadPreviewServiceEndpoints message landing, the right pane was
+	// rendering the new items without the previously-injected rollup
+	// columns. The carry-over copies them onto the new items in place
+	// so the next paint is identical to the prior one.
+	old := []model.Item{
+		{
+			Name: "my-svc", Namespace: "default",
+			Columns: []model.KeyValue{
+				{Key: "Type", Value: "ClusterIP"},
+				{Key: "Backing Endpoints", Value: "2 ready / 0 not ready"},
+				{Key: "Endpoints", Value: "10.0.0.1 → pod/foo\n10.0.0.2 → pod/bar"},
+			},
+		},
+	}
+	// Fresh items from the watch-tick list refresh: same name+namespace,
+	// no rollup columns yet (those are lazy-fetched per hover).
+	fresh := []model.Item{
+		{
+			Name: "my-svc", Namespace: "default",
+			Columns: []model.KeyValue{{Key: "Type", Value: "ClusterIP"}},
+		},
+	}
+	m := Model{middleItems: old}
+	m.carryOverServiceEndpointColumns(fresh)
+
+	assert.Equal(t, "2 ready / 0 not ready",
+		findCol(&fresh[0], "Backing Endpoints"),
+		"Backing Endpoints column must survive the watch-tick rebuild")
+	assert.Contains(t, findCol(&fresh[0], "Endpoints"), "pod/foo",
+		"per-endpoint Endpoints block must survive too")
+}
+
+func TestCarryOverServiceEndpointColumns_NoOpWhenOldHasNothingToCarry(t *testing.T) {
+	// First-load case: old middleItems are empty, fresh items already
+	// don't have the rollup. The helper must not panic and must leave
+	// the new items unchanged.
+	fresh := []model.Item{{Name: "my-svc", Namespace: "default"}}
+	m := Model{middleItems: nil}
+	m.carryOverServiceEndpointColumns(fresh)
+	assert.Empty(t, fresh[0].Columns, "no carry-over when there's nothing to carry; new items stay untouched")
+}
+
 func TestUpdatePreviewServiceEndpointsLoaded_RefreshOverwritesPriorColumns(t *testing.T) {
 	// Second roundtrip after pods come and go must replace the prior
 	// per-endpoint block, not append a duplicate. Tests the
