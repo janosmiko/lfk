@@ -172,11 +172,15 @@ func (m Model) handleEventTimelineOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	case "/":
 		return m.handleEventTimelineOverlayKeySlash()
 	case "n":
-		m.eventTimelineLineInput = ""
-		m.findNextEventMatch(true)
+		count := consumeCountPrefix(&m.eventTimelineLineInput)
+		for range count {
+			m.findNextEventMatch(true)
+		}
 	case "N":
-		m.eventTimelineLineInput = ""
-		m.findNextEventMatch(false)
+		count := consumeCountPrefix(&m.eventTimelineLineInput)
+		for range count {
+			m.findNextEventMatch(false)
+		}
 	case "f":
 		return m.handleEventTimelineOverlayKeyF()
 	case "tab", "z", ">":
@@ -205,8 +209,8 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 	case "h", "left":
 		return m.handleEventTimelineOverlayKeyH(), true
 	case "l", "right":
-		m.eventTimelineLineInput = ""
-		m.eventTimelineCursorCol++
+		n := consumeCountPrefix(&m.eventTimelineLineInput)
+		m.eventTimelineCursorCol += n
 		return m, true
 	case "0":
 		return m.handleEventTimelineOverlayKeyZero(), true
@@ -227,15 +231,15 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 	case "E":
 		return m.handleEventTimelineOverlayKeyE2(), true
 	case "ctrl+d":
-		m.eventTimelineLineInput = ""
-		m.eventTimelineCursor = min(m.eventTimelineCursor+m.eventContentHeight()/2, maxIdx)
+		step := vimScrollStep(&m.eventTimelineLineInput, &m.eventTimelineScrollOption, m.eventContentHeight())
+		m.eventTimelineCursor = min(m.eventTimelineCursor+step, maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
 	case "ctrl+u":
 		return m.handleEventTimelineOverlayKeyCtrlU(), true
 	case "ctrl+f", "pgdown":
-		m.eventTimelineLineInput = ""
-		m.eventTimelineCursor = min(m.eventTimelineCursor+m.eventContentHeight(), maxIdx)
+		n := consumeCountPrefix(&m.eventTimelineLineInput)
+		m.eventTimelineCursor = min(m.eventTimelineCursor+n*m.eventContentHeight(), maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
 	case "ctrl+b", "pgup":
@@ -328,10 +332,10 @@ func (m *Model) handleEventTimelineVisualMovement(key string, maxIdx int) {
 			m.pendingG = true
 		}
 	case "ctrl+d":
-		m.eventTimelineCursor = min(m.eventTimelineCursor+m.eventContentHeight()/2, maxIdx)
+		m.eventTimelineCursor = min(m.eventTimelineCursor+scrollStep(m.eventTimelineScrollOption, m.eventContentHeight()), maxIdx)
 		m.ensureEventCursorVisible()
 	case "ctrl+u":
-		m.eventTimelineCursor = max(m.eventTimelineCursor-m.eventContentHeight()/2, 0)
+		m.eventTimelineCursor = max(m.eventTimelineCursor-scrollStep(m.eventTimelineScrollOption, m.eventContentHeight()), 0)
 		m.ensureEventCursorVisible()
 	default:
 		m.handleEventTimelineVisualWordMotion(key)
@@ -449,65 +453,10 @@ func (m Model) handleEventTimelineVisualKeyY() (tea.Model, tea.Cmd) {
 	if selEnd >= len(m.eventTimelineLines) {
 		selEnd = len(m.eventTimelineLines) - 1
 	}
-	var clipText string
-	switch m.eventTimelineVisualMode {
-	case 'v': // Character mode: partial first/last lines.
-		var parts []string
-		anchorCol := m.eventTimelineVisualCol
-		cursorCol := m.eventTimelineCursorCol
-		startCol, endCol := anchorCol, cursorCol
-		if m.eventTimelineVisualStart > m.eventTimelineCursor {
-			startCol, endCol = cursorCol, anchorCol
-		}
-		for i := selStart; i <= selEnd; i++ {
-			line := m.eventTimelineLines[i]
-			runes := []rune(line)
-			if selStart == selEnd {
-				cs := min(anchorCol, cursorCol)
-				ce := max(anchorCol, cursorCol) + 1
-				if cs > len(runes) {
-					cs = len(runes)
-				}
-				if ce > len(runes) {
-					ce = len(runes)
-				}
-				parts = append(parts, string(runes[cs:ce]))
-			} else if i == selStart {
-				cs := min(startCol, len(runes))
-				parts = append(parts, string(runes[cs:]))
-			} else if i == selEnd {
-				ce := min(endCol+1, len(runes))
-				parts = append(parts, string(runes[:ce]))
-			} else {
-				parts = append(parts, line)
-			}
-		}
-		clipText = strings.Join(parts, "\n")
-	case 'B': // Block mode: rectangular column range.
-		colStart := min(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
-		colEnd := max(m.eventTimelineVisualCol, m.eventTimelineCursorCol) + 1
-		var parts []string
-		for i := selStart; i <= selEnd; i++ {
-			line := m.eventTimelineLines[i]
-			runes := []rune(line)
-			cs := colStart
-			ce := colEnd
-			if cs > len(runes) {
-				cs = len(runes)
-			}
-			if ce > len(runes) {
-				ce = len(runes)
-			}
-			parts = append(parts, string(runes[cs:ce]))
-		}
-		clipText = strings.Join(parts, "\n")
-	default: // Line mode: whole lines.
-		var parts []string
-		for i := selStart; i <= selEnd; i++ {
-			parts = append(parts, m.eventTimelineLines[i])
-		}
-		clipText = strings.Join(parts, "\n")
-	}
+	clipText := visualCopyText(m.eventTimelineLines, selStart, selEnd,
+		rune(m.eventTimelineVisualMode),
+		m.eventTimelineVisualCol, m.eventTimelineCursorCol,
+		m.eventTimelineVisualStart > m.eventTimelineCursor)
 	lineCount := selEnd - selStart + 1
 	m.eventTimelineVisualMode = 0
 	m.setStatusMessage(fmt.Sprintf("Copied %d line(s)", lineCount), false)
@@ -557,10 +506,8 @@ func (m Model) handleEventTimelineOverlayKeyK() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyH() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursorCol > 0 {
-		m.eventTimelineCursorCol--
-	}
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	m.eventTimelineCursorCol = max(m.eventTimelineCursorCol-n, 0)
 	return m
 }
 
@@ -593,24 +540,33 @@ func (m Model) handleEventTimelineOverlayKeyCaret() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyW() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		m.eventTimelineCursorCol = nextWordStart(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 	}
 	return m
 }
 
 func (m Model) handleEventTimelineOverlayKeyW2() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		m.eventTimelineCursorCol = nextWORDStart(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 	}
 	return m
 }
 
 func (m Model) handleEventTimelineOverlayKeyB() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		nc := prevWordStart(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 		if nc >= 0 {
 			m.eventTimelineCursorCol = nc
@@ -620,8 +576,11 @@ func (m Model) handleEventTimelineOverlayKeyB() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyB2() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		nc := prevWORDStart(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 		if nc >= 0 {
 			m.eventTimelineCursorCol = nc
@@ -631,24 +590,30 @@ func (m Model) handleEventTimelineOverlayKeyB2() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyE() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		m.eventTimelineCursorCol = wordEnd(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 	}
 	return m
 }
 
 func (m Model) handleEventTimelineOverlayKeyE2() Model {
-	m.eventTimelineLineInput = ""
-	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	for range n {
+		if m.eventTimelineCursor < 0 || m.eventTimelineCursor >= len(m.eventTimelineLines) {
+			break
+		}
 		m.eventTimelineCursorCol = WORDEnd(m.eventTimelineLines[m.eventTimelineCursor], m.eventTimelineCursorCol)
 	}
 	return m
 }
 
 func (m Model) handleEventTimelineOverlayKeyCtrlU() Model {
-	m.eventTimelineLineInput = ""
-	m.eventTimelineCursor -= m.eventContentHeight() / 2
+	step := vimScrollStep(&m.eventTimelineLineInput, &m.eventTimelineScrollOption, m.eventContentHeight())
+	m.eventTimelineCursor -= step
 	if m.eventTimelineCursor < 0 {
 		m.eventTimelineCursor = 0
 	}
@@ -657,8 +622,8 @@ func (m Model) handleEventTimelineOverlayKeyCtrlU() Model {
 }
 
 func (m Model) handleEventTimelineOverlayKeyCtrlB() Model {
-	m.eventTimelineLineInput = ""
-	m.eventTimelineCursor -= m.eventContentHeight()
+	n := consumeCountPrefix(&m.eventTimelineLineInput)
+	m.eventTimelineCursor -= n * m.eventContentHeight()
 	if m.eventTimelineCursor < 0 {
 		m.eventTimelineCursor = 0
 	}

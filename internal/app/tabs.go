@@ -703,6 +703,7 @@ func (m *Model) saveCurrentTab() {
 	t.yamlContent = m.yamlContent
 	t.yamlScroll = m.yamlScroll
 	t.yamlCursor = m.yamlCursor
+	t.yamlScrollOption = m.yamlScrollOption
 	t.yamlSearchText = m.yamlSearchText
 	t.yamlMatchLines = m.yamlMatchLines
 	t.yamlMatchIdx = m.yamlMatchIdx
@@ -752,6 +753,7 @@ func (m *Model) saveCurrentTab() {
 	t.logVisualType = m.logVisualType
 	t.logVisualCol = m.logVisualCol
 	t.logVisualCurCol = m.logVisualCurCol
+	t.logScrollOption = m.logScrollOption
 	t.logParentKind = m.logParentKind
 	t.logParentName = m.logParentName
 	t.logSavedPodName = m.logSavedPodName
@@ -808,6 +810,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.yamlContent = t.yamlContent
 	m.yamlScroll = t.yamlScroll
 	m.yamlCursor = t.yamlCursor
+	m.yamlScrollOption = t.yamlScrollOption
 	m.yamlSearchText = t.yamlSearchText
 	m.yamlMatchLines = t.yamlMatchLines
 	m.yamlMatchIdx = t.yamlMatchIdx
@@ -859,6 +862,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.logVisualType = t.logVisualType
 	m.logVisualCol = t.logVisualCol
 	m.logVisualCurCol = t.logVisualCurCol
+	m.logScrollOption = t.logScrollOption
 	m.logParentKind = t.logParentKind
 	m.logParentName = t.logParentName
 	m.logSavedPodName = t.logSavedPodName
