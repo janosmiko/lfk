@@ -86,10 +86,13 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "ctrl+d":
 		count := consumeCountPrefix(&m.describeLineInput)
-		return m.describePageMove(count*m.describeContentHeight()/2, maxIdx)
+		// Round the half-page step before scaling: see handleLogKeyCtrlD for why.
+		step := m.describeContentHeight() / 2
+		return m.describePageMove(count*step, maxIdx)
 	case "ctrl+u":
 		count := consumeCountPrefix(&m.describeLineInput)
-		return m.describePageMove(-count*m.describeContentHeight()/2, maxIdx)
+		step := m.describeContentHeight() / 2
+		return m.describePageMove(-count*step, maxIdx)
 	case "ctrl+f", "pgdown":
 		count := consumeCountPrefix(&m.describeLineInput)
 		return m.describePageMove(count*m.describeContentHeight(), maxIdx)
@@ -840,11 +843,13 @@ func (m Model) handleDiffSearchNav(key string, foldRegions []ui.DiffFoldRegion, 
 // diffPageMoveByKey moves the diff cursor by a page amount based on the key pressed.
 func (m Model) diffPageMoveByKey(key string, maxCursor, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.diffLineInput)
+	// Round the half-page step before scaling: see handleLogKeyCtrlD for why.
+	halfStep := m.height / 2
 	switch key {
 	case "ctrl+d":
-		m.diffCursor = min(m.diffCursor+n*m.height/2, maxCursor)
+		m.diffCursor = min(m.diffCursor+n*halfStep, maxCursor)
 	case "ctrl+u":
-		m.diffCursor = max(m.diffCursor-n*m.height/2, 0)
+		m.diffCursor = max(m.diffCursor-n*halfStep, 0)
 	case "ctrl+f", "pgdown":
 		m.diffCursor = min(m.diffCursor+n*m.height, maxCursor)
 	case "ctrl+b", "pgup":

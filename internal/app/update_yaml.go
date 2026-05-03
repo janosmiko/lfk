@@ -619,7 +619,9 @@ func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 // handleYAMLNormalHalfPageDown handles ctrl+d (half page down) in normal YAML mode.
 func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.yamlLineInput)
-	m.yamlCursor += n * m.height / 2
+	// Round the half-page step before scaling: see handleLogKeyCtrlD for why.
+	step := m.height / 2
+	m.yamlCursor += n * step
 	if m.yamlCursor >= totalVisible {
 		m.yamlCursor = totalVisible - 1
 	}
@@ -933,7 +935,8 @@ func (m Model) handleYAMLKeyG() (tea.Model, tea.Cmd) {
 
 func (m Model) handleYAMLKeyCtrlU() (tea.Model, tea.Cmd) {
 	n := consumeCountPrefix(&m.yamlLineInput)
-	m.yamlCursor -= n * m.height / 2
+	step := m.height / 2
+	m.yamlCursor -= n * step
 	if m.yamlCursor < 0 {
 		m.yamlCursor = 0
 	}

@@ -519,7 +519,11 @@ func (m Model) handleLogKeyK() (tea.Model, tea.Cmd) {
 func (m Model) handleLogKeyCtrlD() Model {
 	m.logFollow = false
 	n := consumeCountPrefix(&m.logLineInput)
-	m.logCursor += n * m.logContentHeight() / 2
+	// Round the half-page step before scaling by N: with odd content
+	// heights `n*h/2` over-shoots by floor(n/2). For h=5 a single C-d
+	// is 2; `2<C-d>` must land at 4 (= 2*2), not 5 (= 2*5/2).
+	step := m.logContentHeight() / 2
+	m.logCursor += n * step
 	if m.logCursor >= len(m.logLines) {
 		m.logCursor = len(m.logLines) - 1
 	}
@@ -530,7 +534,8 @@ func (m Model) handleLogKeyCtrlD() Model {
 func (m Model) handleLogKeyCtrlU() (tea.Model, tea.Cmd) {
 	m.logFollow = false
 	n := consumeCountPrefix(&m.logLineInput)
-	m.logCursor -= n * m.logContentHeight() / 2
+	step := m.logContentHeight() / 2
+	m.logCursor -= n * step
 	if m.logCursor < 0 {
 		m.logCursor = 0
 	}

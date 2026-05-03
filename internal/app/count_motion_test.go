@@ -372,6 +372,38 @@ func TestDescribeCountPrefixHalfPageDown(t *testing.T) {
 	assert.Empty(t, rm.describeLineInput)
 }
 
+// Regression: when content height is odd, `2<C-d>` must land at exactly
+// `2 * (h/2)`, not `(2*h)/2`. With describeContentHeight = max(h-4, 3) = 5
+// for height=9, single-step half-page is 2, so two presses should land at 4.
+// The buggy `n*h/2` arithmetic would land at 5 (= 2*5/2), over-shooting by
+// floor(n/2) lines.
+func TestDescribeCountHalfPageOddHeightMatchesSingleSteps(t *testing.T) {
+	m := baseModelDescribe()
+	m.height = 9 // describeContentHeight = 5 (odd); single half-page = 2.
+	lines := make([]string, 200)
+	for i := range lines {
+		lines[i] = "line"
+	}
+	m.describeContent = strings.Join(lines, "\n")
+	m.describeCursor = 0
+
+	// Reference path: two single Ctrl+D presses.
+	ref := m
+	ret, _ := ref.handleDescribeKey(keyMsg("ctrl+d"))
+	ref = ret.(Model)
+	ret, _ = ref.handleDescribeKey(keyMsg("ctrl+d"))
+	ref = ret.(Model)
+	expected := ref.describeCursor
+
+	// Counted path: one `2<C-d>`.
+	m.describeLineInput = "2"
+	ret, _ = m.handleDescribeKey(keyMsg("ctrl+d"))
+	got := ret.(Model).describeCursor
+
+	assert.Equal(t, expected, got, "2<C-d> must land where two single C-d presses do")
+	assert.Equal(t, 4, got, "with content height 5, two half-pages of 2 = 4")
+}
+
 func TestLogsCountPrefixFullPageDown(t *testing.T) {
 	lines := make([]string, 200)
 	for i := range lines {

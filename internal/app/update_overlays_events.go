@@ -232,7 +232,9 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 		return m.handleEventTimelineOverlayKeyE2(), true
 	case "ctrl+d":
 		n := consumeCountPrefix(&m.eventTimelineLineInput)
-		m.eventTimelineCursor = min(m.eventTimelineCursor+n*m.eventContentHeight()/2, maxIdx)
+		// Round the half-page step before scaling: see handleLogKeyCtrlD for why.
+		step := m.eventContentHeight() / 2
+		m.eventTimelineCursor = min(m.eventTimelineCursor+n*step, maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
 	case "ctrl+u":
@@ -668,7 +670,8 @@ func (m Model) handleEventTimelineOverlayKeyE2() Model {
 
 func (m Model) handleEventTimelineOverlayKeyCtrlU() Model {
 	n := consumeCountPrefix(&m.eventTimelineLineInput)
-	m.eventTimelineCursor -= n * m.eventContentHeight() / 2
+	step := m.eventContentHeight() / 2
+	m.eventTimelineCursor -= n * step
 	if m.eventTimelineCursor < 0 {
 		m.eventTimelineCursor = 0
 	}
