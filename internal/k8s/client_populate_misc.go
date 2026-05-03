@@ -336,36 +336,81 @@ func populateNetworkPolicy(ti *model.Item, spec map[string]any) {
 	}
 }
 
+// endpointEntry is the per-address payload extracted from a v1 Endpoints
+// subset or a discovery.k8s.io/v1 EndpointSlice endpoint. Used to build
+// the multi-line "Endpoints" preview block uniformly across both kinds.
+type endpointEntry struct {
+	addr       string
+	targetKind string
+	targetName string
+	nodeName   string
+	ready      bool
+}
+
+// formatEndpointLine renders a single endpoint as
+// "addr → kind/name on node (NotReady)" for the per-endpoint multi-line
+// "Endpoints" preview field. The (NotReady) suffix is only emitted when
+// the endpoint is *not* ready — ready is the silent default so the eye
+// is drawn to broken endpoints. Missing target ref / node degrade the
+// line gracefully (drop the segment).
+func formatEndpointLine(addr, targetKind, targetName, nodeName string, ready bool) string {
+	parts := []string{addr}
+	if targetKind != "" && targetName != "" {
+		parts = append(parts, "→", strings.ToLower(targetKind)+"/"+targetName)
+	}
+	if nodeName != "" {
+		parts = append(parts, "on", nodeName)
+	}
+	line := strings.Join(parts, " ")
+	if !ready {
+		line += " (NotReady)"
+	}
+	return line
+}
+
+// joinEndpointLines turns a list of endpointEntry values into the
+// newline-separated value of the "Endpoints" KeyValue. The renderer
+// (extended in this PR to split on `\n` for the "Endpoints" key) emits
+// one preview line per entry.
+func joinEndpointLines(entries []endpointEntry) string {
+	if len(entries) == 0 {
+		return ""
+	}
+	lines := make([]string, 0, len(entries))
+	for _, e := range entries {
+		lines = append(lines, formatEndpointLine(e.addr, e.targetKind, e.targetName, e.nodeName, e.ready))
+	}
+	return strings.Join(lines, "\n")
+}
+
+// extractTargetRef pulls (kind, name) from a targetRef map. Returns
+// empty strings when the ref is absent or malformed — formatEndpointLine
+// degrades gracefully on missing values.
+func extractTargetRef(m map[string]any) (kind, name string) {
+	ref, ok := m["targetRef"].(map[string]any)
+	if !ok {
+		return "", ""
+	}
+	kind, _ = ref["kind"].(string)
+	name, _ = ref["name"].(string)
+	return kind, name
+}
+
 func populateEndpoints(ti *model.Item, obj map[string]any) {
 	subsets, ok := obj["subsets"].([]any)
 	if !ok {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Endpoints", Value: "<none>"})
 		return
 	}
-	var addrs, notReady, portStrs []string
+	var entries []endpointEntry
+	var portStrs []string
 	for _, s := range subsets {
 		subset, ok := s.(map[string]any)
 		if !ok {
 			continue
 		}
-		if list, ok := subset["addresses"].([]any); ok {
-			for _, a := range list {
-				if amap, ok := a.(map[string]any); ok {
-					if ip, ok := amap["ip"].(string); ok {
-						addrs = append(addrs, ip)
-					}
-				}
-			}
-		}
-		if list, ok := subset["notReadyAddresses"].([]any); ok {
-			for _, a := range list {
-				if amap, ok := a.(map[string]any); ok {
-					if ip, ok := amap["ip"].(string); ok {
-						notReady = append(notReady, ip)
-					}
-				}
-			}
-		}
+		entries = append(entries, collectV1EndpointAddresses(subset, "addresses", true)...)
+		entries = append(entries, collectV1EndpointAddresses(subset, "notReadyAddresses", false)...)
 		if list, ok := subset["ports"].([]any); ok {
 			for _, p := range list {
 				if pmap, ok := p.(map[string]any); ok {
@@ -374,12 +419,59 @@ func populateEndpoints(ti *model.Item, obj map[string]any) {
 			}
 		}
 	}
-	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ready", Value: fmt.Sprintf("%d", len(addrs))})
-	if len(notReady) > 0 {
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Not Ready", Value: fmt.Sprintf("%d", len(notReady))})
+	emitEndpointPreviewColumns(ti, entries, portStrs)
+}
+
+// collectV1EndpointAddresses pulls one of "addresses" or "notReadyAddresses"
+// from a v1 Endpoints subset and returns endpointEntry values flagged with
+// the supplied ready state.
+func collectV1EndpointAddresses(subset map[string]any, key string, ready bool) []endpointEntry {
+	list, ok := subset[key].([]any)
+	if !ok {
+		return nil
 	}
-	if v := summarizeEndpointAddresses(addrs); v != "" {
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Addresses", Value: v})
+	out := make([]endpointEntry, 0, len(list))
+	for _, a := range list {
+		amap, ok := a.(map[string]any)
+		if !ok {
+			continue
+		}
+		ip, _ := amap["ip"].(string)
+		if ip == "" {
+			continue
+		}
+		nodeName, _ := amap["nodeName"].(string)
+		kind, name := extractTargetRef(amap)
+		out = append(out, endpointEntry{
+			addr:       ip,
+			targetKind: kind,
+			targetName: name,
+			nodeName:   nodeName,
+			ready:      ready,
+		})
+	}
+	return out
+}
+
+// emitEndpointPreviewColumns appends the Ready / Not Ready / Endpoints /
+// Ports preview columns from a fully-collected entry slice. Shared by
+// both populateEndpoints and populateEndpointSlice so the two kinds
+// stay visually identical even though they read different API shapes.
+func emitEndpointPreviewColumns(ti *model.Item, entries []endpointEntry, portStrs []string) {
+	var ready, notReady int
+	for _, e := range entries {
+		if e.ready {
+			ready++
+		} else {
+			notReady++
+		}
+	}
+	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ready", Value: fmt.Sprintf("%d", ready)})
+	if notReady > 0 {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Not Ready", Value: fmt.Sprintf("%d", notReady)})
+	}
+	if v := joinEndpointLines(entries); v != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Endpoints", Value: v})
 	}
 	if len(portStrs) > 0 {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ports", Value: strings.Join(portStrs, ", ")})
@@ -391,7 +483,7 @@ func populateEndpointSlice(ti *model.Item, obj map[string]any) {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Type", Value: t})
 	}
 	endpoints, _ := obj["endpoints"].([]any)
-	var ready, notReady, addrs []string
+	var entries []endpointEntry
 	for _, e := range endpoints {
 		ep, ok := e.(map[string]any)
 		if !ok {
@@ -403,37 +495,33 @@ func populateEndpointSlice(ti *model.Item, obj map[string]any) {
 				isReady = true
 			}
 		}
+		nodeName, _ := ep["nodeName"].(string)
+		kind, name := extractTargetRef(ep)
 		if as, ok := ep["addresses"].([]any); ok {
 			for _, a := range as {
-				if s, ok := a.(string); ok {
-					addrs = append(addrs, s)
-					if isReady {
-						ready = append(ready, s)
-					} else {
-						notReady = append(notReady, s)
-					}
+				s, ok := a.(string)
+				if !ok || s == "" {
+					continue
 				}
+				entries = append(entries, endpointEntry{
+					addr:       s,
+					targetKind: kind,
+					targetName: name,
+					nodeName:   nodeName,
+					ready:      isReady,
+				})
 			}
 		}
 	}
-	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ready", Value: fmt.Sprintf("%d", len(ready))})
-	if len(notReady) > 0 {
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Not Ready", Value: fmt.Sprintf("%d", len(notReady))})
-	}
-	if v := summarizeEndpointAddresses(addrs); v != "" {
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Addresses", Value: v})
-	}
+	var portStrs []string
 	if ports, ok := obj["ports"].([]any); ok {
-		var portStrs []string
 		for _, p := range ports {
 			if pmap, ok := p.(map[string]any); ok {
 				portStrs = append(portStrs, formatEndpointPort(pmap))
 			}
 		}
-		if len(portStrs) > 0 {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Ports", Value: strings.Join(portStrs, ", ")})
-		}
 	}
+	emitEndpointPreviewColumns(ti, entries, portStrs)
 }
 
 func formatEndpointPort(p map[string]any) string {
@@ -447,16 +535,4 @@ func formatEndpointPort(p map[string]any) string {
 		return fmt.Sprintf("%s:%d/%s", name, int64(port), proto)
 	}
 	return fmt.Sprintf("%d/%s", int64(port), proto)
-}
-
-func summarizeEndpointAddresses(addrs []string) string {
-	const maxShown = 3
-	switch {
-	case len(addrs) == 0:
-		return ""
-	case len(addrs) <= maxShown:
-		return strings.Join(addrs, ", ")
-	default:
-		return strings.Join(addrs[:maxShown], ", ") + fmt.Sprintf(" +%d more", len(addrs)-maxShown)
-	}
 }

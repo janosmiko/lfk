@@ -92,7 +92,7 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			// Workflow steps: collected separately for STEPS section.
 			continue
 		}
-		if kv.Key == "Labels" || kv.Key == "Finalizers" || kv.Key == "Annotations" || kv.Key == "Used By" || kv.Key == "Selector" || kv.Key == "Taints" {
+		if kv.Key == "Labels" || kv.Key == "Finalizers" || kv.Key == "Annotations" || kv.Key == "Used By" || kv.Key == "Selector" || kv.Key == "Taints" || kv.Key == "Endpoints" {
 			multiLineFields = append(multiLineFields, kv)
 			continue
 		}
@@ -222,9 +222,12 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		renderRow(r)
 	}
 
-	// Render multi-line fields: Taints first (important for node scheduling
-	// decisions), then Labels and Annotations, then Finalizers/Selector/UsedBy.
-	multiOrder := []string{"Taints", "Labels", "Annotations", "Finalizers", "Selector", "Used By"}
+	// Render multi-line fields: Endpoints first (most actionable when
+	// debugging Service / EndpointSlice problems — broken endpoints are
+	// often what drives a user to look at the preview at all), then
+	// Taints (important for node scheduling decisions), then Labels and
+	// Annotations, then Finalizers/Selector/UsedBy.
+	multiOrder := []string{"Endpoints", "Taints", "Labels", "Annotations", "Finalizers", "Selector", "Used By"}
 	multiMap := make(map[string]model.KeyValue, len(multiLineFields))
 	for _, kv := range multiLineFields {
 		multiMap[kv.Key] = kv
@@ -239,7 +242,14 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		}
 		lines = append(lines, "")
 		lines = append(lines, detailKeyStyle.Render(strings.ToUpper(kv.Key)))
-		for entry := range strings.SplitSeq(kv.Value, ", ") {
+		// Endpoints emits one entry per line with `\n` as separator so
+		// the per-endpoint render stays readable; everything else uses
+		// the legacy `, ` split so existing fields render unchanged.
+		sep := ", "
+		if kv.Key == "Endpoints" {
+			sep = "\n"
+		}
+		for entry := range strings.SplitSeq(kv.Value, sep) {
 			if len(lines) >= height {
 				break
 			}

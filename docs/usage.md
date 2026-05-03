@@ -220,6 +220,33 @@ win and removes redundant load on the API server.
 - **TTL:** 5 minutes. Stale entries are refetched automatically on the
   next discovery request.
 
+## Endpoint Visibility
+
+The right-pane preview for the **Endpoints** and **EndpointSlices** kinds
+shows every endpoint individually, with target pod, node, and ready state:
+
+```
+READY      3
+NOT READY  1
+PORTS      http:80/TCP
+
+ENDPOINTS
+  192.168.1.5  → pod/foo-7d9         on node-a
+  192.168.1.6  → pod/foo-7d9-9fr     on node-b
+  192.168.1.7  → pod/foo-7d9-2qx     on node-a
+  192.168.1.8  → pod/foo-7d9-broken  on node-c   (NotReady)
+```
+
+Ready endpoints render with no status suffix; only `(NotReady)` is shown
+inline so the eye is drawn to the broken ones. A row degrades gracefully
+when `targetRef` (no target pod) or `nodeName` (host-network endpoints)
+is absent. Multiple addresses on a single EndpointSlice entry (dual-stack
+IPv4/IPv6 setups) each get their own line.
+
+For a Service's effective endpoints, press `v` (Describe) — `kubectl
+describe service` lists the resolved Endpoints inline as today. A
+dedicated rollup in the Service preview is on the roadmap.
+
 ## Secret Lazy Loading
 
 On clusters with many Helm releases or large TLS secrets, listing the
