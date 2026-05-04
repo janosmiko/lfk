@@ -95,8 +95,15 @@ func RenderLabelEditorOverlay(
 		dataMap = data.Annotations
 	}
 
-	visibleKeys := FilterKVKeys(keys, searchQuery)
-	dataContent := renderLabelEditorTable(visibleKeys, dataMap, cursor, editing, editKey, editValue, editColumn, panelContentW, panelContentH)
+	// Editing swaps the compact table for a focused multi-line edit
+	// pane (see secretview for the rationale).
+	var dataContent string
+	if editing {
+		dataContent = RenderKVEditorEditPane(editKey, editValue, editColumn, panelContentW, panelContentH)
+	} else {
+		visibleKeys := FilterKVKeys(keys, searchQuery)
+		dataContent = renderLabelEditorTable(visibleKeys, dataMap, cursor, false, "", "", 0, panelContentW, panelContentH)
+	}
 
 	// Inner bordered panel — bg + border-bg pulled from the active
 	// theme at render time. See secretview for the full rationale.

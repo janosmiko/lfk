@@ -68,15 +68,20 @@ func RenderConfigMapEditorOverlay(
 	// the stock OverlayTitleStyle uses surfaceBg.
 	title := OverlayTitleStyle.Background(BaseBg).Render("ConfigMap Editor")
 
-	visibleKeys := FilterKVKeys(cm.Keys, searchQuery)
-	filteredCM := &model.ConfigMapData{Keys: visibleKeys, Data: cm.Data}
-
-	// Data table content.
-	dataContent := renderConfigMapEditorTable(
-		filteredCM, cursor,
-		editing, editKey, editValue, editColumn,
-		panelContentW, panelContentH,
-	)
+	// Editing swaps the compact table for a focused multi-line edit
+	// pane (see secretview for the rationale).
+	var dataContent string
+	if editing {
+		dataContent = RenderKVEditorEditPane(editKey, editValue, editColumn, panelContentW, panelContentH)
+	} else {
+		visibleKeys := FilterKVKeys(cm.Keys, searchQuery)
+		filteredCM := &model.ConfigMapData{Keys: visibleKeys, Data: cm.Data}
+		dataContent = renderConfigMapEditorTable(
+			filteredCM, cursor,
+			false, "", "", 0,
+			panelContentW, panelContentH,
+		)
+	}
 
 	// Inner bordered panel — bg + border-bg pulled from the active
 	// theme at render time. See secretview for the full rationale.

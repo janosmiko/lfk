@@ -11,6 +11,32 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// TestRenderSecretEditorOverlay_EditingShowsValueAsMultiline asserts
+// that opening an existing multi-line value for editing renders the
+// value across actual lines (not collapsed via SingleLineCell's "↵"
+// glyph). The user reported they couldn't see/edit multi-line
+// secrets because the table cell collapsed them; the fix swaps the
+// table for a focused edit pane while editing is true.
+func TestRenderSecretEditorOverlay_EditingShowsValueAsMultiline(t *testing.T) {
+	secret := &model.SecretData{
+		Keys: []string{"DB_PASSWORD"},
+		Data: map[string]string{"DB_PASSWORD": "ignored-while-editing"},
+	}
+	out := RenderSecretEditorOverlay(
+		secret, 0, nil, true,
+		true,                             // editing
+		"DB_PASSWORD",                    // editKey
+		"line-one\nline-two\nline-three", // editValue (multi-line)
+		1,                                // editing the value column
+		"", false,
+		120, 30,
+	)
+	assert.Contains(t, out, "line-one", "first line of the multi-line value must be visible")
+	assert.Contains(t, out, "line-two", "second line must be visible — not collapsed to a ↵ glyph")
+	assert.Contains(t, out, "line-three", "third line must be visible")
+	assert.NotContains(t, out, "line-one ↵", "newlines stay as actual line breaks in edit mode, not collapsed")
+}
+
 // TestRenderSecretEditorOverlay_LongMultilineValueKeepsHeight pins
 // the regression for the layout bug the user reported: a really long
 // or multi-line value used to make lipgloss/table wrap the cell

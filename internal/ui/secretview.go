@@ -76,17 +76,25 @@ func RenderSecretEditorOverlay(
 	// fix above eliminates.
 	title := OverlayTitleStyle.Background(BaseBg).Render("Secret Editor")
 
-	// Filter keys before passing to the table renderer so the cursor +
-	// row iteration land on the visible subset.
-	visibleKeys := FilterKVKeys(secret.Keys, searchQuery)
-	filteredSecret := &model.SecretData{Keys: visibleKeys, Data: secret.Data}
-
-	// Data table content.
-	dataContent := renderSecretEditorTable(
-		filteredSecret, cursor, revealedKeys, allRevealed,
-		editing, editKey, editValue, editColumn,
-		panelContentW, panelContentH,
-	)
+	// Editing swaps the compact key/value table for a focused edit
+	// pane that renders the value with embedded newlines preserved.
+	// Without this swap, multi-line values would either collapse
+	// (SingleLineCell hides the line breaks) or expand the table
+	// vertically and break the editor's outer dimensions.
+	var dataContent string
+	if editing {
+		dataContent = RenderKVEditorEditPane(editKey, editValue, editColumn, panelContentW, panelContentH)
+	} else {
+		// Filter keys before passing to the table renderer so the
+		// cursor + row iteration land on the visible subset.
+		visibleKeys := FilterKVKeys(secret.Keys, searchQuery)
+		filteredSecret := &model.SecretData{Keys: visibleKeys, Data: secret.Data}
+		dataContent = renderSecretEditorTable(
+			filteredSecret, cursor, revealedKeys, allRevealed,
+			false, "", "", 0,
+			panelContentW, panelContentH,
+		)
+	}
 
 	// Inner bordered panel — bg + border-bg pulled from the active theme
 	// at render time (the package-level secretInnerPanelStyle is bare so

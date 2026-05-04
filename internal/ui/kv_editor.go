@@ -14,6 +14,95 @@ import (
 // the three editors visually consistent and removes ~60 lines of
 // near-identical code per editor.
 
+// RenderKVEditorEditPane paints the focused edit view that REPLACES
+// the compact key/value table while the user is editing a single
+// row. The pane shows the key and value as full-width labelled
+// regions; the value region renders embedded newlines as actual
+// vertical lines so the user can see and edit multi-line content
+// (PEM certs, kubeconfigs, anything the SingleLineCell collapse
+// would otherwise hide behind a "↵" glyph).
+//
+// editColumn picks which region carries the cursor block ("█"):
+// 0 = key, 1 = value. The pane is sized to (width, height); long
+// values are clipped to height-2 lines (key row + a footer hint
+// "ctrl+s save · tab switch · esc cancel") so the editor's outer
+// dimensions stay bounded.
+func RenderKVEditorEditPane(editKey, editValue string, editColumn, width, height int) string {
+	keyLabel := BarDimStyle.Bold(true).Render("Key:   ")
+	valLabel := BarDimStyle.Bold(true).Render("Value: ")
+	cursor := "█"
+
+	// Key region: single line. Cursor block lands at the end of the
+	// typed text when editColumn == 0; otherwise just plain text.
+	keyText := editKey
+	if editColumn == 0 {
+		keyText += cursor
+	}
+	keyText = Truncate(keyText, max(width-len("Key:   "), 4))
+	keyRow := lipgloss.NewStyle().Background(BaseBg).Render(keyLabel + BarNormalStyle.Render(keyText))
+
+	// Footer hint reserves the bottom row.
+	hint := BarDimStyle.Render("ctrl+s save · tab switch · enter newline · esc cancel")
+
+	// Value region: width-aware wrap to the cell's available height.
+	// Reserve 2 rows for the key row + footer hint; the remaining rows
+	// are the value's vertical budget.
+	valHeight := max(height-2, 1)
+	valWidth := max(width-len("Value: "), 4)
+
+	valText := editValue
+	if editColumn == 1 {
+		valText += cursor
+	}
+	valBody := wrapAndClip(valText, valWidth, valHeight)
+	// Pad each value line so the bg fills the row width — without
+	// padding, lines shorter than valWidth show terminal-default bg
+	// to the right of the text and break the editor's uniform shade.
+	valBodyStyled := stylePerLine(valBody, valWidth, BarNormalStyle)
+	valRow := lipgloss.NewStyle().Background(BaseBg).Render(valLabel) + valBodyStyled
+
+	return keyRow + "\n" + valRow + "\n" + hint
+}
+
+// wrapAndClip soft-wraps `s` so each visual line is at most maxW
+// columns, then clips to at most maxH lines. Returns the wrapped
+// content joined with "\n". Doesn't break inside ANSI sequences
+// (the editor passes plain text so the simple rune split is safe).
+func wrapAndClip(s string, maxW, maxH int) string {
+	lines := strings.Split(s, "\n")
+	out := make([]string, 0, len(lines))
+	for _, line := range lines {
+		if line == "" {
+			out = append(out, "")
+			continue
+		}
+		runes := []rune(line)
+		for i := 0; i < len(runes); i += maxW {
+			end := min(i+maxW, len(runes))
+			out = append(out, string(runes[i:end]))
+		}
+	}
+	if len(out) > maxH {
+		out = out[:maxH]
+		if maxH > 0 {
+			out[maxH-1] = Truncate(out[maxH-1], maxW-1) + "…"
+		}
+	}
+	return strings.Join(out, "\n")
+}
+
+// stylePerLine renders each line of `body` through `style.Width(w)`
+// so every line ends up exactly w visible columns wide and the bg
+// extends across the row. Used for the editor edit pane so cells
+// don't fade to terminal-default bg at the right edge.
+func stylePerLine(body string, w int, style lipgloss.Style) string {
+	lines := strings.Split(body, "\n")
+	for i, line := range lines {
+		lines[i] = style.Width(w).Render(line)
+	}
+	return strings.Join(lines, "\n")
+}
+
 // SingleLineCell collapses a value to a single visual line that fits
 // inside `maxW` columns. Embedded newlines, carriage returns, and tabs
 // are replaced with a faint "↵" glyph so the user still sees that the
