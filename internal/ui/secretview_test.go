@@ -223,6 +223,48 @@ func TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail(t *testing.T) {
 	assert.Contains(t, plain, "Value", "Value field-box label must render")
 }
 
+// TestRenderSecretEditorOverlay_FormatPickerDoesNotShrinkTable pins
+// the user's "Copy as adds a new line below the header and shrinks
+// the table — bad UX" report. Opening the format picker used to
+// subtract 1 row from panelContentH so the table jumped down by one
+// row mid-interaction. The fix lets the format/search bar consume
+// the title's bottom-padding row instead of stealing a panel row.
+//
+// Asserts:
+//
+//  1. Total overlay line count is identical between picker-closed
+//     and picker-open renders (no overall growth).
+//  2. The format-picker chrome ("Copy as:" label) appears once the
+//     picker is open, proving it actually rendered (i.e. we didn't
+//     accidentally hide the picker to keep heights equal).
+func TestRenderSecretEditorOverlay_FormatPickerDoesNotShrinkTable(t *testing.T) {
+	secret := &model.SecretData{
+		Keys: []string{"k1", "k2"},
+		Data: map[string]string{"k1": "v1", "k2": "v2"},
+	}
+	render := func(formatActive bool) string {
+		return RenderSecretEditorOverlay(
+			secret, 0, nil, true,
+			false, "", 0, "", 0, 0,
+			"", false,
+			nil, formatActive, 0, 0,
+			120, 30,
+		)
+	}
+	closed := render(false)
+	open := render(true)
+
+	closedLines := strings.Count(closed, "\n")
+	openLines := strings.Count(open, "\n")
+	assert.Equal(t, closedLines, openLines,
+		"overlay height must be identical with the format picker open vs closed — got closed=%d open=%d",
+		closedLines, openLines)
+
+	plainOpen := stripANSI(open)
+	assert.Contains(t, plainOpen, "Copy as:",
+		"format picker chrome must actually render (sanity check that we didn't 'fix' the height by hiding the picker)")
+}
+
 // TestRenderSecretEditorOverlay_EditingDoesNotShiftKeyColumn pins
 // the user's "the secret key is jumping" report. Non-editing rows
 // carry a 2-char prefix ("  " or "✓ ") on the key column to budget

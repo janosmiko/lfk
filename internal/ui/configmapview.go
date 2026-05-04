@@ -63,25 +63,23 @@ func RenderConfigMapEditorOverlay(
 	gapH := 1
 
 	searchBar := RenderKVEditorSearchBar(searchQuery, searchActive)
-	searchH := 0
-	if searchBar != "" {
-		searchH = 1
-	}
 	var formatBar string
-	formatH := 0
 	if formatActive {
 		formatBar = RenderKVFormatPicker(formatCursor)
-		formatH = 1
 	}
+	hasBar := searchBar != "" || formatBar != ""
 
-	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH-formatH, 3)
+	// Bars replace the title's bottom padding so the panel doesn't
+	// shrink when search/format opens. See secretview for rationale.
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH, 3)
 	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
-	// Title — bg overridden to baseBg so the title row (and its 1-row
-	// bottom padding) match the rest of the editor's baseBg surface;
-	// the stock OverlayTitleStyle uses surfaceBg.
-	title := OverlayTitleStyle.Background(BaseBg).Render("ConfigMap Editor")
+	titleStyle := OverlayTitleStyle.Background(BaseBg)
+	if hasBar {
+		titleStyle = titleStyle.Padding(0, 0, 0, 0)
+	}
+	title := titleStyle.Render("ConfigMap Editor")
 
 	// Mode selection while editing: pane for multi-line values,
 	// inline table edit for single-line. Same contract as the secret

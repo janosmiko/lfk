@@ -75,27 +75,32 @@ func RenderSecretEditorOverlay(
 	// and a row for the Shift+Y format-picker chip strip when the
 	// user is choosing a copy format.
 	searchBar := RenderKVEditorSearchBar(searchQuery, searchActive)
-	searchH := 0
-	if searchBar != "" {
-		searchH = 1
-	}
 	var formatBar string
-	formatH := 0
 	if formatActive {
 		formatBar = RenderKVFormatPicker(formatCursor)
-		formatH = 1
 	}
+	hasBar := searchBar != "" || formatBar != ""
 
-	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH-formatH, 3)
+	// Search/format bars REPLACE the title's bottom padding row when
+	// active so the panel doesn't shrink — opening the picker should
+	// not jump the table down by one row. Without this, formatH/searchH
+	// would have to be subtracted from panelContentH, the panel would
+	// shrink, and the visible content would shift mid-interaction
+	// (which the user reported as bad UX).
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH, 3)
 	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
-	// Title — bg overridden to baseBg so the title row (and its 1-row
-	// bottom padding from OverlayTitleStyle) match the rest of the
-	// editor's baseBg surface; the stock OverlayTitleStyle uses
-	// surfaceBg, which would re-introduce the very mismatch the panel
-	// fix above eliminates.
-	title := OverlayTitleStyle.Background(BaseBg).Render("Secret Editor")
+	// Title — bg overridden to baseBg so the title row matches the
+	// rest of the editor's baseBg surface (stock OverlayTitleStyle
+	// uses surfaceBg). When a bar is active, drop the bottom padding
+	// so the bar takes the gap row's place — see panelContentH note
+	// above.
+	titleStyle := OverlayTitleStyle.Background(BaseBg)
+	if hasBar {
+		titleStyle = titleStyle.Padding(0, 0, 0, 0)
+	}
+	title := titleStyle.Render("Secret Editor")
 
 	// Mode selection while editing:
 	//   - value contains '\n'  → focused bordered pane (handles newlines
