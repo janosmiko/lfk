@@ -46,6 +46,73 @@ func TestSecretEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
 	assert.False(t, present, "second toggle on the same key removes it from the set entirely")
 }
 
+func TestSecretEditor_SpaceTogglesSelectionLikeS(t *testing.T) {
+	// Space is the standard TUI selection key. The handler treats
+	// it as an alias for `s` so users get either keystroke without
+	// having to learn the vim convention.
+	data := &model.SecretData{
+		Keys: []string{"k1", "k2"},
+		Data: map[string]string{"k1": "v1", "k2": "v2"},
+	}
+	m := Model{
+		overlay:      overlaySecretEditor,
+		secretData:   data,
+		secretCursor: 0,
+		tabs:         []TabState{{}},
+		width:        80, height: 40,
+	}
+	ret, _ := m.handleSecretEditorKey(specialKey(tea.KeySpace))
+	r := ret.(Model)
+	assert.True(t, r.editorSearch.selected["k1"], "Space must toggle selection (alias for `s`)")
+	assert.Equal(t, 1, r.secretCursor, "Space must auto-advance the cursor like `s`")
+}
+
+func TestSecretEditor_YWithSelectionOpensFormatPicker(t *testing.T) {
+	// With selections present, plain `y` no longer copies just the
+	// cursor value — it opens the format picker so the user can
+	// pick how to combine the selected pairs. With NO selections,
+	// `y` keeps the original single-value copy semantics.
+	data := &model.SecretData{
+		Keys: []string{"k1", "k2"},
+		Data: map[string]string{"k1": "v1", "k2": "v2"},
+	}
+	m := Model{
+		overlay:      overlaySecretEditor,
+		secretData:   data,
+		secretCursor: 0,
+		tabs:         []TabState{{}},
+		width:        80, height: 40,
+	}
+	m.editorSearch.selected = map[string]bool{"k1": true, "k2": true}
+
+	ret, _ := m.handleSecretEditorKey(runeKey('y'))
+	r := ret.(Model)
+	assert.True(t, r.editorSearch.formatActive,
+		"y with selections must auto-open the format picker — copying a single cursor value would silently ignore the user's marked rows")
+	assert.Empty(t, r.statusMessage,
+		"y must NOT trigger a copy when it opens the picker — copy happens on Enter inside the picker")
+}
+
+func TestSecretEditor_YWithoutSelectionCopiesCursor(t *testing.T) {
+	data := &model.SecretData{
+		Keys: []string{"k1"},
+		Data: map[string]string{"k1": "value-1"},
+	}
+	m := Model{
+		overlay:      overlaySecretEditor,
+		secretData:   data,
+		secretCursor: 0,
+		tabs:         []TabState{{}},
+		width:        80, height: 40,
+	}
+	ret, _ := m.handleSecretEditorKey(runeKey('y'))
+	r := ret.(Model)
+	assert.False(t, r.editorSearch.formatActive,
+		"y without selections must NOT open the picker — single-value copy is the original behaviour")
+	assert.Contains(t, r.statusMessage, "Copied",
+		"y without selections must surface the single-value copy via the status bar")
+}
+
 func TestSecretEditor_ShiftYOpensFormatPicker(t *testing.T) {
 	data := &model.SecretData{
 		Keys: []string{"k1"},

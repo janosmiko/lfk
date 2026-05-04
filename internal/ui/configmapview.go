@@ -162,19 +162,22 @@ func renderConfigMapEditorTable(
 		v := cm.Data[k]
 		displayV := configMapValueDisplay(v, valColW)
 
+		// Consistent 2-char prefix across all rows (including editing)
+		// so column alignment stays stable. See secretview for the
+		// rationale.
+		prefix := "  "
+		if selectedKeys[k] {
+			prefix = "\u2713 "
+		}
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = overlayCursor(editKey, editKeyCursor, true, keyColW)
+			keyText = prefix + overlayCursor(editKey, editKeyCursor, true, keyColW-2)
 			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
-			keyText = SingleLineCell(editKey, keyColW)
+			keyText = prefix + SingleLineCell(editKey, keyColW-2)
 			valText = overlayCursor(editValue, editValueCursor, true, valColW)
 		default:
-			prefix := "  "
-			if selectedKeys[k] {
-				prefix = "\u2713 "
-			}
 			keyText = prefix + SingleLineCell(k, keyColW-2)
 			valText = displayV
 		}

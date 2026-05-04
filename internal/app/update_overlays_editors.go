@@ -52,11 +52,11 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Toggle all values visibility.
 		m.secretAllRevealed = !m.secretAllRevealed
 		return m, nil
-	case "s":
-		// Toggle current row in the multi-select set. Picked over
-		// space (already used by the existing reveal-toggle) and v
-		// (also reveal). The set lives across cursor moves so users
-		// can select non-adjacent rows.
+	case "s", " ":
+		// Toggle current row in the multi-select set. Both `s` (vim-
+		// style) and Space (more discoverable / common TUI convention)
+		// trigger the toggle. The set lives across cursor moves so
+		// users can select non-adjacent rows.
 		return m.handleSecretEditorKeyS()
 	case "Y":
 		// Open the Shift+Y format picker. Apply target = selected
@@ -85,7 +85,16 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Delete selected row.
 		return m.handleSecretEditorKeyD()
 	case "y":
-		// Copy current value to clipboard.
+		// With selections, "y" copies the bundle (auto-opens the
+		// format picker) — copying just the cursor value when the
+		// user explicitly marked rows would silently ignore intent.
+		// Without selections, "y" copies the cursor row's value
+		// verbatim (the original single-value behaviour).
+		if len(m.editorSearch.selected) > 0 {
+			m.editorSearch.formatActive = true
+			m.editorSearch.formatCursor = 0
+			return m, nil
+		}
 		visible := m.secretVisibleKeys()
 		if m.secretCursor >= 0 && m.secretCursor < len(visible) {
 			key := visible[m.secretCursor]
@@ -147,9 +156,9 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfigMapEditorKeyJ()
 	case "k", "up":
 		return m.handleConfigMapEditorKeyK()
-	case "s":
-		// Toggle current row in the multi-select set. See secret editor
-		// for the broader rationale (persists across cursor moves).
+	case "s", " ":
+		// Both `s` (vim) and Space (TUI convention) toggle selection.
+		// See secret editor for broader rationale.
 		return m.handleConfigMapEditorKeyS()
 	case "Y":
 		// Open the format picker — apply target = selected rows if any,
@@ -176,7 +185,13 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Delete selected row.
 		return m.handleConfigMapEditorKeyD()
 	case "y":
-		// Copy current value to clipboard.
+		// With selections, "y" auto-opens the format picker. Without
+		// selections, copy the cursor row's value verbatim.
+		if len(m.editorSearch.selected) > 0 {
+			m.editorSearch.formatActive = true
+			m.editorSearch.formatCursor = 0
+			return m, nil
+		}
 		visible := m.configMapVisibleKeys()
 		if m.configMapCursor >= 0 && m.configMapCursor < len(visible) {
 			key := visible[m.configMapCursor]
@@ -295,8 +310,8 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "k", "up":
 		return m.handleLabelEditorKeyK()
-	case "s":
-		// Toggle current row in the multi-select set. See secret editor.
+	case "s", " ":
+		// Both `s` (vim) and Space (TUI convention) toggle selection.
 		return m.handleLabelEditorKeyS()
 	case "Y":
 		// Open the format picker — apply target = selected rows if any,
@@ -335,6 +350,13 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "D":
 		return m.handleLabelEditorKeyD(currentKeys, currentData, visible)
 	case "y":
+		// With selections, "y" auto-opens the format picker. Without
+		// selections, copy the cursor row's value verbatim.
+		if len(m.editorSearch.selected) > 0 {
+			m.editorSearch.formatActive = true
+			m.editorSearch.formatCursor = 0
+			return m, nil
+		}
 		if m.labelCursor >= 0 && m.labelCursor < len(currentKeys) {
 			key := currentKeys[m.labelCursor]
 			val := currentData[key]

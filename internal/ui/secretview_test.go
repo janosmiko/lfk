@@ -223,6 +223,45 @@ func TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail(t *testing.T) {
 	assert.Contains(t, plain, "Value", "Value field-box label must render")
 }
 
+// TestRenderSecretEditorOverlay_EditingDoesNotShiftKeyColumn pins
+// the user's "the secret key is jumping" report. Non-editing rows
+// carry a 2-char prefix ("  " or "✓ ") on the key column to budget
+// for the selection checkmark; the inline-edit branch used to drop
+// that prefix entirely, so pressing `e` shifted the cursor row's
+// key text left by 2 columns. The fix keeps the same prefix on
+// editing rows so column alignment stays stable across modes.
+func TestRenderSecretEditorOverlay_EditingDoesNotShiftKeyColumn(t *testing.T) {
+	secret := &model.SecretData{
+		Keys: []string{"DB_PASSWORD"},
+		Data: map[string]string{"DB_PASSWORD": "hunter2"},
+	}
+	render := func(editing bool) string {
+		return RenderSecretEditorOverlay(
+			secret, 0, nil, true,
+			editing,
+			"DB_PASSWORD", 11,
+			"hunter2", 7,
+			1, "", false,
+			nil, false, 0, 0,
+			120, 30,
+		)
+	}
+	idle := stripANSI(render(false))
+	editing := stripANSI(render(true))
+
+	// Find the byte index where "DB_PASSWORD" starts on its row in
+	// both renders. Equal indexes prove the column didn't shift.
+	idleIdx := strings.Index(idle, "DB_PASSWORD")
+	editIdx := strings.Index(editing, "DB_PASSWORD")
+	assert.NotEqual(t, -1, idleIdx, "non-editing render must contain the key")
+	assert.NotEqual(t, -1, editIdx, "editing render must still contain the key")
+	// Both indexes are absolute byte offsets in the full overlay output;
+	// since the surrounding overlay chrome is byte-identical between the
+	// two renders, equal offsets = same column position.
+	assert.Equal(t, idleIdx, editIdx,
+		"key column offset must match between editing and non-editing modes — got idle=%d editing=%d", idleIdx, editIdx)
+}
+
 // TestRenderSecretEditorOverlay_SingleLineValueEditsInline asserts
 // that editing a value WITHOUT '\n' renders the table inline (cursor
 // lives inside the cursor row's value cell) rather than swapping in

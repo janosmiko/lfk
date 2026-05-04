@@ -383,14 +383,26 @@ func (m Model) overlayHintBarOverlaySecretEditor() string {
 		{Key: "V", Desc: "all"},
 		{Key: "e", Desc: "edit"},
 		{Key: "a", Desc: "add"},
-		{Key: "y", Desc: "copy"},
-		{Key: "s", Desc: "select"},
+		{Key: "y", Desc: kvCopyHintDesc(m)},
+		{Key: "s/␣", Desc: "select"},
 		{Key: "Y", Desc: "copy as…"},
 		{Key: "/", Desc: "filter"},
 		{Key: "D", Desc: "del"},
 		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
 	})
+}
+
+// kvCopyHintDesc surfaces what `y` will do given the current
+// selection state — reflects the smart-y wiring (single-value copy
+// when no rows are marked, format-picker when selections are present).
+// Keeps the hint bar honest so the user doesn't press `y` and get a
+// surprise picker overlay.
+func kvCopyHintDesc(m Model) string {
+	if len(m.editorSearch.selected) > 0 {
+		return "copy as…"
+	}
+	return "copy"
 }
 
 func (m Model) overlayHintBarOverlayConfigMapEditor() string {
@@ -420,8 +432,8 @@ func (m Model) overlayHintBarOverlayConfigMapEditor() string {
 		{Key: "jk", Desc: "nav"},
 		{Key: "e", Desc: "edit"},
 		{Key: "a", Desc: "add"},
-		{Key: "y", Desc: "copy"},
-		{Key: "s", Desc: "select"},
+		{Key: "y", Desc: kvCopyHintDesc(m)},
+		{Key: "s/␣", Desc: "select"},
 		{Key: "Y", Desc: "copy as…"},
 		{Key: "/", Desc: "filter"},
 		{Key: "D", Desc: "del"},
@@ -457,8 +469,8 @@ func (m Model) overlayHintBarOverlayLabelEditor() string {
 		{Key: "jk", Desc: "nav"},
 		{Key: "e", Desc: "edit"},
 		{Key: "a", Desc: "add"},
-		{Key: "y", Desc: "copy"},
-		{Key: "s", Desc: "select"},
+		{Key: "y", Desc: kvCopyHintDesc(m)},
+		{Key: "s/␣", Desc: "select"},
 		{Key: "Y", Desc: "copy as…"},
 		{Key: "/", Desc: "filter"},
 		{Key: "D", Desc: "del"},

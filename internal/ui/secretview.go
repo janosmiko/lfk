@@ -199,22 +199,24 @@ func renderSecretEditorTable(
 	for i := start; i < end; i++ {
 		k := secret.Keys[i]
 		v := secret.Data[k]
+		// All key cells carry a 2-char prefix slot ("  " unselected,
+		// "✓ " selected) so column alignment stays stable when the
+		// user toggles selection or enters/exits edit mode. Without
+		// this the cursor row's key text would shift left by 2
+		// columns the moment editing started.
+		prefix := "  "
+		if selectedKeys[k] {
+			prefix = "✓ "
+		}
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = overlayCursor(editKey, editKeyCursor, true, keyColW)
+			keyText = prefix + overlayCursor(editKey, editKeyCursor, true, keyColW-2)
 			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
-			keyText = SingleLineCell(editKey, keyColW)
+			keyText = prefix + SingleLineCell(editKey, keyColW-2)
 			valText = overlayCursor(editValue, editValueCursor, true, valColW)
 		default:
-			// Reserve 2 cols for the "✓ " / "  " selection prefix so
-			// adding a checkmark on selected rows doesn't push the key
-			// text past the cell width.
-			prefix := "  "
-			if selectedKeys[k] {
-				prefix = "✓ "
-			}
 			keyText = prefix + SingleLineCell(k, keyColW-2)
 			valText = secretValueDisplay(v, revealedKeys[k] || allRevealed, valColW)
 		}

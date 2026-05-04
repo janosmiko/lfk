@@ -454,9 +454,9 @@ enters edit mode for the selected (or new) entry.
 | `j` / `k` | Move cursor up/down |
 | `e` | Edit selected key/value |
 | `a` | Add a new key/value entry |
-| `y` | Copy selected value to clipboard |
-| `s` | Toggle selection on the current row (cursor auto-advances; works across non-adjacent rows) |
-| `Y` | Open the format picker; copies selected rows (or the cursor row) as YAML / JSON / dotenv / `key=value` / values-only |
+| `y` | Copy: cursor row's value when nothing is selected, **opens the format picker automatically when 1+ rows are selected** (so you don't silently copy a single value while ignoring the marked bundle) |
+| `s` / `Space` | Toggle selection on the current row (cursor auto-advances; works across non-adjacent rows) |
+| `Y` | Always open the format picker; copies selected rows (or the cursor row) as YAML / JSON / dotenv / `key=value` / values-only |
 | `/` | Filter the list by key (typing extends the query, `Enter` applies, `Esc` clears) |
 | `D` | Delete selected entry |
 | `Enter` | Save changes and close (no-op if nothing changed) |
