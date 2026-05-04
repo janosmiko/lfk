@@ -213,6 +213,16 @@ func (m Model) loadResourceTree() tea.Cmd {
 		if sel.Namespace != "" {
 			ns = sel.Namespace
 		}
+	case model.LevelContainers:
+		// At the containers level, M means "show the parent Pod's tree".
+		// The Container itself has no refs distinct from its Pod, and the
+		// user's mental model of "the resource map for what I'm looking at"
+		// is the surrounding Pod.
+		name = m.nav.OwnedName
+		if name == "" {
+			return nil
+		}
+		kind = "Pod"
 	default:
 		return nil
 	}

@@ -252,6 +252,22 @@ func TestCov80LoadResourceTreeClusters(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+func TestCov80LoadResourceTreeContainersUsesPodOwner(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelContainers
+	m.nav.OwnedName = "my-pod"
+	cmd := m.loadResourceTree()
+	require.NotNil(t, cmd, "M at LevelContainers should resolve to the parent Pod's tree")
+}
+
+func TestCov80LoadResourceTreeContainersNoOwnedName(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelContainers
+	m.nav.OwnedName = ""
+	cmd := m.loadResourceTree()
+	assert.Nil(t, cmd, "no Pod selected → no command")
+}
+
 func TestCov80ResolveNamespace(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Namespace = "nav-ns"
