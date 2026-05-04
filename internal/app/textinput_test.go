@@ -139,6 +139,62 @@ func TestTextInput_Right(t *testing.T) {
 	assert.Equal(t, 5, ti.Cursor)
 }
 
+func TestTextInput_Up(t *testing.T) {
+	t.Run("first line is no-op", func(t *testing.T) {
+		ti := TextInput{Value: "hello\nworld", Cursor: 3}
+		ti.Up()
+		assert.Equal(t, 3, ti.Cursor, "no previous line — cursor must not move")
+	})
+
+	t.Run("preserves byte column when previous line is at least as long", func(t *testing.T) {
+		ti := TextInput{Value: "hello\nworld", Cursor: 9} // on "world" at col 3
+		ti.Up()
+		assert.Equal(t, 3, ti.Cursor, "should land at col 3 of 'hello'")
+	})
+
+	t.Run("clamps column when previous line is shorter", func(t *testing.T) {
+		ti := TextInput{Value: "hi\nworld", Cursor: 7} // on "world" at col 4
+		ti.Up()
+		assert.Equal(t, 2, ti.Cursor, "previous line 'hi' has only 2 chars; cursor lands at end")
+	})
+
+	t.Run("up from third line lands on second line same column", func(t *testing.T) {
+		ti := TextInput{Value: "a\nb\ncccc", Cursor: 4} // on "cccc" at col 0
+		ti.Up()
+		assert.Equal(t, 2, ti.Cursor, "col 0 of 'b' line — exactly one line up, not two")
+
+		// One more up: col 0 of 'a' line (start of buffer).
+		ti.Up()
+		assert.Equal(t, 0, ti.Cursor, "col 0 of 'a' line")
+	})
+}
+
+func TestTextInput_Down(t *testing.T) {
+	t.Run("last line is no-op", func(t *testing.T) {
+		ti := TextInput{Value: "hello\nworld", Cursor: 8}
+		ti.Down()
+		assert.Equal(t, 8, ti.Cursor, "no next line — cursor must not move")
+	})
+
+	t.Run("preserves byte column when next line is at least as long", func(t *testing.T) {
+		ti := TextInput{Value: "hello\nworld", Cursor: 3} // on "hello" at col 3
+		ti.Down()
+		assert.Equal(t, 9, ti.Cursor, "should land at col 3 of 'world' (offset 6+3=9)")
+	})
+
+	t.Run("clamps column when next line is shorter", func(t *testing.T) {
+		ti := TextInput{Value: "world\nhi", Cursor: 4} // on "world" at col 4
+		ti.Down()
+		assert.Equal(t, 8, ti.Cursor, "next line 'hi' has only 2 chars; cursor lands at end (offset 6+2=8)")
+	})
+
+	t.Run("works at start of multiline", func(t *testing.T) {
+		ti := TextInput{Value: "first\nsecond\nthird", Cursor: 0}
+		ti.Down()
+		assert.Equal(t, 6, ti.Cursor, "lands at start of 'second'")
+	})
+}
+
 func TestTextInput_Set(t *testing.T) {
 	ti := TextInput{}
 	ti.Set("new value")

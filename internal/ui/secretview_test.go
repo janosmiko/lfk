@@ -160,6 +160,126 @@ func TestRenderSecretEditorOverlay_InnerPanelMatchesOuterBg(t *testing.T) {
 		"editor overlay must emit bg-setting SGRs for the outer overlay AND the inner panel; got %d", bgMarkers)
 }
 
+// TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail pins the
+// regression for the user's "Value  ;162;247;48;2;36;40;59m╭──────"
+// report. kvFieldBox used to splice the label into the styled top
+// border via []rune(top) slicing, but the styled border carries ANSI
+// escape sequences ("\x1b[38;2;R;G;B;48;2;r;g;bm…") whose bytes are
+// counted as runes — so the slice index landed inside an SGR code,
+// leaving the tail (digits + ';' + 'm') visible as raw text. The fix
+// uses ANSI-aware splicing so the escape sequence stays intact.
+//
+// Asserts that, after stripping ANSI from the rendered editor in
+// editing mode, no SGR-tail signature (";\d+;\d+;\d+m" or similar)
+// remains in the visible text.
+func TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail(t *testing.T) {
+	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
+	originalNoColor := ConfigNoColor
+	originalTransparent := ConfigTransparentBg
+	t.Cleanup(func() {
+		lipgloss.DefaultRenderer().SetColorProfile(originalProfile)
+		ConfigNoColor = originalNoColor
+		ConfigTransparentBg = originalTransparent
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ConfigTransparentBg = false
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+	ApplyTheme(DefaultTheme())
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+
+	secret := &model.SecretData{
+		Keys: []string{"DB_PASSWORD"},
+		Data: map[string]string{"DB_PASSWORD": "ignored-while-editing"},
+	}
+	// Editing mode (true) routes through RenderKVEditorEditPane which
+	// uses kvFieldBox for both the Key and Value labels.
+	out := RenderSecretEditorOverlay(
+		secret, 0, nil, true,
+		true,
+		"DB_PASSWORD", 11,
+		"hunter2", 7,
+		1,
+		"", false,
+		nil, false, 0,
+		120, 30,
+	)
+	plain := stripANSI(out)
+	// SGR tail signature: a sequence of digits and semicolons followed
+	// by 'm'. Two or more semicolon-separated numeric groups before an
+	// 'm' is a near-certain SGR tail when seen in stripped (ANSI-free)
+	// text — visible content shouldn't have that shape anywhere.
+	for _, marker := range []string{"48;2;", "38;2;", "48;5;", "38;5;"} {
+		assert.NotContains(t, plain, marker,
+			"stripped output must not contain SGR-tail signature %q — kvFieldBox is leaking ANSI bytes via []rune slicing", marker)
+	}
+	// The Key/Value labels should still be visible in the output.
+	assert.Contains(t, plain, "Key", "Key field-box label must render")
+	assert.Contains(t, plain, "Value", "Value field-box label must render")
+}
+
+// TestRenderSecretEditorOverlay_LongValueScrollsToCursor pins the
+// fix for the user's "secret value is really long … the end of the
+// secret is not shown on the screen" report. overlayCursorMultiline
+// used to hard-clip the visual lines to maxH from the top, so when
+// editing a value taller than the visible field box the trailing
+// lines (and any cursor placed inside them) were silently dropped.
+// The fix scrolls the visible window so the cursor's line stays in
+// view; when the cursor sits at the end of a long value, the END of
+// the value renders, not the beginning.
+func TestRenderSecretEditorOverlay_LongValueScrollsToCursor(t *testing.T) {
+	// Build a value with many short lines — comfortably more than
+	// the field box's ~maxH so the top would clip the bottom under
+	// the old behaviour.
+	var b strings.Builder
+	for i := range 60 {
+		b.WriteString("line-")
+		// Pad the index so we can spot specific lines in the output.
+		switch {
+		case i < 10:
+			b.WriteString("0")
+		}
+		b.WriteString(itoaTiny(i))
+		b.WriteString("\n")
+	}
+	b.WriteString("LAST-LINE-MARKER")
+	value := b.String()
+
+	secret := &model.SecretData{
+		Keys: []string{"big"},
+		Data: map[string]string{"big": "ignored-while-editing"},
+	}
+	out := RenderSecretEditorOverlay(
+		secret, 0, nil, true,
+		true,
+		"big", 3,
+		value, len(value), // cursor at end of value
+		1, // editing the value column
+		"", false,
+		nil, false, 0,
+		120, 30,
+	)
+	plain := stripANSI(out)
+	assert.Contains(t, plain, "LAST-LINE-MARKER",
+		"end of long multi-line value must be visible — the renderer must scroll to follow the cursor")
+}
+
+// itoaTiny converts a non-negative int < 1000 to a string without
+// pulling in strconv at the top of the test file.
+func itoaTiny(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var digits [4]byte
+	i := len(digits)
+	for n > 0 {
+		i--
+		digits[i] = byte('0' + n%10)
+		n /= 10
+	}
+	return string(digits[i:])
+}
+
 // --- secretValueDisplay ---
 
 func TestSecretValueDisplay(t *testing.T) {

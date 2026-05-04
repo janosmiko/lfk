@@ -5,6 +5,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/lipgloss/table"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // kv_editor.go holds rendering primitives shared by the three K/V
@@ -78,7 +79,7 @@ func kvFieldBox(label, content string, active bool, outerW, contentH int) string
 	}
 
 	// Render the field with its content, then splice the label over
-	// the top-border row so it reads as "── Key ──" / "── Value ──".
+	// the top-border row so it reads as "╭ Key ───╮" / "╭ Value ──╮".
 	rendered := border.Render(content)
 	lines := strings.Split(rendered, "\n")
 	if len(lines) == 0 {
@@ -93,20 +94,20 @@ func kvFieldBox(label, content string, active bool, outerW, contentH int) string
 			Bold(true)
 	}
 	styledLabel := labelStyle.Render(label)
-	if 1+lipgloss.Width(styledLabel) <= lipgloss.Width(top) {
-		// Replace the segment of the top border at offset 2..2+labelW
-		// with the label so the chrome reads "╭─ Key ─...─╮".
-		labelW := lipgloss.Width(styledLabel)
-		// Strip ANSI from top to know its visible chars; then rebuild.
-		// Simpler: prepend the first border char + a space, then label,
-		// then the remainder of the top border.
-		first := string([]rune(top)[0]) // "╭"
-		// Skip first char + (labelW + 1) chars from the original top.
-		topRunes := []rune(top)
-		if len(topRunes) > labelW+1 {
-			rest := string(topRunes[1+labelW:])
-			lines[0] = first + styledLabel + rest
-		}
+	labelW := lipgloss.Width(styledLabel)
+	topW := lipgloss.Width(top)
+	if 1+labelW <= topW {
+		// Splice the label into the styled top border. The original
+		// `top` is ANSI-styled (border fg + bg SGR sequences around
+		// every border char), so naive `[]rune(top)` slicing counts
+		// the escape bytes as runes and lands inside an SGR — leaving
+		// the tail visible as raw text (the user reported
+		// "Value  ;162;247;48;2;36;40;59m╭───" symptom). ansi.Cut
+		// is grapheme- and ANSI-aware: it returns the slice between
+		// visual columns [left, right) with escape sequences preserved.
+		prefix := ansi.Cut(top, 0, 1)           // styled "╭"
+		suffix := ansi.Cut(top, 1+labelW, topW) // styled "──...─╮"
+		lines[0] = prefix + styledLabel + suffix
 	}
 	return strings.Join(lines, "\n")
 }
@@ -146,6 +147,13 @@ func overlayCursor(s string, cursor int, active bool, maxW int) string {
 // ANSI sequences from the cursor styling don't break the column
 // math (a previous wrapAndClip-then-style approach miscounted runes
 // when escape sequences landed inside the wrap window).
+//
+// When `active` is true the visible window scrolls to keep the
+// cursor in view: if the cursor's visual line lies past the last
+// visible row, the slice shifts down so the cursor lands on the
+// bottom row. Without this the user couldn't reach the end of long
+// secret values — the trailing lines were silently truncated to
+// maxH and the cursor placed on a line that never made it on screen.
 func overlayCursorMultiline(s string, cursor int, active bool, maxW, maxH int) string {
 	if maxW <= 0 || maxH <= 0 {
 		return ""
@@ -157,6 +165,7 @@ func overlayCursorMultiline(s string, cursor int, active bool, maxW, maxH int) s
 	var cur []byte
 	visualCol := 0
 	cursorPlaced := false
+	cursorLine := -1 // visual line index where the cursor was placed
 
 	flush := func() {
 		lines = append(lines, string(cur))
@@ -165,7 +174,8 @@ func overlayCursorMultiline(s string, cursor int, active bool, maxW, maxH int) s
 	}
 	emitCursor := func(text string) {
 		cur = append(cur, []byte(cursorStyle.Render(text))...)
-		visualCol++ // text is exactly one rune (or " ") so always 1 visual col
+		visualCol++             // text is exactly one rune (or " ") so always 1 visual col
+		cursorLine = len(lines) // index of the line currently being built
 	}
 
 	i := 0
@@ -209,9 +219,17 @@ func overlayCursorMultiline(s string, cursor int, active bool, maxW, maxH int) s
 	if len(cur) > 0 {
 		lines = append(lines, string(cur))
 	}
-	if len(lines) > maxH {
-		lines = lines[:maxH]
+
+	// Scroll-to-cursor: when active and the cursor sits below the
+	// visible window, slide the window down so the cursor lands on
+	// the bottom row. When inactive (or no cursor placed) keep the
+	// historical behaviour of clipping from the top.
+	scroll := 0
+	if active && cursorLine >= maxH {
+		scroll = cursorLine - maxH + 1
 	}
+	end := min(scroll+maxH, len(lines))
+	lines = lines[scroll:end]
 	return stylePerLine(strings.Join(lines, "\n"), maxW, BarNormalStyle)
 }
 

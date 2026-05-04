@@ -86,6 +86,12 @@ func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "right":
 		activeInput.Right()
 		return m, nil
+	case "up":
+		activeInput.Up()
+		return m, nil
+	case "down":
+		activeInput.Down()
+		return m, nil
 	default:
 		key := msg.String()
 		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
@@ -174,6 +180,12 @@ func (m Model) handleConfigMapEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		return m, nil
 	case "right":
 		activeInput.Right()
+		return m, nil
+	case "up":
+		activeInput.Up()
+		return m, nil
+	case "down":
+		activeInput.Down()
 		return m, nil
 	default:
 		key := msg.String()
@@ -265,6 +277,12 @@ func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, cu
 		return m, nil
 	case "right":
 		activeInput.Right()
+		return m, nil
+	case "up":
+		activeInput.Up()
+		return m, nil
+	case "down":
+		activeInput.Down()
 		return m, nil
 	default:
 		key := msg.String()
