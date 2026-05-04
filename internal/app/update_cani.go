@@ -496,6 +496,13 @@ func (m Model) handleCanISubjectFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 // fresh scope without forcing the user to use the in-overlay 'A'
 // toggle (which is awkward when they just changed scope from the
 // global selector they're already familiar with).
+//
+// Multi-select is sorted (so the title bar renders deterministically
+// across frames — map iteration order would shuffle "ns: a,b,c" into
+// "ns: c,a,b") and collapsed to the first entry in Who-Can mode,
+// since loadWhoCan only treats len(canINamespaces) == 1 as a single
+// namespace and otherwise queries cluster-wide. Without the collapse,
+// the title would say "ns: a,b" while the data was cluster-wide.
 func (m *Model) syncCanINamespacesFromSelection() {
 	switch {
 	case m.allNamespaces:
@@ -504,6 +511,10 @@ func (m *Model) syncCanINamespacesFromSelection() {
 		ns := make([]string, 0, len(m.selectedNamespaces))
 		for n := range m.selectedNamespaces {
 			ns = append(ns, n)
+		}
+		sort.Strings(ns)
+		if m.canIMode == canIModeWhoCan && len(ns) > 1 {
+			ns = ns[:1]
 		}
 		m.canINamespaces = ns
 	case m.namespace != "":

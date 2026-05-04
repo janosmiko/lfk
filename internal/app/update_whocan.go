@@ -53,6 +53,7 @@ func (m Model) enterWhoCanMode() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.whoCan.resource = resource
+	m.whoCan.loading = true
 	return m, m.loadWhoCan()
 }
 
@@ -146,6 +147,7 @@ func (m Model) handleWhoCanKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.canINamespaces = []string{""}
 		}
 		if m.whoCan.resource != "" {
+			m.whoCan.loading = true
 			return m, m.loadWhoCan()
 		}
 		return m, nil
@@ -163,6 +165,7 @@ func (m Model) whoCanCycleVerb(delta int) (tea.Model, tea.Cmd) {
 	}
 	m.whoCan.verbCursor = next
 	if m.whoCan.resource != "" {
+		m.whoCan.loading = true
 		return m, m.loadWhoCan()
 	}
 	return m, nil
@@ -258,6 +261,7 @@ func (m Model) refreshWhoCanForCursor(visible []string) (tea.Model, tea.Cmd) {
 	}
 	m.whoCan.resource = resource
 	m.whoCan.subjectsScroll = 0
+	m.whoCan.loading = true
 	return m, m.loadWhoCan()
 }
 
@@ -280,12 +284,25 @@ func (m Model) handleWhoCanFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case filterEscape:
 		m.whoCan.resourceFilterActive = false
 		m.whoCan.resourceFilter.Clear()
-		// Restore cursor to a valid position in the un-narrowed list.
-		if m.whoCan.resourceCursor >= len(m.whoCan.resourceList) {
+		// After clearing the filter the list returns to the full set, so
+		// the cursor index that pointed into the narrowed list may now
+		// land on a different resource. Refresh subjects against the
+		// (now un-narrowed) cursor so the picker highlight and the
+		// subjects pane stay in sync — without this, Esc would leave
+		// the user looking at the previously-selected resource's
+		// subjects while the picker highlights an unrelated row.
+		visible := m.whoCanVisibleResources()
+		if len(visible) == 0 {
+			m.whoCan.resource = ""
+			m.whoCan.resourceCursor = 0
+			m.whoCan.resourceScroll = 0
+			return m, nil
+		}
+		if m.whoCan.resourceCursor >= len(visible) {
 			m.whoCan.resourceCursor = 0
 		}
 		m.whoCan.resourceScroll = 0
-		return m, nil
+		return m.refreshWhoCanForCursor(visible)
 	case filterClose:
 		m.whoCan.resourceFilterActive = false
 		m.whoCan.resourceFilter.Clear()
@@ -308,6 +325,12 @@ func (m Model) handleWhoCanFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // resource + namespace. Fires asynchronously; the result lands as
 // whoCanLoadedMsg and is injected into m.whoCan.subjects by the
 // handler.
+//
+// Note: callers are responsible for setting m.whoCan.loading = true
+// before invoking this method. Doing it here would mutate the value
+// receiver's copy, and the flag wouldn't persist on the Model returned
+// to the Update handler — so the spinner would never show during the
+// in-flight fetch.
 func (m Model) loadWhoCan() tea.Cmd {
 	verb := ui.WhoCanVerbs[m.whoCan.verbCursor]
 	// "*" means "any verb"; passed through to verbMatches which treats
@@ -321,7 +344,6 @@ func (m Model) loadWhoCan() tea.Cmd {
 	}
 	kctx := m.nav.Context
 	gen := m.requestGen
-	m.whoCan.loading = true
 	return m.trackBgTask(
 		bgtasks.KindResourceList,
 		"WhoCan: "+verb+" "+resource,

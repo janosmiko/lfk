@@ -349,6 +349,175 @@ func TestHandleCanIKey_TabDuringSearchDoesNotEnterWhoCan(t *testing.T) {
 		"search must remain active — the key was delegated to handleCanISearchKey, not the WhoCan pivot")
 }
 
+func TestEnterWhoCanMode_SetsLoadingFlagOnReturnedModel(t *testing.T) {
+	// Regression: loading was set inside loadWhoCan (a value-receiver
+	// method), so the mutation lived on a discarded copy. The renderer
+	// then never showed the spinner during the in-flight fetch on entry.
+	// Loading must be set on the Model the caller returns to Update.
+	m := Model{}
+	m.canIGroups = []model.CanIGroup{
+		canIGroupOf("", "pods"),
+	}
+	m.canIGroupCursor = 0
+	mdl, cmd := m.enterWhoCanMode()
+	result := mdl.(Model)
+	assert.True(t, result.whoCan.loading,
+		"entering Who-Can with a resource must arm the spinner on the persisted Model")
+	assert.NotNil(t, cmd, "loadWhoCan must dispatch a fetch when there is a resource")
+}
+
+func TestEnterWhoCanMode_NoResourceLeavesLoadingClear(t *testing.T) {
+	// When there's nothing to fetch (no Can-I groups), entry must NOT
+	// arm the spinner — otherwise the overlay would show a permanent
+	// "loading…" with no fetch ever landing to clear it.
+	m := Model{}
+	mdl, cmd := m.enterWhoCanMode()
+	result := mdl.(Model)
+	assert.False(t, result.whoCan.loading,
+		"empty resource list must leave loading=false — no fetch is dispatched")
+	assert.Nil(t, cmd, "no fetch dispatched when there is no resource to query")
+}
+
+func TestWhoCanCycleVerb_ArmsSpinnerWhenResourceSet(t *testing.T) {
+	// Regression: cycling the verb dispatches a new fetch but used to
+	// rely on loadWhoCan's value-receiver mutation — so the spinner
+	// never showed during verb cycling either.
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods", verbCursor: 0}}}
+	mdl, cmd := m.handleWhoCanKey(keyMsg("right"))
+	result := mdl.(Model)
+	assert.Equal(t, 1, result.whoCan.verbCursor, "right advances the verb cursor")
+	assert.True(t, result.whoCan.loading, "verb cycle must arm the spinner on the persisted Model")
+	assert.NotNil(t, cmd, "verb cycle dispatches a fetch when a resource is selected")
+}
+
+func TestWhoCanCycleVerb_NoResourceLeavesLoadingClear(t *testing.T) {
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{verbCursor: 0}}}
+	mdl, cmd := m.handleWhoCanKey(keyMsg("right"))
+	result := mdl.(Model)
+	assert.Equal(t, 1, result.whoCan.verbCursor)
+	assert.False(t, result.whoCan.loading, "no resource = no fetch = no spinner")
+	assert.Nil(t, cmd)
+}
+
+func TestWhoCanNamespaceToggle_ArmsSpinnerWhenResourceSet(t *testing.T) {
+	// 'A' toggles namespace scope and re-fires the query when a resource
+	// is selected. The spinner must reflect the in-flight refetch.
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods"}, canINamespaces: []string{""}}}
+	m.namespace = "default"
+	mdl, cmd := m.handleWhoCanKey(keyMsg("A"))
+	result := mdl.(Model)
+	assert.True(t, result.whoCan.loading,
+		"'A' must arm the spinner when toggling scope re-fires the query")
+	assert.NotNil(t, cmd)
+}
+
+func TestRefreshWhoCanForCursor_ArmsSpinnerOnResourceChange(t *testing.T) {
+	// Cursor navigation funnels through refreshWhoCanForCursor; the
+	// spinner must light up on the persisted Model when the cursor
+	// lands on a different resource.
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "pods", resourceList: []string{"pods", "secrets"}, resourceCursor: 0}}}
+	m.width = 200
+	m.height = 60
+	mdl, cmd := m.handleWhoCanKey(keyMsg("j"))
+	result := mdl.(Model)
+	assert.Equal(t, 1, result.whoCan.resourceCursor, "j moved the cursor")
+	assert.Equal(t, "secrets", result.whoCan.resource, "resource updated to the cursor's row")
+	assert.True(t, result.whoCan.loading, "cursor moving onto a new resource arms the spinner")
+	assert.NotNil(t, cmd)
+}
+
+func TestRefreshWhoCanForCursor_SameResourceDoesNotArmSpinner(t *testing.T) {
+	// j on the last row clamps without changing resource — no fetch,
+	// no spinner. (Otherwise the user could spam keys and pin the
+	// spinner on indefinitely with no actual work happening.)
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{resource: "secrets", resourceList: []string{"pods", "secrets"}, resourceCursor: 1}}}
+	m.width = 200
+	m.height = 60
+	mdl, cmd := m.handleWhoCanKey(keyMsg("j"))
+	result := mdl.(Model)
+	assert.Equal(t, 1, result.whoCan.resourceCursor)
+	assert.False(t, result.whoCan.loading, "no resource change = no fetch = no spinner")
+	assert.Nil(t, cmd)
+}
+
+func TestWhoCanFilterEscape_RefreshesSubjectsForCursor(t *testing.T) {
+	// Regression: live-narrowing then Esc cleared the filter and reset
+	// scroll, but did not refresh the subjects pane against the cursor's
+	// new (un-narrowed) row. The picker would highlight one resource
+	// while the right pane still showed another resource's subjects.
+	m := Model{}
+	m.canIMode = canIModeWhoCan
+	m.whoCan.resourceList = []string{"configmaps", "deployments", "pods", "secrets"}
+	// Simulate state after live-narrow on "po": cursor at 0 of narrowed
+	// list, m.whoCan.resource set to "pods" (the previously-narrowed row).
+	m.whoCan.resource = "pods"
+	m.whoCan.resourceFilter.Insert("po")
+	m.whoCan.resourceFilterActive = true
+	m.whoCan.resourceCursor = 0
+	m.whoCan.resourceScroll = 5 // pretend the user had scrolled inside the narrowed list
+
+	mdl, cmd := m.handleWhoCanKey(keyMsg("esc"))
+	result := mdl.(Model)
+	assert.False(t, result.whoCan.resourceFilterActive, "esc exits filter mode")
+	assert.Equal(t, "", result.whoCan.resourceFilter.Value, "filter cleared")
+	assert.Equal(t, 0, result.whoCan.resourceScroll, "scroll reset to top of un-narrowed list")
+	// Cursor 0 in the un-narrowed list points to "configmaps", not the
+	// previously-loaded "pods", so the resource must update and a
+	// refetch must dispatch — otherwise the highlight and the right
+	// pane stay desynced.
+	assert.Equal(t, "configmaps", result.whoCan.resource,
+		"esc must refresh the resource to the un-narrowed cursor row, not preserve the narrowed selection")
+	assert.True(t, result.whoCan.loading, "spinner armed for the refetch dispatched after esc")
+	assert.NotNil(t, cmd, "a refetch is dispatched when the resource changes")
+}
+
+func TestWhoCanFilterEscape_EmptyListClearsResource(t *testing.T) {
+	// Esc on an empty resource list (e.g. canIGroups never loaded) must
+	// not crash and must clear the resource so a stale "loading…" doesn't
+	// linger.
+	m := Model{}
+	m.canIMode = canIModeWhoCan
+	m.whoCan.resource = "pods"
+	m.whoCan.resourceFilter.Insert("zzz")
+	m.whoCan.resourceFilterActive = true
+
+	mdl, cmd := m.handleWhoCanKey(keyMsg("esc"))
+	result := mdl.(Model)
+	assert.Equal(t, "", result.whoCan.resource, "empty list clears the resource so the right pane goes idle")
+	assert.Nil(t, cmd, "no fetch dispatched when the un-narrowed list is empty")
+}
+
+func TestSyncCanINamespacesFromSelection_MultiSelectSortsForCanI(t *testing.T) {
+	m := Model{}
+	m.selectedNamespaces = map[string]bool{
+		"monitoring":  true,
+		"default":     true,
+		"kube-system": true,
+	}
+	m.canIMode = canIModeForward
+	m.syncCanINamespacesFromSelection()
+	assert.Equal(t, []string{"default", "kube-system", "monitoring"}, m.canINamespaces,
+		"forward Can-I keeps multi-select; sorted so the title bar renders deterministically across frames")
+}
+
+func TestSyncCanINamespacesFromSelection_MultiSelectCollapsesInWhoCan(t *testing.T) {
+	// Regression: Who-Can's loadWhoCan only recognises canINamespaces of
+	// length 0 or 1 — multi-select would render a "ns: a,b,c" title but
+	// query cluster-wide, so the displayed scope didn't match the data.
+	// In Who-Can mode we collapse to the first sorted namespace so the
+	// scope label and the query agree.
+	m := Model{}
+	m.selectedNamespaces = map[string]bool{
+		"monitoring":  true,
+		"default":     true,
+		"kube-system": true,
+	}
+	m.canIMode = canIModeWhoCan
+	m.syncCanINamespacesFromSelection()
+	assert.Equal(t, []string{"default"}, m.canINamespaces,
+		"Who-Can collapses multi-select to the first sorted namespace so scope label and query match")
+}
+
 func TestEnterWhoCanMode_RefreshesResourceOnEachEntry(t *testing.T) {
 	// Regression: a previous version preserved m.whoCan.resource across
 	// Tab pivots — so after tabbing back to forward, moving the Can-I
