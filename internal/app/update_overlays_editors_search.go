@@ -11,12 +11,51 @@ import (
 // Split out from update_overlays_editors.go so the per-editor
 // handler bodies can stay under the file-length cap.
 
-// resetEditorSearch clears the / search state. Called when an editor
-// overlay opens so a stale query from a prior session doesn't carry
-// over and silently hide rows.
+// resetEditorSearch clears the / search + multi-row selection +
+// format-picker state. Called when an editor overlay opens / closes
+// so stale state from a prior session doesn't leak into the next.
 func (m *Model) resetEditorSearch() {
 	m.editorSearch.active = false
 	m.editorSearch.query.Clear()
+	m.editorSearch.selected = nil
+	m.editorSearch.formatActive = false
+	m.editorSearch.formatCursor = 0
+}
+
+// toggleEditorSelection flips the membership of `key` in the multi-
+// row selection set. Lazy-init the map so editors that never use
+// the feature don't pay the allocation. Removes the key entirely
+// (vs setting to false) so iteration only sees actively-selected
+// keys — copy paths can range over the map directly.
+func (m *Model) toggleEditorSelection(key string) {
+	if m.editorSearch.selected == nil {
+		m.editorSearch.selected = make(map[string]bool, 4)
+	}
+	if m.editorSearch.selected[key] {
+		delete(m.editorSearch.selected, key)
+		if len(m.editorSearch.selected) == 0 {
+			m.editorSearch.selected = nil // free the map when empty
+		}
+	} else {
+		m.editorSearch.selected[key] = true
+	}
+}
+
+// editorFormatPickerStep moves the format-picker cursor by delta,
+// clamped to the bounds of ui.KVFormats. Shared so each editor's
+// per-key dispatch only needs to call this for h/l (and j/k).
+func (m *Model) editorFormatPickerStep(delta int) {
+	next := max(m.editorSearch.formatCursor+delta, 0)
+	if next >= len(ui.KVFormats) {
+		next = len(ui.KVFormats) - 1
+	}
+	m.editorSearch.formatCursor = next
+}
+
+// editorFormatCancel closes the format picker without copying.
+func (m *Model) editorFormatCancel() {
+	m.editorSearch.formatActive = false
+	m.editorSearch.formatCursor = 0
 }
 
 // handleEditorSearchKey dispatches keys while the user is typing into

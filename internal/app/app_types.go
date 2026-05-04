@@ -118,15 +118,27 @@ const (
 	bookmarkModeConfirmDeleteAll
 )
 
-// kvEditorSearchState backs the / search inside the K/V editor
-// overlays (secret, configmap, label). active is true while the user
-// is typing into the input; query holds the live filter text. The
-// renderer narrows visible keys to substring matches (case-insensitive)
-// of query. Reset on overlay open so a stale query from a prior session
-// doesn't carry over.
+// kvEditorSearchState backs the / search + multi-row selection +
+// Shift+Y format-picker for the K/V editor overlays (secret,
+// configmap, label). All state lives here because only one editor
+// is open at a time and all three share the same UX.
+//
+//   - active / query: the / filter — narrows visible keys.
+//   - selected: keys marked with `s` for batch copy. Lazy-init in
+//     handlers (nil = no selections). Lookup by key string so
+//     toggles survive filter changes / row reorders.
+//   - formatActive / formatCursor: drive the Shift+Y format-picker
+//     chip row (yaml/json/dotenv/...). When active, key input
+//     routes to handle*FormatPickerKey instead of normal mode.
+//
+// Reset on overlay open + close so stale state can't leak into the
+// next editor session.
 type kvEditorSearchState struct {
-	active bool
-	query  TextInput
+	active       bool
+	query        TextInput
+	selected     map[string]bool
+	formatActive bool
+	formatCursor int
 }
 
 // sortColDefault is the default sort column name.

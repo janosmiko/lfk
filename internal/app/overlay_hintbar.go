@@ -370,6 +370,13 @@ func (m Model) overlayHintBarOverlaySecretEditor() string {
 			{Key: "esc", Desc: "clear"},
 		})
 	}
+	if m.editorSearch.formatActive {
+		return m.renderHints([]ui.HintEntry{
+			{Key: "h/l", Desc: "format"},
+			{Key: "enter", Desc: "copy"},
+			{Key: "esc", Desc: "cancel"},
+		})
+	}
 	return m.renderHints([]ui.HintEntry{
 		{Key: "jk", Desc: "nav"},
 		{Key: "v", Desc: "toggle"},
@@ -377,6 +384,8 @@ func (m Model) overlayHintBarOverlaySecretEditor() string {
 		{Key: "e", Desc: "edit"},
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
+		{Key: "s", Desc: "select"},
+		{Key: "Y", Desc: "copy as…"},
 		{Key: "/", Desc: "filter"},
 		{Key: "D", Desc: "del"},
 		{Key: "enter", Desc: "save"},

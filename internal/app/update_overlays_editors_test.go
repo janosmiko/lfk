@@ -9,6 +9,105 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// --- multi-row selection + Shift+Y format picker ---
+
+func TestSecretEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
+	data := &model.SecretData{
+		Keys: []string{"k1", "k2", "k3"},
+		Data: map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"},
+	}
+	m := Model{
+		overlay:      overlaySecretEditor,
+		secretData:   data,
+		secretCursor: 0,
+		tabs:         []TabState{{}},
+		width:        80, height: 40,
+	}
+
+	// First `s` toggles k1 ON, cursor advances to k2.
+	ret, _ := m.handleSecretEditorKey(runeKey('s'))
+	r1 := ret.(Model)
+	assert.True(t, r1.editorSearch.selected["k1"], "first `s` selects k1")
+	assert.Equal(t, 1, r1.secretCursor, "cursor advances so spamming `s` checks consecutive rows")
+
+	// Second `s` toggles k2 ON, cursor advances to k3.
+	ret, _ = r1.handleSecretEditorKey(runeKey('s'))
+	r2 := ret.(Model)
+	assert.True(t, r2.editorSearch.selected["k2"], "k2 selected")
+	assert.True(t, r2.editorSearch.selected["k1"], "k1 still selected — toggles persist across cursor moves")
+
+	// Move back and toggle k1 OFF — set should drop the entry, not
+	// keep it as "false".
+	r2.secretCursor = 0
+	ret, _ = r2.handleSecretEditorKey(runeKey('s'))
+	r3 := ret.(Model)
+	_, present := r3.editorSearch.selected["k1"]
+	assert.False(t, present, "second toggle on the same key removes it from the set entirely")
+}
+
+func TestSecretEditor_ShiftYOpensFormatPicker(t *testing.T) {
+	data := &model.SecretData{
+		Keys: []string{"k1"},
+		Data: map[string]string{"k1": "v1"},
+	}
+	m := Model{
+		overlay:      overlaySecretEditor,
+		secretData:   data,
+		secretCursor: 0,
+		tabs:         []TabState{{}},
+		width:        80, height: 40,
+	}
+	ret, _ := m.handleSecretEditorKey(runeKey('Y'))
+	result := ret.(Model)
+	assert.True(t, result.editorSearch.formatActive, "Shift+Y opens the format picker")
+	assert.Equal(t, 0, result.editorSearch.formatCursor, "picker starts at the first format (YAML)")
+}
+
+func TestSecretEditor_FormatPickerEnterCopiesAndCloses(t *testing.T) {
+	data := &model.SecretData{
+		Keys: []string{"k1", "k2"},
+		Data: map[string]string{"k1": "v1", "k2": "v2"},
+	}
+	m := Model{
+		overlay:      overlaySecretEditor,
+		secretData:   data,
+		secretCursor: 0,
+		tabs:         []TabState{{}},
+		width:        80, height: 40,
+	}
+	m.editorSearch.formatActive = true
+	m.editorSearch.formatCursor = 0 // YAML
+	m.editorSearch.selected = map[string]bool{"k2": true}
+
+	ret, _ := m.handleSecretEditorKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.editorSearch.formatActive, "enter closes the picker")
+	// Status message is set; clipboard cmd is returned via tea.Batch
+	// — assert the human-readable label landed on the status bar.
+	assert.Contains(t, result.statusMessage, "Copied",
+		"status message confirms the copy so the user knows it happened")
+}
+
+func TestSecretEditor_FormatPickerEscCancels(t *testing.T) {
+	data := &model.SecretData{
+		Keys: []string{"k1"},
+		Data: map[string]string{"k1": "v1"},
+	}
+	m := Model{
+		overlay:    overlaySecretEditor,
+		secretData: data,
+		tabs:       []TabState{{}},
+		width:      80, height: 40,
+	}
+	m.editorSearch.formatActive = true
+	m.editorSearch.formatCursor = 2 // dotenv
+
+	ret, _ := m.handleSecretEditorKey(specialKey(tea.KeyEsc))
+	result := ret.(Model)
+	assert.False(t, result.editorSearch.formatActive, "esc closes the picker")
+	assert.Empty(t, result.statusMessage, "esc must NOT trigger a copy — no status message")
+}
+
 // --- handleSecretEditorKey ---
 
 func TestSecretEditorNilDataCloses(t *testing.T) {

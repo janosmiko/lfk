@@ -220,7 +220,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{},
 			Data: map[string]string{},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, false, false, "", "", 0, 60, 20)
+		result := renderSecretEditorTable(secret, 0, nil, false, false, "", "", 0, nil, 60, 20)
 		// Headers stay visible above the placeholder; lipgloss/table
 		// renders them uppercase.
 		assert.Contains(t, result, "KEY")
@@ -233,7 +233,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"password", "token"},
 			Data: map[string]string{"password": "secret123", "token": "abc"},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, false, false, "", "", 0, 80, 20)
+		result := renderSecretEditorTable(secret, 0, nil, false, false, "", "", 0, nil, 80, 20)
 		assert.Contains(t, result, "password")
 		assert.Contains(t, result, "********")
 		// The actual value should not appear when not revealed.
@@ -246,7 +246,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Data: map[string]string{"password": "secret123"},
 		}
 		revealed := map[string]bool{"password": true}
-		result := renderSecretEditorTable(secret, 0, revealed, false, false, "", "", 0, 80, 20)
+		result := renderSecretEditorTable(secret, 0, revealed, false, false, "", "", 0, nil, 80, 20)
 		assert.Contains(t, result, "secret123")
 	})
 
@@ -255,7 +255,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"password", "token"},
 			Data: map[string]string{"password": "pass1", "token": "tok1"},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, true, false, "", "", 0, 80, 20)
+		result := renderSecretEditorTable(secret, 0, nil, true, false, "", "", 0, nil, 80, 20)
 		assert.Contains(t, result, "pass1")
 		assert.Contains(t, result, "tok1")
 	})
@@ -268,7 +268,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"key1", "key2"},
 			Data: map[string]string{"key1": "v1", "key2": "v2"},
 		}
-		result := renderSecretEditorTable(secret, 1, nil, false, false, "", "", 0, 60, 20)
+		result := renderSecretEditorTable(secret, 1, nil, false, false, "", "", 0, nil, 60, 20)
 		assert.Contains(t, result, "key1")
 		assert.Contains(t, result, "key2")
 	})
@@ -278,7 +278,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"mykey"},
 			Data: map[string]string{"mykey": "myval"},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, false, true, "newkey", "", 0, 60, 20)
+		result := renderSecretEditorTable(secret, 0, nil, false, true, "newkey", "", 0, nil, 60, 20)
 		assert.Contains(t, result, "newkey")
 		assert.Contains(t, result, "\u2588")
 	})
@@ -288,7 +288,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"mykey"},
 			Data: map[string]string{"mykey": "myval"},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, false, true, "", "newval", 1, 60, 20)
+		result := renderSecretEditorTable(secret, 0, nil, false, true, "", "newval", 1, nil, 60, 20)
 		assert.Contains(t, result, "newval")
 		assert.Contains(t, result, "\u2588")
 	})

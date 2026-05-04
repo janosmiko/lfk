@@ -24,6 +24,12 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.editorSearch.active {
 		return m.handleEditorSearchKey(msg, clampSecretCursorToVisible)
 	}
+	// Format-picker mode: routes h/l/enter/esc through the picker,
+	// resolves to a clipboard write on apply. Same precedence as
+	// search — must dodge the editor's normal-mode key dispatch.
+	if m.editorSearch.formatActive {
+		return m.handleSecretFormatPickerKey(msg)
+	}
 
 	// Normal mode.
 	switch msg.String() {
@@ -46,6 +52,19 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "V":
 		// Toggle all values visibility.
 		m.secretAllRevealed = !m.secretAllRevealed
+		return m, nil
+	case "s":
+		// Toggle current row in the multi-select set. Picked over
+		// space (already used by the existing reveal-toggle) and v
+		// (also reveal). The set lives across cursor moves so users
+		// can select non-adjacent rows.
+		return m.handleSecretEditorKeyS()
+	case "Y":
+		// Open the Shift+Y format picker. Apply target = selected
+		// rows if any are marked, else the cursor row. Resolved at
+		// apply time inside handleSecretFormatPickerKey.
+		m.editorSearch.formatActive = true
+		m.editorSearch.formatCursor = 0
 		return m, nil
 	case "e":
 		// Edit selected value.
@@ -735,37 +754,24 @@ func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, cu
 	}
 }
 
-// secretDataDirty reports whether the in-memory secret data differs from
-// the snapshot taken when the secret was loaded. Used by the Enter-to-save
-// handler so it can skip the API call when there is nothing to save.
+// secretDataDirty / configMapDataDirty / labelDataDirty report
+// whether the in-memory editor state differs from the snapshot taken
+// when the editor was loaded. Used by the Enter-to-save handler so
+// it can skip the API call when there's nothing to save.
 func (m *Model) secretDataDirty() bool {
-	if m.secretData == nil || m.secretDataOriginal == nil {
-		return false
-	}
-	return !stringMapsEqual(m.secretData.Data, m.secretDataOriginal)
+	return m.secretData != nil && m.secretDataOriginal != nil &&
+		!stringMapsEqual(m.secretData.Data, m.secretDataOriginal)
 }
 
-// configMapDataDirty is the configmap counterpart of secretDataDirty.
 func (m *Model) configMapDataDirty() bool {
-	if m.configMapData == nil || m.configMapDataOriginal == nil {
-		return false
-	}
-	return !stringMapsEqual(m.configMapData.Data, m.configMapDataOriginal)
+	return m.configMapData != nil && m.configMapDataOriginal != nil &&
+		!stringMapsEqual(m.configMapData.Data, m.configMapDataOriginal)
 }
 
-// labelDataDirty reports whether either the labels map or the annotations
-// map has changed since the editor was opened.
 func (m *Model) labelDataDirty() bool {
-	if m.labelData == nil {
-		return false
-	}
-	if !stringMapsEqual(m.labelData.Labels, m.labelLabelsOriginal) {
-		return true
-	}
-	if !stringMapsEqual(m.labelData.Annotations, m.labelAnnotationsOriginal) {
-		return true
-	}
-	return false
+	return m.labelData != nil &&
+		(!stringMapsEqual(m.labelData.Labels, m.labelLabelsOriginal) ||
+			!stringMapsEqual(m.labelData.Annotations, m.labelAnnotationsOriginal))
 }
 
 // stringMapsEqual returns true when two string→string maps have the same

@@ -111,10 +111,10 @@ func RenderSecretEditorOverlay(
 		// cursor + row iteration land on the visible subset.
 		visibleKeys := FilterKVKeys(secret.Keys, searchQuery)
 		filteredSecret := &model.SecretData{Keys: visibleKeys, Data: secret.Data}
-		_ = selected // selection wiring lands in next slice
 		dataContent = renderSecretEditorTable(
 			filteredSecret, cursor, revealedKeys, allRevealed,
 			false, "", "", 0,
+			selected,
 			panelContentW, panelContentH,
 		)
 	}
@@ -170,9 +170,14 @@ func renderSecretEditorTable(
 	editKey string,
 	editValue string,
 	editColumn int,
+	selectedKeys map[string]bool, // keys marked with `s` for batch copy; nil = none
 	width, height int,
 ) string {
-	keyColW := computeKeyColumnWidth(secret.Keys, width, 3)
+	// +2 for the "✓ " / "  " selection-indicator prefix every key
+	// row carries — without this the key text gets truncated even
+	// when the underlying name fits, because the prefix steals two
+	// of the column's visible chars.
+	keyColW := computeKeyColumnWidth(secret.Keys, width, 3) + 2
 	// Width budget left after the key column: subtract column divider
 	// + 2*2 padding cells per column = ~5 chars of table chrome.
 	valColW := max(width-keyColW-5, 8)
@@ -196,7 +201,14 @@ func renderSecretEditorTable(
 			keyText = SingleLineCell(editKey, keyColW)
 			valText = SingleLineCell(editValue, valColW-1) + "█"
 		default:
-			keyText = SingleLineCell(k, keyColW)
+			// Reserve 2 cols for the "✓ " / "  " selection prefix so
+			// adding a checkmark on selected rows doesn't push the key
+			// text past the cell width.
+			prefix := "  "
+			if selectedKeys[k] {
+				prefix = "✓ "
+			}
+			keyText = prefix + SingleLineCell(k, keyColW-2)
 			valText = secretValueDisplay(v, revealedKeys[k] || allRevealed, valColW)
 		}
 		t.Row(keyText, valText)
