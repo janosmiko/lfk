@@ -52,11 +52,10 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Toggle all values visibility.
 		m.secretAllRevealed = !m.secretAllRevealed
 		return m, nil
-	case "s", " ":
-		// Toggle current row in the multi-select set. Both `s` (vim-
-		// style) and Space (more discoverable / common TUI convention)
-		// trigger the toggle. The set lives across cursor moves so
-		// users can select non-adjacent rows.
+	case " ":
+		// Toggle current row in the multi-select set. Space is the
+		// canonical TUI selection key; the set lives across cursor
+		// moves so users can select non-adjacent rows.
 		return m.handleSecretEditorKeyS()
 	case "Y":
 		// Open the Shift+Y format picker. Apply target = selected
@@ -156,9 +155,8 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfigMapEditorKeyJ()
 	case "k", "up":
 		return m.handleConfigMapEditorKeyK()
-	case "s", " ":
-		// Both `s` (vim) and Space (TUI convention) toggle selection.
-		// See secret editor for broader rationale.
+	case " ":
+		// Space toggles selection — see secret editor for rationale.
 		return m.handleConfigMapEditorKeyS()
 	case "Y":
 		// Open the format picker — apply target = selected rows if any,
@@ -310,8 +308,8 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "k", "up":
 		return m.handleLabelEditorKeyK()
-	case "s", " ":
-		// Both `s` (vim) and Space (TUI convention) toggle selection.
+	case " ":
+		// Space toggles selection — see secret editor for rationale.
 		return m.handleLabelEditorKeyS()
 	case "Y":
 		// Open the format picker — apply target = selected rows if any,

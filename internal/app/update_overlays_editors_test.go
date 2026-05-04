@@ -12,7 +12,7 @@ import (
 
 // --- multi-row selection + Shift+Y format picker ---
 
-func TestSecretEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
+func TestSecretEditor_SpaceTogglesSelectionAndAdvanceCursor(t *testing.T) {
 	data := &model.SecretData{
 		Keys: []string{"k1", "k2", "k3"},
 		Data: map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"},
@@ -25,14 +25,14 @@ func TestSecretEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
 		width:        80, height: 40,
 	}
 
-	// First `s` toggles k1 ON, cursor advances to k2.
-	ret, _ := m.handleSecretEditorKey(runeKey('s'))
+	// First Space toggles k1 ON, cursor advances to k2.
+	ret, _ := m.handleSecretEditorKey(specialKey(tea.KeySpace))
 	r1 := ret.(Model)
-	assert.True(t, r1.editorSearch.selected["k1"], "first `s` selects k1")
-	assert.Equal(t, 1, r1.secretCursor, "cursor advances so spamming `s` checks consecutive rows")
+	assert.True(t, r1.editorSearch.selected["k1"], "first Space selects k1")
+	assert.Equal(t, 1, r1.secretCursor, "cursor advances so spamming Space checks consecutive rows")
 
-	// Second `s` toggles k2 ON, cursor advances to k3.
-	ret, _ = r1.handleSecretEditorKey(runeKey('s'))
+	// Second Space toggles k2 ON, cursor advances to k3.
+	ret, _ = r1.handleSecretEditorKey(specialKey(tea.KeySpace))
 	r2 := ret.(Model)
 	assert.True(t, r2.editorSearch.selected["k2"], "k2 selected")
 	assert.True(t, r2.editorSearch.selected["k1"], "k1 still selected — toggles persist across cursor moves")
@@ -40,31 +40,10 @@ func TestSecretEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
 	// Move back and toggle k1 OFF — set should drop the entry, not
 	// keep it as "false".
 	r2.secretCursor = 0
-	ret, _ = r2.handleSecretEditorKey(runeKey('s'))
+	ret, _ = r2.handleSecretEditorKey(specialKey(tea.KeySpace))
 	r3 := ret.(Model)
 	_, present := r3.editorSearch.selected["k1"]
 	assert.False(t, present, "second toggle on the same key removes it from the set entirely")
-}
-
-func TestSecretEditor_SpaceTogglesSelectionLikeS(t *testing.T) {
-	// Space is the standard TUI selection key. The handler treats
-	// it as an alias for `s` so users get either keystroke without
-	// having to learn the vim convention.
-	data := &model.SecretData{
-		Keys: []string{"k1", "k2"},
-		Data: map[string]string{"k1": "v1", "k2": "v2"},
-	}
-	m := Model{
-		overlay:      overlaySecretEditor,
-		secretData:   data,
-		secretCursor: 0,
-		tabs:         []TabState{{}},
-		width:        80, height: 40,
-	}
-	ret, _ := m.handleSecretEditorKey(specialKey(tea.KeySpace))
-	r := ret.(Model)
-	assert.True(t, r.editorSearch.selected["k1"], "Space must toggle selection (alias for `s`)")
-	assert.Equal(t, 1, r.secretCursor, "Space must auto-advance the cursor like `s`")
 }
 
 func TestSecretEditor_YWithSelectionOpensFormatPicker(t *testing.T) {
@@ -178,7 +157,7 @@ func TestSecretEditor_FormatPickerEscCancels(t *testing.T) {
 
 // --- ConfigMap multi-row selection + Shift+Y format picker ---
 
-func TestConfigMapEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
+func TestConfigMapEditor_SpaceTogglesSelectionAndAdvanceCursor(t *testing.T) {
 	data := &model.ConfigMapData{
 		Keys: []string{"k1", "k2", "k3"},
 		Data: map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"},
@@ -191,18 +170,18 @@ func TestConfigMapEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
 		width:           80, height: 40,
 	}
 
-	ret, _ := m.handleConfigMapEditorKey(runeKey('s'))
+	ret, _ := m.handleConfigMapEditorKey(specialKey(tea.KeySpace))
 	r1 := ret.(Model)
-	assert.True(t, r1.editorSearch.selected["k1"], "first `s` selects k1")
-	assert.Equal(t, 1, r1.configMapCursor, "cursor advances on s")
+	assert.True(t, r1.editorSearch.selected["k1"], "first Space selects k1")
+	assert.Equal(t, 1, r1.configMapCursor, "cursor advances on Space")
 
-	ret, _ = r1.handleConfigMapEditorKey(runeKey('s'))
+	ret, _ = r1.handleConfigMapEditorKey(specialKey(tea.KeySpace))
 	r2 := ret.(Model)
 	assert.True(t, r2.editorSearch.selected["k2"], "k2 selected")
 	assert.True(t, r2.editorSearch.selected["k1"], "k1 still selected")
 
 	r2.configMapCursor = 0
-	ret, _ = r2.handleConfigMapEditorKey(runeKey('s'))
+	ret, _ = r2.handleConfigMapEditorKey(specialKey(tea.KeySpace))
 	r3 := ret.(Model)
 	_, present := r3.editorSearch.selected["k1"]
 	assert.False(t, present, "second toggle on the same key removes the entry")
@@ -271,7 +250,7 @@ func TestConfigMapEditor_FormatPickerEscCancels(t *testing.T) {
 
 // --- Label multi-row selection + Shift+Y format picker ---
 
-func TestLabelEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
+func TestLabelEditor_SpaceTogglesSelectionAndAdvanceCursor(t *testing.T) {
 	data := &model.LabelAnnotationData{
 		Labels:    map[string]string{"app": "nginx", "env": "prod", "tier": "web"},
 		LabelKeys: []string{"app", "env", "tier"},
@@ -285,12 +264,12 @@ func TestLabelEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
 		width:       80, height: 40,
 	}
 
-	ret, _ := m.handleLabelEditorKey(runeKey('s'))
+	ret, _ := m.handleLabelEditorKey(specialKey(tea.KeySpace))
 	r1 := ret.(Model)
-	assert.True(t, r1.editorSearch.selected["app"], "first `s` selects app")
-	assert.Equal(t, 1, r1.labelCursor, "cursor advances on s")
+	assert.True(t, r1.editorSearch.selected["app"], "first Space selects app")
+	assert.Equal(t, 1, r1.labelCursor, "cursor advances on Space")
 
-	ret, _ = r1.handleLabelEditorKey(runeKey('s'))
+	ret, _ = r1.handleLabelEditorKey(specialKey(tea.KeySpace))
 	r2 := ret.(Model)
 	assert.True(t, r2.editorSearch.selected["env"], "env selected")
 	assert.True(t, r2.editorSearch.selected["app"], "app still selected")
@@ -314,7 +293,7 @@ func TestLabelEditor_TabClearsSelection(t *testing.T) {
 		tabs:        []TabState{{}},
 		width:       80, height: 40,
 	}
-	ret, _ := m.handleLabelEditorKey(runeKey('s'))
+	ret, _ := m.handleLabelEditorKey(specialKey(tea.KeySpace))
 	r1 := ret.(Model)
 	assert.True(t, r1.editorSearch.selected["app"], "selection set has app")
 
