@@ -13,8 +13,8 @@ import (
 func TestRenderLabelEditorTable(t *testing.T) {
 	t.Run("empty data shows add hint", func(t *testing.T) {
 		result := renderLabelEditorTable(nil, nil, 0, false, "", "", 0, 60, 20)
-		assert.Contains(t, result, "Key")
-		assert.Contains(t, result, "Value")
+		assert.Contains(t, result, "KEY")
+		assert.Contains(t, result, "VALUE")
 		assert.Contains(t, result, "(empty - press 'a' to add)")
 	})
 
@@ -28,11 +28,12 @@ func TestRenderLabelEditorTable(t *testing.T) {
 		assert.Contains(t, result, "production")
 	})
 
-	t.Run("selected row shows cursor", func(t *testing.T) {
+	t.Run("selected row keys are present", func(t *testing.T) {
+		// Cursor row is highlighted via StyleFunc bg/bold; just assert
+		// the data lands in output.
 		keys := []string{"k1", "k2"}
 		data := map[string]string{"k1": "v1", "k2": "v2"}
 		result := renderLabelEditorTable(keys, data, 1, false, "", "", 0, 60, 20)
-		assert.Contains(t, result, ">")
 		assert.Contains(t, result, "k2")
 	})
 
@@ -57,7 +58,7 @@ func TestRenderLabelEditorTable(t *testing.T) {
 
 func TestRenderLabelEditorOverlay(t *testing.T) {
 	t.Run("nil data shows error", func(t *testing.T) {
-		result := RenderLabelEditorOverlay(nil, 0, 0, false, "", "", 0, 100, 40)
+		result := RenderLabelEditorOverlay(nil, 0, 0, false, "", "", 0, "", false, 100, 40)
 		assert.Contains(t, result, "No data loaded")
 	})
 
@@ -68,7 +69,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Annotations: map[string]string{"note": "test"},
 			AnnotKeys:   []string{"note"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, false, "", "", 0, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, false, "", "", 0, "", false, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 		assert.Contains(t, result, "Labels (1)")
 		assert.Contains(t, result, "Annotations (1)")
@@ -83,7 +84,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Annotations: map[string]string{"note": "important"},
 			AnnotKeys:   []string{"note"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 1, false, "", "", 0, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 1, false, "", "", 0, "", false, 100, 40)
 		assert.Contains(t, result, "note")
 		assert.Contains(t, result, "important")
 	})
@@ -93,7 +94,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Labels:    map[string]string{"k": "v"},
 			LabelKeys: []string{"k"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, true, "k", "v", 0, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, true, "k", "v", 0, "", false, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 	})
 
@@ -103,7 +104,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Labels:    map[string]string{"k": "v"},
 			LabelKeys: []string{"k"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, false, "", "", 0, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, false, "", "", 0, "", false, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 	})
 }

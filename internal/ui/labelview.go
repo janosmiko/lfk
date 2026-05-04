@@ -2,7 +2,6 @@ package ui
 
 import (
 	"fmt"
-	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -10,12 +9,20 @@ import (
 )
 
 // labelInnerPanelStyle is the bordered panel containing the label/annotation table.
+//
+// The bg fields are NOT set here — they're chained at render time so
+// the value comes from the active theme (this var is initialised
+// before ApplyTheme runs, so theme bgs would be NoColor).
 var labelInnerPanelStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
 	BorderForeground(lipgloss.Color(ColorBorder)).
 	Padding(0, 1)
 
 // RenderLabelEditorOverlay renders the label/annotation editor popup.
+//
+// searchQuery / searchActive drive the / filter (see RenderSecretEditorOverlay
+// for the contract). The filter narrows the keys for the ACTIVE tab
+// (labels or annotations); switching tabs preserves the query.
 func RenderLabelEditorOverlay(
 	data *model.LabelAnnotationData,
 	cursor int,
@@ -24,6 +31,8 @@ func RenderLabelEditorOverlay(
 	editKey string,
 	editValue string,
 	editColumn int,
+	searchQuery string,
+	searchActive bool,
 	screenWidth, screenHeight int,
 ) string {
 	if data == nil {
@@ -46,23 +55,34 @@ func RenderLabelEditorOverlay(
 	titleH := 2 // title + tab bar
 	gapH := 1
 
-	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH, 3)
+	searchBar := RenderKVEditorSearchBar(searchQuery, searchActive)
+	searchH := 0
+	if searchBar != "" {
+		searchH = 1
+	}
+
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH, 3)
 	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
-	title := OverlayTitleStyle.Render("Label / Annotation Editor")
+	// Title — bg overridden to baseBg so the title row (and its 1-row
+	// bottom padding) match the rest of the editor's baseBg surface;
+	// the stock OverlayTitleStyle uses surfaceBg.
+	title := OverlayTitleStyle.Background(BaseBg).Render("Label / Annotation Editor")
 
-	// Tab bar.
+	// Tab bar — inactive tab and the separator both use bg-bound styles
+	// so the row's bg matches the surrounding overlay (DimStyle is fg-
+	// only and would let terminal default bg leak between the two tabs).
 	labelsTab := fmt.Sprintf(" Labels (%d) ", len(data.LabelKeys))
 	annotsTab := fmt.Sprintf(" Annotations (%d) ", len(data.AnnotKeys))
 	if tab == 0 {
 		labelsTab = OverlaySelectedStyle.Render(labelsTab)
-		annotsTab = DimStyle.Render(annotsTab)
+		annotsTab = BarDimStyle.Render(annotsTab)
 	} else {
-		labelsTab = DimStyle.Render(labelsTab)
+		labelsTab = BarDimStyle.Render(labelsTab)
 		annotsTab = OverlaySelectedStyle.Render(annotsTab)
 	}
-	tabBar := labelsTab + "  " + annotsTab
+	tabBar := labelsTab + BarNormalStyle.Render("  ") + annotsTab
 
 	// Content.
 	var keys []string
@@ -75,88 +95,63 @@ func RenderLabelEditorOverlay(
 		dataMap = data.Annotations
 	}
 
-	dataContent := renderLabelEditorTable(keys, dataMap, cursor, editing, editKey, editValue, editColumn, panelContentW, panelContentH)
+	visibleKeys := FilterKVKeys(keys, searchQuery)
+	dataContent := renderLabelEditorTable(visibleKeys, dataMap, cursor, editing, editKey, editValue, editColumn, panelContentW, panelContentH)
 
+	// Inner bordered panel — bg + border-bg pulled from the active
+	// theme at render time. See secretview for the full rationale.
 	innerPanel := labelInnerPanelStyle.
+		Background(BaseBg).
+		BorderBackground(BaseBg).
 		Width(panelW).
 		Height(panelContentH).
 		Render(dataContent)
 
-	body := title + "\n" + tabBar + "\n" + innerPanel
+	body := title + "\n" + tabBar
+	if searchBar != "" {
+		body += "\n" + searchBar
+	}
+	body += "\n" + innerPanel
 
+	// baseBg end-to-end so the outer frame matches the inner panel.
 	return OverlayStyle.
+		Background(BaseBg).
+		BorderBackground(BaseBg).
 		Width(boxW).
 		Render(body)
 }
 
 func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx int, editing bool, editKey, editValue string, editColumn int, width, height int) string {
-	keyColW := 0
-	for _, k := range keys {
-		if len(k) > keyColW {
-			keyColW = len(k)
-		}
-	}
-	if keyColW < 10 {
-		keyColW = 10
-	}
-	if keyColW > width/2 {
-		keyColW = width / 2
-	}
+	keyColW := computeKeyColumnWidth(keys, width, 2)
+	valColW := max(width-keyColW-5, 8)
 
-	valColW := max(width-keyColW-10, 8)
+	bodyHeight := max(height-2, 1)
+	start := scrollWindowStart(selectedIdx, bodyHeight, len(keys))
+	end := min(start+bodyHeight, len(keys))
 
-	var lines []string
-	keyPadded := fmt.Sprintf("%-*s", keyColW, "Key")
-	headerLine := "  " + HeaderStyle.Render(keyPadded) + "  |  " + HeaderStyle.Render("Value")
-	separator := "  " + strings.Repeat("-", keyColW) + "--+--" + strings.Repeat("-", valColW)
-	lines = append(lines, headerLine)
-	lines = append(lines, DimStyle.Render(separator))
-
-	tableHeight := max(height-2, 1)
-	start := 0
-	if selectedIdx >= tableHeight {
-		start = selectedIdx - tableHeight + 1
-	}
-	end := min(start+tableHeight, len(keys))
-
+	t := newKVEditorTable(keyColW, valColW, selectedIdx-start)
 	for i := start; i < end; i++ {
 		k := keys[i]
 		v := data[k]
 		displayV := Truncate(v, valColW)
 
-		var line string
+		var keyText, valText string
 		switch {
-		case i == selectedIdx && editing:
-			// While editing, always show the in-progress edit values in
-			// both columns, not the committed slot value. Only the cursor
-			// block follows editColumn. This keeps the user's typed key
-			// visible after tabbing to the value column (and vice versa).
-			if editColumn == 0 {
-				editDisplay := editKey + DimStyle.Render("\u2588")
-				editW := lipgloss.Width(editDisplay)
-				pad := max(keyColW-editW, 0)
-				valDisplay := Truncate(editValue, valColW)
-				line = HelpKeyStyle.Render("> ") + editDisplay + strings.Repeat(" ", pad) + "  |  " + valDisplay
-			} else {
-				keyDisplay := Truncate(editKey, keyColW)
-				editDisplay := editValue + DimStyle.Render("\u2588")
-				line = HelpKeyStyle.Render("> ") + fmt.Sprintf("%-*s", keyColW, keyDisplay) + "  |  " + editDisplay
-			}
-		case i == selectedIdx:
-			rawLine := fmt.Sprintf("> %-*s  |  %-*s", keyColW, Truncate(k, keyColW), valColW, displayV)
-			line = OverlaySelectedStyle.Render(rawLine)
+		case i == selectedIdx && editing && editColumn == 0:
+			keyText = Truncate(editKey, keyColW) + "\u2588"
+			valText = Truncate(editValue, valColW)
+		case i == selectedIdx && editing && editColumn == 1:
+			keyText = Truncate(editKey, keyColW)
+			valText = Truncate(editValue, valColW) + "\u2588"
 		default:
-			kPadded := fmt.Sprintf("%-*s", keyColW, Truncate(k, keyColW))
-			keyStr := HelpKeyStyle.Render(kPadded)
-			valStr := DimStyle.Render(displayV)
-			line = "  " + keyStr + "  |  " + valStr
+			keyText = Truncate(k, keyColW)
+			valText = displayV
 		}
-		lines = append(lines, line)
+		t.Row(keyText, valText)
 	}
-
+	rendered := t.Render()
 	if len(keys) == 0 {
-		lines = append(lines, DimStyle.Render("  (empty - press 'a' to add)"))
+		return rendered + "\n" + BarDimStyle.Render("  (empty - press 'a' to add)")
 	}
-
-	return strings.Join(lines, "\n")
+	return rendered
 }

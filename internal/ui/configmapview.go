@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -10,12 +9,20 @@ import (
 )
 
 // configMapInnerPanelStyle is the bordered panel containing the configmap table.
+//
+// The bg fields are NOT set here — they're chained at render time so
+// the value comes from the active theme (this var is initialised
+// before ApplyTheme runs, so theme bgs would be NoColor).
 var configMapInnerPanelStyle = lipgloss.NewStyle().
 	Border(lipgloss.RoundedBorder()).
 	BorderForeground(lipgloss.Color(ColorBorder)).
 	Padding(0, 1)
 
 // RenderConfigMapEditorOverlay renders a centered popup overlay for editing configmaps.
+//
+// searchQuery / searchActive drive the / filter (see RenderSecretEditorOverlay
+// for the full contract). Cursor is interpreted as an index into the
+// FILTERED key list.
 func RenderConfigMapEditorOverlay(
 	cm *model.ConfigMapData,
 	cursor int,
@@ -23,6 +30,8 @@ func RenderConfigMapEditorOverlay(
 	editKey string,
 	editValue string,
 	editColumn int, // 0=key, 1=value
+	searchQuery string,
+	searchActive bool,
 	screenWidth, screenHeight int,
 ) string {
 	if cm == nil {
@@ -46,34 +55,57 @@ func RenderConfigMapEditorOverlay(
 	titleH := 1
 	gapH := 1
 
-	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH, 3)
+	searchBar := RenderKVEditorSearchBar(searchQuery, searchActive)
+	searchH := 0
+	if searchBar != "" {
+		searchH = 1
+	}
+
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH, 3)
 	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
-	// Title.
-	title := OverlayTitleStyle.Render("ConfigMap Editor")
+	// Title — bg overridden to baseBg so the title row (and its 1-row
+	// bottom padding) match the rest of the editor's baseBg surface;
+	// the stock OverlayTitleStyle uses surfaceBg.
+	title := OverlayTitleStyle.Background(BaseBg).Render("ConfigMap Editor")
+
+	visibleKeys := FilterKVKeys(cm.Keys, searchQuery)
+	filteredCM := &model.ConfigMapData{Keys: visibleKeys, Data: cm.Data}
 
 	// Data table content.
 	dataContent := renderConfigMapEditorTable(
-		cm, cursor,
+		filteredCM, cursor,
 		editing, editKey, editValue, editColumn,
 		panelContentW, panelContentH,
 	)
 
-	// Inner bordered panel.
+	// Inner bordered panel — bg + border-bg pulled from the active
+	// theme at render time. See secretview for the full rationale.
 	innerPanel := configMapInnerPanelStyle.
+		Background(BaseBg).
+		BorderBackground(BaseBg).
 		Width(panelW).
 		Height(panelContentH).
 		Render(dataContent)
 
-	body := title + "\n" + innerPanel
+	body := title
+	if searchBar != "" {
+		body += "\n" + searchBar
+	}
+	body += "\n" + innerPanel
 
+	// baseBg end-to-end so the outer frame matches the inner panel.
 	return OverlayStyle.
+		Background(BaseBg).
+		BorderBackground(BaseBg).
 		Width(boxW).
 		Render(body)
 }
 
-// renderConfigMapEditorTable renders the key-value table inside the configmap editor.
+// renderConfigMapEditorTable renders the key-value table inside the
+// configmap editor. Uses the shared lipgloss/table-based renderer
+// (newKVEditorTable) so the three K/V editors stay visually identical.
 func renderConfigMapEditorTable(
 	cm *model.ConfigMapData,
 	selectedIdx int,
@@ -83,81 +115,38 @@ func renderConfigMapEditorTable(
 	editColumn int,
 	width, height int,
 ) string {
-	keyColW := 0
-	for _, k := range cm.Keys {
-		if len(k) > keyColW {
-			keyColW = len(k)
-		}
-	}
-	if keyColW < 10 {
-		keyColW = 10
-	}
-	if keyColW > width/3 {
-		keyColW = width / 3
-	}
+	keyColW := computeKeyColumnWidth(cm.Keys, width, 3)
+	valColW := max(width-keyColW-5, 8)
 
-	valColW := max(width-keyColW-10, 8)
+	bodyHeight := max(height-2, 1)
+	start := scrollWindowStart(selectedIdx, bodyHeight, len(cm.Keys))
+	end := min(start+bodyHeight, len(cm.Keys))
 
-	var lines []string
-
-	// Header.
-	keyPadded := fmt.Sprintf("%-*s", keyColW, "Key")
-	headerLine := "  " + HeaderStyle.Render(keyPadded) + "  |  " + HeaderStyle.Render("Value")
-	separator := "  " + strings.Repeat("-", keyColW) + "--+--" + strings.Repeat("-", valColW)
-	lines = append(lines, headerLine)
-	lines = append(lines, DimStyle.Render(separator))
-
-	tableHeight := max(height-2, 1)
-	start := 0
-	if selectedIdx >= tableHeight {
-		start = selectedIdx - tableHeight + 1
-	}
-	end := min(start+tableHeight, len(cm.Keys))
-
+	t := newKVEditorTable(keyColW, valColW, selectedIdx-start)
 	for i := start; i < end; i++ {
 		k := cm.Keys[i]
 		v := cm.Data[k]
-		// For multiline values, show first line + indicator.
 		displayV := configMapValueDisplay(v, valColW)
 
-		var line string
+		var keyText, valText string
 		switch {
-		case i == selectedIdx && editing:
-			// Inline edit mode. Always show the in-progress edit values in
-			// both columns so they survive tabbing between columns. Only
-			// the cursor block follows editColumn.
-			if editColumn == 0 {
-				// Editing key, value column shows the in-progress value.
-				editDisplay := editKey + DimStyle.Render("\u2588")
-				editW := lipgloss.Width(editDisplay)
-				pad := max(keyColW-editW, 0)
-				valDisplay := Truncate(editValue, valColW)
-				line = HelpKeyStyle.Render("> ") + editDisplay + strings.Repeat(" ", pad) + "  |  " + valDisplay
-			} else {
-				// Editing value, key column shows the in-progress key.
-				keyDisplay := Truncate(editKey, keyColW)
-				editDisplay := editValue + DimStyle.Render("\u2588")
-				line = HelpKeyStyle.Render("> ") + fmt.Sprintf("%-*s", keyColW, keyDisplay) + "  |  " + editDisplay
-			}
-		case i == selectedIdx:
-			// Selected row.
-			rawLine := fmt.Sprintf("> %-*s  |  %-*s", keyColW, Truncate(k, keyColW), valColW, displayV)
-			line = OverlaySelectedStyle.Render(rawLine)
+		case i == selectedIdx && editing && editColumn == 0:
+			keyText = Truncate(editKey, keyColW) + "\u2588"
+			valText = Truncate(editValue, valColW)
+		case i == selectedIdx && editing && editColumn == 1:
+			keyText = Truncate(editKey, keyColW)
+			valText = Truncate(editValue, valColW) + "\u2588"
 		default:
-			// Normal row.
-			kPadded := fmt.Sprintf("%-*s", keyColW, Truncate(k, keyColW))
-			keyStr := HelpKeyStyle.Render(kPadded)
-			valStr := DimStyle.Render(displayV)
-			line = "  " + keyStr + "  |  " + valStr
+			keyText = Truncate(k, keyColW)
+			valText = displayV
 		}
-		lines = append(lines, line)
+		t.Row(keyText, valText)
 	}
-
+	rendered := t.Render()
 	if len(cm.Keys) == 0 {
-		lines = append(lines, DimStyle.Render("  (empty - press 'a' to add a key)"))
+		return rendered + "\n" + BarDimStyle.Render("  (empty - press 'a' to add a key)")
 	}
-
-	return strings.Join(lines, "\n")
+	return rendered
 }
 
 // configMapValueDisplay returns the display string for a configmap value.

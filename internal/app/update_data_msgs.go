@@ -20,6 +20,7 @@ func (m Model) updateSecretDataLoaded(msg secretDataLoadedMsg) (tea.Model, tea.C
 	m.secretAllRevealed = false
 	m.secretEditing = false
 	m.secretEditColumn = -1
+	m.resetEditorSearch()
 	m.overlay = overlaySecretEditor
 	return m, nil
 }
@@ -58,6 +59,7 @@ func (m Model) updateConfigMapDataLoaded(msg configMapDataLoadedMsg) (tea.Model,
 	m.configMapCursor = 0
 	m.configMapEditing = false
 	m.configMapEditColumn = -1
+	m.resetEditorSearch()
 	m.overlay = overlayConfigMapEditor
 	return m, nil
 }
@@ -87,6 +89,7 @@ func (m Model) updateLabelDataLoaded(msg labelDataLoadedMsg) (tea.Model, tea.Cmd
 	m.labelTab = 0
 	m.labelEditing = false
 	m.labelEditColumn = -1
+	m.resetEditorSearch()
 	m.overlay = overlayLabelEditor
 	return m, nil
 }

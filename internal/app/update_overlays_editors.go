@@ -18,10 +18,24 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSecretEditorEditKey(msg)
 	}
 
+	// Search input mode: typing extends the / query, esc clears, enter
+	// accepts. Routed first so q/esc don't accidentally close the
+	// overlay while the user is typing.
+	if m.editorSearch.active {
+		return m.handleEditorSearchKey(msg, clampSecretCursorToVisible)
+	}
+
 	// Normal mode.
 	switch msg.String() {
 	case "esc", "q":
 		return m.handleSecretEditorKeyEsc()
+	case "/":
+		// Enter search input mode. Reset query so a fresh / always
+		// starts blank — matching the convention used elsewhere in lfk.
+		m.editorSearch.active = true
+		m.editorSearch.query.Clear()
+		m.secretCursor = 0
+		return m, nil
 	case "j", "down":
 		return m.handleSecretEditorKeyJ()
 	case "k", "up":
@@ -37,7 +51,9 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Edit selected value.
 		return m.handleSecretEditorKeyE()
 	case "a":
-		// Add new key-value pair.
+		// Add new key-value pair. Clear the / search so the newly-added
+		// row is visible (it likely won't match an existing query).
+		m.resetEditorSearch()
 		newKey := fmt.Sprintf("new-key-%d", len(m.secretData.Keys)+1)
 		m.secretData.Keys = append(m.secretData.Keys, newKey)
 		m.secretData.Data[newKey] = ""
@@ -52,8 +68,9 @@ func (m Model) handleSecretEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSecretEditorKeyD()
 	case "y":
 		// Copy current value to clipboard.
-		if m.secretCursor >= 0 && m.secretCursor < len(m.secretData.Keys) {
-			key := m.secretData.Keys[m.secretCursor]
+		visible := m.secretVisibleKeys()
+		if m.secretCursor >= 0 && m.secretCursor < len(visible) {
+			key := visible[m.secretCursor]
 			val := m.secretData.Data[key]
 			m.setStatusMessage("Copied value of "+key, false)
 			return m, tea.Batch(copyToSystemClipboard(val), scheduleStatusClear())
@@ -90,10 +107,19 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfigMapEditorEditKey(msg)
 	}
 
+	if m.editorSearch.active {
+		return m.handleEditorSearchKey(msg, clampConfigMapCursorToVisible)
+	}
+
 	// Normal mode.
 	switch msg.String() {
 	case "esc", "q":
 		return m.handleConfigMapEditorKeyEsc()
+	case "/":
+		m.editorSearch.active = true
+		m.editorSearch.query.Clear()
+		m.configMapCursor = 0
+		return m, nil
 	case "j", "down":
 		return m.handleConfigMapEditorKeyJ()
 	case "k", "up":
@@ -102,7 +128,8 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Edit selected value.
 		return m.handleConfigMapEditorKeyE()
 	case "a":
-		// Add new key-value pair.
+		// Add new key-value pair. Clear search so the new row is visible.
+		m.resetEditorSearch()
 		newKey := fmt.Sprintf("new-key-%d", len(m.configMapData.Keys)+1)
 		m.configMapData.Keys = append(m.configMapData.Keys, newKey)
 		m.configMapData.Data[newKey] = ""
@@ -117,8 +144,9 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfigMapEditorKeyD()
 	case "y":
 		// Copy current value to clipboard.
-		if m.configMapCursor >= 0 && m.configMapCursor < len(m.configMapData.Keys) {
-			key := m.configMapData.Keys[m.configMapCursor]
+		visible := m.configMapVisibleKeys()
+		if m.configMapCursor >= 0 && m.configMapCursor < len(visible) {
+			key := visible[m.configMapCursor]
 			val := m.configMapData.Data[key]
 			m.setStatusMessage("Copied value of "+key, false)
 			return m, tea.Batch(copyToSystemClipboard(val), scheduleStatusClear())
@@ -202,22 +230,35 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLabelEditorEditKey(msg, currentKeys, currentData)
 	}
 
+	if m.editorSearch.active {
+		return m.handleEditorSearchKey(msg, clampLabelCursorToVisible)
+	}
+
+	visible := m.labelVisibleKeys()
+
 	switch msg.String() {
 	case "esc", "q":
 		return m.handleLabelEditorKeyEsc()
+	case "/":
+		m.editorSearch.active = true
+		m.editorSearch.query.Clear()
+		m.labelCursor = 0
+		return m, nil
 	case "tab":
-		// Switch between labels and annotations tabs.
+		// Switch between labels and annotations tabs. Reset cursor +
+		// search since the active key list changes.
+		m.resetEditorSearch()
 		return m.handleLabelEditorKeyTab()
 	case "j", "down":
-		if m.labelCursor < len(currentKeys)-1 {
+		if m.labelCursor < len(visible)-1 {
 			m.labelCursor++
 		}
 		return m, nil
 	case "k", "up":
 		return m.handleLabelEditorKeyK()
 	case "e":
-		if m.labelCursor >= 0 && m.labelCursor < len(currentKeys) {
-			key := currentKeys[m.labelCursor]
+		if m.labelCursor >= 0 && m.labelCursor < len(visible) {
+			key := visible[m.labelCursor]
 			m.labelEditing = true
 			m.labelEditColumn = 1
 			m.labelEditKey.Set(key)
@@ -225,6 +266,8 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case "a":
+		// Clear search so the new row is visible.
+		m.resetEditorSearch()
 		newKey := fmt.Sprintf("new-key-%d", len(currentKeys)+1)
 		currentKeys = append(currentKeys, newKey)
 		currentData[newKey] = ""
@@ -240,19 +283,23 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.labelEditValue.Clear()
 		return m, nil
 	case "D":
-		if m.labelCursor >= 0 && m.labelCursor < len(currentKeys) {
-			key := currentKeys[m.labelCursor]
-			delete(currentData, key)
-			currentKeys = append(currentKeys[:m.labelCursor], currentKeys[m.labelCursor+1:]...)
-			if m.labelTab == 0 {
-				m.labelData.LabelKeys = currentKeys
-			} else {
-				m.labelData.AnnotKeys = currentKeys
-			}
-			if m.labelCursor >= len(currentKeys) && m.labelCursor > 0 {
-				m.labelCursor--
+		if m.labelCursor < 0 || m.labelCursor >= len(visible) {
+			return m, nil
+		}
+		key := visible[m.labelCursor]
+		delete(currentData, key)
+		for i, k := range currentKeys {
+			if k == key {
+				currentKeys = append(currentKeys[:i], currentKeys[i+1:]...)
+				break
 			}
 		}
+		if m.labelTab == 0 {
+			m.labelData.LabelKeys = currentKeys
+		} else {
+			m.labelData.AnnotKeys = currentKeys
+		}
+		clampLabelCursorToVisible(&m)
 		return m, nil
 	case "y":
 		if m.labelCursor >= 0 && m.labelCursor < len(currentKeys) {
@@ -287,11 +334,13 @@ func (m Model) handleSecretEditorKeyEsc() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.secretData = nil
 	m.secretDataOriginal = nil
+	m.resetEditorSearch()
 	return m, nil
 }
 
 func (m Model) handleSecretEditorKeyJ() (tea.Model, tea.Cmd) {
-	if m.secretCursor < len(m.secretData.Keys)-1 {
+	visible := m.secretVisibleKeys()
+	if m.secretCursor < len(visible)-1 {
 		m.secretCursor++
 	}
 	return m, nil
@@ -305,16 +354,18 @@ func (m Model) handleSecretEditorKeyK() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSecretEditorKeyV() (tea.Model, tea.Cmd) {
-	if m.secretCursor >= 0 && m.secretCursor < len(m.secretData.Keys) {
-		key := m.secretData.Keys[m.secretCursor]
+	visible := m.secretVisibleKeys()
+	if m.secretCursor >= 0 && m.secretCursor < len(visible) {
+		key := visible[m.secretCursor]
 		m.secretRevealed[key] = !m.secretRevealed[key]
 	}
 	return m, nil
 }
 
 func (m Model) handleSecretEditorKeyE() (tea.Model, tea.Cmd) {
-	if m.secretCursor >= 0 && m.secretCursor < len(m.secretData.Keys) {
-		key := m.secretData.Keys[m.secretCursor]
+	visible := m.secretVisibleKeys()
+	if m.secretCursor >= 0 && m.secretCursor < len(visible) {
+		key := visible[m.secretCursor]
 		m.secretEditing = true
 		m.secretEditColumn = 1
 		m.secretEditKey.Set(key)
@@ -324,14 +375,20 @@ func (m Model) handleSecretEditorKeyE() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleSecretEditorKeyD() (tea.Model, tea.Cmd) {
-	if m.secretCursor >= 0 && m.secretCursor < len(m.secretData.Keys) {
-		key := m.secretData.Keys[m.secretCursor]
-		delete(m.secretData.Data, key)
-		m.secretData.Keys = append(m.secretData.Keys[:m.secretCursor], m.secretData.Keys[m.secretCursor+1:]...)
-		if m.secretCursor >= len(m.secretData.Keys) && m.secretCursor > 0 {
-			m.secretCursor--
+	visible := m.secretVisibleKeys()
+	if m.secretCursor < 0 || m.secretCursor >= len(visible) {
+		return m, nil
+	}
+	key := visible[m.secretCursor]
+	// Delete from the underlying maps + the canonical Keys order.
+	delete(m.secretData.Data, key)
+	for i, k := range m.secretData.Keys {
+		if k == key {
+			m.secretData.Keys = append(m.secretData.Keys[:i], m.secretData.Keys[i+1:]...)
+			break
 		}
 	}
+	clampSecretCursorToVisible(&m)
 	return m, nil
 }
 
@@ -429,6 +486,7 @@ func (m Model) handleLabelEditorKeyEsc() (tea.Model, tea.Cmd) {
 	m.labelData = nil
 	m.labelLabelsOriginal = nil
 	m.labelAnnotationsOriginal = nil
+	m.resetEditorSearch()
 	return m, nil
 }
 
@@ -449,11 +507,13 @@ func (m Model) handleConfigMapEditorKeyEsc() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.configMapData = nil
 	m.configMapDataOriginal = nil
+	m.resetEditorSearch()
 	return m, nil
 }
 
 func (m Model) handleConfigMapEditorKeyJ() (tea.Model, tea.Cmd) {
-	if m.configMapCursor < len(m.configMapData.Keys)-1 {
+	visible := m.configMapVisibleKeys()
+	if m.configMapCursor < len(visible)-1 {
 		m.configMapCursor++
 	}
 	return m, nil
@@ -467,8 +527,9 @@ func (m Model) handleConfigMapEditorKeyK() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleConfigMapEditorKeyE() (tea.Model, tea.Cmd) {
-	if m.configMapCursor >= 0 && m.configMapCursor < len(m.configMapData.Keys) {
-		key := m.configMapData.Keys[m.configMapCursor]
+	visible := m.configMapVisibleKeys()
+	if m.configMapCursor >= 0 && m.configMapCursor < len(visible) {
+		key := visible[m.configMapCursor]
 		m.configMapEditing = true
 		m.configMapEditColumn = 1
 		m.configMapEditKey.Set(key)
@@ -478,14 +539,19 @@ func (m Model) handleConfigMapEditorKeyE() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleConfigMapEditorKeyD() (tea.Model, tea.Cmd) {
-	if m.configMapCursor >= 0 && m.configMapCursor < len(m.configMapData.Keys) {
-		key := m.configMapData.Keys[m.configMapCursor]
-		delete(m.configMapData.Data, key)
-		m.configMapData.Keys = append(m.configMapData.Keys[:m.configMapCursor], m.configMapData.Keys[m.configMapCursor+1:]...)
-		if m.configMapCursor >= len(m.configMapData.Keys) && m.configMapCursor > 0 {
-			m.configMapCursor--
+	visible := m.configMapVisibleKeys()
+	if m.configMapCursor < 0 || m.configMapCursor >= len(visible) {
+		return m, nil
+	}
+	key := visible[m.configMapCursor]
+	delete(m.configMapData.Data, key)
+	for i, k := range m.configMapData.Keys {
+		if k == key {
+			m.configMapData.Keys = append(m.configMapData.Keys[:i], m.configMapData.Keys[i+1:]...)
+			break
 		}
 	}
+	clampConfigMapCursorToVisible(&m)
 	return m, nil
 }
 

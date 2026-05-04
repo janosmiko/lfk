@@ -587,12 +587,12 @@ type Model struct {
 	helmHistoryRevisions []ui.HelmRevision
 	helmHistoryCursor    int
 
-	// helmRevisionsLoading is shared between the helm rollback and history
-	// overlays. It is set to true when the helm history subprocess is
-	// dispatched and cleared when the result (success or error) arrives so
-	// the overlay can show a loading placeholder instead of flashing the
-	// empty-state message.
+	// Shared loading flag for the helm rollback + history overlays (set on dispatch, cleared on result).
 	helmRevisionsLoading bool
+	// editorSearch backs the / search across the K/V editor overlays
+	// (secret, configmap, label). Shared because only one editor is
+	// open at a time; reset on overlay open.
+	editorSearch kvEditorSearchState
 
 	// Label/annotation editor state.
 	labelData                *model.LabelAnnotationData

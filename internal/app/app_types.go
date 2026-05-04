@@ -118,6 +118,17 @@ const (
 	bookmarkModeConfirmDeleteAll
 )
 
+// kvEditorSearchState backs the / search inside the K/V editor
+// overlays (secret, configmap, label). active is true while the user
+// is typing into the input; query holds the live filter text. The
+// renderer narrows visible keys to substring matches (case-insensitive)
+// of query. Reset on overlay open so a stale query from a prior session
+// doesn't carry over.
+type kvEditorSearchState struct {
+	active bool
+	query  TextInput
+}
+
 // sortColDefault is the default sort column name.
 const sortColDefault = "Name"
 

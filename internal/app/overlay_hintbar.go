@@ -363,6 +363,13 @@ func (m Model) overlayHintBarOverlaySecretEditor() string {
 			{Key: "esc", Desc: "cancel"},
 		})
 	}
+	if m.editorSearch.active {
+		return m.renderHints([]ui.HintEntry{
+			{Key: "type", Desc: "filter"},
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "clear"},
+		})
+	}
 	return m.renderHints([]ui.HintEntry{
 		{Key: "jk", Desc: "nav"},
 		{Key: "v", Desc: "toggle"},
@@ -370,6 +377,7 @@ func (m Model) overlayHintBarOverlaySecretEditor() string {
 		{Key: "e", Desc: "edit"},
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
+		{Key: "/", Desc: "filter"},
 		{Key: "D", Desc: "del"},
 		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
@@ -385,11 +393,19 @@ func (m Model) overlayHintBarOverlayConfigMapEditor() string {
 			{Key: "esc", Desc: "cancel"},
 		})
 	}
+	if m.editorSearch.active {
+		return m.renderHints([]ui.HintEntry{
+			{Key: "type", Desc: "filter"},
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "clear"},
+		})
+	}
 	return m.renderHints([]ui.HintEntry{
 		{Key: "jk", Desc: "nav"},
 		{Key: "e", Desc: "edit"},
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
+		{Key: "/", Desc: "filter"},
 		{Key: "D", Desc: "del"},
 		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
@@ -404,12 +420,20 @@ func (m Model) overlayHintBarOverlayLabelEditor() string {
 			{Key: "esc", Desc: "cancel"},
 		})
 	}
+	if m.editorSearch.active {
+		return m.renderHints([]ui.HintEntry{
+			{Key: "type", Desc: "filter"},
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "clear"},
+		})
+	}
 	return m.renderHints([]ui.HintEntry{
 		{Key: "Tab", Desc: "switch"},
 		{Key: "jk", Desc: "nav"},
 		{Key: "e", Desc: "edit"},
 		{Key: "a", Desc: "add"},
 		{Key: "y", Desc: "copy"},
+		{Key: "/", Desc: "filter"},
 		{Key: "D", Desc: "del"},
 		{Key: "enter", Desc: "save"},
 		{Key: "esc", Desc: "close"},
