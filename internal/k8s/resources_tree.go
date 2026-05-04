@@ -11,6 +11,7 @@ import (
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -374,7 +375,14 @@ func (c *Client) buildPodTree(ctx context.Context, contextName, namespace, podNa
 		})
 	}
 
-	dynClient, _ := c.dynamicForContext(contextName)
+	dynClient, dynErr := c.dynamicForContext(contextName)
+	if dynErr != nil {
+		// Tree build proceeds without ref existence checks and without an
+		// owner chain. Log so operators can see why MissingRef flags and
+		// owner ancestors aren't appearing.
+		logger.Warn("Resource tree: dynamic client unavailable; ref existence checks and owner chain skipped",
+			"context", contextName, "error", dynErr)
+	}
 
 	if obj, convErr := runtime.DefaultUnstructuredConverter.ToUnstructured(pod); convErr == nil {
 		var exists existsFn
