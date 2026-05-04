@@ -19,12 +19,13 @@ var secretInnerPanelStyle = lipgloss.NewStyle().
 
 // RenderSecretEditorOverlay renders a centered popup overlay for editing secrets.
 //
-//   - searchQuery / searchActive: the / filter — narrows visible keys
-//     to substring matches.
-//   - editKeyCursor / editValueCursor: cursor positions inside
-//     editKey / editValue so the rendered "█" lands at the right
-//     character (was always at the end of the input text — felt
-//     broken when the user hit ←/→ to navigate).
+//   - searchQuery / searchActive: the / filter.
+//   - editKeyCursor / editValueCursor: byte offsets inside editKey /
+//     editValue where the "█" cursor block lands.
+//   - selected: keys marked with `s` for batch copy; rendered with a
+//     "✓" prefix in the key column. May be nil.
+//   - formatActive / formatCursor: drive the Shift+Y format-picker
+//     chip row, rendered above the inner panel when formatActive.
 //
 // Cursor is interpreted as an index into the FILTERED key list — the
 // caller (Model) keeps that invariant.
@@ -41,6 +42,9 @@ func RenderSecretEditorOverlay(
 	editColumn int, // 0=key, 1=value
 	searchQuery string,
 	searchActive bool,
+	selected map[string]bool,
+	formatActive bool,
+	formatCursor int,
 	screenWidth, screenHeight int,
 ) string {
 	if secret == nil {
@@ -64,14 +68,22 @@ func RenderSecretEditorOverlay(
 	titleH := 1
 	gapH := 1
 
-	// Reserve a row for the search bar when the / filter is in use.
+	// Reserve a row for the search bar when the / filter is in use,
+	// and a row for the Shift+Y format-picker chip strip when the
+	// user is choosing a copy format.
 	searchBar := RenderKVEditorSearchBar(searchQuery, searchActive)
 	searchH := 0
 	if searchBar != "" {
 		searchH = 1
 	}
+	var formatBar string
+	formatH := 0
+	if formatActive {
+		formatBar = RenderKVFormatPicker(formatCursor)
+		formatH = 1
+	}
 
-	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH, 3)
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH-formatH, 3)
 	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
@@ -99,6 +111,7 @@ func RenderSecretEditorOverlay(
 		// cursor + row iteration land on the visible subset.
 		visibleKeys := FilterKVKeys(secret.Keys, searchQuery)
 		filteredSecret := &model.SecretData{Keys: visibleKeys, Data: secret.Data}
+		_ = selected // selection wiring lands in next slice
 		dataContent = renderSecretEditorTable(
 			filteredSecret, cursor, revealedKeys, allRevealed,
 			false, "", "", 0,
@@ -119,6 +132,9 @@ func RenderSecretEditorOverlay(
 	body := title
 	if searchBar != "" {
 		body += "\n" + searchBar
+	}
+	if formatBar != "" {
+		body += "\n" + formatBar
 	}
 	body += "\n" + innerPanel
 

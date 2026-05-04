@@ -16,92 +16,225 @@ import (
 
 // RenderKVEditorEditPane paints the focused edit view that REPLACES
 // the compact key/value table while the user is editing a single
-// row. The pane shows the key and value as full-width labelled
-// regions; the value region renders embedded newlines as actual
-// vertical lines so the user can see and edit multi-line content
-// (PEM certs, kubeconfigs, anything the SingleLineCell collapse
-// would otherwise hide behind a "↵" glyph).
+// row. Layout: bordered Key and Value field boxes stacked
+// vertically. Active field's border picks up ColorPrimary so the
+// user sees which one Tab will swap into.
 //
-// editKeyCursor / editValueCursor are byte offsets into editKey /
-// editValue where the "█" cursor block lands. Without them the
-// cursor was always pinned to the end of the input, which made
-// ←/→ navigation feel broken.
+// editKeyCursor / editValueCursor are byte offsets where the cursor
+// "block" lands. The cursor renders as inverse-video on the
+// CHARACTER at the offset (not as an inserted "█") so moving the
+// cursor doesn't shift the rest of the text by a column — the user
+// reported the previous insert-style cursor felt like the text
+// jumped around as they typed/navigated.
 //
-// editColumn picks which region carries the cursor block: 0 = key,
-// 1 = value. No inline footer hint — the keymap lives in the global
-// status bar (overlay_hintbar) so the pane gets the full height.
+// editColumn picks the active field: 0 = key, 1 = value. No inline
+// footer hint — the keymap lives in the global status bar
+// (overlay_hintbar) so the pane gets the full height for content.
 func RenderKVEditorEditPane(
 	editKey string, editKeyCursor int,
 	editValue string, editValueCursor int,
 	editColumn, width, height int,
 ) string {
-	keyLabel := BarDimStyle.Bold(true).Render("Key:   ")
-	valLabel := BarDimStyle.Bold(true).Render("Value: ")
+	const (
+		labelKey = "  Key  "
+		labelVal = "  Value  "
+	)
 
-	keyText := insertCursorBlock(editKey, editKeyCursor, editColumn == 0)
-	keyText = Truncate(keyText, max(width-len("Key:   "), 4))
-	keyRow := lipgloss.NewStyle().Background(BaseBg).Render(keyLabel + BarNormalStyle.Render(keyText))
+	// Field-box dimensions: two fields share the available height.
+	// Key gets one content row; Value gets the rest.
+	fieldOuterW := max(width, 12)
+	keyContentH := 1
+	valContentH := max(height-keyContentH-4, 1) // -4: 2 borders for each box's top+bottom = 4 rows total chrome
 
-	// Value region: width-aware wrap to the cell's available height.
-	// Reserve 1 row for the key row; the remainder is the value's
-	// vertical budget. (Was -2 to reserve a footer hint row, but the
-	// hint moved to the global status bar — we use the row for value
-	// content instead.)
-	valHeight := max(height-1, 1)
-	valWidth := max(width-len("Value: "), 4)
+	keyActive := editColumn == 0
+	valActive := editColumn == 1
 
-	valText := insertCursorBlock(editValue, editValueCursor, editColumn == 1)
-	valBody := wrapAndClip(valText, valWidth, valHeight)
-	// Pad each value line so the bg fills the row width — without
-	// padding, lines shorter than valWidth show terminal-default bg
-	// to the right of the text and break the editor's uniform shade.
-	valBodyStyled := stylePerLine(valBody, valWidth, BarNormalStyle)
-	valRow := lipgloss.NewStyle().Background(BaseBg).Render(valLabel) + valBodyStyled
+	keyContent := overlayCursor(editKey, editKeyCursor, keyActive, fieldOuterW-4)
+	valContent := overlayCursorMultiline(editValue, editValueCursor, valActive, fieldOuterW-4, valContentH)
 
-	return keyRow + "\n" + valRow
+	keyBox := kvFieldBox(labelKey, keyContent, keyActive, fieldOuterW, keyContentH)
+	valBox := kvFieldBox(labelVal, valContent, valActive, fieldOuterW, valContentH)
+
+	return keyBox + "\n" + valBox
 }
 
-// insertCursorBlock returns s with a "█" cursor glyph inserted at
-// the given byte offset, but only when active is true. Clamps the
-// offset to s's bounds so a stale cursor position can't panic.
-func insertCursorBlock(s string, cursor int, active bool) string {
+// kvFieldBox wraps `content` in a labelled bordered box. Active
+// fields get an accent border color; idle fields use the standard
+// border color. The box's bg matches the editor's baseBg so it
+// doesn't paint a different shade against the surrounding pane.
+func kvFieldBox(label, content string, active bool, outerW, contentH int) string {
+	border := lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderBackground(BaseBg).
+		Background(BaseBg).
+		Padding(0, 1).
+		Width(outerW - 2). // -2 for left/right borders
+		Height(contentH)
+
+	if active {
+		border = border.BorderForeground(lipgloss.Color(ColorPrimary))
+	} else {
+		border = border.BorderForeground(lipgloss.Color(ColorBorder))
+	}
+
+	// Render the field with its content, then splice the label over
+	// the top-border row so it reads as "── Key ──" / "── Value ──".
+	rendered := border.Render(content)
+	lines := strings.Split(rendered, "\n")
+	if len(lines) == 0 {
+		return rendered
+	}
+	top := lines[0]
+	labelStyle := BarDimStyle
+	if active {
+		labelStyle = lipgloss.NewStyle().
+			Foreground(lipgloss.Color(ColorPrimary)).
+			Background(BaseBg).
+			Bold(true)
+	}
+	styledLabel := labelStyle.Render(label)
+	if 1+lipgloss.Width(styledLabel) <= lipgloss.Width(top) {
+		// Replace the segment of the top border at offset 2..2+labelW
+		// with the label so the chrome reads "╭─ Key ─...─╮".
+		labelW := lipgloss.Width(styledLabel)
+		// Strip ANSI from top to know its visible chars; then rebuild.
+		// Simpler: prepend the first border char + a space, then label,
+		// then the remainder of the top border.
+		first := string([]rune(top)[0]) // "╭"
+		// Skip first char + (labelW + 1) chars from the original top.
+		topRunes := []rune(top)
+		if len(topRunes) > labelW+1 {
+			rest := string(topRunes[1+labelW:])
+			lines[0] = first + styledLabel + rest
+		}
+	}
+	return strings.Join(lines, "\n")
+}
+
+// overlayCursor renders s with the character at `cursor` shown in
+// inverse video (active) or returns s unchanged (inactive). When
+// cursor is at len(s) a single space gets the inverse style so the
+// indicator stays visible at the end of the input.
+//
+// Reverse-video instead of an inserted "█" block: inserting shifts
+// every character to the right of the cursor by one visual column
+// every time the cursor moves, which the user reported as the text
+// "jumping around" while typing / navigating.
+func overlayCursor(s string, cursor int, active bool, maxW int) string {
 	if !active {
-		return s
+		return Truncate(s, maxW)
 	}
-	if cursor < 0 {
-		cursor = 0
+	cursor = clampInt(cursor, 0, len(s))
+	cursorStyle := lipgloss.NewStyle().Reverse(true).Background(BaseBg)
+	var head, ch, tail string
+	if cursor == len(s) {
+		head = s
+		ch = " "
+	} else {
+		end := nextRuneEnd(s, cursor)
+		head = s[:cursor]
+		ch = s[cursor:end]
+		tail = s[end:]
 	}
-	if cursor > len(s) {
-		cursor = len(s)
-	}
-	return s[:cursor] + "█" + s[cursor:]
+	out := head + cursorStyle.Render(ch) + tail
+	return Truncate(out, maxW)
 }
 
-// wrapAndClip soft-wraps `s` so each visual line is at most maxW
-// columns, then clips to at most maxH lines. Returns the wrapped
-// content joined with "\n". Doesn't break inside ANSI sequences
-// (the editor passes plain text so the simple rune split is safe).
-func wrapAndClip(s string, maxW, maxH int) string {
-	lines := strings.Split(s, "\n")
-	out := make([]string, 0, len(lines))
-	for _, line := range lines {
-		if line == "" {
-			out = append(out, "")
+// overlayCursorMultiline soft-wraps s to maxW columns and clips to
+// maxH lines, optionally overlaying a reverse-video cursor at the
+// byte offset. The wrap is performed on the plain source so the
+// ANSI sequences from the cursor styling don't break the column
+// math (a previous wrapAndClip-then-style approach miscounted runes
+// when escape sequences landed inside the wrap window).
+func overlayCursorMultiline(s string, cursor int, active bool, maxW, maxH int) string {
+	if maxW <= 0 || maxH <= 0 {
+		return ""
+	}
+	cursorStyle := lipgloss.NewStyle().Reverse(true).Background(BaseBg)
+	cursor = clampInt(cursor, 0, len(s))
+
+	var lines []string
+	var cur []byte
+	visualCol := 0
+	cursorPlaced := false
+
+	flush := func() {
+		lines = append(lines, string(cur))
+		cur = cur[:0]
+		visualCol = 0
+	}
+	emitCursor := func(text string) {
+		cur = append(cur, []byte(cursorStyle.Render(text))...)
+		visualCol++ // text is exactly one rune (or " ") so always 1 visual col
+	}
+
+	i := 0
+	for i < len(s) {
+		// Place cursor at this position before consuming the next char.
+		if active && !cursorPlaced && i == cursor {
+			if s[i] == '\n' {
+				// Cursor on a newline — show " " mark at end of the
+				// current line, then process the newline as normal.
+				emitCursor(" ")
+				flush()
+				cursorPlaced = true
+				i++
+				continue
+			}
+			end := nextRuneEnd(s, i)
+			emitCursor(s[i:end])
+			cursorPlaced = true
+			i = end
+			if visualCol >= maxW {
+				flush()
+			}
 			continue
 		}
-		runes := []rune(line)
-		for i := 0; i < len(runes); i += maxW {
-			end := min(i+maxW, len(runes))
-			out = append(out, string(runes[i:end]))
+		if s[i] == '\n' {
+			flush()
+			i++
+			continue
+		}
+		end := nextRuneEnd(s, i)
+		cur = append(cur, s[i:end]...)
+		visualCol++
+		i = end
+		if visualCol >= maxW {
+			flush()
 		}
 	}
-	if len(out) > maxH {
-		out = out[:maxH]
-		if maxH > 0 {
-			out[maxH-1] = Truncate(out[maxH-1], maxW-1) + "…"
-		}
+	if active && !cursorPlaced && cursor == len(s) {
+		emitCursor(" ")
 	}
-	return strings.Join(out, "\n")
+	if len(cur) > 0 {
+		lines = append(lines, string(cur))
+	}
+	if len(lines) > maxH {
+		lines = lines[:maxH]
+	}
+	return stylePerLine(strings.Join(lines, "\n"), maxW, BarNormalStyle)
+}
+
+// nextRuneEnd returns the byte offset of the next rune after the
+// rune starting at i. Handles multi-byte UTF-8 by skipping
+// continuation bytes (0b10xxxxxx).
+func nextRuneEnd(s string, i int) int {
+	end := i + 1
+	for end < len(s) && (s[end]&0xC0) == 0x80 {
+		end++
+	}
+	return end
+}
+
+// clampInt restricts v to [lo, hi] inclusive.
+func clampInt(v, lo, hi int) int {
+	if v < lo {
+		return lo
+	}
+	if v > hi {
+		return hi
+	}
+	return v
 }
 
 // stylePerLine renders each line of `body` through `style.Width(w)`

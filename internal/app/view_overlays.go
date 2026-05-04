@@ -317,6 +317,7 @@ func (m Model) renderOverlayFullscreen(background string) string {
 			m.secretEditValue.Value, m.secretEditValue.Cursor,
 			m.secretEditColumn,
 			m.editorSearch.query.Value, m.editorSearch.active,
+			nil, false, 0, // selected / formatActive / formatCursor — wiring in next slice
 			m.width, m.height,
 		)
 	case overlayConfigMapEditor:
