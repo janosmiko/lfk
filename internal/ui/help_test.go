@@ -181,7 +181,7 @@ func TestBuildHelpSpecs_KeysAlignWithinSection(t *testing.T) {
 	specs := buildHelpSpecs("", "")
 
 	var currentSection string
-	var widths []int
+	widths := make([]int, 0, 16)
 
 	check := func() {
 		if len(widths) <= 1 {
@@ -202,7 +202,7 @@ func TestBuildHelpSpecs_KeysAlignWithinSection(t *testing.T) {
 		case helpLineSectionHeader:
 			check()
 			currentSection = s.text
-			widths = nil
+			widths = widths[:0]
 		case helpLineEntry:
 			widths = append(widths, lipgloss.Width(s.key))
 		}
