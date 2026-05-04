@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -81,21 +83,23 @@ func RenderConfigMapEditorOverlay(
 	// the stock OverlayTitleStyle uses surfaceBg.
 	title := OverlayTitleStyle.Background(BaseBg).Render("ConfigMap Editor")
 
-	// Editing swaps the compact table for a focused multi-line edit
-	// pane (see secretview for the rationale).
+	// Mode selection while editing: pane for multi-line values,
+	// inline table edit for single-line. Same contract as the secret
+	// editor — see secretview.go for the full rationale.
 	var dataContent string
-	if editing {
+	switch {
+	case editing && strings.Contains(editValue, "\n"):
 		dataContent = RenderKVEditorEditPane(
 			editKey, editKeyCursor,
 			editValue, editValueCursor,
 			editColumn, editValueScroll, panelContentW, panelContentH,
 		)
-	} else {
+	default:
 		visibleKeys := FilterKVKeys(cm.Keys, searchQuery)
 		filteredCM := &model.ConfigMapData{Keys: visibleKeys, Data: cm.Data}
 		dataContent = renderConfigMapEditorTable(
 			filteredCM, cursor,
-			false, "", "", 0,
+			editing, editKey, editKeyCursor, editValue, editValueCursor, editColumn,
 			selected,
 			panelContentW, panelContentH,
 		)
@@ -135,7 +139,9 @@ func renderConfigMapEditorTable(
 	selectedIdx int,
 	editing bool,
 	editKey string,
+	editKeyCursor int,
 	editValue string,
+	editValueCursor int,
 	editColumn int,
 	selectedKeys map[string]bool, // keys marked with `s` for batch copy; nil = none
 	width, height int,
@@ -159,11 +165,11 @@ func renderConfigMapEditorTable(
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = SingleLineCell(editKey, keyColW-1) + "\u2588"
+			keyText = overlayCursor(editKey, editKeyCursor, true, keyColW)
 			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
 			keyText = SingleLineCell(editKey, keyColW)
-			valText = SingleLineCell(editValue, valColW-1) + "\u2588"
+			valText = overlayCursor(editValue, editValueCursor, true, valColW)
 		default:
 			prefix := "  "
 			if selectedKeys[k] {

@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -95,26 +97,29 @@ func RenderSecretEditorOverlay(
 	// fix above eliminates.
 	title := OverlayTitleStyle.Background(BaseBg).Render("Secret Editor")
 
-	// Editing swaps the compact key/value table for a focused edit
-	// pane that renders the value with embedded newlines preserved.
-	// Without this swap, multi-line values would either collapse
-	// (SingleLineCell hides the line breaks) or expand the table
-	// vertically and break the editor's outer dimensions.
+	// Mode selection while editing:
+	//   - value contains '\n'  → focused bordered pane (handles newlines
+	//     + scroll without breaking the table layout)
+	//   - value is single line  → inline table-cell edit (the cursor
+	//     row's value cell shows the cursor; surrounding rows stay
+	//     visible for context — the bordered pane is overkill for a
+	//     one-line password/token).
 	var dataContent string
-	if editing {
+	switch {
+	case editing && strings.Contains(editValue, "\n"):
 		dataContent = RenderKVEditorEditPane(
 			editKey, editKeyCursor,
 			editValue, editValueCursor,
 			editColumn, editValueScroll, panelContentW, panelContentH,
 		)
-	} else {
+	default:
 		// Filter keys before passing to the table renderer so the
 		// cursor + row iteration land on the visible subset.
 		visibleKeys := FilterKVKeys(secret.Keys, searchQuery)
 		filteredSecret := &model.SecretData{Keys: visibleKeys, Data: secret.Data}
 		dataContent = renderSecretEditorTable(
 			filteredSecret, cursor, revealedKeys, allRevealed,
-			false, "", "", 0,
+			editing, editKey, editKeyCursor, editValue, editValueCursor, editColumn,
 			selected,
 			panelContentW, panelContentH,
 		)
@@ -158,10 +163,11 @@ func RenderSecretEditorOverlay(
 // `-` / `|` glue).
 //
 // The table package renders all rows it's given, so we pre-truncate to
-// the visible window based on cursor position. Cursor-row + editing
-// cell styling are applied via StyleFunc; the cursor block ('█') for
-// inline editing is injected into the row text itself because it must
-// land at a specific character position the style system can't reach.
+// the visible window based on cursor position. When `editing` is set
+// for a single-line value the cursor row's edited cell is rendered in-
+// line via overlayCursor (reverse-video on the char at the cursor
+// offset) so chars don't shift as the cursor moves — the same
+// non-shifting cursor used by the focused edit pane.
 func renderSecretEditorTable(
 	secret *model.SecretData,
 	selectedIdx int,
@@ -169,7 +175,9 @@ func renderSecretEditorTable(
 	allRevealed bool,
 	editing bool,
 	editKey string,
+	editKeyCursor int,
 	editValue string,
+	editValueCursor int,
 	editColumn int,
 	selectedKeys map[string]bool, // keys marked with `s` for batch copy; nil = none
 	width, height int,
@@ -194,13 +202,11 @@ func renderSecretEditorTable(
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			// "█" cursor block has visual width 1 — reserve a column for
-			// it inside maxW so the cell stays at exactly keyColW chars.
-			keyText = SingleLineCell(editKey, keyColW-1) + "█"
+			keyText = overlayCursor(editKey, editKeyCursor, true, keyColW)
 			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
 			keyText = SingleLineCell(editKey, keyColW)
-			valText = SingleLineCell(editValue, valColW-1) + "█"
+			valText = overlayCursor(editValue, editValueCursor, true, valColW)
 		default:
 			// Reserve 2 cols for the "✓ " / "  " selection prefix so
 			// adding a checkmark on selected rows doesn't push the key

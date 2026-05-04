@@ -482,6 +482,17 @@ are the apply target; otherwise the cursor row is copied alone.
 
 ### Edit mode
 
+The editor picks one of two modes based on the value being edited:
+
+- **Inline edit (single-line values)** — the cursor moves into the
+  table cell of the row being edited. Surrounding rows stay visible
+  for context. Used for short values like passwords / tokens / labels.
+- **Pane edit (multi-line values)** — the table is replaced with a
+  bordered Key + Value pane that handles newlines, scrolling, and
+  page navigation. Used for values containing `\n` (TLS certs,
+  dotenv blocks, multi-line config files). The editor switches modes
+  automatically when you insert a newline with `Enter`.
+
 | Key | Action |
 |---|---|
 | `Tab` | Switch between key and value fields (in-progress edits in both fields are preserved) |
@@ -489,12 +500,13 @@ are the apply target; otherwise the cursor row is copied alone.
 | `Ctrl+S` | Commit the in-progress edit back to the list |
 | `Esc` | Cancel the in-progress edit |
 | `←` / `→` | Move cursor left / right |
-| `↑` / `↓` | Move cursor up / down (preserves byte column on the prev/next `\n`-delimited line) |
-| `Ctrl+D` / `Ctrl+U` | Scroll cursor down / up by half a page |
-| `Ctrl+F` / `Ctrl+B` | Scroll cursor down / up by a full page |
+| `↑` / `↓` | Move cursor up / down (preserves byte column on the prev/next `\n`-delimited line; pane mode only) |
+| `Ctrl+D` / `Ctrl+U` | Scroll cursor down / up by half a page (pane mode only) |
+| `Ctrl+F` / `Ctrl+B` | Scroll cursor down / up by a full page (pane mode only) |
 | `Ctrl+A` / `Ctrl+E` | Move cursor to start / end of the **current line** (vim-like `0` / `$`) |
 | `Backspace` | Delete the character before the cursor |
 | `Ctrl+W` | Delete the word before the cursor |
+| `Enter` | Insert a newline (switches to pane mode if value was previously single-line) |
 
 > Pressing `Enter` from the list view saves all pending changes via `kubectl
 > apply`/`patch` and refreshes the resource. If no fields were modified, the

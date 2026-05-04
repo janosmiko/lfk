@@ -12,7 +12,7 @@ import (
 
 func TestRenderLabelEditorTable(t *testing.T) {
 	t.Run("empty data shows add hint", func(t *testing.T) {
-		result := renderLabelEditorTable(nil, nil, 0, false, "", "", 0, nil, 60, 20)
+		result := renderLabelEditorTable(nil, nil, 0, false, "", 0, "", 0, 0, nil, 60, 20)
 		assert.Contains(t, result, "KEY")
 		assert.Contains(t, result, "VALUE")
 		assert.Contains(t, result, "(empty - press 'a' to add)")
@@ -21,7 +21,7 @@ func TestRenderLabelEditorTable(t *testing.T) {
 	t.Run("shows keys and values", func(t *testing.T) {
 		keys := []string{"app", "env"}
 		data := map[string]string{"app": "nginx", "env": "production"}
-		result := renderLabelEditorTable(keys, data, 0, false, "", "", 0, nil, 80, 20)
+		result := renderLabelEditorTable(keys, data, 0, false, "", 0, "", 0, 0, nil, 80, 20)
 		assert.Contains(t, result, "app")
 		assert.Contains(t, result, "nginx")
 		assert.Contains(t, result, "env")
@@ -33,24 +33,32 @@ func TestRenderLabelEditorTable(t *testing.T) {
 		// the data lands in output.
 		keys := []string{"k1", "k2"}
 		data := map[string]string{"k1": "v1", "k2": "v2"}
-		result := renderLabelEditorTable(keys, data, 1, false, "", "", 0, nil, 60, 20)
+		result := renderLabelEditorTable(keys, data, 1, false, "", 0, "", 0, 0, nil, 60, 20)
 		assert.Contains(t, result, "k2")
 	})
 
 	t.Run("editing key column shows edit cursor", func(t *testing.T) {
 		keys := []string{"mykey"}
 		data := map[string]string{"mykey": "myval"}
-		result := renderLabelEditorTable(keys, data, 0, true, "newkey", "", 0, nil, 60, 20)
+		result := renderLabelEditorTable(keys, data, 0, true, "newkey", 6, "", 0, 0, nil, 60, 20)
 		assert.Contains(t, result, "newkey")
-		assert.Contains(t, result, "\u2588")
+		// Cursor presence is now reverse-video styling rather than an
+		// inserted "█" block; under the test profile no escapes emit.
+		// Assert the in-progress edit value is what's rendered, not the
+		// stored data.
+		assert.NotContains(t, result, "myval", "stored value must be replaced by editValue when editing")
 	})
 
 	t.Run("editing value column shows edit cursor", func(t *testing.T) {
 		keys := []string{"mykey"}
 		data := map[string]string{"mykey": "myval"}
-		result := renderLabelEditorTable(keys, data, 0, true, "", "newval", 1, nil, 60, 20)
+		result := renderLabelEditorTable(keys, data, 0, true, "", 0, "newval", 6, 1, nil, 60, 20)
 		assert.Contains(t, result, "newval")
-		assert.Contains(t, result, "\u2588")
+		// Cursor presence is now reverse-video styling rather than an
+		// inserted "█" block; under the test profile no escapes emit.
+		// Assert the in-progress edit value is what's rendered, not the
+		// stored data.
+		assert.NotContains(t, result, "myval", "stored value must be replaced by editValue when editing")
 	})
 }
 

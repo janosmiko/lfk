@@ -194,13 +194,15 @@ func TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail(t *testing.T) {
 		Keys: []string{"DB_PASSWORD"},
 		Data: map[string]string{"DB_PASSWORD": "ignored-while-editing"},
 	}
-	// Editing mode (true) routes through RenderKVEditorEditPane which
-	// uses kvFieldBox for both the Key and Value labels.
+	// Editing a multi-line value (contains '\n') routes through
+	// RenderKVEditorEditPane → kvFieldBox; single-line values stay
+	// in the inline-table edit path. We're testing the field-box
+	// ANSI splice here so feed it a multi-line value to force pane mode.
 	out := RenderSecretEditorOverlay(
 		secret, 0, nil, true,
 		true,
 		"DB_PASSWORD", 11,
-		"hunter2", 7,
+		"line-1\nline-2", 13,
 		1,
 		"", false,
 		nil, false, 0,
@@ -219,6 +221,72 @@ func TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail(t *testing.T) {
 	// The Key/Value labels should still be visible in the output.
 	assert.Contains(t, plain, "Key", "Key field-box label must render")
 	assert.Contains(t, plain, "Value", "Value field-box label must render")
+}
+
+// TestRenderSecretEditorOverlay_SingleLineValueEditsInline asserts
+// that editing a value WITHOUT '\n' renders the table inline (cursor
+// lives inside the cursor row's value cell) rather than swapping in
+// the bordered Key/Value edit pane. The bordered pane is overkill for
+// a one-line password/token — the user wanted the cell-level edit so
+// surrounding rows stay visible for context.
+//
+// Implementation contract: pane mode emits the "  Key  " / "  Value  "
+// field-box labels (kvFieldBox); inline mode does NOT.
+func TestRenderSecretEditorOverlay_SingleLineValueEditsInline(t *testing.T) {
+	secret := &model.SecretData{
+		Keys: []string{"DB_PASSWORD"},
+		Data: map[string]string{"DB_PASSWORD": "ignored-while-editing"},
+	}
+	out := RenderSecretEditorOverlay(
+		secret, 0, nil, true,
+		true,
+		"DB_PASSWORD", 11,
+		"hunter2", 7, // single-line value
+		1,
+		"", false,
+		nil, false, 0,
+		0,
+		120, 30,
+	)
+	plain := stripANSI(out)
+	assert.NotContains(t, plain, "  Key  ",
+		"single-line value must NOT use the bordered field-box pane (kvFieldBox 'Key' label)")
+	assert.NotContains(t, plain, "  Value  ",
+		"single-line value must NOT use the bordered field-box pane (kvFieldBox 'Value' label)")
+	// The KV table headers SHOULD still be present — that's the inline mode.
+	assert.Contains(t, plain, "KEY", "table header KEY must render in inline-edit mode")
+	assert.Contains(t, plain, "VALUE", "table header VALUE must render in inline-edit mode")
+	// The in-progress value should be visible (since we're showing
+	// the table with the editValue rendered in the cursor row).
+	assert.Contains(t, plain, "hunter2", "the in-progress edit value must be visible in the table cell")
+}
+
+// TestRenderSecretEditorOverlay_MultilineValueEditsInPane confirms
+// that values containing '\n' still use the focused bordered pane —
+// inline mode would either collapse the newlines or break the table
+// layout. Once the user inserts a newline the editor seamlessly
+// switches into pane mode.
+func TestRenderSecretEditorOverlay_MultilineValueEditsInPane(t *testing.T) {
+	secret := &model.SecretData{
+		Keys: []string{"CERT"},
+		Data: map[string]string{"CERT": "ignored"},
+	}
+	out := RenderSecretEditorOverlay(
+		secret, 0, nil, true,
+		true,
+		"CERT", 4,
+		"-----BEGIN-----\nbody\n-----END-----", 35, // multi-line value
+		1,
+		"", false,
+		nil, false, 0,
+		0,
+		120, 30,
+	)
+	plain := stripANSI(out)
+	assert.Contains(t, plain, "Key", "pane-mode Key field-box label must render for multi-line values")
+	assert.Contains(t, plain, "Value", "pane-mode Value field-box label must render for multi-line values")
+	assert.Contains(t, plain, "-----BEGIN-----", "first line of multi-line value must be visible")
+	assert.Contains(t, plain, "-----END-----", "last line of multi-line value must be visible")
 }
 
 // TestRenderSecretEditorOverlay_LongValueScrollsToCursor pins the
@@ -364,7 +432,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{},
 			Data: map[string]string{},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, false, false, "", "", 0, nil, 60, 20)
+		result := renderSecretEditorTable(secret, 0, nil, false, false, "", 0, "", 0, 0, nil, 60, 20)
 		// Headers stay visible above the placeholder; lipgloss/table
 		// renders them uppercase.
 		assert.Contains(t, result, "KEY")
@@ -377,7 +445,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"password", "token"},
 			Data: map[string]string{"password": "secret123", "token": "abc"},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, false, false, "", "", 0, nil, 80, 20)
+		result := renderSecretEditorTable(secret, 0, nil, false, false, "", 0, "", 0, 0, nil, 80, 20)
 		assert.Contains(t, result, "password")
 		assert.Contains(t, result, "********")
 		// The actual value should not appear when not revealed.
@@ -390,7 +458,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Data: map[string]string{"password": "secret123"},
 		}
 		revealed := map[string]bool{"password": true}
-		result := renderSecretEditorTable(secret, 0, revealed, false, false, "", "", 0, nil, 80, 20)
+		result := renderSecretEditorTable(secret, 0, revealed, false, false, "", 0, "", 0, 0, nil, 80, 20)
 		assert.Contains(t, result, "secret123")
 	})
 
@@ -399,7 +467,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"password", "token"},
 			Data: map[string]string{"password": "pass1", "token": "tok1"},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, true, false, "", "", 0, nil, 80, 20)
+		result := renderSecretEditorTable(secret, 0, nil, true, false, "", 0, "", 0, 0, nil, 80, 20)
 		assert.Contains(t, result, "pass1")
 		assert.Contains(t, result, "tok1")
 	})
@@ -412,7 +480,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"key1", "key2"},
 			Data: map[string]string{"key1": "v1", "key2": "v2"},
 		}
-		result := renderSecretEditorTable(secret, 1, nil, false, false, "", "", 0, nil, 60, 20)
+		result := renderSecretEditorTable(secret, 1, nil, false, false, "", 0, "", 0, 0, nil, 60, 20)
 		assert.Contains(t, result, "key1")
 		assert.Contains(t, result, "key2")
 	})
@@ -422,9 +490,12 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"mykey"},
 			Data: map[string]string{"mykey": "myval"},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, false, true, "newkey", "", 0, nil, 60, 20)
-		assert.Contains(t, result, "newkey")
-		assert.Contains(t, result, "\u2588")
+		result := renderSecretEditorTable(secret, 0, nil, false, true, "newkey", 6, "", 0, 0, nil, 60, 20)
+		assert.Contains(t, result, "newkey", "in-progress key edit must be visible in the table cell")
+		// The saved value ("myval") MUST NOT appear when editing the key
+		// column \u2014 the renderer should be rendering editKey, not the
+		// stored data.
+		assert.NotContains(t, result, "mykey", "stored key must be replaced by the in-progress editKey")
 	})
 
 	t.Run("editing value column shows edit cursor", func(t *testing.T) {
@@ -432,9 +503,11 @@ func TestRenderSecretEditorTable(t *testing.T) {
 			Keys: []string{"mykey"},
 			Data: map[string]string{"mykey": "myval"},
 		}
-		result := renderSecretEditorTable(secret, 0, nil, false, true, "", "newval", 1, nil, 60, 20)
-		assert.Contains(t, result, "newval")
-		assert.Contains(t, result, "\u2588")
+		result := renderSecretEditorTable(secret, 0, nil, false, true, "", 0, "newval", 6, 1, nil, 60, 20)
+		assert.Contains(t, result, "newval", "in-progress value edit must be visible in the table cell")
+		// Stored value would render masked as "********"; with editing
+		// active the renderer shows editValue instead.
+		assert.NotContains(t, result, "********", "stored secret mask must be replaced by editValue")
 	})
 }
 

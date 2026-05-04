@@ -72,7 +72,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Keys: []string{},
 			Data: map[string]string{},
 		}
-		result := renderConfigMapEditorTable(cm, 0, false, "", "", 0, nil, 60, 20)
+		result := renderConfigMapEditorTable(cm, 0, false, "", 0, "", 0, 0, nil, 60, 20)
 		assert.Contains(t, result, "KEY")
 		assert.Contains(t, result, "VALUE")
 		assert.Contains(t, result, "(empty - press 'a' to add a key)")
@@ -86,7 +86,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 				"DB_HOST":  "localhost",
 			},
 		}
-		result := renderConfigMapEditorTable(cm, 0, false, "", "", 0, nil, 80, 20)
+		result := renderConfigMapEditorTable(cm, 0, false, "", 0, "", 0, 0, nil, 80, 20)
 		assert.Contains(t, result, "KEY")
 		assert.Contains(t, result, "VALUE")
 		assert.Contains(t, result, "APP_NAME")
@@ -102,7 +102,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Keys: []string{"key1", "key2"},
 			Data: map[string]string{"key1": "val1", "key2": "val2"},
 		}
-		result := renderConfigMapEditorTable(cm, 1, false, "", "", 0, nil, 60, 20)
+		result := renderConfigMapEditorTable(cm, 1, false, "", 0, "", 0, 0, nil, 60, 20)
 		assert.Contains(t, result, "key2")
 	})
 
@@ -111,9 +111,13 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Keys: []string{"mykey"},
 			Data: map[string]string{"mykey": "myval"},
 		}
-		result := renderConfigMapEditorTable(cm, 0, true, "newkey", "", 0, nil, 60, 20)
+		result := renderConfigMapEditorTable(cm, 0, true, "newkey", 6, "", 0, 0, nil, 60, 20)
 		assert.Contains(t, result, "newkey")
-		assert.Contains(t, result, "\u2588")
+		// Cursor presence is now reverse-video styling rather than an
+		// inserted "█" block; under the test profile no escapes emit.
+		// Assert the in-progress edit value is what's rendered, not the
+		// stored data.
+		assert.NotContains(t, result, "myval", "stored value must be replaced by editValue when editing")
 	})
 
 	t.Run("editing value column shows edit cursor", func(t *testing.T) {
@@ -121,9 +125,13 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Keys: []string{"mykey"},
 			Data: map[string]string{"mykey": "myval"},
 		}
-		result := renderConfigMapEditorTable(cm, 0, true, "", "newval", 1, nil, 60, 20)
+		result := renderConfigMapEditorTable(cm, 0, true, "", 0, "newval", 6, 1, nil, 60, 20)
 		assert.Contains(t, result, "newval")
-		assert.Contains(t, result, "\u2588")
+		// Cursor presence is now reverse-video styling rather than an
+		// inserted "█" block; under the test profile no escapes emit.
+		// Assert the in-progress edit value is what's rendered, not the
+		// stored data.
+		assert.NotContains(t, result, "myval", "stored value must be replaced by editValue when editing")
 	})
 }
 

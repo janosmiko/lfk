@@ -2,6 +2,7 @@ package ui
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -110,18 +111,20 @@ func RenderLabelEditorOverlay(
 		dataMap = data.Annotations
 	}
 
-	// Editing swaps the compact table for a focused multi-line edit
-	// pane (see secretview for the rationale).
+	// Mode selection while editing: pane for multi-line values,
+	// inline table edit for single-line. Same contract as Secret /
+	// ConfigMap — see secretview.go for the full rationale.
 	var dataContent string
-	if editing {
+	switch {
+	case editing && strings.Contains(editValue, "\n"):
 		dataContent = RenderKVEditorEditPane(
 			editKey, editKeyCursor,
 			editValue, editValueCursor,
 			editColumn, editValueScroll, panelContentW, panelContentH,
 		)
-	} else {
+	default:
 		visibleKeys := FilterKVKeys(keys, searchQuery)
-		dataContent = renderLabelEditorTable(visibleKeys, dataMap, cursor, false, "", "", 0, selected, panelContentW, panelContentH)
+		dataContent = renderLabelEditorTable(visibleKeys, dataMap, cursor, editing, editKey, editKeyCursor, editValue, editValueCursor, editColumn, selected, panelContentW, panelContentH)
 	}
 
 	// Inner bordered panel — bg + border-bg pulled from the active
@@ -150,7 +153,7 @@ func RenderLabelEditorOverlay(
 		Render(body)
 }
 
-func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx int, editing bool, editKey, editValue string, editColumn int, selectedKeys map[string]bool, width, height int) string {
+func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx int, editing bool, editKey string, editKeyCursor int, editValue string, editValueCursor int, editColumn int, selectedKeys map[string]bool, width, height int) string {
 	// +2 budgets for the "✓ " / "  " selection-indicator prefix.
 	keyColW := computeKeyColumnWidth(keys, width, 2) + 2
 	valColW := max(width-keyColW-5, 8)
@@ -167,11 +170,11 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = SingleLineCell(editKey, keyColW-1) + "\u2588"
+			keyText = overlayCursor(editKey, editKeyCursor, true, keyColW)
 			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
 			keyText = SingleLineCell(editKey, keyColW)
-			valText = SingleLineCell(editValue, valColW-1) + "\u2588"
+			valText = overlayCursor(editValue, editValueCursor, true, valColW)
 		default:
 			prefix := "  "
 			if selectedKeys[k] {
