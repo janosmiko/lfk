@@ -14,6 +14,32 @@ import (
 // the three editors visually consistent and removes ~60 lines of
 // near-identical code per editor.
 
+// SingleLineCell collapses a value to a single visual line that fits
+// inside `maxW` columns. Embedded newlines, carriage returns, and tabs
+// are replaced with a faint "↵" glyph so the user still sees that the
+// raw value was multi-line — without letting lipgloss/table wrap the
+// cell vertically (which would expand the row, the table, and break
+// the editor's outer dimensions).
+//
+// Used by every K/V editor renderer for both the key and value cells:
+// passing raw multi-line content to lipgloss/table makes the entire
+// editor window resize to fit the tallest cell, which the user sees
+// as the editor "growing past the screen" instead of truncating.
+func SingleLineCell(s string, maxW int) string {
+	if s == "" || maxW <= 0 {
+		return Truncate(s, maxW)
+	}
+	// strings.NewReplacer is allocation-friendly here; the inputs are
+	// small and we hit this once per visible cell per render.
+	flat := strings.NewReplacer(
+		"\r\n", " ↵ ",
+		"\n", " ↵ ",
+		"\r", " ↵ ",
+		"\t", "    ",
+	).Replace(s)
+	return Truncate(flat, maxW)
+}
+
 // FilterKVKeys narrows `keys` to entries that contain `query` as a
 // case-insensitive substring. Empty query returns the input unchanged.
 // Used by the K/V editor renderers to apply the / search filter

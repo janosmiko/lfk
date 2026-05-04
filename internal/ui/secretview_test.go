@@ -11,6 +11,32 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// TestRenderSecretEditorOverlay_LongMultilineValueKeepsHeight pins
+// the regression for the layout bug the user reported: a really long
+// or multi-line value used to make lipgloss/table wrap the cell
+// vertically, expanding the row, the table, and the entire editor
+// box past its target height. SingleLineCell collapses newlines and
+// truncates so the rendered overlay's line count stays the same as
+// for a short single-line value.
+func TestRenderSecretEditorOverlay_LongMultilineValueKeepsHeight(t *testing.T) {
+	short := &model.SecretData{
+		Keys: []string{"k1"}, Data: map[string]string{"k1": "short"},
+	}
+	long := &model.SecretData{
+		Keys: []string{"k1"}, Data: map[string]string{"k1": strings.Repeat("AAAAAAAAAA", 200) + "\nline2\nline3"},
+	}
+
+	revealed := map[string]bool{"k1": true}
+	a := RenderSecretEditorOverlay(short, 0, revealed, false, false, "", "", 0, "", false, 100, 25)
+	b := RenderSecretEditorOverlay(long, 0, revealed, false, false, "", "", 0, "", false, 100, 25)
+
+	aLines := strings.Count(a, "\n")
+	bLines := strings.Count(b, "\n")
+	assert.Equal(t, aLines, bLines,
+		"long/multi-line value must not change the editor's rendered line count — got short=%d, long=%d",
+		aLines, bLines)
+}
+
 // TestRenderSecretEditorOverlay_SearchFiltersKeys confirms the
 // active / search query narrows the visible key list. Acts as the
 // integration check for FilterKVKeys + the renderer's search-bar slot.

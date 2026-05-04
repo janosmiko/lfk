@@ -12,11 +12,11 @@ import (
 
 func TestConfigMapValueDisplay(t *testing.T) {
 	tests := []struct {
-		name     string
-		val      string
-		maxW     int
-		wantSub  string
-		wantDots bool
+		name    string
+		val     string
+		maxW    int
+		wantSub string
+		wantArr bool // expect the "↵" newline glyph
 	}{
 		{
 			name:    "single line value fits",
@@ -31,17 +31,17 @@ func TestConfigMapValueDisplay(t *testing.T) {
 			wantSub: "very-long",
 		},
 		{
-			name:     "multiline value shows first line with dots",
-			val:      "first line\nsecond line\nthird line",
-			maxW:     30,
-			wantSub:  "first line",
-			wantDots: true,
+			name:    "multiline value collapses with arrow glyph",
+			val:     "first line\nsecond line\nthird line",
+			maxW:    30,
+			wantSub: "first line",
+			wantArr: true,
 		},
 		{
-			name:     "multiline with long first line",
-			val:      "a-very-long-first-line-here\nsecond",
-			maxW:     15,
-			wantDots: true,
+			name:    "multiline with long first line",
+			val:     "a-very-long-first-line-here\nsecond",
+			maxW:    15,
+			wantSub: "a-very-long",
 		},
 		{
 			name:    "empty value",
@@ -56,8 +56,9 @@ func TestConfigMapValueDisplay(t *testing.T) {
 			if tt.wantSub != "" {
 				assert.Contains(t, result, tt.wantSub)
 			}
-			if tt.wantDots {
-				assert.Contains(t, result, "...")
+			if tt.wantArr {
+				assert.Contains(t, result, "↵",
+					"multi-line values must surface the newline glyph so users see the value spans more than one line")
 			}
 		})
 	}

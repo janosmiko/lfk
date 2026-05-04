@@ -154,13 +154,15 @@ func renderSecretEditorTable(
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = Truncate(editKey, keyColW) + "█"
-			valText = Truncate(editValue, valColW)
+			// "█" cursor block has visual width 1 — reserve a column for
+			// it inside maxW so the cell stays at exactly keyColW chars.
+			keyText = SingleLineCell(editKey, keyColW-1) + "█"
+			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
-			keyText = Truncate(editKey, keyColW)
-			valText = Truncate(editValue, valColW) + "█"
+			keyText = SingleLineCell(editKey, keyColW)
+			valText = SingleLineCell(editValue, valColW-1) + "█"
 		default:
-			keyText = Truncate(k, keyColW)
+			keyText = SingleLineCell(k, keyColW)
 			valText = secretValueDisplay(v, revealedKeys[k] || allRevealed, valColW)
 		}
 		t.Row(keyText, valText)
@@ -175,9 +177,12 @@ func renderSecretEditorTable(
 }
 
 // secretValueDisplay returns the display string for a secret value.
+// Hidden values render as the fixed mask; revealed values flow through
+// SingleLineCell so embedded newlines (multi-line secret payloads like
+// kubeconfig values) don't expand the table cell vertically.
 func secretValueDisplay(val string, revealed bool, maxW int) string {
 	if revealed {
-		return Truncate(val, maxW)
+		return SingleLineCell(val, maxW)
 	}
 	return "********"
 }

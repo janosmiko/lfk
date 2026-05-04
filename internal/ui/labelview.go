@@ -133,19 +133,18 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 	for i := start; i < end; i++ {
 		k := keys[i]
 		v := data[k]
-		displayV := Truncate(v, valColW)
 
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = Truncate(editKey, keyColW) + "\u2588"
-			valText = Truncate(editValue, valColW)
+			keyText = SingleLineCell(editKey, keyColW-1) + "\u2588"
+			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
-			keyText = Truncate(editKey, keyColW)
-			valText = Truncate(editValue, valColW) + "\u2588"
+			keyText = SingleLineCell(editKey, keyColW)
+			valText = SingleLineCell(editValue, valColW-1) + "\u2588"
 		default:
-			keyText = Truncate(k, keyColW)
-			valText = displayV
+			keyText = SingleLineCell(k, keyColW)
+			valText = SingleLineCell(v, valColW)
 		}
 		t.Row(keyText, valText)
 	}

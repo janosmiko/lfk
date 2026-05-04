@@ -1,8 +1,6 @@
 package ui
 
 import (
-	"strings"
-
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -131,13 +129,13 @@ func renderConfigMapEditorTable(
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = Truncate(editKey, keyColW) + "\u2588"
-			valText = Truncate(editValue, valColW)
+			keyText = SingleLineCell(editKey, keyColW-1) + "\u2588"
+			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
-			keyText = Truncate(editKey, keyColW)
-			valText = Truncate(editValue, valColW) + "\u2588"
+			keyText = SingleLineCell(editKey, keyColW)
+			valText = SingleLineCell(editValue, valColW-1) + "\u2588"
 		default:
-			keyText = Truncate(k, keyColW)
+			keyText = SingleLineCell(k, keyColW)
 			valText = displayV
 		}
 		t.Row(keyText, valText)
@@ -150,11 +148,9 @@ func renderConfigMapEditorTable(
 }
 
 // configMapValueDisplay returns the display string for a configmap value.
-// For multiline values, shows the first line with a continuation indicator.
+// Routes through SingleLineCell so multi-line YAML/JSON payloads
+// (common in configmaps) collapse to one row with a "↵" glyph instead
+// of expanding the table cell vertically.
 func configMapValueDisplay(val string, maxW int) string {
-	if before, _, ok := strings.Cut(val, "\n"); ok {
-		firstLine := before
-		return Truncate(firstLine, maxW-4) + " ..."
-	}
-	return Truncate(val, maxW)
+	return SingleLineCell(val, maxW)
 }
