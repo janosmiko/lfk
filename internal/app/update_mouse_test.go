@@ -157,6 +157,208 @@ func TestMouseIgnoredInNonExplorerMode(t *testing.T) {
 
 // --- handleMouse: left click ---
 
+// withMiddleLineMap installs a deterministic ActiveMiddleLineMap for the
+// duration of a test. Mouse click resolution reads this package-level var
+// to translate y coordinates into item indices, so tests must seed it.
+func withMiddleLineMap(t *testing.T, mapping []int) {
+	t.Helper()
+	prev := ui.ActiveMiddleLineMap
+	ui.ActiveMiddleLineMap = mapping
+	t.Cleanup(func() { ui.ActiveMiddleLineMap = prev })
+}
+
+// In baseExplorerModel: width=120, single tab, LevelResources (table view).
+//
+//	leftEnd = 17, middleEnd = 79
+//	baseOffset = 2; table view subtracts one more for the header row, so
+//	itemY = y - 3. y=4 -> row index 1 (pod-b).
+func TestMouseLeftClickMiddleColumnSelectsRow(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(0)
+	withMiddleLineMap(t, []int{0, 1, 2})
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+		X:      30, // middle pane
+		Y:      4,  // table row 1
+	})
+	result := ret.(Model)
+	assert.Equal(t, 1, result.cursor(), "click on a different row moves cursor there without drilling")
+	assert.Equal(t, model.LevelResources, result.nav.Level, "drill must not happen on first click")
+}
+
+func TestMouseLeftClickAlreadyCursoredRowDrills(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(1) // pre-position cursor on pod-b
+	withMiddleLineMap(t, []int{0, 1, 2})
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+		X:      30,
+		Y:      4, // same row the cursor is on
+	})
+	result := ret.(Model)
+	// navigateChild from LevelResources transitions to LevelOwned. The
+	// fact that the level changed proves drill-in fired; without Option
+	// B this click would only re-select the already-selected row.
+	assert.NotEqual(t, model.LevelResources, result.nav.Level,
+		"second click on the cursored row drills into it")
+}
+
+func TestMouseLeftClickHeaderRowSorts(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(0)
+	prevCols := ui.ActiveSortableColumns
+	prevLayout := ui.ActiveMiddleColumnLayout
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = prevCols
+		ui.ActiveMiddleColumnLayout = prevLayout
+	})
+	ui.ActiveSortableColumns = []string{"Name"}
+	ui.ActiveMiddleColumnLayout = []ui.MiddleColumnRegion{
+		{Key: "Name", StartX: 0, EndX: 100},
+	}
+	withMiddleLineMap(t, []int{0, 1, 2})
+
+	// y=2 is the table header row (itemY = 2 - 2 - 1 = -1).
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+		X:      30,
+		Y:      2,
+	})
+	result := ret.(Model)
+	assert.Equal(t, "Name", result.sortColumnName, "header click sorts and does not drill")
+	assert.Equal(t, model.LevelResources, result.nav.Level, "header click must not drill")
+}
+
+// --- handleMouse: right click ---
+
+func TestMouseRightClickMiddleColumnOpensActionMenu(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(0)
+	withMiddleLineMap(t, []int{0, 1, 2})
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonRight,
+		Action: tea.MouseActionPress,
+		X:      30,
+		Y:      4, // row 1
+	})
+	result := ret.(Model)
+	assert.Equal(t, 1, result.cursor(), "right-click moves the cursor to the clicked row")
+	assert.Equal(t, overlayAction, result.overlay, "right-click on middle pane opens action menu")
+}
+
+func TestMouseRightClickRightColumnOpensActionMenuWithoutMovingCursor(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(2)
+	withMiddleLineMap(t, []int{0, 1, 2})
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonRight,
+		Action: tea.MouseActionPress,
+		X:      100, // right pane (>= middleEnd=79)
+		Y:      4,
+	})
+	result := ret.(Model)
+	assert.Equal(t, 2, result.cursor(), "right-click on right pane preserves the existing selection")
+	assert.Equal(t, overlayAction, result.overlay, "right-click on right pane opens action menu")
+}
+
+func TestMouseRightClickLeftColumnIsNoOp(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(1)
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonRight,
+		Action: tea.MouseActionPress,
+		X:      5, // left pane (< leftEnd=17)
+		Y:      4,
+	})
+	result := ret.(Model)
+	assert.Equal(t, 1, result.cursor(), "left-pane right-click does not move the cursor")
+	assert.Equal(t, overlayNone, result.overlay, "left-pane right-click does not open action menu")
+	assert.Equal(t, model.LevelResources, result.nav.Level, "left-pane right-click does not drill out")
+}
+
+// While an overlay is open the explorer underneath must not receive a
+// right-click — the click is either dismissing the overlay (outside the
+// box) or being swallowed by the overlay's own handler (inside). Either
+// way, the explorer cursor must not move.
+func TestMouseRightClickWhileOverlayOpenDoesNotReachExplorer(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(0)
+	m.overlay = overlayNamespace
+	m.overlayItems = []model.Item{{Name: "default"}}
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonRight,
+		Action: tea.MouseActionPress,
+		X:      30,
+		Y:      4, // outside the namespace overlay box (above it)
+	})
+	result := ret.(Model)
+	assert.Equal(t, 0, result.cursor(),
+		"right-click while an overlay is open must not move the explorer cursor")
+}
+
+func TestMouseRightClickReleaseIgnored(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(0)
+	withMiddleLineMap(t, []int{0, 1, 2})
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonRight,
+		Action: tea.MouseActionRelease,
+		X:      30,
+		Y:      4,
+	})
+	result := ret.(Model)
+	assert.Equal(t, 0, result.cursor(), "release must not move cursor — only press should react")
+	assert.Equal(t, overlayNone, result.overlay, "release must not open action menu")
+}
+
+func TestMouseRightClickMiddleSeparatorIsNoOp(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(0)
+	// Line map with a separator at index 1 (-1 means non-clickable).
+	withMiddleLineMap(t, []int{0, -1, 1, 2})
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonRight,
+		Action: tea.MouseActionPress,
+		X:      30,
+		Y:      4, // itemY=1 -> separator
+	})
+	result := ret.(Model)
+	assert.Equal(t, 0, result.cursor(), "right-click on a separator must not move cursor")
+	assert.Equal(t, overlayNone, result.overlay, "right-click on a separator must not open action menu")
+}
+
+func TestMouseRightClickRespectsFullscreenLayout(t *testing.T) {
+	m := baseExplorerModel()
+	m.fullscreenMiddle = true // only the middle column is rendered
+	m.setCursor(0)
+	withMiddleLineMap(t, []int{0, 1, 2})
+
+	// In fullscreen the entire width is the middle pane, so a click at
+	// x=100 (which would land in the right pane in normal layout) must
+	// still resolve to the middle column's action menu rather than
+	// falling through to the right-pane branch.
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonRight,
+		Action: tea.MouseActionPress,
+		X:      100,
+		Y:      4,
+	})
+	result := ret.(Model)
+	assert.Equal(t, 1, result.cursor())
+	assert.Equal(t, overlayAction, result.overlay)
+}
+
 func TestMouseLeftClickRightColumn(t *testing.T) {
 	m := baseExplorerModel()
 	// Click far right (right column area) should navigate child.

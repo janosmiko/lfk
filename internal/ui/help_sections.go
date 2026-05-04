@@ -438,8 +438,16 @@ func helpSections() []helpSection {
 		{
 			title: "Mouse",
 			bindings: []helpEntry{
-				{"Click", "Select item / navigate"},
-				{"Scroll", "Navigate up/down"},
+				{"Click left pane", "Drill out one level"},
+				{"Click middle pane", "Select row (loads preview); click again on the same row to drill in"},
+				{"Click right pane", "Drill into the selected item"},
+				{"Right-click middle/right", "Open action menu for the clicked / selected item"},
+				{"Click table header", "Sort by that column (toggles direction)"},
+				{"Click namespace badge", "Open the namespace selector"},
+				{"Click action / namespace row", "Activate that row (same as Enter)"},
+				{"Click outside an overlay", "Dismiss it (same as Esc)"},
+				{"Wheel inside overlay", "Scroll the list cursor"},
+				{"Wheel in explorer", "Scroll up/down"},
 				{"Shift+Drag", "Select text (terminal native)"},
 			},
 		},

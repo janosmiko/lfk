@@ -16,6 +16,11 @@ var overlayNsScroll int
 // ResetOverlayNsScroll resets the namespace overlay scroll position (call when opening the overlay).
 func ResetOverlayNsScroll() { overlayNsScroll = 0 }
 
+// GetOverlayNsScroll returns the current scroll offset of the namespace
+// overlay. Used by mouse click resolution to translate a click row into
+// the correct item index in the underlying items slice.
+func GetOverlayNsScroll() int { return overlayNsScroll }
+
 // overlayPodScroll is the persistent scroll position for the pod selection overlay.
 var overlayPodScroll int
 

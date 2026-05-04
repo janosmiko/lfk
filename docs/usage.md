@@ -61,6 +61,51 @@ select text), you can disable mouse capture:
 - **CLI flag:** `lfk --no-mouse`
 - **Config file:** Add `mouse: false` to `~/.config/lfk/config.yaml`
 
+### Explorer click semantics
+
+The three-pane explorer maps mouse clicks to navigation actions:
+
+| Click | Action |
+|---|---|
+| Left pane | Drill out one level (same as `h` / Left arrow) |
+| Middle pane (different row) | Select that row and load its preview in the right pane |
+| Middle pane (cursored row) | Drill into it (same as `Enter` / Right arrow) |
+| Right pane | Drill into the selected item |
+| Table header row | Sort by that column; click again toggles direction |
+| Right-click on middle pane | Move cursor to the clicked row and open the action menu |
+| Right-click on right pane | Open the action menu for the currently selected item |
+| Right-click on left pane | No-op |
+| Wheel up / down | Scroll the focused pane |
+
+The two-step "select then click again to drill" flow lets you scan items and
+preview them in the right pane without committing — equivalent to using `j` /
+`k` followed by `Enter` on the keyboard.
+
+### Overlay click semantics
+
+While an overlay is open (action menu, namespace selector, confirm dialog,
+etc.) the mouse interacts with the overlay rather than the explorer
+underneath:
+
+| Click | Action |
+|---|---|
+| Click outside the overlay box | Dismiss the overlay (same as `Esc`) |
+| Click on a row in the action menu | Run that action (same as `Enter`) |
+| Click on a row in the namespace selector | Apply that namespace and close |
+| Click on the namespace badge in the title bar | Open the namespace selector |
+| Wheel up / down inside an overlay | Scroll the list cursor — three rows per tick (same as pressing `j` / `k`) |
+| Click inside the box on padding/title/border | No-op (use `Esc` or click outside to dismiss) |
+
+Other list overlays (color scheme picker, bookmarks, templates, container /
+pod / log selectors, column toggle, etc.) accept wheel scroll; row-click
+activation is being added incrementally — for now use `Enter` after wheel
+scrolling to the desired row.
+
+Fullscreen overlays (the secret / config-map / label editors, rollback /
+helm-history pickers, the auto-sync dialog, the Can-I browser, and the
+NetworkPolicy viewer) cover the entire screen, so there is no "outside" to
+click; press `Esc` to close them.
+
 > **Note:** macOS Terminal.app does not support shift+click text selection while
 > mouse capture is active. Use `--no-mouse` or switch to a terminal that handles
 > this correctly (iTerm2, Kitty, Alacritty, WezTerm, Ghostty).

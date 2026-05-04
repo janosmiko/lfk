@@ -65,9 +65,17 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
-	// Don't handle mouse in overlay/help/yaml modes.
-	if m.overlay != overlayNone || m.mode != modeExplorer {
+	// Don't handle mouse outside the explorer mode.
+	if m.mode != modeExplorer {
 		return m, nil
+	}
+
+	// Overlay-aware mouse: click outside a centered overlay dismisses it,
+	// click inside (for supported overlays) activates the row under the
+	// click. Wheel and other buttons fall through unchanged when no
+	// overlay is active.
+	if m.overlay != overlayNone {
+		return m.handleOverlayMouse(msg)
 	}
 
 	switch msg.Button {
@@ -80,75 +88,169 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		return m.handleMouseClick(msg.X, msg.Y)
+	case tea.MouseButtonRight:
+		if msg.Action != tea.MouseActionPress {
+			return m, nil
+		}
+		return m.handleMouseRightClick(msg.X, msg.Y)
 	}
 	return m, nil
 }
 
-func (m Model) handleMouseClick(x, y int) (tea.Model, tea.Cmd) {
-	// Calculate column boundaries (must match viewExplorer).
-	var leftEnd, middleEnd int
+// columnBoundaries returns the x boundaries between left/middle and
+// middle/right columns. Must match viewExplorer's layout math.
+func (m Model) columnBoundaries() (leftEnd, middleEnd int) {
 	if m.fullscreenMiddle || m.fullscreenDashboard {
 		// Fullscreen: only middle column exists.
-		leftEnd = 0
-		middleEnd = m.width
-	} else {
-		usable := m.width - 6
-		leftW := max(10, usable*12/100)
-		middleW := max(10, usable*51/100)
-		// Each column has border(2) + padding(2) = 4 extra chars width.
-		leftEnd = leftW + 4
-		middleEnd = leftEnd + middleW + 4
+		return 0, m.width
 	}
+	usable := m.width - 6
+	leftW := max(10, usable*12/100)
+	middleW := max(10, usable*51/100)
+	// Each column has border(2) + padding(2) = 4 extra chars width.
+	leftEnd = leftW + 4
+	middleEnd = leftEnd + middleW + 4
+	return leftEnd, middleEnd
+}
+
+// isMiddleTableLevel reports whether the current navigation level renders
+// the middle column as a table (with a header row above the items) versus
+// as a plain column with a single label header.
+func (m Model) isMiddleTableLevel() bool {
+	switch m.nav.Level {
+	case model.LevelResources, model.LevelOwned, model.LevelContainers:
+		return true
+	}
+	return false
+}
+
+// resolveMiddleColumnClick maps a click at (x, y) within the middle-column
+// band to a target item index. Pass leftEnd as returned by columnBoundaries.
+//
+// Returns:
+//   - idx >= 0: clickable item index inside m.visibleMiddleItems().
+//   - isHeader == true: the click landed on the table header row (only
+//     possible at table levels). relX is set to the X offset relative to
+//     the middle-column content origin so handleHeaderClick can dispatch
+//     to the right sort column.
+//   - all zero / idx == -1: separator, beyond items, or column-view header
+//     row — caller should treat as no-op.
+func (m Model) resolveMiddleColumnClick(x, y, leftEnd int) (idx int, isHeader bool, relX int) {
+	baseOffset := 2 // title bar (1) + top border (1)
+	if len(m.tabs) > 1 {
+		baseOffset = 3 // title bar (1) + tab bar (1) + top border (1)
+	}
+	itemY := y - baseOffset
+
+	if m.isMiddleTableLevel() {
+		itemY-- // subtract table header row
+		if itemY < 0 {
+			// Header row click — caller should sort.
+			r := x - 2 // border + padding
+			if !m.fullscreenMiddle && !m.fullscreenDashboard {
+				r = x - leftEnd - 2
+			}
+			return -1, true, r
+		}
+	} else {
+		// Column view has a single header line above the items.
+		itemY-- // subtract column header
+	}
+
+	if itemY < 0 || itemY >= len(ui.ActiveMiddleLineMap) {
+		return -1, false, 0
+	}
+	targetIdx := ui.ActiveMiddleLineMap[itemY]
+	if targetIdx < 0 || targetIdx >= len(m.visibleMiddleItems()) {
+		return -1, false, 0
+	}
+	return targetIdx, false, 0
+}
+
+func (m Model) handleMouseClick(x, y int) (tea.Model, tea.Cmd) {
+	// Title bar (y=0) has its own clickable regions (namespace badge,
+	// future: read-only toggle, watch indicator). Handle it first so a
+	// click on the badge doesn't accidentally fall through to the
+	// table-header sort path.
+	if y == 0 {
+		if mdl, cmd, ok := m.handleTitleBarClick(x); ok {
+			return mdl, cmd
+		}
+		return m, nil
+	}
+
+	leftEnd, middleEnd := m.columnBoundaries()
 
 	switch {
 	case x < leftEnd:
 		// Left column click: navigate parent.
 		return m.navigateParent()
 	case x < middleEnd:
-		// Middle column click: select item.
-		// y offset depends on whether column has a header line.
-		// Title bar (1) + top border (1) = 2 base offset.
-		baseOffset := 2 // title bar (1) + top border (1)
-		if len(m.tabs) > 1 {
-			baseOffset = 3 // title bar (1) + tab bar (1) + top border (1)
+		targetIdx, isHeader, relX := m.resolveMiddleColumnClick(x, y, leftEnd)
+		if isHeader {
+			return m.handleHeaderClick(relX)
 		}
-		itemY := y - baseOffset
-		switch m.nav.Level {
-		case model.LevelResources, model.LevelOwned, model.LevelContainers:
-			// Table view has a header row for column names.
-			itemY-- // subtract table header row
-			if itemY < 0 {
-				// Header row click — sort by the clicked column.
-				relX := x - 2 // border + padding
-				if !m.fullscreenMiddle && !m.fullscreenDashboard {
-					relX = x - leftEnd - 2
-				}
-				return m.handleHeaderClick(relX)
-			}
-			// Use line map built during rendering for accurate click targeting.
-			if itemY < len(ui.ActiveMiddleLineMap) {
-				targetIdx := ui.ActiveMiddleLineMap[itemY]
-				if targetIdx >= 0 && targetIdx < len(m.visibleMiddleItems()) {
-					m.setCursor(targetIdx)
-					return m, m.loadPreview()
-				}
-			}
-		default:
-			// Column view has a header line (rendered by RenderColumn).
-			itemY-- // subtract column header
-			if itemY >= 0 && itemY < len(ui.ActiveMiddleLineMap) {
-				targetIdx := ui.ActiveMiddleLineMap[itemY]
-				if targetIdx >= 0 && targetIdx < len(m.visibleMiddleItems()) {
-					m.setCursor(targetIdx)
-					m.syncExpandedGroup()
-					return m, m.loadPreview()
-				}
-			}
+		if targetIdx < 0 {
+			return m, nil
 		}
-		return m, nil
+		// Click on the row already under the cursor drills into it,
+		// matching Enter / right-arrow. First click on a different row
+		// just selects + previews so the user can scan items in the
+		// right pane without committing.
+		if targetIdx == m.cursor() {
+			return m.navigateChild()
+		}
+		m.setCursor(targetIdx)
+		if !m.isMiddleTableLevel() {
+			m.syncExpandedGroup()
+		}
+		return m, m.loadPreview()
 	default:
 		// Right column click: navigate child.
 		return m.navigateChild()
+	}
+}
+
+// handleMouseRightClick dispatches a right-button press to the action menu.
+// Right-click on the middle column moves the cursor to the clicked row
+// before opening the menu so the action targets the row that was clicked,
+// matching standard GUI context-menu behavior. Right-click on the right
+// pane opens the menu for the currently-selected item (no cursor change).
+// Right-click on the left pane is a no-op (no resource context).
+func (m Model) handleMouseRightClick(x, y int) (tea.Model, tea.Cmd) {
+	// Title bar right-click currently has no action — suppress it so a
+	// right-click on the namespace badge doesn't accidentally open the
+	// action menu via the right-pane fallback below.
+	if y == 0 {
+		return m, nil
+	}
+
+	leftEnd, middleEnd := m.columnBoundaries()
+
+	switch {
+	case x < leftEnd:
+		return m, nil
+	case x < middleEnd:
+		targetIdx, isHeader, _ := m.resolveMiddleColumnClick(x, y, leftEnd)
+		if isHeader || targetIdx < 0 {
+			return m, nil
+		}
+		cursorMoved := targetIdx != m.cursor()
+		if cursorMoved {
+			m.setCursor(targetIdx)
+			if !m.isMiddleTableLevel() {
+				m.syncExpandedGroup()
+			}
+		}
+		mdl := m.openActionMenu()
+		if cursorMoved {
+			// Refresh preview so the right pane matches the new cursor
+			// once the menu is dismissed.
+			return mdl, mdl.loadPreview()
+		}
+		return mdl, nil
+	default:
+		return m.openActionMenu(), nil
 	}
 }
 

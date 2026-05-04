@@ -682,8 +682,20 @@ four (`magenta`, `cyan`, `white`, `gray`) stay on ANSI bright codes
 
 | Input | Action |
 |---|---|
-| Click | Select item / navigate |
-| Scroll | Navigate up/down |
+| Click left pane | Drill out one level (same as `h` / Left) |
+| Click middle pane (different row) | Select row and preview it in the right pane |
+| Click middle pane (already-cursored row) | Drill into it (same as `Enter` / Right) |
+| Click right pane | Drill into the selected item |
+| Click table header | Sort by that column; click again toggles direction |
+| Right-click middle pane | Move cursor to clicked row and open action menu |
+| Right-click right pane | Open action menu for the currently selected item |
+| Right-click left pane | No-op |
+| Click action menu row | Run that action (same as `Enter`) |
+| Click namespace badge in title bar | Open the namespace selector |
+| Click row in namespace selector | Apply that namespace and close |
+| Click outside any overlay | Dismiss the overlay (same as `Esc`) |
+| Wheel up/down inside an overlay | Scroll the list cursor (same as `j` / `k` / arrow keys) |
+| Scroll wheel in explorer | Scroll up/down |
 | Shift+Drag | Select text (host terminal) |
 | Shift+Option+Drag (macOS) / Alt+Drag (Linux, Windows) | Block-select text inside the embedded PTY |
 

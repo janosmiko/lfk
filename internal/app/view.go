@@ -494,6 +494,23 @@ func (m Model) renderTitleBar() string {
 		gapContent = ui.BarDimStyle.Render(strings.Repeat(" ", gap))
 	}
 
+	// Record the namespace badge's screen-space x range so the mouse
+	// handler can map clicks on row 0 to the namespace selector. The
+	// outer style wraps barContent with Padding(0, 1) which adds a
+	// 1-char left margin, so positions in barContent shift right by 1
+	// to land on screen.
+	nsStartX := 1 +
+		lipgloss.Width(bc) +
+		lipgloss.Width(watchIndicator) +
+		lipgloss.Width(readOnlyIndicator) +
+		lipgloss.Width(gapContent) +
+		lipgloss.Width(mutationProgress) +
+		lipgloss.Width(tasksIndicator)
+	setTitleBarLayout(titleBarLayout{
+		nsStartX: nsStartX,
+		nsEndX:   nsStartX + lipgloss.Width(nsLabel),
+	})
+
 	barContent := bc + watchIndicator + readOnlyIndicator + gapContent + mutationProgress + tasksIndicator + nsLabel + versionLabel
 	if tint != "" {
 		// Outer wrap also uses the tint so the Padding(0, 1) cells share
