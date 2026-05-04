@@ -69,6 +69,42 @@ func handleEditPanePageKey(m Model, valInput *TextInput, col int, key string, ti
 	return false
 }
 
+// commitEditedKVRow performs the shared half of every editor's
+// ctrl+s save path: resolve the OLD key through the FILTERED visible
+// list (cursor-scoped to it), optionally rename it in the unfiltered
+// `keys` slice, then write the in-progress value into `data`. Used
+// by all three editors so the filter-aware lookup logic only lives
+// in one place.
+//
+// Returns ok=false when the cursor falls outside the visible list
+// — caller should still exit edit mode but skip the mutation.
+//
+// `keys` is mutated in place (rename); since slices are reference
+// types this also updates the caller's backing array. `data` is the
+// editor's underlying map; renames delete the old key before writing
+// the value under newKey.
+func commitEditedKVRow(visible, keys []string, data map[string]string, cursor int, inputKey, inputValue string) bool {
+	if cursor < 0 || cursor >= len(visible) {
+		return false
+	}
+	oldKey := visible[cursor]
+	newKey := inputKey
+	if newKey == "" {
+		newKey = oldKey
+	}
+	if newKey != oldKey {
+		delete(data, oldKey)
+		for i, k := range keys {
+			if k == oldKey {
+				keys[i] = newKey
+				break
+			}
+		}
+	}
+	data[newKey] = inputValue
+	return true
+}
+
 // adjustEditValueScrollFor recomputes the editor's value scroll so
 // the cursor stays inside the visible window. Called from each
 // editor's edit-mode handler via a `defer` so EVERY cursor-affecting
@@ -128,20 +164,11 @@ func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (newM tea.Model, cmd te
 		m.secretEditColumn = -1
 		return m, nil
 	case "ctrl+s":
-		// Commit both the key and the value edits at once, regardless of
-		// which column is currently active. This lets the user type a
-		// value, tab back to the key column (or vice versa), and save
-		// without silently losing the other column's edit.
-		oldKey := m.secretData.Keys[m.secretCursor]
-		newKey := keyInput.Value
-		if newKey == "" {
-			newKey = oldKey
-		}
-		if newKey != oldKey {
-			delete(m.secretData.Data, oldKey)
-			m.secretData.Keys[m.secretCursor] = newKey
-		}
-		m.secretData.Data[newKey] = valInput.Value
+		// Commit both the key and the value edits at once, regardless
+		// of which column is currently active. The filter-aware lookup
+		// + rename lives in commitEditedKVRow so all three editors
+		// agree on the contract; see that helper for details.
+		commitEditedKVRow(m.secretVisibleKeys(), m.secretData.Keys, m.secretData.Data, m.secretCursor, keyInput.Value, valInput.Value)
 		m.secretEditing = false
 		m.secretEditColumn = -1
 		return m, nil
@@ -237,20 +264,9 @@ func (m Model) handleConfigMapEditorEditKey(msg tea.KeyMsg) (newM tea.Model, cmd
 		m.configMapEditColumn = -1
 		return m, nil
 	case "ctrl+s":
-		// Commit both the key and the value edits at once, regardless of
-		// which column is currently active. This lets the user type a
-		// value, tab back to the key column (or vice versa), and save
-		// without silently losing the other column's edit.
-		oldKey := m.configMapData.Keys[m.configMapCursor]
-		newKey := keyInput.Value
-		if newKey == "" {
-			newKey = oldKey
-		}
-		if newKey != oldKey {
-			delete(m.configMapData.Data, oldKey)
-			m.configMapData.Keys[m.configMapCursor] = newKey
-		}
-		m.configMapData.Data[newKey] = valInput.Value
+		// Filter-aware save — see commitEditedKVRow / the secret
+		// editor's ctrl+s note for the wrong-key-mutation bug.
+		commitEditedKVRow(m.configMapVisibleKeys(), m.configMapData.Keys, m.configMapData.Data, m.configMapCursor, keyInput.Value, valInput.Value)
 		m.configMapEditing = false
 		m.configMapEditColumn = -1
 		return m, nil
@@ -343,26 +359,18 @@ func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, cu
 		m.labelEditColumn = -1
 		return m, nil
 	case "ctrl+s":
-		// Commit both the key and the value edits at once, regardless of
-		// which column is currently active. This lets the user type a new
-		// key, tab to the value column, type a value, and save — without
-		// silently losing the key edit that happened before the tab.
-		oldKey := currentKeys[m.labelCursor]
-		newKey := keyInput.Value
-		if newKey == "" {
-			newKey = oldKey
-		}
-		if newKey != oldKey {
-			delete(currentData, oldKey)
-			currentKeys[m.labelCursor] = newKey
-		}
-		currentData[newKey] = valInput.Value
-		if m.labelTab == 0 {
-			m.labelData.LabelKeys = currentKeys
-			m.labelData.Labels = currentData
-		} else {
-			m.labelData.AnnotKeys = currentKeys
-			m.labelData.Annotations = currentData
+		// Filter-aware save — see commitEditedKVRow. Writeback to the
+		// active tab's slice is technically redundant (commitEditedKVRow
+		// mutates the underlying array in place) but kept defensively
+		// in case future code reassigns currentKeys via append.
+		if commitEditedKVRow(m.labelVisibleKeys(), currentKeys, currentData, m.labelCursor, keyInput.Value, valInput.Value) {
+			if m.labelTab == 0 {
+				m.labelData.LabelKeys = currentKeys
+				m.labelData.Labels = currentData
+			} else {
+				m.labelData.AnnotKeys = currentKeys
+				m.labelData.Annotations = currentData
+			}
 		}
 		m.labelEditing = false
 		m.labelEditColumn = -1

@@ -155,6 +155,133 @@ func TestSecretEditor_FormatPickerEscCancels(t *testing.T) {
 	assert.Empty(t, result.statusMessage, "esc must NOT trigger a copy — no status message")
 }
 
+// --- ctrl+s under active filter (CodeRabbit-flagged data corruption) ---
+
+// TestSecretEditor_CtrlSUnderActiveFilterMutatesVisibleKey pins the
+// CodeRabbit-flagged data-corruption bug: ctrl+s in edit mode used
+// to look up `m.secretData.Keys[m.secretCursor]`, but the cursor is
+// scoped to the FILTERED visible list. With `/` filter active, the
+// save path silently mutated a different key than the one the user
+// thought they were editing.
+//
+// Scenario: 3 keys, filter narrows to the middle one ("BETA"), user
+// presses `e` then changes the value, then `ctrl+s`. The fix must
+// rewrite "BETA" — not the alphabetically-first key that happens to
+// share the cursor's filtered-list index.
+func TestSecretEditor_CtrlSUnderActiveFilterMutatesVisibleKey(t *testing.T) {
+	data := &model.SecretData{
+		Keys: []string{"alpha", "BETA", "gamma"},
+		Data: map[string]string{"alpha": "a-old", "BETA": "b-old", "gamma": "g-old"},
+	}
+	m := Model{
+		overlay:      overlaySecretEditor,
+		secretData:   data,
+		secretCursor: 0,
+		tabs:         []TabState{{}},
+		width:        80, height: 40,
+	}
+	m.editorSearch.query.Set("BET")
+
+	ret, _ := m.handleSecretEditorKey(runeKey('e'))
+	r1 := ret.(Model)
+	assert.True(t, r1.secretEditing)
+	assert.Equal(t, "BETA", r1.secretEditKey.Value, "edit-mode entry must pull from the visible (filtered) list")
+
+	r1.secretEditValue = TextInput{Value: "b-new", Cursor: 5}
+	ret, _ = r1.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	r2 := ret.(Model)
+
+	assert.Equal(t, "b-new", r2.secretData.Data["BETA"],
+		"BETA's value must be the new edit — this is the row the user was actually editing")
+	assert.Equal(t, "a-old", r2.secretData.Data["alpha"],
+		"alpha must not be touched — without the fix, alpha (Keys[0]) gets the new value because cursor 0 indexes the wrong slice")
+	assert.Equal(t, "g-old", r2.secretData.Data["gamma"], "gamma must not be touched")
+}
+
+// TestSecretEditor_CtrlSRenameUnderActiveFilterRewritesCorrectKey is
+// the rename variant of the same bug — without the fix, the
+// alphabetically-first unfiltered key gets renamed instead of the
+// one the user is editing.
+func TestSecretEditor_CtrlSRenameUnderActiveFilterRewritesCorrectKey(t *testing.T) {
+	data := &model.SecretData{
+		Keys: []string{"alpha", "BETA", "gamma"},
+		Data: map[string]string{"alpha": "a-old", "BETA": "b-old", "gamma": "g-old"},
+	}
+	m := Model{
+		overlay:      overlaySecretEditor,
+		secretData:   data,
+		secretCursor: 0,
+		tabs:         []TabState{{}},
+		width:        80, height: 40,
+	}
+	m.editorSearch.query.Set("BET")
+
+	ret, _ := m.handleSecretEditorKey(runeKey('e'))
+	r1 := ret.(Model)
+	r1.secretEditKey = TextInput{Value: "BETA-NEW", Cursor: 8}
+
+	ret, _ = r1.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	r2 := ret.(Model)
+
+	assert.Equal(t, []string{"alpha", "BETA-NEW", "gamma"}, r2.secretData.Keys,
+		"rename must replace BETA in place — original Keys order preserved with only the renamed key swapped")
+	_, betaStillThere := r2.secretData.Data["BETA"]
+	assert.False(t, betaStillThere, "BETA's old entry must be deleted from Data")
+	assert.Equal(t, "b-old", r2.secretData.Data["BETA-NEW"], "renamed key carries forward BETA's value")
+	assert.Equal(t, "a-old", r2.secretData.Data["alpha"], "alpha must not be touched by the rename")
+}
+
+func TestConfigMapEditor_CtrlSUnderActiveFilterMutatesVisibleKey(t *testing.T) {
+	data := &model.ConfigMapData{
+		Keys: []string{"alpha", "BETA", "gamma"},
+		Data: map[string]string{"alpha": "a-old", "BETA": "b-old", "gamma": "g-old"},
+	}
+	m := Model{
+		overlay:         overlayConfigMapEditor,
+		configMapData:   data,
+		configMapCursor: 0,
+		tabs:            []TabState{{}},
+		width:           80, height: 40,
+	}
+	m.editorSearch.query.Set("BET")
+
+	ret, _ := m.handleConfigMapEditorKey(runeKey('e'))
+	r1 := ret.(Model)
+	r1.configMapEditValue = TextInput{Value: "b-new", Cursor: 5}
+
+	ret, _ = r1.handleConfigMapEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	r2 := ret.(Model)
+
+	assert.Equal(t, "b-new", r2.configMapData.Data["BETA"], "BETA's value must be the new edit")
+	assert.Equal(t, "a-old", r2.configMapData.Data["alpha"], "alpha (Keys[0]) must not be touched")
+}
+
+func TestLabelEditor_CtrlSUnderActiveFilterMutatesVisibleKey(t *testing.T) {
+	data := &model.LabelAnnotationData{
+		Labels:    map[string]string{"alpha": "a-old", "BETA": "b-old", "gamma": "g-old"},
+		LabelKeys: []string{"alpha", "BETA", "gamma"},
+	}
+	m := Model{
+		overlay:     overlayLabelEditor,
+		labelData:   data,
+		labelTab:    0,
+		labelCursor: 0,
+		tabs:        []TabState{{}},
+		width:       80, height: 40,
+	}
+	m.editorSearch.query.Set("BET")
+
+	ret, _ := m.handleLabelEditorKey(runeKey('e'))
+	r1 := ret.(Model)
+	r1.labelEditValue = TextInput{Value: "b-new", Cursor: 5}
+
+	ret, _ = r1.handleLabelEditorKey(tea.KeyMsg{Type: tea.KeyCtrlS})
+	r2 := ret.(Model)
+
+	assert.Equal(t, "b-new", r2.labelData.Labels["BETA"], "BETA's label value must be the new edit")
+	assert.Equal(t, "a-old", r2.labelData.Labels["alpha"], "alpha must not be touched")
+}
+
 // --- nil-data guards (CodeRabbit-flagged) ---
 
 // TestSecretCopyPairs_NilDataReturnsNil pins the CodeRabbit fix:
