@@ -12,7 +12,7 @@ import (
 
 func TestRenderLabelEditorTable(t *testing.T) {
 	t.Run("empty data shows add hint", func(t *testing.T) {
-		result := renderLabelEditorTable(nil, nil, 0, false, "", "", 0, 60, 20)
+		result := renderLabelEditorTable(nil, nil, 0, false, "", "", 0, nil, 60, 20)
 		assert.Contains(t, result, "KEY")
 		assert.Contains(t, result, "VALUE")
 		assert.Contains(t, result, "(empty - press 'a' to add)")
@@ -21,7 +21,7 @@ func TestRenderLabelEditorTable(t *testing.T) {
 	t.Run("shows keys and values", func(t *testing.T) {
 		keys := []string{"app", "env"}
 		data := map[string]string{"app": "nginx", "env": "production"}
-		result := renderLabelEditorTable(keys, data, 0, false, "", "", 0, 80, 20)
+		result := renderLabelEditorTable(keys, data, 0, false, "", "", 0, nil, 80, 20)
 		assert.Contains(t, result, "app")
 		assert.Contains(t, result, "nginx")
 		assert.Contains(t, result, "env")
@@ -33,14 +33,14 @@ func TestRenderLabelEditorTable(t *testing.T) {
 		// the data lands in output.
 		keys := []string{"k1", "k2"}
 		data := map[string]string{"k1": "v1", "k2": "v2"}
-		result := renderLabelEditorTable(keys, data, 1, false, "", "", 0, 60, 20)
+		result := renderLabelEditorTable(keys, data, 1, false, "", "", 0, nil, 60, 20)
 		assert.Contains(t, result, "k2")
 	})
 
 	t.Run("editing key column shows edit cursor", func(t *testing.T) {
 		keys := []string{"mykey"}
 		data := map[string]string{"mykey": "myval"}
-		result := renderLabelEditorTable(keys, data, 0, true, "newkey", "", 0, 60, 20)
+		result := renderLabelEditorTable(keys, data, 0, true, "newkey", "", 0, nil, 60, 20)
 		assert.Contains(t, result, "newkey")
 		assert.Contains(t, result, "\u2588")
 	})
@@ -48,7 +48,7 @@ func TestRenderLabelEditorTable(t *testing.T) {
 	t.Run("editing value column shows edit cursor", func(t *testing.T) {
 		keys := []string{"mykey"}
 		data := map[string]string{"mykey": "myval"}
-		result := renderLabelEditorTable(keys, data, 0, true, "", "newval", 1, 60, 20)
+		result := renderLabelEditorTable(keys, data, 0, true, "", "newval", 1, nil, 60, 20)
 		assert.Contains(t, result, "newval")
 		assert.Contains(t, result, "\u2588")
 	})
@@ -58,7 +58,7 @@ func TestRenderLabelEditorTable(t *testing.T) {
 
 func TestRenderLabelEditorOverlay(t *testing.T) {
 	t.Run("nil data shows error", func(t *testing.T) {
-		result := RenderLabelEditorOverlay(nil, 0, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(nil, 0, 0, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 40)
 		assert.Contains(t, result, "No data loaded")
 	})
 
@@ -69,7 +69,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Annotations: map[string]string{"note": "test"},
 			AnnotKeys:   []string{"note"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 		assert.Contains(t, result, "Labels (1)")
 		assert.Contains(t, result, "Annotations (1)")
@@ -84,7 +84,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Annotations: map[string]string{"note": "important"},
 			AnnotKeys:   []string{"note"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 1, false, "", 0, "", 0, 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 1, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 40)
 		assert.Contains(t, result, "note")
 		assert.Contains(t, result, "important")
 	})
@@ -94,7 +94,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Labels:    map[string]string{"k": "v"},
 			LabelKeys: []string{"k"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, true, "k", 1, "v", 1, 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, true, "k", 1, "v", 1, 0, "", false, nil, false, 0, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 	})
 
@@ -104,7 +104,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Labels:    map[string]string{"k": "v"},
 			LabelKeys: []string{"k"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 	})
 }

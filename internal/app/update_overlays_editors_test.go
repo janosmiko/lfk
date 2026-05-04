@@ -108,6 +108,243 @@ func TestSecretEditor_FormatPickerEscCancels(t *testing.T) {
 	assert.Empty(t, result.statusMessage, "esc must NOT trigger a copy — no status message")
 }
 
+// --- ConfigMap multi-row selection + Shift+Y format picker ---
+
+func TestConfigMapEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
+	data := &model.ConfigMapData{
+		Keys: []string{"k1", "k2", "k3"},
+		Data: map[string]string{"k1": "v1", "k2": "v2", "k3": "v3"},
+	}
+	m := Model{
+		overlay:         overlayConfigMapEditor,
+		configMapData:   data,
+		configMapCursor: 0,
+		tabs:            []TabState{{}},
+		width:           80, height: 40,
+	}
+
+	ret, _ := m.handleConfigMapEditorKey(runeKey('s'))
+	r1 := ret.(Model)
+	assert.True(t, r1.editorSearch.selected["k1"], "first `s` selects k1")
+	assert.Equal(t, 1, r1.configMapCursor, "cursor advances on s")
+
+	ret, _ = r1.handleConfigMapEditorKey(runeKey('s'))
+	r2 := ret.(Model)
+	assert.True(t, r2.editorSearch.selected["k2"], "k2 selected")
+	assert.True(t, r2.editorSearch.selected["k1"], "k1 still selected")
+
+	r2.configMapCursor = 0
+	ret, _ = r2.handleConfigMapEditorKey(runeKey('s'))
+	r3 := ret.(Model)
+	_, present := r3.editorSearch.selected["k1"]
+	assert.False(t, present, "second toggle on the same key removes the entry")
+}
+
+func TestConfigMapEditor_ShiftYOpensFormatPicker(t *testing.T) {
+	data := &model.ConfigMapData{
+		Keys: []string{"k1"},
+		Data: map[string]string{"k1": "v1"},
+	}
+	m := Model{
+		overlay:         overlayConfigMapEditor,
+		configMapData:   data,
+		configMapCursor: 0,
+		tabs:            []TabState{{}},
+		width:           80, height: 40,
+	}
+	ret, _ := m.handleConfigMapEditorKey(runeKey('Y'))
+	result := ret.(Model)
+	assert.True(t, result.editorSearch.formatActive, "Shift+Y opens the format picker")
+	assert.Equal(t, 0, result.editorSearch.formatCursor, "picker starts at YAML")
+}
+
+func TestConfigMapEditor_FormatPickerEnterCopiesAndCloses(t *testing.T) {
+	data := &model.ConfigMapData{
+		Keys: []string{"k1", "k2"},
+		Data: map[string]string{"k1": "v1", "k2": "v2"},
+	}
+	m := Model{
+		overlay:         overlayConfigMapEditor,
+		configMapData:   data,
+		configMapCursor: 0,
+		tabs:            []TabState{{}},
+		width:           80, height: 40,
+	}
+	m.editorSearch.formatActive = true
+	m.editorSearch.formatCursor = 0
+	m.editorSearch.selected = map[string]bool{"k2": true}
+
+	ret, _ := m.handleConfigMapEditorKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.editorSearch.formatActive, "enter closes the picker")
+	assert.Contains(t, result.statusMessage, "Copied",
+		"status message confirms the copy so the user knows it happened")
+}
+
+func TestConfigMapEditor_FormatPickerEscCancels(t *testing.T) {
+	data := &model.ConfigMapData{
+		Keys: []string{"k1"},
+		Data: map[string]string{"k1": "v1"},
+	}
+	m := Model{
+		overlay:       overlayConfigMapEditor,
+		configMapData: data,
+		tabs:          []TabState{{}},
+		width:         80, height: 40,
+	}
+	m.editorSearch.formatActive = true
+	m.editorSearch.formatCursor = 1
+
+	ret, _ := m.handleConfigMapEditorKey(specialKey(tea.KeyEsc))
+	result := ret.(Model)
+	assert.False(t, result.editorSearch.formatActive, "esc closes the picker")
+	assert.Empty(t, result.statusMessage, "esc must NOT trigger a copy")
+}
+
+// --- Label multi-row selection + Shift+Y format picker ---
+
+func TestLabelEditor_SToggleSelectionAndAdvanceCursor(t *testing.T) {
+	data := &model.LabelAnnotationData{
+		Labels:    map[string]string{"app": "nginx", "env": "prod", "tier": "web"},
+		LabelKeys: []string{"app", "env", "tier"},
+	}
+	m := Model{
+		overlay:     overlayLabelEditor,
+		labelData:   data,
+		labelTab:    0,
+		labelCursor: 0,
+		tabs:        []TabState{{}},
+		width:       80, height: 40,
+	}
+
+	ret, _ := m.handleLabelEditorKey(runeKey('s'))
+	r1 := ret.(Model)
+	assert.True(t, r1.editorSearch.selected["app"], "first `s` selects app")
+	assert.Equal(t, 1, r1.labelCursor, "cursor advances on s")
+
+	ret, _ = r1.handleLabelEditorKey(runeKey('s'))
+	r2 := ret.(Model)
+	assert.True(t, r2.editorSearch.selected["env"], "env selected")
+	assert.True(t, r2.editorSearch.selected["app"], "app still selected")
+}
+
+func TestLabelEditor_TabClearsSelection(t *testing.T) {
+	// Label and annotation namespaces are disjoint — switching tabs
+	// must clear the selection set so a key marked in Labels doesn't
+	// accidentally apply to a same-named annotation.
+	data := &model.LabelAnnotationData{
+		Labels:      map[string]string{"app": "nginx"},
+		LabelKeys:   []string{"app"},
+		Annotations: map[string]string{"note": "test"},
+		AnnotKeys:   []string{"note"},
+	}
+	m := Model{
+		overlay:     overlayLabelEditor,
+		labelData:   data,
+		labelTab:    0,
+		labelCursor: 0,
+		tabs:        []TabState{{}},
+		width:       80, height: 40,
+	}
+	ret, _ := m.handleLabelEditorKey(runeKey('s'))
+	r1 := ret.(Model)
+	assert.True(t, r1.editorSearch.selected["app"], "selection set has app")
+
+	ret, _ = r1.handleLabelEditorKey(specialKey(tea.KeyTab))
+	r2 := ret.(Model)
+	assert.Equal(t, 1, r2.labelTab, "tab switches to annotations")
+	assert.Empty(t, r2.editorSearch.selected, "selection cleared on tab switch")
+}
+
+func TestLabelEditor_ShiftYOpensFormatPicker(t *testing.T) {
+	data := &model.LabelAnnotationData{
+		Labels:    map[string]string{"app": "nginx"},
+		LabelKeys: []string{"app"},
+	}
+	m := Model{
+		overlay:     overlayLabelEditor,
+		labelData:   data,
+		labelTab:    0,
+		labelCursor: 0,
+		tabs:        []TabState{{}},
+		width:       80, height: 40,
+	}
+	ret, _ := m.handleLabelEditorKey(runeKey('Y'))
+	result := ret.(Model)
+	assert.True(t, result.editorSearch.formatActive, "Shift+Y opens the format picker")
+	assert.Equal(t, 0, result.editorSearch.formatCursor, "picker starts at YAML")
+}
+
+func TestLabelEditor_FormatPickerEnterCopiesAndCloses(t *testing.T) {
+	data := &model.LabelAnnotationData{
+		Labels:    map[string]string{"app": "nginx", "env": "prod"},
+		LabelKeys: []string{"app", "env"},
+	}
+	m := Model{
+		overlay:     overlayLabelEditor,
+		labelData:   data,
+		labelTab:    0,
+		labelCursor: 0,
+		tabs:        []TabState{{}},
+		width:       80, height: 40,
+	}
+	m.editorSearch.formatActive = true
+	m.editorSearch.formatCursor = 0
+	m.editorSearch.selected = map[string]bool{"env": true}
+
+	ret, _ := m.handleLabelEditorKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.False(t, result.editorSearch.formatActive, "enter closes the picker")
+	assert.Contains(t, result.statusMessage, "Copied",
+		"status message confirms the copy so the user knows it happened")
+	assert.Contains(t, result.statusMessage, "label",
+		"status message indicates labels were copied (not annotations)")
+}
+
+func TestLabelEditor_FormatPickerStatusMentionsAnnotation(t *testing.T) {
+	// On the annotations tab the status message should call them
+	// "annotation pair(s)" so the user sees what got copied.
+	data := &model.LabelAnnotationData{
+		Annotations: map[string]string{"note": "test"},
+		AnnotKeys:   []string{"note"},
+	}
+	m := Model{
+		overlay:     overlayLabelEditor,
+		labelData:   data,
+		labelTab:    1,
+		labelCursor: 0,
+		tabs:        []TabState{{}},
+		width:       80, height: 40,
+	}
+	m.editorSearch.formatActive = true
+	m.editorSearch.formatCursor = 0
+
+	ret, _ := m.handleLabelEditorKey(specialKey(tea.KeyEnter))
+	result := ret.(Model)
+	assert.Contains(t, result.statusMessage, "annotation",
+		"status message indicates annotations were copied")
+}
+
+func TestLabelEditor_FormatPickerEscCancels(t *testing.T) {
+	data := &model.LabelAnnotationData{
+		Labels:    map[string]string{"app": "nginx"},
+		LabelKeys: []string{"app"},
+	}
+	m := Model{
+		overlay:   overlayLabelEditor,
+		labelData: data,
+		tabs:      []TabState{{}},
+		width:     80, height: 40,
+	}
+	m.editorSearch.formatActive = true
+	m.editorSearch.formatCursor = 1
+
+	ret, _ := m.handleLabelEditorKey(specialKey(tea.KeyEsc))
+	result := ret.(Model)
+	assert.False(t, result.editorSearch.formatActive, "esc closes the picker")
+	assert.Empty(t, result.statusMessage, "esc must NOT trigger a copy")
+}
+
 // --- handleSecretEditorKey ---
 
 func TestSecretEditorNilDataCloses(t *testing.T) {

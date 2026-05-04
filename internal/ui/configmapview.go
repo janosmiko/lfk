@@ -18,9 +18,10 @@ var configMapInnerPanelStyle = lipgloss.NewStyle().
 
 // RenderConfigMapEditorOverlay renders a centered popup overlay for editing configmaps.
 //
-// searchQuery / searchActive drive the / filter (see RenderSecretEditorOverlay
-// for the full contract). Cursor is interpreted as an index into the
-// FILTERED key list.
+// searchQuery / searchActive drive the / filter; selected /
+// formatActive / formatCursor drive the multi-row Shift+Y copy
+// flow (see RenderSecretEditorOverlay for the full contract). The
+// cursor is an index into the FILTERED key list.
 func RenderConfigMapEditorOverlay(
 	cm *model.ConfigMapData,
 	cursor int,
@@ -32,6 +33,9 @@ func RenderConfigMapEditorOverlay(
 	editColumn int, // 0=key, 1=value
 	searchQuery string,
 	searchActive bool,
+	selected map[string]bool,
+	formatActive bool,
+	formatCursor int,
 	screenWidth, screenHeight int,
 ) string {
 	if cm == nil {
@@ -60,8 +64,14 @@ func RenderConfigMapEditorOverlay(
 	if searchBar != "" {
 		searchH = 1
 	}
+	var formatBar string
+	formatH := 0
+	if formatActive {
+		formatBar = RenderKVFormatPicker(formatCursor)
+		formatH = 1
+	}
 
-	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH, 3)
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH-formatH, 3)
 	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
@@ -85,6 +95,7 @@ func RenderConfigMapEditorOverlay(
 		dataContent = renderConfigMapEditorTable(
 			filteredCM, cursor,
 			false, "", "", 0,
+			selected,
 			panelContentW, panelContentH,
 		)
 	}
@@ -101,6 +112,9 @@ func RenderConfigMapEditorOverlay(
 	body := title
 	if searchBar != "" {
 		body += "\n" + searchBar
+	}
+	if formatBar != "" {
+		body += "\n" + formatBar
 	}
 	body += "\n" + innerPanel
 
@@ -122,9 +136,13 @@ func renderConfigMapEditorTable(
 	editKey string,
 	editValue string,
 	editColumn int,
+	selectedKeys map[string]bool, // keys marked with `s` for batch copy; nil = none
 	width, height int,
 ) string {
-	keyColW := computeKeyColumnWidth(cm.Keys, width, 3)
+	// +2 budgets for the "✓ " / "  " selection-indicator prefix every
+	// key row carries — without this the key text gets truncated even
+	// when the underlying name fits.
+	keyColW := computeKeyColumnWidth(cm.Keys, width, 3) + 2
 	valColW := max(width-keyColW-5, 8)
 
 	bodyHeight := max(height-2, 1)
@@ -146,7 +164,11 @@ func renderConfigMapEditorTable(
 			keyText = SingleLineCell(editKey, keyColW)
 			valText = SingleLineCell(editValue, valColW-1) + "\u2588"
 		default:
-			keyText = SingleLineCell(k, keyColW)
+			prefix := "  "
+			if selectedKeys[k] {
+				prefix = "\u2713 "
+			}
+			keyText = prefix + SingleLineCell(k, keyColW-2)
 			valText = displayV
 		}
 		t.Row(keyText, valText)

@@ -455,12 +455,30 @@ enters edit mode for the selected (or new) entry.
 | `e` | Edit selected key/value |
 | `a` | Add a new key/value entry |
 | `y` | Copy selected value to clipboard |
+| `s` | Toggle selection on the current row (cursor auto-advances; works across non-adjacent rows) |
+| `Y` | Open the format picker; copies selected rows (or the cursor row) as YAML / JSON / dotenv / `key=value` / values-only |
+| `/` | Filter the list by key (typing extends the query, `Enter` applies, `Esc` clears) |
 | `D` | Delete selected entry |
 | `Enter` | Save changes and close (no-op if nothing changed) |
 | `Esc` | Close without saving |
 
 The Labels/Annotations editor additionally has a `Tab` binding in the list
-view to switch between the labels pane and the annotations pane.
+view to switch between the labels pane and the annotations pane. Switching
+tabs clears the multi-row selection (label and annotation namespaces are
+disjoint).
+
+### Format picker (Shift+Y)
+
+When the format picker is open, the bottom hint bar swaps to picker controls:
+
+| Key | Action |
+|---|---|
+| `h` / `l` (or `←` / `→`) | Move the format cursor |
+| `Enter` | Copy selected rows in the chosen format and close the picker |
+| `Esc` | Cancel without copying |
+
+Selection wins over the cursor: if `s` was used to mark rows, those rows
+are the apply target; otherwise the cursor row is copied alone.
 
 ### Edit mode
 

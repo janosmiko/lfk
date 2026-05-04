@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 )
@@ -129,6 +128,11 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.editorSearch.active {
 		return m.handleEditorSearchKey(msg, clampConfigMapCursorToVisible)
 	}
+	// Format-picker mode: routes h/l/enter/esc through the picker, then
+	// resolves to a clipboard write on apply. Same precedence as search.
+	if m.editorSearch.formatActive {
+		return m.handleConfigMapFormatPickerKey(msg)
+	}
 
 	// Normal mode.
 	switch msg.String() {
@@ -143,6 +147,16 @@ func (m Model) handleConfigMapEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleConfigMapEditorKeyJ()
 	case "k", "up":
 		return m.handleConfigMapEditorKeyK()
+	case "s":
+		// Toggle current row in the multi-select set. See secret editor
+		// for the broader rationale (persists across cursor moves).
+		return m.handleConfigMapEditorKeyS()
+	case "Y":
+		// Open the format picker — apply target = selected rows if any,
+		// else the cursor row. Resolved inside handleConfigMapFormatPickerKey.
+		m.editorSearch.formatActive = true
+		m.editorSearch.formatCursor = 0
+		return m, nil
 	case "e":
 		// Edit selected value.
 		return m.handleConfigMapEditorKeyE()
@@ -252,6 +266,11 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if m.editorSearch.active {
 		return m.handleEditorSearchKey(msg, clampLabelCursorToVisible)
 	}
+	// Format-picker mode: routes h/l/enter/esc through the picker, then
+	// resolves to a clipboard write on apply. Same precedence as search.
+	if m.editorSearch.formatActive {
+		return m.handleLabelFormatPickerKey(msg)
+	}
 
 	visible := m.labelVisibleKeys()
 
@@ -265,7 +284,8 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "tab":
 		// Switch between labels and annotations tabs. Reset cursor +
-		// search since the active key list changes.
+		// search since the active key list changes; selection too,
+		// since label and annotation namespaces are disjoint.
 		m.resetEditorSearch()
 		return m.handleLabelEditorKeyTab()
 	case "j", "down":
@@ -275,6 +295,15 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "k", "up":
 		return m.handleLabelEditorKeyK()
+	case "s":
+		// Toggle current row in the multi-select set. See secret editor.
+		return m.handleLabelEditorKeyS()
+	case "Y":
+		// Open the format picker — apply target = selected rows if any,
+		// else the cursor row. Resolved inside handleLabelFormatPickerKey.
+		m.editorSearch.formatActive = true
+		m.editorSearch.formatCursor = 0
+		return m, nil
 	case "e":
 		if m.labelCursor >= 0 && m.labelCursor < len(visible) {
 			key := visible[m.labelCursor]
@@ -302,24 +331,7 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.labelEditValue.Clear()
 		return m, nil
 	case "D":
-		if m.labelCursor < 0 || m.labelCursor >= len(visible) {
-			return m, nil
-		}
-		key := visible[m.labelCursor]
-		delete(currentData, key)
-		for i, k := range currentKeys {
-			if k == key {
-				currentKeys = append(currentKeys[:i], currentKeys[i+1:]...)
-				break
-			}
-		}
-		if m.labelTab == 0 {
-			m.labelData.LabelKeys = currentKeys
-		} else {
-			m.labelData.AnnotKeys = currentKeys
-		}
-		clampLabelCursorToVisible(&m)
-		return m, nil
+		return m.handleLabelEditorKeyD(currentKeys, currentData, visible)
 	case "y":
 		if m.labelCursor >= 0 && m.labelCursor < len(currentKeys) {
 			key := currentKeys[m.labelCursor]
@@ -411,95 +423,6 @@ func (m Model) handleSecretEditorKeyD() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleSecretEditorEditKey handles key events while editing a secret value.
-func (m Model) handleSecretEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	keyInput := &m.secretEditKey
-	valInput := &m.secretEditValue
-	col := m.secretEditColumn
-	activeInput := valInput
-	if col == 0 {
-		activeInput = keyInput
-	}
-
-	// Handle paste events (Cmd+V on macOS, Ctrl+Shift+V on Linux) by
-	// inserting the pasted text at the cursor. Newlines are stripped from
-	// the key field but kept in the value field.
-	if msg.Paste {
-		text := string(msg.Runes)
-		if col == 0 {
-			text = strings.ReplaceAll(text, "\n", "")
-			text = strings.ReplaceAll(text, "\r", "")
-		}
-		if text != "" {
-			activeInput.Insert(text)
-		}
-		return m, nil
-	}
-
-	switch msg.String() {
-	case "esc":
-		m.secretEditing = false
-		m.secretEditColumn = -1
-		return m, nil
-	case "ctrl+s":
-		// Commit both the key and the value edits at once, regardless of
-		// which column is currently active. This lets the user type a
-		// value, tab back to the key column (or vice versa), and save
-		// without silently losing the other column's edit.
-		oldKey := m.secretData.Keys[m.secretCursor]
-		newKey := keyInput.Value
-		if newKey == "" {
-			newKey = oldKey
-		}
-		if newKey != oldKey {
-			delete(m.secretData.Data, oldKey)
-			m.secretData.Keys[m.secretCursor] = newKey
-		}
-		m.secretData.Data[newKey] = valInput.Value
-		m.secretEditing = false
-		m.secretEditColumn = -1
-		return m, nil
-	case "enter":
-		if col == 1 {
-			valInput.Insert("\n")
-		}
-		return m, nil
-	case "tab":
-		if col == 0 {
-			m.secretEditColumn = 1
-		} else {
-			m.secretEditColumn = 0
-		}
-		return m, nil
-	case "backspace":
-		if len(activeInput.Value) > 0 {
-			activeInput.Backspace()
-		}
-		return m, nil
-	case "ctrl+w":
-		activeInput.DeleteWord()
-		return m, nil
-	case "ctrl+a":
-		activeInput.Home()
-		return m, nil
-	case "ctrl+e":
-		activeInput.End()
-		return m, nil
-	case "left":
-		activeInput.Left()
-		return m, nil
-	case "right":
-		activeInput.Right()
-		return m, nil
-	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			activeInput.Insert(key)
-		}
-		return m, nil
-	}
-}
-
 func (m Model) handleLabelEditorKeyEsc() (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.labelData = nil
@@ -519,6 +442,27 @@ func (m Model) handleLabelEditorKeyK() (tea.Model, tea.Cmd) {
 	if m.labelCursor > 0 {
 		m.labelCursor--
 	}
+	return m, nil
+}
+
+func (m Model) handleLabelEditorKeyD(currentKeys []string, currentData map[string]string, visible []string) (tea.Model, tea.Cmd) {
+	if m.labelCursor < 0 || m.labelCursor >= len(visible) {
+		return m, nil
+	}
+	key := visible[m.labelCursor]
+	delete(currentData, key)
+	for i, k := range currentKeys {
+		if k == key {
+			currentKeys = append(currentKeys[:i], currentKeys[i+1:]...)
+			break
+		}
+	}
+	if m.labelTab == 0 {
+		m.labelData.LabelKeys = currentKeys
+	} else {
+		m.labelData.AnnotKeys = currentKeys
+	}
+	clampLabelCursorToVisible(&m)
 	return m, nil
 }
 
@@ -572,186 +516,6 @@ func (m Model) handleConfigMapEditorKeyD() (tea.Model, tea.Cmd) {
 	}
 	clampConfigMapCursorToVisible(&m)
 	return m, nil
-}
-
-// handleConfigMapEditorEditKey handles key events while editing a configmap value.
-func (m Model) handleConfigMapEditorEditKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	keyInput := &m.configMapEditKey
-	valInput := &m.configMapEditValue
-	col := m.configMapEditColumn
-	activeInput := valInput
-	if col == 0 {
-		activeInput = keyInput
-	}
-
-	// Handle paste events (Cmd+V on macOS, Ctrl+Shift+V on Linux) by
-	// inserting the pasted text at the cursor. Newlines are stripped from
-	// the key field but kept in the value field.
-	if msg.Paste {
-		text := string(msg.Runes)
-		if col == 0 {
-			text = strings.ReplaceAll(text, "\n", "")
-			text = strings.ReplaceAll(text, "\r", "")
-		}
-		if text != "" {
-			activeInput.Insert(text)
-		}
-		return m, nil
-	}
-
-	switch msg.String() {
-	case "esc":
-		m.configMapEditing = false
-		m.configMapEditColumn = -1
-		return m, nil
-	case "ctrl+s":
-		// Commit both the key and the value edits at once, regardless of
-		// which column is currently active. This lets the user type a
-		// value, tab back to the key column (or vice versa), and save
-		// without silently losing the other column's edit.
-		oldKey := m.configMapData.Keys[m.configMapCursor]
-		newKey := keyInput.Value
-		if newKey == "" {
-			newKey = oldKey
-		}
-		if newKey != oldKey {
-			delete(m.configMapData.Data, oldKey)
-			m.configMapData.Keys[m.configMapCursor] = newKey
-		}
-		m.configMapData.Data[newKey] = valInput.Value
-		m.configMapEditing = false
-		m.configMapEditColumn = -1
-		return m, nil
-	case "enter":
-		if col == 1 {
-			valInput.Insert("\n")
-		}
-		return m, nil
-	case "tab":
-		if col == 0 {
-			m.configMapEditColumn = 1
-		} else {
-			m.configMapEditColumn = 0
-		}
-		return m, nil
-	case "backspace":
-		if len(activeInput.Value) > 0 {
-			activeInput.Backspace()
-		}
-		return m, nil
-	case "ctrl+w":
-		activeInput.DeleteWord()
-		return m, nil
-	case "ctrl+a":
-		activeInput.Home()
-		return m, nil
-	case "ctrl+e":
-		activeInput.End()
-		return m, nil
-	case "left":
-		activeInput.Left()
-		return m, nil
-	case "right":
-		activeInput.Right()
-		return m, nil
-	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			activeInput.Insert(key)
-		}
-		return m, nil
-	}
-}
-
-// handleLabelEditorEditKey handles key events while editing a label/annotation value.
-func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, currentData map[string]string) (tea.Model, tea.Cmd) {
-	keyInput := &m.labelEditKey
-	valInput := &m.labelEditValue
-	col := m.labelEditColumn
-	activeInput := valInput
-	if col == 0 {
-		activeInput = keyInput
-	}
-
-	// Handle paste events (Cmd+V on macOS, Ctrl+Shift+V on Linux) by
-	// inserting the pasted text at the cursor. Newlines are stripped from
-	// the key field but kept in the value field.
-	if msg.Paste {
-		text := string(msg.Runes)
-		if col == 0 {
-			text = strings.ReplaceAll(text, "\n", "")
-			text = strings.ReplaceAll(text, "\r", "")
-		}
-		if text != "" {
-			activeInput.Insert(text)
-		}
-		return m, nil
-	}
-
-	switch msg.String() {
-	case "esc":
-		m.labelEditing = false
-		m.labelEditColumn = -1
-		return m, nil
-	case "ctrl+s":
-		// Commit both the key and the value edits at once, regardless of
-		// which column is currently active. This lets the user type a new
-		// key, tab to the value column, type a value, and save — without
-		// silently losing the key edit that happened before the tab.
-		oldKey := currentKeys[m.labelCursor]
-		newKey := keyInput.Value
-		if newKey == "" {
-			newKey = oldKey
-		}
-		if newKey != oldKey {
-			delete(currentData, oldKey)
-			currentKeys[m.labelCursor] = newKey
-		}
-		currentData[newKey] = valInput.Value
-		if m.labelTab == 0 {
-			m.labelData.LabelKeys = currentKeys
-			m.labelData.Labels = currentData
-		} else {
-			m.labelData.AnnotKeys = currentKeys
-			m.labelData.Annotations = currentData
-		}
-		m.labelEditing = false
-		m.labelEditColumn = -1
-		return m, nil
-	case "tab":
-		if col == 0 {
-			m.labelEditColumn = 1
-		} else {
-			m.labelEditColumn = 0
-		}
-		return m, nil
-	case "backspace":
-		if len(activeInput.Value) > 0 {
-			activeInput.Backspace()
-		}
-		return m, nil
-	case "ctrl+w":
-		activeInput.DeleteWord()
-		return m, nil
-	case "ctrl+a":
-		activeInput.Home()
-		return m, nil
-	case "ctrl+e":
-		activeInput.End()
-		return m, nil
-	case "left":
-		activeInput.Left()
-		return m, nil
-	case "right":
-		activeInput.Right()
-		return m, nil
-	default:
-		key := msg.String()
-		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			activeInput.Insert(key)
-		}
-		return m, nil
-	}
 }
 
 // secretDataDirty / configMapDataDirty / labelDataDirty report

@@ -20,9 +20,12 @@ var labelInnerPanelStyle = lipgloss.NewStyle().
 
 // RenderLabelEditorOverlay renders the label/annotation editor popup.
 //
-// searchQuery / searchActive drive the / filter (see RenderSecretEditorOverlay
-// for the contract). The filter narrows the keys for the ACTIVE tab
-// (labels or annotations); switching tabs preserves the query.
+// searchQuery / searchActive drive the / filter; selected /
+// formatActive / formatCursor drive the multi-row Shift+Y copy
+// (see RenderSecretEditorOverlay for the contract). The filter
+// narrows the keys for the ACTIVE tab (labels or annotations);
+// switching tabs preserves the query but clears the selection (the
+// next slice will scope selection per-tab if needed).
 func RenderLabelEditorOverlay(
 	data *model.LabelAnnotationData,
 	cursor int,
@@ -35,6 +38,9 @@ func RenderLabelEditorOverlay(
 	editColumn int,
 	searchQuery string,
 	searchActive bool,
+	selected map[string]bool,
+	formatActive bool,
+	formatCursor int,
 	screenWidth, screenHeight int,
 ) string {
 	if data == nil {
@@ -62,8 +68,14 @@ func RenderLabelEditorOverlay(
 	if searchBar != "" {
 		searchH = 1
 	}
+	var formatBar string
+	formatH := 0
+	if formatActive {
+		formatBar = RenderKVFormatPicker(formatCursor)
+		formatH = 1
+	}
 
-	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH, 3)
+	panelContentH := max(boxH-outerPadH-innerPadH-titleH-gapH-searchH-formatH, 3)
 	panelContentW := max(boxW-outerPadW-innerPadW, 20)
 	panelW := boxW - outerPadW
 
@@ -108,7 +120,7 @@ func RenderLabelEditorOverlay(
 		)
 	} else {
 		visibleKeys := FilterKVKeys(keys, searchQuery)
-		dataContent = renderLabelEditorTable(visibleKeys, dataMap, cursor, false, "", "", 0, panelContentW, panelContentH)
+		dataContent = renderLabelEditorTable(visibleKeys, dataMap, cursor, false, "", "", 0, selected, panelContentW, panelContentH)
 	}
 
 	// Inner bordered panel — bg + border-bg pulled from the active
@@ -124,6 +136,9 @@ func RenderLabelEditorOverlay(
 	if searchBar != "" {
 		body += "\n" + searchBar
 	}
+	if formatBar != "" {
+		body += "\n" + formatBar
+	}
 	body += "\n" + innerPanel
 
 	// baseBg end-to-end so the outer frame matches the inner panel.
@@ -134,8 +149,9 @@ func RenderLabelEditorOverlay(
 		Render(body)
 }
 
-func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx int, editing bool, editKey, editValue string, editColumn int, width, height int) string {
-	keyColW := computeKeyColumnWidth(keys, width, 2)
+func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx int, editing bool, editKey, editValue string, editColumn int, selectedKeys map[string]bool, width, height int) string {
+	// +2 budgets for the "✓ " / "  " selection-indicator prefix.
+	keyColW := computeKeyColumnWidth(keys, width, 2) + 2
 	valColW := max(width-keyColW-5, 8)
 
 	bodyHeight := max(height-2, 1)
@@ -156,7 +172,11 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 			keyText = SingleLineCell(editKey, keyColW)
 			valText = SingleLineCell(editValue, valColW-1) + "\u2588"
 		default:
-			keyText = SingleLineCell(k, keyColW)
+			prefix := "  "
+			if selectedKeys[k] {
+				prefix = "\u2713 "
+			}
+			keyText = prefix + SingleLineCell(k, keyColW-2)
 			valText = SingleLineCell(v, valColW)
 		}
 		t.Row(keyText, valText)

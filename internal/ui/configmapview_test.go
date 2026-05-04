@@ -72,7 +72,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Keys: []string{},
 			Data: map[string]string{},
 		}
-		result := renderConfigMapEditorTable(cm, 0, false, "", "", 0, 60, 20)
+		result := renderConfigMapEditorTable(cm, 0, false, "", "", 0, nil, 60, 20)
 		assert.Contains(t, result, "KEY")
 		assert.Contains(t, result, "VALUE")
 		assert.Contains(t, result, "(empty - press 'a' to add a key)")
@@ -86,7 +86,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 				"DB_HOST":  "localhost",
 			},
 		}
-		result := renderConfigMapEditorTable(cm, 0, false, "", "", 0, 80, 20)
+		result := renderConfigMapEditorTable(cm, 0, false, "", "", 0, nil, 80, 20)
 		assert.Contains(t, result, "KEY")
 		assert.Contains(t, result, "VALUE")
 		assert.Contains(t, result, "APP_NAME")
@@ -102,7 +102,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Keys: []string{"key1", "key2"},
 			Data: map[string]string{"key1": "val1", "key2": "val2"},
 		}
-		result := renderConfigMapEditorTable(cm, 1, false, "", "", 0, 60, 20)
+		result := renderConfigMapEditorTable(cm, 1, false, "", "", 0, nil, 60, 20)
 		assert.Contains(t, result, "key2")
 	})
 
@@ -111,7 +111,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Keys: []string{"mykey"},
 			Data: map[string]string{"mykey": "myval"},
 		}
-		result := renderConfigMapEditorTable(cm, 0, true, "newkey", "", 0, 60, 20)
+		result := renderConfigMapEditorTable(cm, 0, true, "newkey", "", 0, nil, 60, 20)
 		assert.Contains(t, result, "newkey")
 		assert.Contains(t, result, "\u2588")
 	})
@@ -121,7 +121,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 			Keys: []string{"mykey"},
 			Data: map[string]string{"mykey": "myval"},
 		}
-		result := renderConfigMapEditorTable(cm, 0, true, "", "newval", 1, 60, 20)
+		result := renderConfigMapEditorTable(cm, 0, true, "", "newval", 1, nil, 60, 20)
 		assert.Contains(t, result, "newval")
 		assert.Contains(t, result, "\u2588")
 	})
@@ -131,7 +131,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 
 func TestRenderConfigMapEditorOverlay(t *testing.T) {
 	t.Run("nil configmap shows error", func(t *testing.T) {
-		result := RenderConfigMapEditorOverlay(nil, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
+		result := RenderConfigMapEditorOverlay(nil, 0, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 40)
 		assert.Contains(t, result, "No configmap loaded")
 	})
 
@@ -141,7 +141,7 @@ func TestRenderConfigMapEditorOverlay(t *testing.T) {
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "value1"},
 		}
-		result := RenderConfigMapEditorOverlay(cm, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
+		result := RenderConfigMapEditorOverlay(cm, 0, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 40)
 		assert.Contains(t, result, "ConfigMap Editor")
 		assert.Contains(t, result, "key1")
 	})
@@ -152,7 +152,7 @@ func TestRenderConfigMapEditorOverlay(t *testing.T) {
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "value1"},
 		}
-		result := RenderConfigMapEditorOverlay(cm, 0, true, "key1", 4, "value1", 6, 1, "", false, 100, 40)
+		result := RenderConfigMapEditorOverlay(cm, 0, true, "key1", 4, "value1", 6, 1, "", false, nil, false, 0, 100, 40)
 		assert.Contains(t, result, "ConfigMap Editor")
 	})
 
@@ -161,7 +161,7 @@ func TestRenderConfigMapEditorOverlay(t *testing.T) {
 			Keys: []string{"k"},
 			Data: map[string]string{"k": "v"},
 		}
-		result := RenderConfigMapEditorOverlay(cm, 0, false, "", 0, "", 0, 0, "", false, 30, 10)
+		result := RenderConfigMapEditorOverlay(cm, 0, false, "", 0, "", 0, 0, "", false, nil, false, 0, 30, 10)
 		assert.Contains(t, result, "ConfigMap Editor")
 	})
 }
