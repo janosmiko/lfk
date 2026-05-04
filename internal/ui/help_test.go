@@ -172,6 +172,44 @@ func TestRenderHelpScreen_DigitSearchDoesNotLeakEscapeFragments(t *testing.T) {
 // default stripped profile makes lipgloss render plain text anyway
 // and the assertion would pass vacuously even if BuildHelpLines went
 // back to returning styled output.
+// Within a single help section, every entry row's key column must have
+// the same display width so descriptions align in a clean column.
+// Regression: previously the column was a fixed 14 chars, so any key
+// longer than that (e.g. "Ctrl+F / Ctrl+B / PgDn / PgUp") overflowed
+// and pushed its description right of the rest, breaking alignment.
+func TestBuildHelpSpecs_KeysAlignWithinSection(t *testing.T) {
+	specs := buildHelpSpecs("", "")
+
+	var currentSection string
+	var widths []int
+
+	check := func() {
+		if len(widths) <= 1 {
+			return
+		}
+		first := widths[0]
+		for _, w := range widths {
+			if w != first {
+				t.Errorf("section %q: key widths inconsistent (got %v, want all %d)",
+					currentSection, widths, first)
+				return
+			}
+		}
+	}
+
+	for _, s := range specs {
+		switch s.kind {
+		case helpLineSectionHeader:
+			check()
+			currentSection = s.text
+			widths = nil
+		case helpLineEntry:
+			widths = append(widths, lipgloss.Width(s.key))
+		}
+	}
+	check()
+}
+
 func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
 	original := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor

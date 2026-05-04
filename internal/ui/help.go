@@ -568,9 +568,12 @@ type helpLineSpec struct {
 	desc string
 }
 
-// helpKeyColumnWidth is the fixed-width key column so descriptions
-// align vertically across every entry row.
-const helpKeyColumnWidth = 14
+// helpKeyColumnMinWidth is the minimum width of the key column. Sections
+// whose widest key is shorter still pad to this so the description column
+// has a comfortable left margin. Sections with longer keys widen the
+// column to fit, keeping descriptions vertically aligned within the
+// section.
+const helpKeyColumnMinWidth = 14
 
 // buildHelpSpecs walks the help sections and produces structural
 // specs (un-styled) in the exact display order. Used by both
@@ -594,23 +597,43 @@ func buildHelpSpecs(filter, contextMode string) []helpLineSpec {
 			}
 		}
 
-		var entries []helpLineSpec
+		// First pass: collect bindings that pass the filter. Sizing the
+		// key column to filtered content (rather than the full section)
+		// keeps the column tight when a filter narrows the visible rows.
+		matched := make([]helpEntry, 0, len(section.bindings))
 		for _, b := range section.bindings {
 			if filter != "" {
 				if !MatchLine(b.key, filter) && !MatchLine(b.desc, filter) {
 					continue
 				}
 			}
-			entries = append(entries, helpLineSpec{
-				kind: helpLineEntry,
-				key:  fmt.Sprintf("%-*s", helpKeyColumnWidth, b.key),
-				desc: b.desc,
-			})
+			matched = append(matched, b)
 		}
 
 		// Only include sections that have matching bindings.
-		if len(entries) == 0 {
+		if len(matched) == 0 {
 			continue
+		}
+
+		// Per-section column width: pad keys to the widest key in this
+		// section so descriptions align vertically. The fixed-14 column
+		// used previously broke alignment for sections containing long
+		// keys like "Ctrl+F / Ctrl+B / PgDn / PgUp" — those overflowed
+		// the column and shifted their descriptions right of the rest.
+		keyWidth := helpKeyColumnMinWidth
+		for _, b := range matched {
+			if w := lipgloss.Width(b.key); w > keyWidth {
+				keyWidth = w
+			}
+		}
+
+		entries := make([]helpLineSpec, 0, len(matched))
+		for _, b := range matched {
+			entries = append(entries, helpLineSpec{
+				kind: helpLineEntry,
+				key:  fmt.Sprintf("%-*s", keyWidth, b.key),
+				desc: b.desc,
+			})
 		}
 
 		if len(specs) > 0 {
