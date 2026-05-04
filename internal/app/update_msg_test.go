@@ -1174,6 +1174,50 @@ func TestFinal2UpdateResourcesLoadedMsgPreviewLoadingArmed(t *testing.T) {
 	assert.True(t, rm.previewLoading, "previewLoading must be armed when main list arrives so the right pane keeps showing the spinner")
 }
 
+// TestUpdateResourcesLoadedEmpty_ClearsPreviewLoading locks in the fix for
+// the endless-loading bug: when a namespace has no resources of the selected
+// kind (e.g., empty namespace + Secrets), the main list arrives empty so
+// loadPreview() returns nil because there is nothing to preview. The flag
+// must be cleared in that branch — otherwise it stays armed from the
+// preceding clearRight() / invalidatePreviewForCursorChange() and the right
+// pane renders the spinner forever.
+func TestUpdateResourcesLoadedEmpty_ClearsPreviewLoading(t *testing.T) {
+	m := baseFinalModel()
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "Secret", Resource: "secrets", Namespaced: true,
+	}
+	m.middleItems = nil
+	m.loading = true
+	m.previewLoading = true // armed by clearRight on navigation
+	m.requestGen = 1
+	result, _ := m.Update(resourcesLoadedMsg{items: nil, gen: 1})
+	rm := result.(Model)
+	assert.False(t, rm.previewLoading,
+		"previewLoading must clear when no items arrive — otherwise the right pane spins forever in empty namespaces")
+}
+
+// TestUpdateOwnedLoadedEmpty_ClearsPreviewLoading is the LevelOwned twin of
+// the above: when a Helm release / Deployment has no children of the active
+// owned kind, the same pattern applies — loadPreview() returns nil because
+// there is nothing to preview, and the flag must be cleared so the right
+// pane stops spinning.
+func TestUpdateOwnedLoadedEmpty_ClearsPreviewLoading(t *testing.T) {
+	m := baseFinalModel()
+	m.nav.Level = model.LevelOwned
+	m.nav.ResourceType = model.ResourceTypeEntry{
+		Kind: "Deployment", Resource: "deployments", Namespaced: true,
+	}
+	m.nav.ResourceName = "empty-deploy"
+	m.middleItems = nil
+	m.loading = true
+	m.previewLoading = true // armed by clearRight on drill-in
+	m.requestGen = 1
+	result, _ := m.Update(ownedLoadedMsg{items: nil, gen: 1})
+	rm := result.(Model)
+	assert.False(t, rm.previewLoading,
+		"previewLoading must clear when no owned items arrive — same root cause as the LevelResources empty-namespace bug")
+}
+
 func TestFinal2UpdateResourcesLoadedMsgStale(t *testing.T) {
 	m := baseFinalModel()
 	m.requestGen = 2

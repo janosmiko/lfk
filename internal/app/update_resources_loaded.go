@@ -382,13 +382,17 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 		m.suppressBgtasks = true
 	}
 	var cmds []tea.Cmd
-	// Mark the preview pane as loading so the right column shows the
-	// spinner during the gap between the main list arriving (which cleared
-	// the global loading flag) and the preview load completing. Without
-	// this the right pane briefly renders "No resources found".
+	// Align previewLoading with whether a preview fetch is actually in
+	// flight. clearRight() / invalidatePreviewForCursorChange() armed the
+	// flag to true on navigation so the right pane keeps showing the
+	// spinner across the main-list arrival; if no preview cmd is
+	// dispatched (e.g., empty namespace, so selectedMiddleItem is nil and
+	// loadPreview returns nil), leaving the flag armed would render
+	// "Loading..." forever instead of letting the right pane fall through
+	// to its empty/details branches.
 	previewCmd := m.loadPreview()
+	m.previewLoading = previewCmd != nil
 	if previewCmd != nil {
-		m.previewLoading = true
 		cmds = append(cmds, previewCmd)
 	}
 	switch kind {
@@ -509,11 +513,12 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.silent {
 		m.suppressBgtasks = true
 	}
-	// Mark the preview pane as loading (see updateResourcesLoadedMain).
+	// Align previewLoading with whether a preview fetch is actually in
+	// flight (see updateResourcesLoadedMain for rationale). At LevelOwned,
+	// kinds without further owned children (or empty Helm releases) make
+	// loadPreview return nil; without this the right pane spins forever.
 	previewCmd := m.loadPreview()
-	if previewCmd != nil {
-		m.previewLoading = true
-	}
+	m.previewLoading = previewCmd != nil
 	m.suppressBgtasks = savedSuppress
 	return m, previewCmd
 }
