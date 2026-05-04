@@ -12,19 +12,21 @@ import (
 
 func TestExitCanIView(t *testing.T) {
 	m := Model{
-		overlay:               overlayCanI,
-		canIGroups:            []model.CanIGroup{{Name: "core"}},
-		canIGroupCursor:       3,
-		canIGroupScroll:       5,
-		canIResourceScroll:    2,
-		canISubject:           "system:serviceaccount:default:my-sa",
-		canISubjectName:       "my-sa",
-		canIServiceAccounts:   []string{"default/my-sa"},
-		canISearchActive:      true,
-		canISearchQuery:       "pods",
-		canISubjectFilterMode: true,
-		canIAllowedOnly:       true,
-		canINamespaces:        []string{"default", "kube-system"},
+		overlay: overlayCanI,
+		canIState: canIState{
+			canIGroups:            []model.CanIGroup{{Name: "core"}},
+			canIGroupCursor:       3,
+			canIGroupScroll:       5,
+			canIResourceScroll:    2,
+			canISubject:           "system:serviceaccount:default:my-sa",
+			canISubjectName:       "my-sa",
+			canIServiceAccounts:   []string{"default/my-sa"},
+			canISearchActive:      true,
+			canISearchQuery:       "pods",
+			canISubjectFilterMode: true,
+			canIAllowedOnly:       true,
+			canINamespaces:        []string{"default", "kube-system"},
+		},
 	}
 
 	m.exitCanIView()

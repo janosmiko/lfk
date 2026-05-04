@@ -354,12 +354,14 @@ func TestBookmarkFilterModeViaShared_Enter(t *testing.T) {
 
 func TestCanISubjectFilterModeViaShared_Typing(t *testing.T) {
 	m := Model{
-		overlay:               overlayCanISubject,
-		canISubjectFilterMode: true,
-		overlayFilter:         TextInput{Value: "", Cursor: 0},
-		tabs:                  []TabState{{}},
-		width:                 80,
-		height:                40,
+		overlay: overlayCanISubject,
+		canIState: canIState{
+			canISubjectFilterMode: true,
+		},
+		overlayFilter: TextInput{Value: "", Cursor: 0},
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
 	}
 	ret, _ := m.handleCanISubjectFilterMode(runeKey('a'))
 	result := ret.(Model)

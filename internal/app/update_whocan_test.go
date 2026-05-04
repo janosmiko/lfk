@@ -276,7 +276,7 @@ func TestWhoCanFilter_NarrowsListAndResetsCursor(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_TabReturnsToForward(t *testing.T) {
-	m := Model{canIMode: canIModeWhoCan}
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan}}
 	mdl, _ := m.handleWhoCanKey(keyMsg("tab"))
 	result := mdl.(Model)
 	assert.Equal(t, canIModeForward, result.canIMode,
@@ -284,7 +284,7 @@ func TestHandleWhoCanKey_TabReturnsToForward(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_LeftRightCyclesVerb(t *testing.T) {
-	m := Model{canIMode: canIModeWhoCan}
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan}}
 	require.Equal(t, "get", ui.WhoCanVerbs[0])
 	mdl, _ := m.handleWhoCanKey(keyMsg("right"))
 	result := mdl.(Model)
@@ -296,7 +296,7 @@ func TestHandleWhoCanKey_LeftRightCyclesVerb(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_LeftAtZeroDoesNotUnderflow(t *testing.T) {
-	m := Model{canIMode: canIModeWhoCan, whoCan: whoCanState{verbCursor: 0}}
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan, whoCan: whoCanState{verbCursor: 0}}}
 	mdl, _ := m.handleWhoCanKey(keyMsg("left"))
 	result := mdl.(Model)
 	assert.Equal(t, 0, result.whoCan.verbCursor,
@@ -304,7 +304,7 @@ func TestHandleWhoCanKey_LeftAtZeroDoesNotUnderflow(t *testing.T) {
 }
 
 func TestHandleWhoCanKey_SlashEntersFilterMode(t *testing.T) {
-	m := Model{canIMode: canIModeWhoCan}
+	m := Model{canIState: canIState{canIMode: canIModeWhoCan}}
 	mdl, _ := m.handleWhoCanKey(keyMsg("/"))
 	result := mdl.(Model)
 	assert.True(t, result.whoCan.resourceFilterActive,
@@ -312,7 +312,7 @@ func TestHandleWhoCanKey_SlashEntersFilterMode(t *testing.T) {
 }
 
 func TestUpdateWhoCanLoaded_StoresSubjects(t *testing.T) {
-	m := Model{requestGen: 4, whoCan: whoCanState{loading: true}}
+	m := Model{requestGen: 4, canIState: canIState{whoCan: whoCanState{loading: true}}}
 	subs := []k8s.WhoCanSubject{
 		{Kind: "User", Name: "alice", Via: "ClusterRoleBinding/admins → ClusterRole/cluster-admin"},
 	}
@@ -322,9 +322,62 @@ func TestUpdateWhoCanLoaded_StoresSubjects(t *testing.T) {
 }
 
 func TestUpdateWhoCanLoaded_StaleGenIgnored(t *testing.T) {
-	m := Model{requestGen: 10, whoCan: whoCanState{loading: true}}
+	m := Model{requestGen: 10, canIState: canIState{whoCan: whoCanState{loading: true}}}
 	result := m.updateWhoCanLoaded(whoCanLoadedMsg{gen: 1, subjects: []k8s.WhoCanSubject{{Kind: "User", Name: "x"}}})
 	assert.True(t, result.whoCan.loading,
 		"stale response leaves the loading flag armed so the next fresh response can clear it")
 	assert.Empty(t, result.whoCan.subjects, "stale subjects must not overwrite Model state")
+}
+
+func TestHandleCanIKey_TabDuringSearchDoesNotEnterWhoCan(t *testing.T) {
+	// Regression: an earlier dispatcher checked the WhoCan-pivot Tab
+	// branch BEFORE the search-active guard, so pressing Tab while
+	// `/`-search was active hijacked the key into enterWhoCanMode and
+	// left the model with the search input mid-edit. Search must own
+	// Tab when active — only after it falls through can the WhoCan
+	// pivot consume the key.
+	m := Model{}
+	m.canIMode = canIModeForward
+	m.canISearchActive = true
+
+	mdl, _ := m.handleCanIKey(keyMsg("tab"))
+	result := mdl.(Model)
+
+	assert.Equal(t, canIModeForward, result.canIMode,
+		"Tab while search is active must NOT enter Who-Can mode — search owns Tab")
+	assert.True(t, result.canISearchActive,
+		"search must remain active — the key was delegated to handleCanISearchKey, not the WhoCan pivot")
+}
+
+func TestEnterWhoCanMode_RefreshesResourceOnEachEntry(t *testing.T) {
+	// Regression: a previous version preserved m.whoCan.resource across
+	// Tab pivots — so after tabbing back to forward, moving the Can-I
+	// cursor to a different group, and tabbing again, the user saw
+	// stale Who-Can results from the FIRST entry instead of subjects
+	// for the row they were now hovering. enterWhoCanMode must re-read
+	// the cursor unconditionally on every entry.
+	m := Model{}
+	m.canIGroups = []model.CanIGroup{
+		canIGroupOf("", "pods"),
+		canIGroupOf("apps", "deployments"),
+	}
+
+	// First entry: cursor on the core group, expect "pods".
+	m.canIGroupCursor = 0
+	mdl, _ := m.enterWhoCanMode()
+	first := mdl.(Model)
+	require.Equal(t, "pods", first.whoCan.resource,
+		"first entry pre-positions on the resource under the Can-I cursor")
+
+	// Tab back to forward, then move the Can-I cursor to a different group.
+	mdl, _ = first.handleWhoCanKey(keyMsg("tab"))
+	back := mdl.(Model)
+	require.Equal(t, canIModeForward, back.canIMode)
+	back.canIGroupCursor = 1
+
+	// Re-enter Who-Can — must reflect the NEW cursor, not the stale resource.
+	mdl, _ = back.enterWhoCanMode()
+	second := mdl.(Model)
+	assert.Equal(t, "deployments", second.whoCan.resource,
+		"re-entry must refresh the resource from the current Can-I cursor — preserving the previous Who-Can target leaks stale results across pivots")
 }

@@ -96,15 +96,17 @@ func TestCanIVisibleGroups(t *testing.T) {
 	}
 
 	t.Run("no query returns all", func(t *testing.T) {
-		m := Model{canIGroups: groups}
+		m := Model{canIState: canIState{canIGroups: groups}}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 4)
 	})
 
 	t.Run("query filters by group name", func(t *testing.T) {
 		m := Model{
-			canIGroups:      groups,
-			canISearchQuery: "app",
+			canIState: canIState{
+				canIGroups:      groups,
+				canISearchQuery: "app",
+			},
 		}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 1)
@@ -113,8 +115,10 @@ func TestCanIVisibleGroups(t *testing.T) {
 
 	t.Run("empty group name matches core", func(t *testing.T) {
 		m := Model{
-			canIGroups:      groups,
-			canISearchQuery: "core",
+			canIState: canIState{
+				canIGroups:      groups,
+				canISearchQuery: "core",
+			},
 		}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 1)
@@ -123,8 +127,10 @@ func TestCanIVisibleGroups(t *testing.T) {
 
 	t.Run("case insensitive search", func(t *testing.T) {
 		m := Model{
-			canIGroups:      groups,
-			canISearchQuery: "BATCH",
+			canIState: canIState{
+				canIGroups:      groups,
+				canISearchQuery: "BATCH",
+			},
 		}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 1)
@@ -133,10 +139,12 @@ func TestCanIVisibleGroups(t *testing.T) {
 
 	t.Run("active search input overrides query", func(t *testing.T) {
 		m := Model{
-			canIGroups:       groups,
-			canISearchQuery:  "apps", // would match "apps"
-			canISearchActive: true,
-			canISearchInput:  TextInput{Value: "batch"}, // overrides to "batch"
+			canIState: canIState{
+				canIGroups:       groups,
+				canISearchQuery:  "apps", // would match "apps"
+				canISearchActive: true,
+				canISearchInput:  TextInput{Value: "batch"}, // overrides to "batch"
+			},
 		}
 		indices := m.canIVisibleGroups()
 		assert.Len(t, indices, 1)
@@ -145,8 +153,10 @@ func TestCanIVisibleGroups(t *testing.T) {
 
 	t.Run("no match returns empty", func(t *testing.T) {
 		m := Model{
-			canIGroups:      groups,
-			canISearchQuery: "nonexistent",
+			canIState: canIState{
+				canIGroups:      groups,
+				canISearchQuery: "nonexistent",
+			},
 		}
 		indices := m.canIVisibleGroups()
 		assert.Empty(t, indices)

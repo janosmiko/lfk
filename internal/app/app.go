@@ -731,22 +731,10 @@ type Model struct {
 	explainRecursiveFilter       TextInput // filter input for recursive search overlay
 	explainRecursiveFilterActive bool      // true when typing in filter
 
-	// Can-I browser state.
-	canIGroups            []model.CanIGroup
-	canIGroupCursor       int // selected group in left column
-	canIGroupScroll       int
-	canIResourceScroll    int          // scroll offset for the resource column
-	canISubject           string       // "" = current user, or "system:serviceaccount:ns:name"
-	canISubjectName       string       // display name for the subject ("Current User" or "sa/name")
-	canIServiceAccounts   []string     // cached SA list for the selector
-	canISearchActive      bool         // true when typing in search bar
-	canISearchInput       TextInput    // current search input
-	canISearchQuery       string       // confirmed search query for filtering
-	canISubjectFilterMode bool         // true when typing in subject filter bar
-	canIAllowedOnly       bool         // true = show only allowed permissions
-	canINamespaces        []string     // namespaces used for SelfSubjectRulesReview
-	canIMode              canIViewMode // forward Can-I or reverse Who-Can (Tab toggle)
-	whoCan                whoCanState  // reverse-RBAC overlay state; see update_whocan.go
+	// Can-I / Who-Can RBAC explorer state — see cani_state.go. Embedded
+	// (not a named field) so existing accessors like m.canIGroups and
+	// m.whoCan continue to work via field promotion.
+	canIState
 
 	// Finalizer search overlay state.
 	finalizerSearchPattern      string
