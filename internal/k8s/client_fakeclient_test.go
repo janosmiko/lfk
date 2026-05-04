@@ -2378,6 +2378,11 @@ func TestGetResourceTree_DeploymentRefsMissingAndPresent(t *testing.T) {
 		"apiVersion": "apps/v1",
 		"kind":       "Deployment",
 		"metadata":   map[string]any{"name": "myapp", "namespace": "default", "uid": "dep-uid"},
+		"status": map[string]any{
+			"conditions": []any{
+				map[string]any{"type": "Available", "status": "True"},
+			},
+		},
 	}}
 	rs := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "apps/v1",
@@ -2413,6 +2418,15 @@ func TestGetResourceTree_DeploymentRefsMissingAndPresent(t *testing.T) {
 				},
 			},
 		},
+		"status": map[string]any{
+			"containerStatuses": []any{
+				map[string]any{
+					"name":  "app",
+					"ready": true,
+					"state": map[string]any{"running": map[string]any{}},
+				},
+			},
+		},
 	}}
 	presentSecret := &unstructured.Unstructured{Object: map[string]any{
 		"apiVersion": "v1",
@@ -2426,6 +2440,10 @@ func TestGetResourceTree_DeploymentRefsMissingAndPresent(t *testing.T) {
 	root, err := c.GetResourceTree(context.Background(), "", "default", "Deployment", "myapp")
 	require.NoError(t, err)
 	require.NotNil(t, root)
+
+	// Root status now comes from the central GET in GetResourceTree —
+	// the Available condition resolves to "Available".
+	assert.Equal(t, "Available", root.Status, "root deployment should carry status extracted from its Available condition")
 
 	// Deployment → ReplicaSet → Pod → (Container, present Secret, missing Secret).
 	require.Len(t, root.Children, 1, "expected one ReplicaSet under Deployment")
@@ -2446,6 +2464,19 @@ func TestGetResourceTree_DeploymentRefsMissingAndPresent(t *testing.T) {
 	assert.Equal(t, "", byName["present"].Status, "existing ref must not be flagged")
 	assert.Equal(t, model.MissingRefStatus, byName["missing"].Status,
 		"missing required ref must surface as MissingRef through GetResourceTree")
+
+	// Container under the unstructured tree path now carries status from
+	// pod.status.containerStatuses (matches the typed buildPodTree path).
+	var ctNode *model.ResourceNode
+	for _, ch := range podNode.Children {
+		if ch.Kind == "Container" {
+			ctNode = ch
+			break
+		}
+	}
+	require.NotNil(t, ctNode, "expected a Container child")
+	assert.Equal(t, "Running", ctNode.Status,
+		"container status from pod.status.containerStatuses should propagate through buildDeploymentTree")
 }
 
 // --- getHelmManagedResources ---

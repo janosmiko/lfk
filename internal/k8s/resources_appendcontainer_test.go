@@ -211,6 +211,151 @@ func TestAppendContainerNodes(t *testing.T) {
 		assert.Nil(t, podNode.Children)
 	})
 
+	t.Run("status block populates Container Status from running+ready", func(t *testing.T) {
+		podNode := &model.ResourceNode{Namespace: "ns"}
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
+			},
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
+						"name":  "app",
+						"ready": true,
+						"state": map[string]any{"running": map[string]any{"startedAt": "2024-01-01T00:00:00Z"}},
+					},
+				},
+			},
+		}
+
+		appendContainerNodes(podNode, obj)
+
+		require.Len(t, podNode.Children, 1)
+		assert.Equal(t, "Running", podNode.Children[0].Status)
+	})
+
+	t.Run("running but not ready becomes NotReady", func(t *testing.T) {
+		podNode := &model.ResourceNode{Namespace: "ns"}
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
+			},
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
+						"name":  "app",
+						"ready": false,
+						"state": map[string]any{"running": map[string]any{}},
+					},
+				},
+			},
+		}
+
+		appendContainerNodes(podNode, obj)
+
+		require.Len(t, podNode.Children, 1)
+		assert.Equal(t, "NotReady", podNode.Children[0].Status)
+	})
+
+	t.Run("waiting state becomes Waiting", func(t *testing.T) {
+		podNode := &model.ResourceNode{Namespace: "ns"}
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
+			},
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
+						"name":  "app",
+						"state": map[string]any{"waiting": map[string]any{"reason": "ContainerCreating"}},
+					},
+				},
+			},
+		}
+
+		appendContainerNodes(podNode, obj)
+
+		require.Len(t, podNode.Children, 1)
+		assert.Equal(t, "Waiting", podNode.Children[0].Status)
+	})
+
+	t.Run("terminated with Completed reason becomes Completed", func(t *testing.T) {
+		podNode := &model.ResourceNode{Namespace: "ns"}
+		obj := map[string]any{
+			"spec": map[string]any{
+				"initContainers": []any{map[string]any{"name": "init"}},
+			},
+			"status": map[string]any{
+				"initContainerStatuses": []any{
+					map[string]any{
+						"name":  "init",
+						"state": map[string]any{"terminated": map[string]any{"reason": "Completed"}},
+					},
+				},
+			},
+		}
+
+		appendContainerNodes(podNode, obj)
+
+		require.Len(t, podNode.Children, 1)
+		assert.Equal(t, "Completed", podNode.Children[0].Status)
+	})
+
+	t.Run("terminated with non-Completed reason becomes Terminated", func(t *testing.T) {
+		podNode := &model.ResourceNode{Namespace: "ns"}
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
+			},
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
+						"name":  "app",
+						"state": map[string]any{"terminated": map[string]any{"reason": "Error"}},
+					},
+				},
+			},
+		}
+
+		appendContainerNodes(podNode, obj)
+
+		require.Len(t, podNode.Children, 1)
+		assert.Equal(t, "Terminated", podNode.Children[0].Status)
+	})
+
+	t.Run("missing status block leaves Status empty", func(t *testing.T) {
+		podNode := &model.ResourceNode{Namespace: "ns"}
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
+			},
+		}
+
+		appendContainerNodes(podNode, obj)
+
+		require.Len(t, podNode.Children, 1)
+		assert.Equal(t, "", podNode.Children[0].Status)
+	})
+
+	t.Run("status block present but container missing defaults to Waiting", func(t *testing.T) {
+		// Mirrors containerStatusFromPod's typed default — a pod that has a
+		// status block but the kubelet hasn't reported this container yet.
+		podNode := &model.ResourceNode{Namespace: "ns"}
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{map[string]any{"name": "app"}},
+			},
+			"status": map[string]any{
+				"containerStatuses": []any{}, // empty list
+			},
+		}
+
+		appendContainerNodes(podNode, obj)
+
+		require.Len(t, podNode.Children, 1)
+		assert.Equal(t, "Waiting", podNode.Children[0].Status)
+	})
+
 	t.Run("preserves existing children", func(t *testing.T) {
 		existing := &model.ResourceNode{Name: "existing", Kind: "Volume"}
 		podNode := &model.ResourceNode{

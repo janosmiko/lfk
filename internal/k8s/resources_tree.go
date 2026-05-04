@@ -6,12 +6,32 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// rootGVRForKind maps a Kind that GetResourceTree accepts as an entry point
+// to the GVR used to fetch the root resource for status extraction. It is
+// also reused by wrapWithOwners for owner-chain lookups (a strict superset
+// of what owners can be — Service and Node never appear as owners but their
+// presence here is harmless).
+//
+// Pod is intentionally absent: buildPodTree fetches it via the typed
+// clientset and sets root.Status from pod.Status.Phase directly.
+var rootGVRForKind = map[string]schema.GroupVersionResource{
+	"Deployment":  {Group: "apps", Version: "v1", Resource: "deployments"},
+	"ReplicaSet":  {Group: "apps", Version: "v1", Resource: "replicasets"},
+	"StatefulSet": {Group: "apps", Version: "v1", Resource: "statefulsets"},
+	"DaemonSet":   {Group: "apps", Version: "v1", Resource: "daemonsets"},
+	"Job":         {Group: "batch", Version: "v1", Resource: "jobs"},
+	"CronJob":     {Group: "batch", Version: "v1", Resource: "cronjobs"},
+	"Service":     {Group: "", Version: "v1", Resource: "services"},
+	"Node":        {Group: "", Version: "v1", Resource: "nodes"},
+}
 
 func (c *Client) GetResourceTree(ctx context.Context, contextName, namespace, kind, name string) (*model.ResourceNode, error) {
 	dynClient, err := c.dynamicForContext(contextName)
@@ -23,6 +43,23 @@ func (c *Client) GetResourceTree(ctx context.Context, contextName, namespace, ki
 		Name:      name,
 		Kind:      kind,
 		Namespace: namespace,
+	}
+
+	// Fetch the root resource so the tree's root node renders with a status
+	// consistent with how owner-chain ancestors are rendered by wrapWithOwners.
+	// Skipped for Pod (buildPodTree handles it) and unknown CRD kinds (no
+	// GVR mapping). Errors are non-fatal — empty status is the legacy default.
+	if gvr, ok := rootGVRForKind[kind]; ok {
+		var obj *unstructured.Unstructured
+		var getErr error
+		if kind == "Node" {
+			obj, getErr = dynClient.Resource(gvr).Get(ctx, name, metav1.GetOptions{})
+		} else {
+			obj, getErr = dynClient.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
+		}
+		if getErr == nil && obj != nil {
+			root.Status = extractStatus(obj.Object)
+		}
 	}
 
 	switch kind {
@@ -355,14 +392,8 @@ func (c *Client) buildPodTree(ctx context.Context, contextName, namespace, podNa
 }
 
 func (c *Client) wrapWithOwners(ctx context.Context, dynClient dynamic.Interface, namespace, ownerKind, ownerName string, root *model.ResourceNode) {
-	gvrForKind := map[string]schema.GroupVersionResource{
-		"ReplicaSet":  {Group: "apps", Version: "v1", Resource: "replicasets"},
-		"Deployment":  {Group: "apps", Version: "v1", Resource: "deployments"},
-		"StatefulSet": {Group: "apps", Version: "v1", Resource: "statefulsets"},
-		"DaemonSet":   {Group: "apps", Version: "v1", Resource: "daemonsets"},
-		"Job":         {Group: "batch", Version: "v1", Resource: "jobs"},
-		"CronJob":     {Group: "batch", Version: "v1", Resource: "cronjobs"},
-	}
+	// Reuse rootGVRForKind — it is a superset of legitimate owner kinds.
+	gvrForKind := rootGVRForKind
 
 	type ownerInfo struct {
 		kind, name, status   string
@@ -443,23 +474,100 @@ func appendContainerNodes(podNode *model.ResourceNode, obj map[string]any) {
 	if spec == nil {
 		return
 	}
+	// Pull container statuses from pod.status so Container nodes built from
+	// the unstructured tree path render Running/Waiting/etc. consistently
+	// with the typed buildPodTree path. extractContainerStatusMap returns
+	// nil when the status block is absent, in which case Status is left
+	// empty rather than defaulting to "Waiting".
+	status, _ := obj["status"].(map[string]any)
+	statusByKey := map[string]map[string]string{
+		"initContainers": extractContainerStatusMap(status, "initContainerStatuses"),
+		"containers":     extractContainerStatusMap(status, "containerStatuses"),
+	}
 	for _, key := range []string{"initContainers", "containers"} {
 		containers, _ := spec[key].([]any)
+		lookup := statusByKey[key]
 		for _, c := range containers {
 			cMap, ok := c.(map[string]any)
 			if !ok {
 				continue
 			}
 			name, _ := cMap["name"].(string)
-			if name != "" {
-				podNode.Children = append(podNode.Children, &model.ResourceNode{
-					Name:      name,
-					Kind:      "Container",
-					Namespace: podNode.Namespace,
-				})
+			if name == "" {
+				continue
 			}
+			ctStatus := ""
+			if lookup != nil {
+				ctStatus = lookup[name]
+				if ctStatus == "" {
+					// Status block exists but this container isn't listed yet
+					// (e.g., just-created pod) — match the typed default.
+					ctStatus = "Waiting"
+				}
+			}
+			podNode.Children = append(podNode.Children, &model.ResourceNode{
+				Name:      name,
+				Kind:      "Container",
+				Namespace: podNode.Namespace,
+				Status:    ctStatus,
+			})
 		}
 	}
+}
+
+// extractContainerStatusMap walks pod.status[key] (an array of container
+// status entries) and returns a name → state-string map mirroring
+// containerStateString's typed semantics. Returns nil when the entry is
+// missing or not a list, so callers can distinguish "no status info" from
+// "container missing from status list".
+func extractContainerStatusMap(podStatus map[string]any, key string) map[string]string {
+	if podStatus == nil {
+		return nil
+	}
+	list, ok := podStatus[key].([]any)
+	if !ok {
+		return nil
+	}
+	out := make(map[string]string, len(list))
+	for _, item := range list {
+		m, ok := item.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := m["name"].(string)
+		if name == "" {
+			continue
+		}
+		ready, _ := m["ready"].(bool)
+		state, _ := m["state"].(map[string]any)
+		out[name] = containerStateFromUnstructured(state, ready)
+	}
+	return out
+}
+
+// containerStateFromUnstructured mirrors containerStateString for the
+// unstructured shape: examines the running/waiting/terminated one-of inside
+// container status.state.
+func containerStateFromUnstructured(state map[string]any, ready bool) string {
+	if state == nil {
+		return "Unknown"
+	}
+	if _, ok := state["running"].(map[string]any); ok {
+		if ready {
+			return "Running"
+		}
+		return "NotReady"
+	}
+	if _, ok := state["waiting"].(map[string]any); ok {
+		return "Waiting"
+	}
+	if term, ok := state["terminated"].(map[string]any); ok {
+		if reason, _ := term["reason"].(string); reason == "Completed" {
+			return "Completed"
+		}
+		return "Terminated"
+	}
+	return "Unknown"
 }
 
 func containerStatusFromPod(name string, statuses []corev1.ContainerStatus) string {
