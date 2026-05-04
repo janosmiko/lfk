@@ -57,8 +57,13 @@ func (m Model) handleConfigMapFormatPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cm
 
 // configMapCopyPairs assembles the [{Key, Value}] payload for the
 // Shift+Y copy. Selection wins when set; otherwise the cursor row.
-// Order follows m.configMapData.Keys so the payload matches on-screen order.
+// Order follows m.configMapData.Keys so the payload matches on-screen
+// order. Nil-data → empty result; callers treat nil as "nothing to
+// copy" and close the picker.
 func (m Model) configMapCopyPairs() []ui.KVPair {
+	if m.configMapData == nil {
+		return nil
+	}
 	selected := m.editorSearch.selected
 	if len(selected) > 0 {
 		out := make([]ui.KVPair, 0, len(selected))

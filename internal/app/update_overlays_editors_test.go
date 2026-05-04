@@ -155,6 +155,43 @@ func TestSecretEditor_FormatPickerEscCancels(t *testing.T) {
 	assert.Empty(t, result.statusMessage, "esc must NOT trigger a copy — no status message")
 }
 
+// --- nil-data guards (CodeRabbit-flagged) ---
+
+// TestSecretCopyPairs_NilDataReturnsNil pins the CodeRabbit fix:
+// secretCopyPairs used to dereference m.secretData unconditionally
+// and would panic if invoked while the editor was open without
+// loaded data. Now returns nil so callers can treat it as "nothing
+// to copy" and close the picker.
+func TestSecretCopyPairs_NilDataReturnsNil(t *testing.T) {
+	m := Model{overlay: overlaySecretEditor, secretData: nil, tabs: []TabState{{}}, width: 80, height: 40}
+	assert.Nil(t, m.secretCopyPairs(), "nil secretData must return nil — not panic")
+}
+
+func TestConfigMapCopyPairs_NilDataReturnsNil(t *testing.T) {
+	m := Model{overlay: overlayConfigMapEditor, configMapData: nil, tabs: []TabState{{}}, width: 80, height: 40}
+	assert.Nil(t, m.configMapCopyPairs(), "nil configMapData must return nil — not panic")
+}
+
+func TestLabelCopyPairs_NilDataReturnsNil(t *testing.T) {
+	m := Model{overlay: overlayLabelEditor, labelData: nil, tabs: []TabState{{}}, width: 80, height: 40}
+	assert.Nil(t, m.labelCopyPairs(), "nil labelData must return nil — not panic")
+}
+
+func TestVisibleKeys_NilDataReturnNil(t *testing.T) {
+	t.Run("secret", func(t *testing.T) {
+		m := Model{overlay: overlaySecretEditor, secretData: nil, tabs: []TabState{{}}, width: 80, height: 40}
+		assert.Nil(t, m.secretVisibleKeys(), "nil secretData must short-circuit before FilterKVKeys")
+	})
+	t.Run("configmap", func(t *testing.T) {
+		m := Model{overlay: overlayConfigMapEditor, configMapData: nil, tabs: []TabState{{}}, width: 80, height: 40}
+		assert.Nil(t, m.configMapVisibleKeys(), "nil configMapData must short-circuit before FilterKVKeys")
+	})
+	t.Run("label", func(t *testing.T) {
+		m := Model{overlay: overlayLabelEditor, labelData: nil, tabs: []TabState{{}}, width: 80, height: 40}
+		assert.Nil(t, m.labelVisibleKeys(), "nil labelData must short-circuit before tab branch")
+	})
+}
+
 // --- ConfigMap multi-row selection + Shift+Y format picker ---
 
 func TestConfigMapEditor_SpaceTogglesSelectionAndAdvanceCursor(t *testing.T) {
@@ -1284,6 +1321,31 @@ func TestLabelEditorEditingMode(t *testing.T) {
 		result := ret.(Model)
 		assert.False(t, result.labelEditing)
 		assert.Equal(t, "apache", result.labelData.Labels["app"])
+	})
+
+	t.Run("enter inserts newline in value column", func(t *testing.T) {
+		// CodeRabbit-flagged regression: the label editor used to be
+		// missing the "enter" case so pressing Enter on a value silently
+		// fell through to the default branch and the user couldn't
+		// switch the value to multi-line edit mode (which is gated by
+		// the value containing a '\n').
+		m := makeEditingModel(1)
+		ret, _ := m.handleLabelEditorKey(specialKey(tea.KeyEnter))
+		result := ret.(Model)
+		assert.Contains(t, result.labelEditValue.Value, "\n",
+			"Enter on the value column must insert a literal newline (mirrors Secret/ConfigMap behaviour)")
+	})
+
+	t.Run("enter in key column does nothing", func(t *testing.T) {
+		// Mirror of Secret/ConfigMap behaviour: Enter must not insert
+		// a newline into a key (key strings are single-line by k8s
+		// convention).
+		m := makeEditingModel(0)
+		orig := m.labelEditKey.Value
+		ret, _ := m.handleLabelEditorKey(specialKey(tea.KeyEnter))
+		result := ret.(Model)
+		assert.Equal(t, orig, result.labelEditKey.Value,
+			"Enter on the key column must NOT mutate the key (no newlines allowed)")
 	})
 
 	t.Run("ctrl+s renames key", func(t *testing.T) {

@@ -64,8 +64,13 @@ func (m Model) handleSecretFormatPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 // secretCopyPairs assembles the [{Key, Value}] payload for the
 // Shift+Y copy. Selection wins when set; otherwise the cursor row.
 // Order: m.secretData.Keys traversal order so the clipboard payload
-// matches the on-screen order (selection map is unordered).
+// matches the on-screen order (selection map is unordered). Returns
+// nil when the editor has no data loaded — callers treat nil as
+// "nothing to copy" and close the picker.
 func (m Model) secretCopyPairs() []ui.KVPair {
+	if m.secretData == nil {
+		return nil
+	}
 	selected := m.editorSearch.selected
 	if len(selected) > 0 {
 		out := make([]ui.KVPair, 0, len(selected))

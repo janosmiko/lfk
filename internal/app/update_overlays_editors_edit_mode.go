@@ -367,6 +367,16 @@ func (m Model) handleLabelEditorEditKey(msg tea.KeyMsg, currentKeys []string, cu
 		m.labelEditing = false
 		m.labelEditColumn = -1
 		return m, nil
+	case "enter":
+		// Same contract as Secret/ConfigMap: Enter inserts a literal
+		// newline only when editing the value column. Without this,
+		// pressing Enter on a label value would silently drop into
+		// the default branch and the user couldn't switch a label
+		// from inline → multi-line edit mode.
+		if col == 1 {
+			valInput.Insert("\n")
+		}
+		return m, nil
 	case "tab":
 		if col == 0 {
 			m.labelEditColumn = 1

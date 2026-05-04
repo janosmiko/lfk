@@ -90,8 +90,13 @@ func (m Model) handleEditorSearchKey(msg tea.KeyMsg, clampCursor func(*Model)) (
 // secretVisibleKeys returns the secret editor's key list narrowed by
 // the active / search query. All cursor-based handlers (j/k/v/e/D/y)
 // must index into THIS list — using m.secretData.Keys directly would
-// silently navigate keys the user can't see.
+// silently navigate keys the user can't see. Returns nil when the
+// editor has no data loaded so callers can treat it as an empty list
+// instead of panicking on a nil dereference.
 func (m Model) secretVisibleKeys() []string {
+	if m.secretData == nil {
+		return nil
+	}
 	return ui.FilterKVKeys(m.secretData.Keys, m.editorSearch.query.Value)
 }
 
@@ -114,8 +119,11 @@ func clampSecretCursorToVisible(m *Model) {
 
 // configMapVisibleKeys returns the configmap editor's key list
 // narrowed by the active / search query. See secretVisibleKeys for
-// the contract.
+// the contract — nil-data → nil result.
 func (m Model) configMapVisibleKeys() []string {
+	if m.configMapData == nil {
+		return nil
+	}
 	return ui.FilterKVKeys(m.configMapData.Keys, m.editorSearch.query.Value)
 }
 
@@ -137,8 +145,12 @@ func clampConfigMapCursorToVisible(m *Model) {
 
 // labelVisibleKeys returns the active label tab's key list narrowed
 // by the / search query. The active tab is determined by m.labelTab
-// (0 = labels, 1 = annotations).
+// (0 = labels, 1 = annotations). Nil-data → nil result so handlers
+// that index into the slice don't panic in unloaded states.
 func (m Model) labelVisibleKeys() []string {
+	if m.labelData == nil {
+		return nil
+	}
 	keys := m.labelData.LabelKeys
 	if m.labelTab == 1 {
 		keys = m.labelData.AnnotKeys

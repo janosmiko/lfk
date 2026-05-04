@@ -65,8 +65,12 @@ func (m Model) handleLabelFormatPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // labelCopyPairs assembles the [{Key, Value}] payload for the Shift+Y
 // copy, scoped to the active tab. Selection wins when set; otherwise
 // the cursor row. Order follows the active tab's key slice so the
-// payload matches on-screen order.
+// payload matches on-screen order. Nil-data → empty result; callers
+// treat nil as "nothing to copy" and close the picker.
 func (m Model) labelCopyPairs() []ui.KVPair {
+	if m.labelData == nil {
+		return nil
+	}
 	currentKeys := m.labelData.LabelKeys
 	currentData := m.labelData.Labels
 	if m.labelTab == 1 {

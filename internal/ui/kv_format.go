@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -116,17 +117,48 @@ func FormatKVPairs(pairs []KVPair, format KVFormat) (string, string) {
 
 // needsYAMLQuote returns true when a value's first character or
 // content would change YAML's parsing (collection / scalar markers,
-// reserved indicators). Conservative — over-quoting is safe; a
-// missed case silently corrupts the user's clipboard.
+// reserved indicators) AND when the value is a YAML special scalar
+// — booleans, null, or a number — that would round-trip as a non-
+// string type if emitted unquoted. K/V editor values are always
+// strings (k8s configmap / secret / label data), so over-quoting is
+// safe; a missed case silently changes the user's clipboard from
+// `"true"` (string) to `true` (bool) when re-parsed.
 func needsYAMLQuote(v string) bool {
 	if v == "" {
 		return false
+	}
+	// YAML 1.1/1.2 special scalar words that parse as bool / null
+	// when unquoted (case-insensitive — YAML accepts "True", "TRUE"
+	// and so on as the same token).
+	switch strings.ToLower(v) {
+	case "true", "false", "yes", "no", "on", "off", "y", "n", "null", "~":
+		return true
+	}
+	// Anything that parses as a YAML number (int, float, sign, exponent)
+	// — quote so the round-trip preserves string-ness.
+	if isYAMLNumber(v) {
+		return true
 	}
 	switch v[0] {
 	case '"', '\'', '{', '[', '|', '>', '*', '&', '%', '!', '@', '`', '#', '-', ' ':
 		return true
 	}
 	return strings.ContainsAny(v, ":\n\r#")
+}
+
+// isYAMLNumber reports whether v parses as a YAML number — covers
+// integers, signed integers, decimals, and scientific notation. A
+// configmap / secret value of "8080" or "1.5" must come out of
+// FormatKVPairs as a quoted string so a YAML parser keeps treating
+// it as a string instead of an int / float.
+func isYAMLNumber(v string) bool {
+	if _, err := strconv.ParseInt(v, 10, 64); err == nil {
+		return true
+	}
+	if _, err := strconv.ParseFloat(v, 64); err == nil {
+		return true
+	}
+	return false
 }
 
 // RenderKVFormatPicker paints the Shift+Y format chip row that sits
