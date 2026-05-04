@@ -27,6 +27,15 @@ import (
 // screen so "outside" has no meaning, and their internal layouts are too
 // varied to map to clicks without per-overlay code.
 func (m Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	box, ok := m.centeredOverlayBox()
+	if !ok {
+		// Fullscreen / custom-rendered overlay: swallow every mouse
+		// event (clicks AND wheel) so we don't accidentally drive the
+		// explorer underneath, and so wheel doesn't start scrolling
+		// list state for an overlay we documented as keyboard-only.
+		return m, nil
+	}
+
 	// Wheel events scroll the overlay's list cursor by synthesizing
 	// arrow-key presses. Each overlay's normal-mode key handler reacts
 	// to "up"/"down" by moving its cursor (overlayCursor / schemeCursor /
@@ -43,14 +52,6 @@ func (m Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	if msg.Button != tea.MouseButtonLeft && msg.Button != tea.MouseButtonRight {
-		return m, nil
-	}
-
-	box, ok := m.centeredOverlayBox()
-	if !ok {
-		// No interactive bounding box (fullscreen / custom). Keep the
-		// previous "swallow all clicks" behavior so we don't accidentally
-		// drive the explorer underneath.
 		return m, nil
 	}
 

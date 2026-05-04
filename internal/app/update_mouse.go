@@ -57,8 +57,11 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		}
 	}
 
-	// Handle tab bar clicks in any mode.
-	if len(m.tabs) > 1 && msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress && msg.Y == 1 {
+	// Handle tab bar clicks in any mode — but only when no centered
+	// overlay is open. A modal overlay covers the rest of the screen
+	// and owns mouse input; without this guard a click on row 1 would
+	// switch tabs underneath the modal.
+	if m.overlay == overlayNone && len(m.tabs) > 1 && msg.Button == tea.MouseButtonLeft && msg.Action == tea.MouseActionPress && msg.Y == 1 {
 		if tab := m.tabAtX(msg.X); tab >= 0 && tab != m.activeTab {
 			return m.switchToTab(tab)
 		}
@@ -99,6 +102,15 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 // columnBoundaries returns the x boundaries between left/middle and
 // middle/right columns. Must match viewExplorer's layout math.
+//
+// viewExplorer subtracts only the 2-char border for each of the three
+// columns from m.width to compute `usable`, then splits `usable` into
+// leftW / middleW / rightW. ActiveColumnStyle has Padding(0, 1) which
+// lipgloss folds INTO the .Width(W) value, so leftW already includes
+// padding and the only extra cells on screen are the 2 border chars
+// per column. Adding 4 here would make each boundary 2 cells too wide
+// and misclassify clicks landing on the inner padding next to the
+// pane separators.
 func (m Model) columnBoundaries() (leftEnd, middleEnd int) {
 	if m.fullscreenMiddle || m.fullscreenDashboard {
 		// Fullscreen: only middle column exists.
@@ -107,9 +119,10 @@ func (m Model) columnBoundaries() (leftEnd, middleEnd int) {
 	usable := m.width - 6
 	leftW := max(10, usable*12/100)
 	middleW := max(10, usable*51/100)
-	// Each column has border(2) + padding(2) = 4 extra chars width.
-	leftEnd = leftW + 4
-	middleEnd = leftEnd + middleW + 4
+	// Each column adds 1 border char on each side = 2 extra cells per
+	// column on screen. Padding is already included in leftW / middleW.
+	leftEnd = leftW + 2
+	middleEnd = leftEnd + middleW + 2
 	return leftEnd, middleEnd
 }
 

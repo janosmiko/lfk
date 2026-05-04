@@ -211,12 +211,18 @@ func TestMouseLeftClickHeaderRowSorts(t *testing.T) {
 	m := baseExplorerModel()
 	m.setCursor(0)
 	prevCols := ui.ActiveSortableColumns
+	prevCount := ui.ActiveSortableColumnCount
 	prevLayout := ui.ActiveMiddleColumnLayout
 	t.Cleanup(func() {
 		ui.ActiveSortableColumns = prevCols
+		ui.ActiveSortableColumnCount = prevCount
 		ui.ActiveMiddleColumnLayout = prevLayout
 	})
 	ui.ActiveSortableColumns = []string{"Name"}
+	// Keep the count in sync — RenderTable normally writes both when it
+	// rebuilds the layout, and stale counts from a prior test would let
+	// header-hit logic short-circuit on a length mismatch.
+	ui.ActiveSortableColumnCount = len(ui.ActiveSortableColumns)
 	ui.ActiveMiddleColumnLayout = []ui.MiddleColumnRegion{
 		{Key: "Name", StartX: 0, EndX: 100},
 	}
@@ -336,6 +342,63 @@ func TestMouseRightClickMiddleSeparatorIsNoOp(t *testing.T) {
 	result := ret.(Model)
 	assert.Equal(t, 0, result.cursor(), "right-click on a separator must not move cursor")
 	assert.Equal(t, overlayNone, result.overlay, "right-click on a separator must not open action menu")
+}
+
+// Tab-bar clicks must not fire while a centered overlay is open.
+// Without the overlayNone guard at the top of handleMouse, clicking row
+// 1 (the tab bar) would switch tabs underneath the modal, leaving the
+// overlay attached to whichever tab the user was on but with the
+// foreground tab now showing different navigation state.
+func TestMouseTabBarClickBlockedByOverlay(t *testing.T) {
+	m := baseExplorerModel()
+	m.tabs = []TabState{{nav: model.NavigationState{Context: "ctx-a"}}, {nav: model.NavigationState{Context: "ctx-b"}}}
+	m.activeTab = 0
+	m.overlay = overlayAction
+	m.overlayItems = []model.Item{{Name: "Describe"}}
+	m.overlayCursor = 0
+
+	// Click coordinates that would otherwise hit tab 1: row 1, x in the
+	// second tab's region (tab labels are short, so far-right is safe).
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+		X:      40,
+		Y:      1,
+	})
+	result := ret.(Model)
+	assert.Equal(t, 0, result.activeTab,
+		"tab bar click must not switch tabs while an overlay is open")
+}
+
+// Column boundary math regression. ActiveColumnStyle.Width(W) folds
+// padding into W, so each column adds only 2 visual cells (the border)
+// — not 4. With m.width=120: usable=114, leftW=13, middleW=58, so the
+// left/middle separator falls at x=15 and the middle/right separator
+// at x=75. Off-by-one bugs here misclassify clicks landing in the
+// padding next to a separator (e.g. x=15 belongs to the middle pane,
+// not the left).
+func TestColumnBoundariesMatchViewExplorerLayout(t *testing.T) {
+	m := baseExplorerModel() // width=120
+	leftEnd, middleEnd := m.columnBoundaries()
+	assert.Equal(t, 15, leftEnd, "leftEnd = leftW(13) + border(2)")
+	assert.Equal(t, 75, middleEnd, "middleEnd = leftEnd(15) + middleW(58) + border(2)")
+
+	// x exactly at the boundary belongs to the column to the right of
+	// the separator (half-open intervals).
+	withMiddleLineMap(t, []int{0, 1, 2})
+
+	// x = leftEnd: click should be middle (selects, not navigates parent).
+	m1 := baseExplorerModel()
+	m1.setCursor(0)
+	ret1, _ := m1.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonLeft,
+		Action: tea.MouseActionPress,
+		X:      leftEnd,
+		Y:      4,
+	})
+	r1 := ret1.(Model)
+	assert.Equal(t, model.LevelResources, r1.nav.Level,
+		"x=leftEnd hits the middle column, not the left (which would drill to ResourceTypes)")
 }
 
 func TestMouseRightClickRespectsFullscreenLayout(t *testing.T) {

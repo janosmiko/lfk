@@ -256,6 +256,27 @@ func TestOverlayMouseFullscreenOverlayClickIgnored(t *testing.T) {
 	assert.Equal(t, overlaySecretEditor, result.overlay)
 }
 
+// Wheel events must obey the same fullscreen / custom-overlay guard as
+// clicks. Without it, a wheel tick over a fullscreen editor would
+// synthesize an Up/Down arrow and start scrolling the editor's list
+// state — which the docs promise is keyboard-only.
+func TestOverlayMouseWheelIgnoredForFullscreenOverlay(t *testing.T) {
+	m := baseExplorerModel()
+	m.overlay = overlaySecretEditor
+	originalCursor := m.cursor()
+
+	ret, _ := m.handleMouse(tea.MouseMsg{
+		Button: tea.MouseButtonWheelDown,
+		Action: tea.MouseActionPress,
+		X:      50,
+		Y:      10,
+	})
+	result := ret.(Model)
+	assert.Equal(t, overlaySecretEditor, result.overlay)
+	assert.Equal(t, originalCursor, result.cursor(),
+		"wheel must not leak past a fullscreen overlay to the explorer beneath")
+}
+
 // --- centered box geometry sanity check ---
 
 func TestCenteredOverlayBoxMatchesPlaceOverlayMath(t *testing.T) {
@@ -378,6 +399,9 @@ func TestTitleBarRightClickIsNoOp(t *testing.T) {
 	m := baseExplorerModel()
 	_ = m.renderTitleBar()
 	r := getTitleBarLayout()
+	if r.nsEndX <= r.nsStartX {
+		t.Fatalf("title bar layout did not record an ns region: %+v", r)
+	}
 
 	clickX := (r.nsStartX + r.nsEndX) / 2
 	ret, _ := m.handleMouse(tea.MouseMsg{
