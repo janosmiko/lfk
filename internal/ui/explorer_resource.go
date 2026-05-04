@@ -51,6 +51,12 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	var messageRows []detailRow // Reason, Message, Health Message
 	var multiLineFields []model.KeyValue
 	var dataLines []string
+	// dataKeyCount is the count of secret / data keys (not visual lines)
+	// for the "DATA (N)" label. Counting len(dataLines) was wrong:
+	// multi-line revealed values contribute many visual lines per key,
+	// making the label flip from e.g. "DATA (2)" hidden to "DATA (20)"
+	// after ctrl+s. Count once per key instead.
+	dataKeyCount := 0
 
 	// Key sets for categorization.
 	statusKeys := map[string]bool{
@@ -76,11 +82,13 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 			} else {
 				dataLines = append(dataLines, renderDataKV(label, "********", width)...)
 			}
+			dataKeyCount++
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "data:") {
 			label := kv.Key[len("data:"):]
 			dataLines = append(dataLines, renderDataKV(label, kv.Value, width)...)
+			dataKeyCount++
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "condition:") {
@@ -271,9 +279,12 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	}
 
 	// Render data/secret fields in a separate section with a header.
+	// Header count uses dataKeyCount (one per key) so the label stays
+	// stable across reveal toggle — len(dataLines) counted visual
+	// lines and inflated when multi-line values were revealed.
 	if len(dataLines) > 0 && len(lines) < height {
 		lines = append(lines, "")
-		lines = append(lines, detailKeyStyle.Render(fmt.Sprintf("DATA (%d)", len(dataLines))))
+		lines = append(lines, detailKeyStyle.Render(fmt.Sprintf("DATA (%d)", dataKeyCount)))
 		for _, dl := range dataLines {
 			if len(lines) >= height {
 				break

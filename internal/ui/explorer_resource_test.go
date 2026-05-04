@@ -227,6 +227,31 @@ func TestRenderResourceSummary(t *testing.T) {
 		assert.Contains(t, result, "config.yaml")
 	})
 
+	t.Run("DATA count counts keys not visual lines (regression: flipped on reveal of multi-line value)", func(t *testing.T) {
+		origShow := ActiveShowSecretValues
+		defer func() { ActiveShowSecretValues = origShow }()
+
+		item := &model.Item{
+			Name: "mysecret",
+			Columns: []model.KeyValue{
+				{Key: "secret:single", Value: "v1"},
+				// Multi-line value (e.g. PEM cert / kubeconfig). Counts
+				// as ONE key, but used to inflate DATA(N) when revealed
+				// because each visual line was added to dataLines.
+				{Key: "secret:multi", Value: "line1\nline2\nline3\nline4\nline5"},
+			},
+		}
+
+		ActiveShowSecretValues = false
+		hidden := RenderResourceSummary(item, "", 80, 30)
+		ActiveShowSecretValues = true
+		revealed := RenderResourceSummary(item, "", 80, 30)
+
+		assert.Contains(t, hidden, "DATA (2)", "hidden state shows 2 keys")
+		assert.Contains(t, revealed, "DATA (2)",
+			"revealed state must STILL show 2 keys — counting visual lines made it flip to e.g. DATA (6)")
+	})
+
 	t.Run("secret fields masked by default", func(t *testing.T) {
 		origShow := ActiveShowSecretValues
 		ActiveShowSecretValues = false
