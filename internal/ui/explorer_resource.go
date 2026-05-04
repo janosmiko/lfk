@@ -661,10 +661,32 @@ func renderTreeNodeLabel(node *model.ResourceNode, parentNamespace string) strin
 		label += " " + DimStyle.Render("(ns: "+node.Namespace+")")
 	}
 
-	// Show child count for nodes that have children.
+	// Show child count for nodes that have children. Pods can have a mix of
+	// "owned" children (Containers) and "refs" children (Secret/ConfigMap/PVC/SA);
+	// emit a two-bucket badge in that case.
 	if len(node.Children) > 0 {
-		childKind := node.Children[0].Kind
-		label += " " + DimStyle.Render(fmt.Sprintf("(%d %s)", len(node.Children), childKind))
+		var ownedCount, refsCount int
+		var ownedKind string
+		for _, ch := range node.Children {
+			if ch.Group == "refs" {
+				refsCount++
+				continue
+			}
+			ownedCount++
+			if ownedKind == "" {
+				ownedKind = ch.Kind
+			}
+		}
+		var parts []string
+		if ownedCount > 0 {
+			parts = append(parts, fmt.Sprintf("%d %s", ownedCount, ownedKind))
+		}
+		if refsCount > 0 {
+			parts = append(parts, fmt.Sprintf("%d refs", refsCount))
+		}
+		if len(parts) > 0 {
+			label += " " + DimStyle.Render("("+strings.Join(parts, ", ")+")")
+		}
 	}
 
 	if node.Status != "" {

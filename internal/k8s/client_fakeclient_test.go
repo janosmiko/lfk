@@ -2311,7 +2311,141 @@ func TestBuildPodTree(t *testing.T) {
 	err := c.buildPodTree(context.Background(), "", "default", "my-pod", root)
 	require.NoError(t, err)
 	assert.Equal(t, "Running", root.Status)
-	assert.Len(t, root.Children, 2) // init + app containers
+	// init + app containers, plus the default ServiceAccount ref attached by appendPodRefs.
+	require.Len(t, root.Children, 3)
+	assert.Equal(t, "Container", root.Children[0].Kind)
+	assert.Equal(t, "Container", root.Children[1].Kind)
+	assert.Equal(t, "ServiceAccount", root.Children[2].Kind)
+	assert.Equal(t, "default", root.Children[2].Name)
+	assert.Equal(t, "refs", root.Children[2].Group)
+}
+
+func TestBuildPodTree_RefsMissingAndPresent(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Spec: corev1.PodSpec{
+			AutomountServiceAccountToken: new(false), // suppress the default SA child to keep the assertion focused
+			Containers: []corev1.Container{{
+				Name: "app",
+				EnvFrom: []corev1.EnvFromSource{
+					{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "present"}}},
+					{SecretRef: &corev1.SecretEnvSource{LocalObjectReference: corev1.LocalObjectReference{Name: "missing"}}},
+					{
+						SecretRef: &corev1.SecretEnvSource{
+							LocalObjectReference: corev1.LocalObjectReference{Name: "missing-but-optional"},
+							Optional:             new(true),
+						},
+					},
+				},
+			}},
+		},
+		Status: corev1.PodStatus{Phase: corev1.PodRunning},
+	}
+	presentSecret := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Secret",
+		"metadata":   map[string]any{"name": "present", "namespace": "default"},
+	}}
+
+	cs := k8sfake.NewClientset(pod)
+	dc := newFakeDynClient(presentSecret)
+	c := newFakeClient(cs, dc)
+
+	root := &model.ResourceNode{Name: "my-pod", Kind: "Pod", Namespace: "default"}
+	err := c.buildPodTree(context.Background(), "", "default", "my-pod", root)
+	require.NoError(t, err)
+
+	byName := map[string]*model.ResourceNode{}
+	for _, ch := range root.Children {
+		if ch.Kind == "Secret" {
+			byName[ch.Name] = ch
+		}
+	}
+	require.Contains(t, byName, "present")
+	require.Contains(t, byName, "missing")
+	require.Contains(t, byName, "missing-but-optional")
+	assert.Equal(t, "", byName["present"].Status, "existing ref must not be flagged")
+	assert.Equal(t, model.MissingRefStatus, byName["missing"].Status, "missing required ref must be flagged")
+	assert.Equal(t, "", byName["missing-but-optional"].Status, "missing optional ref must not be flagged")
+}
+
+// TestGetResourceTree_DeploymentRefsMissingAndPresent exercises the full
+// Deployment → ReplicaSet → Pod path through GetResourceTree to confirm the
+// shared existsFn is wired through buildDeploymentTree and that a missing
+// required Secret surfaces as MissingRef on the Pod's children.
+func TestGetResourceTree_DeploymentRefsMissingAndPresent(t *testing.T) {
+	deploy := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "apps/v1",
+		"kind":       "Deployment",
+		"metadata":   map[string]any{"name": "myapp", "namespace": "default", "uid": "dep-uid"},
+	}}
+	rs := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "apps/v1",
+		"kind":       "ReplicaSet",
+		"metadata": map[string]any{
+			"name":      "myapp-abc",
+			"namespace": "default",
+			"uid":       "rs-uid",
+			"ownerReferences": []any{
+				map[string]any{"kind": "Deployment", "name": "myapp", "uid": "dep-uid", "apiVersion": "apps/v1"},
+			},
+		},
+	}}
+	pod := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]any{
+			"name":      "myapp-abc-xyz",
+			"namespace": "default",
+			"ownerReferences": []any{
+				map[string]any{"kind": "ReplicaSet", "name": "myapp-abc", "uid": "rs-uid", "apiVersion": "apps/v1"},
+			},
+		},
+		"spec": map[string]any{
+			"automountServiceAccountToken": false, // suppress the default SA child to keep the assertion focused
+			"containers": []any{
+				map[string]any{
+					"name": "app",
+					"envFrom": []any{
+						map[string]any{"secretRef": map[string]any{"name": "present"}},
+						map[string]any{"secretRef": map[string]any{"name": "missing"}},
+					},
+				},
+			},
+		},
+	}}
+	presentSecret := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Secret",
+		"metadata":   map[string]any{"name": "present", "namespace": "default"},
+	}}
+
+	dc := newFakeDynClient(deploy, rs, pod, presentSecret)
+	c := newFakeClient(nil, dc)
+
+	root, err := c.GetResourceTree(context.Background(), "", "default", "Deployment", "myapp")
+	require.NoError(t, err)
+	require.NotNil(t, root)
+
+	// Deployment → ReplicaSet → Pod → (Container, present Secret, missing Secret).
+	require.Len(t, root.Children, 1, "expected one ReplicaSet under Deployment")
+	rsNode := root.Children[0]
+	assert.Equal(t, "ReplicaSet", rsNode.Kind)
+	require.Len(t, rsNode.Children, 1, "expected one Pod under ReplicaSet")
+	podNode := rsNode.Children[0]
+	assert.Equal(t, "Pod", podNode.Kind)
+
+	byName := map[string]*model.ResourceNode{}
+	for _, ch := range podNode.Children {
+		if ch.Kind == "Secret" {
+			byName[ch.Name] = ch
+		}
+	}
+	require.Contains(t, byName, "present")
+	require.Contains(t, byName, "missing")
+	assert.Equal(t, "", byName["present"].Status, "existing ref must not be flagged")
+	assert.Equal(t, model.MissingRefStatus, byName["missing"].Status,
+		"missing required ref must surface as MissingRef through GetResourceTree")
 }
 
 // --- getHelmManagedResources ---

@@ -6,6 +6,7 @@ import (
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/dynamic"
 
@@ -91,6 +92,10 @@ func (c *Client) buildDeploymentTree(ctx context.Context, dynClient dynamic.Inte
 		return fmt.Errorf("listing pods: %w", err)
 	}
 
+	// Single existsFn shared across all pods in this loop so the cache
+	// dedupes ref lookups across replicas of the same Deployment.
+	existsFn := newRefExistsFn(ctx, dynClient, namespace)
+
 	for _, pod := range podList.Items {
 		for _, ref := range pod.GetOwnerReferences() {
 			if ref.Kind == "ReplicaSet" {
@@ -102,6 +107,7 @@ func (c *Client) buildDeploymentTree(ctx context.Context, dynClient dynamic.Inte
 						Status:    extractStatus(pod.Object),
 					}
 					appendContainerNodes(podNode, pod.Object)
+					appendPodRefs(podNode, pod.Object, pod.GetNamespace(), existsFn)
 					rsNode.Children = append(rsNode.Children, podNode)
 				}
 			}
@@ -118,6 +124,8 @@ func (c *Client) buildPodOwnerTree(ctx context.Context, dynClient dynamic.Interf
 		return fmt.Errorf("listing pods: %w", err)
 	}
 
+	existsFn := newRefExistsFn(ctx, dynClient, namespace)
+
 	for _, pod := range podList.Items {
 		for _, ref := range pod.GetOwnerReferences() {
 			if ref.Kind == ownerKind && ref.Name == ownerName {
@@ -128,6 +136,7 @@ func (c *Client) buildPodOwnerTree(ctx context.Context, dynClient dynamic.Interf
 					Status:    extractStatus(pod.Object),
 				}
 				appendContainerNodes(podNode, pod.Object)
+				appendPodRefs(podNode, pod.Object, pod.GetNamespace(), existsFn)
 				root.Children = append(root.Children, podNode)
 				break
 			}
@@ -183,6 +192,8 @@ func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.In
 		intermediateMap[n.Name] = n
 	}
 
+	existsFn := newRefExistsFn(ctx, dynClient, namespace)
+
 	for _, pod := range podList.Items {
 		for _, ref := range pod.GetOwnerReferences() {
 			podNode := &model.ResourceNode{
@@ -192,6 +203,7 @@ func (c *Client) buildGenericOwnerTree(ctx context.Context, dynClient dynamic.In
 				Status:    extractStatus(pod.Object),
 			}
 			appendContainerNodes(podNode, pod.Object)
+			appendPodRefs(podNode, pod.Object, pod.GetNamespace(), existsFn)
 			if parent, ok := intermediateMap[ref.Name]; ok {
 				parent.Children = append(parent.Children, podNode)
 				break
@@ -325,11 +337,18 @@ func (c *Client) buildPodTree(ctx context.Context, contextName, namespace, podNa
 		})
 	}
 
-	if len(pod.OwnerReferences) > 0 {
-		dynClient, dynErr := c.dynamicForContext(contextName)
-		if dynErr == nil {
-			c.wrapWithOwners(ctx, dynClient, namespace, pod.OwnerReferences[0].Kind, pod.OwnerReferences[0].Name, root)
+	dynClient, _ := c.dynamicForContext(contextName)
+
+	if obj, convErr := runtime.DefaultUnstructuredConverter.ToUnstructured(pod); convErr == nil {
+		var exists existsFn
+		if dynClient != nil {
+			exists = newRefExistsFn(ctx, dynClient, namespace)
 		}
+		appendPodRefs(root, obj, namespace, exists)
+	}
+
+	if len(pod.OwnerReferences) > 0 && dynClient != nil {
+		c.wrapWithOwners(ctx, dynClient, namespace, pod.OwnerReferences[0].Kind, pod.OwnerReferences[0].Name, root)
 	}
 
 	return nil

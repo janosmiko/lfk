@@ -133,13 +133,26 @@ type Item struct {
 	GroupedRefs   []GroupedRef     // For grouped rows (Events): all underlying resource identifiers
 }
 
+// MissingRefStatus is the Status string assigned to a ResourceNode whose
+// referenced object (Secret/ConfigMap/PVC/ServiceAccount) does not exist on
+// the cluster. The k8s package writes it; the ui package matches on it in
+// StatusStyle to render the node red. Keep these two callers in sync via
+// this single constant.
+const MissingRefStatus = "MissingRef"
+
 // ResourceNode represents a node in a resource relationship tree.
 type ResourceNode struct {
 	Name      string
 	Kind      string
 	Namespace string
 	Status    string
-	Children  []*ResourceNode
+	// Group categorizes children for rendering. Empty (default) and "owned"
+	// behave the same — owner-chain descendants like ReplicaSet/Pod/Container.
+	// "refs" marks Secret/ConfigMap/PVC/ServiceAccount nodes attached to a
+	// Pod via env, envFrom, volumes, or serviceAccountName. The renderer
+	// uses this to emit a mixed-kind badge like "(2 Container, 3 refs)".
+	Group    string
+	Children []*ResourceNode
 }
 
 // NavigationState holds the full state of where the user is in the hierarchy.

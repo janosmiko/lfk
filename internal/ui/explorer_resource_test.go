@@ -285,3 +285,51 @@ func TestRenderResourceSummary(t *testing.T) {
 		assert.Contains(t, result, "abc123")
 	})
 }
+
+// --- RenderResourceTree (badge buckets) ---
+
+func TestRenderResourceTree_BadgeBuckets(t *testing.T) {
+	t.Run("homogeneous owned children render single-kind badge", func(t *testing.T) {
+		root := &model.ResourceNode{
+			Name: "my-pod", Kind: "Pod", Namespace: "ns",
+			Children: []*model.ResourceNode{
+				{Name: "init", Kind: "Container", Namespace: "ns"},
+				{Name: "app", Kind: "Container", Namespace: "ns"},
+			},
+		}
+
+		out := RenderResourceTree(root, 120, 30)
+
+		assert.Contains(t, out, "(2 Container)")
+		assert.NotContains(t, out, "refs")
+	})
+
+	t.Run("mixed owned and refs children render two-bucket badge", func(t *testing.T) {
+		root := &model.ResourceNode{
+			Name: "my-pod", Kind: "Pod", Namespace: "ns",
+			Children: []*model.ResourceNode{
+				{Name: "app", Kind: "Container", Namespace: "ns"},
+				{Name: "default", Kind: "ServiceAccount", Namespace: "ns", Group: "refs"},
+				{Name: "regcred", Kind: "Secret", Namespace: "ns", Group: "refs"},
+			},
+		}
+
+		out := RenderResourceTree(root, 120, 30)
+
+		assert.Contains(t, out, "(1 Container, 2 refs)")
+	})
+
+	t.Run("only refs children render refs-only badge", func(t *testing.T) {
+		root := &model.ResourceNode{
+			Name: "my-pod", Kind: "Pod", Namespace: "ns",
+			Children: []*model.ResourceNode{
+				{Name: "default", Kind: "ServiceAccount", Namespace: "ns", Group: "refs"},
+				{Name: "vol-cm", Kind: "ConfigMap", Namespace: "ns", Group: "refs"},
+			},
+		}
+
+		out := RenderResourceTree(root, 120, 30)
+
+		assert.Contains(t, out, "(2 refs)")
+	})
+}

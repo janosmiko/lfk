@@ -265,6 +265,7 @@ func TestStatusStyle(t *testing.T) {
 		"Running", "Active", "Bound", "Available", "Ready",
 		"Pending", "ContainerCreating", "Terminating",
 		"Failed", "CrashLoopBackOff", "Error", "OOMKilled",
+		"MissingRef",
 		"Succeeded", "Completed",
 		"Warning", "Normal",
 		"default", "", "UnknownStatus",

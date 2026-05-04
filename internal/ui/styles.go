@@ -5,6 +5,8 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // Tokyonight Storm color palette default values. These back the mutable
@@ -440,6 +442,7 @@ func StatusStyle(status string) lipgloss.Style {
 		"Missing/Synced",
 		"OOMKilled", "ErrImagePull", "CreateContainerConfigError",
 		"SecretSyncedError", "SecretMissing", "MissingProviderSecret",
+		model.MissingRefStatus,
 		"UpdateFailed", "FailedScheduling",
 		"InvalidStoreConfiguration", "InvalidProviderConfig", "ValidationFailed":
 		return StatusFailed
