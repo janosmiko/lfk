@@ -22,7 +22,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |
 
-## Views and Modes
+## Views and Tools
 
 | Key | Action |
 |---|---|
@@ -31,26 +31,34 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | | Details pane shows labels, finalizers, annotation count, and resource metadata |
 | | Details view shows deletion timestamp (with warning highlight) for resources being deleted |
 | `F` | Toggle fullscreen (middle column or dashboard) |
-| `.` | Quick filter presets |
-| `!` | Error log |
+| `M` | Toggle resource relationship map view |
+| `,` | Column visibility toggle (show/hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
 | `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
 | `I` | API Explorer (browse resource structure interactively) |
 | `U` | RBAC permissions browser (can-i) |
-| `M` | Toggle resource relationship map view |
-| `w` | Toggle watch mode (auto-refresh every 2s) |
-| `,` | Column visibility toggle (show/hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
-| `>` / `<` | Sort by next / previous column |
-| `=` | Toggle sort direction (ascending/descending) |
-| `-` | Reset sort to default (Name ascending) |
-| `W` | Save resource to file / toggle warnings-only filter (Events view) |
-| | Events list also groups duplicate events (same Type/Reason/Message/Object) by default; press `z` to toggle grouping |
-| `T` | Switch color scheme (live preview, not persisted) |
-| `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
 | `Ctrl+G` | Finalizer search and remove |
+| `!` | Error log |
 | `@` | Monitoring overview (active Prometheus alerts) |
 | `Q` | Namespace resource quota dashboard |
 | `` ` `` | Background tasks overlay (Tab toggles running / completed history) |
 | `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`, `:tasks`), kubectl (`:k get pod`), shell (`:! cmd`) |
+
+## Sorting
+
+| Key | Action |
+|---|---|
+| `>` / `<` | Sort by next / previous column |
+| `=` | Toggle sort direction (ascending/descending) |
+| `-` | Reset sort to default (Name ascending) |
+
+## Modes & Settings
+
+| Key | Action |
+|---|---|
+| `w` | Toggle watch mode (auto-refresh every 2s) |
+| `Ctrl+R` | Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab) |
+| `T` | Switch color scheme (live preview, not persisted) |
+| `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
 
 ## Search and Filter
 
@@ -58,6 +66,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 |---|---|
 | `f` | Start filter mode (filter items in current view) |
 | `/` | Start search mode (search and jump to match) |
+| `.` | Quick filter presets |
 | `Tab` | Inside `/` or `f`: toggle broad mode — also matches against column values (annotations, labels, finalizers, CRD printer columns, custom user columns). Prompt shows `filter (all):` / `search (all):` while on. Resets on Enter/Esc. |
 | `Up` / `Down` | Inside `/` or `f`: cycle through previous queries (shared persistent history). |
 | `n` | Jump to next search match |
@@ -83,10 +92,13 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `D` | Delete resource (force delete Pod/Job if already deleting, force finalize others) | `delete` |
 | `X` | Force delete (Pod/Job only) | `force_delete` |
 | `S` | Scale / Export resource YAML to file | `scale` / `save_resource` |
+| `W` | Save resource to file / toggle warnings-only filter (Events view) | `save_resource` |
 | `Ctrl+O` | Open ingress host in browser | `open_browser` |
 | `i` | Edit labels/annotations | `label_editor` |
 | `a` | Create new resource from template (/ to search) | `create_template` |
 | `d` | Diff two selected resources | `diff` |
+
+Events list also groups duplicate events (same Type/Reason/Message/Object) by default; press `z` to toggle grouping.
 
 Port forwarding is available via the action menu (`x`) on Pod, Service, Deployment, StatefulSet, and DaemonSet resources. After creating a port forward, the view automatically navigates to the Port Forwards list and displays the resolved local port in the status bar. Active port forwards can be managed via the "Port Forwards" virtual resource in the Networking group.
 
