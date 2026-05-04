@@ -312,14 +312,20 @@ func (m Model) renderOverlayFullscreen(background string) string {
 	case overlaySecretEditor:
 		overlay = ui.RenderSecretEditorOverlay(
 			m.secretData, m.secretCursor, m.secretRevealed, m.secretAllRevealed,
-			m.secretEditing, m.secretEditKey.Value, m.secretEditValue.Value, m.secretEditColumn,
+			m.secretEditing,
+			m.secretEditKey.Value, m.secretEditKey.Cursor,
+			m.secretEditValue.Value, m.secretEditValue.Cursor,
+			m.secretEditColumn,
 			m.editorSearch.query.Value, m.editorSearch.active,
 			m.width, m.height,
 		)
 	case overlayConfigMapEditor:
 		overlay = ui.RenderConfigMapEditorOverlay(
 			m.configMapData, m.configMapCursor,
-			m.configMapEditing, m.configMapEditKey.Value, m.configMapEditValue.Value, m.configMapEditColumn,
+			m.configMapEditing,
+			m.configMapEditKey.Value, m.configMapEditKey.Cursor,
+			m.configMapEditValue.Value, m.configMapEditValue.Cursor,
+			m.configMapEditColumn,
 			m.editorSearch.query.Value, m.editorSearch.active,
 			m.width, m.height,
 		)
@@ -332,7 +338,10 @@ func (m Model) renderOverlayFullscreen(background string) string {
 	case overlayLabelEditor:
 		overlay = ui.RenderLabelEditorOverlay(
 			m.labelData, m.labelCursor, m.labelTab,
-			m.labelEditing, m.labelEditKey.Value, m.labelEditValue.Value, m.labelEditColumn,
+			m.labelEditing,
+			m.labelEditKey.Value, m.labelEditKey.Cursor,
+			m.labelEditValue.Value, m.labelEditValue.Cursor,
+			m.labelEditColumn,
 			m.editorSearch.query.Value, m.editorSearch.active,
 			m.width, m.height,
 		)

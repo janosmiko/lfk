@@ -19,11 +19,15 @@ var secretInnerPanelStyle = lipgloss.NewStyle().
 
 // RenderSecretEditorOverlay renders a centered popup overlay for editing secrets.
 //
-// searchQuery / searchActive drive the / filter: when searchQuery is
-// non-empty, only keys containing it (case-insensitive substring) are
-// shown. searchActive draws the input cursor block in the search bar
-// while the user is typing. Cursor is interpreted as an index into the
-// FILTERED key list — the caller (Model) keeps that invariant.
+//   - searchQuery / searchActive: the / filter — narrows visible keys
+//     to substring matches.
+//   - editKeyCursor / editValueCursor: cursor positions inside
+//     editKey / editValue so the rendered "█" lands at the right
+//     character (was always at the end of the input text — felt
+//     broken when the user hit ←/→ to navigate).
+//
+// Cursor is interpreted as an index into the FILTERED key list — the
+// caller (Model) keeps that invariant.
 func RenderSecretEditorOverlay(
 	secret *model.SecretData,
 	cursor int,
@@ -31,7 +35,9 @@ func RenderSecretEditorOverlay(
 	allRevealed bool,
 	editing bool,
 	editKey string,
+	editKeyCursor int,
 	editValue string,
+	editValueCursor int,
 	editColumn int, // 0=key, 1=value
 	searchQuery string,
 	searchActive bool,
@@ -83,7 +89,11 @@ func RenderSecretEditorOverlay(
 	// vertically and break the editor's outer dimensions.
 	var dataContent string
 	if editing {
-		dataContent = RenderKVEditorEditPane(editKey, editValue, editColumn, panelContentW, panelContentH)
+		dataContent = RenderKVEditorEditPane(
+			editKey, editKeyCursor,
+			editValue, editValueCursor,
+			editColumn, panelContentW, panelContentH,
+		)
 	} else {
 		// Filter keys before passing to the table renderer so the
 		// cursor + row iteration land on the visible subset.

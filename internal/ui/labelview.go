@@ -29,7 +29,9 @@ func RenderLabelEditorOverlay(
 	tab int, // 0=labels, 1=annotations
 	editing bool,
 	editKey string,
+	editKeyCursor int,
 	editValue string,
+	editValueCursor int,
 	editColumn int,
 	searchQuery string,
 	searchActive bool,
@@ -99,7 +101,11 @@ func RenderLabelEditorOverlay(
 	// pane (see secretview for the rationale).
 	var dataContent string
 	if editing {
-		dataContent = RenderKVEditorEditPane(editKey, editValue, editColumn, panelContentW, panelContentH)
+		dataContent = RenderKVEditorEditPane(
+			editKey, editKeyCursor,
+			editValue, editValueCursor,
+			editColumn, panelContentW, panelContentH,
+		)
 	} else {
 		visibleKeys := FilterKVKeys(keys, searchQuery)
 		dataContent = renderLabelEditorTable(visibleKeys, dataMap, cursor, false, "", "", 0, panelContentW, panelContentH)

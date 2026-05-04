@@ -131,7 +131,7 @@ func TestRenderConfigMapEditorTable(t *testing.T) {
 
 func TestRenderConfigMapEditorOverlay(t *testing.T) {
 	t.Run("nil configmap shows error", func(t *testing.T) {
-		result := RenderConfigMapEditorOverlay(nil, 0, false, "", "", 0, "", false, 100, 40)
+		result := RenderConfigMapEditorOverlay(nil, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
 		assert.Contains(t, result, "No configmap loaded")
 	})
 
@@ -141,7 +141,7 @@ func TestRenderConfigMapEditorOverlay(t *testing.T) {
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "value1"},
 		}
-		result := RenderConfigMapEditorOverlay(cm, 0, false, "", "", 0, "", false, 100, 40)
+		result := RenderConfigMapEditorOverlay(cm, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
 		assert.Contains(t, result, "ConfigMap Editor")
 		assert.Contains(t, result, "key1")
 	})
@@ -152,7 +152,7 @@ func TestRenderConfigMapEditorOverlay(t *testing.T) {
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "value1"},
 		}
-		result := RenderConfigMapEditorOverlay(cm, 0, true, "key1", "value1", 1, "", false, 100, 40)
+		result := RenderConfigMapEditorOverlay(cm, 0, true, "key1", 4, "value1", 6, 1, "", false, 100, 40)
 		assert.Contains(t, result, "ConfigMap Editor")
 	})
 
@@ -161,7 +161,7 @@ func TestRenderConfigMapEditorOverlay(t *testing.T) {
 			Keys: []string{"k"},
 			Data: map[string]string{"k": "v"},
 		}
-		result := RenderConfigMapEditorOverlay(cm, 0, false, "", "", 0, "", false, 30, 10)
+		result := RenderConfigMapEditorOverlay(cm, 0, false, "", 0, "", 0, 0, "", false, 30, 10)
 		assert.Contains(t, result, "ConfigMap Editor")
 	})
 }

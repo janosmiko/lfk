@@ -11,6 +11,31 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// TestRenderSecretEditorOverlay_CursorRendersAtPosition pins the
+// fix for the user's "cursor doesn't move when editing" report.
+// The edit pane used to place the "█" at the end of editValue
+// regardless of where the user actually moved it with ←/→. Now the
+// renderer takes editValueCursor and inserts the block at that byte
+// offset.
+func TestRenderSecretEditorOverlay_CursorRendersAtPosition(t *testing.T) {
+	secret := &model.SecretData{
+		Keys: []string{"k"},
+		Data: map[string]string{"k": "ignored-while-editing"},
+	}
+	// editValue = "abcdef", cursor at offset 3 → renders "abc█def".
+	out := RenderSecretEditorOverlay(
+		secret, 0, nil, true,
+		true,   // editing
+		"k", 1, // editKey + cursor at end
+		"abcdef", 3, // editValue + cursor mid-string
+		1, // editing the value column
+		"", false,
+		120, 30,
+	)
+	assert.Contains(t, out, "abc█def",
+		"cursor block must land at editValueCursor=3 (between 'c' and 'd'), not at the end of editValue")
+}
+
 // TestRenderSecretEditorOverlay_EditingShowsValueAsMultiline asserts
 // that opening an existing multi-line value for editing renders the
 // value across actual lines (not collapsed via SingleLineCell's "↵"
@@ -24,9 +49,10 @@ func TestRenderSecretEditorOverlay_EditingShowsValueAsMultiline(t *testing.T) {
 	}
 	out := RenderSecretEditorOverlay(
 		secret, 0, nil, true,
-		true,                             // editing
-		"DB_PASSWORD",                    // editKey
+		true,              // editing
+		"DB_PASSWORD", 11, // editKey + cursor at end
 		"line-one\nline-two\nline-three", // editValue (multi-line)
+		31,                               // editValue cursor at end
 		1,                                // editing the value column
 		"", false,
 		120, 30,
@@ -53,8 +79,8 @@ func TestRenderSecretEditorOverlay_LongMultilineValueKeepsHeight(t *testing.T) {
 	}
 
 	revealed := map[string]bool{"k1": true}
-	a := RenderSecretEditorOverlay(short, 0, revealed, false, false, "", "", 0, "", false, 100, 25)
-	b := RenderSecretEditorOverlay(long, 0, revealed, false, false, "", "", 0, "", false, 100, 25)
+	a := RenderSecretEditorOverlay(short, 0, revealed, false, false, "", 0, "", 0, 0, "", false, 100, 25)
+	b := RenderSecretEditorOverlay(long, 0, revealed, false, false, "", 0, "", 0, 0, "", false, 100, 25)
 
 	aLines := strings.Count(a, "\n")
 	bLines := strings.Count(b, "\n")
@@ -75,7 +101,7 @@ func TestRenderSecretEditorOverlay_SearchFiltersKeys(t *testing.T) {
 			"AWS_KEY":     "p3",
 		},
 	}
-	out := RenderSecretEditorOverlay(secret, 0, nil, true, false, "", "", 0, "API", true, 120, 30)
+	out := RenderSecretEditorOverlay(secret, 0, nil, true, false, "", 0, "", 0, 0, "API", true, 120, 30)
 	assert.Contains(t, out, "API_TOKEN", "filter API matches API_TOKEN")
 	assert.NotContains(t, out, "DB_PASSWORD", "DB_PASSWORD doesn't contain 'API' — must be filtered out")
 	assert.NotContains(t, out, "AWS_KEY", "AWS_KEY doesn't contain 'API' — must be filtered out")
@@ -115,7 +141,7 @@ func TestRenderSecretEditorOverlay_InnerPanelMatchesOuterBg(t *testing.T) {
 		Keys: []string{"DB_PASSWORD"},
 		Data: map[string]string{"DB_PASSWORD": "hunter2"},
 	}
-	out := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", "", 0, "", false, 120, 30)
+	out := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", 0, "", 0, 0, "", false, 120, 30)
 
 	// 256-color bg = "48;5;", truecolor bg = "48;2;". Both forms count
 	// as a bg-setting SGR.
@@ -262,7 +288,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 
 func TestRenderSecretEditorOverlay(t *testing.T) {
 	t.Run("nil secret shows error", func(t *testing.T) {
-		result := RenderSecretEditorOverlay(nil, 0, nil, false, false, "", "", 0, "", false, 100, 40)
+		result := RenderSecretEditorOverlay(nil, 0, nil, false, false, "", 0, "", 0, 0, "", false, 100, 40)
 		assert.Contains(t, result, "No secret loaded")
 	})
 
@@ -272,7 +298,7 @@ func TestRenderSecretEditorOverlay(t *testing.T) {
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "val1"},
 		}
-		result := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", "", 0, "", false, 100, 40)
+		result := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", 0, "", 0, 0, "", false, 100, 40)
 		assert.Contains(t, result, "Secret Editor")
 		assert.Contains(t, result, "key1")
 	})
@@ -283,7 +309,7 @@ func TestRenderSecretEditorOverlay(t *testing.T) {
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "val1"},
 		}
-		result := RenderSecretEditorOverlay(secret, 0, nil, false, true, "key1", "val1", 1, "", false, 100, 40)
+		result := RenderSecretEditorOverlay(secret, 0, nil, false, true, "key1", 4, "val1", 4, 1, "", false, 100, 40)
 		assert.Contains(t, result, "Secret Editor")
 	})
 }

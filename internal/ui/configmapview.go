@@ -26,7 +26,9 @@ func RenderConfigMapEditorOverlay(
 	cursor int,
 	editing bool,
 	editKey string,
+	editKeyCursor int,
 	editValue string,
+	editValueCursor int,
 	editColumn int, // 0=key, 1=value
 	searchQuery string,
 	searchActive bool,
@@ -72,7 +74,11 @@ func RenderConfigMapEditorOverlay(
 	// pane (see secretview for the rationale).
 	var dataContent string
 	if editing {
-		dataContent = RenderKVEditorEditPane(editKey, editValue, editColumn, panelContentW, panelContentH)
+		dataContent = RenderKVEditorEditPane(
+			editKey, editKeyCursor,
+			editValue, editValueCursor,
+			editColumn, panelContentW, panelContentH,
+		)
 	} else {
 		visibleKeys := FilterKVKeys(cm.Keys, searchQuery)
 		filteredCM := &model.ConfigMapData{Keys: visibleKeys, Data: cm.Data}

@@ -58,7 +58,7 @@ func TestRenderLabelEditorTable(t *testing.T) {
 
 func TestRenderLabelEditorOverlay(t *testing.T) {
 	t.Run("nil data shows error", func(t *testing.T) {
-		result := RenderLabelEditorOverlay(nil, 0, 0, false, "", "", 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(nil, 0, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
 		assert.Contains(t, result, "No data loaded")
 	})
 
@@ -69,7 +69,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Annotations: map[string]string{"note": "test"},
 			AnnotKeys:   []string{"note"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, false, "", "", 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 		assert.Contains(t, result, "Labels (1)")
 		assert.Contains(t, result, "Annotations (1)")
@@ -84,7 +84,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Annotations: map[string]string{"note": "important"},
 			AnnotKeys:   []string{"note"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 1, false, "", "", 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 1, false, "", 0, "", 0, 0, "", false, 100, 40)
 		assert.Contains(t, result, "note")
 		assert.Contains(t, result, "important")
 	})
@@ -94,7 +94,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Labels:    map[string]string{"k": "v"},
 			LabelKeys: []string{"k"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, true, "k", "v", 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, true, "k", 1, "v", 1, 0, "", false, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 	})
 
@@ -104,7 +104,7 @@ func TestRenderLabelEditorOverlay(t *testing.T) {
 			Labels:    map[string]string{"k": "v"},
 			LabelKeys: []string{"k"},
 		}
-		result := RenderLabelEditorOverlay(data, 0, 0, false, "", "", 0, "", false, 100, 40)
+		result := RenderLabelEditorOverlay(data, 0, 0, false, "", 0, "", 0, 0, "", false, 100, 40)
 		assert.Contains(t, result, "Label / Annotation Editor")
 	})
 }

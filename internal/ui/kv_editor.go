@@ -22,38 +22,35 @@ import (
 // (PEM certs, kubeconfigs, anything the SingleLineCell collapse
 // would otherwise hide behind a "↵" glyph).
 //
-// editColumn picks which region carries the cursor block ("█"):
-// 0 = key, 1 = value. The pane is sized to (width, height); long
-// values are clipped to height-2 lines (key row + a footer hint
-// "ctrl+s save · tab switch · esc cancel") so the editor's outer
-// dimensions stay bounded.
-func RenderKVEditorEditPane(editKey, editValue string, editColumn, width, height int) string {
+// editKeyCursor / editValueCursor are byte offsets into editKey /
+// editValue where the "█" cursor block lands. Without them the
+// cursor was always pinned to the end of the input, which made
+// ←/→ navigation feel broken.
+//
+// editColumn picks which region carries the cursor block: 0 = key,
+// 1 = value. No inline footer hint — the keymap lives in the global
+// status bar (overlay_hintbar) so the pane gets the full height.
+func RenderKVEditorEditPane(
+	editKey string, editKeyCursor int,
+	editValue string, editValueCursor int,
+	editColumn, width, height int,
+) string {
 	keyLabel := BarDimStyle.Bold(true).Render("Key:   ")
 	valLabel := BarDimStyle.Bold(true).Render("Value: ")
-	cursor := "█"
 
-	// Key region: single line. Cursor block lands at the end of the
-	// typed text when editColumn == 0; otherwise just plain text.
-	keyText := editKey
-	if editColumn == 0 {
-		keyText += cursor
-	}
+	keyText := insertCursorBlock(editKey, editKeyCursor, editColumn == 0)
 	keyText = Truncate(keyText, max(width-len("Key:   "), 4))
 	keyRow := lipgloss.NewStyle().Background(BaseBg).Render(keyLabel + BarNormalStyle.Render(keyText))
 
-	// Footer hint reserves the bottom row.
-	hint := BarDimStyle.Render("ctrl+s save · tab switch · enter newline · esc cancel")
-
 	// Value region: width-aware wrap to the cell's available height.
-	// Reserve 2 rows for the key row + footer hint; the remaining rows
-	// are the value's vertical budget.
-	valHeight := max(height-2, 1)
+	// Reserve 1 row for the key row; the remainder is the value's
+	// vertical budget. (Was -2 to reserve a footer hint row, but the
+	// hint moved to the global status bar — we use the row for value
+	// content instead.)
+	valHeight := max(height-1, 1)
 	valWidth := max(width-len("Value: "), 4)
 
-	valText := editValue
-	if editColumn == 1 {
-		valText += cursor
-	}
+	valText := insertCursorBlock(editValue, editValueCursor, editColumn == 1)
 	valBody := wrapAndClip(valText, valWidth, valHeight)
 	// Pad each value line so the bg fills the row width — without
 	// padding, lines shorter than valWidth show terminal-default bg
@@ -61,7 +58,23 @@ func RenderKVEditorEditPane(editKey, editValue string, editColumn, width, height
 	valBodyStyled := stylePerLine(valBody, valWidth, BarNormalStyle)
 	valRow := lipgloss.NewStyle().Background(BaseBg).Render(valLabel) + valBodyStyled
 
-	return keyRow + "\n" + valRow + "\n" + hint
+	return keyRow + "\n" + valRow
+}
+
+// insertCursorBlock returns s with a "█" cursor glyph inserted at
+// the given byte offset, but only when active is true. Clamps the
+// offset to s's bounds so a stale cursor position can't panic.
+func insertCursorBlock(s string, cursor int, active bool) string {
+	if !active {
+		return s
+	}
+	if cursor < 0 {
+		cursor = 0
+	}
+	if cursor > len(s) {
+		cursor = len(s)
+	}
+	return s[:cursor] + "█" + s[cursor:]
 }
 
 // wrapAndClip soft-wraps `s` so each visual line is at most maxW
