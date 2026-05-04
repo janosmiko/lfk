@@ -223,6 +223,12 @@ func (m Model) loadResourceTree() tea.Cmd {
 			return nil
 		}
 		kind = "Pod"
+		// effectiveNamespace returns "" in all-namespaces mode; fall back
+		// to the navigation namespace so the typed Pod GET resolves —
+		// same pattern as loadContainers above.
+		if ns == "" && m.nav.Namespace != "" {
+			ns = m.nav.Namespace
+		}
 	default:
 		return nil
 	}

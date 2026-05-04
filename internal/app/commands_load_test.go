@@ -268,6 +268,18 @@ func TestCov80LoadResourceTreeContainersNoOwnedName(t *testing.T) {
 	assert.Nil(t, cmd, "no Pod selected → no command")
 }
 
+func TestCov80LoadResourceTreeContainersAllNamespacesFallback(t *testing.T) {
+	// In all-namespaces mode effectiveNamespace returns "" — the loader
+	// must fall back to nav.Namespace so the typed Pod GET resolves.
+	m := basePush80Model()
+	m.nav.Level = model.LevelContainers
+	m.nav.OwnedName = "database-0"
+	m.nav.Namespace = "lfk-test"
+	m.allNamespaces = true
+	cmd := m.loadResourceTree()
+	require.NotNil(t, cmd, "all-namespaces mode must fall back to nav.Namespace")
+}
+
 func TestCov80ResolveNamespace(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Namespace = "nav-ns"
