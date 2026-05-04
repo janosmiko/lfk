@@ -488,6 +488,13 @@ are the apply target; otherwise the cursor row is copied alone.
 | `Cmd+V` (macOS) / `Ctrl+Shift+V` (Linux) | Paste from clipboard |
 | `Ctrl+S` | Commit the in-progress edit back to the list |
 | `Esc` | Cancel the in-progress edit |
+| `←` / `→` | Move cursor left / right |
+| `↑` / `↓` | Move cursor up / down (preserves byte column on the prev/next `\n`-delimited line) |
+| `Ctrl+D` / `Ctrl+U` | Scroll cursor down / up by half a page |
+| `Ctrl+F` / `Ctrl+B` | Scroll cursor down / up by a full page |
+| `Ctrl+A` / `Ctrl+E` | Move cursor to start / end of the **current line** (vim-like `0` / `$`) |
+| `Backspace` | Delete the character before the cursor |
+| `Ctrl+W` | Delete the word before the cursor |
 
 > Pressing `Enter` from the list view saves all pending changes via `kubectl
 > apply`/`patch` and refreshes the resource. If no fields were modified, the

@@ -20,6 +20,7 @@ func (m *Model) resetEditorSearch() {
 	m.editorSearch.selected = nil
 	m.editorSearch.formatActive = false
 	m.editorSearch.formatCursor = 0
+	m.editorSearch.editValueScroll = 0
 }
 
 // toggleEditorSelection flips the membership of `key` in the multi-

@@ -45,6 +45,7 @@ func RenderSecretEditorOverlay(
 	selected map[string]bool,
 	formatActive bool,
 	formatCursor int,
+	editValueScroll int,
 	screenWidth, screenHeight int,
 ) string {
 	if secret == nil {
@@ -104,7 +105,7 @@ func RenderSecretEditorOverlay(
 		dataContent = RenderKVEditorEditPane(
 			editKey, editKeyCursor,
 			editValue, editValueCursor,
-			editColumn, panelContentW, panelContentH,
+			editColumn, editValueScroll, panelContentW, panelContentH,
 		)
 	} else {
 		// Filter keys before passing to the table renderer so the

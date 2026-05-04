@@ -33,6 +33,7 @@ func TestRenderSecretEditorOverlay_CursorDoesNotShiftCharacters(t *testing.T) {
 		1, // editing the value column
 		"", false,
 		nil, false, 0,
+		0,
 		120, 30,
 	)
 	assert.NotContains(t, out, "abc█def",
@@ -65,6 +66,7 @@ func TestRenderSecretEditorOverlay_EditingShowsValueAsMultiline(t *testing.T) {
 		1,                                // editing the value column
 		"", false,
 		nil, false, 0,
+		0,
 		120, 30,
 	)
 	assert.Contains(t, out, "line-one", "first line of the multi-line value must be visible")
@@ -89,8 +91,8 @@ func TestRenderSecretEditorOverlay_LongMultilineValueKeepsHeight(t *testing.T) {
 	}
 
 	revealed := map[string]bool{"k1": true}
-	a := RenderSecretEditorOverlay(short, 0, revealed, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 25)
-	b := RenderSecretEditorOverlay(long, 0, revealed, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 25)
+	a := RenderSecretEditorOverlay(short, 0, revealed, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 0, 100, 25)
+	b := RenderSecretEditorOverlay(long, 0, revealed, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 0, 100, 25)
 
 	aLines := strings.Count(a, "\n")
 	bLines := strings.Count(b, "\n")
@@ -111,7 +113,7 @@ func TestRenderSecretEditorOverlay_SearchFiltersKeys(t *testing.T) {
 			"AWS_KEY":     "p3",
 		},
 	}
-	out := RenderSecretEditorOverlay(secret, 0, nil, true, false, "", 0, "", 0, 0, "API", true, nil, false, 0, 120, 30)
+	out := RenderSecretEditorOverlay(secret, 0, nil, true, false, "", 0, "", 0, 0, "API", true, nil, false, 0, 0, 120, 30)
 	assert.Contains(t, out, "API_TOKEN", "filter API matches API_TOKEN")
 	assert.NotContains(t, out, "DB_PASSWORD", "DB_PASSWORD doesn't contain 'API' — must be filtered out")
 	assert.NotContains(t, out, "AWS_KEY", "AWS_KEY doesn't contain 'API' — must be filtered out")
@@ -151,7 +153,7 @@ func TestRenderSecretEditorOverlay_InnerPanelMatchesOuterBg(t *testing.T) {
 		Keys: []string{"DB_PASSWORD"},
 		Data: map[string]string{"DB_PASSWORD": "hunter2"},
 	}
-	out := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 120, 30)
+	out := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 0, 120, 30)
 
 	// 256-color bg = "48;5;", truecolor bg = "48;2;". Both forms count
 	// as a bg-setting SGR.
@@ -202,6 +204,7 @@ func TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail(t *testing.T) {
 		1,
 		"", false,
 		nil, false, 0,
+		0,
 		120, 30,
 	)
 	plain := stripANSI(out)
@@ -220,23 +223,27 @@ func TestRenderSecretEditorOverlay_EditingDoesNotLeakANSITail(t *testing.T) {
 
 // TestRenderSecretEditorOverlay_LongValueScrollsToCursor pins the
 // fix for the user's "secret value is really long … the end of the
-// secret is not shown on the screen" report. overlayCursorMultiline
-// used to hard-clip the visual lines to maxH from the top, so when
-// editing a value taller than the visible field box the trailing
-// lines (and any cursor placed inside them) were silently dropped.
-// The fix scrolls the visible window so the cursor's line stays in
-// view; when the cursor sits at the end of a long value, the END of
-// the value renders, not the beginning.
+// secret is not shown on the screen" report.
+//
+// Two-part check:
+//
+//  1. Renderer respects the caller-provided scroll. With sticky
+//     scroll the viewport is owned by the handler — the renderer no
+//     longer auto-clips/auto-follows. Pass scroll=0 and assert the
+//     TOP of the value is visible.
+//
+//  2. Round-trip via AdjustEditValueScroll. Compute scroll for a
+//     cursor at end-of-value (mirrors what the handler does on edit-
+//     mode entry), pass it back to the renderer, and assert the END
+//     of the value is now visible. Without sticky-scroll plumbing
+//     the LAST-LINE-MARKER would be silently clipped.
 func TestRenderSecretEditorOverlay_LongValueScrollsToCursor(t *testing.T) {
 	// Build a value with many short lines — comfortably more than
-	// the field box's ~maxH so the top would clip the bottom under
-	// the old behaviour.
+	// the field box's ~maxH so the top would clip the bottom.
 	var b strings.Builder
 	for i := range 60 {
 		b.WriteString("line-")
-		// Pad the index so we can spot specific lines in the output.
-		switch {
-		case i < 10:
+		if i < 10 {
 			b.WriteString("0")
 		}
 		b.WriteString(itoaTiny(i))
@@ -249,19 +256,36 @@ func TestRenderSecretEditorOverlay_LongValueScrollsToCursor(t *testing.T) {
 		Keys: []string{"big"},
 		Data: map[string]string{"big": "ignored-while-editing"},
 	}
-	out := RenderSecretEditorOverlay(
-		secret, 0, nil, true,
-		true,
-		"big", 3,
-		value, len(value), // cursor at end of value
-		1, // editing the value column
-		"", false,
-		nil, false, 0,
-		120, 30,
-	)
-	plain := stripANSI(out)
-	assert.Contains(t, plain, "LAST-LINE-MARKER",
-		"end of long multi-line value must be visible — the renderer must scroll to follow the cursor")
+	render := func(scroll int) string {
+		return RenderSecretEditorOverlay(
+			secret, 0, nil, true,
+			true,
+			"big", 3,
+			value, len(value), // cursor at end of value
+			1, // editing the value column
+			"", false,
+			nil, false, 0,
+			scroll,
+			120, 30,
+		)
+	}
+
+	// Part 1: scroll=0 shows the top. End is clipped — that's the
+	// renderer being honest about its viewport.
+	top := stripANSI(render(0))
+	assert.Contains(t, top, "line-00", "scroll=0 must render from the top of the value")
+	assert.NotContains(t, top, "LAST-LINE-MARKER", "with scroll=0 the end is correctly clipped")
+
+	// Part 2: with handler-computed scroll the END is reachable.
+	// 80 = approximate field content width for screenW=120 (close
+	// enough to compute the right line count). The math doesn't have
+	// to be exact — AdjustEditValueScroll only cares about wrap-W
+	// when lines exceed it; here lines are short so any wrap-W works.
+	w, h := EditValueContentDims(EditorPanelDims(120, 30, 1, false, false))
+	scroll := AdjustEditValueScroll(value, len(value), 0, w, h)
+	bottom := stripANSI(render(scroll))
+	assert.Contains(t, bottom, "LAST-LINE-MARKER",
+		"end of long multi-line value must be visible after scroll = AdjustEditValueScroll(...)")
 }
 
 // itoaTiny converts a non-negative int < 1000 to a string without
@@ -418,7 +442,7 @@ func TestRenderSecretEditorTable(t *testing.T) {
 
 func TestRenderSecretEditorOverlay(t *testing.T) {
 	t.Run("nil secret shows error", func(t *testing.T) {
-		result := RenderSecretEditorOverlay(nil, 0, nil, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 40)
+		result := RenderSecretEditorOverlay(nil, 0, nil, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 0, 100, 40)
 		assert.Contains(t, result, "No secret loaded")
 	})
 
@@ -428,7 +452,7 @@ func TestRenderSecretEditorOverlay(t *testing.T) {
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "val1"},
 		}
-		result := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 100, 40)
+		result := RenderSecretEditorOverlay(secret, 0, nil, false, false, "", 0, "", 0, 0, "", false, nil, false, 0, 0, 100, 40)
 		assert.Contains(t, result, "Secret Editor")
 		assert.Contains(t, result, "key1")
 	})
@@ -439,7 +463,7 @@ func TestRenderSecretEditorOverlay(t *testing.T) {
 			Keys: []string{"key1"},
 			Data: map[string]string{"key1": "val1"},
 		}
-		result := RenderSecretEditorOverlay(secret, 0, nil, false, true, "key1", 4, "val1", 4, 1, "", false, nil, false, 0, 100, 40)
+		result := RenderSecretEditorOverlay(secret, 0, nil, false, true, "key1", 4, "val1", 4, 1, "", false, nil, false, 0, 0, 100, 40)
 		assert.Contains(t, result, "Secret Editor")
 	})
 }

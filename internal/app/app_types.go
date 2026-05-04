@@ -130,15 +130,20 @@ const (
 //   - formatActive / formatCursor: drive the Shift+Y format-picker
 //     chip row (yaml/json/dotenv/...). When active, key input
 //     routes to handle*FormatPickerKey instead of normal mode.
+//   - editValueScroll: visible-line offset for the value field's
+//     edit pane. Sticky scroll — only adjusted when the cursor
+//     leaves the visible window — so arrow-up doesn't pin the
+//     cursor to the bottom row while content scrolls underneath.
 //
 // Reset on overlay open + close so stale state can't leak into the
 // next editor session.
 type kvEditorSearchState struct {
-	active       bool
-	query        TextInput
-	selected     map[string]bool
-	formatActive bool
-	formatCursor int
+	active          bool
+	query           TextInput
+	selected        map[string]bool
+	formatActive    bool
+	formatCursor    int
+	editValueScroll int
 }
 
 // sortColDefault is the default sort column name.

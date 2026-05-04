@@ -195,6 +195,46 @@ func TestTextInput_Down(t *testing.T) {
 	})
 }
 
+func TestTextInput_LineHome(t *testing.T) {
+	t.Run("middle of line jumps to start of line", func(t *testing.T) {
+		ti := TextInput{Value: "hello\nworld\n!", Cursor: 9} // on "world" col 3
+		ti.LineHome()
+		assert.Equal(t, 6, ti.Cursor, "lands at start of 'world' (right after the \\n)")
+	})
+
+	t.Run("on first line jumps to 0", func(t *testing.T) {
+		ti := TextInput{Value: "hello\nworld", Cursor: 4}
+		ti.LineHome()
+		assert.Equal(t, 0, ti.Cursor)
+	})
+
+	t.Run("already at line start is a no-op", func(t *testing.T) {
+		ti := TextInput{Value: "hi\nthere", Cursor: 3} // start of "there"
+		ti.LineHome()
+		assert.Equal(t, 3, ti.Cursor)
+	})
+}
+
+func TestTextInput_LineEnd(t *testing.T) {
+	t.Run("middle of line jumps to end of line", func(t *testing.T) {
+		ti := TextInput{Value: "hello\nworld\n!", Cursor: 8} // on "world" col 2
+		ti.LineEnd()
+		assert.Equal(t, 11, ti.Cursor, "lands at the byte before the \\n after 'world'")
+	})
+
+	t.Run("on last line jumps to end of buffer", func(t *testing.T) {
+		ti := TextInput{Value: "hello\nworld", Cursor: 7}
+		ti.LineEnd()
+		assert.Equal(t, 11, ti.Cursor, "no following \\n — lands at len(value)")
+	})
+
+	t.Run("already at line end is a no-op", func(t *testing.T) {
+		ti := TextInput{Value: "hi\nthere", Cursor: 2} // end of "hi"
+		ti.LineEnd()
+		assert.Equal(t, 2, ti.Cursor)
+	})
+}
+
 func TestTextInput_Set(t *testing.T) {
 	ti := TextInput{}
 	ti.Set("new value")

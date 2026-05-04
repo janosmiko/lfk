@@ -311,6 +311,8 @@ func (m Model) handleLabelEditorKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.labelEditColumn = 1
 			m.labelEditKey.Set(key)
 			m.labelEditValue.Set(currentData[key])
+			m.editorSearch.editValueScroll = 0
+			adjustEditValueScrollFor(&m, m.labelEditValue.Value, m.labelEditValue.Cursor, 1, 2)
 		}
 		return m, nil
 	case "a":
@@ -401,6 +403,12 @@ func (m Model) handleSecretEditorKeyE() (tea.Model, tea.Cmd) {
 		m.secretEditColumn = 1
 		m.secretEditKey.Set(key)
 		m.secretEditValue.Set(m.secretData.Data[key])
+		// Initial scroll: TextInput.Set() puts the cursor at len(value).
+		// For long values that's past the visible window — without this
+		// the first frame would show the top of the value with a cursor
+		// somewhere off-screen.
+		m.editorSearch.editValueScroll = 0
+		adjustEditValueScrollFor(&m, m.secretEditValue.Value, m.secretEditValue.Cursor, 1, 1)
 	}
 	return m, nil
 }
@@ -497,6 +505,8 @@ func (m Model) handleConfigMapEditorKeyE() (tea.Model, tea.Cmd) {
 		m.configMapEditColumn = 1
 		m.configMapEditKey.Set(key)
 		m.configMapEditValue.Set(m.configMapData.Data[key])
+		m.editorSearch.editValueScroll = 0
+		adjustEditValueScrollFor(&m, m.configMapEditValue.Value, m.configMapEditValue.Cursor, 1, 1)
 	}
 	return m, nil
 }

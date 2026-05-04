@@ -34,7 +34,7 @@ import (
 func RenderKVEditorEditPane(
 	editKey string, editKeyCursor int,
 	editValue string, editValueCursor int,
-	editColumn, width, height int,
+	editColumn, valueScroll, width, height int,
 ) string {
 	const (
 		labelKey = "  Key  "
@@ -51,7 +51,7 @@ func RenderKVEditorEditPane(
 	valActive := editColumn == 1
 
 	keyContent := overlayCursor(editKey, editKeyCursor, keyActive, fieldOuterW-4)
-	valContent := overlayCursorMultiline(editValue, editValueCursor, valActive, fieldOuterW-4, valContentH)
+	valContent := overlayCursorMultiline(editValue, editValueCursor, valActive, valueScroll, fieldOuterW-4, valContentH)
 
 	keyBox := kvFieldBox(labelKey, keyContent, keyActive, fieldOuterW, keyContentH)
 	valBox := kvFieldBox(labelVal, valContent, valActive, fieldOuterW, valContentH)
@@ -142,30 +142,31 @@ func overlayCursor(s string, cursor int, active bool, maxW int) string {
 }
 
 // overlayCursorMultiline soft-wraps s to maxW columns and clips to
-// maxH lines, optionally overlaying a reverse-video cursor at the
-// byte offset. The wrap is performed on the plain source so the
-// ANSI sequences from the cursor styling don't break the column
-// math (a previous wrapAndClip-then-style approach miscounted runes
-// when escape sequences landed inside the wrap window).
+// maxH lines starting at `scroll`, optionally overlaying a reverse-
+// video cursor at the byte offset. The wrap is performed on the
+// plain source so the ANSI sequences from the cursor styling don't
+// break the column math.
 //
-// When `active` is true the visible window scrolls to keep the
-// cursor in view: if the cursor's visual line lies past the last
-// visible row, the slice shifts down so the cursor lands on the
-// bottom row. Without this the user couldn't reach the end of long
-// secret values — the trailing lines were silently truncated to
-// maxH and the cursor placed on a line that never made it on screen.
-func overlayCursorMultiline(s string, cursor int, active bool, maxW, maxH int) string {
+// `scroll` is the visible-line offset — the renderer is purely a
+// function of state, so the SCROLL is supplied externally rather than
+// computed here. The handler owns the scroll state and keeps it
+// sticky (cursor moves freely inside [scroll, scroll+maxH); only when
+// the cursor leaves the window does the handler nudge scroll). See
+// AdjustEditValueScroll for the handler's update rule.
+func overlayCursorMultiline(s string, cursor int, active bool, scroll, maxW, maxH int) string {
 	if maxW <= 0 || maxH <= 0 {
 		return ""
 	}
 	cursorStyle := lipgloss.NewStyle().Reverse(true).Background(BaseBg)
 	cursor = clampInt(cursor, 0, len(s))
+	if scroll < 0 {
+		scroll = 0
+	}
 
 	var lines []string
 	var cur []byte
 	visualCol := 0
 	cursorPlaced := false
-	cursorLine := -1 // visual line index where the cursor was placed
 
 	flush := func() {
 		lines = append(lines, string(cur))
@@ -174,8 +175,7 @@ func overlayCursorMultiline(s string, cursor int, active bool, maxW, maxH int) s
 	}
 	emitCursor := func(text string) {
 		cur = append(cur, []byte(cursorStyle.Render(text))...)
-		visualCol++             // text is exactly one rune (or " ") so always 1 visual col
-		cursorLine = len(lines) // index of the line currently being built
+		visualCol++ // text is exactly one rune (or " ") so always 1 visual col
 	}
 
 	i := 0
@@ -220,17 +220,121 @@ func overlayCursorMultiline(s string, cursor int, active bool, maxW, maxH int) s
 		lines = append(lines, string(cur))
 	}
 
-	// Scroll-to-cursor: when active and the cursor sits below the
-	// visible window, slide the window down so the cursor lands on
-	// the bottom row. When inactive (or no cursor placed) keep the
-	// historical behaviour of clipping from the top.
-	scroll := 0
-	if active && cursorLine >= maxH {
-		scroll = cursorLine - maxH + 1
+	if scroll > len(lines) {
+		scroll = len(lines)
 	}
 	end := min(scroll+maxH, len(lines))
 	lines = lines[scroll:end]
 	return stylePerLine(strings.Join(lines, "\n"), maxW, BarNormalStyle)
+}
+
+// CursorVisualLine returns the visual (wrapped) line index of the
+// cursor in the source text. Walks the same wrap algorithm as
+// overlayCursorMultiline so the handler agrees with the renderer on
+// which row the cursor occupies.
+//
+// Used by AdjustEditValueScroll to decide whether the cursor has
+// drifted outside the visible window after a key event.
+func CursorVisualLine(s string, cursor, maxW int) int {
+	if maxW <= 0 {
+		return 0
+	}
+	cursor = clampInt(cursor, 0, len(s))
+	line := 0
+	visualCol := 0
+	i := 0
+	for i < cursor {
+		if s[i] == '\n' {
+			line++
+			visualCol = 0
+			i++
+			continue
+		}
+		end := nextRuneEnd(s, i)
+		visualCol++
+		i = end
+		if visualCol >= maxW {
+			line++
+			visualCol = 0
+		}
+	}
+	return line
+}
+
+// AdjustEditValueScroll keeps the cursor inside the visible window
+// [scroll, scroll+maxH) by minimally sliding scroll. Returns the
+// updated scroll value:
+//
+//   - cursor visual line < scroll  → scroll = cursorLine (cursor at top)
+//   - cursor >= scroll + maxH      → scroll = cursorLine - maxH + 1 (cursor at bottom)
+//   - cursor inside window          → scroll unchanged (sticky)
+//
+// The sticky behaviour is what makes the edit pane feel like a real
+// editor: arrow-up moves the cursor up within the visible window,
+// only scrolling once the cursor reaches the top edge. Without it,
+// every up press would shift the entire view by one row while the
+// cursor stayed pinned to the bottom (the user-reported bug).
+func AdjustEditValueScroll(value string, cursor, scroll, maxW, maxH int) int {
+	if maxW <= 0 || maxH <= 0 {
+		return 0
+	}
+	if scroll < 0 {
+		scroll = 0
+	}
+	cursorLine := CursorVisualLine(value, cursor, maxW)
+	if cursorLine < scroll {
+		return cursorLine
+	}
+	if cursorLine >= scroll+maxH {
+		return cursorLine - maxH + 1
+	}
+	return scroll
+}
+
+// EditValueContentDims returns the value field's content (W, H)
+// inside the editor edit pane, given the panel's full content
+// dimensions. Mirrors the math at the top of RenderKVEditorEditPane —
+// extracted so the handler can compute the same dims without having
+// to call into the renderer.
+func EditValueContentDims(panelW, panelH int) (w, h int) {
+	fieldOuterW := max(panelW, 12)
+	w = fieldOuterW - 4    // -4: border (2) + padding (1*2)
+	h = max(panelH-1-4, 1) // -1 for key field, -4 for the chrome of both boxes
+	return w, h
+}
+
+// EditorPanelDims returns the (W, H) of the inner panel content area
+// for the K/V editor overlays. titleH varies per editor: 1 for the
+// Secret + ConfigMap editors, 2 for the Label editor (title + tab
+// bar). Mirrors the math at the top of each Render*EditorOverlay so
+// the handler can compute the editor's content dims without having
+// to recreate the layout chain.
+func EditorPanelDims(screenW, screenH, titleH int, searchVisible, formatVisible bool) (panelW, panelH int) {
+	boxW := screenW * 75 / 100
+	boxH := screenH * 75 / 100
+	if boxW < 50 {
+		boxW = 50
+	}
+	if boxH < 10 {
+		boxH = 10
+	}
+	outerPadH := 4
+	outerPadW := 6
+	innerPadH := 2
+	innerPadW := 4
+	gapH := 1
+
+	searchH := 0
+	if searchVisible {
+		searchH = 1
+	}
+	formatH := 0
+	if formatVisible {
+		formatH = 1
+	}
+	panelH = max(boxH-outerPadH-innerPadH-titleH-gapH-searchH-formatH, 3)
+	panelW = max(boxW-outerPadW-innerPadW, 20)
+	return panelW, panelH
 }
 
 // nextRuneEnd returns the byte offset of the next rune after the

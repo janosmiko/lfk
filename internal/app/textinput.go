@@ -61,6 +61,27 @@ func (t *TextInput) End() {
 	t.Cursor = len(t.Value)
 }
 
+// LineHome moves the cursor to the start of the current line — i.e.
+// the byte just after the previous '\n', or 0 if there is no
+// preceding newline. Used by the multi-line edit pane (ctrl+a /
+// vim-`0`) so single-line readline-style buffers (the / search input,
+// numeric inputs) can keep the buffer-wide Home() while edit-pane
+// values get line-scoped behaviour.
+func (t *TextInput) LineHome() {
+	t.Cursor = strings.LastIndex(t.Value[:t.Cursor], "\n") + 1
+}
+
+// LineEnd moves the cursor to the end of the current line — i.e. the
+// byte before the next '\n', or len(value) if no following newline.
+// Counterpart to LineHome.
+func (t *TextInput) LineEnd() {
+	if idx := strings.Index(t.Value[t.Cursor:], "\n"); idx != -1 {
+		t.Cursor += idx
+		return
+	}
+	t.Cursor = len(t.Value)
+}
+
 // Left moves the cursor one position to the left.
 func (t *TextInput) Left() {
 	if t.Cursor > 0 {

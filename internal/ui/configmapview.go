@@ -36,6 +36,7 @@ func RenderConfigMapEditorOverlay(
 	selected map[string]bool,
 	formatActive bool,
 	formatCursor int,
+	editValueScroll int,
 	screenWidth, screenHeight int,
 ) string {
 	if cm == nil {
@@ -87,7 +88,7 @@ func RenderConfigMapEditorOverlay(
 		dataContent = RenderKVEditorEditPane(
 			editKey, editKeyCursor,
 			editValue, editValueCursor,
-			editColumn, panelContentW, panelContentH,
+			editColumn, editValueScroll, panelContentW, panelContentH,
 		)
 	} else {
 		visibleKeys := FilterKVKeys(cm.Keys, searchQuery)

@@ -318,6 +318,7 @@ func (m Model) renderOverlayFullscreen(background string) string {
 			m.secretEditColumn,
 			m.editorSearch.query.Value, m.editorSearch.active,
 			m.editorSearch.selected, m.editorSearch.formatActive, m.editorSearch.formatCursor,
+			m.editorSearch.editValueScroll,
 			m.width, m.height,
 		)
 	case overlayConfigMapEditor:
@@ -329,6 +330,7 @@ func (m Model) renderOverlayFullscreen(background string) string {
 			m.configMapEditColumn,
 			m.editorSearch.query.Value, m.editorSearch.active,
 			m.editorSearch.selected, m.editorSearch.formatActive, m.editorSearch.formatCursor,
+			m.editorSearch.editValueScroll,
 			m.width, m.height,
 		)
 	case overlayRollback:
@@ -346,6 +348,7 @@ func (m Model) renderOverlayFullscreen(background string) string {
 			m.labelEditColumn,
 			m.editorSearch.query.Value, m.editorSearch.active,
 			m.editorSearch.selected, m.editorSearch.formatActive, m.editorSearch.formatCursor,
+			m.editorSearch.editValueScroll,
 			m.width, m.height,
 		)
 	case overlayAutoSync:

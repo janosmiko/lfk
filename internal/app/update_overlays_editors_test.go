@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -691,6 +692,157 @@ func TestSecretEditorEditingMode(t *testing.T) {
 		result := ret.(Model)
 		assert.Equal(t, "admin", result.secretEditValue.Value)
 	})
+
+	t.Run("ctrl+a is line-scoped (not buffer Home)", func(t *testing.T) {
+		// User asked: "ctrl+a should move the cursor to the
+		// beginning of the CURRENT line and ctrl+e to the end of
+		// the current line." Buffer-Home would land at offset 0;
+		// line-Home should land at the start of the second line.
+		m := makeEditingModel(1)
+		m.secretEditValue = TextInput{Value: "first\nsecond", Cursor: 9} // on "second" col 3
+		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlA})
+		result := ret.(Model)
+		assert.Equal(t, 6, result.secretEditValue.Cursor,
+			"ctrl+a should land at start of 'second' (offset 6), not buffer offset 0")
+	})
+
+	t.Run("ctrl+e is line-scoped (not buffer End)", func(t *testing.T) {
+		m := makeEditingModel(1)
+		m.secretEditValue = TextInput{Value: "first\nsecond", Cursor: 2} // mid 'first'
+		ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlE})
+		result := ret.(Model)
+		assert.Equal(t, 5, result.secretEditValue.Cursor,
+			"ctrl+e should land at end of 'first' (offset 5), not buffer end (12)")
+	})
+}
+
+// --- Sticky scroll + page-scroll keys ---
+
+// TestSecretEditor_StickyScrollOnArrowUp pins the user's
+// "scrolling up works differently than scrolling up in other
+// overlays … the cursor stays in the last line and the text scrolls"
+// report. With the previous always-pin-cursor-to-bottom heuristic,
+// arrow-up looked like the view scrolled under a stationary cursor.
+// With sticky scroll the cursor moves freely within the visible
+// window; scroll only adjusts when the cursor leaves it.
+func TestSecretEditor_StickyScrollOnArrowUp(t *testing.T) {
+	// 60 short lines — comfortably more than the field box's height
+	// (~14 rows for screen 120x30).
+	lines := make([]string, 0, 60)
+	for i := range 60 {
+		lines = append(lines, "line-"+itoaTinyApp(i))
+	}
+	value := strings.Join(lines, "\n")
+
+	m := Model{
+		overlay:          overlaySecretEditor,
+		secretData:       &model.SecretData{Keys: []string{"k"}, Data: map[string]string{"k": value}},
+		secretCursor:     0,
+		secretEditing:    true,
+		secretEditColumn: 1,
+		secretEditKey:    TextInput{Value: "k", Cursor: 1},
+		secretEditValue:  TextInput{Value: value, Cursor: len(value)}, // cursor at end
+		tabs:             []TabState{{}},
+		width:            120,
+		height:           30,
+	}
+	// Mimic edit-mode entry: position scroll for cursor at end.
+	adjustEditValueScrollFor(&m, m.secretEditValue.Value, m.secretEditValue.Cursor, 1, 1)
+	scrollAtEntry := m.editorSearch.editValueScroll
+	assert.Greater(t, scrollAtEntry, 0, "cursor at end of long value must scroll past 0")
+
+	// Press up once. Expected: cursor moves up by one line, scroll
+	// unchanged (cursor was on the bottom row, now on second-to-bottom).
+	ret, _ := m.handleSecretEditorKey(specialKey(tea.KeyUp))
+	r1 := ret.(Model)
+	assert.Equal(t, scrollAtEntry, r1.editorSearch.editValueScroll,
+		"single arrow-up must NOT shift scroll — cursor moves within visible window")
+
+	// Cursor moved up one line — verify byte offset decreased by ~1 line.
+	assert.Less(t, r1.secretEditValue.Cursor, m.secretEditValue.Cursor,
+		"cursor should have actually moved up (byte offset decreased)")
+}
+
+// TestSecretEditor_ScrollAdjustsWhenCursorLeavesWindow asserts that
+// once the cursor reaches the top of the visible window, further
+// arrow-up DOES nudge scroll (so the user can keep navigating up).
+func TestSecretEditor_ScrollAdjustsWhenCursorLeavesWindow(t *testing.T) {
+	lines := make([]string, 0, 60)
+	for i := range 60 {
+		lines = append(lines, "line-"+itoaTinyApp(i))
+	}
+	value := strings.Join(lines, "\n")
+
+	m := Model{
+		overlay:          overlaySecretEditor,
+		secretData:       &model.SecretData{Keys: []string{"k"}, Data: map[string]string{"k": value}},
+		secretEditing:    true,
+		secretEditColumn: 1,
+		secretEditKey:    TextInput{Value: "k", Cursor: 1},
+		secretEditValue:  TextInput{Value: value, Cursor: len(value)},
+		tabs:             []TabState{{}},
+		width:            120, height: 30,
+	}
+	adjustEditValueScrollFor(&m, m.secretEditValue.Value, m.secretEditValue.Cursor, 1, 1)
+	startScroll := m.editorSearch.editValueScroll
+
+	// Walk up enough times that the cursor MUST leave the visible window.
+	cur := tea.Model(m)
+	for range 100 {
+		cur, _ = cur.(Model).handleSecretEditorKey(specialKey(tea.KeyUp))
+	}
+	end := cur.(Model)
+	assert.Less(t, end.editorSearch.editValueScroll, startScroll,
+		"after enough up-presses scroll must decrease — cursor walked past the top of the visible window")
+}
+
+// TestSecretEditor_CtrlDScrollsByHalfPage asserts ctrl+d moves the
+// cursor down by approximately half the visible window, exercising
+// the new vim-like page-scroll keys.
+func TestSecretEditor_CtrlDScrollsByHalfPage(t *testing.T) {
+	lines := make([]string, 0, 60)
+	for i := range 60 {
+		lines = append(lines, "line-"+itoaTinyApp(i))
+	}
+	value := strings.Join(lines, "\n")
+
+	m := Model{
+		overlay:          overlaySecretEditor,
+		secretData:       &model.SecretData{Keys: []string{"k"}, Data: map[string]string{"k": value}},
+		secretEditing:    true,
+		secretEditColumn: 1,
+		secretEditKey:    TextInput{Value: "k", Cursor: 1},
+		secretEditValue:  TextInput{Value: value, Cursor: 0}, // cursor at top
+		tabs:             []TabState{{}},
+		width:            120, height: 30,
+	}
+	ret, _ := m.handleSecretEditorKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+	result := ret.(Model)
+	assert.Greater(t, result.secretEditValue.Cursor, 0,
+		"ctrl+d must move the cursor down by half a page")
+	// Confirm we moved by multiple lines, not just 1.
+	linesMoved := strings.Count(value[:result.secretEditValue.Cursor], "\n")
+	assert.GreaterOrEqual(t, linesMoved, 2,
+		"ctrl+d should advance several lines, not just one — got %d", linesMoved)
+}
+
+// itoaTinyApp mirrors itoaTiny in the ui test file (kept local to
+// avoid cross-package test imports).
+func itoaTinyApp(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	var digits [4]byte
+	i := len(digits)
+	for n > 0 {
+		i--
+		digits[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if n2 := len(digits) - i; n2 == 1 {
+		return "0" + string(digits[i:])
+	}
+	return string(digits[i:])
 }
 
 // --- handleConfigMapEditorKey ---

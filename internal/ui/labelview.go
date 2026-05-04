@@ -41,6 +41,7 @@ func RenderLabelEditorOverlay(
 	selected map[string]bool,
 	formatActive bool,
 	formatCursor int,
+	editValueScroll int,
 	screenWidth, screenHeight int,
 ) string {
 	if data == nil {
@@ -116,7 +117,7 @@ func RenderLabelEditorOverlay(
 		dataContent = RenderKVEditorEditPane(
 			editKey, editKeyCursor,
 			editValue, editValueCursor,
-			editColumn, panelContentW, panelContentH,
+			editColumn, editValueScroll, panelContentW, panelContentH,
 		)
 	} else {
 		visibleKeys := FilterKVKeys(keys, searchQuery)
