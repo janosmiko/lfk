@@ -694,10 +694,10 @@ type Model struct {
 	sessionRestored     bool               // true once the pending session has been applied
 	pendingPortForwards *PortForwardStates // loaded port forwards waiting to be re-established
 
-	// Nested owned navigation: stack of parent states pushed when drilling
-	// from LevelOwned into a child that itself has children (e.g., ArgoCD
-	// Application → Deployment → Pods). Popped by navigateParent.
+	// Stack of LevelOwned parents for nested drill-downs (popped by navigateParent).
 	ownedParentStack []ownedParentState
+	// Overlay to restore when the current closes — set when a nested overlay flow opens (e.g., RBAC → namespace selector → back to RBAC).
+	previousOverlay overlayKind
 
 	// Per-context pinned CRD groups state.
 	pinnedState *PinnedState

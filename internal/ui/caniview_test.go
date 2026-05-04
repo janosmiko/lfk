@@ -202,7 +202,7 @@ func TestRenderCanIView(t *testing.T) {
 			{Resource: "statefulsets", Verbs: map[string]bool{"get": false}},
 		}
 		result := RenderCanIView(groups, resources, 0, 0, "admin", []string{"default"}, 120, 30, "hint bar text", 0)
-		assert.Contains(t, result, "RBAC Permissions")
+		assert.Contains(t, result, "RBAC Explorer: Can-I?")
 		assert.Contains(t, result, "admin")
 		assert.Contains(t, result, "API Groups")
 		assert.Contains(t, result, "apps")
@@ -212,12 +212,15 @@ func TestRenderCanIView(t *testing.T) {
 
 	t.Run("narrow width does not panic", func(t *testing.T) {
 		result := RenderCanIView([]string{"apps"}, nil, 0, 0, "user", []string{"default"}, 40, 10, "", 0)
-		assert.Contains(t, result, "RBAC")
+		assert.Contains(t, result, "Can-I?")
 	})
 
 	t.Run("empty groups and resources", func(t *testing.T) {
+		// At 80-col width the left column is narrow (20% = ~14 cols) and
+		// "No groups found" wraps; assert on the resilient first word
+		// instead of the whole phrase.
 		result := RenderCanIView(nil, nil, 0, 0, "test-user", []string{"ns1"}, 80, 20, "", 0)
-		assert.Contains(t, result, "No groups found")
+		assert.Contains(t, result, "No groups")
 		assert.Contains(t, result, "No resources in this group")
 	})
 }

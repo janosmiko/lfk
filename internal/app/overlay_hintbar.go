@@ -191,12 +191,23 @@ func (m Model) overlayHintBarEditor() string {
 		return m.overlayHintBarOverlayFinalizerSearch()
 	case overlayCanI:
 		if m.canIMode == canIModeWhoCan {
+			if m.whoCan.resourceFilterActive {
+				return m.renderHints([]ui.HintEntry{
+					{Key: "type", Desc: "narrow list"},
+					{Key: "enter", Desc: "accept"},
+					{Key: "esc", Desc: "clear"},
+				})
+			}
 			return m.renderHints([]ui.HintEntry{
+				{Key: "j/k", Desc: "pick resource"},
+				{Key: "J/K", Desc: "scroll subjects"},
+				{Key: "g/G", Desc: "top/bottom"},
+				{Key: "ctrl+d/u", Desc: "half page"},
+				{Key: "ctrl+f/b", Desc: "page"},
 				{Key: "←/→", Desc: "verb"},
-				{Key: "/", Desc: "filter resource"},
-				{Key: "j/k", Desc: "scroll subjects"},
-				{Key: "A", Desc: "toggle ns scope"},
-				{Key: "Tab", Desc: "back to Can-I"},
+				{Key: "/", Desc: "filter"},
+				{Key: "A", Desc: "ns scope"},
+				{Key: "Tab", Desc: "back"},
 				{Key: "esc", Desc: "close"},
 			})
 		}

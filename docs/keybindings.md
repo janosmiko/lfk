@@ -517,11 +517,20 @@ resource". Pure RBAC scan — walks every `ClusterRoleBinding` plus the
 `RoleBinding`s in the active namespace scope, resolves their roles, and
 lists subjects whose bound rules match.
 
+Layout is two columns: a scrollable **Resources** picker on the left
+(deduped union of every resource the Can-I view knows about) and the
+**Subjects** result table on the right. Moving the cursor on the picker
+fires a fresh query so the right pane updates as you browse.
+
 | Key | Action |
 |---|---|
+| `j` / `k` (or `↓` / `↑`) | Move the resource cursor (re-queries for the new resource) |
+| `J` / `K` | Scroll the subjects column (right pane) without moving the resource cursor |
+| `g` / `G` (or `Home` / `End`) | Jump to top / bottom of the resource list |
+| `Ctrl+D` / `Ctrl+U` | Half page down / up in the resource list |
+| `Ctrl+F` / `Ctrl+B` (or `PgDn` / `PgUp`) | Full page down / up in the resource list |
 | `←` / `→` (or `h` / `l`) | Cycle the verb chip (`get` `list` `watch` `create` `update` `patch` `delete` `*`) |
-| `/` | Filter resource (Enter to commit, Esc to discard) |
-| `j` / `k` | Scroll subjects table |
+| `/` | Filter the resource list by substring (Enter to accept, Esc to clear) |
 | `A` | Toggle namespace scope (all-namespaces ⇄ active namespace) |
 | `Tab` | Back to forward Can-I view |
 | `q` / `Esc` | Close overlay |

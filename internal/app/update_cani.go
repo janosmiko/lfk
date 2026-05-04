@@ -186,6 +186,21 @@ func (m *Model) canIVisibleGroups() []int {
 //
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// If search is active, delegate to the search key handler first —
+	// Tab inside / search has its own meaning and must not be hijacked
+	// by the WhoCan pivot.
+	if m.canISearchActive {
+		return m.handleCanISearchKey(msg)
+	}
+	// Namespace selector — opens from Can-I (forward) or Who-Can
+	// (reverse) when no input mode is capturing keys. Skipped while
+	// the user is typing into the Who-Can resource filter. Save the
+	// current overlay so the close path restores RBAC instead of
+	// dropping back to the explorer behind it.
+	if msg.String() == ui.ActiveKeybindings.NamespaceSelector && !m.whoCan.resourceFilterActive {
+		m.previousOverlay = m.overlay
+		return m.handleKeyNamespaceSelector()
+	}
 	// Reverse-RBAC mode: dedicated dispatcher in update_whocan.go.
 	if m.canIMode == canIModeWhoCan {
 		return m.handleWhoCanKey(msg)
@@ -193,10 +208,6 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Tab from forward (Can-I) view enters Who-Can mode.
 	if msg.String() == "tab" {
 		return m.enterWhoCanMode()
-	}
-	// If search is active, delegate to the search key handler.
-	if m.canISearchActive {
-		return m.handleCanISearchKey(msg)
 	}
 
 	groupCount := len(m.canIVisibleGroups())
@@ -476,6 +487,30 @@ func (m Model) handleCanISubjectFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	}
 	return m, nil
+}
+
+// syncCanINamespacesFromSelection projects the explorer's namespace
+// selection (m.namespace / m.allNamespaces / m.selectedNamespaces)
+// into the RBAC overlay's scope (m.canINamespaces). Called after the
+// namespace selector closes so Can-I and Who-Can re-query against the
+// fresh scope without forcing the user to use the in-overlay 'A'
+// toggle (which is awkward when they just changed scope from the
+// global selector they're already familiar with).
+func (m *Model) syncCanINamespacesFromSelection() {
+	switch {
+	case m.allNamespaces:
+		m.canINamespaces = []string{""}
+	case len(m.selectedNamespaces) > 0:
+		ns := make([]string, 0, len(m.selectedNamespaces))
+		for n := range m.selectedNamespaces {
+			ns = append(ns, n)
+		}
+		m.canINamespaces = ns
+	case m.namespace != "":
+		m.canINamespaces = []string{m.namespace}
+	default:
+		m.canINamespaces = []string{""}
+	}
 }
 
 // canIVisibleLines returns the number of visible content lines in the Can-I

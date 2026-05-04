@@ -28,7 +28,16 @@ func (m Model) updateCanILoaded(msg canILoadedMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.processCanIRules(msg.rules)
-	m.canINamespaces = msg.namespaces
+	// Re-derive canINamespaces from the user's namespace selection
+	// rather than trusting msg.namespaces. loadCanIRules has to pick a
+	// concrete namespace for SelfSubjectRulesReview (it requires one);
+	// when the user picked "all", that ends up as "default" in the
+	// message, but the user-visible scope must still read "ns: all".
+	if m.allNamespaces {
+		m.canINamespaces = []string{""}
+	} else {
+		m.canINamespaces = msg.namespaces
+	}
 	m.overlay = overlayCanI
 	m.canIGroupCursor = 0
 	m.canIGroupScroll = 0

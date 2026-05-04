@@ -299,6 +299,108 @@ func TestWhoCan_NonResourceURLRulesIgnored(t *testing.T) {
 	assert.Empty(t, out, "nonResourceURLs rules don't grant resource permissions")
 }
 
+// --- Query-side wildcards ---
+
+// TestWhoCan_QueryVerbWildcardMatchesAnyVerbRule pins the contract
+// that querying with verb="*" returns subjects whose role grants ANY
+// verb on the resource — not just rules whose Verbs literally contain
+// "*". Earlier the picker rewrote "*" to "get" which silently dropped
+// subjects that could only list/watch/etc.
+func TestWhoCan_QueryVerbWildcardMatchesAnyVerbRule(t *testing.T) {
+	cr := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "lister"},
+		Rules: []rbacv1.PolicyRule{
+			// list/watch only — no get, no "*".
+			{Verbs: []string{"list", "watch"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+		},
+	}
+	crb := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: pmeta("listers"),
+		Subjects:   []rbacv1.Subject{{Kind: "User", Name: "alice"}},
+		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "lister", APIGroup: "rbac.authorization.k8s.io"},
+	}
+	cs := k8sfake.NewClientset(cr, crb)
+	c := newFakeClient(cs, nil)
+
+	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "*")
+	require.NoError(t, err)
+	assert.Len(t, out, 1, "alice has list/watch on pods → must appear under verb=*")
+	assert.Equal(t, "alice", out[0].Name)
+}
+
+// --- ResourceNames-scoped rules ---
+
+// TestWhoCan_ResourceNamesRulesAreSkipped guards against over-
+// reporting permissions: a rule like resources=[pods],
+// resourceNames=[foo] only grants access to the named pod, not
+// pods in general. The picker has no way to model object names,
+// so these rules must be excluded from the result set.
+func TestWhoCan_ResourceNamesRulesAreSkipped(t *testing.T) {
+	cr := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "named-pod-reader"},
+		Rules: []rbacv1.PolicyRule{
+			{
+				Verbs:         []string{"get"},
+				APIGroups:     []string{""},
+				Resources:     []string{"pods"},
+				ResourceNames: []string{"specific-pod"},
+			},
+		},
+	}
+	crb := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: pmeta("nprs"),
+		Subjects:   []rbacv1.Subject{{Kind: "User", Name: "narrow"}},
+		RoleRef:    rbacv1.RoleRef{Kind: "ClusterRole", Name: "named-pod-reader"},
+	}
+	cs := k8sfake.NewClientset(cr, crb)
+	c := newFakeClient(cs, nil)
+
+	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "get")
+	require.NoError(t, err)
+	assert.Empty(t, out, "ResourceNames-scoped rules must not be reported as generic pod access")
+}
+
+// --- Stable ordering ---
+
+// TestWhoCan_ResultsSortedByName pins the contract that WhoCan
+// returns subjects sorted alphabetically by Name. The picker reads
+// alphabetically from top to bottom, so unsorted output makes the
+// list jump around between renders and forces users to scan the
+// whole table to find a name.
+func TestWhoCan_ResultsSortedByName(t *testing.T) {
+	cr := &rbacv1.ClusterRole{
+		ObjectMeta: metav1.ObjectMeta{Name: "viewer"},
+		Rules: []rbacv1.PolicyRule{
+			{Verbs: []string{"get"}, APIGroups: []string{""}, Resources: []string{"pods"}},
+		},
+	}
+	// Subjects deliberately in reverse-alphabetical order so the test
+	// proves WhoCan re-sorts (rather than the binding ordering being
+	// already-correct by luck).
+	crb := &rbacv1.ClusterRoleBinding{
+		ObjectMeta: pmeta("viewers"),
+		Subjects: []rbacv1.Subject{
+			{Kind: "User", Name: "zoe"},
+			{Kind: "User", Name: "alice"},
+			{Kind: "Group", Name: "monitoring"},
+			{Kind: "User", Name: "bob"},
+		},
+		RoleRef: rbacv1.RoleRef{Kind: "ClusterRole", Name: "viewer", APIGroup: "rbac.authorization.k8s.io"},
+	}
+	cs := k8sfake.NewClientset(cr, crb)
+	c := newFakeClient(cs, nil)
+
+	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "get")
+	require.NoError(t, err)
+
+	names := make([]string, len(out))
+	for i, s := range out {
+		names[i] = s.Name
+	}
+	assert.Equal(t, []string{"alice", "bob", "monitoring", "zoe"}, names,
+		"subjects must be returned in alphabetical Name order so the picker reads top-to-bottom")
+}
+
 // --- Helpers used only in this file ---
 
 func pmeta(name string) metav1.ObjectMeta {

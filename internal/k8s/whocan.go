@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"slices"
+	"sort"
 
 	rbacv1 "k8s.io/api/rbac/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -100,6 +101,21 @@ func (c *Client) WhoCan(ctx context.Context, contextName, namespace, group, reso
 			out = append(out, subjectFromBinding(s, via))
 		}
 	}
+	// Sort by Name primarily so the picker reads alphabetically;
+	// fallback keys keep duplicate-name rows (same subject granted via
+	// multiple bindings) deterministic between renders.
+	sort.SliceStable(out, func(i, j int) bool {
+		if out[i].Name != out[j].Name {
+			return out[i].Name < out[j].Name
+		}
+		if out[i].Kind != out[j].Kind {
+			return out[i].Kind < out[j].Kind
+		}
+		if out[i].Namespace != out[j].Namespace {
+			return out[i].Namespace < out[j].Namespace
+		}
+		return out[i].Via < out[j].Via
+	})
 	return out, nil
 }
 
@@ -182,11 +198,17 @@ func subjectFromBinding(s rbacv1.Subject, via string) WhoCanSubject {
 }
 
 // ruleSetMatches returns true when at least one rule in the set grants
-// the (verb, group, resource) tuple. Skips nonResourceURLs rules — they
-// don't grant resource permissions.
+// the (verb, group, resource) tuple. Skips:
+//   - nonResourceURLs rules (don't grant resource permissions)
+//   - resourceNames-scoped rules (restrict to named objects; the picker
+//     does not model object names, so reporting these as generic access
+//     would over-report permissions).
 func ruleSetMatches(rules []rbacv1.PolicyRule, verb, group, resource string) bool {
 	for _, r := range rules {
 		if len(r.Resources) == 0 && len(r.NonResourceURLs) > 0 {
+			continue
+		}
+		if len(r.ResourceNames) > 0 {
 			continue
 		}
 		if !verbMatches(r.Verbs, verb) {
@@ -204,7 +226,15 @@ func ruleSetMatches(rules []rbacv1.PolicyRule, verb, group, resource string) boo
 }
 
 // verbMatches: rule grants verb when rule.Verbs contains the verb or "*".
+//
+// Query verb "*" means "any verb" — match any rule that has at least
+// one verb. Without this, "*" would only match rules whose Verbs list
+// itself contains "*", silently dropping subjects whose role grants
+// only list/watch/etc.
 func verbMatches(ruleVerbs []string, verb string) bool {
+	if verb == "*" {
+		return len(ruleVerbs) > 0
+	}
 	return slices.Contains(ruleVerbs, "*") || slices.Contains(ruleVerbs, verb)
 }
 

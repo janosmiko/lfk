@@ -77,9 +77,18 @@ const (
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live
 // together on Model without bloating the main struct over the
 // file-length cap. Mutated by handlers in update_whocan.go.
+//
+// The picker is a 2-column layout: a list of resources on the left,
+// subjects on the right. resourceList is the deduped union of all
+// resources across canIGroups (built once on enterWhoCanMode);
+// resourceCursor indexes into the *visible* (post-filter) slice so the
+// cursor stays valid while the user narrows the list.
 type whoCanState struct {
 	verbCursor           int                 // index into ui.WhoCanVerbs
-	resource             string              // committed resource name (e.g. "pods")
+	resource             string              // last queried resource (drives subjects panel title)
+	resourceList         []string            // full deduped sorted resource list (built on entry)
+	resourceCursor       int                 // index into the visible (filtered) resource list
+	resourceScroll       int                 // first visible row in the resource list — stateful so scrolling up keeps the cursor in place instead of pinning it to the last visible row
 	resourceFilterActive bool                // true while typing into the / filter
 	resourceFilter       TextInput           // live filter buffer
 	subjects             []k8s.WhoCanSubject // last fetch result

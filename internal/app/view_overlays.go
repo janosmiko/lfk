@@ -19,6 +19,18 @@ import (
 // centered overlay box via renderOverlayContent.
 
 func (m Model) renderOverlay(background string) string {
+	// Layered overlays: when the current overlay was opened on top of
+	// another (e.g. the namespace selector launched from inside the
+	// RBAC overlay), draw the parent first so it stays visible behind
+	// the new one. Without this, opening a nested overlay would visibly
+	// hide the parent until the user closes the child.
+	if m.previousOverlay != overlayNone && m.previousOverlay != m.overlay {
+		parent := m
+		parent.overlay = m.previousOverlay
+		parent.previousOverlay = overlayNone
+		background = parent.renderOverlay(background)
+	}
+
 	// Fullscreen overlays bypass the standard overlay rendering.
 	switch m.overlay {
 	case overlaySecretEditor, overlayConfigMapEditor, overlayRollback, overlayHelmRollback, overlayHelmHistory, overlayLabelEditor, overlayAutoSync:
@@ -441,8 +453,16 @@ func (m Model) renderCanIOverlay(background string) string {
 		hintBar,
 		m.canIResourceScroll,
 	)
-	canIContent = ui.FillLinesBg(canIContent, overlayW-4, ui.SurfaceBg)
-	overlay := ui.OverlayStyle.Width(overlayW).Height(overlayH).Render(canIContent)
+	// RBAC overlay uses baseBg end-to-end: title (TitleStyle/barBg=baseBg)
+	// + column boxes (Active/InactiveColumnStyle/baseBg) + filler. Mixing
+	// surfaceBg here would paint a visible "frame" of a different shade
+	// around the inner baseBg content — the user reported this.
+	canIContent = ui.FillLinesBg(canIContent, overlayW-4, ui.BaseBg)
+	overlay := ui.OverlayStyle.
+		Background(ui.BaseBg).
+		BorderBackground(ui.BaseBg).
+		Width(overlayW).Height(overlayH).
+		Render(canIContent)
 	bg := ui.PadToHeight(background, m.height)
 	return ui.PlaceOverlay(m.width, m.height, overlay, bg)
 }

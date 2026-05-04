@@ -25,23 +25,33 @@ var canIVerbs = []struct {
 // RenderCanIView renders the can-i browser with a two-column layout.
 // The left column (API groups) is interactive; the right column (resources) is display-only.
 func RenderCanIView(groups []string, resources []model.CanIResource, groupCursor, groupScroll int, subjectName string, namespaces []string, width, height int, hintBar string, resourceScroll int) string {
-	// Title bar — truncate if it exceeds the available width.
-	scopeLabel := "ns:" + strings.Join(namespaces, ",")
-	titleText := TitleStyle.Render("RBAC Permissions ("+subjectName+")") + "  " + BarDimStyle.Render(scopeLabel)
-	if lipgloss.Width(titleText) > width {
-		// Drop scope label if too wide.
-		titleText = TitleStyle.Render("RBAC Permissions (" + subjectName + ")")
+	// Title at the left, scope label flushed to the far right with
+	// baseBg-painted gap fill. Matches the WhoCan header layout so the
+	// title bar reads consistently across both modes.
+	//
+	// Scope label collapses [""] (all-namespaces sentinel) and an empty
+	// namespaces slice into "ns: all" so the user always sees what
+	// scope is active — earlier behavior rendered "ns: " (no value),
+	// which looked like a render bug.
+	scopeLabel := CanIScopeLabel(namespaces)
+	// Subject chip mirrors the Who-Can verb chip styling: dim "Subject:"
+	// label + light value, both on baseBg so they sit flush in the title
+	// row's barBg band.
+	subjectChip := BarDimStyle.Render(" Subject: ") + BarNormalStyle.Render(subjectName)
+	title := TitleStyle.Render("RBAC Explorer: Can-I?") + subjectChip
+	if lipgloss.Width(title)+1+lipgloss.Width(scopeLabel) > width {
+		// Shorter fallback for narrow terminals.
+		title = TitleStyle.Render("Can-I?") + subjectChip
 	}
-	if lipgloss.Width(titleText) > width {
-		// Truncate subject name if still too wide.
-		titleText = TitleStyle.Render("RBAC (" + subjectName + ")")
-	}
+	titleText := joinTitleAndRightLabel(title, BarDimStyle.Render(scopeLabel), width)
 
 	hint := hintBar
 
-	// Column widths: left 25%, middle 75%.
+	// Column widths: left 20% (API group names rarely exceed 25 cols even
+	// for long group names like "apiextensions.k8s.io" — 25% wasted space),
+	// middle 80%.
 	usable := width - 4
-	leftW := max(10, usable*25/100)
+	leftW := max(10, usable*20/100)
 	middleW := max(10, usable-leftW)
 
 	contentHeight := max(height-4, 3)
@@ -68,6 +78,37 @@ func RenderCanIView(groups []string, resources []model.CanIResource, groupCursor
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle)
 
 	return lipgloss.JoinVertical(lipgloss.Left, titleText, columns, hint)
+}
+
+// joinTitleAndRightLabel composes a title row with the title segment
+// at the left, baseBg-painted spaces filling the middle, and the
+// label flushed to the right edge of `width`. Used by both Can-I and
+// Who-Can title rows so the namespace/scope chip lands consistently
+// at the right edge across both modes. If the combined widths exceed
+// `width`, the right label is dropped (a half-shown label is more
+// confusing than no label).
+func joinTitleAndRightLabel(title, rightLabel string, width int) string {
+	if lipgloss.Width(title)+1+lipgloss.Width(rightLabel) > width {
+		// No room for the right label; just return the title.
+		return title
+	}
+	gap := max(width-lipgloss.Width(title)-lipgloss.Width(rightLabel), 1)
+	return title + BarNormalStyle.Render(strings.Repeat(" ", gap)) + rightLabel
+}
+
+// CanIScopeLabel formats the namespace scope shown in the title row.
+// Collapses the all-namespaces sentinels ([""] and the empty slice)
+// to a literal "ns: all" so the label never reads as "ns: " — that
+// looked like a render bug to users who picked "All Namespaces" in
+// the namespace selector.
+func CanIScopeLabel(namespaces []string) string {
+	if len(namespaces) == 0 {
+		return "ns: all"
+	}
+	if len(namespaces) == 1 && namespaces[0] == "" {
+		return "ns: all"
+	}
+	return "ns: " + strings.Join(namespaces, ",")
 }
 
 // canIVerbColWidth returns the column width for a verb label (label length + 1 space padding).

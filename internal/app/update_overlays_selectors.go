@@ -26,8 +26,15 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.overlayCursor = 0
 			return m, nil
 		}
-		m.overlay = overlayNone
 		m.overlayFilter.Clear()
+		// Restore the parent overlay (e.g. RBAC) when the namespace
+		// selector was opened from inside it; otherwise close fully.
+		if m.previousOverlay != overlayNone {
+			m.overlay = m.previousOverlay
+			m.previousOverlay = overlayNone
+			return m, nil
+		}
+		m.overlay = overlayNone
 		return m, nil
 
 	case "enter":
@@ -52,13 +59,35 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.selectedNamespaces = nil
 			m.allNamespaces = true
 		}
-		m.overlay = overlayNone
 		m.overlayFilter.Clear()
 		m.nsFilterMode = false
 		m.saveCurrentSession()
 		m.cancelAndReset()
 		m.requestGen++
-		return m, m.refreshCurrentLevel()
+
+		// Restore the parent overlay (e.g. RBAC) when the namespace
+		// selector was opened from inside it. The namespace change is
+		// global — refreshCurrentLevel runs in BOTH the nested and
+		// non-nested cases so the explorer behind the overlay reflects
+		// the new scope as soon as the user closes back to it.
+		refresh := m.refreshCurrentLevel()
+		if m.previousOverlay != overlayNone {
+			parent := m.previousOverlay
+			m.overlay = parent
+			m.previousOverlay = overlayNone
+			if parent == overlayCanI {
+				m.syncCanINamespacesFromSelection()
+				cmds := []tea.Cmd{refresh, m.loadCanIRules()}
+				if m.canIMode == canIModeWhoCan && m.whoCan.resource != "" {
+					cmds = append(cmds, m.loadWhoCan())
+				}
+				return m, tea.Batch(cmds...)
+			}
+			return m, refresh
+		}
+
+		m.overlay = overlayNone
+		return m, refresh
 
 	case " ":
 		m.nsSelectionModified = true
