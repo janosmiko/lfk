@@ -113,15 +113,21 @@ checksum:
 # entry combined). The previous --output-certificate / --output-signature
 # pair was deprecated in cosign v2.5 and broken in v2.6 (the sign-blob
 # code path always emits a bundle internally; without --bundle the path
-# is empty and the open() call fails). Verify with:
+# is empty and the open() call fails).
+#
+# The `.sigstore` extension is the Sigstore bundle convention and is the
+# extension OpenSSF Scorecard recognises as a release signature (see
+# probes/releasesAreSigned in github.com/ossf/scorecard). A previous
+# `.cosign.bundle` name uploaded successfully but Scorecard reported the
+# release as unsigned. Verify with:
 #   cosign verify-blob \
-#     --bundle checksums.txt.cosign.bundle \
+#     --bundle checksums.txt.sigstore \
 #     --certificate-identity-regexp 'https://github\.com/janosmiko/lfk/.*' \
 #     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
 #     checksums.txt
 signs:
   - cmd: cosign
-    signature: "${artifact}.cosign.bundle"
+    signature: "${artifact}.sigstore"
     args:
       - sign-blob
       - "--bundle=${signature}"
