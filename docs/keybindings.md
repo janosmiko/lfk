@@ -702,8 +702,9 @@ existing recommendations stay visually similar after the upgrade).
 
 > The Usage column always reflects live metrics-server usage regardless of strategy —
 > only the SUGGESTION column changes based on the algorithm and headroom. Each
-> (strategy, headroom) pair's payload is cached for the lifetime of the overlay so
-> cycling between previously-viewed combinations is instant.
+> (strategy, headroom) pair's payload is cached for the user session via
+> `Model.rightsizingCache`; reopening the overlay reuses the cache so revisits
+> are instant. Cleared on `r` refresh or when the kube context / namespace changes.
 
 ### Defaults & stickiness
 
