@@ -631,6 +631,6 @@ func (m Model) overlayHintBarOverlayRightsizing() string {
 func rightsizingVisibleRows(m Model) int {
 	boxH := max(m.height*75/100, 12)
 	// Subtract outer padding (4), inner border (2), title (2), gap (1),
-	// table header (1), header underline (1) = 11.
-	return max(boxH-11, 1)
+	// grouped table header (2), header underline (1) = 12.
+	return max(boxH-12, 1)
 }
