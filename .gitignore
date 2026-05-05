@@ -38,3 +38,7 @@ themes/ghostty/
 
 # Worktrees
 .worktrees/
+
+# Superpowers planning scratch (per-feature plans + design specs are
+# local working notes, not shipped artifacts).
+docs/superpowers/
