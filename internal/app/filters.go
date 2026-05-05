@@ -394,89 +394,110 @@ func orphanLookupKey(namespace, name string) string {
 }
 
 // orphanMatcher builds a FilterPreset.MatchFn that returns true when the item
-// is in the cached OrphanReport for the given (key, kind). The lookup table
-// is built once when the closure is created so MatchFn calls are O(1) — the
-// previous implementation scanned the full slice per call which became O(N²)
-// across a list re-filter.
+// is in the cached OrphanReport for the given (key, kind).
 //
-// An empty cache or a missing key produces an empty lookup and the function
-// returns false for everything; the load command fires asynchronously when
-// the preset is activated, then a re-render rebuilds the matcher with the
-// populated cache.
+// The matcher reads the cache LAZILY: on first call it captures the report
+// pointer and builds an O(1) namespace+name lookup, then on every subsequent
+// call it checks whether the cache slot still points at the same report and
+// only rebuilds if the slot was replaced (e.g. an async DetectOrphans landed,
+// or the user pressed R to refresh). Without this dance the matcher would
+// either scan the full slice per call (the original O(N²) behavior) or
+// freeze the empty pre-load snapshot and never reflect a deferred load —
+// which is exactly the "`:orphans <kind>` returns empty until the cluster
+// overlay scan completes" bug.
+//
+// Bubbletea is single-threaded so the closed-over state is safe.
 func orphanMatcher(cache map[orphanCacheKey]*k8s.OrphanReport, key orphanCacheKey, kind string) func(model.Item) bool {
-	pool := orphanPoolForKind(cache[key], kind)
-	lookup := make(map[string]struct{}, len(pool))
-	for _, o := range pool {
-		lookup[orphanLookupKey(o.Namespace, o.Name)] = struct{}{}
-	}
+	var (
+		built  bool
+		seen   *k8s.OrphanReport
+		lookup map[string]struct{}
+	)
 	return func(item model.Item) bool {
+		report := cache[key]
+		if !built || report != seen {
+			seen = report
+			pool := orphanPoolForKind(report, kind)
+			lookup = make(map[string]struct{}, len(pool))
+			for _, o := range pool {
+				lookup[orphanLookupKey(o.Namespace, o.Name)] = struct{}{}
+			}
+			built = true
+		}
 		_, ok := lookup[orphanLookupKey(item.Namespace, item.Name)]
 		return ok
 	}
 }
 
-// orphanPresetsForKind returns the orphan filter presets relevant to the given
-// kind.
+// orphanPresetsForKind returns the orphan filter presets relevant to the
+// given kind. Every orphan preset binds to the same hotkey ("O") so the
+// user has one mnemonic to remember across the whole feature surface;
+// the per-kind preset Name still distinguishes the underlying check
+// (Orphans / Unmounted / Unused / No Endpoints / Dangling / Unbound).
+//
+// Descriptions are kept short (≈ ≤50 chars) so they fit within the
+// quick-filter overlay's 72-col content area without wrapping.
 func orphanPresetsForKind(kind string, cache map[orphanCacheKey]*k8s.OrphanReport, key orphanCacheKey) []FilterPreset {
+	const orphanKey = "O"
 	switch kind {
 	case "Pod":
 		return []FilterPreset{{
-			Name: "Orphans", Description: "Pods with no owner reference", Key: "O",
+			Name: "Orphans", Description: "No owner reference", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "Pod"),
 		}}
 	case "Secret":
 		return []FilterPreset{{
-			Name: "Unmounted", Description: "Not referenced by any Pod / workload template / Ingress / ServiceAccount", Key: "u",
+			Name: "Unmounted", Description: "No Pod / template / Ingress / SA refers to it", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "Secret"),
 		}}
 	case "ConfigMap":
 		return []FilterPreset{{
-			Name: "Unmounted", Description: "Not referenced by any Pod or workload template (Deployment / Job / CronJob / …)", Key: "u",
+			Name: "Unmounted", Description: "No Pod or workload template refers to it", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "ConfigMap"),
 		}}
 	case "Service":
 		return []FilterPreset{{
-			Name: "No Endpoints", Description: "Service has zero ready+notReady endpoints", Key: "e",
+			Name: "No Endpoints", Description: "Zero ready+notReady endpoints", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "Service"),
 		}}
 	case "PersistentVolumeClaim":
 		return []FilterPreset{{
-			Name: "Unused", Description: "PVC is not mounted by any Pod or workload template", Key: "u",
+			Name: "Unused", Description: "Not mounted by any Pod or template", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "PersistentVolumeClaim"),
 		}}
 	case "HorizontalPodAutoscaler":
 		return []FilterPreset{{
-			Name: "Dangling", Description: "HPA scaleTargetRef points to a missing workload", Key: "d",
+			Name: "Dangling", Description: "scaleTargetRef points to a missing workload", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "HorizontalPodAutoscaler"),
 		}}
 	case "PodDisruptionBudget":
 		return []FilterPreset{{
-			Name: "Dangling", Description: "PDB selector matches no live or templated pods", Key: "d",
+			Name: "Dangling", Description: "Selector matches no live / templated pods", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "PodDisruptionBudget"),
 		}}
 	case "NetworkPolicy":
 		return []FilterPreset{{
-			Name: "Dangling", Description: "NetworkPolicy podSelector matches no live or templated pods", Key: "d",
+			Name: "Dangling", Description: "podSelector matches no live / templated pods", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "NetworkPolicy"),
 		}}
 	case "Role":
 		return []FilterPreset{{
-			Name: "Unbound", Description: "Role has no RoleBinding / ClusterRoleBinding", Key: "u",
+			Name: "Unbound", Description: "No RoleBinding / ClusterRoleBinding refers to it", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "Role"),
 		}}
 	case "ClusterRole":
 		return []FilterPreset{{
-			Name: "Unbound", Description: "ClusterRole has no RoleBinding / ClusterRoleBinding", Key: "u",
+			Name: "Unbound", Description: "No RoleBinding / ClusterRoleBinding refers to it", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "ClusterRole"),
 		}}
 	case "RoleBinding":
 		return []FilterPreset{{
-			Name: "Dangling", Description: "RoleBinding refers to a missing role or has empty subjects", Key: "d",
+			Name: "Dangling", Description: "Missing role or empty subjects", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "RoleBinding"),
 		}}
 	case "ClusterRoleBinding":
 		return []FilterPreset{{
-			Name: "Dangling", Description: "ClusterRoleBinding refers to a missing role or has empty subjects", Key: "d",
+			Name: "Dangling", Description: "Missing role or empty subjects", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "ClusterRoleBinding"),
 		}}
 	}

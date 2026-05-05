@@ -482,6 +482,32 @@ func TestOrphanMatchFn_EmptyCacheReturnsFalse(t *testing.T) {
 	assert.False(t, matcher(model.Item{Kind: "Pod", Name: "anything"}))
 }
 
+// TestOrphanMatchFn_PicksUpDeferredLoad pins the lazy-memoization
+// contract: a matcher built before the cache is populated MUST return
+// true for orphans once the cache slot is filled in. The previous
+// implementation captured the empty pool at closure creation time, so
+// `:orphans secrets` returned an empty list until the user opened the
+// cluster overlay and the scan landed mid-frame — this test prevents
+// regressing back to that snapshot behavior.
+func TestOrphanMatchFn_PicksUpDeferredLoad(t *testing.T) {
+	cache := map[orphanCacheKey]*k8s.OrphanReport{}
+	key := orphanCacheKey{kubeContext: "test", namespace: "default"}
+	matcher := orphanMatcher(cache, key, "Secret")
+
+	naked := model.Item{Kind: "Secret", Namespace: "default", Name: "naked"}
+	assert.False(t, matcher(naked), "no result before the load lands")
+
+	cache[key] = &k8s.OrphanReport{
+		Secrets: []k8s.OrphanItem{{Kind: "Secret", Namespace: "default", Name: "naked"}},
+	}
+	assert.True(t, matcher(naked), "deferred load must populate the matcher")
+
+	// Replace the slot (R refresh) with a smaller report — the matcher
+	// must reflect the new state, not return stale positives.
+	cache[key] = &k8s.OrphanReport{Secrets: nil}
+	assert.False(t, matcher(naked), "matcher must rebuild when the cache slot changes")
+}
+
 func TestBuiltinFilterPresets_SecretUnmounted(t *testing.T) {
 	cache := map[orphanCacheKey]*k8s.OrphanReport{}
 	presets := builtinFilterPresetsWithOrphans("Secret", cache, orphanCacheKey{kubeContext: "ctx", namespace: "ns"})

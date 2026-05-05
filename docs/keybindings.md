@@ -78,20 +78,20 @@ Press **`Shift+O`** anywhere in the explorer (or type `:orphans` with no argumen
 
 ### Per-kind presets
 
-The `.` filter-preset overlay surfaces these orphan-detection presets when the active resource list is one of the supported kinds:
+The `.` filter-preset overlay surfaces these orphan-detection presets when the active resource list is one of the supported kinds. Every orphan preset binds to the same hotkey **`O`** so there is one mnemonic to remember; the per-kind preset name still distinguishes the underlying check.
 
 | Resource list | Preset name | Match |
 | --- | --- | --- |
 | Pods | Orphans | No owner reference (excludes static / mirror pods) |
-| Secrets | Unmounted | Not referenced by any Pod, workload template, Ingress, or SA |
-| ConfigMaps | Unmounted | Not referenced by any Pod or workload template |
+| Secrets | Unmounted | No Pod / template / Ingress / SA refers to it |
+| ConfigMaps | Unmounted | No Pod or workload template refers to it |
 | Services | No Endpoints | Zero ready+notReady endpoints |
-| PersistentVolumeClaims | Unused | Not mounted by any Pod or workload template |
+| PersistentVolumeClaims | Unused | Not mounted by any Pod or template |
 | HorizontalPodAutoscalers | Dangling | `scaleTargetRef` points to a missing workload |
-| PodDisruptionBudgets | Dangling | Selector matches no live or templated pods |
-| NetworkPolicies | Dangling | `podSelector` matches no live or templated pods |
-| Roles / ClusterRoles | Unbound | No RoleBinding or ClusterRoleBinding refers to this role |
-| RoleBindings / ClusterRoleBindings | Dangling | Refers to a missing role or has empty subjects |
+| PodDisruptionBudgets | Dangling | Selector matches no live / templated pods |
+| NetworkPolicies | Dangling | `podSelector` matches no live / templated pods |
+| Roles / ClusterRoles | Unbound | No RoleBinding / ClusterRoleBinding refers to it |
+| RoleBindings / ClusterRoleBindings | Dangling | Missing role or empty subjects |
 
 `:orphans <kind>` (e.g. `:orphans pods`, `:orphans pvcs`, `:orphans rolebindings`) is a shortcut that jumps to the kind's list with the matching preset already applied.
 
