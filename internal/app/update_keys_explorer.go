@@ -289,6 +289,9 @@ func (m Model) handleExplorerUIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.SecretToggle:
 		mdl, cmd := m.handleKeySecretToggle()
 		return mdl, cmd, true
+	case kb.OrphanOverlay:
+		mdl, cmd := m.openOrphansOverlay()
+		return mdl, cmd, true
 	}
 	return m, nil, false
 }

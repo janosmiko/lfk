@@ -153,7 +153,8 @@ func completeBuiltin(tokens []token, m *Model) []ui.Suggestion {
 	// Single-argument commands: stop suggesting once the argument is filled.
 	// Namespace is multi-argument (can select multiple namespaces).
 	singleArg := canonical == "context" ||
-		canonical == "set" || canonical == "sort" || canonical == "export"
+		canonical == "set" || canonical == "sort" || canonical == "export" ||
+		canonical == "orphans"
 	if singleArg && len(tokens) > 2 {
 		return nil
 	}
@@ -183,6 +184,8 @@ func completeBuiltin(tokens []token, m *Model) []ui.Suggestion {
 		return filterSuggestionsFuzzy(ui.ActiveSortableColumns, prefix, "column")
 	case "export":
 		return filterSuggestionsFuzzy([]string{"yaml", "json"}, prefix, "format")
+	case "orphans":
+		return filterSuggestionsFuzzy(orphanKindCompletions(), prefix, "kind")
 	default:
 		return nil
 	}
@@ -257,6 +260,11 @@ func builtinCommandNames() []string {
 	}
 	sort.Strings(names)
 	return names
+}
+
+// orphanKindCompletions returns the kind tokens accepted by :orphans.
+func orphanKindCompletions() []string {
+	return []string{"pods", "secrets", "configmaps", "services"}
 }
 
 // setOptions returns the available options for the :set command.

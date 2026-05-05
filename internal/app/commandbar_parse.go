@@ -44,6 +44,7 @@ var builtinCommands = map[string]string{
 	"errors":    "errors",
 	"warnings":  "errors",
 	"bookmarks": "bookmarks",
+	"orphans":   "orphans",
 	"reload":    "reload",
 	"refresh":   "reload",
 }

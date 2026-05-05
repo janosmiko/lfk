@@ -111,6 +111,7 @@
 - **Port forwarding** from the action menu (with local port setting and browser open); manage active forwards via the Networking group
 - **Clipboard support**: Copy resource name (`y`), YAML (`Y`), paste/apply from clipboard (`Ctrl+P`), paste into search/filter boxes (`Cmd+V` / `Ctrl+Shift+V`)
 - **Bookmarks**: Save favorite resource paths for quick navigation
+- **Orphan detection**: Filter Pods/Secrets/ConfigMaps/Services to just orphans (no owner / unmounted / no endpoints) via the filter-preset overlay (`.`) on each kind, or jump straight there with `:orphans <kind>` (e.g., `:orphans secrets`). Auto-excludes Helm release Secrets, ServiceAccount tokens, owner-managed resources, and `kube-root-ca.crt`. The cluster-wide overview overlay will be added in a follow-up.
 - **Session persistence**: Remembers last context/namespace/resource across restarts
 - **Command bar**: Press `:` for shell/kubectl commands with autocompletion
 

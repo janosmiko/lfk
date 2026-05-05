@@ -467,7 +467,11 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	}
 
 	// Switch context (context-aware bookmarks change cluster, context-free bookmarks keep current).
+	oldCtx := m.nav.Context
 	m.nav.Context = effectiveContext
+	if oldCtx != effectiveContext {
+		m.invalidateOrphanCacheForContext(oldCtx)
+	}
 	m.recomputeReadOnly(effectiveContext)
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
@@ -484,6 +488,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.bookmarkLoadNamespace = false
 
 	if applyNs {
+		oldNs := m.namespace
 		switch {
 		case bm.Namespace == "" && len(bm.Namespaces) == 0:
 			m.allNamespaces = true
@@ -503,6 +508,12 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 			}
 			m.namespace = ns
 			m.selectedNamespaces = map[string]bool{ns: true}
+		}
+		// Invalidate the old namespace's cache within the new context. When
+		// the context also changed, the entire old context was already wiped
+		// above, so only invalidate when staying in the same context.
+		if oldCtx == effectiveContext {
+			m.invalidateOrphanCacheForNamespace(effectiveContext, oldNs)
 		}
 	}
 

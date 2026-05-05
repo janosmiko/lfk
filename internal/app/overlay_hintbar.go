@@ -258,6 +258,31 @@ func (m Model) overlayHintBarMisc() string {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayOrphans:
+		// Filter input mode hides most navigation hints — show only
+		// the keys that actually do something while typing.
+		if m.orphans.filterActive {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "type", Desc: "filter"},
+				{Key: "enter", Desc: "apply"},
+				{Key: "esc", Desc: "clear"},
+			})
+		}
+		modeDesc := "lenient"
+		if m.orphans.strict {
+			modeDesc = "strict"
+		}
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "move"},
+			{Key: "g/G", Desc: "top/bottom"},
+			{Key: "ctrl+d/u", Desc: "half page"},
+			{Key: "tab", Desc: "kind"},
+			{Key: "/", Desc: "filter"},
+			{Key: "enter", Desc: "jump"},
+			{Key: "s", Desc: modeDesc},
+			{Key: "R", Desc: "refresh"},
+			{Key: "q/esc", Desc: "close"},
+		})
 	}
 	return ""
 }

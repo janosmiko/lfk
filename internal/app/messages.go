@@ -507,3 +507,20 @@ type previewServiceEndpointsLoadedMsg struct {
 	err       error
 	fromCache bool
 }
+
+// orphanCacheKey identifies a slot in Model.orphanCache. namespace == ""
+// means cluster-wide (the overlay path); a non-empty namespace is the
+// filter-preset path scoped to a single namespace.
+type orphanCacheKey struct {
+	kubeContext string
+	namespace   string
+}
+
+// orphansLoadedMsg carries the result of a DetectOrphans run. Err may be
+// non-nil while Report holds partial data — the UI renders a banner and
+// still shows what was returned.
+type orphansLoadedMsg struct {
+	key    orphanCacheKey
+	report k8s.OrphanReport
+	err    error
+}

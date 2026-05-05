@@ -316,6 +316,43 @@ skipped — they have no backing EndpointSlices to roll up.
 For a fuller `kubectl describe`-style view of a Service (events,
 session affinity, etc.), press `v` (Describe).
 
+## Orphan detection
+
+`lfk` flags Kubernetes resources that have no live consumer or controller:
+
+- **Pods without owners** — typically debug / one-off pods that escaped a controller. Static pods (kubelet-managed) are excluded; terminal pods older than an hour are tagged separately.
+- **Secrets / ConfigMaps not mounted** — anything not referenced by a Pod (volumes, env, envFrom, imagePullSecrets), an Ingress (`spec.tls.secretName`), or a ServiceAccount.
+- **Services with no endpoints** — non-Headless, non-ExternalName Services with zero backing addresses.
+
+### Cluster-wide overview
+
+Press **`Shift+O`** anywhere in the explorer (or type `:orphans` in the command bar) to open the orphan overview overlay. It scans the cluster and lists every orphan in one table grouped by kind:
+
+- `Tab` / `Shift+Tab` cycle the kind filter chips at the top (All / Pods / Secrets / ConfigMaps / Services)
+- `/` filters by namespace + name
+- `Enter` jumps straight to the highlighted resource (the namespace switches automatically)
+- `R` re-scans the cluster
+- `Esc` closes the overlay
+
+Partial-RBAC denials surface as a warning banner at the top of the overlay; whatever could be listed is still shown.
+
+### Per-kind filter presets
+
+Inside any Pods / Secrets / ConfigMaps / Services list, press **`.`** to open the filter-preset overlay and pick the orphan preset. `:orphans <kind>` (e.g. `:orphans secrets`) jumps to the kind's list with the preset already applied.
+
+### Auto-exclusions
+
+To avoid false positives, the detector excludes these system-managed resources:
+
+| Resource    | Excluded When                                                  |
+| ----------- | -------------------------------------------------------------- |
+| Pod         | Static pod (`kubernetes.io/config.mirror` annotation)          |
+| Secret      | `type=helm.sh/release.v1` (Helm release storage)               |
+| Secret      | `type=kubernetes.io/service-account-token` (auto-generated)    |
+| Secret/CM   | Has any `ownerReference` (managed by another controller)       |
+| ConfigMap   | Named `kube-root-ca.crt` (auto-injected per namespace)         |
+| Service     | Headless (`clusterIP=None`) or `type=ExternalName`             |
+
 ## Secret Lazy Loading
 
 On clusters with many Helm releases or large TLS secrets, listing the

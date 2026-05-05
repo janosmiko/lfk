@@ -62,6 +62,10 @@ func TestOverlayHintBar_ReturnsNonEmpty(t *testing.T) {
 		{"CanISearch", overlayCanI, func(m *Model) { m.canISearchActive = true }, "search"},
 		{"CanISubject", overlayCanISubject, nil, "select"},
 		{"ExplainSearch", overlayExplainSearch, nil, "navigate"},
+		{"Orphans", overlayOrphans, nil, "jump"},
+		{"OrphansFilter", overlayOrphans, func(m *Model) { m.orphans.filterActive = true }, "filter"},
+		{"OrphansStrictModeChip", overlayOrphans, func(m *Model) { m.orphans.strict = true }, "strict"},
+		{"OrphansLenientModeChip", overlayOrphans, func(m *Model) { m.orphans.strict = false }, "lenient"},
 	}
 
 	for _, tt := range overlays {

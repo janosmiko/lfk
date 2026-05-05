@@ -39,6 +39,7 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "enter":
 		// Apply selection and close.
+		oldNs := m.namespace
 		switch {
 		case m.nsSelectionModified && len(m.selectedNamespaces) > 0:
 			// User explicitly toggled selections with Space in this session.
@@ -59,6 +60,7 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.selectedNamespaces = nil
 			m.allNamespaces = true
 		}
+		m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
 		m.overlayFilter.Clear()
 		m.nsFilterMode = false
 		m.saveCurrentSession()
@@ -223,6 +225,7 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if !m.nsSelectionModified {
 			items := m.filteredOverlayItems()
 			if len(items) == 1 {
+				oldNs := m.namespace
 				if items[0].Status == "all" {
 					m.selectedNamespaces = nil
 					m.allNamespaces = true
@@ -232,6 +235,7 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					m.namespace = ns
 					m.allNamespaces = false
 				}
+				m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
 				m.overlay = overlayNone
 				m.overlayFilter.Clear()
 				m.saveCurrentSession()

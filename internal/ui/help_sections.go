@@ -52,6 +52,7 @@ func helpSections() []helpSection {
 				{helpKeyDisplay(kb.SecretToggle), "Toggle secret value visibility (details pane only)"},
 				{kb.APIExplorer, "API Explorer (resource structure)"},
 				{kb.RBACBrowser, "RBAC permissions browser (can-i)"},
+				{kb.OrphanOverlay, "Open the cluster-wide Orphan overview"},
 				{helpKeyDisplay(kb.FinalizerSearch), "Finalizer search and remove (scan, select, remove finalizers)"},
 				{kb.ErrorLog, "Error log"},
 				{kb.Monitoring, "Monitoring overview (active Prometheus alerts)"},

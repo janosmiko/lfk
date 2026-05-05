@@ -20,7 +20,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar (resets each launch) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
-| `o` | Jump to owner/controller of selected resource |
+| `o` | Jump to owner/controller of selected resource (`o` = jump to my owner; `O` = find resources with no owner) |
 
 ## Views and Tools
 
@@ -36,6 +36,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
 | `I` | API Explorer (browse resource structure interactively) |
 | `U` | RBAC permissions browser (can-i) |
+| `Shift+O` | Open the cluster-wide Orphan overview |
 | `Ctrl+G` | Finalizer search and remove |
 | `!` | Error log |
 | `@` | Monitoring overview (active Prometheus alerts) |
@@ -59,6 +60,44 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+R` | Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab) |
 | `T` | Switch color scheme (live preview, not persisted) |
 | `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
+
+## Orphan filter presets
+
+#### Cluster-wide overview
+
+Press **`Shift+O`** anywhere in the explorer (or type `:orphans` with no arguments in the command bar) to open the cluster-wide orphan overview overlay. Inside the overlay:
+
+| Key | Action |
+| --- | ------ |
+| `Tab` / `Shift+Tab` | Cycle kind filter chips (All / Pods / Secrets / ConfigMaps / Services) |
+| `/` | Filter by namespace + name |
+| `Enter` | Jump to the highlighted resource (namespace switches automatically) |
+| `R` | Re-scan the cluster |
+| `Esc` | Close the overlay |
+
+#### Per-kind presets
+
+The `.` filter-preset overlay surfaces these orphan-detection presets when the active resource list is one of:
+
+| Resource list | Preset name      | Match                                              |
+| ------------- | ---------------- | -------------------------------------------------- |
+| Pods          | Orphans          | No owner reference (excludes static / mirror pods) |
+| Secrets       | Unmounted        | Not referenced by any Pod, workload template, Ingress, or SA |
+| ConfigMaps    | Unmounted        | Not referenced by any Pod or workload template     |
+| Services      | No Endpoints     | Zero ready+notReady endpoints                      |
+
+`:orphans <kind>` (e.g. `:orphans pods`) is a shortcut that jumps to the kind's list with the matching preset already applied.
+
+Auto-excluded from "Unmounted" results:
+- Helm release Secrets (`type=helm.sh/release.v1`)
+- ServiceAccount tokens (`type=kubernetes.io/service-account-token`)
+- `kube-root-ca.crt` ConfigMap
+- Anything with an `ownerReference` (cert-manager Certificates, etc.)
+
+Auto-excluded from Pod "Orphans":
+- Static / mirror pods (kubelet-managed via `kubernetes.io/config.mirror` annotation)
+
+Note: terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason is `"no owner (terminal)"` to distinguish them from live workloads.
 
 ## Search and Filter
 

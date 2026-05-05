@@ -217,6 +217,7 @@ func (m Model) directActionLogs() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) directActionRefresh() (tea.Model, tea.Cmd) {
+	m.invalidateOrphanCacheForNamespace(m.nav.Context, m.namespace)
 	m.cancelAndReset()
 	m.requestGen++
 	m.setStatusMessage("Refreshing...", false)

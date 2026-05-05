@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
@@ -448,4 +449,70 @@ func TestCovBuildConfigMatchFnRestartsGt(t *testing.T) {
 	assert.True(t, fn(model.Item{Restarts: "10"}))
 	assert.False(t, fn(model.Item{Restarts: "3"}))
 	assert.False(t, fn(model.Item{Restarts: ""}))
+}
+
+func TestBuiltinFilterPresets_PodOrphans(t *testing.T) {
+	cache := map[orphanCacheKey]*k8s.OrphanReport{}
+	presets := builtinFilterPresetsWithOrphans("Pod", cache, orphanCacheKey{kubeContext: "ctx", namespace: "ns"})
+	orphans := findPreset(presets, "Orphans")
+	require.NotNil(t, orphans, "Pod presets missing 'Orphans'")
+	assert.Equal(t, "O", orphans.Key)
+}
+
+func TestPodOrphansMatchFn_UsesCache(t *testing.T) {
+	cache := map[orphanCacheKey]*k8s.OrphanReport{
+		{kubeContext: "test", namespace: "default"}: {
+			Pods: []k8s.OrphanItem{
+				{Kind: "Pod", Namespace: "default", Name: "naked", Reason: "no owner"},
+			},
+		},
+	}
+	matcher := orphanMatcher(cache, orphanCacheKey{kubeContext: "test", namespace: "default"}, "Pod")
+
+	naked := model.Item{Kind: "Pod", Namespace: "default", Name: "naked"}
+	owned := model.Item{Kind: "Pod", Namespace: "default", Name: "owned"}
+
+	assert.True(t, matcher(naked))
+	assert.False(t, matcher(owned))
+}
+
+func TestOrphanMatchFn_EmptyCacheReturnsFalse(t *testing.T) {
+	cache := map[orphanCacheKey]*k8s.OrphanReport{}
+	matcher := orphanMatcher(cache, orphanCacheKey{kubeContext: "test", namespace: "default"}, "Pod")
+	assert.False(t, matcher(model.Item{Kind: "Pod", Name: "anything"}))
+}
+
+func TestBuiltinFilterPresets_SecretUnmounted(t *testing.T) {
+	cache := map[orphanCacheKey]*k8s.OrphanReport{}
+	presets := builtinFilterPresetsWithOrphans("Secret", cache, orphanCacheKey{kubeContext: "ctx", namespace: "ns"})
+	require.NotNil(t, findPreset(presets, "Unmounted"))
+}
+
+func TestBuiltinFilterPresets_ConfigMapUnmounted(t *testing.T) {
+	cache := map[orphanCacheKey]*k8s.OrphanReport{}
+	presets := builtinFilterPresetsWithOrphans("ConfigMap", cache, orphanCacheKey{kubeContext: "ctx", namespace: "ns"})
+	require.NotNil(t, findPreset(presets, "Unmounted"))
+}
+
+func TestBuiltinFilterPresets_ServiceNoEndpoints(t *testing.T) {
+	cache := map[orphanCacheKey]*k8s.OrphanReport{}
+	presets := builtinFilterPresetsWithOrphans("Service", cache, orphanCacheKey{kubeContext: "ctx", namespace: "ns"})
+	require.NotNil(t, findPreset(presets, "No Endpoints"))
+	require.NotNil(t, findPreset(presets, "LB No IP"), "existing Service preset must remain")
+}
+
+func TestNeedsOrphanCache_OrphanKinds(t *testing.T) {
+	for _, kind := range []string{"Pod", "Secret", "ConfigMap", "Service"} {
+		t.Run(kind, func(t *testing.T) {
+			assert.True(t, needsOrphanCache(kind))
+		})
+	}
+}
+
+func TestNeedsOrphanCache_OtherKinds(t *testing.T) {
+	for _, kind := range []string{"Deployment", "Node", "Event", "ConfigMapXYZ", ""} {
+		t.Run(kind, func(t *testing.T) {
+			assert.False(t, needsOrphanCache(kind))
+		})
+	}
 }

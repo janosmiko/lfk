@@ -679,10 +679,16 @@ func (m Model) handleExplorerActionKeyFilterPresets() (tea.Model, tea.Cmd, bool)
 		return m, tea.Batch(scheduleStatusClear(), m.loadPreview()), true
 	}
 	// Open the filter preset overlay.
-	m.filterPresets = builtinFilterPresets(m.nav.ResourceType.Kind)
+	kind := m.nav.ResourceType.Kind
+	key := orphanCacheKey{kubeContext: m.nav.Context, namespace: m.namespace}
+	m.filterPresets = builtinFilterPresetsWithOrphans(kind, m.orphanCache, key)
 	m.overlayCursor = 0
 	m.overlay = overlayFilterPreset
-	return m, nil, true
+	var loadCmd tea.Cmd
+	if needsOrphanCache(kind) {
+		loadCmd = (&m).cmdLoadOrphans(key)
+	}
+	return m, loadCmd, true
 }
 
 func (m Model) handleExplorerActionKeyDiff() (tea.Model, tea.Cmd, bool) {

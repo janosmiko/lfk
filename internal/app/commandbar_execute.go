@@ -160,7 +160,9 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		for _, ns := range namespaces {
 			m.selectedNamespaces[ns] = true
 		}
+		oldNs := m.namespace
 		m.namespace = namespaces[0]
+		m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
 		if len(namespaces) == 1 {
 			m.setStatusMessage(fmt.Sprintf("Namespace set to %s", namespaces[0]), false)
 		} else {
@@ -173,7 +175,9 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Usage: :ctx <context>", true)
 			return m, scheduleStatusClear()
 		}
+		oldCtx := m.nav.Context
 		m.nav.Context = arg
+		m.invalidateOrphanCacheForContext(oldCtx)
 		m.recomputeReadOnly(arg)
 		m.setStatusMessage(fmt.Sprintf("Context set to %s", arg), false)
 		cmds := []tea.Cmd{m.loadResourceTypes(), scheduleStatusClear()}
@@ -251,6 +255,9 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.bookmarkFilter.Clear()
 		m.bookmarkLoadNamespace = false
 		return m, nil
+
+	case "orphans":
+		return m.executeOrphansCommand(arg)
 
 	case "reload", "refresh":
 		// Force-fetch the current resource list -- equivalent to Shift+R.
@@ -345,7 +352,9 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 		for _, ns := range namespaces {
 			m.selectedNamespaces[ns] = true
 		}
+		oldNs := m.namespace
 		m.namespace = namespaces[0]
+		m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
 	}
 
 	// Resolve abbreviation to full resource name if possible.
@@ -578,4 +587,87 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 	}
 
 	return result
+}
+
+// executeOrphansCommand handles the :orphans builtin. No-arg form opens the
+// cluster-wide orphan overlay. Kind-arg form (`:orphans pods`, `:orphans
+// secrets`, etc.) jumps to that resource list with the orphan filter preset
+// active. `kind` is matched case-insensitively against a fixed alias table so
+// users can type the singular, plural, or short form interchangeably.
+func (m Model) executeOrphansCommand(arg string) (tea.Model, tea.Cmd) {
+	if arg == "" {
+		mt, cmd := m.openOrphansOverlay()
+		return mt, cmd
+	}
+
+	kind, ok := orphanKindFromAlias(arg)
+	if !ok {
+		m.setStatusMessage(fmt.Sprintf("unknown kind: %s (try pods/secrets/configmaps/services)", arg), true)
+		return m, scheduleStatusClear()
+	}
+
+	// Jump to the kind's list, then activate the orphan filter preset
+	// and fire cmdLoadOrphans for the active namespace.
+	mt, jumpCmd := m.executeResourceJump(kind.resource)
+	mModel, ok := mt.(Model)
+	if !ok {
+		return mt, jumpCmd
+	}
+	key := orphanCacheKey{kubeContext: mModel.nav.Context, namespace: mModel.namespace}
+	presets := builtinFilterPresetsWithOrphans(kind.lfkKind, mModel.orphanCache, key)
+	preset := findOrphanPreset(presets, kind.lfkKind)
+	if preset == nil {
+		return mModel, jumpCmd
+	}
+	p := *preset
+	mModel.activeFilterPreset = &p
+	loadCmd := (&mModel).cmdLoadOrphans(key)
+	return mModel, tea.Batch(jumpCmd, loadCmd, scheduleStatusClear())
+}
+
+// orphanKindAlias maps a user-supplied alias to the lfk model Kind name and
+// the plural resource name used by executeResourceJump.
+type orphanKindAlias struct {
+	lfkKind  string // model Kind ("Pod", "Secret", "ConfigMap", "Service")
+	resource string // input to executeResourceJump ("pods", "secrets", ...)
+}
+
+// orphanKindFromAlias resolves a user-typed kind token to an orphanKindAlias.
+// Matching is case-insensitive and accepts singular, plural, and short forms.
+func orphanKindFromAlias(s string) (orphanKindAlias, bool) {
+	switch strings.ToLower(strings.TrimSpace(s)) {
+	case "pod", "pods", "po":
+		return orphanKindAlias{"Pod", "pods"}, true
+	case "secret", "secrets", "sec":
+		return orphanKindAlias{"Secret", "secrets"}, true
+	case "configmap", "configmaps", "cm":
+		return orphanKindAlias{"ConfigMap", "configmaps"}, true
+	case "service", "services", "svc":
+		return orphanKindAlias{"Service", "services"}, true
+	}
+	return orphanKindAlias{}, false
+}
+
+// findOrphanPreset returns a pointer to the first preset whose Name matches
+// the canonical orphan preset name for the given Kind, or nil if not found.
+func findOrphanPreset(presets []FilterPreset, kind string) *FilterPreset {
+	want := orphanPresetNameForKind(kind)
+	for i := range presets {
+		if presets[i].Name == want {
+			return &presets[i]
+		}
+	}
+	return nil
+}
+
+// orphanPresetNameForKind returns the preset Name used by the orphan filter
+// preset for the given Kind. The names must match those defined in filters.go.
+func orphanPresetNameForKind(kind string) string {
+	switch kind {
+	case "Pod":
+		return "Orphans"
+	case "Service":
+		return "No Endpoints"
+	}
+	return "Unmounted"
 }

@@ -508,6 +508,88 @@ func TestExecuteCommandBarInput(t *testing.T) {
 }
 
 // ---------------------------------------------------------------------------
+// executeOrphansCommand
+// ---------------------------------------------------------------------------
+
+func TestOrphansCommand_KindArg_JumpsToList(t *testing.T) {
+	m := newTestModel()
+	m.nav.Context = "test"
+	m.namespace = "default"
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Pods", Kind: "Pod", Extra: "v1/pods"},
+		{Name: "Secrets", Kind: "Secret", Extra: "v1/secrets"},
+		{Name: "ConfigMaps", Kind: "ConfigMap", Extra: "v1/configmaps"},
+		{Name: "Services", Kind: "Service", Extra: "v1/services"},
+	}
+	m.leftItems = m.middleItems
+
+	updated, _ := m.executeBuiltinCommand("orphans secrets")
+
+	mu := updated.(Model)
+	// Regardless of whether the resource jump fully navigates (it requires
+	// discoveredResources), the orphan preset must be activated.
+	require.NotNil(t, mu.activeFilterPreset)
+	assert.Equal(t, "Unmounted", mu.activeFilterPreset.Name)
+}
+
+func TestOrphansCommand_NoArg_OpensOverlay(t *testing.T) {
+	m := newTestModel()
+	updated, _ := m.executeBuiltinCommand("orphans")
+	mu := updated.(Model)
+	assert.Equal(t, overlayOrphans, mu.overlay)
+}
+
+func TestOrphansCommand_UnknownKind(t *testing.T) {
+	m := newTestModel()
+	updated, _ := m.executeBuiltinCommand("orphans foo")
+	mu := updated.(Model)
+	assert.Contains(t, mu.statusMessage, "unknown kind")
+}
+
+func TestOrphansCommand_PodAlias(t *testing.T) {
+	m := newTestModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Pods", Kind: "Pod", Extra: "v1/pods"},
+	}
+	m.leftItems = m.middleItems
+
+	updated, _ := m.executeBuiltinCommand("orphans po")
+	mu := updated.(Model)
+	require.NotNil(t, mu.activeFilterPreset)
+	assert.Equal(t, "Orphans", mu.activeFilterPreset.Name)
+}
+
+func TestOrphansCommand_ConfigMapAlias(t *testing.T) {
+	m := newTestModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "ConfigMaps", Kind: "ConfigMap", Extra: "v1/configmaps"},
+	}
+	m.leftItems = m.middleItems
+
+	updated, _ := m.executeBuiltinCommand("orphans cm")
+	mu := updated.(Model)
+	require.NotNil(t, mu.activeFilterPreset)
+	assert.Equal(t, "Unmounted", mu.activeFilterPreset.Name)
+}
+
+func TestOrphansCommand_ServiceAlias(t *testing.T) {
+	m := newTestModel()
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{
+		{Name: "Services", Kind: "Service", Extra: "v1/services"},
+	}
+	m.leftItems = m.middleItems
+
+	updated, _ := m.executeBuiltinCommand("orphans svc")
+	mu := updated.(Model)
+	require.NotNil(t, mu.activeFilterPreset)
+	assert.Equal(t, "No Endpoints", mu.activeFilterPreset.Name)
+}
+
+// ---------------------------------------------------------------------------
 // helpers
 // ---------------------------------------------------------------------------
 

@@ -73,6 +73,7 @@ const (
 	overlayBackgroundTasks
 	overlayClusterColor // pick a color tint for the highlighted cluster row
 	overlayCrashInvestigator
+	overlayOrphans // cluster-wide orphan resource overview (Shift+O)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

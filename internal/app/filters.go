@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -31,9 +32,22 @@ func columnValue(item model.Item, key string) string {
 
 // builtinFilterPresets returns the quick filter presets relevant to the given
 // resource kind. Universal presets (Old, Recent) are included for every kind;
-// kind-specific presets are added on top.
+// kind-specific presets are added on top. Orphan presets are not included
+// because this shim has no cache reference; callers that have a Model use
+// builtinFilterPresetsWithOrphans instead.
 func builtinFilterPresets(kind string) []FilterPreset {
+	return builtinFilterPresetsWithOrphans(kind, nil, orphanCacheKey{})
+}
+
+// builtinFilterPresetsWithOrphans is the variant the runtime uses; the orphan
+// presets are appended only when a non-nil cache is supplied so unit tests
+// that lack a Model still compile and the original call sites keep working.
+func builtinFilterPresetsWithOrphans(kind string, cache map[orphanCacheKey]*k8s.OrphanReport, key orphanCacheKey) []FilterPreset {
 	presets := kindFilterPresets(kind)
+
+	if cache != nil {
+		presets = append(presets, orphanPresetsForKind(kind, cache, key)...)
+	}
 
 	// --- Universal presets (shown for all kinds) ---
 	presets = append(presets,
@@ -335,6 +349,79 @@ func appendConfigPresets(presets []FilterPreset, kind string) []FilterPreset {
 	}
 
 	return presets
+}
+
+// orphanMatcher builds a FilterPreset.MatchFn that returns true when the item
+// is in the cached OrphanReport for the given (key, kind). An empty cache or a
+// missing key causes the function to return false for everything; the load
+// command fires asynchronously when the preset is activated, then a re-render
+// populates the list.
+func orphanMatcher(cache map[orphanCacheKey]*k8s.OrphanReport, key orphanCacheKey, kind string) func(model.Item) bool {
+	return func(item model.Item) bool {
+		report := cache[key]
+		if report == nil {
+			return false
+		}
+		var pool []k8s.OrphanItem
+		switch kind {
+		case "Pod":
+			pool = report.Pods
+		case "Secret":
+			pool = report.Secrets
+		case "ConfigMap":
+			pool = report.ConfigMaps
+		case "Service":
+			pool = report.Services
+		default:
+			return false
+		}
+		for _, o := range pool {
+			if o.Namespace == item.Namespace && o.Name == item.Name {
+				return true
+			}
+		}
+		return false
+	}
+}
+
+// orphanPresetsForKind returns the orphan filter presets relevant to the given
+// kind.
+func orphanPresetsForKind(kind string, cache map[orphanCacheKey]*k8s.OrphanReport, key orphanCacheKey) []FilterPreset {
+	switch kind {
+	case "Pod":
+		return []FilterPreset{{
+			Name: "Orphans", Description: "Pods with no owner reference", Key: "O",
+			MatchFn: orphanMatcher(cache, key, "Pod"),
+		}}
+	case "Secret":
+		return []FilterPreset{{
+			Name: "Unmounted", Description: "Not referenced by any Pod / workload template / Ingress / ServiceAccount", Key: "u",
+			MatchFn: orphanMatcher(cache, key, "Secret"),
+		}}
+	case "ConfigMap":
+		return []FilterPreset{{
+			Name: "Unmounted", Description: "Not referenced by any Pod or workload template (Deployment / Job / CronJob / …)", Key: "u",
+			MatchFn: orphanMatcher(cache, key, "ConfigMap"),
+		}}
+	case "Service":
+		return []FilterPreset{{
+			Name: "No Endpoints", Description: "Service has zero ready+notReady endpoints", Key: "e",
+			MatchFn: orphanMatcher(cache, key, "Service"),
+		}}
+	}
+	return nil
+}
+
+// needsOrphanCache reports whether opening the filter-preset overlay for this
+// kind should kick off a DetectOrphans scan. Pod/Secret/ConfigMap/Service have
+// orphan presets whose MatchFn reads from orphanCache; other kinds skip the
+// load.
+func needsOrphanCache(kind string) bool {
+	switch kind {
+	case "Pod", "Secret", "ConfigMap", "Service":
+		return true
+	}
+	return false
 }
 
 // buildConfigMatchFn converts a ConfigFilterMatch into a MatchFn closure.

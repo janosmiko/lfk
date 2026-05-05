@@ -150,6 +150,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayBackgroundTasks:
 		c, w, h := m.renderOverlayBackgroundTasks()
 		return c, w, h, true
+	case overlayOrphans:
+		c, w, h := m.renderOrphansOverlay()
+		return c, w, h, true
 	case overlayExplainSearch:
 		c, w, h := m.renderOverlayExplainSearch()
 		return c, w, h, true
