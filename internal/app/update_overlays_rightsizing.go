@@ -142,8 +142,11 @@ func (m Model) cycleRightsizingHeadroom(direction int) (tea.Model, tea.Cmd) {
 	)
 
 	// Fast path 1: cache hit — swap to the cluster-fresh entry without
-	// flashing through a loading state.
+	// flashing through a loading state. Bump gen so any in-flight prior
+	// fetch (e.g. from the previous strategy/headroom open) is dropped
+	// on arrival rather than overwriting the cache hit.
 	if cached, ok := m.rightsizingCache[cacheKey]; ok && cached != nil {
+		m.rightsizing.gen++
 		m.rightsizing.data = cached
 		m.rightsizing.err = nil
 		m.rightsizing.loading = false
@@ -151,8 +154,19 @@ func (m Model) cycleRightsizingHeadroom(direction int) (tea.Model, tea.Cmd) {
 	}
 
 	// Fast path 2: data in memory — every recommendation is just
-	// base × headroom, so multiply locally and skip the fetch.
-	if m.rightsizing.data != nil {
+	// base × headroom, so multiply locally and skip the fetch. Only
+	// safe when the in-memory payload actually matches the currently-
+	// selected strategy AND was generated at the current headroom AND
+	// is not mid-fetch. During a strategy switch the renderer keeps
+	// the previous strategy's data on screen with loading=true, and
+	// rescaling that stale payload would store a cross-strategy
+	// rescale under the new headroom key — then the older async
+	// response can land and overwrite the newly selected headroom.
+	canRescale := !m.rightsizing.loading &&
+		m.rightsizing.data != nil &&
+		m.rightsizing.data.Strategy == m.rightsizing.strategy &&
+		math.Abs(m.rightsizing.data.Headroom-cur) < 1e-9
+	if canRescale {
 		rescaled := k8s.RescaleRightsizing(m.rightsizing.data, next)
 		// RescaleRightsizing returns the input pointer unchanged when
 		// the source has no headroom recorded (legacy fixture). Detect
@@ -259,8 +273,12 @@ func (m Model) cycleRightsizingStrategy(direction int) (tea.Model, tea.Cmd) {
 	)
 
 	// Fast path: cache hit on the new strategy + same headroom — swap
-	// to the cluster-fresh entry without flashing.
+	// to the cluster-fresh entry without flashing. Bump gen so any
+	// in-flight prior strategy fetch is dropped on arrival rather
+	// than overwriting the cache hit (the late response would still
+	// match the old generation otherwise and silently win).
 	if cached, ok := m.rightsizingCache[cacheKey]; ok && cached != nil {
+		m.rightsizing.gen++
 		m.rightsizing.data = cached
 		m.rightsizing.err = nil
 		m.rightsizing.loading = false

@@ -467,6 +467,125 @@ func TestUpdateOverlayRightsizing_HeadroomPickerColdFallback(t *testing.T) {
 	assert.InDelta(t, 1.5, r.rightsizing.headroom, 1e-9)
 }
 
+// --- Race-condition guards on the picker fast paths ---
+//
+// These tests cover the three windows where a naive rescale or
+// cache-hit short-circuit can be overwritten by a stale in-flight
+// response from a previous overlay open / strategy switch.
+
+func TestUpdateOverlayRightsizing_HeadroomPickerSkipsRescaleWhileLoading(t *testing.T) {
+	// During a strategy switch the renderer keeps the previous
+	// strategy's data on screen with loading=true. Pressing < / > in
+	// that window must NOT rescale-and-cache the stale payload under
+	// the new (strategy, headroom) key — the in-flight response will
+	// land later and overwrite the user's selection. Fall through to
+	// the async path instead and bump gen so the older fetch is
+	// dropped on arrival.
+	m := newRightsizingTestModel()
+	m.rightsizing.headroom = model.DefaultRightsizingHeadroom
+	m.rightsizing.loading = true // simulate mid-fetch from a prior strategy switch
+	prevGen := m.rightsizing.gen
+
+	ret, cmd := m.handleRightsizingOverlayKey(runeKey('>'))
+	r := ret.(Model)
+	assert.NotNil(t, cmd, "loading=true → must take the async fetch path, not rescale stale data")
+	assert.True(t, r.rightsizing.loading)
+	assert.Greater(t, r.rightsizing.gen, prevGen, "async path must bump gen so the prior fetch is dropped")
+	// The new (strategy, 1.5) cache key must NOT be populated by a stale rescale.
+	cacheKey := rightsizingCacheKey("c", "ns", "Pod", "pod-a", r.rightsizing.strategy, 1.5)
+	_, ok := r.rightsizingCache[cacheKey]
+	assert.False(t, ok, "loading=true rescale would poison the cache under the new key — must not happen")
+}
+
+func TestUpdateOverlayRightsizing_HeadroomPickerSkipsRescaleOnStrategyMismatch(t *testing.T) {
+	// If the in-memory data was generated for a different strategy
+	// (e.g. the user pressed `]` then immediately `>`), rescaling it
+	// would store a cross-strategy rescale under the new key. Skip the
+	// fast path and fetch fresh.
+	m := newRightsizingTestModel()
+	m.rightsizing.headroom = model.DefaultRightsizingHeadroom
+	m.rightsizing.strategy = model.StrategyVPA
+	// Data was generated for the SNAPSHOT strategy (mismatch).
+	m.rightsizing.data.Strategy = model.StrategySnapshot
+	prevGen := m.rightsizing.gen
+
+	ret, cmd := m.handleRightsizingOverlayKey(runeKey('>'))
+	r := ret.(Model)
+	assert.NotNil(t, cmd, "strategy mismatch → must take async path, not rescale across strategies")
+	assert.Greater(t, r.rightsizing.gen, prevGen)
+	cacheKey := rightsizingCacheKey("c", "ns", "Pod", "pod-a", r.rightsizing.strategy, 1.5)
+	_, ok := r.rightsizingCache[cacheKey]
+	assert.False(t, ok, "cross-strategy rescale would poison the cache — must not happen")
+}
+
+func TestUpdateOverlayRightsizing_HeadroomPickerSkipsRescaleOnHeadroomMismatch(t *testing.T) {
+	// If the in-memory payload's recorded headroom doesn't match the
+	// current one, the rescale ratio (newH/data.Headroom) would scale
+	// from the wrong baseline. Fall through to async fetch instead.
+	m := newRightsizingTestModel()
+	m.rightsizing.headroom = model.DefaultRightsizingHeadroom // 1.25
+	// Data was generated at headroom 2.0 — doesn't match current 1.25.
+	m.rightsizing.data.Headroom = 2.0
+	prevGen := m.rightsizing.gen
+
+	ret, cmd := m.handleRightsizingOverlayKey(runeKey('>'))
+	r := ret.(Model)
+	assert.NotNil(t, cmd, "headroom mismatch → must take async path, not rescale from wrong baseline")
+	assert.Greater(t, r.rightsizing.gen, prevGen)
+}
+
+func TestUpdateOverlayRightsizing_StrategyPickerCacheHitBumpsGen(t *testing.T) {
+	// A cache hit on the new strategy must bump m.rightsizing.gen so
+	// any in-flight prior strategy fetch is dropped on arrival rather
+	// than overwriting the cache hit.
+	m := newRightsizingTestModel()
+	m.rightsizing.strategy = model.StrategyVPA
+	m.rightsizing.available = []model.RightsizingStrategy{
+		model.StrategyVPA, model.StrategyPromMax1D, model.StrategySnapshot,
+	}
+	cached := &model.Rightsizing{
+		Strategy: model.StrategyPromMax1D,
+		Headroom: m.rightsizing.headroom,
+		Containers: []model.ContainerRec{{
+			Name: "app",
+			CPU:  model.ResourceRec{RecommendedRequest: "777m"},
+		}},
+	}
+	cacheKey := rightsizingCacheKey("c", "ns", "Pod", "pod-a", model.StrategyPromMax1D, m.rightsizing.headroom)
+	m.rightsizingCache[cacheKey] = cached
+	prevGen := m.rightsizing.gen
+
+	ret, _ := m.handleRightsizingOverlayKey(runeKey(']'))
+	r := ret.(Model)
+	assert.Greater(t, r.rightsizing.gen, prevGen,
+		"strategy cache hit must bump gen to invalidate any in-flight prior fetch")
+	assert.Same(t, cached, r.rightsizing.data, "cache hit still wins the data slot")
+}
+
+func TestUpdateOverlayRightsizing_HeadroomPickerCacheHitBumpsGen(t *testing.T) {
+	// Same race guard for the headroom fast-path: a cache hit must
+	// bump gen so the prior in-flight fetch can't overwrite it.
+	m := newRightsizingTestModel()
+	m.rightsizing.headroom = model.DefaultRightsizingHeadroom
+	cached := &model.Rightsizing{
+		Strategy: m.rightsizing.strategy,
+		Headroom: 1.5,
+		Containers: []model.ContainerRec{{
+			Name: "app",
+			CPU:  model.ResourceRec{RecommendedRequest: "999m"},
+		}},
+	}
+	cacheKey := rightsizingCacheKey("c", "ns", "Pod", "pod-a", m.rightsizing.strategy, 1.5)
+	m.rightsizingCache[cacheKey] = cached
+	prevGen := m.rightsizing.gen
+
+	ret, _ := m.handleRightsizingOverlayKey(runeKey('>'))
+	r := ret.(Model)
+	assert.Greater(t, r.rightsizing.gen, prevGen,
+		"headroom cache hit must bump gen to invalidate any in-flight prior fetch")
+	assert.Same(t, cached, r.rightsizing.data, "cache hit still wins the data slot")
+}
+
 // --- Headroom seeded on overlay open ---
 
 func TestExecuteActionRightsizing_SeedsDefaultHeadroom(t *testing.T) {
