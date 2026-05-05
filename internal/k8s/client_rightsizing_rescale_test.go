@@ -131,6 +131,34 @@ func TestRescaleRightsizing_DoesNotMutateInput(t *testing.T) {
 	assert.Equal(t, "500m", src.Containers[0].CPU.RecommendedLimit, "source RecommendedLimit unchanged")
 }
 
+// TestRescaleRightsizing_SuffixLessMemoryStaysMemory guards against
+// a regression where scaleQuantityByRatio inferred CPU vs memory from
+// the quantity suffix. Canonical memory quantities can be plain byte
+// counts ("1024") with no suffix at all — sniffing the string
+// silently mis-routed those to SnapCPUMilliToCanonical and emitted
+// "1024m" (CPU shape) for a memory recommendation.
+//
+// The fix threads the resource kind through rescaleResourceRec so
+// memory always snaps to canonical Mi/Gi units regardless of the
+// input string's shape.
+func TestRescaleRightsizing_SuffixLessMemoryStaysMemory(t *testing.T) {
+	src := &model.Rightsizing{
+		Headroom: 1.0,
+		Containers: []model.ContainerRec{{
+			Name: "app",
+			Mem:  model.ResourceRec{RecommendedRequest: "1024", RecommendedLimit: "2048"},
+		}},
+	}
+	out := RescaleRightsizing(src, 2.0)
+	require.NotNil(t, out)
+	require.Len(t, out.Containers, 1)
+	rec := out.Containers[0].Mem.RecommendedRequest
+	// Whatever the snap target rounds to, it must use a memory unit
+	// suffix (Mi/Gi/...) — never the CPU "m" suffix.
+	assert.NotContains(t, rec, "m", "memory recommendation must never get a CPU 'm' suffix from rescaling")
+	assert.Contains(t, rec, "Mi", "memory rescale must snap to canonical Mi units")
+}
+
 // TestRescaleRightsizing_EmptyRecommendationsLeftEmpty covers the no-
 // metrics case: containers without recommendations stay without
 // recommendations after a rescale (no surprise "0m" or similar
