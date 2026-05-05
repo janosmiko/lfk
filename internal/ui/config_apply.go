@@ -243,6 +243,10 @@ func applyRightsizingDefaults(cfg *RightsizingDefaultsConfig) {
 		return
 	}
 	if cfg.Strategy != "" {
+		// Reset before parse so an invalid retry-supplied value clears
+		// any previously-accepted default (rather than silently keeping
+		// the stale one and contradicting the documented contract).
+		model.ConfigDefaultRightsizingStrategy = ""
 		if s, ok := parseRightsizingStrategy(cfg.Strategy); ok {
 			model.ConfigDefaultRightsizingStrategy = s
 		} else {
@@ -252,6 +256,7 @@ func applyRightsizingDefaults(cfg *RightsizingDefaultsConfig) {
 		}
 	}
 	if cfg.Headroom != 0 {
+		model.ConfigDefaultRightsizingHeadroom = 0
 		if h, ok := parseRightsizingHeadroom(cfg.Headroom); ok {
 			model.ConfigDefaultRightsizingHeadroom = h
 		} else {

@@ -451,10 +451,13 @@ func (m Model) updateRightsizingStrategiesProbed(msg rightsizingStrategiesProbed
 	// Sticky strategy is unavailable on this workload. Re-pick from
 	// the fresh list and reload data for the new strategy. Bumping
 	// gen ensures the original load (which will be for the wrong
-	// strategy) is dropped on arrival.
+	// strategy) is dropped on arrival. Clearing err prevents a stale
+	// error from the optimistic-strategy load from masking the
+	// re-picked strategy's data.
 	m.rightsizing.strategy = pickRightsizingStrategy(m.rightsizing.strategy, msg.available)
 	m.rightsizing.gen++
 	m.rightsizing.scroll = 0
+	m.rightsizing.err = nil
 
 	key := rightsizingCacheKey(m.actionCtx.context, m.actionCtx.namespace, m.actionCtx.kind, m.actionCtx.name, m.rightsizing.strategy, m.rightsizing.headroom)
 	if cached, ok := m.rightsizingCache[key]; ok && cached != nil {

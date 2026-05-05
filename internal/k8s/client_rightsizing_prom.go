@@ -164,14 +164,19 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 	}
 	promNs, promSvc, promPort, _, _, _ := resolveMonitoringEndpoints(contextName)
 
-	rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-
 	params := map[string]string{"query": query}
+	// Per-request 10s timeout — a single shared context would burn its
+	// budget on the first hung probe and leave the fallback loop unable
+	// to succeed (every later DoRaw would fail with context.Canceled).
+	doQuery := func(ns, svc string) ([]byte, error) {
+		rctx, cancel := context.WithTimeout(ctx, 10*time.Second)
+		defer cancel()
+		result := cs.CoreV1().Services(ns).ProxyGet("http", svc, promPort, "/api/v1/query", params)
+		return result.DoRaw(rctx)
+	}
 	if cached, ok := promSvcCache.Load(cs); ok {
 		entry := cached.(promSvcEntry)
-		result := cs.CoreV1().Services(entry.namespace).ProxyGet("http", entry.service, promPort, "/api/v1/query", params)
-		data, err := result.DoRaw(rctx)
+		data, err := doQuery(entry.namespace, entry.service)
 		if err == nil {
 			return data, nil
 		}
@@ -180,8 +185,7 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 	var lastErr error
 	for _, ns := range promNs {
 		for _, svc := range promSvc {
-			result := cs.CoreV1().Services(ns).ProxyGet("http", svc, promPort, "/api/v1/query", params)
-			data, err := result.DoRaw(rctx)
+			data, err := doQuery(ns, svc)
 			if err != nil {
 				lastErr = err
 				continue
