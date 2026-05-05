@@ -15,31 +15,57 @@ import (
 // goroutine. The generation token is bumped before dispatch so any
 // in-flight fetch from a previous open is dropped on arrival.
 //
-// Probes which strategies are available for this workload (VPA
-// reachable, Prometheus configured, snapshot always) and seeds the
-// initial strategy + headroom using a sticky-then-config-then-builtin
-// chain (see pickRightsizingStrategy / pickRightsizingHeadroom).
+// Strategy availability (VPA reachable, Prometheus configured,
+// snapshot always) is probed ASYNCHRONOUSLY — the underlying
+// AvailableRightsizingStrategies calls findVPA which issues blocking
+// dynamic-client List requests, so running it inline on the Bubble
+// Tea update loop freezes the UI for the duration of the API round
+// trip. The probe cmd is dispatched alongside the data loader; when
+// it returns, updateRightsizingStrategiesProbed reconciles
+// m.rightsizing.available against the current sticky strategy and
+// re-seeds + reloads only if the strategy is no longer available.
+//
+// The initial guess for `available` is just `[m.rightsizing.strategy]`
+// (after sticky/config/builtin resolution) — a single-element list so
+// the picker has somewhere to render before the probe lands. The
+// strategy chip suppresses the [N/M] indicator while only one entry
+// is in the list, so the user doesn't see a misleading "1/1" before
+// the real list arrives.
+//
+// Headroom is independent of the probe — every value works for every
+// strategy — so it follows its own pickRightsizingHeadroom chain
+// here, no async work needed.
+//
 // Once the overlay is open the [/] picker walks the available strategy
 // list and </> walks the headroom values — see
 // handleRightsizingOverlayKey.
 func (m Model) executeActionRightsizing() (tea.Model, tea.Cmd) {
 	m.overlay = overlayRightsizing
 
-	available := m.client.AvailableRightsizingStrategies(
-		m.reqCtx,
-		m.actionCtx.context, m.actionCtx.namespace, m.actionCtx.kind, m.actionCtx.name,
-	)
-	if len(available) == 0 {
-		// Defensive — AvailableRightsizingStrategies always returns
-		// snapshot at minimum, but a future refactor that removes the
-		// guarantee shouldn't strand the picker.
-		available = []model.RightsizingStrategy{model.StrategySnapshot}
+	// Optimistic-strategy resolution at open time: the async probe
+	// hasn't returned yet, so build a best-guess candidate list from
+	// the sticky strategy + the configured default + snapshot (always
+	// available). pickRightsizingStrategy walks them in priority order
+	// (sticky → config → first available) so the initial guess matches
+	// the user's prior selection / configured preference. The probe
+	// reconciliation in updateRightsizingStrategiesProbed will demote
+	// or replace the choice if the cluster doesn't actually support
+	// it.
+	optimistic := []model.RightsizingStrategy{}
+	if m.rightsizing.strategy != "" {
+		optimistic = append(optimistic, m.rightsizing.strategy)
 	}
-	m.rightsizing.available = available
-
-	// Sticky-then-config-then-builtin defaults. Strategy and headroom
-	// each follow their own fallback chain — see the helpers below.
-	m.rightsizing.strategy = pickRightsizingStrategy(m.rightsizing.strategy, available)
+	if model.ConfigDefaultRightsizingStrategy != "" &&
+		!slices.Contains(optimistic, model.ConfigDefaultRightsizingStrategy) {
+		optimistic = append(optimistic, model.ConfigDefaultRightsizingStrategy)
+	}
+	if !slices.Contains(optimistic, model.StrategySnapshot) {
+		// Snapshot is always available, so it's a safe last-resort
+		// fallback in the initial-guess list.
+		optimistic = append(optimistic, model.StrategySnapshot)
+	}
+	m.rightsizing.strategy = pickRightsizingStrategy(m.rightsizing.strategy, optimistic)
+	m.rightsizing.available = []model.RightsizingStrategy{m.rightsizing.strategy}
 	m.rightsizing.headroom = pickRightsizingHeadroom(m.rightsizing.headroom)
 
 	// Reset the per-workload transient fields. data is recomputed by
@@ -57,7 +83,40 @@ func (m Model) executeActionRightsizing() (tea.Model, tea.Cmd) {
 	} else {
 		m.rightsizing.loading = true
 	}
-	return m, m.loadRightsizing()
+	return m, tea.Batch(m.loadRightsizing(), m.probeRightsizingStrategies())
+}
+
+// probeRightsizingStrategies returns a tea.Cmd that runs
+// k8s.AvailableRightsizingStrategies in a goroutine. The result is
+// delivered via rightsizingStrategiesProbedMsg, which the handler
+// reconciles against the optimistic single-element list seeded by
+// executeActionRightsizing.
+//
+// The probe captures the active context fields + the generation
+// token at dispatch time so a late response from a previous overlay
+// open is dropped on arrival (the gen check in the handler matches
+// the same pattern used by loadRightsizing).
+func (m Model) probeRightsizingStrategies() tea.Cmd {
+	if m.actionCtx.kind == "" || m.actionCtx.name == "" {
+		return nil
+	}
+	client := m.client
+	reqCtx := m.reqCtx
+	ctxName := m.actionCtx.context
+	namespace := m.actionCtx.namespace
+	kind := m.actionCtx.kind
+	name := m.actionCtx.name
+	gen := m.rightsizing.gen
+	return func() tea.Msg {
+		available := client.AvailableRightsizingStrategies(reqCtx, ctxName, namespace, kind, name)
+		if len(available) == 0 {
+			// Defensive — AvailableRightsizingStrategies always returns
+			// snapshot at minimum, but a future refactor that removes
+			// the guarantee shouldn't strand the picker.
+			available = []model.RightsizingStrategy{model.StrategySnapshot}
+		}
+		return rightsizingStrategiesProbedMsg{available: available, generation: gen}
+	}
 }
 
 // pickRightsizingStrategy resolves the initial strategy for a fresh

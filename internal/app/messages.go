@@ -276,6 +276,25 @@ type rightsizingLoadedMsg struct {
 	generation int
 }
 
+// rightsizingStrategiesProbedMsg carries the result of an async probe
+// for the strategies usable on the current workload. The probe is
+// dispatched as a tea.Cmd from executeActionRightsizing because
+// AvailableRightsizingStrategies internally calls findVPA which makes
+// blocking dynamic-client List requests — running it on the Bubble Tea
+// update loop freezes the UI on every overlay open.
+//
+// The handler reconciles available + the current strategy: if the
+// sticky strategy is still in the probe result it's kept; otherwise
+// the picker re-seeds via pickRightsizingStrategy and a fresh load is
+// dispatched (the in-memory data was for the wrong strategy).
+//
+// `generation` is checked against m.rightsizing.gen so a stale probe
+// response from a previous overlay open is dropped.
+type rightsizingStrategiesProbedMsg struct {
+	available  []model.RightsizingStrategy
+	generation int
+}
+
 // secretSavedMsg carries the result of saving secret data.
 type secretSavedMsg struct {
 	err error

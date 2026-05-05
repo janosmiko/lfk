@@ -73,11 +73,17 @@ func TestExecuteActionRightsizing_StickyStrategyKeptWhenAvailable(t *testing.T) 
 // TestExecuteActionRightsizing_StickyStrategyDroppedWhenUnavailable
 // covers the case where the previously selected strategy is not
 // available for the new workload — the picker must fall back to the
-// first available strategy rather than displaying a stale, unusable
-// selection.
+// first available strategy after the async probe lands rather than
+// displaying a stale, unusable selection.
+//
+// The strategy probe runs as a deferred tea.Cmd to keep the blocking
+// findVPA list call off the update loop, so the optimistic open keeps
+// the sticky value and the reconciliation happens when
+// rightsizingStrategiesProbedMsg arrives.
 func TestExecuteActionRightsizing_StickyStrategyDroppedWhenUnavailable(t *testing.T) {
 	// No Prometheus configured → PromMax1D is not in the available
-	// list, so the sticky strategy is dropped.
+	// list, so the sticky strategy will be dropped after probe
+	// reconciliation.
 	m := newRightsizingActionTestModel()
 	m.rightsizing.strategy = model.StrategyPromMax1D
 	m.rightsizing.headroom = 1.5
@@ -85,14 +91,25 @@ func TestExecuteActionRightsizing_StickyStrategyDroppedWhenUnavailable(t *testin
 	ret, _ := m.executeActionRightsizing()
 	r := ret.(Model)
 
-	// AvailableRightsizingStrategies for the bare test client returns
-	// only StrategySnapshot — sticky strategy is dropped, falls back
-	// to first available.
-	assert.Equal(t, model.StrategySnapshot, r.rightsizing.strategy,
-		"unavailable sticky strategy must fall back to first available")
-	// Headroom is independent of strategy availability — sticks regardless.
+	// Optimistic open: sticky is preserved as the initial guess —
+	// the probe hasn't returned yet.
+	assert.Equal(t, model.StrategyPromMax1D, r.rightsizing.strategy,
+		"optimistic open keeps sticky value pending the async probe")
 	assert.InDelta(t, 1.5, r.rightsizing.headroom, 1e-9,
 		"headroom is strategy-independent and must remain sticky")
+
+	// Simulate the probe returning [snapshot] — the bare test client
+	// configures no Prometheus and no VPA, so that's the cluster-true
+	// list.
+	probe := rightsizingStrategiesProbedMsg{
+		available:  []model.RightsizingStrategy{model.StrategySnapshot},
+		generation: r.rightsizing.gen,
+	}
+	r2, _ := r.updateRightsizingStrategiesProbed(probe)
+	assert.Equal(t, model.StrategySnapshot, r2.rightsizing.strategy,
+		"unavailable sticky strategy must be dropped after probe reconciliation")
+	assert.InDelta(t, 1.5, r2.rightsizing.headroom, 1e-9,
+		"headroom is strategy-independent and must remain sticky after reconciliation")
 }
 
 // TestExecuteActionRightsizing_StickyHeadroomKept covers the headroom
@@ -173,8 +190,9 @@ func TestExecuteActionRightsizing_NoStickyNoConfigUsesBuiltinDefaults(t *testing
 
 // TestExecuteActionRightsizing_ConfigDefaultStrategyDroppedWhenUnavailable
 // covers the case where the configured default strategy is not
-// available for the workload — fall back to first available rather
-// than honoring an unusable config value.
+// available for the workload — the optimistic open seeds it but the
+// async probe reconciliation drops it once the cluster-true
+// availability list arrives.
 func TestExecuteActionRightsizing_ConfigDefaultStrategyDroppedWhenUnavailable(t *testing.T) {
 	prevStrategy := model.ConfigDefaultRightsizingStrategy
 	prevHeadroom := model.ConfigDefaultRightsizingHeadroom
@@ -194,6 +212,74 @@ func TestExecuteActionRightsizing_ConfigDefaultStrategyDroppedWhenUnavailable(t 
 	ret, _ := m.executeActionRightsizing()
 	r := ret.(Model)
 
-	assert.Equal(t, model.StrategySnapshot, r.rightsizing.strategy,
-		"unavailable config default must fall back to first available strategy")
+	// Optimistic open: config default is the initial guess (sticky
+	// is empty so config wins).
+	assert.Equal(t, model.StrategyPromMax1D, r.rightsizing.strategy,
+		"optimistic open seeds config default pending the async probe")
+
+	// Probe returns [snapshot] — config default isn't actually
+	// available on this workload.
+	probe := rightsizingStrategiesProbedMsg{
+		available:  []model.RightsizingStrategy{model.StrategySnapshot},
+		generation: r.rightsizing.gen,
+	}
+	r2, _ := r.updateRightsizingStrategiesProbed(probe)
+	assert.Equal(t, model.StrategySnapshot, r2.rightsizing.strategy,
+		"unavailable config default must fall back to first available strategy after probe")
+}
+
+// TestUpdateRightsizingStrategiesProbed_KeepsStickyWhenAvailable
+// verifies the no-op path: when the optimistic strategy survives the
+// probe, the handler doesn't reload data or bump generation — the
+// initial load dispatched alongside the probe is still valid for the
+// chosen strategy.
+func TestUpdateRightsizingStrategiesProbed_KeepsStickyWhenAvailable(t *testing.T) {
+	withPrometheusConfigured(t)
+
+	m := newRightsizingActionTestModel()
+	m.rightsizing.strategy = model.StrategyPromMax1D
+	m.rightsizing.headroom = 1.5
+
+	ret, _ := m.executeActionRightsizing()
+	r := ret.(Model)
+	prevGen := r.rightsizing.gen
+
+	probe := rightsizingStrategiesProbedMsg{
+		available: []model.RightsizingStrategy{
+			model.StrategyPromMax1D, model.StrategySnapshot,
+		},
+		generation: prevGen,
+	}
+	r2, cmd := r.updateRightsizingStrategiesProbed(probe)
+
+	assert.Equal(t, model.StrategyPromMax1D, r2.rightsizing.strategy,
+		"sticky strategy survives the probe → no demotion")
+	assert.Equal(t, prevGen, r2.rightsizing.gen,
+		"no-op reconciliation must NOT bump gen — the in-flight load is still valid")
+	assert.Nil(t, cmd, "no-op reconciliation must NOT fire a fresh load cmd")
+	assert.Equal(t, []model.RightsizingStrategy{
+		model.StrategyPromMax1D, model.StrategySnapshot,
+	}, r2.rightsizing.available, "available list reflects the probe result")
+}
+
+// TestUpdateRightsizingStrategiesProbed_StaleGenerationDropped guards
+// the stale-response path: a probe response from a previous overlay
+// open must be discarded, otherwise it could overwrite the freshly
+// resolved strategy with stale data.
+func TestUpdateRightsizingStrategiesProbed_StaleGenerationDropped(t *testing.T) {
+	m := newRightsizingActionTestModel()
+	m.rightsizing.strategy = model.StrategyVPA
+	m.rightsizing.available = []model.RightsizingStrategy{model.StrategyVPA}
+	m.rightsizing.gen = 5
+
+	stale := rightsizingStrategiesProbedMsg{
+		available:  []model.RightsizingStrategy{model.StrategySnapshot},
+		generation: 4, // older than the current gen
+	}
+	r, cmd := m.updateRightsizingStrategiesProbed(stale)
+	assert.Equal(t, model.StrategyVPA, r.rightsizing.strategy,
+		"stale probe must NOT overwrite current strategy")
+	assert.Nil(t, cmd, "stale probe must NOT dispatch follow-up cmds")
+	assert.Equal(t, []model.RightsizingStrategy{model.StrategyVPA}, r.rightsizing.available,
+		"stale probe must NOT replace the available list")
 }

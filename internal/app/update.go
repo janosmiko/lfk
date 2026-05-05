@@ -329,6 +329,9 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case rightsizingLoadedMsg:
 		m = m.updateRightsizingLoaded(msg)
 		return m, nil, true
+	case rightsizingStrategiesProbedMsg:
+		mdl, cmd := m.updateRightsizingStrategiesProbed(msg)
+		return mdl, cmd, true
 	case secretSavedMsg:
 		mdl, cmd := m.updateSecretSaved(msg)
 		return mdl, cmd, true

@@ -2,8 +2,11 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 	"time"
+
+	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -419,6 +422,49 @@ func (m Model) updateRightsizingLoaded(msg rightsizingLoadedMsg) Model {
 	}
 	m.rightsizingCache[msg.key] = msg.data
 	return m
+}
+
+// updateRightsizingStrategiesProbed handles the deferred result of the
+// async strategy probe kicked by executeActionRightsizing. The probe
+// runs off the update loop because AvailableRightsizingStrategies
+// internally calls findVPA → blocking dyn.Resource(...).List(...).
+//
+// Reconciliation:
+//   - Stale gen → discard (overlay closed/reopened in the meantime).
+//   - Always swap in the fresh available list (the picker chip + the
+//     bottom hint bar both read from it).
+//   - If the currently-selected sticky strategy is still in the list,
+//     keep the in-flight load result as-is — no reload needed.
+//   - Otherwise re-pick via pickRightsizingStrategy and dispatch a
+//     new load so the table reflects the corrected strategy.
+func (m Model) updateRightsizingStrategiesProbed(msg rightsizingStrategiesProbedMsg) (Model, tea.Cmd) {
+	if msg.generation != m.rightsizing.gen {
+		return m, nil // stale probe — overlay closed/reopened
+	}
+	m.rightsizing.available = msg.available
+	if slices.Contains(msg.available, m.rightsizing.strategy) {
+		// Sticky strategy survived the probe — no-op reconciliation.
+		// Don't bump gen / fire another load: the data fetch dispatched
+		// alongside the probe is still valid.
+		return m, nil
+	}
+	// Sticky strategy is unavailable on this workload. Re-pick from
+	// the fresh list and reload data for the new strategy. Bumping
+	// gen ensures the original load (which will be for the wrong
+	// strategy) is dropped on arrival.
+	m.rightsizing.strategy = pickRightsizingStrategy(m.rightsizing.strategy, msg.available)
+	m.rightsizing.gen++
+	m.rightsizing.scroll = 0
+
+	key := rightsizingCacheKey(m.actionCtx.context, m.actionCtx.namespace, m.actionCtx.kind, m.actionCtx.name, m.rightsizing.strategy, m.rightsizing.headroom)
+	if cached, ok := m.rightsizingCache[key]; ok && cached != nil {
+		m.rightsizing.data = cached
+		m.rightsizing.loading = false
+	} else {
+		m.rightsizing.data = nil
+		m.rightsizing.loading = true
+	}
+	return m, m.loadRightsizing()
 }
 
 func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
