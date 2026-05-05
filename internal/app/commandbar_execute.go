@@ -602,7 +602,9 @@ func (m Model) executeOrphansCommand(arg string) (tea.Model, tea.Cmd) {
 
 	kind, ok := orphanKindFromAlias(arg)
 	if !ok {
-		m.setStatusMessage(fmt.Sprintf("unknown kind: %s (try pods/secrets/configmaps/services)", arg), true)
+		m.setStatusMessage(fmt.Sprintf(
+			"unknown kind: %s (try pods/secrets/configmaps/services/pvcs/hpas/pdbs/netpols/roles/clusterroles/rolebindings/clusterrolebindings)",
+			arg), true)
 		return m, scheduleStatusClear()
 	}
 
@@ -613,7 +615,7 @@ func (m Model) executeOrphansCommand(arg string) (tea.Model, tea.Cmd) {
 	if !ok {
 		return mt, jumpCmd
 	}
-	key := orphanCacheKey{kubeContext: mModel.nav.Context, namespace: mModel.namespace}
+	key := orphanCacheKey{kubeContext: mModel.nav.Context, namespace: mModel.orphanCacheNamespace()}
 	presets := builtinFilterPresetsWithOrphans(kind.lfkKind, mModel.orphanCache, key)
 	preset := findOrphanPreset(presets, kind.lfkKind)
 	if preset == nil {
@@ -634,6 +636,8 @@ type orphanKindAlias struct {
 
 // orphanKindFromAlias resolves a user-typed kind token to an orphanKindAlias.
 // Matching is case-insensitive and accepts singular, plural, and short forms.
+// Coverage matches the orphan detector — every kind the cluster overlay
+// surfaces also has a per-list `:orphans <kind>` entry point.
 func orphanKindFromAlias(s string) (orphanKindAlias, bool) {
 	switch strings.ToLower(strings.TrimSpace(s)) {
 	case "pod", "pods", "po":
@@ -644,6 +648,22 @@ func orphanKindFromAlias(s string) (orphanKindAlias, bool) {
 		return orphanKindAlias{"ConfigMap", "configmaps"}, true
 	case "service", "services", "svc":
 		return orphanKindAlias{"Service", "services"}, true
+	case "pvc", "pvcs", "persistentvolumeclaim", "persistentvolumeclaims":
+		return orphanKindAlias{"PersistentVolumeClaim", "persistentvolumeclaims"}, true
+	case "hpa", "hpas", "horizontalpodautoscaler", "horizontalpodautoscalers":
+		return orphanKindAlias{"HorizontalPodAutoscaler", "horizontalpodautoscalers"}, true
+	case "pdb", "pdbs", "poddisruptionbudget", "poddisruptionbudgets":
+		return orphanKindAlias{"PodDisruptionBudget", "poddisruptionbudgets"}, true
+	case "netpol", "netpols", "networkpolicy", "networkpolicies":
+		return orphanKindAlias{"NetworkPolicy", "networkpolicies"}, true
+	case "role", "roles":
+		return orphanKindAlias{"Role", "roles"}, true
+	case "clusterrole", "clusterroles":
+		return orphanKindAlias{"ClusterRole", "clusterroles"}, true
+	case "rolebinding", "rolebindings", "rb":
+		return orphanKindAlias{"RoleBinding", "rolebindings"}, true
+	case "clusterrolebinding", "clusterrolebindings", "crb":
+		return orphanKindAlias{"ClusterRoleBinding", "clusterrolebindings"}, true
 	}
 	return orphanKindAlias{}, false
 }
@@ -668,6 +688,18 @@ func orphanPresetNameForKind(kind string) string {
 		return "Orphans"
 	case "Service":
 		return "No Endpoints"
+	case "Secret", "ConfigMap":
+		return "Unmounted"
+	case "PersistentVolumeClaim":
+		return "Unused"
+	case "HorizontalPodAutoscaler",
+		"PodDisruptionBudget",
+		"NetworkPolicy",
+		"RoleBinding",
+		"ClusterRoleBinding":
+		return "Dangling"
+	case "Role", "ClusterRole":
+		return "Unbound"
 	}
 	return "Unmounted"
 }

@@ -152,7 +152,7 @@ func RenderOrphansOverlay(
 	hasPartial := partialError != ""
 	hasSearch := searchActive || searchQuery != ""
 	if hasPartial {
-		b.WriteString(OverlayWarningStyle.Render("⚠ partial result: " + partialError))
+		b.WriteString(OverlayWarningStyle.Render("partial result: " + partialError))
 		b.WriteString("\n")
 	}
 	if hasSearch {
@@ -246,13 +246,13 @@ func orphanChipDefs(counts OrphanCounts) []orphanChipDef {
 	}
 }
 
-// orphanChipLayout returns the cell width (text + surrounding pad +
-// trailing gutter) and column count for the chip grid given counts and
-// inner width. Renderer and move handler share this so their wrap row
-// counts always match exactly.
-func orphanChipLayout(counts OrphanCounts, width int) (cellW, cols int) {
+// orphanChipLayout returns the widest unpadded chip text and the
+// column count for the chip grid given counts and inner width.
+// Renderer and move handler share this so their wrap row counts always
+// match exactly; the renderer also reuses maxTextW so every cell pads
+// to a uniform width.
+func orphanChipLayout(counts OrphanCounts, width int) (maxTextW, cols int) {
 	defs := orphanChipDefs(counts)
-	maxTextW := 0
 	for _, d := range defs {
 		w := lipgloss.Width(fmt.Sprintf("%s %d", d.label, d.count))
 		if w > maxTextW {
@@ -261,10 +261,10 @@ func orphanChipLayout(counts OrphanCounts, width int) (cellW, cols int) {
 	}
 	const gutter = "  "
 	const indent = "  "
-	cellW = maxTextW + 2 + lipgloss.Width(gutter)
+	cellW := maxTextW + 2 + lipgloss.Width(gutter)
 	avail := max(width-lipgloss.Width(indent), cellW)
 	cols = max(avail/cellW, 1)
-	return cellW, cols
+	return maxTextW, cols
 }
 
 // renderOrphanChips builds the header chip strip in the same visual
@@ -294,17 +294,7 @@ func orphanChipLayout(counts OrphanCounts, width int) (cellW, cols int) {
 // (where `[ All 6 ]` denotes the active chip with bg highlight).
 func renderOrphanChips(counts OrphanCounts, active, width int) string {
 	defs := orphanChipDefs(counts)
-	_, cols := orphanChipLayout(counts, width)
-
-	// maxTextW recomputed here so the inner padding matches what
-	// orphanChipLayout used to derive cellW — keeps cells uniform.
-	maxTextW := 0
-	for _, d := range defs {
-		w := lipgloss.Width(fmt.Sprintf("%s %d", d.label, d.count))
-		if w > maxTextW {
-			maxTextW = w
-		}
-	}
+	maxTextW, cols := orphanChipLayout(counts, width)
 
 	cells := make([]string, 0, len(defs))
 	for _, d := range defs {
@@ -346,7 +336,7 @@ func renderOrphanChips(counts OrphanCounts, active, width int) string {
 		if end-i < cols {
 			missing := cols - (end - i)
 			cellWtext := maxTextW + 2 // unstyled width of one cell's content
-			for k := 0; k < missing; k++ {
+			for range missing {
 				b.WriteString(gutter)
 				b.WriteString(strings.Repeat(" ", cellWtext))
 			}

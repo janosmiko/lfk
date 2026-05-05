@@ -147,7 +147,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayCanI`            | `:can-i` flow (after subject)   | Display can-i evaluation results.                               |
 | `overlayAutoSync`        | ArgoCD app                      | Toggle auto-sync settings.                                      |
 | `overlayBackgroundTasks` | `` ` ``, `:tasks`               | In-flight + recent background tasks.                            |
-| `overlayOrphans`         | `Shift+O`, `:orphans`           | Cluster-wide orphan overview (Pods without owners, unmounted Secrets/ConfigMaps, Services with no endpoints). Backed by `Model.orphanCache`. |
+| `overlayOrphans`         | `Shift+O`, `:orphans`           | Cluster-wide orphan overview across all 11 supported kinds (Pods, Secrets, ConfigMaps, Services, PVCs, HPAs, PDBs, NetworkPolicies, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings). Strict / lenient toggle (`s`) flips between truly unused and currently idle but template-referenced items. Backed by `Model.orphanCache`. |
 
 ## Boolean overlays
 

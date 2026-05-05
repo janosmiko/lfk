@@ -680,7 +680,7 @@ func (m Model) handleExplorerActionKeyFilterPresets() (tea.Model, tea.Cmd, bool)
 	}
 	// Open the filter preset overlay.
 	kind := m.nav.ResourceType.Kind
-	key := orphanCacheKey{kubeContext: m.nav.Context, namespace: m.namespace}
+	key := orphanCacheKey{kubeContext: m.nav.Context, namespace: m.orphanCacheNamespace()}
 	m.filterPresets = builtinFilterPresetsWithOrphans(kind, m.orphanCache, key)
 	m.overlayCursor = 0
 	m.overlay = overlayFilterPreset

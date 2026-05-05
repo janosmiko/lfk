@@ -111,7 +111,7 @@
 - **Port forwarding** from the action menu (with local port setting and browser open); manage active forwards via the Networking group
 - **Clipboard support**: Copy resource name (`y`), YAML (`Y`), paste/apply from clipboard (`Ctrl+P`), paste into search/filter boxes (`Cmd+V` / `Ctrl+Shift+V`)
 - **Bookmarks**: Save favorite resource paths for quick navigation
-- **Orphan detection**: Filter Pods/Secrets/ConfigMaps/Services to just orphans (no owner / unmounted / no endpoints) via the filter-preset overlay (`.`) on each kind, or jump straight there with `:orphans <kind>` (e.g., `:orphans secrets`). Auto-excludes Helm release Secrets, ServiceAccount tokens, owner-managed resources, and `kube-root-ca.crt`. The cluster-wide overview overlay will be added in a follow-up.
+- **Orphan detection**: Press `Shift+O` (or run bare `:orphans`) to open the cluster-wide orphan overview across 11 kinds — Pods, Secrets, ConfigMaps, Services, PVCs, HPAs, PDBs, NetworkPolicies, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings. Per-list filters are still available via the filter-preset overlay (`.`) on each kind, or jump straight to a filtered view with `:orphans <kind>` (e.g., `:orphans secrets`). A strict / lenient toggle (`s`) flips between "truly unused" and "currently idle but referenced by workload templates" (e.g. CronJob between firings). Auto-excludes Helm release Secrets, ServiceAccount tokens, owner-managed resources, and `kube-root-ca.crt`.
 - **Session persistence**: Remembers last context/namespace/resource across restarts
 - **Command bar**: Press `:` for shell/kubectl commands with autocompletion
 

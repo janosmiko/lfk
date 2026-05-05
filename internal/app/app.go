@@ -553,7 +553,8 @@ type Model struct {
 	serviceEndpointsCache map[string]*k8s.ServiceEndpoints // stale-while-revalidate cache for the Service endpoint rollup; see commands_load_preview.go
 	// orphanCache holds the most recent OrphanReport per (kubeContext, namespace); see commands_orphans.go
 	orphanCache        map[orphanCacheKey]*k8s.OrphanReport
-	orphanLoadInflight map[orphanCacheKey]bool
+	orphanLoadInflight map[orphanCacheKey]orphanInflight
+	orphanGen          uint64 // monotonic counter; bumped per scan so a superseded result is dropped on arrival
 	orphans            orphanState
 	// secretPreviewCache caches decoded secret data keyed "ctx/ns/name" to skip
 	// redundant API calls on hover-after-refresh; invalidated on successful save.

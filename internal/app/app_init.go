@@ -70,7 +70,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		secretPreviewCache:         make(map[string]*model.SecretData),
 		serviceEndpointsCache:      make(map[string]*k8s.ServiceEndpoints),
 		orphanCache:                make(map[orphanCacheKey]*k8s.OrphanReport),
-		orphanLoadInflight:         make(map[orphanCacheKey]bool),
+		orphanLoadInflight:         make(map[orphanCacheKey]orphanInflight),
 		orphans:                    orphanState{strict: true},
 		discoveryRefreshedContexts: make(map[string]bool),
 		allGroupsExpanded:          true,

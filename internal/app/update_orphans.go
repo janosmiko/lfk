@@ -41,6 +41,19 @@ func (m Model) orphansOverlayW() int {
 	return min(100, m.width-10)
 }
 
+// orphanCacheNamespace returns the namespace component of the orphan
+// cache key for the model's current list scope. All-namespaces and
+// multi-namespace selections collapse to the empty string so the
+// cluster-wide report is reused — without that, a single-namespace
+// cache slot would shadow the broader list and `:orphans <kind>` would
+// miss valid rows in the default broad-scope flows.
+func (m Model) orphanCacheNamespace() string {
+	if m.allNamespaces || len(m.selectedNamespaces) > 1 {
+		return ""
+	}
+	return m.namespace
+}
+
 // orphansMoveCursor moves the cursor by delta within the visible
 // (post-filter, post-kind-chip) list, clamps at the edges, and updates
 // the scroll offset to keep the cursor in view via vim-like
@@ -276,9 +289,13 @@ func (m Model) jumpToOrphan() (Model, tea.Cmd) {
 
 	// Switch namespace before navigating so the resource list loads
 	// scoped correctly. Cluster-wide orphan list → single-namespace
-	// resource list, so all-namespaces must be off.
+	// resource list, so all-namespaces must be off and any prior
+	// multi-namespace selection has to be replaced — otherwise the
+	// resource load can include extra namespaces or even drop the
+	// target one, making Enter-to-jump look broken.
 	m.allNamespaces = false
 	m.namespace = target.Namespace
+	m.selectedNamespaces = map[string]bool{target.Namespace: true}
 
 	// Climb back to LevelResourceTypes regardless of where the user was
 	// when they opened the overlay.

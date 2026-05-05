@@ -318,27 +318,33 @@ session affinity, etc.), press `v` (Describe).
 
 ## Orphan detection
 
-`lfk` flags Kubernetes resources that have no live consumer or controller:
+`lfk` flags Kubernetes resources that have no live consumer or controller, across 11 kinds:
 
 - **Pods without owners** — typically debug / one-off pods that escaped a controller. Static pods (kubelet-managed) are excluded; terminal pods older than an hour are tagged separately.
 - **Secrets / ConfigMaps not mounted** — anything not referenced by a Pod (volumes, env, envFrom, imagePullSecrets), an Ingress (`spec.tls.secretName`), or a ServiceAccount.
 - **Services with no endpoints** — non-Headless, non-ExternalName Services with zero backing addresses.
+- **PersistentVolumeClaims not mounted** — bound but no Pod or workload template references them.
+- **HorizontalPodAutoscalers with a missing target** — `scaleTargetRef` doesn't resolve.
+- **PodDisruptionBudgets / NetworkPolicies that match nothing** — selector resolves to zero live or templated pods.
+- **Roles / ClusterRoles with no binding** — no RoleBinding or ClusterRoleBinding refers to them.
+- **RoleBindings / ClusterRoleBindings with a missing role or empty subjects.**
 
 ### Cluster-wide overview
 
 Press **`Shift+O`** anywhere in the explorer (or type `:orphans` in the command bar) to open the orphan overview overlay. It scans the cluster and lists every orphan in one table grouped by kind:
 
-- `Tab` / `Shift+Tab` cycle the kind filter chips at the top (All / Pods / Secrets / ConfigMaps / Services)
+- `Tab` / `Shift+Tab` cycle through every kind filter chip (All plus all supported orphan kinds rendered in the strip)
+- `s` toggles strict / lenient — strict (default) hides items referenced by workload templates (e.g. CronJob between firings, scaled-to-zero Deployment); lenient surfaces them
 - `/` filters by namespace + name
 - `Enter` jumps straight to the highlighted resource (the namespace switches automatically)
 - `R` re-scans the cluster
-- `Esc` closes the overlay
+- `Esc`, `q`, or `Shift+O` close the overlay
 
 Partial-RBAC denials surface as a warning banner at the top of the overlay; whatever could be listed is still shown.
 
 ### Per-kind filter presets
 
-Inside any Pods / Secrets / ConfigMaps / Services list, press **`.`** to open the filter-preset overlay and pick the orphan preset. `:orphans <kind>` (e.g. `:orphans secrets`) jumps to the kind's list with the preset already applied.
+Inside a list for any supported kind, press **`.`** to open the filter-preset overlay and pick the orphan preset. `:orphans <kind>` (e.g. `:orphans secrets`, `:orphans pvcs`, `:orphans rolebindings`) jumps to the kind's list with the preset already applied.
 
 ### Auto-exclusions
 

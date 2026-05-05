@@ -351,36 +351,67 @@ func appendConfigPresets(presets []FilterPreset, kind string) []FilterPreset {
 	return presets
 }
 
+// orphanPoolForKind returns the OrphanItem slice on `report` matching
+// `kind`, or nil if the kind doesn't have a per-list orphan preset.
+// Centralised so orphanMatcher and any future caller stay in sync.
+func orphanPoolForKind(report *k8s.OrphanReport, kind string) []k8s.OrphanItem {
+	if report == nil {
+		return nil
+	}
+	switch kind {
+	case "Pod":
+		return report.Pods
+	case "Secret":
+		return report.Secrets
+	case "ConfigMap":
+		return report.ConfigMaps
+	case "Service":
+		return report.Services
+	case "PersistentVolumeClaim":
+		return report.PVCs
+	case "HorizontalPodAutoscaler":
+		return report.HPAs
+	case "PodDisruptionBudget":
+		return report.PDBs
+	case "NetworkPolicy":
+		return report.NetworkPolicies
+	case "Role":
+		return report.Roles
+	case "ClusterRole":
+		return report.ClusterRoles
+	case "RoleBinding":
+		return report.RoleBindings
+	case "ClusterRoleBinding":
+		return report.ClusterRoleBindings
+	}
+	return nil
+}
+
+// orphanLookupKey joins namespace and name with a NUL separator so a
+// stray slash or space in either field can't collide between rows.
+func orphanLookupKey(namespace, name string) string {
+	return namespace + "\x00" + name
+}
+
 // orphanMatcher builds a FilterPreset.MatchFn that returns true when the item
-// is in the cached OrphanReport for the given (key, kind). An empty cache or a
-// missing key causes the function to return false for everything; the load
-// command fires asynchronously when the preset is activated, then a re-render
-// populates the list.
+// is in the cached OrphanReport for the given (key, kind). The lookup table
+// is built once when the closure is created so MatchFn calls are O(1) — the
+// previous implementation scanned the full slice per call which became O(N²)
+// across a list re-filter.
+//
+// An empty cache or a missing key produces an empty lookup and the function
+// returns false for everything; the load command fires asynchronously when
+// the preset is activated, then a re-render rebuilds the matcher with the
+// populated cache.
 func orphanMatcher(cache map[orphanCacheKey]*k8s.OrphanReport, key orphanCacheKey, kind string) func(model.Item) bool {
+	pool := orphanPoolForKind(cache[key], kind)
+	lookup := make(map[string]struct{}, len(pool))
+	for _, o := range pool {
+		lookup[orphanLookupKey(o.Namespace, o.Name)] = struct{}{}
+	}
 	return func(item model.Item) bool {
-		report := cache[key]
-		if report == nil {
-			return false
-		}
-		var pool []k8s.OrphanItem
-		switch kind {
-		case "Pod":
-			pool = report.Pods
-		case "Secret":
-			pool = report.Secrets
-		case "ConfigMap":
-			pool = report.ConfigMaps
-		case "Service":
-			pool = report.Services
-		default:
-			return false
-		}
-		for _, o := range pool {
-			if o.Namespace == item.Namespace && o.Name == item.Name {
-				return true
-			}
-		}
-		return false
+		_, ok := lookup[orphanLookupKey(item.Namespace, item.Name)]
+		return ok
 	}
 }
 
@@ -408,17 +439,62 @@ func orphanPresetsForKind(kind string, cache map[orphanCacheKey]*k8s.OrphanRepor
 			Name: "No Endpoints", Description: "Service has zero ready+notReady endpoints", Key: "e",
 			MatchFn: orphanMatcher(cache, key, "Service"),
 		}}
+	case "PersistentVolumeClaim":
+		return []FilterPreset{{
+			Name: "Unused", Description: "PVC is not mounted by any Pod or workload template", Key: "u",
+			MatchFn: orphanMatcher(cache, key, "PersistentVolumeClaim"),
+		}}
+	case "HorizontalPodAutoscaler":
+		return []FilterPreset{{
+			Name: "Dangling", Description: "HPA scaleTargetRef points to a missing workload", Key: "d",
+			MatchFn: orphanMatcher(cache, key, "HorizontalPodAutoscaler"),
+		}}
+	case "PodDisruptionBudget":
+		return []FilterPreset{{
+			Name: "Dangling", Description: "PDB selector matches no live or templated pods", Key: "d",
+			MatchFn: orphanMatcher(cache, key, "PodDisruptionBudget"),
+		}}
+	case "NetworkPolicy":
+		return []FilterPreset{{
+			Name: "Dangling", Description: "NetworkPolicy podSelector matches no live or templated pods", Key: "d",
+			MatchFn: orphanMatcher(cache, key, "NetworkPolicy"),
+		}}
+	case "Role":
+		return []FilterPreset{{
+			Name: "Unbound", Description: "Role has no RoleBinding / ClusterRoleBinding", Key: "u",
+			MatchFn: orphanMatcher(cache, key, "Role"),
+		}}
+	case "ClusterRole":
+		return []FilterPreset{{
+			Name: "Unbound", Description: "ClusterRole has no RoleBinding / ClusterRoleBinding", Key: "u",
+			MatchFn: orphanMatcher(cache, key, "ClusterRole"),
+		}}
+	case "RoleBinding":
+		return []FilterPreset{{
+			Name: "Dangling", Description: "RoleBinding refers to a missing role or has empty subjects", Key: "d",
+			MatchFn: orphanMatcher(cache, key, "RoleBinding"),
+		}}
+	case "ClusterRoleBinding":
+		return []FilterPreset{{
+			Name: "Dangling", Description: "ClusterRoleBinding refers to a missing role or has empty subjects", Key: "d",
+			MatchFn: orphanMatcher(cache, key, "ClusterRoleBinding"),
+		}}
 	}
 	return nil
 }
 
 // needsOrphanCache reports whether opening the filter-preset overlay for this
-// kind should kick off a DetectOrphans scan. Pod/Secret/ConfigMap/Service have
-// orphan presets whose MatchFn reads from orphanCache; other kinds skip the
-// load.
+// kind should kick off a DetectOrphans scan. Every kind that has a preset in
+// orphanPresetsForKind also needs the cache; keep the two in sync.
 func needsOrphanCache(kind string) bool {
 	switch kind {
-	case "Pod", "Secret", "ConfigMap", "Service":
+	case "Pod", "Secret", "ConfigMap", "Service",
+		"PersistentVolumeClaim",
+		"HorizontalPodAutoscaler",
+		"PodDisruptionBudget",
+		"NetworkPolicy",
+		"Role", "ClusterRole",
+		"RoleBinding", "ClusterRoleBinding":
 		return true
 	}
 	return false

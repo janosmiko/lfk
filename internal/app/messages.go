@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"time"
 
 	"github.com/janosmiko/lfk/internal/k8s"
@@ -516,11 +517,23 @@ type orphanCacheKey struct {
 	namespace   string
 }
 
+// orphanInflight is the per-key bookkeeping for an in-flight scan.
+// gen lets handleOrphansLoaded drop a superseded result; cancel lets
+// invalidators stop the scan immediately when the user switches
+// namespace/context or refreshes — without it, a stale scan could
+// repopulate the cache after invalidation.
+type orphanInflight struct {
+	gen    uint64
+	cancel context.CancelFunc
+}
+
 // orphansLoadedMsg carries the result of a DetectOrphans run. Err may be
 // non-nil while Report holds partial data — the UI renders a banner and
-// still shows what was returned.
+// still shows what was returned. gen is checked against the recorded
+// inflight entry so cancelled / superseded scans don't write back.
 type orphansLoadedMsg struct {
 	key    orphanCacheKey
+	gen    uint64
 	report k8s.OrphanReport
 	err    error
 }

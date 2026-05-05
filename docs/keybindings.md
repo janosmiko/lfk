@@ -20,7 +20,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar (resets each launch) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
-| `o` | Jump to owner/controller of selected resource (`o` = jump to my owner; `O` = find resources with no owner) |
+| `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the cluster-wide orphan overview overlay |
 
 ## Views and Tools
 
@@ -63,30 +63,37 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 
 ## Orphan filter presets
 
-#### Cluster-wide overview
+### Cluster-wide overview
 
 Press **`Shift+O`** anywhere in the explorer (or type `:orphans` with no arguments in the command bar) to open the cluster-wide orphan overview overlay. Inside the overlay:
 
 | Key | Action |
 | --- | ------ |
-| `Tab` / `Shift+Tab` | Cycle kind filter chips (All / Pods / Secrets / ConfigMaps / Services) |
+| `Tab` / `Shift+Tab` | Cycle kind filter chips (All / Pods / Secrets / CMs / Svcs / PVCs / HPAs / PDBs / NetPols / Roles / RBs) |
+| `s` | Toggle strict / lenient — strict (default) hides items referenced by workload templates; lenient surfaces them |
 | `/` | Filter by namespace + name |
 | `Enter` | Jump to the highlighted resource (namespace switches automatically) |
 | `R` | Re-scan the cluster |
-| `Esc` | Close the overlay |
+| `Esc` / `q` / `Shift+O` | Close the overlay |
 
-#### Per-kind presets
+### Per-kind presets
 
-The `.` filter-preset overlay surfaces these orphan-detection presets when the active resource list is one of:
+The `.` filter-preset overlay surfaces these orphan-detection presets when the active resource list is one of the supported kinds:
 
-| Resource list | Preset name      | Match                                              |
-| ------------- | ---------------- | -------------------------------------------------- |
-| Pods          | Orphans          | No owner reference (excludes static / mirror pods) |
-| Secrets       | Unmounted        | Not referenced by any Pod, workload template, Ingress, or SA |
-| ConfigMaps    | Unmounted        | Not referenced by any Pod or workload template     |
-| Services      | No Endpoints     | Zero ready+notReady endpoints                      |
+| Resource list | Preset name | Match |
+| --- | --- | --- |
+| Pods | Orphans | No owner reference (excludes static / mirror pods) |
+| Secrets | Unmounted | Not referenced by any Pod, workload template, Ingress, or SA |
+| ConfigMaps | Unmounted | Not referenced by any Pod or workload template |
+| Services | No Endpoints | Zero ready+notReady endpoints |
+| PersistentVolumeClaims | Unused | Not mounted by any Pod or workload template |
+| HorizontalPodAutoscalers | Dangling | `scaleTargetRef` points to a missing workload |
+| PodDisruptionBudgets | Dangling | Selector matches no live or templated pods |
+| NetworkPolicies | Dangling | `podSelector` matches no live or templated pods |
+| Roles / ClusterRoles | Unbound | No RoleBinding or ClusterRoleBinding refers to this role |
+| RoleBindings / ClusterRoleBindings | Dangling | Refers to a missing role or has empty subjects |
 
-`:orphans <kind>` (e.g. `:orphans pods`) is a shortcut that jumps to the kind's list with the matching preset already applied.
+`:orphans <kind>` (e.g. `:orphans pods`, `:orphans pvcs`, `:orphans rolebindings`) is a shortcut that jumps to the kind's list with the matching preset already applied.
 
 Auto-excluded from "Unmounted" results:
 - Helm release Secrets (`type=helm.sh/release.v1`)

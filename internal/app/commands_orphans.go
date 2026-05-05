@@ -12,54 +12,85 @@ import (
 // inflight — duplicate-fire protection so the overlay opening and a
 // filter preset applying in the same tick don't issue two scans.
 //
-// On completion the result lands as orphansLoadedMsg, handled by
+// The scan runs on a cancellable context whose cancel is stored per
+// key; invalidators (namespace switch, context switch, R refresh) call
+// it so the in-flight scan stops immediately rather than racing the
+// new state. Each scan also carries a generation number so a result
+// arriving after cancellation is dropped on arrival in
 // handleOrphansLoaded.
+//
+// On completion the result lands as orphansLoadedMsg.
 func (m *Model) cmdLoadOrphans(key orphanCacheKey) tea.Cmd {
 	if m.orphanLoadInflight == nil {
-		m.orphanLoadInflight = make(map[orphanCacheKey]bool)
+		m.orphanLoadInflight = make(map[orphanCacheKey]orphanInflight)
 	}
-	if m.orphanLoadInflight[key] {
+	if _, ok := m.orphanLoadInflight[key]; ok {
 		return nil
 	}
-	m.orphanLoadInflight[key] = true
+	m.orphanGen++
+	gen := m.orphanGen
+	ctx, cancel := context.WithCancel(context.Background())
+	m.orphanLoadInflight[key] = orphanInflight{gen: gen, cancel: cancel}
 	client := m.client
 	return func() tea.Msg {
-		report, err := client.DetectOrphans(context.Background(), key.kubeContext, key.namespace)
-		return orphansLoadedMsg{key: key, report: report, err: err}
+		report, err := client.DetectOrphans(ctx, key.kubeContext, key.namespace)
+		return orphansLoadedMsg{key: key, gen: gen, report: report, err: err}
 	}
 }
 
-// invalidateOrphanCacheForNamespace drops cache entries for one namespace
-// of the given context. The cluster-wide entry (namespace == "") is
-// preserved so the overlay's data isn't blown away by a per-namespace
-// refresh.
+// invalidateOrphanCacheForNamespace drops the cache entry for one
+// namespace of the given context and cancels any in-flight scan for
+// that key — without the cancel + generation gate, a stale scan could
+// repopulate the cache after the user moved on. The cluster-wide entry
+// (namespace == "") is preserved so the overlay's data isn't blown
+// away by a per-namespace refresh.
 func (m *Model) invalidateOrphanCacheForNamespace(kubeCtx, ns string) {
-	delete(m.orphanCache, orphanCacheKey{kubeContext: kubeCtx, namespace: ns})
+	key := orphanCacheKey{kubeContext: kubeCtx, namespace: ns}
+	delete(m.orphanCache, key)
+	if inflight, ok := m.orphanLoadInflight[key]; ok {
+		inflight.cancel()
+		delete(m.orphanLoadInflight, key)
+	}
 }
 
-// invalidateOrphanCacheForContext drops every cache entry for the given
-// context. Called on context switch.
+// invalidateOrphanCacheForContext drops every cache entry and cancels
+// every in-flight scan for the given context. Called on context switch.
 func (m *Model) invalidateOrphanCacheForContext(kubeCtx string) {
 	for k := range m.orphanCache {
 		if k.kubeContext == kubeCtx {
 			delete(m.orphanCache, k)
 		}
 	}
+	for k, inflight := range m.orphanLoadInflight {
+		if k.kubeContext == kubeCtx {
+			inflight.cancel()
+			delete(m.orphanLoadInflight, k)
+		}
+	}
 }
 
-// handleOrphansLoaded persists the report to cache and clears the
-// inflight flag. The caller (Update) is responsible for deciding what
-// follow-up the UI needs.
+// handleOrphansLoaded persists the report to cache. A result whose gen
+// no longer matches the inflight entry (or has no entry at all) is
+// silently dropped — the scan was cancelled or superseded, and writing
+// its data back would resurrect stale state on top of the user's newer
+// scope. On a successful match the inflight entry is removed (idempotent
+// cancel — calling cancel a second time is a no-op).
 func (m Model) handleOrphansLoaded(msg orphansLoadedMsg) (Model, tea.Cmd) {
+	if m.orphanLoadInflight == nil {
+		m.orphanLoadInflight = make(map[orphanCacheKey]orphanInflight)
+	}
+	inflight, ok := m.orphanLoadInflight[msg.key]
+	if !ok || inflight.gen != msg.gen {
+		return m, nil
+	}
+	inflight.cancel()
+	delete(m.orphanLoadInflight, msg.key)
+
 	if m.orphanCache == nil {
 		m.orphanCache = make(map[orphanCacheKey]*k8s.OrphanReport)
 	}
 	report := msg.report
 	m.orphanCache[msg.key] = &report
-	if m.orphanLoadInflight == nil {
-		m.orphanLoadInflight = make(map[orphanCacheKey]bool)
-	}
-	m.orphanLoadInflight[msg.key] = false
 
 	// If the overlay is showing the same key, push the report into
 	// orphanState so the next render reflects the load.

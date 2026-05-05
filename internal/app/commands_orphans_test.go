@@ -22,7 +22,7 @@ func newTestModel() Model {
 		itemCache:           make(map[string][]model.Item),
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		orphanCache:         make(map[orphanCacheKey]*k8s.OrphanReport),
-		orphanLoadInflight:  make(map[orphanCacheKey]bool),
+		orphanLoadInflight:  make(map[orphanCacheKey]orphanInflight),
 		width:               80,
 		height:              40,
 		execMu:              &sync.Mutex{},
@@ -33,8 +33,16 @@ func TestCmdLoadOrphans_StoresInCacheOnSuccess(t *testing.T) {
 	m := newTestModel()
 	key := orphanCacheKey{kubeContext: "test", namespace: ""}
 
+	// Simulate cmdLoadOrphans having registered an inflight entry —
+	// handleOrphansLoaded ignores results without a matching gen, so
+	// the test must record one before delivering the message.
+	cmd := m.cmdLoadOrphans(key)
+	require.NotNil(t, cmd)
+	gen := m.orphanLoadInflight[key].gen
+
 	msg := orphansLoadedMsg{
 		key:    key,
+		gen:    gen,
 		report: k8s.OrphanReport{Pods: []k8s.OrphanItem{{Kind: "Pod", Name: "naked"}}},
 	}
 
@@ -42,7 +50,8 @@ func TestCmdLoadOrphans_StoresInCacheOnSuccess(t *testing.T) {
 
 	require.NotNil(t, updated.orphanCache[key])
 	assert.Equal(t, "naked", updated.orphanCache[key].Pods[0].Name)
-	assert.False(t, updated.orphanLoadInflight[key])
+	_, stillInflight := updated.orphanLoadInflight[key]
+	assert.False(t, stillInflight, "inflight entry must be cleared on completion")
 }
 
 func TestCmdLoadOrphans_DedupesInflight(t *testing.T) {
@@ -51,12 +60,34 @@ func TestCmdLoadOrphans_DedupesInflight(t *testing.T) {
 
 	cmd1 := m.cmdLoadOrphans(key)
 	require.NotNil(t, cmd1, "first call must return a Cmd")
-	require.True(t, m.orphanLoadInflight[key])
+	_, ok := m.orphanLoadInflight[key]
+	require.True(t, ok, "first call must record an inflight entry")
 
 	cmd2 := m.cmdLoadOrphans(key)
 	assert.Nil(t, cmd2, "second call must dedupe while inflight")
 
 	_ = cmd1
+}
+
+func TestHandleOrphansLoaded_DropsSupersededResult(t *testing.T) {
+	m := newTestModel()
+	key := orphanCacheKey{kubeContext: "test", namespace: ""}
+
+	// Start a scan, then invalidate before its result arrives. The
+	// late completion should not repopulate the cache — the user has
+	// already moved on.
+	require.NotNil(t, m.cmdLoadOrphans(key))
+	gen := m.orphanLoadInflight[key].gen
+	m.invalidateOrphanCacheForContext("test")
+
+	msg := orphansLoadedMsg{
+		key:    key,
+		gen:    gen,
+		report: k8s.OrphanReport{Pods: []k8s.OrphanItem{{Kind: "Pod", Name: "stale"}}},
+	}
+	updated, _ := m.handleOrphansLoaded(msg)
+
+	assert.Nil(t, updated.orphanCache[key], "superseded result must not write to cache")
 }
 
 func TestInvalidateOrphanCacheForNamespace(t *testing.T) {

@@ -54,6 +54,8 @@ func (m Model) isOverlayToggleKey(key string) bool {
 		return key == kb.QuotaDashboard
 	case overlayClusterColor:
 		return key == kb.ClusterColorPicker
+	case overlayOrphans:
+		return key == kb.OrphanOverlay
 	}
 	return false
 }
