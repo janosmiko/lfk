@@ -72,6 +72,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		orphanCache:                make(map[orphanCacheKey]*k8s.OrphanReport),
 		orphanLoadInflight:         make(map[orphanCacheKey]orphanInflight),
 		orphans:                    orphanState{strict: true},
+		rightsizingCache:           make(map[string]*model.Rightsizing),
 		discoveryRefreshedContexts: make(map[string]bool),
 		allGroupsExpanded:          true,
 		warningEventsOnly:          true,

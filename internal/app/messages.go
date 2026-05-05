@@ -266,6 +266,16 @@ type secretDataLoadedMsg struct {
 	err  error
 }
 
+// rightsizingLoadedMsg carries the lazily-fetched right-sizing
+// recommendations. Generation token guards against stale-fetch
+// races (see Model.rightsizing.gen).
+type rightsizingLoadedMsg struct {
+	key        string // cache key the fetch was dispatched for
+	data       *model.Rightsizing
+	err        error
+	generation int
+}
+
 // secretSavedMsg carries the result of saving secret data.
 type secretSavedMsg struct {
 	err error

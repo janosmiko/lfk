@@ -1,6 +1,8 @@
 package model
 
 import (
+	"slices"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -376,6 +378,94 @@ func actionLabels(actions []ActionMenuItem) []string {
 		labels[i] = a.Label
 	}
 	return labels
+}
+
+// --- RightsizingStrategy ---
+
+func TestAllRightsizingStrategiesPriorityOrder(t *testing.T) {
+	// Priority order is user-confirmed: VPA first (most accurate
+	// historical recommender), then Prometheus peak/avg/p95 windows,
+	// then snapshot as the always-available fallback.
+	want := []RightsizingStrategy{
+		StrategyVPA,
+		StrategyPromMax1D,
+		StrategyPromAvg1D,
+		StrategyPromP957D,
+		StrategySnapshot,
+	}
+	assert.Equal(t, want, AllRightsizingStrategies, "AllRightsizingStrategies must match user-confirmed priority order")
+}
+
+func TestRightsizingStrategyHumanLabel(t *testing.T) {
+	tests := []struct {
+		strategy RightsizingStrategy
+		want     string
+	}{
+		{StrategyVPA, "VPA"},
+		{StrategyPromMax1D, "1d-max"},
+		{StrategyPromAvg1D, "1d-avg"},
+		{StrategyPromP957D, "7d-p95"},
+		{StrategySnapshot, "snapshot"},
+	}
+	for _, tt := range tests {
+		t.Run(string(tt.strategy), func(t *testing.T) {
+			assert.Equal(t, tt.want, tt.strategy.HumanLabel())
+		})
+	}
+}
+
+func TestRightsizingStrategyMethodologyHint(t *testing.T) {
+	// Each hint should mention the source/window so the user can tell
+	// at a glance what algorithm and time range backs the suggestion.
+	// Headroom is intentionally NOT in the strategy-only hint — the UI
+	// appends "x <H> headroom" using the data's Headroom field, so the
+	// strategy-only hint stays headroom-agnostic.
+	hint := StrategyPromMax1D.MethodologyHint()
+	assert.Contains(t, hint, "1d", "1d-max hint must mention the 1d window")
+	assert.Contains(t, hint, "max", "1d-max hint must mention the max aggregation")
+
+	avgHint := StrategyPromAvg1D.MethodologyHint()
+	assert.Contains(t, avgHint, "1d")
+	assert.Contains(t, avgHint, "avg")
+
+	p95Hint := StrategyPromP957D.MethodologyHint()
+	assert.Contains(t, p95Hint, "7d")
+	assert.Contains(t, p95Hint, "p95")
+
+	vpaHint := StrategyVPA.MethodologyHint()
+	assert.Contains(t, strings.ToLower(vpaHint), "vpa", "VPA hint must mention VPA")
+
+	snapHint := StrategySnapshot.MethodologyHint()
+	assert.Contains(t, strings.ToLower(snapHint), "current", "snapshot hint must mention current usage")
+}
+
+// --- RightsizingHeadrooms picker values ---
+
+func TestRightsizingHeadroomsValues(t *testing.T) {
+	// The </> picker walks RightsizingHeadrooms in ASCENDING order so a
+	// `>` press reads as "give me more safety margin" and `<` reads as
+	// "tighten the recommendation." The exact values are user-facing —
+	// changing them is a UX change, hence this guardrail.
+	want := []float64{1.0, 1.1, 1.25, 1.5, 1.75, 2.0}
+	assert.Equal(t, want, RightsizingHeadrooms,
+		"RightsizingHeadrooms must match the picker spec (ascending order)")
+}
+
+func TestDefaultRightsizingHeadroomValue(t *testing.T) {
+	// 1.25 is the closest entry to the previous hardcoded 1.2 default,
+	// chosen so the migration is visually invisible while still sitting
+	// on a value the user can tune up/down via </>.
+	assert.InDelta(t, 1.25, DefaultRightsizingHeadroom, 1e-9,
+		"DefaultRightsizingHeadroom must be 1.25 (the picker value closest to the legacy 1.2 default)")
+}
+
+func TestDefaultRightsizingHeadroomIsInPickerList(t *testing.T) {
+	// The default headroom MUST appear in RightsizingHeadrooms so the
+	// picker's [N/M] chip can render a position on first open without
+	// snapping. If the constant ever drifts off the list, the chip would
+	// render "?" until the user pressed </>.
+	assert.True(t, slices.Contains(RightsizingHeadrooms, DefaultRightsizingHeadroom),
+		"DefaultRightsizingHeadroom must be one of RightsizingHeadrooms")
 }
 
 func TestBookmarkIsContextAware(t *testing.T) {

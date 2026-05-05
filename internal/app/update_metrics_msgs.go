@@ -396,6 +396,31 @@ func ensureNodeMetricsColumnsPlaceholder(item *model.Item) {
 	item.Columns = filtered
 }
 
+// updateRightsizingLoaded handles the rightsizingLoadedMsg. Stale
+// generation discarded (overlay closed + reopened with a different
+// workload before this fetch returned); otherwise stores the result
+// in m.rightsizing (or m.rightsizing.err) and caches it for re-opens.
+//
+// Errors are NOT cached — the next overlay open will retry instead
+// of replaying the stale failure.
+func (m Model) updateRightsizingLoaded(msg rightsizingLoadedMsg) Model {
+	if msg.generation != m.rightsizing.gen {
+		return m // late response from a previous overlay open — discard
+	}
+	m.rightsizing.loading = false
+	if msg.err != nil {
+		m.rightsizing.err = msg.err
+		return m
+	}
+	m.rightsizing.err = nil
+	m.rightsizing.data = msg.data
+	if m.rightsizingCache == nil {
+		m.rightsizingCache = make(map[string]*model.Rightsizing)
+	}
+	m.rightsizingCache[msg.key] = msg.data
+	return m
+}
+
 func (m Model) updateNodeMetricsEnriched(msg nodeMetricsEnrichedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m

@@ -1,7 +1,9 @@
 package ui
 
 import (
+	"math"
 	"os"
+	"slices"
 	"strings"
 	"time"
 
@@ -177,6 +179,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.ReadOnly != nil {
 		ConfigReadOnly = *cfg.ReadOnly
 	}
+	applyRightsizingDefaults(cfg.RightsizingDefaults)
 	if os.Getenv("NO_COLOR") != "" {
 		// Per https://no-color.org, the presence of NO_COLOR (regardless of
 		// value) disables color. Env takes precedence over the config file
@@ -221,4 +224,77 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			}
 		}
 	}
+}
+
+// applyRightsizingDefaults validates the rightsizing_defaults config
+// section and pushes accepted values into the model package-level vars
+// consumed by executeActionRightsizing's sticky-then-config-then-builtin
+// fallback chain.
+//
+// A nil section is a no-op (omitting rightsizing_defaults must NOT
+// clobber an already-set value — important for tests and for future
+// reload paths). Invalid strategy literals or off-preset headroom
+// values are dropped with a warning so the user gets a single, visible
+// signal at startup rather than a silent fallthrough; the model var
+// is left at zero in that case so the runtime falls back through the
+// rest of the chain.
+func applyRightsizingDefaults(cfg *RightsizingDefaultsConfig) {
+	if cfg == nil {
+		return
+	}
+	if cfg.Strategy != "" {
+		if s, ok := parseRightsizingStrategy(cfg.Strategy); ok {
+			model.ConfigDefaultRightsizingStrategy = s
+		} else {
+			logger.Warn("unknown rightsizing_defaults.strategy in config; ignored",
+				"value", cfg.Strategy,
+				"valid", rightsizingStrategyLiterals())
+		}
+	}
+	if cfg.Headroom != 0 {
+		if h, ok := parseRightsizingHeadroom(cfg.Headroom); ok {
+			model.ConfigDefaultRightsizingHeadroom = h
+		} else {
+			logger.Warn("invalid rightsizing_defaults.headroom in config; ignored",
+				"value", cfg.Headroom,
+				"valid", model.RightsizingHeadrooms)
+		}
+	}
+}
+
+// parseRightsizingStrategy resolves a config string against the known
+// strategy literals (strict match, no case folding — predictable for
+// users typing config files by hand). Returns the matched strategy
+// and true on success; ("", false) for unknown values.
+func parseRightsizingStrategy(s string) (model.RightsizingStrategy, bool) {
+	candidate := model.RightsizingStrategy(s)
+	if slices.Contains(model.AllRightsizingStrategies, candidate) {
+		return candidate, true
+	}
+	return "", false
+}
+
+// parseRightsizingHeadroom validates a config float against the
+// preset values in model.RightsizingHeadrooms using a 1e-9 epsilon so
+// 1.25 typed as 1.250000000000001 still matches. Returns the canonical
+// preset value (not the raw input) so any cache key derived from it
+// is stable across config-file rewrites.
+func parseRightsizingHeadroom(v float64) (float64, bool) {
+	for _, preset := range model.RightsizingHeadrooms {
+		if math.Abs(v-preset) < 1e-9 {
+			return preset, true
+		}
+	}
+	return 0, false
+}
+
+// rightsizingStrategyLiterals returns the user-facing string form of
+// every known strategy, used in warning logs so the user can see what
+// they should have typed.
+func rightsizingStrategyLiterals() []string {
+	out := make([]string, 0, len(model.AllRightsizingStrategies))
+	for _, s := range model.AllRightsizingStrategies {
+		out = append(out, string(s))
+	}
+	return out
 }

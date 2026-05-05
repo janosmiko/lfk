@@ -401,6 +401,9 @@ func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, boo
 		return m, m.loadSecretData(), true
 	case "ConfigMap Editor":
 		return m, m.loadConfigMapData(), true
+	case "Right-sizing":
+		mdl, cmd := m.executeActionRightsizing()
+		return mdl, cmd, true
 	case "Delete":
 		mdl, cmd := m.executeActionDelete()
 		return mdl, cmd, true

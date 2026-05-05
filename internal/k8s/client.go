@@ -65,6 +65,13 @@ type Client struct {
 	testDynClient  any // dynamic.Interface
 	testMetaClient any // metadata.Interface
 
+	// testPromQuery, when set, replaces the real Service.ProxyGet
+	// pipeline used by the right-sizing Prometheus strategies. Tests
+	// inject a stub that returns canned PromQL responses without
+	// needing a working Service object on the fake clientset.
+	// Signature: ctx, contextName, promQL -> JSON body bytes.
+	testPromQuery func(ctx context.Context, contextName, query string) ([]byte, error)
+
 	// testHostByDisplay, when set, lets tests bypass kubeconfig host
 	// resolution in HostForContext. Most fake test clients are constructed
 	// without Cluster definitions (no server URL), so a real

@@ -194,6 +194,8 @@ func (m Model) overlayHintBarEditor() string {
 		return m.overlayHintBarOverlaySecretEditor()
 	case overlayConfigMapEditor:
 		return m.overlayHintBarOverlayConfigMapEditor()
+	case overlayRightsizing:
+		return m.overlayHintBarOverlayRightsizing()
 	case overlayLabelEditor:
 		return m.overlayHintBarOverlayLabelEditor()
 	case overlayColumnToggle:
@@ -577,4 +579,58 @@ func (m Model) overlayHintBarOverlayColumnToggle() string {
 		{Key: "Enter", Desc: "save"},
 		{Key: "Esc", Desc: "discard"},
 	})
+}
+
+// overlayHintBarOverlayRightsizing returns the hint bar entries for
+// the right-sizing overlay. Loading state shows only "esc cancel"
+// since the other actions need data; loaded state shows y/r/esc plus
+// the picker chords:
+//
+//   - `[/]: strategy` only when more than one strategy is available
+//     (otherwise the cycle is a no-op and the hint would be a lie).
+//   - `</>: headroom` always (model.RightsizingHeadrooms is a fixed
+//     6-entry list, so the cycle always has somewhere to go).
+//
+// The vim-nav set (jk/gG/ctrl+d-u/ctrl+f-b) appears only when the
+// table actually overflows the visible height.
+func (m Model) overlayHintBarOverlayRightsizing() string {
+	if m.rightsizing.loading {
+		return m.renderHints([]ui.HintEntry{
+			{Key: "esc", Desc: "cancel"},
+		})
+	}
+	hints := []ui.HintEntry{
+		{Key: "y", Desc: "copy as YAML"},
+		{Key: "r", Desc: "refresh"},
+	}
+	if len(m.rightsizing.available) > 1 {
+		hints = append(hints, ui.HintEntry{Key: "[/]", Desc: "strategy"})
+	}
+	hints = append(hints, ui.HintEntry{Key: "</>", Desc: "headroom"})
+	hints = append(hints, ui.HintEntry{Key: "esc", Desc: "close"})
+	if m.rightsizing.data != nil && len(m.rightsizing.data.Containers)*2 > rightsizingVisibleRows(m) {
+		// Match the vim-nav set used by the NetworkPolicy + Help
+		// overlays (jk single, gG top/bottom, ctrl+d/u half-page,
+		// ctrl+f/b full-page) so the right-sizing overlay feels
+		// consistent with lfk's other read-only inspection views.
+		hints = append(hints,
+			ui.HintEntry{Key: "j/k", Desc: "scroll"},
+			ui.HintEntry{Key: "g/G", Desc: "top/bottom"},
+			ui.HintEntry{Key: "ctrl+d/u", Desc: "half page"},
+			ui.HintEntry{Key: "ctrl+f/b", Desc: "page"},
+		)
+	}
+	return m.renderHints(hints)
+}
+
+// rightsizingVisibleRows is a rough estimate of how many table rows
+// fit in the overlay. Used to decide whether to surface the jk hint.
+// Mirrors the box-dim math in RenderRightsizingOverlay (75% screen
+// height minus chrome). Approximate is fine — this is a hint, not a
+// hard layout constraint.
+func rightsizingVisibleRows(m Model) int {
+	boxH := max(m.height*75/100, 12)
+	// Subtract outer padding (4), inner border (2), title (2), gap (1),
+	// table header (1), header underline (1) = 11.
+	return max(boxH-11, 1)
 }

@@ -163,6 +163,54 @@ func parsePodMetrics(obj *unstructured.Unstructured) (*model.PodMetrics, error) 
 	}, nil
 }
 
+// ContainerUsage is the per-container metrics-server reading.
+// CPUMilli is millicores, MemBytes is bytes — both raw integers so
+// callers can do their own snapping/aggregation.
+type ContainerUsage struct {
+	CPUMilli int64
+	MemBytes int64
+}
+
+// parsePodMetricsByContainer reads each container's usage from a
+// metrics.k8s.io PodMetrics object and returns a name → ContainerUsage
+// map. Used by the right-sizing advisor's metrics-server fallback
+// path, which needs per-container values (parsePodMetrics above
+// collapses to pod totals).
+func parsePodMetricsByContainer(obj *unstructured.Unstructured) (map[string]ContainerUsage, error) {
+	containers, found, err := unstructured.NestedSlice(obj.Object, "containers")
+	if err != nil || !found {
+		return nil, fmt.Errorf("no containers in metrics")
+	}
+	out := make(map[string]ContainerUsage, len(containers))
+	for _, c := range containers {
+		cMap, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		name, _ := cMap["name"].(string)
+		if name == "" {
+			continue
+		}
+		usage, ok := cMap["usage"].(map[string]any)
+		if !ok {
+			continue
+		}
+		var u ContainerUsage
+		if cpuVal := usage["cpu"]; cpuVal != nil {
+			if q, err := resource.ParseQuantity(fmt.Sprintf("%v", cpuVal)); err == nil {
+				u.CPUMilli = q.MilliValue()
+			}
+		}
+		if memVal := usage["memory"]; memVal != nil {
+			if q, err := resource.ParseQuantity(fmt.Sprintf("%v", memVal)); err == nil {
+				u.MemBytes = q.Value()
+			}
+		}
+		out[name] = u
+	}
+	return out, nil
+}
+
 // resolveNodeMetricsConfig returns the NodeMetrics setting and whether Prometheus is configured
 // for the given context.
 func resolveNodeMetricsConfig(contextName string) (nodeMetrics string, hasPrometheus bool) {

@@ -101,6 +101,21 @@ type ConditionEntry struct {
 // Set from config at startup.
 var PinnedGroups []string
 
+// ConfigDefaultRightsizingStrategy is the strategy from the user's lfk
+// config (rightsizing_defaults.strategy). Empty when unset or the
+// configured value didn't match any known RightsizingStrategy.
+//
+// Used by executeActionRightsizing as the seed value when there's no
+// sticky strategy from a previous overlay open. NOT consulted on every
+// open — once the user changes strategy in the overlay, that choice
+// sticks for the rest of the session.
+var ConfigDefaultRightsizingStrategy RightsizingStrategy
+
+// ConfigDefaultRightsizingHeadroom is the headroom from
+// rightsizing_defaults.headroom. Zero when unset or invalid.
+// Same sticky-then-fallback semantics as the strategy var above.
+var ConfigDefaultRightsizingHeadroom float64
+
 // GroupedRef identifies a single resource within a grouped row (e.g., one
 // of the many Event objects collapsed into a single line by event grouping).
 type GroupedRef struct {
@@ -216,4 +231,123 @@ type ActionMenuItem struct {
 	Label       string
 	Description string
 	Key         string // shortcut key
+}
+
+// RightsizingStrategy enumerates the supported recommendation algorithms.
+// String type so the value flows through cache keys / log lines cleanly.
+type RightsizingStrategy string
+
+const (
+	StrategyVPA       RightsizingStrategy = "vpa"
+	StrategyPromMax1D RightsizingStrategy = "prom_max_1d"
+	StrategyPromAvg1D RightsizingStrategy = "prom_avg_1d"
+	StrategyPromP957D RightsizingStrategy = "prom_p95_7d"
+	StrategySnapshot  RightsizingStrategy = "snapshot"
+)
+
+// AllRightsizingStrategies in priority order (first = preferred default).
+// The picker walks this list, skipping strategies not present in the
+// per-workload AvailableStrategies slice. The order matches the
+// user-confirmed default: VPA (history-based recommender) > Prometheus
+// peak/avg/p95 windows > snapshot fallback.
+var AllRightsizingStrategies = []RightsizingStrategy{
+	StrategyVPA,
+	StrategyPromMax1D,
+	StrategyPromAvg1D,
+	StrategyPromP957D,
+	StrategySnapshot,
+}
+
+// RightsizingHeadrooms enumerates the headroom multipliers the picker
+// cycles through. Stored ascending so a `>` press in the overlay reads
+// as "give me more safety margin" and `<` reads as "tighten the
+// recommendation."
+//
+// 1.25 is the default (DefaultRightsizingHeadroom) — the closest entry
+// to the previous hardcoded 1.2 factor, so the migration is visually
+// invisible. Users can tune up to 2.0 (double the observed peak) for
+// generous padding or down to 1.0 (raw VPA / metrics value) for the
+// tightest possible spec.
+var RightsizingHeadrooms = []float64{1.0, 1.1, 1.25, 1.5, 1.75, 2.0}
+
+// DefaultRightsizingHeadroom is the headroom multiplier seeded when
+// the right-sizing overlay opens for the first time. Lives in
+// RightsizingHeadrooms so the [N/M] picker chip renders a position on
+// first open instead of "?".
+const DefaultRightsizingHeadroom = 1.25
+
+// HumanLabel returns the short label shown in the overlay header.
+func (s RightsizingStrategy) HumanLabel() string {
+	switch s {
+	case StrategyVPA:
+		return "VPA"
+	case StrategyPromMax1D:
+		return "1d-max"
+	case StrategyPromAvg1D:
+		return "1d-avg"
+	case StrategyPromP957D:
+		return "7d-p95"
+	case StrategySnapshot:
+		return "snapshot"
+	}
+	return string(s)
+}
+
+// MethodologyHint returns the longer explanation appended to the
+// header line so the user understands what window / source backs
+// the recommendation. The headroom multiplier is intentionally NOT
+// in this string — the UI appends " x <H> headroom" using the
+// data's Headroom field, so this hint stays headroom-agnostic and
+// the user can see the actual multiplier they selected.
+func (s RightsizingStrategy) MethodologyHint() string {
+	switch s {
+	case StrategyVPA:
+		return "VPA recommender (history-based)"
+	case StrategyPromMax1D:
+		return "Prometheus peak (max) over last 1d"
+	case StrategyPromAvg1D:
+		return "Prometheus avg over last 1d"
+	case StrategyPromP957D:
+		return "Prometheus p95 over last 7d"
+	case StrategySnapshot:
+		return "current usage"
+	}
+	return string(s)
+}
+
+// Rightsizing is the per-workload right-sizing recommendation
+// payload. Source is the legacy human-readable label kept for
+// external readers; new code should branch on Strategy instead.
+type Rightsizing struct {
+	Source              string                // legacy human-readable label (set from Strategy.HumanLabel())
+	Strategy            RightsizingStrategy   // which algorithm produced these numbers
+	AvailableStrategies []RightsizingStrategy // subset of AllRightsizingStrategies usable on this workload + cluster
+	Headroom            float64               // headroom multiplier that produced these numbers (e.g. 1.25 = 25% padding above usage)
+	PodCount            int                   // pods aggregated (always 1 for Pod kind)
+	Window              string                // sampling window (e.g. "30s" for metrics-server, "1d"/"7d" for Prometheus); empty for VPA
+	Containers          []ContainerRec
+}
+
+// ContainerRec carries the recommendation for a single container,
+// keyed by name to match the corresponding container in the pod
+// spec template (used by the "y copy" path to splice back into a
+// YAML block).
+type ContainerRec struct {
+	Name string
+	CPU  ResourceRec
+	Mem  ResourceRec
+}
+
+// ResourceRec is the current-vs-recommended pair for one resource
+// (CPU or memory). Strings are k8s canonical form ("100m", "256Mi").
+// Empty string = "unset" — current values absent in spec, or no
+// recommendation available. Bounds are populated only on the VPA path.
+type ResourceRec struct {
+	Usage              string // peak observed usage from metrics-server (empty if no live data)
+	CurrentRequest     string
+	CurrentLimit       string
+	RecommendedRequest string
+	RecommendedLimit   string
+	LowerBound         string // VPA only
+	UpperBound         string // VPA only
 }

@@ -459,3 +459,46 @@ func TestResolveNodeMetricsConfig(t *testing.T) {
 		assert.False(t, hp)
 	})
 }
+
+func TestParsePodMetricsByContainer(t *testing.T) {
+	obj := &unstructured.Unstructured{
+		Object: map[string]any{
+			"metadata": map[string]any{
+				"name":      "pod-x",
+				"namespace": "ns",
+			},
+			"containers": []any{
+				map[string]any{
+					"name": "app",
+					"usage": map[string]any{
+						"cpu":    "120m",
+						"memory": "200Mi",
+					},
+				},
+				map[string]any{
+					"name": "proxy",
+					"usage": map[string]any{
+						"cpu":    "30m",
+						"memory": "64Mi",
+					},
+				},
+			},
+		},
+	}
+
+	out, err := parsePodMetricsByContainer(obj)
+	assert.NoError(t, err)
+	assert.Len(t, out, 2, "two containers reported")
+	assert.Equal(t, int64(120), out["app"].CPUMilli)
+	assert.Equal(t, int64(200*1024*1024), out["app"].MemBytes)
+	assert.Equal(t, int64(30), out["proxy"].CPUMilli)
+	assert.Equal(t, int64(64*1024*1024), out["proxy"].MemBytes)
+}
+
+func TestParsePodMetricsByContainer_NoContainers(t *testing.T) {
+	obj := &unstructured.Unstructured{Object: map[string]any{
+		"metadata": map[string]any{"name": "p", "namespace": "ns"},
+	}}
+	_, err := parsePodMetricsByContainer(obj)
+	assert.Error(t, err, "no containers field is an error so callers can distinguish from zero-usage")
+}

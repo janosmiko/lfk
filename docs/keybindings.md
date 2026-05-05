@@ -661,6 +661,78 @@ grants apply everywhere); RoleBindings outside the active scope are excluded.
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` / `Esc` | Close visualizer |
 
+## Right-sizing Advisor
+
+Opens via the action menu (`x` → "Right-sizing", default key `z`) on Pod, Deployment,
+StatefulSet, DaemonSet, Job, CronJob. Shows per-container CPU + memory recommendations
+from one of several strategies. The header chips (`Strategy: <label> [N/M]` and
+`Headroom: <H>x [N/M]`) show the active strategy and headroom along with their position
+in the available cycles.
+
+Available strategies (priority order; unavailable ones are skipped):
+
+1. **VPA** — VerticalPodAutoscaler recommender (history-based). Available when a VPA
+   targets the workload. The recommender's target is multiplied by the active headroom
+   (raw target at headroom = 1.0).
+2. **1d-max** — Prometheus `max_over_time` peak over the last 1 day × headroom.
+   Available when a Prometheus endpoint is configured for the cluster.
+3. **1d-avg** — Prometheus `avg_over_time` over the last 1 day × headroom.
+4. **7d-p95** — Prometheus `quantile_over_time(0.95, ...)` over the last 7 days × headroom.
+5. **snapshot** — current metrics-server usage × headroom (always available as the
+   fallback).
+
+The headroom multiplier is the safety-margin factor applied on top of the strategy's raw
+output. Cycle through `1.0`, `1.1`, `1.25`, `1.5`, `1.75`, `2.0` with `<` and `>`.
+Default is `1.25` (the closest preset to lfk's previous hardcoded `1.2` factor —
+existing recommendations stay visually similar after the upgrade).
+
+| Key | Action |
+|---|---|
+| `y` | Copy recommendations as a strategic-merge `containers[]` YAML block (pasteable into `kubectl patch`) |
+| `r` | Force-refresh (invalidate the cached entry for the active strategy + headroom and re-fetch) |
+| `]` | Cycle to the next available strategy (wraps around) |
+| `[` | Cycle to the previous available strategy (wraps around) |
+| `>` | Cycle to the next headroom multiplier (wraps around; snaps to nearest preset on first press if the active value isn't in the list) |
+| `<` | Cycle to the previous headroom multiplier (wraps around; same snap behavior as `>`) |
+| `j` / `k` | Scroll up / down |
+| `g` / `G` (or `Home` / `End`) | Jump to top / bottom |
+| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+F` / `Ctrl+B` (or `PgDn` / `PgUp`) | Page down / up (full page) |
+| `esc` / `q` | Close |
+
+> The Usage column always reflects live metrics-server usage regardless of strategy —
+> only the SUGGESTION column changes based on the algorithm and headroom. Each
+> (strategy, headroom) pair's payload is cached for the lifetime of the overlay so
+> cycling between previously-viewed combinations is instant.
+
+### Defaults & stickiness
+
+Strategy and headroom selections are **sticky for the duration of the session**.
+Open `pod1`, press `]` to switch to `prom_max_1d`, press `>` to bump headroom to `1.5`,
+close the overlay, then open `pod2` — the overlay reopens with `prom_max_1d` + `1.5`
+already selected (provided `pod2` also supports `prom_max_1d`; otherwise the strategy
+falls back to the workload's first available, but the headroom still sticks).
+
+For the very first overlay open of a session — when there's no sticky value yet — the
+seed comes from two optional config keys:
+
+```yaml
+rightsizing_defaults:
+  strategy: vpa       # vpa | prom_max_1d | prom_avg_1d | prom_p95_7d | snapshot
+  headroom: 1.25      # 1.0 | 1.1 | 1.25 | 1.5 | 1.75 | 2.0
+```
+
+Both fields are optional. Invalid values (e.g. `strategy: garbage`, `headroom: 1.337`)
+are dropped at startup with a warning in the lfk error log; the picker then uses the
+built-in defaults (highest-priority available strategy + `1.25` headroom). A configured
+default that turns out to be unavailable for a specific workload (e.g. `vpa` set in
+config but no VPA targets the workload) also falls back to the first available strategy
+for that workload.
+
+The fallback chain in priority order: **sticky session value → config default → built-in
+default**. Restarting lfk wipes the sticky state, so the config defaults take over again
+on the next session's first overlay open.
+
 ## Error Log (`!`)
 
 | Key | Action |

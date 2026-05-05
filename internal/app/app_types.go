@@ -74,6 +74,7 @@ const (
 	overlayClusterColor // pick a color tint for the highlighted cluster row
 	overlayCrashInvestigator
 	overlayOrphans // cluster-wide orphan resource overview (Shift+O)
+	overlayRightsizing
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live
@@ -129,6 +130,42 @@ type crashInvState struct {
 	activeTab       crashInvTab
 	showPrevious    bool
 	scroll          map[crashInvScrollKey]int
+}
+
+// rightsizingState groups the per-session right-sizing overlay fields
+// so they live together on Model without bloating the main struct over
+// the file-length cap. The cache (Model.rightsizingCache) is kept
+// separate because it survives across overlay opens; this struct is
+// reset (or its scroll/data swapped) every time the overlay is opened
+// for a different workload.
+//
+//   - data is the currently-displayed payload. Nil means "not loaded
+//     yet" and the overlay shows a loading state.
+//   - loading is true while a fetch is in flight.
+//   - err surfaces a non-recoverable error from the fetch.
+//   - gen guards against stale-fetch races (overlay closed + reopened
+//     with a different workload before a slow fetch returns).
+//   - scroll is the visible-row offset within the overlay's table when
+//     it overflows the visible height.
+//   - strategy is the currently-selected recommendation algorithm.
+//     The [/] picker walks `available` to switch.
+//   - available caches the list of usable strategies for the current
+//     workload + cluster (computed once on overlay open by
+//     k8s.AvailableRightsizingStrategies). Empty means "no probe yet"
+//     and the overlay shows snapshot only.
+//   - headroom is the safety-margin multiplier applied to the
+//     recommendation. The </> picker walks model.RightsizingHeadrooms
+//     to cycle through preset values. Seeded to
+//     model.DefaultRightsizingHeadroom on overlay open.
+type rightsizingState struct {
+	data      *model.Rightsizing
+	loading   bool
+	err       error
+	gen       int
+	scroll    int
+	strategy  model.RightsizingStrategy
+	available []model.RightsizingStrategy
+	headroom  float64
 }
 
 // canIViewMode toggles the Can-I overlay between its forward view

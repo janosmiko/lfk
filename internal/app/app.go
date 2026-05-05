@@ -556,6 +556,9 @@ type Model struct {
 	orphanLoadInflight map[orphanCacheKey]orphanInflight
 	orphanGen          uint64 // monotonic counter; bumped per scan so a superseded result is dropped on arrival
 	orphans            orphanState
+	// rightsizingCache stores GetRightsizing results keyed by ctx/ns/kind/name/strategy/headroom; see commands_load_overlays.go
+	rightsizingCache map[string]*model.Rightsizing
+	rightsizing      rightsizingState // overlay session state; see rightsizingState in app_types.go
 	// secretPreviewCache caches decoded secret data keyed "ctx/ns/name" to skip
 	// redundant API calls on hover-after-refresh; invalidated on successful save.
 	secretPreviewCache map[string]*model.SecretData

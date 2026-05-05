@@ -122,6 +122,26 @@ monitoring:
 #     namespaces: ["monitoring", "observability"]
 #     services: ["prometheus-server", "prometheus"]
 
+# ─── Right-sizing Advisor Defaults ─────────────────────────────────────────────
+# Initial strategy + headroom that the Right-sizing overlay opens with on the
+# first overlay open of a session. Once the user changes either value via the
+# overlay's [/] / </> pickers, those choices stick across subsequent overlay
+# opens within the session — so these config keys only seed the "cold start"
+# state. Restarting lfk wipes the sticky state and the config defaults take
+# over again on the next first open.
+#
+# Both fields optional:
+#   strategy: vpa | prom_max_1d | prom_avg_1d | prom_p95_7d | snapshot
+#   headroom: 1.0 | 1.1 | 1.25 | 1.5 | 1.75 | 2.0
+#
+# Invalid values are dropped at startup with a warning in the lfk error log.
+# A configured strategy that's unavailable for a specific workload (e.g. vpa
+# with no matching VPA, or prom_* with no Prometheus configured) falls back to
+# the workload's first available strategy on a per-overlay-open basis.
+# rightsizing_defaults:
+#   strategy: vpa
+#   headroom: 1.25
+
 # ─── Per-Resource-Type Columns ─────────────────────────────────────────────────
 # Configure visible columns for specific resource types (Kind names, case-insensitive).
 # When not set for a kind, columns are auto-detected from resource data.

@@ -33,7 +33,7 @@ func (m Model) renderOverlay(background string) string {
 
 	// Fullscreen overlays bypass the standard overlay rendering.
 	switch m.overlay {
-	case overlaySecretEditor, overlayConfigMapEditor, overlayRollback, overlayHelmRollback, overlayHelmHistory, overlayLabelEditor, overlayAutoSync:
+	case overlaySecretEditor, overlayConfigMapEditor, overlayRollback, overlayHelmRollback, overlayHelmHistory, overlayLabelEditor, overlayAutoSync, overlayRightsizing:
 		return m.renderOverlayFullscreen(background)
 	case overlayCanI:
 		return m.renderCanIOverlay(background)
@@ -345,6 +345,14 @@ func (m Model) renderOverlayFullscreen(background string) string {
 			m.editorSearch.query.Value, m.editorSearch.active,
 			m.editorSearch.selected, m.editorSearch.formatActive, m.editorSearch.formatCursor,
 			m.editorSearch.editValueScroll,
+			m.width, m.height,
+		)
+	case overlayRightsizing:
+		overlay = ui.RenderRightsizingOverlay(
+			m.rightsizing.data,
+			m.rightsizing.loading,
+			m.rightsizing.err,
+			m.rightsizing.scroll,
 			m.width, m.height,
 		)
 	case overlayRollback:

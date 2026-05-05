@@ -130,6 +130,20 @@ type configFile struct {
 	// overrides under clusters.<name>.read_only take precedence; the
 	// --read-only CLI flag wins over both.
 	ReadOnly *bool `json:"read_only" yaml:"read_only"`
+	// RightsizingDefaults configures the initial strategy + headroom that
+	// the right-sizing advisor uses on its first overlay open of the
+	// session. Once the user changes strategy or headroom in the overlay,
+	// those choices stick across subsequent overlay opens (within the
+	// session); restarting lfk falls back to these config values.
+	//
+	//   strategy: "vpa" | "prom_max_1d" | "prom_avg_1d" | "prom_p95_7d" | "snapshot"
+	//   headroom: one of 1.0, 1.1, 1.25, 1.5, 1.75, 2.0
+	//
+	// Invalid values are ignored (logged once at startup). Both fields
+	// optional — when unset, lfk uses the previous picker selection if
+	// any (sticky behavior), otherwise falls back to "highest-priority
+	// available strategy" + 1.25 headroom.
+	RightsizingDefaults *RightsizingDefaultsConfig `json:"rightsizing_defaults" yaml:"rightsizing_defaults"`
 }
 
 // clusterConfig holds per-cluster configuration overrides.
@@ -139,6 +153,19 @@ type clusterConfig struct {
 	// context only. Useful for marking specific clusters (e.g. "prod") as
 	// read-only while leaving others mutable.
 	ReadOnly *bool `json:"read_only" yaml:"read_only"`
+}
+
+// RightsizingDefaultsConfig is the on-disk schema for the
+// rightsizing_defaults section. Both fields optional — leaving them
+// out keeps the runtime fallback chain (sticky -> built-in) intact.
+//
+// Strategy values mirror model.AllRightsizingStrategies (string form).
+// Headroom values must match one of model.RightsizingHeadrooms within
+// 1e-9 epsilon; off-preset values are dropped at apply time so the
+// picker never displays an out-of-list multiplier on first open.
+type RightsizingDefaultsConfig struct {
+	Strategy string  `json:"strategy" yaml:"strategy"`
+	Headroom float64 `json:"headroom" yaml:"headroom"`
 }
 
 // LoadConfig loads the config file (theme, keybindings, abbreviations, etc.) and applies them.

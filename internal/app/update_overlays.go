@@ -100,6 +100,9 @@ func (m Model) handleOverlayKeyPrimary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool
 	case overlaySecretEditor:
 		mdl, cmd := m.handleSecretEditorKey(msg)
 		return mdl, cmd, true
+	case overlayRightsizing:
+		mdl, cmd := m.handleRightsizingOverlayKey(msg)
+		return mdl, cmd, true
 	case overlayConfigMapEditor:
 		mdl, cmd := m.handleConfigMapEditorKey(msg)
 		return mdl, cmd, true

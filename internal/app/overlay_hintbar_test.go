@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
 )
@@ -161,4 +162,56 @@ func TestCovRenderHints(t *testing.T) {
 	}
 	result := m.renderHints(hints)
 	assert.NotEmpty(t, result)
+}
+
+// --- Right-sizing hint bar (strategy + headroom pickers) ---
+
+// rightsizingHintBarModel returns a Model wired into a sensible
+// loaded state for the right-sizing hint bar tests.
+func rightsizingHintBarModel(available []string) Model {
+	avail := make([]model.RightsizingStrategy, 0, len(available))
+	for _, s := range available {
+		avail = append(avail, model.RightsizingStrategy(s))
+	}
+	m := Model{
+		overlay: overlayRightsizing,
+		width:   120,
+		height:  40,
+	}
+	m.rightsizing.available = avail
+	m.rightsizing.headroom = model.DefaultRightsizingHeadroom
+	m.rightsizing.data = &model.Rightsizing{
+		Strategy:            avail[0],
+		AvailableStrategies: avail,
+		Headroom:            model.DefaultRightsizingHeadroom,
+		Containers:          []model.ContainerRec{{Name: "app"}},
+	}
+	return m
+}
+
+func TestOverlayHintBarOverlayRightsizing_HasHeadroomCycle(t *testing.T) {
+	// </> headroom cycle is always advertised — RightsizingHeadrooms
+	// is a fixed 6-entry list, so the cycle never disappears.
+	m := rightsizingHintBarModel([]string{"vpa", "snapshot"})
+	got := m.overlayHintBar()
+	assert.Contains(t, got, "</>", "headroom cycle key should appear")
+	assert.Contains(t, got, "headroom", "headroom hint should label the chord")
+}
+
+func TestOverlayHintBarOverlayRightsizing_HasStrategyCycleWhenMultiAvailable(t *testing.T) {
+	// [/] strategy cycle appears only when more than one strategy is
+	// available (otherwise the cycle is a no-op and the hint is a lie).
+	m := rightsizingHintBarModel([]string{"vpa", "snapshot"})
+	got := m.overlayHintBar()
+	assert.Contains(t, got, "[/]", "strategy cycle key should appear when multiple strategies are available")
+	assert.Contains(t, got, "strategy", "strategy hint should label the chord")
+}
+
+func TestOverlayHintBarOverlayRightsizing_HidesStrategyCycleWhenSingleAvailable(t *testing.T) {
+	// With only one strategy, [/] would be a no-op so the hint is
+	// suppressed. Headroom hint stays — the value cycle still works.
+	m := rightsizingHintBarModel([]string{"snapshot"})
+	got := m.overlayHintBar()
+	assert.NotContains(t, got, "[/]: strategy", "strategy cycle hint should NOT appear when only one strategy is available")
+	assert.Contains(t, got, "</>", "headroom cycle should still appear")
 }
