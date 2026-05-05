@@ -2,9 +2,11 @@ package app
 
 import (
 	"context"
+	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // cmdLoadOrphans returns a tea.Cmd that runs DetectOrphans for the given
@@ -99,6 +101,31 @@ func (m Model) handleOrphansLoaded(msg orphansLoadedMsg) (Model, tea.Cmd) {
 		m.orphans.report = report
 		m.orphans.partial = msg.err
 		m.orphans.loading = false
+	}
+
+	// When a per-list orphan filter is active, the user originally saw
+	// an empty list because the matcher's cache slot was unpopulated.
+	// Now that the slot is filled, re-run the matcher against the
+	// captured unfiltered list so the visible rows reflect the just-
+	// loaded orphans. The matcher rebuilds itself lazily via the cache
+	// pointer compare; if msg.key isn't the matcher's key the rerun is
+	// effectively a no-op (no new positives), which is fine.
+	if m.activeFilterPreset != nil && len(m.unfilteredMiddleItems) > 0 {
+		var filtered []model.Item
+		for _, item := range m.unfilteredMiddleItems {
+			if m.activeFilterPreset.MatchFn(item) {
+				filtered = append(filtered, item)
+			}
+		}
+		m.setMiddleItems(filtered)
+		// Replace the "Scanning for X orphans..." status with the
+		// final match count so the user has feedback the scan is done.
+		// Only fire when the overlay is closed — the overlay has its
+		// own loading indicator and shouldn't be shadowed by the
+		// global status bar.
+		if m.overlay != overlayOrphans {
+			m.setStatusMessage(fmt.Sprintf("Filter: %s (%d matches)", m.activeFilterPreset.Name, len(filtered)), false)
+		}
 	}
 
 	if msg.err != nil && m.overlay != overlayOrphans {

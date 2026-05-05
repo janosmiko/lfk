@@ -90,6 +90,47 @@ func TestHandleOrphansLoaded_DropsSupersededResult(t *testing.T) {
 	assert.Nil(t, updated.orphanCache[key], "superseded result must not write to cache")
 }
 
+// TestHandleOrphansLoaded_ReappliesActiveFilter pins the
+// "load lands -> filtered list refreshes" contract. Before this fix
+// `:orphans secrets` parked the user on an empty filtered list until
+// they opened the cluster overlay; now the unfiltered snapshot is
+// re-run through the matcher when the cache slot lands so the rows
+// appear automatically.
+func TestHandleOrphansLoaded_ReappliesActiveFilter(t *testing.T) {
+	m := newTestModel()
+	m.tabs[0].nav.Context = "test"
+	m.nav.Context = "test"
+	key := orphanCacheKey{kubeContext: "test", namespace: ""}
+
+	// User hit `:orphans secrets`: list is loaded, matcher is built
+	// against an empty cache, so middleItems is currently empty while
+	// the unfiltered snapshot still holds the full list.
+	all := []model.Item{
+		{Kind: "Secret", Namespace: "default", Name: "naked"},
+		{Kind: "Secret", Namespace: "default", Name: "owned"},
+	}
+	m.unfilteredMiddleItems = append([]model.Item(nil), all...)
+	m.setMiddleItems(nil)
+	matcher := orphanMatcher(m.orphanCache, key, "Secret")
+	m.activeFilterPreset = &FilterPreset{Name: "Unmounted", MatchFn: matcher}
+
+	require.NotNil(t, m.cmdLoadOrphans(key))
+	gen := m.orphanLoadInflight[key].gen
+
+	msg := orphansLoadedMsg{
+		key: key, gen: gen,
+		report: k8s.OrphanReport{
+			Secrets: []k8s.OrphanItem{{Kind: "Secret", Namespace: "default", Name: "naked"}},
+		},
+	}
+	updated, _ := m.handleOrphansLoaded(msg)
+
+	require.Len(t, updated.middleItems, 1, "matcher must surface orphans after the load")
+	assert.Equal(t, "naked", updated.middleItems[0].Name)
+	assert.Contains(t, updated.statusMessage, "Unmounted",
+		"status bar should announce the post-scan match count")
+}
+
 func TestInvalidateOrphanCacheForNamespace(t *testing.T) {
 	m := newTestModel()
 	m.orphanCache[orphanCacheKey{kubeContext: "ctxA", namespace: "ns1"}] = &k8s.OrphanReport{}

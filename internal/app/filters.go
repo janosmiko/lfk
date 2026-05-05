@@ -482,7 +482,9 @@ func orphanPresetsForKind(kind string, cache map[orphanCacheKey]*k8s.OrphanRepor
 		}}
 	case "Role":
 		return []FilterPreset{{
-			Name: "Unbound", Description: "No RoleBinding / ClusterRoleBinding refers to it", Key: orphanKey,
+			// ClusterRoleBinding can only reference ClusterRoles, so a
+			// Role is "unbound" iff no RoleBinding refers to it.
+			Name: "Unbound", Description: "No RoleBinding refers to it", Key: orphanKey,
 			MatchFn: orphanMatcher(cache, key, "Role"),
 		}}
 	case "ClusterRole":

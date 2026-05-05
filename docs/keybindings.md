@@ -90,7 +90,8 @@ The `.` filter-preset overlay surfaces these orphan-detection presets when the a
 | HorizontalPodAutoscalers | Dangling | `scaleTargetRef` points to a missing workload |
 | PodDisruptionBudgets | Dangling | Selector matches no live / templated pods |
 | NetworkPolicies | Dangling | `podSelector` matches no live / templated pods |
-| Roles / ClusterRoles | Unbound | No RoleBinding / ClusterRoleBinding refers to it |
+| Roles | Unbound | No RoleBinding refers to it (ClusterRoleBinding can't reference a Role) |
+| ClusterRoles | Unbound | No RoleBinding / ClusterRoleBinding refers to it |
 | RoleBindings / ClusterRoleBindings | Dangling | Missing role or empty subjects |
 
 `:orphans <kind>` (e.g. `:orphans pods`, `:orphans pvcs`, `:orphans rolebindings`) is a shortcut that jumps to the kind's list with the matching preset already applied.

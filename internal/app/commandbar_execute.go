@@ -623,6 +623,15 @@ func (m Model) executeOrphansCommand(arg string) (tea.Model, tea.Cmd) {
 	}
 	p := *preset
 	mModel.activeFilterPreset = &p
+	// When the orphan cache is cold, the matcher is initially empty
+	// and the list will paint as "no matches" until DetectOrphans
+	// returns. Surface a status message so the user knows a scan is
+	// running instead of staring at an empty filtered list — the
+	// matcher rebuilds itself the moment the cache slot is populated
+	// (see orphanMatcher's lazy memoization).
+	if mModel.orphanCache[key] == nil {
+		mModel.setStatusMessage(fmt.Sprintf("Scanning for %s orphans...", kind.lfkKind), false)
+	}
 	loadCmd := (&mModel).cmdLoadOrphans(key)
 	return mModel, tea.Batch(jumpCmd, loadCmd, scheduleStatusClear())
 }
