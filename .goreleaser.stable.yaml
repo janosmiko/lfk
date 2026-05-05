@@ -121,9 +121,10 @@ checksum:
 #     checksums.txt
 signs:
   - cmd: cosign
+    signature: "${artifact}.cosign.bundle"
     args:
       - sign-blob
-      - "--bundle=${artifact}.cosign.bundle"
+      - "--bundle=${signature}"
       - "${artifact}"
       - "--yes"
     artifacts: checksum
