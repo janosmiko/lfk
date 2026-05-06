@@ -143,13 +143,18 @@ jobs:
       - name: Install syft (SBOM)
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
 
-      # GoReleaser's chocolateys publisher invokes `choco pack` and `choco push`.
-      # crazy-max/ghaction-chocolatey is the standard community action and runs
-      # the choco CLI in a Docker container so it works on Linux runners.
+      # GoReleaser's chocolateys publisher invokes `choco pack` and `choco push`,
+      # which require `choco` on PATH. The chocolatey-cli .NET global tool is
+      # the supported cross-platform path on Linux runners. The previously-used
+      # crazy-max/ghaction-chocolatey docker action ran choco in a container
+      # that bind-mounted the workspace, leaving an `opt/` directory in the
+      # checkout (dirtying git state) and not exposing `choco` to subsequent
+      # steps anyway.
       - name: Install Chocolatey CLI
-        uses: crazy-max/ghaction-chocolatey@dff3862348493b11fba2fbc49147b6d2dfe09b66 # v4.0.0
-        with:
-          args: --version
+        run: |
+          dotnet tool install --global chocolatey-cli
+          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
+          "$HOME/.dotnet/tools/choco" --version
 
       # GoReleaser's publishers: block invokes the `cloudsmith` CLI to push
       # .deb and .rpm artifacts to cloudsmith.io/janosmiko/lfk. We use
