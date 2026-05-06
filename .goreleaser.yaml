@@ -175,7 +175,7 @@ publishers:
     ids:
       - lfk
     cmd: |
-      sh -c '
+      bash -c '
         set -euo pipefail
         case "${ARTIFACT_PATH##*.}" in
           deb)
