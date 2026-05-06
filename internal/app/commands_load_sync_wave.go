@@ -9,10 +9,22 @@ import (
 	"github.com/janosmiko/lfk/internal/app/bgtasks"
 )
 
-// syncWaveTimelineTimeout bounds one full timeline build (Application GET
-// + concurrent annotation fetches). 30s is generous; the inner GETs
-// individually time out via the apiserver client defaults.
-const syncWaveTimelineTimeout = 30 * time.Second
+// syncWaveTimelineSkeletonTimeout bounds the FAST first-phase fetch
+// (Application GET + parse only). The skeleton typically lands in
+// ~100ms; 10s is a generous safety bound against a misbehaving
+// apiserver. Kept tight so a stuck skeleton fails fast and the caller
+// can surface an error to the user instead of hanging the overlay.
+//
+// syncWaveTimelineFullTimeout bounds the SLOW full timeline build
+// (Application GET + concurrent per-resource annotation fan-out). On
+// large applications the fan-out can fairly hit ~30s, and a few outlier
+// apps with hundreds of managed resources have been seen to need more
+// than that. 2 minutes is a comfortable upper bound that still keeps a
+// truly stuck fetch from leaking the bgtask forever.
+const (
+	syncWaveTimelineSkeletonTimeout = 10 * time.Second
+	syncWaveTimelineFullTimeout     = 2 * time.Minute
+)
 
 // loadSyncWaveTimeline kicks off a fetch for the action-context
 // Application and emits syncWaveTimelineMsg with the result. The token
@@ -24,7 +36,7 @@ func (m Model) loadSyncWaveTimeline(token uint64) tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	return m.trackBgTask(bgtasks.KindResourceList, "Sync wave timeline: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
-		fetchCtx, cancel := context.WithTimeout(context.Background(), syncWaveTimelineTimeout)
+		fetchCtx, cancel := context.WithTimeout(context.Background(), syncWaveTimelineFullTimeout)
 		defer cancel()
 		info, err := client.GetSyncWaveTimeline(fetchCtx, kctx, ns, name)
 		return syncWaveTimelineMsg{info: info, err: err, token: token}
@@ -42,9 +54,7 @@ func (m Model) loadSyncWaveTimelineSkeleton(token uint64) tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	return m.trackBgTask(bgtasks.KindResourceList, "Sync wave skeleton: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
-		// Same timeout as the full fetch — the skeleton itself is fast
-		// but we keep the bound for safety against a misbehaving apiserver.
-		fetchCtx, cancel := context.WithTimeout(context.Background(), syncWaveTimelineTimeout)
+		fetchCtx, cancel := context.WithTimeout(context.Background(), syncWaveTimelineSkeletonTimeout)
 		defer cancel()
 		info, err := client.GetSyncWaveTimelineSkeleton(fetchCtx, kctx, ns, name)
 		return syncWaveTimelineMsg{info: info, err: err, token: token}
