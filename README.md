@@ -151,6 +151,12 @@ scoop bucket add janosmiko https://github.com/janosmiko/scoop-bucket && scoop in
 # or: winget install janosmiko.lfk
 # or: choco install lfk
 
+# Linux: Debian / Ubuntu (Cloudsmith APT)
+curl -1sLf 'https://dl.cloudsmith.io/public/janosmiko/lfk/setup.deb.sh' | sudo -E bash && sudo apt install lfk
+
+# Linux: Fedora / RHEL (Cloudsmith DNF)
+curl -1sLf 'https://dl.cloudsmith.io/public/janosmiko/lfk/setup.rpm.sh' | sudo -E bash && sudo dnf install lfk
+
 # Go
 go install github.com/janosmiko/lfk@latest
 

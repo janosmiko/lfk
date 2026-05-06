@@ -8,6 +8,31 @@
 brew install janosmiko/tap/lfk
 ```
 
+## Linux
+
+### Debian / Ubuntu (Cloudsmith APT)
+
+Add the Cloudsmith repository, then install:
+
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/janosmiko/lfk/setup.deb.sh' | sudo -E bash
+sudo apt update
+sudo apt install lfk
+```
+
+The setup script imports the Cloudsmith GPG key and writes `/etc/apt/sources.list.d/janosmiko-lfk.list`. Manual setup steps are also documented at https://cloudsmith.io/~janosmiko/repos/lfk/setup/#formats-deb.
+
+### Fedora / RHEL / CentOS (Cloudsmith DNF)
+
+Add the Cloudsmith repository, then install:
+
+```bash
+curl -1sLf 'https://dl.cloudsmith.io/public/janosmiko/lfk/setup.rpm.sh' | sudo -E bash
+sudo dnf install lfk
+```
+
+Manual setup steps are documented at https://cloudsmith.io/~janosmiko/repos/lfk/setup/#formats-rpm.
+
 ## Nix (flake)
 
 Requires Nix ≥ 2.4 with flakes enabled (`experimental-features = nix-command flakes` in `~/.config/nix/nix.conf`).
