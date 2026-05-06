@@ -143,13 +143,22 @@ jobs:
       - name: Install syft (SBOM)
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
 
-      # GoReleaser's chocolateys publisher invokes `choco pack` and `choco push`.
-      # crazy-max/ghaction-chocolatey is the standard community action and runs
-      # the choco CLI in a Docker container so it works on Linux runners.
+      # GoReleaser's chocolateys publisher invokes `choco pack` and `choco push`,
+      # which require `choco` on PATH. On Linux runners we install the official
+      # chocolatey tarball and a tiny `mono` wrapper (the pattern used by
+      # twpayne/chezmoi and golangci/golangci-lint). This avoids the
+      # workspace-bind-mounting docker action that left an `opt/` directory
+      # in the checkout and dirtied git state, and it doesn't require a
+      # separate windows-latest job.
       - name: Install Chocolatey CLI
-        uses: crazy-max/ghaction-chocolatey@dff3862348493b11fba2fbc49147b6d2dfe09b66 # v4.0.0
-        with:
-          args: --version
+        env:
+          CHOCOLATEY_VERSION: 2.7.1
+        run: |
+          mkdir -p /opt/chocolatey
+          wget -q -O - "https://github.com/chocolatey/choco/releases/download/${CHOCOLATEY_VERSION}/chocolatey.v${CHOCOLATEY_VERSION}.tar.gz" | tar -xz -C /opt/chocolatey
+          printf '#!/bin/bash\nmono /opt/chocolatey/choco.exe "$@"\n' | sudo tee /usr/local/bin/choco > /dev/null
+          sudo chmod +x /usr/local/bin/choco
+          choco --version
 
       # GoReleaser's publishers: block invokes the `cloudsmith` CLI to push
       # .deb and .rpm artifacts to cloudsmith.io/janosmiko/lfk. We use
