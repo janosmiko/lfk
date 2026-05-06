@@ -45,6 +45,16 @@ nix profile install github:janosmiko/lfk/v0.9.22
 
 Download pre-built binaries from the [GitHub Releases](https://github.com/janosmiko/lfk/releases) page.
 
+## Windows
+
+Windows binaries (amd64, arm64) are attached as `.zip` files to each [GitHub release](https://github.com/janosmiko/lfk/releases). Until package-manager support lands (Scoop, Winget, Chocolatey), the recommended Windows install is:
+
+1. Download `lfk_<version>_windows_<arch>.zip`.
+2. Extract `lfk.exe` to a directory in your `PATH` (e.g. `%USERPROFILE%\bin`).
+3. Verify with `lfk --version`.
+
+Each archive is covered by the same cosign Sigstore bundle (`checksums.txt.sigstore`) as Linux/macOS builds; verify with `cosign verify-blob` (see release notes for the exact command).
+
 ## From source
 
 ```bash
@@ -83,35 +93,6 @@ docker run -it --rm \
   -v ~/.kube:/home/lfk/.kube:ro \
   janosmiko/lfk
 ```
-
-## Nightly Builds
-
-Nightly builds track the latest development work and are published as GitHub
-pre-releases with every `v*-nightly*` tag.
-
-**Homebrew:**
-
-```bash
-brew install janosmiko/tap/lfk-nightly
-```
-
-**Docker:**
-
-```bash
-# Latest nightly
-docker run -it --rm \
-  -v ~/.kube:/home/lfk/.kube:ro \
-  janosmiko/lfk:nightly
-
-# Specific nightly date
-docker run -it --rm \
-  -v ~/.kube:/home/lfk/.kube:ro \
-  janosmiko/lfk:nightly-20260414
-```
-
-**Binary releases:**
-
-Download from [GitHub Releases](https://github.com/janosmiko/lfk/releases) (look for pre-release tags).
 
 ## External Dependencies
 

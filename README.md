@@ -155,7 +155,7 @@ nix run github:janosmiko/lfk
 
 `kubectl` is required and must be configured. `helm` and `trivy` are optional (Helm management, image vulnerability scanning).
 
-> See [docs/installation.md](docs/installation.md) for Docker, nightly builds, NixOS/home-manager flake input, building from source, and the full list of optional CLI dependencies.
+> See [docs/installation.md](docs/installation.md) for Windows, Docker, NixOS/home-manager flake input, building from source, and the full list of optional CLI dependencies.
 
 ## Usage
 
