@@ -102,7 +102,12 @@ func resetBodyForNewPhase(s *syncWaveState) {
 	s.bodyScroll = 0
 }
 
-// togglePhaseCollapse toggles collapsed[currentPhaseName].
+// togglePhaseCollapse toggles collapsed[currentPhaseName] and re-anchors
+// the body cursor + scroll. After a phase-level toggle the previous
+// body cursor row no longer exists in the flattened sequence (an
+// expand swaps the placeholder row for wave headers; a collapse swaps
+// wave headers/resources for the placeholder), so we reset to a
+// known-good position to keep navigation predictable.
 func togglePhaseCollapse(s *syncWaveState) {
 	if s.data == nil || s.sidebarCursor < 0 || s.sidebarCursor >= len(s.data.Phases) {
 		return
@@ -112,6 +117,7 @@ func togglePhaseCollapse(s *syncWaveState) {
 	}
 	name := s.data.Phases[s.sidebarCursor].Name
 	s.collapsed[name] = !s.collapsed[name]
+	resetBodyForNewPhase(s)
 }
 
 // handleSyncWaveBodyKey handles keys when the body pane has focus. The
@@ -232,5 +238,10 @@ func toggleBodyCursorCollapse(s *syncWaveState, row syncWaveBodyRow) {
 		s.collapsed[key] = !s.collapsed[key]
 	case syncWaveRowPlaceholder:
 		s.collapsed[phase.Name] = !s.collapsed[phase.Name]
+		// Phase-level toggle from the body pane: re-anchor the body
+		// cursor for the same reasons as togglePhaseCollapse — the
+		// flattened row sequence shifts so the previous cursor
+		// position is no longer meaningful.
+		resetBodyForNewPhase(s)
 	}
 }
