@@ -144,17 +144,20 @@ jobs:
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
 
       # GoReleaser's chocolateys publisher invokes `choco pack` and `choco push`,
-      # which require `choco` on PATH. The chocolatey-cli .NET global tool is
-      # the supported cross-platform path on Linux runners. The previously-used
-      # crazy-max/ghaction-chocolatey docker action ran choco in a container
-      # that bind-mounted the workspace, leaving an `opt/` directory in the
-      # checkout (dirtying git state) and not exposing `choco` to subsequent
-      # steps anyway.
+      # which require `choco` on PATH. On Linux runners we install the official
+      # chocolatey tarball and a tiny `mono` wrapper script (the pattern used
+      # by twpayne/chezmoi and golangci/golangci-lint). This avoids a
+      # workspace-bind-mounting docker action that left an `opt/` directory
+      # in the checkout and dirtied git state.
       - name: Install Chocolatey CLI
+        env:
+          CHOCOLATEY_VERSION: 2.7.1
         run: |
-          dotnet tool install --global chocolatey-cli
-          echo "$HOME/.dotnet/tools" >> "$GITHUB_PATH"
-          "$HOME/.dotnet/tools/choco" --version
+          mkdir -p /opt/chocolatey
+          wget -q -O - "https://github.com/chocolatey/choco/releases/download/${CHOCOLATEY_VERSION}/chocolatey.v${CHOCOLATEY_VERSION}.tar.gz" | tar -xz -C /opt/chocolatey
+          printf '#!/bin/bash\nmono /opt/chocolatey/choco.exe "$@"\n' | sudo tee /usr/local/bin/choco > /dev/null
+          sudo chmod +x /usr/local/bin/choco
+          choco --version
 
       # GoReleaser's publishers: block invokes the `cloudsmith` CLI to push
       # .deb and .rpm artifacts to cloudsmith.io/janosmiko/lfk. We use
