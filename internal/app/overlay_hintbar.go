@@ -73,13 +73,18 @@ func (m Model) overlayHintBarDialog() string {
 			{Key: "esc", Desc: "close"},
 		})
 	case overlaySyncWave:
-		return m.renderHints([]ui.HintEntry{
-			{Key: "R", Desc: "refresh"},
-			{Key: "Tab", Desc: "toggle pane"},
-			{Key: "Enter", Desc: "collapse"},
-			{Key: "j/k", Desc: "scroll"},
-			{Key: "q", Desc: "close"},
-		})
+		hints := []ui.HintEntry{{Key: "R", Desc: "refresh"}}
+		// Single-pane mode (m.width < 64) hides the sidebar so Tab has
+		// no effect — omit the hint to match the actual keymap.
+		if m.width >= 64 {
+			hints = append(hints, ui.HintEntry{Key: "Tab", Desc: "toggle pane"})
+		}
+		hints = append(hints,
+			ui.HintEntry{Key: "Enter", Desc: "collapse"},
+			ui.HintEntry{Key: "j/k", Desc: "scroll"},
+			ui.HintEntry{Key: "q", Desc: "close"},
+		)
+		return m.renderHints(hints)
 	case overlayRBAC, overlayPodStartup:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "any key", Desc: "close"},
