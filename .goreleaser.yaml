@@ -111,6 +111,41 @@ scoops:
     license: MIT
     commit_msg_template: "chore: bump lfk to {{ .Tag }}"
 
+winget:
+  - name: lfk
+    publisher: janosmiko
+    license: MIT
+    homepage: "https://github.com/janosmiko/lfk"
+    short_description: "Lightning Fast Kubernetes navigator"
+    description: |
+      LFK is a lightning-fast, keyboard-focused, yazi-inspired terminal user
+      interface for navigating and managing Kubernetes clusters. Built for
+      speed and efficiency, it brings a three-column Miller columns layout
+      with an owner-based resource hierarchy to your terminal.
+    license_url: "https://github.com/janosmiko/lfk/blob/main/LICENSE"
+    package_identifier: janosmiko.lfk
+    publisher_url: "https://github.com/janosmiko"
+    publisher_support_url: "https://github.com/janosmiko/lfk/issues"
+    release_notes_url: "https://github.com/janosmiko/lfk/releases/tag/v{{ .Version }}"
+    tags:
+      - kubernetes
+      - tui
+      - devops
+      - k8s
+      - cli
+    repository:
+      owner: janosmiko
+      name: winget-pkgs
+      branch: "lfk-{{ .Version }}"
+      token: "{{ .Env.WINGET_TOKEN }}"
+      pull_request:
+        enabled: true
+        draft: false
+        base:
+          owner: microsoft
+          name: winget-pkgs
+          branch: master
+
 changelog:
   sort: asc
   filters:
