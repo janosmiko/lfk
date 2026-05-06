@@ -144,16 +144,18 @@ jobs:
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
 
       # GoReleaser's chocolateys publisher invokes `choco pack` and `choco push`,
-      # which require `choco` on PATH. On Linux runners we install the official
-      # chocolatey tarball and a tiny `mono` wrapper (the pattern used by
-      # twpayne/chezmoi and golangci/golangci-lint). This avoids the
-      # workspace-bind-mounting docker action that left an `opt/` directory
-      # in the checkout and dirtied git state, and it doesn't require a
-      # separate windows-latest job.
+      # which require `choco` on PATH. On Linux runners we install mono +
+      # the official chocolatey tarball + a tiny `mono` wrapper (the pattern
+      # used by twpayne/chezmoi and golangci/golangci-lint). Mono is no longer
+      # preinstalled on ubuntu-24.04, so we apt-install mono-devel here.
+      # This avoids the workspace-bind-mounting docker action that left an
+      # `opt/` directory in the checkout and dirtied git state.
       - name: Install Chocolatey CLI
         env:
           CHOCOLATEY_VERSION: 2.7.1
         run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends mono-devel
           mkdir -p /opt/chocolatey
           wget -q -O - "https://github.com/chocolatey/choco/releases/download/${CHOCOLATEY_VERSION}/chocolatey.v${CHOCOLATEY_VERSION}.tar.gz" | tar -xz -C /opt/chocolatey
           printf '#!/bin/bash\nmono /opt/chocolatey/choco.exe "$@"\n' | sudo tee /usr/local/bin/choco > /dev/null
