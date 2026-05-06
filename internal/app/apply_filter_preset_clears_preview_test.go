@@ -30,6 +30,13 @@ func TestApplyFilterPresetEmptyMatchClearsPreview(t *testing.T) {
 	m.metricsContent = "cpu: 10m"
 	m.previewEventsContent = "Warning: ImagePullBackOff"
 	m.resourceTree = &model.ResourceNode{Kind: "Pod", Name: "pod-1"}
+	// previewLoading lingers true from the in-flight cursor-change
+	// load that pod-1 triggered before the preset was applied — the
+	// resourcesLoadedMsg handler is gated on requestGen and will drop
+	// the response after our bump, so applyFilterPreset has to flip
+	// previewLoading off itself or the renderer keeps spinning.
+	m.previewLoading = true
+	prevGen := m.requestGen
 
 	preset := FilterPreset{
 		Name: "Failing",
@@ -43,6 +50,12 @@ func TestApplyFilterPresetEmptyMatchClearsPreview(t *testing.T) {
 
 	assert.Empty(t, rm.middleItems,
 		"sanity: preset matches zero pods")
+	assert.Greater(t, rm.requestGen, prevGen,
+		"empty preset must bump requestGen so the in-flight prior preview "+
+			"is discarded by its gen-gated handler")
+	assert.False(t, rm.previewLoading,
+		"empty preset must reset previewLoading — the in-flight load that "+
+			"set it true is now stale and won't clear it via the normal path")
 	assert.Nil(t, rm.rightItems,
 		"empty preset must clear children pane (rightItems)")
 	assert.Empty(t, rm.previewYAML,
