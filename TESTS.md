@@ -52,7 +52,7 @@ managed by argo-cd >= 2.0. Examples below assume `my-app` in `argocd`.
 
 1. Launch lfk: `./bin/lfk`.
 2. Switch to the cluster, navigate Applications → highlight `my-app`.
-3. Press `a` to open the action menu, then `W`.
+3. Press `x` to open the action menu, then `W`.
    - Expected: fullscreen overlay opens; header shows `Sync Wave
      Timeline: my-app`. If the app has synced before, header shows
      `Last Sync: <Phase> · <age> · revision: <short>`.

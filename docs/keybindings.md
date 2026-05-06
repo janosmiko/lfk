@@ -1030,7 +1030,7 @@ last logs, and describe for the failing container in one tabbed panel.
 
 ### Sync Wave Timeline (Applications)
 
-Open from an `Application` row: press `a` for the action menu, then `W`.
+Open from an `Application` row: press `x` for the action menu, then `W`.
 Two-pane layout: phases on the left sidebar, the selected phase's content
 on the right. `Tab` toggles which pane has focus.
 
