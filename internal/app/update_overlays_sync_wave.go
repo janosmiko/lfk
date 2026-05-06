@@ -13,6 +13,15 @@ import (
 func (m Model) handleSyncWaveOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
+		// Rotate the session token first so any in-flight skeleton/full
+		// fetch or auto-refresh tick that lands after we close the
+		// overlay is treated as stale (the message handlers compare the
+		// inbound token to m.syncWave.token and drop on mismatch).
+		// Without this, a late syncWaveTimelineMsg would re-open the
+		// overlay via updateSyncWaveTimeline's defensive "open on data"
+		// branch, surprising the user.
+		m.syncWave.token++
+		m.loading = false
 		m.overlay = overlayNone
 		m.syncWave.data = nil
 		m.syncWave.collapsed = nil
@@ -21,7 +30,6 @@ func (m Model) handleSyncWaveOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.syncWave.sidebarCursor = 0
 		m.syncWave.activePane = paneSidebar
 		m.syncWave.loadingFrame = 0
-		// token NOT reset — next open rotates it.
 		return m, nil
 	case "R":
 		m.loading = true

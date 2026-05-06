@@ -211,12 +211,16 @@ func TestSyncWaveOverlayKey_EscClosesAndClears(t *testing.T) {
 	m.overlay = overlaySyncWave
 	m.syncWave.token = 7
 	m.syncWave.data = &k8s.SyncWaveTimeline{AppName: "x"}
+	m.loading = true
 
 	got, cmd := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
 	gotM := got.(Model)
 	assert.Equal(t, overlayNone, gotM.overlay)
 	assert.Nil(t, gotM.syncWave.data)
-	assert.Equal(t, uint64(7), gotM.syncWave.token, "token should not be reset until next open")
+	assert.Equal(t, uint64(8), gotM.syncWave.token,
+		"token must rotate on close so any in-flight fetch is invalidated")
+	assert.False(t, gotM.loading,
+		"loading flag must clear on close so the spinner stops")
 	assert.Nil(t, cmd)
 }
 
