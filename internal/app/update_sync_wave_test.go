@@ -226,6 +226,7 @@ func TestSyncWaveOverlayKey_EscClosesAndClears(t *testing.T) {
 
 func TestSyncWaveOverlayKey_TabTogglesPane(t *testing.T) {
 	m := Model{}
+	m.width = 100 // multi-pane terminal — Tab must flip focus
 	m.overlay = overlaySyncWave
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "Sync"}}}
 	m.syncWave.activePane = paneSidebar
@@ -235,8 +236,28 @@ func TestSyncWaveOverlayKey_TabTogglesPane(t *testing.T) {
 	assert.Equal(t, paneSidebar, got.(Model).syncWave.activePane)
 }
 
+// TestSyncWaveOverlayKey_TabNoOpInSinglePaneMode asserts that on narrow
+// terminals (where the sidebar is hidden by the renderer), Tab forces
+// focus on the body instead of toggling. Without this, subsequent
+// j/k/Enter keys route to a sidebar the user can't see.
+func TestSyncWaveOverlayKey_TabNoOpInSinglePaneMode(t *testing.T) {
+	m := Model{}
+	m.width = 50 // below the 64 single-pane threshold
+	m.overlay = overlaySyncWave
+	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "Sync"}}}
+	m.syncWave.activePane = paneSidebar
+	got, _ := m.handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	assert.Equal(t, paneBody, got.(Model).syncWave.activePane,
+		"Tab in single-pane mode must force focus on the body")
+	// Pressing Tab again still keeps focus on the body (no toggle).
+	got, _ = got.(Model).handleSyncWaveOverlayKey(tea.KeyMsg{Type: tea.KeyTab})
+	assert.Equal(t, paneBody, got.(Model).syncWave.activePane,
+		"Tab in single-pane mode must remain a no-op on second press")
+}
+
 func TestSyncWaveOverlayKey_TabPreservesCursors(t *testing.T) {
 	m := Model{}
+	m.width = 100 // multi-pane terminal so Tab actually flips focus
 	m.overlay = overlaySyncWave
 	m.syncWave.data = &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{{Name: "Sync"}}}
 	m.syncWave.sidebarCursor = 0

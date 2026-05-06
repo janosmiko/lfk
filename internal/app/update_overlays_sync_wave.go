@@ -36,6 +36,16 @@ func (m Model) handleSyncWaveOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Refreshing sync wave timeline…", false)
 		return m, m.loadSyncWaveTimeline(m.syncWave.token)
 	case "tab", "shift+tab":
+		// Single-pane mode: the sidebar is hidden, so toggling focus to
+		// it would route subsequent keys (j/k/Enter) to a pane the user
+		// can't see. Force focus on the body and treat Tab as a no-op.
+		// Threshold mirrors the renderer: outer w = min(160, m.width-8),
+		// innerW = max(w-6, 20), and entry.SinglePane = innerW < 50.
+		// Solving for m.width gives the < 64 cutoff used here.
+		if m.width < 64 {
+			m.syncWave.activePane = paneBody
+			return m, nil
+		}
 		if m.syncWave.activePane == paneSidebar {
 			m.syncWave.activePane = paneBody
 		} else {
