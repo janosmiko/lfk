@@ -408,7 +408,7 @@ func ApplyTheme(t Theme) {
 	ParentHighlightStyle = lipgloss.NewStyle().
 		Bold(true).
 		Foreground(lipgloss.Color(t.Text)).
-		Background(lipgloss.Color(t.Border))
+		Background(lipgloss.Color(derivedParentHighlightBg(t)))
 
 	StatusMessageOkStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Secondary)).

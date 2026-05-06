@@ -148,6 +148,62 @@ func hslToRGB(h, s, l float64) (r, g, b float64) {
 	return r, g, b
 }
 
+// derivedParentHighlightBg returns the background color to use for
+// ParentHighlightStyle (the LEFT pane's selected-row highlight, which
+// renders bold Text on top of the returned color).
+//
+// In most themes Border is a subtle mid-luminance color (terminal
+// "bright black"), giving Text-on-Border enough contrast to read. A
+// few themes (e.g. synthwave-everything) set their bright-black
+// palette entry to a near-white color, which collapses Text-on-Border
+// into invisibility. Border itself is intentionally not subject to
+// fg-readability enforcement because it has a decorative role on
+// column outlines — pushing it toward the foreground spectrum makes
+// other things unreadable. Instead we pick a substitute bg here:
+// blend Border toward Base via binary search until Text-on-bg meets
+// the WCAG AA large-text contrast floor (3.0:1).
+//
+// When Text-on-Border already clears the floor, Border is returned
+// unchanged so themes that work today keep their designer-chosen
+// highlight color.
+func derivedParentHighlightBg(t Theme) string {
+	const target = 3.0
+
+	tr, tg, tb, okT := parseHexColor(t.Text)
+	br, bg, bb, okB := parseHexColor(t.Border)
+	baseR, baseG, baseB, okBase := parseHexColor(t.Base)
+	if !okT || !okB || !okBase {
+		return t.Border
+	}
+
+	lText := relativeLuminance(tr, tg, tb)
+	if contrastRatio(lText, relativeLuminance(br, bg, bb)) >= target {
+		return t.Border
+	}
+
+	// Binary search the blend amount in [0, 1] (0 = Border, 1 = Base).
+	// 30 iterations converges to far below 1/255 in each channel, more
+	// precision than hex-truncation can represent.
+	const iterations = 30
+	lerp := func(a, b, t float64) float64 { return a*(1-t) + b*t }
+	lo, hi := 0.0, 1.0
+	for range iterations {
+		mid := (lo + hi) / 2.0
+		r := lerp(br, baseR, mid)
+		g := lerp(bg, baseG, mid)
+		b := lerp(bb, baseB, mid)
+		if contrastRatio(lText, relativeLuminance(r, g, b)) >= target {
+			hi = mid
+		} else {
+			lo = mid
+		}
+	}
+	r := lerp(br, baseR, hi)
+	g := lerp(bg, baseG, hi)
+	b := lerp(bb, baseB, hi)
+	return formatHexColor(r, g, b)
+}
+
 // EnforceMinContrast nudges the fg hex color's HSL lightness so it meets a
 // minimum WCAG contrast ratio against the bg hex color. The value parameter is
 // the user-facing normalized knob in [0, 1]:

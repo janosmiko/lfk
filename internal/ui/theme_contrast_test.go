@@ -338,6 +338,55 @@ func TestApplyThemePreservesParentHighlightReadability(t *testing.T) {
 		ratio, ActiveTheme.Text, ActiveTheme.Border)
 }
 
+// TestDerivedParentHighlightBg_DimsWhenBorderTooCloseToText reproduces a
+// readability bug where the synthwave-everything theme's bright-black
+// palette entry is set to near-white (#fefefe), making it visually
+// identical to Text (#f0eff1). ParentHighlightStyle renders Text on
+// Border, so the LEFT pane's selected-row text collapses into its own
+// background and becomes invisible.
+//
+// Border is intentionally not subject to fg-readability enforcement
+// (see ApplyTheme — it has a decorative role on column outlines and
+// pushing it toward the foreground spectrum makes other things
+// unreadable). Instead, the parent-highlight bg is derived from Border
+// at apply time, blending toward Base when Text-on-Border contrast is
+// below the WCAG large-text floor. The result is a "dimmer" highlight
+// the user can actually read.
+func TestDerivedParentHighlightBg_DimsWhenBorderTooCloseToText(t *testing.T) {
+	const target = 3.0 // WCAG AA large-text contrast floor.
+
+	schemes := BuiltinSchemes()
+	theme, ok := schemes["synthwave-everything"]
+	require.True(t, ok, "synthwave-everything must be present in built-in schemes")
+
+	bg := derivedParentHighlightBg(theme)
+
+	tr, tg, tb, okT := parseHexColor(theme.Text)
+	br, bgG, bb, okB := parseHexColor(bg)
+	require.True(t, okT, "Text must be a valid hex")
+	require.True(t, okB, "derived parent-highlight bg must be a valid hex (got %q)", bg)
+
+	ratio := contrastRatio(
+		relativeLuminance(tr, tg, tb),
+		relativeLuminance(br, bgG, bb),
+	)
+	assert.GreaterOrEqual(t, ratio, target,
+		"Text on derived parent-highlight bg must clear the WCAG large-text floor; got ratio %.2f (Text=%s Border=%s derived=%s)",
+		ratio, theme.Text, theme.Border, bg)
+}
+
+// TestDerivedParentHighlightBg_PreservesBorderWhenContrastIsAdequate
+// guards the no-op path: themes with a properly subtle Border (like
+// the default Tokyonight Storm) must keep their designer-chosen
+// Border as the parent-highlight bg, not get rewritten by the
+// contrast-fallback logic.
+func TestDerivedParentHighlightBg_PreservesBorderWhenContrastIsAdequate(t *testing.T) {
+	theme := DefaultTheme()
+	bg := derivedParentHighlightBg(theme)
+	assert.Equal(t, theme.Border, bg,
+		"default theme has adequate Text-on-Border contrast; derived bg must equal Border untouched")
+}
+
 func TestEnforceMinContrastPreservesFgBgRelationship(t *testing.T) {
 	cases := []struct {
 		name  string
