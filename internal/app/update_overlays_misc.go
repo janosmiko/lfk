@@ -133,6 +133,23 @@ func (m Model) applyFilterPreset(preset FilterPreset) (tea.Model, tea.Cmd) {
 	m.activeFilterPreset = &preset
 	m.setCursor(0)
 	m.clampCursor()
+	if len(filtered) == 0 {
+		// loadPreview short-circuits when nothing is selected, so the
+		// previously-loaded children / YAML / metrics / events / map
+		// would otherwise sit in the right pane describing a pod that
+		// no longer matches. Drop them in step with the empty middle
+		// column. Don't flip previewLoading=true here — there's no
+		// follow-up load to clear it, and the renderer already reads
+		// rightItems == nil + !previewLoading as "No resources found",
+		// which matches what the user expects to see.
+		m.requestGen++
+		m.rightItems = nil
+		m.previewYAML = ""
+		m.previewScroll = 0
+		m.resourceTree = nil
+		m.metricsContent = ""
+		m.previewEventsContent = ""
+	}
 	m.setStatusMessage(fmt.Sprintf("Filter: %s (%d matches)", preset.Name, len(filtered)), false)
 	return m, tea.Batch(scheduleStatusClear(), m.loadPreview())
 }
