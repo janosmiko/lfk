@@ -146,6 +146,30 @@ winget:
           name: winget-pkgs
           branch: master
 
+chocolateys:
+  - name: lfk
+    title: "lfk"
+    authors: janosmiko
+    project_url: "https://github.com/janosmiko/lfk"
+    icon_url: "https://raw.githubusercontent.com/janosmiko/lfk/main/docs/imgs/github-header.png"
+    copyright: "2026 janosmiko"
+    license_url: "https://github.com/janosmiko/lfk/blob/main/LICENSE"
+    require_license_acceptance: false
+    project_source_url: "https://github.com/janosmiko/lfk"
+    docs_url: "https://github.com/janosmiko/lfk/blob/main/docs/usage.md"
+    bug_tracker_url: "https://github.com/janosmiko/lfk/issues"
+    tags: "kubernetes tui devops k8s cli"
+    summary: "Lightning Fast Kubernetes navigator"
+    description: |
+      LFK is a lightning-fast, keyboard-focused, yazi-inspired terminal user
+      interface for navigating and managing Kubernetes clusters. Built for
+      speed and efficiency, it brings a three-column Miller columns layout
+      with an owner-based resource hierarchy to your terminal.
+    release_notes: "https://github.com/janosmiko/lfk/releases/tag/v{{ .Version }}"
+    api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
+    source_repo: "https://push.chocolatey.org/"
+    skip_publish: false
+
 changelog:
   sort: asc
   filters:
