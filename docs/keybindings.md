@@ -1027,3 +1027,46 @@ last logs, and describe for the failing container in one tabbed panel.
 | `Ctrl+F` / `Ctrl+B` | Full-page down / up (also `PgDn` / `PgUp`)           |
 | `Shift+R`      | Refresh — re-fetch all sections, preserves cursor state  |
 | `Esc` / `q`    | Close overlay                                             |
+
+### Sync Wave Timeline (Applications)
+
+Open from an `Application` row: press `a` for the action menu, then `W`.
+Two-pane layout: phases on the left sidebar, the selected phase's content
+on the right. `Tab` toggles which pane has focus.
+
+**When sidebar has focus:**
+
+| Key | Action |
+| --- | --- |
+| `j` / `↓` | Move sidebar cursor down (wraps); resets body cursor + scroll |
+| `k` / `↑` | Move sidebar cursor up (wraps) |
+| `Enter` / `Space` | Toggle phase collapse (sidebar marker `▾`/`▸`; body shows placeholder when collapsed) |
+| `Tab` / `Shift+Tab` | Switch focus to body |
+| `g` / `G` | First / last phase |
+
+**When body has focus:**
+
+| Key | Action |
+| --- | --- |
+| `j` / `↓` | Move body cursor down (wave headers + visible resources) |
+| `k` / `↑` | Move body cursor up |
+| `Enter` / `Space` | If on wave header: toggle wave collapse. If on placeholder: toggle phase collapse. If on resource: no-op |
+| `Tab` / `Shift+Tab` | Switch focus to sidebar |
+| `g` / `G` | First / last visible body row |
+| `Ctrl+D` / `Ctrl+U` | Half-page scroll |
+| `Ctrl+F` / `Ctrl+B` (or `PgDn` / `PgUp`) | Full-page scroll |
+
+**Shared:**
+
+| Key | Action |
+| --- | --- |
+| `R` | Refresh |
+| `q` / `Esc` | Close overlay |
+
+While `Application.status.operationState.phase == "Running"`, the overlay
+auto-refreshes every 3 seconds. A spinner animates in the header during
+the wave-annotation fetch phase.
+
+Below 50 cols of terminal width, the overlay falls back to single-pane
+mode (sidebar hidden, body uses full width). Tab becomes a no-op in this
+mode.

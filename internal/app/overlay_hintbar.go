@@ -72,6 +72,14 @@ func (m Model) overlayHintBarDialog() string {
 			{Key: "R", Desc: "refresh"},
 			{Key: "esc", Desc: "close"},
 		})
+	case overlaySyncWave:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "R", Desc: "refresh"},
+			{Key: "Tab", Desc: "next phase"},
+			{Key: "Enter", Desc: "collapse"},
+			{Key: "j/k", Desc: "scroll"},
+			{Key: "q", Desc: "close"},
+		})
 	case overlayRBAC, overlayPodStartup:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "any key", Desc: "close"},

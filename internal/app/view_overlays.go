@@ -93,6 +93,8 @@ func (m Model) renderOverlay(background string) string {
 }
 
 // renderOverlayContent returns the overlay content and dimensions for standard (non-fullscreen) overlays.
+//
+//nolint:gocyclo // flat overlay-type dispatcher: complexity is "number of overlays we route", not branching depth
 func (m Model) renderOverlayContent() (string, int, int, bool) {
 	switch m.overlay {
 	case overlayNamespace:
@@ -166,6 +168,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		return c, w, h, true
 	case overlayCrashInvestigator:
 		c, w, h := m.renderOverlayCrashInvestigator()
+		return c, w, h, true
+	case overlaySyncWave:
+		c, w, h := m.renderOverlaySyncWave()
 		return c, w, h, true
 	case overlayQuotaDashboard:
 		c, w, h := m.renderOverlayQuotaDashboard()

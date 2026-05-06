@@ -138,6 +138,9 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	case overlayCrashInvestigator:
 		mdl, cmd := m.handleCrashInvestigatorOverlayKey(msg)
 		return mdl, cmd, true
+	case overlaySyncWave:
+		mdl, cmd := m.handleSyncWaveOverlayKey(msg)
+		return mdl, cmd, true
 	case overlayRBAC, overlayPodStartup:
 		m.overlay = overlayNone
 		return m, nil, true

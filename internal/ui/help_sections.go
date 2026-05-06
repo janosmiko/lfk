@@ -411,6 +411,20 @@ func helpSections() []helpSection {
 			},
 		},
 		{
+			title: "Sync Wave Timeline", context: "Sync Wave Timeline",
+			bindings: []helpEntry{
+				{"W", "Open Sync Wave Timeline (Application action menu)"},
+				{"R", "Refresh"},
+				{"Tab / Shift+Tab", "Next / previous phase"},
+				{"Enter / Space", "Collapse / expand focused phase"},
+				{"j/k / Down/Up", "Scroll within focused phase"},
+				{"g / G", "Jump to top / bottom of focused phase"},
+				{"Ctrl+D / Ctrl+U", "Half-page scroll down / up"},
+				{"Ctrl+F / Ctrl+B / PgDn / PgUp", "Full-page scroll down / up"},
+				{"q / Esc", "Close overlay"},
+			},
+		},
+		{
 			title: "Exec Mode (embedded terminal)", context: "Exec Mode",
 			bindings: []helpEntry{
 				{"Ctrl+]", "Prefix key (like tmux Ctrl+b)"},

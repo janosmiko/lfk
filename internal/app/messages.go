@@ -433,6 +433,31 @@ type crashInvestigationMsg struct {
 	err  error
 }
 
+// syncWaveTimelineMsg carries the result of one GetSyncWaveTimeline call.
+// token must match Model.syncWave.token for the result to be applied —
+// otherwise the overlay was closed and reopened during the fetch and
+// applying the data would clobber the new session.
+type syncWaveTimelineMsg struct {
+	info  *k8s.SyncWaveTimeline
+	err   error
+	token uint64
+}
+
+// syncWaveTickMsg is the auto-refresh tick. token works the same way:
+// stale ticks from a closed overlay are dropped.
+type syncWaveTickMsg struct {
+	token uint64
+}
+
+// syncWaveSpinnerTickMsg cycles the loading spinner glyph in the overlay
+// header while the wave-annotation fan-out is in flight. Same token
+// guard: stale ticks from a previous overlay session are dropped. The
+// handler stops issuing new ticks the moment data.Loading flips to false
+// so no goroutines accumulate after the full fetch lands.
+type syncWaveSpinnerTickMsg struct {
+	token uint64
+}
+
 // alertsLoadedMsg carries the result of loading Prometheus alerts for a resource.
 type alertsLoadedMsg struct {
 	alerts []k8s.AlertInfo

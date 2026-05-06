@@ -652,6 +652,7 @@ type Model struct {
 
 	// Crash Investigator overlay state (per-pod multi-tab diagnostic view).
 	crashInv crashInvState
+	syncWave syncWaveState // Sync Wave Timeline overlay state (per-ArgoCD-Application).
 
 	// Event timeline overlay state.
 	eventTimelineData         []k8s.EventInfo // event timeline data

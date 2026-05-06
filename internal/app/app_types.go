@@ -5,6 +5,7 @@ import (
 	"os"
 	"sync"
 	"sync/atomic"
+	"time"
 
 	"github.com/hinshun/vt10x"
 
@@ -75,6 +76,7 @@ const (
 	overlayCrashInvestigator
 	overlayOrphans // cluster-wide orphan resource overview (Shift+O)
 	overlayRightsizing
+	overlaySyncWave // per-Application sync wave timeline (action menu key W)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live
@@ -130,6 +132,47 @@ type crashInvState struct {
 	activeTab       crashInvTab
 	showPrevious    bool
 	scroll          map[crashInvScrollKey]int
+}
+
+// syncWavePane tracks which pane has focus in the Sync Wave Timeline overlay.
+//
+//nolint:unused // wired in Task 7+ of the two-pane refactor
+type syncWavePane int
+
+//nolint:unused // wired in Task 7+ of the two-pane refactor
+const (
+	paneSidebar syncWavePane = iota
+	paneBody
+)
+
+// syncWaveBodyCursor identifies a row in the body pane — either a wave
+// header (resourceIdx == -1) or a resource row inside a wave (resourceIdx >= 0).
+// waveIdx == -1 means the body shows a placeholder (collapsed or empty phase).
+//
+//nolint:unused // wired in Task 7+ of the two-pane refactor
+type syncWaveBodyCursor struct {
+	waveIdx     int
+	resourceIdx int
+}
+
+// syncWaveState groups the Sync Wave Timeline overlay's fields. Mirrors
+// crashInvState. The token field rotates on every overlay open so async
+// messages and ticks from a previous session can never trigger a load
+// into a fresh session.
+//
+//nolint:unused // bodyCursor and activePane are wired in Task 7+ of the two-pane refactor
+type syncWaveState struct {
+	data          *k8s.SyncWaveTimeline
+	collapsed     map[string]bool // phase keys ("<phase>") and wave keys ("<phase>/<waveLabel>")
+	token         uint64
+	lastRefreshAt time.Time
+	loadingFrame  int
+
+	sidebarCursor int                // index into data.Phases (derives selectedPhase)
+	bodyCursor    syncWaveBodyCursor // identifies a row in the focused phase
+	bodyScroll    int                // body's first-visible row offset
+
+	activePane syncWavePane
 }
 
 // rightsizingState groups the per-session right-sizing overlay fields

@@ -331,6 +331,7 @@ func actionsForGitOpsKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Sync (Apply Only)", Description: "Sync application without hooks", Key: "a"},
 			{Label: "Terminate Sync", Description: "Terminate running sync operation", Key: "T"},
 			{Label: "Refresh", Description: "Hard refresh application", Key: "R"},
+			{Label: "Sync Wave Timeline", Description: "Visualize sync wave order and status", Key: "W"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this application", Key: "D"},

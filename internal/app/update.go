@@ -286,6 +286,15 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case crashInvestigationMsg:
 		mdl, cmd := m.updateCrashInvestigation(msg)
 		return mdl, cmd, true
+	case syncWaveTimelineMsg:
+		mdl, cmd := m.updateSyncWaveTimeline(msg)
+		return mdl, cmd, true
+	case syncWaveTickMsg:
+		mdl, cmd := m.handleSyncWaveTick(msg)
+		return mdl, cmd, true
+	case syncWaveSpinnerTickMsg:
+		mdl, cmd := m.handleSyncWaveSpinnerTick(msg)
+		return mdl, cmd, true
 	case quotaLoadedMsg:
 		mdl, cmd := m.updateQuotaLoaded(msg)
 		return mdl, cmd, true

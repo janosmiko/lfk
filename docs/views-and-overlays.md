@@ -64,7 +64,7 @@ wins.
 | Flag                      | Scope    | Default trigger                       | What it shows                                                                                                                |
 | ------------------------- | -------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `fullscreenMiddle`        | per-tab  | `F`                                   | Hides left and right columns; the middle resource list takes the whole screen.                                                |
-| `fullscreenDashboard`     | per-tab  | `Enter` on `[Dashboard]`, `@`         | Cluster dashboard *or* monitoring dashboard, picked by the cursor's `Extra` marker (`__monitoring__`) — see `viewExplorerDashboard`. |
+| `fullscreenDashboard`     | per-tab  | `Enter` on `[Dashboard]`, `@`         | Cluster or monitoring dashboard (see Note below).                                                                            |
 | `errorLogFullscreen`      | global   | inside the error-log overlay (`F`)    | Promotes the error-log overlay to a full-screen log buffer.                                                                   |
 | `eventTimelineFullscreen` | global   | inside the event-timeline overlay     | Promotes the event timeline overlay to a full-screen viewer (also reachable via the `modeEventViewer` drill).                 |
 
@@ -95,7 +95,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayLogContainerSelect` | container key in fullscreen logs | Container picker within log mode.                                                                                                                                                                                    |
 | `overlayFinalizerSearch`    | `Ctrl+G`                         | Pick a finalizer to remove.                                                                                                                                                                                          |
 | `overlayColumnToggle`       | `,`                              | Show / hide table columns per kind.                                                                                                                                                                                  |
-| `overlayClusterColor`       | `L` (Shift+L) at cluster picker  | Pick a background tint for the highlighted cluster row. Reuses the Logs key — at deeper levels `L` still opens Logs as usual. Persisted to `$XDG_STATE_HOME/lfk/cluster-colors.yaml`; also reachable from the action menu → "Set color…". |
+| `overlayClusterColor`       | `L` (Shift+L) at cluster picker  | Pick a background tint for the highlighted cluster row.                                                                                                                                                              |
 
 ### Navigators (jump-driven)
 
@@ -139,15 +139,16 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayHelmHistory`     | action menu → `h` on Helm       | Browse Helm release history.                                   |
 | `overlayRBAC`            | `U`                             | RBAC subject / role browser.                                   |
 | `overlayPodStartup`      | action menu → `S` on Pod        | Pod init / readiness gantt.                                    |
-| `overlayCrashInvestigator` | action menu → `I` on Pod      | Per-pod tabbed CrashLoopBackOff investigator: aggregated container restart history, pod-scoped events, container logs (previous + current), and per-container describe. Refreshable with `Shift+R`. |
+| `overlayCrashInvestigator` | action menu → `I` on Pod      | Per-pod CrashLoopBackOff investigator.                          |
 | `overlayQuotaDashboard`  | `Q`, `:quota`                   | Per-namespace ResourceQuota usage.                              |
 | `overlayEventTimeline`   | `V`                             | Cluster-wide events grouped by object.                          |
 | `overlayAlerts`          | from monitoring view            | Active Prometheus alerts.                                       |
 | `overlayNetworkPolicy`   | from netpol view                | Visualize selected NetworkPolicy.                               |
 | `overlayCanI`            | `:can-i` flow (after subject)   | Display can-i evaluation results.                               |
 | `overlayAutoSync`        | ArgoCD app                      | Toggle auto-sync settings.                                      |
+| `overlaySyncWave`        | action menu → `W` on Application | Per-Application ArgoCD sync wave timeline.                      |
 | `overlayBackgroundTasks` | `` ` ``, `:tasks`               | In-flight + recent background tasks.                            |
-| `overlayOrphans`         | `Shift+O`, `:orphans`           | Cluster-wide orphan overview across all 11 supported kinds (Pods, Secrets, ConfigMaps, Services, PVCs, HPAs, PDBs, NetworkPolicies, Roles, ClusterRoles, RoleBindings, ClusterRoleBindings). Strict / lenient toggle (`s`) flips between truly unused and currently idle but template-referenced items. Backed by `Model.orphanCache`. |
+| `overlayOrphans`         | `Shift+O`, `:orphans`           | Cluster-wide orphan resource overview.                          |
 
 ## Boolean overlays
 
