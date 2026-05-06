@@ -152,7 +152,7 @@ chocolateys:
     authors: janosmiko
     project_url: "https://github.com/janosmiko/lfk"
     icon_url: "https://raw.githubusercontent.com/janosmiko/lfk/main/docs/imgs/github-header.png"
-    copyright: "2026 janosmiko"
+    copyright: "{{ .Now.Format \"2006\" }} janosmiko"
     license_url: "https://github.com/janosmiko/lfk/blob/main/LICENSE"
     require_license_acceptance: false
     project_source_url: "https://github.com/janosmiko/lfk"
