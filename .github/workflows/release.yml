@@ -1,6 +1,4 @@
 # Builds and publishes a GitHub release (with Homebrew formula) on version tags.
-# Stable tags (v1.2.3) produce a full release with "latest" Docker tag.
-# Nightly tags (v1.2.3-nightly*) produce a pre-release with "nightly" Docker tag.
 name: Release
 
 on:
@@ -12,36 +10,6 @@ permissions:
   contents: read
 
 jobs:
-  detect:
-    runs-on: ubuntu-latest
-    outputs:
-      is_nightly: ${{ steps.check.outputs.is_nightly }}
-      nightly_date: ${{ steps.check.outputs.nightly_date }}
-      goreleaser_config: ${{ steps.check.outputs.goreleaser_config }}
-    steps:
-      - name: Detect release type
-        id: check
-        env:
-          TAG_REF: ${{ github.ref }}
-        run: |
-          TAG="${TAG_REF#refs/tags/}"
-          if [[ "$TAG" == *-nightly* ]]; then
-            echo "is_nightly=true" >> "$GITHUB_OUTPUT"
-            echo "goreleaser_config=.goreleaser.nightly.yaml" >> "$GITHUB_OUTPUT"
-            # Extract date from tag (v1.2.3-nightly.20260414 -> nightly-20260414)
-            # or use today's date if tag is just v1.2.3-nightly
-            DATE_PART="${TAG##*-nightly}"
-            if [[ -n "$DATE_PART" && "$DATE_PART" == .* ]]; then
-              echo "nightly_date=nightly-${DATE_PART#.}" >> "$GITHUB_OUTPUT"
-            else
-              echo "nightly_date=nightly-$(date -u +%Y%m%d)" >> "$GITHUB_OUTPUT"
-            fi
-          else
-            echo "is_nightly=false" >> "$GITHUB_OUTPUT"
-            echo "goreleaser_config=.goreleaser.stable.yaml" >> "$GITHUB_OUTPUT"
-            echo "nightly_date=" >> "$GITHUB_OUTPUT"
-          fi
-
   # Runs first (no needs) so a mismatched flake.nix fails the pipeline
   # in seconds instead of waiting on build/test/lint/govulncheck.
   verify-flake-version:
@@ -56,8 +24,8 @@ jobs:
         run: |
           TAG="${TAG_REF#refs/tags/}"
           TAG_VERSION="${TAG#v}"
-          # Nightly/pre-release tags carry a suffix (e.g. 1.2.3-nightly.20260414);
-          # the flake version is the bare X.Y.Z.
+          # Pre-release tags can carry a suffix (e.g. v1.2.3-rc.1); the flake
+          # version is always the bare X.Y.Z, so strip everything after the dash.
           BASE_TAG="${TAG_VERSION%%-*}"
           FLAKE_VERSION=$(grep -E '^\s*baseVersion\s*=' flake.nix | sed -E 's/.*"([^"]+)".*/\1/')
           echo "Tag:   $BASE_TAG"
@@ -149,7 +117,7 @@ jobs:
         run: govulncheck ./...
 
   release:
-    needs: [detect, build-and-test, lint, govulncheck, verify-flake-version, verify-flake-build]
+    needs: [build-and-test, lint, govulncheck, verify-flake-version, verify-flake-build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -192,11 +160,10 @@ jobs:
         with:
           distribution: goreleaser
           version: "~> v2"
-          args: release --clean --config ${{ needs.detect.outputs.goreleaser_config }}
+          args: release --clean --config .goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
-          NIGHTLY_DATE: ${{ needs.detect.outputs.nightly_date }}
 
       # Generates SLSA build provenance attestations for every release artifact.
       # GitHub publishes the attestations alongside the release so downstream
