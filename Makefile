@@ -1,4 +1,4 @@
-.PHONY: setup lint lint-fix test coverage build generate-themes sonar bump-version refresh-vendor-hash release
+.PHONY: setup lint lint-fix test coverage build generate-themes sonar bump-version refresh-vendor-hash release goreleaser-check
 
 setup:
 	git config core.hooksPath .githooks
@@ -71,6 +71,16 @@ coverage: ## Run tests with coverage report
 	go tool cover -func=coverage.out | tail -1
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Open coverage.html in your browser for details"
+
+goreleaser-check: ## Validate .goreleaser.yaml and run a snapshot release without publishing
+	@command -v goreleaser >/dev/null 2>&1 || { \
+		echo "error: goreleaser is required (https://goreleaser.com/install/)"; exit 1; \
+	}
+	goreleaser check --config .goreleaser.yaml
+	goreleaser release --skip=publish,sign,docker --snapshot --clean --config .goreleaser.yaml
+	@echo ""
+	@echo "Snapshot artifacts in ./dist/"
+	@ls -la dist/
 
 build: setup
 	go build -o lfk .
