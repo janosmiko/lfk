@@ -22,7 +22,7 @@ To cut a release manually (skipping `release-please`): `make release VERSION=X.Y
 | Winget | Fork of `microsoft/winget-pkgs` at `janosmiko/winget-pkgs` | PAT in `WINGET_TOKEN` with `contents:write` on the fork. |
 | AUR | aur.archlinux.org account `janosmiko` | SSH public key uploaded; `lfk-bin` reserved. Private key in `AUR_SSH_PRIVATE_KEY` (multi-line PEM). |
 | Chocolatey | chocolatey.org publisher `janosmiko` | API key in `CHOCOLATEY_API_KEY`. `lfk` package id reserved. |
-| Snap | snapcraft.io publisher | Snap name `lfk` registered; classic confinement justification approved. Macaroon in `SNAPCRAFT_STORE_CREDENTIALS` (run `snapcraft export-login --snaps=lfk --acls=package_access,package_push,package_update,package_release - 2>&1 | tail -n +2`). |
+| Snap | snapcraft.io publisher | Snap name `lfk` registered; classic confinement justification approved. Macaroon in `SNAPCRAFT_STORE_CREDENTIALS` (run `snapcraft export-login --snaps=lfk --acls=package_access,package_push,package_update,package_release - 2>&1 \| tail -n +2`). |
 | Cloudsmith | cloudsmith.io account `janosmiko` | Repository `janosmiko/lfk` with DEB + RPM enabled. API key in `CLOUDSMITH_API_KEY`. |
 
 ## GitHub Secrets
