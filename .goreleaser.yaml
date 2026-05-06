@@ -170,6 +170,28 @@ chocolateys:
     source_repo: "https://push.chocolatey.org/"
     skip_publish: false
 
+publishers:
+  - name: cloudsmith
+    ids:
+      - lfk
+    cmd: |
+      sh -c '
+        set -euo pipefail
+        case "${ARTIFACT_PATH##*.}" in
+          deb)
+            cloudsmith push deb janosmiko/lfk/any-distro/any-version "${ARTIFACT_PATH}" --republish
+            ;;
+          rpm)
+            cloudsmith push rpm janosmiko/lfk/any-distro/any-version "${ARTIFACT_PATH}" --republish
+            ;;
+          *)
+            echo "skipping ${ARTIFACT_PATH} (not deb or rpm)"
+            ;;
+        esac
+      '
+    env:
+      - CLOUDSMITH_API_KEY={{ .Env.CLOUDSMITH_API_KEY }}
+
 changelog:
   sort: asc
   filters:
