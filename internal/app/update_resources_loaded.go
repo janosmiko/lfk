@@ -253,6 +253,7 @@ func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd
 	}
 	if msg.err != nil {
 		m.err = msg.err
+		m.previewLoading = false
 		m.setErrorFromErr("Warning: ", msg.err)
 		return m, scheduleStatusClear()
 	}
@@ -467,6 +468,7 @@ func (m Model) updateOwnedLoaded(msg ownedLoadedMsg) (tea.Model, tea.Cmd) {
 	}
 	if msg.err != nil {
 		m.err = msg.err
+		m.previewLoading = false
 		m.setErrorFromErr("Warning: ", msg.err)
 		return m, scheduleStatusClear()
 	}
@@ -548,6 +550,7 @@ func (m Model) updateContainersLoaded(msg containersLoadedMsg) (tea.Model, tea.C
 	}
 	if msg.err != nil {
 		m.err = msg.err
+		m.previewLoading = false
 		m.setErrorFromErr("Warning: ", msg.err)
 		return m, scheduleStatusClear()
 	}

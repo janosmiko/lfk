@@ -2666,3 +2666,75 @@ func TestUpdateResourcesLoadedPreviewNoPrimeWhenMissingRT(t *testing.T) {
 	assert.False(t, hasEmptyKey, "must not prime cache under an empty-resource key")
 	assert.Empty(t, rm.cacheFingerprints, "must not record a fingerprint without an rt")
 }
+
+// TestUpdateResourcesLoaded_ErrorClearsPreviewLoading_ForPreview verifies that
+// a permission error on a preview fetch clears previewLoading so the right pane
+// stops showing the infinite spinner.
+func TestUpdateResourcesLoaded_ErrorClearsPreviewLoading_ForPreview(t *testing.T) {
+	m := baseFinalModel()
+	m.previewLoading = true
+	m.requestGen = 1
+	result, cmd := m.Update(resourcesLoadedMsg{
+		err:        fmt.Errorf("listing servicecidrs: forbidden"),
+		forPreview: true,
+		gen:        1,
+	})
+	rm := result.(Model)
+	assert.False(t, rm.previewLoading,
+		"previewLoading must clear on error for preview fetch so the right pane stops spinning")
+	assert.NotNil(t, rm.err)
+	assert.NotNil(t, cmd)
+}
+
+// TestUpdateResourcesLoaded_ErrorClearsPreviewLoading_ForMain verifies that
+// a permission error on a main-list fetch also clears previewLoading since no
+// follow-up preview will be dispatched from the error path.
+func TestUpdateResourcesLoaded_ErrorClearsPreviewLoading_ForMain(t *testing.T) {
+	m := baseFinalModel()
+	m.previewLoading = true
+	m.requestGen = 1
+	result, cmd := m.Update(resourcesLoadedMsg{
+		err: fmt.Errorf("listing servicecidrs: forbidden"),
+		gen: 1,
+	})
+	rm := result.(Model)
+	assert.False(t, rm.previewLoading,
+		"previewLoading must clear on error for main fetch — no preview will be dispatched")
+	assert.NotNil(t, rm.err)
+	assert.NotNil(t, cmd)
+}
+
+// TestUpdateOwnedLoaded_ErrorClearsPreviewLoading verifies that a permission
+// error on an owned-resource fetch clears previewLoading.
+func TestUpdateOwnedLoaded_ErrorClearsPreviewLoading(t *testing.T) {
+	m := baseFinalModel()
+	m.nav.Level = model.LevelOwned
+	m.previewLoading = true
+	m.requestGen = 1
+	result, cmd := m.Update(ownedLoadedMsg{
+		err: fmt.Errorf("listing pods: forbidden"),
+		gen: 1,
+	})
+	rm := result.(Model)
+	assert.False(t, rm.previewLoading,
+		"previewLoading must clear on ownedLoadedMsg error so the right pane stops spinning")
+	assert.NotNil(t, rm.err)
+	assert.NotNil(t, cmd)
+}
+
+// TestUpdateContainersLoaded_ErrorClearsPreviewLoading verifies that a
+// permission error on a containers fetch clears previewLoading.
+func TestUpdateContainersLoaded_ErrorClearsPreviewLoading(t *testing.T) {
+	m := baseFinalModel()
+	m.previewLoading = true
+	m.requestGen = 1
+	result, cmd := m.Update(containersLoadedMsg{
+		err: fmt.Errorf("listing containers: forbidden"),
+		gen: 1,
+	})
+	rm := result.(Model)
+	assert.False(t, rm.previewLoading,
+		"previewLoading must clear on containersLoadedMsg error so the right pane stops spinning")
+	assert.NotNil(t, rm.err)
+	assert.NotNil(t, cmd)
+}

@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -379,4 +380,35 @@ func TestRenderRightColumnContentMapView(t *testing.T) {
 	}
 	result := m.renderRightColumnContent(80, 20)
 	assert.Contains(t, result, "Loading resource tree")
+}
+
+// TestRenderRightDefault_ErrorShowsMessage verifies that when an error occurs
+// and previewLoading is false, the right pane shows an error message instead of
+// "No resources found".
+func TestRenderRightDefault_ErrorShowsMessage(t *testing.T) {
+	m := Model{
+		nav: model.NavigationState{
+			Level:        model.LevelOwned,
+			ResourceType: model.ResourceTypeEntry{Kind: "Deployment"},
+		},
+		err: fmt.Errorf("forbidden: user cannot list pods"),
+	}
+	result := m.renderRightDefault(80, 20)
+	assert.Contains(t, result, "Unable to load")
+	assert.NotContains(t, result, "Loading")
+}
+
+// TestRenderRightResources_ErrorShowsMessage verifies the same behavior in
+// the resources-level rendering path.
+func TestRenderRightResources_ErrorShowsMessage(t *testing.T) {
+	m := Model{
+		nav: model.NavigationState{
+			Level:        model.LevelResources,
+			ResourceType: model.ResourceTypeEntry{Kind: "ServiceCIDR"},
+		},
+		err: fmt.Errorf("forbidden: user cannot list servicecidrs"),
+	}
+	result := m.renderRightColumnContent(80, 20)
+	assert.Contains(t, result, "Unable to load")
+	assert.NotContains(t, result, "Loading")
 }

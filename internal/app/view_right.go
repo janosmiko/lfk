@@ -292,6 +292,9 @@ func (m Model) renderRightResources(width, height int) string {
 		if m.loading || m.previewLoading {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading...")
 		}
+		if m.err != nil {
+			return ui.DimStyle.Render("Unable to load resources")
+		}
 		return m.renderFallbackYAML(width, height)
 	}
 	return m.renderRightDefault(width, height)
@@ -318,6 +321,9 @@ func (m Model) renderRightDefault(width, height int) string {
 	if len(m.rightItems) == 0 {
 		if m.loading || m.previewLoading {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading...")
+		}
+		if m.err != nil {
+			return ui.DimStyle.Render("Unable to load resources")
 		}
 		return ui.DimStyle.Render("No resources found")
 	}
