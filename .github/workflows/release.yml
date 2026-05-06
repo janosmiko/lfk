@@ -152,13 +152,16 @@ jobs:
           args: --version
 
       # GoReleaser's publishers: block invokes the `cloudsmith` CLI to push
-      # .deb and .rpm artifacts to cloudsmith.io/janosmiko/lfk. pipx isolates
-      # the install from the runner's system Python and is the recommended
-      # path per Cloudsmith's docs.
+      # .deb and .rpm artifacts to cloudsmith.io/janosmiko/lfk. We use
+      # `pip install --user` (not pipx) because pipx on the GitHub-hosted
+      # runner image resolved its bin dir relative to the workspace and
+      # left an `opt/` directory in the checkout, which dirtied the
+      # working tree and made GoReleaser refuse to run.
       - name: Install Cloudsmith CLI
         run: |
-          pipx install cloudsmith-cli
-          cloudsmith --version
+          python3 -m pip install --user --quiet cloudsmith-cli
+          echo "$HOME/.local/bin" >> "$GITHUB_PATH"
+          "$HOME/.local/bin/cloudsmith" --version
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
