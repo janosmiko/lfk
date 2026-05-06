@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.5](https://github.com/janosmiko/lfk/compare/v0.10.4...v0.10.5) (2026-05-06)
+
+
+### Bug Fixes
+
+* **release:** install chocolatey via mono wrapper per chezmoi pattern ([#166](https://github.com/janosmiko/lfk/issues/166)) ([d3d0eb3](https://github.com/janosmiko/lfk/commit/d3d0eb38a1ee2cb513c50214e1db2814d6133128))
+
 ## [0.10.4](https://github.com/janosmiko/lfk/compare/v0.10.3...v0.10.4) (2026-05-06)
 
 
