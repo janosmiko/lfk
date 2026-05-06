@@ -177,15 +177,16 @@ publishers:
     cmd: |
       bash -c '
         set -euo pipefail
-        case "${ARTIFACT_PATH##*.}" in
+        artifact="{{ .ArtifactPath }}"
+        case "${artifact##*.}" in
           deb)
-            cloudsmith push deb janosmiko/lfk/any-distro/any-version "${ARTIFACT_PATH}" --republish
+            cloudsmith push deb janosmiko/lfk/any-distro/any-version "${artifact}" --republish
             ;;
           rpm)
-            cloudsmith push rpm janosmiko/lfk/any-distro/any-version "${ARTIFACT_PATH}" --republish
+            cloudsmith push rpm janosmiko/lfk/any-distro/any-version "${artifact}" --republish
             ;;
           *)
-            echo "skipping ${ARTIFACT_PATH} (not deb or rpm)"
+            echo "skipping ${artifact} (not deb or rpm)"
             ;;
         esac
       '
