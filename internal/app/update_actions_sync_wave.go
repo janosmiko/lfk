@@ -18,3 +18,11 @@ func (m Model) executeActionSyncWaveTimeline() (tea.Model, tea.Cmd) {
 	m.setStatusMessage("Building sync wave timeline…", false)
 	return m, m.loadSyncWaveTimelineSkeleton(m.syncWave.token)
 }
+
+// dispatchActionSyncWaveTimeline is the action-dispatch wrapper used by
+// update_actions.go's switch. Lives here to keep update_actions.go under
+// the 800-line cap.
+func (m Model) dispatchActionSyncWaveTimeline() (tea.Model, tea.Cmd, bool) {
+	mdl, cmd := m.executeActionSyncWaveTimeline()
+	return mdl, cmd, true
+}
