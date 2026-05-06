@@ -42,12 +42,12 @@ func (m Model) updateSyncWaveTimeline(msg syncWaveTimelineMsg) (tea.Model, tea.C
 	if msg.err != nil {
 		m.loading = false
 		m.setStatusMessage(fmt.Sprintf("Sync wave timeline failed: %v", msg.err), true)
-		return m, scheduleStatusClear()
+		return m, withSyncWaveAutoRefresh(m, scheduleStatusClear())
 	}
 	if msg.info == nil {
 		m.loading = false
 		m.setStatusMessage("Sync wave timeline returned no data", true)
-		return m, scheduleStatusClear()
+		return m, withSyncWaveAutoRefresh(m, scheduleStatusClear())
 	}
 	// Keep the loading flag set while we still await the wave map; the
 	// skeleton message paints the phase structure but waves are not yet
@@ -118,6 +118,25 @@ func (m Model) updateSyncWaveTimeline(msg syncWaveTimelineMsg) (tea.Model, tea.C
 	return m, nil
 }
 
+// withSyncWaveAutoRefresh batches the next auto-refresh tick onto the
+// supplied cmd when the previous timeline reported a Running phase.
+// Used by the error / nil-info branches so a transient fetch failure
+// (apiserver hiccup, network blip, RBAC race) does NOT silently kill
+// the auto-refresh loop while the operation is still in flight — the
+// next tick fires syncWaveTickMsg{token: m.syncWave.token}, and the
+// tick handler keeps issuing fetches until the live phase leaves
+// "Running" or the user closes the overlay.
+func withSyncWaveAutoRefresh(m Model, base tea.Cmd) tea.Cmd {
+	if m.syncWave.data == nil || m.syncWave.data.LivePhase != "Running" {
+		return base
+	}
+	token := m.syncWave.token
+	tick := tea.Tick(syncWaveRefreshInterval, func(time.Time) tea.Msg {
+		return syncWaveTickMsg{token: token}
+	})
+	return tea.Batch(base, tick)
+}
+
 // applySmartDefaults sets the default collapsed state on first open:
 // empty fail/delete phases collapse so they don't visually clutter the
 // sidebar; non-empty phases stay expanded.
@@ -160,7 +179,10 @@ func initialBodyCursor(phases []k8s.SyncWavePhase, sidebarIdx int, collapsed map
 }
 
 // clampSyncWaveCursors fixes cursor positions when the data shape
-// shrank (e.g., a phase lost waves between refreshes).
+// shrank (e.g., a phase lost waves between refreshes). Also clamps
+// bodyScroll against the new flattened-row count so a refresh that
+// removes rows can't leave bodyScroll pointing past the end (the body
+// renderer would otherwise paint nothing).
 func clampSyncWaveCursors(s *syncWaveState) {
 	if s.data == nil {
 		return
@@ -172,9 +194,19 @@ func clampSyncWaveCursors(s *syncWaveState) {
 	}
 	if s.sidebarCursor < 0 || s.sidebarCursor >= len(s.data.Phases) {
 		s.bodyCursor = syncWaveBodyCursor{waveIdx: -1, resourceIdx: -1}
+		s.bodyScroll = 0
 		return
 	}
 	phase := s.data.Phases[s.sidebarCursor]
+	clampBodyCursorForPhase(s, phase)
+	clampBodyScrollForPhase(s, phase)
+}
+
+// clampBodyCursorForPhase clamps bodyCursor to a valid row in the
+// flattened sequence for the focused phase. Extracted to keep
+// clampSyncWaveCursors short and to make the bodyScroll clamp easier
+// to read.
+func clampBodyCursorForPhase(s *syncWaveState, phase k8s.SyncWavePhase) {
 	if s.collapsed[phase.Name] || len(phase.Waves) == 0 {
 		s.bodyCursor = syncWaveBodyCursor{waveIdx: -1, resourceIdx: -1}
 		return
@@ -198,6 +230,18 @@ func clampSyncWaveCursors(s *syncWaveState) {
 		} else {
 			s.bodyCursor.resourceIdx = -1
 		}
+	}
+}
+
+// clampBodyScrollForPhase pins bodyScroll to a valid row index for the
+// focused phase. Without this, a refresh that shrinks the data while
+// the user is scrolled deep would leave bodyScroll past the end and
+// the body renderer would paint nothing.
+func clampBodyScrollForPhase(s *syncWaveState, phase k8s.SyncWavePhase) {
+	rows := syncWaveFlattenBody(phase, s.collapsed)
+	maxScroll := max(0, len(rows)-1)
+	if s.bodyScroll > maxScroll {
+		s.bodyScroll = maxScroll
 	}
 }
 

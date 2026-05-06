@@ -111,6 +111,60 @@ func TestUpdateSyncWaveTimeline_NilInfoSetsStatus(t *testing.T) {
 	require.NotNil(t, cmd, "must return scheduleStatusClear() cmd to clear the error message")
 }
 
+// A transient fetch error during a Running sync must not silently kill
+// the auto-refresh loop. The handler should batch the next tick onto
+// the status-clear cmd so the loop keeps polling until the live phase
+// leaves Running or the user closes the overlay.
+func TestUpdateSyncWaveTimeline_ErrorDuringRunningKeepsTickAlive(t *testing.T) {
+	m := Model{}
+	m.syncWave.token = 1
+	m.overlay = overlaySyncWave
+	m.syncWave.data = &k8s.SyncWaveTimeline{LivePhase: "Running"}
+	got, cmd := m.updateSyncWaveTimeline(syncWaveTimelineMsg{err: assertAnError, token: 1})
+	gotM := got.(Model)
+	assert.False(t, gotM.loading)
+	assert.True(t, gotM.statusMessageErr)
+	require.NotNil(t, cmd,
+		"error during Running phase must batch the auto-refresh tick onto the status-clear cmd")
+}
+
+// Same guarantee as the error path: nil-info during a Running sync must
+// keep the auto-refresh loop alive.
+func TestUpdateSyncWaveTimeline_NilInfoDuringRunningKeepsTickAlive(t *testing.T) {
+	m := Model{}
+	m.syncWave.token = 1
+	m.overlay = overlaySyncWave
+	m.syncWave.data = &k8s.SyncWaveTimeline{LivePhase: "Running"}
+	got, cmd := m.updateSyncWaveTimeline(syncWaveTimelineMsg{info: nil, token: 1})
+	gotM := got.(Model)
+	assert.False(t, gotM.loading)
+	assert.True(t, gotM.statusMessageErr)
+	require.NotNil(t, cmd,
+		"nil info during Running phase must batch the auto-refresh tick onto the status-clear cmd")
+}
+
+// clampSyncWaveCursors must pin bodyScroll to a valid row index when
+// a refresh shrinks the data while the user is scrolled deep. Without
+// this, the body renderer would paint nothing because bodyScroll is
+// past the end of the flattened row sequence.
+func TestClampSyncWaveCursors_BodyScrollClampsAfterShrink(t *testing.T) {
+	s := &syncWaveState{
+		data: &k8s.SyncWaveTimeline{Phases: []k8s.SyncWavePhase{
+			{Name: "Sync", Waves: []k8s.SyncWaveBucket{
+				{Wave: 0, Resources: []k8s.SyncWaveResource{{Kind: "Pod", Name: "a"}}},
+			}},
+		}},
+		sidebarCursor: 0,
+		bodyCursor:    syncWaveBodyCursor{waveIdx: 0, resourceIdx: 0},
+		bodyScroll:    50, // way past the end of the flattened sequence
+		collapsed:     map[string]bool{},
+	}
+	clampSyncWaveCursors(s)
+	// Flattened rows: [wave header, resource a] → 2 rows → max scroll 1.
+	assert.LessOrEqual(t, s.bodyScroll, 1,
+		"bodyScroll must clamp to within the flattened row count after shrink")
+}
+
 func TestSyncWaveTickValidation(t *testing.T) {
 	m := Model{}
 	m.syncWave.token = 5
@@ -349,7 +403,11 @@ func TestUpdateSyncWaveTimeline_RefreshPreservesCursor(t *testing.T) {
 	m.overlay = overlaySyncWave
 	m.syncWave.sidebarCursor = 1
 	m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: 0, resourceIdx: 1}
-	m.syncWave.bodyScroll = 5
+	// bodyScroll = 2 sits within the flattened row count (1 wave header
+	// + 5 resources = 6 rows; max scroll 5). Avoids the clamp baked
+	// into clampSyncWaveCursors interfering with the preserve-cursor
+	// assertion below.
+	m.syncWave.bodyScroll = 2
 	m.syncWave.activePane = paneBody
 	m.syncWave.collapsed = map[string]bool{"Sync": false}
 
@@ -359,7 +417,11 @@ func TestUpdateSyncWaveTimeline_RefreshPreservesCursor(t *testing.T) {
 			{Name: "PreSync"},
 			{Name: "Sync", Waves: []k8s.SyncWaveBucket{
 				{Wave: 0, Resources: []k8s.SyncWaveResource{
-					{Kind: "Pod", Name: "a"}, {Kind: "Pod", Name: "b"}, {Kind: "Pod", Name: "c"},
+					{Kind: "Pod", Name: "a"},
+					{Kind: "Pod", Name: "b"},
+					{Kind: "Pod", Name: "c"},
+					{Kind: "Pod", Name: "d"},
+					{Kind: "Pod", Name: "e"},
 				}},
 			}},
 		},
@@ -368,7 +430,7 @@ func TestUpdateSyncWaveTimeline_RefreshPreservesCursor(t *testing.T) {
 	gotM := got.(Model)
 	assert.Equal(t, 1, gotM.syncWave.sidebarCursor)
 	assert.Equal(t, syncWaveBodyCursor{waveIdx: 0, resourceIdx: 1}, gotM.syncWave.bodyCursor)
-	assert.Equal(t, 5, gotM.syncWave.bodyScroll)
+	assert.Equal(t, 2, gotM.syncWave.bodyScroll)
 	assert.Equal(t, paneBody, gotM.syncWave.activePane)
 }
 
