@@ -146,6 +146,11 @@
 # Homebrew (macOS / Linux)
 brew install janosmiko/tap/lfk
 
+# Windows: Scoop
+scoop bucket add janosmiko https://github.com/janosmiko/scoop-bucket && scoop install lfk
+# or: winget install janosmiko.lfk
+# or: choco install lfk
+
 # Go
 go install github.com/janosmiko/lfk@latest
 

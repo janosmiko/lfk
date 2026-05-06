@@ -47,13 +47,32 @@ Download pre-built binaries from the [GitHub Releases](https://github.com/janosm
 
 ## Windows
 
-Windows binaries (amd64, arm64) are attached as `.zip` files to each [GitHub release](https://github.com/janosmiko/lfk/releases). Until package-manager support lands (Scoop, Winget, Chocolatey), the recommended Windows install is:
+### Scoop
 
-1. Download `lfk_<version>_windows_<arch>.zip`.
-2. Extract `lfk.exe` to a directory in your `PATH` (e.g. `%USERPROFILE%\bin`).
-3. Verify with `lfk --version`.
+```powershell
+scoop bucket add janosmiko https://github.com/janosmiko/scoop-bucket
+scoop install lfk
+```
 
-Each archive is covered by the same cosign Sigstore bundle (`checksums.txt.sigstore`) as Linux/macOS builds; verify with `cosign verify-blob` (see release notes for the exact command).
+### Winget
+
+```powershell
+winget install janosmiko.lfk
+```
+
+> The first release after a tag opens an automatic PR to `microsoft/winget-pkgs`. The package becomes installable once that PR is merged by the Winget maintainers — typically within hours.
+
+### Chocolatey
+
+```powershell
+choco install lfk
+```
+
+> First-time installs from Chocolatey may show "Pending" while the package goes through chocolatey.org moderation. Subsequent versions usually become available immediately after publish.
+
+### Manual binary
+
+Download `lfk_<version>_windows_<arch>.zip` from [GitHub Releases](https://github.com/janosmiko/lfk/releases), extract `lfk.exe` into a directory in your `PATH`, and verify with `lfk --version`. Each archive is covered by the same cosign Sigstore bundle as Linux/macOS builds.
 
 ## From source
 
