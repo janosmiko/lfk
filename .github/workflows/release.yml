@@ -163,7 +163,7 @@ jobs:
           args: release --clean --config .goreleaser.yaml
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          HOMEBREW_TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          RELEASE_TAP_TOKEN: ${{ secrets.RELEASE_TAP_TOKEN }}
 
       # Generates SLSA build provenance attestations for every release artifact.
       # GitHub publishes the attestations alongside the release so downstream

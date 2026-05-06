@@ -82,7 +82,7 @@ brews:
   - repository:
       owner: janosmiko
       name: homebrew-tap
-      token: "{{ .Env.HOMEBREW_TAP_TOKEN }}"
+      token: "{{ .Env.RELEASE_TAP_TOKEN }}"
     directory: Formula
     name: lfk
     homepage: "https://github.com/janosmiko/lfk"
