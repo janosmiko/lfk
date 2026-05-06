@@ -408,6 +408,13 @@ func buildSyncWaveTimelineFromApp(app *unstructured.Unstructured, appName, names
 	}
 	statusMap, _ := app.Object["status"].(map[string]any)
 	if statusMap == nil {
+		// Always emit the seven standard phases, even when the
+		// Application has no status yet — the Sync Wave overlay's
+		// pinned sidebar walks tl.Phases to render the phase pipeline,
+		// and a nil slice would leave the user staring at an empty
+		// frame. The phases are empty (no waves), which the renderer
+		// surfaces as "(none in last operation)".
+		tl.Phases = groupSyncWaveResources(map[string][]waveResourceWithWave{})
 		return tl
 	}
 

@@ -613,7 +613,14 @@ func TestGetSyncWaveTimeline_EmptyApp(t *testing.T) {
 	tl, err := c.GetSyncWaveTimeline(context.Background(), "", "argocd", "empty")
 	require.NoError(t, err)
 	assert.Equal(t, "empty", tl.AppName)
-	assert.Nil(t, tl.Phases)
+	// Even when the Application has no status, the timeline must still
+	// emit the seven standard phases so the overlay's pinned sidebar
+	// has something to render. Each phase is empty (no waves), and the
+	// renderer surfaces this as "(none in last operation)".
+	require.Len(t, tl.Phases, 7)
+	assert.Equal(t, "PreSync", tl.Phases[0].Name)
+	assert.Equal(t, "PostDelete", tl.Phases[6].Name)
+	assert.Empty(t, tl.Phases[0].Waves)
 	assert.Nil(t, tl.LastOperation)
 	assert.Equal(t, "", tl.LivePhase)
 }
