@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.10.5](https://github.com/janosmiko/lfk/compare/v0.10.4...v0.10.5) (2026-05-06)
+
+
+### Bug Fixes
+
+* **release:** use ArtifactPath template in cloudsmith publisher ([#169](https://github.com/janosmiko/lfk/issues/169)) ([56b0dde](https://github.com/janosmiko/lfk/commit/56b0dde59f0a7a6afa5d0065d19a4ef403ef0406))
+
 ## [0.10.4](https://github.com/janosmiko/lfk/compare/v0.10.3...v0.10.4) (2026-05-06)
 
 
