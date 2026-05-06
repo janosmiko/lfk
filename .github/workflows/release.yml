@@ -143,6 +143,14 @@ jobs:
       - name: Install syft (SBOM)
         uses: anchore/sbom-action/download-syft@e22c389904149dbc22b58101806040fa8d37a610 # v0
 
+      # GoReleaser's chocolateys publisher invokes `choco pack` and `choco push`.
+      # crazy-max/ghaction-chocolatey is the standard community action and runs
+      # the choco CLI in a Docker container so it works on Linux runners.
+      - name: Install Chocolatey CLI
+        uses: crazy-max/ghaction-chocolatey@dff3862348493b11fba2fbc49147b6d2dfe09b66 # v4.0.0
+        with:
+          args: --version
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@ce360397dd3f832beb865e1373c09c0e9f86d70a # v4
 
@@ -155,6 +163,27 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      # Preflight: verify every required secret is present before GoReleaser
+      # starts. Without this, a missing secret causes a confusing mid-publish
+      # failure deep in GoReleaser's output.
+      - name: Preflight - assert release secrets present
+        env:
+          RELEASE_TAP_TOKEN: ${{ secrets.RELEASE_TAP_TOKEN }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          missing=()
+          for s in RELEASE_TAP_TOKEN WINGET_TOKEN CHOCOLATEY_API_KEY DOCKERHUB_USERNAME DOCKERHUB_TOKEN; do
+            if [ -z "${!s}" ]; then missing+=("$s"); fi
+          done
+          if [ ${#missing[@]} -ne 0 ]; then
+            echo "::error::Missing required secrets: ${missing[*]}"
+            exit 1
+          fi
+          echo "All required secrets present."
+
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@1a80836c5c9d9e5755a25cb59ec6f45a3b5f41a8 # v7
         with:
@@ -164,6 +193,8 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RELEASE_TAP_TOKEN: ${{ secrets.RELEASE_TAP_TOKEN }}
+          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+          CHOCOLATEY_API_KEY: ${{ secrets.CHOCOLATEY_API_KEY }}
 
       # Generates SLSA build provenance attestations for every release artifact.
       # GitHub publishes the attestations alongside the release so downstream
