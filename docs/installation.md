@@ -10,6 +10,18 @@ brew install janosmiko/tap/lfk
 
 ## Linux
 
+### AUR (Arch, Manjaro, EndeavourOS)
+
+```bash
+yay -S lfk-bin
+# or
+paru -S lfk-bin
+# or, manually:
+git clone https://aur.archlinux.org/lfk-bin.git && cd lfk-bin && makepkg -si
+```
+
+The `lfk-bin` package installs the prebuilt binary from the GitHub release. There is no source-build (`lfk` AUR) package; if you want to build from source, use `go install github.com/janosmiko/lfk@latest`.
+
 ### Debian / Ubuntu (Cloudsmith APT)
 
 Add the Cloudsmith repository, then install:
