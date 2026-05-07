@@ -65,7 +65,7 @@ func (m Model) openResourceActionMenu() Model {
 		if targetReadOnly && isMutatingActionForKind(kind, a.Label) {
 			continue
 		}
-		if m.isUnionSentinel() && !isUnionAllowedAction(a.Label) {
+		if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, a.Label) {
 			continue
 		}
 		items = append(items, model.Item{
@@ -215,21 +215,29 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 	m.actionCtx = m.buildActionCtx(sel, kind)
 	// If resource is already deleting, escalate the action.
 	if sel.Deleting {
+		actionLabel := "Force Finalize"
+		if model.IsForceDeleteableKind(kind) {
+			actionLabel = "Force Delete"
+		}
+		if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, actionLabel) {
+			logger.Info("Blocked by union view", "action", actionLabel, "kind", kind)
+			m.setStatusMessage(actionLabel+" is not available in union view", true)
+			return m, scheduleStatusClear()
+		}
 		m.confirmTypeInput.Clear()
 		m.overlay = overlayConfirmType
-		if model.IsForceDeleteableKind(kind) {
+		if actionLabel == "Force Delete" {
 			// Pod/Job: offer force delete.
 			m.confirmAction = sel.Name + " (FORCE)"
 			m.confirmTitle = "Confirm Force Delete"
 			m.confirmQuestion = fmt.Sprintf("Force delete %s?", sel.Name)
-			m.pendingAction = "Force Delete"
 		} else {
 			// Other kinds: offer force finalize (remove finalizers).
 			m.confirmAction = sel.Name
 			m.confirmTitle = "Confirm Force Finalize"
 			m.confirmQuestion = fmt.Sprintf("Remove all finalizers from %s?", sel.Name)
-			m.pendingAction = "Force Finalize"
 		}
+		m.pendingAction = actionLabel
 		return m, nil
 	}
 	return m.executeAction("Delete")
@@ -252,6 +260,11 @@ func (m Model) directActionForceDelete() (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	m.actionCtx = m.buildActionCtx(sel, kind)
+	if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, "Force Delete") {
+		logger.Info("Blocked by union view", "action", "Force Delete", "kind", kind)
+		m.setStatusMessage("Force Delete is not available in union view", true)
+		return m, scheduleStatusClear()
+	}
 	m.confirmAction = sel.Name + " (FORCE)"
 	m.confirmTitle = "Confirm Force Delete"
 	m.confirmQuestion = fmt.Sprintf("Force delete %s?", sel.Name)
@@ -299,7 +312,7 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		return m.executeBulkAction(actionLabel)
 	}
 
-	if isMutatingAction(actionLabel) && m.readOnlyForContext(m.actionCtx.context) {
+	if isMutatingActionForKind(m.actionCtx.kind, actionLabel) && m.readOnlyForContext(m.actionCtx.context) {
 		logger.Info("Blocked by read-only mode", "action", actionLabel, "context", m.actionCtx.context)
 		m.setStatusMessage(readOnlyBlockedMessage(actionLabel), true)
 		return m, scheduleStatusClear()
@@ -309,8 +322,8 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	// allowlist (a custom keybinding or future action handler that bypasses
 	// the menu), refuse mutating actions outside the union allowlist at the
 	// sentinel. The menu filter is the primary surface; this is the backstop.
-	if m.isUnionSentinel() && !isUnionAllowedAction(actionLabel) {
-		logger.Info("Blocked by union view", "action", actionLabel)
+	if m.isUnionSentinel() && !isUnionAllowedActionForKind(m.actionCtx.kind, actionLabel) {
+		logger.Info("Blocked by union view", "action", actionLabel, "kind", m.actionCtx.kind)
 		m.setStatusMessage(actionLabel+" is not available in union view", true)
 		return m, scheduleStatusClear()
 	}
@@ -535,8 +548,12 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 			return m, scheduleStatusClear()
 		}
 	}
-	if m.isUnionSentinel() && !isUnionAllowedAction(actionLabel) {
-		logger.Info("Blocked by union view (bulk)", "action", actionLabel, "count", len(m.bulkItems))
+	kind := m.actionCtx.kind
+	if kind == "" {
+		kind = m.selectedResourceKind()
+	}
+	if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, actionLabel) {
+		logger.Info("Blocked by union view (bulk)", "action", actionLabel, "kind", kind, "count", len(m.bulkItems))
 		m.setStatusMessage(actionLabel+" is not available in union view", true)
 		return m, scheduleStatusClear()
 	}

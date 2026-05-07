@@ -647,7 +647,11 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 		// Load contexts for the left column breadcrumb.
 		contexts, _ := m.client.GetContexts()
 		resourceTypes := model.BuildSidebarItems(model.SeedResources())
-		if discovered := m.discoveredResources[m.nav.Context]; len(discovered) > 0 {
+		discoveryCtx := m.nav.Context
+		if m.unionMode && m.nav.Context == UnionContextSentinel && len(m.unionContexts) > 0 {
+			discoveryCtx = m.unionContexts[0]
+		}
+		if discovered := m.discoveredResources[discoveryCtx]; len(discovered) > 0 {
 			resourceTypes = model.BuildSidebarItems(discovered)
 		}
 

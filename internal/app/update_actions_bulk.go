@@ -48,7 +48,7 @@ func (m Model) openBulkSelectionMenu() Model {
 		if targetReadOnly && isMutatingAction(a.Label) {
 			continue
 		}
-		if m.isUnionSentinel() && !isUnionAllowedAction(a.Label) {
+		if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, a.Label) {
 			continue
 		}
 		items = append(items, model.Item{

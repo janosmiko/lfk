@@ -10,6 +10,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/app/bgtasks"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // --- StartupOptions.IsUnionMode / HasCLIOverrides ---
@@ -362,6 +363,43 @@ func TestUpdateDiscoveryCacheLoaded_UnionLooksUpFirstContext(t *testing.T) {
 	assert.NotEmpty(t, result.itemCache[UnionContextSentinel])
 }
 
+func TestLoadTab_UnionResourceTypesUsesFirstContextDiscovery(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.nav.Context = UnionContextSentinel
+	m.discoveredResources = map[string][]model.ResourceTypeEntry{
+		"blue": {
+			{Kind: "Widget", APIGroup: "example.com", APIVersion: "v1", Resource: "widgets", Namespaced: true},
+		},
+	}
+	m.tabs = []TabState{
+		{
+			needsLoad: true,
+			nav: model.NavigationState{
+				Level:   model.LevelResourceTypes,
+				Context: UnionContextSentinel,
+			},
+			cursorMemory:      make(map[string]int),
+			itemCache:         make(map[string][]model.Item),
+			cacheFingerprints: make(map[string]string),
+		},
+	}
+
+	_ = m.loadTab(0)
+
+	assert.False(t, m.tabs[0].needsLoad)
+	foundWidget := false
+	for _, item := range m.middleItems {
+		if item.Kind == "Widget" {
+			foundWidget = true
+			break
+		}
+	}
+	assert.True(t, foundWidget, "union-restored tabs should rebuild resource types from unionContexts[0], not the sentinel key")
+	assert.NotEmpty(t, m.itemCache[UnionContextSentinel])
+}
+
 // --- isUnionSentinel / effectiveContext ---
 
 func TestIsUnionSentinel(t *testing.T) {
@@ -575,23 +613,46 @@ func TestSelectionKey_UnionPrependsCluster(t *testing.T) {
 // --- Union action allowlist ---
 
 func TestIsUnionAllowedAction(t *testing.T) {
-	// Allowlist: Delete + the two force escalations + Restart. Everything
-	// else mutating must be blocked. Read-only labels (Logs, Describe,
-	// Refresh, Events) pass through unconditionally.
-	allowed := []string{"Delete", "Force Delete", "Force Finalize", "Restart"}
-	for _, label := range allowed {
-		assert.True(t, isUnionAllowedAction(label), "%q must be allowed at the union sentinel", label)
+	// Allowlist: Pod cleanup plus workload restart. Everything else mutating
+	// must be blocked. Read-only labels pass through unconditionally.
+	for _, label := range []string{"Delete", "Force Delete", "Force Finalize"} {
+		assert.True(t, isUnionAllowedActionForKind("Pod", label), "%q must be allowed for Pods at the union sentinel", label)
+	}
+	for _, kind := range []string{"Deployment", "StatefulSet", "DaemonSet"} {
+		assert.True(t, isUnionAllowedActionForKind(kind, "Restart"), "Restart must be allowed for %s at the union sentinel", kind)
 	}
 	blocked := []string{"Edit", "Scale", "Drain", "Cordon", "Exec", "Shell", "Port Forward", "Secret Editor", "Sync", "Upgrade"}
 	for _, label := range blocked {
-		assert.False(t, isUnionAllowedAction(label), "%q must NOT be allowed at the union sentinel", label)
+		assert.False(t, isUnionAllowedActionForKind("Pod", label), "%q must NOT be allowed at the union sentinel", label)
+	}
+	for _, kind := range []string{"Deployment", "Job", "Secret", "ConfigMap", "Application"} {
+		assert.False(t, isUnionAllowedActionForKind(kind, "Delete"), "Delete must not be allowed for %s at the union sentinel", kind)
+	}
+	for _, label := range []string{"Force Delete", "Force Finalize"} {
+		assert.False(t, isUnionAllowedActionForKind("Job", label), "%q must not be allowed for Jobs at the union sentinel", label)
 	}
 	// Non-mutating labels are always allowed because they aren't in
 	// mutatingActions to begin with — verify the helper returns true for
 	// a few representative read-only labels.
 	for _, label := range []string{"Logs", "Describe", "Events", "Refresh"} {
-		assert.True(t, isUnionAllowedAction(label), "non-mutating %q must pass through", label)
+		assert.True(t, isUnionAllowedActionForKind("Pod", label), "non-mutating %q must pass through", label)
 	}
+}
+
+func TestIsUnionAllowedActionForKind_CustomActionsDefaultBlocked(t *testing.T) {
+	prev := ui.ConfigCustomActions
+	t.Cleanup(func() { ui.ConfigCustomActions = prev })
+	ui.ConfigCustomActions = map[string][]ui.CustomAction{
+		"Pod": {
+			{Label: "Archive Pod", Command: "archive {name}"},
+			{Label: "Inspect Pod", Command: "inspect {name}", ReadOnlySafe: true},
+		},
+	}
+
+	assert.False(t, isUnionAllowedActionForKind("Pod", "Archive Pod"),
+		"custom actions should be treated as mutating unless marked read_only_safe")
+	assert.True(t, isUnionAllowedActionForKind("Pod", "Inspect Pod"),
+		"custom actions explicitly marked read_only_safe may pass through")
 }
 
 // --- expandGroupedItems carries ClusterName ---
@@ -793,8 +854,7 @@ func TestOpenActionMenu_UnionSentinel_DeploymentAllowsRestart(t *testing.T) {
 		labels[item.Name] = true
 	}
 	assert.True(t, labels["Restart"], "Restart must be in the union Deployment menu")
-	assert.True(t, labels["Delete"], "Delete must be in the union Deployment menu")
-	for _, label := range []string{"Scale", "Edit", "Rollback"} {
+	for _, label := range []string{"Delete", "Scale", "Edit", "Rollback"} {
 		assert.False(t, labels[label], "%q must be filtered out at the union sentinel", label)
 	}
 }
@@ -821,6 +881,52 @@ func TestExecuteBulkAction_UnionSentinel_BlocksScale(t *testing.T) {
 	require.True(t, ok)
 	assert.Contains(t, result.statusMessage, "not available in union view",
 		"Scale must be refused with the union-view message")
+}
+
+func TestExecuteAction_UnionSentinel_BlocksDeploymentDelete(t *testing.T) {
+	m := Model{
+		unionMode: true,
+		nav: model.NavigationState{
+			Level:   model.LevelResources,
+			Context: UnionContextSentinel,
+		},
+		actionCtx: actionContext{
+			kind:    "Deployment",
+			name:    "my-deploy",
+			context: "blue",
+		},
+	}
+
+	mdl, _ := m.executeAction("Delete")
+	result, ok := mdl.(Model)
+	require.True(t, ok)
+	assert.Contains(t, result.statusMessage, "not available in union view")
+	assert.NotEqual(t, overlayConfirm, result.overlay, "deployment delete confirmation must not open at the union sentinel")
+}
+
+func TestExecuteAction_UnionSentinel_BlocksCustomMutatingAction(t *testing.T) {
+	prev := ui.ConfigCustomActions
+	t.Cleanup(func() { ui.ConfigCustomActions = prev })
+	ui.ConfigCustomActions = map[string][]ui.CustomAction{
+		"Pod": {{Label: "Archive Pod", Command: "archive {name}"}},
+	}
+	m := Model{
+		unionMode: true,
+		nav: model.NavigationState{
+			Level:   model.LevelResources,
+			Context: UnionContextSentinel,
+		},
+		actionCtx: actionContext{
+			kind:    "Pod",
+			name:    "my-pod",
+			context: "blue",
+		},
+	}
+
+	mdl, _ := m.executeAction("Archive Pod")
+	result, ok := mdl.(Model)
+	require.True(t, ok)
+	assert.Contains(t, result.statusMessage, "not available in union view")
 }
 
 func TestExecuteAction_UnionUsesTargetContextReadOnly(t *testing.T) {

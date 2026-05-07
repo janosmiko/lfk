@@ -88,31 +88,23 @@ var mutatingActions = map[string]bool{
 	"Upgrade":     true,
 }
 
-// unionAllowedActions is the narrow allowlist of mutating actions that are
-// permitted at the union sentinel. Read-only actions (Logs, Describe, etc.)
-// pass through the action filter unconditionally — only mutating labels need
-// to opt in here. The label set is the deliberate "union write surface":
-// pod cleanup (Delete + the two force escalations the existing action menu
-// auto-substitutes when sel.Deleting is true) plus deployment-family Restart.
-// Anything else (Edit, Scale, Drain, Cordon, Exec, secret/configmap editors,
-// ArgoCD sync, Helm upgrade, …) stays blocked so the merged-cluster view
-// cannot be used as a stealth path to operations that warrant per-cluster
-// intent. Keep this list intentionally short.
-var unionAllowedActions = map[string]bool{
-	"Delete":         true,
-	"Force Delete":   true,
-	"Force Finalize": true,
-	"Restart":        true,
-}
-
-// isUnionAllowedAction reports whether an action label is allowed at the
-// union sentinel. Returns true for any non-mutating label (those don't need
-// to be enumerated) and for the small allowlist of write actions above.
-func isUnionAllowedAction(label string) bool {
-	if !mutatingActions[label] {
+// isUnionAllowedActionForKind reports whether an action is allowed at the
+// union sentinel. Fetch-only actions pass through, including custom actions
+// explicitly marked read_only_safe. Mutating actions must opt in by both kind
+// and label so the merged view cannot delete arbitrary resource kinds just
+// because they expose a "Delete" action.
+func isUnionAllowedActionForKind(kind, label string) bool {
+	if !isMutatingActionForKind(kind, label) {
 		return true
 	}
-	return unionAllowedActions[label]
+	switch label {
+	case "Delete", "Force Delete", "Force Finalize":
+		return kind == "Pod"
+	case "Restart":
+		return model.IsRestartableKind(kind)
+	default:
+		return false
+	}
 }
 
 // isMutatingAction reports whether a given action label changes cluster state
