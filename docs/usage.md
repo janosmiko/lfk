@@ -31,7 +31,7 @@ lfk --union-context blue --union-context green -n cloud-cd
 # Recall a named union view from the config file (see "Union Sets" below
 # in this doc, or config-reference.md). The set's namespace fills in if
 # unset on the CLI; --namespace overrides whatever the set declared.
-# Mutex with --context and --union-context.
+# Mutually exclusive with --context and --union-context.
 lfk --union-set ski-staging-west
 lfk --union-set ski-staging-west -n other-namespace
 

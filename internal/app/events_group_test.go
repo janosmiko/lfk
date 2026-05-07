@@ -294,6 +294,35 @@ func TestGroupEvents_GroupedRefsPreserveClusterName(t *testing.T) {
 	}
 }
 
+func TestGroupEvents_RegroupingPreservesExistingGroupedRefs(t *testing.T) {
+	now := time.Now()
+	e1 := newEvent("Warning", "FailedScheduling", "msg", "Pod/foo", "1", now)
+	e1.Name = "evt-aaa"
+	e1.Namespace = "ns-1"
+	e1.ClusterName = "blue"
+	e1.GroupedRefs = []model.GroupedRef{
+		{Name: "evt-aaa", Namespace: "ns-1", ClusterName: "blue"},
+		{Name: "evt-hidden", Namespace: "ns-1", ClusterName: "blue"},
+	}
+	e2 := newEvent("Warning", "FailedScheduling", "msg", "Pod/foo", "1", now.Add(-time.Minute))
+	e2.Name = "evt-bbb"
+	e2.Namespace = "ns-1"
+	e2.ClusterName = "blue"
+	e2.GroupedRefs = []model.GroupedRef{
+		{Name: "evt-bbb", Namespace: "ns-1", ClusterName: "blue"},
+		{Name: "evt-hidden-2", Namespace: "ns-1", ClusterName: "blue"},
+	}
+
+	got := groupEvents([]model.Item{e1, e2})
+	require.Len(t, got, 1)
+	assert.ElementsMatch(t, []model.GroupedRef{
+		{Name: "evt-aaa", Namespace: "ns-1", ClusterName: "blue"},
+		{Name: "evt-hidden", Namespace: "ns-1", ClusterName: "blue"},
+		{Name: "evt-bbb", Namespace: "ns-1", ClusterName: "blue"},
+		{Name: "evt-hidden-2", Namespace: "ns-1", ClusterName: "blue"},
+	}, got[0].GroupedRefs)
+}
+
 func TestGroupEvents_SingleEventHasGroupedRef(t *testing.T) {
 	now := time.Now()
 	e := newEvent("Warning", "BackOff", "msg", "Pod/bar", "1", now)

@@ -74,6 +74,36 @@ func TestGetResourcesUnion_FanOutStampingAndSort(t *testing.T) {
 	}
 }
 
+func TestGetResourcesUnion_SortsSameNameClusterByNamespace(t *testing.T) {
+	pod := func(namespace string) *unstructured.Unstructured {
+		return &unstructured.Unstructured{
+			Object: map[string]any{
+				"apiVersion": "v1",
+				"kind":       "Pod",
+				"metadata": map[string]any{
+					"name":      "shared",
+					"namespace": namespace,
+				},
+				"spec":   map[string]any{"containers": []any{map[string]any{"name": "c", "image": "nginx"}}},
+				"status": map[string]any{"phase": "Running"},
+			},
+		}
+	}
+	dyn := newFakeDynClient(pod("zeta"), pod("alpha"))
+	c := newFakeClient(nil, dyn)
+
+	items, err := c.GetResourcesUnion(
+		context.Background(),
+		[]string{"blue"},
+		"",
+		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
+	)
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+	assert.Equal(t, "alpha", items[0].Namespace)
+	assert.Equal(t, "zeta", items[1].Namespace)
+}
+
 func TestGetResourcesUnion_EmptyContextsList(t *testing.T) {
 	// Degenerate case: no contexts. Should not hang, not error, not panic.
 	dyn := newFakeDynClient()

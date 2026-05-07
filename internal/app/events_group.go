@@ -1,6 +1,7 @@
 package app
 
 import (
+	"slices"
 	"strconv"
 	"time"
 
@@ -65,7 +66,7 @@ func groupEvents(items []model.Item) []model.Item {
 		// Seed GroupedRefs with the first item in the group so bulk
 		// operations can expand the grouped row back into individual
 		// delete calls covering every underlying Event object.
-		clone.GroupedRefs = []model.GroupedRef{{Name: it.Name, Namespace: it.Namespace, ClusterName: it.ClusterName}}
+		clone.GroupedRefs = eventGroupedRefs(it)
 		// Refresh the relative-time columns so the cloned row always
 		// reflects its CreatedAt/LastSeen fields, even if the source item
 		// arrived with stale strings.
@@ -95,7 +96,21 @@ func mergeEventInto(dst *model.Item, src model.Item) {
 	addEventCount(dst, readEventCount(src))
 	mergeFirstSeen(dst, src)
 	mergeLastSeen(dst, src)
-	dst.GroupedRefs = append(dst.GroupedRefs, model.GroupedRef{Name: src.Name, Namespace: src.Namespace, ClusterName: src.ClusterName})
+	for _, ref := range eventGroupedRefs(src) {
+		dst.GroupedRefs = appendGroupedRefIfMissing(dst.GroupedRefs, ref)
+	}
+}
+
+func eventGroupedRefs(it model.Item) []model.GroupedRef {
+	refs := append([]model.GroupedRef(nil), it.GroupedRefs...)
+	return appendGroupedRefIfMissing(refs, model.GroupedRef{Name: it.Name, Namespace: it.Namespace, ClusterName: it.ClusterName})
+}
+
+func appendGroupedRefIfMissing(refs []model.GroupedRef, ref model.GroupedRef) []model.GroupedRef {
+	if slices.Contains(refs, ref) {
+		return refs
+	}
+	return append(refs, ref)
 }
 
 // mergeFirstSeen pulls dst.CreatedAt backwards if src has an earlier

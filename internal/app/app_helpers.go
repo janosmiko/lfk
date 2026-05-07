@@ -52,8 +52,11 @@ const namespaceCacheTTL = 60 * time.Second
 // namespace listing and similar metadata; if clusters diverge, the user
 // can drill into a specific cluster and re-run the operation.
 func (m Model) activeContext() string {
-	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
-		return m.unionContexts[0]
+	if m.isUnionSentinel() {
+		if len(m.unionContexts) > 0 {
+			return m.unionContexts[0]
+		}
+		return ""
 	}
 	if m.nav.Context != "" {
 		return m.nav.Context

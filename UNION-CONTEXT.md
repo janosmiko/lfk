@@ -4,7 +4,7 @@
 
 The `--union-context` flag merges resources from multiple Kubernetes clusters into a single view. It is intended for teams that run the same workload across 2–3 clusters (e.g., blue/green/canary) and want to see all resources side-by-side without switching contexts.
 
-```
+```shell
 lfk --union-context blue --union-context green --union-context yellow --namespace cloud-cd
 ```
 
@@ -96,7 +96,7 @@ Union mode is ephemeral (CLI-only). `saveCurrentSession()` returns early when `m
 
 ## Data Flow at `LevelResources`
 
-```
+```text
 watch tick / user navigates to Pods
     → loadResources(false)
         → union branch: nav.Context == "__union__" && unionMode

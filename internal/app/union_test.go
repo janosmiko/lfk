@@ -393,6 +393,14 @@ func TestActiveContext_UnionSentinelResolvesToFirstCluster(t *testing.T) {
 		"sentinel must resolve to unionContexts[0] so namespace listing targets a real cluster")
 }
 
+func TestActiveContext_UnionSentinelWithoutContextsReturnsEmpty(t *testing.T) {
+	m := Model{
+		unionMode: true,
+		nav:       model.NavigationState{Level: model.LevelResources, Context: UnionContextSentinel},
+	}
+	assert.Empty(t, m.activeContext(), "sentinel must not leak as a Kubernetes context when no union contexts are configured")
+}
+
 func TestActiveContext_PostDrillDownReturnsNavContext(t *testing.T) {
 	// Once the user drills into a specific resource, nav.Context is the
 	// real cluster name and activeContext must return it as-is (the

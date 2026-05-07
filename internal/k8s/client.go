@@ -398,7 +398,10 @@ func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, names
 		if merged[i].Name != merged[j].Name {
 			return merged[i].Name < merged[j].Name
 		}
-		return merged[i].ClusterName < merged[j].ClusterName
+		if merged[i].ClusterName != merged[j].ClusterName {
+			return merged[i].ClusterName < merged[j].ClusterName
+		}
+		return merged[i].Namespace < merged[j].Namespace
 	})
 	return merged, firstErr
 }
