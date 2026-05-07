@@ -45,7 +45,7 @@ nfpms:
     homepage: "https://github.com/janosmiko/lfk"
     maintainer: "janosmiko <janosmiko@users.noreply.github.com>"
     description: "Lightning Fast Kubernetes navigator - keyboard-focused TUI for managing K8s clusters"
-    license: MIT
+    license: Apache-2.0
     formats:
       - deb
       - rpm
@@ -87,7 +87,7 @@ brews:
     name: lfk
     homepage: "https://github.com/janosmiko/lfk"
     description: "Lightning Fast Kubernetes navigator - keyboard-focused TUI for managing K8s clusters"
-    license: "MIT"
+    license: "Apache-2.0"
     dependencies:
       - name: kubectl
         type: optional
@@ -108,13 +108,13 @@ scoops:
     name: lfk
     homepage: "https://github.com/janosmiko/lfk"
     description: "Lightning Fast Kubernetes navigator - keyboard-focused TUI for managing K8s clusters"
-    license: MIT
+    license: Apache-2.0
     commit_msg_template: "chore: bump lfk to {{ .Tag }}"
 
 winget:
   - name: lfk
     publisher: janosmiko
-    license: MIT
+    license: Apache-2.0
     homepage: "https://github.com/janosmiko/lfk"
     short_description: "Lightning Fast Kubernetes navigator"
     description: |
