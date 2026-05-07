@@ -979,6 +979,69 @@ func TestExecuteBulkAction_UnionBlocksReadOnlyTargetContext(t *testing.T) {
 	assert.NotEqual(t, overlayConfirm, result.overlay, "bulk delete confirmation must not open when any target context is read-only")
 }
 
+func TestBulkReadOnlyContext_UnionSentinelMissingClusterBlocks(t *testing.T) {
+	m := Model{
+		unionMode: true,
+		actionCtx: actionContext{
+			kind:    "Pod",
+			context: UnionContextSentinel,
+		},
+		bulkItems: []model.Item{{Name: "p1", Kind: "Pod", Namespace: "ns"}},
+	}
+
+	ctx, blocked := m.bulkReadOnlyContext()
+	assert.True(t, blocked)
+	assert.Equal(t, UnionContextSentinel, ctx)
+}
+
+func TestBulkReadOnlyContext_UnionGroupedRefsUseRefClusters(t *testing.T) {
+	m := Model{
+		unionMode: true,
+		actionCtx: actionContext{
+			kind:    "Event",
+			context: UnionContextSentinel,
+		},
+		contextROOverrides: map[string]bool{"green": true},
+		bulkItems: []model.Item{
+			{
+				Name: "grouped-events",
+				Kind: "Event",
+				GroupedRefs: []model.GroupedRef{
+					{Name: "e1", Namespace: "ns", ClusterName: "blue"},
+					{Name: "e2", Namespace: "ns", ClusterName: "green"},
+				},
+			},
+		},
+	}
+
+	ctx, blocked := m.bulkReadOnlyContext()
+	assert.True(t, blocked)
+	assert.Equal(t, "green", ctx)
+}
+
+func TestBulkReadOnlyContext_UnionGroupedRefMissingClusterBlocks(t *testing.T) {
+	m := Model{
+		unionMode: true,
+		actionCtx: actionContext{
+			kind:    "Event",
+			context: UnionContextSentinel,
+		},
+		bulkItems: []model.Item{
+			{
+				Name: "grouped-events",
+				Kind: "Event",
+				GroupedRefs: []model.GroupedRef{
+					{Name: "e1", Namespace: "ns"},
+				},
+			},
+		},
+	}
+
+	ctx, blocked := m.bulkReadOnlyContext()
+	assert.True(t, blocked)
+	assert.Equal(t, UnionContextSentinel, ctx)
+}
+
 func TestNewTab_BlockedInUnionMode(t *testing.T) {
 	m := Model{
 		unionMode: true,

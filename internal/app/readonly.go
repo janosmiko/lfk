@@ -168,18 +168,54 @@ func (m Model) readOnlyForContext(ctx string) bool {
 func (m Model) bulkReadOnlyContext() (string, bool) {
 	if len(m.bulkItems) == 0 {
 		ctx := m.actionCtx.context
+		if m.unionMode && ctx == UnionContextSentinel {
+			return ctx, true
+		}
 		return ctx, m.readOnlyForContext(ctx)
 	}
 	for _, item := range m.bulkItems {
-		ctx := m.actionCtx.context
-		if item.ClusterName != "" {
-			ctx = item.ClusterName
+		contexts, unknown := m.bulkItemTargetContexts(item)
+		if unknown {
+			return UnionContextSentinel, true
 		}
-		if m.readOnlyForContext(ctx) {
-			return ctx, true
+		for _, ctx := range contexts {
+			if m.readOnlyForContext(ctx) {
+				return ctx, true
+			}
 		}
 	}
 	return "", false
+}
+
+func (m Model) bulkItemTargetContexts(item model.Item) ([]string, bool) {
+	if item.ClusterName != "" {
+		return []string{item.ClusterName}, false
+	}
+	if len(item.GroupedRefs) > 0 {
+		contexts := make([]string, 0, len(item.GroupedRefs))
+		seen := make(map[string]struct{}, len(item.GroupedRefs))
+		for _, ref := range item.GroupedRefs {
+			if ref.ClusterName == "" {
+				return nil, true
+			}
+			if _, ok := seen[ref.ClusterName]; ok {
+				continue
+			}
+			seen[ref.ClusterName] = struct{}{}
+			contexts = append(contexts, ref.ClusterName)
+		}
+		if len(contexts) > 0 {
+			return contexts, false
+		}
+	}
+	ctx := m.actionCtx.context
+	if ctx != "" && ctx != UnionContextSentinel {
+		return []string{ctx}, false
+	}
+	if m.unionMode || ctx == UnionContextSentinel {
+		return nil, true
+	}
+	return []string{ctx}, false
 }
 
 func (m Model) actionTargetBlockedByReadOnly() bool {
