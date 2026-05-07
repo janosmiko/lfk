@@ -20,6 +20,21 @@ lfk -n default -n kube-system
 # Combine context and namespace
 lfk --context production -n monitoring
 
+# Merge resources from multiple clusters into a single view ("union" mode).
+# Requires --namespace; mutually exclusive with --context. Each row shows a
+# "Cluster" column identifying the source. Read-only at the merged level
+# except for Pod Delete / Force Delete / Force Finalize and workload
+# Restart — drill into a resource to act on a specific cluster for
+# anything else.
+lfk --union-context blue --union-context green -n cloud-cd
+
+# Recall a named union view from the config file (see "Union Sets" below
+# in this doc, or config-reference.md). The set's namespace fills in if
+# unset on the CLI; --namespace overrides whatever the set declared.
+# Mutex with --context and --union-context.
+lfk --union-set ski-staging-west
+lfk --union-set ski-staging-west -n other-namespace
+
 # Use a specific config file (overrides ~/.config/lfk/config.yaml)
 lfk -c /path/to/config.yaml
 lfk --config /path/to/config.yaml

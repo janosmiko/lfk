@@ -95,6 +95,10 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			m.kubetrisGame.paused = true
 		}
 		if m.mode != modeHelp {
+			if m.unionMode {
+				m.setStatusMessage("New tab is not available in union view", true)
+				return m, scheduleStatusClear(), true
+			}
 			if len(m.tabs) >= 9 {
 				m.setStatusMessage("Max 9 tabs", true)
 				return m, scheduleStatusClear(), true

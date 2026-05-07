@@ -88,6 +88,33 @@ var mutatingActions = map[string]bool{
 	"Upgrade":     true,
 }
 
+// unionAllowedActions is the narrow allowlist of mutating actions that are
+// permitted at the union sentinel. Read-only actions (Logs, Describe, etc.)
+// pass through the action filter unconditionally — only mutating labels need
+// to opt in here. The label set is the deliberate "union write surface":
+// pod cleanup (Delete + the two force escalations the existing action menu
+// auto-substitutes when sel.Deleting is true) plus deployment-family Restart.
+// Anything else (Edit, Scale, Drain, Cordon, Exec, secret/configmap editors,
+// ArgoCD sync, Helm upgrade, …) stays blocked so the merged-cluster view
+// cannot be used as a stealth path to operations that warrant per-cluster
+// intent. Keep this list intentionally short.
+var unionAllowedActions = map[string]bool{
+	"Delete":         true,
+	"Force Delete":   true,
+	"Force Finalize": true,
+	"Restart":        true,
+}
+
+// isUnionAllowedAction reports whether an action label is allowed at the
+// union sentinel. Returns true for any non-mutating label (those don't need
+// to be enumerated) and for the small allowlist of write actions above.
+func isUnionAllowedAction(label string) bool {
+	if !mutatingActions[label] {
+		return true
+	}
+	return unionAllowedActions[label]
+}
+
 // isMutatingAction reports whether a given action label changes cluster state
 // and should be blocked when read-only mode is active.
 //
@@ -123,6 +150,59 @@ func isMutatingActionForKind(kind, label string) bool {
 // action is blocked. Centralised so tests can assert on the exact format.
 func readOnlyBlockedMessage(actionLabel string) string {
 	return "Read-only mode: " + actionLabel + " disabled"
+}
+
+// readOnlyForContext resolves read-only state for a specific target context.
+// This is distinct from Model.readOnly in union mode: the active navigation
+// context is the internal union sentinel, but each row action targets a real
+// source cluster whose own read-only policy still has to be honored.
+func (m Model) readOnlyForContext(ctx string) bool {
+	if m.cliReadOnly || m.readOnly {
+		return true
+	}
+	if !m.unionMode || ctx == "" || ctx == m.nav.Context || ctx == UnionContextSentinel {
+		return false
+	}
+	if v, ok := m.contextROOverrides[ctx]; ok {
+		return v
+	}
+	return ui.ResolveReadOnly(ctx, false)
+}
+
+// bulkReadOnlyContext returns the first target context that would make a
+// mutating bulk action illegal. Bulk union actions are all-or-nothing at the
+// dispatcher; individual handlers should not partially mutate a mixed
+// read-only/read-write selection.
+func (m Model) bulkReadOnlyContext() (string, bool) {
+	if len(m.bulkItems) == 0 {
+		ctx := m.actionCtx.context
+		return ctx, m.readOnlyForContext(ctx)
+	}
+	for _, item := range m.bulkItems {
+		ctx := m.actionCtx.context
+		if item.ClusterName != "" {
+			ctx = item.ClusterName
+		}
+		if m.readOnlyForContext(ctx) {
+			return ctx, true
+		}
+	}
+	return "", false
+}
+
+func (m Model) actionTargetBlockedByReadOnly() bool {
+	if m.bulkMode && len(m.bulkItems) > 0 {
+		_, blocked := m.bulkReadOnlyContext()
+		return blocked
+	}
+	return m.readOnlyForContext(m.actionCtx.context)
+}
+
+func (m Model) pendingActionBlockedByReadOnly() bool {
+	if !isMutatingAction(m.pendingAction) {
+		return false
+	}
+	return m.actionTargetBlockedByReadOnly()
 }
 
 // effectiveContextReadOnly returns the read-only state to display for the

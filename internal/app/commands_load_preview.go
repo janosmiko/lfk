@@ -223,7 +223,7 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 		return nil
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	gen := m.requestGen
 
@@ -324,7 +324,7 @@ func (m Model) checkRBAC() tea.Cmd {
 
 func (m Model) loadCanIRules() tea.Cmd {
 	client := m.client
-	ctx := m.nav.Context
+	ctx := m.effectiveContext()
 	ns := m.namespace
 	if m.allNamespaces || ns == "" {
 		ns = "default"
@@ -377,7 +377,7 @@ func (m Model) loadCanIRules() tea.Cmd {
 
 func (m Model) loadCanISAList() tea.Cmd {
 	client := m.client
-	ctx := m.nav.Context
+	ctx := m.effectiveContext()
 	// Always list SAs across all namespaces so the user can check
 	// permissions for any service account regardless of the current view.
 	// Also discover Users and Groups from RBAC bindings.
@@ -559,7 +559,7 @@ func (m Model) loadPreviewServiceEndpoints() tea.Cmd {
 		return nil
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	if sel.Namespace != "" {
 		ns = sel.Namespace
@@ -672,7 +672,7 @@ func (m Model) loadPreviewSecretData() tea.Cmd {
 		return nil
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	if sel.Namespace != "" {
 		ns = sel.Namespace

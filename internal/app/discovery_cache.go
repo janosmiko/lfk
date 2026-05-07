@@ -7,12 +7,35 @@ import (
 	"path/filepath"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// discoveryCacheLoadedMsg carries the result of an async startup-time
+// preload of the per-host discovery snapshots. The handler in update.go
+// merges entries into m.discoveredResources, layered behind any live
+// apiResourceDiscoveryMsg that has already arrived for the same context.
+type discoveryCacheLoadedMsg struct {
+	cached map[string][]model.ResourceTypeEntry
+}
+
+// discoveryCachePreloadCmd reads the discovery cache off the main goroutine.
+// loadAllDiscoveryCaches walks every kubeconfig context and calls
+// clientcmd.ClientConfig() on each to extract the apiserver host — at one
+// real-world scale (block-sre-operator-style kubeconfig with ~1200 contexts
+// in a single file) this re-parses the kubeconfig ~1200× and serialises the
+// whole startup behind a multi-second clientcmd loop. Running it as a tea.Cmd
+// lets NewModel return immediately so the first frame renders with seed
+// resources; the cache then lands and overlays the seed list when ready.
+func discoveryCachePreloadCmd(client *k8s.Client) tea.Cmd {
+	return func() tea.Msg {
+		return discoveryCacheLoadedMsg{cached: loadAllDiscoveryCaches(client)}
+	}
+}
 
 // discoveryCacheSchemaVersion bumps whenever the on-disk shape changes.
 // loadDiscoveryCacheForHost rejects unknown versions so older binaries don't

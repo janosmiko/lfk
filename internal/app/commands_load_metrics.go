@@ -15,7 +15,7 @@ func (m Model) loadMetrics() tea.Cmd {
 		return nil
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	if sel.Namespace != "" {
 		ns = sel.Namespace
@@ -117,7 +117,7 @@ func (m Model) loadPreviewEvents() tea.Cmd {
 		return nil
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	if sel.Namespace != "" {
 		ns = sel.Namespace
@@ -149,6 +149,13 @@ func (m Model) loadPreviewEvents() tea.Cmd {
 // loadPodMetricsForList fetches metrics for all pods in the current namespace
 // and returns them to enrich the middle pane items.
 func (m Model) loadPodMetricsForList() tea.Cmd {
+	// At the union sentinel, list-wide metrics enrichment would target the
+	// sentinel string instead of a real cluster. Skip rather than fan out:
+	// the merged list spans clusters that may not all run metrics-server,
+	// and a per-row metrics column is not part of the union view's contract.
+	if m.isUnionSentinel() {
+		return nil
+	}
 	kctx := m.nav.Context
 	ns := m.effectiveNamespace()
 	gen := m.requestGen
@@ -171,6 +178,10 @@ func (m Model) loadPodMetricsForList() tea.Cmd {
 // loadNodeMetricsForList fetches metrics for all nodes and returns them
 // to enrich the middle pane items with CPU/MEM usage columns.
 func (m Model) loadNodeMetricsForList() tea.Cmd {
+	// See loadPodMetricsForList: skip at the union sentinel.
+	if m.isUnionSentinel() {
+		return nil
+	}
 	kctx := m.nav.Context
 	gen := m.requestGen
 	client := m.client

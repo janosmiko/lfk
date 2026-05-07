@@ -13,7 +13,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter", "y", "Y":
 		// Read-only safety net: if RO was toggled on while a confirm overlay
 		// was already showing, refuse to commit the mutation.
-		if m.readOnly && isMutatingAction(m.pendingAction) {
+		if m.pendingActionBlockedByReadOnly() {
 			m.overlay = overlayNone
 			label := m.pendingAction
 			m.pendingAction = ""
@@ -82,7 +82,7 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "enter":
 		if m.confirmTypeInput.Value == "DELETE" {
 			// Read-only safety net for force-delete / finalizer-remove paths.
-			if m.readOnly && isMutatingAction(m.pendingAction) {
+			if m.pendingActionBlockedByReadOnly() {
 				m.overlay = overlayNone
 				label := m.pendingAction
 				m.pendingAction = ""
@@ -174,7 +174,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Belt-and-suspenders read-only gate: the dispatcher already blocks
 		// "Scale" upstream, but a user who toggled RO on while this overlay
 		// was open could otherwise commit a scale operation.
-		if m.readOnly {
+		if m.actionTargetBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
 			m.setStatusMessage(readOnlyBlockedMessage("Scale"), true)
@@ -238,7 +238,7 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.scaleInput.Clear()
 			return m, scheduleStatusClear()
 		}
-		if m.readOnly {
+		if m.actionTargetBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
 			m.setStatusMessage(readOnlyBlockedMessage("Resize PVC"), true)

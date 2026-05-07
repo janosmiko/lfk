@@ -46,8 +46,14 @@ func (m Model) middleColumnHeader() string {
 	case model.LevelClusters:
 		return "KUBECONFIG"
 	case model.LevelResourceTypes:
+		if m.unionMode {
+			return "RESOURCE TYPE [UNION]"
+		}
 		return "RESOURCE TYPE"
 	case model.LevelResources:
+		if m.isUnionSentinel() {
+			return strings.ToUpper(m.nav.ResourceType.Kind) + " [UNION]"
+		}
 		return strings.ToUpper(m.nav.ResourceType.Kind)
 	case model.LevelOwned:
 		return strings.ToUpper(m.ownedItemKindLabel())
@@ -66,7 +72,9 @@ func (m Model) middleColumnHeader() string {
 // every real-world resource, leaving the title bar showing only the context.
 func (m Model) breadcrumb() string {
 	parts := []string{"lfk"}
-	if m.nav.Context != "" {
+	if m.isUnionSentinel() {
+		parts = append(parts, "["+strings.Join(m.unionContexts, "+")+"]")
+	} else if m.nav.Context != "" && m.nav.Context != UnionContextSentinel {
 		parts = append(parts, m.nav.Context)
 	}
 	if name := model.DisplayNameFor(m.nav.ResourceType); name != "" {

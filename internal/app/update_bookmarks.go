@@ -23,6 +23,13 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Navigate to a resource type first", true)
 		return m, scheduleStatusClear()
 	}
+	// Union mode at LevelResources would persist the sentinel as the bookmark
+	// context, corrupting the bookmarks file. Block until the user drills into
+	// a specific cluster (where nav.Context is a real context name).
+	if m.isUnionSentinel() {
+		m.setStatusMessage("Bookmarks are not available in union view", true)
+		return m, scheduleStatusClear()
+	}
 
 	// Resolve which resource type the bookmark refers to. At LevelResources
 	// and deeper, m.nav.ResourceType has been populated by navigation. At

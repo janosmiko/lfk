@@ -377,6 +377,10 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 
 	var wg sync.WaitGroup
 	for _, item := range items {
+		itemCtx := kctx
+		if item.ClusterName != "" {
+			itemCtx = item.ClusterName
+		}
 		itemNs := ns
 		if item.Namespace != "" {
 			itemNs = item.Namespace
@@ -396,13 +400,13 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		case "Pod":
 			args = []string{
 				"logs", item.Name, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(kctx),
+				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
 			}
 		default:
 			resourceRef := strings.ToLower(kind) + "/" + item.Name
 			args = []string{
 				"logs", resourceRef, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(kctx),
+				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
 			}
 		}
 
@@ -416,11 +420,12 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		m.addLogEntry("DBG", "kubectl "+strings.Join(args, " "))
 
 		cmd := exec.CommandContext(ctx, kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(kctx))
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(itemCtx))
 		logger.Info("Starting multi-log kubectl",
 			"item", item.Name,
+			"context", itemCtx,
 			"cmd", cmd.String(),
-			"kubeconfig", m.client.KubeconfigPathForContext(kctx))
+			"kubeconfig", m.client.KubeconfigPathForContext(itemCtx))
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
 			logger.Error("Failed to create stdout pipe for multi-log", "item", item.Name, "error", err)
@@ -475,6 +480,10 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 
 	var wg sync.WaitGroup
 	for _, item := range items {
+		itemCtx := kctx
+		if item.ClusterName != "" {
+			itemCtx = item.ClusterName
+		}
 		itemNs := ns
 		if item.Namespace != "" {
 			itemNs = item.Namespace
@@ -494,13 +503,13 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 		case "Pod":
 			args = []string{
 				"logs", item.Name, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(kctx),
+				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
 			}
 		default:
 			resourceRef := strings.ToLower(kind) + "/" + item.Name
 			args = []string{
 				"logs", resourceRef, "--all-containers=true", "--prefix", followFlag,
-				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(kctx),
+				"--max-log-requests=20", "-n", itemNs, "--context", m.kubectlContext(itemCtx),
 			}
 		}
 
@@ -512,16 +521,16 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 		args = append(args, "--timestamps")
 
 		cmd := exec.CommandContext(ctx, kubectlPath, args...)
-		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(kctx))
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(itemCtx))
 		stdout, err := cmd.StdoutPipe()
 		if err != nil {
-			logger.Error("Failed to open kubectl logs stdout pipe (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs)
+			logger.Error("Failed to open kubectl logs stdout pipe (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "context", itemCtx)
 			continue
 		}
 		cmd.Stderr = cmd.Stdout
 
 		if err := cmd.Start(); err != nil {
-			logger.Error("Failed to start kubectl logs (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "cmd", cmd.String())
+			logger.Error("Failed to start kubectl logs (multi-pod)", "error", err, "pod", item.Name, "namespace", itemNs, "context", itemCtx, "cmd", cmd.String())
 			continue
 		}
 

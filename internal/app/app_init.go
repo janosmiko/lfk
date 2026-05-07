@@ -110,21 +110,14 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		captureMgr:     k8s.NewCaptureManager(),
 	}
 
-	// Stale-while-revalidate: seed discoveredResources from the per-host
-	// snapshots under ~/.kube/cache/discovery/<host>/lfk-enriched.yaml so
-	// the sidebar paints instantly on first frame instead of waiting for a
-	// live discovery roundtrip. The lazy-trigger sites still fire fresh
-	// discovery (gated by m.discoveryRefreshedContexts), so the cached
-	// values are replaced as soon as the live result lands.
-	if cached := loadAllDiscoveryCaches(client); cached != nil {
-		pseudo := model.PseudoResources()
-		for ctx, entries := range cached {
-			merged := make([]model.ResourceTypeEntry, 0, len(pseudo)+len(entries))
-			merged = append(merged, pseudo...)
-			merged = append(merged, entries...)
-			m.discoveredResources[ctx] = merged
-		}
-	}
+	// Stale-while-revalidate: the per-host snapshots under
+	// ~/.kube/cache/discovery/<host>/lfk-enriched.yaml are loaded
+	// asynchronously by discoveryCachePreloadCmd dispatched from Init().
+	// Loading them here would block startup behind a clientcmd.ClientConfig()
+	// call per kubeconfig context — at multi-thousand-context scale that
+	// hangs the model construction (and therefore the first render). The
+	// async path overlays cached entries onto m.discoveredResources when the
+	// preload message arrives; until then the sidebar shows the seed list.
 
 	// When CLI flags are provided, replace the file-loaded session with a
 	// synthetic one so the app opens in the requested context/namespace.
@@ -142,6 +135,40 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		m.pendingSession = &SessionState{
 			Context: contextName,
 			Tabs:    []SessionTab{tab},
+		}
+	}
+
+	if opts.IsUnionMode() {
+		m.unionMode = true
+		m.unionContexts = opts.UnionContexts
+		m.unionContextColors = opts.UnionContextColors
+		// In union mode there is no single active context whose config can
+		// populate Model.readOnly. Per-row action dispatch resolves each
+		// target cluster independently; keep only the process-wide CLI flag
+		// here so the kubeconfig's current-context does not accidentally
+		// make the entire union read-only.
+		m.readOnly = opts.ReadOnly
+		if len(m.tabs) > 0 {
+			m.tabs[0].readOnly = opts.ReadOnly
+		}
+		m.nav.Context = UnionContextSentinel
+		m.allNamespaces = false
+		m.namespace = opts.Namespaces[0]
+		if len(opts.Namespaces) > 1 {
+			m.selectedNamespaces = make(map[string]bool, len(opts.Namespaces))
+			for _, ns := range opts.Namespaces {
+				m.selectedNamespaces[ns] = true
+			}
+		}
+		// Use the first union context for API resource discovery and session restore.
+		m.pendingSession = &SessionState{
+			Context: m.unionContexts[0],
+			Tabs: []SessionTab{{
+				Context:            m.unionContexts[0],
+				AllNamespaces:      false,
+				Namespace:          opts.Namespaces[0],
+				SelectedNamespaces: opts.Namespaces,
+			}},
 		}
 	}
 

@@ -179,7 +179,13 @@ func TestLoadAllDiscoveryCachesSkipsContextsWithUnresolvableHost(t *testing.T) {
 		"the default test-ctx had no cached host file — must not show up here")
 }
 
-func TestNewModelPrefillsDiscoveredResourcesFromCache(t *testing.T) {
+func TestDiscoveryCachePreloadHydratesDiscoveredResources(t *testing.T) {
+	// NewModel no longer reads the discovery cache synchronously: at scale
+	// (kubeconfigs with thousands of contexts and an exec auth-provider) the
+	// per-context clientcmd.ClientConfig() walk hangs startup. The cache
+	// preload now runs as a tea.Cmd dispatched from Init(); this test
+	// exercises that round-trip — Cmd → discoveryCacheLoadedMsg → handler —
+	// and asserts the same end state the synchronous path used to produce.
 	withKubeCacheDir(t)
 
 	host := "https://dev.example:6443"
@@ -193,8 +199,26 @@ func TestNewModelPrefillsDiscoveredResourcesFromCache(t *testing.T) {
 
 	m := NewModel(client, StartupOptions{})
 
-	entries, ok := m.discoveredResources["dev-cluster"]
-	require.True(t, ok, "cached context must populate discoveredResources at NewModel time")
+	// First-frame contract: NewModel must NOT have populated discoveredResources
+	// for the cached context — otherwise the async move is a lie and the
+	// startup-hang regression returns.
+	_, populatedAtConstruction := m.discoveredResources["dev-cluster"]
+	assert.False(t, populatedAtConstruction,
+		"cache must not be loaded synchronously from NewModel; that path serialises clientcmd per context")
+
+	// Run the preload Cmd that Init() would dispatch and feed the resulting
+	// message through the handler. This is the post-startup state the user
+	// observes once the cache lands.
+	cmd := discoveryCachePreloadCmd(client)
+	require.NotNil(t, cmd)
+	msg := cmd()
+	loaded, ok := msg.(discoveryCacheLoadedMsg)
+	require.True(t, ok, "discoveryCachePreloadCmd must return discoveryCacheLoadedMsg")
+
+	result := m.updateDiscoveryCacheLoaded(loaded)
+
+	entries, ok := result.discoveredResources["dev-cluster"]
+	require.True(t, ok, "after the async cache lands, the cached context must populate discoveredResources")
 	require.GreaterOrEqual(t, len(entries), 2)
 
 	kinds := make(map[string]bool)
@@ -204,8 +228,32 @@ func TestNewModelPrefillsDiscoveredResourcesFromCache(t *testing.T) {
 	assert.True(t, kinds["Application"], "ArgoCD Application from cache must be present")
 	assert.True(t, kinds["Pod"], "Pod from cache must be present")
 
-	assert.False(t, m.discoveryRefreshedContexts["dev-cluster"],
+	assert.False(t, result.discoveryRefreshedContexts["dev-cluster"],
 		"cached prefill must not be marked as refreshed — live discovery still has to run")
+}
+
+func TestUpdateDiscoveryCacheLoaded_RespectsLiveRefresh(t *testing.T) {
+	// Live discovery is authoritative: if apiResourceDiscoveryMsg has
+	// already populated discoveredResources for a context (and stamped it
+	// in discoveryRefreshedContexts), a late-arriving cache preload must
+	// NOT clobber the fresher entries with stale on-disk ones.
+	live := []model.ResourceTypeEntry{
+		{Kind: "FreshKind", APIGroup: "ex.io", APIVersion: "v1", Resource: "freshkinds", Namespaced: true},
+	}
+	stale := []model.ResourceTypeEntry{
+		{Kind: "StaleKind", APIGroup: "ex.io", APIVersion: "v1", Resource: "stalekinds", Namespaced: true},
+	}
+	m := Model{
+		discoveredResources:        map[string][]model.ResourceTypeEntry{"dev-cluster": live},
+		discoveryRefreshedContexts: map[string]bool{"dev-cluster": true},
+	}
+	result := m.updateDiscoveryCacheLoaded(discoveryCacheLoadedMsg{
+		cached: map[string][]model.ResourceTypeEntry{"dev-cluster": stale},
+	})
+
+	got := result.discoveredResources["dev-cluster"]
+	require.Len(t, got, 1)
+	assert.Equal(t, "FreshKind", got[0].Kind, "live discovery must win over a late cache preload")
 }
 
 func TestUpdateAPIResourceDiscoveryWritesCache(t *testing.T) {

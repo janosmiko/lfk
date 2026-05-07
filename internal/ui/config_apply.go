@@ -136,6 +136,9 @@ func applyConfigOptions(cfg configFile) {
 	if len(cfg.PinnedGroups) > 0 {
 		ConfigPinnedGroups = cfg.PinnedGroups
 	}
+	if len(cfg.UnionSets) > 0 {
+		ConfigUnionSets = sanitizeUnionSets(cfg.UnionSets)
+	}
 	if cfg.Monitoring != nil {
 		model.ConfigMonitoring = cfg.Monitoring
 	}
@@ -166,13 +169,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.Mouse != nil {
 		ConfigMouse = *cfg.Mouse
 	}
-	if cfg.WatchInterval != "" {
-		if d, err := time.ParseDuration(cfg.WatchInterval); err == nil {
-			if clamped := ClampWatchInterval(d); clamped > 0 {
-				ConfigWatchInterval = clamped
-			}
-		}
-	}
+	applyWatchIntervalConfig(cfg.WatchInterval)
 	if cfg.NoColor != nil {
 		ConfigNoColor = *cfg.NoColor
 	}
@@ -210,6 +207,17 @@ func applyDataAccessConfig(cfg configFile) {
 		// API would then reject the lookup with a confusing error.
 		if ns := strings.TrimSpace(cfg.Kubeshark.Namespace); ns != "" {
 			ConfigKubesharkNamespace = ns
+		}
+	}
+}
+
+func applyWatchIntervalConfig(raw string) {
+	if raw == "" {
+		return
+	}
+	if d, err := time.ParseDuration(raw); err == nil {
+		if clamped := ClampWatchInterval(d); clamped > 0 {
+			ConfigWatchInterval = clamped
 		}
 	}
 }
@@ -401,4 +409,65 @@ func schedulerKindByName(name string) (scheduler.Kind, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// sanitizeUnionSets validates a raw UnionSets list from config and emits
+// warnings for entries that won't be usable (missing name, no contexts,
+// duplicate name, malformed per-cluster entries, unknown color names).
+// Invalid entries are dropped rather than failing config load — a typo
+// in one set should not prevent lfk from starting. Last-name-wins on
+// duplicates so the user can override a global set per-project.
+//
+// Per-set context existence in the kubeconfig and namespace presence are
+// NOT checked here: existence depends on the kubeconfig (which the ui
+// package doesn't see), and namespace can come from the CLI. Both are
+// validated when --union-set is resolved at runTUI time via
+// app.ValidateUnionOptions.
+func sanitizeUnionSets(in []UnionSetConfig) []UnionSetConfig {
+	out := make([]UnionSetConfig, 0, len(in))
+	seen := make(map[string]int, len(in))
+	for _, s := range in {
+		if s.Name == "" {
+			logger.Warn("union_sets entry has no name; skipping", "contexts", s.Contexts)
+			continue
+		}
+		// Drop nameless cluster entries, drop invalid color names, dedupe
+		// repeated context references within the same set. The result is
+		// a list whose Context fields are non-empty and whose Color fields
+		// are either empty (untinted) or a valid ClusterColorNames value.
+		cleanCtxs := make([]UnionSetContextConfig, 0, len(s.Contexts))
+		seenCtx := make(map[string]struct{}, len(s.Contexts))
+		for _, c := range s.Contexts {
+			if c.Context == "" {
+				logger.Warn("union_sets entry has nameless context; skipping that entry", "set", s.Name)
+				continue
+			}
+			if _, dup := seenCtx[c.Context]; dup {
+				logger.Warn("union_sets entry repeats a context; keeping first occurrence",
+					"set", s.Name, "context", c.Context)
+				continue
+			}
+			seenCtx[c.Context] = struct{}{}
+			if c.Color != "" && !IsValidClusterColor(c.Color) {
+				logger.Warn("union_sets entry has unknown color; leaving cluster untinted",
+					"set", s.Name, "context", c.Context, "color", c.Color,
+					"valid", ClusterColorNames)
+				c.Color = ""
+			}
+			cleanCtxs = append(cleanCtxs, c)
+		}
+		if len(cleanCtxs) == 0 {
+			logger.Warn("union_sets entry has no usable contexts; skipping", "name", s.Name)
+			continue
+		}
+		s.Contexts = cleanCtxs
+		if idx, dup := seen[s.Name]; dup {
+			logger.Warn("duplicate union_sets name; later definition wins", "name", s.Name)
+			out[idx] = s
+			continue
+		}
+		seen[s.Name] = len(out)
+		out = append(out, s)
+	}
+	return out
 }

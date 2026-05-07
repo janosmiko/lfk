@@ -43,7 +43,18 @@ const namespaceCacheTTL = 60 * time.Second
 // and falls back to the client's current context; returns "" when the
 // client has not been initialised yet (e.g. in pre-startup tests) so
 // callers never panic on a nil client.
+//
+// In union mode at LevelResources, nav.Context holds UnionContextSentinel
+// — a synthetic value that is never a valid kubeconfig context name. Every
+// caller of activeContext (cache key, GetNamespaces, completion) needs a
+// real cluster, so resolve it to unionContexts[0] here. The union assumes
+// homogeneous clusters, so any one of them is a representative source for
+// namespace listing and similar metadata; if clusters diverge, the user
+// can drill into a specific cluster and re-run the operation.
 func (m Model) activeContext() string {
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		return m.unionContexts[0]
+	}
 	if m.nav.Context != "" {
 		return m.nav.Context
 	}

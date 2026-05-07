@@ -704,6 +704,16 @@ type Model struct {
 	mapView      bool
 	resourceTree *model.ResourceNode
 
+	// Union view mode: when true, resources are fetched from multiple clusters and merged.
+	unionMode     bool
+	unionContexts []string // contexts to query in union mode
+	// unionContextColors maps each unionContexts entry to its configured
+	// color (from the union_sets per-cluster `color:` field). Drives the
+	// 1-cell row tile in the merged view. Distinct from the global
+	// clusterColors map (which feeds the cluster picker) so users can
+	// pick deliberate per-set palette without mutating the global state.
+	unionContextColors map[string]string
+
 	// Session persistence: restores navigation state across restarts.
 	pendingSession      *SessionState      // loaded session waiting to be applied after contexts load
 	sessionRestored     bool               // true once the pending session has been applied
@@ -779,22 +789,4 @@ type Model struct {
 	creditsScroll  int  // scroll position for credits screen
 	creditsStopped bool // true when credits reached center and waiting to close
 	kubetrisGame   *kubetrisGame
-}
-
-// Init loads the initial context list.
-func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadContexts(), m.spinner.Tick}
-	if m.stderrChan != nil {
-		cmds = append(cmds, m.waitForStderr())
-	}
-	if m.watchMode {
-		cmds = append(cmds, scheduleWatchTick(m.watchInterval))
-	}
-	if ui.ConfigTipsEnabled {
-		cmds = append(cmds, scheduleStartupTip())
-	}
-	if ui.ColorModeEnabled() {
-		cmds = append(cmds, ui.EnableColorModeCmd())
-	}
-	return tea.Batch(cmds...)
 }

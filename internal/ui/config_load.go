@@ -164,6 +164,13 @@ type configFile struct {
 	// precedence (repeatable), then the KUBECONFIG_DIR env var (colon-separated),
 	// then this config value.
 	KubeconfigDir *kubeconfigDirsSetting `json:"kubeconfig_dir" yaml:"kubeconfig_dir"`
+	// UnionSets defines named multi-cluster groups for the --union-set CLI
+	// flag. Each set bundles a list of contexts and an optional default
+	// namespace so users don't have to retype long --union-context lists
+	// for the same recurring cluster groups (e.g. blue/green/canary).
+	// CLI --namespace overrides the per-set namespace; --union-context and
+	// --context are mutually exclusive with --union-set.
+	UnionSets []UnionSetConfig `json:"union_sets" yaml:"union_sets"`
 }
 
 // SchedulerConfig holds the runtime knobs for the priority task
@@ -184,6 +191,39 @@ type KubesharkConfig struct {
 	// Namespace where Service kubeshark-hub lives. Empty / unset falls
 	// back to DefaultKubesharkNamespace ("kubeshark").
 	Namespace string `json:"namespace" yaml:"namespace"`
+}
+
+// UnionSetConfig is the on-disk schema for one entry under union_sets.
+type UnionSetConfig struct {
+	// Name is the identifier used by --union-set to reference this entry.
+	// Must be unique across UnionSets; duplicates are dropped at apply
+	// time (last wins) with a startup warning.
+	Name string `json:"name" yaml:"name"`
+	// Contexts is the list of cluster entries to merge in this union view.
+	// Subject to the same MaxUnionContexts cap and existence check as
+	// repeated --union-context flags. Each entry carries the kubeconfig
+	// context name plus an optional per-cluster color used to paint the
+	// 1-cell row tile in the merged view.
+	Contexts []UnionSetContextConfig `json:"contexts" yaml:"contexts"`
+	// Namespace is the namespace lfk opens in when this set is selected.
+	// Optional: when empty, --namespace is required on the CLI. When set,
+	// --namespace on the CLI overrides this value.
+	Namespace string `json:"namespace" yaml:"namespace"`
+}
+
+// UnionSetContextConfig identifies one cluster within a union set, plus an
+// optional per-set color used for the row-tile renderer in the merged view.
+// The color lives inside the set rather than the global cluster_colors map
+// so users can pick deliberate "traffic light" semantics per view (e.g. the
+// canary is green in this set, the prod-blue marker stays blue) without
+// affecting the cluster picker's global per-context tints.
+//
+// The color name must be one of ui.ClusterColorNames; invalid values are
+// dropped at sanitize time with a warning, leaving the entry usable but
+// untinted (the row gets a blank reserved cell instead of a colored tile).
+type UnionSetContextConfig struct {
+	Context string `json:"context" yaml:"context"`
+	Color   string `json:"color"   yaml:"color"`
 }
 
 // clusterConfig holds per-cluster configuration overrides.

@@ -24,15 +24,16 @@ const (
 // reports of the same incident (e.g. the same pod failing to schedule 20
 // times produces 20 Event objects with identical Type/Reason/Message/Object).
 type eventGroupKey struct {
-	Type    string
-	Reason  string
-	Message string
-	Object  string
+	ClusterName string
+	Type        string
+	Reason      string
+	Message     string
+	Object      string
 }
 
-// groupEvents collapses events sharing the same (Type, Reason, Message,
-// Object) tuple into a single model.Item whose Count column holds the sum of
-// the originals. The merged row exposes the full incident window:
+// groupEvents collapses events sharing the same (ClusterName, Type, Reason,
+// Message, Object) tuple into a single model.Item whose Count column holds the
+// sum of the originals. The merged row exposes the full incident window:
 //
 //   - CreatedAt / Age column = the OLDEST observation in the group (when the
 //     incident first started). Callers pass events sorted newest-first, so the
@@ -64,7 +65,7 @@ func groupEvents(items []model.Item) []model.Item {
 		// Seed GroupedRefs with the first item in the group so bulk
 		// operations can expand the grouped row back into individual
 		// delete calls covering every underlying Event object.
-		clone.GroupedRefs = []model.GroupedRef{{Name: it.Name, Namespace: it.Namespace}}
+		clone.GroupedRefs = []model.GroupedRef{{Name: it.Name, Namespace: it.Namespace, ClusterName: it.ClusterName}}
 		// Refresh the relative-time columns so the cloned row always
 		// reflects its CreatedAt/LastSeen fields, even if the source item
 		// arrived with stale strings.
@@ -94,7 +95,7 @@ func mergeEventInto(dst *model.Item, src model.Item) {
 	addEventCount(dst, readEventCount(src))
 	mergeFirstSeen(dst, src)
 	mergeLastSeen(dst, src)
-	dst.GroupedRefs = append(dst.GroupedRefs, model.GroupedRef{Name: src.Name, Namespace: src.Namespace})
+	dst.GroupedRefs = append(dst.GroupedRefs, model.GroupedRef{Name: src.Name, Namespace: src.Namespace, ClusterName: src.ClusterName})
 }
 
 // mergeFirstSeen pulls dst.CreatedAt backwards if src has an earlier
@@ -137,7 +138,7 @@ func setEventColumn(dst *model.Item, key, value string) {
 // Missing columns fall back to empty strings, which still produces a stable
 // key for merging two equally-incomplete items.
 func extractEventGroupKey(it model.Item) eventGroupKey {
-	k := eventGroupKey{Type: it.Status}
+	k := eventGroupKey{ClusterName: it.ClusterName, Type: it.Status}
 	for _, col := range it.Columns {
 		switch col.Key {
 		case eventColReason:

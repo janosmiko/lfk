@@ -66,7 +66,7 @@ type dashboardData struct {
 // Side benefit beyond preemption: even on a healthy cluster, the
 // dashboard renders incrementally instead of staying blank for ~20s.
 func (m Model) loadDashboard() tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	gen := m.requestGen
 	client := m.client
 	base := bgtaskTarget(kctx, "")
@@ -352,7 +352,7 @@ func fetchNodeMetrics(reqCtx context.Context, kctx string, client *k8s.Client, n
 
 // loadMonitoringDashboard fetches active Prometheus alerts and renders a monitoring dashboard.
 func (m Model) loadMonitoringDashboard() tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	client := m.client
 	ns := m.effectiveNamespace()
 	return m.trackBgTask(

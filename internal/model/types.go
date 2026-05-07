@@ -118,9 +118,12 @@ var ConfigDefaultRightsizingHeadroom float64
 
 // GroupedRef identifies a single resource within a grouped row (e.g., one
 // of the many Event objects collapsed into a single line by event grouping).
+// ClusterName is set in union mode so the bulk dispatcher can route each ref
+// to its source cluster; empty otherwise.
 type GroupedRef struct {
-	Name      string
-	Namespace string
+	Name        string
+	Namespace   string
+	ClusterName string
 }
 
 // Item represents a single navigable entry in any column.
@@ -140,6 +143,7 @@ type Item struct {
 	LastSeen      time.Time        // Most recent observation (Events only — drives the "Last Seen" column)
 	Columns       []KeyValue       // Additional resource fields for summary preview
 	Conditions    []ConditionEntry // Status conditions for the details pane
+	ClusterName   string           // Source cluster in union mode; empty in normal mode
 	Selected      bool             // Whether this item is part of a multi-selection
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set

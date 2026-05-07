@@ -69,6 +69,39 @@ func (m *Model) selectedResourceKind() string {
 // effectiveNamespace returns the namespace to use for API calls.
 // Returns empty string when allNamespaces is true or multiple namespaces are
 // selected (fetches all, filters client-side).
+// isUnionSentinel reports whether the app is in union mode at LevelResources,
+// where nav.Context holds the UnionContextSentinel value and must not be sent
+// to the Kubernetes API.
+func (m Model) isUnionSentinel() bool {
+	return m.unionMode && m.nav.Context == UnionContextSentinel
+}
+
+// effectiveContext returns the Kubernetes context for API calls targeting the
+// currently selected item. In union mode at LevelResources, nav.Context is
+// the UnionContextSentinel, so we read the source cluster from the hovered
+// item's ClusterName. At all other levels (post-drill-down), nav.Context is
+// already the real cluster and is returned as-is.
+//
+// When the hovered item carries no ClusterName — at LevelResourceTypes
+// (sidebar items don't have a source cluster), at the Overview/Monitoring
+// pseudo-rows, or for anything that isn't a union row — fall back to
+// unionContexts[0]. The union assumes homogeneous clusters, so any one
+// of them is a representative target for cluster-wide operations like
+// dashboard fetches and namespace listing. Without this fallback, the
+// raw "__union__" sentinel leaks into restConfigForContext and surfaces
+// as `context "__union__" does not exist` in the log.
+func (m Model) effectiveContext() string {
+	if m.isUnionSentinel() {
+		if sel := m.selectedMiddleItem(); sel != nil && sel.ClusterName != "" {
+			return sel.ClusterName
+		}
+		if len(m.unionContexts) > 0 {
+			return m.unionContexts[0]
+		}
+	}
+	return m.nav.Context
+}
+
 func (m *Model) effectiveNamespace() string {
 	if m.allNamespaces || len(m.selectedNamespaces) > 1 {
 		return "" // fetch all, filter client-side

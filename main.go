@@ -44,6 +44,8 @@ File locations:
 	}
 
 	rootCmd.Flags().StringVar(&cliOpts.Context, "context", "", "Kubernetes context to use")
+	rootCmd.Flags().StringArrayVar(&cliOpts.UnionContexts, "union-context", nil, "Cluster context to include in union view (repeatable; requires --namespace)")
+	rootCmd.Flags().StringVar(&cliOpts.UnionSet, "union-set", "", "Named union_sets entry from config to expand into a union view (mutex with --union-context and --context; --namespace overrides the set's namespace)")
 	rootCmd.Flags().StringSliceVarP(&cliOpts.Namespaces, "namespace", "n", nil, "Namespace(s) to filter (repeatable, disables all-namespaces mode)")
 	rootCmd.Flags().StringVar(&cliOpts.Kubeconfig, "kubeconfig", "", "Path to kubeconfig file (overrides default discovery)")
 	rootCmd.Flags().StringArrayVar(&cliOpts.KubeconfigDirs, "kubeconfig-dir", nil, "Directory to scan for kubeconfig files instead of ~/.kube/config.d/. Repeatable: pass multiple flags to merge several directories. Also accepts KUBECONFIG_DIR env var (colon-separated). ~/ is expanded against $HOME.")
@@ -123,6 +125,17 @@ func runTUI(opts app.StartupOptions) error {
 	client.SetKubesharkNamespace(ui.ConfigKubesharkNamespace)
 	client.SetInformerCacheMode(k8s.InformerCacheMode(ui.ConfigInformerCacheMode))
 	defer client.Shutdown()
+
+	// --union-set expansion runs AFTER LoadConfig (it reads ui.ConfigUnionSets)
+	// and BEFORE ValidateUnionOptions (which then enforces context existence
+	// and the cluster cap on the resolved list).
+	opts, err = app.ResolveUnionSet(opts, unionSetLookup(ui.ConfigUnionSets))
+	if err != nil {
+		return err
+	}
+	if err := app.ValidateUnionOptions(opts, client.ContextExists); err != nil {
+		return err
+	}
 
 	if err := logger.Init(ui.ConfigLogPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not initialize logger: %v\n", err)
@@ -214,4 +227,30 @@ func validatePprofAddr(addr string) error {
 		return fmt.Errorf("host %q is not a loopback address", host)
 	}
 	return nil
+}
+
+// unionSetLookup adapts the ui-package config slice to the
+// app.UnionSetLookup signature ResolveUnionSet expects. Captured into a
+// closure so the resolver doesn't grow an import on the ui package and
+// stays unit-testable with a hand-rolled lookup. Flattens the per-cluster
+// objects into the parallel (contexts, colors-map) shape the resolver
+// passes downstream.
+func unionSetLookup(sets []ui.UnionSetConfig) app.UnionSetLookup {
+	return func(name string) (contexts []string, namespace string, colors map[string]string, ok bool) {
+		for _, s := range sets {
+			if s.Name != name {
+				continue
+			}
+			ctxs := make([]string, 0, len(s.Contexts))
+			cols := make(map[string]string, len(s.Contexts))
+			for _, c := range s.Contexts {
+				ctxs = append(ctxs, c.Context)
+				if c.Color != "" {
+					cols[c.Context] = c.Color
+				}
+			}
+			return ctxs, s.Namespace, cols, true
+		}
+		return nil, "", nil, false
+	}
 }

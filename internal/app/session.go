@@ -115,6 +115,9 @@ func saveSession(s SessionState) error {
 
 // saveCurrentSession persists the current navigation state to the session file.
 func (m *Model) saveCurrentSession() {
+	if m.unionMode {
+		return
+	}
 	// Ensure the active tab's state is up to date before serialising.
 	m.saveCurrentTab()
 

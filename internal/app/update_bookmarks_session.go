@@ -10,11 +10,24 @@ func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
 	m.pendingSession = nil
 	m.sessionRestored = true
 
+	var restoredModel tea.Model
+	var cmd tea.Cmd
 	if len(sess.Tabs) > 0 {
-		return m.restoreMultiTabSession(sess, contexts)
+		restoredModel, cmd = m.restoreMultiTabSession(sess, contexts)
+	} else {
+		restoredModel, cmd = m.restoreSingleTabSession(sess, contexts)
 	}
 
-	return m.restoreSingleTabSession(sess, contexts)
+	// In union mode the session restore navigates using unionContexts[0] for
+	// API discovery, but nav.Context must be the UnionContextSentinel so that
+	// loadResources fans out to all union contexts when at LevelResources.
+	if m.unionMode {
+		if tm, ok := restoredModel.(Model); ok {
+			tm.nav.Context = UnionContextSentinel
+			return tm, cmd
+		}
+	}
+	return restoredModel, cmd
 }
 
 func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item) (tea.Model, tea.Cmd) {

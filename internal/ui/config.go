@@ -461,6 +461,12 @@ var ConfigCustomActions map[string][]CustomAction
 // ConfigPinnedGroups lists CRD API groups that should appear prominently.
 var ConfigPinnedGroups []string
 
+// ConfigUnionSets holds named multi-cluster groups defined in config.
+// Resolved by --union-set into a list of contexts + optional namespace.
+// Empty by default; populated by applyConfigOptions when union_sets is
+// present in the YAML config.
+var ConfigUnionSets []UnionSetConfig
+
 // ConfigTipsEnabled controls whether to show random tips on startup.
 var ConfigTipsEnabled = true
 

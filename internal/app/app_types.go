@@ -366,6 +366,11 @@ const sortColDefault = "Name"
 // column name and must not appear in the sortable-column cycle.
 const sortColEventLastSeen = "__event_last_seen__"
 
+// UnionContextSentinel is the value stored in nav.Context when the user is at
+// LevelResources in --union-context mode. It is never sent to the Kubernetes
+// API; effectiveContext() resolves it to a real cluster for API calls.
+const UnionContextSentinel = "__union__"
+
 // actionContext stores which resource an action targets.
 type actionContext struct {
 	kind          string // Kubernetes Kind (e.g., "Pod", "Deployment")

@@ -62,7 +62,15 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 	}
 
 	crdNames := extractCRDNames(&m)
-	switch classifyInputWithCRDs(input, crdNames) {
+	classified := classifyInputWithCRDs(input, crdNames)
+	// Shell-out and kubectl commands inject --context from nav.Context. At the
+	// union sentinel that would pass "__union__" to real kubectl and fail.
+	// Block until the user drills into a specific cluster.
+	if m.isUnionSentinel() && (classified == cmdShell || classified == cmdKubectl) {
+		m.setStatusMessage("Shell and kubectl commands require a single cluster — drill into a resource first", true)
+		return m, scheduleStatusClear()
+	}
+	switch classified {
 	case cmdShell:
 		return m, m.executeShellCommand(extractShellCommand(input))
 	case cmdBuiltin:
@@ -219,6 +227,10 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		return m, tea.Batch(m.loadResources(false), scheduleStatusClear())
 
 	case "context":
+		if m.unionMode {
+			m.setStatusMessage(":ctx is disabled in union view", true)
+			return m, scheduleStatusClear()
+		}
 		if arg == "" {
 			m.setStatusMessage("Usage: :ctx <context>", true)
 			return m, scheduleStatusClear()

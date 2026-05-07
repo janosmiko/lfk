@@ -354,3 +354,51 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
 	return items, nil
 }
+
+// GetResourcesUnion fetches resources from multiple contexts in parallel and
+// merges the results. Each item is stamped with ClusterName for drill-down
+// routing and has a "Cluster" column injected for table display.
+// Partial results are returned alongside the first error so the UI can show
+// what it fetched even when one cluster is temporarily unreachable.
+func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+	type result struct {
+		items []model.Item
+		err   error
+		ctx   string
+	}
+	results := make([]result, len(contexts))
+	var wg sync.WaitGroup
+	wg.Add(len(contexts))
+	for i, kctx := range contexts {
+		go func(idx int, contextName string) {
+			defer wg.Done()
+			items, err := c.GetResources(ctx, contextName, namespace, rt)
+			if err != nil {
+				results[idx] = result{ctx: contextName, err: err}
+				return
+			}
+			for j := range items {
+				items[j].ClusterName = contextName
+				items[j].Columns = append([]model.KeyValue{{Key: "Cluster", Value: contextName}}, items[j].Columns...)
+			}
+			results[idx] = result{items: items, ctx: contextName}
+		}(i, kctx)
+	}
+	wg.Wait()
+
+	var merged []model.Item
+	var firstErr error
+	for _, r := range results {
+		if r.err != nil && firstErr == nil {
+			firstErr = fmt.Errorf("context %q: %w", r.ctx, r.err)
+		}
+		merged = append(merged, r.items...)
+	}
+	sort.Slice(merged, func(i, j int) bool {
+		if merged[i].Name != merged[j].Name {
+			return merged[i].Name < merged[j].Name
+		}
+		return merged[i].ClusterName < merged[j].ClusterName
+	})
+	return merged, firstErr
+}

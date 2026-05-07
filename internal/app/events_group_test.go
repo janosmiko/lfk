@@ -118,6 +118,18 @@ func TestGroupEvents_DoesNotMergeDifferentTypes(t *testing.T) {
 	assert.Len(t, got, 2)
 }
 
+func TestGroupEvents_DoesNotMergeDifferentClusters(t *testing.T) {
+	now := time.Now()
+	blue := newEvent("Warning", "FailedScheduling", "same msg", "Pod/foo", "1", now)
+	blue.ClusterName = "blue"
+	green := newEvent("Warning", "FailedScheduling", "same msg", "Pod/foo", "1", now)
+	green.ClusterName = "green"
+
+	got := groupEvents([]model.Item{blue, green})
+	require.Len(t, got, 2, "identical events from different clusters must stay separate")
+	assert.ElementsMatch(t, []string{"blue", "green"}, []string{got[0].ClusterName, got[1].ClusterName})
+}
+
 func TestGroupEvents_NonEventPassthrough(t *testing.T) {
 	now := time.Now()
 	podItem := model.Item{Name: "pod-a", Kind: "Pod", Status: "Running"}
@@ -261,6 +273,25 @@ func TestGroupEvents_PopulatesGroupedRefs(t *testing.T) {
 	assert.Contains(t, names, "ns-1/evt-aaa")
 	assert.Contains(t, names, "ns-1/evt-bbb")
 	assert.Contains(t, names, "ns-2/evt-ccc")
+}
+
+func TestGroupEvents_GroupedRefsPreserveClusterName(t *testing.T) {
+	now := time.Now()
+	e1 := newEvent("Warning", "FailedScheduling", "msg", "Pod/foo", "1", now)
+	e1.Name = "evt-aaa"
+	e1.Namespace = "ns-1"
+	e1.ClusterName = "blue"
+	e2 := newEvent("Warning", "FailedScheduling", "msg", "Pod/foo", "1", now.Add(-time.Minute))
+	e2.Name = "evt-bbb"
+	e2.Namespace = "ns-1"
+	e2.ClusterName = "blue"
+
+	got := groupEvents([]model.Item{e1, e2})
+	require.Len(t, got, 1)
+	require.Len(t, got[0].GroupedRefs, 2)
+	for _, ref := range got[0].GroupedRefs {
+		assert.Equal(t, "blue", ref.ClusterName)
+	}
 }
 
 func TestGroupEvents_SingleEventHasGroupedRef(t *testing.T) {

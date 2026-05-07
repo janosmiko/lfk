@@ -128,3 +128,21 @@ func ClusterColorSwatchBg(name string) string {
 	}
 	return lipgloss.NewStyle().Background(bg).Render("  ")
 }
+
+// ClusterColorTileBg is the single-cell variant of ClusterColorSwatchBg used
+// by the union-view row prefix: every union row gets a 1-cell colored tile
+// at the leading edge so the source cluster is identifiable at a glance
+// without scanning the textual Cluster column. One cell trades visibility
+// for a smaller width tax than the 2-cell picker swatch — appropriate for
+// per-row use across hundreds of rows.
+//
+// Empty / unknown name returns one regular space so rows without a colour
+// stay aligned with rows that have one (the column-width calc subtracts a
+// fixed tileW regardless of which rows actually have colours set).
+func ClusterColorTileBg(name string) string {
+	bg := clusterColorBg(name)
+	if bg == nil {
+		return " "
+	}
+	return lipgloss.NewStyle().Background(bg).Render(" ")
+}

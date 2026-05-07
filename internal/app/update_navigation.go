@@ -128,6 +128,9 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case model.LevelResourceTypes:
+		if m.unionMode {
+			return m, nil // no cluster selection level in union mode
+		}
 		m.saveCursor()
 		m.nav.Level = model.LevelClusters
 		m.nav.Context = ""
@@ -148,7 +151,12 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		// list" that then jumps to the full list when discovery arrives.
 		// Instead, show the loader until apiResourceDiscoveryMsg
 		// populates middleItems with the real CRD-inclusive set.
-		if discovered, ok := m.discoveredResources[m.nav.Context]; ok && len(discovered) > 0 {
+		// In union mode, discovery is stored under unionContexts[0], not the sentinel.
+		discoveryCtx := m.nav.Context
+		if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+			discoveryCtx = m.unionContexts[0]
+		}
+		if discovered, ok := m.discoveredResources[discoveryCtx]; ok && len(discovered) > 0 {
 			m.setMiddleItems(m.leftItems)
 		} else {
 			m.setMiddleItems(nil)
@@ -183,6 +191,9 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		}
 		m.nav.Level = model.LevelResources
 		m.nav.ResourceName = ""
+		if m.unionMode {
+			m.nav.Context = UnionContextSentinel
+		}
 		if cached, ok := m.itemCache[m.navKey()]; ok {
 			m.setMiddleItems(cached)
 		} else {
@@ -200,6 +211,9 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 			m.nav.Level = model.LevelResources
 			m.nav.ResourceName = ""
 			m.nav.OwnedName = ""
+			if m.unionMode {
+				m.nav.Context = UnionContextSentinel
+			}
 		} else {
 			m.nav.Level = model.LevelOwned
 			m.nav.OwnedName = ""
@@ -411,7 +425,11 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.loading = true
 		return m, m.loadPreview()
 	}
-	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[m.nav.Context])
+	discoveryCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
+	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[discoveryCtx])
 	if !ok {
 		return m, nil
 	}
@@ -448,6 +466,9 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	} else if !m.allNamespaces {
 		m.nav.Namespace = m.namespace
 	}
+	if m.unionMode && sel.ClusterName != "" {
+		m.nav.Context = sel.ClusterName
+	}
 	m.saveCurrentSession()
 	if m.nav.ResourceType.Kind == "Pod" {
 		m.nav.OwnedName = sel.Name
@@ -479,6 +500,9 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildOwned(sel *model.Item) (tea.Model, tea.Cmd) {
+	if m.unionMode && sel.ClusterName != "" {
+		m.nav.Context = sel.ClusterName
+	}
 	if sel.Kind == "Pod" {
 		m.saveCursor()
 		m.nav.OwnedName = sel.Name
