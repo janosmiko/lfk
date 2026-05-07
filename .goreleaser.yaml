@@ -170,6 +170,25 @@ chocolateys:
     source_repo: "https://push.chocolatey.org/"
     skip_publish: false
 
+aurs:
+  - name: lfk-bin
+    homepage: "https://github.com/janosmiko/lfk"
+    description: "Lightning Fast Kubernetes navigator - keyboard-focused TUI for managing K8s clusters"
+    maintainers:
+      - 'janosmiko <janosmiko@users.noreply.github.com>'
+    license: MIT
+    private_key: "{{ .Env.AUR_SSH_PRIVATE_KEY }}"
+    git_url: "ssh://aur@aur.archlinux.org/lfk-bin.git"
+    commit_msg_template: "chore: bump lfk-bin to {{ .Tag }}"
+    package: |-
+      install -Dm755 "./lfk" "${pkgdir}/usr/bin/lfk"
+      install -Dm644 "./LICENSE" "${pkgdir}/usr/share/licenses/lfk/LICENSE"
+      install -Dm644 "./README.md" "${pkgdir}/usr/share/doc/lfk/README.md"
+    optdepends:
+      - 'kubectl: Kubernetes CLI integration'
+      - 'helm: Helm release management'
+      - 'trivy: Container image vulnerability scanning'
+
 publishers:
   - name: cloudsmith
     ids:
