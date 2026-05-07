@@ -231,7 +231,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		if len(items) > 0 {
 			tableKind = items[0].Kind
 		}
-		extraCols = collectExtraColumns(items, width, nsW+readyW+restartsW+ageW+statusW+markerColW, tableKind)
+		extraCols = collectExtraColumns(items, width, nsW+readyW+restartsW+ageW+statusW+markerColW+tileW, tableKind)
 
 		filtered := extraCols[:0]
 		for _, ec := range extraCols {

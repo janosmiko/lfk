@@ -14,11 +14,27 @@ This shows all Pods (or any resource type) in namespace `cloud-cd` from all thre
 
 | Flag | Type | Notes |
 |------|------|-------|
-| `--union-context` | `stringArray` (repeatable) | Clusters to include. At least two is the typical usage; one is allowed but degenerates to single-cluster with a Cluster column. |
-| `--namespace` / `-n` | required when using `--union-context` | Fetching across multiple clusters in all-namespaces mode is impractical; the flag validates this. |
+| `--union-context` | `stringArray` (repeatable) | Clusters to include. At least two is the typical usage; one is allowed but degenerates to single-cluster with a Cluster column. Validation caps this at 8 contexts. |
+| `--union-set` | `string` | Name of a configured `union_sets` entry to expand into contexts and an optional default namespace. |
+| `--namespace` / `-n` | required in union mode unless supplied by `union_sets` | Fetching across multiple clusters in all-namespaces mode is impractical; validation requires exactly one namespace. |
 | `--context` | mutually exclusive with `--union-context` | Returns an error if both are supplied. |
 
 Validation runs in `runTUI()` in `main.go` before the TUI starts. Unknown context names produce a specific error naming the offending context.
+
+## Config
+
+Named union views can be stored under the top-level `union_sets` key. Each entry has a `name`, optional `namespace`, and `contexts`. Contexts can be plain strings or objects with a `context` field and optional `color` used for the one-character cluster tile.
+
+```yaml
+union_sets:
+  - name: staging-west
+    namespace: cloud-cd
+    contexts:
+      - blue
+      - green
+      - context: yellow
+        color: yellow
+```
 
 ## Design Decisions
 
@@ -90,7 +106,7 @@ Union mode is ephemeral (CLI-only). `saveCurrentSession()` returns early when `m
 | `internal/app/update_navigation.go` | `navigateParent`: no-op at `LevelResourceTypes`; sentinel restoration at `LevelOwned`/`LevelContainers`; discovery context guard at `LevelResources`; `navigateChildResourceType`: discovery context guard; `navigateChildResource`/`navigateChildOwned`: set `nav.Context = sel.ClusterName` |
 | `internal/app/update_actions.go` | `buildActionCtx`: use `sel.ClusterName` when in union mode |
 | `internal/app/update_bookmarks.go` | `restoreSession`: reset `nav.Context = "__union__"` after session restore |
-| `internal/app/update.go` | `updateAPIResourceDiscovery`: `isCurrentContext` guard for sentinel; `updateResourcesLoadedMain`: cluster-aware cursor restoration |
+| `internal/app/update_resources_loaded.go` | `updateAPIResourceDiscovery`: `isCurrentContext` guard for sentinel; `updateResourcesLoadedMain`: cluster-aware cursor restoration |
 | `internal/app/view_status.go` | `middleColumnHeader`: `[UNION]` suffix; `breadcrumb`: shows `[blue+green+yellow]` |
 | `internal/app/session.go` | `saveCurrentSession`: early return in union mode |
 

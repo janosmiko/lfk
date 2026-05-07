@@ -302,7 +302,11 @@ func (m Model) updateDiscoveryCacheLoaded(msg discoveryCacheLoadedMsg) Model {
 	// navigation. Read the cache key the same way navKey() builds it for
 	// LevelResourceTypes so we don't drift if that format changes.
 	if m.nav.Level == model.LevelResourceTypes {
-		if entries, ok := m.discoveredResources[m.nav.Context]; ok && len(entries) > 0 {
+		discoveryCtx := m.nav.Context
+		if m.unionMode && m.nav.Context == UnionContextSentinel && len(m.unionContexts) > 0 {
+			discoveryCtx = m.unionContexts[0]
+		}
+		if entries, ok := m.discoveredResources[discoveryCtx]; ok && len(entries) > 0 {
 			merged := model.BuildSidebarItems(entries)
 			m.itemCache[m.nav.Context] = merged
 			m.setMiddleItems(merged)

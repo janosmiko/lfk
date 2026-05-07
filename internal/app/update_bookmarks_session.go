@@ -24,6 +24,9 @@ func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
 	if m.unionMode {
 		if tm, ok := restoredModel.(Model); ok {
 			tm.nav.Context = UnionContextSentinel
+			for i := range tm.tabs {
+				tm.tabs[i].nav.Context = UnionContextSentinel
+			}
 			return tm, cmd
 		}
 	}

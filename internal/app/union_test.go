@@ -38,6 +38,12 @@ func TestHasCLIOverrides_IncludesUnionContexts(t *testing.T) {
 		"union contexts alone should count as a CLI override so session restore is skipped")
 }
 
+func TestHasCLIOverrides_IncludesUnionSet(t *testing.T) {
+	opts := StartupOptions{UnionSet: "staging-west"}
+	assert.True(t, opts.HasCLIOverrides(),
+		"raw union-set flag should count as a CLI override before ResolveUnionSet expands it")
+}
+
 // --- ValidateUnionOptions ---
 
 // nKubeContexts returns ["c0", "c1", ..., "c(n-1)"] for boundary-cap tests.
@@ -302,6 +308,58 @@ func TestNewModel_UnionInitialises(t *testing.T) {
 
 	require.NotNil(t, m.pendingSession, "session-restore scaffolding is built off the first union context")
 	assert.Equal(t, "blue", m.pendingSession.Context)
+}
+
+func TestRestoreSession_UnionSetsAllTabContextsToSentinel(t *testing.T) {
+	m := Model{
+		unionMode:                  true,
+		unionContexts:              []string{"blue", "green"},
+		pendingSession:             &SessionState{ActiveTab: 1, Tabs: []SessionTab{{Context: "blue"}, {Context: "green"}}},
+		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
+		discoveryRefreshedContexts: make(map[string]bool),
+		discoveringContexts:        make(map[string]bool),
+		cursorMemory:               make(map[string]int),
+		itemCache:                  make(map[string][]model.Item),
+		cacheFingerprints:          make(map[string]string),
+		cachedNamespaces:           make(map[string]namespaceCacheEntry),
+		bgtasks:                    bgtasks.New(0),
+		tabs:                       []TabState{{}},
+	}
+	result, _ := m.restoreSession([]model.Item{{Name: "blue"}, {Name: "green"}})
+	rm := result.(Model)
+
+	assert.Equal(t, UnionContextSentinel, rm.nav.Context)
+	require.Len(t, rm.tabs, 2)
+	for _, tab := range rm.tabs {
+		assert.Equal(t, UnionContextSentinel, tab.nav.Context)
+	}
+}
+
+func TestUpdateDiscoveryCacheLoaded_UnionLooksUpFirstContext(t *testing.T) {
+	m := Model{
+		unionMode:                  true,
+		unionContexts:              []string{"blue", "green"},
+		nav:                        model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel},
+		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
+		discoveryRefreshedContexts: make(map[string]bool),
+		itemCache:                  make(map[string][]model.Item),
+	}
+	result := m.updateDiscoveryCacheLoaded(discoveryCacheLoadedMsg{
+		cached: map[string][]model.ResourceTypeEntry{
+			"blue": {{Kind: "Widget", APIGroup: "example.com", APIVersion: "v1", Resource: "widgets", Namespaced: true}},
+		},
+	})
+
+	require.NotEmpty(t, result.middleItems)
+	foundWidget := false
+	for _, item := range result.middleItems {
+		if item.Kind == "Widget" {
+			foundWidget = true
+			break
+		}
+	}
+	assert.True(t, foundWidget)
+	assert.NotEmpty(t, result.itemCache[UnionContextSentinel])
 }
 
 // --- isUnionSentinel / effectiveContext ---
@@ -648,6 +706,65 @@ func TestOpenActionMenu_UnionSentinel_PodFiltered(t *testing.T) {
 	for _, label := range []string{"Edit", "Exec", "Attach", "Debug", "Port Forward", "Shell"} {
 		assert.False(t, labels[label], "%q must be filtered out at the union sentinel", label)
 	}
+}
+
+func TestOpenActionMenu_UnionSentinel_ReadOnlyTargetFiltersMutations(t *testing.T) {
+	m := Model{
+		unionMode: true,
+		nav: model.NavigationState{
+			Level:        model.LevelResources,
+			Context:      UnionContextSentinel,
+			ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", Namespaced: true},
+		},
+		middleItems: []model.Item{
+			{Name: "my-pod", Kind: "Pod", Namespace: "cloud-cd", ClusterName: "blue"},
+		},
+		contextROOverrides: map[string]bool{"blue": true},
+		tabs:               []TabState{{}},
+		cursors:            [5]int{},
+		width:              80, height: 40,
+	}
+	result := m.openActionMenu()
+	assert.Equal(t, overlayAction, result.overlay)
+
+	labels := make(map[string]bool)
+	for _, item := range result.overlayItems {
+		labels[item.Name] = true
+	}
+	assert.True(t, labels["Logs"], "read-only-safe actions should remain visible")
+	assert.False(t, labels["Delete"], "mutating actions must be hidden for a read-only source cluster")
+	assert.False(t, labels["Force Delete"], "mutating actions must be hidden for a read-only source cluster")
+}
+
+func TestOpenActionMenu_UnionSentinel_BulkReadOnlyTargetFiltersMutations(t *testing.T) {
+	items := []model.Item{
+		{Name: "p1", Kind: "Pod", Namespace: "cloud-cd", ClusterName: "blue"},
+		{Name: "p2", Kind: "Pod", Namespace: "cloud-cd", ClusterName: "green"},
+	}
+	m := Model{
+		unionMode: true,
+		nav: model.NavigationState{
+			Level:        model.LevelResources,
+			Context:      UnionContextSentinel,
+			ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", Namespaced: true},
+		},
+		middleItems:        items,
+		selectedItems:      map[string]bool{selectionKey(items[0]): true, selectionKey(items[1]): true},
+		selectionAnchor:    -1,
+		contextROOverrides: map[string]bool{"green": true},
+		tabs:               []TabState{{}},
+		cursors:            [5]int{},
+		width:              80, height: 40,
+	}
+	result := m.openActionMenu()
+	assert.Equal(t, overlayAction, result.overlay)
+
+	labels := make(map[string]bool)
+	for _, item := range result.overlayItems {
+		labels[item.Name] = true
+	}
+	assert.True(t, labels["Logs"], "read-only-safe bulk actions should remain visible")
+	assert.False(t, labels["Delete"], "bulk mutating actions must be hidden when any selected source cluster is read-only")
 }
 
 func TestOpenActionMenu_UnionSentinel_DeploymentAllowsRestart(t *testing.T) {

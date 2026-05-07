@@ -69,9 +69,12 @@ func (m *Model) selectedResourceKind() string {
 // effectiveNamespace returns the namespace to use for API calls.
 // Returns empty string when allNamespaces is true or multiple namespaces are
 // selected (fetches all, filters client-side).
-// isUnionSentinel reports whether the app is in union mode at LevelResources,
-// where nav.Context holds the UnionContextSentinel value and must not be sent
-// to the Kubernetes API.
+// isUnionSentinel reports whether the app is in union mode while nav.Context
+// holds the internal sentinel value that must not be sent to the Kubernetes
+// API. Keep this level-agnostic: union mode also uses the sentinel at
+// LevelResourceTypes for discovery and metadata fallbacks. ValidateUnionOptions
+// reserves the literal sentinel name, so it cannot collide with a configured
+// union context.
 func (m Model) isUnionSentinel() bool {
 	return m.unionMode && m.nav.Context == UnionContextSentinel
 }

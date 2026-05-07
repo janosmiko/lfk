@@ -30,9 +30,9 @@ type StartupOptions struct {
 // HasCLIOverrides returns true when any CLI flag was provided.
 // Kubeconfig is intentionally excluded: it affects client construction,
 // not session restore. The session override only matters for --context
-// and --namespace.
+// and namespace/union navigation flags.
 func (o StartupOptions) HasCLIOverrides() bool {
-	return o.Context != "" || len(o.Namespaces) > 0 || len(o.UnionContexts) > 0
+	return o.Context != "" || o.UnionSet != "" || len(o.Namespaces) > 0 || len(o.UnionContexts) > 0
 }
 
 // IsUnionMode returns true when one or more --union-context flags were
