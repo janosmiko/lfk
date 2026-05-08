@@ -84,7 +84,12 @@ func HighlightSearchInLine(line, query string, isCurrent bool) string {
 	return HighlightMatchInline(styled, query, highlight)
 }
 
-// FormatItemNameOnly formats an item showing only its name and icon (no status, age, etc.).
+// FormatItemNameOnly formats an item showing only its name and icon
+// (no status, age, etc.). For IsContext rows shown in the parent
+// pane, no markers are rendered — the active cluster picker
+// (FormatItem) carries the DEF/STATUS/COLOR columns; surfacing them
+// in the parent would re-introduce the leading-padding alignment
+// problem that prompted this layout.
 func FormatItemNameOnly(item model.Item, width int) string {
 	displayName := item.Name
 	if item.Namespace != "" {
@@ -98,33 +103,15 @@ func FormatItemNameOnly(item model.Item, width int) string {
 		deprecationW = lipgloss.Width(deprecationSuffix)
 	}
 
-	roPrefix := readOnlyPrefix(item)
-	roPrefixW := lipgloss.Width(roPrefix)
-
 	resolvedIcon := resolveIcon(item.Icon)
-
-	if item.Status == "current" {
-		prefix := CurrentMarkerStyle.Render("* ")
-		prefixW := lipgloss.Width(prefix)
-		if resolvedIcon != "" {
-			icon := IconStyle.Render(resolvedIcon + " ")
-			iconW := lipgloss.Width(icon)
-			remaining := max(width-prefixW-roPrefixW-iconW-deprecationW, 1)
-			return prefix + roPrefix + icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
-		}
-		remaining := max(width-prefixW-roPrefixW-deprecationW, 1)
-		return prefix + roPrefix + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
-	}
-
 	if resolvedIcon != "" {
 		icon := IconStyle.Render(resolvedIcon + " ")
 		iconW := lipgloss.Width(icon)
-		remaining := max(width-roPrefixW-iconW-deprecationW, 1)
-		return roPrefix + icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
+		remaining := max(width-iconW-deprecationW, 1)
+		return icon + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 	}
-
-	remaining := max(width-roPrefixW-deprecationW, 1)
-	return roPrefix + NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
+	remaining := max(width-deprecationW, 1)
+	return NormalStyle.Render(Truncate(displayName, remaining)) + deprecationSuffix
 }
 
 // FormatItemNameOnlyPlain formats an item showing only name and icon, without ANSI styling.
@@ -141,33 +128,15 @@ func FormatItemNameOnlyPlain(item model.Item, width int) string {
 		deprecationW = lipgloss.Width(deprecationSuffix)
 	}
 
-	roPrefix := readOnlyPrefixPlain(item)
-	roPrefixW := lipgloss.Width(roPrefix)
-
 	resolvedIcon := resolveIcon(item.Icon)
-
-	if item.Status == "current" {
-		prefix := "* "
-		prefixW := len(prefix)
-		if resolvedIcon != "" {
-			icon := resolvedIcon + " "
-			iconW := lipgloss.Width(icon)
-			remaining := max(width-prefixW-roPrefixW-iconW-deprecationW, 1)
-			return prefix + roPrefix + icon + Truncate(displayName, remaining) + deprecationSuffix
-		}
-		remaining := max(width-prefixW-roPrefixW-deprecationW, 1)
-		return prefix + roPrefix + Truncate(displayName, remaining) + deprecationSuffix
-	}
-
 	if resolvedIcon != "" {
 		icon := resolvedIcon + " "
 		iconW := lipgloss.Width(icon)
-		remaining := max(width-roPrefixW-iconW-deprecationW, 1)
-		return roPrefix + icon + Truncate(displayName, remaining) + deprecationSuffix
+		remaining := max(width-iconW-deprecationW, 1)
+		return icon + Truncate(displayName, remaining) + deprecationSuffix
 	}
-
-	remaining := max(width-roPrefixW-deprecationW, 1)
-	return roPrefix + Truncate(displayName, remaining) + deprecationSuffix
+	remaining := max(width-deprecationW, 1)
+	return Truncate(displayName, remaining) + deprecationSuffix
 }
 
 // wrapExtraValue splits a value into continuation-line chunks of the given width.

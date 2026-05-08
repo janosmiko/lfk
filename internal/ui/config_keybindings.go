@@ -100,6 +100,11 @@ type Keybindings struct {
 	// Cluster color picker (Level=Clusters only): assigns a background tint
 	// to the highlighted cluster row, persisted across restarts.
 	ClusterColorPicker string `json:"cluster_color_picker" yaml:"cluster_color_picker"`
+
+	// Local cluster manager (Level=Clusters only): opens the kind/k3d/
+	// minikube manager overlay so users can list, create, start, stop,
+	// and delete local clusters without leaving the TUI.
+	LocalClusterManager string `json:"local_cluster_manager" yaml:"local_cluster_manager"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -158,6 +163,11 @@ func DefaultKeybindings() Keybindings {
 		// and breaks out at deeper levels so "L" continues to open
 		// Logs everywhere else.
 		ClusterColorPicker: "L",
+
+		// Local cluster manager. Ctrl+N is gated on Level=Clusters in
+		// the dispatcher so it doesn't shadow other keys at deeper
+		// levels.
+		LocalClusterManager: "ctrl+n",
 	}
 }
 

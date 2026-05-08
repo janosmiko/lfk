@@ -273,6 +273,8 @@ func (m Model) overlayHintBarMisc() string {
 		return m.renderHints([]ui.HintEntry{
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayLocalClusters:
+		return m.overlayHintBarOverlayLocalClusters()
 	case overlayOrphans:
 		// Filter input mode hides most navigation hints — show only
 		// the keys that actually do something while typing.
@@ -297,6 +299,59 @@ func (m Model) overlayHintBarMisc() string {
 			{Key: "s", Desc: modeDesc},
 			{Key: "R", Desc: "refresh"},
 			{Key: "q/esc", Desc: "close"},
+		})
+	}
+	return ""
+}
+
+// overlayHintBarOverlayLocalClusters returns the hint bar entries for
+// the local-cluster manager. The screen state machine forks the keymap
+// across the list view, the five wizard steps, and the delete-confirm
+// sub-screen — each surface gets its own hint set so the bar matches
+// what the key handler actually consumes.
+func (m Model) overlayHintBarOverlayLocalClusters() string {
+	switch m.localClusterState.screen {
+	case localClusterScreenList:
+		if len(m.localClusterState.clusters) == 0 {
+			return m.renderHints([]ui.HintEntry{
+				{Key: "n", Desc: "new"},
+				{Key: "R", Desc: "refresh"},
+				{Key: "q/esc", Desc: "close"},
+			})
+		}
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "n", Desc: "new"},
+			{Key: "s", Desc: "start"},
+			{Key: "S", Desc: "stop"},
+			{Key: "D", Desc: "delete"},
+			{Key: "enter", Desc: "switch"},
+			{Key: "R", Desc: "refresh"},
+			{Key: "q/esc", Desc: "close"},
+		})
+	case localClusterScreenWizardProvider:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "pick"},
+			{Key: "enter", Desc: "next"},
+			{Key: "esc", Desc: "back"},
+		})
+	case localClusterScreenWizardName,
+		localClusterScreenWizardVersion,
+		localClusterScreenWizardNodes:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "type", Desc: "input"},
+			{Key: "enter", Desc: "next"},
+			{Key: "esc", Desc: "back"},
+		})
+	case localClusterScreenWizardConfirm:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "enter", Desc: "create"},
+			{Key: "esc", Desc: "back"},
+		})
+	case localClusterScreenDeleteConfirm:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "type DELETE", Desc: "confirm"},
+			{Key: "esc", Desc: "cancel"},
 		})
 	}
 	return ""

@@ -341,7 +341,14 @@ func (m Model) viewExplorer() string {
 			middleCol = ui.RenderTable(middleHeader, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, m.loading, m.spinner.View(), middleErrMsg)
 		}
 	default:
-		middleCol = ui.RenderColumn(middleHeader, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, true, m.loading, m.spinner.View(), middleErrMsg)
+		// At LevelClusters, surface column labels (NAME / DEF /
+		// STATUS / COLOR) in the header so the trailing marker
+		// block on each row reads as a real table.
+		header := middleHeader
+		if m.nav.Level == model.LevelClusters {
+			header = ui.ClusterPickerHeader(middleInner)
+		}
+		middleCol = ui.RenderColumn(header, m.visibleMiddleItems(), m.cursor(), middleInner, contentHeight, true, m.loading, m.spinner.View(), middleErrMsg)
 	}
 	// Clear sort indicator so it doesn't appear in right column (children) tables.
 	ui.ActiveSortColumnName = ""

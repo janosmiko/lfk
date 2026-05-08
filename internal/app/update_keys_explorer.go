@@ -132,6 +132,16 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		}
 		mdl, cmd := m.handleKeyClusterColorPicker()
 		return mdl, cmd, true
+	case kb.LocalClusterManager:
+		// Gate on Level=Clusters: the manager only makes sense when the
+		// cluster picker is visible, and Ctrl+N would otherwise shadow
+		// nothing at deeper levels (it has no current default binding
+		// elsewhere) — but the gate keeps room for future bindings.
+		if m.nav.Level != model.LevelClusters {
+			break
+		}
+		mdl, cmd := m.openLocalClusterManager()
+		return mdl, cmd, true
 	case kb.Right, "right":
 		mdl, cmd := m.navigateChild()
 		return mdl, cmd, true

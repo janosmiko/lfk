@@ -24,8 +24,17 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 	// row), then per-context/global config. Re-applying overrides here
 	// ensures Ctrl+R toggles survive a context list refresh.
 	for i := range msg.items {
+		msg.items[i].IsContext = true
 		msg.items[i].ReadOnly = m.effectiveContextReadOnly(msg.items[i].Name)
 		msg.items[i].ClusterColor = m.clusterColors[msg.items[i].Name]
+		// Stamp LocalClusterStatus from the on-Model cache so the picker
+		// row renderer can paint the running / stopped icon on rows that
+		// belong to a known local-cluster provider. Rows without an entry
+		// in the cache leave LocalClusterStatus empty so the renderer
+		// skips the icon for managed contexts.
+		if e, ok := m.localClusterCache[msg.items[i].Name]; ok {
+			msg.items[i].LocalClusterStatus = e.Status
+		}
 	}
 	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems

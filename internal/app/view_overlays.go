@@ -208,6 +208,17 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 			m.clusterColorFilterMode,
 		)
 		return content, min(40, m.width-10), min(15, m.height-6), true
+	case overlayLocalClusters:
+		w, h := min(100, m.width-10), min(20, m.height-6)
+		state := m.buildLocalClusterOverlayState()
+		state.Width, state.Height = w, h
+		switch m.localClusterState.screen {
+		case localClusterScreenList:
+			return ui.RenderLocalClusterOverlay(state), w, h, true
+		case localClusterScreenDeleteConfirm:
+			return ui.RenderLocalClusterDeleteConfirm(state, m.buildLocalClusterDeleteConfirmView()), w, h, true
+		}
+		return ui.RenderLocalClusterWizard(state, m.buildLocalClusterWizardView()), w, h, true
 	}
 	return "", 0, 0, false
 }

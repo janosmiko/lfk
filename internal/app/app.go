@@ -650,9 +650,9 @@ type Model struct {
 	// Pod startup analysis state.
 	podStartupData *k8s.PodStartupInfo
 
-	// Crash Investigator overlay state (per-pod multi-tab diagnostic view).
-	crashInv crashInvState
-	syncWave syncWaveState // Sync Wave Timeline overlay state (per-ArgoCD-Application).
+	crashInv           crashInvState // Crash Investigator overlay (per-pod multi-tab diagnostic view).
+	syncWave           syncWaveState // Sync Wave Timeline overlay state (per-ArgoCD-Application).
+	localClusterFields               // Local-cluster manager overlay (Ctrl+N at LevelClusters); see app_types.go.
 
 	// Event timeline overlay state.
 	eventTimelineData         []k8s.EventInfo // event timeline data
@@ -743,9 +743,7 @@ type Model struct {
 	explainRecursiveFilter       TextInput // filter input for recursive search overlay
 	explainRecursiveFilterActive bool      // true when typing in filter
 
-	// Can-I / Who-Can RBAC explorer state — see cani_state.go. Embedded
-	// (not a named field) so existing accessors like m.canIGroups and
-	// m.whoCan continue to work via field promotion.
+	// canIState (embedded, not named) — Can-I/Who-Can RBAC explorer state; see cani_state.go.
 	canIState
 
 	// Finalizer search overlay state.

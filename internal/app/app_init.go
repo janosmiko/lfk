@@ -57,6 +57,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		cliReadOnly:                opts.ReadOnly,
 		contextROOverrides:         make(map[string]bool),
 		clusterColors:              loadClusterColors(),
+		localClusterFields:         localClusterFields{localClusterCache: loadLocalClusterState()},
 		sortColumnName:             sortColDefault,
 		sortAscending:              true,
 		cursorMemory:               make(map[string]int),

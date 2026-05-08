@@ -76,7 +76,8 @@ const (
 	overlayCrashInvestigator
 	overlayOrphans // cluster-wide orphan resource overview (Shift+O)
 	overlayRightsizing
-	overlaySyncWave // per-Application sync wave timeline (action menu key W)
+	overlaySyncWave      // per-Application sync wave timeline (action menu key W)
+	overlayLocalClusters // local-cluster manager (Ctrl+N at LevelClusters)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live
@@ -99,6 +100,100 @@ type whoCanState struct {
 	subjects             []k8s.WhoCanSubject // last fetch result
 	subjectsScroll       int                 // scroll offset into subjects table
 	loading              bool                // fetch in flight
+}
+
+// localClusterScreen identifies which sub-screen of the local-cluster
+// manager overlay is visible: the list, one of the wizard steps, or
+// the delete confirmation.
+type localClusterScreen int
+
+const (
+	localClusterScreenList localClusterScreen = iota
+	localClusterScreenWizardProvider
+	localClusterScreenWizardName
+	localClusterScreenWizardVersion
+	localClusterScreenWizardNodes
+	localClusterScreenWizardConfirm
+	localClusterScreenDeleteConfirm
+)
+
+// localClusterRowState distinguishes rows that came back from a
+// provider's List() (Real) from synthetic rows for in-flight Create
+// dispatches (InFlight) and from rows whose last operation failed
+// (Failed). Reconciliation in updateLocalClustersDetected /
+// updateLocalClusterCreated keys on Provider+Name and uses this
+// state to decide whether to keep, replace, or drop a row.
+type localClusterRowState int
+
+const (
+	rowStateReal     localClusterRowState = iota // returned by Provider.List
+	rowStateInFlight                             // user-initiated Create still running
+	rowStateFailed                               // last create/start/stop/delete returned an error
+)
+
+// localClusterRow is one row in the manager table — the union of a
+// localcluster.Cluster plus per-row UI flags. Lives here (not in the
+// localcluster package) because Mutating/ListError/state are
+// app-level concerns specific to the manager UI.
+type localClusterRow struct {
+	Provider    string
+	Name        string
+	ContextName string
+	Status      string
+	K8sVersion  string
+	Nodes       int
+	Age         string
+	Mutating    string // "" | "stopping..." | "starting..." | "deleting..."
+	ListError   string // populated when this provider's List() failed
+	state       localClusterRowState
+}
+
+// localClusterWizard holds the staged input across wizard sub-screens.
+// Cleared every time the overlay closes; populated as the user advances.
+type localClusterWizard struct {
+	provider     string
+	providerCur  int
+	installedSet []string
+	name         string
+	nameErr      string
+	version      string
+	versionErr   string
+	nodes        int
+	nodesStr     string
+	nodesErr     string
+}
+
+// localClusterState bundles every Model field the local-cluster
+// manager overlay touches. Grouped to keep app.go below the 800-line
+// file cap (mirrors whoCanState pattern).
+type localClusterState struct {
+	screen    localClusterScreen
+	gen       uint64             // race-guard token; bumps on every Detect request
+	clusters  []localClusterRow  // unified row list; .state distinguishes Real / InFlight / Failed
+	cursor    int                // selected row in the list view
+	loading   bool               // Detect in flight
+	info      string             // transient info banner ("Creating kind/dev...", "Created kind/dev")
+	err       string             // last detect/list error to surface in the header
+	wizard    localClusterWizard // wizard input state (cleared on overlay close)
+	deleteBuf string             // typed buffer for "type DELETE to confirm"
+	deleteRow int                // index of the row being deleted
+}
+
+// localClusterFields is embedded into Model to keep the local-cluster
+// manager's state accessible as m.localClusterState / m.localClusterCache
+// without bloating app.go past its 800-line cap.
+//
+// We deliberately kept the manager logic on Model (methods on Model
+// access these fields) rather than extracting a dedicated
+// localClusterController type. The bubbletea Update/View pattern makes
+// Model itself the controller, and lifting state out via embedding
+// already gives us the practical isolation a controller would —
+// without the cost of duplicating Model accessors (m.bgtasks,
+// m.client, m.middleItems for the cluster-picker integration) inside
+// a separate type.
+type localClusterFields struct {
+	localClusterState localClusterState
+	localClusterCache map[string]localClusterCacheEntry
 }
 
 // crashInvTab identifies which tab is active in the CrashLoopBackOff

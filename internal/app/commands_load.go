@@ -38,12 +38,36 @@ func truncateHelmOutput(out []byte) string {
 
 // --- Commands ---
 
+// loadContexts is the watch-friendly variant. It reads the in-memory
+// context map without re-walking kubeconfig files — fast enough to call
+// every 2 seconds from watch-mode at LevelClusters in setups with many
+// kubeconfig files (~/.kube/config.d/).
 func (m Model) loadContexts() tea.Cmd {
 	return m.trackBgTask(
 		bgtasks.KindResourceList,
 		"List contexts",
 		"",
 		func() tea.Msg {
+			items, err := m.client.GetContexts()
+			return contextsLoadedMsg{items: items, err: err}
+		},
+	)
+}
+
+// loadContextsReload re-walks every kubeconfig file from disk before
+// listing. Use this only when you have reason to believe the kubeconfig
+// changed externally (kind/k3d/minikube create or delete from inside
+// lfk; explicit user-initiated refresh). Watch-mode auto-refresh and
+// startup use the cheaper loadContexts.
+func (m Model) loadContextsReload() tea.Cmd {
+	return m.trackBgTask(
+		bgtasks.KindResourceList,
+		"List contexts (reload)",
+		"",
+		func() tea.Msg {
+			if err := m.client.ReloadKubeconfig(); err != nil {
+				return contextsLoadedMsg{err: err}
+			}
 			items, err := m.client.GetContexts()
 			return contextsLoadedMsg{items: items, err: err}
 		},

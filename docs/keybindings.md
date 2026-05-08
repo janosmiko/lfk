@@ -40,6 +40,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+G` | Finalizer search and remove |
 | `!` | Error log |
 | `@` | Monitoring overview (active Prometheus alerts) |
+| `Ctrl+N` | Open the **Local Clusters Manager** overlay (only at LevelClusters). |
 | `Q` | Namespace resource quota dashboard |
 | `` ` `` | Background tasks overlay (Tab toggles running / completed history) |
 | `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`, `:tasks`), kubectl (`:k get pod`), shell (`:! cmd`) |
@@ -798,6 +799,39 @@ theme tokens (`theme.Error`, `theme.Warning`, `theme.Secondary`,
 four (`magenta`, `cyan`, `white`, `gray`) stay on ANSI bright codes
 (8, 13–15) and look the same regardless of theme.
 
+## Local Clusters Manager
+
+The manager overlay (`Ctrl+N` at LevelClusters) is the single home for
+creating, switching, and lifecycle-managing kind / k3d / minikube
+clusters from inside lfk.
+
+### List view
+
+| Key | Action |
+|---|---|
+| `j` / `k` / `Up` / `Down` | Move cursor |
+| `n` | New local cluster (opens 5-step wizard) |
+| `s` | Start the highlighted cluster (greyed for kind) |
+| `Shift+S` | Stop the highlighted cluster (greyed for kind) |
+| `Shift+D` | Delete the highlighted cluster (asks for `DELETE` typed confirmation) |
+| `Shift+R` | Refresh the list |
+| `Enter` | Switch to the highlighted cluster's context and close the overlay |
+| `q` / `Esc` / `Ctrl+N` | Close the overlay |
+
+### Wizard
+
+| Key | Action |
+|---|---|
+| `j` / `k` (provider step) | Pick provider |
+| Type | Fill the active text field (name / version / nodes) |
+| `Enter` | Advance to the next step (blocks on validation errors) |
+| `Esc` | Back up one step (or close from step 1) |
+
+### Delete confirmation
+
+Type the literal word `DELETE` (uppercase) and press `Enter` to confirm,
+or `Esc` to cancel.
+
 ## Mouse
 
 | Input | Action |
@@ -1008,6 +1042,9 @@ keybindings:
 
   # Cluster color picker (cluster picker only)
   cluster_color_picker: "L"
+
+  # Local Clusters Manager overlay (cluster picker only)
+  local_cluster_manager: "ctrl+n"
 ```
 
 ### Crash Investigator overlay

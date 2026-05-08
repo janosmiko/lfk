@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/k8s/localcluster"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -590,4 +591,42 @@ type orphansLoadedMsg struct {
 	gen    uint64
 	report k8s.OrphanReport
 	err    error
+}
+
+// --- Local cluster manager messages ---
+
+// localClustersDetectedMsg is the result of a fan-out List() across
+// every installed local-cluster provider. gen guards against stale
+// fetches (the manager bumps Model.localClusterState.gen on every
+// open / refresh, and the handler drops msgs with mismatched gen).
+type localClustersDetectedMsg struct {
+	gen            uint64
+	clusters       []localcluster.Cluster
+	providerErrors map[string]string // provider name -> error message
+}
+
+// localClusterCreatedMsg carries the result of a create-cluster wizard
+// submission. Emitted by createLocalClusterCmd after Provider.Create
+// returns; the handler reloads the manager table and contexts list.
+// gen guards against late results landing after the manager closed —
+// without it a 2-minute create that completes after the user navigated
+// away would silently mutate localClusterState.creating + .info.
+type localClusterCreatedMsg struct {
+	gen      uint64
+	provider string
+	name     string
+	err      error
+}
+
+// localClusterMutatedMsg carries the result of a Start/Stop/Delete
+// action on an existing local cluster. verb names the action so the
+// status-bar message can render uniformly. gen guards against late
+// results landing after the manager closed (same reasoning as
+// localClusterCreatedMsg).
+type localClusterMutatedMsg struct {
+	gen      uint64
+	provider string
+	name     string
+	verb     string // "started" | "stopped" | "deleted"
+	err      error
 }

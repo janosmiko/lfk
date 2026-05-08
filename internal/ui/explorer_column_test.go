@@ -319,7 +319,7 @@ func TestFormatItem(t *testing.T) {
 	})
 
 	t.Run("current context shows star", func(t *testing.T) {
-		item := model.Item{Name: "my-context", Status: "current"}
+		item := model.Item{Name: "my-context", IsContext: true, Status: "current"}
 		origQuery := ActiveHighlightQuery
 		ActiveHighlightQuery = ""
 		defer func() { ActiveHighlightQuery = origQuery }()
@@ -353,23 +353,24 @@ func TestFormatItem(t *testing.T) {
 		assert.Contains(t, result, "pod")
 	})
 
-	t.Run("read-only context shows [RO] marker", func(t *testing.T) {
-		// Regression test: a read-only context row must render the [RO]
-		// marker in FormatItem (the non-cursor path), not just in
-		// FormatItemPlain. Without this, j/k cursor moves would drop the
-		// marker on the row that just lost focus.
-		item := model.Item{Name: "prod", ReadOnly: true}
+	t.Run("read-only context renders without [RO] in cluster picker", func(t *testing.T) {
+		// The cluster picker (LevelClusters main pane) surfaces
+		// only the three columns the user pinned: DEF, STATUS,
+		// COLOR. The read-only flag is enforced at the action
+		// level rather than mirrored as a row marker, so [RO]
+		// does not appear here.
+		item := model.Item{Name: "prod", IsContext: true, ReadOnly: true}
 		result := FormatItem(item, 40)
 		assert.Contains(t, result, "prod")
-		assert.Contains(t, result, "[RO]")
+		assert.NotContains(t, result, "[RO]")
 	})
 
-	t.Run("current read-only context shows star and [RO]", func(t *testing.T) {
-		item := model.Item{Name: "prod", Status: "current", ReadOnly: true}
+	t.Run("current read-only context shows star but not [RO]", func(t *testing.T) {
+		item := model.Item{Name: "prod", IsContext: true, Status: "current", ReadOnly: true}
 		result := FormatItem(item, 40)
 		assert.Contains(t, result, "*")
 		assert.Contains(t, result, "prod")
-		assert.Contains(t, result, "[RO]")
+		assert.NotContains(t, result, "[RO]")
 	})
 }
 
@@ -399,7 +400,7 @@ func TestFormatItemPlain(t *testing.T) {
 	})
 
 	t.Run("current context shows star", func(t *testing.T) {
-		item := model.Item{Name: "ctx", Status: "current"}
+		item := model.Item{Name: "ctx", IsContext: true, Status: "current"}
 		result := FormatItemPlain(item, 40)
 		assert.Contains(t, result, "* ")
 		assert.Contains(t, result, "ctx")
@@ -430,22 +431,20 @@ func TestFormatItemPlain(t *testing.T) {
 		assert.Contains(t, result, "⬤")
 	})
 
-	t.Run("read-only context shows [RO] marker in plain", func(t *testing.T) {
-		// Mirror of the FormatItem test. The plain variant is used when the
-		// row is highlighted/selected; the [RO] marker must still render so
-		// the user does not lose the cue when moving the cursor onto the
-		// row.
-		item := model.Item{Name: "prod", ReadOnly: true}
+	t.Run("read-only context renders without [RO] in plain cluster picker", func(t *testing.T) {
+		// Mirror of the FormatItem test — the cursor row plain
+		// variant must omit [RO] to match the non-cursor row.
+		item := model.Item{Name: "prod", IsContext: true, ReadOnly: true}
 		result := FormatItemPlain(item, 40)
 		assert.Contains(t, result, "prod")
-		assert.Contains(t, result, "[RO]")
+		assert.NotContains(t, result, "[RO]")
 	})
 
-	t.Run("current read-only context shows star and [RO] in plain", func(t *testing.T) {
-		item := model.Item{Name: "prod", Status: "current", ReadOnly: true}
+	t.Run("current read-only context shows star but not [RO] in plain", func(t *testing.T) {
+		item := model.Item{Name: "prod", IsContext: true, Status: "current", ReadOnly: true}
 		result := FormatItemPlain(item, 40)
 		assert.Contains(t, result, "*")
 		assert.Contains(t, result, "prod")
-		assert.Contains(t, result, "[RO]")
+		assert.NotContains(t, result, "[RO]")
 	})
 }

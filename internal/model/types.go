@@ -145,7 +145,21 @@ type Item struct {
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
 	ReadOnly      bool             // Whether this item represents a context locked in read-only mode (renders as a [RO] suffix in the picker)
 	ClusterColor  string           // Optional named color (one of ui.ClusterColorNames) for context rows; empty = no swatch.
-	GroupedRefs   []GroupedRef     // For grouped rows (Events): all underlying resource identifiers
+	// LocalClusterStatus is "running" / "stopped" / "" — populated only
+	// for cluster-picker rows whose context name is recognised in
+	// Model.localClusterCache. The renderer prepends a filled-circle
+	// glyph for "running" and a hollow-circle glyph for "stopped"; an
+	// empty string means the row is not a local cluster and the
+	// renderer skips the icon entirely.
+	LocalClusterStatus string
+	// IsContext flags that this Item represents a kubeconfig context
+	// (a row in the cluster picker at LevelClusters). Stamped by
+	// updateContextsLoaded so renderers can lay out the row in a
+	// columned shape — current marker, local-cluster status, RO tag,
+	// and color swatch each occupy a fixed-width slot so rows stay
+	// aligned regardless of which markers are present.
+	IsContext   bool
+	GroupedRefs []GroupedRef // For grouped rows (Events): all underlying resource identifiers
 }
 
 // MissingRefStatus is the Status string assigned to a ResourceNode whose

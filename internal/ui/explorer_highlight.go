@@ -1,6 +1,8 @@
 package ui
 
 import (
+	"strings"
+
 	"github.com/charmbracelet/lipgloss"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -168,43 +170,113 @@ func highlightNameSelectedOver(name, query string, outerStyle lipgloss.Style) st
 	return HighlightMatchStyledOver(name, query, SelectedSearchHighlightStyle, outerStyle)
 }
 
-// readOnlyPrefix returns the "[RO] " prefix for read-only context rows,
-// styled with ReadOnlyMarkerStyle (foreground-only, same visual weight as
-// the "* " current-context marker). Empty string when item is not
-// read-only so callers can always concatenate. The loud
-// ReadOnlyBadgeStyle is reserved for the title-bar header where it
-// indicates the active session's state.
-func readOnlyPrefix(item model.Item) string {
-	if !item.ReadOnly {
-		return ""
-	}
-	return ReadOnlyMarkerStyle.Render("[RO]") + " "
-}
-
-// readOnlyPrefixPlain returns the "[RO] " prefix without ANSI styling. Used
-// by FormatItemPlain and FormatItemNameOnlyPlain (selected/highlighted rows)
-// so the selection background renders cleanly over the prefix instead of
-// being interrupted by a nested ANSI reset.
-func readOnlyPrefixPlain(item model.Item) string {
-	if !item.ReadOnly {
-		return ""
-	}
-	return "[RO] "
-}
-
-// clusterColorSuffix returns a coloured swatch for context rows that have
-// a cluster colour assigned, intended to be rendered at the *end* of the
-// row by TruncateWithSuffix. Foreground-only so the cursor highlight can
-// paint over it cleanly. Empty string for items without a colour so the
-// caller can always concatenate.
+// Cluster-picker (LevelClusters main pane) row layout:
 //
-// The suffix uses a background-coloured 2-cell block (rather than the
-// foreground glyph used by ClusterColorSwatch) so the colour shows up
-// even when the row's selection background paints over it: the inner
-// background wins over the outer fg-only highlight.
-func clusterColorSuffix(item model.Item) string {
-	if item.ClusterColor == "" {
-		return ""
+//	NAME .................. DEF STATUS COLOR
+//	dev-envs                *   ●      ██
+//	itg-k8s                     ○      ██
+//	prod-envs                          ██
+//
+// Each row is `name + filler + trailing block`. The trailing block has
+// three fixed-width columns: DEF (current context), STATUS (local-
+// cluster running/stopped), COLOR (cluster colour swatch). When a
+// marker is absent, the column is filled with spaces so all rows
+// align under the column headers.
+//
+// The parent column at deeper nav levels (KUBECONFIG list shown on the
+// left side after descending into a context) renders IsContext rows
+// as just the name — markers belong on the active column, not the
+// parent.
+const (
+	clusterPickerDefColW    = 4 // "DEF " or "*   "
+	clusterPickerStatusColW = 7 // "STATUS " or "●      " / "○      "
+	clusterPickerColorColW  = 5 // "COLOR" or "██   "
+	clusterPickerTrailingW  = clusterPickerDefColW + clusterPickerStatusColW + clusterPickerColorColW
+)
+
+// ClusterPickerHeader builds the column header line for the cluster
+// picker (LevelClusters main pane). Width-aware so NAME sits flush
+// left and the DEF/STATUS/COLOR labels align with the trailing
+// columns of each row. The DimStyle.Bold wrapper applied by
+// RenderColumn paints the whole label, so this returns plain text.
+func ClusterPickerHeader(width int) string {
+	trailing := padRight("DEF", clusterPickerDefColW) +
+		padRight("STATUS", clusterPickerStatusColW) +
+		padLeft("COLOR", clusterPickerColorColW)
+	if width < clusterPickerTrailingW+4 {
+		// Column too narrow for the full header; fall back to a
+		// section label so we don't return a mangled string.
+		return Truncate("KUBECONFIG", width)
 	}
-	return ClusterColorSwatchBg(item.ClusterColor)
+	left := "NAME"
+	pad := max(width-lipgloss.Width(left)-lipgloss.Width(trailing), 1)
+	return left + strings.Repeat(" ", pad) + trailing
+}
+
+// padLeft prepends spaces to s until lipgloss.Width(s) == target. If s
+// is already at or wider than target it's returned unchanged. The
+// swatch in the cluster-picker COLOR column is right-aligned via this
+// helper so the swatch's terminating ANSI reset sits at end-of-line —
+// otherwise the trailing column padding after the swatch would lose
+// the row's selection background when the cursor lands on the row.
+func padLeft(s string, target int) string {
+	cur := lipgloss.Width(s)
+	if cur >= target {
+		return s
+	}
+	return strings.Repeat(" ", target-cur) + s
+}
+
+// clusterPickerTrailing renders the right-edge marker block for a
+// cluster-picker IsContext row: default-context, local-cluster
+// status, and cluster colour swatch. Total width: clusterPickerTrailingW.
+// The colour swatch is right-aligned in its column so that the inner
+// background ANSI reset lands at end-of-line — see padLeft.
+func clusterPickerTrailing(item model.Item) string {
+	def := strings.Repeat(" ", clusterPickerDefColW)
+	if item.Status == "current" {
+		def = padRight(CurrentMarkerStyle.Render("*"), clusterPickerDefColW)
+	}
+
+	stat := strings.Repeat(" ", clusterPickerStatusColW)
+	switch item.LocalClusterStatus {
+	case "running":
+		stat = padRight(StatusRunning.Render("●"), clusterPickerStatusColW)
+	case "stopped":
+		stat = padRight(DimStyle.Render("○"), clusterPickerStatusColW)
+	}
+
+	color := strings.Repeat(" ", clusterPickerColorColW)
+	if item.ClusterColor != "" {
+		color = padLeft(ClusterColorSwatchBg(item.ClusterColor), clusterPickerColorColW)
+	}
+
+	return def + stat + color
+}
+
+// clusterPickerTrailingPlain mirrors clusterPickerTrailing without
+// ANSI styling on the marker glyphs so the selection background
+// paints uniformly across the row. The colour swatch keeps its
+// background colour (it's row content, not styling) and is right-
+// aligned for the same end-of-line ANSI reason as the styled variant.
+func clusterPickerTrailingPlain(item model.Item) string {
+	def := strings.Repeat(" ", clusterPickerDefColW)
+	if item.Status == "current" {
+		def = padRight("*", clusterPickerDefColW)
+	}
+
+	stat := strings.Repeat(" ", clusterPickerStatusColW)
+	switch item.LocalClusterStatus {
+	case "running":
+		stat = padRight("●", clusterPickerStatusColW)
+	case "stopped":
+		stat = padRight("○", clusterPickerStatusColW)
+	}
+
+	color := strings.Repeat(" ", clusterPickerColorColW)
+	if item.ClusterColor != "" {
+		color = padLeft(ClusterColorSwatchBg(item.ClusterColor), clusterPickerColorColW)
+	}
+
+	return def + stat + color
 }

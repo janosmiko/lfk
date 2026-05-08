@@ -461,36 +461,36 @@ func FormatItem(item model.Item, width int) string {
 		name += DeprecationStyle.Render(" ⚠")
 	}
 
-	// Mark current context with a star and (optionally) prefix the
-	// read-only badge. The cluster-color swatch goes at the *end* of the
-	// row so the leading column stays aligned across coloured and
-	// uncoloured rows — putting it left of the name added a leading-space
-	// that made unset rows look ragged. Order: "* [RO] name   ██".
-	if item.Status == "current" {
-		return TruncateWithSuffix(CurrentMarkerStyle.Render("* ")+readOnlyPrefix(item)+name, clusterColorSuffix(item), width)
-	}
-
-	// Non-current read-only rows: prepend "[RO] " so the marker is
-	// visible regardless of column width. Cluster-color swatch trails
-	// the name so the column lines up with non-RO rows.
-	if item.ReadOnly {
-		return TruncateWithSuffix(readOnlyPrefix(item)+name, clusterColorSuffix(item), width)
-	}
-
-	// Non-current, non-read-only rows: still surface the cluster-color
-	// swatch so unentered contexts can be identified at a glance from
-	// the picker — appended to the name, not prepended, for alignment.
-	// Also apply ActiveHighlightQuery so /search highlighting still
-	// works on coloured rows (the current / read-only branches above
-	// inherit the pre-existing limitation that they don't highlight).
-	if item.ClusterColor != "" {
+	// Cluster-picker rows render the name on the left and a fixed-
+	// width trailing block (DEF / STATUS / COLOR columns) on the
+	// right. The matching column header line is produced by
+	// ClusterPickerHeader. Parent-pane rows take a different path
+	// (FormatItemNameOnly) and render the name only.
+	if item.IsContext {
+		// Narrow-column fallback: skip the trailing block when
+		// there isn't room for a 4-cell name plus a 1-cell gap
+		// plus the full marker block. Without this, the row would
+		// exceed the column and wrap, breaking the one-row-per-
+		// item invariant in RenderColumn. ClusterPickerHeader has
+		// the matching fallback.
+		if width < clusterPickerTrailingW+5 {
+			return Truncate(name, width)
+		}
 		if ActiveHighlightQuery != "" {
 			name = NormalStyle.Render(highlightName(displayName, ActiveHighlightQuery))
 			if icon := resolveIcon(item.Icon); icon != "" {
 				name = IconStyle.Render(icon+" ") + name
 			}
 		}
-		return TruncateWithSuffix(name, clusterColorSuffix(item), width)
+		trailing := clusterPickerTrailing(item)
+		maxNameW := max(width-clusterPickerTrailingW-1, 4)
+		visualName := name
+		if lipgloss.Width(visualName) > maxNameW {
+			visualName = Truncate(visualName, maxNameW)
+		}
+		nameW := lipgloss.Width(visualName)
+		padding := max(width-nameW-clusterPickerTrailingW, 1)
+		return visualName + strings.Repeat(" ", padding) + trailing
 	}
 
 	// Build detail columns: ready, restarts, age.
@@ -585,30 +585,26 @@ func FormatItemPlain(item model.Item, width int) string {
 		name += " ⚠"
 	}
 
-	// Mark current context with a star (plain text, no CurrentMarkerStyle)
-	// and prepend a "[RO] " when applicable. Cluster-color swatch goes at
-	// the end of the row via TruncateWithSuffix so leading columns stay
-	// aligned across rows whether they have a colour or not.
-	if item.Status == "current" {
-		return TruncateWithSuffix("* "+readOnlyPrefixPlain(item)+name, clusterColorSuffix(item), width)
-	}
-
-	// Non-current read-only rows: prepend "[RO] " so the marker is
-	// visible regardless of column width and the standard right-side
-	// info path can still render details / status when applicable.
-	if item.ReadOnly {
-		// Fall through to the standard formatting with a prefix attached
-		// so that any right-side details (currently unused for context
-		// rows but possible for other read-only resources in the future)
-		// remain consistent.
-		return TruncateWithSuffix(readOnlyPrefixPlain(item)+name, clusterColorSuffix(item), width)
-	}
-
-	// Non-current, non-read-only rows: still surface the cluster-color
-	// swatch so unentered contexts can be identified at a glance from
-	// the picker — appended to the end of the row, not prepended.
-	if item.ClusterColor != "" {
-		return TruncateWithSuffix(name, clusterColorSuffix(item), width)
+	// Cluster-picker rows: name + fixed-width trailing marker block
+	// (DEF / STATUS / COLOR). Plain variant strips ANSI from the
+	// markers so the selection background paints over the columns
+	// uniformly, but the colour swatch keeps its background colour
+	// — that's content, not styling.
+	if item.IsContext {
+		// Narrow-column fallback — see FormatItem for the
+		// rationale.
+		if width < clusterPickerTrailingW+5 {
+			return Truncate(name, width)
+		}
+		trailing := clusterPickerTrailingPlain(item)
+		maxNameW := max(width-clusterPickerTrailingW-1, 4)
+		visualName := name
+		if lipgloss.Width(visualName) > maxNameW {
+			visualName = Truncate(visualName, maxNameW)
+		}
+		nameW := lipgloss.Width(visualName)
+		padding := max(width-nameW-clusterPickerTrailingW, 1)
+		return visualName + strings.Repeat(" ", padding) + trailing
 	}
 
 	// Build detail columns: ready, restarts, age.

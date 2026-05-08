@@ -450,6 +450,56 @@ func actionsDefault() []ActionMenuItem {
 	}
 }
 
+// Labels for the cluster-picker action menu. Kept as exported
+// constants so the app-layer dispatcher can switch on them without
+// duplicating the literal strings.
+const (
+	ActionLabelSetColor            = "Set color"
+	ActionLabelManageLocalClusters = "Local clusters"
+)
+
+// ClusterPickerKeys carries the user-configurable shortcuts for the
+// cluster-picker actions so the model layer can render in-menu key
+// hints without importing the ui package. The app layer populates
+// the struct from ui.ActiveKeybindings before calling
+// ActionsForClusterPicker.
+//
+// Only SetColor is user-configurable. The Local clusters action's
+// chip is hardcoded as `[n]` in the constructor: action-menu chips
+// are single-letter activators and the global LocalClusterManager
+// binding is a chord (ctrl+n) that can't reach the action menu's
+// keypress dispatcher anyway.
+type ClusterPickerKeys struct {
+	SetColor string
+}
+
+// localClustersMenuChip is the in-menu single-letter activator for
+// the Local clusters action. Hardcoded because (a) action-menu
+// dispatch routes single keypresses, not chords, and (b) the global
+// LocalClusterManager binding (ctrl+n) opens the manager from
+// anywhere; the action-menu chip is a separate discoverability
+// channel and need not echo it.
+const localClustersMenuChip = "n"
+
+// ActionsForClusterPicker returns the action menu items appropriate
+// when the user is at LevelClusters (the kubeconfig-context picker).
+// Each entry's Key carries the bare-keypress shortcut so the in-menu
+// hint stays in sync with the user's keybinding configuration.
+func ActionsForClusterPicker(keys ClusterPickerKeys) []ActionMenuItem {
+	return []ActionMenuItem{
+		{
+			Label:       ActionLabelSetColor,
+			Description: "Assign a background tint to this context",
+			Key:         keys.SetColor,
+		},
+		{
+			Label:       ActionLabelManageLocalClusters,
+			Description: "Manage kind/k3d/minikube clusters",
+			Key:         localClustersMenuChip,
+		},
+	}
+}
+
 // ActionsForPortForward returns the action menu items for a port forward entry.
 func ActionsForPortForward() []ActionMenuItem {
 	return []ActionMenuItem{

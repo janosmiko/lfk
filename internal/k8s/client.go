@@ -40,14 +40,23 @@ type contextInfo struct {
 
 // Client wraps Kubernetes API access.
 type Client struct {
+	// configMu guards the kubeconfig-derived snapshot fields below
+	// (rawConfig, contexts, contextOrder, currentContext). They were
+	// originally written once at NewClient and treated as read-only,
+	// but ReloadKubeconfig can now update them mid-session whenever a
+	// localcluster create/delete (or external kubectl mutation) lands.
+	// Reads from concurrent tea.Cmd goroutines (GetContexts,
+	// CurrentContext, ContextExists, DefaultNamespace) take RLock;
+	// the reload path takes the write lock around the four-field
+	// swap.
+	configMu sync.RWMutex
+
 	rawConfig    api.Config
 	loadingRules *clientcmd.ClientConfigLoadingRules
 
-	// contexts indexes every loaded context by its lfk display name. Built
-	// once at NewClient by collectContexts and treated as read-only after
-	// construction so concurrent reads from tea.Cmd goroutines stay
-	// race-free. Disambiguates the duplicate-name case that clientcmd's
-	// merge silently collapses.
+	// contexts indexes every loaded context by its lfk display name.
+	// Disambiguates the duplicate-name case that clientcmd's merge
+	// silently collapses.
 	contexts map[string]contextInfo
 
 	// contextOrder preserves a deterministic display order for GetContexts.
@@ -207,11 +216,48 @@ func NewClient(kubeconfigOverride string) (*Client, error) {
 	}, nil
 }
 
+// ReloadKubeconfig re-reads the kubeconfig files from disk and refreshes
+// the cached context list. NewClient loads kubeconfig once at startup;
+// callers that mutate kubeconfig externally (e.g. minikube/kind/k3d
+// creating a new cluster) must call this so subsequent GetContexts /
+// ContextExists / etc. observe the new state. Safe to call repeatedly;
+// idempotent when nothing on disk changed.
+func (c *Client) ReloadKubeconfig() error {
+	if c.loadingRules == nil || len(c.loadingRules.Precedence) == 0 {
+		return nil
+	}
+	kubeConfig := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(c.loadingRules, &clientcmd.ConfigOverrides{})
+	rawConfig, err := kubeConfig.RawConfig()
+	if err != nil {
+		return fmt.Errorf("reloading kubeconfig: %w", err)
+	}
+	if len(rawConfig.Contexts) == 0 {
+		// Reloaded config has no contexts. Either the kubeconfig was
+		// emptied externally (rare) or the loading rules point at a
+		// stub path (test fixtures using /dev/null). In both cases,
+		// preserving existing in-memory state is safer than wiping it
+		// — GetContexts has a rawConfig-fallback path that the tests
+		// rely on, and a user who genuinely deleted all contexts can
+		// just restart lfk.
+		return nil
+	}
+	contexts, order, current := collectContexts(c.loadingRules.Precedence, rawConfig.CurrentContext)
+	c.configMu.Lock()
+	c.rawConfig = rawConfig
+	c.contexts = contexts
+	c.contextOrder = order
+	c.currentContext = current
+	c.configMu.Unlock()
+	return nil
+}
+
 // GetContexts returns all available kube contexts using their lfk display
 // names (which match the original names when there are no collisions and are
 // disambiguated as "name (basename)" when several files declare the same
 // context name).
 func (c *Client) GetContexts() ([]model.Item, error) {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	if len(c.contexts) == 0 {
 		// Fallback for tests that construct a Client directly without
 		// running NewClient: surface whatever rawConfig holds.
@@ -239,6 +285,8 @@ func (c *Client) GetContexts() ([]model.Item, error) {
 
 // CurrentContext returns the lfk display name of the current context.
 func (c *Client) CurrentContext() string {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	if c.currentContext != "" {
 		return c.currentContext
 	}
@@ -247,6 +295,8 @@ func (c *Client) CurrentContext() string {
 
 // ContextExists reports whether the lfk display name is defined.
 func (c *Client) ContextExists(displayName string) bool {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	if _, ok := c.contexts[displayName]; ok {
 		return true
 	}
@@ -258,6 +308,8 @@ func (c *Client) ContextExists(displayName string) bool {
 // DefaultNamespace returns the namespace configured for the given lfk display
 // name, falling back to "default" if none is set.
 func (c *Client) DefaultNamespace(displayName string) string {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	if info, ok := c.contexts[displayName]; ok && info.namespace != "" {
 		return info.namespace
 	}

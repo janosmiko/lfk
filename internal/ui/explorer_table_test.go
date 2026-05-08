@@ -531,10 +531,14 @@ func TestFormatItemNameOnly(t *testing.T) {
 			wantSubstr: []string{"default/my-pod"},
 		},
 		{
-			name:       "current status shows asterisk marker",
+			// FormatItemNameOnly renders the name only — markers
+			// belong on the active cluster picker (FormatItem),
+			// not the parent pane.
+			name:       "current status renders only the name (no marker)",
 			item:       model.Item{Name: "my-context", Status: "current"},
 			width:      40,
-			wantSubstr: []string{"*", "my-context"},
+			wantSubstr: []string{"my-context"},
+			wantAbsent: []string{"*"},
 		},
 		{
 			name:       "deprecated item shows warning marker",
@@ -594,10 +598,12 @@ func TestFormatItemNameOnlyPlain(t *testing.T) {
 			wantSubstr: []string{"prod/nginx"},
 		},
 		{
-			name:       "current status plain shows asterisk",
+			// FormatItemNameOnlyPlain renders the name only — see
+			// FormatItemNameOnly note above for rationale.
+			name:       "current status plain renders only the name",
 			item:       model.Item{Name: "my-ctx", Status: "current"},
 			width:      40,
-			wantSubstr: []string{"* ", "my-ctx"},
+			wantSubstr: []string{"my-ctx"},
 		},
 		{
 			name:       "deprecated plain shows warning symbol",
@@ -641,10 +647,11 @@ func TestFormatItemNameOnly_WithIcons(t *testing.T) {
 		}
 	})
 
-	t.Run("icon with current status", func(t *testing.T) {
+	t.Run("icon with current status renders icon and name only (no marker)", func(t *testing.T) {
 		item := model.Item{Name: "my-ctx", Icon: model.Icon{Unicode: "⬤"}, Status: "current"}
 		result := FormatItemNameOnly(item, 40)
-		assert.Contains(t, result, "*")
+		assert.NotContains(t, result, "*")
+		assert.Contains(t, result, "⬤")
 		assert.Contains(t, result, "my-ctx")
 	})
 }
@@ -670,23 +677,27 @@ func TestFormatItemNameOnlyPlain_WithIcons(t *testing.T) {
 
 // --- FormatItemNameOnly read-only ---
 
+// The parent pane no longer surfaces context-level markers ("* " /
+// "[RO] "); those markers belong on the active cluster picker
+// (FormatItem) where they live as columns alongside DEF/STATUS/COLOR.
+// Parent-pane rendering is strictly "name + icon + deprecation".
 func TestFormatItemNameOnly_ReadOnly(t *testing.T) {
-	t.Run("read-only context shows [RO] marker", func(t *testing.T) {
+	t.Run("read-only flag does not surface [RO] in name-only", func(t *testing.T) {
 		item := model.Item{Name: "prod", ReadOnly: true}
 		result := FormatItemNameOnly(item, 40)
 		assert.Contains(t, result, "prod")
-		assert.Contains(t, result, "[RO]")
+		assert.NotContains(t, result, "[RO]")
 	})
 
-	t.Run("current read-only context shows star and [RO]", func(t *testing.T) {
+	t.Run("current read-only renders name only", func(t *testing.T) {
 		item := model.Item{Name: "prod", Status: "current", ReadOnly: true}
 		result := FormatItemNameOnly(item, 40)
-		assert.Contains(t, result, "*")
 		assert.Contains(t, result, "prod")
-		assert.Contains(t, result, "[RO]")
+		assert.NotContains(t, result, "*")
+		assert.NotContains(t, result, "[RO]")
 	})
 
-	t.Run("non-read-only row does not get marker", func(t *testing.T) {
+	t.Run("non-read-only row also has no marker", func(t *testing.T) {
 		item := model.Item{Name: "dev"}
 		result := FormatItemNameOnly(item, 40)
 		assert.Contains(t, result, "dev")
@@ -697,22 +708,22 @@ func TestFormatItemNameOnly_ReadOnly(t *testing.T) {
 // --- FormatItemNameOnlyPlain read-only ---
 
 func TestFormatItemNameOnlyPlain_ReadOnly(t *testing.T) {
-	t.Run("read-only context shows [RO] marker in plain", func(t *testing.T) {
+	t.Run("read-only flag does not surface [RO] in plain name-only", func(t *testing.T) {
 		item := model.Item{Name: "prod", ReadOnly: true}
 		result := FormatItemNameOnlyPlain(item, 40)
 		assert.Contains(t, result, "prod")
-		assert.Contains(t, result, "[RO]")
+		assert.NotContains(t, result, "[RO]")
 	})
 
-	t.Run("current read-only context shows star and [RO] in plain", func(t *testing.T) {
+	t.Run("current read-only plain renders name only", func(t *testing.T) {
 		item := model.Item{Name: "prod", Status: "current", ReadOnly: true}
 		result := FormatItemNameOnlyPlain(item, 40)
-		assert.Contains(t, result, "*")
 		assert.Contains(t, result, "prod")
-		assert.Contains(t, result, "[RO]")
+		assert.NotContains(t, result, "*")
+		assert.NotContains(t, result, "[RO]")
 	})
 
-	t.Run("non-read-only row does not get marker", func(t *testing.T) {
+	t.Run("non-read-only row also has no marker", func(t *testing.T) {
 		item := model.Item{Name: "dev"}
 		result := FormatItemNameOnlyPlain(item, 40)
 		assert.Contains(t, result, "dev")

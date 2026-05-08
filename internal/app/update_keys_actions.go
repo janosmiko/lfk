@@ -693,8 +693,12 @@ func (m Model) handleExplorerActionKeyFilterPresets() (tea.Model, tea.Cmd, bool)
 
 func (m Model) handleExplorerActionKeyDiff() (tea.Model, tea.Cmd, bool) {
 	if m.nav.Level < model.LevelResources {
-		m.setStatusMessage("Diff is only available at resource level", true)
-		return m, scheduleStatusClear(), true
+		// Diff requires two resources to compare; cluster picker and
+		// resource-type levels have nothing to diff. Don't consume the
+		// key here — let it fall through to other handlers (the local-
+		// cluster manager's `d` handler used to live at LevelClusters,
+		// which is why this used to show an error). Silent no-op now.
+		return m, nil, false
 	}
 	selected := m.selectedItemsList()
 	if len(selected) != 2 {

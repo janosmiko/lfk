@@ -46,8 +46,14 @@ func TestOpenActionMenu_AtClusterPickerListsSetColor(t *testing.T) {
 	m := newClusterPickerModel(t)
 	result := m.openActionMenu()
 	assert.Equal(t, overlayAction, result.overlay, "x at Level=Clusters opens the action menu")
-	require.Len(t, result.overlayItems, 1, "today only one entry — Set color")
-	assert.Equal(t, "Set color", result.overlayItems[0].Name)
+	require.GreaterOrEqual(t, len(result.overlayItems), 1, "the action menu must list at least the Set color entry")
+
+	// Assert ordering, not just existence: Set color must be at index 0
+	// so the cluster-picker action menu opens with the most-common
+	// pick-cluster-color action selected. Searching the slice would
+	// silently let a future regression demote it.
+	assert.Equal(t, "Set color", result.overlayItems[0].Name,
+		"Set color must remain the first entry in the cluster-picker action menu")
 	assert.Equal(t, ui.ActiveKeybindings.ClusterColorPicker, result.overlayItems[0].Status,
 		"Status carries the keybinding so the action menu renders [L] Set color and the in-menu shortcut matches the global one")
 }

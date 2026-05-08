@@ -56,6 +56,8 @@ func (m Model) isOverlayToggleKey(key string) bool {
 		return key == kb.ClusterColorPicker
 	case overlayOrphans:
 		return key == kb.OrphanOverlay
+	case overlayLocalClusters:
+		return key == kb.LocalClusterManager
 	}
 	return false
 }
@@ -192,6 +194,9 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 		return mdl, cmd, true
 	case overlayClusterColor:
 		mdl, cmd := m.handleClusterColorOverlayKey(msg.String())
+		return mdl, cmd, true
+	case overlayLocalClusters:
+		mdl, cmd, _ := m.updateLocalClusterKey(msg)
 		return mdl, cmd, true
 	}
 	return m, nil, false

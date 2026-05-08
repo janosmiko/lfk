@@ -79,6 +79,7 @@
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser
 - **Namespace selector** overlay with type-to-filter
 - **All-namespaces mode** (enabled by default)
+- **Local cluster management** — create, list, and delete `kind` clusters; create, list, start, stop, and delete `k3d` and `minikube` clusters (kind has no native start/stop) from inside lfk via the `Ctrl+N` manager overlay.
 
 ### Resource Operations
 

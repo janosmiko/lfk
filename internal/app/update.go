@@ -154,6 +154,15 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case logContainersLoadedMsg:
 		mdl, cmd := m.updateLogContainersLoaded(msg)
 		return mdl, cmd, true
+	case localClustersDetectedMsg:
+		mdl, cmd := m.updateLocalClustersDetected(msg)
+		return mdl, cmd, true
+	case localClusterCreatedMsg:
+		mdl, cmd := m.updateLocalClusterCreated(msg)
+		return mdl, cmd, true
+	case localClusterMutatedMsg:
+		mdl, cmd := m.updateLocalClusterMutated(msg)
+		return mdl, cmd, true
 	}
 
 	return m.updateEasterEggMsg(msg)
