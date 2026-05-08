@@ -498,10 +498,11 @@ func appendContainerNodes(podNode *model.ResourceNode, obj map[string]any) {
 	// empty rather than defaulting to "Waiting".
 	status, _ := obj["status"].(map[string]any)
 	statusByKey := map[string]map[string]string{
-		"initContainers": extractContainerStatusMap(status, "initContainerStatuses"),
-		"containers":     extractContainerStatusMap(status, "containerStatuses"),
+		"initContainers":      extractContainerStatusMap(status, "initContainerStatuses"),
+		"containers":          extractContainerStatusMap(status, "containerStatuses"),
+		"ephemeralContainers": extractContainerStatusMap(status, "ephemeralContainerStatuses"),
 	}
-	for _, key := range []string{"initContainers", "containers"} {
+	for _, key := range []string{"initContainers", "containers", "ephemeralContainers"} {
 		containers, _ := spec[key].([]any)
 		lookup := statusByKey[key]
 		for _, c := range containers {
