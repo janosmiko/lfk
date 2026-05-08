@@ -395,11 +395,6 @@ confirm_on_exit: true
 # Default: auto
 # informer_cache: auto
 
-# ─── Mouse Support ────────────────────────────────────────────────────────────
-# Capture mouse input for click navigation, scroll, and tab switching.
-# Set to false to disable; equivalent to --no-mouse on the command line.
-# mouse: true
-
 # ─── Scrolloff ────────────────────────────────────────────────────────────────
 # Lines to keep visible above/below the cursor when scrolling. Used by all
 # views with cursor-based navigation.
