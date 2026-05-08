@@ -375,6 +375,15 @@ func (c *Client) buildPodTree(ctx context.Context, contextName, namespace, podNa
 		})
 	}
 
+	for _, ec := range pod.Spec.EphemeralContainers {
+		root.Children = append(root.Children, &model.ResourceNode{
+			Name:      ec.Name,
+			Kind:      "Container",
+			Namespace: namespace,
+			Status:    containerStatusFromPod(ec.Name, pod.Status.EphemeralContainerStatuses),
+		})
+	}
+
 	dynClient, dynErr := c.dynamicForContext(contextName)
 	if dynErr != nil {
 		// Tree build proceeds without ref existence checks and without an

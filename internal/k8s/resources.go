@@ -53,16 +53,27 @@ func (c *Client) GetContainers(ctx context.Context, contextName, namespace, podN
 		return nil, fmt.Errorf("getting pod %s: %w", podName, err)
 	}
 
-	items := make([]model.Item, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers))
+	items := make([]model.Item, 0, len(pod.Spec.InitContainers)+len(pod.Spec.Containers)+len(pod.Spec.EphemeralContainers))
 
 	for _, c := range pod.Spec.InitContainers {
 		isSidecar := c.RestartPolicy != nil && *c.RestartPolicy == corev1.ContainerRestartPolicyAlways
-		item := buildContainerItem(c, pod.Status.InitContainerStatuses, true, isSidecar)
+		item := buildContainerItem(c, pod.Status.InitContainerStatuses, true, isSidecar, false)
 		items = append(items, item)
 	}
 
 	for _, c := range pod.Spec.Containers {
-		item := buildContainerItem(c, pod.Status.ContainerStatuses, false, false)
+		item := buildContainerItem(c, pod.Status.ContainerStatuses, false, false, false)
+		items = append(items, item)
+	}
+
+	// Ephemeral containers live in their own spec/status arrays and are
+	// runtime-attached (kubectl debug). We project only Name/Image into a
+	// corev1.Container shell because Resources and Ports are disallowed by
+	// the API for ephemeral containers, and buildContainerItem reads only
+	// those four fields plus statuses.
+	for _, ec := range pod.Spec.EphemeralContainers {
+		c := corev1.Container{Name: ec.Name, Image: ec.Image}
+		item := buildContainerItem(c, pod.Status.EphemeralContainerStatuses, false, false, true)
 		items = append(items, item)
 	}
 

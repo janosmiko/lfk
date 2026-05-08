@@ -104,7 +104,10 @@ func extractCRDPrinterColumns(spec map[string]any, preferredVersion string) []mo
 }
 
 // buildContainerItem creates a model.Item for a container with enriched details.
-func buildContainerItem(c corev1.Container, statuses []corev1.ContainerStatus, isInit, isSidecar bool) model.Item {
+// At most one of isInit, isSidecar, isEphemeral should be true. Sidecar implies
+// init (a sidecar is an initContainer with restartPolicy=Always); ephemeral is
+// independent (it lives in pod.Spec.EphemeralContainers).
+func buildContainerItem(c corev1.Container, statuses []corev1.ContainerStatus, isInit, isSidecar, isEphemeral bool) model.Item {
 	item := model.Item{
 		Name:  c.Name,
 		Kind:  "Container",
@@ -112,6 +115,9 @@ func buildContainerItem(c corev1.Container, statuses []corev1.ContainerStatus, i
 	}
 
 	switch {
+	case isEphemeral:
+		item.Category = "Ephemeral Containers"
+		item.Status = "Waiting"
 	case isSidecar:
 		item.Category = "Sidecar Containers"
 		item.Status = "Waiting"
