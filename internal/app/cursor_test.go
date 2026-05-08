@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -1396,6 +1397,10 @@ func TestCov80MoveCursorAccordionUp(t *testing.T) {
 func TestCov80LoadMetricsPod(t *testing.T) {
 	m := basePush80Model()
 	m.nav.ResourceType.Kind = "Pod"
+	m.nav.Context = "test-ctx"
+	m.scheduler = scheduler.New(scheduler.DefaultThreshold)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.setCursor(0)
 	cmd := m.loadMetrics()
 	require.NotNil(t, cmd)
@@ -1456,9 +1461,13 @@ func TestCov80LoadMetricsAtLevelOwned(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelOwned
 	m.nav.ResourceType.Kind = "Deployment"
+	m.nav.Context = "test-ctx"
 	m.middleItems = []model.Item{
 		{Name: "pod-a", Namespace: "default", Kind: "Pod", Status: "Running"},
 	}
+	m.scheduler = scheduler.New(scheduler.DefaultThreshold)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.setCursor(0)
 	cmd := m.loadMetrics()
 	require.NotNil(t, cmd) // Pod kind at LevelOwned

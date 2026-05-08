@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -20,12 +20,12 @@ func (m Model) bulkDeleteResources() tea.Cmd {
 	rt := m.actionCtx.resourceType
 	client := m.client
 	ns := m.actionNamespace()
-	registry := m.bgtasks
+	registry := m.scheduler
 	total := len(refs)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	taskName := fmt.Sprintf("Delete %s (%d)", rt.Resource, total)
-	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
+	id := registry.StartCancellable(scheduler.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
 		defer registry.Finish(id)
@@ -74,12 +74,12 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 	rt := m.actionCtx.resourceType
 	client := m.client
 	ns := m.actionNamespace()
-	registry := m.bgtasks
+	registry := m.scheduler
 	total := len(refs)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	taskName := fmt.Sprintf("Force delete %s (%d)", rt.Resource, total)
-	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
+	id := registry.StartCancellable(scheduler.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
 		defer registry.Finish(id)
@@ -157,12 +157,12 @@ func (m Model) bulkScaleResources(replicas int32) tea.Cmd {
 	rt := m.actionCtx.resourceType
 	client := m.client
 	ns := m.actionNamespace()
-	registry := m.bgtasks
+	registry := m.scheduler
 	total := len(items)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	taskName := fmt.Sprintf("Scale %s (%d)", rt.Resource, total)
-	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
+	id := registry.StartCancellable(scheduler.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
 		defer registry.Finish(id)
@@ -197,12 +197,12 @@ func (m Model) bulkRestartResources() tea.Cmd {
 	rt := m.actionCtx.resourceType
 	client := m.client
 	ns := m.actionNamespace()
-	registry := m.bgtasks
+	registry := m.scheduler
 	total := len(items)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	taskName := fmt.Sprintf("Restart %s (%d)", rt.Resource, total)
-	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
+	id := registry.StartCancellable(scheduler.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
 		defer registry.Finish(id)
@@ -241,7 +241,7 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 	}
 	client := m.client
 	ns := m.actionNamespace()
-	registry := m.bgtasks
+	registry := m.scheduler
 	total := len(items)
 
 	labelOrAnnotation := "labels"
@@ -251,7 +251,7 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 
 	ctx, cancel := context.WithCancel(context.Background())
 	taskName := fmt.Sprintf("Patch %s (%d)", labelOrAnnotation, total)
-	id := registry.StartCancellable(bgtasks.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
+	id := registry.StartCancellable(scheduler.KindMutation, taskName, bgtaskTarget(actionCtx, ns), cancel)
 
 	return func() tea.Msg {
 		defer registry.Finish(id)

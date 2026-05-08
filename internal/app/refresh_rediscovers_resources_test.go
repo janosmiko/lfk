@@ -20,7 +20,7 @@ import (
 // elsewhere.
 func TestRefreshAtResourceTypesTriggersRediscovery(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
 	m.cacheFingerprints = make(map[string]string)
 	m.discoveringContexts = make(map[string]bool)
 	m.nav.Level = model.LevelResourceTypes
@@ -44,7 +44,7 @@ func TestRefreshAtResourceTypesTriggersRediscovery(t *testing.T) {
 
 func TestRefreshAtResourceTypesDedupsIfDiscoveryAlreadyInFlight(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
 	m.cacheFingerprints = make(map[string]string)
 	m.discoveringContexts = map[string]bool{
 		m.nav.Context: true, // already in flight

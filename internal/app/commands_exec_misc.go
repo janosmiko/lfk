@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 )
 
@@ -23,7 +23,7 @@ func (m Model) deleteResource() tea.Cmd {
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
 	logger.Info("Deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
-	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		err := m.client.DeleteResource(ctx, ns, rt, name)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -54,7 +54,7 @@ func (m Model) forceDeleteResource() tea.Cmd {
 		deleteArgs = append(deleteArgs, "-n", ns)
 	}
 
-	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Force delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Force delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, deleteArgs...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
@@ -88,7 +88,7 @@ func (m Model) removeFinalizers() tea.Cmd {
 		patchArgs = append(patchArgs, "-n", ns)
 	}
 
-	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Remove finalizers: %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Remove finalizers: %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, patchArgs...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 		logExecCmd("Running kubectl command", cmd)
@@ -112,7 +112,7 @@ func (m Model) vulnScanImage(image string) tea.Cmd {
 	}
 
 	title := fmt.Sprintf("Vuln Scan: %s", image)
-	return m.trackBgTask(bgtasks.KindSubprocess, title, "", func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, title, "", func() tea.Msg {
 		args := []string{"image", "--scanners", "vuln", "--format", "table", "--no-progress", image}
 		cmd := exec.Command(trivyPath, args...)
 		cmd.Env = os.Environ()
@@ -138,7 +138,7 @@ func (m Model) resizePVC(newSize string) tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logger.Info("Resizing PVC", "name", name, "newSize", newSize, "namespace", ns, "context", ctx)
-	return m.trackBgTask(bgtasks.KindMutation, "Resize PVC: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, "Resize PVC: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
 		err := m.client.ResizePVC(ctx, ns, name, newSize)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -153,7 +153,7 @@ func (m Model) scaleResource(replicas int32) tea.Cmd {
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
 	logger.Info("Scaling resource", "kind", kind, "name", name, "replicas", replicas, "namespace", ns, "context", ctx)
-	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Scale %s/%s → %d", kind, name, replicas), bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Scale %s/%s → %d", kind, name, replicas), bgtaskTarget(ctx, ns), func() tea.Msg {
 		err := m.client.ScaleResource(ctx, ns, name, kind, replicas)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -168,7 +168,7 @@ func (m Model) restartResource() tea.Cmd {
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
 	logger.Info("Restarting resource", "kind", kind, "name", name, "namespace", ns, "context", ctx)
-	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Restart %s/%s", kind, name), bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Restart %s/%s", kind, name), bgtaskTarget(ctx, ns), func() tea.Msg {
 		err := m.client.RestartResource(ctx, ns, name, kind)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -183,7 +183,7 @@ func (m Model) rollbackDeployment(revision int64) tea.Cmd {
 	name := m.actionCtx.name
 	client := m.client
 
-	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("Rollback Deployment: %s@%d", name, revision), bgtaskTarget(kctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Rollback Deployment: %s@%d", name, revision), bgtaskTarget(kctx, ns), func() tea.Msg {
 		err := client.RollbackDeployment(context.Background(), kctx, ns, name, revision)
 		return rollbackDoneMsg{err: err}
 	})
@@ -232,7 +232,7 @@ func (m Model) execKubectlNodeCmd(subcmd string) tea.Cmd {
 	name := m.actionCtx.name
 	args := []string{subcmd, name, "--context", m.kubectlContext(m.actionCtx.context)}
 
-	return m.trackBgTask(bgtasks.KindMutation, fmt.Sprintf("%s node: %s", subcmd, name), m.actionCtx.context, func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("%s node: %s", subcmd, name), m.actionCtx.context, func() tea.Msg {
 		cmd := exec.Command(kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 		logExecCmd("Running kubectl command", cmd)
@@ -251,7 +251,7 @@ func (m Model) triggerCronJob() tea.Cmd {
 	kctx := m.actionCtx.context
 	client := m.client
 
-	return m.trackBgTask(bgtasks.KindMutation, "Trigger CronJob: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindMutation, "Trigger CronJob: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		jobName, err := client.TriggerCronJob(context.Background(), kctx, ns, name)
 		return triggerCronJobMsg{jobName: jobName, err: err}
 	})

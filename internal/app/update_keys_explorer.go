@@ -58,9 +58,9 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
 
-	if m.bgtasks != nil && m.bgtasks.HasActiveMutations() {
+	if m.scheduler != nil && m.scheduler.HasActiveMutations() {
 		if key := msg.String(); key == "ctrl+c" || key == "esc" {
-			m.bgtasks.CancelMutations()
+			m.scheduler.CancelMutations()
 			m.setStatusMessage("Cancelling...", false)
 			return m, nil, true
 		}

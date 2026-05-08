@@ -2,13 +2,33 @@ package app
 
 import (
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/charmbracelet/lipgloss"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// newTestModelForDashboard returns a minimal Model with dashboardAcc
+// initialised for use in dashboard handler tests.
+func newTestModelForDashboard(_ *testing.T) Model {
+	return Model{
+		nav:           model.NavigationState{Level: model.LevelResources},
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		dashboardAcc:  make(map[string]*dashboardAccumulator),
+		width:         80,
+		height:        40,
+		execMu:        &sync.Mutex{},
+	}
+}
 
 // stripANSI removes ANSI escape codes to allow plain-text assertions on
 // rendered output. This covers the basic CSI sequences emitted by lipgloss.
@@ -426,34 +446,34 @@ func TestFinal3LoadDashboardRichData(t *testing.T) {
 	m := baseRichModel()
 	cmd := m.loadDashboard()
 	require.NotNil(t, cmd)
+	// loadDashboard now returns a tea.Batch of 6 section submits.
+	// Verify the batch is non-nil (content assertions are covered by
+	// composeDashboardLoadedMsg and handleDashboardPartial tests).
 	msg := cmd()
-	result, ok := msg.(dashboardLoadedMsg)
-	require.True(t, ok, "expected dashboardLoadedMsg, got %T", msg)
-
-	content := stripANSI(result.content)
-	assert.Contains(t, content, "CLUSTER DASHBOARD")
-	assert.Contains(t, content, "Nodes:")
-	assert.Contains(t, content, "Pods:")
-	assert.Contains(t, content, "Namespaces:")
-	assert.Equal(t, "test-ctx", result.context)
+	require.NotNil(t, msg)
 }
 
-func TestFinal3LoadDashboardEventsContent(t *testing.T) {
+// The four tests below were carried over from the pre-fan-out
+// dashboard implementation, when loadDashboard returned a single
+// content-bearing tea.Cmd that could be driven inline. After the
+// fan-out refactor each call returns a tea.Batch of six Submits whose
+// content lives behind dashboardPartialMsg + handleDashboardPartial,
+// so a literal "events content" or "contains sections" assertion
+// would have to drive 6 sub-cmds, await Futures, and pump the
+// accumulator — that's TestLoadDashboard_FanOutToBatch's job. These
+// tests now only verify that loadDashboard returns a non-nil cmd
+// against various fixtures, so the names match what they actually
+// check.
+func TestFinal3LoadDashboardReturnsCmdRich(t *testing.T) {
 	m := baseRichModel()
 	cmd := m.loadDashboard()
-	msg := cmd()
-	result := msg.(dashboardLoadedMsg)
-	events := stripANSI(result.events)
-	assert.Contains(t, events, "RECENT EVENTS")
+	require.NotNil(t, cmd)
 }
 
-func TestFinal3LoadDashboardNotEmpty(t *testing.T) {
+func TestFinal3LoadDashboardReturnsCmdRichTwo(t *testing.T) {
 	m := baseRichModel()
 	cmd := m.loadDashboard()
-	msg := cmd()
-	result := msg.(dashboardLoadedMsg)
-	assert.NotEmpty(t, result.content)
-	assert.NotEmpty(t, result.events)
+	require.NotNil(t, cmd)
 }
 
 func TestFinalLoadDashboardReturnsCmd(t *testing.T) {
@@ -466,32 +486,21 @@ func TestFinalLoadDashboardExecutesAndReturnsDashboardMsg(t *testing.T) {
 	m := baseFinalModelWithDynamic()
 	cmd := m.loadDashboard()
 	require.NotNil(t, cmd)
+	// loadDashboard now returns a tea.Batch of 6 section submits.
 	msg := cmd()
-	result, ok := msg.(dashboardLoadedMsg)
-	require.True(t, ok, "expected dashboardLoadedMsg, got %T", msg)
-	assert.NotEmpty(t, result.content)
-	assert.Equal(t, "test-ctx", result.context)
+	require.NotNil(t, msg)
 }
 
-func TestFinalLoadDashboardContentContainsSections(t *testing.T) {
+func TestFinalLoadDashboardReturnsCmdWithDynamic(t *testing.T) {
 	m := baseFinalModelWithDynamic()
 	cmd := m.loadDashboard()
-	msg := cmd()
-	result := msg.(dashboardLoadedMsg)
-	stripped := stripANSI(result.content)
-	assert.Contains(t, stripped, "CLUSTER DASHBOARD")
-	assert.Contains(t, stripped, "Nodes:")
-	assert.Contains(t, stripped, "Namespaces:")
-	assert.Contains(t, stripped, "Pods:")
+	require.NotNil(t, cmd)
 }
 
-func TestFinalLoadDashboardEventsColumn(t *testing.T) {
+func TestFinalLoadDashboardReturnsCmdWithDynamicTwo(t *testing.T) {
 	m := baseFinalModelWithDynamic()
 	cmd := m.loadDashboard()
-	msg := cmd()
-	result := msg.(dashboardLoadedMsg)
-	stripped := stripANSI(result.events)
-	assert.Contains(t, stripped, "RECENT EVENTS")
+	require.NotNil(t, cmd)
 }
 
 func TestFinalLoadMonitoringDashboardReturnsCmd(t *testing.T) {
@@ -530,4 +539,152 @@ func TestFinalFormatTimeAgoExact(t *testing.T) {
 	// Several days.
 	result4 := formatTimeAgo(time.Now().Add(-72 * time.Hour))
 	assert.Contains(t, result4, "d ago")
+}
+
+func TestHandleDashboardPartial_AccumulatesSections(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "test-ctx"
+	m.requestGen = 7
+
+	// Send 3 of 6 sections. The handler accumulates silently and emits
+	// no tea.Cmd until all 6 arrive (atomic update — partial renders
+	// would flicker the dashboard layout on every watch tick).
+	// nodeItems must be non-nil to trigger the nodeCount merge in mergeDashboardSection.
+	m, cmd1 := m.handleDashboardPartial(dashboardPartialMsg{
+		context: "test-ctx", gen: 7, section: dashboardSectionNodes,
+		data: dashboardData{nodeItems: make([]model.Item, 3), nodeCount: 3, readyNodes: 2},
+	})
+	assert.Nil(t, cmd1, "partial accumulation must not emit a render cmd")
+
+	m, cmd2 := m.handleDashboardPartial(dashboardPartialMsg{
+		context: "test-ctx", gen: 7, section: dashboardSectionPods,
+		data: dashboardData{pods: podStats{total: 10, running: 8}},
+	})
+	assert.Nil(t, cmd2)
+
+	m, cmd3 := m.handleDashboardPartial(dashboardPartialMsg{
+		context: "test-ctx", gen: 7, section: dashboardSectionNamespaces,
+		data: dashboardData{nsCount: 5},
+	})
+	assert.Nil(t, cmd3)
+
+	// 3 of 6 received — accumulator still pending.
+	key := dashboardAccKey("test-ctx", 7)
+	acc, ok := m.dashboardAcc[key]
+	require.True(t, ok)
+	assert.Equal(t, 3, acc.count)
+	assert.Equal(t, 3, acc.data.nodeCount)
+	assert.Equal(t, 5, acc.data.nsCount)
+	assert.Equal(t, 10, acc.data.pods.total)
+}
+
+func TestHandleDashboardPartial_EmitsCmdOnlyAfterAllSections(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "test-ctx"
+	m.requestGen = 1
+
+	// Sections 1..5 produce no cmd.
+	for i := range 5 {
+		var cmd tea.Cmd
+		m, cmd = m.handleDashboardPartial(dashboardPartialMsg{
+			context: "test-ctx", gen: 1, section: dashboardSection(i),
+			data: dashboardData{nodeCount: 1, nodeItems: make([]model.Item, 1)},
+		})
+		assert.Nilf(t, cmd, "section %d (1-indexed: %d) must not emit a cmd until all 6 arrive", i, i+1)
+	}
+
+	// Section 6 emits the dashboardLoadedMsg in one shot.
+	m, cmd := m.handleDashboardPartial(dashboardPartialMsg{
+		context: "test-ctx", gen: 1, section: dashboardSection(5),
+		data: dashboardData{nodeCount: 1, nodeItems: make([]model.Item, 1)},
+	})
+	require.NotNil(t, cmd, "the final section must emit a render cmd")
+	msg, ok := cmd().(dashboardLoadedMsg)
+	require.True(t, ok, "the emitted cmd must produce a dashboardLoadedMsg")
+	assert.Equal(t, "test-ctx", msg.context)
+}
+
+func TestHandleDashboardPartial_DropsStaleGen(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "test-ctx"
+	m.requestGen = 5
+
+	m, _ = m.handleDashboardPartial(dashboardPartialMsg{
+		context: "test-ctx", gen: 4 /* stale */, section: dashboardSectionNodes,
+		data: dashboardData{nodeCount: 99},
+	})
+
+	key := dashboardAccKey("test-ctx", 4)
+	_, ok := m.dashboardAcc[key]
+	assert.False(t, ok, "stale gen msg must be dropped")
+}
+
+func TestHandleDashboardPartial_DropsWrongContext(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "current-ctx"
+	m.requestGen = 1
+
+	m, _ = m.handleDashboardPartial(dashboardPartialMsg{
+		context: "other-ctx", gen: 1, section: dashboardSectionNodes,
+		data: dashboardData{nodeCount: 99},
+	})
+
+	key := dashboardAccKey("other-ctx", 1)
+	_, ok := m.dashboardAcc[key]
+	assert.False(t, ok, "wrong-context msg must be dropped")
+}
+
+func TestHandleDashboardPartial_DropsAccumulatorWhenAll6Arrive(t *testing.T) {
+	m := newTestModelForDashboard(t)
+	m.nav.Context = "test-ctx"
+	m.requestGen = 1
+
+	for i := range 6 {
+		m, _ = m.handleDashboardPartial(dashboardPartialMsg{
+			context: "test-ctx", gen: 1, section: dashboardSection(i),
+			data: dashboardData{nodeCount: 1},
+		})
+	}
+
+	key := dashboardAccKey("test-ctx", 1)
+	_, ok := m.dashboardAcc[key]
+	assert.False(t, ok, "accumulator must be dropped after all 6 sections arrive")
+}
+
+func TestLoadDashboard_FanOutToBatch(t *testing.T) {
+	m := newTestModelWithScheduler()
+	m.nav.Context = "test-ctx"
+	m.scheduler.StopWorkers()
+	// Close drains every queued Future with ErrContextSwitched, which
+	// unblocks the sub-cmd goroutines below — without this they'd park
+	// on the futures forever and leak between tests.
+	defer m.scheduler.Close()
+
+	cmd := m.loadDashboard()
+	require.NotNil(t, cmd)
+
+	// tea.Batch returns a cmd that, when called, produces a BatchMsg
+	// containing the sub-commands. The bubbletea runtime normally dispatches
+	// those in goroutines; here we do it manually to drive the scheduler.
+	msg := cmd()
+	batchMsg, ok := msg.(tea.BatchMsg)
+	require.True(t, ok, "loadDashboard must return a tea.Batch, got %T", msg)
+	require.Len(t, batchMsg, 6, "loadDashboard must fan out into exactly 6 section cmds")
+
+	// Execute each sub-cmd so the scheduler receives the 6 Submits.
+	// Tracked via a WaitGroup so the deferred Close above can join the
+	// goroutines after draining their Futures.
+	var wg sync.WaitGroup
+	for _, subCmd := range batchMsg {
+		wg.Add(1)
+		go func(c tea.Cmd) {
+			defer wg.Done()
+			_ = c()
+		}(subCmd)
+	}
+	t.Cleanup(wg.Wait)
+
+	require.Eventually(t, func() bool {
+		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityLow) >= 6
+	}, 2*time.Second, 10*time.Millisecond, "loadDashboard must fan out into 6 Low-priority Submits")
 }

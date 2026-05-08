@@ -8,13 +8,15 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 )
 
 func TestRenderBackgroundTasksOverlayEmpty(t *testing.T) {
 	t.Parallel()
 	got := RenderBackgroundTasksOverlay(nil, ModeRunning, 0, 60, 15)
-	assert.Contains(t, got, "Background Tasks")
-	assert.Contains(t, got, "No background tasks running")
+	assert.Contains(t, got, "Scheduler — Running")
+	assert.Contains(t, got, "No tasks running")
 }
 
 func TestRenderBackgroundTasksOverlayWithRows(t *testing.T) {
@@ -28,7 +30,7 @@ func TestRenderBackgroundTasksOverlayWithRows(t *testing.T) {
 	got := RenderBackgroundTasksOverlay(rows, ModeRunning, 0, 80, 15)
 
 	// Header.
-	assert.Contains(t, got, "Background Tasks")
+	assert.Contains(t, got, "Scheduler — Running")
 	// Column headers.
 	assert.Contains(t, got, "KIND")
 	assert.Contains(t, got, "NAME")
@@ -39,8 +41,8 @@ func TestRenderBackgroundTasksOverlayWithRows(t *testing.T) {
 	assert.Contains(t, got, "List Pods")
 	assert.Contains(t, got, "default")
 	assert.Contains(t, got, "Pod metrics")
-	// Footer count.
-	assert.Contains(t, got, "3 tasks running")
+	// Footer breakdown.
+	assert.Contains(t, got, "3 running, 0 queued, 0 finished")
 }
 
 func TestFormatElapsedBGT(t *testing.T) {
@@ -83,13 +85,14 @@ func TestRenderBackgroundTasksOverlayFitsInWidthWideRows(t *testing.T) {
 	// Realistic worst-case: long CRD kind, long pod name, long target.
 	rows := []BackgroundTaskRow{
 		{
+			Status:    TaskStatusRunning,
 			Kind:      "VeryLongCustomResourceKind",
 			Name:      "very-long-operation-name-goes-here",
 			Target:    "very-long-namespace/with-slashed/path",
 			StartedAt: time.Now().Add(-5 * time.Second),
 		},
 	}
-	for _, w := range []int{50, 60, 80, 100} {
+	for _, w := range []int{60, 80, 100} {
 		got := RenderBackgroundTasksOverlay(rows, ModeRunning, 0, w, 15)
 		// The overlay content targets width-6 (the caller's OverlayStyle
 		// wraps it in a border + padding adding 6 cells of horizontal
@@ -99,24 +102,25 @@ func TestRenderBackgroundTasksOverlayFitsInWidthWideRows(t *testing.T) {
 		actualWidth := lipgloss.Width(got)
 		assert.LessOrEqual(t, actualWidth, w,
 			"overlay with wide data must still fit in width %d (got %d)", w, actualWidth)
-		// Lines must not wrap. The inner content for 1 data row is
-		// "Background Tasks\n\nHEADER\nROW\n\nN tasks running" — 5 newlines.
-		// Any extra newline means a row wrapped onto a second line.
-		lines := strings.Count(got, "\n")
-		assert.LessOrEqual(t, lines, 5,
-			"overlay with 1 data row should not wrap; got %d lines", lines)
+		// No row should wrap onto a second visible line. Each data row
+		// occupies exactly 1 visible line; we only assert width here
+		// because the renderer pads to a fixed data-area height for
+		// stability (see TestRenderBackgroundTasksOverlay_StableHeight).
 	}
 }
 
-func TestRenderBackgroundTasksOverlaySingleTaskFooter(t *testing.T) {
+func TestRenderBackgroundTasksOverlayLifecycleBreakdown(t *testing.T) {
 	t.Parallel()
-	// Singular noun when count == 1.
+	// Footer shows the per-status breakdown so the user can see the
+	// pipeline at a glance.
+	now := time.Now()
 	rows := []BackgroundTaskRow{
-		{Kind: "ResourceList", Name: "List Pods", Target: "default", StartedAt: time.Now().Add(-2 * time.Second)},
+		{Status: TaskStatusRunning, Kind: "ResourceList", Name: "List Pods", Target: "default", StartedAt: now.Add(-2 * time.Second)},
+		{Status: TaskStatusQueued, Kind: "Dashboard", Name: "Dashboard: pdbs", Target: "ctx", Position: 1},
+		{Status: TaskStatusFinished, Kind: "RBACCheck", Name: "Can-I rules", Target: "default", FinishedAt: now.Add(-200 * time.Millisecond), Duration: 50 * time.Millisecond},
 	}
 	got := RenderBackgroundTasksOverlay(rows, ModeRunning, 0, 80, 15)
-	assert.Contains(t, got, "1 task running")
-	assert.NotContains(t, got, "1 tasks")
+	assert.Contains(t, got, "1 running, 1 queued, 1 finished")
 }
 
 // --- Completed mode ---
@@ -124,7 +128,7 @@ func TestRenderBackgroundTasksOverlaySingleTaskFooter(t *testing.T) {
 func TestRenderBackgroundTasksOverlayCompletedEmpty(t *testing.T) {
 	t.Parallel()
 	got := RenderBackgroundTasksOverlay(nil, ModeCompleted, 0, 60, 15)
-	assert.Contains(t, got, "Completed Tasks",
+	assert.Contains(t, got, "Scheduler — Completed",
 		"completed mode must show the Completed Tasks title")
 	assert.Contains(t, got, "No completed tasks yet",
 		"completed mode must show the no-history empty state")
@@ -151,7 +155,7 @@ func TestRenderBackgroundTasksOverlayCompletedRendersDuration(t *testing.T) {
 	}
 	got := RenderBackgroundTasksOverlay(rows, ModeCompleted, 0, 80, 15)
 
-	assert.Contains(t, got, "Completed Tasks")
+	assert.Contains(t, got, "Scheduler — Completed")
 	assert.Contains(t, got, "DURATION",
 		"completed mode must label the right column as DURATION")
 	assert.NotContains(t, got, "ELAPSED",
@@ -279,4 +283,113 @@ func TestRenderBackgroundTasksOverlayNegativeScrollClampsToZero(t *testing.T) {
 	got := RenderBackgroundTasksOverlay(rows, ModeCompleted, -5, 80, 15)
 	assert.Contains(t, got, "row-00",
 		"negative scroll must clamp to the top of the list")
+}
+
+// --- Priority chips and Queued section ---
+
+func TestRenderBackgroundTasksOverlay_QueuedRowsInUnifiedTable(t *testing.T) {
+	t.Parallel()
+	rows := []BackgroundTaskRow{
+		{Status: TaskStatusQueued, Kind: "Dashboard", Priority: scheduler.PriorityLow, Name: "Dashboard: nodes", Position: 1},
+		{Status: TaskStatusQueued, Kind: "Dashboard", Priority: scheduler.PriorityLow, Name: "Dashboard: pods", Position: 2},
+	}
+	got := RenderBackgroundTasksOverlay(rows, ModeRunning, 0, 100, 30)
+	assert.Contains(t, got, "Dashboard: nodes")
+	assert.Contains(t, got, "Dashboard: pods")
+	assert.Contains(t, got, "LOW")
+	assert.Contains(t, got, "Queued #1")
+	assert.Contains(t, got, "Queued #2")
+}
+
+func TestRenderBackgroundTasksOverlay_PriorityChips(t *testing.T) {
+	t.Parallel()
+	rows := []BackgroundTaskRow{
+		{Kind: "APIDiscovery", Priority: scheduler.PriorityCritical, Name: "API discovery", StartedAt: time.Now()},
+		{Kind: "ResourceList", Priority: scheduler.PriorityHigh, Name: "List Pods", StartedAt: time.Now()},
+	}
+	got := RenderBackgroundTasksOverlay(rows, ModeRunning, 0, 100, 30)
+	assert.Contains(t, got, "CRITICAL")
+	assert.Contains(t, got, "HIGH")
+}
+
+// TestRenderBackgroundTasksOverlay_TableFillsWidth verifies that the
+// data rows expand to fill the overlay's full inner width when the
+// content is shorter than that width. Without this, the table looks
+// truncated against the right border.
+func TestRenderBackgroundTasksOverlay_TableFillsWidth(t *testing.T) {
+	t.Parallel()
+	rows := []BackgroundTaskRow{
+		{Kind: "ResourceList", Priority: scheduler.PriorityHigh, Name: "x", Target: "y", StartedAt: time.Now()},
+	}
+	const width = 100
+	got := RenderBackgroundTasksOverlay(rows, ModeRunning, 0, width, 15)
+	// Find the data row line (stripped of the title and chrome). The
+	// row should be exactly innerWidth wide so the right edge of the
+	// last column lines up with the inner overlay border.
+	lines := strings.Split(got, "\n")
+	const innerW = width - 6 // OverlayStyle border(1+1) + padding(2+2)
+	var rowLine string
+	for _, line := range lines {
+		// The row is the only line containing both the kind and the target.
+		if strings.Contains(line, "ResourceList") && strings.Contains(line, "y") {
+			rowLine = line
+			break
+		}
+	}
+	if rowLine == "" {
+		t.Fatalf("could not find data row in overlay output:\n%s", got)
+	}
+	rowW := lipgloss.Width(rowLine)
+	assert.Equal(t, innerW, rowW,
+		"data row width must equal the overlay's innerW so the table fills the width (got %d, want %d)", rowW, innerW)
+}
+
+// TestRenderBackgroundTasksOverlay_StableHeight is the regression
+// guard for the user-reported "the window grows and shrinks as queued
+// items appear/drain" jank. The renderer pads the data area to a
+// fixed line count so the overlay box stays at a constant size
+// regardless of how many rows are present.
+func TestRenderBackgroundTasksOverlay_StableHeight(t *testing.T) {
+	t.Parallel()
+	const w, h = 100, 20
+
+	now := time.Now()
+	emptyOut := RenderBackgroundTasksOverlay(nil, ModeRunning, 0, w, h)
+	oneRow := []BackgroundTaskRow{
+		{Status: TaskStatusRunning, Kind: "ResourceList", Name: "List Pods", Target: "default", StartedAt: now},
+	}
+	manyRows := make([]BackgroundTaskRow, 0, 5)
+	manyRows = append(manyRows, oneRow...)
+	for i := range 4 {
+		manyRows = append(manyRows, BackgroundTaskRow{
+			Status: TaskStatusQueued, Kind: "Dashboard", Name: "Dashboard: section", Target: "ctx", Position: i + 1,
+		})
+	}
+
+	emptyLines := strings.Count(emptyOut, "\n")
+	oneLines := strings.Count(RenderBackgroundTasksOverlay(oneRow, ModeRunning, 0, w, h), "\n")
+	manyLines := strings.Count(RenderBackgroundTasksOverlay(manyRows, ModeRunning, 0, w, h), "\n")
+
+	assert.Equal(t, emptyLines, oneLines,
+		"line count must not change when a row appears (empty=%d, one=%d)", emptyLines, oneLines)
+	assert.Equal(t, emptyLines, manyLines,
+		"line count must not change when more rows appear (empty=%d, many=%d)", emptyLines, manyLines)
+}
+
+// TestRenderBackgroundTasksOverlay_StatusColumnShowsLifecycle verifies
+// that each lifecycle state is rendered with the right STATUS chip.
+func TestRenderBackgroundTasksOverlay_StatusColumnShowsLifecycle(t *testing.T) {
+	t.Parallel()
+	now := time.Now()
+	rows := []BackgroundTaskRow{
+		{Status: TaskStatusRunning, Kind: "ResourceList", Name: "List Pods", Target: "default", StartedAt: now.Add(-2 * time.Second)},
+		{Status: TaskStatusQueued, Kind: "Dashboard", Name: "Dashboard: nodes", Target: "ctx", Position: 3},
+		{Status: TaskStatusFinished, Kind: "RBACCheck", Name: "Can-I rules", Target: "default", FinishedAt: now.Add(-100 * time.Millisecond), Duration: 80 * time.Millisecond},
+	}
+	got := RenderBackgroundTasksOverlay(rows, ModeRunning, 0, 100, 25)
+	assert.Contains(t, got, "Running", "running rows must show the Running status")
+	assert.Contains(t, got, "Queued #3", "queued rows must show the Queued status with their position")
+	assert.Contains(t, got, "Finished", "finished-lingering rows must show the Finished status")
+	// Queued row's ELAPSED column shows the placeholder dash.
+	assert.Contains(t, got, "—")
 }

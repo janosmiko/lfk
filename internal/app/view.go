@@ -427,8 +427,12 @@ func (m Model) renderTitleBar() string {
 	}
 
 	var mutationProgress, tasksIndicator string
-	if m.bgtasks != nil && m.bgtasks.Len() > 0 {
-		snap := m.bgtasks.Snapshot()
+	if m.scheduler != nil && m.scheduler.LenIndicator() > 0 {
+		// Watch-mode auto-refresh marks its tasks Silent so the spinner
+		// doesn't flicker every second. Filter them here too — they
+		// stay in the :scheduler overlay history but don't crowd the
+		// title-bar indicator.
+		snap := nonSilentTasks(m.scheduler.Snapshot())
 		if tint != "" {
 			mutationProgress = renderMutationProgressOverrideBg(m.spinner.View(), snap, tintBg)
 			tasksIndicator = renderTasksIndicatorOverrideBg(m.spinner.View(), snap, tintBg)

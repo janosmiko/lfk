@@ -19,7 +19,9 @@ import (
 // in-process itemCache.
 func TestWatchTickRefreshGoesToAPI(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.cacheFingerprints = make(map[string]string)
 	m.watchMode = true
 

@@ -7,7 +7,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -22,8 +22,8 @@ func TestRenderTasksIndicatorShowsOnlySpinner(t *testing.T) {
 	// The indicator is intentionally minimal — just the spinner glyph,
 	// no task name or count. Users who want details open the :tasks
 	// overlay. This guards against anyone re-adding a label.
-	snap := []bgtasks.Task{
-		{ID: 1, Kind: bgtasks.KindResourceList, Name: "List Pods", StartedAt: time.Now()},
+	snap := []scheduler.Task{
+		{ID: 1, Kind: scheduler.KindResourceList, Name: "List Pods", StartedAt: time.Now()},
 	}
 	got := renderTasksIndicator("\u280b", snap)
 	assert.Contains(t, got, "\u280b")
@@ -37,7 +37,7 @@ func TestRenderTasksIndicatorMultipleTasksStillOnlySpinner(t *testing.T) {
 	t.Parallel()
 	// Even with many tasks, the indicator shows only the spinner — no
 	// count. The user opens :tasks to see how many are running.
-	snap := []bgtasks.Task{
+	snap := []scheduler.Task{
 		{ID: 1, Name: "List Pods", StartedAt: time.Now()},
 		{ID: 2, Name: "Get YAML", StartedAt: time.Now()},
 		{ID: 3, Name: "Pod metrics", StartedAt: time.Now()},
@@ -55,7 +55,7 @@ func TestRenderTasksIndicatorRendersProvidedSpinnerFrame(t *testing.T) {
 	// animates at whatever cadence the caller's spinner is running).
 	// This guards against regressions where the helper starts hard-coding
 	// a frame and ignores its input.
-	snap := []bgtasks.Task{
+	snap := []scheduler.Task{
 		{ID: 1, Name: "Task", StartedAt: time.Now()},
 	}
 	got := renderTasksIndicator("\u2807", snap)
@@ -69,8 +69,8 @@ func TestTitleBarTasksIndicatorShownWhenRegistryNonEmpty(t *testing.T) {
 	// title bar contains the spinner glyph passed in by m.spinner.View().
 	// We check for the spinner glyph rather than any label, because the
 	// indicator has no label anymore.
-	r := bgtasks.New(0) // 0 threshold so the task is visible immediately
-	r.Start(bgtasks.KindResourceList, "List Pods", "default")
+	r := scheduler.New(0) // 0 threshold so the task is visible immediately
+	r.Start(scheduler.KindResourceList, "List Pods", "default")
 	m := Model{
 		width:  120,
 		height: 40,
@@ -78,7 +78,7 @@ func TestTitleBarTasksIndicatorShownWhenRegistryNonEmpty(t *testing.T) {
 			Context:      "test-ctx",
 			ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"},
 		},
-		bgtasks: r,
+		scheduler: r,
 	}
 	m.spinner = spinner.New()
 
@@ -100,15 +100,15 @@ func TestTitleBarTasksIndicatorHiddenWhenRegistryEmpty(t *testing.T) {
 			Context:      "test-ctx",
 			ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"},
 		},
-		bgtasks: bgtasks.New(0),
+		scheduler: scheduler.New(0),
 	}
 	m.spinner = spinner.New()
 
 	outEmpty := m.renderTitleBar()
 
-	r := bgtasks.New(0)
-	r.Start(bgtasks.KindResourceList, "List Pods", "default")
-	m.bgtasks = r
+	r := scheduler.New(0)
+	r.Start(scheduler.KindResourceList, "List Pods", "default")
+	m.scheduler = r
 	outActive := m.renderTitleBar()
 
 	// When tasks are active the rendered title bar must be strictly
@@ -127,8 +127,8 @@ func TestRenderMutationProgressEmpty(t *testing.T) {
 
 func TestRenderMutationProgressNoMutationTasks(t *testing.T) {
 	t.Parallel()
-	snap := []bgtasks.Task{
-		{ID: 1, Kind: bgtasks.KindResourceList, Name: "List Pods", Total: 5, Current: 3},
+	snap := []scheduler.Task{
+		{ID: 1, Kind: scheduler.KindResourceList, Name: "List Pods", Total: 5, Current: 3},
 	}
 	got := renderMutationProgress("\u280b", snap)
 	assert.Empty(t, got, "non-mutation tasks should not produce progress indicator")
@@ -136,8 +136,8 @@ func TestRenderMutationProgressNoMutationTasks(t *testing.T) {
 
 func TestRenderMutationProgressNoTotal(t *testing.T) {
 	t.Parallel()
-	snap := []bgtasks.Task{
-		{ID: 1, Kind: bgtasks.KindMutation, Name: "Delete pods (5)", Total: 0, Current: 0},
+	snap := []scheduler.Task{
+		{ID: 1, Kind: scheduler.KindMutation, Name: "Delete pods (5)", Total: 0, Current: 0},
 	}
 	got := renderMutationProgress("\u280b", snap)
 	assert.Empty(t, got, "mutation tasks with Total==0 should not produce progress indicator")
@@ -145,8 +145,8 @@ func TestRenderMutationProgressNoTotal(t *testing.T) {
 
 func TestRenderMutationProgressShowsProgress(t *testing.T) {
 	t.Parallel()
-	snap := []bgtasks.Task{
-		{ID: 1, Kind: bgtasks.KindMutation, Name: "Delete pods (10)", Total: 10, Current: 3},
+	snap := []scheduler.Task{
+		{ID: 1, Kind: scheduler.KindMutation, Name: "Delete pods (10)", Total: 10, Current: 3},
 	}
 	got := renderMutationProgress("\u280b", snap)
 	stripped := stripANSI(got)
@@ -157,8 +157,8 @@ func TestRenderMutationProgressShowsProgress(t *testing.T) {
 
 func TestRenderMutationProgressScaling(t *testing.T) {
 	t.Parallel()
-	snap := []bgtasks.Task{
-		{ID: 1, Kind: bgtasks.KindMutation, Name: "Scale deployments (5)", Total: 5, Current: 2},
+	snap := []scheduler.Task{
+		{ID: 1, Kind: scheduler.KindMutation, Name: "Scale deployments (5)", Total: 5, Current: 2},
 	}
 	got := renderMutationProgress("\u280b", snap)
 	stripped := stripANSI(got)
@@ -168,8 +168,8 @@ func TestRenderMutationProgressScaling(t *testing.T) {
 
 func TestRenderMutationProgressForceDelete(t *testing.T) {
 	t.Parallel()
-	snap := []bgtasks.Task{
-		{ID: 1, Kind: bgtasks.KindMutation, Name: "Force delete pods (3)", Total: 3, Current: 1},
+	snap := []scheduler.Task{
+		{ID: 1, Kind: scheduler.KindMutation, Name: "Force delete pods (3)", Total: 3, Current: 1},
 	}
 	got := renderMutationProgress("\u280b", snap)
 	stripped := stripANSI(got)
@@ -179,9 +179,9 @@ func TestRenderMutationProgressForceDelete(t *testing.T) {
 
 func TestRenderMutationProgressOnlyFirstShown(t *testing.T) {
 	t.Parallel()
-	snap := []bgtasks.Task{
-		{ID: 1, Kind: bgtasks.KindMutation, Name: "Delete pods (10)", Total: 10, Current: 5},
-		{ID: 2, Kind: bgtasks.KindMutation, Name: "Scale deploys (3)", Total: 3, Current: 1},
+	snap := []scheduler.Task{
+		{ID: 1, Kind: scheduler.KindMutation, Name: "Delete pods (10)", Total: 10, Current: 5},
+		{ID: 2, Kind: scheduler.KindMutation, Name: "Scale deploys (3)", Total: 3, Current: 1},
 	}
 	got := renderMutationProgress("\u280b", snap)
 	stripped := stripANSI(got)
@@ -211,8 +211,8 @@ func TestShortMutationLabel(t *testing.T) {
 
 func TestTitleBarShowsMutationProgress(t *testing.T) {
 	t.Parallel()
-	r := bgtasks.New(0)
-	id := r.Start(bgtasks.KindMutation, "Delete pods (5)", "test-ctx / default")
+	r := scheduler.New(0)
+	id := r.Start(scheduler.KindMutation, "Delete pods (5)", "test-ctx / default")
 	r.UpdateProgress(id, 3, 5)
 
 	m := Model{
@@ -222,7 +222,7 @@ func TestTitleBarShowsMutationProgress(t *testing.T) {
 			Context:      "test-ctx",
 			ResourceType: model.ResourceTypeEntry{Kind: "Pod", Resource: "pods"},
 		},
-		bgtasks: r,
+		scheduler: r,
 	}
 	m.spinner = spinner.New()
 

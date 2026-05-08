@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -104,7 +104,7 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 
 	title := fmt.Sprintf("Describe: %s/%s", rt.Resource, name)
 
-	return m.trackBgTask(bgtasks.KindSubprocess, title, bgtaskTarget(m.actionCtx.context, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, title, bgtaskTarget(m.actionCtx.context, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(m.actionCtx.context))
 		logExecCmd("Running kubectl command", cmd)

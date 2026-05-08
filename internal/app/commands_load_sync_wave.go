@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 )
 
 // syncWaveTimelineSkeletonTimeout bounds the FAST first-phase fetch
@@ -35,8 +35,8 @@ func (m Model) loadSyncWaveTimeline(token uint64) tea.Cmd {
 	kctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
-	return m.trackBgTask(bgtasks.KindResourceList, "Sync wave timeline: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
-		fetchCtx, cancel := context.WithTimeout(context.Background(), syncWaveTimelineFullTimeout)
+	return m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindResourceList, "Sync wave timeline: "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		fetchCtx, cancel := context.WithTimeout(ctx, syncWaveTimelineFullTimeout)
 		defer cancel()
 		info, err := client.GetSyncWaveTimeline(fetchCtx, kctx, ns, name)
 		return syncWaveTimelineMsg{info: info, err: err, token: token}
@@ -53,8 +53,8 @@ func (m Model) loadSyncWaveTimelineSkeleton(token uint64) tea.Cmd {
 	kctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
-	return m.trackBgTask(bgtasks.KindResourceList, "Sync wave skeleton: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
-		fetchCtx, cancel := context.WithTimeout(context.Background(), syncWaveTimelineSkeletonTimeout)
+	return m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindResourceList, "Sync wave skeleton: "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		fetchCtx, cancel := context.WithTimeout(ctx, syncWaveTimelineSkeletonTimeout)
 		defer cancel()
 		info, err := client.GetSyncWaveTimelineSkeleton(fetchCtx, kctx, ns, name)
 		return syncWaveTimelineMsg{info: info, err: err, token: token}

@@ -1,13 +1,139 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// dashboardSection enumerates the parallel fetches that compose the
+// cluster dashboard. Each section runs as a separate scheduled task so
+// foreground work can preempt mid-flight (Task 26 wires the fan-out).
+type dashboardSection int
+
+const (
+	dashboardSectionNodes dashboardSection = iota
+	dashboardSectionPods
+	dashboardSectionNamespaces
+	dashboardSectionEvents
+	dashboardSectionPDB
+	dashboardSectionNodeMetrics
+)
+
+func (s dashboardSection) String() string {
+	switch s {
+	case dashboardSectionNodes:
+		return "nodes"
+	case dashboardSectionPods:
+		return "pods"
+	case dashboardSectionNamespaces:
+		return "namespaces"
+	case dashboardSectionEvents:
+		return "events"
+	case dashboardSectionPDB:
+		return "pdbs"
+	case dashboardSectionNodeMetrics:
+		return "metrics"
+	default:
+		return "unknown"
+	}
+}
+
+// fetchDashboardNodes fetches node items and counts ready nodes.
+func fetchDashboardNodes(ctx context.Context, kctx string, client *k8s.Client) dashboardData {
+	var data dashboardData
+	nodeItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
+		Kind: "Node", APIGroup: "", APIVersion: "v1", Resource: "nodes", Namespaced: false,
+	})
+	if err == nil {
+		data.nodeItems = nodeItems
+		data.nodeCount = len(nodeItems)
+		for _, n := range nodeItems {
+			if n.Status == "Ready" {
+				data.readyNodes++
+			}
+		}
+	}
+	return data
+}
+
+// fetchDashboardPods fetches pod items and tallies pod stats.
+func fetchDashboardPods(ctx context.Context, kctx string, client *k8s.Client) dashboardData {
+	var data dashboardData
+	podItems, err := client.GetResources(ctx, kctx, "", model.ResourceTypeEntry{
+		Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true,
+	})
+	if err == nil {
+		data.pods = countPodStats(podItems)
+	}
+	return data
+}
+
+// fetchDashboardNamespaces fetches the namespace count.
+func fetchDashboardNamespaces(ctx context.Context, kctx string, client *k8s.Client) dashboardData {
+	var data dashboardData
+	namespaces, _ := client.GetNamespaces(ctx, kctx)
+	data.nsCount = len(namespaces)
+	return data
+}
+
+// fetchDashboardEvents fetches warning events for the dashboard.
+func fetchDashboardEvents(ctx context.Context, kctx string, client *k8s.Client) dashboardData {
+	var data dashboardData
+	data.warningEvents, data.allWarnings = fetchWarningEvents(ctx, kctx, client)
+	return data
+}
+
+// fetchDashboardPDB fetches PodDisruptionBudget warnings.
+func fetchDashboardPDB(ctx context.Context, kctx string, client *k8s.Client) dashboardData {
+	var data dashboardData
+	data.pdbWarnings = fetchPDBWarnings(ctx, kctx, client)
+	return data
+}
+
+// fetchDashboardNodeMetrics fetches per-node resource usage metrics.
+func fetchDashboardNodeMetrics(ctx context.Context, kctx string, client *k8s.Client, nodeItems []model.Item) dashboardData {
+	var data dashboardData
+	data.nodes, data.totalCPUUsed, data.totalCPUAlloc, data.totalMemUsed, data.totalMemAlloc, data.nodeMetricsErr = fetchNodeMetrics(ctx, kctx, client, nodeItems)
+	return data
+}
+
+// mergeDashboardSection merges a per-section partial result into the
+// accumulator. Per-field assignment skips zero-values so a section
+// that hasn't arrived yet doesn't clobber another section's data.
+func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
+	if partial.nodeItems != nil {
+		acc.nodeItems = partial.nodeItems
+		acc.nodeCount = partial.nodeCount
+		acc.readyNodes = partial.readyNodes
+	}
+	if partial.pods.total > 0 {
+		acc.pods = partial.pods
+	}
+	if partial.nsCount > 0 {
+		acc.nsCount = partial.nsCount
+	}
+	if partial.warningEvents != nil || partial.allWarnings != nil {
+		acc.warningEvents = partial.warningEvents
+		acc.allWarnings = partial.allWarnings
+	}
+	if partial.pdbWarnings != nil {
+		acc.pdbWarnings = partial.pdbWarnings
+	}
+	if partial.nodes != nil || partial.nodeMetricsErr != nil {
+		acc.nodes = partial.nodes
+		acc.totalCPUUsed = partial.totalCPUUsed
+		acc.totalCPUAlloc = partial.totalCPUAlloc
+		acc.totalMemUsed = partial.totalMemUsed
+		acc.totalMemAlloc = partial.totalMemAlloc
+		acc.nodeMetricsErr = partial.nodeMetricsErr
+	}
+}
 
 // renderBar renders a horizontal bar graph like [████████░░░░░░░░] 52%.
 // The filled portion is colored based on usage percentage: green (<75%), orange (75-90%), red (>90%).

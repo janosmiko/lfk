@@ -23,7 +23,9 @@ import (
 // items first" cache read in update_navigation.go.
 func TestLoadResourcesMainPathDoesNotShortcutOnCache(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.cacheFingerprints = make(map[string]string)
 
 	cacheKey := m.nav.Context + "/pods"

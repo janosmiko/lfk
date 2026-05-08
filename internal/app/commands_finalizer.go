@@ -7,7 +7,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -33,7 +33,7 @@ func (m Model) searchFinalizers(pattern string) tea.Cmd {
 	}
 
 	return m.trackBgTask(
-		bgtasks.KindResourceList,
+		scheduler.KindResourceList,
 		"Search finalizers: "+pattern,
 		bgtaskTarget(kctx, ns),
 		func() tea.Msg {
@@ -63,7 +63,7 @@ func (m Model) bulkRemoveFinalizer() tea.Cmd {
 	}
 
 	return m.trackBgTask(
-		bgtasks.KindMutation,
+		scheduler.KindMutation,
 		fmt.Sprintf("Remove finalizers (%d)", len(targets)),
 		kctx,
 		func() tea.Msg {

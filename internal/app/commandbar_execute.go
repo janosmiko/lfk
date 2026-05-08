@@ -231,7 +231,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		m.creditsScroll = m.height
 		return m, scheduleCreditsScroll()
 
-	case "tasks":
+	case "scheduler":
 		m.overlay = overlayBackgroundTasks
 		// Always open fresh in running mode with scroll at the top.
 		// Tab inside the overlay switches to the completed-history view.

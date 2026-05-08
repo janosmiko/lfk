@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -10,7 +11,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -44,7 +45,7 @@ func truncateHelmOutput(out []byte) string {
 // kubeconfig files (~/.kube/config.d/).
 func (m Model) loadContexts() tea.Cmd {
 	return m.trackBgTask(
-		bgtasks.KindResourceList,
+		scheduler.KindResourceList,
 		"List contexts",
 		"",
 		func() tea.Msg {
@@ -61,7 +62,7 @@ func (m Model) loadContexts() tea.Cmd {
 // startup use the cheaper loadContexts.
 func (m Model) loadContextsReload() tea.Cmd {
 	return m.trackBgTask(
-		bgtasks.KindResourceList,
+		scheduler.KindResourceList,
 		"List contexts (reload)",
 		"",
 		func() tea.Msg {
@@ -104,17 +105,19 @@ func (m Model) loadResourceTypesFor(kctx string) tea.Cmd {
 }
 
 // discoverAPIResources launches async API resource discovery for the given
-// context via Client.DiscoverAPIResources. Uses context.Background() instead
-// of m.reqCtx because discovery should not be cancelled by navigation
-// actions (cancelAndReset). Results are delivered via apiResourceDiscoveryMsg.
+// context via Client.DiscoverAPIResources. Uses scheduler dispatch with
+// PriorityCritical so it has a reserved worker slot and a per-Kind timeout.
+// The scheduler-provided context replaces context.Background() for timeout
+// control. Results are delivered via apiResourceDiscoveryMsg.
 func (m Model) discoverAPIResources(contextName string) tea.Cmd {
 	client := m.client
-	return m.trackBgTask(
-		bgtasks.KindResourceList,
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindAPIDiscovery,
 		"Discover API resources",
 		contextName,
-		func() tea.Msg {
-			entries, err := client.DiscoverAPIResources(context.Background(), contextName)
+		func(ctx context.Context) tea.Msg {
+			entries, err := client.DiscoverAPIResources(ctx, contextName)
 			return apiResourceDiscoveryMsg{context: contextName, entries: entries, err: err}
 		},
 	)
@@ -123,12 +126,18 @@ func (m Model) discoverAPIResources(contextName string) tea.Cmd {
 // loadQuotas fetches ResourceQuota objects for the current namespace.
 func (m Model) loadQuotas() tea.Cmd {
 	client := m.client
-	ctx := m.nav.Context
+	kctx := m.nav.Context
 	ns := m.effectiveNamespace()
-	return func() tea.Msg {
-		quotas, err := client.GetNamespaceQuotas(context.Background(), ctx, ns)
-		return quotaLoadedMsg{quotas: quotas, err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindResourceList,
+		"Quotas",
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			quotas, err := client.GetNamespaceQuotas(ctx, kctx, ns)
+			return quotaLoadedMsg{quotas: quotas, err: err}
+		},
+	)
 }
 
 func (m Model) loadResources(forPreview bool) tea.Cmd {
@@ -137,7 +146,6 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 	rt := m.nav.ResourceType
 	gen := m.requestGen
 	silent := m.suppressBgtasks
-	reqCtx := m.reqCtx
 	if forPreview {
 		sel := m.selectedMiddleItem()
 		if sel == nil {
@@ -167,12 +175,14 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 			}
 		}
 	}
-	return m.trackBgTask(
-		bgtasks.KindResourceList,
+	client := m.client
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
 		"List "+model.DisplayNameFor(rt),
 		bgtaskTarget(kctx, ns),
-		func() tea.Msg {
-			items, err := m.client.GetResources(reqCtx, kctx, ns, rt)
+		func(ctx context.Context) tea.Msg {
+			items, err := client.GetResources(ctx, kctx, ns, rt)
 			return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
 		},
 	)
@@ -185,7 +195,7 @@ func (m Model) loadOwned(forPreview bool) tea.Cmd {
 	name := m.nav.ResourceName
 	gen := m.requestGen
 	silent := m.suppressBgtasks
-	reqCtx := m.reqCtx
+	client := m.client
 	if forPreview {
 		sel := m.selectedMiddleItem()
 		if sel == nil {
@@ -198,12 +208,13 @@ func (m Model) loadOwned(forPreview bool) tea.Cmd {
 	} else if ns == "" && m.nav.Namespace != "" {
 		ns = m.nav.Namespace
 	}
-	return m.trackBgTask(
-		bgtasks.KindResourceList,
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
 		"List "+kind+" children",
 		bgtaskTarget(kctx, ns),
-		func() tea.Msg {
-			items, err := m.client.GetOwnedResources(reqCtx, kctx, ns, kind, name)
+		func(ctx context.Context) tea.Msg {
+			items, err := client.GetOwnedResources(ctx, kctx, ns, kind, name)
 			return ownedLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
 		},
 	)
@@ -213,7 +224,6 @@ func (m Model) loadResourceTree() tea.Cmd {
 	kctx := m.nav.Context
 	ns := m.effectiveNamespace()
 	gen := m.requestGen
-	reqCtx := m.reqCtx
 
 	var kind, name string
 	switch m.nav.Level {
@@ -257,12 +267,13 @@ func (m Model) loadResourceTree() tea.Cmd {
 		return nil
 	}
 
-	return m.trackBgTask(
-		bgtasks.KindResourceTree,
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindResourceTree,
 		"Resource tree: "+kind+"/"+name,
 		bgtaskTarget(kctx, ns),
-		func() tea.Msg {
-			tree, err := m.client.GetResourceTree(reqCtx, kctx, ns, kind, name)
+		func(ctx context.Context) tea.Msg {
+			tree, err := m.client.GetResourceTree(ctx, kctx, ns, kind, name)
 			return resourceTreeLoadedMsg{tree: tree, err: err, gen: gen}
 		},
 	)
@@ -273,7 +284,7 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 	ns := m.effectiveNamespace()
 	gen := m.requestGen
 	silent := m.suppressBgtasks
-	reqCtx := m.reqCtx
+	client := m.client
 	if ns == "" && m.nav.Namespace != "" {
 		ns = m.nav.Namespace
 	}
@@ -292,12 +303,13 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 	if podName != "" {
 		taskTarget = taskTarget + " / " + podName
 	}
-	return m.trackBgTask(
-		bgtasks.KindContainers,
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindContainers,
 		"List containers",
 		taskTarget,
-		func() tea.Msg {
-			items, err := m.client.GetContainers(reqCtx, kctx, ns, podName)
+		func(ctx context.Context) tea.Msg {
+			items, err := client.GetContainers(ctx, kctx, ns, podName)
 			return containersLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
 		},
 	)
@@ -318,13 +330,18 @@ func (m Model) loadNamespacesSilent(silent bool) tea.Cmd {
 	if m.client == nil {
 		return nil
 	}
+	client := m.client
 	kctx := m.activeContext()
-	// Use an independent context so namespace loading is never blocked or
-	// cancelled by in-flight resource requests.
-	return func() tea.Msg {
-		items, err := m.client.GetNamespaces(context.Background(), kctx)
-		return namespacesLoadedMsg{context: kctx, items: items, err: err, silent: silent}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindNamespaceList,
+		"List namespaces",
+		kctx,
+		func(ctx context.Context) tea.Msg {
+			items, err := client.GetNamespaces(ctx, kctx)
+			return namespacesLoadedMsg{context: kctx, items: items, err: err, silent: silent}
+		},
+	)
 }
 
 // resolveOwnedResourceType determines the correct ResourceTypeEntry for an
@@ -378,7 +395,7 @@ func (m Model) resolveOwnedResourceType(sel *model.Item) (model.ResourceTypeEntr
 func (m Model) loadYAML() tea.Cmd {
 	kctx := m.nav.Context
 	ns := m.resolveNamespace()
-	reqCtx := m.reqCtx
+	client := m.client
 
 	switch m.nav.Level {
 	case model.LevelResources:
@@ -392,12 +409,13 @@ func (m Model) loadYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
-		return m.trackBgTask(
-			bgtasks.KindYAMLFetch,
+		return m.scheduleK8sCall(
+			scheduler.PriorityHigh,
+			scheduler.KindYAMLFetch,
 			"YAML: "+name,
 			bgtaskTarget(kctx, itemNs),
-			func() tea.Msg {
-				content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
+			func(ctx context.Context) tea.Msg {
+				content, err := client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
 				return buildYAMLLoadedMsg(content, err)
 			},
 		)
@@ -413,12 +431,13 @@ func (m Model) loadYAML() tea.Cmd {
 		}
 		taskTarget := bgtaskTarget(kctx, itemNs)
 		if sel.Kind == "Pod" {
-			return m.trackBgTask(
-				bgtasks.KindYAMLFetch,
+			return m.scheduleK8sCall(
+				scheduler.PriorityHigh,
+				scheduler.KindYAMLFetch,
 				"YAML: "+name,
 				taskTarget,
-				func() tea.Msg {
-					content, err := m.client.GetPodYAML(reqCtx, kctx, itemNs, name)
+				func(ctx context.Context) tea.Msg {
+					content, err := client.GetPodYAML(ctx, kctx, itemNs, name)
 					return buildYAMLLoadedMsg(content, err)
 				},
 			)
@@ -429,23 +448,25 @@ func (m Model) loadYAML() tea.Cmd {
 				return buildYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind))
 			}
 		}
-		return m.trackBgTask(
-			bgtasks.KindYAMLFetch,
+		return m.scheduleK8sCall(
+			scheduler.PriorityHigh,
+			scheduler.KindYAMLFetch,
 			"YAML: "+name,
 			taskTarget,
-			func() tea.Msg {
-				content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
+			func(ctx context.Context) tea.Msg {
+				content, err := client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
 				return buildYAMLLoadedMsg(content, err)
 			},
 		)
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
-		return m.trackBgTask(
-			bgtasks.KindYAMLFetch,
+		return m.scheduleK8sCall(
+			scheduler.PriorityHigh,
+			scheduler.KindYAMLFetch,
 			"YAML: "+podName,
 			bgtaskTarget(kctx, ns),
-			func() tea.Msg {
-				content, err := m.client.GetPodYAML(reqCtx, kctx, ns, podName)
+			func(ctx context.Context) tea.Msg {
+				content, err := client.GetPodYAML(ctx, kctx, ns, podName)
 				return buildYAMLLoadedMsg(content, err)
 			},
 		)
@@ -651,11 +672,11 @@ func bgtaskTarget(kctx, ns string) string {
 //
 // Pass a nil inner to skip tracking entirely (for loaders whose early
 // return paths don't dispatch any work).
-func (m Model) trackBgTask(kind bgtasks.Kind, name, target string, inner func() tea.Msg) tea.Cmd {
+func (m Model) trackBgTask(kind scheduler.Kind, name, target string, inner func() tea.Msg) tea.Cmd {
 	if inner == nil {
 		return nil
 	}
-	registry := m.bgtasks
+	registry := m.scheduler
 	var id uint64
 	if m.suppressBgtasks {
 		id = registry.StartUntracked()
@@ -665,5 +686,53 @@ func (m Model) trackBgTask(kind bgtasks.Kind, name, target string, inner func() 
 	return func() tea.Msg {
 		defer registry.Finish(id)
 		return inner()
+	}
+}
+
+// scheduleK8sCall queues a K8s call with the given priority via the
+// scheduler. Replaces trackBgTask for code paths that benefit from
+// priority-based dispatch and coalescing. trackBgTask remains for
+// non-K8s subprocess work (helm, trivy, kubectl describe).
+//
+// Submit is called synchronously (while Update is still building the Cmd
+// return value) so coalescing and preemption take effect immediately —
+// the same pattern trackBgTask uses for Start. The returned tea.Cmd
+// blocks (in its goroutine) on the Future until the scheduler delivers a
+// Result, then returns the Fn's tea.Msg or nil for ErrCoalesced /
+// ErrContextSwitched.
+func (m Model) scheduleK8sCall(prio scheduler.Priority, kind scheduler.Kind, name, target string, fn func(ctx context.Context) tea.Msg) tea.Cmd { //nolint:unparam // prio will receive varying priorities once call sites migrate from trackBgTask in subsequent tasks
+	if fn == nil {
+		return nil
+	}
+	future := m.scheduler.Submit(scheduler.SubmitReq{
+		KubeContext: m.nav.Context,
+		Kind:        kind,
+		Priority:    prio,
+		Name:        name,
+		Target:      target,
+		Gen:         m.requestGen,
+		SilentTrack: m.suppressBgtasks,
+		Fn: func(ctx context.Context) (any, error) {
+			return fn(ctx), nil
+		},
+	})
+	return func() tea.Msg {
+		res := <-future
+		if errors.Is(res.Err, scheduler.ErrCoalesced) || errors.Is(res.Err, scheduler.ErrContextSwitched) {
+			return nil
+		}
+		// Today the inner Fn wrapper above always passes nil as the
+		// scheduler-side error (K8s/timeout errors travel inside the
+		// returned tea.Msg's own err field). If a future change starts
+		// surfacing errors via res.Err, log them so they don't vanish
+		// silently — the typed-msg path is still the primary signal,
+		// but this defends against a regression.
+		if res.Err != nil {
+			logger.Info("scheduleK8sCall: unexpected non-sentinel err", "kind", kind.String(), "name", name, "err", res.Err.Error())
+		}
+		if msg, ok := res.Value.(tea.Msg); ok {
+			return msg
+		}
+		return nil
 	}
 }

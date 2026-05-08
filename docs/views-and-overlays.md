@@ -143,7 +143,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayCanI`            | `U` → can-i flow (after subject) | Display can-i evaluation results.                               |
 | `overlayAutoSync`        | ArgoCD app                      | Toggle auto-sync settings.                                      |
 | `overlaySyncWave`        | action menu → `W` on Application | Per-Application ArgoCD sync wave timeline.                      |
-| `overlayBackgroundTasks` | `` ` ``, `:tasks`               | In-flight + recent background tasks.                            |
+| `overlayBackgroundTasks` | `` ` ``, `:scheduler`           | In-flight + recent background tasks.                            |
 | `overlayOrphans`         | `Shift+O`, `:orphans`           | Cluster-wide orphan resource overview.                          |
 | `overlayLocalClusters`   | `Ctrl+N` at LevelClusters       | Manage kind/k3d/minikube clusters.                              |
 | `overlayTrafficCapture`  | action menu → `c` on Pod / Service | Live packet capture (kubectl-debug, kubeshark).                |

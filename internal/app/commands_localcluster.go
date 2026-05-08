@@ -14,7 +14,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s/localcluster"
 )
 
@@ -107,10 +107,10 @@ func detectLocalClustersCmd(gen uint64, provs []localcluster.Provider) tea.Cmd {
 // On completion the bgtask is finished and the resulting message lands
 // in updateLocalClusterCreated.
 func (m Model) dispatchCreateLocalCluster(p localcluster.Provider, spec localcluster.CreateSpec) tea.Cmd {
-	registry := m.bgtasks
+	registry := m.scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	id := registry.StartCancellable(
-		bgtasks.KindMutation,
+		scheduler.KindMutation,
 		fmt.Sprintf("Create %s/%s", p.Name(), spec.Name),
 		"",
 		cancel,
@@ -124,10 +124,10 @@ func (m Model) dispatchCreateLocalCluster(p localcluster.Provider, spec localclu
 // one registers a cancellable bgtask so the user can hit Ctrl+C to
 // abort a wedged op the same way other mutations are cancelled.
 func (m Model) dispatchStartLocalCluster(p localcluster.LifecycleProvider, name string) tea.Cmd {
-	registry := m.bgtasks
+	registry := m.scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	id := registry.StartCancellable(
-		bgtasks.KindMutation,
+		scheduler.KindMutation,
 		fmt.Sprintf("Start %s/%s", p.Name(), name),
 		"",
 		cancel,
@@ -137,10 +137,10 @@ func (m Model) dispatchStartLocalCluster(p localcluster.LifecycleProvider, name 
 }
 
 func (m Model) dispatchStopLocalCluster(p localcluster.LifecycleProvider, name string) tea.Cmd {
-	registry := m.bgtasks
+	registry := m.scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	id := registry.StartCancellable(
-		bgtasks.KindMutation,
+		scheduler.KindMutation,
 		fmt.Sprintf("Stop %s/%s", p.Name(), name),
 		"",
 		cancel,
@@ -150,10 +150,10 @@ func (m Model) dispatchStopLocalCluster(p localcluster.LifecycleProvider, name s
 }
 
 func (m Model) dispatchDeleteLocalCluster(p localcluster.Provider, name string) tea.Cmd {
-	registry := m.bgtasks
+	registry := m.scheduler
 	ctx, cancel := context.WithCancel(context.Background())
 	id := registry.StartCancellable(
-		bgtasks.KindMutation,
+		scheduler.KindMutation,
 		fmt.Sprintf("Delete %s/%s", p.Name(), name),
 		"",
 		cancel,
@@ -167,7 +167,7 @@ func (m Model) dispatchDeleteLocalCluster(p localcluster.Provider, name string) 
 // surfaces in the title-bar indicator like every other resource list.
 func (m Model) dispatchDetectLocalClusters(gen uint64, provs []localcluster.Provider) tea.Cmd {
 	return m.trackBgTask(
-		bgtasks.KindResourceList,
+		scheduler.KindResourceList,
 		"Detect local clusters",
 		"",
 		detectLocalClustersCmd(gen, provs),
@@ -177,7 +177,7 @@ func (m Model) dispatchDetectLocalClusters(gen uint64, provs []localcluster.Prov
 // wrapWithFinish takes a cmd that will produce a Msg, and returns a
 // new cmd that finishes the bgtask before the message is delivered.
 // Defer ensures Finish runs even if the inner cmd panics.
-func wrapWithFinish(registry *bgtasks.Registry, id uint64, inner tea.Cmd) tea.Cmd {
+func wrapWithFinish(registry *scheduler.Registry, id uint64, inner tea.Cmd) tea.Cmd {
 	return func() tea.Msg {
 		defer registry.Finish(id)
 		if inner == nil {

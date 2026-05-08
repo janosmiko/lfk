@@ -8,7 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/textinput"
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -66,6 +66,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		selectedItems:              make(map[string]bool),
 		selectionAnchor:            -1,
 		yamlCollapsed:              make(map[string]bool),
+		dashboardAcc:               make(map[string]*dashboardAccumulator),
 		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
 		discoveringContexts:        make(map[string]bool),
 		secretPreviewCache:         make(map[string]*model.SecretData),
@@ -79,7 +80,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		warningEventsOnly:          true,
 		eventGrouping:              true,
 		logPreviewVisible:          true,
-		bgtasks:                    bgtasks.New(bgtasks.DefaultThreshold),
+		scheduler:                  scheduler.New(scheduler.DefaultThreshold),
 		diffLineNumbers:            true,
 		reqCtx:                     reqCtx,
 		reqCancel:                  reqCancel,
@@ -149,6 +150,8 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	m.helpSearchInput = textinput.New()
 	m.helpSearchInput.Prompt = ""
 	m.helpSearchInput.CharLimit = 100
+
+	m.scheduler.StartWorkers()
 
 	return m
 }

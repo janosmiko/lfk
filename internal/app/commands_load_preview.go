@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -198,19 +198,19 @@ func (m Model) loadPreviewOwned(sel *model.Item) tea.Cmd {
 	if sel.Namespace != "" {
 		ns = sel.Namespace
 	}
-	reqCtx := m.reqCtx
 	rt, ok := m.resolveOwnedResourceType(sel)
 	if !ok {
 		return func() tea.Msg {
 			return buildYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind))
 		}
 	}
-	return m.trackBgTask(
-		bgtasks.KindYAMLFetch,
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindYAMLFetch,
 		"YAML: "+name,
 		bgtaskTarget(kctx, ns),
-		func() tea.Msg {
-			content, err := m.client.GetResourceYAML(reqCtx, kctx, ns, rt, name)
+		func(ctx context.Context) tea.Msg {
+			content, err := m.client.GetResourceYAML(ctx, kctx, ns, rt, name)
 			return buildYAMLLoadedMsg(content, err)
 		},
 	)
@@ -226,7 +226,6 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 	kctx := m.nav.Context
 	ns := m.resolveNamespace()
 	gen := m.requestGen
-	reqCtx := m.reqCtx
 
 	switch m.nav.Level {
 	case model.LevelResources:
@@ -236,12 +235,14 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
-		return m.trackBgTask(
-			bgtasks.KindYAMLFetch,
+		client := m.client
+		return m.scheduleK8sCall(
+			scheduler.PriorityHigh,
+			scheduler.KindYAMLFetch,
 			"Preview YAML: "+name,
 			bgtaskTarget(kctx, itemNs),
-			func() tea.Msg {
-				content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
+			func(ctx context.Context) tea.Msg {
+				content, err := client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
 				return buildPreviewYAMLLoadedMsg(content, err, gen)
 			},
 		)
@@ -252,13 +253,15 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 			itemNs = sel.Namespace
 		}
 		taskTarget := bgtaskTarget(kctx, itemNs)
+		client := m.client
 		if sel.Kind == "Pod" {
-			return m.trackBgTask(
-				bgtasks.KindYAMLFetch,
+			return m.scheduleK8sCall(
+				scheduler.PriorityHigh,
+				scheduler.KindYAMLFetch,
 				"Preview YAML: "+name,
 				taskTarget,
-				func() tea.Msg {
-					content, err := m.client.GetPodYAML(reqCtx, kctx, itemNs, name)
+				func(ctx context.Context) tea.Msg {
+					content, err := client.GetPodYAML(ctx, kctx, itemNs, name)
 					return buildPreviewYAMLLoadedMsg(content, err, gen)
 				},
 			)
@@ -269,12 +272,13 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 				return buildPreviewYAMLLoadedMsg("", fmt.Errorf("unknown resource type: %s", sel.Kind), gen)
 			}
 		}
-		return m.trackBgTask(
-			bgtasks.KindYAMLFetch,
+		return m.scheduleK8sCall(
+			scheduler.PriorityHigh,
+			scheduler.KindYAMLFetch,
 			"Preview YAML: "+name,
 			taskTarget,
-			func() tea.Msg {
-				content, err := m.client.GetResourceYAML(reqCtx, kctx, itemNs, rt, name)
+			func(ctx context.Context) tea.Msg {
+				content, err := client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
 				return buildPreviewYAMLLoadedMsg(content, err, gen)
 			},
 		)
@@ -289,20 +293,33 @@ func (m Model) loadEventTimeline() tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
-	return m.trackBgTask(bgtasks.KindResourceList, "Event timeline: "+kind+"/"+name, bgtaskTarget(ctx, ns), func() tea.Msg {
-		events, err := client.GetResourceEvents(context.Background(), ctx, ns, name, kind)
-		return eventTimelineMsg{events: events, err: err}
-	})
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Event timeline: "+kind+"/"+name,
+		bgtaskTarget(ctx, ns),
+		func(sctx context.Context) tea.Msg {
+			events, err := client.GetResourceEvents(sctx, ctx, ns, name, kind)
+			return eventTimelineMsg{events: events, err: err}
+		},
+	)
 }
 
 func (m Model) checkRBAC() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	rt := m.actionCtx.resourceType
-	return m.trackBgTask(bgtasks.KindResourceList, "RBAC check: "+rt.Kind, bgtaskTarget(ctx, ns), func() tea.Msg {
-		results, err := m.client.CheckRBAC(context.Background(), ctx, ns, rt.APIGroup, rt.Resource)
-		return rbacCheckMsg{results: results, kind: rt.Kind, resource: rt.Resource, err: err}
-	})
+	client := m.client
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindRBACCheck,
+		"RBAC check: "+rt.Kind,
+		bgtaskTarget(ctx, ns),
+		func(sctx context.Context) tea.Msg {
+			results, err := client.CheckRBAC(sctx, ctx, ns, rt.APIGroup, rt.Resource)
+			return rbacCheckMsg{results: results, kind: rt.Kind, resource: rt.Resource, err: err}
+		},
+	)
 }
 
 func (m Model) loadCanIRules() tea.Cmd {
@@ -317,27 +334,45 @@ func (m Model) loadCanIRules() tea.Cmd {
 	// When checking a specific SA, discover all namespaces where it has
 	// RoleBindings and query permissions across all of them.
 	if subject != "" && strings.HasPrefix(subject, "system:serviceaccount:") {
-		return m.trackBgTask(bgtasks.KindResourceList, "CanI rules: "+subject, ctx, func() tea.Msg {
-			rules, namespaces, err := client.GetSelfRulesMultiNS(context.Background(), ctx, subject)
-			return canILoadedMsg{rules: rules, namespaces: namespaces, err: err}
-		})
+		return m.scheduleK8sCall(
+			scheduler.PriorityCritical,
+			scheduler.KindRBACCheck,
+			"CanI rules: "+subject,
+			ctx,
+			func(sctx context.Context) tea.Msg {
+				rules, namespaces, err := client.GetSelfRulesMultiNS(sctx, ctx, subject)
+				return canILoadedMsg{rules: rules, namespaces: namespaces, err: err}
+			},
+		)
 	}
 
 	// User or Group impersonation: query in the current namespace.
 	// GetSelfRulesAs handles the "group:" prefix internally.
 	if subject != "" {
 		viewNS := ns
-		return m.trackBgTask(bgtasks.KindResourceList, "CanI rules: "+subject, bgtaskTarget(ctx, viewNS), func() tea.Msg {
-			rules, err := client.GetSelfRulesAs(context.Background(), ctx, viewNS, subject)
-			return canILoadedMsg{rules: rules, namespaces: []string{viewNS}, err: err}
-		})
+		return m.scheduleK8sCall(
+			scheduler.PriorityCritical,
+			scheduler.KindRBACCheck,
+			"CanI rules: "+subject,
+			bgtaskTarget(ctx, viewNS),
+			func(sctx context.Context) tea.Msg {
+				rules, err := client.GetSelfRulesAs(sctx, ctx, viewNS, subject)
+				return canILoadedMsg{rules: rules, namespaces: []string{viewNS}, err: err}
+			},
+		)
 	}
 
 	// Current user: use the active namespace only.
-	return m.trackBgTask(bgtasks.KindResourceList, "CanI rules (current user)", bgtaskTarget(ctx, ns), func() tea.Msg {
-		rules, err := client.GetSelfRulesAs(context.Background(), ctx, ns, "")
-		return canILoadedMsg{rules: rules, namespaces: []string{ns}, err: err}
-	})
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindRBACCheck,
+		"CanI rules (current user)",
+		bgtaskTarget(ctx, ns),
+		func(sctx context.Context) tea.Msg {
+			rules, err := client.GetSelfRulesAs(sctx, ctx, ns, "")
+			return canILoadedMsg{rules: rules, namespaces: []string{ns}, err: err}
+		},
+	)
 }
 
 func (m Model) loadCanISAList() tea.Cmd {
@@ -346,14 +381,20 @@ func (m Model) loadCanISAList() tea.Cmd {
 	// Always list SAs across all namespaces so the user can check
 	// permissions for any service account regardless of the current view.
 	// Also discover Users and Groups from RBAC bindings.
-	return m.trackBgTask(bgtasks.KindResourceList, "List service accounts", ctx, func() tea.Msg {
-		accounts, err := client.ListServiceAccounts(context.Background(), ctx, "")
-		if err != nil {
-			return canISAListMsg{err: err}
-		}
-		subjects, _ := client.ListRBACSubjects(context.Background(), ctx)
-		return canISAListMsg{accounts: accounts, subjects: subjects}
-	})
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindRBACCheck,
+		"List service accounts",
+		ctx,
+		func(sctx context.Context) tea.Msg {
+			accounts, err := client.ListServiceAccounts(sctx, ctx, "")
+			if err != nil {
+				return canISAListMsg{err: err}
+			}
+			subjects, _ := client.ListRBACSubjects(sctx, ctx)
+			return canISAListMsg{accounts: accounts, subjects: subjects}
+		},
+	)
 }
 
 func (m Model) loadPodStartup() tea.Cmd {
@@ -361,10 +402,16 @@ func (m Model) loadPodStartup() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
-	return m.trackBgTask(bgtasks.KindResourceList, "Pod startup analysis: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
-		info, err := client.GetPodStartupAnalysis(context.Background(), ctx, ns, name)
-		return podStartupMsg{info: info, err: err}
-	})
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Pod startup analysis: "+name,
+		bgtaskTarget(ctx, ns),
+		func(sctx context.Context) tea.Msg {
+			info, err := client.GetPodStartupAnalysis(sctx, ctx, ns, name)
+			return podStartupMsg{info: info, err: err}
+		},
+	)
 }
 
 func (m Model) loadAlerts() tea.Cmd {
@@ -372,8 +419,8 @@ func (m Model) loadAlerts() tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
-	return m.trackBgTask(bgtasks.KindDashboard, "Alerts: "+kind+"/"+name, bgtaskTarget(kubeCtx, ns), func() tea.Msg {
-		alerts, err := m.client.GetActiveAlerts(context.Background(), kubeCtx, ns, name, kind)
+	return m.scheduleK8sCall(scheduler.PriorityLow, scheduler.KindDashboard, "Alerts: "+kind+"/"+name, bgtaskTarget(kubeCtx, ns), func(ctx context.Context) tea.Msg {
+		alerts, err := m.client.GetActiveAlerts(ctx, kubeCtx, ns, name, kind)
 		return alertsLoadedMsg{alerts: alerts, err: err}
 	})
 }
@@ -384,10 +431,16 @@ func (m Model) loadNetworkPolicy() tea.Cmd {
 	kctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
-	return m.trackBgTask(bgtasks.KindResourceList, "NetworkPolicy: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
-		info, err := client.GetNetworkPolicyInfo(context.Background(), kctx, ns, name)
-		return netpolLoadedMsg{info: info, err: err}
-	})
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"NetworkPolicy: "+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			info, err := client.GetNetworkPolicyInfo(ctx, kctx, ns, name)
+			return netpolLoadedMsg{info: info, err: err}
+		},
+	)
 }
 
 // loadHelmValues runs `helm get values` and returns the output as a message.
@@ -414,7 +467,7 @@ func (m Model) loadHelmValues(allValues bool) tea.Cmd {
 
 	title := fmt.Sprintf("Helm %s: %s", titleSuffix, name)
 
-	return m.trackBgTask(bgtasks.KindSubprocess, title, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, title, bgtaskTarget(ctx, ns), func() tea.Msg {
 		cmd := exec.Command(helmPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running helm command", cmd)
@@ -447,20 +500,20 @@ func (m Model) loadContainerPorts() tea.Cmd {
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
 
-	return m.trackBgTask(bgtasks.KindContainers, "List ports: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindContainers, "List ports: "+kind+"/"+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
 		var ports []k8s.ContainerPort
 		var err error
 		switch kind {
 		case "Pod":
-			ports, err = client.GetContainerPorts(context.Background(), kctx, ns, name)
+			ports, err = client.GetContainerPorts(ctx, kctx, ns, name)
 		case "Service":
-			ports, err = client.GetServicePorts(context.Background(), kctx, ns, name)
+			ports, err = client.GetServicePorts(ctx, kctx, ns, name)
 		case "Deployment":
-			ports, err = client.GetDeploymentPorts(context.Background(), kctx, ns, name)
+			ports, err = client.GetDeploymentPorts(ctx, kctx, ns, name)
 		case "StatefulSet":
-			ports, err = client.GetStatefulSetPorts(context.Background(), kctx, ns, name)
+			ports, err = client.GetStatefulSetPorts(ctx, kctx, ns, name)
 		case "DaemonSet":
-			ports, err = client.GetDaemonSetPorts(context.Background(), kctx, ns, name)
+			ports, err = client.GetDaemonSetPorts(ctx, kctx, ns, name)
 		default:
 			err = fmt.Errorf("unsupported kind for port discovery: %s", kind)
 		}
@@ -513,14 +566,15 @@ func (m Model) loadPreviewServiceEndpoints() tea.Cmd {
 	}
 	name := sel.Name
 	gen := m.requestGen
-	reqCtx := m.reqCtx
+	client := m.client
 
-	fetch := m.trackBgTask(
-		bgtasks.KindResourceList,
+	fetch := m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
 		"Service endpoints: "+name,
 		bgtaskTarget(kctx, ns),
-		func() tea.Msg {
-			data, err := m.client.GetServiceEndpoints(reqCtx, kctx, ns, name)
+		func(ctx context.Context) tea.Msg {
+			data, err := client.GetServiceEndpoints(ctx, kctx, ns, name)
 			return previewServiceEndpointsLoadedMsg{
 				gen:  gen,
 				ctx:  kctx,
@@ -642,13 +696,14 @@ func (m Model) loadPreviewSecretData() tea.Cmd {
 	}
 
 	// Cache miss: fetch in the background.
-	reqCtx := m.reqCtx
-	return m.trackBgTask(
-		bgtasks.KindResourceList,
+	client := m.client
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
 		"Secret data: "+name,
 		bgtaskTarget(kctx, ns),
-		func() tea.Msg {
-			data, err := m.client.GetSecretData(reqCtx, kctx, ns, name)
+		func(ctx context.Context) tea.Msg {
+			data, err := client.GetSecretData(ctx, kctx, ns, name)
 			return previewSecretDataLoadedMsg{
 				gen:  gen,
 				ctx:  kctx,

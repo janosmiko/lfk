@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/bubbles/textinput"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/require"
@@ -175,7 +176,20 @@ func baseModelCov() Model {
 		width:                      80,
 		height:                     40,
 		execMu:                     &sync.Mutex{},
+		scheduler:                  scheduler.New(0),
 	}
+}
+
+// baseModelWithFakeClientAndScheduler returns a Model wired to fake k8s clients
+// with a scheduler that has workers started. Workers are stopped at test cleanup.
+// Use this instead of baseModelWithFakeClient for tests that execute scheduler-
+// routed commands (e.g. loadNamespaces after migration).
+func baseModelWithFakeClientAndScheduler(t *testing.T, objs ...runtime.Object) Model {
+	t.Helper()
+	m := baseModelWithFakeClient(objs...)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
+	return m
 }
 
 func baseModelDescribe() Model {

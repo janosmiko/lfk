@@ -11,7 +11,7 @@ import (
 	dynfake "k8s.io/client-go/dynamic/fake"
 	clientfake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -36,7 +36,7 @@ func TestPostTabSwitch_RefreshesMiddleColumnAtLevelResources(t *testing.T) {
 	}
 	dyn := dynfake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrs)
 
-	m := newTabSwitchTestModel(model.LevelResources)
+	m := newTabSwitchTestModel(t, model.LevelResources)
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
 	m.client = k8s.NewTestClient(clientfake.NewClientset(), dyn)
 
@@ -66,7 +66,7 @@ func TestPostTabSwitch_RefreshesAtLevelOwned(t *testing.T) {
 	}
 	dyn := dynfake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrs)
 
-	m := newTabSwitchTestModel(model.LevelOwned)
+	m := newTabSwitchTestModel(t, model.LevelOwned)
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment", Resource: "deployments", APIVersion: "apps/v1", Namespaced: true}
 	m.nav.ResourceName = "my-deploy"
 	m.client = k8s.NewTestClient(clientfake.NewClientset(), dyn)
@@ -92,7 +92,7 @@ func TestPostTabSwitch_RefreshesAtLevelOwned(t *testing.T) {
 func TestPostTabSwitch_RefreshesAtLevelContainers(t *testing.T) {
 	t.Parallel()
 
-	m := newTabSwitchTestModel(model.LevelContainers)
+	m := newTabSwitchTestModel(t, model.LevelContainers)
 	m.nav.OwnedName = "my-pod"
 	m.client = k8s.NewTestClient(clientfake.NewClientset(), nil)
 
@@ -117,7 +117,7 @@ func TestPostTabSwitch_RefreshesAtLevelContainers(t *testing.T) {
 func TestPostTabSwitch_DoesNotRefreshAtLevelClusters(t *testing.T) {
 	t.Parallel()
 
-	m := newTabSwitchTestModel(model.LevelClusters)
+	m := newTabSwitchTestModel(t, model.LevelClusters)
 	m.client = k8s.NewTestClient(clientfake.NewClientset(), nil)
 
 	cmd := m.postTabSwitchCmd()
@@ -139,8 +139,12 @@ func TestPostTabSwitch_DoesNotRefreshAtLevelClusters(t *testing.T) {
 // Empty middleItems means loadPreview's selection-gated sub-cmds short-
 // circuit, so each test can focus on whether the refresh-on-switch was
 // added without false signals from preview fetches.
-func newTabSwitchTestModel(level model.Level) Model {
-	return Model{
+//
+// Workers are started so scheduleK8sCall futures resolve; t.Cleanup
+// registers StopWorkers so workers exit when the test ends.
+func newTabSwitchTestModel(t *testing.T, level model.Level) Model {
+	t.Helper()
+	m := Model{
 		nav: model.NavigationState{
 			Level:   level,
 			Context: "test-ctx",
@@ -153,8 +157,11 @@ func newTabSwitchTestModel(level model.Level) Model {
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
-		bgtasks:             bgtasks.New(0),
+		scheduler:           scheduler.New(0),
 		reqCtx:              context.Background(),
 		mode:                modeExplorer,
 	}
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
+	return m
 }

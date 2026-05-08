@@ -40,7 +40,7 @@ var builtinCommands = map[string]string{
 	"nyan":      "nyan",
 	"kubetris":  "kubetris",
 	"credits":   "credits",
-	"tasks":     "tasks",
+	"scheduler": "scheduler",
 	"errors":    "errors",
 	"warnings":  "errors",
 	"bookmarks": "bookmarks",

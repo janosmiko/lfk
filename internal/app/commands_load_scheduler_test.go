@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	clientfake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -17,7 +17,11 @@ import (
 // against a fake K8s client whose dynamic side knows about the Pod GVR.
 // Shared by both registry integration tests to keep them focused on the
 // bgtasks instrumentation assertions.
-func newLoadResourcesTestModel() Model {
+//
+// Workers are NOT started. Call m.scheduler.StartWorkers() + t.Cleanup
+// if the test needs to execute cmd() (i.e., waits for a result).
+func newLoadResourcesTestModel(t *testing.T) Model {
+	t.Helper()
 	m := Model{
 		nav: model.NavigationState{
 			Level:        model.LevelResources,
@@ -31,7 +35,7 @@ func newLoadResourcesTestModel() Model {
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
-		bgtasks:             bgtasks.New(0),
+		scheduler:           scheduler.New(0),
 		reqCtx:              context.Background(),
 	}
 	m.client = k8s.NewTestClient(clientfake.NewClientset(), newFinalDynClient())
@@ -49,7 +53,9 @@ func newLoadResourcesTestModel() Model {
 // seconds.
 func TestLoadResourcesCapturesSilentFromSuppressFlag(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.suppressBgtasks = true
 
 	cmd := m.loadResources(false)
@@ -65,7 +71,9 @@ func TestLoadResourcesCapturesSilentFromSuppressFlag(t *testing.T) {
 // cmds run visible.
 func TestLoadResourcesSilentDefaultsFalse(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	// suppressBgtasks is false by default
 
 	cmd := m.loadResources(false)
@@ -83,7 +91,7 @@ func TestLoadResourcesSilentDefaultsFalse(t *testing.T) {
 // indicator never appears for the user action.
 func TestSuppressBgtasksFlagDoesNotLeakAfterWatchTick(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
 	m.watchMode = true
 	// Precondition: the flag starts cleared.
 	assert.False(t, m.suppressBgtasks)
@@ -97,36 +105,34 @@ func TestSuppressBgtasksFlagDoesNotLeakAfterWatchTick(t *testing.T) {
 }
 
 // TestLoadResourcesRegistersTaskSynchronously verifies that loadResources
-// calls Registry.Start SYNCHRONOUSLY at cmd-construction time (while
-// Update is still building its return value), not later from inside the
-// goroutine that runs the tea.Cmd closure.
+// calls Submit SYNCHRONOUSLY at cmd-construction time (while Update is
+// still building its return value), not later from inside the goroutine
+// that runs the tea.Cmd closure.
 //
 // This is load-bearing for the title-bar indicator: bubbletea renders
-// View() between Update() and goroutine dispatch, so if Start ran inside
+// View() between Update() and goroutine dispatch, so if Submit ran inside
 // the closure the render frame would miss the task entirely and fast
 // loads (typical k8s API calls at <100ms) would never flash through
 // the indicator.
 func TestLoadResourcesRegistersTaskSynchronously(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
+	// Workers stopped: the task remains queued so we can observe it
+	// synchronously without racing the dispatcher.
+	m.scheduler.StopWorkers()
 
-	before := m.bgtasks.NextIDForTest()
+	assert.Equal(t, 0, m.scheduler.QueueLen(m.nav.Context),
+		"queue must be empty before loadResources is called")
+
 	cmd := m.loadResources(false)
 	if cmd == nil {
 		t.Fatal("loadResources returned nil cmd")
 	}
-	// At THIS point — before executing the cmd — the registry must
-	// already have the task, because trackBgTask calls Start
-	// synchronously while building the Cmd.
-	afterConstruction := m.bgtasks.NextIDForTest()
-	assert.Greater(t, afterConstruction, before,
-		"trackBgTask must call Registry.Start synchronously at cmd "+
-			"construction, not inside the deferred closure, so View() "+
-			"sees the task before the goroutine runs")
-
-	// After the cmd runs, the registry should return to its starting
-	// state thanks to the deferred Finish inside the closure.
-	_ = cmd()
-	assert.Equal(t, 0, m.bgtasks.Len(),
-		"loadResources must Finish its registered task after completion")
+	// At THIS point — before the cmd goroutine runs — the task must
+	// already be in the scheduler queue because scheduleK8sCall calls
+	// Submit synchronously while building the Cmd.
+	assert.Equal(t, 1, m.scheduler.QueueLen(m.nav.Context),
+		"scheduleK8sCall must Submit synchronously at cmd construction, "+
+			"not inside the deferred closure, so View() sees the task "+
+			"before the goroutine runs")
 }

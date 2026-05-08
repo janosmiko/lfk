@@ -5,9 +5,35 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// nonSilentTasks filters out scheduler.Task entries flagged Silent
+// (watch-mode auto-refresh) so the title-bar indicator doesn't
+// flicker every second on watch-mode. Silent tasks remain in
+// Snapshot so the :scheduler overlay still shows them — only the
+// title-bar consumer drops them.
+func nonSilentTasks(snap []scheduler.Task) []scheduler.Task {
+	if len(snap) == 0 {
+		return snap
+	}
+	// Allocate a fresh slice so we don't compact the caller's backing
+	// array — Snapshot returns a freshly-allocated slice today, but a
+	// future caller that shares it across consumers must not see silent
+	// rows mutated out from under them.
+	out := make([]scheduler.Task, 0, len(snap))
+	for _, t := range snap {
+		if t.Silent {
+			continue
+		}
+		out = append(out, t)
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
 
 // renderTasksIndicator returns the styled string that lives in the title
 // bar between the gap filler and the namespace badge. Empty string when
@@ -19,12 +45,12 @@ import (
 // frame is passed in by the caller (typically m.spinner.View()), so the
 // indicator animates at whatever cadence the caller's spinner is
 // already running.
-func renderTasksIndicator(spinnerFrame string, snapshot []bgtasks.Task) string {
+func renderTasksIndicator(spinnerFrame string, snapshot []scheduler.Task) string {
 	// Count tasks that are NOT already shown by renderMutationProgress
 	// (mutation tasks with Total > 0 get their own progress indicator).
 	n := 0
 	for _, t := range snapshot {
-		if t.Kind == bgtasks.KindMutation && t.Total > 0 {
+		if t.Kind == scheduler.KindMutation && t.Total > 0 {
 			continue
 		}
 		n++
@@ -43,9 +69,9 @@ func renderTasksIndicator(spinnerFrame string, snapshot []bgtasks.Task) string {
 // When multiple mutation tasks run concurrently, only the first one with
 // progress is shown (bulk operations are typically serial).
 // Returns empty string when no mutation task has progress.
-func renderMutationProgress(spinnerFrame string, snapshot []bgtasks.Task) string {
+func renderMutationProgress(spinnerFrame string, snapshot []scheduler.Task) string {
 	for _, t := range snapshot {
-		if t.Kind != bgtasks.KindMutation || t.Total == 0 {
+		if t.Kind != scheduler.KindMutation || t.Total == 0 {
 			continue
 		}
 		label := shortMutationLabel(t.Name)
@@ -60,10 +86,10 @@ func renderMutationProgress(spinnerFrame string, snapshot []bgtasks.Task) string
 // when a cluster colour tint is active, so the background of the
 // indicator matches the rest of the bar instead of leaking the default
 // barBg through.
-func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []bgtasks.Task, bg lipgloss.TerminalColor) string {
+func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []scheduler.Task, bg lipgloss.TerminalColor) string {
 	n := 0
 	for _, t := range snapshot {
-		if t.Kind == bgtasks.KindMutation && t.Total > 0 {
+		if t.Kind == scheduler.KindMutation && t.Total > 0 {
 			continue
 		}
 		n++
@@ -76,9 +102,9 @@ func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []bgtasks.Task
 
 // renderMutationProgressOverrideBg is renderMutationProgress with the
 // background colour swapped to bg. See renderTasksIndicatorOverrideBg.
-func renderMutationProgressOverrideBg(spinnerFrame string, snapshot []bgtasks.Task, bg lipgloss.TerminalColor) string {
+func renderMutationProgressOverrideBg(spinnerFrame string, snapshot []scheduler.Task, bg lipgloss.TerminalColor) string {
 	for _, t := range snapshot {
-		if t.Kind != bgtasks.KindMutation || t.Total == 0 {
+		if t.Kind != scheduler.KindMutation || t.Total == 0 {
 			continue
 		}
 		label := shortMutationLabel(t.Name)

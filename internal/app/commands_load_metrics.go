@@ -4,7 +4,7 @@ import (
 	"context"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -22,7 +22,6 @@ func (m Model) loadMetrics() tea.Cmd {
 	}
 	gen := m.requestGen
 	client := m.client
-	reqCtx := m.reqCtx
 
 	kind := m.nav.ResourceType.Kind
 	if m.nav.Level == model.LevelOwned {
@@ -32,16 +31,17 @@ func (m Model) loadMetrics() tea.Cmd {
 	switch kind {
 	case "Pod":
 		podName := sel.Name
-		return m.trackBgTask(
-			bgtasks.KindMetrics,
+		return m.scheduleK8sCall(
+			scheduler.PriorityLow,
+			scheduler.KindMetrics,
 			"Metrics: Pod/"+podName,
 			bgtaskTarget(kctx, ns),
-			func() tea.Msg {
-				pm, err := client.GetPodMetrics(reqCtx, kctx, ns, podName)
+			func(ctx context.Context) tea.Msg {
+				pm, err := client.GetPodMetrics(ctx, kctx, ns, podName)
 				if err != nil {
 					return metricsLoadedMsg{gen: gen} // silently ignore
 				}
-				cpuReq, cpuLim, memReq, memLim, err := client.GetPodResourceRequests(reqCtx, kctx, ns, podName)
+				cpuReq, cpuLim, memReq, memLim, err := client.GetPodResourceRequests(ctx, kctx, ns, podName)
 				if err != nil {
 					cpuReq, cpuLim, memReq, memLim = 0, 0, 0, 0
 				}
@@ -54,13 +54,14 @@ func (m Model) loadMetrics() tea.Cmd {
 		)
 	case "Deployment", "StatefulSet", "DaemonSet":
 		name := sel.Name
-		return m.trackBgTask(
-			bgtasks.KindMetrics,
+		return m.scheduleK8sCall(
+			scheduler.PriorityLow,
+			scheduler.KindMetrics,
 			"Metrics: "+kind+"/"+name,
 			bgtaskTarget(kctx, ns),
-			func() tea.Msg {
+			func(ctx context.Context) tea.Msg {
 				// Get child pods.
-				childItems, err := client.GetOwnedResources(reqCtx, kctx, ns, kind, name)
+				childItems, err := client.GetOwnedResources(ctx, kctx, ns, kind, name)
 				if err != nil || len(childItems) == 0 {
 					return metricsLoadedMsg{gen: gen}
 				}
@@ -73,7 +74,7 @@ func (m Model) loadMetrics() tea.Cmd {
 				if len(podNames) == 0 {
 					return metricsLoadedMsg{gen: gen}
 				}
-				metrics, err := client.GetPodsMetrics(reqCtx, kctx, ns, podNames)
+				metrics, err := client.GetPodsMetrics(ctx, kctx, ns, podNames)
 				if err != nil || len(metrics) == 0 {
 					return metricsLoadedMsg{gen: gen}
 				}
@@ -87,7 +88,7 @@ func (m Model) loadMetrics() tea.Cmd {
 				// Sum requests/limits from all pods.
 				var totalCPUReq, totalCPULim, totalMemReq, totalMemLim int64
 				for _, podName := range podNames {
-					cpuReq, cpuLim, memReq, memLim, err := client.GetPodResourceRequests(reqCtx, kctx, ns, podName)
+					cpuReq, cpuLim, memReq, memLim, err := client.GetPodResourceRequests(ctx, kctx, ns, podName)
 					if err != nil {
 						continue
 					}
@@ -130,12 +131,13 @@ func (m Model) loadPreviewEvents() tea.Cmd {
 		kind = sel.Kind
 	}
 
-	return m.trackBgTask(
-		bgtasks.KindResourceList,
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindResourceList,
 		"Preview events: "+name,
 		bgtaskTarget(kctx, ns),
-		func() tea.Msg {
-			events, err := client.GetResourceEvents(context.Background(), kctx, ns, name, kind)
+		func(ctx context.Context) tea.Msg {
+			events, err := client.GetResourceEvents(ctx, kctx, ns, name, kind)
 			if err != nil {
 				return previewEventsLoadedMsg{gen: gen}
 			}
@@ -151,13 +153,13 @@ func (m Model) loadPodMetricsForList() tea.Cmd {
 	ns := m.effectiveNamespace()
 	gen := m.requestGen
 	client := m.client
-	reqCtx := m.reqCtx
-	return m.trackBgTask(
-		bgtasks.KindMetrics,
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindMetrics,
 		"Pod metrics",
 		bgtaskTarget(kctx, ns),
-		func() tea.Msg {
-			metrics, err := client.GetAllPodMetrics(reqCtx, kctx, ns)
+		func(ctx context.Context) tea.Msg {
+			metrics, err := client.GetAllPodMetrics(ctx, kctx, ns)
 			if err != nil {
 				return podMetricsEnrichedMsg{gen: gen} // silently ignore
 			}
@@ -172,13 +174,13 @@ func (m Model) loadNodeMetricsForList() tea.Cmd {
 	kctx := m.nav.Context
 	gen := m.requestGen
 	client := m.client
-	reqCtx := m.reqCtx
-	return m.trackBgTask(
-		bgtasks.KindMetrics,
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindMetrics,
 		"Node metrics",
 		bgtaskTarget(kctx, ""),
-		func() tea.Msg {
-			metrics, err := client.GetAllNodeMetrics(reqCtx, kctx)
+		func(ctx context.Context) tea.Msg {
+			metrics, err := client.GetAllNodeMetrics(ctx, kctx)
 			if err != nil {
 				return nodeMetricsEnrichedMsg{gen: gen}
 			}

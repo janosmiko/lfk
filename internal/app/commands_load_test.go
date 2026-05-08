@@ -664,7 +664,7 @@ func TestCovDiscoverAPIResourcesReturnsCmd(t *testing.T) {
 }
 
 func TestCovLoadQuotas(t *testing.T) {
-	m := baseModelWithFakeClient()
+	m := baseModelWithFakeClientAndScheduler(t)
 	cmd := m.loadQuotas()
 	msg := execCmd(t, cmd)
 	result, ok := msg.(quotaLoadedMsg)
@@ -677,7 +677,7 @@ func TestCovLoadNamespaces(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "kube-system"},
 		Status:     corev1.NamespaceStatus{Phase: corev1.NamespaceActive},
 	}
-	m := baseModelWithFakeClient(ns)
+	m := baseModelWithFakeClientAndScheduler(t, ns)
 	cmd := m.loadNamespaces()
 	msg := execCmd(t, cmd)
 	result, ok := msg.(namespacesLoadedMsg)
@@ -688,7 +688,7 @@ func TestCovLoadNamespaces(t *testing.T) {
 }
 
 func TestCovLoadNamespacesNoContext(t *testing.T) {
-	m := baseModelWithFakeClient()
+	m := baseModelWithFakeClientAndScheduler(t)
 	m.nav.Context = ""
 	cmd := m.loadNamespaces()
 	msg := execCmd(t, cmd)
@@ -710,6 +710,8 @@ func TestCovLoadResources(t *testing.T) {
 		Resource:   "pods",
 		Namespaced: true,
 	}
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	cmd := m.loadResources(false)
 	msg := execCmd(t, cmd)
 	result, ok := msg.(resourcesLoadedMsg)
@@ -768,6 +770,8 @@ func TestCovLoadContainers(t *testing.T) {
 		},
 	}
 	m := baseModelWithFakeClient(pod)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.nav.OwnedName = "test-pod"
 	cmd := m.loadContainers(false)
 	msg := execCmd(t, cmd)
@@ -844,6 +848,8 @@ func TestCovLoadYAMLResources(t *testing.T) {
 
 	gvrToListKind := map[schema.GroupVersionResource]string{gvr: "ConfigMapList"}
 	m := baseModelWithFakeDynamic(gvrToListKind, cm)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.nav.Level = model.LevelResources
 	m.nav.ResourceType = model.ResourceTypeEntry{
 		Kind:       "ConfigMap",
@@ -891,6 +897,8 @@ func TestLoadYAMLLevelContainersFetchesNamespacedPod(t *testing.T) {
 
 	gvrToListKind := map[schema.GroupVersionResource]string{gvr: "PodList"}
 	m := baseModelWithFakeDynamic(gvrToListKind, pod)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.nav.Level = model.LevelContainers
 	m.nav.OwnedName = "multi-container-pod"
 	m.nav.Namespace = "default"
@@ -1181,7 +1189,7 @@ func TestResolveOwnedResourceType_CSIDriverClusterScoped(t *testing.T) {
 }
 
 func TestCovLoadPreviewEventsWithSelection(t *testing.T) {
-	m := baseModelWithFakeClient()
+	m := baseModelWithFakeClientAndScheduler(t)
 	m = withMiddleItem(m, model.Item{Name: "my-pod", Namespace: "default"})
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
 	cmd := m.loadPreviewEvents()

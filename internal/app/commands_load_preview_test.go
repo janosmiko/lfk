@@ -255,6 +255,8 @@ func TestLoadPreviewOwnedUsesNavNamespaceForMissingItemNamespace(t *testing.T) {
 
 	gvrToListKind := map[schema.GroupVersionResource]string{pvcGVR: "PersistentVolumeClaimList"}
 	m := baseModelWithFakeDynamic(gvrToListKind, pvc)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 
 	// Pre-populate discoveredResources with the PVC resource type so the new
 	// parameter-only Find* functions can resolve it. Before the runtime

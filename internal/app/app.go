@@ -12,7 +12,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/hinshun/vt10x"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -438,25 +438,23 @@ type Model struct {
 	// Collapse duplicate Events (per-tab mirror of Model.eventGrouping).
 	eventGrouping bool
 
-	// bgtasks tracks in-flight async loads (resource lists, YAML fetches,
-	// metrics, dashboards). Process-global instance shared across tabs so
-	// the title bar reflects all activity, not just the active tab's.
-	bgtasks *bgtasks.Registry
+	// scheduler tracks in-flight async loads AND owns priority-based
+	// dispatch (resource lists, YAML fetches, metrics, dashboards).
+	// Process-global instance shared across tabs so the title bar reflects
+	// all activity, not just the active tab's.
+	scheduler *scheduler.Registry
 
-	// suppressBgtasks, when true, makes loaders call Registry.StartUntracked
-	// instead of Registry.Start so their tasks don't appear in the title-bar
-	// indicator. Set by updateWatchTick before dispatching watch-mode
-	// auto-refreshes — periodic refreshes shouldn't flash through the
-	// indicator every 2 seconds.
+	// suppressBgtasks routes loaders through Registry.StartUntracked so
+	// watch-mode auto-refreshes don't flash the title-bar indicator.
 	suppressBgtasks bool
 
-	// tasksOverlayShowCompleted selects which view the :tasks overlay
-	// renders when it's open. false (default) shows currently running
-	// tasks with a live ELAPSED column; true shows the recent
-	// completed-task history with a fixed DURATION column. Toggled with
-	// Tab inside the overlay; reset to false every time the overlay is
-	// opened fresh.
+	// :scheduler overlay state: tasksOverlayShowCompleted (Tab) flips
+	// running ↔ history; tasksOverlayShowAll (`a`, history only) lifts
+	// the sub-second filter; tasksOverlayFrozenHistory pauses the live
+	// history while scrolled (cleared on scroll-to-top, Tab, `a`, esc).
 	tasksOverlayShowCompleted bool
+	tasksOverlayShowAll       bool
+	tasksOverlayFrozenHistory []ui.BackgroundTaskRow
 
 	// tasksOverlayScroll is the first-visible-row index for the :tasks
 	// overlay. Bumped by j/k (and friends) inside the overlay; reset on
@@ -464,6 +462,8 @@ type Model struct {
 	// valid range so the handler can bump it blindly.
 	tasksOverlayScroll int
 
+	// dashboardAcc holds the per-(kctx,gen) fan-out accumulator; keyed by dashboardAccKey.
+	dashboardAcc map[string]*dashboardAccumulator
 	// Discovered CRDs per context: keyed by context name.
 	discoveredResources map[string][]model.ResourceTypeEntry
 

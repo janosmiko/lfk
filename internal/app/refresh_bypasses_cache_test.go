@@ -20,7 +20,9 @@ import (
 // watch tick or shift+r.
 func TestRefreshCurrentLevelBypassesItemCache(t *testing.T) {
 	t.Parallel()
-	m := newLoadResourcesTestModel()
+	m := newLoadResourcesTestModel(t)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.cacheFingerprints = make(map[string]string)
 
 	// Prime the cache with a stale entry: fake API has no pods, but the

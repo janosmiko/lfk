@@ -16,7 +16,7 @@ import (
 	dynfake "k8s.io/client-go/dynamic/fake"
 	clientfake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -34,7 +34,10 @@ func TestWatchTickRemovesDeletedPodFromList(t *testing.T) {
 	// Fake k8s with one pod present.
 	scheme := runtime.NewScheme()
 	gvrs := map[schema.GroupVersionResource]string{
-		{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+		{Group: "", Version: "v1", Resource: "pods"}:                     "PodList",
+		{Group: "", Version: "v1", Resource: "events"}:                   "EventList",
+		{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "pods"}:  "PodMetricsList",
+		{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
 	}
 	pod := &unstructured.Unstructured{}
 	pod.SetUnstructuredContent(map[string]any{
@@ -63,11 +66,13 @@ func TestWatchTickRemovesDeletedPodFromList(t *testing.T) {
 		discoveredResources: make(map[string][]model.ResourceTypeEntry),
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
-		bgtasks:             bgtasks.New(0),
+		scheduler:           scheduler.New(0),
 		reqCtx:              context.Background(),
 		watchMode:           true,
 	}
 	m.client = k8s.NewTestClient(clientfake.NewClientset(), dyn)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 
 	// First tick: prime middleItems via the full message pipeline so
 	// the model state mirrors what a real first-load looks like.

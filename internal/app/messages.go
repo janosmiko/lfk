@@ -149,6 +149,17 @@ type dashboardLoadedMsg struct {
 	context string
 }
 
+// dashboardPartialMsg delivers one section of the dashboard fan-out
+// to the renderer. The renderer accumulates sections per-(kctx, gen)
+// and re-renders progressively. Once all 6 sections have arrived, a
+// dashboardLoadedMsg is dispatched for downstream consumers.
+type dashboardPartialMsg struct {
+	context string
+	section dashboardSection
+	gen     uint64
+	data    dashboardData
+}
+
 // monitoringDashboardMsg carries the rendered monitoring dashboard content.
 type monitoringDashboardMsg struct {
 	content string

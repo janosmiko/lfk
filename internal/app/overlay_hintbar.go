@@ -257,10 +257,21 @@ func (m Model) overlayHintBarMisc() string {
 		if m.tasksOverlayShowCompleted {
 			tabDesc = "running"
 		}
-		return m.renderHints([]ui.HintEntry{
+		hints := []ui.HintEntry{
 			{Key: "tab", Desc: tabDesc},
-			{Key: "esc", Desc: "close"},
-		})
+			{Key: "j/k", Desc: "scroll"},
+			{Key: "g/G", Desc: "top/bottom"},
+		}
+		// `a` is only meaningful in the completed history view.
+		if m.tasksOverlayShowCompleted {
+			aDesc := "show all"
+			if m.tasksOverlayShowAll {
+				aDesc = "hide sub-second"
+			}
+			hints = append(hints, ui.HintEntry{Key: "a", Desc: aDesc})
+		}
+		hints = append(hints, ui.HintEntry{Key: "esc", Desc: "close"})
+		return m.renderHints(hints)
 	case overlayNetworkPolicy:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "scroll"},

@@ -6,7 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 )
 
 // crashInvestigationTimeout bounds the background fetch for a single
@@ -22,7 +22,7 @@ func (m Model) loadCrashInvestigation() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
-	return m.trackBgTask(bgtasks.KindResourceList, "Crash investigator: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindResourceList, "Crash investigator: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
 		fetchCtx, cancel := context.WithTimeout(context.Background(), crashInvestigationTimeout)
 		defer cancel()
 		info, err := client.GetCrashInvestigation(fetchCtx, ctx, ns, name)

@@ -153,6 +153,23 @@ type configFile struct {
 	// Traffic Capture overlay. Only the namespace is plumbed today;
 	// future fields can land here without further config schema changes.
 	Kubeshark *KubesharkConfig `json:"kubeshark" yaml:"kubeshark"`
+	// Scheduler holds the runtime knobs for the priority task scheduler.
+	// All fields are optional; missing keys fall back to the scheduler
+	// package's compiled defaults.
+	Scheduler *SchedulerConfig `json:"scheduler" yaml:"scheduler"`
+}
+
+// SchedulerConfig holds the runtime knobs for the priority task
+// scheduler. All fields are optional; missing keys fall back to the
+// scheduler package's compiled defaults.
+type SchedulerConfig struct {
+	WorkersPerContext int               `json:"workers_per_context" yaml:"workers_per_context"`
+	CriticalReserved  int               `json:"critical_reserved_slots" yaml:"critical_reserved_slots"`
+	DefaultTimeout    string            `json:"default_timeout" yaml:"default_timeout"`
+	TimeoutsByKind    map[string]string `json:"timeouts_by_kind" yaml:"timeouts_by_kind"`
+	K8sClientQPS      int               `json:"k8s_client_qps" yaml:"k8s_client_qps"`
+	K8sClientBurst    int               `json:"k8s_client_burst" yaml:"k8s_client_burst"`
+	ShowPriority      *bool             `json:"show_priority_in_tasks_overlay" yaml:"show_priority_in_tasks_overlay"`
 }
 
 // KubesharkConfig is the on-disk schema for the kubeshark section.

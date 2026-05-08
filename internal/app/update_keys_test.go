@@ -8,7 +8,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -1412,11 +1412,11 @@ func TestCovHandleKeyExplainSearch(t *testing.T) {
 
 func TestCtrlCCancelsMutationsInsteadOfClosingTab(t *testing.T) {
 	cancelled := false
-	r := bgtasks.New(0)
-	r.StartCancellable(bgtasks.KindMutation, "Delete pods (5)", "ctx / ns", func() { cancelled = true })
+	r := scheduler.New(0)
+	r.StartCancellable(scheduler.KindMutation, "Delete pods (5)", "ctx / ns", func() { cancelled = true })
 
 	m := baseModelNav()
-	m.bgtasks = r
+	m.scheduler = r
 
 	result, cmd, handled := m.handleExplorerNavKey(specialKey(tea.KeyCtrlC))
 	assert.True(t, handled)
@@ -1428,11 +1428,11 @@ func TestCtrlCCancelsMutationsInsteadOfClosingTab(t *testing.T) {
 
 func TestEscCancelsMutationsInsteadOfNavigatingBack(t *testing.T) {
 	cancelled := false
-	r := bgtasks.New(0)
-	r.StartCancellable(bgtasks.KindMutation, "Scale deploys (3)", "ctx / ns", func() { cancelled = true })
+	r := scheduler.New(0)
+	r.StartCancellable(scheduler.KindMutation, "Scale deploys (3)", "ctx / ns", func() { cancelled = true })
 
 	m := baseModelNav()
-	m.bgtasks = r
+	m.scheduler = r
 
 	result, cmd, handled := m.handleExplorerNavKey(specialKey(tea.KeyEsc))
 	assert.True(t, handled)
@@ -1443,11 +1443,11 @@ func TestEscCancelsMutationsInsteadOfNavigatingBack(t *testing.T) {
 }
 
 func TestCtrlCClosesTabWhenNoMutationsActive(t *testing.T) {
-	r := bgtasks.New(0)
-	r.Start(bgtasks.KindResourceList, "List Pods", "ctx / ns") // non-mutation
+	r := scheduler.New(0)
+	r.Start(scheduler.KindResourceList, "List Pods", "ctx / ns") // non-mutation
 
 	m := baseModelNav()
-	m.bgtasks = r
+	m.scheduler = r
 	m.tabs = []TabState{{}, {}} // 2 tabs so close-tab doesn't quit
 
 	_, _, handled := m.handleExplorerNavKey(specialKey(tea.KeyCtrlC))

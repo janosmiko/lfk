@@ -42,8 +42,8 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `@` | Monitoring overview (active Prometheus alerts) |
 | `Ctrl+N` | Open the Local Clusters Manager overlay (only at LevelClusters) |
 | `Q` | Namespace resource quota dashboard |
-| `` ` `` | Background tasks overlay (Tab toggles running / completed history) |
-| `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`, `:tasks`), kubectl (`:k get pod`), shell (`:! cmd`) |
+| `` ` `` | Scheduler / task queue overlay (Tab toggles running / completed history; `a` toggles show-all entries in completed view) |
+| `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`, `:scheduler`), kubectl (`:k get pod`), shell (`:! cmd`) |
 
 ## Sorting
 

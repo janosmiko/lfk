@@ -189,7 +189,7 @@ type localClusterState struct {
 // localClusterController type. The bubbletea Update/View pattern makes
 // Model itself the controller, and lifting state out via embedding
 // already gives us the practical isolation a controller would —
-// without the cost of duplicating Model accessors (m.bgtasks,
+// without the cost of duplicating Model accessors (m.scheduler,
 // m.client, m.middleItems for the cluster-picker integration) inside
 // a separate type.
 type localClusterFields struct {

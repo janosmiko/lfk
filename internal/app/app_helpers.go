@@ -122,6 +122,9 @@ func (m *Model) performQuitCleanup() {
 	}
 	m.cancelAllTabLogStreams()
 	m.cancelInFlightRequests()
+	if m.scheduler != nil {
+		m.scheduler.StopWorkers()
+	}
 	m.saveCurrentSession()
 }
 

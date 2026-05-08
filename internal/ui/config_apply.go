@@ -1,12 +1,14 @@
 package ui
 
 import (
+	"maps"
 	"math"
 	"os"
 	"slices"
 	"strings"
 	"time"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -181,6 +183,9 @@ func applyConfigOptions(cfg configFile) {
 		ConfigReadOnly = *cfg.ReadOnly
 	}
 	applyRightsizingDefaults(cfg.RightsizingDefaults)
+	if cfg.Scheduler != nil {
+		applySchedulerConfig(cfg.Scheduler)
+	}
 	if os.Getenv("NO_COLOR") != "" {
 		// Per https://no-color.org, the presence of NO_COLOR (regardless of
 		// value) disables color. Env takes precedence over the config file
@@ -320,4 +325,77 @@ func rightsizingStrategyLiterals() []string {
 		out = append(out, string(s))
 	}
 	return out
+}
+
+// applySchedulerConfig pushes the YAML scheduler section into the
+// scheduler package-globals consumed by FromGlobals at request time.
+// A nil section is a no-op; zero/negative values are ignored so
+// omitted fields don't clobber the compiled defaults.
+// K8sClientQPS and K8sClientBurst are persisted in the schema but
+// not yet wired to the K8s client; that lands in a follow-up commit.
+func applySchedulerConfig(s *SchedulerConfig) {
+	if s.WorkersPerContext > 0 {
+		scheduler.ConfigWorkersPerContext = scheduler.ClampWorkers(s.WorkersPerContext)
+	}
+	if s.CriticalReserved > 0 {
+		scheduler.ConfigCriticalReserved = scheduler.ClampCriticalReserved(s.CriticalReserved, scheduler.ClampWorkers(scheduler.ConfigWorkersPerContext))
+	}
+	if d, err := time.ParseDuration(s.DefaultTimeout); err == nil && d > 0 {
+		scheduler.ConfigDefaultTimeout = d
+	}
+	if len(s.TimeoutsByKind) > 0 {
+		// Merge YAML overrides into the existing per-Kind map instead
+		// of replacing it. Compiled-in defaults (e.g. APIDiscovery=60s,
+		// Mutation=120s) should remain in effect for any Kind the user
+		// didn't list explicitly.
+		out := make(map[scheduler.Kind]time.Duration, len(scheduler.ConfigTimeoutsByKind)+len(s.TimeoutsByKind))
+		maps.Copy(out, scheduler.ConfigTimeoutsByKind)
+		for name, dur := range s.TimeoutsByKind {
+			d, err := time.ParseDuration(dur)
+			if err != nil || d <= 0 {
+				continue
+			}
+			k, ok := schedulerKindByName(name)
+			if !ok {
+				continue
+			}
+			out[k] = d
+		}
+		scheduler.ConfigTimeoutsByKind = out
+	}
+	if s.ShowPriority != nil {
+		scheduler.ConfigShowPriorityInOverlay = *s.ShowPriority
+	}
+}
+
+// schedulerKindByName maps a YAML key string to the corresponding
+// scheduler.Kind constant. Returns (0, false) for unknown names so
+// the caller can skip unrecognised entries without panicking.
+func schedulerKindByName(name string) (scheduler.Kind, bool) {
+	switch name {
+	case "ResourceList":
+		return scheduler.KindResourceList, true
+	case "YAMLFetch":
+		return scheduler.KindYAMLFetch, true
+	case "Metrics":
+		return scheduler.KindMetrics, true
+	case "ResourceTree":
+		return scheduler.KindResourceTree, true
+	case "Dashboard":
+		return scheduler.KindDashboard, true
+	case "Containers":
+		return scheduler.KindContainers, true
+	case "Mutation":
+		return scheduler.KindMutation, true
+	case "Subprocess":
+		return scheduler.KindSubprocess, true
+	case "APIDiscovery":
+		return scheduler.KindAPIDiscovery, true
+	case "NamespaceList":
+		return scheduler.KindNamespaceList, true
+	case "RBACCheck":
+		return scheduler.KindRBACCheck, true
+	default:
+		return 0, false
+	}
 }

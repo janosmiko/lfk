@@ -681,3 +681,25 @@ func TestExtractShellCommandNoPrefix(t *testing.T) {
 func containsFlag(args []string, flag string) bool {
 	return slices.Contains(args, flag)
 }
+
+// ---------------------------------------------------------------------------
+// scheduler command rename from :tasks
+// ---------------------------------------------------------------------------
+
+func TestCommandbarExecute_SchedulerOpensTasksOverlay(t *testing.T) {
+	m := newTestModel()
+	result, _ := m.executeBuiltinCommand("scheduler")
+	rm := result.(Model)
+
+	assert.Equal(t, overlayBackgroundTasks, rm.overlay,
+		":scheduler must open the tasks overlay")
+}
+
+func TestCommandbarExecute_TasksAliasGone(t *testing.T) {
+	m := newTestModel()
+	result, _ := m.executeBuiltinCommand("tasks")
+	rm := result.(Model)
+
+	assert.NotEqual(t, overlayBackgroundTasks, rm.overlay,
+		":tasks must no longer open the overlay (hard rename)")
+}

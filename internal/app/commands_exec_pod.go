@@ -9,7 +9,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -351,7 +351,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 		title = title + " > " + strings.ReplaceAll(fieldPath, ".", " > ")
 	}
 
-	return m.trackBgTask(bgtasks.KindSubprocess, "Explain: "+target, kctx, func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, "Explain: "+target, kctx, func() tea.Msg {
 		args := []string{"explain", target, "--context", m.kubectlContext(kctx)}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)
@@ -388,7 +388,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 	kctx := m.nav.Context
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
-	return m.trackBgTask(bgtasks.KindSubprocess, "Explain (recursive): "+resource, kctx, func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, "Explain (recursive): "+resource, kctx, func() tea.Msg {
 		args := []string{"explain", resource, "--recursive", "--context", m.kubectlContext(kctx)}
 		if apiVersion != "" {
 			args = append(args, "--api-version", apiVersion)

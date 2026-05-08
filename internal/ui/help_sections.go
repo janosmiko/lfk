@@ -57,7 +57,7 @@ func helpSections() []helpSection {
 				{kb.ErrorLog, "Error log"},
 				{kb.Monitoring, "Monitoring overview (active Prometheus alerts)"},
 				{kb.QuotaDashboard, "Namespace resource quota dashboard"},
-				{kb.TasksOverlay, "Background tasks overlay (Tab toggles running/completed history)"},
+				{kb.TasksOverlay, "Scheduler / task queue overlay (Tab: running/completed, a: show all entries)"},
 			},
 		},
 		{

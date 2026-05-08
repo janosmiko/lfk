@@ -18,7 +18,7 @@ Press `:` to open the command bar. Input is classified by the first word:
 | `:sort <column>` | Sort the current list by column name |
 | `:set <option>` | Toggle log viewer option (see below) |
 | `:export [yaml\|json]` | Copy selected resource(s) to clipboard |
-| `:tasks` | Open background-tasks overlay |
+| `:scheduler` | Open scheduler / task queue overlay |
 | `:bookmarks` | Open bookmarks overlay |
 | `:reload` &nbsp;·&nbsp; `:refresh` | Force refresh of the current list |
 | `:errors` &nbsp;·&nbsp; `:warnings` | Toggle warnings-only filter on the Events list |
@@ -42,9 +42,9 @@ Column names match the table headers (case-sensitive): `Name`, `Namespace`, `Age
 | `follow` / `nofollow` | Auto-scroll to tail |
 | `ansi` / `noansi` | Render ANSI SGR colors from log output. Off replaces ESC bytes with U+FFFD (see config-reference.md `log_render_ansi`). |
 
-### `:tasks`
+### `:scheduler`
 
-Background-tasks overlay. Inside:
+Scheduler / task queue overlay. Inside:
 
 - `Tab` — toggle running / completed history
 - `` ` `` — also opens the overlay

@@ -13,7 +13,7 @@ import (
 	dynfake "k8s.io/client-go/dynamic/fake"
 	fake "k8s.io/client-go/kubernetes/fake"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -71,7 +71,7 @@ func baseSecretModel(t *testing.T) Model {
 		client:              k8s.NewTestClient(cs, dyn),
 		namespace:           "default",
 		reqCtx:              context.Background(),
-		bgtasks:             bgtasks.New(bgtasks.DefaultThreshold),
+		scheduler:           scheduler.New(scheduler.DefaultThreshold),
 	}
 	m.middleItems = []model.Item{
 		{Name: "my-secret", Namespace: "default", Kind: "Secret"},
@@ -169,6 +169,8 @@ func TestLoadPreviewSecretDataGenStaleness(t *testing.T) {
 // only once.
 func TestLoadPreviewSecretDataCacheHit(t *testing.T) {
 	m := baseSecretModel(t)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
 	m.requestGen = 1
 
 	// First call: cache miss — run the returned command synchronously.

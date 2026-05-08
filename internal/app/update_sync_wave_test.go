@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 )
 
@@ -56,7 +56,8 @@ func TestUpdateSyncWaveTimeline_SkeletonChainsToFull(t *testing.T) {
 	m.syncWave.token = 9
 	m.overlay = overlaySyncWave
 	m.loading = true
-	m.bgtasks = bgtasks.New(bgtasks.DefaultThreshold) // loadSyncWaveTimeline calls bgtasks.Start
+	m.scheduler = scheduler.New(scheduler.DefaultThreshold) // loadSyncWaveTimeline calls scheduler.Start
+	t.Cleanup(m.scheduler.StopWorkers)
 
 	tl := &k8s.SyncWaveTimeline{AppName: "skel", LivePhase: "Running", Loading: true}
 	got, cmd := m.updateSyncWaveTimeline(syncWaveTimelineMsg{info: tl, token: 9})
@@ -193,10 +194,11 @@ func TestSyncWaveTickValidation_FreshTickIssuesLoad(t *testing.T) {
 	m.syncWave.token = 5
 	m.overlay = overlaySyncWave
 	m.syncWave.data = &k8s.SyncWaveTimeline{LivePhase: "Running"}
-	// loadSyncWaveTimeline issues bgtasks.Start synchronously, so the
+	// loadSyncWaveTimeline issues scheduler.Start synchronously, so the
 	// model needs a Registry. We still can't drive the returned closure
 	// without a real client — only confirm a cmd was returned.
-	m.bgtasks = bgtasks.New(bgtasks.DefaultThreshold)
+	m.scheduler = scheduler.New(scheduler.DefaultThreshold)
+	t.Cleanup(m.scheduler.StopWorkers)
 
 	_, cmd := m.handleSyncWaveTick(syncWaveTickMsg{token: 5})
 	require.NotNil(t, cmd)
@@ -438,7 +440,8 @@ func TestExecuteActionSyncWaveTimeline_RotatesTokenAndClearsData(t *testing.T) {
 	m := Model{}
 	m.syncWave.token = 3
 	m.syncWave.data = &k8s.SyncWaveTimeline{AppName: "stale"}
-	m.bgtasks = bgtasks.New(bgtasks.DefaultThreshold) // loadSyncWaveTimelineSkeleton calls bgtasks.Start
+	m.scheduler = scheduler.New(scheduler.DefaultThreshold) // loadSyncWaveTimelineSkeleton calls scheduler.Start
+	t.Cleanup(m.scheduler.StopWorkers)
 
 	got, cmd := m.executeActionSyncWaveTimeline()
 	gotM := got.(Model)

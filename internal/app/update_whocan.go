@@ -5,7 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -345,7 +345,7 @@ func (m Model) loadWhoCan() tea.Cmd {
 	kctx := m.nav.Context
 	gen := m.requestGen
 	return m.trackBgTask(
-		bgtasks.KindResourceList,
+		scheduler.KindResourceList,
 		"WhoCan: "+verb+" "+resource,
 		bgtaskTarget(kctx, ns),
 		func() tea.Msg {

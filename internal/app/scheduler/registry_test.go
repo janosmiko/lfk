@@ -1,6 +1,7 @@
-package bgtasks
+package scheduler
 
 import (
+	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -108,14 +109,23 @@ func TestStartStoresTask(t *testing.T) {
 }
 
 func TestFinishRemoves(t *testing.T) {
+	// With the linger window introduced for the Running list, Finish no
+	// longer evicts the task immediately — Snapshot's lazy GC removes
+	// the entry once the linger expires. This test sets a tight linger
+	// and triggers Snapshot to verify the eventual removal contract.
 	r := New(testThreshold)
+	r.SetLingerDurationForTest(5 * time.Millisecond)
 	id := r.Start(KindResourceList, "List Pods", "default")
 	r.Finish(id)
 
+	// Wait for the linger to elapse, then trigger the lazy GC.
+	time.Sleep(15 * time.Millisecond)
+	_ = r.Snapshot()
+
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	assert.NotContains(t, r.tasks, id)
-	assert.NotContains(t, r.order, id)
+	assert.NotContains(t, r.tasks, id, "linger expired — task must be evicted from r.tasks")
+	assert.NotContains(t, r.order, id, "linger expired — task must be removed from r.order")
 }
 
 func TestFinishUnknownIDIsNoop(t *testing.T) {
@@ -187,14 +197,78 @@ func TestSnapshotInsertionOrder(t *testing.T) {
 	assert.Equal(t, id3, got[2].ID)
 }
 
-func TestSnapshotAfterFinishMaintainsOrder(t *testing.T) {
+func TestStartDefaultsPriority(t *testing.T) {
 	r := New(0)
+	r.Start(KindAPIDiscovery, "API discovery", "ctx")
+	r.Start(KindResourceList, "List Pods", "ctx")
+	r.Start(KindDashboard, "Dashboard", "ctx")
+
+	snap := r.Snapshot()
+	require.Len(t, snap, 3)
+	byName := map[string]Task{}
+	for _, t := range snap {
+		byName[t.Name] = t
+	}
+	assert.Equal(t, PriorityCritical, byName["API discovery"].Priority)
+	assert.Equal(t, PriorityHigh, byName["List Pods"].Priority)
+	assert.Equal(t, PriorityLow, byName["Dashboard"].Priority)
+}
+
+func TestQueueSnapshot_PerContext(t *testing.T) {
+	r := New(0)
+	defer r.Close()
+	// Workers not started — tasks stay queued.
+
+	r.Submit(SubmitReq{KubeContext: "c1", Kind: KindDashboard, Priority: PriorityLow, Name: "Dashboard A", Target: "c1", Fn: func(_ context.Context) (any, error) { return nil, nil }})
+	r.Submit(SubmitReq{KubeContext: "c1", Kind: KindResourceList, Priority: PriorityHigh, Name: "List Pods", Target: "c1", Fn: func(_ context.Context) (any, error) { return nil, nil }})
+	r.Submit(SubmitReq{KubeContext: "c2", Kind: KindMetrics, Priority: PriorityLow, Name: "Metrics", Target: "c2", Fn: func(_ context.Context) (any, error) { return nil, nil }})
+
+	snap := r.QueueSnapshot()
+	require.Len(t, snap, 3)
+
+	byName := map[string]QueueEntry{}
+	for _, e := range snap {
+		byName[e.Name] = e
+	}
+	assert.Equal(t, "c1", byName["Dashboard A"].KubeContext)
+	assert.Equal(t, PriorityLow, byName["Dashboard A"].Priority)
+	assert.Equal(t, 1, byName["Dashboard A"].Position)
+	assert.Equal(t, "c1", byName["List Pods"].KubeContext)
+	assert.Equal(t, PriorityHigh, byName["List Pods"].Priority)
+	assert.Equal(t, 1, byName["List Pods"].Position)
+	assert.Equal(t, "c2", byName["Metrics"].KubeContext)
+	assert.Equal(t, PriorityLow, byName["Metrics"].Priority)
+	assert.Equal(t, 1, byName["Metrics"].Position)
+}
+
+func TestQueueSnapshot_NilReceiver(t *testing.T) {
+	var r *Registry
+	assert.Nil(t, r.QueueSnapshot())
+}
+
+func TestSnapshotAfterFinishMaintainsOrder(t *testing.T) {
+	// With the linger window, a finished task stays visible in
+	// Snapshot in its original insertion position. Once the linger
+	// expires it drops out and the order tightens around it.
+	r := New(0)
+	r.SetLingerDurationForTest(5 * time.Millisecond)
 	id1 := r.Start(KindResourceList, "First", "")
 	id2 := r.Start(KindYAMLFetch, "Second", "")
 	id3 := r.Start(KindMetrics, "Third", "")
 	r.Finish(id2)
 
+	// Inside the linger window: all three rows visible, original order.
 	got := r.Snapshot()
+	require.Len(t, got, 3)
+	assert.Equal(t, id1, got[0].ID)
+	assert.Equal(t, id2, got[1].ID)
+	assert.True(t, got[1].IsFinished(), "the lingering entry must be flagged Finished")
+	assert.Equal(t, id3, got[2].ID)
+
+	// After the linger expires: the finished row is gone; the others
+	// keep their insertion order.
+	time.Sleep(15 * time.Millisecond)
+	got = r.Snapshot()
 	require.Len(t, got, 2)
 	assert.Equal(t, id1, got[0].ID)
 	assert.Equal(t, id3, got[1].ID)
@@ -232,7 +306,10 @@ func TestLenSkipsBelowThreshold(t *testing.T) {
 }
 
 func TestConcurrentStartFinishSnapshot(t *testing.T) {
+	// Use a very short linger so the test can assert "all tasks
+	// finished" without waiting for the production 10s default.
 	r := New(0)
+	r.SetLingerDurationForTest(time.Millisecond)
 	const goroutines = 10
 	const ops = 200
 
@@ -252,7 +329,10 @@ func TestConcurrentStartFinishSnapshot(t *testing.T) {
 		<-done
 	}
 
-	assert.Equal(t, 0, r.Len(), "all tasks should be finished")
+	// Wait past the linger and trigger a Snapshot to evict.
+	time.Sleep(10 * time.Millisecond)
+	_ = r.Snapshot()
+	assert.Equal(t, 0, r.Len(), "all tasks should be evicted after linger expiry")
 	assert.Empty(t, r.Snapshot())
 }
 
@@ -308,8 +388,10 @@ func TestFinishAppendsToCompleted(t *testing.T) {
 	assert.False(t, done[0].FinishedAt.Before(before))
 	assert.False(t, done[0].FinishedAt.After(after))
 
-	// And the running list must be empty.
-	assert.Equal(t, 0, r.Len())
+	// And the running list still shows the task during its linger
+	// window (it must be visible in BOTH the Running and Completed
+	// views immediately after Finish — see DefaultLingerDuration).
+	assert.Equal(t, 1, r.Len())
 }
 
 // TestSnapshotCompletedNewestFirst verifies history ordering — the last
@@ -519,4 +601,98 @@ func TestProgressPreservedInSnapshot(t *testing.T) {
 	require.Len(t, snap, 1)
 	assert.Equal(t, 5, snap[0].Current)
 	assert.Equal(t, 5, snap[0].Total)
+}
+
+func TestDefaultCompletedCap_Is1000(t *testing.T) {
+	assert.Equal(t, 1000, DefaultCompletedCap,
+		"history should retain the last 1000 finished tasks; lowering this drops user-visible history")
+}
+
+func TestFinish_LingersInRunningSnapshot(t *testing.T) {
+	r := New(0)
+	r.SetLingerDurationForTest(100 * time.Millisecond)
+
+	id := r.Start(KindResourceList, "List Pods", "default")
+	r.Finish(id)
+
+	// Immediately after Finish: still in Running snapshot (lingering)
+	// AND in completed history.
+	running := r.Snapshot()
+	require.Len(t, running, 1, "finished task should linger in Running")
+	assert.True(t, running[0].IsFinished(), "lingering row's IsFinished() must be true")
+	assert.False(t, running[0].FinishedAt.IsZero())
+
+	completed := r.SnapshotCompleted()
+	require.Len(t, completed, 1, "finished task must appear in history immediately")
+	assert.Equal(t, "List Pods", completed[0].Name)
+}
+
+func TestFinish_LingerWindowExpiresAndEvicts(t *testing.T) {
+	r := New(0)
+	r.SetLingerDurationForTest(20 * time.Millisecond)
+
+	id := r.Start(KindResourceList, "List Pods", "default")
+	r.Finish(id)
+	require.Len(t, r.Snapshot(), 1)
+
+	// Wait past the linger window.
+	time.Sleep(40 * time.Millisecond)
+
+	// Snapshot must drop the task and evict it from the running map.
+	assert.Empty(t, r.Snapshot(), "task must leave Running after linger expires")
+	assert.Equal(t, 0, r.Len())
+
+	// History entry is preserved.
+	completed := r.SnapshotCompleted()
+	require.Len(t, completed, 1, "history entry must outlive the linger window")
+	assert.Equal(t, "List Pods", completed[0].Name)
+}
+
+func TestFinish_LingeringTaskCoexistsWithRunning(t *testing.T) {
+	r := New(0)
+	r.SetLingerDurationForTest(time.Second)
+
+	idA := r.Start(KindResourceList, "List Pods", "default")
+	r.Finish(idA)
+	r.Start(KindResourceList, "List Secrets", "default")
+
+	snap := r.Snapshot()
+	require.Len(t, snap, 2)
+	// Insertion order preserved.
+	assert.Equal(t, "List Pods", snap[0].Name)
+	assert.True(t, snap[0].IsFinished())
+	assert.Equal(t, "List Secrets", snap[1].Name)
+	assert.False(t, snap[1].IsFinished())
+}
+
+func TestStart_DedupeEvictsLingeringFinished(t *testing.T) {
+	r := New(0)
+	r.SetLingerDurationForTest(time.Second)
+
+	id1 := r.Start(KindResourceList, "List Pods", "default")
+	r.Finish(id1)
+	require.Len(t, r.Snapshot(), 1, "finished task lingers")
+
+	// New attempt with same signature replaces the lingering entry.
+	id2 := r.Start(KindResourceList, "List Pods", "default")
+	assert.Greater(t, id2, id1)
+
+	snap := r.Snapshot()
+	require.Len(t, snap, 1, "dedupe must drop the lingering finished entry when a new signature arrives")
+	assert.False(t, snap[0].IsFinished(), "the surviving entry is the new running attempt, not the lingering one")
+}
+
+func TestTask_Elapsed_FreezesAfterFinish(t *testing.T) {
+	now := time.Now()
+	t1 := Task{StartedAt: now.Add(-3 * time.Second)}
+	t2 := Task{StartedAt: now.Add(-3 * time.Second), FinishedAt: now.Add(-2 * time.Second)}
+
+	// Running task: elapsed grows with wall clock.
+	assert.Equal(t, 3*time.Second, t1.Elapsed(now))
+
+	// Finished task: elapsed is frozen at FinishedAt - StartedAt
+	// regardless of how much later the renderer queries.
+	assert.Equal(t, 1*time.Second, t2.Elapsed(now))
+	assert.Equal(t, 1*time.Second, t2.Elapsed(now.Add(time.Hour)),
+		"finished tasks must not keep ticking past Finish()")
 }

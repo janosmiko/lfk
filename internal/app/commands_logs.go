@@ -14,7 +14,7 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -68,8 +68,8 @@ func isKubectlTransientError(line string) bool {
 // progressing" feedback, instead of injecting status lines into the log
 // viewer itself.
 func (m Model) scheduleLogStreamRestart(ch chan string) tea.Cmd {
-	reg := m.bgtasks
-	id := reg.Start(bgtasks.KindContainers, "Waiting for next container", "")
+	reg := m.scheduler
+	id := reg.Start(scheduler.KindContainers, "Waiting for next container", "")
 	return tea.Tick(logAutoReconnectDelay, func(_ time.Time) tea.Msg {
 		reg.Finish(id)
 		return logStreamRestartMsg{ch: ch}
@@ -574,7 +574,7 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 	ctx, cancel := context.WithCancel(context.Background())
 	m.logHistoryCancel = cancel
 
-	return m.trackBgTask(bgtasks.KindSubprocess, "Log history: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, "Log history: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		defer cancel()
 
 		var args []string //nolint:prealloc
@@ -681,7 +681,7 @@ func (m *Model) saveAllLogs() tea.Cmd {
 	logPrevious := m.logPrevious
 	sanitized := sanitizeFilename(name)
 
-	return m.trackBgTask(bgtasks.KindSubprocess, "Save all logs: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, "Save all logs: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		var args []string
 		switch kind {
 		case "Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob", "Service":

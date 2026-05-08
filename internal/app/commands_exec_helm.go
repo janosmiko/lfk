@@ -8,7 +8,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 )
 
@@ -131,7 +131,7 @@ func (m Model) helmDiff() tea.Cmd {
 	ctx := m.actionCtx.context
 	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
-	return m.trackBgTask(bgtasks.KindSubprocess, "Helm diff: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, "Helm diff: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
 		env := append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 
 		chartName := resolveHelmChartName(helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths)
@@ -305,7 +305,7 @@ func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
 	ctx := m.actionCtx.context
 	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
-	return m.trackBgTask(bgtasks.KindSubprocess, fmt.Sprintf("Helm rollback: %s@%d", name, revision), bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.trackBgTask(scheduler.KindSubprocess, fmt.Sprintf("Helm rollback: %s@%d", name, revision), bgtaskTarget(ctx, ns), func() tea.Msg {
 		args := []string{"rollback", name, fmt.Sprintf("%d", revision), "-n", ns, "--kube-context", m.kubectlContext(ctx)}
 		cmd := exec.Command(helmPath, args...)
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)

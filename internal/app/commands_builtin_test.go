@@ -23,7 +23,7 @@ func TestCov80ShellQuote(t *testing.T) {
 }
 
 func TestCovLoadEventTimeline(t *testing.T) {
-	m := baseModelWithFakeClient()
+	m := baseModelWithFakeClientAndScheduler(t)
 	m = withActionCtx(m, "my-pod", "default", "Pod", model.ResourceTypeEntry{})
 	cmd := m.loadEventTimeline()
 	msg := execCmd(t, cmd)
@@ -33,7 +33,7 @@ func TestCovLoadEventTimeline(t *testing.T) {
 }
 
 func TestCovCheckRBAC(t *testing.T) {
-	m := baseModelWithFakeClient()
+	m := baseModelWithFakeClientAndScheduler(t)
 	rt := model.ResourceTypeEntry{
 		Kind:     "Pod",
 		APIGroup: "",
@@ -49,7 +49,7 @@ func TestCovCheckRBAC(t *testing.T) {
 }
 
 func TestCovLoadCanISAList(t *testing.T) {
-	m := baseModelWithFakeClient()
+	m := baseModelWithFakeClientAndScheduler(t)
 	cmd := m.loadCanISAList()
 	msg := execCmd(t, cmd)
 	result, ok := msg.(canISAListMsg)
@@ -63,7 +63,7 @@ func TestCovLoadPodStartup(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
 		Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "main", Image: "nginx"}}},
 	}
-	m := baseModelWithFakeClient(pod)
+	m := baseModelWithFakeClientAndScheduler(t, pod)
 	m = withActionCtx(m, "my-pod", "default", "Pod", model.ResourceTypeEntry{})
 	cmd := m.loadPodStartup()
 	msg := execCmd(t, cmd)
@@ -82,7 +82,7 @@ func TestCovLoadAlertsReturnsCmd(t *testing.T) {
 }
 
 func TestCovLoadNetworkPolicy(t *testing.T) {
-	m := baseModelWithFakeClient()
+	m := baseModelWithFakeClientAndScheduler(t)
 	m = withActionCtx(m, "my-netpol", "default", "NetworkPolicy", model.ResourceTypeEntry{})
 	cmd := m.loadNetworkPolicy()
 	msg := execCmd(t, cmd)
@@ -107,7 +107,7 @@ func TestCovLoadContainerPorts(t *testing.T) {
 			},
 		},
 	}
-	m := baseModelWithFakeClient(pod)
+	m := baseModelWithFakeClientAndScheduler(t, pod)
 	m = withActionCtx(m, "my-pod", "default", "Pod", model.ResourceTypeEntry{})
 	cmd := m.loadContainerPorts()
 	msg := execCmd(t, cmd)
@@ -127,7 +127,7 @@ func TestCovLoadContainerPortsService(t *testing.T) {
 			},
 		},
 	}
-	m := baseModelWithFakeClient(svc)
+	m := baseModelWithFakeClientAndScheduler(t, svc)
 	m = withActionCtx(m, "my-svc", "default", "Service", model.ResourceTypeEntry{})
 	cmd := m.loadContainerPorts()
 	msg := execCmd(t, cmd)
@@ -137,7 +137,7 @@ func TestCovLoadContainerPortsService(t *testing.T) {
 }
 
 func TestCovLoadContainerPortsUnsupportedKind(t *testing.T) {
-	m := baseModelWithFakeClient()
+	m := baseModelWithFakeClientAndScheduler(t)
 	m = withActionCtx(m, "my-job", "default", "Job", model.ResourceTypeEntry{})
 	cmd := m.loadContainerPorts()
 	msg := execCmd(t, cmd)

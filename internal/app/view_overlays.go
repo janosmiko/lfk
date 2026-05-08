@@ -2,8 +2,10 @@ package app
 
 import (
 	"fmt"
+	"slices"
 	"strings"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -333,26 +335,95 @@ func (m Model) renderOverlayBackgroundTasks() (string, int, int) {
 	mode := ui.ModeRunning
 	if m.tasksOverlayShowCompleted {
 		mode = ui.ModeCompleted
-		// Collapse identical (Kind, Name, Target) entries into a single
-		// row with "×N" appended to Name. Without this, a watch-mode
-		// session fills the 50-entry history with twelve consecutive
-		// "List Pods / dev-envs" refreshes and evicts genuinely
-		// interesting one-off tasks.
-		rows = groupCompletedTasks(m.bgtasks.SnapshotCompleted())
+		// While the user is scrolled into the list, render from the
+		// frozen snapshot taken at scroll-time so completions in the
+		// background don't reshuffle rows under the cursor. When
+		// scroll returns to 0 (or `a`/Tab/esc fires), the snapshot is
+		// cleared and the live filtered view resumes.
+		if m.tasksOverlayFrozenHistory != nil {
+			rows = m.tasksOverlayFrozenHistory
+		} else {
+			rows = historyTasksForDisplay(m.scheduler.SnapshotCompleted(), m.tasksOverlayShowAll)
+		}
 	} else {
-		snap := m.bgtasks.Snapshot()
-		rows = make([]ui.BackgroundTaskRow, len(snap))
-		for i, t := range snap {
-			rows[i] = ui.BackgroundTaskRow{
-				Kind:      t.Kind.String(),
-				Name:      t.Name,
-				Target:    t.Target,
-				StartedAt: t.StartedAt,
-			}
+		rows = buildActiveRows(m.scheduler.Snapshot(), m.scheduler.QueueSnapshot())
+	}
+	w, h := tasksOverlaySize(m.width, m.height)
+	subtitle := ""
+	if mode == ui.ModeCompleted && m.tasksOverlayShowAll {
+		subtitle = "(showing all entries — press a to hide sub-second tasks)"
+	} else if mode == ui.ModeCompleted {
+		subtitle = "(press a to show every entry, including sub-second)"
+	}
+	return ui.RenderBackgroundTasksOverlayWithSubtitle(rows, mode, subtitle, m.tasksOverlayScroll, w, h), w, h
+}
+
+// buildActiveRows merges Snapshot() and QueueSnapshot() into a single
+// slice for the unified active-table view. Order: Running first
+// (insertion order — matches the running snapshot), Queued in the
+// middle (priority + position from QueueSnapshot), Finished-lingering
+// last (newest first because Snapshot keeps insertion order and the
+// most recent finishes are usually the user's focus).
+//
+// Building one slice up here keeps the renderer a pure layout function
+// — no business logic about "which bucket does this task belong to".
+func buildActiveRows(snap []scheduler.Task, queued []scheduler.QueueEntry) []ui.BackgroundTaskRow {
+	out := make([]ui.BackgroundTaskRow, 0, len(snap)+len(queued))
+	// Running.
+	for _, t := range snap {
+		if t.IsFinished() {
+			continue
+		}
+		out = append(out, ui.BackgroundTaskRow{
+			Status:    ui.TaskStatusRunning,
+			Kind:      t.Kind.String(),
+			Priority:  t.Priority,
+			Name:      t.Name,
+			Target:    t.Target,
+			StartedAt: t.StartedAt,
+		})
+	}
+	// Queued — already ordered Critical→High→Low by QueueSnapshot,
+	// with 1-based head-of-lane positions.
+	for _, e := range queued {
+		out = append(out, ui.BackgroundTaskRow{
+			Status:   ui.TaskStatusQueued,
+			Kind:     e.Kind.String(),
+			Priority: e.Priority,
+			Name:     e.Name,
+			Target:   e.Target,
+			Position: e.Position,
+		})
+	}
+	// Finished-lingering — sort by FinishedAt DESC so the most-recently
+	// FINISHED row is on top, regardless of when it started. Snapshot's
+	// own ordering is by Start time (insertion order), which would put
+	// a long-running task that just ended below a quick task that
+	// started later but finished earlier. The user explicitly wants
+	// "first item is the one that was executed lately", which is
+	// finish-time DESC.
+	finished := make([]scheduler.Task, 0, len(snap))
+	for _, t := range snap {
+		if t.IsFinished() {
+			finished = append(finished, t)
 		}
 	}
-	w, h := min(120, m.width-10), min(20, m.height-6)
-	return ui.RenderBackgroundTasksOverlay(rows, mode, m.tasksOverlayScroll, w, h), w, h
+	slices.SortStableFunc(finished, func(a, b scheduler.Task) int {
+		return b.FinishedAt.Compare(a.FinishedAt)
+	})
+	for _, t := range finished {
+		out = append(out, ui.BackgroundTaskRow{
+			Status:     ui.TaskStatusFinished,
+			Kind:       t.Kind.String(),
+			Priority:   t.Priority,
+			Name:       t.Name,
+			Target:     t.Target,
+			StartedAt:  t.StartedAt,
+			FinishedAt: t.FinishedAt,
+			Duration:   t.FinishedAt.Sub(t.StartedAt),
+		})
+	}
+	return out
 }
 
 func (m Model) renderOverlayCanISubject(background string) string {
