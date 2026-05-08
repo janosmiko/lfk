@@ -92,7 +92,10 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 }
 
 // Fetch lists every Constraint instance the cluster currently knows
-// about and converts each .status.violations entry into a Finding. The
+// about and converts each .status.violations entry into a Finding.
+// Each kind's instance list is paginated (default 200 items per page)
+// to keep per-response payloads bounded — Constraints carry full
+// status.violations[] arrays and can balloon on busy clusters. The
 // per-CRD listing failure mode is swallowed so a single broken kind
 // doesn't black out the whole feed.
 //
@@ -119,7 +122,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 			Resource: r.Name,
 		}
 		// Constraints are cluster-scoped, so List with no namespace.
-		list, err := s.dynClient.Resource(gvr).List(ctx, metav1.ListOptions{})
+		list, err := security.ListPaginated(ctx, s.dynClient.Resource(gvr))
 		if err != nil {
 			// One bad CRD shouldn't kill the whole fetch — keep going
 			// and let the caller see partial results.
@@ -138,6 +141,13 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 // variant, so we run it on a goroutine and select on ctx.Done(); the
 // goroutine may leak if the API server hangs forever, but the caller
 // returns promptly and the manager can move on.
+//
+// A NotFound discovery error is treated as "Gatekeeper webhook
+// installed but no ConstraintTemplates registered yet" rather than a
+// failure: returning the error here would surface as a per-fetch
+// "Application error" in the explorer and spam the log on every
+// FetchAll. An empty list is the correct semantic — there are zero
+// constraint kinds to query, so there are zero violations.
 func discoverConstraintKinds(ctx context.Context, clientset kubernetes.Interface) ([]metav1.APIResource, error) {
 	type result struct {
 		list *metav1.APIResourceList
@@ -153,6 +163,9 @@ func discoverConstraintKinds(ctx context.Context, clientset kubernetes.Interface
 		return nil, ctx.Err()
 	case r := <-resCh:
 		if r.err != nil {
+			if apierrors.IsNotFound(r.err) {
+				return nil, nil
+			}
 			return nil, r.err
 		}
 		return r.list.APIResources, nil

@@ -67,7 +67,11 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 }
 
 // Fetch lists PolicyReport and ClusterPolicyReport CRDs and returns
-// failing results as findings. Passing results are skipped.
+// failing results as findings. Lists are paginated (default 200 items
+// per page) so large clusters don't blow up etcd / HTTP/2 streams on
+// the way back — a 700+ PolicyReport list with full .results[] is the
+// scenario that has frozen control planes in the wild. Passing results
+// are skipped.
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.client == nil {
 		return nil, nil
@@ -75,8 +79,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 
 	var findings []security.Finding
 
-	// Namespaced PolicyReports.
-	prList, err := s.client.Resource(PolicyReportGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	prList, err := security.ListPaginated(ctx, s.client.Resource(PolicyReportGVR).Namespace(namespace))
 	if err != nil {
 		return nil, fmt.Errorf("list policy reports: %w", err)
 	}
@@ -86,7 +89,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 
 	// ClusterPolicyReports (cluster-scoped, only when namespace is empty).
 	if namespace == "" {
-		cprList, err := s.client.Resource(ClusterPolicyReportGVR).List(ctx, metav1.ListOptions{})
+		cprList, err := security.ListPaginated(ctx, s.client.Resource(ClusterPolicyReportGVR))
 		if err != nil {
 			// ClusterPolicyReport CRD may not exist — non-fatal.
 			return findings, nil //nolint:nilerr // optional CRD, not an error

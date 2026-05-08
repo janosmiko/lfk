@@ -99,6 +99,15 @@ func (m Model) updateSecurityAvailabilityLoaded(msg securityAvailabilityLoadedMs
 	}
 	maps.Copy(m.securityAvailabilityByName, msg.availability)
 	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)
+	// Publish the per-source availability hint to the manager so the
+	// next FetchAll skips its own IsAvailable probe — without this the
+	// manager re-fires N IsAvailable list calls on every navigation,
+	// doubling API load on slow / throttled clusters and triggering
+	// client-side rate limits that produce a perpetual "Scanning ..."
+	// state in the right pane.
+	if m.securityManager != nil {
+		m.securityManager.SetAvailability(msg.context, m.securityAvailabilityByName)
+	}
 	// Persist so the next session's sidebar populates from the cache
 	// instead of flashing the loader. Best-effort: a write failure
 	// doesn't affect the live session.

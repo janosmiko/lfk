@@ -67,7 +67,11 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 }
 
 // Fetch lists VulnerabilityReport and ConfigAuditReport CRDs and returns
-// them as findings. Per-report parse errors are swallowed (malformed items skipped).
+// them as findings. Lists are paginated (default 200 items per page) so
+// large clusters don't materialise the whole report set in one response
+// — Trivy reports embed full vuln details, and a busy cluster easily
+// produces 10s of MB per source. Per-report parse errors are swallowed
+// (malformed items skipped).
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.client == nil {
 		return nil, nil
@@ -75,7 +79,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 
 	var findings []security.Finding
 
-	vulnList, err := s.client.Resource(VulnerabilityReportGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	vulnList, err := security.ListPaginated(ctx, s.client.Resource(VulnerabilityReportGVR).Namespace(namespace))
 	if err != nil {
 		return nil, fmt.Errorf("list vulnerability reports: %w", err)
 	}
@@ -83,7 +87,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		findings = append(findings, parseVulnerabilityReport(&vulnList.Items[i])...)
 	}
 
-	auditList, err := s.client.Resource(ConfigAuditReportGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	auditList, err := security.ListPaginated(ctx, s.client.Resource(ConfigAuditReportGVR).Namespace(namespace))
 	if err != nil {
 		return findings, fmt.Errorf("list config audit reports: %w", err)
 	}

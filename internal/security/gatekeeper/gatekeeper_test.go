@@ -1,11 +1,14 @@
 package gatekeeper
 
 import (
+	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/client-go/kubernetes/fake"
 
 	"github.com/janosmiko/lfk/internal/security"
 )
@@ -88,4 +91,22 @@ func TestSourceWithoutClientsReportsUnavailable(t *testing.T) {
 	findings, err := s.Fetch(t.Context(), "kctx", "")
 	assert.Nil(t, findings)
 	assert.NoError(t, err)
+}
+
+// TestDiscoverConstraintKindsNotFoundReturnsEmpty — when Gatekeeper's
+// constraints.gatekeeper.sh group is not served (webhook installed but
+// no ConstraintTemplates registered yet), discovery returns a NotFound
+// error. discoverConstraintKinds must treat that as "no kinds to query"
+// rather than a hard error so the explorer doesn't spam "could not find
+// the requested resource" on every FetchAll cycle.
+func TestDiscoverConstraintKindsNotFoundReturnsEmpty(t *testing.T) {
+	// FakeDiscovery returns NotFound from ServerResourcesForGroupVersion
+	// when the group/version isn't present in Fake.Resources, which is
+	// exactly the empty-cluster case we want to exercise.
+	clientset := fake.NewSimpleClientset()
+	clientset.Resources = []*metav1.APIResourceList{}
+
+	kinds, err := discoverConstraintKinds(context.Background(), clientset)
+	require.NoError(t, err, "NotFound must NOT propagate as an error")
+	assert.Empty(t, kinds)
 }

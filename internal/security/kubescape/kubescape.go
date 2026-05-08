@@ -68,13 +68,16 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 }
 
 // Fetch lists WorkloadConfigurationScan CRDs and converts every failing
-// control into a security.Finding. Per-object parse errors are swallowed
-// so a malformed report doesn't black out the whole feed.
+// control into a security.Finding. Lists are paginated (default 200
+// items per page) so the per-page response stays bounded — Kubescape
+// scans embed the full control list per workload and can produce large
+// payloads on busy clusters. Per-object parse errors are swallowed so a
+// malformed report doesn't black out the whole feed.
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.client == nil {
 		return nil, nil
 	}
-	list, err := s.client.Resource(WorkloadConfigurationScanGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	list, err := security.ListPaginated(ctx, s.client.Resource(WorkloadConfigurationScanGVR).Namespace(namespace))
 	if err != nil {
 		return nil, fmt.Errorf("list workloadconfigurationscans: %w", err)
 	}

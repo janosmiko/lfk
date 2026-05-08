@@ -3,6 +3,7 @@ package security
 import (
 	"context"
 	"errors"
+	"fmt"
 	"testing"
 	"time"
 
@@ -326,19 +327,141 @@ func TestManagerCachesSuccessfulEmptyResults(t *testing.T) {
 	assert.Equal(t, int32(1), s.FetchCalls.Load(), "second call must hit the cache, not the source")
 }
 
-// TestManagerSkipsCacheWhenAllSourcesError ensures the empty-result cache
-// fix does not silently mask transient errors: if every registered source
-// returns an error (no successful fetch), the result must NOT be cached so
-// the next FetchAll retries.
-func TestManagerSkipsCacheWhenAllSourcesError(t *testing.T) {
+// TestManagerNegativeCacheOnAllErroredFetch locks in the throttling-spiral
+// fix: when every source errors out (the typical pattern on a slow /
+// throttled cluster where every list request times out or fails on
+// HTTP/2 stream errors), the result is cached for a short window so the
+// next navigation tick doesn't re-fire the same failing requests and
+// dig the rate-limit hole even deeper. The window is intentionally
+// short (errorTTL ≪ refreshTTL) so genuine recovery is fast.
+func TestManagerNegativeCacheOnAllErroredFetch(t *testing.T) {
 	m := NewManager()
 	m.SetRefreshTTL(1 * time.Hour)
+	m.SetErrorTTL(50 * time.Millisecond)
 	bad := &FakeSource{NameStr: "bad", Available: true, FetchErr: errors.New("boom")}
 	m.Register(bad)
 
 	_, _ = m.FetchAll(context.Background(), "ctx", "")
 	require.Equal(t, int32(1), bad.FetchCalls.Load())
 
+	// Within the error TTL, the result is served from cache.
 	_, _ = m.FetchAll(context.Background(), "ctx", "")
-	assert.Equal(t, int32(2), bad.FetchCalls.Load(), "all-errored fetch must not be cached")
+	assert.Equal(t, int32(1), bad.FetchCalls.Load(),
+		"all-errored fetch within errorTTL must hit the negative cache")
+
+	// After the error TTL, the next call re-fires.
+	time.Sleep(60 * time.Millisecond)
+	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	assert.Equal(t, int32(2), bad.FetchCalls.Load(),
+		"after errorTTL elapses the source must be re-probed")
+}
+
+// TestManagerSetAvailabilityHintSkipsIsAvailableProbe exercises the
+// hint mechanism that the app's loadSecurityAvailability uses to tell
+// the manager what each source's availability already is. With the hint
+// in place, FetchAll must skip the source's IsAvailable probe — the
+// app-level probe already paid that cost (with a 3s budget) and
+// re-doing it on every FetchAll doubles the API request volume on slow
+// clusters, which is precisely what triggers the client-side throttle
+// we're trying to avoid.
+func TestManagerSetAvailabilityHintSkipsIsAvailableProbe(t *testing.T) {
+	m := NewManager()
+	available := &FakeSource{
+		NameStr: "trivy", Available: true,
+		Findings: []Finding{{ID: "1", Source: "trivy"}},
+	}
+	hidden := &FakeSource{NameStr: "kubescape", Available: true} // would normally fetch
+	m.Register(available)
+	m.Register(hidden)
+
+	m.SetAvailability("ctx", map[string]bool{
+		"trivy":     true,
+		"kubescape": false, // hint says NOT available — skip Fetch entirely
+	})
+
+	res, err := m.FetchAll(context.Background(), "ctx", "")
+	require.NoError(t, err)
+	assert.Len(t, res.Findings, 1, "only available source's findings show")
+	assert.Equal(t, int32(0), available.AvailCalls.Load(),
+		"hinted-available source must skip the IsAvailable probe")
+	assert.Equal(t, int32(1), available.FetchCalls.Load())
+	assert.Equal(t, int32(0), hidden.AvailCalls.Load(),
+		"hinted-unavailable source must skip both IsAvailable AND Fetch")
+	assert.Equal(t, int32(0), hidden.FetchCalls.Load())
+}
+
+// TestManagerFetchAllRespectsConcurrencyCap exercises the
+// SetMaxFetchConcurrency knob that bounds how many source Fetches can
+// run simultaneously. With cap=2 and 6 sources at 50ms each, the total
+// elapsed time must be ≥ ceil(6/2) * 50ms = 150ms — the cap forces a
+// 3-wave fan-out on a 6-source cluster, which is exactly the
+// control-plane-friendliness property we want on busy clusters with
+// every CRD-backed source installed.
+func TestManagerFetchAllRespectsConcurrencyCap(t *testing.T) {
+	m := NewManager()
+	m.SetMaxFetchConcurrency(2)
+	const sourceCount = 6
+	const delay = 50 * time.Millisecond
+	for i := range sourceCount {
+		m.Register(&FakeSource{
+			NameStr:    fmt.Sprintf("s%d", i),
+			Available:  true,
+			FetchDelay: delay,
+		})
+	}
+
+	start := time.Now()
+	res, err := m.FetchAll(context.Background(), "ctx", "")
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	assert.Len(t, res.Sources, sourceCount, "every source must produce a status")
+
+	// 6 sources, cap=2 → 3 waves. Lower bound: 3 * 50ms = 150ms.
+	// Upper bound is loose to absorb scheduler jitter on CI.
+	assert.GreaterOrEqual(t, elapsed, 3*delay,
+		"cap=2 with 6 sources must serialize into at least 3 waves")
+	assert.Less(t, elapsed, 6*delay+50*time.Millisecond,
+		"the cap must not serialize completely — parallel waves must still happen")
+}
+
+// TestManagerFetchAllUnboundedConcurrency confirms the
+// SetMaxFetchConcurrency(0) escape hatch still runs every source in
+// parallel (matches the pre-cap behaviour for tests that need it).
+func TestManagerFetchAllUnboundedConcurrency(t *testing.T) {
+	m := NewManager()
+	m.SetMaxFetchConcurrency(0) // disable cap
+	const sourceCount = 6
+	const delay = 50 * time.Millisecond
+	for i := range sourceCount {
+		m.Register(&FakeSource{
+			NameStr:    fmt.Sprintf("s%d", i),
+			Available:  true,
+			FetchDelay: delay,
+		})
+	}
+
+	start := time.Now()
+	_, err := m.FetchAll(context.Background(), "ctx", "")
+	elapsed := time.Since(start)
+	require.NoError(t, err)
+	// Fully parallel: elapsed ≈ delay + scheduler overhead.
+	assert.Less(t, elapsed, 2*delay,
+		"SetMaxFetchConcurrency(0) must run every source in parallel")
+}
+
+// TestManagerFetchAllFallsBackToProbeWhenNoHint guards the fallback path:
+// without SetAvailability, FetchAll must still call IsAvailable so
+// callers that don't pre-probe (tests, embedded uses) keep working.
+func TestManagerFetchAllFallsBackToProbeWhenNoHint(t *testing.T) {
+	m := NewManager()
+	s := &FakeSource{
+		NameStr: "s", Available: true,
+		Findings: []Finding{{ID: "1"}},
+	}
+	m.Register(s)
+
+	_, err := m.FetchAll(context.Background(), "ctx", "")
+	require.NoError(t, err)
+	assert.Equal(t, int32(1), s.AvailCalls.Load(),
+		"no hint → IsAvailable must run as before")
 }

@@ -2,6 +2,7 @@ package security
 
 import (
 	"context"
+	"maps"
 	"sync"
 	"time"
 )
@@ -28,15 +29,28 @@ type Manager struct {
 	mu      sync.RWMutex
 	sources []SecuritySource
 
-	refreshTTL      time.Duration
-	availabilityTTL time.Duration
+	refreshTTL          time.Duration
+	errorTTL            time.Duration // shorter TTL applied when no source succeeded
+	availabilityTTL     time.Duration
+	maxFetchConcurrency int // upper bound on simultaneous source Fetches; 0 = unbounded
 
-	cacheKey     string // lastCtx + "|" + lastNamespace
-	cachedResult FetchResult
-	cachedAt     time.Time
-	cachedIndex  *FindingIndex
+	cacheKey      string // lastCtx + "|" + lastNamespace
+	cachedResult  FetchResult
+	cachedAt      time.Time
+	cachedSuccess bool // anySourceSucceeded() at the time the result was cached
+	cachedIndex   *FindingIndex
 
 	availCache map[string]availEntry // key = kubeCtx
+
+	// perSourceAvail is the externally-supplied per-source availability
+	// hint, keyed by kubeCtx → sourceName → available. When present,
+	// FetchAll skips its own IsAvailable probe for that source and uses
+	// the hint directly. The probe inside FetchAll is the dominant
+	// non-Fetch API cost on slow / throttled clusters; the app-level
+	// loadSecurityAvailability already performed the same probe with a
+	// 3s budget per source, so re-doing it inside FetchAll doubles the
+	// API load on every navigation. SetAvailability populates this map.
+	perSourceAvail map[string]map[string]bool
 
 	ignoredNamespaces map[string]bool // global namespace filter applied to all sources
 }
@@ -46,15 +60,25 @@ type availEntry struct {
 	at        time.Time
 }
 
-// NewManager returns a Manager with sensible cache defaults (5min fetch, 60s availability).
-// The 5-minute fetch TTL keeps findings stable across navigation cycles
-// (drill into group → jump to resource → navigate back). Users press R
-// for explicit refresh.
+// NewManager returns a Manager with sensible cache defaults (5min fetch, 60s
+// availability). The 5-minute fetch TTL keeps findings stable across
+// navigation cycles (drill into group → jump to resource → navigate
+// back). Users press R for explicit refresh.
+//
+// errorTTL defaults to 30s — the shorter window applied when every
+// source errored. Without it, slow / throttled clusters fall into a
+// hammering loop: each navigation tick re-fires the same failing list
+// requests, the API server applies more aggressive rate limits, and the
+// right pane stays in "Scanning..." indefinitely. 30s is short enough
+// that genuine recovery feels responsive but long enough to break the
+// throttle spiral.
 func NewManager() *Manager {
 	return &Manager{
-		refreshTTL:      5 * time.Minute,
-		availabilityTTL: 60 * time.Second,
-		availCache:      make(map[string]availEntry),
+		refreshTTL:          5 * time.Minute,
+		errorTTL:            30 * time.Second,
+		availabilityTTL:     60 * time.Second,
+		maxFetchConcurrency: 2,
+		availCache:          make(map[string]availEntry),
 	}
 }
 
@@ -65,6 +89,32 @@ func (m *Manager) SetRefreshTTL(d time.Duration) {
 	m.refreshTTL = d
 }
 
+// SetErrorTTL overrides the negative-cache TTL applied when every
+// source erred (no findings produced). Zero disables negative caching
+// entirely — only do that in tests where you want every call to refire.
+func (m *Manager) SetErrorTTL(d time.Duration) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.errorTTL = d
+}
+
+// SetMaxFetchConcurrency caps the number of source Fetch calls that
+// run simultaneously inside FetchAll. The default (2) keeps peak
+// control-plane load roughly an order of magnitude below the original
+// fan-out behaviour on busy clusters with many CRD-backed sources
+// installed (Trivy + Kyverno + Gatekeeper + Kubescape can each list
+// hundreds of objects per call). Pass 0 to disable the cap (run every
+// source concurrently); useful in unit tests where the goroutines do
+// not actually hit a real API server.
+func (m *Manager) SetMaxFetchConcurrency(n int) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if n < 0 {
+		n = 0
+	}
+	m.maxFetchConcurrency = n
+}
+
 // SetAvailabilityTTL overrides the AnyAvailable cache TTL.
 func (m *Manager) SetAvailabilityTTL(d time.Duration) {
 	m.mu.Lock()
@@ -72,7 +122,10 @@ func (m *Manager) SetAvailabilityTTL(d time.Duration) {
 	m.availabilityTTL = d
 }
 
-// Refresh is FetchAll that always bypasses the cache.
+// Refresh is FetchAll that always bypasses the cache. Per-source
+// availability hints are kept — the caller (typically the app's
+// shift+r refresh flow) re-probes availability separately and will
+// re-publish via SetAvailability before/after Refresh.
 func (m *Manager) Refresh(ctx context.Context, kubeCtx, namespace string) (FetchResult, error) {
 	m.mu.Lock()
 	m.cacheKey = ""
@@ -104,6 +157,44 @@ func (m *Manager) Register(s SecuritySource) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.sources = append(m.sources, s)
+}
+
+// SetAvailability records the per-source availability map for kubeCtx
+// so subsequent FetchAll calls can skip their IsAvailable probe and go
+// straight to Fetch (or skip the source altogether). Pass the result of
+// the app-level availability probe (loadSecurityAvailability) here.
+//
+// Sources missing from byName are NOT treated as unavailable — they
+// fall back to FetchAll's regular IsAvailable probe. This lets callers
+// supply a partial map (e.g., only the sources whose probe completed)
+// without forcing the rest to be hidden.
+func (m *Manager) SetAvailability(kubeCtx string, byName map[string]bool) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if m.perSourceAvail == nil {
+		m.perSourceAvail = make(map[string]map[string]bool)
+	}
+	// Copy so the caller can mutate their map without racing us.
+	hint := make(map[string]bool, len(byName))
+	maps.Copy(hint, byName)
+	m.perSourceAvail[kubeCtx] = hint
+}
+
+// availabilityHint reports whether the caller has previously declared a
+// known availability for (kubeCtx, sourceName) via SetAvailability.
+// known=false means "no hint, fall back to s.IsAvailable".
+func (m *Manager) availabilityHint(kubeCtx, sourceName string) (known, available bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	byName, ok := m.perSourceAvail[kubeCtx]
+	if !ok {
+		return false, false
+	}
+	v, ok := byName[sourceName]
+	if !ok {
+		return false, false
+	}
+	return true, v
 }
 
 // SetIgnoredNamespaces configures namespaces that are excluded from ALL
@@ -155,15 +246,23 @@ func (m *Manager) AnyAvailable(ctx context.Context, kubeCtx string) (bool, error
 
 // FetchAll runs Fetch concurrently across all available sources. Per-source
 // errors do not cancel other sources; they are collected in result.Errors.
-// Results are cached by (kubeCtx, namespace) for refreshTTL.
+// Results are cached by (kubeCtx, namespace) for refreshTTL on success
+// and for errorTTL when every source erred (negative cache, breaks the
+// throttling spiral on slow clusters).
 func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (FetchResult, error) {
 	cacheKey := kubeCtx + "|" + namespace
 
 	m.mu.RLock()
-	if cacheKey == m.cacheKey && m.refreshTTL > 0 && time.Since(m.cachedAt) < m.refreshTTL {
-		cached := m.cachedResult
-		m.mu.RUnlock()
-		return cached, nil
+	if cacheKey == m.cacheKey {
+		ttl := m.refreshTTL
+		if !m.cachedSuccess {
+			ttl = m.errorTTL
+		}
+		if ttl > 0 && time.Since(m.cachedAt) < ttl {
+			cached := m.cachedResult
+			m.mu.RUnlock()
+			return cached, nil
+		}
 	}
 	m.mu.RUnlock()
 
@@ -176,20 +275,48 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 	}
 	results := make(chan sourceResult, len(sources))
 
-	// Use a plain WaitGroup; per-source errors flow into res.Errors via
-	// the results channel and the goroutines never return an error worth
-	// cancelling siblings on, so errgroup's WithContext semantics added
-	// dead weight without any benefit.
+	// Per-source errors flow into res.Errors via the results channel and
+	// goroutines never return an error worth cancelling siblings on, so
+	// errgroup's WithContext semantics added dead weight without any
+	// benefit. A buffered semaphore caps simultaneous Fetch calls — the
+	// default cap of 2 keeps a 6-source cluster from issuing six large
+	// list responses in parallel and stressing etcd. The semaphore is
+	// taken AFTER the IsAvailable hint check so unavailable sources cost
+	// nothing concurrency-wise.
+	maxConc := m.maxFetchConcurrency
+	if maxConc <= 0 || maxConc > len(sources) {
+		maxConc = len(sources)
+	}
+	sem := make(chan struct{}, maxConc)
 	var wg sync.WaitGroup
 	for _, s := range sources {
 		wg.Go(func() {
-			// Errors from IsAvailable are intentionally treated as "not
-			// available" (see SecuritySource docs) and do not propagate.
-			ok, _ := s.IsAvailable(ctx, kubeCtx)
-			if !ok {
+			// Skip the IsAvailable probe when the caller supplied a
+			// hint via SetAvailability (the app-level
+			// loadSecurityAvailability already paid this cost with a
+			// 3s-per-source budget). Without the hint, fall back to
+			// the source's own probe — errors are intentionally
+			// treated as "not available" (see SecuritySource docs).
+			known, available := m.availabilityHint(kubeCtx, s.Name())
+			if !known {
+				ok, _ := s.IsAvailable(ctx, kubeCtx)
+				available = ok
+			}
+			if !available {
 				results <- sourceResult{name: s.Name()}
 				return
 			}
+			// Acquire a slot before performing the (potentially expensive)
+			// list. If ctx is cancelled while waiting, exit promptly so
+			// the FetchAll budget isn't burned on already-cancelled work.
+			select {
+			case sem <- struct{}{}:
+			case <-ctx.Done():
+				results <- sourceResult{name: s.Name(), err: ctx.Err()}
+				return
+			}
+			defer func() { <-sem }()
+
 			findings, ferr := s.Fetch(ctx, kubeCtx, namespace)
 			results <- sourceResult{name: s.Name(), findings: findings, err: ferr}
 		})
@@ -225,16 +352,19 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 	}
 
 	m.mu.Lock()
-	// Cache when at least one source actually produced a result (Available
-	// is set on successful fetches at line 203 above). A clean cluster with
-	// zero findings is a valid cacheable outcome — without that we hammered
-	// the sources every navigation tick. Skip the cache only when *every*
-	// registered source errored, so the next FetchAll retries instead of
-	// serving an empty error-shaped result indefinitely.
-	if anySourceSucceeded(res.Sources) {
+	// Cache the result regardless of success — a clean cluster with zero
+	// findings is a valid full-TTL outcome (anySourceSucceeded=true,
+	// just empty), and an all-errored cluster gets the shorter errorTTL
+	// negative cache so the next navigation tick doesn't re-fire the
+	// same failing requests and dig the throttle hole even deeper.
+	// SetErrorTTL(0) disables negative caching for callers (tests) that
+	// need the old "always retry on error" behavior.
+	success := anySourceSucceeded(res.Sources)
+	if success || m.errorTTL > 0 {
 		m.cacheKey = cacheKey
 		m.cachedResult = res
 		m.cachedAt = time.Now()
+		m.cachedSuccess = success
 		m.cachedIndex = BuildFindingIndex(res.Findings)
 	}
 	m.mu.Unlock()
