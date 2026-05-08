@@ -117,9 +117,27 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 }
 
 // postTabSwitchCmd returns the appropriate command after switching tabs.
+//
+// In modeExplorer at the resource-data levels (LevelResources, LevelOwned,
+// LevelContainers) it batches the right-pane preview load with a
+// background refresh of the middle column. The cached middleItems
+// restored by loadTab are shown immediately; the refresh result replaces
+// them when the fetch returns. This is stale-while-revalidate — without
+// it, a mutation on tab A (e.g. deleting a pod whose restart count was
+// 10) leaves tab B's saved list stale until the next watch tick or
+// manual refresh.
+//
+// LevelClusters / LevelResourceTypes are intentionally excluded: contexts
+// and resource-type discovery don't go stale during a session, and
+// re-running discovery on every tab switch would be wasteful.
 func (m Model) postTabSwitchCmd() tea.Cmd {
 	if m.mode == modeExplorer {
-		return m.loadPreview()
+		cmds := []tea.Cmd{m.loadPreview()}
+		switch m.nav.Level {
+		case model.LevelResources, model.LevelOwned, model.LevelContainers:
+			cmds = append(cmds, m.refreshCurrentLevel())
+		}
+		return tea.Batch(cmds...)
 	}
 	if m.mode == modeLogs && m.logCh != nil {
 		return m.waitForLogLine()
