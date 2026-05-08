@@ -163,12 +163,16 @@ func TestNodeShellArgsUseRunWithCleanOverrides(t *testing.T) {
 
 	var spec struct {
 		Spec struct {
-			HostPID     bool   `json:"hostPID"`
-			HostIPC     bool   `json:"hostIPC"`
-			HostNetwork bool   `json:"hostNetwork"`
-			NodeName    string `json:"nodeName"`
-			Tolerations []struct {
+			HostPID           bool   `json:"hostPID"`
+			HostIPC           bool   `json:"hostIPC"`
+			HostNetwork       bool   `json:"hostNetwork"`
+			NodeName          string `json:"nodeName"`
+			PriorityClassName string `json:"priorityClassName"`
+			Tolerations       []struct {
+				Key      string `json:"key"`
 				Operator string `json:"operator"`
+				Value    string `json:"value"`
+				Effect   string `json:"effect"`
 			} `json:"tolerations"`
 			Containers []struct {
 				Name            string   `json:"name"`
@@ -188,8 +192,36 @@ func TestNodeShellArgsUseRunWithCleanOverrides(t *testing.T) {
 	assert.True(t, spec.Spec.HostIPC, "hostIPC required for nsenter --ipc")
 	assert.True(t, spec.Spec.HostNetwork)
 	assert.Equal(t, "node-1", spec.Spec.NodeName, "pod must pin to the target node")
-	require.Len(t, spec.Spec.Tolerations, 1, "must tolerate all taints to land on control-plane nodes")
-	assert.Equal(t, "Exists", spec.Spec.Tolerations[0].Operator)
+
+	// system-node-critical lifts the pod above the kubelet eviction manager's
+	// admission gate so it can run on DiskPressure / MemoryPressure /
+	// PIDPressure nodes (admission rejects non-critical pods regardless of
+	// tolerations). Reserved for kube-system, hence nodeShellNamespace.
+	assert.Equal(t, "system-node-critical", spec.Spec.PriorityClassName,
+		"priorityClassName must lift pod above kubelet eviction admission gate")
+
+	// Must tolerate every taint on every effect — control-plane, NotReady,
+	// Unschedulable, and the four pressure taints all use distinct keys/effects.
+	require.NotEmpty(t, spec.Spec.Tolerations, "must tolerate all taints")
+	for _, tol := range spec.Spec.Tolerations {
+		assert.Equal(t, "Exists", tol.Operator,
+			"every toleration must use operator Exists to match all values")
+		assert.Empty(t, tol.Key,
+			"every toleration must have empty key to match all taint keys")
+		assert.Empty(t, tol.Value,
+			"operator Exists forbids value")
+		assert.Contains(t, []string{"", "NoSchedule", "PreferNoSchedule", "NoExecute"}, tol.Effect,
+			"effect must be empty or one of the three valid taint effects")
+	}
+	// Per-effect coverage: an empty effect already matches all, but the
+	// explicit per-effect entries make the intent grep-able.
+	effects := map[string]bool{}
+	for _, tol := range spec.Spec.Tolerations {
+		effects[tol.Effect] = true
+	}
+	for _, want := range []string{"", "NoSchedule", "PreferNoSchedule", "NoExecute"} {
+		assert.True(t, effects[want], "missing toleration entry for effect %q", want)
+	}
 
 	require.Len(t, spec.Spec.Containers, 1)
 	c := spec.Spec.Containers[0]
@@ -209,6 +241,16 @@ func TestNodeShellArgsUseRunWithCleanOverrides(t *testing.T) {
 	for _, short := range []string{"-t", "-m", "-u", "-i", "-n", "-p"} {
 		assert.NotContains(t, c.Command, short, "expected long flag instead of %s", short)
 	}
+}
+
+// system-node-critical is the only built-in priority class that lifts a pod
+// above the kubelet eviction manager's admission gate, and it is reserved by
+// the Priority admission plugin to pods in kube-system. Pinning the namespace
+// here is what lets `lfk` open a node shell on a DiskPressure-tainted node.
+func TestNodeShellNamespaceIsKubeSystem(t *testing.T) {
+	assert.Equal(t, "kube-system", nodeShellNamespace,
+		"system-node-critical priorityClass is restricted to kube-system; "+
+			"changing this namespace will break node shell on tainted/pressured nodes")
 }
 
 // nodeShellArgs falls back to the "default" namespace when the caller passes

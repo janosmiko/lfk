@@ -13,7 +13,7 @@ import (
 func (m Model) executeActionShell() (tea.Model, tea.Cmd) {
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run lfk-node-shell-<rand> -n default --rm -it --restart=Never --image=busybox --context %s --overrides='<spec pinned to %s with hostPID/IPC/Net + privileged + nsenter>'", ctx, name))
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl run lfk-node-shell-<rand> -n kube-system --rm -it --restart=Never --image=busybox --context %s --overrides='<spec pinned to %s with hostPID/IPC/Net + privileged + nsenter + system-node-critical + tolerate-everything>'", ctx, name))
 	return m, m.execKubectlNodeShell()
 }
 

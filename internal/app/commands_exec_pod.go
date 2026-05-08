@@ -214,6 +214,15 @@ func (m Model) runDebugPodWithPVC() tea.Cmd {
 	return runInteractiveShellExec(cmd, title, "Debug pod", true)
 }
 
+// nodeShellNamespace is the namespace nodeshell pods are always created in.
+//
+// nodeshell needs system-node-critical priority so the kubelet admits the pod
+// on nodes with DiskPressure / MemoryPressure / PIDPressure conditions
+// (admission rejects non-critical pods regardless of tolerations). The
+// built-in Priority admission plugin restricts that priority class to pods
+// in kube-system, so the namespace is pinned here.
+const nodeShellNamespace = "kube-system"
+
 func nodeShellOverrides(podName, nodeName string) (string, error) {
 	spec := map[string]any{
 		"apiVersion": "v1",
@@ -222,7 +231,23 @@ func nodeShellOverrides(podName, nodeName string) (string, error) {
 			"hostIPC":     true,
 			"hostNetwork": true,
 			"nodeName":    nodeName,
-			"tolerations": []map[string]any{{"operator": "Exists"}},
+			// system-node-critical lifts the pod above the kubelet eviction
+			// manager's admission gate so it can land on nodes reporting
+			// DiskPressure / PIDPressure / MemoryPressure conditions. The
+			// priority class is built into Kubernetes since 1.11 and is
+			// reserved for the kube-system namespace (see nodeShellNamespace).
+			"priorityClassName": "system-node-critical",
+			// Tolerate every taint on every effect so the pod can land on
+			// control-plane, NotReady, Unschedulable, or pressure-tainted
+			// nodes. {operator: Exists} with no key/effect already matches
+			// all taints per the Kubernetes spec; the per-effect entries are
+			// kept for readability and to make the intent grep-able.
+			"tolerations": []map[string]any{
+				{"operator": "Exists"},
+				{"operator": "Exists", "effect": "NoSchedule"},
+				{"operator": "Exists", "effect": "PreferNoSchedule"},
+				{"operator": "Exists", "effect": "NoExecute"},
+			},
 			"containers": []map[string]any{{
 				"name":  podName,
 				"image": "busybox",
@@ -280,7 +305,7 @@ func (m Model) execKubectlNodeShell() tea.Cmd {
 		}
 	}
 
-	args := nodeShellArgs(podName, m.actionNamespace(), m.kubectlContext(ctx), overrides)
+	args := nodeShellArgs(podName, nodeShellNamespace, m.kubectlContext(ctx), overrides)
 	cmd := exec.Command(kubectlPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+m.client.KubeconfigPathForContext(ctx))
 	logExecCmd("Running kubectl command", cmd)
