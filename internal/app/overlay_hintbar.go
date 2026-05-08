@@ -275,6 +275,8 @@ func (m Model) overlayHintBarMisc() string {
 		})
 	case overlayLocalClusters:
 		return m.overlayHintBarOverlayLocalClusters()
+	case overlayTrafficCapture:
+		return m.overlayHintBarOverlayTrafficCapture()
 	case overlayOrphans:
 		// Filter input mode hides most navigation hints — show only
 		// the keys that actually do something while typing.
@@ -600,6 +602,50 @@ func (m Model) overlayHintBarOverlayFinalizerSearch() string {
 		{Key: "/", Desc: "filter"},
 		{Key: "esc", Desc: "close"},
 	})
+}
+
+// overlayHintBarOverlayTrafficCapture returns the hint bar entries for the
+// traffic-capture overlay, branching on the current capture phase. Inline
+// hints inside the overlay body are deliberately avoided — the project-wide
+// convention is the bottom-of-screen status bar.
+func (m Model) overlayHintBarOverlayTrafficCapture() string {
+	switch m.captureOverlay.phase {
+	case capturePhaseEndpointPick:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "Enter", Desc: "pick"},
+			{Key: "Esc", Desc: "close"},
+		})
+	case capturePhaseLive:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "s", Desc: "stop"},
+			{Key: "t", Desc: "status-only"},
+			{Key: "Y", Desc: "copy path"},
+			{Key: "/", Desc: "search"},
+			{Key: "j/k", Desc: "scroll"},
+			{Key: "ctrl+d/u", Desc: "half page"},
+			{Key: "ctrl+f/b", Desc: "page"},
+			{Key: "g/G", Desc: "oldest/live"},
+			{Key: "Esc", Desc: "stop"},
+		})
+	case capturePhaseStopped:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "Enter", Desc: "restart"},
+			{Key: "e", Desc: "edit filter"},
+			{Key: "Y", Desc: "copy path"},
+			{Key: "j/k", Desc: "scroll"},
+			{Key: "ctrl+d/u", Desc: "half page"},
+			{Key: "ctrl+f/b", Desc: "page"},
+			{Key: "Esc", Desc: "close"},
+		})
+	default: // capturePhaseConfig
+		return m.renderHints([]ui.HintEntry{
+			{Key: "Enter", Desc: "start"},
+			{Key: "Tab/jk", Desc: "next field"},
+			{Key: "h/l", Desc: "cycle value"},
+			{Key: "Esc", Desc: "close"},
+		})
+	}
 }
 
 func (m Model) overlayHintBarOverlayCanI() string {

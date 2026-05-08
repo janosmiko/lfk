@@ -106,6 +106,7 @@ func runTUI(opts app.StartupOptions) error {
 	}
 	model.PinnedGroups = ui.ConfigPinnedGroups
 	client.SetSecretLazyLoading(ui.ConfigSecretLazyLoading)
+	client.SetKubesharkNamespace(ui.ConfigKubesharkNamespace)
 	client.SetInformerCacheMode(k8s.InformerCacheMode(ui.ConfigInformerCacheMode))
 	defer client.Shutdown()
 

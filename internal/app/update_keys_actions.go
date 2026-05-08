@@ -643,7 +643,7 @@ func (m Model) handleExplorerActionKeySecretEditor() (tea.Model, tea.Cmd, bool) 
 }
 
 func (m Model) handleExplorerActionKeyLabelEditor() (tea.Model, tea.Cmd, bool) {
-	if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind != "__port_forwards__" {
+	if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind != "__port_forwards__" && m.nav.ResourceType.Kind != "__captures__" {
 		sel := m.selectedMiddleItem()
 		if sel != nil {
 			m.labelResourceType = m.nav.ResourceType

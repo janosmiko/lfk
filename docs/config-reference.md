@@ -633,6 +633,15 @@ Navigate the captured scrollback with `Ctrl+]` `Ctrl+U`/`Ctrl+D` (half
 page), `Ctrl+]` `Ctrl+B`/`Ctrl+F` (full page), `Ctrl+]` `g`/`G`
 (oldest/live), or the mouse wheel (1 line per tick).
 
+## kubeshark
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `kubeshark.namespace` | string | `kubeshark` | Namespace probed for `Service kubeshark-hub` by the Traffic Capture overlay's kubeshark backend. |
+
+If the Service isn't found in this namespace, the kubeshark chip is
+omitted from the backend picker.
+
 ## Color Schemes
 
 Over 460 built-in color schemes are available, generated from [ghostty terminal themes](https://github.com/ghostty-org/ghostty). Popular schemes include:

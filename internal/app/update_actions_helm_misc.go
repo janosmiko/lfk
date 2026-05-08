@@ -195,6 +195,13 @@ func (m Model) executeActionStop() (tea.Model, tea.Cmd) {
 			return m, m.stopPortForward(pfID)
 		}
 	}
+	// Stop a capture entry.
+	if m.actionCtx.kind == "__captures__" {
+		sel := m.selectedMiddleItem()
+		if sel != nil {
+			return m.stopCaptureFromPseudo(*sel)
+		}
+	}
 	return m, nil
 }
 

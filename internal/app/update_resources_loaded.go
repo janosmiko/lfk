@@ -360,7 +360,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	// cache instead of refetching. Only record for actual resource lists;
 	// __port_forwards__ is synthetic (sourced from the in-process manager)
 	// and doesn't go through GetResources.
-	if m.nav.ResourceType.Resource != "" && m.nav.ResourceType.Kind != "__port_forwards__" {
+	if m.nav.ResourceType.Resource != "" && m.nav.ResourceType.Kind != "__port_forwards__" && m.nav.ResourceType.Kind != "__captures__" {
 		m.cacheFingerprints[mainCacheKey] = m.fetchFingerprint()
 	}
 	// Always sort: the k8s layer uses a non-stable single-key sort that

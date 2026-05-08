@@ -534,6 +534,25 @@ func TestCovOpenActionMenuBulk(t *testing.T) {
 	assert.True(t, rm.bulkMode)
 }
 
+// TestOpenBulkSelectionMenu_EmptyKindLeavesNoPartialBulkState guards the
+// kind-validates-before-mutation contract on openBulkSelectionMenu: when
+// selectedResourceKind returns "" (heterogeneous selection or
+// unclassifiable items), the early return must NOT leave bulkMode=true
+// and bulkItems set. Otherwise downstream key handlers treat the empty
+// action menu as if a bulk operation were staged.
+func TestOpenBulkSelectionMenu_EmptyKindLeavesNoPartialBulkState(t *testing.T) {
+	m := baseModelActions()
+	// LevelClusters reports an empty resource kind for any selection — the
+	// cluster picker doesn't have a notion of bulk-able resource kinds.
+	m.nav.Level = model.LevelClusters
+	m.selectedItems[selectionKey(model.Item{Name: "ctx-a"})] = true
+	m.middleItems = []model.Item{{Name: "ctx-a"}}
+
+	out := m.openBulkSelectionMenu()
+	assert.False(t, out.bulkMode, "bulkMode must stay false on empty-kind early return")
+	assert.Empty(t, out.bulkItems, "bulkItems must stay empty on empty-kind early return")
+}
+
 func TestCovOpenActionMenuNoMiddleItems(t *testing.T) {
 	m := baseModelActions()
 	m.middleItems = nil

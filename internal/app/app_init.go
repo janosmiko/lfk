@@ -106,6 +106,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		activeTab:      0,
 		execMu:         &sync.Mutex{},
 		portForwardMgr: k8s.NewPortForwardManager(),
+		captureMgr:     k8s.NewCaptureManager(),
 	}
 
 	// Stale-while-revalidate: seed discoveredResources from the per-host

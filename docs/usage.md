@@ -359,6 +359,41 @@ To avoid false positives, the detector excludes these system-managed resources:
 | ConfigMap   | Named `kube-root-ca.crt` (auto-injected per namespace)         |
 | Service     | Headless (`clusterIP=None`) or `type=ExternalName`             |
 
+## Traffic capture
+
+Press `c` on a Pod or Service to open the capture overlay. Backends
+auto-detected:
+
+| Backend | Mechanism | Requirements |
+|---|---|---|
+| `kubectl debug` | Ephemeral container streaming `tcpdump` | kubectl 1.30+, ephemeral containers enabled, target pod can grant `NET_ADMIN` / `NET_RAW` |
+| kubeshark | Hand-off (port-forward + browser) | `kubeshark-hub` Service in `kubeshark` namespace (override via `kubeshark.namespace`) |
+
+Hardened non-root pods can't grant `NET_ADMIN` / `NET_RAW`; capture fails
+with a message pointing at kubeshark. Install with
+`helm install kubeshark kubeshark/kubeshark -n kubeshark --create-namespace`.
+
+pcap output: `$XDG_STATE_HOME/lfk/captures/` (default
+`~/.local/state/lfk/captures/`). The full per-phase keymap lives in
+[`docs/keybindings.md`](keybindings.md#traffic-capture-overlay); the
+load-bearing keys:
+
+- `s` — stop, stay in overlay
+- `Esc` — stop and stay; second `Esc` dismisses + deletes the pcap
+  unless `Y` was pressed
+- `Y` — copy pcap path to system clipboard, marks the capture as saved
+- `e` (from stopped phase) — re-open config to tweak the filter, then
+  `Enter` to restart
+- `__captures__` (Networking sidebar group) — cluster-wide list of
+  running and stopped captures
+
+Read-only mode (`--read-only`, or `Ctrl+R`) blocks the kubectl-debug
+backend (which creates an ephemeral container). The kubeshark hand-off
+stays available even though it uses port-forward internally — the
+listed [Read-Only](#read-only-mode) `port-forward` block applies to the
+user-triggered Port Forward action, not to the kubeshark backend's
+read-only tunnel to its in-cluster hub.
+
 ## Secret Lazy Loading
 
 On clusters with many Helm releases or large TLS secrets, listing the

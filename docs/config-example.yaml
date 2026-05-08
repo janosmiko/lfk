@@ -377,6 +377,12 @@ confirm_on_exit: true
 # Default: 2s
 # watch_interval: 2s
 
+# ─── Kubeshark ────────────────────────────────────────────────────────────────
+# Namespace probed for Service kubeshark-hub by the Traffic Capture overlay.
+# Default: kubeshark (matches `helm install kubeshark/kubeshark -n kubeshark`).
+# kubeshark:
+#   namespace: kubeshark
+
 # ─── Informer Cache ───────────────────────────────────────────────────────────
 # How resource list calls are routed:
 #   "off"     - round-trip every list to the API server (matches kubectl).

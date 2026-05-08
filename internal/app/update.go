@@ -304,6 +304,11 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case syncWaveSpinnerTickMsg:
 		mdl, cmd := m.handleSyncWaveSpinnerTick(msg)
 		return mdl, cmd, true
+	case captureBackendsLoadedMsg, captureStartedMsg, captureFailedMsg,
+		captureStoppedMsg, captureLiveTickMsg, kubesharkLaunchedMsg,
+		captureUpdateMsg:
+		mdl, cmd := m.routeCaptureMsg(msg)
+		return mdl, cmd, true
 	case quotaLoadedMsg:
 		mdl, cmd := m.updateQuotaLoaded(msg)
 		return mdl, cmd, true

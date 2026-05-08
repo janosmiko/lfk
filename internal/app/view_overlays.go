@@ -154,6 +154,14 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayColorscheme:
 		content := ui.RenderColorschemeOverlay(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor, m.schemeFilterMode)
 		return content, min(50, m.width-10), min(22, m.height-6), true
+	}
+	return m.renderOverlayContentExtended()
+}
+
+// renderOverlayContentExtended handles the second half of overlay types,
+// split from renderOverlayContent to keep cyclomatic complexity under 30.
+func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
+	switch m.overlay {
 	case overlayFilterPreset:
 		c, w, h := m.renderOverlayFilterPreset()
 		return c, w, h, true
@@ -197,17 +205,11 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		c, w, h := m.renderOverlayFinalizerSearch()
 		return c, w, h, true
 	case overlayPasteConfirm:
-		lineCount := strings.Count(strings.TrimRight(m.pendingPaste, "\n"), "\n") + 1
-		return ui.RenderPasteConfirmOverlay(lineCount), min(45, m.width-10), min(8, m.height-6), true
+		c, w, h := m.renderOverlayPasteConfirm()
+		return c, w, h, true
 	case overlayClusterColor:
-		content := ui.RenderClusterColorOverlay(
-			m.clusterColorOverlayContext,
-			m.filteredClusterColorNames(),
-			m.clusterColorOverlayCursor,
-			m.clusterColorFilter.Value,
-			m.clusterColorFilterMode,
-		)
-		return content, min(40, m.width-10), min(15, m.height-6), true
+		c, w, h := m.renderOverlayClusterColor()
+		return c, w, h, true
 	case overlayLocalClusters:
 		w, h := min(100, m.width-10), min(20, m.height-6)
 		state := m.buildLocalClusterOverlayState()
@@ -219,8 +221,37 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 			return ui.RenderLocalClusterDeleteConfirm(state, m.buildLocalClusterDeleteConfirmView()), w, h, true
 		}
 		return ui.RenderLocalClusterWizard(state, m.buildLocalClusterWizardView()), w, h, true
+	case overlayTrafficCapture:
+		c, w, h := m.renderOverlayTrafficCapture()
+		return c, w, h, true
 	}
 	return "", 0, 0, false
+}
+
+func (m Model) renderOverlayPasteConfirm() (string, int, int) {
+	lineCount := strings.Count(strings.TrimRight(m.pendingPaste, "\n"), "\n") + 1
+	return ui.RenderPasteConfirmOverlay(lineCount), min(45, m.width-10), min(8, m.height-6)
+}
+
+func (m Model) renderOverlayClusterColor() (string, int, int) {
+	content := ui.RenderClusterColorOverlay(
+		m.clusterColorOverlayContext,
+		m.filteredClusterColorNames(),
+		m.clusterColorOverlayCursor,
+		m.clusterColorFilter.Value,
+		m.clusterColorFilterMode,
+	)
+	return content, min(40, m.width-10), min(15, m.height-6)
+}
+
+func (m Model) renderOverlayTrafficCapture() (string, int, int) {
+	// OverlayStyle adds 6 cols of horizontal chrome (2 border + 2*2 padding)
+	// and 4 rows of vertical chrome on top of (w, h). m.width-8 keeps a small
+	// terminal margin so a long pod name in the title can't push us over.
+	w, h := min(120, m.width-8), min(35, m.height-6)
+	contentW := max(w-4, 20)
+	contentH := max(h-4, 5)
+	return ui.RenderTrafficCaptureOverlay(buildCaptureOverlayEntry(m), contentW, contentH), w, h
 }
 
 func (m Model) renderOverlayFilterPreset() (string, int, int) {

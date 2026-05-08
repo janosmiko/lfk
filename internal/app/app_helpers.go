@@ -117,6 +117,9 @@ func (m *Model) performQuitCleanup() {
 	if m.portForwardMgr != nil {
 		m.portForwardMgr.StopAll()
 	}
+	if m.captureMgr != nil {
+		m.captureMgr.StopAll()
+	}
 	m.cancelAllTabLogStreams()
 	m.cancelInFlightRequests()
 	m.saveCurrentSession()

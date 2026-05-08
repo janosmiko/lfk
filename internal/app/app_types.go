@@ -76,8 +76,9 @@ const (
 	overlayCrashInvestigator
 	overlayOrphans // cluster-wide orphan resource overview (Shift+O)
 	overlayRightsizing
-	overlaySyncWave      // per-Application sync wave timeline (action menu key W)
-	overlayLocalClusters // local-cluster manager (Ctrl+N at LevelClusters)
+	overlaySyncWave       // per-Application sync wave timeline (action menu key W)
+	overlayLocalClusters  // local-cluster manager (Ctrl+N at LevelClusters)
+	overlayTrafficCapture // per-pod live packet capture (action menu key c)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

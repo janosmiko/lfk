@@ -711,11 +711,10 @@ type Model struct {
 	// Overlay to restore when the current closes — set when a nested overlay flow opens (e.g., RBAC → namespace selector → back to RBAC).
 	previousOverlay overlayKind
 
-	// Per-context pinned CRD groups state.
-	pinnedState *PinnedState
-
-	// Port forward manager: tracks active kubectl port-forward processes.
+	pinnedState    *PinnedState // per-context pinned CRD groups state
 	portForwardMgr *k8s.PortForwardManager
+	captureMgr     *k8s.CaptureManager // tracks active packet capture processes
+	captureOverlay captureOverlayState
 
 	// Port forward overlay state: discovered ports for the selected resource.
 	pfAvailablePorts []ui.PortInfo

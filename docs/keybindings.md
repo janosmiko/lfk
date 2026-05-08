@@ -1107,3 +1107,51 @@ the wave-annotation fetch phase.
 Below 50 cols of terminal width, the overlay falls back to single-pane
 mode (sidebar hidden, body uses full width). Tab becomes a no-op in this
 mode.
+
+### Traffic Capture overlay
+
+Open: Pod or Service action menu (`x`) → Capture Traffic (`c`).
+
+#### Configuration phase
+
+| Key | Action |
+|---|---|
+| `Tab` / `Shift+Tab` | Cycle focus between fields (Backend → Interface → Filter → Preset) |
+| `j` / `k` / `↓` / `↑` | Next / previous field (when focus is not on Filter input) |
+| `h` / `l` / `←` / `→` | Cycle the value of the focused field (backend, interface, preset) |
+| (text) | Type BPF filter (when filter input has focus) |
+| `Backspace` | Edit filter |
+| `Enter` | Start capture (or launch kubeshark hand-off) |
+| `Esc` | Close overlay |
+
+For Service targets, an endpoint picker appears first:
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate endpoints |
+| `Enter` | Pick endpoint and proceed to config |
+| `Esc` / `q` | Close overlay |
+
+#### Live phase
+
+| Key | Action |
+|---|---|
+| `s` | Stop capture; transitions to stopped phase, overlay stays |
+| `Esc` / `q` | Stop capture and stay in the overlay; second Esc dismisses |
+| `t` | Toggle live table vs status-only view |
+| `Y` | Copy pcap path to system clipboard; marks capture saved |
+| `/` | Search within live table |
+| `j` / `k` | Scroll older / newer (tail-anchored: `0` = latest at bottom) |
+| `Ctrl+D` / `Ctrl+U` | Half-page scroll older / newer |
+| `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page scroll older / newer |
+| `g` / `G` | Jump to oldest / return to live (latest) |
+
+#### Stopped phase
+
+| Key | Action |
+|---|---|
+| `Enter` | Restart capture with the same params |
+| `e` | Edit filter — re-opens config phase, previous filter is preserved |
+| `Y` | Copy pcap path to clipboard (mark saved so dismiss won't delete) |
+| `j` / `k` / `Ctrl+D/U` / `Ctrl+F/B` / `g` / `G` | Scroll (same semantics as live) |
+| `Esc` / `q` | Dismiss; deletes the pcap unless `Y` was pressed |

@@ -198,6 +198,9 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	case overlayLocalClusters:
 		mdl, cmd, _ := m.updateLocalClusterKey(msg)
 		return mdl, cmd, true
+	case overlayTrafficCapture:
+		mdl, cmd := m.updateOverlayCapture(msg)
+		return mdl, cmd, true
 	}
 	return m, nil, false
 }

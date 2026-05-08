@@ -156,3 +156,65 @@ managed by argo-cd >= 2.0. Examples below assume `my-app` in `argocd`.
 20. Trigger a sync (s on Application). Reopen Sync Wave Timeline.
     - Expected: spinner animates in header during wave-annotation fetch;
       cursor + scroll preserved across the 3s refresh ticks.
+## Traffic Capture (`feat/traffic-capture`)
+
+Verifies the configuration / live / stopped phases, the `__captures__`
+pseudo-resource, and the on-node cleanup path that prevents disk-pressure
+from orphaned ephemeral containers.
+
+### Prerequisites
+
+- A kind / minikube / remote cluster
+- `kubectl` 1.30 or newer (for `--profile=netadmin`)
+- Optional: `helm install kubeshark kubeshark/kubeshark --namespace kubeshark --create-namespace` to test the kubeshark hand-off
+- `tshark` (or wireshark) for verifying exported pcap files
+
+### Setup
+
+```bash
+kind create cluster --name capture-test
+kubectl run web --image=nginx
+kubectl run client --image=curlimages/curl --command -- sleep infinity
+# Generate steady traffic from client to web:
+kubectl exec client -- /bin/sh -c 'while true; do curl -s web > /dev/null; sleep 1; done' &
+```
+
+### Cases
+
+| # | Steps | Expected |
+|---|-------|----------|
+| 1 | `lfk` → namespaces → `default` → pods → `web` → `x` → `c` (Capture Traffic) | Config phase opens **immediately** with `kubectl-debug` chip already shown (synchronous); kubeshark chip appears asynchronously when the probe lands (or is omitted if not deployed) |
+| 2 | `Tab` to focus the preset row, `h`/`l` to cycle | Cycles `all` / `DNS` / `HTTP/S` / `no kube internals`; Filter input updates |
+| 3 | Pick `HTTP/S` → `Enter` | Live phase; badge `● capturing Ns`; live table fills with **decoded** TCP packets (`Protocol=TCP`, real src/dst addresses + ports — not `OTHER  :  :  <length>`) |
+| 4 | `t` | Status-only mode: table hides; packet/byte counters keep climbing |
+| 5 | `t` again | Table re-shows; new packets append at the bottom |
+| 6 | `j` then `k` | `j` scrolls toward latest (no-op when already at 0); `k` reveals older history |
+| 7 | `Ctrl+U` / `Ctrl+B` / `PgUp` | Half-page / full-page back into history |
+| 8 | `Ctrl+D` / `Ctrl+F` / `PgDn` | Half-page / full-page toward latest, clamps at 0 |
+| 9 | `g` then `G` | `g` jumps to the oldest packet; `G` returns to live (latest at bottom) |
+| 10 | `Y` | Status: `pcap path copied to clipboard: <path>`; verify with `pbpaste` (macOS) / `xclip -o -selection clipboard` (Linux) |
+| 11 | `Esc` | Capture stops; overlay **stays open** in stopped phase; badge `■ stopped`; second `Esc` dismisses |
+| 12 | Re-open via `c`, start a fresh capture, `s` to stop, `e` | Edit-filter path: returns to config phase with previous filter pre-filled; `Enter` restarts |
+| 13 | Restart-cleanup: do step 12 WITHOUT pressing Y on the first capture | First capture's pcap file deleted from `$XDG_STATE_HOME/lfk/captures/` when the second starts |
+| 14 | Open `__captures__` from Networking sidebar | Row for `web` pod visible with STATUS, BACKEND, packet/byte counts, file path |
+| 15 | `x` → `Open` on the `__captures__` row | Stopped overlay re-opens for that capture |
+| 16 | `x` → `Delete File` | pcap removed; status bar confirms; row updates |
+| 17 | Exported pcap: `tshark -r ~/.local/state/lfk/captures/<file>.pcap \| head` | Shows TCP packets — confirms decoder + on-disk pcap are well-formed |
+| 18 | Service variant: `kubectl expose pod web --port=80`; navigate `services` → `web` → `x` → `c` | Endpoint picker phase first; pick a pod → config phase → live |
+| 19 | Kubeshark variant: with kubeshark installed, pick the kubeshark chip → `Enter` | Port-forward starts (visible in `__port_forwards__`); browser opens to `localhost:<port>/?q=name == "web"`; overlay closes |
+| 20 | Read-only variant: `lfk --read-only`; open overlay; `Enter` with kubectl-debug | Status: `kubectl-debug capture disabled by read-only — kubeshark hand-off available`; capture does NOT start |
+| 21 | Read-only + kubeshark | Hand-off works (kubeshark is a pure read on the cluster) |
+| 22 | Dismiss-deletes-unsaved: start capture; `Esc` then `Esc` (no Y) | The pcap file is deleted from `$XDG_STATE_HOME/lfk/captures/` |
+| 23 | Save-survives-dismiss: start capture; `Y`; then `Esc` `Esc` | The pcap file remains on disk |
+| 24 | **Disk-pressure fix**: start a capture; `s` to stop; SSH to the node and run `du -sh /var/log/pods/*/lfk-trafcap-*/` | Log directory size is bounded; the running tcpdump in the ephemeral container terminated within ~5s of the stop; `crictl ps -name '^lfk-trafcap-'` returns nothing |
+| 25 | **Timeout safety net**: start a capture, `kill -9 lfk` (force-kill the lfk process before pressing Esc/s) | Within 30 minutes the orphan tcpdump self-terminates via the `timeout 30m` wrapper; verify on the node |
+
+### Cleanup
+
+```bash
+# Stop the curl loop:
+kubectl exec client -- pkill -f curl 2>/dev/null || true
+kind delete cluster --name capture-test
+# If kubeshark was installed:
+helm uninstall kubeshark --namespace kubeshark 2>/dev/null || true
+```

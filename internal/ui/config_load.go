@@ -149,6 +149,17 @@ type configFile struct {
 	// any (sticky behavior), otherwise falls back to "highest-priority
 	// available strategy" + 1.25 headroom.
 	RightsizingDefaults *RightsizingDefaultsConfig `json:"rightsizing_defaults" yaml:"rightsizing_defaults"`
+	// Kubeshark configures the kubeshark hand-off backend used by the
+	// Traffic Capture overlay. Only the namespace is plumbed today;
+	// future fields can land here without further config schema changes.
+	Kubeshark *KubesharkConfig `json:"kubeshark" yaml:"kubeshark"`
+}
+
+// KubesharkConfig is the on-disk schema for the kubeshark section.
+type KubesharkConfig struct {
+	// Namespace where Service kubeshark-hub lives. Empty / unset falls
+	// back to DefaultKubesharkNamespace ("kubeshark").
+	Namespace string `json:"namespace" yaml:"namespace"`
 }
 
 // clusterConfig holds per-cluster configuration overrides.

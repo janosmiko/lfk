@@ -52,6 +52,10 @@ func TestIsMutatingAction(t *testing.T) {
 		"Watch Workflow",
 		// Helm read-only views.
 		"Values", "All Values", "History", "Refresh",
+		// Opening the traffic capture overlay is allowed in read-only mode;
+		// streaming backend (kubectl-debug) is gated inside
+		// startSelectedBackend, not at the action dispatcher.
+		"Capture Traffic",
 	}
 	for _, label := range readOnly {
 		assert.False(t, isMutatingAction(label), "%q must not be classified mutating", label)

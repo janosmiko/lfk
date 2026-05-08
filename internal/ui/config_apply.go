@@ -172,9 +172,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.NoColor != nil {
 		ConfigNoColor = *cfg.NoColor
 	}
-	if cfg.SecretLazyLoading != nil {
-		ConfigSecretLazyLoading = *cfg.SecretLazyLoading
-	}
+	applyDataAccessConfig(cfg)
 	applyInformerCacheSetting(cfg.InformerCache)
 	if cfg.MinContrastRatio != nil {
 		ConfigMinContrastRatio = clamp01(*cfg.MinContrastRatio)
@@ -188,6 +186,23 @@ func applyConfigOptions(cfg configFile) {
 		// value) disables color. Env takes precedence over the config file
 		// field; CLI flag is applied later in main.go.
 		ConfigNoColor = true
+	}
+}
+
+// applyDataAccessConfig applies the cluster-data-access settings:
+// secret lazy-loading and the kubeshark hub namespace. Extracted from
+// applyConfigOptions so the dispatcher stays under the gocyclo cap.
+func applyDataAccessConfig(cfg configFile) {
+	if cfg.SecretLazyLoading != nil {
+		ConfigSecretLazyLoading = *cfg.SecretLazyLoading
+	}
+	if cfg.Kubeshark != nil {
+		// Trim before checking emptiness so a YAML value like `namespace: " "`
+		// doesn't silently overwrite the default with whitespace — the K8s
+		// API would then reject the lookup with a confusing error.
+		if ns := strings.TrimSpace(cfg.Kubeshark.Namespace); ns != "" {
+			ConfigKubesharkNamespace = ns
+		}
 	}
 }
 

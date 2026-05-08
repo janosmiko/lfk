@@ -356,6 +356,25 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.saveCurrentSession()
 		return m, m.waitForPortForwardUpdate()
 	}
+	if sel.Kind == "__captures__" {
+		m.saveCursor()
+		m.nav.ResourceType = model.ResourceTypeEntry{
+			DisplayName: "Captures",
+			Kind:        "__captures__",
+			APIGroup:    "_capture",
+			APIVersion:  "v1",
+			Resource:    "captures",
+			Namespaced:  false,
+		}
+		m.nav.Level = model.LevelResources
+		m.pushLeft()
+		m.clearRight()
+		m.setMiddleItems(capturesPseudoItems(m.captureMgr))
+		m.setCursor(0)
+		m.clampCursor()
+		m.saveCurrentSession()
+		return m, m.waitForCaptureUpdate()
+	}
 	if sel.Kind == "__collapsed_group__" {
 		m.expandedGroup = sel.Category
 		visible := m.visibleMiddleItems()
@@ -494,8 +513,8 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 		return m.navigateChild()
 	}
 
-	// Port forward entries are virtual — no YAML to display.
-	if m.nav.ResourceType.Kind == "__port_forwards__" {
+	// Port forward and capture entries are virtual — no YAML to display.
+	if m.nav.ResourceType.Kind == "__port_forwards__" || m.nav.ResourceType.Kind == "__captures__" {
 		return m, nil
 	}
 

@@ -99,6 +99,13 @@ type Client struct {
 	// option; off by default so the list behaves like every other resource.
 	secretLazyLoading bool
 
+	// kubesharkNamespaceOverride is the namespace probed for the kubeshark
+	// hub Service in the Traffic Capture overlay. Empty string means
+	// "use the default" (see capture_backend_kubeshark.go's
+	// kubesharkNamespace method). Set once at startup from
+	// ui.ConfigKubesharkNamespace via SetKubesharkNamespace.
+	kubesharkNamespaceOverride string
+
 	// Guarded by discoveryMu; concurrent tea.Cmd goroutines may discover
 	// across different contexts.
 	discoveryMu      sync.Mutex
@@ -135,6 +142,14 @@ func (c *Client) informerSnapshot() (InformerCacheMode, *informerCache) {
 // Typically called once at startup after loading the config file.
 func (c *Client) SetSecretLazyLoading(enabled bool) {
 	c.secretLazyLoading = enabled
+}
+
+// SetKubesharkNamespace overrides the namespace probed for Service
+// kubeshark-hub in the Traffic Capture overlay. Empty string keeps the
+// default ("kubeshark"). Typically called once at startup after the
+// config file has been parsed.
+func (c *Client) SetKubesharkNamespace(ns string) {
+	c.kubesharkNamespaceOverride = ns
 }
 
 // SetInformerCacheMode selects how GetResources routes its list requests.

@@ -228,6 +228,17 @@ var ConfigDashboard = true
 // between hover and fetch completion.
 var ConfigSecretLazyLoading bool
 
+// DefaultKubesharkNamespace is the namespace probed for Service
+// kubeshark-hub when no override is configured. Matches the default of
+// `helm install kubeshark kubeshark/kubeshark --namespace kubeshark`.
+const DefaultKubesharkNamespace = "kubeshark"
+
+// ConfigKubesharkNamespace is the namespace where the Traffic Capture
+// overlay looks for the kubeshark hub Service. Set via the kubeshark
+// config block (see configFile.Kubeshark). Falls back to
+// DefaultKubesharkNamespace.
+var ConfigKubesharkNamespace = DefaultKubesharkNamespace
+
 // Recognised string values for the informer_cache config knob. The Go
 // constants are duplicated from internal/k8s.InformerCacheMode to keep the
 // ui package free of a k8s dependency — main.go does the conversion.

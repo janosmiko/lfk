@@ -150,6 +150,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayBackgroundTasks` | `` ` ``, `:tasks`               | In-flight + recent background tasks.                            |
 | `overlayOrphans`         | `Shift+O`, `:orphans`           | Cluster-wide orphan resource overview.                          |
 | `overlayLocalClusters`   | `Ctrl+N` at LevelClusters       | Manage kind/k3d/minikube clusters.                              |
+| `overlayTrafficCapture`  | action menu → `c` on Pod / Service | Live packet capture (kubectl-debug, kubeshark).                |
 
 ## Boolean overlays
 

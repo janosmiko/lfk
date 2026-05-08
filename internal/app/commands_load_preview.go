@@ -105,12 +105,19 @@ func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 			return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
 		}
 	}
+	if sel.Kind == "__captures__" {
+		items := capturesPseudoItems(m.captureMgr)
+		gen := m.requestGen
+		return func() tea.Msg {
+			return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
+		}
+	}
 	return m.loadResources(true)
 }
 
 // loadPreviewResources handles preview loading at the resources level.
 func (m Model) loadPreviewResources() tea.Cmd {
-	if m.nav.ResourceType.Kind == "__port_forwards__" {
+	if m.nav.ResourceType.Kind == "__port_forwards__" || m.nav.ResourceType.Kind == "__captures__" {
 		return nil
 	}
 	var cmds []tea.Cmd

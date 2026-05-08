@@ -73,6 +73,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Port Forward", Description: "Forward local port to pod", Key: "p"},
 			{Label: "Startup Analysis", Description: "Analyze pod startup timing", Key: "S"},
 			{Label: "Crash Investigator", Description: "Investigate crash loop / failing pod", Key: "I"},
+			{Label: "Capture Traffic", Description: "Capture network packets to pcap", Key: "c"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Right-sizing", Description: "Per-container CPU/Mem recommendations", Key: "z"},
@@ -104,6 +105,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this service", Key: "D"},
 			{Label: "Debug Pod", Description: "Run alpine debug pod in namespace", Key: "b"},
+			{Label: "Capture Traffic", Description: "Capture packets on a backing pod", Key: "c"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}, true
 	case "Secret":
@@ -507,6 +509,15 @@ func ActionsForPortForward() []ActionMenuItem {
 		{Label: "Restart", Description: "Restart this port forward", Key: "r"},
 		{Label: "Remove", Description: "Remove this entry", Key: "D"},
 		{Label: "Open in Browser", Description: "Open localhost port in browser", Key: "O"},
+	}
+}
+
+// ActionsForCapture returns the action menu items for a capture entry.
+func ActionsForCapture() []ActionMenuItem {
+	return []ActionMenuItem{
+		{Label: "Open", Description: "Re-open the capture overlay attached to this entry", Key: "o"},
+		{Label: "Stop", Description: "Stop a running capture", Key: "s"},
+		{Label: "Delete File", Description: "Delete the on-disk pcap file", Key: "D"},
 	}
 }
 

@@ -95,6 +95,7 @@
 - **Owner/controller navigation**: Jump to the owner of any resource with `o`
 - **Events view** with warnings-only filter toggle and duplicate-event grouping (`z`)
 - **Crash Investigator** — per-Pod tabbed view combining restart history, pod-scoped events, previous/current container logs, and container-scoped `describe` — accessible from the Pod action menu (`x` → `I`). Refresh with `Shift+R`.
+- **Traffic capture** — per-pod packet capture (kubectl-debug or kubeshark, auto-detected) with live decode and pcap export. Press `c` on a Pod or Service.
 
 ### Preview and Editing
 

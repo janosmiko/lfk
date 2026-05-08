@@ -13,51 +13,7 @@ import (
 func (m Model) openActionMenu() Model {
 	// Bulk mode: when items are selected, show bulk action menu.
 	if m.hasSelection() {
-		selectedList := m.selectedItemsList()
-		if len(selectedList) == 0 {
-			return m
-		}
-		m.bulkMode = true
-		m.bulkItems = selectedList
-
-		// Build action context from first selected item (for resource type info).
-		kind := m.selectedResourceKind()
-		if kind == "" {
-			return m
-		}
-		m.actionCtx = m.buildActionCtx(&selectedList[0], kind)
-
-		actions := model.ActionsForBulk(kind)
-		// Filter out actions that don't apply to the selected resource kind.
-		if !model.IsScaleableKind(kind) || !model.IsRestartableKind(kind) {
-			filtered := actions[:0]
-			for _, a := range actions {
-				if a.Label == "Scale" && !model.IsScaleableKind(kind) {
-					continue
-				}
-				if a.Label == "Restart" && !model.IsRestartableKind(kind) {
-					continue
-				}
-				filtered = append(filtered, a)
-			}
-			actions = filtered
-		}
-		var items []model.Item
-		for _, a := range actions {
-			if m.readOnly && isMutatingAction(a.Label) {
-				continue
-			}
-			items = append(items, model.Item{
-				Name:   a.Label,
-				Extra:  fmt.Sprintf("%s (%d items)", a.Description, len(selectedList)),
-				Status: a.Key,
-			})
-		}
-
-		m.overlay = overlayAction
-		m.overlayItems = items
-		m.overlayCursor = 0
-		return m
+		return m.openBulkSelectionMenu()
 	}
 
 	// At the cluster picker, the action menu has no resource type to
@@ -83,6 +39,8 @@ func (m Model) openActionMenu() Model {
 	switch {
 	case kind == "__port_forwards__" || kind == "__port_forward_entry__":
 		actions = model.ActionsForPortForward()
+	case kind == "__captures__":
+		actions = model.ActionsForCapture()
 	case m.nav.Level == model.LevelContainers:
 		actions = model.ActionsForContainer()
 	default:
@@ -182,7 +140,7 @@ func (m Model) directActionLogs() (tea.Model, tea.Cmd) {
 		return m.openBulkActionDirect("Logs")
 	}
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" {
+	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
 		return m, nil
 	}
 	sel := m.selectedMiddleItem()
@@ -203,7 +161,7 @@ func (m Model) directActionRefresh() (tea.Model, tea.Cmd) {
 
 func (m Model) directActionEdit() (tea.Model, tea.Cmd) {
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" {
+	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
 		return m, nil
 	}
 	sel := m.selectedMiddleItem()
@@ -216,7 +174,7 @@ func (m Model) directActionEdit() (tea.Model, tea.Cmd) {
 
 func (m Model) directActionDescribe() (tea.Model, tea.Cmd) {
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" {
+	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
 		return m, nil
 	}
 	sel := m.selectedMiddleItem()
@@ -232,7 +190,7 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 		return m.openBulkActionDirect("Delete")
 	}
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" {
+	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
 		return m, nil
 	}
 	sel := m.selectedMiddleItem()
@@ -267,7 +225,7 @@ func (m Model) directActionForceDelete() (tea.Model, tea.Cmd) {
 		return m.openBulkActionDirect("Force Delete")
 	}
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" {
+	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
 		return m, nil
 	}
 	if !model.IsForceDeleteableKind(kind) {
@@ -416,6 +374,13 @@ func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, boo
 
 // executeActionCoreOps dispatches node, PVC, and other operational actions.
 func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, bool) {
+	// Capture-related actions are extracted to keep this switch under the
+	// gocyclo cap (>30 fails CI). The helper returns ok=true only when it
+	// actually handled the action, so non-capture labels fall through to
+	// the switch below.
+	if mdl, cmd, ok := m.executeActionCapture(actionLabel); ok {
+		return mdl, cmd, true
+	}
 	switch actionLabel {
 	case "Force Delete":
 		mdl, cmd := m.executeActionForceDelete()
@@ -485,6 +450,35 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Vuln Scan":
 		mdl, cmd := m.executeActionVulnScan()
 		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+// executeActionCapture dispatches the traffic-capture action set: opening
+// the capture overlay from a Pod / Service action menu, and the row
+// actions on the __captures__ pseudo-resource. Returns ok=true only when
+// the label was actually handled, so executeActionCoreOps's caller-side
+// `if ok { return }` pattern leaves unrelated labels to fall through to
+// the main switch.
+func (m Model) executeActionCapture(actionLabel string) (tea.Model, tea.Cmd, bool) {
+	switch actionLabel {
+	case "Capture Traffic":
+		mdl, cmd := m.executeActionCaptureTraffic()
+		return mdl, cmd, true
+	case "Open":
+		if m.actionCtx.kind == "__captures__" {
+			if sel := m.selectedMiddleItem(); sel != nil {
+				mdl, cmd := m.openCaptureFromPseudo(*sel)
+				return mdl, cmd, true
+			}
+		}
+	case "Delete File":
+		if m.actionCtx.kind == "__captures__" {
+			if sel := m.selectedMiddleItem(); sel != nil {
+				mdl, cmd := m.deleteCaptureFile(*sel)
+				return mdl, cmd, true
+			}
+		}
 	}
 	return m, nil, false
 }
@@ -668,6 +662,14 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 		if m.nav.ResourceType.Kind == "__port_forwards__" {
 			gen := m.requestGen
 			items := m.portForwardItems()
+			return func() tea.Msg {
+				return resourcesLoadedMsg{items: items, gen: gen}
+			}
+		}
+		// Captures are also virtual — same pattern as port forwards.
+		if m.nav.ResourceType.Kind == "__captures__" {
+			gen := m.requestGen
+			items := capturesPseudoItems(m.captureMgr)
 			return func() tea.Msg {
 				return resourcesLoadedMsg{items: items, gen: gen}
 			}

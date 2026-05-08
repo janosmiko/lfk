@@ -204,10 +204,12 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	// These are not served by any Kubernetes cluster. They are injected into
 	// the discovered resource set so the sidebar, command bar, and resolver
 	// can treat them uniformly with real resources. The "_helm" and
-	// "_portforward" API groups are LFK-only sentinels that GetResources /
-	// GetResourceYAML route to helm and port-forward handlers.
+	// "_portforward" / "_capture" API groups are LFK-only sentinels that
+	// GetResources / GetResourceYAML route to helm, port-forward, and
+	// capture handlers.
 	"_helm/releases":            {Category: "Helm", DisplayName: "Releases", Icon: Icon{Unicode: "⎈", Simple: "[He]", Emoji: "⛵", NerdFont: "\U000f0833"}},
 	"_portforward/portforwards": {Category: "Networking", DisplayName: "Port Forwards", Icon: Icon{Unicode: "⇵", Simple: "[PF]", Emoji: "🚇", NerdFont: "\U000f07e5"}},
+	"_capture/captures":         {Category: "Networking", DisplayName: "Captures", Icon: Icon{Unicode: "⏺", Simple: "[Cp]", Emoji: "🦈", NerdFont: "\U000f0381"}},
 
 	// ---- Ecosystem CRDs (ported from TopLevelResourceTypes) ----
 	// argoproj.io
@@ -406,7 +408,8 @@ var BuiltInOrderRank = map[string]int{
 	// Rank 65 is reserved for GroupFallbackRank — unknown
 	// networking.k8s.io / gateway.networking.k8s.io resources slot
 	// in here via itemOrderRank's group-level lookup.
-	"_portforward/portforwards": 69,
+	"_portforward/portforwards": 67,
+	"_capture/captures":         68,
 
 	// Storage
 	"/persistentvolumeclaims":             70,
@@ -457,6 +460,14 @@ func PseudoResources() []ResourceTypeEntry {
 			APIGroup:    "_portforward",
 			APIVersion:  "v1",
 			Resource:    "portforwards",
+			Namespaced:  false,
+		},
+		{
+			DisplayName: "Captures",
+			Kind:        "__captures__",
+			APIGroup:    "_capture",
+			APIVersion:  "v1",
+			Resource:    "captures",
 			Namespaced:  false,
 		},
 	}
