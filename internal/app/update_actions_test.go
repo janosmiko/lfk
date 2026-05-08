@@ -88,6 +88,62 @@ func TestDirectActionDelete_NormalPod_NormalDelete(t *testing.T) {
 	assert.Equal(t, "Delete", result.pendingAction)
 }
 
+// TestDirectActionDelete_AtContainersLevel_Blocked locks in the fix for the
+// containers-browser delete bug. Containers can't be deleted in Kubernetes —
+// the only deletable resource is the parent pod. Pressing the Delete key in
+// the containers browser used to fall through to executeAction("Delete"),
+// which built an actionCtx targeting the parent pod and opened the delete
+// confirmation. For single-container pods where the container name matches
+// the pod name, this looked like lfk was using the container name as the
+// pod name. Now the keypress is refused with a status message and no overlay
+// is opened.
+func TestDirectActionDelete_AtContainersLevel_Blocked(t *testing.T) {
+	m := Model{
+		nav: model.NavigationState{
+			Level:     model.LevelContainers,
+			OwnedName: "my-pod",
+		},
+		middleItems: []model.Item{
+			{Name: "app", Extra: "nginx:1.25"},
+		},
+		tabs:  []TabState{{}},
+		width: 80, height: 40,
+	}
+	ret, _ := m.directActionDelete()
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay, "delete must not open a confirm overlay in containers view")
+	assert.Empty(t, result.pendingAction, "no pending action should be set")
+	assert.Contains(t, result.statusMessage, "containers", "status message must explain why")
+	assert.True(t, result.statusMessageErr, "status message should be flagged as error/warning")
+}
+
+// TestDirectActionDelete_AtContainersLevel_BulkBlocked covers the same
+// rule for multi-selected containers — pressing Delete with a selection
+// also short-circuits the bulk path before any pod is targeted.
+func TestDirectActionDelete_AtContainersLevel_BulkBlocked(t *testing.T) {
+	m := Model{
+		nav: model.NavigationState{
+			Level:     model.LevelContainers,
+			OwnedName: "my-pod",
+		},
+		middleItems: []model.Item{
+			{Name: "app", Extra: "nginx:1.25"},
+			{Name: "sidecar", Extra: "envoy:1.30"},
+		},
+		selectedItems: map[string]bool{
+			"app":     true,
+			"sidecar": true,
+		},
+		tabs:  []TabState{{}},
+		width: 80, height: 40,
+	}
+	ret, _ := m.directActionDelete()
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay, "bulk delete must not open a confirm overlay in containers view")
+	assert.False(t, result.bulkMode, "bulk mode must not be entered")
+	assert.Contains(t, result.statusMessage, "containers")
+}
+
 func TestOpenActionMenu_DeletingPod_ShowsForceDelete(t *testing.T) {
 	m := Model{
 		nav: model.NavigationState{

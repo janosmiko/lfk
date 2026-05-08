@@ -186,6 +186,14 @@ func (m Model) directActionDescribe() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
+	// Containers can't be deleted in Kubernetes — only the parent pod can.
+	// Refuse the keypress here so the user isn't tricked into deleting the
+	// parent pod from a view whose action menu (ActionsForContainer) doesn't
+	// even list Delete. Covers both single and bulk-selection paths.
+	if m.nav.Level == model.LevelContainers {
+		m.setStatusMessage("Delete not available for containers", true)
+		return m, scheduleStatusClear()
+	}
 	if m.hasSelection() {
 		return m.openBulkActionDirect("Delete")
 	}
