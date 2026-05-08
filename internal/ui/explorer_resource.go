@@ -479,9 +479,10 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 	}
 
 	// Calculate column widths for alignment.
-	// Format: AGE  TYPE  REASON  MESSAGE
+	// Format: AGE  TYPE  REASON  MESSAGE  (xCount)?
 	maxAgeW := 0
 	maxReasonW := 0
+	maxCountW := 0
 	for _, e := range events {
 		ageStr := RelativeTime(e.Timestamp)
 		if len(ageStr) > maxAgeW {
@@ -490,14 +491,29 @@ func RenderPreviewEvents(events []EventTimelineEntry, width int) string {
 		if len(e.Reason) > maxReasonW {
 			maxReasonW = len(e.Reason)
 		}
+		if e.Count > 1 {
+			countStr := fmt.Sprintf(" (x%d)", e.Count)
+			if len(countStr) > maxCountW {
+				maxCountW = len(countStr)
+			}
+		}
 	}
 	// Cap reason column width.
 	if maxReasonW > 25 {
 		maxReasonW = 25
 	}
 
-	// Message width: total width minus age, type indicator, reason, spacing.
-	msgWidth := max(width-maxAgeW-3-maxReasonW-4, 20) // 3 for " ● ", 4 for spacing
+	// Message width: total width minus age, type indicator, reason, count
+	// suffix, and inter-column spacing.
+	//
+	// maxCountW MUST be reserved up-front (even on rows whose own Count is 0)
+	// so every rendered line stays within `width`. Skipping it lets a line
+	// like " 2m ago ● FailedMount MountVolume.MountDevice failed... (x61)"
+	// exceed the right-column's lipgloss wrap point — lipgloss then wraps it
+	// onto a second visual row, the right column overflows MaxHeight, and
+	// the pinned resource-usage footer at the bottom of the pane gets
+	// clipped off the screen.
+	msgWidth := max(width-maxAgeW-3-maxReasonW-4-maxCountW, 20) // 3 for " ● ", 4 for spacing
 
 	for _, e := range events {
 		ageStr := RelativeTime(e.Timestamp)

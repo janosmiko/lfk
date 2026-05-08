@@ -5,6 +5,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -146,6 +147,46 @@ func TestRenderPreviewEvents(t *testing.T) {
 		}
 		result := RenderPreviewEvents(events, 80)
 		assert.Contains(t, result, "Pulled")
+	})
+
+	// Regression: a high count suffix like "(x61)" used to push the rendered
+	// line past `width`, so lipgloss would wrap it inside the right-column
+	// style. The wrap added a visual row, the right pane overflowed
+	// MaxHeight, and the pinned resource-usage footer got clipped off-screen.
+	// Assert every visible event line stays within `width` for any count.
+	t.Run("event lines with high count fit within width", func(t *testing.T) {
+		now := time.Now()
+		cases := []struct {
+			name  string
+			width int
+			count int32
+			msg   string
+		}{
+			{"short message x63", 80, 63, "MountVolume.SetUp failed for volume \"argocd-dex-server-tls\""},
+			{"long message x61", 80, 61, "MountVolume.MountDevice failed for volume \"pvc-e5942d48-d121-46b0-85a6-3f6ce9d3026f\" : timed out waiting for the condition"},
+			{"narrow column x9999", 60, 9999, "MountVolume.SetUp failed"},
+			{"single digit count x2", 80, 2, "Back-off restarting failed container"},
+		}
+		for _, tc := range cases {
+			t.Run(tc.name, func(t *testing.T) {
+				events := []EventTimelineEntry{{
+					Timestamp: now.Add(-2 * time.Hour),
+					Type:      "Warning",
+					Reason:    "FailedMount",
+					Message:   tc.msg,
+					Count:     tc.count,
+				}}
+				result := RenderPreviewEvents(events, tc.width)
+				for line := range strings.SplitSeq(result, "\n") {
+					if line == "" {
+						continue
+					}
+					assert.LessOrEqual(t, lipgloss.Width(line), tc.width,
+						"event line exceeds width=%d (would force lipgloss wrap and clip the resource-usage footer): %q (visible width %d)",
+						tc.width, line, lipgloss.Width(line))
+				}
+			})
+		}
 	})
 }
 
