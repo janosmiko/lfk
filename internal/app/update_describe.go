@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -261,9 +260,19 @@ func (m Model) handleDescribeVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	maxIdx := max(len(lines)-1, 0)
 	key := msg.String()
 
+	if op, motion, ok := m.consumeTextObjectPrelude(key); ok {
+		return m.applyDescribeTextObject(op, motion, lines)
+	}
+
 	switch key {
 	case "esc":
 		m.describeVisualMode = 0
+		return m, nil
+	case "i":
+		m.pendingTextObject = 'i'
+		return m, nil
+	case "a":
+		m.pendingTextObject = 'a'
 		return m, nil
 	case "V":
 		return m.describeVisualToggle('V')
@@ -322,6 +331,24 @@ func (m Model) handleDescribeVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// applyDescribeTextObject resolves an `iw`/`aw`/`iW`/`aW` text object on the
+// describe line under the cursor and switches the visual selection to
+// character mode covering the resulting range.
+func (m Model) applyDescribeTextObject(op byte, motion string, lines []string) (tea.Model, tea.Cmd) {
+	if m.describeCursor < 0 || m.describeCursor >= len(lines) {
+		return m, nil
+	}
+	start, end, ok := textObjectRange(lines[m.describeCursor], m.describeCursorCol, op, motion)
+	if !ok {
+		return m, nil
+	}
+	m.describeVisualMode = 'v'
+	m.describeVisualStart = m.describeCursor
+	m.describeVisualCol = start
+	m.describeCursorCol = end
+	return m, nil
+}
+
 // describeVisualToggle toggles the visual selection mode in describe view.
 func (m Model) describeVisualToggle(mode byte) (tea.Model, tea.Cmd) {
 	if m.describeVisualMode == mode {
@@ -342,12 +369,13 @@ func (m Model) describeVisualCopy(lines []string) (tea.Model, tea.Cmd) {
 	if selEnd >= len(lines) {
 		selEnd = len(lines) - 1
 	}
+	visualType := rune(m.describeVisualMode)
 	clipText := visualCopyText(lines, selStart, selEnd,
-		rune(m.describeVisualMode), m.describeVisualCol, m.describeCursorCol,
+		visualType, m.describeVisualCol, m.describeCursorCol,
 		m.describeVisualStart > m.describeCursor)
 	lineCount := selEnd - selStart + 1
 	m.describeVisualMode = 0
-	m.setStatusMessage(fmt.Sprintf("Copied %d line(s)", lineCount), false)
+	m.setStatusMessage(formatVisualYank(clipText, visualType, lineCount), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 

@@ -158,6 +158,156 @@ func firstNonWhitespace(line string) int {
 	return 0
 }
 
+// isWORDBoundary returns true if the rune separates WORDs (whitespace only).
+// Mirrors the binary split used by nextWORDStart/prevWORDStart/WORDEnd.
+func isWORDBoundary(r rune) bool {
+	return r == ' ' || r == '\t'
+}
+
+// innerWordRange returns the inclusive [start, end] column range of the inner
+// word text object (vim 'iw') at col. If col sits on a word character the
+// range covers the contiguous run of word characters; if col sits on a word
+// boundary (whitespace/punctuation) the range covers the contiguous run of
+// boundary characters. Returns (-1, -1) for an empty line.
+//
+// Boundary classification follows isWordBoundary, so results are consistent
+// with the w/b/e motions in this codebase.
+func innerWordRange(line string, col int) (int, int) {
+	return innerRangeWith(line, col, isWordBoundary)
+}
+
+// innerWORDRange is the WORD variant of innerWordRange (vim 'iW'); only space
+// and tab are treated as boundaries.
+func innerWORDRange(line string, col int) (int, int) {
+	return innerRangeWith(line, col, isWORDBoundary)
+}
+
+// aroundWordRange returns the inclusive [start, end] column range of the
+// "around word" text object (vim 'aw') at col. If col is on a word, the range
+// covers the word plus trailing whitespace, or leading whitespace when no
+// trailing exists. If col is on whitespace/punctuation, the range covers that
+// run plus the following word. Returns (-1, -1) for an empty line.
+func aroundWordRange(line string, col int) (int, int) {
+	return aroundRangeWith(line, col, isWordBoundary)
+}
+
+// aroundWORDRange is the WORD variant of aroundWordRange (vim 'aW'); only
+// space and tab are treated as boundaries.
+func aroundWORDRange(line string, col int) (int, int) {
+	return aroundRangeWith(line, col, isWORDBoundary)
+}
+
+func innerRangeWith(line string, col int, isBoundary func(rune) bool) (int, int) {
+	runes := []rune(line)
+	n := len(runes)
+	if n == 0 {
+		return -1, -1
+	}
+	if col < 0 {
+		col = 0
+	}
+	if col >= n {
+		col = n - 1
+	}
+	onBoundary := isBoundary(runes[col])
+	start := col
+	for start > 0 && isBoundary(runes[start-1]) == onBoundary {
+		start--
+	}
+	end := col
+	for end < n-1 && isBoundary(runes[end+1]) == onBoundary {
+		end++
+	}
+	return start, end
+}
+
+func aroundRangeWith(line string, col int, isBoundary func(rune) bool) (int, int) {
+	runes := []rune(line)
+	n := len(runes)
+	if n == 0 {
+		return -1, -1
+	}
+	start, end := innerRangeWith(line, col, isBoundary)
+	if start < 0 {
+		return -1, -1
+	}
+	onBoundary := isBoundary(runes[start])
+	if onBoundary {
+		// Cursor on a boundary run: extend forward to swallow the next word.
+		for end < n-1 && !isBoundary(runes[end+1]) {
+			end++
+		}
+		return start, end
+	}
+	// Cursor on a word: prefer trailing boundary; fall back to leading.
+	if end < n-1 && isBoundary(runes[end+1]) {
+		for end < n-1 && isBoundary(runes[end+1]) {
+			end++
+		}
+		return start, end
+	}
+	for start > 0 && isBoundary(runes[start-1]) {
+		start--
+	}
+	return start, end
+}
+
+// consumeTextObjectPrelude is called at the top of every visual-mode key
+// handler. If a text-object operator (`i` or `a`) is pending and `key` is a
+// supported motion (`w` or `W`), it returns (op, motion, true) and clears
+// the pending state so the caller can apply the resolution. If pending is
+// set but `key` is anything else, the operator is dropped (vim semantics:
+// any unrelated key cancels a half-typed operator) and (0, "", false) is
+// returned. Also clears any stale `pendingG` so a half-typed `gg` doesn't
+// survive across an unrelated operator sequence.
+func (m *Model) consumeTextObjectPrelude(key string) (byte, string, bool) {
+	if m.pendingTextObject == 0 {
+		return 0, "", false
+	}
+	op := m.pendingTextObject
+	m.pendingTextObject = 0
+	m.pendingG = false
+	if key == "w" || key == "W" {
+		return op, key, true
+	}
+	return 0, "", false
+}
+
+// textObjectRange resolves a vim text-object operator (`i` or `a`) plus a
+// motion key (`w` or `W`) into an inclusive [start, end] column range on
+// `line`, evaluated at column `col`. Returns ok=false when the line is empty
+// or the inputs are not a recognised text-object combination, leaving the
+// caller's selection unchanged.
+//
+// Callers always commit the resulting range as a character-wise selection
+// (visualType='v') even if the user was previously in line ('V') or block
+// ('B') mode. This deviates from real vim, which keeps the original mode,
+// but matches the "select a word to copy" intent that drives this feature
+// in read-only viewers.
+func textObjectRange(line string, col int, op byte, motion string) (int, int, bool) {
+	switch motion {
+	case "w":
+		switch op {
+		case 'i':
+			s, e := innerWordRange(line, col)
+			return s, e, s >= 0
+		case 'a':
+			s, e := aroundWordRange(line, col)
+			return s, e, s >= 0
+		}
+	case "W":
+		switch op {
+		case 'i':
+			s, e := innerWORDRange(line, col)
+			return s, e, s >= 0
+		case 'a':
+			s, e := aroundWORDRange(line, col)
+			return s, e, s >= 0
+		}
+	}
+	return 0, 0, false
+}
+
 // countLines counts newline characters.
 func countLines(s string) int {
 	n := 0

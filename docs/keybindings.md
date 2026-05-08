@@ -245,6 +245,7 @@ a single-character slot.
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
+| `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank; folds skipped) |
 | `z` | Toggle fold on section under cursor |
@@ -276,6 +277,7 @@ a single-character slot.
 | `v` | Character visual selection |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection |
+| `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
@@ -321,6 +323,7 @@ a single-character slot.
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
 | `h` / `l` | Move selection column left/right (in visual mode) |
+| `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
 | `\` | Switch pod / filter containers (space: select, enter: apply, / to filter) |
@@ -405,6 +408,7 @@ from `terminal:` in the config.
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection |
 | `h` / `l` | Move selection column left/right (in visual mode) |
+| `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank; empty-side lines skipped) |
 | `z` | Toggle fold unchanged section at cursor |
@@ -446,6 +450,7 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `v` | Character visual selection (from cursor column) |
 | `V` | Visual line selection |
 | `Ctrl+V` | Block (column) visual selection (from cursor column) |
+| `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy N lines from cursor (count-prefixed yank) |
 | `?` / `F1` | Open this help, scrolled to the Event Timeline section |

@@ -180,9 +180,19 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	switch msg.String() {
+	key := msg.String()
+	if op, motion, ok := m.consumeTextObjectPrelude(key); ok {
+		return m.applyLogTextObject(op, motion)
+	}
+	switch key {
 	case "esc":
 		m.logVisualMode = false
+		return m, nil
+	case "i":
+		m.pendingTextObject = 'i'
+		return m, nil
+	case "a":
+		m.pendingTextObject = 'a'
 		return m, nil
 	case "V":
 		// Toggle: if already in line mode, cancel; otherwise switch to line mode.

@@ -1,8 +1,6 @@
 package app
 
 import (
-	"fmt"
-
 	tea "github.com/charmbracelet/bubbletea"
 )
 
@@ -36,7 +34,7 @@ func (m Model) handleLogVisualKeyCtrlV() (tea.Model, tea.Cmd) {
 func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 	clipText, lineCount := m.buildLogYankText()
 	m.logVisualMode = false
-	m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
+	m.setStatusMessage(formatVisualYank(clipText, m.logVisualType, lineCount), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 
@@ -258,6 +256,24 @@ func (m Model) handleLogVisualKeyB2() (tea.Model, tea.Cmd) {
 			m.logVisualCurCol = max(newCol, 0)
 		}
 	}
+	return m, nil
+}
+
+// applyLogTextObject resolves an `iw`/`aw`/`iW`/`aW` text object on the line
+// under the cursor and switches the visual selection to character mode
+// covering the resulting range.
+func (m Model) applyLogTextObject(op byte, motion string) (tea.Model, tea.Cmd) {
+	if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+		return m, nil
+	}
+	start, end, ok := textObjectRange(m.logLines[m.logCursor], m.logVisualCurCol, op, motion)
+	if !ok {
+		return m, nil
+	}
+	m.logVisualType = 'v'
+	m.logVisualStart = m.logCursor
+	m.logVisualCol = start
+	m.logVisualCurCol = end
 	return m, nil
 }
 

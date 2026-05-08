@@ -173,6 +173,9 @@ type Model struct {
 	// Vim-style 'gg' command: when true, the next 'g' press jumps to top.
 	pendingG bool
 
+	// Vim text-object operator pending in visual mode ('i'/'a'); 0 = none.
+	pendingTextObject byte
+
 	// Vim-style named marks: m<key> sets a mark, '<key> jumps to it.
 	pendingMark     bool            // waiting for the slot key after 'm'
 	pendingBookmark *model.Bookmark // bookmark awaiting overwrite confirmation

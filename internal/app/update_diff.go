@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -375,10 +374,21 @@ func (m *Model) diffCurrentLineText(foldRegions []ui.DiffFoldRegion) string {
 // handleDiffVisualKey handles key events while in diff visual selection mode.
 func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
 	maxCursor := max(totalLines-1, 0)
+	key := msg.String()
 
-	switch msg.String() {
+	if op, motion, ok := m.consumeTextObjectPrelude(key); ok {
+		return m.applyDiffTextObject(op, motion, foldRegions)
+	}
+
+	switch key {
 	case "esc":
 		m.diffVisualMode = false
+		return m, nil
+	case "i":
+		m.pendingTextObject = 'i'
+		return m, nil
+	case "a":
+		m.pendingTextObject = 'a'
 		return m, nil
 	case "V":
 		return m.diffVisualToggle('V')
@@ -454,6 +464,21 @@ func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 	return m, nil
 }
 
+// applyDiffTextObject resolves an `iw`/`aw`/`iW`/`aW` text object on the
+// active-side line text under the cursor and switches the visual selection
+// to character mode covering the resulting range.
+func (m Model) applyDiffTextObject(op byte, motion string, foldRegions []ui.DiffFoldRegion) (tea.Model, tea.Cmd) {
+	start, end, ok := textObjectRange(m.diffCurrentLineText(foldRegions), m.diffVisualCurCol, op, motion)
+	if !ok {
+		return m, nil
+	}
+	m.diffVisualType = 'v'
+	m.diffVisualStart = m.diffCursor
+	m.diffVisualCol = start
+	m.diffVisualCurCol = end
+	return m, nil
+}
+
 // diffVisualToggle toggles the visual selection type in diff view.
 func (m Model) diffVisualToggle(mode rune) (tea.Model, tea.Cmd) {
 	if m.diffVisualType == mode {
@@ -502,8 +527,9 @@ func (m Model) diffVisualCopy(foldRegions []ui.DiffFoldRegion) (tea.Model, tea.C
 	clipText := visualCopyText(diffLines, 0, len(diffLines)-1,
 		m.diffVisualType, m.diffVisualCol, m.diffVisualCurCol,
 		m.diffVisualStart > m.diffCursor)
+	visualType := m.diffVisualType
 	m.diffVisualMode = false
-	m.setStatusMessage(fmt.Sprintf("Copied %d lines", len(diffLines)), false)
+	m.setStatusMessage(formatVisualYank(clipText, visualType, len(diffLines)), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 

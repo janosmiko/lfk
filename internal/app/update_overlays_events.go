@@ -283,10 +283,20 @@ func (m Model) handleEventTimelineVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	key := msg.String()
 	maxIdx := max(len(m.eventTimelineLines)-1, 0)
 
+	if op, motion, ok := m.consumeTextObjectPrelude(key); ok {
+		return m.applyEventTextObject(op, motion)
+	}
+
 	// Mode switches.
 	switch key {
 	case "esc":
 		m.eventTimelineVisualMode = 0
+		return m, nil
+	case "i":
+		m.pendingTextObject = 'i'
+		return m, nil
+	case "a":
+		m.pendingTextObject = 'a'
 		return m, nil
 	case "V":
 		return m.handleEventTimelineVisualKeyV()
@@ -374,6 +384,25 @@ func (m *Model) handleEventTimelineVisualWordMotion(key string) {
 	}
 }
 
+// applyEventTextObject resolves an `iw`/`aw`/`iW`/`aW` text object on the
+// event timeline line under the cursor and switches the visual selection to
+// character mode covering the resulting range.
+func (m Model) applyEventTextObject(op byte, motion string) (tea.Model, tea.Cmd) {
+	line := m.eventTimelineCurrentLine()
+	if line == "" {
+		return m, nil
+	}
+	start, end, ok := textObjectRange(line, m.eventTimelineCursorCol, op, motion)
+	if !ok {
+		return m, nil
+	}
+	m.eventTimelineVisualMode = 'v'
+	m.eventTimelineVisualStart = m.eventTimelineCursor
+	m.eventTimelineVisualCol = start
+	m.eventTimelineCursorCol = end
+	return m, nil
+}
+
 // eventTimelineCurrentLine returns the current line under the cursor, or empty.
 func (m *Model) eventTimelineCurrentLine() string {
 	if m.eventTimelineCursor >= 0 && m.eventTimelineCursor < len(m.eventTimelineLines) {
@@ -453,13 +482,14 @@ func (m Model) handleEventTimelineVisualKeyY() (tea.Model, tea.Cmd) {
 	if selEnd >= len(m.eventTimelineLines) {
 		selEnd = len(m.eventTimelineLines) - 1
 	}
+	visualType := rune(m.eventTimelineVisualMode)
 	clipText := visualCopyText(m.eventTimelineLines, selStart, selEnd,
-		rune(m.eventTimelineVisualMode),
+		visualType,
 		m.eventTimelineVisualCol, m.eventTimelineCursorCol,
 		m.eventTimelineVisualStart > m.eventTimelineCursor)
 	lineCount := selEnd - selStart + 1
 	m.eventTimelineVisualMode = 0
-	m.setStatusMessage(fmt.Sprintf("Copied %d line(s)", lineCount), false)
+	m.setStatusMessage(formatVisualYank(clipText, visualType, lineCount), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 

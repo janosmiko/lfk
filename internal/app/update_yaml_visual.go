@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"strconv"
 	"strings"
 
@@ -12,9 +11,19 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	totalVisible := visibleLineCount(m.yamlContent, m.yamlSections, m.yamlCollapsed)
 	maxScroll := m.yamlMaxScroll(totalVisible)
 
-	switch msg.String() {
+	key := msg.String()
+	if op, motion, ok := m.consumeTextObjectPrelude(key); ok {
+		return m.applyYAMLTextObject(op, motion)
+	}
+	switch key {
 	case "esc":
 		m.yamlVisualMode = false
+		return m, nil
+	case "i":
+		m.pendingTextObject = 'i'
+		return m, nil
+	case "a":
+		m.pendingTextObject = 'a'
 		return m, nil
 	case "V":
 		return m.handleYAMLVisualToggleMode('V')
@@ -135,8 +144,9 @@ func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
 		clipText = m.yamlVisualCopyLine(selStart, selEnd, mapping, origLines)
 	}
 	lineCount := selEnd - selStart + 1
+	visualType := m.yamlVisualType
 	m.yamlVisualMode = false
-	m.setStatusMessage(fmt.Sprintf("Copied %d lines", lineCount), false)
+	m.setStatusMessage(formatVisualYank(clipText, visualType, lineCount), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 
@@ -208,6 +218,33 @@ func (m Model) yamlVisualCopyLine(selStart, selEnd int, mapping []int, origLines
 		}
 	}
 	return strings.Join(selected, "\n")
+}
+
+// applyYAMLTextObject resolves an `iw`/`aw`/`iW`/`aW` text object on the
+// visible YAML line under the cursor and switches the visual selection to
+// character mode covering the resulting range. Columns are evaluated in
+// visible-line space (with the fold prefix included) and clamped to keep the
+// selection out of the fold prefix.
+func (m Model) applyYAMLTextObject(op byte, motion string) (tea.Model, tea.Cmd) {
+	visLines, _ := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	if m.yamlCursor < 0 || m.yamlCursor >= len(visLines) {
+		return m, nil
+	}
+	start, end, ok := textObjectRange(visLines[m.yamlCursor], m.yamlVisualCurCol, op, motion)
+	if !ok {
+		return m, nil
+	}
+	if start < yamlFoldPrefixLen {
+		start = yamlFoldPrefixLen
+	}
+	if end < start {
+		end = start
+	}
+	m.yamlVisualType = 'v'
+	m.yamlVisualStart = m.yamlCursor
+	m.yamlVisualCol = start
+	m.yamlVisualCurCol = end
+	return m, nil
 }
 
 func (m Model) handleYAMLVisualWordMotion(key string) (tea.Model, tea.Cmd) {

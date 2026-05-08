@@ -950,7 +950,10 @@ func TestLogVisualKeyYankCharMode(t *testing.T) {
 	ret, cmd := m.handleLogVisualKey(runeKey('y'))
 	result := ret.(Model)
 	assert.False(t, result.logVisualMode)
-	assert.Contains(t, result.statusMessage, "Copied 1 lines")
+	// Single-line char-mode selection just says "Copied" — a character
+	// count adds no useful info, and "Copied 1 lines" was misleading
+	// after viw/vaw landed.
+	assert.Equal(t, "Copied", result.statusMessage)
 	assert.NotNil(t, cmd)
 }
 
