@@ -2,7 +2,7 @@
 
 Press `:` to open the command bar. Input is classified by the first word:
 
-- `!<cmd>` — shell command
+- `:!<cmd>` — shell command (e.g. `:! kubectl top nodes`)
 - `:ns`, `:ctx`, `:sort`, … — built-in command
 - `:k`, `:kubectl`, `:get`, … — kubectl command
 - `:pod`, `:svc`, … — resource jump
@@ -17,8 +17,12 @@ Press `:` to open the command bar. Input is classified by the first word:
 | `:context <ctx>` &nbsp;·&nbsp; `:ctx <ctx>` | Switch kube context |
 | `:sort <column>` | Sort the current list by column name |
 | `:set <option>` | Toggle log viewer option (see below) |
-| `:export [yaml\|json]` | Copy selected resource YAML to clipboard |
+| `:export [yaml\|json]` | Copy selected resource(s) to clipboard |
 | `:tasks` | Open background-tasks overlay |
+| `:bookmarks` | Open bookmarks overlay |
+| `:reload` &nbsp;·&nbsp; `:refresh` | Force refresh of the current list |
+| `:errors` &nbsp;·&nbsp; `:warnings` | Toggle warnings-only filter on the Events list |
+| `:orphans [<kind>]` | Open cluster-wide orphan resource overview |
 | `:quit` &nbsp;·&nbsp; `:q` &nbsp;·&nbsp; `:q!` | Exit |
 | `:nyan` | Toggle Nyan mode |
 | `:kubetris` | Play Kubetris |
@@ -36,7 +40,7 @@ Column names match the table headers (case-sensitive): `Name`, `Namespace`, `Age
 | `linenumbers` / `nolinenumbers` | Line numbers |
 | `timestamps` / `notimestamps` | Timestamps |
 | `follow` / `nofollow` | Auto-scroll to tail |
-| `ansi` / `noansi` | Render ANSI SGR colours (bold, foreground, background) emitted by log producers. On by default. Turn off to replace every ESC byte with U+FFFD — useful if an application is emitting malformed sequences that misalign the viewer. Non-SGR CSI sequences (cursor movement, screen erase) are always replaced regardless of this flag. |
+| `ansi` / `noansi` | Render ANSI SGR colors from log output. Off replaces ESC bytes with U+FFFD (see config-reference.md `log_render_ansi`). |
 
 ### `:tasks`
 

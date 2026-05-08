@@ -45,7 +45,7 @@ Wait until `kubectl get pod crashy` shows `STATUS=CrashLoopBackOff` and `RESTART
 kind delete cluster --name crashinv-test
 ```
 
-## Sync Wave Timeline (`feat/sync-wave-timeline`)
+## Sync Wave Timeline
 
 Prerequisites: a kube-context with at least one ArgoCD Application
 managed by argo-cd >= 2.0. Examples below assume `my-app` in `argocd`.
@@ -118,9 +118,9 @@ managed by argo-cd >= 2.0. Examples below assume `my-app` in `argocd`.
 
 ## Regression checks
 
-10. With the overlay closed, run an existing flow (Crash Investigator
-    on a Pod, Sync on an Application via action menu). All should still
-    work — no overlay-state bleed.
+- With the overlay closed, run an existing flow (Crash Investigator
+  on a Pod, Sync on an Application via action menu). All should still
+  work — no overlay-state bleed.
 
 ## Sync Wave Timeline — two-pane layout
 
@@ -156,11 +156,7 @@ managed by argo-cd >= 2.0. Examples below assume `my-app` in `argocd`.
 20. Trigger a sync (s on Application). Reopen Sync Wave Timeline.
     - Expected: spinner animates in header during wave-annotation fetch;
       cursor + scroll preserved across the 3s refresh ticks.
-## Traffic Capture (`feat/traffic-capture`)
-
-Verifies the configuration / live / stopped phases, the `__captures__`
-pseudo-resource, and the on-node cleanup path that prevents disk-pressure
-from orphaned ephemeral containers.
+## Traffic Capture
 
 ### Prerequisites
 

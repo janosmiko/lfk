@@ -4,10 +4,10 @@ Contributions are welcome! Here is how to get started.
 
 ## Prerequisites
 
-- Go 1.26.2 or later
+- Go 1.26.3 or later
 - Access to a Kubernetes cluster (for testing)
 - `kubectl` configured and working
-- `golangci-lint` ([install](https://golangci-lint.run/welcome/install/))
+- `golangci-lint`
 
 ## Development Setup
 
@@ -36,16 +36,14 @@ go build -o lfk .
 # Run tests (if available)
 go test ./...
 
-# Run with race detector
-go build -race -o lfk . && ./lfk
+# Run tests with race detector
+go test -race ./...
 
 # Lint (if you have golangci-lint installed)
 golangci-lint run
 ```
 
 ## Project Structure
-
-The application follows a standard Go project layout:
 
 - `main.go` - Entry point, initializes the Kubernetes client, loads config, and starts the Bubbletea program
 - `internal/app/` - Core application logic: the Bubbletea model, update loop, async commands, and bookmarks

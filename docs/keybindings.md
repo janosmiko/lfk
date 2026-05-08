@@ -40,7 +40,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+G` | Finalizer search and remove |
 | `!` | Error log |
 | `@` | Monitoring overview (active Prometheus alerts) |
-| `Ctrl+N` | Open the **Local Clusters Manager** overlay (only at LevelClusters). |
+| `Ctrl+N` | Open the Local Clusters Manager overlay (only at LevelClusters) |
 | `Q` | Namespace resource quota dashboard |
 | `` ` `` | Background tasks overlay (Tab toggles running / completed history) |
 | `:` | Command bar: resource jumps (`:pod`, `:dep`), built-ins (`:ns`, `:ctx`, `:set`, `:sort`, `:export`, `:tasks`), kubectl (`:k get pod`), shell (`:! cmd`) |
@@ -106,7 +106,7 @@ Auto-excluded from "Unmounted" results:
 Auto-excluded from Pod "Orphans":
 - Static / mirror pods (kubelet-managed via `kubernetes.io/config.mirror` annotation)
 
-Note: terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason is `"no owner (terminal)"` to distinguish them from live workloads.
+Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason is `"no owner (terminal)"` to distinguish them from live workloads.
 
 ## Search and Filter
 
@@ -175,30 +175,14 @@ When items are selected, press `x` to open the bulk action menu (delete, force d
 
 ## Bookmarks
 
-lfk supports vim-style named marks for quick navigation. A bookmark stores a
-resource path (context + namespace + resource type + optional resource name)
-under a single-character slot. The namespace is always persisted; slot case
-only controls whether the jump switches clusters.
+Vim-style named marks for quick navigation. A bookmark stores a resource
+path (context + namespace + resource type + optional resource name) under
+a single-character slot.
 
-Bookmarks come in two flavors depending on the slot case you choose:
-
-- **Context-aware** (lowercase `a-z` / digit `0-9`): remembers the kube
-  context you were in. Jumping switches clusters as needed. Use this
-  when the bookmark should return you to a specific environment.
-- **Context-free** (uppercase `A-Z`): doesn't remember a context.
-  Jumping uses the tab's current cluster. Use this for
-  cluster-agnostic shortcuts (e.g., `P` for "go to Pods in whatever
-  cluster I'm looking at").
-
-**Namespace on jump.** By default *no* bookmark overwrites the tab's
-current namespace scope — you always land on the bookmarked resource
-type in the namespace you were already viewing. The saved namespace
-stays in the record and can be replayed on demand: open the bookmarks
-list with `'`, press `Tab` to arm a `[LOAD NAMESPACE]` chip in the
-title, then press Enter (or the slot key) to jump with the saved
-namespace applied. The flag is consumed after the jump and cleared
-when you close the overlay, so every open starts in the default "keep
-my namespace" mode.
+- **Context-aware** (`a-z` / `0-9`): remembers the kube context; jumping
+  switches clusters.
+- **Context-free** (`A-Z`): uses the tab's current cluster; for
+  cluster-agnostic shortcuts.
 
 | Key | Context | Action |
 |---|---|---|
@@ -211,6 +195,10 @@ my namespace" mode.
 | `Tab` | Bookmark overlay | Toggle `[LOAD NAMESPACE]` — apply the bookmark's saved namespace scope on the next jump |
 | `Ctrl+X` | Bookmark overlay | Delete selected bookmark (with confirmation) |
 | `Alt+X` | Bookmark overlay | Delete all bookmarks (with confirmation) |
+
+> Namespace on jump: by default the tab's current namespace is kept. Press
+> `Tab` in the overlay to arm `[LOAD NAMESPACE]`; the saved namespace is
+> then applied on the next jump and the flag is cleared on close.
 
 ## Help View
 
@@ -340,9 +328,9 @@ my namespace" mode.
 
 The log viewer's `/` keeps its own persistent history at `$XDG_STATE_HOME/lfk/log-search-history` (default `~/.local/state/lfk/log-search-history`), separate from the explorer's `query-history`. Log search matches raw log lines (substring/regex over arbitrary text) rather than resource names, so pooling the two would surface irrelevant entries on Up/Down in either context.
 
-> **Tail-first loading**: Full Logs (`L` key or action menu `L`) load the last 1000 lines initially (configurable via `log_tail_lines`). Tail Logs (action menu `l`) load only the last 10 lines (configurable via `log_tail_lines_short`) — useful for a quick peek without the full history hit. Scrolling to the top automatically loads older log history in both modes.
+Tail-first loading: Full Logs (`L` key or action menu `L`) load the last 1000 lines initially (configurable via `log_tail_lines`). Tail Logs (action menu `l`) load only the last 10 lines (configurable via `log_tail_lines_short`). Scrolling to the top loads older history.
 
-> **Auto-reconnect across init containers**: When viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — for example as each init container finishes and the next one starts. The reconnect is silent: no sentinel markers are inserted into the log buffer. After several consecutive empty reconnects the viewer stops retrying (the pod is terminated).
+Auto-reconnect across init containers: when viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — e.g. as init containers transition. The reconnect is silent. After several consecutive empty reconnects the viewer stops retrying.
 
 ## Exec Mode (embedded terminal)
 
@@ -709,13 +697,7 @@ existing recommendations stay visually similar after the upgrade).
 
 ### Defaults & stickiness
 
-Strategy and headroom selections are **sticky for the duration of the session**.
-Open `pod1`, press `]` to switch to `prom_max_1d`, press `>` to bump headroom to `1.5`,
-close the overlay, then open `pod2` — the overlay reopens with `prom_max_1d` + `1.5`
-already selected (provided `pod2` also supports `prom_max_1d`; otherwise the strategy
-falls back to the workload's first available, but the headroom still sticks).
-
-For the very first overlay open of a session — when there's no sticky value yet — the
+Strategy and headroom selections are sticky for the session. The first-open
 seed comes from two optional config keys:
 
 ```yaml
@@ -724,16 +706,9 @@ rightsizing_defaults:
   headroom: 1.25      # 1.0 | 1.1 | 1.25 | 1.5 | 1.75 | 2.0
 ```
 
-Both fields are optional. Invalid values (e.g. `strategy: garbage`, `headroom: 1.337`)
-are dropped at startup with a warning in the lfk error log; the picker then uses the
-built-in defaults (highest-priority available strategy + `1.25` headroom). A configured
-default that turns out to be unavailable for a specific workload (e.g. `vpa` set in
-config but no VPA targets the workload) also falls back to the first available strategy
-for that workload.
-
-The fallback chain in priority order: **sticky session value → config default → built-in
-default**. Restarting lfk wipes the sticky state, so the config defaults take over again
-on the next session's first overlay open.
+Fallback chain (highest priority first): sticky session value → config
+default → built-in default (first available strategy + `1.25` headroom).
+Invalid config values are dropped at startup with a warning in the error log.
 
 ## Error Log (`!`)
 
@@ -784,7 +759,7 @@ and global config.
 
 | Key | Action |
 |---|---|
-| `L` (Shift+L) (at the cluster picker) | Open the color picker overlay for the highlighted cluster row. Pick one of 8 named colors (`red`, `yellow`, `green`, `blue`, `magenta`, `cyan`, `white`, `gray`) or `None` to clear. The selection is saved to `$XDG_STATE_HOME/lfk/cluster-colors.yaml` and survives restarts. Same overlay is reachable from the action menu (`x` → "Set color…") at the cluster picker. |
+| `L` (Shift+L) (at the cluster picker) | Open color picker for the highlighted cluster (saved to `$XDG_STATE_HOME/lfk/cluster-colors.yaml`). Also reachable via `x` → "Set color…". |
 
 When a context has a color assigned, the cluster picker row shows a
 small background-tinted suffix swatch on the right edge in that color,
@@ -793,7 +768,7 @@ the entire title bar so it's impossible to miss which environment you're
 acting on. Contexts without a color render a neutral placeholder in the
 swatch column so all rows stay aligned.
 
-Four colours (`red`, `yellow`, `green`, `blue`) follow lfk's active
+Four colors (`red`, `yellow`, `green`, `blue`) follow lfk's active
 theme tokens (`theme.Error`, `theme.Warning`, `theme.Secondary`,
 `theme.Primary`) so a colorscheme switch re-skins them. The remaining
 four (`magenta`, `cyan`, `white`, `gray`) stay on ANSI bright codes
@@ -902,34 +877,34 @@ Press `:` to open the command bar. It supports four types of input:
 The action menu (`x` key) shows context-specific actions based on the resource type:
 
 ### Pod Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
 
 ### Deployment Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### StatefulSet Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### DaemonSet Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Service Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `c` Capture Traffic, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Secret Actions
-`e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `b` Debug Pod, `V` Events
+`e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
 ### ConfigMap Actions
-`e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `b` Debug Pod, `V` Events
+`e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
 ### Node Actions
 `c` Cordon, `u` Uncordon, `n` Drain, `t` Taint, `T` Untaint, `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
 
 ### Job Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
 
 ### CronJob Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `t` Trigger (create Job), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `t` Trigger (create Job), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### ArgoCD Application Actions
 `s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
@@ -944,7 +919,7 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 `g` Go to Pod, `b` Debug Mount, `B` Debug Pod, `v` Describe, `E` Edit, `D` Delete, `V` Events
 
 ### Default Actions (all other resources)
-`v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `b` Debug Pod, `V` Events
+`v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
 
 ### Bulk Actions (when items multi-selected)
 `D` Delete, `X` Force Delete, `S` Scale, `r` Restart

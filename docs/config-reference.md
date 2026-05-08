@@ -6,7 +6,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `colorscheme` | string | `"tokyonight"` | Built-in color scheme name (460+ available). Press `T` to browse. Supports dual-mode syntax for auto dark/light switching: `"dark:X,light:Y"`. Custom `theme` overrides are applied on top. |
+| `colorscheme` | string | `"tokyonight-storm"` | Built-in color scheme name (460+ available). Press `T` to browse. Supports dual-mode syntax for auto dark/light switching: `"dark:X,light:Y"`. Custom `theme` overrides are applied on top. |
 | `transparent_background` | bool | `false` | Use the terminal's own background for bars. Selection highlights remain opaque. |
 | `icons` | string | `"auto"` | Icon display mode. One of: `"auto"` (detects Nerd Font terminals; default), `"unicode"`, `"nerdfont"` (Material Design Icons; requires Nerd Font in terminal), `"simple"` (ASCII labels), `"emoji"`, or `"none"`. Unknown values fall back to `"unicode"`. Can be overridden at runtime by the `LFK_ICONS` environment variable. |
 | `log_path` | string | `"~/.local/share/lfk/lfk.log"` | Path to the application log file. |
@@ -19,12 +19,12 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `abbreviations` | map[string]string | *(see Abbreviations section)* | Custom search abbreviation overrides/extensions. |
 | `custom_actions` | map[string]list | `{}` | User-defined actions per resource type. |
 | `filter_presets` | map[string]list | `{}` | User-defined quick filter presets per resource type. |
-| `terminal` | string | `"pty"` | How exec/shell commands run: `"pty"` (embedded in TUI) or `"exec"` (takes over terminal). |
+| `terminal` | string | `"pty"` | How exec/shell commands run: `"pty"` (embedded in TUI), `"exec"` (takes over terminal), or `"mux"` (opens in a new tmux/zellij window/pane; errors out if no multiplexer is detected). |
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context in `~/.local/state/lfk/pinned.yaml`). |
 | `tips` | bool | `true` | Show a random tip in the status bar on startup. Set to `false` to disable. |
 | `log_tail_lines` | int | `1000` | Number of log lines to load initially via `--tail`. Scrolling to the top loads older history. |
 | `log_tail_lines_short` | int | `10` | Number of log lines loaded by the action menu "Tail Logs" entry (`l` key). Intended for lightweight peeks without the full history hit. Non-positive values are ignored. |
-| `log_render_ansi` | bool | `true` | Render ANSI SGR sequences (colour, bold, underline) emitted by log producers. Set to `false` to strip them — the viewer replaces every ESC byte with `U+FFFD`, matching the original safe-but-noisy behaviour. Non-SGR CSI sequences (cursor movement, screen erase) are always stripped regardless. Toggle at runtime with `:set ansi` / `:set noansi`. |
+| `log_render_ansi` | bool | `true` | Render ANSI SGR sequences (color, bold, underline) emitted by log producers. Set to `false` to strip them — the viewer replaces every ESC byte with `U+FFFD`, matching the original safe-but-noisy behavior. Non-SGR CSI sequences (cursor movement, screen erase) are always stripped regardless. Toggle at runtime with `:set ansi` / `:set noansi`. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
 | `dim_overlay` | bool | `true` | Fade the rest of the screen while any overlay is up. Set to `false` for terminals where SGR faint looks awkward; no-op when `no_color: true`. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |
@@ -139,6 +139,7 @@ Currently supported per-cluster overrides:
 | Field | Type | Description |
 |---|---|---|
 | `resource_columns` | map[string]list | Per-resource-type column overrides for this cluster. Same format as the global `resource_columns`. |
+| `read_only` | bool | Per-context read-only override. Same semantics as the top-level `read_only`. |
 
 Per-cluster `resource_columns` take precedence over the global `resource_columns` setting.
 
@@ -327,7 +328,7 @@ custom_actions:
 | `command` | Yes | Shell command to execute (supports template variables) |
 | `key` | Yes | Shortcut key in the action menu |
 | `description` | No | Description shown next to the action |
-| `read_only_safe` | No | When `true`, the action remains available in read-only mode. Defaults to `false` (treated as mutating and blocked) so destructive shell commands don't silently bypass the read-only gate. Set to `true` for view-only commands like `kubectl describe`, `kubectl logs`, `kubectl rollout history`. |
+| `read_only_safe` | No | When `true`, available in read-only mode. Defaults to `false` (treated as mutating). Set `true` for view-only commands (e.g. `kubectl describe`, `kubectl logs`). |
 
 ### Template Variables
 
@@ -444,7 +445,7 @@ The `informer_cache` knob has three modes:
 
 - **`off`** — every list round-trips to the API server, matching kubectl
   semantics. Pick this when the apiserver is sensitive to extra watch
-  connections or when you are debugging server-side behaviour.
+  connections or when you are debugging server-side behavior.
 - **`auto`** (default) — start in `off` mode per `(context, resource type)`,
   but the moment a list returns ≥ 1000 items, promote that resource type
   to a [shared informer](https://pkg.go.dev/k8s.io/client-go/dynamic/dynamicinformer).
@@ -546,10 +547,8 @@ drive it toward `text`'s luminance and collapse that highlight.
 
 ### When to use this
 
-Turn it on when you notice text is hard to read with a particular colorscheme
-on your terminal. Start with `0.175` (WCAG AA) — it is a good balance between
-readability and color fidelity. Increase toward `0.3` if you still find the
-text too dim.
+Enable when text is hard to read on your terminal. Start at `0.175` (WCAG
+AA); raise toward `0.3` if still too dim.
 
 ```yaml
 min_contrast_ratio: 0.175
@@ -644,9 +643,9 @@ omitted from the backend picker.
 
 ## Color Schemes
 
-Over 460 built-in color schemes are available, generated from [ghostty terminal themes](https://github.com/ghostty-org/ghostty). Popular schemes include:
+Over 460 built-in color schemes are available, generated from [ghostty terminal themes](https://github.com/ghostty-org/ghostty). Sample list:
 
-`tokyonight` (default), `dracula`, `nord`, `catppuccin-mocha`, `catppuccin-latte`, `rose-pine`, `gruvbox-dark`, `gruvbox-light`, `everforest-dark`, `one-half-dark`, `ayu-dark`, `nightfox`, `monokai-pro`, `github-dark`, `github-light`, `solarized-dark`, `solarized-light`, and many more.
+`tokyonight-storm` (default), `dracula`, `nord`, `catppuccin-mocha`, `catppuccin-latte`, `rose-pine`, `gruvbox-dark`, `gruvbox-light`, `everforest-dark`, `one-half-dark`, `ayu-dark`, `nightfox`, `monokai-pro`, `github-dark`, `github-light`, `solarized-dark`, `solarized-light`, and many more.
 
 Switch themes at runtime with `T` to browse all available themes interactively with live preview. Runtime changes are not persisted — set `colorscheme` in your config to make it permanent.
 

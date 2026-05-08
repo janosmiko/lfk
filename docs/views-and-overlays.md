@@ -1,11 +1,6 @@
 # Views and Overlays
 
 Reference list of every view, fullscreen flag, and overlay lfk renders.
-Use this when:
-
-- finding the responsible code path while changing UI behavior,
-- keeping the help screen in sync, or
-- remembering which mode owns which keymap.
 
 ## Concepts
 
@@ -28,8 +23,8 @@ lfk's UI is built from three layered concepts:
 
 Source of truth for the enums:
 [`internal/app/app_types.go`](../internal/app/app_types.go) — `viewMode`
-(line ~14) and `overlayKind` (line ~31). When those enums change, update
-this doc and [`internal/ui/help.go`](../internal/ui/help.go).
+and `overlayKind`. When those enums change, update this doc and
+[`internal/ui/help.go`](../internal/ui/help.go).
 
 Default trigger keys below come from
 [`internal/ui/config_keybindings.go`](../internal/ui/config_keybindings.go);
@@ -49,7 +44,7 @@ Listed in `viewMode` declaration order.
 | `modeDescribe`    | `v` on a resource                     | `kubectl describe`-style detail view.                                  |
 | `modeDiff`        | `d` between two selected resources    | Side-by-side diff (e.g. ArgoCD live vs. desired).                      |
 | `modeExec`        | action menu → `s`                     | Embedded PTY shell session.                                            |
-| `modeExplain`     | `I`, `:explain <type>`                | `kubectl explain` field tree.                                          |
+| `modeExplain`     | `I`                                   | `kubectl explain` field tree.                                          |
 | `modeEventViewer` | event timeline overlay → drill-in     | Full-screen event viewer with grouping.                                |
 | `modeKubetris`    | `:kubetris`                           | Easter-egg game.                                                       |
 | `modeCredits`     | `:credits`                            | Scrolling credits screen.                                              |
@@ -84,12 +79,12 @@ category, and every entry maps to a constant in `app_types.go`.
 | Overlay                     | Default trigger                  | Purpose                                                                                                                                                                                                              |
 | --------------------------- | -------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `overlayNamespace`          | `\`, `:namespace`                | Pick / multi-select namespaces.                                                                                                                                                                                      |
-| `overlayContainerSelect`    | `c` in pod log view              | Pick container when a pod has multiples.                                                                                                                                                                             |
-| `overlayPodSelect`          | `\` in log view                  | Switch to a sibling pod's logs.                                                                                                                                                                                      |
+| `overlayContainerSelect`    | action menu → exec / attach / port-forward (multi-container pod) | Pick container when a pod has multiples.                                                                                                                                                |
+| `overlayPodSelect`          | action menu → exec / attach / port-forward / Helm (Service → backing pod) | Pick a backing pod when an action targets a Service / Deployment.                                                                                                  |
 | `overlayTemplates`          | template-create flow             | Pick a built-in resource template.                                                                                                                                                                                   |
 | `overlayColorscheme`        | `T`                              | Theme picker (search + preview).                                                                                                                                                                                     |
 | `overlayFilterPreset`       | `.`                              | Saved filter expressions.                                                                                                                                                                                            |
-| `overlayCanISubject`        | `:can-i` flow                    | Pick the user / SA to evaluate as.                                                                                                                                                                                   |
+| `overlayCanISubject`        | `U` → can-i flow                 | Pick the user / SA to evaluate as.                                                                                                                                                                                   |
 | `overlayExplainSearch`      | search inside `modeExplain`      | Type / field search for `kubectl explain`.                                                                                                                                                                           |
 | `overlayLogPodSelect`       | `\` in fullscreen log mode       | Switch pods within fullscreen log mode.                                                                                                                                                                              |
 | `overlayLogContainerSelect` | container key in fullscreen logs | Container picker within log mode.                                                                                                                                                                                    |
@@ -137,14 +132,15 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayRollback`        | action menu → `R` on Deploy/STS | Pick revision to roll back to.                                 |
 | `overlayHelmRollback`    | action menu → `R` on Helm       | Pick Helm revision to roll back.                               |
 | `overlayHelmHistory`     | action menu → `h` on Helm       | Browse Helm release history.                                   |
-| `overlayRBAC`            | `U`                             | RBAC subject / role browser.                                   |
+| `overlayRBAC`            | action menu → `P` on Secret / ConfigMap / NetworkPolicy | RBAC subject / role browser.                              |
 | `overlayPodStartup`      | action menu → `S` on Pod        | Pod init / readiness gantt.                                    |
 | `overlayCrashInvestigator` | action menu → `I` on Pod      | Per-pod CrashLoopBackOff investigator.                          |
+| `overlayRightsizing`     | action menu → Right-sizing, `z` | Right-sizing advisor with strategy / headroom pickers.          |
 | `overlayQuotaDashboard`  | `Q`, `:quota`                   | Per-namespace ResourceQuota usage.                              |
 | `overlayEventTimeline`   | `V`                             | Cluster-wide events grouped by object.                          |
 | `overlayAlerts`          | from monitoring view            | Active Prometheus alerts.                                       |
 | `overlayNetworkPolicy`   | from netpol view                | Visualize selected NetworkPolicy.                               |
-| `overlayCanI`            | `:can-i` flow (after subject)   | Display can-i evaluation results.                               |
+| `overlayCanI`            | `U` → can-i flow (after subject) | Display can-i evaluation results.                               |
 | `overlayAutoSync`        | ArgoCD app                      | Toggle auto-sync settings.                                      |
 | `overlaySyncWave`        | action menu → `W` on Application | Per-Application ArgoCD sync wave timeline.                      |
 | `overlayBackgroundTasks` | `` ` ``, `:tasks`               | In-flight + recent background tasks.                            |

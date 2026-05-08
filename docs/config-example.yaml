@@ -5,9 +5,9 @@
 # ─── Color Scheme ──────────────────────────────────────────────────────────────
 # Built-in color scheme. 460+ themes are available (generated from ghostty themes).
 # Press T in-app to browse and preview all themes interactively.
-# Popular options: tokyonight (default), dracula, nord, catppuccin-mocha,
+# Popular options: tokyonight-storm (default), dracula, nord, catppuccin-mocha,
 #   rose-pine, gruvbox-dark, everforest-dark, one-half-dark, ayu-dark, nightfox
-colorscheme: tokyonight
+colorscheme: tokyonight-storm
 
 # ─── Auto Dark/Light Mode ─────────────────────────────────────────────────────
 # Use Ghostty-style "dark:X,light:Y" syntax in the colorscheme field to enable
@@ -394,3 +394,25 @@ confirm_on_exit: true
 # Legacy bool form: true → "always", false → "off".
 # Default: auto
 # informer_cache: auto
+
+# ─── Mouse Support ────────────────────────────────────────────────────────────
+# Capture mouse input for click navigation, scroll, and tab switching.
+# Set to false to disable; equivalent to --no-mouse on the command line.
+# mouse: true
+
+# ─── Scrolloff ────────────────────────────────────────────────────────────────
+# Lines to keep visible above/below the cursor when scrolling. Used by all
+# views with cursor-based navigation.
+# scrolloff: 5
+
+# ─── Secret Lazy Loading ──────────────────────────────────────────────────────
+# When true, Secret listing fetches metadata only; decoded values load on
+# hover. Useful in clusters with many Helm release Secrets or large TLS
+# payloads, at the cost of an extra GET per hovered Secret.
+# secret_lazy_loading: false
+
+# ─── Minimum Contrast Ratio ───────────────────────────────────────────────────
+# Normalized [0.0, 1.0] knob. When > 0, foreground colors are nudged in HSL
+# lightness space to meet a minimum WCAG contrast against their backgrounds.
+# 0.175 ≈ WCAG AA (4.5:1); 0.3 ≈ WCAG AAA (7:1).
+# min_contrast_ratio: 0.0

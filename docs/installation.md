@@ -97,7 +97,7 @@ scoop install lfk
 winget install janosmiko.lfk
 ```
 
-> The first release after a tag opens an automatic PR to `microsoft/winget-pkgs`. The package becomes installable once that PR is merged by the Winget maintainers — typically within hours.
+> The first release after a tag opens an automatic PR to `microsoft/winget-pkgs`. The package becomes installable once that PR is merged by the Winget maintainers.
 
 ### Chocolatey
 
@@ -105,7 +105,7 @@ winget install janosmiko.lfk
 choco install lfk
 ```
 
-> First-time installs from Chocolatey may show "Pending" while the package goes through chocolatey.org moderation. Subsequent versions usually become available immediately after publish.
+> First-time installs from Chocolatey show "Pending" until chocolatey.org moderation completes. Subsequent versions are available immediately after publish.
 
 ### Manual binary
 
@@ -113,11 +113,13 @@ Download `lfk_<version>_windows_<arch>.zip` from [GitHub Releases](https://githu
 
 ## From source
 
+Using `go install` (fetches via the Go module proxy):
+
 ```bash
 go install github.com/janosmiko/lfk@latest
 ```
 
-## Build from source
+From a local clone:
 
 ```bash
 git clone https://github.com/janosmiko/lfk.git

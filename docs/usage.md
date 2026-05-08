@@ -106,9 +106,9 @@ helm-history pickers, the auto-sync dialog, the Can-I browser, and the
 NetworkPolicy viewer) cover the entire screen, so there is no "outside" to
 click; press `Esc` to close them.
 
-> **Note:** macOS Terminal.app does not support shift+click text selection while
-> mouse capture is active. Use `--no-mouse` or switch to a terminal that handles
-> this correctly (iTerm2, Kitty, Alacritty, WezTerm, Ghostty).
+> macOS Terminal.app does not support shift+click text selection while mouse
+> capture is active. Use `--no-mouse` or switch to a terminal that handles this
+> correctly (iTerm2, Kitty, Alacritty, WezTerm, Ghostty).
 
 ## No-Color Mode
 
@@ -195,6 +195,19 @@ context; it does not scope the read-only flag.
 The cluster picker hint bar advertises `Ctrl+R toggle RO` so users
 can find the row toggle without reading docs.
 
+## Node Shell
+
+From the Node action menu (`x` → `s`), lfk launches a privileged debug pod
+that `nsenter`s into PID 1 on the selected node, giving an interactive shell
+with the host's mount, network, PID, and IPC namespaces.
+
+The pod runs in `kube-system` with `priorityClassName: system-node-critical`
+so it can land on nodes reporting DiskPressure / MemoryPressure / PIDPressure,
+and tolerates all taints. It is created with `--rm --restart=Never`, so it
+is removed when the shell exits.
+
+Node shell is a mutating action and is gated by the read-only check.
+
 ## Cluster Color Coding
 
 Tag any cluster with a background color so the title bar tints the
@@ -219,7 +232,7 @@ when a stray `D` would do real damage.
   Unknown color names in the file are ignored on load (with a warning
   written to the lfk log) so a typo doesn't poison neighbouring entries.
 
-Four of the colours follow lfk's active theme so they re-skin when you
+Four of the colors follow lfk's active theme so they re-skin when you
 switch colorschemes:
 
 | Picker name | Theme token             |
@@ -231,7 +244,7 @@ switch colorschemes:
 
 The remaining four (`magenta`, `cyan`, `white`, `gray`) stay on ANSI
 bright codes so they look the same regardless of which lfk theme is
-active — useful when none of the theme accent colours fit a particular
+active — useful when none of the theme accent colors fit a particular
 cluster's identity.
 
 ## Watch-Mode Interval
@@ -253,8 +266,8 @@ API discovery (the list of resource types and CRDs the server exposes) is
 cached on disk under `~/.kube/cache/discovery/<host>/` with a 5-minute TTL.
 Layout matches `kubectl` and `k9s` so the same cache is shared across all
 three tools — a cold start hits zero discovery round-trips when the cache
-is warm. On busy clusters with many CRDs this is a measurable launch-time
-win and removes redundant load on the API server.
+is warm. On busy clusters with many CRDs this eliminates redundant
+discovery round-trips on the API server and reduces startup time.
 
 - **Override location:** Set `KUBECACHEDIR` (same env var `kubectl`
   honors) to relocate `<KUBECACHEDIR>/discovery/...` and
@@ -302,13 +315,9 @@ ENDPOINTS
   10.0.0.4  → pod/foo-7d9-broken  on node-c   (NotReady)
 ```
 
-The fetch follows a stale-while-revalidate pattern: on every hover or
-watch-tick refresh, the cached rollup is painted instantly so the row
-doesn't blank during the rebuild, *and* a fresh fetch fires in parallel
-so pod churn (delete + recreate, rolling updates, HPA scale) is always
-reflected within one watch tick. Pure cache-only would show stale
-ready state after pod restart; pure fetch-only would flash a blank
-row every watch tick.
+The fetch is stale-while-revalidate: the cached rollup paints instantly
+and a fresh fetch fires in parallel, so pod churn is reflected within one
+watch tick without blanking the row mid-rebuild.
 
 Headless Services (`clusterIP: None`) and `ExternalName` Services are
 skipped — they have no backing EndpointSlices to roll up.
