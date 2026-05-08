@@ -197,6 +197,10 @@ func aroundWORDRange(line string, col int) (int, int) {
 	return aroundRangeWith(line, col, isWORDBoundary)
 }
 
+// innerRangeWith returns the inclusive [start, end] column range covering the
+// contiguous run at col whose runes share isBoundary's classification (all
+// boundary or all non-boundary). Shared by the word and WORD inner-range
+// variants. Returns (-1, -1) on empty input.
 func innerRangeWith(line string, col int, isBoundary func(rune) bool) (int, int) {
 	runes := []rune(line)
 	n := len(runes)
@@ -221,6 +225,11 @@ func innerRangeWith(line string, col int, isBoundary func(rune) bool) (int, int)
 	return start, end
 }
 
+// aroundRangeWith extends innerRangeWith to the "around" form: a cursor on a
+// word swallows the trailing boundary run (or the leading run when no
+// trailing exists); a cursor on a boundary run swallows the following word.
+// Shared by the word and WORD around-range variants. Returns (-1, -1) on
+// empty input.
 func aroundRangeWith(line string, col int, isBoundary func(rune) bool) (int, int) {
 	runes := []rune(line)
 	n := len(runes)
