@@ -39,6 +39,9 @@ themes/ghostty/
 # Worktrees
 .worktrees/
 
+# Claude Code runtime artifacts
+.claude/scheduled_tasks.lock
+
 # Superpowers planning scratch (per-feature plans + design specs are
 # local working notes, not shipped artifacts).
 docs/superpowers/
