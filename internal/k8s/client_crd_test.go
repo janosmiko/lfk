@@ -423,7 +423,7 @@ func TestBuildContainerItem(t *testing.T) {
 			},
 		}
 
-		item := buildContainerItem(c, statuses, false, false)
+		item := buildContainerItem(c, statuses, false, false, false)
 
 		assert.Equal(t, "app", item.Name)
 		assert.Equal(t, "Container", item.Kind)
@@ -445,7 +445,7 @@ func TestBuildContainerItem(t *testing.T) {
 
 	t.Run("init container", func(t *testing.T) {
 		c := corev1.Container{Name: "init-db", Image: "busybox"}
-		item := buildContainerItem(c, nil, true, false)
+		item := buildContainerItem(c, nil, true, false, false)
 
 		assert.Equal(t, "Init Containers", item.Category)
 		assert.Equal(t, "Init", item.Status)
@@ -453,10 +453,23 @@ func TestBuildContainerItem(t *testing.T) {
 
 	t.Run("sidecar container", func(t *testing.T) {
 		c := corev1.Container{Name: "envoy", Image: "envoyproxy/envoy:v1.28"}
-		item := buildContainerItem(c, nil, false, true)
+		item := buildContainerItem(c, nil, false, true, false)
 
 		assert.Equal(t, "Sidecar Containers", item.Category)
 		assert.Equal(t, "Waiting", item.Status)
+	})
+
+	t.Run("ephemeral container", func(t *testing.T) {
+		c := corev1.Container{Name: "debugger", Image: "busybox:latest"}
+		statuses := []corev1.ContainerStatus{
+			{Name: "debugger", Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+		}
+		item := buildContainerItem(c, statuses, false, false, true)
+
+		assert.Equal(t, "Ephemeral Containers", item.Category)
+		assert.Equal(t, "Container", item.Kind)
+		assert.Equal(t, "Running", item.Status)
+		assert.Equal(t, "true", item.Ready)
 	})
 
 	t.Run("container with waiting state", func(t *testing.T) {
@@ -475,7 +488,7 @@ func TestBuildContainerItem(t *testing.T) {
 			},
 		}
 
-		item := buildContainerItem(c, statuses, false, false)
+		item := buildContainerItem(c, statuses, false, false, false)
 
 		assert.Equal(t, "CrashLoopBackOff", item.Status)
 		assert.Equal(t, "false", item.Ready)
@@ -503,7 +516,7 @@ func TestBuildContainerItem(t *testing.T) {
 			},
 		}
 
-		item := buildContainerItem(c, statuses, false, false)
+		item := buildContainerItem(c, statuses, false, false, false)
 
 		assert.Equal(t, "OOMKilled", item.Status)
 		colMap := columnsToMap(item.Columns)
@@ -531,7 +544,7 @@ func TestBuildContainerItem(t *testing.T) {
 			},
 		}
 
-		item := buildContainerItem(c, statuses, false, false)
+		item := buildContainerItem(c, statuses, false, false, false)
 
 		assert.Equal(t, "Running", item.Status)
 		colMap := columnsToMap(item.Columns)
@@ -551,7 +564,7 @@ func TestBuildContainerItem(t *testing.T) {
 			},
 		}
 
-		item := buildContainerItem(c, statuses, false, false)
+		item := buildContainerItem(c, statuses, false, false, false)
 
 		assert.Equal(t, "Waiting", item.Status)
 		assert.Empty(t, item.Ready)
@@ -569,7 +582,7 @@ func TestBuildContainerItem(t *testing.T) {
 			},
 		}
 
-		item := buildContainerItem(c, nil, false, false)
+		item := buildContainerItem(c, nil, false, false, false)
 
 		colMap := columnsToMap(item.Columns)
 		assert.Equal(t, "http:80/TCP, 443/TCP, metrics:9090/TCP", colMap["Ports"])
@@ -593,7 +606,7 @@ func TestBuildContainerItem(t *testing.T) {
 			},
 		}
 
-		item := buildContainerItem(c, statuses, false, false)
+		item := buildContainerItem(c, statuses, false, false, false)
 
 		colMap := columnsToMap(item.Columns)
 		assert.Equal(t, "Completed", colMap["Last Terminated"])

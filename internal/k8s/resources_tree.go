@@ -375,6 +375,15 @@ func (c *Client) buildPodTree(ctx context.Context, contextName, namespace, podNa
 		})
 	}
 
+	for _, ec := range pod.Spec.EphemeralContainers {
+		root.Children = append(root.Children, &model.ResourceNode{
+			Name:      ec.Name,
+			Kind:      "Container",
+			Namespace: namespace,
+			Status:    containerStatusFromPod(ec.Name, pod.Status.EphemeralContainerStatuses),
+		})
+	}
+
 	dynClient, dynErr := c.dynamicForContext(contextName)
 	if dynErr != nil {
 		// Tree build proceeds without ref existence checks and without an
@@ -489,10 +498,11 @@ func appendContainerNodes(podNode *model.ResourceNode, obj map[string]any) {
 	// empty rather than defaulting to "Waiting".
 	status, _ := obj["status"].(map[string]any)
 	statusByKey := map[string]map[string]string{
-		"initContainers": extractContainerStatusMap(status, "initContainerStatuses"),
-		"containers":     extractContainerStatusMap(status, "containerStatuses"),
+		"initContainers":      extractContainerStatusMap(status, "initContainerStatuses"),
+		"containers":          extractContainerStatusMap(status, "containerStatuses"),
+		"ephemeralContainers": extractContainerStatusMap(status, "ephemeralContainerStatuses"),
 	}
-	for _, key := range []string{"initContainers", "containers"} {
+	for _, key := range []string{"initContainers", "containers", "ephemeralContainers"} {
 		containers, _ := spec[key].([]any)
 		lookup := statusByKey[key]
 		for _, c := range containers {

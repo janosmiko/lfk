@@ -42,6 +42,49 @@ func TestAppendContainerNodes(t *testing.T) {
 		assert.Equal(t, "sidecar", podNode.Children[3].Name)
 	})
 
+	t.Run("includes ephemeral containers with status", func(t *testing.T) {
+		podNode := &model.ResourceNode{
+			Name:      "my-pod",
+			Kind:      "Pod",
+			Namespace: "default",
+		}
+		obj := map[string]any{
+			"spec": map[string]any{
+				"containers": []any{
+					map[string]any{"name": "app"},
+				},
+				"ephemeralContainers": []any{
+					map[string]any{"name": "debugger"},
+				},
+			},
+			"status": map[string]any{
+				"containerStatuses": []any{
+					map[string]any{
+						"name":  "app",
+						"ready": true,
+						"state": map[string]any{"running": map[string]any{}},
+					},
+				},
+				"ephemeralContainerStatuses": []any{
+					map[string]any{
+						"name":  "debugger",
+						"ready": true,
+						"state": map[string]any{"running": map[string]any{}},
+					},
+				},
+			},
+		}
+
+		appendContainerNodes(podNode, obj)
+
+		require.Len(t, podNode.Children, 2)
+		assert.Equal(t, "app", podNode.Children[0].Name)
+		assert.Equal(t, "Running", podNode.Children[0].Status)
+		assert.Equal(t, "debugger", podNode.Children[1].Name)
+		assert.Equal(t, "Container", podNode.Children[1].Kind)
+		assert.Equal(t, "Running", podNode.Children[1].Status)
+	})
+
 	t.Run("no spec returns without adding children", func(t *testing.T) {
 		podNode := &model.ResourceNode{
 			Name:      "my-pod",

@@ -313,6 +313,51 @@ func TestGetContainers_NotFound(t *testing.T) {
 	require.Error(t, err)
 }
 
+func TestGetContainers_WithEphemeralContainers(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{
+				{Name: "app", Image: "myapp:v1"},
+			},
+			EphemeralContainers: []corev1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+						Name:  "debugger",
+						Image: "busybox:latest",
+					},
+					TargetContainerName: "app",
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			ContainerStatuses: []corev1.ContainerStatus{
+				{Name: "app", Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+			},
+			EphemeralContainerStatuses: []corev1.ContainerStatus{
+				{Name: "debugger", Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+			},
+		},
+	}
+	cs := k8sfake.NewClientset(pod)
+	c := newFakeClient(cs, nil)
+
+	items, err := c.GetContainers(context.Background(), "", "default", "my-pod")
+	require.NoError(t, err)
+	require.Len(t, items, 2)
+
+	// App containers come before ephemerals (ephemerals are runtime-attached).
+	assert.Equal(t, "app", items[0].Name)
+	assert.Equal(t, "Containers", items[0].Category)
+
+	assert.Equal(t, "debugger", items[1].Name)
+	assert.Equal(t, "Container", items[1].Kind)
+	assert.Equal(t, "Ephemeral Containers", items[1].Category)
+	assert.Equal(t, "Running", items[1].Status)
+	assert.Equal(t, "true", items[1].Ready)
+	assert.Equal(t, "busybox:latest", items[1].Extra)
+}
+
 // --- GetContainerPorts ---
 
 func TestGetContainerPorts(t *testing.T) {
@@ -2285,6 +2330,54 @@ func TestGetPodsForService_NoSelector(t *testing.T) {
 }
 
 // --- buildPodTree ---
+
+func TestBuildPodTree_WithEphemeralContainers(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Name: "my-pod", Namespace: "default"},
+		Spec: corev1.PodSpec{
+			AutomountServiceAccountToken: new(false), // suppress the default SA child to keep assertion focused
+			Containers:                   []corev1.Container{{Name: "app"}},
+			EphemeralContainers: []corev1.EphemeralContainer{
+				{
+					EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+						Name:  "debugger",
+						Image: "busybox:latest",
+					},
+					TargetContainerName: "app",
+				},
+			},
+		},
+		Status: corev1.PodStatus{
+			Phase: corev1.PodRunning,
+			ContainerStatuses: []corev1.ContainerStatus{
+				{Name: "app", Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+			},
+			EphemeralContainerStatuses: []corev1.ContainerStatus{
+				{Name: "debugger", Ready: true, State: corev1.ContainerState{Running: &corev1.ContainerStateRunning{}}},
+			},
+		},
+	}
+	cs := k8sfake.NewClientset(pod)
+	dc := newFakeDynClient()
+	c := newFakeClient(cs, dc)
+
+	root := &model.ResourceNode{Name: "my-pod", Kind: "Pod", Namespace: "default"}
+	err := c.buildPodTree(context.Background(), "", "default", "my-pod", root)
+	require.NoError(t, err)
+
+	// Exactly 2 container children: app + debugger. AutomountServiceAccountToken=false suppresses the SA ref.
+	require.Len(t, root.Children, 2)
+	var ephemeralFound bool
+	for _, ch := range root.Children {
+		if ch.Kind == "Container" && ch.Name == "debugger" {
+			ephemeralFound = true
+			// Verify status flows from pod.Status.EphemeralContainerStatuses, not just spec presence.
+			assert.Equal(t, "Running", ch.Status)
+			break
+		}
+	}
+	assert.True(t, ephemeralFound, "ephemeral container 'debugger' should appear as a Container child of the pod")
+}
 
 func TestBuildPodTree(t *testing.T) {
 	pod := &corev1.Pod{
