@@ -87,6 +87,33 @@ func TestExportResourceToFileNilDefault(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// --- security view: synthetic kinds have no YAML / no file to export ---
+
+// TestCopyYAMLToClipboardSecurityNoFetch guards against the same warning class
+// as TestLoadYAMLLevelOwnedSecurityNoFetch — pressing 'Y' / `:export yaml` on
+// a __security_affected_resource__ row at LevelOwned must not dispatch a
+// kubectl-shaped fetch.
+func TestCopyYAMLToClipboardSecurityNoFetch(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelOwned
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_falco__", APIGroup: "_security"}
+	m.middleItems = []model.Item{{Name: "pod/affected", Kind: "__security_affected_resource__", Namespace: "default"}}
+	m.setCursor(0)
+	cmd := m.copyYAMLToClipboard()
+	assert.Nil(t, cmd)
+}
+
+// TestExportResourceToFileSecurityNoFetch — same regression for save-to-file.
+func TestExportResourceToFileSecurityNoFetch(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelOwned
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_falco__", APIGroup: "_security"}
+	m.middleItems = []model.Item{{Name: "pod/affected", Kind: "__security_affected_resource__", Namespace: "default"}}
+	m.setCursor(0)
+	cmd := m.exportResourceToFile()
+	assert.Nil(t, cmd)
+}
+
 // --- renderCanIOverlay ---
 
 func TestRenderCanIOverlayEmptySubjectName(t *testing.T) {

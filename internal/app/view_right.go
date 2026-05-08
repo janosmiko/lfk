@@ -258,6 +258,18 @@ func (m Model) renderRightResourceTypes(width, height int) string {
 		}
 		return m.monitoringPreview
 	}
+	// Security sources: show a scanning spinner while the findings
+	// preview load is actually in flight; once it completes, an empty
+	// rightItems means "this source returned zero findings" or "the
+	// fetch errored out", and the spinner would loop forever — so fall
+	// through to renderRightDefault (which says "No resources found")
+	// in that case.
+	if sel != nil && strings.HasPrefix(sel.Kind, "__security_") && sel.Kind != "__security_finding__" {
+		if len(m.rightItems) == 0 && m.previewLoading {
+			return ui.DimStyle.Render(m.spinner.View() + " Scanning " + sel.Name + " findings...")
+		}
+		return m.renderRightDefault(width, height)
+	}
 	return m.renderRightDefault(width, height)
 }
 
@@ -297,6 +309,21 @@ func (m Model) renderRightClusters(width, height int) string {
 func (m Model) renderRightResources(width, height int) string {
 	if isUnionDashboardResourceKind(m.nav.ResourceType.Kind) {
 		return m.renderUnionDashboardMemberPreview()
+	}
+	sel := m.selectedMiddleItem()
+	if sel != nil && sel.Kind == "__security_finding__" {
+		return ui.RenderFindingDetails(*sel, width, height)
+	}
+	// Security finding groups: split view — affected resources table on
+	// top + group details on the bottom, the same shape as Deployment > Pods.
+	if sel != nil && sel.Kind == "__security_finding_group__" {
+		if len(m.rightItems) > 0 {
+			return m.renderSecurityGroupSplitPreview(sel, width, height)
+		}
+		if m.previewLoading {
+			return ui.DimStyle.Render(m.spinner.View() + " Loading affected resources...")
+		}
+		return ui.RenderFindingGroupDetails(*sel, nil, width, height)
 	}
 	if (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod") && len(m.rightItems) > 0 {
 		return m.renderSplitPreview(width, height)
@@ -343,6 +370,10 @@ func (m Model) renderRightOwned(width, height int) string {
 	if sel == nil {
 		return m.renderRightDefault(width, height)
 	}
+	// Security affected resources: render finding context for this resource.
+	if sel.Kind == "__security_affected_resource__" {
+		return ui.RenderAffectedResourceDetails(*sel, width, height)
+	}
 	if sel.Kind == "Pod" && len(m.rightItems) > 0 {
 		return m.renderSplitPreview(width, height)
 	}
@@ -368,6 +399,20 @@ func (m Model) renderRightDefault(width, height int) string {
 	return m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
 		return ui.RenderTable(strings.ToUpper(m.ownedChildKindLabel()), m.rightItems, -1, width, height, m.loading, m.spinner.View(), "", false)
 	})
+}
+
+// renderSecurityGroupSplitPreview renders a split view for a security
+// finding group: affected resources table on top, group details on the
+// bottom — the same layout as Deployment > Pods.
+func (m Model) renderSecurityGroupSplitPreview(sel *model.Item, width, height int) string {
+	childrenHeight := max((height-2)/3, 2)
+	detailsHeight := max(height-childrenHeight-2, 1)
+
+	childrenContent := ui.RenderTable("AFFECTED RESOURCES", m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
+	separator := ui.DimStyle.Render(strings.Repeat("─", width))
+	detailsContent := ui.RenderFindingGroupDetails(*sel, nil, width, detailsHeight)
+
+	return childrenContent + "\n" + separator + "\n" + detailsContent
 }
 
 // renderSplitPreview renders the right column as a split: top children table, bottom details.

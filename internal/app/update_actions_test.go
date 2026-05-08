@@ -2280,3 +2280,35 @@ func TestFinalExecuteActionExplain(t *testing.T) {
 	_ = result.(Model)
 	_ = cmd
 }
+
+// TestDirectActionsSecurityNoOp guards against L/E/D/Del/Ctrl+D/+- direct
+// actions dispatching kubectl-shaped operations on a synthetic security
+// selection at LevelOwned. Without the guard, selectedResourceKind() returns
+// "__security_affected_resource__" which slips past the existing
+// `kind=="" || kind=="__port_forwards__"` gate and feeds buildActionCtx +
+// executeAction with an empty ResourceTypeEntry.
+func TestDirectActionsSecurityNoOp(t *testing.T) {
+	type tc struct {
+		name string
+		fn   func(Model) (any, any)
+	}
+	cases := []tc{
+		{"Logs", func(m Model) (any, any) { r, c := m.directActionLogs(); return r, c }},
+		{"Edit", func(m Model) (any, any) { r, c := m.directActionEdit(); return r, c }},
+		{"Describe", func(m Model) (any, any) { r, c := m.directActionDescribe(); return r, c }},
+		{"Delete", func(m Model) (any, any) { r, c := m.directActionDelete(); return r, c }},
+		{"ForceDelete", func(m Model) (any, any) { r, c := m.directActionForceDelete(); return r, c }},
+		{"Scale", func(m Model) (any, any) { r, c := m.directActionScale(); return r, c }},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			m := basePush80Model()
+			m.nav.Level = model.LevelOwned
+			m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_falco__", APIGroup: "_security"}
+			m.middleItems = []model.Item{{Name: "pod/affected", Kind: "__security_affected_resource__", Namespace: "default"}}
+			m.setCursor(0)
+			_, cmd := c.fn(m)
+			assert.Nil(t, cmd, "%s must no-op on synthetic security selection", c.name)
+		})
+	}
+}

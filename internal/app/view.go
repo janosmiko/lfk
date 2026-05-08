@@ -21,6 +21,12 @@ func (m Model) View() string {
 	ui.NyanMode = m.nyanMode
 	ui.NyanTick = m.nyanTick
 
+	// Activate the SEC badge on resource rows when at least one security
+	// source is available and findings have been indexed for the current
+	// cluster. The renderer reads these globals during table layout.
+	ui.ActiveSecurityIndex = m.securityIndex
+	ui.ActiveSecurityAvailable = m.anySecurityAvailable()
+
 	// Render fullscreen modes (YAML, Logs, Describe, Diff, Exec, Explain) with title bar and tab bar.
 	// Each view renders its own hint bar, so the main status bar is not shown.
 	// Also render the fullscreen view as background when help is open from a fullscreen mode.

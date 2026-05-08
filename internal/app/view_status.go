@@ -57,6 +57,18 @@ func (m Model) middleColumnHeader() string {
 		if m.isUnionSentinel() {
 			return strings.ToUpper(m.nav.ResourceType.Kind) + " [UNION]"
 		}
+		// Honor a populated DisplayName before falling back to Kind so
+		// synthetic resource types (security sources "__security_<src>__",
+		// "__port_forwards__", PseudoResources like Helm Releases) render
+		// human-readable headers instead of the raw sentinel kind, e.g.
+		// "FALCO" / "PORT FORWARDS" / "RELEASES" instead of
+		// "__SECURITY_FALCO__" / "__PORT_FORWARDS__" / "HELMRELEASE".
+		// Discovery-produced ResourceTypeEntry values leave DisplayName
+		// empty (set by SetDisplayName at sidebar build time, not on the
+		// nav RT), so this branch is a no-op for normal Kubernetes kinds.
+		if name := m.nav.ResourceType.DisplayName; name != "" {
+			return strings.ToUpper(name)
+		}
 		return strings.ToUpper(m.nav.ResourceType.Kind)
 	case model.LevelOwned:
 		return strings.ToUpper(m.ownedItemKindLabel())

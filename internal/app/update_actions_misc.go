@@ -73,6 +73,9 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 		}
 		return m.loadResources(false)
 	case model.LevelOwned:
+		if m.nav.ResourceType.APIGroup == model.SecurityVirtualAPIGroup {
+			return m.loadSecurityAffectedResources(false)
+		}
 		return m.loadOwned(false)
 	case model.LevelContainers:
 		return m.loadContainers(false)

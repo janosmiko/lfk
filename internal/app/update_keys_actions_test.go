@@ -1083,3 +1083,20 @@ func TestYKeyBulkCapExceeded(t *testing.T) {
 	assert.False(t, r.copyFormatPicker.active, "picker must NOT open when cap is exceeded")
 	assert.Contains(t, r.statusMessage, "Max 50 exceeded")
 }
+
+// TestLoadDiffSecurityNoFetch guards against the Diff key dispatching a
+// kubectl-shaped GetResourceYAML for a synthetic security ResourceTypeEntry —
+// the cmd must short-circuit with a clear error instead of producing a kubectl
+// failure tagged with "fetching <name>".
+func TestLoadDiffSecurityNoFetch(t *testing.T) {
+	m := basePush80Model()
+	rt := model.ResourceTypeEntry{Kind: "__security_falco__", APIGroup: "_security"}
+	itemA := model.Item{Name: "pod/a", Kind: "__security_affected_resource__", Namespace: "default"}
+	itemB := model.Item{Name: "pod/b", Kind: "__security_affected_resource__", Namespace: "default"}
+	cmd := m.loadDiff(rt, itemA, itemB)
+	require.NotNil(t, cmd)
+	msg, ok := cmd().(diffLoadedMsg)
+	require.True(t, ok)
+	require.Error(t, msg.err)
+	assert.Contains(t, msg.err.Error(), "__security_falco__", "error must identify the synthetic kind")
+}

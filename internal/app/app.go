@@ -796,4 +796,5 @@ type Model struct {
 	creditsScroll  int  // scroll position for credits screen
 	creditsStopped bool // true when credits reached center and waiting to close
 	kubetrisGame   *kubetrisGame
+	securityModelState
 }

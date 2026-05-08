@@ -11,6 +11,7 @@ func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.loadContexts(),
 		m.spinner.Tick,
+		m.loadSecurityAvailability(),
 		// Run the discovery-cache preload off the main goroutine. Blocking
 		// startup on it serialises a clientcmd.ClientConfig() call per
 		// kubeconfig context; see the comment on discoveryCachePreloadCmd.

@@ -920,6 +920,27 @@ func TestCovLoadYAMLNilSelection(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// TestLoadYAMLLevelOwnedSecurityNoFetch is the regression guard for the
+// "Warning: unknown resource type: __security_affected_resource__" warning
+// surfaced when 'y' (full YAML) is pressed on a security finding row.
+// Synthetic security items have no YAML to fetch; loadYAML must short-circuit
+// instead of falling through to resolveOwnedResourceType.
+func TestLoadYAMLLevelOwnedSecurityNoFetch(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelOwned
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_falco__", APIGroup: "_security"}
+	m.middleItems = []model.Item{{Name: "pod/affected", Kind: "__security_affected_resource__", Namespace: "default"}}
+	m.setCursor(0)
+	cmd := m.loadYAML()
+	if cmd == nil {
+		return
+	}
+	msg := cmd()
+	if loaded, ok := msg.(yamlLoadedMsg); ok {
+		assert.NoError(t, loaded.err, "synthetic security item must not produce a yamlLoadedMsg with unknown-resource-type error")
+	}
+}
+
 func TestCovLoadMetricsNilFakeClient(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.middleItems = nil

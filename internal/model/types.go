@@ -6,6 +6,30 @@ import (
 	"time"
 )
 
+// SecurityVirtualAPIGroup is the APIGroup used by synthetic security
+// resource types. Client.GetResources dispatches on this value.
+const SecurityVirtualAPIGroup = "_security"
+
+// SecurityLoaderKind is the synthetic Kind used by the sidebar entry
+// shown while the availability probe is in flight (no cached result).
+// The navigation layer treats it as a no-op so clicking the loader
+// doesn't dispatch a doomed fetch.
+const SecurityLoaderKind = "__security_loader__"
+
+// SecuritySourceEntry describes one entry shown under the Security category
+// in the middle column. Populated at startup by the app layer.
+type SecuritySourceEntry struct {
+	DisplayName string // "Trivy", "Kyverno", "Heuristic"
+	SourceName  string // matches security.SecuritySource.Name() — "trivy-operator", "heuristic", "policy-report"
+	Icon        Icon   // Icon variants for display (see icon.go)
+	Count       int    // populated from FindingIndex at render time
+}
+
+// SecuritySourcesFn returns the list of security source entries to display
+// in the Security category. Set by the app at startup. When nil or empty,
+// the Security category is still shown (it's a core category) but empty.
+var SecuritySourcesFn func() []SecuritySourceEntry
+
 // Level represents the current navigation depth in the owner-based hierarchy.
 type Level int
 
@@ -220,6 +244,17 @@ func (i Item) SelectionKey() string {
 		return i.ClusterName + ":" + base
 	}
 	return base
+}
+
+// ColumnValue returns the value of the named column, or "" if absent.
+// Match is case-sensitive — callers store keys with stable casing.
+func (i Item) ColumnValue(key string) string {
+	for _, c := range i.Columns {
+		if c.Key == key {
+			return c.Value
+		}
+	}
+	return ""
 }
 
 // MissingRefStatus is the Status string assigned to a ResourceNode whose

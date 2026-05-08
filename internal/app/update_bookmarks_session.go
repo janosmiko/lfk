@@ -59,6 +59,17 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	}
 	m.applyPinnedGroups()
 	m.nav.Level = model.LevelResourceTypes
+	// Rebuild the security manager for the restored context. NewModel
+	// called refreshSecuritySources with m.nav.Context = "", which fell
+	// back to the kubeconfig default and registered sources for that
+	// context. If the session lands on a different context, the manager
+	// targets the wrong cluster and the initial probe's result message
+	// is dropped by updateSecurityAvailabilityLoaded's stale-context
+	// gate — leaving the sidebar's "(probing sources...)" loader stuck
+	// until the user navigates out and back in. Re-run refreshSecuritySources
+	// here so the manager + cached availability + dispatched probe all
+	// target sess.Context.
+	m.refreshSecuritySources()
 
 	m.leftItemsHistory = nil
 	m.leftItems = contexts
@@ -80,6 +91,14 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 		cmds = append(cmds, m.discoverAPIResources(discoveryCtx))
 	}
 	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
+	// Re-probe security source availability for the restored context.
+	// The Init-time probe targets the kubeconfig default; if the session
+	// restored to a different context its result is dropped by the
+	// stale-context gate. Pair this with refreshSecuritySources above so
+	// the manager and the probe both target sess.Context.
+	if cmd := m.loadSecurityAvailability(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 

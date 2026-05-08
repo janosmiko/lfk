@@ -1724,6 +1724,63 @@ func TestCov80EnterFullViewNormal(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
+// TestEnterFullViewSecurityFindingGroupDrillsIn guards against the
+// regression where pressing Enter on a __security_finding_group__ row at
+// LevelResources silently no-ops. enterFullView previously routed
+// security selections to "return m, nil" to keep 'y' from entering
+// modeYAML, but Enter MUST drill in (show affected resources) — same as
+// it would for a Pod row by way of LevelResources -> LevelOwned. Land
+// on LevelOwned with the security group key recorded so
+// loadSecurityAffectedResources can fetch the matching findings.
+func TestEnterFullViewSecurityFindingGroupDrillsIn(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_falco__", APIGroup: "_security"}
+	m.middleItems = []model.Item{{
+		Name:  "rule.privileged",
+		Kind:  "__security_finding_group__",
+		Extra: "rule.privileged",
+	}}
+	m.setCursor(0)
+	result, _ := m.enterFullView()
+	rm := result.(Model)
+	assert.Equal(t, model.LevelOwned, rm.nav.Level,
+		"Enter on a finding group must drill into LevelOwned, not no-op")
+	assert.Equal(t, "rule.privileged", rm.securityActiveGroup,
+		"the group key must be recorded so loadSecurityAffectedResources can filter")
+	assert.NotEqual(t, modeYAML, rm.mode,
+		"must not enter modeYAML — there is no YAML for a finding group")
+}
+
+// TestEnterFullViewSecurityAffectedResourceDrillsIn parallels the finding
+// group test for the LevelOwned -> jump path. Pressing Enter on a
+// __security_affected_resource__ row must route through navigateChild ->
+// jumpToFindingResource (implemented in feat: Enter-jump) instead of
+// no-op'ing.
+func TestEnterFullViewSecurityAffectedResourceDrillsIn(t *testing.T) {
+	m := basePush80Model()
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Deployment", APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Namespaced: true},
+	}
+	m.nav.Level = model.LevelOwned
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_falco__", APIGroup: "_security"}
+	m.middleItems = []model.Item{{
+		Name:      "deploy/api",
+		Kind:      "__security_affected_resource__",
+		Namespace: "prod",
+		Columns:   []model.KeyValue{{Key: "__resource_key__", Value: "prod/Deployment/api"}},
+	}}
+	m.setCursor(0)
+	result, _ := m.enterFullView()
+	rm := result.(Model)
+	assert.Equal(t, model.LevelResources, rm.nav.Level,
+		"Enter on an affected-resource row must jump to the underlying real resource")
+	assert.Equal(t, "Deployment", rm.nav.ResourceType.Kind,
+		"the underlying ResourceType must be installed")
+	assert.NotEqual(t, modeYAML, rm.mode,
+		"must not enter modeYAML — there is no YAML for a synthetic affected-resource")
+}
+
 func TestCov80ExportResourceToFileLevelResourcesCmd(t *testing.T) {
 	t.Setenv("XDG_STATE_HOME", t.TempDir())
 	m := basePush80Model()

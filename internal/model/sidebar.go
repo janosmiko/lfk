@@ -20,12 +20,84 @@ import (
 // flow through the same metadata-overlay path as real API resources.
 func BuildSidebarItems(discovered []ResourceTypeEntry) []Item {
 	items := injectPseudoCategoryHeaders()
+	items = append(items, injectSecuritySourceItems()...)
 
 	categorized, crdGroups := partitionDiscovered(discovered)
 	items = append(items, categorized...)
 	items = append(items, crdGroups...)
 
 	return sortSidebarItems(items)
+}
+
+// injectSecuritySourceItems returns one sidebar Item per registered security
+// source (Trivy, Heuristic, PolicyReport, Falco). Items are built from the
+// SecuritySourcesFn hook the app installs at startup. When the hook is unset
+// or returns no entries the Security category remains empty but reserved.
+//
+// Each entry uses the virtual _security APIGroup and a synthetic Kind like
+// "__security_trivy-operator__". Client.GetResources recognises this group
+// and dispatches to the security.Manager.
+//
+// A SecuritySourceEntry with empty SourceName is treated as a loader
+// placeholder (shown while the availability probe is in flight on a
+// fresh cluster); the produced Item carries SecurityLoaderKind and no
+// Extra so the navigation layer can no-op clicks on it.
+func injectSecuritySourceItems() []Item {
+	if SecuritySourcesFn == nil {
+		return nil
+	}
+	entries := SecuritySourcesFn()
+	if len(entries) == 0 {
+		return nil
+	}
+	items := make([]Item, 0, len(entries))
+	for _, src := range entries {
+		if src.SourceName == "" {
+			items = append(items, Item{
+				Name:     src.DisplayName,
+				Kind:     SecurityLoaderKind,
+				Category: "Security",
+				Icon:     src.Icon,
+			})
+			continue
+		}
+		displayName := src.DisplayName
+		if src.Count > 0 {
+			displayName = src.DisplayName + " (" + intToStr(src.Count) + ")"
+		}
+		items = append(items, Item{
+			Name:     displayName,
+			Kind:     "__security_" + src.SourceName + "__",
+			Extra:    SecurityVirtualAPIGroup + "/v1/findings-" + src.SourceName,
+			Category: "Security",
+			Icon:     src.Icon,
+		})
+	}
+	return items
+}
+
+// intToStr converts a non-negative int to its decimal string form without
+// pulling fmt into this package.
+func intToStr(n int) string {
+	if n == 0 {
+		return "0"
+	}
+	neg := n < 0
+	if neg {
+		n = -n
+	}
+	var buf [20]byte
+	i := len(buf)
+	for n > 0 {
+		i--
+		buf[i] = byte('0' + n%10)
+		n /= 10
+	}
+	if neg {
+		i--
+		buf[i] = '-'
+	}
+	return string(buf[i:])
 }
 
 // partitionDiscovered walks the discovered set and produces two slices:

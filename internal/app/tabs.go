@@ -66,6 +66,18 @@ func (m *Model) selectedResourceKind() string {
 	return ""
 }
 
+// isVirtualResourceKind reports whether kind is a synthetic Kind that does
+// not map to a real Kubernetes resource — port-forward rows, capture rows,
+// and security finding rows. Direct actions like Logs/Edit/Describe/Delete/Scale
+// must no-op for these to avoid dispatching kubectl with a bogus type.
+func isVirtualResourceKind(kind string) bool {
+	return kind == "" ||
+		kind == "__port_forwards__" ||
+		kind == "__port_forward_entry__" ||
+		kind == "__captures__" ||
+		strings.HasPrefix(kind, "__security_")
+}
+
 // effectiveNamespace returns the namespace to use for API calls.
 // Returns empty string when allNamespaces is true or multiple namespaces are
 // selected (fetches all, filters client-side).
@@ -514,6 +526,16 @@ func (m *Model) saveCurrentTab() {
 	t.explainCursor = m.explainCursor
 	t.explainScroll = m.explainScroll
 	t.explainSearchQuery = m.explainSearchQuery
+	// Per-tab security state. The map shares its underlying storage
+	// with m.securityAvailabilityByName via the pointer copy — that's
+	// fine because mutations go through maps.Copy on a fresh map in
+	// updateSecurityAvailabilityLoaded; if that ever changes, this
+	// assignment must deep-copy too.
+	t.securityManager = m.securityManager
+	t.securityAvailabilityByName = m.securityAvailabilityByName
+	t.securityIndex = m.securityIndex
+	t.securityActiveGroup = m.securityActiveGroup
+	t.showSecurityIgnored = m.showSecurityIgnored
 }
 
 // loadTab restores Model fields from the given tab index.
@@ -628,6 +650,27 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.explainCursor = t.explainCursor
 	m.explainScroll = t.explainScroll
 	m.explainSearchQuery = t.explainSearchQuery
+	// Restore per-tab security state and re-publish the global hook
+	// state so the next sidebar render reflects this tab's cluster
+	// (rather than whatever tab was active when refreshSecuritySources
+	// last wrote to setSecurityHookState).
+	m.securityManager = t.securityManager
+	m.securityAvailabilityByName = t.securityAvailabilityByName
+	m.securityIndex = t.securityIndex
+	m.securityActiveGroup = t.securityActiveGroup
+	m.showSecurityIgnored = t.showSecurityIgnored
+	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)
+	// Mirror the per-tab toggle on the shared k8s client so an active
+	// fetch sees this tab's preference, not the previous tab's.
+	if m.client != nil {
+		m.client.SetShowIgnored(m.showSecurityIgnored)
+		if m.securityIgnores != nil {
+			m.client.SetIgnoreChecker(&modelIgnoreChecker{
+				state: m.securityIgnores,
+				ctx:   m.nav.Context,
+			})
+		}
+	}
 
 	// Close overlays and reset transient state.
 	m.overlay = overlayNone
@@ -735,6 +778,15 @@ func (m *Model) cloneCurrentTab() TabState {
 		logVisualType:          'V',
 		logVisualCol:           0,
 		logVisualCurCol:        0,
+		// New tabs inherit the active tab's security state because they
+		// start on the same cluster; navigateChildCluster will rebuild
+		// them via refreshSecuritySources when the user picks a
+		// different context.
+		securityManager:            m.securityManager,
+		securityAvailabilityByName: m.securityAvailabilityByName,
+		securityIndex:              m.securityIndex,
+		securityActiveGroup:        m.securityActiveGroup,
+		showSecurityIgnored:        m.showSecurityIgnored,
 	}
 	// Deep copy leftItemsHistory.
 	newTab.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))

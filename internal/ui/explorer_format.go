@@ -197,7 +197,7 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 	order []string, extraCols []extraColumn, item *model.Item,
 ) string {
 	var row strings.Builder
-	row.WriteString(padRight(Truncate(name, nameW-1), nameW))
+	row.WriteString(plainNameCellWithBadge(name, item, nameW))
 	for _, key := range order {
 		if key == "Context" && contextW > 0 {
 			contextName := ""
@@ -251,15 +251,49 @@ func formatTableRowStyledOrdered(item model.Item,
 	return base.String()
 }
 
+// plainNameCellWithBadge renders the name column for the plain-text path,
+// appending the security severity badge inside the budget when one applies.
+// Used for cursor rows where the highlighted background must not collide
+// with ANSI styling embedded in the badge string.
+func plainNameCellWithBadge(name string, item *model.Item, nameW int) string {
+	badge := ""
+	if item != nil {
+		badge = securityBadgePlainForItem(item)
+	}
+	if badge == "" {
+		return padRight(Truncate(name, nameW-1), nameW)
+	}
+	badgeW := lipgloss.Width(badge)
+	reserved := badgeW + 2 // 1 separator + 1 column gap
+	if reserved >= nameW {
+		return padRight(Truncate(name, nameW-1), nameW)
+	}
+	nameMax := nameW - reserved
+	trimmed := Truncate(name, nameMax)
+	content := trimmed + " " + badge
+	return padRight(content, nameW)
+}
+
 // styledNameCell renders the Name column with optional icon and dimmed
 // styling for completed items. Pods in Succeeded or Completed status get
 // their name dimmed; otherwise NormalStyle is used. The active highlight
 // query is applied to the resolved display name.
+//
+// When a security finding index is active and the item has matching findings,
+// the styled severity badge is appended inside the column budget (name is
+// truncated to make room). Gated callers (ActiveSecurityAvailable == false)
+// get an empty badge and the row renders identically to the pre-security UI.
 func styledNameCell(item model.Item, nameW int) string {
 	isDimmed := item.Status == "Succeeded" || item.Status == "Completed"
 	nameStyle := NormalStyle
 	if isDimmed {
 		nameStyle = DimStyle
+	}
+	badge := securityBadgeForItem(&item)
+	badgeW := lipgloss.Width(badge)
+	badgeReserve := 0
+	if badgeW > 0 {
+		badgeReserve = badgeW + 1 // separator space
 	}
 	if resolvedIcon := resolveIcon(item.Icon); resolvedIcon != "" {
 		iconSt := IconStyle
@@ -268,25 +302,50 @@ func styledNameCell(item model.Item, nameW int) string {
 		}
 		icon := iconSt.Render(resolvedIcon) + " "
 		iconVisualW := lipgloss.Width(icon)
-		nameRemaining := max(
-			// -1 reserves gap before next column
-			nameW-iconVisualW-1, 1)
+		// -1 reserves gap before next column.
+		nameRemaining := max(nameW-iconVisualW-1-badgeReserve, 1)
+		// Drop the badge when it would not fit alongside a readable name.
+		activeBadge := badge
+		if badgeReserve > 0 && nameW-iconVisualW-1 <= badgeReserve {
+			activeBadge = ""
+			nameRemaining = max(nameW-iconVisualW-1, 1)
+		}
 		namePart := Truncate(item.Name, nameRemaining)
 		if ActiveHighlightQuery != "" {
 			namePart = highlightName(namePart, ActiveHighlightQuery)
 		}
 		nameVisualW := lipgloss.Width(namePart)
-		pad := max(nameW-iconVisualW-nameVisualW, 0)
+		badgeSegment := ""
+		badgeSegmentW := 0
+		if activeBadge != "" {
+			badgeSegment = " " + activeBadge
+			badgeSegmentW = lipgloss.Width(badgeSegment)
+		}
+		pad := max(nameW-iconVisualW-nameVisualW-badgeSegmentW, 0)
 		if isDimmed {
 			namePart = DimStyle.Render(namePart)
 		}
-		return icon + namePart + strings.Repeat(" ", pad)
+		return icon + namePart + badgeSegment + strings.Repeat(" ", pad)
 	}
-	displayName := Truncate(item.Name, nameW-1)
+	// Drop the badge when it would not fit alongside a readable name.
+	activeBadge := badge
+	if badgeReserve > 0 && nameW <= badgeReserve+1 {
+		activeBadge = ""
+		badgeReserve = 0
+	}
+	nameRemaining := max(nameW-1-badgeReserve, 1)
+	displayName := Truncate(item.Name, nameRemaining)
 	if ActiveHighlightQuery != "" {
 		displayName = highlightName(displayName, ActiveHighlightQuery)
 	}
-	return nameStyle.Render(padRight(displayName, nameW))
+	if activeBadge == "" {
+		return nameStyle.Render(padRight(displayName, nameW))
+	}
+	nameVisualW := lipgloss.Width(displayName)
+	badgeSegment := " " + activeBadge
+	badgeSegmentW := lipgloss.Width(badgeSegment)
+	pad := max(nameW-nameVisualW-badgeSegmentW, 0)
+	return nameStyle.Render(displayName) + badgeSegment + strings.Repeat(" ", pad)
 }
 
 // resourceColumnStyle returns a style for extra columns, colorizing CPU/Mem columns.

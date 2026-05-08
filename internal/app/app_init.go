@@ -182,5 +182,15 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 
 	m.scheduler.StartWorkers()
 
+	// Security feature wiring. Install the SecuritySourcesFn hook before
+	// refreshSecuritySources so the very first sidebar build sees an
+	// empty Security category (rather than nil, which would suppress the
+	// pseudo-header). loadSecurityIgnores reads the user's ignore-list
+	// YAML; refreshSecuritySources builds the per-cluster manager and
+	// publishes it to the hook state.
+	installSecuritySourcesHook()
+	m.securityIgnores = loadSecurityIgnores()
+	m.refreshSecuritySources()
+
 	return m
 }

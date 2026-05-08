@@ -13,6 +13,11 @@ import (
 
 // copyYAMLToClipboard fetches the YAML for the selected resource and sends it for clipboard copy.
 func (m Model) copyYAMLToClipboard() tea.Cmd {
+	// Synthetic security items (e.g., __security_affected_resource__) have
+	// no YAML; short-circuit to avoid "unknown resource type" warnings.
+	if onSecurityView(&m) {
+		return nil
+	}
 	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 
@@ -328,6 +333,10 @@ func buildBulkYAMLClipboardMsg(docs, failures []string, total int) yamlClipboard
 
 // exportResourceToFile saves the selected resource YAML to a file.
 func (m Model) exportResourceToFile() tea.Cmd {
+	// Synthetic security items have no YAML to export.
+	if onSecurityView(&m) {
+		return nil
+	}
 	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 

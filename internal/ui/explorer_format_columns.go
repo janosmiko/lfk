@@ -301,12 +301,17 @@ func isHiddenColumnPrefix(key string) bool {
 }
 
 // blockedColumnsForMode returns the set of columns blocked in the current display mode.
+// Description and References are always blocked because security findings put
+// multi-line content into them (Falco's Details has \n-separated key/value
+// pairs, References is a \n-joined URL list); they belong in the right-pane
+// detail renderer, not in the explorer table where newlines break the layout.
 func blockedColumnsForMode() map[string]bool {
 	if ActiveFullscreenMode {
 		return map[string]bool{
 			"Health Message": true, "Keys": true,
 			"Service Account": true, "Images": true, "Image": true,
 			"Health": true, "Sync": true, "Path": true,
+			"Description": true, "References": true,
 			"Labels": true, "Finalizers": true, "Annotations": true,
 			"Used By": true, "Deletion": true, "Selector": true,
 		}
@@ -322,7 +327,8 @@ func blockedColumnsForMode() map[string]bool {
 		"Sync Message": true, "Sync Errors": true,
 		"OS": true, "Runtime": true,
 		"Hostname": true, "InternalIP": true, "ExternalIP": true,
-		"Source": true,
+		"Source":      true,
+		"Description": true, "References": true,
 		"Labels": true, "Finalizers": true, "Annotations": true,
 		"Used By": true, "Deletion": true, "Selector": true,
 	}
@@ -358,6 +364,11 @@ var columnHeaderAliases = map[string]string{
 	"Default Backend":     "Backend",
 	"Last Transition":     "Transition",
 	"Service Account":     "SA",
+	// Security finding columns: the underlying camelCase keys are kept as-is
+	// for ColumnValue() lookups in the details renderer; the alias is the
+	// human-readable form rendered in the table header.
+	"ResourceKind": "Resource Kind",
+	"FindingCount": "Findings",
 }
 
 // ColumnHeaderLabel returns the uppercase display label for a column key,

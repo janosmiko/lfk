@@ -150,6 +150,12 @@ func (m Model) loadPreviewResources() tea.Cmd {
 	if m.nav.ResourceType.Kind == "__port_forwards__" || m.nav.ResourceType.Kind == "__captures__" {
 		return nil
 	}
+	if m.nav.ResourceType.APIGroup == "_security" {
+		if cmd := m.loadSecurityAffectedResources(true); cmd != nil {
+			return cmd
+		}
+		return nil
+	}
 	var cmds []tea.Cmd
 	switch {
 	case m.mapView && m.resourceTypeHasChildren():
@@ -191,6 +197,16 @@ func (m Model) loadPreviewResources() tea.Cmd {
 
 // loadPreviewOwned handles preview loading at the owned level.
 func (m Model) loadPreviewOwned(sel *model.Item) tea.Cmd {
+	// Synthetic security items (e.g., __security_affected_resource__) are
+	// not real Kubernetes resources — there is no YAML to fetch and the
+	// right-pane renderer (renderRightOwned) handles them via
+	// ui.RenderAffectedResourceDetails directly from the item's Columns.
+	// Without this guard the lookup falls through to resolveOwnedResourceType
+	// which fails and surfaces "Warning: unknown resource type:
+	// __security_affected_resource__" to the user.
+	if strings.HasPrefix(sel.Kind, "__security_") {
+		return nil
+	}
 	if sel.Kind == "Pod" {
 		var cmds []tea.Cmd
 		cmds = append(cmds, m.loadContainers(true))
@@ -277,6 +293,12 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 			},
 		)
 	case model.LevelOwned:
+		// Synthetic security items have no YAML — same guard as in
+		// loadPreviewOwned. Reached when fullYAMLPreview is toggled on while
+		// hovering an affected-resource row.
+		if strings.HasPrefix(sel.Kind, "__security_") {
+			return nil
+		}
 		name := sel.Name
 		itemNs := ns
 		if sel.Namespace != "" {
