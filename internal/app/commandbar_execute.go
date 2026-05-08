@@ -1,12 +1,15 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"sigs.k8s.io/yaml"
+
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -194,12 +197,19 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 
 	case "export":
 		lower := strings.ToLower(arg)
-		if lower == "yaml" || lower == "json" || lower == "" {
+		switch lower {
+		case "", "yaml":
 			// Share the bulk-or-cursor dispatcher with the `Y` keybinding
 			// so multi-selection (cap, "Fetching N..." status, level gating)
 			// behaves the same whether the user types `:export yaml` or
 			// hits `Y`.
 			return m.dispatchYAMLClipboardCopy()
+		case "json":
+			mdl, cmd := m.dispatchYAMLClipboardCopy()
+			if cmd == nil {
+				return mdl, nil
+			}
+			return mdl, wrapYAMLCmdAsJSON(cmd)
 		}
 		m.setStatusMessage(fmt.Sprintf("Unknown export format: %s", arg), true)
 		return m, scheduleStatusClear()
@@ -711,4 +721,45 @@ func orphanPresetNameForKind(kind string) string {
 		return "Unbound"
 	}
 	return "Unmounted"
+}
+
+// wrapYAMLCmdAsJSON converts the YAML payload of an inner yamlClipboardMsg
+// into JSON. A single-document payload becomes a JSON object; a multi-document
+// payload (separated by `\n---\n` per copyYAMLToClipboard's joiner) becomes a
+// JSON array. The bulk-fetch wiring, status messages, and error envelope are
+// reused unchanged.
+func wrapYAMLCmdAsJSON(cmd tea.Cmd) tea.Cmd {
+	return func() tea.Msg {
+		msg := cmd()
+		yc, ok := msg.(yamlClipboardMsg)
+		if !ok || yc.err != nil {
+			return msg
+		}
+		if yc.count <= 1 {
+			jsonBytes, err := yaml.YAMLToJSON([]byte(yc.content))
+			if err != nil {
+				yc.err = fmt.Errorf("converting YAML to JSON: %w", err)
+				return yc
+			}
+			yc.content = string(jsonBytes) + "\n"
+			return yc
+		}
+		docs := strings.Split(strings.TrimRight(yc.content, "\n"), "\n---\n")
+		objects := make([]json.RawMessage, 0, len(docs))
+		for _, doc := range docs {
+			jsonBytes, err := yaml.YAMLToJSON([]byte(doc))
+			if err != nil {
+				yc.err = fmt.Errorf("converting YAML to JSON: %w", err)
+				return yc
+			}
+			objects = append(objects, jsonBytes)
+		}
+		arrayBytes, err := json.Marshal(objects)
+		if err != nil {
+			yc.err = fmt.Errorf("marshaling JSON array: %w", err)
+			return yc
+		}
+		yc.content = string(arrayBytes) + "\n"
+		return yc
+	}
 }

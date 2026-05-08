@@ -1,14 +1,18 @@
 package app
 
 import (
+	"encoding/json"
 	"fmt"
 	"slices"
+	"strings"
 	"testing"
+
+	tea "github.com/charmbracelet/bubbletea"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
-	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
 // ---------------------------------------------------------------------------
@@ -428,9 +432,10 @@ func TestExecuteBuiltinCommand(t *testing.T) {
 		assert.NotNil(t, cmd)
 	})
 
-	// `:export json` is treated as an alias for yaml in the existing impl
-	// (the format toggle is a no-op today). Pin the alias to keep the bulk
-	// hookup symmetric.
+	// `:export json` reuses the same bulk-or-cursor dispatcher as `yaml`,
+	// then post-processes the YAML payload into JSON. Pin the bulk-status
+	// hookup so a future refactor that swaps the dispatcher doesn't silently
+	// drop the over-cap / "Fetching N..." UI.
 	t.Run("export_json_with_selection_shows_fetching_status", func(t *testing.T) {
 		m := basePush80Model()
 		m.toggleSelection(m.middleItems[0])
@@ -471,6 +476,80 @@ func TestExecuteBuiltinCommand(t *testing.T) {
 		rm := result.(Model)
 		assert.Contains(t, rm.statusMessage, "Unknown export format")
 		assert.True(t, rm.statusMessageErr)
+	})
+}
+
+// ---------------------------------------------------------------------------
+// wrapYAMLCmdAsJSON
+// ---------------------------------------------------------------------------
+
+func TestWrapYAMLCmdAsJSON(t *testing.T) {
+	t.Run("single_doc_becomes_json_object", func(t *testing.T) {
+		inner := func() tea.Msg {
+			return yamlClipboardMsg{
+				content: "apiVersion: v1\nkind: Pod\nmetadata:\n  name: foo\n",
+				count:   1,
+			}
+		}
+
+		out := wrapYAMLCmdAsJSON(inner)().(yamlClipboardMsg)
+		require.NoError(t, out.err)
+		assert.Equal(t, 1, out.count)
+		assert.Contains(t, out.content, `"apiVersion":"v1"`)
+		assert.Contains(t, out.content, `"kind":"Pod"`)
+		assert.Contains(t, out.content, `"name":"foo"`)
+	})
+
+	t.Run("multi_doc_becomes_json_array", func(t *testing.T) {
+		inner := func() tea.Msg {
+			return yamlClipboardMsg{
+				content: "kind: Pod\nmetadata:\n  name: a\n" +
+					"\n---\n" +
+					"kind: Pod\nmetadata:\n  name: b\n",
+				count: 2,
+			}
+		}
+
+		out := wrapYAMLCmdAsJSON(inner)().(yamlClipboardMsg)
+		require.NoError(t, out.err)
+		assert.Equal(t, 2, out.count)
+
+		var arr []map[string]any
+		require.NoError(t, json.Unmarshal([]byte(strings.TrimSpace(out.content)), &arr))
+		require.Len(t, arr, 2)
+		assert.Equal(t, "a", arr[0]["metadata"].(map[string]any)["name"])
+		assert.Equal(t, "b", arr[1]["metadata"].(map[string]any)["name"])
+	})
+
+	t.Run("inner_error_passes_through_unchanged", func(t *testing.T) {
+		inner := func() tea.Msg {
+			return yamlClipboardMsg{err: assert.AnError}
+		}
+
+		out := wrapYAMLCmdAsJSON(inner)().(yamlClipboardMsg)
+		assert.ErrorIs(t, out.err, assert.AnError)
+		assert.Empty(t, out.content)
+	})
+
+	t.Run("non_yaml_message_passes_through_unchanged", func(t *testing.T) {
+		marker := struct{ note string }{note: "not-a-yaml-msg"}
+		inner := func() tea.Msg { return marker }
+
+		out := wrapYAMLCmdAsJSON(inner)()
+		assert.Equal(t, marker, out)
+	})
+
+	t.Run("malformed_yaml_surfaces_as_error_envelope", func(t *testing.T) {
+		inner := func() tea.Msg {
+			return yamlClipboardMsg{
+				content: "kind: Pod\nmetadata:\n  name: a\nbadly_formed: : :\n",
+				count:   1,
+			}
+		}
+
+		out := wrapYAMLCmdAsJSON(inner)().(yamlClipboardMsg)
+		require.Error(t, out.err)
+		assert.Contains(t, out.err.Error(), "converting YAML to JSON")
 	})
 }
 
