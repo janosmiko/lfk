@@ -2371,6 +2371,8 @@ func TestBuildPodTree_WithEphemeralContainers(t *testing.T) {
 	for _, ch := range root.Children {
 		if ch.Kind == "Container" && ch.Name == "debugger" {
 			ephemeralFound = true
+			// Verify status flows from pod.Status.EphemeralContainerStatuses, not just spec presence.
+			assert.Equal(t, "Running", ch.Status)
 			break
 		}
 	}
