@@ -384,11 +384,11 @@ func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 	case "esc":
 		m.diffVisualMode = false
 		return m, nil
-	case "i":
-		m.pendingTextObject = 'i'
-		return m, nil
-	case "a":
-		m.pendingTextObject = 'a'
+	case "i", "a":
+		// Clear any digit prefix accumulated before visual entry so it can't
+		// leak into a later counted command via the post-visual normal mode.
+		m.diffLineInput = ""
+		m.pendingTextObject = key[0]
 		return m, nil
 	case "V":
 		return m.diffVisualToggle('V')

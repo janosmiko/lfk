@@ -592,6 +592,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.filterActive = false
 	m.searchActive = false
 	m.err = nil
+	m.pendingTextObject = 0
 
 	// Re-annotate cluster picker rows with the current effective read-only
 	// state. The override map is per-Model (shared across tabs), but

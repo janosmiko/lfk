@@ -19,11 +19,11 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.yamlVisualMode = false
 		return m, nil
-	case "i":
-		m.pendingTextObject = 'i'
-		return m, nil
-	case "a":
-		m.pendingTextObject = 'a'
+	case "i", "a":
+		// Clear any digit prefix accumulated before visual entry so it can't
+		// leak into a later counted command via the post-visual normal mode.
+		m.yamlLineInput = ""
+		m.pendingTextObject = key[0]
 		return m, nil
 	case "V":
 		return m.handleYAMLVisualToggleMode('V')
@@ -234,11 +234,15 @@ func (m Model) applyYAMLTextObject(op byte, motion string) (tea.Model, tea.Cmd) 
 	if !ok {
 		return m, nil
 	}
+	// Drop ranges that resolve entirely inside the fold-prefix gutter; clamping
+	// them would silently collapse the selection onto the first content column
+	// without a corresponding visual change. Leaving early keeps the prior
+	// selection state intact instead.
+	if end < yamlFoldPrefixLen {
+		return m, nil
+	}
 	if start < yamlFoldPrefixLen {
 		start = yamlFoldPrefixLen
-	}
-	if end < start {
-		end = start
 	}
 	m.yamlVisualType = 'v'
 	m.yamlVisualStart = m.yamlCursor

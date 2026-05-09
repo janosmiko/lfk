@@ -268,11 +268,11 @@ func (m Model) handleDescribeVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.describeVisualMode = 0
 		return m, nil
-	case "i":
-		m.pendingTextObject = 'i'
-		return m, nil
-	case "a":
-		m.pendingTextObject = 'a'
+	case "i", "a":
+		// Clear any digit prefix accumulated before visual entry so it can't
+		// leak into a later counted command via the post-visual normal mode.
+		m.describeLineInput = ""
+		m.pendingTextObject = key[0]
 		return m, nil
 	case "V":
 		return m.describeVisualToggle('V')

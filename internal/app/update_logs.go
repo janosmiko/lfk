@@ -188,11 +188,11 @@ func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc":
 		m.logVisualMode = false
 		return m, nil
-	case "i":
-		m.pendingTextObject = 'i'
-		return m, nil
-	case "a":
-		m.pendingTextObject = 'a'
+	case "i", "a":
+		// Clear any digit prefix accumulated before visual entry so it can't
+		// leak into a later counted command via the post-visual normal mode.
+		m.logLineInput = ""
+		m.pendingTextObject = key[0]
 		return m, nil
 	case "V":
 		// Toggle: if already in line mode, cancel; otherwise switch to line mode.

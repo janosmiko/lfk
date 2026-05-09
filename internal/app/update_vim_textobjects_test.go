@@ -4,6 +4,8 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // --- innerWordRange ---
@@ -261,6 +263,29 @@ func TestLogVisualTextObjectClearsStalePendingG(t *testing.T) {
 	assert.False(t, rm.pendingG, "stale pendingG must not survive a text-object resolve")
 }
 
+// --- loadTab clears pendingTextObject ---
+
+// Regression for the bug where a half-typed text-object operator (`i`/`a`) on
+// one tab survived a tab switch and was applied to the first key pressed in
+// the next tab's visual mode. pendingTextObject lives on Model, so it had to
+// be reset alongside the other transient state in loadTab.
+func TestLoadTabClearsPendingTextObject(t *testing.T) {
+	m := Model{
+		tabs: []TabState{
+			{nav: model.NavigationState{Context: "kctx"}},
+			{nav: model.NavigationState{Context: "kctx"}},
+		},
+		activeTab:         0,
+		pendingTextObject: 'i',
+	}
+
+	m.saveCurrentTab()
+	_ = m.loadTab(1)
+
+	assert.Equal(t, byte(0), m.pendingTextObject,
+		"loadTab must clear pendingTextObject so a half-typed operator on tab 0 does not leak into tab 1's visual mode")
+}
+
 // --- yaml viewer (covers fold-prefix offset) ---
 
 func TestYAMLVisualViWRespectsFoldPrefix(t *testing.T) {
@@ -280,4 +305,84 @@ func TestYAMLVisualViWRespectsFoldPrefix(t *testing.T) {
 	assert.Equal(t, rune('v'), m2.yamlVisualType)
 	assert.GreaterOrEqual(t, m2.yamlVisualCol, yamlFoldPrefixLen, "selection start clamped past fold prefix")
 	assert.GreaterOrEqual(t, m2.yamlVisualCurCol, m2.yamlVisualCol)
+}
+
+// Regression for the degenerate clamp: when the cursor sits inside the
+// 2-char fold-prefix gutter and the resolved range is entirely inside that
+// gutter, the prior `start = max(start, foldPrefix); end = max(end, start)`
+// silently collapsed the selection onto col yamlFoldPrefixLen and flipped
+// the type to 'v', with no visible change to confirm the operation.
+// applyYAMLTextObject now bails out so the existing selection state is
+// preserved.
+func TestYAMLVisualViwInsideFoldPrefixPreservesSelection(t *testing.T) {
+	m := baseModelNav()
+	m.mode = modeYAML
+	m.yamlContent = "foo: bar\n"
+	// A non-empty sections slice causes buildVisibleLines to prepend the
+	// 2-char fold-prefix gutter — without it, the gutter doesn't exist and
+	// this regression isn't reachable.
+	m.yamlSections = []yamlSection{
+		{key: "root", startLine: 0, endLine: 0},
+	}
+	m.yamlCollapsed = make(map[string]bool)
+	m.yamlCursor = 0
+	// Cursor in the gutter; the inner-word range resolves to (0, 1) —
+	// entirely inside the fold prefix, since the visible line is "  foo: bar".
+	m.yamlVisualCurCol = 0
+	m.yamlVisualCol = 0
+	m.yamlVisualMode = true
+	m.yamlVisualType = 'V' // sentinel to detect a stray flip to 'v'
+
+	r1, _ := m.handleYAMLVisualKey(keyMsg("i"))
+	r2, _ := r1.(Model).handleYAMLVisualKey(keyMsg("w"))
+	m2 := r2.(Model)
+
+	assert.Equal(t, rune('V'), m2.yamlVisualType,
+		"selection type must not flip to 'v' when the resolved range lies entirely in the fold prefix")
+	assert.Equal(t, 0, m2.yamlVisualCol,
+		"selection start must remain untouched when the range is dropped")
+	assert.Equal(t, 0, m2.yamlVisualCurCol,
+		"selection cursor must remain untouched when the range is dropped")
+}
+
+// --- operator-pending entry clears stale digit prefix ---
+
+// Regression for the bug where a digit prefix typed before visual entry
+// (e.g. `5` followed by `v`) survived in the per-viewer LineInput buffer
+// because yaml/describe visual entry didn't clear it. The PR's new `i`/`a`
+// operator-pending path was the most visible exposure: a stale "5" would
+// silently leak into the next counted command after the visual exit. The
+// fix clears the buffer when entering operator-pending so the new code
+// path is unambiguous regardless of what the visual-entry handlers do.
+
+func TestYAMLVisualOperatorPendingClearsLineInput(t *testing.T) {
+	m := baseModelNav()
+	m.mode = modeYAML
+	m.yamlContent = "foo: bar\n"
+	m.yamlVisualMode = true
+	m.yamlVisualType = 'v'
+	m.yamlVisualCurCol = yamlFoldPrefixLen
+	m.yamlLineInput = "5" // stale digit from before visual entry
+
+	r, _ := m.handleYAMLVisualKey(keyMsg("i"))
+	rm := r.(Model)
+
+	assert.Equal(t, byte('i'), rm.pendingTextObject)
+	assert.Equal(t, "", rm.yamlLineInput,
+		"entering operator-pending must clear the count buffer so a stale digit can't leak into the next counted command")
+}
+
+func TestDescribeVisualOperatorPendingClearsLineInput(t *testing.T) {
+	m := baseModelNav()
+	m.mode = modeDescribe
+	m.describeContent = "alpha beta gamma"
+	m.describeVisualMode = 'v'
+	m.describeLineInput = "5" // stale digit from before visual entry
+
+	r, _ := m.handleDescribeVisualKey(keyMsg("a"))
+	rm := r.(Model)
+
+	assert.Equal(t, byte('a'), rm.pendingTextObject)
+	assert.Equal(t, "", rm.describeLineInput,
+		"entering operator-pending must clear the count buffer so a stale digit can't leak into the next counted command")
 }
