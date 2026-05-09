@@ -316,14 +316,3 @@ func textObjectRange(line string, col int, op byte, motion string) (int, int, bo
 	}
 	return 0, 0, false
 }
-
-// countLines counts newline characters.
-func countLines(s string) int {
-	n := 0
-	for _, c := range s {
-		if c == '\n' {
-			n++
-		}
-	}
-	return n
-}

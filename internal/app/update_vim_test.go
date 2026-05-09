@@ -398,27 +398,6 @@ func TestFirstNonWhitespace(t *testing.T) {
 	}
 }
 
-// --- countLines ---
-
-func TestCountLines(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    string
-		expected int
-	}{
-		{"empty string", "", 0},
-		{"no newlines", "hello", 0},
-		{"one newline", "hello\nworld", 1},
-		{"multiple newlines", "a\nb\nc\n", 3},
-		{"only newlines", "\n\n\n", 3},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			assert.Equal(t, tt.expected, countLines(tt.input))
-		})
-	}
-}
-
 func TestCovBoost2DiffVisualKeyEsc(t *testing.T) {
 	m := baseModelBoost2()
 	m.mode = modeDiff
