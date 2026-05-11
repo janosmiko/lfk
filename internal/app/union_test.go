@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -1447,7 +1448,7 @@ func TestNavigateParent_CLIStartedUnionSetReturnsToPicker(t *testing.T) {
 		"backing out of a named union set should land on the union-set row")
 }
 
-func TestUnionSentinelBlocksContextWideFeatures(t *testing.T) {
+func TestUnionSentinelContextWideFeatures(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.unionMode = true
 	m.unionContexts = []string{"blue", "green"}
@@ -1459,12 +1460,55 @@ func TestUnionSentinelBlocksContextWideFeatures(t *testing.T) {
 	rbac, cmd := m.openCanIBrowser()
 	rbacModel := rbac.(Model)
 	assert.NotNil(t, cmd)
-	assert.Contains(t, rbacModel.statusMessage, "single context")
+	assert.Contains(t, rbacModel.statusMessage, "Loading RBAC permissions")
+
+	whoCan, cmd := rbacModel.handleCanIKey(keyMsg("tab"))
+	whoCanModel := whoCan.(Model)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, whoCanModel.statusMessage, "single context")
 
 	pinned, cmd := m.handleKeyPinGroup()
 	pinnedModel := pinned.(Model)
 	assert.NotNil(t, cmd)
 	assert.Contains(t, pinnedModel.statusMessage, "per-context")
+}
+
+func TestProcessCanIRulesUnionMarksMixedVerbs(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.nav.Context = UnionContextSentinel
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{{Kind: "Pod", Resource: "pods"}}
+	m.discoveredResources["green"] = []model.ResourceTypeEntry{{Kind: "Pod", Resource: "pods"}}
+
+	m.processCanIRulesUnion([]canIContextRules{
+		{
+			context: "blue",
+			rules: []k8s.AccessRule{{
+				Verbs:     []string{"get", "list"},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			}},
+		},
+		{
+			context: "green",
+			rules: []k8s.AccessRule{{
+				Verbs:     []string{"get"},
+				APIGroups: []string{""},
+				Resources: []string{"pods"},
+			}},
+		},
+	})
+
+	require.Len(t, m.canIGroups, 1)
+	require.Len(t, m.canIGroups[0].Resources, 1)
+	pods := m.canIGroups[0].Resources[0]
+	assert.Equal(t, model.CanIVerbAllowed, pods.VerbState("get"))
+	assert.Equal(t, model.CanIVerbMixed, pods.VerbState("list"))
+	assert.Equal(t, model.CanIVerbDenied, pods.VerbState("delete"))
+	assert.True(t, pods.Verbs["get"])
+	assert.False(t, pods.Verbs["list"], "mixed is not all-allowed")
+	assert.True(t, pods.HasAnyAllowedOrMixedVerb())
 }
 
 func TestUnionDashboardPreviewShowsMembersInRightPane(t *testing.T) {

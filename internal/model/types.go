@@ -60,12 +60,50 @@ type PrinterColumn struct {
 	JSONPath string // e.g. ".status.phase", ".spec.source.repoURL"
 }
 
+// CanIVerbState is the display state for one RBAC verb in the Can-I view.
+type CanIVerbState int
+
+const (
+	CanIVerbDenied CanIVerbState = iota
+	CanIVerbAllowed
+	CanIVerbMixed
+)
+
 // CanIResource represents a single resource type with its RBAC permissions.
 type CanIResource struct {
 	APIGroup string
 	Resource string          // plural name (e.g., "deployments")
 	Kind     string          // kind name (e.g., "Deployment")
 	Verbs    map[string]bool // verb -> allowed
+	// VerbStates carries the union-view three-state result. When unset,
+	// renderers and filters fall back to Verbs for the single-context path.
+	VerbStates map[string]CanIVerbState
+}
+
+func (r CanIResource) VerbState(verb string) CanIVerbState {
+	if r.VerbStates != nil {
+		if state, ok := r.VerbStates[verb]; ok {
+			return state
+		}
+	}
+	if r.Verbs[verb] {
+		return CanIVerbAllowed
+	}
+	return CanIVerbDenied
+}
+
+func (r CanIResource) HasAnyAllowedOrMixedVerb() bool {
+	for _, allowed := range r.Verbs {
+		if allowed {
+			return true
+		}
+	}
+	for _, state := range r.VerbStates {
+		if state == CanIVerbAllowed || state == CanIVerbMixed {
+			return true
+		}
+	}
+	return false
 }
 
 // CanIGroup represents an API group with its resources for the can-i browser.

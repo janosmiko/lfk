@@ -12,10 +12,6 @@ import (
 
 // openCanIBrowser starts loading the can-i browser data.
 func (m Model) openCanIBrowser() (tea.Model, tea.Cmd) {
-	if m.isUnionSentinel() {
-		m.setStatusMessage("RBAC browser requires a single context", true)
-		return m, scheduleStatusClear()
-	}
 	m.loading = true
 	m.canISubject = ""
 	m.canISubjectName = "Current User"
@@ -132,6 +128,83 @@ func (m *Model) processCanIRules(rules []k8s.AccessRule) {
 	m.canIGroups = buildSortedCanIGroups(groupMap)
 }
 
+type canIResourceRef struct {
+	group    string
+	resource string
+}
+
+func addCanIResourceMeta(metas map[canIResourceRef]model.CanIResource, group, resource, kind string) {
+	if resource == "" || resource == "*" {
+		return
+	}
+	ref := canIResourceRef{group: group, resource: resource}
+	if _, ok := metas[ref]; ok {
+		return
+	}
+	if kind == "" {
+		kind = resource
+	}
+	metas[ref] = model.CanIResource{APIGroup: group, Resource: resource, Kind: kind}
+}
+
+func addCanIResourcesFromRules(metas map[canIResourceRef]model.CanIResource, rules []k8s.AccessRule) {
+	for key := range buildPermLookup(rules) {
+		if strings.HasSuffix(key, "/*") {
+			continue
+		}
+		parts := strings.SplitN(key, "/", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		addCanIResourceMeta(metas, parts[0], parts[1], parts[1])
+	}
+}
+
+func (m *Model) processCanIRulesUnion(contextRules []canIContextRules) {
+	if len(contextRules) == 0 {
+		m.canIGroups = nil
+		return
+	}
+	metas := make(map[canIResourceRef]model.CanIResource)
+	for _, contextName := range m.unionContexts {
+		for _, rt := range m.discoveredResources[contextName] {
+			addCanIResourceMeta(metas, rt.APIGroup, rt.Resource, rt.Kind)
+		}
+	}
+	lookups := make([]map[string]map[string]bool, 0, len(contextRules))
+	for _, cr := range contextRules {
+		lookups = append(lookups, buildPermLookup(cr.rules))
+		addCanIResourcesFromRules(metas, cr.rules)
+	}
+
+	groupMap := make(map[string][]model.CanIResource)
+	for ref, meta := range metas {
+		verbs := make(map[string]bool, len(canIAllVerbs))
+		states := make(map[string]model.CanIVerbState, len(canIAllVerbs))
+		for _, verb := range canIAllVerbs {
+			allowedCount := 0
+			for _, lookup := range lookups {
+				if resolveVerbs(lookup, ref.group, ref.resource)[verb] {
+					allowedCount++
+				}
+			}
+			switch allowedCount {
+			case len(lookups):
+				verbs[verb] = true
+				states[verb] = model.CanIVerbAllowed
+			case 0:
+				states[verb] = model.CanIVerbDenied
+			default:
+				states[verb] = model.CanIVerbMixed
+			}
+		}
+		meta.Verbs = verbs
+		meta.VerbStates = states
+		groupMap[ref.group] = append(groupMap[ref.group], meta)
+	}
+	m.canIGroups = buildSortedCanIGroups(groupMap)
+}
+
 // buildSortedCanIGroups sorts resources within groups and builds the final sorted group list.
 func buildSortedCanIGroups(groupMap map[string][]model.CanIResource) []model.CanIGroup {
 	for group := range groupMap {
@@ -211,6 +284,10 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	// Tab from forward (Can-I) view enters Who-Can mode.
 	if msg.String() == "tab" {
+		if m.isUnionSentinel() {
+			m.setStatusMessage("Who-Can requires a single context", true)
+			return m, scheduleStatusClear()
+		}
 		return m.enterWhoCanMode()
 	}
 
@@ -543,11 +620,8 @@ func (m *Model) canIVisibleLines() int {
 func filterAllowedResources(resources []model.CanIResource) []model.CanIResource {
 	filtered := make([]model.CanIResource, 0, len(resources))
 	for _, r := range resources {
-		for _, allowed := range r.Verbs {
-			if allowed {
-				filtered = append(filtered, r)
-				break
-			}
+		if r.HasAnyAllowedOrMixedVerb() {
+			filtered = append(filtered, r)
 		}
 	}
 	return filtered
@@ -557,11 +631,8 @@ func filterAllowedResources(resources []model.CanIResource) []model.CanIResource
 func countAllowedResources(resources []model.CanIResource) int {
 	count := 0
 	for _, r := range resources {
-		for _, allowed := range r.Verbs {
-			if allowed {
-				count++
-				break
-			}
+		if r.HasAnyAllowedOrMixedVerb() {
+			count++
 		}
 	}
 	return count

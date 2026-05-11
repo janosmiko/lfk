@@ -136,6 +136,19 @@ func TestRenderCanIResources(t *testing.T) {
 		assert.Contains(t, lines[0], "\u2713")
 	})
 
+	t.Run("mixed union verbs show question mark", func(t *testing.T) {
+		resources := []model.CanIResource{
+			{
+				Resource:   "pods",
+				Verbs:      map[string]bool{"get": true},
+				VerbStates: map[string]model.CanIVerbState{"get": model.CanIVerbAllowed, "list": model.CanIVerbMixed},
+			},
+		}
+		lines := renderCanIResources(resources, 80, 10, 0)
+		assert.Contains(t, lines[0], "\u2713")
+		assert.Contains(t, lines[0], "?")
+	})
+
 	t.Run("pads to maxLines", func(t *testing.T) {
 		resources := []model.CanIResource{
 			{Resource: "pods", Verbs: map[string]bool{}},

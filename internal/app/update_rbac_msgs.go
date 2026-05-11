@@ -26,13 +26,19 @@ func (m Model) updateCanILoaded(msg canILoadedMsg) (tea.Model, tea.Cmd) {
 		m.setStatusMessage(fmt.Sprintf("RBAC rules check failed: %v", msg.err), true)
 		return m, scheduleStatusClear()
 	}
-	m.processCanIRules(msg.rules)
+	if msg.union {
+		m.processCanIRulesUnion(msg.contextRules)
+	} else {
+		m.processCanIRules(msg.rules)
+	}
 	// Re-derive canINamespaces from the user's namespace selection
 	// rather than trusting msg.namespaces. loadCanIRules has to pick a
 	// concrete namespace for SelfSubjectRulesReview (it requires one);
 	// when the user picked "all", that ends up as "default" in the
 	// message, but the user-visible scope must still read "ns: all".
-	if m.allNamespaces {
+	if msg.union {
+		m.canINamespaces = msg.namespaces
+	} else if m.allNamespaces {
 		m.canINamespaces = []string{""}
 	} else {
 		m.canINamespaces = msg.namespaces
