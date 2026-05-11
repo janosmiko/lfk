@@ -4,6 +4,8 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net/http"
+	_ "net/http/pprof" // registers /debug/pprof/* under DefaultServeMux when LFK_PPROF_ADDR is set
 	"os"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -122,6 +124,21 @@ func runTUI(opts app.StartupOptions) error {
 		"secret_lazy_loading", ui.ConfigSecretLazyLoading,
 		"config_path", opts.Config,
 	)
+
+	// Optional pprof endpoint for debugging hot CPU paths (issue #206).
+	// Off by default; set LFK_PPROF_ADDR=localhost:6060 to enable. Bind
+	// only to loopback to avoid exposing process internals on the network.
+	// Capture an idle profile with:
+	//   go tool pprof -seconds=30 http://localhost:6060/debug/pprof/profile
+	if addr := os.Getenv("LFK_PPROF_ADDR"); addr != "" {
+		go func() {
+			logger.Info("starting pprof", "addr", addr)
+			srv := &http.Server{Addr: addr} //nolint:gosec // debug-only, loopback-bound by convention
+			if err := srv.ListenAndServe(); err != nil {
+				logger.Warn("pprof server stopped", "error", err)
+			}
+		}()
+	}
 
 	// Redirect os.Stderr to capture output from exec credential plugins (e.g., AWS SSO
 	// errors from `aws eks get-token`). Without this, subprocess stderr output goes
