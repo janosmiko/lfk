@@ -376,7 +376,7 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 
 // GetResourcesUnion fetches resources from multiple contexts in parallel and
 // merges the results. Each item is stamped with ClusterName for drill-down
-// routing and has a "Context" column injected for table display.
+// routing; the UI renders that field as the first-class CONTEXT column.
 // Partial results are returned alongside the first error so the UI can show
 // what it fetched even when one cluster is temporarily unreachable.
 func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
@@ -398,7 +398,6 @@ func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, names
 			}
 			for j := range items {
 				items[j].ClusterName = contextName
-				items[j].Columns = append([]model.KeyValue{{Key: "Context", Value: contextName}}, items[j].Columns...)
 			}
 			results[idx] = result{items: items, ctx: contextName}
 		}(i, kctx)

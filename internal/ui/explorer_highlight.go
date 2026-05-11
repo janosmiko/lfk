@@ -21,10 +21,10 @@ type MiddleColumnRegion struct {
 type TableLayoutCache struct {
 	Computed bool
 
-	HasNs, HasReady, HasRestarts, HasAge, HasStatus bool
-	NsW, ReadyW, RestartsW, AgeW, StatusW           int
-	AnyRecentRestart                                bool
-	ExtraCols                                       []extraColumn
+	HasContext, HasNs, HasReady, HasRestarts, HasAge, HasStatus bool
+	ContextW, NsW, ReadyW, RestartsW, AgeW, StatusW             int
+	AnyRecentRestart                                            bool
+	ExtraCols                                                   []extraColumn
 }
 
 // ActiveSelectedStyle returns SelectedStyle or a nyan rainbow style if nyan

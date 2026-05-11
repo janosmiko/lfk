@@ -35,7 +35,7 @@ var ActiveExtraColumnKeys []string
 // ActiveColumnOrder is the user-specified column order for the current
 // middle-column render, excluding the mandatory Name column which is
 // always first. Nil means "use the default order". Keys may refer to
-// built-in columns (Namespace/Ready/Restarts/Status/Age) or to extra
+// built-in columns (Context/Namespace/Ready/Restarts/Status/Age) or to extra
 // column keys from additionalPrinterColumns. Entries whose columns are
 // not currently present are silently dropped at render time.
 var ActiveColumnOrder []string

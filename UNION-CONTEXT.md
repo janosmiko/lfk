@@ -54,7 +54,7 @@ union_sets:
 
 A dedicated `ClusterName string` field was added to `model.Item` (not via `item.Columns`) so that drill-down routing, cursor restoration, and action context construction can all reach the source cluster without scanning display columns.
 
-`item.Columns` still gets a `{Key: "Context", Value: contextName}` entry prepended so the table renderer shows a Context column via the existing `collectExtraColumns` mechanism — no changes to the table renderer were needed.
+The table renderer treats `ClusterName` as a first-class union-mode column and renders it with the user-facing `CONTEXT` header. It is sortable, reorderable, and hideable like the other built-in browser columns. Ordinary non-union `Item.Columns` entries named `Context` still render as extra columns, but union rows no longer inject synthetic Context metadata into `item.Columns`.
 
 ### Discovery context
 
@@ -111,7 +111,9 @@ Union mode is ephemeral. `saveCurrentSession()` returns early when `m.unionMode`
 | `main.go` | `--union-context` flag (`StringArrayVar`); validation in `runTUI()` |
 | `internal/app/options.go` | `UnionContexts []string` field; `IsUnionMode()` helper; updated `HasCLIOverrides()` |
 | `internal/model/types.go` | `ClusterName string` field on `Item` |
-| `internal/k8s/client.go` | `GetResourcesUnion()`: parallel fan-out, `ClusterName` stamping, Context column injection, merge + sort |
+| `internal/k8s/client.go` | `GetResourcesUnion()`: parallel fan-out, `ClusterName` stamping, merge + sort |
+| `internal/ui/explorer_table.go`, `internal/ui/explorer_format.go` | First-class union `CONTEXT` browser column rendered from `ClusterName` |
+| `internal/app/tabs_compare.go`, `internal/app/update_column_toggle.go` | Context sorting and column-toggle support |
 | `internal/app/app.go` | `unionMode bool`, `unionContexts []string` fields on `Model`; union initialisation in `NewModel()` |
 | `internal/app/app_helpers.go`, `internal/app/tabs.go` | `discoveryContext()` and `effectiveContext()` helpers |
 | `internal/app/commands_load.go` | Union branch in `loadResources`; `effectiveContext()` applied to 6 functions |
@@ -132,7 +134,7 @@ watch tick / user navigates to Pods
         → union branch: nav.Context == "__union__" && unionMode
         → GetResourcesUnion(ctx, unionContexts, namespace, rt)
             → goroutine per context: GetResources(ctx, contextName, ...)
-            → stamp ClusterName, prepend Context column
+            → stamp ClusterName for routing and table rendering
             → merge + sort by (Name, ClusterName)
         → resourcesLoadedMsg → updateResourcesLoadedMain
             → itemCache["__union__/pods"] = items

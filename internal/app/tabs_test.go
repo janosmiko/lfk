@@ -199,6 +199,27 @@ func TestSortMiddleItemsByStatus(t *testing.T) {
 	assert.Equal(t, "err-pod", m.middleItems[2].Name)
 }
 
+func TestSortMiddleItemsByContext(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "Context", "Namespace"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+	m := Model{
+		nav:            model.NavigationState{Level: model.LevelResources},
+		sortColumnName: "Context", sortAscending: true,
+		middleItems: []model.Item{
+			{Name: "web", Namespace: "prod", ClusterName: "green"},
+			{Name: "web", Namespace: "prod", ClusterName: "blue"},
+			{Name: "api", Namespace: "prod", ClusterName: "green"},
+		},
+	}
+	m.sortMiddleItems()
+
+	require.Len(t, m.middleItems, 3)
+	assert.Equal(t, "blue", m.middleItems[0].ClusterName)
+	assert.Equal(t, "api", m.middleItems[1].Name,
+		"rows with equal Context should use the normal ascending tiebreaker")
+	assert.Equal(t, "web", m.middleItems[2].Name)
+}
+
 // TestSortMiddleItemsDeterministicForEqualPrimaryKeys is a regression guard
 // for the watch-mode flicker bug: items with identical primary sort keys
 // (e.g. a Helm release "traefik" deployed to two namespaces) were

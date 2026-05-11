@@ -16,7 +16,7 @@ import (
 // for every contextName that GetResources is called with. That is exactly
 // what we want here — the test verifies that GetResourcesUnion fans out to
 // every context, stamps each returned item with its source ClusterName,
-// prepends a "Context" column, and merges/sorts results. Per-context
+// leaves the Context column to the UI renderer, and merges/sorts results. Per-context
 // divergence is covered by the existing GetResources tests.
 func TestGetResourcesUnion_FanOutStampingAndSort(t *testing.T) {
 	pod := func(name string) *unstructured.Unstructured {
@@ -66,11 +66,10 @@ func TestGetResourcesUnion_FanOutStampingAndSort(t *testing.T) {
 		assert.Equal(t, want.name, items[i].Name, "row %d name", i)
 		assert.Equal(t, want.cluster, items[i].ClusterName, "row %d cluster", i)
 
-		// Every row must carry a "Context" column, and it must sit FIRST so
-		// the table renderer shows it as the leftmost extra column.
-		require.NotEmpty(t, items[i].Columns)
-		assert.Equal(t, "Context", items[i].Columns[0].Key, "row %d: Context must be the first column", i)
-		assert.Equal(t, want.cluster, items[i].Columns[0].Value, "row %d: Context value must match ClusterName", i)
+		for _, kv := range items[i].Columns {
+			assert.NotEqual(t, "Context", kv.Key,
+				"row %d: Context is rendered from ClusterName, not synthetic Item.Columns metadata", i)
+		}
 	}
 }
 

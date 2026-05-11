@@ -127,6 +127,110 @@ func TestRenderTable(t *testing.T) {
 		assert.Contains(t, result, "kube-system")
 	})
 
+	t.Run("union rows render ClusterName as first-class CONTEXT column", func(t *testing.T) {
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = nil
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origOrder := ActiveColumnOrder
+		ActiveColumnOrder = nil
+		defer func() { ActiveColumnOrder = origOrder }()
+
+		origLayout := ActiveTableLayout
+		ActiveTableLayout = nil
+		defer func() { ActiveTableLayout = origLayout }()
+
+		origSortable := ActiveSortableColumns
+		ActiveSortableColumns = nil
+		defer func() { ActiveSortableColumns = origSortable }()
+
+		origMiddleLayout := ActiveMiddleColumnLayout
+		ActiveMiddleColumnLayout = nil
+		defer func() { ActiveMiddleColumnLayout = origMiddleLayout }()
+
+		origExtra := ActiveExtraColumnKeys
+		ActiveExtraColumnKeys = nil
+		defer func() { ActiveExtraColumnKeys = origExtra }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{
+			{Name: "pod-a", Namespace: "cloud-cd", ClusterName: "blue", Kind: "Pod"},
+			{Name: "pod-a", Namespace: "cloud-cd", ClusterName: "green", Kind: "Pod"},
+		}
+		result := stripANSI(RenderTable("NAME", items, 0, 100, 20, false, "", ""))
+
+		assert.Contains(t, result, "CONTEXT")
+		assert.Contains(t, result, "blue")
+		assert.Contains(t, result, "green")
+		assert.Contains(t, result, "NAMESPACE")
+		assert.Contains(t, ActiveSortableColumns, "Context",
+			"first-class Context column must be sortable like built-in columns")
+		assert.NotContains(t, ActiveExtraColumnKeys, "Context",
+			"union Context must not be exposed as an Item.Columns extra")
+
+		var contextRegion, namespaceRegion *MiddleColumnRegion
+		for i := range ActiveMiddleColumnLayout {
+			switch ActiveMiddleColumnLayout[i].Key {
+			case "Context":
+				contextRegion = &ActiveMiddleColumnLayout[i]
+			case "Namespace":
+				namespaceRegion = &ActiveMiddleColumnLayout[i]
+			}
+		}
+		if assert.NotNil(t, contextRegion, "middle layout must include a Context region for header clicks") &&
+			assert.NotNil(t, namespaceRegion, "middle layout must include Namespace") {
+			assert.Less(t, contextRegion.StartX, namespaceRegion.StartX,
+				"Context should default before Namespace")
+		}
+	})
+
+	t.Run("non-union extra Context column still renders from Item.Columns", func(t *testing.T) {
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = nil
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origOrder := ActiveColumnOrder
+		ActiveColumnOrder = nil
+		defer func() { ActiveColumnOrder = origOrder }()
+
+		origLayout := ActiveTableLayout
+		ActiveTableLayout = nil
+		defer func() { ActiveTableLayout = origLayout }()
+
+		origExtra := ActiveExtraColumnKeys
+		ActiveExtraColumnKeys = nil
+		defer func() { ActiveExtraColumnKeys = origExtra }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{{
+			Name:    "pf/web",
+			Kind:    "PortForward",
+			Columns: []model.KeyValue{{Key: "Context", Value: "prod"}},
+		}}
+		result := stripANSI(RenderTable("NAME", items, 0, 80, 20, false, "", ""))
+		firstLine := strings.Split(result, "\n")[0]
+
+		assert.Contains(t, firstLine, "CONTEXT")
+		assert.Equal(t, 1, strings.Count(firstLine, "CONTEXT"))
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, ActiveExtraColumnKeys, "Context",
+			"non-union Context metadata should remain an ordinary extra column")
+	})
+
 	t.Run("default header label is NAME when empty", func(t *testing.T) {
 		origQuery := ActiveHighlightQuery
 		ActiveHighlightQuery = ""
