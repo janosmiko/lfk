@@ -155,6 +155,26 @@ func (q *ctxQueue) dequeueByPriorityLocked() (*queuedTask, bool) {
 	return nil, false
 }
 
+// hasPendingWork reports whether any priority lane is non-empty. Used by
+// the worker loop to decide whether to re-signal q.wake after a failed
+// pickTask: if the queue is truly empty we must NOT re-signal, otherwise
+// a stale wake left over from a previous drain creates a hot loop in
+// which the same worker repeatedly receives and resends the signal
+// without parking (issue #206 — observed as 2.26M goroutine
+// block/unblock events per second). Caller does not need to hold q.mu;
+// the read is racy but only used as a hint and the worst case is one
+// extra empty wake which the workers tolerate by parking again.
+func (q *ctxQueue) hasPendingWork() bool {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for prio := range q.lanes {
+		if len(q.lanes[prio]) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // Submit queues a unit of K8s work. Returns a buffered Future. If the
 // Registry is nil or has been closed, the Future immediately receives
 // Result{Err: ErrContextSwitched}.
