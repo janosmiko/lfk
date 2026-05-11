@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // --- filteredBookmarks ---
@@ -786,6 +787,81 @@ func TestBookmarkToSlot_ContextFreeStillCapturesNamespace(t *testing.T) {
 		"context-free slot must still record the namespace so `Tab` can replay it")
 }
 
+func TestBookmarkToSlot_ContextFreeAllowedAtUnionSentinel(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	podRT := podResourceType()
+	m := baseFinalModel()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{podRT}
+	m.middleItems = []model.Item{{Name: "Pods", Kind: "Pod", Extra: podRT.ResourceRef()}}
+	m.setCursor(0)
+
+	result, cmd := m.bookmarkToSlot("P")
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	require.Len(t, rm.bookmarks, 1)
+	saved := rm.bookmarks[0]
+	assert.Empty(t, saved.Context, "context-free union bookmark must not persist the union sentinel")
+	assert.Empty(t, saved.UnionSet, "context-free union bookmark must not pin a union set")
+	assert.Equal(t, podRT.ResourceRef(), saved.ResourceType)
+	assert.Contains(t, rm.statusMessage, "context-free")
+}
+
+func TestBookmarkToSlot_ContextAwareAllowedAtNamedUnionSentinel(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name: "staging-west",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue"},
+			{Context: "green"},
+		},
+	}}
+	podRT := podResourceType()
+	m := baseFinalModel()
+	m.unionMode = true
+	m.unionSetName = "staging-west"
+	m.unionContexts = []string{"blue", "green"}
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{podRT}
+	m.middleItems = []model.Item{{Name: "Pods", Kind: "Pod", Extra: podRT.ResourceRef()}}
+	m.setCursor(0)
+
+	result, cmd := m.bookmarkToSlot("p")
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	require.Len(t, rm.bookmarks, 1)
+	saved := rm.bookmarks[0]
+	assert.Empty(t, saved.Context, "named union bookmark must not persist the union sentinel as a context")
+	assert.Equal(t, "staging-west", saved.UnionSet)
+	assert.Equal(t, "staging-west > Pods", saved.Name)
+	assert.True(t, saved.IsContextAware())
+	assert.Contains(t, rm.statusMessage, "context-aware")
+}
+
+func TestBookmarkToSlot_ContextAwareBlockedAtAnonymousUnionSentinel(t *testing.T) {
+	podRT := podResourceType()
+	m := baseFinalModel()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{podRT}
+	m.middleItems = []model.Item{{Name: "Pods", Kind: "Pod", Extra: podRT.ResourceRef()}}
+	m.setCursor(0)
+
+	result, cmd := m.bookmarkToSlot("p")
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Empty(t, rm.bookmarks)
+	assert.Contains(t, rm.statusMessage, "named union set")
+}
+
 // TestNavigateToBookmark_ContextFreeWithLoadAppliesSavedNamespace
 // covers the opt-in: when bookmarkLoadNamespace is set (Tab toggle
 // in the overlay), the saved namespace IS applied to a context-free
@@ -811,6 +887,226 @@ func TestNavigateToBookmark_ContextFreeWithLoadAppliesSavedNamespace(t *testing.
 		"Tab-armed jumps must apply the saved namespace for context-free bookmarks")
 	assert.False(t, rm.bookmarkLoadNamespace,
 		"flag must be consumed after jumping so the next open starts clean")
+}
+
+func TestNavigateToBookmark_ContextFreeUnionSentinelKeepsUnionView(t *testing.T) {
+	m := baseFinalModel()
+	podRT := podResourceType()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{podRT}
+	m.namespace = "staging"
+
+	bm := model.Bookmark{
+		Slot:         "P",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "production",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.Equal(t, UnionContextSentinel, rm.nav.Context)
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+	assert.Equal(t, podRT.ResourceRef(), rm.nav.ResourceType.ResourceRef())
+	assert.Equal(t, "staging", rm.namespace,
+		"context-free union jumps should keep the current namespace unless Tab requested the saved one")
+	assert.Contains(t, rm.cursorMemory, UnionContextSentinel)
+}
+
+func TestNavigateToBookmark_NamedUnionSetActivatesUnionView(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name:      "staging-west",
+		Namespace: "cloud-cd",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue", Color: "blue"},
+			{Context: "green", Color: "green"},
+		},
+	}}
+
+	m := baseFinalModel()
+	m.client.AddTestContext("blue", "https://blue.example.local:6443")
+	m.client.AddTestContext("green", "https://green.example.local:6443")
+	podRT := podResourceType()
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{podRT}
+	m.nav = model.NavigationState{Level: model.LevelResources, Context: "test-ctx", ResourceType: podRT}
+	m.allNamespaces = false
+	m.namespace = "default"
+	m.selectedNamespaces = map[string]bool{"default": true}
+
+	bm := model.Bookmark{
+		Slot:         "p",
+		UnionSet:     "staging-west",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "bookmark-ns",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.True(t, rm.unionMode)
+	assert.True(t, rm.unionStartedFromPicker)
+	assert.Equal(t, "staging-west", rm.unionSetName)
+	assert.Equal(t, []string{"blue", "green"}, rm.unionContexts)
+	assert.Equal(t, map[string]string{"blue": "blue", "green": "green"}, rm.unionContextColors)
+	assert.Equal(t, UnionContextSentinel, rm.nav.Context)
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+	assert.Equal(t, podRT.ResourceRef(), rm.nav.ResourceType.ResourceRef())
+	assert.Equal(t, "default", rm.namespace,
+		"default union-set bookmark jumps should preserve the current single namespace")
+	assert.Equal(t, map[string]bool{"default": true}, rm.selectedNamespaces)
+	assert.Contains(t, rm.cursorMemory, UnionContextSentinel)
+}
+
+func TestNavigateToBookmark_NamedUnionSetReplacesActiveUnionSet(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name:      "staging-east",
+		Namespace: "cloud-cd",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "red", Color: "red"},
+			{Context: "yellow", Color: "yellow"},
+		},
+	}}
+
+	m := baseFinalModel()
+	m.client.AddTestContext("red", "https://red.example.local:6443")
+	m.client.AddTestContext("yellow", "https://yellow.example.local:6443")
+	podRT := podResourceType()
+	m.discoveredResources["red"] = []model.ResourceTypeEntry{podRT}
+	m.unionMode = true
+	m.unionStartedFromPicker = true
+	m.unionSetName = "staging-west"
+	m.unionContexts = []string{"blue", "green"}
+	m.unionContextColors = map[string]string{"blue": "blue", "green": "green"}
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+	m.allNamespaces = false
+	m.namespace = "team-a"
+	m.selectedNamespaces = map[string]bool{"team-a": true}
+
+	bm := model.Bookmark{
+		UnionSet:     "staging-east",
+		ResourceType: podRT.ResourceRef(),
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.True(t, rm.unionMode)
+	assert.Equal(t, "staging-east", rm.unionSetName)
+	assert.Equal(t, []string{"red", "yellow"}, rm.unionContexts)
+	assert.Equal(t, map[string]string{"red": "red", "yellow": "yellow"}, rm.unionContextColors)
+	assert.Equal(t, UnionContextSentinel, rm.nav.Context)
+	assert.Equal(t, "team-a", rm.namespace)
+}
+
+func TestNavigateToBookmark_NamedUnionSetFallsBackToConfiguredNamespace(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name:      "staging-west",
+		Namespace: "cloud-cd",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue"},
+			{Context: "green"},
+		},
+	}}
+
+	m := baseFinalModel()
+	m.client.AddTestContext("blue", "https://blue.example.local:6443")
+	m.client.AddTestContext("green", "https://green.example.local:6443")
+	podRT := podResourceType()
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{podRT}
+	m.allNamespaces = true
+	m.namespace = ""
+	m.selectedNamespaces = nil
+
+	bm := model.Bookmark{
+		UnionSet:     "staging-west",
+		ResourceType: podRT.ResourceRef(),
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.False(t, rm.allNamespaces)
+	assert.Equal(t, "cloud-cd", rm.namespace)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, rm.selectedNamespaces)
+}
+
+func TestNavigateToBookmark_NamedUnionSetWithLoadUsesBookmarkNamespace(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name:      "staging-west",
+		Namespace: "cloud-cd",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue"},
+			{Context: "green"},
+		},
+	}}
+
+	m := baseFinalModel()
+	m.client.AddTestContext("blue", "https://blue.example.local:6443")
+	m.client.AddTestContext("green", "https://green.example.local:6443")
+	podRT := podResourceType()
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{podRT}
+	m.allNamespaces = false
+	m.namespace = "default"
+	m.selectedNamespaces = map[string]bool{"default": true}
+	m.bookmarkLoadNamespace = true
+
+	bm := model.Bookmark{
+		UnionSet:     "staging-west",
+		ResourceType: podRT.ResourceRef(),
+		Namespace:    "bookmark-ns",
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.False(t, rm.bookmarkLoadNamespace)
+	assert.Equal(t, "bookmark-ns", rm.namespace)
+	assert.Equal(t, map[string]bool{"bookmark-ns": true}, rm.selectedNamespaces)
+}
+
+func TestNavigateToBookmark_ContextTargetExitsUnionView(t *testing.T) {
+	m := baseFinalModel()
+	m.client.AddTestContext("prod", "https://prod.example.local:6443")
+	podRT := podResourceType()
+	m.discoveredResources["prod"] = []model.ResourceTypeEntry{podRT}
+	m.unionMode = true
+	m.unionStartedFromPicker = true
+	m.unionSetName = "staging-west"
+	m.unionContexts = []string{"blue", "green"}
+	m.unionContextColors = map[string]string{"blue": "blue"}
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+
+	bm := model.Bookmark{
+		Context:      "prod",
+		ResourceType: podRT.ResourceRef(),
+	}
+
+	result, cmd := m.navigateToBookmark(bm)
+	require.NotNil(t, cmd)
+	rm := result.(Model)
+
+	assert.False(t, rm.unionMode)
+	assert.False(t, rm.unionStartedFromPicker)
+	assert.Empty(t, rm.unionSetName)
+	assert.Nil(t, rm.unionContexts)
+	assert.Nil(t, rm.unionContextColors)
+	assert.Equal(t, "prod", rm.nav.Context)
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
 }
 
 // TestNavigateToBookmark_ContextAwareWithLoadAppliesSavedNamespace

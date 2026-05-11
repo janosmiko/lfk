@@ -321,16 +321,35 @@ func (c *Client) ContextExists(displayName string) bool {
 	return ok
 }
 
+func (c *Client) contextNamespaceLocked(displayName string) (string, bool) {
+	if info, ok := c.contexts[displayName]; ok {
+		ns := strings.TrimSpace(info.namespace)
+		return ns, ns != ""
+	}
+	if ctx, ok := c.rawConfig.Contexts[displayName]; ok && ctx != nil {
+		ns := strings.TrimSpace(ctx.Namespace)
+		return ns, ns != ""
+	}
+	return "", false
+}
+
+// ContextNamespace returns the namespace explicitly configured on the given
+// lfk display context. The boolean is false when the context exists but does
+// not pin a namespace, letting callers distinguish "unset" from Kubernetes'
+// conventional "default" fallback.
+func (c *Client) ContextNamespace(displayName string) (string, bool) {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
+	return c.contextNamespaceLocked(displayName)
+}
+
 // DefaultNamespace returns the namespace configured for the given lfk display
 // name, falling back to "default" if none is set.
 func (c *Client) DefaultNamespace(displayName string) string {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	if info, ok := c.contexts[displayName]; ok && info.namespace != "" {
-		return info.namespace
-	}
-	if ctx, ok := c.rawConfig.Contexts[displayName]; ok && ctx != nil && ctx.Namespace != "" {
-		return ctx.Namespace
+	if ns, ok := c.contextNamespaceLocked(displayName); ok {
+		return ns
 	}
 	return "default"
 }

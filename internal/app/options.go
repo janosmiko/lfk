@@ -109,7 +109,7 @@ func ValidateUnionOptions(o StartupOptions, contextExists func(string) bool) err
 		return nil
 	}
 	if len(o.Namespaces) == 0 {
-		return fmt.Errorf("union mode requires a namespace (--namespace flag or namespace: in the union_sets entry)")
+		return fmt.Errorf("union mode requires a namespace (--namespace flag, namespace: in union_sets, or a namespace on a member context)")
 	}
 	if len(o.Namespaces) != 1 || strings.TrimSpace(o.Namespaces[0]) == "" {
 		return fmt.Errorf("union mode supports exactly one non-empty namespace (got %d)", len(o.Namespaces))

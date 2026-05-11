@@ -230,6 +230,7 @@ type PodMetrics struct {
 type Bookmark struct {
 	Name         string   `json:"name" yaml:"name"`
 	Context      string   `json:"context,omitempty" yaml:"context,omitempty"`
+	UnionSet     string   `json:"union_set,omitempty" yaml:"union_set,omitempty"`
 	Namespace    string   `json:"namespace" yaml:"namespace"`
 	Namespaces   []string `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
 	ResourceType string   `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
@@ -238,10 +239,11 @@ type Bookmark struct {
 }
 
 // IsContextAware reports whether this bookmark is anchored to a specific
-// kube context. Context-aware bookmarks switch to their stored context on
-// jump; context-free bookmarks use whatever context is currently active.
+// kube context or named union set. Context-aware bookmarks switch to their
+// stored target on jump; context-free bookmarks use whatever target is
+// currently active.
 func (b Bookmark) IsContextAware() bool {
-	return b.Context != ""
+	return b.Context != "" || b.UnionSet != ""
 }
 
 // ActionMenuItem represents an entry in the action menu.

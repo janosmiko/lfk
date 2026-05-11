@@ -43,6 +43,7 @@ union_sets:
     contexts:
       - prod-green-east
       - name: prod-blue-east
+        namespace: prod-apps
   - contexts:
       - context: orphan-ctx
   - name: empty-set
@@ -79,9 +80,11 @@ union_sets:
 	prod, ok := byName["ski-prod-east"]
 	require.True(t, ok)
 	assert.Equal(t, []string{"prod-green-east", "prod-blue-east"}, ctxNames(prod.Contexts))
-	for _, c := range prod.Contexts {
-		assert.Empty(t, c.Color, "color is optional; missing field must round-trip as empty")
-	}
+	assert.Empty(t, prod.Contexts[0].Color, "color is optional; missing field must round-trip as empty")
+	assert.Empty(t, prod.Contexts[1].Color, "color is optional; missing field must round-trip as empty")
+	assert.Empty(t, prod.Contexts[0].Namespace)
+	assert.Equal(t, "prod-apps", prod.Contexts[1].Namespace,
+		"context-level namespace must round-trip through YAML")
 	assert.Empty(t, prod.Namespace, "namespace is optional; absence must not crash sanitization")
 }
 
@@ -97,6 +100,7 @@ union_sets:
       - staging-green
       - context: staging-blue
         color: blue
+        namespace: cloud-cd
 `
 	dir := t.TempDir()
 	path := filepath.Join(dir, "config.yaml")
@@ -113,6 +117,7 @@ union_sets:
 	require.Len(t, set.Contexts, 2)
 	assert.Empty(t, set.Contexts[0].Color)
 	assert.Equal(t, "blue", set.Contexts[1].Color)
+	assert.Equal(t, "cloud-cd", set.Contexts[1].Namespace)
 }
 
 func TestSanitizeUnionSets_DropsInvalidEntries(t *testing.T) {

@@ -717,7 +717,8 @@ type Model struct {
 	// 1-cell row tile in the merged view. Distinct from the global
 	// clusterColors map (which feeds the cluster picker) so users can
 	// pick deliberate per-set palette without mutating the global state.
-	unionContextColors map[string]string
+	unionContextColors  map[string]string
+	pendingUnionSetName string // namespace picker is choosing for this union set
 
 	// Session persistence: restores navigation state across restarts.
 	pendingSession      *SessionState      // loaded session waiting to be applied after contexts load

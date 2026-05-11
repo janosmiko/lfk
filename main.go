@@ -132,7 +132,7 @@ func runTUI(opts app.StartupOptions) error {
 	// --union-set expansion runs AFTER LoadConfig (it reads ui.ConfigUnionSets)
 	// and BEFORE ValidateUnionOptions (which then enforces context existence
 	// and the cluster cap on the resolved list).
-	opts, err = app.ResolveUnionSet(opts, unionSetLookup(ui.ConfigUnionSets))
+	opts, err = app.ResolveUnionSet(opts, unionSetLookup(ui.ConfigUnionSets, client))
 	if err != nil {
 		return err
 	}
@@ -237,22 +237,20 @@ func validatePprofAddr(addr string) error {
 // closure so the resolver doesn't grow an import on the ui package and
 // stays unit-testable with a hand-rolled lookup. Flattens the per-cluster
 // objects into the parallel (contexts, colors-map) shape the resolver
-// passes downstream.
-func unionSetLookup(sets []ui.UnionSetConfig) app.UnionSetLookup {
+// passes downstream. The namespace resolver can also see explicit kubeconfig
+// context namespaces through the already-constructed client.
+func unionSetLookup(sets []ui.UnionSetConfig, client *k8s.Client) app.UnionSetLookup {
 	return func(name string) (contexts []string, namespace string, colors map[string]string, ok bool) {
+		var namespaceLookup func(string) (string, bool)
+		if client != nil {
+			namespaceLookup = client.ContextNamespace
+		}
 		for _, s := range sets {
 			if s.Name != name {
 				continue
 			}
-			ctxs := make([]string, 0, len(s.Contexts))
-			cols := make(map[string]string, len(s.Contexts))
-			for _, c := range s.Contexts {
-				ctxs = append(ctxs, c.Context)
-				if c.Color != "" {
-					cols[c.Context] = c.Color
-				}
-			}
-			return ctxs, s.Namespace, cols, true
+			ctxs, ns, cols := app.ExpandUnionSetConfig(s, namespaceLookup)
+			return ctxs, ns, cols, true
 		}
 		return nil, "", nil, false
 	}

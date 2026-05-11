@@ -23,7 +23,9 @@ Validation runs in `runTUI()` in `main.go` before the TUI starts. Unknown contex
 
 ## Config
 
-Named union views can be stored under the top-level `union_sets` key. The preferred shape is a map keyed by set name; list form with `name:` is also accepted for compatibility. Each entry has an optional `namespace` and `contexts`. Contexts can be plain strings or objects with a `context` or `name` field and optional `color` used for the one-character context tile.
+Named union views can be stored under the top-level `union_sets` key. The preferred shape is a map keyed by set name; list form with `name:` is also accepted for compatibility. Each entry has an optional `namespace` and `contexts`. Contexts can be plain strings or objects with a `context` or `name` field, optional `color` for the one-character context tile, and optional `namespace`. Namespace resolution uses the first configured member namespace, then the set-level namespace, then an explicit namespace from one of the member kubeconfig contexts. CLI `--namespace` overrides all configured defaults.
+
+Configured union sets appear at the top of the context picker under a `Union Sets` section, followed by the normal `Contexts` section. Starting lfk with `--union-set` behaves like entering that row from the picker: parent navigation returns to the context picker. Anonymous `--union-context` sessions still have no configured picker row to return to.
 
 ```yaml
 union_sets:
@@ -34,6 +36,7 @@ union_sets:
       - green
       - context: yellow
         color: yellow
+        namespace: cloud-cd
 ```
 
 ## Design Decisions
@@ -89,7 +92,7 @@ This is safe for all callers:
 
 ### Cluster picker
 
-Configured union sets are appended to the context explorer under a dedicated `Union Sets` group. Selecting a set enters union mode using the set's contexts, colors, and namespace. Back navigation from the resource-type level returns to the context explorer when the union view was entered from there. CLI-started union sessions keep the old no-parent behavior because they did not come from a picker row.
+Configured union sets are appended to the context explorer under a dedicated `Union Sets` group. Selecting a set enters union mode using the set's contexts, colors, and resolved namespace. Back navigation from the resource-type level returns to the context explorer when the union view was entered from there. CLI-started union sessions keep the old no-parent behavior because they did not come from a picker row.
 
 ### Union dashboards
 
@@ -144,6 +147,6 @@ Fix in `updateResourcesLoadedMain`: capture `prevCluster` before items are repla
 ## Known Limitations
 
 - **CRD asymmetry**: If clusters have different CRDs, resources present in cluster A but not cluster B produce empty results from B — not an error. A future improvement would take the union of discovered resources across all contexts.
-- **Context-wide tools**: Cluster dashboard and monitoring dashboard expose the union members first, then open a selected member as a normal single-context view. RBAC browser, bookmarks, and pinned groups remain per-context and are blocked at the union sentinel; open a member context or drill into a resource to use them against one cluster.
+- **Context-wide tools**: Cluster dashboard and monitoring dashboard expose the union members first, then open a selected member as a normal single-context view. Context-aware bookmarks can target named `union_sets` and switch between union sets and regular contexts; anonymous `--union-context` views still only support context-free bookmarks because they have no durable configured name. RBAC browser and pinned groups remain per-context and are blocked at the union sentinel; open a member context or drill into a resource to use them against one cluster.
 - **Command bar context commands**: `:ctx`, shell commands, and `:kubectl`/`:k` commands are blocked at the union sentinel because they require one active context.
 - **Drill-down is single-cluster**: Once the user selects a specific resource and drills down, subsequent navigation operates against that resource's cluster only. There is no "multi-cluster owned resources" view.

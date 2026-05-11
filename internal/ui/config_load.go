@@ -256,13 +256,14 @@ type UnionSetConfig struct {
 	// 1-cell row tile in the merged view.
 	Contexts []UnionSetContextConfig `json:"contexts" yaml:"contexts"`
 	// Namespace is the namespace lfk opens in when this set is selected.
-	// Optional: when empty, --namespace is required on the CLI. When set,
-	// --namespace on the CLI overrides this value.
+	// Optional: when empty, lfk can still use a member entry namespace or
+	// an explicit kubeconfig context namespace. When set, --namespace on
+	// the CLI overrides this value.
 	Namespace string `json:"namespace" yaml:"namespace"`
 }
 
-// UnionSetContextConfig identifies one cluster within a union set, plus an
-// optional per-set color used for the row-tile renderer in the merged view.
+// UnionSetContextConfig identifies one cluster within a union set, plus
+// optional per-set metadata used when this named view is activated.
 // The color lives inside the set rather than the global cluster_colors map
 // so users can pick deliberate "traffic light" semantics per view (e.g. the
 // canary is green in this set, the prod-blue marker stays blue) without
@@ -272,8 +273,9 @@ type UnionSetConfig struct {
 // dropped at sanitize time with a warning, leaving the entry usable but
 // untinted (the row gets a blank reserved cell instead of a colored tile).
 type UnionSetContextConfig struct {
-	Context string `json:"context" yaml:"context"`
-	Color   string `json:"color"   yaml:"color"`
+	Context   string `json:"context" yaml:"context"`
+	Color     string `json:"color"   yaml:"color"`
+	Namespace string `json:"namespace" yaml:"namespace"`
 }
 
 func (c *UnionSetContextConfig) UnmarshalJSON(data []byte) error {
@@ -281,12 +283,14 @@ func (c *UnionSetContextConfig) UnmarshalJSON(data []byte) error {
 	if err := json.Unmarshal(data, &name); err == nil {
 		c.Context = name
 		c.Color = ""
+		c.Namespace = ""
 		return nil
 	}
 	var obj struct {
-		Context string `json:"context" yaml:"context"`
-		Name    string `json:"name" yaml:"name"`
-		Color   string `json:"color" yaml:"color"`
+		Context   string `json:"context" yaml:"context"`
+		Name      string `json:"name" yaml:"name"`
+		Color     string `json:"color" yaml:"color"`
+		Namespace string `json:"namespace" yaml:"namespace"`
 	}
 	if err := json.Unmarshal(data, &obj); err != nil {
 		return err
@@ -296,6 +300,7 @@ func (c *UnionSetContextConfig) UnmarshalJSON(data []byte) error {
 		c.Context = obj.Name
 	}
 	c.Color = obj.Color
+	c.Namespace = obj.Namespace
 	return nil
 }
 

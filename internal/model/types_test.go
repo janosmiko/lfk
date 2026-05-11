@@ -470,16 +470,18 @@ func TestDefaultRightsizingHeadroomIsInPickerList(t *testing.T) {
 
 func TestBookmarkIsContextAware(t *testing.T) {
 	tests := []struct {
-		name    string
-		context string
-		want    bool
+		name     string
+		context  string
+		unionSet string
+		want     bool
 	}{
-		{name: "empty context is context-free", context: "", want: false},
+		{name: "empty target is context-free", want: false},
 		{name: "populated context is context-aware", context: "prod-cluster", want: true},
+		{name: "populated union set is context-aware", unionSet: "staging-west", want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bm := Bookmark{Context: tt.context}
+			bm := Bookmark{Context: tt.context, UnionSet: tt.unionSet}
 			if got := bm.IsContextAware(); got != tt.want {
 				t.Errorf("IsContextAware() = %v, want %v", got, tt.want)
 			}

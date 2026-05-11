@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -15,6 +16,33 @@ func (m Model) handleNamespaceOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m.handleNamespaceNormalMode(msg)
 }
 
+func (m Model) applyPendingUnionSetNamespace(item model.Item) (tea.Model, tea.Cmd) {
+	if m.pendingUnionSetName == "" {
+		return m, nil
+	}
+	if item.Name == "" || item.Status == "all" {
+		m.setStatusMessage("Union set requires one namespace", true)
+		return m, scheduleStatusClear()
+	}
+	setName := m.pendingUnionSetName
+	set, ok := m.findUnionSetConfig(setName)
+	if !ok {
+		m.pendingUnionSetName = ""
+		m.overlay = overlayNone
+		m.setStatusMessage(fmt.Sprintf("Union set not found: %s", setName), true)
+		return m, scheduleStatusClear()
+	}
+	m.overlayFilter.Clear()
+	m.nsFilterMode = false
+	m.overlay = overlayNone
+	return m.activateUnionSet(set, item.Name)
+}
+
+func (m Model) rejectPendingUnionSetNamespaceMultiSelect() (tea.Model, tea.Cmd) {
+	m.setStatusMessage("Union sets use exactly one namespace", true)
+	return m, scheduleStatusClear()
+}
+
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	items := m.filteredOverlayItems()
@@ -27,6 +55,7 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m, nil
 		}
 		m.overlayFilter.Clear()
+		m.pendingUnionSetName = ""
 		// Restore the parent overlay (e.g. RBAC) when the namespace
 		// selector was opened from inside it; otherwise close fully.
 		if m.previousOverlay != overlayNone {
@@ -38,6 +67,13 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "enter":
+		if m.pendingUnionSetName != "" {
+			if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
+				return m.applyPendingUnionSetNamespace(items[m.overlayCursor])
+			}
+			m.setStatusMessage("Union set requires one namespace", true)
+			return m, scheduleStatusClear()
+		}
 		// Apply selection and close.
 		oldNs := m.namespace
 		switch {
@@ -92,6 +128,9 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, refresh
 
 	case " ":
+		if m.pendingUnionSetName != "" {
+			return m.rejectPendingUnionSetNamespaceMultiSelect()
+		}
 		m.nsSelectionModified = true
 		// Toggle selection on current item.
 		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
@@ -122,6 +161,9 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case ui.ActiveKeybindings.AllNamespaces:
+		if m.pendingUnionSetName != "" {
+			return m.rejectPendingUnionSetNamespaceMultiSelect()
+		}
 		// Same key the user already uses outside the overlay to flip to
 		// all-namespaces mode (default "A"). Drops individual selections
 		// and enables all-ns. Cursor jumps to the "All Namespaces" row
@@ -246,6 +288,13 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case filterAccept:
 		m.nsFilterMode = false
 		m.overlayCursor = 0
+		if m.pendingUnionSetName != "" {
+			items := m.filteredOverlayItems()
+			if len(items) == 1 {
+				return m.applyPendingUnionSetNamespace(items[0])
+			}
+			return m, nil
+		}
 		// When the filter narrows to a single result and the user hasn't
 		// been multi-selecting with Space, Enter is unambiguous: apply
 		// that result and close. Without this, the user has to press

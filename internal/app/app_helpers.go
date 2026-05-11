@@ -75,13 +75,17 @@ func (m Model) activeContext() string {
 // newly-opened context has completions ready without waiting for the
 // user's keystroke to trigger the fetch.
 func (m Model) ensureNamespaceCacheFresh() tea.Cmd {
-	entry, ok := m.cachedNamespaces[m.activeContext()]
+	return m.ensureNamespaceCacheFreshForContext(m.activeContext())
+}
+
+func (m Model) ensureNamespaceCacheFreshForContext(contextName string) tea.Cmd {
+	entry, ok := m.cachedNamespaces[contextName]
 	if !ok || len(entry.names) == 0 || time.Since(entry.fetchedAt) > namespaceCacheTTL {
 		// Silent: this is a background cache refresh, not an overlay-
 		// triggered load. The handler must NOT clear m.loading or we
 		// race with in-flight API discovery on session restore and
 		// produce a "No items" flash in the resource-types list.
-		return m.loadNamespacesSilent(true)
+		return m.loadNamespacesForContext(contextName, true)
 	}
 	return nil
 }

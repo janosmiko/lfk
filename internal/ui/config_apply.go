@@ -427,6 +427,8 @@ func sanitizeUnionSets(in []UnionSetConfig) []UnionSetConfig {
 	out := make([]UnionSetConfig, 0, len(in))
 	seen := make(map[string]int, len(in))
 	for _, s := range in {
+		s.Name = strings.TrimSpace(s.Name)
+		s.Namespace = strings.TrimSpace(s.Namespace)
 		if s.Name == "" {
 			logger.Warn("union_sets entry has no name; skipping", "contexts", s.Contexts)
 			continue
@@ -438,6 +440,9 @@ func sanitizeUnionSets(in []UnionSetConfig) []UnionSetConfig {
 		cleanCtxs := make([]UnionSetContextConfig, 0, len(s.Contexts))
 		seenCtx := make(map[string]struct{}, len(s.Contexts))
 		for _, c := range s.Contexts {
+			c.Context = strings.TrimSpace(c.Context)
+			c.Color = strings.TrimSpace(c.Color)
+			c.Namespace = strings.TrimSpace(c.Namespace)
 			if c.Context == "" {
 				logger.Warn("union_sets entry has nameless context; skipping that entry", "set", s.Name)
 				continue

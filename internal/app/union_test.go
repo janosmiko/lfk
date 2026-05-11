@@ -289,6 +289,75 @@ func TestResolveUnionSet_PreservesCLIArgsWhenSetHasNoNamespace(t *testing.T) {
 	assert.Empty(t, got.Namespaces)
 }
 
+func TestExpandUnionSetConfigResolvesNamespace(t *testing.T) {
+	tests := []struct {
+		name      string
+		set       ui.UnionSetConfig
+		kubeNS    map[string]string
+		wantNS    string
+		wantCtxs  []string
+		wantColor map[string]string
+	}{
+		{
+			name: "context entry namespace wins over set namespace",
+			set: ui.UnionSetConfig{
+				Name:      "staging",
+				Namespace: "set-ns",
+				Contexts: []ui.UnionSetContextConfig{
+					{Context: "blue", Namespace: "member-ns", Color: "blue"},
+					{Context: "green"},
+				},
+			},
+			wantNS:    "member-ns",
+			wantCtxs:  []string{"blue", "green"},
+			wantColor: map[string]string{"blue": "blue"},
+		},
+		{
+			name: "set namespace wins over kubeconfig namespace",
+			set: ui.UnionSetConfig{
+				Name:      "staging",
+				Namespace: "set-ns",
+				Contexts:  []ui.UnionSetContextConfig{{Context: "blue"}},
+			},
+			kubeNS: map[string]string{"blue": "kube-ns"},
+			wantNS: "set-ns",
+		},
+		{
+			name: "kubeconfig namespace fills missing config namespace",
+			set: ui.UnionSetConfig{
+				Name:     "staging",
+				Contexts: []ui.UnionSetContextConfig{{Context: "blue"}, {Context: "green"}},
+			},
+			kubeNS: map[string]string{"green": "kube-ns"},
+			wantNS: "kube-ns",
+		},
+		{
+			name: "empty when nothing supplies namespace",
+			set: ui.UnionSetConfig{
+				Name:     "staging",
+				Contexts: []ui.UnionSetContextConfig{{Context: "blue"}},
+			},
+			wantNS: "",
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			lookup := func(ctx string) (string, bool) {
+				ns, ok := tc.kubeNS[ctx]
+				return ns, ok
+			}
+			contexts, namespace, colors := ExpandUnionSetConfig(tc.set, lookup)
+			assert.Equal(t, tc.wantNS, namespace)
+			if tc.wantCtxs != nil {
+				assert.Equal(t, tc.wantCtxs, contexts)
+			}
+			if tc.wantColor != nil {
+				assert.Equal(t, tc.wantColor, colors)
+			}
+		})
+	}
+}
+
 // --- NewModel with union options ---
 
 func TestNewModel_UnionInitialises(t *testing.T) {
@@ -302,6 +371,8 @@ func TestNewModel_UnionInitialises(t *testing.T) {
 
 	assert.True(t, m.unionMode)
 	assert.Equal(t, []string{"blue", "green"}, m.unionContexts)
+	assert.False(t, m.unionStartedFromPicker,
+		"anonymous --union-context sessions still have no context-picker parent")
 	assert.Equal(t, UnionContextSentinel, m.nav.Context,
 		"nav.Context should be the sentinel so loadResources knows to fan out")
 	assert.False(t, m.allNamespaces, "union requires a specific namespace")
@@ -309,6 +380,22 @@ func TestNewModel_UnionInitialises(t *testing.T) {
 
 	require.NotNil(t, m.pendingSession, "session-restore scaffolding is built off the first union context")
 	assert.Equal(t, "blue", m.pendingSession.Context)
+}
+
+func TestNewModel_UnionSetCanReturnToPicker(t *testing.T) {
+	client := newTestClientForOptions(t)
+
+	opts := StartupOptions{
+		UnionSet:      "staging-west",
+		UnionContexts: []string{"blue", "green"},
+		Namespaces:    []string{"cloud-cd"},
+	}
+	m := NewModel(client, opts)
+
+	assert.True(t, m.unionMode)
+	assert.True(t, m.unionStartedFromPicker,
+		"named --union-set sessions should behave like picker-entered union sets")
+	assert.Equal(t, "staging-west", m.unionSetName)
 }
 
 func TestRestoreSession_UnionSetsAllTabContextsToSentinel(t *testing.T) {
@@ -539,7 +626,7 @@ func TestSelectedMiddleItem_UnionDisambiguatesByClusterName(t *testing.T) {
 
 // --- Read-only guards in union mode ---
 
-func TestBookmarkToSlot_BlockedAtUnionSentinel(t *testing.T) {
+func TestUnionAnonymousSentinelBlocksContextAwareBookmark(t *testing.T) {
 	m := Model{
 		unionMode: true,
 		nav: model.NavigationState{
@@ -551,8 +638,8 @@ func TestBookmarkToSlot_BlockedAtUnionSentinel(t *testing.T) {
 	mdl, _ := m.bookmarkToSlot("a")
 	result, ok := mdl.(Model)
 	require.True(t, ok)
-	assert.Empty(t, result.bookmarks, "no bookmark should be persisted at the union sentinel")
-	assert.Contains(t, result.statusMessage, "union view",
+	assert.Empty(t, result.bookmarks, "anonymous union mode has no durable target for context-aware bookmarks")
+	assert.Contains(t, result.statusMessage, "named union set",
 		"user should see a clear message about why the bookmark was refused")
 }
 
@@ -1102,7 +1189,7 @@ func TestUpdateResourcesLoaded_UnionPartialErrorKeepsItems(t *testing.T) {
 	assert.Error(t, result.err)
 }
 
-func TestUpdateContextsLoaded_AppendsUnionSetRows(t *testing.T) {
+func TestUpdateContextsLoaded_PrependsUnionSetRows(t *testing.T) {
 	orig := ui.ConfigUnionSets
 	t.Cleanup(func() { ui.ConfigUnionSets = orig })
 	ui.ConfigUnionSets = []ui.UnionSetConfig{{
@@ -1120,13 +1207,31 @@ func TestUpdateContextsLoaded_AppendsUnionSetRows(t *testing.T) {
 	rm := result.(Model)
 
 	require.Len(t, rm.middleItems, 2)
-	assert.True(t, rm.middleItems[0].IsContext)
-	unionRow := rm.middleItems[1]
+	unionRow := rm.middleItems[0]
 	assert.Equal(t, "staging-west", unionRow.Name)
 	assert.Equal(t, unionSetItemKind, unionRow.Kind)
 	assert.Equal(t, unionSetCategory, unionRow.Category)
 	assert.Contains(t, unionRow.Status, "2 contexts")
 	assert.Contains(t, unionRow.Status, "cloud-cd")
+	contextRow := rm.middleItems[1]
+	assert.True(t, contextRow.IsContext)
+	assert.Equal(t, contextCategory, contextRow.Category)
+}
+
+func TestUpdateContextsLoaded_NoUnionSetsOnlyShowsContexts(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = nil
+
+	m := baseModelWithFakeClient()
+	m.nav.Level = model.LevelClusters
+	result, _ := m.updateContextsLoaded(contextsLoadedMsg{items: []model.Item{{Name: "test-ctx"}}})
+	rm := result.(Model)
+
+	require.Len(t, rm.middleItems, 1)
+	assert.True(t, rm.middleItems[0].IsContext)
+	assert.Equal(t, contextCategory, rm.middleItems[0].Category)
+	assert.NotEqual(t, unionSetItemKind, rm.middleItems[0].Kind)
 }
 
 func TestNavigateChildCluster_UnionSetActivatesAndBackReturnsToPicker(t *testing.T) {
@@ -1146,12 +1251,12 @@ func TestNavigateChildCluster_UnionSetActivatesAndBackReturnsToPicker(t *testing
 	m.client.AddTestContext("green", "https://green.example.local:6443")
 	m.nav.Level = model.LevelClusters
 	m.middleItems = []model.Item{
-		{Name: "test-ctx", IsContext: true},
 		{Name: "staging-west", Kind: unionSetItemKind, Extra: "staging-west", Category: unionSetCategory},
+		{Name: "test-ctx", IsContext: true, Category: contextCategory},
 	}
 	m.discoveredResources["blue"] = model.SeedResources()
 	m.discoveryRefreshedContexts["blue"] = true
-	m.setCursor(1)
+	m.setCursor(0)
 
 	result, cmd := m.navigateChild()
 	rm := result.(Model)
@@ -1174,7 +1279,172 @@ func TestNavigateChildCluster_UnionSetActivatesAndBackReturnsToPicker(t *testing
 	assert.Equal(t, model.LevelClusters, bm.nav.Level)
 	assert.Equal(t, "", bm.nav.Context)
 	require.Len(t, bm.middleItems, 2)
-	assert.Equal(t, unionSetItemKind, bm.middleItems[1].Kind)
+	assert.Equal(t, unionSetItemKind, bm.middleItems[0].Kind)
+	assert.Equal(t, 0, bm.cursor())
+}
+
+func TestNavigateChildCluster_UnionSetUsesContextEntryNamespace(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name: "staging-west",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue", Namespace: "cloud-cd", Color: "blue"},
+			{Context: "green", Color: "green"},
+		},
+	}}
+
+	m := baseModelWithFakeClient()
+	m.client.AddTestContextWithNamespace("blue", "https://blue.example.local:6443", "")
+	m.client.AddTestContextWithNamespace("green", "https://green.example.local:6443", "")
+	m.nav.Level = model.LevelClusters
+	m.middleItems = []model.Item{
+		{Name: "staging-west", Kind: unionSetItemKind, Extra: "staging-west", Category: unionSetCategory},
+	}
+	m.discoveredResources["blue"] = model.SeedResources()
+	m.discoveryRefreshedContexts["blue"] = true
+	m.setCursor(0)
+
+	result, cmd := m.navigateChild()
+	rm := result.(Model)
+	require.NotNil(t, cmd)
+	assert.True(t, rm.unionMode)
+	assert.Equal(t, "cloud-cd", rm.namespace)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, rm.selectedNamespaces)
+	assert.Equal(t, []string{"blue", "green"}, rm.unionContexts)
+}
+
+func TestNavigateChildCluster_UnionSetUsesKubeconfigContextNamespace(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name: "staging-west",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue", Color: "blue"},
+			{Context: "green", Color: "green"},
+		},
+	}}
+
+	m := baseModelWithFakeClient()
+	m.client.AddTestContextWithNamespace("blue", "https://blue.example.local:6443", "cloud-cd")
+	m.client.AddTestContextWithNamespace("green", "https://green.example.local:6443", "")
+	m.nav.Level = model.LevelClusters
+	m.middleItems = []model.Item{
+		{Name: "staging-west", Kind: unionSetItemKind, Extra: "staging-west", Category: unionSetCategory},
+	}
+	m.discoveredResources["blue"] = model.SeedResources()
+	m.discoveryRefreshedContexts["blue"] = true
+	m.setCursor(0)
+
+	result, cmd := m.navigateChild()
+	rm := result.(Model)
+	require.NotNil(t, cmd)
+	assert.True(t, rm.unionMode)
+	assert.Equal(t, "cloud-cd", rm.namespace)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, rm.selectedNamespaces)
+}
+
+func TestNavigateChildCluster_UnionSetWithoutNamespaceOpensNamespacePicker(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name: "staging-west",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue", Color: "blue"},
+			{Context: "green", Color: "green"},
+		},
+	}}
+
+	m := baseModelWithFakeClient()
+	m.client.AddTestContextWithNamespace("blue", "https://blue.example.local:6443", "")
+	m.client.AddTestContextWithNamespace("green", "https://green.example.local:6443", "")
+	m.nav.Level = model.LevelClusters
+	m.middleItems = []model.Item{
+		{Name: "staging-west", Kind: unionSetItemKind, Extra: "staging-west", Category: unionSetCategory},
+	}
+	m.setCursor(0)
+
+	result, cmd := m.navigateChild()
+	rm := result.(Model)
+	require.NotNil(t, cmd)
+	assert.False(t, rm.unionMode)
+	assert.Equal(t, overlayNamespace, rm.overlay)
+	assert.Equal(t, "staging-west", rm.pendingUnionSetName)
+	assert.True(t, rm.loading)
+	assert.Empty(t, rm.statusMessage)
+
+	loaded, _ := rm.updateNamespacesLoaded(namespacesLoadedMsg{
+		context: "blue",
+		items:   []model.Item{{Name: "cloud-cd"}, {Name: "kube-system"}},
+	})
+	lm := loaded.(Model)
+	require.Len(t, lm.overlayItems, 2)
+	assert.Equal(t, "cloud-cd", lm.overlayItems[0].Name)
+	assert.NotEqual(t, "all", lm.overlayItems[0].Status,
+		"pending union-set namespace picker must not offer all-namespaces")
+}
+
+func TestNamespacePickerSelectionActivatesPendingUnionSet(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name: "staging-west",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue", Color: "blue"},
+			{Context: "green", Color: "green"},
+		},
+	}}
+
+	m := baseModelWithFakeClient()
+	m.client.AddTestContextWithNamespace("blue", "https://blue.example.local:6443", "")
+	m.client.AddTestContextWithNamespace("green", "https://green.example.local:6443", "")
+	m.pendingUnionSetName = "staging-west"
+	m.overlay = overlayNamespace
+	m.nav.Level = model.LevelClusters
+	m.leftItems = []model.Item{
+		{Name: "staging-west", Kind: unionSetItemKind, Extra: "staging-west", Category: unionSetCategory},
+	}
+	m.overlayItems = []model.Item{{Name: "cloud-cd"}, {Name: "kube-system"}}
+	m.discoveredResources["blue"] = model.SeedResources()
+	m.discoveryRefreshedContexts["blue"] = true
+	m.overlayCursor = 0
+
+	result, cmd := m.handleNamespaceOverlayKey(keyMsg("enter"))
+	rm := result.(Model)
+	require.NotNil(t, cmd)
+	assert.True(t, rm.unionMode)
+	assert.Empty(t, rm.pendingUnionSetName)
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.Equal(t, "staging-west", rm.unionSetName)
+	assert.Equal(t, []string{"blue", "green"}, rm.unionContexts)
+	assert.Equal(t, "cloud-cd", rm.namespace)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, rm.selectedNamespaces)
+}
+
+func TestNavigateParent_CLIStartedUnionSetReturnsToPicker(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionStartedFromPicker = true
+	m.unionSetName = "staging-west"
+	m.unionContexts = []string{"blue", "green"}
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+	m.leftItems = []model.Item{
+		{Name: "staging-west", Kind: unionSetItemKind, Extra: "staging-west", Category: unionSetCategory},
+		{Name: "test-ctx", IsContext: true, Category: contextCategory},
+	}
+	m.setCursor(1)
+
+	result, cmd := m.navigateParent()
+	rm := result.(Model)
+	require.NotNil(t, cmd)
+
+	assert.False(t, rm.unionMode)
+	assert.Equal(t, model.LevelClusters, rm.nav.Level)
+	assert.Equal(t, "", rm.nav.Context)
+	require.Len(t, rm.middleItems, 2)
+	assert.Equal(t, unionSetItemKind, rm.middleItems[0].Kind)
+	assert.Equal(t, 0, rm.cursor(),
+		"backing out of a named union set should land on the union-set row")
 }
 
 func TestUnionSentinelBlocksContextWideFeatures(t *testing.T) {
@@ -1190,11 +1460,6 @@ func TestUnionSentinelBlocksContextWideFeatures(t *testing.T) {
 	rbacModel := rbac.(Model)
 	assert.NotNil(t, cmd)
 	assert.Contains(t, rbacModel.statusMessage, "single context")
-
-	bookmarked, cmd := m.navigateToBookmark(model.Bookmark{ResourceType: "/v1/pods"})
-	bookmarkModel := bookmarked.(Model)
-	assert.NotNil(t, cmd)
-	assert.Contains(t, bookmarkModel.statusMessage, "disabled in union view")
 
 	pinned, cmd := m.handleKeyPinGroup()
 	pinnedModel := pinned.(Model)

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -22,30 +23,61 @@ func (m Model) findUnionSetConfig(name string) (ui.UnionSetConfig, bool) {
 	return ui.UnionSetConfig{}, false
 }
 
-func unionSetContextsAndColors(set ui.UnionSetConfig) ([]string, map[string]string) {
-	contexts := make([]string, 0, len(set.Contexts))
-	colors := make(map[string]string, len(set.Contexts))
+// ExpandUnionSetConfig flattens a configured union set into the startup fields
+// used by both CLI activation and picker activation. Namespace precedence is:
+// per-member namespace in union_sets, set-level namespace, then an explicitly
+// configured namespace on one of the kubeconfig contexts.
+func ExpandUnionSetConfig(
+	set ui.UnionSetConfig,
+	contextNamespace func(string) (string, bool),
+) (contexts []string, namespace string, colors map[string]string) {
+	contexts = make([]string, 0, len(set.Contexts))
+	colors = make(map[string]string, len(set.Contexts))
+	memberNamespace := ""
+	kubeconfigNamespace := ""
 	for _, ctx := range set.Contexts {
-		contexts = append(contexts, ctx.Context)
-		if ctx.Color != "" {
-			colors[ctx.Context] = ctx.Color
+		context := strings.TrimSpace(ctx.Context)
+		contexts = append(contexts, context)
+		if color := strings.TrimSpace(ctx.Color); color != "" {
+			colors[context] = color
+		}
+		if memberNamespace == "" {
+			memberNamespace = strings.TrimSpace(ctx.Namespace)
+		}
+		if kubeconfigNamespace == "" && contextNamespace != nil {
+			if ns, ok := contextNamespace(context); ok {
+				kubeconfigNamespace = strings.TrimSpace(ns)
+			}
 		}
 	}
-	return contexts, colors
+	switch {
+	case memberNamespace != "":
+		namespace = memberNamespace
+	case strings.TrimSpace(set.Namespace) != "":
+		namespace = strings.TrimSpace(set.Namespace)
+	default:
+		namespace = kubeconfigNamespace
+	}
+	return contexts, namespace, colors
 }
 
 func (m Model) withUnionSetRows(items []model.Item) []model.Item {
 	if len(ui.ConfigUnionSets) == 0 {
 		return items
 	}
-	out := append([]model.Item(nil), items...)
+	out := make([]model.Item, 0, len(ui.ConfigUnionSets)+len(items))
+	var namespaceLookup func(string) (string, bool)
+	if m.client != nil {
+		namespaceLookup = m.client.ContextNamespace
+	}
 	for _, set := range ui.ConfigUnionSets {
-		status := fmt.Sprintf("%d contexts", len(set.Contexts))
-		if len(set.Contexts) == 1 {
+		contexts, namespace, _ := ExpandUnionSetConfig(set, namespaceLookup)
+		status := fmt.Sprintf("%d contexts", len(contexts))
+		if len(contexts) == 1 {
 			status = "1 context"
 		}
-		if set.Namespace != "" {
-			status += "  " + set.Namespace
+		if namespace != "" {
+			status += "  " + namespace
 		}
 		out = append(out, model.Item{
 			Name:     set.Name,
@@ -55,6 +87,7 @@ func (m Model) withUnionSetRows(items []model.Item) []model.Item {
 			Category: unionSetCategory,
 		})
 	}
+	out = append(out, items...)
 	return out
 }
 
@@ -80,14 +113,53 @@ func (m Model) navigateChildUnionSet(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.setStatusMessage(fmt.Sprintf("Union set not found: %s", sel.Name), true)
 		return m, scheduleStatusClear()
 	}
-	contexts, colors := unionSetContextsAndColors(set)
+	var namespaceLookup func(string) (string, bool)
+	if m.client != nil {
+		namespaceLookup = m.client.ContextNamespace
+	}
+	contexts, namespace, _ := ExpandUnionSetConfig(set, namespaceLookup)
+	if namespace == "" {
+		return m.openUnionSetNamespacePicker(set, contexts)
+	}
+	return m.activateUnionSet(set, namespace)
+}
+
+func (m Model) openUnionSetNamespacePicker(set ui.UnionSetConfig, contexts []string) (tea.Model, tea.Cmd) {
+	if len(contexts) == 0 {
+		m.setStatusMessage(fmt.Sprintf("Union set has no contexts: %s", set.Name), true)
+		return m, scheduleStatusClear()
+	}
+	opts := StartupOptions{
+		UnionSet:      set.Name,
+		UnionContexts: contexts,
+		Namespaces:    []string{"pending"},
+	}
+	var contextExists func(string) bool
+	if m.client != nil {
+		contextExists = m.client.ContextExists
+	}
+	if err := ValidateUnionOptions(opts, contextExists); err != nil {
+		m.setStatusMessage(err.Error(), true)
+		return m, scheduleStatusClear()
+	}
+	m.pendingUnionSetName = set.Name
+	m.allNamespaces = false
+	m.selectedNamespaces = nil
+	m.namespace = ""
+	return m.openNamespaceSelectorForContext(contexts[0])
+}
+
+func (m Model) activateUnionSet(set ui.UnionSetConfig, namespace string) (tea.Model, tea.Cmd) {
+	var namespaceLookup func(string) (string, bool)
+	if m.client != nil {
+		namespaceLookup = m.client.ContextNamespace
+	}
+	contexts, _, colors := ExpandUnionSetConfig(set, namespaceLookup)
 	opts := StartupOptions{
 		UnionSet:           set.Name,
 		UnionContexts:      contexts,
 		UnionContextColors: colors,
-	}
-	if set.Namespace != "" {
-		opts.Namespaces = []string{set.Namespace}
+		Namespaces:         []string{namespace},
 	}
 	var contextExists func(string) bool
 	if m.client != nil {
@@ -105,6 +177,7 @@ func (m Model) navigateChildUnionSet(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.unionSetName = set.Name
 	m.unionContexts = contexts
 	m.unionContextColors = colors
+	m.pendingUnionSetName = ""
 	m.nav.Context = UnionContextSentinel
 	m.nav.Level = model.LevelResourceTypes
 	m.nav.ResourceType = model.ResourceTypeEntry{}
@@ -117,8 +190,8 @@ func (m Model) navigateChildUnionSet(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.tabs[m.activeTab].readOnly = m.readOnly
 	}
 	m.allNamespaces = false
-	m.namespace = set.Namespace
-	m.selectedNamespaces = map[string]bool{set.Namespace: true}
+	m.namespace = namespace
+	m.selectedNamespaces = map[string]bool{namespace: true}
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
@@ -150,6 +223,7 @@ func (m Model) navigateChildUnionSet(sel *model.Item) (tea.Model, tea.Cmd) {
 
 func (m Model) navigateParentFromPickerUnion() (tea.Model, tea.Cmd) {
 	m.saveCursor()
+	activeUnionSet := m.unionSetName
 	m.unionMode = false
 	m.unionStartedFromPicker = false
 	m.unionSetName = ""
@@ -169,6 +243,12 @@ func (m Model) navigateParentFromPickerUnion() (tea.Model, tea.Cmd) {
 	m.popLeft()
 	m.clearRight()
 	m.restoreCursor()
+	for i, item := range m.middleItems {
+		if item.Kind == unionSetItemKind && (item.Extra == activeUnionSet || item.Name == activeUnionSet) {
+			m.setCursor(i)
+			break
+		}
+	}
 	m.refreshContextReadOnlyMarkers()
 	return m, m.loadPreview()
 }

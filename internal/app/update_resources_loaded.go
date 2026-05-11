@@ -752,7 +752,7 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 	if msg.silent {
 		return m, nil
 	}
-	m.overlayItems = buildNamespaceOverlayItems(msg.items)
+	m.overlayItems = m.namespaceSelectorItems(msg.items)
 	m.overlayCursor = namespaceOverlayCursor(m.overlayItems, m.namespace, m.allNamespaces)
 	return m, nil
 }

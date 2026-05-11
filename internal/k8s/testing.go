@@ -46,6 +46,13 @@ func (c *Client) SetTestHostForContext(displayName, host string) {
 // can simulate multi-cluster setups. The context becomes visible to
 // GetContexts and HostForContext returns the supplied host.
 func (c *Client) AddTestContext(displayName, host string) {
+	c.AddTestContextWithNamespace(displayName, host, "default")
+}
+
+// AddTestContextWithNamespace is AddTestContext with an explicit kubeconfig
+// namespace override. Pass an empty namespace to model a context that leaves
+// namespace unset.
+func (c *Client) AddTestContextWithNamespace(displayName, host, namespace string) {
 	if c == nil {
 		return
 	}
@@ -53,7 +60,7 @@ func (c *Client) AddTestContext(displayName, host string) {
 		c.rawConfig.Contexts = make(map[string]*api.Context)
 	}
 	c.rawConfig.Contexts[displayName] = &api.Context{
-		Namespace: "default",
+		Namespace: namespace,
 		Cluster:   displayName + "-cluster",
 		AuthInfo:  displayName + "-user",
 	}

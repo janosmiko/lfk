@@ -365,35 +365,6 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 	)
 }
 
-func (m Model) loadNamespaces() tea.Cmd {
-	return m.loadNamespacesSilent(false)
-}
-
-// loadNamespacesSilent issues the same namespace fetch as loadNamespaces
-// but tags the resulting msg as a background refresh. Silent loads must
-// not clear m.loading in the handler — the namespace cache is
-// independent of the middle-column/resource-types load the loading flag
-// tracks. Used by ensureNamespaceCacheFresh on session restore and other
-// context-open paths so the fast namespace reply doesn't race with
-// still-in-flight API discovery and produce a "No items" flash.
-func (m Model) loadNamespacesSilent(silent bool) tea.Cmd {
-	if m.client == nil {
-		return nil
-	}
-	client := m.client
-	kctx := m.activeContext()
-	return m.scheduleK8sCall(
-		scheduler.PriorityCritical,
-		scheduler.KindNamespaceList,
-		"List namespaces",
-		kctx,
-		func(ctx context.Context) tea.Msg {
-			items, err := client.GetNamespaces(ctx, kctx)
-			return namespacesLoadedMsg{context: kctx, items: items, err: err, silent: silent}
-		},
-	)
-}
-
 // resolveOwnedResourceType determines the correct ResourceTypeEntry for an
 // owned item at LevelOwned. It uses the item's Kind to look up the type in
 // both built-in resource types and discovered CRDs. If the kind is not found,

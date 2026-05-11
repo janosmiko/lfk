@@ -39,6 +39,32 @@ func TestDefaultNamespace(t *testing.T) {
 	})
 }
 
+// --- ContextNamespace ---
+
+func TestContextNamespace(t *testing.T) {
+	t.Run("returns configured namespace and true for known context", func(t *testing.T) {
+		c := newTestClient(t)
+		got, ok := c.ContextNamespace("test-context")
+		assert.True(t, ok)
+		assert.Equal(t, "default", got)
+	})
+
+	t.Run("returns false for known context without namespace", func(t *testing.T) {
+		c := NewTestClient(nil, nil)
+		c.AddTestContextWithNamespace("no-ns", "https://no-ns.example.local:6443", "")
+		got, ok := c.ContextNamespace("no-ns")
+		assert.False(t, ok)
+		assert.Empty(t, got)
+	})
+
+	t.Run("returns false for unknown context", func(t *testing.T) {
+		c := newTestClient(t)
+		got, ok := c.ContextNamespace("nonexistent-context")
+		assert.False(t, ok)
+		assert.Empty(t, got)
+	})
+}
+
 // --- KubeconfigPaths ---
 
 func TestKubeconfigPaths(t *testing.T) {
