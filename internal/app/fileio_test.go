@@ -31,6 +31,9 @@ func TestSavePinnedStateRoundTrip(t *testing.T) {
 			"prod":    {"cert-manager", "istio-system"},
 			"staging": {"argo"},
 		},
+		UnionSets: map[string][]string{
+			"staging-west": {"monitoring.coreos.com"},
+		},
 	}
 
 	err := savePinnedState(state)
@@ -44,6 +47,7 @@ func TestSavePinnedStateRoundTrip(t *testing.T) {
 	loaded := loadPinnedState()
 	assert.Len(t, loaded.Contexts["prod"], 2)
 	assert.Len(t, loaded.Contexts["staging"], 1)
+	assert.Equal(t, []string{"monitoring.coreos.com"}, loaded.UnionSets["staging-west"])
 }
 
 func TestLoadPinnedStateInvalidYAML(t *testing.T) {
@@ -57,6 +61,7 @@ func TestLoadPinnedStateInvalidYAML(t *testing.T) {
 	state := loadPinnedState()
 	assert.NotNil(t, state)
 	assert.NotNil(t, state.Contexts)
+	assert.NotNil(t, state.UnionSets)
 }
 
 func TestLoadPinnedStateNilContexts(t *testing.T) {
@@ -70,6 +75,7 @@ func TestLoadPinnedStateNilContexts(t *testing.T) {
 
 	state := loadPinnedState()
 	assert.NotNil(t, state.Contexts)
+	assert.NotNil(t, state.UnionSets)
 }
 
 func TestSavePinnedStateEmptyPath(t *testing.T) {

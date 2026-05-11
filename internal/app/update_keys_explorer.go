@@ -379,10 +379,6 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 
 func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
 	if m.nav.Level == model.LevelResourceTypes {
-		if m.isUnionSentinel() {
-			m.setStatusMessage("Pinned groups are per-context", true)
-			return m, scheduleStatusClear()
-		}
 		sel := m.selectedMiddleItem()
 		if sel == nil || sel.Category == "" {
 			return m, nil
@@ -391,20 +387,34 @@ func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Cannot pin built-in category", true)
 			return m, scheduleStatusClear()
 		}
-		pinned := togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category)
+		pinned := false
+		var undo func()
+		scopeLabel := ""
+		switch {
+		case m.isUnionSentinel() && m.unionSetName != "":
+			pinned = togglePinnedUnionSetGroup(m.pinnedState, m.unionSetName, sel.Category)
+			undo = func() { _ = togglePinnedUnionSetGroup(m.pinnedState, m.unionSetName, sel.Category) }
+			scopeLabel = " for union set " + m.unionSetName
+		case m.isUnionSentinel():
+			m.setStatusMessage("Pinned groups in union mode require a named union set", true)
+			return m, scheduleStatusClear()
+		default:
+			pinned = togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category)
+			undo = func() { _ = togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category) }
+		}
 		if err := savePinnedState(m.pinnedState); err != nil {
 			// Roll back the in-memory toggle so runtime state matches what
 			// is actually persisted to disk; togglePinnedGroup is its own
 			// inverse, so calling it again undoes the mutation.
-			_ = togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category)
+			undo()
 			m.setStatusMessage(fmt.Sprintf("Failed to save pinned groups: %v", err), true)
 			return m, scheduleStatusClear()
 		}
 		m.applyPinnedGroups()
 		if pinned {
-			m.setStatusMessage(fmt.Sprintf("Pinned: %s", sel.Category), false)
+			m.setStatusMessage(fmt.Sprintf("Pinned%s: %s", scopeLabel, sel.Category), false)
 		} else {
-			m.setStatusMessage(fmt.Sprintf("Unpinned: %s", sel.Category), false)
+			m.setStatusMessage(fmt.Sprintf("Unpinned%s: %s", scopeLabel, sel.Category), false)
 		}
 		return m, tea.Batch(m.loadResourceTypes(), scheduleStatusClear())
 	}

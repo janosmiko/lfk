@@ -158,8 +158,15 @@ func (m *Model) applyPinnedGroups() {
 			seen[g] = true
 		}
 	}
-	// Add per-context pins.
-	if m.pinnedState != nil && m.nav.Context != "" && !m.isUnionSentinel() {
+	// Add pins scoped to the active context or named union set.
+	if m.pinnedState != nil && m.isUnionSentinel() && m.unionSetName != "" {
+		for _, g := range m.pinnedState.UnionSets[m.unionSetName] {
+			if !seen[g] {
+				merged = append(merged, g)
+				seen[g] = true
+			}
+		}
+	} else if m.pinnedState != nil && m.nav.Context != "" && !m.isUnionSentinel() {
 		for _, g := range m.pinnedState.Contexts[m.nav.Context] {
 			if !seen[g] {
 				merged = append(merged, g)

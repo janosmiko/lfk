@@ -1431,6 +1431,29 @@ func TestApplyPinnedGroupsWithPerContextPins(t *testing.T) {
 	assert.Equal(t, []string{"Workloads", "Networking", "Security"}, model.PinnedGroups)
 }
 
+func TestApplyPinnedGroupsWithUnionSetPins(t *testing.T) {
+	orig := ui.ConfigPinnedGroups
+	defer func() { ui.ConfigPinnedGroups = orig }()
+
+	ui.ConfigPinnedGroups = []string{"Workloads"}
+
+	m := baseModel()
+	m.unionMode = true
+	m.unionSetName = "staging-west"
+	m.nav.Context = UnionContextSentinel
+	m.pinnedState = &PinnedState{
+		Contexts: map[string][]string{
+			"blue": {"Ignored"},
+		},
+		UnionSets: map[string][]string{
+			"staging-west": {"Networking", "Security"},
+		},
+	}
+	m.applyPinnedGroups()
+
+	assert.Equal(t, []string{"Workloads", "Networking", "Security"}, model.PinnedGroups)
+}
+
 func TestApplyPinnedGroupsDeduplicates(t *testing.T) {
 	orig := ui.ConfigPinnedGroups
 	defer func() { ui.ConfigPinnedGroups = orig }()

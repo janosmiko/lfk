@@ -1470,7 +1470,28 @@ func TestUnionSentinelContextWideFeatures(t *testing.T) {
 	pinned, cmd := m.handleKeyPinGroup()
 	pinnedModel := pinned.(Model)
 	assert.NotNil(t, cmd)
-	assert.Contains(t, pinnedModel.statusMessage, "per-context")
+	assert.Contains(t, pinnedModel.statusMessage, "named union set")
+}
+
+func TestUnionSetPinGroupTogglesUnionSetPins(t *testing.T) {
+	tmpDir := t.TempDir()
+	t.Setenv("XDG_STATE_HOME", tmpDir)
+
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionSetName = "staging-west"
+	m.nav.Context = UnionContextSentinel
+	m.nav.Level = model.LevelResourceTypes
+	m.pinnedState = newPinnedState()
+	m.middleItems = []model.Item{{Name: "Widgets", Category: "example.com", Kind: "Widget"}}
+	m.setCursor(0)
+
+	result, cmd := m.handleKeyPinGroup()
+	rm := result.(Model)
+	require.NotNil(t, cmd)
+	assert.Equal(t, []string{"example.com"}, rm.pinnedState.UnionSets["staging-west"])
+	assert.Contains(t, rm.statusMessage, "union set staging-west")
+	assert.Equal(t, []string{"example.com"}, model.PinnedGroups)
 }
 
 func TestProcessCanIRulesUnionMarksMixedVerbs(t *testing.T) {
