@@ -12,7 +12,7 @@ import (
 func TestClearBeforeExec(t *testing.T) {
 	t.Run("wraps simple command", func(t *testing.T) {
 		original := exec.Command("kubectl", "get", "pods")
-		wrapped := clearBeforeExec(original)
+		wrapped := clearBeforeExecForOS(original, "linux")
 
 		assert.Equal(t, "sh", wrapped.Path[len(wrapped.Path)-2:])
 		assert.Equal(t, "sh", wrapped.Args[0])
@@ -27,7 +27,7 @@ func TestClearBeforeExec(t *testing.T) {
 		original := exec.Command("kubectl", "get", "pods")
 		original.Env = []string{"KUBECONFIG=/tmp/config"}
 		original.Dir = "/some/dir"
-		wrapped := clearBeforeExec(original)
+		wrapped := clearBeforeExecForOS(original, "linux")
 
 		assert.Equal(t, []string{"KUBECONFIG=/tmp/config"}, wrapped.Env)
 		assert.Equal(t, "/some/dir", wrapped.Dir)
@@ -35,14 +35,14 @@ func TestClearBeforeExec(t *testing.T) {
 
 	t.Run("quotes args with special chars", func(t *testing.T) {
 		original := exec.Command("kubectl", "get", "pods", "-l", "app=my app")
-		wrapped := clearBeforeExec(original)
+		wrapped := clearBeforeExecForOS(original, "linux")
 
 		assert.Contains(t, wrapped.Args[2], "'app=my app'")
 	})
 
 	t.Run("handles args with single quotes", func(t *testing.T) {
 		original := exec.Command("echo", "it's")
-		wrapped := clearBeforeExec(original)
+		wrapped := clearBeforeExecForOS(original, "linux")
 
 		// shellQuote replaces ' with '"'"'
 		assert.Contains(t, wrapped.Args[2], `'it'"'"'s'`)

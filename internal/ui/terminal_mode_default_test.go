@@ -71,6 +71,20 @@ func TestResolveTerminalMode(t *testing.T) {
 			wantMode:    TerminalModePTY,
 		},
 		{
+			name:        "leading and trailing whitespace is trimmed (no spurious warning)",
+			configValue: "  pty\n",
+			goos:        "linux",
+			currentMode: TerminalModeExec,
+			wantMode:    TerminalModePTY,
+		},
+		{
+			name:        "whitespace-only value treated as empty",
+			configValue: "   ",
+			goos:        "linux",
+			currentMode: TerminalModePTY,
+			wantMode:    TerminalModePTY,
+		},
+		{
 			name:        "unrecognised value keeps current with warning",
 			configValue: "garbage",
 			goos:        "linux",

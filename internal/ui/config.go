@@ -331,10 +331,10 @@ func defaultTerminalModeForOS(goos string) string {
 // implementation — accepting the option would just trap users in a
 // state where every interactive action fails (issue #194).
 func resolveTerminalMode(configValue, goos, currentMode string) (mode string, warning string) {
-	if configValue == "" {
+	normalized := strings.ToLower(strings.TrimSpace(configValue))
+	if normalized == "" {
 		return currentMode, ""
 	}
-	normalized := strings.ToLower(configValue)
 	switch normalized {
 	case TerminalModePTY:
 		if goos == "windows" {
