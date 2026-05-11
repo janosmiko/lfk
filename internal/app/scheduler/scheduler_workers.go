@@ -115,13 +115,18 @@ func (r *Registry) workerLoop(q *ctxQueue, isCritical bool) {
 			// Try to pick a task for this worker class. If none is found
 			// (e.g. a Critical-only worker woke up but only non-Critical
 			// tasks are queued), re-signal so the appropriate worker picks
-			// it up.
+			// it up — but ONLY if the queue actually has pending work.
+			// A stale wake left over from the inner drain loop below
+			// would otherwise feed itself: this worker re-signals, the
+			// same goroutine wins the receive race, fails pickTask
+			// again, re-signals, ad infinitum (issue #206).
 			task, ok := r.pickTask(q, isCritical)
 			if !ok {
-				// Re-signal so another worker class can pick up the work.
-				select {
-				case q.wake <- struct{}{}:
-				default:
+				if q.hasPendingWork() {
+					select {
+					case q.wake <- struct{}{}:
+					default:
+					}
 				}
 				continue
 			}

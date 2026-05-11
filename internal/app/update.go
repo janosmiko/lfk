@@ -29,8 +29,36 @@ func isContextCanceled(err error) bool {
 	return strings.Contains(msg, "context canceled") || strings.Contains(msg, "context deadline exceeded")
 }
 
-// Update handles messages.
+// Update handles messages. It wraps dispatchMessage with a spinner-activation
+// hook: when the dispatched handler transitions the model from "spinner not
+// wanted" to "spinner wanted", we kick the tick chain in the same turn so
+// the indicator actually animates. The wanted state is tracked implicitly
+// via this transition rather than with a separate active-flag, so unit tests
+// that drive Update directly with a pre-built `m.loading = true` model don't
+// get a surprise spinner.Tick attached to their cmd assertion. In real flow,
+// m.loading only flips false → true inside an Update, so this transition
+// edge fires reliably. Without this gate the spinner would tick at 10 Hz
+// forever and burn a core's worth of CPU on idle re-renders (issue #206).
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	wasWanted := m.spinnerWanted()
+	newModel, cmd := m.dispatchMessage(msg)
+	nm, ok := newModel.(Model)
+	if !ok {
+		return newModel, cmd
+	}
+	if !wasWanted && nm.spinnerWanted() {
+		if cmd == nil {
+			return nm, nm.spinner.Tick
+		}
+		return nm, tea.Batch(cmd, nm.spinner.Tick)
+	}
+	return nm, cmd
+}
+
+// dispatchMessage is the original Update body: a flat type-switch that routes
+// each tea.Msg to its handler. Split out from Update so the spinner-activation
+// hook can wrap the result without duplicating the dispatch table.
+func (m Model) dispatchMessage(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.updateWindowSize(msg)
@@ -56,6 +84,31 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		}
 	}
 	return m, nil
+}
+
+// spinnerWanted reports whether anything currently visible to the user
+// requires the spinner frame to keep advancing. When this returns false,
+// updateTick drops the tick chain so the bubbletea event loop and View()
+// stop running at 10 Hz on idle. Update re-kicks the chain when this flips
+// back to true.
+//
+// Conditions mirror every site in view.go / view_right.go that calls
+// m.spinner.View(): the main loading flag, the right-pane preview load, any
+// non-silent scheduler task in the title-bar indicator, and any in-flight
+// API-resource discovery for a context.
+func (m Model) spinnerWanted() bool {
+	if m.loading || m.previewLoading {
+		return true
+	}
+	if m.scheduler != nil && m.scheduler.LenIndicator() > 0 {
+		return true
+	}
+	for _, v := range m.discoveringContexts {
+		if v {
+			return true
+		}
+	}
+	return false
 }
 
 // updateResourceMsg handles resource-loading and navigation-related messages.
@@ -451,6 +504,13 @@ func (m Model) updateWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateTick(msg spinner.TickMsg) (tea.Model, tea.Cmd) {
+	if !m.spinnerWanted() {
+		// Nothing on screen needs the spinner — let the tick chain die.
+		// Update will kick it back when m.loading / scheduler tasks /
+		// discovery flip the wanted check the next time a message comes
+		// through.
+		return m, nil
+	}
 	var cmd tea.Cmd
 	m.spinner, cmd = m.spinner.Update(msg)
 	return m, cmd
