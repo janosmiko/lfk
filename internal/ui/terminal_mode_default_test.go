@@ -106,6 +106,18 @@ func TestResolveTerminalMode(t *testing.T) {
 	}
 }
 
+// resolveTerminalMode must not echo the raw config value into its
+// warning string — global log-redaction policy. Even though the
+// `terminal:` field is structurally an enum, a misplaced secret in
+// that key would otherwise land in the log stream verbatim.
+func TestResolveTerminalMode_WarningDoesNotLeakRawValue(t *testing.T) {
+	const sentinel = "super-secret-token-do-not-leak"
+	_, warning := resolveTerminalMode(sentinel, "linux", TerminalModePTY)
+	assert.NotEmpty(t, warning, "an unrecognised value must produce a warning")
+	assert.NotContains(t, warning, sentinel,
+		"warning string must not embed the raw configValue (log redaction policy)")
+}
+
 // On Windows, github.com/creack/pty (the embedded PTY driver behind
 // TerminalModePTY) returns ErrUnsupported from StartWithSize, so the
 // embedded-terminal path can never succeed. The package-level default

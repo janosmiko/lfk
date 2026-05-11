@@ -106,8 +106,11 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.Terminal != "" {
 		mode, warning := resolveTerminalMode(cfg.Terminal, runtime.GOOS, ConfigTerminalMode)
 		if warning != "" {
+			// Raw cfg.Terminal is intentionally not logged — log
+			// redaction policy. The "valid" list tells the user what
+			// is accepted; their own config file is the source of
+			// truth for what they typed.
 			logger.Warn(warning,
-				"value", cfg.Terminal,
 				"valid", []string{TerminalModePTY, TerminalModeExec, TerminalModeMux},
 				"applied", mode)
 		}

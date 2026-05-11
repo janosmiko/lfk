@@ -344,7 +344,11 @@ func resolveTerminalMode(configValue, goos, currentMode string) (mode string, wa
 	case TerminalModeExec, TerminalModeMux:
 		return normalized, ""
 	default:
-		return currentMode, "unrecognised terminal mode: " + configValue + "; using " + currentMode
+		// The raw configValue is intentionally NOT embedded in the
+		// warning — log redaction policy. Users can check their config
+		// file to see what they typed; the "valid" list logged by the
+		// caller tells them what is accepted.
+		return currentMode, "unrecognised terminal mode; using " + currentMode
 	}
 }
 
