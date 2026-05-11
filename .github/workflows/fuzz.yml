@@ -1,0 +1,50 @@
+name: Fuzz
+
+# Runs every Fuzz* target found in the tree sequentially via `make fuzz`.
+#
+# Triggers:
+#   - schedule:        weekly fuzz pass with the default FUZZTIME
+#   - workflow_dispatch: ad-hoc run, fuzztime overridable from the UI
+#
+# Seed corpora are exercised on every PR by the normal `go test ./...` job
+# in ci.yml; this workflow exists for the longer fuzz runs that find
+# new bugs beyond the seeds.
+
+on:
+  schedule:
+    - cron: '0 4 * * 1' # Monday 04:00 UTC
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: 'Fuzz time per target (e.g. 1m, 5m, 30m)'
+        type: string
+        default: '5m'
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - name: Checkout
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+
+      - name: Set up Go
+        uses: actions/setup-go@4a3601121dd01d1626a1e23e37211e3254c1c06c # v6
+        with:
+          go-version-file: go.mod
+
+      - name: Run fuzz tests
+        env:
+          # Bind workflow_dispatch input to an env var instead of inlining it
+          # into the run script (defence-in-depth against injection).
+          FUZZTIME: ${{ inputs.fuzztime || '5m' }}
+        run: |
+          # Allow only Go duration syntax: digits + (ns|us|µs|ms|s|m|h).
+          if ! printf %s "$FUZZTIME" | grep -Eq '^[0-9]+(ns|us|µs|ms|s|m|h)$'; then
+            echo "::error::FUZZTIME must be a Go duration (e.g. 30s, 5m); got: $FUZZTIME"
+            exit 1
+          fi
+          make fuzz FUZZTIME="$FUZZTIME"
