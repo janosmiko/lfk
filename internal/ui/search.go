@@ -377,6 +377,15 @@ func highlightSubstring(line, query string, style lipgloss.Style, restoreCodes s
 	plain := ansi.Strip(line)
 	plainLower := strings.ToLower(plain)
 	queryLower := strings.ToLower(query)
+	// strings.ToLower replaces each invalid UTF-8 byte with U+FFFD (3
+	// bytes), so plainLower can outgrow plain when the input contains
+	// stray non-UTF-8 bytes (random pod logs, binary payloads). Match
+	// indices computed against plainLower would then slice out of bounds
+	// on plain inside highlightSpans. Skip highlighting in that case —
+	// the line still renders, it just doesn't get per-match coloring.
+	if len(plainLower) != len(plain) {
+		return line
+	}
 	if !strings.Contains(plainLower, queryLower) {
 		return line
 	}

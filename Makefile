@@ -1,4 +1,4 @@
-.PHONY: setup lint lint-fix test coverage build generate-themes sonar bump-version refresh-vendor-hash release goreleaser-check
+.PHONY: setup lint lint-fix test coverage fuzz build generate-themes sonar bump-version refresh-vendor-hash release goreleaser-check
 
 setup:
 	git config core.hooksPath .githooks
@@ -71,6 +71,21 @@ coverage: ## Run tests with coverage report
 	go tool cover -func=coverage.out | tail -1
 	go tool cover -html=coverage.out -o coverage.html
 	@echo "Open coverage.html in your browser for details"
+
+# Runs every Fuzz* function in the tree for FUZZTIME each (default 30s).
+# go test's -fuzz flag only accepts one target per invocation, so we loop.
+# Override with: make fuzz FUZZTIME=2m
+FUZZTIME ?= 30s
+fuzz: ## Run all fuzz tests sequentially (override FUZZTIME, default 30s each)
+	@set -e; \
+	for pkg in $$(go list ./...); do \
+		targets=$$(go test -list 'Fuzz[A-Z].*' $$pkg 2>/dev/null | grep -E '^Fuzz[A-Z]' || true); \
+		[ -z "$$targets" ] && continue; \
+		for t in $$targets; do \
+			echo "=== fuzz: $$pkg::$$t ($(FUZZTIME)) ==="; \
+			go test -run='^$$' -fuzz="^$$t$$" -fuzztime=$(FUZZTIME) $$pkg; \
+		done; \
+	done
 
 goreleaser-check: ## Validate .goreleaser.yaml and run a snapshot release without publishing
 	@command -v goreleaser >/dev/null 2>&1 || { \
