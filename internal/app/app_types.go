@@ -371,6 +371,12 @@ const sortColEventLastSeen = "__event_last_seen__"
 // API; effectiveContext() resolves it to a real cluster for API calls.
 const UnionContextSentinel = "__union__"
 
+const (
+	contextCategory  = "Contexts"
+	unionSetItemKind = "__union_set__"
+	unionSetCategory = "Union Sets"
+)
+
 // actionContext stores which resource an action targets.
 type actionContext struct {
 	kind          string // Kubernetes Kind (e.g., "Pod", "Deployment")

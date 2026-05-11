@@ -8,13 +8,13 @@ The `--union-context` flag merges resources from multiple Kubernetes clusters in
 lfk --union-context blue --union-context green --union-context yellow --namespace cloud-cd
 ```
 
-This shows all Pods (or any resource type) in namespace `cloud-cd` from all three clusters, merged in one table with a **Cluster** column identifying the source.
+This shows all Pods (or any resource type) in namespace `cloud-cd` from all three clusters, merged in one table with a **Context** column identifying the source.
 
 ## CLI Interface
 
 | Flag | Type | Notes |
 |------|------|-------|
-| `--union-context` | `stringArray` (repeatable) | Clusters to include. At least two is the typical usage; one is allowed but degenerates to single-cluster with a Cluster column. Validation caps this at 8 contexts. |
+| `--union-context` | `stringArray` (repeatable) | Contexts to include. At least two is the typical usage; one is allowed but degenerates to single-cluster with a Context column. Validation caps this at 8 contexts. |
 | `--union-set` | `string` | Name of a configured `union_sets` entry to expand into contexts and an optional default namespace. |
 | `--namespace` / `-n` | required in union mode unless supplied by `union_sets` | Fetching across multiple clusters in all-namespaces mode is impractical; validation requires exactly one namespace. |
 | `--context` | mutually exclusive with `--union-context` | Returns an error if both are supplied. |
@@ -23,11 +23,11 @@ Validation runs in `runTUI()` in `main.go` before the TUI starts. Unknown contex
 
 ## Config
 
-Named union views can be stored under the top-level `union_sets` key. Each entry has a `name`, optional `namespace`, and `contexts`. Contexts can be plain strings or objects with a `context` field and optional `color` used for the one-character cluster tile.
+Named union views can be stored under the top-level `union_sets` key. The preferred shape is a map keyed by set name; list form with `name:` is also accepted for compatibility. Each entry has an optional `namespace` and `contexts`. Contexts can be plain strings or objects with a `context` or `name` field and optional `color` used for the one-character context tile.
 
 ```yaml
 union_sets:
-  - name: staging-west
+  staging-west:
     namespace: cloud-cd
     contexts:
       - blue
@@ -51,7 +51,7 @@ union_sets:
 
 A dedicated `ClusterName string` field was added to `model.Item` (not via `item.Columns`) so that drill-down routing, cursor restoration, and action context construction can all reach the source cluster without scanning display columns.
 
-`item.Columns` still gets a `{Key: "Cluster", Value: contextName}` entry prepended so the table renderer shows a Cluster column via the existing `collectExtraColumns` mechanism — no changes to the table renderer were needed.
+`item.Columns` still gets a `{Key: "Context", Value: contextName}` entry prepended so the table renderer shows a Context column via the existing `collectExtraColumns` mechanism — no changes to the table renderer were needed.
 
 ### Discovery context
 
@@ -87,9 +87,13 @@ This is safe for all callers:
 
 `buildActionCtx` uses the same pattern inline: `if m.unionMode && sel.ClusterName != "" { kctx = sel.ClusterName }`.
 
+### Cluster picker
+
+Configured union sets are appended to the context explorer under a dedicated `Union Sets` group. Selecting a set enters union mode using the set's contexts, colors, and namespace. Back navigation from the resource-type level returns to the context explorer when the union view was entered from there. CLI-started union sessions keep the old no-parent behavior because they did not come from a picker row.
+
 ### Session persistence
 
-Union mode is ephemeral (CLI-only). `saveCurrentSession()` returns early when `m.unionMode` is true so the union state is never written to `~/.local/state/lfk/session.yaml`. On restart without the flags the app opens normally.
+Union mode is ephemeral. `saveCurrentSession()` returns early when `m.unionMode` is true so the union state is never written to `~/.local/state/lfk/session.yaml`. On restart without the flags the app opens normally.
 
 ## Files Modified
 
@@ -98,7 +102,7 @@ Union mode is ephemeral (CLI-only). `saveCurrentSession()` returns early when `m
 | `main.go` | `--union-context` flag (`StringArrayVar`); validation in `runTUI()` |
 | `internal/app/options.go` | `UnionContexts []string` field; `IsUnionMode()` helper; updated `HasCLIOverrides()` |
 | `internal/model/types.go` | `ClusterName string` field on `Item` |
-| `internal/k8s/client.go` | `GetResourcesUnion()`: parallel fan-out, `ClusterName` stamping, Cluster column injection, merge + sort |
+| `internal/k8s/client.go` | `GetResourcesUnion()`: parallel fan-out, `ClusterName` stamping, Context column injection, merge + sort |
 | `internal/app/app.go` | `unionMode bool`, `unionContexts []string` fields on `Model`; union initialisation in `NewModel()` |
 | `internal/app/tabs.go` | `effectiveContext()` helper |
 | `internal/app/commands_load.go` | Union branch in `loadResources`; `effectiveContext()` applied to 6 functions |
@@ -118,7 +122,7 @@ watch tick / user navigates to Pods
         → union branch: nav.Context == "__union__" && unionMode
         → GetResourcesUnion(ctx, unionContexts, namespace, rt)
             → goroutine per context: GetResources(ctx, contextName, ...)
-            → stamp ClusterName, prepend Cluster column
+            → stamp ClusterName, prepend Context column
             → merge + sort by (Name, ClusterName)
         → resourcesLoadedMsg → updateResourcesLoadedMain
             → itemCache["__union__/pods"] = items
@@ -135,6 +139,6 @@ Fix in `updateResourcesLoadedMain`: capture `prevCluster` before items are repla
 ## Known Limitations
 
 - **CRD asymmetry**: If clusters have different CRDs, resources present in cluster A but not cluster B produce empty results from B — not an error. A future improvement would take the union of discovered resources across all contexts.
-- **Bookmark navigation**: Jumping to a bookmark that carries a single context may bypass the sentinel. Bookmark jumps in union mode are currently undefined behaviour.
-- **`:ctx` command bar**: Switching context via the command bar in union mode is not guarded and may produce unexpected results.
+- **Context-wide tools**: Cluster dashboard, monitoring dashboard, RBAC browser, bookmarks, and pinned groups are per-context. They are blocked or shown with an explicit per-context message while the user is at the union sentinel; drill into a row to use them against that row's context.
+- **Command bar context commands**: `:ctx`, shell commands, and `:kubectl`/`:k` commands are blocked at the union sentinel because they require one active context.
 - **Drill-down is single-cluster**: Once the user selects a specific resource and drills down, subsequent navigation operates against that resource's cluster only. There is no "multi-cluster owned resources" view.

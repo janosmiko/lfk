@@ -73,6 +73,10 @@ func (m Model) handleKeyClusterColorPicker() (tea.Model, tea.Cmd) {
 	if sel == nil {
 		return m, nil
 	}
+	if isUnionSetItem(sel) {
+		m.setStatusMessage("Colors apply to individual contexts", true)
+		return m, scheduleStatusClear()
+	}
 	m.overlay = overlayClusterColor
 	m.clusterColorOverlayContext = sel.Name
 	m.clusterColorFilter.Clear()

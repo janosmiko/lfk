@@ -141,6 +141,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	if opts.IsUnionMode() {
 		m.unionMode = true
 		m.unionContexts = opts.UnionContexts
+		m.unionSetName = opts.UnionSet
 		m.unionContextColors = opts.UnionContextColors
 		// In union mode there is no single active context whose config can
 		// populate Model.readOnly. Per-row action dispatch resolves each

@@ -53,6 +53,19 @@ func (m Model) loadPreview() tea.Cmd {
 //     updateAPIResourceDiscovery replaces rightItems with the discovered
 //     list.
 func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
+	if isUnionSetItem(sel) {
+		set, ok := m.findUnionSetConfig(sel.Extra)
+		if !ok {
+			return func() tea.Msg {
+				return resourceTypesMsg{items: nil}
+			}
+		}
+		items := unionSetPreviewItems(set)
+		return func() tea.Msg {
+			return resourceTypesMsg{items: items}
+		}
+	}
+
 	hoveredCtx := sel.Name
 	if hoveredCtx == "" {
 		return m.loadResourceTypes()
@@ -87,12 +100,28 @@ func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
 // loadPreviewResourceTypes handles preview loading at the resource types level.
 func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 	if sel.Extra == "__overview__" {
+		if m.isUnionSentinel() {
+			return func() tea.Msg {
+				return dashboardLoadedMsg{
+					content: unionContextWideFeatureMessage("Cluster dashboard"),
+					context: m.nav.Context,
+				}
+			}
+		}
 		if ui.ConfigDashboard {
 			return m.loadDashboard()
 		}
 		return nil
 	}
 	if sel.Extra == "__monitoring__" {
+		if m.isUnionSentinel() {
+			return func() tea.Msg {
+				return monitoringDashboardMsg{
+					content: unionContextWideFeatureMessage("Monitoring dashboard"),
+					context: m.nav.Context,
+				}
+			}
+		}
 		return m.loadMonitoringDashboard()
 	}
 	if sel.Kind == "__collapsed_group__" {

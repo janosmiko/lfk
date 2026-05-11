@@ -137,7 +137,7 @@ func applyConfigOptions(cfg configFile) {
 		ConfigPinnedGroups = cfg.PinnedGroups
 	}
 	if len(cfg.UnionSets) > 0 {
-		ConfigUnionSets = sanitizeUnionSets(cfg.UnionSets)
+		ConfigUnionSets = sanitizeUnionSets([]UnionSetConfig(cfg.UnionSets))
 	}
 	if cfg.Monitoring != nil {
 		model.ConfigMonitoring = cfg.Monitoring

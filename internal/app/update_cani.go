@@ -12,6 +12,10 @@ import (
 
 // openCanIBrowser starts loading the can-i browser data.
 func (m Model) openCanIBrowser() (tea.Model, tea.Cmd) {
+	if m.isUnionSentinel() {
+		m.setStatusMessage("RBAC browser requires a single context", true)
+		return m, scheduleStatusClear()
+	}
 	m.loading = true
 	m.canISubject = ""
 	m.canISubjectName = "Current User"

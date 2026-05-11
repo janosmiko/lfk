@@ -131,8 +131,8 @@ func ClusterColorSwatchBg(name string) string {
 
 // ClusterColorTileBg is the single-cell variant of ClusterColorSwatchBg used
 // by the union-view row prefix: every union row gets a 1-cell colored tile
-// at the leading edge so the source cluster is identifiable at a glance
-// without scanning the textual Cluster column. One cell trades visibility
+// at the leading edge so the source context is identifiable at a glance
+// without scanning the textual Context column. One cell trades visibility
 // for a smaller width tax than the 2-cell picker swatch — appropriate for
 // per-row use across hundreds of rows.
 //

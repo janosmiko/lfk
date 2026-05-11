@@ -15,7 +15,8 @@ import (
 // renderer's "[L] Set color - ..." hint stays in sync with user
 // rebindings.
 func (m Model) openClusterPickerActionMenu() Model {
-	if m.selectedMiddleItem() == nil {
+	sel := m.selectedMiddleItem()
+	if sel == nil || isUnionSetItem(sel) {
 		return m
 	}
 	actions := model.ActionsForClusterPicker(model.ClusterPickerKeys{

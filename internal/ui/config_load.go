@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"sigs.k8s.io/yaml"
 
@@ -170,7 +172,55 @@ type configFile struct {
 	// for the same recurring cluster groups (e.g. blue/green/canary).
 	// CLI --namespace overrides the per-set namespace; --union-context and
 	// --context are mutually exclusive with --union-set.
-	UnionSets []UnionSetConfig `json:"union_sets" yaml:"union_sets"`
+	UnionSets UnionSetsConfig `json:"union_sets" yaml:"union_sets"`
+}
+
+// UnionSetsConfig accepts both supported top-level shapes:
+//
+//	union_sets:
+//	  - name: staging
+//	    contexts: [...]
+//
+// and:
+//
+//	union_sets:
+//	  staging:
+//	    contexts: [...]
+//
+// The map form is the preferred shape for copy/paste config because the key is
+// exactly what --union-set and the cluster picker reference.
+type UnionSetsConfig []UnionSetConfig
+
+func (sets *UnionSetsConfig) UnmarshalJSON(data []byte) error {
+	var list []UnionSetConfig
+	if err := json.Unmarshal(data, &list); err == nil {
+		*sets = list
+		return nil
+	}
+
+	var mapped map[string]struct {
+		Contexts  []UnionSetContextConfig `json:"contexts" yaml:"contexts"`
+		Namespace string                  `json:"namespace" yaml:"namespace"`
+	}
+	if err := json.Unmarshal(data, &mapped); err != nil {
+		return err
+	}
+	out := make([]UnionSetConfig, 0, len(mapped))
+	names := make([]string, 0, len(mapped))
+	for name := range mapped {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		cfg := mapped[name]
+		out = append(out, UnionSetConfig{
+			Name:      name,
+			Contexts:  cfg.Contexts,
+			Namespace: cfg.Namespace,
+		})
+	}
+	*sets = out
+	return nil
 }
 
 // SchedulerConfig holds the runtime knobs for the priority task
@@ -224,6 +274,29 @@ type UnionSetConfig struct {
 type UnionSetContextConfig struct {
 	Context string `json:"context" yaml:"context"`
 	Color   string `json:"color"   yaml:"color"`
+}
+
+func (c *UnionSetContextConfig) UnmarshalJSON(data []byte) error {
+	var name string
+	if err := json.Unmarshal(data, &name); err == nil {
+		c.Context = name
+		c.Color = ""
+		return nil
+	}
+	var obj struct {
+		Context string `json:"context" yaml:"context"`
+		Name    string `json:"name" yaml:"name"`
+		Color   string `json:"color" yaml:"color"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	c.Context = obj.Context
+	if c.Context == "" {
+		c.Context = obj.Name
+	}
+	c.Color = obj.Color
+	return nil
 }
 
 // clusterConfig holds per-cluster configuration overrides.

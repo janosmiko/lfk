@@ -85,14 +85,10 @@ func (m Model) isUnionSentinel() bool {
 // item's ClusterName. At all other levels (post-drill-down), nav.Context is
 // already the real cluster and is returned as-is.
 //
-// When the hovered item carries no ClusterName — at LevelResourceTypes
-// (sidebar items don't have a source cluster), at the Overview/Monitoring
-// pseudo-rows, or for anything that isn't a union row — fall back to
-// unionContexts[0]. The union assumes homogeneous clusters, so any one
-// of them is a representative target for cluster-wide operations like
-// dashboard fetches and namespace listing. Without this fallback, the
-// raw "__union__" sentinel leaks into restConfigForContext and surfaces
-// as `context "__union__" does not exist` in the log.
+// When the hovered item carries no ClusterName, fall back to unionContexts[0].
+// Callers that are semantically per-context (dashboards, RBAC, bookmarks)
+// should guard before calling this; the fallback is for discovery, namespace
+// metadata, and other internals that need one representative real context.
 func (m Model) effectiveContext() string {
 	if m.isUnionSentinel() {
 		if sel := m.selectedMiddleItem(); sel != nil && sel.ClusterName != "" {
@@ -300,6 +296,7 @@ func (m *Model) portForwardItems() []model.Item {
 			CreatedAt: e.StartedAt,
 			Columns: []model.KeyValue{
 				{Key: "ID", Value: fmt.Sprintf("%d", e.ID)},
+				{Key: "Context", Value: e.Context},
 				{Key: "Local", Value: displayLocalPort},
 				{Key: "Remote", Value: e.RemotePort},
 				{Key: "Resource", Value: e.ResourceKind + "/" + e.ResourceName},
@@ -316,7 +313,11 @@ func (m *Model) navigateToPortForwards() {
 	// Build the correct left column state for LevelResources.
 	contexts, _ := m.client.GetContexts()
 	var resourceTypes []model.Item
-	if discovered := m.discoveredResources[m.nav.Context]; len(discovered) > 0 {
+	discoveryCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
+	if discovered := m.discoveredResources[discoveryCtx]; len(discovered) > 0 {
 		resourceTypes = model.BuildSidebarItems(discovered)
 	} else {
 		resourceTypes = model.BuildSidebarItems(model.SeedResources())

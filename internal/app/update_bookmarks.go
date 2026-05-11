@@ -441,6 +441,11 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.bookmarkFilter.Clear()
 
+	if m.isUnionSentinel() {
+		m.setStatusMessage("Bookmarks are disabled in union view", true)
+		return m, scheduleStatusClear()
+	}
+
 	// For context-free bookmarks, stay in the current cluster context.
 	// For context-aware bookmarks, switch to the bookmark's saved context.
 	effectiveContext := bm.Context

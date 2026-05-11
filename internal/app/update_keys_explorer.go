@@ -375,6 +375,10 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 
 func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
 	if m.nav.Level == model.LevelResourceTypes {
+		if m.isUnionSentinel() {
+			m.setStatusMessage("Pinned groups are per-context", true)
+			return m, scheduleStatusClear()
+		}
 		sel := m.selectedMiddleItem()
 		if sel == nil || sel.Category == "" {
 			return m, nil

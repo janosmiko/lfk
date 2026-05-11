@@ -37,7 +37,7 @@ func (o StartupOptions) HasCLIOverrides() bool {
 
 // IsUnionMode returns true when one or more --union-context flags were
 // provided. A single union context is allowed and degenerates to a
-// single-cluster view with a Cluster column.
+// single-cluster view with a Context column.
 func (o StartupOptions) IsUnionMode() bool {
 	return len(o.UnionContexts) > 0
 }

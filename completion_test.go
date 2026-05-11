@@ -90,6 +90,24 @@ union_sets:
 	assert.Equal(t, []string{"local-set"}, got)
 }
 
+func TestCompleteUnionSetsMapForm(t *testing.T) {
+	dir := t.TempDir()
+	config := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(config, []byte(`
+union_sets:
+  staging-west:
+    contexts:
+      - alpha
+  prod-east:
+    contexts:
+      - beta
+`), 0o600))
+
+	got, err := completeUnionSets(config, "")
+	require.NoError(t, err)
+	assert.Equal(t, []string{"prod-east", "staging-west"}, got)
+}
+
 func writeTempKubeconfig(t *testing.T, contents string) string {
 	t.Helper()
 	path := filepath.Join(t.TempDir(), "kubeconfig")

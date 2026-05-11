@@ -8,7 +8,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/janosmiko/lfk/internal/app/bgtasks"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -323,7 +323,7 @@ func TestRestoreSession_UnionSetsAllTabContextsToSentinel(t *testing.T) {
 		itemCache:                  make(map[string][]model.Item),
 		cacheFingerprints:          make(map[string]string),
 		cachedNamespaces:           make(map[string]namespaceCacheEntry),
-		bgtasks:                    bgtasks.New(0),
+		scheduler:                  scheduler.New(0),
 		tabs:                       []TabState{{}},
 	}
 	result, _ := m.restoreSession([]model.Item{{Name: "blue"}, {Name: "green"}})
@@ -1070,7 +1070,7 @@ func TestUpdateResourcesLoaded_UnionPartialErrorKeepsItems(t *testing.T) {
 		discoveringContexts:        make(map[string]bool),
 		itemCache:                  make(map[string][]model.Item),
 		cacheFingerprints:          make(map[string]string),
-		bgtasks:                    bgtasks.New(0),
+		scheduler:                  scheduler.New(0),
 		nav: model.NavigationState{
 			Level:   model.LevelResources,
 			Context: UnionContextSentinel,
@@ -1100,4 +1100,104 @@ func TestUpdateResourcesLoaded_UnionPartialErrorKeepsItems(t *testing.T) {
 	assert.Contains(t, result.statusMessage, "green unavailable")
 	assert.True(t, result.statusMessageErr)
 	assert.Error(t, result.err)
+}
+
+func TestUpdateContextsLoaded_AppendsUnionSetRows(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name:      "staging-west",
+		Namespace: "cloud-cd",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue", Color: "blue"},
+			{Context: "green", Color: "green"},
+		},
+	}}
+
+	m := baseModelWithFakeClient()
+	m.nav.Level = model.LevelClusters
+	result, _ := m.updateContextsLoaded(contextsLoadedMsg{items: []model.Item{{Name: "test-ctx"}}})
+	rm := result.(Model)
+
+	require.Len(t, rm.middleItems, 2)
+	assert.True(t, rm.middleItems[0].IsContext)
+	unionRow := rm.middleItems[1]
+	assert.Equal(t, "staging-west", unionRow.Name)
+	assert.Equal(t, unionSetItemKind, unionRow.Kind)
+	assert.Equal(t, unionSetCategory, unionRow.Category)
+	assert.Contains(t, unionRow.Status, "2 contexts")
+	assert.Contains(t, unionRow.Status, "cloud-cd")
+}
+
+func TestNavigateChildCluster_UnionSetActivatesAndBackReturnsToPicker(t *testing.T) {
+	orig := ui.ConfigUnionSets
+	t.Cleanup(func() { ui.ConfigUnionSets = orig })
+	ui.ConfigUnionSets = []ui.UnionSetConfig{{
+		Name:      "staging-west",
+		Namespace: "cloud-cd",
+		Contexts: []ui.UnionSetContextConfig{
+			{Context: "blue", Color: "blue"},
+			{Context: "green", Color: "green"},
+		},
+	}}
+
+	m := baseModelWithFakeClient()
+	m.client.AddTestContext("blue", "https://blue.example.local:6443")
+	m.client.AddTestContext("green", "https://green.example.local:6443")
+	m.nav.Level = model.LevelClusters
+	m.middleItems = []model.Item{
+		{Name: "test-ctx", IsContext: true},
+		{Name: "staging-west", Kind: unionSetItemKind, Extra: "staging-west", Category: unionSetCategory},
+	}
+	m.discoveredResources["blue"] = model.SeedResources()
+	m.discoveryRefreshedContexts["blue"] = true
+	m.setCursor(1)
+
+	result, cmd := m.navigateChild()
+	rm := result.(Model)
+	require.NotNil(t, cmd)
+	assert.True(t, rm.unionMode)
+	assert.True(t, rm.unionStartedFromPicker)
+	assert.Equal(t, "staging-west", rm.unionSetName)
+	assert.Equal(t, []string{"blue", "green"}, rm.unionContexts)
+	assert.Equal(t, map[string]string{"blue": "blue", "green": "green"}, rm.unionContextColors)
+	assert.Equal(t, UnionContextSentinel, rm.nav.Context)
+	assert.Equal(t, model.LevelResourceTypes, rm.nav.Level)
+	assert.Equal(t, "cloud-cd", rm.namespace)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, rm.selectedNamespaces)
+	assert.NotEmpty(t, rm.middleItems)
+
+	back, _ := rm.navigateParent()
+	bm := back.(Model)
+	assert.False(t, bm.unionMode)
+	assert.False(t, bm.unionStartedFromPicker)
+	assert.Equal(t, model.LevelClusters, bm.nav.Level)
+	assert.Equal(t, "", bm.nav.Context)
+	require.Len(t, bm.middleItems, 2)
+	assert.Equal(t, unionSetItemKind, bm.middleItems[1].Kind)
+}
+
+func TestUnionSentinelBlocksContextWideFeatures(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.nav.Context = UnionContextSentinel
+	m.nav.Level = model.LevelResourceTypes
+	m.middleItems = []model.Item{{Name: "Apps", Category: "example.com", Kind: "Widget"}}
+	m.setCursor(0)
+
+	rbac, cmd := m.openCanIBrowser()
+	rbacModel := rbac.(Model)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, rbacModel.statusMessage, "single context")
+
+	bookmarked, cmd := m.navigateToBookmark(model.Bookmark{ResourceType: "/v1/pods"})
+	bookmarkModel := bookmarked.(Model)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, bookmarkModel.statusMessage, "disabled in union view")
+
+	pinned, cmd := m.handleKeyPinGroup()
+	pinnedModel := pinned.(Model)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, pinnedModel.statusMessage, "per-context")
 }

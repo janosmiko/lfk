@@ -129,7 +129,10 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 
 	case model.LevelResourceTypes:
 		if m.unionMode {
-			return m, nil // no cluster selection level in union mode
+			if m.unionStartedFromPicker {
+				return m.navigateParentFromPickerUnion()
+			}
+			return m, nil // no cluster selection level in CLI-started union mode
 		}
 		m.saveCursor()
 		m.nav.Level = model.LevelClusters
@@ -305,6 +308,10 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
+	if isUnionSetItem(sel) {
+		return m.navigateChildUnionSet(sel)
+	}
+
 	logger.Info("Context selected", "context", sel.Name)
 	m.saveCursor()
 	oldCtx := m.nav.Context
@@ -368,6 +375,18 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 
 func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 	if sel.Extra == "__overview__" || sel.Extra == "__monitoring__" {
+		if m.isUnionSentinel() {
+			feature := "Cluster dashboard"
+			if sel.Extra == "__monitoring__" {
+				feature = "Monitoring dashboard"
+			}
+			if sel.Extra == "__overview__" {
+				m.dashboardPreview = unionContextWideFeatureMessage(feature)
+				m.dashboardEventsPreview = ""
+			} else {
+				m.monitoringPreview = unionContextWideFeatureMessage(feature)
+			}
+		}
 		m.fullscreenDashboard = true
 		m.previewScroll = 0
 		m.setStatusMessage("Dashboard fullscreen ON", false)

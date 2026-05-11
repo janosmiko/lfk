@@ -148,23 +148,38 @@ func decodeUnionSetNames(data []byte) ([]string, error) {
 			Name string `json:"name" yaml:"name"`
 		} `json:"union_sets" yaml:"union_sets"`
 	}
-	if err := yaml.Unmarshal(data, &cfg); err != nil {
-		return nil, err
+	if err := yaml.Unmarshal(data, &cfg); err == nil && cfg.UnionSets != nil {
+		seen := make(map[string]struct{}, len(cfg.UnionSets))
+		names := make([]string, 0, len(cfg.UnionSets))
+		for _, set := range cfg.UnionSets {
+			name := strings.TrimSpace(set.Name)
+			if name == "" {
+				continue
+			}
+			if _, ok := seen[name]; ok {
+				continue
+			}
+			seen[name] = struct{}{}
+			names = append(names, name)
+		}
+		return names, nil
 	}
 
-	seen := make(map[string]struct{}, len(cfg.UnionSets))
-	names := make([]string, 0, len(cfg.UnionSets))
-	for _, set := range cfg.UnionSets {
-		name := strings.TrimSpace(set.Name)
+	var mapped struct {
+		UnionSets map[string]any `json:"union_sets" yaml:"union_sets"`
+	}
+	if err := yaml.Unmarshal(data, &mapped); err != nil {
+		return nil, err
+	}
+	names := make([]string, 0, len(mapped.UnionSets))
+	for name := range mapped.UnionSets {
+		name = strings.TrimSpace(name)
 		if name == "" {
 			continue
 		}
-		if _, ok := seen[name]; ok {
-			continue
-		}
-		seen[name] = struct{}{}
 		names = append(names, name)
 	}
+	sort.Strings(names)
 	return names, nil
 }
 

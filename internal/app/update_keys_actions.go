@@ -326,8 +326,12 @@ func (m Model) handleExplorerActionKeyPageBack() (tea.Model, tea.Cmd, bool) {
 
 func (m Model) handleExplorerActionKeyLevelCluster() (tea.Model, tea.Cmd, bool) {
 	for m.nav.Level > model.LevelClusters {
+		before := m.nav.Level
 		ret, _ := m.navigateParent()
 		m = ret.(Model)
+		if m.nav.Level == before {
+			break
+		}
 	}
 	return m, m.loadPreview(), true
 }
@@ -337,8 +341,12 @@ func (m Model) handleExplorerActionKeyLevelTypes() (tea.Model, tea.Cmd, bool) {
 		return m, nil, true // can't jump forward
 	}
 	for m.nav.Level > model.LevelResourceTypes {
+		before := m.nav.Level
 		ret, _ := m.navigateParent()
 		m = ret.(Model)
+		if m.nav.Level == before {
+			break
+		}
 	}
 	return m, m.loadPreview(), true
 }
@@ -348,8 +356,12 @@ func (m Model) handleExplorerActionKeyLevelResources() (tea.Model, tea.Cmd, bool
 		return m, nil, true
 	}
 	for m.nav.Level > model.LevelResources {
+		before := m.nav.Level
 		ret, _ := m.navigateParent()
 		m = ret.(Model)
+		if m.nav.Level == before {
+			break
+		}
 	}
 	return m, m.loadPreview(), true
 }

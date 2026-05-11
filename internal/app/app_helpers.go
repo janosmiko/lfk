@@ -155,7 +155,7 @@ func (m *Model) applyPinnedGroups() {
 		}
 	}
 	// Add per-context pins.
-	if m.pinnedState != nil && m.nav.Context != "" {
+	if m.pinnedState != nil && m.nav.Context != "" && !m.isUnionSentinel() {
 		for _, g := range m.pinnedState.Contexts[m.nav.Context] {
 			if !seen[g] {
 				merged = append(merged, g)

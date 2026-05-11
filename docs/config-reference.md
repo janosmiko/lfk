@@ -22,7 +22,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `filter_presets` | map[string]list | `{}` | User-defined quick filter presets per resource type. |
 | `terminal` | string | `"pty"` | How exec/shell commands run: `"pty"` (embedded in TUI), `"exec"` (takes over terminal), or `"mux"` (opens in a new tmux/zellij window/pane; errors out if no multiplexer is detected). |
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context in `~/.local/state/lfk/pinned.yaml`). |
-| `union_sets` | list[object] | `[]` | Named multi-cluster groups that the `--union-set <name>` CLI flag expands. See [Union Sets](#union-sets). |
+| `union_sets` | map[string]object or list[object] | `[]` | Named multi-cluster groups that the `--union-set <name>` CLI flag expands. See [Union Sets](#union-sets). |
 | `tips` | bool | `true` | Show a random tip in the status bar on startup. Set to `false` to disable. |
 | `log_tail_lines` | int | `1000` | Number of log lines to load initially via `--tail`. Scrolling to the top loads older history. |
 | `log_tail_lines_short` | int | `10` | Number of log lines loaded by the action menu "Tail Logs" entry (`l` key). Intended for lightweight peeks without the full history hit. Non-positive values are ignored. |
@@ -365,7 +365,7 @@ Define named groups of clusters that the `--union-set <name>` CLI flag expands i
 
 ```yaml
 union_sets:
-  - name: ski-staging-west
+  ski-staging-west:
     contexts:
       - context: operator/block-sre-operator/square-staging-green-us-west-2
         color: green
@@ -374,10 +374,10 @@ union_sets:
       - context: operator/block-sre-operator/square-staging-blue-us-west-2
         color: blue
     namespace: kube-policies
-  - name: ski-prod-east
+  ski-prod-east:
     contexts:
-      - context: prod-green-east
-      - context: prod-blue-east
+      - prod-green-east
+      - name: prod-blue-east
     # namespace omitted: --namespace is required on the CLI for this set
     # color omitted on each context: rows render with a blank reserved cell
 ```
@@ -386,26 +386,26 @@ Top-level fields:
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| `name` | string | yes | Identifier referenced by `--union-set <name>`. Duplicate names log a warning and the last definition wins. |
-| `contexts` | list[object] | yes | Cluster entries to merge. Each entry has a `context:` and an optional `color:` (see below). The total count is capped at `MaxUnionContexts` (currently 8) — the same cap that governs repeated `--union-context` flags. |
+| set name | map key | yes | Identifier referenced by `--union-set <name>` and shown under the cluster picker's `Union Sets` group. List form with `- name: ...` is also accepted; duplicate names log a warning and the last definition wins. |
+| `contexts` | list[string or object] | yes | Context entries to merge. Each entry can be a plain string or an object with `context:`/`name:` and optional `color:` (see below). The total count is capped at `MaxUnionContexts` (currently 8) — the same cap that governs repeated `--union-context` flags. |
 | `namespace` | string | no | Default namespace for the set. Optional: when omitted, `--namespace` is required on the CLI. The CLI flag always overrides whatever the set declared, so you can keep one canonical set and retarget the namespace per launch. |
 
 Per-cluster entry fields:
 
 | Field | Type | Required | Notes |
 |-------|------|----------|-------|
-| `context` | string | yes | Kubeconfig context name. Must exist; verified at startup. |
+| `context` / `name` | string | yes | Kubeconfig context name. Must exist; verified at startup. Plain string entries are shorthand for `context: <name>`. |
 | `color` | string | no | One of: `red`, `yellow`, `green`, `blue`, `magenta`, `cyan`, `white`, `gray`. Drives the 1-cell row tile in the merged view (see below). Unknown color names log a warning and the cluster renders untinted rather than failing the config. |
 
-Validation runs at startup: an unknown set name, a missing context, a duplicate context within the set, more than `MaxUnionContexts` clusters, or no namespace from either source produces a clear error before the TUI starts. Malformed entries (no `name`, empty `contexts:`, nameless cluster entries) are dropped at config load time with a warning rather than failing the whole config.
+Validation runs at startup: an unknown set name, a missing context, a duplicate context within the set, more than `MaxUnionContexts` clusters, or no namespace from either source produces a clear error before the TUI starts. Malformed list-form entries (no `name`), empty `contexts:`, and nameless context entries are dropped at config load time with a warning rather than failing the whole config.
 
-See [the union view docs in usage.md](usage.md) for the runtime semantics — what's editable at the merged level, how drill-down routes to a single cluster, and how the per-row `Cluster` column identifies the source.
+See [the union view docs in usage.md](usage.md) for the runtime semantics — what's editable at the merged level, how drill-down routes to a single cluster, and how the per-row `Context` column identifies the source.
 
 ### Per-row color tiles
 
 When a cluster entry has a `color:` set, every row sourced from that cluster gets a 1-cell colored tile at its leading edge — quick visual identification of the source cluster while scanning a merged list. Rows from clusters without a configured color get a blank reserved cell at the same position so column boundaries stay aligned across the table.
 
-The colors live inside the `union_sets` definition (not the global `cluster_colors` state file used by the cluster picker) so you can pick deliberate "traffic light" semantics per view — for example, the same kubeconfig context can be tinted blue here and untinted in another set, without affecting how it appears in the cluster picker. The textual `Cluster` column remains the source of truth for unambiguous reads (sortable, copyable, fits screen-readers); the tile is purely visual shorthand.
+The colors live inside the `union_sets` definition (not the global `cluster_colors` state file used by the cluster picker) so you can pick deliberate "traffic light" semantics per view — for example, the same kubeconfig context can be tinted blue here and untinted in another set, without affecting how it appears in the cluster picker. The textual `Context` column remains the source of truth for unambiguous reads (sortable, copyable, fits screen-readers); the tile is purely visual shorthand.
 
 ## Filter Presets
 

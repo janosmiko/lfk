@@ -22,7 +22,7 @@ lfk --context production -n monitoring
 
 # Merge resources from multiple clusters into a single view ("union" mode).
 # Requires --namespace; mutually exclusive with --context. Each row shows a
-# "Cluster" column identifying the source. Read-only at the merged level
+# "Context" column identifying the source. Read-only at the merged level
 # except for Pod Delete / Force Delete / Force Finalize and workload
 # Restart — drill into a resource to act on a specific cluster for
 # anything else.

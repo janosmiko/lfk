@@ -261,8 +261,13 @@ func (m Model) renderRightClusters(width, height int) string {
 	// rightItems empty (see loadPreviewClusters) so the user sees a plain
 	// loader instead of a seeded placeholder list.
 	discovering := false
+	header := "RESOURCE TYPE"
 	if sel := m.selectedMiddleItem(); sel != nil {
-		discovering = m.discoveringContexts[sel.Name]
+		if isUnionSetItem(sel) {
+			header = "CONTEXT"
+		} else {
+			discovering = m.discoveringContexts[sel.Name]
+		}
 	}
 	if len(m.rightItems) == 0 {
 		if m.loading || discovering {
@@ -270,7 +275,7 @@ func (m Model) renderRightClusters(width, height int) string {
 		}
 		return ui.DimStyle.Render("No resource types found")
 	}
-	return ui.RenderColumn("RESOURCE TYPE", m.rightItems, -1, width, height, false, m.loading, m.spinner.View(), "")
+	return ui.RenderColumn(header, m.rightItems, -1, width, height, false, m.loading, m.spinner.View(), "")
 }
 
 func (m Model) renderRightResources(width, height int) string {

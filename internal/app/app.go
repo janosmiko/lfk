@@ -707,6 +707,11 @@ type Model struct {
 	// Union view mode: when true, resources are fetched from multiple clusters and merged.
 	unionMode     bool
 	unionContexts []string // contexts to query in union mode
+	unionSetName  string   // configured union_sets entry currently active, when any
+	// unionStartedFromPicker is true when the user entered union mode from the
+	// cluster picker, so back-navigation can return to the picker and clear the
+	// union state. CLI-started union sessions keep the old no-parent behavior.
+	unionStartedFromPicker bool
 	// unionContextColors maps each unionContexts entry to its configured
 	// color (from the union_sets per-cluster `color:` field). Drives the
 	// 1-cell row tile in the merged view. Distinct from the global

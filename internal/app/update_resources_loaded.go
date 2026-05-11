@@ -25,6 +25,7 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 	// ensures Ctrl+R toggles survive a context list refresh.
 	for i := range msg.items {
 		msg.items[i].IsContext = true
+		msg.items[i].Category = contextCategory
 		msg.items[i].ReadOnly = m.effectiveContextReadOnly(msg.items[i].Name)
 		msg.items[i].ClusterColor = m.clusterColors[msg.items[i].Name]
 		// Stamp LocalClusterStatus from the on-Model cache so the picker
@@ -36,6 +37,7 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 			msg.items[i].LocalClusterStatus = e.Status
 		}
 	}
+	msg.items = m.withUnionSetRows(msg.items)
 	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
 	m.leftItems = nil

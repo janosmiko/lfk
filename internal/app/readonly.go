@@ -321,6 +321,10 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 		if sel == nil {
 			return m, nil
 		}
+		if isUnionSetItem(sel) {
+			m.setStatusMessage("Read-only toggle applies to contexts", true)
+			return m, scheduleStatusClear()
+		}
 		newState := !sel.ReadOnly
 		if m.contextROOverrides == nil {
 			m.contextROOverrides = make(map[string]bool)

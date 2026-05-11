@@ -41,8 +41,8 @@ union_sets:
     namespace: kube-policies
   - name: ski-prod-east
     contexts:
-      - context: prod-green-east
-      - context: prod-blue-east
+      - prod-green-east
+      - name: prod-blue-east
   - contexts:
       - context: orphan-ctx
   - name: empty-set
@@ -83,6 +83,36 @@ union_sets:
 		assert.Empty(t, c.Color, "color is optional; missing field must round-trip as empty")
 	}
 	assert.Empty(t, prod.Namespace, "namespace is optional; absence must not crash sanitization")
+}
+
+func TestLoadConfig_UnionSetsMapForm(t *testing.T) {
+	orig := ConfigUnionSets
+	t.Cleanup(func() { ConfigUnionSets = orig })
+
+	yaml := `
+union_sets:
+  ski-staging-west:
+    namespace: kube-policies
+    contexts:
+      - staging-green
+      - context: staging-blue
+        color: blue
+`
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.yaml")
+	require.NoError(t, os.WriteFile(path, []byte(yaml), 0o600))
+
+	ConfigUnionSets = nil
+	LoadConfig(path)
+
+	require.Len(t, ConfigUnionSets, 1)
+	set := ConfigUnionSets[0]
+	assert.Equal(t, "ski-staging-west", set.Name)
+	assert.Equal(t, "kube-policies", set.Namespace)
+	assert.Equal(t, []string{"staging-green", "staging-blue"}, ctxNames(set.Contexts))
+	require.Len(t, set.Contexts, 2)
+	assert.Empty(t, set.Contexts[0].Color)
+	assert.Equal(t, "blue", set.Contexts[1].Color)
 }
 
 func TestSanitizeUnionSets_DropsInvalidEntries(t *testing.T) {
