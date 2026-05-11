@@ -372,9 +372,15 @@ const sortColEventLastSeen = "__event_last_seen__"
 const UnionContextSentinel = "__union__"
 
 const (
-	contextCategory  = "Contexts"
-	unionSetItemKind = "__union_set__"
-	unionSetCategory = "Union Sets"
+	contextCategory                  = "Contexts"
+	unionSetItemKind                 = "__union_set__"
+	unionSetCategory                 = "Union Sets"
+	unionClusterDashboardKind        = "__union_cluster_dashboard__"
+	unionMonitoringDashboardKind     = "__union_monitoring_dashboard__"
+	unionDashboardMemberItemKind     = "__union_dashboard_member__"
+	unionDashboardMemberAPIGroup     = "_union_dashboard"
+	unionClusterDashboardResource    = "cluster-dashboards"
+	unionMonitoringDashboardResource = "monitoring-dashboards"
 )
 
 // actionContext stores which resource an action targets.

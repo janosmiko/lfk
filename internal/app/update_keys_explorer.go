@@ -355,6 +355,10 @@ func (m Model) handleExplorerTogglePreview() (tea.Model, tea.Cmd) {
 func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 	sel := m.selectedMiddleItem()
 	if sel != nil && (sel.Extra == "__overview__" || sel.Extra == "__monitoring__") && m.nav.Level == model.LevelResourceTypes {
+		if m.isUnionSentinel() {
+			m.setStatusMessage("Open dashboard members with right-arrow", false)
+			return m, scheduleStatusClear()
+		}
 		m.fullscreenDashboard = !m.fullscreenDashboard
 		m.previewScroll = 0
 		if m.fullscreenDashboard {

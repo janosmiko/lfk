@@ -1201,3 +1201,111 @@ func TestUnionSentinelBlocksContextWideFeatures(t *testing.T) {
 	assert.NotNil(t, cmd)
 	assert.Contains(t, pinnedModel.statusMessage, "per-context")
 }
+
+func TestUnionDashboardPreviewShowsMembersInRightPane(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.unionContextColors = map[string]string{"blue": "blue", "green": "green"}
+	m.namespace = "cloud-cd"
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+	m.middleItems = []model.Item{{Name: "Cluster", Kind: "__overview__", Extra: "__overview__"}}
+	m.setCursor(0)
+
+	cmd := m.loadPreview()
+	require.NotNil(t, cmd)
+	result, _ := m.Update(cmd())
+	rm := result.(Model)
+
+	require.Len(t, rm.rightItems, 2)
+	assert.Equal(t, "blue", rm.rightItems[0].Name)
+	assert.Equal(t, unionDashboardMemberItemKind, rm.rightItems[0].Kind)
+	assert.Equal(t, string(unionDashboardCluster), rm.rightItems[0].Extra)
+	assert.Equal(t, "blue", rm.rightItems[0].ClusterName)
+	assert.Equal(t, "blue", rm.rightItems[0].ClusterColor)
+	assert.Contains(t, rm.rightItems[0].Status, "cloud-cd")
+	assert.Equal(t, "green", rm.rightItems[1].Name)
+}
+
+func TestUnionDashboardNavigateChildOpensMemberList(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.unionContextColors = map[string]string{"blue": "blue", "green": "green"}
+	m.nav = model.NavigationState{Level: model.LevelResourceTypes, Context: UnionContextSentinel}
+	m.leftItems = []model.Item{{Name: "staging-west", Kind: unionSetItemKind}}
+	m.middleItems = []model.Item{
+		{Name: "Cluster", Kind: "__overview__", Extra: "__overview__", Category: "Dashboards"},
+		{Name: "Monitoring", Kind: "__monitoring__", Extra: "__monitoring__", Category: "Dashboards"},
+	}
+	m.setCursor(1)
+
+	result, cmd := m.navigateChild()
+	rm := result.(Model)
+
+	require.NotNil(t, cmd)
+	assert.Equal(t, model.LevelResources, rm.nav.Level)
+	assert.Equal(t, UnionContextSentinel, rm.nav.Context)
+	assert.Equal(t, unionMonitoringDashboardKind, rm.nav.ResourceType.Kind)
+	require.Len(t, rm.middleItems, 2)
+	assert.Equal(t, "blue", rm.middleItems[0].Name)
+	assert.Equal(t, unionDashboardMemberItemKind, rm.middleItems[0].Kind)
+	assert.Equal(t, string(unionDashboardMonitoring), rm.middleItems[0].Extra)
+	require.Len(t, rm.leftItems, 2)
+	assert.Equal(t, "Monitoring", rm.leftItems[1].Name)
+	require.Len(t, rm.leftItemsHistory, 1)
+}
+
+func TestUnionDashboardMemberOpensContextAndBackReturnsToUnionView(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.unionContextColors = map[string]string{"blue": "blue", "green": "green"}
+	m.namespace = "cloud-cd"
+	m.selectedNamespaces = map[string]bool{"cloud-cd": true}
+	m.nav = model.NavigationState{
+		Level:        model.LevelResources,
+		Context:      UnionContextSentinel,
+		ResourceType: unionDashboardResourceType(unionDashboardMonitoring),
+	}
+	resourceTypes := []model.Item{
+		{Name: "Cluster", Kind: "__overview__", Extra: "__overview__", Category: "Dashboards"},
+		{Name: "Monitoring", Kind: "__monitoring__", Extra: "__monitoring__", Category: "Dashboards"},
+	}
+	m.leftItems = resourceTypes
+	m.leftItemsHistory = [][]model.Item{{{Name: "staging-west", Kind: unionSetItemKind}}}
+	m.middleItems = unionDashboardMemberItems(m.unionContexts, m.unionContextColors, unionDashboardMonitoring, m.namespace)
+	m.discoveredResources["blue"] = model.SeedResources()
+	m.discoveryRefreshedContexts["blue"] = true
+	m.setCursor(0)
+
+	opened, cmd := m.navigateChild()
+	om := opened.(Model)
+	require.NotNil(t, cmd)
+	assert.Equal(t, model.LevelResourceTypes, om.nav.Level)
+	assert.Equal(t, "blue", om.nav.Context)
+	assert.Empty(t, om.nav.ResourceType.Resource)
+	require.Len(t, om.leftItems, 2)
+	assert.Equal(t, unionDashboardMemberItemKind, om.leftItems[0].Kind)
+	assert.NotEmpty(t, om.middleItems)
+
+	back, cmd := om.navigateParent()
+	bm := back.(Model)
+	require.NotNil(t, cmd)
+	assert.Equal(t, model.LevelResources, bm.nav.Level)
+	assert.Equal(t, UnionContextSentinel, bm.nav.Context)
+	assert.Equal(t, unionMonitoringDashboardKind, bm.nav.ResourceType.Kind)
+	require.Len(t, bm.middleItems, 2)
+	assert.Equal(t, "blue", bm.middleItems[0].Name)
+	assert.Equal(t, unionDashboardMemberItemKind, bm.middleItems[0].Kind)
+	require.Len(t, bm.leftItems, 2)
+	assert.Equal(t, "Monitoring", bm.leftItems[1].Name)
+
+	backToUnion, _ := bm.navigateParent()
+	um := backToUnion.(Model)
+	assert.Equal(t, model.LevelResourceTypes, um.nav.Level)
+	assert.Equal(t, UnionContextSentinel, um.nav.Context)
+	assert.Empty(t, um.nav.ResourceType.Resource)
+	require.Len(t, um.middleItems, 2)
+	assert.Equal(t, "Monitoring", um.middleItems[1].Name)
+}

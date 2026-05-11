@@ -172,7 +172,3 @@ func (m Model) navigateParentFromPickerUnion() (tea.Model, tea.Cmd) {
 	m.refreshContextReadOnlyMarkers()
 	return m, m.loadPreview()
 }
-
-func unionContextWideFeatureMessage(feature string) string {
-	return fmt.Sprintf("%s is per-context. Open a single context or drill into a union row first.", feature)
-}

@@ -101,11 +101,10 @@ func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
 func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 	if sel.Extra == "__overview__" {
 		if m.isUnionSentinel() {
+			items := unionDashboardMemberItems(m.unionContexts, m.unionContextColors, unionDashboardCluster, m.namespace)
+			gen := m.requestGen
 			return func() tea.Msg {
-				return dashboardLoadedMsg{
-					content: unionContextWideFeatureMessage("Cluster dashboard"),
-					context: m.nav.Context,
-				}
+				return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
 			}
 		}
 		if ui.ConfigDashboard {
@@ -115,11 +114,10 @@ func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 	}
 	if sel.Extra == "__monitoring__" {
 		if m.isUnionSentinel() {
+			items := unionDashboardMemberItems(m.unionContexts, m.unionContextColors, unionDashboardMonitoring, m.namespace)
+			gen := m.requestGen
 			return func() tea.Msg {
-				return monitoringDashboardMsg{
-					content: unionContextWideFeatureMessage("Monitoring dashboard"),
-					context: m.nav.Context,
-				}
+				return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
 			}
 		}
 		return m.loadMonitoringDashboard()
@@ -146,6 +144,9 @@ func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 
 // loadPreviewResources handles preview loading at the resources level.
 func (m Model) loadPreviewResources() tea.Cmd {
+	if isUnionDashboardResourceKind(m.nav.ResourceType.Kind) {
+		return m.loadPreviewUnionDashboardMember()
+	}
 	if m.nav.ResourceType.Kind == "__port_forwards__" || m.nav.ResourceType.Kind == "__captures__" {
 		return nil
 	}

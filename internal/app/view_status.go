@@ -51,6 +51,9 @@ func (m Model) middleColumnHeader() string {
 		}
 		return "RESOURCE TYPE"
 	case model.LevelResources:
+		if isUnionDashboardResourceKind(m.nav.ResourceType.Kind) {
+			return "CONTEXT [UNION]"
+		}
 		if m.isUnionSentinel() {
 			return strings.ToUpper(m.nav.ResourceType.Kind) + " [UNION]"
 		}

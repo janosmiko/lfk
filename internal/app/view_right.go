@@ -241,18 +241,34 @@ func (m Model) renderFullYAMLPreview(width, height int) string {
 func (m Model) renderRightResourceTypes(width, height int) string {
 	sel := m.selectedMiddleItem()
 	if sel != nil && sel.Extra == "__overview__" {
+		if m.isUnionSentinel() {
+			return m.renderUnionDashboardMembers(width, height)
+		}
 		if m.dashboardPreview == "" {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading cluster dashboard...")
 		}
 		return m.dashboardPreview
 	}
 	if sel != nil && sel.Extra == "__monitoring__" {
+		if m.isUnionSentinel() {
+			return m.renderUnionDashboardMembers(width, height)
+		}
 		if m.monitoringPreview == "" {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading monitoring dashboard...")
 		}
 		return m.monitoringPreview
 	}
 	return m.renderRightDefault(width, height)
+}
+
+func (m Model) renderUnionDashboardMembers(width, height int) string {
+	if len(m.rightItems) == 0 {
+		if m.loading || m.previewLoading {
+			return ui.DimStyle.Render(m.spinner.View() + " Loading contexts...")
+		}
+		return ui.DimStyle.Render("No union contexts found")
+	}
+	return ui.RenderColumn("CONTEXT", m.rightItems, -1, width, height, false, m.loading, m.spinner.View(), "")
 }
 
 func (m Model) renderRightClusters(width, height int) string {
@@ -279,6 +295,9 @@ func (m Model) renderRightClusters(width, height int) string {
 }
 
 func (m Model) renderRightResources(width, height int) string {
+	if isUnionDashboardResourceKind(m.nav.ResourceType.Kind) {
+		return m.renderUnionDashboardMemberPreview()
+	}
 	if (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod") && len(m.rightItems) > 0 {
 		return m.renderSplitPreview(width, height)
 	}
@@ -303,6 +322,20 @@ func (m Model) renderRightResources(width, height int) string {
 		return m.renderFallbackYAML(width, height)
 	}
 	return m.renderRightDefault(width, height)
+}
+
+func (m Model) renderUnionDashboardMemberPreview() string {
+	mode, _ := unionDashboardModeFromKind(m.nav.ResourceType.Kind)
+	if mode == unionDashboardMonitoring {
+		if m.monitoringPreview == "" {
+			return ui.DimStyle.Render(m.spinner.View() + " Loading monitoring dashboard...")
+		}
+		return m.monitoringPreview
+	}
+	if m.dashboardPreview == "" {
+		return ui.DimStyle.Render(m.spinner.View() + " Loading cluster dashboard...")
+	}
+	return m.dashboardPreview
 }
 
 func (m Model) renderRightOwned(width, height int) string {

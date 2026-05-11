@@ -91,6 +91,10 @@ This is safe for all callers:
 
 Configured union sets are appended to the context explorer under a dedicated `Union Sets` group. Selecting a set enters union mode using the set's contexts, colors, and namespace. Back navigation from the resource-type level returns to the context explorer when the union view was entered from there. CLI-started union sessions keep the old no-parent behavior because they did not come from a picker row.
 
+### Union dashboards
+
+At the union resource-type level, the `Cluster` and `Monitoring` dashboard rows preview the union set's member contexts in the right pane instead of trying to aggregate dashboard data. Right-arrow opens that member list in the middle column. Right-arrow on a member opens that context as a normal single-context resource-type view, where the existing dashboard and context-wide tools keep their original semantics. Back returns first to the union dashboard member list, then to the union resource-type list.
+
 ### Session persistence
 
 Union mode is ephemeral. `saveCurrentSession()` returns early when `m.unionMode` is true so the union state is never written to `~/.local/state/lfk/session.yaml`. On restart without the flags the app opens normally.
@@ -107,6 +111,7 @@ Union mode is ephemeral. `saveCurrentSession()` returns early when `m.unionMode`
 | `internal/app/tabs.go` | `effectiveContext()` helper |
 | `internal/app/commands_load.go` | Union branch in `loadResources`; `effectiveContext()` applied to 6 functions |
 | `internal/app/commands_load_preview.go` | `effectiveContext()` applied to `loadPreviewYAML`, `loadPreviewSecretData` |
+| `internal/app/union_dashboards.go` | Synthetic union dashboard member rows; member drill-in/back helpers |
 | `internal/app/update_navigation.go` | `navigateParent`: no-op at `LevelResourceTypes`; sentinel restoration at `LevelOwned`/`LevelContainers`; discovery context guard at `LevelResources`; `navigateChildResourceType`: discovery context guard; `navigateChildResource`/`navigateChildOwned`: set `nav.Context = sel.ClusterName` |
 | `internal/app/update_actions.go` | `buildActionCtx`: use `sel.ClusterName` when in union mode |
 | `internal/app/update_bookmarks.go` | `restoreSession`: reset `nav.Context = "__union__"` after session restore |
@@ -139,6 +144,6 @@ Fix in `updateResourcesLoadedMain`: capture `prevCluster` before items are repla
 ## Known Limitations
 
 - **CRD asymmetry**: If clusters have different CRDs, resources present in cluster A but not cluster B produce empty results from B — not an error. A future improvement would take the union of discovered resources across all contexts.
-- **Context-wide tools**: Cluster dashboard, monitoring dashboard, RBAC browser, bookmarks, and pinned groups are per-context. They are blocked or shown with an explicit per-context message while the user is at the union sentinel; drill into a row to use them against that row's context.
+- **Context-wide tools**: Cluster dashboard and monitoring dashboard expose the union members first, then open a selected member as a normal single-context view. RBAC browser, bookmarks, and pinned groups remain per-context and are blocked at the union sentinel; open a member context or drill into a resource to use them against one cluster.
 - **Command bar context commands**: `:ctx`, shell commands, and `:kubectl`/`:k` commands are blocked at the union sentinel because they require one active context.
 - **Drill-down is single-cluster**: Once the user selects a specific resource and drills down, subsequent navigation operates against that resource's cluster only. There is no "multi-cluster owned resources" view.
