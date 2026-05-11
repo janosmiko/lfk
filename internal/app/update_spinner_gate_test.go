@@ -4,7 +4,10 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/bubbles/spinner"
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // TestSpinnerWantedConditions documents every state that pulls the spinner
@@ -78,5 +81,25 @@ func TestUpdateKicksSpinnerOnWantedTransition(t *testing.T) {
 		// returns (m, nil), wanted stays true, no transition → no kick.
 		_, cmd := m.Update(previewDebounceTickMsg{gen: m.previewDebounceGen + 99})
 		assert.Nil(t, cmd, "stale tick with no wanted transition must not attach a spinner kick")
+	})
+
+	t.Run("false→true transition attaches kick", func(t *testing.T) {
+		m := basePush80Model()
+		m.middleItems = []model.Item{
+			{Name: "pod-1", Namespace: "default", Kind: "Pod"},
+			{Name: "pod-2", Namespace: "default", Kind: "Pod"},
+		}
+		m.setCursor(0)
+		// Pre-state: idle, spinner is not wanted.
+		require := assert.New(t)
+		require.False(m.spinnerWanted(), "test setup precondition: spinner must start unwanted")
+
+		// Press 'down' — moveCursor flips m.loading / m.previewLoading
+		// to true via invalidatePreviewForCursorChange, so the wrapper
+		// should detect the false→true transition and attach a kick.
+		newModel, cmd := m.Update(tea.KeyMsg{Type: tea.KeyDown})
+		nm := newModel.(Model)
+		require.True(nm.spinnerWanted(), "down arrow must transition spinner-wanted to true")
+		require.NotNil(cmd, "false→true transition must attach a spinner kick command")
 	})
 }

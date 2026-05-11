@@ -4,6 +4,7 @@ import (
 	"flag"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	_ "net/http/pprof" // registers /debug/pprof/* under DefaultServeMux when LFK_PPROF_ADDR is set
 	"os"
@@ -126,14 +127,19 @@ func runTUI(opts app.StartupOptions) error {
 	)
 
 	// Optional pprof endpoint for debugging hot CPU paths (issue #206).
-	// Off by default; set LFK_PPROF_ADDR=localhost:6060 to enable. Bind
-	// only to loopback to avoid exposing process internals on the network.
+	// Off by default; set LFK_PPROF_ADDR=127.0.0.1:6060 to enable. The
+	// address MUST resolve to a loopback host — anything else exposes
+	// process internals (heap, goroutines, credentials in symbols) on
+	// the network and we refuse to start.
 	// Capture an idle profile with:
-	//   go tool pprof -seconds=30 http://localhost:6060/debug/pprof/profile
+	//   go tool pprof -seconds=30 http://127.0.0.1:6060/debug/pprof/profile
 	if addr := os.Getenv("LFK_PPROF_ADDR"); addr != "" {
+		if err := validatePprofAddr(addr); err != nil {
+			return fmt.Errorf("LFK_PPROF_ADDR: %w", err)
+		}
 		go func() {
 			logger.Info("starting pprof", "addr", addr)
-			srv := &http.Server{Addr: addr} //nolint:gosec // debug-only, loopback-bound by convention
+			srv := &http.Server{Addr: addr} //nolint:gosec // validated loopback-only above
 			if err := srv.ListenAndServe(); err != nil {
 				logger.Warn("pprof server stopped", "error", err)
 			}
@@ -168,5 +174,33 @@ func runTUI(opts app.StartupOptions) error {
 		return fmt.Errorf("running application: %w", err)
 	}
 
+	return nil
+}
+
+// validatePprofAddr ensures LFK_PPROF_ADDR points at a loopback host so
+// the debug pprof endpoint never gets exposed on the network. Accepts
+// `localhost`, `127.0.0.1`, `::1`, and any other IP whose IsLoopback
+// reports true. Rejects bind-all forms like `:6060`, `0.0.0.0:...`,
+// and `[::]:...` because pprof leaks process internals (heap profile,
+// goroutine stacks, env strings in binaries) and must not be reachable
+// off-box.
+func validatePprofAddr(addr string) error {
+	host, _, err := net.SplitHostPort(addr)
+	if err != nil {
+		return fmt.Errorf("invalid host:port %q: %w", addr, err)
+	}
+	if host == "" {
+		return fmt.Errorf("must specify an explicit loopback host (got %q — bind-all form is refused)", addr)
+	}
+	if host == "localhost" {
+		return nil
+	}
+	ip := net.ParseIP(host)
+	if ip == nil {
+		return fmt.Errorf("host %q is not an IP or 'localhost'", host)
+	}
+	if !ip.IsLoopback() {
+		return fmt.Errorf("host %q is not a loopback address", host)
+	}
 	return nil
 }
