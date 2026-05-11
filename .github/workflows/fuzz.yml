@@ -16,7 +16,7 @@ on:
   workflow_dispatch:
     inputs:
       fuzztime:
-        description: 'Fuzz time per target (e.g. 1m, 5m, 30m)'
+        description: 'Fuzz time per target (e.g. 30s, 5m, 1h30m)'
         type: string
         default: '5m'
 
@@ -42,9 +42,10 @@ jobs:
           # into the run script (defence-in-depth against injection).
           FUZZTIME: ${{ inputs.fuzztime || '5m' }}
         run: |
-          # Allow only Go duration syntax: digits + (ns|us|µs|ms|s|m|h).
-          if ! printf %s "$FUZZTIME" | grep -Eq '^[0-9]+(ns|us|µs|ms|s|m|h)$'; then
-            echo "::error::FUZZTIME must be a Go duration (e.g. 30s, 5m); got: $FUZZTIME"
+          # Allow Go duration syntax: one or more `<digits><unit>` components
+          # so compounds like 1h30m or 2m30s pass alongside simple values.
+          if ! printf %s "$FUZZTIME" | grep -Eq '^([0-9]+(ns|us|µs|ms|s|m|h))+$'; then
+            echo "::error::FUZZTIME must be a Go duration (e.g. 30s, 5m, 1h30m); got: $FUZZTIME"
             exit 1
           fi
           make fuzz FUZZTIME="$FUZZTIME"
