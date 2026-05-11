@@ -587,7 +587,7 @@ func (m Model) secretDataCachedFor(sel *model.Item) bool {
 	if sel.Namespace != "" {
 		ns = sel.Namespace
 	}
-	_, ok := m.secretPreviewCache[secretPreviewCacheKey(m.nav.Context, ns, sel.Name)]
+	_, ok := m.secretPreviewCache[secretPreviewCacheKey(m.effectiveContext(), ns, sel.Name)]
 	return ok
 }
 

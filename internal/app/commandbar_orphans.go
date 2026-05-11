@@ -13,6 +13,10 @@ import (
 // active. `kind` is matched case-insensitively against a fixed alias table so
 // users can type the singular, plural, or short form interchangeably.
 func (m Model) executeOrphansCommand(arg string) (tea.Model, tea.Cmd) {
+	if m.isUnionSentinel() {
+		m.setStatusMessage("Orphans requires a single cluster", true)
+		return m, scheduleStatusClear()
+	}
 	if arg == "" {
 		mt, cmd := m.openOrphansOverlay()
 		return mt, cmd

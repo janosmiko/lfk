@@ -89,6 +89,10 @@ func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)
 			m.setStatusMessage(readOnlyBlockedMessage("Paste & Apply"), true)
 			return m, scheduleStatusClear(), true
 		}
+		if m.isUnionSentinel() {
+			m.setStatusMessage("Paste & Apply requires a single cluster", true)
+			return m, scheduleStatusClear(), true
+		}
 		return m, m.applyFromClipboard(), true
 	case kb.NewTab:
 		return m.handleExplorerActionKeyNewTab()
@@ -131,10 +135,11 @@ func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 	m.showRareResources = !m.showRareResources
 	model.ShowRareResources = m.showRareResources
 
-	// Rebuild the resource types list from the current context's discovered
+	// Rebuild the resource types list from the current discovery context's
 	// set (falling back to the seed list when discovery hasn't completed).
 	var merged []model.Item
-	if discovered, ok := m.discoveredResources[m.nav.Context]; ok && len(discovered) > 0 {
+	discoveryCtx := m.discoveryContext()
+	if discovered, ok := m.discoveredResources[discoveryCtx]; ok && len(discovered) > 0 {
 		merged = model.BuildSidebarItems(discovered)
 	} else {
 		merged = model.BuildSidebarItems(model.SeedResources())
@@ -209,6 +214,10 @@ func (m Model) handleExplorerDirectActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cm
 }
 
 func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool) {
+	if m.unionMode {
+		m.setStatusMessage("Union mode supports exactly one namespace", true)
+		return m, scheduleStatusClear(), true
+	}
 	m.allNamespaces = !m.allNamespaces
 	if m.allNamespaces {
 		m.selectedNamespaces = nil
@@ -634,6 +643,10 @@ func (m Model) handleExplorerActionKeyCreateTemplate() (tea.Model, tea.Cmd, bool
 		m.setStatusMessage(readOnlyBlockedMessage("Create from template"), true)
 		return m, scheduleStatusClear(), true
 	}
+	if m.isUnionSentinel() {
+		m.setStatusMessage("Create from template requires a single cluster", true)
+		return m, scheduleStatusClear(), true
+	}
 	templates := model.BuiltinTemplates()
 	currentKind := m.nav.ResourceType.Kind
 	if currentKind != "" {
@@ -652,6 +665,10 @@ func (m Model) handleExplorerActionKeyCreateTemplate() (tea.Model, tea.Cmd, bool
 }
 
 func (m Model) handleExplorerActionKeySecretEditor() (tea.Model, tea.Cmd, bool) {
+	if m.isUnionSentinel() {
+		m.setStatusMessage("Secret and ConfigMap editors require a single cluster", true)
+		return m, scheduleStatusClear(), true
+	}
 	if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "Secret" {
 		sel := m.selectedMiddleItem()
 		if sel != nil {
@@ -669,6 +686,10 @@ func (m Model) handleExplorerActionKeySecretEditor() (tea.Model, tea.Cmd, bool) 
 }
 
 func (m Model) handleExplorerActionKeyLabelEditor() (tea.Model, tea.Cmd, bool) {
+	if m.isUnionSentinel() {
+		m.setStatusMessage("Labels / Annotations requires a single cluster", true)
+		return m, scheduleStatusClear(), true
+	}
 	if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind != "__port_forwards__" && m.nav.ResourceType.Kind != "__captures__" {
 		sel := m.selectedMiddleItem()
 		if sel != nil {
@@ -704,14 +725,20 @@ func (m Model) handleExplorerActionKeyFilterPresets() (tea.Model, tea.Cmd, bool)
 		m.setStatusMessage("Filter cleared: "+name, false)
 		return m, tea.Batch(scheduleStatusClear(), m.loadPreview()), true
 	}
-	// Open the filter preset overlay.
+	// Open the filter preset overlay. Orphan presets require a context-wide
+	// scan and are omitted at the union sentinel; other quick filters remain
+	// useful against the merged rows.
 	kind := m.nav.ResourceType.Kind
 	key := orphanCacheKey{kubeContext: m.nav.Context, namespace: m.orphanCacheNamespace()}
-	m.filterPresets = builtinFilterPresetsWithOrphans(kind, m.orphanCache, key)
+	if m.isUnionSentinel() && needsOrphanCache(kind) {
+		m.filterPresets = builtinFilterPresets(kind)
+	} else {
+		m.filterPresets = builtinFilterPresetsWithOrphans(kind, m.orphanCache, key)
+	}
 	m.overlayCursor = 0
 	m.overlay = overlayFilterPreset
 	var loadCmd tea.Cmd
-	if needsOrphanCache(kind) {
+	if needsOrphanCache(kind) && !m.isUnionSentinel() {
 		loadCmd = (&m).cmdLoadOrphans(key)
 	}
 	return m, loadCmd, true

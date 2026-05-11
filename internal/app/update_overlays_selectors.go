@@ -74,6 +74,10 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Union set requires one namespace", true)
 			return m, scheduleStatusClear()
 		}
+		if m.unionMode && (m.overlayCursor < 0 || m.overlayCursor >= len(items) || items[m.overlayCursor].Status == "all") {
+			m.setStatusMessage("Union mode supports exactly one namespace", true)
+			return m, scheduleStatusClear()
+		}
 		// Apply selection and close.
 		oldNs := m.namespace
 		switch {
@@ -131,6 +135,10 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.pendingUnionSetName != "" {
 			return m.rejectPendingUnionSetNamespaceMultiSelect()
 		}
+		if m.unionMode {
+			m.setStatusMessage("Union mode supports exactly one namespace", true)
+			return m, scheduleStatusClear()
+		}
 		m.nsSelectionModified = true
 		// Toggle selection on current item.
 		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
@@ -163,6 +171,10 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case ui.ActiveKeybindings.AllNamespaces:
 		if m.pendingUnionSetName != "" {
 			return m.rejectPendingUnionSetNamespaceMultiSelect()
+		}
+		if m.unionMode {
+			m.setStatusMessage("Union mode supports exactly one namespace", true)
+			return m, scheduleStatusClear()
 		}
 		// Same key the user already uses outside the overlay to flip to
 		// all-namespaces mode (default "A"). Drops individual selections

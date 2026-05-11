@@ -243,7 +243,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateToOwner(kind, name string) (tea.Model, tea.Cmd) {
-	crds := m.discoveredResources[m.nav.Context]
+	crds := m.discoveredResources[m.discoveryContext()]
 	rt, ok := model.FindResourceTypeByKind(kind, crds)
 	if !ok {
 		m.setStatusMessage(fmt.Sprintf("Unknown resource type: %s", kind), true)

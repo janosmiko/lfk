@@ -206,25 +206,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		return m, tea.Quit
 
 	case "namespace":
-		namespaces := tokens[1:]
-		if len(namespaces) == 0 {
-			// No arguments: jump to Namespaces resource type.
-			return m.executeResourceJump("namespaces")
-		}
-		m.allNamespaces = false
-		m.selectedNamespaces = make(map[string]bool, len(namespaces))
-		for _, ns := range namespaces {
-			m.selectedNamespaces[ns] = true
-		}
-		oldNs := m.namespace
-		m.namespace = namespaces[0]
-		m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
-		if len(namespaces) == 1 {
-			m.setStatusMessage(fmt.Sprintf("Namespace set to %s", namespaces[0]), false)
-		} else {
-			m.setStatusMessage(fmt.Sprintf("Namespaces set to %s", strings.Join(namespaces, ", ")), false)
-		}
-		return m, tea.Batch(m.loadResources(false), scheduleStatusClear())
+		return m.executeNamespaceCommand(tokens[1:])
 
 	case "context":
 		if m.unionMode {
@@ -339,6 +321,31 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 	}
 }
 
+func (m Model) executeNamespaceCommand(namespaces []string) (tea.Model, tea.Cmd) {
+	if len(namespaces) == 0 {
+		// No arguments: jump to Namespaces resource type.
+		return m.executeResourceJump("namespaces")
+	}
+	if m.unionMode && len(namespaces) != 1 {
+		m.setStatusMessage("Union mode supports exactly one namespace", true)
+		return m, scheduleStatusClear()
+	}
+	m.allNamespaces = false
+	m.selectedNamespaces = make(map[string]bool, len(namespaces))
+	for _, ns := range namespaces {
+		m.selectedNamespaces[ns] = true
+	}
+	oldNs := m.namespace
+	m.namespace = namespaces[0]
+	m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
+	if len(namespaces) == 1 {
+		m.setStatusMessage(fmt.Sprintf("Namespace set to %s", namespaces[0]), false)
+	} else {
+		m.setStatusMessage(fmt.Sprintf("Namespaces set to %s", strings.Join(namespaces, ", ")), false)
+	}
+	return m, tea.Batch(m.loadResources(false), scheduleStatusClear())
+}
+
 // executeSortCommand handles the :sort builtin command. At LevelClusters
 // and LevelResourceTypes the sort engine early-returns, so accepting :sort
 // silently would mutate sortColumnName and emit a misleading "Sort by ..."
@@ -414,6 +421,10 @@ func (m Model) executeResourceJump(input string) (tea.Model, tea.Cmd) {
 	// Optional namespace arguments (one or more).
 	if len(fields) >= 2 {
 		namespaces := fields[1:]
+		if m.unionMode && len(namespaces) != 1 {
+			m.setStatusMessage("Union mode supports exactly one namespace", true)
+			return m, scheduleStatusClear()
+		}
 		m.allNamespaces = false
 		m.selectedNamespaces = make(map[string]bool, len(namespaces))
 		for _, ns := range namespaces {

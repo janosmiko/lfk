@@ -209,7 +209,11 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 	// CRD discovery. Without this, quitting on an ArgoCD Application view
 	// and re-opening lfk drops the user at the resource types level instead
 	// of the saved view.
-	if m.sessionResourceTypeAwaitingDiscovery != "" && msg.context == m.nav.Context {
+	awaitingContext := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		awaitingContext = m.unionContexts[0]
+	}
+	if m.sessionResourceTypeAwaitingDiscovery != "" && msg.context == awaitingContext {
 		ref := m.sessionResourceTypeAwaitingDiscovery
 		name := m.sessionResourceNameAwaitingDiscovery
 		m.sessionResourceTypeAwaitingDiscovery = ""

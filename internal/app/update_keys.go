@@ -327,7 +327,7 @@ func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) namespaceSelectorItems(items []model.Item) []model.Item {
-	if m.pendingUnionSetName != "" {
+	if m.pendingUnionSetName != "" || m.unionMode {
 		return append([]model.Item(nil), items...)
 	}
 	return buildNamespaceOverlayItems(items)

@@ -58,12 +58,14 @@ A dedicated `ClusterName string` field was added to `model.Item` (not via `item.
 
 ### Discovery context
 
-API resource discovery runs against `unionContexts[0]`. All union contexts are assumed to be homogeneous (same resource types). Resources present in context A but not in context B show as empty lists from B rather than errors. The `discoveredResources` map is keyed by `unionContexts[0]`, not by `"__union__"`. Every place that would look up `discoveredResources[nav.Context]` in the hot path has a guard:
+API resource discovery runs against `unionContexts[0]`. All union contexts are assumed to be homogeneous (same resource types). Resources present in context A but not in context B show as empty lists from B rather than errors. The `discoveredResources` map is keyed by `unionContexts[0]`, not by `"__union__"`. Hot paths that need discovery metadata use `discoveryContext()`:
 
 ```go
-discoveryCtx := m.nav.Context
-if m.unionMode && m.nav.Context == "__union__" && len(m.unionContexts) > 0 {
-    discoveryCtx = m.unionContexts[0]
+func (m Model) discoveryContext() string {
+    if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+        return m.unionContexts[0]
+    }
+    return m.nav.Context
 }
 ```
 
@@ -111,13 +113,13 @@ Union mode is ephemeral. `saveCurrentSession()` returns early when `m.unionMode`
 | `internal/model/types.go` | `ClusterName string` field on `Item` |
 | `internal/k8s/client.go` | `GetResourcesUnion()`: parallel fan-out, `ClusterName` stamping, Context column injection, merge + sort |
 | `internal/app/app.go` | `unionMode bool`, `unionContexts []string` fields on `Model`; union initialisation in `NewModel()` |
-| `internal/app/tabs.go` | `effectiveContext()` helper |
+| `internal/app/app_helpers.go`, `internal/app/tabs.go` | `discoveryContext()` and `effectiveContext()` helpers |
 | `internal/app/commands_load.go` | Union branch in `loadResources`; `effectiveContext()` applied to 6 functions |
 | `internal/app/commands_load_preview.go` | `effectiveContext()` applied to `loadPreviewYAML`, `loadPreviewSecretData` |
 | `internal/app/union_dashboards.go` | Synthetic union dashboard member rows; member drill-in/back helpers |
 | `internal/app/update_navigation.go` | `navigateParent`: no-op at `LevelResourceTypes`; sentinel restoration at `LevelOwned`/`LevelContainers`; discovery context guard at `LevelResources`; `navigateChildResourceType`: discovery context guard; `navigateChildResource`/`navigateChildOwned`: set `nav.Context = sel.ClusterName` |
 | `internal/app/update_actions.go` | `buildActionCtx`: use `sel.ClusterName` when in union mode |
-| `internal/app/update_bookmarks.go` | `restoreSession`: reset `nav.Context = "__union__"` after session restore |
+| `internal/app/update_bookmarks.go`, `internal/app/update_bookmarks_session.go` | session/bookmark restore keeps union navigation keyed by `"__union__"` while using the first member for discovery |
 | `internal/app/update_resources_loaded.go` | `updateAPIResourceDiscovery`: `isCurrentContext` guard for sentinel; `updateResourcesLoadedMain`: cluster-aware cursor restoration |
 | `internal/app/view_status.go` | `middleColumnHeader`: `[UNION]` suffix; `breadcrumb`: shows `[blue+green+yellow]` |
 | `internal/app/session.go` | `saveCurrentSession`: early return in union mode |
@@ -147,6 +149,6 @@ Fix in `updateResourcesLoadedMain`: capture `prevCluster` before items are repla
 ## Known Limitations
 
 - **CRD asymmetry**: If clusters have different CRDs, resources present in cluster A but not cluster B produce empty results from B — not an error. A future improvement would take the union of discovered resources across all contexts.
-- **Context-wide tools**: Cluster dashboard and monitoring dashboard expose the union members first, then open a selected member as a normal single-context view. Context-aware bookmarks can target named `union_sets` and switch between union sets and regular contexts; anonymous `--union-context` views still only support context-free bookmarks because they have no durable configured name. Can-I RBAC browser supports union-mode forward checks with allow/deny/mixed verb states. Pinned groups can be managed for named union sets; anonymous union sessions still cannot persist pins. Reverse Who-Can remains per-context and is blocked at the union sentinel.
+- **Context-wide tools**: Cluster dashboard and monitoring dashboard expose the union members first, then open a selected member as a normal single-context view. Context-aware bookmarks can target named `union_sets` and switch between union sets and regular contexts; anonymous `--union-context` views still only support context-free bookmarks because they have no durable configured name. Can-I RBAC browser supports union-mode forward checks with allow/deny/mixed verb states. Pinned groups can be managed for named union sets; anonymous union sessions still cannot persist pins. Per-row Port Forward is available for Pods, Services, Deployments, StatefulSets, and DaemonSets because the selected row carries `ClusterName`; the Port Forwards virtual resource remains a normal global lfk view. Reverse Who-Can and orphan scans remain per-context and are blocked at the union sentinel.
 - **Command bar context commands**: `:ctx`, shell commands, and `:kubectl`/`:k` commands are blocked at the union sentinel because they require one active context.
 - **Drill-down is single-cluster**: Once the user selects a specific resource and drills down, subsequent navigation operates against that resource's cluster only. There is no "multi-cluster owned resources" view.

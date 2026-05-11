@@ -67,6 +67,16 @@ func (m Model) activeContext() string {
 	return ""
 }
 
+// discoveryContext returns the context key used for API discovery metadata.
+// Union-mode discovery is intentionally stored under the first member context,
+// while row-level API calls may target any member via effectiveContext().
+func (m Model) discoveryContext() string {
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		return m.unionContexts[0]
+	}
+	return m.nav.Context
+}
+
 // ensureNamespaceCacheFresh returns a command that refreshes the
 // namespace cache for the current context when the entry is missing,
 // empty, or older than namespaceCacheTTL; returns nil otherwise.

@@ -230,6 +230,10 @@ func (m Model) handleOrphansFilterInput(msg tea.KeyMsg) (Model, tea.Cmd) {
 // cmdLoadOrphans then arrives and orphansClampCursor pulls the cursor
 // into the new list.
 func (m Model) openOrphansOverlay() (Model, tea.Cmd) {
+	if m.isUnionSentinel() {
+		m.setStatusMessage("Orphans requires a single cluster", true)
+		return m, scheduleStatusClear()
+	}
 	m.overlay = overlayOrphans
 	m.orphans.filterActive = false
 

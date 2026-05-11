@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -709,7 +710,10 @@ func TestIsUnionAllowedAction(t *testing.T) {
 	for _, kind := range []string{"Deployment", "StatefulSet", "DaemonSet"} {
 		assert.True(t, isUnionAllowedActionForKind(kind, "Restart"), "Restart must be allowed for %s at the union sentinel", kind)
 	}
-	blocked := []string{"Edit", "Scale", "Drain", "Cordon", "Exec", "Shell", "Port Forward", "Secret Editor", "Sync", "Upgrade"}
+	for _, kind := range []string{"Pod", "Service", "Deployment", "StatefulSet", "DaemonSet"} {
+		assert.True(t, isUnionAllowedActionForKind(kind, "Port Forward"), "Port Forward must be allowed for %s at the union sentinel", kind)
+	}
+	blocked := []string{"Edit", "Scale", "Drain", "Cordon", "Exec", "Shell", "Secret Editor", "Sync", "Upgrade"}
 	for _, label := range blocked {
 		assert.False(t, isUnionAllowedActionForKind("Pod", label), "%q must NOT be allowed at the union sentinel", label)
 	}
@@ -822,8 +826,9 @@ func TestUpdateResourcesLoadedMain_StampsClusterColorOnUnionRows(t *testing.T) {
 // --- Action menu filtering at the union sentinel ---
 
 func TestOpenActionMenu_UnionSentinel_PodFiltered(t *testing.T) {
-	// At the union sentinel a Pod's action menu must drop every mutating
-	// label except Delete and Force Delete. Read-only labels (Logs,
+	// At the union sentinel a Pod's action menu must drop broad mutating
+	// labels but keep targeted per-row operations that carry a source
+	// cluster (Delete/Force Delete/Port Forward). Read-only labels (Logs,
 	// Describe, Events, Crash Investigator, etc.) pass through.
 	m := Model{
 		unionMode:     true,
@@ -851,8 +856,9 @@ func TestOpenActionMenu_UnionSentinel_PodFiltered(t *testing.T) {
 	// In-scope mutations are present.
 	assert.True(t, labels["Delete"], "Delete must be in the union Pod menu")
 	assert.True(t, labels["Force Delete"], "Force Delete must be in the union Pod menu")
+	assert.True(t, labels["Port Forward"], "Port Forward must be in the union Pod menu")
 	// Out-of-scope mutations are filtered out.
-	for _, label := range []string{"Edit", "Exec", "Attach", "Debug", "Port Forward", "Shell"} {
+	for _, label := range []string{"Edit", "Exec", "Attach", "Debug", "Shell"} {
 		assert.False(t, labels[label], "%q must be filtered out at the union sentinel", label)
 	}
 }
@@ -917,8 +923,8 @@ func TestOpenActionMenu_UnionSentinel_BulkReadOnlyTargetFiltersMutations(t *test
 }
 
 func TestOpenActionMenu_UnionSentinel_DeploymentAllowsRestart(t *testing.T) {
-	// A Deployment's union menu must keep Restart and drop Scale/Edit/
-	// Rollback so the sentinel-level write surface stays exactly two ops.
+	// A Deployment's union menu must keep targeted per-row operations and drop
+	// broad mutating actions like Scale/Edit/Rollback.
 	m := Model{
 		unionMode:     true,
 		unionContexts: []string{"blue", "green"},
@@ -942,6 +948,7 @@ func TestOpenActionMenu_UnionSentinel_DeploymentAllowsRestart(t *testing.T) {
 		labels[item.Name] = true
 	}
 	assert.True(t, labels["Restart"], "Restart must be in the union Deployment menu")
+	assert.True(t, labels["Port Forward"], "Port Forward must be in the union Deployment menu")
 	for _, label := range []string{"Delete", "Scale", "Edit", "Rollback"} {
 		assert.False(t, labels[label], "%q must be filtered out at the union sentinel", label)
 	}
@@ -1146,6 +1153,155 @@ func TestNewTab_BlockedInUnionMode(t *testing.T) {
 	require.True(t, ok)
 	assert.Len(t, result.tabs, 1, "union mode must not open a new tab")
 	assert.Contains(t, result.statusMessage, "union view")
+}
+
+func TestUnionModeBlocksAllNamespaceToggles(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.namespace = "cloud-cd"
+	m.selectedNamespaces = map[string]bool{"cloud-cd": true}
+
+	mdl, cmd, handled := m.handleExplorerActionKeyAllNamespaces()
+	result := mdl.(Model)
+	assert.True(t, handled)
+	assert.NotNil(t, cmd)
+	assert.False(t, result.allNamespaces)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, result.selectedNamespaces)
+	assert.Contains(t, result.statusMessage, "exactly one namespace")
+}
+
+func TestUnionNamespaceSelectorOmitsAllNamespaces(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+
+	items := m.namespaceSelectorItems([]model.Item{
+		{Name: "cloud-cd"},
+		{Name: "default"},
+	})
+
+	require.Len(t, items, 2)
+	for _, item := range items {
+		assert.NotEqual(t, "all", item.Status)
+	}
+}
+
+func TestUnionNamespaceOverlayBlocksMultiNamespaceKeys(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.overlay = overlayNamespace
+	m.overlayItems = []model.Item{{Name: "cloud-cd"}, {Name: "default"}}
+	m.overlayCursor = 0
+	m.namespace = "cloud-cd"
+	m.selectedNamespaces = map[string]bool{"cloud-cd": true}
+
+	mdl, cmd := m.handleNamespaceOverlayKey(keyMsg(" "))
+	result := mdl.(Model)
+	assert.NotNil(t, cmd)
+	assert.False(t, result.allNamespaces)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, result.selectedNamespaces)
+	assert.Contains(t, result.statusMessage, "exactly one namespace")
+
+	mdl, cmd = m.handleNamespaceOverlayKey(keyMsg(ui.ActiveKeybindings.AllNamespaces))
+	result = mdl.(Model)
+	assert.NotNil(t, cmd)
+	assert.False(t, result.allNamespaces)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, result.selectedNamespaces)
+	assert.Contains(t, result.statusMessage, "exactly one namespace")
+}
+
+func TestUnionCommandBarBlocksMultiNamespaceInputs(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.namespace = "cloud-cd"
+	m.selectedNamespaces = map[string]bool{"cloud-cd": true}
+
+	mdl, cmd := m.executeBuiltinCommand("ns cloud-cd default")
+	result := mdl.(Model)
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "cloud-cd", result.namespace)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, result.selectedNamespaces)
+	assert.Contains(t, result.statusMessage, "exactly one namespace")
+
+	mdl, cmd = m.executeResourceJump("pods cloud-cd default")
+	result = mdl.(Model)
+	assert.NotNil(t, cmd)
+	assert.Equal(t, "cloud-cd", result.namespace)
+	assert.Equal(t, map[string]bool{"cloud-cd": true}, result.selectedNamespaces)
+	assert.Contains(t, result.statusMessage, "exactly one namespace")
+}
+
+func TestUnionSentinelBlocksSingleClusterDirectEditors(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Secret", Resource: "secrets", Namespaced: true}
+	m.middleItems = []model.Item{{Name: "s1", Kind: "Secret", Namespace: "cloud-cd", ClusterName: "blue"}}
+
+	mdl, cmd, handled := m.handleExplorerActionKeySecretEditor()
+	result := mdl.(Model)
+	assert.True(t, handled)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, result.statusMessage, "single cluster")
+
+	mdl, cmd, handled = m.handleExplorerActionKeyLabelEditor()
+	result = mdl.(Model)
+	assert.True(t, handled)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, result.statusMessage, "single cluster")
+
+	mdl, cmd, handled = m.handleExplorerActionKeyCreateTemplate()
+	result = mdl.(Model)
+	assert.True(t, handled)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, result.statusMessage, "single cluster")
+}
+
+func TestUnionSentinelBlocksOrphans(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.nav.Context = UnionContextSentinel
+
+	updated, cmd := m.openOrphansOverlay()
+	assert.NotEqual(t, overlayOrphans, updated.overlay)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, updated.statusMessage, "single cluster")
+
+	mdl, cmd := m.executeBuiltinCommand("orphans pods")
+	result := mdl.(Model)
+	assert.NotEqual(t, overlayOrphans, result.overlay)
+	assert.NotNil(t, cmd)
+	assert.Contains(t, result.statusMessage, "single cluster")
+}
+
+func TestRestoreSingleTabSession_UnionUsesSentinelNavKey(t *testing.T) {
+	pods := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m := baseModelWithFakeClient()
+	m.unionMode = true
+	m.unionContexts = []string{"blue", "green"}
+	m.nav.Context = UnionContextSentinel
+	m.discoveredResources["blue"] = []model.ResourceTypeEntry{pods}
+	m.discoveryRefreshedContexts["blue"] = true
+	m.cachedNamespaces = make(map[string]namespaceCacheEntry)
+	m.cachedNamespaces["blue"] = namespaceCacheEntry{names: []string{"cloud-cd"}, fetchedAt: time.Now()}
+
+	sess := &SessionState{
+		Context:            "blue",
+		Namespace:          "cloud-cd",
+		SelectedNamespaces: []string{"cloud-cd"},
+		ResourceType:       pods.ResourceRef(),
+	}
+	mdl, cmd := m.restoreSingleTabSession(sess, []model.Item{{Name: "blue"}, {Name: "green"}})
+	result := mdl.(Model)
+
+	assert.NotNil(t, cmd)
+	assert.Equal(t, UnionContextSentinel, result.nav.Context)
+	assert.Equal(t, model.LevelResources, result.nav.Level)
+	assert.Contains(t, result.itemCache, UnionContextSentinel,
+		"resource-type cache must be keyed by the sentinel before load commands are built")
 }
 
 func TestUpdateResourcesLoaded_UnionPartialErrorKeepsItems(t *testing.T) {

@@ -100,6 +100,12 @@ func isUnionAllowedActionForKind(kind, label string) bool {
 	switch label {
 	case "Delete", "Force Delete", "Force Finalize":
 		return kind == "Pod"
+	case "Port Forward":
+		switch kind {
+		case "Pod", "Service", "Deployment", "StatefulSet", "DaemonSet":
+			return true
+		}
+		return false
 	case "Restart":
 		return model.IsRestartableKind(kind)
 	default:

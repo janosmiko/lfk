@@ -38,6 +38,12 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 		return m, m.loadPreview()
 	}
 
+	discoveryCtx := sess.Context
+	navCtx := sess.Context
+	if m.unionMode {
+		navCtx = UnionContextSentinel
+	}
+
 	for i, ctx := range contexts {
 		if ctx.Name == sess.Context {
 			m.cursorMemory[""] = i
@@ -45,15 +51,19 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 		}
 	}
 
-	m.nav.Context = sess.Context
-	m.recomputeReadOnly(sess.Context)
+	m.nav.Context = navCtx
+	if m.unionMode {
+		m.readOnly = m.cliReadOnly
+	} else {
+		m.recomputeReadOnly(discoveryCtx)
+	}
 	m.applyPinnedGroups()
 	m.nav.Level = model.LevelResourceTypes
 
 	m.leftItemsHistory = nil
 	m.leftItems = contexts
 
-	if discovered, ok := m.discoveredResources[sess.Context]; ok && len(discovered) > 0 {
+	if discovered, ok := m.discoveredResources[discoveryCtx]; ok && len(discovered) > 0 {
 		m.setMiddleItems(model.BuildSidebarItems(discovered))
 	} else {
 		m.setMiddleItems(model.BuildSidebarItems(model.SeedResources()))
@@ -64,17 +74,17 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces)
 
 	var cmds []tea.Cmd
-	needsDiscovery := m.shouldFireDiscoveryFor(sess.Context)
+	needsDiscovery := m.shouldFireDiscoveryFor(discoveryCtx)
 	if needsDiscovery {
-		m.markDiscoveryStarted(sess.Context)
-		cmds = append(cmds, m.discoverAPIResources(sess.Context))
+		m.markDiscoveryStarted(discoveryCtx)
+		cmds = append(cmds, m.discoverAPIResources(discoveryCtx))
 	}
 	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
 
 	if sess.ResourceType != "" {
-		rt, ok := resolveSessionResourceType(sess.ResourceType, m.discoveredResources[sess.Context])
+		rt, ok := resolveSessionResourceType(sess.ResourceType, m.discoveredResources[discoveryCtx])
 		if !ok && needsDiscovery {
 			m.sessionResourceTypeAwaitingDiscovery = sess.ResourceType
 			m.sessionResourceNameAwaitingDiscovery = sess.ResourceName

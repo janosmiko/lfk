@@ -358,7 +358,7 @@ func (m *Model) resourceTypeItems() []model.Item {
 // If not cached and not currently loading, triggers an async fetch
 // and returns nil (the caller will see a loading indicator).
 func (m *Model) cachedResourceNames(resourceType, namespace string) []string {
-	cacheKey := m.nav.Context + "/" + namespace + "/" + resourceType
+	cacheKey := m.discoveryContext() + "/" + namespace + "/" + resourceType
 	if m.commandBarNameCache != nil {
 		if names, ok := m.commandBarNameCache[cacheKey]; ok {
 			return names
@@ -375,8 +375,8 @@ func (m *Model) cachedResourceNames(resourceType, namespace string) []string {
 // fetchCommandBarResourceNames creates a tea.Cmd that fetches resource names
 // for the given resource type and namespace, returning them as a message.
 func (m Model) fetchCommandBarResourceNames(resourceType, namespace string) tea.Cmd {
-	cacheKey := m.nav.Context + "/" + namespace + "/" + resourceType
-	kctx := m.nav.Context
+	kctx := m.discoveryContext()
+	cacheKey := kctx + "/" + namespace + "/" + resourceType
 	client := m.client
 	if client == nil {
 		return nil
@@ -443,7 +443,7 @@ func (m *Model) namespaceNames() []string {
 // Returns true if not found (safer default for unknown resources).
 func (m *Model) isNamespacedResource(resourceName string) bool {
 	lower := strings.ToLower(resourceName)
-	for _, rt := range m.discoveredResources[m.nav.Context] {
+	for _, rt := range m.discoveredResources[m.discoveryContext()] {
 		if strings.ToLower(rt.Resource) == lower {
 			return rt.Namespaced
 		}
@@ -460,7 +460,7 @@ func (m *Model) resolveResourceType(name string) string {
 	if expanded, ok := ui.SearchAbbreviations[lower]; ok {
 		lower = strings.ToLower(expanded)
 	}
-	for _, rt := range m.discoveredResources[m.nav.Context] {
+	for _, rt := range m.discoveredResources[m.discoveryContext()] {
 		res := strings.ToLower(rt.Resource)
 		kind := strings.ToLower(rt.Kind)
 		if res == lower || kind == lower {
@@ -533,7 +533,7 @@ func (m *Model) defaultSuggestions() []ui.Suggestion {
 
 	// Add some common resource types.
 	count := 0
-	for _, rt := range m.discoveredResources[m.nav.Context] {
+	for _, rt := range m.discoveredResources[m.discoveryContext()] {
 		result = append(result, ui.Suggestion{
 			Text:     strings.ToLower(rt.Resource),
 			Category: "resource",
