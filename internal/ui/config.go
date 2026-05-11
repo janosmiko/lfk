@@ -3,6 +3,7 @@ package ui
 import (
 	"encoding/json"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -293,8 +294,28 @@ const (
 )
 
 // ConfigTerminalMode controls how exec/shell commands run. One of
-// TerminalModePTY, TerminalModeExec, TerminalModeMux.
-var ConfigTerminalMode = TerminalModePTY
+// TerminalModePTY, TerminalModeExec, TerminalModeMux. Initialised from
+// defaultTerminalMode() so Windows users — where the embedded PTY
+// driver (github.com/creack/pty) has no working backend — start in
+// Exec mode by default and don't hit "failed to start PTY: unsupported"
+// the first time they trigger an interactive shell (issue #194).
+var ConfigTerminalMode = defaultTerminalMode()
+
+// defaultTerminalMode returns the package-level default for
+// ConfigTerminalMode based on the current runtime OS.
+func defaultTerminalMode() string {
+	return defaultTerminalModeForOS(runtime.GOOS)
+}
+
+// defaultTerminalModeForOS is the testable inner form. Windows must
+// default to Exec because creack/pty's Windows StartWithSize returns
+// ErrUnsupported; every other platform gets the richer embedded PTY.
+func defaultTerminalModeForOS(goos string) string {
+	if goos == "windows" {
+		return TerminalModeExec
+	}
+	return TerminalModePTY
+}
 
 // ScrollbackLines clamps for the embedded PTY scrollback ring. The
 // default of 5000 covers an extended interactive session without

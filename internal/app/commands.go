@@ -259,6 +259,19 @@ func (m Model) loadContainersForLogFilter() tea.Cmd {
 // clearBeforeExec wraps cmd to clear the terminal screen before running it.
 // This ensures the TUI artifacts are removed when switching to interactive mode.
 func clearBeforeExec(cmd *exec.Cmd) *exec.Cmd {
+	return clearBeforeExecForOS(cmd, runtime.GOOS)
+}
+
+// clearBeforeExecForOS is the testable inner form. On Windows the sh -c
+// wrap is skipped because sh.exe is not on a standard PATH there —
+// wrapping kubectl in `sh -c "printf '\033c' && exec kubectl …"` would
+// make the parent process fail to start (issue #194: "exit status 2",
+// terminal flashes and closes). The cost is one cosmetic clear-screen
+// on the way into an interactive shell on Windows.
+func clearBeforeExecForOS(cmd *exec.Cmd, goos string) *exec.Cmd {
+	if goos == "windows" {
+		return cmd
+	}
 	// Build a shell command: clear screen with ANSI reset, then exec the original command.
 	quoted := make([]string, 0, len(cmd.Args))
 	for _, arg := range cmd.Args {

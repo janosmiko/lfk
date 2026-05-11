@@ -49,6 +49,34 @@ func TestClearBeforeExec(t *testing.T) {
 	})
 }
 
+// On Windows, sh.exe is not on a standard PATH, so wrapping a kubectl
+// command in `sh -c "printf '\033c' && exec kubectl …"` makes the parent
+// process exit immediately — that's what bug #194 surfaced as
+// "exit status 2" with the terminal flashing and closing. Returning the
+// original cmd unchanged on Windows lets tea.ExecProcess hand kubectl
+// the host terminal directly, losing only the cosmetic clear-screen.
+func TestClearBeforeExecForOS(t *testing.T) {
+	t.Run("linux wraps with sh -c", func(t *testing.T) {
+		cmd := exec.Command("kubectl", "exec", "-it", "pod")
+		wrapped := clearBeforeExecForOS(cmd, "linux")
+		assert.Equal(t, "sh", wrapped.Args[0])
+		assert.Equal(t, "-c", wrapped.Args[1])
+		assert.Contains(t, wrapped.Args[2], `printf '\033c'`)
+	})
+
+	t.Run("darwin wraps with sh -c", func(t *testing.T) {
+		cmd := exec.Command("kubectl", "exec", "-it", "pod")
+		wrapped := clearBeforeExecForOS(cmd, "darwin")
+		assert.Equal(t, "sh", wrapped.Args[0])
+	})
+
+	t.Run("windows returns cmd unchanged because sh is not reliably available", func(t *testing.T) {
+		cmd := exec.Command("kubectl", "exec", "-it", "pod")
+		wrapped := clearBeforeExecForOS(cmd, "windows")
+		assert.Same(t, cmd, wrapped, "windows path must not wrap — sh -c would fail before kubectl ever starts")
+	})
+}
+
 // --- SetVersion ---
 
 func TestSetVersion(t *testing.T) {

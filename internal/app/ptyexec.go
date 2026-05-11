@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -48,11 +49,24 @@ func startPTYExecCmd(cmd *exec.Cmd, title string, cols, rows int) tea.Cmd {
 		})
 		if err != nil {
 			logger.Error("Failed to start PTY", "error", err)
-			return actionResultMsg{err: fmt.Errorf("failed to start PTY: %w", err)}
+			return actionResultMsg{err: ptyStartErrorForOS(err, runtime.GOOS)}
 		}
 
 		return execPTYStartMsg{ptmx: ptmx, term: term, title: title, cmd: cmd}
 	}
+}
+
+// ptyStartErrorForOS converts the pty.StartWithSize failure into a
+// user-visible error. On Windows the underlying creack/pty error is the
+// bare "unsupported" (ErrUnsupported) — useless on its own. The Windows
+// branch trades that for an actionable hint about Exec mode while
+// keeping the original error reachable via errors.Is for callers that
+// log it.
+func ptyStartErrorForOS(err error, goos string) error {
+	if goos == "windows" {
+		return fmt.Errorf("PTY mode is not supported on Windows; press Ctrl+T to switch to exec mode or set `terminal: exec` in your config (%w)", err)
+	}
+	return fmt.Errorf("failed to start PTY: %w", err)
 }
 
 // scheduleExecTick schedules the next terminal refresh tick.

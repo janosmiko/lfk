@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -9,6 +10,35 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/stretchr/testify/assert"
 )
+
+// On Windows the embedded PTY driver returns an opaque "unsupported"
+// error (creack/pty's ErrUnsupported), which surfaced in lfk as
+// "failed to start PTY: unsupported" — useless to users who haven't
+// read the bug tracker. The Windows branch translates it into an
+// actionable hint pointing at Exec mode (Ctrl+T or `terminal: exec`).
+// Non-Windows hosts keep the bare wrap so the original cause stays
+// visible for debugging.
+func TestPTYStartErrorForOS(t *testing.T) {
+	underlying := errors.New("unsupported")
+
+	t.Run("windows surfaces an actionable hint about exec mode", func(t *testing.T) {
+		err := ptyStartErrorForOS(underlying, "windows")
+		msg := err.Error()
+		assert.Contains(t, msg, "not supported on Windows")
+		assert.Contains(t, msg, "exec")
+		assert.ErrorIs(t, err, underlying, "must still wrap the original error for callers that inspect it")
+	})
+
+	t.Run("linux keeps the bare wrap", func(t *testing.T) {
+		err := ptyStartErrorForOS(underlying, "linux")
+		assert.Equal(t, "failed to start PTY: unsupported", err.Error())
+	})
+
+	t.Run("darwin keeps the bare wrap", func(t *testing.T) {
+		err := ptyStartErrorForOS(underlying, "darwin")
+		assert.Equal(t, "failed to start PTY: unsupported", err.Error())
+	})
+}
 
 // --- keyToBytes ---
 
