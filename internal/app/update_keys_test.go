@@ -1408,6 +1408,21 @@ func TestCovHandleKeyExplainSearch(t *testing.T) {
 	assert.False(t, rm.explainSearchActive)
 }
 
+// Regression for #203: typing a letter that happens to be the NewTab
+// keybinding (default "t") while the Describe panel's search input is
+// active must reach the search input, not the global tab handler.
+func TestDescribeSearchSwallowsNewTabKey(t *testing.T) {
+	m := baseModelDescribe()
+	m.describeSearchActive = true
+
+	result, _ := m.handleKey(runeKey('t'))
+	rm := result.(Model)
+
+	assert.Len(t, rm.tabs, 1, "no new tab should be created while describe search is active")
+	assert.True(t, rm.describeSearchActive, "describe search should remain active")
+	assert.Equal(t, "t", rm.describeSearchInput.Value, "'t' should be inserted into the search input")
+}
+
 // --- Cancellation of active mutations ---
 
 func TestCtrlCCancelsMutationsInsteadOfClosingTab(t *testing.T) {
