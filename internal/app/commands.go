@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -125,7 +126,11 @@ func openInBrowser(url string) tea.Cmd {
 	}
 }
 
-// copyToSystemClipboard copies text to the system clipboard using platform-specific tools.
+// copyToSystemClipboard copies text to the system clipboard.
+//
+// Backed by atotto/clipboard so macOS (pbcopy), Linux X11 (xsel/xclip),
+// Linux Wayland (wl-copy) and Windows (native syscall) all work without
+// per-platform branches here.
 //
 // Returns nil on success: every caller already calls setStatusMessage with a
 // context-specific message (e.g. "Copied 1 line", "Copied value of <key>")
@@ -134,17 +139,7 @@ func openInBrowser(url string) tea.Cmd {
 // useful caller message — visible to the user as a flicker.
 func copyToSystemClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
-		var cmd *exec.Cmd
-		switch runtime.GOOS {
-		case "darwin":
-			cmd = exec.Command("pbcopy")
-		case "linux":
-			cmd = exec.Command("xclip", "-selection", "clipboard")
-		default:
-			return actionResultMsg{err: fmt.Errorf("clipboard not supported on %s", runtime.GOOS)}
-		}
-		cmd.Stdin = strings.NewReader(text)
-		if err := cmd.Run(); err != nil {
+		if err := clipboard.WriteAll(text); err != nil {
 			return actionResultMsg{err: fmt.Errorf("clipboard: %w", err)}
 		}
 		return nil

@@ -188,7 +188,7 @@ kubectl exec client -- /bin/sh -c 'while true; do curl -s web > /dev/null; sleep
 | 7 | `Ctrl+U` / `Ctrl+B` / `PgUp` | Half-page / full-page back into history |
 | 8 | `Ctrl+D` / `Ctrl+F` / `PgDn` | Half-page / full-page toward latest, clamps at 0 |
 | 9 | `g` then `G` | `g` jumps to the oldest packet; `G` returns to live (latest at bottom) |
-| 10 | `Y` | Status: `pcap path copied to clipboard: <path>`; verify with `pbpaste` (macOS) / `xclip -o -selection clipboard` (Linux) |
+| 10 | `Y` | Status: `pcap path copied to clipboard: <path>`; verify with `pbpaste` (macOS) / `xclip -o -selection clipboard` or `wl-paste` (Linux) / `Get-Clipboard` (Windows PowerShell) |
 | 11 | `Esc` | Capture stops; overlay **stays open** in stopped phase; badge `■ stopped`; second `Esc` dismisses |
 | 12 | Re-open via `c`, start a fresh capture, `s` to stop, `e` | Edit-filter path: returns to config phase with previous filter pre-filled; `Enter` restarts |
 | 13 | Restart-cleanup: do step 12 WITHOUT pressing Y on the first capture | First capture's pcap file deleted from `$XDG_STATE_HOME/lfk/captures/` when the second starts |

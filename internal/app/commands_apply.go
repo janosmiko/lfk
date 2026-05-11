@@ -4,10 +4,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"runtime"
 	"strings"
 	"time"
 
+	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -20,27 +20,16 @@ func (m Model) applyFromClipboard() tea.Cmd {
 		ns = "default"
 	}
 
-	// Read from clipboard.
-	var clipCmd *exec.Cmd
-	switch runtime.GOOS {
-	case "darwin":
-		clipCmd = exec.Command("pbpaste")
-	case "linux":
-		clipCmd = exec.Command("xclip", "-selection", "clipboard", "-o")
-	default:
-		return func() tea.Msg {
-			return actionResultMsg{err: fmt.Errorf("clipboard not supported on %s", runtime.GOOS)}
-		}
-	}
-
-	clipContent, err := clipCmd.Output()
+	// Read from clipboard. atotto/clipboard covers macOS, Linux (X11 + Wayland)
+	// and Windows uniformly.
+	clipContent, err := clipboard.ReadAll()
 	if err != nil {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("reading clipboard: %w", err)}
 		}
 	}
 
-	if len(strings.TrimSpace(string(clipContent))) == 0 {
+	if len(strings.TrimSpace(clipContent)) == 0 {
 		return func() tea.Msg {
 			return actionResultMsg{err: fmt.Errorf("clipboard is empty")}
 		}
@@ -53,7 +42,7 @@ func (m Model) applyFromClipboard() tea.Cmd {
 			return actionResultMsg{err: fmt.Errorf("creating temp file: %w", err)}
 		}
 	}
-	if _, err := tmpFile.Write(clipContent); err != nil {
+	if _, err := tmpFile.WriteString(clipContent); err != nil {
 		_ = tmpFile.Close()
 		_ = os.Remove(tmpFile.Name())
 		return func() tea.Msg {

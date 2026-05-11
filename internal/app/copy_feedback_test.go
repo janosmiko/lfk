@@ -289,8 +289,10 @@ func TestCopyToSystemClipboardSuccessIsSilent(t *testing.T) {
 		t.Fatal("copyToSystemClipboard returned nil cmd")
 	}
 	msg := cmd()
-	// On platforms without pbcopy/xclip, an error is expected — only
-	// assert success-path silence when the subprocess actually ran.
+	// On hosts where atotto/clipboard can't reach a clipboard (Linux CI
+	// without xsel/xclip/wl-copy installed, headless containers, etc.) an
+	// error is expected — only assert success-path silence when the write
+	// actually succeeded.
 	if msg == nil {
 		return
 	}
