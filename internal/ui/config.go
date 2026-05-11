@@ -317,6 +317,37 @@ func defaultTerminalModeForOS(goos string) string {
 	return TerminalModePTY
 }
 
+// resolveTerminalMode validates the `terminal:` config value against the
+// runtime OS. It returns (effectiveMode, warning):
+//   - effectiveMode is always a valid mode the caller can assign to
+//     ConfigTerminalMode. When the input is empty or unrecognised the
+//     caller's currentMode is returned unchanged.
+//   - warning is non-empty when a fallback was applied; the caller is
+//     expected to log it at Warn level so the user sees why their
+//     configured value didn't stick.
+//
+// `pty` on Windows is silently downgraded to `exec` because the embedded
+// PTY backend (github.com/creack/pty) has no working Windows
+// implementation — accepting the option would just trap users in a
+// state where every interactive action fails (issue #194).
+func resolveTerminalMode(configValue, goos, currentMode string) (mode string, warning string) {
+	if configValue == "" {
+		return currentMode, ""
+	}
+	normalized := strings.ToLower(configValue)
+	switch normalized {
+	case TerminalModePTY:
+		if goos == "windows" {
+			return TerminalModeExec, "terminal: pty is not supported on Windows (no PTY backend); using exec"
+		}
+		return TerminalModePTY, ""
+	case TerminalModeExec, TerminalModeMux:
+		return normalized, ""
+	default:
+		return currentMode, "unrecognised terminal mode: " + configValue + "; using " + currentMode
+	}
+}
+
 // ScrollbackLines clamps for the embedded PTY scrollback ring. The
 // default of 5000 covers an extended interactive session without
 // running the parent process out of memory; the floor stops a typo in

@@ -212,23 +212,36 @@ func TestMultiplexerWrap(t *testing.T) {
 
 func TestNextTerminalMode(t *testing.T) {
 	cases := []struct {
-		name   string
-		from   string
-		hasMux bool
-		want   string
+		name      string
+		from      string
+		hasMux    bool
+		isWindows bool
+		want      string
 	}{
-		{"pty -> exec (no mux)", ui.TerminalModePTY, false, ui.TerminalModeExec},
-		{"pty -> exec (mux available)", ui.TerminalModePTY, true, ui.TerminalModeExec},
-		{"exec -> mux when mux available", ui.TerminalModeExec, true, ui.TerminalModeMux},
-		{"exec -> pty when no mux (skip mux)", ui.TerminalModeExec, false, ui.TerminalModePTY},
-		{"mux -> pty (no mux)", ui.TerminalModeMux, false, ui.TerminalModePTY},
-		{"mux -> pty (mux available)", ui.TerminalModeMux, true, ui.TerminalModePTY},
-		{"unrecognised value resets to pty", "garbage", false, ui.TerminalModePTY},
-		{"unrecognised value resets to pty even with mux", "garbage", true, ui.TerminalModePTY},
+		// Non-Windows cycle: pty -> exec -> (mux if available) -> pty.
+		{"pty -> exec (no mux)", ui.TerminalModePTY, false, false, ui.TerminalModeExec},
+		{"pty -> exec (mux available)", ui.TerminalModePTY, true, false, ui.TerminalModeExec},
+		{"exec -> mux when mux available", ui.TerminalModeExec, true, false, ui.TerminalModeMux},
+		{"exec -> pty when no mux (skip mux)", ui.TerminalModeExec, false, false, ui.TerminalModePTY},
+		{"mux -> pty (no mux)", ui.TerminalModeMux, false, false, ui.TerminalModePTY},
+		{"mux -> pty (mux available)", ui.TerminalModeMux, true, false, ui.TerminalModePTY},
+		{"unrecognised value resets to pty", "garbage", false, false, ui.TerminalModePTY},
+		{"unrecognised value resets to pty even with mux", "garbage", true, false, ui.TerminalModePTY},
+
+		// Windows: pty is unreachable because creack/pty has no Windows
+		// backend. The cycle must never produce pty, otherwise Ctrl+T
+		// becomes a trap that drops users into a broken state where
+		// every interactive action fails.
+		{"windows: exec -> mux when mux available", ui.TerminalModeExec, true, true, ui.TerminalModeMux},
+		{"windows: exec stays exec when no mux (no other valid target)", ui.TerminalModeExec, false, true, ui.TerminalModeExec},
+		{"windows: mux -> exec (never pty)", ui.TerminalModeMux, true, true, ui.TerminalModeExec},
+		{"windows: stale pty resets to exec (recovery path)", ui.TerminalModePTY, false, true, ui.TerminalModeExec},
+		{"windows: stale pty resets to exec even with mux", ui.TerminalModePTY, true, true, ui.TerminalModeExec},
+		{"windows: unrecognised value resets to exec, not pty", "garbage", false, true, ui.TerminalModeExec},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.want, nextTerminalMode(tc.from, tc.hasMux))
+			assert.Equal(t, tc.want, nextTerminalMode(tc.from, tc.hasMux, tc.isWindows))
 		})
 	}
 }

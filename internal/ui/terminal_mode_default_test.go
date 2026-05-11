@@ -6,6 +6,92 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+// resolveTerminalMode is the testable kernel behind applyConfigOptions'
+// terminal-mode handling. The Windows branch must downgrade an explicit
+// `terminal: pty` to exec because pty is unreachable there (creack/pty
+// has no Windows backend) — letting the option through would just trap
+// users in a state where every interactive action fails.
+func TestResolveTerminalMode(t *testing.T) {
+	cases := []struct {
+		name        string
+		configValue string
+		goos        string
+		currentMode string
+		wantMode    string
+		wantWarn    bool
+	}{
+		{
+			name:        "empty config keeps current default",
+			configValue: "",
+			goos:        "linux",
+			currentMode: TerminalModePTY,
+			wantMode:    TerminalModePTY,
+		},
+		{
+			name:        "pty on linux is honoured",
+			configValue: "pty",
+			goos:        "linux",
+			currentMode: TerminalModeExec,
+			wantMode:    TerminalModePTY,
+		},
+		{
+			name:        "pty on darwin is honoured",
+			configValue: "pty",
+			goos:        "darwin",
+			currentMode: TerminalModeExec,
+			wantMode:    TerminalModePTY,
+		},
+		{
+			name:        "pty on windows is rejected and falls back to exec",
+			configValue: "pty",
+			goos:        "windows",
+			currentMode: TerminalModeExec,
+			wantMode:    TerminalModeExec,
+			wantWarn:    true,
+		},
+		{
+			name:        "exec on windows is honoured",
+			configValue: "exec",
+			goos:        "windows",
+			currentMode: TerminalModeExec,
+			wantMode:    TerminalModeExec,
+		},
+		{
+			name:        "mux on windows is honoured (user can opt in if they run tmux/zellij)",
+			configValue: "mux",
+			goos:        "windows",
+			currentMode: TerminalModeExec,
+			wantMode:    TerminalModeMux,
+		},
+		{
+			name:        "case-insensitive normalisation",
+			configValue: "PTY",
+			goos:        "linux",
+			currentMode: TerminalModeExec,
+			wantMode:    TerminalModePTY,
+		},
+		{
+			name:        "unrecognised value keeps current with warning",
+			configValue: "garbage",
+			goos:        "linux",
+			currentMode: TerminalModePTY,
+			wantMode:    TerminalModePTY,
+			wantWarn:    true,
+		},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			mode, warning := resolveTerminalMode(tc.configValue, tc.goos, tc.currentMode)
+			assert.Equal(t, tc.wantMode, mode)
+			if tc.wantWarn {
+				assert.NotEmpty(t, warning, "expected a fallback warning")
+			} else {
+				assert.Empty(t, warning, "no warning expected for an honoured value")
+			}
+		})
+	}
+}
+
 // On Windows, github.com/creack/pty (the embedded PTY driver behind
 // TerminalModePTY) returns ErrUnsupported from StartWithSize, so the
 // embedded-terminal path can never succeed. The package-level default

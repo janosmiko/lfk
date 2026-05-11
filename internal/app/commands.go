@@ -104,22 +104,18 @@ func scheduleDescribeRefresh() tea.Cmd {
 	})
 }
 
-// openInBrowser opens the given URL in the user's default browser using
-// platform-specific commands (open on macOS, xdg-open on Linux, start on Windows).
+// openInBrowser opens the given URL in the user's default browser.
+//
+// Delegates to ui.OpenBrowser, which routes Windows through
+// `rundll32 url.dll,FileProtocolHandler` instead of `cmd /c start`.
+// The earlier `cmd /c start` path here re-parsed the URL through
+// cmd.exe metacharacter semantics, so a single `&` in a query
+// string (e.g. `?a=1&b=2`) would split the URL and execute the
+// remainder as a shell command — both a correctness and a security
+// issue for URLs derived from cluster data.
 func openInBrowser(url string) tea.Cmd {
 	return func() tea.Msg {
-		var cmd *exec.Cmd
-		switch runtime.GOOS {
-		case "darwin":
-			cmd = exec.Command("open", url)
-		case "linux":
-			cmd = exec.Command("xdg-open", url)
-		case "windows":
-			cmd = exec.Command("cmd", "/c", "start", url)
-		default:
-			return actionResultMsg{err: fmt.Errorf("browser open not supported on %s", runtime.GOOS)}
-		}
-		if err := cmd.Start(); err != nil {
+		if err := ui.OpenBrowser(url); err != nil {
 			return actionResultMsg{err: fmt.Errorf("failed to open browser: %w", err)}
 		}
 		return actionResultMsg{message: "Opened " + url}
