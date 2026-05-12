@@ -110,7 +110,15 @@ func (m Model) kubectlNodeCmdFromClaim(subcmd string) tea.Cmd {
 		output, err := cmd.CombinedOutput()
 		if err != nil {
 			logger.Error("kubectl node command failed", "subcmd", subcmd, "claim", claimName, "node", nodeName, "context", ctx, "error", err)
-			return actionResultMsg{err: fmt.Errorf("%s %s (from NodeClaim %s): %s", subcmd, nodeName, claimName, strings.TrimSpace(string(output)))}
+			// kubectl sometimes exits non-zero with no stderr (e.g. context
+			// cancelled, kubeconfig path missing on disk). Fall back to the
+			// exec error so the user always sees concrete failure details
+			// instead of a trailing blank.
+			detail := strings.TrimSpace(string(output))
+			if detail == "" {
+				detail = err.Error()
+			}
+			return actionResultMsg{err: fmt.Errorf("%s %s (from NodeClaim %s): %s", subcmd, nodeName, claimName, detail)}
 		}
 		return actionResultMsg{message: fmt.Sprintf("%s %s (from NodeClaim %s): %s", subcmd, nodeName, claimName, strings.TrimSpace(string(output)))}
 	})
