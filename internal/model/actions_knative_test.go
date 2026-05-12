@@ -72,3 +72,28 @@ func TestKnativeActions_Route(t *testing.T) {
 	assert.Contains(t, labels, "Events")
 	assert.NotContains(t, labels, "Activate")
 }
+
+// TestKnativeEventingActions covers the Eventing kinds curated in this
+// PR: Broker, Trigger, Channel, Subscription, EventType. Eventing has
+// no Activate-class promotion gesture (each kind is independent —
+// there's no "promote this Trigger" semantic equivalent to Knative
+// Serving's traffic split), so the menu intentionally stays on the
+// standard surface. Activate must remain absent on all five kinds.
+func TestKnativeEventingActions(t *testing.T) {
+	kinds := []string{"Broker", "Trigger", "Channel", "Subscription", "EventType"}
+	for _, kind := range kinds {
+		t.Run(kind, func(t *testing.T) {
+			items := ActionsForKind(kind)
+			labels := make([]string, 0, len(items))
+			for _, it := range items {
+				labels = append(labels, it.Label)
+			}
+			assert.Contains(t, labels, "Describe")
+			assert.Contains(t, labels, "Edit")
+			assert.Contains(t, labels, "Delete")
+			assert.Contains(t, labels, "Events")
+			assert.NotContains(t, labels, "Activate",
+				"%s is a Knative Eventing kind — Activate is Serving-only", kind)
+		})
+	}
+}
