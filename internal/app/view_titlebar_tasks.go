@@ -37,19 +37,30 @@ func nonSilentTasks(snap []scheduler.Task) []scheduler.Task {
 
 // renderTasksIndicator returns the styled string that lives in the title
 // bar between the gap filler and the namespace badge. Empty string when
-// no tasks are visible — the title bar then renders no indicator at
-// all and the breadcrumb gets the full remaining width.
+// no in-flight tasks are visible — the title bar then renders no
+// indicator at all and the breadcrumb gets the full remaining width.
 //
 // The indicator is intentionally minimal: just the animated spinner
 // glyph. Users who want details open the :tasks overlay. The spinner
 // frame is passed in by the caller (typically m.spinner.View()), so the
 // indicator animates at whatever cadence the caller's spinner is
 // already running.
+//
+// Finished-within-linger tasks are skipped: they stay in Snapshot for
+// the :tasks overlay's Running list, but the title-bar "work in
+// progress" indicator must only reflect actually-running work. The
+// caller's gate (LenIndicator) already filters these out, but defending
+// here too keeps the function correct against future direct-snapshot
+// callers.
 func renderTasksIndicator(spinnerFrame string, snapshot []scheduler.Task) string {
 	// Count tasks that are NOT already shown by renderMutationProgress
-	// (mutation tasks with Total > 0 get their own progress indicator).
+	// (mutation tasks with Total > 0 get their own progress indicator)
+	// and are not lingering-finished entries.
 	n := 0
 	for _, t := range snapshot {
+		if t.IsFinished() {
+			continue
+		}
 		if t.Kind == scheduler.KindMutation && t.Total > 0 {
 			continue
 		}
@@ -69,8 +80,16 @@ func renderTasksIndicator(spinnerFrame string, snapshot []scheduler.Task) string
 // When multiple mutation tasks run concurrently, only the first one with
 // progress is shown (bulk operations are typically serial).
 // Returns empty string when no mutation task has progress.
+//
+// Finished-within-linger tasks are skipped (consistent with
+// renderTasksIndicator) so the progress label does not stay frozen after
+// a bulk operation completes — Snapshot still carries the entry for the
+// :tasks overlay, but the title-bar must only reflect running work.
 func renderMutationProgress(spinnerFrame string, snapshot []scheduler.Task) string {
 	for _, t := range snapshot {
+		if t.IsFinished() {
+			continue
+		}
 		if t.Kind != scheduler.KindMutation || t.Total == 0 {
 			continue
 		}
@@ -85,10 +104,14 @@ func renderMutationProgress(spinnerFrame string, snapshot []scheduler.Task) stri
 // background colour swapped to bg. Used by the title-bar render path
 // when a cluster colour tint is active, so the background of the
 // indicator matches the rest of the bar instead of leaking the default
-// barBg through.
+// barBg through. See renderTasksIndicator for the finished/mutation
+// filter rationale — kept identical here.
 func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []scheduler.Task, bg lipgloss.TerminalColor) string {
 	n := 0
 	for _, t := range snapshot {
+		if t.IsFinished() {
+			continue
+		}
 		if t.Kind == scheduler.KindMutation && t.Total > 0 {
 			continue
 		}
@@ -102,8 +125,13 @@ func renderTasksIndicatorOverrideBg(spinnerFrame string, snapshot []scheduler.Ta
 
 // renderMutationProgressOverrideBg is renderMutationProgress with the
 // background colour swapped to bg. See renderTasksIndicatorOverrideBg.
+// The finished-task filter mirrors renderMutationProgress so a tinted
+// title bar behaves identically.
 func renderMutationProgressOverrideBg(spinnerFrame string, snapshot []scheduler.Task, bg lipgloss.TerminalColor) string {
 	for _, t := range snapshot {
+		if t.IsFinished() {
+			continue
+		}
 		if t.Kind != scheduler.KindMutation || t.Total == 0 {
 			continue
 		}

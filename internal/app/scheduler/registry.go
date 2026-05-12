@@ -452,9 +452,14 @@ func (r *Registry) Snapshot() []Task {
 	return out
 }
 
-// Len returns the number of tasks currently visible (above the threshold).
-// Cheaper than len(r.Snapshot()) because it doesn't allocate the slice.
-// Used by the title bar to decide whether to render the indicator at all.
+// Len returns the number of tasks currently visible — running plus
+// finished-within-linger, all priorities, including silent. Cheaper
+// than len(r.Snapshot()) because it doesn't allocate the slice. The
+// overlay-facing count.
+//
+// For the title-bar "is anything actually running right now" gate,
+// use LenIndicator() instead — it additionally drops silent and
+// finished-lingering entries.
 //
 // The result may differ from len(Snapshot()) by at most one task when a
 // task's age is crossing the threshold between the two calls, because
@@ -468,32 +473,54 @@ func (r *Registry) Len() int {
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.lenLocked(false)
+	return r.lenLocked(false, false)
 }
 
-// LenIndicator returns the count of NON-silent visible tasks. Used by
-// the title-bar spinner gate: silent tasks (watch-mode auto-refresh)
-// must not activate the spinner because they fire every second.
+// LenIndicator returns the count of NON-silent, actually-running
+// tasks. Used by the title-bar spinner gate. Two filters:
+//   - silent tasks (watch-mode auto-refresh) are skipped so the spinner
+//     doesn't flicker every second.
+//   - finished-within-linger tasks are skipped so the spinner doesn't
+//     keep spinning for DefaultLingerDuration after every navigation.
+//     The linger window is for the :tasks overlay's Running list ("look
+//     at what just ran"), not for the title-bar "work in progress"
+//     indicator.
+//
+// Snapshot() / Len() retain the broader visible set (running +
+// finished-within-linger) so the overlay continues to render history.
 func (r *Registry) LenIndicator() int {
 	if r == nil {
 		return 0
 	}
 	r.mu.Lock()
 	defer r.mu.Unlock()
-	return r.lenLocked(true)
+	return r.lenLocked(true, true)
 }
 
-func (r *Registry) lenLocked(skipSilent bool) int {
+// lenLocked counts visible tasks under r.mu. skipSilent drops silent
+// tasks (watch-mode refresh). skipFinished drops finished-lingering
+// tasks; pass true for title-bar indicator semantics, false for the
+// overlay-facing count that includes the linger window.
+func (r *Registry) lenLocked(skipSilent, skipFinished bool) int {
 	now := time.Now()
 	n := 0
 	for _, t := range r.tasks {
 		if skipSilent && t.Silent {
 			continue
 		}
-		// Skip finished-lingering tasks past their linger window. We do
-		// not GC here (kept read-only style); Snapshot's prune handles
-		// eviction.
-		if !t.FinishedAt.IsZero() && r.lingerDuration > 0 && now.Sub(t.FinishedAt) > r.lingerDuration {
+		// Past-linger entries are skipped unconditionally; we do not GC
+		// here (kept read-only style), Snapshot's prune handles eviction.
+		// A non-positive lingerDuration means "do not linger" so finished
+		// tasks expire immediately for counting purposes.
+		if !t.FinishedAt.IsZero() {
+			if r.lingerDuration <= 0 || now.Sub(t.FinishedAt) > r.lingerDuration {
+				continue
+			}
+		}
+		// In-linger finished tasks: shown in the overlay (skipFinished
+		// false) but excluded from the title-bar indicator (skipFinished
+		// true) so the spinner reflects actual in-flight work.
+		if skipFinished && !t.FinishedAt.IsZero() {
 			continue
 		}
 		// Apply the start-time threshold only to running tasks.
