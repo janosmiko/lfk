@@ -111,6 +111,71 @@ func TestPostTabSwitch_RefreshesAtLevelContainers(t *testing.T) {
 		"postTabSwitchCmd at LevelContainers must fire a non-preview containers-refresh fetch")
 }
 
+// TestPostTabSwitch_RefreshesPreviewAtLevelResourceTypes covers the
+// LevelResourceTypes variant: at this level the right-pane preview is a
+// list of actual resources (e.g. pods) for the hovered resource type.
+// loadResources(forPreview=true) has a cache shortcut that returns
+// cached items synchronously when itemCache + cacheFingerprints match.
+// itemCache is per-tab, so mutations on a sibling tab (delete a pod)
+// don't propagate, and loadPreview after a tab switch serves stale
+// items. The user-visible symptom: switching back to a tab that's on
+// "Pods" shows the deleted pod until the user drills in, because
+// neither tab switch nor cursor-move-and-back refresh the preview.
+//
+// Fix is to drop the cache-freshness fingerprint for the hovered
+// resource type before loadPreview runs, so the shortcut misses and a
+// real K8s fetch happens. The itemCache entry itself is preserved so
+// other code paths (e.g. instant-paint on navigate-back) still hit.
+func TestPostTabSwitch_RefreshesPreviewAtLevelResourceTypes(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	gvrs := map[schema.GroupVersionResource]string{
+		{Group: "", Version: "v1", Resource: "pods"}: "PodList",
+	}
+	dyn := dynfake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrs)
+
+	m := newTabSwitchTestModel(t, model.LevelResourceTypes)
+	m.client = k8s.NewTestClient(clientfake.NewClientset(), dyn)
+
+	podsRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podsRT}
+	m.middleItems = []model.Item{
+		{Name: "Pods", Kind: "Pod", Extra: podsRT.ResourceRef()},
+	}
+	m.setCursor(0)
+
+	// Pre-populate the per-tab cache to mimic the state left behind on
+	// this tab after the user hovered Pods, then switched away. The
+	// fingerprint matches the current model so loadResources' shortcut
+	// would normally fire.
+	cacheKey := "test-ctx/pods"
+	m.itemCache[cacheKey] = []model.Item{{Name: "stale-pod"}}
+	m.cacheFingerprints[cacheKey] = m.fetchFingerprint()
+
+	cmd := m.postTabSwitchCmd()
+	if cmd == nil {
+		t.Fatal("postTabSwitchCmd returned nil at LevelResourceTypes/modeExplorer")
+	}
+
+	// Behavior assertion: the resulting batch must not produce a
+	// preview resourcesLoadedMsg containing the stale items. The fake
+	// client has no pods, so a real fetch yields an empty list; only
+	// the cache shortcut would yield "stale-pod".
+	sawStaleReturn := false
+	for _, c := range flattenBatch(cmd) {
+		if loaded, ok := c().(resourcesLoadedMsg); ok && loaded.forPreview {
+			for _, item := range loaded.items {
+				if item.Name == "stale-pod" {
+					sawStaleReturn = true
+				}
+			}
+		}
+	}
+	assert.False(t, sawStaleReturn,
+		"postTabSwitchCmd at LevelResourceTypes must not serve cached stale preview items — mutations on a sibling tab leave the per-tab cache out of date; loadPreview must re-fetch")
+}
+
 // TestPostTabSwitch_DoesNotRefreshAtLevelClusters keeps the cluster picker
 // view passive on tab switch — the cluster list itself doesn't go stale
 // within a session and discovery is heavy.

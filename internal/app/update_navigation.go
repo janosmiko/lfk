@@ -75,6 +75,28 @@ func (m *Model) invalidatePreviewForCursorChange() {
 	m.previewLoading = true
 }
 
+// invalidatePreviewFingerprintForCurrentSelection drops the cache-freshness
+// fingerprint for the resource type currently under the cursor at
+// LevelResourceTypes. loadResources(forPreview=true) keys its hover-cycle
+// cache shortcut on a (cache entry exists) AND (fingerprint matches)
+// check; clearing the fingerprint forces the next loadPreview through
+// the real fetch path. The cache entry itself is preserved so
+// navigation-history instant-paint still hits.
+//
+// No-op if the cursor is not on a discovered resource type (e.g. a
+// pseudo-resource like __overview__ or a collapsed group).
+func (m *Model) invalidatePreviewFingerprintForCurrentSelection() {
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return
+	}
+	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[m.nav.Context])
+	if !ok || rt.Resource == "" {
+		return
+	}
+	delete(m.cacheFingerprints, m.nav.Context+"/"+rt.Resource)
+}
+
 func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 	m.cancelAndReset()
 	m.requestGen++

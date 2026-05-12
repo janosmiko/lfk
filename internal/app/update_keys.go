@@ -127,11 +127,24 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 // 10) leaves tab B's saved list stale until the next watch tick or
 // manual refresh.
 //
-// LevelClusters / LevelResourceTypes are intentionally excluded: contexts
-// and resource-type discovery don't go stale during a session, and
+// At LevelResourceTypes the middle column (the list of resource types
+// itself) doesn't go stale during a session, but the right-pane preview
+// is a live resource list for the hovered type — those items DO go stale
+// when another tab mutates the cluster. loadResources(forPreview=true)
+// has a fresh-cache shortcut for hover-cycles that returns cached items
+// synchronously; the per-tab itemCache means mutations on a sibling tab
+// never invalidate it. Drop the cache-freshness fingerprint for the
+// hovered resource type so the shortcut misses and a real fetch runs.
+// The itemCache entry itself is left in place so navigation-history
+// instant-paint still works.
+//
+// LevelClusters stays excluded: the context list doesn't go stale and
 // re-running discovery on every tab switch would be wasteful.
 func (m Model) postTabSwitchCmd() tea.Cmd {
 	if m.mode == modeExplorer {
+		if m.nav.Level == model.LevelResourceTypes {
+			m.invalidatePreviewFingerprintForCurrentSelection()
+		}
 		cmds := []tea.Cmd{m.loadPreview()}
 		switch m.nav.Level {
 		case model.LevelResources, model.LevelOwned, model.LevelContainers:
