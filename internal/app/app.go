@@ -781,9 +781,9 @@ type Model struct {
 	kubetrisGame   *kubetrisGame
 }
 
-// Init loads the initial context list. Spinner starts lazily via Update's spinnerWanted gate (#206).
+// Init loads the initial context list.
 func (m Model) Init() tea.Cmd {
-	cmds := []tea.Cmd{m.loadContexts()}
+	cmds := []tea.Cmd{m.loadContexts(), m.spinner.Tick}
 	if m.stderrChan != nil {
 		cmds = append(cmds, m.waitForStderr())
 	}
