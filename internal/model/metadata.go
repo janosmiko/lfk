@@ -343,23 +343,24 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 
 	// Knative Serving — per-kind glyphs so the four-piece Service /
 	// Revision / Configuration / Route mental model reads at a glance.
-	// Service ⌘ (command/orchestrator), Revision ⟲ (versioned snapshot),
-	// Configuration ⌗ (template Revisions are minted from), Route ↦
-	// (the URL → backend mapping). Eventing kinds keep the generic CR
-	// glyph for now — first-class support lands in a follow-up.
+	// Service "⌘" (command/orchestrator), Revision "⟲" (versioned
+	// snapshot), Configuration "⌗" (template Revisions are minted
+	// from), Route "↦" (URL-to-backend mapping). Eventing kinds get
+	// their own block immediately below.
 	"serving.knative.dev/services":       {Category: "serving.knative.dev", DisplayName: "Knative Services", Icon: Icon{Unicode: "⌘", Simple: "[KS]", Emoji: "🚀", NerdFont: "\U000f0a07"}},
 	"serving.knative.dev/routes":         {Category: "serving.knative.dev", DisplayName: "Routes", Icon: Icon{Unicode: "↦", Simple: "[Rt]", Emoji: "🛣️", NerdFont: "\U000f04d5"}},
 	"serving.knative.dev/revisions":      {Category: "serving.knative.dev", DisplayName: "Revisions", Icon: Icon{Unicode: "⟲", Simple: "[Rv]", Emoji: "🔁", NerdFont: "\U000f0451"}},
 	"serving.knative.dev/configurations": {Category: "serving.knative.dev", DisplayName: "Configurations", Icon: Icon{Unicode: "⌗", Simple: "[Cf]", Emoji: "📝", NerdFont: "\U000f0493"}},
 
 	// Knative Eventing — per-kind glyphs so the event-mesh primitives
-	// read at a glance in the sidebar. Broker ❖ (central hub),
-	// Trigger ↯ (fires events from a Broker to a sink — narrow
-	// lightning; the emoji ⚡ is double-width and breaks single-cell
-	// layout), EventType ❑ (schema/typed-event registry), Channel
-	// ⇉ (event pipe), Subscription ◎ (Channel listener).
-	// InMemoryChannel and the many Source / Flow CRDs stay on the
-	// generic CRD path until a follow-up curates them.
+	// read at a glance in the sidebar. Broker "❖" (central hub),
+	// Trigger "↯" (events fire from a Broker to a sink — narrow
+	// lightning, since the wider emoji-form lightning renders at
+	// width 2 and breaks single-cell layout), EventType "❑"
+	// (schema/typed-event registry), Channel "⇉" (event pipe),
+	// Subscription "◎" (Channel listener). InMemoryChannel and the
+	// many Source / Flow CRDs stay on the generic CRD path until a
+	// follow-up curates them.
 	"eventing.knative.dev/triggers":       {Category: "eventing.knative.dev", DisplayName: "Triggers", Icon: Icon{Unicode: "↯", Simple: "[Tr]", Emoji: "⚡", NerdFont: "\U000f0241"}},
 	"eventing.knative.dev/brokers":        {Category: "eventing.knative.dev", DisplayName: "Brokers", Icon: Icon{Unicode: "❖", Simple: "[Br]", Emoji: "🎯", NerdFont: "\U000f1170"}},
 	"eventing.knative.dev/eventtypes":     {Category: "eventing.knative.dev", DisplayName: "EventTypes", Icon: Icon{Unicode: "❑", Simple: "[Et]", Emoji: "📋", NerdFont: "\U000f0219"}},
