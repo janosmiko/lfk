@@ -657,6 +657,15 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 			m.client.InvalidateDiscoveryCache(m.nav.Context)
 			cmds = append(cmds, m.discoverAPIResources(m.nav.Context))
 		}
+		// Drop the preview-cache fingerprint for the hovered resource type
+		// so updateResourceTypes' cascade through loadPreview misses the
+		// hover-cycle shortcut and fetches fresh data. Without this, a
+		// kubectl delete (or any external mutation) leaves the right-pane
+		// list stuck on the cached pre-mutation snapshot until the user
+		// tab-switches or drills in. The cascade carries the silent flag
+		// (set by loadResourceTypesFor from suppressBgtasks) so the watch
+		// tick doesn't flash the title-bar indicator on the resulting fetch.
+		m.invalidatePreviewFingerprintForCurrentSelection()
 		// Always emit the current cached list too so the UI repaints
 		// immediately while the fresh discovery runs in the background.
 		// updateAPIResourceDiscovery overwrites middleItems on completion.

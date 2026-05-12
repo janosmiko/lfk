@@ -87,7 +87,18 @@ func (m Model) updateResourceTypes(msg resourceTypesMsg) (tea.Model, tea.Cmd) {
 	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
 	m.clampCursor()
-	return m, m.loadPreview()
+	// Propagate the watch-tick silent flag into the preview cascade so a
+	// freshly-invalidated cache (refreshCurrentLevel at LevelResourceTypes
+	// drops the preview fingerprint to surface cluster-side mutations)
+	// doesn't flash the title-bar indicator every 2s. Matches the pattern
+	// in updateResourcesLoadedMain.
+	savedSuppress := m.suppressBgtasks
+	if msg.silent {
+		m.suppressBgtasks = true
+	}
+	cmd := m.loadPreview()
+	m.suppressBgtasks = savedSuppress
+	return m, cmd
 }
 
 func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, tea.Cmd) {

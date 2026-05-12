@@ -115,6 +115,133 @@ func TestWatchTickRemovesDeletedPodFromList(t *testing.T) {
 		"fake API has no pods after delete; middleItems must be empty")
 }
 
+// TestWatchTickRefreshesPreviewAtLevelResourceTypes covers the extension
+// of the per-tab cache fix: the right-pane preview at LevelResourceTypes
+// must refresh on every watch tick, not just on tab switch. Without this,
+// any external cluster mutation (kubectl delete, an operator, another
+// process) leaves the hovered resource type's preview stuck on the old
+// snapshot until the user tab-switches or drills in.
+//
+// Setup: model at LevelResourceTypes hovering Pods; cache pre-populated
+// with a "stale-pod" snapshot + a matching fingerprint, so the
+// hover-cycle shortcut in loadResources(forPreview=true) would normally
+// serve the stale items synchronously. Fake K8s has a single "live-pod".
+// One watch tick must drive the cascade through resourceTypesMsg →
+// loadPreview → real fetch and land "live-pod" in rightItems.
+func TestWatchTickRefreshesPreviewAtLevelResourceTypes(t *testing.T) {
+	t.Parallel()
+
+	scheme := runtime.NewScheme()
+	gvrs := map[schema.GroupVersionResource]string{
+		{Group: "", Version: "v1", Resource: "pods"}:                     "PodList",
+		{Group: "", Version: "v1", Resource: "events"}:                   "EventList",
+		{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "pods"}:  "PodMetricsList",
+		{Group: "metrics.k8s.io", Version: "v1beta1", Resource: "nodes"}: "NodeMetricsList",
+	}
+	livePod := &unstructured.Unstructured{}
+	livePod.SetUnstructuredContent(map[string]any{
+		"apiVersion": "v1",
+		"kind":       "Pod",
+		"metadata": map[string]any{
+			"name":              "live-pod",
+			"namespace":         "default",
+			"creationTimestamp": time.Now().Add(-1 * time.Hour).UTC().Format(time.RFC3339),
+		},
+		"status": map[string]any{"phase": "Running"},
+	})
+	dyn := dynfake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrs, livePod)
+
+	podsRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m := Model{
+		nav: model.NavigationState{
+			Level:   model.LevelResourceTypes,
+			Context: "test-ctx",
+		},
+		tabs:                []TabState{{}},
+		selectedItems:       make(map[string]bool),
+		cursorMemory:        make(map[string]int),
+		itemCache:           make(map[string][]model.Item),
+		cacheFingerprints:   make(map[string]string),
+		discoveredResources: map[string][]model.ResourceTypeEntry{"test-ctx": {podsRT}},
+		// Tell refreshCurrentLevel that CRD discovery is already in flight
+		// so it doesn't fire a second discoverAPIResources call — the fake
+		// dynamic client only knows about Pod/Event/Metrics GVRs (the test
+		// is focused on the preview fetch, not CRD discovery).
+		discoveringContexts: map[string]bool{"test-ctx": true},
+		execMu:              &sync.Mutex{},
+		namespace:           "default",
+		scheduler:           scheduler.New(0),
+		reqCtx:              context.Background(),
+		watchMode:           true,
+	}
+	// middleItems must mirror BuildSidebarItems' output so updateResourceTypes
+	// (which overwrites middleItems with that result) doesn't move our cursor
+	// onto a synthetic dashboard / group-header row. The cursor indexes into
+	// visibleMiddleItems (which injects group headers and may collapse
+	// groups), not middleItems directly.
+	m.middleItems = model.BuildSidebarItems([]model.ResourceTypeEntry{podsRT})
+	m.allGroupsExpanded = true // keep groups expanded so visibleMiddleItems contains Pods
+	visible := m.visibleMiddleItems()
+	cursorSet := false
+	for i, item := range visible {
+		if item.Extra == podsRT.ResourceRef() {
+			m.setCursor(i)
+			cursorSet = true
+			break
+		}
+	}
+	if !cursorSet {
+		t.Fatalf("test setup: Pods row not found in visibleMiddleItems; visible=%+v", visible)
+	}
+	m.client = k8s.NewTestClient(clientfake.NewClientset(), dyn)
+	m.scheduler.StartWorkers()
+	t.Cleanup(m.scheduler.StopWorkers)
+
+	// Mimic the state of a tab where the user previously hovered Pods
+	// and the per-tab cache locked in a since-stale snapshot.
+	cacheKey := "test-ctx/pods"
+	m.itemCache[cacheKey] = []model.Item{{Name: "stale-pod"}}
+	m.cacheFingerprints[cacheKey] = m.fetchFingerprint()
+	m.rightItems = []model.Item{{Name: "stale-pod"}}
+
+	// Run one watch tick through the full message pipeline. The cascade
+	// is resourceTypesMsg → updateResourceTypes → loadPreview → fetch →
+	// resourcesLoadedMsg{forPreview} → updateResourcesLoadedPreview, so
+	// the test drains both message kinds.
+	mAny, cmd := m.updateWatchTick(watchTickMsg{})
+	m = mAny.(Model)
+	for _, c := range flattenBatch(cmd) {
+		switch typed := c().(type) {
+		case resourceTypesMsg:
+			modelAny, follow := m.updateResourceTypes(typed)
+			m = modelAny.(Model)
+			for _, fc := range flattenBatch(follow) {
+				if loaded, ok := fc().(resourcesLoadedMsg); ok {
+					modelAny, _ = m.updateResourcesLoaded(loaded)
+					m = modelAny.(Model)
+				}
+			}
+		case resourcesLoadedMsg:
+			modelAny, _ := m.updateResourcesLoaded(typed)
+			m = modelAny.(Model)
+		}
+	}
+
+	for _, item := range m.rightItems {
+		assert.NotEqual(t, "stale-pod", item.Name,
+			"watch tick at LevelResourceTypes must replace cached stale preview items, not serve them")
+	}
+	sawLive := false
+	for _, item := range m.rightItems {
+		if item.Name == "live-pod" {
+			sawLive = true
+			break
+		}
+	}
+	assert.True(t, sawLive,
+		"watch tick at LevelResourceTypes must surface live pods into the preview (rightItems=%+v)", m.rightItems)
+}
+
 // flattenBatch unwraps a tea.Cmd that may be a tea.Batch into a slice of
 // individual commands. Bubble Tea's BatchMsg holds a list of cmds; we
 // invoke each to drive the test pipeline manually.
