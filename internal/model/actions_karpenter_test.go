@@ -7,11 +7,11 @@ import (
 )
 
 // TestKarpenterActions_NodeClaim locks in the per-kind action set for
-// karpenter.sh/NodeClaim. The three Karpenter-specific verbs — Disrupt,
-// Cordon Node, Drain Node — must be present; Disrupt is the
-// type-to-confirm path (delete the NodeClaim → Karpenter terminates the
-// underlying node), Cordon Node / Drain Node resolve status.nodeName
-// and forward to the standard kubectl helpers.
+// karpenter.sh/NodeClaim. The four Karpenter-specific verbs — Disrupt,
+// Cordon / Uncordon / Drain Node — must be present; Disrupt is the
+// type-to-confirm path (delete the NodeClaim → Karpenter terminates
+// the underlying node), and Cordon / Uncordon / Drain Node resolve
+// status.nodeName and forward to the standard kubectl helpers.
 func TestKarpenterActions_NodeClaim(t *testing.T) {
 	items := ActionsForKind("NodeClaim")
 	labels := make([]string, 0, len(items))
@@ -22,6 +22,8 @@ func TestKarpenterActions_NodeClaim(t *testing.T) {
 		"NodeClaim must offer Disrupt (type-to-confirm; deletes the NodeClaim so Karpenter terminates the node)")
 	assert.Contains(t, labels, "Cordon Node",
 		"NodeClaim must offer Cordon Node (resolves status.nodeName then runs kubectl cordon)")
+	assert.Contains(t, labels, "Uncordon Node",
+		"NodeClaim must offer Uncordon Node (resolves status.nodeName then runs kubectl uncordon)")
 	assert.Contains(t, labels, "Drain Node",
 		"NodeClaim must offer Drain Node (resolves status.nodeName then runs the drain flow)")
 	// Standard actions still present.
@@ -51,12 +53,14 @@ func TestKarpenterActions_NodePool(t *testing.T) {
 		"NodePool does not offer Disrupt — that verb only applies to a single NodeClaim")
 	assert.NotContains(t, labels, "Cordon Node",
 		"NodePool has no single underlying node to cordon")
+	assert.NotContains(t, labels, "Uncordon Node",
+		"NodePool has no single underlying node to uncordon")
 	assert.NotContains(t, labels, "Drain Node",
 		"NodePool has no single underlying node to drain")
 }
 
 // TestKarpenterActions_EC2NodeClass surfaces only generic actions. The
-// node-bound verbs (Disrupt / Cordon Node / Drain Node) live on
+// node-bound verbs (Disrupt / Cordon / Uncordon / Drain Node) live on
 // NodeClaim where status.nodeName resolves to a concrete node.
 func TestKarpenterActions_EC2NodeClass(t *testing.T) {
 	items := ActionsForKind("EC2NodeClass")
@@ -72,6 +76,8 @@ func TestKarpenterActions_EC2NodeClass(t *testing.T) {
 		"EC2NodeClass is a node-launch template, not a node — Disrupt does not apply")
 	assert.NotContains(t, labels, "Cordon Node",
 		"EC2NodeClass is a node-launch template, not a node — Cordon Node does not apply")
+	assert.NotContains(t, labels, "Uncordon Node",
+		"EC2NodeClass is a node-launch template, not a node — Uncordon Node does not apply")
 	assert.NotContains(t, labels, "Drain Node",
 		"EC2NodeClass is a node-launch template, not a node — Drain Node does not apply")
 }

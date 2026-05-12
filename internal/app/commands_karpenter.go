@@ -13,8 +13,8 @@ import (
 )
 
 // executeActionKarpenter dispatches the Karpenter-specific action
-// labels (Disrupt, Cordon Node, Drain Node) into the matching Tea
-// command. Returns ok=true when the label is handled here so
+// labels (Disrupt, Cordon / Uncordon / Drain Node) into the matching
+// Tea command. Returns ok=true when the label is handled here so
 // executeActionExtended can early-return without growing its switch.
 // Disrupt opens the type-to-confirm overlay; the deferred mutation
 // lives in update_overlays_confirm.go's "Disrupt" branch.
@@ -25,6 +25,9 @@ func (m Model) executeActionKarpenter(actionLabel string) (tea.Model, tea.Cmd, b
 		return mdl, cmd, true
 	case "Cordon Node":
 		mdl, cmd := m.executeActionSimpleLoading("Cordoning node from NodeClaim", m.cordonNodeFromClaim)
+		return mdl, cmd, true
+	case "Uncordon Node":
+		mdl, cmd := m.executeActionSimpleLoading("Uncordoning node from NodeClaim", m.uncordonNodeFromClaim)
 		return mdl, cmd, true
 	case "Drain Node":
 		mdl, cmd := m.executeActionSimpleLoading("Draining node from NodeClaim", m.drainNodeFromClaim)
@@ -62,6 +65,14 @@ func (m Model) disruptNodeClaim() tea.Cmd {
 // claim has no node bound yet (Karpenter still provisioning).
 func (m Model) cordonNodeFromClaim() tea.Cmd {
 	return m.kubectlNodeCmdFromClaim("cordon")
+}
+
+// uncordonNodeFromClaim mirrors cordonNodeFromClaim but runs
+// `kubectl uncordon <node>` against the resolved name. Provided so
+// users can re-mark a node as schedulable directly from the NodeClaim
+// row without bouncing through the Node view.
+func (m Model) uncordonNodeFromClaim() tea.Cmd {
+	return m.kubectlNodeCmdFromClaim("uncordon")
 }
 
 // drainNodeFromClaim mirrors cordonNodeFromClaim but runs

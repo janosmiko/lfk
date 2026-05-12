@@ -111,7 +111,11 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		content := ui.RenderNamespaceOverlay(m.filteredOverlayItems(), m.overlayFilter.Value, m.overlayCursor, m.namespace, m.allNamespaces, m.selectedNamespaces, m.nsFilterMode, overlayH)
 		return content, overlayW, overlayH, true
 	case overlayAction:
-		w := min(70, m.width-10)
+		// Adaptive width: grow to fit the longest action line so Karpenter
+		// and other long descriptions never wrap, floored at 70 so short
+		// menus keep the historical width and capped at terminal-10 so the
+		// overlay leaves margin on each side.
+		w := ui.ActionOverlayWidth(m.overlayItems, m.width-10)
 		return ui.RenderActionOverlay(m.overlayItems, m.overlayCursor, w), w, min(15, m.height-6), true
 	case overlayQuitConfirm:
 		// Width: outer 32, inner = 32 − 2(border) − 4(left+right padding) = 26.

@@ -445,23 +445,24 @@ func actionsForOperatorKind(kind string) ([]ActionMenuItem, bool) {
 // actionsForKarpenterKind returns actions for Karpenter resource kinds.
 // NodeClaim represents a single provisioned node — Disrupt deletes the
 // claim (Karpenter then terminates the underlying instance), while
-// Cordon Node / Drain Node resolve the claim's status.nodeName and
-// forward to the standard kubectl helpers so the same UX as a plain
-// Node row works from the NodeClaim view. NodePool and EC2NodeClass
-// stick to the generic Describe/Edit/Delete/Events surface for now —
-// per-pool disruption controls (spec.disruption.budgets) overlap with
-// user-managed config and are deferred to a follow-up.
+// Cordon / Uncordon / Drain Node resolve the claim's status.nodeName
+// and forward to the standard kubectl helpers so the same UX as a
+// plain Node row works from the NodeClaim view. NodePool and
+// EC2NodeClass stick to the generic Describe/Edit/Delete/Events surface
+// for now — per-pool disruption controls (spec.disruption.budgets)
+// overlap with user-managed config and are deferred to a follow-up.
 func actionsForKarpenterKind(kind string) ([]ActionMenuItem, bool) {
 	switch kind {
 	case "NodeClaim":
 		return []ActionMenuItem{
-			{Label: "Disrupt", Description: "Delete this NodeClaim (Karpenter terminates the node)", Key: "X"},
-			{Label: "Cordon Node", Description: "Cordon the underlying node from status.nodeName", Key: "c"},
-			{Label: "Drain Node", Description: "Drain the underlying node from status.nodeName", Key: "n"},
+			{Label: "Disrupt", Description: "Delete claim; Karpenter terminates the node", Key: "X"},
+			{Label: "Cordon Node", Description: "Cordon the bound node", Key: "c"},
+			{Label: "Uncordon Node", Description: "Uncordon the bound node", Key: "u"},
+			{Label: "Drain Node", Description: "Drain the bound node (evict pods)", Key: "n"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this NodeClaim", Key: "D"},
-			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in current namespace", Key: "b"},
+			{Label: "Debug Pod", Description: "Run alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}, true
 	case "NodePool":
@@ -469,7 +470,7 @@ func actionsForKarpenterKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this NodePool", Key: "D"},
-			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in current namespace", Key: "b"},
+			{Label: "Debug Pod", Description: "Run alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}, true
 	case "EC2NodeClass":
@@ -477,7 +478,7 @@ func actionsForKarpenterKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this EC2NodeClass", Key: "D"},
-			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in current namespace", Key: "b"},
+			{Label: "Debug Pod", Description: "Run alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}, true
 	}

@@ -252,38 +252,6 @@ func RenderNamespaceOverlay(items []model.Item, filter string, cursor int, curre
 	return b.String()
 }
 
-// RenderActionOverlay renders the action menu overlay content.
-func RenderActionOverlay(items []model.Item, cursor int, width int) string {
-	// Account for overlay border (1 each side) + padding (2 each side) = 6 total.
-	innerW := max(width-6, 20)
-
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Actions"))
-	b.WriteString("\n")
-
-	for i, item := range items {
-		keyHint := ""
-		if item.Status != "" {
-			keyHint = "[" + item.Status + "] "
-		}
-		label := fmt.Sprintf("  %s%s - %s", keyHint, item.Name, item.Extra)
-		// Pad label with spaces to fill the inner width.
-		if len(label) < innerW {
-			label += strings.Repeat(" ", innerW-len(label))
-		}
-		if i == cursor {
-			b.WriteString(OverlaySelectedStyle.Render(label))
-		} else {
-			b.WriteString(OverlayNormalStyle.Render(label))
-		}
-		if i < len(items)-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	return b.String()
-}
-
 // RenderConfirmOverlay renders the y/n confirmation overlay content
 // for standard destructive actions (delete, drain).
 //

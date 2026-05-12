@@ -11,7 +11,7 @@ import (
 // was at the boundary before Karpenter labels were added.
 func (m Model) executeActionExtended(actionLabel string) (tea.Model, tea.Cmd, bool) {
 	switch actionLabel {
-	case "Disrupt", "Cordon Node", "Drain Node":
+	case "Disrupt", "Cordon Node", "Uncordon Node", "Drain Node":
 		return m.executeActionKarpenter(actionLabel)
 	case "Configure AutoSync", "Sync", "Sync (Apply Only)", "Refresh",
 		"Terminate Sync", "Watch Workflow", "Suspend Workflow",

@@ -93,6 +93,45 @@ func TestRenderActionOverlay(t *testing.T) {
 	assert.Contains(t, result, "[D]")
 }
 
+// --- ActionOverlayWidth ---
+
+func TestActionOverlayWidth(t *testing.T) {
+	t.Run("short menu uses the 70-wide floor", func(t *testing.T) {
+		items := []model.Item{
+			{Name: "Delete", Extra: "Delete this resource", Status: "d"},
+			{Name: "Describe", Extra: "Describe resource", Status: "v"},
+		}
+		// Wide terminal, short content -> floor at 70.
+		assert.Equal(t, 70, ActionOverlayWidth(items, 200))
+	})
+
+	t.Run("long description grows the overlay", func(t *testing.T) {
+		// 80-char Extra forces the overlay past the 70-wide floor.
+		long := strings.Repeat("x", 80)
+		items := []model.Item{
+			{Name: "Long Action", Extra: long, Status: "L"},
+		}
+		got := ActionOverlayWidth(items, 200)
+		assert.Greater(t, got, 70, "menu must grow when content exceeds the 70-wide floor")
+	})
+
+	t.Run("clamps to terminal width", func(t *testing.T) {
+		long := strings.Repeat("x", 200)
+		items := []model.Item{
+			{Name: "Long Action", Extra: long, Status: "L"},
+		}
+		// Cap at 90 -> result must not exceed 90 even though content is wider.
+		assert.Equal(t, 90, ActionOverlayWidth(items, 90))
+	})
+
+	t.Run("non-positive max disables clamp", func(t *testing.T) {
+		// maxWidth <= 0 means "no terminal info"; the floor still applies
+		// so callers never get a tiny overlay even on an uninitialised model.
+		items := []model.Item{{Name: "x", Extra: "y", Status: "z"}}
+		assert.Equal(t, 70, ActionOverlayWidth(items, 0))
+	})
+}
+
 // --- RenderConfirmOverlay ---
 
 func TestRenderConfirmOverlay(t *testing.T) {
