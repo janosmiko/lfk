@@ -31,6 +31,13 @@ type resourceTypesMsg struct {
 	// preview at LevelClusters still displays seeded items so the user
 	// sees *something* while hovering a context.
 	seeded bool
+	// silent mirrors resourcesLoadedMsg.silent: captured from
+	// suppressBgtasks at construction time so updateResourceTypes can
+	// propagate it into the loadPreview cascade. Without this, the watch
+	// tick at LevelResourceTypes would flash the title-bar indicator on
+	// every refresh once the preview cache shortcut is bypassed for
+	// cluster-side mutations to surface.
+	silent bool
 }
 
 type resourcesLoadedMsg struct {

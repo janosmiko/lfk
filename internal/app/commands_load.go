@@ -99,8 +99,9 @@ func (m Model) loadResourceTypesFor(kctx string) tea.Cmd {
 		items = model.BuildSidebarItems(model.SeedResources())
 		seeded = true
 	}
+	silent := m.suppressBgtasks
 	return func() tea.Msg {
-		return resourceTypesMsg{items: items, seeded: seeded}
+		return resourceTypesMsg{items: items, seeded: seeded, silent: silent}
 	}
 }
 
