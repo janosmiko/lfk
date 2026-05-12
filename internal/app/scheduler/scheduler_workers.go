@@ -3,6 +3,7 @@ package scheduler
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sync/atomic"
 )
 
@@ -264,7 +265,7 @@ func (r *Registry) runTask(task *queuedTask) {
 
 	visID := r.startWithPriority(task.req.Kind, task.req.Priority, task.req.Name, task.req.Target, task.req.SilentTrack)
 	r.registerRunning(task.req.KubeContext, rt)
-	value, err := task.req.Fn(ctx)
+	value, err := safeRunFn(ctx, task.req.Fn)
 	cancel()
 	r.unregisterRunning(task.req.KubeContext, rt)
 
@@ -312,4 +313,22 @@ func (r *Registry) queueFor(kctx string) *ctxQueue {
 		return nil
 	}
 	return r.ctxQueues[kctx]
+}
+
+// safeRunFn calls fn with the given context and converts any panic into
+// an error. Without this guard, a panic in user-provided Fn unwinds
+// through runTask, skipping unregisterRunning + Finish + future delivery
+// — the registry entry stays in r.tasks with FinishedAt zero, lenLocked
+// counts it forever, the title-bar spinner spins forever, and the
+// caller's scheduleK8sCall closure blocks on the unresolved future. The
+// worker goroutine also dies, draining the pool by one slot. Recovery
+// here lets runTask run its normal cleanup branches with err set to a
+// descriptive panic error.
+func safeRunFn(ctx context.Context, fn func(context.Context) (any, error)) (value any, err error) {
+	defer func() {
+		if p := recover(); p != nil {
+			err = fmt.Errorf("task panic: %v", p)
+		}
+	}()
+	return fn(ctx)
 }
