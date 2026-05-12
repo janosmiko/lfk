@@ -378,9 +378,8 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 func RenderResourceUsage(cpuUsed, cpuReq, cpuLim, memUsed, memReq, memLim int64, width int) string {
 	labelStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Bold(true).Background(BaseBg)
 
-	lines := make([]string, 0, 4)
+	lines := make([]string, 0, 3)
 	lines = append(lines, DimStyle.Bold(true).Render("RESOURCE USAGE"))
-	lines = append(lines, "")
 
 	// CPU bar.
 	cpuLabel := labelStyle.Render("CPU: ")
