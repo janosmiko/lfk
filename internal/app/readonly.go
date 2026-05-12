@@ -71,6 +71,14 @@ var mutatingActions = map[string]bool{
 	"Suspend":       true,
 	"Resume":        true,
 
+	// Karpenter NodeClaim mutations. Disrupt removes the underlying
+	// node; Cordon / Uncordon / Drain Node operate on the node bound
+	// to the NodeClaim.
+	"Disrupt":       true,
+	"Cordon Node":   true,
+	"Uncordon Node": true,
+	"Drain Node":    true,
+
 	// Helm release mutations.
 	"Edit Values": true,
 	"Upgrade":     true,

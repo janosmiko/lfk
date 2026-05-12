@@ -275,10 +275,13 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"infrastructure.cluster.x-k8s.io/azuremanagedclusters":     {Category: "infrastructure.cluster.x-k8s.io", DisplayName: "AzureManagedClusters", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"infrastructure.cluster.x-k8s.io/azuremanagedmachinepools": {Category: "infrastructure.cluster.x-k8s.io", DisplayName: "AzureManagedMachinePools", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 
-	// Karpenter — ecosystem CRDs; use the generic fallback (core Node uses "⌹").
-	"karpenter.sh/nodepools":           {Category: "karpenter.sh", DisplayName: "NodePools", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
-	"karpenter.sh/nodeclaims":          {Category: "karpenter.sh", DisplayName: "NodeClaims", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
-	"karpenter.k8s.aws/ec2nodeclasses": {Category: "karpenter.k8s.aws", DisplayName: "EC2NodeClasses", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
+	// Karpenter — kind-specific glyphs so node-provisioning CRDs read
+	// at a glance against the surrounding generic-CR rows. Core Node
+	// uses "⌹"; we deliberately stay distinct so a NodePool / NodeClaim
+	// row never gets confused with a real Node row.
+	"karpenter.sh/nodepools":           {Category: "karpenter.sh", DisplayName: "NodePools", Icon: Icon{Unicode: "⏣", Simple: "[NP]", Emoji: "🗄️", NerdFont: "\U000f048b"}},
+	"karpenter.sh/nodeclaims":          {Category: "karpenter.sh", DisplayName: "NodeClaims", Icon: Icon{Unicode: "⌬", Simple: "[NC]", Emoji: "📦", NerdFont: "\U000f048b"}},
+	"karpenter.k8s.aws/ec2nodeclasses": {Category: "karpenter.k8s.aws", DisplayName: "EC2NodeClasses", Icon: Icon{Unicode: "⌶", Simple: "[EC]", Emoji: "🟧", NerdFont: "\U000f0174"}},
 
 	// Prometheus operator — ecosystem CRDs.
 	"monitoring.coreos.com/servicemonitors": {Category: "monitoring.coreos.com", DisplayName: "ServiceMonitors", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
