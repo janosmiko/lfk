@@ -79,6 +79,10 @@ var mutatingActions = map[string]bool{
 	"Uncordon Node": true,
 	"Drain Node":    true,
 
+	// Knative Serving mutations. Activate patches the parent Service's
+	// spec.traffic to send 100% to a Revision.
+	"Activate": true,
+
 	// Helm release mutations.
 	"Edit Values": true,
 	"Upgrade":     true,

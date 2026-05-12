@@ -5,11 +5,15 @@ import (
 )
 
 // executeActionExtended dispatches Argo / Helm / Flux / cert-manager /
-// KEDA / ExternalSecrets / Karpenter action labels. Returns (model, cmd,
-// handled). Lives in its own file so update_actions.go stays under the
-// 800-line file cap (revive: file-length-limit); the original switch
-// was at the boundary before Karpenter labels were added.
+// KEDA / ExternalSecrets / Karpenter / Knative action labels. Returns
+// (model, cmd, handled). Lives in its own file so update_actions.go
+// stays under the 800-line file cap (revive: file-length-limit); the
+// original switch was at the boundary before ecosystem labels were
+// added.
 func (m Model) executeActionExtended(actionLabel string) (tea.Model, tea.Cmd, bool) {
+	if mdl, cmd, ok := m.executeActionKnative(actionLabel); ok {
+		return mdl, cmd, true
+	}
 	switch actionLabel {
 	case "Disrupt", "Cordon Node", "Uncordon Node", "Drain Node":
 		return m.executeActionKarpenter(actionLabel)

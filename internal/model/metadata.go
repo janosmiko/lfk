@@ -341,11 +341,16 @@ var BuiltInMetadata = map[string]DisplayMetadata{
 	"kafka.strimzi.io/kafkausers":    {Category: "kafka.strimzi.io", DisplayName: "KafkaUsers", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"kafka.strimzi.io/kafkabridges":  {Category: "kafka.strimzi.io", DisplayName: "KafkaBridges", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 
-	// knative
-	"serving.knative.dev/services":       {Category: "serving.knative.dev", DisplayName: "Knative Services", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
-	"serving.knative.dev/routes":         {Category: "serving.knative.dev", DisplayName: "Routes", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
-	"serving.knative.dev/revisions":      {Category: "serving.knative.dev", DisplayName: "Revisions", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
-	"serving.knative.dev/configurations": {Category: "serving.knative.dev", DisplayName: "Configurations", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
+	// Knative Serving — per-kind glyphs so the four-piece Service /
+	// Revision / Configuration / Route mental model reads at a glance.
+	// Service ⌘ (command/orchestrator), Revision ⟲ (versioned snapshot),
+	// Configuration ⌗ (template Revisions are minted from), Route ↦
+	// (the URL → backend mapping). Eventing kinds keep the generic CR
+	// glyph for now — first-class support lands in a follow-up.
+	"serving.knative.dev/services":       {Category: "serving.knative.dev", DisplayName: "Knative Services", Icon: Icon{Unicode: "⌘", Simple: "[KS]", Emoji: "🚀", NerdFont: "\U000f0a07"}},
+	"serving.knative.dev/routes":         {Category: "serving.knative.dev", DisplayName: "Routes", Icon: Icon{Unicode: "↦", Simple: "[Rt]", Emoji: "🛣️", NerdFont: "\U000f04d5"}},
+	"serving.knative.dev/revisions":      {Category: "serving.knative.dev", DisplayName: "Revisions", Icon: Icon{Unicode: "⟲", Simple: "[Rv]", Emoji: "🔁", NerdFont: "\U000f0451"}},
+	"serving.knative.dev/configurations": {Category: "serving.knative.dev", DisplayName: "Configurations", Icon: Icon{Unicode: "⌗", Simple: "[Cf]", Emoji: "📝", NerdFont: "\U000f0493"}},
 	"eventing.knative.dev/triggers":      {Category: "eventing.knative.dev", DisplayName: "Triggers", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 	"eventing.knative.dev/brokers":       {Category: "eventing.knative.dev", DisplayName: "Brokers", Icon: Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"}},
 }
