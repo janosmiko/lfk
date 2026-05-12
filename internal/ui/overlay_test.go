@@ -130,6 +130,20 @@ func TestActionOverlayWidth(t *testing.T) {
 		items := []model.Item{{Name: "x", Extra: "y", Status: "z"}}
 		assert.Equal(t, 70, ActionOverlayWidth(items, 0))
 	})
+
+	t.Run("wide glyphs are measured by visual cells", func(t *testing.T) {
+		// CJK glyphs occupy two cells each; a byte-length implementation
+		// would compute 240 bytes for 80 runes and exceed the 90-wide
+		// cap, while the cell-width implementation correctly clamps to
+		// 90 because 80 runes × 2 cells = 160 visual cells. The test
+		// fails if the width helper regresses to len() semantics.
+		wide := strings.Repeat("你", 80) // "你" × 80
+		items := []model.Item{
+			{Name: "Wide", Extra: wide, Status: "W"},
+		}
+		assert.Equal(t, 90, ActionOverlayWidth(items, 90),
+			"wide glyphs must be clamped by visual width, not byte length")
+	})
 }
 
 // --- RenderConfirmOverlay ---

@@ -54,9 +54,13 @@ func RenderActionOverlay(items []model.Item, cursor int, width int) string {
 			keyHint = "[" + item.Status + "] "
 		}
 		label := fmt.Sprintf("  %s%s - %s", keyHint, item.Name, item.Extra)
-		// Pad label with spaces to fill the inner width.
-		if len(label) < innerW {
-			label += strings.Repeat(" ", innerW-len(label))
+		// Pad label to fill the inner width. lipgloss.Width counts visual
+		// cells so wide glyphs (CJK, emoji) don't push the row past the
+		// box edge — len() counts bytes and would underfill on multi-byte
+		// runes, leaving a ragged right side under the inverse-video
+		// selection highlight.
+		if lw := lipgloss.Width(label); lw < innerW {
+			label += strings.Repeat(" ", innerW-lw)
 		}
 		if i == cursor {
 			b.WriteString(OverlaySelectedStyle.Render(label))
