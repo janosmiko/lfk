@@ -188,7 +188,7 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `delete` | `D` | Delete resource (force delete Pod/Job if already deleting) |
 | `force_delete` | `X` | Force delete (Pod/Job only) |
 | `scale` | `S` | Scale resource (deployments, statefulsets, daemonsets) |
-| `edit` | `E` | Edit selected resource in $EDITOR |
+| `edit` | `E` | Edit selected resource in $KUBE_EDITOR or $EDITOR |
 | `label_editor` | `i` | Edit labels/annotations |
 | `secret_editor` | `e` | Secret/ConfigMap editor |
 | `column_toggle` | `,` | Column visibility toggle |

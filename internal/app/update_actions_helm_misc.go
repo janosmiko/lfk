@@ -134,7 +134,7 @@ func (m Model) executeActionEditValues() (tea.Model, tea.Cmd) {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
-	m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml → $EDITOR → helm upgrade --reuse-values", name, ns, ctx))
+	m.addLogEntry("DBG", fmt.Sprintf("$ helm get values %s -n %s --kube-context %s -o yaml → $KUBE_EDITOR/$EDITOR → helm upgrade --reuse-values", name, ns, ctx))
 	return m, m.editHelmValues()
 }
 

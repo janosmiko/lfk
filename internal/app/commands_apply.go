@@ -52,10 +52,7 @@ func (m Model) applyFromClipboard() tea.Cmd {
 	_ = tmpFile.Close()
 
 	// Open in editor for review/editing before applying.
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "vi"
-	}
+	editor := editorCommand()
 	tmpPath := tmpFile.Name()
 
 	// Record modification time before opening editor.
@@ -64,7 +61,7 @@ func (m Model) applyFromClipboard() tea.Cmd {
 		origModTime = fi.ModTime()
 	}
 
-	cmd := exec.Command(editor, tmpPath)
+	cmd := exec.Command(editor[0], append(editor[1:], tmpPath)...)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			_ = os.Remove(tmpPath)
@@ -74,8 +71,8 @@ func (m Model) applyFromClipboard() tea.Cmd {
 	})
 }
 
-// applyTemplate creates a temp file with the template YAML, opens it in $EDITOR,
-// then applies it with kubectl after the editor exits.
+// applyTemplate creates a temp file with the template YAML, opens it in
+// $KUBE_EDITOR or $EDITOR, then applies it with kubectl after the editor exits.
 func (m Model) applyTemplate(tmpl model.ResourceTemplate) tea.Cmd {
 	ns := m.effectiveNamespace()
 	if ns == "" {
@@ -103,10 +100,7 @@ func (m Model) applyTemplate(tmpl model.ResourceTemplate) tea.Cmd {
 	_ = tmpFile.Close()
 
 	// Determine editor.
-	editor := os.Getenv("EDITOR")
-	if editor == "" {
-		editor = "vi"
-	}
+	editor := editorCommand()
 
 	tmpPath := tmpFile.Name()
 
@@ -116,7 +110,7 @@ func (m Model) applyTemplate(tmpl model.ResourceTemplate) tea.Cmd {
 		origModTime = fi.ModTime()
 	}
 
-	cmd := exec.Command(editor, tmpPath)
+	cmd := exec.Command(editor[0], append(editor[1:], tmpPath)...)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
 			_ = os.Remove(tmpPath)

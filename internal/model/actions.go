@@ -269,7 +269,7 @@ func actionsForWorkloadKind(kind string) ([]ActionMenuItem, bool) {
 		return []ActionMenuItem{
 			{Label: "Values", Description: "View user-supplied values", Key: "u"},
 			{Label: "All Values", Description: "View all values (including defaults)", Key: "A"},
-			{Label: "Edit Values", Description: "Edit values in $EDITOR", Key: "E"},
+			{Label: "Edit Values", Description: "Edit values in $KUBE_EDITOR or $EDITOR", Key: "E"},
 			{Label: "Diff", Description: "Compare default vs user-supplied values", Key: "d"},
 			{Label: "Upgrade", Description: "Upgrade release to latest chart version", Key: "U"},
 			{Label: "Rollback", Description: "Pick from revision history to apply rollback", Key: "R"},

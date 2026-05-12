@@ -134,7 +134,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
 | `L` | View logs for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
-| `E` | Edit selected resource in $EDITOR | `edit` |
+| `E` | Edit selected resource in $KUBE_EDITOR or $EDITOR | `edit` |
 | `R` | Refresh current view | `refresh` |
 | `v` | Describe selected resource | `describe` |
 | `D` | Delete resource (force delete Pod/Job if already deleting, force finalize others) | `delete` |
@@ -251,7 +251,7 @@ a single-character slot.
 | `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
-| `Ctrl+E` | Edit resource in `$EDITOR` |
+| `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
 | `q` / `Esc` | Back to explorer |
 
 ## Describe View
@@ -989,7 +989,7 @@ keybindings:
   refresh: "R"           # Refresh view
   restart: "r"           # Restart resource (action menu only)
   exec: "s"              # Exec into container (action menu only)
-  edit: "E"              # Edit in $EDITOR
+  edit: "E"              # Edit in $KUBE_EDITOR or $EDITOR
   describe: "v"          # Describe resource
   delete: "D"            # Delete resource
   force_delete: "X"      # Force delete

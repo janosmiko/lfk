@@ -10,6 +10,7 @@ require (
 	github.com/charmbracelet/x/ansi v0.11.7
 	github.com/creack/pty v1.1.24
 	github.com/google/gopacket v1.1.19
+	github.com/google/shlex v0.0.0-20191202100458-e7afc7fbc510
 	github.com/hinshun/vt10x v0.0.0-20220301184237-5011da428d02
 	github.com/muesli/termenv v0.16.0
 	github.com/robfig/cron/v3 v3.0.1
