@@ -13,6 +13,11 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 )
 
+// TestGetNodeClaimNodeName covers the happy path: a NodeClaim with
+// status.nodeName populated. The TUI relies on this value to forward
+// Cordon / Uncordon / Drain Node from the NodeClaim row to the
+// kubectl helpers, so the helper must return the literal string from
+// the API, not a derived form.
 func TestGetNodeClaimNodeName(t *testing.T) {
 	scheme := runtime.NewScheme()
 	gvrs := map[schema.GroupVersionResource]string{
@@ -58,6 +63,11 @@ func TestGetNodeClaimNodeName_NotYetBound(t *testing.T) {
 	assert.Empty(t, got, "unbound NodeClaim returns empty nodeName, not an error")
 }
 
+// TestGetNodeClaimNodeName_NotFound exercises the lookup-failure path:
+// the NodeClaim doesn't exist (deleted, never created, or RBAC denies
+// the Get). The helper must surface a wrapped error so callers can
+// distinguish "missing" from the legitimate ("", nil) "not bound yet"
+// state covered by TestGetNodeClaimNodeName_NotYetBound.
 func TestGetNodeClaimNodeName_NotFound(t *testing.T) {
 	scheme := runtime.NewScheme()
 	gvrs := map[schema.GroupVersionResource]string{
@@ -71,6 +81,12 @@ func TestGetNodeClaimNodeName_NotFound(t *testing.T) {
 	assert.Contains(t, err.Error(), "getting NodeClaim")
 }
 
+// TestDisruptNodeClaim asserts the happy path of the Karpenter
+// disrupt action: the NodeClaim is deleted from the API. Karpenter's
+// real-world cascade (terminating the underlying cloud instance and
+// the matching core Node) is not exercised here — the dynamic fake
+// only models the NodeClaim object — but the delete is the trigger
+// Karpenter watches for, so verifying the delete is sufficient.
 func TestDisruptNodeClaim(t *testing.T) {
 	scheme := runtime.NewScheme()
 	gvrs := map[schema.GroupVersionResource]string{
@@ -92,6 +108,11 @@ func TestDisruptNodeClaim(t *testing.T) {
 	require.Error(t, err, "DisruptNodeClaim must delete the NodeClaim from the API")
 }
 
+// TestDisruptNodeClaim_NotFound asserts that disrupting a NodeClaim
+// that no longer exists returns a wrapped error rather than silently
+// succeeding. The TUI relies on this so the type-to-confirm overlay's
+// status message accurately reports the failure instead of claiming
+// success on a no-op.
 func TestDisruptNodeClaim_NotFound(t *testing.T) {
 	scheme := runtime.NewScheme()
 	gvrs := map[schema.GroupVersionResource]string{
