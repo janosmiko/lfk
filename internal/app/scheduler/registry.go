@@ -510,8 +510,12 @@ func (r *Registry) lenLocked(skipSilent, skipFinished bool) int {
 		}
 		// Past-linger entries are skipped unconditionally; we do not GC
 		// here (kept read-only style), Snapshot's prune handles eviction.
-		if !t.FinishedAt.IsZero() && r.lingerDuration > 0 && now.Sub(t.FinishedAt) > r.lingerDuration {
-			continue
+		// A non-positive lingerDuration means "do not linger" so finished
+		// tasks expire immediately for counting purposes.
+		if !t.FinishedAt.IsZero() {
+			if r.lingerDuration <= 0 || now.Sub(t.FinishedAt) > r.lingerDuration {
+				continue
+			}
 		}
 		// In-linger finished tasks: shown in the overlay (skipFinished
 		// false) but excluded from the title-bar indicator (skipFinished

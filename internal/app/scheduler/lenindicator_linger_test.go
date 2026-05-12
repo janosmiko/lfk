@@ -43,8 +43,12 @@ func TestLenIndicator_SkipsFinishedLingering(t *testing.T) {
 	assert.Equal(t, 1, r.Len(),
 		"finished-lingering task still counts via Len (overlay-facing snapshot still includes it)")
 
-	// And of course past the linger window both drop to zero.
-	time.Sleep(600 * time.Millisecond)
-	assert.Equal(t, 0, r.LenIndicator(), "past-linger: nothing visible to the indicator")
-	assert.Equal(t, 0, r.Len(), "past-linger: nothing visible at all")
+	// And of course past the linger window both drop to zero. Poll
+	// instead of a fixed Sleep so a slow CI runner doesn't flake on a
+	// near-miss timing window — the assertion is on the post-linger
+	// state, not on a specific deadline.
+	assert.Eventually(t, func() bool {
+		return r.LenIndicator() == 0 && r.Len() == 0
+	}, 2*time.Second, 10*time.Millisecond,
+		"past-linger: both LenIndicator and Len must drop to zero")
 }
