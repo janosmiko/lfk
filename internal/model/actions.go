@@ -40,6 +40,15 @@ func ActionsForBulk(kind string) []ActionMenuItem {
 }
 
 // ActionsForKind returns the action menu items appropriate for a given resource kind.
+//
+// Kind collision note: Knative's serving.knative.dev/Service has Kind="Service",
+// which matches the core /v1/Service handler in actionsForCoreKind. Because the
+// core Service menu (Tail Logs, Port Forward, etc.) is largely applicable to
+// Knative Services too — they expose pods underneath — we deliberately do NOT
+// route Knative Services through actionsForKnativeKind. Knative-specific verbs
+// (traffic split editing, scale-min/max via autoscaling.knative.dev annotations)
+// will land on a follow-up that distinguishes Service-by-APIGroup. Revision /
+// Configuration / Route are Knative-only kinds and route here.
 func ActionsForKind(kind string) []ActionMenuItem {
 	if actions, ok := actionsForCoreKind(kind); ok {
 		return actions
@@ -57,6 +66,9 @@ func ActionsForKind(kind string) []ActionMenuItem {
 		return actions
 	}
 	if actions, ok := actionsForKarpenterKind(kind); ok {
+		return actions
+	}
+	if actions, ok := actionsForKnativeKind(kind); ok {
 		return actions
 	}
 	return actionsDefault()
@@ -479,6 +491,50 @@ func actionsForKarpenterKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Delete", Description: "Delete this EC2NodeClass", Key: "D"},
 			{Label: "Debug Pod", Description: "Run alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}, true
+	}
+	return nil, false
+}
+
+// actionsForKnativeKind returns actions for Knative Serving resource
+// kinds. Revision exposes Activate — patching the parent Service's
+// spec.traffic to send 100% of traffic to the selected revision, the
+// canonical Knative rollback / promotion gesture. Configuration and
+// Route stay on the standard surface; their CRD printer columns (URL,
+// LatestReady, Ready) carry the operationally useful state and the
+// generic Describe/Edit/Delete/Events covers the rest.
+//
+// Knative Service (Kind="Service") is NOT routed here — see the
+// comment on ActionsForKind. The core Service menu (Tail Logs, Port
+// Forward, etc.) applies to Knative Services through the pods they
+// expose, and a Knative-specific Service overlay (traffic split, scale
+// min/max) is deferred to a follow-up.
+func actionsForKnativeKind(kind string) ([]ActionMenuItem, bool) {
+	switch kind {
+	case "Revision":
+		return []ActionMenuItem{
+			{Label: "Activate", Description: "Send 100% traffic to this revision (rolls the parent Service)", Key: "a"},
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this Revision", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}, true
+	case "Configuration":
+		return []ActionMenuItem{
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this Configuration", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
+			{Label: "Events", Description: "Show related events", Key: "V"},
+		}, true
+	case "Route":
+		return []ActionMenuItem{
+			{Label: "Describe", Description: "Describe resource", Key: "v"},
+			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
+			{Label: "Delete", Description: "Delete this Route", Key: "D"},
+			{Label: "Debug Pod", Description: "Run standalone alpine debug pod in namespace", Key: "b"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}, true
 	}
