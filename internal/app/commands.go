@@ -60,7 +60,7 @@ var startupTips = []string{
 	"Press y to copy resource name, Y to copy YAML",
 	"Press . for quick filter presets (failing pods, not-ready, etc.)",
 	"Press T to preview different color themes, in preview mode press t to hide theme background",
-	"Press e to edit resources with your $EDITOR",
+	"Press e to edit resources with your $KUBE_EDITOR or $EDITOR",
 	"Press v to describe a resource (like kubectl describe)",
 	"Press p to pin/unpin CRD groups for quick access",
 	"Press Shift+H to surface rarely used resource types (CSI, webhooks, leases, advanced core)",

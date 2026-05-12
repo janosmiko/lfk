@@ -88,7 +88,7 @@ func helpSections() []helpSection {
 				{kb.ActionMenu, "Action menu: l=tail logs (last 10 lines + follow), L=full logs, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, crash investigator, traffic capture, RBAC permissions"},
 				{kb.Logs, "View full logs for selected resource"},
 				{kb.Describe, "Describe selected resource"},
-				{kb.Edit, "Edit selected resource in $EDITOR"},
+				{kb.Edit, "Edit selected resource in $KUBE_EDITOR or $EDITOR"},
 				{kb.SecretEditor, "Secret/ConfigMap editor (inline key-value editing)"},
 				{kb.LabelEditor, "Edit labels/annotations for selected resource"},
 				{kb.Refresh, "Refresh current view"},

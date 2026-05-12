@@ -68,7 +68,7 @@ fi
 # Save checksum before editing
 BEFORE=$(md5sum "$TMPFILE" 2>/dev/null || md5 -q "$TMPFILE" 2>/dev/null || cat "$TMPFILE")
 
-${EDITOR:-${VISUAL:-vi}} "$TMPFILE"
+${KUBE_EDITOR:-${EDITOR:-${VISUAL:-vi}}} "$TMPFILE"
 
 AFTER=$(md5sum "$TMPFILE" 2>/dev/null || md5 -q "$TMPFILE" 2>/dev/null || cat "$TMPFILE")
 
