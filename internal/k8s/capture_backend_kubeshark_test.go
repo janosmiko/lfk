@@ -42,6 +42,7 @@ func TestDetectKubeshark_Found(t *testing.T) {
 	}
 	if info == nil {
 		t.Fatal("info nil, want populated")
+		return // unreachable; defensive return so staticcheck SA5011 doesn't flag the dereferences below as nilable
 	}
 	if info.Namespace != "kubeshark" || info.HubService != "kubeshark-hub" || info.HubPort != 80 {
 		t.Errorf("info = %+v, want ns=kubeshark name=kubeshark-hub port=80", *info)
@@ -85,6 +86,7 @@ func TestDetectKubeshark_HonoursOverrideNamespace(t *testing.T) {
 	}
 	if info == nil {
 		t.Fatal("info nil — probe did not find Service in the override namespace")
+		return // unreachable; defensive return so staticcheck SA5011 doesn't flag the dereference below
 	}
 	if info.Namespace != "trafcap" {
 		t.Errorf("info.Namespace = %q, want trafcap", info.Namespace)
