@@ -221,6 +221,14 @@ var allowListedUnicodeCollisions = map[string]string{
 	"cert-manager.io/issuers":        "cert-issuer",
 	"cert-manager.io/clusterissuers": "cert-issuer",
 
+	// Core Node + Karpenter NodePool/NodeClaim share the node-server
+	// NerdFont glyph (nf-md-server) — they are all "node-y" things, and
+	// users scanning the sidebar benefit from a visual family. Distinct
+	// Unicode glyphs (⌹ / ⏣ / ⌬) keep the text-mode terminals readable.
+	"/nodes":                  "karpenter-node-family",
+	"karpenter.sh/nodepools":  "karpenter-node-family",
+	"karpenter.sh/nodeclaims": "karpenter-node-family",
+
 	// Cert-manager ACME flow shares (CertificateRequests, Orders, Challenges).
 	"cert-manager.io/certificaterequests": "cert-acme-flow",
 	"acme.cert-manager.io/orders":         "cert-acme-flow",

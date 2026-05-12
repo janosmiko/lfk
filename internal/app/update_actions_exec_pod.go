@@ -400,6 +400,23 @@ func (m Model) executeActionForceFinalize() (tea.Model, tea.Cmd) { //nolint:unpa
 	return m, nil
 }
 
+// executeActionDisruptNodeClaim handles the "Disrupt" action on a
+// Karpenter NodeClaim row. Disrupting deletes the NodeClaim, and
+// Karpenter then terminates the underlying cloud instance. Routed
+// through the same type-to-confirm overlay (user types DELETE + Enter)
+// as Force Delete / Force Finalize because the cluster loses capacity
+// until Karpenter reprovisions. The deferred mutation runs in the
+// overlay handler's "Disrupt" branch.
+func (m Model) executeActionDisruptNodeClaim() (tea.Model, tea.Cmd) { //nolint:unparam // consistent action handler signature
+	m.confirmAction = m.actionCtx.name + " (DISRUPT)"
+	m.confirmTitle = "Confirm Disrupt NodeClaim"
+	m.confirmQuestion = fmt.Sprintf("Disrupt NodeClaim %s? Karpenter will terminate the underlying node.", m.actionCtx.name)
+	m.confirmTypeInput.Clear()
+	m.overlay = overlayConfirmType
+	m.pendingAction = "Disrupt"
+	return m, nil
+}
+
 // executeActionCordon handles the "Cordon" action.
 func (m Model) executeActionCordon() (tea.Model, tea.Cmd) {
 	name := m.actionCtx.name

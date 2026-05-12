@@ -132,6 +132,11 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				selectedCount := len(m.finalizerSearchSelected)
 				m.addLogEntry("DBG", fmt.Sprintf("Removing finalizer %q from %d resources", m.finalizerSearchPattern, selectedCount))
 				return m, m.bulkRemoveFinalizer()
+			case "Disrupt":
+				// Karpenter NodeClaim disrupt: kubectl delete nodeclaim.
+				// Cluster-scoped, so no -n flag; rt.Resource is "nodeclaims".
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s %s --context %s", rt.Resource, name, ctx))
+				return m, m.disruptNodeClaim()
 			}
 		}
 		return m, nil
