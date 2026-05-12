@@ -4,11 +4,21 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 )
+
+// knativeActivateTimeout bounds the two API calls (GET Revision + PATCH
+// Service) so a hung apiserver doesn't block the worker that ran the
+// Activate command. trackBgTask doesn't propagate the scheduler's
+// per-task timeout into its inner function (no ctx parameter), so the
+// mutation client method has to self-time-out. 30s matches
+// scheduler.DefaultRequestTimeout, the budget the worker pool would
+// otherwise honour.
+const knativeActivateTimeout = 30 * time.Second
 
 // knativeRevisionGVR / knativeServiceGVR are the v1 GroupVersionResources
 // for Knative Serving. Knative promoted Serving to v1 in 0.16+; older
@@ -48,7 +58,9 @@ func (c *Client) ActivateKnativeRevision(contextName, namespace, revisionName st
 	if err != nil {
 		return "", err
 	}
-	rev, err := dynClient.Resource(knativeRevisionGVR).Namespace(namespace).Get(context.Background(), revisionName, metav1.GetOptions{})
+	ctx, cancel := context.WithTimeout(context.Background(), knativeActivateTimeout)
+	defer cancel()
+	rev, err := dynClient.Resource(knativeRevisionGVR).Namespace(namespace).Get(ctx, revisionName, metav1.GetOptions{})
 	if err != nil {
 		return "", fmt.Errorf("getting Revision %s: %w", revisionName, err)
 	}
@@ -71,7 +83,7 @@ func (c *Client) ActivateKnativeRevision(contextName, namespace, revisionName st
 		return "", fmt.Errorf("building Activate patch for %s: %w", revisionName, err)
 	}
 	if _, err := dynClient.Resource(knativeServiceGVR).Namespace(namespace).Patch(
-		context.Background(), parent, k8stypes.MergePatchType, patchBody, metav1.PatchOptions{},
+		ctx, parent, k8stypes.MergePatchType, patchBody, metav1.PatchOptions{},
 	); err != nil {
 		return "", fmt.Errorf("activating Revision %s on Service %s: %w", revisionName, parent, err)
 	}
