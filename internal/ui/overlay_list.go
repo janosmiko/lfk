@@ -47,6 +47,13 @@ type OverlayListConfig struct {
 	Filter       string
 	FilterActive bool
 
+	// Filterable, when true, ALWAYS renders the filter prompt — showing a
+	// dim "/ to filter" placeholder when Filter is empty and FilterActive
+	// is false. Use this on overlays that accept "/" to enter filter
+	// mode: the row sits in the same spot whether or not the user is
+	// filtering, so pressing "/" doesn't push the list down by one row.
+	Filterable bool
+
 	// Feature flags — render the matching item field/marker when true.
 	MultiSelect      bool
 	ShowActiveMarker bool
@@ -120,11 +127,15 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		b.WriteString(OverlayDimStyle.Render(cfg.Subtitle))
 		b.WriteString("\n")
 	}
-	if cfg.FilterActive || cfg.Filter != "" {
-		b.WriteString(OverlayDimStyle.Render("filter: "))
-		b.WriteString(OverlayInputStyle.Render(cfg.Filter))
-		if cfg.FilterActive {
+	if cfg.Filterable || cfg.FilterActive || cfg.Filter != "" {
+		switch {
+		case cfg.FilterActive:
+			b.WriteString(OverlayFilterStyle.Render("/ " + cfg.Filter))
 			b.WriteString(OverlayDimStyle.Render("█"))
+		case cfg.Filter != "":
+			b.WriteString(OverlayFilterStyle.Render("/ " + cfg.Filter))
+		default:
+			b.WriteString(OverlayDimStyle.Render("/ to filter"))
 		}
 		b.WriteString("\n")
 	}

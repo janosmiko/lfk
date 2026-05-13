@@ -633,7 +633,7 @@ func (m *Model) filteredSchemeNames() []string {
 func (m *Model) schemeFirstVisibleSelectable() int {
 	items := m.schemeDisplayItems()
 	start := ui.GetOverlaySchemeScroll()
-	end := min(start+ui.SchemeOverlayMaxVisible, len(items))
+	end := min(start+ui.GetOverlaySchemeVisible(), len(items))
 	for i := start; i < end; i++ {
 		if items[i].selectIdx >= 0 {
 			return items[i].selectIdx
@@ -647,7 +647,7 @@ func (m *Model) schemeFirstVisibleSelectable() int {
 func (m *Model) schemeLastVisibleSelectable() int {
 	items := m.schemeDisplayItems()
 	start := ui.GetOverlaySchemeScroll()
-	end := min(start+ui.SchemeOverlayMaxVisible, len(items))
+	end := min(start+ui.GetOverlaySchemeVisible(), len(items))
 	for i := end - 1; i >= start; i-- {
 		if items[i].selectIdx >= 0 {
 			return items[i].selectIdx

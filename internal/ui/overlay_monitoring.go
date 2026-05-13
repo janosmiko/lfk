@@ -22,8 +22,23 @@ func GetOverlaySchemeScroll() int { return overlaySchemeScroll }
 // resolution in update_overlays_selectors.go keeps resolving rows correctly.
 func SetOverlaySchemeScroll(s int) { overlaySchemeScroll = s }
 
-// SchemeOverlayMaxVisible is the number of visible lines in the colorscheme overlay.
-const SchemeOverlayMaxVisible = 20
+// overlaySchemeVisible mirrors the viewport size last used by the
+// colorscheme overlay renderer so the mouse-click / page-scroll
+// handlers can resolve hit rows against the correct viewport. The
+// renderer writes this on every render via SetOverlaySchemeVisible;
+// the default 20 matches the legacy constant for the brief window
+// before the first render.
+var overlaySchemeVisible = 20
+
+// GetOverlaySchemeVisible returns the current colorscheme overlay
+// viewport size (number of display lines, including any interleaved
+// section headers).
+func GetOverlaySchemeVisible() int { return overlaySchemeVisible }
+
+// SetOverlaySchemeVisible updates the viewport size to match what the
+// renderer is actually painting. Called from renderColorschemeOverlay
+// on every render.
+func SetOverlaySchemeVisible(n int) { overlaySchemeVisible = n }
 
 // ErrorLogVisualParams holds visual selection state for the error log overlay.
 type ErrorLogVisualParams struct {
