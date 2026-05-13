@@ -2,6 +2,7 @@ package app
 
 import (
 	"slices"
+	"strings"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -214,6 +215,90 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 		MaxVisible:       maxVisible,
 		EmptyMessage:     "No matching columns",
 	}, width-6)
+}
+
+// renderColorschemeOverlay maps the colorscheme picker (with its group-
+// divider headers between Dark / Light / etc. sections) onto OverlayList.
+// Headers render as "── Name ──" via OverlayList's Header item flag; the
+// caller's `cursor` (selectable-index) is translated to the display index
+// inside the items slice so OverlayList can highlight the right row.
+//
+// Scroll lives in ui.overlaySchemeScroll so the mouse-click resolver in
+// update_overlays_selectors.go reads it via ui.GetOverlaySchemeScroll;
+// the helper updates it on every render via ui.SetOverlaySchemeScroll.
+func renderColorschemeOverlay(m Model) string {
+	const maxVisible = ui.SchemeOverlayMaxVisible
+
+	items, cursorDisplayIdx := buildColorschemeItems(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor)
+	if len(items) == 0 {
+		return ui.RenderOverlayList(nil, ui.OverlayListConfig{
+			Title:        "Select Color Scheme",
+			Filter:       m.schemeFilter.Value,
+			FilterActive: m.schemeFilterMode,
+			EmptyMessage: "No matching schemes",
+		}, min(50, m.width-10)-4)
+	}
+
+	prev := ui.GetOverlaySchemeScroll()
+	identity := func(from, to int) int { return to - from }
+	scroll := ui.VimScrollOff(prev, cursorDisplayIdx, len(items), maxVisible, ui.ConfigScrollOff, identity)
+	ui.SetOverlaySchemeScroll(scroll)
+
+	return ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:            "Select Color Scheme",
+		Cursor:           cursorDisplayIdx,
+		Filter:           m.schemeFilter.Value,
+		FilterActive:     m.schemeFilterMode,
+		ShowActiveMarker: true,
+		Scroll:           scroll,
+		MaxVisible:       maxVisible,
+	}, min(50, m.width-10)-4)
+}
+
+// buildColorschemeItems converts SchemeEntry slice + filter into the
+// flat []OverlayListItem the renderer needs, and returns the display
+// index of the row matching `cursor` (which is an index into selectable
+// entries only — the caller's cursor space ignores headers). When the
+// filter is non-empty, header rows are dropped entirely.
+func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) ([]ui.OverlayListItem, int) {
+	var items []ui.OverlayListItem
+	cursorDisplayIdx := 0
+	selectIdx := 0
+	if filter == "" {
+		for _, e := range entries {
+			if e.IsHeader {
+				items = append(items, ui.OverlayListItem{Name: e.Name, Header: true})
+				continue
+			}
+			if selectIdx == cursor {
+				cursorDisplayIdx = len(items)
+			}
+			items = append(items, ui.OverlayListItem{
+				Name:   e.Name,
+				Active: e.Name == ui.ActiveSchemeName,
+			})
+			selectIdx++
+		}
+	} else {
+		lower := strings.ToLower(filter)
+		for _, e := range entries {
+			if e.IsHeader {
+				continue
+			}
+			if !strings.Contains(e.Name, lower) {
+				continue
+			}
+			if selectIdx == cursor {
+				cursorDisplayIdx = len(items)
+			}
+			items = append(items, ui.OverlayListItem{
+				Name:   e.Name,
+				Active: e.Name == ui.ActiveSchemeName,
+			})
+			selectIdx++
+		}
+	}
+	return items, cursorDisplayIdx
 }
 
 // renderNamespaceOverlay maps the namespace selector (with its "All

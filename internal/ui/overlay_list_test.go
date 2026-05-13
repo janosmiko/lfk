@@ -226,6 +226,37 @@ func TestRenderOverlayList(t *testing.T) {
 		assert.NotContains(t, out, "item-J")
 	})
 
+	t.Run("Header row renders as a divider with the section name", func(t *testing.T) {
+		items := []OverlayListItem{
+			{Name: "Dark Themes", Header: true},
+			{Name: "tokyonight-storm", Key: "1"},
+		}
+		out := RenderOverlayList(items, OverlayListConfig{ShowKey: true}, w)
+		assert.Contains(t, out, "── Dark Themes ──")
+		// Selectable row still rendered with its key hint.
+		assert.Contains(t, out, "[1]")
+		assert.Contains(t, out, "tokyonight-storm")
+	})
+
+	t.Run("Header rows ignore other field flags", func(t *testing.T) {
+		// A header item with Key/Status/Active set should NOT render those —
+		// it's purely a divider regardless of what the caller fills in.
+		items := []OverlayListItem{{
+			Name:   "Dark Themes",
+			Header: true,
+			Key:    "x",
+			Status: "s",
+			Active: true,
+		}}
+		out := RenderOverlayList(items, OverlayListConfig{
+			ShowKey: true, ShowStatus: true, ShowActiveMarker: true,
+		}, w)
+		assert.Contains(t, out, "── Dark Themes ──")
+		assert.NotContains(t, out, "[x]")
+		assert.NotContains(t, out, "[s]")
+		assert.NotContains(t, out, "✓")
+	})
+
 	t.Run("scrollbar absent when list fits in window", func(t *testing.T) {
 		items := []OverlayListItem{{Name: "a"}, {Name: "b"}}
 		out := RenderOverlayList(items, OverlayListConfig{MaxVisible: 5}, w)

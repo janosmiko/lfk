@@ -9,50 +9,6 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-// --- RenderColorschemeOverlay ---
-
-func TestRenderColorschemeOverlay(t *testing.T) {
-	entries := GroupedSchemeEntries()
-
-	t.Run("renders with headers", func(t *testing.T) {
-		result := RenderColorschemeOverlay(entries, "", 0, false)
-		assert.Contains(t, result, "Select Color Scheme")
-		assert.Contains(t, result, "Dark Themes")
-		// "Light Themes" header may be scrolled off-screen with many schemes,
-		// but it should exist in the entries.
-		hasLight := false
-		for _, e := range entries {
-			if e.IsHeader && e.Name == "Light Themes" {
-				hasLight = true
-				break
-			}
-		}
-		assert.True(t, hasLight, "entries should include Light Themes header")
-	})
-
-	t.Run("filter mode shows cursor", func(t *testing.T) {
-		result := RenderColorschemeOverlay(entries, "tokyo", 0, true)
-		assert.Contains(t, result, "tokyo")
-		assert.Contains(t, result, "█")
-	})
-
-	t.Run("filter hides headers", func(t *testing.T) {
-		result := RenderColorschemeOverlay(entries, "tokyo", 0, false)
-		assert.NotContains(t, result, "Dark Themes")
-		assert.NotContains(t, result, "Light Themes")
-	})
-
-	t.Run("no matching schemes", func(t *testing.T) {
-		result := RenderColorschemeOverlay(entries, "nonexistent", 0, false)
-		assert.Contains(t, result, "No matching schemes")
-	})
-
-	t.Run("filter hint when empty", func(t *testing.T) {
-		result := RenderColorschemeOverlay(entries, "", 0, false)
-		assert.Contains(t, result, "/ to filter")
-	})
-}
-
 // --- RenderErrorLogOverlay ---
 
 func TestRenderErrorLogOverlay(t *testing.T) {

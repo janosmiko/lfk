@@ -27,6 +27,12 @@ type OverlayListItem struct {
 	Active      bool   // ✓ marker when cfg.ShowActiveMarker
 	Selected    bool   // checkbox state when cfg.MultiSelect
 	Disabled    bool   // renders dim and (by convention) can't be acted on
+
+	// Header rows render as group dividers ("── Name ──") in CategoryStyle.
+	// All other field flags are ignored — no marker, no key, no status,
+	// no description. The caller is responsible for keeping cfg.Cursor on
+	// a non-Header row (header rows aren't navigable targets).
+	Header bool
 }
 
 // OverlayListConfig is the rendering contract for OverlayList. Feature
@@ -179,6 +185,9 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 // controls whether the active-marker column is reserved — see
 // anyActive for the collapse rule.
 func itemPlainLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) string {
+	if it.Header {
+		return "── " + it.Name + " ──"
+	}
 	var p strings.Builder
 	if cfg.MultiSelect {
 		if it.Selected {
@@ -211,6 +220,9 @@ func itemPlainLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) st
 // itemStyledLine returns the item with per-segment styling (dim
 // description, filter-color key hint, etc.) suitable for non-cursor rows.
 func itemStyledLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) string {
+	if it.Header {
+		return CategoryStyle.Render("── " + it.Name + " ──")
+	}
 	var p strings.Builder
 	if cfg.MultiSelect {
 		if it.Selected {
