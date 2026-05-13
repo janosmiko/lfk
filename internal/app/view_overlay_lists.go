@@ -177,7 +177,7 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 	for i, e := range entries {
 		items[i] = ui.OverlayListItem{Name: e.Key, Active: e.Visible}
 	}
-	maxVisible := max(height-8, 1)
+	maxVisible := max(height-5, 1)
 	return ui.RenderOverlayList(items, ui.OverlayListConfig{
 		Title:            "Column Visibility",
 		Cursor:           m.columnToggleCursor,
@@ -200,7 +200,7 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 // the helper stores its computed scroll offset there before rendering so
 // the click handler keeps resolving rows correctly.
 func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
-	maxVisible := min(max(height-8, 1), max(len(items), 1))
+	maxVisible := min(max(height-5, 1), max(len(items), 1))
 	scroll := scrollOffsetFromCursor(m.overlayCursor, maxVisible)
 	ui.SetOverlayNsScroll(scroll)
 

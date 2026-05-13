@@ -86,12 +86,12 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		b.WriteString("\n")
 	}
 	if cfg.Subtitle != "" {
-		b.WriteString(OverlayDimStyle.Render("  " + cfg.Subtitle))
+		b.WriteString(OverlayDimStyle.Render(cfg.Subtitle))
 		b.WriteString("\n")
 	}
 	if cfg.FilterActive || cfg.Filter != "" {
 		b.WriteString("\n")
-		b.WriteString(OverlayDimStyle.Render("  filter: "))
+		b.WriteString(OverlayDimStyle.Render("filter: "))
 		b.WriteString(OverlayInputStyle.Render(cfg.Filter))
 		if cfg.FilterActive {
 			b.WriteString(OverlayDimStyle.Render("█"))
@@ -105,10 +105,10 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		if msg == "" {
 			msg = "No items"
 		}
-		b.WriteString(OverlayDimStyle.Render("  " + msg))
+		b.WriteString(OverlayDimStyle.Render(msg))
 		if cfg.FooterHint != "" {
 			b.WriteString("\n\n")
-			b.WriteString(OverlayDimStyle.Render("  " + cfg.FooterHint))
+			b.WriteString(OverlayDimStyle.Render(cfg.FooterHint))
 		}
 		return b.String()
 	}
@@ -132,7 +132,7 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 
 	if cfg.FooterHint != "" {
 		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("  " + cfg.FooterHint))
+		b.WriteString(OverlayDimStyle.Render(cfg.FooterHint))
 	}
 
 	return b.String()
@@ -143,7 +143,6 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 // the highlight background) and for width measurement.
 func itemPlainLine(it OverlayListItem, cfg OverlayListConfig) string {
 	var p strings.Builder
-	p.WriteString("  ")
 	if cfg.MultiSelect {
 		if it.Selected {
 			p.WriteString("☑ ")
@@ -176,7 +175,6 @@ func itemPlainLine(it OverlayListItem, cfg OverlayListConfig) string {
 // description, filter-color key hint, etc.) suitable for non-cursor rows.
 func itemStyledLine(it OverlayListItem, cfg OverlayListConfig) string {
 	var p strings.Builder
-	p.WriteString("  ")
 	if cfg.MultiSelect {
 		if it.Selected {
 			p.WriteString(OverlayFilterStyle.Render("☑ "))
