@@ -100,15 +100,44 @@ func (m Model) handleClusterColorOverlayKey(key string) (tea.Model, tea.Cmd) {
 	}
 	rows := m.clusterColorOverlayRowCount()
 	switch key {
-	case "down", "j":
+	case "down", "j", "ctrl+n":
 		if rows > 0 {
 			m.clusterColorOverlayCursor = (m.clusterColorOverlayCursor + 1) % rows
 		}
 		return m, nil
-	case "up", "k":
+	case "up", "k", "ctrl+p":
 		if rows > 0 {
 			m.clusterColorOverlayCursor = (m.clusterColorOverlayCursor - 1 + rows) % rows
 		}
+		return m, nil
+	case "ctrl+d":
+		m.clusterColorOverlayCursor = clampOverlayCursor(m.clusterColorOverlayCursor, 10, rows-1)
+		return m, nil
+	case "ctrl+u":
+		m.clusterColorOverlayCursor = clampOverlayCursor(m.clusterColorOverlayCursor, -10, rows-1)
+		return m, nil
+	case "ctrl+f", "pgdown":
+		m.clusterColorOverlayCursor = clampOverlayCursor(m.clusterColorOverlayCursor, 20, rows-1)
+		return m, nil
+	case "ctrl+b", "pgup":
+		m.clusterColorOverlayCursor = clampOverlayCursor(m.clusterColorOverlayCursor, -20, rows-1)
+		return m, nil
+	case "g":
+		if m.pendingG {
+			m.pendingG = false
+			m.clusterColorOverlayCursor = 0
+			return m, nil
+		}
+		m.pendingG = true
+		return m, nil
+	case "G", "end":
+		if rows > 0 {
+			m.clusterColorOverlayCursor = rows - 1
+		}
+		return m, nil
+	case "home":
+		m.pendingG = false
+		m.clusterColorOverlayCursor = 0
 		return m, nil
 	case "/":
 		m.clusterColorFilterMode = true
