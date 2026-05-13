@@ -366,6 +366,27 @@ func TestBuildConfigMatchFn(t *testing.T) {
 			t.Error("expected status to fail")
 		}
 	})
+
+	t.Run("invert negates result", func(t *testing.T) {
+		// status=Bound + invert=true should match anything that is NOT Bound,
+		// and reject anything that IS Bound.
+		fn := buildConfigMatchFn(ui.ConfigFilterMatch{Status: "Bound", Invert: true})
+		if fn(model.Item{Status: "Bound"}) {
+			t.Error("expected Bound NOT to match an inverted status=Bound rule")
+		}
+		if !fn(model.Item{Status: "Pending"}) {
+			t.Error("expected Pending to match an inverted status=Bound rule")
+		}
+	})
+
+	t.Run("invert on empty match still rejects (matches all -> matches none)", func(t *testing.T) {
+		// Empty ConfigFilterMatch matches every item (no constraints).
+		// invert=true on it should then reject every item.
+		fn := buildConfigMatchFn(ui.ConfigFilterMatch{Invert: true})
+		if fn(model.Item{Status: "Running"}) {
+			t.Error("expected inverted empty rule to reject all items")
+		}
+	})
 }
 
 // --- helpers ---
@@ -540,5 +561,107 @@ func TestNeedsOrphanCache_OtherKinds(t *testing.T) {
 		t.Run(kind, func(t *testing.T) {
 			assert.False(t, needsOrphanCache(kind))
 		})
+	}
+}
+
+// --- Not Running / Not Bound presets ---
+
+func TestPodNotRunningPreset(t *testing.T) {
+	presets := builtinFilterPresets("Pod")
+	p := findPreset(presets, "Not Running")
+	require.NotNil(t, p, "Pod 'Not Running' preset missing")
+	assert.Equal(t, notRunningKey, p.Key)
+
+	tests := []struct {
+		status string
+		want   bool
+	}{
+		{"Running", false},
+		{"running", false}, // case-insensitive
+		{"", false},        // empty status should not match
+		{"Pending", true},
+		{"Failed", true},
+		{"CrashLoopBackOff", true},
+		{"Completed", true}, // strict: anything != Running
+		{"Terminating", true},
+		{"ContainerCreating", true},
+	}
+	for _, tt := range tests {
+		item := model.Item{Status: tt.status}
+		assert.Equal(t, tt.want, p.MatchFn(item), "Pod Not Running(%q)", tt.status)
+	}
+}
+
+func TestPVCNotBoundPreset(t *testing.T) {
+	presets := builtinFilterPresets("PersistentVolumeClaim")
+	p := findPreset(presets, "Not Bound")
+	require.NotNil(t, p, "PVC 'Not Bound' preset missing")
+	assert.Equal(t, notRunningKey, p.Key)
+
+	tests := []struct {
+		status string
+		want   bool
+	}{
+		{"Bound", false},
+		{"bound", false},
+		{"", false},
+		{"Pending", true},
+		{"Lost", true},
+		{"Available", true},
+		{"Released", true},
+	}
+	for _, tt := range tests {
+		item := model.Item{Status: tt.status}
+		assert.Equal(t, tt.want, p.MatchFn(item), "PVC Not Bound(%q)", tt.status)
+	}
+}
+
+func TestWorkloadNotRunningPreset(t *testing.T) {
+	for _, kind := range []string{"Deployment", "StatefulSet", "DaemonSet"} {
+		t.Run(kind, func(t *testing.T) {
+			presets := builtinFilterPresets(kind)
+			p := findPreset(presets, "Not Running")
+			require.NotNil(t, p, "%s 'Not Running' preset missing", kind)
+			assert.Equal(t, notRunningKey, p.Key)
+
+			// Healthy: Ready=3/3, no failure status, no unavailable column.
+			assert.False(t, p.MatchFn(model.Item{Ready: "3/3"}))
+			// Replicas mismatch -> Not Running.
+			assert.True(t, p.MatchFn(model.Item{Ready: "1/3"}))
+			// Degraded / failure status -> Not Running.
+			assert.True(t, p.MatchFn(model.Item{Ready: "3/3", Status: "Degraded"}))
+			assert.True(t, p.MatchFn(model.Item{Ready: "3/3", Status: "Failed"}))
+			// Unavailable column > 0 -> Not Running.
+			assert.True(t, p.MatchFn(model.Item{
+				Ready:   "3/3",
+				Columns: []model.KeyValue{{Key: "Unavailable", Value: "1"}},
+			}))
+		})
+	}
+}
+
+func TestJobNotRunningPreset(t *testing.T) {
+	presets := builtinFilterPresets("Job")
+	p := findPreset(presets, "Not Running")
+	require.NotNil(t, p, "Job 'Not Running' preset missing")
+	assert.Equal(t, notRunningKey, p.Key)
+
+	tests := []struct {
+		status string
+		want   bool
+	}{
+		{"Running", false},
+		{"Complete", false},
+		{"Completed", false},
+		{"Succeeded", false},
+		{"Active", false},
+		{"", false},
+		{"Failed", true},
+		{"BackoffLimitExceeded", true},
+		{"Pending", true},
+	}
+	for _, tt := range tests {
+		item := model.Item{Status: tt.status}
+		assert.Equal(t, tt.want, p.MatchFn(item), "Job Not Running(%q)", tt.status)
 	}
 }

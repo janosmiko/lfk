@@ -107,6 +107,12 @@ func kindFilterPresets(kind string) []FilterPreset {
 	}
 }
 
+// notRunningKey is the shared shortcut for "show me anything not in a
+// healthy / running state". Bound to the same letter across Pod, PVC,
+// Workload, and Job lists so the user has one mnemonic, mirroring the
+// orphan-preset shared-key pattern.
+const notRunningKey = "x"
+
 func podFilterPresets() []FilterPreset {
 	return []FilterPreset{
 		{
@@ -129,7 +135,28 @@ func podFilterPresets() []FilterPreset {
 		{Name: "Not Ready", Description: "Ready containers mismatch", Key: "n", MatchFn: matchReadyMismatch},
 		{Name: "Restarting", Description: "Restart count > 0", Key: "r", MatchFn: matchRestartsGt(0)},
 		{Name: "High Restarts", Description: "Restart count > 10", Key: "R", MatchFn: matchRestartsGt(10)},
+		{
+			Name: "Not Running", Description: "Pod phase != Running", Key: notRunningKey,
+			MatchFn: func(item model.Item) bool {
+				return item.Status != "" && !strings.EqualFold(item.Status, "Running")
+			},
+		},
 	}
+}
+
+// matchWorkloadNotRunning is the predicate behind both the workload `Failing`
+// and `Not Running` presets: replicas mismatch OR unavailable replicas OR a
+// failure status string. Shared so the two presets stay in sync; their names
+// differ only to fit different mental models (issue-tracking vs. health-check).
+func matchWorkloadNotRunning(item model.Item) bool {
+	s := strings.ToLower(item.Status)
+	if s == "failed" || s == "error" || s == "degraded" {
+		return true
+	}
+	if ua := columnValue(item, "Unavailable"); ua != "" && ua != "0" {
+		return true
+	}
+	return matchReadyMismatch(item)
 }
 
 func workloadFilterPresets() []FilterPreset {
@@ -137,16 +164,11 @@ func workloadFilterPresets() []FilterPreset {
 		{Name: "Not Ready", Description: "Ready replicas != desired", Key: "n", MatchFn: matchReadyMismatch},
 		{
 			Name: "Failing", Description: "Progressing=False or unavailable replicas", Key: "f",
-			MatchFn: func(item model.Item) bool {
-				s := strings.ToLower(item.Status)
-				if s == "failed" || s == "error" || s == "degraded" {
-					return true
-				}
-				if ua := columnValue(item, "Unavailable"); ua != "" && ua != "0" {
-					return true
-				}
-				return matchReadyMismatch(item)
-			},
+			MatchFn: matchWorkloadNotRunning,
+		},
+		{
+			Name: "Not Running", Description: "Not Ready or unavailable / failed replicas", Key: notRunningKey,
+			MatchFn: matchWorkloadNotRunning,
 		},
 	}
 }
@@ -173,6 +195,20 @@ func jobFilterPresets() []FilterPreset {
 			MatchFn: func(item model.Item) bool {
 				s := strings.ToLower(item.Status)
 				return strings.Contains(s, "failed") || strings.Contains(s, "backofflimit")
+			},
+		},
+		{
+			Name: "Not Running", Description: "Job is not active and not completed", Key: notRunningKey,
+			MatchFn: func(item model.Item) bool {
+				if item.Status == "" {
+					return false
+				}
+				s := strings.ToLower(item.Status)
+				switch s {
+				case "running", "active", "complete", "completed", "succeeded":
+					return false
+				}
+				return true
 			},
 		},
 	}
@@ -273,6 +309,12 @@ func pvcFilterPresets() []FilterPreset {
 		{
 			Name: "Lost", Description: "PVC lost its backing volume", Key: "l",
 			MatchFn: func(item model.Item) bool { return strings.EqualFold(item.Status, "lost") },
+		},
+		{
+			Name: "Not Bound", Description: "Phase != Bound (Pending / Lost / Released / Available)", Key: notRunningKey,
+			MatchFn: func(item model.Item) bool {
+				return item.Status != "" && !strings.EqualFold(item.Status, "Bound")
+			},
 		},
 	}
 }
@@ -524,8 +566,11 @@ func needsOrphanCache(kind string) bool {
 }
 
 // buildConfigMatchFn converts a ConfigFilterMatch into a MatchFn closure.
+// `m.Invert` negates the AND-result of all other fields, making it possible
+// to express "matches anything that does NOT satisfy these criteria"
+// (e.g. PVC `status: Bound` + `invert: true` => Not Bound).
 func buildConfigMatchFn(m ui.ConfigFilterMatch) func(model.Item) bool {
-	return func(item model.Item) bool {
+	core := func(item model.Item) bool {
 		// All non-zero fields must match (AND logic).
 		if m.Status != "" {
 			if !strings.Contains(strings.ToLower(item.Status), strings.ToLower(m.Status)) {
@@ -558,4 +603,8 @@ func buildConfigMatchFn(m ui.ConfigFilterMatch) func(model.Item) bool {
 		}
 		return true
 	}
+	if m.Invert {
+		return func(item model.Item) bool { return !core(item) }
+	}
+	return core
 }

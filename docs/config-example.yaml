@@ -296,10 +296,14 @@ custom_actions:
 #     restarts_gt:  Match pods with restart count greater than this number
 #     column:       Column key to check (case-insensitive, e.g., "Node", "IP")
 #     column_value: Substring match against the column value (case-insensitive)
+#     invert:       true to negate the entire match (e.g., status=Bound + invert
+#                   matches anything that is NOT Bound)
 #
-# Built-in presets vary by kind (Pod gets Failing/Pending/NotReady/Restarting,
-# Deployment gets NotReady/Failing, etc.). Universal presets (Old, Recent)
-# are always shown. Your custom presets appear after the built-ins.
+# Built-in presets vary by kind. Pod: Failing/Pending/Not Ready/Restarting/
+# High Restarts/Not Running. Deployment/StatefulSet/DaemonSet: Not Ready/
+# Failing/Not Running. Job: Failed/Not Running. PVC: Pending/Lost/Not Bound.
+# Universal presets (Old, Recent) are always shown. Your custom presets appear
+# after the built-ins.
 filter_presets:
 # Pod:
 #   - name: "On GPU Nodes"
