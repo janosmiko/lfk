@@ -151,6 +151,37 @@ func TestRenderOverlayList(t *testing.T) {
 		assert.NotContains(t, out, "✓")
 	})
 
+	t.Run("active-marker column collapses when no item is active", func(t *testing.T) {
+		// When ShowActiveMarker is on but nothing's active, the 2-cell
+		// reserved space disappears so [k]/[s] sit flush against the
+		// box's left padding. Width comparison: items render at strictly
+		// less than the width-with-marker case.
+		none := []OverlayListItem{{Name: "Failing", Key: "f"}}
+		one := []OverlayListItem{{Name: "Failing", Key: "f", Active: true}}
+		cfg := OverlayListConfig{ShowActiveMarker: true, ShowKey: true}
+		outNone := RenderOverlayList(none, cfg, w)
+		outOne := RenderOverlayList(one, cfg, w)
+		assert.NotContains(t, outNone, "✓")
+		assert.Contains(t, outOne, "✓")
+	})
+
+	t.Run("active-marker column reserves space when at least one item is active", func(t *testing.T) {
+		// Two items, one active. All rows reserve the 2-cell marker
+		// column so the [k] of inactive rows aligns with the [k] of the
+		// active row.
+		items := []OverlayListItem{
+			{Name: "A", Key: "a"},
+			{Name: "B", Key: "b", Active: true},
+		}
+		out := RenderOverlayList(items, OverlayListConfig{
+			ShowActiveMarker: true, ShowKey: true,
+		}, w)
+		assert.Contains(t, out, "✓")
+		// Both rows contain the bracketed key.
+		assert.Contains(t, out, "[a]")
+		assert.Contains(t, out, "[b]")
+	})
+
 	t.Run("MultiSelect renders checkboxes", func(t *testing.T) {
 		items := []OverlayListItem{
 			{Name: "A", Selected: true},

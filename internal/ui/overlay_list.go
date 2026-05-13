@@ -61,9 +61,10 @@ type OverlayListConfig struct {
 // OverlayListFloor, capped at maxWidth when maxWidth > 0. Mirrors the
 // floor-and-cap pattern from ActionOverlayWidth.
 func OverlayListWidth(items []OverlayListItem, cfg OverlayListConfig, maxWidth int) int {
+	hasActive := anyActive(items, cfg)
 	contentW := 0
 	for _, it := range items {
-		if w := lipgloss.Width(itemPlainLine(it, cfg)); w > contentW {
+		if w := lipgloss.Width(itemPlainLine(it, cfg, hasActive)); w > contentW {
 			contentW = w
 		}
 	}
@@ -72,6 +73,22 @@ func OverlayListWidth(items []OverlayListItem, cfg OverlayListConfig, maxWidth i
 		w = maxWidth
 	}
 	return w
+}
+
+// anyActive reports whether the active-marker column should be reserved.
+// The column collapses when ShowActiveMarker is off or when no item is
+// currently active, so non-stateful lists (no preset applied, no current
+// row marked) render with the bracket flush against the box's left padding.
+func anyActive(items []OverlayListItem, cfg OverlayListConfig) bool {
+	if !cfg.ShowActiveMarker {
+		return false
+	}
+	for _, it := range items {
+		if it.Active {
+			return true
+		}
+	}
+	return false
 }
 
 // RenderOverlayList renders the list at the given inner content width.
@@ -114,6 +131,7 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 	}
 
 	// Scroll window.
+	hasActive := anyActive(items, cfg)
 	start, end := scrollWindow(len(items), cfg.Scroll, cfg.MaxVisible)
 	for i := start; i < end; i++ {
 		it := items[i]
@@ -121,9 +139,9 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 			// Cursor row: plain text padded to innerW so the selection
 			// background spans the entire row. Embedded styles would punch
 			// holes in the highlight.
-			b.WriteString(OverlaySelectedStyle.Width(innerW).Render(itemPlainLine(it, cfg)))
+			b.WriteString(OverlaySelectedStyle.Width(innerW).Render(itemPlainLine(it, cfg, hasActive)))
 		} else {
-			b.WriteString(OverlayNormalStyle.Render(itemStyledLine(it, cfg)))
+			b.WriteString(OverlayNormalStyle.Render(itemStyledLine(it, cfg, hasActive)))
 		}
 		if i < end-1 {
 			b.WriteString("\n")
@@ -140,8 +158,10 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 
 // itemPlainLine returns the item rendered as plain text (no styling).
 // Used for the cursor row (where embedded styles would punch holes in
-// the highlight background) and for width measurement.
-func itemPlainLine(it OverlayListItem, cfg OverlayListConfig) string {
+// the highlight background) and for width measurement. `hasActive`
+// controls whether the active-marker column is reserved — see
+// anyActive for the collapse rule.
+func itemPlainLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) string {
 	var p strings.Builder
 	if cfg.MultiSelect {
 		if it.Selected {
@@ -150,7 +170,7 @@ func itemPlainLine(it OverlayListItem, cfg OverlayListConfig) string {
 			p.WriteString("☐ ")
 		}
 	}
-	if cfg.ShowActiveMarker {
+	if hasActive {
 		if it.Active {
 			p.WriteString("✓ ")
 		} else {
@@ -173,7 +193,7 @@ func itemPlainLine(it OverlayListItem, cfg OverlayListConfig) string {
 
 // itemStyledLine returns the item with per-segment styling (dim
 // description, filter-color key hint, etc.) suitable for non-cursor rows.
-func itemStyledLine(it OverlayListItem, cfg OverlayListConfig) string {
+func itemStyledLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) string {
 	var p strings.Builder
 	if cfg.MultiSelect {
 		if it.Selected {
@@ -182,7 +202,7 @@ func itemStyledLine(it OverlayListItem, cfg OverlayListConfig) string {
 			p.WriteString("☐ ")
 		}
 	}
-	if cfg.ShowActiveMarker {
+	if hasActive {
 		if it.Active {
 			p.WriteString(OverlayFilterStyle.Render("✓ "))
 		} else {
