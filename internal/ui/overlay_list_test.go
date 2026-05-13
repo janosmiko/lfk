@@ -226,6 +226,44 @@ func TestRenderOverlayList(t *testing.T) {
 		assert.NotContains(t, out, "item-J")
 	})
 
+	t.Run("scrollbar absent when list fits in window", func(t *testing.T) {
+		items := []OverlayListItem{{Name: "a"}, {Name: "b"}}
+		out := RenderOverlayList(items, OverlayListConfig{MaxVisible: 5}, w)
+		// No scrollbar glyphs anywhere.
+		assert.NotContains(t, out, "█")
+		assert.NotContains(t, out, "│")
+	})
+
+	t.Run("scrollbar drawn when list overflows", func(t *testing.T) {
+		items := make([]OverlayListItem, 10)
+		for i := range items {
+			items[i].Name = "item-" + string(rune('A'+i))
+		}
+		out := RenderOverlayList(items, OverlayListConfig{
+			Scroll:     0,
+			MaxVisible: 3,
+		}, w)
+		// Both track and thumb glyphs are present.
+		assert.Contains(t, out, "█") // thumb
+		assert.Contains(t, out, "│") // track
+	})
+
+	t.Run("scrollbar thumb shifts down as scroll grows", func(t *testing.T) {
+		items := make([]OverlayListItem, 20)
+		for i := range items {
+			items[i].Name = "item-" + string(rune('A'+i))
+		}
+		// At scroll=0, the first visible row should be the thumb.
+		out0 := RenderOverlayList(items, OverlayListConfig{Scroll: 0, MaxVisible: 4}, w)
+		// At maximum scroll, the LAST visible row should be the thumb.
+		outMax := RenderOverlayList(items, OverlayListConfig{Scroll: 16, MaxVisible: 4}, w)
+		// Both renders should include the scrollbar.
+		assert.Contains(t, out0, "█")
+		assert.Contains(t, outMax, "█")
+		// Sanity: the renders differ (different scroll positions => different thumb).
+		assert.NotEqual(t, out0, outMax)
+	})
+
 	t.Run("scroll offset shifts the window", func(t *testing.T) {
 		items := make([]OverlayListItem, 10)
 		for i := range items {

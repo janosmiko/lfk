@@ -131,16 +131,35 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 	// Scroll window.
 	hasActive := anyActive(items, cfg)
 	start, end := scrollWindow(len(items), cfg.Scroll, cfg.MaxVisible)
+	visible := end - start
+	hasOverflow := len(items) > visible
+	// Reserve the rightmost column for the scrollbar when the list
+	// overflows so users can see at a glance there's more to scroll.
+	itemWidth := innerW
+	if hasOverflow {
+		itemWidth = max(innerW-1, 1)
+	}
 	for i := start; i < end; i++ {
 		it := items[i]
+		var row string
 		if i == cfg.Cursor {
-			// Cursor row: plain text padded to innerW so the selection
-			// background spans the entire row. Embedded styles would punch
-			// holes in the highlight.
-			b.WriteString(OverlaySelectedStyle.Width(innerW).Render(itemPlainLine(it, cfg, hasActive)))
+			// Cursor row: plain text padded to itemWidth so the selection
+			// background spans the entire item area. The scrollbar sits
+			// outside the highlight so it stays readable against the box.
+			row = OverlaySelectedStyle.Width(itemWidth).Render(itemPlainLine(it, cfg, hasActive))
 		} else {
-			b.WriteString(OverlayNormalStyle.Render(itemStyledLine(it, cfg, hasActive)))
+			line := OverlayNormalStyle.Render(itemStyledLine(it, cfg, hasActive))
+			if hasOverflow {
+				if pad := itemWidth - lipgloss.Width(line); pad > 0 {
+					line += strings.Repeat(" ", pad)
+				}
+			}
+			row = line
 		}
+		if hasOverflow {
+			row += renderScrollbar(i-start, visible, len(items), start)
+		}
+		b.WriteString(row)
 		if i < end-1 {
 			b.WriteString("\n")
 		}
@@ -225,6 +244,30 @@ func itemStyledLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) s
 		p.WriteString(OverlayDimStyle.Render(it.Description))
 	}
 	return p.String()
+}
+
+// renderScrollbar returns the single-cell scrollbar character to draw on
+// the right of the row at visualIdx (0-indexed within the visible window).
+// Thumb size is proportional to viewport coverage (visible/total); thumb
+// position interpolates linearly from 0 to (visible - thumb) across the
+// scroll range. Track uses OverlayDimStyle; thumb uses OverlayFilterStyle
+// so it reads against the dim track without competing with the cursor
+// highlight or filter-row colour.
+func renderScrollbar(visualIdx, totalVisible, totalItems, startIdx int) string {
+	if totalItems <= totalVisible {
+		return " "
+	}
+	thumbSize := min(max(totalVisible*totalVisible/totalItems, 1), totalVisible)
+	maxScroll := totalItems - totalVisible
+	maxThumbTop := totalVisible - thumbSize
+	thumbTop := 0
+	if maxScroll > 0 {
+		thumbTop = (maxThumbTop * startIdx) / maxScroll
+	}
+	if visualIdx >= thumbTop && visualIdx < thumbTop+thumbSize {
+		return OverlayFilterStyle.Render("█")
+	}
+	return OverlayDimStyle.Render("│")
 }
 
 // scrollWindow returns the half-open [start, end) item range to render
