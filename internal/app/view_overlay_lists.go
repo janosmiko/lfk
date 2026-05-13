@@ -1,6 +1,7 @@
 package app
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 
@@ -19,6 +20,9 @@ var (
 	overlayContainerScrollPos    int
 	overlayColumnToggleScrollPos int
 	overlayTemplateScrollPos     int
+	overlayHelmHistoryScrollPos  int
+	overlayHelmRollbackScrollPos int
+	overlayRollbackScrollPos     int
 )
 
 // overlayListScroll computes the new viewport start using
@@ -320,6 +324,158 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 		}
 	}
 	return items, cursorDisplayIdx
+}
+
+// renderHelmHistoryOverlay maps the Helm release-history viewer onto
+// OverlayList. The renderer is fullscreen-style (returns a fully styled
+// overlay including OverlayStyle wrapping) so it slots into the
+// renderOverlayFullscreen path the same way the legacy renderer did.
+// Column header lives in cfg.Subtitle; row fields pack into Name with
+// fixed widths so they align with the header.
+func renderHelmHistoryOverlay(m Model) string {
+	const (
+		revW    = 6
+		statusW = 12
+		chartW  = 25
+		appVerW = 12
+		descW   = 30
+	)
+	if m.helmRevisionsLoading {
+		boxW := max(m.width*80/100, 60)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("Loading Helm release history..."))
+	}
+	if len(m.helmHistoryRevisions) == 0 {
+		boxW := max(m.width*80/100, 60)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+	}
+
+	boxW := max(m.width*80/100, 60)
+	boxH := max(m.height*60/100, 10)
+	contentH := max(boxH-2, 1)
+	maxVisible := max(contentH-3, 1) // chrome: title + title pad + subtitle
+
+	hdr := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %s",
+		revW, "REV", statusW, "STATUS", chartW, "CHART",
+		appVerW, "APP VER", descW, "DESCRIPTION", "UPDATED")
+	items := make([]ui.OverlayListItem, len(m.helmHistoryRevisions))
+	for i, rev := range m.helmHistoryRevisions {
+		name := fmt.Sprintf("%-*d  %-*s  %-*s  %-*s  %-*s  %s",
+			revW, rev.Revision,
+			statusW, ui.Truncate(rev.Status, statusW),
+			chartW, ui.Truncate(rev.Chart, chartW),
+			appVerW, ui.Truncate(rev.AppVersion, appVerW),
+			descW, ui.Truncate(rev.Description, descW),
+			ui.Truncate(rev.Updated, 25))
+		items[i] = ui.OverlayListItem{Name: name}
+	}
+	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:      "Helm Release History",
+		Subtitle:   hdr,
+		Cursor:     m.helmHistoryCursor,
+		Scroll:     overlayListScroll(&overlayHelmHistoryScrollPos, m.helmHistoryCursor, len(items), maxVisible),
+		MaxVisible: maxVisible,
+		Height:     contentH,
+	}, boxW-4)
+	return ui.OverlayStyle.Width(boxW).Render(content)
+}
+
+// renderHelmRollbackOverlay mirrors renderHelmHistoryOverlay for the
+// rollback picker — same column layout, distinct title to disambiguate
+// the destructive intent.
+func renderHelmRollbackOverlay(m Model) string {
+	const (
+		revW    = 6
+		statusW = 12
+		chartW  = 25
+		appVerW = 12
+		descW   = 30
+	)
+	if m.helmRevisionsLoading {
+		boxW := max(m.width*80/100, 60)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("Loading Helm release history..."))
+	}
+	if len(m.helmRollbackRevisions) == 0 {
+		boxW := max(m.width*80/100, 60)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+	}
+
+	boxW := max(m.width*80/100, 60)
+	boxH := max(m.height*60/100, 10)
+	contentH := max(boxH-2, 1)
+	maxVisible := max(contentH-3, 1)
+
+	hdr := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %s",
+		revW, "REV", statusW, "STATUS", chartW, "CHART",
+		appVerW, "APP VER", descW, "DESCRIPTION", "UPDATED")
+	items := make([]ui.OverlayListItem, len(m.helmRollbackRevisions))
+	for i, rev := range m.helmRollbackRevisions {
+		name := fmt.Sprintf("%-*d  %-*s  %-*s  %-*s  %-*s  %s",
+			revW, rev.Revision,
+			statusW, ui.Truncate(rev.Status, statusW),
+			chartW, ui.Truncate(rev.Chart, chartW),
+			appVerW, ui.Truncate(rev.AppVersion, appVerW),
+			descW, ui.Truncate(rev.Description, descW),
+			ui.Truncate(rev.Updated, 25))
+		items[i] = ui.OverlayListItem{Name: name}
+	}
+	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:      "Helm Rollback",
+		Subtitle:   hdr,
+		Cursor:     m.helmRollbackCursor,
+		Scroll:     overlayListScroll(&overlayHelmRollbackScrollPos, m.helmRollbackCursor, len(items), maxVisible),
+		MaxVisible: maxVisible,
+		Height:     contentH,
+	}, boxW-4)
+	return ui.OverlayStyle.Width(boxW).Render(content)
+}
+
+// renderRollbackOverlay maps the Deployment rollback picker onto
+// OverlayList. Columns: REV, REPLICASET, PODS, IMAGE, AGE.
+func renderRollbackOverlay(m Model) string {
+	const (
+		revW = 8
+		rsW  = 30
+		podW = 8
+		imgW = 30
+	)
+	if len(m.rollbackRevisions) == 0 {
+		boxW := max(m.width*70/100, 50)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+	}
+
+	boxW := max(m.width*70/100, 50)
+	boxH := max(m.height*60/100, 10)
+	contentH := max(boxH-2, 1)
+	maxVisible := max(contentH-3, 1)
+
+	hdr := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %s",
+		revW, "REV", rsW, "REPLICASET", podW, "PODS", imgW, "IMAGE", "AGE")
+	items := make([]ui.OverlayListItem, len(m.rollbackRevisions))
+	for i, rev := range m.rollbackRevisions {
+		img := ""
+		if len(rev.Images) > 0 {
+			img = rev.Images[0]
+			if len(rev.Images) > 1 {
+				img += fmt.Sprintf(" +%d", len(rev.Images)-1)
+			}
+		}
+		name := fmt.Sprintf("%-*d  %-*s  %-*d  %-*s  %s",
+			revW, rev.Revision,
+			rsW, ui.Truncate(rev.Name, rsW),
+			podW, rev.Replicas,
+			imgW, ui.Truncate(img, imgW),
+			ui.FormatAge(rev.CreatedAt))
+		items[i] = ui.OverlayListItem{Name: name}
+	}
+	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:      "Rollback Deployment",
+		Subtitle:   hdr,
+		Cursor:     m.rollbackCursor,
+		Scroll:     overlayListScroll(&overlayRollbackScrollPos, m.rollbackCursor, len(items), maxVisible),
+		MaxVisible: maxVisible,
+		Height:     contentH,
+	}, boxW-4)
+	return ui.OverlayStyle.Width(boxW).Render(content)
 }
 
 // renderClusterColorOverlay maps the cluster-color picker (with its
