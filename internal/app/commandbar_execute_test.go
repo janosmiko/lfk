@@ -144,6 +144,164 @@ func TestInjectKubectlDefaults(t *testing.T) {
 	}
 }
 
+// TestEmbeddedPTYSize_ClampsToFallbacksWhenSmall pins the safety net
+// that protects the PTY launch path from being called before the
+// initial WindowSizeMsg arrives (m.width / m.height both zero), which
+// would otherwise hand pty.StartWithSize a 0x0 winsize and trip the
+// underlying ioctl.
+func TestEmbeddedPTYSize_ClampsToFallbacksWhenSmall(t *testing.T) {
+	tests := []struct {
+		name     string
+		w, h     int
+		wantCols int
+		wantRows int
+	}{
+		{name: "uninitialized", w: 0, h: 0, wantCols: 80, wantRows: 24},
+		{name: "tiny", w: 5, h: 3, wantCols: 80, wantRows: 24},
+		{name: "border_too_small_cols", w: 19, h: 100, wantCols: 80, wantRows: 94},
+		{name: "border_too_small_rows", w: 200, h: 10, wantCols: 200, wantRows: 24},
+		{name: "normal", w: 200, h: 60, wantCols: 200, wantRows: 54},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			m := Model{width: tt.w, height: tt.h}
+			cols, rows := m.embeddedPTYSize()
+			assert.Equal(t, tt.wantCols, cols, "cols")
+			assert.Equal(t, tt.wantRows, rows, "rows")
+		})
+	}
+}
+
+func TestFmtPTYTitle_TruncatesLong(t *testing.T) {
+	short := "kubectl get pods"
+	assert.Equal(t, short, fmtPTYTitle(short))
+
+	long := strings.Repeat("x", 80)
+	got := fmtPTYTitle(long)
+	// Trailing ellipsis is U+2026 (3 bytes in UTF-8); cap on visible
+	// rune count rather than byte length so widening characters don't
+	// trip the assertion.
+	assert.LessOrEqual(t, len([]rune(got)), 60)
+	assert.True(t, strings.HasSuffix(got, "…"))
+}
+
+// TestInjectKubectlDefaults_SkipsNamespaceFlagsForNonNamespacedCommands
+// pins the fix for kubectl subcommands that reject -A/-n. Before the fix,
+// `:k explain pod` with allNamespaces=true would append -A and fail with
+// "unknown shorthand flag: 'A' in -A". The injection must skip those
+// subcommands while still propagating --context (which kubectl accepts
+// as a global flag on every subcommand).
+func TestInjectKubectlDefaults_SkipsNamespaceFlagsForNonNamespacedCommands(t *testing.T) {
+	nonNS := []string{
+		"explain", "api-resources", "api-versions", "version",
+		"cluster-info", "config", "options", "plugin", "completion",
+		"help", "cordon", "uncordon", "drain", "taint",
+		"kustomize", "convert",
+	}
+	for _, sub := range nonNS {
+		t.Run(sub+"_with_allNamespaces", func(t *testing.T) {
+			m := baseModelCov()
+			m.nav.Context = "my-ctx"
+			m.namespace = ""
+			m.allNamespaces = true
+			m.selectedNamespaces = nil
+
+			result := m.injectKubectlDefaults([]string{sub, "pod"})
+
+			assert.True(t, containsFlag(result, "--context"),
+				"--context should still be injected for %q", sub)
+			assert.False(t, containsFlag(result, "-A"),
+				"-A must NOT be injected for %q", sub)
+			assert.False(t, containsFlag(result, "-n"),
+				"-n must NOT be injected for %q", sub)
+		})
+		t.Run(sub+"_with_namespace", func(t *testing.T) {
+			m := baseModelCov()
+			m.nav.Context = "my-ctx"
+			m.namespace = "kube-system"
+
+			result := m.injectKubectlDefaults([]string{sub, "pod"})
+
+			assert.False(t, containsFlag(result, "-n"),
+				"-n must NOT be injected for %q even with namespace set", sub)
+		})
+	}
+}
+
+// TestInjectKubectlDefaults_NamespacedCommandsStillGetFlags verifies the
+// allowlist doesn't accidentally exclude `get`, `describe`, etc.
+func TestInjectKubectlDefaults_NamespacedCommandsStillGetFlags(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "my-ctx"
+	m.namespace = ""
+	m.allNamespaces = true
+
+	result := m.injectKubectlDefaults([]string{"get", "pods"})
+
+	assert.True(t, containsFlag(result, "-A"),
+		"get pods with allNamespaces should still get -A injected")
+}
+
+// TestCommandSupportsNamespaceFlags_SkipsGlobalFlags pins the fix for
+// kubectl global flags appearing before the verb (Cobra accepts them
+// anywhere). Without this, `:k --context foo explain pod` would slip
+// past the denylist and still get `-A` injected.
+func TestCommandSupportsNamespaceFlags_SkipsGlobalFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{name: "bare_explain", args: []string{"explain", "pod"}, want: false},
+		{name: "bare_get", args: []string{"get", "pods"}, want: true},
+		{name: "global_flag_value_then_explain", args: []string{"--context", "foo", "explain", "pod"}, want: false},
+		{name: "global_flag_equals_then_explain", args: []string{"--context=foo", "explain", "pod"}, want: false},
+		{name: "multiple_globals_then_explain", args: []string{"--context", "foo", "--request-timeout=5s", "explain", "pod"}, want: false},
+		{name: "short_n_then_explain", args: []string{"-n", "kube-system", "explain", "pod"}, want: false},
+		{name: "globals_then_get", args: []string{"--context", "foo", "get", "pods"}, want: true},
+		{name: "all_flags_no_verb", args: []string{"--context", "foo"}, want: false},
+		{name: "empty", args: nil, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, commandSupportsNamespaceFlags(tt.args))
+		})
+	}
+}
+
+// TestInjectKubectlDefaults_GlobalFlagsBeforeExplain combines the
+// denylist with a real injection call to prove the end-to-end fix:
+// `--context X explain pod` with allNamespaces must NOT get `-A`.
+func TestInjectKubectlDefaults_GlobalFlagsBeforeExplain(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "my-ctx"
+	m.namespace = ""
+	m.allNamespaces = true
+
+	result := m.injectKubectlDefaults([]string{"--context", "explicit", "explain", "pod"})
+
+	assert.False(t, containsFlag(result, "-A"),
+		"-A must not be injected when explain sits after a global flag")
+	assert.False(t, containsFlag(result, "-n"),
+		"-n must not be injected for explain")
+}
+
+// TestFmtPTYTitle_RuneSafe confirms the truncation cuts on runes, not
+// bytes, so multi-byte codepoints never get split mid-encoding.
+func TestFmtPTYTitle_RuneSafe(t *testing.T) {
+	// 70 em-dashes (3 bytes each in UTF-8). Byte length 210; rune count 70.
+	long := strings.Repeat("—", 70)
+	got := fmtPTYTitle(long)
+
+	assert.Equal(t, 60, len([]rune(got)), "must be truncated to 60 runes including the ellipsis")
+	assert.True(t, strings.HasSuffix(got, "…"))
+	// Decoding the truncated string must not produce U+FFFD (replacement
+	// rune), which would indicate a mid-codepoint cut.
+	for _, r := range got {
+		assert.NotEqual(t, '�', r, "no replacement rune from mid-codepoint cut")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // executeSetCommand
 // ---------------------------------------------------------------------------
