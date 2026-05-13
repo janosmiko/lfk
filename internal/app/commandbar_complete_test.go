@@ -135,9 +135,13 @@ func TestCompleteResourceJump_ExactMatchSortsFirst(t *testing.T) {
 		{Name: "PodTemplates", Extra: "/v1/podtemplates"},
 	}
 	got := completeResourceJump("pod", items)
-	require := assert.New(t)
-	require.NotEmpty(got)
-	require.Equal("pod", got[0].Text,
+	// Use a fatal guard so the indexed access below can't panic when the
+	// fix regresses — assert.NotEmpty would only flag the failure but
+	// still execute the next line.
+	if !assert.NotEmpty(t, got) {
+		return
+	}
+	assert.Equal(t, "pod", got[0].Text,
 		"exact match 'pod' must be the first suggestion, not 'poddisruptionbudget' or 'podtemplate'")
 }
 

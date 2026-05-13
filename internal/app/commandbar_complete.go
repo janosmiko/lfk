@@ -88,15 +88,15 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 		}
 	}
 
-	if len(results) > maxSuggestions {
-		results = results[:maxSuggestions]
-	}
-
 	// Sort: exact matches first (so `:k explain pod` highlights "pod", not
 	// "poddisruptionbudget"), then by category, then alphabetical. The
 	// exact-match preference outranks category because a user who typed
 	// the full resource name almost always meant that resource, even if
 	// it lives in a lower-priority API group.
+	//
+	// Sorting must run BEFORE the maxSuggestions truncation — `clusterTypes`
+	// is a map, so the pre-sort order is non-deterministic, and truncating
+	// first can throw the exact-match candidate out of the window.
 	sort.SliceStable(results, func(i, j int) bool {
 		iExact := strings.EqualFold(results[i].Text, prefix)
 		jExact := strings.EqualFold(results[j].Text, prefix)
@@ -110,6 +110,10 @@ func completeResourceJump(prefix string, leftItems []model.Item) []ui.Suggestion
 		}
 		return results[i].Text < results[j].Text
 	})
+
+	if len(results) > maxSuggestions {
+		results = results[:maxSuggestions]
+	}
 
 	return results
 }

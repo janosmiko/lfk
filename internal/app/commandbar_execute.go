@@ -156,12 +156,15 @@ func (m Model) embeddedPTYSize() (cols, rows int) {
 
 // fmtPTYTitle returns a short title for the PTY tab bar, truncating
 // long shell command strings so they don't blow out the title line.
+// Operates on runes so a multi-byte codepoint (e.g. an em-dash or a
+// non-ASCII pod name) never gets sliced mid-encoding.
 func fmtPTYTitle(full string) string {
 	const max = 60
-	if len(full) <= max {
+	runes := []rune(full)
+	if len(runes) <= max {
 		return full
 	}
-	return full[:max-1] + "…"
+	return string(runes[:max-1]) + "…"
 }
 
 // executeBuiltinCommand parses and executes a built-in command.
@@ -675,11 +678,18 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 // (cordon, uncordon, drain, taint), and offline tooling (kustomize,
 // convert, completion, plugin). Injecting -A or -n on these makes kubectl
 // reject the whole invocation.
+//
+// Global flags (e.g. `--context foo`, `--request-timeout=5s`) can appear
+// before the verb — kubectl uses Cobra, which parses persistent flags
+// from any position — so the lookup must skip leading flag tokens to
+// locate the real subcommand. Otherwise `:k --context foo explain pod`
+// would still get `-A` injected and fail.
 func commandSupportsNamespaceFlags(args []string) bool {
-	if len(args) == 0 {
+	verb := firstNonFlagToken(args)
+	if verb == "" {
 		return false
 	}
-	switch args[0] {
+	switch verb {
 	case "explain",
 		"api-resources", "api-versions",
 		"version", "cluster-info",
@@ -689,6 +699,57 @@ func commandSupportsNamespaceFlags(args []string) bool {
 		return false
 	}
 	return true
+}
+
+// kubectlGlobalFlagsWithValue is the set of kubectl global/persistent
+// flags whose value is supplied as the next token (e.g. `--context foo`),
+// so the parser must consume two tokens when it sees them. The `--flag=value`
+// form is handled by HasPrefix below and doesn't need to appear here.
+// Source: `kubectl options`.
+var kubectlGlobalFlagsWithValue = map[string]bool{
+	"--as":                    true,
+	"--as-group":              true,
+	"--as-uid":                true,
+	"--cache-dir":             true,
+	"--certificate-authority": true,
+	"--client-certificate":    true,
+	"--client-key":            true,
+	"--cluster":               true,
+	"--context":               true,
+	"--kubeconfig":            true,
+	"--namespace":             true,
+	"-n":                      true,
+	"--password":              true,
+	"--profile":               true,
+	"--profile-output":        true,
+	"--request-timeout":       true,
+	"--server":                true,
+	"-s":                      true,
+	"--tls-server-name":       true,
+	"--token":                 true,
+	"--user":                  true,
+	"--username":              true,
+}
+
+// firstNonFlagToken walks args, skipping leading kubectl global flags
+// (and the values of those that consume a separate token), and returns
+// the first positional token — typically the subcommand verb. Returns
+// "" if every token is a flag or the input is empty.
+func firstNonFlagToken(args []string) string {
+	for i := 0; i < len(args); i++ {
+		a := args[i]
+		if !strings.HasPrefix(a, "-") {
+			return a
+		}
+		// `--flag=value`: nothing extra to consume.
+		if strings.Contains(a, "=") {
+			continue
+		}
+		if kubectlGlobalFlagsWithValue[a] && i+1 < len(args) {
+			i++ // skip the value
+		}
+	}
+	return ""
 }
 
 // executeOrphansCommand handles the :orphans builtin. No-arg form opens the

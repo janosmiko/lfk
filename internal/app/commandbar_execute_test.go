@@ -242,6 +242,66 @@ func TestInjectKubectlDefaults_NamespacedCommandsStillGetFlags(t *testing.T) {
 		"get pods with allNamespaces should still get -A injected")
 }
 
+// TestCommandSupportsNamespaceFlags_SkipsGlobalFlags pins the fix for
+// kubectl global flags appearing before the verb (Cobra accepts them
+// anywhere). Without this, `:k --context foo explain pod` would slip
+// past the denylist and still get `-A` injected.
+func TestCommandSupportsNamespaceFlags_SkipsGlobalFlags(t *testing.T) {
+	tests := []struct {
+		name string
+		args []string
+		want bool
+	}{
+		{name: "bare_explain", args: []string{"explain", "pod"}, want: false},
+		{name: "bare_get", args: []string{"get", "pods"}, want: true},
+		{name: "global_flag_value_then_explain", args: []string{"--context", "foo", "explain", "pod"}, want: false},
+		{name: "global_flag_equals_then_explain", args: []string{"--context=foo", "explain", "pod"}, want: false},
+		{name: "multiple_globals_then_explain", args: []string{"--context", "foo", "--request-timeout=5s", "explain", "pod"}, want: false},
+		{name: "short_n_then_explain", args: []string{"-n", "kube-system", "explain", "pod"}, want: false},
+		{name: "globals_then_get", args: []string{"--context", "foo", "get", "pods"}, want: true},
+		{name: "all_flags_no_verb", args: []string{"--context", "foo"}, want: false},
+		{name: "empty", args: nil, want: false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, commandSupportsNamespaceFlags(tt.args))
+		})
+	}
+}
+
+// TestInjectKubectlDefaults_GlobalFlagsBeforeExplain combines the
+// denylist with a real injection call to prove the end-to-end fix:
+// `--context X explain pod` with allNamespaces must NOT get `-A`.
+func TestInjectKubectlDefaults_GlobalFlagsBeforeExplain(t *testing.T) {
+	m := baseModelCov()
+	m.nav.Context = "my-ctx"
+	m.namespace = ""
+	m.allNamespaces = true
+
+	result := m.injectKubectlDefaults([]string{"--context", "explicit", "explain", "pod"})
+
+	assert.False(t, containsFlag(result, "-A"),
+		"-A must not be injected when explain sits after a global flag")
+	assert.False(t, containsFlag(result, "-n"),
+		"-n must not be injected for explain")
+}
+
+// TestFmtPTYTitle_RuneSafe confirms the truncation cuts on runes, not
+// bytes, so multi-byte codepoints never get split mid-encoding.
+func TestFmtPTYTitle_RuneSafe(t *testing.T) {
+	// 70 em-dashes (3 bytes each in UTF-8). Byte length 210; rune count 70.
+	long := strings.Repeat("—", 70)
+	got := fmtPTYTitle(long)
+
+	assert.Equal(t, 60, len([]rune(got)), "must be truncated to 60 runes including the ellipsis")
+	assert.True(t, strings.HasSuffix(got, "…"))
+	// Decoding the truncated string must not produce U+FFFD (replacement
+	// rune), which would indicate a mid-codepoint cut.
+	for _, r := range got {
+		assert.NotEqual(t, '�', r, "no replacement rune from mid-codepoint cut")
+	}
+}
+
 // ---------------------------------------------------------------------------
 // executeSetCommand
 // ---------------------------------------------------------------------------
