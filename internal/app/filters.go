@@ -311,7 +311,7 @@ func pvcFilterPresets() []FilterPreset {
 			MatchFn: func(item model.Item) bool { return strings.EqualFold(item.Status, "lost") },
 		},
 		{
-			Name: "Not Bound", Description: "Phase != Bound (Pending / Lost / Released / Available)", Key: notRunningKey,
+			Name: "Not Bound", Description: "Phase != Bound", Key: notRunningKey,
 			MatchFn: func(item model.Item) bool {
 				return item.Status != "" && !strings.EqualFold(item.Status, "Bound")
 			},

@@ -110,6 +110,42 @@ func TestRenderFilterPresetOverlay(t *testing.T) {
 	})
 }
 
+// --- FilterPresetOverlayWidth ---
+
+func TestFilterPresetOverlayWidth(t *testing.T) {
+	t.Run("short presets use the 72-wide floor", func(t *testing.T) {
+		presets := []FilterPresetEntry{
+			{Name: "Failing", Description: "CrashLoop / Error", Key: "f"},
+			{Name: "Pending", Description: "Container starting", Key: "p"},
+		}
+		assert.Equal(t, 72, FilterPresetOverlayWidth(presets, 200))
+	})
+
+	t.Run("long description grows the overlay past the floor", func(t *testing.T) {
+		presets := []FilterPresetEntry{
+			{Name: "X", Description: strings.Repeat("y", 90), Key: "x"},
+		}
+		assert.Greater(t, FilterPresetOverlayWidth(presets, 200), 72,
+			"overlay must grow when content exceeds the 72-wide floor")
+	})
+
+	t.Run("clamps to maxWidth", func(t *testing.T) {
+		presets := []FilterPresetEntry{
+			{Name: "X", Description: strings.Repeat("y", 200), Key: "x"},
+		}
+		assert.Equal(t, 90, FilterPresetOverlayWidth(presets, 90))
+	})
+
+	t.Run("non-positive max disables clamp but keeps floor", func(t *testing.T) {
+		presets := []FilterPresetEntry{{Name: "a", Description: "b", Key: "c"}}
+		assert.Equal(t, 72, FilterPresetOverlayWidth(presets, 0))
+	})
+
+	t.Run("empty presets returns floor", func(t *testing.T) {
+		assert.Equal(t, 72, FilterPresetOverlayWidth(nil, 200))
+	})
+}
+
 // --- RenderRBACOverlay ---
 
 func TestRenderRBACOverlay(t *testing.T) {
