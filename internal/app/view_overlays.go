@@ -100,23 +100,17 @@ func (m Model) renderOverlay(background string) string {
 func (m Model) renderOverlayContent() (string, int, int, bool) {
 	switch m.overlay {
 	case overlayNamespace:
-		// Pass the same height to the renderer that we declare on the
-		// overlay box, so the renderer's visible-item cap matches what
-		// fits. Otherwise on a list of 30+ namespaces the renderer
-		// emits ~21 lines into a 20-tall box; lipgloss grows the box
-		// on overflow, and the user sees it "shrink" back to 20 the
-		// moment a filter narrows the list.
+		// Pass the overlay box height to the helper so its visible-item
+		// cap matches what fits; otherwise on a list of 30+ namespaces
+		// lipgloss grows the box on overflow and the user sees it
+		// "shrink" back to its declared size when a filter narrows the
+		// list.
 		overlayW := min(60, m.width-10)
 		overlayH := min(20, m.height-6)
-		content := ui.RenderNamespaceOverlay(m.filteredOverlayItems(), m.overlayFilter.Value, m.overlayCursor, m.namespace, m.allNamespaces, m.selectedNamespaces, m.nsFilterMode, overlayH)
-		return content, overlayW, overlayH, true
+		return renderNamespaceOverlay(m, m.filteredOverlayItems(), overlayH), overlayW, overlayH, true
 	case overlayAction:
-		// Adaptive width: grow to fit the longest action line so Karpenter
-		// and other long descriptions never wrap, floored at 70 so short
-		// menus keep the historical width and capped at terminal-10 so the
-		// overlay leaves margin on each side.
-		w := ui.ActionOverlayWidth(m.overlayItems, m.width-10)
-		return ui.RenderActionOverlay(m.overlayItems, m.overlayCursor, w), w, min(15, m.height-6), true
+		content, w := renderActionOverlay(m)
+		return content, w, min(15, m.height-6), true
 	case overlayQuitConfirm:
 		// Width: outer 32, inner = 32 − 2(border) − 4(left+right padding) = 26.
 		//
@@ -129,37 +123,64 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		// `Align(Center, Center)` do the vertical centering. Setting qh=3
 		// gives a 5-row outer box: border / padding / Quit lfk? / padding
 		// / border, with the text on the middle row.
-		qw := min(32, m.width-10)
-		qh := min(3, m.height-6)
-		return ui.RenderQuitConfirmOverlay(qw-6, qh-2), qw, qh, true
+		// Clamp before subtracting so InnerWidth/Height never go
+		// non-positive on tiny terminals — lipgloss's Align center
+		// requires positive dimensions.
+		qw := max(min(32, m.width-10), 10)
+		qh := max(min(3, m.height-6), 3)
+		return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
+			Title:       "Quit lfk?",
+			Centered:    true,
+			InnerWidth:  qw - 6,
+			InnerHeight: qh - 2,
+		}), qw, qh, true
 	case overlayConfirm:
-		return ui.RenderConfirmOverlay(m.confirmAction), min(50, m.width-10), min(8, m.height-6), true
+		return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
+			Title:   "Confirm Delete",
+			Warning: fmt.Sprintf("Delete %s?", m.confirmAction),
+		}), min(50, m.width-10), min(8, m.height-6), true
 	case overlayConfirmType:
-		return ui.RenderConfirmTypeOverlay(m.confirmTitle, m.confirmQuestion, m.confirmTypeInput.Value), min(55, m.width-10), min(10, m.height-6), true
+		return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
+			Title:     m.confirmTitle,
+			Warning:   m.confirmQuestion,
+			TypeToken: "DELETE",
+			Input:     m.confirmTypeInput.Value,
+		}), min(55, m.width-10), min(10, m.height-6), true
 	case overlayScaleInput:
-		return ui.RenderScaleOverlay(m.scaleInput.Value), min(45, m.width-10), min(8, m.height-6), true
+		return ui.RenderOverlayInput(ui.OverlayInputConfig{
+			Title: "Scale Deployment",
+			Rows:  []ui.OverlayInputRow{{Label: "Replicas: ", Input: m.scaleInput.Value}},
+		}), min(45, m.width-10), min(8, m.height-6), true
 	case overlayPVCResize:
-		return ui.RenderPVCResizeOverlay(m.scaleInput.Value, m.pvcCurrentSize), min(45, m.width-10), min(10, m.height-6), true
+		var hint string
+		if m.pvcCurrentSize != "" {
+			hint = "Current: " + m.pvcCurrentSize
+		}
+		return ui.RenderOverlayInput(ui.OverlayInputConfig{
+			Title: "Resize PVC",
+			Hint:  hint,
+			Rows:  []ui.OverlayInputRow{{Label: "New size: ", Input: m.scaleInput.Value, Placeholder: "e.g. 10Gi"}},
+		}), min(45, m.width-10), min(10, m.height-6), true
 	case overlayPortForward:
-		content := ui.RenderPortForwardOverlay(m.portForwardInput.Value, m.pfAvailablePorts, m.pfPortCursor, m.actionCtx.name)
+		content := renderPortForwardOverlay(m)
 		return content, min(55, m.width-10), min(5+len(m.pfAvailablePorts)+4, m.height-6), true
 	case overlayContainerSelect:
-		return ui.RenderContainerSelectOverlay(m.overlayItems, m.overlayCursor), min(50, m.width-10), min(15, m.height-6), true
+		return renderContainerSelectOverlay(m), min(50, m.width-10), min(15, m.height-6), true
 	case overlayPodSelect, overlayLogPodSelect:
-		content := ui.RenderPodSelectOverlay(m.filteredLogPodItems(), m.overlayCursor, m.logPodFilterText, m.logPodFilterActive)
-		return content, min(60, m.width-10), min(20, m.height-6), true
+		return renderPodSelectOverlay(m), min(60, m.width-10), min(20, m.height-6), true
 	case overlayLogContainerSelect:
-		content := ui.RenderLogContainerSelectOverlay(m.filteredLogContainerItems(), m.overlayCursor, m.logSelectedContainers, m.logContainerFilterText, m.logContainerFilterActive, m.logParentKind != "")
+		content := renderLogContainerSelectOverlay(m)
 		return content, min(60, m.width-10), min(len(m.filteredLogContainerItems())+9, m.height-6), true
 	case overlayBookmarks:
 		w, h := min(90, m.width-10), min(25, m.height-6)
-		return ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode), m.bookmarkLoadNamespace), w, h, true
+		return renderBookmarkOverlay(m), w, h, true
 	case overlayTemplates:
-		w, h := min(60, m.width-10), min(25, m.height-6)
-		return ui.RenderTemplateOverlay(m.filteredTemplates(), m.templateFilter.Value, m.templateCursor, m.templateSearchMode, h), w, h, true
+		content, h := renderTemplateOverlay(m)
+		return content, min(60, m.width-10), h, true
 	case overlayColorscheme:
-		content := ui.RenderColorschemeOverlay(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor, m.schemeFilterMode)
-		return content, min(50, m.width-10), min(22, m.height-6), true
+		overlayH := min(22, m.height-6)
+		content := renderColorschemeOverlay(m, overlayH)
+		return content, min(50, m.width-10), overlayH, true
 	}
 	return m.renderOverlayContentExtended()
 }
@@ -175,7 +196,26 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 		c, w, h := m.renderOverlayRBAC()
 		return c, w, h, true
 	case overlayBatchLabel:
-		content := ui.RenderBatchLabelOverlay(m.batchLabelMode, m.batchLabelInput.Value, m.batchLabelRemove)
+		kindName := "Labels"
+		if m.batchLabelMode == 1 {
+			kindName = "Annotations"
+		}
+		action := "Add"
+		prompt := "  Enter key=value:"
+		if m.batchLabelRemove {
+			action = "Remove"
+			prompt = "  Enter key to remove:"
+		}
+		content := ui.RenderOverlayInput(ui.OverlayInputConfig{
+			Title: fmt.Sprintf("%s %s", action, kindName),
+			Rows: []ui.OverlayInputRow{
+				{
+					Label:      prompt + "\n  ",
+					Input:      m.batchLabelInput.Value,
+					ShowCursor: true,
+				},
+			},
+		})
 		return content, min(50, m.width-10), min(12, m.height-6), true
 	case overlayPodStartup:
 		c, w, h := m.renderOverlayPodStartup()
@@ -236,18 +276,20 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 
 func (m Model) renderOverlayPasteConfirm() (string, int, int) {
 	lineCount := strings.Count(strings.TrimRight(m.pendingPaste, "\n"), "\n") + 1
-	return ui.RenderPasteConfirmOverlay(lineCount), min(45, m.width-10), min(8, m.height-6)
+	content := ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
+		Title: "Paste",
+		Body: []string{
+			fmt.Sprintf("Paste contains %d lines.", lineCount),
+			"Flatten and paste?",
+		},
+	})
+	return content, min(45, m.width-10), min(8, m.height-6)
 }
 
 func (m Model) renderOverlayClusterColor() (string, int, int) {
-	content := ui.RenderClusterColorOverlay(
-		m.clusterColorOverlayContext,
-		m.filteredClusterColorNames(),
-		m.clusterColorOverlayCursor,
-		m.clusterColorFilter.Value,
-		m.clusterColorFilterMode,
-	)
-	return content, min(40, m.width-10), min(15, m.height-6)
+	overlayW := min(40, m.width-10)
+	overlayH := min(15, m.height-6)
+	return renderClusterColorOverlay(m, overlayW-4, overlayH-2), overlayW, overlayH
 }
 
 func (m Model) renderOverlayTrafficCapture() (string, int, int) {
@@ -265,17 +307,25 @@ func (m Model) renderOverlayFilterPreset() (string, int, int) {
 	if m.activeFilterPreset != nil {
 		activePresetName = m.activeFilterPreset.Name
 	}
-	entries := make([]ui.FilterPresetEntry, len(m.filterPresets))
+	items := make([]ui.OverlayListItem, len(m.filterPresets))
 	for i, p := range m.filterPresets {
-		entries[i] = ui.FilterPresetEntry{Name: p.Name, Description: p.Description, Key: p.Key}
+		items[i] = ui.OverlayListItem{
+			Name:        p.Name,
+			Description: p.Description,
+			Key:         p.Key,
+			Active:      p.Name == activePresetName,
+		}
 	}
-	// FilterPresetOverlayWidth floors at 72 (historical width) and grows to
-	// fit the longest preset row, capped at terminal-10 so the overlay leaves
-	// margin. Mirrors the adaptive sizing used by the action menu overlay.
-	overlayW := ui.FilterPresetOverlayWidth(entries, m.width-10)
-	// OverlayStyle reserves 4 cells horizontally for Padding(1, 2).
-	contentW := max(overlayW-4, 0)
-	return ui.RenderFilterPresetOverlay(entries, m.overlayCursor, activePresetName, contentW), overlayW, min(15, m.height-6)
+	cfg := ui.OverlayListConfig{
+		Title:            "Quick Filters",
+		Cursor:           m.overlayCursor,
+		ShowKey:          true,
+		ShowDescription:  true,
+		ShowActiveMarker: true,
+		EmptyMessage:     "No filter presets available",
+	}
+	overlayW := ui.OverlayListWidth(items, cfg, m.width-10)
+	return ui.RenderOverlayList(items, cfg, overlayW-4), overlayW, min(15, m.height-6)
 }
 
 func (m Model) renderOverlayRBAC() (string, int, int) {
@@ -436,7 +486,7 @@ func buildActiveRows(snap []scheduler.Task, queued []scheduler.QueueEntry) []ui.
 func (m Model) renderOverlayCanISubject(background string) string {
 	canIBg := m.renderCanIOverlay(background)
 	w, h := min(80, m.width-10), min(20, m.height-6)
-	content := ui.RenderCanISubjectOverlay(m.filteredOverlayItems(), m.overlayFilter.Value, m.overlayCursor, m.canISubjectFilterMode)
+	content := renderCanISubjectOverlay(m, w-4)
 	content = ui.FillLinesBg(content, w-4, ui.SurfaceBg)
 	overlay := ui.OverlayStyle.Width(w).Height(h).Render(content)
 	return ui.PlaceOverlay(m.width, m.height, overlay, canIBg)
@@ -553,8 +603,7 @@ func (m Model) renderOverlayColumnToggle() (string, int, int) {
 	// resizing.
 	overlayW := min(50, m.width-10)
 	overlayH := min(20, m.height-6)
-	return ui.RenderColumnToggleOverlay(entries, m.columnToggleCursor, m.columnToggleFilter, m.columnToggleFilterActive, overlayW, overlayH),
-		overlayW, overlayH
+	return renderColumnToggleOverlay(m, entries, overlayW, overlayH), overlayW, overlayH
 }
 
 func (m Model) renderOverlayFinalizerSearch() (string, int, int) {

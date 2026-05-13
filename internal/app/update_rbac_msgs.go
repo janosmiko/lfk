@@ -6,7 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func (m Model) updateRbacCheck(msg rbacCheckMsg) (tea.Model, tea.Cmd) {
@@ -95,7 +94,6 @@ func (m Model) updateCanISAList(msg canISAListMsg) (tea.Model, tea.Cmd) {
 	m.overlayCursor = 0
 	m.overlayFilter.Clear()
 	m.canISubjectFilterMode = false
-	ui.ResetOverlayCanISubjectScroll()
 	m.overlay = overlayCanISubject
 	return m, nil
 }

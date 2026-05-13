@@ -189,16 +189,20 @@ type LocalClusterDeleteConfirmView struct {
 }
 
 // RenderLocalClusterDeleteConfirm renders the delete-confirm sub-screen
-// using the same shape as the project's Force Delete confirmation
-// (RenderConfirmTypeOverlay) so destructive actions feel uniform across
-// the app. The caller wraps the result in
-// OverlayStyle.Width(w).Height(h).Render(...).
+// using the same shape as the project's Force Delete confirmation so
+// destructive actions feel uniform across the app. The caller wraps the
+// result in OverlayStyle.Width(w).Height(h).Render(...).
 func RenderLocalClusterDeleteConfirm(s LocalClusterOverlayState, v LocalClusterDeleteConfirmView) string {
 	innerH := max(s.Height-2, 1)
 	question := fmt.Sprintf("Delete cluster %s? This destroys the cluster and removes its kubeconfig context. This cannot be undone.",
 		v.ContextName)
 	return PadToHeight(
-		RenderConfirmTypeOverlay("Confirm Delete Local Cluster", question, v.Buffer),
+		RenderOverlayConfirm(OverlayConfirmConfig{
+			Title:     "Confirm Delete Local Cluster",
+			Warning:   question,
+			TypeToken: "DELETE",
+			Input:     v.Buffer,
+		}),
 		innerH,
 	)
 }

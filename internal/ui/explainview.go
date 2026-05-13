@@ -74,10 +74,14 @@ func renderExplainPath(path, resourceName string, width, _ int) string {
 	b.WriteString(DimStyle.Bold(true).Render("PATH"))
 	b.WriteString("\n")
 
-	// Resource name at top (always shown).
+	// Resource name at top (always shown). Truncate to width-2 so the
+	// "> " / "  " prefix doesn't push the rendered line past the column
+	// boundary — lipgloss wraps overflow, which made the bottom border
+	// fall off-screen on long resource group names (e.g. an
+	// "applications (argoproj.io/v1alpha1)" header wider than leftInner).
 	resDisplay := resourceName
-	if len(resDisplay) > width {
-		resDisplay = resDisplay[:width]
+	if len(resDisplay) > width-2 {
+		resDisplay = resDisplay[:max(width-2, 0)]
 	}
 	if path == "" {
 		// At root level - resource name is the active breadcrumb.

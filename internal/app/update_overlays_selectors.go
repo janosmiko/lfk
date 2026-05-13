@@ -142,6 +142,12 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "/":
 		m.nsFilterMode = true
+		// Snapshot the item under the cursor so Esc can restore it
+		// regardless of what the user navigated to in the filtered view.
+		m.nsFilterEntryItem = ""
+		if items := m.filteredOverlayItems(); m.overlayCursor < len(items) {
+			m.nsFilterEntryItem = items[m.overlayCursor].Name
+		}
 		m.overlayFilter.Clear()
 		return m, nil
 
@@ -190,7 +196,17 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "ctrl+c":
-		return m.closeTabOrQuit()
+		// Close the overlay rather than the tab — once an overlay is
+		// open Ctrl+C should match Esc semantics. The tab-close only
+		// applies at the explorer level (handleExplorerKey).
+		m.overlayFilter.Clear()
+		if m.previousOverlay != overlayNone {
+			m.overlay = m.previousOverlay
+			m.previousOverlay = overlayNone
+			return m, nil
+		}
+		m.overlay = overlayNone
+		return m, nil
 	}
 	return m, nil
 }
@@ -210,9 +226,22 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch handleFilterKey(&m.overlayFilter, msg.String()) {
 	case filterEscape:
+		// Restore the cursor to the item that was selected when filter
+		// mode was entered — not whatever the user navigated to in the
+		// filtered view. The snapshot was taken in the "/" case handler.
+		target := m.nsFilterEntryItem
 		m.nsFilterMode = false
+		m.nsFilterEntryItem = ""
 		m.overlayFilter.Clear()
 		m.overlayCursor = 0
+		if target != "" {
+			for i, it := range m.filteredOverlayItems() {
+				if it.Name == target {
+					m.overlayCursor = i
+					break
+				}
+			}
+		}
 		return m, nil
 	case filterAccept:
 		m.nsFilterMode = false
@@ -246,7 +275,19 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case filterClose:
-		return m.closeTabOrQuit()
+		// Ctrl+C in filter mode closes the overlay, not the tab —
+		// matches the Esc/q behaviour in the surrounding normal-mode
+		// handler so users never accidentally drop a tab while searching.
+		m.nsFilterMode = false
+		m.overlayFilter.Clear()
+		m.overlayCursor = 0
+		if m.previousOverlay != overlayNone {
+			m.overlay = m.previousOverlay
+			m.previousOverlay = overlayNone
+			return m, nil
+		}
+		m.overlay = overlayNone
+		return m, nil
 	case filterContinue:
 		m.overlayCursor = 0
 		return m, nil
@@ -346,9 +387,22 @@ func (m Model) handleTemplateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch handleFilterKey(&m.templateFilter, msg.String()) {
 	case filterEscape:
+		// Preserve cursor on the same template across filter exit.
+		var targetName string
+		if items := m.filteredTemplates(); m.templateCursor < len(items) {
+			targetName = items[m.templateCursor].Name
+		}
 		m.templateSearchMode = false
 		m.templateFilter.Clear()
 		m.templateCursor = 0
+		if targetName != "" {
+			for i, t := range m.filteredTemplates() {
+				if t.Name == targetName {
+					m.templateCursor = i
+					break
+				}
+			}
+		}
 		return m, nil
 	case filterAccept:
 		m.templateSearchMode = false
@@ -437,6 +491,11 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 	case "/":
 		m.schemeFilterMode = true
+		// Snapshot pre-filter cursor target so Esc restores it.
+		m.schemeFilterEntryName = ""
+		if names := m.filteredSchemeNames(); m.schemeCursor < len(names) {
+			m.schemeFilterEntryName = names[m.schemeCursor]
+		}
 		m.schemeFilter.Clear()
 		return m, nil
 
@@ -553,10 +612,22 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	}
 	switch handleFilterKey(&m.schemeFilter, msg.String()) {
 	case filterEscape:
+		// Restore the cursor to the scheme that was selected when filter
+		// mode was entered. The snapshot was taken in the "/" case.
+		target := m.schemeFilterEntryName
 		m.schemeFilterMode = false
+		m.schemeFilterEntryName = ""
 		m.schemeFilter.Clear()
 		m.schemeCursor = 0
 		ui.ResetOverlaySchemeScroll()
+		if target != "" {
+			for i, n := range m.filteredSchemeNames() {
+				if n == target {
+					m.schemeCursor = i
+					break
+				}
+			}
+		}
 		m.previewSchemeAtCursor(m.filteredSchemeNames())
 		return m, nil
 	case filterAccept:
@@ -633,7 +704,7 @@ func (m *Model) filteredSchemeNames() []string {
 func (m *Model) schemeFirstVisibleSelectable() int {
 	items := m.schemeDisplayItems()
 	start := ui.GetOverlaySchemeScroll()
-	end := min(start+ui.SchemeOverlayMaxVisible, len(items))
+	end := min(start+ui.GetOverlaySchemeVisible(), len(items))
 	for i := start; i < end; i++ {
 		if items[i].selectIdx >= 0 {
 			return items[i].selectIdx
@@ -647,7 +718,7 @@ func (m *Model) schemeFirstVisibleSelectable() int {
 func (m *Model) schemeLastVisibleSelectable() int {
 	items := m.schemeDisplayItems()
 	start := ui.GetOverlaySchemeScroll()
-	end := min(start+ui.SchemeOverlayMaxVisible, len(items))
+	end := min(start+ui.GetOverlaySchemeVisible(), len(items))
 	for i := end - 1; i >= start; i-- {
 		if items[i].selectIdx >= 0 {
 			return items[i].selectIdx

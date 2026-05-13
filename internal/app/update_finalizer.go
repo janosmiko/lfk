@@ -136,6 +136,18 @@ func (m Model) handleFinalizerSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleFinalizerSearchFilterKey handles keyboard input when the filter bar
 // is active inside the finalizer search overlay.
 func (m Model) handleFinalizerSearchFilterKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Pasted text arrives as a single key event with Paste=true and the
+	// pasted content in Runes. Append single-line pastes to the filter;
+	// drop multi-line pastes (the finalizer filter is single-line by
+	// design, so collapsing newlines would silently hide content).
+	if msg.Paste {
+		pasted := strings.TrimRight(string(msg.Runes), "\n")
+		if !strings.ContainsAny(pasted, "\n\r") {
+			m.finalizerSearchFilter += pasted
+			m.finalizerSearchCursor = 0
+		}
+		return m, nil
+	}
 	key := msg.String()
 	switch key {
 	case "esc":

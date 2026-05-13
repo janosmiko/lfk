@@ -41,7 +41,6 @@ func (m Model) updatePodSelect(msg podSelectMsg) (tea.Model, tea.Cmd) {
 	m.overlayCursor = 0
 	m.logPodFilterText = ""
 	m.logPodFilterActive = false
-	ui.ResetOverlayPodScroll()
 	return m, nil
 }
 
@@ -107,7 +106,6 @@ func (m Model) updatePodLogSelect(msg podLogSelectMsg) (tea.Model, tea.Cmd) {
 		m.overlayCursor = 0
 		m.logPodFilterText = ""
 		m.logPodFilterActive = false
-		ui.ResetOverlayPodScroll()
 		return m, nil
 	}
 
@@ -133,7 +131,6 @@ func (m Model) updatePodLogSelect(msg podLogSelectMsg) (tea.Model, tea.Cmd) {
 	m.overlayCursor = 0
 	m.logPodFilterText = ""
 	m.logPodFilterActive = false
-	ui.ResetOverlayPodScroll()
 	return m, nil
 }
 
@@ -205,6 +202,5 @@ func (m Model) updateLogContainersLoaded(msg logContainersLoadedMsg) (tea.Model,
 	m.logContainerFilterText = ""
 	m.logContainerFilterActive = false
 	m.logContainerSelectionModified = false
-	ui.ResetOverlayContainerScroll()
 	return m, nil
 }

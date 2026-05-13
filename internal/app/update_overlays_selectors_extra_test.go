@@ -205,6 +205,39 @@ func TestNamespaceFilterModeEscExits(t *testing.T) {
 	assert.Empty(t, result.overlayFilter.Value)
 }
 
+// Esc while filtering restores the cursor to the namespace that was
+// selected when the user FIRST entered filter mode — not wherever they
+// navigated to inside the filtered view. The "/" handler captures the
+// pre-filter item name in nsFilterEntryItem; Esc reads it back.
+func TestNamespaceFilterModeEscRestoresPreFilterCursor(t *testing.T) {
+	m := Model{
+		overlay:           overlayNamespace,
+		nsFilterMode:      true,
+		nsFilterEntryItem: "production", // user was on "production" when they pressed "/"
+		overlayFilter:     TextInput{Value: "kube"},
+		overlayItems: []model.Item{
+			{Name: "All Namespaces", Status: "all"},
+			{Name: "default"},
+			{Name: "kube-public"},
+			{Name: "kube-system"},
+			{Name: "production"},
+		},
+		overlayCursor: 1, // user navigated to "kube-system" inside the filtered view
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
+	}
+	ret, _ := m.handleNamespaceFilterMode(specialKey(tea.KeyEsc))
+	result := ret.(Model)
+	assert.False(t, result.nsFilterMode)
+	assert.Empty(t, result.overlayFilter.Value)
+	// Esc must drop the cursor back on "production" (the snapshot), not
+	// on the filtered-view position they navigated to.
+	got := result.overlayItems[result.overlayCursor].Name
+	assert.Equal(t, "production", got,
+		"cursor should restore to nsFilterEntryItem, not stay on the filtered cursor")
+}
+
 func TestNamespaceFilterModeEnterCommits(t *testing.T) {
 	m := Model{
 		overlay:       overlayNamespace,

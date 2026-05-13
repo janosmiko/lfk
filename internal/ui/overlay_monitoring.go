@@ -17,8 +17,28 @@ func ResetOverlaySchemeScroll() { overlaySchemeScroll = 0 }
 // GetOverlaySchemeScroll returns the current colorscheme overlay scroll position.
 func GetOverlaySchemeScroll() int { return overlaySchemeScroll }
 
-// SchemeOverlayMaxVisible is the number of visible lines in the colorscheme overlay.
-const SchemeOverlayMaxVisible = 20
+// SetOverlaySchemeScroll updates the colorscheme-overlay scroll state. Called
+// by the renderColorschemeOverlay helper on every render so mouse-click row
+// resolution in update_overlays_selectors.go keeps resolving rows correctly.
+func SetOverlaySchemeScroll(s int) { overlaySchemeScroll = s }
+
+// overlaySchemeVisible mirrors the viewport size last used by the
+// colorscheme overlay renderer so the mouse-click / page-scroll
+// handlers can resolve hit rows against the correct viewport. The
+// renderer writes this on every render via SetOverlaySchemeVisible;
+// the default 20 matches the legacy constant for the brief window
+// before the first render.
+var overlaySchemeVisible = 20
+
+// GetOverlaySchemeVisible returns the current colorscheme overlay
+// viewport size (number of display lines, including any interleaved
+// section headers).
+func GetOverlaySchemeVisible() int { return overlaySchemeVisible }
+
+// SetOverlaySchemeVisible updates the viewport size to match what the
+// renderer is actually painting. Called from renderColorschemeOverlay
+// on every render.
+func SetOverlaySchemeVisible(n int) { overlaySchemeVisible = n }
 
 // ErrorLogVisualParams holds visual selection state for the error log overlay.
 type ErrorLogVisualParams struct {
@@ -192,123 +212,6 @@ func RenderErrorLogOverlay(entries []ErrorLogEntry, scroll int, height int, show
 		scrollInfo += " | " + modeLabel
 	}
 	b.WriteString(dimStyle.Render(scrollInfo))
-
-	return b.String()
-}
-
-// RenderColorschemeOverlay renders the color scheme selector overlay content.
-// entries is a list of SchemeEntry (with headers). cursor indexes only selectable entries.
-func RenderColorschemeOverlay(entries []SchemeEntry, filter string, cursor int, filterMode bool) string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Select Color Scheme"))
-	b.WriteString("\n")
-
-	// Filter input.
-	switch {
-	case filterMode:
-		b.WriteString(OverlayFilterStyle.Render("/ " + filter + "█"))
-	case filter != "":
-		b.WriteString(OverlayFilterStyle.Render("/ " + filter))
-	default:
-		b.WriteString(OverlayDimStyle.Render("/ to filter"))
-	}
-	b.WriteString("\n\n")
-
-	// Build display list: when filtering, skip headers and filter selectable entries.
-	type displayItem struct {
-		label     string
-		isHeader  bool
-		selectIdx int // index among selectable items (-1 for headers)
-	}
-
-	var items []displayItem
-	selectIdx := 0
-	if filter == "" {
-		for _, e := range entries {
-			if e.IsHeader {
-				items = append(items, displayItem{label: e.Name, isHeader: true, selectIdx: -1})
-			} else {
-				items = append(items, displayItem{label: e.Name, isHeader: false, selectIdx: selectIdx})
-				selectIdx++
-			}
-		}
-	} else {
-		lowerFilter := strings.ToLower(filter)
-		for _, e := range entries {
-			if e.IsHeader {
-				continue
-			}
-			if strings.Contains(e.Name, lowerFilter) {
-				items = append(items, displayItem{label: e.Name, isHeader: false, selectIdx: selectIdx})
-				selectIdx++
-			}
-		}
-	}
-
-	selectableCount := selectIdx
-	if selectableCount == 0 {
-		b.WriteString(OverlayDimStyle.Render("No matching schemes"))
-		return b.String()
-	}
-
-	// Scrolling window with vim-style scrolloff for stable viewport.
-	maxVisible := SchemeOverlayMaxVisible
-	scrollOff := ConfigScrollOff
-	if len(items) <= maxVisible {
-		scrollOff = 0
-	} else if maxSO := (maxVisible - 1) / 2; scrollOff > maxSO {
-		scrollOff = maxSO
-	}
-
-	// Find the display index of the cursor item.
-	cursorDisplayIdx := 0
-	for i, it := range items {
-		if !it.isHeader && it.selectIdx == cursor {
-			cursorDisplayIdx = i
-			break
-		}
-	}
-
-	displayLines := func(from, to int) int { return to - from }
-	start := VimScrollOff(overlaySchemeScroll, cursorDisplayIdx, len(items), maxVisible, scrollOff, displayLines)
-	overlaySchemeScroll = start
-
-	end := min(start+maxVisible, len(items))
-
-	b.WriteString(RenderScrollAbove(start, end-start, len(items), 0))
-	b.WriteString("\n")
-
-	var lines []string
-	for i := start; i < end; i++ {
-		it := items[i]
-		if it.isHeader {
-			lines = append(lines, "") // separator line
-			lines = append(lines, CategoryStyle.Render("── "+it.label+" ──"))
-		} else {
-			prefix := "  "
-			if it.label == ActiveSchemeName {
-				prefix = "* "
-			}
-			line := prefix + it.label
-			if it.selectIdx == cursor {
-				lines = append(lines, OverlaySelectedStyle.Render(line))
-			} else {
-				lines = append(lines, OverlayNormalStyle.Render(line))
-			}
-		}
-	}
-
-	// Pad or truncate to fixed height so the overlay doesn't resize.
-	for len(lines) < maxVisible {
-		lines = append(lines, "")
-	}
-	if len(lines) > maxVisible {
-		lines = lines[:maxVisible]
-	}
-	b.WriteString(strings.Join(lines, "\n"))
-
-	b.WriteString("\n")
-	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
 
 	return b.String()
 }

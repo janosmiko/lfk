@@ -149,18 +149,17 @@ type Model struct {
 	// Multi-select namespace state.
 	selectedNamespaces  map[string]bool
 	nsFilterMode        bool
-	nsSelectionModified bool // tracks if Space was pressed in current ns overlay session
+	nsSelectionModified bool   // tracks if Space was pressed in current ns overlay session
+	nsFilterEntryItem   string // namespace name selected when filter mode was entered; restored on Esc
 
-	// Fullscreen middle column: hides left and right columns.
-	fullscreenMiddle bool
-
-	// Fullscreen dashboard: renders the cluster dashboard full screen.
+	// Fullscreen toggles: middle = hides left and right columns; dashboard
+	// = renders the cluster dashboard full screen.
+	fullscreenMiddle    bool
 	fullscreenDashboard bool
 
-	// Sort state for resources: column name and direction.
+	// Sort state for resources.
 	sortColumnName string // which column to sort by (e.g. "Name", "Age")
 	sortAscending  bool   // true = ascending, false = descending
-
 	// Status message (temporary, shown in status bar).
 	statusMessage    string
 	statusMessageErr bool
@@ -547,11 +546,12 @@ type Model struct {
 	errorLogLineInput      string // digit buffer for 123G jump-to-line
 
 	// Color scheme selector state.
-	schemeEntries      []ui.SchemeEntry
-	schemeCursor       int
-	schemeFilter       TextInput
-	schemeFilterMode   bool   // true when typing into filter
-	schemeOriginalName string // scheme name before opening overlay, for cancel restore
+	schemeEntries         []ui.SchemeEntry
+	schemeCursor          int
+	schemeFilter          TextInput
+	schemeFilterMode      bool   // true when typing into filter
+	schemeOriginalName    string // scheme name before opening overlay, for cancel restore
+	schemeFilterEntryName string // scheme name selected when filter mode was entered; restored on Esc
 
 	serviceEndpointsCache map[string]*k8s.ServiceEndpoints // stale-while-revalidate cache for the Service endpoint rollup; see commands_load_preview.go
 	// orphanCache holds the most recent OrphanReport per (kubeContext, namespace); see commands_orphans.go
