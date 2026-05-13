@@ -101,6 +101,11 @@ func extractShellCommand(input string) string {
 // executeShellCommand runs an arbitrary shell command via sh -c.
 // It sets the KUBECONFIG environment variable from the client config
 // and logs the command before execution.
+//
+// In PTY terminal mode the command is launched inside lfk's embedded
+// vt10x terminal so the output flows in-place beside the rest of the
+// TUI, with line wrapping at the current pane width. In Exec mode the
+// host terminal is handed over via tea.ExecProcess (legacy behavior).
 func (m Model) executeShellCommand(cmd string) tea.Cmd {
 	if cmd == "" {
 		return nil
@@ -108,7 +113,16 @@ func (m Model) executeShellCommand(cmd string) tea.Cmd {
 
 	m.addLogEntry("DBG", fmt.Sprintf("$ sh -c %q", cmd))
 
-	// Wrap to clear screen, run, and wait for keypress.
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		c := exec.Command("sh", "-c", cmd)
+		c.Env = m.kubectlEnv()
+		logExecCmd("Running shell command", c)
+		cols, rows := m.embeddedPTYSize()
+		return startPTYExecCmd(c, fmtPTYTitle("$ "+cmd), cols, rows)
+	}
+
+	// Exec mode: clear the host screen, run, and wait for a keypress so
+	// the output is readable before the TUI redraws.
 	shellCmd := fmt.Sprintf(
 		`printf '\033c' && %s; printf '\nPress any key to continue...'; read -r -n1 _`,
 		cmd,
@@ -120,6 +134,34 @@ func (m Model) executeShellCommand(cmd string) tea.Cmd {
 	return tea.ExecProcess(c, func(err error) tea.Msg {
 		return actionResultMsg{err: err}
 	})
+}
+
+// embeddedPTYSize returns the column/row dimensions to use for the
+// embedded vt10x terminal when launching a command bar invocation.
+// Mirrors the size policy used by execKubectlExec/Attach/Debug so all
+// command-bar PTY launches share the same layout. The fallbacks (80x24)
+// kick in only before the first WindowSizeMsg, which is rare in
+// practice but keeps the math safe.
+func (m Model) embeddedPTYSize() (cols, rows int) {
+	cols = m.width
+	rows = m.height - 6
+	if cols < 20 {
+		cols = 80
+	}
+	if rows < 5 {
+		rows = 24
+	}
+	return cols, rows
+}
+
+// fmtPTYTitle returns a short title for the PTY tab bar, truncating
+// long shell command strings so they don't blow out the title line.
+func fmtPTYTitle(full string) string {
+	const max = 60
+	if len(full) <= max {
+		return full
+	}
+	return full[:max-1] + "…"
 }
 
 // executeBuiltinCommand parses and executes a built-in command.
@@ -478,7 +520,13 @@ func positionalArgCount(args []string) int {
 
 // executeKubectlCommand runs a kubectl command. It strips the optional
 // "kubectl " or "k " prefix, injects default --context and -n flags,
-// sets KUBECONFIG, and runs interactively via tea.ExecProcess.
+// sets KUBECONFIG, and runs the command.
+//
+// In PTY terminal mode the command runs inside lfk's embedded vt10x
+// terminal so output renders inline (with line wrapping at the pane
+// width) alongside the rest of the TUI. In Exec mode the host terminal
+// is handed over via tea.ExecProcess and lfk is suspended until the
+// command exits.
 func (m Model) executeKubectlCommand(input string) tea.Cmd {
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
@@ -505,7 +553,24 @@ func (m Model) executeKubectlCommand(input string) tea.Cmd {
 
 	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl %s", strings.Join(args, " ")))
 
-	// Wrap command to clear screen, run, and wait for keypress before returning to TUI.
+	if ui.ConfigTerminalMode == ui.TerminalModePTY {
+		c := exec.Command(kubectlPath, args...)
+		c.Env = m.kubectlEnv()
+		logExecCmd("Running kubectl command", c)
+		// PTY-mode commands don't route through tea.ExecProcess, so the
+		// namespace-cache invalidation that normally arrives via
+		// actionResultMsg won't fire here. That's acceptable because the
+		// user sees the result inline and can refresh manually with R; a
+		// future improvement could propagate invalidation through
+		// execPTYExitMsg. The affectsNamespaces value is intentionally
+		// dropped to keep the PTY path free of bespoke wiring.
+		_ = affectsNamespaces
+		cols, rows := m.embeddedPTYSize()
+		return startPTYExecCmd(c, fmtPTYTitle("kubectl "+strings.Join(args, " ")), cols, rows)
+	}
+
+	// Exec mode: clear the host screen, run, and wait for a keypress
+	// before returning to the TUI so the user can read the output.
 	quoted := make([]string, len(args))
 	for i, a := range args {
 		quoted[i] = shellQuote(a)
@@ -553,7 +618,10 @@ func commandAffectsNamespaces(args []string) bool {
 
 // injectKubectlDefaults scans the args for --context, -n/--namespace, and
 // -A/--all-namespaces flags. If they are not present, it injects the current
-// context and namespace from the model.
+// context and namespace from the model. Subcommands that don't accept
+// namespace flags (explain, api-resources, version, config, cordon, etc.)
+// have only --context injected — injecting -A or -n on those would cause
+// kubectl to reject the command with "unknown flag".
 func (m *Model) injectKubectlDefaults(args []string) []string {
 	hasContext := false
 	hasNamespace := false
@@ -577,7 +645,7 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 		result = append(result, "--context", m.kubectlContext(m.nav.Context))
 	}
 
-	if !hasNamespace && !hasAllNamespaces {
+	if commandSupportsNamespaceFlags(args) && !hasNamespace && !hasAllNamespaces {
 		hasResourceNames := positionalArgCount(args) > 2
 		ns := m.effectiveNamespace()
 		if ns != "" {
@@ -597,6 +665,30 @@ func (m *Model) injectKubectlDefaults(args []string) []string {
 	}
 
 	return result
+}
+
+// commandSupportsNamespaceFlags reports whether the given kubectl subcommand
+// accepts -n/--namespace or -A/--all-namespaces flags. Returns false for
+// commands that don't query namespaced resources at all: documentation
+// (explain, help, options), cluster-wide introspection (api-resources,
+// api-versions, version, cluster-info, config), node-scoped operations
+// (cordon, uncordon, drain, taint), and offline tooling (kustomize,
+// convert, completion, plugin). Injecting -A or -n on these makes kubectl
+// reject the whole invocation.
+func commandSupportsNamespaceFlags(args []string) bool {
+	if len(args) == 0 {
+		return false
+	}
+	switch args[0] {
+	case "explain",
+		"api-resources", "api-versions",
+		"version", "cluster-info",
+		"config", "options", "plugin", "completion", "help",
+		"cordon", "uncordon", "drain", "taint",
+		"kustomize", "convert":
+		return false
+	}
+	return true
 }
 
 // executeOrphansCommand handles the :orphans builtin. No-arg form opens the

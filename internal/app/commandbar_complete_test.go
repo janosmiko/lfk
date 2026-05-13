@@ -124,6 +124,23 @@ func TestCompleteResourceJump_IncludesExactMatch(t *testing.T) {
 		"exact match 'pod' should be included")
 }
 
+// TestCompleteResourceJump_ExactMatchSortsFirst pins the fix for
+// `:k explain pod` autocompleting to "poddisruptionbudget" before "pod".
+// When a candidate exactly equals the typed prefix, it must outrank
+// longer prefix matches regardless of API-group priority.
+func TestCompleteResourceJump_ExactMatchSortsFirst(t *testing.T) {
+	items := []model.Item{
+		{Name: "Pods", Extra: "/v1/pods"},
+		{Name: "PodDisruptionBudgets", Extra: "policy/v1/poddisruptionbudgets"},
+		{Name: "PodTemplates", Extra: "/v1/podtemplates"},
+	}
+	got := completeResourceJump("pod", items)
+	require := assert.New(t)
+	require.NotEmpty(got)
+	require.Equal("pod", got[0].Text,
+		"exact match 'pod' must be the first suggestion, not 'poddisruptionbudget' or 'podtemplate'")
+}
+
 func TestCompleteResourceJump_CapsMaxSuggestions(t *testing.T) {
 	// Generate enough items to exceed maxSuggestions.
 	items := make([]model.Item, 60)
