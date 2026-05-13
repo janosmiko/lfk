@@ -1,7 +1,6 @@
 package ui
 
 import (
-	"fmt"
 	"slices"
 	"strings"
 	"time"
@@ -20,23 +19,27 @@ func ResetOverlayNsScroll() { overlayNsScroll = 0 }
 // the correct item index in the underlying items slice.
 func GetOverlayNsScroll() int { return overlayNsScroll }
 
-// overlayPodScroll is the persistent scroll position for the pod selection overlay.
-var overlayPodScroll int
+// ResetOverlayPodScroll is a deprecated no-op; the pod-selector overlay now
+// derives its scroll window from the cursor on every render via OverlayList.
+//
+// Deprecated: drop the call site.
+func ResetOverlayPodScroll() {}
 
-// ResetOverlayPodScroll resets the pod overlay scroll position (call when opening the overlay).
-func ResetOverlayPodScroll() { overlayPodScroll = 0 }
-
-// overlayContainerScroll is the persistent scroll position for the container selection overlay.
+// overlayContainerScroll is the persistent scroll position for the
+// log-container multi-select overlay (still uses the legacy renderer
+// pending its wave-3 OverlayList migration).
 var overlayContainerScroll int
 
-// ResetOverlayContainerScroll resets the container overlay scroll position (call when opening the overlay).
+// ResetOverlayContainerScroll resets the container overlay scroll position
+// (call when opening the overlay).
 func ResetOverlayContainerScroll() { overlayContainerScroll = 0 }
 
-// overlayCanISubjectScroll is the persistent scroll position for the can-i subject selector overlay.
-var overlayCanISubjectScroll int
-
-// ResetOverlayCanISubjectScroll resets the can-i subject overlay scroll position (call when opening the overlay).
-func ResetOverlayCanISubjectScroll() { overlayCanISubjectScroll = 0 }
+// ResetOverlayCanISubjectScroll is a deprecated no-op; the can-i subject
+// selector overlay now derives its scroll window from the cursor on every
+// render.
+//
+// Deprecated: drop the call site.
+func ResetOverlayCanISubjectScroll() {}
 
 // ErrorLogEntry stores a single application log entry with its timestamp and severity level.
 type ErrorLogEntry struct {
@@ -142,9 +145,6 @@ type NetpolPeerEntry struct {
 	Except    []string
 	Namespace string
 }
-
-// bookmarkModeFilter matches the app-level bookmarkModeFilter enum value.
-const bookmarkModeFilter = 1
 
 // RenderNamespaceOverlay renders the namespace selection overlay content.
 //
@@ -314,255 +314,6 @@ func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedCon
 
 	b.WriteString("\n")
 	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
-
-	return b.String()
-}
-
-// RenderPodSelectOverlay renders the pod selection overlay content.
-func RenderPodSelectOverlay(items []model.Item, cursor int, filter string, filterActive bool) string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Select Pod"))
-	b.WriteString("\n")
-
-	// Filter input.
-	switch {
-	case filterActive:
-		b.WriteString(OverlayFilterStyle.Render("/ " + filter + "\u2588"))
-	case filter != "":
-		b.WriteString(OverlayFilterStyle.Render("/ " + filter))
-	default:
-		b.WriteString(OverlayDimStyle.Render("/ to filter"))
-	}
-	b.WriteString("\n\n")
-
-	if items == nil {
-		b.WriteString(OverlayDimStyle.Render("Loading pods..."))
-		return b.String()
-	}
-	if len(items) == 0 {
-		b.WriteString(OverlayDimStyle.Render("No matching pods"))
-		return b.String()
-	}
-
-	maxVisible := min(15, len(items))
-	scrollOff := ConfigScrollOff
-	if len(items) <= maxVisible {
-		scrollOff = 0
-	} else if maxSO := (maxVisible - 1) / 2; scrollOff > maxSO {
-		scrollOff = maxSO
-	}
-
-	displayLines := func(from, to int) int { return to - from }
-	start := VimScrollOff(overlayPodScroll, cursor, len(items), maxVisible, scrollOff, displayLines)
-	overlayPodScroll = start
-
-	end := min(start+maxVisible, len(items))
-
-	b.WriteString(RenderScrollAbove(start, end-start, len(items), 0))
-	b.WriteString("\n")
-
-	for i := start; i < end; i++ {
-		item := items[i]
-		line := fmt.Sprintf("  %s", item.Name)
-		if item.Status != "" {
-			styledStatus := StatusStyle(item.Status).Render(item.Status)
-			line += "  " + styledStatus
-		}
-		if i == cursor {
-			if item.Status != "" {
-				// Re-render without status styling so selected style dominates the name.
-				plainLine := fmt.Sprintf("  %s  %s", item.Name, item.Status)
-				b.WriteString(OverlaySelectedStyle.Render(plainLine))
-			} else {
-				b.WriteString(OverlaySelectedStyle.Render(line))
-			}
-		} else {
-			b.WriteString(OverlayNormalStyle.Render(fmt.Sprintf("  %s", item.Name)))
-			if item.Status != "" {
-				b.WriteString("  " + StatusStyle(item.Status).Render(item.Status))
-			}
-		}
-		if i < end-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
-
-	return b.String()
-}
-
-// RenderBookmarkOverlay renders the bookmark list overlay content.
-// mode: 0 = normal, 1 = filter. loadNamespace, when true, signals that
-// the next jump will apply the bookmark's saved namespace scope
-// instead of keeping the tab's current one; it's surfaced as a
-// "[LOAD NAMESPACE]" chip alongside the title so the user can see
-// what Enter / slot-key will do.
-func RenderBookmarkOverlay(allBookmarks []model.Bookmark, filter string, cursor, mode int, loadNamespace bool) string {
-	var b strings.Builder
-	// Chip sits on the same visual line as the title. Appending it
-	// AFTER OverlayTitleStyle.Render places the chip on the style's
-	// bottom-padding row, which reads as a stray line floating above
-	// the bookmark list — embed it inside the rendered title instead.
-	title := "Bookmarks"
-	if loadNamespace {
-		title += "   " + HelpKeyStyle.Render("[LOAD NAMESPACE]")
-	}
-	b.WriteString(OverlayTitleStyle.Render(title))
-	b.WriteString("\n")
-
-	// Show mode-specific input line.
-	switch mode {
-	case bookmarkModeFilter:
-		b.WriteString(OverlayFilterStyle.Render("filter> " + filter))
-		b.WriteString(OverlayDimStyle.Render("\u2588"))
-	default:
-		if filter != "" {
-			b.WriteString(OverlayDimStyle.Render("filter: "))
-			b.WriteString(OverlayFilterStyle.Render(filter))
-		}
-	}
-	b.WriteString("\n\n")
-
-	if len(allBookmarks) == 0 {
-		b.WriteString(OverlayDimStyle.Render("No bookmarks yet"))
-		b.WriteString("\n\n")
-		b.WriteString(OverlayDimStyle.Render("Press "))
-		b.WriteString(OverlayFilterStyle.Render("m<key>"))
-		b.WriteString(OverlayDimStyle.Render(" in explorer to set a mark"))
-		return b.String()
-	}
-
-	// Apply filter.
-	var bookmarks []model.Bookmark
-	if filter == "" {
-		bookmarks = allBookmarks
-	} else {
-		for _, bm := range allBookmarks {
-			if MatchLine(bm.Name, filter) {
-				bookmarks = append(bookmarks, bm)
-			}
-		}
-	}
-
-	if len(bookmarks) == 0 {
-		b.WriteString(OverlayDimStyle.Render("No matching bookmarks"))
-		return b.String()
-	}
-
-	maxVisible := min(15, len(bookmarks))
-	start := 0
-	if cursor >= maxVisible {
-		start = cursor - maxVisible + 1
-	}
-	end := min(start+maxVisible, len(bookmarks))
-
-	b.WriteString(RenderScrollAbove(start, end-start, len(bookmarks), 0))
-	b.WriteString("\n")
-
-	for i := start; i < end; i++ {
-		bm := bookmarks[i]
-
-		if i == cursor {
-			// Build plain text for the selected line so the highlight
-			// background covers the entire line uniformly.
-			var prefix string
-			if bm.Slot != "" {
-				prefix = bm.Slot + "   "
-			} else {
-				prefix = "    "
-			}
-			name := bm.Name
-			if len(bm.Namespaces) > 1 {
-				name += " [" + strings.Join(bm.Namespaces, ", ") + "]"
-			} else if bm.Namespace != "" {
-				name += " [" + bm.Namespace + "]"
-			}
-			line := fmt.Sprintf("  %s%s", prefix, name)
-			b.WriteString(OverlaySelectedStyle.Render(line))
-		} else {
-			// Non-selected: use styled prefix and namespace.
-			var prefix string
-			if bm.Slot != "" {
-				prefix = OverlayFilterStyle.Render(bm.Slot) + "   "
-			} else {
-				prefix = "    "
-			}
-			name := bm.Name
-			if len(bm.Namespaces) > 1 {
-				name += DimStyle.Render(" [" + strings.Join(bm.Namespaces, ", ") + "]")
-			} else if bm.Namespace != "" {
-				name += DimStyle.Render(" [" + bm.Namespace + "]")
-			}
-			line := fmt.Sprintf("  %s%s", prefix, name)
-			b.WriteString(OverlayNormalStyle.Render(line))
-		}
-		if i < end-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(RenderScrollBelow(start, end-start, len(bookmarks), 0))
-
-	return b.String()
-}
-
-// RenderTemplateOverlay renders the template selection overlay content.
-// filter is the current search text, filterMode indicates active filter input,
-// and overlayH is the total overlay height for footer positioning.
-func RenderTemplateOverlay(templates []model.ResourceTemplate, filter string, cursor int, filterMode bool, overlayH int) string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Create from Template"))
-	b.WriteString("\n")
-
-	// Show filter input line.
-	if filterMode {
-		b.WriteString(OverlayFilterStyle.Render("filter> " + filter))
-		b.WriteString(OverlayDimStyle.Render("\u2588"))
-	} else if filter != "" {
-		b.WriteString(OverlayDimStyle.Render("filter: "))
-		b.WriteString(OverlayFilterStyle.Render(filter))
-	}
-	b.WriteString("\n")
-
-	if len(templates) == 0 {
-		b.WriteString(OverlayDimStyle.Render("No templates available"))
-		return b.String()
-	}
-
-	// Fixed-height list: title(1) + filter(1) = 2 header lines + padding(2).
-	interiorH := overlayH - 2
-	maxVisible := min(
-		// 2 header lines + 1 blank, with a floor of 1
-		max(interiorH-3, 1),
-		len(templates),
-	)
-	start := 0
-	if cursor >= maxVisible {
-		start = cursor - maxVisible + 1
-	}
-	end := min(start+maxVisible, len(templates))
-
-	b.WriteString(RenderScrollAbove(start, end-start, len(templates), 0))
-	b.WriteString("\n")
-
-	for i := start; i < end; i++ {
-		tmpl := templates[i]
-		cat := OverlayDimStyle.Render("[" + tmpl.Category + "]")
-		if i == cursor {
-			fmt.Fprintf(&b, "  > %s %s", cat, OverlaySelectedStyle.Render(tmpl.Name))
-		} else {
-			fmt.Fprintf(&b, "    %s %s", cat, OverlayNormalStyle.Render(tmpl.Name))
-		}
-		if i < end-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(RenderScrollBelow(start, end-start, len(templates), 0))
 
 	return b.String()
 }

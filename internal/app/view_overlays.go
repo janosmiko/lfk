@@ -166,17 +166,16 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayContainerSelect:
 		return renderContainerSelectOverlay(m), min(50, m.width-10), min(15, m.height-6), true
 	case overlayPodSelect, overlayLogPodSelect:
-		content := ui.RenderPodSelectOverlay(m.filteredLogPodItems(), m.overlayCursor, m.logPodFilterText, m.logPodFilterActive)
-		return content, min(60, m.width-10), min(20, m.height-6), true
+		return renderPodSelectOverlay(m), min(60, m.width-10), min(20, m.height-6), true
 	case overlayLogContainerSelect:
 		content := ui.RenderLogContainerSelectOverlay(m.filteredLogContainerItems(), m.overlayCursor, m.logSelectedContainers, m.logContainerFilterText, m.logContainerFilterActive, m.logParentKind != "")
 		return content, min(60, m.width-10), min(len(m.filteredLogContainerItems())+9, m.height-6), true
 	case overlayBookmarks:
 		w, h := min(90, m.width-10), min(25, m.height-6)
-		return ui.RenderBookmarkOverlay(m.bookmarks, m.bookmarkFilter.Value, m.overlayCursor, int(m.bookmarkSearchMode), m.bookmarkLoadNamespace), w, h, true
+		return renderBookmarkOverlay(m), w, h, true
 	case overlayTemplates:
-		w, h := min(60, m.width-10), min(25, m.height-6)
-		return ui.RenderTemplateOverlay(m.filteredTemplates(), m.templateFilter.Value, m.templateCursor, m.templateSearchMode, h), w, h, true
+		content, h := renderTemplateOverlay(m)
+		return content, min(60, m.width-10), h, true
 	case overlayColorscheme:
 		content := ui.RenderColorschemeOverlay(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor, m.schemeFilterMode)
 		return content, min(50, m.width-10), min(22, m.height-6), true
@@ -490,7 +489,7 @@ func buildActiveRows(snap []scheduler.Task, queued []scheduler.QueueEntry) []ui.
 func (m Model) renderOverlayCanISubject(background string) string {
 	canIBg := m.renderCanIOverlay(background)
 	w, h := min(80, m.width-10), min(20, m.height-6)
-	content := ui.RenderCanISubjectOverlay(m.filteredOverlayItems(), m.overlayFilter.Value, m.overlayCursor, m.canISubjectFilterMode)
+	content := renderCanISubjectOverlay(m)
 	content = ui.FillLinesBg(content, w-4, ui.SurfaceBg)
 	overlay := ui.OverlayStyle.Width(w).Height(h).Render(content)
 	return ui.PlaceOverlay(m.width, m.height, overlay, canIBg)

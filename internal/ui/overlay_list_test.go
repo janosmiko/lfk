@@ -217,6 +217,23 @@ func TestRenderOverlayList(t *testing.T) {
 			FilterActive: true,
 		}, w)
 		assert.Contains(t, out, "alp")
+		assert.Contains(t, out, "█") // cursor block when active
+	})
+
+	t.Run("filter input shown when Filter non-empty and inactive (no cursor block)", func(t *testing.T) {
+		items := []OverlayListItem{{Name: "Alpha"}}
+		out := RenderOverlayList(items, OverlayListConfig{
+			Filter:       "alp",
+			FilterActive: false,
+		}, w)
+		assert.Contains(t, out, "alp")
+		assert.NotContains(t, out, "█") // no cursor when not in filter mode
+	})
+
+	t.Run("no filter row when filter empty and inactive", func(t *testing.T) {
+		items := []OverlayListItem{{Name: "Alpha"}}
+		out := RenderOverlayList(items, OverlayListConfig{}, w)
+		assert.NotContains(t, out, "filter: ")
 	})
 
 	t.Run("Disabled item renders with dim style indicator", func(t *testing.T) {

@@ -6,7 +6,6 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // executeActionShell handles the "Shell" action.
@@ -57,7 +56,6 @@ func (m Model) executeActionGoToPod() (tea.Model, tea.Cmd) {
 	m.pendingAction = "Go to Pod"
 	m.logPodFilterText = ""
 	m.logPodFilterActive = false
-	ui.ResetOverlayPodScroll()
 	return m, nil
 }
 

@@ -89,11 +89,13 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		b.WriteString(OverlayDimStyle.Render("  " + cfg.Subtitle))
 		b.WriteString("\n")
 	}
-	if cfg.FilterActive {
+	if cfg.FilterActive || cfg.Filter != "" {
 		b.WriteString("\n")
 		b.WriteString(OverlayDimStyle.Render("  filter: "))
 		b.WriteString(OverlayInputStyle.Render(cfg.Filter))
-		b.WriteString(OverlayDimStyle.Render("█"))
+		if cfg.FilterActive {
+			b.WriteString(OverlayDimStyle.Render("█"))
+		}
 		b.WriteString("\n")
 	}
 	b.WriteString("\n")
