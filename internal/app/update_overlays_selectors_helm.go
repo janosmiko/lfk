@@ -53,6 +53,11 @@ func (m Model) handleRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.rollbackCursor >= 0 && m.rollbackCursor < len(m.rollbackRevisions) {
 			rev := m.rollbackRevisions[m.rollbackCursor]
 			m.addLogEntry("DBG", fmt.Sprintf("Rolling back to revision %d (RS: %s)", rev.Revision, rev.Name))
+			// Close the overlay so the user sees the command running
+			// (spinner / background task in the title bar) instead of a
+			// frozen-looking overlay until the rollback completes.
+			m.overlay = overlayNone
+			m.rollbackRevisions = nil
 			m.loading = true
 			return m, m.rollbackDeployment(rev.Revision)
 		}
@@ -130,6 +135,11 @@ func (m Model) handleHelmRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		if m.helmRollbackCursor >= 0 && m.helmRollbackCursor < len(m.helmRollbackRevisions) {
 			rev := m.helmRollbackRevisions[m.helmRollbackCursor]
 			m.addLogEntry("DBG", fmt.Sprintf("Rolling back Helm release to revision %d", rev.Revision))
+			// Close the overlay so the user sees the command running
+			// instead of a frozen-looking overlay until the rollback
+			// finishes in the background.
+			m.overlay = overlayNone
+			m.helmRollbackRevisions = nil
 			m.loading = true
 			return m, m.rollbackHelmRelease(rev.Revision)
 		}
