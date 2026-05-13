@@ -578,10 +578,7 @@ func (m Model) renderOverlayFullscreen(background string) string {
 			m.width, m.height,
 		)
 	case overlayAutoSync:
-		overlay = ui.RenderAutoSyncOverlay(
-			m.autoSyncEnabled, m.autoSyncSelfHeal, m.autoSyncPrune,
-			m.autoSyncCursor, m.width, m.height,
-		)
+		overlay = renderAutoSyncOverlay(m)
 	default:
 		return background
 	}

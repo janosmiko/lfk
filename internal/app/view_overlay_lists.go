@@ -5,6 +5,8 @@ import (
 	"slices"
 	"strings"
 
+	"github.com/charmbracelet/lipgloss"
+
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -326,6 +328,62 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 	return items, cursorDisplayIdx
 }
 
+// renderAutoSyncOverlay maps the ArgoCD AutoSync configuration picker
+// onto OverlayList. Three rows (AutoSync, Self-Heal, Prune) each carry
+// a pre-styled " ON" / "OFF" / "  -" indicator in the Badge column.
+// Self-Heal and Prune are gated on AutoSync being on; when AutoSync is
+// off they render with Disabled=true (dim) and show the "  -" badge
+// instead of OFF. The space/enter/esc hint sits in FooterHint so users
+// see how to interact without looking at the bottom hint bar.
+func renderAutoSyncOverlay(m Model) string {
+	const (
+		boxWMax    = 46
+		labelW     = 14
+		badgeW     = 3 // " ON" / "OFF" / "  -"
+		chromeRows = 2 // title + title bottom padding
+	)
+	boxW := min(boxWMax, m.width-4)
+	contentH := chromeRows + 3 + 2 // title chrome + 3 rows + blank + footer
+	innerW := max(boxW-4, 1)
+
+	onStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true)
+	offStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorError))
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed))
+
+	badge := func(on, disabled bool) string {
+		switch {
+		case disabled:
+			return dimStyle.Render("  -")
+		case on:
+			return onStyle.Render(" ON")
+		default:
+			return offStyle.Render("OFF")
+		}
+	}
+
+	items := []ui.OverlayListItem{
+		{Name: padRight("AutoSync", labelW), Badge: badge(m.autoSyncEnabled, false)},
+		{
+			Name:     padRight("Self-Heal", labelW),
+			Badge:    badge(m.autoSyncSelfHeal, !m.autoSyncEnabled),
+			Disabled: !m.autoSyncEnabled,
+		},
+		{
+			Name:     padRight("Prune", labelW),
+			Badge:    badge(m.autoSyncPrune, !m.autoSyncEnabled),
+			Disabled: !m.autoSyncEnabled,
+		},
+	}
+	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:      "Configure AutoSync",
+		Cursor:     m.autoSyncCursor,
+		BadgeWidth: badgeW,
+		FooterHint: "space: toggle | enter: save | esc: cancel",
+		Height:     contentH,
+	}, innerW)
+	return ui.OverlayStyle.Width(boxW).Render(content)
+}
+
 // renderHelmHistoryOverlay maps the Helm release-history viewer onto
 // OverlayList. The renderer is fullscreen-style (returns a fully styled
 // overlay including OverlayStyle wrapping) so it slots into the
@@ -524,6 +582,8 @@ func renderClusterColorOverlay(m Model, innerW, contentH int) string {
 // padRight returns s padded with spaces to at least width visual cells.
 // Used to align the badge column across rows in OverlayList; lipgloss
 // handles overflow truncation for us, so this only adds — never trims.
+//
+//nolint:unparam // intentionally generic; current callers happen to share width=14 but each picks its own
 func padRight(s string, width int) string {
 	if w := len(s); w < width {
 		s += strings.Repeat(" ", width-w)
