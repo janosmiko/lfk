@@ -491,7 +491,7 @@ func buildActiveRows(snap []scheduler.Task, queued []scheduler.QueueEntry) []ui.
 func (m Model) renderOverlayCanISubject(background string) string {
 	canIBg := m.renderCanIOverlay(background)
 	w, h := min(80, m.width-10), min(20, m.height-6)
-	content := renderCanISubjectOverlay(m)
+	content := renderCanISubjectOverlay(m, w-4)
 	content = ui.FillLinesBg(content, w-4, ui.SurfaceBg)
 	overlay := ui.OverlayStyle.Width(w).Height(h).Render(content)
 	return ui.PlaceOverlay(m.width, m.height, overlay, canIBg)

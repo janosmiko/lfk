@@ -88,8 +88,13 @@ func renderPodSelectOverlay(m Model) string {
 
 // renderCanISubjectOverlay maps the CanI subject selector (a flat list of
 // ServiceAccount / User / Group items) onto OverlayList. Status moves to
-// Description so the subject kind reads alongside the name.
-func renderCanISubjectOverlay(m Model) string {
+// Description so the subject kind reads alongside the name. innerW is
+// the content width (overlay box width minus the 2+2 cell horizontal
+// padding) — the caller's renderOverlayCanISubject uses an 80-wide box,
+// not the 60-wide default of the other selectors, so we accept it as a
+// parameter instead of hard-coding it (mismatch put the scrollbar in
+// the middle of the box).
+func renderCanISubjectOverlay(m Model, innerW int) string {
 	src := m.filteredOverlayItems()
 	items := make([]ui.OverlayListItem, len(src))
 	for i, it := range src {
@@ -106,7 +111,7 @@ func renderCanISubjectOverlay(m Model) string {
 		Scroll:          overlayListScroll(&overlayCanISubjectScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:      maxVisible,
 		EmptyMessage:    "No matching subjects",
-	}, min(60, m.width-10)-4)
+	}, innerW)
 }
 
 // renderBookmarkOverlay maps the bookmark picker onto OverlayList. The
