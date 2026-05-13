@@ -560,11 +560,11 @@ func (m Model) renderOverlayFullscreen(background string) string {
 			m.width, m.height,
 		)
 	case overlayRollback:
-		overlay = ui.RenderRollbackOverlay(m.rollbackRevisions, m.rollbackCursor, m.width, m.height)
+		overlay = renderRollbackOverlay(m)
 	case overlayHelmRollback:
-		overlay = ui.RenderHelmRollbackOverlay(m.helmRollbackRevisions, m.helmRollbackCursor, m.width, m.height, m.helmRevisionsLoading)
+		overlay = renderHelmRollbackOverlay(m)
 	case overlayHelmHistory:
-		overlay = ui.RenderHelmHistoryOverlay(m.helmHistoryRevisions, m.helmHistoryCursor, m.width, m.height, m.helmRevisionsLoading)
+		overlay = renderHelmHistoryOverlay(m)
 	case overlayLabelEditor:
 		overlay = ui.RenderLabelEditorOverlay(
 			m.labelData, m.labelCursor, m.labelTab,
@@ -578,10 +578,7 @@ func (m Model) renderOverlayFullscreen(background string) string {
 			m.width, m.height,
 		)
 	case overlayAutoSync:
-		overlay = ui.RenderAutoSyncOverlay(
-			m.autoSyncEnabled, m.autoSyncSelfHeal, m.autoSyncPrune,
-			m.autoSyncCursor, m.width, m.height,
-		)
+		overlay = renderAutoSyncOverlay(m)
 	default:
 		return background
 	}

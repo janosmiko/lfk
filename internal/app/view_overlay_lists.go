@@ -1,8 +1,11 @@
 package app
 
 import (
+	"fmt"
 	"slices"
 	"strings"
+
+	"github.com/charmbracelet/lipgloss"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -19,6 +22,9 @@ var (
 	overlayContainerScrollPos    int
 	overlayColumnToggleScrollPos int
 	overlayTemplateScrollPos     int
+	overlayHelmHistoryScrollPos  int
+	overlayHelmRollbackScrollPos int
+	overlayRollbackScrollPos     int
 )
 
 // overlayListScroll computes the new viewport start using
@@ -322,6 +328,219 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 	return items, cursorDisplayIdx
 }
 
+// renderAutoSyncOverlay maps the ArgoCD AutoSync configuration picker
+// onto OverlayList. Three rows (AutoSync, Self-Heal, Prune) each carry
+// a pre-styled " ON" / "OFF" / "  -" indicator in the Badge column.
+// Self-Heal and Prune are gated on AutoSync being on; when AutoSync is
+// off they render with Disabled=true (dim) and show the "  -" badge
+// instead of OFF. The space/enter/esc hint sits in FooterHint so users
+// see how to interact without looking at the bottom hint bar.
+func renderAutoSyncOverlay(m Model) string {
+	const (
+		boxWMax    = 46
+		labelW     = 14
+		badgeW     = 3 // " ON" / "OFF" / "  -"
+		chromeRows = 2 // title + title bottom padding
+	)
+	boxW := min(boxWMax, m.width-4)
+	contentH := chromeRows + 3 + 2 // title chrome + 3 rows + blank + footer
+	innerW := max(boxW-4, 1)
+
+	onStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true)
+	offStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorError))
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed))
+
+	badge := func(on, disabled bool) string {
+		switch {
+		case disabled:
+			return dimStyle.Render("  -")
+		case on:
+			return onStyle.Render(" ON")
+		default:
+			return offStyle.Render("OFF")
+		}
+	}
+
+	items := []ui.OverlayListItem{
+		{Name: padRight("AutoSync", labelW), Badge: badge(m.autoSyncEnabled, false)},
+		{
+			Name:     padRight("Self-Heal", labelW),
+			Badge:    badge(m.autoSyncSelfHeal, !m.autoSyncEnabled),
+			Disabled: !m.autoSyncEnabled,
+		},
+		{
+			Name:     padRight("Prune", labelW),
+			Badge:    badge(m.autoSyncPrune, !m.autoSyncEnabled),
+			Disabled: !m.autoSyncEnabled,
+		},
+	}
+	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:      "Configure AutoSync",
+		Cursor:     m.autoSyncCursor,
+		BadgeWidth: badgeW,
+		FooterHint: "space: toggle | enter: save | esc: cancel",
+		Height:     contentH,
+	}, innerW)
+	return ui.OverlayStyle.Width(boxW).Render(content)
+}
+
+// renderHelmHistoryOverlay maps the Helm release-history viewer onto
+// OverlayList. The renderer is fullscreen-style (returns a fully styled
+// overlay including OverlayStyle wrapping) so it slots into the
+// renderOverlayFullscreen path the same way the legacy renderer did.
+// Column header lives in cfg.Subtitle; row fields pack into Name with
+// fixed widths so they align with the header.
+func renderHelmHistoryOverlay(m Model) string {
+	const (
+		revW    = 6
+		statusW = 12
+		chartW  = 25
+		appVerW = 12
+		descW   = 30
+	)
+	if m.helmRevisionsLoading {
+		boxW := max(m.width*80/100, 60)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("Loading Helm release history..."))
+	}
+	if len(m.helmHistoryRevisions) == 0 {
+		boxW := max(m.width*80/100, 60)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+	}
+
+	boxW := max(m.width*80/100, 60)
+	boxH := max(m.height*60/100, 10)
+	contentH := max(boxH-2, 1)
+	maxVisible := max(contentH-3, 1) // chrome: title + title pad + subtitle
+
+	innerW := max(boxW-4, 1)
+	hdr := ui.Truncate(fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %s",
+		revW, "REV", statusW, "STATUS", chartW, "CHART",
+		appVerW, "APP VER", descW, "DESCRIPTION", "UPDATED"), innerW)
+	items := make([]ui.OverlayListItem, len(m.helmHistoryRevisions))
+	for i, rev := range m.helmHistoryRevisions {
+		// Truncate the assembled row to the inner box width so the
+		// 110+ cell fixed format never wraps on narrower terminals.
+		name := ui.Truncate(fmt.Sprintf("%-*d  %-*s  %-*s  %-*s  %-*s  %s",
+			revW, rev.Revision,
+			statusW, ui.Truncate(rev.Status, statusW),
+			chartW, ui.Truncate(rev.Chart, chartW),
+			appVerW, ui.Truncate(rev.AppVersion, appVerW),
+			descW, ui.Truncate(rev.Description, descW),
+			ui.Truncate(rev.Updated, 25)), innerW)
+		items[i] = ui.OverlayListItem{Name: name}
+	}
+	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:      "Helm Release History",
+		Subtitle:   hdr,
+		Cursor:     m.helmHistoryCursor,
+		Scroll:     overlayListScroll(&overlayHelmHistoryScrollPos, m.helmHistoryCursor, len(items), maxVisible),
+		MaxVisible: maxVisible,
+		Height:     contentH,
+	}, innerW)
+	return ui.OverlayStyle.Width(boxW).Render(content)
+}
+
+// renderHelmRollbackOverlay mirrors renderHelmHistoryOverlay for the
+// rollback picker — same column layout, distinct title to disambiguate
+// the destructive intent.
+func renderHelmRollbackOverlay(m Model) string {
+	const (
+		revW    = 6
+		statusW = 12
+		chartW  = 25
+		appVerW = 12
+		descW   = 30
+	)
+	if m.helmRevisionsLoading {
+		boxW := max(m.width*80/100, 60)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("Loading Helm release history..."))
+	}
+	if len(m.helmRollbackRevisions) == 0 {
+		boxW := max(m.width*80/100, 60)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+	}
+
+	boxW := max(m.width*80/100, 60)
+	boxH := max(m.height*60/100, 10)
+	contentH := max(boxH-2, 1)
+	maxVisible := max(contentH-3, 1)
+
+	innerW := max(boxW-4, 1)
+	hdr := ui.Truncate(fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %s",
+		revW, "REV", statusW, "STATUS", chartW, "CHART",
+		appVerW, "APP VER", descW, "DESCRIPTION", "UPDATED"), innerW)
+	items := make([]ui.OverlayListItem, len(m.helmRollbackRevisions))
+	for i, rev := range m.helmRollbackRevisions {
+		name := ui.Truncate(fmt.Sprintf("%-*d  %-*s  %-*s  %-*s  %-*s  %s",
+			revW, rev.Revision,
+			statusW, ui.Truncate(rev.Status, statusW),
+			chartW, ui.Truncate(rev.Chart, chartW),
+			appVerW, ui.Truncate(rev.AppVersion, appVerW),
+			descW, ui.Truncate(rev.Description, descW),
+			ui.Truncate(rev.Updated, 25)), innerW)
+		items[i] = ui.OverlayListItem{Name: name}
+	}
+	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:      "Helm Rollback",
+		Subtitle:   hdr,
+		Cursor:     m.helmRollbackCursor,
+		Scroll:     overlayListScroll(&overlayHelmRollbackScrollPos, m.helmRollbackCursor, len(items), maxVisible),
+		MaxVisible: maxVisible,
+		Height:     contentH,
+	}, innerW)
+	return ui.OverlayStyle.Width(boxW).Render(content)
+}
+
+// renderRollbackOverlay maps the Deployment rollback picker onto
+// OverlayList. Columns: REV, REPLICASET, PODS, IMAGE, AGE.
+func renderRollbackOverlay(m Model) string {
+	const (
+		revW = 8
+		rsW  = 30
+		podW = 8
+		imgW = 30
+	)
+	if len(m.rollbackRevisions) == 0 {
+		boxW := max(m.width*70/100, 50)
+		return ui.OverlayStyle.Width(boxW).Render(ui.OverlayDimStyle.Render("No revisions found"))
+	}
+
+	boxW := max(m.width*70/100, 50)
+	boxH := max(m.height*60/100, 10)
+	contentH := max(boxH-2, 1)
+	maxVisible := max(contentH-3, 1)
+
+	innerW := max(boxW-4, 1)
+	hdr := ui.Truncate(fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %s",
+		revW, "REV", rsW, "REPLICASET", podW, "PODS", imgW, "IMAGE", "AGE"), innerW)
+	items := make([]ui.OverlayListItem, len(m.rollbackRevisions))
+	for i, rev := range m.rollbackRevisions {
+		img := ""
+		if len(rev.Images) > 0 {
+			img = rev.Images[0]
+			if len(rev.Images) > 1 {
+				img += fmt.Sprintf(" +%d", len(rev.Images)-1)
+			}
+		}
+		name := ui.Truncate(fmt.Sprintf("%-*d  %-*s  %-*d  %-*s  %s",
+			revW, rev.Revision,
+			rsW, ui.Truncate(rev.Name, rsW),
+			podW, rev.Replicas,
+			imgW, ui.Truncate(img, imgW),
+			ui.FormatAge(rev.CreatedAt)), innerW)
+		items[i] = ui.OverlayListItem{Name: name}
+	}
+	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:      "Rollback Deployment",
+		Subtitle:   hdr,
+		Cursor:     m.rollbackCursor,
+		Scroll:     overlayListScroll(&overlayRollbackScrollPos, m.rollbackCursor, len(items), maxVisible),
+		MaxVisible: maxVisible,
+		Height:     contentH,
+	}, innerW)
+	return ui.OverlayStyle.Width(boxW).Render(content)
+}
+
 // renderClusterColorOverlay maps the cluster-color picker (with its
 // right-aligned 5-cell swatch column and "None (clear)" pseudo-row) onto
 // OverlayList. Caller passes innerW (content width inside lipgloss
@@ -368,6 +587,8 @@ func renderClusterColorOverlay(m Model, innerW, contentH int) string {
 // padRight returns s padded with spaces to at least width visual cells.
 // Used to align the badge column across rows in OverlayList; lipgloss
 // handles overflow truncation for us, so this only adds — never trims.
+//
+//nolint:unparam // intentionally generic; current callers happen to share width=14 but each picks its own
 func padRight(s string, width int) string {
 	if w := len(s); w < width {
 		s += strings.Repeat(" ", width-w)
