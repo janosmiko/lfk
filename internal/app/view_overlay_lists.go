@@ -412,18 +412,21 @@ func renderHelmHistoryOverlay(m Model) string {
 	contentH := max(boxH-2, 1)
 	maxVisible := max(contentH-3, 1) // chrome: title + title pad + subtitle
 
-	hdr := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %s",
+	innerW := max(boxW-4, 1)
+	hdr := ui.Truncate(fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %s",
 		revW, "REV", statusW, "STATUS", chartW, "CHART",
-		appVerW, "APP VER", descW, "DESCRIPTION", "UPDATED")
+		appVerW, "APP VER", descW, "DESCRIPTION", "UPDATED"), innerW)
 	items := make([]ui.OverlayListItem, len(m.helmHistoryRevisions))
 	for i, rev := range m.helmHistoryRevisions {
-		name := fmt.Sprintf("%-*d  %-*s  %-*s  %-*s  %-*s  %s",
+		// Truncate the assembled row to the inner box width so the
+		// 110+ cell fixed format never wraps on narrower terminals.
+		name := ui.Truncate(fmt.Sprintf("%-*d  %-*s  %-*s  %-*s  %-*s  %s",
 			revW, rev.Revision,
 			statusW, ui.Truncate(rev.Status, statusW),
 			chartW, ui.Truncate(rev.Chart, chartW),
 			appVerW, ui.Truncate(rev.AppVersion, appVerW),
 			descW, ui.Truncate(rev.Description, descW),
-			ui.Truncate(rev.Updated, 25))
+			ui.Truncate(rev.Updated, 25)), innerW)
 		items[i] = ui.OverlayListItem{Name: name}
 	}
 	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
@@ -433,7 +436,7 @@ func renderHelmHistoryOverlay(m Model) string {
 		Scroll:     overlayListScroll(&overlayHelmHistoryScrollPos, m.helmHistoryCursor, len(items), maxVisible),
 		MaxVisible: maxVisible,
 		Height:     contentH,
-	}, boxW-4)
+	}, innerW)
 	return ui.OverlayStyle.Width(boxW).Render(content)
 }
 
@@ -462,18 +465,19 @@ func renderHelmRollbackOverlay(m Model) string {
 	contentH := max(boxH-2, 1)
 	maxVisible := max(contentH-3, 1)
 
-	hdr := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %s",
+	innerW := max(boxW-4, 1)
+	hdr := ui.Truncate(fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %-*s  %s",
 		revW, "REV", statusW, "STATUS", chartW, "CHART",
-		appVerW, "APP VER", descW, "DESCRIPTION", "UPDATED")
+		appVerW, "APP VER", descW, "DESCRIPTION", "UPDATED"), innerW)
 	items := make([]ui.OverlayListItem, len(m.helmRollbackRevisions))
 	for i, rev := range m.helmRollbackRevisions {
-		name := fmt.Sprintf("%-*d  %-*s  %-*s  %-*s  %-*s  %s",
+		name := ui.Truncate(fmt.Sprintf("%-*d  %-*s  %-*s  %-*s  %-*s  %s",
 			revW, rev.Revision,
 			statusW, ui.Truncate(rev.Status, statusW),
 			chartW, ui.Truncate(rev.Chart, chartW),
 			appVerW, ui.Truncate(rev.AppVersion, appVerW),
 			descW, ui.Truncate(rev.Description, descW),
-			ui.Truncate(rev.Updated, 25))
+			ui.Truncate(rev.Updated, 25)), innerW)
 		items[i] = ui.OverlayListItem{Name: name}
 	}
 	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
@@ -483,7 +487,7 @@ func renderHelmRollbackOverlay(m Model) string {
 		Scroll:     overlayListScroll(&overlayHelmRollbackScrollPos, m.helmRollbackCursor, len(items), maxVisible),
 		MaxVisible: maxVisible,
 		Height:     contentH,
-	}, boxW-4)
+	}, innerW)
 	return ui.OverlayStyle.Width(boxW).Render(content)
 }
 
@@ -506,8 +510,9 @@ func renderRollbackOverlay(m Model) string {
 	contentH := max(boxH-2, 1)
 	maxVisible := max(contentH-3, 1)
 
-	hdr := fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %s",
-		revW, "REV", rsW, "REPLICASET", podW, "PODS", imgW, "IMAGE", "AGE")
+	innerW := max(boxW-4, 1)
+	hdr := ui.Truncate(fmt.Sprintf("%-*s  %-*s  %-*s  %-*s  %s",
+		revW, "REV", rsW, "REPLICASET", podW, "PODS", imgW, "IMAGE", "AGE"), innerW)
 	items := make([]ui.OverlayListItem, len(m.rollbackRevisions))
 	for i, rev := range m.rollbackRevisions {
 		img := ""
@@ -517,12 +522,12 @@ func renderRollbackOverlay(m Model) string {
 				img += fmt.Sprintf(" +%d", len(rev.Images)-1)
 			}
 		}
-		name := fmt.Sprintf("%-*d  %-*s  %-*d  %-*s  %s",
+		name := ui.Truncate(fmt.Sprintf("%-*d  %-*s  %-*d  %-*s  %s",
 			revW, rev.Revision,
 			rsW, ui.Truncate(rev.Name, rsW),
 			podW, rev.Replicas,
 			imgW, ui.Truncate(img, imgW),
-			ui.FormatAge(rev.CreatedAt))
+			ui.FormatAge(rev.CreatedAt)), innerW)
 		items[i] = ui.OverlayListItem{Name: name}
 	}
 	content := ui.RenderOverlayList(items, ui.OverlayListConfig{
@@ -532,7 +537,7 @@ func renderRollbackOverlay(m Model) string {
 		Scroll:     overlayListScroll(&overlayRollbackScrollPos, m.rollbackCursor, len(items), maxVisible),
 		MaxVisible: maxVisible,
 		Height:     contentH,
-	}, boxW-4)
+	}, innerW)
 	return ui.OverlayStyle.Width(boxW).Render(content)
 }
 
