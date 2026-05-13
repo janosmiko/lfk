@@ -18,6 +18,7 @@ var (
 	overlayCanISubjectScrollPos  int
 	overlayContainerScrollPos    int
 	overlayColumnToggleScrollPos int
+	overlayTemplateScrollPos     int
 )
 
 // overlayListScroll computes the new viewport start using
@@ -155,6 +156,7 @@ func renderTemplateOverlay(m Model) (string, int) {
 		Filter:       m.templateFilter.Value,
 		FilterActive: m.templateSearchMode,
 		ShowStatus:   true,
+		Scroll:       overlayListScroll(&overlayTemplateScrollPos, m.templateCursor, len(src), maxVisible),
 		MaxVisible:   maxVisible,
 		EmptyMessage: "No templates available",
 	}

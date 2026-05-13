@@ -23,12 +23,51 @@ func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.previousOverlay = overlayNone
 		return m, nil
 	}
+	// Universal Ctrl+C: close the current overlay (or restore its
+	// parent) rather than fall through to closeTabOrQuit inside the
+	// per-overlay handler. The tab-close behaviour lives at the
+	// explorer level (handleExplorerKey) — once an overlay is open
+	// Ctrl+C should mirror Esc/cancel semantics so users never
+	// accidentally drop a tab while interacting with an overlay.
+	if msg.String() == "ctrl+c" {
+		return m.closeCurrentOverlay()
+	}
 	if mdl, cmd, ok := m.handleOverlayKeyPrimary(msg); ok {
 		return mdl, cmd
 	}
 	if mdl, cmd, ok := m.handleOverlayKeySecondary(msg); ok {
 		return mdl, cmd
 	}
+	return m, nil
+}
+
+// closeCurrentOverlay closes the active overlay, restoring its parent
+// (e.g. RBAC underneath a namespace picker) when one exists. Also
+// clears the per-overlay filter input + filter-mode booleans so the
+// next time the same overlay opens, it starts from a clean slate
+// rather than resuming whatever was typed before the user bailed.
+func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
+	m.nsFilterMode = false
+	m.canISubjectFilterMode = false
+	m.templateSearchMode = false
+	m.schemeFilterMode = false
+	m.bookmarkSearchMode = bookmarkModeNormal
+	m.logPodFilterActive = false
+	m.logContainerFilterActive = false
+	m.columnToggleFilterActive = false
+	m.overlayFilter.Clear()
+	m.bookmarkFilter.Clear()
+	m.templateFilter.Clear()
+	m.schemeFilter.Clear()
+	m.logPodFilterText = ""
+	m.logContainerFilterText = ""
+	m.columnToggleFilter = ""
+	if m.previousOverlay != overlayNone {
+		m.overlay = m.previousOverlay
+		m.previousOverlay = overlayNone
+		return m, nil
+	}
+	m.overlay = overlayNone
 	return m, nil
 }
 

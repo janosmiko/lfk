@@ -142,6 +142,12 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "/":
 		m.nsFilterMode = true
+		// Snapshot the item under the cursor so Esc can restore it
+		// regardless of what the user navigated to in the filtered view.
+		m.nsFilterEntryItem = ""
+		if items := m.filteredOverlayItems(); m.overlayCursor < len(items) {
+			m.nsFilterEntryItem = items[m.overlayCursor].Name
+		}
 		m.overlayFilter.Clear()
 		return m, nil
 
@@ -220,20 +226,17 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch handleFilterKey(&m.overlayFilter, msg.String()) {
 	case filterEscape:
-		// Capture the currently-pointed item before clearing the filter so
-		// the cursor lands on the same item in the unfiltered list — Esc
-		// shouldn't yank the cursor back to the top of a 50-namespace list
-		// just because the user opened then closed filter mode.
-		var targetName string
-		if items := m.filteredOverlayItems(); m.overlayCursor < len(items) {
-			targetName = items[m.overlayCursor].Name
-		}
+		// Restore the cursor to the item that was selected when filter
+		// mode was entered — not whatever the user navigated to in the
+		// filtered view. The snapshot was taken in the "/" case handler.
+		target := m.nsFilterEntryItem
 		m.nsFilterMode = false
+		m.nsFilterEntryItem = ""
 		m.overlayFilter.Clear()
 		m.overlayCursor = 0
-		if targetName != "" {
+		if target != "" {
 			for i, it := range m.filteredOverlayItems() {
-				if it.Name == targetName {
+				if it.Name == target {
 					m.overlayCursor = i
 					break
 				}
@@ -488,6 +491,11 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 
 	case "/":
 		m.schemeFilterMode = true
+		// Snapshot pre-filter cursor target so Esc restores it.
+		m.schemeFilterEntryName = ""
+		if names := m.filteredSchemeNames(); m.schemeCursor < len(names) {
+			m.schemeFilterEntryName = names[m.schemeCursor]
+		}
 		m.schemeFilter.Clear()
 		return m, nil
 
@@ -604,18 +612,17 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	}
 	switch handleFilterKey(&m.schemeFilter, msg.String()) {
 	case filterEscape:
-		// Preserve cursor on the same scheme across filter exit.
-		var targetName string
-		if names := m.filteredSchemeNames(); m.schemeCursor < len(names) {
-			targetName = names[m.schemeCursor]
-		}
+		// Restore the cursor to the scheme that was selected when filter
+		// mode was entered. The snapshot was taken in the "/" case.
+		target := m.schemeFilterEntryName
 		m.schemeFilterMode = false
+		m.schemeFilterEntryName = ""
 		m.schemeFilter.Clear()
 		m.schemeCursor = 0
 		ui.ResetOverlaySchemeScroll()
-		if targetName != "" {
+		if target != "" {
 			for i, n := range m.filteredSchemeNames() {
-				if n == targetName {
+				if n == target {
 					m.schemeCursor = i
 					break
 				}

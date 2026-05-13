@@ -205,15 +205,16 @@ func TestNamespaceFilterModeEscExits(t *testing.T) {
 	assert.Empty(t, result.overlayFilter.Value)
 }
 
-// Esc while filtering must keep the cursor on the same namespace the user
-// was pointing at in the filtered view — yanking it back to row 0 forced
-// users to scroll back through long namespace lists every time they
-// opened then closed filter mode.
-func TestNamespaceFilterModeEscPreservesCursorTarget(t *testing.T) {
+// Esc while filtering restores the cursor to the namespace that was
+// selected when the user FIRST entered filter mode — not wherever they
+// navigated to inside the filtered view. The "/" handler captures the
+// pre-filter item name in nsFilterEntryItem; Esc reads it back.
+func TestNamespaceFilterModeEscRestoresPreFilterCursor(t *testing.T) {
 	m := Model{
-		overlay:       overlayNamespace,
-		nsFilterMode:  true,
-		overlayFilter: TextInput{Value: "kube"},
+		overlay:           overlayNamespace,
+		nsFilterMode:      true,
+		nsFilterEntryItem: "production", // user was on "production" when they pressed "/"
+		overlayFilter:     TextInput{Value: "kube"},
 		overlayItems: []model.Item{
 			{Name: "All Namespaces", Status: "all"},
 			{Name: "default"},
@@ -221,7 +222,7 @@ func TestNamespaceFilterModeEscPreservesCursorTarget(t *testing.T) {
 			{Name: "kube-system"},
 			{Name: "production"},
 		},
-		overlayCursor: 1, // points at "kube-system" in the filtered list
+		overlayCursor: 1, // user navigated to "kube-system" inside the filtered view
 		tabs:          []TabState{{}},
 		width:         80,
 		height:        40,
@@ -230,11 +231,11 @@ func TestNamespaceFilterModeEscPreservesCursorTarget(t *testing.T) {
 	result := ret.(Model)
 	assert.False(t, result.nsFilterMode)
 	assert.Empty(t, result.overlayFilter.Value)
-	// After Esc, "kube-system" lives at index 3 in the unfiltered list
-	// (All / default / kube-public / kube-system / production).
+	// Esc must drop the cursor back on "production" (the snapshot), not
+	// on the filtered-view position they navigated to.
 	got := result.overlayItems[result.overlayCursor].Name
-	assert.Equal(t, "kube-system", got,
-		"cursor should follow the previously-selected item, not jump to row 0")
+	assert.Equal(t, "production", got,
+		"cursor should restore to nsFilterEntryItem, not stay on the filtered cursor")
 }
 
 func TestNamespaceFilterModeEnterCommits(t *testing.T) {

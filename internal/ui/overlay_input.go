@@ -42,10 +42,12 @@ type OverlayInputConfig struct {
 func RenderOverlayInput(cfg OverlayInputConfig) string {
 	var b strings.Builder
 	b.WriteString(OverlayTitleStyle.Render(cfg.Title))
+	b.WriteString("\n")
 	if cfg.Subtitle != "" {
-		b.WriteString(OverlayDimStyle.Render("  " + cfg.Subtitle))
+		b.WriteString(OverlayDimStyle.Render(cfg.Subtitle))
+		b.WriteString("\n")
 	}
-	b.WriteString("\n\n")
+	b.WriteString("\n")
 
 	if cfg.Hint != "" {
 		b.WriteString(OverlayDimStyle.Render(cfg.Hint))

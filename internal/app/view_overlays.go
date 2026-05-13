@@ -123,8 +123,11 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		// `Align(Center, Center)` do the vertical centering. Setting qh=3
 		// gives a 5-row outer box: border / padding / Quit lfk? / padding
 		// / border, with the text on the middle row.
-		qw := min(32, m.width-10)
-		qh := min(3, m.height-6)
+		// Clamp before subtracting so InnerWidth/Height never go
+		// non-positive on tiny terminals — lipgloss's Align center
+		// requires positive dimensions.
+		qw := max(min(32, m.width-10), 10)
+		qh := max(min(3, m.height-6), 3)
 		return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
 			Title:       "Quit lfk?",
 			Centered:    true,

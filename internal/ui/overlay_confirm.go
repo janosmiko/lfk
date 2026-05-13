@@ -60,6 +60,11 @@ func RenderOverlayConfirm(cfg OverlayConfirmConfig) string {
 		}
 	}
 	if cfg.TypeToken != "" {
+		// Insert a blank line between body and the type-confirm row
+		// so they don't read as a single merged line.
+		if len(cfg.Body) > 0 {
+			b.WriteString("\n\n")
+		}
 		b.WriteString(OverlayNormalStyle.Render("Type "))
 		b.WriteString(OverlayFilterStyle.Render(cfg.TypeToken))
 		b.WriteString(OverlayNormalStyle.Render(" to confirm: "))

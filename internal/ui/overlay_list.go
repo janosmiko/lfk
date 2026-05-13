@@ -12,9 +12,13 @@ import (
 // RenderActionOverlay so short menus keep their stable size.
 const OverlayListFloor = 70
 
-// overlayListChrome is the horizontal chrome OverlayStyle adds outside
-// the content area: 1+1 cell border + 2+2 cell padding.
-const overlayListChrome = 6
+// overlayListChrome is the horizontal chrome that needs to be added to
+// the longest content row to compute the outer overlay width passed to
+// OverlayStyle.Width(). lipgloss treats Width() as the content area
+// INSIDE padding (the border lives outside and is rendered around the
+// styled output without counting toward Width), so the chrome that
+// affects width math is just the 2+2 cell padding.
+const overlayListChrome = 4
 
 // OverlayListItem is a single row in the unified overlay list. Optional
 // fields render only when the matching feature flag in OverlayListConfig
@@ -97,19 +101,14 @@ func OverlayListWidth(items []OverlayListItem, cfg OverlayListConfig, maxWidth i
 }
 
 // anyActive reports whether the active-marker column should be reserved.
-// The column collapses when ShowActiveMarker is off or when no item is
-// currently active, so non-stateful lists (no preset applied, no current
-// row marked) render with the bracket flush against the box's left padding.
-func anyActive(items []OverlayListItem, cfg OverlayListConfig) bool {
-	if !cfg.ShowActiveMarker {
-		return false
-	}
-	for _, it := range items {
-		if it.Active {
-			return true
-		}
-	}
-	return false
+// Returns cfg.ShowActiveMarker so the column is ALWAYS present when the
+// caller asks for it — collapsing the column when no item happens to be
+// active produced a visible shift in lists whose active state changes at
+// runtime (namespace selector items hopping left/right as the user
+// filtered and selected). The 2-cell placeholder is a small cosmetic
+// cost in exchange for stable row alignment.
+func anyActive(_ []OverlayListItem, cfg OverlayListConfig) bool {
+	return cfg.ShowActiveMarker
 }
 
 // RenderOverlayList renders the list at the given inner content width.
