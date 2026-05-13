@@ -60,6 +60,14 @@ type OverlayListConfig struct {
 
 	FooterHint   string // optional dim line under the list
 	EmptyMessage string // shown when items is empty (default: "No items")
+
+	// Height, when > 0, locks the rendered output to exactly this many
+	// lines. Padding with blank lines when content is shorter,
+	// truncating when longer. Use this to keep the surrounding overlay
+	// box from visibly resizing when the filter row appears / disappears
+	// or items are filtered out. Pass `overlayH - 2` to account for the
+	// 1+1 vertical padding lipgloss adds inside OverlayStyle.
+	Height int
 }
 
 // OverlayListWidth returns the overlay box width (outer, including border
@@ -131,7 +139,11 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 			b.WriteString("\n\n")
 			b.WriteString(OverlayDimStyle.Render(cfg.FooterHint))
 		}
-		return b.String()
+		out := b.String()
+		if cfg.Height > 0 {
+			out = PadToHeight(out, cfg.Height)
+		}
+		return out
 	}
 
 	// Scroll window.
@@ -176,7 +188,11 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		b.WriteString(OverlayDimStyle.Render(cfg.FooterHint))
 	}
 
-	return b.String()
+	out := b.String()
+	if cfg.Height > 0 {
+		out = PadToHeight(out, cfg.Height)
+	}
+	return out
 }
 
 // itemPlainLine returns the item rendered as plain text (no styling).

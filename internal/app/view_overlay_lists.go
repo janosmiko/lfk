@@ -214,6 +214,7 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 		Scroll:           overlayListScroll(&overlayColumnToggleScrollPos, m.columnToggleCursor, len(entries), maxVisible),
 		MaxVisible:       maxVisible,
 		EmptyMessage:     "No matching columns",
+		Height:           height - 2,
 	}, width-6)
 }
 
@@ -226,7 +227,7 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 // Scroll lives in ui.overlaySchemeScroll so the mouse-click resolver in
 // update_overlays_selectors.go reads it via ui.GetOverlaySchemeScroll;
 // the helper updates it on every render via ui.SetOverlaySchemeScroll.
-func renderColorschemeOverlay(m Model) string {
+func renderColorschemeOverlay(m Model, height int) string {
 	const maxVisible = ui.SchemeOverlayMaxVisible
 
 	items, cursorDisplayIdx := buildColorschemeItems(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor)
@@ -236,6 +237,7 @@ func renderColorschemeOverlay(m Model) string {
 			Filter:       m.schemeFilter.Value,
 			FilterActive: m.schemeFilterMode,
 			EmptyMessage: "No matching schemes",
+			Height:       height - 2,
 		}, min(50, m.width-10)-4)
 	}
 
@@ -252,6 +254,7 @@ func renderColorschemeOverlay(m Model) string {
 		ShowActiveMarker: true,
 		Scroll:           scroll,
 		MaxVisible:       maxVisible,
+		Height:           height - 2,
 	}, min(50, m.width-10)-4)
 }
 
@@ -345,6 +348,7 @@ func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 		Scroll:           scroll,
 		MaxVisible:       maxVisible,
 		EmptyMessage:     "No matching namespaces",
+		Height:           height - 2, // OverlayStyle.Padding(1,2) eats 2 rows
 	}, min(60, m.width-10)-4)
 }
 

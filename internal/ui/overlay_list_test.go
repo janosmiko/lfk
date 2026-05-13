@@ -226,6 +226,26 @@ func TestRenderOverlayList(t *testing.T) {
 		assert.NotContains(t, out, "item-J")
 	})
 
+	t.Run("Height locks the output to a fixed line count regardless of items", func(t *testing.T) {
+		// Fewer items than Height -> pad with blank lines.
+		few := []OverlayListItem{{Name: "A"}, {Name: "B"}}
+		out := RenderOverlayList(few, OverlayListConfig{Title: "T", Height: 20}, w)
+		assert.Equal(t, 20, strings.Count(out, "\n")+1, "fewer items: pad to Height")
+
+		// More items than Height (post-chrome) -> truncate.
+		many := make([]OverlayListItem, 50)
+		for i := range many {
+			many[i].Name = "x"
+		}
+		out2 := RenderOverlayList(many, OverlayListConfig{Title: "T", MaxVisible: 5, Height: 20}, w)
+		assert.Equal(t, 20, strings.Count(out2, "\n")+1, "many items: truncate to Height")
+	})
+
+	t.Run("Height applies to the empty-state branch too", func(t *testing.T) {
+		out := RenderOverlayList(nil, OverlayListConfig{Title: "T", EmptyMessage: "none", Height: 12}, w)
+		assert.Equal(t, 12, strings.Count(out, "\n")+1)
+	})
+
 	t.Run("Header row renders as a divider with the section name", func(t *testing.T) {
 		items := []OverlayListItem{
 			{Name: "Dark Themes", Header: true},

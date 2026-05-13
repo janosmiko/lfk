@@ -175,8 +175,9 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 		content, h := renderTemplateOverlay(m)
 		return content, min(60, m.width-10), h, true
 	case overlayColorscheme:
-		content := renderColorschemeOverlay(m)
-		return content, min(50, m.width-10), min(22, m.height-6), true
+		overlayH := min(22, m.height-6)
+		content := renderColorschemeOverlay(m, overlayH)
+		return content, min(50, m.width-10), overlayH, true
 	}
 	return m.renderOverlayContentExtended()
 }
