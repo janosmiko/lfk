@@ -176,12 +176,17 @@ var ConfigResourceColumns map[string][]string
 var ConfigClusterResourceColumns map[string]map[string][]string
 
 // ConfigFilterMatch defines the match criteria for a user-configured filter preset.
+// Fields are AND-ed together. When `Invert` is true the resulting boolean is
+// negated, so e.g. `status: Bound` + `invert: true` matches everything that is
+// NOT Bound. The pre-existing `ReadyNot` flag remains for fine-grained Ready
+// negation; rule-level `Invert` is the general escape hatch.
 type ConfigFilterMatch struct {
 	Status      string `json:"status" yaml:"status"`
 	ReadyNot    bool   `json:"ready_not" yaml:"ready_not"`
 	RestartsGt  int    `json:"restarts_gt" yaml:"restarts_gt"`
 	Column      string `json:"column" yaml:"column"`
 	ColumnValue string `json:"column_value" yaml:"column_value"`
+	Invert      bool   `json:"invert" yaml:"invert"`
 }
 
 // ConfigFilterPreset defines a single user-configured filter preset.

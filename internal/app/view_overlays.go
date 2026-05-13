@@ -269,7 +269,10 @@ func (m Model) renderOverlayFilterPreset() (string, int, int) {
 	for i, p := range m.filterPresets {
 		entries[i] = ui.FilterPresetEntry{Name: p.Name, Description: p.Description, Key: p.Key}
 	}
-	overlayW := min(72, m.width-10)
+	// FilterPresetOverlayWidth floors at 72 (historical width) and grows to
+	// fit the longest preset row, capped at terminal-10 so the overlay leaves
+	// margin. Mirrors the adaptive sizing used by the action menu overlay.
+	overlayW := ui.FilterPresetOverlayWidth(entries, m.width-10)
 	// OverlayStyle reserves 4 cells horizontally for Padding(1, 2).
 	contentW := max(overlayW-4, 0)
 	return ui.RenderFilterPresetOverlay(entries, m.overlayCursor, activePresetName, contentW), overlayW, min(15, m.height-6)

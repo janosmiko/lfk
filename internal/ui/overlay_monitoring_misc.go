@@ -8,6 +8,35 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
+// FilterPresetOverlayWidth returns the overlay box width needed to render
+// the longest preset row without wrapping. Mirrors ActionOverlayWidth: floored
+// at 72 (the historical fixed width) so short menus keep their stable size,
+// capped at maxWidth so the overlay can't overflow the terminal. The caller
+// passes m.width-10 to leave 5 cells of margin on each side.
+func FilterPresetOverlayWidth(presets []FilterPresetEntry, maxWidth int) int {
+	const (
+		floor = 72
+		// OverlayStyle reserves 4 cells horizontally (Padding(1,2) = 2+2);
+		// the border itself is rendered outside the overlay's reported size,
+		// matching the existing -4 convention in renderOverlayFilterPreset.
+		overhead = 4
+	)
+	contentW := 0
+	for _, p := range presets {
+		// Worst-case layout: "  ✓ [key] Name  Description" (2 leading spaces,
+		// 2-cell marker, "[k] " = 4 cells, name, "  " gap, description).
+		line := "  ✓ [" + p.Key + "] " + p.Name + "  " + p.Description
+		if w := lipgloss.Width(line); w > contentW {
+			contentW = w
+		}
+	}
+	w := max(contentW+overhead, floor)
+	if maxWidth > 0 && w > maxWidth {
+		w = maxWidth
+	}
+	return w
+}
+
 // RenderFilterPresetOverlay renders the quick filter preset selection overlay content.
 // activePresetName is the name of the currently active preset (empty if none).
 // width is the inner content width used to pad the cursor row so the

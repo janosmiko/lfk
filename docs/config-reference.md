@@ -394,6 +394,27 @@ filter_presets:
 | `restarts_gt` | Match pods with restart count greater than this number |
 | `column` | Column key to check (case-insensitive, e.g., "Node", "IP") |
 | `column_value` | Substring match against the column value (case-insensitive) |
+| `invert` | `true` to negate the entire match. Other fields still AND together; the final boolean is flipped. Useful for "anything except X" filters, e.g., `status: Bound` + `invert: true` matches every PVC that is NOT Bound. |
+
+### Built-in Presets
+
+Press `.` on any resource list to see the presets available for that kind. The built-ins are:
+
+| Kind | Presets (key) |
+|---|---|
+| Pod | Failing (`f`), Pending (`p`), Not Ready (`n`), Restarting (`r`), High Restarts (`R`), **Not Running (`x`)** |
+| Deployment / StatefulSet / DaemonSet | Not Ready (`n`), Failing (`f`), **Not Running (`x`)** |
+| Job | Failed (`f`), **Not Running (`x`)** |
+| PersistentVolumeClaim | Pending (`p`), Lost (`l`), **Not Bound (`x`)** |
+| Node | Not Ready (`n`), Cordoned (`c`) |
+| Certificate / CertificateRequest | Not Ready (`n`), Expiring Soon (`e`) |
+| Service | LB No IP (`l`) |
+| CronJob | Suspended (`s`) |
+| Argo Application | Out of Sync (`s`), Degraded (`d`) |
+| Flux HelmRelease / Kustomization | Suspended (`s`), Not Ready (`n`) |
+| Event | Warnings (`w`) |
+
+The `x` key (Not Running / Not Bound) is the shared "show me anything not in a healthy state" mnemonic across the kinds where it applies — k9s `Ctrl-Z` equivalent. Universal presets `Old (>30d)` (`o`) and `Recent (<1h)` (`h`) are also available on every list.
 
 ## Secret lazy loading
 
