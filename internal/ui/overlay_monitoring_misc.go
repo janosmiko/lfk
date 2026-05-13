@@ -8,78 +8,6 @@ import (
 	"github.com/charmbracelet/lipgloss"
 )
 
-// FilterPresetOverlayWidth returns the overlay box width needed to render
-// the longest preset row without wrapping. Mirrors ActionOverlayWidth: floored
-// at 72 (the historical fixed width) so short menus keep their stable size,
-// capped at maxWidth so the overlay can't overflow the terminal. The caller
-// passes m.width-10 to leave 5 cells of margin on each side.
-func FilterPresetOverlayWidth(presets []FilterPresetEntry, maxWidth int) int {
-	const (
-		floor = 72
-		// OverlayStyle reserves 4 cells horizontally (Padding(1,2) = 2+2);
-		// the border itself is rendered outside the overlay's reported size,
-		// matching the existing -4 convention in renderOverlayFilterPreset.
-		overhead = 4
-	)
-	contentW := 0
-	for _, p := range presets {
-		// Worst-case layout: "  ✓ [key] Name  Description" (2 leading spaces,
-		// 2-cell marker, "[k] " = 4 cells, name, "  " gap, description).
-		line := "  ✓ [" + p.Key + "] " + p.Name + "  " + p.Description
-		if w := lipgloss.Width(line); w > contentW {
-			contentW = w
-		}
-	}
-	w := max(contentW+overhead, floor)
-	if maxWidth > 0 && w > maxWidth {
-		w = maxWidth
-	}
-	return w
-}
-
-// RenderFilterPresetOverlay renders the quick filter preset selection overlay content.
-// activePresetName is the name of the currently active preset (empty if none).
-// width is the inner content width used to pad the cursor row so the
-// selection background spans the entire line.
-func RenderFilterPresetOverlay(presets []FilterPresetEntry, cursor int, activePresetName string, width int) string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Quick Filters"))
-	b.WriteString("\n\n")
-
-	if len(presets) == 0 {
-		b.WriteString(OverlayDimStyle.Render("No filter presets available"))
-		return b.String()
-	}
-
-	for i, preset := range presets {
-		if i == cursor {
-			// Selected row: render as plain text with a single uniform
-			// style so the highlight background covers the whole line
-			// (embedded styles would otherwise punch holes in the
-			// selection background).
-			activeMarker := "  "
-			if preset.Name == activePresetName {
-				activeMarker = "✓ "
-			}
-			line := fmt.Sprintf("  %s[%s] %s  %s", activeMarker, preset.Key, preset.Name, preset.Description)
-			b.WriteString(OverlaySelectedStyle.Width(width).Render(line))
-		} else {
-			keyHint := OverlayFilterStyle.Render("[" + preset.Key + "]")
-			activeMarker := "  "
-			if preset.Name == activePresetName {
-				activeMarker = OverlayFilterStyle.Render("✓ ")
-			}
-			line := fmt.Sprintf("  %s%s %s  %s", activeMarker, keyHint, preset.Name, OverlayDimStyle.Render(preset.Description))
-			b.WriteString(OverlayNormalStyle.Render(line))
-		}
-		if i < len(presets)-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	return b.String()
-}
-
 // RenderRBACOverlay renders the RBAC permission check overlay content.
 func RenderRBACOverlay(results []RBACCheckEntry, kind string) string {
 	var b strings.Builder
@@ -97,32 +25,6 @@ func RenderRBACOverlay(results []RBACCheckEntry, kind string) string {
 		b.WriteString("\n")
 	}
 
-	return b.String()
-}
-
-// RenderBatchLabelOverlay renders the batch label/annotation editor overlay.
-func RenderBatchLabelOverlay(mode int, input string, remove bool) string {
-	var b strings.Builder
-
-	kindName := "Labels"
-	if mode == 1 {
-		kindName = "Annotations"
-	}
-	action := "Add"
-	if remove {
-		action = "Remove"
-	}
-
-	b.WriteString(OverlayTitleStyle.Render(fmt.Sprintf("%s %s", action, kindName)))
-	b.WriteString("\n\n")
-
-	if remove {
-		b.WriteString(OverlayNormalStyle.Render("  Enter key to remove:"))
-	} else {
-		b.WriteString(OverlayNormalStyle.Render("  Enter key=value:"))
-	}
-	b.WriteString("\n")
-	fmt.Fprintf(&b, "  %s%s", OverlayInputStyle.Render(input), OverlayDimStyle.Render("█"))
 	return b.String()
 }
 
