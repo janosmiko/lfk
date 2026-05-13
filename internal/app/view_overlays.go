@@ -100,16 +100,14 @@ func (m Model) renderOverlay(background string) string {
 func (m Model) renderOverlayContent() (string, int, int, bool) {
 	switch m.overlay {
 	case overlayNamespace:
-		// Pass the same height to the renderer that we declare on the
-		// overlay box, so the renderer's visible-item cap matches what
-		// fits. Otherwise on a list of 30+ namespaces the renderer
-		// emits ~21 lines into a 20-tall box; lipgloss grows the box
-		// on overflow, and the user sees it "shrink" back to 20 the
-		// moment a filter narrows the list.
+		// Pass the overlay box height to the helper so its visible-item
+		// cap matches what fits; otherwise on a list of 30+ namespaces
+		// lipgloss grows the box on overflow and the user sees it
+		// "shrink" back to its declared size when a filter narrows the
+		// list.
 		overlayW := min(60, m.width-10)
 		overlayH := min(20, m.height-6)
-		content := ui.RenderNamespaceOverlay(m.filteredOverlayItems(), m.overlayFilter.Value, m.overlayCursor, m.namespace, m.allNamespaces, m.selectedNamespaces, m.nsFilterMode, overlayH)
-		return content, overlayW, overlayH, true
+		return renderNamespaceOverlay(m, m.filteredOverlayItems(), overlayH), overlayW, overlayH, true
 	case overlayAction:
 		content, w := renderActionOverlay(m)
 		return content, w, min(15, m.height-6), true
@@ -168,7 +166,7 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 	case overlayPodSelect, overlayLogPodSelect:
 		return renderPodSelectOverlay(m), min(60, m.width-10), min(20, m.height-6), true
 	case overlayLogContainerSelect:
-		content := ui.RenderLogContainerSelectOverlay(m.filteredLogContainerItems(), m.overlayCursor, m.logSelectedContainers, m.logContainerFilterText, m.logContainerFilterActive, m.logParentKind != "")
+		content := renderLogContainerSelectOverlay(m)
 		return content, min(60, m.width-10), min(len(m.filteredLogContainerItems())+9, m.height-6), true
 	case overlayBookmarks:
 		w, h := min(90, m.width-10), min(25, m.height-6)
@@ -606,8 +604,7 @@ func (m Model) renderOverlayColumnToggle() (string, int, int) {
 	// resizing.
 	overlayW := min(50, m.width-10)
 	overlayH := min(20, m.height-6)
-	return ui.RenderColumnToggleOverlay(entries, m.columnToggleCursor, m.columnToggleFilter, m.columnToggleFilterActive, overlayW, overlayH),
-		overlayW, overlayH
+	return renderColumnToggleOverlay(m, entries, overlayW, overlayH), overlayW, overlayH
 }
 
 func (m Model) renderOverlayFinalizerSearch() (string, int, int) {

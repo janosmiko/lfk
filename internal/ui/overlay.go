@@ -1,11 +1,7 @@
 package ui
 
 import (
-	"slices"
-	"strings"
 	"time"
-
-	"github.com/janosmiko/lfk/internal/model"
 )
 
 // overlayNsScroll is the persistent scroll position for the namespace overlay.
@@ -19,20 +15,23 @@ func ResetOverlayNsScroll() { overlayNsScroll = 0 }
 // the correct item index in the underlying items slice.
 func GetOverlayNsScroll() int { return overlayNsScroll }
 
+// SetOverlayNsScroll updates the namespace-overlay scroll state. Called by
+// the namespace OverlayList helper on every render so mouse-click row
+// resolution stays in sync with the rendered scroll window.
+func SetOverlayNsScroll(s int) { overlayNsScroll = s }
+
 // ResetOverlayPodScroll is a deprecated no-op; the pod-selector overlay now
 // derives its scroll window from the cursor on every render via OverlayList.
 //
 // Deprecated: drop the call site.
 func ResetOverlayPodScroll() {}
 
-// overlayContainerScroll is the persistent scroll position for the
-// log-container multi-select overlay (still uses the legacy renderer
-// pending its wave-3 OverlayList migration).
-var overlayContainerScroll int
-
-// ResetOverlayContainerScroll resets the container overlay scroll position
-// (call when opening the overlay).
-func ResetOverlayContainerScroll() { overlayContainerScroll = 0 }
+// ResetOverlayContainerScroll is a deprecated no-op; the log-container
+// multi-select overlay now derives its scroll window from the cursor on
+// every render via OverlayList.
+//
+// Deprecated: drop the call site.
+func ResetOverlayContainerScroll() {}
 
 // ResetOverlayCanISubjectScroll is a deprecated no-op; the can-i subject
 // selector overlay now derives its scroll window from the cursor on every
@@ -144,176 +143,4 @@ type NetpolPeerEntry struct {
 	CIDR      string
 	Except    []string
 	Namespace string
-}
-
-// RenderNamespaceOverlay renders the namespace selection overlay content.
-//
-// The height parameter is the overlay box height the caller will pass to
-// OverlayStyle.Height(). The renderer caps its visible-item count to fit
-// inside that budget so lipgloss never has to grow the box on overflow \u2014
-// without this, a list of 30+ namespaces overflows a 20-tall box (the
-// renderer used to emit ~21 lines), and as the user typed into the
-// filter the box visibly "shrank" back to its declared size when fewer
-// items fit. Mirrors the layout contract enforced for the column toggle
-// overlay.
-func RenderNamespaceOverlay(items []model.Item, filter string, cursor int, currentNs string, allNs bool, selectedNamespaces map[string]bool, filterMode bool, height int) string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Select Namespace"))
-	b.WriteString("\n")
-
-	// Filter input.
-	switch {
-	case filterMode:
-		b.WriteString(OverlayFilterStyle.Render("/ " + filter + "\u2588"))
-	case filter != "":
-		b.WriteString(OverlayFilterStyle.Render("/ " + filter))
-	default:
-		b.WriteString(OverlayDimStyle.Render("/ to filter"))
-	}
-	b.WriteString("\n\n")
-
-	if items == nil {
-		b.WriteString(OverlayDimStyle.Render("Loading namespaces..."))
-		return b.String()
-	}
-	if len(items) == 0 {
-		b.WriteString(OverlayDimStyle.Render("No matching namespaces"))
-		return b.String()
-	}
-
-	// Reserve rows the rendered overlay needs that the caller's `height`
-	// must absorb:
-	//   chrome: title (1 + 1 bottom padding) + filter (1) + blank
-	//           separator (1) + scroll-above (1) + scroll-below (1) = 6
-	//   lipgloss vertical padding from OverlayStyle.Padding(1,2):     2
-	// so the item budget is `height - 8`.
-	//
-	// Reserving only 6 (the obvious chrome) is wrong: lipgloss
-	// `Height(h)` measures the *content area including padding*, so
-	// padding eats 2 rows out of `height` — content over `height-2`
-	// makes lipgloss grow the box on overflow, and as the filter
-	// narrows the list the box visibly "shrinks" back to its nominal
-	// size (the 21→20→…→22 cascade the user reported, observed right
-	// as the "↓ N below" indicator turns into its placeholder row).
-	maxVisible := min(max(height-8, 1), len(items))
-	scrollOff := ConfigScrollOff
-	// Disable or reduce scrolloff when all items fit the visible area.
-	if len(items) <= maxVisible {
-		scrollOff = 0
-	} else if maxSO := (maxVisible - 1) / 2; scrollOff > maxSO {
-		scrollOff = maxSO
-	}
-
-	// Use VimScrollOff for stable viewport behavior.
-	displayLines := func(from, to int) int { return to - from }
-	start := VimScrollOff(overlayNsScroll, cursor, len(items), maxVisible, scrollOff, displayLines)
-	overlayNsScroll = start
-
-	end := min(start+maxVisible, len(items))
-
-	b.WriteString(RenderScrollAbove(start, end-start, len(items), 0))
-	b.WriteString("\n")
-
-	for i := start; i < end; i++ {
-		item := items[i]
-		prefix := "  "
-		switch {
-		case item.Status == "all":
-			if allNs && len(selectedNamespaces) == 0 {
-				prefix = "\u2713 "
-			}
-		case selectedNamespaces != nil && selectedNamespaces[item.Name]:
-			prefix = "\u2713 "
-		case item.Name == currentNs && !allNs && len(selectedNamespaces) == 0:
-			prefix = "* "
-		}
-		line := prefix + item.Name
-		if i == cursor {
-			b.WriteString(OverlaySelectedStyle.Render(line))
-		} else {
-			b.WriteString(OverlayNormalStyle.Render(line))
-		}
-		if i < end-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
-
-	return b.String()
-}
-
-// RenderLogContainerSelectOverlay renders the container filter overlay for the log viewer.
-// The first item should be an "All Containers" virtual item with Status "all".
-// Empty selectedContainers means all containers are selected.
-func RenderLogContainerSelectOverlay(items []model.Item, cursor int, selectedContainers []string, filter string, filterActive bool, canSwitchPod bool) string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Filter Containers"))
-	b.WriteString("\n")
-
-	// Filter input.
-	switch {
-	case filterActive:
-		b.WriteString(OverlayFilterStyle.Render("/ " + filter + "\u2588"))
-	case filter != "":
-		b.WriteString(OverlayFilterStyle.Render("/ " + filter))
-	default:
-		b.WriteString(OverlayDimStyle.Render("/ to filter"))
-	}
-	b.WriteString("\n\n")
-
-	if items == nil {
-		b.WriteString(OverlayDimStyle.Render("Loading containers..."))
-		return b.String()
-	}
-	if len(items) == 0 {
-		b.WriteString(OverlayDimStyle.Render("No matching containers"))
-		return b.String()
-	}
-
-	maxVisible := min(15, len(items))
-	scrollOff := ConfigScrollOff
-	if len(items) <= maxVisible {
-		scrollOff = 0
-	} else if maxSO := (maxVisible - 1) / 2; scrollOff > maxSO {
-		scrollOff = maxSO
-	}
-
-	displayLines := func(from, to int) int { return to - from }
-	start := VimScrollOff(overlayContainerScroll, cursor, len(items), maxVisible, scrollOff, displayLines)
-	overlayContainerScroll = start
-
-	end := min(start+maxVisible, len(items))
-
-	b.WriteString(RenderScrollAbove(start, end-start, len(items), 0))
-	b.WriteString("\n")
-
-	for i := start; i < end; i++ {
-		item := items[i]
-		prefix := "  "
-		switch {
-		case item.Status == "all":
-			if len(selectedContainers) == 0 {
-				prefix = "\u2713 "
-			}
-		case slices.Contains(selectedContainers, item.Name):
-			prefix = "\u2713 "
-		}
-		line := prefix + item.Name
-
-		if i == cursor {
-			b.WriteString(OverlaySelectedStyle.Render(line))
-		} else {
-			b.WriteString(OverlayNormalStyle.Render(line))
-		}
-		if i < end-1 {
-			b.WriteString("\n")
-		}
-	}
-
-	b.WriteString("\n")
-	b.WriteString(RenderScrollBelow(start, end-start, len(items), 0))
-
-	return b.String()
 }

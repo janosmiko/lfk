@@ -7,75 +7,7 @@ import (
 	"time"
 
 	"github.com/stretchr/testify/assert"
-
-	"github.com/janosmiko/lfk/internal/model"
 )
-
-// --- RenderNamespaceOverlay ---
-
-func TestRenderNamespaceOverlay(t *testing.T) {
-	t.Run("nil items shows loading", func(t *testing.T) {
-		result := RenderNamespaceOverlay(nil, "", 0, "default", false, nil, false, 20)
-		assert.Contains(t, result, "Loading namespaces")
-	})
-
-	t.Run("empty items shows no matching", func(t *testing.T) {
-		result := RenderNamespaceOverlay([]model.Item{}, "", 0, "default", false, nil, false, 20)
-		assert.Contains(t, result, "No matching namespaces")
-	})
-
-	t.Run("renders namespace items", func(t *testing.T) {
-		items := []model.Item{
-			{Name: "default"},
-			{Name: "kube-system"},
-			{Name: "production"},
-		}
-		result := RenderNamespaceOverlay(items, "", 0, "default", false, nil, false, 20)
-		assert.Contains(t, result, "default")
-		assert.Contains(t, result, "kube-system")
-		assert.Contains(t, result, "production")
-	})
-
-	t.Run("selected namespaces show checkmark", func(t *testing.T) {
-		items := []model.Item{
-			{Name: "default"},
-			{Name: "staging"},
-		}
-		selected := map[string]bool{"staging": true}
-		result := RenderNamespaceOverlay(items, "", 0, "default", false, selected, false, 20)
-		assert.Contains(t, result, "\u2713")
-	})
-
-	t.Run("all namespaces checkmark", func(t *testing.T) {
-		items := []model.Item{
-			{Name: "All Namespaces", Status: "all"},
-		}
-		result := RenderNamespaceOverlay(items, "", 0, "", true, nil, false, 20)
-		assert.Contains(t, result, "\u2713")
-	})
-
-	t.Run("filter mode shows cursor", func(t *testing.T) {
-		items := []model.Item{{Name: "default"}}
-		result := RenderNamespaceOverlay(items, "def", 0, "", false, nil, true, 20)
-		assert.Contains(t, result, "def")
-		assert.Contains(t, result, "\u2588") // block cursor
-	})
-
-	t.Run("shows filter hint when not in filter mode", func(t *testing.T) {
-		items := []model.Item{{Name: "default"}}
-		result := RenderNamespaceOverlay(items, "", 0, "", false, nil, false, 20)
-		assert.Contains(t, result, "/ to filter")
-	})
-
-	t.Run("footer hints removed from overlay body", func(t *testing.T) {
-		// Hints now live in the main status bar, not inline.
-		items := []model.Item{{Name: "default"}}
-		result := RenderNamespaceOverlay(items, "", 0, "", false, nil, false, 20)
-		assert.NotContains(t, result, "space: select")
-		assert.NotContains(t, result, "enter: apply")
-		assert.NotContains(t, result, "esc: close")
-	})
-}
 
 // --- RenderColorschemeOverlay ---
 

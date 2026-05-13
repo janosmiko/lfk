@@ -202,6 +202,5 @@ func (m Model) updateLogContainersLoaded(msg logContainersLoadedMsg) (tea.Model,
 	m.logContainerFilterText = ""
 	m.logContainerFilterActive = false
 	m.logContainerSelectionModified = false
-	ui.ResetOverlayContainerScroll()
 	return m, nil
 }

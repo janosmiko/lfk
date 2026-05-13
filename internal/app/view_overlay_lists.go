@@ -1,6 +1,9 @@
 package app
 
 import (
+	"slices"
+
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -129,6 +132,101 @@ func renderTemplateOverlay(m Model) (string, int) {
 		EmptyMessage: "No templates available",
 	}
 	return ui.RenderOverlayList(items, cfg, overlayW-4), overlayH
+}
+
+// renderLogContainerSelectOverlay maps the log-viewer container multi-select
+// onto OverlayList. "Active" = currently included in the log stream (either
+// explicitly selected, or the virtual "all" pseudo-row when no per-container
+// selection is set). FooterHint surfaces the tab-switch hint when the caller
+// allows switching to the pod picker.
+func renderLogContainerSelectOverlay(m Model) string {
+	src := m.filteredLogContainerItems()
+	items := make([]ui.OverlayListItem, len(src))
+	for i, it := range src {
+		active := false
+		switch it.Status {
+		case "all":
+			active = len(m.logSelectedContainers) == 0
+		default:
+			active = slices.Contains(m.logSelectedContainers, it.Name)
+		}
+		items[i] = ui.OverlayListItem{Name: it.Name, Active: active}
+	}
+	const maxVisible = 15
+	footer := ""
+	if m.logParentKind != "" {
+		footer = "tab to switch pod"
+	}
+	return ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:            "Filter Containers",
+		Cursor:           m.overlayCursor,
+		Filter:           m.logContainerFilterText,
+		FilterActive:     m.logContainerFilterActive,
+		ShowActiveMarker: true,
+		Scroll:           scrollOffsetFromCursor(m.overlayCursor, maxVisible),
+		MaxVisible:       maxVisible,
+		FooterHint:       footer,
+		EmptyMessage:     "No matching containers",
+	}, min(60, m.width-10)-4)
+}
+
+// renderColumnToggleOverlay maps the column-visibility picker onto
+// OverlayList. Visible columns render with the active marker.
+func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, height int) string {
+	items := make([]ui.OverlayListItem, len(entries))
+	for i, e := range entries {
+		items[i] = ui.OverlayListItem{Name: e.Key, Active: e.Visible}
+	}
+	maxVisible := max(height-8, 1)
+	return ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:            "Column Visibility",
+		Cursor:           m.columnToggleCursor,
+		Filter:           m.columnToggleFilter,
+		FilterActive:     m.columnToggleFilterActive,
+		ShowActiveMarker: true,
+		Scroll:           scrollOffsetFromCursor(m.columnToggleCursor, maxVisible),
+		MaxVisible:       maxVisible,
+		EmptyMessage:     "No matching columns",
+	}, width-6)
+}
+
+// renderNamespaceOverlay maps the namespace selector (with its "All
+// Namespaces" virtual row + multi-select pin state + current-namespace
+// marker) onto OverlayList. The legacy "*" / "✓" marker distinction
+// collapses into a single ✓ — both signals "this row is in effect right
+// now" and the OverlayList active marker conveys the same information.
+//
+// Mouse-click resolution reads overlayNsScroll via ui.GetOverlayNsScroll();
+// the helper stores its computed scroll offset there before rendering so
+// the click handler keeps resolving rows correctly.
+func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
+	maxVisible := min(max(height-8, 1), max(len(items), 1))
+	scroll := scrollOffsetFromCursor(m.overlayCursor, maxVisible)
+	ui.SetOverlayNsScroll(scroll)
+
+	listItems := make([]ui.OverlayListItem, len(items))
+	for i, it := range items {
+		active := false
+		switch {
+		case it.Status == "all":
+			active = m.allNamespaces && len(m.selectedNamespaces) == 0
+		case m.selectedNamespaces[it.Name]:
+			active = true
+		case it.Name == m.namespace && !m.allNamespaces && len(m.selectedNamespaces) == 0:
+			active = true
+		}
+		listItems[i] = ui.OverlayListItem{Name: it.Name, Active: active}
+	}
+	return ui.RenderOverlayList(listItems, ui.OverlayListConfig{
+		Title:            "Select Namespace",
+		Cursor:           m.overlayCursor,
+		Filter:           m.overlayFilter.Value,
+		FilterActive:     m.nsFilterMode,
+		ShowActiveMarker: true,
+		Scroll:           scroll,
+		MaxVisible:       maxVisible,
+		EmptyMessage:     "No matching namespaces",
+	}, min(60, m.width-10)-4)
 }
 
 // renderContainerSelectOverlay maps the container-picker items onto
