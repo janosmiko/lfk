@@ -205,6 +205,38 @@ func TestNamespaceFilterModeEscExits(t *testing.T) {
 	assert.Empty(t, result.overlayFilter.Value)
 }
 
+// Esc while filtering must keep the cursor on the same namespace the user
+// was pointing at in the filtered view — yanking it back to row 0 forced
+// users to scroll back through long namespace lists every time they
+// opened then closed filter mode.
+func TestNamespaceFilterModeEscPreservesCursorTarget(t *testing.T) {
+	m := Model{
+		overlay:       overlayNamespace,
+		nsFilterMode:  true,
+		overlayFilter: TextInput{Value: "kube"},
+		overlayItems: []model.Item{
+			{Name: "All Namespaces", Status: "all"},
+			{Name: "default"},
+			{Name: "kube-public"},
+			{Name: "kube-system"},
+			{Name: "production"},
+		},
+		overlayCursor: 1, // points at "kube-system" in the filtered list
+		tabs:          []TabState{{}},
+		width:         80,
+		height:        40,
+	}
+	ret, _ := m.handleNamespaceFilterMode(specialKey(tea.KeyEsc))
+	result := ret.(Model)
+	assert.False(t, result.nsFilterMode)
+	assert.Empty(t, result.overlayFilter.Value)
+	// After Esc, "kube-system" lives at index 3 in the unfiltered list
+	// (All / default / kube-public / kube-system / production).
+	got := result.overlayItems[result.overlayCursor].Name
+	assert.Equal(t, "kube-system", got,
+		"cursor should follow the previously-selected item, not jump to row 0")
+}
+
 func TestNamespaceFilterModeEnterCommits(t *testing.T) {
 	m := Model{
 		overlay:       overlayNamespace,

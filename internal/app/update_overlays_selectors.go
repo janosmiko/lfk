@@ -190,7 +190,17 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case "ctrl+c":
-		return m.closeTabOrQuit()
+		// Close the overlay rather than the tab — once an overlay is
+		// open Ctrl+C should match Esc semantics. The tab-close only
+		// applies at the explorer level (handleExplorerKey).
+		m.overlayFilter.Clear()
+		if m.previousOverlay != overlayNone {
+			m.overlay = m.previousOverlay
+			m.previousOverlay = overlayNone
+			return m, nil
+		}
+		m.overlay = overlayNone
+		return m, nil
 	}
 	return m, nil
 }
@@ -210,9 +220,25 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch handleFilterKey(&m.overlayFilter, msg.String()) {
 	case filterEscape:
+		// Capture the currently-pointed item before clearing the filter so
+		// the cursor lands on the same item in the unfiltered list — Esc
+		// shouldn't yank the cursor back to the top of a 50-namespace list
+		// just because the user opened then closed filter mode.
+		var targetName string
+		if items := m.filteredOverlayItems(); m.overlayCursor < len(items) {
+			targetName = items[m.overlayCursor].Name
+		}
 		m.nsFilterMode = false
 		m.overlayFilter.Clear()
 		m.overlayCursor = 0
+		if targetName != "" {
+			for i, it := range m.filteredOverlayItems() {
+				if it.Name == targetName {
+					m.overlayCursor = i
+					break
+				}
+			}
+		}
 		return m, nil
 	case filterAccept:
 		m.nsFilterMode = false
@@ -246,7 +272,19 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		return m, nil
 	case filterClose:
-		return m.closeTabOrQuit()
+		// Ctrl+C in filter mode closes the overlay, not the tab —
+		// matches the Esc/q behaviour in the surrounding normal-mode
+		// handler so users never accidentally drop a tab while searching.
+		m.nsFilterMode = false
+		m.overlayFilter.Clear()
+		m.overlayCursor = 0
+		if m.previousOverlay != overlayNone {
+			m.overlay = m.previousOverlay
+			m.previousOverlay = overlayNone
+			return m, nil
+		}
+		m.overlay = overlayNone
+		return m, nil
 	case filterContinue:
 		m.overlayCursor = 0
 		return m, nil
@@ -346,9 +384,22 @@ func (m Model) handleTemplateFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch handleFilterKey(&m.templateFilter, msg.String()) {
 	case filterEscape:
+		// Preserve cursor on the same template across filter exit.
+		var targetName string
+		if items := m.filteredTemplates(); m.templateCursor < len(items) {
+			targetName = items[m.templateCursor].Name
+		}
 		m.templateSearchMode = false
 		m.templateFilter.Clear()
 		m.templateCursor = 0
+		if targetName != "" {
+			for i, t := range m.filteredTemplates() {
+				if t.Name == targetName {
+					m.templateCursor = i
+					break
+				}
+			}
+		}
 		return m, nil
 	case filterAccept:
 		m.templateSearchMode = false
@@ -553,10 +604,23 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	}
 	switch handleFilterKey(&m.schemeFilter, msg.String()) {
 	case filterEscape:
+		// Preserve cursor on the same scheme across filter exit.
+		var targetName string
+		if names := m.filteredSchemeNames(); m.schemeCursor < len(names) {
+			targetName = names[m.schemeCursor]
+		}
 		m.schemeFilterMode = false
 		m.schemeFilter.Clear()
 		m.schemeCursor = 0
 		ui.ResetOverlaySchemeScroll()
+		if targetName != "" {
+			for i, n := range m.filteredSchemeNames() {
+				if n == targetName {
+					m.schemeCursor = i
+					break
+				}
+			}
+		}
 		m.previewSchemeAtCursor(m.filteredSchemeNames())
 		return m, nil
 	case filterAccept:

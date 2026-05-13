@@ -137,7 +137,7 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		default:
 			b.WriteString(OverlayDimStyle.Render("/ to filter"))
 		}
-		b.WriteString("\n")
+		b.WriteString("\n\n")
 	}
 
 	if len(items) == 0 {

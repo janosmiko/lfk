@@ -33,12 +33,12 @@ func overlayListScroll(prev *int, cursor, total, maxVisible int) int {
 
 // overlayListChromeFilterable returns the number of non-item rows the
 // OverlayList block occupies for a filterable overlay (Filterable=true):
-// title + title's bottom padding row + the always-on filter prompt row
-// = 3 rows. Lipgloss's 1+1 vertical padding around the block is handled
-// by the caller subtracting 2 from the outer overlay height before
-// passing the result as cfg.Height — so this helper returns the chrome
-// INSIDE the block only.
-func overlayListChromeFilterable() int { return 3 }
+// title (1) + title's bottom padding row (1) + filter prompt (1) +
+// blank separator below filter (1) = 4 rows. Lipgloss's 1+1 vertical
+// padding around the block is handled by the caller subtracting 2 from
+// the outer overlay height before passing the result as cfg.Height —
+// so this helper returns the chrome INSIDE the block only.
+func overlayListChromeFilterable() int { return 4 }
 
 // renderActionOverlay maps the action-menu items onto OverlayList. The
 // verb code (model.Item.Status) renders as the "[s]" status badge; the
@@ -233,10 +233,10 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 func renderColorschemeOverlay(m Model, height int) string {
 	// contentH = total inner content the OverlayList block must fill
 	// (overlay box height minus lipgloss's 1+1 vertical padding).
-	// Chrome inside the block: title(1) + title's bottom padding row(1)
-	// + filter row(1) = 3. The rest is items.
+	// Chrome inside the block matches overlayListChromeFilterable();
+	// the remainder is the items budget.
 	contentH := max(height-2, 1)
-	maxVisible := max(contentH-3, 1)
+	maxVisible := max(contentH-overlayListChromeFilterable(), 1)
 	ui.SetOverlaySchemeVisible(maxVisible)
 
 	items, cursorDisplayIdx := buildColorschemeItems(m.schemeEntries, m.schemeFilter.Value, m.schemeCursor)
