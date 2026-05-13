@@ -107,7 +107,6 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		b.WriteString("\n")
 	}
 	if cfg.FilterActive || cfg.Filter != "" {
-		b.WriteString("\n")
 		b.WriteString(OverlayDimStyle.Render("filter: "))
 		b.WriteString(OverlayInputStyle.Render(cfg.Filter))
 		if cfg.FilterActive {
@@ -115,7 +114,6 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 		}
 		b.WriteString("\n")
 	}
-	b.WriteString("\n")
 
 	if len(items) == 0 {
 		msg := cfg.EmptyMessage

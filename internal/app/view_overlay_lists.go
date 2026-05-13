@@ -17,6 +17,18 @@ func scrollOffsetFromCursor(cursor, maxVisible int) int {
 	return cursor - maxVisible + 1
 }
 
+// overlayListChrome returns the number of non-item rows the OverlayList
+// renders inside a fixed-height box: title (text + style bottom padding) +
+// lipgloss top + bottom padding = 4 rows, plus one more when a filter row
+// is currently being shown.
+func overlayListChrome(filterRowShown bool) int {
+	const baseChrome = 4
+	if filterRowShown {
+		return baseChrome + 1
+	}
+	return baseChrome
+}
+
 // renderActionOverlay maps the action-menu items onto OverlayList. The
 // verb code (model.Item.Status) renders as the "[s]" status badge; the
 // long-form description (Extra) renders dim after the action name.
@@ -177,7 +189,8 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 	for i, e := range entries {
 		items[i] = ui.OverlayListItem{Name: e.Key, Active: e.Visible}
 	}
-	maxVisible := max(height-5, 1)
+	chrome := overlayListChrome(m.columnToggleFilterActive || m.columnToggleFilter != "")
+	maxVisible := max(height-chrome, 1)
 	return ui.RenderOverlayList(items, ui.OverlayListConfig{
 		Title:            "Column Visibility",
 		Cursor:           m.columnToggleCursor,
@@ -200,7 +213,8 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 // the helper stores its computed scroll offset there before rendering so
 // the click handler keeps resolving rows correctly.
 func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
-	maxVisible := min(max(height-5, 1), max(len(items), 1))
+	chrome := overlayListChrome(m.nsFilterMode || m.overlayFilter.Value != "")
+	maxVisible := min(max(height-chrome, 1), max(len(items), 1))
 	scroll := scrollOffsetFromCursor(m.overlayCursor, maxVisible)
 	ui.SetOverlayNsScroll(scroll)
 
