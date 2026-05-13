@@ -322,6 +322,59 @@ func buildColorschemeItems(entries []ui.SchemeEntry, filter string, cursor int) 
 	return items, cursorDisplayIdx
 }
 
+// renderClusterColorOverlay maps the cluster-color picker (with its
+// right-aligned 5-cell swatch column and "None (clear)" pseudo-row) onto
+// OverlayList. Caller passes innerW (content width inside lipgloss
+// padding) and contentH (overlay box height minus lipgloss padding).
+// The swatch travels in the Badge field so it renders in a reserved
+// column outside the cursor highlight — pressing "j/k" through the
+// list still shows the colour of each row while the cursor highlight
+// indicates the selection.
+func renderClusterColorOverlay(m Model, innerW, contentH int) string {
+	const (
+		labelW  = 14 // matches the legacy bespoke layout
+		swatchW = 5
+	)
+	names := m.filteredClusterColorNames()
+	items := make([]ui.OverlayListItem, 0, len(names)+1)
+	for _, name := range names {
+		items = append(items, ui.OverlayListItem{
+			Name:  padRight(name, labelW),
+			Badge: ui.ClusterColorSwatchN(name, swatchW),
+		})
+	}
+	// "None (clear)" pseudo-row at the bottom — no swatch, but pads to
+	// swatchW so subsequent rows (none) stay aligned. The caller's
+	// cursor at len(names) targets this row.
+	items = append(items, ui.OverlayListItem{
+		Name:  padRight(ui.ClusterColorNoneLabel, labelW),
+		Badge: ui.ClusterColorSwatchN("", swatchW),
+	})
+	titleText := "Set color for " + m.clusterColorOverlayContext
+	if m.clusterColorOverlayContext == "" {
+		titleText = "Set cluster color"
+	}
+	return ui.RenderOverlayList(items, ui.OverlayListConfig{
+		Title:        titleText,
+		Cursor:       m.clusterColorOverlayCursor,
+		Filterable:   true,
+		Filter:       m.clusterColorFilter.Value,
+		FilterActive: m.clusterColorFilterMode,
+		BadgeWidth:   swatchW,
+		Height:       contentH,
+	}, innerW)
+}
+
+// padRight returns s padded with spaces to at least width visual cells.
+// Used to align the badge column across rows in OverlayList; lipgloss
+// handles overflow truncation for us, so this only adds — never trims.
+func padRight(s string, width int) string {
+	if w := len(s); w < width {
+		s += strings.Repeat(" ", width-w)
+	}
+	return s
+}
+
 // renderNamespaceOverlay maps the namespace selector (with its "All
 // Namespaces" virtual row + multi-select pin state + current-namespace
 // marker) onto OverlayList. The legacy "*" / "✓" marker distinction

@@ -287,14 +287,9 @@ func (m Model) renderOverlayPasteConfirm() (string, int, int) {
 }
 
 func (m Model) renderOverlayClusterColor() (string, int, int) {
-	content := ui.RenderClusterColorOverlay(
-		m.clusterColorOverlayContext,
-		m.filteredClusterColorNames(),
-		m.clusterColorOverlayCursor,
-		m.clusterColorFilter.Value,
-		m.clusterColorFilterMode,
-	)
-	return content, min(40, m.width-10), min(15, m.height-6)
+	overlayW := min(40, m.width-10)
+	overlayH := min(15, m.height-6)
+	return renderClusterColorOverlay(m, overlayW-4, overlayH-2), overlayW, overlayH
 }
 
 func (m Model) renderOverlayTrafficCapture() (string, int, int) {

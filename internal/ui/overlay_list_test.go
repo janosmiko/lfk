@@ -226,6 +226,17 @@ func TestRenderOverlayList(t *testing.T) {
 		assert.NotContains(t, out, "item-J")
 	})
 
+	t.Run("Badge renders on the right of the row when BadgeWidth is set", func(t *testing.T) {
+		// Caller pre-renders the badge string (color swatches, glyphs, etc.).
+		items := []OverlayListItem{
+			{Name: "red", Badge: "BADGE"},
+			{Name: "blue", Badge: "OTHER"},
+		}
+		out := RenderOverlayList(items, OverlayListConfig{BadgeWidth: 5}, w)
+		assert.Contains(t, out, "BADGE")
+		assert.Contains(t, out, "OTHER")
+	})
+
 	t.Run("Height locks the output to a fixed line count regardless of items", func(t *testing.T) {
 		// Fewer items than Height -> pad with blank lines.
 		few := []OverlayListItem{{Name: "A"}, {Name: "B"}}

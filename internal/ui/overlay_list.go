@@ -37,6 +37,13 @@ type OverlayListItem struct {
 	// no description. The caller is responsible for keeping cfg.Cursor on
 	// a non-Header row (header rows aren't navigable targets).
 	Header bool
+
+	// Badge is an optional pre-styled string rendered in a fixed-width
+	// column on the right of the row, OUTSIDE the cursor highlight so
+	// any styling baked into the string (e.g. a coloured background
+	// swatch) stays visible on the selected row. The caller controls
+	// the rendering and width — see OverlayListConfig.BadgeWidth.
+	Badge string
 }
 
 // OverlayListConfig is the rendering contract for OverlayList. Feature
@@ -71,6 +78,14 @@ type OverlayListConfig struct {
 
 	FooterHint   string // optional dim line under the list
 	EmptyMessage string // shown when items is empty (default: "No items")
+
+	// BadgeWidth, when > 0, reserves this many cells on the right of
+	// each row for OverlayListItem.Badge. The badge sits OUTSIDE the
+	// cursor highlight so a coloured background (e.g. ClusterColor's
+	// swatch) stays visible on the selected row. Items render in
+	// innerW - BadgeWidth - 1 cells (the -1 is the space between the
+	// row content and the badge).
+	BadgeWidth int
 
 	// Height, when > 0, locks the rendered output to exactly this many
 	// lines. Padding with blank lines when content is shorter,
@@ -161,28 +176,43 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 	start, end := scrollWindow(len(items), cfg.Scroll, cfg.MaxVisible)
 	visible := end - start
 	hasOverflow := len(items) > visible
-	// Reserve the rightmost column for the scrollbar when the list
-	// overflows so users can see at a glance there's more to scroll.
-	itemWidth := innerW
-	if hasOverflow {
-		itemWidth = max(innerW-1, 1)
+	// Reserve trailing columns for the badge (when any items carry one)
+	// and the scrollbar (when the list overflows). Both sit OUTSIDE the
+	// cursor highlight so their styling/visibility stays intact on the
+	// selected row.
+	badgeReserve := 0
+	if cfg.BadgeWidth > 0 {
+		badgeReserve = cfg.BadgeWidth + 1 // +1 for the space separator
 	}
+	scrollReserve := 0
+	if hasOverflow {
+		scrollReserve = 1
+	}
+	itemWidth := max(innerW-badgeReserve-scrollReserve, 1)
 	for i := start; i < end; i++ {
 		it := items[i]
 		var row string
 		if i == cfg.Cursor {
 			// Cursor row: plain text padded to itemWidth so the selection
-			// background spans the entire item area. The scrollbar sits
-			// outside the highlight so it stays readable against the box.
+			// background spans the entire item area. The scrollbar + badge
+			// sit outside the highlight so they stay readable against the
+			// box.
 			row = OverlaySelectedStyle.Width(itemWidth).Render(itemPlainLine(it, cfg, hasActive))
 		} else {
 			line := OverlayNormalStyle.Render(itemStyledLine(it, cfg, hasActive))
-			if hasOverflow {
+			// Only pad non-cursor rows when there's a trailing column
+			// (badge or scrollbar) that needs a stable left edge —
+			// padding rows without a reserve regresses the historical
+			// "non-cursor rows keep their short visible width" behaviour.
+			if hasOverflow || cfg.BadgeWidth > 0 {
 				if pad := itemWidth - lipgloss.Width(line); pad > 0 {
 					line += strings.Repeat(" ", pad)
 				}
 			}
 			row = line
+		}
+		if cfg.BadgeWidth > 0 {
+			row += " " + it.Badge
 		}
 		if hasOverflow {
 			row += renderScrollbar(i-start, visible, len(items), start)
