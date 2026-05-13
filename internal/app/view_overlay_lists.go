@@ -7,14 +7,27 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// scrollOffsetFromCursor returns the smallest scroll value that keeps the
-// cursor inside the visible window. Used by helpers that delegate scroll
-// computation to the caller (OverlayList does not auto-scroll on cursor).
-func scrollOffsetFromCursor(cursor, maxVisible int) int {
-	if cursor < maxVisible {
-		return 0
-	}
-	return cursor - maxVisible + 1
+// Persistent per-overlay scroll positions. Tracked separately so each
+// overlay's scrolloff behaviour stays sticky across renders the way vim's
+// `scrolloff` does — without state, the helpers would always pin the
+// cursor to the top or bottom of the viewport and scrolling up would
+// look like the list shifts instead of the cursor moving.
+var (
+	overlayPodScrollPos          int
+	overlayCanISubjectScrollPos  int
+	overlayContainerScrollPos    int
+	overlayColumnToggleScrollPos int
+)
+
+// overlayListScroll computes the new viewport start using
+// ui.VimScrollOff and stores the result in *prev so the next render
+// resumes from there. Pass the items count as `total`. Always uses
+// ui.ConfigScrollOff for the scrolloff margin so overlays honour the
+// user's `scrolloff` config setting.
+func overlayListScroll(prev *int, cursor, total, maxVisible int) int {
+	identity := func(from, to int) int { return to - from }
+	*prev = ui.VimScrollOff(*prev, cursor, total, maxVisible, ui.ConfigScrollOff, identity)
+	return *prev
 }
 
 // overlayListChrome returns the number of non-item rows the OverlayList
@@ -67,7 +80,7 @@ func renderPodSelectOverlay(m Model) string {
 		Filter:          m.logPodFilterText,
 		FilterActive:    m.logPodFilterActive,
 		ShowDescription: true,
-		Scroll:          scrollOffsetFromCursor(m.overlayCursor, maxVisible),
+		Scroll:          overlayListScroll(&overlayPodScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:      maxVisible,
 		EmptyMessage:    "No matching pods",
 	}, min(60, m.width-10)-4)
@@ -89,7 +102,7 @@ func renderCanISubjectOverlay(m Model) string {
 		Filter:          m.overlayFilter.Value,
 		FilterActive:    m.canISubjectFilterMode,
 		ShowDescription: true,
-		Scroll:          scrollOffsetFromCursor(m.overlayCursor, maxVisible),
+		Scroll:          overlayListScroll(&overlayCanISubjectScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:      maxVisible,
 		EmptyMessage:    "No matching subjects",
 	}, min(60, m.width-10)-4)
@@ -175,7 +188,7 @@ func renderLogContainerSelectOverlay(m Model) string {
 		Filter:           m.logContainerFilterText,
 		FilterActive:     m.logContainerFilterActive,
 		ShowActiveMarker: true,
-		Scroll:           scrollOffsetFromCursor(m.overlayCursor, maxVisible),
+		Scroll:           overlayListScroll(&overlayContainerScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:       maxVisible,
 		FooterHint:       footer,
 		EmptyMessage:     "No matching containers",
@@ -197,7 +210,7 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 		Filter:           m.columnToggleFilter,
 		FilterActive:     m.columnToggleFilterActive,
 		ShowActiveMarker: true,
-		Scroll:           scrollOffsetFromCursor(m.columnToggleCursor, maxVisible),
+		Scroll:           overlayListScroll(&overlayColumnToggleScrollPos, m.columnToggleCursor, len(entries), maxVisible),
 		MaxVisible:       maxVisible,
 		EmptyMessage:     "No matching columns",
 	}, width-6)
@@ -215,7 +228,14 @@ func renderColumnToggleOverlay(m Model, entries []ui.ColumnToggleEntry, width, h
 func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 	chrome := overlayListChrome(m.nsFilterMode || m.overlayFilter.Value != "")
 	maxVisible := min(max(height-chrome, 1), max(len(items), 1))
-	scroll := scrollOffsetFromCursor(m.overlayCursor, maxVisible)
+	// Namespace scroll lives in ui.overlayNsScroll so the mouse-click row
+	// resolver can read it. VimScrollOff gives sticky scrolloff behaviour;
+	// stateless cursor-only math pinned the cursor to viewport edges,
+	// which made scroll-up feel like the list was shifting instead of the
+	// cursor moving (issue reported during smoke testing).
+	prev := ui.GetOverlayNsScroll()
+	identity := func(from, to int) int { return to - from }
+	scroll := ui.VimScrollOff(prev, m.overlayCursor, len(items), maxVisible, ui.ConfigScrollOff, identity)
 	ui.SetOverlayNsScroll(scroll)
 
 	listItems := make([]ui.OverlayListItem, len(items))
