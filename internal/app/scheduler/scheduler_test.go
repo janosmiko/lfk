@@ -16,10 +16,11 @@ func TestSubmitReq_Sig(t *testing.T) {
 	req := SubmitReq{
 		KubeContext: "c1",
 		Kind:        KindResourceList,
+		Name:        "List Pods",
 		Target:      "default",
 		Gen:         5,
 	}
-	assert.Equal(t, Sig{KubeContext: "c1", Kind: KindResourceList, Target: "default", Gen: 5}, req.Sig())
+	assert.Equal(t, Sig{KubeContext: "c1", Kind: KindResourceList, Name: "List Pods", Target: "default", Gen: 5}, req.Sig())
 }
 
 func TestSubmitReq_PriorityZeroValueIsCritical(t *testing.T) {
