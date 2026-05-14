@@ -771,6 +771,7 @@ func wrapYAMLCmdAsJSON(cmd tea.Cmd) tea.Cmd {
 				return yc
 			}
 			yc.content = string(jsonBytes) + "\n"
+			yc.format = "json"
 			return yc
 		}
 		docs := strings.Split(strings.TrimRight(yc.content, "\n"), "\n---\n")
@@ -789,6 +790,7 @@ func wrapYAMLCmdAsJSON(cmd tea.Cmd) tea.Cmd {
 			return yc
 		}
 		yc.content = string(arrayBytes) + "\n"
+		yc.format = "json"
 		return yc
 	}
 }

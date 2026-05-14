@@ -292,8 +292,8 @@ func blockedColumnsForMode() map[string]bool {
 	}
 }
 
-// getExtraColumnValue retrieves the value for a given column key from an item.
-func getExtraColumnValue(item *model.Item, key string) string {
+// GetExtraColumnValue retrieves the value for a given column key from an item.
+func GetExtraColumnValue(item *model.Item, key string) string {
 	if item == nil {
 		return ""
 	}
@@ -324,11 +324,11 @@ var columnHeaderAliases = map[string]string{
 	"Service Account":     "SA",
 }
 
-// columnHeaderLabel returns the uppercase display label for a column key,
+// ColumnHeaderLabel returns the uppercase display label for a column key,
 // applying any alias from columnHeaderAliases. Used by plainExtraCell so
 // internal Column keys can stay descriptive while the rendered table header
 // stays compact.
-func columnHeaderLabel(key string) string {
+func ColumnHeaderLabel(key string) string {
 	if alias, ok := columnHeaderAliases[key]; ok {
 		return strings.ToUpper(alias)
 	}

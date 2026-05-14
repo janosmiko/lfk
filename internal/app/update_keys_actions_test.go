@@ -792,22 +792,26 @@ func TestCopyNameSelectionFilteredOutFallsBack(t *testing.T) {
 }
 
 // TestCopyYAMLSelectionFilteredOutFallsBack mirrors the above for `Y`.
-// The single-item cursor path dispatches silently — no bulk "Fetching..."
-// or cap "Max ..." status is set before the fetch resolves. Asserting
-// statusMessage is empty pins down the "took the cursor branch silently"
-// intent rather than just "didn't take the bulk branch."
+// With a ghost selection (hasSelection() true but selectedItemsList() empty),
+// the picker still opens — its scope falls through to the cursor row, matching
+// the precedence today's Y already follows. No "Fetching..." or "Max..." status
+// is set at open time; status only updates once the user picks a format and
+// the fetch resolves.
 func TestCopyYAMLSelectionFilteredOutFallsBack(t *testing.T) {
 	m := basePush80Model()
 	m.selectedItems["ghost-ns/ghost-pod"] = true
 	m.setCursor(0)
 
-	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	ret, _, handled := m.handleExplorerActionKeyCopyYAML()
 	require.True(t, handled)
 	rm := ret.(Model)
 
+	assert.True(t, rm.copyFormatPicker.active, "Y opens the picker")
+	assert.Len(t, rm.copyFormatPicker.scope, 1,
+		"scope falls back to cursor row when selection has no visible items")
+	assert.Equal(t, "pod-1", rm.copyFormatPicker.scope[0].Name)
 	assert.Empty(t, rm.statusMessage,
-		"cursor path dispatches silently; status only updates once the fetch resolves")
-	assert.NotNil(t, cmd, "must still dispatch single-item fetch from cursor")
+		"opening the picker does not set a status; that happens after apply")
 }
 
 // TestCopyYAMLBulkErrorWrapsNamespaceName checks that the bulk fetch path
@@ -835,22 +839,32 @@ func TestCopyYAMLBulkErrorWrapsNamespaceName(t *testing.T) {
 // "Fetching N manifests..." hint before dispatching, so the user has
 // feedback during the sequential fetch (client-go's default rate limiter
 // serializes the per-item Gets — see maxBulkYAMLCopy comment).
+//
+// After Task 10, Y opens the picker first; applying the YAML row from the
+// picker is what runs dispatchYAMLClipboardCopy and sets the status — so
+// the test now drives open-then-apply rather than direct dispatch.
 func TestCopyYAMLBulkSetsFetchingStatus(t *testing.T) {
 	m := basePush80Model()
 	m.toggleSelection(m.middleItems[0])
 	m.toggleSelection(m.middleItems[1])
 
-	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	mdl, _, handled := m.handleExplorerActionKeyCopyYAML()
 	require.True(t, handled)
-	rm := ret.(Model)
+	r := mdl.(Model)
+	require.True(t, r.copyFormatPicker.active, "Y must open the picker")
+
+	// Apply the YAML row (cursor=0 at LevelResources → YAML).
+	mdl2, cmd := r.applyCopyFormatPicker()
+	rm := mdl2.(Model)
 
 	assert.Equal(t, "Fetching 2 manifests...", rm.statusMessage)
 	assert.NotNil(t, cmd)
 }
 
 // TestCopyYAMLBulkRejectsOverCap verifies selections larger than
-// maxBulkYAMLCopy bail out with an error toast and no fetch is dispatched
-// — protects the UI from multi-second stalls behind the rate limiter.
+// maxBulkYAMLCopy bail out with an error toast at open time, before the
+// user even picks a format. The picker stays closed so the cap rejection
+// is the only feedback they see — no half-open overlay.
 func TestCopyYAMLBulkRejectsOverCap(t *testing.T) {
 	m := basePush80Model()
 	m.middleItems = make([]model.Item, maxBulkYAMLCopy+1)
@@ -867,14 +881,16 @@ func TestCopyYAMLBulkRejectsOverCap(t *testing.T) {
 	require.True(t, handled)
 	rm := ret.(Model)
 
-	assert.Equal(t, fmt.Sprintf("Max %d exceeded for bulk YAML copy", maxBulkYAMLCopy), rm.statusMessage)
+	assert.Equal(t, fmt.Sprintf("Max %d exceeded for bulk YAML/JSON copy", maxBulkYAMLCopy), rm.statusMessage)
 	assert.True(t, rm.statusMessageErr, "must surface as error toast")
+	assert.False(t, rm.copyFormatPicker.active, "picker must not open when cap is exceeded")
 	// Cmd is the auto-clear timer, not a fetch.
 	assert.NotNil(t, cmd)
 }
 
 // TestCopyYAMLBulkAtCapDispatches confirms the boundary case (exactly N=cap)
-// is allowed through.
+// is allowed through: Y opens the picker, and applying YAML kicks off the
+// bulk fetch with the "Fetching..." status.
 func TestCopyYAMLBulkAtCapDispatches(t *testing.T) {
 	m := basePush80Model()
 	m.middleItems = make([]model.Item, maxBulkYAMLCopy)
@@ -887,9 +903,14 @@ func TestCopyYAMLBulkAtCapDispatches(t *testing.T) {
 		m.toggleSelection(m.middleItems[i])
 	}
 
-	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	mdl, _, handled := m.handleExplorerActionKeyCopyYAML()
 	require.True(t, handled)
-	rm := ret.(Model)
+	r := mdl.(Model)
+	require.True(t, r.copyFormatPicker.active, "exactly N=cap must open the picker")
+
+	// Apply YAML (cursor=0 at LevelResources → YAML).
+	mdl2, cmd := r.applyCopyFormatPicker()
+	rm := mdl2.(Model)
 
 	assert.Contains(t, rm.statusMessage, "Fetching")
 	assert.False(t, rm.statusMessageErr)
@@ -907,7 +928,7 @@ func TestUpdateYamlClipboardCountAwareStatus(t *testing.T) {
 			count:   3,
 		})
 		rm := ret.(Model)
-		assert.Equal(t, "Copied 3 manifests to clipboard", rm.statusMessage)
+		assert.Equal(t, "Copied 3 manifests as YAML", rm.statusMessage)
 		assert.NotNil(t, cmd)
 	})
 	t.Run("single", func(t *testing.T) {
@@ -949,30 +970,35 @@ func TestCopyYAMLBulkLevelOwnedWrapsErrorWithNamespaceName(t *testing.T) {
 
 // TestCopyYAMLBulkLevelOwnedDispatcherShowsFetchingStatus confirms the
 // dispatcher's "Fetching N manifests..." pre-fetch status applies at
-// LevelOwned the same as LevelResources.
+// LevelOwned the same as LevelResources, once the user picks YAML from
+// the picker that Y opens.
 func TestCopyYAMLBulkLevelOwnedDispatcherShowsFetchingStatus(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelOwned
 	m.toggleSelection(m.middleItems[0])
 	m.toggleSelection(m.middleItems[1])
 
-	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	mdl, _, handled := m.handleExplorerActionKeyCopyYAML()
 	require.True(t, handled)
-	rm := ret.(Model)
+	r := mdl.(Model)
+	require.True(t, r.copyFormatPicker.active, "Y must open the picker at LevelOwned")
+
+	// Apply YAML (cursor=0 → YAML at LevelOwned).
+	mdl2, cmd := r.applyCopyFormatPicker()
+	rm := mdl2.(Model)
 
 	assert.Equal(t, "Fetching 2 manifests...", rm.statusMessage)
 	assert.NotNil(t, cmd)
 }
 
-// TestCopyYAMLLevelContainersIgnoresSelection guards LevelContainers, where
-// the cmd unconditionally fetches the parent Pod's YAML — bulk doesn't
-// apply (containers don't have separate YAML). With selection, the
-// dispatcher must skip the misleading "Fetching N manifests..." status and
-// fall through to the single-pod path silently. Without this gate, a user
-// who multi-selects two containers and presses `Y` sees a "Fetching 2..."
-// toast but the clipboard ends up with the parent Pod's YAML once and the
-// final status flips to "YAML copied" — promising N, delivering 1.
-func TestCopyYAMLLevelContainersIgnoresSelection(t *testing.T) {
+// TestCopyYAMLLevelContainersBulkSelection asserts the new bulk behavior at
+// LevelContainers: when N containers are selected and the user picks YAML
+// from the picker that Y opens, the dispatcher fires the "Fetching N
+// manifests..." status, fetches the parent Pod once, and the command
+// extracts the matching container spec blocks. Without seeded Pod YAML in
+// the fake client the fetch errors, but error wrapping (`ns/name:`)
+// confirms the bulk path was taken rather than the single-pod fallthrough.
+func TestCopyYAMLLevelContainersBulkSelection(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelContainers
 	m.nav.OwnedName = "pod-1"
@@ -983,15 +1009,77 @@ func TestCopyYAMLLevelContainersIgnoresSelection(t *testing.T) {
 	m.toggleSelection(m.middleItems[0])
 	m.toggleSelection(m.middleItems[1])
 
-	ret, cmd, handled := m.handleExplorerActionKeyCopyYAML()
+	mdl, _, handled := m.handleExplorerActionKeyCopyYAML()
 	require.True(t, handled)
-	rm := ret.(Model)
+	r := mdl.(Model)
+	require.True(t, r.copyFormatPicker.active, "Y must open the picker at LevelContainers")
 
-	assert.Empty(t, rm.statusMessage,
-		"LevelContainers does not support bulk; dispatcher must take the cursor branch silently")
-	require.NotNil(t, cmd, "must still dispatch a single-pod fetch")
+	// Apply YAML (cursor=0 → YAML).
+	mdl2, cmd := r.applyCopyFormatPicker()
+	rm := mdl2.(Model)
+
+	assert.Equal(t, "Fetching 2 manifests...", rm.statusMessage,
+		"LevelContainers now supports bulk; dispatcher must show the fetching toast")
+	require.NotNil(t, cmd, "must still dispatch a bulk fetch")
 
 	ymsg, ok := cmd().(yamlClipboardMsg)
 	require.True(t, ok)
-	assert.Equal(t, 1, ymsg.count, "single-pod fetch must be tagged count=1")
+	require.Error(t, ymsg.err, "fake client has no pod seeded; Pod GET must fail")
+	assert.Contains(t, ymsg.err.Error(), "default/pod-1",
+		"bulk path wraps the Pod fetch error with ns/name")
+	assert.Equal(t, 0, ymsg.count, "early-return on error keeps count at zero")
+}
+
+// TestYKeyOpensPicker_AtResources confirms `Y` at LevelResources opens the
+// copy-as picker instead of dispatching a YAML copy directly. This is the
+// observable contract change for Task 10: Y is no longer a direct YAML
+// dispatcher — it gates on format choice via the picker.
+func TestYKeyOpensPicker_AtResources(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.middleItems = []model.Item{{Name: "a", Kind: "Pod"}}
+	m.setCursor(0)
+	mdl, _, handled := m.handleExplorerActionKeyCopyYAML()
+	assert.True(t, handled)
+	r := mdl.(Model)
+	assert.True(t, r.copyFormatPicker.active, "Y must open the picker, not copy directly")
+}
+
+// TestYKeyOpensPicker_AtClusters confirms `Y` at LevelClusters opens the
+// picker with the Table-only format set — there is no manifest behind a
+// cluster row, so YAML/JSON are deliberately omitted.
+func TestYKeyOpensPicker_AtClusters(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+	m.middleItems = []model.Item{{Name: "kind-1"}}
+	m.setCursor(0)
+	mdl, _, handled := m.handleExplorerActionKeyCopyYAML()
+	assert.True(t, handled)
+	r := mdl.(Model)
+	assert.True(t, r.copyFormatPicker.active)
+	assert.Equal(t, []CopyFormat{CopyFormatTable}, r.copyFormatPicker.formats)
+}
+
+// TestYKeyBulkCapExceeded verifies the cap check fires at open time: with
+// more than maxBulkYAMLCopy items selected at a bulk-capable level, the
+// picker must NOT open and an error toast is shown immediately. This gives
+// the user feedback before they pick a format rather than after.
+func TestYKeyBulkCapExceeded(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	items := make([]model.Item, 51)
+	for i := range items {
+		items[i] = model.Item{Name: fmt.Sprintf("p-%d", i), Kind: "Pod"}
+	}
+	m.middleItems = items
+	m.selectedItems = map[string]bool{}
+	for i := range items {
+		m.selectedItems[selectionKey(items[i])] = true
+	}
+	m.setCursor(0)
+	mdl, _, handled := m.handleExplorerActionKeyCopyYAML()
+	assert.True(t, handled)
+	r := mdl.(Model)
+	assert.False(t, r.copyFormatPicker.active, "picker must NOT open when cap is exceeded")
+	assert.Contains(t, r.statusMessage, "Max 50 exceeded")
 }

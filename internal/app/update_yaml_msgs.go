@@ -72,10 +72,26 @@ func (m Model) updateYamlClipboard(msg yamlClipboardMsg) (tea.Model, tea.Cmd) {
 		m.setErrorFromErr("Error: ", msg.err)
 		return m, scheduleStatusClear()
 	}
+	label, unit := copyFormatStatusParts(msg.format)
 	if msg.count > 1 {
-		m.setStatusMessage(fmt.Sprintf("Copied %d manifests to clipboard", msg.count), false)
+		m.setStatusMessage(fmt.Sprintf("Copied %d %s as %s", msg.count, unit, label), false)
 	} else {
-		m.setStatusMessage("YAML copied to clipboard", false)
+		m.setStatusMessage(fmt.Sprintf("%s copied to clipboard", label), false)
 	}
 	return m, tea.Batch(copyToSystemClipboard(msg.content), scheduleStatusClear())
+}
+
+// copyFormatStatusParts returns the (label, plural-unit) pair used in the
+// clipboard status message. label is title-case for the status line ("YAML",
+// "JSON", "Table"); unit is the plural noun for bulk copies. Empty format
+// defaults to YAML so legacy callers stay correct.
+func copyFormatStatusParts(format string) (label, unit string) {
+	switch format {
+	case "json":
+		return "JSON", "manifests"
+	case "table":
+		return "Table", "rows"
+	default:
+		return "YAML", "manifests"
+	}
 }

@@ -570,7 +570,7 @@ func TestExecuteBuiltinCommand(t *testing.T) {
 		result, cmd := m.executeBuiltinCommand("export yaml")
 		rm := result.(Model)
 
-		assert.Equal(t, fmt.Sprintf("Max %d exceeded for bulk YAML copy", maxBulkYAMLCopy), rm.statusMessage)
+		assert.Equal(t, fmt.Sprintf("Max %d exceeded for bulk YAML/JSON copy", maxBulkYAMLCopy), rm.statusMessage)
 		assert.True(t, rm.statusMessageErr, "must surface as error toast")
 		assert.NotNil(t, cmd, "auto-clear timer is still dispatched")
 	})
@@ -606,10 +606,11 @@ func TestExecuteBuiltinCommand(t *testing.T) {
 		assert.NotNil(t, cmd)
 	})
 
-	// LevelContainers must NOT show "Fetching N...": copyYAMLToClipboard
-	// fetches the parent Pod by OwnedName regardless of selection (containers
-	// don't have separate YAML), so the bulk indicator would be a lie.
-	t.Run("export_yaml_at_level_containers_falls_back_silently", func(t *testing.T) {
+	// LevelContainers now supports bulk: when N containers are selected,
+	// the dispatcher fetches the parent Pod once and extracts the matching
+	// container spec blocks, so "Fetching N manifests..." correctly reflects
+	// the N requested container blocks.
+	t.Run("export_yaml_at_level_containers_uses_bulk", func(t *testing.T) {
 		m := basePush80Model()
 		m.nav.Level = model.LevelContainers
 		m.nav.OwnedName = "pod-1"
@@ -623,8 +624,8 @@ func TestExecuteBuiltinCommand(t *testing.T) {
 		result, cmd := m.executeBuiltinCommand("export yaml")
 		rm := result.(Model)
 
-		assert.Empty(t, rm.statusMessage,
-			"LevelContainers cmd ignores selection; dispatcher must skip the bulk indicator")
+		assert.Equal(t, "Fetching 2 manifests...", rm.statusMessage,
+			"LevelContainers now supports bulk; dispatcher must show the fetching toast")
 		assert.NotNil(t, cmd)
 	})
 

@@ -519,13 +519,14 @@ const maxBulkYAMLCopy = 50
 
 // supportsBulkYAMLCopy reports whether copyYAMLToClipboard implements a
 // per-selection bulk fetch at the current navigation level. LevelContainers
-// is single-Pod-by-OwnedName (containers don't have separate YAML), so its
-// dispatcher must fall through to the cursor branch even with a selection
-// — otherwise the user sees a "Fetching N..." toast but the clipboard ends
-// up with one Pod's YAML. Keep this in sync with the bulk branches in
-// copyYAMLToClipboard.
+// is included because container rows fan a single Pod-YAML fetch through
+// ExtractContainerBlocksYAML, extracting one spec block per selected
+// container name (see commands_yaml.go). Keep this in sync with the bulk
+// branches in copyYAMLToClipboard.
 func (m Model) supportsBulkYAMLCopy() bool {
-	return m.nav.Level == model.LevelResources || m.nav.Level == model.LevelOwned
+	return m.nav.Level == model.LevelResources ||
+		m.nav.Level == model.LevelOwned ||
+		m.nav.Level == model.LevelContainers
 }
 
 // dispatchYAMLClipboardCopy routes Y / `:export yaml` to either the
@@ -540,7 +541,7 @@ func (m Model) dispatchYAMLClipboardCopy() (tea.Model, tea.Cmd) {
 	if m.hasSelection() && m.supportsBulkYAMLCopy() {
 		n := len(m.selectedItemsList())
 		if n > maxBulkYAMLCopy {
-			m.setStatusMessage(fmt.Sprintf("Max %d exceeded for bulk YAML copy", maxBulkYAMLCopy), true)
+			m.setStatusMessage(fmt.Sprintf("Max %d exceeded for bulk YAML/JSON copy", maxBulkYAMLCopy), true)
 			return m, scheduleStatusClear()
 		}
 		if n > 0 {
@@ -555,8 +556,17 @@ func (m Model) dispatchYAMLClipboardCopy() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleExplorerActionKeyCopyYAML() (tea.Model, tea.Cmd, bool) {
-	ret, cmd := m.dispatchYAMLClipboardCopy()
-	return ret, cmd, true
+	// Cap check for YAML/JSON bulk copy happens at open time so the
+	// user gets immediate feedback rather than after picking a format.
+	// Table has no cap because it's a local string build, not a fetch.
+	if m.hasSelection() && m.supportsBulkYAMLCopy() {
+		if n := len(m.selectedItemsList()); n > maxBulkYAMLCopy {
+			m.setStatusMessage(fmt.Sprintf("Max %d exceeded for bulk YAML/JSON copy", maxBulkYAMLCopy), true)
+			return m, scheduleStatusClear(), true
+		}
+	}
+	m.openCopyFormatPicker()
+	return m, nil, true
 }
 
 func (m Model) handleExplorerActionKeyNewTab() (tea.Model, tea.Cmd, bool) {
