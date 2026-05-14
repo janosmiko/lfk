@@ -186,12 +186,17 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 		return m
 	}
 
-	// Prepend and adjust scroll to maintain view position.
+	// Prepend and adjust scroll to maintain view position — unless the user
+	// is still anchored at the absolute top (e.g. just pressed `gg` and the
+	// async fetch resolved before they navigated), in which case keep them
+	// at 0 so the newly revealed older lines come into view.
 	prepended := len(newOlderLines)
 	m.logLines = append(newOlderLines, m.logLines...)
-	m.logScroll += prepended
-	if m.logCursor >= 0 {
-		m.logCursor += prepended
+	if m.logCursor > 0 || m.logScroll > 0 {
+		m.logScroll += prepended
+		if m.logCursor >= 0 {
+			m.logCursor += prepended
+		}
 	}
 	m.logTailLines += ui.ConfigLogTailLines
 
