@@ -144,11 +144,8 @@ func renderConfigMapEditorTable(
 	selectedKeys map[string]bool, // keys marked with `s` for batch copy; nil = none
 	width, height int,
 ) string {
-	// +2 budgets for the "✓ " / "  " selection-indicator prefix every
-	// key row carries — without this the key text gets truncated even
-	// when the underlying name fits.
-	keyColW := computeKeyColumnWidth(cm.Keys, width, 3) + 2
-	valColW := max(width-keyColW-5, 8)
+	keyColW := computeKeyColumnWidth(cm.Keys, width, 3)
+	valColW := max(width-kvSelColumnW-keyColW-8, 8)
 
 	bodyHeight := max(height-2, 1)
 	start := scrollWindowStart(selectedIdx, bodyHeight, len(cm.Keys))
@@ -160,26 +157,23 @@ func renderConfigMapEditorTable(
 		v := cm.Data[k]
 		displayV := configMapValueDisplay(v, valColW)
 
-		// Consistent 2-char prefix across all rows (including editing)
-		// so column alignment stays stable. See secretview for the
-		// rationale.
-		prefix := "  "
-		if selectedKeys[k] {
-			prefix = "\u2713 "
-		}
+		// Selection mark lives in its own leading column so the KEY
+		// cell no longer shifts two characters right just to leave
+		// room for a "  " / "\u2713 " prefix on every row.
+		selCell := kvSelectionCell(selectedKeys[k])
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = prefix + overlayCursor(editKey, editKeyCursor, true, keyColW-2)
+			keyText = overlayCursor(editKey, editKeyCursor, true, keyColW)
 			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
-			keyText = prefix + SingleLineCell(editKey, keyColW-2)
+			keyText = SingleLineCell(editKey, keyColW)
 			valText = overlayCursor(editValue, editValueCursor, true, valColW)
 		default:
-			keyText = prefix + SingleLineCell(k, keyColW-2)
+			keyText = SingleLineCell(k, keyColW)
 			valText = displayV
 		}
-		t.Row(keyText, valText)
+		t.Row(selCell, keyText, valText)
 	}
 	rendered := t.Render()
 	if len(cm.Keys) == 0 {
