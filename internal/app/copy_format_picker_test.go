@@ -370,6 +370,23 @@ func TestCopyFormatPicker_YShortcutAppliesYAML(t *testing.T) {
 	require.NotNil(t, cmd, "yaml dispatch returns non-nil cmd")
 }
 
+// TestCopyFormatPicker_JShortcutAppliesJSON guards the uppercase-J shortcut
+// for JSON. Lowercase j stays bound to cursor-down navigation; the user
+// reaches JSON either via uppercase J or by arrow-key + Enter. Regression
+// test: prior to this binding JSON was the only row without a shortcut
+// chip in the overlay, breaking the visual consistency of the picker.
+func TestCopyFormatPicker_JShortcutAppliesJSON(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelResources
+	m.middleItems = []model.Item{{Name: "a", Kind: "Pod"}}
+	m.setCursor(0)
+	m.openCopyFormatPicker()
+	mdl, cmd := m.handleCopyFormatPickerKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("J")})
+	r := mdl.(Model)
+	assert.False(t, r.copyFormatPicker.active, "J applies JSON and closes picker")
+	require.NotNil(t, cmd, "json dispatch returns non-nil cmd")
+}
+
 func TestCopyFormatPicker_EnterAppliesCursorRow(t *testing.T) {
 	m := baseExplorerModel()
 	m.nav.Level = model.LevelResources

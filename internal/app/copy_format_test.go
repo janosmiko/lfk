@@ -32,8 +32,8 @@ func TestCopyFormatLabelAndKey(t *testing.T) {
 	assert.Equal(t, "YAML", CopyFormatYAML.Label())
 	assert.Equal(t, "y", CopyFormatYAML.ShortcutKey())
 	assert.Equal(t, "JSON", CopyFormatJSON.Label())
-	assert.Equal(t, "", CopyFormatJSON.ShortcutKey(),
-		"JSON returns no shortcut because 'j' is consumed by cursor-down navigation")
+	assert.Equal(t, "J", CopyFormatJSON.ShortcutKey(),
+		"JSON uses uppercase J so it does not collide with lowercase j cursor-down navigation")
 	assert.Equal(t, "Table", CopyFormatTable.Label())
 	assert.Equal(t, "t", CopyFormatTable.ShortcutKey())
 }
