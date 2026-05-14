@@ -102,7 +102,7 @@ func headerCellForKey(key string, extraCols []extraColumn,
 	}
 	for _, ec := range extraCols {
 		if ec.key == key {
-			return headerWithIndicator(columnHeaderLabel(ec.key), ec.key, ec.width)
+			return headerWithIndicator(ColumnHeaderLabel(ec.key), ec.key, ec.width)
 		}
 	}
 	return ""

@@ -79,6 +79,7 @@ const (
 	overlaySyncWave       // per-Application sync wave timeline (action menu key W)
 	overlayLocalClusters  // local-cluster manager (Ctrl+N at LevelClusters)
 	overlayTrafficCapture // per-pod live packet capture (action menu key c)
+	overlayCopyFormat     // Y-key copy-as picker (YAML / JSON / Table)
 )
 
 // whoCanState groups the reverse-RBAC ("Who-Can") fields so they live

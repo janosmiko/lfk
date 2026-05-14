@@ -97,6 +97,8 @@ func (m Model) isOverlayToggleKey(key string) bool {
 		return key == kb.OrphanOverlay
 	case overlayLocalClusters:
 		return key == kb.LocalClusterManager
+	case overlayCopyFormat:
+		return key == kb.CopyYAML
 	}
 	return false
 }
@@ -239,6 +241,9 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 		return mdl, cmd, true
 	case overlayTrafficCapture:
 		mdl, cmd := m.updateOverlayCapture(msg)
+		return mdl, cmd, true
+	case overlayCopyFormat:
+		mdl, cmd := m.handleCopyFormatPickerKey(msg)
 		return mdl, cmd, true
 	}
 	return m, nil, false

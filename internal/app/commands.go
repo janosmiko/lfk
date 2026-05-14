@@ -57,7 +57,7 @@ var startupTips = []string{
 	"Press @ to open the monitoring dashboard",
 	"Press o to jump to the parent/owner of a resource",
 	"Press m<key> to save a bookmark, ' to open bookmarks",
-	"Press y to copy resource name, Y to copy YAML",
+	"Press y to copy resource name, Y to open copy-as picker (YAML / JSON / Table)",
 	"Press . for quick filter presets (failing pods, not-ready, etc.)",
 	"Press T to preview different color themes, in preview mode press t to hide theme background",
 	"Press e to edit resources with your $KUBE_EDITOR or $EDITOR",

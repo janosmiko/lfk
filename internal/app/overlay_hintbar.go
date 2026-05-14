@@ -130,6 +130,13 @@ func (m Model) overlayHintBarSelector() string {
 			{Key: "enter/key", Desc: "select"},
 			{Key: "esc", Desc: "close"},
 		})
+	case overlayCopyFormat:
+		return m.renderHints([]ui.HintEntry{
+			{Key: "j/k", Desc: "navigate"},
+			{Key: "y/t", Desc: "shortcut"},
+			{Key: "enter", Desc: "apply"},
+			{Key: "esc", Desc: "cancel"},
+		})
 	case overlayPortForward:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "select port"},

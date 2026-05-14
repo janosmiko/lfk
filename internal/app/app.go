@@ -91,11 +91,11 @@ type Model struct {
 	// Current view mode.
 	mode viewMode
 
-	// Overlay state.
-	overlay       overlayKind
-	overlayItems  []model.Item // full list (e.g., all namespaces)
-	overlayFilter TextInput    // typed filter text
-	overlayCursor int
+	overlay          overlayKind  // active overlay kind (see overlayKind enum)
+	overlayItems     []model.Item // full list (e.g., all namespaces)
+	overlayFilter    TextInput    // typed filter text
+	overlayCursor    int
+	copyFormatPicker copyFormatPickerState // Y-key copy-as picker — see openCopyFormatPicker
 
 	// Namespace (not a navigation level; displayed in top-right).
 	namespace string

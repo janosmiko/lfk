@@ -270,6 +270,9 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 	case overlayTrafficCapture:
 		c, w, h := m.renderOverlayTrafficCapture()
 		return c, w, h, true
+	case overlayCopyFormat:
+		c, w, h := m.renderOverlayCopyFormat()
+		return c, w, h, true
 	}
 	return "", 0, 0, false
 }

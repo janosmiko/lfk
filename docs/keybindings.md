@@ -157,7 +157,7 @@ Resource-specific actions (exec, scale, restart, secret editor, etc.) are availa
 | Key | Action |
 |---|---|
 | `y` | Copy resource name to clipboard (with multi-selection: newline-joined names of all selected items) |
-| `Y` | Copy resource YAML to clipboard (with multi-selection: multi-doc YAML, items joined with `---`) |
+| `Y` | Open copy-as picker (YAML / JSON / Table). YAML/JSON support multi-selection (multi-doc YAML joined with `---`, JSON array). Table is a kubectl-style aligned plain-text view of the displayed columns. At LevelClusters and LevelResourceTypes only Table is offered. At LevelContainers, YAML and JSON extract the container spec block from the Pod manifest. |
 | `Ctrl+P` | Apply resource from clipboard (`kubectl apply`) |
 
 When items are multi-selected (`Space` / `Ctrl+Space` / `Ctrl+A`), `y` and `Y` operate on the selection rather than the cursor row — mirroring the precedence used by `D` (delete) and other bulk actions. `Y` is capped at 50 manifests per copy (client-go's default rate limiter serializes the per-item fetches).
@@ -998,7 +998,7 @@ keybindings:
   secret_editor: "e"     # Secret/configmap editor
   create_template: "a"   # Create from template
   copy_name: "y"         # Copy name
-  copy_yaml: "Y"         # Copy YAML
+  copy_yaml: "Y"         # Open copy-as picker (YAML / JSON / Table)
   paste_apply: "ctrl+p"  # Apply from clipboard
   open_browser: "ctrl+o" # Open in browser
   diff: "d"              # Diff resources

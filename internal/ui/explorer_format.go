@@ -48,9 +48,9 @@ func headerWithIndicator(label string, colName string, colWidth int) string {
 func plainExtraCell(ec extraColumn, item *model.Item) string {
 	var val string
 	if item == nil {
-		val = columnHeaderLabel(ec.key) + sortIndicatorForColumn(ec.key)
+		val = ColumnHeaderLabel(ec.key) + sortIndicatorForColumn(ec.key)
 	} else {
-		val = getExtraColumnValue(item, ec.key)
+		val = GetExtraColumnValue(item, ec.key)
 	}
 	switch {
 	case strings.HasPrefix(val, "↑ ") || strings.HasPrefix(val, "↓ "):
@@ -66,7 +66,7 @@ func plainExtraCell(ec extraColumn, item *model.Item) string {
 
 // styledExtraCell builds the styled cell for a single extra column.
 func styledExtraCell(ec extraColumn, item *model.Item) string {
-	val := getExtraColumnValue(item, ec.key)
+	val := GetExtraColumnValue(item, ec.key)
 	style := resourceColumnStyle(ec.key, val)
 	switch {
 	case strings.HasPrefix(val, "↑ "):
