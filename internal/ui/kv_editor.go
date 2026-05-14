@@ -493,7 +493,18 @@ const kvSelColumnW = 1
 // cursorRow is the body-row index (0-based; lipgloss/table's HeaderRow
 // is the constant -1) of the cursor. Pass -1 when no row is the cursor
 // (e.g. an empty table that's only showing headers + a placeholder).
-func newKVEditorTable(keyColW, valColW, cursorRow int) *table.Table {
+//
+// editing toggles off the SelectedBg highlight on the cursor row when
+// the user is actively editing an inline cell. The cursor character
+// itself renders as reverse-video at the byte offset (see
+// overlayCursor); its embedded \x1b[7m / \x1b[0m SGR pair breaks the
+// continuity of any background the table wraps around the cell, so
+// the row's SelectedBg ends up visible BEFORE the cursor and missing
+// AFTER it — the user-reported "background is different before and
+// after the cursor" symptom. Dropping the row's SelectedBg during
+// edit mode lets the cursor's own reverse-video pair carry the
+// visual indicator without competing with an outer bg.
+func newKVEditorTable(keyColW, valColW, cursorRow int, editing bool) *table.Table {
 	return table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderRow(false).
@@ -528,6 +539,15 @@ func newKVEditorTable(keyColW, valColW, cursorRow int) *table.Table {
 					Foreground(lipgloss.Color(ColorPrimary)).
 					Bold(true).
 					Underline(true)
+			case row == cursorRow && editing:
+				// Editing the cursor row: drop the SelectedBg so the
+				// cursor's reverse-video glyph isn't fighting an outer
+				// background that won't survive its embedded SGR reset.
+				// Bold + Primary keeps the row visually distinct from
+				// idle rows.
+				return base.
+					Foreground(lipgloss.Color(ColorPrimary)).
+					Bold(true)
 			case row == cursorRow:
 				return base.
 					Foreground(lipgloss.Color(ColorSelectedFg)).

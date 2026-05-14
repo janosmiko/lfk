@@ -151,7 +151,7 @@ func renderConfigMapEditorTable(
 	start := scrollWindowStart(selectedIdx, bodyHeight, len(cm.Keys))
 	end := min(start+bodyHeight, len(cm.Keys))
 
-	t := newKVEditorTable(keyColW, valColW, selectedIdx-start)
+	t := newKVEditorTable(keyColW, valColW, selectedIdx-start, editing)
 	for i := start; i < end; i++ {
 		k := cm.Keys[i]
 		v := cm.Data[k]

@@ -197,7 +197,7 @@ func renderSecretEditorTable(
 	start := scrollWindowStart(selectedIdx, bodyHeight, len(secret.Keys))
 	end := min(start+bodyHeight, len(secret.Keys))
 
-	t := newKVEditorTable(keyColW, valColW, selectedIdx-start)
+	t := newKVEditorTable(keyColW, valColW, selectedIdx-start, editing)
 	for i := start; i < end; i++ {
 		k := secret.Keys[i]
 		v := secret.Data[k]

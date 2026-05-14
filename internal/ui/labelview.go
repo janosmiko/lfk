@@ -159,7 +159,7 @@ func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx i
 	start := scrollWindowStart(selectedIdx, bodyHeight, len(keys))
 	end := min(start+bodyHeight, len(keys))
 
-	t := newKVEditorTable(keyColW, valColW, selectedIdx-start)
+	t := newKVEditorTable(keyColW, valColW, selectedIdx-start, editing)
 	for i := start; i < end; i++ {
 		k := keys[i]
 		v := data[k]
