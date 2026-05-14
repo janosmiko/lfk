@@ -817,7 +817,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 			t.Setenv("KUBECONFIG", origKubeconfig)
 		}()
 
-		paths := buildKubeconfigPaths()
+		paths := buildKubeconfigPaths("")
 
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -837,7 +837,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", cfg1+string(os.PathListSeparator)+cfg2)
 
-		paths := buildKubeconfigPaths()
+		paths := buildKubeconfigPaths("")
 
 		assert.Contains(t, paths, cfg1)
 		assert.Contains(t, paths, cfg2)
@@ -852,7 +852,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", defaultPath)
 
-		paths := buildKubeconfigPaths()
+		paths := buildKubeconfigPaths("")
 
 		count := 0
 		for _, p := range paths {
@@ -876,7 +876,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		// and returns at least the default path.
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths()
+		paths := buildKubeconfigPaths("")
 
 		assert.NotEmpty(t, paths, "should return at least the default kubeconfig path")
 	})
@@ -889,7 +889,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		via := filepath.Join(tmpDir, ".", "config.yaml")
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+via)
 
-		paths := buildKubeconfigPaths()
+		paths := buildKubeconfigPaths("")
 		count := 0
 		for _, p := range paths {
 			if p == cfg || p == via {
@@ -913,7 +913,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.Symlink(cfg, viaSymlink))
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+viaSymlink)
 
-		paths := buildKubeconfigPaths()
+		paths := buildKubeconfigPaths("")
 		// Both entries point at the same underlying file; only one should
 		// remain after dedup. Compare via EvalSymlinks on both sides so
 		// we don't trip over /tmp → /private/tmp on macOS.
@@ -927,6 +927,42 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		}
 		assert.Equal(t, 1, seenReal,
 			"symlinked duplicates should collapse so collectContexts doesn't see the file twice")
+	})
+
+	t.Run("uses provided directory parameter", func(t *testing.T) {
+		tmpDir := t.TempDir()
+		customDir := filepath.Join(tmpDir, "custom-config.d")
+		assert.NoError(t, os.MkdirAll(customDir, 0o755))
+		extraCfg := filepath.Join(customDir, "extra-cluster")
+		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
+
+		t.Setenv("KUBECONFIG", "")
+
+		paths := buildKubeconfigPaths(customDir)
+		// collectConfigDirPaths resolves symlinks, so on macOS /tmp may
+		// become /private/tmp — compare via EvalSymlinks to avoid failing.
+		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
+		assert.NoError(t, err)
+		assert.Contains(t, paths, resolvedExtraCfg,
+			"should include file from provided directory")
+	})
+
+	t.Run("expands tilde in directory parameter", func(t *testing.T) {
+		// Override HOME so we can predict the tilde expansion.
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+		customDir := filepath.Join(tmpHome, "custom-k8s")
+		assert.NoError(t, os.MkdirAll(customDir, 0o755))
+		extraCfg := filepath.Join(customDir, "extra-cluster")
+		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
+
+		t.Setenv("KUBECONFIG", "")
+
+		paths := buildKubeconfigPaths("~/custom-k8s")
+		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
+		assert.NoError(t, err)
+		assert.Contains(t, paths, resolvedExtraCfg,
+			"should expand ~ in directory parameter and include the file")
 	})
 }
 
@@ -946,6 +982,21 @@ func TestDedupKubeconfigPaths(t *testing.T) {
 		// surface a clear error later) — they shouldn't crash the dedup.
 		got := dedupKubeconfigPaths([]string{"/no/such/file", "/no/such/file", "/another"})
 		assert.Equal(t, []string{"/no/such/file", "/another"}, got)
+	})
+}
+
+func TestExpandTilde(t *testing.T) {
+	t.Run("tilde alone expands to home", func(t *testing.T) {
+		assert.Equal(t, "/home/test", expandTilde("~", "/home/test"))
+	})
+	t.Run("tilde-slash expands to home subdir", func(t *testing.T) {
+		assert.Equal(t, "/home/test/.kube/config.d", expandTilde("~/.kube/config.d", "/home/test"))
+	})
+	t.Run("non-tilde path returned unchanged", func(t *testing.T) {
+		assert.Equal(t, "/abs/path", expandTilde("/abs/path", "/home/test"))
+	})
+	t.Run("other-user tilde returned unchanged", func(t *testing.T) {
+		assert.Equal(t, "~other/path", expandTilde("~other/path", "/home/test"))
 	})
 }
 
@@ -998,7 +1049,7 @@ users:
 
 	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
 
-	client, err := NewClient("")
+	client, err := NewClient("", "")
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1093,7 +1144,7 @@ users:
 
 	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
 
-	client, err := NewClient("")
+	client, err := NewClient("", "")
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1192,7 +1243,7 @@ users:
 	t.Setenv("KUBECONFIG",
 		dev+string(os.PathListSeparator)+itg+string(os.PathListSeparator)+prod)
 
-	client, err := NewClient("")
+	client, err := NewClient("", "")
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1468,7 +1519,7 @@ users:
 
 			t.Setenv("KUBECONFIG", strings.Join(paths, string(os.PathListSeparator)))
 
-			client, err := NewClient("")
+			client, err := NewClient("", "")
 			assert.NoError(t, err)
 			assert.NotNil(t, client)
 

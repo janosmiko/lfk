@@ -176,6 +176,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.NoColor != nil {
 		ConfigNoColor = *cfg.NoColor
 	}
+	applyKubeconfigDirSetting(cfg.KubeconfigDir)
 	applyDataAccessConfig(cfg)
 	applyInformerCacheSetting(cfg.InformerCache)
 	if cfg.MinContrastRatio != nil {
@@ -193,6 +194,15 @@ func applyConfigOptions(cfg configFile) {
 		// value) disables color. Env takes precedence over the config file
 		// field; CLI flag is applied later in main.go.
 		ConfigNoColor = true
+	}
+}
+
+// applyKubeconfigDirSetting assigns the kubeconfig_dir config value to the
+// global ConfigKubeconfigDir variable. Extracted from applyConfigOptions to
+// keep that function under the project's cyclomatic-complexity cap.
+func applyKubeconfigDirSetting(dir string) {
+	if dir != "" {
+		ConfigKubeconfigDir = dir
 	}
 }
 

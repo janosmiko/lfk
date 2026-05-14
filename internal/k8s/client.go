@@ -200,12 +200,12 @@ func (c *Client) Shutdown() {
 // 1. KUBECONFIG env var
 // 2. ~/.kube/config
 // 3. All files in ~/.kube/config.d/ (recursively; symlinks to directories are followed)
-func NewClient(kubeconfigOverride string) (*Client, error) {
+func NewClient(kubeconfigOverride, kubeconfigDir string) (*Client, error) {
 	var kubeconfigPaths []string
 	if kubeconfigOverride != "" {
 		kubeconfigPaths = []string{kubeconfigOverride}
 	} else {
-		kubeconfigPaths = buildKubeconfigPaths()
+		kubeconfigPaths = buildKubeconfigPaths(kubeconfigDir)
 	}
 
 	loadingRules := &clientcmd.ClientConfigLoadingRules{

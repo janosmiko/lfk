@@ -8,6 +8,7 @@ import (
 	"net/http"
 	_ "net/http/pprof" // registers /debug/pprof/* under DefaultServeMux when LFK_PPROF_ADDR is set
 	"os"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -46,6 +47,7 @@ File locations:
 	rootCmd.Flags().StringVar(&cliOpts.Context, "context", "", "Kubernetes context to use")
 	rootCmd.Flags().StringSliceVarP(&cliOpts.Namespaces, "namespace", "n", nil, "Namespace(s) to filter (repeatable, disables all-namespaces mode)")
 	rootCmd.Flags().StringVar(&cliOpts.Kubeconfig, "kubeconfig", "", "Path to kubeconfig file (overrides default discovery)")
+	rootCmd.Flags().StringVar(&cliOpts.KubeconfigDir, "kubeconfig-dir", "", "Directory to scan for kubeconfig files instead of ~/.kube/config.d/")
 	rootCmd.Flags().StringVarP(&cliOpts.Config, "config", "c", "", "Path to config file (overrides default ~/.config/lfk/config.yaml)")
 	rootCmd.Flags().BoolVar(&cliOpts.NoMouse, "no-mouse", false, "Disable mouse capture (enables native terminal text selection)")
 	rootCmd.Flags().BoolVar(&cliOpts.NoColor, "no-color", false, "Disable foreground/background colors; keep bold/reverse for visibility. Also honors the NO_COLOR env var.")
@@ -81,18 +83,28 @@ func runTUI(opts app.StartupOptions) error {
 	klog.SetOutput(io.Discard)
 	defer klog.Flush()
 
-	if opts.Kubeconfig != "" {
-		if _, err := os.Stat(opts.Kubeconfig); err != nil {
-			return fmt.Errorf("kubeconfig file %q: %w", opts.Kubeconfig, err)
-		}
-	}
 	if opts.Config != "" {
 		if _, err := os.Stat(opts.Config); err != nil {
 			return fmt.Errorf("config file %q: %w", opts.Config, err)
 		}
 	}
+	ui.LoadConfig(opts.Config)
 
-	client, err := k8s.NewClient(opts.Kubeconfig)
+	if opts.Kubeconfig != "" {
+		if _, err := os.Stat(opts.Kubeconfig); err != nil {
+			return fmt.Errorf("kubeconfig file %q: %w", opts.Kubeconfig, err)
+		}
+	}
+
+	kubeconfigDir := ui.ConfigKubeconfigDir
+	if envDir := strings.TrimSpace(os.Getenv("KUBECONFIG_DIR")); envDir != "" {
+		kubeconfigDir = envDir
+	}
+	if opts.KubeconfigDir != "" {
+		kubeconfigDir = opts.KubeconfigDir
+	}
+
+	client, err := k8s.NewClient(opts.Kubeconfig, kubeconfigDir)
 	if err != nil {
 		return fmt.Errorf("initializing Kubernetes client: %w", err)
 	}
@@ -101,7 +113,6 @@ func runTUI(opts app.StartupOptions) error {
 		return fmt.Errorf("context %q not found in kubeconfig", opts.Context)
 	}
 
-	ui.LoadConfig(opts.Config)
 	// CLI --no-color flag can force monochrome even if config and env don't.
 	// (LoadConfig already honors the NO_COLOR env var and config field.)
 	if opts.NoColor {

@@ -157,6 +157,10 @@ type configFile struct {
 	// All fields are optional; missing keys fall back to the scheduler
 	// package's compiled defaults.
 	Scheduler *SchedulerConfig `json:"scheduler" yaml:"scheduler"`
+	// KubeconfigDir overrides the default kubeconfig directory path (~/.kube/config.d).
+	// When set, this directory is used instead of the default. The CLI flag takes
+	// precedence, then the KUBECONFIG_DIR env var, then this config value.
+	KubeconfigDir string `json:"kubeconfig_dir" yaml:"kubeconfig_dir"`
 }
 
 // SchedulerConfig holds the runtime knobs for the priority task

@@ -129,6 +129,9 @@ func ClampWatchInterval(d time.Duration) time.Duration {
 // ConfigLogPath holds the log_path value from the config file (if any).
 var ConfigLogPath string
 
+// ConfigKubeconfigDir holds the kubeconfig_dir value from the config file (if any).
+var ConfigKubeconfigDir string
+
 // SearchAbbreviations maps short abbreviations to full resource type names for search.
 var SearchAbbreviations map[string]string
 

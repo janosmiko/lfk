@@ -214,7 +214,7 @@ func contextDisplayHint(path string) string {
 }
 
 // buildKubeconfigPaths assembles the list of kubeconfig file paths to load.
-func buildKubeconfigPaths() []string {
+func buildKubeconfigPaths(kubeconfigDir string) []string {
 	var paths []string
 
 	// KUBECONFIG env var (colon-separated on unix).
@@ -230,8 +230,11 @@ func buildKubeconfigPaths() []string {
 			paths = append(paths, defaultPath)
 		}
 
-		// config.d directory - recursively find all files (follows symlinks).
-		paths = append(paths, collectConfigDirPaths(filepath.Join(home, ".kube", "config.d"))...)
+		// Fallback to default if empty.
+		if kubeconfigDir == "" {
+			kubeconfigDir = filepath.Join(home, ".kube", "config.d")
+		}
+		paths = append(paths, collectConfigDirPaths(expandTilde(kubeconfigDir, home))...)
 	}
 
 	// Dedup by canonical path. The same kubeconfig can land in `paths`
@@ -297,6 +300,20 @@ func collectConfigDirPaths(dir string) []string {
 		return nil
 	})
 	return out
+}
+
+// expandTilde resolves a leading "~" in a path to the given home directory.
+// When the path is exactly "~" or starts with "~/", the tilde is replaced
+// with home. Any other form (e.g. "~other/path") is returned unchanged so
+// that filepath expansion errors are surfaced by downstream callers.
+func expandTilde(path, home string) string {
+	if path == "~" {
+		return home
+	}
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(home, path[2:])
+	}
+	return path
 }
 
 func containsPath(paths []string, target string) bool {

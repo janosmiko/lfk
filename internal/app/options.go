@@ -7,6 +7,7 @@ type StartupOptions struct {
 	Context       string
 	Namespaces    []string
 	Kubeconfig    string
+	KubeconfigDir string
 	Config        string
 	NoMouse       bool
 	NoColor       bool          // --no-color: forces monochrome output regardless of env/config.
