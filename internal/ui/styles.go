@@ -45,10 +45,13 @@ func ThemeColor(spec string) lipgloss.TerminalColor {
 }
 
 // Theme color slots used by inline lipgloss.Color(ColorX) calls throughout
-// the codebase. Overwritten by applyNoColorTheme (blanked) and by the
-// color branch of ApplyTheme (restored to defaults). They stay as package
-// variables so code that already references them keeps compiling
-// unchanged.
+// the codebase. ApplyTheme rewrites them from the active theme so inline
+// call sites track theme changes; applyNoColorTheme blanks them so inline
+// foreground calls resolve to NoColor{}. They stay as package variables
+// so code that already references them keeps compiling unchanged.
+//
+// Initial values are the Tokyonight Storm defaults so any early call site
+// that fires before ApplyTheme still emits a valid color.
 var (
 	ColorPrimary    = defaultColorPrimary
 	ColorSecondary  = defaultColorSecondary

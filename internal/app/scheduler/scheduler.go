@@ -30,6 +30,7 @@ func (r SubmitReq) Sig() Sig {
 	return Sig{
 		KubeContext: r.KubeContext,
 		Kind:        r.Kind,
+		Name:        r.Name,
 		Target:      r.Target,
 		Gen:         r.Gen,
 	}
