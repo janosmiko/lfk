@@ -199,7 +199,7 @@ func (m Model) loadSecurityAffectedResources(forPreview bool) tea.Cmd {
 	if m.securityManager == nil || m.client == nil {
 		return nil
 	}
-	if m.nav.ResourceType.APIGroup != "_security" {
+	if m.nav.ResourceType.APIGroup != model.SecurityVirtualAPIGroup {
 		return nil
 	}
 	groupKey := m.securityActiveGroup

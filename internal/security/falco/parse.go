@@ -182,8 +182,11 @@ func extractRefFromOutputFields(fields map[string]any) security.ResourceRef {
 	} else if name := str("k8s.statefulset.name"); name != "" && name != "<NA>" {
 		ref.Kind = "StatefulSet"
 		ref.Name = name
-	} else if name := str("k8s.rc.name"); name != "" && name != "<NA>" {
+	} else if name := str("k8s.rs.name"); name != "" && name != "<NA>" {
 		ref.Kind = "ReplicaSet"
+		ref.Name = name
+	} else if name := str("k8s.rc.name"); name != "" && name != "<NA>" {
+		ref.Kind = "ReplicationController"
 		ref.Name = name
 	}
 	return ref

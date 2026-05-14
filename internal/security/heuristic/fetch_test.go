@@ -94,3 +94,41 @@ func TestSourceFetchNilClient(t *testing.T) {
 	require.NoError(t, err)
 	assert.Empty(t, findings)
 }
+
+// TestSourceFetchScansInitAndEphemeralContainers verifies that the
+// heuristic checks run against init and ephemeral containers, not just
+// the main Spec.Containers — privileged init containers were silently
+// invisible to the dashboard before the fix.
+func TestSourceFetchScansInitAndEphemeralContainers(t *testing.T) {
+	priv := corev1.SecurityContext{Privileged: new(true)}
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "pod"},
+		Spec: corev1.PodSpec{
+			InitContainers: []corev1.Container{{
+				Name: "init", Image: "busybox", SecurityContext: &priv,
+			}},
+			Containers: []corev1.Container{{
+				Name: "main", Image: "nginx", SecurityContext: &priv,
+			}},
+			EphemeralContainers: []corev1.EphemeralContainer{{
+				EphemeralContainerCommon: corev1.EphemeralContainerCommon{
+					Name: "debug", Image: "alpine", SecurityContext: &priv,
+				},
+			}},
+		},
+	}
+	client := fake.NewSimpleClientset(pod)
+	s := NewWithClient(client)
+	findings, err := s.Fetch(context.Background(), "", "")
+	require.NoError(t, err)
+
+	containers := map[string]bool{}
+	for _, f := range findings {
+		if f.Labels["check"] == "privileged" {
+			containers[f.Resource.Container] = true
+		}
+	}
+	assert.True(t, containers["init"], "init container must be scanned")
+	assert.True(t, containers["main"], "main container must be scanned")
+	assert.True(t, containers["debug"], "ephemeral container must be scanned")
+}

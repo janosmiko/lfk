@@ -66,10 +66,21 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		if s.ignoredNamespaces[pod.Namespace] {
 			continue
 		}
-		for _, c := range pod.Spec.Containers {
+		runChecks := func(c corev1.Container) {
 			for _, check := range allChecks {
 				findings = append(findings, check(pod, c)...)
 			}
+		}
+		for _, c := range pod.Spec.InitContainers {
+			runChecks(c)
+		}
+		for _, c := range pod.Spec.Containers {
+			runChecks(c)
+		}
+		// EphemeralContainer embeds EphemeralContainerCommon which mirrors
+		// Container's fields. Coerce so the same check signature applies.
+		for _, ec := range pod.Spec.EphemeralContainers {
+			runChecks(corev1.Container(ec.EphemeralContainerCommon))
 		}
 	}
 	return findings, nil

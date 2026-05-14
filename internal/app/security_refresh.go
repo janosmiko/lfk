@@ -46,10 +46,19 @@ func (m *Model) refreshSecuritySources() {
 		}
 	}
 	m.securityManager = mgr
+	// Reuse the kctx resolved above so the cache lookup honours the
+	// current-context fallback. Passing m.nav.Context directly would skip
+	// the cache when nav.Context is unset (first render before nav is
+	// hydrated), which forces a full probe even though the disk cache is
+	// keyed by the real cluster host.
+	resolvedCtx := m.nav.Context
+	if resolvedCtx == "" && m.client != nil {
+		resolvedCtx = m.client.CurrentContext()
+	}
 	// Seed availability from the per-host disk cache so the sidebar
 	// shows real entries immediately on subsequent runs. A nil/empty
 	// result triggers the loader entry until the live probe completes.
-	if cached := loadSecurityAvailabilityCacheForContext(m.client, m.nav.Context); len(cached) > 0 {
+	if cached := loadSecurityAvailabilityCacheForContext(m.client, resolvedCtx); len(cached) > 0 {
 		m.securityAvailabilityByName = cached
 	} else {
 		m.securityAvailabilityByName = make(map[string]bool)
@@ -57,13 +66,9 @@ func (m *Model) refreshSecuritySources() {
 	if m.client != nil {
 		m.client.SetSecurityManager(mgr)
 		if m.securityIgnores != nil {
-			kctx := m.nav.Context
-			if kctx == "" {
-				kctx = m.client.CurrentContext()
-			}
 			m.client.SetIgnoreChecker(&modelIgnoreChecker{
 				state: m.securityIgnores,
-				ctx:   kctx,
+				ctx:   resolvedCtx,
 			})
 		}
 		m.client.SetShowIgnored(m.showSecurityIgnored)

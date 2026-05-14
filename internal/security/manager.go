@@ -269,9 +269,10 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 	sources := m.Sources()
 
 	type sourceResult struct {
-		name     string
-		findings []Finding
-		err      error
+		name        string
+		findings    []Finding
+		err         error
+		unavailable bool // source's IsAvailable returned false; skip status emission
 	}
 	results := make(chan sourceResult, len(sources))
 
@@ -303,7 +304,7 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 				available = ok
 			}
 			if !available {
-				results <- sourceResult{name: s.Name()}
+				results <- sourceResult{name: s.Name(), unavailable: true}
 				return
 			}
 			// Acquire a slot before performing the (potentially expensive)
@@ -329,6 +330,16 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 		Errors: map[string]error{},
 	}
 	for r := range results {
+		// Unavailable sources (IsAvailable said no) emit a SourceStatus
+		// with Available=false so the cache decision sees them as
+		// "no successful fetch happened". Without this they'd fall into
+		// the success branch below and be reported as Available:true
+		// with 0 findings — making anySourceSucceeded return true on a
+		// cluster with zero installed security tools.
+		if r.unavailable {
+			res.Sources = append(res.Sources, SourceStatus{Name: r.name})
+			continue
+		}
 		if r.err != nil {
 			res.Errors[r.name] = r.err
 			res.Sources = append(res.Sources, SourceStatus{Name: r.name, LastError: r.err})
@@ -340,11 +351,18 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 		})
 	}
 
-	// Apply global namespace filter.
-	if len(m.ignoredNamespaces) > 0 {
-		filtered := res.Findings[:0]
+	// Apply global namespace filter. Snapshot the map under RLock so a
+	// concurrent SetIgnoredNamespaces can't race with the read. Build the
+	// filtered slice into a fresh backing array; an in-place `Findings[:0]`
+	// trick aliases the backing memory that future cache hits return to
+	// callers, which we'd then overwrite from the next FetchAll's append.
+	m.mu.RLock()
+	ignored := m.ignoredNamespaces
+	m.mu.RUnlock()
+	if len(ignored) > 0 {
+		filtered := make([]Finding, 0, len(res.Findings))
 		for _, f := range res.Findings {
-			if !m.ignoredNamespaces[f.Resource.Namespace] {
+			if !ignored[f.Resource.Namespace] {
 				filtered = append(filtered, f)
 			}
 		}

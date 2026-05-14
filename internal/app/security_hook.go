@@ -8,6 +8,7 @@
 package app
 
 import (
+	"maps"
 	"sync"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -22,20 +23,34 @@ var (
 
 // setSecurityHookState publishes the currently-active manager and
 // availability map so SecuritySourcesFn reads them on the next render.
-// Safe to call from any goroutine. Pass nil to clear.
+// Safe to call from any goroutine. Pass nil to clear. The availability
+// map is cloned so the caller's later mutations (e.g., Model's
+// maps.Copy into the same map after a probe result lands) can't be
+// observed by hook readers outside the lock.
 func setSecurityHookState(mgr *security.Manager, avail map[string]bool) {
+	var clone map[string]bool
+	if avail != nil {
+		clone = make(map[string]bool, len(avail))
+		maps.Copy(clone, avail)
+	}
 	securityHookMu.Lock()
 	defer securityHookMu.Unlock()
 	securityHookManager = mgr
-	securityHookAvailability = avail
+	securityHookAvailability = clone
 }
 
 // currentSecurityHookState returns a snapshot of the current hook state.
-// Callers must not mutate the returned map.
+// The availability map is cloned so a caller that mutates the result
+// can't corrupt later reads.
 func currentSecurityHookState() (*security.Manager, map[string]bool) {
 	securityHookMu.RLock()
 	defer securityHookMu.RUnlock()
-	return securityHookManager, securityHookAvailability
+	if securityHookAvailability == nil {
+		return securityHookManager, nil
+	}
+	clone := make(map[string]bool, len(securityHookAvailability))
+	maps.Copy(clone, securityHookAvailability)
+	return securityHookManager, clone
 }
 
 // installSecuritySourcesHook wires model.SecuritySourcesFn to read from the

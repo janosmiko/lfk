@@ -88,11 +88,17 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 	}
 
 	// ClusterPolicyReports (cluster-scoped, only when namespace is empty).
+	// Only NotFound (CRD not installed) is non-fatal — anything else
+	// (RBAC denial, API server timeout, transport error) must surface so
+	// the caller can mark this source as errored instead of silently
+	// returning the partial namespaced result.
 	if namespace == "" {
 		cprList, err := security.ListPaginated(ctx, s.client.Resource(ClusterPolicyReportGVR))
 		if err != nil {
-			// ClusterPolicyReport CRD may not exist — non-fatal.
-			return findings, nil //nolint:nilerr // optional CRD, not an error
+			if apierrors.IsNotFound(err) {
+				return findings, nil
+			}
+			return findings, fmt.Errorf("list cluster policy reports: %w", err)
 		}
 		for i := range cprList.Items {
 			findings = append(findings, parsePolicyReport(&cprList.Items[i])...)

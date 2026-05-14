@@ -465,3 +465,69 @@ func TestManagerFetchAllFallsBackToProbeWhenNoHint(t *testing.T) {
 	assert.Equal(t, int32(1), s.AvailCalls.Load(),
 		"no hint → IsAvailable must run as before")
 }
+
+// TestManagerUnavailableSourceReportsAvailableFalse guards the fix for
+// the cache-decision bug: sources whose IsAvailable returns false were
+// previously reported with Available:true in res.Sources, which made
+// anySourceSucceeded return true on a cluster with zero installed
+// security tools and skipped the negative cache.
+func TestManagerUnavailableSourceReportsAvailableFalse(t *testing.T) {
+	m := NewManager()
+	m.SetRefreshTTL(1 * time.Hour)
+	m.SetErrorTTL(50 * time.Millisecond)
+	notInstalled := &FakeSource{NameStr: "trivy", Available: false}
+	m.Register(notInstalled)
+
+	res, err := m.FetchAll(context.Background(), "ctx", "")
+	require.NoError(t, err)
+	require.Len(t, res.Sources, 1)
+	assert.False(t, res.Sources[0].Available,
+		"unavailable source must report Available=false")
+}
+
+// TestManagerErroringSourceUsesNegativeCache verifies that a cluster
+// with installed-but-erroring sources falls into the errorTTL window
+// rather than the refreshTTL window — without this the throttling
+// spiral fix is undone for sources that are Available but throwing.
+func TestManagerErroringSourceUsesNegativeCache(t *testing.T) {
+	m := NewManager()
+	m.SetRefreshTTL(1 * time.Hour)
+	m.SetErrorTTL(40 * time.Millisecond)
+	bad := &FakeSource{NameStr: "s", Available: true, FetchErr: errors.New("boom")}
+	m.Register(bad)
+
+	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	require.Equal(t, int32(1), bad.FetchCalls.Load())
+
+	time.Sleep(60 * time.Millisecond)
+	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	assert.Equal(t, int32(2), bad.FetchCalls.Load(),
+		"errored source must re-fire after errorTTL")
+}
+
+// TestManagerIgnoredNamespacesFilterDoesNotAliasCachedSlice guards the
+// fix for the in-place namespace-filter aliasing bug. The old code did
+// `filtered := res.Findings[:0]` which reused the backing array; the
+// next FetchAll then appended into the same array and corrupted any
+// caller still iterating the prior cache hit.
+func TestManagerIgnoredNamespacesFilterDoesNotAliasCachedSlice(t *testing.T) {
+	m := NewManager()
+	m.SetIgnoredNamespaces([]string{"kube-system"})
+	s := &FakeSource{
+		NameStr: "s", Available: true,
+		Findings: []Finding{
+			{ID: "1", Source: "s", Resource: ResourceRef{Namespace: "kube-system"}},
+			{ID: "2", Source: "s", Resource: ResourceRef{Namespace: "default"}},
+		},
+	}
+	m.Register(s)
+
+	res, err := m.FetchAll(context.Background(), "ctx", "")
+	require.NoError(t, err)
+	require.Len(t, res.Findings, 1)
+	// Mutating the returned slice must not corrupt the cached one.
+	res.Findings = append(res.Findings, Finding{ID: "tamper"})
+	cached, _ := m.FetchAll(context.Background(), "ctx", "")
+	require.Len(t, cached.Findings, 1, "cache must be insulated from caller mutation")
+	assert.NotEqual(t, "tamper", cached.Findings[0].ID)
+}

@@ -149,6 +149,34 @@ func TestParseLogLineInvalidJSON(t *testing.T) {
 	assert.Nil(t, parseLogLine([]byte(`{"some":"info log"}`), ""))
 }
 
+// TestExtractRefFromOutputFieldsWorkloadKinds locks in the kind mapping
+// for the Falco output_fields used to identify the owning workload.
+// Pre-fix, k8s.rc.name (ReplicationController) was incorrectly mapped
+// to Kind=ReplicaSet, and k8s.rs.name (ReplicaSet) had no handler at all.
+func TestExtractRefFromOutputFieldsWorkloadKinds(t *testing.T) {
+	cases := []struct {
+		field string
+		kind  string
+	}{
+		{"k8s.deployment.name", "Deployment"},
+		{"k8s.daemonset.name", "DaemonSet"},
+		{"k8s.statefulset.name", "StatefulSet"},
+		{"k8s.rs.name", "ReplicaSet"},
+		{"k8s.rc.name", "ReplicationController"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.field, func(t *testing.T) {
+			ref := extractRefFromOutputFields(map[string]any{
+				"k8s.ns.name": "prod",
+				tc.field:      "x",
+			})
+			assert.Equal(t, tc.kind, ref.Kind)
+			assert.Equal(t, "x", ref.Name)
+			assert.Equal(t, "prod", ref.Namespace)
+		})
+	}
+}
+
 func TestFetchWithFakeClient(t *testing.T) {
 	ev := &corev1.Event{
 		ObjectMeta: metav1.ObjectMeta{

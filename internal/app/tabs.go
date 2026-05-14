@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -64,18 +63,6 @@ func (m *Model) selectedResourceKind() string {
 		return "Container"
 	}
 	return ""
-}
-
-// isVirtualResourceKind reports whether kind is a synthetic Kind that does
-// not map to a real Kubernetes resource — port-forward rows, capture rows,
-// and security finding rows. Direct actions like Logs/Edit/Describe/Delete/Scale
-// must no-op for these to avoid dispatching kubectl with a bogus type.
-func isVirtualResourceKind(kind string) bool {
-	return kind == "" ||
-		kind == "__port_forwards__" ||
-		kind == "__port_forward_entry__" ||
-		kind == "__captures__" ||
-		strings.HasPrefix(kind, "__security_")
 }
 
 // effectiveNamespace returns the namespace to use for API calls.
@@ -526,16 +513,7 @@ func (m *Model) saveCurrentTab() {
 	t.explainCursor = m.explainCursor
 	t.explainScroll = m.explainScroll
 	t.explainSearchQuery = m.explainSearchQuery
-	// Per-tab security state. The map shares its underlying storage
-	// with m.securityAvailabilityByName via the pointer copy — that's
-	// fine because mutations go through maps.Copy on a fresh map in
-	// updateSecurityAvailabilityLoaded; if that ever changes, this
-	// assignment must deep-copy too.
-	t.securityManager = m.securityManager
-	t.securityAvailabilityByName = m.securityAvailabilityByName
-	t.securityIndex = m.securityIndex
-	t.securityActiveGroup = m.securityActiveGroup
-	t.showSecurityIgnored = m.showSecurityIgnored
+	m.saveSecurityStateToTab(t)
 }
 
 // loadTab restores Model fields from the given tab index.
@@ -650,27 +628,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.explainCursor = t.explainCursor
 	m.explainScroll = t.explainScroll
 	m.explainSearchQuery = t.explainSearchQuery
-	// Restore per-tab security state and re-publish the global hook
-	// state so the next sidebar render reflects this tab's cluster
-	// (rather than whatever tab was active when refreshSecuritySources
-	// last wrote to setSecurityHookState).
-	m.securityManager = t.securityManager
-	m.securityAvailabilityByName = t.securityAvailabilityByName
-	m.securityIndex = t.securityIndex
-	m.securityActiveGroup = t.securityActiveGroup
-	m.showSecurityIgnored = t.showSecurityIgnored
-	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)
-	// Mirror the per-tab toggle on the shared k8s client so an active
-	// fetch sees this tab's preference, not the previous tab's.
-	if m.client != nil {
-		m.client.SetShowIgnored(m.showSecurityIgnored)
-		if m.securityIgnores != nil {
-			m.client.SetIgnoreChecker(&modelIgnoreChecker{
-				state: m.securityIgnores,
-				ctx:   m.nav.Context,
-			})
-		}
-	}
+	m.loadSecurityStateFromTab(&t)
 
 	// Close overlays and reset transient state.
 	m.overlay = overlayNone
@@ -693,6 +651,11 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 		m.tabs[idx].needsLoad = false
 		m.applyPinnedGroups()
 
+		// Rebuild security state for the restored context so the Security
+		// sidebar populates and the on-disk cache is re-read.
+		m.refreshSecuritySources()
+		securityCmd := m.loadSecurityAvailability()
+
 		// Load contexts for the left column breadcrumb.
 		contexts, _ := m.client.GetContexts()
 		resourceTypes := model.BuildSidebarItems(model.SeedResources())
@@ -713,7 +676,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 			m.clearRight()
 			m.setCursor(0)
 			m.loading = true
-			return m.loadResources(false)
+			return tea.Batch(m.loadResources(false), securityCmd)
 		case model.LevelResourceTypes:
 			// At resource types level: left = contexts, middle = resource types.
 			m.leftItemsHistory = nil
@@ -722,11 +685,11 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 			m.itemCache[m.navKey()] = m.middleItems
 			m.clearRight()
 			m.clampCursor()
-			return m.loadPreview()
+			return tea.Batch(m.loadPreview(), securityCmd)
 		default:
 			// Clusters level or unknown: just load contexts.
 			m.loading = true
-			return m.refreshCurrentLevel()
+			return tea.Batch(m.refreshCurrentLevel(), securityCmd)
 		}
 	}
 	return nil
@@ -778,66 +741,18 @@ func (m *Model) cloneCurrentTab() TabState {
 		logVisualType:          'V',
 		logVisualCol:           0,
 		logVisualCurCol:        0,
-		// New tabs inherit the active tab's security state because they
-		// start on the same cluster; navigateChildCluster will rebuild
-		// them via refreshSecuritySources when the user picks a
-		// different context.
-		securityManager:            m.securityManager,
-		securityAvailabilityByName: m.securityAvailabilityByName,
-		securityIndex:              m.securityIndex,
-		securityActiveGroup:        m.securityActiveGroup,
-		showSecurityIgnored:        m.showSecurityIgnored,
 	}
+	// New tabs inherit the active tab's security state because they
+	// start on the same cluster; navigateChildCluster will rebuild
+	// them via refreshSecuritySources when the user picks a different
+	// context.
+	m.saveSecurityStateToTab(&newTab)
 	// Deep copy leftItemsHistory.
 	newTab.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))
 	for i, hist := range m.leftItemsHistory {
 		newTab.leftItemsHistory[i] = append([]model.Item(nil), hist...)
 	}
 	return newTab
-}
-
-// copyMapStringInt deep copies a map[string]int.
-func copyMapStringInt(m map[string]int) map[string]int {
-	if m == nil {
-		return make(map[string]int)
-	}
-	c := make(map[string]int, len(m))
-	maps.Copy(c, m)
-	return c
-}
-
-// copyMapStringBool deep copies a map[string]bool.
-func copyMapStringBool(m map[string]bool) map[string]bool {
-	if m == nil {
-		return make(map[string]bool)
-	}
-	c := make(map[string]bool, len(m))
-	maps.Copy(c, m)
-	return c
-}
-
-// copyItemCache deep copies the item cache.
-func copyItemCache(m map[string][]model.Item) map[string][]model.Item {
-	if m == nil {
-		return make(map[string][]model.Item)
-	}
-	c := make(map[string][]model.Item, len(m))
-	for k, v := range m {
-		c[k] = append([]model.Item(nil), v...)
-	}
-	return c
-}
-
-// copyMapStringString returns a shallow copy of a string-to-string map.
-// A nil input yields a non-nil empty map so callers can write into it
-// without a second nil check.
-func copyMapStringString(m map[string]string) map[string]string {
-	if m == nil {
-		return make(map[string]string)
-	}
-	c := make(map[string]string, len(m))
-	maps.Copy(c, m)
-	return c
 }
 
 // actionNamespace returns the namespace to use for action commands.

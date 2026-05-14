@@ -93,11 +93,13 @@ func parsePolicyReport(u *unstructured.Unstructured) []security.Finding {
 		return nil
 	}
 
-	// Skip entire reports created by falcosidekick (common label/annotation).
+	// Skip entire reports created by falcosidekick. Match only on explicit
+	// metadata labels — substring "falco" in the name is too broad and
+	// drops legitimate Kyverno reports whose policy or resource name
+	// happens to contain that token.
 	labels := u.GetLabels()
 	if isFalcoSource(labels["app.kubernetes.io/managed-by"]) ||
-		isFalcoSource(labels["created-by"]) ||
-		strings.Contains(strings.ToLower(u.GetName()), "falco") {
+		isFalcoSource(labels["created-by"]) {
 		return nil
 	}
 

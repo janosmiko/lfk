@@ -6,7 +6,6 @@ import (
 	"bufio"
 	"context"
 	"fmt"
-	"io"
 	"strings"
 
 	corev1 "k8s.io/api/core/v1"
@@ -150,20 +149,36 @@ func (s *Source) fetchFromLogs(ctx context.Context, namespace string) []security
 				continue
 			}
 		}
-		scanner := bufio.NewScanner(stream)
-		for scanner.Scan() {
-			line := scanner.Bytes()
-			for _, f := range parseLogLine(line, namespace) {
-				if !seen[f.ID] {
-					findings = append(findings, f)
-					seen[f.ID] = true
+		// Scope the close to a single iteration via an anonymous func so
+		// defer fires per-pod (not at the end of the whole loop) and
+		// always runs even when Scan() aborts mid-stream on a long line
+		// or a transient I/O error.
+		func() {
+			defer func() { _ = stream.Close() }()
+			scanner := bufio.NewScanner(stream)
+			// Allow individual log lines up to maxScannerLineBytes; the
+			// default 64 KiB cap is small enough that a long JSON event
+			// (rule with deeply nested output_fields) can hit
+			// bufio.ErrTooLong and abort the scan silently.
+			scanner.Buffer(make([]byte, 0, 64*1024), maxScannerLineBytes)
+			for scanner.Scan() {
+				line := scanner.Bytes()
+				for _, f := range parseLogLine(line, namespace) {
+					if !seen[f.ID] {
+						findings = append(findings, f)
+						seen[f.ID] = true
+					}
 				}
 			}
-		}
-		_ = stream.(io.Closer).Close()
+		}()
 	}
 	return findings
 }
+
+// maxScannerLineBytes caps an individual log line read by the bufio
+// scanner. 1 MiB is well above any realistic Falco JSON alert but still
+// bounded so a malformed never-ending line cannot exhaust memory.
+const maxScannerLineBytes = 1 << 20
 
 // fetchFromEvents reads Falco alerts from Kubernetes Events.
 func (s *Source) fetchFromEvents(ctx context.Context, namespace string) ([]security.Finding, error) {

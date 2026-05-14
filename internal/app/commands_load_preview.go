@@ -150,7 +150,7 @@ func (m Model) loadPreviewResources() tea.Cmd {
 	if m.nav.ResourceType.Kind == "__port_forwards__" || m.nav.ResourceType.Kind == "__captures__" {
 		return nil
 	}
-	if m.nav.ResourceType.APIGroup == "_security" {
+	if m.nav.ResourceType.APIGroup == model.SecurityVirtualAPIGroup {
 		if cmd := m.loadSecurityAffectedResources(true); cmd != nil {
 			return cmd
 		}
