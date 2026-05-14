@@ -30,16 +30,16 @@ func (f CopyFormat) Label() string {
 }
 
 // ShortcutKey returns the single-letter shortcut that selects this
-// format directly from the picker. JSON deliberately returns "" — the
-// natural shortcut would be "j", but the picker key router consumes
-// "j" for cursor-down navigation, so users apply JSON via Enter on
-// its row (or navigate to it and press Enter). Returning "" here is
-// the single source of truth: the picker view shows no [j] chip and
-// the key router skips JSON in its shortcut loop.
+// format directly from the picker. JSON uses uppercase "J" because
+// lowercase "j" is reserved for cursor-down navigation in the picker
+// (and globally); the chip-in-picker behaviour stays consistent with
+// YAML and Table so every row advertises a shortcut.
 func (f CopyFormat) ShortcutKey() string {
 	switch f {
 	case CopyFormatYAML:
 		return "y"
+	case CopyFormatJSON:
+		return "J"
 	case CopyFormatTable:
 		return "t"
 	}

@@ -133,7 +133,7 @@ func (m Model) overlayHintBarSelector() string {
 	case overlayCopyFormat:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "navigate"},
-			{Key: "y/t", Desc: "shortcut"},
+			{Key: "y/J/t", Desc: "shortcut"},
 			{Key: "enter", Desc: "apply"},
 			{Key: "esc", Desc: "cancel"},
 		})

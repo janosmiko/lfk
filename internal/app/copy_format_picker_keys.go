@@ -5,12 +5,11 @@ import (
 )
 
 // handleCopyFormatPickerKey routes key events to the active copy-as
-// picker. j/k/down/up cycle the cursor; enter applies the cursor row;
-// esc/q cancel; lowercase letter shortcuts apply the matching format
-// directly. The letter `j` is reserved for cursor-down navigation
-// (cursor movement wins over the shadow JSON shortcut), so JSON must
-// be applied via Enter or by typing the up arrow / k to navigate up
-// to its row.
+// picker. j/k/down/up cycle the cursor (j/k stays consistent with
+// the global navigation aliases); enter applies the cursor row;
+// esc/q cancel; letter shortcuts apply the matching format directly.
+// JSON's shortcut is uppercase "J" so it doesn't collide with the
+// lowercase "j" cursor-down alias.
 func (m Model) handleCopyFormatPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc", "q":
@@ -26,8 +25,7 @@ func (m Model) handleCopyFormatPickerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.applyCopyFormatPicker()
 	}
 	// Letter shortcuts: apply the matching format directly. Formats
-	// that return an empty ShortcutKey (today: JSON, which would
-	// otherwise collide with cursor-down) are skipped.
+	// that return an empty ShortcutKey are skipped.
 	pressed := msg.String()
 	for i, f := range m.copyFormatPicker.formats {
 		key := f.ShortcutKey()

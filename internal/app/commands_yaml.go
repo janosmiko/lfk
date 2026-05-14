@@ -36,17 +36,16 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 			}
 			return func() tea.Msg {
 				docs := make([]string, 0, len(targets))
+				var failures []string
 				for _, t := range targets {
 					content, err := m.client.GetResourceYAML(context.Background(), kctx, t.ns, rt, t.name)
 					if err != nil {
-						return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", t.ns, t.name, err)}
+						failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+						continue
 					}
 					docs = append(docs, strings.TrimRight(content, "\n"))
 				}
-				return yamlClipboardMsg{
-					content: strings.Join(docs, "\n---\n") + "\n",
-					count:   len(docs),
-				}
+				return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
 			}
 		}
 		sel := m.selectedMiddleItem()
@@ -91,6 +90,7 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 			}
 			return func() tea.Msg {
 				docs := make([]string, 0, len(targets))
+				var failures []string
 				for _, t := range targets {
 					var (
 						content string
@@ -105,14 +105,12 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 						err = fmt.Errorf("unknown resource type: %s", t.kind)
 					}
 					if err != nil {
-						return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", t.ns, t.name, err)}
+						failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+						continue
 					}
 					docs = append(docs, strings.TrimRight(content, "\n"))
 				}
-				return yamlClipboardMsg{
-					content: strings.Join(docs, "\n---\n") + "\n",
-					count:   len(docs),
-				}
+				return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
 			}
 		}
 		sel := m.selectedMiddleItem()
@@ -178,6 +176,16 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 // the snapshot captured at picker-open time. Returns nil for an empty
 // scope at any level. LevelContainers extracts each container spec
 // block from the Pod YAML.
+//
+// Bulk paths are resilient to per-item failures: if some of the N
+// requested fetches fail (RBAC, 404 on a row that was just deleted by
+// a controller, transient network blip), the successes are still
+// concatenated and copied. The per-item errors are joined into the
+// returned yamlClipboardMsg.err so updateYamlClipboard can surface
+// them — but only after the successful payload has been recorded so
+// the user gets a partial copy rather than an empty clipboard.
+// Without this every "select N → Y" interaction was all-or-nothing,
+// turning a single broken row into "nothing copied" across the batch.
 func (m Model) copyYAMLForScope(scope []model.Item) tea.Cmd {
 	if len(scope) == 0 {
 		return nil
@@ -201,17 +209,16 @@ func (m Model) copyYAMLForScope(scope []model.Item) tea.Cmd {
 		}
 		return func() tea.Msg {
 			docs := make([]string, 0, len(targets))
+			var failures []string
 			for _, t := range targets {
 				content, err := m.client.GetResourceYAML(context.Background(), kctx, t.ns, rt, t.name)
 				if err != nil {
-					return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", t.ns, t.name, err)}
+					failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+					continue
 				}
 				docs = append(docs, strings.TrimRight(content, "\n"))
 			}
-			return yamlClipboardMsg{
-				content: strings.Join(docs, "\n---\n") + "\n",
-				count:   len(docs),
-			}
+			return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
 		}
 	case model.LevelOwned:
 		type fetchTarget struct {
@@ -235,6 +242,7 @@ func (m Model) copyYAMLForScope(scope []model.Item) tea.Cmd {
 		}
 		return func() tea.Msg {
 			docs := make([]string, 0, len(targets))
+			var failures []string
 			for _, t := range targets {
 				var (
 					content string
@@ -249,14 +257,12 @@ func (m Model) copyYAMLForScope(scope []model.Item) tea.Cmd {
 					err = fmt.Errorf("unknown resource type: %s", t.kind)
 				}
 				if err != nil {
-					return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", t.ns, t.name, err)}
+					failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+					continue
 				}
 				docs = append(docs, strings.TrimRight(content, "\n"))
 			}
-			return yamlClipboardMsg{
-				content: strings.Join(docs, "\n---\n") + "\n",
-				count:   len(docs),
-			}
+			return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
 		}
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
@@ -277,6 +283,40 @@ func (m Model) copyYAMLForScope(scope []model.Item) tea.Cmd {
 		}
 	}
 	return nil
+}
+
+// buildBulkYAMLClipboardMsg assembles a yamlClipboardMsg for a bulk-fetch
+// path with per-item failure tolerance. docs holds the successful YAML
+// payloads (joined with the standard \n---\n multi-doc separator);
+// failures carries the "<ns>/<name>: <err>" lines for each fetch that
+// errored out. total is the original target count.
+//
+// Behavior:
+//   - All N succeeded → success message (count == N, no err).
+//   - All N failed → error-only message (no content, single err with
+//     every failure joined).
+//   - Mixed → partial-success message: content is the successes,
+//     count is len(docs), err is the joined failures so the status
+//     line can render "copied K/N, M failed: ...".
+//
+// Without this, every per-item failure aborts the batch and leaves the
+// clipboard untouched — which made "select N → Y → YAML" look broken
+// whenever a single row (e.g. a 404 from a controller-driven delete
+// racing the fetch, or an RBAC gap on one item) tripped the loop.
+func buildBulkYAMLClipboardMsg(docs, failures []string, total int) yamlClipboardMsg {
+	if len(docs) == 0 {
+		return yamlClipboardMsg{
+			err: fmt.Errorf("all %d fetches failed: %s", total, strings.Join(failures, "; ")),
+		}
+	}
+	msg := yamlClipboardMsg{
+		content: strings.Join(docs, "\n---\n") + "\n",
+		count:   len(docs),
+	}
+	if len(failures) > 0 {
+		msg.err = fmt.Errorf("copied %d/%d, %d failed: %s", len(docs), total, len(failures), strings.Join(failures, "; "))
+	}
+	return msg
 }
 
 // exportResourceToFile saves the selected resource YAML to a file.
