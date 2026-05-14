@@ -53,7 +53,7 @@ func TestRenderSecretEditor_CursorRowNoSelectedBgWhileEditing(t *testing.T) {
 
 	secret := &model.SecretData{
 		Keys: []string{"DB_PASSWORD"},
-		Data: map[string]string{"DB_PASSWORD": "hunter2"},
+		Data: map[string]string{"DB_PASSWORD": "<redacted>"},
 	}
 
 	// Render with editing=true, cursor parked in the middle of the
@@ -62,7 +62,7 @@ func TestRenderSecretEditor_CursorRowNoSelectedBgWhileEditing(t *testing.T) {
 		secret, 0, nil, true,
 		true,
 		"DB_PASSWORD", 11,
-		"hunter2", 3,
+		"<redacted>", 3,
 		1, "", false,
 		nil, false, 0, 0,
 		120, 30,
@@ -106,7 +106,7 @@ func TestRenderSecretEditor_CursorRowKeepsSelectedBgWhenIdle(t *testing.T) {
 
 	secret := &model.SecretData{
 		Keys: []string{"DB_PASSWORD"},
-		Data: map[string]string{"DB_PASSWORD": "hunter2"},
+		Data: map[string]string{"DB_PASSWORD": "<redacted>"},
 	}
 
 	idle := RenderSecretEditorOverlay(
