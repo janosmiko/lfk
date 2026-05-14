@@ -187,45 +187,39 @@ func renderSecretEditorTable(
 	selectedKeys map[string]bool, // keys marked with `s` for batch copy; nil = none
 	width, height int,
 ) string {
-	// +2 for the "✓ " / "  " selection-indicator prefix every key
-	// row carries — without this the key text gets truncated even
-	// when the underlying name fits, because the prefix steals two
-	// of the column's visible chars.
-	keyColW := computeKeyColumnWidth(secret.Keys, width, 3) + 2
-	// Width budget left after the key column: subtract column divider
-	// + 2*2 padding cells per column = ~5 chars of table chrome.
-	valColW := max(width-keyColW-5, 8)
+	keyColW := computeKeyColumnWidth(secret.Keys, width, 3)
+	// Width budget left after the selection + key columns: subtract
+	// the two column dividers + 3 * 2 cell-padding pairs (sel, key,
+	// value) = the table chrome the renderer consumes.
+	valColW := max(width-kvSelColumnW-keyColW-8, 8)
 
 	bodyHeight := max(height-2, 1) // -1 header, -1 header underline
 	start := scrollWindowStart(selectedIdx, bodyHeight, len(secret.Keys))
 	end := min(start+bodyHeight, len(secret.Keys))
 
-	t := newKVEditorTable(keyColW, valColW, selectedIdx-start)
+	t := newKVEditorTable(keyColW, valColW, selectedIdx-start, editing)
 	for i := start; i < end; i++ {
 		k := secret.Keys[i]
 		v := secret.Data[k]
-		// All key cells carry a 2-char prefix slot ("  " unselected,
-		// "✓ " selected) so column alignment stays stable when the
-		// user toggles selection or enters/exits edit mode. Without
-		// this the cursor row's key text would shift left by 2
-		// columns the moment editing started.
-		prefix := "  "
-		if selectedKeys[k] {
-			prefix = "✓ "
-		}
+		// Selection cell lives in its own column now — the leading
+		// "  " / "✓ " prefix that used to ride inside the KEY cell
+		// shifted every key two columns to the right whether or not
+		// the row was actually selected. With a dedicated column the
+		// KEY cell starts flush against its own padding.
+		selCell := kvSelectionCell(selectedKeys[k])
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = prefix + overlayCursor(editKey, editKeyCursor, true, keyColW-2)
+			keyText = overlayCursor(editKey, editKeyCursor, true, keyColW)
 			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
-			keyText = prefix + SingleLineCell(editKey, keyColW-2)
+			keyText = SingleLineCell(editKey, keyColW)
 			valText = overlayCursor(editValue, editValueCursor, true, valColW)
 		default:
-			keyText = prefix + SingleLineCell(k, keyColW-2)
+			keyText = SingleLineCell(k, keyColW)
 			valText = secretValueDisplay(v, revealedKeys[k] || allRevealed, valColW)
 		}
-		t.Row(keyText, valText)
+		t.Row(selCell, keyText, valText)
 	}
 	rendered := t.Render()
 	if len(secret.Keys) == 0 {

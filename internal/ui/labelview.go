@@ -152,38 +152,34 @@ func RenderLabelEditorOverlay(
 }
 
 func renderLabelEditorTable(keys []string, data map[string]string, selectedIdx int, editing bool, editKey string, editKeyCursor int, editValue string, editValueCursor int, editColumn int, selectedKeys map[string]bool, width, height int) string {
-	// +2 budgets for the "✓ " / "  " selection-indicator prefix.
-	keyColW := computeKeyColumnWidth(keys, width, 2) + 2
-	valColW := max(width-keyColW-5, 8)
+	keyColW := computeKeyColumnWidth(keys, width, 2)
+	valColW := max(width-kvSelColumnW-keyColW-8, 8)
 
 	bodyHeight := max(height-2, 1)
 	start := scrollWindowStart(selectedIdx, bodyHeight, len(keys))
 	end := min(start+bodyHeight, len(keys))
 
-	t := newKVEditorTable(keyColW, valColW, selectedIdx-start)
+	t := newKVEditorTable(keyColW, valColW, selectedIdx-start, editing)
 	for i := start; i < end; i++ {
 		k := keys[i]
 		v := data[k]
 
-		// Consistent 2-char prefix across all rows (including editing)
-		// so column alignment stays stable. See secretview.
-		prefix := "  "
-		if selectedKeys[k] {
-			prefix = "\u2713 "
-		}
+		// Selection mark lives in its own leading column \u2014 see
+		// secretview for the rationale on dropping the in-cell prefix.
+		selCell := kvSelectionCell(selectedKeys[k])
 		var keyText, valText string
 		switch {
 		case i == selectedIdx && editing && editColumn == 0:
-			keyText = prefix + overlayCursor(editKey, editKeyCursor, true, keyColW-2)
+			keyText = overlayCursor(editKey, editKeyCursor, true, keyColW)
 			valText = SingleLineCell(editValue, valColW)
 		case i == selectedIdx && editing && editColumn == 1:
-			keyText = prefix + SingleLineCell(editKey, keyColW-2)
+			keyText = SingleLineCell(editKey, keyColW)
 			valText = overlayCursor(editValue, editValueCursor, true, valColW)
 		default:
-			keyText = prefix + SingleLineCell(k, keyColW-2)
+			keyText = SingleLineCell(k, keyColW)
 			valText = SingleLineCell(v, valColW)
 		}
-		t.Row(keyText, valText)
+		t.Row(selCell, keyText, valText)
 	}
 	rendered := t.Render()
 	if len(keys) == 0 {

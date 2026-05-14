@@ -474,14 +474,37 @@ func scrollWindowStart(cursor, windowH, total int) int {
 	return start
 }
 
+// kvSelColumnW is the visible width (without padding) of the leading
+// "selection marker" column shared by every K/V editor. Wide enough
+// for the "✓" glyph plus no trailing space; lipgloss/table's per-cell
+// padding (1,1) supplies the gap to the KEY column on either side.
+const kvSelColumnW = 1
+
 // newKVEditorTable builds a lipgloss/table configured for the K/V
-// editor look: vertical column divider only, header underline, theme-
-// aware bg, and per-row styling that highlights the cursor row.
+// editor look: leading selection column, KEY, VALUE — with vertical
+// dividers between cells, header underline, theme-aware bg, and per-
+// row styling that highlights the cursor row.
+//
+// The selection column is the first column so the "✓" lands in a cell
+// of its own instead of being prefixed onto the KEY value (which used
+// to shift every row's key text two columns to the right whether or
+// not the row was actually selected).
 //
 // cursorRow is the body-row index (0-based; lipgloss/table's HeaderRow
 // is the constant -1) of the cursor. Pass -1 when no row is the cursor
 // (e.g. an empty table that's only showing headers + a placeholder).
-func newKVEditorTable(keyColW, valColW, cursorRow int) *table.Table {
+//
+// editing toggles off the SelectedBg highlight on the cursor row when
+// the user is actively editing an inline cell. The cursor character
+// itself renders as reverse-video at the byte offset (see
+// overlayCursor); its embedded \x1b[7m / \x1b[0m SGR pair breaks the
+// continuity of any background the table wraps around the cell, so
+// the row's SelectedBg ends up visible BEFORE the cursor and missing
+// AFTER it — the user-reported "background is different before and
+// after the cursor" symptom. Dropping the row's SelectedBg during
+// edit mode lets the cursor's own reverse-video pair carry the
+// visual indicator without competing with an outer bg.
+func newKVEditorTable(keyColW, valColW, cursorRow int, editing bool) *table.Table {
 	return table.New().
 		Border(lipgloss.NormalBorder()).
 		BorderRow(false).
@@ -493,16 +516,21 @@ func newKVEditorTable(keyColW, valColW, cursorRow int) *table.Table {
 		BorderStyle(lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorBorder)).
 			Background(BaseBg)).
-		Headers("KEY", "VALUE").
+		Headers("", "KEY", "VALUE").
 		StyleFunc(func(row, col int) lipgloss.Style {
 			// Padding eats text space; widen the cell by the padding
 			// budget (1 + 1 = 2) so the row-data Truncate's full
-			// keyColW / valColW characters can land inside without
-			// wrapping into a second visual line.
+			// content can land inside without wrapping into a second
+			// visual line.
 			base := lipgloss.NewStyle().Padding(0, 1).Background(BaseBg)
-			cellW := valColW + 2
-			if col == 0 {
+			var cellW int
+			switch col {
+			case 0:
+				cellW = kvSelColumnW + 2
+			case 1:
 				cellW = keyColW + 2
+			default:
+				cellW = valColW + 2
 			}
 			base = base.Width(cellW)
 			switch {
@@ -511,15 +539,40 @@ func newKVEditorTable(keyColW, valColW, cursorRow int) *table.Table {
 					Foreground(lipgloss.Color(ColorPrimary)).
 					Bold(true).
 					Underline(true)
+			case row == cursorRow && editing:
+				// Editing the cursor row: drop the SelectedBg so the
+				// cursor's reverse-video glyph isn't fighting an outer
+				// background that won't survive its embedded SGR reset.
+				// Bold + Primary keeps the row visually distinct from
+				// idle rows.
+				return base.
+					Foreground(lipgloss.Color(ColorPrimary)).
+					Bold(true)
 			case row == cursorRow:
 				return base.
 					Foreground(lipgloss.Color(ColorSelectedFg)).
 					Background(lipgloss.Color(ColorSelectedBg)).
 					Bold(true)
 			case col == 0:
+				// Selection mark cell: emphasised when set, dimmed
+				// otherwise so the column doesn't read as visual noise
+				// on rows the user hasn't marked.
+				return base.Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
+			case col == 1:
 				return base.Foreground(lipgloss.Color(ColorSecondary)).Bold(true)
 			default:
 				return base.Foreground(lipgloss.Color(ColorDimmed))
 			}
 		})
+}
+
+// kvSelectionCell returns the rendered content for the leading
+// selection-marker column. Returns the checkmark glyph for selected
+// rows and an empty string for unselected ones — lipgloss/table pads
+// the cell to kvSelColumnW so column alignment stays stable either way.
+func kvSelectionCell(selected bool) string {
+	if selected {
+		return "✓"
+	}
+	return ""
 }

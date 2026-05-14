@@ -120,13 +120,23 @@ func TestApplyTheme(t *testing.T) {
 // regardless of which theme was loaded — inline lipgloss.Color(ColorPrimary)
 // call sites (e.g. the detail-pane key style in RenderResourceSummary) showed
 // the default blue even after switching themes.
+//
+// Snapshots ConfigMinContrastRatio + ConfigNoColor + ActiveTheme up front
+// and pins ratio to 0 so ApplyTheme's EnforceMinContrast pass leaves the
+// hand-picked colors untouched — without this guard a sibling test that
+// raised the ratio would silently drift custom.Primary toward the bg and
+// break our exact-equal assertions.
 func TestApplyTheme_TracksActiveThemeInColorSlots(t *testing.T) {
 	origNoColor := ConfigNoColor
+	origContrast := ConfigMinContrastRatio
+	origTheme := ActiveTheme
 	t.Cleanup(func() {
 		ConfigNoColor = origNoColor
-		ApplyTheme(DefaultTheme())
+		ConfigMinContrastRatio = origContrast
+		ApplyTheme(origTheme)
 	})
 	ConfigNoColor = false
+	ConfigMinContrastRatio = 0
 
 	custom := Theme{
 		Primary:    "#ff00aa",
