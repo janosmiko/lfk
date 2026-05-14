@@ -68,14 +68,22 @@ func (m Model) updateActionResult(msg actionResultMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateYamlClipboard(msg yamlClipboardMsg) (tea.Model, tea.Cmd) {
-	if msg.err != nil {
+	// Pure-error path (content empty): surface the error and stop.
+	// Partial-success path (content present + err set) falls through to
+	// the copy + status branch so the user gets the partial payload on
+	// the clipboard; buildBulkYAMLClipboardMsg's err already names the
+	// failed items in the "copied K/N, M failed: ..." form.
+	if msg.err != nil && msg.content == "" {
 		m.setErrorFromErr("Error: ", msg.err)
 		return m, scheduleStatusClear()
 	}
 	label, unit := copyFormatStatusParts(msg.format)
-	if msg.count > 1 {
+	switch {
+	case msg.err != nil:
+		m.setErrorFromErr("Warning: ", msg.err)
+	case msg.count > 1:
 		m.setStatusMessage(fmt.Sprintf("Copied %d %s as %s", msg.count, unit, label), false)
-	} else {
+	default:
 		m.setStatusMessage(fmt.Sprintf("%s copied to clipboard", label), false)
 	}
 	return m, tea.Batch(copyToSystemClipboard(msg.content), scheduleStatusClear())
