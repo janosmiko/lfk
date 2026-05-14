@@ -1900,6 +1900,72 @@ func TestUpdateLogHistoryNotInLogMode(t *testing.T) {
 	assert.Nil(t, cmd) // not in log mode, skip
 }
 
+// When the user has navigated to the absolute top (e.g. pressed `gg`),
+// the cursor and scroll must stay at 0 after older history is prepended
+// so the newly revealed lines come into view. Regression for the
+// "gg jumps back down ~1000 lines a second later" bug.
+func TestUpdateLogHistoryAtTopKeepsCursor(t *testing.T) {
+	m := baseModel()
+	m.mode = modeLogs
+	m.logLoadingHistory = true
+	m.logLines = []string{"existing-1", "existing-2", "existing-3"}
+	m.logCursor = 0
+	m.logScroll = 0
+
+	result, _ := m.Update(logHistoryMsg{
+		lines:     []string{"older1", "older2", "existing-1", "existing-2", "existing-3"},
+		prevTotal: 3,
+	})
+	mdl := result.(Model)
+	assert.False(t, mdl.logLoadingHistory)
+	assert.Equal(t, 0, mdl.logCursor, "cursor must remain at top to reveal older lines")
+	assert.Equal(t, 0, mdl.logScroll, "scroll must remain at top to reveal older lines")
+	assert.Equal(t, 5, len(mdl.logLines))
+	assert.Equal(t, "older1", mdl.logLines[0])
+}
+
+// When the user has scrolled away from the top while the async history
+// fetch was in flight, prepending older lines must shift the cursor and
+// scroll by the prepended count to preserve visual position.
+func TestUpdateLogHistoryMidScrollPreservesPosition(t *testing.T) {
+	m := baseModel()
+	m.mode = modeLogs
+	m.logLoadingHistory = true
+	m.logLines = []string{"existing-1", "existing-2", "existing-3"}
+	m.logCursor = 2
+	m.logScroll = 1
+
+	result, _ := m.Update(logHistoryMsg{
+		lines:     []string{"older1", "older2", "existing-1", "existing-2", "existing-3"},
+		prevTotal: 3,
+	})
+	mdl := result.(Model)
+	assert.Equal(t, 4, mdl.logCursor, "cursor shifted by 2 prepended lines")
+	assert.Equal(t, 3, mdl.logScroll, "scroll shifted by 2 prepended lines")
+}
+
+// Same at-top guard applies on the no-overlap fallback path (logs may
+// have rotated between fetches, in which case all fetched lines are
+// prepended).
+func TestUpdateLogHistoryNoOverlapAtTopKeepsCursor(t *testing.T) {
+	m := baseModel()
+	m.mode = modeLogs
+	m.logLoadingHistory = true
+	m.logLines = []string{"current-1", "current-2", "current-3"}
+	m.logCursor = 0
+	m.logScroll = 0
+
+	result, _ := m.Update(logHistoryMsg{
+		lines:     []string{"rotated-1", "rotated-2"}, // no overlap with current
+		prevTotal: 3,
+	})
+	mdl := result.(Model)
+	assert.Equal(t, 0, mdl.logCursor)
+	assert.Equal(t, 0, mdl.logScroll)
+	assert.Equal(t, 5, len(mdl.logLines))
+	assert.Equal(t, "rotated-1", mdl.logLines[0])
+}
+
 // --- logSaveAllMsg ---
 
 func TestUpdateLogSaveAllSuccess(t *testing.T) {
