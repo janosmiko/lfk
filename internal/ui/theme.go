@@ -104,26 +104,32 @@ func ApplyTheme(t Theme) {
 	}
 	// Returning to color mode after no-color was active: restore whatever
 	// profile termenv originally detected (typically TrueColor in a normal
-	// terminal, Ascii when NO_COLOR was set externally) and restore the
-	// Color* theme variables that no-color blanked.
+	// terminal, Ascii when NO_COLOR was set externally) and repopulate the
+	// Color* theme variables from the active theme — inline
+	// lipgloss.Color(ColorX) call sites otherwise stay frozen at the default
+	// Tokyonight palette regardless of which theme is loaded.
+	//
+	// ColorOrange / ColorCyan have no Theme field (they are special-purpose
+	// constants — high-CPU warning amber, freshly-created cyan) and stay at
+	// their compile-time defaults.
 	if originalColorProfileSaved {
 		lipgloss.DefaultRenderer().SetColorProfile(originalColorProfile)
 	}
-	ColorPrimary = defaultColorPrimary
-	ColorSecondary = defaultColorSecondary
-	ColorFile = defaultColorFile
-	ColorSelectedFg = defaultColorSelectedFg
-	ColorSelectedBg = defaultColorSelectedBg
-	ColorBorder = defaultColorBorder
-	ColorDimmed = defaultColorDimmed
-	ColorError = defaultColorError
-	ColorWarning = defaultColorWarning
-	ColorPurple = defaultColorPurple
+	ColorPrimary = t.Primary
+	ColorSecondary = t.Secondary
+	ColorFile = t.Text
+	ColorSelectedFg = t.SelectedFg
+	ColorSelectedBg = t.SelectedBg
+	ColorBorder = t.Border
+	ColorDimmed = t.Dimmed
+	ColorError = t.Error
+	ColorWarning = t.Warning
+	ColorPurple = t.Purple
 	ColorOrange = defaultColorOrange
 	ColorCyan = defaultColorCyan
-	ColorBase = defaultColorBase
-	ColorBarBg = defaultColorBarBg
-	ColorSurface = defaultColorSurface
+	ColorBase = t.Base
+	ColorBarBg = t.BarBg
+	ColorSurface = t.Surface
 	// baseBg is applied to all column/content text styles so the theme
 	// background shows behind text (ANSI resets from inner styled content
 	// would otherwise clear the container background). NoColor when transparent.

@@ -115,6 +115,54 @@ func TestApplyTheme(t *testing.T) {
 	_ = OverlayStyle.Render("test")
 }
 
+// TestApplyTheme_TracksActiveThemeInColorSlots regression-guards a bug where
+// the package-level Color* slots stayed frozen at the Tokyonight defaults
+// regardless of which theme was loaded — inline lipgloss.Color(ColorPrimary)
+// call sites (e.g. the detail-pane key style in RenderResourceSummary) showed
+// the default blue even after switching themes.
+func TestApplyTheme_TracksActiveThemeInColorSlots(t *testing.T) {
+	origNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = origNoColor
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+
+	custom := Theme{
+		Primary:    "#ff00aa",
+		Secondary:  "#00ff11",
+		Text:       "#abcdef",
+		SelectedFg: "#101010",
+		SelectedBg: "#202020",
+		Border:     "#303030",
+		Dimmed:     "#404040",
+		Error:      "#ff1122",
+		Warning:    "#ffaa00",
+		Purple:     "#aa00ff",
+		Base:       "#050505",
+		BarBg:      "#070707",
+		Surface:    "#090909",
+	}
+	ApplyTheme(custom)
+
+	assert.Equal(t, custom.Primary, ColorPrimary)
+	assert.Equal(t, custom.Secondary, ColorSecondary)
+	assert.Equal(t, custom.Text, ColorFile)
+	assert.Equal(t, custom.SelectedFg, ColorSelectedFg)
+	assert.Equal(t, custom.SelectedBg, ColorSelectedBg)
+	assert.Equal(t, custom.Border, ColorBorder)
+	assert.Equal(t, custom.Dimmed, ColorDimmed)
+	assert.Equal(t, custom.Error, ColorError)
+	assert.Equal(t, custom.Warning, ColorWarning)
+	assert.Equal(t, custom.Purple, ColorPurple)
+	assert.Equal(t, custom.Base, ColorBase)
+	assert.Equal(t, custom.BarBg, ColorBarBg)
+	assert.Equal(t, custom.Surface, ColorSurface)
+	// Orange / Cyan are special-purpose constants with no theme slot.
+	assert.Equal(t, defaultColorOrange, ColorOrange)
+	assert.Equal(t, defaultColorCyan, ColorCyan)
+}
+
 func TestColumnsForKind(t *testing.T) {
 	// Save and restore globals after test.
 	origResource := ConfigResourceColumns
