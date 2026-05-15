@@ -7,6 +7,7 @@ import (
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery/cached/disk"
@@ -97,14 +98,18 @@ type Client struct {
 	// metadata-only API so decoded values are lazy-fetched on hover instead
 	// of being pulled up-front. Configured via the secret_lazy_loading
 	// option; off by default so the list behaves like every other resource.
-	secretLazyLoading bool
+	// Accessed concurrently from tea.Cmd goroutines (GetResources et al)
+	// while the startup setter (and any future runtime-reload path) writes
+	// it; an atomic load/store keeps the access race-free without a lock.
+	secretLazyLoading atomic.Bool
 
 	// kubesharkNamespaceOverride is the namespace probed for the kubeshark
-	// hub Service in the Traffic Capture overlay. Empty string means
-	// "use the default" (see capture_backend_kubeshark.go's
+	// hub Service in the Traffic Capture overlay. nil or empty pointer
+	// value means "use the default" (see capture_backend_kubeshark.go's
 	// kubesharkNamespace method). Set once at startup from
-	// ui.ConfigKubesharkNamespace via SetKubesharkNamespace.
-	kubesharkNamespaceOverride string
+	// ui.ConfigKubesharkNamespace via SetKubesharkNamespace. Same
+	// concurrency rationale as secretLazyLoading above.
+	kubesharkNamespaceOverride atomic.Pointer[string]
 
 	// Guarded by discoveryMu; concurrent tea.Cmd goroutines may discover
 	// across different contexts.
@@ -139,17 +144,19 @@ func (c *Client) informerSnapshot() (InformerCacheMode, *informerCache) {
 }
 
 // SetSecretLazyLoading toggles the metadata-only list path for Secrets.
-// Typically called once at startup after loading the config file.
+// Typically called once at startup after loading the config file, but safe
+// to call from any goroutine — the underlying field is atomic.
 func (c *Client) SetSecretLazyLoading(enabled bool) {
-	c.secretLazyLoading = enabled
+	c.secretLazyLoading.Store(enabled)
 }
 
 // SetKubesharkNamespace overrides the namespace probed for Service
 // kubeshark-hub in the Traffic Capture overlay. Empty string keeps the
 // default ("kubeshark"). Typically called once at startup after the
-// config file has been parsed.
+// config file has been parsed, but safe to call from any goroutine —
+// the underlying field is an atomic pointer.
 func (c *Client) SetKubesharkNamespace(ns string) {
-	c.kubesharkNamespaceOverride = ns
+	c.kubesharkNamespaceOverride.Store(&ns)
 }
 
 // SetInformerCacheMode selects how GetResources routes its list requests.

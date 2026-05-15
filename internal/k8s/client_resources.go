@@ -42,7 +42,7 @@ func (c *Client) GetResources(ctx context.Context, contextName, namespace string
 	// behind SetSecretLazyLoading so the default list behaviour stays
 	// consistent with every other resource type; decoded values are then
 	// loaded on hover at LevelResources.
-	if c.secretLazyLoading && rt.APIGroup == "" && rt.Resource == "secrets" {
+	if c.secretLazyLoading.Load() && rt.APIGroup == "" && rt.Resource == "secrets" {
 		return c.listSecretsMetadata(ctx, contextName, namespace, rt)
 	}
 
