@@ -36,12 +36,25 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			nsArg = " -n " + ns
 		}
 
-		// Bulk delete.
+		// Bulk path. Dispatch by pendingAction so Restart and Delete go to
+		// the right command (older code blindly fell through to bulk delete
+		// regardless of pendingAction, which was safe only as long as
+		// Restart never reached this overlay — that changed when we
+		// gated bulk Restart behind a confirm).
 		if m.bulkMode && len(m.bulkItems) > 0 {
 			m.clearSelection()
 			expanded := expandGroupedItems(m.bulkItems)
-			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
-			return m, m.bulkDeleteResources()
+			switch action {
+			case "Restart":
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout restart %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
+				return m, m.bulkRestartResources()
+			default:
+				// Default remains Delete for compatibility with existing
+				// callers that opened overlayConfirm without setting
+				// pendingAction.
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
+				return m, m.bulkDeleteResources()
+			}
 		}
 
 		if action == "Drain" {

@@ -2,6 +2,7 @@ package app
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -540,6 +541,33 @@ func (m Model) openBulkActionDirect(actionLabel string) (tea.Model, tea.Cmd) {
 	return m.executeBulkAction(actionLabel)
 }
 
+// bulkClustersConfirmSuffix returns a parenthetical clause naming each
+// unique source cluster across m.bulkItems, suitable for appending to a
+// confirmation prompt. Returns "" outside union mode — single-cluster
+// confirm prompts stay unchanged. The sorted, deduplicated list keeps
+// the prompt stable across selection orderings.
+func bulkClustersConfirmSuffix(m Model) string {
+	if !m.unionMode {
+		return ""
+	}
+	seen := make(map[string]struct{}, len(m.bulkItems))
+	for _, item := range m.bulkItems {
+		if item.ClusterName == "" {
+			continue
+		}
+		seen[item.ClusterName] = struct{}{}
+	}
+	if len(seen) == 0 {
+		return ""
+	}
+	names := make([]string, 0, len(seen))
+	for name := range seen {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return fmt.Sprintf(" across [%s]", strings.Join(names, ", "))
+}
+
 func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 	if isMutatingAction(actionLabel) {
 		if ctx, ok := m.bulkReadOnlyContext(); ok {
@@ -564,20 +592,21 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 	)
 	m.addLogEntry("DBG", fmt.Sprintf("Bulk action: %s (%d items)", actionLabel, len(m.bulkItems)))
 
+	clustersSuffix := bulkClustersConfirmSuffix(m)
 	switch actionLabel {
 	case "Logs":
 		m.overlay = 0
 		m.bulkMode = false
 		return m.startMultiLogStream(m.bulkItems)
 	case "Delete":
-		m.confirmAction = fmt.Sprintf("%d resources", len(m.bulkItems))
+		m.confirmAction = fmt.Sprintf("%d resources%s", len(m.bulkItems), clustersSuffix)
 		m.overlay = overlayConfirm
 		m.pendingAction = "Delete"
 		return m, nil
 	case "Force Delete":
-		m.confirmAction = fmt.Sprintf("%d resources (FORCE)", len(m.bulkItems))
+		m.confirmAction = fmt.Sprintf("%d resources (FORCE)%s", len(m.bulkItems), clustersSuffix)
 		m.confirmTitle = "Confirm Force Delete"
-		m.confirmQuestion = fmt.Sprintf("Force delete %d resources?", len(m.bulkItems))
+		m.confirmQuestion = fmt.Sprintf("Force delete %d resources%s?", len(m.bulkItems), clustersSuffix)
 		m.confirmTypeInput.Clear()
 		m.overlay = overlayConfirmType
 		m.pendingAction = "Force Delete"
@@ -587,10 +616,13 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.overlay = overlayScaleInput
 		return m, nil
 	case "Restart":
-		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout restart deployment (%d items) -n %s --context %s", len(m.bulkItems), m.actionCtx.namespace, m.actionCtx.context))
-		m.loading = true
-		m.clearSelection()
-		return m, m.bulkRestartResources()
+		// Bulk restart in any mode is destructive enough to warrant a
+		// confirm — and in union mode it can fire rollout restart across
+		// every cluster the selection touches in one keystroke.
+		m.confirmAction = fmt.Sprintf("restart %d resources%s", len(m.bulkItems), clustersSuffix)
+		m.overlay = overlayConfirm
+		m.pendingAction = "Restart"
+		return m, nil
 	case "Labels / Annotations":
 		m.batchLabelMode = 0
 		m.batchLabelInput.Clear()
