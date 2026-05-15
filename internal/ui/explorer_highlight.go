@@ -132,16 +132,15 @@ func resolveIcon(icon model.Icon) string {
 	}
 }
 
-// isItemSelected checks if an item is in the active selection set.
+// isItemSelected checks if an item is in the active selection set. The
+// lookup key comes from model.Item.SelectionKey so it stays identical to
+// the key the app stores selections under — including the cluster prefix
+// union rows carry.
 func isItemSelected(item model.Item) bool {
 	if ActiveSelectedItems == nil {
 		return false
 	}
-	key := item.Name
-	if item.Namespace != "" {
-		key = item.Namespace + "/" + item.Name
-	}
-	return ActiveSelectedItems[key]
+	return ActiveSelectedItems[item.SelectionKey()]
 }
 
 // highlightName highlights matched portions of query in name using SearchHighlightStyle.

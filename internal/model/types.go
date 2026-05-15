@@ -204,6 +204,24 @@ type Item struct {
 	GroupedRefs []GroupedRef // For grouped rows (Events): all underlying resource identifiers
 }
 
+// SelectionKey returns the stable map key identifying this item in a
+// multi-selection set. Union-mode rows carry a non-empty ClusterName, which
+// is prepended so the same name+namespace appearing in two clusters stays
+// distinct; non-union rows produce the legacy "namespace/name" (or bare
+// "name") form. This is the single source of truth for the key: both the
+// app's selection store and the ui renderer's selected-row check derive
+// their keys here so the two can never drift.
+func (i Item) SelectionKey() string {
+	base := i.Name
+	if i.Namespace != "" {
+		base = i.Namespace + "/" + i.Name
+	}
+	if i.ClusterName != "" {
+		return i.ClusterName + ":" + base
+	}
+	return base
+}
+
 // MissingRefStatus is the Status string assigned to a ResourceNode whose
 // referenced object (Secret/ConfigMap/PVC/ServiceAccount) does not exist on
 // the cluster. The k8s package writes it; the ui package matches on it in

@@ -334,20 +334,13 @@ func (m *Model) selectedMiddleItem() *model.Item {
 	return nil
 }
 
-// selectionKey generates a unique key for an item used in the selectedItems map.
-// In union mode rows carry a non-empty ClusterName, so the key prepends it to
-// keep selections from colliding when the same name+namespace appears in
-// multiple clusters. Non-union rows have an empty ClusterName and the key
-// matches the legacy "namespace/name" format.
+// selectionKey generates a unique key for an item used in the selectedItems
+// map. It delegates to model.Item.SelectionKey so the app's selection store
+// and the ui renderer's selected-row check share one key derivation and
+// cannot drift (a drift that previously hid the multi-select marker in
+// union view).
 func selectionKey(item model.Item) string {
-	base := item.Name
-	if item.Namespace != "" {
-		base = item.Namespace + "/" + item.Name
-	}
-	if item.ClusterName != "" {
-		return item.ClusterName + ":" + base
-	}
-	return base
+	return item.SelectionKey()
 }
 
 // isSelected returns true if the given item is in the multi-selection set.
