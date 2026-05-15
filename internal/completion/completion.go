@@ -1,4 +1,7 @@
-package main
+// Package completion wires cobra shell-completion helpers for lfk's
+// multi-cluster flags (--union-context, --union-set) and provides the
+// `lfk completion` subcommand.
+package completion
 
 import (
 	"fmt"
@@ -13,12 +16,15 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 )
 
-func registerShellCompletions(rootCmd *cobra.Command) {
+// RegisterShellCompletions attaches dynamic completion functions to the
+// flags whose valid values can only be known at runtime.
+func RegisterShellCompletions(rootCmd *cobra.Command) {
 	_ = rootCmd.RegisterFlagCompletionFunc("union-context", completeUnionContextFlag)
 	_ = rootCmd.RegisterFlagCompletionFunc("union-set", completeUnionSetFlag)
 }
 
-func newCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
+// NewCompletionCommand returns the `lfk completion <shell>` subcommand.
+func NewCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "completion [bash|zsh|fish|powershell]",
 		Short: "Generate shell completion script",

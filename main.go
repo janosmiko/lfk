@@ -16,6 +16,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/janosmiko/lfk/internal/app"
+	"github.com/janosmiko/lfk/internal/completion"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -55,7 +56,7 @@ File locations:
 	rootCmd.Flags().BoolVar(&cliOpts.ReadOnly, "read-only", false, "Disable all mutating actions (delete/edit/scale/restart/exec/port-forward/drain/cordon). Also configurable as read_only: true (global) or clusters.<ctx>.read_only (per-context) in config.")
 	rootCmd.Flags().DurationVar(&cliOpts.WatchInterval, "watch-interval", 0, "Watch mode polling interval (e.g. 500ms, 2s, 1m). Clamped to [500ms, 10m]. Overrides config.")
 
-	registerShellCompletions(rootCmd)
+	completion.RegisterShellCompletions(rootCmd)
 
 	rootCmd.Version = version.Full()
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
@@ -68,7 +69,7 @@ File locations:
 		},
 	}
 	rootCmd.AddCommand(versionCmd)
-	rootCmd.AddCommand(newCompletionCommand(rootCmd))
+	rootCmd.AddCommand(completion.NewCompletionCommand(rootCmd))
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
