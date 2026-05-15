@@ -817,7 +817,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 			t.Setenv("KUBECONFIG", origKubeconfig)
 		}()
 
-		paths := buildKubeconfigPaths("")
+		paths := buildKubeconfigPaths(nil)
 
 		home, err := os.UserHomeDir()
 		if err != nil {
@@ -837,7 +837,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", cfg1+string(os.PathListSeparator)+cfg2)
 
-		paths := buildKubeconfigPaths("")
+		paths := buildKubeconfigPaths(nil)
 
 		assert.Contains(t, paths, cfg1)
 		assert.Contains(t, paths, cfg2)
@@ -852,7 +852,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", defaultPath)
 
-		paths := buildKubeconfigPaths("")
+		paths := buildKubeconfigPaths(nil)
 
 		count := 0
 		for _, p := range paths {
@@ -876,7 +876,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		// and returns at least the default path.
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths("")
+		paths := buildKubeconfigPaths(nil)
 
 		assert.NotEmpty(t, paths, "should return at least the default kubeconfig path")
 	})
@@ -889,7 +889,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		via := filepath.Join(tmpDir, ".", "config.yaml")
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+via)
 
-		paths := buildKubeconfigPaths("")
+		paths := buildKubeconfigPaths(nil)
 		count := 0
 		for _, p := range paths {
 			if p == cfg || p == via {
@@ -913,7 +913,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 		assert.NoError(t, os.Symlink(cfg, viaSymlink))
 		t.Setenv("KUBECONFIG", cfg+string(os.PathListSeparator)+viaSymlink)
 
-		paths := buildKubeconfigPaths("")
+		paths := buildKubeconfigPaths(nil)
 		// Both entries point at the same underlying file; only one should
 		// remain after dedup. Compare via EvalSymlinks on both sides so
 		// we don't trip over /tmp → /private/tmp on macOS.
@@ -930,6 +930,10 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 	})
 
 	t.Run("uses provided directory parameter", func(t *testing.T) {
+		// Override HOME so the host's real ~/.kube/config.d cannot pollute
+		// the result and assert.Contains stays meaningful.
+		t.Setenv("HOME", t.TempDir())
+
 		tmpDir := t.TempDir()
 		customDir := filepath.Join(tmpDir, "custom-config.d")
 		assert.NoError(t, os.MkdirAll(customDir, 0o755))
@@ -938,7 +942,7 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths(customDir)
+		paths := buildKubeconfigPaths([]string{customDir})
 		// collectConfigDirPaths resolves symlinks, so on macOS /tmp may
 		// become /private/tmp — compare via EvalSymlinks to avoid failing.
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
@@ -958,11 +962,65 @@ func TestBuildKubeconfigPaths(t *testing.T) {
 
 		t.Setenv("KUBECONFIG", "")
 
-		paths := buildKubeconfigPaths("~/custom-k8s")
+		paths := buildKubeconfigPaths([]string{"~/custom-k8s"})
 		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
 		assert.NoError(t, err)
 		assert.Contains(t, paths, resolvedExtraCfg,
 			"should expand ~ in directory parameter and include the file")
+	})
+
+	t.Run("merges files across multiple kubeconfigDirs", func(t *testing.T) {
+		// Override HOME so the host's real ~/.kube/config.d cannot pollute the result.
+		t.Setenv("HOME", t.TempDir())
+		t.Setenv("KUBECONFIG", "")
+
+		dirA, dirB := t.TempDir(), t.TempDir()
+		cfgA := filepath.Join(dirA, "team-a")
+		cfgB := filepath.Join(dirB, "team-b")
+		assert.NoError(t, os.WriteFile(cfgA, []byte(""), 0o600))
+		assert.NoError(t, os.WriteFile(cfgB, []byte(""), 0o600))
+
+		paths := buildKubeconfigPaths([]string{dirA, dirB})
+
+		resA, _ := filepath.EvalSymlinks(cfgA)
+		resB, _ := filepath.EvalSymlinks(cfgB)
+		assert.Contains(t, paths, resA, "should include file from first dir")
+		assert.Contains(t, paths, resB, "should include file from second dir")
+	})
+
+	t.Run("absolute kubeconfigDir honored when home lookup fails", func(t *testing.T) {
+		// Wipe HOME so os.UserHomeDir errors. The user-provided absolute
+		// path needs no home expansion, so it must still flow through.
+		t.Setenv("HOME", "")
+		t.Setenv("USERPROFILE", "")
+		t.Setenv("KUBECONFIG", "")
+
+		customDir := t.TempDir()
+		extraCfg := filepath.Join(customDir, "extra-cluster")
+		assert.NoError(t, os.WriteFile(extraCfg, []byte(""), 0o600))
+
+		paths := buildKubeconfigPaths([]string{customDir})
+		resolvedExtraCfg, err := filepath.EvalSymlinks(extraCfg)
+		assert.NoError(t, err)
+		assert.Contains(t, paths, resolvedExtraCfg,
+			"absolute --kubeconfig-dir must be honored even without a usable HOME")
+	})
+
+	t.Run("tilde kubeconfigDir skipped when home lookup fails", func(t *testing.T) {
+		// Without HOME we cannot expand "~/foo"; skip rather than producing
+		// a bogus relative path. Validation in main.go is the user-facing
+		// error surface for this case.
+		t.Setenv("HOME", "")
+		t.Setenv("USERPROFILE", "")
+		t.Setenv("KUBECONFIG", "")
+
+		paths := buildKubeconfigPaths([]string{"~/some/dir"})
+		// Result is whatever KUBECONFIG provides (empty here); the tilde
+		// path is silently skipped because expansion isn't possible.
+		for _, p := range paths {
+			assert.NotContains(t, p, "~",
+				"unexpanded tilde must not leak into the path list")
+		}
 	})
 }
 
@@ -997,6 +1055,85 @@ func TestExpandTilde(t *testing.T) {
 	})
 	t.Run("other-user tilde returned unchanged", func(t *testing.T) {
 		assert.Equal(t, "~other/path", expandTilde("~other/path", "/home/test"))
+	})
+}
+
+func TestResolveKubeconfigDirs(t *testing.T) {
+	tests := []struct {
+		name string
+		cli  []string
+		env  string
+		cfg  []string
+		want []string
+	}{
+		{"all empty returns nil", nil, "", nil, nil},
+		{"cli single wins over env and config", []string{"/cli"}, "/env", []string{"/cfg"}, []string{"/cli"}},
+		{"cli multi wins over env and config", []string{"/cli1", "/cli2"}, "/env", []string{"/cfg"}, []string{"/cli1", "/cli2"}},
+		{"env single wins over config when cli empty", nil, "/env", []string{"/cfg"}, []string{"/env"}},
+		{"env colon-separated wins over config", nil, "/env1:/env2:/env3", []string{"/cfg"}, []string{"/env1", "/env2", "/env3"}},
+		{"config single used when cli and env empty", nil, "", []string{"/cfg"}, []string{"/cfg"}},
+		{"config multi used when cli and env empty", nil, "", []string{"/cfg1", "/cfg2"}, []string{"/cfg1", "/cfg2"}},
+		{"trims surrounding whitespace from cli entries", []string{"  /cli1  ", "/cli2\n"}, "", nil, []string{"/cli1", "/cli2"}},
+		{"trims surrounding whitespace from env entries", nil, " /env1 : /env2 ", nil, []string{"/env1", "/env2"}},
+		{"trims surrounding whitespace from config entries", nil, "", []string{"\t/cfg1 ", "/cfg2"}, []string{"/cfg1", "/cfg2"}},
+		{"whitespace-only cli entries dropped, falls through to env", []string{"   ", ""}, "/env", []string{"/cfg"}, []string{"/env"}},
+		{"whitespace-only env entries dropped, falls through to config", nil, " : : ", []string{"/cfg"}, []string{"/cfg"}},
+		{"whitespace-only config entries dropped, returns nil", nil, "", []string{"  ", ""}, nil},
+		{"cli with one whitespace-only entry keeps the real one", []string{"/cli", "   "}, "/env", nil, []string{"/cli"}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, ResolveKubeconfigDirs(tt.cli, tt.env, tt.cfg))
+		})
+	}
+}
+
+func TestValidateKubeconfigDirs(t *testing.T) {
+	t.Run("nil slice is OK", func(t *testing.T) {
+		assert.NoError(t, ValidateKubeconfigDirs(nil))
+	})
+	t.Run("empty slice is OK", func(t *testing.T) {
+		assert.NoError(t, ValidateKubeconfigDirs([]string{}))
+	})
+	t.Run("all existing directories pass", func(t *testing.T) {
+		d1, d2 := t.TempDir(), t.TempDir()
+		assert.NoError(t, ValidateKubeconfigDirs([]string{d1, d2}))
+	})
+	t.Run("first missing path errors and identifies the bad path", func(t *testing.T) {
+		good := t.TempDir()
+		bad := filepath.Join(t.TempDir(), "does-not-exist")
+		err := ValidateKubeconfigDirs([]string{good, bad})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "does-not-exist")
+	})
+	t.Run("regular file errors with not-a-directory", func(t *testing.T) {
+		dir := t.TempDir()
+		file := filepath.Join(dir, "regular.yaml")
+		assert.NoError(t, os.WriteFile(file, []byte(""), 0o600))
+		err := ValidateKubeconfigDirs([]string{file})
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "not a directory")
+	})
+	t.Run("tilde path expanded against HOME", func(t *testing.T) {
+		tmpHome := t.TempDir()
+		t.Setenv("HOME", tmpHome)
+		sub := filepath.Join(tmpHome, "kube-confs")
+		assert.NoError(t, os.MkdirAll(sub, 0o755))
+		assert.NoError(t, ValidateKubeconfigDirs([]string{"~/kube-confs"}))
+	})
+	t.Run("tilde path errors when HOME unavailable", func(t *testing.T) {
+		t.Setenv("HOME", "")
+		t.Setenv("USERPROFILE", "")
+		err := ValidateKubeconfigDirs([]string{"~/kube-confs"})
+		assert.Error(t, err)
+	})
+	t.Run("symlink to directory is accepted", func(t *testing.T) {
+		dir := t.TempDir()
+		real := filepath.Join(dir, "real")
+		assert.NoError(t, os.MkdirAll(real, 0o755))
+		link := filepath.Join(dir, "link")
+		assert.NoError(t, os.Symlink(real, link))
+		assert.NoError(t, ValidateKubeconfigDirs([]string{link}))
 	})
 }
 
@@ -1049,7 +1186,7 @@ users:
 
 	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
 
-	client, err := NewClient("", "")
+	client, err := NewClient("", nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1144,7 +1281,7 @@ users:
 
 	t.Setenv("KUBECONFIG", c1+string(os.PathListSeparator)+c2)
 
-	client, err := NewClient("", "")
+	client, err := NewClient("", nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1243,7 +1380,7 @@ users:
 	t.Setenv("KUBECONFIG",
 		dev+string(os.PathListSeparator)+itg+string(os.PathListSeparator)+prod)
 
-	client, err := NewClient("", "")
+	client, err := NewClient("", nil)
 	assert.NoError(t, err)
 	assert.NotNil(t, client)
 
@@ -1519,7 +1656,7 @@ users:
 
 			t.Setenv("KUBECONFIG", strings.Join(paths, string(os.PathListSeparator)))
 
-			client, err := NewClient("", "")
+			client, err := NewClient("", nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, client)
 

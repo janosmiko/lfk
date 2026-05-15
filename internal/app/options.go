@@ -4,15 +4,15 @@ import "time"
 
 // StartupOptions holds command-line flag values that override default startup behavior.
 type StartupOptions struct {
-	Context       string
-	Namespaces    []string
-	Kubeconfig    string
-	KubeconfigDir string
-	Config        string
-	NoMouse       bool
-	NoColor       bool          // --no-color: forces monochrome output regardless of env/config.
-	ReadOnly      bool          // --read-only: blocks all mutating actions; sticky for the process.
-	WatchInterval time.Duration // 0 means not set — fall back to config/default.
+	Context        string
+	Namespaces     []string
+	Kubeconfig     string
+	KubeconfigDirs []string // --kubeconfig-dir: repeatable; each occurrence adds a directory to scan.
+	Config         string
+	NoMouse        bool
+	NoColor        bool          // --no-color: forces monochrome output regardless of env/config.
+	ReadOnly       bool          // --read-only: blocks all mutating actions; sticky for the process.
+	WatchInterval  time.Duration // 0 means not set — fall back to config/default.
 }
 
 // HasCLIOverrides returns true when any CLI flag was provided.

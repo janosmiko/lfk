@@ -197,15 +197,16 @@ func (c *Client) Shutdown() {
 }
 
 // NewClient creates a new Kubernetes client, loading configs from:
-// 1. KUBECONFIG env var
-// 2. ~/.kube/config
-// 3. All files in ~/.kube/config.d/ (recursively; symlinks to directories are followed)
-func NewClient(kubeconfigOverride, kubeconfigDir string) (*Client, error) {
+//  1. KUBECONFIG env var
+//  2. ~/.kube/config
+//  3. All files in each kubeconfigDirs entry (recursively; symlinks to directories are followed).
+//     Defaults to [~/.kube/config.d/] when the slice is empty.
+func NewClient(kubeconfigOverride string, kubeconfigDirs []string) (*Client, error) {
 	var kubeconfigPaths []string
 	if kubeconfigOverride != "" {
 		kubeconfigPaths = []string{kubeconfigOverride}
 	} else {
-		kubeconfigPaths = buildKubeconfigPaths(kubeconfigDir)
+		kubeconfigPaths = buildKubeconfigPaths(kubeconfigDirs)
 	}
 
 	loadingRules := &clientcmd.ClientConfigLoadingRules{

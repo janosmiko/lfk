@@ -30,6 +30,9 @@ lfk --kubeconfig /path/to/kubeconfig
 # Use a specific directory instead of ~/.kube/config.d/
 lfk --kubeconfig-dir /path/to/configs/
 
+# Merge multiple custom directories (repeat the flag)
+lfk --kubeconfig-dir /team-a/configs/ --kubeconfig-dir /team-b/configs/
+
 # Disable mouse capture (enables native terminal text selection)
 lfk --no-mouse
 
@@ -52,6 +55,9 @@ KUBECONFIG=/path/to/config1:/path/to/config2 lfk
 
 # Use a custom kubeconfig directory via environment variable
 KUBECONFIG_DIR=/path/to/configs/ lfk
+
+# Merge multiple custom directories via env var (colon-separated, like KUBECONFIG)
+KUBECONFIG_DIR=/team-a/configs:/team-b/configs lfk
 ```
 
 When `--context` or `--namespace` flags are provided, the saved session state is
@@ -132,13 +138,20 @@ Precedence: `--no-color` flag > `NO_COLOR` env var > config file.
 ## Kubeconfig Directory
 
 By default, lfk discovers additional kubeconfig files from `~/.kube/config.d/`
-(recursively). This can be overridden via CLI, environment variable, or config:
+(recursively). This can be overridden — and multiple directories can be merged —
+via CLI, environment variable, or config:
 
-- **CLI flag:** `lfk --kubeconfig-dir /path/to/configs/`
-- **Environment variable:** `KUBECONFIG_DIR=/path/to/configs/ lfk`
-- **Config file:** Add `kubeconfig_dir: /path/to/configs/` to `~/.config/lfk/config.yaml`
+- **CLI flag:** `lfk --kubeconfig-dir /path/to/configs/` (repeatable: pass `--kubeconfig-dir` multiple times to merge several directories).
+- **Environment variable:** `KUBECONFIG_DIR=/path/to/configs/ lfk`. Colon-separated for multiple directories on Unix (`KUBECONFIG_DIR=/dir/a:/dir/b`), matching the convention `KUBECONFIG` uses.
+- **Config file:** Add `kubeconfig_dir: /path/to/configs/` to `~/.config/lfk/config.yaml`. The value may be either a single string or a list:
 
-Precedence: `--kubeconfig-dir` flag > `KUBECONFIG_DIR` env var > config file > default `~/.kube/config.d/`. The `--kubeconfig` flag bypasses all directory discovery entirely.
+  ```yaml
+  kubeconfig_dir:
+    - /team-a/configs
+    - /team-b/configs
+  ```
+
+Precedence (replacement, not merge): `--kubeconfig-dir` flag > `KUBECONFIG_DIR` env var > config file > default `~/.kube/config.d/`. Each entry's tilde (`~/`) is expanded against `$HOME`. lfk validates every directory exists at startup and errors out loudly on a typo. The `--kubeconfig` flag bypasses all directory discovery entirely.
 
 ## Read-Only Mode
 

@@ -80,6 +80,21 @@ icons: auto
 # Application log file location. Default: ~/.local/share/lfk/lfk.log
 log_path: /tmp/lfk.log
 
+# ─── Kubeconfig Directory ──────────────────────────────────────────────────────
+# Directory (or list of directories) recursively scanned for kubeconfig files,
+# in addition to ~/.kube/config and the KUBECONFIG env var. Tilde (~/) is
+# expanded against $HOME. Override at runtime with --kubeconfig-dir (repeatable)
+# or KUBECONFIG_DIR (colon-separated). --kubeconfig bypasses directory discovery.
+# Default: ~/.kube/config.d
+#
+# Single value:
+# kubeconfig_dir: ~/.kube/config.d
+#
+# Multiple directories — every kubeconfig under each one is merged:
+# kubeconfig_dir:
+#   - /team-a/configs
+#   - /team-b/configs
+
 # ─── Log Tail Lines ──────────────────────────────────────────────────────────
 # Number of log lines to load initially via --tail.
 # Scrolling to the top of the log viewer automatically fetches older history.

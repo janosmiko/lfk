@@ -185,9 +185,11 @@ lfk --context my-cluster -n kube-system
 lfk --kubeconfig /path/to/kubeconfig
 KUBECONFIG=/path/to/config1:/path/to/config2 lfk
 
-# Use a custom directory for kubeconfigs
+# Use a custom directory for kubeconfigs (repeat the flag for multiple)
 lfk --kubeconfig-dir /path/to/configs/
+lfk --kubeconfig-dir /team-a/configs --kubeconfig-dir /team-b/configs
 KUBECONFIG_DIR=/path/to/configs/ lfk
+KUBECONFIG_DIR=/team-a/configs:/team-b/configs lfk
 ```
 
 > See [docs/usage.md](docs/usage.md) for the full CLI reference and runtime tuning options: mouse capture, no-color mode, read-only mode, watch-mode interval, discovery cache (`KUBECACHEDIR`), and Secret lazy loading.
