@@ -740,7 +740,16 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 
 	// Rebuild left items history: clusters -> resource types.
 	// Load contexts as the base left column.
-	contexts, _ := m.client.GetContexts()
+	contexts, err := m.client.GetContexts()
+	if err != nil {
+		// A kubeconfig reload race or a transient FS error returning
+		// nil here would leave the left history empty, so the user
+		// can't back-navigate. Log and continue with an empty slice
+		// — the subsequent withUnionSetRows still adds the
+		// configured union sets, so the picker remains usable.
+		logger.Warn("GetContexts failed during bookmark navigation; rebuilding history without kubeconfig contexts", "error", err)
+		contexts = nil
+	}
 	contexts = m.withUnionSetRows(contexts)
 	var resourceTypes []model.Item
 	if discovered := m.discoveredResources[target.lookupContext]; len(discovered) > 0 {

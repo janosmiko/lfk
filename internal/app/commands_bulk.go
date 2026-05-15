@@ -147,7 +147,16 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			patchCmd := exec.CommandContext(ctx, kubectlPath, patchArgs...)
 			patchCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", patchCmd)
-			patchCmd.Run() //nolint:errcheck
+			// Best-effort: a failure here (RBAC denial, resource already
+			// gone) is not fatal — the subsequent --force delete will
+			// usually still succeed. But log the failure so a hang or
+			// half-completed delete leaves a trail in lfk.log instead
+			// of disappearing silently.
+			if err := patchCmd.Run(); err != nil {
+				logger.Warn("kubectl finalizer-patch failed; proceeding to force delete",
+					"resource", rt.Resource, "name", ref.Name, "namespace", itemNs,
+					"context", itemCtx, "error", err)
+			}
 
 			// Force delete.
 			deleteArgs := []string{

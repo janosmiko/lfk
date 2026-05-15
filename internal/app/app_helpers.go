@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -195,4 +196,17 @@ func (m *Model) SetVersion(v string) {
 // SetStderrChan sets the channel for receiving captured stderr messages.
 func (m *Model) SetStderrChan(ch <-chan string) {
 	m.stderrChan = ch
+}
+
+// contextsOrEmpty returns the current kubeconfig context list as sidebar
+// items, or an empty slice when GetContexts reports an error. Errors here
+// are observable in lfk.log but never block the caller — the worst case
+// is a brief "no contexts" state until the next refresh.
+func (m Model) contextsOrEmpty() []model.Item {
+	contexts, err := m.client.GetContexts()
+	if err != nil {
+		logger.Warn("GetContexts failed while rebuilding left history; using empty list", "error", err)
+		return nil
+	}
+	return contexts
 }

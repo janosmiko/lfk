@@ -3,6 +3,7 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -384,8 +385,9 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 // GetResourcesUnion fetches resources from multiple contexts in parallel and
 // merges the results. Each item is stamped with ClusterName for drill-down
 // routing; the UI renders that field as the first-class CONTEXT column.
-// Partial results are returned alongside the first error so the UI can show
-// what it fetched even when one cluster is temporarily unreachable.
+// Partial results are returned alongside an errors.Join of every per-context
+// failure, so the status bar can surface "2 of 8 contexts failed: …" instead
+// of silently truncating to the first error.
 func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
 	type result struct {
 		items []model.Item
@@ -412,10 +414,10 @@ func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, names
 	wg.Wait()
 
 	var merged []model.Item
-	var firstErr error
+	var errs []error
 	for _, r := range results {
-		if r.err != nil && firstErr == nil {
-			firstErr = fmt.Errorf("context %q: %w", r.ctx, r.err)
+		if r.err != nil {
+			errs = append(errs, fmt.Errorf("context %q: %w", r.ctx, r.err))
 		}
 		merged = append(merged, r.items...)
 	}
@@ -428,5 +430,5 @@ func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, names
 		}
 		return merged[i].Namespace < merged[j].Namespace
 	})
-	return merged, firstErr
+	return merged, errors.Join(errs...)
 }

@@ -228,8 +228,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			}
 			m.leftItemsHistory = append(m.leftItemsHistory[:0:0], m.leftItemsHistory...)
 			if len(m.leftItemsHistory) == 0 {
-				contexts, _ := m.client.GetContexts()
-				m.leftItemsHistory = [][]model.Item{contexts}
+				m.leftItemsHistory = [][]model.Item{m.contextsOrEmpty()}
 			}
 			m.leftItems = merged
 			m.nav.ResourceType = rt
