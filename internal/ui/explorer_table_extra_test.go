@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -16,6 +18,57 @@ func stripANSI(s string) string {
 }
 
 // --- RenderTable ---
+
+// TestRenderTable_UnionCursorRowKeepsHighlightPastColorTile is the regression
+// test for the bug where, in union view, a colored cluster tile cancelled the
+// cursor-row selection highlight for the rest of the row (the tile ends with
+// an SGR reset). After the fix the cursor branch routes the tile through
+// ClusterColorTileBgOver, which re-asserts the selection style after the
+// reset.
+func TestRenderTable_UnionCursorRowKeepsHighlightPastColorTile(t *testing.T) {
+	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
+	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+
+	origNoColor, origQuery, origScroll := ConfigNoColor, ActiveHighlightQuery, ActiveMiddleScroll
+	origSel, origLayout, origCache, origNyan := ActiveSelectedItems, ActiveTableLayout, ActiveRowCache, NyanMode
+	t.Cleanup(func() {
+		ConfigNoColor, ActiveHighlightQuery, ActiveMiddleScroll = origNoColor, origQuery, origScroll
+		ActiveSelectedItems, ActiveTableLayout, ActiveRowCache, NyanMode = origSel, origLayout, origCache, origNyan
+	})
+	ConfigNoColor, ActiveHighlightQuery, ActiveMiddleScroll = false, "", -1
+	ActiveSelectedItems, ActiveTableLayout, ActiveRowCache, NyanMode = nil, nil, nil, false
+
+	// ClusterName set => union mode => the renderer reserves the 1-cell tile.
+	items := []model.Item{
+		{Name: "pod-a", Namespace: "ns", ClusterName: "prod", ClusterColor: "cyan", Status: "Running"},
+		{Name: "pod-b", Namespace: "ns", ClusterName: "prod", ClusterColor: "cyan", Status: "Running"},
+	}
+	// Cursor on row 0 — the colored-tile row.
+	out := RenderTable("NAME", items, 0, 100, 20, false, "", "")
+
+	selOpen := styleOpenCodes(SelectedStyle)
+	if !assert.NotEmpty(t, selOpen, "test setup: SelectedStyle must emit SGR open codes under a color profile") {
+		return
+	}
+	nameIdx := strings.Index(out, "pod-a")
+	if !assert.GreaterOrEqual(t, nameIdx, 0, "cursor row must contain the item name") {
+		return
+	}
+	// The colored tile ends with an SGR reset immediately before the row
+	// text. Between that reset and the text the selection style must be
+	// re-asserted, or the cursor highlight dies for the rest of the row.
+	const reset = "\x1b[0m"
+	beforeName := out[:nameIdx]
+	tileReset := strings.LastIndex(beforeName, reset)
+	if !assert.GreaterOrEqual(t, tileReset, 0, "the colored tile must emit an SGR reset before the row text") {
+		return
+	}
+	gap := beforeName[tileReset+len(reset):]
+	assert.Equalf(t, selOpen, gap,
+		"after the colored tile's reset the selection style must be re-asserted so the "+
+			"cursor highlight covers the row content; cursor render was %q", out[:nameIdx+len("pod-a")])
+}
 
 func TestRenderTable(t *testing.T) {
 	t.Run("empty items loading shows spinner", func(t *testing.T) {

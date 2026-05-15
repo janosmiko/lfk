@@ -504,7 +504,10 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 			}
 			tilePrefix := ""
 			if tileW > 0 {
-				tilePrefix = ClusterColorTileBg(item.ClusterColor)
+				// Cursor row: the tile must re-assert the selection style
+				// after its own SGR reset, or the highlight dies for the
+				// rest of the row.
+				tilePrefix = ClusterColorTileBgOver(item.ClusterColor, ActiveSelectedStyle(i))
 			}
 			cursorRestarts := item.Restarts
 			if hasRestarts {

@@ -146,3 +146,21 @@ func ClusterColorTileBg(name string) string {
 	}
 	return lipgloss.NewStyle().Background(bg).Render(" ")
 }
+
+// ClusterColorTileBgOver is ClusterColorTileBg for a row wrapped by an outer
+// style — specifically the cursor row's selection highlight. The colored
+// tile ends with an SGR reset; left alone, that reset cancels the outer
+// style for every cell after the tile, so the cursor highlight vanishes for
+// the rest of the row. Re-emitting the outer style's open codes right after
+// the tile restores it. Mirrors the HighlightMatchStyledOver "restore"
+// pattern.
+//
+// An uncolored tile is a plain space with no embedded reset, so it is
+// returned unchanged — nothing needs restoring.
+func ClusterColorTileBgOver(name string, outer lipgloss.Style) string {
+	tile := ClusterColorTileBg(name)
+	if clusterColorBg(name) == nil {
+		return tile
+	}
+	return tile + styleOpenCodes(outer)
+}
