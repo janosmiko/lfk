@@ -37,11 +37,11 @@ contexts:
       user: u
 `)
 
-	got, err := completeKubeContexts(kubeconfig, map[string]struct{}{"prod": {}}, "")
+	got, err := completeKubeContexts(kubeconfig, nil, map[string]struct{}{"prod": {}}, "")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"alpha", "beta"}, got)
 
-	got, err = completeKubeContexts(kubeconfig, nil, "b")
+	got, err = completeKubeContexts(kubeconfig, nil, nil, "b")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"beta"}, got)
 }

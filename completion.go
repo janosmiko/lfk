@@ -54,7 +54,8 @@ func newCompletionCommand(rootCmd *cobra.Command) *cobra.Command {
 
 func completeUnionContextFlag(cmd *cobra.Command, _ []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 	kubeconfig, _ := cmd.Flags().GetString("kubeconfig")
-	completions, err := completeKubeContexts(kubeconfig, selectedUnionContexts(cmd), toComplete)
+	kubeconfigDirs, _ := cmd.Flags().GetStringArray("kubeconfig-dir")
+	completions, err := completeKubeContexts(kubeconfig, kubeconfigDirs, selectedUnionContexts(cmd), toComplete)
 	if err != nil {
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -84,8 +85,8 @@ func selectedUnionContexts(cmd *cobra.Command) map[string]struct{} {
 	return selected
 }
 
-func completeKubeContexts(kubeconfigOverride string, selected map[string]struct{}, prefix string) ([]string, error) {
-	client, err := k8s.NewClient(kubeconfigOverride)
+func completeKubeContexts(kubeconfigOverride string, kubeconfigDirs []string, selected map[string]struct{}, prefix string) ([]string, error) {
+	client, err := k8s.NewClient(kubeconfigOverride, kubeconfigDirs)
 	if err != nil {
 		return nil, err
 	}
