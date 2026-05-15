@@ -73,7 +73,7 @@
 
 - **Multi-tab support**: Open multiple views side by side
 - **Multi-cluster/multi-context support** via merged kubeconfig loading
-- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), and `KUBECONFIG` env var
+- **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), `KUBECONFIG` env var, and `KUBECONFIG_DIR` env var.
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser
@@ -184,6 +184,12 @@ lfk --context my-cluster -n kube-system
 # Use a specific kubeconfig
 lfk --kubeconfig /path/to/kubeconfig
 KUBECONFIG=/path/to/config1:/path/to/config2 lfk
+
+# Use a custom directory for kubeconfigs (repeat the flag for multiple)
+lfk --kubeconfig-dir /path/to/configs/
+lfk --kubeconfig-dir /team-a/configs --kubeconfig-dir /team-b/configs
+KUBECONFIG_DIR=/path/to/configs/ lfk
+KUBECONFIG_DIR=/team-a/configs:/team-b/configs lfk
 ```
 
 > See [docs/usage.md](docs/usage.md) for the full CLI reference and runtime tuning options: mouse capture, no-color mode, read-only mode, watch-mode interval, discovery cache (`KUBECACHEDIR`), and Secret lazy loading.

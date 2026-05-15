@@ -176,6 +176,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.NoColor != nil {
 		ConfigNoColor = *cfg.NoColor
 	}
+	applyKubeconfigDirsSetting(cfg.KubeconfigDir)
 	applyDataAccessConfig(cfg)
 	applyInformerCacheSetting(cfg.InformerCache)
 	if cfg.MinContrastRatio != nil {

@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"slices"
@@ -214,7 +215,15 @@ func contextDisplayHint(path string) string {
 }
 
 // buildKubeconfigPaths assembles the list of kubeconfig file paths to load.
-func buildKubeconfigPaths() []string {
+//
+// Resolution order:
+//  1. KUBECONFIG env var (colon-separated).
+//  2. ~/.kube/config (only when home lookup succeeds).
+//  3. Files under each path in kubeconfigDirs, falling back to a single-element
+//     [~/.kube/config.d/] when the slice is empty. An absolute, non-tilde
+//     directory is honored even when home lookup fails — the only reason to
+//     require a home directory is for tilde expansion or the default fallback.
+func buildKubeconfigPaths(kubeconfigDirs []string) []string {
 	var paths []string
 
 	// KUBECONFIG env var (colon-separated on unix).
@@ -222,22 +231,38 @@ func buildKubeconfigPaths() []string {
 		paths = append(paths, filepath.SplitList(env)...)
 	}
 
-	home, err := os.UserHomeDir()
-	if err == nil {
+	home, homeErr := os.UserHomeDir()
+	if homeErr == nil {
 		// Default kubeconfig.
 		defaultPath := filepath.Join(home, ".kube", "config")
 		if !containsPath(paths, defaultPath) {
 			paths = append(paths, defaultPath)
 		}
+		// Fall back to the default discovery directory when no override.
+		if len(kubeconfigDirs) == 0 {
+			kubeconfigDirs = []string{filepath.Join(home, ".kube", "config.d")}
+		}
+	}
 
-		// config.d directory - recursively find all files (follows symlinks).
-		paths = append(paths, collectConfigDirPaths(filepath.Join(home, ".kube", "config.d"))...)
+	// Walk each kubeconfig directory. Skip silently when expansion is
+	// required but home lookup failed — main.go's ValidateKubeconfigDirs
+	// is the user-facing surface for this case, and at that point the
+	// CLI/env/config layer has already errored out before we get here.
+	for _, dir := range kubeconfigDirs {
+		if dir == "" {
+			continue
+		}
+		if strings.HasPrefix(dir, "~") && homeErr != nil {
+			continue
+		}
+		paths = append(paths, collectConfigDirPaths(expandTilde(dir, home))...)
 	}
 
 	// Dedup by canonical path. The same kubeconfig can land in `paths`
 	// twice when KUBECONFIG points at a file inside ~/.kube/config.d/, or
 	// when one path is "foo.yaml" and another is "./foo.yaml", or when a
-	// symlink resolves to a file the walk also visits directly. Without
+	// symlink resolves to a file the walk also visits directly, or when
+	// two --kubeconfig-dir entries point at overlapping trees. Without
 	// this pass collectContexts loads the same file twice and emits each
 	// context as two "disambiguated" rows in the cluster list.
 	return dedupKubeconfigPaths(paths)
@@ -297,6 +322,102 @@ func collectConfigDirPaths(dir string) []string {
 		return nil
 	})
 	return out
+}
+
+// expandTilde resolves a leading "~" in a path to the given home directory.
+// When the path is exactly "~" or starts with "~/", the tilde is replaced
+// with home. Any other form (e.g. "~other/path") is returned unchanged so
+// that filepath expansion errors are surfaced by downstream callers.
+func expandTilde(path, home string) string {
+	if path == "~" {
+		return home
+	}
+	if strings.HasPrefix(path, "~/") {
+		return filepath.Join(home, path[2:])
+	}
+	return path
+}
+
+// ResolveKubeconfigDirs picks the user's kubeconfig discovery directories by
+// applying the documented precedence: CLI flags > env var > config file.
+// Replacement semantics — the first layer that yields any non-empty entry
+// wins outright; lower-priority layers are NOT merged in.
+//
+// Each entry is trimmed of surrounding whitespace; whitespace-only entries
+// are dropped so they do not silently shadow a lower-priority layer that
+// has real paths. The env var is split on the OS path-list separator
+// (":" on unix, ";" on Windows), matching how KUBECONFIG itself is parsed.
+// Returns nil when all three layers are empty, which signals "use the default
+// ~/.kube/config.d" to the caller.
+func ResolveKubeconfigDirs(cliFlags []string, envVar string, configValues []string) []string {
+	if v := trimNonEmpty(cliFlags); len(v) > 0 {
+		return v
+	}
+	if envVar = strings.TrimSpace(envVar); envVar != "" {
+		if v := trimNonEmpty(filepath.SplitList(envVar)); len(v) > 0 {
+			return v
+		}
+	}
+	if v := trimNonEmpty(configValues); len(v) > 0 {
+		return v
+	}
+	return nil
+}
+
+// trimNonEmpty trims whitespace from each entry and drops entries that are
+// empty after trimming. Returns nil (not []string{}) when the input has no
+// non-empty entries, so callers can use a single len() check.
+func trimNonEmpty(in []string) []string {
+	var out []string
+	for _, s := range in {
+		if v := strings.TrimSpace(s); v != "" {
+			out = append(out, v)
+		}
+	}
+	return out
+}
+
+// ValidateKubeconfigDirs checks that every path exists and is a directory,
+// returning a wrapped error on the first failure (so the user sees which
+// path was bad). An empty/nil slice passes silently — caller falls back to
+// default discovery. See ValidateKubeconfigDir for the per-path semantics
+// including tilde expansion.
+func ValidateKubeconfigDirs(paths []string) error {
+	for _, p := range paths {
+		if err := ValidateKubeconfigDir(p); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ValidateKubeconfigDir checks that path exists and is a directory, returning
+// a wrapped error otherwise. Empty path is treated as "no override" and
+// passes silently — the caller falls back to default discovery. Tilde
+// prefixes ("~", "~/...") are expanded against the user's home directory
+// before stat; an unresolvable home is itself a validation error so a typo
+// like "~/.kuibe/config.d" doesn't silently degrade to "no directory
+// override applied".
+func ValidateKubeconfigDir(path string) error {
+	if path == "" {
+		return nil
+	}
+	expanded := path
+	if strings.HasPrefix(path, "~") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return fmt.Errorf("kubeconfig directory %q: cannot expand ~ (no home directory): %w", path, err)
+		}
+		expanded = expandTilde(path, home)
+	}
+	info, err := os.Stat(expanded)
+	if err != nil {
+		return fmt.Errorf("kubeconfig directory %q: %w", path, err)
+	}
+	if !info.IsDir() {
+		return fmt.Errorf("kubeconfig directory %q: not a directory", path)
+	}
+	return nil
 }
 
 func containsPath(paths []string, target string) bool {
