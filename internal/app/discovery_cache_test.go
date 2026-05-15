@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"os"
 	"path/filepath"
 	"testing"
@@ -153,7 +154,7 @@ func TestLoadAllDiscoveryCachesMapsContextsToHostFiles(t *testing.T) {
 	client.AddTestContext("beta", hostA) // same host as alpha
 	client.AddTestContext("gamma", hostB)
 
-	loaded := loadAllDiscoveryCaches(client)
+	loaded := loadAllDiscoveryCaches(context.Background(), client)
 	require.Len(t, loaded["alpha"], 1)
 	require.Len(t, loaded["beta"], 1)
 	require.Len(t, loaded["gamma"], 1)
@@ -173,7 +174,7 @@ func TestLoadAllDiscoveryCachesSkipsContextsWithUnresolvableHost(t *testing.T) {
 		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods"},
 	}))
 
-	loaded := loadAllDiscoveryCaches(client)
+	loaded := loadAllDiscoveryCaches(context.Background(), client)
 	require.NotNil(t, loaded["alpha"])
 	assert.NotContains(t, loaded, "test-ctx",
 		"the default test-ctx had no cached host file — must not show up here")
@@ -209,7 +210,7 @@ func TestDiscoveryCachePreloadHydratesDiscoveredResources(t *testing.T) {
 	// Run the preload Cmd that Init() would dispatch and feed the resulting
 	// message through the handler. This is the post-startup state the user
 	// observes once the cache lands.
-	cmd := discoveryCachePreloadCmd(client)
+	cmd := discoveryCachePreloadCmd(context.Background(), client)
 	require.NotNil(t, cmd)
 	msg := cmd()
 	loaded, ok := msg.(discoveryCacheLoadedMsg)

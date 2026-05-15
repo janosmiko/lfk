@@ -14,7 +14,7 @@ func (m Model) Init() tea.Cmd {
 		// Run the discovery-cache preload off the main goroutine. Blocking
 		// startup on it serialises a clientcmd.ClientConfig() call per
 		// kubeconfig context; see the comment on discoveryCachePreloadCmd.
-		discoveryCachePreloadCmd(m.client),
+		discoveryCachePreloadCmd(m.reqCtx, m.client),
 	}
 	if m.stderrChan != nil {
 		cmds = append(cmds, m.waitForStderr())
