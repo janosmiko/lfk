@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -91,6 +93,17 @@ func groupHasResource(groupMap map[string][]model.CanIResource, group, resource 
 // processCanIRules converts raw access rules into grouped CanIResource entries,
 // cross-referencing with discovered CRDs for kind names.
 func (m *Model) processCanIRules(rules []k8s.AccessRule) {
+	// Defensive: this single-context path indexes discoveredResources by
+	// m.nav.Context, which is the union sentinel in union mode. The normal
+	// load flow routes through processCanIRulesUnion before reaching here,
+	// but a future caller that forgets to dispatch by mode would silently
+	// return an empty rules table. Surface that as a warning so the bug is
+	// visible in lfk.log instead of looking like a permissions issue.
+	if m.nav.Context == UnionContextSentinel {
+		logger.Warn("processCanIRules called with the union sentinel; expected processCanIRulesUnion — returning empty table")
+		m.canIGroups = nil
+		return
+	}
 	perms := buildPermLookup(rules)
 	groupMap := make(map[string][]model.CanIResource)
 

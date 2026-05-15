@@ -463,7 +463,7 @@ type Model struct {
 
 	// dashboardAcc holds the per-(kctx,gen) fan-out accumulator; keyed by dashboardAccKey.
 	dashboardAcc map[string]*dashboardAccumulator
-	// Discovered CRDs per context: keyed by context name.
+	// Discovered CRDs per context (unsynchronized: only the bubbletea update goroutine writes).
 	discoveredResources map[string][]model.ResourceTypeEntry
 
 	// Contexts with an in-flight API discovery call. Used to avoid

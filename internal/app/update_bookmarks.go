@@ -644,81 +644,13 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	// bookmarks activate union mode, and context-free bookmarks preserve the
 	// current mode.
 	oldCtx := m.nav.Context
-	m.nav.Context = target.context
-	if oldCtx != target.context {
-		m.invalidateOrphanCacheForContext(oldCtx)
-	}
-	switch target.kind {
-	case bookmarkTargetUnionSet:
-		m.unionMode = true
-		m.unionStartedFromPicker = target.unionStartedFromRow
-		m.unionSetName = target.unionSetName
-		m.unionContexts = append([]string(nil), target.unionContexts...)
-		m.unionContextColors = copyMapStringString(target.unionContextColors)
-		m.allNamespaces = false
-		m.namespace = target.unionNamespace
-		m.selectedNamespaces = map[string]bool{target.unionNamespace: true}
-		m.readOnly = m.cliReadOnly
-	case bookmarkTargetContext:
-		m.unionMode = false
-		m.unionStartedFromPicker = false
-		m.unionSetName = ""
-		m.unionContexts = nil
-		m.unionContextColors = nil
-		m.recomputeReadOnly(target.context)
-	default:
-		if target.context == UnionContextSentinel {
-			m.readOnly = m.cliReadOnly
-		} else {
-			m.recomputeReadOnly(target.context)
-		}
-	}
+	m.applyBookmarkContextSwitch(target)
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
 	m.applyPinnedGroups()
 
-	// Apply the bookmark's saved namespace only when the user asked
-	// for it via Tab in the overlay. Default behaviour is "jump to
-	// the resource type in my current namespace scope", regardless of
-	// slot case; the saved namespace stays in the record so the
-	// override can replay it on demand. Consume the flag right after
-	// reading so it can't leak into the next open.
-	applyNs := m.bookmarkLoadNamespace
-	m.bookmarkLoadNamespace = false
-	if target.kind == bookmarkTargetUnionSet {
-		applyNs = false
-	}
-
-	if applyNs {
-		oldNs := m.namespace
-		switch {
-		case bm.Namespace == "" && len(bm.Namespaces) == 0:
-			m.allNamespaces = true
-			m.selectedNamespaces = nil
-		case len(bm.Namespaces) > 1:
-			m.allNamespaces = false
-			m.namespace = bm.Namespaces[0]
-			m.selectedNamespaces = make(map[string]bool, len(bm.Namespaces))
-			for _, ns := range bm.Namespaces {
-				m.selectedNamespaces[ns] = true
-			}
-		default:
-			m.allNamespaces = false
-			ns := bm.Namespace
-			if len(bm.Namespaces) == 1 {
-				ns = bm.Namespaces[0]
-			}
-			m.namespace = ns
-			m.selectedNamespaces = map[string]bool{ns: true}
-		}
-		// Invalidate the old namespace's cache within the new context. When
-		// the context also changed, the entire old context was already wiped
-		// above, so only invalidate when staying in the same context.
-		if oldCtx == target.context {
-			m.invalidateOrphanCacheForNamespace(target.context, oldNs)
-		}
-	}
+	m.applyBookmarkNamespace(bm, target, oldCtx)
 
 	// Navigate to resource type level first, then optionally deeper.
 	m.nav.ResourceType = rt
@@ -738,29 +670,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.rightItems = nil
 	m.clearRight()
 
-	// Rebuild left items history: clusters -> resource types.
-	// Load contexts as the base left column.
-	contexts, err := m.client.GetContexts()
-	if err != nil {
-		// A kubeconfig reload race or a transient FS error returning
-		// nil here would leave the left history empty, so the user
-		// can't back-navigate. Log and continue with an empty slice
-		// — the subsequent withUnionSetRows still adds the
-		// configured union sets, so the picker remains usable.
-		logger.Warn("GetContexts failed during bookmark navigation; rebuilding history without kubeconfig contexts", "error", err)
-		contexts = nil
-	}
-	contexts = m.withUnionSetRows(contexts)
-	var resourceTypes []model.Item
-	if discovered := m.discoveredResources[target.lookupContext]; len(discovered) > 0 {
-		resourceTypes = model.BuildSidebarItems(discovered)
-	} else {
-		resourceTypes = model.BuildSidebarItems(model.SeedResources())
-	}
-
-	// Set up history: at LevelResources, leftItemsHistory has [contexts], leftItems = resourceTypes.
-	m.leftItemsHistory = [][]model.Item{contexts}
-	m.leftItems = resourceTypes
+	resourceTypes := m.rebuildLeftHistoryForBookmark(target)
 
 	// Reset cursors, then set the parent (resource types) cursor to the
 	// correct position so that pressing 'h' returns to the right item.
