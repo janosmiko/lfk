@@ -203,8 +203,16 @@ func (m Model) bulkScaleResources(replicas int32) tea.Cmd {
 			if item.Namespace != "" {
 				itemNs = item.Namespace
 			}
-			logger.Info("Bulk scaling", "name", item.Name, "replicas", replicas, "namespace", itemNs)
-			err := client.ScaleResource(actionCtx, itemNs, item.Name, kind, replicas)
+			// Per-item cluster routing for union mode (see bulkDeleteResources).
+			// Scale is currently excluded from the union allow-list, so this is
+			// defensive: if the allow-list is ever relaxed, mixed-cluster
+			// selections must still target each row's source apiserver.
+			itemCtx := actionCtx
+			if item.ClusterName != "" {
+				itemCtx = item.ClusterName
+			}
+			logger.Info("Bulk scaling", "name", item.Name, "replicas", replicas, "namespace", itemNs, "context", itemCtx)
+			err := client.ScaleResource(itemCtx, itemNs, item.Name, kind, replicas)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
@@ -309,11 +317,21 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 			if !rt.Namespaced {
 				itemNs = ""
 			}
+			// Per-item cluster routing for union mode (see bulkDeleteResources).
+			// Labels/Annotations are currently excluded from the union
+			// allow-list, so this is defensive: if the allow-list is ever
+			// relaxed, mixed-cluster selections must still target each row's
+			// source apiserver.
+			itemCtx := actionCtx
+			if item.ClusterName != "" {
+				itemCtx = item.ClusterName
+			}
+			logger.Info("Bulk patching", "kind", labelOrAnnotation, "name", item.Name, "namespace", itemNs, "context", itemCtx)
 			var err error
 			if isAnnotation {
-				err = client.PatchAnnotations(ctx, actionCtx, itemNs, item.Name, gvr, patch)
+				err = client.PatchAnnotations(ctx, itemCtx, itemNs, item.Name, gvr, patch)
 			} else {
-				err = client.PatchLabels(ctx, actionCtx, itemNs, item.Name, gvr, patch)
+				err = client.PatchLabels(ctx, itemCtx, itemNs, item.Name, gvr, patch)
 			}
 			if err != nil {
 				failed++
