@@ -348,7 +348,8 @@ func TestExpandUnionSetConfigResolvesNamespace(t *testing.T) {
 				ns, ok := tc.kubeNS[ctx]
 				return ns, ok
 			}
-			contexts, namespace, colors := ExpandUnionSetConfig(tc.set, lookup)
+			contexts, namespace, colors, err := ExpandUnionSetConfig(tc.set, lookup)
+			require.NoError(t, err)
 			assert.Equal(t, tc.wantNS, namespace)
 			if tc.wantCtxs != nil {
 				assert.Equal(t, tc.wantCtxs, contexts)

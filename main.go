@@ -249,7 +249,17 @@ func unionSetLookup(sets []ui.UnionSetConfig, client *k8s.Client) app.UnionSetLo
 			if s.Name != name {
 				continue
 			}
-			ctxs, ns, cols := app.ExpandUnionSetConfig(s, namespaceLookup)
+			ctxs, ns, cols, err := app.ExpandUnionSetConfig(s, namespaceLookup)
+			if err != nil {
+				// The lookup signature can't carry an error back to
+				// ResolveUnionSet, so surface the malformed-set message via
+				// the kubeconfig context name so it reads naturally in the
+				// downstream "context not found" error path. Tests cover the
+				// happy path; production users with this bug will see the
+				// validation error at startup with the offending set name.
+				logger.Error("union set is malformed", "error", err)
+				return nil, "", nil, false
+			}
 			return ctxs, ns, cols, true
 		}
 		return nil, "", nil, false

@@ -27,10 +27,15 @@ func (m Model) findUnionSetConfig(name string) (ui.UnionSetConfig, bool) {
 // used by both CLI activation and picker activation. Namespace precedence is:
 // per-member namespace in union_sets, set-level namespace, then an explicitly
 // configured namespace on one of the kubeconfig contexts.
+//
+// Returns an error when multiple member entries declare different non-empty
+// namespaces — silently picking one was the previous behaviour and produced
+// "wrong namespace" surprises in multi-cluster sets. Either drop the
+// per-member namespaces and use the set-level field, or make them all equal.
 func ExpandUnionSetConfig(
 	set ui.UnionSetConfig,
 	contextNamespace func(string) (string, bool),
-) (contexts []string, namespace string, colors map[string]string) {
+) (contexts []string, namespace string, colors map[string]string, err error) {
 	contexts = make([]string, 0, len(set.Contexts))
 	colors = make(map[string]string, len(set.Contexts))
 	memberNamespace := ""
@@ -41,8 +46,15 @@ func ExpandUnionSetConfig(
 		if color := strings.TrimSpace(ctx.Color); color != "" {
 			colors[context] = color
 		}
-		if memberNamespace == "" {
-			memberNamespace = strings.TrimSpace(ctx.Namespace)
+		ns := strings.TrimSpace(ctx.Namespace)
+		if ns != "" {
+			if memberNamespace != "" && memberNamespace != ns {
+				return nil, "", nil, fmt.Errorf(
+					"union_sets %q: members declare conflicting namespaces (%q vs %q); use set-level namespace or make them equal",
+					set.Name, memberNamespace, ns,
+				)
+			}
+			memberNamespace = ns
 		}
 		if kubeconfigNamespace == "" && contextNamespace != nil {
 			if ns, ok := contextNamespace(context); ok {
@@ -58,7 +70,7 @@ func ExpandUnionSetConfig(
 	default:
 		namespace = kubeconfigNamespace
 	}
-	return contexts, namespace, colors
+	return contexts, namespace, colors, nil
 }
 
 func (m Model) withUnionSetRows(items []model.Item) []model.Item {
@@ -71,7 +83,13 @@ func (m Model) withUnionSetRows(items []model.Item) []model.Item {
 		namespaceLookup = m.client.ContextNamespace
 	}
 	for _, set := range ui.ConfigUnionSets {
-		contexts, namespace, _ := ExpandUnionSetConfig(set, namespaceLookup)
+		contexts, namespace, _, err := ExpandUnionSetConfig(set, namespaceLookup)
+		if err != nil {
+			// Skip the picker entry for malformed sets; the same validation
+			// runs (and surfaces a clearer error) when the user actually
+			// resolves --union-set at startup.
+			continue
+		}
 		status := fmt.Sprintf("%d contexts", len(contexts))
 		if len(contexts) == 1 {
 			status = "1 context"
@@ -117,7 +135,11 @@ func (m Model) navigateChildUnionSet(sel *model.Item) (tea.Model, tea.Cmd) {
 	if m.client != nil {
 		namespaceLookup = m.client.ContextNamespace
 	}
-	contexts, namespace, _ := ExpandUnionSetConfig(set, namespaceLookup)
+	contexts, namespace, _, err := ExpandUnionSetConfig(set, namespaceLookup)
+	if err != nil {
+		m.setStatusMessage(err.Error(), true)
+		return m, scheduleStatusClear()
+	}
 	if namespace == "" {
 		return m.openUnionSetNamespacePicker(set, contexts)
 	}
@@ -154,7 +176,11 @@ func (m Model) activateUnionSet(set ui.UnionSetConfig, namespace string) (tea.Mo
 	if m.client != nil {
 		namespaceLookup = m.client.ContextNamespace
 	}
-	contexts, _, colors := ExpandUnionSetConfig(set, namespaceLookup)
+	contexts, _, colors, err := ExpandUnionSetConfig(set, namespaceLookup)
+	if err != nil {
+		m.setStatusMessage(err.Error(), true)
+		return m, scheduleStatusClear()
+	}
 	opts := StartupOptions{
 		UnionSet:           set.Name,
 		UnionContexts:      contexts,

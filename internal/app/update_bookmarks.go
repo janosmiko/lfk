@@ -70,7 +70,10 @@ func (m Model) namespaceForUnionBookmark(bm model.Bookmark, set ui.UnionSetConfi
 	if m.client != nil {
 		namespaceLookup = m.client.ContextNamespace
 	}
-	_, resolvedNamespace, _ := ExpandUnionSetConfig(set, namespaceLookup)
+	_, resolvedNamespace, _, err := ExpandUnionSetConfig(set, namespaceLookup)
+	if err != nil {
+		return "", false
+	}
 	if ns := strings.TrimSpace(resolvedNamespace); ns != "" {
 		return ns, true
 	}
@@ -94,7 +97,10 @@ func (m Model) resolveBookmarkTarget(bm model.Bookmark, loadSavedNamespace bool)
 		if m.client != nil {
 			namespaceLookup = m.client.ContextNamespace
 		}
-		contexts, _, colors := ExpandUnionSetConfig(set, namespaceLookup)
+		contexts, _, colors, err := ExpandUnionSetConfig(set, namespaceLookup)
+		if err != nil {
+			return bookmarkTarget{}, err.Error(), false
+		}
 		if len(contexts) == 0 {
 			return bookmarkTarget{}, fmt.Sprintf("Union set has no contexts: %s", bm.UnionSet), false
 		}
