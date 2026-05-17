@@ -314,12 +314,17 @@ func (m *Model) selectedMiddleItem() *model.Item {
 	c := m.cursor()
 	if c >= 0 && c < len(visible) {
 		// Return a pointer to the item in middleItems (not the filtered copy).
+		// ClusterName is included in the match so union-mode rows that share
+		// Name+Kind+Extra+Namespace across clusters still resolve to the exact
+		// row under the cursor. In non-union mode ClusterName is "" on all
+		// items, so this is a no-op.
 		target := visible[c]
 		for i := range m.middleItems {
 			if m.middleItems[i].Name == target.Name &&
 				m.middleItems[i].Kind == target.Kind &&
 				m.middleItems[i].Extra == target.Extra &&
-				m.middleItems[i].Namespace == target.Namespace {
+				m.middleItems[i].Namespace == target.Namespace &&
+				m.middleItems[i].ClusterName == target.ClusterName {
 				return &m.middleItems[i]
 			}
 		}
@@ -329,12 +334,13 @@ func (m *Model) selectedMiddleItem() *model.Item {
 	return nil
 }
 
-// selectionKey generates a unique key for an item used in the selectedItems map.
+// selectionKey generates a unique key for an item used in the selectedItems
+// map. It delegates to model.Item.SelectionKey so the app's selection store
+// and the ui renderer's selected-row check share one key derivation and
+// cannot drift (a drift that previously hid the multi-select marker in
+// union view).
 func selectionKey(item model.Item) string {
-	if item.Namespace != "" {
-		return item.Namespace + "/" + item.Name
-	}
-	return item.Name
+	return item.SelectionKey()
 }
 
 // isSelected returns true if the given item is in the multi-selection set.

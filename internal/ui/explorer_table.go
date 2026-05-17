@@ -27,16 +27,37 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		return b.String()
 	}
 
-	var hasNs, hasReady, hasRestarts, hasAge, hasStatus bool
-	var nsW, readyW, restartsW, ageW, statusW int
+	var hasContext, hasNs, hasReady, hasRestarts, hasAge, hasStatus bool
+	var contextW, nsW, readyW, restartsW, ageW, statusW int
 	var anyRecentRestart bool
 
+	// Detect whether any row carries a ClusterName (the union-row signal)
+	// so we can reserve a 1-cell leading tile column. The tile is painted
+	// only when item.ClusterColor is set, but the cell is reserved on
+	// every union-mode row so the column boundaries stay aligned across
+	// rows whose source cluster doesn't have a configured color. In
+	// non-union sessions hasUnion stays false and the row layout is
+	// unchanged.
+	hasUnion := false
+	for _, item := range items {
+		if item.ClusterName != "" {
+			hasUnion = true
+			break
+		}
+	}
+	tileW := 0
+	if hasUnion {
+		tileW = 1
+	}
+
 	if ActiveTableLayout != nil && ActiveTableLayout.Computed {
+		hasContext = ActiveTableLayout.HasContext
 		hasNs = ActiveTableLayout.HasNs
 		hasReady = ActiveTableLayout.HasReady
 		hasRestarts = ActiveTableLayout.HasRestarts
 		hasAge = ActiveTableLayout.HasAge
 		hasStatus = ActiveTableLayout.HasStatus
+		contextW = ActiveTableLayout.ContextW
 		nsW = ActiveTableLayout.NsW
 		readyW = ActiveTableLayout.ReadyW
 		restartsW = ActiveTableLayout.RestartsW
@@ -45,6 +66,9 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		anyRecentRestart = ActiveTableLayout.AnyRecentRestart
 	} else {
 		for _, item := range items {
+			if item.ClusterName != "" {
+				hasContext = true
+			}
 			if item.Namespace != "" {
 				hasNs = true
 			}
@@ -63,6 +87,9 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 
 		if ActiveMiddleScroll >= 0 && ActiveHiddenBuiltinColumns != nil {
+			if ActiveHiddenBuiltinColumns["Context"] {
+				hasContext = false
+			}
 			if ActiveHiddenBuiltinColumns["Namespace"] {
 				hasNs = false
 			}
@@ -80,6 +107,18 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 			}
 		}
 
+		if hasContext {
+			contextW = len("CONTEXT")
+			for _, item := range items {
+				if w := len(item.ClusterName); w > contextW {
+					contextW = w
+				}
+			}
+			contextW++
+			if contextW > 30 {
+				contextW = 30
+			}
+		}
 		if hasNs {
 			nsW = len("NAMESPACE")
 			for _, item := range items {
@@ -157,7 +196,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		if len(showMarker) == 0 || showMarker[0] {
 			markerW = 2
 		}
-		fixedOther := readyW + restartsW + ageW + statusW + markerW
+		fixedOther := contextW + readyW + restartsW + ageW + statusW + markerW + tileW
 		nsHeaderW := len("NAMESPACE") + 1
 		targetNs := max(width-fixedOther-(longestName+1), nsHeaderW)
 		if targetNs < nsW {
@@ -188,7 +227,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 		abbrevStatusW := abbrevMaxW + 1
 		if willShrinkAny && abbrevStatusW < statusW {
-			fixedOther := readyW + restartsW + ageW + markerW
+			fixedOther := contextW + readyW + restartsW + ageW + markerW + tileW
 			minNsW := 0
 			if hasNs {
 				minNsW = min(len("NAMESPACE")+1, nsW)
@@ -212,10 +251,13 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		if len(items) > 0 {
 			tableKind = items[0].Kind
 		}
-		extraCols = collectExtraColumns(items, width, nsW+readyW+restartsW+ageW+statusW+markerColW, tableKind)
+		extraCols = collectExtraColumns(items, width, contextW+nsW+readyW+restartsW+ageW+statusW+markerColW+tileW, tableKind)
 
 		filtered := extraCols[:0]
 		for _, ec := range extraCols {
+			if hasContext && ec.key == "Context" {
+				continue
+			}
 			if !isBuiltinColumnKey(ec.key) {
 				filtered = append(filtered, ec)
 			}
@@ -223,11 +265,13 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		extraCols = filtered
 
 		if ActiveTableLayout != nil {
+			ActiveTableLayout.HasContext = hasContext
 			ActiveTableLayout.HasNs = hasNs
 			ActiveTableLayout.HasReady = hasReady
 			ActiveTableLayout.HasRestarts = hasRestarts
 			ActiveTableLayout.HasAge = hasAge
 			ActiveTableLayout.HasStatus = hasStatus
+			ActiveTableLayout.ContextW = contextW
 			ActiveTableLayout.NsW = nsW
 			ActiveTableLayout.ReadyW = readyW
 			ActiveTableLayout.RestartsW = restartsW
@@ -246,7 +290,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 	}
 
-	order := orderedColumnKeys(hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols)
+	order := orderedColumnKeys(hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols)
 
 	if ActiveMiddleScroll >= 0 {
 		ActiveSortableColumns = ActiveSortableColumns[:0]
@@ -267,12 +311,13 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		extraTotalW += ec.width
 	}
 
-	nameW := max(width-nsW-readyW-restartsW-ageW-statusW-markerColW-extraTotalW, 10)
+	nameW := max(width-contextW-nsW-readyW-restartsW-ageW-statusW-markerColW-extraTotalW-tileW, 10)
 
 	if headerLabel == "" {
 		headerLabel = "NAME"
 	}
 	nameHeader := headerWithIndicator(headerLabel, "Name", nameW)
+	contextHeader := headerWithIndicator("CONTEXT", "Context", contextW)
 	nsHeader := headerWithIndicator("NAMESPACE", "Namespace", nsW)
 	readyHeader := headerWithIndicator("READY", "Ready", readyW)
 	rsHeader := headerWithIndicator("RS", "Restarts", restartsW)
@@ -283,9 +328,14 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	if wantMarker {
 		hdrParts = append(hdrParts, "  ")
 	}
+	if tileW > 0 {
+		// Reserve a blank cell in the header so the leading tile column
+		// stays aligned with the data rows below.
+		hdrParts = append(hdrParts, " ")
+	}
 	hdrParts = append(hdrParts, nameHeader)
 	for _, key := range order {
-		hdrParts = append(hdrParts, headerCellForKey(key, extraCols, nsHeader, readyHeader, rsHeader, statusHeader, ageHeader))
+		hdrParts = append(hdrParts, headerCellForKey(key, contextW, extraCols, contextHeader, nsHeader, readyHeader, rsHeader, statusHeader, ageHeader))
 	}
 	hdr := strings.Join(hdrParts, "")
 	b.WriteString(DimStyle.Bold(true).Render(Truncate(hdr, width)))
@@ -297,10 +347,13 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		if wantMarker {
 			x += markerColW
 		}
+		if tileW > 0 {
+			x += tileW
+		}
 		ActiveMiddleColumnLayout = append(ActiveMiddleColumnLayout, MiddleColumnRegion{Key: "Name", StartX: x, EndX: x + nameW})
 		x += nameW
 		for _, key := range order {
-			w := widthForColumnKey(key, nsW, readyW, restartsW, statusW, ageW, extraCols)
+			w := widthForColumnKey(key, contextW, nsW, readyW, restartsW, statusW, ageW, extraCols)
 			ActiveMiddleColumnLayout = append(ActiveMiddleColumnLayout, MiddleColumnRegion{Key: key, StartX: x, EndX: x + w})
 			x += w
 		}
@@ -449,6 +502,13 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 					markerPrefix = selectionMarker
 				}
 			}
+			tilePrefix := ""
+			if tileW > 0 {
+				// Cursor row: the tile must re-assert the selection style
+				// after its own SGR reset, or the highlight dies for the
+				// rest of the row.
+				tilePrefix = ClusterColorTileBgOver(item.ClusterColor, ActiveSelectedStyle(i))
+			}
 			cursorRestarts := item.Restarts
 			if hasRestarts {
 				restartCount, _ := strconv.Atoi(item.Restarts)
@@ -459,8 +519,8 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 					cursorRestarts = " " + item.Restarts
 				}
 			}
-			row := markerPrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, LiveAge(item),
-				nameW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
+			row := markerPrefix + tilePrefix + formatTableRowOrdered(displayName, ns, item.Ready, cursorRestarts, item.Status, LiveAge(item),
+				nameW, contextW, nsW, readyW, restartsW, statusW, ageW, order, extraCols, &item)
 			highlighted := false
 			if ActiveHighlightQuery != "" {
 				row = highlightNameSelectedOver(row, ActiveHighlightQuery, ActiveSelectedStyle(i))
@@ -488,7 +548,11 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 						markerPrefix = SelectionMarkerStyle.Render(selectionMarker)
 					}
 				}
-				rendered = markerPrefix + formatTableRowStyledOrdered(item, nameW, nsW, readyW, restartsW, statusW, ageW,
+				tilePrefix := ""
+				if tileW > 0 {
+					tilePrefix = ClusterColorTileBg(item.ClusterColor)
+				}
+				rendered = markerPrefix + tilePrefix + formatTableRowStyledOrdered(item, nameW, contextW, nsW, readyW, restartsW, statusW, ageW,
 					order, extraCols, anyRecentRestart)
 				if ActiveRowCache != nil {
 					ActiveRowCache[i] = rendered

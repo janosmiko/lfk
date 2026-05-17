@@ -5,7 +5,9 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -91,6 +93,17 @@ func groupHasResource(groupMap map[string][]model.CanIResource, group, resource 
 // processCanIRules converts raw access rules into grouped CanIResource entries,
 // cross-referencing with discovered CRDs for kind names.
 func (m *Model) processCanIRules(rules []k8s.AccessRule) {
+	// Defensive: this single-context path indexes discoveredResources by
+	// m.nav.Context, which is the union sentinel in union mode. The normal
+	// load flow routes through processCanIRulesUnion before reaching here,
+	// but a future caller that forgets to dispatch by mode would silently
+	// return an empty rules table. Surface that as a warning so the bug is
+	// visible in lfk.log instead of looking like a permissions issue.
+	if m.nav.Context == UnionContextSentinel {
+		logger.Warn("processCanIRules called with the union sentinel; expected processCanIRulesUnion — returning empty table")
+		m.canIGroups = nil
+		return
+	}
 	perms := buildPermLookup(rules)
 	groupMap := make(map[string][]model.CanIResource)
 
@@ -125,6 +138,83 @@ func (m *Model) processCanIRules(rules []k8s.AccessRule) {
 	}
 
 	// Sort and build result.
+	m.canIGroups = buildSortedCanIGroups(groupMap)
+}
+
+type canIResourceRef struct {
+	group    string
+	resource string
+}
+
+func addCanIResourceMeta(metas map[canIResourceRef]model.CanIResource, group, resource, kind string) {
+	if resource == "" || resource == "*" {
+		return
+	}
+	ref := canIResourceRef{group: group, resource: resource}
+	if _, ok := metas[ref]; ok {
+		return
+	}
+	if kind == "" {
+		kind = resource
+	}
+	metas[ref] = model.CanIResource{APIGroup: group, Resource: resource, Kind: kind}
+}
+
+func addCanIResourcesFromRules(metas map[canIResourceRef]model.CanIResource, rules []k8s.AccessRule) {
+	for key := range buildPermLookup(rules) {
+		if strings.HasSuffix(key, "/*") {
+			continue
+		}
+		parts := strings.SplitN(key, "/", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		addCanIResourceMeta(metas, parts[0], parts[1], parts[1])
+	}
+}
+
+func (m *Model) processCanIRulesUnion(contextRules []canIContextRules) {
+	if len(contextRules) == 0 {
+		m.canIGroups = nil
+		return
+	}
+	metas := make(map[canIResourceRef]model.CanIResource)
+	for _, contextName := range m.unionContexts {
+		for _, rt := range m.discoveredResources[contextName] {
+			addCanIResourceMeta(metas, rt.APIGroup, rt.Resource, rt.Kind)
+		}
+	}
+	lookups := make([]map[string]map[string]bool, 0, len(contextRules))
+	for _, cr := range contextRules {
+		lookups = append(lookups, buildPermLookup(cr.rules))
+		addCanIResourcesFromRules(metas, cr.rules)
+	}
+
+	groupMap := make(map[string][]model.CanIResource)
+	for ref, meta := range metas {
+		verbs := make(map[string]bool, len(canIAllVerbs))
+		states := make(map[string]model.CanIVerbState, len(canIAllVerbs))
+		for _, verb := range canIAllVerbs {
+			allowedCount := 0
+			for _, lookup := range lookups {
+				if resolveVerbs(lookup, ref.group, ref.resource)[verb] {
+					allowedCount++
+				}
+			}
+			switch allowedCount {
+			case len(lookups):
+				verbs[verb] = true
+				states[verb] = model.CanIVerbAllowed
+			case 0:
+				states[verb] = model.CanIVerbDenied
+			default:
+				states[verb] = model.CanIVerbMixed
+			}
+		}
+		meta.Verbs = verbs
+		meta.VerbStates = states
+		groupMap[ref.group] = append(groupMap[ref.group], meta)
+	}
 	m.canIGroups = buildSortedCanIGroups(groupMap)
 }
 
@@ -207,6 +297,10 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	// Tab from forward (Can-I) view enters Who-Can mode.
 	if msg.String() == "tab" {
+		if m.isUnionSentinel() {
+			m.setStatusMessage("Who-Can requires a single context", true)
+			return m, scheduleStatusClear()
+		}
 		return m.enterWhoCanMode()
 	}
 
@@ -539,11 +633,8 @@ func (m *Model) canIVisibleLines() int {
 func filterAllowedResources(resources []model.CanIResource) []model.CanIResource {
 	filtered := make([]model.CanIResource, 0, len(resources))
 	for _, r := range resources {
-		for _, allowed := range r.Verbs {
-			if allowed {
-				filtered = append(filtered, r)
-				break
-			}
+		if r.HasAnyAllowedOrMixedVerb() {
+			filtered = append(filtered, r)
 		}
 	}
 	return filtered
@@ -553,11 +644,8 @@ func filterAllowedResources(resources []model.CanIResource) []model.CanIResource
 func countAllowedResources(resources []model.CanIResource) int {
 	count := 0
 	for _, r := range resources {
-		for _, allowed := range r.Verbs {
-			if allowed {
-				count++
-				break
-			}
+		if r.HasAnyAllowedOrMixedVerb() {
+			count++
 		}
 	}
 	return count

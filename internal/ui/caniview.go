@@ -223,10 +223,14 @@ func renderCanIResources(resources []model.CanIResource, width, maxLines, scroll
 		verbParts := make([]string, 0, len(canIVerbs))
 		for _, v := range canIVerbs {
 			colW := canIVerbColWidth(v.label)
-			if r.Verbs[v.verb] {
+			switch r.VerbState(v.verb) {
+			case model.CanIVerbAllowed:
 				padded := "\u2713" + strings.Repeat(" ", colW-1)
 				verbParts = append(verbParts, lipgloss.NewStyle().Foreground(ThemeColor("2")).Background(BaseBg).Render(padded))
-			} else {
+			case model.CanIVerbMixed:
+				padded := "?" + strings.Repeat(" ", colW-1)
+				verbParts = append(verbParts, lipgloss.NewStyle().Foreground(lipgloss.Color(ColorWarning)).Background(BaseBg).Render(padded))
+			default:
 				padded := "\u00b7" + strings.Repeat(" ", colW-1)
 				verbParts = append(verbParts, DimStyle.Render(padded))
 			}

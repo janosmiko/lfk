@@ -16,6 +16,7 @@ import (
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 
 	"github.com/janosmiko/lfk/internal/app"
+	"github.com/janosmiko/lfk/internal/completion"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -44,6 +45,8 @@ File locations:
 	}
 
 	rootCmd.Flags().StringVar(&cliOpts.Context, "context", "", "Kubernetes context to use")
+	rootCmd.Flags().StringArrayVar(&cliOpts.UnionContexts, "union-context", nil, "Cluster context to include in union view (repeatable; requires --namespace)")
+	rootCmd.Flags().StringVar(&cliOpts.UnionSet, "union-set", "", "Named union_sets entry from config to expand into a union view (mutex with --union-context and --context; --namespace overrides the set's namespace)")
 	rootCmd.Flags().StringSliceVarP(&cliOpts.Namespaces, "namespace", "n", nil, "Namespace(s) to filter (repeatable, disables all-namespaces mode)")
 	rootCmd.Flags().StringVar(&cliOpts.Kubeconfig, "kubeconfig", "", "Path to kubeconfig file (overrides default discovery)")
 	rootCmd.Flags().StringArrayVar(&cliOpts.KubeconfigDirs, "kubeconfig-dir", nil, "Directory to scan for kubeconfig files instead of ~/.kube/config.d/. Repeatable: pass multiple flags to merge several directories. Also accepts KUBECONFIG_DIR env var (colon-separated). ~/ is expanded against $HOME.")
@@ -52,6 +55,8 @@ File locations:
 	rootCmd.Flags().BoolVar(&cliOpts.NoColor, "no-color", false, "Disable foreground/background colors; keep bold/reverse for visibility. Also honors the NO_COLOR env var.")
 	rootCmd.Flags().BoolVar(&cliOpts.ReadOnly, "read-only", false, "Disable all mutating actions (delete/edit/scale/restart/exec/port-forward/drain/cordon). Also configurable as read_only: true (global) or clusters.<ctx>.read_only (per-context) in config.")
 	rootCmd.Flags().DurationVar(&cliOpts.WatchInterval, "watch-interval", 0, "Watch mode polling interval (e.g. 500ms, 2s, 1m). Clamped to [500ms, 10m]. Overrides config.")
+
+	completion.RegisterShellCompletions(rootCmd)
 
 	rootCmd.Version = version.Full()
 	rootCmd.SetVersionTemplate("{{.Version}}\n")
@@ -64,6 +69,7 @@ File locations:
 		},
 	}
 	rootCmd.AddCommand(versionCmd)
+	rootCmd.AddCommand(completion.NewCompletionCommand(rootCmd))
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintf(os.Stderr, "Error: %v\n", err)
@@ -123,6 +129,17 @@ func runTUI(opts app.StartupOptions) error {
 	client.SetKubesharkNamespace(ui.ConfigKubesharkNamespace)
 	client.SetInformerCacheMode(k8s.InformerCacheMode(ui.ConfigInformerCacheMode))
 	defer client.Shutdown()
+
+	// --union-set expansion runs AFTER LoadConfig (it reads ui.ConfigUnionSets)
+	// and BEFORE ValidateUnionOptions (which then enforces context existence
+	// and the cluster cap on the resolved list).
+	opts, err = app.ResolveUnionSet(opts, unionSetLookup(ui.ConfigUnionSets, client))
+	if err != nil {
+		return err
+	}
+	if err := app.ValidateUnionOptions(opts, client.ContextExists); err != nil {
+		return err
+	}
 
 	if err := logger.Init(ui.ConfigLogPath); err != nil {
 		fmt.Fprintf(os.Stderr, "Warning: could not initialize logger: %v\n", err)
@@ -214,4 +231,38 @@ func validatePprofAddr(addr string) error {
 		return fmt.Errorf("host %q is not a loopback address", host)
 	}
 	return nil
+}
+
+// unionSetLookup adapts the ui-package config slice to the
+// app.UnionSetLookup signature ResolveUnionSet expects. Captured into a
+// closure so the resolver doesn't grow an import on the ui package and
+// stays unit-testable with a hand-rolled lookup. Flattens the per-cluster
+// objects into the parallel (contexts, colors-map) shape the resolver
+// passes downstream. The namespace resolver can also see explicit kubeconfig
+// context namespaces through the already-constructed client.
+func unionSetLookup(sets []ui.UnionSetConfig, client *k8s.Client) app.UnionSetLookup {
+	return func(name string) (contexts []string, namespace string, colors map[string]string, ok bool) {
+		var namespaceLookup func(string) (string, bool)
+		if client != nil {
+			namespaceLookup = client.ContextNamespace
+		}
+		for _, s := range sets {
+			if s.Name != name {
+				continue
+			}
+			ctxs, ns, cols, err := app.ExpandUnionSetConfig(s, namespaceLookup)
+			if err != nil {
+				// The lookup signature can't carry an error back to
+				// ResolveUnionSet, so surface the malformed-set message via
+				// the kubeconfig context name so it reads naturally in the
+				// downstream "context not found" error path. Tests cover the
+				// happy path; production users with this bug will see the
+				// validation error at startup with the offending set name.
+				logger.Error("union set is malformed", "error", err)
+				return nil, "", nil, false
+			}
+			return ctxs, ns, cols, true
+		}
+		return nil, "", nil, false
+	}
 }

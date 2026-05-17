@@ -1,18 +1,47 @@
 package app
 
 import (
+	"context"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"time"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
+
+// discoveryCacheLoadedMsg carries the result of an async startup-time
+// preload of the per-host discovery snapshots. The handler in update.go
+// merges entries into m.discoveredResources, layered behind any live
+// apiResourceDiscoveryMsg that has already arrived for the same context.
+type discoveryCacheLoadedMsg struct {
+	cached map[string][]model.ResourceTypeEntry
+}
+
+// discoveryCachePreloadCmd reads the discovery cache off the main goroutine.
+// loadAllDiscoveryCaches walks every kubeconfig context and calls
+// clientcmd.ClientConfig() on each to extract the apiserver host — at one
+// real-world scale (block-sre-operator-style kubeconfig with ~1200 contexts
+// in a single file) this re-parses the kubeconfig ~1200× and serialises the
+// whole startup behind a multi-second clientcmd loop. Running it as a tea.Cmd
+// lets NewModel return immediately so the first frame renders with seed
+// resources; the cache then lands and overlays the seed list when ready.
+//
+// reqCtx lets a user-initiated quit short-circuit the loop instead of
+// waiting for the full walk to finish. Without this plumbing a Ctrl+C
+// during preload of a 1200-context kubeconfig would block until every
+// host's cache file had been read and parsed.
+func discoveryCachePreloadCmd(reqCtx context.Context, client *k8s.Client) tea.Cmd {
+	return func() tea.Msg {
+		return discoveryCacheLoadedMsg{cached: loadAllDiscoveryCaches(reqCtx, client)}
+	}
+}
 
 // discoveryCacheSchemaVersion bumps whenever the on-disk shape changes.
 // loadDiscoveryCacheForHost rejects unknown versions so older binaries don't
@@ -152,7 +181,12 @@ func saveDiscoveryCacheForHost(host string, entries []model.ResourceTypeEntry) e
 // to plug into m.discoveredResources. Contexts with unresolvable hosts or
 // missing cache files are silently skipped — they fall through to live
 // discovery on first interaction.
-func loadAllDiscoveryCaches(client *k8s.Client) map[string][]model.ResourceTypeEntry {
+//
+// reqCtx is checked at the top of every iteration so a cancellation during
+// the walk (e.g. user quit) returns whatever was loaded so far instead of
+// processing the rest. With a kubeconfig of ~1200 contexts the loop is
+// minutes long under cold disk, and a quit must not block on it.
+func loadAllDiscoveryCaches(reqCtx context.Context, client *k8s.Client) map[string][]model.ResourceTypeEntry {
 	if client == nil {
 		return nil
 	}
@@ -163,6 +197,9 @@ func loadAllDiscoveryCaches(client *k8s.Client) map[string][]model.ResourceTypeE
 	out := make(map[string][]model.ResourceTypeEntry)
 	hostCache := make(map[string]*DiscoveryCacheHostState)
 	for _, ctx := range contexts {
+		if reqCtx != nil && reqCtx.Err() != nil {
+			return out
+		}
 		host := client.HostForContext(ctx.Name)
 		if host == "" {
 			continue

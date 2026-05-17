@@ -193,12 +193,20 @@ func styledRestartsCell(item model.Item, restartsW int, anyRecentRestart bool) s
 // handling upstream (e.g. the cursor row preprocesses restarts for arrow
 // alignment).
 func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
-	nameW, nsW, readyW, restartsW, statusW, ageW int,
+	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, item *model.Item,
 ) string {
 	var row strings.Builder
 	row.WriteString(padRight(Truncate(name, nameW-1), nameW))
 	for _, key := range order {
+		if key == "Context" && contextW > 0 {
+			contextName := ""
+			if item != nil {
+				contextName = item.ClusterName
+			}
+			row.WriteString(padRight(Truncate(contextName, contextW-1), contextW))
+			continue
+		}
 		if isBuiltinColumnKey(key) {
 			row.WriteString(plainBuiltinCell(key, ns, ready, restarts, status, age,
 				nsW, readyW, restartsW, statusW, ageW))
@@ -219,12 +227,16 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 // column order. Name (with icon handling) is always emitted first via the
 // existing styled name helper; the rest is dispatched per-key.
 func formatTableRowStyledOrdered(item model.Item,
-	nameW, nsW, readyW, restartsW, statusW, ageW int,
+	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, anyRecentRestart bool,
 ) string {
 	var base strings.Builder
 	base.WriteString(styledNameCell(item, nameW))
 	for _, key := range order {
+		if key == "Context" && contextW > 0 {
+			base.WriteString(DimStyle.Render(padRight(Truncate(item.ClusterName, contextW-1), contextW)))
+			continue
+		}
 		if isBuiltinColumnKey(key) {
 			base.WriteString(styledBuiltinCell(key, item, nsW, readyW, restartsW, statusW, ageW, anyRecentRestart))
 			continue

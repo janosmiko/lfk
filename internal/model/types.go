@@ -60,12 +60,50 @@ type PrinterColumn struct {
 	JSONPath string // e.g. ".status.phase", ".spec.source.repoURL"
 }
 
+// CanIVerbState is the display state for one RBAC verb in the Can-I view.
+type CanIVerbState int
+
+const (
+	CanIVerbDenied CanIVerbState = iota
+	CanIVerbAllowed
+	CanIVerbMixed
+)
+
 // CanIResource represents a single resource type with its RBAC permissions.
 type CanIResource struct {
 	APIGroup string
 	Resource string          // plural name (e.g., "deployments")
 	Kind     string          // kind name (e.g., "Deployment")
 	Verbs    map[string]bool // verb -> allowed
+	// VerbStates carries the union-view three-state result. When unset,
+	// renderers and filters fall back to Verbs for the single-context path.
+	VerbStates map[string]CanIVerbState
+}
+
+func (r CanIResource) VerbState(verb string) CanIVerbState {
+	if r.VerbStates != nil {
+		if state, ok := r.VerbStates[verb]; ok {
+			return state
+		}
+	}
+	if r.Verbs[verb] {
+		return CanIVerbAllowed
+	}
+	return CanIVerbDenied
+}
+
+func (r CanIResource) HasAnyAllowedOrMixedVerb() bool {
+	for _, allowed := range r.Verbs {
+		if allowed {
+			return true
+		}
+	}
+	for _, state := range r.VerbStates {
+		if state == CanIVerbAllowed || state == CanIVerbMixed {
+			return true
+		}
+	}
+	return false
 }
 
 // CanIGroup represents an API group with its resources for the can-i browser.
@@ -118,9 +156,12 @@ var ConfigDefaultRightsizingHeadroom float64
 
 // GroupedRef identifies a single resource within a grouped row (e.g., one
 // of the many Event objects collapsed into a single line by event grouping).
+// ClusterName is set in union mode so the bulk dispatcher can route each ref
+// to its source cluster; empty otherwise.
 type GroupedRef struct {
-	Name      string
-	Namespace string
+	Name        string
+	Namespace   string
+	ClusterName string
 }
 
 // Item represents a single navigable entry in any column.
@@ -140,6 +181,7 @@ type Item struct {
 	LastSeen      time.Time        // Most recent observation (Events only — drives the "Last Seen" column)
 	Columns       []KeyValue       // Additional resource fields for summary preview
 	Conditions    []ConditionEntry // Status conditions for the details pane
+	ClusterName   string           // Source cluster in union mode; empty in normal mode
 	Selected      bool             // Whether this item is part of a multi-selection
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
@@ -160,6 +202,24 @@ type Item struct {
 	// aligned regardless of which markers are present.
 	IsContext   bool
 	GroupedRefs []GroupedRef // For grouped rows (Events): all underlying resource identifiers
+}
+
+// SelectionKey returns the stable map key identifying this item in a
+// multi-selection set. Union-mode rows carry a non-empty ClusterName, which
+// is prepended so the same name+namespace appearing in two clusters stays
+// distinct; non-union rows produce the legacy "namespace/name" (or bare
+// "name") form. This is the single source of truth for the key: both the
+// app's selection store and the ui renderer's selected-row check derive
+// their keys here so the two can never drift.
+func (i Item) SelectionKey() string {
+	base := i.Name
+	if i.Namespace != "" {
+		base = i.Namespace + "/" + i.Name
+	}
+	if i.ClusterName != "" {
+		return i.ClusterName + ":" + base
+	}
+	return base
 }
 
 // MissingRefStatus is the Status string assigned to a ResourceNode whose
@@ -226,6 +286,7 @@ type PodMetrics struct {
 type Bookmark struct {
 	Name         string   `json:"name" yaml:"name"`
 	Context      string   `json:"context,omitempty" yaml:"context,omitempty"`
+	UnionSet     string   `json:"union_set,omitempty" yaml:"union_set,omitempty"`
 	Namespace    string   `json:"namespace" yaml:"namespace"`
 	Namespaces   []string `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
 	ResourceType string   `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
@@ -234,10 +295,11 @@ type Bookmark struct {
 }
 
 // IsContextAware reports whether this bookmark is anchored to a specific
-// kube context. Context-aware bookmarks switch to their stored context on
-// jump; context-free bookmarks use whatever context is currently active.
+// kube context or named union set. Context-aware bookmarks switch to their
+// stored target on jump; context-free bookmarks use whatever target is
+// currently active.
 func (b Bookmark) IsContextAware() bool {
-	return b.Context != ""
+	return b.Context != "" || b.UnionSet != ""
 }
 
 // ActionMenuItem represents an entry in the action menu.

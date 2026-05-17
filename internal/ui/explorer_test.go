@@ -48,6 +48,20 @@ func TestIsItemSelected(t *testing.T) {
 		assert.False(t, isItemSelected(model.Item{Name: "my-pod", Namespace: "kube-system"}))
 		assert.False(t, isItemSelected(model.Item{Name: "my-pod"}))
 	})
+
+	t.Run("union row matches its cluster-scoped key", func(t *testing.T) {
+		origSel := ActiveSelectedItems
+		// The app stores union selections under "<cluster>:<ns>/<name>"
+		// (model.Item.SelectionKey); the renderer must look them up the
+		// same way or the multi-select checkmark never appears in union view.
+		ActiveSelectedItems = map[string]bool{"prod:default/my-pod": true}
+		defer func() { ActiveSelectedItems = origSel }()
+		assert.True(t, isItemSelected(model.Item{Name: "my-pod", Namespace: "default", ClusterName: "prod"}))
+		assert.False(t, isItemSelected(model.Item{Name: "my-pod", Namespace: "default", ClusterName: "staging"}),
+			"the same name+namespace in a different cluster must not match")
+		assert.False(t, isItemSelected(model.Item{Name: "my-pod", Namespace: "default"}),
+			"the non-union key form must not match a cluster-scoped selection")
+	})
 }
 
 // --- highlightName ---

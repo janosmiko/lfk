@@ -95,6 +95,10 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			m.kubetrisGame.paused = true
 		}
 		if m.mode != modeHelp {
+			if m.unionMode {
+				m.setStatusMessage("New tab is not available in union view", true)
+				return m, scheduleStatusClear(), true
+			}
 			if len(m.tabs) >= 9 {
 				m.setStatusMessage("Max 9 tabs", true)
 				return m, scheduleStatusClear(), true
@@ -319,6 +323,17 @@ func (m Model) handleKeyPrevMatch() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
+	return m.openNamespaceSelectorForContext(m.activeContext())
+}
+
+func (m Model) namespaceSelectorItems(items []model.Item) []model.Item {
+	if m.pendingUnionSetName != "" || m.unionMode {
+		return append([]model.Item(nil), items...)
+	}
+	return buildNamespaceOverlayItems(items)
+}
+
+func (m Model) openNamespaceSelectorForContext(contextName string) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNamespace
 	m.overlayFilter.Clear()
 	ui.ResetOverlayNsScroll()
@@ -331,9 +346,9 @@ func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
 	// stale-while-revalidate refresh to swap in fresh data shortly after.
 	// Only the empty/missing-cache case still pays the loading-spinner +
 	// API round-trip path the original implementation always took.
-	entry, ok := m.cachedNamespaces[m.activeContext()]
+	entry, ok := m.cachedNamespaces[contextName]
 	if ok && len(entry.items) > 0 {
-		m.overlayItems = buildNamespaceOverlayItems(entry.items)
+		m.overlayItems = m.namespaceSelectorItems(entry.items)
 		m.overlayCursor = namespaceOverlayCursor(m.overlayItems, m.namespace, m.allNamespaces)
 		m.loading = false
 		// ensureNamespaceCacheFresh returns nil when the entry is fresh
@@ -341,13 +356,13 @@ func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
 		// namespaceCacheTTL — the silent flag keeps the spinner off and
 		// makes updateNamespacesLoaded skip the overlay-state rewrite, so
 		// the user's cursor and item list survive the background refresh.
-		return m, m.ensureNamespaceCacheFresh()
+		return m, m.ensureNamespaceCacheFreshForContext(contextName)
 	}
 
 	m.overlayItems = nil // populated when namespacesLoadedMsg arrives
 	m.overlayCursor = 0
 	m.loading = true
-	return m, m.loadNamespaces()
+	return m, m.loadNamespacesForContext(contextName, false)
 }
 
 func (m Model) handleKeyWatchMode() (tea.Model, tea.Cmd) {

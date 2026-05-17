@@ -187,7 +187,7 @@ func (m Model) updateEventTimeline(msg eventTimelineMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
-	if msg.context == m.nav.Context {
+	if msg.context == m.dashboardPreviewTargetContext() {
 		m.dashboardPreview = msg.content
 		m.dashboardEventsPreview = msg.events
 	}
@@ -195,7 +195,7 @@ func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
 }
 
 func (m Model) updateMonitoringDashboard(msg monitoringDashboardMsg) Model {
-	if msg.context == m.nav.Context {
+	if msg.context == m.dashboardPreviewTargetContext() {
 		m.monitoringPreview = msg.content
 	}
 	return m

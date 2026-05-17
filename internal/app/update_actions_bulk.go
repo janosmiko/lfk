@@ -43,8 +43,12 @@ func (m Model) openBulkSelectionMenu() Model {
 		actions = filtered
 	}
 	var items []model.Item
+	_, targetReadOnly := m.bulkReadOnlyContext()
 	for _, a := range actions {
-		if m.readOnly && isMutatingAction(a.Label) {
+		if targetReadOnly && isMutatingAction(a.Label) {
+			continue
+		}
+		if m.isUnionSentinel() && !isUnionAllowedActionForKind(kind, a.Label) {
 			continue
 		}
 		items = append(items, model.Item{

@@ -470,18 +470,56 @@ func TestDefaultRightsizingHeadroomIsInPickerList(t *testing.T) {
 
 func TestBookmarkIsContextAware(t *testing.T) {
 	tests := []struct {
-		name    string
-		context string
-		want    bool
+		name     string
+		context  string
+		unionSet string
+		want     bool
 	}{
-		{name: "empty context is context-free", context: "", want: false},
+		{name: "empty target is context-free", want: false},
 		{name: "populated context is context-aware", context: "prod-cluster", want: true},
+		{name: "populated union set is context-aware", unionSet: "staging-west", want: true},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			bm := Bookmark{Context: tt.context}
+			bm := Bookmark{Context: tt.context, UnionSet: tt.unionSet}
 			if got := bm.IsContextAware(); got != tt.want {
 				t.Errorf("IsContextAware() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestItemSelectionKey(t *testing.T) {
+	tests := []struct {
+		name string
+		item Item
+		want string
+	}{
+		{
+			name: "non-namespaced non-union row uses the bare name",
+			item: Item{Name: "node-1"},
+			want: "node-1",
+		},
+		{
+			name: "namespaced non-union row uses namespace/name",
+			item: Item{Name: "my-pod", Namespace: "default"},
+			want: "default/my-pod",
+		},
+		{
+			name: "union row prepends the cluster to a namespaced key",
+			item: Item{Name: "my-pod", Namespace: "default", ClusterName: "prod"},
+			want: "prod:default/my-pod",
+		},
+		{
+			name: "union row prepends the cluster to a non-namespaced key",
+			item: Item{Name: "node-1", ClusterName: "prod"},
+			want: "prod:node-1",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.item.SelectionKey(); got != tt.want {
+				t.Errorf("SelectionKey() = %q, want %q", got, tt.want)
 			}
 		})
 	}

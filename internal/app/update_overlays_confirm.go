@@ -13,7 +13,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "enter", "y", "Y":
 		// Read-only safety net: if RO was toggled on while a confirm overlay
 		// was already showing, refuse to commit the mutation.
-		if m.readOnly && isMutatingAction(m.pendingAction) {
+		if m.pendingActionBlockedByReadOnly() {
 			m.overlay = overlayNone
 			label := m.pendingAction
 			m.pendingAction = ""
@@ -36,12 +36,25 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			nsArg = " -n " + ns
 		}
 
-		// Bulk delete.
+		// Bulk path. Dispatch by pendingAction so Restart and Delete go to
+		// the right command (older code blindly fell through to bulk delete
+		// regardless of pendingAction, which was safe only as long as
+		// Restart never reached this overlay — that changed when we
+		// gated bulk Restart behind a confirm).
 		if m.bulkMode && len(m.bulkItems) > 0 {
 			m.clearSelection()
 			expanded := expandGroupedItems(m.bulkItems)
-			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
-			return m, m.bulkDeleteResources()
+			switch action {
+			case "Restart":
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout restart %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
+				return m, m.bulkRestartResources()
+			default:
+				// Default remains Delete for compatibility with existing
+				// callers that opened overlayConfirm without setting
+				// pendingAction.
+				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
+				return m, m.bulkDeleteResources()
+			}
 		}
 
 		if action == "Drain" {
@@ -82,7 +95,7 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "enter":
 		if m.confirmTypeInput.Value == "DELETE" {
 			// Read-only safety net for force-delete / finalizer-remove paths.
-			if m.readOnly && isMutatingAction(m.pendingAction) {
+			if m.pendingActionBlockedByReadOnly() {
 				m.overlay = overlayNone
 				label := m.pendingAction
 				m.pendingAction = ""
@@ -174,7 +187,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		// Belt-and-suspenders read-only gate: the dispatcher already blocks
 		// "Scale" upstream, but a user who toggled RO on while this overlay
 		// was open could otherwise commit a scale operation.
-		if m.readOnly {
+		if m.actionTargetBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
 			m.setStatusMessage(readOnlyBlockedMessage("Scale"), true)
@@ -238,7 +251,7 @@ func (m Model) handlePVCResizeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.scaleInput.Clear()
 			return m, scheduleStatusClear()
 		}
-		if m.readOnly {
+		if m.actionTargetBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
 			m.setStatusMessage(readOnlyBlockedMessage("Resize PVC"), true)

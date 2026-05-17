@@ -1,9 +1,11 @@
 package ui
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"sigs.k8s.io/yaml"
 
@@ -164,6 +166,61 @@ type configFile struct {
 	// precedence (repeatable), then the KUBECONFIG_DIR env var (colon-separated),
 	// then this config value.
 	KubeconfigDir *kubeconfigDirsSetting `json:"kubeconfig_dir" yaml:"kubeconfig_dir"`
+	// UnionSets defines named multi-cluster groups for the --union-set CLI
+	// flag. Each set bundles a list of contexts and an optional default
+	// namespace so users don't have to retype long --union-context lists
+	// for the same recurring cluster groups (e.g. blue/green/canary).
+	// CLI --namespace overrides the per-set namespace; --union-context and
+	// --context are mutually exclusive with --union-set.
+	UnionSets UnionSetsConfig `json:"union_sets" yaml:"union_sets"`
+}
+
+// UnionSetsConfig accepts both supported top-level shapes:
+//
+//	union_sets:
+//	  - name: staging
+//	    contexts: [...]
+//
+// and:
+//
+//	union_sets:
+//	  staging:
+//	    contexts: [...]
+//
+// The map form is the preferred shape for copy/paste config because the key is
+// exactly what --union-set and the cluster picker reference.
+type UnionSetsConfig []UnionSetConfig
+
+func (sets *UnionSetsConfig) UnmarshalJSON(data []byte) error {
+	var list []UnionSetConfig
+	if err := json.Unmarshal(data, &list); err == nil {
+		*sets = list
+		return nil
+	}
+
+	var mapped map[string]struct {
+		Contexts  []UnionSetContextConfig `json:"contexts" yaml:"contexts"`
+		Namespace string                  `json:"namespace" yaml:"namespace"`
+	}
+	if err := json.Unmarshal(data, &mapped); err != nil {
+		return err
+	}
+	out := make([]UnionSetConfig, 0, len(mapped))
+	names := make([]string, 0, len(mapped))
+	for name := range mapped {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	for _, name := range names {
+		cfg := mapped[name]
+		out = append(out, UnionSetConfig{
+			Name:      name,
+			Contexts:  cfg.Contexts,
+			Namespace: cfg.Namespace,
+		})
+	}
+	*sets = out
+	return nil
 }
 
 // SchedulerConfig holds the runtime knobs for the priority task
@@ -184,6 +241,67 @@ type KubesharkConfig struct {
 	// Namespace where Service kubeshark-hub lives. Empty / unset falls
 	// back to DefaultKubesharkNamespace ("kubeshark").
 	Namespace string `json:"namespace" yaml:"namespace"`
+}
+
+// UnionSetConfig is the on-disk schema for one entry under union_sets.
+type UnionSetConfig struct {
+	// Name is the identifier used by --union-set to reference this entry.
+	// Must be unique across UnionSets; duplicates are dropped at apply
+	// time (last wins) with a startup warning.
+	Name string `json:"name" yaml:"name"`
+	// Contexts is the list of cluster entries to merge in this union view.
+	// Subject to the same MaxUnionContexts cap and existence check as
+	// repeated --union-context flags. Each entry carries the kubeconfig
+	// context name plus an optional per-cluster color used to paint the
+	// 1-cell row tile in the merged view.
+	Contexts []UnionSetContextConfig `json:"contexts" yaml:"contexts"`
+	// Namespace is the namespace lfk opens in when this set is selected.
+	// Optional: when empty, lfk can still use a member entry namespace or
+	// an explicit kubeconfig context namespace. When set, --namespace on
+	// the CLI overrides this value.
+	Namespace string `json:"namespace" yaml:"namespace"`
+}
+
+// UnionSetContextConfig identifies one cluster within a union set, plus
+// optional per-set metadata used when this named view is activated.
+// The color lives inside the set rather than the global cluster_colors map
+// so users can pick deliberate "traffic light" semantics per view (e.g. the
+// canary is green in this set, the prod-blue marker stays blue) without
+// affecting the cluster picker's global per-context tints.
+//
+// The color name must be one of ui.ClusterColorNames; invalid values are
+// dropped at sanitize time with a warning, leaving the entry usable but
+// untinted (the row gets a blank reserved cell instead of a colored tile).
+type UnionSetContextConfig struct {
+	Context   string `json:"context" yaml:"context"`
+	Color     string `json:"color"   yaml:"color"`
+	Namespace string `json:"namespace" yaml:"namespace"`
+}
+
+func (c *UnionSetContextConfig) UnmarshalJSON(data []byte) error {
+	var name string
+	if err := json.Unmarshal(data, &name); err == nil {
+		c.Context = name
+		c.Color = ""
+		c.Namespace = ""
+		return nil
+	}
+	var obj struct {
+		Context   string `json:"context" yaml:"context"`
+		Name      string `json:"name" yaml:"name"`
+		Color     string `json:"color" yaml:"color"`
+		Namespace string `json:"namespace" yaml:"namespace"`
+	}
+	if err := json.Unmarshal(data, &obj); err != nil {
+		return err
+	}
+	c.Context = obj.Context
+	if c.Context == "" {
+		c.Context = obj.Name
+	}
+	c.Color = obj.Color
+	c.Namespace = obj.Namespace
+	return nil
 }
 
 // clusterConfig holds per-cluster configuration overrides.

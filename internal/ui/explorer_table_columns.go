@@ -1,7 +1,7 @@
 package ui
 
-// isBuiltinColumnKey reports whether key is one of the five mandatory
-// built-in column keys.
+// isBuiltinColumnKey reports whether key is one of the fixed built-in item
+// field columns other than the union-only Context column.
 func isBuiltinColumnKey(key string) bool {
 	switch key {
 	case "Namespace", "Ready", "Restarts", "Status", "Age":
@@ -12,8 +12,11 @@ func isBuiltinColumnKey(key string) bool {
 
 // orderedColumnKeys returns the ordered list of column keys (excluding "Name")
 // that RenderTable should emit for a middle-column render.
-func orderedColumnKeys(hasNs, hasReady, hasRestarts, hasStatus, hasAge bool, extraCols []extraColumn) []string {
-	defaults := make([]string, 0, 5+len(extraCols))
+func orderedColumnKeys(hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge bool, extraCols []extraColumn) []string {
+	defaults := make([]string, 0, 6+len(extraCols))
+	if hasContext {
+		defaults = append(defaults, "Context")
+	}
 	if hasNs {
 		defaults = append(defaults, "Namespace")
 	}
@@ -62,8 +65,12 @@ func orderedColumnKeys(hasNs, hasReady, hasRestarts, hasStatus, hasAge bool, ext
 }
 
 // widthForColumnKey returns the precomputed width for a given column key.
-func widthForColumnKey(key string, nsW, readyW, restartsW, statusW, ageW int, extraCols []extraColumn) int {
+func widthForColumnKey(key string, contextW, nsW, readyW, restartsW, statusW, ageW int, extraCols []extraColumn) int {
 	switch key {
+	case "Context":
+		if contextW > 0 {
+			return contextW
+		}
 	case "Namespace":
 		return nsW
 	case "Ready":
@@ -85,10 +92,14 @@ func widthForColumnKey(key string, nsW, readyW, restartsW, statusW, ageW int, ex
 
 // headerCellForKey returns the pre-styled header cell string for a single
 // column key.
-func headerCellForKey(key string, extraCols []extraColumn,
-	nsHeader, readyHeader, rsHeader, statusHeader, ageHeader string,
+func headerCellForKey(key string, contextW int, extraCols []extraColumn,
+	contextHeader, nsHeader, readyHeader, rsHeader, statusHeader, ageHeader string,
 ) string {
 	switch key {
+	case "Context":
+		if contextW > 0 {
+			return contextHeader
+		}
 	case "Namespace":
 		return nsHeader
 	case "Ready":

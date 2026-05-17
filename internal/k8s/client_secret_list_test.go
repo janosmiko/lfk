@@ -340,7 +340,7 @@ func TestGetResources_SecretLazyLoadingDisabledUsesDynamicPath(t *testing.T) {
 	)
 
 	c := NewTestClient(nil, dc) // lazy loading off by default
-	require.False(t, c.secretLazyLoading, "precondition: flag must default to false")
+	require.False(t, c.secretLazyLoading.Load(), "precondition: flag must default to false")
 
 	items, err := c.GetResources(context.Background(), "", "default", secretRT)
 	require.NoError(t, err)

@@ -25,6 +25,7 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 	// ensures Ctrl+R toggles survive a context list refresh.
 	for i := range msg.items {
 		msg.items[i].IsContext = true
+		msg.items[i].Category = contextCategory
 		msg.items[i].ReadOnly = m.effectiveContextReadOnly(msg.items[i].Name)
 		msg.items[i].ClusterColor = m.clusterColors[msg.items[i].Name]
 		// Stamp LocalClusterStatus from the on-Model cache so the picker
@@ -36,6 +37,7 @@ func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) 
 			msg.items[i].LocalClusterStatus = e.Status
 		}
 	}
+	msg.items = m.withUnionSetRows(msg.items)
 	m.setMiddleItems(msg.items)
 	m.itemCache[m.navKey()] = m.middleItems
 	m.leftItems = nil
@@ -109,37 +111,13 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 	if isContextCanceled(msg.err) {
 		return m, nil
 	}
+	// In union mode, discovery runs against unionContexts[0] but nav.Context
+	// is the UnionContextSentinel. Treat them as equivalent for sidebar and
+	// loading state.
+	isCurrentContext := m.nav.Context == msg.context ||
+		(m.isUnionSentinel() && len(m.unionContexts) > 0 && msg.context == m.unionContexts[0])
 	if msg.err != nil {
-		// API resource discovery failed (permissions, etc.) -- fall back to
-		// seed resources so the user can still navigate.
-		logger.Info("API resource discovery failed", "context", msg.context, "error", msg.err.Error())
-		if m.nav.Context == msg.context && m.loading {
-			// Mirror the success branch's wasInitial guard. m.loading alone
-			// is unreliable as an "is this the initial discovery" signal
-			// because invalidatePreviewForCursorChange flips it true on
-			// every j/k. Without this guard, a discovery retry that lands
-			// while the user is mid-scroll calls restoreCursor and snaps
-			// the cursor back to cursorMemory[ctx] (e.g., the resource type
-			// saved by session-restore), undoing the user's navigation.
-			wasInitial := len(m.middleItems) == 0
-			m.loading = false
-			m.setMiddleItems(model.BuildSidebarItems(model.SeedResources()))
-			m.itemCache[m.navKey()] = m.middleItems
-			if wasInitial {
-				m.restoreCursor()
-			} else {
-				m.clampCursor()
-			}
-			m.syncExpandedGroup()
-		}
-		// On discovery failure, drop any queued bookmark so we don't loop
-		// retrying. The user can re-open the overlay and try again.
-		if m.bookmarkAwaitingDiscovery != nil {
-			m.bookmarkAwaitingDiscovery = nil
-			m.setStatusMessage("Resource type not found in current cluster", true)
-			return m, scheduleStatusClear()
-		}
-		return m, nil
+		return m.handleAPIResourceDiscoveryError(msg, isCurrentContext)
 	}
 	// Prepend LFK pseudo-resources (helm releases, port forwards) so they
 	// resolve via FindResourceType* and appear in the sidebar uniformly
@@ -168,9 +146,11 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			m.rightItems = merged
 		}
 	}
-	if m.nav.Context == msg.context {
-		// Update the item cache for the resource types level.
-		rtCacheKey := msg.context
+	if isCurrentContext {
+		// Update the item cache for the resource types level. In union mode
+		// use the sentinel as the cache key so navKey() lookups at
+		// LevelResourceTypes find the sidebar items correctly.
+		rtCacheKey := m.nav.Context
 		m.itemCache[rtCacheKey] = merged
 		if m.nav.Level == model.LevelResourceTypes {
 			// User is on resource types level: update the visible list.
@@ -202,7 +182,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 				rtRef := m.nav.ResourceType.ResourceRef()
 				for i, item := range merged {
 					if item.Extra == rtRef {
-						m.cursorMemory[msg.context] = i
+						m.cursorMemory[m.nav.Context] = i
 						break
 					}
 				}
@@ -229,7 +209,11 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 	// CRD discovery. Without this, quitting on an ArgoCD Application view
 	// and re-opening lfk drops the user at the resource types level instead
 	// of the saved view.
-	if m.sessionResourceTypeAwaitingDiscovery != "" && msg.context == m.nav.Context {
+	awaitingContext := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		awaitingContext = m.unionContexts[0]
+	}
+	if m.sessionResourceTypeAwaitingDiscovery != "" && msg.context == awaitingContext {
 		ref := m.sessionResourceTypeAwaitingDiscovery
 		name := m.sessionResourceNameAwaitingDiscovery
 		m.sessionResourceTypeAwaitingDiscovery = ""
@@ -244,8 +228,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			}
 			m.leftItemsHistory = append(m.leftItemsHistory[:0:0], m.leftItemsHistory...)
 			if len(m.leftItemsHistory) == 0 {
-				contexts, _ := m.client.GetContexts()
-				m.leftItemsHistory = [][]model.Item{contexts}
+				m.leftItemsHistory = [][]model.Item{m.contextsOrEmpty()}
 			}
 			m.leftItems = merged
 			m.nav.ResourceType = rt
@@ -263,6 +246,81 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 	return m, nil
 }
 
+func (m Model) handleAPIResourceDiscoveryError(msg apiResourceDiscoveryMsg, isCurrentContext bool) (Model, tea.Cmd) {
+	// API resource discovery failed (permissions, etc.) -- fall back to
+	// seed resources so the user can still navigate.
+	logger.Info("API resource discovery failed", "context", msg.context, "error", msg.err.Error())
+	if isCurrentContext && m.loading {
+		// Mirror the success branch's wasInitial guard. m.loading alone
+		// is unreliable as an "is this the initial discovery" signal
+		// because invalidatePreviewForCursorChange flips it true on
+		// every j/k. Without this guard, a discovery retry that lands
+		// while the user is mid-scroll calls restoreCursor and snaps
+		// the cursor back to cursorMemory[ctx] (e.g., the resource type
+		// saved by session-restore), undoing the user's navigation.
+		wasInitial := len(m.middleItems) == 0
+		m.loading = false
+		m.setMiddleItems(model.BuildSidebarItems(model.SeedResources()))
+		m.itemCache[m.navKey()] = m.middleItems
+		if wasInitial {
+			m.restoreCursor()
+		} else {
+			m.clampCursor()
+		}
+		m.syncExpandedGroup()
+	}
+	// On discovery failure, drop any queued bookmark so we don't loop
+	// retrying. The user can re-open the overlay and try again.
+	if m.bookmarkAwaitingDiscovery != nil {
+		m.bookmarkAwaitingDiscovery = nil
+		m.setStatusMessage("Resource type not found in current cluster", true)
+		return m, scheduleStatusClear()
+	}
+	return m, nil
+}
+
+// updateDiscoveryCacheLoaded merges per-host discovery snapshots produced by
+// the async discoveryCachePreloadCmd dispatched from Init. The live
+// apiResourceDiscoveryMsg path is authoritative: any context already marked
+// in discoveryRefreshedContexts has a fresher view from the apiserver, so
+// the stale-while-revalidate seed must not overwrite it. Contexts that
+// haven't been refreshed yet — i.e. the user hasn't navigated into them —
+// are populated so the sidebar can paint a CRD-aware list as soon as they
+// hover the context.
+func (m Model) updateDiscoveryCacheLoaded(msg discoveryCacheLoadedMsg) Model {
+	if msg.cached == nil {
+		return m
+	}
+	pseudo := model.PseudoResources()
+	for ctx, entries := range msg.cached {
+		if m.discoveryRefreshedContexts[ctx] {
+			continue
+		}
+		merged := make([]model.ResourceTypeEntry, 0, len(pseudo)+len(entries))
+		merged = append(merged, pseudo...)
+		merged = append(merged, entries...)
+		m.discoveredResources[ctx] = merged
+	}
+	// If the user is sitting at LevelResourceTypes for a context that just
+	// got hydrated, swap the seed sidebar for the cached entries. Without
+	// this, the sidebar would only update on the next user-initiated
+	// navigation. Read the cache key the same way navKey() builds it for
+	// LevelResourceTypes so we don't drift if that format changes.
+	if m.nav.Level == model.LevelResourceTypes {
+		discoveryCtx := m.nav.Context
+		if m.unionMode && m.nav.Context == UnionContextSentinel && len(m.unionContexts) > 0 {
+			discoveryCtx = m.unionContexts[0]
+		}
+		if entries, ok := m.discoveredResources[discoveryCtx]; ok && len(entries) > 0 {
+			merged := model.BuildSidebarItems(entries)
+			m.itemCache[m.nav.Context] = merged
+			m.setMiddleItems(merged)
+			m.syncExpandedGroup()
+		}
+	}
+	return m
+}
+
 func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {
 	if msg.gen != m.requestGen {
 		return m, nil // stale response, discard
@@ -275,27 +333,29 @@ func (m Model) updateResourcesLoaded(msg resourcesLoadedMsg) (tea.Model, tea.Cmd
 		m.err = msg.err
 		m.previewLoading = false
 		m.setErrorFromErr("Warning: ", msg.err)
-		return m, scheduleStatusClear()
+		if len(msg.items) == 0 {
+			return m, scheduleStatusClear()
+		}
+	} else {
+		m.err = nil
 	}
-	m.err = nil
+	partialErr := msg.err
+	var mdl tea.Model
+	var cmd tea.Cmd
 	if msg.forPreview {
-		return m.updateResourcesLoadedPreview(msg)
+		mdl = m.updateResourcesLoadedPreview(msg)
+	} else {
+		mdl, cmd = m.updateResourcesLoadedMain(msg)
 	}
-	return m.updateResourcesLoadedMain(msg)
+	if partialErr != nil {
+		return mdl, tea.Batch(cmd, scheduleStatusClear())
+	}
+	return mdl, cmd
 }
 
-func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {
+func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) Model {
 	m.previewLoading = false
-	// Filter by selected namespaces when multi-select is active.
-	if len(m.selectedNamespaces) > 1 {
-		filtered := make([]model.Item, 0, len(msg.items))
-		for _, item := range msg.items {
-			if item.Namespace == "" || m.selectedNamespaces[item.Namespace] {
-				filtered = append(filtered, item)
-			}
-		}
-		msg.items = filtered
-	}
+	msg.items = m.filterLoadedItemsBySelectedNamespaces(msg.items)
 	// Prime itemCache under the drill-in navKey so loadResources can serve
 	// the list instantly and skip a redundant fetch when the user drills
 	// in or re-hovers this rt later. Only do this when msg.rt carries a
@@ -331,24 +391,38 @@ func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) (tea.Model, 
 	if len(m.rightItems) == 0 {
 		logger.Info("No child resources found", "resourceType", m.nav.ResourceType.Kind, "resource", m.nav.ResourceName)
 	}
-	return m, nil
+	return m
 }
 
 func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea.Cmd) {
-	// Filter by selected namespaces when multi-select is active.
-	if len(m.selectedNamespaces) > 1 {
-		filtered := make([]model.Item, 0, len(msg.items))
-		for _, item := range msg.items {
-			if item.Namespace == "" || m.selectedNamespaces[item.Namespace] {
-				filtered = append(filtered, item)
-			}
-		}
-		msg.items = filtered
-	}
+	msg.items = m.filterLoadedItemsBySelectedNamespaces(msg.items)
 	if len(msg.items) == 0 {
 		logger.Info("No resources found", "resourceType", m.nav.ResourceType.Kind, "namespace", m.namespace)
 	}
 	prevName, prevNs, prevExtra, prevKind := m.cursorItemKey()
+	// In union mode, items with the same name exist in multiple clusters.
+	// Capture the source cluster before items are replaced so we can prefer
+	// the exact cluster when restoring the cursor (otherwise it always jumps
+	// to the first alphabetical cluster's entry).
+	prevCluster := ""
+	if m.unionMode {
+		if visible := m.visibleMiddleItems(); m.cursor() < len(visible) {
+			prevCluster = visible[m.cursor()].ClusterName
+		}
+		// Stamp the per-row cluster color from the union-set's per-cluster
+		// color map so the table renderer can paint a 1-cell color tile
+		// per row. Items whose source cluster has no configured color in
+		// the union_sets entry get an empty string and the renderer
+		// reserves a blank cell for alignment. Sourced from the per-set
+		// map rather than the global clusterColors so users can pick
+		// deliberate "traffic light" semantics per view without
+		// disturbing the cluster picker's global tints.
+		for i := range msg.items {
+			if cn := msg.items[i].ClusterName; cn != "" {
+				msg.items[i].ClusterColor = m.unionContextColors[cn]
+			}
+		}
+	}
 
 	kind := m.nav.ResourceType.Kind
 	if (kind == "Pod" || kind == "Node") && len(m.middleItems) > 0 {
@@ -391,6 +465,20 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 			}
 		}
 		m.pendingTarget = ""
+	} else if m.unionMode && prevCluster != "" {
+		// In union mode, prefer the exact cluster match to avoid jumping to
+		// the first alphabetical cluster when names are shared across clusters.
+		restored := false
+		for i, item := range m.visibleMiddleItems() {
+			if item.Name == prevName && item.Namespace == prevNs && item.ClusterName == prevCluster {
+				m.setCursor(i)
+				restored = true
+				break
+			}
+		}
+		if !restored {
+			m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
+		}
 	} else {
 		m.restoreCursorToItem(prevName, prevNs, prevExtra, prevKind)
 	}
@@ -426,6 +514,20 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 	return m, tea.Batch(cmds...)
 }
 
+func (m Model) filterLoadedItemsBySelectedNamespaces(items []model.Item) []model.Item {
+	// Filter by selected namespaces when multi-select is active.
+	if len(m.selectedNamespaces) <= 1 {
+		return items
+	}
+	filtered := make([]model.Item, 0, len(items))
+	for _, item := range items {
+		if item.Namespace == "" || m.selectedNamespaces[item.Namespace] {
+			filtered = append(filtered, item)
+		}
+	}
+	return filtered
+}
+
 func (m *Model) applyWarningEventsFilter() {
 	if m.warningEventsOnly && m.nav.ResourceType.Kind == "Event" {
 		var filtered []model.Item
@@ -438,9 +540,10 @@ func (m *Model) applyWarningEventsFilter() {
 	}
 }
 
-// applyEventGrouping collapses duplicate Events sharing Type/Reason/Message/Object
-// into a single row with a summed Count. Runs only when viewing the Event
-// resource list with grouping enabled; other resource kinds pass through untouched.
+// applyEventGrouping collapses duplicate Events sharing ClusterName/Type/
+// Reason/Message/Object into a single row with a summed Count. Runs only when
+// viewing the Event resource list with grouping enabled; other resource kinds
+// pass through untouched.
 func (m *Model) applyEventGrouping() {
 	if !m.eventGrouping || m.nav.ResourceType.Kind != "Event" {
 		return
@@ -652,7 +755,7 @@ func (m Model) updateNamespacesLoaded(msg namespacesLoadedMsg) (tea.Model, tea.C
 	if msg.silent {
 		return m, nil
 	}
-	m.overlayItems = buildNamespaceOverlayItems(msg.items)
+	m.overlayItems = m.namespaceSelectorItems(msg.items)
 	m.overlayCursor = namespaceOverlayCursor(m.overlayItems, m.namespace, m.allNamespaces)
 	return m, nil
 }

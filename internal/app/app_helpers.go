@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -43,7 +44,21 @@ const namespaceCacheTTL = 60 * time.Second
 // and falls back to the client's current context; returns "" when the
 // client has not been initialised yet (e.g. in pre-startup tests) so
 // callers never panic on a nil client.
+//
+// In union mode at LevelResources, nav.Context holds UnionContextSentinel
+// — a synthetic value that is never a valid kubeconfig context name. Every
+// caller of activeContext (cache key, GetNamespaces, completion) needs a
+// real cluster, so resolve it to unionContexts[0] here. The union assumes
+// homogeneous clusters, so any one of them is a representative source for
+// namespace listing and similar metadata; if clusters diverge, the user
+// can drill into a specific cluster and re-run the operation.
 func (m Model) activeContext() string {
+	if m.isUnionSentinel() {
+		if len(m.unionContexts) > 0 {
+			return m.unionContexts[0]
+		}
+		return ""
+	}
 	if m.nav.Context != "" {
 		return m.nav.Context
 	}
@@ -51,6 +66,16 @@ func (m Model) activeContext() string {
 		return m.client.CurrentContext()
 	}
 	return ""
+}
+
+// discoveryContext returns the context key used for API discovery metadata.
+// Union-mode discovery is intentionally stored under the first member context,
+// while row-level API calls may target any member via effectiveContext().
+func (m Model) discoveryContext() string {
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		return m.unionContexts[0]
+	}
+	return m.nav.Context
 }
 
 // ensureNamespaceCacheFresh returns a command that refreshes the
@@ -61,13 +86,17 @@ func (m Model) activeContext() string {
 // newly-opened context has completions ready without waiting for the
 // user's keystroke to trigger the fetch.
 func (m Model) ensureNamespaceCacheFresh() tea.Cmd {
-	entry, ok := m.cachedNamespaces[m.activeContext()]
+	return m.ensureNamespaceCacheFreshForContext(m.activeContext())
+}
+
+func (m Model) ensureNamespaceCacheFreshForContext(contextName string) tea.Cmd {
+	entry, ok := m.cachedNamespaces[contextName]
 	if !ok || len(entry.names) == 0 || time.Since(entry.fetchedAt) > namespaceCacheTTL {
 		// Silent: this is a background cache refresh, not an overlay-
 		// triggered load. The handler must NOT clear m.loading or we
 		// race with in-flight API discovery on session restore and
 		// produce a "No items" flash in the resource-types list.
-		return m.loadNamespacesSilent(true)
+		return m.loadNamespacesForContext(contextName, true)
 	}
 	return nil
 }
@@ -140,8 +169,15 @@ func (m *Model) applyPinnedGroups() {
 			seen[g] = true
 		}
 	}
-	// Add per-context pins.
-	if m.pinnedState != nil && m.nav.Context != "" {
+	// Add pins scoped to the active context or named union set.
+	if m.pinnedState != nil && m.isUnionSentinel() && m.unionSetName != "" {
+		for _, g := range m.pinnedState.UnionSets[m.unionSetName] {
+			if !seen[g] {
+				merged = append(merged, g)
+				seen[g] = true
+			}
+		}
+	} else if m.pinnedState != nil && m.nav.Context != "" && !m.isUnionSentinel() {
 		for _, g := range m.pinnedState.Contexts[m.nav.Context] {
 			if !seen[g] {
 				merged = append(merged, g)
@@ -160,4 +196,17 @@ func (m *Model) SetVersion(v string) {
 // SetStderrChan sets the channel for receiving captured stderr messages.
 func (m *Model) SetStderrChan(ch <-chan string) {
 	m.stderrChan = ch
+}
+
+// contextsOrEmpty returns the current kubeconfig context list as sidebar
+// items, or an empty slice when GetContexts reports an error. Errors here
+// are observable in lfk.log but never block the caller — the worst case
+// is a brief "no contexts" state until the next refresh.
+func (m Model) contextsOrEmpty() []model.Item {
+	contexts, err := m.client.GetContexts()
+	if err != nil {
+		logger.Warn("GetContexts failed while rebuilding left history; using empty list", "error", err)
+		return nil
+	}
+	return contexts
 }

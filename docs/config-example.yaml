@@ -347,7 +347,8 @@ filter_presets:
 # Pin CRD API groups so they appear right after built-in categories
 # (Workloads, Networking, etc.) instead of being sorted alphabetically.
 # Can also be managed interactively: press 'p' at resource types level.
-# In-app pins are stored per-context in ~/.local/state/lfk/pinned.yaml.
+# In-app pins are stored per-context or per named union set in
+# ~/.local/state/lfk/pinned.yaml.
 # pinned_groups:
 #   - karpenter.sh
 #   - monitoring.coreos.com

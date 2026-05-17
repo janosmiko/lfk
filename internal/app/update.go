@@ -70,6 +70,9 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case apiResourceDiscoveryMsg:
 		mdl, cmd := m.updateAPIResourceDiscovery(msg)
 		return mdl, cmd, true
+	case discoveryCacheLoadedMsg:
+		mdl := m.updateDiscoveryCacheLoaded(msg)
+		return mdl, nil, true
 	case resourcesLoadedMsg:
 		mdl, cmd := m.updateResourcesLoaded(msg)
 		return mdl, cmd, true

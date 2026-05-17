@@ -335,7 +335,7 @@ func (m Model) execKubectlExplain(resource, apiVersion, fieldPath string) tea.Cm
 		}
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
 	target := resource
@@ -385,7 +385,7 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 		}
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
 	return m.trackBgTask(scheduler.KindSubprocess, "Explain (recursive): "+resource, kctx, func() tea.Msg {

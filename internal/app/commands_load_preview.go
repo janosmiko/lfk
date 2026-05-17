@@ -53,6 +53,19 @@ func (m Model) loadPreview() tea.Cmd {
 //     updateAPIResourceDiscovery replaces rightItems with the discovered
 //     list.
 func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
+	if isUnionSetItem(sel) {
+		set, ok := m.findUnionSetConfig(sel.Extra)
+		if !ok {
+			return func() tea.Msg {
+				return resourceTypesMsg{items: nil}
+			}
+		}
+		items := unionSetPreviewItems(set)
+		return func() tea.Msg {
+			return resourceTypesMsg{items: items}
+		}
+	}
+
 	hoveredCtx := sel.Name
 	if hoveredCtx == "" {
 		return m.loadResourceTypes()
@@ -87,12 +100,26 @@ func (m Model) loadPreviewClusters(sel *model.Item) tea.Cmd {
 // loadPreviewResourceTypes handles preview loading at the resource types level.
 func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 	if sel.Extra == "__overview__" {
+		if m.isUnionSentinel() {
+			items := unionDashboardMemberItems(m.unionContexts, m.unionContextColors, unionDashboardCluster, m.namespace)
+			gen := m.requestGen
+			return func() tea.Msg {
+				return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
+			}
+		}
 		if ui.ConfigDashboard {
 			return m.loadDashboard()
 		}
 		return nil
 	}
 	if sel.Extra == "__monitoring__" {
+		if m.isUnionSentinel() {
+			items := unionDashboardMemberItems(m.unionContexts, m.unionContextColors, unionDashboardMonitoring, m.namespace)
+			gen := m.requestGen
+			return func() tea.Msg {
+				return resourcesLoadedMsg{items: items, forPreview: true, gen: gen}
+			}
+		}
 		return m.loadMonitoringDashboard()
 	}
 	if sel.Kind == "__collapsed_group__" {
@@ -117,6 +144,9 @@ func (m Model) loadPreviewResourceTypes(sel *model.Item) tea.Cmd {
 
 // loadPreviewResources handles preview loading at the resources level.
 func (m Model) loadPreviewResources() tea.Cmd {
+	if isUnionDashboardResourceKind(m.nav.ResourceType.Kind) {
+		return m.loadPreviewUnionDashboardMember()
+	}
 	if m.nav.ResourceType.Kind == "__port_forwards__" || m.nav.ResourceType.Kind == "__captures__" {
 		return nil
 	}
@@ -223,7 +253,7 @@ func (m Model) loadPreviewYAML() tea.Cmd {
 		return nil
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	gen := m.requestGen
 
@@ -301,98 +331,6 @@ func (m Model) loadEventTimeline() tea.Cmd {
 		func(sctx context.Context) tea.Msg {
 			events, err := client.GetResourceEvents(sctx, ctx, ns, name, kind)
 			return eventTimelineMsg{events: events, err: err}
-		},
-	)
-}
-
-func (m Model) checkRBAC() tea.Cmd {
-	ctx := m.actionCtx.context
-	ns := m.actionCtx.namespace
-	rt := m.actionCtx.resourceType
-	client := m.client
-	return m.scheduleK8sCall(
-		scheduler.PriorityCritical,
-		scheduler.KindRBACCheck,
-		"RBAC check: "+rt.Kind,
-		bgtaskTarget(ctx, ns),
-		func(sctx context.Context) tea.Msg {
-			results, err := client.CheckRBAC(sctx, ctx, ns, rt.APIGroup, rt.Resource)
-			return rbacCheckMsg{results: results, kind: rt.Kind, resource: rt.Resource, err: err}
-		},
-	)
-}
-
-func (m Model) loadCanIRules() tea.Cmd {
-	client := m.client
-	ctx := m.nav.Context
-	ns := m.namespace
-	if m.allNamespaces || ns == "" {
-		ns = "default"
-	}
-	subject := m.canISubject
-
-	// When checking a specific SA, discover all namespaces where it has
-	// RoleBindings and query permissions across all of them.
-	if subject != "" && strings.HasPrefix(subject, "system:serviceaccount:") {
-		return m.scheduleK8sCall(
-			scheduler.PriorityCritical,
-			scheduler.KindRBACCheck,
-			"CanI rules: "+subject,
-			ctx,
-			func(sctx context.Context) tea.Msg {
-				rules, namespaces, err := client.GetSelfRulesMultiNS(sctx, ctx, subject)
-				return canILoadedMsg{rules: rules, namespaces: namespaces, err: err}
-			},
-		)
-	}
-
-	// User or Group impersonation: query in the current namespace.
-	// GetSelfRulesAs handles the "group:" prefix internally.
-	if subject != "" {
-		viewNS := ns
-		return m.scheduleK8sCall(
-			scheduler.PriorityCritical,
-			scheduler.KindRBACCheck,
-			"CanI rules: "+subject,
-			bgtaskTarget(ctx, viewNS),
-			func(sctx context.Context) tea.Msg {
-				rules, err := client.GetSelfRulesAs(sctx, ctx, viewNS, subject)
-				return canILoadedMsg{rules: rules, namespaces: []string{viewNS}, err: err}
-			},
-		)
-	}
-
-	// Current user: use the active namespace only.
-	return m.scheduleK8sCall(
-		scheduler.PriorityCritical,
-		scheduler.KindRBACCheck,
-		"CanI rules (current user)",
-		bgtaskTarget(ctx, ns),
-		func(sctx context.Context) tea.Msg {
-			rules, err := client.GetSelfRulesAs(sctx, ctx, ns, "")
-			return canILoadedMsg{rules: rules, namespaces: []string{ns}, err: err}
-		},
-	)
-}
-
-func (m Model) loadCanISAList() tea.Cmd {
-	client := m.client
-	ctx := m.nav.Context
-	// Always list SAs across all namespaces so the user can check
-	// permissions for any service account regardless of the current view.
-	// Also discover Users and Groups from RBAC bindings.
-	return m.scheduleK8sCall(
-		scheduler.PriorityCritical,
-		scheduler.KindRBACCheck,
-		"List service accounts",
-		ctx,
-		func(sctx context.Context) tea.Msg {
-			accounts, err := client.ListServiceAccounts(sctx, ctx, "")
-			if err != nil {
-				return canISAListMsg{err: err}
-			}
-			subjects, _ := client.ListRBACSubjects(sctx, ctx)
-			return canISAListMsg{accounts: accounts, subjects: subjects}
 		},
 	)
 }
@@ -559,7 +497,7 @@ func (m Model) loadPreviewServiceEndpoints() tea.Cmd {
 		return nil
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	if sel.Namespace != "" {
 		ns = sel.Namespace
@@ -649,7 +587,7 @@ func (m Model) secretDataCachedFor(sel *model.Item) bool {
 	if sel.Namespace != "" {
 		ns = sel.Namespace
 	}
-	_, ok := m.secretPreviewCache[secretPreviewCacheKey(m.nav.Context, ns, sel.Name)]
+	_, ok := m.secretPreviewCache[secretPreviewCacheKey(m.effectiveContext(), ns, sel.Name)]
 	return ok
 }
 
@@ -672,7 +610,7 @@ func (m Model) loadPreviewSecretData() tea.Cmd {
 		return nil
 	}
 
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	if sel.Namespace != "" {
 		ns = sel.Namespace

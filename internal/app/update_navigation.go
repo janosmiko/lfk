@@ -73,6 +73,11 @@ func (m *Model) invalidatePreviewForCursorChange() {
 	m.resourceTree = nil
 	m.loading = true
 	m.previewLoading = true
+	if isUnionDashboardResourceKind(m.nav.ResourceType.Kind) {
+		m.dashboardPreview = ""
+		m.dashboardEventsPreview = ""
+		m.monitoringPreview = ""
+	}
 }
 
 // invalidatePreviewFingerprintForCurrentSelection drops the cache-freshness
@@ -128,6 +133,15 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		return m, nil
 
 	case model.LevelResourceTypes:
+		if m.unionMode && m.nav.Context != "" && m.nav.Context != UnionContextSentinel && isUnionDashboardMemberList(m.leftItems) {
+			return m.navigateParentToUnionDashboardMembers()
+		}
+		if m.unionMode {
+			if m.unionStartedFromPicker {
+				return m.navigateParentFromPickerUnion()
+			}
+			return m, nil // no cluster selection level in CLI-started union mode
+		}
 		m.saveCursor()
 		m.nav.Level = model.LevelClusters
 		m.nav.Context = ""
@@ -148,7 +162,12 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		// list" that then jumps to the full list when discovery arrives.
 		// Instead, show the loader until apiResourceDiscoveryMsg
 		// populates middleItems with the real CRD-inclusive set.
-		if discovered, ok := m.discoveredResources[m.nav.Context]; ok && len(discovered) > 0 {
+		// In union mode, discovery is stored under unionContexts[0], not the sentinel.
+		discoveryCtx := m.nav.Context
+		if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+			discoveryCtx = m.unionContexts[0]
+		}
+		if discovered, ok := m.discoveredResources[discoveryCtx]; ok && len(discovered) > 0 {
 			m.setMiddleItems(m.leftItems)
 		} else {
 			m.setMiddleItems(nil)
@@ -183,6 +202,9 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		}
 		m.nav.Level = model.LevelResources
 		m.nav.ResourceName = ""
+		if m.unionMode && !m.hasUnionDashboardMemberBreadcrumb() {
+			m.nav.Context = UnionContextSentinel
+		}
 		if cached, ok := m.itemCache[m.navKey()]; ok {
 			m.setMiddleItems(cached)
 		} else {
@@ -200,6 +222,9 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 			m.nav.Level = model.LevelResources
 			m.nav.ResourceName = ""
 			m.nav.OwnedName = ""
+			if m.unionMode && !m.hasUnionDashboardMemberBreadcrumb() {
+				m.nav.Context = UnionContextSentinel
+			}
 		} else {
 			m.nav.Level = model.LevelOwned
 			m.nav.OwnedName = ""
@@ -218,7 +243,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateToOwner(kind, name string) (tea.Model, tea.Cmd) {
-	crds := m.discoveredResources[m.nav.Context]
+	crds := m.discoveredResources[m.discoveryContext()]
 	rt, ok := model.FindResourceTypeByKind(kind, crds)
 	if !ok {
 		m.setStatusMessage(fmt.Sprintf("Unknown resource type: %s", kind), true)
@@ -291,6 +316,10 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
+	if isUnionSetItem(sel) {
+		return m.navigateChildUnionSet(sel)
+	}
+
 	logger.Info("Context selected", "context", sel.Name)
 	m.saveCursor()
 	oldCtx := m.nav.Context
@@ -354,6 +383,25 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 
 func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 	if sel.Extra == "__overview__" || sel.Extra == "__monitoring__" {
+		if m.isUnionSentinel() {
+			mode, ok := unionDashboardModeFromExtra(sel.Extra)
+			if !ok {
+				return m, nil
+			}
+			m.saveCursor()
+			m.nav.ResourceType = unionDashboardResourceType(mode)
+			m.nav.Level = model.LevelResources
+			m.dashboardPreview = ""
+			m.dashboardEventsPreview = ""
+			m.monitoringPreview = ""
+			m.pushLeft()
+			m.clearRight()
+			m.setMiddleItems(unionDashboardMemberItems(m.unionContexts, m.unionContextColors, mode, m.namespace))
+			m.setCursor(0)
+			m.clampCursor()
+			m.saveCurrentSession()
+			return m, m.loadPreview()
+		}
 		m.fullscreenDashboard = true
 		m.previewScroll = 0
 		m.setStatusMessage("Dashboard fullscreen ON", false)
@@ -411,7 +459,11 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.loading = true
 		return m, m.loadPreview()
 	}
-	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[m.nav.Context])
+	discoveryCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
+	rt, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[discoveryCtx])
 	if !ok {
 		return m, nil
 	}
@@ -438,6 +490,9 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
+	if isUnionDashboardResourceKind(m.nav.ResourceType.Kind) {
+		return m.navigateChildUnionDashboardMember(sel)
+	}
 	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
 		return m, nil
 	}
@@ -447,6 +502,9 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.nav.Namespace = sel.Namespace
 	} else if !m.allNamespaces {
 		m.nav.Namespace = m.namespace
+	}
+	if m.unionMode && sel.ClusterName != "" {
+		m.nav.Context = sel.ClusterName
 	}
 	m.saveCurrentSession()
 	if m.nav.ResourceType.Kind == "Pod" {
@@ -479,6 +537,9 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildOwned(sel *model.Item) (tea.Model, tea.Cmd) {
+	if m.unionMode && sel.ClusterName != "" {
+		m.nav.Context = sel.ClusterName
+	}
 	if sel.Kind == "Pod" {
 		m.saveCursor()
 		m.nav.OwnedName = sel.Name

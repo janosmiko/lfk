@@ -67,6 +67,18 @@ func TestTogglePinnedGroup(t *testing.T) {
 	})
 }
 
+func TestTogglePinnedUnionSetGroup(t *testing.T) {
+	s := &PinnedState{UnionSets: make(map[string][]string)}
+
+	pinned := togglePinnedUnionSetGroup(s, "staging-west", "argoproj.io")
+	assert.True(t, pinned)
+	assert.Equal(t, []string{"argoproj.io"}, s.UnionSets["staging-west"])
+
+	pinned = togglePinnedUnionSetGroup(s, "staging-west", "argoproj.io")
+	assert.False(t, pinned)
+	assert.Empty(t, s.UnionSets["staging-west"])
+}
+
 // --- savePinnedState / loadPinnedState ---
 
 func TestSaveAndLoadPinnedState(t *testing.T) {
@@ -77,6 +89,9 @@ func TestSaveAndLoadPinnedState(t *testing.T) {
 		Contexts: map[string][]string{
 			"prod": {"argoproj.io", "fluxcd.io"},
 			"dev":  {"my-crd.io"},
+		},
+		UnionSets: map[string][]string{
+			"staging-west": {"monitoring.coreos.com"},
 		},
 	}
 
@@ -92,6 +107,7 @@ func TestSaveAndLoadPinnedState(t *testing.T) {
 	loaded := loadPinnedState()
 	assert.Equal(t, []string{"argoproj.io", "fluxcd.io"}, loaded.Contexts["prod"])
 	assert.Equal(t, []string{"my-crd.io"}, loaded.Contexts["dev"])
+	assert.Equal(t, []string{"monitoring.coreos.com"}, loaded.UnionSets["staging-west"])
 }
 
 func TestLoadPinnedStateNoFile(t *testing.T) {
@@ -100,5 +116,7 @@ func TestLoadPinnedStateNoFile(t *testing.T) {
 
 	loaded := loadPinnedState()
 	assert.NotNil(t, loaded.Contexts)
+	assert.NotNil(t, loaded.UnionSets)
 	assert.Empty(t, loaded.Contexts)
+	assert.Empty(t, loaded.UnionSets)
 }

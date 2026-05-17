@@ -4,7 +4,9 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -16,6 +18,57 @@ func stripANSI(s string) string {
 }
 
 // --- RenderTable ---
+
+// TestRenderTable_UnionCursorRowKeepsHighlightPastColorTile is the regression
+// test for the bug where, in union view, a colored cluster tile cancelled the
+// cursor-row selection highlight for the rest of the row (the tile ends with
+// an SGR reset). After the fix the cursor branch routes the tile through
+// ClusterColorTileBgOver, which re-asserts the selection style after the
+// reset.
+func TestRenderTable_UnionCursorRowKeepsHighlightPastColorTile(t *testing.T) {
+	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
+	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+
+	origNoColor, origQuery, origScroll := ConfigNoColor, ActiveHighlightQuery, ActiveMiddleScroll
+	origSel, origLayout, origCache, origNyan := ActiveSelectedItems, ActiveTableLayout, ActiveRowCache, NyanMode
+	t.Cleanup(func() {
+		ConfigNoColor, ActiveHighlightQuery, ActiveMiddleScroll = origNoColor, origQuery, origScroll
+		ActiveSelectedItems, ActiveTableLayout, ActiveRowCache, NyanMode = origSel, origLayout, origCache, origNyan
+	})
+	ConfigNoColor, ActiveHighlightQuery, ActiveMiddleScroll = false, "", -1
+	ActiveSelectedItems, ActiveTableLayout, ActiveRowCache, NyanMode = nil, nil, nil, false
+
+	// ClusterName set => union mode => the renderer reserves the 1-cell tile.
+	items := []model.Item{
+		{Name: "pod-a", Namespace: "ns", ClusterName: "prod", ClusterColor: "cyan", Status: "Running"},
+		{Name: "pod-b", Namespace: "ns", ClusterName: "prod", ClusterColor: "cyan", Status: "Running"},
+	}
+	// Cursor on row 0 — the colored-tile row.
+	out := RenderTable("NAME", items, 0, 100, 20, false, "", "")
+
+	selOpen := styleOpenCodes(SelectedStyle)
+	if !assert.NotEmpty(t, selOpen, "test setup: SelectedStyle must emit SGR open codes under a color profile") {
+		return
+	}
+	nameIdx := strings.Index(out, "pod-a")
+	if !assert.GreaterOrEqual(t, nameIdx, 0, "cursor row must contain the item name") {
+		return
+	}
+	// The colored tile ends with an SGR reset immediately before the row
+	// text. Between that reset and the text the selection style must be
+	// re-asserted, or the cursor highlight dies for the rest of the row.
+	const reset = "\x1b[0m"
+	beforeName := out[:nameIdx]
+	tileReset := strings.LastIndex(beforeName, reset)
+	if !assert.GreaterOrEqual(t, tileReset, 0, "the colored tile must emit an SGR reset before the row text") {
+		return
+	}
+	gap := beforeName[tileReset+len(reset):]
+	assert.Equalf(t, selOpen, gap,
+		"after the colored tile's reset the selection style must be re-asserted so the "+
+			"cursor highlight covers the row content; cursor render was %q", out[:nameIdx+len("pod-a")])
+}
 
 func TestRenderTable(t *testing.T) {
 	t.Run("empty items loading shows spinner", func(t *testing.T) {
@@ -125,6 +178,110 @@ func TestRenderTable(t *testing.T) {
 		assert.Contains(t, result, "NAMESPACE")
 		assert.Contains(t, result, "default")
 		assert.Contains(t, result, "kube-system")
+	})
+
+	t.Run("union rows render ClusterName as first-class CONTEXT column", func(t *testing.T) {
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = nil
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origOrder := ActiveColumnOrder
+		ActiveColumnOrder = nil
+		defer func() { ActiveColumnOrder = origOrder }()
+
+		origLayout := ActiveTableLayout
+		ActiveTableLayout = nil
+		defer func() { ActiveTableLayout = origLayout }()
+
+		origSortable := ActiveSortableColumns
+		ActiveSortableColumns = nil
+		defer func() { ActiveSortableColumns = origSortable }()
+
+		origMiddleLayout := ActiveMiddleColumnLayout
+		ActiveMiddleColumnLayout = nil
+		defer func() { ActiveMiddleColumnLayout = origMiddleLayout }()
+
+		origExtra := ActiveExtraColumnKeys
+		ActiveExtraColumnKeys = nil
+		defer func() { ActiveExtraColumnKeys = origExtra }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{
+			{Name: "pod-a", Namespace: "cloud-cd", ClusterName: "blue", Kind: "Pod"},
+			{Name: "pod-a", Namespace: "cloud-cd", ClusterName: "green", Kind: "Pod"},
+		}
+		result := stripANSI(RenderTable("NAME", items, 0, 100, 20, false, "", ""))
+
+		assert.Contains(t, result, "CONTEXT")
+		assert.Contains(t, result, "blue")
+		assert.Contains(t, result, "green")
+		assert.Contains(t, result, "NAMESPACE")
+		assert.Contains(t, ActiveSortableColumns, "Context",
+			"first-class Context column must be sortable like built-in columns")
+		assert.NotContains(t, ActiveExtraColumnKeys, "Context",
+			"union Context must not be exposed as an Item.Columns extra")
+
+		var contextRegion, namespaceRegion *MiddleColumnRegion
+		for i := range ActiveMiddleColumnLayout {
+			switch ActiveMiddleColumnLayout[i].Key {
+			case "Context":
+				contextRegion = &ActiveMiddleColumnLayout[i]
+			case "Namespace":
+				namespaceRegion = &ActiveMiddleColumnLayout[i]
+			}
+		}
+		if assert.NotNil(t, contextRegion, "middle layout must include a Context region for header clicks") &&
+			assert.NotNil(t, namespaceRegion, "middle layout must include Namespace") {
+			assert.Less(t, contextRegion.StartX, namespaceRegion.StartX,
+				"Context should default before Namespace")
+		}
+	})
+
+	t.Run("non-union extra Context column still renders from Item.Columns", func(t *testing.T) {
+		origMS := ActiveMiddleScroll
+		ActiveMiddleScroll = 0
+		defer func() { ActiveMiddleScroll = origMS }()
+
+		origHidden := ActiveHiddenBuiltinColumns
+		ActiveHiddenBuiltinColumns = nil
+		defer func() { ActiveHiddenBuiltinColumns = origHidden }()
+
+		origOrder := ActiveColumnOrder
+		ActiveColumnOrder = nil
+		defer func() { ActiveColumnOrder = origOrder }()
+
+		origLayout := ActiveTableLayout
+		ActiveTableLayout = nil
+		defer func() { ActiveTableLayout = origLayout }()
+
+		origExtra := ActiveExtraColumnKeys
+		ActiveExtraColumnKeys = nil
+		defer func() { ActiveExtraColumnKeys = origExtra }()
+
+		origSel := ActiveSelectedItems
+		ActiveSelectedItems = nil
+		defer func() { ActiveSelectedItems = origSel }()
+
+		items := []model.Item{{
+			Name:    "pf/web",
+			Kind:    "PortForward",
+			Columns: []model.KeyValue{{Key: "Context", Value: "prod"}},
+		}}
+		result := stripANSI(RenderTable("NAME", items, 0, 80, 20, false, "", ""))
+		firstLine := strings.Split(result, "\n")[0]
+
+		assert.Contains(t, firstLine, "CONTEXT")
+		assert.Equal(t, 1, strings.Count(firstLine, "CONTEXT"))
+		assert.Contains(t, result, "prod")
+		assert.Contains(t, ActiveExtraColumnKeys, "Context",
+			"non-union Context metadata should remain an ordinary extra column")
 	})
 
 	t.Run("default header label is NAME when empty", func(t *testing.T) {

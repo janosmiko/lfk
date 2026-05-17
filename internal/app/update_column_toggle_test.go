@@ -316,6 +316,27 @@ func TestCovOpenColumnToggleIncludesBuiltins(t *testing.T) {
 	assert.NotNil(t, ipExtra, "IP extra entry must exist")
 }
 
+func TestOpenColumnToggleIncludesUnionContextBuiltin(t *testing.T) {
+	m := baseModelNav()
+	m.middleItems = []model.Item{
+		{
+			Name:        "pod-1",
+			Namespace:   "default",
+			Kind:        "Pod",
+			ClusterName: "prod-east",
+		},
+	}
+
+	m.openColumnToggle()
+
+	contextEntry := findColumnToggleEntry(m.columnToggleItems, "Context", true)
+	if assert.NotNil(t, contextEntry, "Context built-in entry must exist for union rows") {
+		assert.True(t, contextEntry.visible)
+	}
+	assert.Nil(t, findColumnToggleEntry(m.columnToggleItems, "Context", false),
+		"union Context must not be treated as an extra column")
+}
+
 // TestCovOpenColumnTogglePreSelectsFromHiddenBuiltins verifies that when
 // hiddenBuiltinColumns lists a built-in as hidden for the current kind,
 // that entry opens with visible=false.

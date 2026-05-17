@@ -56,8 +56,8 @@ func (m *Model) sortMiddleItems() {
 		// Tiebreaker: items with identical primary keys fall through to a
 		// stable chain that is always ascending, regardless of the
 		// primary's asc/desc flag. The chain is primary-aware: the
-		// identity triple (Name, Namespace, Age) forms the main fallback
-		// in that order, with whichever of those three is already the
+		// identity tuple (Name, Context, Namespace, Age) forms the main fallback
+		// in that order, with whichever of those four is already the
 		// primary column skipped so the tiebreaker doesn't redo work
 		// the primary already did. Kind and Extra are appended as
 		// absolute final discriminators.
@@ -76,18 +76,24 @@ func (m *Model) sortMiddleItems() {
 // flag — so identical primary keys land in a deterministic order across
 // refreshes whether the user is sorting ascending or descending.
 //
-// The chain is primary-aware: (Name, Namespace, Age) participates in
-// that order, with whichever of those three is the current primary
+// The chain is primary-aware: (Name, Context, Namespace, Age) participates in
+// that order, with whichever of those four is the current primary
 // column excluded. Kind and Extra act as final fallbacks so rows with
 // truly identical identity still have a stable order.
 //
-//	primary=Name      → (Namespace, Age,   Kind, Extra)
-//	primary=Namespace → (Name,      Age,   Kind, Extra)
-//	primary=Age       → (Name,      Namespace, Kind, Extra)
-//	primary=anything  → (Name, Namespace, Age, Kind, Extra)
+//	primary=Name      → (Context, Namespace, Age, Kind, Extra)
+//	primary=Context   → (Name, Namespace, Age, Kind, Extra)
+//	primary=Namespace → (Name, Context, Age, Kind, Extra)
+//	primary=Age       → (Name, Context, Namespace, Kind, Extra)
+//	primary=anything  → (Name, Context, Namespace, Age, Kind, Extra)
 func itemTiebreakerLess(a, b model.Item, primaryCol string) bool {
 	if primaryCol != "Name" {
 		if c := strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name)); c != 0 {
+			return c < 0
+		}
+	}
+	if primaryCol != "Context" {
+		if c := strings.Compare(strings.ToLower(a.ClusterName), strings.ToLower(b.ClusterName)); c != 0 {
 			return c < 0
 		}
 	}
@@ -115,6 +121,8 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 	switch colName {
 	case "Name":
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
+	case "Context":
+		return strings.Compare(strings.ToLower(a.ClusterName), strings.ToLower(b.ClusterName))
 	case "Namespace":
 		return strings.Compare(strings.ToLower(a.Namespace), strings.ToLower(b.Namespace))
 	case "Ready":

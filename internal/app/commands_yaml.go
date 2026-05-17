@@ -13,7 +13,7 @@ import (
 
 // copyYAMLToClipboard fetches the YAML for the selected resource and sends it for clipboard copy.
 func (m Model) copyYAMLToClipboard() tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 
 	switch m.nav.Level {
@@ -24,7 +24,7 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 		// (cursor) path, not an empty multi-doc fetch.
 		if items := m.selectedItemsList(); len(items) > 0 {
 			type fetchTarget struct {
-				ns, name string
+				ns, name, ctx string
 			}
 			targets := make([]fetchTarget, len(items))
 			for i, it := range items {
@@ -32,13 +32,20 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 				if it.Namespace != "" {
 					itemNs = it.Namespace
 				}
-				targets[i] = fetchTarget{ns: itemNs, name: it.Name}
+				// Per-item cluster routing for union mode: each row carries
+				// its source cluster on it.ClusterName. ClusterName is empty
+				// in non-union mode so this falls back to kctx.
+				itemCtx := kctx
+				if it.ClusterName != "" {
+					itemCtx = it.ClusterName
+				}
+				targets[i] = fetchTarget{ns: itemNs, name: it.Name, ctx: itemCtx}
 			}
 			return func() tea.Msg {
 				docs := make([]string, 0, len(targets))
 				var failures []string
 				for _, t := range targets {
-					content, err := m.client.GetResourceYAML(context.Background(), kctx, t.ns, rt, t.name)
+					content, err := m.client.GetResourceYAML(context.Background(), t.ctx, t.ns, rt, t.name)
 					if err != nil {
 						failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
 						continue
@@ -321,7 +328,7 @@ func buildBulkYAMLClipboardMsg(docs, failures []string, total int) yamlClipboard
 
 // exportResourceToFile saves the selected resource YAML to a file.
 func (m Model) exportResourceToFile() tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 
 	var fetchYAML func() (string, string, error) // returns (yaml, kindForFilename, error)

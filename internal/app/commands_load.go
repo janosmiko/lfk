@@ -76,7 +76,11 @@ func (m Model) loadContextsReload() tea.Cmd {
 }
 
 func (m Model) loadResourceTypes() tea.Cmd {
-	return m.loadResourceTypesFor(m.nav.Context)
+	// effectiveContext resolves the union sentinel to unionContexts[0], which
+	// is where m.discoveredResources entries land in union mode (the cache
+	// key is the resolved cluster, not the sentinel). Passing the raw
+	// nav.Context here would always miss the cache and emit the seed list.
+	return m.loadResourceTypesFor(m.effectiveContext())
 }
 
 // loadResourceTypesFor emits a resourceTypesMsg for a specific context.
@@ -127,7 +131,7 @@ func (m Model) discoverAPIResources(contextName string) tea.Cmd {
 // loadQuotas fetches ResourceQuota objects for the current namespace.
 func (m Model) loadQuotas() tea.Cmd {
 	client := m.client
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.effectiveNamespace()
 	return m.scheduleK8sCall(
 		scheduler.PriorityLow,
@@ -147,17 +151,62 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 	rt := m.nav.ResourceType
 	gen := m.requestGen
 	silent := m.suppressBgtasks
+
+	// In union mode at LevelResources, resource type discovery lives under the
+	// first union context rather than the UnionContextSentinel.
+	discoveryCtx := kctx
+	if m.unionMode && kctx == UnionContextSentinel && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
 	if forPreview {
 		sel := m.selectedMiddleItem()
 		if sel == nil {
 			return nil
 		}
-		found, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[kctx])
+		found, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[discoveryCtx])
 		if !ok {
 			return nil
 		}
 		rt = found
 	}
+	// Union fetch: fan out to all union contexts in parallel. Covers both
+	// preview hovers and main-list loads — without this, the preview path
+	// at LevelResourceTypes would fall through to the regular GetResources
+	// call below and pass the literal "__union__" sentinel as the context,
+	// which restConfigForContext rejects with `context "__union__" does
+	// not exist` on every sidebar hover whose target rt isn't already in
+	// itemCache.
+	//
+	// Preview hovers serve from cache when fresh; main-list and watch
+	// ticks always refetch so deleted pods don't linger and Age advances.
+	// This mirrors the non-union policy below — see the fresh-cache
+	// shortcut comment.
+	if m.unionMode && kctx == UnionContextSentinel && rt.Resource != "" {
+		if forPreview {
+			cacheKey := kctx + "/" + rt.Resource
+			if cached, ok := m.itemCache[cacheKey]; ok &&
+				m.cacheFingerprints[cacheKey] == m.fetchFingerprint() {
+				items := cached
+				rtCopy := rt
+				return func() tea.Msg {
+					return resourcesLoadedMsg{items: items, forPreview: true, gen: gen, silent: silent, rt: rtCopy}
+				}
+			}
+		}
+		unionCtxs := m.unionContexts
+		client := m.client
+		return m.scheduleK8sCall(
+			scheduler.PriorityHigh,
+			scheduler.KindResourceList,
+			"List "+model.DisplayNameFor(rt)+" (union)",
+			strings.Join(unionCtxs, ", "),
+			func(ctx context.Context) tea.Msg {
+				items, err := client.GetResourcesUnion(ctx, unionCtxs, ns, rt)
+				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rt}
+			},
+		)
+	}
+
 	// Fresh-cache shortcut: serve preview hover-cycles between sibling
 	// resource types without hitting the API. Restricted to forPreview
 	// because main-list loads (drill-in, navigate-back, watch tick,
@@ -190,7 +239,7 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 }
 
 func (m Model) loadOwned(forPreview bool) tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.effectiveNamespace()
 	kind := m.nav.ResourceType.Kind
 	name := m.nav.ResourceName
@@ -222,7 +271,7 @@ func (m Model) loadOwned(forPreview bool) tea.Cmd {
 }
 
 func (m Model) loadResourceTree() tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.effectiveNamespace()
 	gen := m.requestGen
 
@@ -281,7 +330,7 @@ func (m Model) loadResourceTree() tea.Cmd {
 }
 
 func (m Model) loadContainers(forPreview bool) tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.effectiveNamespace()
 	gen := m.requestGen
 	silent := m.suppressBgtasks
@@ -312,35 +361,6 @@ func (m Model) loadContainers(forPreview bool) tea.Cmd {
 		func(ctx context.Context) tea.Msg {
 			items, err := client.GetContainers(ctx, kctx, ns, podName)
 			return containersLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
-		},
-	)
-}
-
-func (m Model) loadNamespaces() tea.Cmd {
-	return m.loadNamespacesSilent(false)
-}
-
-// loadNamespacesSilent issues the same namespace fetch as loadNamespaces
-// but tags the resulting msg as a background refresh. Silent loads must
-// not clear m.loading in the handler — the namespace cache is
-// independent of the middle-column/resource-types load the loading flag
-// tracks. Used by ensureNamespaceCacheFresh on session restore and other
-// context-open paths so the fast namespace reply doesn't race with
-// still-in-flight API discovery and produce a "No items" flash.
-func (m Model) loadNamespacesSilent(silent bool) tea.Cmd {
-	if m.client == nil {
-		return nil
-	}
-	client := m.client
-	kctx := m.activeContext()
-	return m.scheduleK8sCall(
-		scheduler.PriorityCritical,
-		scheduler.KindNamespaceList,
-		"List namespaces",
-		kctx,
-		func(ctx context.Context) tea.Msg {
-			items, err := client.GetNamespaces(ctx, kctx)
-			return namespacesLoadedMsg{context: kctx, items: items, err: err, silent: silent}
 		},
 	)
 }
@@ -394,7 +414,7 @@ func (m Model) resolveOwnedResourceType(sel *model.Item) (model.ResourceTypeEntr
 }
 
 func (m Model) loadYAML() tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	client := m.client
 
@@ -480,6 +500,12 @@ func (m Model) loadDiff(rt model.ResourceTypeEntry, itemA, itemB model.Item) tea
 	kctx := m.nav.Context
 	reqCtx := m.reqCtx
 
+	resolveCtx := func(item model.Item) string {
+		if item.ClusterName != "" {
+			return item.ClusterName
+		}
+		return kctx
+	}
 	resolveNS := func(item model.Item) string {
 		if item.Namespace != "" {
 			return item.Namespace
@@ -487,6 +513,8 @@ func (m Model) loadDiff(rt model.ResourceTypeEntry, itemA, itemB model.Item) tea
 		return m.resolveNamespace()
 	}
 
+	ctxA := resolveCtx(itemA)
+	ctxB := resolveCtx(itemB)
 	nsA := resolveNS(itemA)
 	nsB := resolveNS(itemB)
 
@@ -499,13 +527,17 @@ func (m Model) loadDiff(rt model.ResourceTypeEntry, itemA, itemB model.Item) tea
 		leftLabel = nsA + "/" + nameA
 		rightLabel = nsB + "/" + nameB
 	}
+	if ctxA != ctxB {
+		leftLabel = ctxA + "/" + leftLabel
+		rightLabel = ctxB + "/" + rightLabel
+	}
 
 	return func() tea.Msg {
-		yamlA, errA := m.client.GetResourceYAML(reqCtx, kctx, nsA, rt, nameA)
+		yamlA, errA := m.client.GetResourceYAML(reqCtx, ctxA, nsA, rt, nameA)
 		if errA != nil {
 			return diffLoadedMsg{err: fmt.Errorf("fetching %s: %w", nameA, errA)}
 		}
-		yamlB, errB := m.client.GetResourceYAML(reqCtx, kctx, nsB, rt, nameB)
+		yamlB, errB := m.client.GetResourceYAML(reqCtx, ctxB, nsB, rt, nameB)
 		if errB != nil {
 			return diffLoadedMsg{err: fmt.Errorf("fetching %s: %w", nameB, errB)}
 		}

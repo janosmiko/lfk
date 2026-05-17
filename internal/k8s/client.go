@@ -3,10 +3,12 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
 	"sync"
+	"sync/atomic"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery/cached/disk"
@@ -97,14 +99,18 @@ type Client struct {
 	// metadata-only API so decoded values are lazy-fetched on hover instead
 	// of being pulled up-front. Configured via the secret_lazy_loading
 	// option; off by default so the list behaves like every other resource.
-	secretLazyLoading bool
+	// Accessed concurrently from tea.Cmd goroutines (GetResources et al)
+	// while the startup setter (and any future runtime-reload path) writes
+	// it; an atomic load/store keeps the access race-free without a lock.
+	secretLazyLoading atomic.Bool
 
 	// kubesharkNamespaceOverride is the namespace probed for the kubeshark
-	// hub Service in the Traffic Capture overlay. Empty string means
-	// "use the default" (see capture_backend_kubeshark.go's
+	// hub Service in the Traffic Capture overlay. nil or empty pointer
+	// value means "use the default" (see capture_backend_kubeshark.go's
 	// kubesharkNamespace method). Set once at startup from
-	// ui.ConfigKubesharkNamespace via SetKubesharkNamespace.
-	kubesharkNamespaceOverride string
+	// ui.ConfigKubesharkNamespace via SetKubesharkNamespace. Same
+	// concurrency rationale as secretLazyLoading above.
+	kubesharkNamespaceOverride atomic.Pointer[string]
 
 	// Guarded by discoveryMu; concurrent tea.Cmd goroutines may discover
 	// across different contexts.
@@ -139,17 +145,19 @@ func (c *Client) informerSnapshot() (InformerCacheMode, *informerCache) {
 }
 
 // SetSecretLazyLoading toggles the metadata-only list path for Secrets.
-// Typically called once at startup after loading the config file.
+// Typically called once at startup after loading the config file, but safe
+// to call from any goroutine — the underlying field is atomic.
 func (c *Client) SetSecretLazyLoading(enabled bool) {
-	c.secretLazyLoading = enabled
+	c.secretLazyLoading.Store(enabled)
 }
 
 // SetKubesharkNamespace overrides the namespace probed for Service
 // kubeshark-hub in the Traffic Capture overlay. Empty string keeps the
 // default ("kubeshark"). Typically called once at startup after the
-// config file has been parsed.
+// config file has been parsed, but safe to call from any goroutine —
+// the underlying field is an atomic pointer.
 func (c *Client) SetKubesharkNamespace(ns string) {
-	c.kubesharkNamespaceOverride = ns
+	c.kubesharkNamespaceOverride.Store(&ns)
 }
 
 // SetInformerCacheMode selects how GetResources routes its list requests.
@@ -321,16 +329,35 @@ func (c *Client) ContextExists(displayName string) bool {
 	return ok
 }
 
+func (c *Client) contextNamespaceLocked(displayName string) (string, bool) {
+	if info, ok := c.contexts[displayName]; ok {
+		ns := strings.TrimSpace(info.namespace)
+		return ns, ns != ""
+	}
+	if ctx, ok := c.rawConfig.Contexts[displayName]; ok && ctx != nil {
+		ns := strings.TrimSpace(ctx.Namespace)
+		return ns, ns != ""
+	}
+	return "", false
+}
+
+// ContextNamespace returns the namespace explicitly configured on the given
+// lfk display context. The boolean is false when the context exists but does
+// not pin a namespace, letting callers distinguish "unset" from Kubernetes'
+// conventional "default" fallback.
+func (c *Client) ContextNamespace(displayName string) (string, bool) {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
+	return c.contextNamespaceLocked(displayName)
+}
+
 // DefaultNamespace returns the namespace configured for the given lfk display
 // name, falling back to "default" if none is set.
 func (c *Client) DefaultNamespace(displayName string) string {
 	c.configMu.RLock()
 	defer c.configMu.RUnlock()
-	if info, ok := c.contexts[displayName]; ok && info.namespace != "" {
-		return info.namespace
-	}
-	if ctx, ok := c.rawConfig.Contexts[displayName]; ok && ctx != nil && ctx.Namespace != "" {
-		return ctx.Namespace
+	if ns, ok := c.contextNamespaceLocked(displayName); ok {
+		return ns
 	}
 	return "default"
 }
@@ -353,4 +380,55 @@ func (c *Client) GetNamespaces(ctx context.Context, contextName string) ([]model
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
 	return items, nil
+}
+
+// GetResourcesUnion fetches resources from multiple contexts in parallel and
+// merges the results. Each item is stamped with ClusterName for drill-down
+// routing; the UI renders that field as the first-class CONTEXT column.
+// Partial results are returned alongside an errors.Join of every per-context
+// failure, so the status bar can surface "2 of 8 contexts failed: …" instead
+// of silently truncating to the first error.
+func (c *Client) GetResourcesUnion(ctx context.Context, contexts []string, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+	type result struct {
+		items []model.Item
+		err   error
+		ctx   string
+	}
+	results := make([]result, len(contexts))
+	var wg sync.WaitGroup
+	wg.Add(len(contexts))
+	for i, kctx := range contexts {
+		go func(idx int, contextName string) {
+			defer wg.Done()
+			items, err := c.GetResources(ctx, contextName, namespace, rt)
+			if err != nil {
+				results[idx] = result{ctx: contextName, err: err}
+				return
+			}
+			for j := range items {
+				items[j].ClusterName = contextName
+			}
+			results[idx] = result{items: items, ctx: contextName}
+		}(i, kctx)
+	}
+	wg.Wait()
+
+	var merged []model.Item
+	var errs []error
+	for _, r := range results {
+		if r.err != nil {
+			errs = append(errs, fmt.Errorf("context %q: %w", r.ctx, r.err))
+		}
+		merged = append(merged, r.items...)
+	}
+	sort.Slice(merged, func(i, j int) bool {
+		if merged[i].Name != merged[j].Name {
+			return merged[i].Name < merged[j].Name
+		}
+		if merged[i].ClusterName != merged[j].ClusterName {
+			return merged[i].ClusterName < merged[j].ClusterName
+		}
+		return merged[i].Namespace < merged[j].Namespace
+	})
+	return merged, errors.Join(errs...)
 }

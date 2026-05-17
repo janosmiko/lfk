@@ -421,11 +421,19 @@ type eventTimelineMsg struct {
 	err    error
 }
 
+type canIContextRules struct {
+	context    string
+	rules      []k8s.AccessRule
+	namespaces []string
+}
+
 // canILoadedMsg carries the result of a SelfSubjectRulesReview.
 type canILoadedMsg struct {
-	rules      []k8s.AccessRule
-	namespaces []string // namespaces queried for the rules review
-	err        error
+	rules        []k8s.AccessRule
+	namespaces   []string // namespaces queried for the rules review
+	contextRules []canIContextRules
+	union        bool
+	err          error
 }
 
 // canISAListMsg carries the list of ServiceAccounts and RBAC subjects for the can-i browser.

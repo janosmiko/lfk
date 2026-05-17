@@ -38,9 +38,9 @@ func CollectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 var ActiveSessionColumns []string
 
 // ActiveHiddenBuiltinColumns holds the set of built-in column keys that should
-// be suppressed in the current middle-column render. Valid keys: "Namespace",
-// "Ready", "Restarts", "Age", "Status". Set by the app before rendering.
-// Nil means no overrides.
+// be suppressed in the current middle-column render. Valid keys: "Context",
+// "Namespace", "Ready", "Restarts", "Age", "Status". Set by the app before
+// rendering. Nil means no overrides.
 var ActiveHiddenBuiltinColumns map[string]bool
 
 // collectExtraColumns discovers which extra columns to show based on item data and config.

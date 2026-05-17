@@ -13,15 +13,177 @@ import (
 
 // --- Bookmark handlers ---
 
+func bookmarkSlotIsContextAware(slot string) bool {
+	return len(slot) != 1 || slot[0] < 'A' || slot[0] > 'Z'
+}
+
+type bookmarkTargetKind int
+
+const (
+	bookmarkTargetCurrent bookmarkTargetKind = iota
+	bookmarkTargetContext
+	bookmarkTargetUnionSet
+)
+
+type bookmarkTarget struct {
+	kind                bookmarkTargetKind
+	context             string
+	lookupContext       string
+	unionSetName        string
+	unionContexts       []string
+	unionContextColors  map[string]string
+	unionNamespace      string
+	unionStartedFromRow bool
+}
+
+func bookmarkSingleNamespace(bm model.Bookmark) string {
+	if len(bm.Namespaces) == 1 {
+		return strings.TrimSpace(bm.Namespaces[0])
+	}
+	if len(bm.Namespaces) > 1 {
+		return ""
+	}
+	return strings.TrimSpace(bm.Namespace)
+}
+
+func (m Model) currentSingleNamespace() string {
+	if m.allNamespaces || len(m.selectedNamespaces) > 1 {
+		return ""
+	}
+	if len(m.selectedNamespaces) == 1 {
+		for ns := range m.selectedNamespaces {
+			return strings.TrimSpace(ns)
+		}
+	}
+	return strings.TrimSpace(m.namespace)
+}
+
+func (m Model) namespaceForUnionBookmark(bm model.Bookmark, set ui.UnionSetConfig, loadSaved bool) (string, bool) {
+	if loadSaved {
+		ns := bookmarkSingleNamespace(bm)
+		return ns, ns != ""
+	}
+	if ns := m.currentSingleNamespace(); ns != "" {
+		return ns, true
+	}
+	var namespaceLookup func(string) (string, bool)
+	if m.client != nil {
+		namespaceLookup = m.client.ContextNamespace
+	}
+	_, resolvedNamespace, _, err := ExpandUnionSetConfig(set, namespaceLookup)
+	if err != nil {
+		return "", false
+	}
+	if ns := strings.TrimSpace(resolvedNamespace); ns != "" {
+		return ns, true
+	}
+	if ns := bookmarkSingleNamespace(bm); ns != "" {
+		return ns, true
+	}
+	return "", false
+}
+
+func (m Model) resolveBookmarkTarget(bm model.Bookmark, loadSavedNamespace bool) (bookmarkTarget, string, bool) {
+	if bm.Context != "" && bm.UnionSet != "" {
+		return bookmarkTarget{}, "Bookmark target is invalid", false
+	}
+
+	if bm.UnionSet != "" {
+		set, ok := m.findUnionSetConfig(bm.UnionSet)
+		if !ok {
+			return bookmarkTarget{}, fmt.Sprintf("Union set not found: %s", bm.UnionSet), false
+		}
+		var namespaceLookup func(string) (string, bool)
+		if m.client != nil {
+			namespaceLookup = m.client.ContextNamespace
+		}
+		contexts, _, colors, err := ExpandUnionSetConfig(set, namespaceLookup)
+		if err != nil {
+			return bookmarkTarget{}, err.Error(), false
+		}
+		if len(contexts) == 0 {
+			return bookmarkTarget{}, fmt.Sprintf("Union set has no contexts: %s", bm.UnionSet), false
+		}
+		ns, ok := m.namespaceForUnionBookmark(bm, set, loadSavedNamespace)
+		if !ok {
+			return bookmarkTarget{}, "Union-set bookmark requires exactly one namespace", false
+		}
+		opts := StartupOptions{
+			UnionSet:           set.Name,
+			UnionContexts:      contexts,
+			UnionContextColors: colors,
+			Namespaces:         []string{ns},
+		}
+		var contextExists func(string) bool
+		if m.client != nil {
+			contextExists = m.client.ContextExists
+		}
+		if err := ValidateUnionOptions(opts, contextExists); err != nil {
+			return bookmarkTarget{}, err.Error(), false
+		}
+		return bookmarkTarget{
+			kind:                bookmarkTargetUnionSet,
+			context:             UnionContextSentinel,
+			lookupContext:       contexts[0],
+			unionSetName:        set.Name,
+			unionContexts:       contexts,
+			unionContextColors:  colors,
+			unionNamespace:      ns,
+			unionStartedFromRow: true,
+		}, "", true
+	}
+
+	if bm.Context != "" {
+		return bookmarkTarget{
+			kind:          bookmarkTargetContext,
+			context:       bm.Context,
+			lookupContext: bm.Context,
+		}, "", true
+	}
+
+	target := bookmarkTarget{
+		kind:          bookmarkTargetCurrent,
+		context:       m.nav.Context,
+		lookupContext: m.nav.Context,
+	}
+	if m.isUnionSentinel() {
+		if len(m.unionContexts) == 0 {
+			return bookmarkTarget{}, "Union view has no member contexts", false
+		}
+		target.lookupContext = m.unionContexts[0]
+		target.unionSetName = m.unionSetName
+		target.unionContexts = append([]string(nil), m.unionContexts...)
+		target.unionContextColors = copyMapStringString(m.unionContextColors)
+		target.unionStartedFromRow = m.unionStartedFromPicker
+	}
+	return target, "", true
+}
+
 // bookmarkToSlot saves the current location as a named mark in the given slot.
 // Lowercase (a-z) and digit (0-9) slots create context-aware bookmarks that
-// remember the current kube context. Uppercase (A-Z) slots create
-// context-free bookmarks that use whatever context is active on jump.
+// remember the current kube context or named union set. Uppercase (A-Z)
+// slots create context-free bookmarks that use whatever target is active on
+// jump.
 // If a bookmark already exists in that slot, it prompts for confirmation.
 func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	if m.nav.Level < model.LevelResourceTypes {
 		m.setStatusMessage("Navigate to a resource type first", true)
 		return m, scheduleStatusClear()
+	}
+	// Lowercase (a-z) and digit (0-9) slots create context-aware bookmarks
+	// that remember the current kube context or named union set. Uppercase
+	// (A-Z) slots create context-free bookmarks that use whatever target is
+	// active on jump.
+	isContextAware := bookmarkSlotIsContextAware(slot)
+	if m.isUnionSentinel() && isContextAware && m.unionSetName == "" {
+		m.setStatusMessage("Context-aware union bookmarks require a named union set", true)
+		return m, scheduleStatusClear()
+	}
+	if m.isUnionSentinel() && isContextAware {
+		if _, ok := m.findUnionSetConfig(m.unionSetName); !ok {
+			m.setStatusMessage(fmt.Sprintf("Union set not found: %s", m.unionSetName), true)
+			return m, scheduleStatusClear()
+		}
 	}
 
 	// Resolve which resource type the bookmark refers to. At LevelResources
@@ -40,7 +202,11 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Select a resource type to bookmark", true)
 			return m, scheduleStatusClear()
 		}
-		resolved, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[m.nav.Context])
+		discoveryCtx := m.nav.Context
+		if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+			discoveryCtx = m.unionContexts[0]
+		}
+		resolved, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[discoveryCtx])
 		if !ok {
 			// Discovery may not have run yet (seed sidebar). Fall back to
 			// the seed set the same way restoreSessionResourceType does.
@@ -60,17 +226,20 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 			}
 		}
 	}
+	if isUnionDashboardResourceKind(rt.Kind) {
+		m.setStatusMessage("Select a Kubernetes resource type to bookmark", true)
+		return m, scheduleStatusClear()
+	}
 
-	// Lowercase (a-z) and digit (0-9) slots create context-aware bookmarks
-	// that remember the current kube context. Uppercase (A-Z) slots create
-	// context-free bookmarks that use whatever context is active on jump.
-	isContextAware := len(slot) != 1 || slot[0] < 'A' || slot[0] > 'Z'
-
-	// Context-aware bookmarks include the context in the display name and
+	// Context-aware bookmarks include the target in the display name and
 	// save it for cross-cluster navigation. Context-free bookmarks do not.
 	var parts []string
 	if isContextAware {
-		parts = append(parts, m.nav.Context)
+		if m.isUnionSentinel() {
+			parts = append(parts, m.unionSetName)
+		} else {
+			parts = append(parts, m.nav.Context)
+		}
 	}
 	if label := model.DisplayNameFor(rt); label != "" {
 		parts = append(parts, label)
@@ -101,13 +270,19 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	}
 
 	bmContext := ""
+	bmUnionSet := ""
 	if isContextAware {
-		bmContext = m.nav.Context
+		if m.isUnionSentinel() {
+			bmUnionSet = m.unionSetName
+		} else {
+			bmContext = m.nav.Context
+		}
 	}
 
 	bm := model.Bookmark{
 		Name:         name,
 		Context:      bmContext,
+		UnionSet:     bmUnionSet,
 		Namespace:    ns,
 		Namespaces:   nsList,
 		ResourceType: rt.ResourceRef(),
@@ -434,14 +609,13 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 	m.bookmarkFilter.Clear()
 
-	// For context-free bookmarks, stay in the current cluster context.
-	// For context-aware bookmarks, switch to the bookmark's saved context.
-	effectiveContext := bm.Context
-	if !bm.IsContextAware() {
-		effectiveContext = m.nav.Context
+	target, msg, ok := m.resolveBookmarkTarget(bm, m.bookmarkLoadNamespace)
+	if !ok {
+		m.setStatusMessage(msg, true)
+		return m, scheduleStatusClear()
 	}
 
-	rt, ok := model.FindResourceTypeIn(bm.ResourceType, m.discoveredResources[effectiveContext])
+	rt, ok := model.FindResourceTypeIn(bm.ResourceType, m.discoveredResources[target.lookupContext])
 	if !ok {
 		// Distinguish "discovery hasn't run yet" (key absent from the map)
 		// from "discovered, type genuinely not in cluster" (key present, type
@@ -451,14 +625,14 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 		// a bookmark for an ArgoCD Application right after launching lfk
 		// failed outright until the user navigated out and back to force a
 		// resource-types refresh.
-		if _, discovered := m.discoveredResources[effectiveContext]; !discovered {
+		if _, discovered := m.discoveredResources[target.lookupContext]; !discovered {
 			bmCopy := bm
 			m.bookmarkAwaitingDiscovery = &bmCopy
 			m.setStatusMessage("Discovering resources...", false)
 			cmds := []tea.Cmd{scheduleStatusClear()}
-			if m.shouldFireDiscoveryFor(effectiveContext) {
-				m.markDiscoveryStarted(effectiveContext)
-				cmds = append(cmds, m.discoverAPIResources(effectiveContext))
+			if m.shouldFireDiscoveryFor(target.lookupContext) {
+				m.markDiscoveryStarted(target.lookupContext)
+				cmds = append(cmds, m.discoverAPIResources(target.lookupContext))
 			}
 			return m, tea.Batch(cmds...)
 		}
@@ -466,56 +640,17 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
-	// Switch context (context-aware bookmarks change cluster, context-free bookmarks keep current).
+	// Switch target: context bookmarks exit union mode, named union-set
+	// bookmarks activate union mode, and context-free bookmarks preserve the
+	// current mode.
 	oldCtx := m.nav.Context
-	m.nav.Context = effectiveContext
-	if oldCtx != effectiveContext {
-		m.invalidateOrphanCacheForContext(oldCtx)
-	}
-	m.recomputeReadOnly(effectiveContext)
+	m.applyBookmarkContextSwitch(target)
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
 	m.applyPinnedGroups()
 
-	// Apply the bookmark's saved namespace only when the user asked
-	// for it via Tab in the overlay. Default behaviour is "jump to
-	// the resource type in my current namespace scope", regardless of
-	// slot case; the saved namespace stays in the record so the
-	// override can replay it on demand. Consume the flag right after
-	// reading so it can't leak into the next open.
-	applyNs := m.bookmarkLoadNamespace
-	m.bookmarkLoadNamespace = false
-
-	if applyNs {
-		oldNs := m.namespace
-		switch {
-		case bm.Namespace == "" && len(bm.Namespaces) == 0:
-			m.allNamespaces = true
-			m.selectedNamespaces = nil
-		case len(bm.Namespaces) > 1:
-			m.allNamespaces = false
-			m.namespace = bm.Namespaces[0]
-			m.selectedNamespaces = make(map[string]bool, len(bm.Namespaces))
-			for _, ns := range bm.Namespaces {
-				m.selectedNamespaces[ns] = true
-			}
-		default:
-			m.allNamespaces = false
-			ns := bm.Namespace
-			if len(bm.Namespaces) == 1 {
-				ns = bm.Namespaces[0]
-			}
-			m.namespace = ns
-			m.selectedNamespaces = map[string]bool{ns: true}
-		}
-		// Invalidate the old namespace's cache within the new context. When
-		// the context also changed, the entire old context was already wiped
-		// above, so only invalidate when staying in the same context.
-		if oldCtx == effectiveContext {
-			m.invalidateOrphanCacheForNamespace(effectiveContext, oldNs)
-		}
-	}
+	m.applyBookmarkNamespace(bm, target, oldCtx)
 
 	// Navigate to resource type level first, then optionally deeper.
 	m.nav.ResourceType = rt
@@ -535,19 +670,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.rightItems = nil
 	m.clearRight()
 
-	// Rebuild left items history: clusters -> resource types.
-	// Load contexts as the base left column.
-	contexts, _ := m.client.GetContexts()
-	var resourceTypes []model.Item
-	if discovered := m.discoveredResources[effectiveContext]; len(discovered) > 0 {
-		resourceTypes = model.BuildSidebarItems(discovered)
-	} else {
-		resourceTypes = model.BuildSidebarItems(model.SeedResources())
-	}
-
-	// Set up history: at LevelResources, leftItemsHistory has [contexts], leftItems = resourceTypes.
-	m.leftItemsHistory = [][]model.Item{contexts}
-	m.leftItems = resourceTypes
+	resourceTypes := m.rebuildLeftHistoryForBookmark(target)
 
 	// Reset cursors, then set the parent (resource types) cursor to the
 	// correct position so that pressing 'h' returns to the right item.
@@ -560,7 +683,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	rtRef := rt.ResourceRef()
 	for i, item := range resourceTypes {
 		if item.Extra == rtRef {
-			m.cursorMemory[effectiveContext] = i
+			m.cursorMemory[target.context] = i
 			break
 		}
 	}

@@ -51,8 +51,8 @@ func (c *Client) DetectKubeshark(ctx context.Context, kubectx string) (*Kubeshar
 // "kubeshark" — the default of `helm install kubeshark kubeshark/kubeshark
 // --namespace kubeshark`.
 func (c *Client) kubesharkNamespace() string {
-	if c.kubesharkNamespaceOverride != "" {
-		return c.kubesharkNamespaceOverride
+	if override := c.kubesharkNamespaceOverride.Load(); override != nil && *override != "" {
+		return *override
 	}
 	return "kubeshark"
 }

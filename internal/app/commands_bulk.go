@@ -39,8 +39,17 @@ func (m Model) bulkDeleteResources() tea.Cmd {
 			if ref.Namespace != "" {
 				itemNs = ref.Namespace
 			}
-			logger.Info("Bulk deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs)
-			err := client.DeleteResource(actionCtx, itemNs, rt, ref.Name)
+			// In union mode each row carries its source cluster on
+			// ref.ClusterName; route per-item so a mixed-cluster selection
+			// hits the right apiserver for each row instead of fanning the
+			// whole list at the first item's cluster. ClusterName is empty
+			// in normal mode so this falls back to actionCtx.
+			itemCtx := actionCtx
+			if ref.ClusterName != "" {
+				itemCtx = ref.ClusterName
+			}
+			logger.Info("Bulk deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", itemCtx)
+			err := client.DeleteResource(itemCtx, itemNs, rt, ref.Name)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", ref.Name, err.Error()))
@@ -56,13 +65,26 @@ func (m Model) bulkDeleteResources() tea.Cmd {
 // expandGroupedItems flattens bulk items so that grouped rows (with
 // GroupedRefs) are expanded into one entry per underlying resource.
 // Non-grouped items pass through unchanged.
+//
+// ClusterName is carried through for union-mode routing. Event grouping stores
+// each underlying ref's ClusterName; the parent item is only a fallback for
+// older cached grouped rows or callers that build grouped refs manually.
 func expandGroupedItems(items []model.Item) []model.GroupedRef {
 	refs := make([]model.GroupedRef, 0, len(items))
 	for _, item := range items {
 		if len(item.GroupedRefs) > 0 {
-			refs = append(refs, item.GroupedRefs...)
+			for _, ref := range item.GroupedRefs {
+				if ref.ClusterName == "" {
+					ref.ClusterName = item.ClusterName
+				}
+				refs = append(refs, ref)
+			}
 		} else {
-			refs = append(refs, model.GroupedRef{Name: item.Name, Namespace: item.Namespace})
+			refs = append(refs, model.GroupedRef{
+				Name:        item.Name,
+				Namespace:   item.Namespace,
+				ClusterName: item.ClusterName,
+			})
 		}
 	}
 	return refs
@@ -99,15 +121,20 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			if ref.Namespace != "" {
 				itemNs = ref.Namespace
 			}
-			logger.Info("Bulk force deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs)
+			// Per-item cluster routing for union mode (see bulkDeleteResources).
+			itemCtx := actionCtx
+			if ref.ClusterName != "" {
+				itemCtx = ref.ClusterName
+			}
+			logger.Info("Bulk force deleting", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", itemCtx)
 
-			// Resolve KUBECONFIG to just the file that defines actionCtx so
+			// Resolve KUBECONFIG to just the file that defines itemCtx so
 			// that overlapping cluster/user names across kubeconfigs do not
 			// route this command to the wrong cluster — see issue #23. Also
 			// translate the lfk display name back to the literal kubeconfig
 			// context name for the --context flag.
-			kubeconfigPath := client.KubeconfigPathForContext(actionCtx)
-			kubectlCtx := client.OriginalContextName(actionCtx)
+			kubeconfigPath := client.KubeconfigPathForContext(itemCtx)
+			kubectlCtx := client.OriginalContextName(itemCtx)
 
 			// Remove finalizers first.
 			patchArgs := []string{
@@ -120,7 +147,16 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			patchCmd := exec.CommandContext(ctx, kubectlPath, patchArgs...)
 			patchCmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", patchCmd)
-			patchCmd.Run() //nolint:errcheck
+			// Best-effort: a failure here (RBAC denial, resource already
+			// gone) is not fatal — the subsequent --force delete will
+			// usually still succeed. But log the failure so a hang or
+			// half-completed delete leaves a trail in lfk.log instead
+			// of disappearing silently.
+			if err := patchCmd.Run(); err != nil {
+				logger.Warn("kubectl finalizer-patch failed; proceeding to force delete",
+					"resource", rt.Resource, "name", ref.Name, "namespace", itemNs,
+					"context", itemCtx, "error", err)
+			}
 
 			// Force delete.
 			deleteArgs := []string{
@@ -134,7 +170,7 @@ func (m Model) bulkForceDeleteResources() tea.Cmd {
 			cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
 			logExecCmd("Running kubectl command", cmd)
 			if _, err := cmd.CombinedOutput(); err != nil {
-				logger.Error("kubectl bulk force delete failed", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", actionCtx, "error", err)
+				logger.Error("kubectl bulk force delete failed", "resource", rt.Resource, "name", ref.Name, "namespace", itemNs, "context", itemCtx, "error", err)
 				failed++
 				msg := strings.TrimSpace(err.Error())
 				if msg == "" {
@@ -176,8 +212,16 @@ func (m Model) bulkScaleResources(replicas int32) tea.Cmd {
 			if item.Namespace != "" {
 				itemNs = item.Namespace
 			}
-			logger.Info("Bulk scaling", "name", item.Name, "replicas", replicas, "namespace", itemNs)
-			err := client.ScaleResource(actionCtx, itemNs, item.Name, kind, replicas)
+			// Per-item cluster routing for union mode (see bulkDeleteResources).
+			// Scale is currently excluded from the union allow-list, so this is
+			// defensive: if the allow-list is ever relaxed, mixed-cluster
+			// selections must still target each row's source apiserver.
+			itemCtx := actionCtx
+			if item.ClusterName != "" {
+				itemCtx = item.ClusterName
+			}
+			logger.Info("Bulk scaling", "name", item.Name, "replicas", replicas, "namespace", itemNs, "context", itemCtx)
+			err := client.ScaleResource(itemCtx, itemNs, item.Name, kind, replicas)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
@@ -216,8 +260,13 @@ func (m Model) bulkRestartResources() tea.Cmd {
 			if item.Namespace != "" {
 				itemNs = item.Namespace
 			}
-			logger.Info("Bulk restarting", "name", item.Name, "namespace", itemNs)
-			err := client.RestartResource(actionCtx, itemNs, item.Name, kind)
+			// Per-item cluster routing for union mode (see bulkDeleteResources).
+			itemCtx := actionCtx
+			if item.ClusterName != "" {
+				itemCtx = item.ClusterName
+			}
+			logger.Info("Bulk restarting", "name", item.Name, "namespace", itemNs, "context", itemCtx)
+			err := client.RestartResource(itemCtx, itemNs, item.Name, kind)
 			if err != nil {
 				failed++
 				errors = append(errors, fmt.Sprintf("%s: %s", item.Name, err.Error()))
@@ -277,11 +326,21 @@ func (m Model) batchPatchLabels(key, value string, remove bool, isAnnotation boo
 			if !rt.Namespaced {
 				itemNs = ""
 			}
+			// Per-item cluster routing for union mode (see bulkDeleteResources).
+			// Labels/Annotations are currently excluded from the union
+			// allow-list, so this is defensive: if the allow-list is ever
+			// relaxed, mixed-cluster selections must still target each row's
+			// source apiserver.
+			itemCtx := actionCtx
+			if item.ClusterName != "" {
+				itemCtx = item.ClusterName
+			}
+			logger.Info("Bulk patching", "kind", labelOrAnnotation, "name", item.Name, "namespace", itemNs, "context", itemCtx)
 			var err error
 			if isAnnotation {
-				err = client.PatchAnnotations(ctx, actionCtx, itemNs, item.Name, gvr, patch)
+				err = client.PatchAnnotations(ctx, itemCtx, itemNs, item.Name, gvr, patch)
 			} else {
-				err = client.PatchLabels(ctx, actionCtx, itemNs, item.Name, gvr, patch)
+				err = client.PatchLabels(ctx, itemCtx, itemNs, item.Name, gvr, patch)
 			}
 			if err != nil {
 				failed++

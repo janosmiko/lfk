@@ -733,8 +733,12 @@ func TestCovExecuteBulkActionRestart(t *testing.T) {
 	m.actionCtx = actionContext{context: "ctx", namespace: "ns"}
 	ret, cmd := m.executeBulkAction("Restart")
 	result := ret.(Model)
-	assert.True(t, result.loading)
-	assert.NotNil(t, cmd)
+	// Bulk Restart now opens a confirmation overlay rather than firing
+	// the restart command immediately — destructive bulk actions in
+	// union mode can hit multiple clusters in one keystroke.
+	assert.Equal(t, overlayConfirm, result.overlay)
+	assert.Equal(t, "Restart", result.pendingAction)
+	assert.Nil(t, cmd)
 }
 
 func TestCovExecuteBulkActionLabels(t *testing.T) {

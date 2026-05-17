@@ -66,7 +66,11 @@ type dashboardData struct {
 // Side benefit beyond preemption: even on a healthy cluster, the
 // dashboard renders incrementally instead of staying blank for ~20s.
 func (m Model) loadDashboard() tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
+	return m.loadDashboardFor(kctx)
+}
+
+func (m Model) loadDashboardFor(kctx string) tea.Cmd {
 	gen := m.requestGen
 	client := m.client
 	base := bgtaskTarget(kctx, "")
@@ -152,7 +156,7 @@ func dashboardAccKey(kctx string, gen uint64) string {
 // (context, gen) is evicted — otherwise navigating away mid-refresh
 // would leak partial entries in m.dashboardAcc forever.
 func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) {
-	if msg.context != m.nav.Context || msg.gen != m.requestGen {
+	if msg.context != m.dashboardPreviewTargetContext() || msg.gen != m.requestGen {
 		// Drop any partial accumulator left behind for this stale
 		// (context, gen). The guarded m.dashboardAcc init lets us skip
 		// the delete when the map is nil (test fixtures).
@@ -352,7 +356,11 @@ func fetchNodeMetrics(reqCtx context.Context, kctx string, client *k8s.Client, n
 
 // loadMonitoringDashboard fetches active Prometheus alerts and renders a monitoring dashboard.
 func (m Model) loadMonitoringDashboard() tea.Cmd {
-	kctx := m.nav.Context
+	kctx := m.effectiveContext()
+	return m.loadMonitoringDashboardFor(kctx)
+}
+
+func (m Model) loadMonitoringDashboardFor(kctx string) tea.Cmd {
 	client := m.client
 	ns := m.effectiveNamespace()
 	return m.trackBgTask(

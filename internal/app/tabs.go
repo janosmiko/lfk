@@ -69,6 +69,38 @@ func (m *Model) selectedResourceKind() string {
 // effectiveNamespace returns the namespace to use for API calls.
 // Returns empty string when allNamespaces is true or multiple namespaces are
 // selected (fetches all, filters client-side).
+// isUnionSentinel reports whether the app is in union mode while nav.Context
+// holds the internal sentinel value that must not be sent to the Kubernetes
+// API. Keep this level-agnostic: union mode also uses the sentinel at
+// LevelResourceTypes for discovery and metadata fallbacks. ValidateUnionOptions
+// reserves the literal sentinel name, so it cannot collide with a configured
+// union context.
+func (m Model) isUnionSentinel() bool {
+	return m.unionMode && m.nav.Context == UnionContextSentinel
+}
+
+// effectiveContext returns the Kubernetes context for API calls targeting the
+// currently selected item. In union mode at LevelResources, nav.Context is
+// the UnionContextSentinel, so we read the source cluster from the hovered
+// item's ClusterName. At all other levels (post-drill-down), nav.Context is
+// already the real cluster and is returned as-is.
+//
+// When the hovered item carries no ClusterName, fall back to unionContexts[0].
+// Callers that are semantically per-context (dashboards, RBAC, bookmarks)
+// should guard before calling this; the fallback is for discovery, namespace
+// metadata, and other internals that need one representative real context.
+func (m Model) effectiveContext() string {
+	if m.isUnionSentinel() {
+		if sel := m.selectedMiddleItem(); sel != nil && sel.ClusterName != "" {
+			return sel.ClusterName
+		}
+		if len(m.unionContexts) > 0 {
+			return m.unionContexts[0]
+		}
+	}
+	return m.nav.Context
+}
+
 func (m *Model) effectiveNamespace() string {
 	if m.allNamespaces || len(m.selectedNamespaces) > 1 {
 		return "" // fetch all, filter client-side
@@ -264,6 +296,7 @@ func (m *Model) portForwardItems() []model.Item {
 			CreatedAt: e.StartedAt,
 			Columns: []model.KeyValue{
 				{Key: "ID", Value: fmt.Sprintf("%d", e.ID)},
+				{Key: "Context", Value: e.Context},
 				{Key: "Local", Value: displayLocalPort},
 				{Key: "Remote", Value: e.RemotePort},
 				{Key: "Resource", Value: e.ResourceKind + "/" + e.ResourceName},
@@ -280,7 +313,11 @@ func (m *Model) navigateToPortForwards() {
 	// Build the correct left column state for LevelResources.
 	contexts, _ := m.client.GetContexts()
 	var resourceTypes []model.Item
-	if discovered := m.discoveredResources[m.nav.Context]; len(discovered) > 0 {
+	discoveryCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
+	if discovered := m.discoveredResources[discoveryCtx]; len(discovered) > 0 {
 		resourceTypes = model.BuildSidebarItems(discovered)
 	} else {
 		resourceTypes = model.BuildSidebarItems(model.SeedResources())
@@ -611,7 +648,11 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 		// Load contexts for the left column breadcrumb.
 		contexts, _ := m.client.GetContexts()
 		resourceTypes := model.BuildSidebarItems(model.SeedResources())
-		if discovered := m.discoveredResources[m.nav.Context]; len(discovered) > 0 {
+		discoveryCtx := m.nav.Context
+		if m.unionMode && m.nav.Context == UnionContextSentinel && len(m.unionContexts) > 0 {
+			discoveryCtx = m.unionContexts[0]
+		}
+		if discovered := m.discoveredResources[discoveryCtx]; len(discovered) > 0 {
 			resourceTypes = model.BuildSidebarItems(discovered)
 		}
 

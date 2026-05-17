@@ -61,7 +61,7 @@
 - **Three-column Miller columns** interface (parent / current / preview)
 - **Owner-based navigation**: Clusters -> Resource Types -> Resources -> Owned Resources -> Containers
 - **Resource groups**: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
-- **Pinned CRD groups**: Pin frequently used CRD API groups so they appear after built-in categories. Configurable via `pinned_groups` in config or interactively with `p` key (stored per-context)
+- **Pinned CRD groups**: Pin frequently used CRD API groups so they appear after built-in categories. Configurable via `pinned_groups` in config or interactively with `p` key (stored per-context or per named union set)
 - **CRD categories**: Discovered CRDs are grouped by API group name (e.g., `argoproj.io`, `longhorn.io`, `networking.istio.io`)
 - **Hide rarely used resources**: CSI internals, admission webhooks, APF, leases, runtime classes, and uncategorized core resources are hidden by default. Press `H` to surface them under their categories and an "Advanced" group (resets each launch)
 - **Expandable/collapsible resource groups** with `z`
@@ -74,6 +74,7 @@
 - **Multi-tab support**: Open multiple views side by side
 - **Multi-cluster/multi-context support** via merged kubeconfig loading
 - **Merged kubeconfig loading**: `~/.kube/config`, `~/.kube/config.d/*` (recursive, symlinks followed), `KUBECONFIG` env var, and `KUBECONFIG_DIR` env var.
+- **Union view**: Merge resources from multiple clusters into a single table with a `Context` column identifying the source, via `--union-context` (repeatable) or a named `--union-set` from config. See [Union View](docs/union-context.md).
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser

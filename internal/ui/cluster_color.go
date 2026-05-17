@@ -128,3 +128,39 @@ func ClusterColorSwatchBg(name string) string {
 	}
 	return lipgloss.NewStyle().Background(bg).Render("  ")
 }
+
+// ClusterColorTileBg is the single-cell variant of ClusterColorSwatchBg used
+// by the union-view row prefix: every union row gets a 1-cell colored tile
+// at the leading edge so the source context is identifiable at a glance
+// without scanning the textual Context column. One cell trades visibility
+// for a smaller width tax than the 2-cell picker swatch — appropriate for
+// per-row use across hundreds of rows.
+//
+// Empty / unknown name returns one regular space so rows without a colour
+// stay aligned with rows that have one (the column-width calc subtracts a
+// fixed tileW regardless of which rows actually have colours set).
+func ClusterColorTileBg(name string) string {
+	bg := clusterColorBg(name)
+	if bg == nil {
+		return " "
+	}
+	return lipgloss.NewStyle().Background(bg).Render(" ")
+}
+
+// ClusterColorTileBgOver is ClusterColorTileBg for a row wrapped by an outer
+// style — specifically the cursor row's selection highlight. The colored
+// tile ends with an SGR reset; left alone, that reset cancels the outer
+// style for every cell after the tile, so the cursor highlight vanishes for
+// the rest of the row. Re-emitting the outer style's open codes right after
+// the tile restores it. Mirrors the HighlightMatchStyledOver "restore"
+// pattern.
+//
+// An uncolored tile is a plain space with no embedded reset, so it is
+// returned unchanged — nothing needs restoring.
+func ClusterColorTileBgOver(name string, outer lipgloss.Style) string {
+	tile := ClusterColorTileBg(name)
+	if clusterColorBg(name) == nil {
+		return tile
+	}
+	return tile + styleOpenCodes(outer)
+}

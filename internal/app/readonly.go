@@ -88,6 +88,31 @@ var mutatingActions = map[string]bool{
 	"Upgrade":     true,
 }
 
+// isUnionAllowedActionForKind reports whether an action is allowed at the
+// union sentinel. Fetch-only actions pass through, including custom actions
+// explicitly marked read_only_safe. Mutating actions must opt in by both kind
+// and label so the merged view cannot delete arbitrary resource kinds just
+// because they expose a "Delete" action.
+func isUnionAllowedActionForKind(kind, label string) bool {
+	if !isMutatingActionForKind(kind, label) {
+		return true
+	}
+	switch label {
+	case "Delete", "Force Delete", "Force Finalize":
+		return kind == "Pod"
+	case "Port Forward":
+		switch kind {
+		case "Pod", "Service", "Deployment", "StatefulSet", "DaemonSet":
+			return true
+		}
+		return false
+	case "Restart":
+		return model.IsRestartableKind(kind)
+	default:
+		return false
+	}
+}
+
 // isMutatingAction reports whether a given action label changes cluster state
 // and should be blocked when read-only mode is active.
 //
@@ -123,6 +148,95 @@ func isMutatingActionForKind(kind, label string) bool {
 // action is blocked. Centralised so tests can assert on the exact format.
 func readOnlyBlockedMessage(actionLabel string) string {
 	return "Read-only mode: " + actionLabel + " disabled"
+}
+
+// readOnlyForContext resolves read-only state for a specific target context.
+// This is distinct from Model.readOnly in union mode: the active navigation
+// context is the internal union sentinel, but each row action targets a real
+// source cluster whose own read-only policy still has to be honored.
+func (m Model) readOnlyForContext(ctx string) bool {
+	if m.cliReadOnly || m.readOnly {
+		return true
+	}
+	if !m.unionMode || ctx == "" || ctx == m.nav.Context || ctx == UnionContextSentinel {
+		return false
+	}
+	if v, ok := m.contextROOverrides[ctx]; ok {
+		return v
+	}
+	return ui.ResolveReadOnly(ctx, false)
+}
+
+// bulkReadOnlyContext returns the first target context that would make a
+// mutating bulk action illegal. Bulk union actions are all-or-nothing at the
+// dispatcher; individual handlers should not partially mutate a mixed
+// read-only/read-write selection.
+func (m Model) bulkReadOnlyContext() (string, bool) {
+	if len(m.bulkItems) == 0 {
+		ctx := m.actionCtx.context
+		if m.unionMode && ctx == UnionContextSentinel {
+			return ctx, true
+		}
+		return ctx, m.readOnlyForContext(ctx)
+	}
+	for _, item := range m.bulkItems {
+		contexts, unknown := m.bulkItemTargetContexts(item)
+		if unknown {
+			return UnionContextSentinel, true
+		}
+		for _, ctx := range contexts {
+			if m.readOnlyForContext(ctx) {
+				return ctx, true
+			}
+		}
+	}
+	return "", false
+}
+
+func (m Model) bulkItemTargetContexts(item model.Item) ([]string, bool) {
+	if item.ClusterName != "" {
+		return []string{item.ClusterName}, false
+	}
+	if len(item.GroupedRefs) > 0 {
+		contexts := make([]string, 0, len(item.GroupedRefs))
+		seen := make(map[string]struct{}, len(item.GroupedRefs))
+		for _, ref := range item.GroupedRefs {
+			if ref.ClusterName == "" {
+				return nil, true
+			}
+			if _, ok := seen[ref.ClusterName]; ok {
+				continue
+			}
+			seen[ref.ClusterName] = struct{}{}
+			contexts = append(contexts, ref.ClusterName)
+		}
+		if len(contexts) > 0 {
+			return contexts, false
+		}
+	}
+	ctx := m.actionCtx.context
+	if ctx != "" && ctx != UnionContextSentinel {
+		return []string{ctx}, false
+	}
+	if m.unionMode || ctx == UnionContextSentinel {
+		return nil, true
+	}
+	return []string{ctx}, false
+}
+
+func (m Model) actionTargetBlockedByReadOnly() bool {
+	if m.bulkMode && len(m.bulkItems) > 0 {
+		_, blocked := m.bulkReadOnlyContext()
+		return blocked
+	}
+	return m.readOnlyForContext(m.actionCtx.context)
+}
+
+func (m Model) pendingActionBlockedByReadOnly() bool {
+	if !isMutatingAction(m.pendingAction) {
+		return false
+	}
+	return m.actionTargetBlockedByReadOnly()
 }
 
 // effectiveContextReadOnly returns the read-only state to display for the
@@ -212,6 +326,10 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 		sel := m.selectedMiddleItem()
 		if sel == nil {
 			return m, nil
+		}
+		if isUnionSetItem(sel) {
+			m.setStatusMessage("Read-only toggle applies to contexts", true)
+			return m, scheduleStatusClear()
 		}
 		newState := !sel.ReadOnly
 		if m.contextROOverrides == nil {
