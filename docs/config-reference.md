@@ -741,3 +741,21 @@ The application follows the [XDG Base Directory Specification](https://specifica
 | `~/.local/share/lfk/lfk.log` (default) | Application log file (configurable via `log_path`) |
 
 State files stored at the legacy `~/.config/lfk/` location are automatically migrated to the new XDG state directory on first access.
+
+### Directory overrides
+
+For portable installs such as Scoop's persist directory, lfk honors three environment variables that override the XDG variables and OS defaults:
+
+| Variable | Overrides | Holds |
+|---|---|---|
+| `LFK_CONFIG_DIR` | config directory | `config.yaml` |
+| `LFK_STATE_DIR` | state directory | bookmarks, session, pinned groups, history, cluster colors, captures |
+| `LFK_DATA_DIR` | data directory | `lfk.log` |
+
+Each variable is used verbatim as the lfk directory — unlike `XDG_*_HOME`, no `lfk` component is appended. Resolution precedence per directory:
+
+1. `LFK_<X>_DIR` if set.
+2. `$XDG_<X>_HOME/lfk` if set.
+3. OS default (`~/.config/lfk`, `~/.local/state/lfk`, `~/.local/share/lfk`).
+
+The `--config` flag and the `log_path` config field are full file-path overrides and still win over `LFK_CONFIG_DIR` and `LFK_DATA_DIR` respectively.
