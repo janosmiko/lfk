@@ -87,7 +87,7 @@ Download pre-built binaries from the [GitHub Releases](https://github.com/janosm
 ### Scoop
 
 ```powershell
-scoop bucket add janosmiko https://github.com/janosmiko/scoop-bucket
+scoop bucket add extras
 scoop install lfk
 ```
 
