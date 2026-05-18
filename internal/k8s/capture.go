@@ -11,6 +11,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // CaptureBackend identifies which capture engine the user picked.
@@ -41,7 +43,7 @@ type CaptureRequest struct {
 	Interface string // default "any"
 	SnapLen   int    // default 65535
 	BPFFilter string // optional
-	OutputDir string // default $XDG_STATE_HOME/lfk/captures
+	OutputDir string // default: "captures" in the lfk state directory
 }
 
 // CaptureEntry is one running or completed capture.
@@ -381,12 +383,13 @@ func (m *CaptureManager) StopAll() {
 }
 
 // defaultCaptureDir returns the user-default capture directory.
+// Returns "" when the state directory cannot be resolved.
 func defaultCaptureDir() string {
-	if x := os.Getenv("XDG_STATE_HOME"); x != "" {
-		return filepath.Join(x, "lfk", "captures")
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
 	}
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".local", "state", "lfk", "captures")
+	return filepath.Join(dir, "captures")
 }
 
 // captureLastErrorMaxLen bounds the stderr substring stored in
