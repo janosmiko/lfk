@@ -525,7 +525,7 @@ func helpSections() []helpSection {
 			bindings: []helpEntry{
 				{"", "Config: ~/.config/lfk/config.yaml (or $XDG_CONFIG_HOME/lfk/config.yaml)"},
 				{"", "State:  ~/.local/state/lfk/ (bookmarks, session, history, pinned groups)"},
-				{"", "Logs:   ~/.local/share/lfk/lfk.log"},
+				{"", "Logs:   ~/.local/share/lfk/lfk.log (or $XDG_DATA_HOME/lfk/lfk.log)"},
 				{"", "Override dirs: LFK_CONFIG_DIR, LFK_STATE_DIR, LFK_DATA_DIR"},
 			},
 		},

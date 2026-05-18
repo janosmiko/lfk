@@ -35,7 +35,7 @@ func main() {
 File locations:
   Config: ~/.config/lfk/config.yaml  (or $XDG_CONFIG_HOME/lfk/config.yaml)
   State:  ~/.local/state/lfk/        (bookmarks, session, history)
-  Logs:   ~/.local/share/lfk/lfk.log
+  Logs:   ~/.local/share/lfk/lfk.log  (or $XDG_DATA_HOME/lfk/lfk.log)
   Override dirs for portable installs: LFK_CONFIG_DIR, LFK_STATE_DIR, LFK_DATA_DIR`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			return runTUI(cliOpts)
