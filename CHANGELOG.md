@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.0](https://github.com/janosmiko/lfk/compare/v0.11.8...v0.12.0) (2026-05-18)
+
+
+### Features
+
+* add configurable data directories (LFK_*_DIR overrides) ([#246](https://github.com/janosmiko/lfk/issues/246)) ([4de5317](https://github.com/janosmiko/lfk/commit/4de531735ea2d480165f0d19c0760061ce5ec798))
+* add multi-cluster union view with --union-context and --union-set ([#172](https://github.com/janosmiko/lfk/issues/172)) ([ba0f405](https://github.com/janosmiko/lfk/commit/ba0f4059db6cd6588a4e4d8c9c4ba77fadd543db))
+
 ## [0.11.8](https://github.com/janosmiko/lfk/compare/v0.11.7...v0.11.8) (2026-05-15)
 
 
