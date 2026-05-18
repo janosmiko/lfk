@@ -10,6 +10,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 type configFile struct {
@@ -353,22 +354,18 @@ func LoadConfig(configOverride string) {
 }
 
 // loadConfigFile reads and parses the YAML config file.
-// When configOverride is non-empty, it is used directly instead of the default
-// XDG-based path.
+// When configOverride is non-empty, it is used directly instead of the
+// resolved config directory (see internal/paths).
 func loadConfigFile(configOverride string) (configFile, bool) {
 	var configPath string
 	if configOverride != "" {
 		configPath = configOverride
 	} else {
-		configDir := os.Getenv("XDG_CONFIG_HOME")
-		if configDir == "" {
-			home, err := os.UserHomeDir()
-			if err != nil {
-				return configFile{}, false
-			}
-			configDir = filepath.Join(home, ".config")
+		dir, err := paths.ConfigDir()
+		if err != nil {
+			return configFile{}, false
 		}
-		configPath = filepath.Join(configDir, "lfk", "config.yaml")
+		configPath = filepath.Join(dir, "config.yaml")
 	}
 
 	data, err := os.ReadFile(configPath)

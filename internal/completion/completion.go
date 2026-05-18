@@ -14,6 +14,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/k8s"
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // RegisterShellCompletions attaches dynamic completion functions to the
@@ -194,13 +195,9 @@ func completionConfigPath(configOverride string) (string, bool) {
 	if configOverride != "" {
 		return configOverride, true
 	}
-	configDir := os.Getenv("XDG_CONFIG_HOME")
-	if configDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return "", false
-		}
-		configDir = filepath.Join(home, ".config")
+	dir, err := paths.ConfigDir()
+	if err != nil {
+		return "", false
 	}
-	return filepath.Join(configDir, "lfk", "config.yaml"), true
+	return filepath.Join(dir, "config.yaml"), true
 }
