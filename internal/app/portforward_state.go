@@ -11,6 +11,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // PortForwardState represents a single persisted port forward.
@@ -30,15 +31,11 @@ type PortForwardStates struct {
 
 // portForwardStatePath returns the path to the port forward state file.
 func portForwardStatePath() string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
 	}
-	return filepath.Join(stateDir, "lfk", "portforwards.yaml")
+	return filepath.Join(dir, "portforwards.yaml")
 }
 
 // loadPortForwardState reads saved port forwards from disk.

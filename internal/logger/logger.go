@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 var (
@@ -23,15 +25,16 @@ func init() {
 }
 
 // Init opens (or creates) the log file at logPath, sets up a JSON handler,
-// and assigns the package-level Logger. If logPath is empty the default
-// ~/.local/share/lfk/lfk.log is used. Parent directories are created as needed.
+// and assigns the package-level Logger. If logPath is empty the log file
+// defaults to lfk.log inside the resolved data directory (see internal/paths).
+// Parent directories are created as needed.
 func Init(logPath string) error {
 	if logPath == "" {
-		home, err := os.UserHomeDir()
+		dir, err := paths.DataDir()
 		if err != nil {
 			return err
 		}
-		logPath = filepath.Join(home, ".local", "share", "lfk", "lfk.log")
+		logPath = filepath.Join(dir, "lfk.log")
 	}
 
 	if err := os.MkdirAll(filepath.Dir(logPath), 0o755); err != nil {

@@ -6,11 +6,12 @@ import (
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 const maxHistoryEntries = 500
 
-// Filenames for the persistent input histories under $XDG_STATE_HOME/lfk/.
+// Filenames for the persistent input histories in the lfk state directory.
 // `/` (search) and `f` (filter) share one file: the query syntax and matched
 // fields are identical between the two, only the action on a match differs
 // (jump vs. narrow), so users want to recall the same query regardless of
@@ -33,27 +34,23 @@ type commandHistory struct {
 	entries  []string
 	cursor   int    // -1 means "not browsing history" (typing new command)
 	draft    string // saves what the user was typing before browsing history
-	filename string // file under $XDG_STATE_HOME/lfk/; empty = command bar (back-compat)
+	filename string // file in the lfk state directory; empty = command bar (back-compat)
 }
 
 // historyFilePath returns the path to the command bar history file.
-// Uses $XDG_STATE_HOME/lfk/history (defaults to ~/.local/state/lfk/history).
+// Uses the "history" file in the lfk state directory (see internal/paths).
 func historyFilePath() string {
 	return historyFilePathFor(historyFileCommand)
 }
 
 // historyFilePathFor returns the path to the named history file. Returns
-// "" when the home directory cannot be resolved.
+// "" when the state directory cannot be resolved.
 func historyFilePathFor(name string) string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
 	}
-	return filepath.Join(stateDir, "lfk", name)
+	return filepath.Join(dir, name)
 }
 
 // loadCommandHistory reads command bar history from disk.

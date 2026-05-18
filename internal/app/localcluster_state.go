@@ -1,5 +1,5 @@
 // localcluster_state persists the manager overlay's last-seen view of
-// local clusters to $XDG_STATE_HOME/lfk/local-clusters.yaml. The cache
+// local clusters to the lfk state directory (local-clusters.yaml). The cache
 // drives the cluster picker's status icon (filled vs hollow) so stopped
 // clusters don't disappear from the picker between manager refreshes.
 // Mirrors cluster_colors.go and discovery_cache.go: schema-versioned,
@@ -17,6 +17,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 const localClusterStateSchemaVersion = 1
@@ -39,15 +40,11 @@ type localClusterStateFile struct {
 }
 
 func localClusterStateFilePath() string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
 	}
-	return filepath.Join(stateDir, "lfk", "local-clusters.yaml")
+	return filepath.Join(dir, "local-clusters.yaml")
 }
 
 // loadLocalClusterState reads the cache from disk. Returns an empty
@@ -95,7 +92,7 @@ func loadLocalClusterState() map[string]localClusterCacheEntry {
 func saveLocalClusterState(entries []localClusterCacheEntry) error {
 	path := localClusterStateFilePath()
 	if path == "" {
-		err := errors.New("no state path: HOME and XDG_STATE_HOME both unset")
+		err := errors.New("no state path: cannot resolve lfk state directory")
 		logger.Warn("local cluster state save failed", "error", err)
 		return err
 	}

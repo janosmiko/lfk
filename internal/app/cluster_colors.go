@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/paths"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -26,18 +27,13 @@ type clusterColorsState struct {
 }
 
 // clusterColorsFilePath returns the path to the cluster-colors state file.
-// Uses $XDG_STATE_HOME/lfk/ (defaults to ~/.local/state/lfk/) per XDG spec —
-// same convention as bookmarks.yaml and the input histories.
+// Resolves the lfk state directory via internal/paths.
 func clusterColorsFilePath() string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
 	}
-	return filepath.Join(stateDir, "lfk", "cluster-colors.yaml")
+	return filepath.Join(dir, "cluster-colors.yaml")
 }
 
 // loadClusterColors reads the cluster-colours map from disk. Returns an

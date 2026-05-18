@@ -8,6 +8,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // SessionTab represents the persisted navigation state for a single tab.
@@ -36,17 +37,13 @@ type SessionState struct {
 }
 
 // sessionFilePath returns the path to the session state file.
-// Uses $XDG_STATE_HOME/lfk/ (defaults to ~/.local/state/lfk/) per XDG specification.
+// Resolves the lfk state directory via internal/paths.
 func sessionFilePath() string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
 	}
-	return filepath.Join(stateDir, "lfk", "session.yaml")
+	return filepath.Join(dir, "session.yaml")
 }
 
 // migrateStateFile checks if a state file exists at the legacy ~/.config/lfk/ location
