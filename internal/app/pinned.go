@@ -7,6 +7,7 @@ import (
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // PinnedState stores pinned CRD groups scoped either to a kube context or to
@@ -18,15 +19,11 @@ type PinnedState struct {
 
 // pinnedFilePath returns the path to the pinned groups state file.
 func pinnedFilePath() string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
 	}
-	return filepath.Join(stateDir, "lfk", "pinned.yaml")
+	return filepath.Join(dir, "pinned.yaml")
 }
 
 // loadPinnedState reads pinned groups from disk.

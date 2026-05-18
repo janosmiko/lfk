@@ -8,20 +8,17 @@ import (
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/paths"
 )
 
 // bookmarksFilePath returns the path to the bookmarks file.
-// Uses $XDG_STATE_HOME/lfk/ (defaults to ~/.local/state/lfk/) per XDG specification.
+// Resolves the lfk state directory via internal/paths.
 func bookmarksFilePath() string {
-	stateDir := os.Getenv("XDG_STATE_HOME")
-	if stateDir == "" {
-		home, err := os.UserHomeDir()
-		if err != nil {
-			return ""
-		}
-		stateDir = filepath.Join(home, ".local", "state")
+	dir, err := paths.StateDir()
+	if err != nil {
+		return ""
 	}
-	return filepath.Join(stateDir, "lfk", "bookmarks.yaml")
+	return filepath.Join(dir, "bookmarks.yaml")
 }
 
 // loadBookmarks reads bookmarks from the YAML file on disk.
