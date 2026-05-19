@@ -140,6 +140,7 @@ func (m Model) overlayHintBarSelector() string {
 	case overlayPortForward:
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "select port"},
+			{Key: "0-9", Desc: "local[:remote] port (eg 8080:80)"},
 			{Key: "enter", Desc: "forward"},
 			{Key: "esc", Desc: "cancel"},
 		})

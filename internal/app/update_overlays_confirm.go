@@ -313,8 +313,11 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	case "enter":
 		var localPort, remotePort string
+		// A ':' in the input means the user is typing a full local:remote
+		// mapping manually — that takes precedence over any list selection.
+		manualMapping := strings.Contains(m.portForwardInput.Value, ":")
 		switch {
-		case m.pfPortCursor >= 0 && m.pfPortCursor < len(m.pfAvailablePorts):
+		case !manualMapping && m.pfPortCursor >= 0 && m.pfPortCursor < len(m.pfAvailablePorts):
 			p := m.pfAvailablePorts[m.pfPortCursor]
 			remotePort = p.Port
 			if m.portForwardInput.Value != "" {
@@ -375,10 +378,6 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		key := msg.String()
 		if len(key) == 1 && ((key[0] >= '0' && key[0] <= '9') || key[0] == ':') {
 			m.portForwardInput.Insert(key)
-			// When user types ':', they want manual local:remote mode — deselect from port list.
-			if key[0] == ':' {
-				m.pfPortCursor = -1
-			}
 		}
 		return m, nil
 	}

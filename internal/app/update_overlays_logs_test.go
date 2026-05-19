@@ -673,7 +673,10 @@ func TestCovPortForwardKeyColon(t *testing.T) {
 	m.pfPortCursor = 0
 	result, _ := m.handlePortForwardOverlayKey(keyMsg(":"))
 	rm := result.(Model)
-	assert.Equal(t, -1, rm.pfPortCursor)
+	// ':' enters manual mode via the input content; the list selection
+	// is preserved so deleting the ':' can restore it.
+	assert.Equal(t, 0, rm.pfPortCursor)
+	assert.Contains(t, rm.portForwardInput.Value, ":")
 }
 
 func TestCovPortForwardKeyInvalidChar(t *testing.T) {

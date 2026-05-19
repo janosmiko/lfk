@@ -1138,7 +1138,7 @@ func TestPortForwardOverlayTypesDigits(t *testing.T) {
 	assert.Equal(t, "8080", result.portForwardInput.Value)
 }
 
-func TestPortForwardOverlayColonDeselectsPort(t *testing.T) {
+func TestPortForwardOverlayColonKeepsPortSelected(t *testing.T) {
 	m := Model{
 		overlay:          overlayPortForward,
 		portForwardInput: TextInput{Value: "8080", Cursor: 4},
@@ -1147,10 +1147,18 @@ func TestPortForwardOverlayColonDeselectsPort(t *testing.T) {
 		width:            80,
 		height:           40,
 	}
+	// Typing ':' switches to manual local:remote entry but must keep the
+	// list selection, so removing the ':' can restore it.
 	ret, _ := m.handlePortForwardOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{':'}})
 	result := ret.(Model)
-	assert.Equal(t, -1, result.pfPortCursor)
 	assert.Equal(t, "8080:", result.portForwardInput.Value)
+	assert.Equal(t, 1, result.pfPortCursor)
+
+	// Deleting the ':' returns to list mode with the same port selected.
+	ret2, _ := result.handlePortForwardOverlayKey(specialKey(tea.KeyBackspace))
+	result2 := ret2.(Model)
+	assert.Equal(t, "8080", result2.portForwardInput.Value)
+	assert.Equal(t, 1, result2.pfPortCursor)
 }
 
 func TestPortForwardOverlayEnterWithNoInput(t *testing.T) {

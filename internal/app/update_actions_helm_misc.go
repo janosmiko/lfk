@@ -219,3 +219,24 @@ func (m Model) executeActionRemove() (tea.Model, tea.Cmd) {
 	}
 	return m, nil
 }
+
+// removeSelectedPortForward removes the port forward under the cursor in the
+// __port_forwards__ browser — the path taken by the D / delete key. Mirrors
+// the action-menu "Remove" but sources the entry from the selected row
+// rather than m.actionCtx.
+func (m Model) removeSelectedPortForward() (tea.Model, tea.Cmd) {
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil
+	}
+	pfID := m.getPortForwardID(sel.Columns)
+	if pfID <= 0 {
+		return m, nil
+	}
+	m.portForwardMgr.Remove(pfID)
+	m.setMiddleItems(m.portForwardItems())
+	m.clampCursor()
+	m.saveCurrentPortForwards()
+	m.setStatusMessage("Port forward removed", false)
+	return m, scheduleStatusClear()
+}
