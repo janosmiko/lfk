@@ -113,6 +113,29 @@ func TestRenderOverlayPortForward(t *testing.T) {
 	assert.NotEmpty(t, result)
 }
 
+// TestRenderOverlayPortForwardColonTogglesManualMode verifies that a ':' in
+// the input hides the Remote-port row (manual local:remote mode) and that
+// clearing it brings the row back.
+func TestRenderOverlayPortForwardColonTogglesManualMode(t *testing.T) {
+	m := baseOverlayModel()
+	m.overlay = overlayPortForward
+	m.pfAvailablePorts = []ui.PortInfo{{Port: "80", Name: "http"}, {Port: "443", Name: "https"}}
+	m.pfPortCursor = 1
+	m.actionCtx = actionContext{name: "my-pod"}
+	bg := strings.Repeat("bg\n", 10)
+
+	// No ':' — a port is selected, so the Remote-port row is shown.
+	m.portForwardInput = TextInput{Value: "8080"}
+	listMode := m.renderOverlay(bg)
+	assert.Contains(t, listMode, "Remote port")
+
+	// ':' in the input — manual mapping mode, Remote-port row hidden.
+	m.portForwardInput = TextInput{Value: "8080:"}
+	manualMode := m.renderOverlay(bg)
+	assert.NotContains(t, manualMode, "Remote port")
+	assert.Contains(t, manualMode, "Port mapping")
+}
+
 func TestRenderOverlayContainerSelect(t *testing.T) {
 	m := baseOverlayModel()
 	m.overlay = overlayContainerSelect

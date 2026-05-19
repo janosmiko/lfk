@@ -46,3 +46,25 @@ func TestCovRestorePortForwards(t *testing.T) {
 	// No port forwards to restore, and kubectl may not be available.
 	_ = cmds
 }
+
+// TestRestartLocalPort verifies that restarting a port forward reuses the
+// local port the forward already had, rather than picking a new random one.
+func TestRestartLocalPort(t *testing.T) {
+	tests := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"resolved random port is reused", "54321", "54321"},
+		{"user-specified port is reused", "8080", "8080"},
+		{"unresolved zero stays random", "0", "0"},
+		{"empty falls back to random", "", "0"},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := restartLocalPort(tc.in); got != tc.want {
+				t.Errorf("restartLocalPort(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
+	}
+}

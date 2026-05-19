@@ -148,7 +148,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 
 Events list also groups duplicate events (same Type/Reason/Message/Object) by default; press `z` to toggle grouping.
 
-Port forwarding is available via the action menu (`x`) on Pod, Service, Deployment, StatefulSet, and DaemonSet resources. After creating a port forward, the view automatically navigates to the Port Forwards list and displays the resolved local port in the status bar. Active port forwards can be managed via the "Port Forwards" virtual resource in the Networking group.
+Port forwarding is available via the action menu (`x`) on Pod, Service, Deployment, StatefulSet, and DaemonSet resources. In the port-forward dialog, select an exposed port with `j`/`k`, or type a `local:remote` mapping (e.g. `8080:80`) to choose a specific local port — omit the local port (e.g. `:80`) for a random one. After creating a port forward, the view automatically navigates to the Port Forwards list and displays the resolved local port in the status bar. Active port forwards can be managed via the "Port Forwards" virtual resource in the Networking group; press `D` there to remove the selected forward.
 
 Resource-specific actions (exec, scale, restart, secret editor, etc.) are available through the action menu (`x`).
 

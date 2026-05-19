@@ -59,6 +59,17 @@ func (m Model) stopPortForward(id int) tea.Cmd {
 	}
 }
 
+// restartLocalPort returns the local port to reuse when restarting a port
+// forward. The forward's existing local port is kept — including a port
+// kubectl resolved on the first run — so the restart stays on the same
+// localhost:<port>. An empty value falls back to "0" for a fresh assignment.
+func restartLocalPort(localPort string) string {
+	if localPort == "" {
+		return "0"
+	}
+	return localPort
+}
+
 // restartPortForward restarts a stopped/failed port forward by ID.
 // It removes the old entry and starts a new one with the same parameters.
 func (m Model) restartPortForward(id int) tea.Cmd {
@@ -82,8 +93,7 @@ func (m Model) restartPortForward(id int) tea.Cmd {
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 	kubectlKctx := m.kubectlContext(kctx)
 	remotePort := entry.RemotePort
-	// Use "0" for local port to get a fresh random port assignment.
-	localPort := "0"
+	localPort := restartLocalPort(entry.LocalPort)
 
 	mgr.Remove(id)
 

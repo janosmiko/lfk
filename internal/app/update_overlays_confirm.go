@@ -313,8 +313,11 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		return m, nil
 	case "enter":
 		var localPort, remotePort string
+		// A ':' in the input means the user is typing a full local:remote
+		// mapping manually — that takes precedence over any list selection.
+		manualMapping := strings.Contains(m.portForwardInput.Value, ":")
 		switch {
-		case m.pfPortCursor >= 0 && m.pfPortCursor < len(m.pfAvailablePorts):
+		case !manualMapping && m.pfPortCursor >= 0 && m.pfPortCursor < len(m.pfAvailablePorts):
 			p := m.pfAvailablePorts[m.pfPortCursor]
 			remotePort = p.Port
 			if m.portForwardInput.Value != "" {
@@ -327,6 +330,13 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		case m.portForwardInput.Value != "":
 			// Manual entry: parse as localPort:remotePort or just port.
 			parts := strings.SplitN(m.portForwardInput.Value, ":", 2)
+			if len(parts) == 2 && parts[1] == "" {
+				// "8080:" has no remote port; kubectl would reject it.
+				// An empty local port (":80") is fine — kubectl picks one.
+				m.setStatusMessage("Port mapping needs a remote port (e.g., 8080:80)", true)
+				m.overlay = overlayNone
+				return m, scheduleStatusClear()
+			}
 			localPort = parts[0]
 			if len(parts) == 2 {
 				remotePort = parts[1]
@@ -375,10 +385,6 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		key := msg.String()
 		if len(key) == 1 && ((key[0] >= '0' && key[0] <= '9') || key[0] == ':') {
 			m.portForwardInput.Insert(key)
-			// When user types ':', they want manual local:remote mode — deselect from port list.
-			if key[0] == ':' {
-				m.pfPortCursor = -1
-			}
 		}
 		return m, nil
 	}

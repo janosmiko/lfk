@@ -201,6 +201,10 @@ func (m Model) handleExplorerDirectActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cm
 		ret, cmd := m.directActionDescribe()
 		return ret, cmd, true
 	case kb.Delete:
+		if m.nav.Level == model.LevelResources && m.nav.ResourceType.Kind == "__port_forwards__" {
+			ret, cmd := m.removeSelectedPortForward()
+			return ret, cmd, true
+		}
 		ret, cmd := m.directActionDelete()
 		return ret, cmd, true
 	case kb.ForceDelete:

@@ -587,6 +587,19 @@ func TestCovPortForwardKeyEnterManualSinglePort(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
+func TestCovPortForwardKeyEnterEmptyRemote(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayPortForward
+	m.pfPortCursor = -1
+	m.portForwardInput.Insert("8080:")
+	result, cmd := m.handlePortForwardOverlayKey(keyMsg("enter"))
+	rm := result.(Model)
+	// "8080:" has an empty remote port: rejected with a status message.
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.NotNil(t, cmd)
+	assert.True(t, rm.hasStatusMessage())
+}
+
 func TestCovPortForwardKeyEnterEmpty(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayPortForward
@@ -673,7 +686,10 @@ func TestCovPortForwardKeyColon(t *testing.T) {
 	m.pfPortCursor = 0
 	result, _ := m.handlePortForwardOverlayKey(keyMsg(":"))
 	rm := result.(Model)
-	assert.Equal(t, -1, rm.pfPortCursor)
+	// ':' enters manual mode via the input content; the list selection
+	// is preserved so deleting the ':' can restore it.
+	assert.Equal(t, 0, rm.pfPortCursor)
+	assert.Contains(t, rm.portForwardInput.Value, ":")
 }
 
 func TestCovPortForwardKeyInvalidChar(t *testing.T) {
