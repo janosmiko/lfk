@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.12.1](https://github.com/janosmiko/lfk/compare/v0.12.0...v0.12.1) (2026-05-19)
+
+
+### Features
+
+* add jump-back navigation history ([#249](https://github.com/janosmiko/lfk/issues/249)) ([#256](https://github.com/janosmiko/lfk/issues/256)) ([c7eae4b](https://github.com/janosmiko/lfk/commit/c7eae4ba6828bcb1abca2a50b63fac6aae449835))
+
+
+### Bug Fixes
+
+* **port-forward:** reuse local port on restart, fix setup-overlay UX ([#253](https://github.com/janosmiko/lfk/issues/253)) ([d065a5e](https://github.com/janosmiko/lfk/commit/d065a5e15204f9edfb55314a8186420513eb3d59))
+* **sort:** sort numeric/structured columns numerically ([#255](https://github.com/janosmiko/lfk/issues/255)) ([1a13ad0](https://github.com/janosmiko/lfk/commit/1a13ad03893d239819238cc4266765a85ef9d8b6)), closes [#250](https://github.com/janosmiko/lfk/issues/250)
+
 ## [0.12.0](https://github.com/janosmiko/lfk/compare/v0.11.8...v0.12.0) (2026-05-18)
 
 
