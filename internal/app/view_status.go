@@ -361,6 +361,13 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	hintEntries = append(hintEntries,
 		ui.HintEntry{Key: kb.Filter, Desc: "filter"},
 		ui.HintEntry{Key: kb.SetMark + "/" + kb.OpenMarks, Desc: "marks"},
+	)
+	// Advertise jump-back only when the stack has entries, so the bar never
+	// lies that a no-op key does something.
+	if len(m.jumpBackStack) > 0 {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.JumpBack, Desc: "jump back"})
+	}
+	hintEntries = append(hintEntries,
 		ui.HintEntry{Key: kb.Help, Desc: "help"},
 		ui.HintEntry{Key: "q", Desc: "quit"},
 	)

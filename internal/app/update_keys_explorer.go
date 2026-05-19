@@ -66,6 +66,10 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		}
 	}
 
+	if mdl, cmd, handled := m.handleExplorerJumpKey(msg); handled {
+		return mdl, cmd, true
+	}
+
 	switch msg.String() {
 	case "q":
 		m.overlay = overlayQuitConfirm
@@ -98,9 +102,6 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return mdl, cmd, true
 	case kb.JumpBottom, "end":
 		mdl, cmd := m.handleExplorerJumpBottom()
-		return mdl, cmd, true
-	case "home":
-		mdl, cmd := m.handleExplorerHome()
 		return mdl, cmd, true
 	case kb.SelectRange:
 		mdl := m.handleKeySelectRange()
@@ -153,6 +154,26 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return mdl, cmd, true
 	case kb.PrevMatch:
 		mdl, cmd := m.handleKeyPrevMatch()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+func (m Model) handleExplorerJumpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
+	switch msg.String() {
+	case "home":
+		mdl, cmd := m.handleExplorerHome()
+		return mdl, cmd, true
+	case kb.JumpBack:
+		// JumpBack defaults to Backspace. While the user is editing a filter
+		// or search query, Backspace must delete a character — leave the key
+		// unhandled so the input handlers receive it. update_keys.go already
+		// routes active text entry away upstream; this guard is defensive.
+		if m.filterActive || m.searchActive {
+			return m, nil, false
+		}
+		mdl, cmd := m.jumpBack()
 		return mdl, cmd, true
 	}
 	return m, nil, false

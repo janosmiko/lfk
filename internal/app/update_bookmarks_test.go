@@ -2208,3 +2208,41 @@ func TestSaveBookmarkStatusMessageIncludesKind(t *testing.T) {
 			"status message must call out context-free kind")
 	})
 }
+
+// TestNavigateToBookmark_RecordsJumpHistory verifies a successful bookmark
+// jump records the origin on the jump-back stack — covering both the
+// jumpToSlot path and the overlay Enter path, which both route through
+// navigateToBookmark.
+func TestNavigateToBookmark_RecordsJumpHistory(t *testing.T) {
+	m := baseFinalModel()
+	podRT := model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podRT}
+	bm := model.Bookmark{Slot: "P", ResourceType: podRT.ResourceRef()}
+
+	result, _ := m.navigateToBookmark(bm)
+	rm := result.(Model)
+
+	require.Len(t, rm.jumpBackStack, 1,
+		"a successful bookmark jump must record the origin for jump-back")
+}
+
+// TestNavigateToBookmark_FailedJumpRecordsNoHistory verifies an unresolvable
+// bookmark (resource type genuinely absent from a discovered cluster) does
+// not push a jump-history entry.
+func TestNavigateToBookmark_FailedJumpRecordsNoHistory(t *testing.T) {
+	m := baseFinalModel()
+	// Discovery has run for the context but the bookmarked type is not in it.
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "Pod", Resource: "pods", APIVersion: "v1"},
+	}
+	bm := model.Bookmark{
+		Slot:         "W",
+		ResourceType: "example.com/v1/widgets",
+	}
+
+	result, _ := m.navigateToBookmark(bm)
+	rm := result.(Model)
+
+	assert.Empty(t, rm.jumpBackStack,
+		"a failed bookmark jump must not record a jump-history entry")
+}

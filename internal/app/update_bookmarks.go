@@ -640,6 +640,11 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	// Target resolved successfully. Record the origin so jump_back can return
+	// here after this teleport — done before any nav state is mutated, and
+	// only on a confirmed-resolvable jump so failed jumps leave no history.
+	m.pushJumpHistory()
+
 	// Switch target: context bookmarks exit union mode, named union-set
 	// bookmarks activate union mode, and context-free bookmarks preserve the
 	// current mode.

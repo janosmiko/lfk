@@ -402,11 +402,16 @@ type TabState struct {
 	// a full refreshCurrentLevel instead of the lighter loadPreview.
 	needsLoad bool
 
-	nav                model.NavigationState
-	leftItems          []model.Item
-	middleItems        []model.Item
-	rightItems         []model.Item
-	leftItemsHistory   [][]model.Item
+	nav              model.NavigationState
+	leftItems        []model.Item
+	middleItems      []model.Item
+	rightItems       []model.Item
+	leftItemsHistory [][]model.Item
+	// jumpBackStack holds this tab's teleport history so each tab navigates
+	// its own jumps independently. navSnapshots are never mutated after
+	// captureNavSnapshot deep-copies their slices, so copying the outer
+	// slice on save/restore is enough.
+	jumpBackStack      []navSnapshot
 	cursors            [5]int
 	middleScroll       int // persistent scroll position for middle column (vim-style scrolloff)
 	leftScroll         int // persistent scroll position for left column (vim-style scrolloff)

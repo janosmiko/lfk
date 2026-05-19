@@ -289,6 +289,9 @@ func (m Model) jumpToOrphan() (Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	// Record the origin so jump_back can return here after this teleport.
+	m.pushJumpHistory()
+
 	m = m.closeOrphansOverlay()
 
 	// Switch namespace before navigating so the resource list loads
