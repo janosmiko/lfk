@@ -1,9 +1,11 @@
 package app
 
 import (
+	"net/netip"
 	"sort"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -136,6 +138,16 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	case "Age":
 		return compareAgeCmp(a, b)
+	case "Ports":
+		return comparePortsCmp(getColumnValue(a, "Ports"), getColumnValue(b, "Ports"))
+	case "Progress":
+		// Argo Workflow progress is an "N/M" fraction, identical in shape
+		// to the Ready ratio — reuse the same comparator.
+		return compareReadyCmp(getColumnValue(a, "Progress"), getColumnValue(b, "Progress"))
+	case "Duration":
+		return compareDurationCmp(getColumnValue(a, "Duration"), getColumnValue(b, "Duration"))
+	case "Cluster IP", "Pod IP", "External IPs":
+		return compareIPCmp(getColumnValue(a, colName), getColumnValue(b, colName))
 	case sortColEventLastSeen:
 		return compareLastSeenCmp(a, b)
 	default:
@@ -263,6 +275,85 @@ func compareLastSeenCmp(a, b model.Item) int {
 	default:
 		return 0
 	}
+}
+
+// comparePortsCmp compares Service "Ports" column values numerically by
+// their leading port number, so "99/TCP" sorts before "10000/TCP" instead
+// of lexicographically. Values are comma-joined lists (e.g. "80/TCP, 443/TCP");
+// only the first entry's port drives the comparison. Falls back to a
+// case-insensitive lexicographic comparison when either value lacks a
+// leading number.
+func comparePortsCmp(a, b string) int {
+	na, okA := leadingPortNumber(a)
+	nb, okB := leadingPortNumber(b)
+	if okA && okB {
+		if c := cmpInt(na, nb); c != 0 {
+			return c
+		}
+		return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+	}
+	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+}
+
+// leadingPortNumber extracts the leading run of digits from a port string
+// (e.g. "8080:30000/TCP" → 8080). Returns false when there is no leading digit.
+func leadingPortNumber(s string) (int, bool) {
+	s = strings.TrimSpace(s)
+	i := 0
+	for i < len(s) && s[i] >= '0' && s[i] <= '9' {
+		i++
+	}
+	if i == 0 {
+		return 0, false
+	}
+	n, err := strconv.Atoi(s[:i])
+	if err != nil {
+		return 0, false
+	}
+	return n, true
+}
+
+// compareDurationCmp compares two Go duration strings (e.g. "5m30s") by
+// their actual length, so "10m" sorts after "5m" instead of before it.
+// Falls back to case-insensitive lexicographic comparison when either
+// value is not a parseable duration.
+func compareDurationCmp(a, b string) int {
+	da, errA := time.ParseDuration(strings.TrimSpace(a))
+	db, errB := time.ParseDuration(strings.TrimSpace(b))
+	if errA == nil && errB == nil {
+		return cmpInt64(int64(da), int64(db))
+	}
+	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+}
+
+// compareIPCmp compares IP-address column values numerically, so
+// "10.0.0.9" sorts before "10.0.0.10". Values may be comma-joined lists
+// (e.g. External IPs); only the first address drives the comparison.
+// Falls back to case-insensitive lexicographic comparison when either
+// value lacks a parseable leading address (e.g. "None", "<none>").
+func compareIPCmp(a, b string) int {
+	ia, okA := leadingIP(a)
+	ib, okB := leadingIP(b)
+	if okA && okB {
+		if c := ia.Compare(ib); c != 0 {
+			return c
+		}
+		return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+	}
+	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+}
+
+// leadingIP parses the first comma-separated token of s as an IP address.
+func leadingIP(s string) (netip.Addr, bool) {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, ','); i >= 0 {
+		s = strings.TrimSpace(s[:i])
+	}
+	addr, err := netip.ParseAddr(s)
+	if err != nil {
+		return netip.Addr{}, false
+	}
+	return addr, true
 }
 
 // compareColumnValuesCmp compares two column values with automatic detection
