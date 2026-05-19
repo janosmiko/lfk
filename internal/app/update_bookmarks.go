@@ -333,8 +333,6 @@ func (m Model) saveBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 func (m Model) jumpToSlot(slot string) (tea.Model, tea.Cmd) {
 	for _, bm := range m.bookmarks {
 		if bm.Slot == slot {
-			// Record the origin so jump_back can return here after this teleport.
-			m.pushJumpHistory()
 			return m.navigateToBookmark(bm)
 		}
 	}
@@ -641,6 +639,11 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 		m.setStatusMessage("Resource type not found in current cluster", true)
 		return m, scheduleStatusClear()
 	}
+
+	// Target resolved successfully. Record the origin so jump_back can return
+	// here after this teleport — done before any nav state is mutated, and
+	// only on a confirmed-resolvable jump so failed jumps leave no history.
+	m.pushJumpHistory()
 
 	// Switch target: context bookmarks exit union mode, named union-set
 	// bookmarks activate union mode, and context-free bookmarks preserve the

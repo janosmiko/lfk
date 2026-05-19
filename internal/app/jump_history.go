@@ -101,6 +101,11 @@ func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
 	// picker rather than restoring into a dead context.
 	if snap.nav.Level > model.LevelClusters && snap.nav.Context != "" {
 		if !m.contextStillValid(snap.nav.Context) {
+			// A jump-back is a navigation transition: cancel in-flight work and
+			// bump requestGen so async responses from the pre-fallback view
+			// can't apply after this reset (mirrors navigateParent).
+			m.cancelAndReset()
+			m.requestGen++
 			m.setStatusMessage("Jump target no longer available — returned to clusters", true)
 			m.nav = model.NavigationState{Level: model.LevelClusters}
 			m.leftItemsHistory = nil

@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
@@ -97,22 +98,11 @@ func TestJumpHistoryStackCap(t *testing.T) {
 	// Push one more than the cap; the oldest entry must be dropped.
 	for i := range jumpHistoryCap + 10 {
 		m.setCursor(i)
-		m.jumpBackStack = append(m.jumpBackStack, m.captureNavSnapshot())
-		if len(m.jumpBackStack) > jumpHistoryCap {
-			m.jumpBackStack = m.jumpBackStack[len(m.jumpBackStack)-jumpHistoryCap:]
-		}
+		m.pushJumpHistory()
 	}
 	assert.Len(t, m.jumpBackStack, jumpHistoryCap)
 	// Oldest surviving entry should be cursor index 10, not 0.
 	assert.Equal(t, 10, m.jumpBackStack[0].cursors[model.LevelResources])
-}
-
-func TestJumpHistoryPushCapViaPushHelper(t *testing.T) {
-	m := jumpHistoryModel()
-	for range jumpHistoryCap + 5 {
-		m.pushJumpHistory()
-	}
-	assert.Len(t, m.jumpBackStack, jumpHistoryCap)
 }
 
 func TestMultiLevelJumpHistory(t *testing.T) {
@@ -242,4 +232,45 @@ func TestJumpHistoryIsIndependentPerTab(t *testing.T) {
 	m.saveCurrentTab()
 	m.loadTab(0)
 	require.Len(t, m.jumpBackStack, 1, "tab A's jump history must survive the round-trip")
+}
+
+// TestJumpBackKeyIgnoredDuringTextEntry verifies that the JumpBack key
+// (Backspace) is left unhandled by handleExplorerJumpKey while a filter or
+// search query is being edited, so the input handlers receive it instead.
+func TestJumpBackKeyIgnoredDuringTextEntry(t *testing.T) {
+	// The non-editing case reaches jumpBack(), which persists session state;
+	// isolate the state dir so it doesn't leak into other tests.
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+
+	kb := ui.ActiveKeybindings
+	jumpBackMsg := tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(kb.JumpBack)}
+	if kb.JumpBack == "backspace" {
+		jumpBackMsg = tea.KeyMsg{Type: tea.KeyBackspace}
+	}
+
+	t.Run("not handled while filter active", func(t *testing.T) {
+		m := jumpHistoryModel()
+		m.pushJumpHistory()
+		m.filterActive = true
+		_, _, handled := m.handleExplorerJumpKey(jumpBackMsg)
+		assert.False(t, handled,
+			"JumpBack must be left for the filter input handler while editing")
+	})
+
+	t.Run("not handled while search active", func(t *testing.T) {
+		m := jumpHistoryModel()
+		m.pushJumpHistory()
+		m.searchActive = true
+		_, _, handled := m.handleExplorerJumpKey(jumpBackMsg)
+		assert.False(t, handled,
+			"JumpBack must be left for the search input handler while editing")
+	})
+
+	t.Run("handled when not editing", func(t *testing.T) {
+		m := jumpHistoryModel()
+		m.pushJumpHistory()
+		_, _, handled := m.handleExplorerJumpKey(jumpBackMsg)
+		assert.True(t, handled,
+			"JumpBack must trigger jump-back when no text entry is active")
+	})
 }
