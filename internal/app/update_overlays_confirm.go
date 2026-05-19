@@ -330,6 +330,13 @@ func (m Model) handlePortForwardOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		case m.portForwardInput.Value != "":
 			// Manual entry: parse as localPort:remotePort or just port.
 			parts := strings.SplitN(m.portForwardInput.Value, ":", 2)
+			if len(parts) == 2 && parts[1] == "" {
+				// "8080:" has no remote port; kubectl would reject it.
+				// An empty local port (":80") is fine — kubectl picks one.
+				m.setStatusMessage("Port mapping needs a remote port (e.g., 8080:80)", true)
+				m.overlay = overlayNone
+				return m, scheduleStatusClear()
+			}
 			localPort = parts[0]
 			if len(parts) == 2 {
 				remotePort = parts[1]

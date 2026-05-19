@@ -587,6 +587,19 @@ func TestCovPortForwardKeyEnterManualSinglePort(t *testing.T) {
 	assert.NotNil(t, cmd)
 }
 
+func TestCovPortForwardKeyEnterEmptyRemote(t *testing.T) {
+	m := baseModelBoost2()
+	m.overlay = overlayPortForward
+	m.pfPortCursor = -1
+	m.portForwardInput.Insert("8080:")
+	result, cmd := m.handlePortForwardOverlayKey(keyMsg("enter"))
+	rm := result.(Model)
+	// "8080:" has an empty remote port: rejected with a status message.
+	assert.Equal(t, overlayNone, rm.overlay)
+	assert.NotNil(t, cmd)
+	assert.True(t, rm.hasStatusMessage())
+}
+
 func TestCovPortForwardKeyEnterEmpty(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayPortForward
