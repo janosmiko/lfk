@@ -333,6 +333,8 @@ func (m Model) saveBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 func (m Model) jumpToSlot(slot string) (tea.Model, tea.Cmd) {
 	for _, bm := range m.bookmarks {
 		if bm.Slot == slot {
+			// Record the origin so jump_back can return here after this teleport.
+			m.pushJumpHistory()
 			return m.navigateToBookmark(bm)
 		}
 	}

@@ -66,6 +66,10 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		}
 	}
 
+	if mdl, cmd, handled := m.handleExplorerJumpKey(msg); handled {
+		return mdl, cmd, true
+	}
+
 	switch msg.String() {
 	case "q":
 		m.overlay = overlayQuitConfirm
@@ -98,9 +102,6 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return mdl, cmd, true
 	case kb.JumpBottom, "end":
 		mdl, cmd := m.handleExplorerJumpBottom()
-		return mdl, cmd, true
-	case "home":
-		mdl, cmd := m.handleExplorerHome()
 		return mdl, cmd, true
 	case kb.SelectRange:
 		mdl := m.handleKeySelectRange()
@@ -153,6 +154,19 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return mdl, cmd, true
 	case kb.PrevMatch:
 		mdl, cmd := m.handleKeyPrevMatch()
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
+func (m Model) handleExplorerJumpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
+	switch msg.String() {
+	case "home":
+		mdl, cmd := m.handleExplorerHome()
+		return mdl, cmd, true
+	case kb.JumpBack:
+		mdl, cmd := m.jumpBack()
 		return mdl, cmd, true
 	}
 	return m, nil, false

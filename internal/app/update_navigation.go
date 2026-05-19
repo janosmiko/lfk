@@ -250,6 +250,9 @@ func (m Model) navigateToOwner(kind, name string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	// Record the origin so jump_back can return here after this teleport.
+	m.pushJumpHistory()
+
 	// Navigate back to resource types level.
 	for m.nav.Level > model.LevelResourceTypes {
 		ret, _ := m.navigateParent()

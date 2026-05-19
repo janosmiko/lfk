@@ -310,6 +310,9 @@ func (m *Model) portForwardItems() []model.Item {
 // navigateToPortForwards switches the view to the Port Forwards resource list.
 // If pfLastCreatedID is set, the cursor is placed on the matching entry.
 func (m *Model) navigateToPortForwards() {
+	// Record the origin so jump_back can return here after this teleport.
+	m.pushJumpHistory()
+
 	// Build the correct left column state for LevelResources.
 	contexts, _ := m.client.GetContexts()
 	var resourceTypes []model.Item
@@ -418,6 +421,7 @@ func (m *Model) saveCurrentTab() {
 	for i, hist := range m.leftItemsHistory {
 		t.leftItemsHistory[i] = append([]model.Item(nil), hist...)
 	}
+	t.jumpBackStack = cloneNavSnapshots(m.jumpBackStack)
 	t.cursors = m.cursors
 	t.middleScroll = ui.ActiveMiddleScroll
 	t.leftScroll = ui.ActiveLeftScroll
@@ -527,6 +531,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	for i, hist := range t.leftItemsHistory {
 		m.leftItemsHistory[i] = append([]model.Item(nil), hist...)
 	}
+	m.jumpBackStack = cloneNavSnapshots(t.jumpBackStack)
 	m.cursors = t.cursors
 	ui.ActiveMiddleScroll = t.middleScroll
 	ui.ActiveLeftScroll = t.leftScroll

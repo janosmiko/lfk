@@ -725,6 +725,9 @@ type Model struct {
 	sessionRestored     bool               // true once the pending session has been applied
 	pendingPortForwards *PortForwardStates // loaded port forwards waiting to be re-established
 
+	// Jump history: back stack for "teleport" jumps; jump_back pops it. Capped at jumpHistoryCap.
+	jumpBackStack []navSnapshot
+
 	// Stack of LevelOwned parents for nested drill-downs (popped by navigateParent).
 	ownedParentStack []ownedParentState
 	// Overlay to restore when the current closes — set when a nested overlay flow opens (e.g., RBAC → namespace selector → back to RBAC).
@@ -778,10 +781,8 @@ type Model struct {
 	columnToggleCursor       int
 	columnToggleFilter       string
 	columnToggleFilterActive bool
-	// columnToggleSnapshot captures the pre-overlay values of session/
-	// hidden/order maps for the current kind so Esc can revert when the
-	// user explored toggles live and changed their mind. Captured at
-	// openColumnToggle, consumed at handleColumnToggleKeyEsc.
+	// columnToggleSnapshot captures pre-overlay session/hidden/order maps
+	// so Esc can revert live edits (openColumnToggle -> handleColumnToggleKeyEsc).
 	columnToggleSnapshot columnToggleSnapshot
 	sessionColumns       map[string][]string // kind -> ordered visible extra column keys (session-only)
 	hiddenBuiltinColumns map[string][]string // kind -> hidden built-in column keys (session-only)
