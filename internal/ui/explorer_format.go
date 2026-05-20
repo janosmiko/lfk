@@ -359,6 +359,8 @@ func resourceColumnStyle(key, val string) lipgloss.Style {
 		return pctStyle(val)
 	case "CPU Req", "CPU Lim", "Mem Req", "Mem Lim", "CPU Alloc", "Mem Alloc":
 		return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Background(BaseBg)
+	case "Severity":
+		return severityColumnStyle(val)
 	case "Last Sync", "Health", "Sync", "Reason":
 		return StatusStyle(val)
 	case "Synced At":
@@ -378,6 +380,24 @@ func resourceColumnStyle(key, val string) lipgloss.Style {
 	default:
 		return DimStyle
 	}
+}
+
+// severityColumnStyle returns the lipgloss.Style that paints the
+// abbreviated severity label in the Severity column. Mirrors the badge
+// palette in styleSeverityBadge so the row, badge, and details panel
+// all use the same color per level.
+func severityColumnStyle(val string) lipgloss.Style {
+	switch val {
+	case "CRIT":
+		return StatusFailed
+	case "HIGH":
+		return DeprecationStyle
+	case "MED":
+		return StatusProgressing
+	case "LOW":
+		return StatusRunning
+	}
+	return DimStyle
 }
 
 // pctStyle returns a colored style based on a percentage string like "42%" or "n/a".

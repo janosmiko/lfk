@@ -229,6 +229,28 @@ func TestStatusPriority(t *testing.T) {
 	}
 }
 
+// --- severityRank ---
+
+func TestSeverityRank(t *testing.T) {
+	tests := []struct {
+		sev  string
+		rank int
+	}{
+		{"CRIT", 0},
+		{"HIGH", 1},
+		{"MED", 2},
+		{"LOW", 3},
+		{"?", 4},
+		{"", 4},
+		{"bogus", 4},
+	}
+	for _, tt := range tests {
+		t.Run(tt.sev, func(t *testing.T) {
+			assert.Equal(t, tt.rank, severityRank(tt.sev))
+		})
+	}
+}
+
 // --- fullErrorMessage ---
 
 func TestFullErrorMessage(t *testing.T) {

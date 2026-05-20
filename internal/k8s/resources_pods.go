@@ -14,6 +14,29 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// appendSyntheticOwner adds an owner-reference column for a parent the
+// pod does not list directly in OwnerReferences (e.g. the Deployment
+// behind a ReplicaSet). The UI's security-finding index reads
+// "owner:N" columns to roll findings up from the parent workload onto
+// child pod rows, which is otherwise blind to the Deployment->RS->Pod
+// chain. The numeric suffix is offset past any real OwnerReferences
+// populated upstream so the existing keys stay intact.
+func appendSyntheticOwner(ti *model.Item, kind, name string) {
+	if kind == "" || name == "" {
+		return
+	}
+	idx := 0
+	for _, kv := range ti.Columns {
+		if strings.HasPrefix(kv.Key, "owner:") {
+			idx++
+		}
+	}
+	ti.Columns = append(ti.Columns, model.KeyValue{
+		Key:   fmt.Sprintf("owner:%d", idx),
+		Value: "||" + kind + "||" + name,
+	})
+}
+
 func (c *Client) getPodsViaReplicaSets(ctx context.Context, dynClient dynamic.Interface, namespace, deploymentName string) ([]model.Item, error) {
 	rsGVR := schema.GroupVersionResource{Group: "apps", Version: "v1", Resource: "replicasets"}
 	rsList, err := dynClient.Resource(rsGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
@@ -57,6 +80,7 @@ func (c *Client) getPodsViaReplicaSets(ctx context.Context, dynClient dynamic.In
 					ti.Age = formatAge(time.Since(creationTS.Time))
 				}
 				populateResourceDetails(&ti, pod.Object, "Pod")
+				appendSyntheticOwner(&ti, "Deployment", deploymentName)
 				items = append(items, ti)
 				break
 			}
@@ -90,6 +114,7 @@ func (c *Client) getPodsByOwner(ctx context.Context, dynClient dynamic.Interface
 					ti.Age = formatAge(time.Since(creationTS.Time))
 				}
 				populateResourceDetails(&ti, pod.Object, "Pod")
+				appendSyntheticOwner(&ti, ownerKind, ownerName)
 				items = append(items, ti)
 				break
 			}
