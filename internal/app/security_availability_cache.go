@@ -36,7 +36,6 @@ const securityAvailabilityCacheFilename = "lfk-security-availability.yaml"
 // Model.securityAvailabilityByName.
 type SecurityAvailabilityCacheState struct {
 	SchemaVersion int             `json:"schema_version"`
-	Host          string          `json:"host"`
 	UpdatedAt     time.Time       `json:"updated_at"`
 	Availability  map[string]bool `json:"availability"`
 }
@@ -66,18 +65,18 @@ func loadSecurityAvailabilityCacheForHost(host string) *SecurityAvailabilityCach
 	data, err := os.ReadFile(path)
 	if err != nil {
 		if !errors.Is(err, fs.ErrNotExist) {
-			logger.Warn("Security availability cache read failed", "host", host, "error", err)
+			logger.Warn("Security availability cache read failed", "host", k8s.CacheHostDir(host), "error", err)
 		}
 		return nil
 	}
 	var s SecurityAvailabilityCacheState
 	if err := yaml.Unmarshal(data, &s); err != nil {
-		logger.Warn("Security availability cache is corrupt; ignoring", "host", host, "error", err)
+		logger.Warn("Security availability cache is corrupt; ignoring", "host", k8s.CacheHostDir(host), "error", err)
 		return nil
 	}
 	if s.SchemaVersion != securityAvailabilityCacheSchemaVersion {
 		logger.Info("Security availability cache schema version mismatch; ignoring",
-			"host", host, "got", s.SchemaVersion, "want", securityAvailabilityCacheSchemaVersion)
+			"host", k8s.CacheHostDir(host), "got", s.SchemaVersion, "want", securityAvailabilityCacheSchemaVersion)
 		return nil
 	}
 	return &s
@@ -99,7 +98,6 @@ func saveSecurityAvailabilityCacheForHost(host string, availability map[string]b
 	maps.Copy(avail, availability)
 	state := SecurityAvailabilityCacheState{
 		SchemaVersion: securityAvailabilityCacheSchemaVersion,
-		Host:          host,
 		UpdatedAt:     time.Now().UTC(),
 		Availability:  avail,
 	}
@@ -111,7 +109,20 @@ func saveSecurityAvailabilityCacheForHost(host string, availability map[string]b
 	if err := os.WriteFile(tmp, data, 0o644); err != nil {
 		return err
 	}
-	return os.Rename(tmp, path)
+	if err := os.Rename(tmp, path); err != nil {
+		return err
+	}
+	// Fsync parent dir so the rename itself is durable on crash.
+	dirFd, err := os.Open(filepath.Dir(path))
+	if err != nil {
+		return err
+	}
+	syncErr := dirFd.Sync()
+	closeErr := dirFd.Close()
+	if syncErr != nil {
+		return syncErr
+	}
+	return closeErr
 }
 
 // loadSecurityAvailabilityCacheForContext is the convenience accessor used

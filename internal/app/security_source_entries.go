@@ -11,11 +11,12 @@ import (
 // hook installed in NewModel.
 //
 // While the availability probe is still in flight (availability map empty),
-// the function returns nil so the sidebar Security category stays empty
-// until we know which sources are actually installed in the cluster. The
-// previous behaviour eagerly listed every registered source (Trivy,
-// Heuristic, Falco, Kyverno) and then "shrunk" the list once the probe
-// landed — confusing users on clusters where only Heuristic was available.
+// the function returns a single loader-sentinel entry so the sidebar
+// shows a stable "(probing sources...)" row until we know which sources
+// are actually installed in the cluster. The previous behaviour eagerly
+// listed every registered source (Trivy, Heuristic, Falco, Kyverno) and
+// then "shrunk" the list once the probe landed — confusing users on
+// clusters where only Heuristic was available.
 //
 // Once the probe completes (availability map non-empty), only sources the
 // probe confirmed available are shown.
@@ -32,7 +33,7 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 		return []model.SecuritySourceEntry{{
 			DisplayName: "(probing sources...)",
 			SourceName:  "",
-			Icon:        model.Icon{Unicode: "…", Simple: "[..]", Emoji: "⏳", NerdFont: "\U000f04bd"},
+			Icon:        model.Icon{Unicode: "…", Simple: "[..]", NerdFont: "\U000f04bd"},
 			Count:       -1,
 		}}
 	}
@@ -40,13 +41,13 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 		display string
 		icon    model.Icon
 	}{
-		"heuristic":      {"Heuristic", model.Icon{Unicode: "◉", Simple: "[He]", Emoji: "🛡️", NerdFont: "\U000f0483"}},
-		"trivy-operator": {"Trivy", model.Icon{Unicode: "◈", Simple: "[Tr]", Emoji: "🔍", NerdFont: "\U000f0483"}},
-		"policy-report":  {"Kyverno", model.Icon{Unicode: "◇", Simple: "[Ky]", Emoji: "📋", NerdFont: "\U000f0483"}},
-		"falco":          {"Falco", model.Icon{Unicode: "◎", Simple: "[Fa]", Emoji: "🦅", NerdFont: "\U000f0483"}},
-		"kube-bench":     {"CIS", model.Icon{Unicode: "◆", Simple: "[CI]", Emoji: "📝", NerdFont: "\U000f0483"}},
-		"gatekeeper":     {"Gatekeeper", model.Icon{Unicode: "◔", Simple: "[Gk]", Emoji: "🚪", NerdFont: "\U000f0483"}},
-		"kubescape":      {"Kubescape", model.Icon{Unicode: "◐", Simple: "[Ks]", Emoji: "🛂", NerdFont: "\U000f0483"}},
+		"heuristic":      {"Heuristic", model.Icon{Unicode: "◉", Simple: "[He]", NerdFont: "\U000f0483"}},
+		"trivy-operator": {"Trivy", model.Icon{Unicode: "◈", Simple: "[Tr]", NerdFont: "\U000f0483"}},
+		"policy-report":  {"Kyverno", model.Icon{Unicode: "◇", Simple: "[Ky]", NerdFont: "\U000f0483"}},
+		"falco":          {"Falco", model.Icon{Unicode: "◎", Simple: "[Fa]", NerdFont: "\U000f0483"}},
+		"kube-bench":     {"CIS", model.Icon{Unicode: "◆", Simple: "[CI]", NerdFont: "\U000f0483"}},
+		"gatekeeper":     {"Gatekeeper", model.Icon{Unicode: "◔", Simple: "[Gk]", NerdFont: "\U000f0483"}},
+		"kubescape":      {"Kubescape", model.Icon{Unicode: "◐", Simple: "[Ks]", NerdFont: "\U000f0483"}},
 	}
 	var entries []model.SecuritySourceEntry
 	for _, src := range mgr.Sources() {
@@ -56,7 +57,7 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 		meta, known := displayByName[src.Name()]
 		if !known {
 			meta.display = src.Name()
-			meta.icon = model.Icon{Unicode: "●", Simple: "[Se]", Emoji: "🔒", NerdFont: "\U000f0483"}
+			meta.icon = model.Icon{Unicode: "●", Simple: "[Se]", NerdFont: "\U000f0483"}
 		}
 		entries = append(entries, model.SecuritySourceEntry{
 			DisplayName: meta.display,

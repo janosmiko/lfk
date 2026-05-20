@@ -27,7 +27,6 @@ func TestSecurityAvailabilityCacheRoundTrip(t *testing.T) {
 	loaded := loadSecurityAvailabilityCacheForHost(host)
 	require.NotNil(t, loaded, "round trip must round-trip")
 	assert.Equal(t, securityAvailabilityCacheSchemaVersion, loaded.SchemaVersion)
-	assert.Equal(t, host, loaded.Host)
 	assert.Equal(t, avail, loaded.Availability)
 }
 

@@ -37,8 +37,8 @@ func parseLogLine(line []byte, namespace string) []security.Finding {
 
 	// Extract resource reference from output_fields.
 	ref := extractRefFromOutputFields(entry.OutputFields)
-	if namespace != "" && ref.Namespace != "" && ref.Namespace != namespace {
-		return nil // filtered out by namespace
+	if namespace != "" && ref.Namespace != namespace {
+		return nil // filtered out by namespace (also drops findings with no namespace)
 	}
 
 	// Build a stable ID from the rule + resource + time.

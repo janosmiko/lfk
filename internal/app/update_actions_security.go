@@ -45,6 +45,11 @@ func (m Model) executeActionSecurityFindings() Model {
 		parts = append(parts, fmt.Sprintf("%d low", counts.Low))
 	}
 	summary := summariseSeverityParts(parts)
+	if summary == "" {
+		m.setStatusMessage(fmt.Sprintf("%d security findings on %s/%s — open Security category for details",
+			total, m.actionCtx.kind, m.actionCtx.name), false)
+		return m
+	}
 	m.setStatusMessage(fmt.Sprintf("%d security findings (%s) on %s/%s — open Security category for details",
 		total, summary, m.actionCtx.kind, m.actionCtx.name), false)
 	return m

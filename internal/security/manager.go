@@ -466,19 +466,25 @@ func BuildFindingIndex(findings []Finding) *FindingIndex {
 		counts:   make(map[string]SeverityCounts),
 		bySource: make(map[string]int),
 	}
-	// Track (resource + title) pairs to deduplicate per-container findings
-	// in the per-resource severity counters only.
-	seen := make(map[string]bool)
+	// Pick the highest severity per (resource, Title) pair before counting.
+	// Two-pass keeps the per-source totals accurate (every finding increments
+	// bySource in the first pass) while ensuring a later duplicate that
+	// reports a higher severity isn't lost to first-write-wins iteration
+	// order, which would silently under-color the SEC badge.
+	maxSev := make(map[string]Severity)
+	maxKey := make(map[string]string) // dedup -> resource Key for the second pass
 	for _, f := range findings {
 		idx.bySource[f.Source]++
-		key := f.Resource.Key()
-		dedup := key + "|" + f.Title
-		if seen[dedup] {
-			continue
+		dedup := f.Resource.Key() + "|" + f.Title
+		if cur, ok := maxSev[dedup]; !ok || f.Severity > cur {
+			maxSev[dedup] = f.Severity
+			maxKey[dedup] = f.Resource.Key()
 		}
-		seen[dedup] = true
+	}
+	for dedup, sev := range maxSev {
+		key := maxKey[dedup]
 		c := idx.counts[key]
-		switch f.Severity {
+		switch sev {
 		case SeverityCritical:
 			c.Critical++
 		case SeverityHigh:

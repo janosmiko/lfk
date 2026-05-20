@@ -171,12 +171,17 @@ func (m Model) loadSecurityFindings() tea.Cmd {
 }
 
 // updateSecurityFindingsLoaded rebuilds the FindingIndex consulted by
-// the SEC badge renderer. Stale messages (different context) are
-// discarded so the index never carries findings from a prior cluster.
-// Per-source errors are logged but do not block index rebuild — partial
-// success is the common case (e.g., Trivy installed but Falco missing).
+// the SEC badge renderer. Stale messages (different context OR a
+// different namespace within the same context) are discarded so the
+// index never carries findings from a prior cluster or a prior
+// namespace selection. Per-source errors are logged but do not block
+// index rebuild — partial success is the common case (e.g., Trivy
+// installed but Falco missing).
 func (m Model) updateSecurityFindingsLoaded(msg securityFindingsLoadedMsg) Model {
-	if msg.context != m.nav.Context && m.nav.Context != "" {
+	if m.nav.Context != "" && msg.context != m.nav.Context {
+		return m
+	}
+	if msg.namespace != m.namespace {
 		return m
 	}
 	for source, err := range msg.errors {

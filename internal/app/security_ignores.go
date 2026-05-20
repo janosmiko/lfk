@@ -109,7 +109,22 @@ func saveSecurityIgnores(state *SecurityIgnoreState) error {
 		return err
 	}
 
-	return os.Rename(tmpPath, path)
+	if err := os.Rename(tmpPath, path); err != nil {
+		return err
+	}
+	// Fsync the parent directory so the rename itself is durable; without
+	// this, a crash immediately after rename can lose the new directory
+	// entry even though the file contents are already on stable storage.
+	dirFd, err := os.Open(dir)
+	if err != nil {
+		return err
+	}
+	syncErr := dirFd.Sync()
+	closeErr := dirFd.Close()
+	if syncErr != nil {
+		return syncErr
+	}
+	return closeErr
 }
 
 // saveSecurityIgnoresCmd wraps saveSecurityIgnores in a tea.Cmd so the

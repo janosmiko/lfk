@@ -439,13 +439,17 @@ func (m Model) loadYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
+		itemCtx := kctx
+		if sel.ClusterName != "" {
+			itemCtx = sel.ClusterName
+		}
 		return m.scheduleK8sCall(
 			scheduler.PriorityHigh,
 			scheduler.KindYAMLFetch,
 			"YAML: "+name,
-			bgtaskTarget(kctx, itemNs),
+			bgtaskTarget(itemCtx, itemNs),
 			func(ctx context.Context) tea.Msg {
-				content, err := client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
+				content, err := client.GetResourceYAML(ctx, itemCtx, itemNs, rt, name)
 				return buildYAMLLoadedMsg(content, err)
 			},
 		)
@@ -459,7 +463,11 @@ func (m Model) loadYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
-		taskTarget := bgtaskTarget(kctx, itemNs)
+		itemCtx := kctx
+		if sel.ClusterName != "" {
+			itemCtx = sel.ClusterName
+		}
+		taskTarget := bgtaskTarget(itemCtx, itemNs)
 		if sel.Kind == "Pod" {
 			return m.scheduleK8sCall(
 				scheduler.PriorityHigh,
@@ -467,7 +475,7 @@ func (m Model) loadYAML() tea.Cmd {
 				"YAML: "+name,
 				taskTarget,
 				func(ctx context.Context) tea.Msg {
-					content, err := client.GetPodYAML(ctx, kctx, itemNs, name)
+					content, err := client.GetPodYAML(ctx, itemCtx, itemNs, name)
 					return buildYAMLLoadedMsg(content, err)
 				},
 			)
@@ -484,7 +492,7 @@ func (m Model) loadYAML() tea.Cmd {
 			"YAML: "+name,
 			taskTarget,
 			func(ctx context.Context) tea.Msg {
-				content, err := client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
+				content, err := client.GetResourceYAML(ctx, itemCtx, itemNs, rt, name)
 				return buildYAMLLoadedMsg(content, err)
 			},
 		)

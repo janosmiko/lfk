@@ -654,7 +654,7 @@ func (m Model) jumpToFindingResource(sel *model.Item) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 	namespace, kind, name := parts[0], parts[1], parts[2]
-	rt, ok := model.FindResourceTypeByKind(kind, m.discoveredResources[m.nav.Context])
+	rt, ok := model.FindResourceTypeByKind(kind, m.discoveredResources[m.discoveryContext()])
 	if !ok {
 		m.setStatusMessage("Cannot jump: "+kind+" not discovered in this context", true)
 		return m, scheduleStatusClear()

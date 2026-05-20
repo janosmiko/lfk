@@ -161,8 +161,9 @@ func TestLoadPreviewForSecurityFindingGroupHover(t *testing.T) {
 	cmd := m.loadPreview()
 	require.NotNil(t, cmd, "hover preview must dispatch")
 
-	loaded, ok := cmd().(ownedLoadedMsg)
-	require.True(t, ok, "expected ownedLoadedMsg, got %T", cmd())
+	msg := cmd()
+	loaded, ok := msg.(ownedLoadedMsg)
+	require.True(t, ok, "expected ownedLoadedMsg, got %T", msg)
 	require.True(t, loaded.forPreview, "forPreview must be set so updateOwnedLoaded routes to the rightItems branch")
 	require.NoError(t, loaded.err)
 	require.Len(t, loaded.items, 2,
@@ -443,8 +444,9 @@ func TestRefreshCurrentLevelAtSecurityLevelOwnedKeepsAffectedResources(t *testin
 
 	cmd := m.refreshCurrentLevel()
 	require.NotNil(t, cmd, "refresh at LevelOwned in security view must dispatch a fetch")
-	loaded, ok := cmd().(ownedLoadedMsg)
-	require.True(t, ok, "expected ownedLoadedMsg, got %T", cmd())
+	msg := cmd()
+	loaded, ok := msg.(ownedLoadedMsg)
+	require.True(t, ok, "expected ownedLoadedMsg, got %T", msg)
 	require.NoError(t, loaded.err)
 	require.Len(t, loaded.items, 1,
 		"refresh must keep the affected resources list — empty would mean GetOwnedResources clobbered the row")
