@@ -213,6 +213,11 @@ func (c *Client) GetSecurityAffectedResources(ctx context.Context, contextName, 
 	if err != nil {
 		return nil, fmt.Errorf("security fetch: %w", err)
 	}
+	// Surface the requested source's per-source error so a source-specific
+	// fetch failure isn't mistaken for "no affected resources".
+	if srcErr, ok := res.Errors[sourceName]; ok && srcErr != nil {
+		return nil, fmt.Errorf("source %s: %w", sourceName, srcErr)
+	}
 	// Filter to findings matching source and group key.
 	var matched []security.Finding
 	for _, f := range res.Findings {

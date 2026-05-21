@@ -999,6 +999,11 @@ func TestSaveCurrentTab(t *testing.T) {
 // active tab's state to the package-level hook so the next sidebar
 // render shows the correct sources.
 func TestTabSwitchPreservesSecurityState(t *testing.T) {
+	prevMgr, prevAvail := currentSecurityHookState()
+	t.Cleanup(func() {
+		setSecurityHookState(prevMgr, prevAvail)
+	})
+
 	mgrA := security.NewManager()
 	mgrB := security.NewManager()
 	availA := map[string]bool{"heuristic": true}

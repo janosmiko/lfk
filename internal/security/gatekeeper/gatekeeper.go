@@ -33,14 +33,16 @@ const ConstraintsGroup = "constraints.gatekeeper.sh"
 // missed until this constant is updated.
 const ConstraintsVersion = "v1beta1"
 
-// ConstraintTemplateGVR is the parent CRD that defines every Constraint
-// kind. Used as the cheap availability probe target so we don't depend
-// on the Discovery API (which the client-go client doesn't expose with
-// a context, so a hung API server blocks the whole probe goroutine
-// past the manager's 3s timeout). v1 has been GA since Gatekeeper 3.10;
-// older clusters that still serve v1beta1 only would need a fallback.
-var ConstraintTemplateGVR = schema.GroupVersionResource{
-	Group: "templates.gatekeeper.sh", Version: "v1", Resource: "constrainttemplates",
+// constraintTemplateGVRs are the parent-CRD availability probe targets,
+// newest API version first. The probe avoids the Discovery API (which
+// client-go doesn't expose with a context, so a hung API server would
+// block the probe goroutine past the manager's 3s timeout). v1 has been
+// GA since Gatekeeper 3.10; clusters older than that serve
+// ConstraintTemplate as v1beta1 only, so the probe falls back to it
+// before reporting Gatekeeper unavailable.
+var constraintTemplateGVRs = []schema.GroupVersionResource{
+	{Group: "templates.gatekeeper.sh", Version: "v1", Resource: "constrainttemplates"},
+	{Group: "templates.gatekeeper.sh", Version: "v1beta1", Resource: "constrainttemplates"},
 }
 
 // Source is the gatekeeper SecuritySource implementation.
@@ -77,18 +79,21 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 	if s.dynClient == nil {
 		return false, nil
 	}
-	_, err := s.dynClient.Resource(ConstraintTemplateGVR).List(ctx, metav1.ListOptions{Limit: 1})
-	if err != nil {
-		// NotFound / no-such-resource → definitive "Gatekeeper not
-		// installed". Other errors propagate so the manager's probe
-		// preserves the previous-known availability rather than
-		// briefly hiding Gatekeeper on a transient failure.
-		if apierrors.IsNotFound(err) {
-			return false, nil
+	for _, gvr := range constraintTemplateGVRs {
+		_, err := s.dynClient.Resource(gvr).List(ctx, metav1.ListOptions{Limit: 1})
+		if err == nil {
+			return true, nil
 		}
-		return false, fmt.Errorf("gatekeeper availability probe: %w", err)
+		// NotFound / no-such-resource → this API version isn't served;
+		// try the next. Other errors propagate so the manager's probe
+		// preserves the previous-known availability rather than briefly
+		// hiding Gatekeeper on a transient failure.
+		if !apierrors.IsNotFound(err) {
+			return false, fmt.Errorf("gatekeeper availability probe: %w", err)
+		}
 	}
-	return true, nil
+	// Every version returned NotFound → definitive "Gatekeeper not installed".
+	return false, nil
 }
 
 // Fetch lists every Constraint instance the cluster currently knows

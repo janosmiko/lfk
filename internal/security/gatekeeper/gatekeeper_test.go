@@ -6,12 +6,28 @@ import (
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
+	dynfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
+	k8stesting "k8s.io/client-go/testing"
 
 	"github.com/janosmiko/lfk/internal/security"
 )
+
+// newConstraintTemplateDynClient builds a fake dynamic client that knows
+// the list kind for both ConstraintTemplate API versions.
+func newConstraintTemplateDynClient() *dynfake.FakeDynamicClient {
+	scheme := runtime.NewScheme()
+	listKinds := make(map[schema.GroupVersionResource]string, len(constraintTemplateGVRs))
+	for _, gvr := range constraintTemplateGVRs {
+		listKinds[gvr] = "ConstraintTemplateList"
+	}
+	return dynfake.NewSimpleDynamicClientWithCustomListKinds(scheme, listKinds)
+}
 
 func TestSeverityFromEnforcement(t *testing.T) {
 	assert.Equal(t, security.SeverityHigh, severityFromEnforcement("deny"))
@@ -91,6 +107,44 @@ func TestSourceWithoutClientsReportsUnavailable(t *testing.T) {
 	findings, err := s.Fetch(t.Context(), "kctx", "")
 	assert.Nil(t, findings)
 	assert.NoError(t, err)
+}
+
+// TestIsAvailableFallsBackToV1beta1 — on Gatekeeper releases older than
+// v3.10 the cluster serves ConstraintTemplate as v1beta1 only. The probe
+// must fall back to v1beta1 after v1 returns NotFound rather than
+// reporting Gatekeeper unavailable.
+func TestIsAvailableFallsBackToV1beta1(t *testing.T) {
+	dc := newConstraintTemplateDynClient()
+	dc.PrependReactor("list", "constrainttemplates",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			if action.GetResource().Version == "v1" {
+				return true, nil, apierrors.NewNotFound(
+					action.GetResource().GroupResource(), "")
+			}
+			// v1beta1: defer to the tracker, which returns an empty list.
+			return false, nil, nil
+		})
+
+	s := NewWithClients(nil, dc)
+	ok, err := s.IsAvailable(context.Background(), "ctx")
+	require.NoError(t, err)
+	assert.True(t, ok, "v1 NotFound must fall back to v1beta1")
+}
+
+// TestIsAvailableBothVersionsNotFound — when neither ConstraintTemplate
+// version is served the probe reports a definitive "not installed".
+func TestIsAvailableBothVersionsNotFound(t *testing.T) {
+	dc := newConstraintTemplateDynClient()
+	dc.PrependReactor("list", "constrainttemplates",
+		func(action k8stesting.Action) (bool, runtime.Object, error) {
+			return true, nil, apierrors.NewNotFound(
+				action.GetResource().GroupResource(), "")
+		})
+
+	s := NewWithClients(nil, dc)
+	ok, err := s.IsAvailable(context.Background(), "ctx")
+	require.NoError(t, err)
+	assert.False(t, ok)
 }
 
 // TestDiscoverConstraintKindsNotFoundReturnsEmpty — when Gatekeeper's

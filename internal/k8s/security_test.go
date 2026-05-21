@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -339,6 +340,27 @@ func TestGetSecurityAffectedResources(t *testing.T) {
 	assert.Equal(t, "pod/api", items[0].Name)
 	assert.Equal(t, "pod/web", items[1].Name)
 	assert.Equal(t, "Pod", items[0].ColumnValue("ResourceKind"))
+}
+
+// TestGetSecurityAffectedResourcesPropagatesSourceError guards that a
+// source-specific fetch failure surfaces as an error rather than being
+// silently mistaken for "no affected resources".
+func TestGetSecurityAffectedResourcesPropagatesSourceError(t *testing.T) {
+	mgr := security.NewManager()
+	mgr.Register(&security.FakeSource{
+		NameStr: "heuristic", Available: true,
+		FetchErr: errors.New("boom"),
+	})
+	c := &Client{securityManager: mgr}
+	rt := model.ResourceTypeEntry{Kind: "__security_heuristic__"}
+
+	items, err := c.GetSecurityAffectedResources(
+		context.Background(), "kctx", "", rt, "privileged",
+	)
+	require.Error(t, err)
+	assert.Nil(t, items)
+	assert.Contains(t, err.Error(), "source heuristic")
+	assert.Contains(t, err.Error(), "boom")
 }
 
 // TestSecurityIgnoreSnapshotConcurrentAccess exercises the lock around

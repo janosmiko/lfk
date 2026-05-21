@@ -932,13 +932,7 @@ func TestLoadYAMLLevelOwnedSecurityNoFetch(t *testing.T) {
 	m.middleItems = []model.Item{{Name: "pod/affected", Kind: "__security_affected_resource__", Namespace: "default"}}
 	m.setCursor(0)
 	cmd := m.loadYAML()
-	if cmd == nil {
-		return
-	}
-	msg := cmd()
-	if loaded, ok := msg.(yamlLoadedMsg); ok {
-		assert.NoError(t, loaded.err, "synthetic security item must not produce a yamlLoadedMsg with unknown-resource-type error")
-	}
+	assert.Nil(t, cmd, "synthetic security item must short-circuit without dispatching YAML fetch")
 }
 
 func TestCovLoadMetricsNilFakeClient(t *testing.T) {

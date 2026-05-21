@@ -55,33 +55,41 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 	if s.client == nil {
 		return nil, nil
 	}
-	list, err := s.client.CoreV1().Pods(namespace).List(ctx, metav1.ListOptions{})
-	if err != nil {
-		return nil, err
-	}
-
 	var findings []security.Finding
-	for i := range list.Items {
-		pod := &list.Items[i]
-		if s.ignoredNamespaces[pod.Namespace] {
-			continue
+	// Paginate so an unbounded List can't degrade control-plane
+	// responsiveness on large clusters.
+	opts := metav1.ListOptions{Limit: 200}
+	for {
+		list, err := s.client.CoreV1().Pods(namespace).List(ctx, opts)
+		if err != nil {
+			return nil, err
 		}
-		runChecks := func(c corev1.Container) {
-			for _, check := range allChecks {
-				findings = append(findings, check(pod, c)...)
+		for i := range list.Items {
+			pod := &list.Items[i]
+			if s.ignoredNamespaces[pod.Namespace] {
+				continue
+			}
+			runChecks := func(c corev1.Container) {
+				for _, check := range allChecks {
+					findings = append(findings, check(pod, c)...)
+				}
+			}
+			for _, c := range pod.Spec.InitContainers {
+				runChecks(c)
+			}
+			for _, c := range pod.Spec.Containers {
+				runChecks(c)
+			}
+			// EphemeralContainer embeds EphemeralContainerCommon which mirrors
+			// Container's fields. Coerce so the same check signature applies.
+			for _, ec := range pod.Spec.EphemeralContainers {
+				runChecks(corev1.Container(ec.EphemeralContainerCommon))
 			}
 		}
-		for _, c := range pod.Spec.InitContainers {
-			runChecks(c)
+		if list.Continue == "" {
+			break
 		}
-		for _, c := range pod.Spec.Containers {
-			runChecks(c)
-		}
-		// EphemeralContainer embeds EphemeralContainerCommon which mirrors
-		// Container's fields. Coerce so the same check signature applies.
-		for _, ec := range pod.Spec.EphemeralContainers {
-			runChecks(corev1.Container(ec.EphemeralContainerCommon))
-		}
+		opts.Continue = list.Continue
 	}
 	return findings, nil
 }

@@ -4,8 +4,10 @@ package app
 import "github.com/janosmiko/lfk/internal/security"
 
 // securityAvailabilityLoadedMsg is sent after a per-source availability
-// probe completes. The availability map has one entry per registered
-// source (true = IsAvailable succeeded; false = error or not installed).
+// probe completes. The availability map only includes sources whose probe
+// returned without error (true = installed/available; false = definitively
+// not installed). Sources whose probe errored are omitted so the handler's
+// merge keeps the previous-known availability rather than wiping them.
 type securityAvailabilityLoadedMsg struct {
 	context      string
 	availability map[string]bool
