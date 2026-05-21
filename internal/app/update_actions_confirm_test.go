@@ -145,3 +145,197 @@ func TestHandleConfirmOverlayKey_RestartDispatchesBulkRestart(t *testing.T) {
 	// We rely on the fact that bulkRestartResources logs "Bulk restarting"
 	// and bulkDeleteResources logs "Bulk deleting" — covered by Theme 1.
 }
+
+// --- Regression: stale bulk-action snapshot ---
+//
+// Confirming or cancelling a bulk action used to leave bulkMode/bulkItems
+// set until the background operation finished. During that window a
+// single-item action routed through executeAction's bulk gate and acted
+// on the stale snapshot — e.g. pressing delete on one pod prompted
+// "delete N resources" for the N items deleted moments earlier.
+
+func TestHandleConfirmOverlayKey_BulkDeleteClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.pendingAction = "Delete"
+	m.overlay = overlayConfirm
+	m.bulkItems = make([]model.Item, 50)
+	m.actionCtx = actionContext{
+		context:      "test-ctx",
+		kind:         "Pod",
+		resourceType: model.ResourceTypeEntry{Resource: "pods", Namespaced: true},
+	}
+
+	res, cmd := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	rm := res.(Model)
+
+	require.NotNil(t, cmd, "bulk delete must dispatch a command")
+	assert.False(t, rm.bulkMode, "bulkMode must be reset once the bulk delete is dispatched")
+	assert.Empty(t, rm.bulkItems, "bulkItems must be cleared once the bulk delete is dispatched")
+}
+
+func TestHandleConfirmTypeOverlayKey_BulkForceDeleteClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.pendingAction = "Force Delete"
+	m.overlay = overlayConfirmType
+	m.confirmTypeInput = TextInput{Value: "DELETE", Cursor: 6}
+	m.bulkItems = []model.Item{
+		{Name: "pod-1", Namespace: "default", Kind: "Pod"},
+		{Name: "pod-2", Namespace: "default", Kind: "Pod"},
+	}
+	m.actionCtx = actionContext{
+		context:      "test-ctx",
+		kind:         "Pod",
+		resourceType: model.ResourceTypeEntry{Resource: "pods", Namespaced: true},
+	}
+
+	res, cmd := m.handleConfirmTypeOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	rm := res.(Model)
+
+	require.NotNil(t, cmd, "bulk force delete must dispatch a command")
+	assert.False(t, rm.bulkMode, "bulkMode must be reset once the bulk force delete is dispatched")
+	assert.Empty(t, rm.bulkItems, "bulkItems must be cleared once the bulk force delete is dispatched")
+}
+
+func TestHandleScaleOverlayKey_BulkScaleClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.overlay = overlayScaleInput
+	m.scaleInput = TextInput{Value: "3"}
+	m.bulkItems = []model.Item{
+		{Name: "deploy-1", Namespace: "default", Kind: "Deployment"},
+		{Name: "deploy-2", Namespace: "default", Kind: "Deployment"},
+	}
+	m.actionCtx = actionContext{
+		context:      "test-ctx",
+		kind:         "Deployment",
+		resourceType: model.ResourceTypeEntry{Resource: "deployments", Namespaced: true},
+	}
+
+	res, cmd := m.handleScaleOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	rm := res.(Model)
+
+	require.NotNil(t, cmd, "bulk scale must dispatch a command")
+	assert.False(t, rm.bulkMode, "bulkMode must be reset once the bulk scale is dispatched")
+	assert.Empty(t, rm.bulkItems, "bulkItems must be cleared once the bulk scale is dispatched")
+}
+
+func TestHandleConfirmOverlayKey_CancelClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.pendingAction = "Delete"
+	m.overlay = overlayConfirm
+	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
+
+	res, _ := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	rm := res.(Model)
+
+	assert.False(t, rm.bulkMode, "cancelling a bulk delete must reset bulkMode")
+	assert.Empty(t, rm.bulkItems, "cancelling a bulk delete must clear bulkItems")
+}
+
+func TestHandleConfirmTypeOverlayKey_CancelClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.pendingAction = "Force Delete"
+	m.overlay = overlayConfirmType
+	m.confirmTypeInput = TextInput{Value: "DEL"}
+	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
+
+	res, _ := m.handleConfirmTypeOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	rm := res.(Model)
+
+	assert.False(t, rm.bulkMode, "cancelling a bulk force delete must reset bulkMode")
+	assert.Empty(t, rm.bulkItems, "cancelling a bulk force delete must clear bulkItems")
+}
+
+func TestHandleScaleOverlayKey_CancelClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.overlay = overlayScaleInput
+	m.scaleInput = TextInput{Value: "3"}
+	m.bulkItems = []model.Item{{Name: "deploy-1", Namespace: "default", Kind: "Deployment"}}
+
+	res, _ := m.handleScaleOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	rm := res.(Model)
+
+	assert.False(t, rm.bulkMode, "cancelling a bulk scale must reset bulkMode")
+	assert.Empty(t, rm.bulkItems, "cancelling a bulk scale must clear bulkItems")
+}
+
+// A read-only block dismisses the confirm overlay without dispatching. The
+// bulk snapshot must still be cleared, otherwise it leaks exactly as it
+// would after a successful dispatch.
+
+func TestHandleConfirmOverlayKey_ReadOnlyBlockedClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.cliReadOnly = true
+	m.bulkMode = true
+	m.pendingAction = "Delete"
+	m.overlay = overlayConfirm
+	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
+	m.actionCtx = actionContext{context: "test-ctx", kind: "Pod"}
+
+	res, _ := m.handleConfirmOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	rm := res.(Model)
+
+	assert.Equal(t, overlayNone, rm.overlay, "read-only block must close the overlay")
+	assert.False(t, rm.bulkMode, "read-only block must reset bulkMode")
+	assert.Empty(t, rm.bulkItems, "read-only block must clear bulkItems")
+}
+
+func TestHandleConfirmTypeOverlayKey_ReadOnlyBlockedClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.cliReadOnly = true
+	m.bulkMode = true
+	m.pendingAction = "Force Delete"
+	m.overlay = overlayConfirmType
+	m.confirmTypeInput = TextInput{Value: "DELETE", Cursor: 6}
+	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
+	m.actionCtx = actionContext{context: "test-ctx", kind: "Pod"}
+
+	res, _ := m.handleConfirmTypeOverlayKey(tea.KeyMsg{Type: tea.KeyEnter})
+	rm := res.(Model)
+
+	assert.Equal(t, overlayNone, rm.overlay, "read-only block must close the overlay")
+	assert.False(t, rm.bulkMode, "read-only block must reset bulkMode")
+	assert.Empty(t, rm.bulkItems, "read-only block must clear bulkItems")
+}
+
+func TestCloseCurrentOverlay_ClearsBulkSnapshot(t *testing.T) {
+	// ctrl+c on a confirm overlay is intercepted by handleOverlayKey and
+	// routed to closeCurrentOverlay, bypassing the per-overlay cancel
+	// branches — so the snapshot must be cleared here too.
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.overlay = overlayConfirm
+	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
+
+	res, _ := m.closeCurrentOverlay()
+	rm := res.(Model)
+
+	assert.False(t, rm.bulkMode, "closing the overlay must reset bulkMode")
+	assert.Empty(t, rm.bulkItems, "closing the overlay must clear bulkItems")
+}
+
+func TestExecuteBulkAction_SyncClearsBulkSnapshot(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.bulkItems = []model.Item{
+		{Name: "app-1", Namespace: "argocd", Kind: "Application"},
+		{Name: "app-2", Namespace: "argocd", Kind: "Application"},
+	}
+	m.actionCtx = actionContext{
+		context:      "test-ctx",
+		kind:         "Application",
+		resourceType: model.ResourceTypeEntry{Resource: "applications", Namespaced: true},
+	}
+
+	res, cmd := m.executeBulkAction("Sync")
+	rm := res.(Model)
+
+	require.NotNil(t, cmd, "bulk sync must dispatch a command")
+	assert.False(t, rm.bulkMode, "bulkMode must be reset once the bulk sync is dispatched")
+	assert.Empty(t, rm.bulkItems, "bulkItems must be cleared once the bulk sync is dispatched")
+}

@@ -62,6 +62,10 @@ func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
 	m.logPodFilterText = ""
 	m.logContainerFilterText = ""
 	m.columnToggleFilter = ""
+	// Drop any pending bulk-action snapshot — closing the overlay (Ctrl+C
+	// or toggle key) abandons the action, so a later single-item action
+	// must not be misrouted through the stale selection.
+	m.resetBulkAction()
 	if m.previousOverlay != overlayNone {
 		m.overlay = m.previousOverlay
 		m.previousOverlay = overlayNone

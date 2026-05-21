@@ -641,17 +641,23 @@ func (m Model) executeBulkAction(actionLabel string) (tea.Model, tea.Cmd) {
 		m.addLogEntry("DBG", fmt.Sprintf("Bulk sync (%d apps, hook strategy)", len(m.bulkItems)))
 		m.loading = true
 		m.clearSelection()
-		return m, m.bulkSyncArgoApps(false)
+		cmd := m.bulkSyncArgoApps(false)
+		m.resetBulkAction()
+		return m, cmd
 	case "Sync (Apply Only)":
 		m.addLogEntry("DBG", fmt.Sprintf("Bulk sync (%d apps, apply strategy)", len(m.bulkItems)))
 		m.loading = true
 		m.clearSelection()
-		return m, m.bulkSyncArgoApps(true)
+		cmd := m.bulkSyncArgoApps(true)
+		m.resetBulkAction()
+		return m, cmd
 	case "Refresh":
 		m.addLogEntry("DBG", fmt.Sprintf("Bulk refresh (%d apps)", len(m.bulkItems)))
 		m.loading = true
 		m.clearSelection()
-		return m, m.bulkRefreshArgoApps()
+		cmd := m.bulkRefreshArgoApps()
+		m.resetBulkAction()
+		return m, cmd
 	}
 
 	return m, nil
