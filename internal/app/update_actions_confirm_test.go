@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // TestExecuteBulkAction_RestartOpensConfirmInsteadOfFiring ensures that the
@@ -317,6 +318,23 @@ func TestCloseCurrentOverlay_ClearsBulkSnapshot(t *testing.T) {
 
 	assert.False(t, rm.bulkMode, "closing the overlay must reset bulkMode")
 	assert.Empty(t, rm.bulkItems, "closing the overlay must clear bulkItems")
+}
+
+func TestHandleOverlayKey_ToggleCloseClearsBulkSnapshot(t *testing.T) {
+	// The bulk action menu (overlayAction) is opened with bulkMode set.
+	// Pressing its hotkey again toggles it shut via handleOverlayKey's
+	// toggle path, which must also drop the bulk snapshot.
+	m := baseModelWithFakeClient()
+	m.bulkMode = true
+	m.overlay = overlayAction
+	m.bulkItems = []model.Item{{Name: "pod-1", Namespace: "default", Kind: "Pod"}}
+
+	res, _ := m.handleOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune(ui.ActiveKeybindings.ActionMenu)})
+	rm := res.(Model)
+
+	assert.Equal(t, overlayNone, rm.overlay, "toggle key must close the bulk action menu")
+	assert.False(t, rm.bulkMode, "toggling the bulk action menu shut must reset bulkMode")
+	assert.Empty(t, rm.bulkItems, "toggling the bulk action menu shut must clear bulkItems")
 }
 
 func TestExecuteBulkAction_SyncClearsBulkSnapshot(t *testing.T) {
