@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.12.2](https://github.com/janosmiko/lfk/compare/v0.12.1...v0.12.2) (2026-05-21)
+
+
+### Bug Fixes
+
+* **bulk:** clear stale bulk-action snapshot on dispatch and cancel ([#257](https://github.com/janosmiko/lfk/issues/257)) ([16a4c60](https://github.com/janosmiko/lfk/commit/16a4c606b632785b84f383251d88b31d12fd7a47))
+* stop node metrics column-order flicker (and prevent the whole class) ([#259](https://github.com/janosmiko/lfk/issues/259)) ([7f5c695](https://github.com/janosmiko/lfk/commit/7f5c695020bee63ed35db09ef20992a31cece50a))
+
 ## [0.12.1](https://github.com/janosmiko/lfk/compare/v0.12.0...v0.12.1) (2026-05-19)
 
 
