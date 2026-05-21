@@ -6,6 +6,17 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// resetBulkAction clears the bulk-action snapshot (bulkMode and bulkItems).
+// The snapshot is taken when a bulk action is initiated and carried through
+// the confirmation overlay; it must be cleared once the action is dispatched
+// or cancelled. Leaving it set lets executeAction's bulk gate misroute a
+// later single-item action through the stale snapshot — e.g. prompting to
+// delete N resources while the background bulk delete is still running.
+func (m *Model) resetBulkAction() {
+	m.bulkMode = false
+	m.bulkItems = nil
+}
+
 // openBulkSelectionMenu builds and shows the action overlay for multi-selected items.
 // Extracted from openActionMenu to keep that function's cyclomatic complexity under 30.
 func (m Model) openBulkSelectionMenu() Model {

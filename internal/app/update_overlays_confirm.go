@@ -18,6 +18,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			label := m.pendingAction
 			m.pendingAction = ""
 			m.confirmAction = ""
+			m.resetBulkAction()
 			m.setStatusMessage(readOnlyBlockedMessage(label), true)
 			return m, scheduleStatusClear()
 		}
@@ -47,13 +48,17 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			switch action {
 			case "Restart":
 				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl rollout restart %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
-				return m, m.bulkRestartResources()
+				cmd := m.bulkRestartResources()
+				m.resetBulkAction()
+				return m, cmd
 			default:
 				// Default remains Delete for compatibility with existing
 				// callers that opened overlayConfirm without setting
 				// pendingAction.
 				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
-				return m, m.bulkDeleteResources()
+				cmd := m.bulkDeleteResources()
+				m.resetBulkAction()
+				return m, cmd
 			}
 		}
 
@@ -73,6 +78,7 @@ func (m Model) handleConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		m.confirmAction = ""
 		m.pendingAction = ""
+		m.resetBulkAction()
 		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -89,6 +95,7 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.confirmQuestion = ""
 		m.pendingAction = ""
 		m.confirmTypeInput.Clear()
+		m.resetBulkAction()
 		return m, nil
 	case "ctrl+c":
 		return m.closeTabOrQuit()
@@ -103,6 +110,7 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				m.confirmTitle = ""
 				m.confirmQuestion = ""
 				m.confirmTypeInput.Clear()
+				m.resetBulkAction()
 				m.setStatusMessage(readOnlyBlockedMessage(label), true)
 				return m, scheduleStatusClear()
 			}
@@ -129,7 +137,9 @@ func (m Model) handleConfirmTypeOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 				m.clearSelection()
 				expanded := expandGroupedItems(m.bulkItems)
 				m.addLogEntry("DBG", fmt.Sprintf("$ kubectl delete --force --grace-period=0 %s (%d items)%s --context %s", rt.Resource, len(expanded), nsArg, ctx))
-				return m, m.bulkForceDeleteResources()
+				cmd := m.bulkForceDeleteResources()
+				m.resetBulkAction()
+				return m, cmd
 			}
 
 			switch action {
@@ -175,6 +185,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc", "q":
 		m.overlay = overlayNone
 		m.scaleInput.Clear()
+		m.resetBulkAction()
 		return m, nil
 	case "enter":
 		replicas, err := strconv.ParseInt(m.scaleInput.Value, 10, 32)
@@ -182,6 +193,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.setStatusMessage("Invalid replica count", true)
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
+			m.resetBulkAction()
 			return m, scheduleStatusClear()
 		}
 		// Belt-and-suspenders read-only gate: the dispatcher already blocks
@@ -190,6 +202,7 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.actionTargetBlockedByReadOnly() {
 			m.overlay = overlayNone
 			m.scaleInput.Clear()
+			m.resetBulkAction()
 			m.setStatusMessage(readOnlyBlockedMessage("Scale"), true)
 			return m, scheduleStatusClear()
 		}
@@ -201,7 +214,9 @@ func (m Model) handleScaleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if m.bulkMode && len(m.bulkItems) > 0 {
 			m.addLogEntry("DBG", fmt.Sprintf("$ kubectl scale %s --replicas=%d (%d items) -n %s --context %s", strings.ToLower(m.actionCtx.kind), replicas, len(m.bulkItems), m.actionCtx.namespace, m.actionCtx.context))
 			m.clearSelection()
-			return m, m.bulkScaleResources(int32(replicas))
+			cmd := m.bulkScaleResources(int32(replicas))
+			m.resetBulkAction()
+			return m, cmd
 		}
 
 		m.addLogEntry("DBG", fmt.Sprintf("$ kubectl scale %s %s --replicas=%d -n %s --context %s", strings.ToLower(m.actionCtx.kind), m.actionCtx.name, replicas, m.actionCtx.namespace, m.actionCtx.context))

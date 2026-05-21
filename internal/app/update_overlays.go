@@ -9,19 +9,11 @@ import (
 
 func (m Model) handleOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Toggle: pressing the same hotkey that opened an overlay closes it.
-	// When the current overlay is layered on top of another (e.g. the
-	// namespace selector launched from inside RBAC), restore the parent
-	// instead of dropping all the way to the explorer — and ALWAYS
-	// clear previousOverlay so a stale parent can't reappear next time
-	// the same hotkey opens the overlay again.
+	// Route through closeCurrentOverlay so toggle-close gets the same
+	// cleanup as Esc/Ctrl+C — parent restoration, filter-state reset, and
+	// dropping any pending bulk-action snapshot.
 	if m.isOverlayToggleKey(msg.String()) {
-		if m.previousOverlay != overlayNone {
-			m.overlay = m.previousOverlay
-		} else {
-			m.overlay = overlayNone
-		}
-		m.previousOverlay = overlayNone
-		return m, nil
+		return m.closeCurrentOverlay()
 	}
 	// Universal Ctrl+C: close the current overlay (or restore its
 	// parent) rather than fall through to closeTabOrQuit inside the
@@ -62,6 +54,10 @@ func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
 	m.logPodFilterText = ""
 	m.logContainerFilterText = ""
 	m.columnToggleFilter = ""
+	// Drop any pending bulk-action snapshot — closing the overlay (Ctrl+C
+	// or toggle key) abandons the action, so a later single-item action
+	// must not be misrouted through the stale selection.
+	m.resetBulkAction()
 	if m.previousOverlay != overlayNone {
 		m.overlay = m.previousOverlay
 		m.previousOverlay = overlayNone
