@@ -1829,6 +1829,91 @@ func TestPodMetricsColumnOrderIsStableAcrossAllPaths(t *testing.T) {
 	})
 }
 
+// ensureNodeMetricsColumnsPlaceholder used to append the CPU/CPU%/MEM/MEM%
+// columns while the enriched and carry-over paths prepend them, so on every
+// watch tick a metrics-less node's column order flipped between the two
+// layouts and the user saw a ~1 Hz layout blink. Pin the order: CPU/MEM
+// block first, all other columns after, identical across all three paths.
+func TestNodeMetricsColumnOrderIsStableAcrossAllPaths(t *testing.T) {
+	metricsKeys := []string{"CPU", "CPU%", "MEM", "MEM%"}
+	keysOf := func(cols []model.KeyValue) []string {
+		ks := make([]string, len(cols))
+		for i, kv := range cols {
+			ks[i] = kv.Key
+		}
+		return ks
+	}
+	assertCPUMemFirst := func(t *testing.T, label string, cols []model.KeyValue) {
+		t.Helper()
+		require.GreaterOrEqual(t, len(cols), len(metricsKeys), "%s: too few columns", label)
+		for i, want := range metricsKeys {
+			assert.Equal(t, want, cols[i].Key, "%s: column %d must be %q (CPU/MEM block before other columns); full order=%v", label, i, want, keysOf(cols))
+		}
+	}
+
+	// Path 1: ensureNodeMetricsColumnsPlaceholder (no metrics for this node).
+	t.Run("placeholder", func(t *testing.T) {
+		m := baseModel()
+		m.middleItems = []model.Item{{
+			Name: "node-x",
+			Columns: []model.KeyValue{
+				{Key: "INTERNALDNS", Value: "node-x"},
+				{Key: "VERSION", Value: "v1.31"},
+				{Key: "CPU", Value: "500m"}, // stale prior-tick value
+			},
+		}}
+		result, _ := m.Update(nodeMetricsEnrichedMsg{
+			metrics: map[string]model.PodMetrics{"other": {Name: "other"}},
+			gen:     0,
+		})
+		assertCPUMemFirst(t, "placeholder", result.(Model).middleItems[0].Columns)
+	})
+
+	// Path 2: updateNodeMetricsEnriched with real metrics for this node.
+	t.Run("enriched", func(t *testing.T) {
+		m := baseModel()
+		m.middleItems = []model.Item{{
+			Name: "node-x",
+			Columns: []model.KeyValue{
+				{Key: "INTERNALDNS", Value: "node-x"},
+				{Key: "VERSION", Value: "v1.31"},
+			},
+		}}
+		result, _ := m.Update(nodeMetricsEnrichedMsg{
+			metrics: map[string]model.PodMetrics{
+				"node-x": {Name: "node-x", CPU: 50, Memory: 100 * 1024 * 1024},
+			},
+			gen: 0,
+		})
+		assertCPUMemFirst(t, "enriched", result.(Model).middleItems[0].Columns)
+	})
+
+	// Path 3: carryOverMetricsColumns (watch tick replacing items).
+	t.Run("carryOver", func(t *testing.T) {
+		m := baseModel()
+		m.middleItems = []model.Item{{
+			Name: "node-x",
+			Columns: []model.KeyValue{
+				{Key: "CPU", Value: "n/a"},
+				{Key: "CPU%", Value: "n/a"},
+				{Key: "MEM", Value: "n/a"},
+				{Key: "MEM%", Value: "n/a"},
+				{Key: "INTERNALDNS", Value: "node-x"},
+				{Key: "VERSION", Value: "v1.31"},
+			},
+		}}
+		newItems := []model.Item{{
+			Name: "node-x",
+			Columns: []model.KeyValue{
+				{Key: "INTERNALDNS", Value: "node-x"},
+				{Key: "VERSION", Value: "v1.31"},
+			},
+		}}
+		m.carryOverMetricsColumns(newItems)
+		assertCPUMemFirst(t, "carryOver", newItems[0].Columns)
+	})
+}
+
 // --- nodeMetricsEnrichedMsg ---
 
 func TestUpdateNodeMetricsEnrichedStaleGen(t *testing.T) {

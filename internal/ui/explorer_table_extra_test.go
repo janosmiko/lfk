@@ -773,6 +773,53 @@ func TestCollectExtraColumns(t *testing.T) {
 	})
 }
 
+// TestCollectExtraColumns_MetricsColumnOrderIsInsertionIndependent is the
+// renderer-level regression guard for the node/pod metrics column flicker.
+// Several refresh paths rewrite the CPU/MEM block on every ~2s tick and
+// historically disagreed on whether to prepend or append it, so the column
+// order flipped between two layouts and the user saw a ~1Hz blink. The
+// renderer must pin the metrics block to a canonical position regardless of
+// where the columns happen to sit in item.Columns.
+func TestCollectExtraColumns_MetricsColumnOrderIsInsertionIndependent(t *testing.T) {
+	origFS := ActiveFullscreenMode
+	ActiveFullscreenMode = false
+	defer func() { ActiveFullscreenMode = origFS }()
+
+	keysOf := func(cols []extraColumn) []string {
+		ks := make([]string, len(cols))
+		for i, c := range cols {
+			ks[i] = c.key
+		}
+		return ks
+	}
+	// Tick A: a path appended the metrics block (metrics last).
+	tickA := []model.Item{{Name: "node-x", Columns: []model.KeyValue{
+		{Key: "VERSION", Value: "v1.31"},
+		{Key: "TAINTS", Value: "none"},
+		{Key: "CPU", Value: "n/a"},
+		{Key: "CPU%", Value: "n/a"},
+		{Key: "MEM", Value: "n/a"},
+		{Key: "MEM%", Value: "n/a"},
+	}}}
+	// Tick B: another path prepended the metrics block (metrics first).
+	tickB := []model.Item{{Name: "node-x", Columns: []model.KeyValue{
+		{Key: "CPU", Value: "n/a"},
+		{Key: "CPU%", Value: "n/a"},
+		{Key: "MEM", Value: "n/a"},
+		{Key: "MEM%", Value: "n/a"},
+		{Key: "VERSION", Value: "v1.31"},
+		{Key: "TAINTS", Value: "none"},
+	}}}
+
+	gotA := keysOf(collectExtraColumns(tickA, 400, 20, "Node"))
+	gotB := keysOf(collectExtraColumns(tickB, 400, 20, "Node"))
+
+	assert.Equal(t, gotA, gotB,
+		"column display order must not depend on insertion order in item.Columns")
+	assert.Equal(t, []string{"CPU", "CPU%", "MEM", "MEM%", "VERSION", "TAINTS"}, gotA,
+		"metrics block must be pinned to the canonical leading position, non-metrics keep discovery order")
+}
+
 // TestCollectExtraColumns_NameReservationGrowsWithLongestName is the
 // regression test for issue #53: when item names are long, the Name
 // column gets squeezed to the 20-char floor while extras (HOSTS,

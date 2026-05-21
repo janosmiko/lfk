@@ -378,25 +378,29 @@ func clearStalePodMetricsColumns(item *model.Item) {
 // autoDetectColumns drops the metrics columns whenever every visible row
 // lacks them, and the user sees the column set blink in and out as
 // metrics-server health fluctuates.
+//
+// Column order MUST match updateNodeMetricsEnriched and carryOverMetricsColumns
+// (CPU/MEM block first, everything else after) — otherwise every watch tick on
+// a node metrics-server has no data for flips the column order between two
+// layouts, producing a visible ~1Hz layout blink.
 func ensureNodeMetricsColumnsPlaceholder(item *model.Item) {
 	// Strip any prior CPU/CPU%/MEM/MEM% values so a node that has just
 	// dropped out of metrics-server output does not keep showing stale
 	// numbers from the previous tick — autoDetectColumns already keeps
-	// the columns visible thanks to the placeholders we re-append below.
+	// the columns visible thanks to the placeholders we prepend below.
 	removeCols := map[string]bool{"CPU": true, "CPU%": true, "MEM": true, "MEM%": true}
-	filtered := item.Columns[:0]
+	newCols := []model.KeyValue{
+		{Key: "CPU", Value: "n/a"},
+		{Key: "CPU%", Value: "n/a"},
+		{Key: "MEM", Value: "n/a"},
+		{Key: "MEM%", Value: "n/a"},
+	}
 	for _, kv := range item.Columns {
 		if !removeCols[kv.Key] {
-			filtered = append(filtered, kv)
+			newCols = append(newCols, kv)
 		}
 	}
-	filtered = append(filtered,
-		model.KeyValue{Key: "CPU", Value: "n/a"},
-		model.KeyValue{Key: "CPU%", Value: "n/a"},
-		model.KeyValue{Key: "MEM", Value: "n/a"},
-		model.KeyValue{Key: "MEM%", Value: "n/a"},
-	)
-	item.Columns = filtered
+	item.Columns = newCols
 }
 
 // updateRightsizingLoaded handles the rightsizingLoadedMsg. Stale

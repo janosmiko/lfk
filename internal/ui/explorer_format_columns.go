@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"sort"
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
@@ -54,6 +55,36 @@ type colInfo struct {
 	hasArrow bool // true if any value in this column has a trend arrow
 }
 
+// canonicalColumnPriority pins the display position of the volatile metrics
+// columns. Their values are rewritten on every ~2s refresh by several
+// independent paths (placeholder / metrics-enriched / carry-over), and those
+// paths historically disagreed on whether to prepend or append the block —
+// flipping the column order between two layouts each tick (a visible ~1Hz
+// blink). Deriving display order purely from item.Columns insertion order
+// made every such path load-bearing. Sorting the detected order against this
+// list instead makes display order independent of insertion order, so no
+// mutation path can reintroduce the flicker.
+var canonicalColumnPriority = map[string]int{
+	"CPU": 0, "CPU%": 1, "CPU/R": 2, "CPU/L": 3,
+	"MEM": 4, "MEM%": 5, "MEM/R": 6, "MEM/L": 7,
+}
+
+// stabilizeColumnOrder reorders detected column keys in place so the canonical
+// metrics block always occupies a fixed leading position, while every other
+// column keeps its relative discovery order (stable sort).
+func stabilizeColumnOrder(order []string) {
+	sort.SliceStable(order, func(i, j int) bool {
+		ri, iPinned := canonicalColumnPriority[order[i]]
+		rj, jPinned := canonicalColumnPriority[order[j]]
+		if iPinned && jPinned {
+			return ri < rj
+		}
+		// A pinned key sorts before any unpinned one; two unpinned keys
+		// compare equal so the stable sort preserves their discovery order.
+		return iPinned && !jPinned
+	})
+}
+
 func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind string) []extraColumn {
 	// Collect all available column keys and their max value widths.
 	seen := make(map[string]*colInfo)
@@ -80,6 +111,11 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	if len(order) == 0 {
 		return nil
 	}
+
+	// Pin the metrics block to a canonical position before candidate
+	// selection so display order does not depend on the order the refresh
+	// paths happened to write the columns into item.Columns.
+	stabilizeColumnOrder(order)
 
 	candidates := selectColumnCandidates(seen, order, kind, items)
 
