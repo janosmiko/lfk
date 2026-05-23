@@ -146,6 +146,8 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 		return compareReadyCmp(getColumnValue(a, "Progress"), getColumnValue(b, "Progress"))
 	case "Duration":
 		return compareDurationCmp(getColumnValue(a, "Duration"), getColumnValue(b, "Duration"))
+	case "REV":
+		return compareREVCmp(getColumnValue(a, "REV"), getColumnValue(b, "REV"))
 	case "Cluster IP", "Pod IP", "External IPs":
 		return compareIPCmp(getColumnValue(a, colName), getColumnValue(b, colName))
 	case sortColEventLastSeen:
@@ -178,6 +180,17 @@ func cmpFloat(a, b float64) int {
 }
 
 func cmpInt64(a, b int64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func cmpUint64(a, b uint64) int {
 	switch {
 	case a < b:
 		return -1
@@ -322,6 +335,18 @@ func compareDurationCmp(a, b string) int {
 	db, errB := time.ParseDuration(strings.TrimSpace(b))
 	if errA == nil && errB == nil {
 		return cmpInt64(int64(da), int64(db))
+	}
+	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+}
+
+// compareREVCmp compares REV column values numerically (decimal). Falls back
+// to case-insensitive lexicographic comparison when either value is not
+// parseable as a uint64.
+func compareREVCmp(a, b string) int {
+	na, errA := strconv.ParseUint(strings.TrimSpace(a), 10, 64)
+	nb, errB := strconv.ParseUint(strings.TrimSpace(b), 10, 64)
+	if errA == nil && errB == nil {
+		return cmpUint64(na, nb)
 	}
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 }

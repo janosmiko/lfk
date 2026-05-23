@@ -13,9 +13,9 @@ func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
 	case "Pod":
 		populatePodDetails(ti, obj, status, spec)
 	case "Deployment":
-		populateDeploymentDetails(ti, status, spec)
+		populateDeploymentDetails(ti, obj, status, spec)
 	case "StatefulSet":
-		populateStatefulSetDetails(ti, status, spec)
+		populateStatefulSetDetails(ti, obj, status, spec)
 	case "DaemonSet":
 		populateDaemonSetDetails(ti, status, spec)
 	case "ReplicaSet":

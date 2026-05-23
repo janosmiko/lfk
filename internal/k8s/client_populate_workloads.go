@@ -2,6 +2,7 @@ package k8s
 
 import (
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -122,7 +123,7 @@ func populatePodExtraColumns(ti *model.Item, _ map[string]any, status, spec map[
 	}
 }
 
-func populateDeploymentDetails(ti *model.Item, status, spec map[string]any) {
+func populateDeploymentDetails(ti *model.Item, obj, status, spec map[string]any) {
 	if status == nil || spec == nil {
 		return
 	}
@@ -140,6 +141,9 @@ func populateDeploymentDetails(ti *model.Item, status, spec map[string]any) {
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Replicas", Value: fmt.Sprintf("%d", specReplicas)})
+	if rev := resourceVersionDecimal(obj); rev != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
+	}
 	if strategy, ok := spec["strategy"].(map[string]any); ok {
 		if t, ok := strategy["type"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Strategy", Value: t})
@@ -156,7 +160,7 @@ func populateDeploymentDetails(ti *model.Item, status, spec map[string]any) {
 	populateContainerImages(ti, spec)
 }
 
-func populateStatefulSetDetails(ti *model.Item, status, spec map[string]any) {
+func populateStatefulSetDetails(ti *model.Item, obj, status, spec map[string]any) {
 	if status == nil || spec == nil {
 		return
 	}
@@ -174,6 +178,9 @@ func populateStatefulSetDetails(ti *model.Item, status, spec map[string]any) {
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Replicas", Value: fmt.Sprintf("%d", specReplicas)})
+	if rev := resourceVersionDecimal(obj); rev != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
+	}
 	cpuReq, cpuLim, memReq, memLim := extractTemplateResources(spec)
 	addResourceColumns(ti, cpuReq, cpuLim, memReq, memLim)
 	populateContainerImages(ti, spec)
@@ -254,6 +261,28 @@ func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", suspend)})
 		}
 	}
+}
+
+// resourceVersionDecimal returns metadata.resourceVersion as a decimal string,
+// or "" when the field is missing or not parseable as a non-negative integer.
+// The Kubernetes resourceVersion is opaque to clients; we validate it as a
+// uint64 so the comparator can sort numerically.
+func resourceVersionDecimal(obj map[string]any) string {
+	if obj == nil {
+		return ""
+	}
+	metadata, ok := obj["metadata"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	rv, ok := metadata["resourceVersion"].(string)
+	if !ok || rv == "" {
+		return ""
+	}
+	if _, err := strconv.ParseUint(rv, 10, 64); err != nil {
+		return ""
+	}
+	return rv
 }
 
 func populateJobDetails(ti *model.Item, status, spec map[string]any) {
