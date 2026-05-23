@@ -300,6 +300,45 @@ func ColumnsForKind(kind, context string) []string {
 	return nil
 }
 
+// HiddenBuiltinsForView returns the set of built-in column keys that should
+// be hidden when rendering kind under the given cluster context. When a view
+// is configured and its columns list omits a given built-in (Context,
+// Namespace, Ready, Restarts, Age, Status), that built-in is hidden so the
+// table renders only what the user asked for. Returns nil when no view is
+// configured for this kind in this scope. Per-cluster wins over global.
+func HiddenBuiltinsForView(kind, context string) map[string]bool {
+	if kind == "" {
+		return nil
+	}
+	lk := strings.ToLower(kind)
+	var v *View
+	if context != "" && len(ConfigClusterViews) > 0 {
+		if cluster, ok := ConfigClusterViews[context]; ok {
+			v = cluster[lk]
+		}
+	}
+	if v == nil {
+		v = ConfigViews[lk]
+	}
+	if v == nil {
+		return nil
+	}
+	listed := make(map[string]bool, len(v.Columns))
+	for _, c := range v.Columns {
+		listed[c.Name] = true
+	}
+	hidden := make(map[string]bool, 6)
+	for _, name := range []string{"Context", "Namespace", "Ready", "Restarts", "Age", "Status"} {
+		if !listed[name] {
+			hidden[name] = true
+		}
+	}
+	if len(hidden) == 0 {
+		return nil
+	}
+	return hidden
+}
+
 // viewColumnNames returns the ordered list of column Name fields from the
 // view stored under key kind, or nil when no view exists. Columns flagged
 // |W (FlagWideOnly) are omitted unless ActiveFullscreenMode is set, so
