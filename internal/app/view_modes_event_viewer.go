@@ -180,6 +180,7 @@ func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, l
 			HangingIndent: eventTimelineMessageColumn,
 			IsCursor:      isCursor,
 			CursorCol:     m.eventTimelineCursorCol,
+			Fullscreen:    true,
 		}
 		switch {
 		case inSel && m.eventTimelineVisualMode == 'V':

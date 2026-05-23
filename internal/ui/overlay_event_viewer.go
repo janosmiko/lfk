@@ -269,6 +269,12 @@ type WrappedEventRowOpts struct {
 	SelEnd        int  // absolute col on the logical line (exclusive)
 	// Search highlight (applied only when no selection is active):
 	LowerSearch string
+	// Fullscreen suppresses the overlay-mode background style on plain
+	// rows: in fullscreen mode the surrounding FullscreenBorderStyle
+	// owns the body background, and applying OverlayNormalStyle here
+	// would paint a different-colored rectangle behind text rows than
+	// the empty padding rows around them.
+	Fullscreen bool
 }
 
 // RenderWrappedEventRow renders one logical event line as a multi-line
@@ -317,10 +323,14 @@ func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 			text = highlightEventSearchLine(text, opts.LowerSearch)
 			styled = true
 		}
-		if !styled {
+		if !styled && !opts.Fullscreen {
 			// Apply overlay-normal styling so wrapped rows match the
 			// surrounding (non-wrap) rows' fg/bg pair instead of
 			// punching a transparent rectangle through the overlay.
+			// Skipped in fullscreen: the FullscreenBorderStyle owns
+			// the body background, and an explicit fg/bg here would
+			// paint text rows a different color than empty padding
+			// rows around them.
 			text = OverlayNormalStyle.Render(text)
 		}
 
@@ -432,19 +442,27 @@ func RenderEventViewer(p EventViewerParams) string {
 		colStart:   colStart,
 		colEnd:     colEnd,
 	}
-	for i := scroll; i < end; i++ {
-		b.WriteString(renderEventViewerLine(p, i, evLineCtx))
-		if i < end-1 {
-			b.WriteString("\n")
+	// Pagination is by physical lines, not logical events: in wrap
+	// mode one event expands to multiple sub-lines, and counting by
+	// logical events would emit far more physical rows than
+	// maxVisible — pushing the footer and the overlay's bottom
+	// border off the viewport. Stop emitting as soon as we fill the
+	// reserved height. The logical `end` is still used below by the
+	// footer for the "line N/M" indicator.
+	var physicalLines []string
+	for i := scroll; i < len(p.Lines) && len(physicalLines) < maxVisible; i++ {
+		rendered := renderEventViewerLine(p, i, evLineCtx)
+		for sub := range strings.SplitSeq(rendered, "\n") {
+			if len(physicalLines) >= maxVisible {
+				break
+			}
+			physicalLines = append(physicalLines, sub)
 		}
 	}
-
-	// Pad to fixed height.
-	rendered := end - scroll
-	for rendered < maxVisible {
-		b.WriteString("\n")
-		rendered++
+	for len(physicalLines) < maxVisible {
+		physicalLines = append(physicalLines, "")
 	}
+	b.WriteString(strings.Join(physicalLines, "\n"))
 	b.WriteString("\n")
 
 	// Search input / footer.
