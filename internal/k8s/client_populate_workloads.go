@@ -149,11 +149,14 @@ func populateDeploymentDetails(ti *model.Item, obj, status, spec map[string]any)
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Strategy", Value: t})
 		}
 	}
-	if updated, ok := status["updatedReplicas"].(float64); ok {
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Up-to-date", Value: fmt.Sprintf("%d", int64(updated))})
+	if updated, ok := intFromMap(status, "updatedReplicas"); ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Up-to-date", Value: fmt.Sprintf("%d", updated)})
 	}
-	if avail, ok := status["availableReplicas"].(float64); ok {
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Available", Value: fmt.Sprintf("%d", int64(avail))})
+	if avail, ok := intFromMap(status, "availableReplicas"); ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Available", Value: fmt.Sprintf("%d", avail)})
+	}
+	if unavail, ok := intFromMap(status, "unavailableReplicas"); ok && unavail > 0 {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Unavailable", Value: fmt.Sprintf("%d", unavail)})
 	}
 	cpuReq, cpuLim, memReq, memLim := extractTemplateResources(spec)
 	addResourceColumns(ti, cpuReq, cpuLim, memReq, memLim)
@@ -181,12 +184,26 @@ func populateStatefulSetDetails(ti *model.Item, obj, status, spec map[string]any
 	if rev := resourceVersionDecimal(obj); rev != "" {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
 	}
+	if updated, ok := intFromMap(status, "updatedReplicas"); ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Up-to-date", Value: fmt.Sprintf("%d", updated)})
+	}
+	if us, ok := spec["updateStrategy"].(map[string]any); ok {
+		if t, ok := us["type"].(string); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Update Strategy", Value: t})
+		}
+	}
+	if cr, ok := status["currentRevision"].(string); ok && cr != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Current Revision", Value: cr})
+	}
+	if ur, ok := status["updateRevision"].(string); ok && ur != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Update Revision", Value: ur})
+	}
 	cpuReq, cpuLim, memReq, memLim := extractTemplateResources(spec)
 	addResourceColumns(ti, cpuReq, cpuLim, memReq, memLim)
 	populateContainerImages(ti, spec)
 }
 
-func populateDaemonSetDetails(ti *model.Item, status, spec map[string]any) {
+func populateDaemonSetDetails(ti *model.Item, obj, status, spec map[string]any) {
 	if status == nil {
 		return
 	}
@@ -203,13 +220,29 @@ func populateDaemonSetDetails(ti *model.Item, status, spec map[string]any) {
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", ready, desired)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Desired", Value: fmt.Sprintf("%d", desired)})
+	if rev := resourceVersionDecimal(obj); rev != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
+	}
+	if current, ok := intFromMap(status, "currentNumberScheduled"); ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Current", Value: fmt.Sprintf("%d", current)})
+	}
+	if updated, ok := intFromMap(status, "updatedNumberScheduled"); ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Up-to-date", Value: fmt.Sprintf("%d", updated)})
+	}
+	if avail, ok := intFromMap(status, "numberAvailable"); ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Available", Value: fmt.Sprintf("%d", avail)})
+	}
+	if miss, ok := intFromMap(status, "numberMisscheduled"); ok && miss > 0 {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Misscheduled", Value: fmt.Sprintf("%d", miss)})
+	}
 	if spec != nil {
 		cpuReq, cpuLim, memReq, memLim := extractTemplateResources(spec)
 		addResourceColumns(ti, cpuReq, cpuLim, memReq, memLim)
+		populateContainerImages(ti, spec)
 	}
 }
 
-func populateReplicaSetDetails(ti *model.Item, status, spec map[string]any) {
+func populateReplicaSetDetails(ti *model.Item, obj, status, spec map[string]any) {
 	if status == nil || spec == nil {
 		return
 	}
@@ -226,6 +259,13 @@ func populateReplicaSetDetails(ti *model.Item, status, spec map[string]any) {
 		readyReplicas = int64(r)
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
+	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Desired", Value: fmt.Sprintf("%d", specReplicas)})
+	if rev := resourceVersionDecimal(obj); rev != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
+	}
+	cpuReq, cpuLim, memReq, memLim := extractTemplateResources(spec)
+	addResourceColumns(ti, cpuReq, cpuLim, memReq, memLim)
+	populateContainerImages(ti, spec)
 }
 
 func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
@@ -283,6 +323,17 @@ func resourceVersionDecimal(obj map[string]any) string {
 		return ""
 	}
 	return rv
+}
+
+// intFromMap reads key from m as int64, accepting both int64 and float64 wire types.
+func intFromMap(m map[string]any, key string) (int64, bool) {
+	if v, ok := m[key].(int64); ok {
+		return v, true
+	}
+	if v, ok := m[key].(float64); ok {
+		return int64(v), true
+	}
+	return 0, false
 }
 
 func populateJobDetails(ti *model.Item, status, spec map[string]any) {
