@@ -202,6 +202,12 @@ type Item struct {
 	// aligned regardless of which markers are present.
 	IsContext   bool
 	GroupedRefs []GroupedRef // For grouped rows (Events): all underlying resource identifiers
+	// Raw is the source map[string]any from the Kubernetes API,
+	// retained so user-defined JSONPath columns (configured via
+	// views:) can be re-evaluated without re-fetching. Nil for
+	// items not sourced from a list response (synthetic items
+	// like port-forwards, captures, test fixtures).
+	Raw map[string]any
 }
 
 // SelectionKey returns the stable map key identifying this item in a

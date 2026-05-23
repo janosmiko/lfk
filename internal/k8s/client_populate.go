@@ -6,6 +6,7 @@ import (
 
 // populateResourceDetails fills in Ready and Restarts fields for specific resource kinds.
 func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
+	ti.Raw = obj
 	status, _ := obj["status"].(map[string]any)
 	spec, _ := obj["spec"].(map[string]any)
 
