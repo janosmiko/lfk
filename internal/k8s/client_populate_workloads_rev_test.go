@@ -233,3 +233,174 @@ func TestPopulateReplicaSetDetails_NewColumns(t *testing.T) {
 		}
 	}
 }
+
+func TestPopulateJobDetails_Columns(t *testing.T) {
+	tests := []struct {
+		name      string
+		obj       map[string]any
+		wantReady string
+		wantStat  string
+		wantCols  map[string]string
+		notCols   []string
+	}{
+		{
+			name: "completed job",
+			obj: map[string]any{
+				"metadata": map[string]any{"resourceVersion": "1234"},
+				"spec":     map[string]any{"completions": int64(3)},
+				"status": map[string]any{
+					"succeeded":      int64(3),
+					"failed":         int64(0),
+					"startTime":      "2026-01-01T00:00:00Z",
+					"completionTime": "2026-01-01T00:05:00Z",
+					"conditions": []any{
+						map[string]any{"type": "Complete", "status": "True"},
+					},
+				},
+			},
+			wantReady: "3/3",
+			wantStat:  "Complete",
+			wantCols: map[string]string{
+				"Completions": "3",
+				"Succeeded":   "3",
+				"Duration":    "5m0s",
+				"REV":         "1234",
+			},
+			notCols: []string{"Failed", "Active"},
+		},
+		{
+			name: "failed job with active",
+			obj: map[string]any{
+				"metadata": map[string]any{},
+				"spec":     map[string]any{"completions": float64(5)},
+				"status": map[string]any{
+					"succeeded": float64(1),
+					"failed":    float64(2),
+					"active":    float64(1),
+					"conditions": []any{
+						map[string]any{"type": "Failed", "status": "True"},
+					},
+				},
+			},
+			wantReady: "1/5",
+			wantStat:  "Failed",
+			wantCols: map[string]string{
+				"Completions": "5",
+				"Succeeded":   "1",
+				"Failed":      "2",
+				"Active":      "1",
+			},
+		},
+		{
+			name: "suspended job",
+			obj: map[string]any{
+				"metadata": map[string]any{},
+				"spec":     map[string]any{"completions": int64(1), "suspend": true},
+				"status":   map[string]any{},
+			},
+			wantStat: "Suspended",
+			wantCols: map[string]string{
+				"Suspend":     "true",
+				"Completions": "1",
+			},
+		},
+		{
+			name: "running job",
+			obj: map[string]any{
+				"metadata": map[string]any{},
+				"spec":     map[string]any{"completions": int64(3)},
+				"status":   map[string]any{"active": int64(2), "succeeded": int64(1)},
+			},
+			wantReady: "1/3",
+			wantStat:  "Running",
+			wantCols: map[string]string{
+				"Active":      "2",
+				"Succeeded":   "1",
+				"Completions": "3",
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ti := &model.Item{}
+			populateResourceDetails(ti, tt.obj, "Job")
+			if tt.wantReady != "" && ti.Ready != tt.wantReady {
+				t.Errorf("Ready = %q, want %q", ti.Ready, tt.wantReady)
+			}
+			if ti.Status != tt.wantStat {
+				t.Errorf("Status = %q, want %q", ti.Status, tt.wantStat)
+			}
+			for key, want := range tt.wantCols {
+				got := ""
+				for _, kv := range ti.Columns {
+					if kv.Key == key {
+						got = kv.Value
+						break
+					}
+				}
+				if got != want {
+					t.Errorf("%q column = %q, want %q", key, got, want)
+				}
+			}
+			for _, notKey := range tt.notCols {
+				for _, kv := range ti.Columns {
+					if kv.Key == notKey {
+						t.Errorf("%q column should be absent, got %q", notKey, kv.Value)
+					}
+				}
+			}
+		})
+	}
+}
+
+func TestPopulateCronJobDetails_NewColumns(t *testing.T) {
+	t.Run("active count emitted", func(t *testing.T) {
+		ti := &model.Item{}
+		obj := map[string]any{
+			"metadata": map[string]any{"resourceVersion": "555"},
+			"spec":     map[string]any{"schedule": "*/5 * * * *"},
+			"status": map[string]any{
+				"active": []any{
+					map[string]any{"name": "job-1"},
+					map[string]any{"name": "job-2"},
+				},
+			},
+		}
+		populateResourceDetails(ti, obj, "CronJob")
+		got := ""
+		for _, kv := range ti.Columns {
+			if kv.Key == "Active" {
+				got = kv.Value
+				break
+			}
+		}
+		if got != "2" {
+			t.Fatalf("Active column = %q, want 2", got)
+		}
+		gotREV := ""
+		for _, kv := range ti.Columns {
+			if kv.Key == "REV" {
+				gotREV = kv.Value
+				break
+			}
+		}
+		if gotREV != "555" {
+			t.Fatalf("REV = %q, want 555", gotREV)
+		}
+	})
+
+	t.Run("active suppressed when empty", func(t *testing.T) {
+		ti := &model.Item{}
+		obj := map[string]any{
+			"metadata": map[string]any{},
+			"spec":     map[string]any{"schedule": "*/5 * * * *"},
+			"status":   map[string]any{"active": []any{}},
+		}
+		populateResourceDetails(ti, obj, "CronJob")
+		for _, kv := range ti.Columns {
+			if kv.Key == "Active" {
+				t.Fatalf("Active column should be suppressed when empty, got %q", kv.Value)
+			}
+		}
+	})
+}

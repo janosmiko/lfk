@@ -268,7 +268,7 @@ func populateReplicaSetDetails(ti *model.Item, obj, status, spec map[string]any)
 	populateContainerImages(ti, spec)
 }
 
-func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
+func populateCronJobDetails(ti *model.Item, obj, status, spec map[string]any) {
 	var (
 		schedule string
 		timeZone string
@@ -290,6 +290,9 @@ func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
 		if lastSchedule, ok := status["lastScheduleTime"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Last Schedule", Value: lastSchedule})
 		}
+		if active, ok := status["active"].([]any); ok && len(active) > 0 {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Active", Value: fmt.Sprintf("%d", len(active))})
+		}
 	}
 	if !suspend && schedule != "" {
 		if next, ok := nextCronFire(schedule, timeZone, time.Now()); ok {
@@ -300,6 +303,9 @@ func populateCronJobDetails(ti *model.Item, status, spec map[string]any) {
 		if _, ok := spec["suspend"].(bool); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", suspend)})
 		}
+	}
+	if rev := resourceVersionDecimal(obj); rev != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
 	}
 }
 
@@ -336,23 +342,95 @@ func intFromMap(m map[string]any, key string) (int64, bool) {
 	return 0, false
 }
 
-func populateJobDetails(ti *model.Item, status, spec map[string]any) {
-	if spec != nil {
-		if completions, ok := spec["completions"].(float64); ok {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Completions", Value: fmt.Sprintf("%d", int64(completions))})
+func jobDuration(status map[string]any) string {
+	startStr, _ := status["startTime"].(string)
+	if startStr == "" {
+		return ""
+	}
+	start, err := time.Parse(time.RFC3339, startStr)
+	if err != nil {
+		return ""
+	}
+	var end time.Time
+	if compStr, ok := status["completionTime"].(string); ok && compStr != "" {
+		if t, err := time.Parse(time.RFC3339, compStr); err == nil {
+			end = t
 		}
 	}
+	if end.IsZero() {
+		end = time.Now().UTC()
+	}
+	d := end.Sub(start).Round(time.Second)
+	if d < 0 {
+		return ""
+	}
+	return d.String()
+}
+
+func jobStatus(status, spec map[string]any) string {
+	conds, _ := status["conditions"].([]any)
+	for _, c := range conds {
+		cm, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		ctype, _ := cm["type"].(string)
+		cstat, _ := cm["status"].(string)
+		if cstat != "True" {
+			continue
+		}
+		switch ctype {
+		case "Complete", "SuccessCriteriaMet":
+			return "Complete"
+		case "Failed", "FailureTarget":
+			return "Failed"
+		}
+	}
+	if susp, ok := spec["suspend"].(bool); ok && susp {
+		return "Suspended"
+	}
+	if active, ok := intFromMap(status, "active"); ok && active > 0 {
+		return "Running"
+	}
+	return ""
+}
+
+func populateJobDetails(ti *model.Item, obj, status, spec map[string]any) {
+	var specCompletions int64
+	if spec != nil {
+		if c, ok := intFromMap(spec, "completions"); ok {
+			specCompletions = c
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Completions", Value: fmt.Sprintf("%d", c)})
+		}
+	}
+	var succeeded int64
 	if status != nil {
-		if succeeded, ok := status["succeeded"].(float64); ok {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Succeeded", Value: fmt.Sprintf("%d", int64(succeeded))})
+		if s, ok := intFromMap(status, "succeeded"); ok {
+			succeeded = s
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Succeeded", Value: fmt.Sprintf("%d", s)})
 		}
-		if failed, ok := status["failed"].(float64); ok && failed > 0 {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Failed", Value: fmt.Sprintf("%d", int64(failed))})
+		if f, ok := intFromMap(status, "failed"); ok && f > 0 {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Failed", Value: fmt.Sprintf("%d", f)})
 		}
+		if a, ok := intFromMap(status, "active"); ok && a > 0 {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Active", Value: fmt.Sprintf("%d", a)})
+		}
+		if dur := jobDuration(status); dur != "" {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Duration", Value: dur})
+		}
+	}
+	if specCompletions > 0 {
+		ti.Ready = fmt.Sprintf("%d/%d", succeeded, specCompletions)
 	}
 	if spec != nil {
 		if suspend, ok := spec["suspend"].(bool); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Suspend", Value: fmt.Sprintf("%v", suspend)})
 		}
+	}
+	if status != nil && spec != nil {
+		ti.Status = jobStatus(status, spec)
+	}
+	if rev := resourceVersionDecimal(obj); rev != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
 	}
 }

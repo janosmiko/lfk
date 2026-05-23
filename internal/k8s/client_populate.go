@@ -33,9 +33,9 @@ func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
 	case "PersistentVolumeClaim":
 		populatePVCDetails(ti, status, spec)
 	case "CronJob":
-		populateCronJobDetails(ti, status, spec)
+		populateCronJobDetails(ti, obj, status, spec)
 	case "Job":
-		populateJobDetails(ti, status, spec)
+		populateJobDetails(ti, obj, status, spec)
 	case "HorizontalPodAutoscaler":
 		populateHPADetails(ti, status, spec)
 	default:
