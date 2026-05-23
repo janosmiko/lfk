@@ -52,7 +52,10 @@ func TestApplyViewColumns_NilView(t *testing.T) {
 }
 
 func TestApplyViewColumns_NilRaw(t *testing.T) {
-	v, _ := ui.BuildView(&ui.ConfigView{Columns: []string{"X:.foo"}})
+	v, err := ui.BuildView(&ui.ConfigView{Columns: []string{"X:.foo"}})
+	if err != nil {
+		t.Fatalf("BuildView: %v", err)
+	}
 	items := []model.Item{{Name: "x"}}
 	applyViewColumns(items, v)
 	if len(items[0].Columns) != 0 {
@@ -61,7 +64,10 @@ func TestApplyViewColumns_NilRaw(t *testing.T) {
 }
 
 func TestApplyViewColumns_BuiltinSkipped(t *testing.T) {
-	v, _ := ui.BuildView(&ui.ConfigView{Columns: []string{"Name", "Age", "Ready"}})
+	v, err := ui.BuildView(&ui.ConfigView{Columns: []string{"Name", "Age", "Ready"}})
+	if err != nil {
+		t.Fatalf("BuildView: %v", err)
+	}
 	items := []model.Item{{Name: "x", Raw: map[string]any{}}}
 	applyViewColumns(items, v)
 	if len(items[0].Columns) != 0 {
@@ -70,7 +76,10 @@ func TestApplyViewColumns_BuiltinSkipped(t *testing.T) {
 }
 
 func TestApplyViewColumns_EmptyResultSuppressed(t *testing.T) {
-	v, _ := ui.BuildView(&ui.ConfigView{Columns: []string{"X:.does.not.exist"}})
+	v, err := ui.BuildView(&ui.ConfigView{Columns: []string{"X:.does.not.exist"}})
+	if err != nil {
+		t.Fatalf("BuildView: %v", err)
+	}
 	items := []model.Item{{Name: "x", Raw: map[string]any{"metadata": map[string]any{"name": "x"}}}}
 	applyViewColumns(items, v)
 	for _, kv := range items[0].Columns {

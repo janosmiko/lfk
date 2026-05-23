@@ -222,7 +222,7 @@ Use `views` to configure columns and default sort for specific resource types. K
 
 ### Column spec syntax
 
-```
+```text
 NAME[:.jsonpath][|flag]*
 ```
 
