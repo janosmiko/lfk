@@ -141,6 +141,9 @@ func populateDeploymentDetails(ti *model.Item, obj, status, spec map[string]any)
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Replicas", Value: fmt.Sprintf("%d", specReplicas)})
+	if g := progressingGeneration(obj, status); g != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Progressing", Value: g})
+	}
 	if rev := resourceVersionDecimal(obj); rev != "" {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
 	}
@@ -181,6 +184,9 @@ func populateStatefulSetDetails(ti *model.Item, obj, status, spec map[string]any
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Replicas", Value: fmt.Sprintf("%d", specReplicas)})
+	if g := progressingGeneration(obj, status); g != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Progressing", Value: g})
+	}
 	if rev := resourceVersionDecimal(obj); rev != "" {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
 	}
@@ -220,6 +226,9 @@ func populateDaemonSetDetails(ti *model.Item, obj, status, spec map[string]any) 
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", ready, desired)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Desired", Value: fmt.Sprintf("%d", desired)})
+	if g := progressingGeneration(obj, status); g != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Progressing", Value: g})
+	}
 	if rev := resourceVersionDecimal(obj); rev != "" {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
 	}
@@ -260,6 +269,9 @@ func populateReplicaSetDetails(ti *model.Item, obj, status, spec map[string]any)
 	}
 	ti.Ready = fmt.Sprintf("%d/%d", readyReplicas, specReplicas)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Desired", Value: fmt.Sprintf("%d", specReplicas)})
+	if g := progressingGeneration(obj, status); g != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Progressing", Value: g})
+	}
 	if rev := resourceVersionDecimal(obj); rev != "" {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "REV", Value: rev})
 	}
@@ -329,6 +341,33 @@ func resourceVersionDecimal(obj map[string]any) string {
 		return ""
 	}
 	return rv
+}
+
+// progressingGeneration returns the desired generation as a decimal string
+// when metadata.generation > status.observedGeneration (indicating an
+// in-progress or stalled rollout). Returns "" when in sync, missing, or
+// not parseable — so the caller emits the column only when meaningful.
+func progressingGeneration(obj, status map[string]any) string {
+	if obj == nil || status == nil {
+		return ""
+	}
+	metadata, ok := obj["metadata"].(map[string]any)
+	if !ok {
+		return ""
+	}
+	gen, ok := intFromMap(metadata, "generation")
+	if !ok {
+		return ""
+	}
+	observed, ok := intFromMap(status, "observedGeneration")
+	if !ok {
+		// No observedGeneration at all = controller hasn't reconciled.
+		return strconv.FormatInt(gen, 10)
+	}
+	if gen > observed {
+		return strconv.FormatInt(gen, 10)
+	}
+	return ""
 }
 
 // intFromMap reads key from m as int64, accepting both int64 and float64 wire types.

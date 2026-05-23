@@ -404,3 +404,84 @@ func TestPopulateCronJobDetails_NewColumns(t *testing.T) {
 		}
 	})
 }
+
+func TestProgressingColumn_Workloads(t *testing.T) {
+	tests := []struct {
+		name      string
+		kind      string
+		metadata  map[string]any
+		status    map[string]any
+		spec      map[string]any
+		wantValue string // "" means column should be absent
+	}{
+		{
+			name:      "Deployment in sync — no Progressing column",
+			kind:      "Deployment",
+			metadata:  map[string]any{"generation": int64(3)},
+			status:    map[string]any{"observedGeneration": int64(3), "readyReplicas": int64(2)},
+			spec:      map[string]any{"replicas": int64(2)},
+			wantValue: "",
+		},
+		{
+			name:      "Deployment with newer generation — column shows desired gen",
+			kind:      "Deployment",
+			metadata:  map[string]any{"generation": int64(5)},
+			status:    map[string]any{"observedGeneration": int64(3), "readyReplicas": int64(2)},
+			spec:      map[string]any{"replicas": int64(2)},
+			wantValue: "5",
+		},
+		{
+			name:      "StatefulSet without observedGeneration — column shows desired gen",
+			kind:      "StatefulSet",
+			metadata:  map[string]any{"generation": int64(1)},
+			status:    map[string]any{"readyReplicas": int64(0)},
+			spec:      map[string]any{"replicas": int64(2)},
+			wantValue: "1",
+		},
+		{
+			name:      "DaemonSet in sync",
+			kind:      "DaemonSet",
+			metadata:  map[string]any{"generation": int64(2)},
+			status:    map[string]any{"observedGeneration": int64(2), "desiredNumberScheduled": int64(1), "numberReady": int64(1)},
+			spec:      map[string]any{},
+			wantValue: "",
+		},
+		{
+			name:      "ReplicaSet rolling — Progressing shown",
+			kind:      "ReplicaSet",
+			metadata:  map[string]any{"generation": int64(4)},
+			status:    map[string]any{"observedGeneration": int64(3), "readyReplicas": int64(0)},
+			spec:      map[string]any{"replicas": int64(3)},
+			wantValue: "4",
+		},
+		{
+			name:      "Deployment with no generation field — column absent",
+			kind:      "Deployment",
+			metadata:  map[string]any{},
+			status:    map[string]any{"readyReplicas": int64(1)},
+			spec:      map[string]any{"replicas": int64(1)},
+			wantValue: "",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ti := &model.Item{}
+			obj := map[string]any{
+				"metadata": tt.metadata,
+				"spec":     tt.spec,
+				"status":   tt.status,
+			}
+			populateResourceDetails(ti, obj, tt.kind)
+			got := ""
+			for _, kv := range ti.Columns {
+				if kv.Key == "Progressing" {
+					got = kv.Value
+					break
+				}
+			}
+			if got != tt.wantValue {
+				t.Fatalf("Progressing = %q, want %q", got, tt.wantValue)
+			}
+		})
+	}
+}
