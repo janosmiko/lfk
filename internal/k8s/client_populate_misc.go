@@ -27,7 +27,9 @@ func populateIngressClass(ti *model.Item, obj map[string]any) {
 		scope, _ := params["scope"].(string)
 		kind, _ := params["kind"].(string)
 		name, _ := params["name"].(string)
-		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Parameters", Value: fmt.Sprintf("%s/%s/%s", scope, kind, name)})
+		if scope != "" || kind != "" || name != "" {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Parameters", Value: fmt.Sprintf("%s/%s/%s", scope, kind, name)})
+		}
 	}
 }
 

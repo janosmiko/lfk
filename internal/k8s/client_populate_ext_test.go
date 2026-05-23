@@ -1011,6 +1011,28 @@ func TestPopulateResourceDetailsExt_IngressClass_ControllerAndParameters(t *test
 		assert.Equal(t, "Cluster/IngressClassParams/nginx-params", colMap["Parameters"])
 	})
 
+	t.Run("parameters block with all empty fields suppressed", func(t *testing.T) {
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{},
+			},
+			"spec": map[string]any{
+				"controller": "k8s.io/ingress-nginx",
+				"parameters": map[string]any{
+					"scope": "",
+					"kind":  "",
+					"name":  "",
+				},
+			},
+		}
+		ti := &model.Item{Name: "nginx"}
+		populateResourceDetailsExt(ti, obj, "IngressClass", nil, nil)
+
+		colMap := columnsToMap(ti.Columns)
+		_, found := colMap["Parameters"]
+		assert.False(t, found, "Parameters should be suppressed when all sub-fields are empty")
+	})
+
 	t.Run("without parameters block", func(t *testing.T) {
 		obj := map[string]any{
 			"metadata": map[string]any{
