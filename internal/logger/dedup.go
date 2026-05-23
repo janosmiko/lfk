@@ -116,11 +116,17 @@ func pruneDedupStateLocked(now time.Time) {
 	}
 }
 
-// ResetDedupForTest clears the dedup state. Test-only.
+// ResetDedupForTest clears the dedup state AND restores every
+// Set*ForTest override to its production default, so tests can't leak
+// state into each other via a forgotten window/clock/prune setting.
+// Test-only.
 func ResetDedupForTest() {
 	dedupMu.Lock()
 	dedupState = map[string]*dedupEntry{}
 	dedupOps = 0
+	dedupWindow = DefaultDedupWindow
+	dedupPruneEvery = 1024
+	dedupNow = time.Now
 	dedupMu.Unlock()
 }
 
