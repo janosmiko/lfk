@@ -230,6 +230,19 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			ConfigResourceColumns[strings.ToLower(k)] = v
 		}
 	}
+	if len(cfg.Views) > 0 {
+		ConfigViews = make(map[string]*View, len(cfg.Views))
+		for k, cv := range cfg.Views {
+			v, err := BuildView(&cv)
+			if err != nil {
+				logger.Warn("ignoring invalid view config",
+					"key", k,
+					"err", err.Error())
+				continue
+			}
+			ConfigViews[strings.ToLower(k)] = v
+		}
+	}
 	for k, v := range cfg.Abbreviations {
 		abbr[strings.ToLower(k)] = strings.ToLower(v)
 	}
@@ -255,6 +268,24 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			}
 			if cc.ReadOnly != nil {
 				ConfigClusterReadOnly[ctx] = *cc.ReadOnly
+			}
+			if len(cc.Views) > 0 {
+				if ConfigClusterViews == nil {
+					ConfigClusterViews = make(map[string]map[string]*View, len(cfg.Clusters))
+				}
+				perCluster := make(map[string]*View, len(cc.Views))
+				for k, cv := range cc.Views {
+					v, err := BuildView(&cv)
+					if err != nil {
+						logger.Warn("ignoring invalid view config",
+							"context", ctx,
+							"key", k,
+							"err", err.Error())
+						continue
+					}
+					perCluster[strings.ToLower(k)] = v
+				}
+				ConfigClusterViews[ctx] = perCluster
 			}
 		}
 	}
