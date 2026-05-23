@@ -180,9 +180,20 @@ func (m *Model) collectBuiltinToggleEntries(items []model.Item, kind string) []c
 		}
 	}
 
+	// Effective hidden state: session toggle wins over view-derived defaults.
+	// Without this, opening the overlay on a kind that has a view: configured
+	// would show all built-ins as "visible" even though the table is hiding
+	// the ones not listed in the view — and the first toggle would silently
+	// commit that wrong baseline as session state, wiping the view's effect.
 	hidden := map[string]bool{}
-	for _, k := range m.hiddenBuiltinColumns[kind] {
-		hidden[k] = true
+	if sessionHidden, ok := m.hiddenBuiltinColumns[kind]; ok && len(sessionHidden) > 0 {
+		for _, k := range sessionHidden {
+			hidden[k] = true
+		}
+	} else if viewHidden := ui.HiddenBuiltinsForView(kind, m.nav.Context); viewHidden != nil {
+		for k := range viewHidden {
+			hidden[k] = true
+		}
 	}
 
 	entries := make([]columnToggleEntry, 0, len(builtinColumnOrder))
