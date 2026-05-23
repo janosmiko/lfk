@@ -135,11 +135,26 @@ func openInBrowser(url string) tea.Cmd {
 // useful caller message — visible to the user as a flicker.
 func copyToSystemClipboard(text string) tea.Cmd {
 	return func() tea.Msg {
-		if err := clipboard.WriteAll(text); err != nil {
+		if err := clipboard.WriteAll(normalizeClipboardLineEndings(text, runtime.GOOS)); err != nil {
 			return actionResultMsg{err: fmt.Errorf("clipboard: %w", err)}
 		}
 		return nil
 	}
+}
+
+// normalizeClipboardLineEndings converts bare LF to CRLF on Windows so
+// multi-line payloads paste as separate lines in apps that follow the
+// Windows clipboard CF_UNICODETEXT convention (Notepad, Excel, many
+// browser textareas). Existing CRLF sequences are preserved — we don't
+// want to double-CR text that's already normalized. No-op on non-Windows
+// hosts where LF is the native line ending.
+func normalizeClipboardLineEndings(text, goos string) string {
+	if goos != "windows" || !strings.Contains(text, "\n") {
+		return text
+	}
+	// Replace lone LF with CRLF without touching existing CRLF.
+	text = strings.ReplaceAll(text, "\r\n", "\n")
+	return strings.ReplaceAll(text, "\n", "\r\n")
 }
 
 // loadPodsForAction fetches pods owned by the action target resource (for exec/attach on parent resources).
