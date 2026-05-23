@@ -289,6 +289,68 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			}
 		}
 	}
+
+	// Bridge resource_columns into views as a deprecated alias. views: wins when
+	// both are present for the same key. A single deprecation warning is emitted
+	// if any bridging occurs (not once per entry).
+	if bridgeResourceColumnsToViews(cfg) {
+		logger.Warn("resource_columns is deprecated; migrate to views: (see docs/config-reference.md)")
+	}
+}
+
+// bridgeResourceColumnsToViews populates ConfigViews and ConfigClusterViews from
+// resource_columns entries that have no corresponding views: entry. Returns true
+// if any bridging was performed so the caller can emit a single deprecation warning.
+func bridgeResourceColumnsToViews(cfg configFile) bool {
+	bridged := false
+	if len(cfg.ResourceColumns) > 0 {
+		if ConfigViews == nil {
+			ConfigViews = make(map[string]*View, len(cfg.ResourceColumns))
+		}
+		for kind, cols := range cfg.ResourceColumns {
+			key := strings.ToLower(kind)
+			if _, exists := ConfigViews[key]; exists {
+				continue // views: wins
+			}
+			v, err := BuildView(&configView{Columns: cols})
+			if err != nil {
+				logger.Warn("ignoring invalid resource_columns config",
+					"key", key,
+					"err", err.Error())
+				continue
+			}
+			ConfigViews[key] = v
+			bridged = true
+		}
+	}
+	for ctx, cc := range cfg.Clusters {
+		if len(cc.ResourceColumns) == 0 {
+			continue
+		}
+		if ConfigClusterViews == nil {
+			ConfigClusterViews = make(map[string]map[string]*View, len(cfg.Clusters))
+		}
+		if ConfigClusterViews[ctx] == nil {
+			ConfigClusterViews[ctx] = make(map[string]*View, len(cc.ResourceColumns))
+		}
+		for kind, cols := range cc.ResourceColumns {
+			key := strings.ToLower(kind)
+			if _, exists := ConfigClusterViews[ctx][key]; exists {
+				continue
+			}
+			v, err := BuildView(&configView{Columns: cols})
+			if err != nil {
+				logger.Warn("ignoring invalid resource_columns config",
+					"context", ctx,
+					"key", key,
+					"err", err.Error())
+				continue
+			}
+			ConfigClusterViews[ctx][key] = v
+			bridged = true
+		}
+	}
+	return bridged
 }
 
 // applyRightsizingDefaults validates the rightsizing_defaults config
