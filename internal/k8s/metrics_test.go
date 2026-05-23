@@ -460,6 +460,61 @@ func TestResolveNodeMetricsConfig(t *testing.T) {
 	})
 }
 
+// Regression guard: a `_global` MonitoringConfig with a Prometheus block
+// is a common shared default. Before the routing fallback, any cluster
+// without its own per-context entry was hard-routed to Prometheus, and
+// metrics-server-only clusters (e.g. EKS without kube-prometheus-stack)
+// silently rendered n/a everywhere when the Prometheus probe failed.
+// The fallback restores metrics-api as the safety net.
+func TestSelectNodeMetricsRoutes(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name          string
+		nodeMetrics   string
+		hasPrometheus bool
+		want          []nodeMetricsRoute
+	}{
+		{
+			name:        "nothing configured tries metrics-api only",
+			nodeMetrics: "", hasPrometheus: false,
+			want: []nodeMetricsRoute{nodeMetricsRouteAPI},
+		},
+		{
+			name:        "implicit prometheus (e.g. _global) falls back to metrics-api",
+			nodeMetrics: "", hasPrometheus: true,
+			want: []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI},
+		},
+		{
+			name:        "explicit prometheus falls back to metrics-api",
+			nodeMetrics: "prometheus", hasPrometheus: true,
+			want: []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI},
+		},
+		{
+			name:        "explicit metrics-api with prometheus available falls back to prometheus",
+			nodeMetrics: "metrics-api", hasPrometheus: true,
+			want: []nodeMetricsRoute{nodeMetricsRouteAPI, nodeMetricsRoutePrometheus},
+		},
+		{
+			name:        "explicit metrics-api without prometheus does not attempt prometheus fallback",
+			nodeMetrics: "metrics-api", hasPrometheus: false,
+			want: []nodeMetricsRoute{nodeMetricsRouteAPI},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := selectNodeMetricsRoutes(tt.nodeMetrics, tt.hasPrometheus)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
+func TestNodeMetricsRouteString(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, "metrics-api", nodeMetricsRouteAPI.String())
+	assert.Equal(t, "prometheus", nodeMetricsRoutePrometheus.String())
+}
+
 func TestParsePodMetricsByContainer(t *testing.T) {
 	obj := &unstructured.Unstructured{
 		Object: map[string]any{
