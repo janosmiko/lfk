@@ -58,6 +58,12 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 			ti.Name += " (default)"
 			ti.Status = "default"
 		}
+		if v, ok := spec["value"].(float64); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Value", Value: fmt.Sprintf("%d", int64(v))})
+		}
+		if pp, ok := spec["preemptionPolicy"].(string); ok && pp != "" {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Preemption Policy", Value: pp})
+		}
 
 	case "Workflow":
 		populateArgoWorkflow(ti, status)

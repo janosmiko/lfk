@@ -16,6 +16,19 @@ func populateIngressClass(ti *model.Item, obj map[string]any) {
 		ti.Name += " (default)"
 		ti.Status = "default"
 	}
+	spec, _ := obj["spec"].(map[string]any)
+	if spec == nil {
+		return
+	}
+	if ctrl, ok := spec["controller"].(string); ok && ctrl != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Controller", Value: ctrl})
+	}
+	if params, ok := spec["parameters"].(map[string]any); ok {
+		scope, _ := params["scope"].(string)
+		kind, _ := params["kind"].(string)
+		name, _ := params["name"].(string)
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Parameters", Value: fmt.Sprintf("%s/%s/%s", scope, kind, name)})
+	}
 }
 
 func populateStorageClass(ti *model.Item, obj map[string]any) {

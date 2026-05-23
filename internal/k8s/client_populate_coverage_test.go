@@ -4,6 +4,7 @@ import (
 	"encoding/base64"
 	"fmt"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 
@@ -728,6 +729,179 @@ func TestPopulate_HPAResourceAverageValue(t *testing.T) {
 	colMap := columnsToMap(ti.Columns)
 	assert.Equal(t, "500Mi", colMap["Target Memory"])
 	assert.Equal(t, "256Mi", colMap["Current Memory"])
+}
+
+// --- HPA: lastScaleTime ---
+
+func TestPopulate_HPALastScaleTime(t *testing.T) {
+	scaleTime := time.Now().Add(-30 * time.Minute).UTC().Format(time.RFC3339)
+	obj := map[string]any{
+		"spec": map[string]any{
+			"maxReplicas": float64(5),
+		},
+		"status": map[string]any{
+			"currentReplicas": float64(2),
+			"desiredReplicas": float64(2),
+			"lastScaleTime":   scaleTime,
+		},
+	}
+	ti := model.Item{}
+	populateResourceDetails(&ti, obj, "HorizontalPodAutoscaler")
+
+	colMap := columnsToMap(ti.Columns)
+	_, found := colMap["Last Scale Time"]
+	assert.True(t, found, "Last Scale Time column should be present")
+}
+
+func TestPopulate_HPALastScaleTimeAbsent(t *testing.T) {
+	obj := map[string]any{
+		"spec": map[string]any{
+			"maxReplicas": float64(5),
+		},
+		"status": map[string]any{
+			"currentReplicas": float64(2),
+			"desiredReplicas": float64(2),
+		},
+	}
+	ti := model.Item{}
+	populateResourceDetails(&ti, obj, "HorizontalPodAutoscaler")
+
+	colMap := columnsToMap(ti.Columns)
+	_, found := colMap["Last Scale Time"]
+	assert.False(t, found, "Last Scale Time column should be absent when not set")
+}
+
+// --- HPA: External metric type ---
+
+func TestPopulate_HPAExternalMetric(t *testing.T) {
+	obj := map[string]any{
+		"spec": map[string]any{
+			"maxReplicas": float64(5),
+			"metrics": []any{
+				map[string]any{
+					"type": "External",
+					"external": map[string]any{
+						"metric": map[string]any{
+							"name": "pubsub.googleapis.com/subscription/num_undelivered_messages",
+						},
+						"target": map[string]any{
+							"type":  "Value",
+							"value": "30",
+						},
+					},
+				},
+			},
+		},
+		"status": map[string]any{
+			"currentReplicas": float64(1),
+			"desiredReplicas": float64(1),
+			"currentMetrics": []any{
+				map[string]any{
+					"type": "External",
+					"external": map[string]any{
+						"metric": map[string]any{
+							"name": "pubsub.googleapis.com/subscription/num_undelivered_messages",
+						},
+						"current": map[string]any{
+							"value": "15",
+						},
+					},
+				},
+			},
+		},
+	}
+	ti := model.Item{}
+	populateResourceDetails(&ti, obj, "HorizontalPodAutoscaler")
+
+	colMap := columnsToMap(ti.Columns)
+	assert.Equal(t, "30", colMap["Target pubsub.googleapis.com/subscription/num_undelivered_messages"])
+	assert.Equal(t, "15", colMap["Current pubsub.googleapis.com/subscription/num_undelivered_messages"])
+}
+
+func TestPopulate_HPAExternalMetricAverageValue(t *testing.T) {
+	obj := map[string]any{
+		"spec": map[string]any{
+			"maxReplicas": float64(5),
+			"metrics": []any{
+				map[string]any{
+					"type": "External",
+					"external": map[string]any{
+						"metric": map[string]any{"name": "queue_depth"},
+						"target": map[string]any{
+							"type":         "AverageValue",
+							"averageValue": "100",
+						},
+					},
+				},
+			},
+		},
+		"status": map[string]any{
+			"currentReplicas": float64(1),
+			"desiredReplicas": float64(1),
+			"currentMetrics": []any{
+				map[string]any{
+					"type": "External",
+					"external": map[string]any{
+						"metric":  map[string]any{"name": "queue_depth"},
+						"current": map[string]any{"averageValue": "42"},
+					},
+				},
+			},
+		},
+	}
+	ti := model.Item{}
+	populateResourceDetails(&ti, obj, "HorizontalPodAutoscaler")
+
+	colMap := columnsToMap(ti.Columns)
+	assert.Equal(t, "100", colMap["Target queue_depth"])
+	assert.Equal(t, "42", colMap["Current queue_depth"])
+}
+
+// --- Node: Unschedulable ---
+
+func TestPopulate_NodeUnschedulableTrue(t *testing.T) {
+	obj := map[string]any{
+		"metadata": map[string]any{"labels": map[string]any{}},
+		"spec": map[string]any{
+			"unschedulable": true,
+		},
+		"status": map[string]any{},
+	}
+	ti := model.Item{}
+	populateResourceDetails(&ti, obj, "Node")
+
+	colMap := columnsToMap(ti.Columns)
+	assert.Equal(t, "true", colMap["Unschedulable"])
+}
+
+func TestPopulate_NodeUnschedulableAbsent(t *testing.T) {
+	obj := map[string]any{
+		"metadata": map[string]any{"labels": map[string]any{}},
+		"spec":     map[string]any{},
+		"status":   map[string]any{},
+	}
+	ti := model.Item{}
+	populateResourceDetails(&ti, obj, "Node")
+
+	colMap := columnsToMap(ti.Columns)
+	_, found := colMap["Unschedulable"]
+	assert.False(t, found)
+}
+
+func TestPopulate_NodeUnschedulableFalseSuppressed(t *testing.T) {
+	obj := map[string]any{
+		"metadata": map[string]any{"labels": map[string]any{}},
+		"spec": map[string]any{
+			"unschedulable": false,
+		},
+		"status": map[string]any{},
+	}
+	ti := model.Item{}
+	populateResourceDetails(&ti, obj, "Node")
+
+	colMap := columnsToMap(ti.Columns)
+	_, found := colMap["Unschedulable"]
+	assert.False(t, found)
 }
 
 // --- Unknown kind falls through to ext ---

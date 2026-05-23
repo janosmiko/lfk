@@ -3,6 +3,7 @@ package k8s
 import (
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -72,6 +73,8 @@ func populateHPASpecMetrics(ti *model.Item, metrics []any) {
 			populateHPAPodsMetric(ti, mMap, "target", "Target")
 		case "Object":
 			populateHPAObjectMetric(ti, mMap)
+		case "External":
+			populateHPAExternalMetric(ti, mMap, "external", "target", "Target")
 		}
 	}
 }
@@ -160,6 +163,13 @@ func populateHPAStatusColumns(ti *model.Item, status map[string]any) {
 	if currentMetrics, ok := status["currentMetrics"].([]any); ok {
 		populateHPACurrentMetrics(ti, currentMetrics)
 	}
+	if lastScale, ok := status["lastScaleTime"].(string); ok && lastScale != "" {
+		if t, err := time.Parse(time.RFC3339, lastScale); err == nil {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Last Scale Time", Value: formatAge(time.Since(t))})
+		} else if t, err = time.Parse(time.RFC3339Nano, lastScale); err == nil {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Last Scale Time", Value: formatAge(time.Since(t))})
+		}
+	}
 	if conditions, ok := status["conditions"].([]any); ok {
 		populateHPAConditions(ti, conditions)
 	}
@@ -177,6 +187,8 @@ func populateHPACurrentMetrics(ti *model.Item, currentMetrics []any) {
 			populateHPACurrentResourceMetric(ti, mMap)
 		case "Pods":
 			populateHPACurrentPodsMetric(ti, mMap)
+		case "External":
+			populateHPAExternalMetric(ti, mMap, "external", "current", "Current")
 		}
 	}
 }
@@ -220,6 +232,37 @@ func populateHPACurrentPodsMetric(ti *model.Item, mMap map[string]any) {
 	if avg, ok := current["averageValue"].(string); ok && metricName != "" {
 		ti.Columns = append(ti.Columns, model.KeyValue{
 			Key:   fmt.Sprintf("Current %s", metricName),
+			Value: avg,
+		})
+	}
+}
+
+// populateHPAExternalMetric handles External metric entries in both spec (dataKey="target",
+// prefix="Target") and status (dataKey="current", prefix="Current") loops.
+func populateHPAExternalMetric(ti *model.Item, mMap map[string]any, blockKey, dataKey, prefix string) {
+	ext, ok := mMap[blockKey].(map[string]any)
+	if !ok {
+		return
+	}
+	metricName := ""
+	if mn, ok := ext["metric"].(map[string]any); ok {
+		metricName, _ = mn["name"].(string)
+	}
+	if metricName == "" {
+		return
+	}
+	data, ok := ext[dataKey].(map[string]any)
+	if !ok {
+		return
+	}
+	if val, ok := data["value"].(string); ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{
+			Key:   fmt.Sprintf("%s %s", prefix, metricName),
+			Value: val,
+		})
+	} else if avg, ok := data["averageValue"].(string); ok {
+		ti.Columns = append(ti.Columns, model.KeyValue{
+			Key:   fmt.Sprintf("%s %s", prefix, metricName),
 			Value: avg,
 		})
 	}

@@ -11,6 +11,7 @@ import (
 func populateNodeDetails(ti *model.Item, obj map[string]any, status, spec map[string]any) {
 	populateNodeRoles(ti, obj)
 	populateNodeStatus(ti, status)
+	populateNodeUnschedulable(ti, spec)
 	populateNodeTaints(ti, spec)
 }
 
@@ -71,6 +72,15 @@ func populateNodeStatus(ti *model.Item, status map[string]any) {
 		if v, ok := nodeInfo["containerRuntimeVersion"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Runtime", Value: v})
 		}
+	}
+}
+
+func populateNodeUnschedulable(ti *model.Item, spec map[string]any) {
+	if spec == nil {
+		return
+	}
+	if val, ok := spec["unschedulable"].(bool); ok && val {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Unschedulable", Value: "true"})
 	}
 }
 
