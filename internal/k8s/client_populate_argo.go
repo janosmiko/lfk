@@ -19,11 +19,17 @@ func populateArgoCDApplication(ti *model.Item, _ map[string]any, status, spec ma
 
 func populateArgoCDHealthAndSync(ti *model.Item, status map[string]any) {
 	if health, ok := status["health"].(map[string]any); ok {
+		if healthStatus, ok := health["status"].(string); ok && healthStatus != "" {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Health", Value: healthStatus})
+		}
 		if msg, ok := health["message"].(string); ok && msg != "" {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Health Message", Value: msg})
 		}
 	}
 	if sync, ok := status["sync"].(map[string]any); ok {
+		if syncStatus, ok := sync["status"].(string); ok && syncStatus != "" {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Sync Status", Value: syncStatus})
+		}
 		if rev, ok := sync["revision"].(string); ok && rev != "" {
 			if len(rev) > 8 {
 				rev = rev[:8]
@@ -129,6 +135,9 @@ func populateArgoCDConditions(ti *model.Item, status map[string]any) {
 func populateArgoCDSpec(ti *model.Item, spec map[string]any, kind string) {
 	if spec == nil {
 		return
+	}
+	if project, ok := spec["project"].(string); ok && project != "" {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Project", Value: project})
 	}
 	if kind == "Application" {
 		populateArgoCDAutoSync(ti, spec)
