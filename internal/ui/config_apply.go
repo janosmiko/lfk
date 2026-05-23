@@ -241,6 +241,10 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 				continue
 			}
 			ConfigViews[strings.ToLower(k)] = v
+			logger.Debug("loaded view",
+				"key", strings.ToLower(k),
+				"columns", len(v.Columns),
+				"sort_column", v.SortColumn)
 		}
 	}
 	for k, v := range cfg.Abbreviations {

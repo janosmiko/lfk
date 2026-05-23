@@ -301,8 +301,10 @@ func ColumnsForKind(kind, context string) []string {
 }
 
 // viewColumnNames returns the ordered list of column Name fields from the
-// view stored under key kind, or nil when no view exists. Falls back to nil
-// for views with no columns so the caller continues the resolution chain.
+// view stored under key kind, or nil when no view exists. Columns flagged
+// |W (FlagWideOnly) are omitted unless ActiveFullscreenMode is set, so
+// users can keep wide-only columns in their config without crowding narrow
+// table layouts.
 func viewColumnNames(views map[string]*View, kind string) []string {
 	if len(views) == 0 || kind == "" {
 		return nil
@@ -313,6 +315,9 @@ func viewColumnNames(views map[string]*View, kind string) []string {
 	}
 	names := make([]string, 0, len(v.Columns))
 	for _, c := range v.Columns {
+		if c.Flags&FlagWideOnly != 0 && !ActiveFullscreenMode {
+			continue
+		}
 		names = append(names, c.Name)
 	}
 	return names
