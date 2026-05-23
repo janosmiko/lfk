@@ -1060,6 +1060,10 @@ func TestUpdateEventTimelineSuccess(t *testing.T) {
 	assert.Len(t, mdl.eventTimelineData, 1)
 	assert.Equal(t, 0, mdl.eventTimelineScroll)
 	assert.Nil(t, cmd)
+	// Wrap defaults to on so long messages (FailedScheduling reasons,
+	// Helm hook output) don't right-truncate in the default overlay
+	// view. User can press `>` to flip off.
+	assert.True(t, mdl.eventTimelineWrap, "events overlay must open with wrap enabled")
 }
 
 // --- rbacCheckMsg ---

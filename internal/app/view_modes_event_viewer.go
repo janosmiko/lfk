@@ -103,7 +103,7 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 	lowerQuery := strings.ToLower(m.eventTimelineSearchQuery)
 
 	if m.eventTimelineWrap {
-		return m.renderEventViewerLinesWrapped(lines, scroll, maxLines, lineContentWidth)
+		return m.renderEventViewerLinesWrapped(lines, scroll, maxLines, lineContentWidth, selStart, selEnd, colStart, colEnd)
 	}
 
 	var visible []string
@@ -142,23 +142,87 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 	return visible
 }
 
-func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, lineContentWidth int) []string {
-	wrapStyle := lipgloss.NewStyle().Width(lineContentWidth)
+func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, lineContentWidth, selStart, selEnd, colStart, colEnd int) []string {
+	lowerQuery := strings.ToLower(m.eventTimelineSearchQuery)
+
 	var visible []string
 	for i := scroll; i < len(lines) && len(visible) < maxLines; i++ {
 		isCursor := i == m.eventTimelineCursor
-		wrapped := wrapStyle.Render(lines[i])
-		subLines := strings.Split(wrapped, "\n")
-		for si, sub := range subLines {
+		inSel := m.eventTimelineVisualMode != 0 && i >= selStart && i <= selEnd
+		gutter := " "
+		if isCursor {
+			gutter = ui.YamlCursorIndicatorStyle.Render("▎")
+		}
+
+		// Block-mode (B) selection has no meaningful geometry over
+		// wrapped sub-lines (rectangular column ranges across multiple
+		// physical rows don't represent what the user picked). Fall
+		// back to the single-line truncate path for that case only.
+		if inSel && m.eventTimelineVisualMode == 'B' {
+			truncLine := lines[i]
+			if len([]rune(truncLine)) > lineContentWidth {
+				truncLine = string([]rune(truncLine)[:lineContentWidth])
+			}
+			rendered := ui.RenderVisualSelection(truncLine, rune(m.eventTimelineVisualMode), i, selStart, selEnd,
+				m.eventTimelineVisualStart, m.eventTimelineVisualCol, m.eventTimelineCursorCol, colStart, colEnd)
+			visible = append(visible, gutter+rendered)
+			continue
+		}
+
+		// Unified wrap rendering: per-sub-line gutter, V-mode full
+		// highlight, v-mode char highlight mapped across sub-lines,
+		// block cursor placed on the sub-line containing CursorCol so
+		// it stays visible while navigating.
+		opts := ui.WrappedEventRowOpts{
+			Line:          lines[i],
+			Gutter:        gutter,
+			ContentW:      lineContentWidth,
+			HangingIndent: eventTimelineMessageColumn,
+			IsCursor:      isCursor,
+			CursorCol:     m.eventTimelineCursorCol,
+			Fullscreen:    true,
+		}
+		switch {
+		case inSel && m.eventTimelineVisualMode == 'V':
+			opts.SelectionLine = true
+		case inSel && m.eventTimelineVisualMode == 'v':
+			opts.SelStart, opts.SelEnd = m.charSelectionRangeForLine(lines[i], i, selStart, selEnd)
+		default:
+			opts.LowerSearch = lowerQuery
+		}
+		block := ui.RenderWrappedEventRow(opts)
+		for sub := range strings.SplitSeq(block, "\n") {
 			if len(visible) >= maxLines {
 				break
 			}
-			if isCursor && si == 0 {
-				visible = append(visible, ui.YamlCursorIndicatorStyle.Render("▎")+sub)
-			} else {
-				visible = append(visible, " "+sub)
-			}
+			visible = append(visible, sub)
 		}
 	}
 	return visible
+}
+
+// charSelectionRangeForLine mirrors the per-line logic of
+// ui.renderCharSelection for the wrap renderer: anchor-only line
+// highlights from anchorCol to end; cursor-only line highlights from
+// 0 to cursorCol+1; middle lines highlight everything.
+func (m Model) charSelectionRangeForLine(line string, i, selStart, selEnd int) (int, int) {
+	lineWidth := len([]rune(line))
+	if selStart == selEnd {
+		return min(m.eventTimelineVisualCol, m.eventTimelineCursorCol),
+			max(m.eventTimelineVisualCol, m.eventTimelineCursorCol) + 1
+	}
+	var startCol, endCol int
+	if m.eventTimelineVisualStart <= m.eventTimelineCursor {
+		startCol, endCol = m.eventTimelineVisualCol, m.eventTimelineCursorCol
+	} else {
+		startCol, endCol = m.eventTimelineCursorCol, m.eventTimelineVisualCol
+	}
+	switch i {
+	case selStart:
+		return startCol, lineWidth
+	case selEnd:
+		return 0, endCol + 1
+	default:
+		return 0, lineWidth
+	}
 }

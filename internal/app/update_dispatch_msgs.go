@@ -181,6 +181,11 @@ func (m Model) updateEventTimeline(msg eventTimelineMsg) (tea.Model, tea.Cmd) {
 	m.eventTimelineSearchQuery = ""
 	m.eventTimelineSearchActive = false
 	m.eventTimelineFullscreen = false
+	// Default to wrap-on so long event messages (multi-line FailedScheduling
+	// reasons, Helm hook output, container error chains) stay visible in
+	// the overlay instead of being right-truncated. The user can press `>`
+	// to flip back to no-wrap if they prefer horizontal scrolling.
+	m.eventTimelineWrap = true
 	m.eventTimelineLines = m.buildEventTimelineLines()
 	m.overlay = overlayEventTimeline
 	return m, nil
