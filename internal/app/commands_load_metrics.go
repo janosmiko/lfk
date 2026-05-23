@@ -40,7 +40,9 @@ func (m Model) loadMetrics() tea.Cmd {
 			func(ctx context.Context) tea.Msg {
 				pm, err := client.GetPodMetrics(ctx, kctx, ns, podName)
 				if err != nil {
-					return metricsLoadedMsg{gen: gen} // silently ignore
+					logger.WarnOnce("pod-metrics-load", kctx+"/"+ns+"/"+podName,
+						"pod metrics load failed", "context", kctx, "namespace", ns, "pod", podName, "error", logger.Redact(err.Error()))
+					return metricsLoadedMsg{gen: gen}
 				}
 				cpuReq, cpuLim, memReq, memLim, err := client.GetPodResourceRequests(ctx, kctx, ns, podName)
 				if err != nil {
@@ -63,7 +65,12 @@ func (m Model) loadMetrics() tea.Cmd {
 			func(ctx context.Context) tea.Msg {
 				// Get child pods.
 				childItems, err := client.GetOwnedResources(ctx, kctx, ns, kind, name)
-				if err != nil || len(childItems) == 0 {
+				if err != nil {
+					logger.WarnOnce("owned-resources-load", kctx+"/"+ns+"/"+kind+"/"+name,
+						"owned resources load failed", "context", kctx, "namespace", ns, "kind", kind, "name", name, "error", logger.Redact(err.Error()))
+					return metricsLoadedMsg{gen: gen}
+				}
+				if len(childItems) == 0 {
 					return metricsLoadedMsg{gen: gen}
 				}
 				var podNames []string
@@ -76,7 +83,12 @@ func (m Model) loadMetrics() tea.Cmd {
 					return metricsLoadedMsg{gen: gen}
 				}
 				metrics, err := client.GetPodsMetrics(ctx, kctx, ns, podNames)
-				if err != nil || len(metrics) == 0 {
+				if err != nil {
+					logger.WarnOnce("pods-metrics-load", kctx+"/"+ns+"/"+kind+"/"+name,
+						"workload pod metrics load failed", "context", kctx, "namespace", ns, "kind", kind, "name", name, "error", logger.Redact(err.Error()))
+					return metricsLoadedMsg{gen: gen}
+				}
+				if len(metrics) == 0 {
 					return metricsLoadedMsg{gen: gen}
 				}
 
@@ -140,6 +152,8 @@ func (m Model) loadPreviewEvents() tea.Cmd {
 		func(ctx context.Context) tea.Msg {
 			events, err := client.GetResourceEvents(ctx, kctx, ns, name, kind)
 			if err != nil {
+				logger.WarnOnce("preview-events-load", kctx+"/"+ns+"/"+kind+"/"+name,
+					"preview events load failed", "context", kctx, "namespace", ns, "kind", kind, "name", name, "error", logger.Redact(err.Error()))
 				return previewEventsLoadedMsg{gen: gen}
 			}
 			return previewEventsLoadedMsg{events: events, gen: gen}
@@ -169,11 +183,8 @@ func (m Model) loadPodMetricsForList() tea.Cmd {
 		func(ctx context.Context) tea.Msg {
 			metrics, err := client.GetAllPodMetrics(ctx, kctx, ns)
 			if err != nil {
-				// Don't fail the UI tick, but surface the cause for diagnosis.
-				// Without this log, missing metrics columns look like a UI
-				// bug rather than a backend (metrics-server / RBAC / routing)
-				// problem.
-				logger.Warn("pod metrics load failed", "context", kctx, "namespace", ns, "error", err)
+				logger.WarnOnce("pod-metrics-list-load", kctx+"/"+ns,
+					"pod metrics list load failed", "context", kctx, "namespace", ns, "error", logger.Redact(err.Error()))
 				return podMetricsEnrichedMsg{gen: gen}
 			}
 			return podMetricsEnrichedMsg{metrics: metrics, gen: gen}
@@ -199,12 +210,8 @@ func (m Model) loadNodeMetricsForList() tea.Cmd {
 		func(ctx context.Context) tea.Msg {
 			metrics, err := client.GetAllNodeMetrics(ctx, kctx)
 			if err != nil {
-				// Surface the underlying cause; the UI renders "n/a"
-				// placeholders downstream, which used to mask a silent
-				// routing failure (e.g. `_global` Prometheus block
-				// pointing a metrics-server-only cluster at a missing
-				// Prometheus endpoint).
-				logger.Warn("node metrics load failed", "context", kctx, "error", err)
+				logger.WarnOnce("node-metrics-list-load", kctx,
+					"node metrics list load failed", "context", kctx, "error", logger.Redact(err.Error()))
 				return nodeMetricsEnrichedMsg{gen: gen}
 			}
 			return nodeMetricsEnrichedMsg{metrics: metrics, gen: gen}

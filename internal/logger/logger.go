@@ -162,7 +162,21 @@ func (sc *StderrCapture) readLoop() {
 				// and the TUI message also flows through setStatusMessage which
 				// re-logs it — so we must redact at the source.
 				redacted := Redact(msg)
-				Logger.Error(redacted, "source", "stderr")
+				// Dedup identical lines per rolling window. A wedged exec
+				// credential plugin (expired SSO, missing VPN) emits the
+				// same error 20+ times/sec; without this gate, both the
+				// on-disk log and the in-app overlay drown in repeats.
+				// Key on the redacted text itself so any change in the
+				// error surfaces immediately.
+				emit, supp := ShouldEmit("stderr", redacted)
+				if !emit {
+					continue
+				}
+				args := []any{"source", "stderr"}
+				if supp > 0 {
+					args = append(args, "suppressed_during_window", supp)
+				}
+				Logger.Error(redacted, args...)
 				select {
 				case sc.MsgChan <- redacted:
 				default:
