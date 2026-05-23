@@ -19,6 +19,10 @@ func (m Model) Init() tea.Cmd {
 	if m.stderrChan != nil {
 		cmds = append(cmds, m.waitForStderr())
 	}
+	// Subscribe to deduplicated log events so background failures
+	// (metrics-server unreachable, RBAC denied, ...) reach the in-app
+	// log overlay instead of only the on-disk file.
+	cmds = append(cmds, waitForLoggerUI())
 	if m.watchMode {
 		cmds = append(cmds, scheduleWatchTick(m.watchInterval))
 	}
