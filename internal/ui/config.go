@@ -270,24 +270,52 @@ type ConfigFilterPreset struct {
 var ConfigFilterPresets map[string][]ConfigFilterPreset
 
 // ColumnsForKind returns the configured column list for the given resource kind
-// and cluster context. Per-cluster config takes priority over global config.
+// and cluster context. Resolution order: per-cluster resource_columns,
+// per-cluster views, global resource_columns, global views. Per-cluster wins
+// over global; the legacy resource_columns surface wins over views within a
+// scope so users with both keys configured see the explicit resource_columns
+// override.
 func ColumnsForKind(kind, context string) []string {
 	lk := strings.ToLower(kind)
-	// Per-cluster override first.
-	if context != "" && len(ConfigClusterResourceColumns) > 0 {
-		if clusterCols, ok := ConfigClusterResourceColumns[context]; ok {
-			if cols, ok := clusterCols[lk]; ok {
-				return cols
+	if context != "" {
+		if len(ConfigClusterResourceColumns) > 0 {
+			if clusterCols, ok := ConfigClusterResourceColumns[context]; ok {
+				if cols, ok := clusterCols[lk]; ok {
+					return cols
+				}
 			}
 		}
+		if cols := viewColumnNames(ConfigClusterViews[context], lk); cols != nil {
+			return cols
+		}
 	}
-	// Global override.
 	if len(ConfigResourceColumns) > 0 && kind != "" {
 		if cols, ok := ConfigResourceColumns[lk]; ok {
 			return cols
 		}
 	}
+	if cols := viewColumnNames(ConfigViews, lk); cols != nil {
+		return cols
+	}
 	return nil
+}
+
+// viewColumnNames returns the ordered list of column Name fields from the
+// view stored under key kind, or nil when no view exists. Falls back to nil
+// for views with no columns so the caller continues the resolution chain.
+func viewColumnNames(views map[string]*View, kind string) []string {
+	if len(views) == 0 || kind == "" {
+		return nil
+	}
+	v, ok := views[kind]
+	if !ok || v == nil || len(v.Columns) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(v.Columns))
+	for _, c := range v.Columns {
+		names = append(names, c.Name)
+	}
+	return names
 }
 
 // ConfigDashboard controls whether to show a cluster dashboard when entering a context.
