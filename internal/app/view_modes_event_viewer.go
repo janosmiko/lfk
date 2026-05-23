@@ -143,21 +143,23 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 }
 
 func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, lineContentWidth int) []string {
-	wrapStyle := lipgloss.NewStyle().Width(lineContentWidth)
 	var visible []string
 	for i := scroll; i < len(lines) && len(visible) < maxLines; i++ {
 		isCursor := i == m.eventTimelineCursor
-		wrapped := wrapStyle.Render(lines[i])
-		subLines := strings.Split(wrapped, "\n")
-		for si, sub := range subLines {
+		gutter := " "
+		if isCursor {
+			gutter = ui.YamlCursorIndicatorStyle.Render("▎")
+		}
+		// Hanging-indent wrap so continuation lines align under the
+		// message column rather than re-flowing flush-left. Every
+		// physical sub-line gets the gutter prefix so the cursor's
+		// presence doesn't make continuation lines visually shift.
+		subLines := ui.WrapEventLine(lines[i], lineContentWidth, eventTimelineMessageColumn)
+		for _, sub := range subLines {
 			if len(visible) >= maxLines {
 				break
 			}
-			if isCursor && si == 0 {
-				visible = append(visible, ui.YamlCursorIndicatorStyle.Render("▎")+sub)
-			} else {
-				visible = append(visible, " "+sub)
-			}
+			visible = append(visible, gutter+sub)
 		}
 	}
 	return visible

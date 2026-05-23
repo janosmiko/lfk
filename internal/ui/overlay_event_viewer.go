@@ -181,6 +181,44 @@ type EventViewerParams struct {
 	SearchQuery  string
 	SearchActive bool
 	SearchInput  string
+	// HangingIndent is the column at which the message field starts in
+	// Lines. Continuation lines under wrap are indented by this many
+	// spaces so the wrapped message text stays under the original
+	// message column (table-style continuation). Zero means flush-left.
+	HangingIndent int
+}
+
+// WrapEventLine wraps a single event timeline line into physical lines
+// that fit within contentW. The first physical line uses the full
+// width; continuation lines are indented by hangingIndent so wrapped
+// message text aligns under the original message column instead of
+// re-flowing flush to the left margin.
+//
+// Falls back to flush-left wrap if contentW is too narrow to leave
+// any useful room for continuation text after the indent.
+func WrapEventLine(line string, contentW, hangingIndent int) []string {
+	if contentW <= 0 {
+		return []string{line}
+	}
+	runes := []rune(line)
+	if len(runes) <= contentW {
+		return []string{line}
+	}
+	// Clamp the indent: leave at least 8 chars per continuation line.
+	// On very narrow terminals we just flush-left.
+	if hangingIndent < 0 || hangingIndent >= contentW-8 {
+		hangingIndent = 0
+	}
+	out := []string{string(runes[:contentW])}
+	rest := runes[contentW:]
+	pad := strings.Repeat(" ", hangingIndent)
+	chunkSize := contentW - hangingIndent
+	for len(rest) > 0 {
+		n := min(chunkSize, len(rest))
+		out = append(out, pad+string(rest[:n]))
+		rest = rest[n:]
+	}
+	return out
 }
 
 // RenderEventViewer renders the event viewer with cursor, visual selection,
@@ -253,10 +291,7 @@ func RenderEventViewer(p EventViewerParams) string {
 		contentW = 10
 	}
 
-	wrapStyle := lipgloss.NewStyle().Width(contentW)
-
 	evLineCtx := eventLineContext{
-		wrapStyle:  wrapStyle,
 		contentW:   contentW,
 		lowerQuery: lowerQuery,
 		selStart:   selStart,
@@ -302,7 +337,6 @@ func RenderEventViewer(p EventViewerParams) string {
 
 // eventLineContext holds shared state for rendering individual event viewer lines.
 type eventLineContext struct {
-	wrapStyle  lipgloss.Style
 	contentW   int
 	lowerQuery string
 	selStart   int
@@ -317,13 +351,9 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 	inSelection := p.VisualMode != 0 && i >= ctx.selStart && i <= ctx.selEnd
 	isCursorLine := i == p.Cursor
 
-	fitLine := line
-	if p.Wrap {
-		fitLine = ctx.wrapStyle.Render(line)
-	} else if len([]rune(fitLine)) > ctx.contentW {
-		fitLine = string([]rune(fitLine)[:ctx.contentW])
-	}
-
+	// Visual selection forces a single truncated line — char-based
+	// selection needs deterministic column positions, which a wrapped
+	// multi-line block cannot offer.
 	if inSelection {
 		selLine := line
 		if len([]rune(selLine)) > ctx.contentW {
@@ -341,23 +371,51 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 		return " " + rendered
 	}
 
+	gutter := " "
 	if isCursorLine {
-		return renderEventCursorLine(p, line, fitLine, ctx)
+		gutter = YamlCursorIndicatorStyle.Render("▎")
 	}
 
-	return renderEventNormalLine(p, line, fitLine, ctx)
+	if p.Wrap {
+		return renderWrappedEventBlock(p, line, gutter, ctx)
+	}
+
+	// Non-wrap path: truncate to contentW.
+	fitLine := line
+	if len([]rune(fitLine)) > ctx.contentW {
+		fitLine = string([]rune(fitLine)[:ctx.contentW])
+	}
+	if isCursorLine {
+		return renderEventCursorLine(p, fitLine, ctx, gutter)
+	}
+	return renderEventNormalLine(p, fitLine, ctx, gutter)
 }
 
-// renderEventCursorLine renders the cursor line with gutter indicator and block cursor.
-func renderEventCursorLine(p EventViewerParams, line, fitLine string, ctx eventLineContext) string {
-	gutter := YamlCursorIndicatorStyle.Render("▎")
-	if p.Wrap {
-		displayLine := fitLine
-		if p.SearchQuery != "" {
-			displayLine = ctx.wrapStyle.Render(highlightEventSearchLine(line, ctx.lowerQuery))
+// renderWrappedEventBlock returns the multi-line wrapped form of one
+// event line. Every physical sub-line is prefixed with the gutter (or
+// space) so the leftmost column stays consistent — moving the cursor
+// over a wrapped event no longer makes the continuation lines appear
+// to shift left, which used to read as "wrapped a second time".
+func renderWrappedEventBlock(p EventViewerParams, line, gutter string, ctx eventLineContext) string {
+	physLines := WrapEventLine(line, ctx.contentW, p.HangingIndent)
+	var sb strings.Builder
+	for i, pl := range physLines {
+		if i > 0 {
+			sb.WriteByte('\n')
 		}
-		return gutter + displayLine
+		sb.WriteString(gutter)
+		if p.SearchQuery != "" {
+			sb.WriteString(highlightEventSearchLine(pl, ctx.lowerQuery))
+		} else {
+			sb.WriteString(pl)
+		}
 	}
+	return sb.String()
+}
+
+// renderEventCursorLine renders the non-wrap cursor line with gutter
+// indicator and block cursor at the configured column.
+func renderEventCursorLine(p EventViewerParams, fitLine string, ctx eventLineContext, gutter string) string {
 	displayLine := fitLine
 	if p.SearchQuery != "" {
 		displayLine = highlightEventSearchLine(displayLine, ctx.lowerQuery)
@@ -365,22 +423,15 @@ func renderEventCursorLine(p EventViewerParams, line, fitLine string, ctx eventL
 	return gutter + RenderCursorAtCol(displayLine, fitLine, p.CursorCol)
 }
 
-// renderEventNormalLine renders a non-cursor, non-selected line.
-func renderEventNormalLine(p EventViewerParams, line, fitLine string, ctx eventLineContext) string {
-	if p.Wrap {
-		displayLine := fitLine
-		if p.SearchQuery != "" {
-			displayLine = ctx.wrapStyle.Render(highlightEventSearchLine(line, ctx.lowerQuery))
-		}
-		return " " + displayLine
-	}
+// renderEventNormalLine renders a non-wrap, non-cursor, non-selected line.
+func renderEventNormalLine(p EventViewerParams, fitLine string, ctx eventLineContext, gutter string) string {
 	displayLine := fitLine
 	if p.SearchQuery != "" {
 		displayLine = highlightEventSearchLine(displayLine, ctx.lowerQuery)
 	} else {
 		displayLine = OverlayNormalStyle.Render(displayLine)
 	}
-	return " " + displayLine
+	return gutter + displayLine
 }
 
 // highlightEventSearchLine highlights search matches in a single line using

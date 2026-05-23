@@ -9,6 +9,14 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// eventTimelineMessageColumn is the column at which the message field
+// starts in lines produced by buildEventTimelineLines (age width 8 +
+// sep 1 + type width 7 + sep 1 + reason width 20 + sep 1 = 38). The
+// event viewer uses this as the hanging indent for wrap mode so
+// continuation lines align under the message column instead of
+// re-flowing flush to the left margin.
+const eventTimelineMessageColumn = 8 + 1 + 7 + 1 + 20 + 1
+
 // buildEventTimelineLines converts event timeline data into flat text lines
 // for cursor navigation. Each event becomes a single line with format:
 // {age}  {type}  {reason}  {message}

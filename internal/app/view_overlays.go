@@ -380,6 +380,7 @@ func (m Model) renderOverlayEventTimeline() (string, int, int) {
 		Width: w, Height: h, Wrap: m.eventTimelineWrap, Fullscreen: false,
 		VisualMode: m.eventTimelineVisualMode, VisualStart: m.eventTimelineVisualStart, VisualCol: m.eventTimelineVisualCol,
 		SearchQuery: m.eventTimelineSearchQuery, SearchActive: m.eventTimelineSearchActive, SearchInput: m.eventTimelineSearchInput.Value,
+		HangingIndent: eventTimelineMessageColumn,
 	}
 	return ui.RenderEventViewer(params), w, h
 }
