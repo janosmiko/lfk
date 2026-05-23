@@ -176,6 +176,19 @@ func TestShouldEmit_PrunedEntryEmitsFresh(t *testing.T) {
 	assert.Equal(t, 0, supp, "pruned entry should look like a first emission")
 }
 
+// Regression guard: setting dedupPruneEvery to 0 must NOT panic the
+// modulo in ShouldEmit. Treat non-positive as "pruning disabled".
+func TestShouldEmit_PruneEveryZeroDoesNotPanic(t *testing.T) {
+	ResetDedupForTest()
+	SetDedupPruneEveryForTest(0)
+	defer SetDedupPruneEveryForTest(1024)
+
+	// Hundreds of calls would each hit `dedupOps % 0` without the guard.
+	for range 200 {
+		ShouldEmit("tag", "ctx")
+	}
+}
+
 func drainUIChan() {
 	for {
 		select {

@@ -49,7 +49,10 @@ func ShouldEmit(tag, contextKey string) (emit bool, suppressed int) {
 	dedupMu.Lock()
 	defer dedupMu.Unlock()
 	dedupOps++
-	if dedupOps%dedupPruneEvery == 0 {
+	// Guard the modulo: dedupPruneEvery is exposed via a test setter,
+	// and a 0 (or negative) value would panic. Treat non-positive as
+	// "pruning disabled" rather than crashing.
+	if dedupPruneEvery > 0 && dedupOps%dedupPruneEvery == 0 {
 		pruneDedupStateLocked(now)
 	}
 	e, ok := dedupState[key]
