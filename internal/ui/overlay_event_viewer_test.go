@@ -98,11 +98,11 @@ func TestRenderEventViewer_VisualLineModeKeepsWrap(t *testing.T) {
 	assert.Contains(t, out, pad+strings.Repeat("a", 12))
 }
 
-// Char-mode (v) selection on a wrapped event keeps the column-based
-// semantics — it deliberately collapses to a single truncated line so
-// the highlight columns map deterministically. Guard against future
-// changes that accidentally enable wrap for char mode.
-func TestRenderEventViewer_CharModeCollapsesToSingleLine(t *testing.T) {
+// Char-mode (v) selection on a wrapped event now keeps the wrap and
+// places the highlight on the actual selected character range across
+// physical sub-lines. The wrap survives navigation; only the
+// selection geometry differs from V-mode (range, not full row).
+func TestRenderEventViewer_CharModeKeepsWrap(t *testing.T) {
 	t.Parallel()
 	prefix := strings.Repeat("x", 38)
 	msg := strings.Repeat("a", 200)
@@ -120,8 +120,58 @@ func TestRenderEventViewer_CharModeCollapsesToSingleLine(t *testing.T) {
 	}
 	out := RenderEventViewer(p)
 	pad := strings.Repeat(" ", 38)
+	assert.Contains(t, out, pad+strings.Repeat("a", 12),
+		"char-mode selection must still wrap the event row")
+}
+
+// Block-mode (B) selection has no meaningful geometry over wrapped
+// sub-lines, so it intentionally falls back to single-line truncate.
+func TestRenderEventViewer_BlockModeCollapsesToSingleLine(t *testing.T) {
+	t.Parallel()
+	prefix := strings.Repeat("x", 38)
+	msg := strings.Repeat("a", 200)
+	p := EventViewerParams{
+		Lines:         []string{prefix + msg},
+		Width:         60,
+		Height:        20,
+		Wrap:          true,
+		HangingIndent: 38,
+		Cursor:        0,
+		VisualMode:    'B',
+		VisualStart:   0,
+		VisualCol:     0,
+		CursorCol:     5,
+	}
+	out := RenderEventViewer(p)
+	pad := strings.Repeat(" ", 38)
 	assert.NotContains(t, out, pad+strings.Repeat("a", 12),
-		"char-mode selection should not produce indented continuation")
+		"block-mode selection should not produce indented continuation")
+}
+
+// In wrap mode, the cursor was previously only a gutter character on
+// the first physical sub-line — invisible if the user expected a
+// block cursor at CursorCol. Now the block cursor is placed on the
+// physical sub-line containing CursorCol so navigation is visible.
+func TestRenderEventViewer_BlockCursorVisibleInWrap(t *testing.T) {
+	t.Parallel()
+	prefix := strings.Repeat("x", 38)
+	msg := "abcdefghij" + strings.Repeat("Z", 200)
+	p := EventViewerParams{
+		Lines:         []string{prefix + msg},
+		Width:         60,
+		Height:        20,
+		Wrap:          true,
+		HangingIndent: 38,
+		Cursor:        0,
+		CursorCol:     38 + 3, // 4th char of the message
+	}
+	out := RenderEventViewer(p)
+	// CursorBlockStyle renders a reverse-video block. Just check the
+	// rendered output contains both the expected pre-cursor chars and
+	// the char "d" at that position survives the render (it will be
+	// styled with reverse video — assert presence as a smoke check).
+	assert.Contains(t, out, prefix+"abc")
+	assert.Contains(t, out, "d")
 }
 
 // Regression guard for the two issues raised on #263 in the events

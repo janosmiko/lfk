@@ -4,7 +4,6 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
-	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -148,6 +147,7 @@ func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, l
 	selEnd := max(m.eventTimelineVisualStart, m.eventTimelineCursor)
 	colStart := min(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
 	colEnd := max(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
+	lowerQuery := strings.ToLower(m.eventTimelineSearchQuery)
 
 	var visible []string
 	for i := scroll; i < len(lines) && len(visible) < maxLines; i++ {
@@ -158,45 +158,74 @@ func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, l
 			gutter = ui.YamlCursorIndicatorStyle.Render("▎")
 		}
 
-		// Visual selection: V-mode wraps cleanly (full physical-line
-		// highlight on each sub-line); v/B modes need deterministic
-		// columns, so they truncate to a single line as in non-wrap
-		// rendering. Without this branch, entering visual mode in
-		// fullscreen+wrap left both the cursor and the selection
-		// invisible because the rendered line skipped both gutter
-		// styling and selection styling.
-		if inSel {
-			if m.eventTimelineVisualMode == 'V' {
-				physLines := ui.WrapEventLine(lines[i], lineContentWidth, eventTimelineMessageColumn)
-				for _, pl := range physLines {
-					if len(visible) >= maxLines {
-						break
-					}
-					visible = append(visible, gutter+ui.SelectedStyle.Render(ansi.Strip(pl)))
-				}
-			} else {
-				truncLine := lines[i]
-				if len([]rune(truncLine)) > lineContentWidth {
-					truncLine = string([]rune(truncLine)[:lineContentWidth])
-				}
-				rendered := ui.RenderVisualSelection(truncLine, rune(m.eventTimelineVisualMode), i, selStart, selEnd,
-					m.eventTimelineVisualStart, m.eventTimelineVisualCol, m.eventTimelineCursorCol, colStart, colEnd)
-				visible = append(visible, gutter+rendered)
+		// Block-mode (B) selection has no meaningful geometry over
+		// wrapped sub-lines (rectangular column ranges across multiple
+		// physical rows don't represent what the user picked). Fall
+		// back to the single-line truncate path for that case only.
+		if inSel && m.eventTimelineVisualMode == 'B' {
+			truncLine := lines[i]
+			if len([]rune(truncLine)) > lineContentWidth {
+				truncLine = string([]rune(truncLine)[:lineContentWidth])
 			}
+			rendered := ui.RenderVisualSelection(truncLine, rune(m.eventTimelineVisualMode), i, selStart, selEnd,
+				m.eventTimelineVisualStart, m.eventTimelineVisualCol, m.eventTimelineCursorCol, colStart, colEnd)
+			visible = append(visible, gutter+rendered)
 			continue
 		}
 
-		// Hanging-indent wrap so continuation lines align under the
-		// message column rather than re-flowing flush-left. Every
-		// physical sub-line gets the gutter prefix so the cursor's
-		// presence doesn't make continuation lines visually shift.
-		subLines := ui.WrapEventLine(lines[i], lineContentWidth, eventTimelineMessageColumn)
-		for _, sub := range subLines {
+		// Unified wrap rendering: per-sub-line gutter, V-mode full
+		// highlight, v-mode char highlight mapped across sub-lines,
+		// block cursor placed on the sub-line containing CursorCol so
+		// it stays visible while navigating.
+		opts := ui.WrappedEventRowOpts{
+			Line:          lines[i],
+			Gutter:        gutter,
+			ContentW:      lineContentWidth,
+			HangingIndent: eventTimelineMessageColumn,
+			IsCursor:      isCursor,
+			CursorCol:     m.eventTimelineCursorCol,
+		}
+		switch {
+		case inSel && m.eventTimelineVisualMode == 'V':
+			opts.SelectionLine = true
+		case inSel && m.eventTimelineVisualMode == 'v':
+			opts.SelStart, opts.SelEnd = m.charSelectionRangeForLine(lines[i], i, selStart, selEnd)
+		default:
+			opts.LowerSearch = lowerQuery
+		}
+		block := ui.RenderWrappedEventRow(opts)
+		for sub := range strings.SplitSeq(block, "\n") {
 			if len(visible) >= maxLines {
 				break
 			}
-			visible = append(visible, gutter+sub)
+			visible = append(visible, sub)
 		}
 	}
 	return visible
+}
+
+// charSelectionRangeForLine mirrors the per-line logic of
+// ui.renderCharSelection for the wrap renderer: anchor-only line
+// highlights from anchorCol to end; cursor-only line highlights from
+// 0 to cursorCol+1; middle lines highlight everything.
+func (m Model) charSelectionRangeForLine(line string, i, selStart, selEnd int) (int, int) {
+	lineWidth := len([]rune(line))
+	if selStart == selEnd {
+		return min(m.eventTimelineVisualCol, m.eventTimelineCursorCol),
+			max(m.eventTimelineVisualCol, m.eventTimelineCursorCol) + 1
+	}
+	var startCol, endCol int
+	if m.eventTimelineVisualStart <= m.eventTimelineCursor {
+		startCol, endCol = m.eventTimelineVisualCol, m.eventTimelineCursorCol
+	} else {
+		startCol, endCol = m.eventTimelineCursorCol, m.eventTimelineVisualCol
+	}
+	switch i {
+	case selStart:
+		return startCol, lineWidth
+	case selEnd:
+		return 0, endCol + 1
+	default:
+		return 0, lineWidth
+	}
 }
