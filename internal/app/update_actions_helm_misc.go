@@ -59,6 +59,28 @@ func (m Model) executeActionGoToPod() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// executeActionGoToNode handles the "Go to Node" action on a Pod —
+// teleports the explorer to the Node hosting the selected pod. The
+// node name is read from the pod's "Node" column (populated by
+// populatePodDetails from spec.nodeName). Unscheduled pods (Pending,
+// no nodeName yet) surface a status message instead of navigating to
+// an empty name that would land the user on the Node list with the
+// wrong cursor.
+func (m Model) executeActionGoToNode() (tea.Model, tea.Cmd) {
+	var nodeName string
+	for _, kv := range m.actionCtx.columns {
+		if kv.Key == "Node" {
+			nodeName = kv.Value
+			break
+		}
+	}
+	if nodeName == "" {
+		m.setStatusMessage("Pod is not scheduled to a node", true)
+		return m, scheduleStatusClear()
+	}
+	return m.navigateToOwner("Node", nodeName)
+}
+
 // executeActionDebugMount handles the "Debug Mount" action.
 func (m Model) executeActionDebugMount() (tea.Model, tea.Cmd) {
 	ns := m.actionCtx.namespace

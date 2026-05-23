@@ -73,6 +73,7 @@ func TestActionsForKind(t *testing.T) {
 		assert.Contains(t, labels, "Delete")
 		assert.Contains(t, labels, "Port Forward")
 		assert.Contains(t, labels, "Debug")
+		assert.Contains(t, labels, "Go to Node")
 	})
 
 	t.Run("Deployment actions", func(t *testing.T) {

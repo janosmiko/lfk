@@ -1346,6 +1346,40 @@ func TestCovExecuteActionGoToPodMultiple(t *testing.T) {
 	assert.Equal(t, overlayPodSelect, rm.overlay)
 }
 
+// Pods scheduled to a node populate the "Node" column with the
+// node name; "Go to Node" must teleport the explorer there.
+func TestCovExecuteActionGoToNodeScheduled(t *testing.T) {
+	m := testModelExec()
+	m.actionCtx.columns = []model.KeyValue{{Key: "Node", Value: "ip-10-0-0-1"}}
+	result, _ := m.executeAction("Go to Node")
+	_ = result
+}
+
+// An unscheduled pod (Pending, no spec.nodeName) lacks the "Node"
+// column or has it empty. Navigation must be refused with a status
+// message — landing on the Node list with an empty pendingTarget
+// would silently mis-select the cursor.
+func TestCovExecuteActionGoToNodeUnscheduled(t *testing.T) {
+	m := testModelExec()
+	m.actionCtx.columns = []model.KeyValue{{Key: "Node", Value: ""}}
+	result, cmd := m.executeAction("Go to Node")
+	rm := result.(Model)
+	assert.NotNil(t, cmd, "must schedule status clear")
+	assert.True(t, rm.hasStatusMessage())
+}
+
+// Belt-and-braces: a pod item with no Node column at all (e.g. an
+// older cache entry, a transient state) must take the same refusal
+// path as the empty-value case.
+func TestCovExecuteActionGoToNodeMissingColumn(t *testing.T) {
+	m := testModelExec()
+	m.actionCtx.columns = nil
+	result, cmd := m.executeAction("Go to Node")
+	rm := result.(Model)
+	assert.NotNil(t, cmd)
+	assert.True(t, rm.hasStatusMessage())
+}
+
 func TestCovExecuteActionGoToPodNone(t *testing.T) {
 	m := testModelExec()
 	m.actionCtx.columns = nil

@@ -89,6 +89,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Startup Analysis", Description: "Analyze pod startup timing", Key: "S"},
 			{Label: "Crash Investigator", Description: "Investigate crash loop / failing pod", Key: "I"},
 			{Label: "Capture Traffic", Description: "Capture network packets to pcap", Key: "c"},
+			{Label: "Go to Node", Description: "Navigate to the node hosting this pod", Key: "g"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
 			{Label: "Right-sizing", Description: "Per-container CPU/Mem recommendations", Key: "z"},
