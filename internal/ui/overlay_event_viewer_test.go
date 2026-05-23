@@ -166,12 +166,60 @@ func TestRenderEventViewer_BlockCursorVisibleInWrap(t *testing.T) {
 		CursorCol:     38 + 3, // 4th char of the message
 	}
 	out := RenderEventViewer(p)
-	// CursorBlockStyle renders a reverse-video block. Just check the
-	// rendered output contains both the expected pre-cursor chars and
-	// the char "d" at that position survives the render (it will be
-	// styled with reverse video — assert presence as a smoke check).
-	assert.Contains(t, out, prefix+"abc")
-	assert.Contains(t, out, "d")
+	// CursorBlockStyle is reverse-video — emits ESC[7m … ESC[0m around
+	// the cursor character. Assert the styled escape sequence wraps
+	// the expected character rather than just checking the char
+	// appears anywhere.
+	cursorMark := CursorBlockStyle.Render("d")
+	assert.Contains(t, out, cursorMark,
+		"block cursor must be present at CursorCol with reverse-video styling")
+}
+
+// Defaults case: opening events places the cursor at line 0, col 0.
+// The block cursor must render on the very first character of the
+// line (right after the gutter). This was the regression report —
+// "cursor not visible (or disappears) in both views" — for the
+// common open-events-and-look path.
+func TestRenderEventViewer_BlockCursorAtZeroColumnInWrap(t *testing.T) {
+	t.Parallel()
+	line := "2m       Warning  FailedScheduling   " + strings.Repeat("a", 200)
+	p := EventViewerParams{
+		Lines:         []string{line},
+		Width:         60,
+		Height:        20,
+		Wrap:          true,
+		HangingIndent: 38,
+		Cursor:        0,
+		CursorCol:     0,
+	}
+	out := RenderEventViewer(p)
+	cursorMark := CursorBlockStyle.Render("2")
+	assert.Contains(t, out, cursorMark,
+		"block cursor must render on the first character at CursorCol=0")
+}
+
+// If CursorCol points past the line's last character (e.g. cursor
+// stayed at col 50 after navigating from a long event to a short
+// one), the cursor would otherwise vanish — no chunk contains it.
+// The block cursor must clamp to the end of the last chunk so the
+// user can always see where the cursor parked.
+func TestRenderEventViewer_BlockCursorClampsPastLineEndInWrap(t *testing.T) {
+	t.Parallel()
+	line := "short line"
+	p := EventViewerParams{
+		Lines:         []string{line},
+		Width:         60,
+		Height:        20,
+		Wrap:          true,
+		HangingIndent: 38,
+		Cursor:        0,
+		CursorCol:     500, // far past end
+	}
+	out := RenderEventViewer(p)
+	// RenderCursorAtCol appends a highlighted space when col >= width.
+	pastEndCursor := CursorBlockStyle.Render(" ")
+	assert.Contains(t, out, pastEndCursor,
+		"block cursor must remain visible when CursorCol is past the line end")
 }
 
 // Regression guard for the two issues raised on #263 in the events

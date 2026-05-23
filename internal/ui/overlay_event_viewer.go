@@ -279,6 +279,25 @@ type WrappedEventRowOpts struct {
 // h/l in wrap mode actually shows where the cursor is.
 func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 	chunks := wrappedEventChunks(opts.Line, opts.ContentW, opts.HangingIndent)
+
+	// Pick which chunk receives the block cursor. The "first chunk
+	// whose origStart..origStart+origLen contains CursorCol" rule
+	// works for in-line positions; past-end (cursor stayed at col 50
+	// after navigating from a long event to a short one) clamps to
+	// the last chunk so the cursor never simply disappears.
+	cursorChunk := -1
+	if opts.IsCursor && len(chunks) > 0 {
+		for ci, ch := range chunks {
+			if opts.CursorCol >= ch.origStart && opts.CursorCol < ch.origStart+ch.origLen {
+				cursorChunk = ci
+				break
+			}
+		}
+		if cursorChunk == -1 {
+			cursorChunk = len(chunks) - 1
+		}
+	}
+
 	var sb strings.Builder
 	for i, ch := range chunks {
 		if i > 0 {
@@ -296,8 +315,9 @@ func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 		case opts.LowerSearch != "":
 			text = highlightEventSearchLine(text, opts.LowerSearch)
 		}
-		if opts.IsCursor && opts.CursorCol >= ch.origStart && opts.CursorCol < ch.origStart+ch.origLen {
-			physCol := ch.indentCols + (opts.CursorCol - ch.origStart)
+		if i == cursorChunk {
+			rawCol := max(opts.CursorCol-ch.origStart, 0)
+			physCol := ch.indentCols + rawCol
 			text = RenderCursorAtCol(text, "", physCol)
 		}
 		sb.WriteString(text)
