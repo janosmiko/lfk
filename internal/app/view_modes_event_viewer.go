@@ -103,7 +103,7 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 	lowerQuery := strings.ToLower(m.eventTimelineSearchQuery)
 
 	if m.eventTimelineWrap {
-		return m.renderEventViewerLinesWrapped(lines, scroll, maxLines, lineContentWidth)
+		return m.renderEventViewerLinesWrapped(lines, scroll, maxLines, lineContentWidth, selStart, selEnd, colStart, colEnd)
 	}
 
 	var visible []string
@@ -142,11 +142,7 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 	return visible
 }
 
-func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, lineContentWidth int) []string {
-	selStart := min(m.eventTimelineVisualStart, m.eventTimelineCursor)
-	selEnd := max(m.eventTimelineVisualStart, m.eventTimelineCursor)
-	colStart := min(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
-	colEnd := max(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
+func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, lineContentWidth, selStart, selEnd, colStart, colEnd int) []string {
 	lowerQuery := strings.ToLower(m.eventTimelineSearchQuery)
 
 	var visible []string

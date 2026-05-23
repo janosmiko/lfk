@@ -272,30 +272,21 @@ type WrappedEventRowOpts struct {
 }
 
 // RenderWrappedEventRow renders one logical event line as a multi-line
-// wrapped block. Each physical sub-line is prefixed with the gutter so
-// the leftmost column stays consistent regardless of cursor / selection
-// state; selection highlight and block cursor are placed on the
-// physical sub-line(s) that the logical columns map to, so navigating
-// h/l in wrap mode actually shows where the cursor is.
+// wrapped block. Mirrors the convention used by the YAML and describe
+// viewers: the cursor block and per-line selection highlight sit on
+// the FIRST physical sub-line, continuation sub-lines are plain
+// (gutter + indented text). RenderCursorAtCol's "append a highlighted
+// space when col >= width" branch keeps the cursor visible when
+// CursorCol drifted past the visible chunk after navigating from a
+// long event to a short one — same behaviour YAML relies on.
+//
+// V-mode (line) selection still spans every sub-line because the user
+// explicitly asked for the whole wrapped block to be highlighted; v
+// and B modes stick to the simpler single-line model.
 func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 	chunks := wrappedEventChunks(opts.Line, opts.ContentW, opts.HangingIndent)
-
-	// Pick which chunk receives the block cursor. The "first chunk
-	// whose origStart..origStart+origLen contains CursorCol" rule
-	// works for in-line positions; past-end (cursor stayed at col 50
-	// after navigating from a long event to a short one) clamps to
-	// the last chunk so the cursor never simply disappears.
-	cursorChunk := -1
-	if opts.IsCursor && len(chunks) > 0 {
-		for ci, ch := range chunks {
-			if opts.CursorCol >= ch.origStart && opts.CursorCol < ch.origStart+ch.origLen {
-				cursorChunk = ci
-				break
-			}
-		}
-		if cursorChunk == -1 {
-			cursorChunk = len(chunks) - 1
-		}
+	if len(chunks) == 0 {
+		return opts.Gutter
 	}
 
 	var sb strings.Builder
@@ -305,50 +296,62 @@ func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
 		}
 		sb.WriteString(opts.Gutter)
 		text := ch.text
-		switch {
-		case opts.SelectionLine:
-			// V-mode: full physical-line highlight. Strip producer ANSI so
-			// the selection style owns the visual presentation.
+
+		styled := false
+		if opts.SelectionLine {
+			// V-mode: full highlight on every sub-line.
 			text = SelectedStyle.Render(ansi.Strip(text))
-		case opts.SelEnd > opts.SelStart:
-			text = applyCharSelectionToChunk(text, ch, opts.SelStart, opts.SelEnd)
-		case opts.LowerSearch != "":
+			styled = true
+		} else if i == 0 {
+			// First sub-line carries selection and search styling.
+			switch {
+			case opts.SelEnd > opts.SelStart:
+				text = applyCharSelectionToFirstSubLine(text, opts.SelStart, opts.SelEnd)
+				styled = true
+			case opts.LowerSearch != "":
+				text = highlightEventSearchLine(text, opts.LowerSearch)
+				styled = true
+			}
+		} else if opts.LowerSearch != "" {
+			// Highlight matches on continuation sub-lines too.
 			text = highlightEventSearchLine(text, opts.LowerSearch)
+			styled = true
 		}
-		if i == cursorChunk {
-			rawCol := max(opts.CursorCol-ch.origStart, 0)
-			physCol := ch.indentCols + rawCol
-			text = RenderCursorAtCol(text, "", physCol)
+		if !styled {
+			// Apply overlay-normal styling so wrapped rows match the
+			// surrounding (non-wrap) rows' fg/bg pair instead of
+			// punching a transparent rectangle through the overlay.
+			text = OverlayNormalStyle.Render(text)
+		}
+
+		if opts.IsCursor && i == 0 {
+			text = RenderCursorAtCol(text, "", opts.CursorCol)
 		}
 		sb.WriteString(text)
 	}
 	return sb.String()
 }
 
-// applyCharSelectionToChunk highlights the slice of a chunk that falls
-// inside the logical-line selection range [selStart, selEnd). Returns
-// the chunk text unchanged if the selection does not overlap.
-func applyCharSelectionToChunk(text string, ch wrappedEventChunk, selStart, selEnd int) string {
-	chunkSelStart := selStart - ch.origStart
-	chunkSelEnd := selEnd - ch.origStart
-	if chunkSelStart < 0 {
-		chunkSelStart = 0
-	}
-	if chunkSelEnd > ch.origLen {
-		chunkSelEnd = ch.origLen
-	}
-	if chunkSelEnd <= chunkSelStart {
-		return text
-	}
-	physStart := ch.indentCols + chunkSelStart
-	physEnd := ch.indentCols + chunkSelEnd
+// applyCharSelectionToFirstSubLine highlights the [selStart, selEnd)
+// column range on the first physical sub-line of a wrapped event. The
+// range is clamped to the sub-line's bounds; the selection that
+// extends past contentW is not shown on continuation lines (matches
+// the YAML viewer's behaviour, where v-mode selection only paints the
+// first sub-line).
+func applyCharSelectionToFirstSubLine(text string, selStart, selEnd int) string {
 	runes := []rune(text)
-	if physStart < 0 || physEnd > len(runes) {
+	if selStart < 0 {
+		selStart = 0
+	}
+	if selEnd > len(runes) {
+		selEnd = len(runes)
+	}
+	if selEnd <= selStart {
 		return text
 	}
-	return string(runes[:physStart]) +
-		SelectedStyle.Render(string(runes[physStart:physEnd])) +
-		string(runes[physEnd:])
+	return string(runes[:selStart]) +
+		SelectedStyle.Render(string(runes[selStart:selEnd])) +
+		string(runes[selEnd:])
 }
 
 // RenderEventViewer renders the event viewer with cursor, visual selection,
