@@ -101,6 +101,7 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 			m.leftItemsHistory = [][]model.Item{contexts}
 			m.leftItems = m.middleItems
 			m.nav.ResourceType = rt
+			m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 			m.nav.Level = model.LevelResources
 			m.setMiddleItems(nil)
 			m.clearRight()

@@ -659,6 +659,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 
 	// Navigate to resource type level first, then optionally deeper.
 	m.nav.ResourceType = rt
+	m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 	m.nav.ResourceName = bm.ResourceName
 
 	// Navigate to resources level (optionally with a specific resource selected).

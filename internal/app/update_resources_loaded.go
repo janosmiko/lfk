@@ -233,6 +233,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			}
 			m.leftItems = merged
 			m.nav.ResourceType = rt
+			m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 			m.nav.Level = model.LevelResources
 			m.setMiddleItems(nil)
 			m.clearRight()
