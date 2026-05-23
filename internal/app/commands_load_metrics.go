@@ -5,6 +5,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -168,7 +169,12 @@ func (m Model) loadPodMetricsForList() tea.Cmd {
 		func(ctx context.Context) tea.Msg {
 			metrics, err := client.GetAllPodMetrics(ctx, kctx, ns)
 			if err != nil {
-				return podMetricsEnrichedMsg{gen: gen} // silently ignore
+				// Don't fail the UI tick, but surface the cause for diagnosis.
+				// Without this log, missing metrics columns look like a UI
+				// bug rather than a backend (metrics-server / RBAC / routing)
+				// problem.
+				logger.Warn("pod metrics load failed", "context", kctx, "namespace", ns, "error", err)
+				return podMetricsEnrichedMsg{gen: gen}
 			}
 			return podMetricsEnrichedMsg{metrics: metrics, gen: gen}
 		},
@@ -193,6 +199,12 @@ func (m Model) loadNodeMetricsForList() tea.Cmd {
 		func(ctx context.Context) tea.Msg {
 			metrics, err := client.GetAllNodeMetrics(ctx, kctx)
 			if err != nil {
+				// Surface the underlying cause; the UI renders "n/a"
+				// placeholders downstream, which used to mask a silent
+				// routing failure (e.g. `_global` Prometheus block
+				// pointing a metrics-server-only cluster at a missing
+				// Prometheus endpoint).
+				logger.Warn("node metrics load failed", "context", kctx, "error", err)
 				return nodeMetricsEnrichedMsg{gen: gen}
 			}
 			return nodeMetricsEnrichedMsg{metrics: metrics, gen: gen}

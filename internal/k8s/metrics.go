@@ -230,19 +230,91 @@ func resolveNodeMetricsConfig(contextName string) (nodeMetrics string, hasPromet
 	return mc.NodeMetrics, mc.Prometheus != nil
 }
 
+// nodeMetricsRoute names a single attempt strategy for node metrics:
+// either the metrics.k8s.io API (metrics-server) or a Prometheus query.
+type nodeMetricsRoute int
+
+const (
+	nodeMetricsRouteAPI nodeMetricsRoute = iota
+	nodeMetricsRoutePrometheus
+)
+
+func (r nodeMetricsRoute) String() string {
+	if r == nodeMetricsRoutePrometheus {
+		return "prometheus"
+	}
+	return "metrics-api"
+}
+
+// selectNodeMetricsRoutes returns the ordered list of routes to try, given
+// the resolved monitoring config. The first route is the preferred path;
+// the second (if present) is a fallback attempted only when the primary
+// errors. This keeps `_global` Prometheus convenience working for users
+// who set it once and forget, but stops a wrong default from killing
+// metrics on clusters that don't match the global routing (e.g. a
+// metrics-server-only EKS cluster picking up a shared `_global`
+// Prometheus block, then silently rendering n/a everywhere).
+func selectNodeMetricsRoutes(nodeMetrics string, hasPrometheus bool) []nodeMetricsRoute {
+	switch {
+	case nodeMetrics == "prometheus":
+		// Explicit Prometheus: try Prometheus, fall back to metrics-api.
+		return []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI}
+	case nodeMetrics == "metrics-api":
+		// Explicit metrics-api: try metrics-api, fall back to Prometheus
+		// only if one is even configured (avoids attempting a guaranteed-
+		// to-fail service-proxy probe).
+		if hasPrometheus {
+			return []nodeMetricsRoute{nodeMetricsRouteAPI, nodeMetricsRoutePrometheus}
+		}
+		return []nodeMetricsRoute{nodeMetricsRouteAPI}
+	case nodeMetrics == "" && hasPrometheus:
+		// Implicit Prometheus (typically from a shared `_global` entry):
+		// try Prometheus, fall back to metrics-api. The fallback is the
+		// fix for clusters that inherit a global Prometheus pointer but
+		// only actually have metrics-server.
+		return []nodeMetricsRoute{nodeMetricsRoutePrometheus, nodeMetricsRouteAPI}
+	default:
+		// Nothing configured: metrics-api only.
+		return []nodeMetricsRoute{nodeMetricsRouteAPI}
+	}
+}
+
 // GetAllNodeMetrics fetches metrics for all nodes and returns a map of node name -> PodMetrics.
 // Reuses PodMetrics struct since the data shape (CPU + Memory) is the same.
+//
+// Routing follows selectNodeMetricsRoutes: the configured path is tried
+// first, and the other path is attempted as a fallback when the primary
+// errors. Each attempted route is logged at Debug, and any demotion to
+// the fallback is logged at Warn so users can self-diagnose missing
+// metrics from a single log read.
 func (c *Client) GetAllNodeMetrics(ctx context.Context, contextName string) (map[string]model.PodMetrics, error) {
 	nodeMetrics, hasPrometheus := resolveNodeMetricsConfig(contextName)
+	routes := selectNodeMetricsRoutes(nodeMetrics, hasPrometheus)
 
-	switch {
-	case nodeMetrics == "prometheus" || (nodeMetrics == "" && hasPrometheus):
-		return c.getNodeMetricsFromPrometheus(contextName)
-	case nodeMetrics == "metrics-api":
-		return c.getNodeMetricsFromAPI(ctx, contextName)
-	default:
-		return c.getNodeMetricsFromAPI(ctx, contextName)
+	var lastErr error
+	for i, route := range routes {
+		logger.Debug("node metrics route", "context", contextName, "route", route.String(), "attempt", i+1)
+		var (
+			result map[string]model.PodMetrics
+			err    error
+		)
+		switch route {
+		case nodeMetricsRoutePrometheus:
+			result, err = c.getNodeMetricsFromPrometheus(contextName)
+		default:
+			result, err = c.getNodeMetricsFromAPI(ctx, contextName)
+		}
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+		if i+1 < len(routes) {
+			logger.Warn("node metrics route failed, trying fallback",
+				"context", contextName, "failed_route", route.String(),
+				"fallback_route", routes[i+1].String(), "error", err)
+		}
 	}
+	return nil, lastErr
 }
 
 // getNodeMetricsFromAPI fetches node metrics from the metrics.k8s.io API (v1beta1, then v1).
