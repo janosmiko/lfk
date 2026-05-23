@@ -166,13 +166,12 @@ func TestRenderEventViewer_BlockCursorVisibleInWrap(t *testing.T) {
 		CursorCol:     38 + 3, // 4th char of the message
 	}
 	out := RenderEventViewer(p)
-	// CursorBlockStyle is reverse-video — emits ESC[7m … ESC[0m around
-	// the cursor character. Assert the styled escape sequence wraps
-	// the expected character rather than just checking the char
-	// appears anywhere.
-	cursorMark := CursorBlockStyle.Render("d")
-	assert.Contains(t, out, cursorMark,
-		"block cursor must be present at CursorCol with reverse-video styling")
+	// Assert the styled cursor token appears AT the expected position,
+	// not just anywhere in the output — a bare Contains("d") would
+	// trivially pass even if the cursor were not applied at CursorCol
+	// (CodeRabbit nitpick).
+	assert.Contains(t, out, prefix+"abc"+CursorBlockStyle.Render("d"),
+		"block cursor must wrap the character at CursorCol")
 }
 
 // Defaults case: opening events places the cursor at line 0, col 0.
@@ -193,8 +192,11 @@ func TestRenderEventViewer_BlockCursorAtZeroColumnInWrap(t *testing.T) {
 		CursorCol:     0,
 	}
 	out := RenderEventViewer(p)
-	cursorMark := CursorBlockStyle.Render("2")
-	assert.Contains(t, out, cursorMark,
+	// Positional assertion: the cursor-styled "2" must be followed by
+	// "m" (the line is "2m       Warning..."), proving the cursor
+	// wraps the character at CursorCol=0 rather than somewhere
+	// arbitrary.
+	assert.Contains(t, out, CursorBlockStyle.Render("2")+"m       Warning",
 		"block cursor must render on the first character at CursorCol=0")
 }
 
@@ -216,9 +218,10 @@ func TestRenderEventViewer_BlockCursorClampsPastLineEndInWrap(t *testing.T) {
 		CursorCol:     500, // far past end
 	}
 	out := RenderEventViewer(p)
-	// RenderCursorAtCol appends a highlighted space when col >= width.
-	pastEndCursor := CursorBlockStyle.Render(" ")
-	assert.Contains(t, out, pastEndCursor,
+	// Positional assertion: the past-end cursor block (a highlighted
+	// space) must appear immediately after the full line text, not
+	// just anywhere in the rendered overlay.
+	assert.Contains(t, out, "short line"+CursorBlockStyle.Render(" "),
 		"block cursor must remain visible when CursorCol is past the line end")
 }
 
