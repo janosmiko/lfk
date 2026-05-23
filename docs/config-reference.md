@@ -13,7 +13,8 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `kubeconfig_dir` | string or list[string] | `"~/.kube/config.d"` | Directory (or list of directories) recursively scanned for kubeconfig files, in addition to `~/.kube/config` and `KUBECONFIG`. Tilde paths are expanded against `$HOME`. The `--kubeconfig-dir` CLI flag (repeatable) and `KUBECONFIG_DIR` env var (colon-separated) override this; the `--kubeconfig` flag bypasses directory discovery entirely. See [Kubeconfig Directory](usage.md#kubeconfig-directory). |
 | `dashboard` | bool | `true` | Show cluster dashboard when entering a context. Set to `false` to go directly to resource types. |
 | `monitoring` | map[string]object | `{}` | Per-cluster monitoring endpoint configuration. Keys are context names or `"_global"`. See [Monitoring](#monitoring) section. |
-| `resource_columns` | map[string]list | `{}` | Per-resource-type column configuration. Keys are resource Kind names (case-insensitive). When not set for a kind, columns are auto-detected. |
+| `views` | map[string]object | `{}` | Per-resource-type column and sort configuration. Keys are GVR (`apps/v1/deployments`) or Kind (`deployment`, case-insensitive); GVR wins when both match. Supersedes `resource_columns`. See [views](#views). |
+| `resource_columns` | map[string]list | `{}` | Per-resource-type column configuration. Keys are resource Kind names (case-insensitive). **Deprecated** — use `views` instead. Bridged automatically; `views` wins when both are set for the same Kind. |
 | `clusters` | map[string]object | `{}` | Per-cluster configuration overrides. Keys are context names. See [Clusters](#clusters) section. |
 | `theme` | object | *(see Theme section)* | Custom color theme overrides. |
 | `keybindings` | object | *(see Keybindings section)* | Custom keybinding overrides for direct actions. |
@@ -140,20 +141,25 @@ Currently supported per-cluster overrides:
 
 | Field | Type | Description |
 |---|---|---|
-| `resource_columns` | map[string]list | Per-resource-type column overrides for this cluster. Same format as the global `resource_columns`. |
+| `views` | map[string]object | Per-resource-type view overrides for this cluster. Same format as the global `views`. Wins over global `views` for matching keys. |
+| `resource_columns` | map[string]list | Per-resource-type column overrides for this cluster. **Deprecated** — use `views` instead. |
 | `read_only` | bool | Per-context read-only override. Same semantics as the top-level `read_only`. |
 
-Per-cluster `resource_columns` take precedence over the global `resource_columns` setting.
+Per-cluster `views` take precedence over the global `views` setting.
 
 ```yaml
 clusters:
   my-prod-cluster:
-    resource_columns:
+    views:
+      apps/v1/deployments:
+        columns: ["Name", "Replicas", "Available", "REV"]
+        sort_column: "REV"         # defaults to desc for REV
+    resource_columns:              # deprecated; still works
       Pod: ["IP", "Node", "Image", "CPU", "MEM"]
-      Deployment: ["Replicas", "Available"]
   my-staging-cluster:
-    resource_columns:
-      Pod: ["IP", "Node", "Image"]
+    views:
+      pod:
+        columns: ["Name", "IP", "Node", "Image"]
 ```
 
 ## Theme
@@ -203,7 +209,63 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `terminal_toggle` | `ctrl+t` | Cycle terminal mode (pty/exec/mux) |
 | `toggle_rare` | `H` | Toggle rarely used resource types in the sidebar |
 
-## Resource Columns
+## Views
+
+Use `views` to configure columns and default sort for specific resource types. Keys are either a GVR (`apps/v1/deployments`) or a Kind name (`deployment`, case-insensitive). When both match, GVR takes precedence.
+
+### View entry fields
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `columns` | list[string] | *(auto-detected)* | Ordered column specs. See [Column spec syntax](#column-spec-syntax). |
+| `sort_column` | string | *(none)* | Default sort column. Format: `"COL"` or `"COL:asc"` / `"COL:desc"`. When direction is omitted, `REV` defaults to `desc`; all other columns default to `asc`. |
+
+### Column spec syntax
+
+```
+NAME[:.jsonpath][|flag]*
+```
+
+| Form | Meaning |
+|---|---|
+| `Name` | Built-in column resolved by the renderer (Name, Age, Ready, REV, etc.) |
+| `Name:.jsonpath` | Custom column — JSONPath evaluated against the source object. Uses `k8s.io/client-go/util/jsonpath` (kubectl-flavored). |
+| `Name:.jsonpath\|flag` | Custom column with one or more display flags (stackable with multiple `\|`). |
+
+**Flags** (case-insensitive):
+
+| Flag | Effect |
+|---|---|
+| `R` | Right-align the column |
+| `T` | Humanize value as a timestamp |
+| `W` | Wide-only — hidden until the terminal width crosses the wide threshold |
+
+**JSONPath notes:** compile errors at config load emit a `logger.Warn` and skip that view (the rest of config loads normally). A miss at row-render time produces an empty cell with no log spam. The JSONPath dialect is kubectl-flavored (`k8s.io/client-go/util/jsonpath`); advanced filter expressions that differ from k9s's dialect may not be portable.
+
+### Example
+
+```yaml
+views:
+  # GVR key — wins over a matching Kind key
+  apps/v1/deployments:
+    columns: ["Name", "Namespace", "Replicas", "Available", "REV", "Age"]
+    sort_column: "REV"            # desc by default for REV
+  # Kind key (case-insensitive)
+  pod:
+    columns:
+      - "Name"
+      - "IP"
+      - "Node"
+      - "GitSHA:.metadata.labels.git-sha|W"   # custom JSONPath column, wide-only
+      - "Age"
+    sort_column: "Age:asc"
+```
+
+Per-cluster overrides follow the same format under `clusters.<name>.views` and win over global `views` for matching keys.
+
+## Resource Columns (Deprecated)
+
+> **Deprecated.** Use [`views`](#views) instead. `resource_columns` is bridged automatically — each entry becomes a `views` entry with the same columns and no `sort_column`. A one-time warning is logged when bridging occurs. When `views` is set for the same Kind, `views` wins.
 
 Use `resource_columns` to configure which columns are displayed for specific resource types. When not configured for a kind, columns are auto-detected from the resource data.
 

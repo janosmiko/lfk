@@ -157,9 +157,40 @@ monitoring:
 #   strategy: vpa
 #   headroom: 1.25
 
-# ─── Per-Resource-Type Columns ─────────────────────────────────────────────────
-# Configure visible columns for specific resource types (Kind names, case-insensitive).
-# When not set for a kind, columns are auto-detected from resource data.
+# ─── Views (columns + sort per resource type) ──────────────────────────────────
+# Configure visible columns and default sort for specific resource types.
+# Keys are GVR ("apps/v1/deployments") or Kind name ("deployment", case-insensitive).
+# GVR wins when both match the same resource.
+#
+# Column spec: NAME[:.jsonpath][|flag]*
+#   NAME alone    → built-in column (Name, Age, Ready, REV, CPU, MEM, …)
+#   NAME:.path    → custom column; JSONPath evaluated against the source object
+#                   (k8s.io/client-go/util/jsonpath — kubectl-flavored dialect)
+#   Flags (stackable): R=right-align, T=humanize-timestamp, W=wide-only
+#
+# sort_column: "COL" or "COL:asc" / "COL:desc"
+#   Direction omitted: REV defaults to desc, all other columns default to asc.
+#
+# JSONPath compile errors skip that view with a warning; misses at row render
+# produce an empty cell.
+# views:
+#   # GVR key — resolves before matching Kind key for the same resource
+#   apps/v1/deployments:
+#     columns: ["Name", "Namespace", "Replicas", "Available", "REV", "Age"]
+#     sort_column: "REV"        # desc by default for REV
+#   # Kind key (case-insensitive)
+#   pod:
+#     columns:
+#       - "Name"
+#       - "IP"
+#       - "Node"
+#       - "GitSHA:.metadata.labels.git-sha|W"   # custom column, wide-only
+#       - "Age"
+#     sort_column: "Age:asc"
+
+# ─── Per-Resource-Type Columns (deprecated) ────────────────────────────────────
+# Deprecated: use views above. Existing entries are bridged automatically as views
+# without sort_column. views wins for any Kind where both are configured.
 resource_columns:
 # Pod: ["IP", "Node", "Image", "CPU", "MEM", "CPU/R", "CPU/L", "MEM/R", "MEM/L"]
 # Deployment: ["Replicas", "Available", "CPU", "MEM"]
@@ -168,17 +199,21 @@ resource_columns:
 
 # ─── Per-Cluster Overrides ─────────────────────────────────────────────────────
 # Override settings per kubeconfig context name.
-# Supports per-cluster resource_columns and read_only.
+# Supports per-cluster views, resource_columns (deprecated), and read_only.
 # Per-cluster overrides take precedence over the matching global setting.
 clusters:
 # my-prod-cluster:
 #   read_only: true                       # lock production against mutations
-#   resource_columns:
-#     Pod: ["IP", "Node", "Image", "CPU", "MEM"]
-#     Deployment: ["Replicas", "Available"]
+#   views:
+#     apps/v1/deployments:
+#       columns: ["Name", "Replicas", "Available", "REV", "Age"]
+#       sort_column: "REV"
+#     pod:
+#       columns: ["Name", "IP", "Node", "Image", "CPU", "MEM"]
 # my-staging-cluster:
-#   resource_columns:
-#     Pod: ["IP", "Node", "Image"]
+#   views:
+#     pod:
+#       columns: ["Name", "IP", "Node", "Image"]
 
 # ─── Theme ─────────────────────────────────────────────────────────────────────
 # Custom color theme. All values are CSS hex color codes.
