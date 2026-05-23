@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // RenderEventTimelineOverlay renders the event timeline overlay content.
@@ -351,10 +352,21 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 	inSelection := p.VisualMode != 0 && i >= ctx.selStart && i <= ctx.selEnd
 	isCursorLine := i == p.Cursor
 
-	// Visual selection forces a single truncated line — char-based
-	// selection needs deterministic column positions, which a wrapped
-	// multi-line block cannot offer.
+	gutter := " "
+	if isCursorLine {
+		gutter = YamlCursorIndicatorStyle.Render("▎")
+	}
+
+	// Visual selection.
+	//
+	// Line-mode (V) wraps cleanly: every physical sub-line is fully
+	// highlighted, so the selection follows the visible block.
+	// Char-mode (v) and block-mode (B) need deterministic column
+	// positions, so they fall back to single-line truncate.
 	if inSelection {
+		if p.Wrap && p.VisualMode == 'V' {
+			return renderWrappedLineSelection(line, gutter, ctx.contentW, p.HangingIndent)
+		}
 		selLine := line
 		if len([]rune(selLine)) > ctx.contentW {
 			selLine = string([]rune(selLine)[:ctx.contentW])
@@ -365,15 +377,7 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 			p.VisualStart, p.VisualCol, p.CursorCol,
 			ctx.colStart, ctx.colEnd,
 		)
-		if isCursorLine {
-			return YamlCursorIndicatorStyle.Render("▎") + rendered
-		}
-		return " " + rendered
-	}
-
-	gutter := " "
-	if isCursorLine {
-		gutter = YamlCursorIndicatorStyle.Render("▎")
+		return gutter + rendered
 	}
 
 	if p.Wrap {
@@ -389,6 +393,25 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 		return renderEventCursorLine(p, fitLine, ctx, gutter)
 	}
 	return renderEventNormalLine(p, fitLine, ctx, gutter)
+}
+
+// renderWrappedLineSelection returns a hanging-indent-wrapped block
+// with the V-mode selection style applied to every physical sub-line.
+// Producer ANSI (kyverno-style colored levels, dim timestamps) is
+// stripped so the selection style owns the visual without invisible-
+// on-invisible color collisions — same rule as the non-wrap V path
+// in RenderVisualSelection.
+func renderWrappedLineSelection(line, gutter string, contentW, hangingIndent int) string {
+	physLines := WrapEventLine(line, contentW, hangingIndent)
+	var sb strings.Builder
+	for i, pl := range physLines {
+		if i > 0 {
+			sb.WriteByte('\n')
+		}
+		sb.WriteString(gutter)
+		sb.WriteString(SelectedStyle.Render(ansi.Strip(pl)))
+	}
+	return sb.String()
 }
 
 // renderWrappedEventBlock returns the multi-line wrapped form of one

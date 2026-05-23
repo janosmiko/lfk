@@ -4,6 +4,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -143,13 +144,48 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 }
 
 func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, lineContentWidth int) []string {
+	selStart := min(m.eventTimelineVisualStart, m.eventTimelineCursor)
+	selEnd := max(m.eventTimelineVisualStart, m.eventTimelineCursor)
+	colStart := min(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
+	colEnd := max(m.eventTimelineVisualCol, m.eventTimelineCursorCol)
+
 	var visible []string
 	for i := scroll; i < len(lines) && len(visible) < maxLines; i++ {
 		isCursor := i == m.eventTimelineCursor
+		inSel := m.eventTimelineVisualMode != 0 && i >= selStart && i <= selEnd
 		gutter := " "
 		if isCursor {
 			gutter = ui.YamlCursorIndicatorStyle.Render("▎")
 		}
+
+		// Visual selection: V-mode wraps cleanly (full physical-line
+		// highlight on each sub-line); v/B modes need deterministic
+		// columns, so they truncate to a single line as in non-wrap
+		// rendering. Without this branch, entering visual mode in
+		// fullscreen+wrap left both the cursor and the selection
+		// invisible because the rendered line skipped both gutter
+		// styling and selection styling.
+		if inSel {
+			if m.eventTimelineVisualMode == 'V' {
+				physLines := ui.WrapEventLine(lines[i], lineContentWidth, eventTimelineMessageColumn)
+				for _, pl := range physLines {
+					if len(visible) >= maxLines {
+						break
+					}
+					visible = append(visible, gutter+ui.SelectedStyle.Render(ansi.Strip(pl)))
+				}
+			} else {
+				truncLine := lines[i]
+				if len([]rune(truncLine)) > lineContentWidth {
+					truncLine = string([]rune(truncLine)[:lineContentWidth])
+				}
+				rendered := ui.RenderVisualSelection(truncLine, rune(m.eventTimelineVisualMode), i, selStart, selEnd,
+					m.eventTimelineVisualStart, m.eventTimelineVisualCol, m.eventTimelineCursorCol, colStart, colEnd)
+				visible = append(visible, gutter+rendered)
+			}
+			continue
+		}
+
 		// Hanging-indent wrap so continuation lines align under the
 		// message column rather than re-flowing flush-left. Every
 		// physical sub-line gets the gutter prefix so the cursor's

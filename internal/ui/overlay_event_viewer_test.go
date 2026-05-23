@@ -72,6 +72,58 @@ func TestWrapEventLine_DegenerateInputs(t *testing.T) {
 	assert.NotEmpty(t, got)
 }
 
+// V-line visual selection used to collapse the wrap and render the
+// event as a single truncated line — confusing because exiting visual
+// mode brought wrap back. With this fix the selection follows the
+// wrapped block: every physical sub-line is fully highlighted.
+func TestRenderEventViewer_VisualLineModeKeepsWrap(t *testing.T) {
+	t.Parallel()
+	prefix := strings.Repeat("x", 38)
+	msg := strings.Repeat("a", 200)
+	p := EventViewerParams{
+		Lines:         []string{prefix + msg},
+		Width:         60,
+		Height:        20,
+		Wrap:          true,
+		HangingIndent: 38,
+		Cursor:        0,
+		VisualMode:    'V',
+		VisualStart:   0,
+	}
+	out := RenderEventViewer(p)
+	// Continuation chunk (38-space indent + message piece) must still
+	// appear in the rendered output — proving the wrap survived the
+	// selection rendering rather than collapsing to a single line.
+	pad := strings.Repeat(" ", 38)
+	assert.Contains(t, out, pad+strings.Repeat("a", 12))
+}
+
+// Char-mode (v) selection on a wrapped event keeps the column-based
+// semantics — it deliberately collapses to a single truncated line so
+// the highlight columns map deterministically. Guard against future
+// changes that accidentally enable wrap for char mode.
+func TestRenderEventViewer_CharModeCollapsesToSingleLine(t *testing.T) {
+	t.Parallel()
+	prefix := strings.Repeat("x", 38)
+	msg := strings.Repeat("a", 200)
+	p := EventViewerParams{
+		Lines:         []string{prefix + msg},
+		Width:         60,
+		Height:        20,
+		Wrap:          true,
+		HangingIndent: 38,
+		Cursor:        0,
+		VisualMode:    'v',
+		VisualStart:   0,
+		VisualCol:     0,
+		CursorCol:     5,
+	}
+	out := RenderEventViewer(p)
+	pad := strings.Repeat(" ", 38)
+	assert.NotContains(t, out, pad+strings.Repeat("a", 12),
+		"char-mode selection should not produce indented continuation")
+}
+
 // Regression guard for the two issues raised on #263 in the events
 // overlay: each physical sub-line is prefixed with the gutter so the
 // continuation lines do not appear to shift left when the cursor
