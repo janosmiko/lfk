@@ -82,11 +82,17 @@ func TestBuiltinColumnsRegistryHasExpectedKeys(t *testing.T) {
 	}
 	got := make(map[string]bool, len(builtinColumns))
 	for _, col := range builtinColumns {
+		// A duplicate key would otherwise overwrite the prior entry in
+		// builtinColumnsByKey (the first would be dead) and silently
+		// leave the set-equality check below intact, since map writes
+		// of the same key don't grow the set.
+		assert.Falsef(t, got[col.key], "duplicate registry key %q", col.key)
 		got[col.key] = true
 		assert.NotNil(t, col.width, "%q missing width fn", col.key)
 		assert.NotNil(t, col.header, "%q missing header fn", col.key)
 		assert.NotNil(t, col.plain, "%q missing plain fn", col.key)
 		assert.NotNil(t, col.styled, "%q missing styled fn", col.key)
 	}
+	assert.Len(t, builtinColumns, len(expected), "registry entry count drifted from expected set")
 	assert.Equal(t, expected, got, "registry keys drifted from expected set")
 }
