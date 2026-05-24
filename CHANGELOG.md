@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.4](https://github.com/janosmiko/lfk/compare/v0.12.3...v0.12.4) (2026-05-24)
+
+
+### Bug Fixes
+
+* **sort:** numeric ordering for percent columns (CPU%, MEM%, */R, */L) ([#273](https://github.com/janosmiko/lfk/issues/273)) ([f50537a](https://github.com/janosmiko/lfk/commit/f50537a8cc91fee15fabad596f671182922a7b58)), closes [#272](https://github.com/janosmiko/lfk/issues/272)
+
 ## [0.12.3](https://github.com/janosmiko/lfk/compare/v0.12.2...v0.12.3) (2026-05-23)
 
 
