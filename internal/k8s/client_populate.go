@@ -6,6 +6,7 @@ import (
 
 // populateResourceDetails fills in Ready and Restarts fields for specific resource kinds.
 func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
+	ti.Raw = obj
 	status, _ := obj["status"].(map[string]any)
 	spec, _ := obj["spec"].(map[string]any)
 
@@ -13,13 +14,13 @@ func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
 	case "Pod":
 		populatePodDetails(ti, obj, status, spec)
 	case "Deployment":
-		populateDeploymentDetails(ti, status, spec)
+		populateDeploymentDetails(ti, obj, status, spec)
 	case "StatefulSet":
-		populateStatefulSetDetails(ti, status, spec)
+		populateStatefulSetDetails(ti, obj, status, spec)
 	case "DaemonSet":
-		populateDaemonSetDetails(ti, status, spec)
+		populateDaemonSetDetails(ti, obj, status, spec)
 	case "ReplicaSet":
-		populateReplicaSetDetails(ti, status, spec)
+		populateReplicaSetDetails(ti, obj, status, spec)
 	case "Service":
 		populateServiceDetails(ti, status, spec)
 	case "Ingress":
@@ -33,9 +34,9 @@ func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
 	case "PersistentVolumeClaim":
 		populatePVCDetails(ti, status, spec)
 	case "CronJob":
-		populateCronJobDetails(ti, status, spec)
+		populateCronJobDetails(ti, obj, status, spec)
 	case "Job":
-		populateJobDetails(ti, status, spec)
+		populateJobDetails(ti, obj, status, spec)
 	case "HorizontalPodAutoscaler":
 		populateHPADetails(ti, status, spec)
 	default:

@@ -472,6 +472,7 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 	}
 	m.saveCursor()
 	m.nav.ResourceType = rt
+	m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 	m.nav.Level = model.LevelResources
 	m.pushLeft()
 	m.clearRight()

@@ -270,24 +270,96 @@ type ConfigFilterPreset struct {
 var ConfigFilterPresets map[string][]ConfigFilterPreset
 
 // ColumnsForKind returns the configured column list for the given resource kind
-// and cluster context. Per-cluster config takes priority over global config.
+// and cluster context. Resolution order: per-cluster resource_columns,
+// per-cluster views, global resource_columns, global views. Per-cluster wins
+// over global; the legacy resource_columns surface wins over views within a
+// scope so users with both keys configured see the explicit resource_columns
+// override.
 func ColumnsForKind(kind, context string) []string {
 	lk := strings.ToLower(kind)
-	// Per-cluster override first.
-	if context != "" && len(ConfigClusterResourceColumns) > 0 {
-		if clusterCols, ok := ConfigClusterResourceColumns[context]; ok {
-			if cols, ok := clusterCols[lk]; ok {
-				return cols
+	if context != "" {
+		if len(ConfigClusterResourceColumns) > 0 {
+			if clusterCols, ok := ConfigClusterResourceColumns[context]; ok {
+				if cols, ok := clusterCols[lk]; ok {
+					return cols
+				}
 			}
 		}
+		if cols := viewColumnNames(ConfigClusterViews[context], lk); cols != nil {
+			return cols
+		}
 	}
-	// Global override.
 	if len(ConfigResourceColumns) > 0 && kind != "" {
 		if cols, ok := ConfigResourceColumns[lk]; ok {
 			return cols
 		}
 	}
+	if cols := viewColumnNames(ConfigViews, lk); cols != nil {
+		return cols
+	}
 	return nil
+}
+
+// HiddenBuiltinsForView returns the set of built-in column keys that should
+// be hidden when rendering kind under the given cluster context. When a view
+// is configured and its columns list omits a given built-in (Context,
+// Namespace, Ready, Restarts, Age, Status), that built-in is hidden so the
+// table renders only what the user asked for. Returns nil when no view is
+// configured for this kind in this scope. Per-cluster wins over global.
+func HiddenBuiltinsForView(kind, context string) map[string]bool {
+	if kind == "" {
+		return nil
+	}
+	lk := strings.ToLower(kind)
+	var v *View
+	if context != "" && len(ConfigClusterViews) > 0 {
+		if cluster, ok := ConfigClusterViews[context]; ok {
+			v = cluster[lk]
+		}
+	}
+	if v == nil {
+		v = ConfigViews[lk]
+	}
+	if v == nil {
+		return nil
+	}
+	listed := make(map[string]bool, len(v.Columns))
+	for _, c := range v.Columns {
+		listed[c.Name] = true
+	}
+	hidden := make(map[string]bool, 6)
+	for _, name := range []string{"Context", "Namespace", "Ready", "Restarts", "Age", "Status"} {
+		if !listed[name] {
+			hidden[name] = true
+		}
+	}
+	if len(hidden) == 0 {
+		return nil
+	}
+	return hidden
+}
+
+// viewColumnNames returns the ordered list of column Name fields from the
+// view stored under key kind, or nil when no view exists. Columns flagged
+// |W (FlagWideOnly) are omitted unless ActiveFullscreenMode is set, so
+// users can keep wide-only columns in their config without crowding narrow
+// table layouts.
+func viewColumnNames(views map[string]*View, kind string) []string {
+	if len(views) == 0 || kind == "" {
+		return nil
+	}
+	v, ok := views[kind]
+	if !ok || v == nil || len(v.Columns) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(v.Columns))
+	for _, c := range v.Columns {
+		if c.Flags&FlagWideOnly != 0 && !ActiveFullscreenMode {
+			continue
+		}
+		names = append(names, c.Name)
+	}
+	return names
 }
 
 // ConfigDashboard controls whether to show a cluster dashboard when entering a context.

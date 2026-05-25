@@ -986,6 +986,130 @@ func TestPopulateResourceDetailsExt_PriorityClass(t *testing.T) {
 	})
 }
 
+// --- populateResourceDetailsExt: IngressClass controller + parameters ---
+
+func TestPopulateResourceDetailsExt_IngressClass_ControllerAndParameters(t *testing.T) {
+	t.Run("with controller and parameters", func(t *testing.T) {
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{},
+			},
+			"spec": map[string]any{
+				"controller": "k8s.io/ingress-nginx",
+				"parameters": map[string]any{
+					"scope": "Cluster",
+					"kind":  "IngressClassParams",
+					"name":  "nginx-params",
+				},
+			},
+		}
+		ti := &model.Item{Name: "nginx"}
+		populateResourceDetailsExt(ti, obj, "IngressClass", nil, nil)
+
+		colMap := columnsToMap(ti.Columns)
+		assert.Equal(t, "k8s.io/ingress-nginx", colMap["Controller"])
+		assert.Equal(t, "Cluster/IngressClassParams/nginx-params", colMap["Parameters"])
+	})
+
+	t.Run("parameters block with all empty fields suppressed", func(t *testing.T) {
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{},
+			},
+			"spec": map[string]any{
+				"controller": "k8s.io/ingress-nginx",
+				"parameters": map[string]any{
+					"scope": "",
+					"kind":  "",
+					"name":  "",
+				},
+			},
+		}
+		ti := &model.Item{Name: "nginx"}
+		populateResourceDetailsExt(ti, obj, "IngressClass", nil, nil)
+
+		colMap := columnsToMap(ti.Columns)
+		_, found := colMap["Parameters"]
+		assert.False(t, found, "Parameters should be suppressed when all sub-fields are empty")
+	})
+
+	t.Run("without parameters block", func(t *testing.T) {
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{},
+			},
+			"spec": map[string]any{
+				"controller": "k8s.io/ingress-nginx",
+			},
+		}
+		ti := &model.Item{Name: "nginx"}
+		populateResourceDetailsExt(ti, obj, "IngressClass", nil, nil)
+
+		colMap := columnsToMap(ti.Columns)
+		assert.Equal(t, "k8s.io/ingress-nginx", colMap["Controller"])
+		_, found := colMap["Parameters"]
+		assert.False(t, found)
+	})
+
+	t.Run("empty controller suppressed", func(t *testing.T) {
+		obj := map[string]any{
+			"metadata": map[string]any{
+				"annotations": map[string]any{},
+			},
+			"spec": map[string]any{
+				"controller": "",
+			},
+		}
+		ti := &model.Item{Name: "nginx"}
+		populateResourceDetailsExt(ti, obj, "IngressClass", nil, nil)
+
+		colMap := columnsToMap(ti.Columns)
+		_, found := colMap["Controller"]
+		assert.False(t, found)
+	})
+}
+
+// --- populateResourceDetailsExt: PriorityClass value + preemption ---
+
+func TestPopulateResourceDetailsExt_PriorityClass_ValueAndPreemption(t *testing.T) {
+	t.Run("value 1000 and preemption Never", func(t *testing.T) {
+		ti := &model.Item{Name: "high-priority"}
+		spec := map[string]any{
+			"value":            float64(1000),
+			"preemptionPolicy": "Never",
+		}
+		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
+
+		colMap := columnsToMap(ti.Columns)
+		assert.Equal(t, "1000", colMap["Value"])
+		assert.Equal(t, "Never", colMap["Preemption Policy"])
+	})
+
+	t.Run("zero value emitted", func(t *testing.T) {
+		ti := &model.Item{Name: "zero-priority"}
+		spec := map[string]any{
+			"value": float64(0),
+		}
+		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
+
+		colMap := columnsToMap(ti.Columns)
+		assert.Equal(t, "0", colMap["Value"])
+	})
+
+	t.Run("empty preemption policy suppressed", func(t *testing.T) {
+		ti := &model.Item{Name: "some-priority"}
+		spec := map[string]any{
+			"value":            float64(500),
+			"preemptionPolicy": "",
+		}
+		populateResourceDetailsExt(ti, map[string]any{}, "PriorityClass", nil, spec)
+
+		colMap := columnsToMap(ti.Columns)
+		_, found := colMap["Preemption Policy"]
+		assert.False(t, found)
+	})
+}
+
 // --- populateResourceDetailsExt: generic CRD fallback ---
 
 func TestPopulateResourceDetailsExt_GenericCRDFallback(t *testing.T) {

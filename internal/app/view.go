@@ -161,13 +161,19 @@ func (m Model) applySessionColumnsForKind(kind string) {
 	} else {
 		ui.ActiveSessionColumns = nil
 	}
-	// Hidden built-in columns for this kind.
+	// Hidden built-in columns for this kind. Session toggles (from the
+	// column-toggle overlay) win over view-derived defaults; when neither is
+	// set, fall back to the view's column list — any built-in not listed in
+	// views.<kind>.columns is hidden so the table doesn't render columns the
+	// user didn't ask for.
 	if hiddenBi, ok := m.hiddenBuiltinColumns[kind]; ok && len(hiddenBi) > 0 {
 		set := make(map[string]bool, len(hiddenBi))
 		for _, k := range hiddenBi {
 			set[k] = true
 		}
 		ui.ActiveHiddenBuiltinColumns = set
+	} else if viewHidden := ui.HiddenBuiltinsForView(kind, m.nav.Context); viewHidden != nil {
+		ui.ActiveHiddenBuiltinColumns = viewHidden
 	} else {
 		ui.ActiveHiddenBuiltinColumns = nil
 	}
