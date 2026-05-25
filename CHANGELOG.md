@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.12.6](https://github.com/janosmiko/lfk/compare/v0.12.5...v0.12.6) (2026-05-25)
+
+
+### Bug Fixes
+
+* **views:** apply GVR-keyed view columns and hide unlisted builtins ([#277](https://github.com/janosmiko/lfk/issues/277)) ([a2df863](https://github.com/janosmiko/lfk/commit/a2df863902a2f58f6c9dd4ed896a210d43da2051)), closes [#262](https://github.com/janosmiko/lfk/issues/262)
+
 ## [0.12.5](https://github.com/janosmiko/lfk/compare/v0.12.4...v0.12.5) (2026-05-25)
 
 
