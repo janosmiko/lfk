@@ -82,8 +82,6 @@ func styledExtraCell(ec extraColumn, item *model.Item) string {
 	}
 }
 
-// plainBuiltinCell builds the plain-text cell for a single built-in column.
-// Values are the already-resolved display strings for this row (e.g. ns with
 // statusAbbreviations maps long-form Pod-ish status strings to a compact
 // label used when the STATUS column has been shrunk under width pressure.
 // Entries here are status values that are otherwise too verbose for narrow
@@ -119,53 +117,6 @@ func AbbreviateStatusForWidth(status string, w int) string {
 	return status
 }
 
-// dash fallback, preprocessed restarts with arrow prefix).
-func plainBuiltinCell(key string, ns, ready, restarts, status, age string,
-	nsW, readyW, restartsW, statusW, ageW int,
-) string {
-	switch key {
-	case "Namespace":
-		return padRight(Truncate(ns, nsW-1), nsW)
-	case "Ready":
-		return padRight(ready, readyW)
-	case "Restarts":
-		return padRight(restarts, restartsW)
-	case "Status":
-		return padRight(Truncate(AbbreviateStatusForWidth(status, statusW-1), statusW-1), statusW)
-	case "Age":
-		return padRight(age, ageW)
-	}
-	return ""
-}
-
-// styledBuiltinCell builds the styled cell for a single built-in column.
-// Namespaces are dimmed, Ready is dimmed, Restarts is delegated to
-// styledRestartsCell for its arrow handling, Status and Age use their own
-// status-aware style helpers.
-func styledBuiltinCell(key string, item model.Item,
-	nsW, readyW, restartsW, statusW, ageW int, anyRecentRestart bool,
-) string {
-	switch key {
-	case "Namespace":
-		ns := item.Namespace
-		if ns == "" {
-			ns = "-"
-		}
-		return DimStyle.Render(padRight(Truncate(ns, nsW-1), nsW))
-	case "Ready":
-		return DimStyle.Render(padRight(item.Ready, readyW))
-	case "Restarts":
-		return styledRestartsCell(item, restartsW, anyRecentRestart)
-	case "Status":
-		val := AbbreviateStatusForWidth(item.Status, statusW-1)
-		return StatusStyle(val).Render(padRight(Truncate(val, statusW-1), statusW))
-	case "Age":
-		age := LiveAge(item)
-		return AgeStyle(age).Render(padRight(age, ageW))
-	}
-	return ""
-}
-
 // styledRestartsCell renders the restarts column with recent-restart arrow
 // styling. Rows whose LastRestartAt is within the past hour are tagged with
 // an up-arrow; when any row in the table has a recent restart, rows without
@@ -196,23 +147,15 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, item *model.Item,
 ) string {
+	widths := builtinColWidths{context: contextW, ns: nsW, ready: readyW, restarts: restartsW, status: statusW, age: ageW}
+	inputs := plainCellInputs{item: item, ns: ns, ready: ready, restarts: restarts, status: status, age: age, widths: widths}
 	var row strings.Builder
 	row.WriteString(padRight(Truncate(name, nameW-1), nameW))
 	for _, key := range order {
-		if key == "Context" && contextW > 0 {
-			contextName := ""
-			if item != nil {
-				contextName = item.ClusterName
-			}
-			row.WriteString(padRight(Truncate(contextName, contextW-1), contextW))
+		if col := renderableBuiltin(key, widths); col != nil {
+			row.WriteString(col.plain(inputs))
 			continue
 		}
-		if isBuiltinColumnKey(key) {
-			row.WriteString(plainBuiltinCell(key, ns, ready, restarts, status, age,
-				nsW, readyW, restartsW, statusW, ageW))
-			continue
-		}
-		// Extra column: look up metadata and emit via plainExtraCell.
 		for _, ec := range extraCols {
 			if ec.key == key {
 				row.WriteString(plainExtraCell(ec, item))
@@ -230,15 +173,13 @@ func formatTableRowStyledOrdered(item model.Item,
 	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, anyRecentRestart bool,
 ) string {
+	widths := builtinColWidths{context: contextW, ns: nsW, ready: readyW, restarts: restartsW, status: statusW, age: ageW}
+	inputs := styledCellInputs{item: item, widths: widths, anyRecentRestart: anyRecentRestart}
 	var base strings.Builder
 	base.WriteString(styledNameCell(item, nameW))
 	for _, key := range order {
-		if key == "Context" && contextW > 0 {
-			base.WriteString(DimStyle.Render(padRight(Truncate(item.ClusterName, contextW-1), contextW)))
-			continue
-		}
-		if isBuiltinColumnKey(key) {
-			base.WriteString(styledBuiltinCell(key, item, nsW, readyW, restartsW, statusW, ageW, anyRecentRestart))
+		if col := renderableBuiltin(key, widths); col != nil {
+			base.WriteString(col.styled(inputs))
 			continue
 		}
 		for _, ec := range extraCols {
