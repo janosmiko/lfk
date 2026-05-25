@@ -76,7 +76,7 @@ func TestViewsConfigEndToEnd_PodWithLabelColumn(t *testing.T) {
 	})
 
 	t.Run("ColumnsForKind returns the view's column order", func(t *testing.T) {
-		cols := ui.ColumnsForKind("Pod", "")
+		cols := ui.ColumnsForKind(ui.ResourceRef{Kind: "Pod"}, "")
 		assert.Equal(t, []string{"Name", "GitSHA", "Age"}, cols)
 	})
 }

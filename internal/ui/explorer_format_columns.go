@@ -250,7 +250,16 @@ func selectColumnCandidates(seen map[string]*colInfo, order []string, kind strin
 		return candidates
 	}
 
-	configCols := ColumnsForKind(kind, ActiveContext)
+	// Build a ResourceRef so GVR-keyed view configs resolve. When the
+	// rendered kind matches ActiveResourceRef (set by the app for the
+	// middle column) carry through the full GVR; otherwise fall back to
+	// Kind-only — at LevelOwned/LevelContainers the rendered kind diverges
+	// from nav.ResourceType so GVR can't be trusted and Kind lookup applies.
+	rt := ResourceRef{Kind: kind}
+	if kind != "" && strings.EqualFold(kind, ActiveResourceRef.Kind) {
+		rt = ActiveResourceRef
+	}
+	configCols := ColumnsForKind(rt, ActiveContext)
 	if len(configCols) > 0 {
 		if len(configCols) == 1 && configCols[0] == "*" {
 			return order
