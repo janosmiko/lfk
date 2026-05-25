@@ -317,12 +317,15 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		headerLabel = "NAME"
 	}
 	nameHeader := headerWithIndicator(headerLabel, "Name", nameW)
-	contextHeader := headerWithIndicator("CONTEXT", "Context", contextW)
-	nsHeader := headerWithIndicator("NAMESPACE", "Namespace", nsW)
-	readyHeader := headerWithIndicator("READY", "Ready", readyW)
-	rsHeader := headerWithIndicator("RS", "Restarts", restartsW)
-	statusHeader := headerWithIndicator("STATUS", "Status", statusW)
-	ageHeader := headerWithIndicator("AGE", "Age", ageW)
+	colWidths := builtinColWidths{context: contextW, ns: nsW, ready: readyW, restarts: restartsW, status: statusW, age: ageW}
+	colHeaders := builtinColHeaders{
+		context:  headerWithIndicator("CONTEXT", "Context", contextW),
+		ns:       headerWithIndicator("NAMESPACE", "Namespace", nsW),
+		ready:    headerWithIndicator("READY", "Ready", readyW),
+		restarts: headerWithIndicator("RS", "Restarts", restartsW),
+		status:   headerWithIndicator("STATUS", "Status", statusW),
+		age:      headerWithIndicator("AGE", "Age", ageW),
+	}
 
 	var hdrParts []string
 	if wantMarker {
@@ -335,7 +338,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	}
 	hdrParts = append(hdrParts, nameHeader)
 	for _, key := range order {
-		hdrParts = append(hdrParts, headerCellForKey(key, contextW, extraCols, contextHeader, nsHeader, readyHeader, rsHeader, statusHeader, ageHeader))
+		hdrParts = append(hdrParts, headerCellForKey(key, colWidths, colHeaders, extraCols))
 	}
 	hdr := strings.Join(hdrParts, "")
 	b.WriteString(DimStyle.Bold(true).Render(Truncate(hdr, width)))
@@ -353,7 +356,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		ActiveMiddleColumnLayout = append(ActiveMiddleColumnLayout, MiddleColumnRegion{Key: "Name", StartX: x, EndX: x + nameW})
 		x += nameW
 		for _, key := range order {
-			w := widthForColumnKey(key, contextW, nsW, readyW, restartsW, statusW, ageW, extraCols)
+			w := widthForColumnKey(key, colWidths, extraCols)
 			ActiveMiddleColumnLayout = append(ActiveMiddleColumnLayout, MiddleColumnRegion{Key: key, StartX: x, EndX: x + w})
 			x += w
 		}

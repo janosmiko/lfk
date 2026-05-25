@@ -1,13 +1,12 @@
 package ui
 
 // isBuiltinColumnKey reports whether key is one of the fixed built-in item
-// field columns other than the union-only Context column.
+// field columns other than the union-only Context column. Context is excluded
+// because, when it isn't already requested via hasContext, an extras-defined
+// "Context" can still render.
 func isBuiltinColumnKey(key string) bool {
-	switch key {
-	case "Namespace", "Ready", "Restarts", "Status", "Age":
-		return true
-	}
-	return false
+	_, ok := builtinColumnsByKey[key]
+	return ok && key != "Context"
 }
 
 // orderedColumnKeys returns the ordered list of column keys (excluding "Name")
@@ -65,22 +64,10 @@ func orderedColumnKeys(hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasA
 }
 
 // widthForColumnKey returns the precomputed width for a given column key.
-func widthForColumnKey(key string, contextW, nsW, readyW, restartsW, statusW, ageW int, extraCols []extraColumn) int {
-	switch key {
-	case "Context":
-		if contextW > 0 {
-			return contextW
-		}
-	case "Namespace":
-		return nsW
-	case "Ready":
-		return readyW
-	case "Restarts":
-		return restartsW
-	case "Status":
-		return statusW
-	case "Age":
-		return ageW
+// Builtin keys come from the column registry; extras are looked up by key.
+func widthForColumnKey(key string, widths builtinColWidths, extraCols []extraColumn) int {
+	if col := renderableBuiltin(key, widths); col != nil {
+		return col.width(widths)
 	}
 	for _, ec := range extraCols {
 		if ec.key == key {
@@ -91,25 +78,11 @@ func widthForColumnKey(key string, contextW, nsW, readyW, restartsW, statusW, ag
 }
 
 // headerCellForKey returns the pre-styled header cell string for a single
-// column key.
-func headerCellForKey(key string, contextW int, extraCols []extraColumn,
-	contextHeader, nsHeader, readyHeader, rsHeader, statusHeader, ageHeader string,
-) string {
-	switch key {
-	case "Context":
-		if contextW > 0 {
-			return contextHeader
-		}
-	case "Namespace":
-		return nsHeader
-	case "Ready":
-		return readyHeader
-	case "Restarts":
-		return rsHeader
-	case "Status":
-		return statusHeader
-	case "Age":
-		return ageHeader
+// column key. Builtin keys read from the precomputed headers struct; extras
+// build their header on the fly using stored width + label.
+func headerCellForKey(key string, widths builtinColWidths, headers builtinColHeaders, extraCols []extraColumn) string {
+	if col := renderableBuiltin(key, widths); col != nil {
+		return col.header(headers)
 	}
 	for _, ec := range extraCols {
 		if ec.key == key {
