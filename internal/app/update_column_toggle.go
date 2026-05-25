@@ -190,7 +190,7 @@ func (m *Model) collectBuiltinToggleEntries(items []model.Item, kind string) []c
 		for _, k := range sessionHidden {
 			hidden[k] = true
 		}
-	} else if viewHidden := ui.HiddenBuiltinsForView(kind, m.nav.Context); viewHidden != nil {
+	} else if viewHidden := ui.HiddenBuiltinsForView(m.viewRefForKind(kind), m.nav.Context); viewHidden != nil {
 		for k := range viewHidden {
 			hidden[k] = true
 		}

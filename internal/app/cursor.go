@@ -275,6 +275,46 @@ func (m *Model) middleColumnKind() string {
 	return strings.ToLower(m.nav.ResourceType.Kind)
 }
 
+// middleColumnRef returns the ui.ResourceRef identifying the resource
+// currently rendered in the middle column. Used to resolve view configs
+// keyed by GVR or Kind. At LevelOwned/LevelContainers the parent's GVR
+// does not match the rendered items, so only Kind is populated (matching
+// the kind returned by middleColumnKind); resolution then falls back to
+// Kind-only lookup. At shallower levels the full GVR is returned so views
+// keyed by `<group>/<version>/<resource>` resolve.
+func (m *Model) middleColumnRef() ui.ResourceRef {
+	if m.nav.Level == model.LevelOwned || m.nav.Level == model.LevelContainers {
+		if len(m.middleItems) > 0 && m.middleItems[0].Kind != "" {
+			return ui.ResourceRef{Kind: m.middleItems[0].Kind}
+		}
+		return ui.ResourceRef{Kind: m.nav.ResourceType.Kind}
+	}
+	return ui.ResourceRef{
+		Group:    m.nav.ResourceType.APIGroup,
+		Version:  m.nav.ResourceType.APIVersion,
+		Resource: m.nav.ResourceType.Resource,
+		Kind:     m.nav.ResourceType.Kind,
+	}
+}
+
+// viewRefForKind returns a ResourceRef suitable for resolving view config
+// (HiddenBuiltinsForView / ColumnsForKind / ResolveView) for the given
+// kind. When kind matches nav.ResourceType.Kind, the full GVR is included
+// so views keyed by GVR resolve. Otherwise (LevelOwned/LevelContainers
+// where rendered kind diverges from nav.ResourceType) a Kind-only ref is
+// returned so resolution falls back to Kind lookup.
+func (m *Model) viewRefForKind(kind string) ui.ResourceRef {
+	if kind != "" && strings.EqualFold(kind, m.nav.ResourceType.Kind) {
+		return ui.ResourceRef{
+			Group:    m.nav.ResourceType.APIGroup,
+			Version:  m.nav.ResourceType.APIVersion,
+			Resource: m.nav.ResourceType.Resource,
+			Kind:     m.nav.ResourceType.Kind,
+		}
+	}
+	return ui.ResourceRef{Kind: kind}
+}
+
 // navKey builds a unique key from the current navigation state, used for
 // cursor memory and item caching.
 func (m *Model) navKey() string {

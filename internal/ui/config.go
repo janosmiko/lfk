@@ -269,58 +269,52 @@ type ConfigFilterPreset struct {
 // ConfigFilterPresets maps lowercase Kind names to user-configured filter presets.
 var ConfigFilterPresets map[string][]ConfigFilterPreset
 
-// ColumnsForKind returns the configured column list for the given resource kind
+// ColumnsForKind returns the configured column list for the given resource
 // and cluster context. Resolution order: per-cluster resource_columns,
-// per-cluster views, global resource_columns, global views. Per-cluster wins
-// over global; the legacy resource_columns surface wins over views within a
-// scope so users with both keys configured see the explicit resource_columns
-// override.
-func ColumnsForKind(kind, context string) []string {
-	lk := strings.ToLower(kind)
+// per-cluster views (GVR then Kind), global resource_columns, global views
+// (GVR then Kind). Per-cluster wins over global; the legacy resource_columns
+// surface wins over views within a scope so users with both keys configured
+// see the explicit resource_columns override. GVR keys win over Kind keys
+// within the views surface, matching ResolveView.
+func ColumnsForKind(rt ResourceRef, context string) []string {
+	gvrKey := rt.GVRKey()
+	kindKey := rt.KindKey()
 	if context != "" {
 		if len(ConfigClusterResourceColumns) > 0 {
 			if clusterCols, ok := ConfigClusterResourceColumns[context]; ok {
-				if cols, ok := clusterCols[lk]; ok {
+				if cols, ok := clusterCols[kindKey]; ok {
 					return cols
 				}
 			}
 		}
-		if cols := viewColumnNames(ConfigClusterViews[context], lk); cols != nil {
+		if cols := viewColumnNames(ConfigClusterViews[context], gvrKey, kindKey); cols != nil {
 			return cols
 		}
 	}
-	if len(ConfigResourceColumns) > 0 && kind != "" {
-		if cols, ok := ConfigResourceColumns[lk]; ok {
+	if len(ConfigResourceColumns) > 0 && kindKey != "" {
+		if cols, ok := ConfigResourceColumns[kindKey]; ok {
 			return cols
 		}
 	}
-	if cols := viewColumnNames(ConfigViews, lk); cols != nil {
+	if cols := viewColumnNames(ConfigViews, gvrKey, kindKey); cols != nil {
 		return cols
 	}
 	return nil
 }
 
 // HiddenBuiltinsForView returns the set of built-in column keys that should
-// be hidden when rendering kind under the given cluster context. When a view
+// be hidden when rendering rt under the given cluster context. When a view
 // is configured and its columns list omits a given built-in (Context,
 // Namespace, Ready, Restarts, Age, Status), that built-in is hidden so the
 // table renders only what the user asked for. Returns nil when no view is
-// configured for this kind in this scope. Per-cluster wins over global.
-func HiddenBuiltinsForView(kind, context string) map[string]bool {
-	if kind == "" {
+// configured for this resource in this scope. Resolution follows ResolveView:
+// per-cluster GVR > per-cluster Kind > global GVR > global Kind.
+func HiddenBuiltinsForView(rt ResourceRef, context string) map[string]bool {
+	if rt.Kind == "" && rt.Resource == "" {
 		return nil
 	}
-	lk := strings.ToLower(kind)
-	var v *View
-	if context != "" && len(ConfigClusterViews) > 0 {
-		if cluster, ok := ConfigClusterViews[context]; ok {
-			v = cluster[lk]
-		}
-	}
-	if v == nil {
-		v = ConfigViews[lk]
-	}
-	if v == nil {
+	v, ok := ResolveView(rt, context)
+	if !ok || v == nil {
 		return nil
 	}
 	listed := make(map[string]bool, len(v.Columns))
@@ -340,16 +334,20 @@ func HiddenBuiltinsForView(kind, context string) map[string]bool {
 }
 
 // viewColumnNames returns the ordered list of column Name fields from the
-// view stored under key kind, or nil when no view exists. Columns flagged
-// |W (FlagWideOnly) are omitted unless ActiveFullscreenMode is set, so
-// users can keep wide-only columns in their config without crowding narrow
-// table layouts.
-func viewColumnNames(views map[string]*View, kind string) []string {
-	if len(views) == 0 || kind == "" {
+// view stored under gvrKey (preferred) or kindKey (fallback), or nil when
+// no view exists under either. Matches the GVR-then-Kind resolution order
+// used by ResolveView. Columns flagged |W (FlagWideOnly) are omitted unless
+// ActiveFullscreenMode is set, so users can keep wide-only columns in their
+// config without crowding narrow table layouts.
+func viewColumnNames(views map[string]*View, gvrKey, kindKey string) []string {
+	if len(views) == 0 {
 		return nil
 	}
-	v, ok := views[kind]
-	if !ok || v == nil || len(v.Columns) == 0 {
+	v := views[gvrKey]
+	if v == nil && kindKey != "" {
+		v = views[kindKey]
+	}
+	if v == nil || len(v.Columns) == 0 {
 		return nil
 	}
 	names := make([]string, 0, len(v.Columns))

@@ -172,7 +172,7 @@ func (m Model) applySessionColumnsForKind(kind string) {
 			set[k] = true
 		}
 		ui.ActiveHiddenBuiltinColumns = set
-	} else if viewHidden := ui.HiddenBuiltinsForView(kind, m.nav.Context); viewHidden != nil {
+	} else if viewHidden := ui.HiddenBuiltinsForView(m.viewRefForKind(kind), m.nav.Context); viewHidden != nil {
 		ui.ActiveHiddenBuiltinColumns = viewHidden
 	} else {
 		ui.ActiveHiddenBuiltinColumns = nil
@@ -243,6 +243,9 @@ func (m Model) viewExplorer() string {
 	// Set fullscreen mode and context for column visibility.
 	ui.ActiveFullscreenMode = m.fullscreenMiddle
 	ui.ActiveContext = m.nav.Context
+	// Carry the middle column's resource ref so view configs keyed by
+	// GVR (e.g. "apps/v1/deployments") resolve inside collectExtraColumns.
+	ui.ActiveResourceRef = m.middleColumnRef()
 
 	// Set sort state for column header indicators.
 	// Mirror the Event override so the arrow appears on "Last Seen"
