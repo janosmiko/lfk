@@ -218,6 +218,10 @@ func (m Model) handleExplorerDirectActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cm
 }
 
 func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool) {
+	if m.nav.Level == model.LevelClusters {
+		m.setStatusMessage("Namespace selection requires a selected context", true)
+		return m, scheduleStatusClear(), true
+	}
 	if m.unionMode {
 		m.setStatusMessage("Union mode supports exactly one namespace", true)
 		return m, scheduleStatusClear(), true
@@ -643,6 +647,10 @@ func (m Model) handleExplorerActionKeyPrevTab() (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleExplorerActionKeyCreateTemplate() (tea.Model, tea.Cmd, bool) {
+	if m.nav.Level == model.LevelClusters {
+		m.setStatusMessage("Create from template requires a selected context", true)
+		return m, scheduleStatusClear(), true
+	}
 	if m.readOnly {
 		m.setStatusMessage(readOnlyBlockedMessage("Create from template"), true)
 		return m, scheduleStatusClear(), true
