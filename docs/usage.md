@@ -219,11 +219,14 @@ tab when created and re-evaluate on context switch.
   over per-context and global config when entering that context.
   Persists across back-and-forth navigation to the picker; cleared on
   process exit. Blocked when `--read-only` is set.
-- **Inside a context**: flips read-only for the current tab.
-  Session-scoped — does not write to the config file, and does not leak
-  across context switches. Blocked when `--read-only` is set; the CLI
-  flag is the strongest precedence level and cannot be defeated within
-  the running process.
+- **Inside a context**: flips read-only for the current tab and records
+  the choice as a session override for that context, so it survives
+  navigating back to the picker and re-entering, and keeps the picker's
+  `[RO]` marker in sync. Session-scoped — does not write to the config
+  file. Keyed by context, so unlocking one context never leaks read-write
+  state into another. Blocked when `--read-only` is set; the CLI flag is
+  the strongest precedence level and cannot be defeated within the
+  running process.
 
 ### CLI flag
 

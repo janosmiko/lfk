@@ -505,7 +505,8 @@ func TestRefreshContextReadOnlyMarkers_NoOpOutsideClusterPicker(t *testing.T) {
 
 func TestHandleKeyReadOnlyToggle_InsideContext(t *testing.T) {
 	// Inside a specific context, the toggle flips the active tab's RO
-	// state directly. The override map is not touched.
+	// state and records the choice in the per-context override so it
+	// survives re-entry and stays in sync with the cluster-picker marker.
 	m := Model{
 		nav:  model.NavigationState{Level: model.LevelResources, Context: "prod"},
 		tabs: []TabState{{}}, width: 80, height: 40,
@@ -513,7 +514,35 @@ func TestHandleKeyReadOnlyToggle_InsideContext(t *testing.T) {
 	ret, _ := m.handleKeyReadOnlyToggle()
 	result := ret.(Model)
 	assert.True(t, result.readOnly)
-	assert.Empty(t, result.contextROOverrides, "in-context toggle must not write to the override map")
+	assert.True(t, result.contextROOverrides["prod"], "in-context toggle must record the override for the active context")
+}
+
+// TestHandleKeyReadOnlyToggle_InsideContext_PersistsAcrossReentry is the
+// regression for the L942 desync bug: turning read-only OFF inside a context
+// must survive navigating back to the picker and re-entering, even when
+// per-context config says the context should be read-only. Before the fix the
+// in-context toggle lived only in m.readOnly, so recomputeReadOnly on re-entry
+// re-read the config and silently re-locked the context.
+func TestHandleKeyReadOnlyToggle_InsideContext_PersistsAcrossReentry(t *testing.T) {
+	prev := ui.ConfigClusterReadOnly
+	t.Cleanup(func() { ui.ConfigClusterReadOnly = prev })
+	ui.ConfigClusterReadOnly = map[string]bool{"prod": true} // config locks prod
+
+	m := Model{
+		nav:  model.NavigationState{Level: model.LevelResources, Context: "prod"},
+		tabs: []TabState{{}}, width: 80, height: 40,
+		readOnly: true, // entered prod read-only via config
+	}
+
+	// User unlocks the context with in-context Ctrl+R.
+	ret, _ := m.handleKeyReadOnlyToggle()
+	result := ret.(Model)
+	require.False(t, result.readOnly)
+	require.False(t, result.contextROOverrides["prod"], "toggle OFF must record an explicit false override")
+
+	// Simulate navigating back to the picker and re-entering prod.
+	result.recomputeReadOnly("prod")
+	assert.False(t, result.readOnly, "in-context unlock must survive re-entry and beat the per-context config")
 }
 
 // newTestModelForNav builds a minimal Model adequate for navigateChildCluster.

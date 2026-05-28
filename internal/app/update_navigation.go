@@ -149,6 +149,11 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.popLeft()
 		m.clearRight()
 		m.restoreCursor()
+		// The restored rows were captured on context entry and carry stale
+		// [RO] markers; an in-context Ctrl+R toggle since then updated the
+		// override but not this snapshot. Re-apply so the picker marker
+		// matches the context's current read-only state.
+		m.refreshContextReadOnlyMarkers()
 		return m, m.loadPreview()
 
 	case model.LevelResources:

@@ -284,9 +284,12 @@ func (m *Model) refreshContextReadOnlyMarkers() {
 //   - per-context config (clusters.<ctx>.read_only)
 //   - global config (read_only)
 //
-// The in-context Ctrl+R toggle bypasses this function — it sets m.readOnly
-// directly for the current tab. Switching contexts re-runs recompute and
-// drops the in-context toggle.
+// The in-context Ctrl+R toggle also records its result in
+// contextROOverrides (keyed by the active context), so re-entering that
+// context re-reads the override here and preserves the user's last choice
+// rather than reverting to config. Switching to a *different* context reads
+// that context's own override/config, so an unlock never leaks across
+// contexts.
 func (m *Model) recomputeReadOnly(ctx string) {
 	if m.cliReadOnly {
 		m.readOnly = true
@@ -362,6 +365,18 @@ func (m Model) handleKeyReadOnlyToggle() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.readOnly = !m.readOnly
+	// Persist the toggle to the per-context override so it survives re-entry
+	// (recomputeReadOnly reads the override on context entry) and keeps the
+	// cluster-picker [RO] marker in sync. Keyed by context, so unlocking one
+	// context never leaks read-write state into another. The union sentinel
+	// is skipped: it is not a real context and each member keeps its own
+	// policy via readOnlyForContext.
+	if !m.isUnionSentinel() && m.nav.Context != "" {
+		if m.contextROOverrides == nil {
+			m.contextROOverrides = make(map[string]bool)
+		}
+		m.contextROOverrides[m.nav.Context] = m.readOnly
+	}
 	state := "OFF"
 	if m.readOnly {
 		state = "ON"

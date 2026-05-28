@@ -748,7 +748,7 @@ Invalid config values are dropped at startup with a warning in the error log.
 
 | Key | Action |
 |---|---|
-| `Ctrl+R` (inside a context) | Toggle read-only mode for the current tab. Session-scoped — does not write to config and does not leak across context switches. Blocked when `--read-only` is set. |
+| `Ctrl+R` (inside a context) | Toggle read-only mode for the current tab. Recorded as a session override for that context, so it survives re-entry and stays in sync with the picker's `[RO]` marker; does not write to config and never leaks across contexts. Blocked when `--read-only` is set. |
 | `Ctrl+R` (at the cluster picker) | Toggle the `[RO]` marker on the highlighted context row. Stored as a session override that wins over per-context config and is honored on context entry. Blocked when `--read-only` is set (the CLI flag forces every context RO). |
 
 The `[RO]` badge appears in the title bar only when you're inside a
