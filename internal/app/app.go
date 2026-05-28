@@ -148,6 +148,7 @@ type Model struct {
 
 	// Multi-select namespace state.
 	selectedNamespaces  map[string]bool
+	nsSelectionNegated  bool // when true, selectedNamespaces is an EXCLUDE set
 	nsFilterMode        bool
 	nsSelectionModified bool   // tracks if Space was pressed in current ns overlay session
 	nsFilterEntryItem   string // namespace name selected when filter mode was entered; restored on Esc

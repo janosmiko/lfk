@@ -24,13 +24,14 @@ const overlayListChrome = 4
 // fields render only when the matching feature flag in OverlayListConfig
 // is enabled — callers leave them zero-valued otherwise.
 type OverlayListItem struct {
-	Key         string // shortcut letter; rendered "[k]" when cfg.ShowKey
-	Name        string // primary text
-	Description string // dim secondary suffix; rendered when cfg.ShowDescription
-	Status      string // status badge; rendered "[s]" when cfg.ShowStatus
-	Active      bool   // ✓ marker when cfg.ShowActiveMarker
-	Selected    bool   // checkbox state when cfg.MultiSelect
-	Disabled    bool   // renders dim and (by convention) can't be acted on
+	Key          string // shortcut letter; rendered "[k]" when cfg.ShowKey
+	Name         string // primary text
+	Description  string // dim secondary suffix; rendered when cfg.ShowDescription
+	Status       string // status badge; rendered "[s]" when cfg.ShowStatus
+	Active       bool   // ✓ marker when cfg.ShowActiveMarker
+	ActiveMarker string // overrides the default ✓ glyph when Active and non-empty
+	Selected     bool   // checkbox state when cfg.MultiSelect
+	Disabled     bool   // renders dim and (by convention) can't be acted on
 
 	// Header rows render as group dividers ("── Name ──") in CategoryStyle.
 	// All other field flags are ignored — no marker, no key, no status,
@@ -240,6 +241,15 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 // the highlight background) and for width measurement. `hasActive`
 // controls whether the active-marker column is reserved — see
 // anyActive for the collapse rule.
+// activeMarkerGlyph returns the single-cell marker drawn for an Active row,
+// defaulting to ✓ unless the item overrides it (e.g. "!" for excluded items).
+func activeMarkerGlyph(it OverlayListItem) string {
+	if it.ActiveMarker != "" {
+		return it.ActiveMarker
+	}
+	return "✓"
+}
+
 func itemPlainLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) string {
 	if it.Header {
 		return "── " + it.Name + " ──"
@@ -254,7 +264,7 @@ func itemPlainLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) st
 	}
 	if hasActive {
 		if it.Active {
-			p.WriteString("✓ ")
+			p.WriteString(activeMarkerGlyph(it) + " ")
 		} else {
 			p.WriteString("  ")
 		}
@@ -289,7 +299,7 @@ func itemStyledLine(it OverlayListItem, cfg OverlayListConfig, hasActive bool) s
 	}
 	if hasActive {
 		if it.Active {
-			p.WriteString(OverlayFilterStyle.Render("✓ "))
+			p.WriteString(OverlayFilterStyle.Render(activeMarkerGlyph(it) + " "))
 		} else {
 			p.WriteString("  ")
 		}

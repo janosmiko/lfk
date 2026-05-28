@@ -451,27 +451,7 @@ func (m Model) renderTitleBar() string {
 		}
 	}
 
-	nsText := m.namespace
-	switch {
-	case m.allNamespaces:
-		nsText = "all"
-	case len(m.selectedNamespaces) > 1:
-		names := make([]string, 0, len(m.selectedNamespaces))
-		for ns := range m.selectedNamespaces {
-			names = append(names, ns)
-		}
-		sort.Strings(names)
-		if len(names) > 3 {
-			nsText = fmt.Sprintf("%s +%d more", strings.Join(names[:3], ","), len(names)-3)
-		} else {
-			nsText = strings.Join(names, ",")
-		}
-	case len(m.selectedNamespaces) == 1:
-		for ns := range m.selectedNamespaces {
-			nsText = ns
-		}
-	}
-	nsLabel := ui.NamespaceBadgeStyle.Render(" ns: " + nsText + " ")
+	nsLabel := ui.NamespaceBadgeStyle.Render(" ns: " + m.buildNsLabelText() + " ")
 
 	var versionLabel string
 	if m.version != "" {
@@ -764,4 +744,37 @@ func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rig
 	left := ui.InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
 	right := ui.InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
+}
+
+// buildNsLabelText returns the text portion of the namespace scope chip shown
+// in the title bar. When nsSelectionNegated is true, each selected namespace
+// is prefixed with "!" to indicate it is excluded.
+func (m Model) buildNsLabelText() string {
+	if m.allNamespaces {
+		return "all"
+	}
+	if len(m.selectedNamespaces) == 0 {
+		return m.namespace
+	}
+
+	names := make([]string, 0, len(m.selectedNamespaces))
+	for ns := range m.selectedNamespaces {
+		names = append(names, ns)
+	}
+	sort.Strings(names)
+
+	if m.nsSelectionNegated {
+		for i, ns := range names {
+			names[i] = "!" + ns
+		}
+	}
+
+	if len(names) > 3 {
+		more := "more"
+		if m.nsSelectionNegated {
+			more = "more excl"
+		}
+		return fmt.Sprintf("%s +%d %s", strings.Join(names[:3], ","), len(names)-3, more)
+	}
+	return strings.Join(names, ",")
 }

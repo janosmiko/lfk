@@ -608,6 +608,8 @@ func keyMsg(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyEsc}
 	case "enter":
 		return tea.KeyMsg{Type: tea.KeyEnter}
+	case "tab":
+		return tea.KeyMsg{Type: tea.KeyTab}
 	case "backspace":
 		return tea.KeyMsg{Type: tea.KeyBackspace}
 	case "ctrl+c":

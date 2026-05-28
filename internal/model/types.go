@@ -290,14 +290,15 @@ type PodMetrics struct {
 
 // Bookmark represents a saved navigation path for quick access.
 type Bookmark struct {
-	Name         string   `json:"name" yaml:"name"`
-	Context      string   `json:"context,omitempty" yaml:"context,omitempty"`
-	UnionSet     string   `json:"union_set,omitempty" yaml:"union_set,omitempty"`
-	Namespace    string   `json:"namespace" yaml:"namespace"`
-	Namespaces   []string `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
-	ResourceType string   `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
-	ResourceName string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
-	Slot         string   `json:"slot,omitempty" yaml:"slot,omitempty"` // single char key for vim-style named marks (a-z, A-Z, 0-9)
+	Name               string   `json:"name" yaml:"name"`
+	Context            string   `json:"context,omitempty" yaml:"context,omitempty"`
+	UnionSet           string   `json:"union_set,omitempty" yaml:"union_set,omitempty"`
+	Namespace          string   `json:"namespace" yaml:"namespace"`
+	Namespaces         []string `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
+	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
+	ResourceType       string   `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
+	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+	Slot               string   `json:"slot,omitempty" yaml:"slot,omitempty"` // single char key for vim-style named marks (a-z, A-Z, 0-9)
 }
 
 // IsContextAware reports whether this bookmark is anchored to a specific

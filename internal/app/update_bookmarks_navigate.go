@@ -61,6 +61,7 @@ func (m *Model) applyBookmarkNamespace(bm model.Bookmark, target bookmarkTarget,
 	case bm.Namespace == "" && len(bm.Namespaces) == 0:
 		m.allNamespaces = true
 		m.selectedNamespaces = nil
+		m.nsSelectionNegated = false
 	case len(bm.Namespaces) > 1:
 		m.allNamespaces = false
 		m.namespace = bm.Namespaces[0]
@@ -68,6 +69,7 @@ func (m *Model) applyBookmarkNamespace(bm model.Bookmark, target bookmarkTarget,
 		for _, ns := range bm.Namespaces {
 			m.selectedNamespaces[ns] = true
 		}
+		m.nsSelectionNegated = bm.NsSelectionNegated
 	default:
 		m.allNamespaces = false
 		ns := bm.Namespace
@@ -76,6 +78,7 @@ func (m *Model) applyBookmarkNamespace(bm model.Bookmark, target bookmarkTarget,
 		}
 		m.namespace = ns
 		m.selectedNamespaces = map[string]bool{ns: true}
+		m.nsSelectionNegated = bm.NsSelectionNegated
 	}
 	// Invalidate the old namespace's cache within the new context. When the
 	// context also changed, the entire old context was already wiped by

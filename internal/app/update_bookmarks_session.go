@@ -71,7 +71,7 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	m.itemCache[m.navKey()] = m.middleItems
 	m.clearRight()
 
-	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces)
+	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces, sess.NsSelectionNegated)
 
 	var cmds []tea.Cmd
 	needsDiscovery := m.shouldFireDiscoveryFor(discoveryCtx)
@@ -154,6 +154,7 @@ func (m Model) restoreMultiTabSession(sess *SessionState, contexts []model.Item)
 		Namespace:          activeSess.Namespace,
 		AllNamespaces:      activeSess.AllNamespaces,
 		SelectedNamespaces: activeSess.SelectedNamespaces,
+		NsSelectionNegated: activeSess.NsSelectionNegated,
 		ResourceType:       activeSess.ResourceType,
 		ResourceName:       activeSess.ResourceName,
 	}, contexts)
@@ -187,6 +188,7 @@ func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) 
 		} else {
 			tab.selectedNamespaces = map[string]bool{st.Namespace: true}
 		}
+		tab.nsSelectionNegated = st.NsSelectionNegated
 	} else {
 		tab.allNamespaces = true
 	}
@@ -227,10 +229,11 @@ func contextInList(ctx string, items []model.Item) bool {
 	return false
 }
 
-func applySessionNamespaces(m *Model, allNS bool, ns string, selectedNS []string) {
+func applySessionNamespaces(m *Model, allNS bool, ns string, selectedNS []string, negated bool) {
 	if allNS {
 		m.allNamespaces = true
 		m.selectedNamespaces = nil
+		m.nsSelectionNegated = false
 	} else if ns != "" {
 		m.namespace = ns
 		m.allNamespaces = false
@@ -242,5 +245,6 @@ func applySessionNamespaces(m *Model, allNS bool, ns string, selectedNS []string
 		} else {
 			m.selectedNamespaces = map[string]bool{ns: true}
 		}
+		m.nsSelectionNegated = negated
 	}
 }

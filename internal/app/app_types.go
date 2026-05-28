@@ -432,6 +432,7 @@ type TabState struct {
 	namespace          string
 	allNamespaces      bool
 	selectedNamespaces map[string]bool
+	nsSelectionNegated bool
 	sortColumnName     string // column name to sort by (e.g. "Name", "Age", "CPU")
 	sortAscending      bool
 	filterText         string

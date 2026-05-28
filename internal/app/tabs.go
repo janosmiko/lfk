@@ -102,7 +102,7 @@ func (m Model) effectiveContext() string {
 }
 
 func (m *Model) effectiveNamespace() string {
-	if m.allNamespaces || len(m.selectedNamespaces) > 1 {
+	if m.allNamespaces || m.nsSelectionNegated || len(m.selectedNamespaces) > 1 {
 		return "" // fetch all, filter client-side
 	}
 	if len(m.selectedNamespaces) == 1 {
@@ -113,13 +113,10 @@ func (m *Model) effectiveNamespace() string {
 	return m.namespace
 }
 
-// fetchFingerprint returns a stable digest of the parameters that
-// determine what a resource list fetch returns: effective namespace, the
-// allNamespaces toggle, and the selectedNamespaces multi-select filter.
-// It is used by the preview-cache shortcut in navigateChildResourceType
-// to decide whether a primed cache entry is still applicable. Context and
-// resource are not included because they are already part of the navKey
-// the fingerprint is paired with.
+// fetchFingerprint returns a stable digest of what a resource list fetch
+// returns: effective namespace, the allNamespaces toggle, and the
+// selectedNamespaces multi-select filter (with its negation flag). Used by
+// the preview-cache shortcut; context/resource live in the paired navKey.
 func (m *Model) fetchFingerprint() string {
 	var b strings.Builder
 	if m.allNamespaces {
@@ -135,8 +132,10 @@ func (m *Model) fetchFingerprint() string {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		b.WriteString("sel=")
-		b.WriteString(strings.Join(keys, ","))
+		if m.nsSelectionNegated {
+			b.WriteString("!")
+		}
+		fmt.Fprintf(&b, "sel=%s", strings.Join(keys, ","))
 	}
 	return b.String()
 }
@@ -442,6 +441,7 @@ func (m *Model) saveCurrentTab() {
 	t.namespace = m.namespace
 	t.allNamespaces = m.allNamespaces
 	t.selectedNamespaces = copyMapStringBool(m.selectedNamespaces)
+	t.nsSelectionNegated = m.nsSelectionNegated
 	t.sortColumnName = m.sortColumnName
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
@@ -552,6 +552,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.namespace = t.namespace
 	m.allNamespaces = t.allNamespaces
 	m.selectedNamespaces = copyMapStringBool(t.selectedNamespaces)
+	m.nsSelectionNegated = t.nsSelectionNegated
 	m.sortColumnName = t.sortColumnName
 	m.sortAscending = t.sortAscending
 	m.filterText = t.filterText
@@ -710,6 +711,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		namespace:              m.namespace,
 		allNamespaces:          m.allNamespaces,
 		selectedNamespaces:     copyMapStringBool(m.selectedNamespaces),
+		nsSelectionNegated:     m.nsSelectionNegated,
 		sortColumnName:         m.sortColumnName,
 		sortAscending:          m.sortAscending,
 		filterText:             m.filterText,
