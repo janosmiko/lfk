@@ -67,6 +67,39 @@ func TestHandleKeyDismissesStatusTip(t *testing.T) {
 	assert.False(t, result.statusMessageTip)
 }
 
+// --- navigation clears a lingering status/error message immediately ---
+
+func TestHandleKeyNavigationClearsStatusMessage(t *testing.T) {
+	cases := []struct {
+		name string
+		key  tea.KeyMsg
+	}{
+		{"down (j)", runeKey('j')},
+		{"up (k)", runeKey('k')},
+		{"left (h)", runeKey('h')},
+		{"right (l)", runeKey('l')},
+		{"down arrow", specialKey(tea.KeyDown)},
+		{"up arrow", specialKey(tea.KeyUp)},
+		{"left arrow", specialKey(tea.KeyLeft)},
+		{"right arrow", specialKey(tea.KeyRight)},
+		{"jump bottom (G)", runeKey('G')},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := baseExplorerModel()
+			m.setCursor(1)
+			m.statusMessage = "Read-only mode: ON"
+			m.statusMessageErr = true
+			m.statusMessageExp = time.Now().Add(5 * time.Second)
+
+			ret, _ := m.handleKey(tc.key)
+			result := ret.(Model)
+			assert.Empty(t, result.statusMessage, "navigation must clear the hint-bar message immediately")
+			assert.False(t, result.statusMessageErr)
+		})
+	}
+}
+
 // --- handleKey: cursor movement j/k ---
 
 func TestHandleKeyJMovesDown(t *testing.T) {
