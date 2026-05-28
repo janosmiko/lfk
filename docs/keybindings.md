@@ -136,7 +136,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `L` | View logs for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
 | `E` | Edit selected resource in $KUBE_EDITOR or $EDITOR | `edit` |
-| `R` | Refresh current view | `refresh` |
+| `R` | Refresh current view (also works inside the namespace selector — re-fetches the namespace list from the cluster) | `refresh` |
 | `v` | Describe selected resource | `describe` |
 | `D` | Delete resource (force delete Pod/Job if already deleting, force finalize others) | `delete` |
 | `X` | Force delete (Pod/Job only) | `force_delete` |

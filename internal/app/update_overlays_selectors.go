@@ -265,6 +265,22 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlayCursor = 0
 		return m, nil
 
+	case ui.ActiveKeybindings.Refresh:
+		// Re-fetch the namespace list from the API. GetNamespaces always
+		// hits the cluster (no client cache), so the non-silent load gets
+		// fresh data and repopulates the overlay via updateNamespacesLoaded
+		// when it returns. The current list stays visible until then
+		// (stale-while-revalidate), so the overlay never blanks out.
+		kctx := m.nsOverlayContext
+		if kctx == "" {
+			kctx = m.activeContext()
+		}
+		if m.client == nil || kctx == "" {
+			return m, nil
+		}
+		m.setStatusMessage("Refreshing namespaces...", false)
+		return m, tea.Batch(m.loadNamespacesForContext(kctx, false), scheduleStatusClear())
+
 	case "ctrl+c":
 		// Close the overlay rather than the tab — once an overlay is
 		// open Ctrl+C should match Esc semantics. The tab-close only

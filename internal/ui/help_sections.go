@@ -84,7 +84,7 @@ func helpSections() []helpSection {
 		{
 			title: "Actions",
 			bindings: []helpEntry{
-				{kb.NamespaceSelector, "Select namespace (space: include, tab: exclude, A: all-namespaces)"},
+				{kb.NamespaceSelector, "Select namespace (space: include, tab: exclude, A: all-namespaces, R: refresh)"},
 				{kb.AllNamespaces, "Toggle all-namespaces mode"},
 				{kb.ActionMenu, "Action menu: l=tail logs (last 10 lines + follow), L=full logs, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, crash investigator, traffic capture, RBAC permissions"},
 				{kb.Logs, "View full logs for selected resource"},
