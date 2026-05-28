@@ -332,6 +332,7 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			items := m.filteredOverlayItems()
 			if len(items) == 1 {
 				oldNs := m.namespace
+				m.nsSelectionNegated = false
 				if items[0].Status == "all" {
 					m.selectedNamespaces = nil
 					m.allNamespaces = true
