@@ -41,6 +41,11 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	// Navigating clears any lingering hint-bar toast immediately rather than
+	// letting it wait out its 5s timer. Done before dispatch so a handler that
+	// sets a fresh message (e.g. Left exiting dashboard fullscreen) still wins.
+	m = m.clearStatusOnNavigationKey(msg)
+
 	if mdl, cmd, handled := m.handleExplorerNavKey(msg); handled {
 		return mdl, cmd
 	}
