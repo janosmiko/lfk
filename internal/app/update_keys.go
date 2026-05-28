@@ -323,6 +323,10 @@ func (m Model) handleKeyPrevMatch() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
+	if m.nav.Level == model.LevelClusters {
+		m.setStatusMessage("Namespace selection requires a selected context", true)
+		return m, scheduleStatusClear()
+	}
 	return m.openNamespaceSelectorForContext(m.activeContext())
 }
 

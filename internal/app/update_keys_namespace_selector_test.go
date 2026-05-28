@@ -26,6 +26,19 @@ func nsSelectorModel() Model {
 // populate synchronously: overlayItems is non-nil before any tea.Cmd
 // runs, m.loading stays false, and ensureNamespaceCacheFresh returns nil
 // so no API call is scheduled.
+func TestHandleKeyNamespaceSelector_NoOpAtClusters(t *testing.T) {
+	m := nsSelectorModel()
+	m.nav.Level = model.LevelClusters
+
+	ret, cmd := m.handleKeyNamespaceSelector()
+	result := ret.(Model)
+
+	assert.NotEqual(t, overlayNamespace, result.overlay,
+		"namespace overlay must not open without a selected context")
+	assert.NotEmpty(t, result.statusMessage)
+	assert.NotNil(t, cmd)
+}
+
 func TestHandleKeyNamespaceSelector_SeedsFromFreshCache(t *testing.T) {
 	m := nsSelectorModel()
 	m.cachedNamespaces[m.activeContext()] = namespaceCacheEntry{

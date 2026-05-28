@@ -205,9 +205,9 @@ func TestStatusBarDashboardHints(t *testing.T) {
 	assert.Contains(t, stripped, "namespace")
 }
 
-// --- statusBar: cluster-list hints omit "actions" ---
+// --- statusBar: cluster-list hints show "actions", omit "create" ---
 
-func TestStatusBarClusterListOmitsActionsHint(t *testing.T) {
+func TestStatusBarClusterListHints(t *testing.T) {
 	m := Model{
 		nav:           model.NavigationState{Level: model.LevelClusters},
 		middleItems:   []model.Item{{Name: "ctx-a"}},
@@ -217,8 +217,15 @@ func TestStatusBarClusterListOmitsActionsHint(t *testing.T) {
 		selectedItems: make(map[string]bool),
 	}
 	stripped := stripANSI(m.statusBar())
-	assert.NotContains(t, stripped, "actions")
-	assert.Contains(t, stripped, "create")
+	// The cluster picker has real action-menu entries (set color, manage
+	// local clusters), so "actions" must be advertised.
+	assert.Contains(t, stripped, "actions")
+	// No context is selected at LevelClusters, so "create" (kubectl apply
+	// against the active context) is a no-op and must stay hidden.
+	assert.NotContains(t, stripped, "create")
+	// Namespace selection also requires a selected context.
+	assert.NotContains(t, stripped, "namespace")
+	assert.NotContains(t, stripped, "all-ns")
 	assert.Contains(t, stripped, "filter")
 }
 
