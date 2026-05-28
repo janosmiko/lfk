@@ -342,6 +342,11 @@ func (m Model) openNamespaceSelectorForContext(contextName string) (tea.Model, t
 	m.overlayFilter.Clear()
 	ui.ResetOverlayNsScroll()
 	m.nsSelectionModified = false
+	// Remember which context this overlay lists so the in-overlay refresh
+	// (R) re-fetches the right namespaces even when activeContext() would
+	// resolve differently (e.g. the union-set namespace picker, which opens
+	// for the first member context before union mode is active).
+	m.nsOverlayContext = contextName
 
 	// Reuse the existing per-context namespace cache (also used by the
 	// command-bar autocompleter). When a cached entry exists we seed the
