@@ -99,6 +99,28 @@ func TestCov80NavigateParentFromResourceTypes(t *testing.T) {
 	_ = cmd
 }
 
+// TestNavigateParentToClusters_RefreshesReadOnlyMarkers guards the L942 sync:
+// navigating back to the cluster picker must re-apply each row's [RO] marker
+// from the (possibly just-toggled) override map rather than show the stale
+// snapshot captured on context entry.
+func TestNavigateParentToClusters_RefreshesReadOnlyMarkers(t *testing.T) {
+	m := basePush80Model()
+	m.nav.Level = model.LevelResourceTypes
+	m.nav.Context = "prod"
+	// Snapshot captured on entry says prod was read-write...
+	m.leftItems = []model.Item{{Name: "prod", ReadOnly: false}}
+	m.leftItemsHistory = [][]model.Item{{{Name: "root"}}}
+	// ...but an in-context toggle since then locked it via the override.
+	m.contextROOverrides = map[string]bool{"prod": true}
+
+	result, _ := m.navigateParent()
+	rm := result.(Model)
+	require.Equal(t, model.LevelClusters, rm.nav.Level)
+	require.Len(t, rm.middleItems, 1)
+	assert.True(t, rm.middleItems[0].ReadOnly,
+		"cluster picker row must reflect the override after navigating back")
+}
+
 func TestCov80NavigateParentFromResources(t *testing.T) {
 	m := basePush80Model()
 	m.nav.Level = model.LevelResources
