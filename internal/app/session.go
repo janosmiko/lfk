@@ -17,6 +17,7 @@ type SessionTab struct {
 	Namespace          string   `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	AllNamespaces      bool     `json:"all_namespaces,omitempty" yaml:"all_namespaces,omitempty"`
 	SelectedNamespaces []string `json:"selected_namespaces,omitempty" yaml:"selected_namespaces,omitempty"`
+	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
 	ResourceType       string   `json:"resource_type,omitempty" yaml:"resource_type,omitempty"`
 	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
 }
@@ -28,6 +29,7 @@ type SessionState struct {
 	Namespace          string   `json:"namespace,omitempty" yaml:"namespace,omitempty"`
 	AllNamespaces      bool     `json:"all_namespaces,omitempty" yaml:"all_namespaces,omitempty"`
 	SelectedNamespaces []string `json:"selected_namespaces,omitempty" yaml:"selected_namespaces,omitempty"`
+	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
 	ResourceType       string   `json:"resource_type,omitempty" yaml:"resource_type,omitempty"` // group/version/resource ref string
 	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
 
@@ -137,6 +139,7 @@ func (m *Model) saveCurrentSession() {
 				slices.Sort(nsList)
 				st.SelectedNamespaces = nsList
 			}
+			st.NsSelectionNegated = t.nsSelectionNegated
 		}
 		if t.nav.ResourceType.Resource != "" {
 			st.ResourceType = t.nav.ResourceType.ResourceRef()

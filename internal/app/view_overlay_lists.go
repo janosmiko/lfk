@@ -621,15 +621,19 @@ func renderNamespaceOverlay(m Model, items []model.Item, height int) string {
 	listItems := make([]ui.OverlayListItem, len(items))
 	for i, it := range items {
 		active := false
+		marker := ""
 		switch {
 		case it.Status == "all":
 			active = m.allNamespaces && len(m.selectedNamespaces) == 0
+		case m.nsSelectionNegated && m.selectedNamespaces[it.Name]:
+			active = true
+			marker = "!"
 		case m.selectedNamespaces[it.Name]:
 			active = true
 		case it.Name == m.namespace && !m.allNamespaces && len(m.selectedNamespaces) == 0:
 			active = true
 		}
-		listItems[i] = ui.OverlayListItem{Name: it.Name, Active: active}
+		listItems[i] = ui.OverlayListItem{Name: it.Name, Active: active, ActiveMarker: marker}
 	}
 	return ui.RenderOverlayList(listItems, ui.OverlayListConfig{
 		Title:            "Select Namespace",

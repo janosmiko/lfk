@@ -24,7 +24,7 @@ var canIVerbs = []struct {
 
 // RenderCanIView renders the can-i browser with a two-column layout.
 // The left column (API groups) is interactive; the right column (resources) is display-only.
-func RenderCanIView(groups []string, resources []model.CanIResource, groupCursor, groupScroll int, subjectName string, namespaces []string, width, height int, hintBar string, resourceScroll int) string {
+func RenderCanIView(groups []string, resources []model.CanIResource, groupCursor, groupScroll int, subjectName string, namespaces []string, width, height int, hintBar string, resourceScroll int, nsNegated bool) string {
 	// Title at the left, scope label flushed to the far right with
 	// baseBg-painted gap fill. Matches the WhoCan header layout so the
 	// title bar reads consistently across both modes.
@@ -33,7 +33,7 @@ func RenderCanIView(groups []string, resources []model.CanIResource, groupCursor
 	// namespaces slice into "ns: all" so the user always sees what
 	// scope is active — earlier behavior rendered "ns: " (no value),
 	// which looked like a render bug.
-	scopeLabel := CanIScopeLabel(namespaces)
+	scopeLabel := CanIScopeLabel(namespaces, nsNegated)
 	// Subject chip mirrors the Who-Can verb chip styling: dim "Subject:"
 	// label + light value, both on baseBg so they sit flush in the title
 	// row's barBg band.
@@ -100,15 +100,23 @@ func joinTitleAndRightLabel(title, rightLabel string, width int) string {
 // Collapses the all-namespaces sentinels ([""] and the empty slice)
 // to a literal "ns: all" so the label never reads as "ns: " — that
 // looked like a render bug to users who picked "All Namespaces" in
-// the namespace selector.
-func CanIScopeLabel(namespaces []string) string {
+// the namespace selector. When negated is true, each namespace is
+// prefixed with "!" to indicate it is excluded.
+func CanIScopeLabel(namespaces []string, negated bool) string {
 	if len(namespaces) == 0 {
 		return "ns: all"
 	}
 	if len(namespaces) == 1 && namespaces[0] == "" {
 		return "ns: all"
 	}
-	return "ns: " + strings.Join(namespaces, ",")
+	if !negated {
+		return "ns: " + strings.Join(namespaces, ",")
+	}
+	prefixed := make([]string, len(namespaces))
+	for i, ns := range namespaces {
+		prefixed[i] = "!" + ns
+	}
+	return "ns: " + strings.Join(prefixed, ",")
 }
 
 // canIVerbColWidth returns the column width for a verb label (label length + 1 space padding).

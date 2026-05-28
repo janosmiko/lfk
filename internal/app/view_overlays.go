@@ -702,6 +702,7 @@ func (m Model) renderCanIOverlay(background string) string {
 		innerW, innerH,
 		hintBar,
 		m.canIResourceScroll,
+		m.nsSelectionNegated,
 	)
 	// RBAC overlay uses baseBg end-to-end: title (TitleStyle/barBg=baseBg)
 	// + column boxes (Active/InactiveColumnStyle/baseBg) + filler. Mixing

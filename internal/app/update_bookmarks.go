@@ -280,14 +280,15 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	}
 
 	bm := model.Bookmark{
-		Name:         name,
-		Context:      bmContext,
-		UnionSet:     bmUnionSet,
-		Namespace:    ns,
-		Namespaces:   nsList,
-		ResourceType: rt.ResourceRef(),
-		ResourceName: m.nav.ResourceName,
-		Slot:         slot,
+		Name:               name,
+		Context:            bmContext,
+		UnionSet:           bmUnionSet,
+		Namespace:          ns,
+		Namespaces:         nsList,
+		NsSelectionNegated: m.nsSelectionNegated,
+		ResourceType:       rt.ResourceRef(),
+		ResourceName:       m.nav.ResourceName,
+		Slot:               slot,
 	}
 
 	// Check if slot is already in use; if so, ask for confirmation.

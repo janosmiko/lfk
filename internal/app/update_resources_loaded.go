@@ -525,13 +525,12 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 }
 
 func (m Model) filterLoadedItemsBySelectedNamespaces(items []model.Item) []model.Item {
-	// Filter by selected namespaces when multi-select is active.
-	if len(m.selectedNamespaces) <= 1 {
+	if (!m.nsSelectionNegated && len(m.selectedNamespaces) <= 1) || (m.nsSelectionNegated && len(m.selectedNamespaces) == 0) {
 		return items
 	}
 	filtered := make([]model.Item, 0, len(items))
 	for _, item := range items {
-		if item.Namespace == "" || m.selectedNamespaces[item.Namespace] {
+		if item.Namespace == "" || m.selectedNamespaces[item.Namespace] != m.nsSelectionNegated {
 			filtered = append(filtered, item)
 		}
 	}
