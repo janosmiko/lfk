@@ -37,9 +37,8 @@ func TestDashboardBarsScaleWithWidth(t *testing.T) {
 	full := Model{width: 200, height: 50, fullscreenDashboard: true}
 	pane := Model{width: 200, height: 50, fullscreenDashboard: false}
 
-	data := dashboardData{nodeCount: 3, readyNodes: 3, pods: podStats{total: 10, running: 10}}
-	wf := full.dashboardWidths(data, false)
-	wp := pane.dashboardWidths(data, false)
+	wf := full.dashboardWidths(false)
+	wp := pane.dashboardWidths(false)
 
 	assert.Greater(t, wf.bar, wp.bar, "fullscreen bars must be wider than the right-pane bars")
 	assert.Greater(t, wf.bar, 30, "fullscreen bars must use more space than the old fixed 30")

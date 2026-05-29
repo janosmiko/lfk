@@ -212,7 +212,7 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 			{data.nodeCount - data.readyNodes, ui.StatusFailed},
 		}
 		nodeBar := renderStackedBar(segments, data.nodeCount, w.bar)
-		lines = append(lines, dashboardMetricRow("Nodes", nodeBar, nodeSummaryStr(data), w))
+		lines = append(lines, dashboardMetricLines("Nodes", nodeBar, nodeSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")
 
@@ -239,7 +239,7 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 			{podOther(data.pods), ui.DimStyle},
 		}
 		podBar := renderStackedBar(segments, data.pods.total, w.bar)
-		lines = append(lines, dashboardMetricRow("Pods", podBar, podSummaryStr(data), w))
+		lines = append(lines, dashboardMetricLines("Pods", podBar, podSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")
 	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))
@@ -259,11 +259,11 @@ func dashboardResourcesSection(lines []string, data dashboardData, w dashboardWi
 	lines = append(lines, "")
 	if data.totalCPUAlloc > 0 {
 		cpuBar := renderBar(data.totalCPUUsed, data.totalCPUAlloc, w.bar)
-		lines = append(lines, dashboardMetricRow("CPU", cpuBar, cpuSummaryStr(data), w))
+		lines = append(lines, dashboardMetricLines("CPU", cpuBar, cpuSummaryStr(data), w)...)
 	}
 	if data.totalMemAlloc > 0 {
 		memBar := renderBar(data.totalMemUsed, data.totalMemAlloc, w.bar)
-		lines = append(lines, dashboardMetricRow("Mem", memBar, memSummaryStr(data), w))
+		lines = append(lines, dashboardMetricLines("Mem", memBar, memSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")
 	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))

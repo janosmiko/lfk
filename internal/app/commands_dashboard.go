@@ -272,13 +272,19 @@ func memSummaryStr(d dashboardData) string {
 // dashboardSummarySep separates status counts within an inline summary.
 const dashboardSummarySep = " · "
 
-// dashboardMetricRow lays out one cluster metric as a single line:
-// "  <label>  <bar>  <summary>", truncated to w.content so a long summary in
-// the narrow right pane can't wrap and tear the layout.
-func dashboardMetricRow(label, bar, summary string, w dashboardWidths) string {
+// dashboardMetricLines lays out one cluster metric over two lines: the label +
+// bar on the first, and the status summary on its own indented line. Keeping
+// the summary off the bar line means a long breakdown (e.g. Running · Pending ·
+// Failed · Succeeded) never shrinks the bar. Both lines are truncated to the
+// column width so a long summary can't wrap and tear the layout.
+func dashboardMetricLines(label, bar, summary string, w dashboardWidths) []string {
 	pad := max(w.label-lipgloss.Width(label), 0)
-	row := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  " + bar + "  " + summary
-	return ansi.Truncate(row, w.content, "")
+	barLine := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  " + bar
+	sumLine := strings.Repeat(" ", 2+w.label+2) + summary
+	return []string{
+		ansi.Truncate(barLine, w.content, ""),
+		ansi.Truncate(sumLine, w.content, ""),
+	}
 }
 
 // dashboardContentWidth returns the column content width the dashboard will be
@@ -299,34 +305,16 @@ func (m Model) dashboardContentWidth(twoCol bool) int {
 	return max(innerW, 20)
 }
 
-// dashboardWidths derives the inline metric-row widths from the target content
-// width and the actual summaries. The cluster bar is sized so the widest row
-// (label + bar + its bar-string decoration + summary) still fits contentW, so
-// no row wraps inside the two-column left pane.
-func (m Model) dashboardWidths(data dashboardData, twoCol bool) dashboardWidths {
+// dashboardWidths derives the metric-row widths from the target content width.
+// Bars are uniform and as wide as the column allows; the summary lives on its
+// own line, so it no longer constrains the bar. The reservation (labelCol + 11)
+// leaves room for the "  " indents, brackets, and renderBar's " NNN%" suffix so
+// the bar line still fits contentW.
+func (m Model) dashboardWidths(twoCol bool) dashboardWidths {
 	contentW := m.dashboardContentWidth(twoCol)
 	const labelCol = 5 // "Nodes" / "Pods" / "CPU" / "Mem"
-	// Fixed per-row width that is NOT the bar fill: "  " + label + "  " + "  "
-	// around the bar and summary.
-	base := 2 + labelCol + 2 + 2
-	// Reserve the worst row. renderBar (CPU/Mem) adds "[]" + " NNN%" (~7);
-	// the stacked bars (Nodes/Pods) add just "[]" (2).
-	worst := 0
-	for _, r := range []struct {
-		barExtra int
-		summary  string
-	}{
-		{2, nodeSummaryStr(data)},
-		{2, podSummaryStr(data)},
-		{7, cpuSummaryStr(data)},
-		{7, memSummaryStr(data)},
-	} {
-		if o := base + r.barExtra + lipgloss.Width(r.summary); o > worst {
-			worst = o
-		}
-	}
 	return dashboardWidths{
-		bar:     min(max(contentW-worst, 8), 100),
+		bar:     min(max(contentW-labelCol-11, 8), 100),
 		node:    min(max((contentW-34)/2, 6), 40),
 		sep:     min(max(contentW-2, 16), 120),
 		label:   labelCol,
@@ -341,7 +329,7 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	eventLines := dashboardEventsColumn(data.allWarnings)
 	events = strings.Join(eventLines, "\n")
 	twoCol := m.fullscreenDashboard && events != ""
-	w := m.dashboardWidths(data, twoCol)
+	w := m.dashboardWidths(twoCol)
 
 	var lines []string
 	lines = append(lines, "")
