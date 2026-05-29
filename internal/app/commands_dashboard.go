@@ -352,7 +352,15 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 
 	var right []string
 	if twoCol {
-		right = append(right, dashboardWarningsColumn(data)...)
+		if warn := dashboardWarningsColumn(data); len(warn) > 0 {
+			right = append(right, warn...)
+			// Divide warnings from the events below. Size it to match
+			// wrapEventsColumn's wrap width (rightW-4); that helper adds the
+			// leading "  " pad, so the rule renders as a single full-width line
+			// rather than wrapping.
+			_, rightW := dashboardColumnWidths(content, m.width-2)
+			right = append(right, ui.DimStyle.Render(strings.Repeat("─", max(rightW-4, 10))))
+		}
 	}
 	right = append(right, dashboardEventsColumn(data.allWarnings)...)
 	events = strings.Join(right, "\n")

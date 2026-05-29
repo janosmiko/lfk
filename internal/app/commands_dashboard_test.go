@@ -123,6 +123,11 @@ func TestComposeDashboard_WarningsPlacement(t *testing.T) {
 		assert.Contains(t, right, "RECENT EVENTS")
 		assert.Less(t, strings.Index(right, "WARNINGS"), strings.Index(right, "RECENT EVENTS"),
 			"warnings must sit above recent events")
+		// A separator divides the warnings from the events below it.
+		sep := strings.Index(right, "─")
+		require.Positive(t, sep, "a separator must appear in the right column")
+		assert.Less(t, strings.Index(right, "WARNINGS"), sep)
+		assert.Less(t, sep, strings.Index(right, "RECENT EVENTS"))
 	})
 
 	t.Run("preview pane stacks warnings in the single column", func(t *testing.T) {
