@@ -9,6 +9,8 @@ import (
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -37,6 +39,7 @@ type podStats struct {
 	running   int
 	failed    int
 	pending   int
+	succeeded int
 	crashLoop int
 }
 
@@ -198,27 +201,182 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	data := acc.data
 	delete(m.dashboardAcc, key)
 	return m, func() tea.Msg {
-		return composeDashboardLoadedMsg(msg.context, data)
+		return dashboardLoadedMsg{data: data, context: msg.context}
 	}
 }
 
-// composeDashboardLoadedMsg builds a dashboardLoadedMsg from a (possibly
-// partial) dashboardData. Used by the partial accumulator.
-func composeDashboardLoadedMsg(kctx string, data dashboardData) dashboardLoadedMsg {
-	var lines []string
-	lines = append(lines, "")
-	lines = dashboardHeaderSection(lines, data)
-	lines = dashboardResourcesSection(lines, data)
-	lines = dashboardNodesSection(lines, data)
-	lines = dashboardWarningsSection(lines, data)
-	lines = dashboardInlineEventsSection(lines, data.warningEvents)
-	lines = append(lines, "")
-	eventLines := dashboardEventsColumn(data.allWarnings)
-	return dashboardLoadedMsg{
-		content: strings.Join(lines, "\n"),
-		events:  strings.Join(eventLines, "\n"),
-		context: kctx,
+// dashboardWidths holds the bar/separator widths used when composing the
+// dashboard. They scale with the width the dashboard is rendered at so the
+// bars use the available space (wide in fullscreen, compact in the right
+// preview pane) without overflowing the column.
+type dashboardWidths struct {
+	bar     int // cluster bars: node health, pod status, CPU, Mem
+	node    int // per-node CPU/Mem bars (two side by side)
+	sep     int // horizontal separator rule
+	label   int // metric-row label column width (for inline label/bar/summary alignment)
+	content int // total content width; inline rows are truncated to it as a safety net
+}
+
+// nodeSummaryStr is the inline status summary for the Nodes row, e.g.
+// "14 Ready" or "12 Ready · 2 NotReady".
+func nodeSummaryStr(d dashboardData) string {
+	s := ui.StatusRunning.Render(fmt.Sprintf("%d Ready", d.readyNodes))
+	if d.readyNodes < d.nodeCount {
+		s += dashboardSummarySep + ui.StatusFailed.Render(fmt.Sprintf("%d NotReady", d.nodeCount-d.readyNodes))
 	}
+	return s
+}
+
+// podOther is the count of pods not in a counted phase (Terminating, Unknown,
+// etc.) plus any rounding slack. Kept non-negative.
+func podOther(p podStats) int {
+	return max(p.total-p.running-p.pending-p.failed-p.succeeded, 0)
+}
+
+// podSummaryStr is the inline status breakdown for the Pods row, e.g.
+// "361 Running · 39 Failed · 24 Succeeded". Only non-zero states are shown;
+// Succeeded is grey (terminal, not an error), Failed red, Pending amber, and
+// any uncounted pods show as a neutral "Other" so they never read as failures.
+// The categories and order mirror the bar segments so bar and text agree.
+func podSummaryStr(d dashboardData) string {
+	parts := make([]string, 0, 5)
+	if d.pods.running > 0 {
+		parts = append(parts, ui.StatusRunning.Render(fmt.Sprintf("%d Running", d.pods.running)))
+	}
+	if d.pods.pending > 0 {
+		parts = append(parts, ui.StatusProgressing.Render(fmt.Sprintf("%d Pending", d.pods.pending)))
+	}
+	if d.pods.failed > 0 {
+		parts = append(parts, ui.StatusFailed.Render(fmt.Sprintf("%d Failed", d.pods.failed)))
+	}
+	if d.pods.succeeded > 0 {
+		parts = append(parts, ui.StatusOther.Render(fmt.Sprintf("%d Succeeded", d.pods.succeeded)))
+	}
+	if other := podOther(d.pods); other > 0 {
+		parts = append(parts, ui.DimStyle.Render(fmt.Sprintf("%d Other", other)))
+	}
+	if len(parts) == 0 {
+		return ui.DimStyle.Render("no pods")
+	}
+	return strings.Join(parts, dashboardSummarySep)
+}
+
+func cpuSummaryStr(d dashboardData) string {
+	return ui.NormalStyle.Render(ui.FormatCPU(d.totalCPUUsed) + " / " + ui.FormatCPU(d.totalCPUAlloc))
+}
+
+func memSummaryStr(d dashboardData) string {
+	return ui.NormalStyle.Render(ui.FormatMemory(d.totalMemUsed) + " / " + ui.FormatMemory(d.totalMemAlloc))
+}
+
+// dashboardSummarySep separates status counts within an inline summary.
+const dashboardSummarySep = " · "
+
+// dashboardMetricLines lays out one cluster metric over two lines: the label +
+// bar on the first, and the status summary on its own indented line. Keeping
+// the summary off the bar line means a long breakdown (e.g. Running · Pending ·
+// Failed · Succeeded) never shrinks the bar. Both lines are truncated to the
+// column width so a long summary can't wrap and tear the layout.
+func dashboardMetricLines(label, bar, summary string, w dashboardWidths) []string {
+	pad := max(w.label-lipgloss.Width(label), 0)
+	barLine := "  " + ui.HelpKeyStyle.Render(label) + strings.Repeat(" ", pad) + "  " + bar
+	sumLine := strings.Repeat(" ", 2+w.label+2) + summary
+	return []string{
+		ansi.Truncate(barLine, w.content, ""),
+		ansi.Truncate(sumLine, w.content, ""),
+	}
+}
+
+// dashboardContentWidth returns the column content width the dashboard will be
+// rendered into for the current display mode, matching the view layout.
+func (m Model) dashboardContentWidth(twoCol bool) int {
+	if !m.fullscreenDashboard {
+		// Right preview pane inner width (mirrors viewExplorer's column math).
+		usable := m.width - 6
+		leftW := max(10, usable*12/100)
+		middleW := max(10, usable*51/100)
+		rightW := max(10, usable-leftW-middleW)
+		return max(rightW-2, 20)
+	}
+	innerW := m.width - 4 // ActiveColumnStyle border+padding
+	if twoCol {
+		return max(innerW*60/100, 20) // left column cap (see dashboardColumnWidths)
+	}
+	return max(innerW, 20)
+}
+
+// dashboardWidths derives the metric-row widths from the target content width.
+// Bars are uniform and as wide as the column allows; the summary lives on its
+// own line, so it no longer constrains the bar. The reservation (labelCol + 11)
+// leaves room for the "  " indents, brackets, and renderBar's " NNN%" suffix so
+// the bar line still fits contentW.
+func (m Model) dashboardWidths(twoCol bool) dashboardWidths {
+	contentW := m.dashboardContentWidth(twoCol)
+	const labelCol = 5 // "Nodes" / "Pods" / "CPU" / "Mem"
+	// Per-node row is `      CPU [bar] NN%   MEM [bar] NN%`; the two bars share
+	// a fixed 31-col overhead (indents, "CPU"/"MEM" labels, brackets, "%",
+	// gaps), so split the rest between them to reach the same right edge as the
+	// top bars instead of staying noticeably narrower.
+	const perNodeOverhead = 31
+	return dashboardWidths{
+		bar:     min(max(contentW-labelCol-11, 8), 100),
+		node:    min(max((contentW-perNodeOverhead)/2, 3), 60),
+		sep:     min(max(contentW-2, 16), 120),
+		label:   labelCol,
+		content: contentW,
+	}
+}
+
+// composeDashboard renders the dashboard content + events column for the given
+// data at the current display width. Pure w.r.t. the model except for reading
+// width / fullscreen state, so it can be re-run whenever those change.
+func (m Model) composeDashboard(data dashboardData) (content, events string) {
+	// The fullscreen cluster dashboard is always two-column (the right column
+	// always shows at least "RECENT EVENTS"). There, warnings move to the top
+	// of the right column, above the events. In the non-fullscreen preview pane
+	// everything stacks in the single column.
+	twoCol := m.fullscreenDashboard
+	w := m.dashboardWidths(twoCol)
+
+	var left []string
+	left = append(left, "")
+	left = dashboardHeaderSection(left, data, w)
+	left = dashboardResourcesSection(left, data, w)
+	left = dashboardNodesSection(left, data, w)
+	if !twoCol {
+		left = dashboardWarningsSection(left, data, w)
+		left = dashboardInlineEventsSection(left, data.warningEvents, w)
+	}
+	left = append(left, "")
+	content = strings.Join(left, "\n")
+
+	var right []string
+	if twoCol {
+		if warn := dashboardWarningsColumn(data); len(warn) > 0 {
+			right = append(right, warn...)
+			// Divide warnings from the events below. Size it to match
+			// wrapEventsColumn's wrap width (rightW-4); that helper adds the
+			// leading "  " pad, so the rule renders as a single full-width line
+			// rather than wrapping.
+			_, rightW := dashboardColumnWidths(content, m.width-2)
+			right = append(right, ui.DimStyle.Render(strings.Repeat("─", max(rightW-4, 10))))
+		}
+	}
+	right = append(right, dashboardEventsColumn(data.allWarnings)...)
+	events = strings.Join(right, "\n")
+	return content, events
+}
+
+// recomposeDashboard re-renders dashboardPreview / dashboardEventsPreview from
+// the retained data at the current width. No-op when no data is loaded for the
+// active context. Called on data load, fullscreen toggle, and window resize so
+// the bars always fit the available space.
+func (m Model) recomposeDashboard() Model {
+	ctx := m.dashboardPreviewTargetContext()
+	if data, ok := m.dashboardData[ctx]; ok {
+		m.dashboardPreview, m.dashboardEventsPreview = m.composeDashboard(data)
+	}
+	return m
 }
 
 // countPodStats tallies pod statuses.
@@ -235,6 +393,8 @@ func countPodStats(podItems []model.Item) podStats {
 			ps.failed++
 		case "Pending", "ContainerCreating", "Init":
 			ps.pending++
+		case "Succeeded", "Completed":
+			ps.succeeded++
 		}
 	}
 	return ps

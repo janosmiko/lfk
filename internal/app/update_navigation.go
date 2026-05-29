@@ -412,6 +412,7 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		}
 		m.fullscreenDashboard = true
 		m.previewScroll = 0
+		m = m.recomposeDashboard()
 		m.setStatusMessage("Dashboard fullscreen ON", false)
 		return m, scheduleStatusClear()
 	}

@@ -518,14 +518,11 @@ type Model struct {
 	prevNodeMetrics     map[string]model.PodMetrics
 	prevNodeMetricsTime time.Time
 
-	// Dashboard preview: rendered cluster dashboard for the right column.
-	dashboardPreview string
-
-	// Dashboard events preview: warning events for the two-column dashboard layout.
-	dashboardEventsPreview string
-
-	// Monitoring preview: rendered monitoring dashboard for the right column.
-	monitoringPreview string
+	// Dashboard state for the cluster overview / monitoring previews.
+	dashboardPreview       string                   // rendered cluster dashboard (right column / fullscreen)
+	dashboardEventsPreview string                   // warning events for the two-column layout
+	dashboardData          map[string]dashboardData // retained per context; recomposed at current width on resize / fullscreen toggle
+	monitoringPreview      string                   // rendered monitoring dashboard
 
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)

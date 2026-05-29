@@ -30,6 +30,133 @@ func newTestModelForDashboard(_ *testing.T) Model {
 	}
 }
 
+// TestDashboardBarsScaleWithWidth verifies the resource usage bars use the
+// available space: wide in fullscreen, compact in the narrow right pane, and
+// noticeably wider than the old fixed width of 30.
+func TestDashboardBarsScaleWithWidth(t *testing.T) {
+	full := Model{width: 200, height: 50, fullscreenDashboard: true}
+	pane := Model{width: 200, height: 50, fullscreenDashboard: false}
+
+	wf := full.dashboardWidths(false)
+	wp := pane.dashboardWidths(false)
+
+	assert.Greater(t, wf.bar, wp.bar, "fullscreen bars must be wider than the right-pane bars")
+	assert.Greater(t, wf.bar, 30, "fullscreen bars must use more space than the old fixed 30")
+}
+
+// TestComposeDashboardFitsContentWidth guards the two-column wrap risk: no
+// composed dashboard line may exceed the content width it is rendered into,
+// otherwise the left pane wraps and the layout tears.
+func TestComposeDashboardFitsContentWidth(t *testing.T) {
+	// A long pod breakdown is the worst-case summary width.
+	base := dashboardData{
+		nodeCount: 3, readyNodes: 1, nodeItems: make([]model.Item, 3),
+		pods:         podStats{total: 424, running: 361, failed: 39, succeeded: 24},
+		nsCount:      53,
+		totalCPUUsed: 520, totalCPUAlloc: 1000,
+		totalMemUsed: 2 << 30, totalMemAlloc: 4 << 30,
+		nodes: []nodeInfo{
+			// A very long node name must be truncated, not wrapped.
+			{name: "itg-k8s-autoscaled-cx43-167f996afa950112-extra-long", cpuUsed: 1, cpuAlloc: 2, memUsed: 1 << 30, memAlloc: 2 << 30},
+		},
+	}
+	withWarnings := base
+	withWarnings.allWarnings = []model.Item{{Name: "e1"}, {Name: "e2"}}
+
+	for _, tc := range []struct {
+		name       string
+		fullscreen bool
+		data       dashboardData
+	}{
+		{"fullscreen single-col", true, base},
+		{"fullscreen two-col", true, withWarnings},
+		{"right pane", false, base},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := Model{width: 120, height: 40, fullscreenDashboard: tc.fullscreen}
+			content, events := m.composeDashboard(tc.data)
+			twoCol := tc.fullscreen && events != ""
+			cw := m.dashboardContentWidth(twoCol)
+			for ln := range strings.SplitSeq(content, "\n") {
+				assert.LessOrEqual(t, lipgloss.Width(ln), cw,
+					"line %q exceeds content width %d", stripANSI(ln), cw)
+			}
+		})
+	}
+}
+
+func TestCountPodStatsSucceeded(t *testing.T) {
+	ps := countPodStats([]model.Item{
+		{Status: "Running"}, {Status: "Succeeded"}, {Status: "Completed"}, {Status: "Failed"},
+	})
+	assert.Equal(t, 2, ps.succeeded, "Succeeded and Completed both count as succeeded")
+	assert.Equal(t, 1, ps.running)
+	assert.Equal(t, 1, ps.failed)
+}
+
+func TestPodSummaryBreakdown(t *testing.T) {
+	s := stripANSI(podSummaryStr(dashboardData{
+		pods: podStats{total: 424, running: 361, failed: 39, succeeded: 24},
+	}))
+	assert.Contains(t, s, "361 Running")
+	assert.Contains(t, s, "39 Failed")
+	assert.Contains(t, s, "24 Succeeded")
+	// Zero-count states are omitted (no phantom categories).
+	assert.NotContains(t, s, "Pending")
+	assert.NotContains(t, s, "Other")
+}
+
+func TestComposeDashboard_WarningsPlacement(t *testing.T) {
+	data := dashboardData{
+		nodeCount: 3, readyNodes: 3, nodeItems: make([]model.Item, 3),
+		pods:          podStats{total: 10, running: 6, failed: 4},
+		warningEvents: []model.Item{{Age: "5m"}},
+		allWarnings:   []model.Item{{Age: "5m"}},
+	}
+
+	t.Run("fullscreen puts warnings in the right column above events", func(t *testing.T) {
+		m := Model{width: 120, height: 40, fullscreenDashboard: true}
+		content, events := m.composeDashboard(data)
+		assert.NotContains(t, stripANSI(content), "WARNINGS",
+			"warnings must not be in the left column in fullscreen")
+		right := stripANSI(events)
+		assert.Contains(t, right, "WARNINGS")
+		assert.Contains(t, right, "RECENT EVENTS")
+		assert.Less(t, strings.Index(right, "WARNINGS"), strings.Index(right, "RECENT EVENTS"),
+			"warnings must sit above recent events")
+		// A separator divides the warnings from the events below it.
+		sep := strings.Index(right, "─")
+		require.Positive(t, sep, "a separator must appear in the right column")
+		assert.Less(t, strings.Index(right, "WARNINGS"), sep)
+		assert.Less(t, sep, strings.Index(right, "RECENT EVENTS"))
+	})
+
+	t.Run("preview pane stacks warnings in the single column", func(t *testing.T) {
+		m := Model{width: 120, height: 40, fullscreenDashboard: false}
+		content, _ := m.composeDashboard(data)
+		assert.Contains(t, stripANSI(content), "WARNINGS")
+	})
+}
+
+func TestPodOther(t *testing.T) {
+	// Uncounted phases (Terminating/Unknown) surface as Other, never Failed.
+	assert.Equal(t, 5, podOther(podStats{total: 10, running: 5}))
+	assert.Equal(t, 0, podOther(podStats{total: 10, running: 6, succeeded: 4}))
+	// Never negative even if counts somehow exceed the total.
+	assert.Equal(t, 0, podOther(podStats{total: 10, running: 8, failed: 5}))
+}
+
+func TestPodSummaryShowsOtherNotFailed(t *testing.T) {
+	// total exceeds the counted phases with zero failures: the leftover must
+	// read as Other, not as a phantom failure.
+	s := stripANSI(podSummaryStr(dashboardData{
+		pods: podStats{total: 10, running: 7},
+	}))
+	assert.Contains(t, s, "7 Running")
+	assert.Contains(t, s, "3 Other")
+	assert.NotContains(t, s, "Failed")
+}
+
 // stripANSI removes ANSI escape codes to allow plain-text assertions on
 // rendered output. This covers the basic CSI sequences emitted by lipgloss.
 func stripANSI(s string) string {
