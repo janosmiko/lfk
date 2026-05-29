@@ -88,6 +88,63 @@ func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
 		"two-col rows must not overflow the content area and wrap (no blank tail line between rows)")
 }
 
+// TestViewExplorerDashboardTwoColWrappedEventsFillBackground guards the issue
+// #293 follow-up: the events column wraps long messages, and lipgloss emits the
+// parameterless reset (ESC[m) at each wrap boundary. FillLinesBg must re-apply
+// the theme background after that reset too, or the per-column padding that
+// follows a wrapped sub-line renders with the terminal default (a black "tear")
+// — the artifact reported in the cluster events preview.
+func TestViewExplorerDashboardTwoColWrappedEventsFillBackground(t *testing.T) {
+	origProfile := lipgloss.DefaultRenderer().ColorProfile()
+	origTheme := ui.ActiveTheme
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+	ui.ApplyTheme(ui.DefaultTheme())
+	t.Cleanup(func() {
+		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
+		ui.ApplyTheme(origTheme)
+	})
+
+	// A long, styled message that must wrap across several sub-lines within the
+	// right column — each wrap boundary closes with the parameterless reset.
+	longMsg := ui.DimStyle.Render("Readiness probe failed: Get http://172.18.12.93:8080/healthz: " +
+		"dial tcp 172.18.12.93:8080: connect: connection refused after several retries")
+	m := Model{
+		nav:                 model.NavigationState{Level: model.LevelResourceTypes, Context: "test"},
+		middleItems:         []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}},
+		width:               120,
+		height:              40,
+		mode:                modeExplorer,
+		namespace:           "default",
+		fullscreenDashboard: true,
+		dashboardPreview:    "NODES: 3 Ready\nPODS: 42 Running",
+		dashboardEventsPreview: ui.DimStyle.Bold(true).Render("  RECENT EVENTS") + "\n\n" +
+			"  " + ui.StatusProgressing.Render("⚠") + " 2m   " +
+			ui.StatusFailed.Render("Unhealthy:") + " " + ui.NormalStyle.Render("Pod/argocd-server") + "\n" +
+			"       " + longMsg,
+		tabs:               []TabState{{}},
+		selectedItems:      make(map[string]bool),
+		cursorMemory:       make(map[string]int),
+		itemCache:          make(map[string][]model.Item),
+		yamlCollapsed:      make(map[string]bool),
+		selectedNamespaces: make(map[string]bool),
+	}
+
+	out := m.View()
+
+	assert.Contains(t, out, "\x1b[", "forced color profile must emit ANSI sequences")
+	// Guard against a vacuous pass: confirm a wrap boundary actually emitted the
+	// parameterless reset. The fix rewrites it to "reset + bgSeq" (keeping the
+	// reset present), so its absence would mean no wrap occurred — making the
+	// NotContains check below meaningless.
+	assert.Contains(t, out, "\x1b[m",
+		"a wrapped event sub-line must emit the parameterless reset for this test to be meaningful")
+	// A parameterless reset immediately followed by a space is un-backgrounded
+	// padding after a wrap boundary — the black tear. FillLinesBg must rewrite
+	// it to "reset + bgSeq".
+	assert.NotContains(t, out, "\x1b[m ",
+		"wrapped event sub-lines must re-apply the theme background after the parameterless reset")
+}
+
 // TestClampPreviewScrollDashboard guards against scrolling the fullscreen
 // dashboard past its last line. clampPreviewScroll previously only knew the
 // right-column preview's content, so in dashboard mode it let previewScroll
