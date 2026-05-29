@@ -4,10 +4,70 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// TestViewExplorerDashboardTwoColFillsThemeBackground guards issue #293: the
+// two-column fullscreen dashboard (cluster overview with a warning-events
+// column) must re-apply the theme background after every ANSI reset in its
+// content, otherwise styled spans leave the terminal's default background
+// (black under non-black themes) "torn" into the panel.
+//
+// FillLinesBg rewrites every interior reset to "reset + bgSeq". The lipgloss
+// column wrapper does not re-apply its background after resets inside the
+// content it wraps, so the "reset + bgSeq" adjacency only appears when the
+// two-col path itself ran FillLinesBg — which is exactly the fix.
+func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
+	// lipgloss downgrades to the Ascii profile without a TTY (emits no ANSI),
+	// which would make FillLinesBg a no-op. Force a color profile so the
+	// background sequences are actually rendered.
+	origProfile := lipgloss.DefaultRenderer().ColorProfile()
+	origTheme := ui.ActiveTheme
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+	ui.ApplyTheme(ui.DefaultTheme())
+	t.Cleanup(func() {
+		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
+		ui.ApplyTheme(origTheme)
+	})
+
+	// A styled span ends with an ANSI reset; the line is shorter than the
+	// column so per-column padding follows it — the exact tear condition.
+	styled := lipgloss.NewStyle().Foreground(lipgloss.Color("#ff5555")).Render("GAUGE")
+	m := Model{
+		nav:                 model.NavigationState{Level: model.LevelResourceTypes, Context: "test"},
+		middleItems:         []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}},
+		width:               120,
+		height:              40,
+		mode:                modeExplorer,
+		namespace:           "default",
+		fullscreenDashboard: true,
+		dashboardPreview:    styled + "\nNode Count: 3\nPod Count: 42",
+		dashboardEventsPreview: "RECENT WARNING EVENTS\n" +
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#ffaa00")).Render("Warning") + " pod crashed",
+		tabs:               []TabState{{}},
+		selectedItems:      make(map[string]bool),
+		cursorMemory:       make(map[string]int),
+		itemCache:          make(map[string][]model.Item),
+		yamlCollapsed:      make(map[string]bool),
+		selectedNamespaces: make(map[string]bool),
+	}
+
+	out := m.View()
+
+	// Guard against a vacuous pass: with the forced TrueColor profile the view
+	// must contain ANSI styling, otherwise there are no resets to assert on.
+	assert.Contains(t, out, "\x1b[", "forced color profile must emit ANSI sequences")
+	// A reset immediately followed by a space is un-backgrounded padding — the
+	// "black tear". FillLinesBg rewrites every reset to "reset + bgSeq", so no
+	// bare "reset space" survives once the two-col path fills the background.
+	assert.NotContains(t, out, "\x1b[0m ",
+		"two-col dashboard must re-apply the theme background after interior ANSI resets")
+}
 
 // --- View: fullscreen modes ---
 

@@ -670,6 +670,12 @@ func (m Model) viewExplorerDashboardTwoCol(dashContent string, fullW, contentHei
 		rows[i] = leftStyle.Render(l) + sep + rightStyle.Render(r)
 	}
 	dashCol := strings.Join(rows, "\n")
+	// Re-apply the theme background after every ANSI reset and pad each row to
+	// full width, mirroring the single-col path. Without this the per-column
+	// lipgloss padding and the gaps after styled spans render with the
+	// terminal's default background, which "tears" black rectangles into the
+	// dashboard under themes whose base colour isn't black.
+	dashCol = ui.FillLinesBg(dashCol, leftW+1+rightW, ui.BaseBg)
 	return ui.ActiveColumnStyle.Width(fullW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(dashCol)
 }
 
