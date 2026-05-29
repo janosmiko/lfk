@@ -105,6 +105,33 @@ func TestPodSummaryBreakdown(t *testing.T) {
 	assert.NotContains(t, s, "Other")
 }
 
+func TestComposeDashboard_WarningsPlacement(t *testing.T) {
+	data := dashboardData{
+		nodeCount: 3, readyNodes: 3, nodeItems: make([]model.Item, 3),
+		pods:          podStats{total: 10, running: 6, failed: 4},
+		warningEvents: []model.Item{{Age: "5m"}},
+		allWarnings:   []model.Item{{Age: "5m"}},
+	}
+
+	t.Run("fullscreen puts warnings in the right column above events", func(t *testing.T) {
+		m := Model{width: 120, height: 40, fullscreenDashboard: true}
+		content, events := m.composeDashboard(data)
+		assert.NotContains(t, stripANSI(content), "WARNINGS",
+			"warnings must not be in the left column in fullscreen")
+		right := stripANSI(events)
+		assert.Contains(t, right, "WARNINGS")
+		assert.Contains(t, right, "RECENT EVENTS")
+		assert.Less(t, strings.Index(right, "WARNINGS"), strings.Index(right, "RECENT EVENTS"),
+			"warnings must sit above recent events")
+	})
+
+	t.Run("preview pane stacks warnings in the single column", func(t *testing.T) {
+		m := Model{width: 120, height: 40, fullscreenDashboard: false}
+		content, _ := m.composeDashboard(data)
+		assert.Contains(t, stripANSI(content), "WARNINGS")
+	})
+}
+
 func TestPodOther(t *testing.T) {
 	// Uncounted phases (Terminating/Unknown) surface as Other, never Failed.
 	assert.Equal(t, 5, podOther(podStats{total: 10, running: 5}))

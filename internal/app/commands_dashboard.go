@@ -313,9 +313,14 @@ func (m Model) dashboardContentWidth(twoCol bool) int {
 func (m Model) dashboardWidths(twoCol bool) dashboardWidths {
 	contentW := m.dashboardContentWidth(twoCol)
 	const labelCol = 5 // "Nodes" / "Pods" / "CPU" / "Mem"
+	// Per-node row is `      CPU [bar] NN%   MEM [bar] NN%`; the two bars share
+	// a fixed 31-col overhead (indents, "CPU"/"MEM" labels, brackets, "%",
+	// gaps), so split the rest between them to reach the same right edge as the
+	// top bars instead of staying noticeably narrower.
+	const perNodeOverhead = 31
 	return dashboardWidths{
 		bar:     min(max(contentW-labelCol-11, 8), 100),
-		node:    min(max((contentW-34)/2, 6), 40),
+		node:    min(max((contentW-perNodeOverhead)/2, 6), 60),
 		sep:     min(max(contentW-2, 16), 120),
 		label:   labelCol,
 		content: contentW,
@@ -326,20 +331,32 @@ func (m Model) dashboardWidths(twoCol bool) dashboardWidths {
 // data at the current display width. Pure w.r.t. the model except for reading
 // width / fullscreen state, so it can be re-run whenever those change.
 func (m Model) composeDashboard(data dashboardData) (content, events string) {
-	eventLines := dashboardEventsColumn(data.allWarnings)
-	events = strings.Join(eventLines, "\n")
-	twoCol := m.fullscreenDashboard && events != ""
+	// The fullscreen cluster dashboard is always two-column (the right column
+	// always shows at least "RECENT EVENTS"). There, warnings move to the top
+	// of the right column, above the events. In the non-fullscreen preview pane
+	// everything stacks in the single column.
+	twoCol := m.fullscreenDashboard
 	w := m.dashboardWidths(twoCol)
 
-	var lines []string
-	lines = append(lines, "")
-	lines = dashboardHeaderSection(lines, data, w)
-	lines = dashboardResourcesSection(lines, data, w)
-	lines = dashboardNodesSection(lines, data, w)
-	lines = dashboardWarningsSection(lines, data, w)
-	lines = dashboardInlineEventsSection(lines, data.warningEvents)
-	lines = append(lines, "")
-	return strings.Join(lines, "\n"), events
+	var left []string
+	left = append(left, "")
+	left = dashboardHeaderSection(left, data, w)
+	left = dashboardResourcesSection(left, data, w)
+	left = dashboardNodesSection(left, data, w)
+	if !twoCol {
+		left = dashboardWarningsSection(left, data, w)
+		left = dashboardInlineEventsSection(left, data.warningEvents, w)
+	}
+	left = append(left, "")
+	content = strings.Join(left, "\n")
+
+	var right []string
+	if twoCol {
+		right = append(right, dashboardWarningsColumn(data)...)
+	}
+	right = append(right, dashboardEventsColumn(data.allWarnings)...)
+	events = strings.Join(right, "\n")
+	return content, events
 }
 
 // recomposeDashboard re-renders dashboardPreview / dashboardEventsPreview from
