@@ -132,6 +132,12 @@ func TestViewExplorerDashboardTwoColWrappedEventsFillBackground(t *testing.T) {
 	out := m.View()
 
 	assert.Contains(t, out, "\x1b[", "forced color profile must emit ANSI sequences")
+	// Guard against a vacuous pass: confirm a wrap boundary actually emitted the
+	// parameterless reset. The fix rewrites it to "reset + bgSeq" (keeping the
+	// reset present), so its absence would mean no wrap occurred — making the
+	// NotContains check below meaningless.
+	assert.Contains(t, out, "\x1b[m",
+		"a wrapped event sub-line must emit the parameterless reset for this test to be meaningful")
 	// A parameterless reset immediately followed by a space is un-backgrounded
 	// padding after a wrap boundary — the black tear. FillLinesBg must rewrite
 	// it to "reset + bgSeq".
