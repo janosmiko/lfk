@@ -224,7 +224,9 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))
 
 	// Pods: status bar (green Running / amber Pending / red Failed / grey
-	// Succeeded) + inline breakdown.
+	// Succeeded) + inline breakdown. "Other" (Terminating/Unknown + rounding
+	// slack) is the neutral last segment so renderStackedBar's remainder-fill
+	// never paints leftover space red as phantom failures.
 	if data.pods.total > 0 {
 		segments := []struct {
 			count int
@@ -232,8 +234,9 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 		}{
 			{data.pods.running, ui.StatusRunning},
 			{data.pods.pending, ui.StatusProgressing},
-			{data.pods.succeeded, ui.StatusOther},
 			{data.pods.failed, ui.StatusFailed},
+			{data.pods.succeeded, ui.StatusOther},
+			{podOther(data.pods), ui.DimStyle},
 		}
 		podBar := renderStackedBar(segments, data.pods.total, w.bar)
 		lines = append(lines, dashboardMetricRow("Pods", podBar, podSummaryStr(data), w))

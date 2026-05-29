@@ -101,8 +101,28 @@ func TestPodSummaryBreakdown(t *testing.T) {
 	assert.Contains(t, s, "361 Running")
 	assert.Contains(t, s, "39 Failed")
 	assert.Contains(t, s, "24 Succeeded")
-	// Zero-count states are omitted.
+	// Zero-count states are omitted (no phantom categories).
 	assert.NotContains(t, s, "Pending")
+	assert.NotContains(t, s, "Other")
+}
+
+func TestPodOther(t *testing.T) {
+	// Uncounted phases (Terminating/Unknown) surface as Other, never Failed.
+	assert.Equal(t, 5, podOther(podStats{total: 10, running: 5}))
+	assert.Equal(t, 0, podOther(podStats{total: 10, running: 6, succeeded: 4}))
+	// Never negative even if counts somehow exceed the total.
+	assert.Equal(t, 0, podOther(podStats{total: 10, running: 8, failed: 5}))
+}
+
+func TestPodSummaryShowsOtherNotFailed(t *testing.T) {
+	// total exceeds the counted phases with zero failures: the leftover must
+	// read as Other, not as a phantom failure.
+	s := stripANSI(podSummaryStr(dashboardData{
+		pods: podStats{total: 10, running: 7},
+	}))
+	assert.Contains(t, s, "7 Running")
+	assert.Contains(t, s, "3 Other")
+	assert.NotContains(t, s, "Failed")
 }
 
 // stripANSI removes ANSI escape codes to allow plain-text assertions on

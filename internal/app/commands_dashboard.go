@@ -227,11 +227,19 @@ func nodeSummaryStr(d dashboardData) string {
 	return s
 }
 
+// podOther is the count of pods not in a counted phase (Terminating, Unknown,
+// etc.) plus any rounding slack. Kept non-negative.
+func podOther(p podStats) int {
+	return max(p.total-p.running-p.pending-p.failed-p.succeeded, 0)
+}
+
 // podSummaryStr is the inline status breakdown for the Pods row, e.g.
 // "361 Running · 39 Failed · 24 Succeeded". Only non-zero states are shown;
-// Succeeded is grey (terminal, not an error), Failed red, Pending amber.
+// Succeeded is grey (terminal, not an error), Failed red, Pending amber, and
+// any uncounted pods show as a neutral "Other" so they never read as failures.
+// The categories and order mirror the bar segments so bar and text agree.
 func podSummaryStr(d dashboardData) string {
-	parts := make([]string, 0, 4)
+	parts := make([]string, 0, 5)
 	if d.pods.running > 0 {
 		parts = append(parts, ui.StatusRunning.Render(fmt.Sprintf("%d Running", d.pods.running)))
 	}
@@ -243,6 +251,9 @@ func podSummaryStr(d dashboardData) string {
 	}
 	if d.pods.succeeded > 0 {
 		parts = append(parts, ui.StatusOther.Render(fmt.Sprintf("%d Succeeded", d.pods.succeeded)))
+	}
+	if other := podOther(d.pods); other > 0 {
+		parts = append(parts, ui.DimStyle.Render(fmt.Sprintf("%d Other", other)))
 	}
 	if len(parts) == 0 {
 		return ui.DimStyle.Render("no pods")
