@@ -88,6 +88,53 @@ func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
 		"two-col rows must not overflow the content area and wrap (no blank tail line between rows)")
 }
 
+// TestClampPreviewScrollDashboard guards against scrolling the fullscreen
+// dashboard past its last line. clampPreviewScroll previously only knew the
+// right-column preview's content, so in dashboard mode it let previewScroll
+// run into blank space below the rendered nodes/overview content.
+func TestClampPreviewScrollDashboard(t *testing.T) {
+	newModel := func(lines, height int) Model {
+		body := make([]string, lines)
+		for i := range body {
+			// Wide lines: they fit on one row at the full dashboard width but
+			// wrap when the old clamp measured them at the narrow right-column
+			// width, which is exactly what inflated maxScroll and allowed the
+			// over-scroll.
+			body[i] = strings.Repeat("x", 80)
+		}
+		return Model{
+			nav:                 model.NavigationState{Level: model.LevelResourceTypes, Context: "test"},
+			middleItems:         []model.Item{{Name: "Cluster Dashboard", Extra: "__overview__"}},
+			width:               120,
+			height:              height,
+			fullscreenDashboard: true,
+			dashboardPreview:    strings.Join(body, "\n"),
+			// Right-pane preview state that the old clamp folded into its
+			// total — irrelevant to the dashboard, and the source of the
+			// over-scroll. The dashboard clamp must ignore it.
+			previewEventsContent: strings.Repeat("event\n", 50),
+			tabs:                 []TabState{{}},
+			selectedItems:        make(map[string]bool),
+			cursorMemory:         make(map[string]int),
+		}
+	}
+
+	t.Run("content shorter than viewport cannot scroll", func(t *testing.T) {
+		m := newModel(5, 40) // 5 lines, viewport ~36
+		m.previewScroll = 999
+		m.clampPreviewScroll()
+		assert.Equal(t, 0, m.previewScroll, "no scroll when content fits the viewport")
+	})
+
+	t.Run("content taller than viewport clamps to last page", func(t *testing.T) {
+		m := newModel(100, 20) // viewport = height-4 = 16
+		m.previewScroll = 999
+		m.clampPreviewScroll()
+		assert.Equal(t, 100-16, m.previewScroll,
+			"max scroll must leave the last viewport of content on screen")
+	})
+}
+
 // --- View: fullscreen modes ---
 
 func TestViewYAMLModeWithVisualMode(t *testing.T) {

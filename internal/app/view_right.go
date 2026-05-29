@@ -10,6 +10,13 @@ import (
 // clampPreviewScroll prevents scrolling past the preview content.
 // Only details+events scroll; pinned header (children) and footer (resource usage) are excluded.
 func (m *Model) clampPreviewScroll() {
+	// The fullscreen dashboard reuses previewScroll but renders entirely
+	// different content (cluster overview / monitoring), so bound it against
+	// that content instead of the right-column preview.
+	if m.fullscreenDashboard {
+		m.clampDashboardScroll()
+		return
+	}
 	// Compute the right column width exactly as the View function does.
 	usable := m.width - 6
 	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
