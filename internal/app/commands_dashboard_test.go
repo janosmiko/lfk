@@ -56,7 +56,8 @@ func TestComposeDashboardFitsContentWidth(t *testing.T) {
 		totalCPUUsed: 520, totalCPUAlloc: 1000,
 		totalMemUsed: 2 << 30, totalMemAlloc: 4 << 30,
 		nodes: []nodeInfo{
-			{name: "node-1", cpuUsed: 1, cpuAlloc: 2, memUsed: 1 << 30, memAlloc: 2 << 30},
+			// A very long node name must be truncated, not wrapped.
+			{name: "itg-k8s-autoscaled-cx43-167f996afa950112-extra-long", cpuUsed: 1, cpuAlloc: 2, memUsed: 1 << 30, memAlloc: 2 << 30},
 		},
 	}
 	withWarnings := base
