@@ -320,7 +320,7 @@ func (m Model) dashboardWidths(twoCol bool) dashboardWidths {
 	const perNodeOverhead = 31
 	return dashboardWidths{
 		bar:     min(max(contentW-labelCol-11, 8), 100),
-		node:    min(max((contentW-perNodeOverhead)/2, 6), 60),
+		node:    min(max((contentW-perNodeOverhead)/2, 3), 60),
 		sep:     min(max(contentW-2, 16), 120),
 		label:   labelCol,
 		content: contentW,

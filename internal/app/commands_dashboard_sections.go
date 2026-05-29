@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -139,7 +140,7 @@ func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
 // The filled portion is colored based on usage percentage: green (<75%), orange (75-90%), red (>90%).
 func renderBar(used, total int64, width int) string {
 	if total <= 0 {
-		return "[" + strings.Repeat("░", width) + "] N/A"
+		return "[" + strings.Repeat("░", width) + "]  N/A"
 	}
 	pct := float64(used) / float64(total) * 100
 	if pct > 100 {
@@ -162,7 +163,10 @@ func renderBar(used, total int64, width int) string {
 		style = ui.StatusRunning
 	}
 
-	return "[" + style.Render(filledStr) + emptyStr + "] " + fmt.Sprintf("%.0f%%", pct)
+	// Pad the percentage to a fixed width ("  5%", " 14%", "100%") so bars
+	// placed side by side (per-node CPU/MEM) stay column-aligned regardless of
+	// the digit count.
+	return "[" + style.Render(filledStr) + emptyStr + "] " + fmt.Sprintf("%3.0f%%", pct)
 }
 
 // renderStackedBar renders a stacked bar showing proportions of multiple segments.
@@ -297,10 +301,13 @@ func dashboardNodesSection(lines []string, data dashboardData, w dashboardWidths
 
 		cpuBar := renderBar(n.cpuUsed, n.cpuAlloc, w.node)
 		memBar := renderBar(n.memUsed, n.memAlloc, w.node)
-		lines = append(lines, fmt.Sprintf("  %s %s%s", statusDot, name, roleStr))
-		lines = append(lines, fmt.Sprintf("      %s %s   %s %s",
+		nameLine := fmt.Sprintf("  %s %s%s", statusDot, name, roleStr)
+		barLine := fmt.Sprintf("      %s %s   %s %s",
 			ui.HelpKeyStyle.Render("CPU"), cpuBar,
-			ui.HelpKeyStyle.Render("MEM"), memBar))
+			ui.HelpKeyStyle.Render("MEM"), memBar)
+		// Truncate to the column so a narrow pane can't wrap the row.
+		lines = append(lines, ansi.Truncate(nameLine, w.content, ""))
+		lines = append(lines, ansi.Truncate(barLine, w.content, ""))
 	}
 	lines = append(lines, "")
 	return lines
