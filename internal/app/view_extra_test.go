@@ -46,7 +46,7 @@ func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
 		mode:                modeExplorer,
 		namespace:           "default",
 		fullscreenDashboard: true,
-		dashboardPreview:    styled + "\nNode Count: 3\nPod Count: 42",
+		dashboardPreview:    styled + "\nNODES: 3 Ready\nPODS: 42 Running",
 		dashboardEventsPreview: "RECENT WARNING EVENTS\n" +
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#ffaa00")).Render("Warning") + " pod crashed",
 		tabs:               []TabState{{}},
@@ -67,6 +67,25 @@ func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
 	// bare "reset space" survives once the two-col path fills the background.
 	assert.NotContains(t, out, "\x1b[0m ",
 		"two-col dashboard must re-apply the theme background after interior ANSI resets")
+
+	// Layout guard: rows must fit the wrapper's content area. If they overflow
+	// (rows built to fullW instead of fullW-2), lipgloss wraps every row and
+	// inserts a blank tail line between consecutive rows, so the left column's
+	// adjacent lines stop being adjacent. Assert the two dashboard lines render
+	// on consecutive output rows.
+	strippedLines := strings.Split(stripANSI(out), "\n")
+	nodesLine, podsLine := -1, -1
+	for i, ln := range strippedLines {
+		if strings.Contains(ln, "NODES: 3 Ready") {
+			nodesLine = i
+		}
+		if strings.Contains(ln, "PODS: 42 Running") {
+			podsLine = i
+		}
+	}
+	assert.NotEqual(t, -1, nodesLine, "NODES line must render")
+	assert.Equal(t, nodesLine+1, podsLine,
+		"two-col rows must not overflow the content area and wrap (no blank tail line between rows)")
 }
 
 // --- View: fullscreen modes ---

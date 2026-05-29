@@ -619,17 +619,25 @@ func (m Model) viewExplorerDashboardSingleCol(dashContent string, fullW, content
 
 // viewExplorerDashboardTwoCol renders a two-column fullscreen dashboard.
 func (m Model) viewExplorerDashboardTwoCol(dashContent string, fullW, contentHeight int) string {
-	leftW := fullW / 2
+	// Allocate the two columns within the wrapper's *content* area, not its
+	// outer width: ActiveColumnStyle adds Padding(0,1), so the usable inner
+	// width is fullW-2. Building rows to the full fullW overflows the content
+	// box by 2 columns; lipgloss then wraps every row (the wrap is invisible
+	// while the trailing pad is plain whitespace, but FillLinesBg makes it
+	// styled, so the overflow tears the layout). Mirrors the single-col path,
+	// which fills to m.width-4 == fullW-2.
+	innerW := fullW - 2
+	leftW := innerW / 2
 	for line := range strings.SplitSeq(dashContent, "\n") {
 		if w := lipgloss.Width(line); w+2 > leftW {
 			leftW = w + 2
 		}
 	}
-	maxLeft := fullW * 60 / 100
+	maxLeft := innerW * 60 / 100
 	if leftW > maxLeft {
 		leftW = maxLeft
 	}
-	rightW := fullW - leftW - 1
+	rightW := innerW - leftW - 1
 
 	leftContent := dashContent
 	if idx := strings.Index(leftContent, "RECENT WARNING EVENTS"); idx > 0 {
