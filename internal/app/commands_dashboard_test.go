@@ -37,8 +37,9 @@ func TestDashboardBarsScaleWithWidth(t *testing.T) {
 	full := Model{width: 200, height: 50, fullscreenDashboard: true}
 	pane := Model{width: 200, height: 50, fullscreenDashboard: false}
 
-	wf := full.dashboardWidths(false)
-	wp := pane.dashboardWidths(false)
+	data := dashboardData{nodeCount: 3, readyNodes: 3, pods: podStats{total: 10, running: 10}}
+	wf := full.dashboardWidths(data, false)
+	wp := pane.dashboardWidths(data, false)
 
 	assert.Greater(t, wf.bar, wp.bar, "fullscreen bars must be wider than the right-pane bars")
 	assert.Greater(t, wf.bar, 30, "fullscreen bars must use more space than the old fixed 30")
@@ -48,37 +49,60 @@ func TestDashboardBarsScaleWithWidth(t *testing.T) {
 // composed dashboard line may exceed the content width it is rendered into,
 // otherwise the left pane wraps and the layout tears.
 func TestComposeDashboardFitsContentWidth(t *testing.T) {
-	data := dashboardData{
-		nodeCount: 3, readyNodes: 3, nodeItems: make([]model.Item, 3),
-		pods:         podStats{total: 10, running: 10},
-		nsCount:      5,
-		totalCPUUsed: 500, totalCPUAlloc: 1000,
+	// A long pod breakdown is the worst-case summary width.
+	base := dashboardData{
+		nodeCount: 3, readyNodes: 1, nodeItems: make([]model.Item, 3),
+		pods:         podStats{total: 424, running: 361, failed: 39, succeeded: 24},
+		nsCount:      53,
+		totalCPUUsed: 520, totalCPUAlloc: 1000,
 		totalMemUsed: 2 << 30, totalMemAlloc: 4 << 30,
 		nodes: []nodeInfo{
 			{name: "node-1", cpuUsed: 1, cpuAlloc: 2, memUsed: 1 << 30, memAlloc: 2 << 30},
-			{name: "node-2", cpuUsed: 1, cpuAlloc: 2, memUsed: 1 << 30, memAlloc: 2 << 30},
 		},
 	}
+	withWarnings := base
+	withWarnings.allWarnings = []model.Item{{Name: "e1"}, {Name: "e2"}}
 
 	for _, tc := range []struct {
 		name       string
 		fullscreen bool
-		twoCol     bool
+		data       dashboardData
 	}{
-		{"fullscreen single-col", true, false},
-		{"fullscreen two-col", true, true},
-		{"right pane", false, false},
+		{"fullscreen single-col", true, base},
+		{"fullscreen two-col", true, withWarnings},
+		{"right pane", false, base},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			m := Model{width: 120, height: 40, fullscreenDashboard: tc.fullscreen}
-			content, _ := m.composeDashboard(data)
-			cw := m.dashboardContentWidth(tc.twoCol)
+			content, events := m.composeDashboard(tc.data)
+			twoCol := tc.fullscreen && events != ""
+			cw := m.dashboardContentWidth(twoCol)
 			for ln := range strings.SplitSeq(content, "\n") {
 				assert.LessOrEqual(t, lipgloss.Width(ln), cw,
 					"line %q exceeds content width %d", stripANSI(ln), cw)
 			}
 		})
 	}
+}
+
+func TestCountPodStatsSucceeded(t *testing.T) {
+	ps := countPodStats([]model.Item{
+		{Status: "Running"}, {Status: "Succeeded"}, {Status: "Completed"}, {Status: "Failed"},
+	})
+	assert.Equal(t, 2, ps.succeeded, "Succeeded and Completed both count as succeeded")
+	assert.Equal(t, 1, ps.running)
+	assert.Equal(t, 1, ps.failed)
+}
+
+func TestPodSummaryBreakdown(t *testing.T) {
+	s := stripANSI(podSummaryStr(dashboardData{
+		pods: podStats{total: 424, running: 361, failed: 39, succeeded: 24},
+	}))
+	assert.Contains(t, s, "361 Running")
+	assert.Contains(t, s, "39 Failed")
+	assert.Contains(t, s, "24 Succeeded")
+	// Zero-count states are omitted.
+	assert.NotContains(t, s, "Pending")
 }
 
 // stripANSI removes ANSI escape codes to allow plain-text assertions on

@@ -202,21 +202,17 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 	lines = append(lines, ui.DimStyle.Bold(true).Render("  CLUSTER DASHBOARD"))
 	lines = append(lines, "")
 
-	// Nodes section.
-	nodeStatus := ui.StatusRunning.Render(fmt.Sprintf("%d Ready", data.readyNodes))
-	if data.readyNodes < data.nodeCount {
-		notReady := data.nodeCount - data.readyNodes
-		nodeStatus += " " + ui.StatusFailed.Render(fmt.Sprintf("%d NotReady", notReady))
-	}
-	lines = append(lines, fmt.Sprintf("  %s %s  %s",
-		ui.HelpKeyStyle.Render("Nodes:"),
-		ui.NormalStyle.Render(fmt.Sprintf("%d", data.nodeCount)),
-		nodeStatus))
+	// Nodes: health bar (green Ready / red NotReady) + inline summary.
 	if data.nodeCount > 0 {
-		nodeBar := renderBar(int64(data.readyNodes), int64(data.nodeCount), w.bar)
-		lines = append(lines, fmt.Sprintf("  %s %s",
-			ui.HelpKeyStyle.Render("           "),
-			nodeBar))
+		segments := []struct {
+			count int
+			style lipgloss.Style
+		}{
+			{data.readyNodes, ui.StatusRunning},
+			{data.nodeCount - data.readyNodes, ui.StatusFailed},
+		}
+		nodeBar := renderStackedBar(segments, data.nodeCount, w.bar)
+		lines = append(lines, dashboardMetricRow("Nodes", nodeBar, nodeSummaryStr(data), w))
 	}
 	lines = append(lines, "")
 
@@ -227,18 +223,8 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 	lines = append(lines, "")
 	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))
 
-	// Pods section.
-	podStatus := ui.StatusRunning.Render(fmt.Sprintf("%d Running", data.pods.running))
-	if data.pods.failed > 0 {
-		podStatus += " " + ui.StatusFailed.Render(fmt.Sprintf("%d Failed", data.pods.failed))
-	}
-	if data.pods.pending > 0 {
-		podStatus += " " + ui.StatusProgressing.Render(fmt.Sprintf("%d Pending", data.pods.pending))
-	}
-	lines = append(lines, fmt.Sprintf("  %s %s  %s",
-		ui.HelpKeyStyle.Render("Pods:"),
-		ui.NormalStyle.Render(fmt.Sprintf("%d", data.pods.total)),
-		podStatus))
+	// Pods: status bar (green Running / amber Pending / red Failed / grey
+	// Succeeded) + inline breakdown.
 	if data.pods.total > 0 {
 		segments := []struct {
 			count int
@@ -246,12 +232,11 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 		}{
 			{data.pods.running, ui.StatusRunning},
 			{data.pods.pending, ui.StatusProgressing},
+			{data.pods.succeeded, ui.StatusOther},
 			{data.pods.failed, ui.StatusFailed},
 		}
 		podBar := renderStackedBar(segments, data.pods.total, w.bar)
-		lines = append(lines, fmt.Sprintf("  %s %s",
-			ui.HelpKeyStyle.Render("           "),
-			podBar))
+		lines = append(lines, dashboardMetricRow("Pods", podBar, podSummaryStr(data), w))
 	}
 	lines = append(lines, "")
 	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))
@@ -271,19 +256,11 @@ func dashboardResourcesSection(lines []string, data dashboardData, w dashboardWi
 	lines = append(lines, "")
 	if data.totalCPUAlloc > 0 {
 		cpuBar := renderBar(data.totalCPUUsed, data.totalCPUAlloc, w.bar)
-		lines = append(lines, fmt.Sprintf("  %s %s  %s / %s",
-			ui.HelpKeyStyle.Render("CPU:"),
-			cpuBar,
-			ui.FormatCPU(data.totalCPUUsed),
-			ui.FormatCPU(data.totalCPUAlloc)))
+		lines = append(lines, dashboardMetricRow("CPU", cpuBar, cpuSummaryStr(data), w))
 	}
 	if data.totalMemAlloc > 0 {
 		memBar := renderBar(data.totalMemUsed, data.totalMemAlloc, w.bar)
-		lines = append(lines, fmt.Sprintf("  %s %s  %s / %s",
-			ui.HelpKeyStyle.Render("Mem:"),
-			memBar,
-			ui.FormatMemory(data.totalMemUsed),
-			ui.FormatMemory(data.totalMemAlloc)))
+		lines = append(lines, dashboardMetricRow("Mem", memBar, memSummaryStr(data), w))
 	}
 	lines = append(lines, "")
 	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))

@@ -598,7 +598,8 @@ func TestPush2UpdateDashboardLoadedMsg(t *testing.T) {
 	rm := result.(Model)
 	// The data is composed into the preview at the current width on receipt.
 	assert.Contains(t, rm.dashboardPreview, "CLUSTER DASHBOARD")
-	assert.Contains(t, rm.dashboardPreview, "Nodes:")
+	assert.Contains(t, rm.dashboardPreview, "Nodes")
+	assert.Contains(t, rm.dashboardPreview, "3 Ready")
 }
 
 func TestPush2UpdateDashboardLoadedMsgWrongContext(t *testing.T) {
