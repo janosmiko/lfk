@@ -193,8 +193,19 @@ func (m Model) updateEventTimeline(msg eventTimelineMsg) (tea.Model, tea.Cmd) {
 
 func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
 	if msg.context == m.dashboardPreviewTargetContext() {
-		m.dashboardPreview = msg.content
-		m.dashboardEventsPreview = msg.events
+		if msg.content != "" {
+			// Static override (e.g. "Cluster dashboard disabled"): no data to
+			// recompose, so show it verbatim.
+			m.dashboardPreview = msg.content
+			m.dashboardEventsPreview = ""
+			delete(m.dashboardData, msg.context)
+			return m
+		}
+		if m.dashboardData == nil {
+			m.dashboardData = make(map[string]dashboardData)
+		}
+		m.dashboardData[msg.context] = msg.data
+		m = m.recomposeDashboard()
 	}
 	return m
 }

@@ -121,6 +121,7 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		if m.fullscreenDashboard {
 			m.fullscreenDashboard = false
 			m.previewScroll = 0
+			m = m.recomposeDashboard()
 			m.setStatusMessage("Dashboard fullscreen OFF", false)
 			return m, scheduleStatusClear(), true
 		}
@@ -215,6 +216,7 @@ func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
 	if m.fullscreenDashboard {
 		m.fullscreenDashboard = false
 		m.previewScroll = 0
+		m = m.recomposeDashboard()
 		m.setStatusMessage("Dashboard fullscreen OFF", false)
 		return m, scheduleStatusClear()
 	}
@@ -387,6 +389,8 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 		}
 		m.fullscreenDashboard = !m.fullscreenDashboard
 		m.previewScroll = 0
+		// Re-render so the bars use the new (fullscreen vs right-pane) width.
+		m = m.recomposeDashboard()
 		if m.fullscreenDashboard {
 			m.setStatusMessage("Dashboard fullscreen ON", false)
 		} else {

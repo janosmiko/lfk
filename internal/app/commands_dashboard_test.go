@@ -30,6 +30,57 @@ func newTestModelForDashboard(_ *testing.T) Model {
 	}
 }
 
+// TestDashboardBarsScaleWithWidth verifies the resource usage bars use the
+// available space: wide in fullscreen, compact in the narrow right pane, and
+// noticeably wider than the old fixed width of 30.
+func TestDashboardBarsScaleWithWidth(t *testing.T) {
+	full := Model{width: 200, height: 50, fullscreenDashboard: true}
+	pane := Model{width: 200, height: 50, fullscreenDashboard: false}
+
+	wf := full.dashboardWidths(false)
+	wp := pane.dashboardWidths(false)
+
+	assert.Greater(t, wf.bar, wp.bar, "fullscreen bars must be wider than the right-pane bars")
+	assert.Greater(t, wf.bar, 30, "fullscreen bars must use more space than the old fixed 30")
+}
+
+// TestComposeDashboardFitsContentWidth guards the two-column wrap risk: no
+// composed dashboard line may exceed the content width it is rendered into,
+// otherwise the left pane wraps and the layout tears.
+func TestComposeDashboardFitsContentWidth(t *testing.T) {
+	data := dashboardData{
+		nodeCount: 3, readyNodes: 3, nodeItems: make([]model.Item, 3),
+		pods:         podStats{total: 10, running: 10},
+		nsCount:      5,
+		totalCPUUsed: 500, totalCPUAlloc: 1000,
+		totalMemUsed: 2 << 30, totalMemAlloc: 4 << 30,
+		nodes: []nodeInfo{
+			{name: "node-1", cpuUsed: 1, cpuAlloc: 2, memUsed: 1 << 30, memAlloc: 2 << 30},
+			{name: "node-2", cpuUsed: 1, cpuAlloc: 2, memUsed: 1 << 30, memAlloc: 2 << 30},
+		},
+	}
+
+	for _, tc := range []struct {
+		name       string
+		fullscreen bool
+		twoCol     bool
+	}{
+		{"fullscreen single-col", true, false},
+		{"fullscreen two-col", true, true},
+		{"right pane", false, false},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			m := Model{width: 120, height: 40, fullscreenDashboard: tc.fullscreen}
+			content, _ := m.composeDashboard(data)
+			cw := m.dashboardContentWidth(tc.twoCol)
+			for ln := range strings.SplitSeq(content, "\n") {
+				assert.LessOrEqual(t, lipgloss.Width(ln), cw,
+					"line %q exceeds content width %d", stripANSI(ln), cw)
+			}
+		})
+	}
+}
+
 // stripANSI removes ANSI escape codes to allow plain-text assertions on
 // rendered output. This covers the basic CSI sequences emitted by lipgloss.
 func stripANSI(s string) string {

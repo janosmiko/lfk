@@ -151,8 +151,8 @@ type containerSelectMsg struct {
 
 // dashboardLoadedMsg carries the rendered dashboard content.
 type dashboardLoadedMsg struct {
-	content string
-	events  string // recent warning events for the right column in two-column mode
+	data    dashboardData // composed into preview/events at the current width on receipt
+	content string        // optional pre-rendered override (e.g. "disabled"); used verbatim when non-empty
 	context string
 }
 

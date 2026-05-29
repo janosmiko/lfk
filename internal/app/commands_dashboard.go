@@ -198,27 +198,81 @@ func (m Model) handleDashboardPartial(msg dashboardPartialMsg) (Model, tea.Cmd) 
 	data := acc.data
 	delete(m.dashboardAcc, key)
 	return m, func() tea.Msg {
-		return composeDashboardLoadedMsg(msg.context, data)
+		return dashboardLoadedMsg{data: data, context: msg.context}
 	}
 }
 
-// composeDashboardLoadedMsg builds a dashboardLoadedMsg from a (possibly
-// partial) dashboardData. Used by the partial accumulator.
-func composeDashboardLoadedMsg(kctx string, data dashboardData) dashboardLoadedMsg {
+// dashboardWidths holds the bar/separator widths used when composing the
+// dashboard. They scale with the width the dashboard is rendered at so the
+// bars use the available space (wide in fullscreen, compact in the right
+// preview pane) without overflowing the column.
+type dashboardWidths struct {
+	bar  int // cluster bars: node count, pod stack, CPU, Mem
+	node int // per-node CPU/Mem bars (two side by side)
+	sep  int // horizontal separator rule
+}
+
+// dashboardContentWidth returns the column content width the dashboard will be
+// rendered into for the current display mode, matching the view layout.
+func (m Model) dashboardContentWidth(twoCol bool) int {
+	if !m.fullscreenDashboard {
+		// Right preview pane inner width (mirrors viewExplorer's column math).
+		usable := m.width - 6
+		leftW := max(10, usable*12/100)
+		middleW := max(10, usable*51/100)
+		rightW := max(10, usable-leftW-middleW)
+		return max(rightW-2, 20)
+	}
+	innerW := m.width - 4 // ActiveColumnStyle border+padding
+	if twoCol {
+		return max(innerW*60/100, 20) // left column cap (see dashboardColumnWidths)
+	}
+	return max(innerW, 20)
+}
+
+// dashboardWidths derives bar/separator widths from the target content width.
+// The reservations leave room for each bar line's label prefix and value
+// suffix so no composed line exceeds contentW (which would wrap inside the
+// two-column left pane).
+func (m Model) dashboardWidths(twoCol bool) dashboardWidths {
+	contentW := m.dashboardContentWidth(twoCol)
+	return dashboardWidths{
+		bar:  min(max(contentW-30, 8), 80),
+		node: min(max((contentW-34)/2, 6), 40),
+		sep:  min(max(contentW-2, 16), 120),
+	}
+}
+
+// composeDashboard renders the dashboard content + events column for the given
+// data at the current display width. Pure w.r.t. the model except for reading
+// width / fullscreen state, so it can be re-run whenever those change.
+func (m Model) composeDashboard(data dashboardData) (content, events string) {
+	eventLines := dashboardEventsColumn(data.allWarnings)
+	events = strings.Join(eventLines, "\n")
+	twoCol := m.fullscreenDashboard && events != ""
+	w := m.dashboardWidths(twoCol)
+
 	var lines []string
 	lines = append(lines, "")
-	lines = dashboardHeaderSection(lines, data)
-	lines = dashboardResourcesSection(lines, data)
-	lines = dashboardNodesSection(lines, data)
-	lines = dashboardWarningsSection(lines, data)
+	lines = dashboardHeaderSection(lines, data, w)
+	lines = dashboardResourcesSection(lines, data, w)
+	lines = dashboardNodesSection(lines, data, w)
+	lines = dashboardWarningsSection(lines, data, w)
 	lines = dashboardInlineEventsSection(lines, data.warningEvents)
 	lines = append(lines, "")
-	eventLines := dashboardEventsColumn(data.allWarnings)
-	return dashboardLoadedMsg{
-		content: strings.Join(lines, "\n"),
-		events:  strings.Join(eventLines, "\n"),
-		context: kctx,
+	return strings.Join(lines, "\n"), events
+}
+
+// recomposeDashboard re-renders dashboardPreview / dashboardEventsPreview from
+// the retained data at the current width. No-op when no data is loaded for the
+// active context. Called on data load, fullscreen toggle, and window resize so
+// the bars always fit the available space.
+func (m Model) recomposeDashboard() Model {
+	ctx := m.dashboardPreviewTargetContext()
+	if data, ok := m.dashboardData[ctx]; ok {
+		m.dashboardPreview, m.dashboardEventsPreview = m.composeDashboard(data)
 	}
+	return m
 }
 
 // countPodStats tallies pod statuses.
