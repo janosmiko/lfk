@@ -61,7 +61,7 @@
 - **Three-column Miller columns** interface (parent / current / preview)
 - **Owner-based navigation**: Clusters -> Resource Types -> Resources -> Owned Resources -> Containers
 - **Resource groups**: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
-- **Pinned resource types**: Pin individual resource types (built-in or CRD) into a "Pinned" section at the top of the list, below the dashboards. Configurable via `pinned_groups` in config or interactively with `p` key (stored per-context or per named union set)
+- **Pinned resource types**: Pin individual resource types (built-in or CRD) into a "Pinned" section at the top of the list, below the dashboards. Configurable via `pinned_types` in config (legacy `pinned_groups` also supported) or interactively with `p` key (stored per-context or per named union set)
 - **CRD categories**: Discovered CRDs are grouped by API group name (e.g., `argoproj.io`, `longhorn.io`, `networking.istio.io`)
 - **Hide rarely used resources**: CSI internals, admission webhooks, APF, leases, runtime classes, and uncategorized core resources are hidden by default. Press `H` to surface them under their categories and an "Advanced" group (resets each launch)
 - **Expandable/collapsible resource groups** with `z`
