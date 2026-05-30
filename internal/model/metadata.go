@@ -7,6 +7,7 @@ import "slices"
 // be pinned or reordered by the user.
 var CoreCategories = []string{
 	"Dashboards",
+	"Pinned", // user-pinned resource types; section hidden when empty
 	"Cluster",
 	"Workloads",
 	"Config",

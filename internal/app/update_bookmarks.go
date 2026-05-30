@@ -654,7 +654,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 
 	m.applyBookmarkNamespace(bm, target, oldCtx)
 

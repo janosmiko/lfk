@@ -374,6 +374,51 @@ func (m *Model) selectedMiddleItem() *model.Item {
 	return nil
 }
 
+// nextResourceTypeCursorItem returns a copy of the resource-type item the
+// cursor should follow to after the selected item is pinned/unpinned and the
+// sidebar re-sorts: the next real resource type below the cursor, falling back
+// to the previous one when the selection is the last item. Returns nil when no
+// sibling resource type exists. Headers and collapsed-group placeholders (whose
+// Extra has no version segment) are skipped.
+func (m *Model) nextResourceTypeCursorItem() *model.Item {
+	visible := m.visibleMiddleItems()
+	c := m.cursor()
+	isType := func(it model.Item) bool {
+		return it.Kind != "__collapsed_group__" && model.PinKeyFromRef(it.Extra) != ""
+	}
+	for i := c + 1; i < len(visible); i++ {
+		if isType(visible[i]) {
+			it := visible[i]
+			return &it
+		}
+	}
+	for i := c - 1; i >= 0; i-- {
+		if isType(visible[i]) {
+			it := visible[i]
+			return &it
+		}
+	}
+	return nil
+}
+
+// focusMiddleItem moves the cursor onto the item matching target (by
+// Name/Kind/Extra) in the current visible list. No-op when target is nil or
+// the item is no longer present.
+func (m *Model) focusMiddleItem(target *model.Item) {
+	if target == nil {
+		return
+	}
+	visible := m.visibleMiddleItems()
+	for i := range visible {
+		if visible[i].Name == target.Name &&
+			visible[i].Kind == target.Kind &&
+			visible[i].Extra == target.Extra {
+			m.setCursor(i)
+			return
+		}
+	}
+}
+
 // selectionKey generates a unique key for an item used in the selectedItems
 // map. It delegates to model.Item.SelectionKey so the app's selection store
 // and the ui renderer's selected-row check share one key derivation and
@@ -518,7 +563,7 @@ func (m *Model) visibleMiddleItems() []model.Item {
 		seenCategories := make(map[string]bool)
 		for _, item := range items {
 			// Items with no category or in the Dashboards group are always shown expanded.
-			if item.Category == "" || item.Category == "Dashboards" {
+			if item.Category == "" || item.Category == "Dashboards" || item.Category == "Pinned" {
 				collapsed = append(collapsed, item)
 				continue
 			}

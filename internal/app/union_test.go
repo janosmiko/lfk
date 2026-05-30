@@ -1611,7 +1611,8 @@ func TestUnionSentinelContextWideFeatures(t *testing.T) {
 	m.unionContexts = []string{"blue", "green"}
 	m.nav.Context = UnionContextSentinel
 	m.nav.Level = model.LevelResourceTypes
-	m.middleItems = []model.Item{{Name: "Apps", Category: "example.com", Kind: "Widget"}}
+	m.allGroupsExpanded = true // surface the real item, not a collapsed-group placeholder
+	m.middleItems = []model.Item{{Name: "Apps", Category: "example.com", Kind: "Widget", Extra: "example.com/v1/widgets"}}
 	m.setCursor(0)
 
 	rbac, cmd := m.openCanIBrowser()
@@ -1639,16 +1640,17 @@ func TestUnionSetPinGroupTogglesUnionSetPins(t *testing.T) {
 	m.unionSetName = "staging-west"
 	m.nav.Context = UnionContextSentinel
 	m.nav.Level = model.LevelResourceTypes
+	m.allGroupsExpanded = true // surface the real item, not a collapsed-group placeholder
 	m.pinnedState = newPinnedState()
-	m.middleItems = []model.Item{{Name: "Widgets", Category: "example.com", Kind: "Widget"}}
+	m.middleItems = []model.Item{{Name: "Widgets", Category: "example.com", Kind: "Widget", Extra: "example.com/v1/widgets"}}
 	m.setCursor(0)
 
 	result, cmd := m.handleKeyPinGroup()
 	rm := result.(Model)
 	require.NotNil(t, cmd)
-	assert.Equal(t, []string{"example.com"}, rm.pinnedState.UnionSets["staging-west"])
+	assert.Equal(t, []string{"example.com/widgets"}, rm.pinnedState.UnionSets["staging-west"])
 	assert.Contains(t, rm.statusMessage, "union set staging-west")
-	assert.Equal(t, []string{"example.com"}, model.PinnedGroups)
+	assert.Equal(t, []string{"example.com/widgets"}, model.PinnedTypes)
 }
 
 func TestProcessCanIRulesUnionMarksMixedVerbs(t *testing.T) {

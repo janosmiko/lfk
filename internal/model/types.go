@@ -3,6 +3,7 @@ package model
 
 import (
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -135,9 +136,23 @@ type ConditionEntry struct {
 	Message string
 }
 
-// PinnedGroups lists CRD API groups that should appear right after built-in categories.
-// Set from config at startup.
-var PinnedGroups []string
+// PinnedTypes lists resource-type pin keys (version-agnostic "group/resource",
+// e.g. "apps/deployments" or "/pods") that the user pinned. Matching sidebar
+// items move into the top-level "Pinned" section. Set from config plus
+// per-context / per-union-set state at startup and on navigation.
+var PinnedTypes []string
+
+// PinKeyFromRef converts a resource reference ("group/version/resource", e.g.
+// "apps/v1/deployments" or "/v1/pods") into a version-agnostic pin key
+// ("group/resource"). Returns "" for sentinel refs without a version segment
+// (e.g. dashboards "__overview__"), which are not pinnable.
+func PinKeyFromRef(ref string) string {
+	parts := strings.Split(ref, "/")
+	if len(parts) < 3 {
+		return ""
+	}
+	return parts[0] + "/" + parts[len(parts)-1]
+}
 
 // ConfigDefaultRightsizingStrategy is the strategy from the user's lfk
 // config (rightsizing_defaults.strategy). Empty when unset or the

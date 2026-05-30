@@ -344,6 +344,13 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	// Column sort is a no-op at both the cluster picker and the resource-
 	// type browser: sortMiddleItems() early-returns so </> doesn't reorder
 	// anything. Hide the sort hint there to avoid advertising dead keys.
+	// At the resource-types level, advertise pinning the selected type into
+	// the top-level Pinned section. Dashboard rows return early above, so any
+	// row reaching here is a real resource type.
+	if m.nav.Level == model.LevelResourceTypes {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.PinGroup, Desc: "pin"})
+	}
+
 	hasResourceContext := m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
 	// The action menu has real entries at the cluster picker (set color,
 	// manage local clusters via openClusterPickerActionMenu) and at the

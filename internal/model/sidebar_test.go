@@ -125,34 +125,6 @@ func TestBuildSidebarItems_PseudoResourcesCategorized(t *testing.T) {
 	assert.Equal(t, "_portforward/v1/portforwards", cats["Port Forwards"].Extra)
 }
 
-func TestBuildSidebarItems_PinnedGroupsOrdering(t *testing.T) {
-	defer func(orig []string) { PinnedGroups = orig }(PinnedGroups)
-	PinnedGroups = []string{"example.com"}
-
-	discovered := []ResourceTypeEntry{
-		{Kind: "Widget", APIGroup: "example.com", APIVersion: "v1", Resource: "widgets"},
-		{Kind: "Gadget", APIGroup: "zzz.com", APIVersion: "v1", Resource: "gadgets"},
-	}
-
-	items := BuildSidebarItems(discovered)
-
-	// Find the first non-core category item — it should come from example.com.
-	coreCats := map[string]bool{
-		"Dashboards": true, "Cluster": true, "Workloads": true, "Config": true,
-		"Networking": true, "Storage": true, "Access Control": true,
-		"Helm": true, "API and CRDs": true,
-	}
-	var firstNonCore *Item
-	for i := range items {
-		if !coreCats[items[i].Category] {
-			firstNonCore = &items[i]
-			break
-		}
-	}
-	require.NotNil(t, firstNonCore)
-	assert.Equal(t, "example.com", firstNonCore.Category, "pinned group must appear before unpinned")
-}
-
 // TestBuildSidebarItems_RareResourcesHiddenByDefault verifies that entries
 // marked Rare in BuiltInMetadata are skipped from the default sidebar and
 // only surface when ShowRareResources is true. Also verifies that
