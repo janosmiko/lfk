@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.0](https://github.com/janosmiko/lfk/compare/v0.12.9...v0.13.0) (2026-05-30)
+
+
+### Features
+
+* pin individual resource types into a top "Pinned" section ([#300](https://github.com/janosmiko/lfk/issues/300)) ([3953bd6](https://github.com/janosmiko/lfk/commit/3953bd63416313413705a420b19e8daf32a9b3d2))
+
+
+### Bug Fixes
+
+* apply theme switch to cached previews immediately ([#299](https://github.com/janosmiko/lfk/issues/299)) ([7d32aaa](https://github.com/janosmiko/lfk/commit/7d32aaa028d3fcc8903d962edb251cdce050076b))
+* dashboard events preview background tear under non-black themes ([#293](https://github.com/janosmiko/lfk/issues/293)) ([#296](https://github.com/janosmiko/lfk/issues/296)) ([2d1672d](https://github.com/janosmiko/lfk/commit/2d1672dc7272759cf72904a93982f4c4d4fc644a))
+
 ## [0.12.9](https://github.com/janosmiko/lfk/compare/v0.12.8...v0.12.9) (2026-05-29)
 
 
