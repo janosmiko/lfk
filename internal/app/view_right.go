@@ -17,6 +17,7 @@ func (m *Model) clearRight() {
 	m.yamlContent = ""
 	m.yamlSections = nil
 	m.previewYAML = ""
+	m.previewScroll = 0
 	m.metricsContent = ""
 	m.previewEventsContent = ""
 	m.metricsData = nil

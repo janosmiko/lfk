@@ -714,6 +714,8 @@ func (m *Model) cloneCurrentTab() TabState {
 		monitoringPreview:      m.monitoringPreview,
 		metricsContent:         m.metricsContent,
 		previewEventsContent:   m.previewEventsContent,
+		metricsData:            m.metricsData,
+		previewEventsData:      append([]ui.EventTimelineEntry(nil), m.previewEventsData...),
 		warningEventsOnly:      m.warningEventsOnly,
 		eventGrouping:          m.eventGrouping,
 		expandedGroup:          m.expandedGroup,
