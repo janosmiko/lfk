@@ -11,6 +11,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // viewMode tracks the current view state.
@@ -456,6 +457,10 @@ type TabState struct {
 	// to clear them.
 	metricsContent       string
 	previewEventsContent string
+	// Raw inputs behind the two footers above, retained per-tab so a theme
+	// change / resize can re-render them in place (see recomposeThemedContent).
+	metricsData       *metricsInputs
+	previewEventsData []ui.EventTimelineEntry
 
 	// Toggle to show only Warning events in Event list view.
 	warningEventsOnly bool

@@ -32,23 +32,6 @@ func (m *Model) popLeft() {
 	}
 }
 
-// clearRight resets the right column and YAML preview so stale data doesn't linger.
-// Every caller of clearRight is a navigation transition that will dispatch a
-// new preview load, so we arm previewLoading here to keep the right pane's
-// spinner visible during the gap. Without this, navigateParent/navigateChild
-// and other transitions briefly render "No resources found".
-func (m *Model) clearRight() {
-	m.rightItems = nil
-	m.yamlContent = ""
-	m.yamlSections = nil
-	m.previewYAML = ""
-	m.metricsContent = ""
-	m.previewEventsContent = ""
-	m.resourceTree = nil
-	m.mapView = false
-	m.previewLoading = true
-}
-
 // selectedResourceKind returns the Kind of the currently selected resource,
 // which is context-dependent on the navigation level.
 func (m *Model) selectedResourceKind() string {
@@ -457,6 +440,8 @@ func (m *Model) saveCurrentTab() {
 	t.monitoringPreview = m.monitoringPreview
 	t.metricsContent = m.metricsContent
 	t.previewEventsContent = m.previewEventsContent
+	t.metricsData = m.metricsData
+	t.previewEventsData = m.previewEventsData
 	t.warningEventsOnly = m.warningEventsOnly
 	t.eventGrouping = m.eventGrouping
 	t.expandedGroup = m.expandedGroup
@@ -570,6 +555,8 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	// metrics / events instead of leaking the previous tab's values.
 	m.metricsContent = t.metricsContent
 	m.previewEventsContent = t.previewEventsContent
+	m.metricsData = t.metricsData
+	m.previewEventsData = t.previewEventsData
 	m.warningEventsOnly = t.warningEventsOnly
 	m.eventGrouping = t.eventGrouping
 	m.expandedGroup = t.expandedGroup

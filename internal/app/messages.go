@@ -167,9 +167,14 @@ type dashboardPartialMsg struct {
 	data    dashboardData
 }
 
-// monitoringDashboardMsg carries the rendered monitoring dashboard content.
+// monitoringDashboardMsg carries the rendered monitoring dashboard content
+// plus the raw alert payload it was built from. The raw payload is retained so
+// the dashboard can be re-rendered on a theme change or resize without
+// re-querying Prometheus (see recomposeMonitoring).
 type monitoringDashboardMsg struct {
-	content string
+	content string          // pre-rendered body for immediate display
+	alerts  []k8s.AlertInfo // raw payload retained for theme/resize recompose
+	errMsg  string          // non-empty when the monitoring backend was unreachable
 	context string
 }
 

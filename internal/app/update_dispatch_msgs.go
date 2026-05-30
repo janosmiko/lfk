@@ -212,6 +212,12 @@ func (m Model) updateDashboardLoaded(msg dashboardLoadedMsg) Model {
 
 func (m Model) updateMonitoringDashboard(msg monitoringDashboardMsg) Model {
 	if msg.context == m.dashboardPreviewTargetContext() {
+		if m.monitoringData == nil {
+			m.monitoringData = make(map[string]monitoringData)
+		}
+		// Retain the raw alerts so a theme change / resize can re-render the
+		// dashboard in place via recomposeMonitoring without re-querying.
+		m.monitoringData[msg.context] = monitoringData{alerts: msg.alerts, errMsg: msg.errMsg}
 		m.monitoringPreview = msg.content
 	}
 	return m

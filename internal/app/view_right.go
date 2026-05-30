@@ -7,6 +7,25 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// clearRight resets the right column and YAML preview so stale data doesn't linger.
+// Every caller of clearRight is a navigation transition that will dispatch a
+// new preview load, so we arm previewLoading here to keep the right pane's
+// spinner visible during the gap. Without this, navigateParent/navigateChild
+// and other transitions briefly render "No resources found".
+func (m *Model) clearRight() {
+	m.rightItems = nil
+	m.yamlContent = ""
+	m.yamlSections = nil
+	m.previewYAML = ""
+	m.metricsContent = ""
+	m.previewEventsContent = ""
+	m.metricsData = nil
+	m.previewEventsData = nil
+	m.resourceTree = nil
+	m.mapView = false
+	m.previewLoading = true
+}
+
 // clampPreviewScroll prevents scrolling past the preview content.
 // Only details+events scroll; pinned header (children) and footer (resource usage) are excluded.
 func (m *Model) clampPreviewScroll() {
