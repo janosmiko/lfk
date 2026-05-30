@@ -436,8 +436,9 @@ func (m Model) updateWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.clampAllCursors()
-	// Re-render the dashboard so its bars use the new width.
-	m = m.recomposeDashboard()
+	// Re-render every width-dependent cached preview (dashboard, monitoring,
+	// metrics bar, events footer) so they use the new width.
+	m = m.recomposeThemedContent()
 	// Resize the embedded PTY terminal if active.
 	if m.mode == modeExec && m.execTerm != nil && m.execPTY != nil {
 		cols := m.width

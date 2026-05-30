@@ -508,9 +508,11 @@ type Model struct {
 
 	// Metrics content: rendered bar graph for the preview column.
 	metricsContent string
+	metricsData    *metricsInputs // raw numbers behind metricsContent; recomposed on theme/resize, nil when none
 
 	// Preview events content: rendered event timeline for the preview column.
 	previewEventsContent string
+	previewEventsData    []ui.EventTimelineEntry // raw entries behind previewEventsContent; recomposed on theme/resize
 
 	// Baseline metrics for trend detection (updated every ~60s, not every refresh).
 	prevPodMetrics      map[string]model.PodMetrics
@@ -519,10 +521,11 @@ type Model struct {
 	prevNodeMetricsTime time.Time
 
 	// Dashboard state for the cluster overview / monitoring previews.
-	dashboardPreview       string                   // rendered cluster dashboard (right column / fullscreen)
-	dashboardEventsPreview string                   // warning events for the two-column layout
-	dashboardData          map[string]dashboardData // retained per context; recomposed at current width on resize / fullscreen toggle
-	monitoringPreview      string                   // rendered monitoring dashboard
+	dashboardPreview       string                    // rendered cluster dashboard (right column / fullscreen)
+	dashboardEventsPreview string                    // warning events for the two-column layout
+	dashboardData          map[string]dashboardData  // retained per context; recomposed at current width on resize / fullscreen toggle
+	monitoringPreview      string                    // rendered monitoring dashboard
+	monitoringData         map[string]monitoringData // raw alerts retained per context; recomposed on theme change / resize
 
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)

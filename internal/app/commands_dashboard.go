@@ -61,6 +61,14 @@ type dashboardData struct {
 	nodeMetricsErr error
 }
 
+// monitoringData retains the raw alert payload behind monitoringPreview so the
+// monitoring dashboard can be re-rendered on a theme change or resize without
+// re-querying Prometheus. Mirrors dashboardData's per-context retention.
+type monitoringData struct {
+	alerts []k8s.AlertInfo
+	errMsg string // non-empty when the monitoring backend was unreachable
+}
+
 // loadDashboard fans out the cluster dashboard fetch into 6 parallel
 // Low-priority scheduler tasks, one per section. Each emits a
 // dashboardPartialMsg as it completes; handleDashboardPartial
@@ -367,18 +375,6 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	return content, events
 }
 
-// recomposeDashboard re-renders dashboardPreview / dashboardEventsPreview from
-// the retained data at the current width. No-op when no data is loaded for the
-// active context. Called on data load, fullscreen toggle, and window resize so
-// the bars always fit the available space.
-func (m Model) recomposeDashboard() Model {
-	ctx := m.dashboardPreviewTargetContext()
-	if data, ok := m.dashboardData[ctx]; ok {
-		m.dashboardPreview, m.dashboardEventsPreview = m.composeDashboard(data)
-	}
-	return m
-}
-
 // countPodStats tallies pod statuses.
 func countPodStats(podItems []model.Item) podStats {
 	ps := podStats{total: len(podItems)}
@@ -528,34 +524,52 @@ func (m Model) loadMonitoringDashboardFor(kctx string) tea.Cmd {
 		"Monitoring dashboard",
 		bgtaskTarget(kctx, ns),
 		func() tea.Msg {
-			var lines []string
-			lines = append(lines, "")
-			lines = append(lines, ui.DimStyle.Bold(true).Render("  MONITORING OVERVIEW"))
-			lines = append(lines, "")
-
 			ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 			defer cancel()
 
 			alerts, err := client.GetAllActiveAlerts(ctx, kctx, ns)
+			errMsg := ""
 			if err != nil {
-				lines = append(lines, ui.DimStyle.Render("  Prometheus/Alertmanager not reachable"))
-				lines = append(lines, ui.DimStyle.Render("  "+err.Error()))
-				lines = append(lines, "")
-				lines = append(lines, ui.DimStyle.Render("  Searched in well-known namespaces:"))
-				lines = append(lines, ui.DimStyle.Render("  monitoring, prometheus, observability, kube-prometheus-stack"))
-				lines = append(lines, "")
-				return monitoringDashboardMsg{content: strings.Join(lines, "\n"), context: kctx}
+				errMsg = err.Error()
+				alerts = nil
 			}
-
-			lines = monitoringAlertSummary(lines, alerts)
-			lines = append(lines, "")
-			sortAlerts(alerts)
-			lines = monitoringAlertTable(lines, alerts)
-
-			lines = append(lines, "")
-			return monitoringDashboardMsg{content: strings.Join(lines, "\n"), context: kctx}
+			return monitoringDashboardMsg{
+				content: composeMonitoring(alerts, errMsg),
+				alerts:  alerts,
+				errMsg:  errMsg,
+				context: kctx,
+			}
 		},
 	)
+}
+
+// composeMonitoring renders the monitoring dashboard body from raw alert data.
+// It takes no model state so it can run both inside the load goroutine and in
+// recomposeMonitoring, where it re-renders with the current theme on a theme
+// change. errMsg, when non-empty, signals the monitoring backend was
+// unreachable and renders the connectivity hint instead of the alert table.
+func composeMonitoring(alerts []k8s.AlertInfo, errMsg string) string {
+	var lines []string
+	lines = append(lines, "")
+	lines = append(lines, ui.DimStyle.Bold(true).Render("  MONITORING OVERVIEW"))
+	lines = append(lines, "")
+
+	if errMsg != "" {
+		lines = append(lines, ui.DimStyle.Render("  Prometheus/Alertmanager not reachable"))
+		lines = append(lines, ui.DimStyle.Render("  "+errMsg))
+		lines = append(lines, "")
+		lines = append(lines, ui.DimStyle.Render("  Searched in well-known namespaces:"))
+		lines = append(lines, ui.DimStyle.Render("  monitoring, prometheus, observability, kube-prometheus-stack"))
+		lines = append(lines, "")
+		return strings.Join(lines, "\n")
+	}
+
+	lines = monitoringAlertSummary(lines, alerts)
+	lines = append(lines, "")
+	sortAlerts(alerts)
+	lines = monitoringAlertTable(lines, alerts)
+	lines = append(lines, "")
+	return strings.Join(lines, "\n")
 }
 
 // monitoringAlertSummary renders the alert summary header with state/severity counts.

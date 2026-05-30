@@ -14,26 +14,30 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// metricsInputs holds the raw resource-usage numbers behind metricsContent,
+// retained so the bar can be re-rendered at the current width / theme without
+// a metrics-server round-trip (see recomposeMetrics).
+type metricsInputs struct {
+	cpuUsed, cpuReq, cpuLim int64
+	memUsed, memReq, memLim int64
+}
+
 func (m Model) updateMetricsLoaded(msg metricsLoadedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response
 	}
 	if msg.cpuUsed == 0 && msg.memUsed == 0 {
 		m.metricsContent = ""
+		m.metricsData = nil
 		return m
 	}
-	// Calculate available width for the metrics bar.
-	usable := m.width - 6
-	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
-	innerW := max(
-		// column padding + border
-		rightW-4, 20)
-	m.metricsContent = ui.RenderResourceUsage(
-		msg.cpuUsed, msg.cpuReq, msg.cpuLim,
-		msg.memUsed, msg.memReq, msg.memLim,
-		innerW,
-	)
-	return m
+	// Retain the raw numbers so a theme change / resize can re-render the bar
+	// in place via recomposeMetrics, then compose at the current width.
+	m.metricsData = &metricsInputs{
+		cpuUsed: msg.cpuUsed, cpuReq: msg.cpuReq, cpuLim: msg.cpuLim,
+		memUsed: msg.memUsed, memReq: msg.memReq, memLim: msg.memLim,
+	}
+	return m.recomposeMetrics()
 }
 
 func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
@@ -42,12 +46,9 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 	}
 	if len(msg.events) == 0 {
 		m.previewEventsContent = ""
+		m.previewEventsData = nil
 		return m
 	}
-	// Calculate available width for the events section.
-	usable := m.width - 6
-	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
-	innerW := max(rightW-4, 20)
 	entries := make([]ui.EventTimelineEntry, len(msg.events))
 	for i, e := range msg.events {
 		entries[i] = ui.EventTimelineEntry{
@@ -61,8 +62,10 @@ func (m Model) updatePreviewEventsLoaded(msg previewEventsLoadedMsg) Model {
 			InvolvedKind: e.InvolvedKind,
 		}
 	}
-	m.previewEventsContent = ui.RenderPreviewEvents(entries, innerW)
-	return m
+	// Retain the entries so a theme change / resize can re-render the footer in
+	// place via recomposePreviewEvents, then compose at the current width.
+	m.previewEventsData = entries
+	return m.recomposePreviewEvents()
 }
 
 // updatePreviewServiceEndpointsLoaded injects the rollup into every
