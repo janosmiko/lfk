@@ -90,7 +90,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 			// BuiltInMetadata yet — surface it in the mapped category with
 			// the generic CRD glyph so it's visible instead of hidden.
 			categorized = append(categorized, Item{
-				Name:       titleCaseFirst(rt.Resource),
+				Name:       displayNameFromKind(rt.Kind, rt.Resource),
 				Kind:       rt.Kind,
 				Extra:      rt.ResourceRef(),
 				Category:   cat,
@@ -105,7 +105,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 			}
 			// Surface uncategorized core K8s resources under "Advanced".
 			categorized = append(categorized, Item{
-				Name:       titleCaseFirst(rt.Resource),
+				Name:       displayNameFromKind(rt.Kind, rt.Resource),
 				Kind:       rt.Kind,
 				Extra:      rt.ResourceRef(),
 				Category:   AdvancedCategory,
@@ -116,7 +116,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 		}
 		// Unknown resource in a CRD group — show with generic icon.
 		crdGroups = append(crdGroups, Item{
-			Name:       titleCaseFirst(rt.Resource),
+			Name:       displayNameFromKind(rt.Kind, rt.Resource),
 			Kind:       rt.Kind,
 			Extra:      rt.ResourceRef(),
 			Category:   rt.APIGroup,
@@ -149,6 +149,31 @@ func titleCaseFirst(s string) string {
 		return s
 	}
 	return strings.ToUpper(s[:1]) + s[1:]
+}
+
+// displayNameFromKind derives a sidebar display name for a discovered
+// resource, preferring the resource's Kind so multi-word casing is preserved.
+// Kubernetes forces resource plurals to lowercase, which loses the casing of
+// kinds like "ApplicationSet" (plural "applicationsets"). When the plural is a
+// regular suffixing of the lowercased kind ("+s", "+es", or "y"->"ies"), the
+// kind reconstructs the intended camel case. Irregular plurals (and an empty
+// kind) fall back to capitalizing the plural's first letter.
+//
+// Kubernetes kinds are ASCII identifiers, so byte length is rune length here
+// and the byte-index slicing below is safe.
+func displayNameFromKind(kind, plural string) string {
+	if kind != "" {
+		lower := strings.ToLower(kind)
+		switch plural {
+		case lower + "s", lower + "es":
+			// Reuse the plural's actual suffix so casing comes from the kind.
+			return kind + plural[len(lower):]
+		}
+		if strings.HasSuffix(lower, "y") && plural == lower[:len(lower)-1]+"ies" {
+			return kind[:len(kind)-1] + "ies"
+		}
+	}
+	return titleCaseFirst(plural)
 }
 
 // sortSidebarItems orders sidebar items: core categories in fixed order,
