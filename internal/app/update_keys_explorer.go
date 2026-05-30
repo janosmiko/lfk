@@ -426,6 +426,10 @@ func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
 		m.setStatusMessage("This item cannot be pinned", true)
 		return m, scheduleStatusClear()
 	}
+	// Capture the item to follow to before the pin re-sorts the list. Pinning
+	// moves the selection up into the "Pinned" section, so without this the
+	// cursor would land on the previous row; jump to the next sibling instead.
+	cursorTarget := m.nextResourceTypeCursorItem()
 	pinned := false
 	var undo func()
 	scopeLabel := ""
@@ -450,6 +454,19 @@ func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.applyPinnedTypes()
+	// Re-sort the sidebar now so the cursor can follow to the captured item;
+	// the async loadResourceTypes refresh below rebuilds the same list and
+	// preserves this position (setMiddleItems does not reset the cursor).
+	discoveryCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
+	if entries := m.discoveredResources[discoveryCtx]; len(entries) > 0 {
+		m.setMiddleItems(model.BuildSidebarItems(entries))
+		m.syncExpandedGroup()
+	}
+	m.focusMiddleItem(cursorTarget)
+	m.clampCursor()
 	if pinned {
 		m.setStatusMessage(fmt.Sprintf("Pinned%s: %s", scopeLabel, sel.Name), false)
 	} else {
