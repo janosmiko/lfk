@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -157,35 +158,107 @@ func (m *Model) performQuitCleanup() {
 	m.saveCurrentSession()
 }
 
-// applyPinnedGroups merges config-level pinned groups with per-context pinned groups
-// and sets model.PinnedGroups.
-func (m *Model) applyPinnedGroups() {
-	// Start with config-level pins.
+// applyPinnedTypes recomputes model.PinnedTypes from config-level pins plus the
+// pins scoped to the active context (or named union set). Legacy whole-group
+// pins (a bare group name with no "/", from older pinned.yaml files or the
+// config's pinned_groups) are expanded into their currently-discovered member
+// resource types. Per-context state holding legacy group entries is migrated to
+// expanded type keys in place once discovery has surfaced members.
+func (m *Model) applyPinnedTypes() {
+	discCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discCtx = m.unionContexts[0]
+	}
+	discovered := m.discoveredResources[discCtx]
+
 	seen := make(map[string]bool)
 	var merged []string
-	for _, g := range ui.ConfigPinnedGroups {
-		if !seen[g] {
-			merged = append(merged, g)
-			seen[g] = true
+	add := func(key string) {
+		if key != "" && !seen[key] {
+			merged = append(merged, key)
+			seen[key] = true
 		}
 	}
-	// Add pins scoped to the active context or named union set.
-	if m.pinnedState != nil && m.isUnionSentinel() && m.unionSetName != "" {
-		for _, g := range m.pinnedState.UnionSets[m.unionSetName] {
-			if !seen[g] {
-				merged = append(merged, g)
-				seen[g] = true
+	// expand resolves raw entries (type keys with "/", or legacy group names
+	// without "/") into pin keys, expanding groups via discovery.
+	expand := func(raw []string) {
+		for _, e := range raw {
+			if strings.Contains(e, "/") {
+				add(e)
+				continue
 			}
-		}
-	} else if m.pinnedState != nil && m.nav.Context != "" && !m.isUnionSentinel() {
-		for _, g := range m.pinnedState.Contexts[m.nav.Context] {
-			if !seen[g] {
-				merged = append(merged, g)
-				seen[g] = true
+			for _, rt := range discovered {
+				if rt.APIGroup == e {
+					add(rt.APIGroup + "/" + rt.Resource)
+				}
 			}
 		}
 	}
-	model.PinnedGroups = merged
+
+	// Config-level pins: new type keys plus legacy group names.
+	expand(ui.ConfigPinnedTypes)
+	expand(ui.ConfigPinnedGroups)
+
+	// Per-scope pins, migrating any legacy group entries in place.
+	if m.pinnedState != nil {
+		switch {
+		case m.isUnionSentinel() && m.unionSetName != "":
+			expand(m.pinnedState.UnionSets[m.unionSetName])
+			m.migratePinnedScope(m.pinnedState.UnionSets, m.unionSetName, discovered)
+		case !m.isUnionSentinel() && m.nav.Context != "":
+			expand(m.pinnedState.Contexts[m.nav.Context])
+			m.migratePinnedScope(m.pinnedState.Contexts, m.nav.Context, discovered)
+		}
+	}
+
+	model.PinnedTypes = merged
+}
+
+// migratePinnedScope rewrites legacy whole-group entries (no "/") for one scope
+// key into their currently-discovered member type keys, persisting the change
+// once. Group entries with no discovered members are kept as-is so a pin for a
+// not-yet-installed CRD group is not silently lost. No-op (no disk write) when
+// there is nothing to migrate.
+func (m *Model) migratePinnedScope(scope map[string][]string, key string, discovered []model.ResourceTypeEntry) {
+	entries := scope[key]
+	hasLegacy := false
+	for _, e := range entries {
+		if !strings.Contains(e, "/") {
+			hasLegacy = true
+			break
+		}
+	}
+	if !hasLegacy {
+		return
+	}
+	seen := make(map[string]bool)
+	var out []string
+	keep := func(str string) {
+		if str != "" && !seen[str] {
+			out = append(out, str)
+			seen[str] = true
+		}
+	}
+	for _, e := range entries {
+		if strings.Contains(e, "/") {
+			keep(e)
+			continue
+		}
+		members := 0
+		for _, rt := range discovered {
+			if rt.APIGroup == e {
+				keep(rt.APIGroup + "/" + rt.Resource)
+				members++
+			}
+		}
+		if members == 0 {
+			keep(e) // keep legacy group pin until its CRD is installed
+		}
+	}
+	scope[key] = out
+	if err := savePinnedState(m.pinnedState); err != nil {
+		logger.Warn("Failed to persist pinned-type migration", "error", err, "scope", key)
+	}
 }
 
 // SetVersion sets the application version string displayed in the title bar.

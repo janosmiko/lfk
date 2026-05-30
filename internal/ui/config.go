@@ -531,6 +531,10 @@ var ConfigCustomActions map[string][]CustomAction
 // ConfigPinnedGroups lists CRD API groups that should appear prominently.
 var ConfigPinnedGroups []string
 
+// ConfigPinnedTypes lists version-agnostic resource-type pin keys
+// ("group/resource") that should move into the top-level Pinned section.
+var ConfigPinnedTypes []string
+
 // ConfigUnionSets holds named multi-cluster groups defined in config.
 // Resolved by --union-set into a list of contexts + optional namespace.
 // Empty by default; populated by applyConfigOptions when union_sets is

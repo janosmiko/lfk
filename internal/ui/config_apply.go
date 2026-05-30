@@ -136,6 +136,9 @@ func applyConfigOptions(cfg configFile) {
 	if len(cfg.PinnedGroups) > 0 {
 		ConfigPinnedGroups = cfg.PinnedGroups
 	}
+	if len(cfg.PinnedTypes) > 0 {
+		ConfigPinnedTypes = cfg.PinnedTypes
+	}
 	if len(cfg.UnionSets) > 0 {
 		ConfigUnionSets = sanitizeUnionSets([]UnionSetConfig(cfg.UnionSets))
 	}

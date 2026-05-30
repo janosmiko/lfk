@@ -408,45 +408,52 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
-	if m.nav.Level == model.LevelResourceTypes {
-		sel := m.selectedMiddleItem()
-		if sel == nil || sel.Category == "" {
-			return m, nil
-		}
-		if model.IsCoreCategory(sel.Category) {
-			m.setStatusMessage("Cannot pin built-in category", true)
-			return m, scheduleStatusClear()
-		}
-		pinned := false
-		var undo func()
-		scopeLabel := ""
-		switch {
-		case m.isUnionSentinel() && m.unionSetName != "":
-			pinned = togglePinnedUnionSetGroup(m.pinnedState, m.unionSetName, sel.Category)
-			undo = func() { _ = togglePinnedUnionSetGroup(m.pinnedState, m.unionSetName, sel.Category) }
-			scopeLabel = " for union set " + m.unionSetName
-		case m.isUnionSentinel():
-			m.setStatusMessage("Pinned groups in union mode require a named union set", true)
-			return m, scheduleStatusClear()
-		default:
-			pinned = togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category)
-			undo = func() { _ = togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category) }
-		}
-		if err := savePinnedState(m.pinnedState); err != nil {
-			// Roll back the in-memory toggle so runtime state matches what
-			// is actually persisted to disk; togglePinnedGroup is its own
-			// inverse, so calling it again undoes the mutation.
-			undo()
-			m.setStatusMessage(fmt.Sprintf("Failed to save pinned groups: %v", err), true)
-			return m, scheduleStatusClear()
-		}
-		m.applyPinnedGroups()
-		if pinned {
-			m.setStatusMessage(fmt.Sprintf("Pinned%s: %s", scopeLabel, sel.Category), false)
-		} else {
-			m.setStatusMessage(fmt.Sprintf("Unpinned%s: %s", scopeLabel, sel.Category), false)
-		}
-		return m, tea.Batch(m.loadResourceTypes(), scheduleStatusClear())
+	if m.nav.Level != model.LevelResourceTypes {
+		return m, nil
 	}
-	return m, nil
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil
+	}
+	// Collapsed-group headers and the dashboard pseudo-items are not real
+	// resource types and cannot be pinned.
+	if sel.Kind == "__collapsed_group__" || sel.Category == "Dashboards" {
+		m.setStatusMessage("Select a resource type to pin", true)
+		return m, scheduleStatusClear()
+	}
+	key := model.PinKeyFromRef(sel.Extra)
+	if key == "" {
+		m.setStatusMessage("This item cannot be pinned", true)
+		return m, scheduleStatusClear()
+	}
+	pinned := false
+	var undo func()
+	scopeLabel := ""
+	switch {
+	case m.isUnionSentinel() && m.unionSetName != "":
+		pinned = togglePinnedUnionSetType(m.pinnedState, m.unionSetName, key)
+		undo = func() { _ = togglePinnedUnionSetType(m.pinnedState, m.unionSetName, key) }
+		scopeLabel = " for union set " + m.unionSetName
+	case m.isUnionSentinel():
+		m.setStatusMessage("Pinning in union mode requires a named union set", true)
+		return m, scheduleStatusClear()
+	default:
+		pinned = togglePinnedType(m.pinnedState, m.nav.Context, key)
+		undo = func() { _ = togglePinnedType(m.pinnedState, m.nav.Context, key) }
+	}
+	if err := savePinnedState(m.pinnedState); err != nil {
+		// Roll back the in-memory toggle so runtime state matches what is
+		// actually persisted to disk; togglePinnedType is its own inverse,
+		// so calling it again undoes the mutation.
+		undo()
+		m.setStatusMessage(fmt.Sprintf("Failed to save pinned types: %v", err), true)
+		return m, scheduleStatusClear()
+	}
+	m.applyPinnedTypes()
+	if pinned {
+		m.setStatusMessage(fmt.Sprintf("Pinned%s: %s", scopeLabel, sel.Name), false)
+	} else {
+		m.setStatusMessage(fmt.Sprintf("Unpinned%s: %s", scopeLabel, sel.Name), false)
+	}
+	return m, tea.Batch(m.loadResourceTypes(), scheduleStatusClear())
 }

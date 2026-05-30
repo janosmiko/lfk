@@ -518,7 +518,7 @@ func (m *Model) visibleMiddleItems() []model.Item {
 		seenCategories := make(map[string]bool)
 		for _, item := range items {
 			// Items with no category or in the Dashboards group are always shown expanded.
-			if item.Category == "" || item.Category == "Dashboards" {
+			if item.Category == "" || item.Category == "Dashboards" || item.Category == "Pinned" {
 				collapsed = append(collapsed, item)
 				continue
 			}

@@ -157,7 +157,7 @@ func (m Model) navigateChildUnionDashboardMember(sel *model.Item) (tea.Model, te
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 
 	m.pushLeft()
 	m.clearRight()
@@ -203,7 +203,7 @@ func (m Model) navigateParentToUnionDashboardMembers() (tea.Model, tea.Cmd) {
 	m.nav.Namespace = ""
 	m.invalidateOrphanCacheForContext(oldCtx)
 	m.readOnly = m.cliReadOnly
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""

@@ -174,7 +174,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		}
 	}
 
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 
 	m.helpSearchInput = textinput.New()
 	m.helpSearchInput.Prompt = ""

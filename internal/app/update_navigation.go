@@ -337,7 +337,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 	m.nav.Level = model.LevelResourceTypes
 	// Capture whatever the right-pane preview was already displaying for
 	// this context (real discovery hit or seed fallback). We use this

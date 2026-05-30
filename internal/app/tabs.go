@@ -636,7 +636,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	// that fetches the tab's data.
 	if needsLoad {
 		m.tabs[idx].needsLoad = false
-		m.applyPinnedGroups()
+		m.applyPinnedTypes()
 
 		// Load contexts for the left column breadcrumb.
 		contexts, _ := m.client.GetContexts()

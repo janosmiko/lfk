@@ -95,12 +95,12 @@ func TestPinnedFilePathDefault(t *testing.T) {
 	assert.Contains(t, path, ".local/state/lfk/pinned.yaml")
 }
 
-// --- togglePinnedGroup ---
+// --- togglePinnedType ---
 
 func TestTogglePinnedGroupAdd(t *testing.T) {
 	state := &PinnedState{Contexts: make(map[string][]string)}
 
-	pinned := togglePinnedGroup(state, "prod", "cert-manager")
+	pinned := togglePinnedType(state, "prod", "cert-manager")
 	assert.True(t, pinned)
 	assert.Contains(t, state.Contexts["prod"], "cert-manager")
 }
@@ -112,7 +112,7 @@ func TestTogglePinnedGroupRemove(t *testing.T) {
 		},
 	}
 
-	pinned := togglePinnedGroup(state, "prod", "cert-manager")
+	pinned := togglePinnedType(state, "prod", "cert-manager")
 	assert.False(t, pinned)
 	assert.NotContains(t, state.Contexts["prod"], "cert-manager")
 	assert.Contains(t, state.Contexts["prod"], "istio")

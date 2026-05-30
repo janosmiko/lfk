@@ -384,6 +384,17 @@ filter_presets:
 # Can also be managed interactively: press 'p' at resource types level.
 # In-app pins are stored per-context or per named union set in
 # ~/.local/state/lfk/pinned.yaml.
+# Pin individual resource types (version-agnostic group/resource) into a
+# top-level "Pinned" section, below the dashboards. Works for built-in and
+# CRD types. Manage interactively with 'p' at the resource types level
+# (stored per-context or per named union set in ~/.local/state/lfk/pinned.yaml).
+# pinned_types:
+#   - apps/deployments
+#   - argoproj.io/applications
+#   - /pods
+#
+# Legacy: pin whole CRD API groups. Still honored and expanded into member
+# types on load, but pinning individual types above is preferred.
 # pinned_groups:
 #   - karpenter.sh
 #   - monitoring.coreos.com

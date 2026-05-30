@@ -57,7 +57,7 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	} else {
 		m.recomputeReadOnly(discoveryCtx)
 	}
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 	m.nav.Level = model.LevelResourceTypes
 
 	m.leftItemsHistory = nil

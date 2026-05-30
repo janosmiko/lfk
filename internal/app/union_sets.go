@@ -221,7 +221,7 @@ func (m Model) activateUnionSet(set ui.UnionSetConfig, namespace string) (tea.Mo
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 	m.pushLeft()
 	m.clearRight()
 
@@ -264,7 +264,7 @@ func (m Model) navigateParentFromPickerUnion() (tea.Model, tea.Cmd) {
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 	m.setMiddleItems(m.leftItems)
 	m.popLeft()
 	m.clearRight()

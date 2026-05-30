@@ -61,6 +61,10 @@ type configFile struct {
 	// PinnedGroups lists CRD API groups that should appear prominently
 	// right after built-in categories. Example: ["karpenter.sh", "monitoring.coreos.com"]
 	PinnedGroups []string `json:"pinned_groups" yaml:"pinned_groups"`
+	// PinnedTypes lists version-agnostic resource-type pin keys
+	// ("group/resource", e.g. "apps/deployments" or "argoproj.io/applications")
+	// to move into the top-level Pinned section.
+	PinnedTypes []string `json:"pinned_types" yaml:"pinned_types"`
 	// Monitoring maps cluster context names to custom monitoring endpoint config.
 	// The special key "_global" applies to clusters without explicit config.
 	Monitoring map[string]model.MonitoringConfig `json:"monitoring" yaml:"monitoring"`
