@@ -230,7 +230,7 @@ func TestGetPodResourceRequests_NotFound(t *testing.T) {
 
 func TestTriggerCronJob(t *testing.T) {
 	cronJob := &batchv1.CronJob{
-		ObjectMeta: metav1.ObjectMeta{Name: "my-cron", Namespace: "default"},
+		ObjectMeta: metav1.ObjectMeta{Name: "my-cron", Namespace: "default", UID: "cj-uid"},
 		Spec: batchv1.CronJobSpec{
 			Schedule: "*/5 * * * *",
 			JobTemplate: batchv1.JobTemplateSpec{
@@ -257,6 +257,14 @@ func TestTriggerCronJob(t *testing.T) {
 	require.NoError(t, err)
 	assert.Len(t, jobs.Items, 1)
 	assert.Equal(t, "busybox", jobs.Items[0].Spec.Template.Spec.Containers[0].Image)
+
+	// The manual Job must carry a controller ownerReference back to the
+	// CronJob, otherwise it is missing from the CronJob's Jobs subview.
+	owner := metav1.GetControllerOf(&jobs.Items[0])
+	require.NotNil(t, owner)
+	assert.Equal(t, "CronJob", owner.Kind)
+	assert.Equal(t, "my-cron", owner.Name)
+	assert.Equal(t, k8stypes.UID("cj-uid"), owner.UID)
 }
 
 func TestTriggerCronJob_NotFound(t *testing.T) {
