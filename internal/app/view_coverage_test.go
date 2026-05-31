@@ -143,10 +143,12 @@ func TestViewYAMLModeWithOverlay(t *testing.T) {
 		nav: model.NavigationState{
 			Level: model.LevelResources,
 		},
-		yamlContent:   "apiVersion: v1\nkind: Pod",
-		yamlCollapsed: make(map[string]bool),
-		tabs:          []TabState{{}},
-		overlay:       overlayQuitConfirm,
+		yamlView: yamlViewState{
+			content:   "apiVersion: v1\nkind: Pod",
+			collapsed: make(map[string]bool),
+		},
+		tabs:    []TabState{{}},
+		overlay: overlayQuitConfirm,
 	}
 	output := m.View()
 	assert.NotEmpty(t, output)
@@ -164,16 +166,18 @@ func TestViewExplorerErrorLogOverlayVisible(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        []model.Item{{Name: "nginx"}},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:   []model.Item{{Name: "nginx"}},
+		width:         120,
+		height:        40,
+		mode:          modeExplorer,
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 		overlayErrorLog:    true,
 	}
@@ -191,16 +195,18 @@ func TestViewExplorerWithHelpOverlay(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        []model.Item{{Name: "nginx"}},
-		width:              120,
-		height:             40,
-		mode:               modeHelp,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:   []model.Item{{Name: "nginx"}},
+		width:         120,
+		height:        40,
+		mode:          modeHelp,
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 		helpFilter:         TextInput{},
 		helpSearchInput:    textinput.New(),
@@ -230,8 +236,10 @@ func TestViewExplorerFullscreenDashboardContent(t *testing.T) {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
-		yamlCollapsed:       make(map[string]bool),
-		selectedNamespaces:  make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
+		selectedNamespaces: make(map[string]bool),
 	}
 	output := m.viewExplorer()
 	stripped := stripANSI(output)
@@ -257,8 +265,10 @@ func TestViewExplorerFullscreenMonitoring(t *testing.T) {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
-		yamlCollapsed:       make(map[string]bool),
-		selectedNamespaces:  make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
+		selectedNamespaces: make(map[string]bool),
 	}
 	output := m.viewExplorer()
 	stripped := stripANSI(output)
@@ -275,17 +285,19 @@ func TestViewExplorerFullscreenMiddleMode(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        []model.Item{{Name: "nginx"}},
-		fullscreenMiddle:   true,
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:      []model.Item{{Name: "nginx"}},
+		fullscreenMiddle: true,
+		width:            120,
+		height:           40,
+		mode:             modeExplorer,
+		namespace:        "default",
+		tabs:             []TabState{{}},
+		selectedItems:    make(map[string]bool),
+		cursorMemory:     make(map[string]int),
+		itemCache:        make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	output := m.viewExplorer()
@@ -400,17 +412,19 @@ func TestViewExplorerWithErrorMsg(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        nil,
-		err:                assert.AnError,
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:   nil,
+		err:           assert.AnError,
+		width:         120,
+		height:        40,
+		mode:          modeExplorer,
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	output := m.viewExplorer()
@@ -425,7 +439,9 @@ func TestClampPreviewScrollBasic(t *testing.T) {
 		height:        40,
 		tabs:          []TabState{{}},
 		previewScroll: 0,
-		yamlCollapsed: make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		nav: model.NavigationState{
 			Level:        model.LevelResources,
 			ResourceType: model.ResourceTypeEntry{Kind: "ConfigMap"},
@@ -441,7 +457,9 @@ func TestClampPreviewScrollHighScroll(t *testing.T) {
 		height:        40,
 		tabs:          []TabState{{}},
 		previewScroll: 10000,
-		yamlCollapsed: make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		nav: model.NavigationState{
 			Level:        model.LevelResources,
 			ResourceType: model.ResourceTypeEntry{Kind: "ConfigMap"},
@@ -459,7 +477,9 @@ func TestClampPreviewScrollWithMetrics(t *testing.T) {
 		tabs:           []TabState{{}},
 		previewScroll:  0,
 		metricsContent: "CPU: 100m\nMEM: 256Mi",
-		yamlCollapsed:  make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		nav: model.NavigationState{
 			Level:        model.LevelResources,
 			ResourceType: model.ResourceTypeEntry{Kind: "ConfigMap"},
@@ -476,7 +496,9 @@ func TestClampPreviewScrollSplitMode(t *testing.T) {
 		tabs:          []TabState{{}},
 		previewScroll: 100,
 		rightItems:    []model.Item{{Name: "pod-1"}},
-		yamlCollapsed: make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		nav: model.NavigationState{
 			Level:        model.LevelResources,
 			ResourceType: model.ResourceTypeEntry{Kind: "Deployment"},

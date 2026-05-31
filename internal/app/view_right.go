@@ -14,8 +14,8 @@ import (
 // and other transitions briefly render "No resources found".
 func (m *Model) clearRight() {
 	m.rightItems = nil
-	m.yamlContent = ""
-	m.yamlSections = nil
+	m.yamlView.content = ""
+	m.yamlView.sections = nil
 	m.previewYAML = ""
 	m.previewScroll = 0
 	m.metricsContent = ""
@@ -211,7 +211,7 @@ func (m Model) renderDetailsOnly(width, height int) string {
 	} else {
 		yaml := m.previewYAML
 		if yaml == "" {
-			yaml = m.yamlContent
+			yaml = m.yamlView.content
 		}
 		if yaml != "" {
 			bottomContent = ui.RenderYAMLContent(yaml, width, bodyHeight)
@@ -257,7 +257,7 @@ func (m Model) renderRightColumnContent(width, height int) string {
 func (m Model) renderFullYAMLPreview(width, height int) string {
 	yaml := m.previewYAML
 	if yaml == "" {
-		yaml = m.yamlContent
+		yaml = m.yamlView.content
 	}
 	if yaml == "" {
 		return ui.DimStyle.Render("Loading YAML...")
@@ -474,7 +474,7 @@ func (m Model) renderSplitPreview(width, height int) string {
 		// Fall back to YAML if no detail columns are available.
 		yaml := m.previewYAML
 		if yaml == "" {
-			yaml = m.yamlContent
+			yaml = m.yamlView.content
 		}
 		if yaml != "" {
 			bottomContent = ui.RenderYAMLContent(yaml, width, detailsHeight)
@@ -490,7 +490,7 @@ func (m Model) renderSplitPreview(width, height int) string {
 func (m Model) renderFallbackYAML(width, height int) string {
 	yaml := m.previewYAML
 	if yaml == "" {
-		yaml = m.yamlContent
+		yaml = m.yamlView.content
 	}
 	if yaml != "" {
 		return ui.RenderYAMLContent(yaml, width, height)

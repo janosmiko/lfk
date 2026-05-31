@@ -40,15 +40,17 @@ func baseExplorerModel() Model {
 			{Name: "pod-b", Kind: "Pod"},
 			{Name: "pod-c", Kind: "Pod"},
 		},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		width:         120,
+		height:        40,
+		mode:          modeExplorer,
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 		selectionAnchor:    -1,
 	}
@@ -567,7 +569,7 @@ func TestPush2HandleKeyHelpMode(t *testing.T) {
 func TestPush2HandleKeyYAMLMode(t *testing.T) {
 	m := basePush80v2Model()
 	m.mode = modeYAML
-	m.yamlContent = "apiVersion: v1"
+	m.yamlView.content = "apiVersion: v1"
 	result, _ := m.handleKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)
@@ -1450,7 +1452,7 @@ func TestCovHandleKeyDispatchToLogs(t *testing.T) {
 func TestCovHandleKeyDispatchToYAML(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeYAML
-	m.yamlContent = "key: value"
+	m.yamlView.content = "key: value"
 	result, _ := m.handleKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)

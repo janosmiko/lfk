@@ -67,7 +67,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		cacheFingerprints:          make(map[string]string),
 		selectedItems:              make(map[string]bool),
 		selectionAnchor:            -1,
-		yamlCollapsed:              make(map[string]bool),
+		yamlView:                   yamlViewState{collapsed: make(map[string]bool)},
 		dashboardAcc:               make(map[string]*dashboardAccumulator),
 		discoveredResources:        make(map[string][]model.ResourceTypeEntry),
 		discoveringContexts:        make(map[string]bool),

@@ -13,11 +13,11 @@ import (
 
 func (m Model) viewYAML() string {
 	yamlTitleText := m.yamlTitle()
-	if m.yamlWrap {
+	if m.yamlView.wrap {
 		yamlTitleText += " [WRAP]"
 	}
-	if m.yamlVisualMode {
-		switch m.yamlVisualType {
+	if m.yamlView.visualMode {
+		switch m.yamlView.visualType {
 		case 'v':
 			yamlTitleText += " [VISUAL]"
 		case 'B':
@@ -28,7 +28,7 @@ func (m Model) viewYAML() string {
 	}
 	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(yamlTitleText)
 	var yamlHints []ui.HintEntry
-	if m.yamlVisualMode {
+	if m.yamlView.visualMode {
 		yamlHints = []ui.HintEntry{
 			{Key: "j/k", Desc: "extend selection"},
 			{Key: "y", Desc: "copy selected"},
@@ -58,29 +58,29 @@ func (m Model) viewYAML() string {
 	switch {
 	case m.hasStatusMessage():
 		hint = m.renderStatusHint()
-	case m.yamlSearchMode:
-		yamlModeInd := ui.SearchModeIndicator(m.yamlSearchText.Value)
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlSearchText.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.yamlSearchText.CursorRight())
+	case m.yamlView.searchMode:
+		yamlModeInd := ui.SearchModeIndicator(m.yamlView.searchText.Value)
+		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorRight())
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
-	case m.yamlSearchText.Value != "":
-		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlMatchIdx+1, len(m.yamlMatchLines))
-		if len(m.yamlMatchLines) == 0 {
+	case m.yamlView.searchText.Value != "":
+		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlView.matchIdx+1, len(m.yamlView.matchLines))
+		if len(m.yamlView.matchLines) == 0 {
 			matchInfo = " [no matches]"
 		}
 		nav := ""
-		if len(m.yamlMatchLines) > 0 {
+		if len(m.yamlView.matchLines) > 0 {
 			nav = ui.BarDimStyle.Render(" | ") + ui.HelpKeyStyle.Render("n/N") + ui.BarDimStyle.Render(": next/prev")
 		}
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.yamlSearchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
+		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.yamlView.searchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
 	maxLines := max(m.height-4, 3)
 
 	// Build visible lines with fold indicators, respecting collapsed sections.
-	visLines, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	visLines, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 
-	yamlScroll := m.yamlScroll
+	yamlScroll := m.yamlView.scroll
 	if yamlScroll >= len(visLines) {
 		yamlScroll = len(visLines) - 1
 	}
@@ -93,44 +93,44 @@ func (m Model) viewYAML() string {
 	}
 
 	// Compute line number gutter width.
-	totalOrigLines := len(strings.Split(m.yamlContent, "\n"))
+	totalOrigLines := len(strings.Split(m.yamlView.content, "\n"))
 	gutterWidth := max(len(fmt.Sprintf("%d", totalOrigLines)), 2)
 
 	// Build a set of original matching lines for search highlight.
 	matchSet := make(map[int]bool)
-	for _, ml := range m.yamlMatchLines {
+	for _, ml := range m.yamlView.matchLines {
 		matchSet[ml] = true
 	}
 	currentMatchLine := -1
-	if len(m.yamlMatchLines) > 0 && m.yamlMatchIdx >= 0 && m.yamlMatchIdx < len(m.yamlMatchLines) {
-		currentMatchLine = m.yamlMatchLines[m.yamlMatchIdx]
+	if len(m.yamlView.matchLines) > 0 && m.yamlView.matchIdx >= 0 && m.yamlView.matchIdx < len(m.yamlView.matchLines) {
+		currentMatchLine = m.yamlView.matchLines[m.yamlView.matchIdx]
 	}
 
 	// Clamp yamlCursor to valid range.
-	if m.yamlCursor < 0 {
-		m.yamlCursor = 0
+	if m.yamlView.cursor < 0 {
+		m.yamlView.cursor = 0
 	}
-	if m.yamlCursor >= len(visLines) {
-		m.yamlCursor = len(visLines) - 1
+	if m.yamlView.cursor >= len(visLines) {
+		m.yamlView.cursor = len(visLines) - 1
 	}
-	if m.yamlCursor < 0 {
-		m.yamlCursor = 0
+	if m.yamlView.cursor < 0 {
+		m.yamlView.cursor = 0
 	}
 
 	// Compute visual selection range (if active).
 	selStart, selEnd := -1, -1
-	if m.yamlVisualMode {
-		selStart = min(m.yamlVisualStart, m.yamlCursor)
-		selEnd = max(m.yamlVisualStart, m.yamlCursor)
+	if m.yamlView.visualMode {
+		selStart = min(m.yamlView.visualStart, m.yamlView.cursor)
+		selEnd = max(m.yamlView.visualStart, m.yamlView.cursor)
 	}
 
 	// Compute column range for char/block visual modes.
 	// For char mode: anchorCol on anchor line, cursorCol on cursor line.
 	// For block mode: rectangular column range on every selected line.
 	visualColStart, visualColEnd := 0, 0
-	if m.yamlVisualMode && (m.yamlVisualType == 'v' || m.yamlVisualType == 'B') {
-		visualColStart = min(m.yamlVisualCol, m.yamlCursorCol())
-		visualColEnd = max(m.yamlVisualCol, m.yamlCursorCol())
+	if m.yamlView.visualMode && (m.yamlView.visualType == 'v' || m.yamlView.visualType == 'B') {
+		visualColStart = min(m.yamlView.visualCol, m.yamlCursorCol())
+		visualColEnd = max(m.yamlView.visualCol, m.yamlCursorCol())
 	}
 
 	// Content width for wrapping/truncation.
@@ -144,22 +144,22 @@ func (m Model) viewYAML() string {
 		mapping:        mapping,
 		matchSet:       matchSet,
 		currentMatch:   currentMatchLine,
-		searchQuery:    m.yamlSearchText.Value,
+		searchQuery:    m.yamlView.searchText.Value,
 		gutterWidth:    gutterWidth,
 		contentWidth:   contentWidth,
 		maxLines:       maxLines,
-		yamlCursor:     m.yamlCursor,
-		visualMode:     m.yamlVisualMode,
-		visualType:     m.yamlVisualType,
-		visualStart:    m.yamlVisualStart,
-		visualCol:      m.yamlVisualCol,
+		yamlCursor:     m.yamlView.cursor,
+		visualMode:     m.yamlView.visualMode,
+		visualType:     m.yamlView.visualType,
+		visualStart:    m.yamlView.visualStart,
+		visualCol:      m.yamlView.visualCol,
 		cursorCol:      m.yamlCursorCol(),
-		visualCurCol:   m.yamlVisualCurCol,
+		visualCurCol:   m.yamlView.visualCurCol,
 		selStart:       selStart,
 		selEnd:         selEnd,
 		visualColStart: visualColStart,
 		visualColEnd:   visualColEnd,
-		wrap:           m.yamlWrap,
+		wrap:           m.yamlView.wrap,
 	}
 	highlightedLines := renderYAMLViewportLines(viewport, renderCtx)
 
@@ -204,7 +204,7 @@ func (m Model) yamlTitle() string {
 
 // yamlCursorCol returns the current cursor column position within the YAML line.
 func (m Model) yamlCursorCol() int {
-	return m.yamlVisualCurCol
+	return m.yamlView.visualCurCol
 }
 
 // yamlRenderCtx holds the rendering parameters for YAML viewport lines.

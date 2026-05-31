@@ -16,59 +16,67 @@ import (
 func TestYAMLNormalCountPrefixJumpsDown(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:   "a: 1\nb: 2\nc: 3\nd: 4\ne: 5\nf: 6",
-		yamlCollapsed: map[string]bool{},
-		yamlCursor:    0,
-		yamlLineInput: "3",
-		tabs:          []TabState{{}},
+		yamlView: yamlViewState{
+			content:   "a: 1\nb: 2\nc: 3\nd: 4\ne: 5\nf: 6",
+			collapsed: map[string]bool{},
+			cursor:    0,
+			lineInput: "3",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("j"))
 	rm := ret.(Model)
-	assert.Equal(t, 3, rm.yamlCursor)
-	assert.Empty(t, rm.yamlLineInput, "digit buffer must be consumed by the motion")
+	assert.Equal(t, 3, rm.yamlView.cursor)
+	assert.Empty(t, rm.yamlView.lineInput, "digit buffer must be consumed by the motion")
 }
 
 func TestYAMLNormalCountPrefixJumpsUp(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:   "a: 1\nb: 2\nc: 3\nd: 4\ne: 5\nf: 6",
-		yamlCollapsed: map[string]bool{},
-		yamlCursor:    5,
-		yamlLineInput: "3",
-		tabs:          []TabState{{}},
+		yamlView: yamlViewState{
+			content:   "a: 1\nb: 2\nc: 3\nd: 4\ne: 5\nf: 6",
+			collapsed: map[string]bool{},
+			cursor:    5,
+			lineInput: "3",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("k"))
 	rm := ret.(Model)
-	assert.Equal(t, 2, rm.yamlCursor)
-	assert.Empty(t, rm.yamlLineInput)
+	assert.Equal(t, 2, rm.yamlView.cursor)
+	assert.Empty(t, rm.yamlView.lineInput)
 }
 
 func TestYAMLNormalCountClampsAtBottom(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:   "a: 1\nb: 2\nc: 3",
-		yamlCollapsed: map[string]bool{},
-		yamlCursor:    1,
-		yamlLineInput: "100",
-		tabs:          []TabState{{}},
+		yamlView: yamlViewState{
+			content:   "a: 1\nb: 2\nc: 3",
+			collapsed: map[string]bool{},
+			cursor:    1,
+			lineInput: "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("j"))
 	rm := ret.(Model)
-	assert.Equal(t, 2, rm.yamlCursor, "count must clamp to last visible line")
+	assert.Equal(t, 2, rm.yamlView.cursor, "count must clamp to last visible line")
 }
 
 func TestYAMLNormalCountClampsAtTop(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:   "a: 1\nb: 2\nc: 3",
-		yamlCollapsed: map[string]bool{},
-		yamlCursor:    1,
-		yamlLineInput: "100",
-		tabs:          []TabState{{}},
+		yamlView: yamlViewState{
+			content:   "a: 1\nb: 2\nc: 3",
+			collapsed: map[string]bool{},
+			cursor:    1,
+			lineInput: "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("k"))
 	rm := ret.(Model)
-	assert.Equal(t, 0, rm.yamlCursor)
+	assert.Equal(t, 0, rm.yamlView.cursor)
 }
 
 func TestDescribeNormalCountPrefixJumpsDown(t *testing.T) {
@@ -555,16 +563,18 @@ func TestDiffCountPrefixHalfPageDown(t *testing.T) {
 func TestYAMLCountPrefixColumnRight(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:      "key: value",
-		yamlCollapsed:    map[string]bool{},
-		yamlVisualCurCol: yamlFoldPrefixLen,
-		yamlLineInput:    "5",
-		tabs:             []TabState{{}},
+		yamlView: yamlViewState{
+			content:      "key: value",
+			collapsed:    map[string]bool{},
+			visualCurCol: yamlFoldPrefixLen,
+			lineInput:    "5",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("l"))
 	rm := ret.(Model)
-	assert.Equal(t, yamlFoldPrefixLen+5, rm.yamlVisualCurCol)
-	assert.Empty(t, rm.yamlLineInput)
+	assert.Equal(t, yamlFoldPrefixLen+5, rm.yamlView.visualCurCol)
+	assert.Empty(t, rm.yamlView.lineInput)
 }
 
 func TestYAMLCountPrefixHalfPageDown(t *testing.T) {
@@ -574,18 +584,20 @@ func TestYAMLCountPrefixHalfPageDown(t *testing.T) {
 	}
 	m := Model{
 		width: 80, height: 40, mode: modeYAML,
-		yamlContent:   strings.Join(lines, "\n"),
-		yamlCollapsed: map[string]bool{},
-		yamlCursor:    0,
-		yamlLineInput: "2",
-		tabs:          []TabState{{}},
+		yamlView: yamlViewState{
+			content:   strings.Join(lines, "\n"),
+			collapsed: map[string]bool{},
+			cursor:    0,
+			lineInput: "2",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
 	// Vim semantics: 2<C-d> moves 2 lines and sets sticky scroll=2.
-	assert.Equal(t, 2, rm.yamlCursor)
-	assert.Equal(t, 2, rm.yamlScrollOption)
-	assert.Empty(t, rm.yamlLineInput)
+	assert.Equal(t, 2, rm.yamlView.cursor)
+	assert.Equal(t, 2, rm.yamlView.scrollOption)
+	assert.Empty(t, rm.yamlView.lineInput)
 }
 
 // --- Diff: search-nav with count ---
@@ -683,17 +695,19 @@ func TestDescribeCaretClearsBuffer(t *testing.T) {
 func TestYAMLDollarClearsBuffer(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:      "hello world",
-		yamlCollapsed:    map[string]bool{},
-		yamlCursor:       0,
-		yamlVisualCurCol: 0,
-		yamlLineInput:    "7",
-		tabs:             []TabState{{}},
+		yamlView: yamlViewState{
+			content:      "hello world",
+			collapsed:    map[string]bool{},
+			cursor:       0,
+			visualCurCol: 0,
+			lineInput:    "7",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("$"))
 	rm := ret.(Model)
-	assert.Empty(t, rm.yamlLineInput, "$ must consume the digit buffer")
-	assert.Equal(t, len([]rune("hello world"))-1, rm.yamlVisualCurCol)
+	assert.Empty(t, rm.yamlView.lineInput, "$ must consume the digit buffer")
+	assert.Equal(t, len([]rune("hello world"))-1, rm.yamlView.visualCurCol)
 }
 
 // YAML's `^` is unique among the viewers: it clamps to yamlFoldPrefixLen
@@ -702,18 +716,20 @@ func TestYAMLDollarClearsBuffer(t *testing.T) {
 func TestYAMLCaretClearsBuffer(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:      "    hello",
-		yamlCollapsed:    map[string]bool{},
-		yamlCursor:       0,
-		yamlVisualCurCol: 8,
-		yamlLineInput:    "9",
-		tabs:             []TabState{{}},
+		yamlView: yamlViewState{
+			content:      "    hello",
+			collapsed:    map[string]bool{},
+			cursor:       0,
+			visualCurCol: 8,
+			lineInput:    "9",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("^"))
 	rm := ret.(Model)
-	assert.Empty(t, rm.yamlLineInput, "^ must consume the digit buffer")
+	assert.Empty(t, rm.yamlView.lineInput, "^ must consume the digit buffer")
 	// firstNonWhitespace("    hello") = 4, max(4, yamlFoldPrefixLen) = 4.
-	assert.Equal(t, 4, rm.yamlVisualCurCol)
+	assert.Equal(t, 4, rm.yamlView.visualCurCol)
 }
 
 func TestDiffCaretClearsBuffer(t *testing.T) {
@@ -916,7 +932,7 @@ func TestScrollOptionIsPerViewer(t *testing.T) {
 	rm := ret.(Model)
 	assert.Equal(t, 7, rm.logScrollOption)
 	assert.Equal(t, 0, rm.describeScrollOption)
-	assert.Equal(t, 0, rm.yamlScrollOption)
+	assert.Equal(t, 0, rm.yamlView.scrollOption)
 	assert.Equal(t, 0, rm.diffScrollOption)
 	assert.Equal(t, 0, rm.eventTimelineScrollOption)
 }

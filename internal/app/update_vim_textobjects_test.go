@@ -293,18 +293,18 @@ func TestYAMLVisualViWRespectsFoldPrefix(t *testing.T) {
 	m.mode = modeYAML
 	// YAML visible lines include a 2-char fold prefix, so a word at original
 	// col 0 lives at visible col 2.
-	m.yamlContent = "foo: bar\n"
-	m.yamlCursor = 0
-	m.yamlVisualCurCol = yamlFoldPrefixLen + 5 // on 'b' of "bar"
-	m.yamlVisualMode = true
-	m.yamlVisualType = 'v'
+	m.yamlView.content = "foo: bar\n"
+	m.yamlView.cursor = 0
+	m.yamlView.visualCurCol = yamlFoldPrefixLen + 5 // on 'b' of "bar"
+	m.yamlView.visualMode = true
+	m.yamlView.visualType = 'v'
 
 	r1, _ := m.handleYAMLVisualKey(keyMsg("i"))
 	r2, _ := r1.(Model).handleYAMLVisualKey(keyMsg("W"))
 	m2 := r2.(Model)
-	assert.Equal(t, rune('v'), m2.yamlVisualType)
-	assert.GreaterOrEqual(t, m2.yamlVisualCol, yamlFoldPrefixLen, "selection start clamped past fold prefix")
-	assert.GreaterOrEqual(t, m2.yamlVisualCurCol, m2.yamlVisualCol)
+	assert.Equal(t, rune('v'), m2.yamlView.visualType)
+	assert.GreaterOrEqual(t, m2.yamlView.visualCol, yamlFoldPrefixLen, "selection start clamped past fold prefix")
+	assert.GreaterOrEqual(t, m2.yamlView.visualCurCol, m2.yamlView.visualCol)
 }
 
 // Regression for the degenerate clamp: when the cursor sits inside the
@@ -317,31 +317,31 @@ func TestYAMLVisualViWRespectsFoldPrefix(t *testing.T) {
 func TestYAMLVisualViwInsideFoldPrefixPreservesSelection(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeYAML
-	m.yamlContent = "foo: bar\n"
+	m.yamlView.content = "foo: bar\n"
 	// A non-empty sections slice causes buildVisibleLines to prepend the
 	// 2-char fold-prefix gutter — without it, the gutter doesn't exist and
 	// this regression isn't reachable.
-	m.yamlSections = []yamlSection{
+	m.yamlView.sections = []yamlSection{
 		{key: "root", startLine: 0, endLine: 0},
 	}
-	m.yamlCollapsed = make(map[string]bool)
-	m.yamlCursor = 0
+	m.yamlView.collapsed = make(map[string]bool)
+	m.yamlView.cursor = 0
 	// Cursor in the gutter; the inner-word range resolves to (0, 1) —
 	// entirely inside the fold prefix, since the visible line is "  foo: bar".
-	m.yamlVisualCurCol = 0
-	m.yamlVisualCol = 0
-	m.yamlVisualMode = true
-	m.yamlVisualType = 'V' // sentinel to detect a stray flip to 'v'
+	m.yamlView.visualCurCol = 0
+	m.yamlView.visualCol = 0
+	m.yamlView.visualMode = true
+	m.yamlView.visualType = 'V' // sentinel to detect a stray flip to 'v'
 
 	r1, _ := m.handleYAMLVisualKey(keyMsg("i"))
 	r2, _ := r1.(Model).handleYAMLVisualKey(keyMsg("w"))
 	m2 := r2.(Model)
 
-	assert.Equal(t, rune('V'), m2.yamlVisualType,
+	assert.Equal(t, rune('V'), m2.yamlView.visualType,
 		"selection type must not flip to 'v' when the resolved range lies entirely in the fold prefix")
-	assert.Equal(t, 0, m2.yamlVisualCol,
+	assert.Equal(t, 0, m2.yamlView.visualCol,
 		"selection start must remain untouched when the range is dropped")
-	assert.Equal(t, 0, m2.yamlVisualCurCol,
+	assert.Equal(t, 0, m2.yamlView.visualCurCol,
 		"selection cursor must remain untouched when the range is dropped")
 }
 
@@ -358,17 +358,17 @@ func TestYAMLVisualViwInsideFoldPrefixPreservesSelection(t *testing.T) {
 func TestYAMLVisualOperatorPendingClearsLineInput(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeYAML
-	m.yamlContent = "foo: bar\n"
-	m.yamlVisualMode = true
-	m.yamlVisualType = 'v'
-	m.yamlVisualCurCol = yamlFoldPrefixLen
-	m.yamlLineInput = "5" // stale digit from before visual entry
+	m.yamlView.content = "foo: bar\n"
+	m.yamlView.visualMode = true
+	m.yamlView.visualType = 'v'
+	m.yamlView.visualCurCol = yamlFoldPrefixLen
+	m.yamlView.lineInput = "5" // stale digit from before visual entry
 
 	r, _ := m.handleYAMLVisualKey(keyMsg("i"))
 	rm := r.(Model)
 
 	assert.Equal(t, byte('i'), rm.pendingTextObject)
-	assert.Equal(t, "", rm.yamlLineInput,
+	assert.Equal(t, "", rm.yamlView.lineInput,
 		"entering operator-pending must clear the count buffer so a stale digit can't leak into the next counted command")
 }
 

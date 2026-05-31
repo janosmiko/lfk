@@ -157,16 +157,18 @@ func TestLogTextObjectEmptyLine(t *testing.T) {
 
 func TestYAMLTextObjectViwYanksWord(t *testing.T) {
 	m := Model{
-		mode:           modeYAML,
-		yamlContent:    "name: alpha-beta",
-		yamlCursor:     0,
-		yamlVisualMode: true,
-		yamlVisualType: 'v',
+		mode: modeYAML,
+		yamlView: yamlViewState{
+			content:    "name: alpha-beta",
+			cursor:     0,
+			visualMode: true,
+			visualType: 'v',
+		},
 	}
 	// Visible line is "  name: alpha-beta" (fold prefix prepends 2 chars).
 	// Cursor on 'p' of "alpha" -> col yamlFoldPrefixLen + 8 = 10.
-	m.yamlVisualCurCol = yamlFoldPrefixLen + 8
-	m.yamlVisualCol = m.yamlVisualCurCol
+	m.yamlView.visualCurCol = yamlFoldPrefixLen + 8
+	m.yamlView.visualCol = m.yamlView.visualCurCol
 	m.tabs = []TabState{{}}
 	m.width = 80
 	m.height = 40
@@ -180,23 +182,25 @@ func TestYAMLTextObjectViwYanksWord(t *testing.T) {
 	// selection is "alpha" — a single-line char yank just says "Copied".
 	assert.Equal(t, "Copied", rm.statusMessage,
 		"single-line word yank reports just 'Copied'")
-	assert.False(t, rm.yamlVisualMode)
+	assert.False(t, rm.yamlView.visualMode)
 	assert.NotNil(t, cmd)
 }
 
 func TestYAMLTextObjectViWYanksHyphenated(t *testing.T) {
 	m := Model{
-		mode:           modeYAML,
-		yamlContent:    "name: alpha-beta",
-		yamlCursor:     0,
-		yamlVisualMode: true,
-		yamlVisualType: 'v',
-		tabs:           []TabState{{}},
-		width:          80,
-		height:         40,
+		mode: modeYAML,
+		yamlView: yamlViewState{
+			content:    "name: alpha-beta",
+			cursor:     0,
+			visualMode: true,
+			visualType: 'v',
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
-	m.yamlVisualCurCol = yamlFoldPrefixLen + 8 // on 'p' of alpha
-	m.yamlVisualCol = m.yamlVisualCurCol
+	m.yamlView.visualCurCol = yamlFoldPrefixLen + 8 // on 'p' of alpha
+	m.yamlView.visualCol = m.yamlView.visualCurCol
 
 	r1, _ := m.handleYAMLVisualKey(keyMsg("i"))
 	r2, _ := r1.(Model).handleYAMLVisualKey(keyMsg("W"))

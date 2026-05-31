@@ -16,22 +16,22 @@ func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 	// body so the user understands the fetch did not complete rather than
 	// being stuck on the spinner.
 	if isContextCanceled(msg.err) {
-		m.yamlContent = ""
-		m.yamlSections = nil
+		m.yamlView.content = ""
+		m.yamlView.sections = nil
 		return m, nil
 	}
 	if msg.err != nil {
 		m.err = msg.err
 		m.setErrorFromErr("Warning: ", msg.err)
-		m.yamlContent = "# Error loading resource\n# " + msg.err.Error()
-		m.yamlSections = nil
+		m.yamlView.content = "# Error loading resource\n# " + msg.err.Error()
+		m.yamlView.sections = nil
 		return m, scheduleStatusClear()
 	}
 	m.err = nil
 	// Content and sections are pre-processed in the loading goroutine so
 	// the main event loop stays responsive on very large CRD manifests.
-	m.yamlContent = msg.content
-	m.yamlSections = msg.sections
+	m.yamlView.content = msg.content
+	m.yamlView.sections = msg.sections
 	return m, nil
 }
 

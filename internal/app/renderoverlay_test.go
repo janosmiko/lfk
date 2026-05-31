@@ -19,7 +19,9 @@ func baseOverlayModel() Model {
 		height:        40,
 		tabs:          []TabState{{}},
 		selectedItems: make(map[string]bool),
-		yamlCollapsed: make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 	}
 }
 

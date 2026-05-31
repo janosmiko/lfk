@@ -27,7 +27,9 @@ func TestRenderFallbackYAML(t *testing.T) {
 				ResourceType: model.ResourceTypeEntry{Kind: "ConfigMap"},
 			},
 			previewYAML: "apiVersion: v1\nkind: ConfigMap\n",
-			yamlContent: "fallback: content\n",
+			yamlView: yamlViewState{
+				content: "fallback: content\n",
+			},
 		}
 		result := m.renderFallbackYAML(80, 20)
 		assert.Contains(t, result, "apiVersion")
@@ -38,7 +40,9 @@ func TestRenderFallbackYAML(t *testing.T) {
 			nav: model.NavigationState{
 				ResourceType: model.ResourceTypeEntry{Kind: "ConfigMap"},
 			},
-			yamlContent: "fallback: content\n",
+			yamlView: yamlViewState{
+				content: "fallback: content\n",
+			},
 		}
 		result := m.renderFallbackYAML(80, 20)
 		assert.Contains(t, result, "fallback")
