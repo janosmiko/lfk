@@ -34,3 +34,31 @@ type Sig struct {
 func (s Sig) NeverCoalesce() bool {
 	return s.Kind == KindMutation
 }
+
+// coalesceIgnoresGen reports whether two submissions of this Kind should
+// coalesce even when their Gen differs. Dashboard sections re-fire on a
+// fixed per-context target (e.g. "c1#metrics") every refresh; keeping Gen
+// in their coalesce identity let a watch-tick or cursor-move resubmission
+// stack a second full six-task batch behind the first instead of replacing
+// it, so stale batches accumulated in the Low lane. Other Kinds keep Gen in
+// their identity (see Sig's Gen doc) so a stale-cancelled fetch and a fresh
+// fetch never collapse into one.
+func (k Kind) coalesceIgnoresGen() bool {
+	return k == KindDashboard
+}
+
+// CoalescesWith reports whether a queued task's Sig should be displaced by a
+// newer submission with Sig s. Identity is Kind+Context+Name+Target; Gen is
+// included only for Kinds that do not opt out via coalesceIgnoresGen.
+func (s Sig) CoalescesWith(other Sig) bool {
+	if s.Kind != other.Kind ||
+		s.KubeContext != other.KubeContext ||
+		s.Name != other.Name ||
+		s.Target != other.Target {
+		return false
+	}
+	if s.Kind.coalesceIgnoresGen() {
+		return true
+	}
+	return s.Gen == other.Gen
+}

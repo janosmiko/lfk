@@ -607,6 +607,49 @@ func (r *Registry) CancelContext(kctx string) {
 	}
 }
 
+// CancelStaleByGen reclaims background work on kctx that a newer
+// requestGen has made irrelevant: it drops queued Low-priority tasks and
+// cancels in-flight Low-priority tasks whose Gen predates keepGen,
+// delivering ErrSuperseded to their Futures.
+//
+// Scoped to Low priority on purpose. Cursor moves bump requestGen only to
+// invalidate the preview pane, so the user's current view (High-priority
+// resource list, YAML, containers) and foundational/mutation work
+// (Critical) must survive a gen bump — only the decorative Low lane
+// (dashboard sections, metrics, preview events) is safe to reclaim and
+// cheap to re-issue. Called from navigation paths right after the bump so
+// superseded dashboard/preview fetches stop blocking fresh work in the
+// shared Low lane instead of running to completion only to be discarded.
+func (r *Registry) CancelStaleByGen(kctx string, keepGen uint64) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	q := r.ctxQueues[kctx]
+	running := append([]*runningTask(nil), r.runningTasks[kctx]...)
+	r.mu.Unlock()
+
+	if q != nil {
+		q.dropStaleByGen(keepGen)
+	}
+
+	for _, rt := range running {
+		// Snapshot taken under r.mu above; we act outside the lock (mirrors
+		// CancelContext). The window is safe: rt.cancel() is idempotent, and
+		// the Future is only ever sent-to/closed by runTask — never here. If
+		// a concurrent CancelContext already set contextSwitched, this guard
+		// skips the task and runTask delivers ErrContextSwitched; otherwise
+		// runTask sees superseded and delivers ErrSuperseded. No double-send.
+		if rt.superseded.Load() || rt.preempted.Load() || rt.contextSwitched.Load() {
+			continue
+		}
+		if staleByGen(rt.task.req, keepGen) {
+			rt.superseded.Store(true)
+			rt.cancel()
+		}
+	}
+}
+
 // Close releases all per-context resources. Idempotent. Pending Futures
 // receive Result{Err: ErrContextSwitched}. Safe on a nil receiver.
 func (r *Registry) Close() {

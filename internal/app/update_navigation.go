@@ -57,6 +57,18 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 	return m, schedulePreviewDebounce(m.previewDebounceGen)
 }
 
+// reclaimStaleBgWork drops queued and cancels in-flight Low-priority
+// scheduler tasks on the active context whose requestGen predates the
+// current one. Call right after bumping m.requestGen on navigation: a
+// cursor move or drill reclaims worker slots from dashboard/preview
+// fetches whose results the gen check would discard anyway, instead of
+// letting them block fresh work in the shared Low lane. High/Critical work
+// (the user's current view, mutations) is left untouched — see
+// scheduler.Registry.CancelStaleByGen.
+func (m *Model) reclaimStaleBgWork() {
+	m.scheduler.CancelStaleByGen(m.effectiveContext(), m.requestGen)
+}
+
 // invalidatePreviewForCursorChange resets the right-column state and bumps
 // requestGen so any in-flight preview load triggered by the previous cursor
 // position is discarded by its message handler instead of being applied to
@@ -67,6 +79,7 @@ func (m Model) moveCursor(delta int) (tea.Model, tea.Cmd) {
 // msg channel with context.Canceled deliveries that crowd out KeyMsgs.
 func (m *Model) invalidatePreviewForCursorChange() {
 	m.requestGen++
+	m.reclaimStaleBgWork()
 	m.previewDebounceGen++
 	m.rightItems = nil
 	m.previewYAML = ""
@@ -106,6 +119,7 @@ func (m *Model) invalidatePreviewFingerprintForCurrentSelection() {
 func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 	m.cancelAndReset()
 	m.requestGen++
+	m.reclaimStaleBgWork()
 	m.clearSelection()
 	m.activeFilterPreset = nil
 	m.unfilteredMiddleItems = nil
@@ -299,6 +313,7 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 
 	m.cancelAndReset()
 	m.requestGen++
+	m.reclaimStaleBgWork()
 	m.clearSelection()
 
 	// Reset scroll positions when navigating to a new level.

@@ -199,8 +199,14 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		}
 		unionCtxs := m.unionContexts
 		client := m.client
+		// Main list is Critical, preview hovers stay High — see the
+		// non-union path below for the rationale.
+		unionListPriority := scheduler.PriorityHigh
+		if !forPreview {
+			unionListPriority = scheduler.PriorityCritical
+		}
 		return m.scheduleK8sCall(
-			scheduler.PriorityHigh,
+			unionListPriority,
 			scheduler.KindResourceList,
 			"List "+model.DisplayNameFor(rt)+" (union)",
 			strings.Join(unionCtxs, ", "),
@@ -230,8 +236,17 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		}
 	}
 	client := m.client
+	// The main resource list (drill-in / watch refresh) is the view the user
+	// is actively waiting on, so it runs at Critical: it gets the reserved
+	// worker and is never queued behind background dashboard/metrics/preview
+	// work. Preview hovers stay High — they are speculative and must remain
+	// preemptible so rapid sidebar cursoring can drop superseded fetches.
+	listPriority := scheduler.PriorityHigh
+	if !forPreview {
+		listPriority = scheduler.PriorityCritical
+	}
 	return m.scheduleK8sCall(
-		scheduler.PriorityHigh,
+		listPriority,
 		scheduler.KindResourceList,
 		"List "+model.DisplayNameFor(rt),
 		bgtaskTarget(kctx, ns),
@@ -773,7 +788,13 @@ func (m Model) scheduleK8sCall(prio scheduler.Priority, kind scheduler.Kind, nam
 	})
 	return func() tea.Msg {
 		res := <-future
-		if errors.Is(res.Err, scheduler.ErrCoalesced) || errors.Is(res.Err, scheduler.ErrContextSwitched) {
+		// All three sentinels mean "this submission was intentionally
+		// abandoned" — coalesced by a newer one, context dropped, or
+		// superseded by a newer requestGen via CancelStaleByGen. Return nil
+		// so the UI ignores it; the surviving submission carries the result.
+		if errors.Is(res.Err, scheduler.ErrCoalesced) ||
+			errors.Is(res.Err, scheduler.ErrContextSwitched) ||
+			errors.Is(res.Err, scheduler.ErrSuperseded) {
 			return nil
 		}
 		// Today the inner Fn wrapper above always passes nil as the
