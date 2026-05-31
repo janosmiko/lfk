@@ -171,6 +171,7 @@ func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) 
 		eventGrouping:     true,
 		allGroupsExpanded: true,
 		cursorMemory:      make(map[string]int),
+		filterMemory:      make(map[string]savedFilter),
 		itemCache:         make(map[string][]model.Item),
 		selectedItems:     make(map[string]bool),
 		selectionAnchor:   -1,

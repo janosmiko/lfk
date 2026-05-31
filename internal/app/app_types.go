@@ -417,6 +417,7 @@ type TabState struct {
 	middleScroll       int // persistent scroll position for middle column (vim-style scrolloff)
 	leftScroll         int // persistent scroll position for left column (vim-style scrolloff)
 	cursorMemory       map[string]int
+	filterMemory       map[string]savedFilter
 	itemCache          map[string][]model.Item
 	cacheFingerprints  map[string]string
 	yamlContent        string

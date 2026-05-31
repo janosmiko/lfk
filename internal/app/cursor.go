@@ -1,6 +1,7 @@
 package app
 
 import (
+	"maps"
 	"sort"
 	"strings"
 
@@ -345,6 +346,58 @@ func (m *Model) restoreCursor() {
 		return
 	}
 	m.setCursor(0)
+}
+
+// savedFilter captures a list's committed filter so it can be recalled exactly
+// when the user returns to that level. broad mirrors m.filterBroadMode (the Tab
+// toggle that also matches column values) so a broad filter doesn't come back
+// as a plain name filter.
+type savedFilter struct {
+	text  string
+	broad bool
+}
+
+// copyMapStringSavedFilter deep copies a map[string]savedFilter. A nil input
+// yields a non-nil empty map so callers can write into it without a nil check.
+func copyMapStringSavedFilter(m map[string]savedFilter) map[string]savedFilter {
+	c := make(map[string]savedFilter, len(m))
+	maps.Copy(c, m)
+	return c
+}
+
+// saveLevelFilter persists the committed filter for the current navigation path
+// so it can be restored when the user returns to this list. An empty filter
+// deletes any prior entry so a later visit starts clean rather than restoring a
+// phantom filter. Must be called BEFORE a level change clears m.filterText.
+func (m *Model) saveLevelFilter() {
+	key := m.navKey()
+	if m.filterText == "" {
+		delete(m.filterMemory, key)
+		return
+	}
+	if m.filterMemory == nil {
+		m.filterMemory = make(map[string]savedFilter)
+	}
+	m.filterMemory[key] = savedFilter{text: m.filterText, broad: m.filterBroadMode}
+}
+
+// restoreLevelFilter applies the saved filter for the current navigation path,
+// or clears the live filter if none was saved (so a sibling list never inherits
+// another list's filter). Must be called AFTER the destination level is set.
+// It deliberately does NOT touch m.filterMemory and is only called on explicit
+// navigation transitions — never on data-refresh paths — so a live filter the
+// user is still typing is never clobbered.
+func (m *Model) restoreLevelFilter() {
+	if f, ok := m.filterMemory[m.navKey()]; ok {
+		m.filterText = f.text
+		m.filterInput.Set(f.text)
+		m.filterBroadMode = f.broad
+	} else {
+		m.filterText = ""
+		m.filterInput.Clear()
+		m.filterBroadMode = false
+	}
+	m.filterActive = false
 }
 
 // selectedMiddleItem returns the currently selected item in the middle column,

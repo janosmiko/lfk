@@ -109,11 +109,17 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 	m.activeFilterPreset = nil
 	m.unfilteredMiddleItems = nil
 
+	// Remember this level's filter before clearing it, so the parent level
+	// can restore its own saved filter (see restoreLevelFilter calls below)
+	// and a later re-visit to this level recalls what was typed here.
+	m.saveLevelFilter()
+
 	// Clear filter when navigating to a parent. Without this, a filter
 	// committed at a child level (e.g. "deploy" at LevelResourceTypes)
 	// stays in m.filterText and visibleMiddleItems silently filters out
 	// every parent-level item whose name doesn't match — making the
 	// cluster picker look empty after backing out of a filtered view.
+	// The per-level restore below re-applies the parent's own filter (if any).
 	m.filterText = ""
 	m.filterInput.Clear()
 	m.filterActive = false
@@ -149,6 +155,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.popLeft()
 		m.clearRight()
 		m.restoreCursor()
+		m.restoreLevelFilter()
 		// The restored rows were captured on context entry and carry stale
 		// [RO] markers; an in-context Ctrl+R toggle since then updated the
 		// override but not this snapshot. Re-apply so the picker marker
@@ -181,6 +188,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.popLeft()
 		m.clearRight()
 		m.restoreCursor()
+		m.restoreLevelFilter()
 		m.syncExpandedGroup()
 		return m, m.loadPreview()
 
@@ -203,6 +211,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 			m.popLeft()
 			m.clearRight()
 			m.restoreCursor()
+			m.restoreLevelFilter()
 			return m, m.loadPreview()
 		}
 		m.nav.Level = model.LevelResources
@@ -218,6 +227,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.popLeft()
 		m.clearRight()
 		m.restoreCursor()
+		m.restoreLevelFilter()
 		return m, m.loadPreview()
 
 	case model.LevelContainers:
@@ -242,6 +252,7 @@ func (m Model) navigateParent() (tea.Model, tea.Cmd) {
 		m.popLeft()
 		m.clearRight()
 		m.restoreCursor()
+		m.restoreLevelFilter()
 		return m, m.loadPreview()
 	}
 	return m, nil
@@ -292,6 +303,10 @@ func (m Model) navigateChild() (tea.Model, tea.Cmd) {
 	// Reset scroll positions when navigating to a new level.
 	ui.ActiveMiddleScroll = 0
 	ui.ActiveLeftScroll = 0
+
+	// Remember this level's filter before clearing it, so navigating back
+	// (navigateParent) restores the list exactly as the user left it.
+	m.saveLevelFilter()
 
 	// Clear filter when navigating into a child.
 	m.filterText = ""
