@@ -6,6 +6,17 @@
 
 **LFK** is a keyboard-focused, yazi-inspired terminal user interface for navigating and managing Kubernetes clusters. It brings a three-column Miller columns layout with an owner-based resource hierarchy to your terminal.
 
+## Support
+
+LFK is a side project I build in my free time, and the tools that go into it
+(IDE licenses, AI assistants) are not free. If LFK saves you time and you'd like
+to help cover those costs and fund continued development, consider sponsoring:
+
+- [GitHub Sponsors](https://github.com/sponsors/janosmiko)
+- [Buy Me a Coffee](https://buymeacoffee.com/janosmiko)
+
+Every contribution is appreciated and helps make LFK sustainable. Thank you for your support!
+
 ## Screenshots
 
 ### Demo
@@ -344,13 +355,6 @@ All search and filter inputs support three modes, auto-detected from the query s
 ## Contributing
 
 Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for prerequisites, development setup, build/test commands, project layout, and the PR submission flow.
-
-## Support
-
-If you find lfk useful and want to support its development:
-
-- [GitHub Sponsors](https://github.com/sponsors/janosmiko)
-- [Buy Me a Coffee](https://buymeacoffee.com/janosmiko)
 
 ## License
 
