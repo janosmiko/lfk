@@ -76,6 +76,18 @@ icons: auto
 # Default: false
 # read_only: false
 
+# ─── Security Dashboard ────────────────────────────────────────────────────────
+# Built-in security findings dashboard (Security sidebar category + SEC badge).
+# Sources auto-detect by their operator/CRDs: heuristic (always on), trivy,
+# kyverno, kubescape, falco, gatekeeper. See docs/security.md.
+# Per-context overrides under clusters.<name>.security beat these globals.
+# Default: enabled, all sources on.
+# security:
+#   enabled: true            # set false to turn the dashboard + probing off
+#   sources:
+#     falco: false           # disable a single source; omitted = enabled
+#     trivy: false
+
 # ─── Log Path ──────────────────────────────────────────────────────────────────
 # Application log file location. Default: ~/.local/share/lfk/lfk.log
 log_path: /tmp/lfk.log
@@ -199,11 +211,13 @@ resource_columns:
 
 # ─── Per-Cluster Overrides ─────────────────────────────────────────────────────
 # Override settings per kubeconfig context name.
-# Supports per-cluster views, resource_columns (deprecated), and read_only.
+# Supports per-cluster views, resource_columns (deprecated), read_only, and security.
 # Per-cluster overrides take precedence over the matching global setting.
 clusters:
 # my-prod-cluster:
 #   read_only: true                       # lock production against mutations
+#   security:
+#     enabled: false                      # turn the security dashboard off here
 #   views:
 #     apps/v1/deployments:
 #       columns: ["Name", "Replicas", "Available", "REV", "Age"]
@@ -211,6 +225,9 @@ clusters:
 #     pod:
 #       columns: ["Name", "IP", "Node", "Image", "CPU", "MEM"]
 # my-staging-cluster:
+#   security:
+#     sources:
+#       falco: false                      # keep the dashboard, drop Falco here
 #   views:
 #     pod:
 #       columns: ["Name", "IP", "Node", "Image"]

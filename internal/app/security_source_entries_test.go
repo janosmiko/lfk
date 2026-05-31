@@ -14,6 +14,16 @@ func TestBuildSecuritySourceEntriesNilManager(t *testing.T) {
 	assert.Nil(t, entries)
 }
 
+// TestBuildSecuritySourceEntriesNoSources guards the config path where every
+// source is disabled: the manager exists but has no registered sources, so the
+// Security category must stay empty rather than showing a loader that never
+// resolves (there is nothing to probe).
+func TestBuildSecuritySourceEntriesNoSources(t *testing.T) {
+	mgr := security.NewManager()
+	assert.Nil(t, buildSecuritySourceEntries(mgr, nil))
+	assert.Nil(t, buildSecuritySourceEntries(mgr, map[string]bool{}))
+}
+
 // TestBuildSecuritySourceEntriesProbeInFlight guards the loader-entry
 // behaviour: previously, all registered sources were listed eagerly and
 // the list "shrunk" to the available subset once the availability probe

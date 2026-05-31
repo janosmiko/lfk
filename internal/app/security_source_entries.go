@@ -24,6 +24,11 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 	if mgr == nil {
 		return nil
 	}
+	// No registered sources (e.g. every source disabled per-config): keep the
+	// Security category empty rather than showing a loader that never resolves.
+	if len(mgr.Sources()) == 0 {
+		return nil
+	}
 	if len(availability) == 0 {
 		// Probe in flight — surface a single non-navigable loader entry
 		// so users see "(probing security sources...)" instead of an

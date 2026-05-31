@@ -12,6 +12,7 @@ import (
 	"github.com/janosmiko/lfk/internal/security/kubescape"
 	"github.com/janosmiko/lfk/internal/security/policyreport"
 	"github.com/janosmiko/lfk/internal/security/trivyop"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // refreshSecuritySources rebuilds the security manager's source list for the
@@ -27,40 +28,54 @@ func (m *Model) refreshSecuritySources() {
 	// category. Without this, switching back to a previously-probed context
 	// would leave the rebuilt manager's availability empty (perpetual loader).
 	m.securityProbedContext = ""
+	// Resolve the context once so the enable check, source gating, and the
+	// disk-cache lookup below all agree (m.nav.Context is empty on the first
+	// render before nav is hydrated; fall back to the client's current one).
+	resolvedCtx := m.nav.Context
+	if resolvedCtx == "" && m.client != nil {
+		resolvedCtx = m.client.CurrentContext()
+	}
+	// Honour the global / per-cluster enable toggle. When disabled, tear down
+	// the manager and hook state so the Security category, SEC badge, and all
+	// probing stay off for this context.
+	if !ui.ResolveSecurityEnabled(resolvedCtx) {
+		m.securityManager = nil
+		m.securityIndex = nil
+		m.securityAvailabilityByName = nil
+		if m.client != nil {
+			m.client.SetSecurityManager(nil)
+		}
+		setSecurityHookState(nil, nil)
+		return
+	}
 	mgr := security.NewManager()
 	if m.client != nil {
-		kctx := m.nav.Context
-		if kctx == "" {
-			kctx = m.client.CurrentContext()
+		kc := m.client.RawClientsetForContext(resolvedCtx)
+		dc := m.client.RawDynamicForContext(resolvedCtx)
+		// register adds src only when its per-source toggle is enabled for
+		// this context (per-cluster override > global > enabled by default).
+		register := func(name string, src security.SecuritySource) {
+			if ui.ResolveSecuritySourceEnabled(resolvedCtx, name) {
+				mgr.Register(src)
+			}
 		}
-		kc := m.client.RawClientsetForContext(kctx)
-		dc := m.client.RawDynamicForContext(kctx)
 		if kc != nil {
-			mgr.Register(heuristic.NewWithClient(kc))
-			mgr.Register(falco.NewWithClient(kc))
+			register("heuristic", heuristic.NewWithClient(kc))
+			register("falco", falco.NewWithClient(kc))
 		}
 		if dc != nil {
-			mgr.Register(trivyop.NewWithDynamic(dc))
-			mgr.Register(policyreport.NewWithDynamic(dc))
-			mgr.Register(kubescape.NewWithDynamic(dc))
+			register("trivy-operator", trivyop.NewWithDynamic(dc))
+			register("policy-report", policyreport.NewWithDynamic(dc))
+			register("kubescape", kubescape.NewWithDynamic(dc))
 		}
 		// Gatekeeper needs both clientsets — Discovery() to enumerate
 		// the dynamically-generated Constraint CRDs and the dynamic
 		// client to list each kind's instances.
 		if kc != nil && dc != nil {
-			mgr.Register(gatekeeper.NewWithClients(kc, dc))
+			register("gatekeeper", gatekeeper.NewWithClients(kc, dc))
 		}
 	}
 	m.securityManager = mgr
-	// Reuse the kctx resolved above so the cache lookup honours the
-	// current-context fallback. Passing m.nav.Context directly would skip
-	// the cache when nav.Context is unset (first render before nav is
-	// hydrated), which forces a full probe even though the disk cache is
-	// keyed by the real cluster host.
-	resolvedCtx := m.nav.Context
-	if resolvedCtx == "" && m.client != nil {
-		resolvedCtx = m.client.CurrentContext()
-	}
 	// Seed availability from the per-host disk cache so the sidebar
 	// shows real entries immediately on subsequent runs. A nil/empty
 	// result triggers the loader entry until the live probe completes.

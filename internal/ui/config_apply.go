@@ -185,6 +185,7 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.ReadOnly != nil {
 		ConfigReadOnly = *cfg.ReadOnly
 	}
+	applySecurityConfig(cfg)
 	applyRightsizingDefaults(cfg.RightsizingDefaults)
 	if cfg.Scheduler != nil {
 		applySchedulerConfig(cfg.Scheduler)
@@ -194,6 +195,21 @@ func applyConfigOptions(cfg configFile) {
 		// value) disables color. Env takes precedence over the config file
 		// field; CLI flag is applied later in main.go.
 		ConfigNoColor = true
+	}
+}
+
+// applySecurityConfig applies the global `security` section: the dashboard
+// enable toggle and the per-source overrides. Per-cluster overrides under
+// clusters.<name>.security are applied in the Clusters loop.
+func applySecurityConfig(cfg configFile) {
+	if cfg.Security == nil {
+		return
+	}
+	if cfg.Security.Enabled != nil {
+		ConfigSecurityEnabled = *cfg.Security.Enabled
+	}
+	if cfg.Security.Sources != nil {
+		ConfigSecuritySources = cfg.Security.Sources
 	}
 }
 
@@ -265,6 +281,8 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 	if len(cfg.Clusters) > 0 {
 		ConfigClusterResourceColumns = make(map[string]map[string][]string, len(cfg.Clusters))
 		ConfigClusterReadOnly = make(map[string]bool, len(cfg.Clusters))
+		ConfigClusterSecurityEnabled = make(map[string]bool, len(cfg.Clusters))
+		ConfigClusterSecuritySources = make(map[string]map[string]bool, len(cfg.Clusters))
 		for ctx, cc := range cfg.Clusters {
 			if len(cc.ResourceColumns) > 0 {
 				cols := make(map[string][]string, len(cc.ResourceColumns))
@@ -275,6 +293,14 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			}
 			if cc.ReadOnly != nil {
 				ConfigClusterReadOnly[ctx] = *cc.ReadOnly
+			}
+			if cc.Security != nil {
+				if cc.Security.Enabled != nil {
+					ConfigClusterSecurityEnabled[ctx] = *cc.Security.Enabled
+				}
+				if cc.Security.Sources != nil {
+					ConfigClusterSecuritySources[ctx] = cc.Security.Sources
+				}
 			}
 			if len(cc.Views) > 0 {
 				if ConfigClusterViews == nil {
