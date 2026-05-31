@@ -32,7 +32,10 @@ func TestApplyKindSortDefault_FromMemory(t *testing.T) {
 func TestApplyKindSortDefault_MemoryWinsOverView(t *testing.T) {
 	orig := ui.ConfigViews
 	t.Cleanup(func() { ui.ConfigViews = orig })
-	v, _ := ui.BuildView(&ui.ConfigView{SortColumn: "REV:desc"})
+	v, err := ui.BuildView(&ui.ConfigView{SortColumn: "REV:desc"})
+	if err != nil {
+		t.Fatalf("BuildView: %v", err)
+	}
 	ui.ConfigViews = map[string]*ui.View{"apps/v1/deployments": v}
 
 	ref := ui.ResourceRef{Group: "apps", Version: "v1", Resource: "deployments", Kind: "Deployment"}
@@ -103,7 +106,10 @@ func TestRememberSort_SkipsSyntheticResource(t *testing.T) {
 func TestForgetSort_RestoresViewDefault(t *testing.T) {
 	orig := ui.ConfigViews
 	t.Cleanup(func() { ui.ConfigViews = orig })
-	v, _ := ui.BuildView(&ui.ConfigView{SortColumn: "REV:desc"})
+	v, err := ui.BuildView(&ui.ConfigView{SortColumn: "REV:desc"})
+	if err != nil {
+		t.Fatalf("BuildView: %v", err)
+	}
 	ui.ConfigViews = map[string]*ui.View{"apps/v1/deployments": v}
 
 	rt := model.ResourceTypeEntry{APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Kind: "Deployment"}
