@@ -7,6 +7,51 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestDisplayNameFromKind(t *testing.T) {
+	tests := []struct {
+		name   string
+		kind   string
+		plural string
+		want   string
+	}{
+		{"camel-case kind plus s", "ApplicationSet", "applicationsets", "ApplicationSets"},
+		{"simple kind plus s", "Widget", "widgets", "Widgets"},
+		{"kind plus es", "Ingress", "ingresses", "Ingresses"},
+		{"camel kind plus es", "StorageClass", "storageclasses", "StorageClasses"},
+		{"y to ies", "NetworkPolicy", "networkpolicies", "NetworkPolicies"},
+		{"regular y plural keeps kind", "Gateway", "gateways", "Gateways"},
+		{"irregular plural falls back to plural", "Endpoints", "endpoints", "Endpoints"},
+		{"mismatched plural falls back", "Foo", "bars", "Bars"},
+		{"empty kind falls back to plural", "", "widgets", "Widgets"},
+		{"empty plural", "Widget", "", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			assert.Equal(t, tt.want, displayNameFromKind(tt.kind, tt.plural))
+		})
+	}
+}
+
+func TestBuildSidebarItems_CamelCasesCRDFromKind(t *testing.T) {
+	discovered := []ResourceTypeEntry{
+		// Custom CRD whose plural is the lowercased kind + "s". The display
+		// name should recover the kind's camel case instead of "Applicationsets".
+		{Kind: "ApplicationSet", APIGroup: "example.com", APIVersion: "v1", Resource: "applicationsets", Namespaced: true},
+	}
+
+	items := BuildSidebarItems(discovered)
+
+	var got *Item
+	for i := range items {
+		if items[i].Kind == "ApplicationSet" {
+			got = &items[i]
+			break
+		}
+	}
+	require.NotNil(t, got)
+	assert.Equal(t, "ApplicationSets", got.Name)
+}
+
 func TestBuildSidebarItems_CategorizesBuiltIns(t *testing.T) {
 	discovered := []ResourceTypeEntry{
 		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
@@ -125,34 +170,6 @@ func TestBuildSidebarItems_PseudoResourcesCategorized(t *testing.T) {
 	assert.Equal(t, "_portforward/v1/portforwards", cats["Port Forwards"].Extra)
 }
 
-func TestBuildSidebarItems_PinnedGroupsOrdering(t *testing.T) {
-	defer func(orig []string) { PinnedGroups = orig }(PinnedGroups)
-	PinnedGroups = []string{"example.com"}
-
-	discovered := []ResourceTypeEntry{
-		{Kind: "Widget", APIGroup: "example.com", APIVersion: "v1", Resource: "widgets"},
-		{Kind: "Gadget", APIGroup: "zzz.com", APIVersion: "v1", Resource: "gadgets"},
-	}
-
-	items := BuildSidebarItems(discovered)
-
-	// Find the first non-core category item — it should come from example.com.
-	coreCats := map[string]bool{
-		"Dashboards": true, "Cluster": true, "Workloads": true, "Config": true,
-		"Networking": true, "Storage": true, "Access Control": true,
-		"Helm": true, "API and CRDs": true,
-	}
-	var firstNonCore *Item
-	for i := range items {
-		if !coreCats[items[i].Category] {
-			firstNonCore = &items[i]
-			break
-		}
-	}
-	require.NotNil(t, firstNonCore)
-	assert.Equal(t, "example.com", firstNonCore.Category, "pinned group must appear before unpinned")
-}
-
 // TestBuildSidebarItems_RareResourcesHiddenByDefault verifies that entries
 // marked Rare in BuiltInMetadata are skipped from the default sidebar and
 // only surface when ShowRareResources is true. Also verifies that
@@ -176,7 +193,7 @@ func TestBuildSidebarItems_RareResourcesHiddenByDefault(t *testing.T) {
 	defaultNames := collectByDisplay(defaultItems)
 	assert.Contains(t, defaultNames, "Pods", "Pod must always appear")
 	assert.NotContains(t, defaultNames, "CSIDrivers", "rare curated entry must be hidden by default")
-	assert.NotContains(t, defaultNames, "Tokenreviews", "uncategorized core resource must be hidden by default")
+	assert.NotContains(t, defaultNames, "TokenReviews", "uncategorized core resource must be hidden by default")
 
 	// With toggle ON: rare curated surfaces in its category, uncategorized
 	// core resources surface under "Advanced".
@@ -186,9 +203,9 @@ func TestBuildSidebarItems_RareResourcesHiddenByDefault(t *testing.T) {
 	require.Contains(t, toggleNames, "CSIDrivers")
 	assert.Equal(t, "Storage", toggleNames["CSIDrivers"].Category)
 
-	require.Contains(t, toggleNames, "Tokenreviews")
-	assert.Equal(t, AdvancedCategory, toggleNames["Tokenreviews"].Category)
-	assert.Equal(t, "TokenReview", toggleNames["Tokenreviews"].Kind)
+	require.Contains(t, toggleNames, "TokenReviews")
+	assert.Equal(t, AdvancedCategory, toggleNames["TokenReviews"].Category)
+	assert.Equal(t, "TokenReview", toggleNames["TokenReviews"].Kind)
 }
 
 // TestBuildSidebarItems_CuratedOrderWithinCategory verifies that items in
@@ -243,15 +260,15 @@ func TestBuildSidebarItems_GroupFallbackCategorizesUnknownNetworking(t *testing.
 	items := BuildSidebarItems(discovered)
 	byName := collectByDisplay(items)
 
-	require.Contains(t, byName, "Futurenetresources",
+	require.Contains(t, byName, "FutureNetResources",
 		"unknown networking.k8s.io resource must appear via group fallback")
-	assert.Equal(t, "Networking", byName["Futurenetresources"].Category)
-	assert.Equal(t, "⧫", byName["Futurenetresources"].Icon.Unicode,
+	assert.Equal(t, "Networking", byName["FutureNetResources"].Category)
+	assert.Equal(t, "⧫", byName["FutureNetResources"].Icon.Unicode,
 		"fallback items use the generic CRD glyph")
 
-	require.Contains(t, byName, "Futuregatewayresources",
+	require.Contains(t, byName, "FutureGatewayResources",
 		"unknown gateway.networking.k8s.io resource must appear via group fallback")
-	assert.Equal(t, "Networking", byName["Futuregatewayresources"].Category)
+	assert.Equal(t, "Networking", byName["FutureGatewayResources"].Category)
 }
 
 // TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards verifies
@@ -282,11 +299,11 @@ func TestBuildSidebarItems_GroupFallbackOrderedBeforePortForwards(t *testing.T) 
 	// The unknown resource must slot after them, before Port Forwards.
 	idxGateway := indexOf(networking, "Gateways")
 	idxHTTPRoute := indexOf(networking, "HTTPRoutes")
-	idxFallback := indexOf(networking, "Futuregatewayresources")
+	idxFallback := indexOf(networking, "FutureGatewayResources")
 	idxPortFwd := indexOf(networking, "Port Forwards")
 	require.GreaterOrEqual(t, idxGateway, 0, "Gateways must appear")
 	require.GreaterOrEqual(t, idxHTTPRoute, 0, "HTTPRoutes must appear")
-	require.GreaterOrEqual(t, idxFallback, 0, "Futuregatewayresources must appear via fallback")
+	require.GreaterOrEqual(t, idxFallback, 0, "FutureGatewayResources must appear via fallback")
 	require.GreaterOrEqual(t, idxPortFwd, 0, "Port Forwards must appear")
 
 	assert.Less(t, idxGateway, idxFallback,
@@ -337,7 +354,7 @@ func TestBuildSidebarItems_SkipsNonListableResources(t *testing.T) {
 
 	assert.Contains(t, names, "Pods", "listable resource must appear")
 	assert.Contains(t, names, "Releases", "pseudo-resource with empty Verbs must appear")
-	assert.NotContains(t, names, "Tokenreviews", "non-listable review API must be hidden")
+	assert.NotContains(t, names, "TokenReviews", "non-listable review API must be hidden")
 	assert.NotContains(t, names, "Subjectaccessreviews", "non-listable review API must be hidden")
 	assert.NotContains(t, names, "Selfsubjectreviews", "non-listable review API must be hidden")
 	assert.NotContains(t, names, "Selfsubjectaccessreviews", "non-listable review API must be hidden")

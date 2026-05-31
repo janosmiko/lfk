@@ -3,6 +3,7 @@ package model
 
 import (
 	"slices"
+	"strings"
 	"time"
 )
 
@@ -82,6 +83,10 @@ type PrinterColumn struct {
 	Name     string
 	Type     string // string, integer, number, boolean, date
 	JSONPath string // e.g. ".status.phase", ".spec.source.repoURL"
+	// Priority mirrors the column's additionalPrinterColumns priority.
+	// kubectl shows priority 0 columns in standard output and hides
+	// priority > 0 columns unless `-o wide`; LFK applies the same default.
+	Priority int
 }
 
 // CanIVerbState is the display state for one RBAC verb in the Can-I view.
@@ -159,9 +164,23 @@ type ConditionEntry struct {
 	Message string
 }
 
-// PinnedGroups lists CRD API groups that should appear right after built-in categories.
-// Set from config at startup.
-var PinnedGroups []string
+// PinnedTypes lists resource-type pin keys (version-agnostic "group/resource",
+// e.g. "apps/deployments" or "/pods") that the user pinned. Matching sidebar
+// items move into the top-level "Pinned" section. Set from config plus
+// per-context / per-union-set state at startup and on navigation.
+var PinnedTypes []string
+
+// PinKeyFromRef converts a resource reference ("group/version/resource", e.g.
+// "apps/v1/deployments" or "/v1/pods") into a version-agnostic pin key
+// ("group/resource"). Returns "" for sentinel refs without a version segment
+// (e.g. dashboards "__overview__"), which are not pinnable.
+func PinKeyFromRef(ref string) string {
+	parts := strings.Split(ref, "/")
+	if len(parts) < 3 {
+		return ""
+	}
+	return parts[0] + "/" + parts[len(parts)-1]
+}
 
 // ConfigDefaultRightsizingStrategy is the strategy from the user's lfk
 // config (rightsizing_defaults.strategy). Empty when unset or the
@@ -226,6 +245,12 @@ type Item struct {
 	// aligned regardless of which markers are present.
 	IsContext   bool
 	GroupedRefs []GroupedRef // For grouped rows (Events): all underlying resource identifiers
+	// Raw is the source map[string]any from the Kubernetes API,
+	// retained so user-defined JSONPath columns (configured via
+	// views:) can be re-evaluated without re-fetching. Nil for
+	// items not sourced from a list response (synthetic items
+	// like port-forwards, captures, test fixtures).
+	Raw map[string]any
 }
 
 // SelectionKey returns the stable map key identifying this item in a
@@ -319,14 +344,15 @@ type PodMetrics struct {
 
 // Bookmark represents a saved navigation path for quick access.
 type Bookmark struct {
-	Name         string   `json:"name" yaml:"name"`
-	Context      string   `json:"context,omitempty" yaml:"context,omitempty"`
-	UnionSet     string   `json:"union_set,omitempty" yaml:"union_set,omitempty"`
-	Namespace    string   `json:"namespace" yaml:"namespace"`
-	Namespaces   []string `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
-	ResourceType string   `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
-	ResourceName string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
-	Slot         string   `json:"slot,omitempty" yaml:"slot,omitempty"` // single char key for vim-style named marks (a-z, A-Z, 0-9)
+	Name               string   `json:"name" yaml:"name"`
+	Context            string   `json:"context,omitempty" yaml:"context,omitempty"`
+	UnionSet           string   `json:"union_set,omitempty" yaml:"union_set,omitempty"`
+	Namespace          string   `json:"namespace" yaml:"namespace"`
+	Namespaces         []string `json:"namespaces,omitempty" yaml:"namespaces,omitempty"`
+	NsSelectionNegated bool     `json:"ns_selection_negated,omitempty" yaml:"ns_selection_negated,omitempty"`
+	ResourceType       string   `json:"resource_type" yaml:"resource_type"` // resource ref string (group/version/resource)
+	ResourceName       string   `json:"resource_name,omitempty" yaml:"resource_name,omitempty"`
+	Slot               string   `json:"slot,omitempty" yaml:"slot,omitempty"` // single char key for vim-style named marks (a-z, A-Z, 0-9)
 }
 
 // IsContextAware reports whether this bookmark is anchored to a specific

@@ -5,7 +5,10 @@ import (
 	"testing"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/stretchr/testify/assert"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // --- formatTableRowOrdered ---
@@ -386,4 +389,91 @@ func TestRenderTabBar(t *testing.T) {
 func TestColumnHeaderLabelSecurityAliases(t *testing.T) {
 	assert.Equal(t, "RESOURCE KIND", ColumnHeaderLabel("ResourceKind"))
 	assert.Equal(t, "FINDINGS", ColumnHeaderLabel("FindingCount"))
+}
+
+// --- Row builder byte-parity regression ---
+//
+// These tests pin exact output for the row builders so the wantContains-style
+// tests above can't silently let column-cell padding/truncation/styling drift
+// past us. They're the safety net for the builtin-column-registry refactor:
+// if any registry entry diverges from its old switch-arm semantics, the
+// expected byte string here fails immediately.
+
+func TestFormatTableRowOrdered_AllColumnsExactBytes(t *testing.T) {
+	prev := ActiveHighlightQuery
+	ActiveHighlightQuery = ""
+	t.Cleanup(func() { ActiveHighlightQuery = prev })
+
+	item := model.Item{
+		Name:        "pod-1",
+		Namespace:   "default",
+		Status:      "Running",
+		Ready:       "1/1",
+		Restarts:    "0",
+		Age:         "5d",
+		ClusterName: "prod",
+	}
+	order := []string{"Context", "Namespace", "Ready", "Restarts", "Status", "Age"}
+
+	got := formatTableRowOrdered(
+		item.Name, item.Namespace, item.Ready, item.Restarts, item.Status, item.Age,
+		10, 8, 10, 6, 4, 10, 4,
+		order, nil, &item,
+	)
+
+	// name(10) + context(8) + ns(10) + ready(6) + restarts(4) + status(10) + age(4) = 52
+	want := "pod-1     prod    default   1/1   0   Running   5d  "
+	assert.Equal(t, want, got)
+	assert.Equal(t, 52, len(got), "total width must match sum of column widths")
+}
+
+func TestFormatTableRowOrdered_ContextZeroWidthFallsThrough(t *testing.T) {
+	prev := ActiveHighlightQuery
+	ActiveHighlightQuery = ""
+	t.Cleanup(func() { ActiveHighlightQuery = prev })
+
+	item := model.Item{Name: "pod-1", Namespace: "default", ClusterName: "should-not-render"}
+	order := []string{"Context", "Namespace"}
+
+	got := formatTableRowOrdered(
+		"pod-1", "default", "", "", "", "",
+		10, 0, 10, 0, 0, 0, 0,
+		order, nil, &item,
+	)
+
+	want := "pod-1     default   "
+	assert.Equal(t, want, got)
+	assert.NotContains(t, got, "should-not-render", "zero-width Context must not render ClusterName")
+}
+
+func TestFormatTableRowStyledOrdered_VisibleWidthAndContent(t *testing.T) {
+	prev := ActiveHighlightQuery
+	ActiveHighlightQuery = ""
+	t.Cleanup(func() { ActiveHighlightQuery = prev })
+
+	item := model.Item{
+		Name:        "pod-1",
+		Namespace:   "default",
+		Status:      "Running",
+		Ready:       "1/1",
+		Restarts:    "0",
+		Age:         "5d",
+		ClusterName: "prod",
+	}
+	order := []string{"Context", "Namespace", "Ready", "Restarts", "Status", "Age"}
+
+	got := formatTableRowStyledOrdered(item,
+		10, 8, 10, 6, 4, 10, 4,
+		order, nil, false)
+
+	// Visible width pins padding; ANSI-stripped content pins per-cell text.
+	// Together these catch any styling/padding drift in the registry's
+	// styled render functions without overcommitting to lipgloss escape
+	// byte sequences.
+	assert.Equal(t, 52, lipgloss.Width(got),
+		"visible width must equal sum of column widths")
+	assert.Equal(t,
+		"pod-1     prod    default   1/1   0   Running   5d  ",
+		ansi.Strip(got),
+		"ANSI-stripped styled row must match plain row layout")
 }

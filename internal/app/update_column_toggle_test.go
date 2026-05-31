@@ -152,7 +152,7 @@ func TestCovColumnToggleEnter(t *testing.T) {
 
 	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
-	assert.Equal(t, []string{"IP"}, r.(Model).sessionColumns["pod"])
+	assert.Equal(t, []string{"IP"}, r.(Model).sessionColumns[colKey("pod")])
 }
 
 func TestCovColumnToggleEnterAllHidden(t *testing.T) {
@@ -161,10 +161,10 @@ func TestCovColumnToggleEnterAllHidden(t *testing.T) {
 		{key: "IP", visible: false},
 	}
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
-	m.sessionColumns = map[string][]string{"pod": {"old"}}
+	m.sessionColumns = map[string][]string{colKey("pod"): {"old"}}
 
 	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
-	_, exists := r.(Model).sessionColumns["pod"]
+	_, exists := r.(Model).sessionColumns[colKey("pod")]
 	assert.False(t, exists)
 }
 
@@ -177,13 +177,13 @@ func TestCovColumnToggleSlash(t *testing.T) {
 
 func TestCovColumnToggleReset(t *testing.T) {
 	m := baseModelCov()
-	m.sessionColumns = map[string][]string{"pod": {"IP"}}
+	m.sessionColumns = map[string][]string{colKey("pod"): {"IP"}}
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
 	m.columnToggleItems = []columnToggleEntry{{key: "IP"}}
 
 	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'R'}})
 	assert.Equal(t, overlayNone, r.(Model).overlay)
-	_, exists := r.(Model).sessionColumns["pod"]
+	_, exists := r.(Model).sessionColumns[colKey("pod")]
 	assert.False(t, exists)
 }
 
@@ -353,7 +353,7 @@ func TestCovOpenColumnTogglePreSelectsFromHiddenBuiltins(t *testing.T) {
 			Age:       "5m",
 		},
 	}
-	m.hiddenBuiltinColumns = map[string][]string{"pod": {"Ready", "Status"}}
+	m.hiddenBuiltinColumns = map[string][]string{m.columnMemoryKey("pod"): {"Ready", "Status"}}
 
 	m.openColumnToggle()
 
@@ -388,7 +388,7 @@ func TestCovOpenColumnTogglePreSelectsFromActiveExtras(t *testing.T) {
 		},
 	}}
 	// Saved preference is larger than what currently fits.
-	m.sessionColumns = map[string][]string{"pod": {"IP", "Node", "Image"}}
+	m.sessionColumns = map[string][]string{m.columnMemoryKey("pod"): {"IP", "Node", "Image"}}
 	// Only IP actually fits on screen right now.
 	ui.ActiveExtraColumnKeys = []string{"IP"}
 
@@ -429,8 +429,8 @@ func TestCovColumnToggleEnterSavesBuiltinsAndExtras(t *testing.T) {
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
-	assert.Equal(t, []string{"IP"}, rm.sessionColumns["pod"], "sessionColumns holds visible extras")
-	hidden := rm.hiddenBuiltinColumns["pod"]
+	assert.Equal(t, []string{"IP"}, rm.sessionColumns[colKey("pod")], "sessionColumns holds visible extras")
+	hidden := rm.hiddenBuiltinColumns[colKey("pod")]
 	assert.ElementsMatch(t, []string{"Ready", "Status"}, hidden, "hiddenBuiltinColumns holds invisible built-ins")
 }
 
@@ -510,16 +510,16 @@ func TestCovWithSessionColumnsForKindRestoresState(t *testing.T) {
 
 	m := baseModelCov()
 	m.sessionColumns = map[string][]string{
-		"pod":       {"IP"},
-		"container": {"Image"},
+		colKey("pod"):       {"IP"},
+		colKey("container"): {"Image"},
 	}
 	m.hiddenBuiltinColumns = map[string][]string{
-		"pod":       {"Ready"},
-		"container": {"Status"},
+		colKey("pod"):       {"Ready"},
+		colKey("container"): {"Status"},
 	}
 	m.columnOrder = map[string][]string{
-		"pod":       {"IP", "Namespace"},
-		"container": {"Image", "Namespace"},
+		colKey("pod"):       {"IP", "Namespace"},
+		colKey("container"): {"Image", "Namespace"},
 	}
 
 	// Start with the pod config applied, as viewExplorer would.
@@ -579,13 +579,13 @@ func TestCovColumnToggleDoesNotLeakBetweenPodAndContainer(t *testing.T) {
 	rm := r.(Model)
 
 	// The pod configuration should be saved under "pod".
-	_, podSessionExists := rm.sessionColumns["pod"]
+	_, podSessionExists := rm.sessionColumns[colKey("pod")]
 	assert.True(t, podSessionExists, "sessionColumns[pod] must be set")
 
 	// The container configuration should NOT have been touched.
-	_, containerSessionExists := rm.sessionColumns["container"]
+	_, containerSessionExists := rm.sessionColumns[colKey("container")]
 	assert.False(t, containerSessionExists, "sessionColumns[container] must be untouched")
-	_, containerHiddenExists := rm.hiddenBuiltinColumns["container"]
+	_, containerHiddenExists := rm.hiddenBuiltinColumns[colKey("container")]
 	assert.False(t, containerHiddenExists, "hiddenBuiltinColumns[container] must be untouched")
 }
 
@@ -612,12 +612,12 @@ func TestCovColumnToggleEnterBuiltinsOnlyPersistsEmptyExtras(t *testing.T) {
 	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	rm := r.(Model)
 
-	sess, exists := rm.sessionColumns["pod"]
+	sess, exists := rm.sessionColumns[colKey("pod")]
 	assert.True(t, exists, "sessionColumns[pod] must be set to record user's choice")
 	assert.Empty(t, sess, "sessionColumns[pod] must be empty (no extras selected)")
 	assert.NotNil(t, sess, "sessionColumns[pod] must be non-nil to distinguish from auto-detect")
 
-	assert.ElementsMatch(t, []string{"Ready", "Status", "Age"}, rm.hiddenBuiltinColumns["pod"])
+	assert.ElementsMatch(t, []string{"Ready", "Status", "Age"}, rm.hiddenBuiltinColumns[colKey("pod")])
 }
 
 // TestCovColumnToggleEnterAllUnselectedResetsToDefault verifies that
@@ -634,17 +634,17 @@ func TestCovColumnToggleEnterAllUnselectedResetsToDefault(t *testing.T) {
 		{key: "Node", visible: false, builtin: false},
 	}
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
-	m.sessionColumns = map[string][]string{"pod": {"IP"}}
-	m.hiddenBuiltinColumns = map[string][]string{"pod": {"Ready"}}
+	m.sessionColumns = map[string][]string{colKey("pod"): {"IP"}}
+	m.hiddenBuiltinColumns = map[string][]string{colKey("pod"): {"Ready"}}
 	m.overlay = overlayColumnToggle
 
 	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
-	_, sessionExists := rm.sessionColumns["pod"]
+	_, sessionExists := rm.sessionColumns[colKey("pod")]
 	assert.False(t, sessionExists, "sessionColumns[pod] must be cleared on full unselect")
-	_, hiddenExists := rm.hiddenBuiltinColumns["pod"]
+	_, hiddenExists := rm.hiddenBuiltinColumns[colKey("pod")]
 	assert.False(t, hiddenExists, "hiddenBuiltinColumns[pod] must be cleared on full unselect")
 }
 
@@ -653,8 +653,8 @@ func TestCovColumnToggleEnterAllUnselectedResetsToDefault(t *testing.T) {
 func TestCovColumnToggleResetClearsBothMaps(t *testing.T) {
 	m := baseModelCov()
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
-	m.sessionColumns = map[string][]string{"pod": {"IP"}}
-	m.hiddenBuiltinColumns = map[string][]string{"pod": {"Ready"}}
+	m.sessionColumns = map[string][]string{colKey("pod"): {"IP"}}
+	m.hiddenBuiltinColumns = map[string][]string{colKey("pod"): {"Ready"}}
 	m.columnToggleItems = []columnToggleEntry{{key: "IP"}}
 	m.overlay = overlayColumnToggle
 
@@ -662,9 +662,9 @@ func TestCovColumnToggleResetClearsBothMaps(t *testing.T) {
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
-	_, sessionExists := rm.sessionColumns["pod"]
+	_, sessionExists := rm.sessionColumns[colKey("pod")]
 	assert.False(t, sessionExists, "sessionColumns[pod] must be cleared")
-	_, hiddenExists := rm.hiddenBuiltinColumns["pod"]
+	_, hiddenExists := rm.hiddenBuiltinColumns[colKey("pod")]
 	assert.False(t, hiddenExists, "hiddenBuiltinColumns[pod] must be cleared")
 }
 
@@ -686,7 +686,7 @@ func TestCovColumnToggleEnterSavesColumnOrder(t *testing.T) {
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
-	assert.Equal(t, []string{"Status", "Namespace", "IP", "Age"}, rm.columnOrder["pod"],
+	assert.Equal(t, []string{"Status", "Namespace", "IP", "Age"}, rm.columnOrder[colKey("pod")],
 		"columnOrder[pod] must preserve the overlay order")
 }
 
@@ -711,7 +711,7 @@ func TestCovOpenColumnToggleRespectsSavedOrder(t *testing.T) {
 		},
 	}
 	// Saved order puts Age first, then IP, then Namespace.
-	m.columnOrder = map[string][]string{"pod": {"Age", "IP", "Namespace"}}
+	m.columnOrder = map[string][]string{m.columnMemoryKey("pod"): {"Age", "IP", "Namespace"}}
 	// ActiveExtraColumnKeys controls which extras are "currently visible";
 	// must include IP so it ends up visible in the overlay.
 	defer func(orig []string) { ui.ActiveExtraColumnKeys = orig }(ui.ActiveExtraColumnKeys)
@@ -742,9 +742,9 @@ func TestCovOpenColumnToggleRespectsSavedOrder(t *testing.T) {
 func TestCovColumnToggleResetClearsColumnOrder(t *testing.T) {
 	m := baseModelCov()
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
-	m.sessionColumns = map[string][]string{"pod": {"IP"}}
-	m.hiddenBuiltinColumns = map[string][]string{"pod": {"Ready"}}
-	m.columnOrder = map[string][]string{"pod": {"Age", "Namespace"}}
+	m.sessionColumns = map[string][]string{colKey("pod"): {"IP"}}
+	m.hiddenBuiltinColumns = map[string][]string{colKey("pod"): {"Ready"}}
+	m.columnOrder = map[string][]string{colKey("pod"): {"Age", "Namespace"}}
 	m.columnToggleItems = []columnToggleEntry{{key: "IP"}}
 	m.overlay = overlayColumnToggle
 
@@ -752,11 +752,11 @@ func TestCovColumnToggleResetClearsColumnOrder(t *testing.T) {
 	rm := r.(Model)
 
 	assert.Equal(t, overlayNone, rm.overlay)
-	_, sessionExists := rm.sessionColumns["pod"]
+	_, sessionExists := rm.sessionColumns[colKey("pod")]
 	assert.False(t, sessionExists, "sessionColumns[pod] must be cleared")
-	_, hiddenExists := rm.hiddenBuiltinColumns["pod"]
+	_, hiddenExists := rm.hiddenBuiltinColumns[colKey("pod")]
 	assert.False(t, hiddenExists, "hiddenBuiltinColumns[pod] must be cleared")
-	_, orderExists := rm.columnOrder["pod"]
+	_, orderExists := rm.columnOrder[colKey("pod")]
 	assert.False(t, orderExists, "columnOrder[pod] must be cleared")
 }
 
@@ -770,12 +770,12 @@ func TestCovColumnToggleEnterAllUnselectedClearsColumnOrder(t *testing.T) {
 		{key: "IP", visible: false, builtin: false},
 	}
 	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
-	m.columnOrder = map[string][]string{"pod": {"IP", "Namespace"}}
+	m.columnOrder = map[string][]string{colKey("pod"): {"IP", "Namespace"}}
 	m.overlay = overlayColumnToggle
 
 	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	rm := r.(Model)
 
-	_, exists := rm.columnOrder["pod"]
+	_, exists := rm.columnOrder[colKey("pod")]
 	assert.False(t, exists, "columnOrder[pod] must be cleared on full unselect")
 }

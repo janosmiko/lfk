@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -139,7 +140,7 @@ func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
 // The filled portion is colored based on usage percentage: green (<75%), orange (75-90%), red (>90%).
 func renderBar(used, total int64, width int) string {
 	if total <= 0 {
-		return "[" + strings.Repeat("░", width) + "] N/A"
+		return "[" + strings.Repeat("░", width) + "]  N/A"
 	}
 	pct := float64(used) / float64(total) * 100
 	if pct > 100 {
@@ -162,7 +163,10 @@ func renderBar(used, total int64, width int) string {
 		style = ui.StatusRunning
 	}
 
-	return "[" + style.Render(filledStr) + emptyStr + "] " + fmt.Sprintf("%.0f%%", pct)
+	// Pad the percentage to a fixed width ("  5%", " 14%", "100%") so bars
+	// placed side by side (per-node CPU/MEM) stay column-aligned regardless of
+	// the digit count.
+	return "[" + style.Render(filledStr) + emptyStr + "] " + fmt.Sprintf("%3.0f%%", pct)
 }
 
 // renderStackedBar renders a stacked bar showing proportions of multiple segments.
@@ -198,25 +202,21 @@ func renderStackedBar(segments []struct {
 }
 
 // dashboardHeaderSection renders the cluster header, node, namespace, and pod sections.
-func dashboardHeaderSection(lines []string, data dashboardData) []string {
+func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidths) []string {
 	lines = append(lines, ui.DimStyle.Bold(true).Render("  CLUSTER DASHBOARD"))
 	lines = append(lines, "")
 
-	// Nodes section.
-	nodeStatus := ui.StatusRunning.Render(fmt.Sprintf("%d Ready", data.readyNodes))
-	if data.readyNodes < data.nodeCount {
-		notReady := data.nodeCount - data.readyNodes
-		nodeStatus += " " + ui.StatusFailed.Render(fmt.Sprintf("%d NotReady", notReady))
-	}
-	lines = append(lines, fmt.Sprintf("  %s %s  %s",
-		ui.HelpKeyStyle.Render("Nodes:"),
-		ui.NormalStyle.Render(fmt.Sprintf("%d", data.nodeCount)),
-		nodeStatus))
+	// Nodes: health bar (green Ready / red NotReady) + inline summary.
 	if data.nodeCount > 0 {
-		nodeBar := renderBar(int64(data.readyNodes), int64(data.nodeCount), 30)
-		lines = append(lines, fmt.Sprintf("  %s %s",
-			ui.HelpKeyStyle.Render("           "),
-			nodeBar))
+		segments := []struct {
+			count int
+			style lipgloss.Style
+		}{
+			{data.readyNodes, ui.StatusRunning},
+			{data.nodeCount - data.readyNodes, ui.StatusFailed},
+		}
+		nodeBar := renderStackedBar(segments, data.nodeCount, w.bar)
+		lines = append(lines, dashboardMetricLines("Nodes", nodeBar, nodeSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")
 
@@ -225,20 +225,11 @@ func dashboardHeaderSection(lines []string, data dashboardData) []string {
 		ui.HelpKeyStyle.Render("Namespaces:"),
 		ui.NormalStyle.Render(fmt.Sprintf("%d", data.nsCount))))
 	lines = append(lines, "")
-	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", 50)))
 
-	// Pods section.
-	podStatus := ui.StatusRunning.Render(fmt.Sprintf("%d Running", data.pods.running))
-	if data.pods.failed > 0 {
-		podStatus += " " + ui.StatusFailed.Render(fmt.Sprintf("%d Failed", data.pods.failed))
-	}
-	if data.pods.pending > 0 {
-		podStatus += " " + ui.StatusProgressing.Render(fmt.Sprintf("%d Pending", data.pods.pending))
-	}
-	lines = append(lines, fmt.Sprintf("  %s %s  %s",
-		ui.HelpKeyStyle.Render("Pods:"),
-		ui.NormalStyle.Render(fmt.Sprintf("%d", data.pods.total)),
-		podStatus))
+	// Pods: status bar (green Running / amber Pending / red Failed / grey
+	// Succeeded) + inline breakdown. "Other" (Terminating/Unknown + rounding
+	// slack) is the neutral last segment so renderStackedBar's remainder-fill
+	// never paints leftover space red as phantom failures.
 	if data.pods.total > 0 {
 		segments := []struct {
 			count int
@@ -247,54 +238,46 @@ func dashboardHeaderSection(lines []string, data dashboardData) []string {
 			{data.pods.running, ui.StatusRunning},
 			{data.pods.pending, ui.StatusProgressing},
 			{data.pods.failed, ui.StatusFailed},
+			{data.pods.succeeded, ui.StatusOther},
+			{podOther(data.pods), ui.DimStyle},
 		}
-		podBar := renderStackedBar(segments, data.pods.total, 30)
-		lines = append(lines, fmt.Sprintf("  %s %s",
-			ui.HelpKeyStyle.Render("           "),
-			podBar))
+		podBar := renderStackedBar(segments, data.pods.total, w.bar)
+		lines = append(lines, dashboardMetricLines("Pods", podBar, podSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")
-	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", 50)))
 
 	return lines
 }
 
 // dashboardResourcesSection renders the cluster resources (CPU/Mem) section.
-func dashboardResourcesSection(lines []string, data dashboardData) []string {
+func dashboardResourcesSection(lines []string, data dashboardData, w dashboardWidths) []string {
 	if data.totalCPUAlloc <= 0 && data.totalMemAlloc <= 0 {
 		return lines
 	}
+	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))
 	lines = append(lines, ui.DimStyle.Bold(true).Render("  CLUSTER RESOURCES"))
 	if data.nodeMetricsErr != nil {
 		lines = append(lines, ui.StatusProgressing.Render("  (metrics-server unavailable)"))
 	}
 	lines = append(lines, "")
 	if data.totalCPUAlloc > 0 {
-		cpuBar := renderBar(data.totalCPUUsed, data.totalCPUAlloc, 30)
-		lines = append(lines, fmt.Sprintf("  %s %s  %s / %s",
-			ui.HelpKeyStyle.Render("CPU:"),
-			cpuBar,
-			ui.FormatCPU(data.totalCPUUsed),
-			ui.FormatCPU(data.totalCPUAlloc)))
+		cpuBar := renderBar(data.totalCPUUsed, data.totalCPUAlloc, w.bar)
+		lines = append(lines, dashboardMetricLines("CPU", cpuBar, cpuSummaryStr(data), w)...)
 	}
 	if data.totalMemAlloc > 0 {
-		memBar := renderBar(data.totalMemUsed, data.totalMemAlloc, 30)
-		lines = append(lines, fmt.Sprintf("  %s %s  %s / %s",
-			ui.HelpKeyStyle.Render("Mem:"),
-			memBar,
-			ui.FormatMemory(data.totalMemUsed),
-			ui.FormatMemory(data.totalMemAlloc)))
+		memBar := renderBar(data.totalMemUsed, data.totalMemAlloc, w.bar)
+		lines = append(lines, dashboardMetricLines("Mem", memBar, memSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")
-	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", 50)))
 	return lines
 }
 
 // dashboardNodesSection renders the per-node breakdown.
-func dashboardNodesSection(lines []string, data dashboardData) []string {
+func dashboardNodesSection(lines []string, data dashboardData, w dashboardWidths) []string {
 	if len(data.nodes) == 0 || (data.totalCPUAlloc <= 0 && data.totalMemAlloc <= 0) {
 		return lines
 	}
+	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))
 	lines = append(lines, ui.DimStyle.Bold(true).Render("  NODES"))
 	lines = append(lines, "")
 
@@ -316,12 +299,15 @@ func dashboardNodesSection(lines []string, data dashboardData) []string {
 		statusDot := nodeStatusDot(data.nodeItems, n.name)
 		roleStr := nodeRoleStr(data.nodeItems, n.name)
 
-		cpuBar := renderBar(n.cpuUsed, n.cpuAlloc, 15)
-		memBar := renderBar(n.memUsed, n.memAlloc, 15)
-		lines = append(lines, fmt.Sprintf("  %s %s%s", statusDot, name, roleStr))
-		lines = append(lines, fmt.Sprintf("      %s %s   %s %s",
+		cpuBar := renderBar(n.cpuUsed, n.cpuAlloc, w.node)
+		memBar := renderBar(n.memUsed, n.memAlloc, w.node)
+		nameLine := fmt.Sprintf("  %s %s%s", statusDot, name, roleStr)
+		barLine := fmt.Sprintf("      %s %s   %s %s",
 			ui.HelpKeyStyle.Render("CPU"), cpuBar,
-			ui.HelpKeyStyle.Render("MEM"), memBar))
+			ui.HelpKeyStyle.Render("MEM"), memBar)
+		// Truncate to the column so a narrow pane can't wrap the row.
+		lines = append(lines, ansi.Truncate(nameLine, w.content, ""))
+		lines = append(lines, ansi.Truncate(barLine, w.content, ""))
 	}
 	lines = append(lines, "")
 	return lines
@@ -352,45 +338,64 @@ func nodeRoleStr(nodeItems []model.Item, name string) string {
 	return ""
 }
 
-// dashboardWarningsSection renders the warnings (pod/node health issues + PDB).
-func dashboardWarningsSection(lines []string, data dashboardData) []string {
-	hasHealthWarnings := data.pods.failed > 0 || data.pods.crashLoop > 0
+// dashboardWarningBody renders the warning lines (pod/node health + PDB) with
+// no separators or surrounding blanks. Returns nil when there's nothing to
+// warn about. Shared by the single-column section and the two-column right
+// column so both read identically.
+func dashboardWarningBody(data dashboardData) []string {
 	notReadyWorkers := countNotReadyWorkerNodes(data.nodeItems)
-	if notReadyWorkers > 0 {
-		hasHealthWarnings = true
-	}
+	hasHealthWarnings := data.pods.failed > 0 || data.pods.crashLoop > 0 || notReadyWorkers > 0
 	if !hasHealthWarnings && len(data.pdbWarnings) == 0 {
-		return lines
+		return nil
 	}
 
-	lines = append(lines, ui.DimStyle.Bold(true).Render("  WARNINGS"))
-	lines = append(lines, "")
+	var out []string
+	out = append(out, ui.DimStyle.Bold(true).Render("  WARNINGS"), "")
 	if data.pods.failed > 0 {
-		lines = append(lines, ui.StatusFailed.Render(fmt.Sprintf("  ! %d pod(s) in failed state", data.pods.failed)))
+		out = append(out, ui.StatusFailed.Render(fmt.Sprintf("  ! %d pod(s) in failed state", data.pods.failed)))
 	}
 	if notReadyWorkers > 0 {
-		lines = append(lines, ui.StatusFailed.Render(fmt.Sprintf("  ! %d worker node(s) not ready", notReadyWorkers)))
+		out = append(out, ui.StatusFailed.Render(fmt.Sprintf("  ! %d worker node(s) not ready", notReadyWorkers)))
 	}
 	if data.pods.crashLoop > 0 {
-		lines = append(lines, ui.StatusFailed.Render(fmt.Sprintf("  ! %d pod(s) in CrashLoopBackOff", data.pods.crashLoop)))
+		out = append(out, ui.StatusFailed.Render(fmt.Sprintf("  ! %d pod(s) in CrashLoopBackOff", data.pods.crashLoop)))
 	}
 	if len(data.pdbWarnings) > 0 {
-		lines = append(lines, "")
-		lines = append(lines, ui.DimStyle.Bold(true).Render("  PDB WARNINGS"))
-		lines = append(lines, "")
+		out = append(out, "", ui.DimStyle.Bold(true).Render("  PDB WARNINGS"), "")
 		for _, pw := range data.pdbWarnings {
-			lines = append(lines, fmt.Sprintf("  %s %s/%s",
+			out = append(out, fmt.Sprintf("  %s %s/%s",
 				ui.StatusProgressing.Render("⊘"),
 				ui.DimStyle.Render(pw.namespace),
 				ui.StatusProgressing.Render(pw.name)))
-			detail := fmt.Sprintf("       MinAvail=%s  Healthy=%s  DisruptionsAllowed=%s",
-				pw.minAvailable, pw.currentHealthy, pw.disruptionsAllowed)
-			lines = append(lines, ui.DimStyle.Render(detail))
+			out = append(out, ui.DimStyle.Render(fmt.Sprintf("       MinAvail=%s  Healthy=%s  DisruptionsAllowed=%s",
+				pw.minAvailable, pw.currentHealthy, pw.disruptionsAllowed)))
 		}
 	}
+	return out
+}
+
+// dashboardWarningsSection renders the warnings for the single-column layout,
+// led by a separator so it's clearly divided from the section above it.
+func dashboardWarningsSection(lines []string, data dashboardData, w dashboardWidths) []string {
+	body := dashboardWarningBody(data)
+	if len(body) == 0 {
+		return lines
+	}
+	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))
+	lines = append(lines, body...)
 	lines = append(lines, "")
-	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", 50)))
 	return lines
+}
+
+// dashboardWarningsColumn renders the warnings for the top of the two-column
+// right column (above RECENT EVENTS). No separator — the right column wraps
+// each line, so a full-width rule would look wrong there.
+func dashboardWarningsColumn(data dashboardData) []string {
+	body := dashboardWarningBody(data)
+	if len(body) == 0 {
+		return nil
+	}
+	return append([]string{""}, body...)
 }
 
 // countNotReadyWorkerNodes counts worker nodes that are not Ready.
@@ -436,11 +441,14 @@ func extractEventFields(ev model.Item) eventColumnFields {
 	return f
 }
 
-// dashboardInlineEventsSection renders the inline warning events section.
-func dashboardInlineEventsSection(lines []string, warningEvents []model.Item) []string {
+// dashboardInlineEventsSection renders the inline warning events section
+// (single-column layout only), led by a separator to divide it from the
+// section above.
+func dashboardInlineEventsSection(lines []string, warningEvents []model.Item, w dashboardWidths) []string {
 	if len(warningEvents) == 0 {
 		return lines
 	}
+	lines = append(lines, ui.DimStyle.Render("  "+strings.Repeat("─", w.sep)))
 	lines = append(lines, ui.DimStyle.Bold(true).Render("  RECENT WARNING EVENTS"))
 	lines = append(lines, "")
 	for _, ev := range warningEvents {

@@ -1,5 +1,110 @@
 # Changelog
 
+## [0.13.1](https://github.com/janosmiko/lfk/compare/v0.13.0...v0.13.1) (2026-05-31)
+
+
+### Features
+
+* derive CRD display names from Kind to preserve camel case ([#306](https://github.com/janosmiko/lfk/issues/306)) ([c334c85](https://github.com/janosmiko/lfk/commit/c334c85b571e9d867aaf223bfbc8f27b0ff30cba)), closes [#301](https://github.com/janosmiko/lfk/issues/301)
+* per-kind sort memory and per-context column memory ([#310](https://github.com/janosmiko/lfk/issues/310)) ([4e80556](https://github.com/janosmiko/lfk/commit/4e80556ba5e10368ac63804ef5798c80530259bf))
+
+
+### Bug Fixes
+
+* honor CRD additionalPrinterColumns priority and keep them visible ([#309](https://github.com/janosmiko/lfk/issues/309)) ([bed3a7a](https://github.com/janosmiko/lfk/commit/bed3a7af0d241c34bae675af80d0c1c93544f199))
+* link manually-triggered CronJob jobs to their CronJob via ownerRef ([#308](https://github.com/janosmiko/lfk/issues/308)) ([39acb48](https://github.com/janosmiko/lfk/commit/39acb485a3391fc48491481fc09e2a348db52594)), closes [#304](https://github.com/janosmiko/lfk/issues/304)
+* remember resource list filter across subview navigation ([#303](https://github.com/janosmiko/lfk/issues/303)) ([#311](https://github.com/janosmiko/lfk/issues/311)) ([4dca616](https://github.com/janosmiko/lfk/commit/4dca616fb12776e7e21ba3f3641e731e82e8e729))
+
+## [0.13.0](https://github.com/janosmiko/lfk/compare/v0.12.9...v0.13.0) (2026-05-30)
+
+
+### Features
+
+* pin individual resource types into a top "Pinned" section ([#300](https://github.com/janosmiko/lfk/issues/300)) ([3953bd6](https://github.com/janosmiko/lfk/commit/3953bd63416313413705a420b19e8daf32a9b3d2))
+
+
+### Bug Fixes
+
+* apply theme switch to cached previews immediately ([#299](https://github.com/janosmiko/lfk/issues/299)) ([7d32aaa](https://github.com/janosmiko/lfk/commit/7d32aaa028d3fcc8903d962edb251cdce050076b))
+* dashboard events preview background tear under non-black themes ([#293](https://github.com/janosmiko/lfk/issues/293)) ([#296](https://github.com/janosmiko/lfk/issues/296)) ([2d1672d](https://github.com/janosmiko/lfk/commit/2d1672dc7272759cf72904a93982f4c4d4fc644a))
+
+## [0.12.9](https://github.com/janosmiko/lfk/compare/v0.12.8...v0.12.9) (2026-05-29)
+
+
+### Bug Fixes
+
+* cluster dashboard rendering, scrolling, and responsive usage bars ([#293](https://github.com/janosmiko/lfk/issues/293)) ([#294](https://github.com/janosmiko/lfk/issues/294)) ([9b3fb00](https://github.com/janosmiko/lfk/commit/9b3fb001d4a32f2a7e51780f5dda4e1a1cffae43))
+
+## [0.12.8](https://github.com/janosmiko/lfk/compare/v0.12.7...v0.12.8) (2026-05-28)
+
+
+### Features
+
+* refresh namespaces in the namespace selector with R ([#292](https://github.com/janosmiko/lfk/issues/292)) ([bc6ace6](https://github.com/janosmiko/lfk/commit/bc6ace6aaf876eda1a5c48260e909a2c421a2db6))
+
+
+### Bug Fixes
+
+* clear hint-bar message immediately on explorer navigation ([#291](https://github.com/janosmiko/lfk/issues/291)) ([3b5bb3e](https://github.com/janosmiko/lfk/commit/3b5bb3e628cb1aaa55b7de899250372174d707ae))
+* gate explorer hint bar by nav level at context picker ([#288](https://github.com/janosmiko/lfk/issues/288)) ([199de4b](https://github.com/janosmiko/lfk/commit/199de4b9730e1a00e349d14b84daec7bb662c874))
+* persist in-context read-only toggle to per-context override ([#290](https://github.com/janosmiko/lfk/issues/290)) ([35cbab5](https://github.com/janosmiko/lfk/commit/35cbab5dfdc868303c7300e8a6359a91dc60bb20))
+
+## [0.12.7](https://github.com/janosmiko/lfk/compare/v0.12.6...v0.12.7) (2026-05-28)
+
+
+### Features
+
+* add negative namespace selection ([#287](https://github.com/janosmiko/lfk/issues/287)) ([653d1cd](https://github.com/janosmiko/lfk/commit/653d1cd9d83708ffa727580af4cd03fc5343c302))
+
+
+### Bug Fixes
+
+* **nix:** update vendorHash after k8s dependency bump ([#285](https://github.com/janosmiko/lfk/issues/285)) ([9020c87](https://github.com/janosmiko/lfk/commit/9020c87fe35b4d8b60cfae0c23ab8ed9346bef5d)), closes [#284](https://github.com/janosmiko/lfk/issues/284)
+
+## [0.12.6](https://github.com/janosmiko/lfk/compare/v0.12.5...v0.12.6) (2026-05-25)
+
+
+### Bug Fixes
+
+* **views:** apply GVR-keyed view columns and hide unlisted builtins ([#277](https://github.com/janosmiko/lfk/issues/277)) ([a2df863](https://github.com/janosmiko/lfk/commit/a2df863902a2f58f6c9dd4ed896a210d43da2051)), closes [#262](https://github.com/janosmiko/lfk/issues/262)
+
+## [0.12.5](https://github.com/janosmiko/lfk/compare/v0.12.4...v0.12.5) (2026-05-25)
+
+
+### Features
+
+* **columns + views:** REV, kubectl-parity audit, k9s-style views config ([#271](https://github.com/janosmiko/lfk/issues/271)) ([837961c](https://github.com/janosmiko/lfk/commit/837961ce44c1de45eca45e17be0a9f916e86dbe2))
+
+## [0.12.4](https://github.com/janosmiko/lfk/compare/v0.12.3...v0.12.4) (2026-05-24)
+
+
+### Bug Fixes
+
+* **sort:** numeric ordering for percent columns (CPU%, MEM%, */R, */L) ([#273](https://github.com/janosmiko/lfk/issues/273)) ([f50537a](https://github.com/janosmiko/lfk/commit/f50537a8cc91fee15fabad596f671182922a7b58)), closes [#272](https://github.com/janosmiko/lfk/issues/272)
+
+## [0.12.3](https://github.com/janosmiko/lfk/compare/v0.12.2...v0.12.3) (2026-05-23)
+
+
+### Features
+
+* **actions:** add "Go to Node" to the Pod action menu ([#264](https://github.com/janosmiko/lfk/issues/264)) ([#269](https://github.com/janosmiko/lfk/issues/269)) ([c9190d1](https://github.com/janosmiko/lfk/commit/c9190d1dbc87e5e4f0bb956e058f5be02cdd1b9b))
+* **events:** make the events overlay readable by default ([#263](https://github.com/janosmiko/lfk/issues/263)) ([#270](https://github.com/janosmiko/lfk/issues/270)) ([8bce4ea](https://github.com/janosmiko/lfk/commit/8bce4ea2afc704d655e48f9fa7908feaa124bc58))
+* **logger:** surface silent failures with dedup to in-app log ([#268](https://github.com/janosmiko/lfk/issues/268)) ([ccfece0](https://github.com/janosmiko/lfk/commit/ccfece0682b69b165c21edae994320d8440bba25))
+
+
+### Bug Fixes
+
+* **metrics:** fall back to metrics-api when prometheus route fails ([#266](https://github.com/janosmiko/lfk/issues/266)) ([3a79c37](https://github.com/janosmiko/lfk/commit/3a79c377b9abb45019e3029066fe2cee840c4518))
+* normalize clipboard line endings to CRLF on Windows ([#261](https://github.com/janosmiko/lfk/issues/261)) ([#265](https://github.com/janosmiko/lfk/issues/265)) ([2b884aa](https://github.com/janosmiko/lfk/commit/2b884aa610a49b90bc3b08ed9ce29919e5d2e2d1))
+
+## [0.12.2](https://github.com/janosmiko/lfk/compare/v0.12.1...v0.12.2) (2026-05-21)
+
+
+### Bug Fixes
+
+* **bulk:** clear stale bulk-action snapshot on dispatch and cancel ([#257](https://github.com/janosmiko/lfk/issues/257)) ([16a4c60](https://github.com/janosmiko/lfk/commit/16a4c606b632785b84f383251d88b31d12fd7a47))
+* stop node metrics column-order flicker (and prevent the whole class) ([#259](https://github.com/janosmiko/lfk/issues/259)) ([7f5c695](https://github.com/janosmiko/lfk/commit/7f5c695020bee63ed35db09ef20992a31cece50a))
+
 ## [0.12.1](https://github.com/janosmiko/lfk/compare/v0.12.0...v0.12.1) (2026-05-19)
 
 

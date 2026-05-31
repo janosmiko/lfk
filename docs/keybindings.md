@@ -16,7 +16,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping in the Events list |
-| `p` | Pin/unpin CRD group (at resource types level) |
+| `p` | Pin/unpin resource type (at resource types level) |
 | `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar (resets each launch) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
@@ -53,6 +53,8 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `>` / `<` | Sort by next / previous column |
 | `=` | Toggle sort direction (ascending/descending) |
 | `-` | Reset sort to default (Name ascending) |
+
+Your chosen sort is remembered per resource kind for the running session, so leaving a list and returning keeps your sort instead of resetting.
 
 ## Modes & Settings
 
@@ -122,6 +124,8 @@ Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason 
 | `N` | Jump to previous search match |
 | `Esc` | Clear filter / cancel search |
 
+Each list remembers its `f` filter per tab: drilling into a resource (logs, containers, owned objects) and navigating back keeps the filter applied. A different list starts unfiltered; press `Esc` to clear a list's filter.
+
 Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 
 `/` and `f` share one persistent history at `$XDG_STATE_HOME/lfk/query-history` (default `~/.local/state/lfk/query-history`) — both inputs accept the same query syntax and match against the same fields, so a query confirmed in one mode is recallable from the other. The `:` command bar keeps its own `history` file because its inputs are kubectl-shaped commands rather than resource-name queries.
@@ -136,7 +140,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `L` | View logs for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
 | `E` | Edit selected resource in $KUBE_EDITOR or $EDITOR | `edit` |
-| `R` | Refresh current view | `refresh` |
+| `R` | Refresh current view (also works inside the namespace selector — re-fetches the namespace list from the cluster) | `refresh` |
 | `v` | Describe selected resource | `describe` |
 | `D` | Delete resource (force delete Pod/Job if already deleting, force finalize others) | `delete` |
 | `X` | Force delete (Pod/Job only) | `force_delete` |
@@ -748,7 +752,7 @@ Invalid config values are dropped at startup with a warning in the error log.
 
 | Key | Action |
 |---|---|
-| `Ctrl+R` (inside a context) | Toggle read-only mode for the current tab. Session-scoped — does not write to config and does not leak across context switches. Blocked when `--read-only` is set. |
+| `Ctrl+R` (inside a context) | Toggle read-only mode for the current tab. Recorded as a session override for that context, so it survives re-entry and stays in sync with the picker's `[RO]` marker; does not write to config and never leaks across contexts. Blocked when `--read-only` is set. |
 | `Ctrl+R` (at the cluster picker) | Toggle the `[RO]` marker on the highlighted context row. Stored as a session override that wins over per-context config and is honored on context entry. Blocked when `--read-only` is set (the CLI flag forces every context RO). |
 
 The `[RO]` badge appears in the title bar only when you're inside a

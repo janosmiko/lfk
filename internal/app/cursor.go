@@ -1,6 +1,7 @@
 package app
 
 import (
+	"maps"
 	"sort"
 	"strings"
 
@@ -275,6 +276,56 @@ func (m *Model) middleColumnKind() string {
 	return strings.ToLower(m.nav.ResourceType.Kind)
 }
 
+// middleColumnRef returns the ui.ResourceRef identifying the resource
+// currently rendered in the middle column. Used to resolve view configs
+// keyed by GVR or Kind. At LevelOwned/LevelContainers the parent's GVR
+// does not match the rendered items, so only Kind is populated (matching
+// the kind returned by middleColumnKind); resolution then falls back to
+// Kind-only lookup. At shallower levels the full GVR is returned so views
+// keyed by `<group>/<version>/<resource>` resolve.
+func (m *Model) middleColumnRef() ui.ResourceRef {
+	if m.nav.Level == model.LevelOwned || m.nav.Level == model.LevelContainers {
+		if len(m.middleItems) > 0 && m.middleItems[0].Kind != "" {
+			return ui.ResourceRef{Kind: m.middleItems[0].Kind}
+		}
+		return ui.ResourceRef{Kind: m.nav.ResourceType.Kind}
+	}
+	return ui.ResourceRef{
+		Group:    m.nav.ResourceType.APIGroup,
+		Version:  m.nav.ResourceType.APIVersion,
+		Resource: m.nav.ResourceType.Resource,
+		Kind:     m.nav.ResourceType.Kind,
+	}
+}
+
+// viewRefForKind returns a ResourceRef suitable for resolving view config
+// (HiddenBuiltinsForView / ColumnsForKind / ResolveView) for the given
+// kind. When kind matches nav.ResourceType.Kind, the full GVR is included
+// so views keyed by GVR resolve. Otherwise (LevelOwned/LevelContainers
+// where rendered kind diverges from nav.ResourceType) a Kind-only ref is
+// returned so resolution falls back to Kind lookup.
+func (m *Model) viewRefForKind(kind string) ui.ResourceRef {
+	if kind != "" && strings.EqualFold(kind, m.nav.ResourceType.Kind) {
+		return ui.ResourceRef{
+			Group:    m.nav.ResourceType.APIGroup,
+			Version:  m.nav.ResourceType.APIVersion,
+			Resource: m.nav.ResourceType.Resource,
+			Kind:     m.nav.ResourceType.Kind,
+		}
+	}
+	return ui.ResourceRef{Kind: kind}
+}
+
+// columnMemoryKey scopes the per-kind column session maps (sessionColumns,
+// hiddenBuiltinColumns, columnOrder) to the current cluster context, so the
+// same kind can show different columns in different clusters — mirroring sort
+// memory. Both the render path (applySessionColumnsForKind) and the
+// column-toggle overlay must route map access through this so reads and
+// writes share one key.
+func (m *Model) columnMemoryKey(kind string) string {
+	return m.nav.Context + "\x00" + kind
+}
+
 // navKey builds a unique key from the current navigation state, used for
 // cursor memory and item caching.
 func (m *Model) navKey() string {
@@ -307,6 +358,58 @@ func (m *Model) restoreCursor() {
 	m.setCursor(0)
 }
 
+// savedFilter captures a list's committed filter so it can be recalled exactly
+// when the user returns to that level. broad mirrors m.filterBroadMode (the Tab
+// toggle that also matches column values) so a broad filter doesn't come back
+// as a plain name filter.
+type savedFilter struct {
+	text  string
+	broad bool
+}
+
+// copyMapStringSavedFilter deep copies a map[string]savedFilter. A nil input
+// yields a non-nil empty map so callers can write into it without a nil check.
+func copyMapStringSavedFilter(m map[string]savedFilter) map[string]savedFilter {
+	c := make(map[string]savedFilter, len(m))
+	maps.Copy(c, m)
+	return c
+}
+
+// saveLevelFilter persists the committed filter for the current navigation path
+// so it can be restored when the user returns to this list. An empty filter
+// deletes any prior entry so a later visit starts clean rather than restoring a
+// phantom filter. Must be called BEFORE a level change clears m.filterText.
+func (m *Model) saveLevelFilter() {
+	key := m.navKey()
+	if m.filterText == "" {
+		delete(m.filterMemory, key)
+		return
+	}
+	if m.filterMemory == nil {
+		m.filterMemory = make(map[string]savedFilter)
+	}
+	m.filterMemory[key] = savedFilter{text: m.filterText, broad: m.filterBroadMode}
+}
+
+// restoreLevelFilter applies the saved filter for the current navigation path,
+// or clears the live filter if none was saved (so a sibling list never inherits
+// another list's filter). Must be called AFTER the destination level is set.
+// It deliberately does NOT touch m.filterMemory and is only called on explicit
+// navigation transitions — never on data-refresh paths — so a live filter the
+// user is still typing is never clobbered.
+func (m *Model) restoreLevelFilter() {
+	if f, ok := m.filterMemory[m.navKey()]; ok {
+		m.filterText = f.text
+		m.filterInput.Set(f.text)
+		m.filterBroadMode = f.broad
+	} else {
+		m.filterText = ""
+		m.filterInput.Clear()
+		m.filterBroadMode = false
+	}
+	m.filterActive = false
+}
+
 // selectedMiddleItem returns the currently selected item in the middle column,
 // taking into account any active filter.
 func (m *Model) selectedMiddleItem() *model.Item {
@@ -332,6 +435,51 @@ func (m *Model) selectedMiddleItem() *model.Item {
 		return &visible[c]
 	}
 	return nil
+}
+
+// nextResourceTypeCursorItem returns a copy of the resource-type item the
+// cursor should follow to after the selected item is pinned/unpinned and the
+// sidebar re-sorts: the next real resource type below the cursor, falling back
+// to the previous one when the selection is the last item. Returns nil when no
+// sibling resource type exists. Headers and collapsed-group placeholders (whose
+// Extra has no version segment) are skipped.
+func (m *Model) nextResourceTypeCursorItem() *model.Item {
+	visible := m.visibleMiddleItems()
+	c := m.cursor()
+	isType := func(it model.Item) bool {
+		return it.Kind != "__collapsed_group__" && model.PinKeyFromRef(it.Extra) != ""
+	}
+	for i := c + 1; i < len(visible); i++ {
+		if isType(visible[i]) {
+			it := visible[i]
+			return &it
+		}
+	}
+	for i := c - 1; i >= 0; i-- {
+		if isType(visible[i]) {
+			it := visible[i]
+			return &it
+		}
+	}
+	return nil
+}
+
+// focusMiddleItem moves the cursor onto the item matching target (by
+// Name/Kind/Extra) in the current visible list. No-op when target is nil or
+// the item is no longer present.
+func (m *Model) focusMiddleItem(target *model.Item) {
+	if target == nil {
+		return
+	}
+	visible := m.visibleMiddleItems()
+	for i := range visible {
+		if visible[i].Name == target.Name &&
+			visible[i].Kind == target.Kind &&
+			visible[i].Extra == target.Extra {
+			m.setCursor(i)
+			return
+		}
+	}
 }
 
 // selectionKey generates a unique key for an item used in the selectedItems
@@ -478,7 +626,7 @@ func (m *Model) visibleMiddleItems() []model.Item {
 		seenCategories := make(map[string]bool)
 		for _, item := range items {
 			// Items with no category or in the Dashboards group are always shown expanded.
-			if item.Category == "" || item.Category == "Dashboards" {
+			if item.Category == "" || item.Category == "Dashboards" || item.Category == "Pinned" {
 				collapsed = append(collapsed, item)
 				continue
 			}

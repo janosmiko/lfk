@@ -33,6 +33,11 @@ type configFile struct {
 	// ResourceColumns maps resource Kind names (case-insensitive, e.g. "Pod", "Deployment")
 	// to per-type column lists. When set, these override the global Columns setting for that kind.
 	ResourceColumns map[string][]string `json:"resource_columns" yaml:"resource_columns"`
+	// Views maps GVR ("apps/v1/deployments") or Kind ("deployment", case-insensitive)
+	// to a view config — ordered columns and a default sort column. Subsumes
+	// ResourceColumns (which remains supported for backward compat). See the
+	// ColumnSpec parser for the per-entry format.
+	Views map[string]configView `json:"views" yaml:"views"`
 	// Dashboard controls whether to show a cluster dashboard when entering a context.
 	// Defaults to true. Set to false to go directly to resource types.
 	Dashboard *bool `json:"dashboard" yaml:"dashboard"`
@@ -56,6 +61,10 @@ type configFile struct {
 	// PinnedGroups lists CRD API groups that should appear prominently
 	// right after built-in categories. Example: ["karpenter.sh", "monitoring.coreos.com"]
 	PinnedGroups []string `json:"pinned_groups" yaml:"pinned_groups"`
+	// PinnedTypes lists version-agnostic resource-type pin keys
+	// ("group/resource", e.g. "apps/deployments" or "argoproj.io/applications")
+	// to move into the top-level Pinned section.
+	PinnedTypes []string `json:"pinned_types" yaml:"pinned_types"`
 	// Monitoring maps cluster context names to custom monitoring endpoint config.
 	// The special key "_global" applies to clusters without explicit config.
 	Monitoring map[string]model.MonitoringConfig `json:"monitoring" yaml:"monitoring"`
@@ -307,7 +316,8 @@ func (c *UnionSetContextConfig) UnmarshalJSON(data []byte) error {
 
 // clusterConfig holds per-cluster configuration overrides.
 type clusterConfig struct {
-	ResourceColumns map[string][]string `json:"resource_columns" yaml:"resource_columns"`
+	ResourceColumns map[string][]string   `json:"resource_columns" yaml:"resource_columns"`
+	Views           map[string]configView `json:"views" yaml:"views"`
 	// ReadOnly, when set, overrides the global read_only setting for this
 	// context only. Useful for marking specific clusters (e.g. "prod") as
 	// read-only while leaving others mutable.

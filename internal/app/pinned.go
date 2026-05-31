@@ -10,8 +10,11 @@ import (
 	"github.com/janosmiko/lfk/internal/paths"
 )
 
-// PinnedState stores pinned CRD groups scoped either to a kube context or to
-// a named union set.
+// PinnedState stores pinned resource-type keys ("group/resource",
+// version-agnostic) scoped either to a kube context or to a named union set.
+// Older files may still hold legacy whole-group entries (a bare group name with
+// no "/"); these are expanded into member types on first use (see
+// applyPinnedTypes / migratePinnedScope).
 type PinnedState struct {
 	Contexts  map[string][]string `json:"contexts" yaml:"contexts"`
 	UnionSets map[string][]string `json:"union_sets" yaml:"union_sets"`
@@ -76,32 +79,32 @@ func savePinnedState(s *PinnedState) error {
 	return os.WriteFile(path, data, 0o644)
 }
 
-// togglePinnedGroup adds or removes a group from the per-context pinned list.
-// Returns true if the group was added (pinned), false if removed (unpinned).
-func togglePinnedGroup(s *PinnedState, context, group string) bool {
+// togglePinnedType adds or removes a resource-type key from the per-context
+// pinned list. Returns true if it was added (pinned), false if removed.
+func togglePinnedType(s *PinnedState, context, typeKey string) bool {
 	if s.Contexts == nil {
 		s.Contexts = make(map[string][]string)
 	}
-	return togglePinnedGroupIn(s.Contexts, context, group)
+	return togglePinnedTypeIn(s.Contexts, context, typeKey)
 }
 
-func togglePinnedUnionSetGroup(s *PinnedState, unionSet, group string) bool {
+func togglePinnedUnionSetType(s *PinnedState, unionSet, typeKey string) bool {
 	if s.UnionSets == nil {
 		s.UnionSets = make(map[string][]string)
 	}
-	return togglePinnedGroupIn(s.UnionSets, unionSet, group)
+	return togglePinnedTypeIn(s.UnionSets, unionSet, typeKey)
 }
 
-func togglePinnedGroupIn(scope map[string][]string, key, group string) bool {
-	groups := scope[key]
-	for i, g := range groups {
-		if g == group {
+func togglePinnedTypeIn(scope map[string][]string, key, typeKey string) bool {
+	keys := scope[key]
+	for i, k := range keys {
+		if k == typeKey {
 			// Remove (unpin).
-			scope[key] = append(groups[:i], groups[i+1:]...)
+			scope[key] = append(keys[:i], keys[i+1:]...)
 			return false
 		}
 	}
 	// Add (pin).
-	scope[key] = append(groups, group)
+	scope[key] = append(keys, typeKey)
 	return true
 }

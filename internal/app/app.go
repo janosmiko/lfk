@@ -23,8 +23,7 @@ type Model struct {
 	client  *k8s.Client
 	version string // application version string shown in the title bar
 
-	// Navigation state.
-	nav model.NavigationState
+	nav model.NavigationState // navigation state
 
 	// Column data.
 	leftItems   []model.Item
@@ -39,6 +38,7 @@ type Model struct {
 
 	// Cursor memory: maps navigation path to cursor position for back-and-forth navigation.
 	cursorMemory map[string]int
+	filterMemory map[string]savedFilter // per-level committed filter, recalled on back-nav; see saveLevelFilter (#303)
 
 	// Item cache: maps navigation path to loaded items for faster back navigation.
 	itemCache map[string][]model.Item
@@ -143,23 +143,23 @@ type Model struct {
 	// Text input for type-to-confirm overlay (e.g., Force Finalize).
 	confirmTypeInput TextInput
 
-	// All-namespaces mode.
-	allNamespaces bool
-
-	// Multi-select namespace state.
+	// Namespace selection state (all-namespaces mode + multi-select).
+	allNamespaces       bool
 	selectedNamespaces  map[string]bool
+	nsSelectionNegated  bool // when true, selectedNamespaces is an EXCLUDE set
 	nsFilterMode        bool
 	nsSelectionModified bool   // tracks if Space was pressed in current ns overlay session
 	nsFilterEntryItem   string // namespace name selected when filter mode was entered; restored on Esc
+	nsOverlayContext    string // context the open namespace overlay lists; used by the in-overlay refresh (R)
 
 	// Fullscreen toggles: middle = hides left and right columns; dashboard
 	// = renders the cluster dashboard full screen.
 	fullscreenMiddle    bool
 	fullscreenDashboard bool
 
-	// Sort state for resources.
-	sortColumnName string // which column to sort by (e.g. "Name", "Age")
-	sortAscending  bool   // true = ascending, false = descending
+	sortColumnName string              // which column to sort by (e.g. "Name", "Age")
+	sortAscending  bool                // true = ascending, false = descending
+	sortMemory     map[string]sortPref // remembered sort per resource kind (context+GVR), session-only
 	// Status message (temporary, shown in status bar).
 	statusMessage    string
 	statusMessageErr bool
@@ -508,9 +508,11 @@ type Model struct {
 
 	// Metrics content: rendered bar graph for the preview column.
 	metricsContent string
+	metricsData    *metricsInputs // raw numbers behind metricsContent; recomposed on theme/resize, nil when none
 
 	// Preview events content: rendered event timeline for the preview column.
 	previewEventsContent string
+	previewEventsData    []ui.EventTimelineEntry // raw entries behind previewEventsContent; recomposed on theme/resize
 
 	// Baseline metrics for trend detection (updated every ~60s, not every refresh).
 	prevPodMetrics      map[string]model.PodMetrics
@@ -518,14 +520,12 @@ type Model struct {
 	prevNodeMetrics     map[string]model.PodMetrics
 	prevNodeMetricsTime time.Time
 
-	// Dashboard preview: rendered cluster dashboard for the right column.
-	dashboardPreview string
-
-	// Dashboard events preview: warning events for the two-column dashboard layout.
-	dashboardEventsPreview string
-
-	// Monitoring preview: rendered monitoring dashboard for the right column.
-	monitoringPreview string
+	// Dashboard state for the cluster overview / monitoring previews.
+	dashboardPreview       string                    // rendered cluster dashboard (right column / fullscreen)
+	dashboardEventsPreview string                    // warning events for the two-column layout
+	dashboardData          map[string]dashboardData  // retained per context; recomposed at current width on resize / fullscreen toggle
+	monitoringPreview      string                    // rendered monitoring dashboard
+	monitoringData         map[string]monitoringData // raw alerts retained per context; recomposed on theme change / resize
 
 	// Collapsible tree view state for resource types.
 	expandedGroup     string // currently expanded category (accordion behavior)

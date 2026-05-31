@@ -36,6 +36,9 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		}
 		m.overlay = overlayNone
 		m.schemeFilter.Clear()
+		// Re-render cached previews so they drop the live-preview theme's baked
+		// colors and paint with the restored theme immediately.
+		m = m.recomposeThemedContent()
 		return m, nil
 
 	case "enter":
@@ -49,6 +52,9 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			}
 			m.overlay = overlayNone
 			m.schemeFilter.Clear()
+			// Re-render cached previews so the new theme applies immediately
+			// instead of waiting for the next data tick.
+			m = m.recomposeThemedContent()
 			return m, scheduleStatusClear()
 		}
 		return m, nil
@@ -146,6 +152,8 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		if theme, ok := ui.BuiltinSchemes()[ui.ActiveSchemeName]; ok {
 			ui.ApplyTheme(theme)
 		}
+		// Re-render cached previews so the transparency change applies now.
+		m = m.recomposeThemedContent()
 		if ui.ConfigTransparentBg {
 			m.setStatusMessage("Transparent background: on", false)
 		} else {
@@ -213,6 +221,8 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 			}
 			m.overlay = overlayNone
 			m.schemeFilter.Clear()
+			// Re-render cached previews so the new theme applies immediately.
+			m = m.recomposeThemedContent()
 			return m, scheduleStatusClear()
 		}
 		m.previewSchemeAtCursor(filtered)
@@ -229,6 +239,10 @@ func (m Model) handleColorschemeFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 }
 
 // previewSchemeAtCursor applies the scheme under the cursor as a live preview.
+// The colorscheme picker keeps the explorer behind it un-dimmed for side-by-side
+// comparison (see renderOverlay), so the cached preview strings (dashboard,
+// monitoring, metrics bar, events footer) must be recomposed on every preview
+// step — otherwise their baked-in theme colors stay stale until the next tick.
 func (m *Model) previewSchemeAtCursor(filtered []string) {
 	if m.schemeCursor >= 0 && m.schemeCursor < len(filtered) {
 		name := filtered[m.schemeCursor]
@@ -236,6 +250,7 @@ func (m *Model) previewSchemeAtCursor(filtered []string) {
 		if theme, ok := schemes[name]; ok {
 			ui.ApplyTheme(theme)
 			ui.ActiveSchemeName = name
+			*m = m.recomposeThemedContent()
 		}
 	}
 }

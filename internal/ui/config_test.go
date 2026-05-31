@@ -74,10 +74,10 @@ func TestColumnsForKind_CaseInsensitive(t *testing.T) {
 		"pod": {"name", "status"},
 	}
 
-	assert.Equal(t, []string{"name", "status"}, ColumnsForKind("Pod", ""))
-	assert.Equal(t, []string{"name", "status"}, ColumnsForKind("pod", ""))
-	assert.Nil(t, ColumnsForKind("Deployment", ""))
-	assert.Nil(t, ColumnsForKind("", ""))
+	assert.Equal(t, []string{"name", "status"}, ColumnsForKind(ResourceRef{Kind: "Pod"}, ""))
+	assert.Equal(t, []string{"name", "status"}, ColumnsForKind(ResourceRef{Kind: "pod"}, ""))
+	assert.Nil(t, ColumnsForKind(ResourceRef{Kind: "Deployment"}, ""))
+	assert.Nil(t, ColumnsForKind(ResourceRef{}, ""))
 }
 
 func TestDetectIconModeFromEnv(t *testing.T) {

@@ -220,6 +220,10 @@ func (m Model) handleExplorerDirectActionKeys(msg tea.KeyMsg) (tea.Model, tea.Cm
 }
 
 func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool) {
+	if m.nav.Level == model.LevelClusters {
+		m.setStatusMessage("Namespace selection requires a selected context", true)
+		return m, scheduleStatusClear(), true
+	}
 	if m.unionMode {
 		m.setStatusMessage("Union mode supports exactly one namespace", true)
 		return m, scheduleStatusClear(), true
@@ -447,61 +451,6 @@ func (m Model) handleExplorerActionKeyJumpOwner() (tea.Model, tea.Cmd, bool) {
 	return ret, cmd, true
 }
 
-func (m Model) handleExplorerActionKeySortNext() (tea.Model, tea.Cmd, bool) {
-	if !m.sortApplies() {
-		return m, nil, true
-	}
-	colCount := ui.ActiveSortableColumnCount
-	if colCount > 0 {
-		idx := sortColumnIndex(m.sortColumnName)
-		idx = (idx + 1) % colCount
-		m.sortColumnName = ui.ActiveSortableColumns[idx]
-	}
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
-}
-
-func (m Model) handleExplorerActionKeySortPrev() (tea.Model, tea.Cmd, bool) {
-	if !m.sortApplies() {
-		return m, nil, true
-	}
-	colCount := ui.ActiveSortableColumnCount
-	if colCount > 0 {
-		idx := sortColumnIndex(m.sortColumnName)
-		idx = (idx - 1 + colCount) % colCount
-		m.sortColumnName = ui.ActiveSortableColumns[idx]
-	}
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
-}
-
-func (m Model) handleExplorerActionKeySortFlip() (tea.Model, tea.Cmd, bool) {
-	if !m.sortApplies() {
-		return m, nil, true
-	}
-	m.sortAscending = !m.sortAscending
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
-}
-
-func (m Model) handleExplorerActionKeySortReset() (tea.Model, tea.Cmd, bool) {
-	if !m.sortApplies() {
-		return m, nil, true
-	}
-	m.sortColumnName = sortColDefault
-	m.sortAscending = true
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
-}
-
 func (m Model) handleExplorerActionKeyOpenBrowser() (tea.Model, tea.Cmd, bool) {
 	kind := m.selectedResourceKind()
 	if kind != "Ingress" {
@@ -645,6 +594,10 @@ func (m Model) handleExplorerActionKeyPrevTab() (tea.Model, tea.Cmd, bool) {
 }
 
 func (m Model) handleExplorerActionKeyCreateTemplate() (tea.Model, tea.Cmd, bool) {
+	if m.nav.Level == model.LevelClusters {
+		m.setStatusMessage("Create from template requires a selected context", true)
+		return m, scheduleStatusClear(), true
+	}
 	if m.readOnly {
 		m.setStatusMessage(readOnlyBlockedMessage("Create from template"), true)
 		return m, scheduleStatusClear(), true

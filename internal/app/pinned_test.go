@@ -25,12 +25,12 @@ func TestPinnedFilePath(t *testing.T) {
 	})
 }
 
-// --- togglePinnedGroup ---
+// --- togglePinnedType ---
 
 func TestTogglePinnedGroup(t *testing.T) {
 	t.Run("pins a new group", func(t *testing.T) {
 		s := &PinnedState{Contexts: make(map[string][]string)}
-		pinned := togglePinnedGroup(s, "prod", "argoproj.io")
+		pinned := togglePinnedType(s, "prod", "argoproj.io")
 		assert.True(t, pinned)
 		assert.Equal(t, []string{"argoproj.io"}, s.Contexts["prod"])
 	})
@@ -41,7 +41,7 @@ func TestTogglePinnedGroup(t *testing.T) {
 				"prod": {"argoproj.io", "fluxcd.io"},
 			},
 		}
-		pinned := togglePinnedGroup(s, "prod", "argoproj.io")
+		pinned := togglePinnedType(s, "prod", "argoproj.io")
 		assert.False(t, pinned)
 		assert.Equal(t, []string{"fluxcd.io"}, s.Contexts["prod"])
 	})
@@ -49,18 +49,18 @@ func TestTogglePinnedGroup(t *testing.T) {
 	t.Run("pin and unpin idempotent", func(t *testing.T) {
 		s := &PinnedState{Contexts: make(map[string][]string)}
 
-		togglePinnedGroup(s, "dev", "my.group")
+		togglePinnedType(s, "dev", "my.group")
 		assert.Len(t, s.Contexts["dev"], 1)
 
-		togglePinnedGroup(s, "dev", "my.group")
+		togglePinnedType(s, "dev", "my.group")
 		assert.Empty(t, s.Contexts["dev"])
 	})
 
 	t.Run("different contexts are independent", func(t *testing.T) {
 		s := &PinnedState{Contexts: make(map[string][]string)}
 
-		togglePinnedGroup(s, "prod", "group-a")
-		togglePinnedGroup(s, "dev", "group-b")
+		togglePinnedType(s, "prod", "group-a")
+		togglePinnedType(s, "dev", "group-b")
 
 		assert.Equal(t, []string{"group-a"}, s.Contexts["prod"])
 		assert.Equal(t, []string{"group-b"}, s.Contexts["dev"])
@@ -70,11 +70,11 @@ func TestTogglePinnedGroup(t *testing.T) {
 func TestTogglePinnedUnionSetGroup(t *testing.T) {
 	s := &PinnedState{UnionSets: make(map[string][]string)}
 
-	pinned := togglePinnedUnionSetGroup(s, "staging-west", "argoproj.io")
+	pinned := togglePinnedUnionSetType(s, "staging-west", "argoproj.io")
 	assert.True(t, pinned)
 	assert.Equal(t, []string{"argoproj.io"}, s.UnionSets["staging-west"])
 
-	pinned = togglePinnedUnionSetGroup(s, "staging-west", "argoproj.io")
+	pinned = togglePinnedUnionSetType(s, "staging-west", "argoproj.io")
 	assert.False(t, pinned)
 	assert.Empty(t, s.UnionSets["staging-west"])
 }

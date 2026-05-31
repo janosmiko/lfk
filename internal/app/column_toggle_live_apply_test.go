@@ -42,7 +42,7 @@ func TestColumnToggleSpaceAppliesImmediately(t *testing.T) {
 	assert.Equal(t, overlayColumnToggle, rm.overlay,
 		"Space must keep the overlay open")
 	assert.False(t, rm.columnToggleItems[0].visible, "overlay state flipped")
-	assert.Contains(t, rm.hiddenBuiltinColumns["pod"], "Namespace",
+	assert.Contains(t, rm.hiddenBuiltinColumns[colKey("pod")], "Namespace",
 		"Space must persist to hiddenBuiltinColumns immediately so the table updates live")
 }
 
@@ -56,7 +56,7 @@ func TestColumnToggleSpaceOnExtraPersistsSession(t *testing.T) {
 	rm := r.(Model)
 
 	assert.True(t, rm.columnToggleItems[3].visible)
-	assert.Contains(t, rm.sessionColumns["pod"], "Node",
+	assert.Contains(t, rm.sessionColumns[colKey("pod")], "Node",
 		"toggling an extra ON must persist to sessionColumns immediately")
 }
 
@@ -64,16 +64,16 @@ func TestColumnToggleEscDiscardsChanges(t *testing.T) {
 	t.Parallel()
 	m := newColumnToggleModel()
 	// Pre-existing user choice: Namespace was hidden, IP shown.
-	m.hiddenBuiltinColumns = map[string][]string{"pod": {"Namespace"}}
-	m.sessionColumns = map[string][]string{"pod": {"IP"}}
-	m.columnOrder = map[string][]string{"pod": {"Ready", "IP"}}
+	m.hiddenBuiltinColumns = map[string][]string{colKey("pod"): {"Namespace"}}
+	m.sessionColumns = map[string][]string{colKey("pod"): {"IP"}}
+	m.columnOrder = map[string][]string{colKey("pod"): {"Ready", "IP"}}
 	openColumnToggleSnapshot(&m)
 
 	// Mutate while overlay is open.
 	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'c'}})
 	rm := r.(Model)
 	// c clears all visible — should persist (live-apply).
-	assert.NotEqual(t, []string{"IP"}, rm.sessionColumns["pod"],
+	assert.NotEqual(t, []string{"IP"}, rm.sessionColumns[colKey("pod")],
 		"clear must mutate state live")
 
 	// Esc: revert to the snapshot.
@@ -81,11 +81,11 @@ func TestColumnToggleEscDiscardsChanges(t *testing.T) {
 	rm2 := r2.(Model)
 
 	assert.Equal(t, overlayNone, rm2.overlay)
-	assert.Equal(t, []string{"Namespace"}, rm2.hiddenBuiltinColumns["pod"],
+	assert.Equal(t, []string{"Namespace"}, rm2.hiddenBuiltinColumns[colKey("pod")],
 		"Esc must restore hiddenBuiltinColumns to the snapshot")
-	assert.Equal(t, []string{"IP"}, rm2.sessionColumns["pod"],
+	assert.Equal(t, []string{"IP"}, rm2.sessionColumns[colKey("pod")],
 		"Esc must restore sessionColumns to the snapshot")
-	assert.Equal(t, []string{"Ready", "IP"}, rm2.columnOrder["pod"],
+	assert.Equal(t, []string{"Ready", "IP"}, rm2.columnOrder[colKey("pod")],
 		"Esc must restore columnOrder to the snapshot")
 }
 
@@ -97,14 +97,14 @@ func TestColumnToggleEnterClosesWithSavedState(t *testing.T) {
 	// Toggle off Namespace.
 	r, _ := m.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{' '}})
 	rm := r.(Model)
-	assert.Contains(t, rm.hiddenBuiltinColumns["pod"], "Namespace")
+	assert.Contains(t, rm.hiddenBuiltinColumns[colKey("pod")], "Namespace")
 
 	// Enter closes; saved state is preserved.
 	r2, _ := rm.handleColumnToggleKey(tea.KeyMsg{Type: tea.KeyEnter})
 	rm2 := r2.(Model)
 
 	assert.Equal(t, overlayNone, rm2.overlay)
-	assert.Contains(t, rm2.hiddenBuiltinColumns["pod"], "Namespace",
+	assert.Contains(t, rm2.hiddenBuiltinColumns[colKey("pod")], "Namespace",
 		"Enter commits — the live-applied state survives the close")
 }
 
@@ -119,7 +119,7 @@ func TestColumnToggleReorderJPersistsOrder(t *testing.T) {
 
 	assert.Equal(t, "Ready", rm.columnToggleItems[0].key)
 	assert.Equal(t, "Namespace", rm.columnToggleItems[1].key)
-	saved := rm.columnOrder["pod"]
+	saved := rm.columnOrder[colKey("pod")]
 	assert.NotEmpty(t, saved, "J must persist columnOrder live")
 	// Ready must come before Namespace in the persisted order.
 	posReady, posNamespace := -1, -1

@@ -151,6 +151,8 @@ func (m Model) applyFilterPreset(preset FilterPreset) (tea.Model, tea.Cmd) {
 		m.resourceTree = nil
 		m.metricsContent = ""
 		m.previewEventsContent = ""
+		m.metricsData = nil
+		m.previewEventsData = nil
 	}
 	m.setStatusMessage(fmt.Sprintf("Filter: %s (%d matches)", preset.Name, len(filtered)), false)
 	return m, tea.Batch(scheduleStatusClear(), m.loadPreview())

@@ -278,6 +278,36 @@ func TestDiffNormalCopySkipsEmptySideLines(t *testing.T) {
 		"left side has 3 real lines; the 2 insert rows must be skipped")
 }
 
+// Regression guard for issue #261: on Windows the clipboard convention
+// is CRLF (CF_UNICODETEXT), so payloads built with bare LF — notably the
+// "copy as table" output — paste as a single long line in Notepad,
+// Excel, and many browser textareas. Normalize to CRLF on Windows;
+// leave other platforms untouched.
+func TestNormalizeClipboardLineEndings(t *testing.T) {
+	t.Parallel()
+	tests := []struct {
+		name string
+		text string
+		goos string
+		want string
+	}{
+		{"non-windows untouched", "a\nb\nc", "linux", "a\nb\nc"},
+		{"darwin untouched", "a\nb\nc", "darwin", "a\nb\nc"},
+		{"windows lf to crlf", "a\nb\nc", "windows", "a\r\nb\r\nc"},
+		{"windows preserves existing crlf", "a\r\nb\r\nc", "windows", "a\r\nb\r\nc"},
+		{"windows mixed normalized", "a\r\nb\nc", "windows", "a\r\nb\r\nc"},
+		{"windows no newlines noop", "abc", "windows", "abc"},
+		{"empty", "", "windows", ""},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			got := normalizeClipboardLineEndings(tt.text, tt.goos)
+			assert.Equal(t, tt.want, got)
+		})
+	}
+}
+
 // Regression guard: copyToSystemClipboard must not return a generic
 // "Copied to clipboard" message — every caller has already set a
 // context-specific status. Returning the generic one races back via

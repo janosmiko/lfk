@@ -342,16 +342,34 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 		{Key: kb.Left + "/" + kb.Right, Desc: "navigate"},
 		{Key: kb.Down + "/" + kb.Up, Desc: "move"},
 		{Key: kb.Enter, Desc: "view"},
-		{Key: kb.NamespaceSelector, Desc: "namespace"},
-		{Key: kb.AllNamespaces, Desc: "all-ns"},
 	}
-	// At the cluster picker and resource-type browser, both the action
-	// menu and column sort are no-ops: selectedResourceKind() returns
-	// "" so openActionMenu() bails out, and sortMiddleItems() early-
-	// returns so </> doesn't reorder anything. Hide both hints there
-	// to avoid advertising dead keys.
+	// Namespace selection only makes sense once a context is selected. At
+	// the cluster picker no context is active, so these keys would act on
+	// the implicit kubeconfig current-context rather than the hovered row;
+	// their handlers no-op there, so keep the hints hidden too.
+	if m.nav.Level != model.LevelClusters {
+		hintEntries = append(hintEntries,
+			ui.HintEntry{Key: kb.NamespaceSelector, Desc: "namespace"},
+			ui.HintEntry{Key: kb.AllNamespaces, Desc: "all-ns"},
+		)
+	}
+	// Column sort is a no-op at both the cluster picker and the resource-
+	// type browser: sortMiddleItems() early-returns so </> doesn't reorder
+	// anything. Hide the sort hint there to avoid advertising dead keys.
+	// At the resource-types level, advertise pinning the selected type into
+	// the top-level Pinned section. Dashboard rows return early above, so any
+	// row reaching here is a real resource type.
+	if m.nav.Level == model.LevelResourceTypes {
+		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.PinGroup, Desc: "pin"})
+	}
+
 	hasResourceContext := m.nav.Level != model.LevelClusters && m.nav.Level != model.LevelResourceTypes
-	if hasResourceContext {
+	// The action menu has real entries at the cluster picker (set color,
+	// manage local clusters via openClusterPickerActionMenu) and at the
+	// resource levels. It is a no-op only at the resource-type browser,
+	// where openResourceActionMenu() bails out on an empty kind. Advertise
+	// it everywhere except there.
+	if m.nav.Level != model.LevelResourceTypes {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ActionMenu, Desc: "actions"})
 	}
 	// Advertise the read-only toggle on every level so users can
@@ -362,9 +380,12 @@ func (m Model) explorerHintEntries() []ui.HintEntry {
 	if m.nav.Level == model.LevelClusters || !m.cliReadOnly {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.ReadOnlyToggle, Desc: "toggle RO"})
 	}
-	// "create" runs `kubectl apply` from a template. Hide it in
-	// read-only mode since it would be blocked anyway.
-	if !m.readOnly {
+	// "create" runs `kubectl apply` from a template against the active
+	// context. At LevelClusters no context is selected yet, so the action
+	// is a no-op there (see handleExplorerActionKeyCreateTemplate) and the
+	// hint must stay hidden. Also hidden in read-only mode since it would
+	// be blocked anyway.
+	if m.nav.Level != model.LevelClusters && !m.readOnly {
 		hintEntries = append(hintEntries, ui.HintEntry{Key: kb.CreateTemplate, Desc: "create"})
 	}
 	if hasResourceContext {

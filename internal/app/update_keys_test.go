@@ -67,6 +67,111 @@ func TestHandleKeyDismissesStatusTip(t *testing.T) {
 	assert.False(t, result.statusMessageTip)
 }
 
+// --- navigation clears a lingering status/error message immediately ---
+
+func TestHandleKeyNavigationClearsStatusMessage(t *testing.T) {
+	cases := []struct {
+		name string
+		key  tea.KeyMsg
+	}{
+		{"down (j)", runeKey('j')},
+		{"up (k)", runeKey('k')},
+		{"left (h)", runeKey('h')},
+		{"right (l)", runeKey('l')},
+		{"down arrow", specialKey(tea.KeyDown)},
+		{"up arrow", specialKey(tea.KeyUp)},
+		{"left arrow", specialKey(tea.KeyLeft)},
+		{"right arrow", specialKey(tea.KeyRight)},
+		{"jump top (g)", runeKey('g')},
+		{"jump bottom (G)", runeKey('G')},
+		{"end", specialKey(tea.KeyEnd)},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := baseExplorerModel()
+			m.setCursor(1)
+			m.statusMessage = "Read-only mode: ON"
+			m.statusMessageErr = true
+			m.statusMessageExp = time.Now().Add(5 * time.Second)
+
+			ret, _ := m.handleKey(tc.key)
+			result := ret.(Model)
+			assert.Empty(t, result.statusMessage, "navigation must clear the hint-bar message immediately")
+			assert.False(t, result.statusMessageErr)
+		})
+	}
+}
+
+// TestClearStatusOnNavigationKey covers the full navigation/scroll key set the
+// helper clears on. It exercises the helper directly so the assertions aren't
+// coupled to handler side-effects (some nav handlers, e.g. JumpOwner, set their
+// own message after the clear). Defaults assumed; see ui.DefaultKeybindings.
+func TestClearStatusOnNavigationKey(t *testing.T) {
+	clears := []struct {
+		name string
+		key  tea.KeyMsg
+	}{
+		{"down (j)", runeKey('j')},
+		{"up (k)", runeKey('k')},
+		{"left (h)", runeKey('h')},
+		{"right (l)", runeKey('l')},
+		{"jump top (g)", runeKey('g')},
+		{"jump bottom (G)", runeKey('G')},
+		{"home", specialKey(tea.KeyHome)},
+		{"end", specialKey(tea.KeyEnd)},
+		{"half page down (ctrl+d)", specialKey(tea.KeyCtrlD)},
+		{"half page up (ctrl+u)", specialKey(tea.KeyCtrlU)},
+		{"full page down (ctrl+f)", specialKey(tea.KeyCtrlF)},
+		{"full page up (ctrl+b)", specialKey(tea.KeyCtrlB)},
+		{"pgdown", specialKey(tea.KeyPgDown)},
+		{"pgup", specialKey(tea.KeyPgUp)},
+		{"preview down (J)", runeKey('J')},
+		{"preview up (K)", runeKey('K')},
+		{"level clusters (0)", runeKey('0')},
+		{"level types (1)", runeKey('1')},
+		{"level resources (2)", runeKey('2')},
+		{"jump back (backspace)", specialKey(tea.KeyBackspace)},
+		{"jump owner (o)", runeKey('o')},
+		{"next match (n)", runeKey('n')},
+		{"prev match (N)", runeKey('N')},
+		{"next tab (])", runeKey(']')},
+		{"prev tab ([)", runeKey('[')},
+		{"new tab (t)", runeKey('t')},
+	}
+	for _, tc := range clears {
+		t.Run(tc.name, func(t *testing.T) {
+			m := baseExplorerModel()
+			m.statusMessage = "some toast"
+			m.statusMessageErr = true
+			m.statusMessageExp = time.Now().Add(5 * time.Second)
+
+			result := m.clearStatusOnNavigationKey(tc.key)
+			assert.Empty(t, result.statusMessage, "navigation key must clear the message")
+			assert.False(t, result.statusMessageErr)
+		})
+	}
+
+	// Non-navigation keys must leave the message intact.
+	for _, tc := range []struct {
+		name string
+		key  tea.KeyMsg
+	}{
+		{"action menu (x)", runeKey('x')},
+		{"filter (f)", runeKey('f')},
+		{"enter", specialKey(tea.KeyEnter)},
+	} {
+		t.Run("keeps/"+tc.name, func(t *testing.T) {
+			m := baseExplorerModel()
+			m.statusMessage = "some toast"
+			m.statusMessageExp = time.Now().Add(5 * time.Second)
+
+			result := m.clearStatusOnNavigationKey(tc.key)
+			assert.Equal(t, "some toast", result.statusMessage,
+				"non-navigation key must not clear the message")
+		})
+	}
+}
+
 // --- handleKey: cursor movement j/k ---
 
 func TestHandleKeyJMovesDown(t *testing.T) {

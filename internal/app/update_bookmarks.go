@@ -280,14 +280,15 @@ func (m Model) bookmarkToSlot(slot string) (tea.Model, tea.Cmd) {
 	}
 
 	bm := model.Bookmark{
-		Name:         name,
-		Context:      bmContext,
-		UnionSet:     bmUnionSet,
-		Namespace:    ns,
-		Namespaces:   nsList,
-		ResourceType: rt.ResourceRef(),
-		ResourceName: m.nav.ResourceName,
-		Slot:         slot,
+		Name:               name,
+		Context:            bmContext,
+		UnionSet:           bmUnionSet,
+		Namespace:          ns,
+		Namespaces:         nsList,
+		NsSelectionNegated: m.nsSelectionNegated,
+		ResourceType:       rt.ResourceRef(),
+		ResourceName:       m.nav.ResourceName,
+		Slot:               slot,
 	}
 
 	// Check if slot is already in use; if so, ask for confirmation.
@@ -653,12 +654,13 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	m.dashboardPreview = ""
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
-	m.applyPinnedGroups()
+	m.applyPinnedTypes()
 
 	m.applyBookmarkNamespace(bm, target, oldCtx)
 
 	// Navigate to resource type level first, then optionally deeper.
 	m.nav.ResourceType = rt
+	m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 	m.nav.ResourceName = bm.ResourceName
 
 	// Navigate to resources level (optionally with a specific resource selected).
@@ -681,6 +683,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	// correct position so that pressing 'h' returns to the right item.
 	m.cursors = [5]int{}
 	m.cursorMemory = make(map[string]int)
+	m.filterMemory = make(map[string]savedFilter)
 	m.itemCache = make(map[string][]model.Item)
 	m.setCursor(0)
 

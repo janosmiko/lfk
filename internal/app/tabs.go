@@ -31,23 +31,6 @@ func (m *Model) popLeft() {
 	}
 }
 
-// clearRight resets the right column and YAML preview so stale data doesn't linger.
-// Every caller of clearRight is a navigation transition that will dispatch a
-// new preview load, so we arm previewLoading here to keep the right pane's
-// spinner visible during the gap. Without this, navigateParent/navigateChild
-// and other transitions briefly render "No resources found".
-func (m *Model) clearRight() {
-	m.rightItems = nil
-	m.yamlContent = ""
-	m.yamlSections = nil
-	m.previewYAML = ""
-	m.metricsContent = ""
-	m.previewEventsContent = ""
-	m.resourceTree = nil
-	m.mapView = false
-	m.previewLoading = true
-}
-
 // selectedResourceKind returns the Kind of the currently selected resource,
 // which is context-dependent on the navigation level.
 func (m *Model) selectedResourceKind() string {
@@ -101,7 +84,7 @@ func (m Model) effectiveContext() string {
 }
 
 func (m *Model) effectiveNamespace() string {
-	if m.allNamespaces || len(m.selectedNamespaces) > 1 {
+	if m.allNamespaces || m.nsSelectionNegated || len(m.selectedNamespaces) > 1 {
 		return "" // fetch all, filter client-side
 	}
 	if len(m.selectedNamespaces) == 1 {
@@ -112,13 +95,10 @@ func (m *Model) effectiveNamespace() string {
 	return m.namespace
 }
 
-// fetchFingerprint returns a stable digest of the parameters that
-// determine what a resource list fetch returns: effective namespace, the
-// allNamespaces toggle, and the selectedNamespaces multi-select filter.
-// It is used by the preview-cache shortcut in navigateChildResourceType
-// to decide whether a primed cache entry is still applicable. Context and
-// resource are not included because they are already part of the navKey
-// the fingerprint is paired with.
+// fetchFingerprint returns a stable digest of what a resource list fetch
+// returns: effective namespace, the allNamespaces toggle, and the
+// selectedNamespaces multi-select filter (with its negation flag). Used by
+// the preview-cache shortcut; context/resource live in the paired navKey.
 func (m *Model) fetchFingerprint() string {
 	var b strings.Builder
 	if m.allNamespaces {
@@ -134,8 +114,10 @@ func (m *Model) fetchFingerprint() string {
 			keys = append(keys, k)
 		}
 		sort.Strings(keys)
-		b.WriteString("sel=")
-		b.WriteString(strings.Join(keys, ","))
+		if m.nsSelectionNegated {
+			b.WriteString("!")
+		}
+		fmt.Fprintf(&b, "sel=%s", strings.Join(keys, ","))
 	}
 	return b.String()
 }
@@ -425,6 +407,8 @@ func (m *Model) saveCurrentTab() {
 	t.middleScroll = ui.ActiveMiddleScroll
 	t.leftScroll = ui.ActiveLeftScroll
 	t.cursorMemory = copyMapStringInt(m.cursorMemory)
+	t.filterMemory = copyMapStringSavedFilter(m.filterMemory)
+	t.sortMemory = copyMapStringSortPref(m.sortMemory)
 	t.itemCache = copyItemCache(m.itemCache)
 	t.cacheFingerprints = copyMapStringString(m.cacheFingerprints)
 	t.yamlContent = m.yamlContent
@@ -441,6 +425,7 @@ func (m *Model) saveCurrentTab() {
 	t.namespace = m.namespace
 	t.allNamespaces = m.allNamespaces
 	t.selectedNamespaces = copyMapStringBool(m.selectedNamespaces)
+	t.nsSelectionNegated = m.nsSelectionNegated
 	t.sortColumnName = m.sortColumnName
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
@@ -456,6 +441,8 @@ func (m *Model) saveCurrentTab() {
 	t.monitoringPreview = m.monitoringPreview
 	t.metricsContent = m.metricsContent
 	t.previewEventsContent = m.previewEventsContent
+	t.metricsData = m.metricsData
+	t.previewEventsData = m.previewEventsData
 	t.warningEventsOnly = m.warningEventsOnly
 	t.eventGrouping = m.eventGrouping
 	t.expandedGroup = m.expandedGroup
@@ -536,6 +523,8 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	ui.ActiveMiddleScroll = t.middleScroll
 	ui.ActiveLeftScroll = t.leftScroll
 	m.cursorMemory = copyMapStringInt(t.cursorMemory)
+	m.filterMemory = copyMapStringSavedFilter(t.filterMemory)
+	m.sortMemory = copyMapStringSortPref(t.sortMemory)
 	m.itemCache = copyItemCache(t.itemCache)
 	m.cacheFingerprints = copyMapStringString(t.cacheFingerprints)
 	m.yamlContent = t.yamlContent
@@ -552,6 +541,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.namespace = t.namespace
 	m.allNamespaces = t.allNamespaces
 	m.selectedNamespaces = copyMapStringBool(t.selectedNamespaces)
+	m.nsSelectionNegated = t.nsSelectionNegated
 	m.sortColumnName = t.sortColumnName
 	m.sortAscending = t.sortAscending
 	m.filterText = t.filterText
@@ -569,6 +559,8 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	// metrics / events instead of leaking the previous tab's values.
 	m.metricsContent = t.metricsContent
 	m.previewEventsContent = t.previewEventsContent
+	m.metricsData = t.metricsData
+	m.previewEventsData = t.previewEventsData
 	m.warningEventsOnly = t.warningEventsOnly
 	m.eventGrouping = t.eventGrouping
 	m.expandedGroup = t.expandedGroup
@@ -649,7 +641,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	// that fetches the tab's data.
 	if needsLoad {
 		m.tabs[idx].needsLoad = false
-		m.applyPinnedGroups()
+		m.applyPinnedTypes()
 
 		// Rebuild security state for the restored context so the Security
 		// sidebar populates and the on-disk cache is re-read.
@@ -706,6 +698,8 @@ func (m *Model) cloneCurrentTab() TabState {
 		middleScroll:           ui.ActiveMiddleScroll,
 		leftScroll:             ui.ActiveLeftScroll,
 		cursorMemory:           copyMapStringInt(m.cursorMemory),
+		filterMemory:           copyMapStringSavedFilter(m.filterMemory),
+		sortMemory:             copyMapStringSortPref(m.sortMemory),
 		itemCache:              copyItemCache(m.itemCache),
 		cacheFingerprints:      copyMapStringString(m.cacheFingerprints),
 		yamlContent:            m.yamlContent,
@@ -716,6 +710,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		namespace:              m.namespace,
 		allNamespaces:          m.allNamespaces,
 		selectedNamespaces:     copyMapStringBool(m.selectedNamespaces),
+		nsSelectionNegated:     m.nsSelectionNegated,
 		sortColumnName:         m.sortColumnName,
 		sortAscending:          m.sortAscending,
 		filterText:             m.filterText,
@@ -731,6 +726,8 @@ func (m *Model) cloneCurrentTab() TabState {
 		monitoringPreview:      m.monitoringPreview,
 		metricsContent:         m.metricsContent,
 		previewEventsContent:   m.previewEventsContent,
+		metricsData:            m.metricsData,
+		previewEventsData:      append([]ui.EventTimelineEntry(nil), m.previewEventsData...),
 		warningEventsOnly:      m.warningEventsOnly,
 		eventGrouping:          m.eventGrouping,
 		expandedGroup:          m.expandedGroup,

@@ -8,6 +8,7 @@ import "slices"
 var CoreCategories = []string{
 	"Dashboards",
 	"Security", // dynamically populated via model.SecuritySourcesFn
+	"Pinned",   // user-pinned resource types; section hidden when empty
 	"Cluster",
 	"Workloads",
 	"Config",

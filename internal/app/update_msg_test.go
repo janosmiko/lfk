@@ -590,11 +590,16 @@ func TestPush2UpdateBulkActionResultMsgNoErrors(t *testing.T) {
 
 func TestPush2UpdateDashboardLoadedMsg(t *testing.T) {
 	m := basePush80v2Model()
-	msg := dashboardLoadedMsg{content: "dashboard content", events: "events", context: "test-ctx"}
+	msg := dashboardLoadedMsg{
+		data:    dashboardData{nodeCount: 3, readyNodes: 3, nodeItems: make([]model.Item, 3)},
+		context: "test-ctx",
+	}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
-	assert.Equal(t, "dashboard content", rm.dashboardPreview)
-	assert.Equal(t, "events", rm.dashboardEventsPreview)
+	// The data is composed into the preview at the current width on receipt.
+	assert.Contains(t, rm.dashboardPreview, "CLUSTER DASHBOARD")
+	assert.Contains(t, rm.dashboardPreview, "Nodes")
+	assert.Contains(t, rm.dashboardPreview, "3 Ready")
 }
 
 func TestPush2UpdateDashboardLoadedMsgWrongContext(t *testing.T) {

@@ -29,6 +29,19 @@ func TestActionKeyATogglesAllNamespaces(t *testing.T) {
 	assert.False(t, result.allNamespaces)
 }
 
+func TestActionKeyAllNamespacesNoOpAtClusters(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+	m.allNamespaces = false
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('A'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.False(t, result.allNamespaces, "all-namespaces must not toggle without a selected context")
+	assert.NotEmpty(t, result.statusMessage)
+	assert.NotNil(t, cmd)
+}
+
 // --- handleExplorerActionKey: ctrl+d half page down ---
 
 func TestActionKeyCtrlDHalfPageDown(t *testing.T) {
@@ -371,6 +384,19 @@ func TestActionKeyAOpensTemplates(t *testing.T) {
 	assert.True(t, handled)
 	result := ret.(Model)
 	assert.Equal(t, overlayTemplates, result.overlay)
+}
+
+func TestActionKeyANoOpAtClusters(t *testing.T) {
+	m := baseExplorerModel()
+	m.nav.Level = model.LevelClusters
+
+	ret, cmd, handled := m.handleExplorerActionKey(runeKey('a'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, overlayNone, result.overlay,
+		"template overlay must not open without a selected context")
+	assert.NotEmpty(t, result.statusMessage)
+	assert.NotNil(t, cmd)
 }
 
 func TestActionKeyATemplateMatchesCurrentKind(t *testing.T) {

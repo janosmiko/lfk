@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func (m Model) updateContextsLoaded(msg contextsLoadedMsg) (tea.Model, tea.Cmd) {
@@ -232,6 +233,7 @@ func (m Model) updateAPIResourceDiscovery(msg apiResourceDiscoveryMsg) (Model, t
 			}
 			m.leftItems = merged
 			m.nav.ResourceType = rt
+			m.applyResourceTypeSortDefault(m.nav.ResourceType, m.nav.Context)
 			m.nav.Level = model.LevelResources
 			m.setMiddleItems(nil)
 			m.clearRight()
@@ -436,6 +438,14 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 		// loadPreviewServiceEndpoints message landing.
 		m.carryOverServiceEndpointColumns(msg.items)
 	}
+	if view, ok := ui.ResolveView(ui.ResourceRef{
+		Group:    m.nav.ResourceType.APIGroup,
+		Version:  m.nav.ResourceType.APIVersion,
+		Resource: m.nav.ResourceType.Resource,
+		Kind:     m.nav.ResourceType.Kind,
+	}, m.nav.Context); ok {
+		applyViewColumns(msg.items, view)
+	}
 	m.setMiddleItems(msg.items)
 	mainCacheKey := m.navKey()
 	m.itemCache[mainCacheKey] = m.middleItems
@@ -515,13 +525,12 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 }
 
 func (m Model) filterLoadedItemsBySelectedNamespaces(items []model.Item) []model.Item {
-	// Filter by selected namespaces when multi-select is active.
-	if len(m.selectedNamespaces) <= 1 {
+	if (!m.nsSelectionNegated && len(m.selectedNamespaces) <= 1) || (m.nsSelectionNegated && len(m.selectedNamespaces) == 0) {
 		return items
 	}
 	filtered := make([]model.Item, 0, len(items))
 	for _, item := range items {
-		if item.Namespace == "" || m.selectedNamespaces[item.Namespace] {
+		if item.Namespace == "" || m.selectedNamespaces[item.Namespace] != m.nsSelectionNegated {
 			filtered = append(filtered, item)
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"github.com/charmbracelet/bubbles/spinner"
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/creack/pty"
+	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -43,6 +44,9 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case stderrCapturedMsg:
 		m.setStatusMessage("stderr: "+msg.message, true)
 		return m, tea.Batch(scheduleStatusClear(), m.waitForStderr())
+	case loggerUIMsg:
+		m.appendLoggerUIEntry(logger.UIEntry(msg))
+		return m, waitForLoggerUI()
 	default:
 		if dark, ok := ui.ParseColorModeMsg(msg); ok {
 			ui.SetColorMode(dark)
@@ -441,6 +445,9 @@ func (m Model) updateWindowSize(msg tea.WindowSizeMsg) (tea.Model, tea.Cmd) {
 	m.width = msg.Width
 	m.height = msg.Height
 	m.clampAllCursors()
+	// Re-render every width-dependent cached preview (dashboard, monitoring,
+	// metrics bar, events footer) so they use the new width.
+	m = m.recomposeThemedContent()
 	// Resize the embedded PTY terminal if active.
 	if m.mode == modeExec && m.execTerm != nil && m.execPTY != nil {
 		cols := m.width

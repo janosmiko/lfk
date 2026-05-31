@@ -28,6 +28,14 @@ var ActiveFullscreenMode bool
 // Used by collectExtraColumns for per-cluster column config lookups.
 var ActiveContext string
 
+// ActiveResourceRef is set by the app to the resource currently rendered
+// in the middle column. Used by collectExtraColumns so view configs keyed
+// by GVR (e.g. "apps/v1/deployments") resolve, not only by Kind. Empty
+// fields cause GVR lookup to miss and fall back to Kind, matching legacy
+// behaviour at LevelOwned/LevelContainers where the rendered kind diverges
+// from nav.ResourceType.
+var ActiveResourceRef ResourceRef
+
 // ActiveExtraColumnKeys holds the keys of the extra columns currently displayed
 // in the middle column table. Set during RenderTable for the column toggle overlay.
 var ActiveExtraColumnKeys []string

@@ -155,11 +155,26 @@ func (m Model) applySessionColumnsForKind(kind string) {
 		ui.ActiveSessionColumns = nil
 		ui.ActiveHiddenBuiltinColumns = nil
 		ui.ActiveColumnOrder = nil
+		ui.ActivePrinterColumns = nil
 		return
 	}
+	// CRD additionalPrinterColumns for the navigated resource type drive
+	// priority-aware, first-class printer-column rendering. Only applies when
+	// the rendered kind matches nav.ResourceType (the middle column at
+	// LevelResources); owned children/containers have their own kinds.
+	if rt := m.nav.ResourceType; len(rt.PrinterColumns) > 0 && rt.Kind != "" && strings.EqualFold(rt.Kind, kind) {
+		pcs := make(map[string]int, len(rt.PrinterColumns))
+		for _, pc := range rt.PrinterColumns {
+			pcs[pc.Name] = pc.Priority
+		}
+		ui.ActivePrinterColumns = pcs
+	} else {
+		ui.ActivePrinterColumns = nil
+	}
+	key := m.columnMemoryKey(kind)
 	// Session extras: nil vs non-nil-empty distinguishes "auto-detect" from
 	// "user explicitly configured no extras".
-	if sessionCols, ok := m.sessionColumns[kind]; ok {
+	if sessionCols, ok := m.sessionColumns[key]; ok {
 		if sessionCols == nil {
 			sessionCols = []string{}
 		}
@@ -167,18 +182,24 @@ func (m Model) applySessionColumnsForKind(kind string) {
 	} else {
 		ui.ActiveSessionColumns = nil
 	}
-	// Hidden built-in columns for this kind.
-	if hiddenBi, ok := m.hiddenBuiltinColumns[kind]; ok && len(hiddenBi) > 0 {
+	// Hidden built-in columns for this kind. Session toggles (from the
+	// column-toggle overlay) win over view-derived defaults; when neither is
+	// set, fall back to the view's column list — any built-in not listed in
+	// views.<kind>.columns is hidden so the table doesn't render columns the
+	// user didn't ask for.
+	if hiddenBi, ok := m.hiddenBuiltinColumns[key]; ok && len(hiddenBi) > 0 {
 		set := make(map[string]bool, len(hiddenBi))
 		for _, k := range hiddenBi {
 			set[k] = true
 		}
 		ui.ActiveHiddenBuiltinColumns = set
+	} else if viewHidden := ui.HiddenBuiltinsForView(m.viewRefForKind(kind), m.nav.Context); viewHidden != nil {
+		ui.ActiveHiddenBuiltinColumns = viewHidden
 	} else {
 		ui.ActiveHiddenBuiltinColumns = nil
 	}
 	// Explicit column order (excluding Name).
-	if order, ok := m.columnOrder[kind]; ok && len(order) > 0 {
+	if order, ok := m.columnOrder[key]; ok && len(order) > 0 {
 		ui.ActiveColumnOrder = order
 	} else {
 		ui.ActiveColumnOrder = nil
@@ -195,11 +216,13 @@ func (m Model) withSessionColumnsForKind(kind string, fn func() string) string {
 	prevSession := ui.ActiveSessionColumns
 	prevHidden := ui.ActiveHiddenBuiltinColumns
 	prevOrder := ui.ActiveColumnOrder
+	prevPrinter := ui.ActivePrinterColumns
 	m.applySessionColumnsForKind(kind)
 	defer func() {
 		ui.ActiveSessionColumns = prevSession
 		ui.ActiveHiddenBuiltinColumns = prevHidden
 		ui.ActiveColumnOrder = prevOrder
+		ui.ActivePrinterColumns = prevPrinter
 	}()
 	return fn()
 }
@@ -243,6 +266,9 @@ func (m Model) viewExplorer() string {
 	// Set fullscreen mode and context for column visibility.
 	ui.ActiveFullscreenMode = m.fullscreenMiddle
 	ui.ActiveContext = m.nav.Context
+	// Carry the middle column's resource ref so view configs keyed by
+	// GVR (e.g. "apps/v1/deployments") resolve inside collectExtraColumns.
+	ui.ActiveResourceRef = m.middleColumnRef()
 
 	// Set sort state for column header indicators.
 	// Mirror the Event override so the arrow appears on "Last Seen"
@@ -448,27 +474,7 @@ func (m Model) renderTitleBar() string {
 		}
 	}
 
-	nsText := m.namespace
-	switch {
-	case m.allNamespaces:
-		nsText = "all"
-	case len(m.selectedNamespaces) > 1:
-		names := make([]string, 0, len(m.selectedNamespaces))
-		for ns := range m.selectedNamespaces {
-			names = append(names, ns)
-		}
-		sort.Strings(names)
-		if len(names) > 3 {
-			nsText = fmt.Sprintf("%s +%d more", strings.Join(names[:3], ","), len(names)-3)
-		} else {
-			nsText = strings.Join(names, ",")
-		}
-	case len(m.selectedNamespaces) == 1:
-		for ns := range m.selectedNamespaces {
-			nsText = ns
-		}
-	}
-	nsLabel := ui.NamespaceBadgeStyle.Render(" ns: " + nsText + " ")
+	nsLabel := ui.NamespaceBadgeStyle.Render(" ns: " + m.buildNsLabelText() + " ")
 
 	var versionLabel string
 	if m.version != "" {
@@ -542,187 +548,6 @@ func (m Model) renderTitleBar() string {
 	return ui.TitleBarStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(barContent)
 }
 
-// viewExplorerDashboard renders the fullscreen dashboard view.
-func (m Model) viewExplorerDashboard(contentHeight int) string {
-	sel := m.selectedMiddleItem()
-	isMonitoring := sel != nil && sel.Extra == "__monitoring__"
-
-	var dashContent string
-	if isMonitoring {
-		dashContent = m.monitoringPreview
-		if dashContent == "" {
-			dashContent = ui.DimStyle.Render(m.spinner.View() + " Loading monitoring dashboard...")
-		}
-	} else {
-		dashContent = m.dashboardPreview
-		if dashContent == "" {
-			dashContent = ui.DimStyle.Render(m.spinner.View() + " Loading cluster dashboard...")
-		}
-	}
-
-	fullW := m.width - 2
-	if !isMonitoring && m.dashboardEventsPreview != "" {
-		return m.viewExplorerDashboardTwoCol(dashContent, fullW, contentHeight)
-	}
-	return m.viewExplorerDashboardSingleCol(dashContent, fullW, contentHeight)
-}
-
-// viewExplorerColumns picks which view fills the explorer's columns slot.
-// Fullscreen variants (error log, dashboard, single middle column) take
-// precedence over the three-column layout. Extracted so viewExplorer
-// itself stays under the gocyclo cap.
-func (m Model) viewExplorerColumns(middle string, leftW, leftInner, rightW, rightInner, contentHeight int) string {
-	switch {
-	case m.overlayErrorLog && m.errorLogFullscreen:
-		return m.viewErrorLogFullscreen(contentHeight)
-	case m.fullscreenDashboard:
-		return m.viewExplorerDashboard(contentHeight)
-	case m.fullscreenMiddle:
-		return middle
-	default:
-		return m.viewExplorerThreeCol(middle, leftW, leftInner, rightW, rightInner, contentHeight)
-	}
-}
-
-// viewErrorLogFullscreen renders the in-app error log as the columns slot
-// of viewExplorer when the user has fullscreened it. This reuses the same
-// fullscreen pattern as viewExplorerDashboard so the surrounding title
-// bar, tab bar, and status bar (with the overlayErrorLog-specific hints)
-// stay consistent — instead of doing custom slice-and-rebuild that would
-// drop background fills and break global keys like the theme selector.
-func (m Model) viewErrorLogFullscreen(contentHeight int) string {
-	vp := ui.ErrorLogVisualParams{
-		VisualMode:     m.errorLogVisualMode,
-		VisualStart:    m.errorLogVisualStart,
-		VisualStartCol: m.errorLogVisualStartCol,
-		CursorLine:     m.errorLogCursorLine,
-		CursorCol:      m.errorLogCursorCol,
-	}
-	fullW := m.width - 2
-	innerW := max(fullW-2, 1) // minus column padding
-	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, contentHeight, m.showDebugLogs, vp)
-	content = clampErrorLogLines(content, innerW, contentHeight)
-	content = ui.PadToHeight(content, contentHeight)
-	content = ui.FillLinesBg(content, innerW, ui.BaseBg)
-	// Apply BaseBg to the column wrapper too so the 1-char padding lipgloss
-	// adds inside the rounded border doesn't render with the terminal's
-	// default background — that's the "background looks different" gap
-	// users see between the inner BaseBg-filled content and the border.
-	style := ui.ActiveColumnStyle.
-		Width(fullW).
-		Height(contentHeight).
-		MaxHeight(contentHeight + 2).
-		Background(ui.BaseBg).
-		BorderBackground(ui.BaseBg)
-	return style.Render(content)
-}
-
-// viewExplorerDashboardSingleCol renders a single-column fullscreen dashboard.
-func (m Model) viewExplorerDashboardSingleCol(dashContent string, fullW, contentHeight int) string {
-	if m.previewScroll > 0 {
-		lines := strings.Split(dashContent, "\n")
-		if m.previewScroll >= len(lines) {
-			m.previewScroll = len(lines) - 1
-		}
-		if m.previewScroll > 0 {
-			lines = lines[m.previewScroll:]
-		}
-		dashContent = strings.Join(lines, "\n")
-	}
-	dashCol := ui.PadToHeight(dashContent, contentHeight)
-	dashCol = ui.FillLinesBg(dashCol, m.width-4, ui.BaseBg)
-	return ui.ActiveColumnStyle.Width(fullW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(dashCol)
-}
-
-// viewExplorerDashboardTwoCol renders a two-column fullscreen dashboard.
-func (m Model) viewExplorerDashboardTwoCol(dashContent string, fullW, contentHeight int) string {
-	leftW := fullW / 2
-	for line := range strings.SplitSeq(dashContent, "\n") {
-		if w := lipgloss.Width(line); w+2 > leftW {
-			leftW = w + 2
-		}
-	}
-	maxLeft := fullW * 60 / 100
-	if leftW > maxLeft {
-		leftW = maxLeft
-	}
-	rightW := fullW - leftW - 1
-
-	leftContent := dashContent
-	if idx := strings.Index(leftContent, "RECENT WARNING EVENTS"); idx > 0 {
-		lineStart := strings.LastIndex(leftContent[:idx], "\n")
-		if lineStart > 0 {
-			leftContent = leftContent[:lineStart]
-		}
-	}
-	rightContent := m.dashboardEventsPreview
-
-	if m.previewScroll > 0 {
-		leftContent = scrollContent(leftContent, m.previewScroll)
-		rightContent = scrollContent(rightContent, m.previewScroll)
-	}
-
-	leftLines := strings.Split(leftContent, "\n")
-	rightLines := wrapEventsColumn(strings.Split(rightContent, "\n"), rightW)
-
-	for len(leftLines) < contentHeight {
-		leftLines = append(leftLines, "")
-	}
-	for len(rightLines) < contentHeight {
-		rightLines = append(rightLines, "")
-	}
-
-	leftStyle := lipgloss.NewStyle().Width(leftW).MaxWidth(leftW)
-	rightStyle := lipgloss.NewStyle().Width(rightW).MaxWidth(rightW)
-	sep := ui.DimStyle.Render("\u2502")
-	rows := make([]string, contentHeight)
-	for i := range contentHeight {
-		l, r := "", ""
-		if i < len(leftLines) {
-			l = leftLines[i]
-		}
-		if i < len(rightLines) {
-			r = rightLines[i]
-		}
-		rows[i] = leftStyle.Render(l) + sep + rightStyle.Render(r)
-	}
-	dashCol := strings.Join(rows, "\n")
-	return ui.ActiveColumnStyle.Width(fullW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(dashCol)
-}
-
-// scrollContent applies scroll offset to a newline-separated content string.
-func scrollContent(content string, scroll int) string {
-	lines := strings.Split(content, "\n")
-	if scroll >= len(lines) {
-		return ""
-	}
-	if scroll > 0 {
-		lines = lines[scroll:]
-	}
-	return strings.Join(lines, "\n")
-}
-
-// wrapEventsColumn word-wraps event lines to fit the right column width.
-func wrapEventsColumn(rawLines []string, rightW int) []string {
-	pad := "  "
-	maxContentW := max(rightW-4, 10)
-	wrapStyle := lipgloss.NewStyle().Width(maxContentW)
-	result := make([]string, 0, len(rawLines))
-	for _, line := range rawLines {
-		if lipgloss.Width(line) == 0 {
-			result = append(result, "")
-		} else if lipgloss.Width(line) <= maxContentW {
-			result = append(result, pad+line)
-		} else {
-			wrapped := wrapStyle.Render(line)
-			for wl := range strings.SplitSeq(wrapped, "\n") {
-				result = append(result, pad+wl)
-			}
-		}
-	}
-	return result
-}
-
 // leftColumnLoading reports whether the left column should display a
 // loading spinner. The left column represents the *parent* of the current
 // middle list (kubeconfig -> contexts -> resource types -> resources ...).
@@ -761,4 +586,37 @@ func (m Model) viewExplorerThreeCol(middle string, leftW, leftInner, rightW, rig
 	left := ui.InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
 	right := ui.InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightCol)
 	return lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
+}
+
+// buildNsLabelText returns the text portion of the namespace scope chip shown
+// in the title bar. When nsSelectionNegated is true, each selected namespace
+// is prefixed with "!" to indicate it is excluded.
+func (m Model) buildNsLabelText() string {
+	if m.allNamespaces {
+		return "all"
+	}
+	if len(m.selectedNamespaces) == 0 {
+		return m.namespace
+	}
+
+	names := make([]string, 0, len(m.selectedNamespaces))
+	for ns := range m.selectedNamespaces {
+		names = append(names, ns)
+	}
+	sort.Strings(names)
+
+	if m.nsSelectionNegated {
+		for i, ns := range names {
+			names[i] = "!" + ns
+		}
+	}
+
+	if len(names) > 3 {
+		more := "more"
+		if m.nsSelectionNegated {
+			more = "more excl"
+		}
+		return fmt.Sprintf("%s +%d %s", strings.Join(names[:3], ","), len(names)-3, more)
+	}
+	return strings.Join(names, ",")
 }

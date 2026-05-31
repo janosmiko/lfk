@@ -7,9 +7,36 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// clearRight resets the right column and YAML preview so stale data doesn't linger.
+// Every caller of clearRight is a navigation transition that will dispatch a
+// new preview load, so we arm previewLoading here to keep the right pane's
+// spinner visible during the gap. Without this, navigateParent/navigateChild
+// and other transitions briefly render "No resources found".
+func (m *Model) clearRight() {
+	m.rightItems = nil
+	m.yamlContent = ""
+	m.yamlSections = nil
+	m.previewYAML = ""
+	m.previewScroll = 0
+	m.metricsContent = ""
+	m.previewEventsContent = ""
+	m.metricsData = nil
+	m.previewEventsData = nil
+	m.resourceTree = nil
+	m.mapView = false
+	m.previewLoading = true
+}
+
 // clampPreviewScroll prevents scrolling past the preview content.
 // Only details+events scroll; pinned header (children) and footer (resource usage) are excluded.
 func (m *Model) clampPreviewScroll() {
+	// The fullscreen dashboard reuses previewScroll but renders entirely
+	// different content (cluster overview / monitoring), so bound it against
+	// that content instead of the right-column preview.
+	if m.fullscreenDashboard {
+		m.clampDashboardScroll()
+		return
+	}
 	// Compute the right column width exactly as the View function does.
 	usable := m.width - 6
 	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))

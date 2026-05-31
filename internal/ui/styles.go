@@ -360,11 +360,18 @@ func FillLinesBg(content string, width int, bg lipgloss.TerminalColor) string {
 
 	fill := lipgloss.NewStyle().Background(bg)
 	reset := "\x1b[0m"
+	// lipgloss/reflow emit the parameterless SGR reset (ESC[m) at word-wrap
+	// boundaries inside a styled span, while a style's own closing reset is the
+	// full ESC[0m. Both clear the background, so both must be followed by bgSeq
+	// — otherwise padding after a wrap-induced reset renders with the terminal
+	// default (black under non-black themes), "tearing" the panel (issue #293).
+	shortReset := "\x1b[m"
 
 	lines := strings.Split(content, "\n")
 	for i, line := range lines {
 		// Prepend bg at start of line and after every ANSI reset.
 		line = bgSeq + strings.ReplaceAll(line, reset, reset+bgSeq)
+		line = strings.ReplaceAll(line, shortReset, shortReset+bgSeq)
 		// Pad to full width.
 		w := lipgloss.Width(line)
 		if w < width {

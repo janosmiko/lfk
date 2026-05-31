@@ -95,10 +95,12 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.selectedNamespaces = map[string]bool{ns: true}
 			m.namespace = ns
 			m.allNamespaces = false
+			m.nsSelectionNegated = false
 		default:
 			// Cursor on "All Namespaces" or no specific item.
 			m.selectedNamespaces = nil
 			m.allNamespaces = true
+			m.nsSelectionNegated = false
 		}
 		m.invalidateOrphanCacheForNamespace(m.nav.Context, oldNs)
 		m.overlayFilter.Clear()
@@ -157,6 +159,7 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 					if len(m.selectedNamespaces) == 0 {
 						m.selectedNamespaces = nil
 						m.allNamespaces = true
+						m.nsSelectionNegated = false
 					}
 				} else {
 					m.selectedNamespaces[selected.Name] = true
@@ -166,6 +169,18 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 		// Advance cursor to the next item after toggling.
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 1, len(items)-1)
+		return m, nil
+
+	case "tab":
+		if m.pendingUnionSetName != "" {
+			return m.rejectPendingUnionSetNamespaceMultiSelect()
+		}
+		if m.unionMode {
+			m.setStatusMessage("Union mode supports exactly one namespace", true)
+			return m, scheduleStatusClear()
+		}
+		m.nsSelectionNegated = !m.nsSelectionNegated
+		m.nsSelectionModified = true
 		return m, nil
 
 	case ui.ActiveKeybindings.AllNamespaces:
@@ -186,6 +201,7 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.nsSelectionModified = true
 		m.selectedNamespaces = nil
 		m.allNamespaces = true
+		m.nsSelectionNegated = false
 		for i, item := range items {
 			if item.Status == "all" {
 				m.overlayCursor = i
@@ -248,6 +264,22 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.pendingG = false
 		m.overlayCursor = 0
 		return m, nil
+
+	case ui.ActiveKeybindings.Refresh:
+		// Re-fetch the namespace list from the API. GetNamespaces always
+		// hits the cluster (no client cache), so the non-silent load gets
+		// fresh data and repopulates the overlay via updateNamespacesLoaded
+		// when it returns. The current list stays visible until then
+		// (stale-while-revalidate), so the overlay never blanks out.
+		kctx := m.nsOverlayContext
+		if kctx == "" {
+			kctx = m.activeContext()
+		}
+		if m.client == nil || kctx == "" {
+			return m, nil
+		}
+		m.setStatusMessage("Refreshing namespaces...", false)
+		return m, tea.Batch(m.loadNamespacesForContext(kctx, false), scheduleStatusClear())
 
 	case "ctrl+c":
 		// Close the overlay rather than the tab — once an overlay is
@@ -316,6 +348,7 @@ func (m Model) handleNamespaceFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			items := m.filteredOverlayItems()
 			if len(items) == 1 {
 				oldNs := m.namespace
+				m.nsSelectionNegated = false
 				if items[0].Status == "all" {
 					m.selectedNamespaces = nil
 					m.allNamespaces = true

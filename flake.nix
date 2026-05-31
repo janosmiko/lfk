@@ -34,7 +34,7 @@
         # below; release.yml then verifies this matches the pushed tag so the
         # two can't drift. `make bump-version VERSION=X.Y.Z` remains available
         # for emergency manual bumps.
-        baseVersion = "0.12.1"; # x-release-please-version
+        baseVersion = "0.13.1"; # x-release-please-version
         commit = self.shortRev or self.dirtyShortRev or "unknown";
         version = "${baseVersion}-${commit}";
       in
@@ -46,7 +46,7 @@
 
             src = ./.;
 
-            vendorHash = "sha256-zUfHbY8zyQxKOuruwi0G6J+d5o3ihU96Hg1OqPRtB9g=";
+            vendorHash = "sha256-3kQLUdKc8VYblYHFVh+iPl+mMfdnkHe138dMwPy50WQ=";
 
             subPackages = [ "." ];
 

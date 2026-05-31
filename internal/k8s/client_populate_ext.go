@@ -12,10 +12,10 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 	switch kind {
 	case "Kustomization", "GitRepository", "HelmRepository", "HelmChart", "OCIRepository", "Bucket",
 		"Alert", "Provider", "Receiver", "ImageRepository", "ImagePolicy", "ImageUpdateAutomation":
-		populateFluxCDResource(ti, obj, status)
+		populateFluxCDResource(ti, obj, status, kind)
 
 	case "Certificate", "CertificateRequest", "Issuer", "ClusterIssuer", "Order", "Challenge":
-		populateCertManagerResource(ti, status, spec)
+		populateCertManagerResource(ti, status, spec, kind)
 
 	case "Application", "ApplicationSet":
 		populateArgoCDApplication(ti, obj, status, spec, kind)
@@ -57,6 +57,12 @@ func populateResourceDetailsExt(ti *model.Item, obj map[string]any, kind string,
 		if val, ok := spec["globalDefault"].(bool); ok && val {
 			ti.Name += " (default)"
 			ti.Status = "default"
+		}
+		if v, ok := spec["value"].(float64); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Value", Value: fmt.Sprintf("%d", int64(v))})
+		}
+		if pp, ok := spec["preemptionPolicy"].(string); ok && pp != "" {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Preemption Policy", Value: pp})
 		}
 
 	case "Workflow":

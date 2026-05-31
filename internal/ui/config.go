@@ -269,25 +269,95 @@ type ConfigFilterPreset struct {
 // ConfigFilterPresets maps lowercase Kind names to user-configured filter presets.
 var ConfigFilterPresets map[string][]ConfigFilterPreset
 
-// ColumnsForKind returns the configured column list for the given resource kind
-// and cluster context. Per-cluster config takes priority over global config.
-func ColumnsForKind(kind, context string) []string {
-	lk := strings.ToLower(kind)
-	// Per-cluster override first.
-	if context != "" && len(ConfigClusterResourceColumns) > 0 {
-		if clusterCols, ok := ConfigClusterResourceColumns[context]; ok {
-			if cols, ok := clusterCols[lk]; ok {
-				return cols
+// ColumnsForKind returns the configured column list for the given resource
+// and cluster context. Resolution order: per-cluster resource_columns,
+// per-cluster views (GVR then Kind), global resource_columns, global views
+// (GVR then Kind). Per-cluster wins over global; the legacy resource_columns
+// surface wins over views within a scope so users with both keys configured
+// see the explicit resource_columns override. GVR keys win over Kind keys
+// within the views surface, matching ResolveView.
+func ColumnsForKind(rt ResourceRef, context string) []string {
+	gvrKey := rt.GVRKey()
+	kindKey := rt.KindKey()
+	if context != "" {
+		if len(ConfigClusterResourceColumns) > 0 {
+			if clusterCols, ok := ConfigClusterResourceColumns[context]; ok {
+				if cols, ok := clusterCols[kindKey]; ok {
+					return cols
+				}
 			}
 		}
-	}
-	// Global override.
-	if len(ConfigResourceColumns) > 0 && kind != "" {
-		if cols, ok := ConfigResourceColumns[lk]; ok {
+		if cols := viewColumnNames(ConfigClusterViews[context], gvrKey, kindKey); cols != nil {
 			return cols
 		}
 	}
+	if len(ConfigResourceColumns) > 0 && kindKey != "" {
+		if cols, ok := ConfigResourceColumns[kindKey]; ok {
+			return cols
+		}
+	}
+	if cols := viewColumnNames(ConfigViews, gvrKey, kindKey); cols != nil {
+		return cols
+	}
 	return nil
+}
+
+// HiddenBuiltinsForView returns the set of built-in column keys that should
+// be hidden when rendering rt under the given cluster context. When a view
+// is configured and its columns list omits a given built-in (Context,
+// Namespace, Ready, Restarts, Age, Status), that built-in is hidden so the
+// table renders only what the user asked for. Returns nil when no view is
+// configured for this resource in this scope. Resolution follows ResolveView:
+// per-cluster GVR > per-cluster Kind > global GVR > global Kind.
+func HiddenBuiltinsForView(rt ResourceRef, context string) map[string]bool {
+	if rt.Kind == "" && rt.Resource == "" {
+		return nil
+	}
+	v, ok := ResolveView(rt, context)
+	if !ok || v == nil {
+		return nil
+	}
+	listed := make(map[string]bool, len(v.Columns))
+	for _, c := range v.Columns {
+		listed[c.Name] = true
+	}
+	hidden := make(map[string]bool, 6)
+	for _, name := range []string{"Context", "Namespace", "Ready", "Restarts", "Age", "Status"} {
+		if !listed[name] {
+			hidden[name] = true
+		}
+	}
+	if len(hidden) == 0 {
+		return nil
+	}
+	return hidden
+}
+
+// viewColumnNames returns the ordered list of column Name fields from the
+// view stored under gvrKey (preferred) or kindKey (fallback), or nil when
+// no view exists under either. Matches the GVR-then-Kind resolution order
+// used by ResolveView. Columns flagged |W (FlagWideOnly) are omitted unless
+// ActiveFullscreenMode is set, so users can keep wide-only columns in their
+// config without crowding narrow table layouts.
+func viewColumnNames(views map[string]*View, gvrKey, kindKey string) []string {
+	if len(views) == 0 {
+		return nil
+	}
+	v := views[gvrKey]
+	if v == nil && kindKey != "" {
+		v = views[kindKey]
+	}
+	if v == nil || len(v.Columns) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(v.Columns))
+	for _, c := range v.Columns {
+		if c.Flags&FlagWideOnly != 0 && !ActiveFullscreenMode {
+			continue
+		}
+		names = append(names, c.Name)
+	}
+	return names
 }
 
 // ConfigDashboard controls whether to show a cluster dashboard when entering a context.
@@ -460,6 +530,10 @@ var ConfigCustomActions map[string][]CustomAction
 
 // ConfigPinnedGroups lists CRD API groups that should appear prominently.
 var ConfigPinnedGroups []string
+
+// ConfigPinnedTypes lists version-agnostic resource-type pin keys
+// ("group/resource") that should move into the top-level Pinned section.
+var ConfigPinnedTypes []string
 
 // ConfigUnionSets holds named multi-cluster groups defined in config.
 // Resolved by --union-set into a list of contexts + optional namespace.

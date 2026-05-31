@@ -367,13 +367,20 @@ func (m Model) renderOverlayQuotaDashboard() (string, int, int) {
 }
 
 func (m Model) renderOverlayEventTimeline() (string, int, int) {
-	w, h := min(100, m.width-6), min(30, m.height-4)
+	// Events frequently carry long messages (image pulls, FailedScheduling
+	// reasons, Helm pre/post-install output) that get truncated in a
+	// narrow overlay even with wrap on. Take a generous slice of the
+	// terminal — leaving only a thin chrome border around it — so the
+	// overlay-mode view is useful without immediately reaching for `f`
+	// (fullscreen) or `>` (wrap).
+	w, h := min(160, m.width-6), min(45, m.height-4)
 	params := ui.EventViewerParams{
 		Lines: m.eventTimelineLines, ResourceName: m.actionCtx.name,
 		Scroll: m.eventTimelineScroll, Cursor: m.eventTimelineCursor, CursorCol: m.eventTimelineCursorCol,
 		Width: w, Height: h, Wrap: m.eventTimelineWrap, Fullscreen: false,
 		VisualMode: m.eventTimelineVisualMode, VisualStart: m.eventTimelineVisualStart, VisualCol: m.eventTimelineVisualCol,
 		SearchQuery: m.eventTimelineSearchQuery, SearchActive: m.eventTimelineSearchActive, SearchInput: m.eventTimelineSearchInput.Value,
+		HangingIndent: eventTimelineMessageColumn,
 	}
 	return ui.RenderEventViewer(params), w, h
 }
@@ -695,6 +702,7 @@ func (m Model) renderCanIOverlay(background string) string {
 		innerW, innerH,
 		hintBar,
 		m.canIResourceScroll,
+		m.nsSelectionNegated,
 	)
 	// RBAC overlay uses baseBg end-to-end: title (TitleStyle/barBg=baseBg)
 	// + column boxes (Active/InactiveColumnStyle/baseBg) + filler. Mixing

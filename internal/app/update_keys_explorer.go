@@ -41,6 +41,11 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 
+	// Navigating clears any lingering hint-bar toast immediately rather than
+	// letting it wait out its 5s timer. Done before dispatch so a handler that
+	// sets a fresh message (e.g. Left exiting dashboard fullscreen) still wins.
+	m = m.clearStatusOnNavigationKey(msg)
+
 	if mdl, cmd, handled := m.handleExplorerNavKey(msg); handled {
 		return mdl, cmd
 	}
@@ -116,6 +121,7 @@ func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		if m.fullscreenDashboard {
 			m.fullscreenDashboard = false
 			m.previewScroll = 0
+			m = m.recomposeDashboard()
 			m.setStatusMessage("Dashboard fullscreen OFF", false)
 			return m, scheduleStatusClear(), true
 		}
@@ -210,6 +216,7 @@ func (m Model) handleExplorerEsc() (tea.Model, tea.Cmd) {
 	if m.fullscreenDashboard {
 		m.fullscreenDashboard = false
 		m.previewScroll = 0
+		m = m.recomposeDashboard()
 		m.setStatusMessage("Dashboard fullscreen OFF", false)
 		return m, scheduleStatusClear()
 	}
@@ -382,6 +389,8 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 		}
 		m.fullscreenDashboard = !m.fullscreenDashboard
 		m.previewScroll = 0
+		// Re-render so the bars use the new (fullscreen vs right-pane) width.
+		m = m.recomposeDashboard()
 		if m.fullscreenDashboard {
 			m.setStatusMessage("Dashboard fullscreen ON", false)
 		} else {
@@ -399,45 +408,69 @@ func (m Model) handleExplorerFullscreen() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyPinGroup() (tea.Model, tea.Cmd) {
-	if m.nav.Level == model.LevelResourceTypes {
-		sel := m.selectedMiddleItem()
-		if sel == nil || sel.Category == "" {
-			return m, nil
-		}
-		if model.IsCoreCategory(sel.Category) {
-			m.setStatusMessage("Cannot pin built-in category", true)
-			return m, scheduleStatusClear()
-		}
-		pinned := false
-		var undo func()
-		scopeLabel := ""
-		switch {
-		case m.isUnionSentinel() && m.unionSetName != "":
-			pinned = togglePinnedUnionSetGroup(m.pinnedState, m.unionSetName, sel.Category)
-			undo = func() { _ = togglePinnedUnionSetGroup(m.pinnedState, m.unionSetName, sel.Category) }
-			scopeLabel = " for union set " + m.unionSetName
-		case m.isUnionSentinel():
-			m.setStatusMessage("Pinned groups in union mode require a named union set", true)
-			return m, scheduleStatusClear()
-		default:
-			pinned = togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category)
-			undo = func() { _ = togglePinnedGroup(m.pinnedState, m.nav.Context, sel.Category) }
-		}
-		if err := savePinnedState(m.pinnedState); err != nil {
-			// Roll back the in-memory toggle so runtime state matches what
-			// is actually persisted to disk; togglePinnedGroup is its own
-			// inverse, so calling it again undoes the mutation.
-			undo()
-			m.setStatusMessage(fmt.Sprintf("Failed to save pinned groups: %v", err), true)
-			return m, scheduleStatusClear()
-		}
-		m.applyPinnedGroups()
-		if pinned {
-			m.setStatusMessage(fmt.Sprintf("Pinned%s: %s", scopeLabel, sel.Category), false)
-		} else {
-			m.setStatusMessage(fmt.Sprintf("Unpinned%s: %s", scopeLabel, sel.Category), false)
-		}
-		return m, tea.Batch(m.loadResourceTypes(), scheduleStatusClear())
+	if m.nav.Level != model.LevelResourceTypes {
+		return m, nil
 	}
-	return m, nil
+	sel := m.selectedMiddleItem()
+	if sel == nil {
+		return m, nil
+	}
+	// Collapsed-group headers and the dashboard pseudo-items are not real
+	// resource types and cannot be pinned.
+	if sel.Kind == "__collapsed_group__" || sel.Category == "Dashboards" {
+		m.setStatusMessage("Select a resource type to pin", true)
+		return m, scheduleStatusClear()
+	}
+	key := model.PinKeyFromRef(sel.Extra)
+	if key == "" {
+		m.setStatusMessage("This item cannot be pinned", true)
+		return m, scheduleStatusClear()
+	}
+	// Capture the item to follow to before the pin re-sorts the list. Pinning
+	// moves the selection up into the "Pinned" section, so without this the
+	// cursor would land on the previous row; jump to the next sibling instead.
+	cursorTarget := m.nextResourceTypeCursorItem()
+	pinned := false
+	var undo func()
+	scopeLabel := ""
+	switch {
+	case m.isUnionSentinel() && m.unionSetName != "":
+		pinned = togglePinnedUnionSetType(m.pinnedState, m.unionSetName, key)
+		undo = func() { _ = togglePinnedUnionSetType(m.pinnedState, m.unionSetName, key) }
+		scopeLabel = " for union set " + m.unionSetName
+	case m.isUnionSentinel():
+		m.setStatusMessage("Pinning in union mode requires a named union set", true)
+		return m, scheduleStatusClear()
+	default:
+		pinned = togglePinnedType(m.pinnedState, m.nav.Context, key)
+		undo = func() { _ = togglePinnedType(m.pinnedState, m.nav.Context, key) }
+	}
+	if err := savePinnedState(m.pinnedState); err != nil {
+		// Roll back the in-memory toggle so runtime state matches what is
+		// actually persisted to disk; togglePinnedType is its own inverse,
+		// so calling it again undoes the mutation.
+		undo()
+		m.setStatusMessage(fmt.Sprintf("Failed to save pinned types: %v", err), true)
+		return m, scheduleStatusClear()
+	}
+	m.applyPinnedTypes()
+	// Re-sort the sidebar now so the cursor can follow to the captured item;
+	// the async loadResourceTypes refresh below rebuilds the same list and
+	// preserves this position (setMiddleItems does not reset the cursor).
+	discoveryCtx := m.nav.Context
+	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
+		discoveryCtx = m.unionContexts[0]
+	}
+	if entries := m.discoveredResources[discoveryCtx]; len(entries) > 0 {
+		m.setMiddleItems(model.BuildSidebarItems(entries))
+		m.syncExpandedGroup()
+	}
+	m.focusMiddleItem(cursorTarget)
+	m.clampCursor()
+	if pinned {
+		m.setStatusMessage(fmt.Sprintf("Pinned%s: %s", scopeLabel, sel.Name), false)
+	} else {
+		m.setStatusMessage(fmt.Sprintf("Unpinned%s: %s", scopeLabel, sel.Name), false)
+	}
+	return m, tea.Batch(m.loadResourceTypes(), scheduleStatusClear())
 }

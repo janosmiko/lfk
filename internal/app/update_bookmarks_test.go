@@ -98,21 +98,21 @@ func TestContextInList(t *testing.T) {
 func TestApplySessionNamespaces(t *testing.T) {
 	t.Run("all namespaces mode", func(t *testing.T) {
 		m := Model{namespace: "old"}
-		applySessionNamespaces(&m, true, "", nil)
+		applySessionNamespaces(&m, true, "", nil, false)
 		assert.True(t, m.allNamespaces)
 		assert.Nil(t, m.selectedNamespaces)
 	})
 
 	t.Run("single namespace", func(t *testing.T) {
 		m := Model{}
-		applySessionNamespaces(&m, false, "production", nil)
+		applySessionNamespaces(&m, false, "production", nil, false)
 		assert.Equal(t, "production", m.namespace)
 		assert.False(t, m.allNamespaces)
 	})
 
 	t.Run("multiple namespaces", func(t *testing.T) {
 		m := Model{}
-		applySessionNamespaces(&m, false, "ns-1", []string{"ns-1", "ns-2", "ns-3"})
+		applySessionNamespaces(&m, false, "ns-1", []string{"ns-1", "ns-2", "ns-3"}, false)
 		assert.Equal(t, "ns-1", m.namespace)
 		assert.Len(t, m.selectedNamespaces, 3)
 		assert.True(t, m.selectedNamespaces["ns-1"])
@@ -1926,16 +1926,16 @@ func TestFinalContextInListEmpty(t *testing.T) {
 
 func TestFinalApplySessionNamespaces(t *testing.T) {
 	m := baseFinalModel()
-	applySessionNamespaces(&m, true, "", nil)
+	applySessionNamespaces(&m, true, "", nil, false)
 	assert.True(t, m.allNamespaces)
 
 	m2 := baseFinalModel()
-	applySessionNamespaces(&m2, false, "custom-ns", nil)
+	applySessionNamespaces(&m2, false, "custom-ns", nil, false)
 	assert.Equal(t, "custom-ns", m2.namespace)
 	assert.False(t, m2.allNamespaces)
 
 	m3 := baseFinalModel()
-	applySessionNamespaces(&m3, false, "ns1", []string{"ns1", "ns2"})
+	applySessionNamespaces(&m3, false, "ns1", []string{"ns1", "ns2"}, false)
 	assert.Equal(t, "ns1", m3.namespace)
 	assert.True(t, m3.selectedNamespaces["ns1"])
 	assert.True(t, m3.selectedNamespaces["ns2"])

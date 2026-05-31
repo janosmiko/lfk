@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"sort"
 	"strings"
 
@@ -37,6 +38,24 @@ func CollectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 // ActiveSessionColumns holds the session-only column override for the current
 // resource type. Set by the app before rendering. Nil means no override.
 var ActiveSessionColumns []string
+
+// ActivePrinterColumns maps CRD additionalPrinterColumns names to their
+// declared priority for the resource type currently rendered in the middle
+// column. Set by the app before rendering; nil for non-CRD resources or CRDs
+// without printer columns. Priority 0 columns are treated as mandatory (always
+// shown, never dropped by the width budget); priority > 0 columns are hidden by
+// default, matching kubectl's standard vs. `-o wide` behaviour.
+var ActivePrinterColumns map[string]int
+
+// isMandatoryColumn reports whether key is a CRD printer column that must
+// always be shown (priority 0).
+func isMandatoryColumn(key string) bool {
+	if ActivePrinterColumns == nil {
+		return false
+	}
+	prio, ok := ActivePrinterColumns[key]
+	return ok && prio == 0
+}
 
 // ActiveHiddenBuiltinColumns holds the set of built-in column keys that should
 // be suppressed in the current middle-column render. Valid keys: "Context",
@@ -85,6 +104,48 @@ func stabilizeColumnOrder(order []string) {
 	})
 }
 
+// extraColWidth computes the capped display width (including 1 spacing column)
+// and the pre-cap natural width for an extra column, given its collected info.
+func extraColWidth(info *colInfo, key string, maxColW int) (colW, natural int) {
+	colW = len(key)
+	maxVal := info.maxValW
+	// When some values have arrows, non-arrow values need a placeholder space.
+	// The arrow values already include the arrow in their visual width, so
+	// ensure non-arrow values get +1 to match.
+	if info.hasArrow {
+		maxVal++
+	}
+	if maxVal > colW {
+		colW = maxVal
+	}
+	natural = colW + 1 // pre-cap natural width (with spacing)
+	if colW > maxColW {
+		colW = maxColW
+	}
+	colW++ // spacing
+	return colW, natural
+}
+
+// prioritizeMandatoryColumns returns candidates with mandatory CRD printer
+// columns (priority 0) moved to the front, preserving relative order within
+// each group. Returns the input unchanged when there are no mandatory columns.
+// fitExtraColumns relies on the resulting contiguous mandatory prefix.
+func prioritizeMandatoryColumns(candidates []string) []string {
+	if !slices.ContainsFunc(candidates, isMandatoryColumn) {
+		return candidates
+	}
+	mandatory := make([]string, 0, len(candidates))
+	rest := make([]string, 0, len(candidates))
+	for _, k := range candidates {
+		if isMandatoryColumn(k) {
+			mandatory = append(mandatory, k)
+		} else {
+			rest = append(rest, k)
+		}
+	}
+	return append(mandatory, rest...)
+}
+
 func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind string) []extraColumn {
 	// Collect all available column keys and their max value widths.
 	seen := make(map[string]*colInfo)
@@ -117,10 +178,19 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	// paths happened to write the columns into item.Columns.
 	stabilizeColumnOrder(order)
 
-	candidates := selectColumnCandidates(seen, order, kind, items)
+	candidates, fromAutoDetect := selectColumnCandidates(seen, order, kind, items)
 
 	if len(candidates) == 0 {
 		return nil
+	}
+
+	// Mandatory CRD printer-column protection applies only on the default
+	// auto-detect path; an explicit session or configured (views.<kind>.columns)
+	// order is authoritative and left untouched. When active, move mandatory
+	// columns to the front so the width budget serves them before optional extras.
+	mandatoryActive := fromAutoDetect && ActivePrinterColumns != nil
+	if mandatoryActive {
+		candidates = prioritizeMandatoryColumns(candidates)
 	}
 
 	// Reserve budget for the Name column based on the longest item name
@@ -148,56 +218,74 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	// minExtrasBudget = capped column (maxColW + spacing). Tracks the
 	// same maxColW used below so the budget scales with fullscreen mode.
 	const nameFloor = 20
-	maxColWForBudget := 20
+	maxColW := 20
 	if ActiveFullscreenMode {
-		maxColWForBudget = 40
+		maxColW = 40
 	}
-	minExtrasBudget := maxColWForBudget + 1
+	minExtrasBudget := maxColW + 1
 	longestName := 0
 	for _, item := range items {
 		if w := lipgloss.Width(item.Name); w > longestName {
 			longestName = w
 		}
 	}
+
+	// Sum the width mandatory CRD printer columns need so the name reservation
+	// below can be capped to leave room for them. Without this, long generated
+	// resource names (issue #305) consume the budget and trailing user-declared
+	// columns get silently dropped.
+	mandatoryBudget := 0
+	if mandatoryActive {
+		for _, key := range candidates {
+			if isMandatoryColumn(key) {
+				w, _ := extraColWidth(seen[key], key, maxColW)
+				mandatoryBudget += w
+			}
+		}
+	}
+
 	nameReserve := longestName + 1 // +1 for column spacing
 	if nameReserve+usedWidth > totalWidth {
 		// Can't fit the full name even after dropping every extra. Cap
 		// the reservation so at least one extra gets a fair budget.
 		nameReserve = max(totalWidth-usedWidth-minExtrasBudget, nameFloor)
 	}
+	if mandatoryBudget > 0 {
+		// Never let the name reservation crowd out mandatory columns; NAME
+		// shrinks toward its floor and overflow is clipped by the caller.
+		nameReserve = min(nameReserve, max(totalWidth-usedWidth-mandatoryBudget, nameFloor))
+	}
 	nameReserve = max(nameReserve, nameFloor)
+	// available may be negative when mandatory columns alone exceed the row;
+	// fitExtraColumns still emits them and the caller clips the overflow.
 	available := totalWidth - usedWidth - nameReserve
-	if available < 8 {
+	if available < 8 && mandatoryBudget == 0 {
 		return nil
 	}
 
+	return fitExtraColumns(candidates, seen, available, maxColW, mandatoryActive)
+}
+
+// fitExtraColumns selects columns from candidates that fit within available
+// width and computes their display widths. Columns are added in order until the
+// budget is exhausted (optional columns then stop); mandatory CRD printer
+// columns are always emitted even past the budget, leaving the row to be
+// clipped. Leftover budget is redistributed round-robin to capped columns.
+//
+// When mandatoryActive, callers must pass candidates with the mandatory
+// (priority-0) columns as a contiguous prefix (see prioritizeMandatoryColumns):
+// the budget break below ends the optional tail, so a mandatory column after an
+// over-budget optional one would otherwise be lost.
+func fitExtraColumns(candidates []string, seen map[string]*colInfo, available, maxColW int, mandatoryActive bool) []extraColumn {
 	result := make([]extraColumn, 0, len(candidates))
 	naturalW := make([]int, 0, len(candidates)) // pre-cap desired width including spacing
 	remainingW := available
-	maxColW := 20
-	if ActiveFullscreenMode {
-		maxColW = 40
-	}
 	for _, key := range candidates {
 		info := seen[key]
-		// Column width: max of header length and value length, capped, plus 1 for spacing.
-		colW := len(key)
-		maxVal := info.maxValW
-		// When some values have arrows, non-arrow values need a placeholder space.
-		// The arrow values already include the arrow in their visual width,
-		// so ensure non-arrow values get +1 to match.
-		if info.hasArrow {
-			maxVal++ // reserve space for placeholder on non-arrow rows
-		}
-		if maxVal > colW {
-			colW = maxVal
-		}
-		natural := colW + 1 // pre-cap natural width (with spacing)
-		if colW > maxColW {
-			colW = maxColW
-		}
-		colW++ // spacing
-		if colW > remainingW {
+		colW, natural := extraColWidth(info, key, maxColW)
+		// Mandatory printer columns are always emitted; remainingW may go
+		// negative, which is fine — NAME floors and the row is clipped.
+		if colW > remainingW && (!mandatoryActive || !isMandatoryColumn(key)) {
 			break
 		}
 		result = append(result, extraColumn{key: key, width: colW, hasArrow: info.hasArrow})
@@ -233,38 +321,50 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 }
 
 // selectColumnCandidates determines which extra columns to display based on
-// session overrides, per-kind config, or auto-detection.
+// session overrides, per-kind config, or auto-detection. The second return
+// value reports whether the auto-detect path produced the result; only then
+// may mandatory CRD printer-column protection reorder/force columns (an
+// explicit session or config order is authoritative and left untouched).
 //
 // ActiveSessionColumns is the authoritative signal when non-nil: an empty
 // slice means the user explicitly configured this kind with no extras and
 // must not fall through to auto-detect. Only a nil slice means "no session
 // override" and lets the config / auto-detect paths run.
-func selectColumnCandidates(seen map[string]*colInfo, order []string, kind string, items []model.Item) []string {
+func selectColumnCandidates(seen map[string]*colInfo, order []string, kind string, items []model.Item) (candidates []string, fromAutoDetect bool) {
 	if ActiveSessionColumns != nil {
-		candidates := make([]string, 0, len(ActiveSessionColumns))
+		out := make([]string, 0, len(ActiveSessionColumns))
 		for _, key := range ActiveSessionColumns {
 			if _, ok := seen[key]; ok {
-				candidates = append(candidates, key)
+				out = append(out, key)
 			}
 		}
-		return candidates
+		return out, false
 	}
 
-	configCols := ColumnsForKind(kind, ActiveContext)
+	// Build a ResourceRef so GVR-keyed view configs resolve. When the
+	// rendered kind matches ActiveResourceRef (set by the app for the
+	// middle column) carry through the full GVR; otherwise fall back to
+	// Kind-only — at LevelOwned/LevelContainers the rendered kind diverges
+	// from nav.ResourceType so GVR can't be trusted and Kind lookup applies.
+	rt := ResourceRef{Kind: kind}
+	if kind != "" && strings.EqualFold(kind, ActiveResourceRef.Kind) {
+		rt = ActiveResourceRef
+	}
+	configCols := ColumnsForKind(rt, ActiveContext)
 	if len(configCols) > 0 {
 		if len(configCols) == 1 && configCols[0] == "*" {
-			return order
+			return order, false
 		}
-		var candidates []string
+		var out []string
 		for _, cfgKey := range configCols {
 			if _, ok := seen[cfgKey]; ok {
-				candidates = append(candidates, cfgKey)
+				out = append(out, cfgKey)
 			}
 		}
-		return candidates
+		return out, false
 	}
 
-	return autoDetectColumns(seen, order, items)
+	return autoDetectColumns(seen, order, items), true
 }
 
 // autoDetectColumns selects columns based on heuristic thresholds and blocked lists.
@@ -279,6 +379,16 @@ func autoDetectColumns(seen map[string]*colInfo, order []string, items []model.I
 	alwaysShow := map[string]bool{"Condition": true}
 	var candidates []string
 	for _, key := range order {
+		// CRD additionalPrinterColumns get kubectl semantics: priority 0 is
+		// always shown (bypassing the threshold and blocked list), priority > 0
+		// is hidden by default. A user can still reveal priority > 0 columns via
+		// the column-toggle overlay (which routes through ActiveSessionColumns).
+		if prio, ok := ActivePrinterColumns[key]; ok {
+			if prio == 0 {
+				candidates = append(candidates, key)
+			}
+			continue
+		}
 		if blocked[key] || isHiddenColumnPrefix(key) {
 			continue
 		}

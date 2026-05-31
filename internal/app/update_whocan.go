@@ -391,7 +391,7 @@ func (m Model) renderWhoCanOverlay(background string) string {
 
 	// Match Can-I's scope label format ("ns: all" / "ns: <name>") so
 	// Tab between modes shows the same scope chip in the same shape.
-	nsLabel := ui.CanIScopeLabel(m.canINamespaces)
+	nsLabel := ui.CanIScopeLabel(m.canINamespaces, m.nsSelectionNegated)
 
 	// Filter input renders as the overlay footer — same vertical
 	// position Can-I uses for its search bar so the input lands in the

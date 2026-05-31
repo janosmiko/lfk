@@ -311,6 +311,14 @@ func (c *Client) TriggerCronJob(ctx context.Context, contextName, namespace, cro
 			Annotations: map[string]string{
 				"cronjob.kubernetes.io/instantiate": "manual",
 			},
+			// Tie the manual Job to its CronJob the same way the
+			// kube-controller-manager does for scheduled runs. Without this
+			// owner reference the Job is absent from the CronJob's Jobs
+			// subview (which filters by ownerRef) and is not garbage-collected
+			// when the CronJob is deleted.
+			OwnerReferences: []metav1.OwnerReference{
+				*metav1.NewControllerRef(cronJob, batchv1.SchemeGroupVersion.WithKind("CronJob")),
+			},
 		},
 		Spec: cronJob.Spec.JobTemplate.Spec,
 	}

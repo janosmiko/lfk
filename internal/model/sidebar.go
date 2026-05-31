@@ -26,6 +26,7 @@ func BuildSidebarItems(discovered []ResourceTypeEntry) []Item {
 	items = append(items, categorized...)
 	items = append(items, crdGroups...)
 
+	markPinned(items)
 	return sortSidebarItems(items)
 }
 
@@ -100,6 +101,25 @@ func intToStr(n int) string {
 	return string(buf[i:])
 }
 
+// markPinned reassigns items whose version-agnostic pin key is in PinnedTypes
+// to the synthetic "Pinned" category, moving them out of their home category
+// into the top-level Pinned section. Dashboard pseudo-items (whose Extra has no
+// version segment) never match and are left in place.
+func markPinned(items []Item) {
+	if len(PinnedTypes) == 0 {
+		return
+	}
+	pinned := make(map[string]bool, len(PinnedTypes))
+	for _, k := range PinnedTypes {
+		pinned[k] = true
+	}
+	for i := range items {
+		if key := PinKeyFromRef(items[i].Extra); key != "" && pinned[key] {
+			items[i].Category = "Pinned"
+		}
+	}
+}
+
 // partitionDiscovered walks the discovered set and produces two slices:
 // items that matched BuiltInMetadata (curated, with category/icon), and
 // items for unknown resources in non-core groups that should appear as
@@ -142,7 +162,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 			// BuiltInMetadata yet — surface it in the mapped category with
 			// the generic CRD glyph so it's visible instead of hidden.
 			categorized = append(categorized, Item{
-				Name:       titleCaseFirst(rt.Resource),
+				Name:       displayNameFromKind(rt.Kind, rt.Resource),
 				Kind:       rt.Kind,
 				Extra:      rt.ResourceRef(),
 				Category:   cat,
@@ -157,7 +177,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 			}
 			// Surface uncategorized core K8s resources under "Advanced".
 			categorized = append(categorized, Item{
-				Name:       titleCaseFirst(rt.Resource),
+				Name:       displayNameFromKind(rt.Kind, rt.Resource),
 				Kind:       rt.Kind,
 				Extra:      rt.ResourceRef(),
 				Category:   AdvancedCategory,
@@ -168,7 +188,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 		}
 		// Unknown resource in a CRD group — show with generic icon.
 		crdGroups = append(crdGroups, Item{
-			Name:       titleCaseFirst(rt.Resource),
+			Name:       displayNameFromKind(rt.Kind, rt.Resource),
 			Kind:       rt.Kind,
 			Extra:      rt.ResourceRef(),
 			Category:   rt.APIGroup,
@@ -203,19 +223,40 @@ func titleCaseFirst(s string) string {
 	return strings.ToUpper(s[:1]) + s[1:]
 }
 
+// displayNameFromKind derives a sidebar display name for a discovered
+// resource, preferring the resource's Kind so multi-word casing is preserved.
+// Kubernetes forces resource plurals to lowercase, which loses the casing of
+// kinds like "ApplicationSet" (plural "applicationsets"). When the plural is a
+// regular suffixing of the lowercased kind ("+s", "+es", or "y"->"ies"), the
+// kind reconstructs the intended camel case. Irregular plurals (and an empty
+// kind) fall back to capitalizing the plural's first letter.
+//
+// Kubernetes kinds are ASCII identifiers, so byte length is rune length here
+// and the byte-index slicing below is safe.
+func displayNameFromKind(kind, plural string) string {
+	if kind != "" {
+		lower := strings.ToLower(kind)
+		switch plural {
+		case lower + "s", lower + "es":
+			// Reuse the plural's actual suffix so casing comes from the kind.
+			return kind + plural[len(lower):]
+		}
+		if strings.HasSuffix(lower, "y") && plural == lower[:len(lower)-1]+"ies" {
+			return kind[:len(kind)-1] + "ies"
+		}
+	}
+	return titleCaseFirst(plural)
+}
+
 // sortSidebarItems orders sidebar items: core categories in fixed order,
 // items within a core category in BuiltInOrderRank order (falling back to
-// alphabetical by display name for entries without a curated rank), pinned
-// CRD groups next (respecting PinnedGroups config), then remaining CRD
-// groups alphabetical by category and item name.
+// alphabetical by display name for entries without a curated rank). The
+// synthetic "Pinned" section is ordered alphabetically by display name.
+// Remaining CRD groups follow, alphabetical by category and item name.
 func sortSidebarItems(items []Item) []Item {
 	coreOrder := make(map[string]int, len(CoreCategories))
 	for i, name := range CoreCategories {
 		coreOrder[name] = i
-	}
-	pinnedOrder := make(map[string]int, len(PinnedGroups))
-	for i, g := range PinnedGroups {
-		pinnedOrder[g] = i
 	}
 
 	sort.SliceStable(items, func(i, j int) bool {
@@ -226,6 +267,11 @@ func sortSidebarItems(items []Item) []Item {
 		case aCore && bCore:
 			if aCoreRank != bCoreRank {
 				return aCoreRank < bCoreRank
+			}
+			// The Pinned section ignores curated ranks and sorts purely
+			// alphabetically by display name.
+			if a.Category == "Pinned" {
+				return strings.ToLower(a.Name) < strings.ToLower(b.Name)
 			}
 			// Same core category: use the curated BuiltInOrderRank so
 			// items appear in their declared order (e.g., Pods before
@@ -247,22 +293,9 @@ func sortSidebarItems(items []Item) []Item {
 		case bCore:
 			return false
 		default:
-			// Both non-core: pinned before unpinned; within pinned, follow PinnedGroups order; otherwise alphabetical by category.
-			aPinRank, aPin := pinnedOrder[a.Category]
-			bPinRank, bPin := pinnedOrder[b.Category]
-			switch {
-			case aPin && bPin:
-				if aPinRank != bPinRank {
-					return aPinRank < bPinRank
-				}
-			case aPin:
-				return true
-			case bPin:
-				return false
-			default:
-				if a.Category != b.Category {
-					return a.Category < b.Category
-				}
+			// Both non-core CRD groups: alphabetical by category, then name.
+			if a.Category != b.Category {
+				return a.Category < b.Category
 			}
 		}
 		return strings.ToLower(a.Name) < strings.ToLower(b.Name)

@@ -470,6 +470,9 @@ func (m Model) executeActionCoreOps(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Go to Pod":
 		mdl, cmd := m.executeActionGoToPod()
 		return mdl, cmd, true
+	case "Go to Node":
+		mdl, cmd := m.executeActionGoToNode()
+		return mdl, cmd, true
 	case "Debug Mount":
 		mdl, cmd := m.executeActionDebugMount()
 		return mdl, cmd, true

@@ -26,6 +26,19 @@ func nsSelectorModel() Model {
 // populate synchronously: overlayItems is non-nil before any tea.Cmd
 // runs, m.loading stays false, and ensureNamespaceCacheFresh returns nil
 // so no API call is scheduled.
+func TestHandleKeyNamespaceSelector_NoOpAtClusters(t *testing.T) {
+	m := nsSelectorModel()
+	m.nav.Level = model.LevelClusters
+
+	ret, cmd := m.handleKeyNamespaceSelector()
+	result := ret.(Model)
+
+	assert.NotEqual(t, overlayNamespace, result.overlay,
+		"namespace overlay must not open without a selected context")
+	assert.NotEmpty(t, result.statusMessage)
+	assert.NotNil(t, cmd)
+}
+
 func TestHandleKeyNamespaceSelector_SeedsFromFreshCache(t *testing.T) {
 	m := nsSelectorModel()
 	m.cachedNamespaces[m.activeContext()] = namespaceCacheEntry{
@@ -166,6 +179,40 @@ func TestHandleKeyNamespaceSelector_StaleCacheSchedulesBackgroundRefresh(t *test
 	require.Len(t, result.overlayItems, 3, "stale cache must still seed the overlay")
 	assert.False(t, result.loading, "stale cache hit must not blank the overlay")
 	assert.NotNil(t, cmd, "stale cache must schedule a silent refresh command")
+}
+
+// TestHandleNamespaceOverlay_RefreshReloads verifies the in-overlay refresh
+// (R / kb.Refresh) re-fetches namespaces and keeps the overlay open.
+func TestHandleNamespaceOverlay_RefreshReloads(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.overlay = overlayNamespace
+	m.nsOverlayContext = m.activeContext()
+	m.overlayItems = []model.Item{
+		{Name: "All Namespaces", Status: "all"},
+		{Name: "default", Status: "Active"},
+	}
+
+	ret, cmd := m.handleNamespaceOverlayKey(runeKey('R'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayNamespace, result.overlay, "refresh must keep the overlay open")
+	assert.NotNil(t, cmd, "refresh must schedule a namespace reload")
+	assert.Contains(t, result.statusMessage, "Refresh")
+	assert.False(t, result.statusMessageErr)
+}
+
+// TestHandleNamespaceOverlay_RefreshNoClientNoOp verifies refresh is a safe
+// no-op (no panic, overlay intact) when no client is wired.
+func TestHandleNamespaceOverlay_RefreshNoClientNoOp(t *testing.T) {
+	m := nsSelectorModel() // baseExplorerModel: m.client == nil
+	m.overlay = overlayNamespace
+	m.nsOverlayContext = "test"
+
+	ret, cmd := m.handleNamespaceOverlayKey(runeKey('R'))
+	result := ret.(Model)
+
+	assert.Equal(t, overlayNamespace, result.overlay)
+	assert.Nil(t, cmd)
 }
 
 // TestUpdateNamespacesLoaded_SilentPreservesOverlayCursor guards the

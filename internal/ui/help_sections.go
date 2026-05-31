@@ -24,7 +24,7 @@ func helpSections() []helpSection {
 				{helpKeyDisplay(kb.JumpBack), "Jump back through teleport history (owner/port-forward/orphan/mark jumps)"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down/up"},
 				{kb.ExpandCollapse, "Toggle expand/collapse all resource groups / toggle event grouping (Events)"},
-				{kb.PinGroup, "Pin/unpin CRD group (at resource types level)"},
+				{kb.PinGroup, "Pin/unpin resource type (at resource types level)"},
 				{kb.ToggleRare, "Toggle rarely used resource types (CSI, webhooks, advanced) in the sidebar"},
 			},
 		},
@@ -32,6 +32,7 @@ func helpSections() []helpSection {
 			title: "Search & Filter",
 			bindings: []helpEntry{
 				{kb.Filter, "Filter items (~prefix: fuzzy, regex auto-detected, \\prefix: literal)"},
+				{"", "Each list keeps its filter per tab: drill into a resource and back and it's still applied; Esc clears it."},
 				{kb.Search, "Search and jump to match (~fuzzy, regex auto, \\literal)"},
 				{"", "Up/Down inside filter or search recalls previous queries (shared, persistent across sessions)."},
 				{"", "Paste from clipboard: Cmd+V (macOS) / Ctrl+Shift+V (Linux). Multiline asks to confirm."},
@@ -84,7 +85,7 @@ func helpSections() []helpSection {
 		{
 			title: "Actions",
 			bindings: []helpEntry{
-				{kb.NamespaceSelector, "Select namespace"},
+				{kb.NamespaceSelector, "Select namespace (space: include, tab: exclude, A: all-namespaces, R: refresh)"},
 				{kb.AllNamespaces, "Toggle all-namespaces mode"},
 				{kb.ActionMenu, "Action menu: l=tail logs (last 10 lines + follow), L=full logs, exec, debug, debug pod, describe, edit, delete, scale, port-forward, events, startup analysis, crash investigator, traffic capture, RBAC permissions"},
 				{kb.Logs, "View full logs for selected resource"},
@@ -525,7 +526,7 @@ func helpSections() []helpSection {
 			title: "Configuration",
 			bindings: []helpEntry{
 				{"", "Config: ~/.config/lfk/config.yaml (or $XDG_CONFIG_HOME/lfk/config.yaml)"},
-				{"", "State:  ~/.local/state/lfk/ (bookmarks, session, history, pinned groups)"},
+				{"", "State:  ~/.local/state/lfk/ (bookmarks, session, history, pinned types)"},
 				{"", "Logs:   ~/.local/share/lfk/lfk.log (or $XDG_DATA_HOME/lfk/lfk.log)"},
 				{"", "Override dirs: LFK_CONFIG_DIR, LFK_STATE_DIR, LFK_DATA_DIR"},
 			},

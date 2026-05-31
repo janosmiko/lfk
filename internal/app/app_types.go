@@ -12,6 +12,7 @@ import (
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // viewMode tracks the current view state.
@@ -417,6 +418,7 @@ type TabState struct {
 	middleScroll       int // persistent scroll position for middle column (vim-style scrolloff)
 	leftScroll         int // persistent scroll position for left column (vim-style scrolloff)
 	cursorMemory       map[string]int
+	filterMemory       map[string]savedFilter
 	itemCache          map[string][]model.Item
 	cacheFingerprints  map[string]string
 	yamlContent        string
@@ -433,8 +435,10 @@ type TabState struct {
 	namespace          string
 	allNamespaces      bool
 	selectedNamespaces map[string]bool
+	nsSelectionNegated bool
 	sortColumnName     string // column name to sort by (e.g. "Name", "Age", "CPU")
 	sortAscending      bool
+	sortMemory         map[string]sortPref
 	filterText         string
 	watchMode          bool
 	// readOnly blocks all mutating actions for this tab. Re-evaluated on
@@ -456,6 +460,10 @@ type TabState struct {
 	// to clear them.
 	metricsContent       string
 	previewEventsContent string
+	// Raw inputs behind the two footers above, retained per-tab so a theme
+	// change / resize can re-render them in place (see recomposeThemedContent).
+	metricsData       *metricsInputs
+	previewEventsData []ui.EventTimelineEntry
 
 	// Toggle to show only Warning events in Event list view.
 	warningEventsOnly bool

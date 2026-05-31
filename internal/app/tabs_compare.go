@@ -115,10 +115,44 @@ func itemTiebreakerLess(a, b model.Item, primaryCol string) bool {
 	return a.Extra < b.Extra
 }
 
+// valueCmpFunc compares two extra-column string values. Used by the
+// columnValueCmp registry below to type extra columns whose semantics
+// can't be inferred from their value alone (e.g. "45%" could be a
+// percent or a label, "80/TCP" could be a port or a path).
+type valueCmpFunc func(a, b string) int
+
+// columnValueCmp registers per-column comparators for extra-column
+// values (those stored in Item.Columns rather than top-level Item fields).
+// Adding a new typed column is a one-line registration here — keeping
+// the format dispatch in one place avoids the bug class where new
+// percent/resource columns silently fell through to lexicographic sort
+// (e.g. "100%" < "9%").
+var columnValueCmp = map[string]valueCmpFunc{
+	"CPU":          func(a, b string) int { return compareResourceValuesCmp(a, b, "CPU") },
+	"MEM":          func(a, b string) int { return compareResourceValuesCmp(a, b, "MEM") },
+	"CPU%":         comparePercentCmp,
+	"MEM%":         comparePercentCmp,
+	"CPU/R":        comparePercentCmp,
+	"CPU/L":        comparePercentCmp,
+	"MEM/R":        comparePercentCmp,
+	"MEM/L":        comparePercentCmp,
+	"Ports":        comparePortsCmp,
+	"Progress":     compareReadyCmp, // "N/M" fraction, same shape as Ready ratio
+	"Duration":     compareDurationCmp,
+	"REV":          compareREVCmp,
+	"Cluster IP":   compareIPCmp,
+	"Pod IP":       compareIPCmp,
+	"External IPs": compareIPCmp,
+}
+
 // comparePrimaryColumn returns -1, 0, or +1 for a < b, a == b, a > b
 // according to the selected sort column. Returning 0 lets the caller run
 // a tiebreaker chain instead of relying on sort.SliceStable's input-order
 // preservation.
+//
+// Columns whose comparator needs the whole Item (top-level fields,
+// timestamps, status priority) are handled inline; extra columns go
+// through columnValueCmp, with auto-detection as the final fallback.
 func comparePrimaryColumn(a, b model.Item, colName string) int {
 	switch colName {
 	case "Name":
@@ -152,9 +186,12 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 		return cmpInt(severityRank(getColumnValue(a, "Severity")), severityRank(getColumnValue(b, "Severity")))
 	case sortColEventLastSeen:
 		return compareLastSeenCmp(a, b)
-	default:
-		return compareColumnValuesCmp(getColumnValue(a, colName), getColumnValue(b, colName), colName)
 	}
+	va, vb := getColumnValue(a, colName), getColumnValue(b, colName)
+	if cmp, ok := columnValueCmp[colName]; ok {
+		return cmp(va, vb)
+	}
+	return compareColumnValuesCmp(va, vb)
 }
 
 func cmpInt(a, b int) int {
@@ -180,6 +217,17 @@ func cmpFloat(a, b float64) int {
 }
 
 func cmpInt64(a, b int64) int {
+	switch {
+	case a < b:
+		return -1
+	case a > b:
+		return 1
+	default:
+		return 0
+	}
+}
+
+func cmpUint64(a, b uint64) int {
 	switch {
 	case a < b:
 		return -1
@@ -228,6 +276,38 @@ func compareResourceValues(a, b, col string) bool {
 func compareResourceValuesCmp(a, b, col string) int {
 	isCPU := strings.HasPrefix(col, "CPU")
 	return cmpInt64(ui.ParseResourceValue(a, isCPU), ui.ParseResourceValue(b, isCPU))
+}
+
+// comparePercentCmp compares two percentage-formatted column values
+// (e.g. "42%", "n/a") numerically by their leading integer percentage.
+// "n/a" (and any other unparseable value) sorts after real values so
+// metrics-less rows land at the bottom in ascending order.
+func comparePercentCmp(a, b string) int {
+	pa, okA := parsePercent(a)
+	pb, okB := parsePercent(b)
+	switch {
+	case okA && okB:
+		return cmpFloat(pa, pb)
+	case okA:
+		return -1
+	case okB:
+		return 1
+	default:
+		return strings.Compare(strings.ToLower(strings.TrimSpace(a)), strings.ToLower(strings.TrimSpace(b)))
+	}
+}
+
+func parsePercent(s string) (float64, bool) {
+	s = strings.TrimSpace(s)
+	s = strings.TrimSuffix(s, "%")
+	if s == "" {
+		return 0, false
+	}
+	n, err := strconv.ParseFloat(s, 64)
+	if err != nil {
+		return 0, false
+	}
+	return n, true
 }
 
 // compareAgeCmp returns the three-way age comparison with zero-time
@@ -328,6 +408,18 @@ func compareDurationCmp(a, b string) int {
 	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
 }
 
+// compareREVCmp compares REV column values numerically (decimal). Falls back
+// to case-insensitive lexicographic comparison when either value is not
+// parseable as a uint64.
+func compareREVCmp(a, b string) int {
+	na, errA := strconv.ParseUint(strings.TrimSpace(a), 10, 64)
+	nb, errB := strconv.ParseUint(strings.TrimSpace(b), 10, 64)
+	if errA == nil && errB == nil {
+		return cmpUint64(na, nb)
+	}
+	return strings.Compare(strings.ToLower(a), strings.ToLower(b))
+}
+
 // compareIPCmp compares IP-address column values numerically, so
 // "10.0.0.9" sorts before "10.0.0.10". Values may be comma-joined lists
 // (e.g. External IPs); only the first address drives the comparison.
@@ -362,11 +454,9 @@ func leadingIP(s string) (netip.Addr, bool) {
 // of resource quantities (10Gi, 500Mi, 100m), plain numbers, and strings.
 // Returns -1, 0, or +1 so sort.SliceStable callers can detect equality
 // and fall through to the row-identity tiebreaker chain.
-func compareColumnValuesCmp(a, b, colName string) int {
-	// Known CPU/MEM columns: use resource value parser directly.
-	if colName == "CPU" || colName == "MEM" || colName == "CPU/R" || colName == "CPU/L" || colName == "MEM/R" || colName == "MEM/L" {
-		return compareResourceValuesCmp(a, b, colName)
-	}
+func compareColumnValuesCmp(a, b string) int {
+	// Auto-detect for unknown columns: typed columns are dispatched via
+	// columnValueCmp before reaching here.
 
 	// Try parsing as resource quantities (Gi, Mi, Ki, B suffixes or millicores).
 	if looksLikeResourceQuantity(a) || looksLikeResourceQuantity(b) {

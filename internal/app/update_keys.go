@@ -323,6 +323,10 @@ func (m Model) handleKeyPrevMatch() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleKeyNamespaceSelector() (tea.Model, tea.Cmd) {
+	if m.nav.Level == model.LevelClusters {
+		m.setStatusMessage("Namespace selection requires a selected context", true)
+		return m, scheduleStatusClear()
+	}
 	return m.openNamespaceSelectorForContext(m.activeContext())
 }
 
@@ -338,6 +342,11 @@ func (m Model) openNamespaceSelectorForContext(contextName string) (tea.Model, t
 	m.overlayFilter.Clear()
 	ui.ResetOverlayNsScroll()
 	m.nsSelectionModified = false
+	// Remember which context this overlay lists so the in-overlay refresh
+	// (R) re-fetches the right namespaces even when activeContext() would
+	// resolve differently (e.g. the union-set namespace picker, which opens
+	// for the first member context before union mode is active).
+	m.nsOverlayContext = contextName
 
 	// Reuse the existing per-context namespace cache (also used by the
 	// command-bar autocompleter). When a cached entry exists we seed the

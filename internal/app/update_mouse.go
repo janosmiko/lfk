@@ -322,6 +322,7 @@ func (m Model) handleHeaderClick(relX int) (tea.Model, tea.Cmd) {
 		m.sortColumnName = clickedKey
 		m.sortAscending = true
 	}
+	m.rememberSort()
 	m.sortMiddleItems()
 	m.clampCursor()
 	m.setStatusMessage("Sort: "+m.sortModeName(), false)

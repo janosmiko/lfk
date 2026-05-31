@@ -151,6 +151,16 @@ func TestRenderOverlayList(t *testing.T) {
 		assert.NotContains(t, out, "✓")
 	})
 
+	t.Run("ActiveMarker overrides the default check glyph", func(t *testing.T) {
+		items := []OverlayListItem{
+			{Name: "A", Active: true},
+			{Name: "B", Active: true, ActiveMarker: "!"},
+		}
+		out := RenderOverlayList(items, OverlayListConfig{ShowActiveMarker: true}, w)
+		assert.Contains(t, out, "✓", "default marker still used for items without an override")
+		assert.Contains(t, out, "! B", "overridden item renders its custom marker")
+	})
+
 	t.Run("active-marker column collapses when no item is active", func(t *testing.T) {
 		// When ShowActiveMarker is on but nothing's active, the 2-cell
 		// reserved space disappears so [k]/[s] sit flush against the

@@ -19,7 +19,6 @@ import (
 	"github.com/janosmiko/lfk/internal/completion"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
-	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/janosmiko/lfk/internal/version"
 )
@@ -125,7 +124,6 @@ func runTUI(opts app.StartupOptions) error {
 	if opts.NoColor {
 		ui.SetNoColor(true)
 	}
-	model.PinnedGroups = ui.ConfigPinnedGroups
 	client.SetSecretLazyLoading(ui.ConfigSecretLazyLoading)
 	client.SetKubesharkNamespace(ui.ConfigKubesharkNamespace)
 	client.SetInformerCacheMode(k8s.InformerCacheMode(ui.ConfigInformerCacheMode))

@@ -61,7 +61,7 @@
 - **Three-column Miller columns** interface (parent / current / preview)
 - **Owner-based navigation**: Clusters -> Resource Types -> Resources -> Owned Resources -> Containers
 - **Resource groups**: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
-- **Pinned CRD groups**: Pin frequently used CRD API groups so they appear after built-in categories. Configurable via `pinned_groups` in config or interactively with `p` key (stored per-context or per named union set)
+- **Pinned resource types**: Pin individual resource types (built-in or CRD) into a "Pinned" section at the top of the list, below the dashboards. Configurable via `pinned_types` in config (legacy `pinned_groups` also supported) or interactively with `p` key (stored per-context or per named union set)
 - **CRD categories**: Discovered CRDs are grouped by API group name (e.g., `argoproj.io`, `longhorn.io`, `networking.istio.io`)
 - **Hide rarely used resources**: CSI internals, admission webhooks, APF, leases, runtime classes, and uncategorized core resources are hidden by default. Press `H` to surface them under their categories and an "Advanced" group (resets each launch)
 - **Expandable/collapsible resource groups** with `z`
@@ -88,7 +88,7 @@
 - **Context-aware action menus**: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward, vuln scan, PVC resize
 - **Custom user-defined actions**: Define custom shell commands per resource type in config
 - **Multi-select with bulk actions**: Select multiple resources with Space, range-select with Ctrl+Space, perform bulk delete, scale, restart, and ArgoCD bulk sync/refresh
-- **Resource sorting** by name, age, or status
+- **Resource sorting** by name, age, or status, remembered per resource kind for the session
 - **Filter and search**: Filter with `f`, search with `/` -- supports substring, regex (auto-detected), and fuzzy (`~` prefix) modes
 - **Abbreviated search**: Type `pvc`, `hpa`, `deploy` etc. to jump to resource types
 - **Command bar** (`:`) with vertical dropdown autocomplete: resource jumps (`:pod`, `:dep`), built-in commands (`:ns`, `:ctx`, `:set`, `:sort`, `:export`), kubectl with `:k`/`:kubectl` prefix and flag/namespace completion, shell commands (`:!`). Value positions (namespace, context, resource name, option, column, format) accept fuzzy matches; command names stay on prefix.
@@ -205,7 +205,7 @@ Clusters (kubeconfig contexts)
                     +-- Containers (for Pods)
 ```
 
-Namespaces are **not** a navigation level. The current namespace is shown in the top-right corner and can be changed by pressing `\`. All-namespaces mode is enabled by default (toggle with `A`).
+Namespaces are **not** a navigation level. The current namespace is shown in the top-right corner and can be changed by pressing `\`. All-namespaces mode is enabled by default (toggle with `A`). Inside the namespace selector, press `Space` to include namespaces, `Tab` to exclude them (negative selection — shows all except the marked namespaces, each prefixed with `!`), `A` to reset to all-namespaces mode, or `R` to refresh the list from the cluster.
 
 ### Owner Resolution
 
@@ -236,7 +236,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page scroll down/up |
 | `Enter` | Open full-screen YAML view / navigate into |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping (Events view) |
-| `p` | Pin/unpin CRD group (at resource types level) |
+| `p` | Pin/unpin resource type (at resource types level) |
 | `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |

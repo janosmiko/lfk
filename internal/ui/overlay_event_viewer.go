@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // RenderEventTimelineOverlay renders the event timeline overlay content.
@@ -181,6 +182,186 @@ type EventViewerParams struct {
 	SearchQuery  string
 	SearchActive bool
 	SearchInput  string
+	// HangingIndent is the column at which the message field starts in
+	// Lines. Continuation lines under wrap are indented by this many
+	// spaces so the wrapped message text stays under the original
+	// message column (table-style continuation). Zero means flush-left.
+	HangingIndent int
+}
+
+// wrappedEventChunk describes one physical sub-line of a wrapped event
+// row, tracking how it maps back to the original logical line so the
+// renderer can place a block cursor or per-character selection
+// highlight on the correct physical sub-line + column.
+type wrappedEventChunk struct {
+	text       string // full sub-line text including any leading indent
+	indentCols int    // leading pad width within text
+	origStart  int    // index of first original-line char in this chunk
+	origLen    int    // count of original-line chars in this chunk
+}
+
+// wrappedEventChunks splits a logical event line into physical sub-lines
+// with column tracking. The first sub-line uses the full contentW; later
+// sub-lines are indented by hangingIndent so the wrapped message stays
+// under the original message column.
+//
+// Falls back to flush-left wrap if contentW is too narrow to leave any
+// useful room for continuation text after the indent.
+func wrappedEventChunks(line string, contentW, hangingIndent int) []wrappedEventChunk {
+	runes := []rune(line)
+	if contentW <= 0 || len(runes) <= contentW {
+		return []wrappedEventChunk{{text: line, origLen: len(runes)}}
+	}
+	// Clamp the indent: leave at least 8 chars per continuation line.
+	if hangingIndent < 0 || hangingIndent >= contentW-8 {
+		hangingIndent = 0
+	}
+	out := []wrappedEventChunk{{
+		text:      string(runes[:contentW]),
+		origStart: 0,
+		origLen:   contentW,
+	}}
+	pad := strings.Repeat(" ", hangingIndent)
+	chunkSize := contentW - hangingIndent
+	pos := contentW
+	for pos < len(runes) {
+		n := min(chunkSize, len(runes)-pos)
+		out = append(out, wrappedEventChunk{
+			text:       pad + string(runes[pos:pos+n]),
+			indentCols: hangingIndent,
+			origStart:  pos,
+			origLen:    n,
+		})
+		pos += n
+	}
+	return out
+}
+
+// WrapEventLine wraps a single event timeline line into physical lines
+// that fit within contentW. The first physical line uses the full
+// width; continuation lines are indented by hangingIndent so wrapped
+// message text aligns under the original message column instead of
+// re-flowing flush to the left margin.
+func WrapEventLine(line string, contentW, hangingIndent int) []string {
+	chunks := wrappedEventChunks(line, contentW, hangingIndent)
+	out := make([]string, len(chunks))
+	for i, c := range chunks {
+		out[i] = c.text
+	}
+	return out
+}
+
+// WrappedEventRowOpts bundles inputs for RenderWrappedEventRow. The
+// caller computes which selection range applies (line-mode highlights
+// the whole row; char-mode pre-computes the absolute column range on
+// the logical line). Cursor block rendering is opt-in via IsCursor.
+type WrappedEventRowOpts struct {
+	Line          string
+	Gutter        string // prefix prepended to every physical sub-line
+	ContentW      int
+	HangingIndent int
+	// Cursor block:
+	IsCursor  bool
+	CursorCol int
+	// Selection:
+	SelectionLine bool // full-row highlight (V mode)
+	SelStart      int  // absolute col on the logical line (inclusive)
+	SelEnd        int  // absolute col on the logical line (exclusive)
+	// Search highlight (applied only when no selection is active):
+	LowerSearch string
+	// Fullscreen suppresses the overlay-mode background style on plain
+	// rows: in fullscreen mode the surrounding FullscreenBorderStyle
+	// owns the body background, and applying OverlayNormalStyle here
+	// would paint a different-colored rectangle behind text rows than
+	// the empty padding rows around them.
+	Fullscreen bool
+}
+
+// RenderWrappedEventRow renders one logical event line as a multi-line
+// wrapped block. Mirrors the convention used by the YAML and describe
+// viewers: the cursor block and per-line selection highlight sit on
+// the FIRST physical sub-line, continuation sub-lines are plain
+// (gutter + indented text). RenderCursorAtCol's "append a highlighted
+// space when col >= width" branch keeps the cursor visible when
+// CursorCol drifted past the visible chunk after navigating from a
+// long event to a short one — same behaviour YAML relies on.
+//
+// V-mode (line) selection still spans every sub-line because the user
+// explicitly asked for the whole wrapped block to be highlighted; v
+// and B modes stick to the simpler single-line model.
+func RenderWrappedEventRow(opts WrappedEventRowOpts) string {
+	chunks := wrappedEventChunks(opts.Line, opts.ContentW, opts.HangingIndent)
+	if len(chunks) == 0 {
+		return opts.Gutter
+	}
+
+	var sb strings.Builder
+	for i, ch := range chunks {
+		if i > 0 {
+			sb.WriteByte('\n')
+		}
+		sb.WriteString(opts.Gutter)
+		text := ch.text
+
+		styled := false
+		if opts.SelectionLine {
+			// V-mode: full highlight on every sub-line.
+			text = SelectedStyle.Render(ansi.Strip(text))
+			styled = true
+		} else if i == 0 {
+			// First sub-line carries selection and search styling.
+			switch {
+			case opts.SelEnd > opts.SelStart:
+				text = applyCharSelectionToFirstSubLine(text, opts.SelStart, opts.SelEnd)
+				styled = true
+			case opts.LowerSearch != "":
+				text = highlightEventSearchLine(text, opts.LowerSearch)
+				styled = true
+			}
+		} else if opts.LowerSearch != "" {
+			// Highlight matches on continuation sub-lines too.
+			text = highlightEventSearchLine(text, opts.LowerSearch)
+			styled = true
+		}
+		if !styled && !opts.Fullscreen {
+			// Apply overlay-normal styling so wrapped rows match the
+			// surrounding (non-wrap) rows' fg/bg pair instead of
+			// punching a transparent rectangle through the overlay.
+			// Skipped in fullscreen: the FullscreenBorderStyle owns
+			// the body background, and an explicit fg/bg here would
+			// paint text rows a different color than empty padding
+			// rows around them.
+			text = OverlayNormalStyle.Render(text)
+		}
+
+		if opts.IsCursor && i == 0 {
+			text = RenderCursorAtCol(text, "", opts.CursorCol)
+		}
+		sb.WriteString(text)
+	}
+	return sb.String()
+}
+
+// applyCharSelectionToFirstSubLine highlights the [selStart, selEnd)
+// column range on the first physical sub-line of a wrapped event. The
+// range is clamped to the sub-line's bounds; the selection that
+// extends past contentW is not shown on continuation lines (matches
+// the YAML viewer's behaviour, where v-mode selection only paints the
+// first sub-line).
+func applyCharSelectionToFirstSubLine(text string, selStart, selEnd int) string {
+	runes := []rune(text)
+	if selStart < 0 {
+		selStart = 0
+	}
+	if selEnd > len(runes) {
+		selEnd = len(runes)
+	}
+	if selEnd <= selStart {
+		return text
+	}
+	return string(runes[:selStart]) +
+		SelectedStyle.Render(string(runes[selStart:selEnd])) +
+		string(runes[selEnd:])
 }
 
 // RenderEventViewer renders the event viewer with cursor, visual selection,
@@ -253,10 +434,7 @@ func RenderEventViewer(p EventViewerParams) string {
 		contentW = 10
 	}
 
-	wrapStyle := lipgloss.NewStyle().Width(contentW)
-
 	evLineCtx := eventLineContext{
-		wrapStyle:  wrapStyle,
 		contentW:   contentW,
 		lowerQuery: lowerQuery,
 		selStart:   selStart,
@@ -264,19 +442,27 @@ func RenderEventViewer(p EventViewerParams) string {
 		colStart:   colStart,
 		colEnd:     colEnd,
 	}
-	for i := scroll; i < end; i++ {
-		b.WriteString(renderEventViewerLine(p, i, evLineCtx))
-		if i < end-1 {
-			b.WriteString("\n")
+	// Pagination is by physical lines, not logical events: in wrap
+	// mode one event expands to multiple sub-lines, and counting by
+	// logical events would emit far more physical rows than
+	// maxVisible — pushing the footer and the overlay's bottom
+	// border off the viewport. Stop emitting as soon as we fill the
+	// reserved height. The logical `end` is still used below by the
+	// footer for the "line N/M" indicator.
+	var physicalLines []string
+	for i := scroll; i < len(p.Lines) && len(physicalLines) < maxVisible; i++ {
+		rendered := renderEventViewerLine(p, i, evLineCtx)
+		for sub := range strings.SplitSeq(rendered, "\n") {
+			if len(physicalLines) >= maxVisible {
+				break
+			}
+			physicalLines = append(physicalLines, sub)
 		}
 	}
-
-	// Pad to fixed height.
-	rendered := end - scroll
-	for rendered < maxVisible {
-		b.WriteString("\n")
-		rendered++
+	for len(physicalLines) < maxVisible {
+		physicalLines = append(physicalLines, "")
 	}
+	b.WriteString(strings.Join(physicalLines, "\n"))
 	b.WriteString("\n")
 
 	// Search input / footer.
@@ -302,7 +488,6 @@ func RenderEventViewer(p EventViewerParams) string {
 
 // eventLineContext holds shared state for rendering individual event viewer lines.
 type eventLineContext struct {
-	wrapStyle  lipgloss.Style
 	contentW   int
 	lowerQuery string
 	selStart   int
@@ -317,11 +502,35 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 	inSelection := p.VisualMode != 0 && i >= ctx.selStart && i <= ctx.selEnd
 	isCursorLine := i == p.Cursor
 
-	fitLine := line
-	if p.Wrap {
-		fitLine = ctx.wrapStyle.Render(line)
-	} else if len([]rune(fitLine)) > ctx.contentW {
-		fitLine = string([]rune(fitLine)[:ctx.contentW])
+	gutter := " "
+	if isCursorLine {
+		gutter = YamlCursorIndicatorStyle.Render("▎")
+	}
+
+	// Wrap-mode rendering is unified via RenderWrappedEventRow: it
+	// handles the gutter, block-cursor placement on the physical
+	// sub-line containing CursorCol, V-mode full-row highlight, and
+	// v-mode char selection across sub-lines. Block-mode (B) keeps the
+	// single-line truncate path below because rectangular column
+	// selection over wrapped sub-lines has no meaningful geometry.
+	if p.Wrap && (!inSelection || p.VisualMode == 'V' || p.VisualMode == 'v') {
+		opts := WrappedEventRowOpts{
+			Line:          line,
+			Gutter:        gutter,
+			ContentW:      ctx.contentW,
+			HangingIndent: p.HangingIndent,
+			IsCursor:      isCursorLine,
+			CursorCol:     p.CursorCol,
+		}
+		switch {
+		case inSelection && p.VisualMode == 'V':
+			opts.SelectionLine = true
+		case inSelection && p.VisualMode == 'v':
+			opts.SelStart, opts.SelEnd = charSelectionRangeForLine(p, ctx, i)
+		default:
+			opts.LowerSearch = ctx.lowerQuery
+		}
+		return RenderWrappedEventRow(opts)
 	}
 
 	if inSelection {
@@ -335,29 +544,50 @@ func renderEventViewerLine(p EventViewerParams, i int, ctx eventLineContext) str
 			p.VisualStart, p.VisualCol, p.CursorCol,
 			ctx.colStart, ctx.colEnd,
 		)
-		if isCursorLine {
-			return YamlCursorIndicatorStyle.Render("▎") + rendered
-		}
-		return " " + rendered
+		return gutter + rendered
 	}
 
+	// Non-wrap, non-selection path.
+	fitLine := line
+	if len([]rune(fitLine)) > ctx.contentW {
+		fitLine = string([]rune(fitLine)[:ctx.contentW])
+	}
 	if isCursorLine {
-		return renderEventCursorLine(p, line, fitLine, ctx)
+		return renderEventCursorLine(p, fitLine, ctx, gutter)
 	}
-
-	return renderEventNormalLine(p, line, fitLine, ctx)
+	return renderEventNormalLine(p, fitLine, ctx, gutter)
 }
 
-// renderEventCursorLine renders the cursor line with gutter indicator and block cursor.
-func renderEventCursorLine(p EventViewerParams, line, fitLine string, ctx eventLineContext) string {
-	gutter := YamlCursorIndicatorStyle.Render("▎")
-	if p.Wrap {
-		displayLine := fitLine
-		if p.SearchQuery != "" {
-			displayLine = ctx.wrapStyle.Render(highlightEventSearchLine(line, ctx.lowerQuery))
-		}
-		return gutter + displayLine
+// charSelectionRangeForLine returns the [start, end) column range to
+// highlight on the given logical line under v-mode selection. Mirrors
+// renderCharSelection's per-line logic: anchor-only line highlights
+// from anchorCol to end-of-line; cursor-only line highlights from 0 to
+// cursorCol+1; middle lines highlight everything (caller can detect
+// "everything" via end == len(line)).
+func charSelectionRangeForLine(p EventViewerParams, ctx eventLineContext, i int) (start, end int) {
+	lineWidth := len([]rune(p.Lines[i]))
+	if ctx.selStart == ctx.selEnd {
+		return min(p.VisualCol, p.CursorCol), max(p.VisualCol, p.CursorCol) + 1
 	}
+	var startCol, endCol int
+	if p.VisualStart <= p.Cursor {
+		startCol, endCol = p.VisualCol, p.CursorCol
+	} else {
+		startCol, endCol = p.CursorCol, p.VisualCol
+	}
+	switch i {
+	case ctx.selStart:
+		return startCol, lineWidth
+	case ctx.selEnd:
+		return 0, endCol + 1
+	default:
+		return 0, lineWidth // middle line — highlight everything
+	}
+}
+
+// renderEventCursorLine renders the non-wrap cursor line with gutter
+// indicator and block cursor at the configured column.
+func renderEventCursorLine(p EventViewerParams, fitLine string, ctx eventLineContext, gutter string) string {
 	displayLine := fitLine
 	if p.SearchQuery != "" {
 		displayLine = highlightEventSearchLine(displayLine, ctx.lowerQuery)
@@ -365,22 +595,15 @@ func renderEventCursorLine(p EventViewerParams, line, fitLine string, ctx eventL
 	return gutter + RenderCursorAtCol(displayLine, fitLine, p.CursorCol)
 }
 
-// renderEventNormalLine renders a non-cursor, non-selected line.
-func renderEventNormalLine(p EventViewerParams, line, fitLine string, ctx eventLineContext) string {
-	if p.Wrap {
-		displayLine := fitLine
-		if p.SearchQuery != "" {
-			displayLine = ctx.wrapStyle.Render(highlightEventSearchLine(line, ctx.lowerQuery))
-		}
-		return " " + displayLine
-	}
+// renderEventNormalLine renders a non-wrap, non-cursor, non-selected line.
+func renderEventNormalLine(p EventViewerParams, fitLine string, ctx eventLineContext, gutter string) string {
 	displayLine := fitLine
 	if p.SearchQuery != "" {
 		displayLine = highlightEventSearchLine(displayLine, ctx.lowerQuery)
 	} else {
 		displayLine = OverlayNormalStyle.Render(displayLine)
 	}
-	return " " + displayLine
+	return gutter + displayLine
 }
 
 // highlightEventSearchLine highlights search matches in a single line using
