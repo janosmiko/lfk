@@ -117,7 +117,7 @@ Each monitoring entry accepts the following top-level fields:
 |---|---|---|---|
 | `prometheus` | object | *(auto-discovery)* | Prometheus endpoint configuration. See endpoint fields below. |
 | `alertmanager` | object | *(auto-discovery)* | Alertmanager endpoint configuration. See endpoint fields below. |
-| `node_metrics` | string | *(auto-detect)* | Node metrics source: `"prometheus"` (use Prometheus queries), `"metrics-api"` (use metrics.k8s.io API). When empty, uses Prometheus if a prometheus endpoint is configured, otherwise falls back to metrics-api. |
+| `node_metrics` | string | *(auto-detect)* | Metrics source for node **and pod** usage: `"prometheus"` (use Prometheus queries), `"metrics-api"` (use metrics.k8s.io API). When empty, uses Prometheus if a prometheus endpoint is configured, otherwise metrics-api. Either way the other source is tried as a fallback, so pod metrics resolve on clusters served only by Prometheus. |
 
 ### Monitoring Endpoint Fields
 

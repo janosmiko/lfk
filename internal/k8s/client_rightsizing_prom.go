@@ -174,13 +174,16 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 		result := cs.CoreV1().Services(ns).ProxyGet("http", svc, promPort, "/api/v1/query", params)
 		return result.DoRaw(rctx)
 	}
-	if cached, ok := promSvcCache.Load(cs); ok {
+	// Keyed by contextName (not the clientset): clientsetForContext builds a
+	// fresh clientset per call, so a clientset key would never hit and re-run
+	// service discovery on every query.
+	if cached, ok := promSvcCache.Load(contextName); ok {
 		entry := cached.(promSvcEntry)
 		data, err := doQuery(entry.namespace, entry.service)
 		if err == nil {
 			return data, nil
 		}
-		promSvcCache.Delete(cs)
+		promSvcCache.Delete(contextName)
 	}
 	var lastErr error
 	for _, ns := range promNs {
@@ -190,7 +193,7 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 				lastErr = err
 				continue
 			}
-			promSvcCache.Store(cs, promSvcEntry{namespace: ns, service: svc})
+			promSvcCache.Store(contextName, promSvcEntry{namespace: ns, service: svc})
 			return data, nil
 		}
 	}
