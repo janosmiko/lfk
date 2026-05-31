@@ -241,7 +241,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |
-| `Backspace` | Jump back through teleport history (owner / port-forward / orphan / mark jumps) |
+| `Backspace` | Jump back through teleport history (owner / port-forward / orphan / finding / mark jumps) |
 
 ### Views and Modes
 

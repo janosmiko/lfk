@@ -682,6 +682,10 @@ func (m Model) jumpToFindingResource(sel *model.Item) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.saveCursor()
+	// Record the finding's affected-resources view as the jump origin so
+	// JumpBack returns here after this teleport. Captured before popLeft and
+	// the nav mutations below so the snapshot reflects the finding view.
+	m.pushJumpHistory()
 	// Drop the security finding-groups view from leftItems and restore the
 	// resource-types sidebar (pushed onto history when the user entered the
 	// security view from LevelResourceTypes). After this the Esc cascade

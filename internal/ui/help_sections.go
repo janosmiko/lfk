@@ -21,7 +21,7 @@ func helpSections() []helpSection {
 				{kb.Enter, "Open YAML view / navigate into"},
 				{kb.LevelCluster + "/" + kb.LevelTypes + "/" + kb.LevelResources, "Jump to clusters/types/resources level"},
 				{kb.JumpOwner, "Jump to owner/controller of selected resource"},
-				{helpKeyDisplay(kb.JumpBack), "Jump back through teleport history (owner/port-forward/orphan/mark jumps)"},
+				{helpKeyDisplay(kb.JumpBack), "Jump back through teleport history (owner/port-forward/orphan/finding/mark jumps)"},
 				{kb.PreviewDown + "/" + kb.PreviewUp, "Scroll preview pane down/up"},
 				{kb.ExpandCollapse, "Toggle expand/collapse all resource groups / toggle event grouping (Events)"},
 				{kb.PinGroup, "Pin/unpin resource type (at resource types level)"},
