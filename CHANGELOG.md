@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.13.1](https://github.com/janosmiko/lfk/compare/v0.13.0...v0.13.1) (2026-05-31)
+
+
+### Features
+
+* derive CRD display names from Kind to preserve camel case ([#306](https://github.com/janosmiko/lfk/issues/306)) ([c334c85](https://github.com/janosmiko/lfk/commit/c334c85b571e9d867aaf223bfbc8f27b0ff30cba)), closes [#301](https://github.com/janosmiko/lfk/issues/301)
+* per-kind sort memory and per-context column memory ([#310](https://github.com/janosmiko/lfk/issues/310)) ([4e80556](https://github.com/janosmiko/lfk/commit/4e80556ba5e10368ac63804ef5798c80530259bf))
+
+
+### Bug Fixes
+
+* honor CRD additionalPrinterColumns priority and keep them visible ([#309](https://github.com/janosmiko/lfk/issues/309)) ([bed3a7a](https://github.com/janosmiko/lfk/commit/bed3a7af0d241c34bae675af80d0c1c93544f199))
+* link manually-triggered CronJob jobs to their CronJob via ownerRef ([#308](https://github.com/janosmiko/lfk/issues/308)) ([39acb48](https://github.com/janosmiko/lfk/commit/39acb485a3391fc48491481fc09e2a348db52594)), closes [#304](https://github.com/janosmiko/lfk/issues/304)
+* remember resource list filter across subview navigation ([#303](https://github.com/janosmiko/lfk/issues/303)) ([#311](https://github.com/janosmiko/lfk/issues/311)) ([4dca616](https://github.com/janosmiko/lfk/commit/4dca616fb12776e7e21ba3f3641e731e82e8e729))
+
 ## [0.13.0](https://github.com/janosmiko/lfk/compare/v0.12.9...v0.13.0) (2026-05-30)
 
 
