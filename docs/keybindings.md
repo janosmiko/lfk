@@ -21,7 +21,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the cluster-wide orphan overview overlay |
-| `Backspace` | Jump back through teleport history (owner, port-forward, orphan, and mark jumps push history; hierarchical `h`/`l` navigation does not) |
+| `Backspace` | Jump back through teleport history (owner, port-forward, orphan, finding, and mark jumps push history; hierarchical `h`/`l` navigation does not) |
 
 ## Views and Tools
 

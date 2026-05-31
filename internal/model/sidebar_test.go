@@ -362,6 +362,72 @@ func TestBuildSidebarItems_SkipsNonListableResources(t *testing.T) {
 	assert.NotContains(t, names, "Writeonlythings", "non-listable CRD must be hidden")
 }
 
+// TestBuildSidebarItems_InjectsSecuritySources verifies that the
+// SecuritySourcesFn hook produces one sidebar Item per registered source,
+// using the _security virtual APIGroup so GetResources can dispatch on it.
+// A nil hook keeps the Security category empty (the pseudo-header still
+// renders because Security is in CoreCategories).
+func TestBuildSidebarItems_InjectsSecuritySources(t *testing.T) {
+	prev := SecuritySourcesFn
+	t.Cleanup(func() { SecuritySourcesFn = prev })
+	SecuritySourcesFn = func() []SecuritySourceEntry {
+		return []SecuritySourceEntry{
+			{DisplayName: "Trivy", SourceName: "trivy-operator"},
+			{DisplayName: "Heuristic", SourceName: "heuristic"},
+		}
+	}
+
+	items := BuildSidebarItems(nil)
+
+	byName := make(map[string]Item, len(items))
+	for _, it := range items {
+		byName[it.Name] = it
+	}
+	require.Contains(t, byName, "Trivy")
+	require.Contains(t, byName, "Heuristic")
+	assert.Equal(t, "__security_trivy-operator__", byName["Trivy"].Kind)
+	assert.Equal(t, "Security", byName["Trivy"].Category)
+	assert.Equal(t, SecurityVirtualAPIGroup+"/v1/findings-trivy-operator", byName["Trivy"].Extra,
+		"Extra encodes the virtual API group so the explorer dispatches to security.Manager")
+}
+
+// TestBuildSidebarItems_NilSecurityHook ensures the Security category is
+// still navigable as an empty header when no sources are registered. This
+// matters during the brief window between cluster switch and probe completion.
+func TestBuildSidebarItems_NilSecurityHook(t *testing.T) {
+	prev := SecuritySourcesFn
+	t.Cleanup(func() { SecuritySourcesFn = prev })
+	SecuritySourcesFn = nil
+
+	items := BuildSidebarItems(nil)
+	for _, it := range items {
+		assert.NotEqual(t, "Security", it.Category,
+			"with nil hook, no Security entries must be injected (the category header lives in CoreCategories)")
+	}
+}
+
+// TestBuildSidebarItems_SecuritySourceCount surfaces the (N) suffix when
+// a source has at least one finding. Zero counts render as the bare display
+// name so the user is not distracted by "(0)" decorations.
+func TestBuildSidebarItems_SecuritySourceCount(t *testing.T) {
+	prev := SecuritySourcesFn
+	t.Cleanup(func() { SecuritySourcesFn = prev })
+	SecuritySourcesFn = func() []SecuritySourceEntry {
+		return []SecuritySourceEntry{
+			{DisplayName: "Trivy", SourceName: "trivy-operator", Count: 7},
+			{DisplayName: "Heuristic", SourceName: "heuristic", Count: 0},
+		}
+	}
+
+	items := BuildSidebarItems(nil)
+	names := make(map[string]bool, len(items))
+	for _, it := range items {
+		names[it.Name] = true
+	}
+	assert.True(t, names["Trivy (7)"], "non-zero count surfaces as '(N)' suffix")
+	assert.True(t, names["Heuristic"], "zero count keeps the bare display name")
+}
+
 func TestTitleCaseFirst(t *testing.T) {
 	cases := []struct {
 		in, want string

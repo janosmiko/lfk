@@ -383,6 +383,14 @@ func TestRenderTabBar(t *testing.T) {
 	})
 }
 
+// TestColumnHeaderLabelSecurityAliases verifies the security-finding column
+// keys render as space-separated, human-readable headers instead of
+// "RESOURCEKIND" / "FINDINGCOUNT".
+func TestColumnHeaderLabelSecurityAliases(t *testing.T) {
+	assert.Equal(t, "RESOURCE KIND", ColumnHeaderLabel("ResourceKind"))
+	assert.Equal(t, "FINDINGS", ColumnHeaderLabel("FindingCount"))
+}
+
 // --- Row builder byte-parity regression ---
 //
 // These tests pin exact output for the row builders so the wantContains-style

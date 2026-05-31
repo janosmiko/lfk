@@ -13,6 +13,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -988,6 +989,79 @@ func TestSaveCurrentTab(t *testing.T) {
 	// Verify deep copy: modifying tab fields should not affect model.
 	tab.leftItems[0].Name = "modified"
 	assert.Equal(t, "ctx", m.leftItems[0].Name)
+}
+
+// TestTabSwitchPreservesSecurityState guards against the bug where two
+// tabs pointing at different clusters share security state via the
+// global SecuritySourcesFn hook. saveCurrentTab + loadTab must
+// round-trip the per-tab securityManager / availability / index /
+// activeGroup / showIgnored fields, and loadTab must publish the
+// active tab's state to the package-level hook so the next sidebar
+// render shows the correct sources.
+func TestTabSwitchPreservesSecurityState(t *testing.T) {
+	prevMgr, prevAvail := currentSecurityHookState()
+	t.Cleanup(func() {
+		setSecurityHookState(prevMgr, prevAvail)
+	})
+
+	mgrA := security.NewManager()
+	mgrB := security.NewManager()
+	availA := map[string]bool{"heuristic": true}
+	availB := map[string]bool{"heuristic": true, "trivy-operator": true, "falco": true, "policy-report": true}
+
+	m := Model{
+		tabs: []TabState{
+			{
+				nav: model.NavigationState{Context: "cluster-a"},
+				// Tab A: heuristic-only cluster.
+				securityManager:            mgrA,
+				securityAvailabilityByName: availA,
+				securityActiveGroup:        "groupA",
+				showSecurityIgnored:        true,
+			},
+			{
+				nav: model.NavigationState{Context: "cluster-b"},
+				// Tab B: full-stack cluster.
+				securityManager:            mgrB,
+				securityAvailabilityByName: availB,
+				securityActiveGroup:        "groupB",
+				showSecurityIgnored:        false,
+			},
+		},
+		activeTab: 0,
+		// Mirror Tab 0's state into the active model fields so
+		// saveCurrentTab has something to persist. Model embeds
+		// securityModelState, so the fields are promoted but must be
+		// initialised via the embedded struct literal.
+		securityModelState: securityModelState{
+			securityManager:            mgrA,
+			securityAvailabilityByName: availA,
+			securityActiveGroup:        "groupA",
+			showSecurityIgnored:        true,
+		},
+	}
+
+	// Switch to Tab B.
+	m.saveCurrentTab()
+	m.loadTab(1)
+	assert.Same(t, mgrB, m.securityManager, "Tab B's manager must be active")
+	assert.Equal(t, availB, m.securityAvailabilityByName, "Tab B's availability map must be active")
+	assert.Equal(t, "groupB", m.securityActiveGroup)
+	assert.False(t, m.showSecurityIgnored, "Tab B's toggle must be active")
+	hookMgr, hookAvail := currentSecurityHookState()
+	assert.Same(t, mgrB, hookMgr, "hook state must publish Tab B's manager so sidebar renders B's sources")
+	assert.Equal(t, availB, hookAvail)
+
+	// Switch back to Tab A.
+	m.saveCurrentTab()
+	m.loadTab(0)
+	assert.Same(t, mgrA, m.securityManager)
+	assert.Equal(t, availA, m.securityAvailabilityByName)
+	assert.Equal(t, "groupA", m.securityActiveGroup)
+	assert.True(t, m.showSecurityIgnored)
+	hookMgr, hookAvail = currentSecurityHookState()
+	assert.Same(t, mgrA, hookMgr)
+	assert.Equal(t, availA, hookAvail)
 }
 
 func TestPush2UpdateStatusMessageExpiredMsg(t *testing.T) {

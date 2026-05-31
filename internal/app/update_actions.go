@@ -11,7 +11,14 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-func (m Model) openActionMenu() Model {
+// openActionMenu builds the action menu for the current selection. The
+// branching reflects the inherent variety of contexts (cluster picker,
+// bulk mode, per-kind, security view) and stays in one place so adding
+// a new context is a single-file change.
+func (m Model) openActionMenu() Model { //nolint:gocyclo // dispatcher; complexity ~= number of contexts
+	if mdl, ok := m.openSecurityActionMenuIfApplicable(); ok {
+		return mdl
+	}
 	if m.hasSelection() {
 		return m.openBulkSelectionMenu()
 	}
@@ -148,7 +155,7 @@ func (m Model) directActionLogs() (tea.Model, tea.Cmd) {
 		return m.openBulkActionDirect("Logs")
 	}
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
+	if isVirtualResourceKind(kind) {
 		return m, nil
 	}
 	sel := m.selectedMiddleItem()
@@ -163,13 +170,21 @@ func (m Model) directActionRefresh() (tea.Model, tea.Cmd) {
 	m.invalidateOrphanCacheForNamespace(m.nav.Context, m.namespace)
 	m.cancelAndReset()
 	m.requestGen++
+	m.invalidateSecurityCache()
 	m.setStatusMessage("Refreshing...", false)
-	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
+	cmds := []tea.Cmd{m.refreshCurrentLevel(), scheduleStatusClear()}
+	// Only re-probe security if it was already activated for this context
+	// (the user has focused the Security category). A refresh from a user
+	// who never opened security must not trigger the aws credential plugin.
+	if m.securityProbedContext != "" {
+		cmds = append(cmds, m.loadSecurityAvailability())
+	}
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) directActionEdit() (tea.Model, tea.Cmd) {
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
+	if isVirtualResourceKind(kind) {
 		return m, nil
 	}
 	sel := m.selectedMiddleItem()
@@ -182,7 +197,7 @@ func (m Model) directActionEdit() (tea.Model, tea.Cmd) {
 
 func (m Model) directActionDescribe() (tea.Model, tea.Cmd) {
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
+	if isVirtualResourceKind(kind) {
 		return m, nil
 	}
 	sel := m.selectedMiddleItem()
@@ -206,7 +221,7 @@ func (m Model) directActionDelete() (tea.Model, tea.Cmd) {
 		return m.openBulkActionDirect("Delete")
 	}
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
+	if isVirtualResourceKind(kind) {
 		return m, nil
 	}
 	sel := m.selectedMiddleItem()
@@ -249,7 +264,7 @@ func (m Model) directActionForceDelete() (tea.Model, tea.Cmd) {
 		return m.openBulkActionDirect("Force Delete")
 	}
 	kind := m.selectedResourceKind()
-	if kind == "" || kind == "__port_forwards__" || kind == "__captures__" {
+	if isVirtualResourceKind(kind) {
 		return m, nil
 	}
 	if !model.IsForceDeleteableKind(kind) {
@@ -280,6 +295,9 @@ func (m Model) directActionScale() (tea.Model, tea.Cmd) {
 		return m.openBulkActionDirect("Scale")
 	}
 	kind := m.selectedResourceKind()
+	if isVirtualResourceKind(kind) {
+		return m, nil
+	}
 	if !model.IsScaleableKind(kind) {
 		m.setStatusMessage("Scale not available for "+kind, true)
 		return m, scheduleStatusClear()
@@ -337,6 +355,9 @@ func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 		"context", m.actionCtx.context,
 	)
 
+	if mdl, cmd, ok := m.dispatchSecurityActionIfApplicable(actionLabel); ok {
+		return mdl, cmd
+	}
 	if mdl, cmd, ok := m.executeActionCore(actionLabel); ok {
 		return mdl, cmd
 	}
@@ -383,6 +404,8 @@ func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Right-sizing":
 		mdl, cmd := m.executeActionRightsizing()
 		return mdl, cmd, true
+	case "Security Findings":
+		return m.executeActionSecurityFindings(), nil, true
 	case "Delete":
 		mdl, cmd := m.executeActionDelete()
 		return mdl, cmd, true

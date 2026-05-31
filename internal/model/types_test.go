@@ -525,3 +525,18 @@ func TestItemSelectionKey(t *testing.T) {
 		})
 	}
 }
+
+func TestItemColumnValue(t *testing.T) {
+	item := Item{
+		Columns: []KeyValue{
+			{Key: "Severity", Value: "CRIT"},
+			{Key: "Title", Value: "runs as root"},
+		},
+	}
+	assert.Equal(t, "CRIT", item.ColumnValue("Severity"))
+	assert.Equal(t, "runs as root", item.ColumnValue("Title"))
+	assert.Equal(t, "", item.ColumnValue("Missing"),
+		"absent key returns empty string, not panic or zero value")
+	assert.Equal(t, "", item.ColumnValue("severity"),
+		"match is case-sensitive — callers store keys with stable casing")
+}

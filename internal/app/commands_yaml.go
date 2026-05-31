@@ -13,6 +13,11 @@ import (
 
 // copyYAMLToClipboard fetches the YAML for the selected resource and sends it for clipboard copy.
 func (m Model) copyYAMLToClipboard() tea.Cmd {
+	// Synthetic security items (e.g., __security_affected_resource__) have
+	// no YAML; short-circuit to avoid "unknown resource type" warnings.
+	if onSecurityView(&m) {
+		return nil
+	}
 	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 
@@ -64,8 +69,12 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
+		itemCtx := kctx
+		if sel.ClusterName != "" {
+			itemCtx = sel.ClusterName
+		}
 		return func() tea.Msg {
-			content, err := m.client.GetResourceYAML(context.Background(), kctx, itemNs, rt, name)
+			content, err := m.client.GetResourceYAML(context.Background(), itemCtx, itemNs, rt, name)
 			return yamlClipboardMsg{content: content, count: 1, err: err}
 		}
 	case model.LevelOwned:
@@ -328,6 +337,10 @@ func buildBulkYAMLClipboardMsg(docs, failures []string, total int) yamlClipboard
 
 // exportResourceToFile saves the selected resource YAML to a file.
 func (m Model) exportResourceToFile() tea.Cmd {
+	// Synthetic security items have no YAML to export.
+	if onSecurityView(&m) {
+		return nil
+	}
 	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 
@@ -345,9 +358,13 @@ func (m Model) exportResourceToFile() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
+		itemCtx := kctx
+		if sel.ClusterName != "" {
+			itemCtx = sel.ClusterName
+		}
 		kind := strings.ToLower(rt.Kind)
 		fetchYAML = func() (string, string, error) {
-			content, err := m.client.GetResourceYAML(context.Background(), kctx, itemNs, rt, name)
+			content, err := m.client.GetResourceYAML(context.Background(), itemCtx, itemNs, rt, name)
 			return content, kind, err
 		}
 	case model.LevelOwned:
@@ -360,9 +377,13 @@ func (m Model) exportResourceToFile() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
+		itemCtx := kctx
+		if sel.ClusterName != "" {
+			itemCtx = sel.ClusterName
+		}
 		if sel.Kind == "Pod" {
 			fetchYAML = func() (string, string, error) {
-				content, err := m.client.GetPodYAML(context.Background(), kctx, itemNs, name)
+				content, err := m.client.GetPodYAML(context.Background(), itemCtx, itemNs, name)
 				return content, "pod", err
 			}
 		} else {
@@ -374,7 +395,7 @@ func (m Model) exportResourceToFile() tea.Cmd {
 			}
 			kind := strings.ToLower(rt.Kind)
 			fetchYAML = func() (string, string, error) {
-				content, err := m.client.GetResourceYAML(context.Background(), kctx, itemNs, rt, name)
+				content, err := m.client.GetResourceYAML(context.Background(), itemCtx, itemNs, rt, name)
 				return content, kind, err
 			}
 		}

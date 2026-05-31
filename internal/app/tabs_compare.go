@@ -172,6 +172,18 @@ func comparePrimaryColumn(a, b model.Item, colName string) int {
 		return strings.Compare(strings.ToLower(a.Name), strings.ToLower(b.Name))
 	case "Age":
 		return compareAgeCmp(a, b)
+	case "Ports":
+		return comparePortsCmp(getColumnValue(a, "Ports"), getColumnValue(b, "Ports"))
+	case "Progress":
+		// Argo Workflow progress is an "N/M" fraction, identical in shape
+		// to the Ready ratio — reuse the same comparator.
+		return compareReadyCmp(getColumnValue(a, "Progress"), getColumnValue(b, "Progress"))
+	case "Duration":
+		return compareDurationCmp(getColumnValue(a, "Duration"), getColumnValue(b, "Duration"))
+	case "Cluster IP", "Pod IP", "External IPs":
+		return compareIPCmp(getColumnValue(a, colName), getColumnValue(b, colName))
+	case "Severity":
+		return cmpInt(severityRank(getColumnValue(a, "Severity")), severityRank(getColumnValue(b, "Severity")))
 	case sortColEventLastSeen:
 		return compareLastSeenCmp(a, b)
 	}
@@ -484,6 +496,24 @@ func getColumnValue(item model.Item, key string) string {
 		}
 	}
 	return ""
+}
+
+// severityRank maps a Severity column value to a sort priority. Lower
+// rank sorts first in ascending order, so CRIT lands at the top and
+// unknown severity ("?") at the bottom. Mirrors severityLabel in the
+// k8s package but lives here so app's sort stays self-contained.
+func severityRank(sev string) int {
+	switch sev {
+	case "CRIT":
+		return 0
+	case "HIGH":
+		return 1
+	case "MED":
+		return 2
+	case "LOW":
+		return 3
+	}
+	return 4
 }
 
 // statusPriority returns a sort priority for a status string.

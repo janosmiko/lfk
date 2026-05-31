@@ -3,6 +3,7 @@ package app
 import (
 	"fmt"
 	"slices"
+	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -353,6 +354,12 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
 	m.applyPinnedTypes()
+	// Rebuild the security manager against the new cluster's clientsets so
+	// findings, availability, and the SEC badge index reflect the active
+	// cluster instead of lingering on the prior one.
+	m.refreshSecuritySources()
+	m.securityIndex = nil
+	m.securityActiveGroup = ""
 	m.nav.Level = model.LevelResourceTypes
 	// Capture whatever the right-pane preview was already displaying for
 	// this context (real discovery hit or seed fallback). We use this
@@ -388,6 +395,11 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.setStatusMessage(fmt.Sprintf("Context: %s", sel.Name), false)
 	m.saveCurrentSession()
 	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
+	// Security availability is probed lazily on first focus of the Security
+	// category (maybeProbeSecurityOnFocus), not eagerly on context switch, so
+	// switching clusters never triggers the aws credential plugin for a user
+	// who isn't looking at security. refreshSecuritySources above cleared the
+	// per-context probe guard.
 	// Fire discovery once per session per context. The disk cache may have
 	// prefilled m.discoveredResources, but stale-while-revalidate still
 	// wants a live refresh on the user's first interaction with the
@@ -483,6 +495,23 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 		m.loading = true
 		return m, m.loadPreview()
 	}
+	if rt, ok := securityResourceTypeForItem(sel); ok {
+		m.saveCursor()
+		m.nav.ResourceType = rt
+		m.nav.Level = model.LevelResources
+		m.pushLeft()
+		m.clearRight()
+		m.saveCurrentSession()
+		if cached, cacheHit := m.itemCache[m.navKey()]; cacheHit {
+			m.setMiddleItems(cached)
+			m.restoreCursor()
+		} else {
+			m.setMiddleItems(nil)
+			m.setCursor(0)
+		}
+		m.loading = true
+		return m, m.loadResources(false)
+	}
 	discoveryCtx := m.nav.Context
 	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
 		discoveryCtx = m.unionContexts[0]
@@ -517,6 +546,24 @@ func (m Model) navigateChildResourceType(sel *model.Item) (tea.Model, tea.Cmd) {
 func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	if isUnionDashboardResourceKind(m.nav.ResourceType.Kind) {
 		return m.navigateChildUnionDashboardMember(sel)
+	}
+	if sel.Kind == "__security_finding_group__" {
+		m.saveCursor()
+		m.securityActiveGroup = sel.Extra
+		m.nav.ResourceName = sel.Name
+		m.nav.Level = model.LevelOwned
+		m.pushLeft()
+		m.clearRight()
+		m.saveCurrentSession()
+		if cached, ok := m.itemCache[m.navKey()]; ok {
+			m.setMiddleItems(cached)
+			m.restoreCursor()
+		} else {
+			m.setMiddleItems(nil)
+			m.setCursor(0)
+		}
+		m.loading = true
+		return m, m.loadSecurityAffectedResources(false)
 	}
 	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
 		return m, nil
@@ -562,6 +609,9 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) navigateChildOwned(sel *model.Item) (tea.Model, tea.Cmd) {
+	if sel.Kind == "__security_affected_resource__" {
+		return m.jumpToFindingResource(sel)
+	}
 	if m.unionMode && sel.ClusterName != "" {
 		m.nav.Context = sel.ClusterName
 	}
@@ -611,6 +661,63 @@ func (m Model) navigateChildOwned(sel *model.Item) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// jumpToFindingResource navigates from a __security_affected_resource__ row
+// at LevelOwned to the underlying real Kubernetes resource at LevelResources.
+// The target identity is read from the synthetic __resource_key__ column
+// (format: namespace/Kind/name) and resolved against the active context's
+// discoveredResources. When the kind has not yet been discovered (e.g., a
+// CRD whose API discovery is still pending), surfaces a status message and
+// stays at LevelOwned rather than silently no-op'ing — callers expect the
+// hint "[Enter] jump to resource" to do something visible.
+func (m Model) jumpToFindingResource(sel *model.Item) (tea.Model, tea.Cmd) {
+	parts := strings.SplitN(sel.ColumnValue("__resource_key__"), "/", 3)
+	if len(parts) != 3 || parts[1] == "" || parts[2] == "" {
+		return m, nil
+	}
+	namespace, kind, name := parts[0], parts[1], parts[2]
+	rt, ok := model.FindResourceTypeByKind(kind, m.discoveredResources[m.discoveryContext()])
+	if !ok {
+		m.setStatusMessage("Cannot jump: "+kind+" not discovered in this context", true)
+		return m, scheduleStatusClear()
+	}
+	m.saveCursor()
+	// Record the finding's affected-resources view as the jump origin so
+	// JumpBack returns here after this teleport. Captured before popLeft and
+	// the nav mutations below so the snapshot reflects the finding view.
+	m.pushJumpHistory()
+	// Drop the security finding-groups view from leftItems and restore the
+	// resource-types sidebar (pushed onto history when the user entered the
+	// security view from LevelResourceTypes). After this the Esc cascade
+	// behaves as if the user came from LevelResourceTypes directly.
+	m.popLeft()
+	m.nav.ResourceType = rt
+	m.nav.ResourceName = ""
+	m.nav.Namespace = namespace
+	m.nav.Level = model.LevelResources
+	m.securityActiveGroup = ""
+	m.clearRight()
+	m.saveCurrentSession()
+	if cached, cacheHit := m.itemCache[m.navKey()]; cacheHit {
+		m.setMiddleItems(cached)
+		placed := false
+		for i, item := range cached {
+			if item.Name == name && (item.Namespace == namespace || item.Namespace == "") {
+				m.setCursor(i)
+				placed = true
+				break
+			}
+		}
+		if !placed {
+			m.setCursor(0)
+		}
+	} else {
+		m.setMiddleItems(nil)
+		m.setCursor(0)
+	}
+	m.loading = true
+	return m, m.loadResources(false)
+}
+
 func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 	sel := m.selectedMiddleItem()
 	if sel == nil {
@@ -624,6 +731,19 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 	// Port forward and capture entries are virtual — no YAML to display.
 	if m.nav.ResourceType.Kind == "__port_forwards__" || m.nav.ResourceType.Kind == "__captures__" {
 		return m, nil
+	}
+	// Synthetic security items have no YAML to render in modeYAML, but
+	// Enter still has a meaningful action: drill into a finding group's
+	// affected resources at LevelResources, or jump to the underlying
+	// real resource at LevelOwned. Both are wired through navigateChild
+	// (navigateChildResource handles __security_finding_group__,
+	// navigateChildOwned routes __security_affected_resource__ through
+	// jumpToFindingResource). Falling through to loadYAML here used to
+	// produce "Warning: unknown resource type"; an earlier fix returned
+	// nil here which silently no-op'd Enter and stranded users on the
+	// finding-groups list.
+	if onSecurityView(&m) {
+		return m.navigateChild()
 	}
 
 	m.mode = modeYAML

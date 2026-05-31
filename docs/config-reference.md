@@ -34,6 +34,9 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `mouse` | bool | `true` | Capture mouse input for click navigation, scroll, and tab switching. Set to `false` to allow native terminal text selection. Also available as `--no-mouse` CLI flag. |
 | `read_only` | bool | `false` | Disable all mutating actions (delete, edit, scale, restart, exec, port-forward, drain, cordon, etc.) globally. Per-context overrides under `clusters.<name>.read_only` and the `--read-only` CLI flag take precedence. See [Read-Only Mode](usage.md#read-only-mode). |
 | `clusters.<name>.read_only` | bool | _(unset)_ | Per-context read-only override. Wins over the global `read_only` so you can mark specific clusters (e.g. `prod`) read-only while leaving others mutable. |
+| `security.enabled` | bool | `true` | Enable the built-in security findings dashboard (Security category + SEC badge). `false` turns the dashboard and all source probing off. Per-context overrides under `clusters.<name>.security` take precedence. See [Security Dashboard](security.md). |
+| `security.sources.<name>` | bool | `true` | Enable/disable individual sources (`heuristic`, `trivy`, `kyverno`, `kubescape`, `falco`, `gatekeeper`). A source omitted from the map stays enabled. |
+| `clusters.<name>.security` | object | _(unset)_ | Per-context security override (`enabled` and/or `sources`). Wins over the global `security` settings for that context. |
 | `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. Much faster in clusters with many Helm release secrets (each release is a multi-hundred-KB Secret) or large TLS payloads, at the cost of an extra GET per hovered Secret. When `false` (default), Secrets list like every other resource type — full objects are pulled and `data` is eagerly decoded, so the Type column and decoded values are visible immediately. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
 | `informer_cache` | bool or string | `auto` | Selects the list strategy. Accepts `off` (round-trip every list — matches kubectl), `auto` (default; promote a resource type to a shared informer once a list crosses 1000 items, demote when sustained below 500), and `always` (open a watch eagerly on first use). Legacy bool form is still accepted: `true` → `always`, `false` → `off`. See [Informer cache](#informer-cache) for trade-offs. |
 | `min_contrast_ratio` | float | `0.0` | Normalized readability knob in `[0.0, 1.0]`. When above zero, foreground colors are nudged in HSL lightness space to meet a minimum WCAG contrast ratio against their paired background. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
@@ -144,6 +147,7 @@ Currently supported per-cluster overrides:
 | `views` | map[string]object | Per-resource-type view overrides for this cluster. Same format as the global `views`. Wins over global `views` for matching keys. |
 | `resource_columns` | map[string]list | Per-resource-type column overrides for this cluster. **Deprecated** — use `views` instead. |
 | `read_only` | bool | Per-context read-only override. Same semantics as the top-level `read_only`. |
+| `security` | object | Per-context security override (`enabled` and/or `sources`). Same semantics as the top-level `security`; wins over it for this context. |
 
 Per-cluster `views` take precedence over the global `views` setting.
 
@@ -161,6 +165,33 @@ clusters:
       pod:
         columns: ["Name", "IP", "Node", "Image"]
 ```
+
+## Security
+
+Controls the built-in security findings dashboard. Disable it globally or per
+cluster, or enable only specific sources. Source keys: `heuristic`, `trivy`,
+`kyverno`, `kubescape`, `falco`, `gatekeeper` (the internal ids
+`trivy-operator` and `policy-report` are also accepted). Any source omitted
+from `sources` stays enabled.
+
+```yaml
+security:
+  enabled: true            # global default (omit = true)
+  sources:
+    falco: false           # disable Falco everywhere
+
+clusters:
+  prod:
+    security:
+      enabled: false       # turn the whole dashboard off on prod
+  staging:
+    security:
+      sources:
+        trivy: false       # keep the dashboard, drop Trivy on staging only
+```
+
+Precedence: `clusters.<ctx>.security.*` overrides the global `security.*`. See
+[Security Dashboard](security.md) for the source catalog and behavior.
 
 ## Theme
 

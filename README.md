@@ -96,6 +96,7 @@ Every contribution is appreciated and helps make LFK sustainable. Thank you for 
 ### Resource Operations
 
 - **Read-only mode**: Lock a session against destructive actions (delete, edit, scale, restart, exec, port-forward, drain, etc.). Enable with `--read-only`, the `read_only: true` config field, per-context `clusters.<name>.read_only`, or the in-app `Ctrl+R` toggle (toggles the highlighted row's `[RO]` marker at the cluster picker; toggles the current tab inside a context). A `[RO]` badge in the title bar marks active sessions. See [Read-Only Mode](docs/usage.md#read-only-mode).
+- **Security dashboard**: Aggregated findings from Trivy, Kyverno, Kubescape, Falco, Gatekeeper, plus a built-in zero-dependency heuristic Pod-spec scanner. Auto-detects installed sources, shows a per-resource SEC badge, and probes lazily on first use. Enable/disable globally or per cluster via `security.enabled` / `clusters.<name>.security`. See [Security Dashboard](docs/security.md).
 - **Context-aware action menus**: logs, exec, attach, debug, scale, restart, delete, describe, edit, events, port-forward, vuln scan, PVC resize
 - **Custom user-defined actions**: Define custom shell commands per resource type in config
 - **Multi-select with bulk actions**: Select multiple resources with Space, range-select with Ctrl+Space, perform bulk delete, scale, restart, and ArgoCD bulk sync/refresh
@@ -252,7 +253,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |
-| `Backspace` | Jump back through teleport history (owner / port-forward / orphan / mark jumps) |
+| `Backspace` | Jump back through teleport history (owner / port-forward / orphan / finding / mark jumps) |
 
 ### Views and Modes
 

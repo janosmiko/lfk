@@ -106,6 +106,10 @@ type Keybindings struct {
 	// minikube manager overlay so users can list, create, start, stop,
 	// and delete local clusters without leaving the TUI.
 	LocalClusterManager string `json:"local_cluster_manager" yaml:"local_cluster_manager"`
+
+	// SecurityIgnoreToggle flips the show/hide-ignored-findings state on
+	// the active security view and triggers a refresh.
+	SecurityIgnoreToggle string `json:"security_ignore_toggle" yaml:"security_ignore_toggle"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -157,6 +161,8 @@ func DefaultKeybindings() Keybindings {
 
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",
+
+		SecurityIgnoreToggle: "ctrl+i",
 
 		// Cluster color picker. Bound to Shift+L because the picker only
 		// exists at Level=Clusters and "L" is otherwise the Logs action

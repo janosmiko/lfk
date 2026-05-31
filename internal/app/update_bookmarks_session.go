@@ -59,6 +59,17 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	}
 	m.applyPinnedTypes()
 	m.nav.Level = model.LevelResourceTypes
+	// Rebuild the security manager for the restored context. NewModel
+	// called refreshSecuritySources with m.nav.Context = "", which fell
+	// back to the kubeconfig default and registered sources for that
+	// context. If the session lands on a different context, the manager
+	// targets the wrong cluster and the initial probe's result message
+	// is dropped by updateSecurityAvailabilityLoaded's stale-context
+	// gate — leaving the sidebar's "(probing sources...)" loader stuck
+	// until the user navigates out and back in. Re-run refreshSecuritySources
+	// here so the manager + cached availability + dispatched probe all
+	// target sess.Context.
+	m.refreshSecuritySources()
 
 	m.leftItemsHistory = nil
 	m.leftItems = contexts
@@ -82,6 +93,10 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
+	// Security availability is probed lazily on first focus of the Security
+	// category (maybeProbeSecurityOnFocus), not eagerly on session restore.
+	// refreshSecuritySources above reseeds the sidebar from the on-disk cache
+	// and clears the per-context probe guard for sess.Context.
 
 	if sess.ResourceType != "" {
 		rt, ok := resolveSessionResourceType(sess.ResourceType, m.discoveredResources[discoveryCtx])
@@ -248,5 +263,13 @@ func applySessionNamespaces(m *Model, allNS bool, ns string, selectedNS []string
 			m.selectedNamespaces = map[string]bool{ns: true}
 		}
 		m.nsSelectionNegated = negated
+	} else {
+		// Session omitted the namespace (older or partially-populated file):
+		// reset to all-namespaces rather than inheriting the prior tab's
+		// namespace filter, which would silently scope the restored context.
+		m.namespace = ""
+		m.allNamespaces = true
+		m.selectedNamespaces = nil
+		m.nsSelectionNegated = false
 	}
 }

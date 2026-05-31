@@ -23,8 +23,7 @@ type Model struct {
 	client  *k8s.Client
 	version string // application version string shown in the title bar
 
-	// Navigation state.
-	nav model.NavigationState
+	nav model.NavigationState // navigation state
 
 	// Column data.
 	leftItems   []model.Item
@@ -797,4 +796,5 @@ type Model struct {
 	creditsScroll  int  // scroll position for credits screen
 	creditsStopped bool // true when credits reached center and waiting to close
 	kubetrisGame   *kubetrisGame
+	securityModelState
 }

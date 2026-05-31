@@ -11,6 +11,7 @@ import (
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -543,6 +544,19 @@ type TabState struct {
 	explainCursor      int
 	explainScroll      int
 	explainSearchQuery string // persisted search query for n/N navigation
+
+	// Security feature state — per-tab so two tabs pointing at different
+	// clusters keep their own source manager and availability map.
+	// Without these, the active tab's state leaked into other tabs via
+	// the global SecuritySourcesFn hook, so the sidebar's Security
+	// category showed the wrong sources after tab switches.
+	// securityIgnores stays at Model level (the rules database is keyed
+	// by context internally and shared across tabs).
+	securityManager            *security.Manager
+	securityAvailabilityByName map[string]bool
+	securityIndex              *security.FindingIndex
+	securityActiveGroup        string
+	showSecurityIgnored        bool
 }
 
 // columnToggleEntry represents a single column in the column toggle overlay.

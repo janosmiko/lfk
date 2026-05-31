@@ -147,6 +147,11 @@ type configFile struct {
 	// overrides under clusters.<name>.read_only take precedence; the
 	// --read-only CLI flag wins over both.
 	ReadOnly *bool `json:"read_only" yaml:"read_only"`
+	// Security configures the built-in security-findings dashboard. When
+	// disabled the Security sidebar category, the SEC badge, and all source
+	// probing are turned off. Per-context overrides under
+	// clusters.<name>.security take precedence over this global setting.
+	Security *securityConfig `json:"security" yaml:"security"`
 	// RightsizingDefaults configures the initial strategy + headroom that
 	// the right-sizing advisor uses on its first overlay open of the
 	// session. Once the user changes strategy or headroom in the overlay,
@@ -322,6 +327,24 @@ type clusterConfig struct {
 	// context only. Useful for marking specific clusters (e.g. "prod") as
 	// read-only while leaving others mutable.
 	ReadOnly *bool `json:"read_only" yaml:"read_only"`
+	// Security, when set, overrides the global security settings for this
+	// context only — e.g. disabling the dashboard on a cluster where the
+	// kubeconfig credential plugin is noisy, or enabling only specific
+	// sources per cluster.
+	Security *securityConfig `json:"security" yaml:"security"`
+}
+
+// securityConfig is the on-disk schema for the global `security` section and
+// the per-cluster `clusters.<name>.security` override.
+type securityConfig struct {
+	// Enabled turns the whole security dashboard on or off. Defaults to true
+	// (omitted = enabled).
+	Enabled *bool `json:"enabled" yaml:"enabled"`
+	// Sources enables or disables individual sources by name. Keys accept the
+	// friendly names (heuristic, trivy, kyverno, kubescape, falco, gatekeeper)
+	// or the internal source ids (trivy-operator, policy-report). Any source
+	// omitted from the map defaults to enabled.
+	Sources map[string]bool `json:"sources" yaml:"sources"`
 }
 
 // RightsizingDefaultsConfig is the on-disk schema for the

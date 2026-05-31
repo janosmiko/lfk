@@ -233,6 +233,60 @@ func TestCovLoadPreviewContainers(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// TestLoadPreviewOwnedSecurityAffectedResourceNoYAMLFetch is the regression
+// guard for the "Warning: unknown resource type: __security_affected_resource__"
+// warning that fires when drilling into a security finding group. Affected
+// resources are synthetic items (Kind="__security_affected_resource__")
+// rendered via ui.RenderAffectedResourceDetails — there is no real Kubernetes
+// resource type to fetch, so loadPreviewOwned must short-circuit instead of
+// falling through to resolveOwnedResourceType (which fails and emits the
+// warning).
+func TestLoadPreviewOwnedSecurityAffectedResourceNoYAMLFetch(t *testing.T) {
+	m := baseModelBoost2()
+	m.nav.Level = model.LevelOwned
+	m.middleItems = []model.Item{{
+		Name:      "pod/affected-pod",
+		Kind:      "__security_affected_resource__",
+		Namespace: "default",
+		Extra:     "some-group-key",
+	}}
+	cmd := m.loadPreview()
+	if cmd == nil {
+		return
+	}
+	msg := cmd()
+	if loaded, ok := msg.(yamlLoadedMsg); ok {
+		assert.NoError(t, loaded.err, "synthetic security item must not produce a yamlLoadedMsg with unknown-resource-type error")
+	}
+}
+
+// TestLoadPreviewOwnedSecurityAffectedResourceFullYAMLNoFetch covers the
+// fullYAMLPreview branch of loadPreviewOwned, which routes through
+// loadPreviewYAML. The same guard must apply: synthetic security items have
+// no YAML to fetch.
+func TestLoadPreviewOwnedSecurityAffectedResourceFullYAMLNoFetch(t *testing.T) {
+	m := baseModelBoost2()
+	m.nav.Level = model.LevelOwned
+	m.fullYAMLPreview = true
+	m.middleItems = []model.Item{{
+		Name:      "pod/affected-pod",
+		Kind:      "__security_affected_resource__",
+		Namespace: "default",
+		Extra:     "some-group-key",
+	}}
+	cmd := m.loadPreview()
+	if cmd == nil {
+		return
+	}
+	msg := cmd()
+	if loaded, ok := msg.(previewYAMLLoadedMsg); ok {
+		assert.NoError(t, loaded.err, "synthetic security item must not produce a previewYAMLLoadedMsg with unknown-resource-type error")
+	}
+	if loaded, ok := msg.(yamlLoadedMsg); ok {
+		assert.NoError(t, loaded.err, "synthetic security item must not produce a yamlLoadedMsg with unknown-resource-type error")
+	}
+}
+
 // TestLoadPreviewOwnedUsesNavNamespaceForMissingItemNamespace is the
 // regression guard for the "Warning: getting resource: the server could not
 // find the requested resource" warning that fires when hovering on Helm

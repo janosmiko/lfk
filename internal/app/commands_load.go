@@ -163,11 +163,15 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		if sel == nil {
 			return nil
 		}
-		found, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[discoveryCtx])
-		if !ok {
-			return nil
+		if secRT, ok := securityResourceTypeForItem(sel); ok {
+			rt = secRT
+		} else {
+			found, ok := model.FindResourceTypeIn(sel.Extra, m.discoveredResources[discoveryCtx])
+			if !ok {
+				return nil
+			}
+			rt = found
 		}
-		rt = found
 	}
 	// Union fetch: fan out to all union contexts in parallel. Covers both
 	// preview hovers and main-list loads — without this, the preview path
@@ -414,6 +418,11 @@ func (m Model) resolveOwnedResourceType(sel *model.Item) (model.ResourceTypeEntr
 }
 
 func (m Model) loadYAML() tea.Cmd {
+	// Synthetic security items have no YAML; defense in depth alongside
+	// the gate in enterFullView so any future caller stays safe.
+	if onSecurityView(&m) {
+		return nil
+	}
 	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 	client := m.client
@@ -430,13 +439,17 @@ func (m Model) loadYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
+		itemCtx := kctx
+		if sel.ClusterName != "" {
+			itemCtx = sel.ClusterName
+		}
 		return m.scheduleK8sCall(
 			scheduler.PriorityHigh,
 			scheduler.KindYAMLFetch,
 			"YAML: "+name,
-			bgtaskTarget(kctx, itemNs),
+			bgtaskTarget(itemCtx, itemNs),
 			func(ctx context.Context) tea.Msg {
-				content, err := client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
+				content, err := client.GetResourceYAML(ctx, itemCtx, itemNs, rt, name)
 				return buildYAMLLoadedMsg(content, err)
 			},
 		)
@@ -450,7 +463,11 @@ func (m Model) loadYAML() tea.Cmd {
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
 		}
-		taskTarget := bgtaskTarget(kctx, itemNs)
+		itemCtx := kctx
+		if sel.ClusterName != "" {
+			itemCtx = sel.ClusterName
+		}
+		taskTarget := bgtaskTarget(itemCtx, itemNs)
 		if sel.Kind == "Pod" {
 			return m.scheduleK8sCall(
 				scheduler.PriorityHigh,
@@ -458,7 +475,7 @@ func (m Model) loadYAML() tea.Cmd {
 				"YAML: "+name,
 				taskTarget,
 				func(ctx context.Context) tea.Msg {
-					content, err := client.GetPodYAML(ctx, kctx, itemNs, name)
+					content, err := client.GetPodYAML(ctx, itemCtx, itemNs, name)
 					return buildYAMLLoadedMsg(content, err)
 				},
 			)
@@ -475,7 +492,7 @@ func (m Model) loadYAML() tea.Cmd {
 			"YAML: "+name,
 			taskTarget,
 			func(ctx context.Context) tea.Msg {
-				content, err := client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
+				content, err := client.GetResourceYAML(ctx, itemCtx, itemNs, rt, name)
 				return buildYAMLLoadedMsg(content, err)
 			},
 		)
@@ -497,6 +514,11 @@ func (m Model) loadYAML() tea.Cmd {
 
 // loadDiff fetches YAML for two resources and returns a diffLoadedMsg.
 func (m Model) loadDiff(rt model.ResourceTypeEntry, itemA, itemB model.Item) tea.Cmd {
+	if isVirtualResourceKind(rt.Kind) {
+		return func() tea.Msg {
+			return diffLoadedMsg{err: fmt.Errorf("diff not available for %q", rt.Kind)}
+		}
+	}
 	kctx := m.nav.Context
 	reqCtx := m.reqCtx
 

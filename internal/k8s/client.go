@@ -16,6 +16,7 @@ import (
 	"k8s.io/client-go/tools/clientcmd/api"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 )
 
 // contextInfo decorates a kubeconfig context with its source file plus a
@@ -133,6 +134,31 @@ type Client struct {
 	// touch the cache, keeping the existing fake-client surface unchanged.
 	// Read via informerSnapshot.
 	informers *informerCache
+
+	// securityManager dispatches finding fetches across registered
+	// SecuritySource adapters (Trivy Operator, Heuristic, PolicyReport,
+	// Falco). Set at startup by the app layer via SetSecurityManager but
+	// read from tea.Cmd goroutines, so it is an atomic pointer for the same
+	// concurrency rationale as kubesharkNamespaceOverride above. Nil in
+	// tests that don't exercise the security category.
+	securityManager atomic.Pointer[security.Manager]
+
+	// securityIgnoreMu guards ignoreChecker + showIgnored. Both are read on
+	// every getSecurityFindings call (which runs on a tea.Cmd goroutine) and
+	// written by app-layer handlers when the user adds/removes ignore rules
+	// or toggles the "show ignored" overlay — so the access is genuinely
+	// concurrent and race-prone without synchronization. Read via
+	// securityIgnoreSnapshot.
+	securityIgnoreMu sync.RWMutex
+	// ignoreChecker filters findings/groups marked ignored by the user's
+	// security ignore-list. Nil means "show everything." Read via
+	// securityIgnoreSnapshot.
+	ignoreChecker IgnoreChecker
+	// showIgnored, when true, includes ignored findings in the output
+	// (rendered with an "ignored" indicator) instead of hiding them. Off
+	// by default; toggled via the security ignore-list overlay. Read via
+	// securityIgnoreSnapshot.
+	showIgnored bool
 }
 
 // informerSnapshot returns the current routing config as a single
@@ -158,6 +184,46 @@ func (c *Client) SetSecretLazyLoading(enabled bool) {
 // the underlying field is an atomic pointer.
 func (c *Client) SetKubesharkNamespace(ns string) {
 	c.kubesharkNamespaceOverride.Store(&ns)
+}
+
+// SetSecurityManager wires the security source manager into the client so
+// GetResources can dispatch _security virtual API group calls. Pass nil to
+// disable the security category. Called once at startup by the app layer.
+func (c *Client) SetSecurityManager(m *security.Manager) {
+	c.securityManager.Store(m)
+}
+
+// SecurityManager returns the wired security manager, or nil if SetSecurityManager
+// was never called. Callers that need to fetch findings for the dashboard should
+// go through this accessor rather than the unexported field.
+func (c *Client) SecurityManager() *security.Manager {
+	return c.securityManager.Load()
+}
+
+// SetIgnoreChecker installs the ignore-list filter consulted when converting
+// findings into Items. Pass nil to disable filtering.
+func (c *Client) SetIgnoreChecker(checker IgnoreChecker) {
+	c.securityIgnoreMu.Lock()
+	defer c.securityIgnoreMu.Unlock()
+	c.ignoreChecker = checker
+}
+
+// SetShowIgnored toggles whether ignored findings are surfaced in the
+// security view (true: include with marker, false: hide).
+func (c *Client) SetShowIgnored(show bool) {
+	c.securityIgnoreMu.Lock()
+	defer c.securityIgnoreMu.Unlock()
+	c.showIgnored = show
+}
+
+// securityIgnoreSnapshot returns the current ignore filter and showIgnored
+// flag in a single locked read, so getSecurityFindings always sees a
+// consistent pair even if SetIgnoreChecker / SetShowIgnored land between
+// the two field reads.
+func (c *Client) securityIgnoreSnapshot() (IgnoreChecker, bool) {
+	c.securityIgnoreMu.RLock()
+	defer c.securityIgnoreMu.RUnlock()
+	return c.ignoreChecker, c.showIgnored
 }
 
 // SetInformerCacheMode selects how GetResources routes its list requests.

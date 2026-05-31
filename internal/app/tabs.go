@@ -500,6 +500,7 @@ func (m *Model) saveCurrentTab() {
 	t.explainCursor = m.explainCursor
 	t.explainScroll = m.explainScroll
 	t.explainSearchQuery = m.explainSearchQuery
+	m.saveSecurityStateToTab(t)
 }
 
 // loadTab restores Model fields from the given tab index.
@@ -619,6 +620,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.explainCursor = t.explainCursor
 	m.explainScroll = t.explainScroll
 	m.explainSearchQuery = t.explainSearchQuery
+	m.loadSecurityStateFromTab(&t)
 
 	// Close overlays and reset transient state.
 	m.overlay = overlayNone
@@ -640,6 +642,12 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	if needsLoad {
 		m.tabs[idx].needsLoad = false
 		m.applyPinnedTypes()
+
+		// Rebuild security state for the restored context so the Security
+		// sidebar seeds from the on-disk cache. Live availability probing is
+		// lazy (maybeProbeSecurityOnFocus) — it runs when the user focuses
+		// the Security category, not eagerly on every tab/context restore.
+		m.refreshSecuritySources()
 
 		// Load contexts for the left column breadcrumb.
 		contexts, _ := m.client.GetContexts()
@@ -732,6 +740,11 @@ func (m *Model) cloneCurrentTab() TabState {
 		logVisualCol:           0,
 		logVisualCurCol:        0,
 	}
+	// New tabs inherit the active tab's security state because they
+	// start on the same cluster; navigateChildCluster will rebuild
+	// them via refreshSecuritySources when the user picks a different
+	// context.
+	m.saveSecurityStateToTab(&newTab)
 	// Deep copy leftItemsHistory.
 	newTab.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))
 	for i, hist := range m.leftItemsHistory {

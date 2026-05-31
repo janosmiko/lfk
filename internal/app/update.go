@@ -103,6 +103,15 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case namespacesLoadedMsg:
 		mdl, cmd := m.updateNamespacesLoaded(msg)
 		return mdl, cmd, true
+	case securityAvailabilityLoadedMsg:
+		mdl, cmd := m.updateSecurityAvailabilityLoaded(msg)
+		return mdl, cmd, true
+	case securityFindingsLoadedMsg:
+		mdl := m.updateSecurityFindingsLoaded(msg)
+		return mdl, nil, true
+	case securityIgnoresSaveErrMsg:
+		mdl, cmd := m.updateSecurityIgnoresSaveErr(msg)
+		return mdl, cmd, true
 	case yamlLoadedMsg:
 		mdl, cmd := m.updateYamlLoaded(msg)
 		return mdl, cmd, true

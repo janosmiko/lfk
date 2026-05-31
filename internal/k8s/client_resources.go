@@ -29,6 +29,10 @@ var secretGVR = schema.GroupVersionResource{Group: "", Version: "v1", Resource: 
 // "secret:<key>" data columns and no "Type" column. Per-secret data is loaded
 // lazily by the UI layer when the user selects a specific secret.
 func (c *Client) GetResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
+	// Virtual security resource types — dispatched to the injected manager.
+	if rt.APIGroup == model.SecurityVirtualAPIGroup {
+		return c.getSecurityFindings(ctx, contextName, namespace, rt)
+	}
 	// Special handling for virtual resource types.
 	if rt.APIGroup == "_helm" && rt.Resource == "releases" {
 		return c.GetHelmReleases(ctx, contextName, namespace)

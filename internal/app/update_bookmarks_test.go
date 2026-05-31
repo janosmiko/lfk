@@ -119,6 +119,22 @@ func TestApplySessionNamespaces(t *testing.T) {
 		assert.True(t, m.selectedNamespaces["ns-2"])
 		assert.True(t, m.selectedNamespaces["ns-3"])
 	})
+
+	t.Run("omitted namespace resets stale filter", func(t *testing.T) {
+		// A partially-populated session (allNS=false, ns="") must not inherit
+		// the prior tab's namespace filter.
+		m := Model{
+			namespace:          "stale",
+			allNamespaces:      false,
+			selectedNamespaces: map[string]bool{"stale": true},
+			nsSelectionNegated: true,
+		}
+		applySessionNamespaces(&m, false, "", nil, false)
+		assert.Empty(t, m.namespace)
+		assert.True(t, m.allNamespaces)
+		assert.Nil(t, m.selectedNamespaces)
+		assert.False(t, m.nsSelectionNegated)
+	})
 }
 
 // --- bookmarkToSlot context-aware flag ---

@@ -90,6 +90,35 @@ func TestMiddleColumnHeader(t *testing.T) {
 			expected: "POD",
 		},
 		{
+			// Synthetic security resource types must render their
+			// DisplayName (e.g., "Falco") rather than the raw Kind
+			// sentinel "__security_falco__" -> "__SECURITY_FALCO__".
+			name: "LevelResources security source uses DisplayName",
+			nav: model.NavigationState{
+				Level: model.LevelResources,
+				ResourceType: model.ResourceTypeEntry{
+					Kind:        "__security_falco__",
+					DisplayName: "Falco",
+					APIGroup:    "_security",
+				},
+			},
+			expected: "FALCO",
+		},
+		{
+			// Same fix benefits the port-forwards pseudo-resource and
+			// Helm Releases: their Kind is also a sentinel.
+			name: "LevelResources port-forwards uses DisplayName",
+			nav: model.NavigationState{
+				Level: model.LevelResources,
+				ResourceType: model.ResourceTypeEntry{
+					Kind:        "__port_forwards__",
+					DisplayName: "Port Forwards",
+					APIGroup:    "_portforward",
+				},
+			},
+			expected: "PORT FORWARDS",
+		},
+		{
 			name:     "LevelContainers",
 			nav:      model.NavigationState{Level: model.LevelContainers},
 			expected: "CONTAINER",

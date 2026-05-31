@@ -47,17 +47,33 @@ func (m Model) handleExplorerKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	m = m.clearStatusOnNavigationKey(msg)
 
 	if mdl, cmd, handled := m.handleExplorerNavKey(msg); handled {
-		return mdl, cmd
+		return withLazySecurityProbe(mdl, cmd)
 	}
 	if mdl, cmd, handled := m.handleExplorerUIKey(msg); handled {
-		return mdl, cmd
+		return withLazySecurityProbe(mdl, cmd)
 	}
 
 	if ret, cmd, handled := m.handleExplorerActionKey(msg); handled {
-		return ret, cmd
+		return withLazySecurityProbe(ret, cmd)
 	}
 
 	return m, nil
+}
+
+// withLazySecurityProbe augments an explorer key result with a lazy security
+// availability probe when the key left the user focused on the Security
+// category. Centralised here so every navigation and cursor handler triggers
+// the probe without threading it through each one. A no-op for non-Model
+// results, non-Security focus, or an already-probed context.
+func withLazySecurityProbe(mdl tea.Model, cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	mm, ok := mdl.(Model)
+	if !ok {
+		return mdl, cmd
+	}
+	if probe := mm.maybeProbeSecurityOnFocus(); probe != nil {
+		return mm, tea.Batch(cmd, probe)
+	}
+	return mm, cmd
 }
 
 func (m Model) handleExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
