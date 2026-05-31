@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.2](https://github.com/janosmiko/lfk/compare/v0.13.1...v0.13.2) (2026-05-31)
+
+
+### Features
+
+* graceful shutdown notice with 10s force-quit timeout ([#314](https://github.com/janosmiko/lfk/issues/314)) ([68e03f6](https://github.com/janosmiko/lfk/commit/68e03f62ce7f8a279112a4f271efbf52228f53f9))
+
 ## [0.13.1](https://github.com/janosmiko/lfk/compare/v0.13.0...v0.13.1) (2026-05-31)
 
 
