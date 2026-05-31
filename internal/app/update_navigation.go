@@ -395,12 +395,11 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.setStatusMessage(fmt.Sprintf("Context: %s", sel.Name), false)
 	m.saveCurrentSession()
 	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
-	// Re-probe security source availability for the new cluster. The
-	// findings fetch chains off the probe result (handled by
-	// updateSecurityAvailabilityLoaded).
-	if cmd := m.loadSecurityAvailability(); cmd != nil {
-		cmds = append(cmds, cmd)
-	}
+	// Security availability is probed lazily on first focus of the Security
+	// category (maybeProbeSecurityOnFocus), not eagerly on context switch, so
+	// switching clusters never triggers the aws credential plugin for a user
+	// who isn't looking at security. refreshSecuritySources above cleared the
+	// per-context probe guard.
 	// Fire discovery once per session per context. The disk cache may have
 	// prefilled m.discoveredResources, but stale-while-revalidate still
 	// wants a live refresh on the user's first interaction with the

@@ -644,9 +644,10 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 		m.applyPinnedTypes()
 
 		// Rebuild security state for the restored context so the Security
-		// sidebar populates and the on-disk cache is re-read.
+		// sidebar seeds from the on-disk cache. Live availability probing is
+		// lazy (maybeProbeSecurityOnFocus) — it runs when the user focuses
+		// the Security category, not eagerly on every tab/context restore.
 		m.refreshSecuritySources()
-		securityCmd := m.loadSecurityAvailability()
 
 		// Load contexts for the left column breadcrumb.
 		contexts, _ := m.client.GetContexts()
@@ -668,7 +669,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 			m.clearRight()
 			m.setCursor(0)
 			m.loading = true
-			return tea.Batch(m.loadResources(false), securityCmd)
+			return m.loadResources(false)
 		case model.LevelResourceTypes:
 			// At resource types level: left = contexts, middle = resource types.
 			m.leftItemsHistory = nil
@@ -677,11 +678,11 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 			m.itemCache[m.navKey()] = m.middleItems
 			m.clearRight()
 			m.clampCursor()
-			return tea.Batch(m.loadPreview(), securityCmd)
+			return m.loadPreview()
 		default:
 			// Clusters level or unknown: just load contexts.
 			m.loading = true
-			return tea.Batch(m.refreshCurrentLevel(), securityCmd)
+			return m.refreshCurrentLevel()
 		}
 	}
 	return nil

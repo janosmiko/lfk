@@ -93,14 +93,10 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	if cmd := m.ensureNamespaceCacheFresh(); cmd != nil {
 		cmds = append(cmds, cmd)
 	}
-	// Re-probe security source availability for the restored context.
-	// The Init-time probe targets the kubeconfig default; if the session
-	// restored to a different context its result is dropped by the
-	// stale-context gate. Pair this with refreshSecuritySources above so
-	// the manager and the probe both target sess.Context.
-	if cmd := m.loadSecurityAvailability(); cmd != nil {
-		cmds = append(cmds, cmd)
-	}
+	// Security availability is probed lazily on first focus of the Security
+	// category (maybeProbeSecurityOnFocus), not eagerly on session restore.
+	// refreshSecuritySources above reseeds the sidebar from the on-disk cache
+	// and clears the per-context probe guard for sess.Context.
 
 	if sess.ResourceType != "" {
 		rt, ok := resolveSessionResourceType(sess.ResourceType, m.discoveredResources[discoveryCtx])

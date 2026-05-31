@@ -21,6 +21,12 @@ import (
 // package-level hook state so model.SecuritySourcesFn picks it up on the
 // next sidebar render.
 func (m *Model) refreshSecuritySources() {
+	// The manager is rebuilt below, so any prior probe for this slot is moot.
+	// Clearing the guard lets maybeProbeSecurityOnFocus re-probe the new (or
+	// re-selected) context the next time the user focuses the Security
+	// category. Without this, switching back to a previously-probed context
+	// would leave the rebuilt manager's availability empty (perpetual loader).
+	m.securityProbedContext = ""
 	mgr := security.NewManager()
 	if m.client != nil {
 		kctx := m.nav.Context

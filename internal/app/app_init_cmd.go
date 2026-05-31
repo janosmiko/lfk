@@ -11,7 +11,10 @@ func (m Model) Init() tea.Cmd {
 	cmds := []tea.Cmd{
 		m.loadContexts(),
 		m.spinner.Tick,
-		m.loadSecurityAvailability(),
+		// Security source availability is probed lazily on first focus of the
+		// Security category (maybeProbeSecurityOnFocus), not at startup, so a
+		// cluster the user never inspects for security never pays the probe's
+		// API calls (which on EKS surface aws SSO-expired noise).
 		// Run the discovery-cache preload off the main goroutine. Blocking
 		// startup on it serialises a clientcmd.ClientConfig() call per
 		// kubeconfig context; see the comment on discoveryCachePreloadCmd.

@@ -28,6 +28,13 @@ type securityModelState struct {
 	// showSecurityIgnored toggles whether ignored findings surface in the
 	// explorer. Off by default; flipped with kb.SecurityIgnoreToggle.
 	showSecurityIgnored bool
+	// securityProbedContext is the cluster context whose security sources
+	// have already been probed this activation. Availability probing is
+	// lazy — it runs only when the user focuses the Security category, not
+	// eagerly at cluster open — so this guard stops a re-probe on every
+	// keystroke while focused. refreshSecuritySources clears it on context
+	// switch (the manager is rebuilt), allowing a fresh probe per context.
+	securityProbedContext string
 }
 
 // anySecurityAvailable reports whether at least one registered source

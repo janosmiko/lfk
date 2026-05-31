@@ -27,6 +27,35 @@ func (m Model) invalidateSecurityCache() {
 	}
 }
 
+// maybeProbeSecurityOnFocus lazily probes security source availability the
+// first time the user focuses the Security category for the active context.
+// Probing is deferred — it does NOT run at cluster open — so a cluster the
+// user never inspects for security never pays the probe's API calls. On EKS
+// those calls go through the kubeconfig's aws exec-credential plugin, which
+// surfaces "SSO session expired" noise when the session has lapsed even
+// though the foreground views work off a cached token. The per-context guard
+// stops a re-probe on every cursor move; refreshSecuritySources clears it on
+// context switch so each cluster is probed once on first Security focus.
+func (m *Model) maybeProbeSecurityOnFocus() tea.Cmd {
+	if m.nav.Level != model.LevelResourceTypes {
+		return nil
+	}
+	sel := m.selectedMiddleItem()
+	focused := m.expandedGroup == "Security" || (sel != nil && sel.Category == "Security")
+	if !focused {
+		return nil
+	}
+	ctx := m.nav.Context
+	if ctx == "" && m.client != nil {
+		ctx = m.client.CurrentContext()
+	}
+	if m.securityProbedContext == ctx {
+		return nil
+	}
+	m.securityProbedContext = ctx
+	return m.loadSecurityAvailability()
+}
+
 // loadSecurityAvailability probes IsAvailable on every registered source
 // for the active cluster and returns a securityAvailabilityLoadedMsg with
 // the per-source result. Each source's probe runs in its own goroutine

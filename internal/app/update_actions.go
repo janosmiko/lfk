@@ -172,7 +172,14 @@ func (m Model) directActionRefresh() (tea.Model, tea.Cmd) {
 	m.requestGen++
 	m.invalidateSecurityCache()
 	m.setStatusMessage("Refreshing...", false)
-	return m, tea.Batch(m.refreshCurrentLevel(), m.loadSecurityAvailability(), scheduleStatusClear())
+	cmds := []tea.Cmd{m.refreshCurrentLevel(), scheduleStatusClear()}
+	// Only re-probe security if it was already activated for this context
+	// (the user has focused the Security category). A refresh from a user
+	// who never opened security must not trigger the aws credential plugin.
+	if m.securityProbedContext != "" {
+		cmds = append(cmds, m.loadSecurityAvailability())
+	}
+	return m, tea.Batch(cmds...)
 }
 
 func (m Model) directActionEdit() (tea.Model, tea.Cmd) {
