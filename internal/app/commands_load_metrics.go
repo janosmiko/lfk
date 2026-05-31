@@ -184,7 +184,7 @@ func (m Model) loadPodMetricsForList() tea.Cmd {
 			metrics, err := client.GetAllPodMetrics(ctx, kctx, ns)
 			if err != nil {
 				logger.WarnOnce("pod-metrics-list-load", kctx+"/"+ns,
-					"pod metrics list load failed", "context", kctx, "namespace", ns, "error", logger.Redact(err.Error()))
+					"pod metrics unavailable: no metrics-server or Prometheus source", "context", kctx, "namespace", ns, "error", logger.Redact(err.Error()))
 				return podMetricsEnrichedMsg{gen: gen}
 			}
 			return podMetricsEnrichedMsg{metrics: metrics, gen: gen}

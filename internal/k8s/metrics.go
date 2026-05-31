@@ -34,8 +34,26 @@ func (c *Client) metricsGVR(resource string) []schema.GroupVersionResource {
 	}
 }
 
-// GetPodMetrics fetches CPU and memory usage for a single pod using the metrics API.
+// GetPodMetrics fetches CPU and memory usage for a single pod, trying the
+// configured routes (Prometheus / metrics-server) in order.
 func (c *Client) GetPodMetrics(ctx context.Context, contextName, namespace, podName string) (*model.PodMetrics, error) {
+	return runPodMetricsRoutes(contextName,
+		func() (*model.PodMetrics, error) {
+			all, err := c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
+			if err != nil {
+				return nil, err
+			}
+			if pm, ok := all[namespace+"/"+podName]; ok {
+				return &pm, nil
+			}
+			return nil, fmt.Errorf("pod metrics for %s/%s not present in prometheus", namespace, podName)
+		},
+		func() (*model.PodMetrics, error) { return c.getPodMetricsFromAPI(ctx, contextName, namespace, podName) },
+	)
+}
+
+// getPodMetricsFromAPI fetches a single pod's metrics from the metrics.k8s.io API.
+func (c *Client) getPodMetricsFromAPI(ctx context.Context, contextName, namespace, podName string) (*model.PodMetrics, error) {
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return nil, err
@@ -51,8 +69,31 @@ func (c *Client) GetPodMetrics(ctx context.Context, contextName, namespace, podN
 	return nil, fmt.Errorf("fetching pod metrics: metrics API unavailable")
 }
 
-// GetPodsMetrics fetches metrics for multiple pods.
+// GetPodsMetrics fetches metrics for multiple pods, trying the configured
+// routes (Prometheus / metrics-server) in order.
 func (c *Client) GetPodsMetrics(ctx context.Context, contextName, namespace string, podNames []string) ([]model.PodMetrics, error) {
+	return runPodMetricsRoutes(contextName,
+		func() ([]model.PodMetrics, error) {
+			all, err := c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
+			if err != nil {
+				return nil, err
+			}
+			out := make([]model.PodMetrics, 0, len(podNames))
+			for _, n := range podNames {
+				if pm, ok := all[namespace+"/"+n]; ok {
+					out = append(out, pm)
+				}
+			}
+			return out, nil
+		},
+		func() ([]model.PodMetrics, error) {
+			return c.getPodsMetricsFromAPI(ctx, contextName, namespace, podNames)
+		},
+	)
+}
+
+// getPodsMetricsFromAPI fetches metrics for multiple pods from the metrics.k8s.io API.
+func (c *Client) getPodsMetricsFromAPI(ctx context.Context, contextName, namespace string, podNames []string) ([]model.PodMetrics, error) {
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return nil, err
@@ -86,8 +127,23 @@ func (c *Client) GetPodsMetrics(ctx context.Context, contextName, namespace stri
 	return nil, fmt.Errorf("listing pod metrics: metrics API unavailable")
 }
 
-// GetAllPodMetrics fetches metrics for all pods in a namespace and returns a map of pod name -> PodMetrics.
+// GetAllPodMetrics fetches metrics for all pods in a namespace (or the whole
+// cluster when namespace is empty) and returns a map keyed by "namespace/name".
+// It tries the configured routes (Prometheus / metrics-server) in order, so a
+// cluster served only by Prometheus no longer reports "metrics API unavailable".
 func (c *Client) GetAllPodMetrics(ctx context.Context, contextName, namespace string) (map[string]model.PodMetrics, error) {
+	return runPodMetricsRoutes(contextName,
+		func() (map[string]model.PodMetrics, error) {
+			return c.getAllPodMetricsFromPrometheus(ctx, contextName, namespace)
+		},
+		func() (map[string]model.PodMetrics, error) {
+			return c.getAllPodMetricsFromAPI(ctx, contextName, namespace)
+		},
+	)
+}
+
+// getAllPodMetricsFromAPI fetches all pod metrics from the metrics.k8s.io API.
+func (c *Client) getAllPodMetricsFromAPI(ctx context.Context, contextName, namespace string) (map[string]model.PodMetrics, error) {
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return nil, err
@@ -384,13 +440,13 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 	defer cancel()
 
 	cpuQuery := `sum by (node) (rate(container_cpu_usage_seconds_total{container!=""}[3m])) * 1000`
-	cpuMap, cpuErr := c.queryPrometheusNodeMetric(ctx, clientset, promNs, promSvc, promPort, cpuQuery)
+	cpuMap, cpuErr := c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, cpuQuery)
 	if cpuErr != nil {
 		logger.Debug("Prometheus node CPU query failed", "error", cpuErr)
 	}
 
 	memQuery := `sum by (node) (container_memory_working_set_bytes{container!=""})`
-	memMap, memErr := c.queryPrometheusNodeMetric(ctx, clientset, promNs, promSvc, promPort, memQuery)
+	memMap, memErr := c.queryPrometheusNodeMetric(ctx, contextName, clientset, promNs, promSvc, promPort, memQuery)
 	if memErr != nil {
 		logger.Debug("Prometheus node memory query failed", "error", memErr)
 	}
@@ -422,11 +478,14 @@ func (c *Client) getNodeMetricsFromPrometheus(contextName string) (map[string]mo
 
 // queryPrometheusNodeMetric runs a PromQL instant query via Kubernetes service proxy
 // and returns a map of node name -> float64 value.
-func (c *Client) queryPrometheusNodeMetric(ctx context.Context, cs kubernetes.Interface, namespaces, services []string, port, query string) (map[string]float64, error) {
+func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName string, cs kubernetes.Interface, namespaces, services []string, port, query string) (map[string]float64, error) {
 	params := map[string]string{"query": query}
 
-	// Check cache for a known working namespace+service.
-	if cached, ok := promSvcCache.Load(cs); ok {
+	// Check cache for a known working namespace+service. Keyed by contextName
+	// (not the clientset): clientsetForContext builds a fresh clientset per
+	// call, so a clientset key would never hit and re-run service discovery
+	// on every poll.
+	if cached, ok := promSvcCache.Load(contextName); ok {
 		entry := cached.(promSvcEntry)
 		result := cs.CoreV1().Services(entry.namespace).ProxyGet("http", entry.service, port, "/api/v1/query", params)
 		data, err := result.DoRaw(ctx)
@@ -437,7 +496,7 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, cs kubernetes.In
 			}
 		}
 		// Cache entry stale, remove and fall through to discovery.
-		promSvcCache.Delete(cs)
+		promSvcCache.Delete(contextName)
 	}
 
 	var lastErr error
@@ -455,7 +514,7 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, cs kubernetes.In
 				lastErr = err
 				continue
 			}
-			promSvcCache.Store(cs, promSvcEntry{namespace: ns, service: svc})
+			promSvcCache.Store(contextName, promSvcEntry{namespace: ns, service: svc})
 			return nodeMap, nil
 		}
 	}
@@ -466,30 +525,24 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, cs kubernetes.In
 	return nil, fmt.Errorf("no prometheus service found")
 }
 
-// parsePrometheusNodeResponse parses a Prometheus /api/v1/query JSON response
-// and extracts a map of node name -> float64 value.
-func parsePrometheusNodeResponse(data []byte) (map[string]float64, error) {
+// parsePrometheusVector parses a Prometheus /api/v1/query instant-vector
+// response into a map keyed by keyFunc(metricLabels). Samples for which keyFunc
+// returns ok=false, or whose scalar value can't be parsed, are skipped. Shared
+// by the node, pod, and container readers, which differ only in how the result
+// key is derived from the metric's labels.
+func parsePrometheusVector(data []byte, keyFunc func(labels map[string]string) (string, bool)) (map[string]float64, error) {
 	var resp prometheusQueryResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, fmt.Errorf("parsing prometheus response: %w", err)
 	}
-
 	if resp.Status != "success" {
 		return nil, fmt.Errorf("prometheus query returned status: %s", resp.Status)
 	}
 
 	result := make(map[string]float64, len(resp.Data.Result))
 	for _, r := range resp.Data.Result {
-		node := r.Metric["node"]
-		if node == "" {
-			for _, alt := range []string{"instance", "kubernetes_node", "nodename", "host"} {
-				if v := r.Metric[alt]; v != "" {
-					node = v
-					break
-				}
-			}
-		}
-		if node == "" {
+		key, ok := keyFunc(r.Metric)
+		if !ok {
 			continue
 		}
 		if len(r.Value) < 2 {
@@ -503,8 +556,25 @@ func parsePrometheusNodeResponse(data []byte) (map[string]float64, error) {
 		if err != nil {
 			continue
 		}
-		result[node] = val
+		result[key] = val
 	}
-
 	return result, nil
+}
+
+// parsePrometheusNodeResponse extracts a node name -> value map. The node name
+// comes from the "node" label, falling back to common alternates emitted by
+// different exporters.
+func parsePrometheusNodeResponse(data []byte) (map[string]float64, error) {
+	return parsePrometheusVector(data, func(labels map[string]string) (string, bool) {
+		node := labels["node"]
+		if node == "" {
+			for _, alt := range []string{"instance", "kubernetes_node", "nodename", "host"} {
+				if v := labels[alt]; v != "" {
+					node = v
+					break
+				}
+			}
+		}
+		return node, node != ""
+	})
 }

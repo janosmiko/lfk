@@ -371,7 +371,11 @@ func (c *Client) clientsetForContext(contextName string) (kubernetes.Interface, 
 	if err != nil {
 		return nil, err
 	}
-	cs, err := kubernetes.NewForConfig(cfg)
+	httpClient, err := taggedHTTPClient(cfg, contextName)
+	if err != nil {
+		return nil, fmt.Errorf("creating http client: %w", err)
+	}
+	cs, err := kubernetes.NewForConfigAndClient(cfg, httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("creating clientset: %w", err)
 	}
@@ -389,7 +393,11 @@ func (c *Client) dynamicForContext(contextName string) (dynamic.Interface, error
 	if err != nil {
 		return nil, err
 	}
-	dynClient, err := dynamic.NewForConfig(cfg)
+	httpClient, err := taggedHTTPClient(cfg, contextName)
+	if err != nil {
+		return nil, fmt.Errorf("creating http client: %w", err)
+	}
+	dynClient, err := dynamic.NewForConfigAndClient(cfg, httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("creating dynamic client: %w", err)
 	}
@@ -459,7 +467,11 @@ func (c *Client) metadataForContext(contextName string) (metadata.Interface, err
 	if err != nil {
 		return nil, err
 	}
-	mc, err := metadata.NewForConfig(cfg)
+	httpClient, err := taggedHTTPClient(cfg, contextName)
+	if err != nil {
+		return nil, fmt.Errorf("creating http client: %w", err)
+	}
+	mc, err := metadata.NewForConfigAndClient(cfg, httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("creating metadata client: %w", err)
 	}

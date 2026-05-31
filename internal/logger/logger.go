@@ -176,6 +176,16 @@ func (sc *StderrCapture) readLoop() {
 				if supp > 0 {
 					args = append(args, "suppressed_during_window", supp)
 				}
+				// A kubeconfig exec credential plugin (AWS SSO, gke auth) writes
+				// its credential error here with no cluster context. The failing
+				// in-process API call is tagged with the context separately (see
+				// internal/k8s credTaggingRoundTripper), so demote this contextless
+				// duplicate to Debug and keep it out of the in-app overlay rather
+				// than surfacing an unactionable "which cluster?" line.
+				if looksLikeExecCredentialStderr(redacted) {
+					Logger.Debug(redacted, args...)
+					continue
+				}
 				Logger.Error(redacted, args...)
 				select {
 				case sc.MsgChan <- redacted:
