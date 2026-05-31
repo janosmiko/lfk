@@ -151,7 +151,12 @@ func (m Model) loadSecurityFindings() tea.Cmd {
 	if kctx == "" && m.client != nil {
 		kctx = m.client.CurrentContext()
 	}
-	ns := m.namespace
+	// Use the same namespace key as the list and preview fetches
+	// (loadResources / loadSecurityAffectedResources both use
+	// effectiveNamespace) so all three share one coalesced FetchAll scan
+	// instead of keying the manager cache differently and forcing a
+	// redundant full scan for the badge index.
+	ns := m.effectiveNamespace()
 	return m.trackBgTask(
 		scheduler.KindResourceList,
 		"Loading security findings",
@@ -181,7 +186,11 @@ func (m Model) updateSecurityFindingsLoaded(msg securityFindingsLoadedMsg) Model
 	if m.nav.Context != "" && msg.context != m.nav.Context {
 		return m
 	}
-	if msg.namespace != m.namespace {
+	// Compare against effectiveNamespace — the value loadSecurityFindings
+	// now fetches with — so the guard discards stale messages by the same
+	// key the fetch used (matters in all-namespaces / multi-select mode,
+	// where effectiveNamespace is "" but m.namespace is not).
+	if msg.namespace != m.effectiveNamespace() {
 		return m
 	}
 	for source, err := range msg.errors {

@@ -4,12 +4,42 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// TestManagerFetchAllCoalescesConcurrentCalls verifies that overlapping
+// FetchAll calls for the same (context, namespace) share a single source
+// scan instead of each running the full multi-source fetch. On navigation
+// the middle list, the SEC-badge index, and the right-pane preview all call
+// FetchAll near-simultaneously; without coalescing each ran the expensive
+// scan independently, tripling API load and leaving the right pane spinning
+// on its own slow fetch while the list had already resolved.
+func TestManagerFetchAllCoalescesConcurrentCalls(t *testing.T) {
+	m := NewManager()
+	s := &FakeSource{
+		NameStr: "s", Available: true,
+		FetchDelay: 100 * time.Millisecond,
+		Findings:   []Finding{{ID: "x"}},
+	}
+	m.Register(s)
+
+	const n = 8
+	var wg sync.WaitGroup
+	for range n {
+		wg.Go(func() {
+			_, _ = m.FetchAll(context.Background(), "ctx", "")
+		})
+	}
+	wg.Wait()
+
+	assert.Equal(t, int32(1), s.FetchCalls.Load(),
+		"concurrent identical FetchAll calls must coalesce into one source scan")
+}
 
 func TestManagerRegisterAndFetchAll(t *testing.T) {
 	m := NewManager()

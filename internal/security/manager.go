@@ -5,6 +5,8 @@ import (
 	"maps"
 	"sync"
 	"time"
+
+	"golang.org/x/sync/singleflight"
 )
 
 // FetchResult is the aggregated output of Manager.FetchAll.
@@ -39,6 +41,14 @@ type Manager struct {
 	cachedAt      time.Time
 	cachedSuccess bool // anySourceSucceeded() at the time the result was cached
 	cachedIndex   *FindingIndex
+
+	// fetchGroup coalesces concurrent FetchAll calls for the same
+	// (kubeCtx, namespace). On navigation the middle list, the SEC-badge
+	// index, and the right-pane preview each call FetchAll near-
+	// simultaneously; without this they ran the full multi-source scan
+	// independently — tripling API load and leaving the right pane
+	// spinning on its own slow fetch after the list had resolved.
+	fetchGroup singleflight.Group
 
 	availCache map[string]availEntry // key = kubeCtx
 
@@ -252,20 +262,46 @@ func (m *Manager) AnyAvailable(ctx context.Context, kubeCtx string) (bool, error
 func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (FetchResult, error) {
 	cacheKey := kubeCtx + "|" + namespace
 
-	m.mu.RLock()
-	if cacheKey == m.cacheKey {
-		ttl := m.refreshTTL
-		if !m.cachedSuccess {
-			ttl = m.errorTTL
-		}
-		if ttl > 0 && time.Since(m.cachedAt) < ttl {
-			cached := m.cachedResult
-			m.mu.RUnlock()
+	if cached, ok := m.cachedFetch(cacheKey); ok {
+		return cached, nil
+	}
+
+	// Coalesce overlapping identical scans (see fetchGroup). Concurrent
+	// callers share the winner's result; the key is released when the scan
+	// completes, so the next call re-checks the cache below and serves the
+	// freshly-cached result instead of re-scanning.
+	v, _, _ := m.fetchGroup.Do(cacheKey, func() (any, error) {
+		if cached, ok := m.cachedFetch(cacheKey); ok {
 			return cached, nil
 		}
-	}
-	m.mu.RUnlock()
+		return m.fetchAllScan(ctx, kubeCtx, namespace, cacheKey), nil
+	})
+	return v.(FetchResult), nil
+}
 
+// cachedFetch returns the cached FetchResult for cacheKey when it is still
+// within the applicable TTL (refreshTTL on success, errorTTL on a fully-
+// errored result). The bool is false on a miss or an expired entry.
+func (m *Manager) cachedFetch(cacheKey string) (FetchResult, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if cacheKey != m.cacheKey {
+		return FetchResult{}, false
+	}
+	ttl := m.refreshTTL
+	if !m.cachedSuccess {
+		ttl = m.errorTTL
+	}
+	if ttl > 0 && time.Since(m.cachedAt) < ttl {
+		return m.cachedResult, true
+	}
+	return FetchResult{}, false
+}
+
+// fetchAllScan runs Fetch across all available sources, aggregates the
+// results, and writes the cache. It is invoked through fetchGroup so only
+// one scan per cacheKey runs at a time.
+func (m *Manager) fetchAllScan(ctx context.Context, kubeCtx, namespace, cacheKey string) FetchResult {
 	sources := m.Sources()
 
 	type sourceResult struct {
@@ -386,7 +422,7 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 		m.cachedIndex = BuildFindingIndex(res.Findings)
 	}
 	m.mu.Unlock()
-	return res, nil
+	return res
 }
 
 // anySourceSucceeded reports whether at least one entry in s carries
