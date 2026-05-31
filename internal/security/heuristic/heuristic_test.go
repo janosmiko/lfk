@@ -114,6 +114,25 @@ func TestCheckHostNamespaces(t *testing.T) {
 	}
 }
 
+// TestFirstContainerChecks_NoRegularContainers guards the pod-level checks
+// bound to the first regular container against a pod that has only init or
+// ephemeral containers. The fetch loop passes those containers through, so an
+// empty Containers slice must not panic on Containers[0].
+func TestFirstContainerChecks_NoRegularContainers(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+		Spec: corev1.PodSpec{
+			HostPID:        true,
+			InitContainers: []corev1.Container{{Name: "init"}},
+			Volumes:        []corev1.Volume{{Name: "v", VolumeSource: corev1.VolumeSource{HostPath: &corev1.HostPathVolumeSource{Path: "/"}}}},
+		},
+	}
+	init := pod.Spec.InitContainers[0]
+	assert.Nil(t, checkHostNamespaces(pod, init))
+	assert.Nil(t, checkHostPath(pod, init))
+	assert.Nil(t, checkDefaultServiceAccount(pod, init))
+}
+
 func TestCheckHostPath(t *testing.T) {
 	pod := &corev1.Pod{
 		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},

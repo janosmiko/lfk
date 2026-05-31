@@ -42,6 +42,7 @@ func TestSecurityResourceTypeForItem_MalformedKind(t *testing.T) {
 		"__security___", // empty source name between markers
 		"__security_",   // missing trailing markers
 		"security_x__",  // missing leading markers
+		"__security__",  // prefix and suffix overlap (len < prefix+suffix)
 	}
 	for _, k := range cases {
 		_, ok := securityResourceTypeForItem(&model.Item{Kind: k})

@@ -265,6 +265,35 @@ func TestFindingIndexCountBySourceCrossSourceOverlap(t *testing.T) {
 	assert.Equal(t, 1, idx.CountBySource("policy-report"))
 }
 
+// TestFindingIndexDedupeKeepsHighestSeverity verifies that when two sources
+// report the same (resource, Title) at different severities, the per-resource
+// bucket records the higher one — independent of iteration order. This guards
+// the f.Severity > cur comparison in BuildFindingIndex against silently
+// under-coloring the SEC badge if a lower-severity duplicate is seen last.
+func TestFindingIndexDedupeKeepsHighestSeverity(t *testing.T) {
+	ref := ResourceRef{Namespace: "p", Kind: "Deployment", Name: "api"}
+	cases := []struct {
+		name     string
+		findings []Finding
+	}{
+		{"low then critical", []Finding{
+			{Source: "heuristic", Severity: SeverityLow, Title: "privileged", Resource: ref},
+			{Source: "trivy-operator", Severity: SeverityCritical, Title: "privileged", Resource: ref},
+		}},
+		{"critical then low", []Finding{
+			{Source: "trivy-operator", Severity: SeverityCritical, Title: "privileged", Resource: ref},
+			{Source: "heuristic", Severity: SeverityLow, Title: "privileged", Resource: ref},
+		}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			counts := BuildFindingIndex(tc.findings).For(ref)
+			assert.Equal(t, 1, counts.Critical, "highest severity must win")
+			assert.Equal(t, 0, counts.Low, "lower-severity duplicate must not be counted")
+		})
+	}
+}
+
 func TestManagerInvalidateClearsCache(t *testing.T) {
 	m := NewManager()
 	m.SetRefreshTTL(1 * time.Hour)

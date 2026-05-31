@@ -137,9 +137,11 @@ type Client struct {
 
 	// securityManager dispatches finding fetches across registered
 	// SecuritySource adapters (Trivy Operator, Heuristic, PolicyReport,
-	// Falco). Set at startup by the app layer via SetSecurityManager.
-	// Nil in tests that don't exercise the security category.
-	securityManager *security.Manager
+	// Falco). Set at startup by the app layer via SetSecurityManager but
+	// read from tea.Cmd goroutines, so it is an atomic pointer for the same
+	// concurrency rationale as kubesharkNamespaceOverride above. Nil in
+	// tests that don't exercise the security category.
+	securityManager atomic.Pointer[security.Manager]
 
 	// securityIgnoreMu guards ignoreChecker + showIgnored. Both are read on
 	// every getSecurityFindings call (which runs on a tea.Cmd goroutine) and
@@ -188,14 +190,14 @@ func (c *Client) SetKubesharkNamespace(ns string) {
 // GetResources can dispatch _security virtual API group calls. Pass nil to
 // disable the security category. Called once at startup by the app layer.
 func (c *Client) SetSecurityManager(m *security.Manager) {
-	c.securityManager = m
+	c.securityManager.Store(m)
 }
 
 // SecurityManager returns the wired security manager, or nil if SetSecurityManager
 // was never called. Callers that need to fetch findings for the dashboard should
 // go through this accessor rather than the unexported field.
 func (c *Client) SecurityManager() *security.Manager {
-	return c.securityManager
+	return c.securityManager.Load()
 }
 
 // SetIgnoreChecker installs the ignore-list filter consulted when converting

@@ -9,26 +9,10 @@ import (
 	"fmt"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
 )
-
-// severityToStatus maps Severity onto one of the status strings lfk's table
-// renderer already colors (Failed = red, Progressing = yellow/orange,
-// Running = green, Pending = dim).
-func severityToStatus(s security.Severity) string {
-	switch s {
-	case security.SeverityCritical, security.SeverityHigh:
-		return "Failed"
-	case security.SeverityMedium:
-		return "Progressing"
-	case security.SeverityLow:
-		return "Pending"
-	}
-	return "Unknown"
-}
 
 // severityLabel returns the abbreviated label used in the Severity column.
 func severityLabel(s security.Severity) string {
@@ -138,26 +122,6 @@ func sourceNameFromKind(kind string) string {
 	return inner
 }
 
-// titleCase converts a snake_case label key (e.g., "fixed_version") into a
-// space-separated, capitalized form ("Fixed Version") so the rendered table
-// header reads "FIXED VERSION" rather than "FIXED_VERSION". Already-uppercase
-// inputs (e.g., "ALREADY") and single-segment lowercase inputs ("cve") are
-// preserved as a single capitalized word. Each underscore-separated segment
-// is independently capitalized via ToUpper of its first byte.
-func titleCase(s string) string {
-	if s == "" {
-		return s
-	}
-	parts := strings.Split(s, "_")
-	for i, p := range parts {
-		if p == "" {
-			continue
-		}
-		parts[i] = strings.ToUpper(p[:1]) + p[1:]
-	}
-	return strings.Join(parts, " ")
-}
-
 // getSecurityFindings is the dispatch target for virtual _security resource
 // types. It fetches findings from the manager for the source encoded in
 // the ResourceTypeEntry's Kind and returns them as grouped model.Items
@@ -166,7 +130,8 @@ func titleCase(s string) string {
 //
 //nolint:unparam // contextName and namespace are passed straight through from GetResources callers.
 func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, error) {
-	if c.securityManager == nil {
+	mgr := c.securityManager.Load()
+	if mgr == nil {
 		return nil, nil
 	}
 	sourceName := sourceNameFromKind(rt.Kind)
@@ -177,7 +142,7 @@ func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace
 		// raw sentinel into the error overlay.
 		return nil, fmt.Errorf("internal: malformed security resource type")
 	}
-	res, err := c.securityManager.FetchAll(ctx, contextName, namespace)
+	res, err := mgr.FetchAll(ctx, contextName, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("security fetch: %w", err)
 	}
@@ -201,7 +166,8 @@ func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace
 // source. Each item has Kind __security_affected_resource__ and carries
 // the real resource Kind/Name for jumpToFindingResource navigation.
 func (c *Client) GetSecurityAffectedResources(ctx context.Context, contextName, namespace string, rt model.ResourceTypeEntry, groupKey string) ([]model.Item, error) {
-	if c.securityManager == nil {
+	mgr := c.securityManager.Load()
+	if mgr == nil {
 		return nil, nil
 	}
 	sourceName := sourceNameFromKind(rt.Kind)
@@ -209,7 +175,7 @@ func (c *Client) GetSecurityAffectedResources(ctx context.Context, contextName, 
 		// Same defensive path as getSecurityFindings — see comment there.
 		return nil, fmt.Errorf("internal: malformed security resource type")
 	}
-	res, err := c.securityManager.FetchAll(ctx, contextName, namespace)
+	res, err := mgr.FetchAll(ctx, contextName, namespace)
 	if err != nil {
 		return nil, fmt.Errorf("security fetch: %w", err)
 	}
@@ -247,63 +213,4 @@ func (c *Client) GetSecurityAffectedResources(ctx context.Context, contextName, 
 		items = append(items, affectedResourceToItem(ref, groupKey, matched))
 	}
 	return items, nil
-}
-
-// findingToItem maps a security.Finding onto the model.Item shape the
-// explorer table already knows how to render. All display data for the
-// middle column lives in the first five Columns (Severity, Resource,
-// Title, Category, ResourceKind). Details-only fields (Source,
-// Description, References, raw labels) live in subsequent columns and
-// are read by the finding details preview renderer.
-func findingToItem(f security.Finding) model.Item {
-	item := model.Item{
-		Name:      f.Title,
-		Kind:      "__security_finding__",
-		Namespace: f.Resource.Namespace,
-		Status:    severityToStatus(f.Severity),
-		Extra:     f.ID,
-		CreatedAt: time.Now(),
-		Columns: []model.KeyValue{
-			{Key: "Severity", Value: severityLabel(f.Severity)},
-			{Key: "Resource", Value: shortResource(f.Resource)},
-			{Key: "Title", Value: f.Title},
-			{Key: "Category", Value: string(f.Category)},
-			{Key: "ResourceKind", Value: f.Resource.Kind},
-		},
-	}
-	if f.Source != "" {
-		item.Columns = append(item.Columns, model.KeyValue{
-			Key: "Source", Value: f.Source,
-		})
-	}
-	if f.Summary != "" || f.Details != "" {
-		desc := f.Summary
-		if f.Details != "" {
-			if desc != "" {
-				desc += "\n\n"
-			}
-			desc += f.Details
-		}
-		item.Columns = append(item.Columns, model.KeyValue{
-			Key: "Description", Value: desc,
-		})
-	}
-	if len(f.References) > 0 {
-		item.Columns = append(item.Columns, model.KeyValue{
-			Key: "References", Value: strings.Join(f.References, "\n"),
-		})
-	}
-	// Source-specific labels as additional columns with TitleCase keys.
-	// Sort for deterministic test output.
-	labelKeys := make([]string, 0, len(f.Labels))
-	for k := range f.Labels {
-		labelKeys = append(labelKeys, k)
-	}
-	sort.Strings(labelKeys)
-	for _, k := range labelKeys {
-		item.Columns = append(item.Columns, model.KeyValue{
-			Key: titleCase(k), Value: f.Labels[k],
-		})
-	}
-	return item
 }

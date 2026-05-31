@@ -110,6 +110,7 @@ func saveSecurityIgnores(state *SecurityIgnoreState) error {
 	}
 
 	if err := os.Rename(tmpPath, path); err != nil {
+		_ = os.Remove(tmpPath)
 		return err
 	}
 	// Fsync the parent directory so the rename itself is durable; without
@@ -143,7 +144,7 @@ func saveSecurityIgnoresCmd(state *SecurityIgnoreState) tea.Cmd {
 }
 
 // addSecurityIgnore returns a NEW state with the rule added for the given context.
-// Deduplicates by (GroupKey, Resource). Sets CreatedAt if empty.
+// Deduplicates by (Source, GroupKey, Resource). Sets CreatedAt if empty.
 func addSecurityIgnore(state *SecurityIgnoreState, ctx string, rule SecurityIgnoreRule) *SecurityIgnoreState {
 	if rule.CreatedAt == "" {
 		rule.CreatedAt = time.Now().Format(time.RFC3339)

@@ -44,7 +44,7 @@ func (s *Source) Name() string { return "kubescape" }
 
 // Categories returns the categories this source produces.
 func (s *Source) Categories() []security.Category {
-	return []security.Category{security.CategoryMisconfig, security.CategoryCompliance}
+	return []security.Category{security.CategoryMisconfig}
 }
 
 // IsAvailable checks that the WorkloadConfigurationScan CRD is served.

@@ -33,6 +33,12 @@ func securityResourceTypeForItem(sel *model.Item) (model.ResourceTypeEntry, bool
 	if !strings.HasPrefix(sel.Kind, prefix) || !strings.HasSuffix(sel.Kind, suffix) {
 		return model.ResourceTypeEntry{}, false
 	}
+	// Reject kinds too short for prefix and suffix to occupy disjoint spans;
+	// e.g. "__security__" (len 12) satisfies both Has* checks but its markers
+	// overlap, so the slice below would have low > high and panic.
+	if len(sel.Kind) < len(prefix)+len(suffix) {
+		return model.ResourceTypeEntry{}, false
+	}
 	source := sel.Kind[len(prefix) : len(sel.Kind)-len(suffix)]
 	if source == "" {
 		return model.ResourceTypeEntry{}, false

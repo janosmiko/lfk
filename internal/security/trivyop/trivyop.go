@@ -89,7 +89,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 
 	auditList, err := security.ListPaginated(ctx, s.client.Resource(ConfigAuditReportGVR).Namespace(namespace))
 	if err != nil {
-		return findings, fmt.Errorf("list config audit reports: %w", err)
+		return nil, fmt.Errorf("list config audit reports: %w", err)
 	}
 	for i := range auditList.Items {
 		findings = append(findings, parseConfigAuditReport(&auditList.Items[i])...)

@@ -47,7 +47,7 @@ func checkPrivileged(pod *corev1.Pod, c corev1.Container) []security.Finding {
 // checkHostNamespaces flags pods that share the host's PID/network/IPC namespaces.
 // Only emits for the first container (bound to first container) to avoid duplication.
 func checkHostNamespaces(pod *corev1.Pod, c corev1.Container) []security.Finding {
-	if pod.Spec.Containers[0].Name != c.Name {
+	if len(pod.Spec.Containers) == 0 || pod.Spec.Containers[0].Name != c.Name {
 		return nil
 	}
 	var findings []security.Finding
@@ -69,7 +69,7 @@ func checkHostNamespaces(pod *corev1.Pod, c corev1.Container) []security.Finding
 // checkHostPath flags pods that mount hostPath volumes.
 // Only emits for the first container — volumes are pod-level.
 func checkHostPath(pod *corev1.Pod, c corev1.Container) []security.Finding {
-	if pod.Spec.Containers[0].Name != c.Name {
+	if len(pod.Spec.Containers) == 0 || pod.Spec.Containers[0].Name != c.Name {
 		return nil
 	}
 	var findings []security.Finding
@@ -175,7 +175,7 @@ func checkResourceLimits(pod *corev1.Pod, c corev1.Container) []security.Finding
 // checkDefaultServiceAccount flags pods using the namespace's default service account.
 // Emits once per pod (bound to first container).
 func checkDefaultServiceAccount(pod *corev1.Pod, c corev1.Container) []security.Finding {
-	if pod.Spec.Containers[0].Name != c.Name {
+	if len(pod.Spec.Containers) == 0 || pod.Spec.Containers[0].Name != c.Name {
 		return nil
 	}
 	sa := pod.Spec.ServiceAccountName

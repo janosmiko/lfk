@@ -33,8 +33,8 @@ func parseSeverity(s string) security.Severity {
 	return security.SeverityUnknown
 }
 
-// parseResult converts a Policy Reports API result status to whether it's
-// a finding. Only "fail" and "error" results are treated as findings.
+// isFailingResult reports whether a Policy Reports API result status counts
+// as a finding. Only "fail" and "error" results are treated as findings.
 func isFailingResult(status string) bool {
 	switch strings.ToLower(status) {
 	case "fail", "error":
