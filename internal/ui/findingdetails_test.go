@@ -115,7 +115,7 @@ func TestRenderFindingGroupDetails(t *testing.T) {
 			{Key: "Severity", Value: "CRIT"},
 			{Key: "Affected", Value: "3"},
 			{Key: "Category", Value: "misconfig"},
-			{Key: "Source", Value: "heuristic"},
+			{Key: "__source__", Value: "heuristic"},
 			{Key: "Description", Value: "Runs as privileged"},
 		},
 	}
@@ -125,8 +125,7 @@ func TestRenderFindingGroupDetails(t *testing.T) {
 			Namespace: "default",
 			Kind:      "__security_affected_resource__",
 			Columns: []model.KeyValue{
-				{Key: "Severity", Value: "CRIT"},
-				{Key: "ResourceKind", Value: "Pod"},
+				{Key: "__severity__", Value: "CRIT"},
 				{Key: "Namespace", Value: "default"},
 			},
 		},
@@ -135,8 +134,7 @@ func TestRenderFindingGroupDetails(t *testing.T) {
 			Namespace: "default",
 			Kind:      "__security_affected_resource__",
 			Columns: []model.KeyValue{
-				{Key: "Severity", Value: "CRIT"},
-				{Key: "ResourceKind", Value: "Pod"},
+				{Key: "__severity__", Value: "CRIT"},
 				{Key: "Namespace", Value: "default"},
 			},
 		},

@@ -109,7 +109,7 @@ func RenderFindingGroupDetails(group model.Item, affected []model.Item, width, h
 		fmt.Fprintf(&b, "  %s  %s\n", label, v)
 	}
 	kv("Affected", group.ColumnValue("Affected")+" resources")
-	kv("Source", group.ColumnValue("Source"))
+	kv("Source", group.ColumnValue("__source__"))
 	kv("Category", group.ColumnValue("Category"))
 
 	if desc := group.ColumnValue("Description"); desc != "" {
@@ -132,7 +132,7 @@ func RenderFindingGroupDetails(group model.Item, affected []model.Item, width, h
 		maxShow := min(max(height/2, 5), len(affected))
 		for i := range maxShow {
 			it := affected[i]
-			sev := it.ColumnValue("Severity")
+			sev := it.ColumnValue("__severity__")
 			fmt.Fprintf(&b, "    %s  %s",
 				styleSeverityBadge(sev), it.Name)
 			if it.Namespace != "" {
@@ -155,7 +155,7 @@ func RenderFindingGroupDetails(group model.Item, affected []model.Item, width, h
 func RenderAffectedResourceDetails(item model.Item, width, height int) string {
 	var b strings.Builder
 
-	severity := item.ColumnValue("Severity")
+	severity := item.ColumnValue("__severity__")
 	// item.Name is shortResource(ref) — the same value the (now removed)
 	// "Resource" column used to carry. Reading from Name avoids the
 	// duplicated-column rendering noted in the security UI audit.
@@ -174,9 +174,14 @@ func RenderAffectedResourceDetails(item model.Item, width, height int) string {
 		}
 		fmt.Fprintf(&b, "  %s  %s\n", label, v)
 	}
-	kv("Kind", item.ColumnValue("ResourceKind"))
+	// No "Kind" line: item.Name (shortResource) already encodes the kind.
 	kv("Namespace", item.ColumnValue("Namespace"))
-	kv("Findings", item.ColumnValue("FindingCount"))
+	// Findings count is only meaningful when a resource has more than one
+	// instance of this finding (e.g. several containers); the common "1" is
+	// noise, so it is omitted.
+	if fc := item.ColumnValue("__finding_count__"); fc != "" && fc != "0" && fc != "1" {
+		kv("Findings", fc)
+	}
 
 	if desc := item.ColumnValue("Description"); desc != "" {
 		b.WriteString("\n  Details:\n")

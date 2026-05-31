@@ -185,7 +185,11 @@ func findingGroupToItem(g findingGroup) model.Item {
 			// mismatch users were reporting.
 			{Key: "Affected", Value: fmt.Sprintf("%d", g.Count)},
 			{Key: "Category", Value: string(g.Category)},
-			{Key: "Source", Value: g.Source},
+			// Source is hidden (__-prefixed): the user reaches this list by
+			// entering a single source, so every group row carries the same
+			// value — a constant column is noise. Still shown in the details
+			// pane via __source__.
+			{Key: "__source__", Value: g.Source},
 		},
 	}
 	// Show the full title when it provides more info than the key alone.
@@ -285,14 +289,22 @@ func affectedResourceToItem(ref security.ResourceRef, groupKey string, findings 
 		// makes the "Age" column reset to ~0 on every refresh — misleading.
 		// LiveAge falls back to item.Age (also empty) so the column stays
 		// blank until a real timestamp is plumbed through.
-		// No "Resource" column — it would duplicate Item.Name (the table's
-		// first column already shows shortResource(ref)). Consumers that need
-		// the resource label read item.Name directly.
+		// Column relevance at the affected-resources level (one finding,
+		// many resources):
+		//   - No "Resource"/ResourceKind column: Item.Name is shortResource
+		//     (e.g. "deploy/api"), which already encodes the kind. A kind
+		//     column just duplicates it.
+		//   - Severity and FindingCount are hidden (__-prefixed): severity is
+		//     a property of the finding, so it is identical on every row here
+		//     (the group row above already shows it once), and the count is
+		//     almost always 1. They stay available to the details pane and
+		//     the group preview's mini-list, just not as redundant columns.
+		// Namespace is the only value that varies per row, so it is the sole
+		// visible column besides the name.
 		Columns: []model.KeyValue{
-			{Key: "Severity", Value: severityLabel(highestSev)},
-			{Key: "ResourceKind", Value: ref.Kind},
+			{Key: "__severity__", Value: severityLabel(highestSev)},
 			{Key: "Namespace", Value: ref.Namespace},
-			{Key: "FindingCount", Value: fmt.Sprintf("%d", count)},
+			{Key: "__finding_count__", Value: fmt.Sprintf("%d", count)},
 			{Key: "__resource_key__", Value: ref.Key()},
 		},
 	}

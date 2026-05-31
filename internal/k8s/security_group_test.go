@@ -193,7 +193,10 @@ func TestFindingGroupToItem(t *testing.T) {
 	// matches the "<n> resources" suffix in RenderFindingGroupDetails.
 	assert.Equal(t, "3", item.ColumnValue("Affected"))
 	assert.Equal(t, "misconfig", item.ColumnValue("Category"))
-	assert.Equal(t, "heuristic", item.ColumnValue("Source"))
+	// Source is hidden (details-only): constant across a single source's
+	// group list, so not shown as a visible column.
+	assert.Equal(t, "heuristic", item.ColumnValue("__source__"))
+	assert.Empty(t, item.ColumnValue("Source"), "Source is hidden, not a visible column")
 	assert.Empty(t, item.ColumnValue("Title"), "Title removed — Name already shows it")
 	assert.Equal(t, "Container running as privileged\n\nAllows full host access",
 		item.ColumnValue("Description"))
@@ -238,12 +241,19 @@ func TestAffectedResourceToItem(t *testing.T) {
 	assert.Empty(t, item.Status)
 	assert.Equal(t, "privileged", item.Extra)
 
-	assert.Equal(t, "CRIT", item.ColumnValue("Severity"))
-	// Resource column intentionally absent — same value lives in item.Name.
+	// Severity and FindingCount are hidden (details-only): severity is
+	// constant per finding and the count is almost always 1, so neither is
+	// shown as a table column.
+	assert.Equal(t, "CRIT", item.ColumnValue("__severity__"))
+	assert.Equal(t, "2", item.ColumnValue("__finding_count__"))
+	assert.Empty(t, item.ColumnValue("Severity"), "Severity is hidden, not a visible column")
+	assert.Empty(t, item.ColumnValue("FindingCount"), "FindingCount is hidden, not a visible column")
+	// Resource and ResourceKind columns intentionally absent — item.Name
+	// (shortResource) already carries both the kind and the name.
 	assert.Empty(t, item.ColumnValue("Resource"))
-	assert.Equal(t, "Deployment", item.ColumnValue("ResourceKind"))
+	assert.Empty(t, item.ColumnValue("ResourceKind"), "ResourceKind dropped — duplicates item.Name")
+	// Namespace is the only per-row-varying value, so it stays visible.
 	assert.Equal(t, "prod", item.ColumnValue("Namespace"))
-	assert.Equal(t, "2", item.ColumnValue("FindingCount"))
 }
 
 func TestGroupFindingsUniqueResources(t *testing.T) {

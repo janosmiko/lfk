@@ -146,7 +146,7 @@ func TestGetSecurityFindingsFiltersBySource(t *testing.T) {
 	require.Len(t, items, 1)
 	assert.Equal(t, "__security_finding_group__", items[0].Kind)
 	assert.Equal(t, "CVE-1", items[0].Name)
-	assert.Equal(t, "trivy-operator", items[0].ColumnValue("Source"))
+	assert.Equal(t, "trivy-operator", items[0].ColumnValue("__source__"))
 }
 
 func TestGetSecurityFindingsSortsBySeverity(t *testing.T) {
@@ -257,7 +257,10 @@ func TestGetSecurityAffectedResources(t *testing.T) {
 	// Sorted by namespace then name.
 	assert.Equal(t, "pod/api", items[0].Name)
 	assert.Equal(t, "pod/web", items[1].Name)
-	assert.Equal(t, "Pod", items[0].ColumnValue("ResourceKind"))
+	// ResourceKind is no longer a column — the kind is encoded in Name
+	// (shortResource) and the full identity in the hidden __resource_key__.
+	assert.Empty(t, items[0].ColumnValue("ResourceKind"))
+	assert.Equal(t, "ns/Pod/api", items[0].ColumnValue("__resource_key__"))
 }
 
 // TestGetSecurityAffectedResourcesPropagatesSourceError guards that a
