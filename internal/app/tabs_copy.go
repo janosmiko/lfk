@@ -36,14 +36,34 @@ func copyMapStringSortPref(m map[string]sortPref) map[string]sortPref {
 	return c
 }
 
-// copyItemCache deep copies the item cache.
+// copyItemCache copies the item cache, isolating each tab's snapshot from
+// later in-place mutation. model.Item's mutable reference-typed slices
+// (Columns, Conditions, GroupedRefs) are cloned because the metrics and
+// event-grouping paths append to them in place (e.g. update_metrics_msgs.go,
+// events_group.go), which would otherwise write through a shared backing
+// array into another tab's cache. Item.Raw is deliberately shared: it is the
+// immutable source object, only ever re-read for JSONPath evaluation, so
+// cloning it would waste memory for no isolation benefit.
 func copyItemCache(m map[string][]model.Item) map[string][]model.Item {
 	if m == nil {
 		return make(map[string][]model.Item)
 	}
 	c := make(map[string][]model.Item, len(m))
 	for k, v := range m {
-		c[k] = append([]model.Item(nil), v...)
+		items := make([]model.Item, len(v))
+		for i, it := range v {
+			if it.Columns != nil {
+				it.Columns = append([]model.KeyValue(nil), it.Columns...)
+			}
+			if it.Conditions != nil {
+				it.Conditions = append([]model.ConditionEntry(nil), it.Conditions...)
+			}
+			if it.GroupedRefs != nil {
+				it.GroupedRefs = append([]model.GroupedRef(nil), it.GroupedRefs...)
+			}
+			items[i] = it
+		}
+		c[k] = items
 	}
 	return c
 }
