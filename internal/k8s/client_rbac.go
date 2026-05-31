@@ -87,7 +87,11 @@ func (c *Client) GetSelfRulesAs(ctx context.Context, contextName, namespace, asU
 		}
 	}
 
-	clientset, err := kubernetes.NewForConfig(cfg)
+	httpClient, err := taggedHTTPClient(cfg, contextName)
+	if err != nil {
+		return nil, fmt.Errorf("creating http client: %w", err)
+	}
+	clientset, err := kubernetes.NewForConfigAndClient(cfg, httpClient)
 	if err != nil {
 		return nil, fmt.Errorf("creating clientset: %w", err)
 	}
