@@ -34,7 +34,8 @@ type Manager struct {
 	refreshTTL          time.Duration
 	errorTTL            time.Duration // shorter TTL applied when no source succeeded
 	availabilityTTL     time.Duration
-	maxFetchConcurrency int // upper bound on simultaneous source Fetches; 0 = unbounded
+	maxFetchConcurrency int           // upper bound on simultaneous source Fetches; 0 = unbounded
+	scanTimeout         time.Duration // hard ceiling on a single coalesced FetchAll scan
 
 	cacheKey      string // lastCtx + "|" + lastNamespace
 	cachedResult  FetchResult
@@ -88,6 +89,7 @@ func NewManager() *Manager {
 		errorTTL:            30 * time.Second,
 		availabilityTTL:     60 * time.Second,
 		maxFetchConcurrency: 2,
+		scanTimeout:         60 * time.Second,
 		availCache:          make(map[string]availEntry),
 	}
 }
@@ -266,17 +268,39 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 		return cached, nil
 	}
 
-	// Coalesce overlapping identical scans (see fetchGroup). Concurrent
-	// callers share the winner's result; the key is released when the scan
-	// completes, so the next call re-checks the cache below and serves the
-	// freshly-cached result instead of re-scanning.
-	v, _, _ := m.fetchGroup.Do(cacheKey, func() (any, error) {
+	// Coalesce overlapping identical scans (see fetchGroup). DoChan (not Do)
+	// is deliberate: callers run inside the app's per-context scheduler
+	// worker pool, which preempts and times out work via context
+	// cancellation. A worker blocked on the uncancellable Do would ignore
+	// its ctx and stay stuck for the whole scan, starving the pod/dashboard
+	// loads that share the pool. With DoChan each caller selects on its own
+	// ctx and returns promptly when cancelled.
+	//
+	// The scan itself runs on a detached, bounded context — not the caller's
+	// — so it completes and populates the cache even if the caller that
+	// started it navigates away. Tying the scan to one caller's ctx would
+	// let a preempted caller abort the shared scan and hand every waiter a
+	// premature empty result.
+	ch := m.fetchGroup.DoChan(cacheKey, func() (any, error) {
 		if cached, ok := m.cachedFetch(cacheKey); ok {
 			return cached, nil
 		}
-		return m.fetchAllScan(ctx, kubeCtx, namespace, cacheKey), nil
+		scanCtx, cancel := context.WithTimeout(context.Background(), m.scanTimeout)
+		defer cancel()
+		return m.fetchAllScan(scanCtx, kubeCtx, namespace, cacheKey), nil
 	})
-	return v.(FetchResult), nil
+	select {
+	case res := <-ch:
+		if res.Err != nil {
+			return FetchResult{}, res.Err
+		}
+		return res.Val.(FetchResult), nil
+	case <-ctx.Done():
+		// Caller cancelled / preempted / timed out. The detached scan keeps
+		// running and caches its result for the next call; this caller
+		// returns immediately so a scheduler worker is never stuck waiting.
+		return FetchResult{}, ctx.Err()
+	}
 }
 
 // cachedFetch returns the cached FetchResult for cacheKey when it is still

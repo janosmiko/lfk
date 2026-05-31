@@ -78,6 +78,37 @@ func TestManagerFetchAllParallel(t *testing.T) {
 	assert.Less(t, elapsed, 150*time.Millisecond, "sources should fetch in parallel")
 }
 
+// TestManagerFetchAllWaiterRespectsContext guards against a coalesced caller
+// blocking uncancellably on an in-flight scan. FetchAll runs inside the app's
+// per-context scheduler worker pool, which preempts and times out tasks via
+// context cancellation. A waiter that ignored its context would keep a worker
+// stuck for the full duration of a slow source scan (Falco/Trivy log reads),
+// starving the pod/dashboard loads that share the pool.
+func TestManagerFetchAllWaiterRespectsContext(t *testing.T) {
+	m := NewManager()
+	m.Register(&FakeSource{
+		NameStr: "slow", Available: true,
+		FetchDelay: 800 * time.Millisecond,
+		Findings:   []Finding{{ID: "x"}},
+	})
+
+	// Kick off a scan that will be in flight for ~800ms.
+	go func() { _, _ = m.FetchAll(context.Background(), "ctx", "") }()
+	time.Sleep(50 * time.Millisecond) // let the flight start
+
+	// A second caller for the same key with a short deadline must return when
+	// its own context expires, not block until the in-flight scan completes.
+	cctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	defer cancel()
+	start := time.Now()
+	_, err := m.FetchAll(cctx, "ctx", "")
+	elapsed := time.Since(start)
+
+	require.Error(t, err, "waiter must return its context error, not the coalesced result")
+	assert.Less(t, elapsed, 400*time.Millisecond,
+		"waiter must not block for the full in-flight scan")
+}
+
 func TestManagerFetchAllPartialFailure(t *testing.T) {
 	m := NewManager()
 	good := &FakeSource{
