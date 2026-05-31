@@ -41,17 +41,22 @@ func (m *Model) SetShutdownNotifier(fn func()) {
 // goroutine. The drain reports completion via shutdownCompleteMsg, at
 // which point Update dispatches tea.Quit.
 func (m Model) beginShutdown() (tea.Model, tea.Cmd) {
-	m.signalShutdown()
-	// Persist the session synchronously on the UI goroutine: it is a fast
-	// local-disk write that can't hang on an unreachable cluster, and
-	// keeping it here avoids racing with a late Update-driven save once the
-	// drain goroutine is running.
-	m.saveCurrentSession()
-	m.overlay = overlayShuttingDown
-	m.shuttingDown = true
+	if m.shuttingDown {
+		return m, nil
+	}
+	// Arm the force-quit watchdog first so the grace period bounds every
+	// step below, including the synchronous session save — a local-disk
+	// write that is normally fast but could stall on a slow or networked
+	// home directory.
 	if m.shutdownNotifier != nil {
 		m.shutdownNotifier()
 	}
+	m.signalShutdown()
+	// Persist the session synchronously on the UI goroutine: keeping it off
+	// the drain goroutine avoids racing with a late Update-driven save.
+	m.saveCurrentSession()
+	m.overlay = overlayShuttingDown
+	m.shuttingDown = true
 	return m, m.shutdownDrainCmd()
 }
 

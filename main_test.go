@@ -10,18 +10,20 @@ import (
 // the grace elapses.
 func TestArmForceQuit_KillsThenExitsAfterGrace(t *testing.T) {
 	order := make(chan string, 2)
-	notify := armForceQuit(20*time.Millisecond,
+	notify := armForceQuit(100*time.Millisecond,
 		func() { order <- "kill" },
 		func() { order <- "exit" },
 	)
 
 	notify()
 
-	// Nothing should fire before the grace period.
+	// Nothing should fire before the grace period. The pre-check window is
+	// kept a clear fraction below the grace so a descheduled goroutine on a
+	// busy CI runner does not flake this assertion.
 	select {
 	case got := <-order:
 		t.Fatalf("watchdog fired %q before grace elapsed", got)
-	case <-time.After(5 * time.Millisecond):
+	case <-time.After(20 * time.Millisecond):
 	}
 
 	got := make([]string, 0, 2)
