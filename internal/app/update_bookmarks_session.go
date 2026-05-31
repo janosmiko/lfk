@@ -263,5 +263,13 @@ func applySessionNamespaces(m *Model, allNS bool, ns string, selectedNS []string
 			m.selectedNamespaces = map[string]bool{ns: true}
 		}
 		m.nsSelectionNegated = negated
+	} else {
+		// Session omitted the namespace (older or partially-populated file):
+		// reset to all-namespaces rather than inheriting the prior tab's
+		// namespace filter, which would silently scope the restored context.
+		m.namespace = ""
+		m.allNamespaces = true
+		m.selectedNamespaces = nil
+		m.nsSelectionNegated = false
 	}
 }

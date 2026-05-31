@@ -206,7 +206,16 @@ func (c *Client) GetSecurityAffectedResources(ctx context.Context, contextName, 
 		if refs[i].Namespace != refs[j].Namespace {
 			return refs[i].Namespace < refs[j].Namespace
 		}
-		return refs[i].Name < refs[j].Name
+		if refs[i].Name != refs[j].Name {
+			return refs[i].Name < refs[j].Name
+		}
+		// Tie-break on Kind (then the full key) so same-namespace, same-name
+		// resources of different kinds (e.g. Deployment/api vs Service/api)
+		// render in a stable order rather than arbitrarily.
+		if refs[i].Kind != refs[j].Kind {
+			return refs[i].Kind < refs[j].Kind
+		}
+		return refs[i].Key() < refs[j].Key()
 	})
 	items := make([]model.Item, 0, len(refs))
 	for _, ref := range refs {
