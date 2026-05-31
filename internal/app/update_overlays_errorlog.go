@@ -362,10 +362,64 @@ func (m Model) handleErrorLogOverlayKeyD() (tea.Model, tea.Cmd) {
 		// Don't toggle debug in visual mode — 'd' is ambiguous.
 		return m, nil
 	}
+
+	// Anchor on the currently selected entry so the cursor stays on the same
+	// log line across the filter change instead of jumping back to the top.
+	// When hiding debug, the selected line may itself be a DBG entry that is
+	// about to disappear — fall back to the nearest surviving entry.
+	before := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
 	m.showDebugLogs = !m.showDebugLogs
-	m.errorLogScroll = 0
+	anchor, ok := nearestSurvivingErrorLogEntry(before, m.errorLogCursorLine, m.showDebugLogs)
+
+	after := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
+	if ok {
+		if idx := indexOfErrorLogEntry(after, anchor); idx >= 0 {
+			_, maxVisible, maxScroll := m.errorLogVisibleCount()
+			m.errorLogCursorLine = idx
+			m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
+			return m, nil
+		}
+	}
+
+	// Nothing to anchor to (empty log, or the entry vanished): reset to top.
 	m.errorLogCursorLine = 0
+	m.errorLogScroll = 0
 	return m, nil
+}
+
+// nearestSurvivingErrorLogEntry returns the entry at cursor if it survives the
+// post-toggle debug filter, otherwise the closest entry that does. The list is
+// newest-first, so the outward scan tries the higher index (older entry) before
+// the lower index (newer entry). Returns ok=false when no entry survives or the
+// cursor is out of range.
+func nearestSurvivingErrorLogEntry(entries []ui.ErrorLogEntry, cursor int, showDebugAfter bool) (ui.ErrorLogEntry, bool) {
+	survives := func(e ui.ErrorLogEntry) bool { return showDebugAfter || e.Level != "DBG" }
+	if cursor < 0 || cursor >= len(entries) {
+		return ui.ErrorLogEntry{}, false
+	}
+	if survives(entries[cursor]) {
+		return entries[cursor], true
+	}
+	for off := 1; off < len(entries); off++ {
+		if i := cursor + off; i < len(entries) && survives(entries[i]) {
+			return entries[i], true
+		}
+		if i := cursor - off; i >= 0 && survives(entries[i]) {
+			return entries[i], true
+		}
+	}
+	return ui.ErrorLogEntry{}, false
+}
+
+// indexOfErrorLogEntry finds the index of an entry by its identity
+// (timestamp + level + message). Returns -1 when absent.
+func indexOfErrorLogEntry(entries []ui.ErrorLogEntry, target ui.ErrorLogEntry) int {
+	for i, e := range entries {
+		if e.Time.Equal(target.Time) && e.Level == target.Level && e.Message == target.Message {
+			return i
+		}
+	}
+	return -1
 }
 
 func (m Model) handleErrorLogOverlayKeyG() (tea.Model, tea.Cmd) {
