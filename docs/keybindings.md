@@ -122,6 +122,8 @@ Terminal pods (Succeeded/Failed) older than 1h are still flagged but the reason 
 | `N` | Jump to previous search match |
 | `Esc` | Clear filter / cancel search |
 
+Each list remembers its `f` filter per tab: drilling into a resource (logs, containers, owned objects) and navigating back keeps the filter applied. A different list starts unfiltered; press `Esc` to clear a list's filter.
+
 Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 
 `/` and `f` share one persistent history at `$XDG_STATE_HOME/lfk/query-history` (default `~/.local/state/lfk/query-history`) — both inputs accept the same query syntax and match against the same fields, so a query confirmed in one mode is recallable from the other. The `:` command bar keeps its own `history` file because its inputs are kubectl-shaped commands rather than resource-name queries.

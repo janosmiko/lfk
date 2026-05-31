@@ -683,6 +683,7 @@ func (m Model) navigateToBookmark(bm model.Bookmark) (tea.Model, tea.Cmd) {
 	// correct position so that pressing 'h' returns to the right item.
 	m.cursors = [5]int{}
 	m.cursorMemory = make(map[string]int)
+	m.filterMemory = make(map[string]savedFilter)
 	m.itemCache = make(map[string][]model.Item)
 	m.setCursor(0)
 

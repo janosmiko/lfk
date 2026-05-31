@@ -32,6 +32,7 @@ func helpSections() []helpSection {
 			title: "Search & Filter",
 			bindings: []helpEntry{
 				{kb.Filter, "Filter items (~prefix: fuzzy, regex auto-detected, \\prefix: literal)"},
+				{"", "Each list keeps its filter per tab: drill into a resource and back and it's still applied; Esc clears it."},
 				{kb.Search, "Search and jump to match (~fuzzy, regex auto, \\literal)"},
 				{"", "Up/Down inside filter or search recalls previous queries (shared, persistent across sessions)."},
 				{"", "Paste from clipboard: Cmd+V (macOS) / Ctrl+Shift+V (Linux). Multiline asks to confirm."},

@@ -269,6 +269,7 @@ func (m Model) navigateParentFromPickerUnion() (tea.Model, tea.Cmd) {
 	m.popLeft()
 	m.clearRight()
 	m.restoreCursor()
+	m.restoreLevelFilter()
 	for i, item := range m.middleItems {
 		if item.Kind == unionSetItemKind && (item.Extra == activeUnionSet || item.Name == activeUnionSet) {
 			m.setCursor(i)

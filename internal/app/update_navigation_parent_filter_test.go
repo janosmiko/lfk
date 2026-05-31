@@ -10,10 +10,15 @@ import (
 )
 
 // Regression: a filter committed at a child level (e.g. a typed-then-Enter'd
-// query at LevelResourceTypes) must not survive into the parent level. The
+// query at LevelResourceTypes) must not LEAK into the parent level. The
 // previous bug left m.filterText populated, so visibleMiddleItems silently
 // filtered every cluster-picker entry whose name didn't match — making the
 // context list look empty after backing out of a filtered view.
+//
+// Per-level filter memory (issue #303) means the parent restores ITS OWN
+// saved filter, not the child's. These cases seed no parent-level filter, so
+// the live filter must end up empty — proving the child's text never leaks.
+// (Restoring a genuine parent filter is covered in navigation_filter_memory_test.go.)
 //
 // The table covers every branch in navigateParent so a future early-return
 // added above the filter-clear block can't reintroduce the leak.
@@ -95,6 +100,7 @@ func TestNavigateParent_ClearsFilter(t *testing.T) {
 				m := basePush80Model()
 				m.nav.Level = model.LevelContainers
 				m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+				m.nav.ResourceName = "pod-1"
 				m.leftItems = []model.Item{{Name: "container-1"}}
 				m.leftItemsHistory = [][]model.Item{{{Name: "cluster"}}, {{Name: "Pods"}}, {{Name: "pod-1"}}}
 				return m
@@ -107,6 +113,8 @@ func TestNavigateParent_ClearsFilter(t *testing.T) {
 				m := basePush80Model()
 				m.nav.Level = model.LevelContainers
 				m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment"}
+				m.nav.ResourceName = "dep-1"
+				m.nav.OwnedName = "pod-1" // the owned pod whose containers we view
 				m.leftItems = []model.Item{{Name: "container-1"}}
 				m.leftItemsHistory = [][]model.Item{{{Name: "cluster"}}, {{Name: "Deploys"}}, {{Name: "dep-1"}}}
 				return m

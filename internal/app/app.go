@@ -39,6 +39,7 @@ type Model struct {
 
 	// Cursor memory: maps navigation path to cursor position for back-and-forth navigation.
 	cursorMemory map[string]int
+	filterMemory map[string]savedFilter // per-level committed filter, recalled on back-nav; see saveLevelFilter (#303)
 
 	// Item cache: maps navigation path to loaded items for faster back navigation.
 	itemCache map[string][]model.Item

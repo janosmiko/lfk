@@ -408,6 +408,7 @@ func (m *Model) saveCurrentTab() {
 	t.middleScroll = ui.ActiveMiddleScroll
 	t.leftScroll = ui.ActiveLeftScroll
 	t.cursorMemory = copyMapStringInt(m.cursorMemory)
+	t.filterMemory = copyMapStringSavedFilter(m.filterMemory)
 	t.itemCache = copyItemCache(m.itemCache)
 	t.cacheFingerprints = copyMapStringString(m.cacheFingerprints)
 	t.yamlContent = m.yamlContent
@@ -521,6 +522,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	ui.ActiveMiddleScroll = t.middleScroll
 	ui.ActiveLeftScroll = t.leftScroll
 	m.cursorMemory = copyMapStringInt(t.cursorMemory)
+	m.filterMemory = copyMapStringSavedFilter(t.filterMemory)
 	m.itemCache = copyItemCache(t.itemCache)
 	m.cacheFingerprints = copyMapStringString(t.cacheFingerprints)
 	m.yamlContent = t.yamlContent
@@ -688,6 +690,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		middleScroll:           ui.ActiveMiddleScroll,
 		leftScroll:             ui.ActiveLeftScroll,
 		cursorMemory:           copyMapStringInt(m.cursorMemory),
+		filterMemory:           copyMapStringSavedFilter(m.filterMemory),
 		itemCache:              copyItemCache(m.itemCache),
 		cacheFingerprints:      copyMapStringString(m.cacheFingerprints),
 		yamlContent:            m.yamlContent,

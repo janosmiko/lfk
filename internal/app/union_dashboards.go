@@ -211,6 +211,7 @@ func (m Model) navigateParentToUnionDashboardMembers() (tea.Model, tea.Cmd) {
 	m.popLeft()
 	m.clearRight()
 	m.restoreCursor()
+	m.restoreLevelFilter()
 	m.syncExpandedGroup()
 	m.saveCurrentSession()
 	return m, m.loadPreview()
