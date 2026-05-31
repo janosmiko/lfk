@@ -169,7 +169,7 @@ func TestLoadCanISAList_SubmitsAtCriticalPriority(t *testing.T) {
 	}, time.Second, 10*time.Millisecond, "loadCanISAList must Submit at Critical priority")
 }
 
-func TestLoadResources_SubmitsAtHighPriority(t *testing.T) {
+func TestLoadResources_MainListSubmitsAtCriticalPriority(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.nav.Context = "test-ctx"
 	m.nav.ResourceType = model.ResourceTypeEntry{
@@ -181,13 +181,43 @@ func TestLoadResources_SubmitsAtHighPriority(t *testing.T) {
 	}
 	m.scheduler.StopWorkers()
 
+	// The main list (forPreview=false) is the view the user is waiting on,
+	// so it runs Critical to claim the reserved worker and never queue
+	// behind background work.
 	cmd := m.loadResources(false)
 	require.NotNil(t, cmd)
 	go cmd()
 
 	require.Eventually(t, func() bool {
+		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityCritical) >= 1
+	}, time.Second, 10*time.Millisecond, "main resource list must Submit at Critical priority")
+}
+
+func TestLoadResources_PreviewSubmitsAtHighPriority(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m.nav.Context = "test-ctx"
+	m.nav.Level = model.LevelResourceTypes
+	podsRT := model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true}
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{podsRT}
+	m.middleItems = model.BuildSidebarItems([]model.ResourceTypeEntry{podsRT})
+	m.allGroupsExpanded = true
+	visible := m.visibleMiddleItems()
+	for i, item := range visible {
+		if item.Extra == podsRT.ResourceRef() {
+			m.setCursor(i)
+			break
+		}
+	}
+	m.scheduler.StopWorkers()
+
+	// Preview hovers stay High — speculative and preemptible.
+	cmd := m.loadResources(true)
+	require.NotNil(t, cmd)
+	go cmd()
+
+	require.Eventually(t, func() bool {
 		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityHigh) >= 1
-	}, time.Second, 10*time.Millisecond, "loadResources must Submit at High priority")
+	}, time.Second, 10*time.Millisecond, "preview resource list must Submit at High priority")
 }
 
 func TestLoadOwned_SubmitsAtHighPriority(t *testing.T) {

@@ -29,7 +29,15 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 		// "__union__" string, which restConfigForContext immediately rejects.
 		discoveryCtx := m.effectiveContext()
 		var cmds []tea.Cmd
-		if !m.discoveringContexts[discoveryCtx] {
+		// Only force a discovery round-trip on an explicit user refresh
+		// (shift+r), never on the watch tick. The watch tick reaches
+		// refreshCurrentLevel every interval with suppressBgtasks set;
+		// re-invalidating the cache and re-firing discovery there ran a full
+		// API-resource discovery every few seconds while the user simply sat
+		// on the resource-type list (visible as "Discover API Resources"
+		// constantly running). The resource set is session-cached by design —
+		// new CRDs surface on the next manual refresh, not via polling.
+		if !m.suppressBgtasks && !m.discoveringContexts[discoveryCtx] {
 			if m.discoveringContexts != nil {
 				m.discoveringContexts[discoveryCtx] = true
 			}

@@ -2,40 +2,15 @@ package app
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"os"
-	"os/exec"
 	"strings"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
-	"github.com/janosmiko/lfk/internal/ui"
 )
-
-// helmHistoryTimeout caps how long the helm history subprocess may run before
-// being killed. Prevents the loader goroutine from leaking when helm hangs on
-// an unresponsive API server.
-const helmHistoryTimeout = 30 * time.Second
-
-// helmErrOutputCap bounds how much of helm's stderr/stdout we propagate into
-// error messages and logs. Helm can emit multi-kilobyte NOTES.txt content and
-// values snippets that would otherwise bloat logs and the UI error overlay.
-const helmErrOutputCap = 512
-
-// truncateHelmOutput trims helm subprocess output to helmErrOutputCap bytes so
-// logs and UI error messages stay bounded.
-func truncateHelmOutput(out []byte) string {
-	s := strings.TrimSpace(string(out))
-	if len(s) > helmErrOutputCap {
-		return s[:helmErrOutputCap] + "...(truncated)"
-	}
-	return s
-}
 
 // --- Commands ---
 
@@ -199,8 +174,14 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		}
 		unionCtxs := m.unionContexts
 		client := m.client
+		// Main list is Critical, preview hovers stay High — see the
+		// non-union path below for the rationale.
+		unionListPriority := scheduler.PriorityHigh
+		if !forPreview {
+			unionListPriority = scheduler.PriorityCritical
+		}
 		return m.scheduleK8sCall(
-			scheduler.PriorityHigh,
+			unionListPriority,
 			scheduler.KindResourceList,
 			"List "+model.DisplayNameFor(rt)+" (union)",
 			strings.Join(unionCtxs, ", "),
@@ -230,8 +211,17 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		}
 	}
 	client := m.client
+	// The main resource list (drill-in / watch refresh) is the view the user
+	// is actively waiting on, so it runs at Critical: it gets the reserved
+	// worker and is never queued behind background dashboard/metrics/preview
+	// work. Preview hovers stay High — they are speculative and must remain
+	// preemptible so rapid sidebar cursoring can drop superseded fetches.
+	listPriority := scheduler.PriorityHigh
+	if !forPreview {
+		listPriority = scheduler.PriorityCritical
+	}
 	return m.scheduleK8sCall(
-		scheduler.PriorityHigh,
+		listPriority,
 		scheduler.KindResourceList,
 		"List "+model.DisplayNameFor(rt),
 		bgtaskTarget(kctx, ns),
@@ -601,104 +591,6 @@ func (m Model) loadRevisions() tea.Cmd {
 	}
 }
 
-// fetchHelmHistory shells out to `helm history` and returns the parsed
-// revisions (newest first). It is shared between the rollback and read-only
-// history overlays so both views use the same data source. The subprocess is
-// bounded by helmHistoryTimeout and its error output is truncated before
-// being logged or propagated to the UI.
-func fetchHelmHistory(helmPath, name, ns, kubeCtx, kubeconfigPaths string) ([]ui.HelmRevision, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), helmHistoryTimeout)
-	defer cancel()
-
-	args := []string{"history", name, "-n", ns, "--kube-context", kubeCtx, "-o", "json", "--max", "50"}
-	cmd := exec.CommandContext(ctx, helmPath, args...)
-	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
-	logExecCmd("Running helm command", cmd)
-	output, cmdErr := cmd.CombinedOutput()
-	if cmdErr != nil {
-		truncated := truncateHelmOutput(output)
-		logger.Error("helm history failed", "cmd", cmd.String(), "error", cmdErr, "output", truncated)
-		return nil, fmt.Errorf("%w: %s", cmdErr, truncated)
-	}
-
-	var entries []struct {
-		Revision    int    `json:"revision"`
-		Status      string `json:"status"`
-		Chart       string `json:"chart"`
-		AppVersion  string `json:"app_version"`
-		Description string `json:"description"`
-		Updated     string `json:"updated"`
-	}
-	if jsonErr := json.Unmarshal(output, &entries); jsonErr != nil {
-		return nil, fmt.Errorf("failed to parse helm history: %w", jsonErr)
-	}
-
-	revisions := make([]ui.HelmRevision, len(entries))
-	for i, e := range entries {
-		revisions[i] = ui.HelmRevision{
-			Revision:    e.Revision,
-			Status:      e.Status,
-			Chart:       e.Chart,
-			AppVersion:  e.AppVersion,
-			Description: e.Description,
-			Updated:     e.Updated,
-		}
-	}
-	// Reverse so newest revision is first.
-	for i, j := 0, len(revisions)-1; i < j; i, j = i+1, j-1 {
-		revisions[i], revisions[j] = revisions[j], revisions[i]
-	}
-	return revisions, nil
-}
-
-// loadHelmRevisions fetches the revision history for a Helm release.
-func (m Model) loadHelmRevisions() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
-	if err != nil {
-		return func() tea.Msg {
-			return helmRevisionListMsg{err: fmt.Errorf("helm not found: %w", err)}
-		}
-	}
-
-	ns := m.actionCtx.namespace
-	name := m.actionCtx.name
-	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
-
-	return func() tea.Msg {
-		revisions, err := fetchHelmHistory(helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths)
-		if err != nil {
-			return helmRevisionListMsg{err: err}
-		}
-		return helmRevisionListMsg{revisions: revisions}
-	}
-}
-
-// loadHelmHistory fetches revision history for the read-only history overlay.
-// It reuses fetchHelmHistory but routes the result to helmHistoryListMsg so
-// the update path opens overlayHelmHistory instead of overlayHelmRollback.
-func (m Model) loadHelmHistory() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
-	if err != nil {
-		return func() tea.Msg {
-			return helmHistoryListMsg{err: fmt.Errorf("helm not found: %w", err)}
-		}
-	}
-
-	ns := m.actionCtx.namespace
-	name := m.actionCtx.name
-	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
-
-	return func() tea.Msg {
-		revisions, err := fetchHelmHistory(helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths)
-		if err != nil {
-			return helmHistoryListMsg{err: err}
-		}
-		return helmHistoryListMsg{revisions: revisions}
-	}
-}
-
 // bgtaskTarget formats a context+namespace pair for the :tasks overlay's
 // Target column. Falls back gracefully when either part is empty.
 func bgtaskTarget(kctx, ns string) string {
@@ -773,7 +665,13 @@ func (m Model) scheduleK8sCall(prio scheduler.Priority, kind scheduler.Kind, nam
 	})
 	return func() tea.Msg {
 		res := <-future
-		if errors.Is(res.Err, scheduler.ErrCoalesced) || errors.Is(res.Err, scheduler.ErrContextSwitched) {
+		// All three sentinels mean "this submission was intentionally
+		// abandoned" — coalesced by a newer one, context dropped, or
+		// superseded by a newer requestGen via CancelStaleByGen. Return nil
+		// so the UI ignores it; the surviving submission carries the result.
+		if errors.Is(res.Err, scheduler.ErrCoalesced) ||
+			errors.Is(res.Err, scheduler.ErrContextSwitched) ||
+			errors.Is(res.Err, scheduler.ErrSuperseded) {
 			return nil
 		}
 		// Today the inner Fn wrapper above always passes nil as the

@@ -188,6 +188,7 @@ type runningTask struct {
 	cancel          context.CancelFunc
 	preempted       atomic.Bool
 	contextSwitched atomic.Bool
+	superseded      atomic.Bool
 }
 
 func (r *Registry) registerRunning(kctx string, rt *runningTask) {
@@ -227,7 +228,10 @@ func (r *Registry) pokePreempt(kctx string, newPrio Priority) bool {
 	var victim *runningTask
 	worstPrio := newPrio
 	for _, rt := range list {
-		if rt.preempted.Load() {
+		// Skip tasks already being torn down (preempted, or superseded by
+		// CancelStaleByGen): preempting one wastes this submission's single
+		// preemption on a worker slot that is already being reclaimed.
+		if rt.preempted.Load() || rt.superseded.Load() {
 			continue
 		}
 		if rt.task.req.Priority > worstPrio {
@@ -271,6 +275,16 @@ func (r *Registry) runTask(task *queuedTask) {
 	if rt.contextSwitched.Load() {
 		r.Finish(visID)
 		task.future <- Result{Err: ErrContextSwitched}
+		close(task.future)
+		return
+	}
+
+	// Superseded is checked before preempted: a stale-cancelled task must
+	// resolve as ErrSuperseded and NOT be requeued (the preempt path would
+	// re-run it), since a newer generation already owns the result.
+	if rt.superseded.Load() {
+		r.Finish(visID)
+		task.future <- Result{Err: ErrSuperseded}
 		close(task.future)
 		return
 	}

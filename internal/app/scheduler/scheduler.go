@@ -59,6 +59,12 @@ var (
 	// task's context before it could run. Caller's tea.Cmd should return
 	// nil (no UI update needed; the cluster context is gone).
 	ErrContextSwitched = errors.New("scheduler: context switched")
+
+	// ErrSuperseded is delivered when CancelStaleByGen drops or cancels a
+	// Low-priority task whose Gen predates the caller's current requestGen.
+	// The result would be discarded by the caller's gen check anyway, so
+	// the tea.Cmd should return nil and free the worker for fresh work.
+	ErrSuperseded = errors.New("scheduler: superseded by newer generation")
 )
 
 // queuedTask wraps a SubmitReq with its Future channel for delivery.
@@ -98,8 +104,42 @@ func (q *ctxQueue) coalesceBySigLocked(sig Sig) {
 		}
 		kept := lane[:0]
 		for _, t := range lane {
-			if t.req.Sig() == sig {
+			if sig.CoalescesWith(t.req.Sig()) {
 				t.future <- Result{Err: ErrCoalesced}
+				close(t.future)
+				continue
+			}
+			kept = append(kept, t)
+		}
+		q.lanes[prio] = kept
+	}
+}
+
+// staleByGen reports whether a queued/running req should be reclaimed by
+// CancelStaleByGen(keepGen): a Low-priority read whose Gen predates keepGen.
+// Gen == 0 (work submitted without a requestGen) and any non-Low priority
+// (the user's current view, mutations) are never stale.
+func staleByGen(req SubmitReq, keepGen uint64) bool {
+	return req.Priority == PriorityLow &&
+		req.Kind != KindMutation &&
+		req.Gen != 0 &&
+		req.Gen < keepGen
+}
+
+// dropStaleByGen removes queued tasks made stale by keepGen and delivers
+// ErrSuperseded to their Futures. Acquires q.mu itself.
+func (q *ctxQueue) dropStaleByGen(keepGen uint64) {
+	q.mu.Lock()
+	defer q.mu.Unlock()
+	for prio := range q.lanes {
+		lane := q.lanes[prio]
+		if len(lane) == 0 {
+			continue
+		}
+		kept := lane[:0]
+		for _, t := range lane {
+			if staleByGen(t.req, keepGen) {
+				t.future <- Result{Err: ErrSuperseded}
 				close(t.future)
 				continue
 			}
