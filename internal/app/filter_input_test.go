@@ -693,8 +693,8 @@ func TestCovQuitConfirmKeyY(t *testing.T) {
 	m.overlay = overlayQuitConfirm
 	result, cmd := m.handleQuitConfirmOverlayKey(keyMsg("y"))
 	rm := result.(Model)
-	assert.Equal(t, overlayNone, rm.overlay)
-	assert.NotNil(t, cmd) // tea.Quit
+	assert.Equal(t, overlayShuttingDown, rm.overlay)
+	assert.NotNil(t, cmd) // shutdown drain
 }
 
 func TestCovQuitConfirmKeyBigY(t *testing.T) {
@@ -702,8 +702,8 @@ func TestCovQuitConfirmKeyBigY(t *testing.T) {
 	m.overlay = overlayQuitConfirm
 	result, cmd := m.handleQuitConfirmOverlayKey(keyMsg("Y"))
 	rm := result.(Model)
-	assert.Equal(t, overlayNone, rm.overlay)
-	assert.NotNil(t, cmd) // tea.Quit
+	assert.Equal(t, overlayShuttingDown, rm.overlay)
+	assert.NotNil(t, cmd) // shutdown drain
 }
 
 func TestCovQuitConfirmKeyN(t *testing.T) {

@@ -202,8 +202,7 @@ func (m Model) executeBuiltinCommand(input string) (tea.Model, tea.Cmd) {
 		// kubectl log streams started from any tab don't outlive the
 		// process. Without this, `:q` / `:q!` / `:quit` leaks the
 		// kubectl subprocess and its reader goroutine — issue #48.
-		m.performQuitCleanup()
-		return m, tea.Quit
+		return m.beginShutdown()
 
 	case "namespace":
 		return m.executeNamespaceCommand(tokens[1:])
