@@ -1,6 +1,7 @@
 package app
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -48,9 +49,22 @@ func fetchHelmHistory(helmPath, name, ns, kubeCtx, kubeconfigPaths string) ([]ui
 	cmd := exec.CommandContext(ctx, helmPath, args...)
 	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 	logExecCmd("Running helm command", cmd)
-	output, cmdErr := cmd.CombinedOutput()
+	// Capture stdout and stderr separately: helm writes the JSON document to
+	// stdout but may also print warnings (kubeconfig perms, deprecations) to
+	// stderr on an otherwise-successful run. Merging them (CombinedOutput)
+	// would interleave that text into the JSON and break Unmarshal even
+	// though helm exited 0.
+	var stderr bytes.Buffer
+	cmd.Stderr = &stderr
+	output, cmdErr := cmd.Output()
 	if cmdErr != nil {
-		truncated := truncateHelmOutput(output)
+		// Prefer stderr for the error detail; fall back to stdout when helm
+		// wrote the failure there instead.
+		detail := stderr.Bytes()
+		if len(bytes.TrimSpace(detail)) == 0 {
+			detail = output
+		}
+		truncated := truncateHelmOutput(detail)
 		logger.Error("helm history failed", "cmd", cmd.String(), "error", cmdErr, "output", truncated)
 		return nil, fmt.Errorf("%w: %s", cmdErr, truncated)
 	}
