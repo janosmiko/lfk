@@ -437,6 +437,7 @@ type TabState struct {
 	nsSelectionNegated bool
 	sortColumnName     string // column name to sort by (e.g. "Name", "Age", "CPU")
 	sortAscending      bool
+	sortMemory         map[string]sortPref
 	filterText         string
 	watchMode          bool
 	// readOnly blocks all mutating actions for this tab. Re-evaluated on

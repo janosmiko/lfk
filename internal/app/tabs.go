@@ -2,7 +2,6 @@ package app
 
 import (
 	"fmt"
-	"maps"
 	"sort"
 	"strconv"
 	"strings"
@@ -409,6 +408,7 @@ func (m *Model) saveCurrentTab() {
 	t.leftScroll = ui.ActiveLeftScroll
 	t.cursorMemory = copyMapStringInt(m.cursorMemory)
 	t.filterMemory = copyMapStringSavedFilter(m.filterMemory)
+	t.sortMemory = copyMapStringSortPref(m.sortMemory)
 	t.itemCache = copyItemCache(m.itemCache)
 	t.cacheFingerprints = copyMapStringString(m.cacheFingerprints)
 	t.yamlContent = m.yamlContent
@@ -523,6 +523,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	ui.ActiveLeftScroll = t.leftScroll
 	m.cursorMemory = copyMapStringInt(t.cursorMemory)
 	m.filterMemory = copyMapStringSavedFilter(t.filterMemory)
+	m.sortMemory = copyMapStringSortPref(t.sortMemory)
 	m.itemCache = copyItemCache(t.itemCache)
 	m.cacheFingerprints = copyMapStringString(t.cacheFingerprints)
 	m.yamlContent = t.yamlContent
@@ -691,6 +692,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		leftScroll:             ui.ActiveLeftScroll,
 		cursorMemory:           copyMapStringInt(m.cursorMemory),
 		filterMemory:           copyMapStringSavedFilter(m.filterMemory),
+		sortMemory:             copyMapStringSortPref(m.sortMemory),
 		itemCache:              copyItemCache(m.itemCache),
 		cacheFingerprints:      copyMapStringString(m.cacheFingerprints),
 		yamlContent:            m.yamlContent,
@@ -736,50 +738,6 @@ func (m *Model) cloneCurrentTab() TabState {
 		newTab.leftItemsHistory[i] = append([]model.Item(nil), hist...)
 	}
 	return newTab
-}
-
-// copyMapStringInt deep copies a map[string]int.
-func copyMapStringInt(m map[string]int) map[string]int {
-	if m == nil {
-		return make(map[string]int)
-	}
-	c := make(map[string]int, len(m))
-	maps.Copy(c, m)
-	return c
-}
-
-// copyMapStringBool deep copies a map[string]bool.
-func copyMapStringBool(m map[string]bool) map[string]bool {
-	if m == nil {
-		return make(map[string]bool)
-	}
-	c := make(map[string]bool, len(m))
-	maps.Copy(c, m)
-	return c
-}
-
-// copyItemCache deep copies the item cache.
-func copyItemCache(m map[string][]model.Item) map[string][]model.Item {
-	if m == nil {
-		return make(map[string][]model.Item)
-	}
-	c := make(map[string][]model.Item, len(m))
-	for k, v := range m {
-		c[k] = append([]model.Item(nil), v...)
-	}
-	return c
-}
-
-// copyMapStringString returns a shallow copy of a string-to-string map.
-// A nil input yields a non-nil empty map so callers can write into it
-// without a second nil check.
-func copyMapStringString(m map[string]string) map[string]string {
-	if m == nil {
-		return make(map[string]string)
-	}
-	c := make(map[string]string, len(m))
-	maps.Copy(c, m)
-	return c
 }
 
 // actionNamespace returns the namespace to use for action commands.

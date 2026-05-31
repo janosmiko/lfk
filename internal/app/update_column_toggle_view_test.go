@@ -54,7 +54,7 @@ func TestCollectBuiltinToggleEntries_SessionWinsOverView(t *testing.T) {
 	}
 	m := &Model{
 		hiddenBuiltinColumns: map[string][]string{
-			"pod": {"Age"}, // session: hide Age (view would have kept it)
+			colKey("pod"): {"Age"}, // session: hide Age (view would have kept it)
 		},
 	}
 	entries := m.collectBuiltinToggleEntries(items, "pod")

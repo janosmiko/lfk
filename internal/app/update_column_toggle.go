@@ -33,15 +33,16 @@ type columnToggleSnapshot struct {
 // edits the user made while the overlay was open.
 func captureColumnToggleSnapshot(m *Model, kind string) columnToggleSnapshot {
 	snap := columnToggleSnapshot{kind: kind}
-	if v, ok := m.sessionColumns[kind]; ok {
+	key := m.columnMemoryKey(kind)
+	if v, ok := m.sessionColumns[key]; ok {
 		snap.hasSession = true
 		snap.session = append([]string(nil), v...)
 	}
-	if v, ok := m.hiddenBuiltinColumns[kind]; ok {
+	if v, ok := m.hiddenBuiltinColumns[key]; ok {
 		snap.hasHidden = true
 		snap.hidden = append([]string(nil), v...)
 	}
-	if v, ok := m.columnOrder[kind]; ok {
+	if v, ok := m.columnOrder[key]; ok {
 		snap.hasOrder = true
 		snap.order = append([]string(nil), v...)
 	}
@@ -55,29 +56,32 @@ func restoreColumnToggleSnapshot(m *Model, snap columnToggleSnapshot) {
 	if snap.kind == "" {
 		return
 	}
+	// Context cannot change while the overlay is open, so recompute the
+	// context-scoped key from the captured kind.
+	key := m.columnMemoryKey(snap.kind)
 	if snap.hasSession {
 		if m.sessionColumns == nil {
 			m.sessionColumns = make(map[string][]string)
 		}
-		m.sessionColumns[snap.kind] = snap.session
+		m.sessionColumns[key] = snap.session
 	} else {
-		delete(m.sessionColumns, snap.kind)
+		delete(m.sessionColumns, key)
 	}
 	if snap.hasHidden {
 		if m.hiddenBuiltinColumns == nil {
 			m.hiddenBuiltinColumns = make(map[string][]string)
 		}
-		m.hiddenBuiltinColumns[snap.kind] = snap.hidden
+		m.hiddenBuiltinColumns[key] = snap.hidden
 	} else {
-		delete(m.hiddenBuiltinColumns, snap.kind)
+		delete(m.hiddenBuiltinColumns, key)
 	}
 	if snap.hasOrder {
 		if m.columnOrder == nil {
 			m.columnOrder = make(map[string][]string)
 		}
-		m.columnOrder[snap.kind] = snap.order
+		m.columnOrder[key] = snap.order
 	} else {
-		delete(m.columnOrder, snap.kind)
+		delete(m.columnOrder, key)
 	}
 }
 
@@ -91,6 +95,7 @@ func (m *Model) openColumnToggle() {
 	// is scoped to the actual kind being shown (e.g., "container", not the
 	// parent pod's "pod").
 	kind := m.middleColumnKind()
+	key := m.columnMemoryKey(kind)
 
 	builtinEntries := m.collectBuiltinToggleEntries(items, kind)
 	extraEntries := m.collectExtraToggleEntries(items)
@@ -99,7 +104,7 @@ func (m *Model) openColumnToggle() {
 		return
 	}
 
-	entries := mergeColumnToggleEntries(builtinEntries, extraEntries, m.columnOrder[kind])
+	entries := mergeColumnToggleEntries(builtinEntries, extraEntries, m.columnOrder[key])
 
 	m.columnToggleItems = entries
 	m.columnToggleCursor = 0
@@ -186,7 +191,7 @@ func (m *Model) collectBuiltinToggleEntries(items []model.Item, kind string) []c
 	// the ones not listed in the view — and the first toggle would silently
 	// commit that wrong baseline as session state, wiping the view's effect.
 	hidden := map[string]bool{}
-	if sessionHidden, ok := m.hiddenBuiltinColumns[kind]; ok && len(sessionHidden) > 0 {
+	if sessionHidden, ok := m.hiddenBuiltinColumns[m.columnMemoryKey(kind)]; ok && len(sessionHidden) > 0 {
 		for _, k := range sessionHidden {
 			hidden[k] = true
 		}
@@ -464,7 +469,7 @@ func (m Model) handleColumnToggleKeyK2() (tea.Model, tea.Cmd) {
 // when the caller's map fields are nil — a value receiver would only
 // update the local copy.
 func (m *Model) applyColumnToggleState() {
-	kind := m.middleColumnKind()
+	key := m.columnMemoryKey(m.middleColumnKind())
 
 	var visibleExtras []string
 	var hiddenBuiltins []string
@@ -490,9 +495,9 @@ func (m *Model) applyColumnToggleState() {
 	// The behavior matches a hypothetical R reset, but the overlay STAYS
 	// open under the new live-apply contract — only Enter or Esc close it.
 	if visibleCount == 0 {
-		delete(m.sessionColumns, kind)
-		delete(m.hiddenBuiltinColumns, kind)
-		delete(m.columnOrder, kind)
+		delete(m.sessionColumns, key)
+		delete(m.hiddenBuiltinColumns, key)
+		delete(m.columnOrder, key)
 		return
 	}
 
@@ -504,24 +509,24 @@ func (m *Model) applyColumnToggleState() {
 	if visibleExtras == nil {
 		visibleExtras = []string{}
 	}
-	m.sessionColumns[kind] = visibleExtras
+	m.sessionColumns[key] = visibleExtras
 
 	if m.hiddenBuiltinColumns == nil {
 		m.hiddenBuiltinColumns = make(map[string][]string)
 	}
 	if len(hiddenBuiltins) == 0 {
-		delete(m.hiddenBuiltinColumns, kind)
+		delete(m.hiddenBuiltinColumns, key)
 	} else {
-		m.hiddenBuiltinColumns[kind] = hiddenBuiltins
+		m.hiddenBuiltinColumns[key] = hiddenBuiltins
 	}
 
 	if m.columnOrder == nil {
 		m.columnOrder = make(map[string][]string)
 	}
 	if len(fullOrder) == 0 {
-		delete(m.columnOrder, kind)
+		delete(m.columnOrder, key)
 	} else {
-		m.columnOrder[kind] = fullOrder
+		m.columnOrder[key] = fullOrder
 	}
 }
 
@@ -540,15 +545,15 @@ func (m Model) handleColumnToggleKeyEnter() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleColumnToggleKeyR() (tea.Model, tea.Cmd) {
-	kind := m.middleColumnKind()
+	key := m.columnMemoryKey(m.middleColumnKind())
 	if m.sessionColumns != nil {
-		delete(m.sessionColumns, kind)
+		delete(m.sessionColumns, key)
 	}
 	if m.hiddenBuiltinColumns != nil {
-		delete(m.hiddenBuiltinColumns, kind)
+		delete(m.hiddenBuiltinColumns, key)
 	}
 	if m.columnOrder != nil {
-		delete(m.columnOrder, kind)
+		delete(m.columnOrder, key)
 	}
 	m.overlay = overlayNone
 	m.columnToggleItems = nil

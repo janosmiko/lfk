@@ -449,61 +449,6 @@ func (m Model) handleExplorerActionKeyJumpOwner() (tea.Model, tea.Cmd, bool) {
 	return ret, cmd, true
 }
 
-func (m Model) handleExplorerActionKeySortNext() (tea.Model, tea.Cmd, bool) {
-	if !m.sortApplies() {
-		return m, nil, true
-	}
-	colCount := ui.ActiveSortableColumnCount
-	if colCount > 0 {
-		idx := sortColumnIndex(m.sortColumnName)
-		idx = (idx + 1) % colCount
-		m.sortColumnName = ui.ActiveSortableColumns[idx]
-	}
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
-}
-
-func (m Model) handleExplorerActionKeySortPrev() (tea.Model, tea.Cmd, bool) {
-	if !m.sortApplies() {
-		return m, nil, true
-	}
-	colCount := ui.ActiveSortableColumnCount
-	if colCount > 0 {
-		idx := sortColumnIndex(m.sortColumnName)
-		idx = (idx - 1 + colCount) % colCount
-		m.sortColumnName = ui.ActiveSortableColumns[idx]
-	}
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
-}
-
-func (m Model) handleExplorerActionKeySortFlip() (tea.Model, tea.Cmd, bool) {
-	if !m.sortApplies() {
-		return m, nil, true
-	}
-	m.sortAscending = !m.sortAscending
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
-}
-
-func (m Model) handleExplorerActionKeySortReset() (tea.Model, tea.Cmd, bool) {
-	if !m.sortApplies() {
-		return m, nil, true
-	}
-	m.sortColumnName = sortColDefault
-	m.sortAscending = true
-	m.sortMiddleItems()
-	m.clampCursor()
-	m.setStatusMessage("Sort: "+m.sortModeName(), false)
-	return m, tea.Batch(m.loadPreview(), scheduleStatusClear()), true
-}
-
 func (m Model) handleExplorerActionKeyOpenBrowser() (tea.Model, tea.Cmd, bool) {
 	kind := m.selectedResourceKind()
 	if kind != "Ingress" {
