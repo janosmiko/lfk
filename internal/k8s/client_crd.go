@@ -95,12 +95,29 @@ func extractCRDPrinterColumns(spec map[string]any, preferredVersion string) []mo
 				Name:     colName,
 				Type:     colType,
 				JSONPath: jsonPath,
+				Priority: printerColumnPriority(cm["priority"]),
 			})
 		}
 		return result
 	}
 
 	return nil
+}
+
+// printerColumnPriority coerces an additionalPrinterColumns "priority" value to
+// an int. Unstructured JSON decodes numbers to float64; YAML-sourced specs may
+// carry int64. A missing or non-numeric priority defaults to 0 (shown).
+func printerColumnPriority(v any) int {
+	switch p := v.(type) {
+	case int64:
+		return int(p)
+	case int:
+		return p
+	case float64:
+		return int(p)
+	default:
+		return 0
+	}
 }
 
 // buildContainerItem creates a model.Item for a container with enriched details.

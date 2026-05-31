@@ -149,7 +149,21 @@ func (m Model) applySessionColumnsForKind(kind string) {
 		ui.ActiveSessionColumns = nil
 		ui.ActiveHiddenBuiltinColumns = nil
 		ui.ActiveColumnOrder = nil
+		ui.ActivePrinterColumns = nil
 		return
+	}
+	// CRD additionalPrinterColumns for the navigated resource type drive
+	// priority-aware, first-class printer-column rendering. Only applies when
+	// the rendered kind matches nav.ResourceType (the middle column at
+	// LevelResources); owned children/containers have their own kinds.
+	if rt := m.nav.ResourceType; len(rt.PrinterColumns) > 0 && rt.Kind != "" && strings.EqualFold(rt.Kind, kind) {
+		pcs := make(map[string]int, len(rt.PrinterColumns))
+		for _, pc := range rt.PrinterColumns {
+			pcs[pc.Name] = pc.Priority
+		}
+		ui.ActivePrinterColumns = pcs
+	} else {
+		ui.ActivePrinterColumns = nil
 	}
 	// Session extras: nil vs non-nil-empty distinguishes "auto-detect" from
 	// "user explicitly configured no extras".
@@ -195,11 +209,13 @@ func (m Model) withSessionColumnsForKind(kind string, fn func() string) string {
 	prevSession := ui.ActiveSessionColumns
 	prevHidden := ui.ActiveHiddenBuiltinColumns
 	prevOrder := ui.ActiveColumnOrder
+	prevPrinter := ui.ActivePrinterColumns
 	m.applySessionColumnsForKind(kind)
 	defer func() {
 		ui.ActiveSessionColumns = prevSession
 		ui.ActiveHiddenBuiltinColumns = prevHidden
 		ui.ActiveColumnOrder = prevOrder
+		ui.ActivePrinterColumns = prevPrinter
 	}()
 	return fn()
 }
