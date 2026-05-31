@@ -158,7 +158,6 @@ type Model struct {
 	fullscreenMiddle    bool
 	fullscreenDashboard bool
 
-	// Sort state for resources.
 	sortColumnName string              // which column to sort by (e.g. "Name", "Age")
 	sortAscending  bool                // true = ascending, false = descending
 	sortMemory     map[string]sortPref // remembered sort per resource kind (context+GVR), session-only
