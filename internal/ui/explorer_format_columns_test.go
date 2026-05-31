@@ -72,6 +72,78 @@ func TestCollectExtraColumns_MandatoryPrinterColumnsSurvive(t *testing.T) {
 	}
 }
 
+// TestCollectExtraColumns_ConfiguredOrderNotReshuffled verifies that an
+// explicit views.<kind>.columns configuration is authoritative: mandatory
+// printer-column protection does not reorder it or hide its priority>0 columns
+// (regression for the auto-detect-path-only contract).
+func TestCollectExtraColumns_ConfiguredOrderNotReshuffled(t *testing.T) {
+	defer func(orig map[string]int) { ActivePrinterColumns = orig }(ActivePrinterColumns)
+	defer func(orig []string) { ActiveSessionColumns = orig }(ActiveSessionColumns)
+	defer func(orig map[string][]string) { ConfigResourceColumns = orig }(ConfigResourceColumns)
+	defer func(orig ResourceRef) { ActiveResourceRef = orig }(ActiveResourceRef)
+	defer func(orig string) { ActiveContext = orig }(ActiveContext)
+	ActiveSessionColumns = nil
+	ActiveResourceRef = ResourceRef{}
+	ActiveContext = ""
+
+	ActivePrinterColumns = map[string]int{"Duration": 0, "Parent": 1, "Created At": 0}
+	// Explicit config order: non-mandatory-first, and includes the priority>0
+	// "Parent" the user chose to surface.
+	ConfigResourceColumns = map[string][]string{
+		"choretask": {"Duration", "Parent", "Created At"},
+	}
+
+	items := []model.Item{
+		{Name: "ct-a", Columns: []model.KeyValue{
+			{Key: "Duration", Value: "1.0"}, {Key: "Parent", Value: "p"}, {Key: "Created At", Value: "2026-05-31T00:00:00Z"},
+		}},
+		{Name: "ct-b", Columns: []model.KeyValue{
+			{Key: "Duration", Value: "2.0"}, {Key: "Parent", Value: "q"}, {Key: "Created At", Value: "2026-05-31T00:01:00Z"},
+		}},
+	}
+
+	cols := collectExtraColumns(items, 200, 20, "ChoreTask")
+
+	if got := keysOf(cols); len(got) != 3 || got[0] != "Duration" || got[1] != "Parent" || got[2] != "Created At" {
+		t.Errorf("configured column order must be preserved verbatim, got %v", got)
+	}
+}
+
+// TestSelectColumnCandidates_AutoDetectFlag verifies the fromAutoDetect signal
+// is true only on the auto-detect path, not for session or config overrides.
+func TestSelectColumnCandidates_AutoDetectFlag(t *testing.T) {
+	defer func(orig []string) { ActiveSessionColumns = orig }(ActiveSessionColumns)
+	defer func(orig map[string][]string) { ConfigResourceColumns = orig }(ConfigResourceColumns)
+	defer func(orig ResourceRef) { ActiveResourceRef = orig }(ActiveResourceRef)
+	defer func(orig string) { ActiveContext = orig }(ActiveContext)
+	ActiveResourceRef = ResourceRef{}
+	ActiveContext = ""
+
+	seen := map[string]*colInfo{"Duration": {key: "Duration", count: 2}, "Task": {key: "Task", count: 2}}
+	order := []string{"Duration", "Task"}
+	items := []model.Item{{}, {}}
+
+	// Session override -> not auto-detect.
+	ActiveSessionColumns = []string{"Duration"}
+	ConfigResourceColumns = nil
+	if _, auto := selectColumnCandidates(seen, order, "Foo", items); auto {
+		t.Error("session override must report fromAutoDetect=false")
+	}
+
+	// Config override -> not auto-detect.
+	ActiveSessionColumns = nil
+	ConfigResourceColumns = map[string][]string{"foo": {"Duration"}}
+	if _, auto := selectColumnCandidates(seen, order, "Foo", items); auto {
+		t.Error("config override must report fromAutoDetect=false")
+	}
+
+	// No overrides -> auto-detect.
+	ConfigResourceColumns = nil
+	if _, auto := selectColumnCandidates(seen, order, "Foo", items); !auto {
+		t.Error("default path must report fromAutoDetect=true")
+	}
+}
+
 // TestCollectExtraColumns_NonCRDUnaffected verifies that with no printer-column
 // metadata the heuristic pipeline behaves exactly as before (no regression).
 func TestCollectExtraColumns_NonCRDUnaffected(t *testing.T) {

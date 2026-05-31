@@ -178,17 +178,17 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	// paths happened to write the columns into item.Columns.
 	stabilizeColumnOrder(order)
 
-	candidates := selectColumnCandidates(seen, order, kind, items)
+	candidates, fromAutoDetect := selectColumnCandidates(seen, order, kind, items)
 
 	if len(candidates) == 0 {
 		return nil
 	}
 
 	// Mandatory CRD printer-column protection applies only on the default
-	// auto-detect path; an explicit session override (column-toggle overlay)
-	// is authoritative and left untouched. When active, move mandatory columns
-	// to the front so the width budget serves them before optional extras.
-	mandatoryActive := ActivePrinterColumns != nil && ActiveSessionColumns == nil
+	// auto-detect path; an explicit session or configured (views.<kind>.columns)
+	// order is authoritative and left untouched. When active, move mandatory
+	// columns to the front so the width budget serves them before optional extras.
+	mandatoryActive := fromAutoDetect && ActivePrinterColumns != nil
 	if mandatoryActive {
 		candidates = prioritizeMandatoryColumns(candidates)
 	}
@@ -321,21 +321,24 @@ func fitExtraColumns(candidates []string, seen map[string]*colInfo, available, m
 }
 
 // selectColumnCandidates determines which extra columns to display based on
-// session overrides, per-kind config, or auto-detection.
+// session overrides, per-kind config, or auto-detection. The second return
+// value reports whether the auto-detect path produced the result; only then
+// may mandatory CRD printer-column protection reorder/force columns (an
+// explicit session or config order is authoritative and left untouched).
 //
 // ActiveSessionColumns is the authoritative signal when non-nil: an empty
 // slice means the user explicitly configured this kind with no extras and
 // must not fall through to auto-detect. Only a nil slice means "no session
 // override" and lets the config / auto-detect paths run.
-func selectColumnCandidates(seen map[string]*colInfo, order []string, kind string, items []model.Item) []string {
+func selectColumnCandidates(seen map[string]*colInfo, order []string, kind string, items []model.Item) (candidates []string, fromAutoDetect bool) {
 	if ActiveSessionColumns != nil {
-		candidates := make([]string, 0, len(ActiveSessionColumns))
+		out := make([]string, 0, len(ActiveSessionColumns))
 		for _, key := range ActiveSessionColumns {
 			if _, ok := seen[key]; ok {
-				candidates = append(candidates, key)
+				out = append(out, key)
 			}
 		}
-		return candidates
+		return out, false
 	}
 
 	// Build a ResourceRef so GVR-keyed view configs resolve. When the
@@ -350,18 +353,18 @@ func selectColumnCandidates(seen map[string]*colInfo, order []string, kind strin
 	configCols := ColumnsForKind(rt, ActiveContext)
 	if len(configCols) > 0 {
 		if len(configCols) == 1 && configCols[0] == "*" {
-			return order
+			return order, false
 		}
-		var candidates []string
+		var out []string
 		for _, cfgKey := range configCols {
 			if _, ok := seen[cfgKey]; ok {
-				candidates = append(candidates, cfgKey)
+				out = append(out, cfgKey)
 			}
 		}
-		return candidates
+		return out, false
 	}
 
-	return autoDetectColumns(seen, order, items)
+	return autoDetectColumns(seen, order, items), true
 }
 
 // autoDetectColumns selects columns based on heuristic thresholds and blocked lists.
