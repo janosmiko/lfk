@@ -361,6 +361,7 @@ func (m Model) executeSortCommand(arg string) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.sortColumnName = arg
+	m.rememberSort()
 	m.sortMiddleItems()
 	m.clampCursor()
 	m.setStatusMessage(fmt.Sprintf("Sort by %s", arg), false)

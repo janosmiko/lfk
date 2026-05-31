@@ -54,6 +54,8 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `=` | Toggle sort direction (ascending/descending) |
 | `-` | Reset sort to default (Name ascending) |
 
+Your chosen sort is remembered per resource kind for the running session, so leaving a list and returning keeps your sort instead of resetting.
+
 ## Modes & Settings
 
 | Key | Action |
