@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -8,6 +9,7 @@ import (
 	"net/http"
 	_ "net/http/pprof" // registers /debug/pprof/* under DefaultServeMux when LFK_PPROF_ADDR is set
 	"os"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
@@ -194,14 +196,49 @@ func runTUI(opts app.StartupOptions) error {
 	if ui.ColorModeEnabled() {
 		defer ui.DisableColorModeNotifications()
 	}
-	p := tea.NewProgram(m, progOpts...)
 
-	if _, err := p.Run(); err != nil {
+	// Force-quit watchdog: when the user confirms quit, the model fires
+	// this notifier. If the graceful drain (worker pools, informer caches)
+	// has not let the process exit within the grace period, kill the
+	// program — which restores the terminal — and exit, so a drain wedged
+	// on an unreachable cluster cannot leave the user stuck on a frozen
+	// alt-screen. p is assigned just below; the closure captures the
+	// variable, so it is set by the time the notifier ever runs.
+	var p *tea.Program
+	m.SetShutdownNotifier(armForceQuit(app.ForceQuitGracePeriod,
+		func() { p.Kill(); p.Wait() },
+		func() { os.Exit(0) },
+	))
+	p = tea.NewProgram(m, progOpts...)
+
+	// ErrProgramKilled is expected when the watchdog force-quits; treat it
+	// as a clean exit rather than surfacing it as a startup failure.
+	if _, err := p.Run(); err != nil && !errors.Is(err, tea.ErrProgramKilled) {
 		os.Stderr = origStderr
 		return fmt.Errorf("running application: %w", err)
 	}
 
 	return nil
+}
+
+// armForceQuit returns a notifier that, once invoked, force-terminates the
+// process if it has not exited within grace. It kills the Bubble Tea
+// program first (restoring the terminal) and then exits. kill and exit are
+// injected so the timing logic is testable without a real program or a
+// real os.Exit.
+//
+// The timer goroutine is intentionally not cancellable: on a clean exit
+// the process returns from main well before grace elapses and the runtime
+// reaps the sleeping goroutine, so it never fires. It only acts when the
+// drain genuinely overruns grace — which is exactly the force-quit case.
+func armForceQuit(grace time.Duration, kill, exit func()) func() {
+	return func() {
+		go func() {
+			time.Sleep(grace)
+			kill()
+			exit()
+		}()
+	}
 }
 
 // validatePprofAddr ensures LFK_PPROF_ADDR points at a loopback host so

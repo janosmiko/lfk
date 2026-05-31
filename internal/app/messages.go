@@ -16,6 +16,11 @@ type stderrCapturedMsg struct {
 	message string
 }
 
+// shutdownCompleteMsg signals that the asynchronous quit drain (worker
+// pools, informer caches, session save) has finished, so the program can
+// dispatch tea.Quit and exit cleanly.
+type shutdownCompleteMsg struct{}
+
 type contextsLoadedMsg struct {
 	items []model.Item
 	err   error

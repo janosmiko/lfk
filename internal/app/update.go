@@ -32,6 +32,17 @@ func isContextCanceled(err error) bool {
 
 // Update handles messages.
 func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	// Once graceful shutdown has begun, the drain goroutine owns the shared
+	// managers; freeze the model so no concurrent Update path mutates state
+	// underneath it. The only message that still matters is the drain's
+	// completion, which triggers the actual quit.
+	if m.shuttingDown {
+		if _, ok := msg.(shutdownCompleteMsg); ok {
+			return m, tea.Quit
+		}
+		return m, nil
+	}
+
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		return m.updateWindowSize(msg)
