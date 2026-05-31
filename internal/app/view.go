@@ -165,9 +165,10 @@ func (m Model) applySessionColumnsForKind(kind string) {
 	} else {
 		ui.ActivePrinterColumns = nil
 	}
+	key := m.columnMemoryKey(kind)
 	// Session extras: nil vs non-nil-empty distinguishes "auto-detect" from
 	// "user explicitly configured no extras".
-	if sessionCols, ok := m.sessionColumns[kind]; ok {
+	if sessionCols, ok := m.sessionColumns[key]; ok {
 		if sessionCols == nil {
 			sessionCols = []string{}
 		}
@@ -180,7 +181,7 @@ func (m Model) applySessionColumnsForKind(kind string) {
 	// set, fall back to the view's column list — any built-in not listed in
 	// views.<kind>.columns is hidden so the table doesn't render columns the
 	// user didn't ask for.
-	if hiddenBi, ok := m.hiddenBuiltinColumns[kind]; ok && len(hiddenBi) > 0 {
+	if hiddenBi, ok := m.hiddenBuiltinColumns[key]; ok && len(hiddenBi) > 0 {
 		set := make(map[string]bool, len(hiddenBi))
 		for _, k := range hiddenBi {
 			set[k] = true
@@ -192,7 +193,7 @@ func (m Model) applySessionColumnsForKind(kind string) {
 		ui.ActiveHiddenBuiltinColumns = nil
 	}
 	// Explicit column order (excluding Name).
-	if order, ok := m.columnOrder[kind]; ok && len(order) > 0 {
+	if order, ok := m.columnOrder[key]; ok && len(order) > 0 {
 		ui.ActiveColumnOrder = order
 	} else {
 		ui.ActiveColumnOrder = nil

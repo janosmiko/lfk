@@ -316,6 +316,16 @@ func (m *Model) viewRefForKind(kind string) ui.ResourceRef {
 	return ui.ResourceRef{Kind: kind}
 }
 
+// columnMemoryKey scopes the per-kind column session maps (sessionColumns,
+// hiddenBuiltinColumns, columnOrder) to the current cluster context, so the
+// same kind can show different columns in different clusters — mirroring sort
+// memory. Both the render path (applySessionColumnsForKind) and the
+// column-toggle overlay must route map access through this so reads and
+// writes share one key.
+func (m *Model) columnMemoryKey(kind string) string {
+	return m.nav.Context + "\x00" + kind
+}
+
 // navKey builds a unique key from the current navigation state, used for
 // cursor memory and item caching.
 func (m *Model) navKey() string {

@@ -161,6 +161,15 @@ func baseModelBoost2() Model {
 	return m
 }
 
+// colKey returns the context-scoped column-memory key for a kind under the
+// empty (test default) context, matching what production code reads/writes
+// via Model.columnMemoryKey. Use it whenever a test seeds or asserts on the
+// sessionColumns / hiddenBuiltinColumns / columnOrder maps.
+func colKey(kind string) string {
+	var m Model
+	return m.columnMemoryKey(kind)
+}
+
 // baseModelCov returns a minimal Model for coverage tests.
 func baseModelCov() Model {
 	return Model{
