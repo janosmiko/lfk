@@ -135,29 +135,6 @@ func (m *Model) cancelInFlightRequests() {
 	}
 }
 
-// performQuitCleanup runs every shutdown side effect that must happen
-// before tea.Quit is dispatched: stop port-forwards, cancel log
-// streams, cancel in-flight API requests, and persist session state.
-// Centralising this here keeps the three quit entry points
-// (handleQuitConfirmOverlayKey, closeTabOrQuit's last-tab branch, and
-// the :quit command) in lockstep so adding a fourth path — or a new
-// cleanup step — does not require remembering the full sequence at
-// every call site.
-func (m *Model) performQuitCleanup() {
-	if m.portForwardMgr != nil {
-		m.portForwardMgr.StopAll()
-	}
-	if m.captureMgr != nil {
-		m.captureMgr.StopAll()
-	}
-	m.cancelAllTabLogStreams()
-	m.cancelInFlightRequests()
-	if m.scheduler != nil {
-		m.scheduler.StopWorkers()
-	}
-	m.saveCurrentSession()
-}
-
 // applyPinnedTypes recomputes model.PinnedTypes from config-level pins plus the
 // pins scoped to the active context (or named union set). Legacy whole-group
 // pins (a bare group name with no "/", from older pinned.yaml files or the

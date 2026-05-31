@@ -1308,8 +1308,12 @@ func TestQuitConfirmOverlayConfirms(t *testing.T) {
 			}
 			ret, cmd := m.handleQuitConfirmOverlayKey(tt.key)
 			result := ret.(Model)
-			assert.Equal(t, overlayNone, result.overlay)
-			assert.NotNil(t, cmd, "should issue tea.Quit")
+			// Confirming now starts a graceful shutdown: the view switches
+			// to the shutdown notice and a drain command runs before the
+			// program exits via shutdownCompleteMsg.
+			assert.Equal(t, overlayShuttingDown, result.overlay)
+			assert.True(t, result.shuttingDown)
+			assert.NotNil(t, cmd, "should start the shutdown drain")
 		})
 	}
 }

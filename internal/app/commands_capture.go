@@ -118,7 +118,7 @@ func (m Model) waitForCaptureUpdate() tea.Cmd {
 // Uses context.Background() rather than m.reqCtx because the capture is meant
 // to outlive the current navigation — the user explicitly stops it via the
 // overlay's `s` key (mgr.Stop) or via __captures__ row actions, and on app
-// shutdown via captureMgr.StopAll() in performQuitCleanup. m.reqCtx would
+// shutdown via captureMgr.StopAll() in signalShutdown. m.reqCtx would
 // kill the capture every time the user navigates to a different view.
 func (m Model) startCapture(req k8s.CaptureRequest, liveBuf *captureRing) tea.Cmd {
 	mgr := m.captureMgr

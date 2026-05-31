@@ -699,8 +699,8 @@ type Model struct {
 	commandBarNameLoading string // cache key currently being fetched ("" if idle)
 
 	// Stderr capture channel for exec credential plugin errors.
-	stderrChan <-chan string
-
+	stderrChan    <-chan string
+	shutdownState // graceful-shutdown flags (m.shuttingDown, m.shutdownNotifier)
 	// Resource map view: shows relationship tree in the right column.
 	mapView      bool
 	resourceTree *model.ResourceNode

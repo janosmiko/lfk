@@ -437,9 +437,7 @@ func (m Model) handleContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.C
 func (m Model) handleQuitConfirmOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter", "y", "Y":
-		m.overlay = overlayNone
-		m.performQuitCleanup()
-		return m, tea.Quit
+		return m.beginShutdown()
 	case "n", "N", "esc", "q":
 		m.overlay = overlayNone
 		return m, nil

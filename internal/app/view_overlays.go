@@ -134,6 +134,19 @@ func (m Model) renderOverlayContent() (string, int, int, bool) {
 			InnerWidth:  qw - 6,
 			InnerHeight: qh - 2,
 		}), qw, qh, true
+	case overlayShuttingDown:
+		// Mirror the Quit overlay: a single line centered on both axes in a
+		// fixed-size box. See the overlayQuitConfirm case for the height
+		// arithmetic (visible outer height is sh+2; the inner slice is
+		// sh-2 rows so Align centers the title on the middle row).
+		sw := max(min(32, m.width-10), 10)
+		sh := max(min(3, m.height-6), 3)
+		return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
+			Title:       "Shutting down...",
+			Centered:    true,
+			InnerWidth:  sw - 6,
+			InnerHeight: sh - 2,
+		}), sw, sh, true
 	case overlayConfirm:
 		return ui.RenderOverlayConfirm(ui.OverlayConfirmConfig{
 			Title:   "Confirm Delete",

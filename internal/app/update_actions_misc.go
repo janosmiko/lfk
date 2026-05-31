@@ -132,8 +132,7 @@ func (m Model) closeTabOrQuit() (tea.Model, tea.Cmd) {
 		m.overlay = overlayQuitConfirm
 		return m, nil
 	}
-	m.performQuitCleanup()
-	return m, tea.Quit
+	return m.beginShutdown()
 }
 
 func (m Model) executeActionScale() Model {
