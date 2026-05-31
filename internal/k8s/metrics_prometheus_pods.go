@@ -2,10 +2,8 @@ package k8s
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"math"
-	"strconv"
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/logger"
@@ -43,33 +41,13 @@ func buildPromPodQuery(namespace, resourceKind string) string {
 // the metrics-API path and the app-side enrichment build. Samples missing
 // either label are skipped.
 func parsePrometheusPodResponse(data []byte) (map[string]float64, error) {
-	var resp prometheusQueryResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, fmt.Errorf("parsing prometheus response: %w", err)
-	}
-	if resp.Status != "success" {
-		return nil, fmt.Errorf("prometheus query returned status: %s", resp.Status)
-	}
-	out := make(map[string]float64, len(resp.Data.Result))
-	for _, r := range resp.Data.Result {
-		ns, pod := r.Metric["namespace"], r.Metric["pod"]
+	return parsePrometheusVector(data, func(labels map[string]string) (string, bool) {
+		ns, pod := labels["namespace"], labels["pod"]
 		if ns == "" || pod == "" {
-			continue
+			return "", false
 		}
-		if len(r.Value) < 2 {
-			continue
-		}
-		var s string
-		if err := json.Unmarshal(r.Value[1], &s); err != nil {
-			continue
-		}
-		v, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			continue
-		}
-		out[ns+"/"+pod] = v
-	}
-	return out, nil
+		return ns + "/" + pod, true
+	})
 }
 
 // getAllPodMetricsFromPrometheus fetches per-pod CPU and memory usage from the

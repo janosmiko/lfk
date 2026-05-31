@@ -42,6 +42,7 @@ func TestIsExecCredentialError(t *testing.T) {
 	}{
 		{"nil", nil, false},
 		{"aws sso exit", errors.New("getting credentials: exec: executable aws failed with exit code 255"), true},
+		{"executable not found", errors.New("getting credentials: exec: executable aws not found"), true},
 		{"generic exec exit", errors.New("exec: executable gke-gcloud-auth-plugin failed with exit code 1"), true},
 		{"exec plugin generic", errors.New("exec plugin: invalid apiVersion"), true},
 		{"unrelated api error", errors.New("pods \"foo\" not found"), false},

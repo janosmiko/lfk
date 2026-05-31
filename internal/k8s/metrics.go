@@ -525,30 +525,24 @@ func (c *Client) queryPrometheusNodeMetric(ctx context.Context, contextName stri
 	return nil, fmt.Errorf("no prometheus service found")
 }
 
-// parsePrometheusNodeResponse parses a Prometheus /api/v1/query JSON response
-// and extracts a map of node name -> float64 value.
-func parsePrometheusNodeResponse(data []byte) (map[string]float64, error) {
+// parsePrometheusVector parses a Prometheus /api/v1/query instant-vector
+// response into a map keyed by keyFunc(metricLabels). Samples for which keyFunc
+// returns ok=false, or whose scalar value can't be parsed, are skipped. Shared
+// by the node, pod, and container readers, which differ only in how the result
+// key is derived from the metric's labels.
+func parsePrometheusVector(data []byte, keyFunc func(labels map[string]string) (string, bool)) (map[string]float64, error) {
 	var resp prometheusQueryResponse
 	if err := json.Unmarshal(data, &resp); err != nil {
 		return nil, fmt.Errorf("parsing prometheus response: %w", err)
 	}
-
 	if resp.Status != "success" {
 		return nil, fmt.Errorf("prometheus query returned status: %s", resp.Status)
 	}
 
 	result := make(map[string]float64, len(resp.Data.Result))
 	for _, r := range resp.Data.Result {
-		node := r.Metric["node"]
-		if node == "" {
-			for _, alt := range []string{"instance", "kubernetes_node", "nodename", "host"} {
-				if v := r.Metric[alt]; v != "" {
-					node = v
-					break
-				}
-			}
-		}
-		if node == "" {
+		key, ok := keyFunc(r.Metric)
+		if !ok {
 			continue
 		}
 		if len(r.Value) < 2 {
@@ -562,8 +556,25 @@ func parsePrometheusNodeResponse(data []byte) (map[string]float64, error) {
 		if err != nil {
 			continue
 		}
-		result[node] = val
+		result[key] = val
 	}
-
 	return result, nil
+}
+
+// parsePrometheusNodeResponse extracts a node name -> value map. The node name
+// comes from the "node" label, falling back to common alternates emitted by
+// different exporters.
+func parsePrometheusNodeResponse(data []byte) (map[string]float64, error) {
+	return parsePrometheusVector(data, func(labels map[string]string) (string, bool) {
+		node := labels["node"]
+		if node == "" {
+			for _, alt := range []string{"instance", "kubernetes_node", "nodename", "host"} {
+				if v := labels[alt]; v != "" {
+					node = v
+					break
+				}
+			}
+		}
+		return node, node != ""
+	})
 }

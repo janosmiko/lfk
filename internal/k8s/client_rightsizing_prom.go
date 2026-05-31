@@ -2,10 +2,8 @@ package k8s
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"regexp"
-	"strconv"
 	"strings"
 	"time"
 
@@ -209,31 +207,8 @@ func (c *Client) runPrometheusQuery(ctx context.Context, contextName, query stri
 // "POD" pause container is filtered out by the query, but defensive
 // code here keeps a malformed metric from polluting the map).
 func parsePrometheusContainerResponse(data []byte) (map[string]float64, error) {
-	var resp prometheusQueryResponse
-	if err := json.Unmarshal(data, &resp); err != nil {
-		return nil, fmt.Errorf("parsing prometheus response: %w", err)
-	}
-	if resp.Status != "success" {
-		return nil, fmt.Errorf("prometheus query returned status: %s", resp.Status)
-	}
-	out := make(map[string]float64, len(resp.Data.Result))
-	for _, r := range resp.Data.Result {
-		container := r.Metric["container"]
-		if container == "" {
-			continue
-		}
-		if len(r.Value) < 2 {
-			continue
-		}
-		var s string
-		if err := json.Unmarshal(r.Value[1], &s); err != nil {
-			continue
-		}
-		v, err := strconv.ParseFloat(s, 64)
-		if err != nil {
-			continue
-		}
-		out[container] = v
-	}
-	return out, nil
+	return parsePrometheusVector(data, func(labels map[string]string) (string, bool) {
+		container := labels["container"]
+		return container, container != ""
+	})
 }
