@@ -12,6 +12,34 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// --- extractCRDPrinterColumns ---
+
+func TestExtractCRDPrinterColumns_CapturesPriority(t *testing.T) {
+	spec := map[string]any{
+		"versions": []any{
+			map[string]any{
+				"name": "v1alpha1",
+				"additionalPrinterColumns": []any{
+					// priority omitted -> 0 (shown by default, like kubectl)
+					map[string]any{"name": "Phase", "type": "string", "jsonPath": ".status.phase"},
+					// JSON numbers decode to float64.
+					map[string]any{"name": "Parent", "type": "string", "jsonPath": ".spec.parent", "priority": float64(1)},
+					// YAML/int64 path is also accepted.
+					map[string]any{"name": "Created At", "type": "string", "jsonPath": ".status.createdAt", "priority": int64(0)},
+				},
+			},
+		},
+	}
+
+	cols := extractCRDPrinterColumns(spec, "v1alpha1")
+
+	assert.Equal(t, []model.PrinterColumn{
+		{Name: "Phase", Type: "string", JSONPath: ".status.phase", Priority: 0},
+		{Name: "Parent", Type: "string", JSONPath: ".spec.parent", Priority: 1},
+		{Name: "Created At", Type: "string", JSONPath: ".status.createdAt", Priority: 0},
+	}, cols)
+}
+
 // --- preferredCRDVersion ---
 
 func TestPreferredCRDVersion(t *testing.T) {

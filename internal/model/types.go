@@ -59,6 +59,10 @@ type PrinterColumn struct {
 	Name     string
 	Type     string // string, integer, number, boolean, date
 	JSONPath string // e.g. ".status.phase", ".spec.source.repoURL"
+	// Priority mirrors the column's additionalPrinterColumns priority.
+	// kubectl shows priority 0 columns in standard output and hides
+	// priority > 0 columns unless `-o wide`; LFK applies the same default.
+	Priority int
 }
 
 // CanIVerbState is the display state for one RBAC verb in the Can-I view.
