@@ -9,11 +9,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// dashReq builds a Dashboard-section submission with an explicit Name and Gen
-// so the gen-agnostic coalesce path can be exercised directly.
-func dashReq(kctx, name, target string, gen uint64) SubmitReq {
+// dashReq builds a Dashboard-section submission on context "c1" with an
+// explicit Name and Gen so the gen-agnostic coalesce path can be exercised
+// directly.
+func dashReq(name, target string, gen uint64) SubmitReq {
 	return SubmitReq{
-		KubeContext: kctx,
+		KubeContext: "c1",
 		Kind:        KindDashboard,
 		Priority:    PriorityLow,
 		Name:        name,
@@ -33,8 +34,8 @@ func TestSubmit_DashboardCoalescesAcrossGen(t *testing.T) {
 	r := New(0)
 	defer r.Close()
 
-	old := r.Submit(dashReq("c1", "Dashboard: metrics", "c1#metrics", 1))
-	fresh := r.Submit(dashReq("c1", "Dashboard: metrics", "c1#metrics", 2))
+	old := r.Submit(dashReq("Dashboard: metrics", "c1#metrics", 1))
+	fresh := r.Submit(dashReq("Dashboard: metrics", "c1#metrics", 2))
 
 	select {
 	case res := <-old:
@@ -53,8 +54,8 @@ func TestSubmit_DashboardDifferentSectionDoesNotCoalesce(t *testing.T) {
 	r := New(0)
 	defer r.Close()
 
-	r.Submit(dashReq("c1", "Dashboard: pods", "c1#pods", 1))
-	r.Submit(dashReq("c1", "Dashboard: nodes", "c1#nodes", 1))
+	r.Submit(dashReq("Dashboard: pods", "c1#pods", 1))
+	r.Submit(dashReq("Dashboard: nodes", "c1#nodes", 1))
 
 	assert.Equal(t, 2, r.QueueLen("c1"), "distinct dashboard sections must not coalesce")
 }
@@ -67,8 +68,8 @@ func TestCancelStaleByGen_DropsQueuedLowOlderGen(t *testing.T) {
 	r := New(0)
 	defer r.Close()
 
-	keep := r.Submit(dashReq("c1", "Dashboard: pods", "c1#pods", 2))  // current gen
-	stale := r.Submit(dashReq("c1", "Dashboard: metrics", "c1#m", 1)) // older gen, Low
+	keep := r.Submit(dashReq("Dashboard: pods", "c1#pods", 2))  // current gen
+	stale := r.Submit(dashReq("Dashboard: metrics", "c1#m", 1)) // older gen, Low
 	high := r.Submit(SubmitReq{KubeContext: "c1", Kind: KindResourceList, Priority: PriorityHigh, Name: "List Events", Target: "c1", Gen: 1, Fn: noopFn})
 
 	r.CancelStaleByGen("c1", 2)
@@ -98,7 +99,7 @@ func TestCancelStaleByGen_KeepsGenZero(t *testing.T) {
 	r := New(0)
 	defer r.Close()
 
-	r.Submit(dashReq("c1", "Dashboard: pods", "c1#pods", 0))
+	r.Submit(dashReq("Dashboard: pods", "c1#pods", 0))
 	r.CancelStaleByGen("c1", 5)
 	assert.Equal(t, 1, r.QueueLen("c1"), "Gen==0 tasks are not subject to gen reclaim")
 }

@@ -56,6 +56,10 @@ func TestInvalidatePreviewForCursorChange_ReclaimsStaleDashboard(t *testing.T) {
 func TestInvalidatePreviewForCursorChange_KeepsHighPriorityView(t *testing.T) {
 	m := newTestModelWithScheduler()
 	m.nav.Context = "test-ctx"
+	// Carry a non-zero Gen like a real navigation load, so the task's
+	// survival is attributable to the High-priority exemption, not the
+	// Gen==0 "never stale" special-case.
+	m.requestGen = 1
 
 	cmd := m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindResourceList,
 		"List Events", "test-ctx",
