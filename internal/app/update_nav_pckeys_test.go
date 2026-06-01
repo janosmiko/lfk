@@ -826,59 +826,61 @@ func diffModelWithLines() Model {
 		lines[i] = "line" + string(rune('a'+i%26))
 	}
 	return Model{
-		mode:     modeDiff,
-		diffLeft: strings.Join(lines, "\n"),
-		tabs:     []TabState{{}},
-		width:    80,
-		height:   40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left: strings.Join(lines, "\n"),
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 }
 
 func TestPCKeysDiffPgDownMatchesCtrlF(t *testing.T) {
 	m := diffModelWithLines()
-	m.diffCursor = 10
+	m.diffView.cursor = 10
 	resPg, _ := m.handleDiffKey(keyMsg("pgdown"))
 	resCF, _ := m.handleDiffKey(keyMsg("ctrl+f"))
-	assert.Equal(t, resCF.(Model).diffCursor, resPg.(Model).diffCursor,
+	assert.Equal(t, resCF.(Model).diffView.cursor, resPg.(Model).diffView.cursor,
 		"pgdown should match ctrl+f in diff view")
-	assert.Greater(t, resPg.(Model).diffCursor, 10)
+	assert.Greater(t, resPg.(Model).diffView.cursor, 10)
 }
 
 func TestPCKeysDiffPgUpMatchesCtrlB(t *testing.T) {
 	m := diffModelWithLines()
-	m.diffCursor = 100
+	m.diffView.cursor = 100
 	resPg, _ := m.handleDiffKey(keyMsg("pgup"))
 	resCB, _ := m.handleDiffKey(keyMsg("ctrl+b"))
-	assert.Equal(t, resCB.(Model).diffCursor, resPg.(Model).diffCursor,
+	assert.Equal(t, resCB.(Model).diffView.cursor, resPg.(Model).diffView.cursor,
 		"pgup should match ctrl+b in diff view")
-	assert.Less(t, resPg.(Model).diffCursor, 100)
+	assert.Less(t, resPg.(Model).diffView.cursor, 100)
 }
 
 func TestPCKeysDiffHomeJumpsToTop(t *testing.T) {
 	m := diffModelWithLines()
-	m.diffCursor = 100
-	m.diffScroll = 80
-	m.diffLineInput = "15"
+	m.diffView.cursor = 100
+	m.diffView.scroll = 80
+	m.diffView.lineInput = "15"
 	m.pendingG = true
 	res, _ := m.handleDiffKey(keyMsg("home"))
 	rm := res.(Model)
-	assert.Equal(t, 0, rm.diffCursor, "home should reset diffCursor to 0")
-	assert.Equal(t, 0, rm.diffScroll, "home should reset diffScroll to 0")
-	assert.Empty(t, rm.diffLineInput, "home should clear diffLineInput")
+	assert.Equal(t, 0, rm.diffView.cursor, "home should reset diffCursor to 0")
+	assert.Equal(t, 0, rm.diffView.scroll, "home should reset diffScroll to 0")
+	assert.Empty(t, rm.diffView.lineInput, "home should clear diffLineInput")
 	assert.False(t, rm.pendingG, "home must clear pendingG")
 }
 
 func TestPCKeysDiffEndJumpsToBottom(t *testing.T) {
 	m := diffModelWithLines()
-	m.diffCursor = 0
+	m.diffView.cursor = 0
 	// Even with a line-number buffer, end must always go to the bottom.
-	m.diffLineInput = "42"
+	m.diffView.lineInput = "42"
 	res, _ := m.handleDiffKey(keyMsg("end"))
 	rm := res.(Model)
 	// With 200 lines, cursor should go to the last.
-	assert.Equal(t, 199, rm.diffCursor,
+	assert.Equal(t, 199, rm.diffView.cursor,
 		"end should jump to the last diff line regardless of diffLineInput")
-	assert.Empty(t, rm.diffLineInput, "end should clear diffLineInput")
+	assert.Empty(t, rm.diffView.lineInput, "end should clear diffLineInput")
 }
 
 // --- API Explorer (handleExplainKey) --------------------------------------------

@@ -401,155 +401,155 @@ func TestFirstNonWhitespace(t *testing.T) {
 func TestCovBoost2DiffVisualKeyEsc(t *testing.T) {
 	m := baseModelBoost2()
 	m.mode = modeDiff
-	m.diffVisualMode = true
+	m.diffView.visualMode = true
 	result, cmd := m.handleDiffVisualKey(keyMsg("esc"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 	assert.Nil(t, cmd)
 }
 
 func TestCovBoost2DiffVisualKeyV(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
 	// V when already in line mode toggles off.
 	result, _ := m.handleDiffVisualKey(keyMsg("V"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, rune('V'), rm.diffVisualType)
+	assert.Equal(t, rune('V'), rm.diffView.visualType)
 }
 
 func TestCovBoost2DiffVisualKeyVToggleOff(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'V'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'V'
 	result, _ := m.handleDiffVisualKey(keyMsg("V"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 }
 
 func TestCovBoost2DiffVisualKeySmallV(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'V'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'V'
 	result, _ := m.handleDiffVisualKey(keyMsg("v"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, rune('v'), rm.diffVisualType)
+	assert.Equal(t, rune('v'), rm.diffView.visualType)
 }
 
 func TestCovBoost2DiffVisualKeySmallVToggleOff(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
 	result, _ := m.handleDiffVisualKey(keyMsg("v"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 }
 
 func TestCovBoost2DiffVisualKeyCtrlV(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
 	result, _ := m.handleDiffVisualKey(tea.KeyMsg{Type: tea.KeyCtrlV}, nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, rune('B'), rm.diffVisualType)
+	assert.Equal(t, rune('B'), rm.diffView.visualType)
 }
 
 func TestCovBoost2DiffVisualKeyCtrlVToggleOff(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'B'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'B'
 	result, _ := m.handleDiffVisualKey(tea.KeyMsg{Type: tea.KeyCtrlV}, nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 }
 
 func TestCovBoost2DiffVisualKeyJK(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 0
+	m.diffView.visualMode = true
+	m.diffView.cursor = 0
 	result, _ := m.handleDiffVisualKey(keyMsg("j"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.diffCursor)
+	assert.Equal(t, 1, rm.diffView.cursor)
 
 	result2, _ := rm.handleDiffVisualKey(keyMsg("k"), nil, 10, 5, 5)
 	rm2 := result2.(Model)
-	assert.Equal(t, 0, rm2.diffCursor)
+	assert.Equal(t, 0, rm2.diffView.cursor)
 }
 
 func TestCovBoost2DiffVisualKeyDown(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 0
+	m.diffView.visualMode = true
+	m.diffView.cursor = 0
 	result, _ := m.handleDiffVisualKey(keyMsg("down"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.diffCursor)
+	assert.Equal(t, 1, rm.diffView.cursor)
 }
 
 func TestCovBoost2DiffVisualKeyUp(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 3
+	m.diffView.visualMode = true
+	m.diffView.cursor = 3
 	result, _ := m.handleDiffVisualKey(keyMsg("up"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, 2, rm.diffCursor)
+	assert.Equal(t, 2, rm.diffView.cursor)
 }
 
 func TestCovBoost2DiffVisualKeyHL(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffVisualCurCol = 5
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.visualCurCol = 5
 	result, _ := m.handleDiffVisualKey(keyMsg("h"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, 4, rm.diffVisualCurCol)
+	assert.Equal(t, 4, rm.diffView.visualCurCol)
 
 	result2, _ := rm.handleDiffVisualKey(keyMsg("l"), nil, 10, 5, 5)
 	rm2 := result2.(Model)
-	assert.Equal(t, 5, rm2.diffVisualCurCol)
+	assert.Equal(t, 5, rm2.diffView.visualCurCol)
 }
 
 func TestCovBoost2DiffVisualKeyHLBlockMode(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'B'
-	m.diffVisualCurCol = 5
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'B'
+	m.diffView.visualCurCol = 5
 	result, _ := m.handleDiffVisualKey(keyMsg("h"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, 4, rm.diffVisualCurCol)
+	assert.Equal(t, 4, rm.diffView.visualCurCol)
 }
 
 func TestCovBoost2DiffVisualKeyHLNotInCharOrBlockMode(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'V'
-	m.diffVisualCurCol = 5
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'V'
+	m.diffView.visualCurCol = 5
 	result, _ := m.handleDiffVisualKey(keyMsg("h"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, 5, rm.diffVisualCurCol)
+	assert.Equal(t, 5, rm.diffView.visualCurCol)
 }
 
 func TestCovBoost2DiffVisualKeyYLineMode(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'V'
-	m.diffVisualStart = 0
-	m.diffCursor = 0
-	m.diffLeft = "line1\nline2\nline3"
-	m.diffRight = "lineA\nlineB\nlineC"
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'V'
+	m.diffView.visualStart = 0
+	m.diffView.cursor = 0
+	m.diffView.left = "line1\nline2\nline3"
+	m.diffView.right = "lineA\nlineB\nlineC"
 	result, cmd := m.handleDiffVisualKey(keyMsg("y"), nil, 3, 3, 0)
 	rm := result.(Model)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 	assert.NotNil(t, cmd)
 }
 
 func TestCovBoost2DiffVisualKeyZero(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffVisualCurCol = 5
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.visualCurCol = 5
 	result, _ := m.handleDiffVisualKey(keyMsg("0"), nil, 10, 5, 5)
 	rm := result.(Model)
-	assert.Equal(t, 0, rm.diffVisualCurCol)
+	assert.Equal(t, 0, rm.diffView.visualCurCol)
 }
 
 func TestCovEventTimelineVisualEsc(t *testing.T) {
@@ -832,156 +832,156 @@ func TestCovEventTimelineVisualBigE(t *testing.T) {
 
 func TestCovBoost2DiffVisualYCharModeSingleLine(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "hello world"
-	m.diffRight = "hello world"
-	m.diffVisualStart = 0
-	m.diffCursor = 0
-	m.diffVisualCol = 0
-	m.diffVisualCurCol = 4
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "hello world"
+	m.diffView.right = "hello world"
+	m.diffView.visualStart = 0
+	m.diffView.cursor = 0
+	m.diffView.visualCol = 0
+	m.diffView.visualCurCol = 4
 	result, cmd := m.handleDiffVisualKey(keyMsg("y"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 	assert.NotNil(t, cmd)
 }
 
 func TestCovBoost2DiffVisualYBlockMode(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'B'
-	m.diffLeft = "hello world\nfoo bar"
-	m.diffRight = "hello world\nfoo bar"
-	m.diffVisualStart = 0
-	m.diffCursor = 1
-	m.diffVisualCol = 0
-	m.diffVisualCurCol = 4
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'B'
+	m.diffView.left = "hello world\nfoo bar"
+	m.diffView.right = "hello world\nfoo bar"
+	m.diffView.visualStart = 0
+	m.diffView.cursor = 1
+	m.diffView.visualCol = 0
+	m.diffView.visualCurCol = 4
 	result, cmd := m.handleDiffVisualKey(keyMsg("y"), nil, 2, 2, 0)
 	rm := result.(Model)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 	assert.NotNil(t, cmd)
 }
 
 func TestCovBoost2DiffVisualKeyDollar(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "hello world"
-	m.diffRight = "hello world"
-	m.diffCursor = 0
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "hello world"
+	m.diffView.right = "hello world"
+	m.diffView.cursor = 0
 	result, _ := m.handleDiffVisualKey(keyMsg("$"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.True(t, rm.diffVisualCurCol > 0)
+	assert.True(t, rm.diffView.visualCurCol > 0)
 }
 
 func TestCovBoost2DiffVisualKeyCaret(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "  hello world"
-	m.diffRight = "  hello world"
-	m.diffCursor = 0
-	m.diffVisualCurCol = 5
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "  hello world"
+	m.diffView.right = "  hello world"
+	m.diffView.cursor = 0
+	m.diffView.visualCurCol = 5
 	result, _ := m.handleDiffVisualKey(keyMsg("^"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.Equal(t, 2, rm.diffVisualCurCol) // first non-whitespace
+	assert.Equal(t, 2, rm.diffView.visualCurCol) // first non-whitespace
 }
 
 func TestCovBoost2DiffVisualKeyW(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "hello world foo"
-	m.diffRight = "hello world foo"
-	m.diffCursor = 0
-	m.diffVisualCurCol = 0
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "hello world foo"
+	m.diffView.right = "hello world foo"
+	m.diffView.cursor = 0
+	m.diffView.visualCurCol = 0
 	result, _ := m.handleDiffVisualKey(keyMsg("w"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.True(t, rm.diffVisualCurCol > 0)
+	assert.True(t, rm.diffView.visualCurCol > 0)
 }
 
 func TestCovBoost2DiffVisualKeySmallB(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "hello world foo"
-	m.diffRight = "hello world foo"
-	m.diffCursor = 0
-	m.diffVisualCurCol = 6
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "hello world foo"
+	m.diffView.right = "hello world foo"
+	m.diffView.cursor = 0
+	m.diffView.visualCurCol = 6
 	result, _ := m.handleDiffVisualKey(keyMsg("b"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.True(t, rm.diffVisualCurCol < 6)
+	assert.True(t, rm.diffView.visualCurCol < 6)
 }
 
 func TestCovBoost2DiffVisualKeyE(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "hello world"
-	m.diffRight = "hello world"
-	m.diffCursor = 0
-	m.diffVisualCurCol = 0
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "hello world"
+	m.diffView.right = "hello world"
+	m.diffView.cursor = 0
+	m.diffView.visualCurCol = 0
 	result, _ := m.handleDiffVisualKey(keyMsg("e"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.True(t, rm.diffVisualCurCol > 0)
+	assert.True(t, rm.diffView.visualCurCol > 0)
 }
 
 func TestCovBoost2DiffVisualKeyBigE(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "hello world"
-	m.diffRight = "hello world"
-	m.diffCursor = 0
-	m.diffVisualCurCol = 0
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "hello world"
+	m.diffView.right = "hello world"
+	m.diffView.cursor = 0
+	m.diffView.visualCurCol = 0
 	result, _ := m.handleDiffVisualKey(keyMsg("E"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.True(t, rm.diffVisualCurCol > 0)
+	assert.True(t, rm.diffView.visualCurCol > 0)
 }
 
 func TestCovBoost2DiffVisualKeyBigW(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "hello world foo"
-	m.diffRight = "hello world foo"
-	m.diffCursor = 0
-	m.diffVisualCurCol = 0
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "hello world foo"
+	m.diffView.right = "hello world foo"
+	m.diffView.cursor = 0
+	m.diffView.visualCurCol = 0
 	result, _ := m.handleDiffVisualKey(keyMsg("W"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.True(t, rm.diffVisualCurCol > 0)
+	assert.True(t, rm.diffView.visualCurCol > 0)
 }
 
 func TestCovBoost2DiffVisualKeyBigB(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffLeft = "hello world foo"
-	m.diffRight = "hello world foo"
-	m.diffCursor = 0
-	m.diffVisualCurCol = 12
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.left = "hello world foo"
+	m.diffView.right = "hello world foo"
+	m.diffView.cursor = 0
+	m.diffView.visualCurCol = 12
 	result, _ := m.handleDiffVisualKey(keyMsg("B"), nil, 1, 1, 0)
 	rm := result.(Model)
-	assert.True(t, rm.diffVisualCurCol < 12)
+	assert.True(t, rm.diffView.visualCurCol < 12)
 }
 
 func TestCovBoost2DiffVisualKeyBigG(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 0
-	m.diffLeft = "a\nb\nc"
-	m.diffRight = "a\nb\nc"
+	m.diffView.visualMode = true
+	m.diffView.cursor = 0
+	m.diffView.left = "a\nb\nc"
+	m.diffView.right = "a\nb\nc"
 	result, _ := m.handleDiffVisualKey(keyMsg("G"), nil, 3, 3, 0)
 	rm := result.(Model)
-	assert.Equal(t, 2, rm.diffCursor)
+	assert.Equal(t, 2, rm.diffView.cursor)
 }
 
 func TestCovBoost2DiffVisualKeyGG(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 2
-	m.diffLeft = "a\nb\nc"
-	m.diffRight = "a\nb\nc"
+	m.diffView.visualMode = true
+	m.diffView.cursor = 2
+	m.diffView.left = "a\nb\nc"
+	m.diffView.right = "a\nb\nc"
 	// First g.
 	result, _ := m.handleDiffVisualKey(keyMsg("g"), nil, 3, 3, 0)
 	rm := result.(Model)
@@ -990,76 +990,76 @@ func TestCovBoost2DiffVisualKeyGG(t *testing.T) {
 	// Second g.
 	result2, _ := rm.handleDiffVisualKey(keyMsg("g"), nil, 3, 3, 0)
 	rm2 := result2.(Model)
-	assert.Equal(t, 0, rm2.diffCursor)
+	assert.Equal(t, 0, rm2.diffView.cursor)
 }
 
 func TestCovBoost2DiffVisualKeyCtrlD(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 0
-	m.diffLeft = strings.Repeat("line\n", 50)
-	m.diffRight = strings.Repeat("line\n", 50)
+	m.diffView.visualMode = true
+	m.diffView.cursor = 0
+	m.diffView.left = strings.Repeat("line\n", 50)
+	m.diffView.right = strings.Repeat("line\n", 50)
 	result, _ := m.handleDiffVisualKey(keyMsg("ctrl+d"), nil, 50, 20, 30)
 	rm := result.(Model)
-	assert.True(t, rm.diffCursor > 0)
+	assert.True(t, rm.diffView.cursor > 0)
 }
 
 func TestCovBoost2DiffVisualKeyCtrlU(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 25
-	m.diffLeft = strings.Repeat("line\n", 50)
-	m.diffRight = strings.Repeat("line\n", 50)
+	m.diffView.visualMode = true
+	m.diffView.cursor = 25
+	m.diffView.left = strings.Repeat("line\n", 50)
+	m.diffView.right = strings.Repeat("line\n", 50)
 	result, _ := m.handleDiffVisualKey(keyMsg("ctrl+u"), nil, 50, 20, 30)
 	rm := result.(Model)
-	assert.True(t, rm.diffCursor < 25)
+	assert.True(t, rm.diffView.cursor < 25)
 }
 
 func TestCovBoost2DiffVisualKeyCtrlF(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 0
+	m.diffView.visualMode = true
+	m.diffView.cursor = 0
 	result, _ := m.handleDiffVisualKey(keyMsg("ctrl+f"), nil, 50, 20, 30)
 	rm := result.(Model)
-	assert.True(t, rm.diffCursor > 0)
+	assert.True(t, rm.diffView.cursor > 0)
 }
 
 func TestCovBoost2DiffVisualKeyCtrlB(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursor = 30
+	m.diffView.visualMode = true
+	m.diffView.cursor = 30
 	result, _ := m.handleDiffVisualKey(keyMsg("ctrl+b"), nil, 50, 20, 30)
 	rm := result.(Model)
-	assert.True(t, rm.diffCursor < 30)
+	assert.True(t, rm.diffView.cursor < 30)
 }
 
 func TestCovBoost2DiffVisualKeyH2(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
 	result, _ := m.handleDiffVisualKey(keyMsg("H"), nil, 10, 5, 5)
 	_ = result
 }
 
 func TestCovBoost2DiffVisualKeyL2(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
 	result, _ := m.handleDiffVisualKey(keyMsg("L"), nil, 10, 5, 5)
 	_ = result
 }
 
 func TestCovBoost2DiffVisualKeyM(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
+	m.diffView.visualMode = true
 	result, _ := m.handleDiffVisualKey(keyMsg("M"), nil, 10, 5, 5)
 	_ = result
 }
 
 func TestCovBoost2DiffVisualKeyTab(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
-	m.diffCursorSide = 0
+	m.diffView.visualMode = true
+	m.diffView.cursorSide = 0
 	// "tab" is not handled by handleDiffVisualKey, falls through.
 	result, cmd := m.handleDiffVisualKey(keyMsg("tab"), nil, 10, 5, 5)
 	assert.Nil(t, cmd)
@@ -1068,7 +1068,7 @@ func TestCovBoost2DiffVisualKeyTab(t *testing.T) {
 
 func TestCovBoost2DiffVisualKeyUnknown(t *testing.T) {
 	m := baseModelBoost2()
-	m.diffVisualMode = true
+	m.diffView.visualMode = true
 	result, cmd := m.handleDiffVisualKey(keyMsg("z"), nil, 10, 5, 5)
 	assert.Nil(t, cmd)
 	_ = result
@@ -1077,40 +1077,40 @@ func TestCovBoost2DiffVisualKeyUnknown(t *testing.T) {
 func TestCovDiffKeySearchEnter(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
-	m.diffSearchText.Insert("test")
-	m.diffLeft = "line1\nline2\ntest line"
-	m.diffRight = "line1\nline2\ntest line"
+	m.diffView.searchMode = true
+	m.diffView.searchText.Insert("test")
+	m.diffView.left = "line1\nline2\ntest line"
+	m.diffView.right = "line1\nline2\ntest line"
 	result, _ := m.handleDiffKey(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.diffSearchMode)
-	assert.Equal(t, "test", rm.diffSearchQuery)
+	assert.False(t, rm.diffView.searchMode)
+	assert.Equal(t, "test", rm.diffView.searchQuery)
 }
 
 func TestCovDiffKeySearchEsc(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
+	m.diffView.searchMode = true
 	result, _ := m.handleDiffKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.False(t, rm.diffSearchMode)
+	assert.False(t, rm.diffView.searchMode)
 }
 
 func TestCovDiffKeySearchBackspace(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
-	m.diffSearchText.Insert("ab")
+	m.diffView.searchMode = true
+	m.diffView.searchText.Insert("ab")
 	result, _ := m.handleDiffKey(keyMsg("backspace"))
 	rm := result.(Model)
-	assert.Equal(t, "a", rm.diffSearchText.Value)
+	assert.Equal(t, "a", rm.diffView.searchText.Value)
 }
 
 func TestCovDiffKeySearchCtrlW(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
-	m.diffSearchText.Insert("foo bar")
+	m.diffView.searchMode = true
+	m.diffView.searchText.Insert("foo bar")
 	result, _ := m.handleDiffKey(keyMsg("ctrl+w"))
 	_ = result.(Model)
 }
@@ -1118,7 +1118,7 @@ func TestCovDiffKeySearchCtrlW(t *testing.T) {
 func TestCovDiffKeySearchCtrlA(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
+	m.diffView.searchMode = true
 	result, _ := m.handleDiffKey(keyMsg("ctrl+a"))
 	_ = result.(Model)
 }
@@ -1126,7 +1126,7 @@ func TestCovDiffKeySearchCtrlA(t *testing.T) {
 func TestCovDiffKeySearchCtrlE(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
+	m.diffView.searchMode = true
 	result, _ := m.handleDiffKey(keyMsg("ctrl+e"))
 	_ = result.(Model)
 }
@@ -1134,8 +1134,8 @@ func TestCovDiffKeySearchCtrlE(t *testing.T) {
 func TestCovDiffKeySearchLeftRight(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
-	m.diffSearchText.Insert("abc")
+	m.diffView.searchMode = true
+	m.diffView.searchText.Insert("abc")
 	result, _ := m.handleDiffKey(keyMsg("left"))
 	rm := result.(Model)
 	result, _ = rm.handleDiffKey(keyMsg("right"))
@@ -1145,26 +1145,26 @@ func TestCovDiffKeySearchLeftRight(t *testing.T) {
 func TestCovDiffKeySearchTyping(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
+	m.diffView.searchMode = true
 	result, _ := m.handleDiffKey(keyMsg("x"))
 	rm := result.(Model)
-	assert.Equal(t, "x", rm.diffSearchText.Value)
+	assert.Equal(t, "x", rm.diffView.searchText.Value)
 }
 
 func TestCovDiffKeySearchCtrlC(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffSearchMode = true
+	m.diffView.searchMode = true
 	result, _ := m.handleDiffKey(keyMsg("ctrl+c"))
 	rm := result.(Model)
-	assert.False(t, rm.diffSearchMode)
+	assert.False(t, rm.diffView.searchMode)
 }
 
 func TestCovDiffKeyHelp(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffLeft = "line1\nline2"
-	m.diffRight = "line1\nline3"
+	m.diffView.left = "line1\nline2"
+	m.diffView.right = "line1\nline3"
 	result, _ := m.handleDiffKey(keyMsg("?"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
@@ -1174,19 +1174,19 @@ func TestCovDiffKeyHelp(t *testing.T) {
 func TestCovDiffKeyToggleWrap(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffWrap = false
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.wrap = false
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleDiffKey(keyMsg(">"))
 	rm := result.(Model)
-	assert.True(t, rm.diffWrap)
+	assert.True(t, rm.diffView.wrap)
 }
 
 func TestCovDiffKeyEsc(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleDiffKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)
@@ -1195,9 +1195,9 @@ func TestCovDiffKeyEsc(t *testing.T) {
 func TestCovDiffKeyDown(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffScroll = 0
-	m.diffLeft = "a\nb\nc\nd"
-	m.diffRight = "a\nb\nc\nd"
+	m.diffView.scroll = 0
+	m.diffView.left = "a\nb\nc\nd"
+	m.diffView.right = "a\nb\nc\nd"
 	result, _ := m.handleDiffKey(keyMsg("j"))
 	_ = result.(Model)
 }
@@ -1205,9 +1205,9 @@ func TestCovDiffKeyDown(t *testing.T) {
 func TestCovDiffKeyUp(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffScroll = 3
-	m.diffLeft = "a\nb\nc\nd"
-	m.diffRight = "a\nb\nc\nd"
+	m.diffView.scroll = 3
+	m.diffView.left = "a\nb\nc\nd"
+	m.diffView.right = "a\nb\nc\nd"
 	result, _ := m.handleDiffKey(keyMsg("k"))
 	_ = result.(Model)
 }
@@ -1215,30 +1215,30 @@ func TestCovDiffKeyUp(t *testing.T) {
 func TestCovDiffKeySlash(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleDiffKey(keyMsg("/"))
 	rm := result.(Model)
-	assert.True(t, rm.diffSearchMode)
+	assert.True(t, rm.diffView.searchMode)
 }
 
 func TestCovDiffKeyToggleUnified(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffUnified = false
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.unified = false
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleDiffKey(keyMsg("u"))
 	rm := result.(Model)
-	assert.True(t, rm.diffUnified)
+	assert.True(t, rm.diffView.unified)
 }
 
 func TestCovDiffKeyCtrlD(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffScroll = 0
-	m.diffLeft = "a\nb\nc\nd\ne\nf\ng\nh"
-	m.diffRight = "a\nb\nc\nd\ne\nf\ng\nh"
+	m.diffView.scroll = 0
+	m.diffView.left = "a\nb\nc\nd\ne\nf\ng\nh"
+	m.diffView.right = "a\nb\nc\nd\ne\nf\ng\nh"
 	result, _ := m.handleDiffKey(keyMsg("ctrl+d"))
 	_ = result.(Model)
 }
@@ -1246,9 +1246,9 @@ func TestCovDiffKeyCtrlD(t *testing.T) {
 func TestCovDiffKeyCtrlU(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffScroll = 10
-	m.diffLeft = "a\nb\nc\nd\ne\nf"
-	m.diffRight = "a\nb\nc\nd\ne\nf"
+	m.diffView.scroll = 10
+	m.diffView.left = "a\nb\nc\nd\ne\nf"
+	m.diffView.right = "a\nb\nc\nd\ne\nf"
 	result, _ := m.handleDiffKey(keyMsg("ctrl+u"))
 	_ = result.(Model)
 }
@@ -1256,67 +1256,67 @@ func TestCovDiffKeyCtrlU(t *testing.T) {
 func TestCovDiffKeyGG(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffScroll = 5
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.scroll = 5
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleDiffKey(keyMsg("g"))
 	rm := result.(Model)
 	assert.True(t, rm.pendingG)
 
 	result, _ = rm.handleDiffKey(keyMsg("g"))
 	rm = result.(Model)
-	assert.Equal(t, 0, rm.diffScroll)
+	assert.Equal(t, 0, rm.diffView.scroll)
 }
 
 func TestCovDiffKeyBigG(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffLeft = "a\nb\nc"
-	m.diffRight = "a\nb\nc"
+	m.diffView.left = "a\nb\nc"
+	m.diffView.right = "a\nb\nc"
 	result, _ := m.handleDiffKey(keyMsg("G"))
 	rm := result.(Model)
-	assert.GreaterOrEqual(t, rm.diffScroll, 0)
+	assert.GreaterOrEqual(t, rm.diffView.scroll, 0)
 }
 
 func TestCovDiffKeyVisualV(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleDiffKey(keyMsg("v"))
 	rm := result.(Model)
-	assert.True(t, rm.diffVisualMode)
+	assert.True(t, rm.diffView.visualMode)
 }
 
 func TestCovDiffKeyTab(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffCursorSide = 0
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.cursorSide = 0
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleDiffKey(keyMsg("tab"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.diffCursorSide)
+	assert.Equal(t, 1, rm.diffView.cursorSide)
 }
 
 func TestCovDiffVisualKeyEsc(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeDiff
-	m.diffVisualMode = true
-	m.diffLeft = "a\nb"
-	m.diffRight = "a\nc"
+	m.diffView.visualMode = true
+	m.diffView.left = "a\nb"
+	m.diffView.right = "a\nc"
 	result, _ := m.handleDiffKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 }
 
 func TestCovDiffVisualKeyDown(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeDiff
-	m.diffVisualMode = true
-	m.diffLeft = "a\nb\nc"
-	m.diffRight = "a\nb\nc"
-	m.diffScroll = 0
+	m.diffView.visualMode = true
+	m.diffView.left = "a\nb\nc"
+	m.diffView.right = "a\nb\nc"
+	m.diffView.scroll = 0
 	result, _ := m.handleDiffKey(keyMsg("j"))
 	_ = result.(Model)
 }
@@ -1324,11 +1324,11 @@ func TestCovDiffVisualKeyDown(t *testing.T) {
 func TestCovDiffVisualKeyYank(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeDiff
-	m.diffVisualMode = true
-	m.diffVisualStart = 0
-	m.diffScroll = 0
-	m.diffLeft = "a\nb\nc"
-	m.diffRight = "a\nb\nc"
+	m.diffView.visualMode = true
+	m.diffView.visualStart = 0
+	m.diffView.scroll = 0
+	m.diffView.left = "a\nb\nc"
+	m.diffView.right = "a\nb\nc"
 	_, cmd := m.handleDiffKey(keyMsg("y"))
 	assert.NotNil(t, cmd)
 }
