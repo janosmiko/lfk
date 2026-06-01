@@ -1244,7 +1244,7 @@ func TestCovExecuteActionLogsPodAllContainers(t *testing.T) {
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.Equal(t, modeLogs, rm.mode)
-	assert.Contains(t, rm.logTitle, "Logs:")
+	assert.Contains(t, rm.logView.title, "Logs:")
 }
 
 func TestCovExecuteActionExecDirectPod(t *testing.T) {
@@ -1922,7 +1922,7 @@ func TestFinalExecuteActionLogsDirectPod(t *testing.T) {
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.Equal(t, modeLogs, rm.mode)
-	assert.Contains(t, rm.logTitle, "main")
+	assert.Contains(t, rm.logView.title, "main")
 }
 
 func TestFinalExecuteActionLogsGroupResource(t *testing.T) {
@@ -1932,7 +1932,7 @@ func TestFinalExecuteActionLogsGroupResource(t *testing.T) {
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.Equal(t, modeLogs, rm.mode)
-	assert.Equal(t, "Deployment", rm.logParentKind)
+	assert.Equal(t, "Deployment", rm.logView.parentKind)
 }
 
 func TestFinalExecuteActionLogsUnknownKind(t *testing.T) {

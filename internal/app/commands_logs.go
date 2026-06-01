@@ -95,8 +95,8 @@ func (m *Model) startLogStream() tea.Cmd {
 	kctx := m.actionCtx.context
 	containerName := m.actionCtx.containerName
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
-	logPrevious := m.logPrevious
-	tailLines := m.logTailLines
+	logPrevious := m.logView.previous
+	tailLines := m.logView.tailLines
 	if tailLines == 0 {
 		tailLines = ui.ConfigLogTailLines
 	}
@@ -107,18 +107,18 @@ func (m *Model) startLogStream() tea.Cmd {
 	// and log lines lack the [pod/name/container] prefix that matchesContainerFilter needs.
 	var selectedContainers []string
 	if containerName == "" {
-		selectedContainers = append([]string(nil), m.logSelectedContainers...)
+		selectedContainers = append([]string(nil), m.logView.selectedContainers...)
 	}
 
 	// On auto-reconnect, force --tail=0 so we only pick up new lines from
 	// the next container rather than re-pulling history we already have.
-	reconnecting := m.logReconnecting
+	reconnecting := m.logView.reconnecting
 
 	ctx, cancel := context.WithCancel(context.Background())
-	m.logCancel = cancel
+	m.logView.cancel = cancel
 
 	ch := make(chan string, 256)
-	m.logCh = ch
+	m.logView.ch = ch
 
 	// Run selector discovery and kubectl logs entirely in a background
 	// goroutine so that OIDC browser auth doesn't freeze the TUI.
@@ -326,7 +326,7 @@ func matchesContainerFilter(line string, selectedContainers []string) bool {
 
 // waitForLogLine returns a tea.Cmd that reads the next line from the log channel.
 func (m Model) waitForLogLine() tea.Cmd {
-	ch := m.logCh
+	ch := m.logView.ch
 	if ch == nil {
 		return nil
 	}
@@ -350,27 +350,27 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 
 	// Initialize log viewer state.
 	m.mode = modeLogs
-	m.logLines = nil
-	m.logScroll = 0
-	m.logFollow = true
-	m.logWrap = false
-	m.logLineNumbers = true
-	m.logTimestamps = false
-	m.logPrevious = false
-	m.logIsMulti = true
-	m.logMultiItems = items
-	m.logTitle = fmt.Sprintf("Logs: %d resources", len(items))
-	m.logTailLines = ui.ConfigLogTailLines
-	m.logHasMoreHistory = false // too complex to deduplicate across multiple streams
-	m.logLoadingHistory = false
-	m.logCursor = 0 // will track end as lines stream in with follow mode
-	m.logVisualMode = false
-	m.logVisualStart = 0
+	m.logView.lines = nil
+	m.logView.scroll = 0
+	m.logView.follow = true
+	m.logView.wrap = false
+	m.logView.lineNumbers = true
+	m.logView.timestamps = false
+	m.logView.previous = false
+	m.logView.isMulti = true
+	m.logView.multiItems = items
+	m.logView.title = fmt.Sprintf("Logs: %d resources", len(items))
+	m.logView.tailLines = ui.ConfigLogTailLines
+	m.logView.hasMoreHistory = false // too complex to deduplicate across multiple streams
+	m.logView.loadingHistory = false
+	m.logView.cursor = 0 // will track end as lines stream in with follow mode
+	m.logView.visualMode = false
+	m.logView.visualStart = 0
 
 	ctx, cancel := context.WithCancel(context.Background())
-	m.logCancel = cancel
+	m.logView.cancel = cancel
 	ch := make(chan string, 256)
-	m.logCh = ch
+	m.logView.ch = ch
 
 	kctx := m.nav.Context
 	ns := m.resolveNamespace()
@@ -392,7 +392,7 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		}
 
 		followFlag := "-f"
-		if m.logPrevious {
+		if m.logView.previous {
 			followFlag = "--previous"
 		}
 		var args []string
@@ -411,8 +411,8 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 		}
 
 		// Add --tail for initial loading.
-		if m.logTailLines > 0 {
-			args = append(args, fmt.Sprintf("--tail=%d", m.logTailLines))
+		if m.logView.tailLines > 0 {
+			args = append(args, fmt.Sprintf("--tail=%d", m.logView.tailLines))
 		}
 
 		args = append(args, "--timestamps")
@@ -470,13 +470,13 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	m.logCancel = cancel
+	m.logView.cancel = cancel
 	ch := make(chan string, 256)
-	m.logCh = ch
+	m.logView.ch = ch
 
 	kctx := m.nav.Context
 	ns := m.resolveNamespace()
-	items := m.logMultiItems
+	items := m.logView.multiItems
 
 	var wg sync.WaitGroup
 	for _, item := range items {
@@ -495,7 +495,7 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 		}
 
 		followFlag := "-f"
-		if m.logPrevious {
+		if m.logView.previous {
 			followFlag = "--previous"
 		}
 		var args []string
@@ -514,8 +514,8 @@ func (m Model) restartMultiLogStream() (Model, tea.Cmd) {
 		}
 
 		// Add --tail for initial loading.
-		if m.logTailLines > 0 {
-			args = append(args, fmt.Sprintf("--tail=%d", m.logTailLines))
+		if m.logView.tailLines > 0 {
+			args = append(args, fmt.Sprintf("--tail=%d", m.logView.tailLines))
 		}
 
 		args = append(args, "--timestamps")
@@ -572,16 +572,16 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 	kctx := m.actionCtx.context
 	containerName := m.actionCtx.containerName
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
-	newTail := m.logTailLines + ui.ConfigLogTailLines
-	prevTotal := len(m.logLines)
+	newTail := m.logView.tailLines + ui.ConfigLogTailLines
+	prevTotal := len(m.logView.lines)
 	// Only filter client-side when in --all-containers mode (no -c flag).
 	var selectedContainers []string
 	if containerName == "" {
-		selectedContainers = append([]string(nil), m.logSelectedContainers...)
+		selectedContainers = append([]string(nil), m.logView.selectedContainers...)
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
-	m.logHistoryCancel = cancel
+	m.logView.historyCancel = cancel
 
 	return m.trackBgTask(scheduler.KindSubprocess, "Log history: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {
 		defer cancel()
@@ -656,8 +656,8 @@ func (m *Model) fetchOlderLogs() tea.Cmd {
 // ctrl+b, gg, mouse wheel up — would immediately fetch older history even
 // when the user has only moved a single line up from the bottom.
 func (m *Model) maybeLoadMoreHistory() tea.Cmd {
-	if m.logScroll == 0 && m.logCursor <= 0 && m.logHasMoreHistory && !m.logLoadingHistory && !m.logPrevious {
-		m.logLoadingHistory = true
+	if m.logView.scroll == 0 && m.logView.cursor <= 0 && m.logView.hasMoreHistory && !m.logView.loadingHistory && !m.logView.previous {
+		m.logView.loadingHistory = true
 		return m.fetchOlderLogs()
 	}
 	return nil
@@ -667,7 +667,7 @@ func (m *Model) maybeLoadMoreHistory() tea.Cmd {
 func (m *Model) saveLoadedLogs() (string, error) {
 	name := sanitizeFilename(m.actionCtx.name)
 	path := fmt.Sprintf("%s/lfk-logs-%s-%d.log", os.TempDir(), name, time.Now().Unix())
-	content := strings.Join(m.logLines, "\n") + "\n"
+	content := strings.Join(m.logView.lines, "\n") + "\n"
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
 		return "", err
 	}
@@ -687,7 +687,7 @@ func (m *Model) saveAllLogs() tea.Cmd {
 	kctx := m.actionCtx.context
 	containerName := m.actionCtx.containerName
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
-	logPrevious := m.logPrevious
+	logPrevious := m.logView.previous
 	sanitized := sanitizeFilename(name)
 
 	return m.trackBgTask(scheduler.KindSubprocess, "Save all logs: "+kind+"/"+name, bgtaskTarget(kctx, ns), func() tea.Msg {

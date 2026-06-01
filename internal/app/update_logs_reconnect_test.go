@@ -13,10 +13,12 @@ import (
 func TestUpdateLogLine_DonePodAllContainersSchedulesReconnect(t *testing.T) {
 	ch := make(chan string)
 	m := Model{
-		mode:      modeLogs,
-		logCh:     ch,
-		logFollow: true,
-		tabs:      []TabState{{}},
+		mode: modeLogs,
+		logView: logViewState{
+			ch:     ch,
+			follow: true,
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind: "Pod",
 			name: "my-pod",
@@ -24,11 +26,11 @@ func TestUpdateLogLine_DonePodAllContainersSchedulesReconnect(t *testing.T) {
 	}
 	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
 	rm := result.(Model)
-	assert.Empty(t, rm.logLines,
+	assert.Empty(t, rm.logView.lines,
 		"no sentinel markers on auto-reconnect — the reconnect is silent")
 	assert.NotNil(t, cmd,
 		"done must return a restart command (scheduled)")
-	assert.Equal(t, 1, rm.logAutoReconnectAttempt)
+	assert.Equal(t, 1, rm.logView.autoReconnectAttempt)
 }
 
 // If the user has scrolled up to read history (logFollow=false), they are
@@ -37,10 +39,12 @@ func TestUpdateLogLine_DonePodAllContainersSchedulesReconnect(t *testing.T) {
 func TestUpdateLogLine_DoneNotInFollowModeDoesNotReconnect(t *testing.T) {
 	ch := make(chan string)
 	m := Model{
-		mode:      modeLogs,
-		logCh:     ch,
-		logFollow: false, // user has scrolled away from the tail
-		tabs:      []TabState{{}},
+		mode: modeLogs,
+		logView: logViewState{
+			ch:     ch,
+			follow: false, // user has scrolled away from the tail
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind: "Pod",
 			name: "my-pod",
@@ -48,10 +52,10 @@ func TestUpdateLogLine_DoneNotInFollowModeDoesNotReconnect(t *testing.T) {
 	}
 	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
 	rm := result.(Model)
-	assert.Empty(t, rm.logLines)
+	assert.Empty(t, rm.logView.lines)
 	assert.Nil(t, cmd,
 		"not in follow mode: don't schedule a reconnect on behalf of a user who isn't watching")
-	assert.Equal(t, 0, rm.logAutoReconnectAttempt)
+	assert.Equal(t, 0, rm.logView.autoReconnectAttempt)
 }
 
 // When a specific container was selected (actionCtx.containerName set), the
@@ -59,9 +63,11 @@ func TestUpdateLogLine_DoneNotInFollowModeDoesNotReconnect(t *testing.T) {
 func TestUpdateLogLine_DoneSpecificContainerStreamEnds(t *testing.T) {
 	ch := make(chan string)
 	m := Model{
-		mode:  modeLogs,
-		logCh: ch,
-		tabs:  []TabState{{}},
+		mode: modeLogs,
+		logView: logViewState{
+			ch: ch,
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind:          "Pod",
 			name:          "my-pod",
@@ -70,7 +76,7 @@ func TestUpdateLogLine_DoneSpecificContainerStreamEnds(t *testing.T) {
 	}
 	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
 	rm := result.(Model)
-	assert.Empty(t, rm.logLines)
+	assert.Empty(t, rm.logView.lines)
 	assert.Nil(t, cmd)
 }
 
@@ -80,9 +86,11 @@ func TestUpdateLogLine_DoneSpecificContainerStreamEnds(t *testing.T) {
 func TestUpdateLogLine_DoneDeploymentStreamEnds(t *testing.T) {
 	ch := make(chan string)
 	m := Model{
-		mode:  modeLogs,
-		logCh: ch,
-		tabs:  []TabState{{}},
+		mode: modeLogs,
+		logView: logViewState{
+			ch: ch,
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind: "Deployment",
 			name: "my-deploy",
@@ -90,7 +98,7 @@ func TestUpdateLogLine_DoneDeploymentStreamEnds(t *testing.T) {
 	}
 	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
 	rm := result.(Model)
-	assert.Empty(t, rm.logLines)
+	assert.Empty(t, rm.logView.lines)
 	assert.Nil(t, cmd)
 }
 
@@ -99,10 +107,12 @@ func TestUpdateLogLine_DoneDeploymentStreamEnds(t *testing.T) {
 func TestUpdateLogLine_DoneMultiStreamEnds(t *testing.T) {
 	ch := make(chan string)
 	m := Model{
-		mode:       modeLogs,
-		logCh:      ch,
-		tabs:       []TabState{{}},
-		logIsMulti: true,
+		mode: modeLogs,
+		logView: logViewState{
+			ch:      ch,
+			isMulti: true,
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind: "Pod",
 			name: "my-pod",
@@ -110,7 +120,7 @@ func TestUpdateLogLine_DoneMultiStreamEnds(t *testing.T) {
 	}
 	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
 	rm := result.(Model)
-	assert.Empty(t, rm.logLines)
+	assert.Empty(t, rm.logView.lines)
 	assert.Nil(t, cmd)
 }
 
@@ -118,10 +128,12 @@ func TestUpdateLogLine_DoneMultiStreamEnds(t *testing.T) {
 func TestUpdateLogLine_DonePreviousStreamEnds(t *testing.T) {
 	ch := make(chan string)
 	m := Model{
-		mode:        modeLogs,
-		logCh:       ch,
-		tabs:        []TabState{{}},
-		logPrevious: true,
+		mode: modeLogs,
+		logView: logViewState{
+			ch:       ch,
+			previous: true,
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind: "Pod",
 			name: "my-pod",
@@ -129,7 +141,7 @@ func TestUpdateLogLine_DonePreviousStreamEnds(t *testing.T) {
 	}
 	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
 	rm := result.(Model)
-	assert.Empty(t, rm.logLines)
+	assert.Empty(t, rm.logView.lines)
 	assert.Nil(t, cmd)
 }
 
@@ -139,10 +151,12 @@ func TestUpdateLogLine_DonePreviousStreamEnds(t *testing.T) {
 func TestUpdateLogLine_DoneGivesUpAfterMaxAttempts(t *testing.T) {
 	ch := make(chan string)
 	m := Model{
-		mode:                    modeLogs,
-		logCh:                   ch,
-		tabs:                    []TabState{{}},
-		logAutoReconnectAttempt: logAutoReconnectMaxAttempts,
+		mode: modeLogs,
+		logView: logViewState{
+			ch:                   ch,
+			autoReconnectAttempt: logAutoReconnectMaxAttempts,
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind: "Pod",
 			name: "my-pod",
@@ -150,7 +164,7 @@ func TestUpdateLogLine_DoneGivesUpAfterMaxAttempts(t *testing.T) {
 	}
 	result, cmd := m.Update(logLineMsg{done: true, ch: ch})
 	rm := result.(Model)
-	assert.Empty(t, rm.logLines)
+	assert.Empty(t, rm.logView.lines)
 	assert.Nil(t, cmd)
 }
 
@@ -160,10 +174,12 @@ func TestUpdateLogLine_DoneGivesUpAfterMaxAttempts(t *testing.T) {
 func TestUpdateLogLine_LineReceivedResetsAttemptCounter(t *testing.T) {
 	ch := make(chan string, 1)
 	m := Model{
-		mode:                    modeLogs,
-		logCh:                   ch,
-		tabs:                    []TabState{{}},
-		logAutoReconnectAttempt: 3,
+		mode: modeLogs,
+		logView: logViewState{
+			ch:                   ch,
+			autoReconnectAttempt: 3,
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind: "Pod",
 			name: "my-pod",
@@ -171,19 +187,21 @@ func TestUpdateLogLine_LineReceivedResetsAttemptCounter(t *testing.T) {
 	}
 	result, _ := m.Update(logLineMsg{line: "new line", ch: ch})
 	rm := result.(Model)
-	assert.Equal(t, 0, rm.logAutoReconnectAttempt,
+	assert.Equal(t, 0, rm.logView.autoReconnectAttempt,
 		"incoming line means the stream is producing output; reset attempt counter")
 }
 
-// A restart msg whose channel no longer matches m.logCh (user switched pods
+// A restart msg whose channel no longer matches m.logView.ch (user switched pods
 // or exited logs mode) must be ignored.
 func TestUpdateLogStreamRestart_StaleChannelIgnored(t *testing.T) {
 	oldCh := make(chan string)
 	newCh := make(chan string)
 	m := Model{
-		mode:  modeLogs,
-		logCh: newCh, // current stream is a different channel
-		tabs:  []TabState{{}},
+		mode: modeLogs,
+		logView: logViewState{
+			ch: newCh, // current stream is a different channel
+		},
+		tabs: []TabState{{}},
 		actionCtx: actionContext{
 			kind: "Pod",
 			name: "my-pod",
@@ -199,9 +217,11 @@ func TestUpdateLogStreamRestart_StaleChannelIgnored(t *testing.T) {
 func TestUpdateLogStreamRestart_NotInLogsModeIgnored(t *testing.T) {
 	ch := make(chan string)
 	m := Model{
-		mode:  modeExplorer,
-		logCh: ch,
-		tabs:  []TabState{{}},
+		mode: modeExplorer,
+		logView: logViewState{
+			ch: ch,
+		},
+		tabs: []TabState{{}},
 	}
 	result, cmd := m.Update(logStreamRestartMsg{ch: ch})
 	rm := result.(Model)

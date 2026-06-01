@@ -64,7 +64,7 @@ func (m Model) updateExecPTYStart(msg execPTYStartMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
-	if msg.ch != m.logCh {
+	if msg.ch != m.logView.ch {
 		// Message from a background tab's log stream — buffer it into that tab's state.
 		for i := range m.tabs {
 			if m.tabs[i].logCh == msg.ch {
@@ -93,21 +93,21 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		// streams in without manual action. Bail out after
 		// logAutoReconnectMaxAttempts consecutive empty reconnects so we
 		// don't spin forever once the pod is truly terminated.
-		if m.shouldAutoReconnectLogs() && m.logAutoReconnectAttempt < logAutoReconnectMaxAttempts {
-			m.logAutoReconnectAttempt++
+		if m.shouldAutoReconnectLogs() && m.logView.autoReconnectAttempt < logAutoReconnectMaxAttempts {
+			m.logView.autoReconnectAttempt++
 			return m, m.scheduleLogStreamRestart(msg.ch)
 		}
 		return m, nil
 	}
 	// A line arrived — the stream is producing output, so any pending
 	// auto-reconnect backoff is no longer relevant.
-	if m.logAutoReconnectAttempt > 0 {
-		m.logAutoReconnectAttempt = 0
+	if m.logView.autoReconnectAttempt > 0 {
+		m.logView.autoReconnectAttempt = 0
 	}
-	m.logLines = append(m.logLines, msg.line)
-	if m.logFollow {
-		m.logScroll, m.logWrapTopSkip = m.logMaxScrollAndSkip()
-		m.logCursor = len(m.logLines) - 1
+	m.logView.lines = append(m.logView.lines, msg.line)
+	if m.logView.follow {
+		m.logView.scroll, m.logView.wrapTopSkip = m.logMaxScrollAndSkip()
+		m.logView.cursor = len(m.logView.lines) - 1
 	}
 	return m, m.waitForLogLine()
 }
@@ -123,9 +123,9 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 // not watching live — no point re-arming the stream on their behalf.
 func (m Model) shouldAutoReconnectLogs() bool {
 	return m.mode == modeLogs &&
-		m.logFollow &&
-		!m.logIsMulti &&
-		!m.logPrevious &&
+		m.logView.follow &&
+		!m.logView.isMulti &&
+		!m.logView.previous &&
 		m.actionCtx.kind == "Pod" &&
 		m.actionCtx.containerName == ""
 }
@@ -134,19 +134,19 @@ func (m Model) shouldAutoReconnectLogs() bool {
 // the user has switched pods, exited logs mode, or the stream has been
 // replaced (e.g. by a manual action), the restart is silently dropped.
 func (m Model) updateLogStreamRestart(msg logStreamRestartMsg) (tea.Model, tea.Cmd) {
-	if m.mode != modeLogs || m.logCh != msg.ch || !m.shouldAutoReconnectLogs() {
+	if m.mode != modeLogs || m.logView.ch != msg.ch || !m.shouldAutoReconnectLogs() {
 		return m, nil
 	}
-	m.logReconnecting = true
+	m.logView.reconnecting = true
 	cmd := m.startLogStream()
-	m.logReconnecting = false
+	m.logView.reconnecting = false
 	return m, cmd
 }
 
 func (m Model) updateLogHistory(msg logHistoryMsg) Model {
-	m.logLoadingHistory = false
+	m.logView.loadingHistory = false
 	if msg.err != nil {
-		m.logHasMoreHistory = false
+		m.logView.hasMoreHistory = false
 		return m
 	}
 	if m.mode != modeLogs {
@@ -155,18 +155,18 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 
 	// Find overlap: search for the first 3 current lines in the fetched history.
 	overlapIdx := -1
-	if len(m.logLines) >= 3 && len(msg.lines) > 3 {
-		first3 := m.logLines[:3]
+	if len(m.logView.lines) >= 3 && len(msg.lines) > 3 {
+		first3 := m.logView.lines[:3]
 		for i := len(msg.lines) - 3; i >= 0; i-- {
 			if msg.lines[i] == first3[0] && msg.lines[i+1] == first3[1] && msg.lines[i+2] == first3[2] {
 				overlapIdx = i
 				break
 			}
 		}
-	} else if len(m.logLines) > 0 && len(msg.lines) > 0 {
+	} else if len(m.logView.lines) > 0 && len(msg.lines) > 0 {
 		// Single-line fallback.
 		for i, line := range slices.Backward(msg.lines) {
-			if line == m.logLines[0] {
+			if line == m.logView.lines[0] {
 				overlapIdx = i
 				break
 			}
@@ -182,7 +182,7 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	}
 
 	if len(newOlderLines) == 0 {
-		m.logHasMoreHistory = false
+		m.logView.hasMoreHistory = false
 		return m
 	}
 
@@ -191,18 +191,18 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	// async fetch resolved before they navigated), in which case keep them
 	// at 0 so the newly revealed older lines come into view.
 	prepended := len(newOlderLines)
-	m.logLines = append(newOlderLines, m.logLines...)
-	if m.logCursor > 0 || m.logScroll > 0 {
-		m.logScroll += prepended
-		if m.logCursor >= 0 {
-			m.logCursor += prepended
+	m.logView.lines = append(newOlderLines, m.logView.lines...)
+	if m.logView.cursor > 0 || m.logView.scroll > 0 {
+		m.logView.scroll += prepended
+		if m.logView.cursor >= 0 {
+			m.logView.cursor += prepended
 		}
 	}
-	m.logTailLines += ui.ConfigLogTailLines
+	m.logView.tailLines += ui.ConfigLogTailLines
 
 	// Cap total to prevent unbounded growth.
-	if m.logTailLines > 100000 {
-		m.logHasMoreHistory = false
+	if m.logView.tailLines > 100000 {
+		m.logView.hasMoreHistory = false
 	}
 
 	return m

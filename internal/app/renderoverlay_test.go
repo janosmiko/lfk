@@ -180,7 +180,7 @@ func TestRenderOverlayLogContainerSelect(t *testing.T) {
 		{Name: "app"},
 		{Name: "init-container"},
 	}
-	m.logSelectedContainers = []string{"app"}
+	m.logView.selectedContainers = []string{"app"}
 	bg := strings.Repeat("bg\n", 10)
 	result := m.renderOverlay(bg)
 	assert.NotEmpty(t, result)

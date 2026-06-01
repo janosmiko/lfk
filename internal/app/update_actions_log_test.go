@@ -26,8 +26,8 @@ func newTestModelWithClient(t *testing.T) Model {
 func TestExecuteLogsResetsLogParentKindForPods(t *testing.T) {
 	m := newTestModelWithClient(t)
 	// Simulate stale parent context from a previous log session.
-	m.logParentKind = "Job"
-	m.logParentName = "old-job"
+	m.logView.parentKind = "Job"
+	m.logView.parentName = "old-job"
 	m.actionCtx = actionContext{
 		kind:      "Pod",
 		name:      "my-pod",
@@ -39,15 +39,15 @@ func TestExecuteLogsResetsLogParentKindForPods(t *testing.T) {
 	mdl := result.(Model)
 
 	assert.Equal(t, modeLogs, mdl.mode)
-	assert.Equal(t, "", mdl.logParentKind, "logParentKind should be reset for direct Pod logs")
-	assert.Equal(t, "", mdl.logParentName, "logParentName should be reset for direct Pod logs")
+	assert.Equal(t, "", mdl.logView.parentKind, "logParentKind should be reset for direct Pod logs")
+	assert.Equal(t, "", mdl.logView.parentName, "logParentName should be reset for direct Pod logs")
 }
 
 func TestExecuteLogsResetsLogParentKindForContainers(t *testing.T) {
 	m := newTestModelWithClient(t)
 	// Simulate stale parent context from a previous log session.
-	m.logParentKind = "Deployment"
-	m.logParentName = "old-deploy"
+	m.logView.parentKind = "Deployment"
+	m.logView.parentName = "old-deploy"
 	m.actionCtx = actionContext{
 		kind:          "Pod",
 		name:          "my-pod",
@@ -60,8 +60,8 @@ func TestExecuteLogsResetsLogParentKindForContainers(t *testing.T) {
 	mdl := result.(Model)
 
 	assert.Equal(t, modeLogs, mdl.mode)
-	assert.Equal(t, "", mdl.logParentKind, "logParentKind should be reset for container-level Pod logs")
-	assert.Equal(t, "", mdl.logParentName, "logParentName should be reset for container-level Pod logs")
+	assert.Equal(t, "", mdl.logView.parentKind, "logParentKind should be reset for container-level Pod logs")
+	assert.Equal(t, "", mdl.logView.parentName, "logParentName should be reset for container-level Pod logs")
 }
 
 func TestExecuteLogsSetsSelectedContainersForSingleContainer(t *testing.T) {
@@ -77,9 +77,9 @@ func TestExecuteLogsSetsSelectedContainersForSingleContainer(t *testing.T) {
 	result, _ := m.executeAction("Logs")
 	mdl := result.(Model)
 
-	assert.Equal(t, []string{"web"}, mdl.logSelectedContainers,
+	assert.Equal(t, []string{"web"}, mdl.logView.selectedContainers,
 		"logSelectedContainers should contain the single container name")
-	assert.Contains(t, mdl.logTitle, "[web]")
+	assert.Contains(t, mdl.logView.title, "[web]")
 }
 
 func TestExecuteLogsAllContainersHasNilSelectedContainers(t *testing.T) {
@@ -94,7 +94,7 @@ func TestExecuteLogsAllContainersHasNilSelectedContainers(t *testing.T) {
 	result, _ := m.executeAction("Logs")
 	mdl := result.(Model)
 
-	assert.Nil(t, mdl.logSelectedContainers,
+	assert.Nil(t, mdl.logView.selectedContainers,
 		"logSelectedContainers should be nil for all-container logs")
 }
 
@@ -112,8 +112,8 @@ func TestExecuteLogsGroupResourceSetsLogParent(t *testing.T) {
 
 	// Group resources now stream all pods directly (no pod selector).
 	// Parent context is still saved for pod/container re-selection from the log viewer.
-	assert.Equal(t, "Job", mdl.logParentKind)
-	assert.Equal(t, "my-job", mdl.logParentName)
+	assert.Equal(t, "Job", mdl.logView.parentKind)
+	assert.Equal(t, "my-job", mdl.logView.parentName)
 	assert.Equal(t, modeLogs, mdl.mode,
 		"group resource should go directly to log streaming")
 }

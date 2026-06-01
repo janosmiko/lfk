@@ -54,8 +54,8 @@ func (m Model) executeActionGoToPod() (tea.Model, tea.Cmd) {
 	m.overlay = overlayPodSelect
 	m.overlayCursor = 0
 	m.pendingAction = "Go to Pod"
-	m.logPodFilterText = ""
-	m.logPodFilterActive = false
+	m.logView.podFilterText = ""
+	m.logView.podFilterActive = false
 	return m, nil
 }
 

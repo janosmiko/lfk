@@ -449,33 +449,33 @@ func (m *Model) saveCurrentTab() {
 	t.expandedGroup = m.expandedGroup
 	t.allGroupsExpanded = m.allGroupsExpanded
 	t.mode = m.mode
-	t.logLines = append([]string(nil), m.logLines...)
-	t.logScroll = m.logScroll
-	t.logWrapTopSkip = m.logWrapTopSkip
-	t.logFollow = m.logFollow
-	t.logWrap = m.logWrap
-	t.logLineNumbers = m.logLineNumbers
-	t.logTimestamps = m.logTimestamps
-	t.logPrevious = m.logPrevious
-	t.logIsMulti = m.logIsMulti
-	t.logTitle = m.logTitle
-	t.logCancel = m.logCancel
-	t.logCh = m.logCh
-	t.logTailLines = m.logTailLines
-	t.logHasMoreHistory = m.logHasMoreHistory
-	t.logLoadingHistory = m.logLoadingHistory
-	t.logCursor = m.logCursor
-	t.logVisualMode = m.logVisualMode
-	t.logVisualStart = m.logVisualStart
-	t.logVisualType = m.logVisualType
-	t.logVisualCol = m.logVisualCol
-	t.logVisualCurCol = m.logVisualCurCol
-	t.logScrollOption = m.logScrollOption
-	t.logParentKind = m.logParentKind
-	t.logParentName = m.logParentName
-	t.logSavedPodName = m.logSavedPodName
-	t.logContainers = append([]string(nil), m.logContainers...)
-	t.logSelectedContainers = append([]string(nil), m.logSelectedContainers...)
+	t.logLines = append([]string(nil), m.logView.lines...)
+	t.logScroll = m.logView.scroll
+	t.logWrapTopSkip = m.logView.wrapTopSkip
+	t.logFollow = m.logView.follow
+	t.logWrap = m.logView.wrap
+	t.logLineNumbers = m.logView.lineNumbers
+	t.logTimestamps = m.logView.timestamps
+	t.logPrevious = m.logView.previous
+	t.logIsMulti = m.logView.isMulti
+	t.logTitle = m.logView.title
+	t.logCancel = m.logView.cancel
+	t.logCh = m.logView.ch
+	t.logTailLines = m.logView.tailLines
+	t.logHasMoreHistory = m.logView.hasMoreHistory
+	t.logLoadingHistory = m.logView.loadingHistory
+	t.logCursor = m.logView.cursor
+	t.logVisualMode = m.logView.visualMode
+	t.logVisualStart = m.logView.visualStart
+	t.logVisualType = m.logView.visualType
+	t.logVisualCol = m.logView.visualCol
+	t.logVisualCurCol = m.logView.visualCurCol
+	t.logScrollOption = m.logView.scrollOption
+	t.logParentKind = m.logView.parentKind
+	t.logParentName = m.logView.parentName
+	t.logSavedPodName = m.logView.savedPodName
+	t.logContainers = append([]string(nil), m.logView.containers...)
+	t.logSelectedContainers = append([]string(nil), m.logView.selectedContainers...)
 	t.describeContent = m.describeContent
 	t.describeScroll = m.describeScroll
 	t.describeTitle = m.describeTitle
@@ -570,33 +570,33 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 
 	// Restore per-tab view mode and log state.
 	m.mode = t.mode
-	m.logLines = append([]string(nil), t.logLines...)
-	m.logScroll = t.logScroll
-	m.logWrapTopSkip = t.logWrapTopSkip
-	m.logFollow = t.logFollow
-	m.logWrap = t.logWrap
-	m.logLineNumbers = t.logLineNumbers
-	m.logTimestamps = t.logTimestamps
-	m.logPrevious = t.logPrevious
-	m.logIsMulti = t.logIsMulti
-	m.logTitle = t.logTitle
-	m.logCancel = t.logCancel
-	m.logCh = t.logCh
-	m.logTailLines = t.logTailLines
-	m.logHasMoreHistory = t.logHasMoreHistory
-	m.logLoadingHistory = t.logLoadingHistory
-	m.logCursor = t.logCursor
-	m.logVisualMode = t.logVisualMode
-	m.logVisualStart = t.logVisualStart
-	m.logVisualType = t.logVisualType
-	m.logVisualCol = t.logVisualCol
-	m.logVisualCurCol = t.logVisualCurCol
-	m.logScrollOption = t.logScrollOption
-	m.logParentKind = t.logParentKind
-	m.logParentName = t.logParentName
-	m.logSavedPodName = t.logSavedPodName
-	m.logContainers = append([]string(nil), t.logContainers...)
-	m.logSelectedContainers = append([]string(nil), t.logSelectedContainers...)
+	m.logView.lines = append([]string(nil), t.logLines...)
+	m.logView.scroll = t.logScroll
+	m.logView.wrapTopSkip = t.logWrapTopSkip
+	m.logView.follow = t.logFollow
+	m.logView.wrap = t.logWrap
+	m.logView.lineNumbers = t.logLineNumbers
+	m.logView.timestamps = t.logTimestamps
+	m.logView.previous = t.logPrevious
+	m.logView.isMulti = t.logIsMulti
+	m.logView.title = t.logTitle
+	m.logView.cancel = t.logCancel
+	m.logView.ch = t.logCh
+	m.logView.tailLines = t.logTailLines
+	m.logView.hasMoreHistory = t.logHasMoreHistory
+	m.logView.loadingHistory = t.logLoadingHistory
+	m.logView.cursor = t.logCursor
+	m.logView.visualMode = t.logVisualMode
+	m.logView.visualStart = t.logVisualStart
+	m.logView.visualType = t.logVisualType
+	m.logView.visualCol = t.logVisualCol
+	m.logView.visualCurCol = t.logVisualCurCol
+	m.logView.scrollOption = t.logScrollOption
+	m.logView.parentKind = t.logParentKind
+	m.logView.parentName = t.logParentName
+	m.logView.savedPodName = t.logSavedPodName
+	m.logView.containers = append([]string(nil), t.logContainers...)
+	m.logView.selectedContainers = append([]string(nil), t.logSelectedContainers...)
 	m.describeContent = t.describeContent
 	m.describeScroll = t.describeScroll
 	m.describeTitle = t.describeTitle
@@ -736,7 +736,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		eventGrouping:          m.eventGrouping,
 		expandedGroup:          m.expandedGroup,
 		allGroupsExpanded:      m.allGroupsExpanded,
-		logCursor:              m.logCursor,
+		logCursor:              m.logView.cursor,
 		logVisualMode:          false, // don't clone visual mode into new tabs
 		logVisualStart:         0,
 		logVisualType:          'V',

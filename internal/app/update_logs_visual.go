@@ -5,36 +5,36 @@ import (
 )
 
 func (m Model) handleLogVisualKeyV() (tea.Model, tea.Cmd) {
-	if m.logVisualType == 'V' {
-		m.logVisualMode = false
+	if m.logView.visualType == 'V' {
+		m.logView.visualMode = false
 	} else {
-		m.logVisualType = 'V'
+		m.logView.visualType = 'V'
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyV2() (tea.Model, tea.Cmd) {
-	if m.logVisualType == 'v' {
-		m.logVisualMode = false
+	if m.logView.visualType == 'v' {
+		m.logView.visualMode = false
 	} else {
-		m.logVisualType = 'v'
+		m.logView.visualType = 'v'
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyCtrlV() (tea.Model, tea.Cmd) {
-	if m.logVisualType == 'B' {
-		m.logVisualMode = false
+	if m.logView.visualType == 'B' {
+		m.logView.visualMode = false
 	} else {
-		m.logVisualType = 'B'
+		m.logView.visualType = 'B'
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 	clipText, lineCount := m.buildLogYankText()
-	m.logVisualMode = false
-	m.setStatusMessage(formatVisualYank(clipText, m.logVisualType, lineCount), false)
+	m.logView.visualMode = false
+	m.setStatusMessage(formatVisualYank(clipText, m.logView.visualType, lineCount), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 
@@ -46,13 +46,13 @@ func (m Model) handleLogVisualKeyY() (tea.Model, tea.Cmd) {
 // are interpreted in display-line space (after stripping), which is
 // where the cursor lives.
 func (m *Model) buildLogYankText() (string, int) {
-	selStart := min(m.logVisualStart, m.logCursor)
-	selEnd := max(m.logVisualStart, m.logCursor)
+	selStart := min(m.logView.visualStart, m.logView.cursor)
+	selEnd := max(m.logView.visualStart, m.logView.cursor)
 	if selStart < 0 {
 		selStart = 0
 	}
-	if selEnd >= len(m.logLines) {
-		selEnd = len(m.logLines) - 1
+	if selEnd >= len(m.logView.lines) {
+		selEnd = len(m.logView.lines) - 1
 	}
 	if selStart > selEnd {
 		return "", 0
@@ -64,38 +64,38 @@ func (m *Model) buildLogYankText() (string, int) {
 	}
 
 	clipText := visualCopyText(displayed, 0, len(displayed)-1,
-		m.logVisualType, m.logVisualCol, m.logVisualCurCol,
-		m.logVisualStart > m.logCursor)
+		m.logView.visualType, m.logView.visualCol, m.logView.visualCurCol,
+		m.logView.visualStart > m.logView.cursor)
 	return clipText, len(displayed)
 }
 
 func (m Model) handleLogVisualKeyH() (tea.Model, tea.Cmd) {
-	if m.logVisualType == 'v' || m.logVisualType == 'B' {
-		if m.logVisualCurCol > 0 {
-			m.logVisualCurCol--
+	if m.logView.visualType == 'v' || m.logView.visualType == 'B' {
+		if m.logView.visualCurCol > 0 {
+			m.logView.visualCurCol--
 		}
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyL() (tea.Model, tea.Cmd) {
-	if m.logVisualType == 'v' || m.logVisualType == 'B' {
-		m.logVisualCurCol++
+	if m.logView.visualType == 'v' || m.logView.visualType == 'B' {
+		m.logView.visualCurCol++
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyJ() (tea.Model, tea.Cmd) {
-	if m.logCursor < len(m.logLines)-1 {
-		m.logCursor++
+	if m.logView.cursor < len(m.logView.lines)-1 {
+		m.logView.cursor++
 	}
 	m.ensureLogCursorVisible()
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyK() (tea.Model, tea.Cmd) {
-	if m.logCursor > 0 {
-		m.logCursor--
+	if m.logView.cursor > 0 {
+		m.logView.cursor--
 	}
 	m.ensureLogCursorVisible()
 	cmd := m.maybeLoadMoreHistory()
@@ -103,7 +103,7 @@ func (m Model) handleLogVisualKeyK() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleLogVisualKeyG() (tea.Model, tea.Cmd) {
-	m.logCursor = len(m.logLines) - 1
+	m.logView.cursor = len(m.logView.lines) - 1
 	m.ensureLogCursorVisible()
 	return m, nil
 }
@@ -111,7 +111,7 @@ func (m Model) handleLogVisualKeyG() (tea.Model, tea.Cmd) {
 func (m Model) handleLogVisualKeyG2() (tea.Model, tea.Cmd) {
 	if m.pendingG {
 		m.pendingG = false
-		m.logCursor = 0
+		m.logView.cursor = 0
 		m.ensureLogCursorVisible()
 		return m, nil
 	}
@@ -120,140 +120,140 @@ func (m Model) handleLogVisualKeyG2() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleLogVisualKeyCtrlD() (tea.Model, tea.Cmd) {
-	m.logCursor += scrollStep(m.logScrollOption, m.logContentHeight())
-	if m.logCursor >= len(m.logLines) {
-		m.logCursor = len(m.logLines) - 1
+	m.logView.cursor += scrollStep(m.logView.scrollOption, m.logContentHeight())
+	if m.logView.cursor >= len(m.logView.lines) {
+		m.logView.cursor = len(m.logView.lines) - 1
 	}
 	m.ensureLogCursorVisible()
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyCtrlU() (tea.Model, tea.Cmd) {
-	m.logCursor -= scrollStep(m.logScrollOption, m.logContentHeight())
-	if m.logCursor < 0 {
-		m.logCursor = 0
+	m.logView.cursor -= scrollStep(m.logView.scrollOption, m.logContentHeight())
+	if m.logView.cursor < 0 {
+		m.logView.cursor = 0
 	}
 	m.ensureLogCursorVisible()
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyDollar() (tea.Model, tea.Cmd) {
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
+	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
+		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
 		if lineLen > 0 {
-			m.logVisualCurCol = lineLen - 1
+			m.logView.visualCurCol = lineLen - 1
 		}
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyE() (tea.Model, tea.Cmd) {
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
-		newCol := wordEnd(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
-			m.logCursor++
-			newCol = wordEnd(m.logLines[m.logCursor], 0)
-			nextLineLen := len([]rune(m.logLines[m.logCursor]))
+	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
+		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+		newCol := wordEnd(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		if newCol >= lineLen && m.logView.cursor < len(m.logView.lines)-1 {
+			m.logView.cursor++
+			newCol = wordEnd(m.logView.lines[m.logView.cursor], 0)
+			nextLineLen := len([]rune(m.logView.lines[m.logView.cursor]))
 			if newCol >= nextLineLen {
 				newCol = max(nextLineLen-1, 0)
 			}
-			m.logVisualCurCol = newCol
+			m.logView.visualCurCol = newCol
 			m.ensureLogCursorVisible()
 		} else {
-			m.logVisualCurCol = newCol
+			m.logView.visualCurCol = newCol
 		}
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyB() (tea.Model, tea.Cmd) {
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		newCol := prevWordStart(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol < 0 && m.logCursor > 0 {
-			m.logCursor--
-			lineLen := len([]rune(m.logLines[m.logCursor]))
-			newCol = max(prevWordStart(m.logLines[m.logCursor], lineLen), 0)
-			m.logVisualCurCol = newCol
+	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
+		newCol := prevWordStart(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		if newCol < 0 && m.logView.cursor > 0 {
+			m.logView.cursor--
+			lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+			newCol = max(prevWordStart(m.logView.lines[m.logView.cursor], lineLen), 0)
+			m.logView.visualCurCol = newCol
 			m.ensureLogCursorVisible()
 		} else {
-			m.logVisualCurCol = max(newCol, 0)
+			m.logView.visualCurCol = max(newCol, 0)
 		}
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyW() (tea.Model, tea.Cmd) {
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
-		newCol := nextWordStart(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
-			m.logCursor++
-			newCol = nextWordStart(m.logLines[m.logCursor], 0)
-			nextLineLen := len([]rune(m.logLines[m.logCursor]))
+	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
+		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+		newCol := nextWordStart(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		if newCol >= lineLen && m.logView.cursor < len(m.logView.lines)-1 {
+			m.logView.cursor++
+			newCol = nextWordStart(m.logView.lines[m.logView.cursor], 0)
+			nextLineLen := len([]rune(m.logView.lines[m.logView.cursor]))
 			if newCol >= nextLineLen {
 				newCol = max(nextLineLen-1, 0)
 			}
-			m.logVisualCurCol = newCol
+			m.logView.visualCurCol = newCol
 			m.ensureLogCursorVisible()
 		} else {
-			m.logVisualCurCol = newCol
+			m.logView.visualCurCol = newCol
 		}
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyW2() (tea.Model, tea.Cmd) {
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
-		newCol := nextWORDStart(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
-			m.logCursor++
-			newCol = nextWORDStart(m.logLines[m.logCursor], 0)
-			nextLineLen := len([]rune(m.logLines[m.logCursor]))
+	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
+		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+		newCol := nextWORDStart(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		if newCol >= lineLen && m.logView.cursor < len(m.logView.lines)-1 {
+			m.logView.cursor++
+			newCol = nextWORDStart(m.logView.lines[m.logView.cursor], 0)
+			nextLineLen := len([]rune(m.logView.lines[m.logView.cursor]))
 			if newCol >= nextLineLen {
 				newCol = max(nextLineLen-1, 0)
 			}
-			m.logVisualCurCol = newCol
+			m.logView.visualCurCol = newCol
 			m.ensureLogCursorVisible()
 		} else {
-			m.logVisualCurCol = newCol
+			m.logView.visualCurCol = newCol
 		}
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyE2() (tea.Model, tea.Cmd) {
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		lineLen := len([]rune(m.logLines[m.logCursor]))
-		newCol := WORDEnd(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol >= lineLen && m.logCursor < len(m.logLines)-1 {
-			m.logCursor++
-			newCol = WORDEnd(m.logLines[m.logCursor], 0)
-			nextLineLen := len([]rune(m.logLines[m.logCursor]))
+	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
+		lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+		newCol := WORDEnd(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		if newCol >= lineLen && m.logView.cursor < len(m.logView.lines)-1 {
+			m.logView.cursor++
+			newCol = WORDEnd(m.logView.lines[m.logView.cursor], 0)
+			nextLineLen := len([]rune(m.logView.lines[m.logView.cursor]))
 			if newCol >= nextLineLen {
 				newCol = max(nextLineLen-1, 0)
 			}
-			m.logVisualCurCol = newCol
+			m.logView.visualCurCol = newCol
 			m.ensureLogCursorVisible()
 		} else {
-			m.logVisualCurCol = newCol
+			m.logView.visualCurCol = newCol
 		}
 	}
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyB2() (tea.Model, tea.Cmd) {
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		newCol := prevWORDStart(m.logLines[m.logCursor], m.logVisualCurCol)
-		if newCol < 0 && m.logCursor > 0 {
-			m.logCursor--
-			lineLen := len([]rune(m.logLines[m.logCursor]))
-			newCol = max(prevWORDStart(m.logLines[m.logCursor], lineLen), 0)
-			m.logVisualCurCol = newCol
+	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
+		newCol := prevWORDStart(m.logView.lines[m.logView.cursor], m.logView.visualCurCol)
+		if newCol < 0 && m.logView.cursor > 0 {
+			m.logView.cursor--
+			lineLen := len([]rune(m.logView.lines[m.logView.cursor]))
+			newCol = max(prevWORDStart(m.logView.lines[m.logView.cursor], lineLen), 0)
+			m.logView.visualCurCol = newCol
 			m.ensureLogCursorVisible()
 		} else {
-			m.logVisualCurCol = max(newCol, 0)
+			m.logView.visualCurCol = max(newCol, 0)
 		}
 	}
 	return m, nil
@@ -263,23 +263,23 @@ func (m Model) handleLogVisualKeyB2() (tea.Model, tea.Cmd) {
 // under the cursor and switches the visual selection to character mode
 // covering the resulting range.
 func (m Model) applyLogTextObject(op byte, motion string) (tea.Model, tea.Cmd) {
-	if m.logCursor < 0 || m.logCursor >= len(m.logLines) {
+	if m.logView.cursor < 0 || m.logView.cursor >= len(m.logView.lines) {
 		return m, nil
 	}
-	start, end, ok := textObjectRange(m.logLines[m.logCursor], m.logVisualCurCol, op, motion)
+	start, end, ok := textObjectRange(m.logView.lines[m.logView.cursor], m.logView.visualCurCol, op, motion)
 	if !ok {
 		return m, nil
 	}
-	m.logVisualType = 'v'
-	m.logVisualStart = m.logCursor
-	m.logVisualCol = start
-	m.logVisualCurCol = end
+	m.logView.visualType = 'v'
+	m.logView.visualStart = m.logView.cursor
+	m.logView.visualCol = start
+	m.logView.visualCurCol = end
 	return m, nil
 }
 
 func (m Model) handleLogVisualKeyCaret() (tea.Model, tea.Cmd) {
-	if m.logCursor >= 0 && m.logCursor < len(m.logLines) {
-		m.logVisualCurCol = firstNonWhitespace(m.logLines[m.logCursor])
+	if m.logView.cursor >= 0 && m.logView.cursor < len(m.logView.lines) {
+		m.logView.visualCurCol = firstNonWhitespace(m.logView.lines[m.logView.cursor])
 	}
 	return m, nil
 }

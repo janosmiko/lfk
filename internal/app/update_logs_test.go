@@ -14,93 +14,107 @@ import (
 func TestFindNextLogMatch(t *testing.T) {
 	t.Run("forward finds next match", func(t *testing.T) {
 		m := Model{
-			height:         30,
-			width:          80,
-			tabs:           []TabState{{}},
-			logLines:       []string{"info: start", "error: failed", "info: ok", "error: timeout"},
-			logSearchQuery: "error",
-			logCursor:      0,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:       []string{"info: start", "error: failed", "info: ok", "error: timeout"},
+				searchQuery: "error",
+				cursor:      0,
+			},
 		}
 		m.findNextLogMatch(true)
-		assert.Equal(t, 1, m.logCursor)
+		assert.Equal(t, 1, m.logView.cursor)
 	})
 
 	t.Run("forward wraps around", func(t *testing.T) {
 		m := Model{
-			height:         30,
-			width:          80,
-			tabs:           []TabState{{}},
-			logLines:       []string{"error: first", "info: ok", "info: ok2"},
-			logSearchQuery: "error",
-			logCursor:      2,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:       []string{"error: first", "info: ok", "info: ok2"},
+				searchQuery: "error",
+				cursor:      2,
+			},
 		}
 		m.findNextLogMatch(true)
-		assert.Equal(t, 0, m.logCursor)
+		assert.Equal(t, 0, m.logView.cursor)
 	})
 
 	t.Run("backward finds previous match", func(t *testing.T) {
 		m := Model{
-			height:         30,
-			width:          80,
-			tabs:           []TabState{{}},
-			logLines:       []string{"error: first", "info: ok", "error: second", "info: ok2"},
-			logSearchQuery: "error",
-			logCursor:      3,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:       []string{"error: first", "info: ok", "error: second", "info: ok2"},
+				searchQuery: "error",
+				cursor:      3,
+			},
 		}
 		m.findNextLogMatch(false)
-		assert.Equal(t, 2, m.logCursor)
+		assert.Equal(t, 2, m.logView.cursor)
 	})
 
 	t.Run("backward wraps around", func(t *testing.T) {
 		m := Model{
-			height:         30,
-			width:          80,
-			tabs:           []TabState{{}},
-			logLines:       []string{"info: ok", "info: ok2", "error: last"},
-			logSearchQuery: "error",
-			logCursor:      0,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:       []string{"info: ok", "info: ok2", "error: last"},
+				searchQuery: "error",
+				cursor:      0,
+			},
 		}
 		m.findNextLogMatch(false)
-		assert.Equal(t, 2, m.logCursor)
+		assert.Equal(t, 2, m.logView.cursor)
 	})
 
 	t.Run("empty query does nothing", func(t *testing.T) {
 		m := Model{
-			height:         30,
-			width:          80,
-			tabs:           []TabState{{}},
-			logLines:       []string{"error: test"},
-			logSearchQuery: "",
-			logCursor:      0,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:       []string{"error: test"},
+				searchQuery: "",
+				cursor:      0,
+			},
 		}
 		m.findNextLogMatch(true)
-		assert.Equal(t, 0, m.logCursor)
+		assert.Equal(t, 0, m.logView.cursor)
 	})
 
 	t.Run("no match keeps cursor", func(t *testing.T) {
 		m := Model{
-			height:         30,
-			width:          80,
-			tabs:           []TabState{{}},
-			logLines:       []string{"info: ok", "debug: test"},
-			logSearchQuery: "error",
-			logCursor:      0,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:       []string{"info: ok", "debug: test"},
+				searchQuery: "error",
+				cursor:      0,
+			},
 		}
 		m.findNextLogMatch(true)
-		assert.Equal(t, 0, m.logCursor)
+		assert.Equal(t, 0, m.logView.cursor)
 	})
 
 	t.Run("case insensitive search", func(t *testing.T) {
 		m := Model{
-			height:         30,
-			width:          80,
-			tabs:           []TabState{{}},
-			logLines:       []string{"info: ok", "ERROR: FAILED"},
-			logSearchQuery: "error",
-			logCursor:      0,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:       []string{"info: ok", "ERROR: FAILED"},
+				searchQuery: "error",
+				cursor:      0,
+			},
 		}
 		m.findNextLogMatch(true)
-		assert.Equal(t, 1, m.logCursor)
+		assert.Equal(t, 1, m.logView.cursor)
 	})
 
 	t.Run("forward does not panic when cursor col exceeds line length", func(t *testing.T) {
@@ -109,31 +123,35 @@ func TestFindNextLogMatch(t *testing.T) {
 		// current (start) line is shorter than logVisualCurCol+1, the
 		// rune-slice indexing must not panic.
 		m := Model{
-			height:          30,
-			width:           80,
-			tabs:            []TabState{{}},
-			logLines:        []string{"short", "info: target here"},
-			logSearchQuery:  "target",
-			logCursor:       0,
-			logVisualCurCol: 900, // far beyond "short"
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:        []string{"short", "info: target here"},
+				searchQuery:  "target",
+				cursor:       0,
+				visualCurCol: 900, // far beyond "short"
+			},
 		}
 		assert.NotPanics(t, func() { m.findNextLogMatch(true) })
-		assert.Equal(t, 1, m.logCursor)
+		assert.Equal(t, 1, m.logView.cursor)
 	})
 
 	t.Run("backward does not panic when cursor col exceeds line length", func(t *testing.T) {
 		// Same regression for the backward path (N / shift-n).
 		m := Model{
-			height:          30,
-			width:           80,
-			tabs:            []TabState{{}},
-			logLines:        []string{"info: target here", "short"},
-			logSearchQuery:  "target",
-			logCursor:       1,
-			logVisualCurCol: 900, // far beyond "short"
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:        []string{"info: target here", "short"},
+				searchQuery:  "target",
+				cursor:       1,
+				visualCurCol: 900, // far beyond "short"
+			},
 		}
 		assert.NotPanics(t, func() { m.findNextLogMatch(false) })
-		assert.Equal(t, 0, m.logCursor)
+		assert.Equal(t, 0, m.logView.cursor)
 	})
 
 	t.Run("does not panic on multi-byte rune lines when cursor col exceeds rune count", func(t *testing.T) {
@@ -142,43 +160,49 @@ func TestFindNextLogMatch(t *testing.T) {
 		// (e.g. `こんにちは` is 5 runes / 15 bytes) exercises the rune path
 		// distinct from len(line). Verify both forward and backward.
 		m := Model{
-			height:          30,
-			width:           80,
-			tabs:            []TabState{{}},
-			logLines:        []string{"こんにちは", "info: target here"},
-			logSearchQuery:  "target",
-			logCursor:       0,
-			logVisualCurCol: 900, // far beyond 5 runes
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:        []string{"こんにちは", "info: target here"},
+				searchQuery:  "target",
+				cursor:       0,
+				visualCurCol: 900, // far beyond 5 runes
+			},
 		}
 		assert.NotPanics(t, func() { m.findNextLogMatch(true) })
-		assert.Equal(t, 1, m.logCursor)
+		assert.Equal(t, 1, m.logView.cursor)
 
 		m2 := Model{
-			height:          30,
-			width:           80,
-			tabs:            []TabState{{}},
-			logLines:        []string{"info: target here", "こんにちは"},
-			logSearchQuery:  "target",
-			logCursor:       1,
-			logVisualCurCol: 900,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:        []string{"info: target here", "こんにちは"},
+				searchQuery:  "target",
+				cursor:       1,
+				visualCurCol: 900,
+			},
 		}
 		assert.NotPanics(t, func() { m2.findNextLogMatch(false) })
-		assert.Equal(t, 0, m2.logCursor)
+		assert.Equal(t, 0, m2.logView.cursor)
 	})
 
 	t.Run("disables log follow on match", func(t *testing.T) {
 		m := Model{
-			height:         30,
-			width:          80,
-			tabs:           []TabState{{}},
-			logLines:       []string{"info: ok", "error: test"},
-			logSearchQuery: "error",
-			logCursor:      0,
-			logFollow:      true,
+			height: 30,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:       []string{"info: ok", "error: test"},
+				searchQuery: "error",
+				cursor:      0,
+				follow:      true,
+			},
 		}
 		m.findNextLogMatch(true)
-		assert.Equal(t, 1, m.logCursor)
-		assert.False(t, m.logFollow)
+		assert.Equal(t, 1, m.logView.cursor)
+		assert.False(t, m.logView.follow)
 	})
 }
 
@@ -193,52 +217,52 @@ func TestPush4HandleLogKeyQ(t *testing.T) {
 func TestPush4HandleLogKeyJ(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
-	m.logFollow = true
-	m.logLines = []string{"line1", "line2", "line3"}
-	m.logCursor = 0
+	m.logView.follow = true
+	m.logView.lines = []string{"line1", "line2", "line3"}
+	m.logView.cursor = 0
 	result, _ := m.handleLogKey(keyMsg("j"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.logCursor)
+	assert.Equal(t, 1, rm.logView.cursor)
 }
 
 func TestPush4HandleLogKeyK(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
-	m.logLines = []string{"line1", "line2", "line3"}
-	m.logCursor = 2
+	m.logView.lines = []string{"line1", "line2", "line3"}
+	m.logView.cursor = 2
 	result, _ := m.handleLogKey(keyMsg("k"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.logCursor)
+	assert.Equal(t, 1, rm.logView.cursor)
 }
 
 func TestPush4HandleLogKeyG(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
 	m.pendingG = true
-	m.logLines = []string{"line1", "line2"}
-	m.logCursor = 1
+	m.logView.lines = []string{"line1", "line2"}
+	m.logView.cursor = 1
 	result, _ := m.handleLogKey(keyMsg("g"))
 	rm := result.(Model)
-	assert.Equal(t, 0, rm.logCursor)
+	assert.Equal(t, 0, rm.logView.cursor)
 }
 
 func TestPush4HandleLogKeyGBig(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
-	m.logLines = []string{"line1", "line2", "line3"}
+	m.logView.lines = []string{"line1", "line2", "line3"}
 	result, _ := m.handleLogKey(keyMsg("G"))
 	rm := result.(Model)
-	assert.Equal(t, 2, rm.logCursor)
-	assert.True(t, rm.logFollow)
+	assert.Equal(t, 2, rm.logView.cursor)
+	assert.True(t, rm.logView.follow)
 }
 
 func TestPush4HandleLogKeyF(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
-	m.logFollow = false
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("f"))
 	rm := result.(Model)
-	assert.True(t, rm.logFollow)
+	assert.True(t, rm.logView.follow)
 }
 
 func TestPush4HandleLogKeyW(t *testing.T) {
@@ -269,53 +293,53 @@ func TestPush4HandleLogKeySearch(t *testing.T) {
 	m.mode = modeLogs
 	result, _ := m.handleLogKey(keyMsg("/"))
 	rm := result.(Model)
-	assert.True(t, rm.logSearchActive)
+	assert.True(t, rm.logView.searchActive)
 }
 
 func TestPush4HandleLogKeyVisualMode(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
-	m.logLines = []string{"line1", "line2"}
+	m.logView.lines = []string{"line1", "line2"}
 	result, _ := m.handleLogKey(keyMsg("v"))
 	rm := result.(Model)
-	assert.True(t, rm.logVisualMode)
+	assert.True(t, rm.logView.visualMode)
 }
 
 func TestPush4HandleLogKeyVisualModeV(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
-	m.logLines = []string{"line1", "line2"}
+	m.logView.lines = []string{"line1", "line2"}
 	result, _ := m.handleLogKey(keyMsg("V"))
 	rm := result.(Model)
-	assert.True(t, rm.logVisualMode)
+	assert.True(t, rm.logView.visualMode)
 }
 
 func TestPush4HandleLogKeyHalfPageDown(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
-	m.logLines = make([]string, 100)
-	m.logCursor = 0
+	m.logView.lines = make([]string, 100)
+	m.logView.cursor = 0
 	kb := ui.ActiveKeybindings
 	result, _ := m.handleLogKey(keyMsg(kb.PageDown))
 	rm := result.(Model)
-	assert.Greater(t, rm.logCursor, 0)
+	assert.Greater(t, rm.logView.cursor, 0)
 }
 
 func TestPush4HandleLogKeyHalfPageUp(t *testing.T) {
 	m := basePush4Model()
 	m.mode = modeLogs
-	m.logLines = make([]string, 100)
-	m.logCursor = 50
+	m.logView.lines = make([]string, 100)
+	m.logView.cursor = 50
 	kb := ui.ActiveKeybindings
 	result, _ := m.handleLogKey(keyMsg(kb.PageUp))
 	rm := result.(Model)
-	assert.Less(t, rm.logCursor, 50)
+	assert.Less(t, rm.logView.cursor, 50)
 }
 
 func TestCovLogKeyHelp(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = []string{"line1", "line2"}
+	m.logView.lines = []string{"line1", "line2"}
 	result, _ := m.handleLogKey(keyMsg("?"))
 	rm := result.(Model)
 	assert.Equal(t, modeHelp, rm.mode)
@@ -340,164 +364,164 @@ func TestCovLogKeyQ(t *testing.T) {
 func TestCovLogKeyDown(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = []string{"l1", "l2", "l3", "l4", "l5"}
-	m.logCursor = 0
-	m.logFollow = false
+	m.logView.lines = []string{"l1", "l2", "l3", "l4", "l5"}
+	m.logView.cursor = 0
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("j"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.logCursor)
+	assert.Equal(t, 1, rm.logView.cursor)
 }
 
 func TestCovLogKeyUp(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = []string{"l1", "l2", "l3"}
-	m.logCursor = 2
-	m.logFollow = false
+	m.logView.lines = []string{"l1", "l2", "l3"}
+	m.logView.cursor = 2
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("k"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.logCursor)
+	assert.Equal(t, 1, rm.logView.cursor)
 }
 
 func TestCovLogKeyToggleFollow(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logFollow = false
-	m.logLines = []string{"l1"}
+	m.logView.follow = false
+	m.logView.lines = []string{"l1"}
 	result, _ := m.handleLogKey(keyMsg("f"))
 	rm := result.(Model)
-	assert.True(t, rm.logFollow)
+	assert.True(t, rm.logView.follow)
 }
 
 func TestCovLogKeyDigit(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = []string{"l1"}
+	m.logView.lines = []string{"l1"}
 	result, _ := m.handleLogKey(keyMsg("5"))
 	rm := result.(Model)
-	assert.Equal(t, "5", rm.logLineInput)
+	assert.Equal(t, "5", rm.logView.lineInput)
 }
 
 func TestCovLogKeyCtrlF(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = make([]string, 100)
-	m.logCursor = 0
-	m.logFollow = false
+	m.logView.lines = make([]string, 100)
+	m.logView.cursor = 0
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("ctrl+f"))
 	rm := result.(Model)
-	assert.Greater(t, rm.logCursor, 0)
+	assert.Greater(t, rm.logView.cursor, 0)
 }
 
 func TestCovLogKeyCtrlB(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = make([]string, 100)
-	m.logCursor = 50
-	m.logFollow = false
+	m.logView.lines = make([]string, 100)
+	m.logView.cursor = 50
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("ctrl+b"))
 	rm := result.(Model)
-	assert.Less(t, rm.logCursor, 50)
+	assert.Less(t, rm.logView.cursor, 50)
 }
 
 func TestCovLogKeyGG(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logCursor = 3
-	m.logLines = []string{"l1", "l2", "l3", "l4"}
-	m.logFollow = false
+	m.logView.cursor = 3
+	m.logView.lines = []string{"l1", "l2", "l3", "l4"}
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("g"))
 	rm := result.(Model)
 	assert.True(t, rm.pendingG)
 	result, _ = rm.handleLogKey(keyMsg("g"))
 	rm = result.(Model)
-	assert.Equal(t, 0, rm.logCursor)
+	assert.Equal(t, 0, rm.logView.cursor)
 }
 
 func TestCovLogKeyBigG(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logCursor = 0
-	m.logLines = []string{"l1", "l2", "l3"}
-	m.logFollow = false
+	m.logView.cursor = 0
+	m.logView.lines = []string{"l1", "l2", "l3"}
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("G"))
 	rm := result.(Model)
-	assert.Equal(t, 2, rm.logCursor)
+	assert.Equal(t, 2, rm.logView.cursor)
 }
 
 func TestCovLogKeyCtrlD(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = make([]string, 100)
-	m.logCursor = 0
-	m.logFollow = false
+	m.logView.lines = make([]string, 100)
+	m.logView.cursor = 0
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("ctrl+d"))
 	rm := result.(Model)
-	assert.Greater(t, rm.logCursor, 0)
+	assert.Greater(t, rm.logView.cursor, 0)
 }
 
 func TestCovLogKeyCtrlU(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = make([]string, 100)
-	m.logCursor = 50
-	m.logFollow = false
+	m.logView.lines = make([]string, 100)
+	m.logView.cursor = 50
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("ctrl+u"))
 	rm := result.(Model)
-	assert.Less(t, rm.logCursor, 50)
+	assert.Less(t, rm.logView.cursor, 50)
 }
 
 func TestCovLogKeySlash(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = []string{"l1"}
+	m.logView.lines = []string{"l1"}
 	result, _ := m.handleLogKey(keyMsg("/"))
 	rm := result.(Model)
-	assert.True(t, rm.logSearchActive)
+	assert.True(t, rm.logView.searchActive)
 }
 
 func TestCovLogKeyVisualV(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = []string{"l1", "l2"}
-	m.logCursor = 0
-	m.logFollow = false
+	m.logView.lines = []string{"l1", "l2"}
+	m.logView.cursor = 0
+	m.logView.follow = false
 	result, _ := m.handleLogKey(keyMsg("V"))
 	rm := result.(Model)
-	assert.True(t, rm.logVisualMode)
+	assert.True(t, rm.logView.visualMode)
 }
 
 func TestCovLogSearchKeyEnter(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchActive = true
-	m.logSearchInput.Insert("error")
-	m.logLines = []string{"error line", "ok line"}
+	m.logView.searchActive = true
+	m.logView.searchInput.Insert("error")
+	m.logView.lines = []string{"error line", "ok line"}
 	result, _ := m.handleLogKey(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.logSearchActive)
-	assert.Equal(t, "error", rm.logSearchQuery)
+	assert.False(t, rm.logView.searchActive)
+	assert.Equal(t, "error", rm.logView.searchQuery)
 }
 
 func TestCovLogSearchKeyEsc(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchActive = true
-	m.logSearchInput.Insert("test")
+	m.logView.searchActive = true
+	m.logView.searchInput.Insert("test")
 	result, _ := m.handleLogKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.False(t, rm.logSearchActive)
+	assert.False(t, rm.logView.searchActive)
 }
 
 func TestCovLogSearchKeyBackspace(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchActive = true
-	m.logSearchInput.Insert("ab")
-	m.logLines = []string{"abc"}
+	m.logView.searchActive = true
+	m.logView.searchInput.Insert("ab")
+	m.logView.lines = []string{"abc"}
 	result, _ := m.handleLogKey(keyMsg("backspace"))
 	rm := result.(Model)
-	assert.Equal(t, "a", rm.logSearchInput.Value)
+	assert.Equal(t, "a", rm.logView.searchInput.Value)
 }
 
 // Ctrl+U is the standard readline "delete-to-line-start" shortcut and
@@ -510,26 +534,26 @@ func TestCovLogSearchKeyBackspace(t *testing.T) {
 func TestCovLogSearchKeyCtrlU(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchActive = true
-	m.logSearchInput.Insert("error")
-	m.logSearchQuery = "error"
-	m.logLines = []string{"error line"}
+	m.logView.searchActive = true
+	m.logView.searchInput.Insert("error")
+	m.logView.searchQuery = "error"
+	m.logView.lines = []string{"error line"}
 
 	result, _ := m.handleLogKey(keyMsg("ctrl+u"))
 	rm := result.(Model)
-	assert.Equal(t, "", rm.logSearchInput.Value)
-	assert.Equal(t, "", rm.logSearchQuery,
+	assert.Equal(t, "", rm.logView.searchInput.Value)
+	assert.Equal(t, "", rm.logView.searchQuery,
 		"Ctrl+U must clear logSearchQuery so the highlight overlay stops painting")
 }
 
 func TestCovLogSearchKeyTyping(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchActive = true
-	m.logLines = []string{"test"}
+	m.logView.searchActive = true
+	m.logView.lines = []string{"test"}
 	result, _ := m.handleLogKey(keyMsg("x"))
 	rm := result.(Model)
-	assert.Equal(t, "x", rm.logSearchInput.Value)
+	assert.Equal(t, "x", rm.logView.searchInput.Value)
 }
 
 // Regression: typing into the log-viewer search input now updates
@@ -539,22 +563,22 @@ func TestCovLogSearchKeyTyping(t *testing.T) {
 func TestLogSearchTypingUpdatesQueryLive(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchActive = true
-	m.logLines = []string{"some error here"}
+	m.logView.searchActive = true
+	m.logView.lines = []string{"some error here"}
 
 	result, _ := m.handleLogKey(keyMsg("e"))
 	rm := result.(Model)
-	assert.Equal(t, "e", rm.logSearchInput.Value)
-	assert.Equal(t, "e", rm.logSearchQuery,
+	assert.Equal(t, "e", rm.logView.searchInput.Value)
+	assert.Equal(t, "e", rm.logView.searchQuery,
 		"logSearchQuery must mirror logSearchInput while typing so highlights paint live")
 
 	result, _ = rm.handleLogKey(keyMsg("r"))
 	rm = result.(Model)
-	assert.Equal(t, "er", rm.logSearchQuery)
+	assert.Equal(t, "er", rm.logView.searchQuery)
 
 	result, _ = rm.handleLogKey(keyMsg("backspace"))
 	rm = result.(Model)
-	assert.Equal(t, "e", rm.logSearchQuery,
+	assert.Equal(t, "e", rm.logView.searchQuery,
 		"backspace must keep logSearchQuery in sync, not leave the highlight stale")
 }
 
@@ -568,14 +592,14 @@ func TestLogSearchTypingUpdatesQueryLive(t *testing.T) {
 func TestLogSearchHistoryEnterAdds(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{cursor: -1}
-	m.logSearchActive = true
-	m.logSearchInput.Insert("error")
-	m.logLines = []string{"error line"}
+	m.logView.searchHistory = &commandHistory{cursor: -1}
+	m.logView.searchActive = true
+	m.logView.searchInput.Insert("error")
+	m.logView.lines = []string{"error line"}
 
 	result, _ := m.handleLogKey(keyMsg("enter"))
 	rm := result.(Model)
-	assert.Equal(t, []string{"error"}, rm.logSearchHistory.entries)
+	assert.Equal(t, []string{"error"}, rm.logView.searchHistory.entries)
 }
 
 // Esc cancels without committing — the input is wiped and the history
@@ -584,13 +608,13 @@ func TestLogSearchHistoryEnterAdds(t *testing.T) {
 func TestLogSearchHistoryEscDoesNotAdd(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{cursor: -1}
-	m.logSearchActive = true
-	m.logSearchInput.Insert("typo")
+	m.logView.searchHistory = &commandHistory{cursor: -1}
+	m.logView.searchActive = true
+	m.logView.searchInput.Insert("typo")
 
 	result, _ := m.handleLogKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.Empty(t, rm.logSearchHistory.entries)
+	assert.Empty(t, rm.logView.searchHistory.entries)
 }
 
 // Up replays the most recent entry into the input and mirrors it into
@@ -600,35 +624,35 @@ func TestLogSearchHistoryEscDoesNotAdd(t *testing.T) {
 func TestLogSearchHistoryUpDownRecall(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{
+	m.logView.searchHistory = &commandHistory{
 		cursor:  -1,
 		entries: []string{"first", "second"},
 	}
-	m.logSearchActive = true
-	m.logSearchInput.Insert("draft")
-	m.logSearchQuery = "draft"
+	m.logView.searchActive = true
+	m.logView.searchInput.Insert("draft")
+	m.logView.searchQuery = "draft"
 
 	// Up -> newest entry, draft saved.
 	result, _ := m.handleLogKey(keyMsg("up"))
 	rm := result.(Model)
-	assert.Equal(t, "second", rm.logSearchInput.Value)
-	assert.Equal(t, "second", rm.logSearchQuery)
+	assert.Equal(t, "second", rm.logView.searchInput.Value)
+	assert.Equal(t, "second", rm.logView.searchQuery)
 
 	// Up again -> older entry.
 	result, _ = rm.handleLogKey(keyMsg("up"))
 	rm = result.(Model)
-	assert.Equal(t, "first", rm.logSearchInput.Value)
+	assert.Equal(t, "first", rm.logView.searchInput.Value)
 
 	// Down -> back toward newer.
 	result, _ = rm.handleLogKey(keyMsg("down"))
 	rm = result.(Model)
-	assert.Equal(t, "second", rm.logSearchInput.Value)
+	assert.Equal(t, "second", rm.logView.searchInput.Value)
 
 	// Down past newest -> restores the original draft.
 	result, _ = rm.handleLogKey(keyMsg("down"))
 	rm = result.(Model)
-	assert.Equal(t, "draft", rm.logSearchInput.Value)
-	assert.Equal(t, "draft", rm.logSearchQuery)
+	assert.Equal(t, "draft", rm.logView.searchInput.Value)
+	assert.Equal(t, "draft", rm.logView.searchQuery)
 }
 
 // Editing a recalled entry must drop the user out of history-browsing
@@ -638,23 +662,23 @@ func TestLogSearchHistoryUpDownRecall(t *testing.T) {
 func TestLogSearchHistoryEditAfterRecallResets(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{
+	m.logView.searchHistory = &commandHistory{
 		cursor:  -1,
 		entries: []string{"old"},
 	}
-	m.logSearchActive = true
+	m.logView.searchActive = true
 
 	// Recall the entry.
 	result, _ := m.handleLogKey(keyMsg("up"))
 	rm := result.(Model)
-	assert.Equal(t, "old", rm.logSearchInput.Value)
-	assert.NotEqual(t, -1, rm.logSearchHistory.cursor)
+	assert.Equal(t, "old", rm.logView.searchInput.Value)
+	assert.NotEqual(t, -1, rm.logView.searchHistory.cursor)
 
 	// Type a char -> resets cursor to -1.
 	result, _ = rm.handleLogKey(keyMsg("x"))
 	rm = result.(Model)
-	assert.Equal(t, -1, rm.logSearchHistory.cursor)
-	assert.Equal(t, "oldx", rm.logSearchInput.Value)
+	assert.Equal(t, -1, rm.logView.searchHistory.cursor)
+	assert.Equal(t, "oldx", rm.logView.searchInput.Value)
 }
 
 // Ctrl+W (delete-word) after recall must also drop out of history
@@ -664,19 +688,19 @@ func TestLogSearchHistoryEditAfterRecallResets(t *testing.T) {
 func TestLogSearchHistoryCtrlWAfterRecallResets(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{
+	m.logView.searchHistory = &commandHistory{
 		cursor:  -1,
 		entries: []string{"hello world"},
 	}
-	m.logSearchActive = true
+	m.logView.searchActive = true
 
 	result, _ := m.handleLogKey(keyMsg("up"))
 	rm := result.(Model)
-	assert.NotEqual(t, -1, rm.logSearchHistory.cursor)
+	assert.NotEqual(t, -1, rm.logView.searchHistory.cursor)
 
 	result, _ = rm.handleLogKey(keyMsg("ctrl+w"))
 	rm = result.(Model)
-	assert.Equal(t, -1, rm.logSearchHistory.cursor)
+	assert.Equal(t, -1, rm.logView.searchHistory.cursor)
 }
 
 // Ctrl+U (delete-to-line-start) after recall must also drop out of
@@ -684,20 +708,20 @@ func TestLogSearchHistoryCtrlWAfterRecallResets(t *testing.T) {
 func TestLogSearchHistoryCtrlUAfterRecallResets(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{
+	m.logView.searchHistory = &commandHistory{
 		cursor:  -1,
 		entries: []string{"hello world"},
 	}
-	m.logSearchActive = true
+	m.logView.searchActive = true
 
 	result, _ := m.handleLogKey(keyMsg("up"))
 	rm := result.(Model)
-	assert.NotEqual(t, -1, rm.logSearchHistory.cursor)
+	assert.NotEqual(t, -1, rm.logView.searchHistory.cursor)
 
 	result, _ = rm.handleLogKey(keyMsg("ctrl+u"))
 	rm = result.(Model)
-	assert.Equal(t, -1, rm.logSearchHistory.cursor)
-	assert.Equal(t, "", rm.logSearchInput.Value)
+	assert.Equal(t, -1, rm.logView.searchHistory.cursor)
+	assert.Equal(t, "", rm.logView.searchInput.Value)
 }
 
 // Backspace after recall also resets the history cursor for the same
@@ -705,19 +729,19 @@ func TestLogSearchHistoryCtrlUAfterRecallResets(t *testing.T) {
 func TestLogSearchHistoryBackspaceAfterRecallResets(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{
+	m.logView.searchHistory = &commandHistory{
 		cursor:  -1,
 		entries: []string{"old"},
 	}
-	m.logSearchActive = true
+	m.logView.searchActive = true
 
 	result, _ := m.handleLogKey(keyMsg("up"))
 	rm := result.(Model)
-	assert.NotEqual(t, -1, rm.logSearchHistory.cursor)
+	assert.NotEqual(t, -1, rm.logView.searchHistory.cursor)
 
 	result, _ = rm.handleLogKey(keyMsg("backspace"))
 	rm = result.(Model)
-	assert.Equal(t, -1, rm.logSearchHistory.cursor)
+	assert.Equal(t, -1, rm.logView.searchHistory.cursor)
 }
 
 // TestLogSearchHistoryEditThenDownRestoresPreRecallDraft pins the fix
@@ -726,28 +750,28 @@ func TestLogSearchHistoryBackspaceAfterRecallResets(t *testing.T) {
 func TestLogSearchHistoryEditThenDownRestoresPreRecallDraft(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{
+	m.logView.searchHistory = &commandHistory{
 		cursor:  -1,
 		entries: []string{"err"},
 	}
-	m.logSearchActive = true
-	m.logSearchInput.Set("ngi")
+	m.logView.searchActive = true
+	m.logView.searchInput.Set("ngi")
 
 	// Up: recall "err", draft "ngi" saved.
 	result, _ := m.handleLogKey(keyMsg("up"))
 	rm := result.(Model)
-	require.Equal(t, "err", rm.logSearchInput.Value)
+	require.Equal(t, "err", rm.logView.searchInput.Value)
 
 	// Edit: type a char. Must leave browse but preserve draft.
 	result, _ = rm.handleLogKey(keyMsg("x"))
 	rm = result.(Model)
-	require.Equal(t, "errx", rm.logSearchInput.Value)
-	require.Equal(t, -1, rm.logSearchHistory.cursor)
+	require.Equal(t, "errx", rm.logView.searchInput.Value)
+	require.Equal(t, -1, rm.logView.searchHistory.cursor)
 
 	// Down past newest: pre-recall draft "ngi" must come back.
 	result, _ = rm.handleLogKey(keyMsg("down"))
 	rm = result.(Model)
-	assert.Equal(t, "ngi", rm.logSearchInput.Value, "Down past newest must restore pre-recall draft")
+	assert.Equal(t, "ngi", rm.logView.searchInput.Value, "Down past newest must restore pre-recall draft")
 }
 
 // Opening search via `/` resets any leftover cursor from a prior
@@ -756,7 +780,7 @@ func TestLogSearchHistoryEditThenDownRestoresPreRecallDraft(t *testing.T) {
 func TestLogSearchHistorySlashResetsCursor(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logSearchHistory = &commandHistory{
+	m.logView.searchHistory = &commandHistory{
 		cursor:  0, // simulating a prior in-progress recall
 		entries: []string{"a", "b"},
 		draft:   "stale",
@@ -764,27 +788,27 @@ func TestLogSearchHistorySlashResetsCursor(t *testing.T) {
 
 	result, _ := m.handleLogKey(keyMsg("/"))
 	rm := result.(Model)
-	assert.Equal(t, -1, rm.logSearchHistory.cursor)
-	assert.Equal(t, "", rm.logSearchHistory.draft)
+	assert.Equal(t, -1, rm.logView.searchHistory.cursor)
+	assert.Equal(t, "", rm.logView.searchHistory.draft)
 }
 
 func TestCovLogVisualKeyEsc(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logVisualMode = true
-	m.logLines = []string{"l1", "l2"}
+	m.logView.visualMode = true
+	m.logView.lines = []string{"l1", "l2"}
 	result, _ := m.handleLogKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.False(t, rm.logVisualMode)
+	assert.False(t, rm.logView.visualMode)
 }
 
 func TestCovLogVisualKeyYank(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logVisualMode = true
-	m.logVisualStart = 0
-	m.logCursor = 1
-	m.logLines = []string{"l1", "l2"}
+	m.logView.visualMode = true
+	m.logView.visualStart = 0
+	m.logView.cursor = 1
+	m.logView.lines = []string{"l1", "l2"}
 	_, cmd := m.handleLogKey(keyMsg("y"))
 	assert.NotNil(t, cmd)
 }
@@ -792,23 +816,23 @@ func TestCovLogVisualKeyYank(t *testing.T) {
 func TestCovLogVisualKeyDown(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logVisualMode = true
-	m.logCursor = 0
-	m.logLines = []string{"l1", "l2", "l3"}
+	m.logView.visualMode = true
+	m.logView.cursor = 0
+	m.logView.lines = []string{"l1", "l2", "l3"}
 	result, _ := m.handleLogKey(keyMsg("j"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.logCursor)
+	assert.Equal(t, 1, rm.logView.cursor)
 }
 
 func TestCovLogVisualKeyUp(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logVisualMode = true
-	m.logCursor = 2
-	m.logLines = []string{"l1", "l2", "l3"}
+	m.logView.visualMode = true
+	m.logView.cursor = 2
+	m.logView.lines = []string{"l1", "l2", "l3"}
 	result, _ := m.handleLogKey(keyMsg("k"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.logCursor)
+	assert.Equal(t, 1, rm.logView.cursor)
 }
 
 // --- handleLogKeyS2: Save loaded logs (S) ---
@@ -820,7 +844,7 @@ func TestHandleLogKeyS2CopiesPathToClipboard(t *testing.T) {
 	// announce that explicitly.
 	m := baseModel()
 	m.mode = modeLogs
-	m.logLines = []string{"line1", "line2"}
+	m.logView.lines = []string{"line1", "line2"}
 	m.actionCtx = actionContext{name: "test-pod"}
 
 	ret, cmd := m.handleLogKeyS2()
@@ -875,7 +899,7 @@ func TestHandleLogKeyS2ErrorPathDoesNotCopy(t *testing.T) {
 	// which works on writable filesystems, so we instead force a write failure by
 	// pointing TMPDIR at a non-existent directory.
 	t.Setenv("TMPDIR", "/this/path/does/not/exist/lfk-test")
-	m.logLines = []string{"line1"}
+	m.logView.lines = []string{"line1"}
 
 	ret, _ := m.handleLogKeyS2()
 	rm := ret.(Model)

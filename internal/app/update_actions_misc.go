@@ -96,13 +96,13 @@ func (m Model) refreshCurrentLevel() tea.Cmd {
 // tab's kubectl subprocess and reader goroutine exit immediately, while
 // sibling tabs' streams (held in TabState.logCancel) keep running.
 func (m *Model) cancelActiveTabLogStreams() {
-	if m.logCancel != nil {
-		m.logCancel()
-		m.logCancel = nil
+	if m.logView.cancel != nil {
+		m.logView.cancel()
+		m.logView.cancel = nil
 	}
-	if m.logHistoryCancel != nil {
-		m.logHistoryCancel()
-		m.logHistoryCancel = nil
+	if m.logView.historyCancel != nil {
+		m.logView.historyCancel()
+		m.logView.historyCancel = nil
 	}
 }
 

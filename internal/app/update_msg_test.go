@@ -930,12 +930,12 @@ func TestPush3UpdateLogLineMsg(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeLogs
 	ch := make(chan string, 1)
-	m.logCh = ch
+	m.logView.ch = ch
 	ch <- "next line"
 	msg := logLineMsg{line: "test line", ch: ch}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
-	assert.Contains(t, rm.logLines, "test line")
+	assert.Contains(t, rm.logView.lines, "test line")
 }
 
 func TestPush3UpdateLogLineMsgDone(t *testing.T) {
@@ -1976,11 +1976,11 @@ func TestFinalUpdateLogLineMsg(t *testing.T) {
 	m := baseFinalModel()
 	m.mode = modeLogs
 	ch := make(chan string, 1)
-	m.logCh = ch
-	m.logFollow = true
+	m.logView.ch = ch
+	m.logView.follow = true
 	result, cmd := m.Update(logLineMsg{line: "log line", ch: ch})
 	rm := result.(Model)
-	assert.Contains(t, rm.logLines, "log line")
+	assert.Contains(t, rm.logView.lines, "log line")
 	assert.NotNil(t, cmd)
 }
 
@@ -1988,7 +1988,7 @@ func TestFinalUpdateLogLineMsgDone(t *testing.T) {
 	m := baseFinalModel()
 	m.mode = modeLogs
 	ch := make(chan string)
-	m.logCh = ch
+	m.logView.ch = ch
 	result, _ := m.Update(logLineMsg{done: true, ch: ch})
 	_ = result.(Model)
 }
@@ -1998,11 +1998,11 @@ func TestFinalUpdateLogLineMsgStaleChannel(t *testing.T) {
 	m.mode = modeLogs
 	ch1 := make(chan string, 1)
 	ch2 := make(chan string, 1)
-	m.logCh = ch2 // current channel
+	m.logView.ch = ch2 // current channel
 	result, _ := m.Update(logLineMsg{line: "stale", ch: ch1})
 	rm := result.(Model)
 	// Should discard the stale line.
-	assert.NotContains(t, rm.logLines, "stale")
+	assert.NotContains(t, rm.logView.lines, "stale")
 }
 
 func TestFinalUpdateTriggerCronJobMsg(t *testing.T) {
@@ -2041,23 +2041,23 @@ func TestFinalUpdateRollbackDoneMsgError(t *testing.T) {
 func TestFinalUpdateLogHistoryMsg(t *testing.T) {
 	m := baseFinalModel()
 	m.mode = modeLogs
-	m.logLoadingHistory = true
-	m.logLines = []string{"existing"}
+	m.logView.loadingHistory = true
+	m.logView.lines = []string{"existing"}
 	result, _ := m.Update(logHistoryMsg{
 		lines:     []string{"older1", "older2", "existing"},
 		prevTotal: 1,
 	})
 	rm := result.(Model)
-	assert.False(t, rm.logLoadingHistory)
+	assert.False(t, rm.logView.loadingHistory)
 }
 
 func TestFinalUpdateLogHistoryMsgError(t *testing.T) {
 	m := baseFinalModel()
 	m.mode = modeLogs
-	m.logLoadingHistory = true
+	m.logView.loadingHistory = true
 	result, _ := m.Update(logHistoryMsg{err: assert.AnError})
 	rm := result.(Model)
-	assert.False(t, rm.logLoadingHistory)
+	assert.False(t, rm.logView.loadingHistory)
 }
 
 func TestFinalUpdateDiffLoadedMsg(t *testing.T) {
@@ -2466,10 +2466,10 @@ func TestCovUpdateDiffLoaded(t *testing.T) {
 func TestCovUpdateLogLine(t *testing.T) {
 	m := baseModelUpdate()
 	m.mode = modeLogs
-	m.logFollow = true
+	m.logView.follow = true
 	result, _ := m.Update(logLineMsg{line: "2024-01-01 log entry"})
 	rm := result.(Model)
-	assert.Contains(t, rm.logLines, "2024-01-01 log entry")
+	assert.Contains(t, rm.logView.lines, "2024-01-01 log entry")
 }
 
 func TestCovUpdatePodsForAction(t *testing.T) {

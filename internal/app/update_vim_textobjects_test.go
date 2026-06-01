@@ -112,13 +112,13 @@ func TestTextObjectRangeDispatch(t *testing.T) {
 func TestLogVisualViwSelectsInnerWord(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logLines = []string{"alpha beta gamma"}
-	m.logCursor = 0
-	m.logVisualCurCol = 7 // on 'e' of "beta"
-	m.logVisualMode = true
-	m.logVisualType = 'v'
-	m.logVisualStart = 0
-	m.logVisualCol = 7
+	m.logView.lines = []string{"alpha beta gamma"}
+	m.logView.cursor = 0
+	m.logView.visualCurCol = 7 // on 'e' of "beta"
+	m.logView.visualMode = true
+	m.logView.visualType = 'v'
+	m.logView.visualStart = 0
+	m.logView.visualCol = 7
 
 	// `i`
 	r1, _ := m.handleLogVisualKey(keyMsg("i"))
@@ -129,36 +129,36 @@ func TestLogVisualViwSelectsInnerWord(t *testing.T) {
 	r2, _ := m1.handleLogVisualKey(keyMsg("w"))
 	m2 := r2.(Model)
 	assert.Equal(t, byte(0), m2.pendingTextObject, "operator cleared after resolution")
-	assert.Equal(t, rune('v'), m2.logVisualType, "switched to char-wise visual")
-	assert.Equal(t, 6, m2.logVisualCol, "selection start at 'b' of beta")
-	assert.Equal(t, 9, m2.logVisualCurCol, "selection end at 'a' of beta")
+	assert.Equal(t, rune('v'), m2.logView.visualType, "switched to char-wise visual")
+	assert.Equal(t, 6, m2.logView.visualCol, "selection start at 'b' of beta")
+	assert.Equal(t, 9, m2.logView.visualCurCol, "selection end at 'a' of beta")
 }
 
 func TestLogVisualVawSelectsAroundWord(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logLines = []string{"alpha beta gamma"}
-	m.logCursor = 0
-	m.logVisualCurCol = 7
-	m.logVisualMode = true
-	m.logVisualType = 'v'
-	m.logVisualStart = 0
-	m.logVisualCol = 7
+	m.logView.lines = []string{"alpha beta gamma"}
+	m.logView.cursor = 0
+	m.logView.visualCurCol = 7
+	m.logView.visualMode = true
+	m.logView.visualType = 'v'
+	m.logView.visualStart = 0
+	m.logView.visualCol = 7
 
 	r1, _ := m.handleLogVisualKey(keyMsg("a"))
 	r2, _ := r1.(Model).handleLogVisualKey(keyMsg("w"))
 	m2 := r2.(Model)
-	assert.Equal(t, 6, m2.logVisualCol)
-	assert.Equal(t, 10, m2.logVisualCurCol, "includes trailing space")
+	assert.Equal(t, 6, m2.logView.visualCol)
+	assert.Equal(t, 10, m2.logView.visualCurCol, "includes trailing space")
 }
 
 func TestLogVisualPendingClearedOnUnknownKey(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logLines = []string{"alpha beta"}
-	m.logCursor = 0
-	m.logVisualMode = true
-	m.logVisualType = 'v'
+	m.logView.lines = []string{"alpha beta"}
+	m.logView.cursor = 0
+	m.logView.visualMode = true
+	m.logView.visualType = 'v'
 
 	r1, _ := m.handleLogVisualKey(keyMsg("i"))
 	assert.Equal(t, byte('i'), r1.(Model).pendingTextObject)
@@ -170,14 +170,14 @@ func TestLogVisualPendingClearedOnUnknownKey(t *testing.T) {
 func TestLogVisualEscClearsPendingOperator(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logLines = []string{"alpha"}
-	m.logVisualMode = true
+	m.logView.lines = []string{"alpha"}
+	m.logView.visualMode = true
 	m.pendingTextObject = 'i'
 
 	r, _ := m.handleLogVisualKey(keyMsg("esc"))
 	rm := r.(Model)
 	assert.Equal(t, byte(0), rm.pendingTextObject)
-	assert.False(t, rm.logVisualMode)
+	assert.False(t, rm.logView.visualMode)
 }
 
 // --- describe viewer ---
@@ -252,9 +252,9 @@ func TestEventsVisualViwSelectsInnerWord(t *testing.T) {
 func TestLogVisualTextObjectClearsStalePendingG(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeLogs
-	m.logLines = []string{"alpha beta"}
-	m.logVisualMode = true
-	m.logVisualType = 'v'
+	m.logView.lines = []string{"alpha beta"}
+	m.logView.visualMode = true
+	m.logView.visualType = 'v'
 	m.pendingG = true
 	m.pendingTextObject = 'i'
 

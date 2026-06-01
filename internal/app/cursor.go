@@ -732,10 +732,10 @@ func (m *Model) filteredOverlayItems() []model.Item {
 
 // filteredLogPodItems returns overlay items matching the current log pod filter.
 func (m *Model) filteredLogPodItems() []model.Item {
-	if m.logPodFilterText == "" {
+	if m.logView.podFilterText == "" {
 		return m.overlayItems
 	}
-	rawQuery := m.logPodFilterText
+	rawQuery := m.logView.podFilterText
 	var filtered []model.Item
 	for _, item := range m.overlayItems {
 		if ui.MatchLine(item.Name, rawQuery) {
@@ -752,10 +752,10 @@ func (m *Model) filteredLogPodItems() []model.Item {
 // muscle-memory consistency with the namespace and log pod selectors.
 // Users can still reach all-containers by clearing the filter.
 func (m *Model) filteredLogContainerItems() []model.Item {
-	if m.logContainerFilterText == "" {
+	if m.logView.containerFilterText == "" {
 		return m.overlayItems
 	}
-	rawQuery := m.logContainerFilterText
+	rawQuery := m.logView.containerFilterText
 	filtered := []model.Item{}
 	for _, item := range m.overlayItems {
 		if ui.MatchLine(item.Name, rawQuery) {

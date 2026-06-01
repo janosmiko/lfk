@@ -373,28 +373,28 @@ func (m Model) executeSortCommand(arg string) (tea.Model, tea.Cmd) {
 func (m Model) executeSetCommand(option string) (tea.Model, tea.Cmd) {
 	switch strings.ToLower(strings.TrimSpace(option)) {
 	case "wrap":
-		m.logWrap = true
+		m.logView.wrap = true
 		m.setStatusMessage("Line wrap ON", false)
 	case "nowrap":
-		m.logWrap = false
+		m.logView.wrap = false
 		m.setStatusMessage("Line wrap OFF", false)
 	case "linenumbers":
-		m.logLineNumbers = true
+		m.logView.lineNumbers = true
 		m.setStatusMessage("Line numbers ON", false)
 	case "nolinenumbers":
-		m.logLineNumbers = false
+		m.logView.lineNumbers = false
 		m.setStatusMessage("Line numbers OFF", false)
 	case "timestamps":
-		m.logTimestamps = true
+		m.logView.timestamps = true
 		m.setStatusMessage("Timestamps ON", false)
 	case "notimestamps":
-		m.logTimestamps = false
+		m.logView.timestamps = false
 		m.setStatusMessage("Timestamps OFF", false)
 	case "follow":
-		m.logFollow = true
+		m.logView.follow = true
 		m.setStatusMessage("Log follow ON", false)
 	case "nofollow":
-		m.logFollow = false
+		m.logView.follow = false
 		m.setStatusMessage("Log follow OFF", false)
 	case "ansi":
 		ui.ConfigLogRenderAnsi = true

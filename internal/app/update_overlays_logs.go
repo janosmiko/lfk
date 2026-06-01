@@ -10,7 +10,7 @@ import (
 )
 
 func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.logPodFilterActive {
+	if m.logView.podFilterActive {
 		return m.handleLogPodFilterMode(msg)
 	}
 
@@ -18,15 +18,15 @@ func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "esc", "q":
-		if m.logPodFilterText != "" {
-			m.logPodFilterText = ""
+		if m.logView.podFilterText != "" {
+			m.logView.podFilterText = ""
 			m.overlayCursor = 0
 			return m, nil
 		}
 		m.overlay = overlayNone
 		m.pendingAction = ""
-		m.logPodFilterText = ""
-		m.logPodFilterActive = false
+		m.logView.podFilterText = ""
+		m.logView.podFilterActive = false
 		return m, nil
 	case "enter":
 		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
@@ -37,8 +37,8 @@ func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				m.actionCtx.namespace = sel.Namespace
 			}
 			m.overlay = overlayNone
-			m.logPodFilterText = ""
-			m.logPodFilterActive = false
+			m.logView.podFilterText = ""
+			m.logView.podFilterActive = false
 			if m.pendingAction == "Go to Pod" {
 				m.pendingAction = ""
 				return m.navigateToOwner("Pod", sel.Name)
@@ -56,8 +56,8 @@ func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlay = overlayNone
 		return m, nil
 	case "/":
-		m.logPodFilterActive = true
-		m.logPodFilterText = ""
+		m.logView.podFilterActive = true
+		m.logView.podFilterText = ""
 		return m, nil
 	case "j", "down", "ctrl+n":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 1, len(items)-1)
@@ -80,7 +80,7 @@ func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleLogPodSelectOverlayKey handles keyboard input for the inline pod selector
 // overlay shown within the log viewer (triggered by pressing P while viewing logs).
 func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.logPodFilterActive {
+	if m.logView.podFilterActive {
 		return m.handleLogPodFilterMode(msg)
 	}
 
@@ -88,31 +88,31 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 
 	switch msg.String() {
 	case "esc", "q":
-		if m.logPodFilterText != "" {
-			m.logPodFilterText = ""
+		if m.logView.podFilterText != "" {
+			m.logView.podFilterText = ""
 			m.overlayCursor = 0
 			return m, nil
 		}
 		// Cancel pod selection and restart the previous log stream.
 		m.overlay = overlayNone
 		m.pendingAction = ""
-		m.logPodFilterText = ""
-		m.logPodFilterActive = false
-		if m.logSavedPodName != "" {
-			m.actionCtx.name = m.logSavedPodName
+		m.logView.podFilterText = ""
+		m.logView.podFilterActive = false
+		if m.logView.savedPodName != "" {
+			m.actionCtx.name = m.logView.savedPodName
 			m.actionCtx.kind = "Pod"
 			m.actionCtx.containerName = ""
-			m.logSavedPodName = ""
+			m.logView.savedPodName = ""
 			// Reset container selection and log viewer state before restarting.
-			m.logSelectedContainers = nil
-			m.logContainers = nil
-			m.logLines = nil
-			m.logScroll = 0
-			m.logFollow = true
-			m.logTailLines = ui.ConfigLogTailLines
-			m.logHasMoreHistory = true
-			m.logLoadingHistory = false
-			m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+			m.logView.selectedContainers = nil
+			m.logView.containers = nil
+			m.logView.lines = nil
+			m.logView.scroll = 0
+			m.logView.follow = true
+			m.logView.tailLines = ui.ConfigLogTailLines
+			m.logView.hasMoreHistory = true
+			m.logView.loadingHistory = false
+			m.logView.title = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
 			return m, m.startLogStream()
 		}
 		return m, nil
@@ -123,8 +123,8 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 		}
 		return m, nil
 	case "/":
-		m.logPodFilterActive = true
-		m.logPodFilterText = ""
+		m.logView.podFilterActive = true
+		m.logView.podFilterText = ""
 		return m, nil
 	case "j", "down", "ctrl+n":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 1, len(items)-1)
@@ -151,23 +151,23 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 func (m *Model) applyLogPodSelection(sel model.Item) tea.Cmd {
 	m.overlay = overlayNone
 	m.pendingAction = ""
-	m.logSavedPodName = ""
-	m.logPodFilterText = ""
-	m.logPodFilterActive = false
-	m.logSelectedContainers = nil
-	m.logContainers = nil
-	m.logLines = nil
-	m.logScroll = 0
-	m.logTailLines = ui.ConfigLogTailLines
-	m.logHasMoreHistory = true
-	m.logLoadingHistory = false
+	m.logView.savedPodName = ""
+	m.logView.podFilterText = ""
+	m.logView.podFilterActive = false
+	m.logView.selectedContainers = nil
+	m.logView.containers = nil
+	m.logView.lines = nil
+	m.logView.scroll = 0
+	m.logView.tailLines = ui.ConfigLogTailLines
+	m.logView.hasMoreHistory = true
+	m.logView.loadingHistory = false
 
 	if sel.Status == "all" {
 		// "All Pods" selected: stream all pods using the parent resource.
-		m.actionCtx.kind = m.logParentKind
-		m.actionCtx.name = m.logParentName
+		m.actionCtx.kind = m.logView.parentKind
+		m.actionCtx.name = m.logView.parentName
 		m.actionCtx.containerName = ""
-		m.logTitle = fmt.Sprintf("Logs: %s/%s (all pods)", m.actionNamespace(), m.logParentName)
+		m.logView.title = fmt.Sprintf("Logs: %s/%s (all pods)", m.actionNamespace(), m.logView.parentName)
 	} else {
 		// Specific pod selected.
 		m.actionCtx.name = sel.Name
@@ -176,14 +176,14 @@ func (m *Model) applyLogPodSelection(sel model.Item) tea.Cmd {
 			m.actionCtx.namespace = sel.Namespace
 		}
 		m.actionCtx.containerName = ""
-		m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+		m.logView.title = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
 	}
 	return m.startLogStream()
 }
 
 // handleLogPodFilterMode handles keyboard input while the pod selector filter is active.
 func (m Model) handleLogPodFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	fi := &stringFilterInput{ptr: &m.logPodFilterText}
+	fi := &stringFilterInput{ptr: &m.logView.podFilterText}
 	// Handle paste events.
 	if msg.Paste {
 		switch handlePastedText(fi, msg.Runes) {
@@ -198,12 +198,12 @@ func (m Model) handleLogPodFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch handleFilterKey(fi, msg.String()) {
 	case filterEscape:
-		m.logPodFilterActive = false
-		m.logPodFilterText = ""
+		m.logView.podFilterActive = false
+		m.logView.podFilterText = ""
 		m.overlayCursor = 0
 		return m, nil
 	case filterAccept:
-		m.logPodFilterActive = false
+		m.logView.podFilterActive = false
 		m.overlayCursor = 0
 		// When the filter narrows to a single pod, Enter is unambiguous:
 		// apply it and start streaming. Without this, the user has to press
@@ -227,7 +227,7 @@ func (m Model) handleLogPodFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleLogContainerSelectOverlayKey handles keyboard input for the log container
 // filter overlay (triggered by pressing C in the log viewer).
 func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	if m.logContainerFilterActive {
+	if m.logView.containerFilterActive {
 		return m.handleLogContainerFilterMode(msg)
 	}
 
@@ -235,33 +235,33 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 
 	switch msg.String() {
 	case "esc", "q":
-		if m.logContainerFilterText != "" {
-			m.logContainerFilterText = ""
+		if m.logView.containerFilterText != "" {
+			m.logView.containerFilterText = ""
 			m.overlayCursor = 0
 			return m, nil
 		}
 		// Close overlay without changes.
 		m.overlay = overlayNone
-		m.logContainerFilterText = ""
-		m.logContainerFilterActive = false
+		m.logView.containerFilterText = ""
+		m.logView.containerFilterActive = false
 		return m, nil
 	case " ":
-		m.logContainerSelectionModified = true
+		m.logView.containerSelectionModified = true
 		// Toggle selection (namespace-selector style).
 		if m.overlayCursor >= 0 && m.overlayCursor < len(items) {
 			item := items[m.overlayCursor]
 			if item.Status == "all" {
 				// "All Containers" selected: reset to all.
-				m.logSelectedContainers = nil
+				m.logView.selectedContainers = nil
 			} else {
 				containerName := item.Name
-				if len(m.logSelectedContainers) == 0 {
+				if len(m.logView.selectedContainers) == 0 {
 					// Currently "all" selected; user selects one = select only that one.
-					m.logSelectedContainers = []string{containerName}
+					m.logView.selectedContainers = []string{containerName}
 				} else {
 					// Check if container is currently selected.
 					found := -1
-					for i, sc := range m.logSelectedContainers {
+					for i, sc := range m.logView.selectedContainers {
 						if sc == containerName {
 							found = i
 							break
@@ -269,16 +269,16 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 					}
 					if found >= 0 {
 						// Deselect: remove from list (but don't allow empty).
-						if len(m.logSelectedContainers) > 1 {
-							m.logSelectedContainers = append(m.logSelectedContainers[:found], m.logSelectedContainers[found+1:]...)
+						if len(m.logView.selectedContainers) > 1 {
+							m.logView.selectedContainers = append(m.logView.selectedContainers[:found], m.logView.selectedContainers[found+1:]...)
 						}
 					} else {
 						// Select: add to list.
-						m.logSelectedContainers = append(m.logSelectedContainers, containerName)
+						m.logView.selectedContainers = append(m.logView.selectedContainers, containerName)
 					}
 					// If all containers are now selected, reset to nil (meaning "all").
-					if len(m.logSelectedContainers) >= len(m.logContainers) {
-						m.logSelectedContainers = nil
+					if len(m.logView.selectedContainers) >= len(m.logView.containers) {
+						m.logView.selectedContainers = nil
 					}
 				}
 			}
@@ -287,27 +287,27 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 	case "enter":
 		// Apply selection and close overlay (namespace-selector style).
 		switch {
-		case m.logContainerSelectionModified:
+		case m.logView.containerSelectionModified:
 			// User toggled with Space: apply those selections.
 		case m.overlayCursor >= 0 && m.overlayCursor < len(items) && items[m.overlayCursor].Status != "all":
 			// No Space toggling: apply cursor item as single selection.
-			m.logSelectedContainers = []string{items[m.overlayCursor].Name}
+			m.logView.selectedContainers = []string{items[m.overlayCursor].Name}
 		default:
 			// Cursor on "All Containers" or no item.
-			m.logSelectedContainers = nil
+			m.logView.selectedContainers = nil
 		}
 		m.overlay = overlayNone
-		m.logContainerFilterText = ""
-		m.logContainerFilterActive = false
-		m.logContainerSelectionModified = false
+		m.logView.containerFilterText = ""
+		m.logView.containerFilterActive = false
+		m.logView.containerSelectionModified = false
 		// Call restartLogStreamForContainerFilter before return so that the
 		// pointer-receiver mutations (new logCh, logCancel, etc.) are reflected
 		// in the returned Model value.
 		cmd := m.restartLogStreamForContainerFilter()
 		return m, cmd
 	case "/":
-		m.logContainerFilterActive = true
-		m.logContainerFilterText = ""
+		m.logView.containerFilterActive = true
+		m.logView.containerFilterText = ""
 		return m, nil
 	case "j", "down", "ctrl+n":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 1, len(items)-1)
@@ -323,22 +323,22 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 		return m, nil
 	case "P", "\\":
 		// Switch to pod selector if available (group resources like Deployment).
-		if m.logParentKind != "" {
+		if m.logView.parentKind != "" {
 			m.overlay = overlayNone
-			m.logContainerFilterText = ""
-			m.logContainerFilterActive = false
-			m.logSavedPodName = m.actionCtx.name
-			if m.logCancel != nil {
-				m.logCancel()
-				m.logCancel = nil
+			m.logView.containerFilterText = ""
+			m.logView.containerFilterActive = false
+			m.logView.savedPodName = m.actionCtx.name
+			if m.logView.cancel != nil {
+				m.logView.cancel()
+				m.logView.cancel = nil
 			}
-			if m.logHistoryCancel != nil {
-				m.logHistoryCancel()
-				m.logHistoryCancel = nil
+			if m.logView.historyCancel != nil {
+				m.logView.historyCancel()
+				m.logView.historyCancel = nil
 			}
-			m.logCh = nil
-			m.actionCtx.kind = m.logParentKind
-			m.actionCtx.name = m.logParentName
+			m.logView.ch = nil
+			m.actionCtx.kind = m.logView.parentKind
+			m.actionCtx.name = m.logView.parentName
 			m.actionCtx.containerName = ""
 			m.pendingAction = "Logs"
 			m.loading = true
@@ -354,7 +354,7 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 
 // handleLogContainerFilterMode handles keyboard input while the container selector filter is active.
 func (m Model) handleLogContainerFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	fi := &stringFilterInput{ptr: &m.logContainerFilterText}
+	fi := &stringFilterInput{ptr: &m.logView.containerFilterText}
 	// Handle paste events.
 	if msg.Paste {
 		switch handlePastedText(fi, msg.Runes) {
@@ -369,28 +369,28 @@ func (m Model) handleLogContainerFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	}
 	switch handleFilterKey(fi, msg.String()) {
 	case filterEscape:
-		m.logContainerFilterActive = false
-		m.logContainerFilterText = ""
+		m.logView.containerFilterActive = false
+		m.logView.containerFilterText = ""
 		m.overlayCursor = 0
 		return m, nil
 	case filterAccept:
-		m.logContainerFilterActive = false
+		m.logView.containerFilterActive = false
 		m.overlayCursor = 0
 		// When the filter narrows to a single container and the user hasn't
 		// been Space-toggling selections, Enter is unambiguous: apply that
 		// container and restart the stream. Multi-select via Space is
 		// preserved: if the user already toggled selections, Enter still
 		// just exits filter mode without replacing them.
-		if !m.logContainerSelectionModified {
+		if !m.logView.containerSelectionModified {
 			items := m.filteredLogContainerItems()
 			if len(items) == 1 {
 				if items[0].Status == "all" {
-					m.logSelectedContainers = nil
+					m.logView.selectedContainers = nil
 				} else {
-					m.logSelectedContainers = []string{items[0].Name}
+					m.logView.selectedContainers = []string{items[0].Name}
 				}
 				m.overlay = overlayNone
-				m.logContainerFilterText = ""
+				m.logView.containerFilterText = ""
 				cmd := m.restartLogStreamForContainerFilter()
 				return m, cmd
 			}
@@ -408,34 +408,34 @@ func (m Model) handleLogContainerFilterMode(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 // restartLogStreamForContainerFilter cancels the current log stream and restarts
 // it with the updated container filter.
 func (m *Model) restartLogStreamForContainerFilter() tea.Cmd {
-	if m.logCancel != nil {
-		m.logCancel()
+	if m.logView.cancel != nil {
+		m.logView.cancel()
 	}
-	if m.logHistoryCancel != nil {
-		m.logHistoryCancel()
-		m.logHistoryCancel = nil
+	if m.logView.historyCancel != nil {
+		m.logView.historyCancel()
+		m.logView.historyCancel = nil
 	}
 	// Clear single-container override so startLogStream uses --all-containers --prefix,
 	// which is required for the prefix-based container filtering to work.
 	m.actionCtx.containerName = ""
-	m.logLines = nil
-	m.logScroll = 0
-	m.logCursor = 0
-	m.logFollow = true
-	m.logVisualMode = false
-	m.logTailLines = ui.ConfigLogTailLines
-	m.logHasMoreHistory = !m.logPrevious && !m.logIsMulti
-	m.logLoadingHistory = false
+	m.logView.lines = nil
+	m.logView.scroll = 0
+	m.logView.cursor = 0
+	m.logView.follow = true
+	m.logView.visualMode = false
+	m.logView.tailLines = ui.ConfigLogTailLines
+	m.logView.hasMoreHistory = !m.logView.previous && !m.logView.isMulti
+	m.logView.loadingHistory = false
 	// Update the log title to show selected containers.
-	m.logTitle = m.buildLogTitle()
+	m.logView.title = m.buildLogTitle()
 	return m.startLogStream()
 }
 
 // buildLogTitle constructs the log title, including selected container names if filtered.
 func (m *Model) buildLogTitle() string {
 	base := fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
-	if len(m.logSelectedContainers) > 0 && len(m.logSelectedContainers) < len(m.logContainers) {
-		base += " [" + strings.Join(m.logSelectedContainers, ", ") + "]"
+	if len(m.logView.selectedContainers) > 0 && len(m.logView.selectedContainers) < len(m.logView.containers) {
+		base += " [" + strings.Join(m.logView.selectedContainers, ", ") + "]"
 	}
 	return base
 }

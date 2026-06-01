@@ -210,7 +210,7 @@ type logLineMsg struct {
 // logStreamRestartMsg triggers an automatic reconnect of the log stream when
 // the previous stream ended (e.g. an init container completed and the next
 // one hasn't produced output yet). The ch field correlates the restart with
-// the stream it was scheduled for: if m.logCh no longer points at this
+// the stream it was scheduled for: if m.logView.ch no longer points at this
 // channel (user switched pods or exited logs mode), the restart is dropped.
 type logStreamRestartMsg struct {
 	ch chan string

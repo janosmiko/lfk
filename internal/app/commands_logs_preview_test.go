@@ -39,7 +39,7 @@ func TestLogEffectiveWidthRespectsPreview(t *testing.T) {
 	m := Model{width: 200}
 	assert.Equal(t, 200, m.logEffectiveWidth(), "preview off: full width")
 
-	m.logPreviewVisible = true
+	m.logView.previewVisible = true
 	logW, prevW := splitLogPreviewWidth(200)
 	assert.Equal(t, logW, m.logEffectiveWidth(), "preview on: log column width")
 	assert.Greater(t, prevW, 0, "expected non-zero preview width at width 200")
@@ -49,65 +49,71 @@ func TestLogEffectiveWidthRespectsPreview(t *testing.T) {
 }
 
 func TestLogPreviewLine(t *testing.T) {
-	m := Model{logLines: nil}
+	m := Model{logView: logViewState{lines: nil}}
 	assert.Equal(t, "", m.logPreviewLine(), "empty buffer returns empty")
 
-	m.logLines = []string{"first", "second", "third"}
-	m.logCursor = 1
+	m.logView.lines = []string{"first", "second", "third"}
+	m.logView.cursor = 1
 	assert.Equal(t, "second", m.logPreviewLine(), "cursor in range returns its line")
 
-	m.logCursor = -1
+	m.logView.cursor = -1
 	assert.Equal(t, "third", m.logPreviewLine(), "unset cursor falls back to last line")
 
-	m.logCursor = 99
+	m.logView.cursor = 99
 	assert.Equal(t, "third", m.logPreviewLine(), "out-of-range cursor falls back to last line")
 }
 
 func TestLogKeyPCapitalTogglesPreview(t *testing.T) {
 	m := Model{
-		mode:     modeLogs,
-		logLines: []string{`{"level":"info","msg":"hi"}`},
-		tabs:     []TabState{{}},
-		width:    120,
-		height:   40,
+		mode: modeLogs,
+		logView: logViewState{
+			lines: []string{`{"level":"info","msg":"hi"}`},
+		},
+		tabs:   []TabState{{}},
+		width:  120,
+		height: 40,
 	}
-	assert.False(t, m.logPreviewVisible)
+	assert.False(t, m.logView.previewVisible)
 
 	ret, _ := m.handleLogKey(runeKey('P'))
 	on := ret.(Model)
-	assert.True(t, on.logPreviewVisible, "P should turn preview on")
+	assert.True(t, on.logView.previewVisible, "P should turn preview on")
 
 	ret2, _ := on.handleLogKey(runeKey('P'))
 	off := ret2.(Model)
-	assert.False(t, off.logPreviewVisible, "second P should turn preview off")
+	assert.False(t, off.logView.previewVisible, "second P should turn preview off")
 }
 
 func TestLogKeyPLowercaseStillTogglesPrefixesOnly(t *testing.T) {
 	// Regression guard: lowercase p must remain bound to the prefix toggle
 	// and must not affect the new preview state.
 	m := Model{
-		mode:     modeLogs,
-		logLines: []string{"[pod/x/y] line"},
-		tabs:     []TabState{{}},
-		width:    120,
-		height:   40,
+		mode: modeLogs,
+		logView: logViewState{
+			lines: []string{"[pod/x/y] line"},
+		},
+		tabs:   []TabState{{}},
+		width:  120,
+		height: 40,
 	}
 	ret, _ := m.handleLogKey(runeKey('p'))
 	result := ret.(Model)
-	assert.True(t, result.logHidePrefixes, "lowercase p toggles prefixes")
-	assert.False(t, result.logPreviewVisible, "lowercase p must not affect preview")
+	assert.True(t, result.logView.hidePrefixes, "lowercase p toggles prefixes")
+	assert.False(t, result.logView.previewVisible, "lowercase p must not affect preview")
 }
 
 func TestViewLogsRendersPreviewWhenVisible(t *testing.T) {
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{`{"level":"info","msg":"served","port":8080}`},
-		logCursor:         0,
-		logPreviewVisible: true,
-		tabs:              []TabState{{}},
-		width:             140,
-		height:            30,
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{`{"level":"info","msg":"served","port":8080}`},
+			cursor:         0,
+			previewVisible: true,
+		},
+		tabs:   []TabState{{}},
+		width:  140,
+		height: 30,
 	}
 	out := m.viewLogs()
 	// The PREVIEW header and the JSON-detection label should appear once
@@ -118,14 +124,16 @@ func TestViewLogsRendersPreviewWhenVisible(t *testing.T) {
 
 func TestViewLogsHidesPreviewWhenTerminalTooNarrow(t *testing.T) {
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{`{"level":"info"}`},
-		logCursor:         0,
-		logPreviewVisible: true, // armed but width < 80 so panel must be suppressed
-		tabs:              []TabState{{}},
-		width:             60,
-		height:            30,
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{`{"level":"info"}`},
+			cursor:         0,
+			previewVisible: true, // armed but width < 80 so panel must be suppressed
+		},
+		tabs:   []TabState{{}},
+		width:  60,
+		height: 30,
 	}
 	out := m.viewLogs()
 	assert.NotContains(t, out, "PREVIEW", "panel must be suppressed when terminal is too narrow")
@@ -138,35 +146,39 @@ const scrollOverflowJSON = `{"a":"1","b":"2","c":"3","d":"4","e":"5","f":"6","g"
 
 func TestLogKeyJCapitalScrollsPreviewDown(t *testing.T) {
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{scrollOverflowJSON},
-		logCursor:         0,
-		logPreviewVisible: true,
-		tabs:              []TabState{{}},
-		width:             140,
-		height:            10, // small enough to force preview overflow
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{scrollOverflowJSON},
+			cursor:         0,
+			previewVisible: true,
+		},
+		tabs:   []TabState{{}},
+		width:  140,
+		height: 10, // small enough to force preview overflow
 	}
 	ret, _ := m.handleLogKey(runeKey('J'))
 	scrolled := ret.(Model)
-	assert.Equal(t, 1, scrolled.logPreviewScroll, "J should advance preview scroll by 1")
+	assert.Equal(t, 1, scrolled.logView.previewScroll, "J should advance preview scroll by 1")
 }
 
 func TestLogKeyKCapitalScrollsPreviewUp(t *testing.T) {
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{scrollOverflowJSON},
-		logCursor:         0,
-		logPreviewVisible: true,
-		logPreviewScroll:  3,
-		tabs:              []TabState{{}},
-		width:             140,
-		height:            10,
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{scrollOverflowJSON},
+			cursor:         0,
+			previewVisible: true,
+			previewScroll:  3,
+		},
+		tabs:   []TabState{{}},
+		width:  140,
+		height: 10,
 	}
 	ret, _ := m.handleLogKey(runeKey('K'))
 	scrolled := ret.(Model)
-	assert.Equal(t, 2, scrolled.logPreviewScroll, "K should rewind preview scroll by 1")
+	assert.Equal(t, 2, scrolled.logView.previewScroll, "K should rewind preview scroll by 1")
 }
 
 func TestLogKeyJCapitalNoOpWhenPreviewHidden(t *testing.T) {
@@ -174,30 +186,34 @@ func TestLogKeyJCapitalNoOpWhenPreviewHidden(t *testing.T) {
 	// returning ok=false means the dispatcher leaves m unchanged at the
 	// outer handleLogKey level. We confirm scroll stays 0.
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{scrollOverflowJSON},
-		logCursor:         0,
-		logPreviewVisible: false,
-		tabs:              []TabState{{}},
-		width:             140,
-		height:            10,
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{scrollOverflowJSON},
+			cursor:         0,
+			previewVisible: false,
+		},
+		tabs:   []TabState{{}},
+		width:  140,
+		height: 10,
 	}
 	ret, _ := m.handleLogKey(runeKey('J'))
 	after := ret.(Model)
-	assert.Equal(t, 0, after.logPreviewScroll, "J must not scroll preview when preview is hidden")
+	assert.Equal(t, 0, after.logView.previewScroll, "J must not scroll preview when preview is hidden")
 }
 
 func TestLogKeyJCapitalClampsAtMax(t *testing.T) {
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{scrollOverflowJSON},
-		logCursor:         0,
-		logPreviewVisible: true,
-		tabs:              []TabState{{}},
-		width:             140,
-		height:            10,
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{scrollOverflowJSON},
+			cursor:         0,
+			previewVisible: true,
+		},
+		tabs:   []TabState{{}},
+		width:  140,
+		height: 10,
 	}
 	// Press J many more times than the body has rows.
 	for range 100 {
@@ -209,24 +225,26 @@ func TestLogKeyJCapitalClampsAtMax(t *testing.T) {
 	// height (logContentHeight), and LogPreviewMaxScroll's height arg is
 	// the outer panel size, so add 2 for the border.
 	wantMax := ui.LogPreviewMaxScroll(m.logPreviewLine(), previewW, m.logContentHeight()+2)
-	assert.Equal(t, wantMax, m.logPreviewScroll, "J spam must clamp at LogPreviewMaxScroll")
+	assert.Equal(t, wantMax, m.logView.previewScroll, "J spam must clamp at LogPreviewMaxScroll")
 }
 
 func TestLogKeyKCapitalClampsAtZero(t *testing.T) {
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{scrollOverflowJSON},
-		logCursor:         0,
-		logPreviewVisible: true,
-		logPreviewScroll:  0,
-		tabs:              []TabState{{}},
-		width:             140,
-		height:            10,
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{scrollOverflowJSON},
+			cursor:         0,
+			previewVisible: true,
+			previewScroll:  0,
+		},
+		tabs:   []TabState{{}},
+		width:  140,
+		height: 10,
 	}
 	ret, _ := m.handleLogKey(runeKey('K'))
 	after := ret.(Model)
-	assert.Equal(t, 0, after.logPreviewScroll, "K at scroll 0 must not go negative")
+	assert.Equal(t, 0, after.logView.previewScroll, "K at scroll 0 must not go negative")
 }
 
 func TestEnsureLogCursorVisibleResetsPreviewScroll(t *testing.T) {
@@ -234,14 +252,16 @@ func TestEnsureLogCursorVisibleResetsPreviewScroll(t *testing.T) {
 	// scroll offset is stale and must be cleared. ensureLogCursorVisible
 	// is the chokepoint every cursor handler funnels through.
 	m := Model{
-		logLines:         []string{"a", "b", "c"},
-		logCursor:        2,
-		logPreviewScroll: 5,
-		width:            120,
-		height:           20,
+		logView: logViewState{
+			lines:         []string{"a", "b", "c"},
+			cursor:        2,
+			previewScroll: 5,
+		},
+		width:  120,
+		height: 20,
 	}
 	m.ensureLogCursorVisible()
-	assert.Equal(t, 0, m.logPreviewScroll, "ensureLogCursorVisible must reset preview scroll")
+	assert.Equal(t, 0, m.logView.previewScroll, "ensureLogCursorVisible must reset preview scroll")
 }
 
 func TestScrollToMaxRevealsLastBodyRowInRenderedView(t *testing.T) {
@@ -261,14 +281,16 @@ func TestScrollToMaxRevealsLastBodyRowInRenderedView(t *testing.T) {
 	jsonLine := `{"a":"1","b":"2","c":"3","d":"4","e":"5","f":"6","g":"7","h":"8","i":"9","j":"10","k":"11","l":"12","m":"13","n":"14","o":"15","p":"16","q":"17","r":"18","s":"19","t":"20","u":"21","v":"22","w":"23","x":"24","y":"25","z_last_field":"` + sentinel + `"}`
 	terminalH := 16
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{jsonLine},
-		logCursor:         0,
-		logPreviewVisible: true,
-		tabs:              []TabState{{}}, // single tab → no tab bar
-		width:             140,
-		height:            terminalH, // Update-context: untouched terminal height
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{jsonLine},
+			cursor:         0,
+			previewVisible: true,
+		},
+		tabs:   []TabState{{}}, // single tab → no tab bar
+		width:  140,
+		height: terminalH, // Update-context: untouched terminal height
 	}
 	// Spam J more times than there could possibly be body rows so we land
 	// at whatever maxScroll the handler considers final.
@@ -294,17 +316,19 @@ func TestScrollToMaxRevealsLastBodyRowInRenderedView(t *testing.T) {
 func TestViewLogs_PreviewVisible_HotkeyHintFullWidth(t *testing.T) {
 	const terminalW = 300
 	base := Model{
-		mode:     modeLogs,
-		logLines: []string{"sample log line"},
-		tabs:     []TabState{{}},
-		width:    terminalW,
-		height:   30 - 1, // mimic View()'s app title decrement
-		logTitle: "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title: "Logs",
+			lines: []string{"sample log line"},
+		},
+		tabs:   []TabState{{}},
+		width:  terminalW,
+		height: 30 - 1, // mimic View()'s app title decrement
 	}
 	off := base
-	off.logPreviewVisible = false
+	off.logView.previewVisible = false
 	on := base
-	on.logPreviewVisible = true
+	on.logView.previewVisible = true
 
 	outOff := off.viewLogs()
 	outOn := on.viewLogs()
@@ -341,17 +365,19 @@ func TestLogKeyJLowercaseResetsPreviewScroll(t *testing.T) {
 	// lowercase j (cursor down) must reset any preview scroll because the
 	// cursor lands on a different line whose preview is unrelated.
 	m := Model{
-		mode:              modeLogs,
-		logLines:          []string{"first line", "second line"},
-		logCursor:         0,
-		logPreviewVisible: true,
-		logPreviewScroll:  4,
-		tabs:              []TabState{{}},
-		width:             140,
-		height:            20,
-		logTitle:          "Logs",
+		mode: modeLogs,
+		logView: logViewState{
+			title:          "Logs",
+			lines:          []string{"first line", "second line"},
+			cursor:         0,
+			previewVisible: true,
+			previewScroll:  4,
+		},
+		tabs:   []TabState{{}},
+		width:  140,
+		height: 20,
 	}
 	ret, _ := m.handleLogKey(runeKey('j'))
 	after := ret.(Model)
-	assert.Equal(t, 0, after.logPreviewScroll, "lowercase j must reset preview scroll via ensureLogCursorVisible")
+	assert.Equal(t, 0, after.logView.previewScroll, "lowercase j must reset preview scroll via ensureLogCursorVisible")
 }

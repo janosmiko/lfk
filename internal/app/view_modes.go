@@ -14,7 +14,7 @@ import (
 
 func (m Model) viewLogs() string {
 	viewH := m.logViewHeight()
-	canSwitchPod := m.logParentKind != ""
+	canSwitchPod := m.logView.parentKind != ""
 	canFilterContainers := m.actionCtx.kind == "Pod"
 	var statusMsg string
 	var statusIsErr bool
@@ -25,7 +25,7 @@ func (m Model) viewLogs() string {
 
 	logWidth := m.width
 	previewWidth := 0
-	if m.logPreviewVisible {
+	if m.logView.previewVisible {
 		logWidth, previewWidth = splitLogPreviewWidth(m.width)
 	}
 
@@ -35,12 +35,12 @@ func (m Model) viewLogs() string {
 	// keeps its built-in footer for the standalone (no-preview) layout.
 	omitInnerFooter := previewWidth > 0
 
-	logView := ui.RenderLogViewer(m.logLines, m.logScroll, logWidth, viewH, m.logFollow, m.logWrap, m.logLineNumbers, m.logTimestamps, m.logPrevious, m.logHidePrefixes, m.logTitle, m.logSearchQuery, m.logSearchInput.Value, m.logSearchActive, canSwitchPod, canFilterContainers, m.logHasMoreHistory, m.logLoadingHistory, statusMsg, statusIsErr, m.logCursor, m.logVisualMode, m.logVisualStart, m.logVisualType, m.logVisualCol, m.logVisualCurCol, m.logWrapTopSkip, omitInnerFooter)
+	logView := ui.RenderLogViewer(m.logView.lines, m.logView.scroll, logWidth, viewH, m.logView.follow, m.logView.wrap, m.logView.lineNumbers, m.logView.timestamps, m.logView.previous, m.logView.hidePrefixes, m.logView.title, m.logView.searchQuery, m.logView.searchInput.Value, m.logView.searchActive, canSwitchPod, canFilterContainers, m.logView.hasMoreHistory, m.logView.loadingHistory, statusMsg, statusIsErr, m.logView.cursor, m.logView.visualMode, m.logView.visualStart, m.logView.visualType, m.logView.visualCol, m.logView.visualCurCol, m.logView.wrapTopSkip, omitInnerFooter)
 
 	if previewWidth > 0 {
-		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logPreviewScroll, true)
+		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logView.previewScroll, true)
 		panes := lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
-		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logSearchActive, m.logSearchInput.Value, m.logSearchQuery, m.logVisualMode, canSwitchPod, canFilterContainers)
+		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logView.searchActive, m.logView.searchInput.Value, m.logView.searchQuery, m.logView.visualMode, canSwitchPod, canFilterContainers)
 		return lipgloss.JoinVertical(lipgloss.Left, panes, footer)
 	}
 	return logView
@@ -312,11 +312,11 @@ func (m *Model) logContentHeight() int {
 
 func (m *Model) clampLogScroll() {
 	maxScroll := m.logMaxScroll()
-	if m.logScroll > maxScroll {
-		m.logScroll = maxScroll
+	if m.logView.scroll > maxScroll {
+		m.logView.scroll = maxScroll
 	}
-	if m.logScroll < 0 {
-		m.logScroll = 0
+	if m.logView.scroll < 0 {
+		m.logView.scroll = 0
 	}
 }
 
@@ -331,33 +331,33 @@ func (m *Model) ensureLogCursorVisible() {
 	// to), so any prior preview scroll is now relative to stale content.
 	// Resetting here covers j/k/ctrl+d/u/ctrl+f/b/G/g/search-next as well
 	// as the toggle, which all reach this function.
-	m.logPreviewScroll = 0
+	m.logView.previewScroll = 0
 
-	if m.logCursor < 0 {
+	if m.logView.cursor < 0 {
 		return
 	}
-	if len(m.logLines) > 0 && m.logCursor >= len(m.logLines) {
-		m.logCursor = len(m.logLines) - 1
+	if len(m.logView.lines) > 0 && m.logView.cursor >= len(m.logView.lines) {
+		m.logView.cursor = len(m.logView.lines) - 1
 	}
-	if m.logFollow {
-		m.logScroll, m.logWrapTopSkip = m.logMaxScrollAndSkip()
+	if m.logView.follow {
+		m.logView.scroll, m.logView.wrapTopSkip = m.logMaxScrollAndSkip()
 		return
 	}
 	viewH := max(m.logContentHeight(), 1)
 	so := min(ui.ConfigScrollOff, viewH/2)
 
-	if m.logWrap {
+	if m.logView.wrap {
 		m.adjustLogScrollForCursorWrap(viewH)
 		return
 	}
 
-	if m.logCursor < m.logScroll+so {
-		m.logScroll = m.logCursor - so
+	if m.logView.cursor < m.logView.scroll+so {
+		m.logView.scroll = m.logView.cursor - so
 	}
-	if m.logCursor >= m.logScroll+viewH-so {
-		m.logScroll = m.logCursor - viewH + so + 1
+	if m.logView.cursor >= m.logView.scroll+viewH-so {
+		m.logView.scroll = m.logView.cursor - viewH + so + 1
 	}
-	m.logWrapTopSkip = 0
+	m.logView.wrapTopSkip = 0
 	m.clampLogScroll()
 }
 
@@ -370,20 +370,20 @@ func (m *Model) adjustLogScrollForCursorWrap(viewH int) {
 	availWidth := m.logWrapAvailWidth()
 
 	// Cursor above scroll → snap top.
-	if m.logCursor < m.logScroll {
-		m.logScroll = m.logCursor
-		m.logWrapTopSkip = 0
+	if m.logView.cursor < m.logView.scroll {
+		m.logView.scroll = m.logView.cursor
+		m.logView.wrapTopSkip = 0
 		m.clampLogScroll()
 		return
 	}
 
 	// Compute the visual row where cursor's first wrapped sub-line will
 	// land given the current (logScroll, logWrapTopSkip).
-	cursorTopRow := -m.logWrapTopSkip
-	for i := m.logScroll; i < m.logCursor && i < len(m.logLines); i++ {
+	cursorTopRow := -m.logView.wrapTopSkip
+	for i := m.logView.scroll; i < m.logView.cursor && i < len(m.logView.lines); i++ {
 		cursorTopRow += wrappedLineCount(m.logDisplayLine(i), availWidth)
 	}
-	cursorWrap := wrappedLineCount(m.logDisplayLine(m.logCursor), availWidth)
+	cursorWrap := wrappedLineCount(m.logDisplayLine(m.logView.cursor), availWidth)
 	cursorBottomRow := cursorTopRow + cursorWrap - 1
 
 	if cursorBottomRow < viewH {
@@ -398,24 +398,24 @@ func (m *Model) adjustLogScrollForCursorWrap(viewH int) {
 		// Cursor itself wraps to more than viewH rows: show its first
 		// viewH sub-lines so the cursor indicator (always on sub-line 0)
 		// stays visible at the top.
-		m.logScroll = m.logCursor
-		m.logWrapTopSkip = 0
+		m.logView.scroll = m.logView.cursor
+		m.logView.wrapTopSkip = 0
 		m.clampLogScroll()
 		return
 	}
 	accumulated := 0
-	for i := m.logCursor - 1; i >= 0; i-- {
+	for i := m.logView.cursor - 1; i >= 0; i-- {
 		wc := wrappedLineCount(m.logDisplayLine(i), availWidth)
 		if accumulated+wc >= target {
-			m.logScroll = i
-			m.logWrapTopSkip = accumulated + wc - target
+			m.logView.scroll = i
+			m.logView.wrapTopSkip = accumulated + wc - target
 			m.clampLogScroll()
 			return
 		}
 		accumulated += wc
 	}
-	m.logScroll = 0
-	m.logWrapTopSkip = 0
+	m.logView.scroll = 0
+	m.logView.wrapTopSkip = 0
 }
 
 // logMaxScroll returns the maximum valid scroll offset for the log viewer.
@@ -435,12 +435,12 @@ func (m *Model) logMaxScroll() int {
 func (m *Model) logMaxScrollAndSkip() (int, int) {
 	viewH := max(m.logContentHeight(), 1)
 
-	if m.logWrap {
+	if m.logView.wrap {
 		availWidth := m.logWrapAvailWidth()
 		visualLines := 0
 		// Default: everything fits, scroll stays at the top with no skip.
 		maxScroll, topSkip := 0, 0
-		for i := range slices.Backward(m.logLines) {
+		for i := range slices.Backward(m.logView.lines) {
 			// Use the displayed line (timestamps and pod prefixes
 			// stripped to match the renderer) so the wrap count reflects
 			// what the viewer actually paints — otherwise the raw line
@@ -457,7 +457,7 @@ func (m *Model) logMaxScrollAndSkip() (int, int) {
 		return maxScroll, topSkip
 	}
 
-	ms := len(m.logLines) - viewH
+	ms := len(m.logView.lines) - viewH
 	if ms < 0 {
 		return 0, 0
 	}
@@ -472,8 +472,8 @@ func (m *Model) logMaxScrollAndSkip() (int, int) {
 func (m *Model) logWrapAvailWidth() int {
 	contentWidth := max(m.logEffectiveWidth()-4, 10)
 	lineNumWidth := 0
-	if m.logLineNumbers && len(m.logLines) > 0 {
-		lineNumWidth = len(fmt.Sprintf("%d", len(m.logLines))) + 1
+	if m.logView.lineNumbers && len(m.logView.lines) > 0 {
+		lineNumWidth = len(fmt.Sprintf("%d", len(m.logView.lines))) + 1
 	}
 	return max(contentWidth-1-lineNumWidth, 10)
 }

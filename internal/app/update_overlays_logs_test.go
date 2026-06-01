@@ -156,63 +156,63 @@ func TestCovLogContainerSelectEsc(t *testing.T) {
 func TestCovLogContainerSelectEscWithFilter(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainerFilterText = "main"
+	m.logView.containerFilterText = "main"
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.Empty(t, rm.logContainerFilterText)
+	assert.Empty(t, rm.logView.containerFilterText)
 }
 
 func TestCovLogContainerSelectSpaceAll(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main", "sidecar"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logView.containers = []string{"main", "sidecar"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
 	m.overlayCursor = 0
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg(" "))
 	rm := result.(Model)
-	assert.Nil(t, rm.logSelectedContainers)
+	assert.Nil(t, rm.logView.selectedContainers)
 }
 
 func TestCovLogContainerSelectSpaceSelectOne(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main", "sidecar"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logView.containers = []string{"main", "sidecar"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
 	m.overlayCursor = 1
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg(" "))
 	rm := result.(Model)
-	assert.NotNil(t, rm.logSelectedContainers)
+	assert.NotNil(t, rm.logView.selectedContainers)
 }
 
 func TestCovLogContainerSelectSpaceDeselect(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main", "sidecar"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
-	m.logSelectedContainers = []string{"main", "sidecar"}
+	m.logView.containers = []string{"main", "sidecar"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
+	m.logView.selectedContainers = []string{"main", "sidecar"}
 	m.overlayCursor = 1 // Points to "main".
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg(" "))
 	rm := result.(Model)
-	assert.True(t, len(rm.logSelectedContainers) < 2 || rm.logSelectedContainers == nil)
+	assert.True(t, len(rm.logView.selectedContainers) < 2 || rm.logView.selectedContainers == nil)
 }
 
 func TestCovLogContainerSelectSpaceAddContainer(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main", "sidecar", "proxy"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
-	m.logSelectedContainers = []string{"main"}
+	m.logView.containers = []string{"main", "sidecar", "proxy"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
+	m.logView.selectedContainers = []string{"main"}
 	m.overlayCursor = 2 // Points to "sidecar".
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg(" "))
 	rm := result.(Model)
-	assert.Equal(t, 2, len(rm.logSelectedContainers))
+	assert.Equal(t, 2, len(rm.logView.selectedContainers))
 }
 
 func TestCovLogContainerSelectEnterNoModify(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main", "sidecar"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logView.containers = []string{"main", "sidecar"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
 	m.overlayCursor = 1 // Points to "main".
 	result, cmd := m.handleLogContainerSelectOverlayKey(keyMsg("enter"))
 	rm := result.(Model)
@@ -223,22 +223,22 @@ func TestCovLogContainerSelectEnterNoModify(t *testing.T) {
 func TestCovLogContainerSelectEnterAll(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logView.containers = []string{"main"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
 	m.overlayCursor = 0 // Points to "All Containers".
 	result, cmd := m.handleLogContainerSelectOverlayKey(keyMsg("enter"))
 	rm := result.(Model)
-	assert.Nil(t, rm.logSelectedContainers)
+	assert.Nil(t, rm.logView.selectedContainers)
 	assert.NotNil(t, cmd)
 }
 
 func TestCovLogContainerSelectEnterModified(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main", "sidecar"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
-	m.logContainerSelectionModified = true
-	m.logSelectedContainers = []string{"main"}
+	m.logView.containers = []string{"main", "sidecar"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
+	m.logView.containerSelectionModified = true
+	m.logView.selectedContainers = []string{"main"}
 	result, cmd := m.handleLogContainerSelectOverlayKey(keyMsg("enter"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -250,16 +250,16 @@ func TestCovLogContainerSelectEnterModified(t *testing.T) {
 func TestLogContainerFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main", "sidecar", "init"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
-	m.logContainerFilterActive = true
-	m.logContainerFilterText = "side"
+	m.logView.containers = []string{"main", "sidecar", "init"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
+	m.logView.containerFilterActive = true
+	m.logView.containerFilterText = "side"
 	result, cmd := m.handleLogContainerFilterMode(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.logContainerFilterActive)
+	assert.False(t, rm.logView.containerFilterActive)
 	assert.Equal(t, overlayNone, rm.overlay, "overlay must close")
-	assert.Equal(t, []string{"sidecar"}, rm.logSelectedContainers, "sole filter match must be applied")
-	assert.Empty(t, rm.logContainerFilterText, "filter text must be cleared after commit")
+	assert.Equal(t, []string{"sidecar"}, rm.logView.selectedContainers, "sole filter match must be applied")
+	assert.Empty(t, rm.logView.containerFilterText, "filter text must be cleared after commit")
 	assert.NotNil(t, cmd, "restart log stream command must be returned")
 }
 
@@ -268,15 +268,15 @@ func TestLogContainerFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
 func TestLogContainerFilterModeEnterPreservesMultipleResults(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"web-main", "web-side", "init"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
-	m.logContainerFilterActive = true
-	m.logContainerFilterText = "web"
+	m.logView.containers = []string{"web-main", "web-side", "init"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
+	m.logView.containerFilterActive = true
+	m.logView.containerFilterText = "web"
 	result, cmd := m.handleLogContainerFilterMode(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.logContainerFilterActive)
+	assert.False(t, rm.logView.containerFilterActive)
 	assert.Equal(t, overlayLogContainerSelect, rm.overlay, "overlay must stay open")
-	assert.Equal(t, "web", rm.logContainerFilterText, "filter text must be preserved")
+	assert.Equal(t, "web", rm.logView.containerFilterText, "filter text must be preserved")
 	assert.Nil(t, cmd, "no command must be issued when more than one match")
 }
 
@@ -286,17 +286,17 @@ func TestLogContainerFilterModeEnterPreservesMultipleResults(t *testing.T) {
 func TestLogContainerFilterModeEnterPreservesMultiSelect(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main", "sidecar", "init"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
-	m.logContainerSelectionModified = true
-	m.logSelectedContainers = []string{"main"}
-	m.logContainerFilterActive = true
-	m.logContainerFilterText = "side"
+	m.logView.containers = []string{"main", "sidecar", "init"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
+	m.logView.containerSelectionModified = true
+	m.logView.selectedContainers = []string{"main"}
+	m.logView.containerFilterActive = true
+	m.logView.containerFilterText = "side"
 	result, cmd := m.handleLogContainerFilterMode(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.logContainerFilterActive)
+	assert.False(t, rm.logView.containerFilterActive)
 	assert.Equal(t, overlayLogContainerSelect, rm.overlay, "overlay must stay open")
-	assert.Equal(t, []string{"main"}, rm.logSelectedContainers, "Space-toggled selection must survive")
+	assert.Equal(t, []string{"main"}, rm.logView.selectedContainers, "Space-toggled selection must survive")
 	assert.Nil(t, cmd, "no command must be issued during in-progress multi-select")
 }
 
@@ -305,15 +305,15 @@ func TestLogContainerFilterModeEnterPreservesMultiSelect(t *testing.T) {
 func TestLogContainerFilterModeEnterAutoSelectsSoleAllContainersResult(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"main"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
-	m.logSelectedContainers = []string{"main"}
-	m.logContainerFilterActive = true
-	m.logContainerFilterText = "All"
+	m.logView.containers = []string{"main"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
+	m.logView.selectedContainers = []string{"main"}
+	m.logView.containerFilterActive = true
+	m.logView.containerFilterText = "All"
 	result, cmd := m.handleLogContainerFilterMode(keyMsg("enter"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)
-	assert.Nil(t, rm.logSelectedContainers, "sole 'All Containers' match must reset to all")
+	assert.Nil(t, rm.logView.selectedContainers, "sole 'All Containers' match must reset to all")
 	assert.NotNil(t, cmd)
 }
 
@@ -321,19 +321,19 @@ func TestCovLogContainerSelectSlash(t *testing.T) {
 	m := baseModelBoost2()
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("/"))
 	rm := result.(Model)
-	assert.True(t, rm.logContainerFilterActive)
+	assert.True(t, rm.logView.containerFilterActive)
 }
 
 func TestCovLogContainerSelectJK(t *testing.T) {
 	m := baseModelBoost2()
-	m.logContainers = []string{"main", "sidecar"}
-	m.overlayItems = logContainerOverlayItems(m.logContainers)
+	m.logView.containers = []string{"main", "sidecar"}
+	m.overlayItems = logContainerOverlayItems(m.logView.containers)
 	m.overlayCursor = 0
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("j"))
 	rm := result.(Model)
 	assert.Equal(t, 1, rm.overlayCursor)
 
-	rm.overlayItems = logContainerOverlayItems(m.logContainers)
+	rm.overlayItems = logContainerOverlayItems(m.logView.containers)
 	result2, _ := rm.handleLogContainerSelectOverlayKey(keyMsg("k"))
 	rm2 := result2.(Model)
 	assert.Equal(t, 0, rm2.overlayCursor)
@@ -341,12 +341,12 @@ func TestCovLogContainerSelectJK(t *testing.T) {
 
 func TestCovLogContainerSelectCtrlD(t *testing.T) {
 	m := baseModelBoost2()
-	m.logContainers = make([]string, 20)
+	m.logView.containers = make([]string, 20)
 	m.overlayItems = make([]model.Item, 21) // "All Containers" + 20
 	m.overlayItems[0] = model.Item{Name: "All Containers", Status: "all"}
-	for i := range m.logContainers {
-		m.logContainers[i] = "c" + string(rune('a'+i))
-		m.overlayItems[i+1] = model.Item{Name: m.logContainers[i]}
+	for i := range m.logView.containers {
+		m.logView.containers[i] = "c" + string(rune('a'+i))
+		m.overlayItems[i+1] = model.Item{Name: m.logView.containers[i]}
 	}
 	m.overlayCursor = 0
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("ctrl+d"))
@@ -356,12 +356,12 @@ func TestCovLogContainerSelectCtrlD(t *testing.T) {
 
 func TestCovLogContainerSelectCtrlU(t *testing.T) {
 	m := baseModelBoost2()
-	m.logContainers = make([]string, 20)
+	m.logView.containers = make([]string, 20)
 	m.overlayItems = make([]model.Item, 21)
 	m.overlayItems[0] = model.Item{Name: "All Containers", Status: "all"}
-	for i := range m.logContainers {
-		m.logContainers[i] = "c" + string(rune('a'+i))
-		m.overlayItems[i+1] = model.Item{Name: m.logContainers[i]}
+	for i := range m.logView.containers {
+		m.logView.containers[i] = "c" + string(rune('a'+i))
+		m.overlayItems[i+1] = model.Item{Name: m.logView.containers[i]}
 	}
 	m.overlayCursor = 15
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("ctrl+u"))
@@ -380,16 +380,16 @@ func TestCovLogPodSelectEsc(t *testing.T) {
 func TestCovLogPodSelectEscWithFilter(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogPodSelect
-	m.logPodFilterText = "web"
+	m.logView.podFilterText = "web"
 	result, _ := m.handleLogPodSelectOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.Empty(t, rm.logPodFilterText)
+	assert.Empty(t, rm.logView.podFilterText)
 }
 
 func TestCovLogPodSelectEscWithSavedPod(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogPodSelect
-	m.logSavedPodName = "old-pod"
+	m.logView.savedPodName = "old-pod"
 	result, cmd := m.handleLogPodSelectOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -399,8 +399,8 @@ func TestCovLogPodSelectEscWithSavedPod(t *testing.T) {
 func TestCovLogPodSelectEnterAllPods(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogPodSelect
-	m.logParentKind = "Deployment"
-	m.logParentName = "my-deploy"
+	m.logView.parentKind = "Deployment"
+	m.logView.parentName = "my-deploy"
 	m.overlayItems = []model.Item{{Name: "All Pods", Status: "all"}, {Name: "pod-1"}}
 	m.overlayCursor = 0
 	result, cmd := m.handleLogPodSelectOverlayKey(keyMsg("enter"))
@@ -430,14 +430,14 @@ func TestLogPodFilterModeEnterAutoSelectsSoleResult(t *testing.T) {
 		{Name: "kube-proxy-abc", Namespace: "kube-system"},
 		{Name: "etcd-main", Namespace: "kube-system"},
 	}
-	m.logPodFilterActive = true
-	m.logPodFilterText = "kube-proxy"
+	m.logView.podFilterActive = true
+	m.logView.podFilterText = "kube-proxy"
 	result, cmd := m.handleLogPodFilterMode(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.logPodFilterActive)
+	assert.False(t, rm.logView.podFilterActive)
 	assert.Equal(t, overlayNone, rm.overlay, "overlay must close")
 	assert.Equal(t, "kube-proxy-abc", rm.actionCtx.name, "sole filter match must be applied")
-	assert.Empty(t, rm.logPodFilterText, "filter text must be cleared after commit")
+	assert.Empty(t, rm.logView.podFilterText, "filter text must be cleared after commit")
 	assert.NotNil(t, cmd, "startLogStream command must be returned")
 }
 
@@ -451,13 +451,13 @@ func TestLogPodFilterModeEnterPreservesMultipleResults(t *testing.T) {
 		{Name: "kube-proxy-1"},
 		{Name: "kube-proxy-2"},
 	}
-	m.logPodFilterActive = true
-	m.logPodFilterText = "kube"
+	m.logView.podFilterActive = true
+	m.logView.podFilterText = "kube"
 	result, cmd := m.handleLogPodFilterMode(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.logPodFilterActive)
+	assert.False(t, rm.logView.podFilterActive)
 	assert.Equal(t, overlayLogPodSelect, rm.overlay, "overlay must stay open")
-	assert.Equal(t, "kube", rm.logPodFilterText, "filter text must be preserved")
+	assert.Equal(t, "kube", rm.logView.podFilterText, "filter text must be preserved")
 	assert.Nil(t, cmd, "no command must be issued when more than one match")
 }
 
@@ -466,14 +466,14 @@ func TestLogPodFilterModeEnterPreservesMultipleResults(t *testing.T) {
 func TestLogPodFilterModeEnterAutoSelectsSoleAllPodsResult(t *testing.T) {
 	m := baseModelBoost2()
 	m.overlay = overlayLogPodSelect
-	m.logParentKind = "Deployment"
-	m.logParentName = "my-deploy"
+	m.logView.parentKind = "Deployment"
+	m.logView.parentName = "my-deploy"
 	m.overlayItems = []model.Item{
 		{Name: "All Pods", Status: "all"},
 		{Name: "kube-proxy-1"},
 	}
-	m.logPodFilterActive = true
-	m.logPodFilterText = "All"
+	m.logView.podFilterActive = true
+	m.logView.podFilterText = "All"
 	result, cmd := m.handleLogPodFilterMode(keyMsg("enter"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -486,7 +486,7 @@ func TestCovLogPodSelectSlash(t *testing.T) {
 	m := baseModelBoost2()
 	result, _ := m.handleLogPodSelectOverlayKey(keyMsg("/"))
 	rm := result.(Model)
-	assert.True(t, rm.logPodFilterActive)
+	assert.True(t, rm.logView.podFilterActive)
 }
 
 func TestCovLogPodSelectJK(t *testing.T) {
@@ -735,7 +735,7 @@ func TestCovPortForwardOverlayKeyColon(t *testing.T) {
 func TestCovLogPodSelectOverlayKeyEsc(t *testing.T) {
 	m := baseModelHandlers2()
 	m.overlay = overlayLogPodSelect
-	m.logMultiItems = []model.Item{{Name: "pod-1"}}
+	m.logView.multiItems = []model.Item{{Name: "pod-1"}}
 	result, _ := m.handleLogPodSelectOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -744,7 +744,7 @@ func TestCovLogPodSelectOverlayKeyEsc(t *testing.T) {
 func TestCovLogPodSelectOverlayKeyDown(t *testing.T) {
 	m := baseModelHandlers2()
 	m.overlay = overlayLogPodSelect
-	m.logMultiItems = []model.Item{{Name: "pod-1"}, {Name: "pod-2"}}
+	m.logView.multiItems = []model.Item{{Name: "pod-1"}, {Name: "pod-2"}}
 	m.overlayCursor = 0
 	result, _ := m.handleLogPodSelectOverlayKey(keyMsg("j"))
 	_ = result.(Model)
@@ -753,7 +753,7 @@ func TestCovLogPodSelectOverlayKeyDown(t *testing.T) {
 func TestCovLogPodSelectOverlayKeyUp(t *testing.T) {
 	m := baseModelHandlers2()
 	m.overlay = overlayLogPodSelect
-	m.logMultiItems = []model.Item{{Name: "pod-1"}, {Name: "pod-2"}}
+	m.logView.multiItems = []model.Item{{Name: "pod-1"}, {Name: "pod-2"}}
 	m.overlayCursor = 1
 	result, _ := m.handleLogPodSelectOverlayKey(keyMsg("k"))
 	_ = result.(Model)
@@ -762,7 +762,7 @@ func TestCovLogPodSelectOverlayKeyUp(t *testing.T) {
 func TestCovLogContainerSelectOverlayKeyEsc(t *testing.T) {
 	m := baseModelHandlers2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"c1", "c2"}
+	m.logView.containers = []string{"c1", "c2"}
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -771,7 +771,7 @@ func TestCovLogContainerSelectOverlayKeyEsc(t *testing.T) {
 func TestCovLogContainerSelectOverlayKeyDownNav(t *testing.T) {
 	m := baseModelHandlers2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"c1", "c2"}
+	m.logView.containers = []string{"c1", "c2"}
 	m.overlayCursor = 0
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("j"))
 	_ = result.(Model)
@@ -780,7 +780,7 @@ func TestCovLogContainerSelectOverlayKeyDownNav(t *testing.T) {
 func TestCovLogContainerSelectOverlayKeyUpNav(t *testing.T) {
 	m := baseModelHandlers2()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"c1", "c2"}
+	m.logView.containers = []string{"c1", "c2"}
 	m.overlayCursor = 1
 	result, _ := m.handleLogContainerSelectOverlayKey(keyMsg("k"))
 	_ = result.(Model)

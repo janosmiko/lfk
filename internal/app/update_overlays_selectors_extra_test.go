@@ -786,132 +786,150 @@ func TestHelmHistoryOverlayEnterIsNoop(t *testing.T) {
 
 func TestLogPodFilterModeEscExits(t *testing.T) {
 	m := Model{
-		overlay:            overlayPodSelect,
-		logPodFilterActive: true,
-		logPodFilterText:   "test",
-		tabs:               []TabState{{}},
-		width:              80,
-		height:             40,
+		overlay: overlayPodSelect,
+		logView: logViewState{
+			podFilterActive: true,
+			podFilterText:   "test",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogPodFilterMode(specialKey(tea.KeyEsc))
 	result := ret.(Model)
-	assert.False(t, result.logPodFilterActive)
-	assert.Empty(t, result.logPodFilterText)
+	assert.False(t, result.logView.podFilterActive)
+	assert.Empty(t, result.logView.podFilterText)
 }
 
 func TestLogPodFilterModeEnterCommits(t *testing.T) {
 	m := Model{
-		overlay:            overlayPodSelect,
-		logPodFilterActive: true,
-		logPodFilterText:   "kube",
-		tabs:               []TabState{{}},
-		width:              80,
-		height:             40,
+		overlay: overlayPodSelect,
+		logView: logViewState{
+			podFilterActive: true,
+			podFilterText:   "kube",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogPodFilterMode(specialKey(tea.KeyEnter))
 	result := ret.(Model)
-	assert.False(t, result.logPodFilterActive)
+	assert.False(t, result.logView.podFilterActive)
 }
 
 func TestLogPodFilterModeTyping(t *testing.T) {
 	m := Model{
-		overlay:            overlayPodSelect,
-		logPodFilterActive: true,
-		logPodFilterText:   "",
-		tabs:               []TabState{{}},
-		width:              80,
-		height:             40,
+		overlay: overlayPodSelect,
+		logView: logViewState{
+			podFilterActive: true,
+			podFilterText:   "",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogPodFilterMode(runeKey('a'))
 	result := ret.(Model)
-	assert.Equal(t, "a", result.logPodFilterText)
+	assert.Equal(t, "a", result.logView.podFilterText)
 }
 
 func TestLogPodFilterModeBackspace(t *testing.T) {
 	m := Model{
-		overlay:            overlayPodSelect,
-		logPodFilterActive: true,
-		logPodFilterText:   "abc",
-		tabs:               []TabState{{}},
-		width:              80,
-		height:             40,
+		overlay: overlayPodSelect,
+		logView: logViewState{
+			podFilterActive: true,
+			podFilterText:   "abc",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogPodFilterMode(specialKey(tea.KeyBackspace))
 	result := ret.(Model)
-	assert.Equal(t, "ab", result.logPodFilterText)
+	assert.Equal(t, "ab", result.logView.podFilterText)
 }
 
 func TestLogPodFilterModeCtrlW(t *testing.T) {
 	m := Model{
-		overlay:            overlayPodSelect,
-		logPodFilterActive: true,
-		logPodFilterText:   "hello world",
-		tabs:               []TabState{{}},
-		width:              80,
-		height:             40,
+		overlay: overlayPodSelect,
+		logView: logViewState{
+			podFilterActive: true,
+			podFilterText:   "hello world",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogPodFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
 	result := ret.(Model)
-	assert.Equal(t, "hello ", result.logPodFilterText)
+	assert.Equal(t, "hello ", result.logView.podFilterText)
 }
 
 // --- handleLogContainerFilterMode ---
 
 func TestLogContainerFilterModeEscExits(t *testing.T) {
 	m := Model{
-		overlay:                  overlayLogContainerSelect,
-		logContainerFilterActive: true,
-		logContainerFilterText:   "test",
-		tabs:                     []TabState{{}},
-		width:                    80,
-		height:                   40,
+		overlay: overlayLogContainerSelect,
+		logView: logViewState{
+			containerFilterActive: true,
+			containerFilterText:   "test",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogContainerFilterMode(specialKey(tea.KeyEsc))
 	result := ret.(Model)
-	assert.False(t, result.logContainerFilterActive)
-	assert.Empty(t, result.logContainerFilterText)
+	assert.False(t, result.logView.containerFilterActive)
+	assert.Empty(t, result.logView.containerFilterText)
 }
 
 func TestLogContainerFilterModeTyping(t *testing.T) {
 	m := Model{
-		overlay:                  overlayLogContainerSelect,
-		logContainerFilterActive: true,
-		logContainerFilterText:   "",
-		tabs:                     []TabState{{}},
-		width:                    80,
-		height:                   40,
+		overlay: overlayLogContainerSelect,
+		logView: logViewState{
+			containerFilterActive: true,
+			containerFilterText:   "",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogContainerFilterMode(runeKey('x'))
 	result := ret.(Model)
-	assert.Equal(t, "x", result.logContainerFilterText)
+	assert.Equal(t, "x", result.logView.containerFilterText)
 }
 
 func TestLogContainerFilterModeBackspace(t *testing.T) {
 	m := Model{
-		overlay:                  overlayLogContainerSelect,
-		logContainerFilterActive: true,
-		logContainerFilterText:   "abc",
-		tabs:                     []TabState{{}},
-		width:                    80,
-		height:                   40,
+		overlay: overlayLogContainerSelect,
+		logView: logViewState{
+			containerFilterActive: true,
+			containerFilterText:   "abc",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogContainerFilterMode(specialKey(tea.KeyBackspace))
 	result := ret.(Model)
-	assert.Equal(t, "ab", result.logContainerFilterText)
+	assert.Equal(t, "ab", result.logView.containerFilterText)
 }
 
 func TestLogContainerFilterModeCtrlW(t *testing.T) {
 	m := Model{
-		overlay:                  overlayLogContainerSelect,
-		logContainerFilterActive: true,
-		logContainerFilterText:   "hello world",
-		tabs:                     []TabState{{}},
-		width:                    80,
-		height:                   40,
+		overlay: overlayLogContainerSelect,
+		logView: logViewState{
+			containerFilterActive: true,
+			containerFilterText:   "hello world",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogContainerFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
 	result := ret.(Model)
-	assert.Equal(t, "hello ", result.logContainerFilterText)
+	assert.Equal(t, "hello ", result.logView.containerFilterText)
 }
 
 // --- handleColorschemeOverlayKey ---

@@ -44,15 +44,15 @@ func (m Model) closeCurrentOverlay() (tea.Model, tea.Cmd) {
 	m.templateSearchMode = false
 	m.schemeFilterMode = false
 	m.bookmarkSearchMode = bookmarkModeNormal
-	m.logPodFilterActive = false
-	m.logContainerFilterActive = false
+	m.logView.podFilterActive = false
+	m.logView.containerFilterActive = false
 	m.columnToggleFilterActive = false
 	m.overlayFilter.Clear()
 	m.bookmarkFilter.Clear()
 	m.templateFilter.Clear()
 	m.schemeFilter.Clear()
-	m.logPodFilterText = ""
-	m.logContainerFilterText = ""
+	m.logView.podFilterText = ""
+	m.logView.containerFilterText = ""
 	m.columnToggleFilter = ""
 	// Drop any pending bulk-action snapshot — closing the overlay (Ctrl+C
 	// or toggle key) abandons the action, so a later single-item action

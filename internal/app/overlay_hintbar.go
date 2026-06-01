@@ -433,7 +433,7 @@ func (m Model) overlayHintBarOverlayLogContainerSelect() string {
 		{Key: "enter", Desc: "apply"},
 		{Key: "/", Desc: "filter"},
 	}
-	if m.logParentKind != "" {
+	if m.logView.parentKind != "" {
 		hints = append(hints, ui.HintEntry{Key: "P", Desc: "switch pod"})
 	}
 	hints = append(hints, ui.HintEntry{Key: "esc", Desc: "close"})

@@ -98,7 +98,7 @@ func TestSanitizeFilename(t *testing.T) {
 
 func TestCovSaveLoadedLogs(t *testing.T) {
 	m := baseModelCov()
-	m.logLines = []string{"line1", "line2", "line3"}
+	m.logView.lines = []string{"line1", "line2", "line3"}
 	m.actionCtx = actionContext{name: "test-pod"}
 	path, err := m.saveLoadedLogs()
 	assert.NoError(t, err)
@@ -107,8 +107,8 @@ func TestCovSaveLoadedLogs(t *testing.T) {
 
 func TestCovSaveAllLogs(t *testing.T) {
 	m := baseModelWithFakeClient()
-	m.logLines = []string{"line1", "line2"}
-	m.logTitle = "Logs: my-pod"
+	m.logView.lines = []string{"line1", "line2"}
+	m.logView.title = "Logs: my-pod"
 	m = withActionCtx(m, "my-pod", "default", "Pod", model.ResourceTypeEntry{})
 	cmd := m.saveAllLogs()
 	assert.NotNil(t, cmd)
@@ -124,8 +124,8 @@ func TestCovBuildLogTitle(t *testing.T) {
 func TestCovBuildLogTitleWithContainerFilter(t *testing.T) {
 	m := baseModelCov()
 	m.actionCtx = actionContext{name: "my-pod", namespace: "default", context: "ctx"}
-	m.logContainers = []string{"main", "sidecar"}
-	m.logSelectedContainers = []string{"main"}
+	m.logView.containers = []string{"main", "sidecar"}
+	m.logView.selectedContainers = []string{"main"}
 	title := m.buildLogTitle()
 	assert.Contains(t, title, "[main]")
 }
@@ -156,7 +156,7 @@ func TestFinalMatchesContainerFilterNoMatch(t *testing.T) {
 
 func TestFinalWaitForLogLineNilChannel(t *testing.T) {
 	m := baseFinalModel()
-	m.logCh = nil
+	m.logView.ch = nil
 	cmd := m.waitForLogLine()
 	assert.Nil(t, cmd)
 }
@@ -165,7 +165,7 @@ func TestFinalWaitForLogLineWithChannel(t *testing.T) {
 	m := baseFinalModel()
 	ch := make(chan string, 1)
 	ch <- "test log line"
-	m.logCh = ch
+	m.logView.ch = ch
 	cmd := m.waitForLogLine()
 	require.NotNil(t, cmd)
 	msg := cmd()
@@ -178,7 +178,7 @@ func TestFinalWaitForLogLineChannelClosed(t *testing.T) {
 	m := baseFinalModel()
 	ch := make(chan string)
 	close(ch)
-	m.logCh = ch
+	m.logView.ch = ch
 	cmd := m.waitForLogLine()
 	require.NotNil(t, cmd)
 	msg := cmd()
@@ -206,7 +206,7 @@ func TestFinalSanitizeFilename(t *testing.T) {
 func TestFinalSaveLoadedLogs(t *testing.T) {
 	m := baseFinalModel()
 	m.actionCtx.name = "test-pod"
-	m.logLines = []string{"line1", "line2", "line3"}
+	m.logView.lines = []string{"line1", "line2", "line3"}
 	path, err := m.saveLoadedLogs()
 	require.NoError(t, err)
 	assert.Contains(t, path, "lfk-logs-test-pod")
@@ -214,34 +214,34 @@ func TestFinalSaveLoadedLogs(t *testing.T) {
 
 func TestFinalMaybeLoadMoreHistoryNotAtTop(t *testing.T) {
 	m := baseFinalModel()
-	m.logScroll = 5
-	m.logHasMoreHistory = true
+	m.logView.scroll = 5
+	m.logView.hasMoreHistory = true
 	cmd := m.maybeLoadMoreHistory()
 	assert.Nil(t, cmd)
 }
 
 func TestFinalMaybeLoadMoreHistoryNoMore(t *testing.T) {
 	m := baseFinalModel()
-	m.logScroll = 0
-	m.logHasMoreHistory = false
+	m.logView.scroll = 0
+	m.logView.hasMoreHistory = false
 	cmd := m.maybeLoadMoreHistory()
 	assert.Nil(t, cmd)
 }
 
 func TestFinalMaybeLoadMoreHistoryAlreadyLoading(t *testing.T) {
 	m := baseFinalModel()
-	m.logScroll = 0
-	m.logHasMoreHistory = true
-	m.logLoadingHistory = true
+	m.logView.scroll = 0
+	m.logView.hasMoreHistory = true
+	m.logView.loadingHistory = true
 	cmd := m.maybeLoadMoreHistory()
 	assert.Nil(t, cmd)
 }
 
 func TestFinalMaybeLoadMoreHistoryPrevious(t *testing.T) {
 	m := baseFinalModel()
-	m.logScroll = 0
-	m.logHasMoreHistory = true
-	m.logPrevious = true
+	m.logView.scroll = 0
+	m.logView.hasMoreHistory = true
+	m.logView.previous = true
 	cmd := m.maybeLoadMoreHistory()
 	assert.Nil(t, cmd)
 }
@@ -254,22 +254,22 @@ func TestFinalMaybeLoadMoreHistoryPrevious(t *testing.T) {
 // per the docs).
 func TestFinalMaybeLoadMoreHistoryCursorNotAtTop(t *testing.T) {
 	m := baseFinalModel()
-	m.logLines = []string{"l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9", "l10"}
-	m.logScroll = 0
-	m.logCursor = 5 // mid-buffer — user navigated up but not to the top
-	m.logHasMoreHistory = true
+	m.logView.lines = []string{"l1", "l2", "l3", "l4", "l5", "l6", "l7", "l8", "l9", "l10"}
+	m.logView.scroll = 0
+	m.logView.cursor = 5 // mid-buffer — user navigated up but not to the top
+	m.logView.hasMoreHistory = true
 	cmd := m.maybeLoadMoreHistory()
 	assert.Nil(t, cmd, "should not fire fetchOlderLogs when cursor is mid-buffer")
-	assert.False(t, m.logLoadingHistory, "logLoadingHistory must not flip when load was skipped")
+	assert.False(t, m.logView.loadingHistory, "logLoadingHistory must not flip when load was skipped")
 }
 
 func TestFinalMaybeLoadMoreHistoryCursorAtTopFires(t *testing.T) {
 	m := baseFinalModel()
-	m.logLines = []string{"l1", "l2", "l3"}
-	m.logScroll = 0
-	m.logCursor = 0 // user reached the top of the loaded buffer
-	m.logHasMoreHistory = true
+	m.logView.lines = []string{"l1", "l2", "l3"}
+	m.logView.scroll = 0
+	m.logView.cursor = 0 // user reached the top of the loaded buffer
+	m.logView.hasMoreHistory = true
 	cmd := m.maybeLoadMoreHistory()
 	assert.NotNil(t, cmd, "should fire fetchOlderLogs when cursor is at the top")
-	assert.True(t, m.logLoadingHistory, "logLoadingHistory must be set to deduplicate concurrent triggers")
+	assert.True(t, m.logView.loadingHistory, "logLoadingHistory must be set to deduplicate concurrent triggers")
 }
