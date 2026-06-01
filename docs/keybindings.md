@@ -838,7 +838,8 @@ or `Esc` to cancel.
 | Click row in namespace selector | Apply that namespace and close |
 | Click outside a centered overlay | Dismiss it (same as `Esc`) — fullscreen / custom overlays are keyboard-only |
 | Wheel up/down inside a centered overlay | Scroll the list cursor (same as `j` / `k` / arrow keys) |
-| Scroll wheel in explorer | Scroll up/down |
+| Scroll wheel over middle pane | Move the row selection up/down |
+| Scroll wheel over right pane | Scroll the preview under the pointer |
 | Shift+Drag | Select text (host terminal) |
 | Shift+Option+Drag (macOS) / Alt+Drag (Linux, Windows) | Block-select text inside the embedded PTY |
 
