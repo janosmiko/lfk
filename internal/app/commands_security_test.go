@@ -292,7 +292,7 @@ func TestSecurityFindingsLoadedBuildsIndex(t *testing.T) {
 		{ID: "F1", Title: "crit", Severity: security.SeverityCritical, Resource: ref},
 		{ID: "F2", Title: "med", Severity: security.SeverityMedium, Resource: ref},
 	}
-	updated := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
+	updated, _ := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
 		context:  "kctx",
 		findings: findings,
 	})
@@ -310,7 +310,7 @@ func TestSecurityFindingsLoadedStaleContextDiscarded(t *testing.T) {
 	priorIdx := security.BuildFindingIndex(nil)
 	m.securityIndex = priorIdx
 
-	updated := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
+	updated, _ := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
 		context:  "stale",
 		findings: []security.Finding{{ID: "ignored"}},
 	})
@@ -325,7 +325,7 @@ func TestSecurityFindingsLoadedStaleContextDiscarded(t *testing.T) {
 // that their cluster's Trivy/Falco/etc. is broken.
 func TestSecurityFindingsLoadedPropagatesErrors(t *testing.T) {
 	m := newTestModelWithSecurity(t, security.NewManager(), "kctx")
-	updated := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
+	updated, _ := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
 		context:  "kctx",
 		findings: nil,
 		errors:   map[string]error{"trivy-operator": assert.AnError},

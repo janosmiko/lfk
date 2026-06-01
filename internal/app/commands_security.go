@@ -244,16 +244,16 @@ func (m Model) loadSecurityFindings() tea.Cmd {
 // namespace selection. Per-source errors are logged but do not block
 // index rebuild — partial success is the common case (e.g., Trivy
 // installed but Falco missing).
-func (m Model) updateSecurityFindingsLoaded(msg securityFindingsLoadedMsg) Model {
+func (m Model) updateSecurityFindingsLoaded(msg securityFindingsLoadedMsg) (Model, tea.Cmd) {
 	if m.nav.Context != "" && msg.context != m.nav.Context {
-		return m
+		return m, nil
 	}
 	// Compare against effectiveNamespace — the value loadSecurityFindings
 	// now fetches with — so the guard discards stale messages by the same
 	// key the fetch used (matters in all-namespaces / multi-select mode,
 	// where effectiveNamespace is "" but m.namespace is not).
 	if msg.namespace != m.effectiveNamespace() {
-		return m
+		return m, nil
 	}
 	anyErr := false
 	for source, err := range msg.errors {
@@ -263,18 +263,29 @@ func (m Model) updateSecurityFindingsLoaded(msg securityFindingsLoadedMsg) Model
 		}
 	}
 	m.securityIndex = security.BuildFindingIndex(msg.findings)
-	// Persist to disk for stale-while-revalidate on the next session — but
-	// only a clean scan: a partial result (some source errored) would cache an
-	// undercount that the badges would show until the TTL expires. A fully
-	// clean scan with zero findings is still cached (it is a valid "nothing
-	// found" answer). Best-effort; a write failure never affects the session.
-	if !anyErr {
-		if err := updateSecurityFindingsCacheForContext(m.client, msg.context, msg.namespace, msg.findings); err != nil {
-			logger.Warn("Failed to persist security findings cache",
-				"context", msg.context, "namespace", msg.namespace, "error", err)
-		}
+	if anyErr {
+		// Partial result: don't cache an undercount that the badges would show
+		// until the TTL expires. No persistence.
+		return m, nil
 	}
-	return m
+	// Persist to disk for stale-while-revalidate on the next session — but OFF
+	// the Bubble Tea Update goroutine. Marshaling the full findings set to YAML
+	// and the durable write take multiple seconds on clusters with many
+	// findings; running them inline here froze the UI until the write finished
+	// (the findings message lands on the Update loop exactly when a background
+	// scan completes). A fully clean scan with zero findings is still cached (a
+	// valid "nothing found"). Best-effort; a write failure never affects the
+	// session. saveSecurityFindingsCacheForHost serializes concurrent writes.
+	client := m.client
+	ctx, ns, findings := msg.context, msg.namespace, msg.findings
+	persist := func() tea.Msg {
+		if err := updateSecurityFindingsCacheForContext(client, ctx, ns, findings); err != nil {
+			logger.Warn("Failed to persist security findings cache",
+				"context", ctx, "namespace", ns, "error", err)
+		}
+		return nil
+	}
+	return m, persist
 }
 
 // loadSecurityAffectedResources fetches the resources affected by a

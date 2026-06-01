@@ -149,15 +149,42 @@ func TestUpdateSecurityFindingsLoaded_PersistsCleanScan(t *testing.T) {
 	t.Setenv("KUBECACHEDIR", t.TempDir())
 	m := findingsCacheTestModel(t)
 
-	m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
+	_, cmd := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
 		context:   "ctx",
 		namespace: "default",
 		findings:  sampleFindings(),
 		errors:    map[string]error{"trivy-operator": nil},
 	})
+	require.NotNil(t, cmd, "a clean scan must defer persistence to a command")
+	cmd() // run the background persistence (off the Update goroutine)
 
 	got := loadSecurityFindingsCacheForHost("https://api.persist.test:6443", "default", time.Hour)
 	require.Len(t, got, 2, "a clean scan must be persisted to disk")
+}
+
+// TestUpdateSecurityFindingsLoaded_PersistenceIsDeferred verifies the disk
+// write does NOT run inline on the Update goroutine — marshaling the full
+// findings set to YAML there froze the UI until the write finished. The
+// handler must return a command and leave the file unwritten until it runs.
+func TestUpdateSecurityFindingsLoaded_PersistenceIsDeferred(t *testing.T) {
+	t.Setenv("KUBECACHEDIR", t.TempDir())
+	m := findingsCacheTestModel(t)
+
+	_, cmd := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
+		context:   "ctx",
+		namespace: "default",
+		findings:  sampleFindings(),
+		errors:    map[string]error{"trivy-operator": nil},
+	})
+	require.NotNil(t, cmd, "clean scan must return a persistence command")
+
+	// The write must NOT have happened inline on the Update goroutine.
+	assert.Nil(t, loadSecurityFindingsCacheForHost("https://api.persist.test:6443", "default", time.Hour),
+		"persistence must be deferred, not run inline on the Update goroutine")
+
+	cmd() // only now, off the Update goroutine, does the write happen
+	got := loadSecurityFindingsCacheForHost("https://api.persist.test:6443", "default", time.Hour)
+	require.Len(t, got, 2, "running the deferred command writes the cache")
 }
 
 // TestUpdateSecurityFindingsLoaded_SkipsPartialScan verifies a scan where any
@@ -167,12 +194,13 @@ func TestUpdateSecurityFindingsLoaded_SkipsPartialScan(t *testing.T) {
 	t.Setenv("KUBECACHEDIR", t.TempDir())
 	m := findingsCacheTestModel(t)
 
-	m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
+	_, cmd := m.updateSecurityFindingsLoaded(securityFindingsLoadedMsg{
 		context:   "ctx",
 		namespace: "default",
 		findings:  sampleFindings()[:1], // undercount: one source failed
 		errors:    map[string]error{"kyverno": errors.New("timeout")},
 	})
+	assert.Nil(t, cmd, "a partial (errored) scan must not persist")
 
 	assert.Nil(t, loadSecurityFindingsCacheForHost("https://api.persist.test:6443", "default", time.Hour),
 		"a partial (errored) scan must not be persisted")
