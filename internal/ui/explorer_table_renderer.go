@@ -45,6 +45,16 @@ type tableFingerprint struct {
 	contextLabel string
 	iconMode     string
 	noColor      bool
+	// Security badge render inputs. The cached non-cursor row strings embed
+	// the SEC badge, whose output is decided by these three globals (see
+	// securityBadgeForItem). Without them the badge toggle (kb.SecurityBadgeToggle)
+	// only refreshed the always-rerendered cursor row, leaving cached rows
+	// stale until an unrelated input (data tick, age-bucket roll) changed the
+	// fingerprint. secIndexPtr also catches a findings refresh swapping the
+	// index for a fresh pointer.
+	secBadgesHidden bool
+	secAvailable    bool
+	secIndexPtr     uintptr
 }
 
 func NewTableRenderer() *TableRenderer {
@@ -53,21 +63,24 @@ func NewTableRenderer() *TableRenderer {
 
 func (r *TableRenderer) Render(headerLabel string, items []model.Item, cursor int, width, height int, loading bool, spinnerView string, errMsg string, middleRev, selRev uint64) string {
 	fp := tableFingerprint{
-		itemsPtr:     itemsHeaderPtr(items),
-		itemsLen:     len(items),
-		middleRev:    middleRev,
-		selRev:       selRev,
-		themeRev:     ThemeRev.Load(),
-		ageBucket:    time.Now().Unix() / ageBucketSeconds,
-		width:        width,
-		height:       height,
-		highlight:    ActiveHighlightQuery,
-		hiddenCols:   serializeBoolSet(ActiveHiddenBuiltinColumns),
-		columnOrder:  strings.Join(ActiveColumnOrder, "|"),
-		sessionCols:  strings.Join(ActiveSessionColumns, "|"),
-		contextLabel: ActiveContext,
-		iconMode:     IconMode,
-		noColor:      ConfigNoColor,
+		itemsPtr:        itemsHeaderPtr(items),
+		itemsLen:        len(items),
+		middleRev:       middleRev,
+		selRev:          selRev,
+		themeRev:        ThemeRev.Load(),
+		ageBucket:       time.Now().Unix() / ageBucketSeconds,
+		width:           width,
+		height:          height,
+		highlight:       ActiveHighlightQuery,
+		hiddenCols:      serializeBoolSet(ActiveHiddenBuiltinColumns),
+		columnOrder:     strings.Join(ActiveColumnOrder, "|"),
+		sessionCols:     strings.Join(ActiveSessionColumns, "|"),
+		contextLabel:    ActiveContext,
+		iconMode:        IconMode,
+		noColor:         ConfigNoColor,
+		secBadgesHidden: ActiveSecurityBadgesHidden,
+		secAvailable:    ActiveSecurityAvailable,
+		secIndexPtr:     uintptr(unsafe.Pointer(ActiveSecurityIndex)),
 	}
 	if r.fp != fp {
 		r.fp = fp
