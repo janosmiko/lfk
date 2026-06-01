@@ -730,9 +730,10 @@ Invalid config values are dropped at startup with a warning in the error log.
 | `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `V` | Line visual selection |
-| `v` | Character visual selection |
-| `h` / `l` | Move cursor column left/right (in character visual mode) |
-| `0` / `$` | Move cursor to line start/end (in character visual mode) |
+| `v` | Character visual selection (from cursor column) |
+| `h` / `l` / `Left` / `Right` | Move cursor column left/right |
+| `0` / `$` / `^` | Move cursor to line start / end / first non-whitespace |
+| `w` / `b` / `e` / `W` / `B` / `E` | Word / WORD motions |
 | `y` | Copy selected lines (visual mode) or all entries (normal mode) |
 | `f` | Toggle fullscreen / overlay mode |
 | `d` | Toggle debug log visibility |
@@ -740,6 +741,8 @@ Invalid config values are dropped at startup with a warning in the error log.
 | `q` | Close overlay |
 
 > **Fullscreen mode**: Press `f` to expand the error log to full terminal size. This removes the overlay border, so mouse text selection works cleanly without picking up background characters. Press `f` again to return to overlay mode.
+
+> **Line wrapping**: Long entries wrap onto continuation lines indented under the message column, so the full text stays readable instead of being truncated.
 
 ## Tabs
 

@@ -76,6 +76,12 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	}
 
+	// Cursor-column movement (h/l/0/$/^ and word motions) — extracted to keep
+	// this function under the gocyclo cap.
+	if mdl, handled := m.errorLogColumnMotion(key); handled {
+		return mdl, nil
+	}
+
 	switch key {
 	case "esc", "q":
 		return m.handleErrorLogOverlayKeyEsc()
@@ -88,18 +94,6 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	case "v":
 		return m.handleErrorLogOverlayKeyV2()
-
-	case "h", "left":
-		return m.handleErrorLogOverlayKeyH()
-
-	case "l", "right":
-		return m.handleErrorLogOverlayKeyL()
-
-	case "0":
-		return m.handleErrorLogOverlayKeyZero()
-
-	case "$":
-		return m.handleErrorLogOverlayKeyDollar()
 
 	case "y":
 		m.errorLogLineInput = ""
@@ -303,6 +297,9 @@ func (m Model) handleErrorLogOverlayKeyV2() (tea.Model, tea.Cmd) {
 	if m.errorLogVisualMode == 'v' {
 		m.errorLogVisualMode = 0
 	} else {
+		// Clamp first so the selection anchor isn't left past end-of-line by a
+		// prior vertical move onto a shorter line.
+		m.errorLogCursorCol = m.errorLogClampedCursorCol()
 		m.errorLogVisualMode = 'v'
 		m.errorLogVisualStart = m.errorLogCursorLine
 		m.errorLogVisualStartCol = m.errorLogCursorCol
@@ -310,50 +307,122 @@ func (m Model) handleErrorLogOverlayKeyV2() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-func (m Model) handleErrorLogOverlayKeyH() (tea.Model, tea.Cmd) {
+// errorLogColumnMotion dispatches the cursor-column movement keys (h/l/0/$/^
+// and the vim word motions). Returns handled=false for any other key so the
+// main key switch can run. Works in both normal and char-visual modes. These
+// motions never emit a command, so only the updated Model is returned.
+func (m Model) errorLogColumnMotion(key string) (Model, bool) {
+	// Clamp a column left over from a vertical move onto a shorter line before
+	// applying the motion. The clamp only sticks when a column key is handled;
+	// for other keys the returned Model is discarded by the caller.
+	m.errorLogCursorCol = m.errorLogClampedCursorCol()
+	switch key {
+	case "h", "left":
+		return m.handleErrorLogOverlayKeyH(), true
+	case "l", "right":
+		return m.handleErrorLogOverlayKeyL(), true
+	case "0":
+		return m.handleErrorLogOverlayKeyZero(), true
+	case "$":
+		return m.handleErrorLogOverlayKeyDollar(), true
+	case "w", "e", "b", "W", "E", "B", "^":
+		return m.handleErrorLogOverlayWordMotion(key), true
+	}
+	return m, false
+}
+
+// errorLogCurrentLine returns the cursor entry's plain text (the basis for
+// horizontal cursor movement and word motions), or "" when out of range.
+func (m Model) errorLogCurrentLine() string {
+	reversed := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
+	if m.errorLogCursorLine < 0 || m.errorLogCursorLine >= len(reversed) {
+		return ""
+	}
+	return ui.ErrorLogEntryPlainText(reversed[m.errorLogCursorLine])
+}
+
+// errorLogCurrentLineLen returns the rune length of the cursor entry's plain
+// text, used to clamp horizontal cursor movement.
+func (m Model) errorLogCurrentLineLen() int {
+	return len([]rune(m.errorLogCurrentLine()))
+}
+
+// errorLogClampedCursorCol returns errorLogCursorCol clamped to the current
+// line. A vertical move (j/k) onto a shorter line leaves the column past that
+// line's end; clamping on read keeps horizontal motions and selection anchors
+// valid while preserving the column when moving back onto a longer line.
+func (m Model) errorLogClampedCursorCol() int {
+	return min(m.errorLogCursorCol, max(m.errorLogCurrentLineLen()-1, 0))
+}
+
+// handleErrorLogOverlayWordMotion applies a vim word/WORD motion (w/e/b/W/E/B)
+// or ^ to the cursor column, reusing the shared motion helpers (update_vim.go).
+// Works in both normal and char-visual modes — char-visual additionally
+// extends the selection to the new column. Results are clamped to the line so
+// the cursor stays on a real character (matching the clamped h/l behaviour).
+func (m Model) handleErrorLogOverlayWordMotion(key string) Model {
 	m.errorLogLineInput = ""
-	if m.errorLogVisualMode == 'v' && m.errorLogCursorCol > 0 {
+	line := m.errorLogCurrentLine()
+	if line == "" {
+		return m
+	}
+	maxCol := len([]rune(line)) - 1
+	switch key {
+	case "^":
+		m.errorLogCursorCol = firstNonWhitespace(line)
+	case "w":
+		m.errorLogCursorCol = min(nextWordStart(line, m.errorLogCursorCol), maxCol)
+	case "W":
+		m.errorLogCursorCol = min(nextWORDStart(line, m.errorLogCursorCol), maxCol)
+	case "e":
+		m.errorLogCursorCol = min(wordEnd(line, m.errorLogCursorCol), maxCol)
+	case "E":
+		m.errorLogCursorCol = min(WORDEnd(line, m.errorLogCursorCol), maxCol)
+	case "b":
+		if nc := prevWordStart(line, m.errorLogCursorCol); nc >= 0 {
+			m.errorLogCursorCol = nc
+		}
+	case "B":
+		if nc := prevWORDStart(line, m.errorLogCursorCol); nc >= 0 {
+			m.errorLogCursorCol = nc
+		}
+	}
+	return m
+}
+
+// h/l/0/$ move the cursor column in both normal and char-visual modes (the
+// cursor line carries a block cursor in normal mode, matching the event
+// viewer); char-visual additionally extends the selection to that column.
+// These never emit a command, so they return the updated Model directly.
+func (m Model) handleErrorLogOverlayKeyH() Model {
+	m.errorLogLineInput = ""
+	if m.errorLogCursorCol > 0 {
 		m.errorLogCursorCol--
 	}
-	return m, nil
+	return m
 }
 
-func (m Model) handleErrorLogOverlayKeyL() (tea.Model, tea.Cmd) {
+func (m Model) handleErrorLogOverlayKeyL() Model {
 	m.errorLogLineInput = ""
-	if m.errorLogVisualMode == 'v' {
-		// Clamp to line length.
-		reversed := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
-		if m.errorLogCursorLine < len(reversed) {
-			lineLen := len([]rune(ui.ErrorLogEntryPlainText(reversed[m.errorLogCursorLine])))
-			if m.errorLogCursorCol < lineLen-1 {
-				m.errorLogCursorCol++
-			}
-		}
+	if m.errorLogCursorCol < m.errorLogCurrentLineLen()-1 {
+		m.errorLogCursorCol++
 	}
-	return m, nil
+	return m
 }
 
-func (m Model) handleErrorLogOverlayKeyZero() (tea.Model, tea.Cmd) {
+func (m Model) handleErrorLogOverlayKeyZero() Model {
 	if m.errorLogLineInput != "" {
 		m.errorLogLineInput += "0"
-		return m, nil
+		return m
 	}
-	if m.errorLogVisualMode == 'v' {
-		m.errorLogCursorCol = 0
-	}
-	return m, nil
+	m.errorLogCursorCol = 0
+	return m
 }
 
-func (m Model) handleErrorLogOverlayKeyDollar() (tea.Model, tea.Cmd) {
+func (m Model) handleErrorLogOverlayKeyDollar() Model {
 	m.errorLogLineInput = ""
-	if m.errorLogVisualMode == 'v' {
-		reversed := ui.FilteredErrorLogEntries(m.errorLog, m.showDebugLogs)
-		if m.errorLogCursorLine < len(reversed) {
-			lineLen := len([]rune(ui.ErrorLogEntryPlainText(reversed[m.errorLogCursorLine])))
-			m.errorLogCursorCol = max(lineLen-1, 0)
-		}
-	}
-	return m, nil
+	m.errorLogCursorCol = max(m.errorLogCurrentLineLen()-1, 0)
+	return m
 }
 
 func (m Model) handleErrorLogOverlayKeyD() (tea.Model, tea.Cmd) {

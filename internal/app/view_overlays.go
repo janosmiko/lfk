@@ -771,7 +771,7 @@ func (m Model) renderErrorLogOverlay(background string) string {
 	if innerH < 1 {
 		innerH = 1
 	}
-	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, innerH, m.showDebugLogs, vp)
+	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, innerW, innerH, m.showDebugLogs, vp)
 	content = clampErrorLogLines(content, innerW, innerH)
 	content = ui.FillLinesBg(content, innerW, ui.SurfaceBg)
 	overlay := ui.OverlayStyle.Width(overlayW).Height(overlayH).Render(content)
@@ -779,11 +779,12 @@ func (m Model) renderErrorLogOverlay(background string) string {
 	return ui.PlaceOverlay(m.width, m.height, overlay, bg)
 }
 
-// clampErrorLogLines truncates each line of content to maxW visual columns
-// and caps the total line count at maxH. Lines that exceed maxW are cut with
-// a trailing "~" marker via ui.Truncate; extra lines beyond maxH are dropped.
-// This prevents long error messages from wrapping and pushing the overlay
-// past its allocated height.
+// clampErrorLogLines is a defensive safety net that caps the total line count
+// at maxH and each line at maxW visual columns (cutting overflow with a
+// trailing "~" via ui.Truncate). RenderErrorLogOverlay already wraps messages
+// to width and paginates by physical line to fit its viewport, so with
+// wrapping enabled this is ordinarily a no-op — it only fires for edge cases
+// such as wide (CJK) runes whose visual width exceeds their rune count.
 func clampErrorLogLines(content string, maxW, maxH int) string {
 	lines := strings.Split(content, "\n")
 	if len(lines) > maxH {
