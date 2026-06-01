@@ -90,59 +90,61 @@ func describeModelWithLines() Model {
 		lines[i] = "line" + string(rune('a'+i%26))
 	}
 	return Model{
-		mode:            modeDescribe,
-		describeContent: strings.Join(lines, "\n"),
-		describeCursor:  0,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: strings.Join(lines, "\n"),
+			cursor:  0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 }
 
 func TestPCKeysDescribePgDownMatchesCtrlF(t *testing.T) {
 	m := describeModelWithLines()
-	m.describeCursor = 10
+	m.describeView.cursor = 10
 	resPg, _ := m.handleDescribeKey(keyMsg("pgdown"))
 	resCF, _ := m.handleDescribeKey(keyMsg("ctrl+f"))
-	assert.Equal(t, resCF.(Model).describeCursor, resPg.(Model).describeCursor,
+	assert.Equal(t, resCF.(Model).describeView.cursor, resPg.(Model).describeView.cursor,
 		"pgdown should move the describe cursor the same as ctrl+f")
-	assert.Greater(t, resPg.(Model).describeCursor, 10,
+	assert.Greater(t, resPg.(Model).describeView.cursor, 10,
 		"pgdown should advance the describe cursor")
 }
 
 func TestPCKeysDescribePgUpMatchesCtrlB(t *testing.T) {
 	m := describeModelWithLines()
-	m.describeCursor = 100
+	m.describeView.cursor = 100
 	resPg, _ := m.handleDescribeKey(keyMsg("pgup"))
 	resCB, _ := m.handleDescribeKey(keyMsg("ctrl+b"))
-	assert.Equal(t, resCB.(Model).describeCursor, resPg.(Model).describeCursor,
+	assert.Equal(t, resCB.(Model).describeView.cursor, resPg.(Model).describeView.cursor,
 		"pgup should move the describe cursor the same as ctrl+b")
-	assert.Less(t, resPg.(Model).describeCursor, 100,
+	assert.Less(t, resPg.(Model).describeView.cursor, 100,
 		"pgup should retract the describe cursor")
 }
 
 func TestPCKeysDescribeHomeJumpsToTop(t *testing.T) {
 	m := describeModelWithLines()
-	m.describeCursor = 100
-	m.describeLineInput = "15"
+	m.describeView.cursor = 100
+	m.describeView.lineInput = "15"
 	m.pendingG = true
 	res, _ := m.handleDescribeKey(keyMsg("home"))
 	rm := res.(Model)
-	assert.Equal(t, 0, rm.describeCursor, "home should reset describeCursor to 0")
-	assert.Empty(t, rm.describeLineInput, "home should clear describeLineInput")
+	assert.Equal(t, 0, rm.describeView.cursor, "home should reset describeCursor to 0")
+	assert.Empty(t, rm.describeView.lineInput, "home should clear describeLineInput")
 	assert.False(t, rm.pendingG, "home must clear pendingG")
 }
 
 func TestPCKeysDescribeEndJumpsToBottom(t *testing.T) {
 	m := describeModelWithLines()
-	m.describeCursor = 0
+	m.describeView.cursor = 0
 	// Even with a line-number buffer, end must always go to the bottom.
-	m.describeLineInput = "42"
+	m.describeView.lineInput = "42"
 	res, _ := m.handleDescribeKey(keyMsg("end"))
 	rm := res.(Model)
-	assert.Equal(t, 199, rm.describeCursor,
+	assert.Equal(t, 199, rm.describeView.cursor,
 		"end should jump to the last line regardless of describeLineInput")
-	assert.Empty(t, rm.describeLineInput, "end should clear describeLineInput")
+	assert.Empty(t, rm.describeView.lineInput, "end should clear describeLineInput")
 }
 
 // --- Bookmarks overlay (handleBookmarkOverlayKey) -------------------------------

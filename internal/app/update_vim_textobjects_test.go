@@ -184,14 +184,16 @@ func TestLogVisualEscClearsPendingOperator(t *testing.T) {
 
 func TestDescribeVisualViwSelectsInnerWord(t *testing.T) {
 	m := Model{
-		mode:               modeDescribe,
-		describeContent:    "alpha beta gamma",
-		describeCursor:     0,
-		describeCursorCol:  7, // on 'e' of "beta"
-		describeVisualMode: 'v',
-		tabs:               []TabState{{}},
-		width:              80,
-		height:             40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content:    "alpha beta gamma",
+			cursor:     0,
+			cursorCol:  7, // on 'e' of "beta"
+			visualMode: 'v',
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 
 	r1, _ := m.handleDescribeVisualKey(keyMsg("i"))
@@ -200,9 +202,9 @@ func TestDescribeVisualViwSelectsInnerWord(t *testing.T) {
 	r2, _ := r1.(Model).handleDescribeVisualKey(keyMsg("w"))
 	m2 := r2.(Model)
 	assert.Equal(t, byte(0), m2.pendingTextObject)
-	assert.Equal(t, byte('v'), m2.describeVisualMode)
-	assert.Equal(t, 6, m2.describeVisualCol)
-	assert.Equal(t, 9, m2.describeCursorCol)
+	assert.Equal(t, byte('v'), m2.describeView.visualMode)
+	assert.Equal(t, 6, m2.describeView.visualCol)
+	assert.Equal(t, 9, m2.describeView.cursorCol)
 }
 
 // --- diff viewer ---
@@ -375,14 +377,14 @@ func TestYAMLVisualOperatorPendingClearsLineInput(t *testing.T) {
 func TestDescribeVisualOperatorPendingClearsLineInput(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeDescribe
-	m.describeContent = "alpha beta gamma"
-	m.describeVisualMode = 'v'
-	m.describeLineInput = "5" // stale digit from before visual entry
+	m.describeView.content = "alpha beta gamma"
+	m.describeView.visualMode = 'v'
+	m.describeView.lineInput = "5" // stale digit from before visual entry
 
 	r, _ := m.handleDescribeVisualKey(keyMsg("a"))
 	rm := r.(Model)
 
 	assert.Equal(t, byte('a'), rm.pendingTextObject)
-	assert.Equal(t, "", rm.describeLineInput,
+	assert.Equal(t, "", rm.describeView.lineInput,
 		"entering operator-pending must clear the count buffer so a stale digit can't leak into the next counted command")
 }

@@ -476,9 +476,9 @@ func (m *Model) saveCurrentTab() {
 	t.logSavedPodName = m.logSavedPodName
 	t.logContainers = append([]string(nil), m.logContainers...)
 	t.logSelectedContainers = append([]string(nil), m.logSelectedContainers...)
-	t.describeContent = m.describeContent
-	t.describeScroll = m.describeScroll
-	t.describeTitle = m.describeTitle
+	t.describeContent = m.describeView.content
+	t.describeScroll = m.describeView.scroll
+	t.describeTitle = m.describeView.title
 	t.diffLeft = m.diffLeft
 	t.diffRight = m.diffRight
 	t.diffLeftName = m.diffLeftName
@@ -597,9 +597,9 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.logSavedPodName = t.logSavedPodName
 	m.logContainers = append([]string(nil), t.logContainers...)
 	m.logSelectedContainers = append([]string(nil), t.logSelectedContainers...)
-	m.describeContent = t.describeContent
-	m.describeScroll = t.describeScroll
-	m.describeTitle = t.describeTitle
+	m.describeView.content = t.describeContent
+	m.describeView.scroll = t.describeScroll
+	m.describeView.title = t.describeTitle
 	m.diffLeft = t.diffLeft
 	m.diffRight = t.diffRight
 	m.diffLeftName = t.diffLeftName

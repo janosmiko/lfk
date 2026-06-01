@@ -16,7 +16,7 @@ func (m Model) handleMouseToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	}
 	// Never steal the key while a viewer search/filter input is focused.
 	if m.yamlView.searchMode || m.logSearchActive || m.helpSearchActive ||
-		m.explainSearchActive || m.diffSearchMode || m.describeSearchActive ||
+		m.explainSearchActive || m.diffSearchMode || m.describeView.searchActive ||
 		m.helpFilterActive {
 		return m, nil, false
 	}

@@ -81,31 +81,31 @@ func TestYAMLNormalCountClampsAtTop(t *testing.T) {
 
 func TestDescribeNormalCountPrefixJumpsDown(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 0
-	m.describeLineInput = "4"
+	m.describeView.cursor = 0
+	m.describeView.lineInput = "4"
 	ret, _ := m.handleDescribeKey(keyMsg("j"))
 	rm := ret.(Model)
-	assert.Equal(t, 4, rm.describeCursor)
-	assert.Empty(t, rm.describeLineInput)
+	assert.Equal(t, 4, rm.describeView.cursor)
+	assert.Empty(t, rm.describeView.lineInput)
 }
 
 func TestDescribeNormalCountPrefixJumpsUp(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 8
-	m.describeLineInput = "5"
+	m.describeView.cursor = 8
+	m.describeView.lineInput = "5"
 	ret, _ := m.handleDescribeKey(keyMsg("k"))
 	rm := ret.(Model)
-	assert.Equal(t, 3, rm.describeCursor)
-	assert.Empty(t, rm.describeLineInput)
+	assert.Equal(t, 3, rm.describeView.cursor)
+	assert.Empty(t, rm.describeView.lineInput)
 }
 
 func TestDescribeNormalCountClampsAtBottom(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 8
-	m.describeLineInput = "100"
+	m.describeView.cursor = 8
+	m.describeView.lineInput = "100"
 	ret, _ := m.handleDescribeKey(keyMsg("j"))
 	rm := ret.(Model)
-	assert.Equal(t, 9, rm.describeCursor, "10-line fixture clamps to index 9")
+	assert.Equal(t, 9, rm.describeView.cursor, "10-line fixture clamps to index 9")
 }
 
 func TestDiffNormalCountPrefixJumpsDown(t *testing.T) {
@@ -270,14 +270,14 @@ func TestEventTimelineCountClampsAtTop(t *testing.T) {
 // who never type counts notice no change.
 func TestPlainJKStillMovesByOne(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 4
+	m.describeView.cursor = 4
 	ret, _ := m.handleDescribeKey(keyMsg("j"))
-	assert.Equal(t, 5, ret.(Model).describeCursor)
+	assert.Equal(t, 5, ret.(Model).describeView.cursor)
 
 	m = baseModelDescribe()
-	m.describeCursor = 4
+	m.describeView.cursor = 4
 	ret, _ = m.handleDescribeKey(keyMsg("k"))
-	assert.Equal(t, 3, ret.(Model).describeCursor)
+	assert.Equal(t, 3, ret.(Model).describeView.cursor)
 }
 
 // --- Column motion: h/l with count ---
@@ -287,21 +287,21 @@ func TestPlainJKStillMovesByOne(t *testing.T) {
 
 func TestDescribeCountPrefixColumnRight(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursorCol = 0
-	m.describeLineInput = "5"
+	m.describeView.cursorCol = 0
+	m.describeView.lineInput = "5"
 	ret, _ := m.handleDescribeKey(keyMsg("l"))
 	rm := ret.(Model)
-	assert.Equal(t, 5, rm.describeCursorCol)
-	assert.Empty(t, rm.describeLineInput)
+	assert.Equal(t, 5, rm.describeView.cursorCol)
+	assert.Empty(t, rm.describeView.lineInput)
 }
 
 func TestDescribeCountPrefixColumnLeftClampsAtZero(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursorCol = 3
-	m.describeLineInput = "100"
+	m.describeView.cursorCol = 3
+	m.describeView.lineInput = "100"
 	ret, _ := m.handleDescribeKey(keyMsg("h"))
 	rm := ret.(Model)
-	assert.Equal(t, 0, rm.describeCursorCol)
+	assert.Equal(t, 0, rm.describeView.cursorCol)
 }
 
 func TestLogsCountPrefixColumnRight(t *testing.T) {
@@ -328,15 +328,15 @@ func TestLogsCountPrefixColumnRight(t *testing.T) {
 func TestDescribeCountPrefixWordForward(t *testing.T) {
 	m := baseModelDescribe()
 	// "line0" — only one word per line in the fixture; use a richer line.
-	m.describeContent = "alpha beta gamma delta epsilon"
-	m.describeCursor = 0
-	m.describeCursorCol = 0
-	m.describeLineInput = "3"
+	m.describeView.content = "alpha beta gamma delta epsilon"
+	m.describeView.cursor = 0
+	m.describeView.cursorCol = 0
+	m.describeView.lineInput = "3"
 	ret, _ := m.handleDescribeKey(keyMsg("w"))
 	rm := ret.(Model)
 	// alpha(0) -> beta(6) -> gamma(11) -> delta(17): 3w lands at delta.
-	assert.Equal(t, 17, rm.describeCursorCol)
-	assert.Empty(t, rm.describeLineInput)
+	assert.Equal(t, 17, rm.describeView.cursorCol)
+	assert.Empty(t, rm.describeView.lineInput)
 }
 
 func TestLogsCountPrefixWordForward(t *testing.T) {
@@ -371,17 +371,17 @@ func TestDescribeCountPrefixHalfPageDown(t *testing.T) {
 	for i := range lines {
 		lines[i] = "line"
 	}
-	m.describeContent = strings.Join(lines, "\n")
-	m.describeCursor = 0
-	m.describeLineInput = "2"
+	m.describeView.content = strings.Join(lines, "\n")
+	m.describeView.cursor = 0
+	m.describeView.lineInput = "2"
 	ret, _ := m.handleDescribeKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
 	// Vim semantics: `[count]<C-d>` moves exactly count lines (clamped to
 	// viewport) and stores count as the sticky 'scroll' option for future
 	// uncounted <C-d>/<C-u> presses.
-	assert.Equal(t, 2, rm.describeCursor)
-	assert.Equal(t, 2, rm.describeScrollOption)
-	assert.Empty(t, rm.describeLineInput)
+	assert.Equal(t, 2, rm.describeView.cursor)
+	assert.Equal(t, 2, rm.describeView.scrollOption)
+	assert.Empty(t, rm.describeView.lineInput)
 }
 
 // Vim's `[count]<C-d>` does NOT equal repeated single presses. A counted
@@ -396,31 +396,31 @@ func TestDescribeVimScrollSemantics(t *testing.T) {
 	for i := range lines {
 		lines[i] = "line"
 	}
-	m.describeContent = strings.Join(lines, "\n")
-	m.describeCursor = 0
+	m.describeView.content = strings.Join(lines, "\n")
+	m.describeView.cursor = 0
 
 	// Counted: 2<C-d> moves exactly 2 lines, sets sticky=2.
-	m.describeLineInput = "2"
+	m.describeView.lineInput = "2"
 	ret, _ := m.handleDescribeKey(keyMsg("ctrl+d"))
 	counted := ret.(Model)
-	assert.Equal(t, 2, counted.describeCursor)
-	assert.Equal(t, 2, counted.describeScrollOption)
+	assert.Equal(t, 2, counted.describeView.cursor)
+	assert.Equal(t, 2, counted.describeView.scrollOption)
 
 	// Subsequent plain <C-d> reuses sticky scroll=2 (vim's stickiness).
 	ret, _ = counted.handleDescribeKey(keyMsg("ctrl+d"))
 	stuck := ret.(Model)
-	assert.Equal(t, 4, stuck.describeCursor, "plain <C-d> must reuse sticky scroll value")
+	assert.Equal(t, 4, stuck.describeView.cursor, "plain <C-d> must reuse sticky scroll value")
 
 	// Reference: two un-counted presses use the default (half-viewport).
 	ref := m
-	ref.describeLineInput = ""
-	ref.describeScrollOption = 0
+	ref.describeView.lineInput = ""
+	ref.describeView.scrollOption = 0
 	ret, _ = ref.handleDescribeKey(keyMsg("ctrl+d"))
 	ref = ret.(Model)
 	ret, _ = ref.handleDescribeKey(keyMsg("ctrl+d"))
 	ref = ret.(Model)
 	half := ref.describeContentHeight() / 2
-	assert.Equal(t, 2*half, ref.describeCursor, "two plain <C-d> = 2 * half-viewport")
+	assert.Equal(t, 2*half, ref.describeView.cursor, "two plain <C-d> = 2 * half-viewport")
 }
 
 func TestLogsCountPrefixFullPageDown(t *testing.T) {
@@ -454,15 +454,15 @@ func TestLogsCountPrefixFullPageDown(t *testing.T) {
 
 func TestDescribeCountPrefixSearchNext(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeContent = "miss\nhit\nmiss\nhit\nmiss\nhit\nmiss"
-	m.describeSearchQuery = "hit"
-	m.describeCursor = 0
-	m.describeLineInput = "2"
+	m.describeView.content = "miss\nhit\nmiss\nhit\nmiss\nhit\nmiss"
+	m.describeView.searchQuery = "hit"
+	m.describeView.cursor = 0
+	m.describeView.lineInput = "2"
 	ret, _ := m.handleDescribeKey(keyMsg("n"))
 	rm := ret.(Model)
 	// First `n` from row 0 lands on row 1; second `n` lands on row 3.
-	assert.Equal(t, 3, rm.describeCursor)
-	assert.Empty(t, rm.describeLineInput)
+	assert.Equal(t, 3, rm.describeView.cursor)
+	assert.Empty(t, rm.describeView.lineInput)
 }
 
 func TestLogsCountPrefixSearchNext(t *testing.T) {
@@ -668,28 +668,28 @@ func TestEventTimelineCountPrefixWordForward(t *testing.T) {
 
 func TestDescribeDollarClearsBuffer(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeContent = "hello world"
-	m.describeCursor = 0
-	m.describeCursorCol = 0
-	m.describeLineInput = "5"
+	m.describeView.content = "hello world"
+	m.describeView.cursor = 0
+	m.describeView.cursorCol = 0
+	m.describeView.lineInput = "5"
 	ret, _ := m.handleDescribeKey(keyMsg("$"))
 	rm := ret.(Model)
-	assert.Empty(t, rm.describeLineInput, "$ must consume the digit buffer")
+	assert.Empty(t, rm.describeView.lineInput, "$ must consume the digit buffer")
 	// $ jumps to the last column on the line regardless of the count.
-	assert.Equal(t, len([]rune("hello world"))-1, rm.describeCursorCol)
+	assert.Equal(t, len([]rune("hello world"))-1, rm.describeView.cursorCol)
 }
 
 func TestDescribeCaretClearsBuffer(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeContent = "  hello"
-	m.describeCursor = 0
-	m.describeCursorCol = 6
-	m.describeLineInput = "9"
+	m.describeView.content = "  hello"
+	m.describeView.cursor = 0
+	m.describeView.cursorCol = 6
+	m.describeView.lineInput = "9"
 	ret, _ := m.handleDescribeKey(keyMsg("^"))
 	rm := ret.(Model)
-	assert.Empty(t, rm.describeLineInput, "^ must consume the digit buffer")
+	assert.Empty(t, rm.describeView.lineInput, "^ must consume the digit buffer")
 	// ^ jumps to the first non-whitespace column (2).
-	assert.Equal(t, 2, rm.describeCursorCol)
+	assert.Equal(t, 2, rm.describeView.cursorCol)
 }
 
 func TestYAMLDollarClearsBuffer(t *testing.T) {
@@ -931,7 +931,7 @@ func TestScrollOptionIsPerViewer(t *testing.T) {
 	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
 	assert.Equal(t, 7, rm.logScrollOption)
-	assert.Equal(t, 0, rm.describeScrollOption)
+	assert.Equal(t, 0, rm.describeView.scrollOption)
 	assert.Equal(t, 0, rm.yamlView.scrollOption)
 	assert.Equal(t, 0, rm.diffScrollOption)
 	assert.Equal(t, 0, rm.eventTimelineScrollOption)

@@ -1958,8 +1958,8 @@ func TestFinalUpdateDescribeLoadedMsg(t *testing.T) {
 	m.mode = modeDescribe
 	result, _ := m.Update(describeLoadedMsg{content: "desc content", title: "Title"})
 	rm := result.(Model)
-	assert.Equal(t, "desc content", rm.describeContent)
-	assert.Equal(t, "Title", rm.describeTitle)
+	assert.Equal(t, "desc content", rm.describeView.content)
+	assert.Equal(t, "Title", rm.describeView.title)
 }
 
 func TestFinalUpdateDescribeLoadedMsgError(t *testing.T) {
@@ -2440,7 +2440,7 @@ func TestCovUpdateDescribeLoaded(t *testing.T) {
 	})
 	rm := result.(Model)
 	assert.Equal(t, modeDescribe, rm.mode)
-	assert.Contains(t, rm.describeContent, "Name: my-pod")
+	assert.Contains(t, rm.describeView.content, "Name: my-pod")
 }
 
 func TestCovUpdateDescribeLoadedError(t *testing.T) {

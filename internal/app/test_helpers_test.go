@@ -214,7 +214,7 @@ func baseModelDescribe() Model {
 		height:              40,
 		execMu:              &sync.Mutex{},
 	}
-	m.describeContent = "line0\nline1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9"
+	m.describeView.content = "line0\nline1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9"
 	m.mode = modeDescribe
 	return m
 }

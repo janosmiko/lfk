@@ -18,11 +18,11 @@ func (m Model) updateCommandBarResult(msg commandBarResultMsg) (tea.Model, tea.C
 		// Show error output in describe view if there's content, otherwise status bar.
 		if msg.output != "" {
 			m.mode = modeDescribe
-			m.describeContent = strings.TrimSpace(msg.output)
-			m.describeScroll = 0
-			m.describeCursor = 0
-			m.describeCursorCol = 0
-			m.describeTitle = "Command Output (error)"
+			m.describeView.content = strings.TrimSpace(msg.output)
+			m.describeView.scroll = 0
+			m.describeView.cursor = 0
+			m.describeView.cursorCol = 0
+			m.describeView.title = "Command Output (error)"
 			return m, nil
 		}
 		m.setErrorFromErr("Command failed: ", fmt.Errorf("%s", errMsg))
@@ -33,11 +33,11 @@ func (m Model) updateCommandBarResult(msg commandBarResultMsg) (tea.Model, tea.C
 		m.addLogEntry("INF", output)
 		// Open output in the describe viewer (scrollable, searchable, wrappable).
 		m.mode = modeDescribe
-		m.describeContent = output
-		m.describeScroll = 0
-		m.describeCursor = 0
-		m.describeCursorCol = 0
-		m.describeTitle = "Command Output"
+		m.describeView.content = output
+		m.describeView.scroll = 0
+		m.describeView.cursor = 0
+		m.describeView.cursorCol = 0
+		m.describeView.title = "Command Output"
 		return m, nil
 	}
 	m.setStatusMessage("Command completed (no output)", false)

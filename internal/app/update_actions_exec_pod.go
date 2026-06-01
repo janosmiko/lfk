@@ -326,8 +326,8 @@ func (m Model) executeActionArgo(actionLabel string) (tea.Model, tea.Cmd) {
 	case "Watch Workflow":
 		m.addLogEntry("DBG", fmt.Sprintf("Watching workflow %s in %s", name, ns))
 		m.loading = true
-		m.describeAutoRefresh = true
-		m.describeRefreshFunc = func() tea.Cmd { return m.watchArgoWorkflow() }
+		m.describeView.autoRefresh = true
+		m.describeView.refreshFunc = func() tea.Cmd { return m.watchArgoWorkflow() }
 		return m, m.watchArgoWorkflow()
 	case "Suspend Workflow":
 		m.addLogEntry("DBG", fmt.Sprintf("Suspending workflow %s in %s", name, ns))

@@ -225,21 +225,23 @@ func TestDescribeTextObjectMatrix(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			m := Model{
-				mode:               modeDescribe,
-				describeContent:    "alpha beta gamma",
-				describeCursor:     0,
-				describeCursorCol:  7,
-				describeVisualMode: 'v',
-				tabs:               []TabState{{}},
-				width:              80,
-				height:             40,
+				mode: modeDescribe,
+				describeView: describeViewState{
+					content:    "alpha beta gamma",
+					cursor:     0,
+					cursorCol:  7,
+					visualMode: 'v',
+				},
+				tabs:   []TabState{{}},
+				width:  80,
+				height: 40,
 			}
 			r1, _ := m.handleDescribeVisualKey(keyMsg(string(tc.sequence[0])))
 			r2, _ := r1.(Model).handleDescribeVisualKey(keyMsg(string(tc.sequence[1])))
 			r3, _ := r2.(Model).handleDescribeVisualKey(keyMsg("y"))
 			rm := r3.(Model)
 			assert.Equal(t, tc.want, rm.statusMessage)
-			assert.Equal(t, byte(0), rm.describeVisualMode, "visual exits after yank")
+			assert.Equal(t, byte(0), rm.describeView.visualMode, "visual exits after yank")
 		})
 	}
 }

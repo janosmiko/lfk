@@ -332,10 +332,12 @@ func TestLogMaxScroll(t *testing.T) {
 func TestViewDescribe(t *testing.T) {
 	t.Run("renders title and content", func(t *testing.T) {
 		m := Model{
-			width:           120,
-			height:          30,
-			describeTitle:   "Describe: my-pod",
-			describeContent: "Name:         my-pod\nNamespace:    default\nStatus:       Running",
+			width:  120,
+			height: 30,
+			describeView: describeViewState{
+				title:   "Describe: my-pod",
+				content: "Name:         my-pod\nNamespace:    default\nStatus:       Running",
+			},
 		}
 		output := m.viewDescribe()
 		stripped := stripANSI(output)
@@ -351,11 +353,13 @@ func TestViewDescribe(t *testing.T) {
 			lines[i] = strings.Repeat("x", 10)
 		}
 		m := Model{
-			width:           80,
-			height:          30,
-			describeTitle:   "Test",
-			describeContent: strings.Join(lines, "\n"),
-			describeScroll:  10,
+			width:  80,
+			height: 30,
+			describeView: describeViewState{
+				title:   "Test",
+				content: strings.Join(lines, "\n"),
+				scroll:  10,
+			},
 		}
 		output := m.viewDescribe()
 		assert.NotEmpty(t, output)
@@ -363,10 +367,12 @@ func TestViewDescribe(t *testing.T) {
 
 	t.Run("small height renders correctly", func(t *testing.T) {
 		m := Model{
-			width:           80,
-			height:          5,
-			describeTitle:   "Test",
-			describeContent: "line1\nline2\nline3",
+			width:  80,
+			height: 5,
+			describeView: describeViewState{
+				title:   "Test",
+				content: "line1\nline2\nline3",
+			},
 		}
 		output := m.viewDescribe()
 		assert.NotEmpty(t, output)
@@ -424,12 +430,14 @@ func TestViewLogs(t *testing.T) {
 
 func TestViewDescribeMode(t *testing.T) {
 	m := Model{
-		width:           80,
-		height:          30,
-		mode:            modeDescribe,
-		describeTitle:   "Describe: test",
-		describeContent: "Name: test-pod\nStatus: Running",
-		tabs:            []TabState{{}},
+		width:  80,
+		height: 30,
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			title:   "Describe: test",
+			content: "Name: test-pod\nStatus: Running",
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -537,11 +545,13 @@ func TestViewHelpMode(t *testing.T) {
 
 func TestViewWithTabs(t *testing.T) {
 	m := Model{
-		width:           120,
-		height:          30,
-		mode:            modeDescribe,
-		describeTitle:   "Describe: test",
-		describeContent: "Name: test\n",
+		width:  120,
+		height: 30,
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			title:   "Describe: test",
+			content: "Name: test\n",
+		},
 		nav: model.NavigationState{
 			Context: "active-ctx",
 		},
@@ -601,7 +611,7 @@ func TestPush3ViewDiffNotEmpty(t *testing.T) {
 func TestPush3ViewDescribeNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeDescribe
-	m.describeContent = "Name: pod-1\nStatus: Running"
+	m.describeView.content = "Name: pod-1\nStatus: Running"
 	result := m.View()
 	assert.NotEmpty(t, result)
 }
@@ -894,14 +904,16 @@ func TestCovRenderSplitPreview(t *testing.T) {
 
 func TestCovViewDescribeWithContent(t *testing.T) {
 	m := Model{
-		width:               80,
-		height:              30,
-		tabs:                []TabState{{}},
-		execMu:              &sync.Mutex{},
-		mode:                modeDescribe,
-		describeContent:     "Name: nginx\nNamespace: default\nStatus: Running",
-		describeTitle:       "Describe: pods/nginx",
-		describeSearchInput: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			content:     "Name: nginx\nNamespace: default\nStatus: Running",
+			title:       "Describe: pods/nginx",
+			searchInput: TextInput{},
+		},
 	}
 	result := m.viewDescribe()
 	assert.NotEmpty(t, result)
@@ -909,15 +921,17 @@ func TestCovViewDescribeWithContent(t *testing.T) {
 
 func TestCovViewDescribeSearchActive(t *testing.T) {
 	m := Model{
-		width:                80,
-		height:               30,
-		tabs:                 []TabState{{}},
-		execMu:               &sync.Mutex{},
-		mode:                 modeDescribe,
-		describeContent:      "Name: nginx",
-		describeTitle:        "Describe",
-		describeSearchActive: true,
-		describeSearchInput:  TextInput{Value: "Name"},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			content:      "Name: nginx",
+			title:        "Describe",
+			searchActive: true,
+			searchInput:  TextInput{Value: "Name"},
+		},
 	}
 	result := m.viewDescribe()
 	assert.NotEmpty(t, result)
@@ -925,15 +939,17 @@ func TestCovViewDescribeSearchActive(t *testing.T) {
 
 func TestCovViewDescribeWithSearchQuery(t *testing.T) {
 	m := Model{
-		width:               80,
-		height:              30,
-		tabs:                []TabState{{}},
-		execMu:              &sync.Mutex{},
-		mode:                modeDescribe,
-		describeContent:     "Name: nginx\nStatus: Running",
-		describeTitle:       "Describe",
-		describeSearchQuery: "Status",
-		describeSearchInput: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			content:     "Name: nginx\nStatus: Running",
+			title:       "Describe",
+			searchQuery: "Status",
+			searchInput: TextInput{},
+		},
 	}
 	result := m.viewDescribe()
 	assert.NotEmpty(t, result)
@@ -941,15 +957,17 @@ func TestCovViewDescribeWithSearchQuery(t *testing.T) {
 
 func TestCovViewDescribeVisualMode(t *testing.T) {
 	m := Model{
-		width:               80,
-		height:              30,
-		tabs:                []TabState{{}},
-		execMu:              &sync.Mutex{},
-		mode:                modeDescribe,
-		describeContent:     "Name: nginx\nStatus: Running",
-		describeTitle:       "Describe",
-		describeVisualMode:  'V',
-		describeSearchInput: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			content:     "Name: nginx\nStatus: Running",
+			title:       "Describe",
+			visualMode:  'V',
+			searchInput: TextInput{},
+		},
 	}
 	result := m.viewDescribe()
 	assert.Contains(t, result, "VISUAL LINE")

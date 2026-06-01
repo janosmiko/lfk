@@ -1176,6 +1176,46 @@ func TestTabSwitchPreservesYAMLViewerState(t *testing.T) {
 	assert.False(t, m.tabs[0].yamlCollapsed["injected"], "loadTab must deep-copy yamlCollapsed")
 }
 
+// TestTabSwitchPreservesDescribeViewerState pins the save->switch->restore
+// contract for the full-screen describe viewer before/after the
+// describeViewState extraction. Only the persisted subset (content, scroll,
+// title) round-trips across a tab switch; the rest of the describe state is
+// transient. The extraction must keep this behaviour byte-for-byte.
+func TestTabSwitchPreservesDescribeViewerState(t *testing.T) {
+	m := Model{
+		tabs: []TabState{
+			{}, // Tab A: receives the active model's describe state on save.
+			{ // Tab B: carries its own persisted describe viewer state.
+				describeContent: "b-content",
+				describeScroll:  21,
+				describeTitle:   "Pod/b",
+			},
+		},
+		activeTab: 0,
+		// Mirror Tab A's describe state into the active model so saveCurrentTab
+		// has something to persist.
+		describeView: describeViewState{
+			content: "a-content",
+			scroll:  88,
+			title:   "Pod/a",
+		},
+	}
+
+	// Switch to Tab B: its persisted describe state must become active.
+	m.saveCurrentTab()
+	m.loadTab(1)
+	assert.Equal(t, "b-content", m.describeView.content)
+	assert.Equal(t, 21, m.describeView.scroll)
+	assert.Equal(t, "Pod/b", m.describeView.title)
+
+	// Switch back to Tab A: its persisted describe state must round-trip intact.
+	m.saveCurrentTab()
+	m.loadTab(0)
+	assert.Equal(t, "a-content", m.describeView.content)
+	assert.Equal(t, 88, m.describeView.scroll)
+	assert.Equal(t, "Pod/a", m.describeView.title, "Tab B's title must not bleed into Tab A")
+}
+
 func TestPush2UpdateStatusMessageExpiredMsg(t *testing.T) {
 	m := basePush80v2Model()
 	m.setStatusMessage("temp msg", false)
