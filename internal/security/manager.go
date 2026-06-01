@@ -101,6 +101,14 @@ func (m *Manager) SetRefreshTTL(d time.Duration) {
 	m.refreshTTL = d
 }
 
+// CachedFindings returns the cached FetchAll result for (kubeCtx, namespace)
+// without triggering a scan. ok is false when nothing is cached for that key
+// or the cache has expired. Lets callers serve the shared scan synchronously
+// off the scheduler when it is already warm.
+func (m *Manager) CachedFindings(kubeCtx, namespace string) (FetchResult, bool) {
+	return m.cachedFetch(kubeCtx + "|" + namespace)
+}
+
 // SetErrorTTL overrides the negative-cache TTL applied when every
 // source erred (no findings produced). Zero disables negative caching
 // entirely — only do that in tests where you want every call to refire.

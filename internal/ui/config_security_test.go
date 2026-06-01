@@ -4,22 +4,43 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func saveSecurityGlobals(t *testing.T) {
 	t.Helper()
 	pe, ps := ConfigSecurityEnabled, ConfigSecuritySources
 	pce, pcs := ConfigClusterSecurityEnabled, ConfigClusterSecuritySources
+	pip := ConfigSecurityIgnorePatterns
 	t.Cleanup(func() {
 		ConfigSecurityEnabled = pe
 		ConfigSecuritySources = ps
 		ConfigClusterSecurityEnabled = pce
 		ConfigClusterSecuritySources = pcs
+		ConfigSecurityIgnorePatterns = pip
 	})
 	ConfigSecurityEnabled = true
 	ConfigSecuritySources = map[string]bool{}
 	ConfigClusterSecurityEnabled = map[string]bool{}
 	ConfigClusterSecuritySources = map[string]map[string]bool{}
+	ConfigSecurityIgnorePatterns = nil
+}
+
+func TestApplySecurityConfigIgnorePatterns(t *testing.T) {
+	saveSecurityGlobals(t)
+
+	cfg := configFile{Security: &securityConfig{
+		IgnorePatterns: []SecurityIgnorePattern{
+			{Source: "trivy-operator", Group: "CVE-2024-*", Namespace: "kube-system", Comment: "accepted"},
+			{},                        // no constraints -> dropped
+			{Comment: "comment only"}, // still no constraints -> dropped
+		},
+	}}
+	applySecurityConfig(cfg)
+
+	require.Len(t, ConfigSecurityIgnorePatterns, 1, "all-empty patterns must be dropped")
+	assert.Equal(t, "trivy-operator", ConfigSecurityIgnorePatterns[0].Source)
+	assert.Equal(t, "kube-system", ConfigSecurityIgnorePatterns[0].Namespace)
 }
 
 func TestResolveSecurityEnabled(t *testing.T) {

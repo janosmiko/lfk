@@ -210,6 +210,20 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 			}
 		}
 	}
+	// Security findings share one coalesced, cached cluster scan. When that
+	// scan is already warm, render the source's findings synchronously off the
+	// scheduler — instant even when the scheduler is congested, and without a
+	// tracked task (so the explorer stops showing a per-source "scan" entry
+	// that is really a cache-hit filter over the shared scan). A cold cache
+	// falls through to the scan task below, which warms it.
+	if rt.APIGroup == model.SecurityVirtualAPIGroup && m.client != nil {
+		if items, ok, err := m.client.GetSecurityFindingsCached(kctx, ns, rt); ok {
+			rtCopy := rt
+			return func() tea.Msg {
+				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+			}
+		}
+	}
 	client := m.client
 	// The main resource list (drill-in / watch refresh) runs at High — the
 	// same lane as preview hovers. It must NOT be Critical: Critical is the
@@ -220,10 +234,17 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 	// Critical first — starve the High preview work that renders pod details.
 	// High keeps the list ahead of Low background (dashboard/metrics/events)
 	// while sharing the general pool fairly with previews.
+	// Security findings reaching here have a cold cache; name the task so it
+	// reads as the shared security scan (it triggers/awaits the one coalesced
+	// FetchAll that covers every source), not a per-source object listing.
+	listName := "List " + model.DisplayNameFor(rt)
+	if rt.APIGroup == model.SecurityVirtualAPIGroup {
+		listName = "Security findings: " + model.DisplayNameFor(rt)
+	}
 	return m.scheduleK8sCall(
 		scheduler.PriorityHigh,
 		scheduler.KindResourceList,
-		"List "+model.DisplayNameFor(rt),
+		listName,
 		bgtaskTarget(kctx, ns),
 		func(ctx context.Context) tea.Msg {
 			items, err := client.GetResources(ctx, kctx, ns, rt)

@@ -65,6 +65,7 @@ Your chosen sort is remembered per resource kind for the running session, so lea
 | `T` | Switch color scheme (live preview, not persisted) |
 | `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
 | `B` | Show/hide the per-resource SEC severity badge on explorer rows |
+| `i` | Show/hide ignored security findings (security view only — shadows the Label Editor there, which is a no-op on synthetic finding rows) |
 
 ## Orphan filter presets
 

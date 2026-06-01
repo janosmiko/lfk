@@ -3,19 +3,27 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// SecurityIgnoreRule represents a single ignore entry.
+// SecurityIgnoreRule represents a single ignore entry. Scope is determined by
+// which of Namespace / Resource are set, in order of increasing specificity:
+//
+//	Namespace == "" && Resource == "" -> whole group, cluster-wide
+//	Namespace != "" && Resource == "" -> group within one namespace
+//	Resource  != ""                   -> one specific resource (ns encoded in key)
 type SecurityIgnoreRule struct {
-	Source    string `json:"source" yaml:"source"`                         // Security source name: "heuristic", "trivy-operator", "falco", "policy-report"
-	GroupKey  string `json:"group_key" yaml:"group_key"`                   // Finding group key (check label, CVE ID, rule name)
-	Resource  string `json:"resource,omitempty" yaml:"resource,omitempty"` // ResourceRef.Key() format: "ns/kind/name". Empty = global ignore.
+	Source    string `json:"source" yaml:"source"`                           // Security source name: "heuristic", "trivy-operator", "falco", "policy-report"
+	GroupKey  string `json:"group_key" yaml:"group_key"`                     // Finding group key (check label, CVE ID, rule name)
+	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"` // Namespace scope. Empty = any namespace. Ignored when Resource is set.
+	Resource  string `json:"resource,omitempty" yaml:"resource,omitempty"`   // ResourceRef.Key() format: "ns/kind/name". Empty = no resource scope.
 	Comment   string `json:"comment,omitempty" yaml:"comment,omitempty"`
 	CreatedAt string `json:"created_at" yaml:"created_at"` // RFC3339
 }
@@ -160,9 +168,11 @@ func addSecurityIgnore(state *SecurityIgnoreState, ctx string, rule SecurityIgno
 
 	existing := newContexts[ctx]
 
-	// Deduplicate: replace if same (Source, GroupKey, Resource) already exists.
+	// Deduplicate: replace if same (Source, GroupKey, Namespace, Resource)
+	// already exists.
 	for i, r := range existing {
-		if r.Source == rule.Source && r.GroupKey == rule.GroupKey && r.Resource == rule.Resource {
+		if r.Source == rule.Source && r.GroupKey == rule.GroupKey &&
+			r.Namespace == rule.Namespace && r.Resource == rule.Resource {
 			existing[i] = rule
 			newContexts[ctx] = existing
 			return &SecurityIgnoreState{Contexts: newContexts}
@@ -174,8 +184,9 @@ func addSecurityIgnore(state *SecurityIgnoreState, ctx string, rule SecurityIgno
 	return &SecurityIgnoreState{Contexts: newContexts}
 }
 
-// removeSecurityIgnore returns a NEW state with the matching rule removed.
-func removeSecurityIgnore(state *SecurityIgnoreState, ctx, source, groupKey, resource string) *SecurityIgnoreState {
+// removeSecurityIgnore returns a NEW state with the rule matching
+// (source, groupKey, namespace, resource) removed.
+func removeSecurityIgnore(state *SecurityIgnoreState, ctx, source, groupKey, namespace, resource string) *SecurityIgnoreState {
 	newContexts := make(map[string][]SecurityIgnoreRule, len(state.Contexts))
 	for k, v := range state.Contexts {
 		copied := make([]SecurityIgnoreRule, len(v))
@@ -186,7 +197,8 @@ func removeSecurityIgnore(state *SecurityIgnoreState, ctx, source, groupKey, res
 	existing := newContexts[ctx]
 	filtered := make([]SecurityIgnoreRule, 0, len(existing))
 	for _, r := range existing {
-		if r.Source == source && r.GroupKey == groupKey && r.Resource == resource {
+		if r.Source == source && r.GroupKey == groupKey &&
+			r.Namespace == namespace && r.Resource == resource {
 			continue
 		}
 		filtered = append(filtered, r)
@@ -196,25 +208,60 @@ func removeSecurityIgnore(state *SecurityIgnoreState, ctx, source, groupKey, res
 	return &SecurityIgnoreState{Contexts: newContexts}
 }
 
-// isGroupIgnored returns true if there is a global ignore rule (empty Resource)
-// for the given source and group key in the specified context.
+// namespaceFromResourceKey extracts the namespace from a ResourceRef.Key()
+// ("ns/kind/name"). Cluster-scoped findings have an empty namespace segment.
+func namespaceFromResourceKey(resourceKey string) string {
+	ns, _, _ := strings.Cut(resourceKey, "/")
+	return ns
+}
+
+// isGroupIgnored returns true only when the whole group is ignored cluster-wide
+// (a rule with neither a Namespace nor a Resource scope) for the given source
+// and group key. Namespace- and resource-scoped rules do NOT make the whole
+// group ignored, so the group row stays visible.
 func isGroupIgnored(state *SecurityIgnoreState, ctx, source, groupKey string) bool {
 	for _, r := range state.Contexts[ctx] {
-		if r.Source == source && r.GroupKey == groupKey && r.Resource == "" {
+		if r.Source == source && r.GroupKey == groupKey && r.Resource == "" && r.Namespace == "" {
 			return true
 		}
 	}
 	return false
 }
 
-// isResourceIgnored returns true if EITHER a global ignore (empty Resource)
-// OR a resource-specific ignore matches the given source, group key and resource key.
+// isNamespaceIgnored returns true if there is a namespace-scoped ignore rule
+// (Namespace set, Resource empty) for the given source/group/namespace.
+func isNamespaceIgnored(state *SecurityIgnoreState, ctx, source, groupKey, namespace string) bool {
+	if namespace == "" {
+		return false
+	}
+	for _, r := range state.Contexts[ctx] {
+		if r.Source == source && r.GroupKey == groupKey && r.Resource == "" && r.Namespace == namespace {
+			return true
+		}
+	}
+	return false
+}
+
+// isResourceIgnored returns true when a finding on resourceKey is hidden by ANY
+// matching rule, checked from least to most specific: a cluster-wide group
+// ignore, a namespace-scoped ignore for the resource's namespace, or a
+// resource-specific ignore. resourceKey is in ResourceRef.Key() form.
 func isResourceIgnored(state *SecurityIgnoreState, ctx, source, groupKey, resourceKey string) bool {
+	ns := namespaceFromResourceKey(resourceKey)
 	for _, r := range state.Contexts[ctx] {
 		if r.Source != source || r.GroupKey != groupKey {
 			continue
 		}
-		if r.Resource == "" || r.Resource == resourceKey {
+		switch {
+		case r.Resource != "":
+			if r.Resource == resourceKey {
+				return true
+			}
+		case r.Namespace != "":
+			if r.Namespace == ns {
+				return true
+			}
+		default: // neither scope set -> cluster-wide group ignore
 			return true
 		}
 	}
@@ -234,12 +281,12 @@ func isResourceSpecificIgnored(state *SecurityIgnoreState, ctx, source, groupKey
 	return false
 }
 
-// countIgnoredGroups returns the count of global ignores (rules with empty Resource)
-// for the given context.
+// countIgnoredGroups returns the count of cluster-wide group ignores (rules
+// with neither a namespace nor a resource scope) for the given context.
 func countIgnoredGroups(state *SecurityIgnoreState, ctx string) int {
 	count := 0
 	for _, r := range state.Contexts[ctx] {
-		if r.Resource == "" {
+		if r.Resource == "" && r.Namespace == "" {
 			count++
 		}
 	}
@@ -249,19 +296,40 @@ func countIgnoredGroups(state *SecurityIgnoreState, ctx string) int {
 // modelIgnoreChecker adapts SecurityIgnoreState to the k8s.IgnoreChecker
 // interface so the groupFindings engine can filter ignored entries. The
 // interface is defined in the k8s package; Go structural typing allows this
-// app-layer type to satisfy it without importing k8s.
+// app-layer type to satisfy it without importing k8s. It combines two
+// sources: the interactive per-cluster ignore-list (state) and the
+// declarative config-file glob patterns (patterns), snapshotted at
+// construction. The interactive action menu reads the state functions
+// directly, so config patterns never surface a misleading "Un-ignore".
 type modelIgnoreChecker struct {
-	state *SecurityIgnoreState
-	ctx   string
+	state    *SecurityIgnoreState
+	ctx      string
+	patterns []ui.SecurityIgnorePattern
 }
 
-// IsGroupIgnored returns true when the entire group is globally ignored.
+// newModelIgnoreChecker builds a checker for one cluster context, capturing a
+// snapshot of the config ignore patterns (read-only after load).
+func newModelIgnoreChecker(state *SecurityIgnoreState, ctx string) *modelIgnoreChecker {
+	return &modelIgnoreChecker{
+		state:    state,
+		ctx:      ctx,
+		patterns: ui.ConfigSecurityIgnorePatterns,
+	}
+}
+
+// IsGroupIgnored returns true when the entire group is ignored cluster-wide,
+// by either an interactive rule or an any-namespace config pattern.
 func (c *modelIgnoreChecker) IsGroupIgnored(source, groupKey string) bool {
-	return isGroupIgnored(c.state, c.ctx, source, groupKey)
+	return isGroupIgnored(c.state, c.ctx, source, groupKey) ||
+		patternIgnoresGroup(c.patterns, c.ctx, source, groupKey)
 }
 
-// IsResourceIgnored returns true when the specific resource within a group
-// is ignored (either via a resource-level rule or a global group ignore).
+// IsResourceIgnored returns true when the specific resource within a group is
+// ignored — by an interactive rule (group / namespace / resource scope) or a
+// matching config pattern.
 func (c *modelIgnoreChecker) IsResourceIgnored(source, groupKey, resourceKey string) bool {
-	return isResourceIgnored(c.state, c.ctx, source, groupKey, resourceKey)
+	if isResourceIgnored(c.state, c.ctx, source, groupKey, resourceKey) {
+		return true
+	}
+	return patternIgnoresResource(c.patterns, c.ctx, source, groupKey, namespaceFromResourceKey(resourceKey))
 }

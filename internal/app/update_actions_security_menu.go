@@ -39,7 +39,7 @@ func (m Model) openSecurityActionMenu() Model {
 	}
 	var items []model.Item
 	kctx := m.nav.Context
-	sourceName := securitySourceFromKind(m.nav.ResourceType.Kind)
+	sourceName := m.securitySourceForAction(sel)
 
 	switch sel.Kind {
 	case "__security_finding_group__":
@@ -62,7 +62,12 @@ func (m Model) openSecurityActionMenu() Model {
 	case "__security_affected_resource__":
 		groupKey := sel.Extra
 		resourceKey := sel.ColumnValue("__resource_key__")
+		namespace := sel.Namespace
 		groupIgnored := isGroupIgnored(m.securityIgnores, kctx, sourceName, groupKey)
+		nsIgnored := isNamespaceIgnored(m.securityIgnores, kctx, sourceName, groupKey, namespace)
+		// resourceIgnored is true when ANY scope (group / namespace / resource)
+		// already hides this row, so the "Ignore (...)" entries only offer
+		// strictly-broader scopes the user hasn't applied yet.
 		resourceIgnored := isResourceIgnored(m.securityIgnores, kctx, sourceName, groupKey, resourceKey)
 		if !groupIgnored {
 			items = append(items, model.Item{
@@ -71,7 +76,14 @@ func (m Model) openSecurityActionMenu() Model {
 				Status: "i",
 			})
 		}
-		if !resourceIgnored && !groupIgnored && resourceKey != "" {
+		if namespace != "" && !groupIgnored && !nsIgnored {
+			items = append(items, model.Item{
+				Name:   "Ignore (Namespace)",
+				Extra:  "Hide this finding for all resources in " + namespace,
+				Status: "n",
+			})
+		}
+		if !resourceIgnored && resourceKey != "" {
 			items = append(items, model.Item{
 				Name:   "Ignore (This Resource)",
 				Extra:  "Hide this specific resource from the group",
@@ -100,11 +112,13 @@ func (m Model) openSecurityActionMenu() Model {
 }
 
 // executeSecurityIgnoreAction handles Ignore / Un-ignore actions emitted by
-// openSecurityActionMenu. It mutates SecurityIgnoreState, dispatches the
-// disk persistence asynchronously (so an fsync stall on slow disks does
-// not freeze the UI), re-installs the IgnoreChecker on the client, busts
-// the manager cache, and refreshes the current level so the user sees the
-// result immediately. Persistence failures arrive via
+// openSecurityActionMenu. It replaces m.securityIgnores with a new
+// SecurityIgnoreState (the add/remove helpers never mutate in place),
+// dispatches the disk persistence asynchronously (so an fsync stall on slow disks does
+// not freeze the UI), re-installs the IgnoreChecker on the client, and
+// refreshes the current level so the user sees the result immediately — a
+// cache-hit re-filter, not a re-scan (see the refresh return below).
+// Persistence failures arrive via
 // securityIgnoresSaveErrMsg and replace the optimistic success status with
 // a clear error.
 func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.Cmd) {
@@ -114,7 +128,14 @@ func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.C
 	}
 	kctx := m.nav.Context
 	groupKey := sel.Extra
-	sourceName := securitySourceFromKind(m.nav.ResourceType.Kind)
+	sourceName := m.securitySourceForAction(sel)
+	// Never write an ignore rule under an empty source — it would be
+	// unmatchable and silently hide nothing (or, worse, collide across
+	// sources). Refuse rather than persist a misattributed rule.
+	if sourceName == "" {
+		m.setStatusMessage("Cannot determine security source", true)
+		return m, scheduleStatusClear()
+	}
 
 	switch actionLabel {
 	case "Ignore (Group)":
@@ -123,6 +144,19 @@ func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.C
 			GroupKey: groupKey,
 		})
 		m.setStatusMessage("Ignored: "+groupKey, false)
+
+	case "Ignore (Namespace)":
+		namespace := sel.Namespace
+		if namespace == "" {
+			m.setStatusMessage("Cannot determine namespace", true)
+			return m, scheduleStatusClear()
+		}
+		m.securityIgnores = addSecurityIgnore(m.securityIgnores, kctx, SecurityIgnoreRule{
+			Source:    sourceName,
+			GroupKey:  groupKey,
+			Namespace: namespace,
+		})
+		m.setStatusMessage("Ignored in namespace "+namespace+": "+groupKey, false)
 
 	case "Ignore (This Resource)":
 		resourceKey := sel.ColumnValue("__resource_key__")
@@ -138,26 +172,36 @@ func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.C
 		m.setStatusMessage("Ignored resource: "+resourceKey, false)
 
 	case "Un-ignore":
-		// Decide whether the un-ignore targets the per-resource rule or
-		// the group-level rule: prefer per-resource when it exists,
-		// otherwise drop the group rule.
-		resourceKey := ""
+		// Peel back the most specific matching rule first: resource, then
+		// namespace, then the cluster-wide group rule. Config-file glob
+		// ignores are read-only and intentionally not removable here.
+		namespace, resourceKey, rk := "", "", ""
 		if sel.Kind == "__security_affected_resource__" {
-			resourceKey = sel.ColumnValue("__resource_key__")
-			if !isResourceSpecificIgnored(m.securityIgnores, kctx, sourceName, groupKey, resourceKey) {
-				resourceKey = ""
+			rk = sel.ColumnValue("__resource_key__")
+			switch {
+			case isResourceSpecificIgnored(m.securityIgnores, kctx, sourceName, groupKey, rk):
+				resourceKey = rk
+			case isNamespaceIgnored(m.securityIgnores, kctx, sourceName, groupKey, sel.Namespace):
+				namespace = sel.Namespace
 			}
 		}
-		m.securityIgnores = removeSecurityIgnore(m.securityIgnores, kctx, sourceName, groupKey, resourceKey)
-		m.setStatusMessage("Un-ignored: "+groupKey, false)
+		m.securityIgnores = removeSecurityIgnore(m.securityIgnores, kctx, sourceName, groupKey, namespace, resourceKey)
+		msg := "Un-ignored: " + groupKey
+		// If a broader rule (or a read-only config pattern) still hides this
+		// row, say so — a bare "Un-ignored" would be misleading.
+		if rk != "" && isResourceIgnored(m.securityIgnores, kctx, sourceName, groupKey, rk) {
+			msg += " (still hidden by a broader rule)"
+		}
+		m.setStatusMessage(msg, false)
 	}
 
 	if m.client != nil {
-		m.client.SetIgnoreChecker(&modelIgnoreChecker{state: m.securityIgnores, ctx: kctx})
+		m.client.SetIgnoreChecker(newModelIgnoreChecker(m.securityIgnores, kctx))
 	}
-	if m.securityManager != nil {
-		m.securityManager.Invalidate()
-	}
+	// No manager-cache invalidation: ignoring changes only the checker, which
+	// groupFindings applies AFTER FetchAll's (filter-independent) cache. The
+	// refresh re-filters from cache instantly; invalidating would force a slow
+	// full re-scan. Explicit "Refresh" still invalidates (see dispatch).
 	return m, tea.Batch(saveSecurityIgnoresCmd(m.securityIgnores), m.refreshCurrentLevel(), scheduleStatusClear())
 }
 
@@ -182,7 +226,7 @@ func (m Model) dispatchSecurityActionIfApplicable(actionLabel string) (tea.Model
 		return m, nil, false
 	}
 	switch actionLabel {
-	case "Ignore (Group)", "Ignore (This Resource)", "Un-ignore":
+	case "Ignore (Group)", "Ignore (Namespace)", "Ignore (This Resource)", "Un-ignore":
 		mdl, cmd := m.executeSecurityIgnoreAction(actionLabel)
 		return mdl, cmd, true
 	case "Refresh":
@@ -206,6 +250,35 @@ func onSecurityView(m *Model) bool {
 		return true
 	}
 	return false
+}
+
+// securitySourceForAction resolves the security source id for an ignore/un-ignore
+// action. It prefers the navigated resource type's kind
+// ("__security_<source>__"), and when that is not a security source — e.g. the
+// menu was opened via the selected-item fallback while the nav kind is a normal
+// resource — falls back to the selected row: its hidden __source__ column
+// (finding-group and affected-resource rows carry it) or, for a sidebar source
+// entry, its "__security_<source>__" kind. Returns "" only when no source can
+// be determined, so callers refuse to write a misattributed (empty-source)
+// rule. Note securitySourceFromKind matches the sentinel kinds
+// ("__security_finding_group__" etc.) too, so those are handled via __source__
+// and excluded from the kind-based fallback.
+func (m Model) securitySourceForAction(sel *model.Item) string {
+	if s := securitySourceFromKind(m.nav.ResourceType.Kind); s != "" {
+		return s
+	}
+	if sel == nil {
+		return ""
+	}
+	if s := sel.ColumnValue("__source__"); s != "" {
+		return s
+	}
+	switch sel.Kind {
+	case "__security_finding_group__", "__security_affected_resource__":
+		return ""
+	default:
+		return securitySourceFromKind(sel.Kind)
+	}
 }
 
 // securitySourceFromKind extracts the source name from a security RT kind

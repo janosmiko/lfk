@@ -87,6 +87,17 @@ icons: auto
 #   sources:
 #     falco: false           # disable a single source; omitted = enabled
 #     trivy: false
+#   # Declarative, glob-based ignore rules (applied at load). Each field is a
+#   # glob (* and ?); an empty field matches anything; a finding is hidden when
+#   # every non-empty field matches. Read-only — the `i` toggle still reveals
+#   # them. Interactive per-finding ignores (action menu `x`) are stored
+#   # separately in ~/.local/state/lfk/security_ignores.yaml.
+#   ignore_patterns:
+#     - source: trivy-operator   # source id; "" = any
+#       group: "CVE-2024-*"      # CVE id / check label / rule name; "" = any
+#       namespace: kube-system   # "" or "*" = any namespace (hides whole group)
+#       cluster: "prod-*"        # kube-context glob; "" = any cluster
+#       comment: accepted in system namespaces
 
 # ─── Log Path ──────────────────────────────────────────────────────────────────
 # Application log file location. Default: ~/.local/share/lfk/lfk.log
@@ -282,6 +293,8 @@ keybindings:
   scale: "S" # Scale resource (default: S)
   mouse_toggle: "alt+ctrl+y" # Suspend/resume mouse capture for native text selection (Ctrl+Option+Y; default: alt+ctrl+y)
   cluster_color_picker: "L" # Open cluster-color picker (default: Shift+L; reuses the Logs key, since Logs has no resource to act on at the cluster picker — at deeper levels "L" still opens Logs)
+  security_ignore_toggle: "i" # Show/hide ignored security findings (default: i; security view only — shadows the Label Editor there)
+  security_badge_toggle: "B" # Show/hide the per-resource SEC severity badge (default: B)
 
 # ─── Search Abbreviations ─────────────────────────────────────────────────────
 # Short names for resource types used in search/filter.

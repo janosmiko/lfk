@@ -72,7 +72,7 @@ func TestRemoveSecurityIgnore(t *testing.T) {
 	state = addSecurityIgnore(state, "prod", rule)
 	require.Len(t, state.Contexts["prod"], 1)
 
-	state = removeSecurityIgnore(state, "prod", "heuristic", "CVE-2024-1234", "")
+	state = removeSecurityIgnore(state, "prod", "heuristic", "CVE-2024-1234", "", "")
 	assert.Empty(t, state.Contexts["prod"])
 }
 
@@ -80,7 +80,7 @@ func TestRemoveSecurityIgnoreNonexistent(t *testing.T) {
 	state := &SecurityIgnoreState{Contexts: make(map[string][]SecurityIgnoreRule)}
 
 	// Should not panic on empty state.
-	result := removeSecurityIgnore(state, "prod", "heuristic", "CVE-NONE", "")
+	result := removeSecurityIgnore(state, "prod", "heuristic", "CVE-NONE", "", "")
 	assert.Empty(t, result.Contexts["prod"])
 }
 

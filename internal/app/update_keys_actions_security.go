@@ -6,20 +6,42 @@ package app
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// handleExplorerSecurityViewKeys dispatches keys that are only meaningful on a
+// security view. It runs before the general explorer action keys so it can
+// shadow global bindings that make no sense on synthetic finding rows. It
+// currently owns the show-ignored toggle (kb.SecurityIgnoreToggle), which
+// reuses LabelEditor's "i" — the same context-gated reuse ClusterColorPicker
+// applies to the Logs key at the cluster picker. Off a security view it
+// returns handled=false with the model untouched, so the key keeps its normal
+// global meaning everywhere else.
+func (m Model) handleExplorerSecurityViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if !onSecurityView(&m) {
+		return m, nil, false
+	}
+	if msg.String() == ui.ActiveKeybindings.SecurityIgnoreToggle {
+		return m.handleExplorerActionKeySecurityIgnoreToggle()
+	}
+	return m, nil, false
+}
 
 // handleExplorerActionKeySecurityIgnoreToggle flips the show/hide-ignored
 // state, propagates it to the k8s client (which decides whether
-// groupFindings filters ignored entries), invalidates the manager cache
-// so the next list call re-emits the filtered set, and refreshes the
-// current level so the user sees the result immediately.
+// groupFindings filters ignored entries), and refreshes the current level so
+// the user sees the result immediately.
+//
+// It deliberately does NOT invalidate the manager cache. show-ignored is a
+// pure view filter applied by groupFindings AFTER FetchAll, whose cache holds
+// the raw findings keyed by context|namespace (filter-independent). The
+// refresh therefore hits the cache and re-filters instantly; invalidating
+// would force a full cluster re-scan — the multi-second delay users saw.
 func (m Model) handleExplorerActionKeySecurityIgnoreToggle() (tea.Model, tea.Cmd, bool) {
 	m.showSecurityIgnored = !m.showSecurityIgnored
 	if m.client != nil {
 		m.client.SetShowIgnored(m.showSecurityIgnored)
-	}
-	if m.securityManager != nil {
-		m.securityManager.Invalidate()
 	}
 	if m.showSecurityIgnored {
 		m.setStatusMessage("Showing ignored findings", false)

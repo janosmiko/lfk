@@ -339,6 +339,16 @@ func (m Model) loadSecurityAffectedResources(forPreview bool) tea.Cmd {
 	gen := m.requestGen
 	silent := m.suppressBgtasks
 	reqCtx := m.reqCtx
+	// Warm-cache fast path: the affected-resource view filters the same shared
+	// scan, so serve it synchronously off the scheduler when cached (see
+	// loadResources). Cold cache falls through to the scan task.
+	if m.client != nil {
+		if items, ok, err := m.client.GetSecurityAffectedResourcesCached(kctx, ns, rt, groupKey); ok {
+			return func() tea.Msg {
+				return ownedLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent}
+			}
+		}
+	}
 	return m.trackBgTask(
 		scheduler.KindResourceList,
 		"List affected resources",

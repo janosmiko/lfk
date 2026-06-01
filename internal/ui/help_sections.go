@@ -113,6 +113,7 @@ func helpSections() []helpSection {
 				{kb.ThemeSelector, "Switch color scheme (" + kb.NewTab + ": toggle transparent bg)"},
 				{helpKeyDisplay(kb.TerminalToggle), "Cycle terminal mode (pty / exec / mux — mux skipped if no tmux/zellij detected)"},
 				{kb.SecurityBadgeToggle, "Show/hide the per-resource SEC severity badge on explorer rows"},
+				{kb.SecurityIgnoreToggle, "Show/hide ignored security findings (only on a security view)"},
 			},
 		},
 		{

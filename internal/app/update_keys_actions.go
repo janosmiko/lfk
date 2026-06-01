@@ -16,6 +16,12 @@ import (
 // Returns (model, cmd, handled) where handled indicates whether the key
 // was consumed. If not handled, the caller should fall through.
 func (m Model) handleExplorerActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	// Security-view-scoped keys take precedence so they can shadow global
+	// action keys that are meaningless on a security view (e.g. the
+	// show-ignored toggle reuses LabelEditor's key on finding rows).
+	if ret, cmd, handled := m.handleExplorerSecurityViewKeys(msg); handled {
+		return ret, cmd, true
+	}
 	// Try navigation/scroll keybindings first.
 	if ret, cmd, handled := m.handleExplorerNavKeys(msg); handled {
 		return ret, cmd, true
@@ -122,8 +128,6 @@ func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)
 		return m.handleExplorerActionKeyTerminalToggle()
 	case kb.ToggleRare:
 		return m.handleExplorerActionKeyToggleRare()
-	case kb.SecurityIgnoreToggle:
-		return m.handleExplorerActionKeySecurityIgnoreToggle()
 	case kb.SecurityBadgeToggle:
 		return m.handleExplorerActionKeySecurityBadgeToggle()
 	}
