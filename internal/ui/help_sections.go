@@ -502,6 +502,7 @@ func helpSections() []helpSection {
 				{"Wheel inside centered overlay", "Scroll the list cursor"},
 				{"Wheel in explorer", "Scroll up/down"},
 				{"Shift+Drag", "Select text (terminal native)"},
+				{helpKeyDisplay(kb.MouseToggle), "Toggle mouse capture — release it to select text where Shift+Drag doesn't work"},
 			},
 		},
 		{

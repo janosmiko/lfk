@@ -839,8 +839,11 @@ or `Esc` to cancel.
 | Click outside a centered overlay | Dismiss it (same as `Esc`) — fullscreen / custom overlays are keyboard-only |
 | Wheel up/down inside a centered overlay | Scroll the list cursor (same as `j` / `k` / arrow keys) |
 | Scroll wheel in explorer | Scroll up/down |
+| `Ctrl+X` | Toggle mouse capture — release it to select text where `Shift+Drag` doesn't work, press again to re-enable |
 | Shift+Drag | Select text (host terminal) |
 | Shift+Option+Drag (macOS) / Alt+Drag (Linux, Windows) | Block-select text inside the embedded PTY |
+
+The status bar shows a `[MOUSE OFF]` chip while capture is suspended. Mouse capture (`Ctrl+X`) is rebindable via the `mouse_toggle` config key.
 
 ## Command Bar
 

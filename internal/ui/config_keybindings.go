@@ -95,6 +95,11 @@ type Keybindings struct {
 	// Terminal mode
 	TerminalToggle string `json:"terminal_toggle" yaml:"terminal_toggle"`
 
+	// MouseToggle suspends/resumes mouse capture at runtime so the user can
+	// make a native terminal text selection (and use the terminal's own
+	// scrollback / copy) without restarting with --no-mouse.
+	MouseToggle string `json:"mouse_toggle" yaml:"mouse_toggle"`
+
 	// Read-only mode
 	ReadOnlyToggle string `json:"readonly_toggle" yaml:"readonly_toggle"`
 
@@ -162,6 +167,10 @@ func DefaultKeybindings() Keybindings {
 
 		// Terminal mode
 		TerminalToggle: "ctrl+t",
+
+		// Mouse capture toggle. Ctrl+X is unused elsewhere and easy to reach
+		// with one hand before a drag-select; rebindable like any other key.
+		MouseToggle: "ctrl+x",
 
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",

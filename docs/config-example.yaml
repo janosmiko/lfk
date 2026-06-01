@@ -280,6 +280,7 @@ keybindings:
   delete: "D" # Delete resource (default: D)
   force_delete: "X" # Force delete resource (default: X)
   scale: "S" # Scale resource (default: S)
+  mouse_toggle: "ctrl+x" # Suspend/resume mouse capture for native text selection (default: ctrl+x)
   cluster_color_picker: "L" # Open cluster-color picker (default: Shift+L; reuses the Logs key, since Logs has no resource to act on at the cluster picker — at deeper levels "L" still opens Logs)
 
 # ─── Search Abbreviations ─────────────────────────────────────────────────────
