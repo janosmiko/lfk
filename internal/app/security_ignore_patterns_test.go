@@ -94,3 +94,18 @@ func TestPatternIgnoresGroup(t *testing.T) {
 	// Non-matching source.
 	assert.False(t, patternIgnoresGroup(patterns, "ctx", "policy-report", "x"))
 }
+
+// An all-"*" namespace glob ("**", "***") means "any namespace" — same as
+// globMatch's any-sentinel — so it must hide the whole group, consistent with
+// patternIgnoresResource (regression for the "*"-only check).
+func TestPatternIgnoresGroup_AllStarNamespaceIsWholeGroup(t *testing.T) {
+	patterns := []ui.SecurityIgnorePattern{{Source: "falco", Group: "rule", Namespace: "**"}}
+	assert.True(t, patternIgnoresGroup(patterns, "ctx", "falco", "rule"),
+		"'**' namespace must count as whole-group")
+	assert.True(t, patternIgnoresResource(patterns, "ctx", "falco", "rule", "any-ns"),
+		"and still match a specific resource (already consistent)")
+
+	// A specific namespace glob stays namespace-scoped (not whole-group).
+	scoped := []ui.SecurityIgnorePattern{{Source: "falco", Group: "rule", Namespace: "kube-*"}}
+	assert.False(t, patternIgnoresGroup(scoped, "ctx", "falco", "rule"))
+}

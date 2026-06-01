@@ -39,7 +39,7 @@ func (m Model) openSecurityActionMenu() Model {
 	}
 	var items []model.Item
 	kctx := m.nav.Context
-	sourceName := securitySourceFromKind(m.nav.ResourceType.Kind)
+	sourceName := m.securitySourceForAction(sel)
 
 	switch sel.Kind {
 	case "__security_finding_group__":
@@ -128,7 +128,14 @@ func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.C
 	}
 	kctx := m.nav.Context
 	groupKey := sel.Extra
-	sourceName := securitySourceFromKind(m.nav.ResourceType.Kind)
+	sourceName := m.securitySourceForAction(sel)
+	// Never write an ignore rule under an empty source — it would be
+	// unmatchable and silently hide nothing (or, worse, collide across
+	// sources). Refuse rather than persist a misattributed rule.
+	if sourceName == "" {
+		m.setStatusMessage("Cannot determine security source", true)
+		return m, scheduleStatusClear()
+	}
 
 	switch actionLabel {
 	case "Ignore (Group)":
@@ -243,6 +250,35 @@ func onSecurityView(m *Model) bool {
 		return true
 	}
 	return false
+}
+
+// securitySourceForAction resolves the security source id for an ignore/un-ignore
+// action. It prefers the navigated resource type's kind
+// ("__security_<source>__"), and when that is not a security source — e.g. the
+// menu was opened via the selected-item fallback while the nav kind is a normal
+// resource — falls back to the selected row: its hidden __source__ column
+// (finding-group and affected-resource rows carry it) or, for a sidebar source
+// entry, its "__security_<source>__" kind. Returns "" only when no source can
+// be determined, so callers refuse to write a misattributed (empty-source)
+// rule. Note securitySourceFromKind matches the sentinel kinds
+// ("__security_finding_group__" etc.) too, so those are handled via __source__
+// and excluded from the kind-based fallback.
+func (m Model) securitySourceForAction(sel *model.Item) string {
+	if s := securitySourceFromKind(m.nav.ResourceType.Kind); s != "" {
+		return s
+	}
+	if sel == nil {
+		return ""
+	}
+	if s := sel.ColumnValue("__source__"); s != "" {
+		return s
+	}
+	switch sel.Kind {
+	case "__security_finding_group__", "__security_affected_resource__":
+		return ""
+	default:
+		return securitySourceFromKind(sel.Kind)
+	}
 }
 
 // securitySourceFromKind extracts the source name from a security RT kind

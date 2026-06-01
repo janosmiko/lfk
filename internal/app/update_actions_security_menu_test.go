@@ -170,19 +170,52 @@ func TestDispatchSecurityActionOnSecurityView(t *testing.T) {
 
 // openSecurityActionMenuIfApplicable also fires via the selected-item fallback
 // when the nav resource type is a normal kind but a security row is selected.
+// The fallback must resolve the source from the row (via its hidden __source__
+// column) so an ignore action is attributed correctly — NOT written under an
+// empty source (the source must not collapse just because nav kind is "Pod").
 func TestOpenSecurityActionMenuFallbackBySelectedItem(t *testing.T) {
 	m := Model{}
-	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"} // normal kind
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"} // non-security nav kind
+	m.nav.Context = "prod"
 	m.securityIgnores = &SecurityIgnoreState{Contexts: map[string][]SecurityIgnoreRule{}}
 	m.middleItems = []model.Item{{
 		Kind:      "__security_affected_resource__",
 		Name:      "pod/grafana",
 		Namespace: "monitoring",
 		Extra:     "no-limits",
-		Columns:   []model.KeyValue{{Key: "__resource_key__", Value: "monitoring/Pod/grafana"}},
+		Columns: []model.KeyValue{
+			{Key: "__resource_key__", Value: "monitoring/Pod/grafana"},
+			{Key: "__source__", Value: "heuristic"},
+		},
 	}}
 	m.setCursor(0)
 
 	_, ok := m.openSecurityActionMenuIfApplicable()
-	assert.True(t, ok, "a selected security row must open the security menu even under a normal nav kind")
+	require.True(t, ok, "a selected security row must open the security menu even under a normal nav kind")
+
+	res, _ := m.executeSecurityIgnoreAction("Ignore (Group)")
+	rules := res.(Model).securityIgnores.Contexts["prod"]
+	require.Len(t, rules, 1, "the ignore rule must be written")
+	assert.Equal(t, "heuristic", rules[0].Source, "source resolved from the row, not collapsed to empty")
+	assert.Equal(t, "no-limits", rules[0].GroupKey)
+}
+
+// When the source cannot be resolved (non-security nav kind and a row without a
+// __source__ column), an ignore action must refuse rather than persist a rule
+// under an empty source.
+func TestExecuteSecurityIgnoreActionRefusesUnresolvedSource(t *testing.T) {
+	m := Model{}
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+	m.nav.Context = "prod"
+	m.securityIgnores = &SecurityIgnoreState{Contexts: map[string][]SecurityIgnoreRule{}}
+	m.middleItems = []model.Item{{
+		Kind: "__security_affected_resource__", Name: "x", Extra: "g",
+		Columns: []model.KeyValue{{Key: "__resource_key__", Value: "ns/Pod/x"}}, // no __source__
+	}}
+	m.setCursor(0)
+
+	res, _ := m.executeSecurityIgnoreAction("Ignore (Group)")
+	rm := res.(Model)
+	assert.Empty(t, rm.securityIgnores.Contexts["prod"], "no rule written when source is unresolved")
+	assert.Contains(t, rm.statusMessage, "source")
 }

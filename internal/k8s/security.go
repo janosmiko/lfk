@@ -286,6 +286,9 @@ func (c *Client) affectedResourcesFromResult(res security.FetchResult, sourceNam
 			continue
 		}
 		item := affectedResourceToItem(ref, groupKey, matched)
+		// Carry the source (hidden) so the action menu can resolve it even when
+		// opened via the selected-item path with a non-security nav kind.
+		item.Columns = append(item.Columns, model.KeyValue{Key: "__source__", Value: sourceName})
 		if ignored {
 			item.Columns = append(item.Columns, model.KeyValue{Key: "__ignored__", Value: "true"})
 		}

@@ -90,7 +90,11 @@ func patternIgnoresGroup(patterns []ui.SecurityIgnorePattern, ctx, source, group
 		if patternIsEmpty(p) {
 			continue
 		}
-		if p.Namespace != "" && p.Namespace != "*" {
+		// An all-"*" namespace glob ("", "*", "**", …) means "any namespace" —
+		// the same any-sentinel globMatch uses — so it hides the whole group. A
+		// specific glob (e.g. "kube-*") is namespace-scoped and excluded here,
+		// matching patternIgnoresResource's per-resource behavior.
+		if p.Namespace != "" && strings.Trim(p.Namespace, "*") != "" {
 			continue
 		}
 		if globMatch(p.Cluster, ctx) &&

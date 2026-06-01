@@ -44,7 +44,8 @@ func TestSecurityIgnoreToggleDoesNotInvalidateCache(t *testing.T) {
 
 	m.handleExplorerActionKeySecurityIgnoreToggle()
 
-	_, _ = mgr.FetchAll(m.reqCtx, "kctx", "")
+	_, err := mgr.FetchAll(m.reqCtx, "kctx", "")
+	require.NoError(t, err, "the cached fetch must still succeed (not left in a broken state)")
 	require.Equal(t, int32(1), src.FetchCalls.Load(),
 		"show-ignored toggle must serve from cache, not trigger a re-scan")
 }
@@ -60,7 +61,8 @@ func TestSecurityIgnoreActionDoesNotInvalidateCache(t *testing.T) {
 
 	m.executeSecurityIgnoreAction("Ignore (Group)")
 
-	_, _ = mgr.FetchAll(m.reqCtx, "kctx", "")
+	_, err := mgr.FetchAll(m.reqCtx, "kctx", "")
+	require.NoError(t, err, "the cached fetch must still succeed (not left in a broken state)")
 	require.Equal(t, int32(1), src.FetchCalls.Load(),
 		"ignoring a finding must serve from cache, not trigger a re-scan")
 }
