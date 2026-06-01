@@ -98,7 +98,7 @@ func TestRenderHelpScreen_CurrentMatchStyledDifferently(t *testing.T) {
 	// Find a line index where flipping currentMatchLine actually changes
 	// the render — i.e. the line contains a "filter" match. The exact
 	// index depends on help content ordering; we just need any one.
-	totalLines := len(BuildHelpLines("", ""))
+	totalLines := len(BuildHelpLines("", "", 120))
 	for i := range totalLines {
 		withCurrent := RenderHelpScreen(120, 200, 0, "", "filter", "", i)
 		if withoutCurrent != withCurrent {
@@ -178,7 +178,7 @@ func TestRenderHelpScreen_DigitSearchDoesNotLeakEscapeFragments(t *testing.T) {
 // longer than that (e.g. "Ctrl+F / Ctrl+B / PgDn / PgUp") overflowed
 // and pushed its description right of the rest, breaking alignment.
 func TestBuildHelpSpecs_KeysAlignWithinSection(t *testing.T) {
-	specs := buildHelpSpecs("", "")
+	specs := buildHelpSpecs("", "", helpInnerWidth(120))
 
 	var currentSection string
 	widths := make([]int, 0, 16)
@@ -210,6 +210,51 @@ func TestBuildHelpSpecs_KeysAlignWithinSection(t *testing.T) {
 	check()
 }
 
+// Word-wrap (issue #319 a): long descriptions must wrap onto continuation
+// rows so they read in full instead of being truncated with a "~". Every
+// entry row's plain width must fit innerW so RenderHelpScreen's final
+// Truncate never trims it.
+func TestBuildHelpSpecs_WrappedEntriesFitWidth(t *testing.T) {
+	innerW := 70
+	specs := buildHelpSpecs("", "", innerW)
+	for _, s := range specs {
+		if s.kind != helpLineEntry {
+			continue
+		}
+		w := lipgloss.Width(helpSpecPlain(s))
+		assert.LessOrEqualf(t, w, innerW,
+			"entry row must fit innerW (no truncation): %q (width %d)", helpSpecPlain(s), w)
+	}
+}
+
+// A narrower help width wraps long descriptions onto more rows than a wide
+// one — proving wrapping actually happens (not just truncation).
+func TestBuildHelpSpecs_NarrowWidthWrapsToMoreRows(t *testing.T) {
+	wide := buildHelpSpecs("", "", 200)
+	narrow := buildHelpSpecs("", "", 60)
+	assert.Greater(t, len(narrow), len(wide),
+		"narrow width must wrap long descriptions onto additional rows")
+}
+
+// Continuation rows carry a blank key column (the key shows only on the
+// first row of a wrapped entry) but keep the section's key-column width so
+// the wrapped description stays aligned under the original.
+func TestBuildHelpSpecs_ContinuationRowsHaveBlankAlignedKey(t *testing.T) {
+	specs := buildHelpSpecs("", "", 50) // narrow -> forces wrapping
+	foundContinuation := false
+	for _, s := range specs {
+		if s.kind != helpLineEntry {
+			continue
+		}
+		if strings.TrimSpace(s.key) == "" && s.desc != "" {
+			foundContinuation = true
+			break
+		}
+	}
+	assert.True(t, foundContinuation,
+		"narrow width must produce at least one continuation row with a blank key")
+}
+
 func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
 	original := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
@@ -223,7 +268,7 @@ func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
 	ApplyTheme(DefaultTheme())
 	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
 
-	lines := BuildHelpLines("", "")
+	lines := BuildHelpLines("", "", 120)
 	for i, line := range lines {
 		assert.NotContains(t, line, "\x1b",
 			"BuildHelpLines must return plain text (no ANSI escapes) — line %d: %q", i, line)
