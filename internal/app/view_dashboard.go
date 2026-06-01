@@ -117,7 +117,7 @@ func (m Model) viewErrorLogFullscreen(contentHeight int) string {
 	}
 	fullW := m.width - 2
 	innerW := max(fullW-2, 1) // minus column padding
-	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, contentHeight, m.showDebugLogs, vp)
+	content := ui.RenderErrorLogOverlay(m.errorLog, m.errorLogScroll, innerW, contentHeight, m.showDebugLogs, vp)
 	content = clampErrorLogLines(content, innerW, contentHeight)
 	content = ui.PadToHeight(content, contentHeight)
 	content = ui.FillLinesBg(content, innerW, ui.BaseBg)

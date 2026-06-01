@@ -6,6 +6,9 @@ import (
 	"testing"
 	"time"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -13,7 +16,7 @@ import (
 
 func TestRenderErrorLogOverlay(t *testing.T) {
 	t.Run("empty entries", func(t *testing.T) {
-		result := RenderErrorLogOverlay(nil, 0, 20, false, ErrorLogVisualParams{})
+		result := RenderErrorLogOverlay(nil, 0, 80, 20, false, ErrorLogVisualParams{})
 		assert.Contains(t, result, "No log entries")
 	})
 
@@ -23,7 +26,7 @@ func TestRenderErrorLogOverlay(t *testing.T) {
 			{Time: time.Date(2024, 1, 1, 10, 1, 0, 0, time.UTC), Message: "second warning", Level: "WRN"},
 			{Time: time.Date(2024, 1, 1, 10, 2, 0, 0, time.UTC), Message: "info message", Level: "INF"},
 		}
-		result := RenderErrorLogOverlay(entries, 0, 20, false, ErrorLogVisualParams{})
+		result := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{})
 		assert.Contains(t, result, "Application Log")
 		assert.Contains(t, result, "first error")
 		assert.Contains(t, result, "second warning")
@@ -37,7 +40,7 @@ func TestRenderErrorLogOverlay(t *testing.T) {
 			{Time: time.Now(), Message: "wrn", Level: "WRN"},
 			{Time: time.Now(), Message: "inf", Level: "INF"},
 		}
-		result := RenderErrorLogOverlay(entries, 0, 20, false, ErrorLogVisualParams{})
+		result := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{})
 		assert.Contains(t, result, "ERR")
 		assert.Contains(t, result, "WRN")
 		assert.Contains(t, result, "INF")
@@ -48,7 +51,7 @@ func TestRenderErrorLogOverlay(t *testing.T) {
 			{Time: time.Now(), Message: "debug msg", Level: "DBG"},
 			{Time: time.Now(), Message: "info msg", Level: "INF"},
 		}
-		result := RenderErrorLogOverlay(entries, 0, 20, false, ErrorLogVisualParams{})
+		result := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{})
 		assert.NotContains(t, result, "debug msg")
 		assert.Contains(t, result, "info msg")
 		assert.Contains(t, result, "1 hidden")
@@ -59,7 +62,7 @@ func TestRenderErrorLogOverlay(t *testing.T) {
 			{Time: time.Now(), Message: "debug msg", Level: "DBG"},
 			{Time: time.Now(), Message: "info msg", Level: "INF"},
 		}
-		result := RenderErrorLogOverlay(entries, 0, 20, true, ErrorLogVisualParams{})
+		result := RenderErrorLogOverlay(entries, 0, 80, 20, true, ErrorLogVisualParams{})
 		assert.Contains(t, result, "debug msg")
 		assert.Contains(t, result, "DBG")
 		assert.Contains(t, result, "info msg")
@@ -96,7 +99,7 @@ func TestErrorLogEntryPlainText(t *testing.T) {
 		Message: "something failed",
 	}
 	result := ErrorLogEntryPlainText(e)
-	assert.Equal(t, "10:30:15 [ERR] something failed", result)
+	assert.Equal(t, "10:30:15 ERR something failed", result)
 }
 
 func TestRenderErrorLogOverlayVisualMode(t *testing.T) {
@@ -108,21 +111,265 @@ func TestRenderErrorLogOverlayVisualMode(t *testing.T) {
 
 	t.Run("visual mode shows VISUAL LINE indicator", func(t *testing.T) {
 		vp := ErrorLogVisualParams{VisualMode: 'V', VisualStart: 0, CursorLine: 1}
-		result := RenderErrorLogOverlay(entries, 0, 20, false, vp)
+		result := RenderErrorLogOverlay(entries, 0, 80, 20, false, vp)
 		assert.Contains(t, result, "VISUAL LINE")
 	})
 
 	t.Run("char visual mode shows VISUAL indicator", func(t *testing.T) {
 		vp := ErrorLogVisualParams{VisualMode: 'v', VisualStart: 0, CursorLine: 0}
-		result := RenderErrorLogOverlay(entries, 0, 20, false, vp)
+		result := RenderErrorLogOverlay(entries, 0, 80, 20, false, vp)
 		assert.Contains(t, result, "VISUAL")
 		assert.NotContains(t, result, "VISUAL LINE")
 	})
 
 	t.Run("no visual mode has no indicator", func(t *testing.T) {
-		result := RenderErrorLogOverlay(entries, 0, 20, false, ErrorLogVisualParams{})
+		result := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{})
 		assert.NotContains(t, result, "VISUAL")
 	})
+}
+
+func TestRenderErrorLogOverlay_SelectionHasNoBracketsOrShift(t *testing.T) {
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "ERR", Message: "boom"},
+	}
+	// Visual column of "boom" (ansi.StringWidth handles the multi-byte "▎").
+	col := func(rendered string) int {
+		for ln := range strings.SplitSeq(ansi.Strip(rendered), "\n") {
+			if before, _, found := strings.Cut(ln, "boom"); found {
+				return ansi.StringWidth(before)
+			}
+		}
+		return -1
+	}
+	normal := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{})
+	visual := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{VisualMode: 'V', VisualStart: 0, CursorLine: 0})
+
+	// Selecting a log must not wrap the severity in brackets or shift the text.
+	assert.NotContains(t, ansi.Strip(visual), "[ERR]", "selection must not add brackets around the level")
+	assert.Equal(t, col(normal), col(visual), "message column must not shift when selecting")
+	assert.Equal(t, errorLogDisplayMsgColumn, col(visual))
+}
+
+func TestRenderErrorLogOverlay_CursorMarkerMatchesEventsAndPersistsInVisual(t *testing.T) {
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "ERR", Message: "first"},
+		{Time: time.Date(2024, 1, 1, 10, 1, 0, 0, time.UTC), Level: "INF", Message: "second"},
+	}
+	// The cursor line is flagged with the "▎" gutter (matching the event
+	// viewer), not the legacy ">" indicator — and the marker stays visible
+	// when entering line- or char-visual selection.
+	for _, tc := range []struct {
+		name string
+		vp   ErrorLogVisualParams
+	}{
+		{"normal", ErrorLogVisualParams{CursorLine: 0}},
+		{"line-visual", ErrorLogVisualParams{VisualMode: 'V', VisualStart: 0, CursorLine: 0}},
+		{"char-visual", ErrorLogVisualParams{VisualMode: 'v', VisualStart: 0, CursorLine: 0}},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			plain := ansi.Strip(RenderErrorLogOverlay(entries, 0, 80, 20, false, tc.vp))
+			assert.Contains(t, plain, "▎", "cursor line marker must be visible")
+			assert.NotContains(t, plain, ">", "legacy '>' cursor indicator must be gone")
+		})
+	}
+}
+
+func TestRenderErrorLogOverlay_BlockCursorTracksColumnInNormalMode(t *testing.T) {
+	// Force a real color profile so the reverse-video block cursor is emitted
+	// (the default test renderer strips styling).
+	originalProfile := lipgloss.DefaultRenderer().ColorProfile()
+	t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(originalProfile) })
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.TrueColor)
+
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "ERR", Message: "abcdefgh"},
+	}
+	at0 := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{CursorLine: 0, CursorCol: 0})
+	at5 := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{CursorLine: 0, CursorCol: 5})
+
+	// A reverse-video block cursor is rendered in normal mode (no selection)...
+	assert.Contains(t, at0, "\x1b[7m", "normal-mode cursor line should carry a reverse-video block cursor")
+	// ...and it moves with the cursor column without entering visual mode.
+	assert.NotEqual(t, at0, at5, "block cursor position should change with CursorCol")
+}
+
+// uniqueLongMessage returns a 120-character message whose every substring is
+// position-identifiable (no repeating window), so wrap reconstruction tests
+// can prove text appears in the right order without false matches.
+func uniqueLongMessage() string {
+	const n = 120
+	var b strings.Builder
+	for i := 0; b.Len() < n; i++ {
+		fmt.Fprintf(&b, "%03d|", i)
+	}
+	return string([]rune(b.String())[:n])
+}
+
+// errorLogDisplayMsgColumn is the on-screen column where the message starts:
+// the 1-column gutter plus the in-content message column.
+const errorLogDisplayMsgColumn = errorLogGutterWidth + errorLogMsgColumn
+
+// reconstructErrorLogMessage rebuilds the message text from a rendered overlay
+// by stripping ANSI and slicing each message-bearing line at the display
+// message column. Title ("Application Log") and footer ("N entries") lines are
+// skipped by name.
+func reconstructErrorLogMessage(rendered string) string {
+	var b strings.Builder
+	for ln := range strings.SplitSeq(ansi.Strip(rendered), "\n") {
+		if !errorLogMessageLine(ln) {
+			continue
+		}
+		b.WriteString(string([]rune(ln)[errorLogDisplayMsgColumn:]))
+	}
+	return b.String()
+}
+
+// countErrorLogMessageLines counts the message-bearing physical lines in a
+// rendered overlay (excluding the title, its bottom-padding blank, and the
+// footer), used to assert wrapping.
+func countErrorLogMessageLines(rendered string) int {
+	n := 0
+	for ln := range strings.SplitSeq(ansi.Strip(rendered), "\n") {
+		if errorLogMessageLine(ln) {
+			n++
+		}
+	}
+	return n
+}
+
+// errorLogMessageLine reports whether a stripped rendered line carries message
+// content (not the title, the title's bottom-padding blank, or the footer).
+func errorLogMessageLine(ln string) bool {
+	if strings.TrimSpace(ln) == "" {
+		return false // blank line (e.g. title bottom padding)
+	}
+	if strings.Contains(ln, "Application Log") || strings.Contains(ln, "entries") {
+		return false // title / footer
+	}
+	return len([]rune(ln)) > errorLogDisplayMsgColumn
+}
+
+func TestRenderErrorLogOverlay_WrapsLongMessage(t *testing.T) {
+	const width = 50
+	longMsg := uniqueLongMessage()
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "ERR", Message: longMsg},
+	}
+	result := RenderErrorLogOverlay(entries, 0, width, 30, false, ErrorLogVisualParams{})
+
+	// No truncation marker — the message is wrapped, not cut.
+	assert.NotContains(t, ansi.Strip(result), "~")
+
+	// Message fully preserved across wrapped continuation lines.
+	assert.Equal(t, longMsg, reconstructErrorLogMessage(result))
+
+	// The message spans more than one line.
+	assert.Greater(t, countErrorLogMessageLines(result), 1, "long message should wrap onto multiple lines")
+
+	// Every rendered line fits within the available width.
+	for ln := range strings.SplitSeq(result, "\n") {
+		assert.LessOrEqual(t, lipgloss.Width(ln), width, "line exceeds width: %q", ansi.Strip(ln))
+	}
+}
+
+func TestRenderErrorLogOverlay_WrapsLongCursorMessage(t *testing.T) {
+	const width = 50
+	longMsg := uniqueLongMessage()
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "ERR", Message: longMsg},
+	}
+	vp := ErrorLogVisualParams{CursorLine: 0}
+	result := RenderErrorLogOverlay(entries, 0, width, 30, false, vp)
+
+	plain := ansi.Strip(result)
+	// Cursor line marker present.
+	assert.Contains(t, plain, "▎")
+	// Message preserved across wrapped cursor sub-lines.
+	assert.Equal(t, longMsg, reconstructErrorLogMessage(result))
+	for ln := range strings.SplitSeq(result, "\n") {
+		assert.LessOrEqual(t, lipgloss.Width(ln), width, "cursor line exceeds width: %q", ansi.Strip(ln))
+	}
+}
+
+func TestRenderErrorLogOverlay_WrapsLongSelectedMessage(t *testing.T) {
+	const width = 50
+	longMsg := uniqueLongMessage()
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "ERR", Message: longMsg},
+	}
+	// Line-visual mode selecting the single entry.
+	vp := ErrorLogVisualParams{VisualMode: 'V', VisualStart: 0, CursorLine: 0}
+	result := RenderErrorLogOverlay(entries, 0, width, 30, false, vp)
+
+	// Visual rendering carries no brackets, so the message column matches the
+	// non-visual row.
+	assert.Equal(t, longMsg, reconstructErrorLogMessage(result))
+	for ln := range strings.SplitSeq(result, "\n") {
+		assert.LessOrEqual(t, lipgloss.Width(ln), width, "selected line exceeds width: %q", ansi.Strip(ln))
+	}
+}
+
+func TestRenderErrorLogOverlay_CharVisualWrapsLongMessage(t *testing.T) {
+	const width = 50
+	longMsg := uniqueLongMessage()
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "ERR", Message: longMsg},
+	}
+	// Char-visual mode selecting a column range on the single entry. The
+	// highlight lands on the first sub-line; continuations render as plain
+	// wrapped text, so the message must still reconstruct fully.
+	vp := ErrorLogVisualParams{VisualMode: 'v', VisualStart: 0, VisualStartCol: 0, CursorLine: 0, CursorCol: 5}
+	result := RenderErrorLogOverlay(entries, 0, width, 30, false, vp)
+
+	assert.Equal(t, longMsg, reconstructErrorLogMessage(result))
+	assert.Greater(t, countErrorLogMessageLines(result), 1, "char-visual long message should wrap")
+	for ln := range strings.SplitSeq(result, "\n") {
+		assert.LessOrEqual(t, lipgloss.Width(ln), width, "char-visual line exceeds width: %q", ansi.Strip(ln))
+	}
+}
+
+func TestRenderErrorLogOverlay_CursorVisibleAtBottomWithWrap(t *testing.T) {
+	// Regression for the physical-line pagination vs logical-entry scroll
+	// mismatch: with many wrapping entries and the cursor on the last one,
+	// the cursor entry (and its indicator) must still be rendered even though
+	// the entries above it would consume the physical-line budget.
+	const width = 50
+	base := time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC)
+	entries := make([]ErrorLogEntry, 12)
+	for i := range entries {
+		entries[i] = ErrorLogEntry{Time: base, Level: "ERR", Message: fmt.Sprintf("entry%02d ", i) + strings.Repeat("x", 90)}
+	}
+	reversed := FilteredErrorLogEntries(entries, false)
+	cursor := len(reversed) - 1              // bottom of the list (newest-first reversed)
+	wantTail := reversed[cursor].Message[:7] // unique "entryNN" prefix of the cursor entry
+
+	// Incoming scroll 0 with a short viewport: the naive entry-based start
+	// would clip the cursor; the renderer must adjust so it is visible.
+	result := RenderErrorLogOverlay(entries, 0, width, 18, false, ErrorLogVisualParams{CursorLine: cursor})
+	plain := ansi.Strip(result)
+
+	assert.Contains(t, plain, "▎", "cursor line marker must be visible")
+	assert.Contains(t, plain, wantTail, "cursor entry must be rendered despite earlier entries wrapping")
+	for ln := range strings.SplitSeq(result, "\n") {
+		assert.LessOrEqual(t, lipgloss.Width(ln), width, "line exceeds width: %q", ansi.Strip(ln))
+	}
+}
+
+func TestRenderErrorLogOverlay_ShortMessageUnchangedShape(t *testing.T) {
+	// A short message must still render as exactly one content line, so the
+	// wrapping change does not alter the common single-line case.
+	entries := []ErrorLogEntry{
+		{Time: time.Date(2024, 1, 1, 10, 0, 0, 0, time.UTC), Level: "INF", Message: "short message"},
+	}
+	result := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{})
+	plain := ansi.Strip(result)
+	msgLines := 0
+	for ln := range strings.SplitSeq(plain, "\n") {
+		if strings.Contains(ln, "short message") {
+			msgLines++
+		}
+	}
+	assert.Equal(t, 1, msgLines, "short message should occupy a single line")
 }
 
 // --- RenderPodStartupOverlay ---
