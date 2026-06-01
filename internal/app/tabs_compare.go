@@ -46,6 +46,15 @@ func (m *Model) sortMiddleItems() {
 	sort.SliceStable(m.middleItems, func(i, j int) bool {
 		a, b := m.middleItems[i], m.middleItems[j]
 
+		// Metrics-less rows ("n/a") always sort last, in BOTH directions.
+		// This cannot live inside comparePrimaryColumn: the asc/desc sign
+		// flip below would invert it and float missing data to the top when
+		// sorting descending. Handle it here (like the direction-independent
+		// tiebreaker) so flipping the sort never reorders the n/a block.
+		if aMiss, bMiss := metricValueMissing(colName, a), metricValueMissing(colName, b); aMiss != bMiss {
+			return bMiss // a sorts before b iff b is the missing one
+		}
+
 		// Primary comparison on the selected column.
 		primary := comparePrimaryColumn(a, b, colName)
 		if primary != 0 {
@@ -143,6 +152,26 @@ var columnValueCmp = map[string]valueCmpFunc{
 	"Cluster IP":   compareIPCmp,
 	"Pod IP":       compareIPCmp,
 	"External IPs": compareIPCmp,
+}
+
+// metricsMissingLastColumns are the metrics columns whose cells render as
+// "n/a" when metrics-server has no data for the row. Rows missing such a value
+// must sort to the bottom regardless of sort direction (see sortMiddleItems).
+var metricsMissingLastColumns = map[string]bool{
+	"CPU": true, "MEM": true,
+	"CPU%": true, "MEM%": true,
+	"CPU/R": true, "CPU/L": true, "MEM/R": true, "MEM/L": true,
+}
+
+// metricValueMissing reports whether item's value for colName is a metrics-less
+// "n/a" placeholder that should always sort last. Returns false for non-metrics
+// columns, so only the CPU/MEM family gets the always-last treatment.
+func metricValueMissing(colName string, item model.Item) bool {
+	if !metricsMissingLastColumns[colName] {
+		return false
+	}
+	v := strings.TrimSpace(getColumnValue(item, colName))
+	return v == "" || v == "n/a"
 }
 
 // comparePrimaryColumn returns -1, 0, or +1 for a < b, a == b, a > b
@@ -273,9 +302,25 @@ func compareResourceValues(a, b, col string) bool {
 	return compareResourceValuesCmp(a, b, col) < 0
 }
 
+// compareResourceValuesCmp compares two CPU/MEM column values numerically.
+// Values may carry a trend arrow ("↑ 1.3", "↓ 710m") — stripped during parse —
+// or be "n/a" when metrics-server has no data for the row. "n/a" (and any other
+// unparseable value) sorts after real values so metrics-less rows land at the
+// bottom in ascending order, mirroring comparePercentCmp.
 func compareResourceValuesCmp(a, b, col string) int {
 	isCPU := strings.HasPrefix(col, "CPU")
-	return cmpInt64(ui.ParseResourceValue(a, isCPU), ui.ParseResourceValue(b, isCPU))
+	va, okA := ui.ParseResourceValueOK(a, isCPU)
+	vb, okB := ui.ParseResourceValueOK(b, isCPU)
+	switch {
+	case okA && okB:
+		return cmpInt64(va, vb)
+	case okA:
+		return -1
+	case okB:
+		return 1
+	default:
+		return strings.Compare(strings.ToLower(strings.TrimSpace(a)), strings.ToLower(strings.TrimSpace(b)))
+	}
 }
 
 // comparePercentCmp compares two percentage-formatted column values

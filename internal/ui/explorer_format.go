@@ -361,39 +361,70 @@ func pctStyle(val string) lipgloss.Style {
 	}
 }
 
-// ParseResourceValue parses a CPU (millicores) or memory (bytes) string back to int64.
+// ParseResourceValue parses a CPU (millicores) or memory (bytes) string back to
+// int64. Unparseable input (empty, "n/a", garbage) yields 0; callers that must
+// distinguish "missing" from a genuine 0 should use ParseResourceValueOK.
 func ParseResourceValue(val string, isCPU bool) int64 {
-	val = strings.TrimSpace(val)
-	if val == "" {
-		return 0
+	v, _ := ParseResourceValueOK(val, isCPU)
+	return v
+}
+
+// ParseResourceValueOK parses a CPU (millicores) or memory (bytes) string back
+// to int64, reporting whether the value was a real numeric quantity. A leading
+// trend arrow ("↑ " / "↓ ") is stripped first — it is a cosmetic decoration the
+// metrics path prepends to the CPU/MEM columns, never part of the number. The
+// ok flag is false for empty, "n/a", or otherwise unparseable input, letting
+// sort comparators push metrics-less rows to the bottom instead of treating
+// them as 0 (which is indistinguishable from a genuine "0m").
+func ParseResourceValueOK(val string, isCPU bool) (int64, bool) {
+	val = strings.TrimSpace(stripTrendArrow(val))
+	if val == "" || val == "n/a" {
+		return 0, false
 	}
 	if isCPU {
 		// CPU: "100m" or "1.5" (cores)
 		if before, ok := strings.CutSuffix(val, "m"); ok {
-			n, _ := strconv.ParseFloat(before, 64)
-			return int64(n)
+			n, err := strconv.ParseFloat(before, 64)
+			if err != nil {
+				return 0, false
+			}
+			return int64(n), true
 		}
-		n, _ := strconv.ParseFloat(val, 64)
-		return int64(n * 1000)
+		n, err := strconv.ParseFloat(val, 64)
+		if err != nil {
+			return 0, false
+		}
+		return int64(n * 1000), true
 	}
 	// Memory: "128Mi", "1.5Gi", "1024Ki", "1024B"
+	var mult float64 = 1
 	switch {
 	case strings.HasSuffix(val, "Gi"):
-		n, _ := strconv.ParseFloat(strings.TrimSuffix(val, "Gi"), 64)
-		return int64(n * 1024 * 1024 * 1024)
+		val, mult = strings.TrimSuffix(val, "Gi"), 1024*1024*1024
 	case strings.HasSuffix(val, "Mi"):
-		n, _ := strconv.ParseFloat(strings.TrimSuffix(val, "Mi"), 64)
-		return int64(n * 1024 * 1024)
+		val, mult = strings.TrimSuffix(val, "Mi"), 1024*1024
 	case strings.HasSuffix(val, "Ki"):
-		n, _ := strconv.ParseFloat(strings.TrimSuffix(val, "Ki"), 64)
-		return int64(n * 1024)
+		val, mult = strings.TrimSuffix(val, "Ki"), 1024
 	case strings.HasSuffix(val, "B"):
-		n, _ := strconv.ParseFloat(strings.TrimSuffix(val, "B"), 64)
-		return int64(n)
-	default:
-		n, _ := strconv.ParseFloat(val, 64)
-		return int64(n)
+		val = strings.TrimSuffix(val, "B")
 	}
+	n, err := strconv.ParseFloat(val, 64)
+	if err != nil {
+		return 0, false
+	}
+	return int64(n * mult), true
+}
+
+// stripTrendArrow removes the leading "↑ " / "↓ " trend decoration the metrics
+// refresh prepends to CPU/MEM usage values, returning the bare quantity.
+func stripTrendArrow(val string) string {
+	if rest, ok := strings.CutPrefix(val, "↑ "); ok {
+		return rest
+	}
+	if rest, ok := strings.CutPrefix(val, "↓ "); ok {
+		return rest
+	}
+	return val
 }
 
 // padRight pads a string with spaces to reach the target visual width.

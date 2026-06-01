@@ -162,6 +162,51 @@ func TestSortMiddleItemsByName(t *testing.T) {
 	assert.Equal(t, "charlie", m.middleItems[2].Name)
 }
 
+func TestSortMiddleItemsCPU_NaAlwaysLast(t *testing.T) {
+	ui.ActiveSortableColumns = []string{"Name", "CPU"}
+	defer func() { ui.ActiveSortableColumns = nil }()
+
+	mkItem := func(name, cpu string) model.Item {
+		return model.Item{Name: name, Columns: []model.KeyValue{{Key: "CPU", Value: cpu}}}
+	}
+	seed := func() []model.Item {
+		return []model.Item{
+			mkItem("none1", "n/a"),
+			mkItem("low", "↓ 5m"),
+			mkItem("high", "↑ 1.3"),
+			mkItem("none2", "n/a"),
+			mkItem("mid", "710m"),
+		}
+	}
+	names := func(items []model.Item) []string {
+		out := make([]string, len(items))
+		for i, it := range items {
+			out[i] = it.Name
+		}
+		return out
+	}
+
+	t.Run("descending keeps n/a last", func(t *testing.T) {
+		m := Model{
+			nav:            model.NavigationState{Level: model.LevelResources},
+			sortColumnName: "CPU", sortAscending: false,
+			middleItems: seed(),
+		}
+		m.sortMiddleItems()
+		assert.Equal(t, []string{"high", "mid", "low", "none1", "none2"}, names(m.middleItems))
+	})
+
+	t.Run("ascending keeps n/a last", func(t *testing.T) {
+		m := Model{
+			nav:            model.NavigationState{Level: model.LevelResources},
+			sortColumnName: "CPU", sortAscending: true,
+			middleItems: seed(),
+		}
+		m.sortMiddleItems()
+		assert.Equal(t, []string{"low", "mid", "high", "none1", "none2"}, names(m.middleItems))
+	})
+}
+
 func TestSortMiddleItemsByAge(t *testing.T) {
 	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
 	defer func() { ui.ActiveSortableColumns = nil }()
