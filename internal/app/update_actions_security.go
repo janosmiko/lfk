@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/security"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // executeActionSecurityFindings handles the "Security Findings" action.
@@ -20,15 +21,27 @@ func (m Model) executeActionSecurityFindings() Model {
 		m.setStatusMessage("Security findings still loading…", false)
 		return m
 	}
-	ref := security.ResourceRef{
-		Namespace: m.actionCtx.namespace,
-		Kind:      m.actionCtx.kind,
-		Name:      m.actionCtx.name,
+	// Count exactly what the SEC row badge shows: the selected item's own
+	// findings merged with its owner resources' (owner:N) findings. A bare
+	// actionCtx-ref query would miss owner-attributed findings (e.g. trivy
+	// CVEs on the Deployment that the Pod's badge surfaces), making the action
+	// and the badge disagree. Fall back to the actionCtx ref when no row is
+	// selected.
+	kind, name := m.actionCtx.kind, m.actionCtx.name
+	var counts security.SeverityCounts
+	if sel := m.selectedMiddleItem(); sel != nil {
+		counts = ui.MergedSecurityCounts(m.securityIndex, sel)
+		kind, name = sel.Kind, sel.Name
+	} else {
+		counts = m.securityIndex.For(security.ResourceRef{
+			Namespace: m.actionCtx.namespace,
+			Kind:      m.actionCtx.kind,
+			Name:      m.actionCtx.name,
+		})
 	}
-	counts := m.securityIndex.For(ref)
 	total := counts.Total()
 	if total == 0 {
-		m.setStatusMessage(fmt.Sprintf("No security findings on %s/%s", m.actionCtx.kind, m.actionCtx.name), false)
+		m.setStatusMessage(fmt.Sprintf("No security findings on %s/%s", kind, name), false)
 		return m
 	}
 	parts := []string{}
@@ -47,11 +60,11 @@ func (m Model) executeActionSecurityFindings() Model {
 	summary := summariseSeverityParts(parts)
 	if summary == "" {
 		m.setStatusMessage(fmt.Sprintf("%d security findings on %s/%s — open Security category for details",
-			total, m.actionCtx.kind, m.actionCtx.name), false)
+			total, kind, name), false)
 		return m
 	}
 	m.setStatusMessage(fmt.Sprintf("%d security findings (%s) on %s/%s — open Security category for details",
-		total, summary, m.actionCtx.kind, m.actionCtx.name), false)
+		total, summary, kind, name), false)
 	return m
 }
 

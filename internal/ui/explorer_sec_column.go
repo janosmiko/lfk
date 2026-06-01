@@ -135,13 +135,23 @@ func securityBadgePlainForItem(item *model.Item) string {
 	return securityBadgePlain(counts)
 }
 
-// itemSecurityCounts returns the merged SeverityCounts for an item,
-// combining findings for the item itself with findings for its owner
-// resources (extracted from owner:N columns).
+// itemSecurityCounts returns the merged SeverityCounts for an item against the
+// active render-time index. Thin wrapper over MergedSecurityCounts.
 func itemSecurityCounts(item *model.Item) security.SeverityCounts {
-	counts := ActiveSecurityIndex.For(itemSecurityRef(item))
-	// Also check owner references so trivy findings (which reference the
-	// Deployment, not the Pod) show on Pod rows.
+	return MergedSecurityCounts(ActiveSecurityIndex, item)
+}
+
+// MergedSecurityCounts returns an item's own findings combined with its owner
+// resources' findings (from owner:N columns) — the exact aggregation the SEC
+// row badge shows (e.g. a Pod row includes its Deployment's trivy findings).
+// Exported so app-layer surfaces such as the "Security Findings" action report
+// the same numbers as the badge instead of a bare per-ref count. Returns zero
+// counts when idx or item is nil.
+func MergedSecurityCounts(idx *security.FindingIndex, item *model.Item) security.SeverityCounts {
+	if idx == nil || item == nil {
+		return security.SeverityCounts{}
+	}
+	counts := idx.For(itemSecurityRef(item))
 	for _, col := range item.Columns {
 		if len(col.Key) < 6 || col.Key[:6] != "owner:" {
 			continue
@@ -156,7 +166,7 @@ func itemSecurityCounts(item *model.Item) security.SeverityCounts {
 			Kind:      ownerKind,
 			Name:      ownerName,
 		}
-		oc := ActiveSecurityIndex.For(ownerRef)
+		oc := idx.For(ownerRef)
 		counts.Critical += oc.Critical
 		counts.High += oc.High
 		counts.Medium += oc.Medium

@@ -5,6 +5,7 @@ import (
 
 	"github.com/stretchr/testify/assert"
 
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/security"
 )
 
@@ -53,4 +54,31 @@ func TestExecuteActionSecurityFindingsCounts(t *testing.T) {
 		"status message names the resource")
 	assert.Contains(t, msg, "Security category",
 		"hint points the user toward the drill-in path")
+}
+
+// TestExecuteActionSecurityFindingsMatchesBadgeOwnerAggregation locks in L959:
+// the action must report the SAME findings the SEC row badge shows, which
+// includes owner-attributed findings (e.g. a trivy CVE on the Deployment that
+// surfaces on the Pod row via owner:N). A bare per-ref query would say "No
+// security findings" while the badge shows one — the discrepancy users hit.
+func TestExecuteActionSecurityFindingsMatchesBadgeOwnerAggregation(t *testing.T) {
+	idx := security.BuildFindingIndex([]security.Finding{
+		{
+			ID: "1", Title: "CVE-x", Severity: security.SeverityCritical,
+			Resource: security.ResourceRef{Namespace: "default", Kind: "Deployment", Name: "api"},
+		},
+	})
+	m := Model{securityModelState: securityModelState{securityIndex: idx}}
+	m.middleItems = []model.Item{{
+		Kind: "Pod", Name: "api-xyz", Namespace: "default",
+		Columns: []model.KeyValue{{Key: "owner:0", Value: "apps/v1||Deployment||api"}},
+	}}
+	m.setCursor(0)
+	m.actionCtx = actionContext{kind: "Pod", name: "api-xyz", namespace: "default"}
+
+	updated := m.executeActionSecurityFindings()
+	assert.Contains(t, updated.statusMessage, "1 security findings",
+		"owner-attributed finding must be counted, matching the badge")
+	assert.Contains(t, updated.statusMessage, "1 critical")
+	assert.Contains(t, updated.statusMessage, "Pod/api-xyz")
 }
