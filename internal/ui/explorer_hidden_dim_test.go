@@ -49,6 +49,7 @@ func TestRenderColumn_HiddenRowDimNotBrokenByInnerReset(t *testing.T) {
 	items := []model.Item{
 		{Name: "Pods", Category: "Workloads", Icon: model.Icon{Unicode: "P"}},
 		{Name: "Ingresses", Category: "Networking", Icon: model.Icon{Unicode: "I"}, Hidden: true},
+		{Name: "CSIDrivers", Category: "Storage", Icon: model.Icon{Unicode: "C"}, Rare: true},
 	}
 
 	for _, tc := range []struct {
@@ -58,18 +59,20 @@ func TestRenderColumn_HiddenRowDimNotBrokenByInnerReset(t *testing.T) {
 		{"active column", true},
 		{"parent column", false},
 	} {
-		t.Run(tc.name, func(t *testing.T) {
-			ActiveMiddleScroll, ActiveLeftScroll = 0, 0
-			defer func() { ActiveMiddleScroll, ActiveLeftScroll = -1, -1 }()
+		for _, target := range []string{"Ingresses", "CSIDrivers"} {
+			t.Run(tc.name+"/"+target, func(t *testing.T) {
+				ActiveMiddleScroll, ActiveLeftScroll = 0, 0
+				defer func() { ActiveMiddleScroll, ActiveLeftScroll = -1, -1 }()
 
-			out := RenderColumn("", items, 0, 40, 20, tc.isActive, false, "", "")
-			row := rowContaining(t, out, "Ingresses")
+				out := RenderColumn("", items, 0, 40, 20, tc.isActive, false, "", "")
+				row := rowContaining(t, out, target)
 
-			assert.True(t, strings.HasPrefix(row, openSGR), "hidden row must open with the dim style")
-			// One uniform dim span: a single reset, none interior. The buggy
-			// per-fragment path produced a reset between the icon and the name.
-			assert.Equal(t, 1, strings.Count(row, "\x1b[0m"),
-				"dim must not be broken by interior resets from per-fragment styling")
-		})
+				assert.True(t, strings.HasPrefix(row, openSGR), "dimmed row must open with the dim style")
+				// One uniform dim span: a single reset, none interior. The buggy
+				// per-fragment path produced a reset between the icon and the name.
+				assert.Equal(t, 1, strings.Count(row, "\x1b[0m"),
+					"dim must not be broken by interior resets from per-fragment styling")
+			})
+		}
 	}
 }

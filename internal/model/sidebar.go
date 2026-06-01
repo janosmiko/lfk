@@ -182,6 +182,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 				Category:   meta.Category,
 				Icon:       meta.Icon,
 				Deprecated: rt.Deprecated,
+				Rare:       meta.Rare,
 			})
 			continue
 		}
@@ -211,6 +212,7 @@ func partitionDiscovered(discovered []ResourceTypeEntry) (categorized, crdGroups
 				Category:   AdvancedCategory,
 				Icon:       Icon{Unicode: "⧫", Simple: "[CR]", Emoji: "🔷", NerdFont: "\U000f0174"},
 				Deprecated: rt.Deprecated,
+				Rare:       true,
 			})
 			continue
 		}

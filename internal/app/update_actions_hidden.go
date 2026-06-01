@@ -57,16 +57,23 @@ func (m Model) openResourceTypeActionMenu() Model {
 	if m.isTypePinned(key) {
 		pinLabel, pinDesc = actionLabelUnpinType, "Remove this resource type from the Pinned section"
 	}
-	hideLabel, hideDesc := actionLabelHideType, "Hide this resource type from the sidebar"
-	if m.isTypeHidden(key) {
-		hideLabel, hideDesc = actionLabelShowType, "Show this hidden resource type again"
+	items := []model.Item{
+		{Name: pinLabel, Extra: pinDesc, Status: ui.ActiveKeybindings.PinGroup},
+	}
+
+	// Rarely-used types are already hidden by default and only surfaced via
+	// the reveal toggle, so a per-type hide/show would be meaningless — offer
+	// it only for normal types.
+	if !sel.Rare {
+		hideLabel, hideDesc := actionLabelHideType, "Hide this resource type from the sidebar"
+		if m.isTypeHidden(key) {
+			hideLabel, hideDesc = actionLabelShowType, "Show this hidden resource type again"
+		}
+		items = append(items, model.Item{Name: hideLabel, Extra: hideDesc, Status: hideMenuChip})
 	}
 
 	m.overlay = overlayAction
-	m.overlayItems = []model.Item{
-		{Name: pinLabel, Extra: pinDesc, Status: ui.ActiveKeybindings.PinGroup},
-		{Name: hideLabel, Extra: hideDesc, Status: hideMenuChip},
-	}
+	m.overlayItems = items
 	m.overlayCursor = 0
 	return m
 }
@@ -114,6 +121,10 @@ func (m Model) toggleHiddenResourceType() (tea.Model, tea.Cmd) {
 	}
 	if sel.Kind == "__collapsed_group__" || sel.Category == "Dashboards" {
 		m.setStatusMessage("Select a resource type to hide", true)
+		return m, scheduleStatusClear()
+	}
+	if sel.Rare {
+		m.setStatusMessage("Rarely-used types can't be hidden; toggle them with "+ui.ActiveKeybindings.ToggleRare, true)
 		return m, scheduleStatusClear()
 	}
 	key := model.PinKeyFromRef(sel.Extra)

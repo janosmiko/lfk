@@ -26,7 +26,7 @@ func helpSections() []helpSection {
 				{kb.ExpandCollapse, "Toggle expand/collapse all resource groups / toggle event grouping (Events)"},
 				{kb.PinGroup, "Pin/unpin resource type (at resource types level)"},
 				{kb.ActionMenu, "At resource types level: pin/unpin or hide/show the selected resource type (per cluster / union set)"},
-				{kb.ToggleRare, "Toggle rarely used + hidden resource types (CSI, webhooks, advanced) in the sidebar"},
+				{kb.ToggleRare, "Toggle rarely used + hidden resource types (CSI, webhooks, advanced); shown dimmed"},
 			},
 		},
 		{

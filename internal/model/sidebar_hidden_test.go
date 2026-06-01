@@ -54,6 +54,28 @@ func TestBuildSidebarItems_HiddenTypes(t *testing.T) {
 	})
 }
 
+// TestBuildSidebarItems_RareItemsFlaggedForDimming verifies that rarely-used
+// types surfaced via ShowRareResources carry Rare=true so the renderer dims
+// them — both curated Rare entries and uncategorized core (Advanced) resources.
+func TestBuildSidebarItems_RareItemsFlaggedForDimming(t *testing.T) {
+	defer func(orig bool) { ShowRareResources = orig }(ShowRareResources)
+	ShowRareResources = true
+
+	discovered := []ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		{Kind: "CSIDriver", APIGroup: "storage.k8s.io", APIVersion: "v1", Resource: "csidrivers", Namespaced: false},
+		{Kind: "TokenReview", APIGroup: "authentication.k8s.io", APIVersion: "v1", Resource: "tokenreviews", Namespaced: false},
+	}
+	names := collectByDisplay(BuildSidebarItems(discovered))
+
+	require.Contains(t, names, "CSIDrivers")
+	assert.True(t, names["CSIDrivers"].Rare, "curated Rare entry must be flagged Rare")
+	require.Contains(t, names, "TokenReviews")
+	assert.True(t, names["TokenReviews"].Rare, "uncategorized core (Advanced) resource must be flagged Rare")
+	require.Contains(t, names, "Pods")
+	assert.False(t, names["Pods"].Rare, "normal type must not be flagged Rare")
+}
+
 // TestBuildSidebarItems_PinnedAndHidden locks in the precedence when a type is
 // both pinned and hidden: hidden wins. With reveal off it is removed entirely
 // (including from the Pinned section); with reveal on it surfaces dimmed,

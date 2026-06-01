@@ -113,6 +113,47 @@ func TestOpenResourceTypeActionMenu_LabelReflectsState(t *testing.T) {
 	assert.Equal(t, actionLabelShowType, menu2.overlayItems[1].Name)
 }
 
+// rareTestModel builds a model whose sidebar includes a rarely-used type
+// (CSIDrivers) surfaced via the reveal toggle.
+func rareTestModel(t *testing.T) Model {
+	t.Helper()
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	m := baseModelWithFakeClient()
+	m.nav.Context = "prod"
+	m.nav.Level = model.LevelResourceTypes
+	m.allGroupsExpanded = true
+	m.hiddenState = newHiddenTypesState()
+	discovered := []model.ResourceTypeEntry{
+		{Kind: "Pod", APIGroup: "", APIVersion: "v1", Resource: "pods", Namespaced: true},
+		{Kind: "CSIDriver", APIGroup: "storage.k8s.io", APIVersion: "v1", Resource: "csidrivers", Namespaced: false},
+	}
+	m.discoveredResources["prod"] = discovered
+	m.setMiddleItems(model.BuildSidebarItems(discovered))
+	return m
+}
+
+// TestRareType_NotHideable verifies that rarely-used types offer no hide/show
+// action and that the hide handler refuses them.
+func TestRareType_NotHideable(t *testing.T) {
+	defer func(orig bool) { model.ShowRareResources = orig }(model.ShowRareResources)
+	model.ShowRareResources = true
+
+	m := rareTestModel(t)
+	idx := cursorIndexOfItem(&m, "CSIDrivers")
+	require.NotEqual(t, -1, idx, "CSIDrivers must be visible with reveal on")
+	m.setCursor(idx)
+
+	// Menu offers Pin only — no hide/show entry for a rare type.
+	menu := m.openResourceTypeActionMenu()
+	require.Len(t, menu.overlayItems, 1, "rare type offers no hide/show entry")
+	assert.Equal(t, actionLabelPinType, menu.overlayItems[0].Name)
+
+	// The hide handler refuses and persists nothing.
+	res, _ := m.toggleHiddenResourceType()
+	rm := res.(Model)
+	assert.Empty(t, rm.hiddenState.Contexts["prod"], "rare type must not be added to hidden state")
+}
+
 // TestOpenResourceTypeActionMenu_PinLabelReflectsState verifies the Pin entry
 // flips to Unpin once the type is pinned.
 func TestOpenResourceTypeActionMenu_PinLabelReflectsState(t *testing.T) {
