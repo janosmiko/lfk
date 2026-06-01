@@ -103,9 +103,11 @@ func TestDiffNormalCopyYanksCursorLine(t *testing.T) {
 func TestLogsNormalCopyYanksCursorLine(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:  []string{"line one", "line two", "line three"},
-		logCursor: 1,
-		tabs:      []TabState{{}},
+		logView: logViewState{
+			lines:  []string{"line one", "line two", "line three"},
+			cursor: 1,
+		},
+		tabs: []TabState{{}},
 	}
 	ret, cmd := m.handleLogKey(keyMsg("y"))
 	rm := ret.(Model)
@@ -118,7 +120,9 @@ func TestLogsNormalCopyYanksCursorLine(t *testing.T) {
 func TestLogsNormalCopyEmptyBuffer(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines: nil, logCursor: 0,
+		logView: logViewState{
+			lines: nil, cursor: 0,
+		},
 		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("y"))
@@ -163,15 +167,17 @@ func TestDescribeNormalCopyCountPrefixYanksMultipleLines(t *testing.T) {
 func TestLogsNormalCopyCountPrefixYanksMultipleLines(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:     []string{"a", "b", "c", "d", "e", "f"},
-		logCursor:    1,
-		logLineInput: "3",
-		tabs:         []TabState{{}},
+		logView: logViewState{
+			lines:     []string{"a", "b", "c", "d", "e", "f"},
+			cursor:    1,
+			lineInput: "3",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, cmd := m.handleLogKey(keyMsg("y"))
 	rm := ret.(Model)
 	assert.Equal(t, "Copied 3 lines", rm.statusMessage)
-	assert.Empty(t, rm.logLineInput)
+	assert.Empty(t, rm.logView.lineInput)
 	assert.NotNil(t, cmd)
 }
 
@@ -180,10 +186,12 @@ func TestLogsNormalCopyCountPrefixYanksMultipleLines(t *testing.T) {
 func TestLogsNormalCopyCountClampsToRemaining(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:     []string{"a", "b", "c"},
-		logCursor:    1,
-		logLineInput: "100",
-		tabs:         []TabState{{}},
+		logView: logViewState{
+			lines:     []string{"a", "b", "c"},
+			cursor:    1,
+			lineInput: "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("y"))
 	rm := ret.(Model)

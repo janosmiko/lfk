@@ -6,11 +6,11 @@ import (
 
 // logDisplayLine returns the log line as shown on screen (timestamps/prefixes stripped).
 func (m *Model) logDisplayLine(lineIdx int) string {
-	line := m.logLines[lineIdx]
-	if !m.logTimestamps {
+	line := m.logView.lines[lineIdx]
+	if !m.logView.timestamps {
 		line = ui.StripTimestamp(line)
 	}
-	if m.logHidePrefixes {
+	if m.logView.hidePrefixes {
 		line = ui.StripPodPrefix(line)
 	}
 	return line
@@ -18,9 +18,9 @@ func (m *Model) logDisplayLine(lineIdx int) string {
 
 // logJumpToCol sets the cursor to the given line and rune column.
 func (m *Model) logJumpToCol(lineIdx, runeCol int) {
-	m.logCursor = lineIdx
-	m.logVisualCurCol = runeCol
-	m.logFollow = false
+	m.logView.cursor = lineIdx
+	m.logView.visualCurCol = runeCol
+	m.logView.follow = false
 	m.ensureLogCursorVisible()
 }
 
@@ -50,13 +50,13 @@ func (m *Model) logFindLastMatch(lineIdx int, query string) bool {
 }
 
 func (m *Model) findNextLogMatch(forward bool) {
-	if m.logSearchQuery == "" {
+	if m.logView.searchQuery == "" {
 		return
 	}
-	rawQuery := m.logSearchQuery
-	start := m.logCursor
+	rawQuery := m.logView.searchQuery
+	start := m.logView.cursor
 	if start < 0 {
-		start = m.logScroll
+		start = m.logView.scroll
 	}
 
 	if forward {
@@ -68,23 +68,23 @@ func (m *Model) findNextLogMatch(forward bool) {
 
 func (m *Model) findNextLogMatchForward(rawQuery string, start int) {
 	// Check for another match on the current line after the cursor.
-	if start >= 0 && start < len(m.logLines) {
+	if start >= 0 && start < len(m.logView.lines) {
 		dl := m.logDisplayLine(start)
 		runes := []rune(dl)
 		// Clamp: logVisualCurCol carries the column from a previously
 		// focused line and may exceed this line's rune length. Forward
 		// uses +1 because the search starts after (not at) the cursor.
-		end := min(m.logVisualCurCol+1, len(runes))
+		end := min(m.logView.visualCurCol+1, len(runes))
 		curBytePos := len(string(runes[:end]))
 		if curBytePos < len(dl) {
 			col := ui.FindColumnInLine(dl[curBytePos:], rawQuery)
 			if col >= 0 {
-				m.logJumpToCol(start, m.logVisualCurCol+1+col)
+				m.logJumpToCol(start, m.logView.visualCurCol+1+col)
 				return
 			}
 		}
 	}
-	for i := start + 1; i < len(m.logLines); i++ {
+	for i := start + 1; i < len(m.logView.lines); i++ {
 		if m.logFindFirstMatch(i, rawQuery) {
 			return
 		}
@@ -98,12 +98,12 @@ func (m *Model) findNextLogMatchForward(rawQuery string, start int) {
 
 func (m *Model) findNextLogMatchBackward(rawQuery string, start int) {
 	// Check for a match on the current line before the cursor.
-	if start >= 0 && start < len(m.logLines) {
+	if start >= 0 && start < len(m.logView.lines) {
 		dl := m.logDisplayLine(start)
 		runes := []rune(dl)
 		// Clamp: logVisualCurCol may exceed this line's rune length;
 		// backward search ends at (excluding) the cursor.
-		end := min(m.logVisualCurCol, len(runes))
+		end := min(m.logView.visualCurCol, len(runes))
 		curBytePos := len(string(runes[:end]))
 		if curBytePos > 0 {
 			lastCol := findLastMatchInStr(dl[:curBytePos], rawQuery)
@@ -118,7 +118,7 @@ func (m *Model) findNextLogMatchBackward(rawQuery string, start int) {
 			return
 		}
 	}
-	for i := len(m.logLines) - 1; i >= start; i-- {
+	for i := len(m.logView.lines) - 1; i >= start; i-- {
 		if m.logFindLastMatch(i, rawQuery) {
 			return
 		}

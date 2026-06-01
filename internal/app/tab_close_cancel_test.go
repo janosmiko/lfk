@@ -39,17 +39,19 @@ func modelWithLogCancels(t *testing.T, calls *[]string) Model {
 		},
 	}
 	return Model{
-		tabs:             tabs,
-		activeTab:        1,
-		nav:              tabs[1].nav,
-		logCancel:        recordCancelFn("active-stream", calls),
-		logHistoryCancel: recordCancelFn("active-history", calls),
-		width:            120,
-		height:           30,
-		mode:             modeExplorer,
-		selectedItems:    make(map[string]bool),
-		cursorMemory:     make(map[string]int),
-		itemCache:        make(map[string][]model.Item),
+		tabs:      tabs,
+		activeTab: 1,
+		nav:       tabs[1].nav,
+		logView: logViewState{
+			cancel:        recordCancelFn("active-stream", calls),
+			historyCancel: recordCancelFn("active-history", calls),
+		},
+		width:         120,
+		height:        30,
+		mode:          modeExplorer,
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
 		yamlView: yamlViewState{
 			collapsed: make(map[string]bool),
 		},
@@ -80,8 +82,8 @@ func TestCancelAllTabLogStreams_CancelsEveryStreamAndHistory(t *testing.T) {
 
 	// All cancel pointers must be nil after calling so a second invocation
 	// is a no-op (idempotent).
-	assert.Nil(t, m.logCancel)
-	assert.Nil(t, m.logHistoryCancel)
+	assert.Nil(t, m.logView.cancel)
+	assert.Nil(t, m.logView.historyCancel)
 	for i := range m.tabs {
 		assert.Nilf(t, m.tabs[i].logCancel, "tab %d logCancel must be nil after helper", i)
 	}
@@ -154,15 +156,17 @@ func TestCloseTabOrQuit_NoConfirmQuitCancelsAllStreams(t *testing.T) {
 			nav:       model.NavigationState{Context: "prod", Level: model.LevelResources},
 			logCancel: recordCancelFn("tab0-stream", &calls),
 		}},
-		activeTab:        0,
-		nav:              model.NavigationState{Context: "prod", Level: model.LevelResources},
-		logCancel:        recordCancelFn("active-stream", &calls),
-		logHistoryCancel: recordCancelFn("active-history", &calls),
-		width:            120,
-		height:           30,
-		selectedItems:    make(map[string]bool),
-		cursorMemory:     make(map[string]int),
-		itemCache:        make(map[string][]model.Item),
+		activeTab: 0,
+		nav:       model.NavigationState{Context: "prod", Level: model.LevelResources},
+		logView: logViewState{
+			cancel:        recordCancelFn("active-stream", &calls),
+			historyCancel: recordCancelFn("active-history", &calls),
+		},
+		width:         120,
+		height:        30,
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
 		yamlView: yamlViewState{
 			collapsed: make(map[string]bool),
 		},

@@ -802,16 +802,16 @@ func TestP4LogKeyQ(t *testing.T) {
 func TestP4LogKeyF(t *testing.T) {
 	m := bp4()
 	m.mode = modeLogs
-	m.logFollow = false
+	m.logView.follow = false
 	result, _ := m.handleKey(keyMsg("f"))
 	rm := result.(Model)
-	assert.True(t, rm.logFollow)
+	assert.True(t, rm.logView.follow)
 }
 
 func TestP4LogKeyW(t *testing.T) {
 	m := bp4()
 	m.mode = modeLogs
-	m.logWrap = false
+	m.logView.wrap = false
 	result, _ := m.handleKey(keyMsg("w"))
 	rm := result.(Model)
 	// 'w' toggles wrap. The actual key might be different.
@@ -821,19 +821,19 @@ func TestP4LogKeyW(t *testing.T) {
 func TestP4LogKeyS(t *testing.T) {
 	m := bp4()
 	m.mode = modeLogs
-	m.logTimestamps = false
+	m.logView.timestamps = false
 	result, _ := m.handleKey(keyMsg("s"))
 	rm := result.(Model)
-	assert.True(t, rm.logTimestamps)
+	assert.True(t, rm.logView.timestamps)
 }
 
 func TestP4LogKeyNumber(t *testing.T) {
 	m := bp4()
 	m.mode = modeLogs
-	m.logLineNumbers = false
+	m.logView.lineNumbers = false
 	result, _ := m.handleKey(keyMsg("#"))
 	rm := result.(Model)
-	assert.True(t, rm.logLineNumbers)
+	assert.True(t, rm.logView.lineNumbers)
 }
 
 func TestP4LogKeyHelp(t *testing.T) {
@@ -847,12 +847,12 @@ func TestP4LogKeyHelp(t *testing.T) {
 func TestP4LogKeyGG(t *testing.T) {
 	m := bp4()
 	m.mode = modeLogs
-	m.logLines = []string{"line1", "line2", "line3"}
-	m.logScroll = 2
+	m.logView.lines = []string{"line1", "line2", "line3"}
+	m.logView.scroll = 2
 	m.pendingG = true
 	result, _ := m.handleKey(keyMsg("g"))
 	rm := result.(Model)
-	assert.Equal(t, 0, rm.logScroll)
+	assert.Equal(t, 0, rm.logView.scroll)
 }
 
 func TestP4LogKeyG(t *testing.T) {
@@ -1475,7 +1475,7 @@ func TestCovHandleKeyDispatchToSearch(t *testing.T) {
 func TestCovHandleKeyDispatchToLogs(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeLogs
-	m.logLines = []string{"l1"}
+	m.logView.lines = []string{"l1"}
 	result, _ := m.handleKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)

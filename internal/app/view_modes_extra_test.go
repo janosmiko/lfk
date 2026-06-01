@@ -16,12 +16,14 @@ func TestLogMaxScrollWrapWithLineNumbers(t *testing.T) {
 		lines[i] = "a short line"
 	}
 	m := Model{
-		height:         20,
-		width:          80,
-		tabs:           []TabState{{}},
-		logLines:       lines,
-		logWrap:        true,
-		logLineNumbers: true,
+		height: 20,
+		width:  80,
+		tabs:   []TabState{{}},
+		logView: logViewState{
+			lines:       lines,
+			wrap:        true,
+			lineNumbers: true,
+		},
 	}
 	ms := m.logMaxScroll()
 	assert.GreaterOrEqual(t, ms, 0)
@@ -113,10 +115,12 @@ func TestViewExecTerminalNilTerm(t *testing.T) {
 
 func TestEnsureLogCursorVisibleEmptyLog(t *testing.T) {
 	m := Model{
-		height:    20,
-		width:     80,
-		tabs:      []TabState{{}},
-		logCursor: 5,
+		height: 20,
+		width:  80,
+		tabs:   []TabState{{}},
+		logView: logViewState{
+			cursor: 5,
+		},
 	}
 	m.ensureLogCursorVisible()
 	// With no log lines, cursor is clamped to -1.
@@ -132,15 +136,17 @@ func TestClampLogScrollWithLineNumbers(t *testing.T) {
 		lines[i] = "log line content"
 	}
 	m := Model{
-		height:         20,
-		width:          80,
-		tabs:           []TabState{{}},
-		logLines:       lines,
-		logWrap:        true,
-		logLineNumbers: true,
-		logScroll:      200,
+		height: 20,
+		width:  80,
+		tabs:   []TabState{{}},
+		logView: logViewState{
+			lines:       lines,
+			wrap:        true,
+			lineNumbers: true,
+			scroll:      200,
+		},
 	}
 	m.clampLogScroll()
-	assert.GreaterOrEqual(t, m.logScroll, 0)
-	assert.LessOrEqual(t, m.logScroll, len(lines))
+	assert.GreaterOrEqual(t, m.logView.scroll, 0)
+	assert.LessOrEqual(t, m.logView.scroll, len(lines))
 }

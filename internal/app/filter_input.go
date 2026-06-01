@@ -148,9 +148,9 @@ func (m *Model) resolvePasteTarget(id pasteTarget) FilterInput {
 	case pasteTargetBookmarkFilter:
 		return &m.bookmarkFilter
 	case pasteTargetLogPodFilter:
-		return &stringFilterInput{ptr: &m.logPodFilterText}
+		return &stringFilterInput{ptr: &m.logView.podFilterText}
 	case pasteTargetLogContainerFilter:
-		return &stringFilterInput{ptr: &m.logContainerFilterText}
+		return &stringFilterInput{ptr: &m.logView.containerFilterText}
 	default:
 		return nil
 	}

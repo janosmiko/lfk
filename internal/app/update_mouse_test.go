@@ -140,51 +140,57 @@ func TestMouseWheelOverMiddlePaneMovesCursor(t *testing.T) {
 
 func TestMouseWheelUpInLogMode(t *testing.T) {
 	m := Model{
-		mode:      modeLogs,
-		logLines:  make([]string, 100),
-		logScroll: 50,
-		logFollow: true,
-		height:    30,
-		width:     80,
-		tabs:      []TabState{{}},
+		mode: modeLogs,
+		logView: logViewState{
+			lines:  make([]string, 100),
+			scroll: 50,
+			follow: true,
+		},
+		height: 30,
+		width:  80,
+		tabs:   []TabState{{}},
 	}
 
 	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
 	result := ret.(Model)
-	assert.False(t, result.logFollow)
-	assert.Less(t, result.logScroll, 50)
+	assert.False(t, result.logView.follow)
+	assert.Less(t, result.logView.scroll, 50)
 }
 
 func TestMouseWheelDownInLogMode(t *testing.T) {
 	m := Model{
-		mode:      modeLogs,
-		logLines:  make([]string, 100),
-		logScroll: 5,
-		logFollow: true,
-		height:    30,
-		width:     80,
-		tabs:      []TabState{{}},
+		mode: modeLogs,
+		logView: logViewState{
+			lines:  make([]string, 100),
+			scroll: 5,
+			follow: true,
+		},
+		height: 30,
+		width:  80,
+		tabs:   []TabState{{}},
 	}
 
 	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
 	result := ret.(Model)
-	assert.False(t, result.logFollow)
-	assert.Greater(t, result.logScroll, 5)
+	assert.False(t, result.logView.follow)
+	assert.Greater(t, result.logView.scroll, 5)
 }
 
 func TestMouseWheelUpInLogModeAtZero(t *testing.T) {
 	m := Model{
-		mode:      modeLogs,
-		logLines:  make([]string, 10),
-		logScroll: 0,
-		height:    30,
-		width:     80,
-		tabs:      []TabState{{}},
+		mode: modeLogs,
+		logView: logViewState{
+			lines:  make([]string, 10),
+			scroll: 0,
+		},
+		height: 30,
+		width:  80,
+		tabs:   []TabState{{}},
 	}
 
 	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
 	result := ret.(Model)
-	assert.Equal(t, 0, result.logScroll)
+	assert.Equal(t, 0, result.logView.scroll)
 }
 
 // --- handleMouse: overlay mode ignores mouse ---
@@ -640,7 +646,7 @@ func TestCov80SwitchToTabLogs(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeLogs
 	ch := make(chan string, 1)
-	m.logCh = ch
+	m.logView.ch = ch
 	m.tabs = []TabState{{}, {}}
 	m.activeTab = 0
 	// Pre-fill the second tab so loadTab restores it.
@@ -668,21 +674,21 @@ func TestCov80SwitchToTabNilCmd(t *testing.T) {
 func TestCov80HandleMouseWheelUpInLogs(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeLogs
-	m.logScroll = 10
+	m.logView.scroll = 10
 	msg := tea.MouseMsg{Button: tea.MouseButtonWheelUp}
 	result, _ := m.handleMouse(msg)
 	rm := result.(Model)
-	assert.Less(t, rm.logScroll, 10)
+	assert.Less(t, rm.logView.scroll, 10)
 }
 
 func TestCov80HandleMouseWheelDownInLogs(t *testing.T) {
 	m := basePush80Model()
 	m.mode = modeLogs
-	m.logScroll = 0
+	m.logView.scroll = 0
 	msg := tea.MouseMsg{Button: tea.MouseButtonWheelDown}
 	result, _ := m.handleMouse(msg)
 	rm := result.(Model)
-	assert.GreaterOrEqual(t, rm.logScroll, 0)
+	assert.GreaterOrEqual(t, rm.logView.scroll, 0)
 }
 
 func TestCov80HandleMouseInOverlay(t *testing.T) {
@@ -729,22 +735,22 @@ func TestCovSwitchToTab(t *testing.T) {
 func TestCovMouseScrollUpInLogs(t *testing.T) {
 	m := baseModelActions()
 	m.mode = modeLogs
-	m.logScroll = 5
-	m.logLines = make([]string, 20)
+	m.logView.scroll = 5
+	m.logView.lines = make([]string, 20)
 	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
 	rm := result.(Model)
-	assert.Less(t, rm.logScroll, 5)
-	assert.False(t, rm.logFollow)
+	assert.Less(t, rm.logView.scroll, 5)
+	assert.False(t, rm.logView.follow)
 }
 
 func TestCovMouseScrollDownInLogs(t *testing.T) {
 	m := baseModelActions()
 	m.mode = modeLogs
-	m.logScroll = 0
-	m.logLines = make([]string, 20)
+	m.logView.scroll = 0
+	m.logView.lines = make([]string, 20)
 	result, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
 	rm := result.(Model)
-	assert.GreaterOrEqual(t, rm.logScroll, 0)
+	assert.GreaterOrEqual(t, rm.logView.scroll, 0)
 }
 
 func TestCovMouseInOverlay(t *testing.T) {

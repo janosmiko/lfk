@@ -798,13 +798,13 @@ func TestFilteredLogPodItems(t *testing.T) {
 	}
 
 	t.Run("no filter returns all", func(t *testing.T) {
-		m.logPodFilterText = ""
+		m.logView.podFilterText = ""
 		result := m.filteredLogPodItems()
 		assert.Len(t, result, 3)
 	})
 
 	t.Run("filter matches subset", func(t *testing.T) {
-		m.logPodFilterText = "nginx"
+		m.logView.podFilterText = "nginx"
 		result := m.filteredLogPodItems()
 		assert.Len(t, result, 2)
 	})
@@ -885,7 +885,7 @@ func TestFilteredLogContainerItems(t *testing.T) {
 	}
 
 	t.Run("no filter returns all", func(t *testing.T) {
-		m.logContainerFilterText = ""
+		m.logView.containerFilterText = ""
 		result := m.filteredLogContainerItems()
 		assert.Len(t, result, 3)
 	})
@@ -895,14 +895,14 @@ func TestFilteredLogContainerItems(t *testing.T) {
 	// clutters the filtered list and breaks the muscle-memory consistency
 	// across selectors.
 	t.Run("filter excludes All Containers when name does not match", func(t *testing.T) {
-		m.logContainerFilterText = "nginx"
+		m.logView.containerFilterText = "nginx"
 		result := m.filteredLogContainerItems()
 		assert.Len(t, result, 1)
 		assert.Equal(t, "nginx", result[0].Name)
 	})
 
 	t.Run("filter matches All Containers by name", func(t *testing.T) {
-		m.logContainerFilterText = "All"
+		m.logView.containerFilterText = "All"
 		result := m.filteredLogContainerItems()
 		assert.Len(t, result, 1)
 		assert.Equal(t, "All Containers", result[0].Name)

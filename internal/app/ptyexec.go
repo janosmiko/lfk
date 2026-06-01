@@ -233,7 +233,7 @@ func (m Model) execSwitchTab(target int) (tea.Model, tea.Cmd) {
 	case modeExplorer:
 		return m, m.loadPreview()
 	case modeLogs:
-		if m.logCh != nil {
+		if m.logView.ch != nil {
 			return m, m.waitForLogLine()
 		}
 	case modeExec:

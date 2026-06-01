@@ -361,11 +361,11 @@ func TestCovContainerSelectOverlayKeyUp(t *testing.T) {
 func TestCovPodSelectOverlayKeyEscClearsFilter(t *testing.T) {
 	m := baseModelHandlers2()
 	m.overlay = overlayPodSelect
-	m.logPodFilterText = "test"
+	m.logView.podFilterText = "test"
 	m.overlayItems = []model.Item{{Name: "pod-1"}}
 	result, _ := m.handlePodSelectOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.Empty(t, rm.logPodFilterText)
+	assert.Empty(t, rm.logView.podFilterText)
 }
 
 func TestCovPodSelectOverlayKeyEscClosesOverlay(t *testing.T) {
@@ -390,7 +390,7 @@ func TestCovPodSelectOverlayKeySlash(t *testing.T) {
 	m.overlay = overlayPodSelect
 	result, _ := m.handlePodSelectOverlayKey(keyMsg("/"))
 	rm := result.(Model)
-	assert.True(t, rm.logPodFilterActive)
+	assert.True(t, rm.logView.podFilterActive)
 }
 
 func TestCovColorschemeOverlayKeyEsc(t *testing.T) {

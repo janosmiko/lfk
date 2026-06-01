@@ -820,13 +820,13 @@ func TestUpdateLogContainersLoadedMultiple(t *testing.T) {
 	mdl := result.(Model)
 	assert.Equal(t, overlayLogContainerSelect, mdl.overlay,
 		"handler must open the overlay once containers have loaded")
-	assert.Equal(t, "app", mdl.logContainers[0])
+	assert.Equal(t, "app", mdl.logView.containers[0])
 	assert.Len(t, mdl.overlayItems, 4) // "All Containers" + 3
 	assert.Equal(t, "All Containers", mdl.overlayItems[0].Name)
 	assert.Equal(t, 0, mdl.overlayCursor, "cursor must reset to top of new overlay")
-	assert.Empty(t, mdl.logContainerFilterText, "filter text must be clear when overlay opens")
-	assert.False(t, mdl.logContainerFilterActive, "filter must be inactive when overlay opens")
-	assert.False(t, mdl.logContainerSelectionModified, "modified flag must be false on a fresh open")
+	assert.Empty(t, mdl.logView.containerFilterText, "filter text must be clear when overlay opens")
+	assert.False(t, mdl.logView.containerFilterActive, "filter must be inactive when overlay opens")
+	assert.False(t, mdl.logView.containerSelectionModified, "modified flag must be false on a fresh open")
 	assert.False(t, mdl.loading, "loading flag must be cleared once data is ready")
 	assert.Nil(t, cmd)
 }
@@ -1921,23 +1921,23 @@ func TestUpdateCanISAListSuccess(t *testing.T) {
 
 func TestUpdateLogHistoryError(t *testing.T) {
 	m := baseModel()
-	m.logLoadingHistory = true
+	m.logView.loadingHistory = true
 
 	result, cmd := m.Update(logHistoryMsg{err: errors.New("fetch failed")})
 	mdl := result.(Model)
-	assert.False(t, mdl.logLoadingHistory)
-	assert.False(t, mdl.logHasMoreHistory)
+	assert.False(t, mdl.logView.loadingHistory)
+	assert.False(t, mdl.logView.hasMoreHistory)
 	assert.Nil(t, cmd)
 }
 
 func TestUpdateLogHistoryNotInLogMode(t *testing.T) {
 	m := baseModel()
 	m.mode = modeExplorer
-	m.logLoadingHistory = true
+	m.logView.loadingHistory = true
 
 	result, cmd := m.Update(logHistoryMsg{lines: []string{"line1", "line2"}})
 	mdl := result.(Model)
-	assert.False(t, mdl.logLoadingHistory)
+	assert.False(t, mdl.logView.loadingHistory)
 	assert.Nil(t, cmd) // not in log mode, skip
 }
 
@@ -1948,21 +1948,21 @@ func TestUpdateLogHistoryNotInLogMode(t *testing.T) {
 func TestUpdateLogHistoryAtTopKeepsCursor(t *testing.T) {
 	m := baseModel()
 	m.mode = modeLogs
-	m.logLoadingHistory = true
-	m.logLines = []string{"existing-1", "existing-2", "existing-3"}
-	m.logCursor = 0
-	m.logScroll = 0
+	m.logView.loadingHistory = true
+	m.logView.lines = []string{"existing-1", "existing-2", "existing-3"}
+	m.logView.cursor = 0
+	m.logView.scroll = 0
 
 	result, _ := m.Update(logHistoryMsg{
 		lines:     []string{"older1", "older2", "existing-1", "existing-2", "existing-3"},
 		prevTotal: 3,
 	})
 	mdl := result.(Model)
-	assert.False(t, mdl.logLoadingHistory)
-	assert.Equal(t, 0, mdl.logCursor, "cursor must remain at top to reveal older lines")
-	assert.Equal(t, 0, mdl.logScroll, "scroll must remain at top to reveal older lines")
-	assert.Equal(t, 5, len(mdl.logLines))
-	assert.Equal(t, "older1", mdl.logLines[0])
+	assert.False(t, mdl.logView.loadingHistory)
+	assert.Equal(t, 0, mdl.logView.cursor, "cursor must remain at top to reveal older lines")
+	assert.Equal(t, 0, mdl.logView.scroll, "scroll must remain at top to reveal older lines")
+	assert.Equal(t, 5, len(mdl.logView.lines))
+	assert.Equal(t, "older1", mdl.logView.lines[0])
 }
 
 // When the user has scrolled away from the top while the async history
@@ -1971,18 +1971,18 @@ func TestUpdateLogHistoryAtTopKeepsCursor(t *testing.T) {
 func TestUpdateLogHistoryMidScrollPreservesPosition(t *testing.T) {
 	m := baseModel()
 	m.mode = modeLogs
-	m.logLoadingHistory = true
-	m.logLines = []string{"existing-1", "existing-2", "existing-3"}
-	m.logCursor = 2
-	m.logScroll = 1
+	m.logView.loadingHistory = true
+	m.logView.lines = []string{"existing-1", "existing-2", "existing-3"}
+	m.logView.cursor = 2
+	m.logView.scroll = 1
 
 	result, _ := m.Update(logHistoryMsg{
 		lines:     []string{"older1", "older2", "existing-1", "existing-2", "existing-3"},
 		prevTotal: 3,
 	})
 	mdl := result.(Model)
-	assert.Equal(t, 4, mdl.logCursor, "cursor shifted by 2 prepended lines")
-	assert.Equal(t, 3, mdl.logScroll, "scroll shifted by 2 prepended lines")
+	assert.Equal(t, 4, mdl.logView.cursor, "cursor shifted by 2 prepended lines")
+	assert.Equal(t, 3, mdl.logView.scroll, "scroll shifted by 2 prepended lines")
 }
 
 // Same at-top guard applies on the no-overlap fallback path (logs may
@@ -1991,20 +1991,20 @@ func TestUpdateLogHistoryMidScrollPreservesPosition(t *testing.T) {
 func TestUpdateLogHistoryNoOverlapAtTopKeepsCursor(t *testing.T) {
 	m := baseModel()
 	m.mode = modeLogs
-	m.logLoadingHistory = true
-	m.logLines = []string{"current-1", "current-2", "current-3"}
-	m.logCursor = 0
-	m.logScroll = 0
+	m.logView.loadingHistory = true
+	m.logView.lines = []string{"current-1", "current-2", "current-3"}
+	m.logView.cursor = 0
+	m.logView.scroll = 0
 
 	result, _ := m.Update(logHistoryMsg{
 		lines:     []string{"rotated-1", "rotated-2"}, // no overlap with current
 		prevTotal: 3,
 	})
 	mdl := result.(Model)
-	assert.Equal(t, 0, mdl.logCursor)
-	assert.Equal(t, 0, mdl.logScroll)
-	assert.Equal(t, 5, len(mdl.logLines))
-	assert.Equal(t, "rotated-1", mdl.logLines[0])
+	assert.Equal(t, 0, mdl.logView.cursor)
+	assert.Equal(t, 0, mdl.logView.scroll)
+	assert.Equal(t, 5, len(mdl.logView.lines))
+	assert.Equal(t, "rotated-1", mdl.logView.lines[0])
 }
 
 // --- logSaveAllMsg ---

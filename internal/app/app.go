@@ -232,72 +232,12 @@ type Model struct {
 	searchPrevCursor int
 	searchBroadMode  bool // Tab toggle inside search input: also match column values
 
-	// Log viewer state.
-	logLines          []string           // buffered log lines
-	logScroll         int                // scroll offset (top visible source line)
-	logWrapTopSkip    int                // wrap mode: number of sub-lines to skip from the top of logLines[logScroll]
-	logFollow         bool               // auto-scroll to bottom
-	logWrap           bool               // wrap long lines
-	logLineNumbers    bool               // show line numbers
-	logTimestamps     bool               // show timestamps (--timestamps)
-	logHidePrefixes   bool               // hide [pod/name/container] prefixes
-	logPreviewVisible bool               // show structured preview side panel
-	logPreviewScroll  int                // body-row offset within the preview pane (J/K)
-	logPrevious       bool               // show previous container logs (--previous)
-	logIsMulti        bool               // multi-log stream (for restart)
-	logMultiItems     []model.Item       // items for multi-log restart
-	logTitle          string             // title for the log overlay
-	logCancel         context.CancelFunc // cancel the kubectl log process
-	logCh             chan string        // channel for streaming log lines
-	logTailLines      int                // current --tail value for the active stream
-	logHasMoreHistory bool               // true if older lines may exist
-	logLoadingHistory bool               // true while fetching older logs
-	logHistoryCancel  context.CancelFunc // cancel for the history fetch
-	logCursor         int                // cursor position (absolute line index), -1 when inactive
-	logVisualMode     bool               // true when in visual line selection mode
-	logVisualStart    int                // anchor line where visual selection started
-	logVisualType     rune               // 'V' = line, 'v' = char, 'B' = block
-	logVisualCol      int                // character column of anchor (for char and block modes)
-	logVisualCurCol   int                // current cursor column (for char and block modes)
-	logScrollOption   int                // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
-
-	// Log viewer: parent resource context for pod re-selection.
-	logParentKind   string // original parent resource kind (e.g., "Deployment")
-	logParentName   string // original parent resource name
-	logSavedPodName string // saved pod name before overlay, for restoring on cancel
-
-	// Log viewer: auto-reconnect for multi-container Pods. When following all
-	// containers of a Pod, the kubectl stream ends as soon as the current set
-	// of containers all exit (e.g. an init container finishes before the next
-	// one has started). logAutoReconnectAttempt counts consecutive empty
-	// reconnects so we can give up when the pod is really terminated. It is
-	// reset to 0 every time a line arrives. logReconnecting tells
-	// startLogStream to suppress --tail so we don't re-fetch history we
-	// already have.
-	logAutoReconnectAttempt int
-	logReconnecting         bool
-
-	// Log viewer: container filter state.
-	logContainers         []string // available container names for current pod
-	logSelectedContainers []string // which containers are currently selected (empty = all)
-
-	// Log pod selector filter state.
-	logPodFilterText   string
-	logPodFilterActive bool
-
-	// Log container selector filter state.
-	logContainerFilterText        string
-	logContainerFilterActive      bool
-	logContainerSelectionModified bool
-
-	// Log viewer: jump to line (digits + G).
-	logLineInput string
-
-	// Log viewer: search state.
-	logSearchActive  bool
-	logSearchInput   TextInput
-	logSearchQuery   string // applied search
-	logSearchHistory *commandHistory
+	// Inline log viewer state: buffered lines, scroll/cursor, follow/wrap/
+	// timestamps toggles, the streaming channel and cancel handles, container
+	// filter and selection, pod/container selector filters, and search.
+	// Extracted from the formerly flat log* fields into one cohesive value;
+	// see logview.go.
+	logView logViewState
 
 	// Full-screen describe viewer state (kubectl-describe output): content,
 	// scroll/cursor, auto-refresh, search, and visual selection. Extracted

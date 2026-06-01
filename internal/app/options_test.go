@@ -143,7 +143,7 @@ func TestNewModel_LogPreviewVisibleByDefault(t *testing.T) {
 	client := newTestClientForOptions(t)
 	m := NewModel(client, StartupOptions{})
 
-	assert.True(t, m.logPreviewVisible,
+	assert.True(t, m.logView.previewVisible,
 		"log preview side panel should be visible by default; users can toggle off with P")
 }
 

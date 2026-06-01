@@ -6,12 +6,12 @@ import (
 
 func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// Handle log search input mode.
-	if m.logSearchActive {
+	if m.logView.searchActive {
 		return m.handleLogSearchKey(msg)
 	}
 
 	// Handle visual select mode keys.
-	if m.logVisualMode {
+	if m.logView.visualMode {
 		return m.handleLogVisualKey(msg)
 	}
 
@@ -23,7 +23,7 @@ func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	if ret, cmd, ok := m.handleLogActionKey(msg); ok {
 		return ret, cmd
 	}
-	m.logLineInput = ""
+	m.logView.lineInput = ""
 	return m, nil
 }
 
@@ -56,9 +56,9 @@ func (m Model) handleLogMovementKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return ret, cmd, true
 	case "home":
 		m.pendingG = false
-		m.logCursor = 0
-		m.logScroll = 0
-		m.logFollow = false
+		m.logView.cursor = 0
+		m.logView.scroll = 0
+		m.logView.follow = false
 		return m, nil, true
 	case "h", "left":
 		ret := m.handleLogKeyH()
@@ -94,7 +94,7 @@ func (m Model) handleLogMovementKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		ret := m.handleLogKeyZero()
 		return ret, nil, true
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		m.logLineInput += msg.String()
+		m.logView.lineInput += msg.String()
 		return m, nil, true
 	}
 	return m, nil, false
@@ -143,13 +143,13 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		ret := m.handleLogKeyP2()
 		return ret, nil, true
 	case "J":
-		if !m.logPreviewVisible {
+		if !m.logView.previewVisible {
 			return m, nil, false
 		}
 		ret := m.handleLogKeyJ2()
 		return ret, nil, true
 	case "K":
-		if !m.logPreviewVisible {
+		if !m.logView.previewVisible {
 			return m, nil, false
 		}
 		ret := m.handleLogKeyK2()
@@ -186,12 +186,12 @@ func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch key {
 	case "esc":
-		m.logVisualMode = false
+		m.logView.visualMode = false
 		return m, nil
 	case "i", "a":
 		// Clear any digit prefix accumulated before visual entry so it can't
 		// leak into a later counted command via the post-visual normal mode.
-		m.logLineInput = ""
+		m.logView.lineInput = ""
 		m.pendingTextObject = key[0]
 		return m, nil
 	case "V":
@@ -225,10 +225,10 @@ func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+u":
 		return m.handleLogVisualKeyCtrlU()
 	case "ctrl+c":
-		m.logVisualMode = false
+		m.logView.visualMode = false
 		return m.closeTabOrQuit()
 	case "q":
-		m.logVisualMode = false
+		m.logView.visualMode = false
 		return m, nil
 	case "$":
 		return m.handleLogVisualKeyDollar()
@@ -245,7 +245,7 @@ func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "B":
 		return m.handleLogVisualKeyB2()
 	case "0":
-		m.logVisualCurCol = 0
+		m.logView.visualCurCol = 0
 		return m, nil
 	case "^":
 		return m.handleLogVisualKeyCaret()
@@ -256,59 +256,59 @@ func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleLogSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
-		m.logSearchActive = false
-		m.logSearchQuery = m.logSearchInput.Value
-		m.logSearchHistory.add(m.logSearchInput.Value)
-		m.logSearchHistory.save()
+		m.logView.searchActive = false
+		m.logView.searchQuery = m.logView.searchInput.Value
+		m.logView.searchHistory.add(m.logView.searchInput.Value)
+		m.logView.searchHistory.save()
 		m.findNextLogMatch(true)
 	case "esc":
-		m.logSearchActive = false
-		m.logSearchInput.Clear()
-		m.logSearchQuery = ""
+		m.logView.searchActive = false
+		m.logView.searchInput.Clear()
+		m.logView.searchQuery = ""
 	case "up":
-		m.logSearchInput.Set(m.logSearchHistory.up(m.logSearchInput.Value))
-		m.logSearchQuery = m.logSearchInput.Value
+		m.logView.searchInput.Set(m.logView.searchHistory.up(m.logView.searchInput.Value))
+		m.logView.searchQuery = m.logView.searchInput.Value
 	case "down":
-		m.logSearchInput.Set(m.logSearchHistory.down())
-		m.logSearchQuery = m.logSearchInput.Value
+		m.logView.searchInput.Set(m.logView.searchHistory.down())
+		m.logView.searchQuery = m.logView.searchInput.Value
 	case "backspace":
-		if len(m.logSearchInput.Value) > 0 {
-			m.logSearchInput.Backspace()
-			m.logSearchQuery = m.logSearchInput.Value
+		if len(m.logView.searchInput.Value) > 0 {
+			m.logView.searchInput.Backspace()
+			m.logView.searchQuery = m.logView.searchInput.Value
 			// Editing a recalled entry leaves history navigation but
 			// keeps the pre-recall draft intact, so a later Down past
 			// newest restores the original draft the user had before
 			// pressing Up — not the recalled-then-edited text.
-			m.logSearchHistory.leaveBrowse()
+			m.logView.searchHistory.leaveBrowse()
 		}
 	case "ctrl+w":
-		m.logSearchInput.DeleteWord()
-		m.logSearchQuery = m.logSearchInput.Value
-		m.logSearchHistory.leaveBrowse()
+		m.logView.searchInput.DeleteWord()
+		m.logView.searchQuery = m.logView.searchInput.Value
+		m.logView.searchHistory.leaveBrowse()
 	case "ctrl+u":
-		m.logSearchInput.DeleteLine()
-		m.logSearchQuery = m.logSearchInput.Value
-		m.logSearchHistory.leaveBrowse()
+		m.logView.searchInput.DeleteLine()
+		m.logView.searchQuery = m.logView.searchInput.Value
+		m.logView.searchHistory.leaveBrowse()
 	case "ctrl+a":
-		m.logSearchInput.Home()
+		m.logView.searchInput.Home()
 	case "ctrl+e":
-		m.logSearchInput.End()
+		m.logView.searchInput.End()
 	case "left":
-		m.logSearchInput.Left()
+		m.logView.searchInput.Left()
 	case "right":
-		m.logSearchInput.Right()
+		m.logView.searchInput.Right()
 	case "ctrl+c":
 		return m.closeTabOrQuit()
 	default:
 		key := msg.String()
 		if len(key) == 1 && key[0] >= 32 && key[0] < 127 {
-			m.logSearchInput.Insert(key)
+			m.logView.searchInput.Insert(key)
 			// Live-update the highlight query so matches paint as the user
 			// types. Enter still "commits" search-input mode and triggers
 			// findNextLogMatch; before that the user only saw the input
 			// echo with no feedback on whether the query matches anything.
-			m.logSearchQuery = m.logSearchInput.Value
-			m.logSearchHistory.leaveBrowse()
+			m.logView.searchQuery = m.logView.searchInput.Value
+			m.logView.searchHistory.leaveBrowse()
 		}
 	}
 	return m, nil

@@ -18,10 +18,12 @@ func TestBuildLogTitleBasic(t *testing.T) {
 
 func TestBuildLogTitleWithContainerFilter(t *testing.T) {
 	m := Model{
-		namespace:             "default",
-		actionCtx:             actionContext{name: "my-pod", namespace: "default"},
-		logContainers:         []string{"app", "sidecar", "init"},
-		logSelectedContainers: []string{"app", "sidecar"},
+		namespace: "default",
+		actionCtx: actionContext{name: "my-pod", namespace: "default"},
+		logView: logViewState{
+			containers:         []string{"app", "sidecar", "init"},
+			selectedContainers: []string{"app", "sidecar"},
+		},
 	}
 	title := m.buildLogTitle()
 	assert.Contains(t, title, "app")
@@ -30,10 +32,12 @@ func TestBuildLogTitleWithContainerFilter(t *testing.T) {
 
 func TestBuildLogTitleAllContainersSelected(t *testing.T) {
 	m := Model{
-		namespace:             "default",
-		actionCtx:             actionContext{name: "my-pod", namespace: "default"},
-		logContainers:         []string{"app", "sidecar"},
-		logSelectedContainers: []string{"app", "sidecar"}, // all selected
+		namespace: "default",
+		actionCtx: actionContext{name: "my-pod", namespace: "default"},
+		logView: logViewState{
+			containers:         []string{"app", "sidecar"},
+			selectedContainers: []string{"app", "sidecar"}, // all selected
+		},
 	}
 	title := m.buildLogTitle()
 	// When all containers are selected, no bracket filter is shown.

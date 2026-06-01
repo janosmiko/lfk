@@ -17,17 +17,19 @@ import (
 func runLogVisualTextObject(t *testing.T, line string, col int, op, motion byte) Model {
 	t.Helper()
 	m := Model{
-		mode:            modeLogs,
-		logLines:        []string{line},
-		logCursor:       0,
-		logVisualCurCol: col,
-		logVisualMode:   true,
-		logVisualType:   'v',
-		logVisualStart:  0,
-		logVisualCol:    col,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeLogs,
+		logView: logViewState{
+			lines:        []string{line},
+			cursor:       0,
+			visualCurCol: col,
+			visualMode:   true,
+			visualType:   'v',
+			visualStart:  0,
+			visualCol:    col,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	r1, _ := m.handleLogVisualKey(keyMsg(string(op)))
 	r2, _ := r1.(Model).handleLogVisualKey(keyMsg(string(motion)))
@@ -60,7 +62,7 @@ func TestLogTextObjectMatrix_AlphaBetaGamma(t *testing.T) {
 			clipText, _ := m.buildLogYankText()
 			assert.Equal(t, tc.wantClip, clipText, "clipboard text")
 			assert.Equal(t, tc.wantStatus, rm.statusMessage, "status message")
-			assert.False(t, rm.logVisualMode, "visual mode exits after yank")
+			assert.False(t, rm.logView.visualMode, "visual mode exits after yank")
 			assert.NotNil(t, cmd, "yank dispatches a clipboard command")
 		})
 	}
@@ -137,19 +139,21 @@ func TestLogTextObjectAtLineEnd(t *testing.T) {
 
 func TestLogTextObjectEmptyLine(t *testing.T) {
 	m := Model{
-		mode:          modeLogs,
-		logLines:      []string{""},
-		logVisualMode: true,
-		logVisualType: 'v',
-		tabs:          []TabState{{}},
-		width:         80,
-		height:        40,
+		mode: modeLogs,
+		logView: logViewState{
+			lines:      []string{""},
+			visualMode: true,
+			visualType: 'v',
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	r1, _ := m.handleLogVisualKey(keyMsg("i"))
 	r2, _ := r1.(Model).handleLogVisualKey(keyMsg("w"))
 	rm := r2.(Model)
 	// No crash; selection unchanged.
-	assert.True(t, rm.logVisualMode, "visual mode preserved")
+	assert.True(t, rm.logView.visualMode, "visual mode preserved")
 	assert.Equal(t, byte(0), rm.pendingTextObject, "operator cleared even on no-op")
 }
 
@@ -311,59 +315,65 @@ func TestEventsTextObjectMatrix(t *testing.T) {
 
 func TestLogTextObjectDowngradesLineMode(t *testing.T) {
 	m := Model{
-		mode:            modeLogs,
-		logLines:        []string{"alpha beta gamma"},
-		logCursor:       0,
-		logVisualCurCol: 7,
-		logVisualMode:   true,
-		logVisualType:   'V', // line mode
-		logVisualStart:  0,
-		logVisualCol:    7,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeLogs,
+		logView: logViewState{
+			lines:        []string{"alpha beta gamma"},
+			cursor:       0,
+			visualCurCol: 7,
+			visualMode:   true,
+			visualType:   'V', // line mode
+			visualStart:  0,
+			visualCol:    7,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	r1, _ := m.handleLogVisualKey(keyMsg("i"))
 	r2, _ := r1.(Model).handleLogVisualKey(keyMsg("w"))
 	rm := r2.(Model)
-	assert.Equal(t, rune('v'), rm.logVisualType, "line mode downgraded to char mode after iw")
+	assert.Equal(t, rune('v'), rm.logView.visualType, "line mode downgraded to char mode after iw")
 }
 
 func TestLogTextObjectDowngradesBlockMode(t *testing.T) {
 	m := Model{
-		mode:            modeLogs,
-		logLines:        []string{"alpha beta gamma"},
-		logCursor:       0,
-		logVisualCurCol: 7,
-		logVisualMode:   true,
-		logVisualType:   'B', // block mode
-		logVisualStart:  0,
-		logVisualCol:    7,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeLogs,
+		logView: logViewState{
+			lines:        []string{"alpha beta gamma"},
+			cursor:       0,
+			visualCurCol: 7,
+			visualMode:   true,
+			visualType:   'B', // block mode
+			visualStart:  0,
+			visualCol:    7,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	r1, _ := m.handleLogVisualKey(keyMsg("i"))
 	r2, _ := r1.(Model).handleLogVisualKey(keyMsg("w"))
 	rm := r2.(Model)
-	assert.Equal(t, rune('v'), rm.logVisualType, "block mode downgraded to char mode after iw")
+	assert.Equal(t, rune('v'), rm.logView.visualType, "block mode downgraded to char mode after iw")
 }
 
 // --- regression: line-mode yank still says lines, not characters ---
 
 func TestLineModeYankStillReportsLines(t *testing.T) {
 	m := Model{
-		mode:            modeLogs,
-		logLines:        []string{"alpha", "beta"},
-		logCursor:       1,
-		logVisualMode:   true,
-		logVisualType:   'V',
-		logVisualStart:  0,
-		logVisualCol:    0,
-		logVisualCurCol: 0,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeLogs,
+		logView: logViewState{
+			lines:        []string{"alpha", "beta"},
+			cursor:       1,
+			visualMode:   true,
+			visualType:   'V',
+			visualStart:  0,
+			visualCol:    0,
+			visualCurCol: 0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	r, _ := m.handleLogVisualKey(keyMsg("y"))
 	rm := r.(Model)

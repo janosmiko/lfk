@@ -49,8 +49,8 @@ func (m Model) executeActionLogsWithTail(pendingLabel string, tailLines int) (te
 
 	if isGroupResource && m.actionCtx.containerName == "" {
 		// Save parent resource context for pod/container re-selection from the log viewer.
-		m.logParentKind = m.actionCtx.kind
-		m.logParentName = m.actionCtx.name
+		m.logView.parentKind = m.actionCtx.kind
+		m.logView.parentName = m.actionCtx.name
 		// Stream all pods at once using label selector (no pod selection step).
 		// The user can still filter pods/containers from the log viewer overlay.
 	}
@@ -65,8 +65,8 @@ func (m Model) executeActionLogsWithTail(pendingLabel string, tailLines int) (te
 	// from a previous session don't leak. Group resources keep their
 	// parent context for the pod/container re-selection overlay.
 	if !isGroupResource {
-		m.logParentKind = ""
-		m.logParentName = ""
+		m.logView.parentKind = ""
+		m.logView.parentName = ""
 	}
 
 	kubectlCtx := m.kubectlContext(ctx)
@@ -77,41 +77,41 @@ func (m Model) executeActionLogsWithTail(pendingLabel string, tailLines int) (te
 	}
 	// Initialize log viewer state.
 	m.mode = modeLogs
-	m.logLines = nil
-	m.logScroll = 0
-	m.logFollow = true
-	m.logWrap = false
-	m.logLineNumbers = true
-	m.logTimestamps = false
-	m.logPrevious = false
-	m.logIsMulti = false
-	m.logMultiItems = nil
-	m.logContainers = nil
+	m.logView.lines = nil
+	m.logView.scroll = 0
+	m.logView.follow = true
+	m.logView.wrap = false
+	m.logView.lineNumbers = true
+	m.logView.timestamps = false
+	m.logView.previous = false
+	m.logView.isMulti = false
+	m.logView.multiItems = nil
+	m.logView.containers = nil
 	// For single-container logs, pre-select that container so the
 	// container selector overlay shows the correct active state.
 	if m.actionCtx.containerName != "" {
-		m.logSelectedContainers = []string{m.actionCtx.containerName}
+		m.logView.selectedContainers = []string{m.actionCtx.containerName}
 	} else {
-		m.logSelectedContainers = nil
+		m.logView.selectedContainers = nil
 	}
-	m.logTailLines = tailLines
-	m.logHasMoreHistory = true
-	m.logLoadingHistory = false
-	m.logCursor = 0 // will track end as lines stream in with follow mode
-	m.logVisualMode = false
-	m.logVisualStart = 0
+	m.logView.tailLines = tailLines
+	m.logView.hasMoreHistory = true
+	m.logView.loadingHistory = false
+	m.logView.cursor = 0 // will track end as lines stream in with follow mode
+	m.logView.visualMode = false
+	m.logView.visualStart = 0
 	isTail := pendingLabel == "Tail Logs"
 	if m.actionCtx.containerName != "" {
 		if isTail {
-			m.logTitle = fmt.Sprintf("Logs (tail): %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
+			m.logView.title = fmt.Sprintf("Logs (tail): %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
 		} else {
-			m.logTitle = fmt.Sprintf("Logs: %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
+			m.logView.title = fmt.Sprintf("Logs: %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
 		}
 	} else {
 		if isTail {
-			m.logTitle = fmt.Sprintf("Logs (tail): %s/%s", m.actionNamespace(), m.actionCtx.name)
+			m.logView.title = fmt.Sprintf("Logs (tail): %s/%s", m.actionNamespace(), m.actionCtx.name)
 		} else {
-			m.logTitle = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+			m.logView.title = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
 		}
 	}
 	return m, m.startLogStream()

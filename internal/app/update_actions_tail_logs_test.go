@@ -27,7 +27,7 @@ func TestExecuteActionTailLogsSetsShortTail(t *testing.T) {
 	mdl := result.(Model)
 
 	assert.Equal(t, modeLogs, mdl.mode)
-	assert.Equal(t, 7, mdl.logTailLines, "logTailLines should equal ConfigLogTailLinesShort")
+	assert.Equal(t, 7, mdl.logView.tailLines, "logTailLines should equal ConfigLogTailLinesShort")
 }
 
 // TestExecuteActionTailLogsTitleContainsTailIndicator verifies the log viewer
@@ -44,7 +44,7 @@ func TestExecuteActionTailLogsTitleContainsTailIndicator(t *testing.T) {
 	result, _ := m.executeAction("Tail Logs")
 	mdl := result.(Model)
 
-	assert.Contains(t, mdl.logTitle, "tail", "log title should contain 'tail' for Tail Logs action")
+	assert.Contains(t, mdl.logView.title, "tail", "log title should contain 'tail' for Tail Logs action")
 }
 
 // TestExecuteActionTailLogsContainerTitleContainsTailIndicator verifies that
@@ -62,8 +62,8 @@ func TestExecuteActionTailLogsContainerTitleContainsTailIndicator(t *testing.T) 
 	result, _ := m.executeAction("Tail Logs")
 	mdl := result.(Model)
 
-	assert.Contains(t, mdl.logTitle, "tail", "container log title should contain 'tail' for Tail Logs action")
-	assert.Contains(t, mdl.logTitle, "sidecar", "container log title should contain the container name")
+	assert.Contains(t, mdl.logView.title, "tail", "container log title should contain 'tail' for Tail Logs action")
+	assert.Contains(t, mdl.logView.title, "sidecar", "container log title should contain the container name")
 }
 
 // TestExecuteActionLogsUsesConfiguredTailLines verifies that the refactored
@@ -89,7 +89,7 @@ func TestExecuteActionLogsUsesConfiguredTailLines(t *testing.T) {
 	result, _ := m.executeAction("Logs")
 	mdl := result.(Model)
 
-	assert.Equal(t, 250, mdl.logTailLines, "full Logs must use ConfigLogTailLines")
+	assert.Equal(t, 250, mdl.logView.tailLines, "full Logs must use ConfigLogTailLines")
 }
 
 // TestExecuteActionLogsFullTitleHasNoTailIndicator ensures the full Logs
@@ -106,7 +106,7 @@ func TestExecuteActionLogsFullTitleHasNoTailIndicator(t *testing.T) {
 	result, _ := m.executeAction("Logs")
 	mdl := result.(Model)
 
-	assert.NotContains(t, mdl.logTitle, "tail", "full Logs title must not contain 'tail'")
+	assert.NotContains(t, mdl.logView.title, "tail", "full Logs title must not contain 'tail'")
 }
 
 // TestExecuteActionTailLogsGroupResourceSetsPendingAction verifies that when a
@@ -128,5 +128,5 @@ func TestExecuteActionTailLogsGroupResourceSetsPendingAction(t *testing.T) {
 
 	// For group resources, the log parent is set and modeLogs entered directly.
 	assert.Equal(t, modeLogs, mdl.mode, "Deployment Tail Logs should enter modeLogs directly")
-	assert.Equal(t, "Deployment", mdl.logParentKind, "logParentKind should be set for group resource")
+	assert.Equal(t, "Deployment", mdl.logView.parentKind, "logParentKind should be set for group resource")
 }

@@ -317,56 +317,56 @@ func TestExecuteSetCommand(t *testing.T) {
 			name:   "wrap",
 			option: "wrap",
 			checkFn: func(t *testing.T, m Model) {
-				assert.True(t, m.logWrap)
+				assert.True(t, m.logView.wrap)
 			},
 		},
 		{
 			name:   "nowrap",
 			option: "nowrap",
 			checkFn: func(t *testing.T, m Model) {
-				assert.False(t, m.logWrap)
+				assert.False(t, m.logView.wrap)
 			},
 		},
 		{
 			name:   "linenumbers",
 			option: "linenumbers",
 			checkFn: func(t *testing.T, m Model) {
-				assert.True(t, m.logLineNumbers)
+				assert.True(t, m.logView.lineNumbers)
 			},
 		},
 		{
 			name:   "nolinenumbers",
 			option: "nolinenumbers",
 			checkFn: func(t *testing.T, m Model) {
-				assert.False(t, m.logLineNumbers)
+				assert.False(t, m.logView.lineNumbers)
 			},
 		},
 		{
 			name:   "timestamps",
 			option: "timestamps",
 			checkFn: func(t *testing.T, m Model) {
-				assert.True(t, m.logTimestamps)
+				assert.True(t, m.logView.timestamps)
 			},
 		},
 		{
 			name:   "notimestamps",
 			option: "notimestamps",
 			checkFn: func(t *testing.T, m Model) {
-				assert.False(t, m.logTimestamps)
+				assert.False(t, m.logView.timestamps)
 			},
 		},
 		{
 			name:   "follow",
 			option: "follow",
 			checkFn: func(t *testing.T, m Model) {
-				assert.True(t, m.logFollow)
+				assert.True(t, m.logView.follow)
 			},
 		},
 		{
 			name:   "nofollow",
 			option: "nofollow",
 			checkFn: func(t *testing.T, m Model) {
-				assert.False(t, m.logFollow)
+				assert.False(t, m.logView.follow)
 			},
 		},
 		{
@@ -487,7 +487,7 @@ func TestExecuteBuiltinCommand(t *testing.T) {
 		m := baseModelCov()
 		result, _ := m.executeBuiltinCommand("set wrap")
 		rm := result.(Model)
-		assert.True(t, rm.logWrap)
+		assert.True(t, rm.logView.wrap)
 	})
 
 	t.Run("sort_sets_column", func(t *testing.T) {

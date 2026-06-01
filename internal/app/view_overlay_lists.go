@@ -83,8 +83,8 @@ func renderPodSelectOverlay(m Model) string {
 		Title:           "Select Pod",
 		Cursor:          m.overlayCursor,
 		Filterable:      true,
-		Filter:          m.logPodFilterText,
-		FilterActive:    m.logPodFilterActive,
+		Filter:          m.logView.podFilterText,
+		FilterActive:    m.logView.podFilterActive,
 		ShowDescription: true,
 		Scroll:          overlayListScroll(&overlayPodScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:      maxVisible,
@@ -186,23 +186,23 @@ func renderLogContainerSelectOverlay(m Model) string {
 		active := false
 		switch it.Status {
 		case "all":
-			active = len(m.logSelectedContainers) == 0
+			active = len(m.logView.selectedContainers) == 0
 		default:
-			active = slices.Contains(m.logSelectedContainers, it.Name)
+			active = slices.Contains(m.logView.selectedContainers, it.Name)
 		}
 		items[i] = ui.OverlayListItem{Name: it.Name, Active: active}
 	}
 	const maxVisible = 15
 	footer := ""
-	if m.logParentKind != "" {
+	if m.logView.parentKind != "" {
 		footer = "tab to switch pod"
 	}
 	return ui.RenderOverlayList(items, ui.OverlayListConfig{
 		Title:            "Filter Containers",
 		Cursor:           m.overlayCursor,
 		Filterable:       true,
-		Filter:           m.logContainerFilterText,
-		FilterActive:     m.logContainerFilterActive,
+		Filter:           m.logView.containerFilterText,
+		FilterActive:     m.logView.containerFilterActive,
 		ShowActiveMarker: true,
 		Scroll:           overlayListScroll(&overlayContainerScrollPos, m.overlayCursor, len(src), maxVisible),
 		MaxVisible:       maxVisible,

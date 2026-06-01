@@ -2207,7 +2207,7 @@ func TestCovPodSelectOverlayEsc(t *testing.T) {
 func TestCovLogPodSelectOverlayEsc(t *testing.T) {
 	m := baseModelOverlay()
 	m.overlay = overlayLogPodSelect
-	m.logMultiItems = []model.Item{{Name: "pod-1"}}
+	m.logView.multiItems = []model.Item{{Name: "pod-1"}}
 	result, _ := m.handleOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)
@@ -2216,7 +2216,7 @@ func TestCovLogPodSelectOverlayEsc(t *testing.T) {
 func TestCovLogContainerSelectOverlayEsc(t *testing.T) {
 	m := baseModelOverlay()
 	m.overlay = overlayLogContainerSelect
-	m.logContainers = []string{"container-1"}
+	m.logView.containers = []string{"container-1"}
 	result, _ := m.handleOverlayKey(keyMsg("esc"))
 	rm := result.(Model)
 	assert.Equal(t, overlayNone, rm.overlay)

@@ -83,51 +83,59 @@ func TestWrappedLineCount(t *testing.T) {
 func TestClampLogScrollNoWrap(t *testing.T) {
 	t.Run("clamps scroll past end", func(t *testing.T) {
 		m := Model{
-			height:    20,
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  make([]string, 10),
-			logScroll: 100,
+			height: 20,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  make([]string, 10),
+				scroll: 100,
+			},
 		}
 		m.clampLogScroll()
-		assert.LessOrEqual(t, m.logScroll, len(m.logLines))
-		assert.GreaterOrEqual(t, m.logScroll, 0)
+		assert.LessOrEqual(t, m.logView.scroll, len(m.logView.lines))
+		assert.GreaterOrEqual(t, m.logView.scroll, 0)
 	})
 
 	t.Run("zero scroll stays zero", func(t *testing.T) {
 		m := Model{
-			height:    20,
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  make([]string, 10),
-			logScroll: 0,
+			height: 20,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  make([]string, 10),
+				scroll: 0,
+			},
 		}
 		m.clampLogScroll()
-		assert.Equal(t, 0, m.logScroll)
+		assert.Equal(t, 0, m.logView.scroll)
 	})
 
 	t.Run("negative scroll clamped to zero", func(t *testing.T) {
 		m := Model{
-			height:    20,
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  make([]string, 10),
-			logScroll: -5,
+			height: 20,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  make([]string, 10),
+				scroll: -5,
+			},
 		}
 		m.clampLogScroll()
-		assert.Equal(t, 0, m.logScroll)
+		assert.Equal(t, 0, m.logView.scroll)
 	})
 
 	t.Run("fewer lines than viewport keeps scroll at zero", func(t *testing.T) {
 		m := Model{
-			height:    100,
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  make([]string, 5),
-			logScroll: 3,
+			height: 100,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  make([]string, 5),
+				scroll: 3,
+			},
 		}
 		m.clampLogScroll()
-		assert.Equal(t, 0, m.logScroll)
+		assert.Equal(t, 0, m.logView.scroll)
 	})
 }
 
@@ -138,16 +146,18 @@ func TestClampLogScrollWithWrap(t *testing.T) {
 			lines[i] = strings.Repeat("x", 10) // short lines
 		}
 		m := Model{
-			height:    100, // tall viewport
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  lines,
-			logWrap:   true,
-			logScroll: 50,
+			height: 100, // tall viewport
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  lines,
+				wrap:   true,
+				scroll: 50,
+			},
 		}
 		m.clampLogScroll()
-		assert.GreaterOrEqual(t, m.logScroll, 0)
-		assert.LessOrEqual(t, m.logScroll, len(lines))
+		assert.GreaterOrEqual(t, m.logView.scroll, 0)
+		assert.LessOrEqual(t, m.logView.scroll, len(lines))
 	})
 
 	t.Run("wrap with long last line pins tail to bottom via topSkip", func(t *testing.T) {
@@ -161,12 +171,14 @@ func TestClampLogScrollWithWrap(t *testing.T) {
 		// 350-char line wraps to 10 sub-lines.
 		longLine := strings.Repeat("x", 350)
 		m := Model{
-			height:        12, // viewH ≈ 12-5 = 7
-			width:         40,
-			tabs:          []TabState{{}},
-			logLines:      []string{longLine},
-			logWrap:       true,
-			logTimestamps: true, // no stripping
+			height: 12, // viewH ≈ 12-5 = 7
+			width:  40,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:      []string{longLine},
+				wrap:       true,
+				timestamps: true, // no stripping
+			},
 		}
 		viewH := m.logContentHeight()
 		ms, topSkip := m.logMaxScrollAndSkip()
@@ -197,12 +209,14 @@ func TestClampLogScrollWithWrap(t *testing.T) {
 			lines[i] += " " + strings.Repeat("y", 30) // raw ~66, stripped ~34
 		}
 		m := Model{
-			height:        20, // viewport height includes overhead
-			width:         60, // content width 56, avail ~55
-			tabs:          []TabState{{}},
-			logLines:      lines,
-			logWrap:       true,
-			logTimestamps: false, // timestamps stripped at render
+			height: 20, // viewport height includes overhead
+			width:  60, // content width 56, avail ~55
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:      lines,
+				wrap:       true,
+				timestamps: false, // timestamps stripped at render
+			},
 		}
 		ms := m.logMaxScroll()
 		// With stripped lines fitting on one visual line each and
@@ -221,57 +235,65 @@ func TestClampLogScrollWithWrap(t *testing.T) {
 func TestEnsureLogCursorVisible(t *testing.T) {
 	t.Run("cursor above viewport scrolls up with scrolloff", func(t *testing.T) {
 		m := Model{
-			height:    20,
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  make([]string, 100),
-			logScroll: 50,
-			logCursor: 10,
+			height: 20,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  make([]string, 100),
+				scroll: 50,
+				cursor: 10,
+			},
 		}
 		m.ensureLogCursorVisible()
 		// Scroll should position cursor with scrolloff margin above it.
 		so := ui.ConfigScrollOff
-		assert.Equal(t, 10-so, m.logScroll)
+		assert.Equal(t, 10-so, m.logView.scroll)
 	})
 
 	t.Run("cursor below viewport scrolls down", func(t *testing.T) {
 		m := Model{
-			height:    20,
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  make([]string, 100),
-			logScroll: 0,
-			logCursor: 50,
+			height: 20,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  make([]string, 100),
+				scroll: 0,
+				cursor: 50,
+			},
 		}
 		m.ensureLogCursorVisible()
 		viewH := m.logContentHeight()
-		assert.GreaterOrEqual(t, m.logScroll, 50-viewH)
+		assert.GreaterOrEqual(t, m.logView.scroll, 50-viewH)
 	})
 
 	t.Run("negative cursor is no-op", func(t *testing.T) {
 		m := Model{
-			height:    20,
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  make([]string, 100),
-			logScroll: 10,
-			logCursor: -1,
+			height: 20,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  make([]string, 100),
+				scroll: 10,
+				cursor: -1,
+			},
 		}
 		m.ensureLogCursorVisible()
-		assert.Equal(t, 10, m.logScroll)
+		assert.Equal(t, 10, m.logView.scroll)
 	})
 
 	t.Run("cursor past end is clamped", func(t *testing.T) {
 		m := Model{
-			height:    20,
-			width:     80,
-			tabs:      []TabState{{}},
-			logLines:  make([]string, 10),
-			logScroll: 0,
-			logCursor: 100,
+			height: 20,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines:  make([]string, 10),
+				scroll: 0,
+				cursor: 100,
+			},
 		}
 		m.ensureLogCursorVisible()
-		assert.Equal(t, 9, m.logCursor)
+		assert.Equal(t, 9, m.logView.cursor)
 	})
 }
 
@@ -280,25 +302,29 @@ func TestEnsureLogCursorVisible(t *testing.T) {
 func TestLogMaxScroll(t *testing.T) {
 	t.Run("fewer lines than viewport returns zero", func(t *testing.T) {
 		m := Model{
-			height:   100,
-			width:    80,
-			tabs:     []TabState{{}},
-			logLines: make([]string, 5),
+			height: 100,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines: make([]string, 5),
+			},
 		}
 		assert.Equal(t, 0, m.logMaxScroll())
 	})
 
 	t.Run("more lines than viewport returns positive", func(t *testing.T) {
 		m := Model{
-			height:   20,
-			width:    80,
-			tabs:     []TabState{{}},
-			logLines: make([]string, 100),
+			height: 20,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines: make([]string, 100),
+			},
 		}
 		ms := m.logMaxScroll()
 		assert.Greater(t, ms, 0)
 		viewH := m.logContentHeight()
-		assert.Equal(t, len(m.logLines)-viewH, ms)
+		assert.Equal(t, len(m.logView.lines)-viewH, ms)
 	})
 
 	t.Run("wrap mode returns valid max scroll", func(t *testing.T) {
@@ -307,11 +333,13 @@ func TestLogMaxScroll(t *testing.T) {
 			lines[i] = "short"
 		}
 		m := Model{
-			height:   100,
-			width:    80,
-			tabs:     []TabState{{}},
-			logLines: lines,
-			logWrap:  true,
+			height: 100,
+			width:  80,
+			tabs:   []TabState{{}},
+			logView: logViewState{
+				lines: lines,
+				wrap:  true,
+			},
 		}
 		ms := m.logMaxScroll()
 		assert.GreaterOrEqual(t, ms, 0)
@@ -419,11 +447,13 @@ func TestViewDiff(t *testing.T) {
 
 func TestViewLogs(t *testing.T) {
 	m := Model{
-		width:    80,
-		height:   30,
-		tabs:     []TabState{{}},
-		logLines: []string{"line 1", "line 2", "line 3"},
-		logTitle: "Logs: my-pod",
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		logView: logViewState{
+			lines: []string{"line 1", "line 2", "line 3"},
+			title: "Logs: my-pod",
+		},
 	}
 	output := m.viewLogs()
 	stripped := stripANSI(output)
@@ -450,12 +480,14 @@ func TestViewDescribeMode(t *testing.T) {
 
 func TestViewLogsMode(t *testing.T) {
 	m := Model{
-		width:    80,
-		height:   30,
-		mode:     modeLogs,
-		logLines: []string{"log line 1"},
-		logTitle: "Logs: my-pod",
-		tabs:     []TabState{{}},
+		width:  80,
+		height: 30,
+		mode:   modeLogs,
+		logView: logViewState{
+			lines: []string{"log line 1"},
+			title: "Logs: my-pod",
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -686,8 +718,11 @@ func TestCovViewExecTerminalSmall(t *testing.T) {
 func TestCovViewLogsBasic(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, tabs: []TabState{{}},
-		logLines: []string{"line 1", "line 2"}, logTitle: "Logs: pod",
-		logFollow: true, actionCtx: actionContext{kind: "Pod"}, logSearchInput: TextInput{},
+		logView: logViewState{
+			lines: []string{"line 1", "line 2"}, title: "Logs: pod",
+			follow: true, searchInput: TextInput{},
+		},
+		actionCtx: actionContext{kind: "Pod"},
 	}
 	assert.NotEmpty(t, m.viewLogs())
 }
@@ -695,8 +730,10 @@ func TestCovViewLogsBasic(t *testing.T) {
 func TestCovViewLogsSearch(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, tabs: []TabState{{}},
-		logLines: []string{"line"}, logTitle: "Logs",
-		logSearchActive: true, logSearchInput: TextInput{Value: "err"},
+		logView: logViewState{
+			lines: []string{"line"}, title: "Logs",
+			searchActive: true, searchInput: TextInput{Value: "err"},
+		},
 		actionCtx: actionContext{kind: "Pod"},
 	}
 	assert.NotEmpty(t, m.viewLogs())
@@ -705,9 +742,11 @@ func TestCovViewLogsSearch(t *testing.T) {
 func TestCovViewLogsStatus(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, tabs: []TabState{{}},
-		logLines: []string{"line"}, logTitle: "Logs",
+		logView: logViewState{
+			lines: []string{"line"}, title: "Logs",
+			searchInput: TextInput{},
+		},
 		statusMessage: "Copied", actionCtx: actionContext{kind: "Pod"},
-		logSearchInput: TextInput{},
 	}
 	assert.NotEmpty(t, m.viewLogs())
 }

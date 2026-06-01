@@ -371,30 +371,34 @@ func TestCanISubjectFilterModeViaShared_Typing(t *testing.T) {
 
 func TestLogPodFilterModeViaShared_Backspace(t *testing.T) {
 	m := Model{
-		overlay:            overlayPodSelect,
-		logPodFilterActive: true,
-		logPodFilterText:   "abc",
-		tabs:               []TabState{{}},
-		width:              80,
-		height:             40,
+		overlay: overlayPodSelect,
+		logView: logViewState{
+			podFilterActive: true,
+			podFilterText:   "abc",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogPodFilterMode(specialKey(tea.KeyBackspace))
 	result := ret.(Model)
-	assert.Equal(t, "ab", result.logPodFilterText)
+	assert.Equal(t, "ab", result.logView.podFilterText)
 }
 
 func TestLogContainerFilterModeViaShared_CtrlW(t *testing.T) {
 	m := Model{
-		overlay:                  overlayLogContainerSelect,
-		logContainerFilterActive: true,
-		logContainerFilterText:   "hello world",
-		tabs:                     []TabState{{}},
-		width:                    80,
-		height:                   40,
+		overlay: overlayLogContainerSelect,
+		logView: logViewState{
+			containerFilterActive: true,
+			containerFilterText:   "hello world",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleLogContainerFilterMode(tea.KeyMsg{Type: tea.KeyCtrlW})
 	result := ret.(Model)
-	assert.Equal(t, "hello ", result.logContainerFilterText)
+	assert.Equal(t, "hello ", result.logView.containerFilterText)
 }
 
 func TestCovStringFilterInputNavigation(t *testing.T) {

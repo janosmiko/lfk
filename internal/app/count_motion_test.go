@@ -161,57 +161,65 @@ func TestDiffNormalCountClampsAtTop(t *testing.T) {
 func TestLogsNormalCountPrefixJumpsDown(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:     []string{"a", "b", "c", "d", "e", "f"},
-		logCursor:    0,
-		logFollow:    true,
-		logLineInput: "3",
-		tabs:         []TabState{{}},
+		logView: logViewState{
+			lines:     []string{"a", "b", "c", "d", "e", "f"},
+			cursor:    0,
+			follow:    true,
+			lineInput: "3",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("j"))
 	rm := ret.(Model)
-	assert.Equal(t, 3, rm.logCursor)
-	assert.Empty(t, rm.logLineInput)
-	assert.False(t, rm.logFollow, "any j press disables follow mode")
+	assert.Equal(t, 3, rm.logView.cursor)
+	assert.Empty(t, rm.logView.lineInput)
+	assert.False(t, rm.logView.follow, "any j press disables follow mode")
 }
 
 func TestLogsNormalCountPrefixJumpsUp(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:     []string{"a", "b", "c", "d", "e", "f"},
-		logCursor:    5,
-		logLineInput: "4",
-		tabs:         []TabState{{}},
+		logView: logViewState{
+			lines:     []string{"a", "b", "c", "d", "e", "f"},
+			cursor:    5,
+			lineInput: "4",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("k"))
 	rm := ret.(Model)
-	assert.Equal(t, 1, rm.logCursor)
-	assert.Empty(t, rm.logLineInput)
+	assert.Equal(t, 1, rm.logView.cursor)
+	assert.Empty(t, rm.logView.lineInput)
 }
 
 func TestLogsNormalCountClampsAtTop(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:     []string{"a", "b", "c"},
-		logCursor:    1,
-		logLineInput: "100",
-		tabs:         []TabState{{}},
+		logView: logViewState{
+			lines:     []string{"a", "b", "c"},
+			cursor:    1,
+			lineInput: "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("k"))
 	rm := ret.(Model)
-	assert.Equal(t, 0, rm.logCursor)
+	assert.Equal(t, 0, rm.logView.cursor)
 }
 
 func TestLogsNormalCountClampsAtBottom(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:     []string{"a", "b", "c"},
-		logCursor:    1,
-		logLineInput: "100",
-		tabs:         []TabState{{}},
+		logView: logViewState{
+			lines:     []string{"a", "b", "c"},
+			cursor:    1,
+			lineInput: "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("j"))
 	rm := ret.(Model)
-	assert.Equal(t, 2, rm.logCursor)
+	assert.Equal(t, 2, rm.logView.cursor)
 }
 
 // Empty log buffer must not let the cursor go negative when a count motion
@@ -220,15 +228,17 @@ func TestLogsNormalCountClampsAtBottom(t *testing.T) {
 func TestLogsNormalCountOnEmptyBufferStaysAtZero(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:     nil,
-		logCursor:    0,
-		logLineInput: "5",
-		tabs:         []TabState{{}},
+		logView: logViewState{
+			lines:     nil,
+			cursor:    0,
+			lineInput: "5",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("j"))
 	rm := ret.(Model)
-	assert.Equal(t, 0, rm.logCursor)
-	assert.Empty(t, rm.logLineInput)
+	assert.Equal(t, 0, rm.logView.cursor)
+	assert.Empty(t, rm.logView.lineInput)
 }
 
 func TestEventTimelineCountPrefixJumpsDown(t *testing.T) {
@@ -313,16 +323,18 @@ func TestDescribeCountPrefixColumnLeftClampsAtZero(t *testing.T) {
 func TestLogsCountPrefixColumnRight(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:        []string{"hello world from logs"},
-		logCursor:       0,
-		logVisualCurCol: 0,
-		logLineInput:    "6",
-		tabs:            []TabState{{}},
+		logView: logViewState{
+			lines:        []string{"hello world from logs"},
+			cursor:       0,
+			visualCurCol: 0,
+			lineInput:    "6",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("l"))
 	rm := ret.(Model)
-	assert.Equal(t, 6, rm.logVisualCurCol)
-	assert.Empty(t, rm.logLineInput)
+	assert.Equal(t, 6, rm.logView.visualCurCol)
+	assert.Empty(t, rm.logView.lineInput)
 }
 
 // --- Word motion: w with count ---
@@ -348,17 +360,19 @@ func TestDescribeCountPrefixWordForward(t *testing.T) {
 func TestLogsCountPrefixWordForward(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:        []string{"alpha beta gamma delta"},
-		logCursor:       0,
-		logVisualCurCol: 0,
-		logLineInput:    "2",
-		tabs:            []TabState{{}},
+		logView: logViewState{
+			lines:        []string{"alpha beta gamma delta"},
+			cursor:       0,
+			visualCurCol: 0,
+			lineInput:    "2",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("w"))
 	rm := ret.(Model)
 	// alpha(0) -> beta(6) -> gamma(11): 2w lands at gamma.
-	assert.Equal(t, 11, rm.logVisualCurCol)
-	assert.Empty(t, rm.logLineInput)
+	assert.Equal(t, 11, rm.logView.visualCurCol)
+	assert.Empty(t, rm.logView.lineInput)
 }
 
 // --- Page motion: Ctrl+D / Ctrl+F with count ---
@@ -436,11 +450,13 @@ func TestLogsCountPrefixFullPageDown(t *testing.T) {
 	}
 	m := Model{
 		width: 80, height: 40, mode: modeLogs,
-		logLines:     lines,
-		logCursor:    0,
-		logFollow:    true,
-		logLineInput: "2",
-		tabs:         []TabState{{}},
+		logView: logViewState{
+			lines:     lines,
+			cursor:    0,
+			follow:    true,
+			lineInput: "2",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("ctrl+f"))
 	rm := ret.(Model)
@@ -448,9 +464,9 @@ func TestLogsCountPrefixFullPageDown(t *testing.T) {
 	// and within the buffer. Stronger assertion: count is consumed and
 	// motion was multiplied (not the unscaled single-page step).
 	step := m.logContentHeight()
-	assert.Greater(t, rm.logCursor, step, "2<C-f> must move further than a single full page")
-	assert.Empty(t, rm.logLineInput)
-	assert.False(t, rm.logFollow)
+	assert.Greater(t, rm.logView.cursor, step, "2<C-f> must move further than a single full page")
+	assert.Empty(t, rm.logView.lineInput)
+	assert.False(t, rm.logView.follow)
 }
 
 // --- Search nav: n / N with count ---
@@ -474,18 +490,20 @@ func TestDescribeCountPrefixSearchNext(t *testing.T) {
 func TestLogsCountPrefixSearchNext(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:        []string{"miss", "hit", "miss", "hit", "miss", "hit"},
-		logSearchQuery:  "hit",
-		logCursor:       0,
-		logVisualCurCol: 0,
-		logLineInput:    "2",
-		tabs:            []TabState{{}},
+		logView: logViewState{
+			lines:        []string{"miss", "hit", "miss", "hit", "miss", "hit"},
+			searchQuery:  "hit",
+			cursor:       0,
+			visualCurCol: 0,
+			lineInput:    "2",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("n"))
 	rm := ret.(Model)
 	// 2n from cursor 0: first match at row 1, second at row 3.
-	assert.Equal(t, 3, rm.logCursor)
-	assert.Empty(t, rm.logLineInput)
+	assert.Equal(t, 3, rm.logView.cursor)
+	assert.Empty(t, rm.logView.lineInput)
 }
 
 // --- Event timeline: column and page with count ---
@@ -767,31 +785,35 @@ func TestDiffCaretClearsBuffer(t *testing.T) {
 func TestLogsDollarClearsBuffer(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:        []string{"hello world"},
-		logCursor:       0,
-		logVisualCurCol: 0,
-		logLineInput:    "5",
-		tabs:            []TabState{{}},
+		logView: logViewState{
+			lines:        []string{"hello world"},
+			cursor:       0,
+			visualCurCol: 0,
+			lineInput:    "5",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("$"))
 	rm := ret.(Model)
-	assert.Empty(t, rm.logLineInput, "$ must consume the digit buffer")
-	assert.Equal(t, len([]rune("hello world"))-1, rm.logVisualCurCol)
+	assert.Empty(t, rm.logView.lineInput, "$ must consume the digit buffer")
+	assert.Equal(t, len([]rune("hello world"))-1, rm.logView.visualCurCol)
 }
 
 func TestLogsCaretClearsBuffer(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:        []string{"  hello"},
-		logCursor:       0,
-		logVisualCurCol: 6,
-		logLineInput:    "9",
-		tabs:            []TabState{{}},
+		logView: logViewState{
+			lines:        []string{"  hello"},
+			cursor:       0,
+			visualCurCol: 6,
+			lineInput:    "9",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("^"))
 	rm := ret.(Model)
-	assert.Empty(t, rm.logLineInput, "^ must consume the digit buffer")
-	assert.Equal(t, 2, rm.logVisualCurCol)
+	assert.Empty(t, rm.logView.lineInput, "^ must consume the digit buffer")
+	assert.Equal(t, 2, rm.logView.visualCurCol)
 }
 
 func TestEventTimelineDollarClearsBuffer(t *testing.T) {
@@ -829,16 +851,18 @@ func TestEventTimelineCaretClearsBuffer(t *testing.T) {
 func TestLogsCountPrefixColumnLeftClampsAtZero(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeLogs,
-		logLines:        []string{"hello world from logs"},
-		logCursor:       0,
-		logVisualCurCol: 3,
-		logLineInput:    "100",
-		tabs:            []TabState{{}},
+		logView: logViewState{
+			lines:        []string{"hello world from logs"},
+			cursor:       0,
+			visualCurCol: 3,
+			lineInput:    "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleLogKey(keyMsg("h"))
 	rm := ret.(Model)
-	assert.Equal(t, 0, rm.logVisualCurCol)
-	assert.Empty(t, rm.logLineInput)
+	assert.Equal(t, 0, rm.logView.visualCurCol)
+	assert.Empty(t, rm.logView.lineInput)
 }
 
 // Pins the diffEnterVisual fix: a digit buffer typed before `v` must not leak
@@ -880,8 +904,10 @@ func longLogModel() Model {
 	}
 	return Model{
 		width: 80, height: 40, mode: modeLogs,
-		logLines: lines,
-		tabs:     []TabState{{}},
+		logView: logViewState{
+			lines: lines,
+		},
+		tabs: []TabState{{}},
 	}
 }
 
@@ -889,11 +915,11 @@ func longLogModel() Model {
 // (half the viewport), matching vim's `default: half a screen`.
 func TestLogsCtrlDDefaultsToHalfViewport(t *testing.T) {
 	m := longLogModel()
-	m.logCursor = 0
+	m.logView.cursor = 0
 	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
-	assert.Equal(t, m.logContentHeight()/2, rm.logCursor)
-	assert.Equal(t, 0, rm.logScrollOption, "plain <C-d> must not change the sticky option")
+	assert.Equal(t, m.logContentHeight()/2, rm.logView.cursor)
+	assert.Equal(t, 0, rm.logView.scrollOption, "plain <C-d> must not change the sticky option")
 }
 
 // 5<C-d> sets sticky scroll=5 and moves 5 lines. The next plain <C-d> reuses
@@ -901,54 +927,54 @@ func TestLogsCtrlDDefaultsToHalfViewport(t *testing.T) {
 // moves 8. The next plain <C-d> uses the new 8.
 func TestLogsCtrlDStickyAndShared(t *testing.T) {
 	m := longLogModel()
-	m.logCursor = 0
+	m.logView.cursor = 0
 
-	m.logLineInput = "5"
+	m.logView.lineInput = "5"
 	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
 	a := ret.(Model)
-	assert.Equal(t, 5, a.logCursor)
-	assert.Equal(t, 5, a.logScrollOption)
+	assert.Equal(t, 5, a.logView.cursor)
+	assert.Equal(t, 5, a.logView.scrollOption)
 
 	ret, _ = a.handleLogKey(keyMsg("ctrl+d"))
 	b := ret.(Model)
-	assert.Equal(t, 10, b.logCursor, "plain <C-d> reuses sticky=5")
-	assert.Equal(t, 5, b.logScrollOption)
+	assert.Equal(t, 10, b.logView.cursor, "plain <C-d> reuses sticky=5")
+	assert.Equal(t, 5, b.logView.scrollOption)
 
 	ret, _ = b.handleLogKey(keyMsg("ctrl+u"))
 	c := ret.(Model)
-	assert.Equal(t, 5, c.logCursor, "plain <C-u> shares the same sticky")
+	assert.Equal(t, 5, c.logView.cursor, "plain <C-u> shares the same sticky")
 
-	c.logLineInput = "8"
+	c.logView.lineInput = "8"
 	ret, _ = c.handleLogKey(keyMsg("ctrl+u"))
 	d := ret.(Model)
-	assert.Equal(t, 0, d.logCursor, "8<C-u> from line 5 clamps at top")
-	assert.Equal(t, 8, d.logScrollOption, "counted <C-u> replaces sticky")
+	assert.Equal(t, 0, d.logView.cursor, "8<C-u> from line 5 clamps at top")
+	assert.Equal(t, 8, d.logView.scrollOption, "counted <C-u> replaces sticky")
 
 	ret, _ = d.handleLogKey(keyMsg("ctrl+d"))
 	e := ret.(Model)
-	assert.Equal(t, 8, e.logCursor, "plain <C-d> uses new sticky=8")
+	assert.Equal(t, 8, e.logView.cursor, "plain <C-d> uses new sticky=8")
 }
 
 // Vim caps 'scroll' at winheight; mirror that with the lfk viewport.
 func TestLogsCtrlDClampsToViewport(t *testing.T) {
 	m := longLogModel()
-	m.logCursor = 0
-	m.logLineInput = "999"
+	m.logView.cursor = 0
+	m.logView.lineInput = "999"
 	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
 	viewport := m.logContentHeight()
-	assert.Equal(t, viewport, rm.logCursor, "999<C-d> caps at viewport")
-	assert.Equal(t, viewport, rm.logScrollOption, "sticky cap matches viewport")
+	assert.Equal(t, viewport, rm.logView.cursor, "999<C-d> caps at viewport")
+	assert.Equal(t, viewport, rm.logView.scrollOption, "sticky cap matches viewport")
 }
 
 // The scroll option is per-viewer: setting log's sticky must not change the
 // describe / yaml / diff / events sticky values.
 func TestScrollOptionIsPerViewer(t *testing.T) {
 	m := longLogModel()
-	m.logLineInput = "7"
+	m.logView.lineInput = "7"
 	ret, _ := m.handleLogKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
-	assert.Equal(t, 7, rm.logScrollOption)
+	assert.Equal(t, 7, rm.logView.scrollOption)
 	assert.Equal(t, 0, rm.describeView.scrollOption)
 	assert.Equal(t, 0, rm.yamlView.scrollOption)
 	assert.Equal(t, 0, rm.diffView.scrollOption)

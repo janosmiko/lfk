@@ -15,7 +15,7 @@ func (m Model) handleMouseToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return m, nil, false
 	}
 	// Never steal the key while a viewer search/filter input is focused.
-	if m.yamlView.searchMode || m.logSearchActive || m.helpSearchActive ||
+	if m.yamlView.searchMode || m.logView.searchActive || m.helpSearchActive ||
 		m.explainSearchActive || m.diffView.searchMode || m.describeView.searchActive ||
 		m.helpFilterActive {
 		return m, nil, false
@@ -64,18 +64,18 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	if m.mode == modeLogs {
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
-			m.logFollow = false
-			if m.logScroll > 0 {
-				m.logScroll -= 3
-				if m.logScroll < 0 {
-					m.logScroll = 0
+			m.logView.follow = false
+			if m.logView.scroll > 0 {
+				m.logView.scroll -= 3
+				if m.logView.scroll < 0 {
+					m.logView.scroll = 0
 				}
 			}
 			cmd := m.maybeLoadMoreHistory()
 			return m, cmd
 		case tea.MouseButtonWheelDown:
-			m.logFollow = false
-			m.logScroll += 3
+			m.logView.follow = false
+			m.logView.scroll += 3
 			m.clampLogScroll()
 		}
 		return m, nil
@@ -452,7 +452,7 @@ func (m Model) switchToTab(tab int) (tea.Model, tea.Cmd) {
 	if m.mode == modeExplorer {
 		return m, m.loadPreview()
 	}
-	if m.mode == modeLogs && m.logCh != nil {
+	if m.mode == modeLogs && m.logView.ch != nil {
 		return m, m.waitForLogLine()
 	}
 	if m.mode == modeExec && m.execPTY != nil {

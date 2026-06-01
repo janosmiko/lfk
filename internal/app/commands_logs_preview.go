@@ -31,7 +31,7 @@ func splitLogPreviewWidth(total int) (int, int) {
 // accounting for the optional preview side panel. Used by wrap-math helpers
 // so cursor visibility and follow-mode pinning stay in sync with the renderer.
 func (m *Model) logEffectiveWidth() int {
-	if !m.logPreviewVisible {
+	if !m.logView.previewVisible {
 		return m.width
 	}
 	logW, previewW := splitLogPreviewWidth(m.width)
@@ -45,12 +45,12 @@ func (m *Model) logEffectiveWidth() int {
 // The cursor is the source of truth; when it is unset (initial state, no
 // stream yet) we fall back to the most recent line.
 func (m *Model) logPreviewLine() string {
-	if len(m.logLines) == 0 {
+	if len(m.logView.lines) == 0 {
 		return ""
 	}
-	idx := m.logCursor
-	if idx < 0 || idx >= len(m.logLines) {
-		idx = len(m.logLines) - 1
+	idx := m.logView.cursor
+	if idx < 0 || idx >= len(m.logView.lines) {
+		idx = len(m.logView.lines) - 1
 	}
-	return m.logLines[idx]
+	return m.logView.lines[idx]
 }
