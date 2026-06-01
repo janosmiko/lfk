@@ -146,9 +146,14 @@ func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace
 	if err != nil {
 		return nil, fmt.Errorf("security fetch: %w", err)
 	}
-	// Surface the requested source's per-source error so the explorer
-	// renders an error state instead of an empty list — without this the
-	// caller sees "0 findings" indistinguishable from a fetch failure.
+	return c.groupSecurityFindings(res, sourceName)
+}
+
+// groupSecurityFindings turns a FetchResult into explorer items for one source:
+// it surfaces the source's per-source error (so the explorer shows an error
+// state rather than an empty list indistinguishable from a fetch failure),
+// then groups and ignore-filters. Shared by the scanning and cache-only paths.
+func (c *Client) groupSecurityFindings(res security.FetchResult, sourceName string) ([]model.Item, error) {
 	if srcErr, ok := res.Errors[sourceName]; ok && srcErr != nil {
 		return nil, fmt.Errorf("source %s: %w", sourceName, srcErr)
 	}
@@ -159,6 +164,28 @@ func (c *Client) getSecurityFindings(ctx context.Context, contextName, namespace
 		items = append(items, findingGroupToItem(g))
 	}
 	return items, nil
+}
+
+// GetSecurityFindingsCached returns the grouped findings for a security RT from
+// the manager cache ONLY (no scan). ok is false when the shared scan is not
+// cached / has expired, signalling the caller to fall back to a scanning fetch.
+// Lets the explorer render the source's finding list synchronously off the
+// scheduler whenever the (coalesced, cached) scan is already warm.
+func (c *Client) GetSecurityFindingsCached(contextName, namespace string, rt model.ResourceTypeEntry) ([]model.Item, bool, error) {
+	mgr := c.securityManager.Load()
+	if mgr == nil {
+		return nil, false, nil
+	}
+	sourceName := sourceNameFromKind(rt.Kind)
+	if sourceName == "" {
+		return nil, false, nil
+	}
+	res, ok := mgr.CachedFindings(contextName, namespace)
+	if !ok {
+		return nil, false, nil
+	}
+	items, err := c.groupSecurityFindings(res, sourceName)
+	return items, true, err
 }
 
 // GetSecurityAffectedResources returns the list of resources affected by
@@ -179,6 +206,35 @@ func (c *Client) GetSecurityAffectedResources(ctx context.Context, contextName, 
 	if err != nil {
 		return nil, fmt.Errorf("security fetch: %w", err)
 	}
+	return c.affectedResourcesFromResult(res, sourceName, groupKey)
+}
+
+// GetSecurityAffectedResourcesCached is the cache-only counterpart to
+// GetSecurityAffectedResources (no scan). ok is false on a cold/expired cache,
+// signalling the caller to fall back to a scanning fetch.
+func (c *Client) GetSecurityAffectedResourcesCached(contextName, namespace string, rt model.ResourceTypeEntry, groupKey string) ([]model.Item, bool, error) {
+	mgr := c.securityManager.Load()
+	if mgr == nil {
+		return nil, false, nil
+	}
+	sourceName := sourceNameFromKind(rt.Kind)
+	if sourceName == "" {
+		return nil, false, nil
+	}
+	res, ok := mgr.CachedFindings(contextName, namespace)
+	if !ok {
+		return nil, false, nil
+	}
+	items, err := c.affectedResourcesFromResult(res, sourceName, groupKey)
+	return items, true, err
+}
+
+// affectedResourcesFromResult builds the affected-resource items for one
+// finding group from a FetchResult: surfaces the source error, matches
+// findings by source+group, dedups + sorts resources, and applies the ignore
+// policy (hide when show-ignored is off; tag __ignored__ when on). Shared by
+// the scanning and cache-only paths.
+func (c *Client) affectedResourcesFromResult(res security.FetchResult, sourceName, groupKey string) ([]model.Item, error) {
 	// Surface the requested source's per-source error so a source-specific
 	// fetch failure isn't mistaken for "no affected resources".
 	if srcErr, ok := res.Errors[sourceName]; ok && srcErr != nil {
