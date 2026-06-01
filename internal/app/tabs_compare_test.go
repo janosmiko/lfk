@@ -156,6 +156,53 @@ func TestComparePrimaryColumn_PercentColumns(t *testing.T) {
 	}
 }
 
+func TestCompareResourceValuesCmp(t *testing.T) {
+	tests := []struct {
+		name string
+		a, b string
+		col  string
+		want int
+	}{
+		{"cpu millicores ordered", "100m", "200m", "CPU", -1},
+		{"cpu cores beat millicores", "710m", "1.3", "CPU", -1},
+		{"cpu equal", "100m", "100m", "CPU", 0},
+		// Trend arrows must not affect numeric ordering.
+		{"cpu up-arrow value sorts by number", "↑ 1.3", "710m", "CPU", 1},
+		{"cpu down-arrow value sorts by number", "↓ 710m", "1.3", "CPU", -1},
+		{"cpu arrowed equals plain", "↑ 100m", "100m", "CPU", 0},
+		// n/a sorts after any real value, both directions.
+		{"n/a after real cpu", "n/a", "0m", "CPU", 1},
+		{"real cpu before n/a", "0m", "n/a", "CPU", -1},
+		{"n/a equals n/a", "n/a", "n/a", "CPU", 0},
+		// Memory shares the comparator (isCPU=false).
+		{"memory ordered", "100Mi", "200Mi", "MEM", -1},
+		{"memory arrow stripped", "↓ 2Gi", "512Mi", "MEM", 1},
+		{"n/a after real memory", "n/a", "0Mi", "MEM", 1},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := compareResourceValuesCmp(tt.a, tt.b, tt.col)
+			if (got < 0) != (tt.want < 0) || (got > 0) != (tt.want > 0) {
+				t.Errorf("compareResourceValuesCmp(%q, %q, %q) = %d, want sign of %d", tt.a, tt.b, tt.col, got, tt.want)
+			}
+		})
+	}
+}
+
+func TestCompareResourceValuesCmp_SortOrder(t *testing.T) {
+	values := []string{"↑ 1.3", "n/a", "710m", "0m", "↓ 5m", "n/a", "250m"}
+	sort.SliceStable(values, func(i, j int) bool {
+		return compareResourceValuesCmp(values[i], values[j], "CPU") < 0
+	})
+	// Ascending: 0m < 5m < 250m < 710m < 1300m(1.3), then n/a markers last.
+	want := []string{"0m", "↓ 5m", "250m", "710m", "↑ 1.3", "n/a", "n/a"}
+	for i := range want {
+		if values[i] != want[i] {
+			t.Fatalf("sorted = %v, want %v", values, want)
+		}
+	}
+}
+
 func itemWithCol(key, val string) model.Item {
 	return model.Item{Columns: []model.KeyValue{{Key: key, Value: val}}}
 }

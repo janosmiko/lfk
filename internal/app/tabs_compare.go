@@ -273,9 +273,25 @@ func compareResourceValues(a, b, col string) bool {
 	return compareResourceValuesCmp(a, b, col) < 0
 }
 
+// compareResourceValuesCmp compares two CPU/MEM column values numerically.
+// Values may carry a trend arrow ("↑ 1.3", "↓ 710m") — stripped during parse —
+// or be "n/a" when metrics-server has no data for the row. "n/a" (and any other
+// unparseable value) sorts after real values so metrics-less rows land at the
+// bottom in ascending order, mirroring comparePercentCmp.
 func compareResourceValuesCmp(a, b, col string) int {
 	isCPU := strings.HasPrefix(col, "CPU")
-	return cmpInt64(ui.ParseResourceValue(a, isCPU), ui.ParseResourceValue(b, isCPU))
+	va, okA := ui.ParseResourceValueOK(a, isCPU)
+	vb, okB := ui.ParseResourceValueOK(b, isCPU)
+	switch {
+	case okA && okB:
+		return cmpInt64(va, vb)
+	case okA:
+		return -1
+	case okB:
+		return 1
+	default:
+		return strings.Compare(strings.ToLower(strings.TrimSpace(a)), strings.ToLower(strings.TrimSpace(b)))
+	}
 }
 
 // comparePercentCmp compares two percentage-formatted column values

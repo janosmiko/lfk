@@ -122,6 +122,12 @@ func TestParseResourceValue(t *testing.T) {
 			{"0.5", 500},
 			{"2", 2000},
 			{"", 0},
+			// Trend arrows are cosmetic decorations and must be stripped
+			// before parsing; otherwise arrowed rows collapse to 0 and break
+			// CPU sorting (issue: "sorting by CPU doesn't work").
+			{"↑ 1.3", 1300},
+			{"↓ 710m", 710},
+			{"↑ 250m", 250},
 		}
 		for _, tt := range tests {
 			assert.Equal(t, tt.expected, ParseResourceValue(tt.val, true), "CPU: %s", tt.val)
@@ -150,6 +156,42 @@ func TestParseResourceValue(t *testing.T) {
 		expected := int64(1.5 * 1024 * 1024 * 1024)
 		assert.Equal(t, expected, val)
 	})
+
+	t.Run("memory strips trend arrows", func(t *testing.T) {
+		assert.Equal(t, int64(128*1024*1024), ParseResourceValue("↑ 128Mi", false))
+		assert.Equal(t, int64(1024*1024*1024), ParseResourceValue("↓ 1Gi", false))
+	})
+}
+
+func TestParseResourceValueOK(t *testing.T) {
+	tests := []struct {
+		name     string
+		val      string
+		isCPU    bool
+		expected int64
+		ok       bool
+	}{
+		{"plain cpu millicores", "710m", true, 710, true},
+		{"plain cpu cores", "1.3", true, 1300, true},
+		{"cpu with up arrow", "↑ 1.3", true, 1300, true},
+		{"cpu with down arrow", "↓ 710m", true, 710, true},
+		{"cpu zero is parseable", "0m", true, 0, true},
+		{"cpu n/a not parseable", "n/a", true, 0, false},
+		{"empty not parseable", "", true, 0, false},
+		{"garbage not parseable", "abc", true, 0, false},
+		{"memory mebibytes", "128Mi", false, 128 * 1024 * 1024, true},
+		{"memory with arrow", "↑ 1Gi", false, 1024 * 1024 * 1024, true},
+		{"memory n/a not parseable", "n/a", false, 0, false},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, ok := ParseResourceValueOK(tt.val, tt.isCPU)
+			assert.Equal(t, tt.ok, ok, "ok flag for %q", tt.val)
+			if tt.ok {
+				assert.Equal(t, tt.expected, got, "value for %q", tt.val)
+			}
+		})
+	}
 }
 
 // --- padRight ---
