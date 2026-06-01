@@ -118,6 +118,18 @@ type Client struct {
 	discoveryMu      sync.Mutex
 	discoveryClients map[string]*disk.CachedDiscoveryClient
 
+	// clientMu guards clientCache. Typed/dynamic/metadata clients are
+	// expensive to build (kubeconfig parse + TLS transport + ~1.8k allocs,
+	// plus an exec-credential plugin invocation for EKS/kubelogin contexts)
+	// and were previously rebuilt on every call, discarding connection
+	// pooling and resetting the client-side QPS limiter each time. clientCache
+	// memoizes them per cache key (see clientCacheKey: context, plus a
+	// "throttled" variant for the lower-rate security clients). Invalidated on
+	// ReloadKubeconfig (the only mid-session config mutation) and per-context
+	// via invalidateClientsForContext.
+	clientMu    sync.Mutex
+	clientCache map[string]*ctxClients
+
 	// informerMu guards informerMode + informers. Writes happen at most
 	// once (SetInformerCacheMode at startup); reads happen on every
 	// GetResources. RWMutex is overkill for the call rate but documents
@@ -338,6 +350,12 @@ func (c *Client) ReloadKubeconfig() error {
 	c.contextOrder = order
 	c.currentContext = current
 	c.configMu.Unlock()
+	// Drop cached clients: they were built from the previous kubeconfig
+	// snapshot (endpoint, credentials, exec plugin). A reload can change any
+	// of those, so the next builder call must reconstruct. Done outside
+	// configMu — invalidateClientCache takes its own clientMu — to keep the
+	// two locks independent and avoid a lock-ordering constraint.
+	c.invalidateClientCache()
 	return nil
 }
 
