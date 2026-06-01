@@ -115,9 +115,10 @@ func (m Model) openSecurityActionMenu() Model {
 // openSecurityActionMenu. It replaces m.securityIgnores with a new
 // SecurityIgnoreState (the add/remove helpers never mutate in place),
 // dispatches the disk persistence asynchronously (so an fsync stall on slow disks does
-// not freeze the UI), re-installs the IgnoreChecker on the client, busts
-// the manager cache, and refreshes the current level so the user sees the
-// result immediately. Persistence failures arrive via
+// not freeze the UI), re-installs the IgnoreChecker on the client, and
+// refreshes the current level so the user sees the result immediately — a
+// cache-hit re-filter, not a re-scan (see the refresh return below).
+// Persistence failures arrive via
 // securityIgnoresSaveErrMsg and replace the optimistic success status with
 // a clear error.
 func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.Cmd) {
@@ -190,9 +191,10 @@ func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.C
 	if m.client != nil {
 		m.client.SetIgnoreChecker(newModelIgnoreChecker(m.securityIgnores, kctx))
 	}
-	if m.securityManager != nil {
-		m.securityManager.Invalidate()
-	}
+	// No manager-cache invalidation: ignoring changes only the checker, which
+	// groupFindings applies AFTER FetchAll's (filter-independent) cache. The
+	// refresh re-filters from cache instantly; invalidating would force a slow
+	// full re-scan. Explicit "Refresh" still invalidates (see dispatch).
 	return m, tea.Batch(saveSecurityIgnoresCmd(m.securityIgnores), m.refreshCurrentLevel(), scheduleStatusClear())
 }
 
