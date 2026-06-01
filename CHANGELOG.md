@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.13.3](https://github.com/janosmiko/lfk/compare/v0.13.2...v0.13.3) (2026-06-01)
+
+
+### Features
+
+* **app:** wrap application log lines and add events-style cursor navigation ([#325](https://github.com/janosmiko/lfk/issues/325)) ([48ef73f](https://github.com/janosmiko/lfk/commit/48ef73f38c644b039a5cda84a0b8ed33ca50b6c0))
+* **help:** word-wrap long keybinding descriptions ([#319](https://github.com/janosmiko/lfk/issues/319) a) ([#329](https://github.com/janosmiko/lfk/issues/329)) ([13b3e9f](https://github.com/janosmiko/lfk/commit/13b3e9fbd5277c40eafd11f04f5a07a56b2b2e5b))
+* hide individual resource types per cluster ([#321](https://github.com/janosmiko/lfk/issues/321)) ([#338](https://github.com/janosmiko/lfk/issues/338)) ([8535628](https://github.com/janosmiko/lfk/commit/85356280292126a25a6758ea9066cfd33e7ef74d))
+* metrics loading placeholder and segmented resource-usage bars ([#324](https://github.com/janosmiko/lfk/issues/324)) ([7ba0ed1](https://github.com/janosmiko/lfk/commit/7ba0ed1edd80b4376a77a4453d93dbcc7d4068c4))
+* **mouse:** add a runtime mouse-capture toggle ([#331](https://github.com/janosmiko/lfk/issues/331)) ([2f78dd1](https://github.com/janosmiko/lfk/commit/2f78dd13640dea1015c35ef1196aefdf9403679f))
+* **mouse:** scroll the pane under the pointer ([#330](https://github.com/janosmiko/lfk/issues/330)) ([d58ee21](https://github.com/janosmiko/lfk/commit/d58ee21eabbd71ed2ca6016518434c9051501cee))
+* **security:** finding-ignore visibility — namespace + config-glob ignores, badge/action consistency, cached lists ([#332](https://github.com/janosmiko/lfk/issues/332)) ([6d3411e](https://github.com/janosmiko/lfk/commit/6d3411ed5be60a0d085bac9e4cd40bd7d9d73499))
+* **security:** security findings dashboard ([#183](https://github.com/janosmiko/lfk/issues/183)) ([2e3c0d9](https://github.com/janosmiko/lfk/commit/2e3c0d968f86977436bc08368b06e9959cbca268))
+
+
+### Bug Fixes
+
+* **app:** make filter/search inert in dashboard fullscreen ([#323](https://github.com/janosmiko/lfk/issues/323)) ([6db089c](https://github.com/janosmiko/lfk/commit/6db089c3a5b62e8481b109fca0a982a44fb9d085))
+* attribute cluster credential failures + Prometheus pod metrics + log viewer cursor ([#318](https://github.com/janosmiko/lfk/issues/318)) ([ce26c05](https://github.com/janosmiko/lfk/commit/ce26c05f2f568a4771186e38fda00bf595db6fc6))
+* GUI freeze while loading background jobs ([#328](https://github.com/janosmiko/lfk/issues/328)) ([7237559](https://github.com/janosmiko/lfk/commit/723755905fab66e6ca6f6cb75a466b74868ca333))
+* **scheduler:** reclaim superseded background work so the focused view wins ([#317](https://github.com/janosmiko/lfk/issues/317)) ([0e18880](https://github.com/janosmiko/lfk/commit/0e188808a1a840c729fecfd53d054c3bb4196cb2))
+* show loader on startup instead of flashing empty states ([#333](https://github.com/janosmiko/lfk/issues/333)) ([70190d3](https://github.com/janosmiko/lfk/commit/70190d384706f7f1707ba791973e8b24ed259af7))
+* **ui:** refresh all rows immediately on SEC badge toggle ([#326](https://github.com/janosmiko/lfk/issues/326)) ([7cece15](https://github.com/janosmiko/lfk/commit/7cece1561dcb4ff83dcc6ace50cb42ba71f88c36))
+* **ui:** sort CPU/MEM columns numerically, n/a last ([#327](https://github.com/janosmiko/lfk/issues/327)) ([8279452](https://github.com/janosmiko/lfk/commit/82794523614f3eb87ee2a9fd3ab5f268124aa301))
+
+
+### Performance Improvements
+
+* fix background-work starvation, cache clients, configurable rate limits ([#322](https://github.com/janosmiko/lfk/issues/322)) ([5249fe9](https://github.com/janosmiko/lfk/commit/5249fe9660e39bed65a8b7e640784c3be39caded))
+
 ## [0.13.2](https://github.com/janosmiko/lfk/compare/v0.13.1...v0.13.2) (2026-05-31)
 
 
