@@ -178,8 +178,13 @@ func buildHelpSpecs(filter, contextMode string, innerW int) []helpLineSpec {
 		// the wrapped text stays aligned under the original description.
 		// rowOverhead is the fixed prefix helpSpecPlain prepends to an entry
 		// row: 4 leading spaces + keyWidth + 2 spaces between key and desc.
+		// descBudget is the exact room left for the description; flooring at
+		// 1 (rather than a larger value) keeps the wrapped row within innerW
+		// so the renderer's Truncate never lops a character with a "~" — the
+		// only residual overflow is when a section's key column alone is
+		// wider than the panel, which no description width could fix.
 		rowOverhead := 4 + keyWidth + 2
-		descBudget := max(innerW-rowOverhead, 8)
+		descBudget := max(innerW-rowOverhead, 1)
 		blankKey := strings.Repeat(" ", keyWidth)
 		entries := make([]helpLineSpec, 0, len(matched))
 		for _, b := range matched {
@@ -214,31 +219,99 @@ func buildHelpSpecs(filter, contextMode string, innerW int) []helpLineSpec {
 	return specs
 }
 
-// wrapHelpText word-wraps desc to width, then hard-breaks any single
-// token still wider than width (e.g. a slash-joined "owner/port-forward/
-// orphan" enumeration with no spaces). Without the hard break such a
-// token would overrun the column and force RenderHelpScreen to truncate
-// it with a "~", which is exactly what wrapping is meant to avoid.
+// wrapHelpText word-wraps desc to width on word boundaries. A space-free
+// token wider than width (e.g. a slash-joined "owner/port-forward/orphan/
+// finding/mark" enumeration) is broken after its "/" separators so it
+// wraps at readable boundaries rather than mid-word; a segment between
+// slashes that is itself wider than width falls back to a hard character
+// break. The output never exceeds width, so RenderHelpScreen's final
+// Truncate never adds a "~".
 func wrapHelpText(desc string, width int) []string {
 	if width < 1 {
 		width = 1
 	}
-	words := wrapText(desc, width)
-	if len(words) == 0 {
+	if strings.TrimSpace(desc) == "" {
 		return nil
 	}
-	out := make([]string, 0, len(words))
-	for _, w := range words {
-		if lipgloss.Width(w) <= width {
-			out = append(out, w)
+
+	// Tokenize into pieces no wider than width. spaceBefore marks pieces
+	// that follow a real space (a word boundary); slash continuations and
+	// hard-break fragments glue to the previous piece with no space.
+	type piece struct {
+		text        string
+		spaceBefore bool
+	}
+	var pieces []piece
+	for word := range strings.FieldsSeq(desc) {
+		first := true
+		for _, seg := range splitAfterSlash(word) {
+			for _, chunk := range hardChunks(seg, width) {
+				pieces = append(pieces, piece{text: chunk, spaceBefore: first})
+				first = false
+			}
+		}
+	}
+
+	// Greedy pack: keep adding pieces to the current line while they fit.
+	var lines []string
+	cur := ""
+	for _, p := range pieces {
+		if cur == "" {
+			cur = p.text
 			continue
 		}
-		runes := []rune(w)
-		for len(runes) > 0 {
-			n := min(width, len(runes))
-			out = append(out, string(runes[:n]))
-			runes = runes[n:]
+		sep := ""
+		if p.spaceBefore {
+			sep = " "
 		}
+		if lipgloss.Width(cur)+lipgloss.Width(sep)+lipgloss.Width(p.text) <= width {
+			cur += sep + p.text
+			continue
+		}
+		lines = append(lines, cur)
+		cur = p.text
+	}
+	if cur != "" {
+		lines = append(lines, cur)
+	}
+	return lines
+}
+
+// splitAfterSlash splits s into segments that each end just after a "/"
+// (the slash stays on the left segment), so "owner/port-forward/orphan"
+// becomes ["owner/", "port-forward/", "orphan"]. Used to give long
+// slash-joined tokens readable break points.
+func splitAfterSlash(s string) []string {
+	if !strings.Contains(s, "/") {
+		return []string{s}
+	}
+	runes := []rune(s)
+	var out []string
+	start := 0
+	for i, r := range runes {
+		if r == '/' {
+			out = append(out, string(runes[start:i+1]))
+			start = i + 1
+		}
+	}
+	if start < len(runes) {
+		out = append(out, string(runes[start:]))
+	}
+	return out
+}
+
+// hardChunks splits s into pieces no wider than width by raw rune count,
+// used only as the last resort for a segment with no break opportunity.
+func hardChunks(s string, width int) []string {
+	if lipgloss.Width(s) <= width {
+		return []string{s}
+	}
+	runes := []rune(s)
+	var out []string
+	for len(runes) > 0 {
+		n := min(width, len(runes))
+		out = append(out, string(runes[:n]))
+		runes = runes[n:]
 	}
 	return out
 }

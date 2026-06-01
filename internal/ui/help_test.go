@@ -255,6 +255,33 @@ func TestBuildHelpSpecs_ContinuationRowsHaveBlankAlignedKey(t *testing.T) {
 		"narrow width must produce at least one continuation row with a blank key")
 }
 
+// A long slash-joined token must wrap at "/" boundaries rather than being
+// hard-broken mid-word (issue #319 a follow-up: "...findi" / "ng/mark...").
+func TestWrapHelpText_BreaksLongSlashTokenAtSlashes(t *testing.T) {
+	desc := "Jump back through teleport history (owner/port-forward/orphan/finding/mark jumps)"
+	for _, width := range []int{20, 30, 41, 60} {
+		lines := wrapHelpText(desc, width)
+
+		for _, ln := range lines {
+			assert.LessOrEqualf(t, lipgloss.Width(ln), width,
+				"width %d: row %q exceeds the budget", width, ln)
+		}
+
+		// No data loss: ignoring whitespace, the wrapped text reproduces the
+		// original exactly (slash continuations glue with no space).
+		norm := func(s string) string { return strings.ReplaceAll(s, " ", "") }
+		assert.Equalf(t, norm(desc), norm(strings.Join(lines, "")),
+			"width %d: wrapping dropped or duplicated characters", width)
+
+		// At widths that comfortably fit a slash segment, segments stay whole.
+		if width >= 30 {
+			joined := strings.Join(lines, "\n")
+			assert.Containsf(t, joined, "finding/",
+				"width %d: slash segment 'finding/' must not be broken mid-word", width)
+		}
+	}
+}
+
 func TestBuildHelpLines_ReturnsPlainText(t *testing.T) {
 	original := lipgloss.DefaultRenderer().ColorProfile()
 	originalNoColor := ConfigNoColor
