@@ -332,25 +332,29 @@ func TestDescribeKeyWordMotion(t *testing.T) {
 
 func TestDiffKeyEscReturnsToExplorer(t *testing.T) {
 	m := Model{
-		mode:     modeDiff,
-		diffLeft: "line1\nline2",
-		tabs:     []TabState{{}},
-		width:    80,
-		height:   40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left: "line1\nline2",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDiffKey(specialKey(tea.KeyEsc))
 	result := ret.(Model)
 	assert.Equal(t, modeExplorer, result.mode)
-	assert.Equal(t, 0, result.diffScroll)
+	assert.Equal(t, 0, result.diffView.scroll)
 }
 
 func TestDiffKeyQuestionMarkOpensHelp(t *testing.T) {
 	m := Model{
-		mode:     modeDiff,
-		diffLeft: "line1",
-		tabs:     []TabState{{}},
-		width:    80,
-		height:   40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left: "line1",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDiffKey(runeKey('?'))
 	result := ret.(Model)
@@ -360,87 +364,97 @@ func TestDiffKeyQuestionMarkOpensHelp(t *testing.T) {
 
 func TestDiffKeyJMovesCursorDown(t *testing.T) {
 	m := Model{
-		mode:       modeDiff,
-		diffLeft:   strings.Repeat("line\n", 100),
-		diffCursor: 0,
-		tabs:       []TabState{{}},
-		width:      80,
-		height:     40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left:   strings.Repeat("line\n", 100),
+			cursor: 0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDiffKey(runeKey('j'))
 	result := ret.(Model)
-	assert.Equal(t, 1, result.diffCursor)
+	assert.Equal(t, 1, result.diffView.cursor)
 }
 
 func TestDiffKeyUTogglesUnified(t *testing.T) {
 	m := Model{
-		mode:        modeDiff,
-		diffLeft:    "line1",
-		diffUnified: false,
-		tabs:        []TabState{{}},
-		width:       80,
-		height:      40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left:    "line1",
+			unified: false,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDiffKey(runeKey('u'))
 	result := ret.(Model)
-	assert.True(t, result.diffUnified)
+	assert.True(t, result.diffView.unified)
 }
 
 func TestDiffKeyHashTogglesLineNumbers(t *testing.T) {
 	m := Model{
-		mode:            modeDiff,
-		diffLeft:        "line1",
-		diffLineNumbers: false,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left:        "line1",
+			lineNumbers: false,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDiffKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'#'}})
 	result := ret.(Model)
-	assert.True(t, result.diffLineNumbers)
+	assert.True(t, result.diffView.lineNumbers)
 }
 
 func TestDiffKeyDigitBuffering(t *testing.T) {
 	m := Model{
-		mode:          modeDiff,
-		diffLeft:      strings.Repeat("line\n", 100),
-		diffLineInput: "",
-		tabs:          []TabState{{}},
-		width:         80,
-		height:        40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left:      strings.Repeat("line\n", 100),
+			lineInput: "",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDiffKey(runeKey('1'))
 	result := ret.(Model)
-	assert.Equal(t, "1", result.diffLineInput)
+	assert.Equal(t, "1", result.diffView.lineInput)
 
 	ret2, _ := result.handleDiffKey(runeKey('5'))
 	result2 := ret2.(Model)
-	assert.Equal(t, "15", result2.diffLineInput)
+	assert.Equal(t, "15", result2.diffView.lineInput)
 }
 
 func TestDiffKeyGWithDigitJumpsToLine(t *testing.T) {
 	m := Model{
-		mode:          modeDiff,
-		diffLeft:      strings.Repeat("line\n", 100),
-		diffLineInput: "10",
-		tabs:          []TabState{{}},
-		width:         80,
-		height:        40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left:      strings.Repeat("line\n", 100),
+			lineInput: "10",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDiffKey(runeKey('G'))
 	result := ret.(Model)
-	assert.Equal(t, 9, result.diffCursor) // 10 - 1 = 9 (0-indexed)
-	assert.Empty(t, result.diffLineInput)
+	assert.Equal(t, 9, result.diffView.cursor) // 10 - 1 = 9 (0-indexed)
+	assert.Empty(t, result.diffView.lineInput)
 }
 
 func TestCovToggleDiffFoldAtCursor(t *testing.T) {
 	m := baseModelCov()
-	m.diffLeft = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
-	m.diffRight = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
+	m.diffView.left = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
+	m.diffView.right = "line1\nline2\nline3\nline4\nline5\nline6\nline7\nline8\nline9\nline10"
 
-	foldRegions := ui.ComputeDiffFoldRegions(m.diffLeft, m.diffRight)
-	m.diffFoldState = make([]bool, len(foldRegions))
-	m.diffCursor = 0
+	foldRegions := ui.ComputeDiffFoldRegions(m.diffView.left, m.diffView.right)
+	m.diffView.foldState = make([]bool, len(foldRegions))
+	m.diffView.cursor = 0
 
 	// Should not panic even with no foldable regions (all lines equal = one big fold).
 	m.toggleDiffFoldAtCursor(foldRegions)
@@ -448,27 +462,27 @@ func TestCovToggleDiffFoldAtCursor(t *testing.T) {
 
 func TestCovToggleDiffFoldAtCursorOutOfBounds(t *testing.T) {
 	m := baseModelCov()
-	m.diffLeft = ""
-	m.diffRight = ""
-	m.diffCursor = 100
-	m.diffFoldState = nil
+	m.diffView.left = ""
+	m.diffView.right = ""
+	m.diffView.cursor = 100
+	m.diffView.foldState = nil
 	m.toggleDiffFoldAtCursor(nil)
 }
 
 func TestCovToggleAllDiffFolds(t *testing.T) {
 	m := baseModelCov()
-	m.diffFoldState = []bool{false, false, true}
+	m.diffView.foldState = []bool{false, false, true}
 	regions := []ui.DiffFoldRegion{{Start: 0, End: 2}, {Start: 3, End: 5}, {Start: 6, End: 8}}
 
 	// Some collapsed -> expand all.
 	m.toggleAllDiffFolds(regions)
-	for _, v := range m.diffFoldState {
+	for _, v := range m.diffView.foldState {
 		assert.False(t, v)
 	}
 
 	// None collapsed -> collapse all.
 	m.toggleAllDiffFolds(regions)
-	for _, v := range m.diffFoldState {
+	for _, v := range m.diffView.foldState {
 		assert.True(t, v)
 	}
 }

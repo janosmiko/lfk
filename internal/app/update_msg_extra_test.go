@@ -578,12 +578,12 @@ func TestUpdateDiffLoadedSuccess(t *testing.T) {
 	mdl := result.(Model)
 	assert.False(t, mdl.loading)
 	assert.Equal(t, modeDiff, mdl.mode)
-	assert.Contains(t, mdl.diffLeft, "Pod")
-	assert.Contains(t, mdl.diffRight, "Service")
-	assert.Equal(t, "pod.yaml", mdl.diffLeftName)
-	assert.Equal(t, "svc.yaml", mdl.diffRightName)
-	assert.Equal(t, 0, mdl.diffScroll)
-	assert.False(t, mdl.diffUnified)
+	assert.Contains(t, mdl.diffView.left, "Pod")
+	assert.Contains(t, mdl.diffView.right, "Service")
+	assert.Equal(t, "pod.yaml", mdl.diffView.leftName)
+	assert.Equal(t, "svc.yaml", mdl.diffView.rightName)
+	assert.Equal(t, 0, mdl.diffView.scroll)
+	assert.False(t, mdl.diffView.unified)
 	assert.Nil(t, cmd)
 }
 

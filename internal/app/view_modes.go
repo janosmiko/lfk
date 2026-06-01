@@ -262,15 +262,15 @@ func (m Model) viewExplain() string {
 }
 
 func (m Model) viewDiff() string {
-	foldRegions := ui.ComputeDiffFoldRegions(m.diffLeft, m.diffRight)
-	searchInput := m.diffSearchText.Value
+	foldRegions := ui.ComputeDiffFoldRegions(m.diffView.left, m.diffView.right)
+	searchInput := m.diffView.searchText.Value
 	vp := ui.DiffVisualParams{
-		CursorSide:  m.diffCursorSide,
-		CursorCol:   m.diffVisualCurCol,
-		VisualMode:  m.diffVisualMode,
-		VisualType:  m.diffVisualType,
-		VisualStart: m.diffVisualStart,
-		VisualCol:   m.diffVisualCol,
+		CursorSide:  m.diffView.cursorSide,
+		CursorCol:   m.diffView.visualCurCol,
+		VisualMode:  m.diffView.visualMode,
+		VisualType:  m.diffView.visualType,
+		VisualStart: m.diffView.visualStart,
+		VisualCol:   m.diffView.visualCol,
 	}
 	// The diff renderer paints its own bottom hint bar inside the ui
 	// package, so the only safe way to surface a status message there is
@@ -282,10 +282,10 @@ func (m Model) viewDiff() string {
 	if m.hasStatusMessage() {
 		footerOverride = m.renderStatusHint()
 	}
-	if m.diffUnified {
-		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp, footerOverride)
+	if m.diffView.unified {
+		return ui.RenderUnifiedDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, vp, footerOverride)
 	}
-	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp, footerOverride)
+	return ui.RenderDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, vp, footerOverride)
 }
 
 func (m Model) logViewHeight() int {

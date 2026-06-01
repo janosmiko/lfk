@@ -54,12 +54,12 @@ func (m Model) updateDiffLoaded(msg diffLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.mode = modeDiff
-	m.diffLeft = msg.left
-	m.diffRight = msg.right
-	m.diffLeftName = msg.leftName
-	m.diffRightName = msg.rightName
-	m.diffScroll = 0
-	m.diffUnified = false
+	m.diffView.left = msg.left
+	m.diffView.right = msg.right
+	m.diffView.leftName = msg.leftName
+	m.diffView.rightName = msg.rightName
+	m.diffView.scroll = 0
+	m.diffView.unified = false
 	return m, nil
 }
 

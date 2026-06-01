@@ -210,8 +210,8 @@ func TestDescribeVisualViwSelectsInnerWord(t *testing.T) {
 func TestDiffVisualViwSetsPendingThenResolves(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeDiff
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
 
 	r1, _ := m.handleDiffVisualKey(keyMsg("i"), nil, 1, 5, 0)
 	assert.Equal(t, byte('i'), r1.(Model).pendingTextObject)

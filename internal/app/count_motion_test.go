@@ -111,45 +111,51 @@ func TestDescribeNormalCountClampsAtBottom(t *testing.T) {
 func TestDiffNormalCountPrefixJumpsDown(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeDiff,
-		diffLeft: "a\nb\nc\nd\ne\nf", diffRight: "a\nb\nc\nd\ne\nf",
-		diffLeftName: "before", diffRightName: "after",
-		diffCursor:    0,
-		diffLineInput: "3",
-		tabs:          []TabState{{}},
+		diffView: diffViewState{
+			left: "a\nb\nc\nd\ne\nf", right: "a\nb\nc\nd\ne\nf",
+			leftName: "before", rightName: "after",
+			cursor:    0,
+			lineInput: "3",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("j"))
 	rm := ret.(Model)
-	assert.Equal(t, 3, rm.diffCursor)
-	assert.Empty(t, rm.diffLineInput)
+	assert.Equal(t, 3, rm.diffView.cursor)
+	assert.Empty(t, rm.diffView.lineInput)
 }
 
 func TestDiffNormalCountPrefixJumpsUp(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeDiff,
-		diffLeft: "a\nb\nc\nd\ne\nf", diffRight: "a\nb\nc\nd\ne\nf",
-		diffLeftName: "before", diffRightName: "after",
-		diffCursor:    5,
-		diffLineInput: "4",
-		tabs:          []TabState{{}},
+		diffView: diffViewState{
+			left: "a\nb\nc\nd\ne\nf", right: "a\nb\nc\nd\ne\nf",
+			leftName: "before", rightName: "after",
+			cursor:    5,
+			lineInput: "4",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("k"))
 	rm := ret.(Model)
-	assert.Equal(t, 1, rm.diffCursor)
-	assert.Empty(t, rm.diffLineInput)
+	assert.Equal(t, 1, rm.diffView.cursor)
+	assert.Empty(t, rm.diffView.lineInput)
 }
 
 func TestDiffNormalCountClampsAtTop(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeDiff,
-		diffLeft: "a\nb\nc", diffRight: "a\nb\nc",
-		diffLeftName: "before", diffRightName: "after",
-		diffCursor:    1,
-		diffLineInput: "100",
-		tabs:          []TabState{{}},
+		diffView: diffViewState{
+			left: "a\nb\nc", right: "a\nb\nc",
+			leftName: "before", rightName: "after",
+			cursor:    1,
+			lineInput: "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("k"))
 	rm := ret.(Model)
-	assert.Equal(t, 0, rm.diffCursor)
+	assert.Equal(t, 0, rm.diffView.cursor)
 }
 
 func TestLogsNormalCountPrefixJumpsDown(t *testing.T) {
@@ -524,16 +530,18 @@ func TestEventTimelineCountPrefixHalfPageDown(t *testing.T) {
 func TestDiffCountPrefixColumnRight(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeDiff,
-		diffLeft: "hello world", diffRight: "hello world",
-		diffLeftName: "before", diffRightName: "after",
-		diffVisualCurCol: 0,
-		diffLineInput:    "5",
-		tabs:             []TabState{{}},
+		diffView: diffViewState{
+			left: "hello world", right: "hello world",
+			leftName: "before", rightName: "after",
+			visualCurCol: 0,
+			lineInput:    "5",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("l"))
 	rm := ret.(Model)
-	assert.Equal(t, 5, rm.diffVisualCurCol)
-	assert.Empty(t, rm.diffLineInput)
+	assert.Equal(t, 5, rm.diffView.visualCurCol)
+	assert.Empty(t, rm.diffView.lineInput)
 }
 
 func TestDiffCountPrefixHalfPageDown(t *testing.T) {
@@ -544,18 +552,20 @@ func TestDiffCountPrefixHalfPageDown(t *testing.T) {
 	content := strings.Join(lines, "\n")
 	m := Model{
 		width: 80, height: 40, mode: modeDiff,
-		diffLeft: content, diffRight: content,
-		diffLeftName: "before", diffRightName: "after",
-		diffCursor:    0,
-		diffLineInput: "2",
-		tabs:          []TabState{{}},
+		diffView: diffViewState{
+			left: content, right: content,
+			leftName: "before", rightName: "after",
+			cursor:    0,
+			lineInput: "2",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("ctrl+d"))
 	rm := ret.(Model)
 	// Vim semantics: 2<C-d> moves 2 lines and sets sticky scroll=2.
-	assert.Equal(t, 2, rm.diffCursor)
-	assert.Equal(t, 2, rm.diffScrollOption)
-	assert.Empty(t, rm.diffLineInput)
+	assert.Equal(t, 2, rm.diffView.cursor)
+	assert.Equal(t, 2, rm.diffView.scrollOption)
+	assert.Empty(t, rm.diffView.lineInput)
 }
 
 // --- YAML: column and page with count ---
@@ -609,37 +619,41 @@ func TestYAMLCountPrefixHalfPageDown(t *testing.T) {
 func TestDiffCountPrefixSearchNext(t *testing.T) {
 	m := Model{
 		width: 80, height: 40, mode: modeDiff,
-		diffLeft: "a\nb\nc\nd\ne", diffRight: "a\nb\nc\nd\ne",
-		diffLeftName: "before", diffRightName: "after",
-		diffMatchLines:  []int{1, 3, 4},
-		diffMatchIdx:    0,
-		diffSearchQuery: "x",
-		diffLineInput:   "2",
-		tabs:            []TabState{{}},
+		diffView: diffViewState{
+			left: "a\nb\nc\nd\ne", right: "a\nb\nc\nd\ne",
+			leftName: "before", rightName: "after",
+			matchLines:  []int{1, 3, 4},
+			matchIdx:    0,
+			searchQuery: "x",
+			lineInput:   "2",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("n"))
 	rm := ret.(Model)
 	// 2n from idx 0: 0 -> 1 -> 2.
-	assert.Equal(t, 2, rm.diffMatchIdx)
-	assert.Empty(t, rm.diffLineInput)
+	assert.Equal(t, 2, rm.diffView.matchIdx)
+	assert.Empty(t, rm.diffView.lineInput)
 }
 
 func TestDiffCountPrefixSearchPrev(t *testing.T) {
 	m := Model{
 		width: 80, height: 40, mode: modeDiff,
-		diffLeft: "a\nb\nc\nd\ne", diffRight: "a\nb\nc\nd\ne",
-		diffLeftName: "before", diffRightName: "after",
-		diffMatchLines:  []int{1, 3, 4},
-		diffMatchIdx:    0,
-		diffSearchQuery: "x",
-		diffLineInput:   "2",
-		tabs:            []TabState{{}},
+		diffView: diffViewState{
+			left: "a\nb\nc\nd\ne", right: "a\nb\nc\nd\ne",
+			leftName: "before", rightName: "after",
+			matchLines:  []int{1, 3, 4},
+			matchIdx:    0,
+			searchQuery: "x",
+			lineInput:   "2",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("N"))
 	rm := ret.(Model)
 	// 2N from idx 0 wraps backward: 0 -> 2 -> 1.
-	assert.Equal(t, 1, rm.diffMatchIdx)
-	assert.Empty(t, rm.diffLineInput)
+	assert.Equal(t, 1, rm.diffView.matchIdx)
+	assert.Empty(t, rm.diffView.lineInput)
 }
 
 // --- Event timeline: word motion with count ---
@@ -735,17 +749,19 @@ func TestYAMLCaretClearsBuffer(t *testing.T) {
 func TestDiffCaretClearsBuffer(t *testing.T) {
 	m := Model{
 		width: 80, height: 40, mode: modeDiff,
-		diffLeft: "  hello", diffRight: "  hello",
-		diffLeftName: "before", diffRightName: "after",
-		diffCursor:       0,
-		diffVisualCurCol: 6,
-		diffLineInput:    "5",
-		tabs:             []TabState{{}},
+		diffView: diffViewState{
+			left: "  hello", right: "  hello",
+			leftName: "before", rightName: "after",
+			cursor:       0,
+			visualCurCol: 6,
+			lineInput:    "5",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("^"))
 	rm := ret.(Model)
-	assert.Empty(t, rm.diffLineInput, "^ must consume the digit buffer")
-	assert.Equal(t, 2, rm.diffVisualCurCol)
+	assert.Empty(t, rm.diffView.lineInput, "^ must consume the digit buffer")
+	assert.Equal(t, 2, rm.diffView.visualCurCol)
 }
 
 func TestLogsDollarClearsBuffer(t *testing.T) {
@@ -832,16 +848,18 @@ func TestLogsCountPrefixColumnLeftClampsAtZero(t *testing.T) {
 func TestDiffEnterVisualClearsBuffer(t *testing.T) {
 	m := Model{
 		width: 80, height: 40, mode: modeDiff,
-		diffLeft: "a\nb\nc\nd\ne", diffRight: "a\nb\nc\nd\ne",
-		diffLeftName: "before", diffRightName: "after",
-		diffCursor:    0,
-		diffLineInput: "5",
-		tabs:          []TabState{{}},
+		diffView: diffViewState{
+			left: "a\nb\nc\nd\ne", right: "a\nb\nc\nd\ne",
+			leftName: "before", rightName: "after",
+			cursor:    0,
+			lineInput: "5",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("v"))
 	rm := ret.(Model)
-	assert.True(t, rm.diffVisualMode)
-	assert.Empty(t, rm.diffLineInput, "entering visual mode must consume the digit buffer")
+	assert.True(t, rm.diffView.visualMode)
+	assert.Empty(t, rm.diffView.lineInput, "entering visual mode must consume the digit buffer")
 }
 
 // --- Vim 'scroll' semantics for [count]<C-d>/<C-u> ---
@@ -933,6 +951,6 @@ func TestScrollOptionIsPerViewer(t *testing.T) {
 	assert.Equal(t, 7, rm.logScrollOption)
 	assert.Equal(t, 0, rm.describeScrollOption)
 	assert.Equal(t, 0, rm.yamlView.scrollOption)
-	assert.Equal(t, 0, rm.diffScrollOption)
+	assert.Equal(t, 0, rm.diffView.scrollOption)
 	assert.Equal(t, 0, rm.eventTimelineScrollOption)
 }

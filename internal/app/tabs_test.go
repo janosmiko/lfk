@@ -1176,6 +1176,58 @@ func TestTabSwitchPreservesYAMLViewerState(t *testing.T) {
 	assert.False(t, m.tabs[0].yamlCollapsed["injected"], "loadTab must deep-copy yamlCollapsed")
 }
 
+// TestTabSwitchPreservesDiffViewerState pins the save->switch->restore contract
+// for the full-screen diff viewer before/after the diffViewState extraction.
+// Only the persisted subset (left, right, leftName, rightName, scroll, unified)
+// round-trips across a tab switch; the rest of the diff state is transient. The
+// extraction must keep this behaviour byte-for-byte.
+func TestTabSwitchPreservesDiffViewerState(t *testing.T) {
+	m := Model{
+		tabs: []TabState{
+			{}, // Tab A: receives the active model's diff state on save.
+			{ // Tab B: carries its own persisted diff viewer state.
+				diffLeft:      "b-left",
+				diffRight:     "b-right",
+				diffLeftName:  "b-from",
+				diffRightName: "b-to",
+				diffScroll:    33,
+				diffUnified:   true,
+			},
+		},
+		activeTab: 0,
+		// Mirror Tab A's diff state into the active model so saveCurrentTab
+		// has something to persist.
+		diffView: diffViewState{
+			left:      "a-left",
+			right:     "a-right",
+			leftName:  "a-from",
+			rightName: "a-to",
+			scroll:    77,
+			unified:   false,
+		},
+	}
+
+	// Switch to Tab B: its persisted diff state must become active.
+	m.saveCurrentTab()
+	m.loadTab(1)
+	assert.Equal(t, "b-left", m.diffView.left)
+	assert.Equal(t, "b-right", m.diffView.right)
+	assert.Equal(t, "b-from", m.diffView.leftName)
+	assert.Equal(t, "b-to", m.diffView.rightName)
+	assert.Equal(t, 33, m.diffView.scroll)
+	assert.True(t, m.diffView.unified)
+
+	// Switch back to Tab A: its persisted diff state must round-trip intact.
+	m.saveCurrentTab()
+	m.loadTab(0)
+	assert.Equal(t, "a-left", m.diffView.left)
+	assert.Equal(t, "a-right", m.diffView.right)
+	assert.Equal(t, "a-from", m.diffView.leftName)
+	assert.Equal(t, "a-to", m.diffView.rightName)
+	assert.Equal(t, 77, m.diffView.scroll)
+	assert.False(t, m.diffView.unified, "Tab B's unified flag must not bleed into Tab A")
+}
+
 func TestPush2UpdateStatusMessageExpiredMsg(t *testing.T) {
 	m := basePush80v2Model()
 	m.setStatusMessage("temp msg", false)
