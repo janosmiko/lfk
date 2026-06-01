@@ -121,6 +121,16 @@ func (m Model) updateWatchTick(msg watchTickMsg) (tea.Model, tea.Cmd) {
 	if !m.watchMode {
 		return m, nil
 	}
+	// No explicit backpressure gate here: the scheduler's in-flight coalescing
+	// (Registry.Submit dedups against an identical RUNNING task, not just the
+	// queue) already gives this loop fixed-DELAY semantics under load — a tick
+	// that fires while the previous identical refresh is still running is
+	// coalesced away rather than stacking a redundant fetch. An earlier gate on
+	// total queue depth was removed: it conflated the user's foreground list
+	// refresh (High) with background metrics/events (Low) and suppressed a live
+	// list refresh whenever slow background work was still draining (a deleted
+	// pod lingered in the list — see TestWatchTickRemovesDeletedPodFromList).
+	//
 	// Mark this dispatch as a watch-tick refresh so the instrumented
 	// loaders called below (through refreshCurrentLevel) use
 	// Registry.StartUntracked and don't flash the title-bar indicator

@@ -53,6 +53,7 @@ const (
 	KindAPIDiscovery              // discover API resource types for a context (foundational)
 	KindNamespaceList             // list namespaces for a context (foundational)
 	KindRBACCheck                 // RBAC SelfSubjectAccessReview / Can-I checks (foundational)
+	KindSecurityScan              // background security source availability + finding scans
 )
 
 // String returns the human-readable label for a Kind.
@@ -80,6 +81,8 @@ func (k Kind) String() string {
 		return "NamespaceList"
 	case KindRBACCheck:
 		return "RBACCheck"
+	case KindSecurityScan:
+		return "SecurityScan"
 	default:
 		return "Unknown"
 	}

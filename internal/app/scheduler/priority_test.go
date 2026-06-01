@@ -33,6 +33,7 @@ func TestDefaultPriorityFor_KnownKinds(t *testing.T) {
 		{KindMetrics, PriorityLow},
 		{KindResourceTree, PriorityLow},
 		{KindDashboard, PriorityLow},
+		{KindSecurityScan, PriorityLow},
 	}
 	for _, tc := range cases {
 		t.Run(tc.kind.String(), func(t *testing.T) {

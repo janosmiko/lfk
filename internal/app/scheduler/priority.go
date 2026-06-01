@@ -41,7 +41,7 @@ func DefaultPriorityFor(k Kind) Priority {
 		return PriorityCritical
 	case KindResourceList, KindContainers, KindYAMLFetch:
 		return PriorityHigh
-	case KindMetrics, KindResourceTree, KindDashboard:
+	case KindMetrics, KindResourceTree, KindDashboard, KindSecurityScan:
 		return PriorityLow
 	default:
 		return PriorityLow

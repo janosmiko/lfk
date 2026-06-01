@@ -34,7 +34,7 @@ func TestWorkerLoop_DoesNotBusyLoopOnStaleWake(t *testing.T) {
 	// when r.started, so we need the queue to exist before
 	// StartWorkers.
 	r.mu.Lock()
-	q := newCtxQueue()
+	q := newCtxQueue(DefaultAgingThreshold)
 	r.ctxQueues["c1"] = q
 	r.mu.Unlock()
 	r.StartWorkers()

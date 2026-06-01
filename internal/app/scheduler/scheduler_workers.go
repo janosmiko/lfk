@@ -6,6 +6,18 @@ import (
 	"sync/atomic"
 )
 
+// workerClass selects which priority lane a worker prefers when picking the
+// next task. General workers honor strict priority (with aging); the reserved
+// classes bias toward one end of the range but always fall back so a reserved
+// slot is never wasted when its preferred lane is empty.
+type workerClass int
+
+const (
+	workerClassGeneral  workerClass = iota // strict priority + aging
+	workerClassCritical                    // prefer Critical, else fall back
+	workerClassLow                         // prefer Low, else fall back
+)
+
 // StartWorkers enables worker dispatch. Idempotent. Workers are spawned
 // per cluster context on first Submit AND retroactively for any
 // queues that already exist when StartWorkers is called — this lets
@@ -75,6 +87,37 @@ func (r *Registry) SetWorkersForTest(workers, criticalReserved int) {
 	defer r.mu.Unlock()
 	r.cfg.WorkersPerContext = ClampWorkers(workers)
 	r.cfg.CriticalReserved = ClampCriticalReserved(criticalReserved, r.cfg.WorkersPerContext)
+	// Re-clamp the existing low reservation against the new totals so an
+	// earlier SetLowReservedForTest stays valid (and the default doesn't
+	// exceed a small test pool). Tests that want a specific value call
+	// SetLowReservedForTest after this.
+	r.cfg.LowReserved = ClampLowReserved(r.cfg.LowReserved, r.cfg.WorkersPerContext, r.cfg.CriticalReserved)
+}
+
+// SetLowReservedForTest overrides the low-reserved worker count before any
+// pool is spawned. Clamped against the current worker/critical totals.
+// Production code MUST NOT call this; use the ConfigLowReserved global.
+func (r *Registry) SetLowReservedForTest(n int) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cfg.LowReserved = ClampLowReserved(n, r.cfg.WorkersPerContext, r.cfg.CriticalReserved)
+}
+
+// SetAgingThresholdForTest overrides the anti-starvation aging threshold on a
+// Registry before any per-context queue is created (queues capture it lazily on
+// first Submit). The value is used verbatim — including 0 to disable aging — so
+// tests can exercise both small thresholds and the strict-priority kill switch.
+// Production code MUST NOT call this; use the ConfigAgingThreshold global.
+func (r *Registry) SetAgingThresholdForTest(n int) {
+	if r == nil {
+		return
+	}
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.cfg.AgingThreshold = n
 }
 
 // ensurePoolFor spawns the per-context worker pool the first time a
@@ -88,16 +131,31 @@ func (r *Registry) ensurePoolFor(_ string, q *ctxQueue) {
 	}
 	q.poolStarted = true
 	for i := range r.cfg.WorkersPerContext {
-		isCritical := i < r.cfg.CriticalReserved
 		r.workersWG.Add(1)
-		go r.workerLoop(q, isCritical)
+		go r.workerLoop(q, workerClassFor(i, r.cfg.CriticalReserved, r.cfg.LowReserved))
 	}
 }
 
-// workerLoop is one worker goroutine: pulls tasks from q honoring
-// priority, runs Fn with timeout, delivers Result. If isCritical is
-// true, this worker only picks up Critical tasks.
-func (r *Registry) workerLoop(q *ctxQueue, isCritical bool) {
+// workerClassFor assigns worker index i a class: the first CriticalReserved
+// workers prefer Critical, the last LowReserved workers prefer Low, and the
+// rest are general. The ranges never overlap because ClampLowReserved keeps
+// critical + low <= workers - 1.
+func workerClassFor(i, criticalReserved, lowReserved int) workerClass {
+	switch {
+	case i < criticalReserved:
+		return workerClassCritical
+	case i >= criticalReserved && i < criticalReserved+lowReserved:
+		return workerClassLow
+	default:
+		return workerClassGeneral
+	}
+}
+
+// workerLoop is one worker goroutine: pulls tasks from q honoring priority
+// and its worker class, runs Fn with timeout, delivers Result. The class
+// biases which lane it prefers (see pickTask); all classes fall back so no
+// worker idles while work is queued.
+func (r *Registry) workerLoop(q *ctxQueue, class workerClass) {
 	defer r.workersWG.Done()
 	for {
 		select {
@@ -112,15 +170,16 @@ func (r *Registry) workerLoop(q *ctxQueue, isCritical bool) {
 			if shutdownPending(r.stopAll, q.stop) {
 				return
 			}
-			// Try to pick a task for this worker class. If none is found
-			// (e.g. a Critical-only worker woke up but only non-Critical
-			// tasks are queued), re-signal so the appropriate worker picks
-			// it up — but ONLY if the queue actually has pending work.
-			// A stale wake left over from the inner drain loop below
-			// would otherwise feed itself: this worker re-signals, the
-			// same goroutine wins the receive race, fails pickTask
-			// again, re-signals, ad infinitum (issue #206).
-			task, ok := r.pickTask(q, isCritical)
+			// Try to pick a task for this worker class. pickTask returns
+			// (nil, false) only when the queue is genuinely empty (a race
+			// between the wake signal and a concurrent pick) — a reserved
+			// worker no longer idles on a non-empty queue since it falls
+			// back to non-Critical work. Re-signal so a sibling retries, but
+			// ONLY when work is actually pending: a stale wake left over from
+			// the inner drain loop below would otherwise feed itself (this
+			// worker re-signals, wins the receive race, fails pickTask again,
+			// re-signals, ad infinitum — issue #206).
+			task, ok := r.pickTask(q, class)
 			if !ok {
 				if q.hasPendingWork() {
 					select {
@@ -130,6 +189,15 @@ func (r *Registry) workerLoop(q *ctxQueue, isCritical bool) {
 				}
 				continue
 			}
+			// Wake a sibling before running: runTask blocks for the whole
+			// duration of the (potentially slow) Fn, so without this a burst
+			// of submits whose wake signals collapsed into the size-1 buffer
+			// would be drained by THIS worker serially while siblings stay
+			// parked — the lost-wakeup jam (one task runs, the rest queue
+			// behind a single blocked worker). Re-signalling on every
+			// successful pick cascades the wake across the pool so queued
+			// work runs in parallel up to WorkersPerContext.
+			r.wakeSibling(q)
 			r.runTask(task)
 			// Drain remaining work for this worker class after running
 			// one — but bail at every iteration if shutdown has been
@@ -139,12 +207,28 @@ func (r *Registry) workerLoop(q *ctxQueue, isCritical bool) {
 				if shutdownPending(r.stopAll, q.stop) {
 					return
 				}
-				task, ok = r.pickTask(q, isCritical)
+				task, ok = r.pickTask(q, class)
 				if !ok {
 					break
 				}
+				r.wakeSibling(q)
 				r.runTask(task)
 			}
+		}
+	}
+}
+
+// wakeSibling re-signals q.wake when work is still queued, so another parked
+// worker engages instead of leaving the current (about-to-block) worker to
+// drain the burst serially. Guarded by hasPendingWork so it never spins on an
+// empty queue (issue #206): the non-blocking send + size-1 buffer cap the
+// signal at one outstanding wake, and a spurious wake just parks the receiver
+// again after a failed pick.
+func (r *Registry) wakeSibling(q *ctxQueue) {
+	if q.hasPendingWork() {
+		select {
+		case q.wake <- struct{}{}:
+		default:
 		}
 	}
 }
@@ -163,21 +247,45 @@ func shutdownPending(stopAll, stop chan struct{}) bool {
 	}
 }
 
-// pickTask dequeues honoring isCritical (Critical-reserved workers only
-// take Critical tasks; non-Critical workers take any priority).
-func (r *Registry) pickTask(q *ctxQueue, isCritical bool) (*queuedTask, bool) {
+// pickTask dequeues the next task for this worker, biased by its class.
+//
+// A Critical-class worker takes Critical first; a Low-class worker takes Low
+// first. When the preferred lane is empty, BOTH fall through to
+// dequeueByPriorityLocked (priority + aging) rather than idling while other
+// work waits — the reservation guarantees a slot is biased toward that lane,
+// not that the worker sits idle. This is what gives background (Low) work a
+// guaranteed floor: under a flood of High submissions the Low-class workers
+// still drain the Low lane, so metrics/events/dashboards keep running instead
+// of queueing behind the foreground backlog. A General worker always honors
+// strict priority (with aging). The Critical preempt poker still makes a
+// Critical slot by bumping a running lower-priority task.
+func (r *Registry) pickTask(q *ctxQueue, class workerClass) (*queuedTask, bool) {
 	q.mu.Lock()
 	defer q.mu.Unlock()
-	if isCritical {
-		lane := q.lanes[int(PriorityCritical)]
-		if len(lane) == 0 {
-			return nil, false
+	switch class {
+	case workerClassCritical:
+		if t, ok := dequeueLaneLocked(q, PriorityCritical); ok {
+			return t, true
 		}
-		t := lane[0]
-		q.lanes[int(PriorityCritical)] = lane[1:]
-		return t, true
+	case workerClassLow:
+		if t, ok := dequeueLaneLocked(q, PriorityLow); ok {
+			return t, true
+		}
+	case workerClassGeneral:
+		// strict priority + aging below
 	}
 	return q.dequeueByPriorityLocked()
+}
+
+// dequeueLaneLocked pops the head of a single priority lane. Caller holds q.mu.
+func dequeueLaneLocked(q *ctxQueue, prio Priority) (*queuedTask, bool) {
+	lane := q.lanes[int(prio)]
+	if len(lane) == 0 {
+		return nil, false
+	}
+	t := lane[0]
+	q.lanes[int(prio)] = lane[1:]
+	return t, true
 }
 
 // runningTask tracks a task currently executing in a worker. The
