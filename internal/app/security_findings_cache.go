@@ -12,6 +12,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"sync"
 	"time"
 
 	"sigs.k8s.io/yaml"
@@ -20,6 +21,15 @@ import (
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/security"
 )
+
+// securityFindingsCacheMu serializes the findings-cache read-modify-write.
+// Persistence runs on background goroutines (off the Bubble Tea Update loop,
+// where the YAML marshal of a large findings set would freeze the UI), so two
+// scan completions for different namespaces of the same host could otherwise
+// interleave their read/merge/rename and drop an entry. Process-wide is fine —
+// writes are infrequent (scan completions), and the cross-process race is
+// already accepted (see saveSecurityFindingsCacheForHost).
+var securityFindingsCacheMu sync.Mutex
 
 // securityFindingsCacheSchemaVersion bumps when the on-disk shape changes.
 // A mismatch is treated as a miss so an older binary never decodes a
@@ -127,12 +137,14 @@ func saveSecurityFindingsCacheForHost(host, namespace string, findings []securit
 		findings = []security.Finding{}
 	}
 	// Merge into any existing state so a save for one namespace doesn't wipe
-	// the others. A corrupt/missing file just starts fresh. NOTE: the
-	// read-modify-write is only atomic within one process (saves run on the
-	// Bubble Tea Update loop). Two lfk instances saving different namespaces
-	// of the same host concurrently can lose one entry (last rename wins) —
-	// acceptable for a best-effort, TTL-bounded cache; the lost entry is
-	// re-derived by the next scan.
+	// the others. A corrupt/missing file just starts fresh. The read-modify-
+	// write is serialized within this process by securityFindingsCacheMu (saves
+	// run on background goroutines, no longer the Update loop). Two lfk
+	// instances saving different namespaces of the same host concurrently can
+	// still lose one entry (last rename wins) — acceptable for a best-effort,
+	// TTL-bounded cache; the lost entry is re-derived by the next scan.
+	securityFindingsCacheMu.Lock()
+	defer securityFindingsCacheMu.Unlock()
 	state := readFindingsCacheFile(host)
 	if state == nil {
 		state = &securityFindingsCacheState{SchemaVersion: securityFindingsCacheSchemaVersion}

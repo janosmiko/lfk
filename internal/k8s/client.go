@@ -10,6 +10,7 @@ import (
 	"sync"
 	"sync/atomic"
 
+	"golang.org/x/sync/singleflight"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/discovery/cached/disk"
 	"k8s.io/client-go/tools/clientcmd"
@@ -118,17 +119,34 @@ type Client struct {
 	discoveryMu      sync.Mutex
 	discoveryClients map[string]*disk.CachedDiscoveryClient
 
-	// clientMu guards clientCache. Typed/dynamic/metadata clients are
-	// expensive to build (kubeconfig parse + TLS transport + ~1.8k allocs,
-	// plus an exec-credential plugin invocation for EKS/kubelogin contexts)
-	// and were previously rebuilt on every call, discarding connection
-	// pooling and resetting the client-side QPS limiter each time. clientCache
-	// memoizes them per cache key (see clientCacheKey: context, plus a
-	// "throttled" variant for the lower-rate security clients). Invalidated on
-	// ReloadKubeconfig (the only mid-session config mutation) and per-context
-	// via invalidateClientsForContext.
+	// clientMu guards clientCache and clientCacheGen. Typed/dynamic/metadata
+	// clients are expensive to build (kubeconfig parse + TLS transport +
+	// ~1.8k allocs) and were previously rebuilt on every call, discarding
+	// connection pooling and resetting the client-side QPS limiter each time.
+	// (The exec-credential plugin for EKS/kubelogin runs lazily on the first
+	// HTTP request, NOT during build, so it is never part of this critical
+	// section.) clientCache memoizes clients per cache key (see clientCacheKey:
+	// context, plus a "throttled" variant for the lower-rate security clients).
+	// Invalidated on ReloadKubeconfig (the only mid-session config mutation)
+	// and per-context via invalidateClientsForContext.
+	//
+	// The actual construction runs OUTSIDE clientMu via clientGroup (see
+	// buildCachedClient): a slow build must never block other callers — in
+	// particular the Bubble Tea Update goroutine, which builds the throttled
+	// security clients synchronously in refreshSecuritySources. clientMu is
+	// only ever held for microsecond map reads/writes around the build.
 	clientMu    sync.Mutex
 	clientCache map[string]*ctxClients
+	// clientGroup coalesces concurrent builds for the same cache key+kind so a
+	// burst of cold-cache callers runs ONE construction, not N. clientCacheGen
+	// is bumped (under clientMu) on every cache invalidation; a build that
+	// races an invalidate compares the generation it captured before building
+	// and skips caching its now-stale result, so an invalidated client is
+	// never served as a cache hit. (The old lock-across-build made invalidate
+	// and build mutually exclusive; building outside the lock reintroduces the
+	// race that the generation guard closes.)
+	clientGroup    singleflight.Group
+	clientCacheGen uint64
 
 	// informerMu guards informerMode + informers. Writes happen at most
 	// once (SetInformerCacheMode at startup); reads happen on every
