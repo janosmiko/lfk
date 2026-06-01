@@ -103,6 +103,12 @@ type Model struct {
 	// Spinner for loading animation.
 	spinner spinner.Model
 
+	// initialSecuritySeedCmd holds the SEC-badge findings-cache seed command
+	// produced by refreshSecuritySources during NewModel. NewModel cannot
+	// return a command, so Init dispatches it (the read runs off the Update
+	// goroutine). Nil when security is disabled or no findings cache applies.
+	initialSecuritySeedCmd tea.Cmd
+
 	// Action context: which resource/kind the action targets.
 	actionCtx actionContext
 

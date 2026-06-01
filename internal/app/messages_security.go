@@ -26,6 +26,18 @@ type securityFindingsLoadedMsg struct {
 	errors    map[string]error
 }
 
+// securityFindingsSeedMsg carries the stale-while-revalidate SEC badge seed
+// read from the per-host findings cache. The disk read and index build run OFF
+// the Update goroutine (securityFindingsSeedCmd): the per-host cache file can be
+// tens of MB on clusters with many findings, and decoding it inline — the
+// previous behavior inside refreshSecuritySources — froze the UI for seconds at
+// startup and on context/tab switch. index is nil on a cache miss.
+type securityFindingsSeedMsg struct {
+	context   string
+	namespace string
+	index     *security.FindingIndex
+}
+
 // securityIgnoresSaveErrMsg is dispatched when the async ignore-state save
 // (via saveSecurityIgnoresCmd) fails. Successful saves emit no message — the
 // optimistic status set when the user pressed the action stays visible. The

@@ -200,7 +200,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	// publishes it to the hook state.
 	installSecuritySourcesHook()
 	m.securityIgnores = loadSecurityIgnores()
-	m.refreshSecuritySources()
+	m.initialSecuritySeedCmd = m.refreshSecuritySources()
 
 	// Mirror main.go's startup mouse decision: capture is on unless the
 	// --no-mouse flag was set or config disabled it. The toggle keybinding

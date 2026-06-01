@@ -69,7 +69,7 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	// until the user navigates out and back in. Re-run refreshSecuritySources
 	// here so the manager + cached availability + dispatched probe all
 	// target sess.Context.
-	m.refreshSecuritySources()
+	securitySeedCmd := m.refreshSecuritySources()
 
 	m.leftItemsHistory = nil
 	m.leftItems = contexts
@@ -85,6 +85,9 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	applySessionNamespaces(&m, sess.AllNamespaces, sess.Namespace, sess.SelectedNamespaces, sess.NsSelectionNegated)
 
 	var cmds []tea.Cmd
+	if securitySeedCmd != nil {
+		cmds = append(cmds, securitySeedCmd)
+	}
 	needsDiscovery := m.shouldFireDiscoveryFor(discoveryCtx)
 	if needsDiscovery {
 		m.markDiscoveryStarted(discoveryCtx)
