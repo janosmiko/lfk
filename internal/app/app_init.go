@@ -37,6 +37,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
+	hiddenSt := loadHiddenTypesState()
 	m := Model{
 		client: client,
 		// Start in the loading state. Init() dispatches loadContexts()
@@ -53,6 +54,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		queryHistory:               loadInputHistory(historyFileQuery),
 		logView:                    logViewState{searchHistory: loadInputHistory(historyFileLogSearch), previewVisible: true},
 		pinnedState:                pinnedSt,
+		hiddenState:                hiddenSt,
 		namespace:                  defaultNS,
 		spinner:                    s,
 		watchInterval:              watchInterval,

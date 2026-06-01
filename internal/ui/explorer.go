@@ -435,16 +435,26 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 		case !isActive:
 			// Inactive columns (parent/child): show name only.
 			line = FormatItemNameOnly(item, width)
-			line = NormalStyle.Width(width).MaxWidth(width).Render(line)
+			line = itemRowStyle(item).Width(width).MaxWidth(width).Render(line)
 		default:
 			line = FormatItem(item, width)
-			line = NormalStyle.Width(width).MaxWidth(width).Render(line)
+			line = itemRowStyle(item).Width(width).MaxWidth(width).Render(line)
 		}
 		b.WriteString(line)
 		first = false
 	}
 
 	return b.String()
+}
+
+// itemRowStyle returns the base style for a non-selected item row: dimmed for
+// resource types the user hid (surfaced via the reveal toggle so they can be
+// un-hidden), normal otherwise.
+func itemRowStyle(item model.Item) lipgloss.Style {
+	if item.Hidden {
+		return DimStyle
+	}
+	return NormalStyle
 }
 
 // FormatItem formats a single item for display in a column.

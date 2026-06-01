@@ -27,7 +27,35 @@ func BuildSidebarItems(discovered []ResourceTypeEntry) []Item {
 	items = append(items, crdGroups...)
 
 	markPinned(items)
+	items = markHiddenItems(items)
 	return sortSidebarItems(items)
+}
+
+// markHiddenItems applies the user's per-context HiddenTypes to the sidebar.
+// When the reveal toggle (ShowRareResources) is off, items whose version-
+// agnostic type key is hidden are dropped; when it is on they are kept but
+// flagged Hidden so the renderer dims them, letting the user find a hidden
+// type and un-hide it. Items without a pinnable key (dashboards, collapsed
+// group placeholders) never match.
+func markHiddenItems(items []Item) []Item {
+	if len(HiddenTypes) == 0 {
+		return items
+	}
+	hidden := make(map[string]bool, len(HiddenTypes))
+	for _, k := range HiddenTypes {
+		hidden[k] = true
+	}
+	out := make([]Item, 0, len(items))
+	for _, it := range items {
+		if key := PinKeyFromRef(it.Extra); key != "" && hidden[key] {
+			if !ShowRareResources {
+				continue
+			}
+			it.Hidden = true
+		}
+		out = append(out, it)
+	}
+	return out
 }
 
 // injectSecuritySourceItems returns one sidebar Item per registered security

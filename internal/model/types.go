@@ -170,6 +170,14 @@ type ConditionEntry struct {
 // per-context / per-union-set state at startup and on navigation.
 var PinnedTypes []string
 
+// HiddenTypes lists resource-type pin keys (version-agnostic "group/resource",
+// e.g. "networking.k8s.io/ingresses" or "/limitranges") the user has hidden
+// from the sidebar. Matching items are dropped from the sidebar unless the
+// reveal toggle (ShowRareResources) is on, in which case they surface dimmed
+// (Item.Hidden) so the user can find and un-hide them. Set from per-context /
+// per-union-set state at startup and on navigation, mirroring PinnedTypes.
+var HiddenTypes []string
+
 // PinKeyFromRef converts a resource reference ("group/version/resource", e.g.
 // "apps/v1/deployments" or "/v1/pods") into a version-agnostic pin key
 // ("group/resource"). Returns "" for sentinel refs without a version segment
@@ -228,8 +236,10 @@ type Item struct {
 	Selected      bool             // Whether this item is part of a multi-selection
 	Deprecated    bool             // Whether this resource uses a deprecated API version
 	Deleting      bool             // Whether this resource has a deletionTimestamp set
-	ReadOnly      bool             // Whether this item represents a context locked in read-only mode (renders as a [RO] suffix in the picker)
-	ClusterColor  string           // Optional named color (one of ui.ClusterColorNames) for context rows; empty = no swatch.
+	Hidden        bool             // Resource-type row the user hid; rendered dimmed when revealed via ShowRareResources
+
+	ReadOnly     bool   // Whether this item represents a context locked in read-only mode (renders as a [RO] suffix in the picker)
+	ClusterColor string // Optional named color (one of ui.ClusterColorNames) for context rows; empty = no swatch.
 	// LocalClusterStatus is "running" / "stopped" / "" — populated only
 	// for cluster-picker rows whose context name is recognised in
 	// Model.localClusterCache. The renderer prepends a filled-circle

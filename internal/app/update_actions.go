@@ -25,6 +25,9 @@ func (m Model) openActionMenu() Model { //nolint:gocyclo // dispatcher; complexi
 	if m.nav.Level == model.LevelClusters {
 		return m.openClusterPickerActionMenu()
 	}
+	if m.nav.Level == model.LevelResourceTypes {
+		return m.openResourceTypeActionMenu()
+	}
 	return m.openResourceActionMenu()
 }
 
@@ -312,6 +315,13 @@ func (m Model) directActionScale() (tea.Model, tea.Cmd) {
 
 func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
+
+	// Hiding/showing a resource type is a local sidebar preference, not a
+	// cluster mutation. Dispatch it before the read-only / union guards below
+	// so those (which key off a resource kind) never block it.
+	if actionLabel == actionLabelHideType || actionLabel == actionLabelShowType {
+		return m.toggleHiddenResourceType()
+	}
 
 	// Cluster-picker actions live outside the kind-based machinery: they
 	// don't have an actionCtx and there is no resource type at this level.

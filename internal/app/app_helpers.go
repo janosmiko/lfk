@@ -141,6 +141,12 @@ func (m *Model) cancelInFlightRequests() {
 // config's pinned_groups) are expanded into their currently-discovered member
 // resource types. Per-context state holding legacy group entries is migrated to
 // expanded type keys in place once discovery has surfaced members.
+//
+// It also refreshes model.HiddenTypes via applyHiddenTypes, since hidden types
+// must recompute at exactly the same moments as pins. Callers that already call
+// applyPinnedTypes therefore need NOT call applyHiddenTypes separately (doing so
+// is harmless but redundant); a caller that needs only hidden types refreshed
+// may call applyHiddenTypes directly.
 func (m *Model) applyPinnedTypes() {
 	discCtx := m.nav.Context
 	if m.isUnionSentinel() && len(m.unionContexts) > 0 {
@@ -189,6 +195,37 @@ func (m *Model) applyPinnedTypes() {
 	}
 
 	model.PinnedTypes = merged
+
+	// Hidden types refresh at exactly the same moments as pins (cluster
+	// switch, union-set change, navigation), so recompute them here from the
+	// same active scope rather than threading a second call through every
+	// caller of applyPinnedTypes.
+	m.applyHiddenTypes()
+}
+
+// applyHiddenTypes recomputes model.HiddenTypes from the hidden-types state
+// scoped to the active context (or named union set). Unlike pins, hidden
+// entries are always stored as version-agnostic type keys ("group/resource"),
+// so no legacy whole-group expansion is needed.
+func (m *Model) applyHiddenTypes() {
+	if m.hiddenState == nil {
+		model.HiddenTypes = nil
+		return
+	}
+	var keys []string
+	switch {
+	case m.isUnionSentinel() && m.unionSetName != "":
+		keys = m.hiddenState.UnionSets[m.unionSetName]
+	case !m.isUnionSentinel() && m.nav.Context != "":
+		keys = m.hiddenState.Contexts[m.nav.Context]
+	}
+	if len(keys) == 0 {
+		model.HiddenTypes = nil
+		return
+	}
+	merged := make([]string, len(keys))
+	copy(merged, keys)
+	model.HiddenTypes = merged
 }
 
 // migratePinnedScope rewrites legacy whole-group entries (no "/") for one scope
