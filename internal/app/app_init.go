@@ -38,7 +38,13 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
 	m := Model{
-		client:                     client,
+		client: client,
+		// Start in the loading state. Init() dispatches loadContexts()
+		// asynchronously, so the first frame renders before any
+		// contextsLoadedMsg arrives; loading=false there falls through to the
+		// "No items" / "No resource types found" empty states until the reply
+		// lands. The loaded-message handlers clear the flag once data arrives.
+		loading:                    true,
 		nav:                        model.NavigationState{Level: model.LevelClusters},
 		bookmarks:                  loadBookmarks(),
 		pendingSession:             loadSession(),
