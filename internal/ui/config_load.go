@@ -244,11 +244,17 @@ func (sets *UnionSetsConfig) UnmarshalJSON(data []byte) error {
 type SchedulerConfig struct {
 	WorkersPerContext int               `json:"workers_per_context" yaml:"workers_per_context"`
 	CriticalReserved  int               `json:"critical_reserved_slots" yaml:"critical_reserved_slots"`
+	LowReserved       *int              `json:"low_reserved_slots" yaml:"low_reserved_slots"`
 	DefaultTimeout    string            `json:"default_timeout" yaml:"default_timeout"`
 	TimeoutsByKind    map[string]string `json:"timeouts_by_kind" yaml:"timeouts_by_kind"`
 	K8sClientQPS      int               `json:"k8s_client_qps" yaml:"k8s_client_qps"`
 	K8sClientBurst    int               `json:"k8s_client_burst" yaml:"k8s_client_burst"`
 	ShowPriority      *bool             `json:"show_priority_in_tasks_overlay" yaml:"show_priority_in_tasks_overlay"`
+	// AgingThreshold bounds priority starvation: a background (Low) task runs
+	// after at most this many higher-priority dispatches. 0 disables aging
+	// (strict priority). Pointer so an explicit 0 is distinguishable from
+	// "omitted". Omitted keeps the compiled default.
+	AgingThreshold *int `json:"aging_threshold" yaml:"aging_threshold"`
 }
 
 // KubesharkConfig is the on-disk schema for the kubeshark section.
@@ -332,6 +338,11 @@ type clusterConfig struct {
 	// kubeconfig credential plugin is noisy, or enabling only specific
 	// sources per cluster.
 	Security *securityConfig `json:"security" yaml:"security"`
+	// K8sClientQPS / K8sClientBurst override the foreground REST client rate
+	// for this context only — e.g. a higher ceiling on a big cluster, or a
+	// lower one on a shared/throttled API server. Omitted = use the global.
+	K8sClientQPS   *int `json:"k8s_client_qps" yaml:"k8s_client_qps"`
+	K8sClientBurst *int `json:"k8s_client_burst" yaml:"k8s_client_burst"`
 }
 
 // securityConfig is the on-disk schema for the global `security` section and

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 )
 
@@ -604,6 +605,45 @@ func ResolveReadOnly(context string, cliFlag bool) bool {
 		return v
 	}
 	return ConfigReadOnly
+}
+
+// ConfigK8sClientQPS / ConfigK8sClientBurst are the global foreground REST
+// client rate limits. Defaults mirror k8s.DefaultClientQPS/Burst; raising the
+// stock client-go 5/10 keeps foreground lists responsive while background
+// scans run. Per-cluster overrides take precedence.
+var (
+	ConfigK8sClientQPS   = 50
+	ConfigK8sClientBurst = 100
+)
+
+// ConfigClusterK8sClientQPS / ConfigClusterK8sClientBurst map context names to
+// per-cluster overrides of the foreground client rate. A value here wins over
+// the global default for that context.
+var (
+	ConfigClusterK8sClientQPS   = map[string]int{}
+	ConfigClusterK8sClientBurst = map[string]int{}
+)
+
+// init wires the foreground rate resolver into the k8s package so every REST
+// client picks up the configured (or default) QPS/Burst. Set unconditionally
+// at package load; resolution is lazy, so config applied later is honored.
+func init() {
+	k8s.RateLimitForContext = ResolveK8sClientRate
+}
+
+// ResolveK8sClientRate returns the effective foreground QPS/Burst for a
+// context. Precedence: per-cluster override > global > compiled default.
+// Returned as (float32, int) to match rest.Config fields; this is the resolver
+// wired into k8s.RateLimitForContext.
+func ResolveK8sClientRate(context string) (qps float32, burst int) {
+	q, b := ConfigK8sClientQPS, ConfigK8sClientBurst
+	if v, ok := ConfigClusterK8sClientQPS[context]; ok && v > 0 {
+		q = v
+	}
+	if v, ok := ConfigClusterK8sClientBurst[context]; ok && v > 0 {
+		b = v
+	}
+	return float32(q), b
 }
 
 // ConfigSecurityEnabled is the global default for the security dashboard.

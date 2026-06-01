@@ -64,6 +64,7 @@ Your chosen sort is remembered per resource kind for the running session, so lea
 | `Ctrl+R` | Toggle read-only mode (cluster picker: highlighted row's [RO] marker; inside a context: current tab) |
 | `T` | Switch color scheme (live preview, not persisted) |
 | `Ctrl+T` | Cycle terminal mode (pty / exec / mux — mux skipped without tmux/zellij) |
+| `B` | Show/hide the per-resource SEC severity badge on explorer rows |
 
 ## Orphan filter presets
 

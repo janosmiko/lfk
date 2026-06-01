@@ -90,7 +90,12 @@ func saveSecurityAvailabilityCacheForHost(host string, availability map[string]b
 	if path == "" {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	// 0700 dir to match the findings cache that shares this per-host
+	// directory: whichever cache creates it first sets the mode, so both use
+	// 0700 to keep the dir non-traversable on multi-user hosts. The
+	// availability file itself holds only booleans (which sources exist), so
+	// 0644 on the file is fine.
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	// Copy to insulate the on-disk snapshot from later mutations.
@@ -105,42 +110,7 @@ func saveSecurityAvailabilityCacheForHost(host string, availability map[string]b
 	if err != nil {
 		return err
 	}
-	tmp := path + ".tmp"
-	// Open/write/fsync/close explicitly so the file contents are durable
-	// before the rename — os.WriteFile closes without an fsync, leaving a
-	// crash window where the rename survives but the contents do not.
-	f, err := os.OpenFile(tmp, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0o644)
-	if err != nil {
-		return err
-	}
-	if _, err := f.Write(data); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err := f.Sync(); err != nil {
-		_ = f.Close()
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err := f.Close(); err != nil {
-		_ = os.Remove(tmp)
-		return err
-	}
-	if err := os.Rename(tmp, path); err != nil {
-		return err
-	}
-	// Fsync parent dir so the rename itself is durable on crash.
-	dirFd, err := os.Open(filepath.Dir(path))
-	if err != nil {
-		return err
-	}
-	syncErr := dirFd.Sync()
-	closeErr := dirFd.Close()
-	if syncErr != nil {
-		return syncErr
-	}
-	return closeErr
+	return writeFileDurable(path, data, 0o644)
 }
 
 // loadSecurityAvailabilityCacheForContext is the convenience accessor used

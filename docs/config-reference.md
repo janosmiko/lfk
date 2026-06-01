@@ -148,6 +148,8 @@ Currently supported per-cluster overrides:
 | `resource_columns` | map[string]list | Per-resource-type column overrides for this cluster. **Deprecated** — use `views` instead. |
 | `read_only` | bool | Per-context read-only override. Same semantics as the top-level `read_only`. |
 | `security` | object | Per-context security override (`enabled` and/or `sources`). Same semantics as the top-level `security`; wins over it for this context. |
+| `k8s_client_qps` | int | Per-context foreground API client QPS override. Wins over the global `scheduler.k8s_client_qps`. See [API client rate limits](#api-client-rate-limits). |
+| `k8s_client_burst` | int | Per-context foreground API client burst override. Wins over the global `scheduler.k8s_client_burst`. |
 
 Per-cluster `views` take precedence over the global `views` setting.
 
@@ -192,6 +194,79 @@ clusters:
 
 Precedence: `clusters.<ctx>.security.*` overrides the global `security.*`. See
 [Security Dashboard](security.md) for the source catalog and behavior.
+
+## API client rate limits
+
+lfk caps how fast it calls each cluster's API server (client-side QPS/burst).
+The stock client-go default (QPS 5 / burst 10) is low for a multi-resource TUI
+and lets a background scan stall foreground lists, so lfk defaults to **QPS 50 /
+burst 100**. Tune globally under `scheduler`, or per cluster under
+`clusters.<name>`.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `scheduler.k8s_client_qps` | int | `50` | Sustained foreground requests/sec to the API server. |
+| `scheduler.k8s_client_burst` | int | `100` | Burst capacity above QPS for short spikes. |
+| `clusters.<name>.k8s_client_qps` | int | _(global)_ | Per-context QPS override. Wins over the global value. |
+| `clusters.<name>.k8s_client_burst` | int | _(global)_ | Per-context burst override. |
+
+```yaml
+scheduler:
+  k8s_client_qps: 50
+  k8s_client_burst: 100
+
+clusters:
+  big-prod-cluster:
+    k8s_client_qps: 200      # raise the ceiling on a large, dedicated cluster
+    k8s_client_burst: 400
+  shared-cluster:
+    k8s_client_qps: 20       # be gentle on a shared/throttled API server
+    k8s_client_burst: 40
+```
+
+Precedence: `clusters.<ctx>.k8s_client_*` overrides `scheduler.k8s_client_*`,
+which overrides the built-in default. Security source scans run on a separate,
+deliberately lower budget (QPS 10 / burst 20) so background finding scans never
+starve foreground lists — see [Security Dashboard](security.md).
+
+### Background task scheduling
+
+lfk runs API work in a per-context worker pool, classified into priority
+lanes: Critical (API discovery, RBAC, namespaces, mutations), High (the view
+you are looking at — resource lists, drill-in, preview), and Low (background
+work — security scans, metrics, events, dashboards). Three knobs keep
+background work flowing without slowing the foreground, which matters most on
+slow-responding clusters where calls hold a worker for seconds:
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `scheduler.workers_per_context` | int | `8` | Concurrent workers per cluster context (clamped 1–16). More slots drain the metrics/events backlog faster on slow clusters. |
+| `scheduler.critical_reserved_slots` | int | `1` | Workers that prefer Critical work (clamped to ≤ half the pool). |
+| `scheduler.low_reserved_slots` | int | `2` | Workers that prefer Low (background) work so metrics/events/dashboards always have a slot even while the foreground floods the pool. Clamped to leave ≥1 general worker. |
+| `scheduler.aging_threshold` | int | `8` | Max higher-priority dispatches a background task waits behind before it is promoted for one task. `0` disables aging (strict priority). |
+
+Reserved workers are not idle: a reserved worker prefers its lane but falls
+back to any other queued work when its lane is empty, so reservations bias
+capacity without wasting it. Critical is never aged. The low-reserved floor
+and aging are complementary: the floor guarantees throughput for background
+work under a saturated pool, while aging bounds queue-ordering latency when
+High and Low are both backed up.
+
+To keep API load bounded on slow clusters, the scheduler avoids redundant work:
+an identical fetch that is already in flight (same kind, target, and navigation
+generation) absorbs new submissions instead of running twice. This gives
+watch-mode its effective cadence under load — a tick that fires while the
+previous identical refresh is still running is coalesced away rather than
+stacking a duplicate fetch, so metrics/list refreshes never pile up faster than
+the cluster can serve them. Automatic and not configurable.
+
+```yaml
+scheduler:
+  workers_per_context: 8
+  critical_reserved_slots: 1
+  low_reserved_slots: 2   # always keep slots for metrics/events/dashboards
+  aging_threshold: 8      # 0 = strict priority; higher = background waits longer
+```
 
 ## Theme
 

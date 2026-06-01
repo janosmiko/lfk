@@ -70,9 +70,32 @@ clusters:
   category in a context, not at cluster open. A cluster you never inspect for
   security makes no security API calls — which on EKS avoids invoking the
   kubeconfig `aws` credential plugin (and its "SSO session expired" stderr).
-- **SEC badge**: resource rows (e.g. Pods, Deployments) show a SEC badge with a
-  severity breakdown once findings are loaded. The badge is hidden when no
-  source is available or the dashboard is disabled.
+- **SEC badge**: resource rows (e.g. Pods, Deployments) show a SEC badge once
+  findings are loaded. The glyph and color reflect the **highest** severity
+  present (`●` critical, `◐` high, `○` medium/low), and the number is the count
+  of findings at that severity only — e.g. `●3` means 3 criticals. Lower-severity
+  findings are surfaced in the dashboard, not on the badge. Toggle the badge on/off
+  with `B` (`security_badge_toggle`). The badge is hidden when no source is
+  available or the dashboard is disabled.
+- **Background scan**: once a cluster's sources have been detected (on your first
+  visit to the Security category), their availability is cached to disk. On every
+  later visit to that cluster the findings scan runs automatically in the
+  background, so SEC badges populate without navigating to Security. A cluster you
+  have never inspected stays fully lazy — no security API calls until you open its
+  Security category — so the badge auto-scan never triggers the EKS `aws`
+  credential plugin for clusters you don't look at.
+- **Cached findings (stale-while-revalidate)**: a clean scan's findings are
+  persisted per cluster + namespace (next to the availability cache, under the
+  kubectl cache dir). On reopen, SEC badges paint instantly from the last scan
+  while a fresh scan revalidates in the background and replaces them. Findings
+  older than one hour are not painted (the live scan still runs). Partial scans
+  (any source errored) are not cached, so a transient failure never persists an
+  undercount.
+- **Low priority**: security scans run as a low-priority background task and on a
+  dedicated, throttled API client (QPS 10 / burst 20, separate from the
+  foreground budget), so a multi-source scan never starves foreground resource
+  lists. The foreground client rate is configurable; see
+  [API client rate limits](config-reference.md#api-client-rate-limits).
 - **Drill-down**: open the Security category, pick a source to list finding
   groups (one per check/CVE), then drill into a group to see affected
   resources. `Enter` on an affected resource jumps to the real object;

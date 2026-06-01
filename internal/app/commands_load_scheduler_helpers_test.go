@@ -169,7 +169,7 @@ func TestLoadCanISAList_SubmitsAtCriticalPriority(t *testing.T) {
 	}, time.Second, 10*time.Millisecond, "loadCanISAList must Submit at Critical priority")
 }
 
-func TestLoadResources_MainListSubmitsAtCriticalPriority(t *testing.T) {
+func TestLoadResources_MainListSubmitsAtHighPriority(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.nav.Context = "test-ctx"
 	m.nav.ResourceType = model.ResourceTypeEntry{
@@ -181,16 +181,19 @@ func TestLoadResources_MainListSubmitsAtCriticalPriority(t *testing.T) {
 	}
 	m.scheduler.StopWorkers()
 
-	// The main list (forPreview=false) is the view the user is waiting on,
-	// so it runs Critical to claim the reserved worker and never queue
-	// behind background work.
+	// The main list (forPreview=false) runs High, not Critical: Critical is
+	// reserved for foundational gating work (discovery/RBAC/namespaces).
+	// Submitting the user-driven list there let rapid navigation flood the
+	// single reserved slot and starve High preview work (pod details).
 	cmd := m.loadResources(false)
 	require.NotNil(t, cmd)
 	go cmd()
 
 	require.Eventually(t, func() bool {
-		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityCritical) >= 1
-	}, time.Second, 10*time.Millisecond, "main resource list must Submit at Critical priority")
+		return m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityHigh) >= 1
+	}, time.Second, 10*time.Millisecond, "main resource list must Submit at High priority")
+	assert.Equal(t, 0, m.scheduler.QueueLenByPriority("test-ctx", scheduler.PriorityCritical),
+		"main list must NOT occupy the reserved Critical lane")
 }
 
 func TestLoadResources_PreviewSubmitsAtHighPriority(t *testing.T) {

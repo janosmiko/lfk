@@ -355,6 +355,25 @@ func TestFindingIndexDedupeKeepsHighestSeverity(t *testing.T) {
 	}
 }
 
+func TestSeverityCountsHighestCount(t *testing.T) {
+	cases := []struct {
+		name   string
+		counts SeverityCounts
+		want   int
+	}{
+		{"empty", SeverityCounts{}, 0},
+		{"critical wins over lower buckets", SeverityCounts{Critical: 3, High: 6, Low: 110}, 3},
+		{"high when no critical", SeverityCounts{High: 5, Medium: 2}, 5},
+		{"medium when only medium and low", SeverityCounts{Medium: 4, Low: 9}, 4},
+		{"low only", SeverityCounts{Low: 7}, 7},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.counts.HighestCount())
+		})
+	}
+}
+
 func TestManagerInvalidateClearsCache(t *testing.T) {
 	m := NewManager()
 	m.SetRefreshTTL(1 * time.Hour)
@@ -620,4 +639,19 @@ func TestManagerIgnoredNamespacesFilterDoesNotAliasCachedSlice(t *testing.T) {
 	cached, _ := m.FetchAll(context.Background(), "ctx", "")
 	require.Len(t, cached.Findings, 1, "cache must be insulated from caller mutation")
 	assert.NotEqual(t, "tamper", cached.Findings[0].ID)
+}
+
+// TestScanTimeoutGetterSetter covers the default, override, and no-op clamp
+// for the per-scan timeout knob used by callers to align their own deadline.
+func TestScanTimeoutGetterSetter(t *testing.T) {
+	m := NewManager()
+	assert.Equal(t, 60*time.Second, m.ScanTimeout(), "default scan timeout")
+
+	m.SetScanTimeout(15 * time.Second)
+	assert.Equal(t, 15*time.Second, m.ScanTimeout(), "override takes effect")
+
+	m.SetScanTimeout(0)
+	assert.Equal(t, 15*time.Second, m.ScanTimeout(), "zero is a no-op")
+	m.SetScanTimeout(-1 * time.Second)
+	assert.Equal(t, 15*time.Second, m.ScanTimeout(), "negative is a no-op")
 }

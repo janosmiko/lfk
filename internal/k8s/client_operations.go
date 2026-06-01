@@ -357,51 +357,62 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 	if err != nil {
 		return nil, fmt.Errorf("building rest config for context %q: %w", displayName, err)
 	}
+	if RateLimitOverridesEnabled {
+		qps, burst := foregroundRate(displayName)
+		applyRateLimit(cfg, qps, burst)
+	}
+	return cfg, nil
+}
+
+// applyRateLimit sets the client-side QPS/Burst on cfg when both are positive.
+// A zero/negative value leaves client-go's own default in place.
+func applyRateLimit(cfg *rest.Config, qps float32, burst int) {
+	if qps > 0 {
+		cfg.QPS = qps
+	}
+	if burst > 0 {
+		cfg.Burst = burst
+	}
+}
+
+// restConfigForContextThrottled builds a rest config for the given context
+// carrying the dedicated, smaller security-client rate limit so background
+// finding scans yield to the foreground rather than draining its shared
+// token bucket.
+func (c *Client) restConfigForContextThrottled(displayName string) (*rest.Config, error) {
+	cfg, err := c.restConfigForContext(displayName)
+	if err != nil {
+		return nil, err
+	}
+	if RateLimitOverridesEnabled {
+		applyRateLimit(cfg, SecurityClientQPS, SecurityClientBurst)
+	}
 	return cfg, nil
 }
 
 func (c *Client) clientsetForContext(contextName string) (kubernetes.Interface, error) {
-	// Allow tests to inject a fake clientset.
+	// Allow tests to inject a fake clientset (before the cache so fakes are
+	// never memoized and every test sees its injected client).
 	if c.testClientset != nil {
 		if cs, ok := c.testClientset.(kubernetes.Interface); ok {
 			return cs, nil
 		}
 	}
-	cfg, err := c.restConfigForContext(contextName)
-	if err != nil {
-		return nil, err
-	}
-	httpClient, err := taggedHTTPClient(cfg, contextName)
-	if err != nil {
-		return nil, fmt.Errorf("creating http client: %w", err)
-	}
-	cs, err := kubernetes.NewForConfigAndClient(cfg, httpClient)
-	if err != nil {
-		return nil, fmt.Errorf("creating clientset: %w", err)
-	}
-	return cs, nil
+	return c.cachedClientset(contextName, false, func() (*rest.Config, error) {
+		return c.restConfigForContext(contextName)
+	})
 }
 
 func (c *Client) dynamicForContext(contextName string) (dynamic.Interface, error) {
-	// Allow tests to inject a fake dynamic client.
+	// Allow tests to inject a fake dynamic client (before the cache).
 	if c.testDynClient != nil {
 		if dc, ok := c.testDynClient.(dynamic.Interface); ok {
 			return dc, nil
 		}
 	}
-	cfg, err := c.restConfigForContext(contextName)
-	if err != nil {
-		return nil, err
-	}
-	httpClient, err := taggedHTTPClient(cfg, contextName)
-	if err != nil {
-		return nil, fmt.Errorf("creating http client: %w", err)
-	}
-	dynClient, err := dynamic.NewForConfigAndClient(cfg, httpClient)
-	if err != nil {
-		return nil, fmt.Errorf("creating dynamic client: %w", err)
-	}
-	return dynClient, nil
+	return c.cachedDynamic(contextName, false, func() (*rest.Config, error) {
+		return c.restConfigForContext(contextName)
+	})
 }
 
 // RawClientset returns the kubernetes clientset for the currently selected
@@ -454,26 +465,59 @@ func (c *Client) RawDynamicForContext(contextName string) dynamic.Interface {
 	return dc
 }
 
+// RawClientsetForContextThrottled is like RawClientsetForContext but the
+// returned clientset carries the dedicated, smaller security-client rate
+// limit (SecurityClientQPS/Burst). Used to build security source clients so
+// background finding scans yield to the foreground. Honors the injected test
+// clientset so tests bypass real config construction.
+func (c *Client) RawClientsetForContextThrottled(contextName string) kubernetes.Interface {
+	if contextName == "" {
+		return nil
+	}
+	if c.testClientset != nil {
+		if cs, ok := c.testClientset.(kubernetes.Interface); ok {
+			return cs
+		}
+	}
+	cs, err := c.cachedClientset(contextName, true, func() (*rest.Config, error) {
+		return c.restConfigForContextThrottled(contextName)
+	})
+	if err != nil {
+		return nil
+	}
+	return cs
+}
+
+// RawDynamicForContextThrottled is like RawDynamicForContext but the returned
+// dynamic client carries the dedicated, smaller security-client rate limit.
+func (c *Client) RawDynamicForContextThrottled(contextName string) dynamic.Interface {
+	if contextName == "" {
+		return nil
+	}
+	if c.testDynClient != nil {
+		if dc, ok := c.testDynClient.(dynamic.Interface); ok {
+			return dc
+		}
+	}
+	dc, err := c.cachedDynamic(contextName, true, func() (*rest.Config, error) {
+		return c.restConfigForContextThrottled(contextName)
+	})
+	if err != nil {
+		return nil
+	}
+	return dc
+}
+
 // metadataForContext returns a metadata-only client for the given context.
 // When testMetaClient is set (tests), it is returned directly.
 func (c *Client) metadataForContext(contextName string) (metadata.Interface, error) {
-	// Allow tests to inject a fake metadata client.
+	// Allow tests to inject a fake metadata client (before the cache).
 	if c.testMetaClient != nil {
 		if mc, ok := c.testMetaClient.(metadata.Interface); ok {
 			return mc, nil
 		}
 	}
-	cfg, err := c.restConfigForContext(contextName)
-	if err != nil {
-		return nil, err
-	}
-	httpClient, err := taggedHTTPClient(cfg, contextName)
-	if err != nil {
-		return nil, fmt.Errorf("creating http client: %w", err)
-	}
-	mc, err := metadata.NewForConfigAndClient(cfg, httpClient)
-	if err != nil {
-		return nil, fmt.Errorf("creating metadata client: %w", err)
-	}
-	return mc, nil
+	return c.cachedMetadata(contextName, func() (*rest.Config, error) {
+		return c.restConfigForContext(contextName)
+	})
 }

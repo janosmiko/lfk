@@ -127,6 +127,27 @@ func (m *Manager) SetMaxFetchConcurrency(n int) {
 	m.maxFetchConcurrency = n
 }
 
+// ScanTimeout returns the hard ceiling on a single coalesced FetchAll scan.
+// Callers align their own context deadline to this so a slow-but-succeeding
+// scan delivers its result to the triggering load instead of orphaning at a
+// shorter caller timeout while the detached scan runs on.
+func (m *Manager) ScanTimeout() time.Duration {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.scanTimeout
+}
+
+// SetScanTimeout overrides the per-scan hard ceiling. Clamped to a positive
+// value; non-positive is ignored so a misconfig can't disable the timeout.
+func (m *Manager) SetScanTimeout(d time.Duration) {
+	if d <= 0 {
+		return
+	}
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.scanTimeout = d
+}
+
 // SetAvailabilityTTL overrides the AnyAvailable cache TTL.
 func (m *Manager) SetAvailabilityTTL(d time.Duration) {
 	m.mu.Lock()
@@ -281,11 +302,16 @@ func (m *Manager) FetchAll(ctx context.Context, kubeCtx, namespace string) (Fetc
 	// started it navigates away. Tying the scan to one caller's ctx would
 	// let a preempted caller abort the shared scan and hand every waiter a
 	// premature empty result.
+	// Capture scanTimeout under the lock before the closure: the DoChan
+	// goroutine reads it on a separate goroutine, and SetScanTimeout writes it
+	// under m.mu — reading m.scanTimeout directly inside the closure would be
+	// an unsynchronized read racing that write.
+	scanTimeout := m.ScanTimeout()
 	ch := m.fetchGroup.DoChan(cacheKey, func() (any, error) {
 		if cached, ok := m.cachedFetch(cacheKey); ok {
 			return cached, nil
 		}
-		scanCtx, cancel := context.WithTimeout(context.Background(), m.scanTimeout)
+		scanCtx, cancel := context.WithTimeout(context.Background(), scanTimeout)
 		defer cancel()
 		return m.fetchAllScan(scanCtx, kubeCtx, namespace, cacheKey), nil
 	})
@@ -484,6 +510,25 @@ func (c SeverityCounts) Highest() Severity {
 		return SeverityLow
 	default:
 		return SeverityUnknown
+	}
+}
+
+// HighestCount returns the number of findings in the highest-severity bucket
+// that has any, or 0 when empty. Pairs with Highest: the badge colors by
+// Highest and labels with HighestCount so a red badge means "this many
+// criticals", never the all-severity total.
+func (c SeverityCounts) HighestCount() int {
+	switch {
+	case c.Critical > 0:
+		return c.Critical
+	case c.High > 0:
+		return c.High
+	case c.Medium > 0:
+		return c.Medium
+	case c.Low > 0:
+		return c.Low
+	default:
+		return 0
 	}
 }
 

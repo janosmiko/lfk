@@ -283,6 +283,8 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 		ConfigClusterReadOnly = make(map[string]bool, len(cfg.Clusters))
 		ConfigClusterSecurityEnabled = make(map[string]bool, len(cfg.Clusters))
 		ConfigClusterSecuritySources = make(map[string]map[string]bool, len(cfg.Clusters))
+		ConfigClusterK8sClientQPS = make(map[string]int, len(cfg.Clusters))
+		ConfigClusterK8sClientBurst = make(map[string]int, len(cfg.Clusters))
 		for ctx, cc := range cfg.Clusters {
 			if len(cc.ResourceColumns) > 0 {
 				cols := make(map[string][]string, len(cc.ResourceColumns))
@@ -293,6 +295,12 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			}
 			if cc.ReadOnly != nil {
 				ConfigClusterReadOnly[ctx] = *cc.ReadOnly
+			}
+			if cc.K8sClientQPS != nil && *cc.K8sClientQPS > 0 {
+				ConfigClusterK8sClientQPS[ctx] = *cc.K8sClientQPS
+			}
+			if cc.K8sClientBurst != nil && *cc.K8sClientBurst > 0 {
+				ConfigClusterK8sClientBurst[ctx] = *cc.K8sClientBurst
 			}
 			if cc.Security != nil {
 				if cc.Security.Enabled != nil {
@@ -468,14 +476,21 @@ func rightsizingStrategyLiterals() []string {
 // scheduler package-globals consumed by FromGlobals at request time.
 // A nil section is a no-op; zero/negative values are ignored so
 // omitted fields don't clobber the compiled defaults.
-// K8sClientQPS and K8sClientBurst are persisted in the schema but
-// not yet wired to the K8s client; that lands in a follow-up commit.
+// K8sClientQPS and K8sClientBurst set the global foreground REST client rate
+// (per-cluster overrides are applied from the clusters section). The k8s
+// package reads the resolved value through the RateLimitForContext hook wired
+// in this package's init().
 func applySchedulerConfig(s *SchedulerConfig) {
 	if s.WorkersPerContext > 0 {
 		scheduler.ConfigWorkersPerContext = scheduler.ClampWorkers(s.WorkersPerContext)
 	}
 	if s.CriticalReserved > 0 {
 		scheduler.ConfigCriticalReserved = scheduler.ClampCriticalReserved(s.CriticalReserved, scheduler.ClampWorkers(scheduler.ConfigWorkersPerContext))
+	}
+	if s.LowReserved != nil {
+		workers := scheduler.ClampWorkers(scheduler.ConfigWorkersPerContext)
+		crit := scheduler.ClampCriticalReserved(scheduler.ConfigCriticalReserved, workers)
+		scheduler.ConfigLowReserved = scheduler.ClampLowReserved(*s.LowReserved, workers, crit)
 	}
 	if d, err := time.ParseDuration(s.DefaultTimeout); err == nil && d > 0 {
 		scheduler.ConfigDefaultTimeout = d
@@ -500,8 +515,17 @@ func applySchedulerConfig(s *SchedulerConfig) {
 		}
 		scheduler.ConfigTimeoutsByKind = out
 	}
+	if s.K8sClientQPS > 0 {
+		ConfigK8sClientQPS = s.K8sClientQPS
+	}
+	if s.K8sClientBurst > 0 {
+		ConfigK8sClientBurst = s.K8sClientBurst
+	}
 	if s.ShowPriority != nil {
 		scheduler.ConfigShowPriorityInOverlay = *s.ShowPriority
+	}
+	if s.AgingThreshold != nil {
+		scheduler.ConfigAgingThreshold = scheduler.ClampAgingThreshold(*s.AgingThreshold)
 	}
 }
 
@@ -532,6 +556,8 @@ func schedulerKindByName(name string) (scheduler.Kind, bool) {
 		return scheduler.KindNamespaceList, true
 	case "RBACCheck":
 		return scheduler.KindRBACCheck, true
+	case "SecurityScan":
+		return scheduler.KindSecurityScan, true
 	default:
 		return 0, false
 	}

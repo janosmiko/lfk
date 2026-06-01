@@ -211,17 +211,17 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 		}
 	}
 	client := m.client
-	// The main resource list (drill-in / watch refresh) is the view the user
-	// is actively waiting on, so it runs at Critical: it gets the reserved
-	// worker and is never queued behind background dashboard/metrics/preview
-	// work. Preview hovers stay High — they are speculative and must remain
-	// preemptible so rapid sidebar cursoring can drop superseded fetches.
-	listPriority := scheduler.PriorityHigh
-	if !forPreview {
-		listPriority = scheduler.PriorityCritical
-	}
+	// The main resource list (drill-in / watch refresh) runs at High — the
+	// same lane as preview hovers. It must NOT be Critical: Critical is the
+	// reserved lane for foundational, one-shot gating work (API discovery,
+	// RBAC, namespaces). Submitting the user-driven list there let rapid
+	// navigation flood the single reserved slot with non-coalescing
+	// (per-generation) list loads, and — because general workers drain
+	// Critical first — starve the High preview work that renders pod details.
+	// High keeps the list ahead of Low background (dashboard/metrics/events)
+	// while sharing the general pool fairly with previews.
 	return m.scheduleK8sCall(
-		listPriority,
+		scheduler.PriorityHigh,
 		scheduler.KindResourceList,
 		"List "+model.DisplayNameFor(rt),
 		bgtaskTarget(kctx, ns),

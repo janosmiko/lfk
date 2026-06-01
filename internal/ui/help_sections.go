@@ -112,6 +112,7 @@ func helpSections() []helpSection {
 				{helpKeyDisplay(kb.ClusterColorPicker), "Cluster color picker (cluster picker only): tint title bar + add row swatch; persisted across restarts"},
 				{kb.ThemeSelector, "Switch color scheme (" + kb.NewTab + ": toggle transparent bg)"},
 				{helpKeyDisplay(kb.TerminalToggle), "Cycle terminal mode (pty / exec / mux — mux skipped if no tmux/zellij detected)"},
+				{kb.SecurityBadgeToggle, "Show/hide the per-resource SEC severity badge on explorer rows"},
 			},
 		},
 		{

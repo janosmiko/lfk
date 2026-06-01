@@ -124,6 +124,8 @@ func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)
 		return m.handleExplorerActionKeyToggleRare()
 	case kb.SecurityIgnoreToggle:
 		return m.handleExplorerActionKeySecurityIgnoreToggle()
+	case kb.SecurityBadgeToggle:
+		return m.handleExplorerActionKeySecurityBadgeToggle()
 	}
 	return m, nil, false
 }

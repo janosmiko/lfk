@@ -28,3 +28,17 @@ func (m Model) handleExplorerActionKeySecurityIgnoreToggle() (tea.Model, tea.Cmd
 	}
 	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear()), true
 }
+
+// handleExplorerActionKeySecurityBadgeToggle shows/hides the per-resource SEC
+// row badge. It is a pure view toggle — no fetch, no cache bust — so the
+// Security dashboard and source probing are unaffected. The view layer reads
+// hideSecurityBadges into ui.ActiveSecurityBadgesHidden on the next render.
+func (m Model) handleExplorerActionKeySecurityBadgeToggle() (tea.Model, tea.Cmd, bool) {
+	m.hideSecurityBadges = !m.hideSecurityBadges
+	if m.hideSecurityBadges {
+		m.setStatusMessage("Hiding security badges", false)
+	} else {
+		m.setStatusMessage("Showing security badges", false)
+	}
+	return m, scheduleStatusClear(), true
+}

@@ -110,6 +110,10 @@ type Keybindings struct {
 	// SecurityIgnoreToggle flips the show/hide-ignored-findings state on
 	// the active security view and triggers a refresh.
 	SecurityIgnoreToggle string `json:"security_ignore_toggle" yaml:"security_ignore_toggle"`
+
+	// SecurityBadgeToggle shows/hides the per-resource SEC severity badge on
+	// explorer rows without affecting the Security dashboard or source probing.
+	SecurityBadgeToggle string `json:"security_badge_toggle" yaml:"security_badge_toggle"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -163,6 +167,7 @@ func DefaultKeybindings() Keybindings {
 		ReadOnlyToggle: "ctrl+r",
 
 		SecurityIgnoreToggle: "ctrl+i",
+		SecurityBadgeToggle:  "B",
 
 		// Cluster color picker. Bound to Shift+L because the picker only
 		// exists at Level=Clusters and "L" is otherwise the Logs action

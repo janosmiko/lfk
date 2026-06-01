@@ -28,6 +28,12 @@ type securityModelState struct {
 	// showSecurityIgnored toggles whether ignored findings surface in the
 	// explorer. Off by default; flipped with kb.SecurityIgnoreToggle.
 	showSecurityIgnored bool
+	// hideSecurityBadges suppresses the per-resource SEC row badge when set.
+	// Off by default (badges shown); flipped with kb.SecurityBadgeToggle. A
+	// global session preference, not per-tab and not persisted, mirroring
+	// showRareResources — it hides only the row badge, leaving the Security
+	// dashboard and source probing untouched.
+	hideSecurityBadges bool
 	// securityProbedContext is the cluster context whose security sources
 	// have already been probed this activation. Availability probing is
 	// lazy — it runs only when the user focuses the Security category, not

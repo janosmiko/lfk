@@ -75,18 +75,27 @@ type queuedTask struct {
 
 // ctxQueue holds the three priority lanes for one cluster context plus
 // a wake signal channel.
+//
+// skips and agingThreshold implement anti-starvation aging: skips[p] counts
+// how many times lane p has been passed over while non-empty; once it reaches
+// agingThreshold the lane is promoted ahead of higher-priority lanes for one
+// dequeue. Critical (lane 0) is never aged. agingThreshold == 0 disables aging
+// (strict priority). See dequeueByPriorityLocked.
 type ctxQueue struct {
-	mu          sync.Mutex
-	lanes       [3][]*queuedTask // indexed by Priority value
-	wake        chan struct{}    // size 1, non-blocking signal
-	stop        chan struct{}    // closes on context drop or Registry close
-	poolStarted bool
+	mu             sync.Mutex
+	lanes          [3][]*queuedTask // indexed by Priority value
+	skips          [3]int           // per-lane consecutive passed-over count
+	agingThreshold int              // 0 = aging disabled (strict priority)
+	wake           chan struct{}    // size 1, non-blocking signal
+	stop           chan struct{}    // closes on context drop or Registry close
+	poolStarted    bool
 }
 
-func newCtxQueue() *ctxQueue {
+func newCtxQueue(agingThreshold int) *ctxQueue {
 	return &ctxQueue{
-		wake: make(chan struct{}, 1),
-		stop: make(chan struct{}),
+		agingThreshold: agingThreshold,
+		wake:           make(chan struct{}, 1),
+		stop:           make(chan struct{}),
 	}
 }
 
@@ -181,19 +190,58 @@ func (q *ctxQueue) drain(err error) {
 	}
 }
 
-// dequeueByPriorityLocked removes and returns the head of the highest-
-// priority non-empty lane. Returns (nil, false) if all lanes are empty.
-// Caller must hold q.mu.
+// dequeueByPriorityLocked removes and returns the next task to run, honoring
+// priority with anti-starvation aging. Returns (nil, false) if all lanes are
+// empty. Caller must hold q.mu.
+//
+// Critical is absolute: foundational gating work (API discovery, RBAC,
+// namespaces) and destructive mutations must never be delayed, so it is served
+// outright and is never aged. Among the non-Critical lanes the highest-priority
+// non-empty lane wins by default, but a lower lane passed over more than
+// agingThreshold times preempts it for a single dequeue. Without this, sustained
+// High submissions on a slow cluster keep the High lane non-empty forever and
+// Low work (security scans, dashboard, metrics) never runs (priority
+// starvation); aging bounds that wait to ~agingThreshold higher-priority
+// dispatches. agingThreshold == 0 restores strict priority.
 func (q *ctxQueue) dequeueByPriorityLocked() (*queuedTask, bool) {
-	for prio := PriorityCritical; prio <= PriorityLow; prio++ {
-		lane := q.lanes[int(prio)]
-		if len(lane) > 0 {
-			t := lane[0]
-			q.lanes[int(prio)] = lane[1:]
-			return t, true
+	if lane := q.lanes[int(PriorityCritical)]; len(lane) > 0 {
+		q.lanes[int(PriorityCritical)] = lane[1:]
+		return lane[0], true
+	}
+
+	chosen := -1
+	for prio := int(PriorityHigh); prio <= int(PriorityLow); prio++ {
+		if len(q.lanes[prio]) == 0 {
+			continue
+		}
+		if chosen == -1 {
+			chosen = prio // strict-priority default: first non-empty lane
+		}
+		if q.agingThreshold > 0 && q.skips[prio] >= q.agingThreshold {
+			chosen = prio // starved lane overrides the default for one pick
+			break
 		}
 	}
-	return nil, false
+	if chosen == -1 {
+		return nil, false
+	}
+
+	if q.agingThreshold > 0 {
+		// Reset the served lane and age every other non-empty non-Critical
+		// lane that lost this round.
+		for prio := int(PriorityHigh); prio <= int(PriorityLow); prio++ {
+			switch {
+			case prio == chosen:
+				q.skips[prio] = 0
+			case len(q.lanes[prio]) > 0:
+				q.skips[prio]++
+			}
+		}
+	}
+
+	t := q.lanes[chosen][0]
+	q.lanes[chosen] = q.lanes[chosen][1:]
+	return t, true
 }
 
 // hasPendingWork reports whether any priority lane is non-empty. Used by
@@ -238,13 +286,33 @@ func (r *Registry) Submit(req SubmitReq) Future {
 	}
 	q, ok := r.ctxQueues[req.KubeContext]
 	if !ok {
-		q = newCtxQueue()
+		threshold := DefaultAgingThreshold
+		if r.cfg != nil {
+			threshold = r.cfg.AgingThreshold
+		}
+		q = newCtxQueue(threshold)
 		r.ctxQueues[req.KubeContext] = q
 	}
 	r.mu.Unlock()
 
 	t := &queuedTask{req: req, future: fut}
 	sig := req.Sig()
+
+	// Coalesce against work already IN FLIGHT, not just queued. Without this,
+	// a slow fetch (e.g. Pod metrics on a sluggish cluster) that is still
+	// running cannot absorb an identical resubmission — the duplicate queues
+	// behind it and runs a redundant API call when the worker frees up. The
+	// queue-only coalesce below never sees the running task because it lives
+	// in runningTasks, not q.lanes. Checked before enqueue so the caller's
+	// Future resolves immediately with ErrCoalesced (its tea.Cmd returns nil;
+	// the in-flight task's result is the one that matters). Mutations opt out
+	// via NeverCoalesce — a second write must always run.
+	if !sig.NeverCoalesce() && r.coalescesWithRunning(req.KubeContext, sig) {
+		fut <- Result{Err: ErrCoalesced}
+		close(fut)
+		return fut
+	}
+
 	q.mu.Lock()
 	// Re-check after taking q.mu: Close() / CancelContext() can drain
 	// the queue in the window between r.mu.Unlock above and this lock.
@@ -271,6 +339,24 @@ func (r *Registry) Submit(req SubmitReq) Future {
 	r.pokePreempt(req.KubeContext, req.Priority)
 
 	return fut
+}
+
+// coalescesWithRunning reports whether an in-flight task on kctx has a Sig that
+// the incoming sig coalesces with. A task already being torn down (preempted,
+// superseded, or context-switched) is skipped: it is about to free its slot
+// and deliver a sentinel, so coalescing onto it would drop the fresh request.
+func (r *Registry) coalescesWithRunning(kctx string, sig Sig) bool {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	for _, rt := range r.runningTasks[kctx] {
+		if rt.preempted.Load() || rt.superseded.Load() || rt.contextSwitched.Load() {
+			continue
+		}
+		if sig.CoalescesWith(rt.task.req.Sig()) {
+			return true
+		}
+	}
+	return false
 }
 
 // QueueLen returns the number of queued (not in-flight) tasks for kctx.
