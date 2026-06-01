@@ -225,7 +225,11 @@ func plainNameCellWithBadge(name string, item *model.Item, nameW int) string {
 // truncated to make room). Gated callers (ActiveSecurityAvailable == false)
 // get an empty badge and the row renders identically to the pre-security UI.
 func styledNameCell(item model.Item, nameW int) string {
-	isDimmed := item.Status == "Succeeded" || item.Status == "Completed"
+	// Ignored security findings (revealed by the show-ignored toggle, tagged
+	// __ignored__ by groupFindings / GetSecurityAffectedResources) are dimmed
+	// so they read as de-emphasized next to active findings.
+	isDimmed := item.Status == "Succeeded" || item.Status == "Completed" ||
+		item.ColumnValue("__ignored__") == "true"
 	nameStyle := NormalStyle
 	if isDimmed {
 		nameStyle = DimStyle

@@ -217,9 +217,23 @@ func (c *Client) GetSecurityAffectedResources(ctx context.Context, contextName, 
 		}
 		return refs[i].Key() < refs[j].Key()
 	})
+	// Apply the same ignore policy as the group list (getSecurityFindings):
+	// hide ignored resources unless show-ignored is on, and when shown, tag
+	// them so the renderer can mark them. Without this the drill-in showed
+	// ignored resources unconditionally, contradicting the group's filtered
+	// affected count.
+	checker, showIgnored := c.securityIgnoreSnapshot()
 	items := make([]model.Item, 0, len(refs))
 	for _, ref := range refs {
-		items = append(items, affectedResourceToItem(ref, groupKey, matched))
+		ignored := checker != nil && checker.IsResourceIgnored(sourceName, groupKey, ref.Key())
+		if ignored && !showIgnored {
+			continue
+		}
+		item := affectedResourceToItem(ref, groupKey, matched)
+		if ignored {
+			item.Columns = append(item.Columns, model.KeyValue{Key: "__ignored__", Value: "true"})
+		}
+		items = append(items, item)
 	}
 	return items, nil
 }
