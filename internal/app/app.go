@@ -67,7 +67,7 @@ type Model struct {
 	// Full YAML preview: show only YAML in the right column (no children list).
 	fullYAMLPreview bool
 	// Separate YAML content for the split/full preview in the right column,
-	// so it doesn't conflict with the full-screen yamlContent.
+	// so it doesn't conflict with the full-screen yamlView.content.
 	previewYAML string
 
 	// Current view mode.
