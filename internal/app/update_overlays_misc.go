@@ -152,6 +152,7 @@ func (m Model) applyFilterPreset(preset FilterPreset) (tea.Model, tea.Cmd) {
 		m.metricsContent = ""
 		m.previewEventsContent = ""
 		m.metricsData = nil
+		m.metricsLoading = false
 		m.previewEventsData = nil
 	}
 	m.setStatusMessage(fmt.Sprintf("Filter: %s (%d matches)", preset.Name, len(filtered)), false)

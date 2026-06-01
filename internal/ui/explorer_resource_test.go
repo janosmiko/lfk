@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -52,13 +53,19 @@ func TestRenderDataKV(t *testing.T) {
 // --- renderUsageBar ---
 
 func TestRenderUsageBar(t *testing.T) {
-	t.Run("zero reference shows just value", func(t *testing.T) {
-		result := renderUsageBar(500, 0, 0, 40, FormatCPU)
-		assert.Equal(t, "500m", result)
+	// A reservation wide enough for every value string used below; production
+	// derives it from the actual CPU/Mem widths (see RenderResourceUsage).
+	const reserve = 24
+
+	t.Run("no request and no limit shows value only", func(t *testing.T) {
+		result := stripANSI(renderUsageBar(500, 0, 0, 40, FormatCPU, reserve))
+		assert.Contains(t, result, "500m")
+		assert.Contains(t, result, "no request/limit")
+		assert.NotContains(t, result, "[", "no bar without a request or limit")
 	})
 
 	t.Run("with limit shows bar and percentage", func(t *testing.T) {
-		result := renderUsageBar(500, 0, 1000, 60, FormatCPU)
+		result := renderUsageBar(500, 0, 1000, 60, FormatCPU, reserve)
 		assert.Contains(t, result, "500m")
 		assert.Contains(t, result, "1.0")
 		assert.Contains(t, result, "50%")
@@ -67,22 +74,124 @@ func TestRenderUsageBar(t *testing.T) {
 	})
 
 	t.Run("with request as fallback reference", func(t *testing.T) {
-		result := renderUsageBar(250, 500, 0, 60, FormatCPU)
+		result := renderUsageBar(250, 500, 0, 60, FormatCPU, reserve)
 		assert.Contains(t, result, "250m")
 		assert.Contains(t, result, "50%")
 	})
 
 	t.Run("memory usage bar", func(t *testing.T) {
-		result := renderUsageBar(512*1024*1024, 0, 1024*1024*1024, 60, FormatMemory)
+		result := renderUsageBar(512*1024*1024, 0, 1024*1024*1024, 60, FormatMemory, reserve)
 		assert.Contains(t, result, "512Mi")
 		assert.Contains(t, result, "1.0Gi")
 		assert.Contains(t, result, "50%")
 	})
 
 	t.Run("over 100 percent capped at 100", func(t *testing.T) {
-		result := renderUsageBar(2000, 0, 1000, 60, FormatCPU)
+		result := renderUsageBar(2000, 0, 1000, 60, FormatCPU, reserve)
 		assert.Contains(t, result, "100%")
 	})
+
+	t.Run("same suffix reservation yields equal bar length", func(t *testing.T) {
+		// Two bars with very different value-string widths must produce the
+		// same bracketed bar length when given the same reserved suffix width.
+		cpu := renderUsageBar(1, 0, 100, 100, FormatCPU, reserve)
+		mem := renderUsageBar(69*1024*1024, 0, 160*1024*1024, 100, FormatMemory, reserve)
+		assert.Equal(t, barInnerWidth(cpu), barInnerWidth(mem),
+			"bars sharing a suffix reservation must be the same length")
+	})
+
+	t.Run("line fills full width with right-aligned value", func(t *testing.T) {
+		// The value is right-aligned in the reserved column so the line spans
+		// the full barWidth and the percentages line up across rows.
+		const barWidth = 100
+		line := stripANSI(renderUsageBar(1, 0, 100, barWidth, FormatCPU, reserve))
+		assert.Equal(t, barWidth, lipgloss.Width(line),
+			"line must fill the full width")
+		assert.True(t, strings.HasSuffix(line, "1m/100m (1%)"),
+			"value text must be flush against the right edge, got %q", line)
+	})
+
+	t.Run("bar is segmented at the request boundary", func(t *testing.T) {
+		// limit 256, request 128 (half), usage 190: green to half, then hot to
+		// ~74%, then dim. No suffix reserve so the bar is the whole 64 cells.
+		fill := stripANSI(renderUsageBarFill(64, 190, 128, 256))
+		green := strings.Count(fill, zoneBelowRequest.fillGlyph())
+		hot := strings.Count(fill, zoneAboveRequest.fillGlyph())
+		dim := strings.Count(fill, usageBarEmptyGlyph)
+		assert.Equal(t, 32, green, "green band runs to the request (half of 64)")
+		assert.Equal(t, 48-32, hot, "hot band runs from request to usage (~74%)")
+		assert.Equal(t, 64-48, dim, "dim track is the headroom up to the limit")
+	})
+
+	t.Run("no limit scales to usage with request as interior boundary", func(t *testing.T) {
+		// request 25, usage 50, no limit: bar full, request at 50% -> half green
+		// (within request), half orange (over request), no dim, no red.
+		fill := stripANSI(renderUsageBarFill(64, 50, 25, 0))
+		assert.Equal(t, 32, strings.Count(fill, zoneBelowRequest.fillGlyph()), "green up to the request (half)")
+		assert.Equal(t, 32, strings.Count(fill, zoneAboveRequest.fillGlyph()), "orange over the request (rest)")
+		assert.Equal(t, 0, strings.Count(fill, zoneNearLimit.fillGlyph()), "never red without a limit")
+		assert.Equal(t, 0, strings.Count(fill, usageBarEmptyGlyph), "no headroom without a limit when over request")
+	})
+
+	t.Run("near limit is red even when usage is within the request", func(t *testing.T) {
+		// request == limit (4Gi), usage 3.9Gi (97%): usage is within the
+		// request, but >=90% of the limit must still show red.
+		gi := int64(1024 * 1024 * 1024)
+		fill := stripANSI(renderUsageBarFill(80, 39*gi/10, 4*gi, 4*gi))
+		assert.Positive(t, strings.Count(fill, zoneNearLimit.fillGlyph()),
+			"usage at 97%% of the limit must paint a red band")
+		assert.Equal(t, 0, strings.Count(fill, zoneAboveRequest.fillGlyph()),
+			"no orange band when the request equals the limit")
+	})
+
+	t.Run("request tick shown when usage below request", func(t *testing.T) {
+		// usage 32 (< request 128): green to usage, a single green tick at the
+		// request position, dim elsewhere.
+		fill := stripANSI(renderUsageBarFill(64, 32, 128, 256))
+		assert.Equal(t, 0, strings.Count(fill, zoneAboveRequest.fillGlyph()),
+			"no hot band when usage is below the request")
+		// 8 green cells of usage (32/256*64).
+		assert.Equal(t, 8, strings.Count(fill, zoneBelowRequest.fillGlyph()),
+			"green usage band")
+		assert.Equal(t, 1, strings.Count(fill, usageBarRequestTick),
+			"a single request tick marks the request position")
+	})
+
+	t.Run("zone reflects usage relative to request and limit", func(t *testing.T) {
+		assert.Equal(t, zoneBelowRequest, usageBarZone(50, 100, 200), "below request")
+		assert.Equal(t, zoneAboveRequest, usageBarZone(150, 100, 200), "above request, below 90%")
+		assert.Equal(t, zoneAboveRequest, usageBarZone(178, 100, 200), "89% of limit is still orange")
+		assert.Equal(t, zoneNearLimit, usageBarZone(180, 100, 200), "90% of limit is red")
+		assert.Equal(t, zoneNearLimit, usageBarZone(200, 100, 200), "at limit")
+		assert.Equal(t, zoneBelowRequest, usageBarZone(50, 0, 200), "no request, low")
+		assert.Equal(t, zoneAboveRequest, usageBarZone(150, 100, 0), "no limit, above request")
+	})
+
+	t.Run("color and glyph differ per zone for colorless legibility", func(t *testing.T) {
+		zones := []usageZone{zoneBelowRequest, zoneAboveRequest, zoneNearLimit}
+		colors := map[string]bool{}
+		glyphs := map[string]bool{}
+		for _, z := range zones {
+			colors[z.color()] = true
+			glyphs[z.fillGlyph()] = true
+			assert.NotEqual(t, usageBarEmptyGlyph, z.fillGlyph(),
+				"fill glyph must differ from the empty-track glyph")
+		}
+		assert.Len(t, colors, 3, "each zone needs a distinct color")
+		assert.Len(t, glyphs, 3, "each zone needs a distinct glyph for colorless mode")
+	})
+}
+
+// barInnerWidth returns the display width of the content between the first '['
+// and the matching ']' in a rendered usage bar, ignoring ANSI styling.
+func barInnerWidth(line string) int {
+	plain := stripANSI(line)
+	open := strings.IndexRune(plain, '[')
+	closeIdx := strings.IndexRune(plain, ']')
+	if open < 0 || closeIdx < 0 || closeIdx <= open {
+		return -1
+	}
+	return lipgloss.Width(plain[open+1 : closeIdx])
 }
 
 // --- RenderResourceUsage ---
@@ -100,6 +209,16 @@ func TestRenderResourceUsage(t *testing.T) {
 		assert.Contains(t, result, "RESOURCE USAGE")
 		assert.Contains(t, result, "CPU")
 		assert.Contains(t, result, "0m")
+	})
+
+	t.Run("CPU and Mem lines fill the full section width", func(t *testing.T) {
+		const width = 80
+		result := RenderResourceUsage(1, 0, 100, 69*1024*1024, 0, 160*1024*1024, width)
+		lines := strings.Split(stripANSI(result), "\n")
+		require.GreaterOrEqual(t, len(lines), 3, "expected header + CPU + Mem lines")
+		// lines[0] is the "RESOURCE USAGE" header; the two bars follow.
+		assert.Equal(t, width, lipgloss.Width(lines[1]), "CPU line must fill the width")
+		assert.Equal(t, width, lipgloss.Width(lines[2]), "Mem line must fill the width")
 	})
 }
 

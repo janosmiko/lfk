@@ -38,18 +38,22 @@ func (m Model) recomposeMonitoring() Model {
 	return m
 }
 
-// recomposeMetrics re-renders the right-pane resource-usage bar from the
-// retained raw numbers at the current width. No-op when no metrics are loaded.
+// recomposeMetrics re-renders the right-pane resource-usage bar at the current
+// width: the real bar from retained raw numbers, or a loading placeholder while
+// a metrics fetch is in flight. No-op when neither metrics nor a load are
+// pending, so it preserves an already-empty footer on theme/resize.
 func (m Model) recomposeMetrics() Model {
-	if m.metricsData == nil {
-		return m
+	switch {
+	case m.metricsData != nil:
+		d := m.metricsData
+		m.metricsContent = ui.RenderResourceUsage(
+			d.cpuUsed, d.cpuReq, d.cpuLim,
+			d.memUsed, d.memReq, d.memLim,
+			m.rightFooterInnerWidth(),
+		)
+	case m.metricsLoading:
+		m.metricsContent = ui.RenderResourceUsagePlaceholder()
 	}
-	d := m.metricsData
-	m.metricsContent = ui.RenderResourceUsage(
-		d.cpuUsed, d.cpuReq, d.cpuLim,
-		d.memUsed, d.memReq, d.memLim,
-		m.rightFooterInnerWidth(),
-	)
 	return m
 }
 
@@ -64,9 +68,12 @@ func (m Model) recomposePreviewEvents() Model {
 }
 
 // rightFooterInnerWidth returns the content width of the right-column footer
-// region (resource-usage bar / events), matching renderRightColumn's geometry.
+// region (resource-usage bar / events). It must equal the column's inner width
+// (rightW-colPad, colPad=2) so the footer fills the same span as the separator
+// above it and the children table — see renderRightColumn and the matching
+// innerW in clampPreviewScroll.
 func (m Model) rightFooterInnerWidth() int {
 	usable := m.width - 6
 	rightW := max(10, usable-max(10, usable*12/100)-max(10, usable*51/100))
-	return max(rightW-4, 20)
+	return max(rightW-2, 20)
 }

@@ -491,6 +491,7 @@ type Model struct {
 	// Metrics content: rendered bar graph for the preview column.
 	metricsContent string
 	metricsData    *metricsInputs // raw numbers behind metricsContent; recomposed on theme/resize, nil when none
+	metricsLoading bool           // true while a metrics fetch for the focused resource is in flight; renders a placeholder bar instead of the previous resource's numbers
 
 	// Preview events content: rendered event timeline for the preview column.
 	previewEventsContent string
