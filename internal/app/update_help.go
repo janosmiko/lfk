@@ -197,7 +197,7 @@ func (m *Model) helpRecomputeMatches() {
 		m.helpMatchIdx = 0
 		return
 	}
-	lines := ui.BuildHelpLines(m.helpFilter.Value, m.helpContextMode)
+	lines := ui.BuildHelpLines(m.helpFilter.Value, m.helpContextMode, m.width)
 	for i, line := range lines {
 		if ui.MatchLine(line, m.helpSearchQuery) {
 			m.helpMatchLines = append(m.helpMatchLines, i)
@@ -268,7 +268,7 @@ func (m *Model) helpVisibleLines() int {
 // range, so subsequent ctrl+u presses spend dozens of keystrokes
 // undoing phantom scroll before the viewport visibly moves.
 func (m *Model) clampHelpScroll() {
-	totalLines := len(ui.BuildHelpLines(m.helpFilter.Value, m.helpContextMode))
+	totalLines := len(ui.BuildHelpLines(m.helpFilter.Value, m.helpContextMode, m.width))
 	maxScroll := max(totalLines-m.helpVisibleLines(), 0)
 	if m.helpScroll > maxScroll {
 		m.helpScroll = maxScroll

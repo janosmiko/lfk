@@ -29,12 +29,24 @@ type helpSection struct {
 }
 
 // helpKeyDisplay formats a keybinding value for display in the help screen.
-// It capitalizes "ctrl+" prefixes for readability.
+// It capitalizes "ctrl+" and "alt+" modifier prefixes for readability (e.g.
+// "alt+ctrl+y" -> "Alt+Ctrl+Y"); other bindings display verbatim.
 func helpKeyDisplay(key string) string {
-	if strings.HasPrefix(key, "ctrl+") {
-		return "Ctrl+" + strings.ToUpper(key[5:])
+	if !strings.HasPrefix(key, "ctrl+") && !strings.HasPrefix(key, "alt+") {
+		return key
 	}
-	return key
+	parts := strings.Split(key, "+")
+	for i, p := range parts {
+		switch p {
+		case "ctrl":
+			parts[i] = "Ctrl"
+		case "alt":
+			parts[i] = "Alt"
+		default:
+			parts[i] = strings.ToUpper(p)
+		}
+	}
+	return strings.Join(parts, "+")
 }
 
 // helpSections lives in help_sections.go.
@@ -51,13 +63,24 @@ func helpKeyDisplay(key string) string {
 // digit query match bytes that live inside an SGR escape (e.g. the
 // "1" in "\x1b[33;1m"), inflating match counts and pointing n/N at
 // rows with no visible match.
-func BuildHelpLines(filter, contextMode string) []string {
-	specs := buildHelpSpecs(filter, contextMode)
+func BuildHelpLines(filter, contextMode string, screenWidth int) []string {
+	specs := buildHelpSpecs(filter, contextMode, helpInnerWidth(screenWidth))
 	out := make([]string, len(specs))
 	for i, s := range specs {
 		out[i] = helpSpecPlain(s)
 	}
 	return out
+}
+
+// helpInnerWidth returns the content width (in cells) available for a
+// single help row at the given screen width. Mirrors the boxW / contentW
+// arithmetic in RenderHelpScreen so buildHelpSpecs wraps descriptions to
+// the exact width the renderer will display — keeping the wrapped row set
+// (and therefore the search-match indices) identical on both paths.
+func helpInnerWidth(screenWidth int) int {
+	boxW := max(screenWidth*70/100, 50)
+	contentW := boxW - 6 // border + padding
+	return max(contentW-2, 10)
 }
 
 // HelpVisibleLines returns the number of help-content rows that fit
@@ -112,7 +135,7 @@ const helpKeyColumnMinWidth = 14
 // BuildHelpLines and RenderHelpScreen so the plain match indices
 // computed by the app layer line up 1:1 with the styled rows on
 // screen.
-func buildHelpSpecs(filter, contextMode string) []helpLineSpec {
+func buildHelpSpecs(filter, contextMode string, innerW int) []helpLineSpec {
 	sections := helpSections()
 	specs := make([]helpLineSpec, 0, 64)
 	for _, section := range sections {
@@ -159,13 +182,39 @@ func buildHelpSpecs(filter, contextMode string) []helpLineSpec {
 			}
 		}
 
+		// Word-wrap each description to the width left after the key column
+		// so long entries read in full instead of being truncated with a
+		// "~". Each wrapped chunk becomes its own entry spec, preserving the
+		// one-spec-per-rendered-row invariant the search/scroll machinery
+		// relies on: continuation rows carry a blank (but same-width) key so
+		// the wrapped text stays aligned under the original description.
+		// rowOverhead is the fixed prefix helpSpecPlain prepends to an entry
+		// row: 4 leading spaces + keyWidth + 2 spaces between key and desc.
+		// descBudget is the exact room left for the description; flooring at
+		// 1 (rather than a larger value) keeps the wrapped row within innerW
+		// so the renderer's Truncate never lops a character with a "~" — the
+		// only residual overflow is when a section's key column alone is
+		// wider than the panel, which no description width could fix.
+		rowOverhead := 4 + keyWidth + 2
+		descBudget := max(innerW-rowOverhead, 1)
+		blankKey := strings.Repeat(" ", keyWidth)
 		entries := make([]helpLineSpec, 0, len(matched))
 		for _, b := range matched {
-			entries = append(entries, helpLineSpec{
-				kind: helpLineEntry,
-				key:  fmt.Sprintf("%-*s", keyWidth, b.key),
-				desc: b.desc,
-			})
+			chunks := wrapHelpText(b.desc, descBudget)
+			if len(chunks) == 0 {
+				chunks = []string{""}
+			}
+			for ci, chunk := range chunks {
+				key := blankKey
+				if ci == 0 {
+					key = fmt.Sprintf("%-*s", keyWidth, b.key)
+				}
+				entries = append(entries, helpLineSpec{
+					kind: helpLineEntry,
+					key:  key,
+					desc: chunk,
+				})
+			}
 		}
 
 		if len(specs) > 0 {
@@ -180,6 +229,103 @@ func buildHelpSpecs(filter, contextMode string) []helpLineSpec {
 	}
 
 	return specs
+}
+
+// wrapHelpText word-wraps desc to width on word boundaries. A space-free
+// token wider than width (e.g. a slash-joined "owner/port-forward/orphan/
+// finding/mark" enumeration) is broken after its "/" separators so it
+// wraps at readable boundaries rather than mid-word; a segment between
+// slashes that is itself wider than width falls back to a hard character
+// break. The output never exceeds width, so RenderHelpScreen's final
+// Truncate never adds a "~".
+func wrapHelpText(desc string, width int) []string {
+	if width < 1 {
+		width = 1
+	}
+	if strings.TrimSpace(desc) == "" {
+		return nil
+	}
+
+	// Tokenize into pieces no wider than width. spaceBefore marks pieces
+	// that follow a real space (a word boundary); slash continuations and
+	// hard-break fragments glue to the previous piece with no space.
+	type piece struct {
+		text        string
+		spaceBefore bool
+	}
+	var pieces []piece
+	for word := range strings.FieldsSeq(desc) {
+		first := true
+		for _, seg := range splitAfterSlash(word) {
+			for _, chunk := range hardChunks(seg, width) {
+				pieces = append(pieces, piece{text: chunk, spaceBefore: first})
+				first = false
+			}
+		}
+	}
+
+	// Greedy pack: keep adding pieces to the current line while they fit.
+	var lines []string
+	cur := ""
+	for _, p := range pieces {
+		if cur == "" {
+			cur = p.text
+			continue
+		}
+		sep := ""
+		if p.spaceBefore {
+			sep = " "
+		}
+		if lipgloss.Width(cur)+lipgloss.Width(sep)+lipgloss.Width(p.text) <= width {
+			cur += sep + p.text
+			continue
+		}
+		lines = append(lines, cur)
+		cur = p.text
+	}
+	if cur != "" {
+		lines = append(lines, cur)
+	}
+	return lines
+}
+
+// splitAfterSlash splits s into segments that each end just after a "/"
+// (the slash stays on the left segment), so "owner/port-forward/orphan"
+// becomes ["owner/", "port-forward/", "orphan"]. Used to give long
+// slash-joined tokens readable break points.
+func splitAfterSlash(s string) []string {
+	if !strings.Contains(s, "/") {
+		return []string{s}
+	}
+	runes := []rune(s)
+	var out []string
+	start := 0
+	for i, r := range runes {
+		if r == '/' {
+			out = append(out, string(runes[start:i+1]))
+			start = i + 1
+		}
+	}
+	if start < len(runes) {
+		out = append(out, string(runes[start:]))
+	}
+	return out
+}
+
+// hardChunks splits s into pieces no wider than width by raw rune count,
+// used only as the last resort for a segment with no break opportunity.
+func hardChunks(s string, width int) []string {
+	if lipgloss.Width(s) <= width {
+		return []string{s}
+	}
+	runes := []rune(s)
+	var out []string
+	for len(runes) > 0 {
+		n := min(width, len(runes))
+		out = append(out, string(runes[:n]))
+		runes = runes[n:]
+	}
+	return out
 }
 
 // helpSpecPlain returns the un-styled visible form of a help-line
@@ -261,14 +407,12 @@ func RenderHelpScreen(screenWidth, screenHeight, scroll int, filter, search, con
 	// "highlight on already-styled, already-truncated line" path could
 	// match a digit query inside an SGR like \x1b[33;1m, which broke
 	// the sequence and printed "[33;" / ";1m" as visible text.
-	specs := buildHelpSpecs(filter, contextMode)
-	// Truncate each line to the inner-panel content width so one entry
-	// in `lines` always renders as exactly one row. Lipgloss's
-	// auto-wrap behavior would otherwise silently expand long
-	// descriptions to two rows, the rendered row count would diverge
-	// from len(lines), and the outer box height would drift — making
-	// a filter that narrows results visibly shrink the window.
-	innerW := max(contentW-2, 10)
+	innerW := helpInnerWidth(screenWidth)
+	specs := buildHelpSpecs(filter, contextMode, innerW)
+	// buildHelpSpecs already word-wrapped descriptions to innerW, so each
+	// spec is one rendered row. Truncate stays as a safety net for the
+	// rare row whose key column alone overruns innerW (extremely narrow
+	// terminals); it never trims wrapped descriptions in normal layouts.
 	lines := make([]string, len(specs))
 	for i, s := range specs {
 		lines[i] = Truncate(helpSpecStyled(s, search, i == currentMatchLine), innerW)

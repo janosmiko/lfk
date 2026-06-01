@@ -168,9 +168,11 @@ func DefaultKeybindings() Keybindings {
 		// Terminal mode
 		TerminalToggle: "ctrl+t",
 
-		// Mouse capture toggle. Ctrl+X is unused elsewhere and easy to reach
-		// with one hand before a drag-select; rebindable like any other key.
-		MouseToggle: "ctrl+x",
+		// Mouse capture toggle. Ctrl+Option+Y (Ctrl+Alt+Y) avoids the Ctrl+X
+		// collision with the bookmark-overlay delete and is hard to hit by
+		// accident; rebindable like any other key. Bubble Tea reports the
+		// Option/Alt prefix first, so the stored string is "alt+ctrl+y".
+		MouseToggle: "alt+ctrl+y",
 
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",

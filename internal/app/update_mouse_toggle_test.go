@@ -9,8 +9,9 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// ctrlXKey is the default MouseToggle binding ("ctrl+x").
-var ctrlXKey = tea.KeyMsg{Type: tea.KeyCtrlX}
+// mouseToggleKey is the default MouseToggle binding, Ctrl+Option+Y, which
+// Bubble Tea reports as "alt+ctrl+y" (Alt prefix from the Option/Meta key).
+var mouseToggleKey = tea.KeyMsg{Type: tea.KeyCtrlY, Alt: true}
 
 func TestMouseToggleSuspendsAndResumesCapture(t *testing.T) {
 	m := baseExplorerModel()
@@ -18,13 +19,13 @@ func TestMouseToggleSuspendsAndResumesCapture(t *testing.T) {
 	m.mouseCaptured = true
 
 	// First press suspends capture and emits a command (DisableMouse batch).
-	ret, cmd := m.handleKey(ctrlXKey)
+	ret, cmd := m.handleKey(mouseToggleKey)
 	r := ret.(Model)
 	assert.False(t, r.mouseCaptured, "first toggle suspends mouse capture")
 	assert.NotNil(t, cmd, "suspending capture emits a command")
 
 	// Second press resumes capture.
-	ret2, cmd2 := r.handleKey(ctrlXKey)
+	ret2, cmd2 := r.handleKey(mouseToggleKey)
 	r2 := ret2.(Model)
 	assert.True(t, r2.mouseCaptured, "second toggle resumes mouse capture")
 	assert.NotNil(t, cmd2, "resuming capture emits a command")
@@ -35,7 +36,7 @@ func TestMouseToggleNoOpWhenUnavailable(t *testing.T) {
 	m.mouseAvailable = false
 	m.mouseCaptured = false
 
-	ret, _ := m.handleKey(ctrlXKey)
+	ret, _ := m.handleKey(mouseToggleKey)
 	r := ret.(Model)
 	assert.False(t, r.mouseCaptured, "toggle is a no-op when mouse was never available")
 	assert.Contains(t, r.statusMessage, "disabled", "explains why nothing happened")
@@ -50,7 +51,7 @@ func TestMouseToggleIgnoredDuringViewerSearch(t *testing.T) {
 	m.mouseCaptured = true
 	m.yamlView.searchMode = true
 
-	_, _, handled := m.handleMouseToggleKey(ctrlXKey)
+	_, _, handled := m.handleMouseToggleKey(mouseToggleKey)
 	assert.False(t, handled, "toggle must not fire while a viewer search input is focused")
 }
 
@@ -64,6 +65,6 @@ func TestMouseToggleEmptyBindingDoesNotFire(t *testing.T) {
 	m.mouseAvailable = true
 	m.mouseCaptured = true
 
-	_, _, handled := m.handleMouseToggleKey(ctrlXKey)
+	_, _, handled := m.handleMouseToggleKey(mouseToggleKey)
 	assert.False(t, handled, "no binding means the key is never intercepted")
 }

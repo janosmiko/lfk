@@ -78,7 +78,7 @@ Every contribution is appreciated and helps make LFK sustainable. Thank you for 
 - **Expandable/collapsible resource groups** with `z`
 - **Fullscreen middle column** toggle with `Shift+F`
 - **Vim-style keybindings** throughout (fully customizable via config)
-- **Mouse support**: Click to navigate, scroll wheel to move, `Ctrl+X` toggles mouse capture, Shift+Drag for native terminal text selection
+- **Mouse support**: Click to navigate, scroll wheel scrolls the pane under the pointer, `Ctrl+Option+Y` toggles mouse capture, Shift+Drag for native terminal text selection
 
 ### Cluster Management
 
