@@ -113,7 +113,12 @@ type Keybindings struct {
 	LocalClusterManager string `json:"local_cluster_manager" yaml:"local_cluster_manager"`
 
 	// SecurityIgnoreToggle flips the show/hide-ignored-findings state on
-	// the active security view and triggers a refresh.
+	// the active security view and triggers a refresh. Dispatched only when
+	// the user is on a security view, so it can reuse a key bound elsewhere
+	// (it shadows LabelEditor, which is meaningless on synthetic finding
+	// rows) — mirroring how ClusterColorPicker reuses the Logs key at the
+	// cluster picker. Must not be a terminal control-alias (ctrl+i/m/[);
+	// see TestDefaultKeybindingsNoUnreachableControlAliases.
 	SecurityIgnoreToggle string `json:"security_ignore_toggle" yaml:"security_ignore_toggle"`
 
 	// SecurityBadgeToggle shows/hides the per-resource SEC severity badge on
@@ -177,7 +182,10 @@ func DefaultKeybindings() Keybindings {
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",
 
-		SecurityIgnoreToggle: "ctrl+i",
+		// "i" (not "ctrl+i": a terminal sends ctrl+i as Tab, so that binding
+		// could never fire). Gated to security views in the dispatcher, where
+		// it shadows the otherwise-meaningless LabelEditor ("i").
+		SecurityIgnoreToggle: "i",
 		SecurityBadgeToggle:  "B",
 
 		// Cluster color picker. Bound to Shift+L because the picker only

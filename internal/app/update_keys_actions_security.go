@@ -6,7 +6,27 @@ package app
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// handleExplorerSecurityViewKeys dispatches keys that are only meaningful on a
+// security view. It runs before the general explorer action keys so it can
+// shadow global bindings that make no sense on synthetic finding rows. It
+// currently owns the show-ignored toggle (kb.SecurityIgnoreToggle), which
+// reuses LabelEditor's "i" — the same context-gated reuse ClusterColorPicker
+// applies to the Logs key at the cluster picker. Off a security view it
+// returns handled=false with the model untouched, so the key keeps its normal
+// global meaning everywhere else.
+func (m Model) handleExplorerSecurityViewKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	if !onSecurityView(&m) {
+		return m, nil, false
+	}
+	if msg.String() == ui.ActiveKeybindings.SecurityIgnoreToggle {
+		return m.handleExplorerActionKeySecurityIgnoreToggle()
+	}
+	return m, nil, false
+}
 
 // handleExplorerActionKeySecurityIgnoreToggle flips the show/hide-ignored
 // state, propagates it to the k8s client (which decides whether
