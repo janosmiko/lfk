@@ -655,6 +655,12 @@ var ConfigSecurityEnabled = true
 // defaults to enabled.
 var ConfigSecuritySources = map[string]bool{}
 
+// ConfigSecurityIgnorePatterns holds the declarative, glob-based security
+// ignore rules from the `security.ignore_patterns` config section. Read-only
+// after load; consumed by the app layer's ignore checker alongside the
+// interactive per-cluster ignore-list.
+var ConfigSecurityIgnorePatterns []SecurityIgnorePattern
+
 // ConfigClusterSecurityEnabled maps context names to per-cluster
 // dashboard-enabled overrides; a value here wins over ConfigSecurityEnabled.
 var ConfigClusterSecurityEnabled = map[string]bool{}

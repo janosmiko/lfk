@@ -35,9 +35,6 @@ func (m *Model) loadSecurityStateFromTab(t *TabState) {
 	}
 	m.client.SetShowIgnored(m.showSecurityIgnored)
 	if m.securityIgnores != nil {
-		m.client.SetIgnoreChecker(&modelIgnoreChecker{
-			state: m.securityIgnores,
-			ctx:   m.nav.Context,
-		})
+		m.client.SetIgnoreChecker(newModelIgnoreChecker(m.securityIgnores, m.nav.Context))
 	}
 }

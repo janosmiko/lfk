@@ -356,6 +356,43 @@ type securityConfig struct {
 	// or the internal source ids (trivy-operator, policy-report). Any source
 	// omitted from the map defaults to enabled.
 	Sources map[string]bool `json:"sources" yaml:"sources"`
+	// IgnorePatterns are declarative, glob-based ignore rules applied at load.
+	// They complement the interactive per-cluster ignore-list (managed with
+	// the action menu): config patterns are read-only and cannot be
+	// un-ignored from the UI, but the show-ignored toggle still reveals them.
+	// Honored ONLY in the top-level `security` section — per-cluster scoping
+	// is expressed via each pattern's `cluster` glob. A per-cluster block that
+	// sets ignore_patterns is ignored (with a warning).
+	IgnorePatterns []SecurityIgnorePattern `json:"ignore_patterns" yaml:"ignore_patterns"`
+}
+
+// SecurityIgnorePattern is a declarative ignore rule from the config file.
+// Each field is a glob (`*` and `?`); an empty field matches anything. A
+// finding is ignored when every non-empty field matches it. A pattern with
+// every field empty is treated as a no-op (skipped) to avoid silently hiding
+// all findings.
+type SecurityIgnorePattern struct {
+	// Cluster globs the kube-context name. Empty = any cluster.
+	Cluster string `json:"cluster,omitempty" yaml:"cluster,omitempty"`
+	// Source globs the security source id (heuristic, trivy-operator,
+	// policy-report, falco, ...). Empty = any source.
+	Source string `json:"source,omitempty" yaml:"source,omitempty"`
+	// Group globs the finding group key (CVE id, check label, rule name).
+	// Empty = any group.
+	Group string `json:"group,omitempty" yaml:"group,omitempty"`
+	// Namespace globs the resource namespace. Empty (or `*`) = any namespace,
+	// which hides the whole group; a specific value scopes the ignore to that
+	// namespace only. Cluster-scoped findings have an empty namespace.
+	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	// Comment is a free-text note explaining why the rule exists.
+	Comment string `json:"comment,omitempty" yaml:"comment,omitempty"`
+}
+
+// IsEmpty reports whether the pattern has no match constraints (every glob
+// field empty). Such a pattern would match every finding, so it is dropped at
+// load and skipped at match time.
+func (p SecurityIgnorePattern) IsEmpty() bool {
+	return p.Cluster == "" && p.Source == "" && p.Group == "" && p.Namespace == ""
 }
 
 // RightsizingDefaultsConfig is the on-disk schema for the

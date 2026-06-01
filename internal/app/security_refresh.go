@@ -110,10 +110,7 @@ func (m *Model) refreshSecuritySources() {
 	if m.client != nil {
 		m.client.SetSecurityManager(mgr)
 		if m.securityIgnores != nil {
-			m.client.SetIgnoreChecker(&modelIgnoreChecker{
-				state: m.securityIgnores,
-				ctx:   resolvedCtx,
-			})
+			m.client.SetIgnoreChecker(newModelIgnoreChecker(m.securityIgnores, resolvedCtx))
 		}
 		m.client.SetShowIgnored(m.showSecurityIgnored)
 	}

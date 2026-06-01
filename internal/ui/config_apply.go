@@ -211,6 +211,16 @@ func applySecurityConfig(cfg configFile) {
 	if cfg.Security.Sources != nil {
 		ConfigSecuritySources = cfg.Security.Sources
 	}
+	// Drop all-empty patterns so an accidental blank list item can't hide
+	// every finding.
+	patterns := make([]SecurityIgnorePattern, 0, len(cfg.Security.IgnorePatterns))
+	for _, p := range cfg.Security.IgnorePatterns {
+		if p.IsEmpty() {
+			continue
+		}
+		patterns = append(patterns, p)
+	}
+	ConfigSecurityIgnorePatterns = patterns
 }
 
 // applyDataAccessConfig applies the cluster-data-access settings:
@@ -308,6 +318,14 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 				}
 				if cc.Security.Sources != nil {
 					ConfigClusterSecuritySources[ctx] = cc.Security.Sources
+				}
+				// ignore_patterns is honored only in the top-level security
+				// section; per-cluster scoping is expressed via each pattern's
+				// `cluster` glob instead. Warn rather than silently drop.
+				if len(cc.Security.IgnorePatterns) > 0 {
+					logger.Warn("clusters.<ctx>.security.ignore_patterns is ignored; "+
+						"set ignore_patterns at the top-level security section and use the per-pattern 'cluster' glob",
+						"context", ctx)
 				}
 			}
 			if len(cc.Views) > 0 {

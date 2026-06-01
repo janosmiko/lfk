@@ -103,10 +103,48 @@ clusters:
 
 ## Ignoring findings
 
-Each cluster has an ignore-list so known/accepted findings can be hidden.
+Known/accepted findings can be hidden so the dashboard surfaces only what still
+needs attention. Two mechanisms exist, applied together: an **interactive
+per-cluster ignore-list** and **declarative config-file patterns**.
+
+### Interactive (action menu)
+
+On a finding group or an affected resource, press `x` to open the action menu.
+The available scopes depend on the row:
+
+| Action | Scope |
+|---|---|
+| Ignore (Group) | Hide the finding across the whole cluster |
+| Ignore (Namespace) | Hide the finding for every resource in the selected row's namespace |
+| Ignore (This Resource) | Hide the finding for one specific resource |
+| Un-ignore | Remove the most specific matching rule (resource → namespace → group) |
 
 | Key | Action |
 |---|---|
-| `Ctrl+I` | Toggle show/hide ignored findings on the active security view |
+| `i` | Toggle show/hide ignored findings (only on a security view) |
+| `x` | Open the action menu to ignore/un-ignore the selected finding |
 
-The ignore-list is stored per cluster and persists across sessions.
+The interactive ignore-list is stored per cluster in
+`$XDG_STATE_HOME/lfk/security_ignores.yaml` (default `~/.local/state/lfk/`) and
+persists across sessions.
+
+### Declarative (config file)
+
+`security.ignore_patterns` in the config file defines glob-based rules applied
+at startup — useful for org-wide accepted findings. Each field is a glob (`*`,
+`?`); an empty field matches anything. A finding is ignored when every non-empty
+field matches it.
+
+```yaml
+security:
+  ignore_patterns:
+    - source: trivy-operator    # source id; "" = any
+      group: "CVE-2024-*"       # CVE id / check label / rule name; "" = any
+      namespace: kube-system    # "" or "*" = any namespace (hides the whole group)
+      cluster: "prod-*"         # kube-context glob; "" = any cluster
+      comment: accepted in system namespaces
+```
+
+Config patterns are read-only — they cannot be un-ignored from the action menu —
+but the `i` toggle still reveals findings they hide. A pattern with every field
+empty is ignored (it would otherwise hide everything).

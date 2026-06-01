@@ -62,7 +62,12 @@ func (m Model) openSecurityActionMenu() Model {
 	case "__security_affected_resource__":
 		groupKey := sel.Extra
 		resourceKey := sel.ColumnValue("__resource_key__")
+		namespace := sel.Namespace
 		groupIgnored := isGroupIgnored(m.securityIgnores, kctx, sourceName, groupKey)
+		nsIgnored := isNamespaceIgnored(m.securityIgnores, kctx, sourceName, groupKey, namespace)
+		// resourceIgnored is true when ANY scope (group / namespace / resource)
+		// already hides this row, so the "Ignore (...)" entries only offer
+		// strictly-broader scopes the user hasn't applied yet.
 		resourceIgnored := isResourceIgnored(m.securityIgnores, kctx, sourceName, groupKey, resourceKey)
 		if !groupIgnored {
 			items = append(items, model.Item{
@@ -71,7 +76,14 @@ func (m Model) openSecurityActionMenu() Model {
 				Status: "i",
 			})
 		}
-		if !resourceIgnored && !groupIgnored && resourceKey != "" {
+		if namespace != "" && !groupIgnored && !nsIgnored {
+			items = append(items, model.Item{
+				Name:   "Ignore (Namespace)",
+				Extra:  "Hide this finding for all resources in " + namespace,
+				Status: "n",
+			})
+		}
+		if !resourceIgnored && resourceKey != "" {
 			items = append(items, model.Item{
 				Name:   "Ignore (This Resource)",
 				Extra:  "Hide this specific resource from the group",
@@ -100,8 +112,9 @@ func (m Model) openSecurityActionMenu() Model {
 }
 
 // executeSecurityIgnoreAction handles Ignore / Un-ignore actions emitted by
-// openSecurityActionMenu. It mutates SecurityIgnoreState, dispatches the
-// disk persistence asynchronously (so an fsync stall on slow disks does
+// openSecurityActionMenu. It replaces m.securityIgnores with a new
+// SecurityIgnoreState (the add/remove helpers never mutate in place),
+// dispatches the disk persistence asynchronously (so an fsync stall on slow disks does
 // not freeze the UI), re-installs the IgnoreChecker on the client, busts
 // the manager cache, and refreshes the current level so the user sees the
 // result immediately. Persistence failures arrive via
@@ -124,6 +137,19 @@ func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.C
 		})
 		m.setStatusMessage("Ignored: "+groupKey, false)
 
+	case "Ignore (Namespace)":
+		namespace := sel.Namespace
+		if namespace == "" {
+			m.setStatusMessage("Cannot determine namespace", true)
+			return m, scheduleStatusClear()
+		}
+		m.securityIgnores = addSecurityIgnore(m.securityIgnores, kctx, SecurityIgnoreRule{
+			Source:    sourceName,
+			GroupKey:  groupKey,
+			Namespace: namespace,
+		})
+		m.setStatusMessage("Ignored in namespace "+namespace+": "+groupKey, false)
+
 	case "Ignore (This Resource)":
 		resourceKey := sel.ColumnValue("__resource_key__")
 		if resourceKey == "" {
@@ -138,22 +164,31 @@ func (m Model) executeSecurityIgnoreAction(actionLabel string) (tea.Model, tea.C
 		m.setStatusMessage("Ignored resource: "+resourceKey, false)
 
 	case "Un-ignore":
-		// Decide whether the un-ignore targets the per-resource rule or
-		// the group-level rule: prefer per-resource when it exists,
-		// otherwise drop the group rule.
-		resourceKey := ""
+		// Peel back the most specific matching rule first: resource, then
+		// namespace, then the cluster-wide group rule. Config-file glob
+		// ignores are read-only and intentionally not removable here.
+		namespace, resourceKey, rk := "", "", ""
 		if sel.Kind == "__security_affected_resource__" {
-			resourceKey = sel.ColumnValue("__resource_key__")
-			if !isResourceSpecificIgnored(m.securityIgnores, kctx, sourceName, groupKey, resourceKey) {
-				resourceKey = ""
+			rk = sel.ColumnValue("__resource_key__")
+			switch {
+			case isResourceSpecificIgnored(m.securityIgnores, kctx, sourceName, groupKey, rk):
+				resourceKey = rk
+			case isNamespaceIgnored(m.securityIgnores, kctx, sourceName, groupKey, sel.Namespace):
+				namespace = sel.Namespace
 			}
 		}
-		m.securityIgnores = removeSecurityIgnore(m.securityIgnores, kctx, sourceName, groupKey, resourceKey)
-		m.setStatusMessage("Un-ignored: "+groupKey, false)
+		m.securityIgnores = removeSecurityIgnore(m.securityIgnores, kctx, sourceName, groupKey, namespace, resourceKey)
+		msg := "Un-ignored: " + groupKey
+		// If a broader rule (or a read-only config pattern) still hides this
+		// row, say so — a bare "Un-ignored" would be misleading.
+		if rk != "" && isResourceIgnored(m.securityIgnores, kctx, sourceName, groupKey, rk) {
+			msg += " (still hidden by a broader rule)"
+		}
+		m.setStatusMessage(msg, false)
 	}
 
 	if m.client != nil {
-		m.client.SetIgnoreChecker(&modelIgnoreChecker{state: m.securityIgnores, ctx: kctx})
+		m.client.SetIgnoreChecker(newModelIgnoreChecker(m.securityIgnores, kctx))
 	}
 	if m.securityManager != nil {
 		m.securityManager.Invalidate()
@@ -182,7 +217,7 @@ func (m Model) dispatchSecurityActionIfApplicable(actionLabel string) (tea.Model
 		return m, nil, false
 	}
 	switch actionLabel {
-	case "Ignore (Group)", "Ignore (This Resource)", "Un-ignore":
+	case "Ignore (Group)", "Ignore (Namespace)", "Ignore (This Resource)", "Un-ignore":
 		mdl, cmd := m.executeSecurityIgnoreAction(actionLabel)
 		return mdl, cmd, true
 	case "Refresh":

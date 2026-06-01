@@ -36,6 +36,7 @@ The configuration file is located at `~/.config/lfk/config.yaml`. All fields are
 | `clusters.<name>.read_only` | bool | _(unset)_ | Per-context read-only override. Wins over the global `read_only` so you can mark specific clusters (e.g. `prod`) read-only while leaving others mutable. |
 | `security.enabled` | bool | `true` | Enable the built-in security findings dashboard (Security category + SEC badge). `false` turns the dashboard and all source probing off. Per-context overrides under `clusters.<name>.security` take precedence. See [Security Dashboard](security.md). |
 | `security.sources.<name>` | bool | `true` | Enable/disable individual sources (`heuristic`, `trivy`, `kyverno`, `kubescape`, `falco`, `gatekeeper`). A source omitted from the map stays enabled. |
+| `security.ignore_patterns` | list | _(empty)_ | Declarative glob-based ignore rules applied at load. Each entry has `cluster`, `source`, `group`, `namespace` (globs; empty = any) and an optional `comment`. A finding is hidden when every non-empty field matches. An all-empty entry is dropped. Read-only (not un-ignorable from the UI); the `i` toggle still reveals them. |
 | `clusters.<name>.security` | object | _(unset)_ | Per-context security override (`enabled` and/or `sources`). Wins over the global `security` settings for that context. |
 | `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. Much faster in clusters with many Helm release secrets (each release is a multi-hundred-KB Secret) or large TLS payloads, at the cost of an extra GET per hovered Secret. When `false` (default), Secrets list like every other resource type — full objects are pulled and `data` is eagerly decoded, so the Type column and decoded values are visible immediately. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
 | `informer_cache` | bool or string | `auto` | Selects the list strategy. Accepts `off` (round-trip every list — matches kubectl), `auto` (default; promote a resource type to a shared informer once a list crosses 1000 items, demote when sustained below 500), and `always` (open a watch eagerly on first use). Legacy bool form is still accepted: `true` → `always`, `false` → `off`. See [Informer cache](#informer-cache) for trade-offs. |
@@ -182,6 +183,13 @@ security:
   sources:
     falco: false           # disable Falco everywhere
 
+  ignore_patterns:        # declarative, glob-based ignore rules (applied at load)
+    - source: trivy-operator
+      group: "CVE-2024-*"  # CVE id / check label / rule name
+      namespace: kube-system  # "" or "*" = any namespace (hides the whole group)
+      cluster: "prod-*"    # kube-context glob; "" = any cluster
+      comment: accepted in system namespaces
+
 clusters:
   prod:
     security:
@@ -192,8 +200,11 @@ clusters:
         trivy: false       # keep the dashboard, drop Trivy on staging only
 ```
 
-Precedence: `clusters.<ctx>.security.*` overrides the global `security.*`. See
-[Security Dashboard](security.md) for the source catalog and behavior.
+Precedence: `clusters.<ctx>.security.*` overrides the global `security.*`. The
+interactive per-cluster ignore-list (action menu) and `ignore_patterns` are
+applied together; config patterns are read-only. See
+[Security Dashboard](security.md) for the source catalog, ignore scopes, and
+behavior.
 
 ## API client rate limits
 
