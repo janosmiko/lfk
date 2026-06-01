@@ -315,7 +315,7 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	// findings (stale-while-revalidate), so nil-ing after would discard it.
 	m.securityIndex = nil
 	m.securityActiveGroup = ""
-	m.refreshSecuritySources()
+	securitySeedCmd := m.refreshSecuritySources()
 	m.nav.Level = model.LevelResourceTypes
 	// Capture whatever the right-pane preview was already displaying for
 	// this context (real discovery hit or seed fallback). We use this
@@ -351,6 +351,9 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.setStatusMessage(fmt.Sprintf("Context: %s", sel.Name), false)
 	m.saveCurrentSession()
 	cmds := []tea.Cmd{m.loadPreview(), scheduleStatusClear()}
+	if securitySeedCmd != nil {
+		cmds = append(cmds, securitySeedCmd)
+	}
 	// Security availability is probed lazily on first focus of the Security
 	// category (maybeProbeSecurityOnFocus), not eagerly on context switch, so
 	// switching clusters never triggers the aws credential plugin for a user

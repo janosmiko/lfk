@@ -5,6 +5,8 @@
 package app
 
 import (
+	tea "github.com/charmbracelet/bubbletea"
+
 	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/security/falco"
 	"github.com/janosmiko/lfk/internal/security/gatekeeper"
@@ -21,7 +23,12 @@ import (
 // fresh manager is wired into the k8s.Client and published to the
 // package-level hook state so model.SecuritySourcesFn picks it up on the
 // next sidebar render.
-func (m *Model) refreshSecuritySources() {
+// The returned command, when non-nil, reads the per-host findings cache off the
+// Update goroutine and emits securityFindingsSeedMsg to paint the SEC badges
+// (stale-while-revalidate). Callers must dispatch it; NewModel stores it for
+// Init to fire. Reading that cache inline here used to freeze the UI for seconds
+// on clusters with a large findings cache.
+func (m *Model) refreshSecuritySources() tea.Cmd {
 	// The manager is rebuilt below, so any prior probe for this slot is moot.
 	// Clearing the guard lets maybeProbeSecurityOnFocus re-probe the new (or
 	// re-selected) context the next time the user focuses the Security
@@ -46,7 +53,7 @@ func (m *Model) refreshSecuritySources() {
 			m.client.SetSecurityManager(nil)
 		}
 		setSecurityHookState(nil, nil)
-		return
+		return nil
 	}
 	mgr := security.NewManager()
 	if m.client != nil {
@@ -82,6 +89,7 @@ func (m *Model) refreshSecuritySources() {
 	// Seed availability from the per-host disk cache so the sidebar
 	// shows real entries immediately on subsequent runs. A nil/empty
 	// result triggers the loader entry until the live probe completes.
+	seedFindings := false
 	if cached := loadSecurityAvailabilityCacheForContext(m.client, resolvedCtx); len(cached) > 0 {
 		m.securityAvailabilityByName = cached
 		// Publish the cached availability as the manager's hint so an eager
@@ -92,18 +100,11 @@ func (m *Model) refreshSecuritySources() {
 		// with no new probe; an as-yet-uninspected cluster has no cache and
 		// stays fully lazy.
 		mgr.SetAvailability(resolvedCtx, cached)
-		// Stale-while-revalidate: paint SEC badges instantly from the
-		// last session's findings while the eager scan revalidates in the
-		// background (maybeEagerSecurityScan, fired at cluster open, replaces
-		// the index when fresh results land). Keyed by the effective
-		// namespace so the seed matches what the scan will fetch. A miss
-		// (no cache / expired) just leaves the index nil until the scan
-		// completes — the pre-cache behavior.
-		if cachedFindings := loadSecurityFindingsCacheForContext(
-			m.client, resolvedCtx, m.effectiveNamespace(), securityFindingsCacheTTL,
-		); cachedFindings != nil {
-			m.securityIndex = security.BuildFindingIndex(cachedFindings)
-		}
+		// A cached availability means this cluster was inspected before, so its
+		// findings cache is worth reading for the stale-while-revalidate badge
+		// seed. The read itself is deferred to securityFindingsSeedCmd (below)
+		// because the cache file can be tens of MB.
+		seedFindings = true
 	} else {
 		m.securityAvailabilityByName = make(map[string]bool)
 	}
@@ -116,4 +117,33 @@ func (m *Model) refreshSecuritySources() {
 	}
 	// Publish to the hook state so SecuritySourcesFn reads the new data.
 	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)
+	if !seedFindings {
+		return nil
+	}
+	return m.securityFindingsSeedCmd(resolvedCtx, m.effectiveNamespace())
+}
+
+// securityFindingsSeedCmd reads the per-host findings cache and builds the SEC
+// badge index OFF the Update goroutine, delivering the result as a
+// securityFindingsSeedMsg. The per-host cache file can be tens of MB on
+// clusters with many findings; decoding it inline (the previous behavior in
+// refreshSecuritySources) froze the UI for seconds at startup and on
+// context/tab switch. Returns nil when no client is wired. A cache miss yields
+// a nil message, which Bubble Tea drops.
+func (m *Model) securityFindingsSeedCmd(resolvedCtx, namespace string) tea.Cmd {
+	client := m.client
+	if client == nil {
+		return nil
+	}
+	return func() tea.Msg {
+		cached := loadSecurityFindingsCacheForContext(client, resolvedCtx, namespace, securityFindingsCacheTTL)
+		if cached == nil {
+			return nil
+		}
+		return securityFindingsSeedMsg{
+			context:   resolvedCtx,
+			namespace: namespace,
+			index:     security.BuildFindingIndex(cached),
+		}
+	}
 }

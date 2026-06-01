@@ -38,7 +38,13 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
 	m := Model{
-		client:                     client,
+		client: client,
+		// Start in the loading state. Init() dispatches loadContexts()
+		// asynchronously, so the first frame renders before any
+		// contextsLoadedMsg arrives; loading=false there falls through to the
+		// "No items" / "No resource types found" empty states until the reply
+		// lands. The loaded-message handlers clear the flag once data arrives.
+		loading:                    true,
 		nav:                        model.NavigationState{Level: model.LevelClusters},
 		bookmarks:                  loadBookmarks(),
 		pendingSession:             loadSession(),
@@ -194,7 +200,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	// publishes it to the hook state.
 	installSecuritySourcesHook()
 	m.securityIgnores = loadSecurityIgnores()
-	m.refreshSecuritySources()
+	m.initialSecuritySeedCmd = m.refreshSecuritySources()
 
 	// Mirror main.go's startup mouse decision: capture is on unless the
 	// --no-mouse flag was set or config disabled it. The toggle keybinding

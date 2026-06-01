@@ -288,6 +288,26 @@ func (m Model) updateSecurityFindingsLoaded(msg securityFindingsLoadedMsg) (Mode
 	return m, persist
 }
 
+// updateSecurityFindingsSeed applies the disk-cached SEC badge seed delivered
+// by securityFindingsSeedCmd. It is stale-while-revalidate: the seed is applied
+// only when no live scan has populated the index yet (m.securityIndex == nil)
+// and the context still matches, so a freshly-scanned index is never clobbered
+// by older cached data, and another cluster's findings never paint here. A nil
+// index is a cache miss and is ignored.
+func (m Model) updateSecurityFindingsSeed(msg securityFindingsSeedMsg) Model {
+	if msg.index == nil {
+		return m
+	}
+	if m.securityIndex != nil {
+		return m // a live scan already won; do not regress to stale data
+	}
+	if m.nav.Context != "" && msg.context != m.nav.Context {
+		return m
+	}
+	m.securityIndex = msg.index
+	return m
+}
+
 // loadSecurityAffectedResources fetches the resources affected by a
 // finding group and emits them as an ownedLoadedMsg so the existing
 // LevelOwned rendering picks them up. The group key comes from the
