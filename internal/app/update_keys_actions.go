@@ -137,8 +137,10 @@ func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)
 // handleExplorerActionKeyToggleRare toggles the global ShowRareResources
 // flag. When enabled, the sidebar surfaces curated entries marked Rare
 // (CSI internals, admission webhooks, etc.) plus uncategorized core
-// Kubernetes resources under the synthetic "Advanced" category. The state
-// is not persisted and resets on each launch.
+// Kubernetes resources under the synthetic "Advanced" category. It also
+// reveals resource types the user hid (rendered dimmed) so they can be
+// un-hidden via the action menu. The state is not persisted and resets on
+// each launch.
 func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 	m.showRareResources = !m.showRareResources
 	model.ShowRareResources = m.showRareResources
@@ -184,9 +186,9 @@ func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 	}
 
 	if m.showRareResources {
-		m.setStatusMessage("Rarely used resource types: ON", false)
+		m.setStatusMessage("Rarely used + hidden resource types: ON", false)
 	} else {
-		m.setStatusMessage("Rarely used resource types: OFF", false)
+		m.setStatusMessage("Rarely used + hidden resource types: OFF", false)
 	}
 	return m, scheduleStatusClear(), true
 }

@@ -96,7 +96,9 @@ func togglePinnedUnionSetType(s *PinnedState, unionSet, typeKey string) bool {
 }
 
 func togglePinnedTypeIn(scope map[string][]string, key, typeKey string) bool {
-	keys := scope[key]
+	// Copy before mutating so we never shift elements in a backing array that
+	// another slice header might still reference (e.g. an undo snapshot).
+	keys := append([]string(nil), scope[key]...)
 	for i, k := range keys {
 		if k == typeKey {
 			// Remove (unpin).

@@ -432,6 +432,14 @@ func RenderColumn(header string, items []model.Item, cursor int, width, height i
 				line += strings.Repeat(" ", width-lineWidth)
 			}
 			line = ParentHighlightStyle.MaxWidth(width).Render(line)
+		case (item.Hidden || item.Rare) && !isActive:
+			// Normally-hidden type (user-hidden or rarely-used) surfaced in a
+			// parent column: render the plain (no inner ANSI) text so DimStyle
+			// applies uniformly — inner Render resets would otherwise cancel
+			// the outer dim mid-line.
+			line = DimStyle.Width(width).MaxWidth(width).Render(FormatItemNameOnlyPlain(item, width))
+		case item.Hidden || item.Rare:
+			line = DimStyle.Width(width).MaxWidth(width).Render(FormatItemPlain(item, width))
 		case !isActive:
 			// Inactive columns (parent/child): show name only.
 			line = FormatItemNameOnly(item, width)

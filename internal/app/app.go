@@ -640,7 +640,8 @@ type Model struct {
 	// Overlay to restore when the current closes — set when a nested overlay flow opens (e.g., RBAC → namespace selector → back to RBAC).
 	previousOverlay overlayKind
 
-	pinnedState    *PinnedState // per-context pinned CRD groups state
+	pinnedState    *PinnedState      // per-context pinned CRD groups state
+	hiddenState    *HiddenTypesState // per-context hidden resource types state
 	portForwardMgr *k8s.PortForwardManager
 	captureMgr     *k8s.CaptureManager // tracks active packet capture processes
 	captureOverlay captureOverlayState

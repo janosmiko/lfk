@@ -17,7 +17,8 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping in the Events list |
 | `p` | Pin/unpin resource type (at resource types level) |
-| `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar (resets each launch) |
+| `x` | At resource types level: pin/unpin or hide/show the selected resource type via the action menu (saved per cluster context / union set) |
+| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed (rare toggle resets each launch; per-type hides persist) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the cluster-wide orphan overview overlay |

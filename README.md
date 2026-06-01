@@ -74,7 +74,8 @@ Every contribution is appreciated and helps make LFK sustainable. Thank you for 
 - **Resource groups**: Dashboards, Workloads, Networking, Config, Storage, ArgoCD, Helm, Access Control, Cluster, Custom Resources
 - **Pinned resource types**: Pin individual resource types (built-in or CRD) into a "Pinned" section at the top of the list, below the dashboards. Configurable via `pinned_types` in config (legacy `pinned_groups` also supported) or interactively with `p` key (stored per-context or per named union set)
 - **CRD categories**: Discovered CRDs are grouped by API group name (e.g., `argoproj.io`, `longhorn.io`, `networking.istio.io`)
-- **Hide rarely used resources**: CSI internals, admission webhooks, APF, leases, runtime classes, and uncategorized core resources are hidden by default. Press `H` to surface them under their categories and an "Advanced" group (resets each launch)
+- **Hide rarely used resources**: CSI internals, admission webhooks, APF, leases, runtime classes, and uncategorized core resources are hidden by default. Press `H` to surface them (dimmed) under their categories and an "Advanced" group (resets each launch)
+- **Hide individual resource types**: At the resource types level, open the action menu (`x`) on a type to hide or show it. Hidden types are saved per cluster context (or named union set) and stay hidden across restarts. Press `H` to reveal hidden types dimmed so you can un-hide them
 - **Expandable/collapsible resource groups** with `z`
 - **Fullscreen middle column** toggle with `Shift+F`
 - **Vim-style keybindings** throughout (fully customizable via config)
@@ -249,7 +250,8 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Enter` | Open full-screen YAML view / navigate into |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping (Events view) |
 | `p` | Pin/unpin resource type (at resource types level) |
-| `H` | Toggle rarely used resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar |
+| `x` | At resource types level: pin/unpin or hide/show the selected resource type (saved per cluster context / union set) |
+| `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
 | `o` | Jump to owner/controller of selected resource |

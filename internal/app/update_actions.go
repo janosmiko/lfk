@@ -25,6 +25,9 @@ func (m Model) openActionMenu() Model { //nolint:gocyclo // dispatcher; complexi
 	if m.nav.Level == model.LevelClusters {
 		return m.openClusterPickerActionMenu()
 	}
+	if m.nav.Level == model.LevelResourceTypes {
+		return m.openResourceTypeActionMenu()
+	}
 	return m.openResourceActionMenu()
 }
 
@@ -312,6 +315,17 @@ func (m Model) directActionScale() (tea.Model, tea.Cmd) {
 
 func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
+
+	// Pinning and hiding a resource type are local sidebar preferences, not
+	// cluster mutations. Dispatch them before the read-only / union guards
+	// below so those (which key off a resource kind) never block them. Both
+	// handlers no-op outside LevelResourceTypes.
+	switch actionLabel {
+	case actionLabelHideType, actionLabelShowType:
+		return m.toggleHiddenResourceType()
+	case actionLabelPinType, actionLabelUnpinType:
+		return m.handleKeyPinGroup()
+	}
 
 	// Cluster-picker actions live outside the kind-based machinery: they
 	// don't have an actionCtx and there is no resource type at this level.
