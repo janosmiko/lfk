@@ -27,6 +27,12 @@ func (m Model) Init() tea.Cmd {
 	// (metrics-server unreachable, RBAC denied, ...) reach the in-app
 	// log overlay instead of only the on-disk file.
 	cmds = append(cmds, waitForLoggerUI())
+	// Dispatch the SEC-badge findings-cache seed produced during NewModel. The
+	// disk read runs off the Update goroutine; refreshSecuritySources returns
+	// nil when security is disabled or no findings cache applies.
+	if m.initialSecuritySeedCmd != nil {
+		cmds = append(cmds, m.initialSecuritySeedCmd)
+	}
 	if m.watchMode {
 		cmds = append(cmds, scheduleWatchTick(m.watchInterval))
 	}

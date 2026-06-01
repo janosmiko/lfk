@@ -109,6 +109,8 @@ func (m Model) updateResourceMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) { //nol
 	case securityFindingsLoadedMsg:
 		mdl, cmd := m.updateSecurityFindingsLoaded(msg)
 		return mdl, cmd, true
+	case securityFindingsSeedMsg:
+		return m.updateSecurityFindingsSeed(msg), nil, true
 	case securityIgnoresSaveErrMsg:
 		mdl, cmd := m.updateSecurityIgnoresSaveErr(msg)
 		return mdl, cmd, true
