@@ -83,9 +83,9 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.Button {
 	case tea.MouseButtonWheelUp:
-		return m.moveCursor(-3)
+		return m.handleExplorerWheel(msg.X, -3)
 	case tea.MouseButtonWheelDown:
-		return m.moveCursor(3)
+		return m.handleExplorerWheel(msg.X, 3)
 	case tea.MouseButtonLeft:
 		if msg.Action != tea.MouseActionPress {
 			return m, nil
@@ -98,6 +98,35 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 		return m.handleMouseRightClick(msg.X, msg.Y)
 	}
 	return m, nil
+}
+
+// handleExplorerWheel routes a wheel tick to the pane under the pointer
+// at x. The right pane scrolls its preview content; the left and middle
+// panes move the row cursor — the whole-window behaviour the wheel had
+// before per-pane routing existed (issue #319 b). delta is the signed
+// line count (negative scrolls up, positive scrolls down).
+//
+// In fullscreen, columnBoundaries collapses to (0, m.width) so x can
+// never reach the right pane and the wheel keeps moving the cursor,
+// preserving the prior fullscreen behaviour.
+func (m Model) handleExplorerWheel(x, delta int) (tea.Model, tea.Cmd) {
+	_, middleEnd := m.columnBoundaries()
+	if x >= middleEnd {
+		// Right pane: scroll the preview, mirroring the PreviewUp/PreviewDown
+		// keys (J/K). Scroll-up is a plain decrement with a zero floor;
+		// scroll-down increments and clamps to the rendered content height.
+		m.previewScroll += delta
+		if delta < 0 {
+			if m.previewScroll < 0 {
+				m.previewScroll = 0
+			}
+		} else {
+			m.clampPreviewScroll()
+		}
+		return m, nil
+	}
+	// Left and middle panes: move the selection cursor.
+	return m.moveCursor(delta)
 }
 
 // columnBoundaries returns the x boundaries between left/middle and

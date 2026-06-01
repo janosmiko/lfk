@@ -82,6 +82,60 @@ func TestMouseWheelDownMovesDown(t *testing.T) {
 	assert.Greater(t, result.cursor(), 0)
 }
 
+// --- handleMouse: explorer per-pane wheel routing ---
+
+// Wheel over the right (preview) pane scrolls the preview content, not the
+// row cursor. Before per-pane routing the wheel always moved the middle
+// cursor regardless of where the pointer was (issue #319 b).
+func TestMouseWheelOverRightPaneScrollsPreview(t *testing.T) {
+	m := baseExplorerModel() // width=120 -> middleEnd=75
+	m.setCursor(2)
+	m.previewScroll = 10
+
+	// X=100 is the right pane (>= middleEnd).
+	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: 100})
+	result := ret.(Model)
+	assert.Equal(t, 2, result.cursor(), "wheel over right pane must not move the row cursor")
+	assert.Equal(t, 7, result.previewScroll, "wheel up over right pane scrolls the preview up by 3")
+}
+
+func TestMouseWheelDownOverRightPaneKeepsCursor(t *testing.T) {
+	m := baseExplorerModel()
+	m.setCursor(2)
+	m.previewScroll = 0
+
+	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 100})
+	result := ret.(Model)
+	assert.Equal(t, 2, result.cursor(), "wheel down over right pane must not move the row cursor")
+}
+
+// Wheel up over the right pane never scrolls the preview below zero.
+func TestMouseWheelOverRightPaneFloorsAtZero(t *testing.T) {
+	m := baseExplorerModel()
+	m.previewScroll = 1
+
+	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: 100})
+	result := ret.(Model)
+	assert.Equal(t, 0, result.previewScroll, "preview scroll floors at 0")
+}
+
+// Wheel over the middle pane still moves the selection cursor.
+func TestMouseWheelOverMiddlePaneMovesCursor(t *testing.T) {
+	items := make([]model.Item, 20)
+	for i := range items {
+		items[i] = model.Item{Name: "pod", Kind: "Pod"}
+	}
+	m := baseExplorerModel()
+	m.middleItems = items
+	m.setCursor(0)
+
+	// X=30 is the middle pane (leftEnd=15 <= 30 < middleEnd=75).
+	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 30})
+	result := ret.(Model)
+	assert.Greater(t, result.cursor(), 0, "wheel over middle pane moves the cursor")
+	assert.Equal(t, 0, result.previewScroll, "wheel over middle pane does not touch preview scroll")
+}
+
 // --- handleMouse: log viewer scroll ---
 
 func TestMouseWheelUpInLogMode(t *testing.T) {
