@@ -22,6 +22,12 @@ var ActiveSecurityIndex *security.FindingIndex
 // must not be rendered even if an index happens to be populated.
 var ActiveSecurityAvailable bool
 
+// ActiveSecurityBadgesHidden suppresses the SEC row badge when the user has
+// toggled it off (kb.SecurityBadgeToggle). Set from Model.hideSecurityBadges
+// by the app layer each render. Independent of ActiveSecurityAvailable so the
+// Security dashboard and source probing keep working while badges are hidden.
+var ActiveSecurityBadgesHidden bool
+
 // Severity badge symbols (monochrome width = 1 each).
 const (
 	securityBadgeCritical = "\u25cf" // ● filled circle
@@ -31,36 +37,46 @@ const (
 
 // securityBadgeFor returns a styled severity badge for the given resource,
 // or an empty string when idx is nil or the resource has zero findings.
-// The badge format is "<symbol><total>" (e.g. "●3"), with color driven by
-// the highest severity in the bucket.
+// The badge format is "<symbol><worst-count>" (e.g. "●3": 3 criticals), with
+// both glyph and color driven by the highest severity present. Only the
+// worst-severity count is shown — lower-severity findings are surfaced in the
+// Security dashboard, not on the glance-level row badge.
 func securityBadgeFor(idx *security.FindingIndex, ref security.ResourceRef) string {
 	if idx == nil {
 		return ""
 	}
-	counts := idx.For(ref)
-	if counts.Total() == 0 {
-		return ""
-	}
-	sym, style := securityBadgeSymbolStyle(counts.Highest())
-	if sym == "" {
-		return ""
-	}
-	return style.Render(sym + strconv.Itoa(counts.Total()))
+	return securityBadgeStyled(idx.For(ref))
 }
 
-// securityBadgePlain returns the plain (ANSI-free) text that
-// securityBadgeFor would produce for the given counts. Exported only to the
-// package for width math and test assertions.
+// securityBadgeStyled renders the styled badge for the given counts, or an
+// empty string when there are no findings. It is the single styling path
+// shared by the resource-ref and model.Item entry points.
+func securityBadgeStyled(counts security.SeverityCounts) string {
+	plain := securityBadgePlain(counts)
+	if plain == "" {
+		return ""
+	}
+	_, style := securityBadgeSymbolStyle(counts.Highest())
+	return style.Render(plain)
+}
+
+// securityBadgePlain returns the plain (ANSI-free) badge text for the given
+// counts. It is the single source of truth for the badge string used by both
+// the styled renderers and the name-column width math.
+//
+// The badge shows only the worst-severity count (e.g. "●3" = 3 criticals), so
+// a red "●" badge can never be misread as a total across all severities. The
+// full per-tier breakdown lives in the Security dashboard.
 func securityBadgePlain(counts security.SeverityCounts) string {
-	total := counts.Total()
-	if total == 0 {
+	worst := counts.HighestCount()
+	if worst == 0 {
 		return ""
 	}
 	sym, _ := securityBadgeSymbolStyle(counts.Highest())
 	if sym == "" {
 		return ""
 	}
-	return sym + strconv.Itoa(total)
+	return sym + strconv.Itoa(worst)
 }
 
 // securityBadgeSymbolStyle maps a severity to a (symbol, style) pair. The
@@ -102,25 +118,17 @@ func itemSecurityRef(item *model.Item) security.ResourceRef {
 // (which reference the Deployment, not individual Pods) surface on
 // Pod rows too.
 func securityBadgeForItem(item *model.Item) string {
-	if !ActiveSecurityAvailable || ActiveSecurityIndex == nil || item == nil {
+	if ActiveSecurityBadgesHidden || !ActiveSecurityAvailable || ActiveSecurityIndex == nil || item == nil {
 		return ""
 	}
-	counts := itemSecurityCounts(item)
-	if counts.Total() == 0 {
-		return ""
-	}
-	sym, style := securityBadgeSymbolStyle(counts.Highest())
-	if sym == "" {
-		return ""
-	}
-	return style.Render(sym + strconv.Itoa(counts.Total()))
+	return securityBadgeStyled(itemSecurityCounts(item))
 }
 
 // securityBadgePlainForItem returns the plain text badge for an item, used
 // when computing the width budget for the name column so the styled badge
 // slots in alongside the resource name without clipping.
 func securityBadgePlainForItem(item *model.Item) string {
-	if !ActiveSecurityAvailable || ActiveSecurityIndex == nil || item == nil {
+	if ActiveSecurityBadgesHidden || !ActiveSecurityAvailable || ActiveSecurityIndex == nil || item == nil {
 		return ""
 	}
 	counts := itemSecurityCounts(item)

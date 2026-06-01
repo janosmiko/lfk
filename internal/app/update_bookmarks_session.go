@@ -96,7 +96,12 @@ func (m Model) restoreSingleTabSession(sess *SessionState, contexts []model.Item
 	// Security availability is probed lazily on first focus of the Security
 	// category (maybeProbeSecurityOnFocus), not eagerly on session restore.
 	// refreshSecuritySources above reseeds the sidebar from the on-disk cache
-	// and clears the per-context probe guard for sess.Context.
+	// and clears the per-context probe guard for sess.Context. When that cache
+	// already knows the sources, kick off a no-probe findings scan so the SEC
+	// badges populate on the restored cluster without a trip to Security.
+	if cmd := m.maybeEagerSecurityScan(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 
 	if sess.ResourceType != "" {
 		rt, ok := resolveSessionResourceType(sess.ResourceType, m.discoveredResources[discoveryCtx])

@@ -355,6 +355,25 @@ func TestFindingIndexDedupeKeepsHighestSeverity(t *testing.T) {
 	}
 }
 
+func TestSeverityCountsHighestCount(t *testing.T) {
+	cases := []struct {
+		name   string
+		counts SeverityCounts
+		want   int
+	}{
+		{"empty", SeverityCounts{}, 0},
+		{"critical wins over lower buckets", SeverityCounts{Critical: 3, High: 6, Low: 110}, 3},
+		{"high when no critical", SeverityCounts{High: 5, Medium: 2}, 5},
+		{"medium when only medium and low", SeverityCounts{Medium: 4, Low: 9}, 4},
+		{"low only", SeverityCounts{Low: 7}, 7},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.counts.HighestCount())
+		})
+	}
+}
+
 func TestManagerInvalidateClearsCache(t *testing.T) {
 	m := NewManager()
 	m.SetRefreshTTL(1 * time.Hour)

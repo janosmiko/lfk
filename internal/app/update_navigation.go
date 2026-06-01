@@ -415,6 +415,14 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	// switching clusters never triggers the aws credential plugin for a user
 	// who isn't looking at security. refreshSecuritySources above cleared the
 	// per-context probe guard.
+	//
+	// Eager findings scan: when this cluster was inspected before,
+	// refreshSecuritySources seeded availability (and the manager hint) from
+	// the disk cache, so we can populate the SEC badge index now without any
+	// probe. No cache (first-ever visit) -> this no-ops and badges stay lazy.
+	if cmd := m.maybeEagerSecurityScan(); cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	// Fire discovery once per session per context. The disk cache may have
 	// prefilled m.discoveredResources, but stale-while-revalidate still
 	// wants a live refresh on the user's first interaction with the

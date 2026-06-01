@@ -50,8 +50,11 @@ func (m *Model) refreshSecuritySources() {
 	}
 	mgr := security.NewManager()
 	if m.client != nil {
-		kc := m.client.RawClientsetForContext(resolvedCtx)
-		dc := m.client.RawDynamicForContext(resolvedCtx)
+		// Security sources get throttled clients (dedicated lower QPS/Burst)
+		// so background finding scans run at a low rate and never drain the
+		// foreground's API budget.
+		kc := m.client.RawClientsetForContextThrottled(resolvedCtx)
+		dc := m.client.RawDynamicForContextThrottled(resolvedCtx)
 		// register adds src only when its per-source toggle is enabled for
 		// this context (per-cluster override > global > enabled by default).
 		register := func(name string, src security.SecuritySource) {
@@ -81,6 +84,14 @@ func (m *Model) refreshSecuritySources() {
 	// result triggers the loader entry until the live probe completes.
 	if cached := loadSecurityAvailabilityCacheForContext(m.client, resolvedCtx); len(cached) > 0 {
 		m.securityAvailabilityByName = cached
+		// Publish the cached availability as the manager's hint so an eager
+		// findings fetch (maybeEagerSecurityScan, fired at cluster open)
+		// skips the per-source IsAvailable probe — that probe is the exact
+		// EKS aws-credential-plugin call the lazy design avoids. With the
+		// hint set, a previously-inspected cluster scans straight from Fetch
+		// with no new probe; an as-yet-uninspected cluster has no cache and
+		// stays fully lazy.
+		mgr.SetAvailability(resolvedCtx, cached)
 	} else {
 		m.securityAvailabilityByName = make(map[string]bool)
 	}

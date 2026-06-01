@@ -56,6 +56,31 @@ func (m *Model) maybeProbeSecurityOnFocus() tea.Cmd {
 	return m.loadSecurityAvailability()
 }
 
+// eagerSecurityScanEnabled gates the cluster-open background findings scan.
+// Enabled now that the scheduler lost-wakeup jam is fixed: at cluster open the
+// SEC badges populate from a background, throttled, low-priority scan without
+// the user navigating to the Security category. Set to false to fall back to
+// the lazy-on-focus behavior (scan only when Security is opened). A var (not
+// const) so tests can exercise both paths.
+var eagerSecurityScanEnabled = true
+
+// maybeEagerSecurityScan kicks off a background findings fetch at cluster open
+// so the SEC badges populate without the user navigating to the Security
+// category. It runs only when source availability is already known from the
+// on-disk cache (seeded into securityAvailabilityByName by
+// refreshSecuritySources, which also sets the manager's availability hint), so
+// it performs NO IsAvailable probe: a previously-inspected cluster pays just
+// the Fetch cost, and an as-yet-uninspected one (empty cache) no-ops here and
+// stays fully lazy — preserving the EKS aws-credential-plugin behavior the
+// lazy probe protects. loadSecurityFindings already returns nil when no source
+// is available, so this is a thin, intent-revealing wrapper.
+func (m Model) maybeEagerSecurityScan() tea.Cmd {
+	if !eagerSecurityScanEnabled {
+		return nil
+	}
+	return m.loadSecurityFindings()
+}
+
 // loadSecurityAvailability probes IsAvailable on every registered source
 // for the active cluster and returns a securityAvailabilityLoadedMsg with
 // the per-source result. Each source's probe runs in its own goroutine
@@ -74,7 +99,7 @@ func (m Model) loadSecurityAvailability() tea.Cmd {
 		kctx = m.client.CurrentContext()
 	}
 	return m.trackBgTask(
-		scheduler.KindResourceList,
+		scheduler.KindSecurityScan,
 		"Probing security sources",
 		bgtaskTarget(kctx, ""),
 		func() tea.Msg {
@@ -162,17 +187,7 @@ func (m Model) updateSecurityAvailabilityLoaded(msg securityAvailabilityLoadedMs
 // so subsequent calls within refreshTTL return immediately. Returns nil
 // when no manager is wired or no source is available.
 func (m Model) loadSecurityFindings() tea.Cmd {
-	if m.securityManager == nil {
-		return nil
-	}
-	anyAvailable := false
-	for _, ok := range m.securityAvailabilityByName {
-		if ok {
-			anyAvailable = true
-			break
-		}
-	}
-	if !anyAvailable {
+	if m.securityManager == nil || !m.anySecurityAvailable() {
 		return nil
 	}
 	mgr := m.securityManager
@@ -186,14 +201,25 @@ func (m Model) loadSecurityFindings() tea.Cmd {
 	// instead of keying the manager cache differently and forcing a
 	// redundant full scan for the badge index.
 	ns := m.effectiveNamespace()
+	// KindSecurityScan keeps this background badge scan at PriorityLow so it
+	// yields to the user's foreground resource lists, and gives it its own
+	// dedupe namespace in the registry (distinct from real KindResourceList
+	// loads). The new scheduler aging guarantees Low still makes progress.
 	return m.trackBgTask(
-		scheduler.KindResourceList,
+		scheduler.KindSecurityScan,
 		"Loading security findings",
 		bgtaskTarget(kctx, ns),
 		func() tea.Msg {
 			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 			defer cancel()
-			res, _ := mgr.FetchAll(ctx, kctx, ns)
+			res, err := mgr.FetchAll(ctx, kctx, ns)
+			if err != nil {
+				// Caller ctx cancelled / preempted / 30s budget elapsed. The
+				// detached scan keeps running and caches its result, so a later
+				// call rebuilds the index. Emit nothing rather than forwarding
+				// an empty result that would wipe the existing badge index.
+				return nil
+			}
 			return securityFindingsLoadedMsg{
 				context:   kctx,
 				namespace: ns,

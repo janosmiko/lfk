@@ -26,6 +26,7 @@ func (m Model) View() string {
 	// cluster. The renderer reads these globals during table layout.
 	ui.ActiveSecurityIndex = m.securityIndex
 	ui.ActiveSecurityAvailable = m.anySecurityAvailable()
+	ui.ActiveSecurityBadgesHidden = m.hideSecurityBadges
 
 	// Render fullscreen modes (YAML, Logs, Describe, Diff, Exec, Explain) with title bar and tab bar.
 	// Each view renders its own hint bar, so the main status bar is not shown.

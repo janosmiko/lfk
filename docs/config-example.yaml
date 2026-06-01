@@ -209,13 +209,32 @@ resource_columns:
 # Service: ["*"]  # show all for Services
 # StatefulSet: ["Replicas"]
 
+# ─── Scheduler & API Client Rate Limits ────────────────────────────────────────
+# Client-side QPS/burst for API calls. Default 50/100 (client-go's stock 5/10 is
+# too low for a multi-resource TUI). Override globally here, or per cluster below.
+# Background-work scheduling keeps metrics / events / security scans / dashboards
+# progressing under continuous foreground load on slow clusters:
+#   workers_per_context  - concurrent workers per cluster (default 8, max 16)
+#   low_reserved_slots   - workers that prefer background work (default 2)
+#   aging_threshold      - promote a starved background task after N higher-prio
+#                          dispatches (default 8; 0 = strict priority)
+# scheduler:
+#   k8s_client_qps: 50
+#   k8s_client_burst: 100
+#   workers_per_context: 8
+#   low_reserved_slots: 2
+#   aging_threshold: 8
+
 # ─── Per-Cluster Overrides ─────────────────────────────────────────────────────
 # Override settings per kubeconfig context name.
-# Supports per-cluster views, resource_columns (deprecated), read_only, and security.
+# Supports per-cluster views, resource_columns (deprecated), read_only, security,
+# and k8s_client_qps / k8s_client_burst.
 # Per-cluster overrides take precedence over the matching global setting.
 clusters:
 # my-prod-cluster:
 #   read_only: true                       # lock production against mutations
+#   k8s_client_qps: 200                   # raise the rate ceiling on a big cluster
+#   k8s_client_burst: 400
 #   security:
 #     enabled: false                      # turn the security dashboard off here
 #   views:

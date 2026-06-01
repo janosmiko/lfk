@@ -487,6 +487,25 @@ func (c SeverityCounts) Highest() Severity {
 	}
 }
 
+// HighestCount returns the number of findings in the highest-severity bucket
+// that has any, or 0 when empty. Pairs with Highest: the badge colors by
+// Highest and labels with HighestCount so a red badge means "this many
+// criticals", never the all-severity total.
+func (c SeverityCounts) HighestCount() int {
+	switch {
+	case c.Critical > 0:
+		return c.Critical
+	case c.High > 0:
+		return c.High
+	case c.Medium > 0:
+		return c.Medium
+	case c.Low > 0:
+		return c.Low
+	default:
+		return 0
+	}
+}
+
 // FindingIndex aggregates findings by resource for O(1) per-row lookup.
 type FindingIndex struct {
 	counts   map[string]SeverityCounts
