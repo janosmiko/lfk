@@ -153,6 +153,54 @@ func TestTableRendererInvalidatesOnApplyTheme(t *testing.T) {
 			"in the fingerprint changed")
 }
 
+// Reproduces the "SEC badge hides/appears in two stages" report. Pressing
+// kb.SecurityBadgeToggle flips ui.ActiveSecurityBadgesHidden, but that flag
+// was not part of the table-renderer fingerprint. Cursor rows re-render every
+// frame (so the badge under the cursor toggled instantly), while non-cursor
+// rows came from the cache and kept their stale badge until an unrelated input
+// (data tick, age-bucket roll) changed the fingerprint ~1s later.
+//
+// Same sentinel technique as TestTableRendererInvalidatesOnApplyTheme: the
+// sentinel can only survive if Render reuses r.rows. Toggling the badge flag
+// between renders must invalidate the cache and clear it.
+//
+// The items slice is pinned to the heap (secToggleHeapSink) so its backing
+// array address — and thus the fingerprint's itemsPtr — stays stable across
+// both Render calls. A stack-allocated slice can move on stack growth, which
+// would change itemsPtr and clear the cache for the wrong reason, masking the
+// toggle behavior under test. In production the equivalent slice
+// (m.middleItems via visibleMiddleItems) is likewise heap-stable between
+// keystrokes.
+var secToggleHeapSink []model.Item
+
+func TestTableRendererInvalidatesOnSecurityBadgeToggle(t *testing.T) {
+	prevHidden := ActiveSecurityBadgesHidden
+	t.Cleanup(func() {
+		ActiveSecurityBadgesHidden = prevHidden
+		secToggleHeapSink = nil
+	})
+
+	r := NewTableRenderer()
+	items := tableRendererTestItems()
+	secToggleHeapSink = items // force the backing array to escape to the heap
+
+	ActiveSecurityBadgesHidden = false
+	_ = r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+	require.NotEmpty(t, r.rows, "first render must populate the cache")
+
+	const sentinelKey = -1
+	r.rows[sentinelKey] = "sentinel"
+
+	ActiveSecurityBadgesHidden = true
+	_ = r.Render("NAME", items, 0, 80, 20, false, "", "", 0, 0)
+
+	_, present := r.rows[sentinelKey]
+	assert.False(t, present,
+		"toggling ActiveSecurityBadgesHidden between renders must invalidate the "+
+			"row cache; sentinel survived, so non-cursor rows would keep their stale "+
+			"SEC badge until something else in the fingerprint changed")
+}
+
 func TestTableRendererRestoresGlobalsAfterRender(t *testing.T) {
 	sentinelCache := map[int]string{99: "sentinel"}
 	sentinelLayout := &TableLayoutCache{Computed: true}
