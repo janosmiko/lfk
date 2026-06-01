@@ -7,6 +7,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -214,6 +215,7 @@ func TestRenderResourceUsage(t *testing.T) {
 		const width = 80
 		result := RenderResourceUsage(1, 0, 100, 69*1024*1024, 0, 160*1024*1024, width)
 		lines := strings.Split(stripANSI(result), "\n")
+		require.GreaterOrEqual(t, len(lines), 3, "expected header + CPU + Mem lines")
 		// lines[0] is the "RESOURCE USAGE" header; the two bars follow.
 		assert.Equal(t, width, lipgloss.Width(lines[1]), "CPU line must fill the width")
 		assert.Equal(t, width, lipgloss.Width(lines[2]), "Mem line must fill the width")
