@@ -457,15 +457,17 @@ func TestViewExplorerMode(t *testing.T) {
 		middleItems: []model.Item{
 			{Name: "nginx-pod", Status: "Running"},
 		},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		width:         120,
+		height:        40,
+		mode:          modeExplorer,
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()

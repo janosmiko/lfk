@@ -16,20 +16,20 @@ import (
 func TestMouseWheelScrollsYAMLViewer(t *testing.T) {
 	m := baseModelCov()
 	m.mode = modeYAML
-	m.yamlContent = ""
+	m.yamlView.content = ""
 	for range 30 {
-		m.yamlContent += "line\n"
+		m.yamlView.content += "line\n"
 	}
 	m.height = 20
-	m.yamlCursor = 10
+	m.yamlView.cursor = 10
 
 	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
 	rm := ret.(Model)
-	assert.Greater(t, rm.yamlCursor, 10, "wheel down must advance the YAML cursor")
+	assert.Greater(t, rm.yamlView.cursor, 10, "wheel down must advance the YAML cursor")
 
 	ret2, _ := rm.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp})
 	rm2 := ret2.(Model)
-	assert.Less(t, rm2.yamlCursor, rm.yamlCursor, "wheel up must move the cursor back")
+	assert.Less(t, rm2.yamlView.cursor, rm.yamlView.cursor, "wheel up must move the cursor back")
 }
 
 func TestMouseWheelScrollsDescribeViewer(t *testing.T) {

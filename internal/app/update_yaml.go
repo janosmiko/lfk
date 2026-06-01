@@ -24,12 +24,12 @@ func (m Model) yamlViewportLines() int {
 
 func (m Model) handleYAMLKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	// When in search input mode, handle text input.
-	if m.yamlSearchMode {
+	if m.yamlView.searchMode {
 		return m.handleYAMLSearchInput(msg)
 	}
 
 	// In visual selection mode, restrict keys to selection/copy/cancel.
-	if m.yamlVisualMode {
+	if m.yamlView.visualMode {
 		return m.handleYAMLVisualKey(msg)
 	}
 
@@ -48,49 +48,49 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	switch msg.String() {
 	case "enter":
-		m.yamlSearchMode = false
+		m.yamlView.searchMode = false
 		m.updateYAMLSearchMatches()
-		if len(m.yamlMatchLines) > 0 {
-			m.yamlMatchIdx = m.findYAMLMatchFromCursor()
+		if len(m.yamlView.matchLines) > 0 {
+			m.yamlView.matchIdx = m.findYAMLMatchFromCursor()
 			m.yamlScrollToMatchFolded(viewportLines)
 		}
 		return m, nil
 	case "esc":
-		m.yamlSearchMode = false
-		m.yamlSearchText.Clear()
-		m.yamlMatchLines = nil
-		m.yamlMatchIdx = 0
+		m.yamlView.searchMode = false
+		m.yamlView.searchText.Clear()
+		m.yamlView.matchLines = nil
+		m.yamlView.matchIdx = 0
 		return m, nil
 	case "backspace":
-		if len(m.yamlSearchText.Value) > 0 {
-			m.yamlSearchText.Backspace()
+		if len(m.yamlView.searchText.Value) > 0 {
+			m.yamlView.searchText.Backspace()
 		}
 		m.updateYAMLSearchMatches()
 		return m, nil
 	case "ctrl+w":
-		m.yamlSearchText.DeleteWord()
+		m.yamlView.searchText.DeleteWord()
 		m.updateYAMLSearchMatches()
 		return m, nil
 	case "ctrl+a":
-		m.yamlSearchText.Home()
+		m.yamlView.searchText.Home()
 		return m, nil
 	case "ctrl+e":
-		m.yamlSearchText.End()
+		m.yamlView.searchText.End()
 		return m, nil
 	case "left":
-		m.yamlSearchText.Left()
+		m.yamlView.searchText.Left()
 		return m, nil
 	case "right":
-		m.yamlSearchText.Right()
+		m.yamlView.searchText.Right()
 		return m, nil
 	case "ctrl+c":
-		m.yamlSearchMode = false
-		m.yamlSearchText.Clear()
-		m.yamlMatchLines = nil
+		m.yamlView.searchMode = false
+		m.yamlView.searchText.Clear()
+		m.yamlView.matchLines = nil
 		return m, nil
 	default:
 		if len(msg.String()) == 1 || msg.String() == " " {
-			m.yamlSearchText.Insert(msg.String())
+			m.yamlView.searchText.Insert(msg.String())
 			m.updateYAMLSearchMatches()
 		}
 		return m, nil
@@ -104,15 +104,15 @@ func (m Model) handleYAMLSearchInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // not in scope — a count that reaches a folded section jumps over its hidden
 // children and continues with the lines that follow.
 func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.yamlLineInput)
-	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
-	if m.yamlCursor < 0 || m.yamlCursor >= len(mapping) {
+	n := consumeCountPrefix(&m.yamlView.lineInput)
+	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(mapping) {
 		return m, nil
 	}
-	origLines := strings.Split(m.yamlContent, "\n")
-	end := min(m.yamlCursor+n, len(mapping))
-	parts := make([]string, 0, end-m.yamlCursor)
-	for i := m.yamlCursor; i < end; i++ {
+	origLines := strings.Split(m.yamlView.content, "\n")
+	end := min(m.yamlView.cursor+n, len(mapping))
+	parts := make([]string, 0, end-m.yamlView.cursor)
+	for i := m.yamlView.cursor; i < end; i++ {
 		origIdx := mapping[i]
 		if origIdx < 0 || origIdx >= len(origLines) {
 			continue
@@ -131,7 +131,7 @@ func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
 // pointer-receiver step so the loop avoids per-iteration Model copies — only
 // the value-receiver method boundary copy remains.
 func (m Model) handleYAMLNormalWordMotion(key string) (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.yamlLineInput)
+	n := consumeCountPrefix(&m.yamlView.lineInput)
 	for range n {
 		m.yamlWordMotionStep(key)
 	}
@@ -147,7 +147,7 @@ func (m Model) yamlMaxScroll(totalVisible int) int {
 
 // handleYAMLNormalKey handles key events in normal YAML viewing mode.
 func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	totalVisible := visibleLineCount(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	totalVisible := visibleLineCount(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	viewportLines := m.yamlViewportLines()
 	maxScroll := m.yamlMaxScroll(totalVisible)
 
@@ -175,7 +175,7 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "y":
 		return m.handleYAMLNormalCopy()
 	case "ctrl+w", ">":
-		m.yamlWrap = !m.yamlWrap
+		m.yamlView.wrap = !m.yamlView.wrap
 		return m, nil
 	case "z":
 		return m.handleYAMLKeyFoldToggle()
@@ -184,24 +184,24 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "h", "left":
 		return m.handleYAMLKeyH()
 	case "l", "right":
-		n := consumeCountPrefix(&m.yamlLineInput)
-		m.yamlVisualCurCol += n
+		n := consumeCountPrefix(&m.yamlView.lineInput)
+		m.yamlView.visualCurCol += n
 		return m, nil
 	case "0":
 		return m.handleYAMLKeyZero()
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
-		m.yamlLineInput += msg.String()
+		m.yamlView.lineInput += msg.String()
 		return m, nil
 	case "$", "^":
 		// $ / ^ are absolute-position motions and ignore counts, but still
 		// consume the buffer so a stray digit prefix doesn't leak forward.
-		consumeCountPrefix(&m.yamlLineInput)
+		consumeCountPrefix(&m.yamlView.lineInput)
 		return m.handleYAMLVisualWordMotion(msg.String())
 	case "w", "b", "e", "E", "B", "W":
 		return m.handleYAMLNormalWordMotion(msg.String())
 	case "j", "down":
-		n := consumeCountPrefix(&m.yamlLineInput)
-		m.yamlCursor = min(m.yamlCursor+n, max(totalVisible-1, 0))
+		n := consumeCountPrefix(&m.yamlView.lineInput)
+		m.yamlView.cursor = min(m.yamlView.cursor+n, max(totalVisible-1, 0))
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	case "k", "up":
@@ -211,7 +211,7 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "G", "end":
 		return m.handleYAMLNormalG(totalVisible, maxScroll)
 	case "home":
-		m.yamlCursor = 0
+		m.yamlView.cursor = 0
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	case "ctrl+d":
@@ -223,22 +223,22 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "ctrl+b", "pgup":
 		return m.handleYAMLKeyCtrlB()
 	default:
-		m.yamlLineInput = ""
+		m.yamlView.lineInput = ""
 	}
 	return m, nil
 }
 
 // handleYAMLKeyN handles the 'n' key (next search match) in normal YAML mode.
 func (m Model) handleYAMLKeyN(viewportLines int) (tea.Model, tea.Cmd) {
-	count := consumeCountPrefix(&m.yamlLineInput)
+	count := consumeCountPrefix(&m.yamlView.lineInput)
 	for range count {
-		if len(m.yamlMatchLines) == 0 {
+		if len(m.yamlView.matchLines) == 0 {
 			break
 		}
 		if m.yamlNextIntraLineMatch(true) {
 			continue
 		}
-		m.yamlMatchIdx = (m.yamlMatchIdx + 1) % len(m.yamlMatchLines)
+		m.yamlView.matchIdx = (m.yamlView.matchIdx + 1) % len(m.yamlView.matchLines)
 		m.yamlScrollToMatchFolded(viewportLines)
 	}
 	return m, nil
@@ -246,17 +246,17 @@ func (m Model) handleYAMLKeyN(viewportLines int) (tea.Model, tea.Cmd) {
 
 // handleYAMLKeyShiftN handles the 'N' key (previous search match) in normal YAML mode.
 func (m Model) handleYAMLKeyShiftN(viewportLines int) (tea.Model, tea.Cmd) {
-	count := consumeCountPrefix(&m.yamlLineInput)
+	count := consumeCountPrefix(&m.yamlView.lineInput)
 	for range count {
-		if len(m.yamlMatchLines) == 0 {
+		if len(m.yamlView.matchLines) == 0 {
 			break
 		}
 		if m.yamlNextIntraLineMatch(false) {
 			continue
 		}
-		m.yamlMatchIdx--
-		if m.yamlMatchIdx < 0 {
-			m.yamlMatchIdx = len(m.yamlMatchLines) - 1
+		m.yamlView.matchIdx--
+		if m.yamlView.matchIdx < 0 {
+			m.yamlView.matchIdx = len(m.yamlView.matchLines) - 1
 		}
 		m.yamlScrollToMatchFolded(viewportLines)
 	}
@@ -280,26 +280,26 @@ func (m Model) handleYAMLKeyCtrlE() (tea.Model, tea.Cmd) {
 
 // handleYAMLKeyFoldToggle toggles the fold on the section at the cursor position.
 func (m Model) handleYAMLKeyFoldToggle() (tea.Model, tea.Cmd) {
-	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
-	sec := sectionAtScrollPos(m.yamlCursor, mapping, m.yamlSections)
+	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	sec := sectionAtScrollPos(m.yamlView.cursor, mapping, m.yamlView.sections)
 	if sec != "" {
-		if m.yamlCollapsed == nil {
-			m.yamlCollapsed = make(map[string]bool)
+		if m.yamlView.collapsed == nil {
+			m.yamlView.collapsed = make(map[string]bool)
 		}
-		m.yamlCollapsed[sec] = !m.yamlCollapsed[sec]
+		m.yamlView.collapsed[sec] = !m.yamlView.collapsed[sec]
 
-		if m.yamlCollapsed[sec] {
+		if m.yamlView.collapsed[sec] {
 			var startLine int
-			for _, s := range m.yamlSections {
+			for _, s := range m.yamlView.sections {
 				if s.key == sec {
 					startLine = s.startLine
 					break
 				}
 			}
-			_, newMapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+			_, newMapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 			for vi, orig := range newMapping {
 				if orig == startLine {
-					m.yamlCursor = vi
+					m.yamlView.cursor = vi
 					break
 				}
 			}
@@ -313,9 +313,9 @@ func (m Model) handleYAMLKeyFoldToggle() (tea.Model, tea.Cmd) {
 
 // handleYAMLNormalG handles the G key in normal mode (go-to-line or end).
 func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cmd) {
-	if m.yamlLineInput != "" {
-		lineNum, _ := strconv.Atoi(m.yamlLineInput)
-		m.yamlLineInput = ""
+	if m.yamlView.lineInput != "" {
+		lineNum, _ := strconv.Atoi(m.yamlView.lineInput)
+		m.yamlView.lineInput = ""
 		if lineNum > 0 {
 			lineNum--
 		}
@@ -325,12 +325,12 @@ func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 		if lineNum < 0 {
 			lineNum = 0
 		}
-		m.yamlCursor = lineNum
+		m.yamlView.cursor = lineNum
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	}
-	m.yamlCursor = max(totalVisible-1, 0)
-	m.yamlScroll = maxScroll
+	m.yamlView.cursor = max(totalVisible-1, 0)
+	m.yamlView.scroll = maxScroll
 	return m, nil
 }
 
@@ -340,10 +340,10 @@ func (m Model) handleYAMLNormalG(totalVisible, maxScroll int) (tea.Model, tea.Cm
 // option to min(count, viewport); plain presses reuse the sticky value
 // (defaulting to viewport/2). The same option is shared with ctrl+u.
 func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cmd) {
-	step := vimScrollStep(&m.yamlLineInput, &m.yamlScrollOption, m.yamlViewportLines())
-	m.yamlCursor += step
-	if m.yamlCursor >= totalVisible {
-		m.yamlCursor = totalVisible - 1
+	step := vimScrollStep(&m.yamlView.lineInput, &m.yamlView.scrollOption, m.yamlViewportLines())
+	m.yamlView.cursor += step
+	if m.yamlView.cursor >= totalVisible {
+		m.yamlView.cursor = totalVisible - 1
 	}
 	m.ensureYAMLCursorVisible()
 	return m, nil
@@ -351,10 +351,10 @@ func (m Model) handleYAMLNormalHalfPageDown(totalVisible int) (tea.Model, tea.Cm
 
 // handleYAMLNormalPageDown handles ctrl+f (full page down) in normal YAML mode.
 func (m Model) handleYAMLNormalPageDown(totalVisible int) (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.yamlLineInput)
-	m.yamlCursor += n * m.yamlViewportLines()
-	if m.yamlCursor >= totalVisible {
-		m.yamlCursor = totalVisible - 1
+	n := consumeCountPrefix(&m.yamlView.lineInput)
+	m.yamlView.cursor += n * m.yamlViewportLines()
+	if m.yamlView.cursor >= totalVisible {
+		m.yamlView.cursor = totalVisible - 1
 	}
 	m.ensureYAMLCursorVisible()
 	return m, nil
@@ -365,47 +365,47 @@ func (m Model) handleYAMLNormalPageDown(totalVisible int) (tea.Model, tea.Cmd) {
 func (m *Model) ensureYAMLCursorVisible() {
 	maxLines := m.yamlViewportLines()
 	so := min(ui.ConfigScrollOff, maxLines/2)
-	if m.yamlCursor < m.yamlScroll+so {
-		m.yamlScroll = m.yamlCursor - so
+	if m.yamlView.cursor < m.yamlView.scroll+so {
+		m.yamlView.scroll = m.yamlView.cursor - so
 	}
-	if m.yamlCursor >= m.yamlScroll+maxLines-so {
-		m.yamlScroll = m.yamlCursor - maxLines + so + 1
+	if m.yamlView.cursor >= m.yamlView.scroll+maxLines-so {
+		m.yamlView.scroll = m.yamlView.cursor - maxLines + so + 1
 	}
-	if m.yamlScroll < 0 {
-		m.yamlScroll = 0
+	if m.yamlView.scroll < 0 {
+		m.yamlView.scroll = 0
 	}
 }
 
 // clampYAMLScroll ensures yamlScroll stays within bounds after fold changes.
 func (m *Model) clampYAMLScroll() {
-	totalVisible := visibleLineCount(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	totalVisible := visibleLineCount(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	viewportLines := m.yamlViewportLines()
 	maxScroll := max(totalVisible-viewportLines, 0)
-	if m.yamlScroll > maxScroll {
-		m.yamlScroll = maxScroll
+	if m.yamlView.scroll > maxScroll {
+		m.yamlView.scroll = maxScroll
 	}
-	if m.yamlScroll < 0 {
-		m.yamlScroll = 0
+	if m.yamlView.scroll < 0 {
+		m.yamlView.scroll = 0
 	}
 }
 
 // yamlScrollToMatchFolded scrolls to show the current search match, expanding
 // the containing section if it is collapsed, and using visible-line coordinates.
 func (m *Model) yamlScrollToMatchFolded(viewportLines int) {
-	if m.yamlMatchIdx < 0 || m.yamlMatchIdx >= len(m.yamlMatchLines) {
+	if m.yamlView.matchIdx < 0 || m.yamlView.matchIdx >= len(m.yamlView.matchLines) {
 		return
 	}
-	targetOrig := m.yamlMatchLines[m.yamlMatchIdx]
+	targetOrig := m.yamlView.matchLines[m.yamlView.matchIdx]
 
 	// If the match is inside a collapsed section, expand it.
-	for _, sec := range m.yamlSections {
-		if m.yamlCollapsed[sec.key] && targetOrig > sec.startLine && targetOrig <= sec.endLine {
-			m.yamlCollapsed[sec.key] = false
+	for _, sec := range m.yamlView.sections {
+		if m.yamlView.collapsed[sec.key] && targetOrig > sec.startLine && targetOrig <= sec.endLine {
+			m.yamlView.collapsed[sec.key] = false
 		}
 	}
 
 	// Convert original line to visible line.
-	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	visIdx := originalToVisible(targetOrig, mapping)
 	if visIdx < 0 {
 		return
@@ -415,34 +415,34 @@ func (m *Model) yamlScrollToMatchFolded(viewportLines int) {
 	maxScroll := max(totalVisible-viewportLines, 0)
 
 	// Move cursor to the match and center it in the viewport.
-	m.yamlCursor = visIdx
+	m.yamlView.cursor = visIdx
 	// Move cursor column to the match position within the visible line
 	// (which includes fold prefixes).
-	visibleLines, _ := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	visibleLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	if visIdx >= 0 && visIdx < len(visibleLines) {
-		col := ui.FindColumnInLine(visibleLines[visIdx], m.yamlSearchText.Value)
+		col := ui.FindColumnInLine(visibleLines[visIdx], m.yamlView.searchText.Value)
 		if col >= 0 {
-			m.yamlVisualCurCol = col
+			m.yamlView.visualCurCol = col
 		}
 	}
-	m.yamlScroll = max(min(visIdx-viewportLines/2, maxScroll), 0)
+	m.yamlView.scroll = max(min(visIdx-viewportLines/2, maxScroll), 0)
 }
 
 // yamlNextIntraLineMatch checks for another match on the current YAML line
 // after (forward=true) or before (forward=false) the cursor column.
 // Returns true if a match was found and cursor was moved.
 func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
-	if m.yamlSearchText.Value == "" {
+	if m.yamlView.searchText.Value == "" {
 		return false
 	}
-	rawQuery := m.yamlSearchText.Value
+	rawQuery := m.yamlView.searchText.Value
 
 	// Use visible lines (which include fold prefixes) for accurate column positions.
-	visibleLines, _ := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
-	if m.yamlCursor < 0 || m.yamlCursor >= len(visibleLines) {
+	visibleLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(visibleLines) {
 		return false
 	}
-	line := visibleLines[m.yamlCursor]
+	line := visibleLines[m.yamlView.cursor]
 
 	runes := []rune(line)
 	if forward {
@@ -450,13 +450,13 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 		// Clamp: yamlVisualCurCol carries the column from a previously
 		// focused line and may exceed this line's rune length. Forward
 		// uses +1 because the search starts after (not at) the cursor.
-		end := min(m.yamlVisualCurCol+1, len(runes))
+		end := min(m.yamlView.visualCurCol+1, len(runes))
 		curBytePos := len(string(runes[:end]))
 		if curBytePos < len(line) {
 			remainder := line[curBytePos:]
 			col := ui.FindColumnInLine(remainder, rawQuery)
 			if col >= 0 {
-				m.yamlVisualCurCol = m.yamlVisualCurCol + 1 + col
+				m.yamlView.visualCurCol = m.yamlView.visualCurCol + 1 + col
 				return true
 			}
 		}
@@ -464,7 +464,7 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 		// Search for a match before the current cursor position.
 		// Clamp: yamlVisualCurCol may exceed this line's rune length;
 		// backward search ends at (excluding) the cursor.
-		end := min(m.yamlVisualCurCol, len(runes))
+		end := min(m.yamlView.visualCurCol, len(runes))
 		curBytePos := len(string(runes[:end]))
 		if curBytePos > 0 {
 			prefix := line[:curBytePos]
@@ -489,7 +489,7 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 				offset += advanceRunes
 			}
 			if lastCol >= 0 {
-				m.yamlVisualCurCol = lastCol
+				m.yamlView.visualCurCol = lastCol
 				return true
 			}
 		}
@@ -500,14 +500,14 @@ func (m *Model) yamlNextIntraLineMatch(forward bool) bool {
 // updateYAMLSearchMatches finds all lines matching the current search text.
 // Supports substring, regex, and fuzzy search modes.
 func (m *Model) updateYAMLSearchMatches() {
-	m.yamlMatchLines = nil
-	if m.yamlSearchText.Value == "" {
+	m.yamlView.matchLines = nil
+	if m.yamlView.searchText.Value == "" {
 		return
 	}
-	rawQuery := m.yamlSearchText.Value
-	for i, line := range strings.Split(m.yamlContent, "\n") {
+	rawQuery := m.yamlView.searchText.Value
+	for i, line := range strings.Split(m.yamlView.content, "\n") {
 		if ui.MatchLine(line, rawQuery) {
-			m.yamlMatchLines = append(m.yamlMatchLines, i)
+			m.yamlView.matchLines = append(m.yamlView.matchLines, i)
 		}
 	}
 }
@@ -515,12 +515,12 @@ func (m *Model) updateYAMLSearchMatches() {
 // findYAMLMatchFromCursor returns the index of the first match at or after the
 // current cursor position. Wraps to 0 if no match is found after the cursor.
 func (m *Model) findYAMLMatchFromCursor() int {
-	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	origLine := 0
-	if m.yamlCursor >= 0 && m.yamlCursor < len(mapping) {
-		origLine = mapping[m.yamlCursor]
+	if m.yamlView.cursor >= 0 && m.yamlView.cursor < len(mapping) {
+		origLine = mapping[m.yamlView.cursor]
 	}
-	for i, matchLine := range m.yamlMatchLines {
+	for i, matchLine := range m.yamlView.matchLines {
 		if matchLine >= origLine {
 			return i
 		}
@@ -539,114 +539,114 @@ func (m Model) handleYAMLKeyQuestion() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLKeyV() (tea.Model, tea.Cmd) {
-	m.yamlVisualMode = true
-	m.yamlVisualType = 'V'
-	m.yamlVisualStart = m.yamlCursor
-	m.yamlVisualCol = m.yamlVisualCurCol
+	m.yamlView.visualMode = true
+	m.yamlView.visualType = 'V'
+	m.yamlView.visualStart = m.yamlView.cursor
+	m.yamlView.visualCol = m.yamlView.visualCurCol
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyV2() (tea.Model, tea.Cmd) {
-	m.yamlVisualMode = true
-	m.yamlVisualType = 'v'
-	m.yamlVisualStart = m.yamlCursor
-	m.yamlVisualCol = m.yamlVisualCurCol
+	m.yamlView.visualMode = true
+	m.yamlView.visualType = 'v'
+	m.yamlView.visualStart = m.yamlView.cursor
+	m.yamlView.visualCol = m.yamlView.visualCurCol
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyCtrlV() (tea.Model, tea.Cmd) {
-	m.yamlVisualMode = true
-	m.yamlVisualType = 'B'
-	m.yamlVisualStart = m.yamlCursor
-	m.yamlVisualCol = m.yamlVisualCurCol
+	m.yamlView.visualMode = true
+	m.yamlView.visualType = 'B'
+	m.yamlView.visualStart = m.yamlView.cursor
+	m.yamlView.visualCol = m.yamlView.visualCurCol
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyQ() (tea.Model, tea.Cmd) {
-	if m.yamlSearchText.Value != "" {
+	if m.yamlView.searchText.Value != "" {
 		// Clear search first.
-		m.yamlSearchText.Clear()
-		m.yamlMatchLines = nil
-		m.yamlMatchIdx = 0
+		m.yamlView.searchText.Clear()
+		m.yamlView.matchLines = nil
+		m.yamlView.matchIdx = 0
 		return m, nil
 	}
 	m.mode = modeExplorer
-	m.yamlScroll = 0
-	m.yamlCursor = 0
-	m.yamlWrap = false
+	m.yamlView.scroll = 0
+	m.yamlView.cursor = 0
+	m.yamlView.wrap = false
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyCtrlC() (tea.Model, tea.Cmd) {
 	m.mode = modeExplorer
-	m.yamlScroll = 0
-	m.yamlCursor = 0
-	m.yamlWrap = false
-	m.yamlSearchText.Clear()
-	m.yamlMatchLines = nil
+	m.yamlView.scroll = 0
+	m.yamlView.cursor = 0
+	m.yamlView.wrap = false
+	m.yamlView.searchText.Clear()
+	m.yamlView.matchLines = nil
 	return m, nil
 }
 
 func (m Model) handleYAMLKeySlash() (tea.Model, tea.Cmd) {
-	m.yamlSearchMode = true
-	m.yamlSearchText.Clear()
-	m.yamlMatchLines = nil
-	m.yamlMatchIdx = 0
+	m.yamlView.searchMode = true
+	m.yamlView.searchText.Clear()
+	m.yamlView.matchLines = nil
+	m.yamlView.matchIdx = 0
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyZ() (tea.Model, tea.Cmd) {
-	if m.yamlCollapsed == nil {
-		m.yamlCollapsed = make(map[string]bool)
+	if m.yamlView.collapsed == nil {
+		m.yamlView.collapsed = make(map[string]bool)
 	}
 	anyExpanded := false
-	for _, sec := range m.yamlSections {
-		if isMultiLineSection(sec) && !m.yamlCollapsed[sec.key] {
+	for _, sec := range m.yamlView.sections {
+		if isMultiLineSection(sec) && !m.yamlView.collapsed[sec.key] {
 			anyExpanded = true
 			break
 		}
 	}
 	if anyExpanded {
-		for _, sec := range m.yamlSections {
+		for _, sec := range m.yamlView.sections {
 			if isMultiLineSection(sec) {
-				m.yamlCollapsed[sec.key] = true
+				m.yamlView.collapsed[sec.key] = true
 			}
 		}
 	} else {
-		m.yamlCollapsed = make(map[string]bool)
+		m.yamlView.collapsed = make(map[string]bool)
 	}
 	m.clampYAMLScroll()
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyH() (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.yamlLineInput)
-	m.yamlVisualCurCol = max(m.yamlVisualCurCol-n, yamlFoldPrefixLen)
+	n := consumeCountPrefix(&m.yamlView.lineInput)
+	m.yamlView.visualCurCol = max(m.yamlView.visualCurCol-n, yamlFoldPrefixLen)
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyZero() (tea.Model, tea.Cmd) {
-	if m.yamlLineInput != "" {
-		m.yamlLineInput += "0"
+	if m.yamlView.lineInput != "" {
+		m.yamlView.lineInput += "0"
 	} else {
-		m.yamlVisualCurCol = yamlFoldPrefixLen
+		m.yamlView.visualCurCol = yamlFoldPrefixLen
 	}
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyK() (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.yamlLineInput)
-	m.yamlCursor = max(m.yamlCursor-n, 0)
+	n := consumeCountPrefix(&m.yamlView.lineInput)
+	m.yamlView.cursor = max(m.yamlView.cursor-n, 0)
 	m.ensureYAMLCursorVisible()
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyG() (tea.Model, tea.Cmd) {
-	m.yamlLineInput = ""
+	m.yamlView.lineInput = ""
 	if m.pendingG {
 		m.pendingG = false
-		m.yamlCursor = 0
-		m.yamlScroll = 0
+		m.yamlView.cursor = 0
+		m.yamlView.scroll = 0
 		return m, nil
 	}
 	m.pendingG = true
@@ -654,20 +654,20 @@ func (m Model) handleYAMLKeyG() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLKeyCtrlU() (tea.Model, tea.Cmd) {
-	step := vimScrollStep(&m.yamlLineInput, &m.yamlScrollOption, m.yamlViewportLines())
-	m.yamlCursor -= step
-	if m.yamlCursor < 0 {
-		m.yamlCursor = 0
+	step := vimScrollStep(&m.yamlView.lineInput, &m.yamlView.scrollOption, m.yamlViewportLines())
+	m.yamlView.cursor -= step
+	if m.yamlView.cursor < 0 {
+		m.yamlView.cursor = 0
 	}
 	m.ensureYAMLCursorVisible()
 	return m, nil
 }
 
 func (m Model) handleYAMLKeyCtrlB() (tea.Model, tea.Cmd) {
-	n := consumeCountPrefix(&m.yamlLineInput)
-	m.yamlCursor -= n * m.yamlViewportLines()
-	if m.yamlCursor < 0 {
-		m.yamlCursor = 0
+	n := consumeCountPrefix(&m.yamlView.lineInput)
+	m.yamlView.cursor -= n * m.yamlViewportLines()
+	if m.yamlView.cursor < 0 {
+		m.yamlView.cursor = 0
 	}
 	m.ensureYAMLCursorVisible()
 	return m, nil

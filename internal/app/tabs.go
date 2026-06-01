@@ -411,14 +411,14 @@ func (m *Model) saveCurrentTab() {
 	t.sortMemory = copyMapStringSortPref(m.sortMemory)
 	t.itemCache = copyItemCache(m.itemCache)
 	t.cacheFingerprints = copyMapStringString(m.cacheFingerprints)
-	t.yamlContent = m.yamlContent
-	t.yamlScroll = m.yamlScroll
-	t.yamlCursor = m.yamlCursor
-	t.yamlScrollOption = m.yamlScrollOption
-	t.yamlSearchText = m.yamlSearchText
-	t.yamlMatchLines = m.yamlMatchLines
-	t.yamlMatchIdx = m.yamlMatchIdx
-	t.yamlCollapsed = copyMapStringBool(m.yamlCollapsed)
+	t.yamlContent = m.yamlView.content
+	t.yamlScroll = m.yamlView.scroll
+	t.yamlCursor = m.yamlView.cursor
+	t.yamlScrollOption = m.yamlView.scrollOption
+	t.yamlSearchText = m.yamlView.searchText
+	t.yamlMatchLines = m.yamlView.matchLines
+	t.yamlMatchIdx = m.yamlView.matchIdx
+	t.yamlCollapsed = copyMapStringBool(m.yamlView.collapsed)
 	t.splitPreview = m.splitPreview
 	t.fullYAMLPreview = m.fullYAMLPreview
 	t.previewYAML = m.previewYAML
@@ -527,14 +527,14 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.sortMemory = copyMapStringSortPref(t.sortMemory)
 	m.itemCache = copyItemCache(t.itemCache)
 	m.cacheFingerprints = copyMapStringString(t.cacheFingerprints)
-	m.yamlContent = t.yamlContent
-	m.yamlScroll = t.yamlScroll
-	m.yamlCursor = t.yamlCursor
-	m.yamlScrollOption = t.yamlScrollOption
-	m.yamlSearchText = t.yamlSearchText
-	m.yamlMatchLines = t.yamlMatchLines
-	m.yamlMatchIdx = t.yamlMatchIdx
-	m.yamlCollapsed = copyMapStringBool(t.yamlCollapsed)
+	m.yamlView.content = t.yamlContent
+	m.yamlView.scroll = t.yamlScroll
+	m.yamlView.cursor = t.yamlCursor
+	m.yamlView.scrollOption = t.yamlScrollOption
+	m.yamlView.searchText = t.yamlSearchText
+	m.yamlView.matchLines = t.yamlMatchLines
+	m.yamlView.matchIdx = t.yamlMatchIdx
+	m.yamlView.collapsed = copyMapStringBool(t.yamlCollapsed)
 	m.splitPreview = t.splitPreview
 	m.fullYAMLPreview = t.fullYAMLPreview
 	m.previewYAML = t.previewYAML
@@ -703,8 +703,8 @@ func (m *Model) cloneCurrentTab() TabState {
 		sortMemory:             copyMapStringSortPref(m.sortMemory),
 		itemCache:              copyItemCache(m.itemCache),
 		cacheFingerprints:      copyMapStringString(m.cacheFingerprints),
-		yamlContent:            m.yamlContent,
-		yamlCollapsed:          copyMapStringBool(m.yamlCollapsed),
+		yamlContent:            m.yamlView.content,
+		yamlCollapsed:          copyMapStringBool(m.yamlView.collapsed),
 		splitPreview:           m.splitPreview,
 		fullYAMLPreview:        m.fullYAMLPreview,
 		previewYAML:            m.previewYAML,

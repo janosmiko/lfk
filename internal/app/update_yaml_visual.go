@@ -8,7 +8,7 @@ import (
 )
 
 func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
-	totalVisible := visibleLineCount(m.yamlContent, m.yamlSections, m.yamlCollapsed)
+	totalVisible := visibleLineCount(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	maxScroll := m.yamlMaxScroll(totalVisible)
 
 	key := msg.String()
@@ -17,12 +17,12 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	switch key {
 	case "esc":
-		m.yamlVisualMode = false
+		m.yamlView.visualMode = false
 		return m, nil
 	case "i", "a":
 		// Clear any digit prefix accumulated before visual entry so it can't
 		// leak into a later counted command via the post-visual normal mode.
-		m.yamlLineInput = ""
+		m.yamlView.lineInput = ""
 		m.pendingTextObject = key[0]
 		return m, nil
 	case "V":
@@ -34,35 +34,35 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "y":
 		return m.handleYAMLVisualCopy()
 	case "h", "left":
-		if m.yamlVisualType == 'v' || m.yamlVisualType == 'B' {
-			if m.yamlVisualCurCol > yamlFoldPrefixLen {
-				m.yamlVisualCurCol--
+		if m.yamlView.visualType == 'v' || m.yamlView.visualType == 'B' {
+			if m.yamlView.visualCurCol > yamlFoldPrefixLen {
+				m.yamlView.visualCurCol--
 			}
 		}
 		return m, nil
 	case "l", "right":
-		if m.yamlVisualType == 'v' || m.yamlVisualType == 'B' {
-			m.yamlVisualCurCol++
+		if m.yamlView.visualType == 'v' || m.yamlView.visualType == 'B' {
+			m.yamlView.visualCurCol++
 		}
 		return m, nil
 	case "j", "down":
-		if m.yamlCursor < totalVisible-1 {
-			m.yamlCursor++
+		if m.yamlView.cursor < totalVisible-1 {
+			m.yamlView.cursor++
 		}
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	case "k", "up":
-		if m.yamlCursor > 0 {
-			m.yamlCursor--
+		if m.yamlView.cursor > 0 {
+			m.yamlView.cursor--
 		}
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	case "g":
 		if m.pendingG {
 			m.pendingG = false
-			m.yamlLineInput = ""
-			m.yamlCursor = 0
-			m.yamlScroll = 0
+			m.yamlView.lineInput = ""
+			m.yamlView.cursor = 0
+			m.yamlView.scroll = 0
 			return m, nil
 		}
 		m.pendingG = true
@@ -70,27 +70,27 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "G":
 		return m.handleYAMLVisualG(totalVisible, maxScroll)
 	case "ctrl+d":
-		m.yamlCursor += scrollStep(m.yamlScrollOption, m.yamlViewportLines())
-		if m.yamlCursor >= totalVisible {
-			m.yamlCursor = totalVisible - 1
+		m.yamlView.cursor += scrollStep(m.yamlView.scrollOption, m.yamlViewportLines())
+		if m.yamlView.cursor >= totalVisible {
+			m.yamlView.cursor = totalVisible - 1
 		}
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	case "ctrl+u":
-		m.yamlCursor -= scrollStep(m.yamlScrollOption, m.yamlViewportLines())
-		if m.yamlCursor < 0 {
-			m.yamlCursor = 0
+		m.yamlView.cursor -= scrollStep(m.yamlView.scrollOption, m.yamlViewportLines())
+		if m.yamlView.cursor < 0 {
+			m.yamlView.cursor = 0
 		}
 		m.ensureYAMLCursorVisible()
 		return m, nil
 	case "ctrl+c":
-		m.yamlVisualMode = false
+		m.yamlView.visualMode = false
 		m.mode = modeExplorer
-		m.yamlScroll = 0
-		m.yamlCursor = 0
+		m.yamlView.scroll = 0
+		m.yamlView.cursor = 0
 		return m, nil
 	case "0":
-		m.yamlVisualCurCol = yamlFoldPrefixLen
+		m.yamlView.visualCurCol = yamlFoldPrefixLen
 		return m, nil
 	case "$", "w", "b", "e", "E", "B", "W", "^":
 		return m.handleYAMLVisualWordMotion(msg.String())
@@ -99,43 +99,43 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLVisualToggleMode(mode rune) (tea.Model, tea.Cmd) {
-	if m.yamlVisualType == mode {
-		m.yamlVisualMode = false
+	if m.yamlView.visualType == mode {
+		m.yamlView.visualMode = false
 	} else {
-		m.yamlVisualType = mode
+		m.yamlView.visualType = mode
 	}
 	return m, nil
 }
 
 func (m Model) handleYAMLVisualG(totalVisible, maxScroll int) (tea.Model, tea.Cmd) {
-	if m.yamlLineInput != "" {
-		lineNum, _ := strconv.Atoi(m.yamlLineInput)
-		m.yamlLineInput = ""
+	if m.yamlView.lineInput != "" {
+		lineNum, _ := strconv.Atoi(m.yamlView.lineInput)
+		m.yamlView.lineInput = ""
 		if lineNum > 0 {
 			lineNum--
 		}
-		m.yamlCursor = max(min(lineNum, totalVisible-1), 0)
+		m.yamlView.cursor = max(min(lineNum, totalVisible-1), 0)
 		m.ensureYAMLCursorVisible()
 	} else {
-		m.yamlCursor = max(totalVisible-1, 0)
-		m.yamlScroll = maxScroll
+		m.yamlView.cursor = max(totalVisible-1, 0)
+		m.yamlView.scroll = maxScroll
 	}
 	return m, nil
 }
 
 func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
-	_, mapping := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
-	selStart := min(m.yamlVisualStart, m.yamlCursor)
-	selEnd := max(m.yamlVisualStart, m.yamlCursor)
+	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	selStart := min(m.yamlView.visualStart, m.yamlView.cursor)
+	selEnd := max(m.yamlView.visualStart, m.yamlView.cursor)
 	if selStart < 0 {
 		selStart = 0
 	}
 	if selEnd >= len(mapping) {
 		selEnd = len(mapping) - 1
 	}
-	origLines := strings.Split(m.yamlContent, "\n")
+	origLines := strings.Split(m.yamlView.content, "\n")
 	var clipText string
-	switch m.yamlVisualType {
+	switch m.yamlView.visualType {
 	case 'v':
 		clipText = m.yamlVisualCopyChar(selStart, selEnd, mapping, origLines)
 	case 'B':
@@ -144,18 +144,18 @@ func (m Model) handleYAMLVisualCopy() (tea.Model, tea.Cmd) {
 		clipText = m.yamlVisualCopyLine(selStart, selEnd, mapping, origLines)
 	}
 	lineCount := selEnd - selStart + 1
-	visualType := m.yamlVisualType
-	m.yamlVisualMode = false
+	visualType := m.yamlView.visualType
+	m.yamlView.visualMode = false
 	m.setStatusMessage(formatVisualYank(clipText, visualType, lineCount), false)
 	return m, tea.Batch(copyToSystemClipboard(clipText), scheduleStatusClear())
 }
 
 func (m Model) yamlVisualCopyChar(selStart, selEnd int, mapping []int, origLines []string) string {
 	var parts []string
-	anchorCol := m.yamlVisualCol - yamlFoldPrefixLen
-	cursorCol := m.yamlVisualCurCol - yamlFoldPrefixLen
+	anchorCol := m.yamlView.visualCol - yamlFoldPrefixLen
+	cursorCol := m.yamlView.visualCurCol - yamlFoldPrefixLen
 	startCol, endCol := anchorCol, cursorCol
-	if m.yamlVisualStart > m.yamlCursor {
+	if m.yamlView.visualStart > m.yamlView.cursor {
 		startCol, endCol = cursorCol, anchorCol
 	}
 	for i := selStart; i <= selEnd; i++ {
@@ -188,8 +188,8 @@ func (m Model) yamlVisualCopyChar(selStart, selEnd int, mapping []int, origLines
 }
 
 func (m Model) yamlVisualCopyBlock(selStart, selEnd int, mapping []int, origLines []string) string {
-	colStart := min(m.yamlVisualCol, m.yamlVisualCurCol) - yamlFoldPrefixLen
-	colEnd := max(m.yamlVisualCol, m.yamlVisualCurCol) - yamlFoldPrefixLen + 1
+	colStart := min(m.yamlView.visualCol, m.yamlView.visualCurCol) - yamlFoldPrefixLen
+	colEnd := max(m.yamlView.visualCol, m.yamlView.visualCurCol) - yamlFoldPrefixLen + 1
 	var parts []string
 	for i := selStart; i <= selEnd; i++ {
 		if i >= len(mapping) || mapping[i] < 0 || mapping[i] >= len(origLines) {
@@ -226,11 +226,11 @@ func (m Model) yamlVisualCopyLine(selStart, selEnd int, mapping []int, origLines
 // visible-line space (with the fold prefix included) and clamped to keep the
 // selection out of the fold prefix.
 func (m Model) applyYAMLTextObject(op byte, motion string) (tea.Model, tea.Cmd) {
-	visLines, _ := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
-	if m.yamlCursor < 0 || m.yamlCursor >= len(visLines) {
+	visLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(visLines) {
 		return m, nil
 	}
-	start, end, ok := textObjectRange(visLines[m.yamlCursor], m.yamlVisualCurCol, op, motion)
+	start, end, ok := textObjectRange(visLines[m.yamlView.cursor], m.yamlView.visualCurCol, op, motion)
 	if !ok {
 		return m, nil
 	}
@@ -244,10 +244,10 @@ func (m Model) applyYAMLTextObject(op byte, motion string) (tea.Model, tea.Cmd) 
 	if start < yamlFoldPrefixLen {
 		start = yamlFoldPrefixLen
 	}
-	m.yamlVisualType = 'v'
-	m.yamlVisualStart = m.yamlCursor
-	m.yamlVisualCol = start
-	m.yamlVisualCurCol = end
+	m.yamlView.visualType = 'v'
+	m.yamlView.visualStart = m.yamlView.cursor
+	m.yamlView.visualCol = start
+	m.yamlView.visualCurCol = end
 	return m, nil
 }
 
@@ -257,20 +257,20 @@ func (m Model) handleYAMLVisualWordMotion(key string) (tea.Model, tea.Cmd) {
 }
 
 func (m *Model) yamlWordMotionStep(key string) {
-	visLines, _ := buildVisibleLines(m.yamlContent, m.yamlSections, m.yamlCollapsed)
-	if m.yamlCursor < 0 || m.yamlCursor >= len(visLines) {
+	visLines, _ := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(visLines) {
 		return
 	}
 
 	switch key {
 	case "$":
-		lineLen := len([]rune(visLines[m.yamlCursor]))
+		lineLen := len([]rune(visLines[m.yamlView.cursor]))
 		if lineLen > 0 {
-			m.yamlVisualCurCol = lineLen - 1
+			m.yamlView.visualCurCol = lineLen - 1
 		}
 	case "^":
-		col := max(firstNonWhitespace(visLines[m.yamlCursor]), yamlFoldPrefixLen)
-		m.yamlVisualCurCol = col
+		col := max(firstNonWhitespace(visLines[m.yamlView.cursor]), yamlFoldPrefixLen)
+		m.yamlView.visualCurCol = col
 	case "w":
 		m.yamlWordForward(visLines, nextWordStart)
 	case "W":
@@ -287,31 +287,31 @@ func (m *Model) yamlWordMotionStep(key string) {
 }
 
 func (m *Model) yamlWordForward(visLines []string, motionFn func(string, int) int) {
-	lineLen := len([]rune(visLines[m.yamlCursor]))
-	newCol := motionFn(visLines[m.yamlCursor], m.yamlVisualCurCol)
-	if newCol >= lineLen && m.yamlCursor < len(visLines)-1 {
-		m.yamlCursor++
-		newCol = motionFn(visLines[m.yamlCursor], 0)
-		nextLineLen := len([]rune(visLines[m.yamlCursor]))
+	lineLen := len([]rune(visLines[m.yamlView.cursor]))
+	newCol := motionFn(visLines[m.yamlView.cursor], m.yamlView.visualCurCol)
+	if newCol >= lineLen && m.yamlView.cursor < len(visLines)-1 {
+		m.yamlView.cursor++
+		newCol = motionFn(visLines[m.yamlView.cursor], 0)
+		nextLineLen := len([]rune(visLines[m.yamlView.cursor]))
 		if newCol >= nextLineLen {
 			newCol = max(nextLineLen-1, 0)
 		}
-		m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
+		m.yamlView.visualCurCol = max(yamlFoldPrefixLen, newCol)
 		m.ensureYAMLCursorVisible()
 	} else {
-		m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
+		m.yamlView.visualCurCol = max(yamlFoldPrefixLen, newCol)
 	}
 }
 
 func (m *Model) yamlWordBackward(visLines []string, motionFn func(string, int) int) {
-	newCol := motionFn(visLines[m.yamlCursor], m.yamlVisualCurCol)
-	if newCol < 0 && m.yamlCursor > 0 {
-		m.yamlCursor--
-		lineLen := len([]rune(visLines[m.yamlCursor]))
-		newCol = max(motionFn(visLines[m.yamlCursor], lineLen), 0)
-		m.yamlVisualCurCol = max(yamlFoldPrefixLen, newCol)
+	newCol := motionFn(visLines[m.yamlView.cursor], m.yamlView.visualCurCol)
+	if newCol < 0 && m.yamlView.cursor > 0 {
+		m.yamlView.cursor--
+		lineLen := len([]rune(visLines[m.yamlView.cursor]))
+		newCol = max(motionFn(visLines[m.yamlView.cursor], lineLen), 0)
+		m.yamlView.visualCurCol = max(yamlFoldPrefixLen, newCol)
 		m.ensureYAMLCursorVisible()
 	} else {
-		m.yamlVisualCurCol = max(yamlFoldPrefixLen, max(newCol, 0))
+		m.yamlView.visualCurCol = max(yamlFoldPrefixLen, max(newCol, 0))
 	}
 }

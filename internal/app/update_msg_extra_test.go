@@ -42,7 +42,7 @@ func TestUpdateYamlLoadedMsgSuccess(t *testing.T) {
 	result, cmd := m.Update(yamlLoadedMsg{content: "apiVersion: v1\nkind: Pod\n"})
 	mdl := result.(Model)
 	assert.False(t, mdl.loading)
-	assert.Contains(t, mdl.yamlContent, "apiVersion")
+	assert.Contains(t, mdl.yamlView.content, "apiVersion")
 	assert.Nil(t, mdl.err)
 	assert.Nil(t, cmd)
 }

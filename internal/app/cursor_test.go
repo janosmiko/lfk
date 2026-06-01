@@ -2459,7 +2459,7 @@ func TestCovPushPopLeft(t *testing.T) {
 func TestCovClearRight(t *testing.T) {
 	m := baseModelCov()
 	m.rightItems = []model.Item{{Name: "right1"}}
-	m.yamlContent = "apiVersion: v1"
+	m.yamlView.content = "apiVersion: v1"
 	m.previewYAML = "yaml content"
 	m.metricsContent = "metrics"
 	m.previewEventsContent = "events"
@@ -2467,7 +2467,7 @@ func TestCovClearRight(t *testing.T) {
 
 	m.clearRight()
 	assert.Nil(t, m.rightItems)
-	assert.Empty(t, m.yamlContent)
+	assert.Empty(t, m.yamlView.content)
 	assert.Empty(t, m.previewYAML)
 	assert.Empty(t, m.metricsContent)
 	assert.Empty(t, m.previewEventsContent)

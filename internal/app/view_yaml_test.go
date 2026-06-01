@@ -92,9 +92,9 @@ func TestYamlTitle(t *testing.T) {
 // --- yamlCursorCol ---
 
 func TestYamlCursorCol(t *testing.T) {
-	m := Model{yamlVisualCurCol: 15}
+	m := Model{yamlView: yamlViewState{visualCurCol: 15}}
 	assert.Equal(t, 15, m.yamlCursorCol())
 
-	m.yamlVisualCurCol = 0
+	m.yamlView.visualCurCol = 0
 	assert.Equal(t, 0, m.yamlCursorCol())
 }

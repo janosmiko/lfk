@@ -23,8 +23,10 @@ func TestViewDescribeShowsStatusMessage(t *testing.T) {
 func TestViewYAMLShowsStatusMessage(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:      "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test",
-		yamlCollapsed:    map[string]bool{},
+		yamlView: yamlViewState{
+			content:   "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test",
+			collapsed: map[string]bool{},
+		},
 		tabs:             []TabState{{}},
 		statusMessage:    "Copied 1 line",
 		statusMessageExp: time.Now().Add(5 * time.Second),
@@ -65,10 +67,12 @@ func TestViewEventViewerShowsStatusMessage(t *testing.T) {
 func TestYAMLNormalCopyYanksCursorLine(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:   "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test",
-		yamlCollapsed: map[string]bool{},
-		yamlCursor:    1,
-		tabs:          []TabState{{}},
+		yamlView: yamlViewState{
+			content:   "apiVersion: v1\nkind: Pod\nmetadata:\n  name: test",
+			collapsed: map[string]bool{},
+			cursor:    1,
+		},
+		tabs: []TabState{{}},
 	}
 	ret, cmd := m.handleYAMLKey(keyMsg("y"))
 	rm := ret.(Model)
@@ -126,16 +130,18 @@ func TestLogsNormalCopyEmptyBuffer(t *testing.T) {
 func TestYAMLNormalCopyCountPrefixYanksMultipleLines(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:   "a: 1\nb: 2\nc: 3\nd: 4\ne: 5",
-		yamlCollapsed: map[string]bool{},
-		yamlCursor:    1,
-		yamlLineInput: "3",
-		tabs:          []TabState{{}},
+		yamlView: yamlViewState{
+			content:   "a: 1\nb: 2\nc: 3\nd: 4\ne: 5",
+			collapsed: map[string]bool{},
+			cursor:    1,
+			lineInput: "3",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, cmd := m.handleYAMLKey(keyMsg("y"))
 	rm := ret.(Model)
 	assert.Equal(t, "Copied 3 lines", rm.statusMessage)
-	assert.Empty(t, rm.yamlLineInput, "digit buffer must be consumed by the yank")
+	assert.Empty(t, rm.yamlView.lineInput, "digit buffer must be consumed by the yank")
 	assert.NotNil(t, cmd)
 }
 
@@ -243,12 +249,14 @@ func TestYAMLNormalCopyCountSkipsCollapsedSection(t *testing.T) {
 	}
 	m := Model{
 		width: 80, height: 30, mode: modeYAML,
-		yamlContent:   content,
-		yamlSections:  sections,
-		yamlCollapsed: collapsed,
-		yamlCursor:    0,
-		yamlLineInput: "100",
-		tabs:          []TabState{{}},
+		yamlView: yamlViewState{
+			content:   content,
+			sections:  sections,
+			collapsed: collapsed,
+			cursor:    0,
+			lineInput: "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleYAMLKey(keyMsg("y"))
 	rm := ret.(Model)

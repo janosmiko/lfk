@@ -478,7 +478,7 @@ func TestPush2UpdateYamlLoadedMsg(t *testing.T) {
 	msg := yamlLoadedMsg{content: "apiVersion: v1\nkind: Pod\n"}
 	result, _ := m.Update(msg)
 	rm := result.(Model)
-	assert.Contains(t, rm.yamlContent, "apiVersion")
+	assert.Contains(t, rm.yamlView.content, "apiVersion")
 }
 
 func TestPush2UpdateYamlLoadedMsgErr(t *testing.T) {
@@ -1364,7 +1364,7 @@ func TestUpdateContainersLoadedClearsPreviewLoadingAtLevelContainers(t *testing.
 
 // TestUpdateYamlLoadedErrorClearsLoadingPlaceholder locks in the fix for
 // issue #34: pressing Enter on a resource kicks off the full-screen YAML
-// view with m.yamlContent="Loading..." as an initial placeholder.
+// view with m.yamlView.content="Loading..." as an initial placeholder.
 // updateYamlLoaded previously bailed out on any error (including
 // context.Canceled) without touching yamlContent, so the viewer stayed
 // stuck on "Loading..." forever. The status-bar error flashed briefly
@@ -1373,11 +1373,11 @@ func TestUpdateContainersLoadedClearsPreviewLoadingAtLevelContainers(t *testing.
 func TestUpdateYamlLoadedErrorClearsLoadingPlaceholder(t *testing.T) {
 	m := baseFinalModel()
 	m.mode = modeYAML
-	m.yamlContent = "Loading..."
+	m.yamlView.content = "Loading..."
 	result, _ := m.Update(yamlLoadedMsg{err: assert.AnError})
 	rm := result.(Model)
-	assert.NotEqual(t, "Loading...", rm.yamlContent, "yamlContent must not stay on the Loading placeholder when the fetch errors")
-	assert.Contains(t, rm.yamlContent, assert.AnError.Error(), "yamlContent should surface the error message so users can see what went wrong")
+	assert.NotEqual(t, "Loading...", rm.yamlView.content, "yamlContent must not stay on the Loading placeholder when the fetch errors")
+	assert.Contains(t, rm.yamlView.content, assert.AnError.Error(), "yamlContent should surface the error message so users can see what went wrong")
 }
 
 // TestUpdateYamlLoadedContextCanceledClearsPlaceholder covers the
@@ -1387,10 +1387,10 @@ func TestUpdateYamlLoadedErrorClearsLoadingPlaceholder(t *testing.T) {
 func TestUpdateYamlLoadedContextCanceledClearsPlaceholder(t *testing.T) {
 	m := baseFinalModel()
 	m.mode = modeYAML
-	m.yamlContent = "Loading..."
+	m.yamlView.content = "Loading..."
 	result, _ := m.Update(yamlLoadedMsg{err: context.Canceled})
 	rm := result.(Model)
-	assert.NotEqual(t, "Loading...", rm.yamlContent, "yamlContent must not stay on the Loading placeholder when the request is canceled")
+	assert.NotEqual(t, "Loading...", rm.yamlView.content, "yamlContent must not stay on the Loading placeholder when the request is canceled")
 }
 
 func TestFinal2UpdateNamespacesLoadedMsg(t *testing.T) {
@@ -1421,7 +1421,7 @@ func TestFinal2UpdateYAMLLoadedMsg(t *testing.T) {
 	result, _ := m.Update(yamlLoadedMsg{content: "apiVersion: v1\nkind: Pod"})
 	rm := result.(Model)
 	assert.False(t, rm.loading)
-	assert.NotEmpty(t, rm.yamlContent)
+	assert.NotEmpty(t, rm.yamlView.content)
 }
 
 func TestFinal2UpdateYAMLLoadedMsgError(t *testing.T) {

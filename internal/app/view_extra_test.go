@@ -49,11 +49,13 @@ func TestViewExplorerDashboardTwoColFillsThemeBackground(t *testing.T) {
 		dashboardPreview:    styled + "\nNODES: 3 Ready\nPODS: 42 Running",
 		dashboardEventsPreview: "RECENT WARNING EVENTS\n" +
 			lipgloss.NewStyle().Foreground(lipgloss.Color("#ffaa00")).Render("Warning") + " pod crashed",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 
@@ -121,11 +123,13 @@ func TestViewExplorerDashboardTwoColWrappedEventsFillBackground(t *testing.T) {
 			"  " + ui.StatusProgressing.Render("⚠") + " 2m   " +
 			ui.StatusFailed.Render("Unhealthy:") + " " + ui.NormalStyle.Render("Pod/argocd-server") + "\n" +
 			"       " + longMsg,
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 
@@ -202,13 +206,15 @@ func TestViewYAMLModeWithVisualMode(t *testing.T) {
 		nav: model.NavigationState{
 			Level: model.LevelResources,
 		},
-		namespace:      "default",
-		middleItems:    []model.Item{{Name: "my-configmap"}},
-		yamlContent:    "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: my-configmap",
-		yamlCollapsed:  make(map[string]bool),
-		yamlVisualMode: true,
-		yamlVisualType: 'V',
-		tabs:           []TabState{{}},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "my-configmap"}},
+		yamlView: yamlViewState{
+			content:    "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: my-configmap",
+			collapsed:  make(map[string]bool),
+			visualMode: true,
+			visualType: 'V',
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -223,13 +229,15 @@ func TestViewYAMLModeCharVisual(t *testing.T) {
 		nav: model.NavigationState{
 			Level: model.LevelResources,
 		},
-		namespace:      "default",
-		middleItems:    []model.Item{{Name: "my-configmap"}},
-		yamlContent:    "apiVersion: v1\nkind: ConfigMap",
-		yamlCollapsed:  make(map[string]bool),
-		yamlVisualMode: true,
-		yamlVisualType: 'v',
-		tabs:           []TabState{{}},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "my-configmap"}},
+		yamlView: yamlViewState{
+			content:    "apiVersion: v1\nkind: ConfigMap",
+			collapsed:  make(map[string]bool),
+			visualMode: true,
+			visualType: 'v',
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -244,13 +252,15 @@ func TestViewYAMLModeBlockVisual(t *testing.T) {
 		nav: model.NavigationState{
 			Level: model.LevelResources,
 		},
-		namespace:      "default",
-		middleItems:    []model.Item{{Name: "my-configmap"}},
-		yamlContent:    "apiVersion: v1\nkind: ConfigMap",
-		yamlCollapsed:  make(map[string]bool),
-		yamlVisualMode: true,
-		yamlVisualType: 'B',
-		tabs:           []TabState{{}},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "my-configmap"}},
+		yamlView: yamlViewState{
+			content:    "apiVersion: v1\nkind: ConfigMap",
+			collapsed:  make(map[string]bool),
+			visualMode: true,
+			visualType: 'B',
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -265,13 +275,15 @@ func TestViewYAMLModeSearchActive(t *testing.T) {
 		nav: model.NavigationState{
 			Level: model.LevelResources,
 		},
-		namespace:      "default",
-		middleItems:    []model.Item{{Name: "test"}},
-		yamlContent:    "apiVersion: v1\nkind: ConfigMap",
-		yamlCollapsed:  make(map[string]bool),
-		yamlSearchMode: true,
-		yamlSearchText: TextInput{Value: "api"},
-		tabs:           []TabState{{}},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "test"}},
+		yamlView: yamlViewState{
+			content:    "apiVersion: v1\nkind: ConfigMap",
+			collapsed:  make(map[string]bool),
+			searchMode: true,
+			searchText: TextInput{Value: "api"},
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -286,14 +298,16 @@ func TestViewYAMLModeSearchResultsShown(t *testing.T) {
 		nav: model.NavigationState{
 			Level: model.LevelResources,
 		},
-		namespace:      "default",
-		middleItems:    []model.Item{{Name: "test"}},
-		yamlContent:    "apiVersion: v1\nkind: ConfigMap\napiVersion: apps/v1",
-		yamlCollapsed:  make(map[string]bool),
-		yamlSearchText: TextInput{Value: "apiVersion"},
-		yamlMatchLines: []int{0, 2},
-		yamlMatchIdx:   0,
-		tabs:           []TabState{{}},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "test"}},
+		yamlView: yamlViewState{
+			content:    "apiVersion: v1\nkind: ConfigMap\napiVersion: apps/v1",
+			collapsed:  make(map[string]bool),
+			searchText: TextInput{Value: "apiVersion"},
+			matchLines: []int{0, 2},
+			matchIdx:   0,
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -308,13 +322,15 @@ func TestViewYAMLModeSearchNoMatches(t *testing.T) {
 		nav: model.NavigationState{
 			Level: model.LevelResources,
 		},
-		namespace:      "default",
-		middleItems:    []model.Item{{Name: "test"}},
-		yamlContent:    "apiVersion: v1\nkind: ConfigMap",
-		yamlCollapsed:  make(map[string]bool),
-		yamlSearchText: TextInput{Value: "nonexistent"},
-		yamlMatchLines: nil,
-		tabs:           []TabState{{}},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "test"}},
+		yamlView: yamlViewState{
+			content:    "apiVersion: v1\nkind: ConfigMap",
+			collapsed:  make(map[string]bool),
+			searchText: TextInput{Value: "nonexistent"},
+			matchLines: nil,
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -330,15 +346,17 @@ func TestViewYAMLModeDefaultHintsListGotoAndOmitSearchNav(t *testing.T) {
 	// (123G) but must not advertise n/N — there are no matches to step
 	// through yet.
 	m := Model{
-		width:         200, // wide enough so hints don't truncate
-		height:        30,
-		mode:          modeYAML,
-		nav:           model.NavigationState{Level: model.LevelResources},
-		namespace:     "default",
-		middleItems:   []model.Item{{Name: "test"}},
-		yamlContent:   "apiVersion: v1\nkind: ConfigMap",
-		yamlCollapsed: make(map[string]bool),
-		tabs:          []TabState{{}},
+		width:       200, // wide enough so hints don't truncate
+		height:      30,
+		mode:        modeYAML,
+		nav:         model.NavigationState{Level: model.LevelResources},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "test"}},
+		yamlView: yamlViewState{
+			content:   "apiVersion: v1\nkind: ConfigMap",
+			collapsed: make(map[string]bool),
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -352,18 +370,20 @@ func TestViewYAMLModeSearchResultsShowNavHint(t *testing.T) {
 	// A committed search with at least one match should expose the n/N
 	// next/prev navigation hint alongside the [hit/total] indicator.
 	m := Model{
-		width:          200,
-		height:         30,
-		mode:           modeYAML,
-		nav:            model.NavigationState{Level: model.LevelResources},
-		namespace:      "default",
-		middleItems:    []model.Item{{Name: "test"}},
-		yamlContent:    "apiVersion: v1\nkind: ConfigMap\napiVersion: apps/v1",
-		yamlCollapsed:  make(map[string]bool),
-		yamlSearchText: TextInput{Value: "apiVersion"},
-		yamlMatchLines: []int{0, 2},
-		yamlMatchIdx:   0,
-		tabs:           []TabState{{}},
+		width:       200,
+		height:      30,
+		mode:        modeYAML,
+		nav:         model.NavigationState{Level: model.LevelResources},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "test"}},
+		yamlView: yamlViewState{
+			content:    "apiVersion: v1\nkind: ConfigMap\napiVersion: apps/v1",
+			collapsed:  make(map[string]bool),
+			searchText: TextInput{Value: "apiVersion"},
+			matchLines: []int{0, 2},
+			matchIdx:   0,
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -374,15 +394,17 @@ func TestViewYAMLModeSearchResultsShowNavHint(t *testing.T) {
 
 func TestViewYAMLModeSmallHeight(t *testing.T) {
 	m := Model{
-		width:         80,
-		height:        5,
-		mode:          modeYAML,
-		nav:           model.NavigationState{Level: model.LevelResources},
-		namespace:     "default",
-		middleItems:   []model.Item{{Name: "test"}},
-		yamlContent:   "a: 1\nb: 2\nc: 3\nd: 4\ne: 5\nf: 6",
-		yamlCollapsed: make(map[string]bool),
-		tabs:          []TabState{{}},
+		width:       80,
+		height:      5,
+		mode:        modeYAML,
+		nav:         model.NavigationState{Level: model.LevelResources},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "test"}},
+		yamlView: yamlViewState{
+			content:   "a: 1\nb: 2\nc: 3\nd: 4\ne: 5\nf: 6",
+			collapsed: make(map[string]bool),
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	assert.NotEmpty(t, output)
@@ -400,17 +422,19 @@ func TestViewExplorerFullscreenMiddle(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        []model.Item{{Name: "nginx"}},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		fullscreenMiddle:   true,
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:      []model.Item{{Name: "nginx"}},
+		width:            120,
+		height:           40,
+		mode:             modeExplorer,
+		namespace:        "default",
+		fullscreenMiddle: true,
+		tabs:             []TabState{{}},
+		selectedItems:    make(map[string]bool),
+		cursorMemory:     make(map[string]int),
+		itemCache:        make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
@@ -427,17 +451,19 @@ func TestViewExplorerWithError(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        nil,
-		err:                assert.AnError,
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:   nil,
+		err:           assert.AnError,
+		width:         120,
+		height:        40,
+		mode:          modeExplorer,
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
@@ -454,17 +480,19 @@ func TestViewExplorerWithOverlay(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        []model.Item{{Name: "nginx"}},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		overlay:            overlayQuitConfirm,
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:   []model.Item{{Name: "nginx"}},
+		width:         120,
+		height:        40,
+		mode:          modeExplorer,
+		namespace:     "default",
+		overlay:       overlayQuitConfirm,
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
@@ -481,17 +509,19 @@ func TestViewExplorerWithErrorLogOverlay(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        []model.Item{{Name: "nginx"}},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		overlayErrorLog:    true,
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:     []model.Item{{Name: "nginx"}},
+		width:           120,
+		height:          40,
+		mode:            modeExplorer,
+		namespace:       "default",
+		overlayErrorLog: true,
+		tabs:            []TabState{{}},
+		selectedItems:   make(map[string]bool),
+		cursorMemory:    make(map[string]int),
+		itemCache:       make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
@@ -602,15 +632,17 @@ func TestViewExplorerColumnView(t *testing.T) {
 			{Name: "cluster-1"},
 			{Name: "cluster-2"},
 		},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		width:         120,
+		height:        40,
+		mode:          modeExplorer,
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
@@ -631,15 +663,17 @@ func TestViewExplorerTableView(t *testing.T) {
 		middleItems: []model.Item{
 			{Name: "nginx-pod", Status: "Running", Ready: "1/1", Age: "3d"},
 		},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		width:         120,
+		height:        40,
+		mode:          modeExplorer,
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
@@ -667,8 +701,10 @@ func TestViewExplorerFullscreenDashboard(t *testing.T) {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
-		yamlCollapsed:       make(map[string]bool),
-		selectedNamespaces:  make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
+		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
 	assert.NotEmpty(t, view)
@@ -693,8 +729,10 @@ func TestViewExplorerFullscreenDashboardMonitoring(t *testing.T) {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
-		yamlCollapsed:       make(map[string]bool),
-		selectedNamespaces:  make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
+		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
 	assert.NotEmpty(t, view)
@@ -724,8 +762,10 @@ func TestViewExplorerFullscreenDashboardWithScroll(t *testing.T) {
 		selectedItems:       make(map[string]bool),
 		cursorMemory:        make(map[string]int),
 		itemCache:           make(map[string][]model.Item),
-		yamlCollapsed:       make(map[string]bool),
-		selectedNamespaces:  make(map[string]bool),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
+		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
 	assert.NotEmpty(t, view)
@@ -752,11 +792,13 @@ func TestViewExplorerWithMultipleTabs(t *testing.T) {
 			{nav: model.NavigationState{Context: "test-cluster"}},
 			{nav: model.NavigationState{Context: "prod-cluster"}},
 		},
-		activeTab:          0,
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		activeTab:     0,
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()
@@ -776,17 +818,19 @@ func TestViewExplorerCollapsedGroups(t *testing.T) {
 			{Name: "Deployments", Category: "Workloads"},
 			{Name: "Services", Category: "Networking"},
 		},
-		width:              120,
-		height:             40,
-		mode:               modeExplorer,
-		namespace:          "default",
-		expandedGroup:      "Workloads",
-		allGroupsExpanded:  false,
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		width:             120,
+		height:            40,
+		mode:              modeExplorer,
+		namespace:         "default",
+		expandedGroup:     "Workloads",
+		allGroupsExpanded: false,
+		tabs:              []TabState{{}},
+		selectedItems:     make(map[string]bool),
+		cursorMemory:      make(map[string]int),
+		itemCache:         make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	view := m.View()

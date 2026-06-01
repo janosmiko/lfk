@@ -55,37 +55,19 @@ type Model struct {
 	// without a fingerprint, which safely defaults to a real fetch.
 	cacheFingerprints map[string]string
 
-	// Preview / YAML content for the right column or full screen view.
-	yamlContent      string
-	yamlScroll       int
-	yamlCursor       int       // cursor line in visible-line space
-	yamlScrollOption int       // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
-	yamlLineInput    string    // digit buffer for 123G jump-to-line
-	yamlSearchMode   bool      // true when typing in the search bar
-	yamlSearchText   TextInput // current search query
-	yamlMatchLines   []int     // line indices matching the search
-	yamlMatchIdx     int       // current match index in yamlMatchLines
-
-	// Visual selection in YAML view.
-	yamlVisualMode   bool // true when in visual line selection mode
-	yamlVisualStart  int  // anchor line (visible-line index) where visual selection started
-	yamlVisualType   rune // 'V' = line, 'v' = char, 'B' = block
-	yamlVisualCol    int  // character column of anchor (for char and block modes)
-	yamlVisualCurCol int  // current cursor column (for char and block modes)
-
-	// Word wrap toggle for YAML view.
-	yamlWrap bool
-
-	// Collapsible YAML sections.
-	yamlSections  []yamlSection   // parsed hierarchical sections
-	yamlCollapsed map[string]bool // collapsed state per section key (persists across resources)
+	// Full-screen YAML viewer state (the `y` view): content, scroll/cursor,
+	// search, visual selection, wrap, and collapsible sections. Extracted
+	// from the formerly flat yaml* fields into one cohesive value; see
+	// yamlview.go. Note: previewYAML/splitPreview/fullYAMLPreview below are
+	// distinct right-pane preview state and are intentionally not part of it.
+	yamlView yamlViewState
 
 	// Split preview: show children in top 1/3 + YAML in bottom 2/3 of right column.
 	splitPreview bool
 	// Full YAML preview: show only YAML in the right column (no children list).
 	fullYAMLPreview bool
 	// Separate YAML content for the split/full preview in the right column,
-	// so it doesn't conflict with the full-screen yamlContent.
+	// so it doesn't conflict with the full-screen yamlView.content.
 	previewYAML string
 
 	// Current view mode.

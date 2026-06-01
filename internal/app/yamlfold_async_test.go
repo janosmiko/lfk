@@ -94,9 +94,9 @@ func TestUpdateYamlLoadedDoesNotReprocess(t *testing.T) {
 	result, _ := m.updateYamlLoaded(msg)
 	rm := result.(Model)
 
-	assert.Equal(t, raw, rm.yamlContent,
+	assert.Equal(t, raw, rm.yamlView.content,
 		"handler must store the content verbatim — no re-indenting")
-	assert.Nil(t, rm.yamlSections,
+	assert.Nil(t, rm.yamlView.sections,
 		"handler must store sections verbatim — no re-parsing")
 }
 

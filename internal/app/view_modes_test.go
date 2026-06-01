@@ -458,11 +458,13 @@ func TestViewYAMLMode(t *testing.T) {
 		nav: model.NavigationState{
 			Level: model.LevelResources,
 		},
-		namespace:     "default",
-		middleItems:   []model.Item{{Name: "my-configmap"}},
-		yamlContent:   "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: my-configmap",
-		yamlCollapsed: make(map[string]bool),
-		tabs:          []TabState{{}},
+		namespace:   "default",
+		middleItems: []model.Item{{Name: "my-configmap"}},
+		yamlView: yamlViewState{
+			content:   "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: my-configmap",
+			collapsed: make(map[string]bool),
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -516,13 +518,15 @@ func TestViewHelpMode(t *testing.T) {
 				Kind:        "Pod",
 			},
 		},
-		middleItems:        []model.Item{{Name: "test-pod"}},
-		namespace:          "default",
-		tabs:               []TabState{{}},
-		selectedItems:      make(map[string]bool),
-		cursorMemory:       make(map[string]int),
-		itemCache:          make(map[string][]model.Item),
-		yamlCollapsed:      make(map[string]bool),
+		middleItems:   []model.Item{{Name: "test-pod"}},
+		namespace:     "default",
+		tabs:          []TabState{{}},
+		selectedItems: make(map[string]bool),
+		cursorMemory:  make(map[string]int),
+		itemCache:     make(map[string][]model.Item),
+		yamlView: yamlViewState{
+			collapsed: make(map[string]bool),
+		},
 		selectedNamespaces: make(map[string]bool),
 	}
 	output := m.View()
@@ -580,7 +584,7 @@ func TestPush3ViewExplorerNotEmpty(t *testing.T) {
 func TestPush3ViewYAMLNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeYAML
-	m.yamlContent = "apiVersion: v1"
+	m.yamlView.content = "apiVersion: v1"
 	result := m.View()
 	assert.NotEmpty(t, result)
 }
@@ -878,9 +882,11 @@ func TestCovRenderSplitPreview(t *testing.T) {
 		nav:          model.NavigationState{Level: model.LevelResources, ResourceType: model.ResourceTypeEntry{Kind: "Pod"}},
 		splitPreview: true,
 		previewYAML:  "apiVersion: v1\nkind: Pod",
-		yamlContent:  "apiVersion: v1\nkind: Pod",
-		middleItems:  []model.Item{{Name: "pod-1", Namespace: "ns1", Status: "Running"}},
-		cursors:      [5]int{},
+		yamlView: yamlViewState{
+			content: "apiVersion: v1\nkind: Pod",
+		},
+		middleItems: []model.Item{{Name: "pod-1", Namespace: "ns1", Status: "Running"}},
+		cursors:     [5]int{},
 	}
 	result := m.renderSplitPreview(60, 25)
 	assert.NotEmpty(t, result)

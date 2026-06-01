@@ -57,7 +57,7 @@ func TestPushLeftPopLeft(t *testing.T) {
 func TestClearRight(t *testing.T) {
 	m := Model{
 		rightItems:           []model.Item{{Name: "container-1"}},
-		yamlContent:          "apiVersion: v1",
+		yamlView:             yamlViewState{content: "apiVersion: v1"},
 		previewYAML:          "preview yaml",
 		metricsContent:       "metrics",
 		previewEventsContent: "events",
@@ -67,7 +67,7 @@ func TestClearRight(t *testing.T) {
 	m.clearRight()
 
 	assert.Nil(t, m.rightItems)
-	assert.Empty(t, m.yamlContent)
+	assert.Empty(t, m.yamlView.content)
 	assert.Empty(t, m.previewYAML)
 	assert.Empty(t, m.metricsContent)
 	assert.Empty(t, m.previewEventsContent)
@@ -965,7 +965,7 @@ func TestSaveCurrentTab(t *testing.T) {
 		watchMode:          true,
 		selectedItems:      map[string]bool{"x": true},
 		selectionAnchor:    2,
-		yamlCollapsed:      map[string]bool{"sec1": true},
+		yamlView:           yamlViewState{collapsed: map[string]bool{"sec1": true}},
 		selectedNamespaces: map[string]bool{"ns": true},
 		errorLog: []ui.ErrorLogEntry{
 			{Message: "test", Level: "INF"},
@@ -1062,6 +1062,73 @@ func TestTabSwitchPreservesSecurityState(t *testing.T) {
 	hookMgr, hookAvail = currentSecurityHookState()
 	assert.Same(t, mgrA, hookMgr)
 	assert.Equal(t, availA, hookAvail)
+}
+
+// TestTabSwitchPreservesYAMLViewerState pins the save->switch->restore
+// contract for the full-screen YAML viewer before the yamlViewState
+// extraction. Only the persisted subset (content, scroll, cursor,
+// scrollOption, searchText, matchLines, matchIdx, collapsed) round-trips
+// across a tab switch; the transient fields (visual mode, wrap, lineInput,
+// searchMode, sections) intentionally do not. The extraction must keep this
+// behaviour byte-for-byte, so this test guards the mechanical rename.
+func TestTabSwitchPreservesYAMLViewerState(t *testing.T) {
+	m := Model{
+		tabs: []TabState{
+			{}, // Tab A: receives the active model's YAML state on save.
+			{ // Tab B: carries its own persisted YAML viewer state.
+				yamlContent:      "tab-b-content",
+				yamlScroll:       42,
+				yamlCursor:       7,
+				yamlScrollOption: 10,
+				yamlSearchText:   TextInput{Value: "needle-b"},
+				yamlMatchLines:   []int{3, 9},
+				yamlMatchIdx:     1,
+				yamlCollapsed:    map[string]bool{"spec": true},
+			},
+		},
+		activeTab: 0,
+		// Mirror Tab A's YAML state into the active model so saveCurrentTab
+		// has something to persist.
+		yamlView: yamlViewState{
+			content:      "tab-a-content",
+			scroll:       100,
+			cursor:       12,
+			scrollOption: 20,
+			searchText:   TextInput{Value: "needle-a"},
+			matchLines:   []int{1, 2},
+			matchIdx:     0,
+			collapsed:    map[string]bool{"metadata": true},
+		},
+	}
+
+	// Switch to Tab B: its persisted YAML state must become active.
+	m.saveCurrentTab()
+	m.loadTab(1)
+	assert.Equal(t, "tab-b-content", m.yamlView.content)
+	assert.Equal(t, 42, m.yamlView.scroll)
+	assert.Equal(t, 7, m.yamlView.cursor)
+	assert.Equal(t, 10, m.yamlView.scrollOption)
+	assert.Equal(t, "needle-b", m.yamlView.searchText.Value)
+	assert.Equal(t, []int{3, 9}, m.yamlView.matchLines)
+	assert.Equal(t, 1, m.yamlView.matchIdx)
+	assert.True(t, m.yamlView.collapsed["spec"])
+
+	// Switch back to Tab A: its persisted YAML state must round-trip intact.
+	m.saveCurrentTab()
+	m.loadTab(0)
+	assert.Equal(t, "tab-a-content", m.yamlView.content)
+	assert.Equal(t, 100, m.yamlView.scroll)
+	assert.Equal(t, 12, m.yamlView.cursor)
+	assert.Equal(t, 20, m.yamlView.scrollOption)
+	assert.Equal(t, "needle-a", m.yamlView.searchText.Value)
+	assert.Equal(t, []int{1, 2}, m.yamlView.matchLines)
+	assert.Equal(t, 0, m.yamlView.matchIdx)
+	assert.True(t, m.yamlView.collapsed["metadata"])
+	assert.False(t, m.yamlView.collapsed["spec"], "Tab B's collapsed state must not bleed into Tab A")
+
+	// Deep-copy guard: mutating the restored map must not corrupt the stored tab.
+	m.yamlView.collapsed["injected"] = true
+	assert.False(t, m.tabs[0].yamlCollapsed["injected"], "loadTab must deep-copy yamlCollapsed")
 }
 
 func TestPush2UpdateStatusMessageExpiredMsg(t *testing.T) {
