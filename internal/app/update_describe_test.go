@@ -13,29 +13,33 @@ import (
 
 func TestDescribeKeyEscReturnsToExplorer(t *testing.T) {
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: "line1\nline2\nline3",
-		describeCursor:  2,
-		describeScroll:  1,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "line1\nline2\nline3",
+			cursor:  2,
+			scroll:  1,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(specialKey(tea.KeyEsc))
 	result := ret.(Model)
 	assert.Equal(t, modeExplorer, result.mode)
-	assert.Equal(t, 0, result.describeScroll)
-	assert.Equal(t, 0, result.describeCursor)
-	assert.Equal(t, 0, result.describeCursorCol)
+	assert.Equal(t, 0, result.describeView.scroll)
+	assert.Equal(t, 0, result.describeView.cursor)
+	assert.Equal(t, 0, result.describeView.cursorCol)
 }
 
 func TestDescribeKeyQReturnsToExplorer(t *testing.T) {
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: "line1",
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "line1",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(runeKey('q'))
 	result := ret.(Model)
@@ -44,11 +48,13 @@ func TestDescribeKeyQReturnsToExplorer(t *testing.T) {
 
 func TestDescribeKeyQuestionMarkOpensHelp(t *testing.T) {
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: "line1",
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "line1",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(runeKey('?'))
 	result := ret.(Model)
@@ -60,57 +66,65 @@ func TestDescribeKeyQuestionMarkOpensHelp(t *testing.T) {
 func TestDescribeKeyJMovesCursorDown(t *testing.T) {
 	content := strings.Repeat("line\n", 100)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  0,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(runeKey('j'))
 	result := ret.(Model)
-	assert.Equal(t, 1, result.describeCursor)
+	assert.Equal(t, 1, result.describeView.cursor)
 }
 
 func TestDescribeKeyKMovesCursorUp(t *testing.T) {
 	content := strings.Repeat("line\n", 100)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  10,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  10,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(runeKey('k'))
 	result := ret.(Model)
-	assert.Equal(t, 9, result.describeCursor)
+	assert.Equal(t, 9, result.describeView.cursor)
 }
 
 func TestDescribeKeyKAtZeroStays(t *testing.T) {
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: "line1\nline2",
-		describeCursor:  0,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "line1\nline2",
+			cursor:  0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(runeKey('k'))
 	result := ret.(Model)
-	assert.Equal(t, 0, result.describeCursor)
+	assert.Equal(t, 0, result.describeView.cursor)
 }
 
 func TestDescribeKeyGGMovesToTop(t *testing.T) {
 	content := strings.Repeat("line\n", 100)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  50,
-		describeScroll:  45,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  50,
+			scroll:  45,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	// First g sets pendingG
 	ret, _ := m.handleDescribeKey(runeKey('g'))
@@ -120,177 +134,199 @@ func TestDescribeKeyGGMovesToTop(t *testing.T) {
 	// Second g moves cursor to top
 	ret2, _ := result.handleDescribeKey(runeKey('g'))
 	result2 := ret2.(Model)
-	assert.Equal(t, 0, result2.describeCursor)
+	assert.Equal(t, 0, result2.describeView.cursor)
 	assert.False(t, result2.pendingG)
 }
 
 func TestDescribeKeyGMovesToBottom(t *testing.T) {
 	content := strings.Repeat("line\n", 100)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  0,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(runeKey('G'))
 	result := ret.(Model)
-	assert.Greater(t, result.describeCursor, 0)
+	assert.Greater(t, result.describeView.cursor, 0)
 }
 
 func TestDescribeKeyCtrlDHalfPageDown(t *testing.T) {
 	content := strings.Repeat("line\n", 200)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  0,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlD})
 	result := ret.(Model)
 	// describeContentHeight() = (40 - 4) = 36, half = 18
-	assert.Equal(t, 18, result.describeCursor)
+	assert.Equal(t, 18, result.describeView.cursor)
 }
 
 func TestDescribeKeyCtrlUHalfPageUp(t *testing.T) {
 	content := strings.Repeat("line\n", 200)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  30,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  30,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlU})
 	result := ret.(Model)
-	assert.Equal(t, 12, result.describeCursor) // 30 - 18 = 12
+	assert.Equal(t, 12, result.describeView.cursor) // 30 - 18 = 12
 }
 
 func TestDescribeKeyCtrlUClampsToZero(t *testing.T) {
 	content := strings.Repeat("line\n", 200)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  5,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  5,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlU})
 	result := ret.(Model)
-	assert.Equal(t, 0, result.describeCursor)
+	assert.Equal(t, 0, result.describeView.cursor)
 }
 
 func TestDescribeKeyCtrlFFullPageDown(t *testing.T) {
 	content := strings.Repeat("line\n", 200)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  0,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlF})
 	result := ret.(Model)
-	assert.Equal(t, 36, result.describeCursor) // describeContentHeight() = 36
+	assert.Equal(t, 36, result.describeView.cursor) // describeContentHeight() = 36
 }
 
 func TestDescribeKeyCtrlBFullPageUp(t *testing.T) {
 	content := strings.Repeat("line\n", 200)
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: content,
-		describeCursor:  60,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: content,
+			cursor:  60,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(tea.KeyMsg{Type: tea.KeyCtrlB})
 	result := ret.(Model)
-	assert.Equal(t, 24, result.describeCursor) // 60 - 36 = 24
+	assert.Equal(t, 24, result.describeView.cursor) // 60 - 36 = 24
 }
 
 // --- New describe cursor/visual/search tests ---
 
 func TestDescribeKeyHLColumnMovement(t *testing.T) {
 	m := Model{
-		mode:              modeDescribe,
-		describeContent:   "hello world",
-		describeCursorCol: 5,
-		tabs:              []TabState{{}},
-		width:             80,
-		height:            40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content:   "hello world",
+			cursorCol: 5,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	// h moves left
 	ret, _ := m.handleDescribeKey(runeKey('h'))
 	result := ret.(Model)
-	assert.Equal(t, 4, result.describeCursorCol)
+	assert.Equal(t, 4, result.describeView.cursorCol)
 
 	// l moves right
 	ret2, _ := result.handleDescribeKey(runeKey('l'))
 	result2 := ret2.(Model)
-	assert.Equal(t, 5, result2.describeCursorCol)
+	assert.Equal(t, 5, result2.describeView.cursorCol)
 }
 
 func TestDescribeKeyVisualMode(t *testing.T) {
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: "line1\nline2\nline3",
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "line1\nline2\nline3",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	// v enters char visual mode
 	ret, _ := m.handleDescribeKey(runeKey('v'))
 	result := ret.(Model)
-	assert.Equal(t, byte('v'), result.describeVisualMode)
+	assert.Equal(t, byte('v'), result.describeView.visualMode)
 
 	// esc exits visual mode
 	ret2, _ := result.handleDescribeKey(specialKey(tea.KeyEsc))
 	result2 := ret2.(Model)
-	assert.Equal(t, byte(0), result2.describeVisualMode)
+	assert.Equal(t, byte(0), result2.describeView.visualMode)
 }
 
 func TestDescribeKeyVisualLineMode(t *testing.T) {
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: "line1\nline2\nline3",
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "line1\nline2\nline3",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(runeKey('V'))
 	result := ret.(Model)
-	assert.Equal(t, byte('V'), result.describeVisualMode)
+	assert.Equal(t, byte('V'), result.describeView.visualMode)
 }
 
 func TestDescribeKeySearch(t *testing.T) {
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: "line1\nline2\nline3",
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "line1\nline2\nline3",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	// / activates search
 	ret, _ := m.handleDescribeKey(runeKey('/'))
 	result := ret.(Model)
-	assert.True(t, result.describeSearchActive)
+	assert.True(t, result.describeView.searchActive)
 }
 
 func TestDescribeKeyCopyCurrentLine(t *testing.T) {
 	m := Model{
-		mode:            modeDescribe,
-		describeContent: "line1\nline2\nline3",
-		describeCursor:  1,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: "line1\nline2\nline3",
+			cursor:  1,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, cmd := m.handleDescribeKey(runeKey('y'))
 	result := ret.(Model)
@@ -300,32 +336,36 @@ func TestDescribeKeyCopyCurrentLine(t *testing.T) {
 
 func TestDescribeKeyEscClearsSearchFirst(t *testing.T) {
 	m := Model{
-		mode:                modeDescribe,
-		describeContent:     "line1\nline2",
-		describeSearchQuery: "line",
-		tabs:                []TabState{{}},
-		width:               80,
-		height:              40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content:     "line1\nline2",
+			searchQuery: "line",
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(specialKey(tea.KeyEsc))
 	result := ret.(Model)
 	// First esc clears search, stays in describe mode
 	assert.Equal(t, modeDescribe, result.mode)
-	assert.Empty(t, result.describeSearchQuery)
+	assert.Empty(t, result.describeView.searchQuery)
 }
 
 func TestDescribeKeyWordMotion(t *testing.T) {
 	m := Model{
-		mode:              modeDescribe,
-		describeContent:   "hello world test",
-		describeCursorCol: 0,
-		tabs:              []TabState{{}},
-		width:             80,
-		height:            40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content:   "hello world test",
+			cursorCol: 0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 	ret, _ := m.handleDescribeKey(runeKey('w'))
 	result := ret.(Model)
-	assert.Equal(t, 6, result.describeCursorCol) // "world" starts at 6
+	assert.Equal(t, 6, result.describeView.cursorCol) // "world" starts at 6
 }
 
 // --- handleDiffKey ---
@@ -497,18 +537,18 @@ func TestCovDescribeKeyHelp(t *testing.T) {
 
 func TestCovDescribeKeyToggleWrap(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeWrap = false
+	m.describeView.wrap = false
 	result, _ := m.handleDescribeKey(keyMsg(">"))
 	rm := result.(Model)
-	assert.True(t, rm.describeWrap)
+	assert.True(t, rm.describeView.wrap)
 }
 
 func TestCovDescribeKeyEscClearsSearch(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchQuery = "hello"
+	m.describeView.searchQuery = "hello"
 	result, _ := m.handleDescribeKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.Empty(t, rm.describeSearchQuery)
+	assert.Empty(t, rm.describeView.searchQuery)
 	assert.Equal(t, modeDescribe, rm.mode)
 }
 
@@ -517,140 +557,140 @@ func TestCovDescribeKeyEscExitsView(t *testing.T) {
 	result, _ := m.handleDescribeKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)
-	assert.Equal(t, 0, rm.describeScroll)
+	assert.Equal(t, 0, rm.describeView.scroll)
 }
 
 func TestCovDescribeKeyMoveDown(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 0
+	m.describeView.cursor = 0
 	result, _ := m.handleDescribeKey(keyMsg("j"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.describeCursor)
+	assert.Equal(t, 1, rm.describeView.cursor)
 }
 
 func TestCovDescribeKeyMoveUp(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 5
+	m.describeView.cursor = 5
 	result, _ := m.handleDescribeKey(keyMsg("k"))
 	rm := result.(Model)
-	assert.Equal(t, 4, rm.describeCursor)
+	assert.Equal(t, 4, rm.describeView.cursor)
 }
 
 func TestCovDescribeKeyMoveLeft(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursorCol = 5
+	m.describeView.cursorCol = 5
 	result, _ := m.handleDescribeKey(keyMsg("h"))
 	rm := result.(Model)
-	assert.Equal(t, 4, rm.describeCursorCol)
+	assert.Equal(t, 4, rm.describeView.cursorCol)
 }
 
 func TestCovDescribeKeyMoveRight(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursorCol = 0
+	m.describeView.cursorCol = 0
 	result, _ := m.handleDescribeKey(keyMsg("l"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.describeCursorCol)
+	assert.Equal(t, 1, rm.describeView.cursorCol)
 }
 
 func TestCovDescribeKeyZero(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursorCol = 5
+	m.describeView.cursorCol = 5
 	result, _ := m.handleDescribeKey(keyMsg("0"))
 	rm := result.(Model)
-	assert.Equal(t, 0, rm.describeCursorCol)
+	assert.Equal(t, 0, rm.describeView.cursorCol)
 }
 
 func TestCovDescribeKeyZeroInLineInput(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeLineInput = "12"
+	m.describeView.lineInput = "12"
 	result, _ := m.handleDescribeKey(keyMsg("0"))
 	rm := result.(Model)
-	assert.Equal(t, "120", rm.describeLineInput)
+	assert.Equal(t, "120", rm.describeView.lineInput)
 }
 
 func TestCovDescribeKeyDollar(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 0
+	m.describeView.cursor = 0
 	result, _ := m.handleDescribeKey(keyMsg("$"))
 	rm := result.(Model)
 	// "line0" has 5 chars, so cursor col should be at 4
-	assert.Equal(t, 4, rm.describeCursorCol)
+	assert.Equal(t, 4, rm.describeView.cursorCol)
 }
 
 func TestCovDescribeKeyCaret(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeContent = "   indented"
-	m.describeCursor = 0
+	m.describeView.content = "   indented"
+	m.describeView.cursor = 0
 	result, _ := m.handleDescribeKey(keyMsg("^"))
 	rm := result.(Model)
-	assert.Equal(t, 3, rm.describeCursorCol)
+	assert.Equal(t, 3, rm.describeView.cursorCol)
 }
 
 func TestCovDescribeKeyWordMotions(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeContent = "hello world foo"
-	m.describeCursor = 0
-	m.describeCursorCol = 0
+	m.describeView.content = "hello world foo"
+	m.describeView.cursor = 0
+	m.describeView.cursorCol = 0
 
 	result, _ := m.handleDescribeKey(keyMsg("w"))
 	rm := result.(Model)
-	assert.Greater(t, rm.describeCursorCol, 0)
+	assert.Greater(t, rm.describeView.cursorCol, 0)
 
 	result, _ = rm.handleDescribeKey(keyMsg("b"))
 	rm = result.(Model)
-	assert.Equal(t, 0, rm.describeCursorCol)
+	assert.Equal(t, 0, rm.describeView.cursorCol)
 
 	result, _ = rm.handleDescribeKey(keyMsg("e"))
 	rm = result.(Model)
-	assert.Greater(t, rm.describeCursorCol, 0)
+	assert.Greater(t, rm.describeView.cursorCol, 0)
 
 	result, _ = rm.handleDescribeKey(keyMsg("W"))
 	rm = result.(Model)
-	assert.Greater(t, rm.describeCursorCol, 0)
+	assert.Greater(t, rm.describeView.cursorCol, 0)
 
 	result, _ = rm.handleDescribeKey(keyMsg("B"))
 	rm = result.(Model)
 
 	result, _ = rm.handleDescribeKey(keyMsg("E"))
 	rm = result.(Model)
-	assert.Greater(t, rm.describeCursorCol, 0)
+	assert.Greater(t, rm.describeView.cursorCol, 0)
 }
 
 func TestCovDescribeKeyCtrlD(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 0
+	m.describeView.cursor = 0
 	result, _ := m.handleDescribeKey(keyMsg("ctrl+d"))
 	rm := result.(Model)
-	assert.Greater(t, rm.describeCursor, 0)
+	assert.Greater(t, rm.describeView.cursor, 0)
 }
 
 func TestCovDescribeKeyCtrlU(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 5
+	m.describeView.cursor = 5
 	result, _ := m.handleDescribeKey(keyMsg("ctrl+u"))
 	rm := result.(Model)
-	assert.Less(t, rm.describeCursor, 5)
+	assert.Less(t, rm.describeView.cursor, 5)
 }
 
 func TestCovDescribeKeyCtrlF(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 0
+	m.describeView.cursor = 0
 	result, _ := m.handleDescribeKey(keyMsg("ctrl+f"))
 	rm := result.(Model)
-	assert.Greater(t, rm.describeCursor, 0)
+	assert.Greater(t, rm.describeView.cursor, 0)
 }
 
 func TestCovDescribeKeyCtrlB(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 9
+	m.describeView.cursor = 9
 	result, _ := m.handleDescribeKey(keyMsg("ctrl+b"))
 	rm := result.(Model)
-	assert.Less(t, rm.describeCursor, 9)
+	assert.Less(t, rm.describeView.cursor, 9)
 }
 
 func TestCovDescribeKeyG(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 5
+	m.describeView.cursor = 5
 	// First 'g' sets pendingG
 	result, _ := m.handleDescribeKey(keyMsg("g"))
 	rm := result.(Model)
@@ -659,57 +699,57 @@ func TestCovDescribeKeyG(t *testing.T) {
 	// Second 'g' jumps to top
 	result, _ = rm.handleDescribeKey(keyMsg("g"))
 	rm = result.(Model)
-	assert.Equal(t, 0, rm.describeCursor)
+	assert.Equal(t, 0, rm.describeView.cursor)
 	assert.False(t, rm.pendingG)
 }
 
 func TestCovDescribeKeyGBig(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 0
+	m.describeView.cursor = 0
 	result, _ := m.handleDescribeKey(keyMsg("G"))
 	rm := result.(Model)
-	assert.Equal(t, 9, rm.describeCursor)
+	assert.Equal(t, 9, rm.describeView.cursor)
 }
 
 func TestCovDescribeKeyGBigWithLineInput(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeLineInput = "3"
+	m.describeView.lineInput = "3"
 	result, _ := m.handleDescribeKey(keyMsg("G"))
 	rm := result.(Model)
-	assert.Equal(t, 2, rm.describeCursor) // 3-1=2 (0-indexed)
+	assert.Equal(t, 2, rm.describeView.cursor) // 3-1=2 (0-indexed)
 }
 
 func TestCovDescribeKeyDigit(t *testing.T) {
 	m := baseModelDescribe()
 	result, _ := m.handleDescribeKey(keyMsg("5"))
 	rm := result.(Model)
-	assert.Equal(t, "5", rm.describeLineInput)
+	assert.Equal(t, "5", rm.describeView.lineInput)
 }
 
 func TestCovDescribeKeyVisualV(t *testing.T) {
 	m := baseModelDescribe()
 	result, _ := m.handleDescribeKey(keyMsg("v"))
 	rm := result.(Model)
-	assert.Equal(t, byte('v'), rm.describeVisualMode)
+	assert.Equal(t, byte('v'), rm.describeView.visualMode)
 }
 
 func TestCovDescribeKeyVisualShiftV(t *testing.T) {
 	m := baseModelDescribe()
 	result, _ := m.handleDescribeKey(keyMsg("V"))
 	rm := result.(Model)
-	assert.Equal(t, byte('V'), rm.describeVisualMode)
+	assert.Equal(t, byte('V'), rm.describeView.visualMode)
 }
 
 func TestCovDescribeKeyVisualCtrlV(t *testing.T) {
 	m := baseModelDescribe()
 	result, _ := m.handleDescribeKey(keyMsg("ctrl+v"))
 	rm := result.(Model)
-	assert.Equal(t, byte('B'), rm.describeVisualMode)
+	assert.Equal(t, byte('B'), rm.describeView.visualMode)
 }
 
 func TestCovDescribeKeyYank(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 0
+	m.describeView.cursor = 0
 	_, cmd := m.handleDescribeKey(keyMsg("y"))
 	assert.NotNil(t, cmd)
 }
@@ -718,110 +758,110 @@ func TestCovDescribeKeySlash(t *testing.T) {
 	m := baseModelDescribe()
 	result, _ := m.handleDescribeKey(keyMsg("/"))
 	rm := result.(Model)
-	assert.True(t, rm.describeSearchActive)
+	assert.True(t, rm.describeView.searchActive)
 }
 
 func TestCovDescribeKeySearchNav(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchQuery = "line"
+	m.describeView.searchQuery = "line"
 	// n searches forward
 	result, _ := m.handleDescribeKey(keyMsg("n"))
 	rm := result.(Model)
-	assert.NotEqual(t, -1, rm.describeCursor)
+	assert.NotEqual(t, -1, rm.describeView.cursor)
 
 	// N searches backward
-	rm.describeCursor = 5
+	rm.describeView.cursor = 5
 	result, _ = rm.handleDescribeKey(keyMsg("N"))
 	rm = result.(Model)
-	assert.NotEqual(t, -1, rm.describeCursor)
+	assert.NotEqual(t, -1, rm.describeView.cursor)
 }
 
 func TestCovDescribeKeyDefault(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeLineInput = "123"
+	m.describeView.lineInput = "123"
 	result, _ := m.handleDescribeKey(keyMsg("x"))
 	rm := result.(Model)
-	assert.Empty(t, rm.describeLineInput)
+	assert.Empty(t, rm.describeView.lineInput)
 }
 
 func TestCovDescribeVisualKeyEsc(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'V'
+	m.describeView.visualMode = 'V'
 	result, _ := m.handleDescribeVisualKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.Zero(t, rm.describeVisualMode)
+	assert.Zero(t, rm.describeView.visualMode)
 }
 
 func TestCovDescribeVisualKeyToggleV(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'V'
+	m.describeView.visualMode = 'V'
 	result, _ := m.handleDescribeVisualKey(keyMsg("V"))
 	rm := result.(Model)
-	assert.Zero(t, rm.describeVisualMode)
+	assert.Zero(t, rm.describeView.visualMode)
 }
 
 func TestCovDescribeVisualKeyToggleSwitchV(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'v'
+	m.describeView.visualMode = 'v'
 	result, _ := m.handleDescribeVisualKey(keyMsg("V"))
 	rm := result.(Model)
-	assert.Equal(t, byte('V'), rm.describeVisualMode)
+	assert.Equal(t, byte('V'), rm.describeView.visualMode)
 }
 
 func TestCovDescribeVisualKeyToggleLowerV(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'v'
+	m.describeView.visualMode = 'v'
 	result, _ := m.handleDescribeVisualKey(keyMsg("v"))
 	rm := result.(Model)
-	assert.Zero(t, rm.describeVisualMode)
+	assert.Zero(t, rm.describeView.visualMode)
 }
 
 func TestCovDescribeVisualKeyCtrlV(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'B'
+	m.describeView.visualMode = 'B'
 	result, _ := m.handleDescribeVisualKey(keyMsg("ctrl+v"))
 	rm := result.(Model)
-	assert.Zero(t, rm.describeVisualMode)
+	assert.Zero(t, rm.describeView.visualMode)
 }
 
 func TestCovDescribeVisualKeyCtrlVOn(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'v'
+	m.describeView.visualMode = 'v'
 	result, _ := m.handleDescribeVisualKey(keyMsg("ctrl+v"))
 	rm := result.(Model)
-	assert.Equal(t, byte('B'), rm.describeVisualMode)
+	assert.Equal(t, byte('B'), rm.describeView.visualMode)
 }
 
 func TestCovDescribeVisualKeyMovement(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'V'
-	m.describeCursor = 2
-	m.describeCursorCol = 2
+	m.describeView.visualMode = 'V'
+	m.describeView.cursor = 2
+	m.describeView.cursorCol = 2
 
 	result, _ := m.handleDescribeVisualKey(keyMsg("j"))
 	rm := result.(Model)
-	assert.Equal(t, 3, rm.describeCursor)
+	assert.Equal(t, 3, rm.describeView.cursor)
 
 	result, _ = rm.handleDescribeVisualKey(keyMsg("k"))
 	rm = result.(Model)
-	assert.Equal(t, 2, rm.describeCursor)
+	assert.Equal(t, 2, rm.describeView.cursor)
 
 	result, _ = rm.handleDescribeVisualKey(keyMsg("l"))
 	rm = result.(Model)
-	assert.Equal(t, 3, rm.describeCursorCol)
+	assert.Equal(t, 3, rm.describeView.cursorCol)
 
-	rm.describeCursorCol = 2
+	rm.describeView.cursorCol = 2
 	result, _ = rm.handleDescribeVisualKey(keyMsg("h"))
 	rm = result.(Model)
-	assert.Equal(t, 1, rm.describeCursorCol)
+	assert.Equal(t, 1, rm.describeView.cursorCol)
 
 	result, _ = rm.handleDescribeVisualKey(keyMsg("0"))
 	rm = result.(Model)
-	assert.Equal(t, 0, rm.describeCursorCol)
+	assert.Equal(t, 0, rm.describeView.cursorCol)
 
 	result, _ = rm.handleDescribeVisualKey(keyMsg("$"))
 	rm = result.(Model)
-	assert.Greater(t, rm.describeCursorCol, 0)
+	assert.Greater(t, rm.describeView.cursorCol, 0)
 
 	result, _ = rm.handleDescribeVisualKey(keyMsg("^"))
 	rm = result.(Model)
@@ -847,12 +887,12 @@ func TestCovDescribeVisualKeyMovement(t *testing.T) {
 
 func TestCovDescribeVisualKeyG(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'V'
-	m.describeCursor = 5
+	m.describeView.visualMode = 'V'
+	m.describeView.cursor = 5
 
 	result, _ := m.handleDescribeVisualKey(keyMsg("G"))
 	rm := result.(Model)
-	assert.Equal(t, 9, rm.describeCursor)
+	assert.Equal(t, 9, rm.describeView.cursor)
 
 	rm.pendingG = false
 	result, _ = rm.handleDescribeVisualKey(keyMsg("g"))
@@ -861,91 +901,91 @@ func TestCovDescribeVisualKeyG(t *testing.T) {
 
 	result, _ = rm.handleDescribeVisualKey(keyMsg("g"))
 	rm = result.(Model)
-	assert.Equal(t, 0, rm.describeCursor)
+	assert.Equal(t, 0, rm.describeView.cursor)
 }
 
 func TestCovDescribeVisualKeyPageMovement(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'V'
-	m.describeCursor = 0
+	m.describeView.visualMode = 'V'
+	m.describeView.cursor = 0
 
 	result, _ := m.handleDescribeVisualKey(keyMsg("ctrl+d"))
 	rm := result.(Model)
-	assert.Greater(t, rm.describeCursor, 0)
+	assert.Greater(t, rm.describeView.cursor, 0)
 
-	rm.describeCursor = 9
+	rm.describeView.cursor = 9
 	result, _ = rm.handleDescribeVisualKey(keyMsg("ctrl+u"))
 	rm = result.(Model)
-	assert.Less(t, rm.describeCursor, 9)
+	assert.Less(t, rm.describeView.cursor, 9)
 }
 
 func TestCovDescribeVisualKeyCopyLineMode(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'V'
-	m.describeCursor = 2
-	m.describeVisualStart = 0
+	m.describeView.visualMode = 'V'
+	m.describeView.cursor = 2
+	m.describeView.visualStart = 0
 	_, cmd := m.handleDescribeVisualKey(keyMsg("y"))
 	assert.NotNil(t, cmd)
 }
 
 func TestCovDescribeVisualKeyCopyCharMode(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'v'
-	m.describeCursor = 1
-	m.describeVisualStart = 0
-	m.describeVisualCol = 0
-	m.describeCursorCol = 3
+	m.describeView.visualMode = 'v'
+	m.describeView.cursor = 1
+	m.describeView.visualStart = 0
+	m.describeView.visualCol = 0
+	m.describeView.cursorCol = 3
 	_, cmd := m.handleDescribeVisualKey(keyMsg("y"))
 	assert.NotNil(t, cmd)
 }
 
 func TestCovDescribeVisualKeyCopyBlockMode(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'B'
-	m.describeCursor = 2
-	m.describeVisualStart = 0
-	m.describeVisualCol = 0
-	m.describeCursorCol = 3
+	m.describeView.visualMode = 'B'
+	m.describeView.cursor = 2
+	m.describeView.visualStart = 0
+	m.describeView.visualCol = 0
+	m.describeView.cursorCol = 3
 	_, cmd := m.handleDescribeVisualKey(keyMsg("y"))
 	assert.NotNil(t, cmd)
 }
 
 func TestCovDescribeVisualKeyCopyCharModeSameLine(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'v'
-	m.describeCursor = 0
-	m.describeVisualStart = 0
-	m.describeVisualCol = 0
-	m.describeCursorCol = 3
+	m.describeView.visualMode = 'v'
+	m.describeView.cursor = 0
+	m.describeView.visualStart = 0
+	m.describeView.visualCol = 0
+	m.describeView.cursorCol = 3
 	_, cmd := m.handleDescribeVisualKey(keyMsg("y"))
 	assert.NotNil(t, cmd)
 }
 
 func TestCovDescribeSearchKeyEnter(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
-	m.describeSearchInput.Insert("line")
+	m.describeView.searchActive = true
+	m.describeView.searchInput.Insert("line")
 	result, _ := m.handleDescribeSearchKey(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.describeSearchActive)
-	assert.Equal(t, "line", rm.describeSearchQuery)
+	assert.False(t, rm.describeView.searchActive)
+	assert.Equal(t, "line", rm.describeView.searchQuery)
 }
 
 func TestCovDescribeSearchKeyEsc(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
+	m.describeView.searchActive = true
 	result, _ := m.handleDescribeSearchKey(keyMsg("esc"))
 	rm := result.(Model)
-	assert.False(t, rm.describeSearchActive)
+	assert.False(t, rm.describeView.searchActive)
 }
 
 func TestCovDescribeSearchKeyBackspace(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
-	m.describeSearchInput.Insert("ab")
+	m.describeView.searchActive = true
+	m.describeView.searchInput.Insert("ab")
 	result, _ := m.handleDescribeSearchKey(keyMsg("backspace"))
 	rm := result.(Model)
-	assert.Equal(t, "a", rm.describeSearchInput.Value)
+	assert.Equal(t, "a", rm.describeView.searchInput.Value)
 }
 
 // Regression: typing into the describe-view search input now updates
@@ -953,53 +993,53 @@ func TestCovDescribeSearchKeyBackspace(t *testing.T) {
 // in real time rather than waiting for Enter to commit.
 func TestDescribeSearchTypingUpdatesQueryLive(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
+	m.describeView.searchActive = true
 
 	result, _ := m.handleDescribeSearchKey(keyMsg("a"))
 	rm := result.(Model)
-	assert.Equal(t, "a", rm.describeSearchInput.Value)
-	assert.Equal(t, "a", rm.describeSearchQuery,
+	assert.Equal(t, "a", rm.describeView.searchInput.Value)
+	assert.Equal(t, "a", rm.describeView.searchQuery,
 		"describeSearchQuery must mirror describeSearchInput while typing so highlights paint live")
 
 	result, _ = rm.handleDescribeSearchKey(keyMsg("b"))
 	rm = result.(Model)
-	assert.Equal(t, "ab", rm.describeSearchQuery)
+	assert.Equal(t, "ab", rm.describeView.searchQuery)
 
 	result, _ = rm.handleDescribeSearchKey(keyMsg("backspace"))
 	rm = result.(Model)
-	assert.Equal(t, "a", rm.describeSearchQuery,
+	assert.Equal(t, "a", rm.describeView.searchQuery,
 		"backspace must keep describeSearchQuery in sync with the input")
 }
 
 func TestCovDescribeSearchKeyCtrlW(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
-	m.describeSearchInput.Insert("foo bar")
+	m.describeView.searchActive = true
+	m.describeView.searchInput.Insert("foo bar")
 	result, _ := m.handleDescribeSearchKey(keyMsg("ctrl+w"))
 	rm := result.(Model)
-	assert.NotEqual(t, "foo bar", rm.describeSearchInput.Value)
+	assert.NotEqual(t, "foo bar", rm.describeView.searchInput.Value)
 }
 
 func TestCovDescribeSearchKeyCtrlA(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
-	m.describeSearchInput.Insert("abc")
+	m.describeView.searchActive = true
+	m.describeView.searchInput.Insert("abc")
 	result, _ := m.handleDescribeSearchKey(keyMsg("ctrl+a"))
 	_ = result.(Model)
 }
 
 func TestCovDescribeSearchKeyCtrlE(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
-	m.describeSearchInput.Insert("abc")
+	m.describeView.searchActive = true
+	m.describeView.searchInput.Insert("abc")
 	result, _ := m.handleDescribeSearchKey(keyMsg("ctrl+e"))
 	_ = result.(Model)
 }
 
 func TestCovDescribeSearchKeyLeftRight(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
-	m.describeSearchInput.Insert("abc")
+	m.describeView.searchActive = true
+	m.describeView.searchInput.Insert("abc")
 	result, _ := m.handleDescribeSearchKey(keyMsg("left"))
 	rm := result.(Model)
 	result, _ = rm.handleDescribeSearchKey(keyMsg("right"))
@@ -1008,42 +1048,42 @@ func TestCovDescribeSearchKeyLeftRight(t *testing.T) {
 
 func TestCovDescribeSearchKeyInsertChar(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
+	m.describeView.searchActive = true
 	result, _ := m.handleDescribeSearchKey(keyMsg("x"))
 	rm := result.(Model)
-	assert.Equal(t, "x", rm.describeSearchInput.Value)
+	assert.Equal(t, "x", rm.describeView.searchInput.Value)
 }
 
 func TestCovFindNextDescribeMatchForward(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchQuery = "line5"
-	m.describeCursor = 0
+	m.describeView.searchQuery = "line5"
+	m.describeView.cursor = 0
 	m.findNextDescribeMatch(true)
-	assert.Equal(t, 5, m.describeCursor)
+	assert.Equal(t, 5, m.describeView.cursor)
 }
 
 func TestCovFindNextDescribeMatchBackward(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchQuery = "line3"
-	m.describeCursor = 5
+	m.describeView.searchQuery = "line3"
+	m.describeView.cursor = 5
 	m.findNextDescribeMatch(false)
-	assert.Equal(t, 3, m.describeCursor)
+	assert.Equal(t, 3, m.describeView.cursor)
 }
 
 func TestCovFindNextDescribeMatchNoQuery(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchQuery = ""
-	m.describeCursor = 5
+	m.describeView.searchQuery = ""
+	m.describeView.cursor = 5
 	m.findNextDescribeMatch(true)
-	assert.Equal(t, 5, m.describeCursor) // unchanged
+	assert.Equal(t, 5, m.describeView.cursor) // unchanged
 }
 
 func TestCovFindNextDescribeMatchNotFound(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchQuery = "nonexistent"
-	m.describeCursor = 0
+	m.describeView.searchQuery = "nonexistent"
+	m.describeView.cursor = 0
 	m.findNextDescribeMatch(true)
-	assert.Equal(t, 0, m.describeCursor) // unchanged
+	assert.Equal(t, 0, m.describeView.cursor) // unchanged
 }
 
 func TestCovDescribeContentHeight(t *testing.T) {
@@ -1059,25 +1099,25 @@ func TestCovDescribeContentHeight(t *testing.T) {
 
 func TestCovEnsureDescribeCursorVisible(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 100 // out of bounds
+	m.describeView.cursor = 100 // out of bounds
 	m.ensureDescribeCursorVisible()
-	assert.LessOrEqual(t, m.describeCursor, 9)
+	assert.LessOrEqual(t, m.describeView.cursor, 9)
 }
 
 func TestCovDescribeKeyDispatchToSearch(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
-	m.describeSearchInput.Insert("test")
+	m.describeView.searchActive = true
+	m.describeView.searchInput.Insert("test")
 	result, _ := m.handleDescribeKey(keyMsg("enter"))
 	rm := result.(Model)
-	assert.False(t, rm.describeSearchActive)
+	assert.False(t, rm.describeView.searchActive)
 }
 
 func TestCovDescribeKeyDispatchToVisual(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeVisualMode = 'V'
-	m.describeCursor = 2
+	m.describeView.visualMode = 'V'
+	m.describeView.cursor = 2
 	result, _ := m.handleDescribeKey(keyMsg("j"))
 	rm := result.(Model)
-	assert.Equal(t, 3, rm.describeCursor)
+	assert.Equal(t, 3, rm.describeView.cursor)
 }

@@ -249,7 +249,7 @@ func (m *Model) clampAllCursors() {
 		m.ensureEventCursorVisible()
 	}
 	// Clamp describe cursor on resize.
-	if m.mode == modeDescribe && m.describeContent != "" {
+	if m.mode == modeDescribe && m.describeView.content != "" {
 		m.ensureDescribeCursorVisible()
 	}
 }

@@ -34,16 +34,16 @@ func TestMouseWheelScrollsYAMLViewer(t *testing.T) {
 
 func TestMouseWheelScrollsDescribeViewer(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeContent = ""
+	m.describeView.content = ""
 	for range 30 {
-		m.describeContent += "line\n"
+		m.describeView.content += "line\n"
 	}
 	m.height = 20
-	m.describeCursor = 10
+	m.describeView.cursor = 10
 
 	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown})
 	rm := ret.(Model)
-	assert.Greater(t, rm.describeCursor, 10, "wheel down must advance the describe cursor")
+	assert.Greater(t, rm.describeView.cursor, 10, "wheel down must advance the describe cursor")
 }
 
 func TestMouseWheelScrollsHelpViewer(t *testing.T) {

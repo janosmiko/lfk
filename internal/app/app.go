@@ -299,23 +299,11 @@ type Model struct {
 	logSearchQuery   string // applied search
 	logSearchHistory *commandHistory
 
-	// Describe viewer state.
-	describeContent      string
-	describeScroll       int
-	describeTitle        string
-	describeWrap         bool           // word wrap toggle for describe view
-	describeAutoRefresh  bool           // when true, describe viewer auto-refreshes every 2s
-	describeRefreshFunc  func() tea.Cmd // returns the load command for auto-refresh
-	describeLineInput    string         // digit buffer for 123G jump-to-line
-	describeCursor       int            // cursor line position
-	describeCursorCol    int            // cursor column position
-	describeVisualMode   byte           // 0=off, 'v'=char, 'V'=line, 'B'=block
-	describeVisualStart  int            // anchor line for visual selection
-	describeVisualCol    int            // anchor column for visual mode
-	describeScrollOption int            // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
-	describeSearchActive bool
-	describeSearchInput  TextInput
-	describeSearchQuery  string
+	// Full-screen describe viewer state (kubectl-describe output): content,
+	// scroll/cursor, auto-refresh, search, and visual selection. Extracted
+	// from the formerly flat describe* fields into one cohesive value; see
+	// describeview.go.
+	describeView describeViewState
 
 	// Full-screen diff viewer state (resource compare / revision diff):
 	// left/right content, scroll/cursor, unified vs side-by-side, search,

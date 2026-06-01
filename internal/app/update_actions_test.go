@@ -1454,7 +1454,7 @@ func TestCovExecuteActionWatchWorkflow(t *testing.T) {
 	rm := result.(Model)
 	assert.NotNil(t, cmd)
 	assert.True(t, rm.loading)
-	assert.True(t, rm.describeAutoRefresh)
+	assert.True(t, rm.describeView.autoRefresh)
 }
 
 func TestCovExecuteActionSuspendWorkflow(t *testing.T) {
@@ -2089,7 +2089,7 @@ func TestFinalExecuteActionWatchWorkflow(t *testing.T) {
 	require.NotNil(t, cmd)
 	rm := result.(Model)
 	assert.True(t, rm.loading)
-	assert.True(t, rm.describeAutoRefresh)
+	assert.True(t, rm.describeView.autoRefresh)
 }
 
 func TestFinalExecuteActionSuspendWorkflow(t *testing.T) {

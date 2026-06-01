@@ -586,7 +586,7 @@ func TestPush2HandleKeyExplainMode(t *testing.T) {
 func TestPush2HandleKeyDescribeMode(t *testing.T) {
 	m := basePush80v2Model()
 	m.mode = modeDescribe
-	m.describeContent = "some content"
+	m.describeView.content = "some content"
 	result, _ := m.handleKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)
@@ -1436,10 +1436,10 @@ func TestCovHandleKeyDispatchToHelp(t *testing.T) {
 func TestCovHandleKeyDispatchToDescribe(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDescribe
-	m.describeContent = "line1\nline2"
+	m.describeView.content = "line1\nline2"
 	result, _ := m.handleKey(keyMsg("j"))
 	rm := result.(Model)
-	assert.Equal(t, 1, rm.describeCursor)
+	assert.Equal(t, 1, rm.describeView.cursor)
 }
 
 func TestCovHandleKeyDispatchToOverlay(t *testing.T) {
@@ -1552,14 +1552,14 @@ func TestCovHandleKeyExplainSearch(t *testing.T) {
 // active must reach the search input, not the global tab handler.
 func TestDescribeSearchSwallowsNewTabKey(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchActive = true
+	m.describeView.searchActive = true
 
 	result, _ := m.handleKey(runeKey('t'))
 	rm := result.(Model)
 
 	assert.Len(t, rm.tabs, 1, "no new tab should be created while describe search is active")
-	assert.True(t, rm.describeSearchActive, "describe search should remain active")
-	assert.Equal(t, "t", rm.describeSearchInput.Value, "'t' should be inserted into the search input")
+	assert.True(t, rm.describeView.searchActive, "describe search should remain active")
+	assert.Equal(t, "t", rm.describeView.searchInput.Value, "'t' should be inserted into the search input")
 }
 
 // --- Cancellation of active mutations ---

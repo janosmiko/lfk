@@ -151,12 +151,12 @@ func TestYAMLNormalCopyCountPrefixYanksMultipleLines(t *testing.T) {
 
 func TestDescribeNormalCopyCountPrefixYanksMultipleLines(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeCursor = 2
-	m.describeLineInput = "4"
+	m.describeView.cursor = 2
+	m.describeView.lineInput = "4"
 	ret, cmd := m.handleDescribeKey(keyMsg("y"))
 	rm := ret.(Model)
 	assert.Equal(t, "Copied 4 lines", rm.statusMessage)
-	assert.Empty(t, rm.describeLineInput)
+	assert.Empty(t, rm.describeView.lineInput)
 	assert.NotNil(t, cmd)
 }
 
@@ -354,7 +354,7 @@ func TestCopyToSystemClipboardSuccessIsSilent(t *testing.T) {
 // feedback should win over the search bar.
 func TestStatusBeatsSearchBarInDescribe(t *testing.T) {
 	m := baseModelDescribe()
-	m.describeSearchQuery = "Name"
+	m.describeView.searchQuery = "Name"
 	m.statusMessage = "Copied 1 line"
 	m.statusMessageExp = time.Now().Add(5 * time.Second)
 	out := stripANSI(m.View())
