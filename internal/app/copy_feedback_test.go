@@ -38,8 +38,10 @@ func TestViewYAMLShowsStatusMessage(t *testing.T) {
 func TestViewDiffShowsStatusMessage(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeDiff,
-		diffLeft: "a: 1\nb: 2", diffRight: "a: 1\nb: 3",
-		diffLeftName: "before", diffRightName: "after",
+		diffView: diffViewState{
+			left: "a: 1\nb: 2", right: "a: 1\nb: 3",
+			leftName: "before", rightName: "after",
+		},
 		tabs:             []TabState{{}},
 		statusMessage:    "Copied 1 line",
 		statusMessageExp: time.Now().Add(5 * time.Second),
@@ -84,10 +86,12 @@ func TestYAMLNormalCopyYanksCursorLine(t *testing.T) {
 func TestDiffNormalCopyYanksCursorLine(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeDiff,
-		diffLeft: "a: 1\nb: 2\nc: 3", diffRight: "a: 1\nb: 2\nc: 4",
-		diffLeftName: "before", diffRightName: "after",
-		diffCursor: 2,
-		tabs:       []TabState{{}},
+		diffView: diffViewState{
+			left: "a: 1\nb: 2\nc: 3", right: "a: 1\nb: 2\nc: 4",
+			leftName: "before", rightName: "after",
+			cursor: 2,
+		},
+		tabs: []TabState{{}},
 	}
 	ret, cmd := m.handleDiffKey(keyMsg("y"))
 	rm := ret.(Model)
@@ -192,16 +196,18 @@ func TestLogsNormalCopyCountClampsToRemaining(t *testing.T) {
 func TestDiffNormalCopyCountPrefixYanksMultipleLines(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeDiff,
-		diffLeft: "a: 1\nb: 2\nc: 3\nd: 4\ne: 5", diffRight: "a: 1\nb: 2\nc: 3\nd: 4\ne: 5",
-		diffLeftName: "before", diffRightName: "after",
-		diffCursor:    1,
-		diffLineInput: "3",
-		tabs:          []TabState{{}},
+		diffView: diffViewState{
+			left: "a: 1\nb: 2\nc: 3\nd: 4\ne: 5", right: "a: 1\nb: 2\nc: 3\nd: 4\ne: 5",
+			leftName: "before", rightName: "after",
+			cursor:    1,
+			lineInput: "3",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, cmd := m.handleDiffKey(keyMsg("y"))
 	rm := ret.(Model)
 	assert.Equal(t, "Copied 3 lines", rm.statusMessage)
-	assert.Empty(t, rm.diffLineInput)
+	assert.Empty(t, rm.diffView.lineInput)
 	assert.NotNil(t, cmd)
 }
 
@@ -273,12 +279,14 @@ func TestYAMLNormalCopyCountSkipsCollapsedSection(t *testing.T) {
 func TestDiffNormalCopySkipsEmptySideLines(t *testing.T) {
 	m := Model{
 		width: 80, height: 30, mode: modeDiff,
-		diffLeft: "a\nb\nc", diffRight: "a\nx\ny\nb\nc",
-		diffLeftName: "before", diffRightName: "after",
-		diffCursorSide: 0,
-		diffCursor:     0,
-		diffLineInput:  "100",
-		tabs:           []TabState{{}},
+		diffView: diffViewState{
+			left: "a\nb\nc", right: "a\nx\ny\nb\nc",
+			leftName: "before", rightName: "after",
+			cursorSide: 0,
+			cursor:     0,
+			lineInput:  "100",
+		},
+		tabs: []TabState{{}},
 	}
 	ret, _ := m.handleDiffKey(keyMsg("y"))
 	rm := ret.(Model)

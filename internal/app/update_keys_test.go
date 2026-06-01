@@ -595,8 +595,8 @@ func TestPush2HandleKeyDescribeMode(t *testing.T) {
 func TestPush2HandleKeyDiffMode(t *testing.T) {
 	m := basePush80v2Model()
 	m.mode = modeDiff
-	m.diffLeft = "left"
-	m.diffRight = "right"
+	m.diffView.left = "left"
+	m.diffView.right = "right"
 	result, _ := m.handleKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)
@@ -721,8 +721,8 @@ func TestPush3HandleKeyPrevTab(t *testing.T) {
 func TestP4DiffKeyQ(t *testing.T) {
 	m := bp4()
 	m.mode = modeDiff
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)
@@ -731,8 +731,8 @@ func TestP4DiffKeyQ(t *testing.T) {
 func TestP4DiffKeyEsc(t *testing.T) {
 	m := bp4()
 	m.mode = modeDiff
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleKey(keyMsg("esc"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)
@@ -741,8 +741,8 @@ func TestP4DiffKeyEsc(t *testing.T) {
 func TestP4DiffKeyJ(t *testing.T) {
 	m := bp4()
 	m.mode = modeDiff
-	m.diffLeft = "line1\nline2\nline3\n"
-	m.diffRight = "line1\nline2x\nline3\n"
+	m.diffView.left = "line1\nline2\nline3\n"
+	m.diffView.right = "line1\nline2x\nline3\n"
 	result, _ := m.handleKey(keyMsg("j"))
 	rm := result.(Model)
 	_ = rm
@@ -751,7 +751,7 @@ func TestP4DiffKeyJ(t *testing.T) {
 func TestP4DiffKeyK(t *testing.T) {
 	m := bp4()
 	m.mode = modeDiff
-	m.diffScroll = 5
+	m.diffView.scroll = 5
 	result, _ := m.handleKey(keyMsg("k"))
 	rm := result.(Model)
 	_ = rm
@@ -771,16 +771,16 @@ func TestP4DiffKeyGG(t *testing.T) {
 	m.pendingG = true
 	result, _ := m.handleKey(keyMsg("g"))
 	rm := result.(Model)
-	assert.Equal(t, 0, rm.diffScroll)
+	assert.Equal(t, 0, rm.diffView.scroll)
 }
 
 func TestP4DiffKeyU(t *testing.T) {
 	m := bp4()
 	m.mode = modeDiff
-	m.diffUnified = false
+	m.diffView.unified = false
 	result, _ := m.handleKey(keyMsg("u"))
 	rm := result.(Model)
-	assert.True(t, rm.diffUnified)
+	assert.True(t, rm.diffView.unified)
 }
 
 func TestP4DiffKeyHelp(t *testing.T) {
@@ -1493,8 +1493,8 @@ func TestCovHandleKeyDispatchToYAML(t *testing.T) {
 func TestCovHandleKeyDispatchToDiff(t *testing.T) {
 	m := baseModelHandlers2()
 	m.mode = modeDiff
-	m.diffLeft = "a"
-	m.diffRight = "b"
+	m.diffView.left = "a"
+	m.diffView.right = "b"
 	result, _ := m.handleKey(keyMsg("q"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)

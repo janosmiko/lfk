@@ -384,13 +384,15 @@ func TestViewDescribe(t *testing.T) {
 func TestViewDiff(t *testing.T) {
 	t.Run("unified mode calls unified renderer", func(t *testing.T) {
 		m := Model{
-			width:         80,
-			height:        30,
-			diffLeft:      "line1\nline2\n",
-			diffRight:     "line1\nline3\n",
-			diffLeftName:  "old.yaml",
-			diffRightName: "new.yaml",
-			diffUnified:   true,
+			width:  80,
+			height: 30,
+			diffView: diffViewState{
+				left:      "line1\nline2\n",
+				right:     "line1\nline3\n",
+				leftName:  "old.yaml",
+				rightName: "new.yaml",
+				unified:   true,
+			},
 		}
 		output := m.viewDiff()
 		assert.NotEmpty(t, output)
@@ -398,13 +400,15 @@ func TestViewDiff(t *testing.T) {
 
 	t.Run("side-by-side mode", func(t *testing.T) {
 		m := Model{
-			width:         80,
-			height:        30,
-			diffLeft:      "same\nold\n",
-			diffRight:     "same\nnew\n",
-			diffLeftName:  "before",
-			diffRightName: "after",
-			diffUnified:   false,
+			width:  80,
+			height: 30,
+			diffView: diffViewState{
+				left:      "same\nold\n",
+				right:     "same\nnew\n",
+				leftName:  "before",
+				rightName: "after",
+				unified:   false,
+			},
 		}
 		output := m.viewDiff()
 		assert.NotEmpty(t, output)
@@ -481,14 +485,16 @@ func TestViewYAMLMode(t *testing.T) {
 
 func TestViewDiffMode(t *testing.T) {
 	m := Model{
-		width:         80,
-		height:        30,
-		mode:          modeDiff,
-		diffLeft:      "old content",
-		diffRight:     "new content",
-		diffLeftName:  "before",
-		diffRightName: "after",
-		tabs:          []TabState{{}},
+		width:  80,
+		height: 30,
+		mode:   modeDiff,
+		diffView: diffViewState{
+			left:      "old content",
+			right:     "new content",
+			leftName:  "before",
+			rightName: "after",
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	assert.NotEmpty(t, output)
@@ -602,8 +608,8 @@ func TestPush3ViewYAMLNotEmpty(t *testing.T) {
 func TestPush3ViewDiffNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeDiff
-	m.diffLeft = "left"
-	m.diffRight = "right"
+	m.diffView.left = "left"
+	m.diffView.right = "right"
 	result := m.View()
 	assert.NotEmpty(t, result)
 }
@@ -975,16 +981,18 @@ func TestCovViewDescribeVisualMode(t *testing.T) {
 
 func TestCovViewDiff(t *testing.T) {
 	m := Model{
-		width:          80,
-		height:         30,
-		tabs:           []TabState{{}},
-		execMu:         &sync.Mutex{},
-		mode:           modeDiff,
-		diffLeft:       "key: default\n",
-		diffRight:      "key: custom\n",
-		diffLeftName:   "Default Values",
-		diffRightName:  "User Values",
-		diffSearchText: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDiff,
+		diffView: diffViewState{
+			left:       "key: default\n",
+			right:      "key: custom\n",
+			leftName:   "Default Values",
+			rightName:  "User Values",
+			searchText: TextInput{},
+		},
 	}
 	result := m.viewDiff()
 	assert.NotEmpty(t, result)
@@ -992,17 +1000,19 @@ func TestCovViewDiff(t *testing.T) {
 
 func TestCovViewDiffUnified(t *testing.T) {
 	m := Model{
-		width:          80,
-		height:         30,
-		tabs:           []TabState{{}},
-		execMu:         &sync.Mutex{},
-		mode:           modeDiff,
-		diffLeft:       "key: default\n",
-		diffRight:      "key: custom\n",
-		diffLeftName:   "Default",
-		diffRightName:  "User",
-		diffUnified:    true,
-		diffSearchText: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDiff,
+		diffView: diffViewState{
+			left:       "key: default\n",
+			right:      "key: custom\n",
+			leftName:   "Default",
+			rightName:  "User",
+			unified:    true,
+			searchText: TextInput{},
+		},
 	}
 	result := m.viewDiff()
 	assert.NotEmpty(t, result)

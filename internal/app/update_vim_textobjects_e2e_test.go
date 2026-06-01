@@ -251,16 +251,16 @@ func TestDescribeTextObjectMatrix(t *testing.T) {
 func TestDiffTextObjectViwYanksWord(t *testing.T) {
 	m := baseModelNav()
 	m.mode = modeDiff
-	m.diffLeft = "alpha beta gamma\n"
-	m.diffRight = "alpha beta gamma\n"
-	m.diffCursor = 0
-	m.diffCursorSide = 0
-	m.diffUnified = true // simpler: single-side line text
-	m.diffVisualCurCol = 7
-	m.diffVisualCol = 7
-	m.diffVisualMode = true
-	m.diffVisualType = 'v'
-	m.diffVisualStart = 0
+	m.diffView.left = "alpha beta gamma\n"
+	m.diffView.right = "alpha beta gamma\n"
+	m.diffView.cursor = 0
+	m.diffView.cursorSide = 0
+	m.diffView.unified = true // simpler: single-side line text
+	m.diffView.visualCurCol = 7
+	m.diffView.visualCol = 7
+	m.diffView.visualMode = true
+	m.diffView.visualType = 'v'
+	m.diffView.visualStart = 0
 
 	r1, _ := m.handleDiffVisualKey(keyMsg("i"), nil, 1, 5, 0)
 	r2, _ := r1.(Model).handleDiffVisualKey(keyMsg("w"), nil, 1, 5, 0)
@@ -270,7 +270,7 @@ func TestDiffTextObjectViwYanksWord(t *testing.T) {
 	// Single-line char-mode diff yank just says "Copied" regardless of the
 	// exact line-prefix-driven column math.
 	assert.Equal(t, "Copied", rm.statusMessage)
-	assert.False(t, rm.diffVisualMode)
+	assert.False(t, rm.diffView.visualMode)
 }
 
 // --- events viewer: viw + vaw matrix ---

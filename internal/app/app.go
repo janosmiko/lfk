@@ -305,30 +305,11 @@ type Model struct {
 	// describeview.go.
 	describeView describeViewState
 
-	// Diff viewer state.
-	diffLeft         string // YAML content of first resource
-	diffRight        string // YAML content of second resource
-	diffLeftName     string // name of first resource
-	diffRightName    string // name of second resource
-	diffScroll       int    // scroll position in diff view
-	diffCursor       int    // cursor line in visible-line space
-	diffCursorSide   int    // 0=left, 1=right (side-by-side only)
-	diffUnified      bool   // true = unified diff, false = side-by-side
-	diffWrap         bool   // word wrap toggle for diff view
-	diffLineNumbers  bool   // show line numbers in diff view
-	diffLineInput    string // digit accumulator for jump-to-line (digits + G)
-	diffSearchMode   bool   // true when typing in the search bar
-	diffSearchText   TextInput
-	diffSearchQuery  string // committed search query
-	diffMatchLines   []int  // diff line indices with matches
-	diffMatchIdx     int    // current match index in diffMatchLines
-	diffFoldState    []bool // per-unchanged-region collapsed state
-	diffVisualMode   bool   // true when in visual selection mode
-	diffVisualType   rune   // 'V' = line, 'v' = char, 'B' = block
-	diffVisualStart  int    // anchor line (visible-line index)
-	diffVisualCol    int    // anchor column
-	diffVisualCurCol int    // current cursor column
-	diffScrollOption int    // sticky vim 'scroll' option for [count]<C-d>/<C-u>; 0 = default (half viewport)
+	// Full-screen diff viewer state (resource compare / revision diff):
+	// left/right content, scroll/cursor, unified vs side-by-side, search,
+	// fold regions, and visual selection. Extracted from the formerly flat
+	// diff* fields into one cohesive value; see diffview.go.
+	diffView diffViewState
 
 	// Embedded terminal state (PTY mode).
 	execPTY          *os.File       // PTY master file descriptor
