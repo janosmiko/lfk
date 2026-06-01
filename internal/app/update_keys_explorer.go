@@ -330,9 +330,17 @@ func (m Model) handleExplorerUIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		mdl := m.handleKeyHelp()
 		return mdl, nil, true
 	case kb.Filter:
+		// Filter narrows the visible item list; the fullscreen dashboard has no
+		// list to narrow (it scrolls a rendered preview), so swallow the key.
+		if m.fullscreenDashboard {
+			return m, nil, true
+		}
 		mdl := m.handleKeyFilter()
 		return mdl, nil, true
 	case kb.Search:
+		if m.fullscreenDashboard {
+			return m, nil, true
+		}
 		mdl := m.handleKeySearch()
 		return mdl, nil, true
 	case kb.CommandBar:
