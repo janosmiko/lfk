@@ -465,6 +465,7 @@ type TabState struct {
 	// change / resize can re-render them in place (see recomposeThemedContent).
 	metricsData       *metricsInputs
 	previewEventsData []ui.EventTimelineEntry
+	metricsLoading    bool
 
 	// Toggle to show only Warning events in Event list view.
 	warningEventsOnly bool

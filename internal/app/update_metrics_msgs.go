@@ -26,6 +26,7 @@ func (m Model) updateMetricsLoaded(msg metricsLoadedMsg) Model {
 	if msg.gen != m.requestGen {
 		return m // stale response
 	}
+	m.metricsLoading = false
 	if msg.cpuUsed == 0 && msg.memUsed == 0 {
 		m.metricsContent = ""
 		m.metricsData = nil

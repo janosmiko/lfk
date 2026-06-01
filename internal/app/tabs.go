@@ -442,6 +442,7 @@ func (m *Model) saveCurrentTab() {
 	t.metricsContent = m.metricsContent
 	t.previewEventsContent = m.previewEventsContent
 	t.metricsData = m.metricsData
+	t.metricsLoading = m.metricsLoading
 	t.previewEventsData = m.previewEventsData
 	t.warningEventsOnly = m.warningEventsOnly
 	t.eventGrouping = m.eventGrouping
@@ -560,6 +561,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.metricsContent = t.metricsContent
 	m.previewEventsContent = t.previewEventsContent
 	m.metricsData = t.metricsData
+	m.metricsLoading = t.metricsLoading
 	m.previewEventsData = t.previewEventsData
 	m.warningEventsOnly = t.warningEventsOnly
 	m.eventGrouping = t.eventGrouping
@@ -728,6 +730,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		metricsContent:         m.metricsContent,
 		previewEventsContent:   m.previewEventsContent,
 		metricsData:            m.metricsData,
+		metricsLoading:         m.metricsLoading,
 		previewEventsData:      append([]ui.EventTimelineEntry(nil), m.previewEventsData...),
 		warningEventsOnly:      m.warningEventsOnly,
 		eventGrouping:          m.eventGrouping,

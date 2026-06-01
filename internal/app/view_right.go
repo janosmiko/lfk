@@ -21,6 +21,7 @@ func (m *Model) clearRight() {
 	m.metricsContent = ""
 	m.previewEventsContent = ""
 	m.metricsData = nil
+	m.metricsLoading = false
 	m.previewEventsData = nil
 	m.resourceTree = nil
 	m.mapView = false

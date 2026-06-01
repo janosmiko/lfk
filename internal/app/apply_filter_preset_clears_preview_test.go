@@ -28,6 +28,7 @@ func TestApplyFilterPresetEmptyMatchClearsPreview(t *testing.T) {
 	m.rightItems = []model.Item{{Name: "container-a", Kind: "Container"}}
 	m.previewYAML = "kind: Pod\nmetadata:\n  name: pod-1\n"
 	m.metricsContent = "cpu: 10m"
+	m.metricsLoading = true
 	m.previewEventsContent = "Warning: ImagePullBackOff"
 	m.resourceTree = &model.ResourceNode{Kind: "Pod", Name: "pod-1"}
 	// previewLoading lingers true from the in-flight cursor-change
@@ -62,6 +63,9 @@ func TestApplyFilterPresetEmptyMatchClearsPreview(t *testing.T) {
 		"empty preset must clear cached YAML preview")
 	assert.Empty(t, rm.metricsContent,
 		"empty preset must clear pinned metrics footer")
+	assert.False(t, rm.metricsLoading,
+		"empty preset must reset metricsLoading so the placeholder bar does not "+
+			"persist forever (no follow-up fetch fires when nothing is selected)")
 	assert.Empty(t, rm.previewEventsContent,
 		"empty preset must clear preview events rollup")
 	assert.Nil(t, rm.resourceTree,
