@@ -360,10 +360,12 @@ func TestLogMaxScroll(t *testing.T) {
 func TestViewDescribe(t *testing.T) {
 	t.Run("renders title and content", func(t *testing.T) {
 		m := Model{
-			width:           120,
-			height:          30,
-			describeTitle:   "Describe: my-pod",
-			describeContent: "Name:         my-pod\nNamespace:    default\nStatus:       Running",
+			width:  120,
+			height: 30,
+			describeView: describeViewState{
+				title:   "Describe: my-pod",
+				content: "Name:         my-pod\nNamespace:    default\nStatus:       Running",
+			},
 		}
 		output := m.viewDescribe()
 		stripped := stripANSI(output)
@@ -379,11 +381,13 @@ func TestViewDescribe(t *testing.T) {
 			lines[i] = strings.Repeat("x", 10)
 		}
 		m := Model{
-			width:           80,
-			height:          30,
-			describeTitle:   "Test",
-			describeContent: strings.Join(lines, "\n"),
-			describeScroll:  10,
+			width:  80,
+			height: 30,
+			describeView: describeViewState{
+				title:   "Test",
+				content: strings.Join(lines, "\n"),
+				scroll:  10,
+			},
 		}
 		output := m.viewDescribe()
 		assert.NotEmpty(t, output)
@@ -391,10 +395,12 @@ func TestViewDescribe(t *testing.T) {
 
 	t.Run("small height renders correctly", func(t *testing.T) {
 		m := Model{
-			width:           80,
-			height:          5,
-			describeTitle:   "Test",
-			describeContent: "line1\nline2\nline3",
+			width:  80,
+			height: 5,
+			describeView: describeViewState{
+				title:   "Test",
+				content: "line1\nline2\nline3",
+			},
 		}
 		output := m.viewDescribe()
 		assert.NotEmpty(t, output)
@@ -406,13 +412,15 @@ func TestViewDescribe(t *testing.T) {
 func TestViewDiff(t *testing.T) {
 	t.Run("unified mode calls unified renderer", func(t *testing.T) {
 		m := Model{
-			width:         80,
-			height:        30,
-			diffLeft:      "line1\nline2\n",
-			diffRight:     "line1\nline3\n",
-			diffLeftName:  "old.yaml",
-			diffRightName: "new.yaml",
-			diffUnified:   true,
+			width:  80,
+			height: 30,
+			diffView: diffViewState{
+				left:      "line1\nline2\n",
+				right:     "line1\nline3\n",
+				leftName:  "old.yaml",
+				rightName: "new.yaml",
+				unified:   true,
+			},
 		}
 		output := m.viewDiff()
 		assert.NotEmpty(t, output)
@@ -420,13 +428,15 @@ func TestViewDiff(t *testing.T) {
 
 	t.Run("side-by-side mode", func(t *testing.T) {
 		m := Model{
-			width:         80,
-			height:        30,
-			diffLeft:      "same\nold\n",
-			diffRight:     "same\nnew\n",
-			diffLeftName:  "before",
-			diffRightName: "after",
-			diffUnified:   false,
+			width:  80,
+			height: 30,
+			diffView: diffViewState{
+				left:      "same\nold\n",
+				right:     "same\nnew\n",
+				leftName:  "before",
+				rightName: "after",
+				unified:   false,
+			},
 		}
 		output := m.viewDiff()
 		assert.NotEmpty(t, output)
@@ -454,12 +464,14 @@ func TestViewLogs(t *testing.T) {
 
 func TestViewDescribeMode(t *testing.T) {
 	m := Model{
-		width:           80,
-		height:          30,
-		mode:            modeDescribe,
-		describeTitle:   "Describe: test",
-		describeContent: "Name: test-pod\nStatus: Running",
-		tabs:            []TabState{{}},
+		width:  80,
+		height: 30,
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			title:   "Describe: test",
+			content: "Name: test-pod\nStatus: Running",
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	stripped := stripANSI(output)
@@ -505,14 +517,16 @@ func TestViewYAMLMode(t *testing.T) {
 
 func TestViewDiffMode(t *testing.T) {
 	m := Model{
-		width:         80,
-		height:        30,
-		mode:          modeDiff,
-		diffLeft:      "old content",
-		diffRight:     "new content",
-		diffLeftName:  "before",
-		diffRightName: "after",
-		tabs:          []TabState{{}},
+		width:  80,
+		height: 30,
+		mode:   modeDiff,
+		diffView: diffViewState{
+			left:      "old content",
+			right:     "new content",
+			leftName:  "before",
+			rightName: "after",
+		},
+		tabs: []TabState{{}},
 	}
 	output := m.View()
 	assert.NotEmpty(t, output)
@@ -569,11 +583,13 @@ func TestViewHelpMode(t *testing.T) {
 
 func TestViewWithTabs(t *testing.T) {
 	m := Model{
-		width:           120,
-		height:          30,
-		mode:            modeDescribe,
-		describeTitle:   "Describe: test",
-		describeContent: "Name: test\n",
+		width:  120,
+		height: 30,
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			title:   "Describe: test",
+			content: "Name: test\n",
+		},
 		nav: model.NavigationState{
 			Context: "active-ctx",
 		},
@@ -624,8 +640,8 @@ func TestPush3ViewYAMLNotEmpty(t *testing.T) {
 func TestPush3ViewDiffNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeDiff
-	m.diffLeft = "left"
-	m.diffRight = "right"
+	m.diffView.left = "left"
+	m.diffView.right = "right"
 	result := m.View()
 	assert.NotEmpty(t, result)
 }
@@ -633,7 +649,7 @@ func TestPush3ViewDiffNotEmpty(t *testing.T) {
 func TestPush3ViewDescribeNotEmpty(t *testing.T) {
 	m := basePush80v3Model()
 	m.mode = modeDescribe
-	m.describeContent = "Name: pod-1\nStatus: Running"
+	m.describeView.content = "Name: pod-1\nStatus: Running"
 	result := m.View()
 	assert.NotEmpty(t, result)
 }
@@ -933,14 +949,16 @@ func TestCovRenderSplitPreview(t *testing.T) {
 
 func TestCovViewDescribeWithContent(t *testing.T) {
 	m := Model{
-		width:               80,
-		height:              30,
-		tabs:                []TabState{{}},
-		execMu:              &sync.Mutex{},
-		mode:                modeDescribe,
-		describeContent:     "Name: nginx\nNamespace: default\nStatus: Running",
-		describeTitle:       "Describe: pods/nginx",
-		describeSearchInput: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			content:     "Name: nginx\nNamespace: default\nStatus: Running",
+			title:       "Describe: pods/nginx",
+			searchInput: TextInput{},
+		},
 	}
 	result := m.viewDescribe()
 	assert.NotEmpty(t, result)
@@ -948,15 +966,17 @@ func TestCovViewDescribeWithContent(t *testing.T) {
 
 func TestCovViewDescribeSearchActive(t *testing.T) {
 	m := Model{
-		width:                80,
-		height:               30,
-		tabs:                 []TabState{{}},
-		execMu:               &sync.Mutex{},
-		mode:                 modeDescribe,
-		describeContent:      "Name: nginx",
-		describeTitle:        "Describe",
-		describeSearchActive: true,
-		describeSearchInput:  TextInput{Value: "Name"},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			content:      "Name: nginx",
+			title:        "Describe",
+			searchActive: true,
+			searchInput:  TextInput{Value: "Name"},
+		},
 	}
 	result := m.viewDescribe()
 	assert.NotEmpty(t, result)
@@ -964,15 +984,17 @@ func TestCovViewDescribeSearchActive(t *testing.T) {
 
 func TestCovViewDescribeWithSearchQuery(t *testing.T) {
 	m := Model{
-		width:               80,
-		height:              30,
-		tabs:                []TabState{{}},
-		execMu:              &sync.Mutex{},
-		mode:                modeDescribe,
-		describeContent:     "Name: nginx\nStatus: Running",
-		describeTitle:       "Describe",
-		describeSearchQuery: "Status",
-		describeSearchInput: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			content:     "Name: nginx\nStatus: Running",
+			title:       "Describe",
+			searchQuery: "Status",
+			searchInput: TextInput{},
+		},
 	}
 	result := m.viewDescribe()
 	assert.NotEmpty(t, result)
@@ -980,15 +1002,17 @@ func TestCovViewDescribeWithSearchQuery(t *testing.T) {
 
 func TestCovViewDescribeVisualMode(t *testing.T) {
 	m := Model{
-		width:               80,
-		height:              30,
-		tabs:                []TabState{{}},
-		execMu:              &sync.Mutex{},
-		mode:                modeDescribe,
-		describeContent:     "Name: nginx\nStatus: Running",
-		describeTitle:       "Describe",
-		describeVisualMode:  'V',
-		describeSearchInput: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDescribe,
+		describeView: describeViewState{
+			content:     "Name: nginx\nStatus: Running",
+			title:       "Describe",
+			visualMode:  'V',
+			searchInput: TextInput{},
+		},
 	}
 	result := m.viewDescribe()
 	assert.Contains(t, result, "VISUAL LINE")
@@ -996,16 +1020,18 @@ func TestCovViewDescribeVisualMode(t *testing.T) {
 
 func TestCovViewDiff(t *testing.T) {
 	m := Model{
-		width:          80,
-		height:         30,
-		tabs:           []TabState{{}},
-		execMu:         &sync.Mutex{},
-		mode:           modeDiff,
-		diffLeft:       "key: default\n",
-		diffRight:      "key: custom\n",
-		diffLeftName:   "Default Values",
-		diffRightName:  "User Values",
-		diffSearchText: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDiff,
+		diffView: diffViewState{
+			left:       "key: default\n",
+			right:      "key: custom\n",
+			leftName:   "Default Values",
+			rightName:  "User Values",
+			searchText: TextInput{},
+		},
 	}
 	result := m.viewDiff()
 	assert.NotEmpty(t, result)
@@ -1013,17 +1039,19 @@ func TestCovViewDiff(t *testing.T) {
 
 func TestCovViewDiffUnified(t *testing.T) {
 	m := Model{
-		width:          80,
-		height:         30,
-		tabs:           []TabState{{}},
-		execMu:         &sync.Mutex{},
-		mode:           modeDiff,
-		diffLeft:       "key: default\n",
-		diffRight:      "key: custom\n",
-		diffLeftName:   "Default",
-		diffRightName:  "User",
-		diffUnified:    true,
-		diffSearchText: TextInput{},
+		width:  80,
+		height: 30,
+		tabs:   []TabState{{}},
+		execMu: &sync.Mutex{},
+		mode:   modeDiff,
+		diffView: diffViewState{
+			left:       "key: default\n",
+			right:      "key: custom\n",
+			leftName:   "Default",
+			rightName:  "User",
+			unified:    true,
+			searchText: TextInput{},
+		},
 	}
 	result := m.viewDiff()
 	assert.NotEmpty(t, result)

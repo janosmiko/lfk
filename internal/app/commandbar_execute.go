@@ -83,8 +83,8 @@ func (m Model) executeCommandBarInput(input string) (tea.Model, tea.Cmd) {
 		fields := strings.Fields(trimmed)
 		if len(fields) >= 2 && fields[0] == "explain" && fields[1] == "life" {
 			m.mode = modeDescribe
-			m.describeContent = explainLifeContent()
-			m.describeScroll = 0
+			m.describeView.content = explainLifeContent()
+			m.describeView.scroll = 0
 			return m, nil
 		}
 

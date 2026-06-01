@@ -365,8 +365,8 @@ func TestUpdateCommandBarResultSuccess(t *testing.T) {
 	result, cmd := m.Update(commandBarResultMsg{output: "NAME\tSTATUS\npod-1\tRunning"})
 	mdl := result.(Model)
 	assert.Equal(t, modeDescribe, mdl.mode)
-	assert.Contains(t, mdl.describeContent, "pod-1")
-	assert.Equal(t, "Command Output", mdl.describeTitle)
+	assert.Contains(t, mdl.describeView.content, "pod-1")
+	assert.Equal(t, "Command Output", mdl.describeView.title)
 	assert.Nil(t, cmd)
 }
 
@@ -388,7 +388,7 @@ func TestUpdateCommandBarResultErrorWithOutput(t *testing.T) {
 	})
 	mdl := result.(Model)
 	assert.Equal(t, modeDescribe, mdl.mode)
-	assert.Equal(t, "Command Output (error)", mdl.describeTitle)
+	assert.Equal(t, "Command Output (error)", mdl.describeView.title)
 	assert.Nil(t, cmd)
 }
 
@@ -517,9 +517,9 @@ func TestUpdateDescribeLoadedSuccess(t *testing.T) {
 	mdl := result.(Model)
 	assert.False(t, mdl.loading)
 	assert.Equal(t, modeDescribe, mdl.mode)
-	assert.Contains(t, mdl.describeContent, "my-pod")
-	assert.Equal(t, "Pod: my-pod", mdl.describeTitle)
-	assert.Equal(t, 0, mdl.describeScroll)
+	assert.Contains(t, mdl.describeView.content, "my-pod")
+	assert.Equal(t, "Pod: my-pod", mdl.describeView.title)
+	assert.Equal(t, 0, mdl.describeView.scroll)
 	assert.Nil(t, cmd)
 }
 
@@ -547,8 +547,8 @@ func TestUpdateHelmValuesLoadedSuccess(t *testing.T) {
 	mdl := result.(Model)
 	assert.False(t, mdl.loading)
 	assert.Equal(t, modeDescribe, mdl.mode)
-	assert.Contains(t, mdl.describeContent, "replicaCount")
-	assert.Equal(t, "Values: my-release", mdl.describeTitle)
+	assert.Contains(t, mdl.describeView.content, "replicaCount")
+	assert.Equal(t, "Values: my-release", mdl.describeView.title)
 	assert.Nil(t, cmd)
 }
 
@@ -578,12 +578,12 @@ func TestUpdateDiffLoadedSuccess(t *testing.T) {
 	mdl := result.(Model)
 	assert.False(t, mdl.loading)
 	assert.Equal(t, modeDiff, mdl.mode)
-	assert.Contains(t, mdl.diffLeft, "Pod")
-	assert.Contains(t, mdl.diffRight, "Service")
-	assert.Equal(t, "pod.yaml", mdl.diffLeftName)
-	assert.Equal(t, "svc.yaml", mdl.diffRightName)
-	assert.Equal(t, 0, mdl.diffScroll)
-	assert.False(t, mdl.diffUnified)
+	assert.Contains(t, mdl.diffView.left, "Pod")
+	assert.Contains(t, mdl.diffView.right, "Service")
+	assert.Equal(t, "pod.yaml", mdl.diffView.leftName)
+	assert.Equal(t, "svc.yaml", mdl.diffView.rightName)
+	assert.Equal(t, 0, mdl.diffView.scroll)
+	assert.False(t, mdl.diffView.unified)
 	assert.Nil(t, cmd)
 }
 

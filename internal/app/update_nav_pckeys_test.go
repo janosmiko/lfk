@@ -90,59 +90,61 @@ func describeModelWithLines() Model {
 		lines[i] = "line" + string(rune('a'+i%26))
 	}
 	return Model{
-		mode:            modeDescribe,
-		describeContent: strings.Join(lines, "\n"),
-		describeCursor:  0,
-		tabs:            []TabState{{}},
-		width:           80,
-		height:          40,
+		mode: modeDescribe,
+		describeView: describeViewState{
+			content: strings.Join(lines, "\n"),
+			cursor:  0,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 }
 
 func TestPCKeysDescribePgDownMatchesCtrlF(t *testing.T) {
 	m := describeModelWithLines()
-	m.describeCursor = 10
+	m.describeView.cursor = 10
 	resPg, _ := m.handleDescribeKey(keyMsg("pgdown"))
 	resCF, _ := m.handleDescribeKey(keyMsg("ctrl+f"))
-	assert.Equal(t, resCF.(Model).describeCursor, resPg.(Model).describeCursor,
+	assert.Equal(t, resCF.(Model).describeView.cursor, resPg.(Model).describeView.cursor,
 		"pgdown should move the describe cursor the same as ctrl+f")
-	assert.Greater(t, resPg.(Model).describeCursor, 10,
+	assert.Greater(t, resPg.(Model).describeView.cursor, 10,
 		"pgdown should advance the describe cursor")
 }
 
 func TestPCKeysDescribePgUpMatchesCtrlB(t *testing.T) {
 	m := describeModelWithLines()
-	m.describeCursor = 100
+	m.describeView.cursor = 100
 	resPg, _ := m.handleDescribeKey(keyMsg("pgup"))
 	resCB, _ := m.handleDescribeKey(keyMsg("ctrl+b"))
-	assert.Equal(t, resCB.(Model).describeCursor, resPg.(Model).describeCursor,
+	assert.Equal(t, resCB.(Model).describeView.cursor, resPg.(Model).describeView.cursor,
 		"pgup should move the describe cursor the same as ctrl+b")
-	assert.Less(t, resPg.(Model).describeCursor, 100,
+	assert.Less(t, resPg.(Model).describeView.cursor, 100,
 		"pgup should retract the describe cursor")
 }
 
 func TestPCKeysDescribeHomeJumpsToTop(t *testing.T) {
 	m := describeModelWithLines()
-	m.describeCursor = 100
-	m.describeLineInput = "15"
+	m.describeView.cursor = 100
+	m.describeView.lineInput = "15"
 	m.pendingG = true
 	res, _ := m.handleDescribeKey(keyMsg("home"))
 	rm := res.(Model)
-	assert.Equal(t, 0, rm.describeCursor, "home should reset describeCursor to 0")
-	assert.Empty(t, rm.describeLineInput, "home should clear describeLineInput")
+	assert.Equal(t, 0, rm.describeView.cursor, "home should reset describeCursor to 0")
+	assert.Empty(t, rm.describeView.lineInput, "home should clear describeLineInput")
 	assert.False(t, rm.pendingG, "home must clear pendingG")
 }
 
 func TestPCKeysDescribeEndJumpsToBottom(t *testing.T) {
 	m := describeModelWithLines()
-	m.describeCursor = 0
+	m.describeView.cursor = 0
 	// Even with a line-number buffer, end must always go to the bottom.
-	m.describeLineInput = "42"
+	m.describeView.lineInput = "42"
 	res, _ := m.handleDescribeKey(keyMsg("end"))
 	rm := res.(Model)
-	assert.Equal(t, 199, rm.describeCursor,
+	assert.Equal(t, 199, rm.describeView.cursor,
 		"end should jump to the last line regardless of describeLineInput")
-	assert.Empty(t, rm.describeLineInput, "end should clear describeLineInput")
+	assert.Empty(t, rm.describeView.lineInput, "end should clear describeLineInput")
 }
 
 // --- Bookmarks overlay (handleBookmarkOverlayKey) -------------------------------
@@ -826,59 +828,61 @@ func diffModelWithLines() Model {
 		lines[i] = "line" + string(rune('a'+i%26))
 	}
 	return Model{
-		mode:     modeDiff,
-		diffLeft: strings.Join(lines, "\n"),
-		tabs:     []TabState{{}},
-		width:    80,
-		height:   40,
+		mode: modeDiff,
+		diffView: diffViewState{
+			left: strings.Join(lines, "\n"),
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 }
 
 func TestPCKeysDiffPgDownMatchesCtrlF(t *testing.T) {
 	m := diffModelWithLines()
-	m.diffCursor = 10
+	m.diffView.cursor = 10
 	resPg, _ := m.handleDiffKey(keyMsg("pgdown"))
 	resCF, _ := m.handleDiffKey(keyMsg("ctrl+f"))
-	assert.Equal(t, resCF.(Model).diffCursor, resPg.(Model).diffCursor,
+	assert.Equal(t, resCF.(Model).diffView.cursor, resPg.(Model).diffView.cursor,
 		"pgdown should match ctrl+f in diff view")
-	assert.Greater(t, resPg.(Model).diffCursor, 10)
+	assert.Greater(t, resPg.(Model).diffView.cursor, 10)
 }
 
 func TestPCKeysDiffPgUpMatchesCtrlB(t *testing.T) {
 	m := diffModelWithLines()
-	m.diffCursor = 100
+	m.diffView.cursor = 100
 	resPg, _ := m.handleDiffKey(keyMsg("pgup"))
 	resCB, _ := m.handleDiffKey(keyMsg("ctrl+b"))
-	assert.Equal(t, resCB.(Model).diffCursor, resPg.(Model).diffCursor,
+	assert.Equal(t, resCB.(Model).diffView.cursor, resPg.(Model).diffView.cursor,
 		"pgup should match ctrl+b in diff view")
-	assert.Less(t, resPg.(Model).diffCursor, 100)
+	assert.Less(t, resPg.(Model).diffView.cursor, 100)
 }
 
 func TestPCKeysDiffHomeJumpsToTop(t *testing.T) {
 	m := diffModelWithLines()
-	m.diffCursor = 100
-	m.diffScroll = 80
-	m.diffLineInput = "15"
+	m.diffView.cursor = 100
+	m.diffView.scroll = 80
+	m.diffView.lineInput = "15"
 	m.pendingG = true
 	res, _ := m.handleDiffKey(keyMsg("home"))
 	rm := res.(Model)
-	assert.Equal(t, 0, rm.diffCursor, "home should reset diffCursor to 0")
-	assert.Equal(t, 0, rm.diffScroll, "home should reset diffScroll to 0")
-	assert.Empty(t, rm.diffLineInput, "home should clear diffLineInput")
+	assert.Equal(t, 0, rm.diffView.cursor, "home should reset diffCursor to 0")
+	assert.Equal(t, 0, rm.diffView.scroll, "home should reset diffScroll to 0")
+	assert.Empty(t, rm.diffView.lineInput, "home should clear diffLineInput")
 	assert.False(t, rm.pendingG, "home must clear pendingG")
 }
 
 func TestPCKeysDiffEndJumpsToBottom(t *testing.T) {
 	m := diffModelWithLines()
-	m.diffCursor = 0
+	m.diffView.cursor = 0
 	// Even with a line-number buffer, end must always go to the bottom.
-	m.diffLineInput = "42"
+	m.diffView.lineInput = "42"
 	res, _ := m.handleDiffKey(keyMsg("end"))
 	rm := res.(Model)
 	// With 200 lines, cursor should go to the last.
-	assert.Equal(t, 199, rm.diffCursor,
+	assert.Equal(t, 199, rm.diffView.cursor,
 		"end should jump to the last diff line regardless of diffLineInput")
-	assert.Empty(t, rm.diffLineInput, "end should clear diffLineInput")
+	assert.Empty(t, rm.diffView.lineInput, "end should clear diffLineInput")
 }
 
 // --- API Explorer (handleExplainKey) --------------------------------------------

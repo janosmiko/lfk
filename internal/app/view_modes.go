@@ -47,7 +47,7 @@ func (m Model) viewLogs() string {
 }
 
 func (m Model) viewDescribe() string {
-	titleText := m.describeTitle + viewModeIndicators(m.describeWrap, rune(m.describeVisualMode), m.describeSearchQuery)
+	titleText := m.describeView.title + viewModeIndicators(m.describeView.wrap, rune(m.describeView.visualMode), m.describeView.searchQuery)
 	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(titleText)
 
 	// Build hint bar or search bar.
@@ -60,24 +60,24 @@ func (m Model) viewDescribe() string {
 		{Key: "ctrl+w/>", Desc: "wrap"},
 		{Key: "q/esc", Desc: "back"},
 	}
-	if m.describeAutoRefresh {
+	if m.describeView.autoRefresh {
 		hints = append(hints, ui.HintEntry{Key: "LIVE", Desc: "auto-refresh"})
 	}
 	var hint string
 	switch {
 	case m.hasStatusMessage():
 		hint = m.renderStatusHint()
-	case m.describeSearchActive:
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeSearchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.describeSearchInput.CursorRight())
+	case m.describeView.searchActive:
+		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorRight())
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
-	case m.describeSearchQuery != "":
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeSearchQuery)
+	case m.describeView.searchQuery != "":
+		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeView.searchQuery)
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	default:
 		hint = ui.RenderHintBar(hints, m.width)
 	}
 
-	lines := strings.Split(m.describeContent, "\n")
+	lines := strings.Split(m.describeView.content, "\n")
 
 	maxLines := max(m.height-4, 3)
 
@@ -90,7 +90,7 @@ func (m Model) viewDescribe() string {
 		// -1 for cursor gutter
 		contentWidth-1, 10)
 
-	scroll := m.describeScroll
+	scroll := m.describeView.scroll
 	if scroll > len(lines) {
 		scroll = len(lines) - 1
 	}
@@ -99,16 +99,16 @@ func (m Model) viewDescribe() string {
 	}
 
 	// Visual selection range.
-	selStart := min(m.describeVisualStart, m.describeCursor)
-	selEnd := max(m.describeVisualStart, m.describeCursor)
-	colStart := min(m.describeVisualCol, m.describeCursorCol)
-	colEnd := max(m.describeVisualCol, m.describeCursorCol)
+	selStart := min(m.describeView.visualStart, m.describeView.cursor)
+	selEnd := max(m.describeView.visualStart, m.describeView.cursor)
+	colStart := min(m.describeView.visualCol, m.describeView.cursorCol)
+	colEnd := max(m.describeView.visualCol, m.describeView.cursorCol)
 
 	// Search query for highlighting.
-	lowerQuery := strings.ToLower(m.describeSearchQuery)
+	lowerQuery := strings.ToLower(m.describeView.searchQuery)
 
 	// When wrap is enabled, use a simplified rendering path (no column cursor).
-	if m.describeWrap {
+	if m.describeView.wrap {
 		visible := lines[scroll:]
 		if len(visible) > maxLines {
 			visible = visible[:maxLines]
@@ -142,8 +142,8 @@ func (m Model) viewDescribe() string {
 
 	for i := scroll; i < end; i++ {
 		line := lines[i]
-		inSelection := m.describeVisualMode != 0 && i >= selStart && i <= selEnd
-		isCursorLine := i == m.describeCursor
+		inSelection := m.describeView.visualMode != 0 && i >= selStart && i <= selEnd
+		isCursorLine := i == m.describeView.cursor
 
 		// Truncate to content width.
 		plainLine := line
@@ -153,9 +153,9 @@ func (m Model) viewDescribe() string {
 
 		if inSelection {
 			rendered := ui.RenderVisualSelection(
-				plainLine, rune(m.describeVisualMode),
+				plainLine, rune(m.describeView.visualMode),
 				i, selStart, selEnd,
-				m.describeVisualStart, m.describeVisualCol, m.describeCursorCol,
+				m.describeView.visualStart, m.describeView.visualCol, m.describeView.cursorCol,
 				colStart, colEnd,
 			)
 			if isCursorLine {
@@ -168,7 +168,7 @@ func (m Model) viewDescribe() string {
 			if lowerQuery != "" {
 				displayLine = highlightDescribeSearchLine(plainLine, lowerQuery)
 			}
-			cursorLine := ui.RenderCursorAtCol(displayLine, plainLine, m.describeCursorCol)
+			cursorLine := ui.RenderCursorAtCol(displayLine, plainLine, m.describeView.cursorCol)
 			renderedLines = append(renderedLines, ui.YamlCursorIndicatorStyle.Render("\u258e")+cursorLine)
 		} else {
 			displayLine := plainLine
@@ -262,15 +262,15 @@ func (m Model) viewExplain() string {
 }
 
 func (m Model) viewDiff() string {
-	foldRegions := ui.ComputeDiffFoldRegions(m.diffLeft, m.diffRight)
-	searchInput := m.diffSearchText.Value
+	foldRegions := ui.ComputeDiffFoldRegions(m.diffView.left, m.diffView.right)
+	searchInput := m.diffView.searchText.Value
 	vp := ui.DiffVisualParams{
-		CursorSide:  m.diffCursorSide,
-		CursorCol:   m.diffVisualCurCol,
-		VisualMode:  m.diffVisualMode,
-		VisualType:  m.diffVisualType,
-		VisualStart: m.diffVisualStart,
-		VisualCol:   m.diffVisualCol,
+		CursorSide:  m.diffView.cursorSide,
+		CursorCol:   m.diffView.visualCurCol,
+		VisualMode:  m.diffView.visualMode,
+		VisualType:  m.diffView.visualType,
+		VisualStart: m.diffView.visualStart,
+		VisualCol:   m.diffView.visualCol,
 	}
 	// The diff renderer paints its own bottom hint bar inside the ui
 	// package, so the only safe way to surface a status message there is
@@ -282,10 +282,10 @@ func (m Model) viewDiff() string {
 	if m.hasStatusMessage() {
 		footerOverride = m.renderStatusHint()
 	}
-	if m.diffUnified {
-		return ui.RenderUnifiedDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp, footerOverride)
+	if m.diffView.unified {
+		return ui.RenderUnifiedDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, vp, footerOverride)
 	}
-	return ui.RenderDiffView(m.diffLeft, m.diffRight, m.diffLeftName, m.diffRightName, m.diffScroll, m.width, m.height, m.diffLineNumbers, m.diffWrap, m.diffSearchQuery, foldRegions, m.diffFoldState, m.diffSearchMode, searchInput, m.diffCursor, vp, footerOverride)
+	return ui.RenderDiffView(m.diffView.left, m.diffView.right, m.diffView.leftName, m.diffView.rightName, m.diffView.scroll, m.width, m.height, m.diffView.lineNumbers, m.diffView.wrap, m.diffView.searchQuery, foldRegions, m.diffView.foldState, m.diffView.searchMode, searchInput, m.diffView.cursor, vp, footerOverride)
 }
 
 func (m Model) logViewHeight() int {

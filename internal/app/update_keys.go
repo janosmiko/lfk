@@ -68,7 +68,7 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 // handleTabSwitchKey handles tab switching keys (next/prev/new tab).
 func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	kb := ui.ActiveKeybindings
-	if m.mode == modeExplorer || m.mode == modeExec || m.yamlView.searchMode || m.logView.searchActive || m.helpSearchActive || m.explainSearchActive || m.diffSearchMode || m.describeSearchActive {
+	if m.mode == modeExplorer || m.mode == modeExec || m.yamlView.searchMode || m.logView.searchActive || m.helpSearchActive || m.explainSearchActive || m.diffView.searchMode || m.describeView.searchActive {
 		return m, nil, false
 	}
 	switch msg.String() {

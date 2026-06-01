@@ -11,25 +11,25 @@ func (m Model) updateDescribeLoaded(msg describeLoadedMsg) (tea.Model, tea.Cmd) 
 		return m, scheduleStatusClear()
 	}
 	m.mode = modeDescribe
-	m.describeContent = msg.content
+	m.describeView.content = msg.content
 	// Preserve scroll/cursor on auto-refresh, reset on first load.
-	if !m.describeAutoRefresh {
-		m.describeScroll = 0
-		m.describeCursor = 0
-		m.describeCursorCol = 0
+	if !m.describeView.autoRefresh {
+		m.describeView.scroll = 0
+		m.describeView.cursor = 0
+		m.describeView.cursorCol = 0
 	}
-	m.describeTitle = msg.title
-	if m.describeAutoRefresh {
+	m.describeView.title = msg.title
+	if m.describeView.autoRefresh {
 		return m, scheduleDescribeRefresh()
 	}
 	return m, nil
 }
 
 func (m Model) updateDescribeRefreshTick(msg describeRefreshTickMsg) (tea.Model, tea.Cmd) {
-	if m.mode != modeDescribe || !m.describeAutoRefresh || m.describeRefreshFunc == nil {
+	if m.mode != modeDescribe || !m.describeView.autoRefresh || m.describeView.refreshFunc == nil {
 		return m, nil
 	}
-	return m, m.describeRefreshFunc()
+	return m, m.describeView.refreshFunc()
 }
 
 func (m Model) updateHelmValuesLoaded(msg helmValuesLoadedMsg) (tea.Model, tea.Cmd) {
@@ -39,11 +39,11 @@ func (m Model) updateHelmValuesLoaded(msg helmValuesLoadedMsg) (tea.Model, tea.C
 		return m, scheduleStatusClear()
 	}
 	m.mode = modeDescribe
-	m.describeContent = msg.content
-	m.describeScroll = 0
-	m.describeCursor = 0
-	m.describeCursorCol = 0
-	m.describeTitle = msg.title
+	m.describeView.content = msg.content
+	m.describeView.scroll = 0
+	m.describeView.cursor = 0
+	m.describeView.cursorCol = 0
+	m.describeView.title = msg.title
 	return m, nil
 }
 
@@ -54,12 +54,12 @@ func (m Model) updateDiffLoaded(msg diffLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.mode = modeDiff
-	m.diffLeft = msg.left
-	m.diffRight = msg.right
-	m.diffLeftName = msg.leftName
-	m.diffRightName = msg.rightName
-	m.diffScroll = 0
-	m.diffUnified = false
+	m.diffView.left = msg.left
+	m.diffView.right = msg.right
+	m.diffView.leftName = msg.leftName
+	m.diffView.rightName = msg.rightName
+	m.diffView.scroll = 0
+	m.diffView.unified = false
 	return m, nil
 }
 

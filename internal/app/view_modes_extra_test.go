@@ -33,11 +33,13 @@ func TestLogMaxScrollWrapWithLineNumbers(t *testing.T) {
 
 func TestViewDescribeScrollPastEnd(t *testing.T) {
 	m := Model{
-		width:           80,
-		height:          30,
-		describeTitle:   "Test",
-		describeContent: "line1\nline2\nline3",
-		describeScroll:  100,
+		width:  80,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Test",
+			content: "line1\nline2\nline3",
+			scroll:  100,
+		},
 	}
 	output := m.viewDescribe()
 	assert.NotEmpty(t, output)
@@ -45,11 +47,13 @@ func TestViewDescribeScrollPastEnd(t *testing.T) {
 
 func TestViewDescribeNegativeScroll(t *testing.T) {
 	m := Model{
-		width:           80,
-		height:          30,
-		describeTitle:   "Test",
-		describeContent: "line1\nline2\nline3",
-		describeScroll:  -5,
+		width:  80,
+		height: 30,
+		describeView: describeViewState{
+			title:   "Test",
+			content: "line1\nline2\nline3",
+			scroll:  -5,
+		},
 	}
 	output := m.viewDescribe()
 	assert.NotEmpty(t, output)

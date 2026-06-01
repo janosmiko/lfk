@@ -88,7 +88,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		warningEventsOnly:          true,
 		eventGrouping:              true,
 		scheduler:                  scheduler.New(scheduler.DefaultThreshold),
-		diffLineNumbers:            true,
+		diffView:                   diffViewState{lineNumbers: true},
 		reqCtx:                     reqCtx,
 		reqCancel:                  reqCancel,
 		middleTableRenderer:        ui.NewTableRenderer(),
