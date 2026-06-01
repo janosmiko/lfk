@@ -6,6 +6,44 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// handleMouseToggleKey intercepts the configured mouse-capture toggle key.
+// Returns handled=false when the key doesn't match or a viewer text-input
+// sub-mode owns the keystroke, so the keystroke falls through unchanged.
+func (m Model) handleMouseToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
+	if kb.MouseToggle == "" || msg.String() != kb.MouseToggle {
+		return m, nil, false
+	}
+	// Never steal the key while a viewer search/filter input is focused.
+	if m.yamlView.searchMode || m.logSearchActive || m.helpSearchActive ||
+		m.explainSearchActive || m.diffSearchMode || m.describeSearchActive ||
+		m.helpFilterActive {
+		return m, nil, false
+	}
+	mdl, cmd := m.toggleMouseCapture()
+	return mdl, cmd, true
+}
+
+// toggleMouseCapture suspends or resumes mouse reporting at runtime. When
+// suspended the terminal regains the mouse, so the user can select text,
+// copy, and use native scrollback; resuming re-enables cell-motion capture
+// (the same mode main.go installs at startup). It is a no-op with an
+// explanatory message when mouse capture was never available.
+func (m Model) toggleMouseCapture() (tea.Model, tea.Cmd) {
+	if !m.mouseAvailable {
+		m.setStatusMessage("Mouse capture is disabled (started with --no-mouse or config)", true)
+		return m, scheduleStatusClear()
+	}
+	m.mouseCaptured = !m.mouseCaptured
+	if m.mouseCaptured {
+		m.setStatusMessage("Mouse capture ON", false)
+		return m, tea.Batch(tea.EnableMouseCellMotion, scheduleStatusClear())
+	}
+	m.setStatusMessage("Mouse capture OFF — select text natively; press "+
+		ui.ActiveKeybindings.MouseToggle+" to re-enable", false)
+	return m, tea.Batch(tea.DisableMouse, scheduleStatusClear())
+}
+
 func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	// Mouse wheel inside the embedded PTY pane scrolls the scrollback
 	// ring (when present). One line per tick matches what most native

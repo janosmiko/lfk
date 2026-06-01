@@ -488,6 +488,15 @@ type Model struct {
 	// Preview scroll offset for the right column.
 	previewScroll int
 
+	// Mouse capture runtime state. mouseAvailable is true when mouse
+	// capture was enabled at startup (no --no-mouse flag and config allows
+	// it); mouseCaptured tracks the current runtime state so the toggle
+	// keybinding can suspend capture for native terminal text selection and
+	// later re-enable it. When mouse was never available the toggle is a
+	// no-op.
+	mouseAvailable bool
+	mouseCaptured  bool
+
 	// Metrics content: rendered bar graph for the preview column.
 	metricsContent string
 	metricsData    *metricsInputs // raw numbers behind metricsContent; recomposed on theme/resize, nil when none

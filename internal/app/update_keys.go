@@ -43,6 +43,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleSearchKey(msg)
 	}
 
+	// Mouse-capture toggle works in every navigable mode (explorer and the
+	// fullscreen viewers) so the user can release capture to select text
+	// from a YAML/log/describe preview, not just the explorer.
+	if mdl, cmd, handled := m.handleMouseToggleKey(msg); handled {
+		return mdl, cmd
+	}
+
 	// Tab switching keys work in all fullscreen modes (YAML, Logs, Describe, Diff, Help)
 	// as long as the user is not in a text input sub-mode (search, etc.).
 	if mdl, cmd, handled := m.handleTabSwitchKey(msg); handled {

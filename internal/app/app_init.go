@@ -196,5 +196,12 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	m.securityIgnores = loadSecurityIgnores()
 	m.refreshSecuritySources()
 
+	// Mirror main.go's startup mouse decision: capture is on unless the
+	// --no-mouse flag was set or config disabled it. The toggle keybinding
+	// flips mouseCaptured at runtime; when mouse was never available it
+	// reports that and does nothing.
+	m.mouseAvailable = !opts.NoMouse && ui.ConfigMouse
+	m.mouseCaptured = m.mouseAvailable
+
 	return m
 }

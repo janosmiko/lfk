@@ -313,6 +313,12 @@ func (m Model) explorerStatusChips() string {
 	if m.nyanMode {
 		parts = append(parts, ui.HelpKeyStyle.Render("[NYAN]"))
 	}
+	// Persistent reminder that mouse capture is suspended — the toggle's
+	// toast auto-clears, but the released-mouse state needs a lasting cue
+	// so the user knows clicks/wheel won't reach the TUI until re-enabled.
+	if m.mouseAvailable && !m.mouseCaptured {
+		parts = append(parts, ui.HelpKeyStyle.Render("[MOUSE OFF]"))
+	}
 
 	return strings.Join(parts, "  ")
 }

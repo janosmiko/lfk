@@ -29,12 +29,24 @@ type helpSection struct {
 }
 
 // helpKeyDisplay formats a keybinding value for display in the help screen.
-// It capitalizes "ctrl+" prefixes for readability.
+// It capitalizes "ctrl+" and "alt+" modifier prefixes for readability (e.g.
+// "alt+ctrl+y" -> "Alt+Ctrl+Y"); other bindings display verbatim.
 func helpKeyDisplay(key string) string {
-	if strings.HasPrefix(key, "ctrl+") {
-		return "Ctrl+" + strings.ToUpper(key[5:])
+	if !strings.HasPrefix(key, "ctrl+") && !strings.HasPrefix(key, "alt+") {
+		return key
 	}
-	return key
+	parts := strings.Split(key, "+")
+	for i, p := range parts {
+		switch p {
+		case "ctrl":
+			parts[i] = "Ctrl"
+		case "alt":
+			parts[i] = "Alt"
+		default:
+			parts[i] = strings.ToUpper(p)
+		}
+	}
+	return strings.Join(parts, "+")
 }
 
 // helpSections lives in help_sections.go.

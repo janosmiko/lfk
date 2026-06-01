@@ -503,6 +503,7 @@ func helpSections() []helpSection {
 				{"Wheel over middle pane", "Move the row selection up/down"},
 				{"Wheel over right pane", "Scroll the preview under the pointer"},
 				{"Shift+Drag", "Select text (terminal native)"},
+				{helpKeyDisplay(kb.MouseToggle), "Toggle mouse capture — release it to select text where Shift+Drag doesn't work"},
 			},
 		},
 		{

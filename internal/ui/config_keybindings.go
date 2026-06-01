@@ -95,6 +95,11 @@ type Keybindings struct {
 	// Terminal mode
 	TerminalToggle string `json:"terminal_toggle" yaml:"terminal_toggle"`
 
+	// MouseToggle suspends/resumes mouse capture at runtime so the user can
+	// make a native terminal text selection (and use the terminal's own
+	// scrollback / copy) without restarting with --no-mouse.
+	MouseToggle string `json:"mouse_toggle" yaml:"mouse_toggle"`
+
 	// Read-only mode
 	ReadOnlyToggle string `json:"readonly_toggle" yaml:"readonly_toggle"`
 
@@ -162,6 +167,12 @@ func DefaultKeybindings() Keybindings {
 
 		// Terminal mode
 		TerminalToggle: "ctrl+t",
+
+		// Mouse capture toggle. Ctrl+Option+Y (Ctrl+Alt+Y) avoids the Ctrl+X
+		// collision with the bookmark-overlay delete and is hard to hit by
+		// accident; rebindable like any other key. Bubble Tea reports the
+		// Option/Alt prefix first, so the stored string is "alt+ctrl+y".
+		MouseToggle: "alt+ctrl+y",
 
 		// Read-only mode
 		ReadOnlyToggle: "ctrl+r",

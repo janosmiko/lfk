@@ -840,8 +840,11 @@ or `Esc` to cancel.
 | Wheel up/down inside a centered overlay | Scroll the list cursor (same as `j` / `k` / arrow keys) |
 | Scroll wheel over middle pane | Move the row selection up/down |
 | Scroll wheel over right pane | Scroll the preview under the pointer |
+| `Ctrl+Option+Y` | Toggle mouse capture — release it to select text where `Shift+Drag` doesn't work, press again to re-enable |
 | Shift+Drag | Select text (host terminal) |
 | Shift+Option+Drag (macOS) / Alt+Drag (Linux, Windows) | Block-select text inside the embedded PTY |
+
+The status bar shows a `[MOUSE OFF]` chip while capture is suspended. Mouse capture (`Ctrl+Option+Y`) is rebindable via the `mouse_toggle` config key.
 
 ## Command Bar
 
