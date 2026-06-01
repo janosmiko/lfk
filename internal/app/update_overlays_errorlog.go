@@ -297,6 +297,9 @@ func (m Model) handleErrorLogOverlayKeyV2() (tea.Model, tea.Cmd) {
 	if m.errorLogVisualMode == 'v' {
 		m.errorLogVisualMode = 0
 	} else {
+		// Clamp first so the selection anchor isn't left past end-of-line by a
+		// prior vertical move onto a shorter line.
+		m.errorLogCursorCol = m.errorLogClampedCursorCol()
 		m.errorLogVisualMode = 'v'
 		m.errorLogVisualStart = m.errorLogCursorLine
 		m.errorLogVisualStartCol = m.errorLogCursorCol
@@ -309,6 +312,10 @@ func (m Model) handleErrorLogOverlayKeyV2() (tea.Model, tea.Cmd) {
 // main key switch can run. Works in both normal and char-visual modes. These
 // motions never emit a command, so only the updated Model is returned.
 func (m Model) errorLogColumnMotion(key string) (Model, bool) {
+	// Clamp a column left over from a vertical move onto a shorter line before
+	// applying the motion. The clamp only sticks when a column key is handled;
+	// for other keys the returned Model is discarded by the caller.
+	m.errorLogCursorCol = m.errorLogClampedCursorCol()
 	switch key {
 	case "h", "left":
 		return m.handleErrorLogOverlayKeyH(), true
@@ -338,6 +345,14 @@ func (m Model) errorLogCurrentLine() string {
 // text, used to clamp horizontal cursor movement.
 func (m Model) errorLogCurrentLineLen() int {
 	return len([]rune(m.errorLogCurrentLine()))
+}
+
+// errorLogClampedCursorCol returns errorLogCursorCol clamped to the current
+// line. A vertical move (j/k) onto a shorter line leaves the column past that
+// line's end; clamping on read keeps horizontal motions and selection anchors
+// valid while preserving the column when moving back onto a longer line.
+func (m Model) errorLogClampedCursorCol() int {
+	return min(m.errorLogCursorCol, max(m.errorLogCurrentLineLen()-1, 0))
 }
 
 // handleErrorLogOverlayWordMotion applies a vim word/WORD motion (w/e/b/W/E/B)

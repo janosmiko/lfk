@@ -185,3 +185,39 @@ func TestErrorLogWordMotionInNormalMode(t *testing.T) {
 		assert.Equal(t, 3, col(res))
 	})
 }
+
+// A vertical move (j/k) onto a shorter line leaves errorLogCursorCol past that
+// line's end; column motions and visual-entry must clamp it on read so the
+// cursor stays on a real character (CodeRabbit #325 follow-up).
+func TestErrorLogCursorColClampedOnShorterLine(t *testing.T) {
+	entries := []ui.ErrorLogEntry{{Level: "ERR", Message: "hi"}}  // short line
+	lineLen := len([]rune(ui.ErrorLogEntryPlainText(entries[0]))) // "00:00:00 ERR hi"
+	overflow := lineLen + 50
+
+	t.Run("h clamps before moving", func(t *testing.T) {
+		m := Model{overlayErrorLog: true, errorLog: entries, errorLogCursorCol: overflow}
+		mdl, handled := m.errorLogColumnMotion("h")
+		assert.True(t, handled)
+		assert.Equal(t, lineLen-2, mdl.errorLogCursorCol) // clamped to lineLen-1, then h
+	})
+
+	t.Run("l clamps and stays at end", func(t *testing.T) {
+		m := Model{overlayErrorLog: true, errorLog: entries, errorLogCursorCol: overflow}
+		mdl, _ := m.errorLogColumnMotion("l")
+		assert.Equal(t, lineLen-1, mdl.errorLogCursorCol)
+	})
+
+	t.Run("w clamps before motion", func(t *testing.T) {
+		m := Model{overlayErrorLog: true, errorLog: entries, errorLogCursorCol: overflow}
+		mdl, _ := m.errorLogColumnMotion("w")
+		assert.LessOrEqual(t, mdl.errorLogCursorCol, lineLen-1)
+	})
+
+	t.Run("entering char-visual clamps the anchor", func(t *testing.T) {
+		m := Model{overlayErrorLog: true, errorLog: entries, errorLogCursorCol: overflow}
+		res, _ := m.handleErrorLogOverlayKeyV2()
+		rm := res.(Model)
+		assert.Equal(t, lineLen-1, rm.errorLogVisualStartCol)
+		assert.Equal(t, lineLen-1, rm.errorLogCursorCol)
+	})
+}

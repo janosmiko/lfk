@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/x/ansi"
 )
 
 // overlaySchemeScroll is the persistent scroll position for the colorscheme overlay.
@@ -338,7 +339,11 @@ func renderErrorLogEntry(entry ErrorLogEntry, contentW int, vp ErrorLogVisualPar
 	} else {
 		lines = renderErrorLogContent(entry, contentW)
 		if isCursor && len(lines) > 0 {
-			lines[0] = RenderCursorAtCol(lines[0], "", vp.CursorCol)
+			// Clamp the block cursor to the last real character so a column
+			// left over from a vertical move onto a shorter line lands on the
+			// text rather than parking in the padding past end-of-line.
+			col := min(vp.CursorCol, max(ansi.StringWidth(lines[0])-1, 0))
+			lines[0] = RenderCursorAtCol(lines[0], "", col)
 		}
 	}
 

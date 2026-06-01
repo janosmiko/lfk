@@ -191,6 +191,13 @@ func TestRenderErrorLogOverlay_BlockCursorTracksColumnInNormalMode(t *testing.T)
 	assert.Contains(t, at0, "\x1b[7m", "normal-mode cursor line should carry a reverse-video block cursor")
 	// ...and it moves with the cursor column without entering visual mode.
 	assert.NotEqual(t, at0, at5, "block cursor position should change with CursorCol")
+
+	// A column left over from a vertical move onto a shorter line is clamped to
+	// the last character, so the block cursor never parks past end-of-line.
+	msgW := len([]rune("10:00:00 ERR abcdefgh")) // content (after gutter) width
+	atEnd := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{CursorLine: 0, CursorCol: msgW - 1})
+	atOver := RenderErrorLogOverlay(entries, 0, 80, 20, false, ErrorLogVisualParams{CursorLine: 0, CursorCol: 1000})
+	assert.Equal(t, atEnd, atOver, "an out-of-range cursor column should clamp to the last character")
 }
 
 // uniqueLongMessage returns a 120-character message whose every substring is
