@@ -210,11 +210,18 @@ func (m Model) loadSecurityFindings() tea.Cmd {
 		"Loading security findings",
 		bgtaskTarget(kctx, ns),
 		func() tea.Msg {
-			ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+			// Match the caller deadline to the manager's own per-scan ceiling.
+			// A shorter caller timeout (was a hardcoded 30s vs the manager's
+			// 60s scan) orphaned a slow-but-succeeding scan: this load timed
+			// out and returned nil while the detached scan finished later, so
+			// the findings only appeared on a subsequent navigation. Adding a
+			// small grace margin lets the scan's own timeout fire first and
+			// deliver a partial result rather than the caller pre-empting it.
+			ctx, cancel := context.WithTimeout(context.Background(), mgr.ScanTimeout()+2*time.Second)
 			defer cancel()
 			res, err := mgr.FetchAll(ctx, kctx, ns)
 			if err != nil {
-				// Caller ctx cancelled / preempted / 30s budget elapsed. The
+				// Caller ctx cancelled / preempted / budget elapsed. The
 				// detached scan keeps running and caches its result, so a later
 				// call rebuilds the index. Emit nothing rather than forwarding
 				// an empty result that would wipe the existing badge index.
@@ -248,12 +255,25 @@ func (m Model) updateSecurityFindingsLoaded(msg securityFindingsLoadedMsg) Model
 	if msg.namespace != m.effectiveNamespace() {
 		return m
 	}
+	anyErr := false
 	for source, err := range msg.errors {
 		if err != nil {
+			anyErr = true
 			logger.Info("Security source fetch failed", "source", source, "context", msg.context, "error", err)
 		}
 	}
 	m.securityIndex = security.BuildFindingIndex(msg.findings)
+	// Persist to disk for stale-while-revalidate on the next session — but
+	// only a clean scan: a partial result (some source errored) would cache an
+	// undercount that the badges would show until the TTL expires. A fully
+	// clean scan with zero findings is still cached (it is a valid "nothing
+	// found" answer). Best-effort; a write failure never affects the session.
+	if !anyErr {
+		if err := updateSecurityFindingsCacheForContext(m.client, msg.context, msg.namespace, msg.findings); err != nil {
+			logger.Warn("Failed to persist security findings cache",
+				"context", msg.context, "namespace", msg.namespace, "error", err)
+		}
+	}
 	return m
 }
 

@@ -92,6 +92,18 @@ func (m *Model) refreshSecuritySources() {
 		// with no new probe; an as-yet-uninspected cluster has no cache and
 		// stays fully lazy.
 		mgr.SetAvailability(resolvedCtx, cached)
+		// Stale-while-revalidate: paint SEC badges instantly from the
+		// last session's findings while the eager scan revalidates in the
+		// background (maybeEagerSecurityScan, fired at cluster open, replaces
+		// the index when fresh results land). Keyed by the effective
+		// namespace so the seed matches what the scan will fetch. A miss
+		// (no cache / expired) just leaves the index nil until the scan
+		// completes — the pre-cache behavior.
+		if cachedFindings := loadSecurityFindingsCacheForContext(
+			m.client, resolvedCtx, m.effectiveNamespace(), securityFindingsCacheTTL,
+		); cachedFindings != nil {
+			m.securityIndex = security.BuildFindingIndex(cachedFindings)
+		}
 	} else {
 		m.securityAvailabilityByName = make(map[string]bool)
 	}

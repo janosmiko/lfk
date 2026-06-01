@@ -369,12 +369,12 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.dashboardEventsPreview = ""
 	m.monitoringPreview = ""
 	m.applyPinnedTypes()
-	// Rebuild the security manager against the new cluster's clientsets so
-	// findings, availability, and the SEC badge index reflect the active
-	// cluster instead of lingering on the prior one.
-	m.refreshSecuritySources()
+	// Clear the prior cluster's badge index BEFORE refreshSecuritySources:
+	// that rebuild seeds m.securityIndex from the new cluster's disk-cached
+	// findings (stale-while-revalidate), so nil-ing after would discard it.
 	m.securityIndex = nil
 	m.securityActiveGroup = ""
+	m.refreshSecuritySources()
 	m.nav.Level = model.LevelResourceTypes
 	// Capture whatever the right-pane preview was already displaying for
 	// this context (real discovery hit or seed fallback). We use this

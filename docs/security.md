@@ -84,6 +84,13 @@ clusters:
   have never inspected stays fully lazy — no security API calls until you open its
   Security category — so the badge auto-scan never triggers the EKS `aws`
   credential plugin for clusters you don't look at.
+- **Cached findings (stale-while-revalidate)**: a clean scan's findings are
+  persisted per cluster + namespace (next to the availability cache, under the
+  kubectl cache dir). On reopen, SEC badges paint instantly from the last scan
+  while a fresh scan revalidates in the background and replaces them. Findings
+  older than one hour are not painted (the live scan still runs). Partial scans
+  (any source errored) are not cached, so a transient failure never persists an
+  undercount.
 - **Low priority**: security scans run as a low-priority background task and on a
   dedicated, throttled API client (QPS 10 / burst 20, separate from the
   foreground budget), so a multi-source scan never starves foreground resource

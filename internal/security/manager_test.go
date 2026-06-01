@@ -640,3 +640,18 @@ func TestManagerIgnoredNamespacesFilterDoesNotAliasCachedSlice(t *testing.T) {
 	require.Len(t, cached.Findings, 1, "cache must be insulated from caller mutation")
 	assert.NotEqual(t, "tamper", cached.Findings[0].ID)
 }
+
+// TestScanTimeoutGetterSetter covers the default, override, and no-op clamp
+// for the per-scan timeout knob used by callers to align their own deadline.
+func TestScanTimeoutGetterSetter(t *testing.T) {
+	m := NewManager()
+	assert.Equal(t, 60*time.Second, m.ScanTimeout(), "default scan timeout")
+
+	m.SetScanTimeout(15 * time.Second)
+	assert.Equal(t, 15*time.Second, m.ScanTimeout(), "override takes effect")
+
+	m.SetScanTimeout(0)
+	assert.Equal(t, 15*time.Second, m.ScanTimeout(), "zero is a no-op")
+	m.SetScanTimeout(-1 * time.Second)
+	assert.Equal(t, 15*time.Second, m.ScanTimeout(), "negative is a no-op")
+}
