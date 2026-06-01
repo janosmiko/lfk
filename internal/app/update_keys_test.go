@@ -988,6 +988,38 @@ func TestPush4HandleKeyUpFullscreenDashboard(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
+// Filter and Search narrow the visible item list. The fullscreen dashboard has
+// no list to narrow (it scrolls a rendered preview), so these keys must be
+// inert there — matching the hint bar, which already hides them.
+func TestPush4HandleKeyFilterFullscreenDashboardNoOp(t *testing.T) {
+	m := basePush4Model()
+	m.fullscreenDashboard = true
+	kb := ui.ActiveKeybindings
+	result, _ := m.handleKey(keyMsg(kb.Filter))
+	rm := result.(Model)
+	assert.False(t, rm.filterActive, "filter must not activate in fullscreen dashboard")
+	assert.True(t, rm.fullscreenDashboard, "fullscreen dashboard stays on")
+}
+
+func TestPush4HandleKeySearchFullscreenDashboardNoOp(t *testing.T) {
+	m := basePush4Model()
+	m.fullscreenDashboard = true
+	kb := ui.ActiveKeybindings
+	result, _ := m.handleKey(keyMsg(kb.Search))
+	rm := result.(Model)
+	assert.False(t, rm.searchActive, "search must not activate in fullscreen dashboard")
+	assert.True(t, rm.fullscreenDashboard, "fullscreen dashboard stays on")
+}
+
+// Outside the fullscreen dashboard the same keys keep working as before.
+func TestPush4HandleKeyFilterExplorerActivates(t *testing.T) {
+	m := basePush4Model()
+	kb := ui.ActiveKeybindings
+	result, _ := m.handleKey(keyMsg(kb.Filter))
+	rm := result.(Model)
+	assert.True(t, rm.filterActive, "filter activates in the explorer list")
+}
+
 func TestPush4HandleKeyGGFullscreenDashboard(t *testing.T) {
 	m := basePush4Model()
 	m.fullscreenDashboard = true
