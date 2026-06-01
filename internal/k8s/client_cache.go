@@ -10,6 +10,7 @@ package k8s
 
 import (
 	"fmt"
+	"strconv"
 
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -114,8 +115,9 @@ func buildCachedClient[T comparable](
 ) (T, error) {
 	var zero T
 
-	// Fast path: hit returns without entering the singleflight group or the
-	// build, holding clientMu only for the map read.
+	// Fast path: a hit returns without entering the singleflight group or the
+	// build, holding clientMu only for the map read. The generation is
+	// snapshotted under the same lock so it is consistent with the miss.
 	c.clientMu.Lock()
 	if entry, ok := c.clientCache[key]; ok {
 		if v := get(entry); v != zero {
@@ -123,13 +125,19 @@ func buildCachedClient[T comparable](
 			return v, nil
 		}
 	}
+	gen := c.clientCacheGen
 	c.clientMu.Unlock()
 
-	// The singleflight key includes kind, but clientCache stays keyed by key
-	// alone (one ctxClients per context, with get/set selecting the field).
-	// Do NOT collapse this to key: a clientset and a dynamic build for the same
-	// context must be independent flights, or one caller gets the wrong type.
-	res, err, _ := c.clientGroup.Do(key+"\x00"+kind, func() (any, error) {
+	// The singleflight key includes BOTH kind and gen; clientCache itself stays
+	// keyed by key alone (one ctxClients per context, get/set select the field):
+	//   - kind: a clientset and a dynamic build for the same context must be
+	//     independent flights, or one caller gets the wrong type.
+	//   - gen: a caller that arrives after an invalidate (newer gen) must NOT
+	//     join a flight that is still building against the now-stale config —
+	//     singleflight would hand it that pre-invalidate client. A newer gen
+	//     means a different key, hence a fresh flight built against fresh config.
+	sfKey := key + "\x00" + kind + "\x00" + strconv.FormatUint(gen, 10)
+	res, err, _ := c.clientGroup.Do(sfKey, func() (any, error) {
 		// Re-check under the lock: another caller may have finished the build
 		// between our fast-path miss and entering the group.
 		c.clientMu.Lock()
@@ -139,9 +147,6 @@ func buildCachedClient[T comparable](
 				return v, nil
 			}
 		}
-		// Snapshot the cache generation before the (lock-free) build so a
-		// concurrent invalidate is detectable on store.
-		gen := c.clientCacheGen
 		c.clientMu.Unlock()
 
 		built, berr := build()
@@ -152,10 +157,10 @@ func buildCachedClient[T comparable](
 		c.clientMu.Lock()
 		// If an invalidate (ReloadKubeconfig / invalidateClientsForContext)
 		// bumped the generation while we built, our client is against stale
-		// config: hand it to every caller coalesced into this flight (Do
-		// returns the same value to all of them) but do NOT cache it, so the
-		// next caller rebuilds against the fresh config instead of getting a
-		// stale hit.
+		// config: hand it to this flight's callers (all of whom snapshotted the
+		// same pre-invalidate gen, so their request predates the change) but do
+		// NOT cache it — the next caller snapshots the newer gen, takes a fresh
+		// flight, and rebuilds against the fresh config.
 		if c.clientCacheGen == gen {
 			set(c.cachedClientsLocked(key), built)
 		}

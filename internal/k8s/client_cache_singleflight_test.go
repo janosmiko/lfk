@@ -181,3 +181,55 @@ func TestCachedClient_CoalescedWaitersRacingInvalidate(t *testing.T) {
 	require.NoError(t, err)
 	assert.NotSame(t, results[0], fresh, "the stale coalesced result must not have been cached as a hit")
 }
+
+// TestCachedClient_PostInvalidateCallerStartsFreshFlight verifies a caller that
+// arrives AFTER an invalidation does not join an in-flight build started under
+// the previous generation (singleflight would otherwise hand it that
+// pre-invalidate, now-stale client). The generation is part of the singleflight
+// key, so the later caller starts its own flight and builds against fresh config.
+func TestCachedClient_PostInvalidateCallerStartsFreshFlight(t *testing.T) {
+	c := newCacheTestClient(t)
+	cfg, err := c.restConfigForContext("plain")
+	require.NoError(t, err)
+
+	release := make(chan struct{})
+	aStarted := make(chan struct{})
+	aDone := make(chan kubernetes.Interface, 1)
+	// Caller A: build under the current generation, parked mid-build.
+	go func() {
+		cs, _ := c.cachedClientset("plain", false, func() (*rest.Config, error) {
+			close(aStarted)
+			<-release
+			return cfg, nil
+		})
+		aDone <- cs
+	}()
+	<-aStarted
+
+	// Invalidate (new generation) while A's build is still in flight.
+	c.invalidateClientsForContext("plain")
+
+	// Caller B arrives after the invalidate. It must run its OWN build (its
+	// generation differs from A's flight key), not block on A's parked flight.
+	bBuilt := make(chan struct{})
+	bDone := make(chan kubernetes.Interface, 1)
+	go func() {
+		cs, _ := c.cachedClientset("plain", false, func() (*rest.Config, error) {
+			close(bBuilt)
+			return cfg, nil
+		})
+		bDone <- cs
+	}()
+
+	select {
+	case <-bBuilt:
+		// good: B ran its own build instead of joining A's pre-invalidate flight
+	case <-time.After(2 * time.Second):
+		close(release)
+		t.Fatal("post-invalidate caller joined the stale in-flight build instead of starting fresh")
+	}
+	b := <-bDone
+	close(release)
+	a := <-aDone
+	assert.NotSame(t, a, b, "post-invalidate caller must build fresh, not receive the pre-invalidate in-flight client")
+}
