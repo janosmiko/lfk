@@ -250,7 +250,7 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 | `Enter` | Open full-screen YAML view / navigate into |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping (Events view) |
 | `p` | Pin/unpin resource type (at resource types level) |
-| `x` | At resource types level: hide/show the selected resource type (saved per cluster) |
+| `x` | At resource types level: pin/unpin or hide/show the selected resource type (saved per cluster context / union set) |
 | `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core) in the sidebar |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |

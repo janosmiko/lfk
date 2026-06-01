@@ -7,6 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func hiddenTestModel(t *testing.T) Model {
@@ -86,7 +87,8 @@ func TestToggleHiddenResourceType_RevealedStaysAndUnhides(t *testing.T) {
 }
 
 // TestOpenResourceTypeActionMenu_LabelReflectsState verifies the menu offers
-// Hide for a visible type and Show for an already-hidden one.
+// Pin + Hide for a fresh type, each with a key chip, and that the Hide entry
+// flips to Show once the type is hidden.
 func TestOpenResourceTypeActionMenu_LabelReflectsState(t *testing.T) {
 	defer func(orig []string) { model.HiddenTypes = orig }(model.HiddenTypes)
 
@@ -94,16 +96,41 @@ func TestOpenResourceTypeActionMenu_LabelReflectsState(t *testing.T) {
 	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
 
 	menu := m.openResourceTypeActionMenu()
-	require.Len(t, menu.overlayItems, 1)
-	assert.Equal(t, actionLabelHideType, menu.overlayItems[0].Name)
+	require.Len(t, menu.overlayItems, 2, "menu offers both Pin and Hide")
+	assert.Equal(t, actionLabelPinType, menu.overlayItems[0].Name)
+	assert.Equal(t, ui.ActiveKeybindings.PinGroup, menu.overlayItems[0].Status, "pin entry carries the pin key chip")
+	assert.Equal(t, actionLabelHideType, menu.overlayItems[1].Name)
+	assert.Equal(t, hideMenuChip, menu.overlayItems[1].Status, "hide entry carries a key chip")
 
-	// Hide it, then reopen: the label flips to Show.
+	// Hide it, then reopen: the hide entry flips to Show.
+	defer func(orig bool) { model.ShowRareResources = orig }(model.ShowRareResources)
 	model.ShowRareResources = true
-	defer func() { model.ShowRareResources = false }()
 	res, _ := m.toggleHiddenResourceType()
 	rm := res.(Model)
 	rm.setCursor(cursorIndexOfItem(&rm, "Gadgets"))
 	menu2 := rm.openResourceTypeActionMenu()
-	require.Len(t, menu2.overlayItems, 1)
-	assert.Equal(t, actionLabelShowType, menu2.overlayItems[0].Name)
+	require.Len(t, menu2.overlayItems, 2)
+	assert.Equal(t, actionLabelShowType, menu2.overlayItems[1].Name)
+}
+
+// TestOpenResourceTypeActionMenu_PinLabelReflectsState verifies the Pin entry
+// flips to Unpin once the type is pinned.
+func TestOpenResourceTypeActionMenu_PinLabelReflectsState(t *testing.T) {
+	defer func(orig []string) { model.PinnedTypes = orig }(model.PinnedTypes)
+
+	m := hiddenTestModel(t)
+	m.pinnedState = newPinnedState()
+	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
+
+	menu := m.openResourceTypeActionMenu()
+	require.Len(t, menu.overlayItems, 2)
+	assert.Equal(t, actionLabelPinType, menu.overlayItems[0].Name)
+
+	// Pin via the menu dispatch path, then reopen: the entry flips to Unpin.
+	res, _ := m.handleKeyPinGroup()
+	rm := res.(Model)
+	rm.setCursor(cursorIndexOfItem(&rm, "Gadgets"))
+	menu2 := rm.openResourceTypeActionMenu()
+	require.Len(t, menu2.overlayItems, 2)
+	assert.Equal(t, actionLabelUnpinType, menu2.overlayItems[0].Name)
 }

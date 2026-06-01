@@ -316,11 +316,15 @@ func (m Model) directActionScale() (tea.Model, tea.Cmd) {
 func (m Model) executeAction(actionLabel string) (tea.Model, tea.Cmd) {
 	m.overlay = overlayNone
 
-	// Hiding/showing a resource type is a local sidebar preference, not a
-	// cluster mutation. Dispatch it before the read-only / union guards below
-	// so those (which key off a resource kind) never block it.
-	if actionLabel == actionLabelHideType || actionLabel == actionLabelShowType {
+	// Pinning and hiding a resource type are local sidebar preferences, not
+	// cluster mutations. Dispatch them before the read-only / union guards
+	// below so those (which key off a resource kind) never block them. Both
+	// handlers no-op outside LevelResourceTypes.
+	switch actionLabel {
+	case actionLabelHideType, actionLabelShowType:
 		return m.toggleHiddenResourceType()
+	case actionLabelPinType, actionLabelUnpinType:
+		return m.handleKeyPinGroup()
 	}
 
 	// Cluster-picker actions live outside the kind-based machinery: they

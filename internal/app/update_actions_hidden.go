@@ -21,14 +21,24 @@ import (
 // Action labels for the resource-type action menu. Kept as constants so the
 // menu builder and executeAction's dispatch switch on the same literal.
 const (
-	actionLabelHideType = "Hide Resource Type"
-	actionLabelShowType = "Show Resource Type"
+	actionLabelPinType   = "Pin"
+	actionLabelUnpinType = "Unpin"
+	actionLabelHideType  = "Hide"
+	actionLabelShowType  = "Show"
 )
 
+// hideMenuChip is the in-menu single-letter activator for the hide/show
+// action. Hardcoded because there is no global hide keybinding to echo (hiding
+// is offered only through this menu) and it does not collide with the
+// overlay's j/k navigation. The pin/unpin entry reuses the configured
+// PinGroup key so the chip stays in sync with the global binding.
+const hideMenuChip = "h"
+
 // openResourceTypeActionMenu builds the action menu shown when the user
-// presses the action-menu key at the resource-types level. It offers a single
-// Hide/Show toggle for the resource type under the cursor. Returns the model
-// unchanged (no overlay) when the selection is not a real resource type
+// presses the action-menu key at the resource-types level. It offers Pin/Unpin
+// and Hide/Show toggles for the resource type under the cursor, in the same
+// label + description + key-chip shape as the resource action menu. Returns the
+// model unchanged (no overlay) when the selection is not a real resource type
 // (dashboard pseudo-items, collapsed-group headers).
 func (m Model) openResourceTypeActionMenu() Model {
 	sel := m.selectedMiddleItem()
@@ -43,13 +53,20 @@ func (m Model) openResourceTypeActionMenu() Model {
 		return m
 	}
 
-	label, desc := actionLabelHideType, "Hide this resource type from the sidebar (this cluster)"
+	pinLabel, pinDesc := actionLabelPinType, "Pin this resource type to the top of the sidebar"
+	if m.isTypePinned(key) {
+		pinLabel, pinDesc = actionLabelUnpinType, "Remove this resource type from the Pinned section"
+	}
+	hideLabel, hideDesc := actionLabelHideType, "Hide this resource type from the sidebar"
 	if m.isTypeHidden(key) {
-		label, desc = actionLabelShowType, "Show this hidden resource type again (this cluster)"
+		hideLabel, hideDesc = actionLabelShowType, "Show this hidden resource type again"
 	}
 
 	m.overlay = overlayAction
-	m.overlayItems = []model.Item{{Name: label, Extra: desc}}
+	m.overlayItems = []model.Item{
+		{Name: pinLabel, Extra: pinDesc, Status: ui.ActiveKeybindings.PinGroup},
+		{Name: hideLabel, Extra: hideDesc, Status: hideMenuChip},
+	}
 	m.overlayCursor = 0
 	return m
 }
@@ -66,6 +83,21 @@ func (m Model) isTypeHidden(key string) bool {
 		return slices.Contains(m.hiddenState.UnionSets[m.unionSetName], key)
 	}
 	return slices.Contains(m.hiddenState.Contexts[m.nav.Context], key)
+}
+
+// isTypePinned reports whether the type key is pinned in the active scope. It
+// reads the per-context / per-union-set state that handleKeyPinGroup toggles,
+// so the menu label predicts what selecting the entry will do (config-level
+// pins are a separate, file-managed layer and are intentionally not consulted
+// here).
+func (m Model) isTypePinned(key string) bool {
+	if m.pinnedState == nil {
+		return false
+	}
+	if m.isUnionSentinel() && m.unionSetName != "" {
+		return slices.Contains(m.pinnedState.UnionSets[m.unionSetName], key)
+	}
+	return slices.Contains(m.pinnedState.Contexts[m.nav.Context], key)
 }
 
 // toggleHiddenResourceType hides or shows the resource type under the cursor,
