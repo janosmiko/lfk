@@ -170,6 +170,13 @@ var (
 	HeaderIconStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorPrimary))
 
+	// SortActiveHeaderStyle highlights the header label and sort arrow of the
+	// column the table is currently sorted by, so the active sort column reads
+	// distinctly against the dim of the inactive headers.
+	SortActiveHeaderStyle = lipgloss.NewStyle().
+				Bold(true).
+				Foreground(lipgloss.Color(ColorPrimary))
+
 	// Namespace indicator in top-right (kept for compat).
 	NamespaceStyle = lipgloss.NewStyle().
 			Foreground(lipgloss.Color(ColorWarning)).

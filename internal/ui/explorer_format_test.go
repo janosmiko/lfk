@@ -6,6 +6,7 @@ import (
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -476,4 +477,108 @@ func TestFormatTableRowStyledOrdered_VisibleWidthAndContent(t *testing.T) {
 		"pod-1     prod    default   1/1   0   Running   5d  ",
 		ansi.Strip(got),
 		"ANSI-stripped styled row must match plain row layout")
+}
+
+// --- Sort-column header highlight (issue: highlight the active sort arrow) ---
+
+// TestRenderStyledHeader_ActiveColumnAccented verifies the header cell for the
+// active sort column (label + sort arrow) is rendered with SortActiveHeaderStyle
+// while every other header cell stays dim, so the sorted column stands out.
+func TestRenderStyledHeader_ActiveColumnAccented(t *testing.T) {
+	// Force color mode + a color profile + populated theme so the dim and
+	// accent styles emit distinguishable ANSI; restore the mutable globals
+	// afterwards. ConfigNoColor is pinned because a prior test may have left
+	// it set, which would route ApplyTheme through the no-color path and drop
+	// the profile back to Ascii.
+	origProfile := lipgloss.DefaultRenderer().ColorProfile()
+	origNoColor := ConfigNoColor
+	t.Cleanup(func() {
+		ConfigNoColor = origNoColor
+		lipgloss.DefaultRenderer().SetColorProfile(origProfile)
+		ApplyTheme(DefaultTheme())
+	})
+	ConfigNoColor = false
+	ApplyTheme(DefaultTheme())
+	// ApplyTheme restores the saved (Ascii, under test) profile, so force the
+	// profile last; styles carry color specs that resolve at render time.
+	lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+
+	prev := ActiveSortColumnName
+	t.Cleanup(func() { ActiveSortColumnName = prev })
+	ActiveSortColumnName = "QoS"
+
+	segs := []headerSegment{
+		{text: "NAME      ", colName: "Name"},
+		{text: "QOS↑    ", colName: "QoS"},
+		{text: "AGE  ", colName: "Age"},
+	}
+	out := renderStyledHeader(segs, 200)
+
+	assert.Contains(t, out, SortActiveHeaderStyle.Render("QOS↑    "),
+		"active sort column header must use the accent style")
+	assert.Contains(t, out, DimStyle.Bold(true).Render("NAME      "),
+		"inactive header cells must stay dim+bold")
+	assert.NotContains(t, out, DimStyle.Bold(true).Render("QOS↑    "),
+		"active sort column must not be rendered dim")
+	// Visible content is preserved verbatim (styling adds no visible width).
+	assert.Equal(t, "NAME      QOS↑    AGE  ", ansi.Strip(out))
+}
+
+// TestHeaderWithIndicator_NoSpaceNoTruncate verifies the sort arrow sits in the
+// column's trailing spacing with no space before it, and does not eat the last
+// character of a tight column label (regression: "RS" sorted rendered "R ↑").
+func TestHeaderWithIndicator_NoSpaceNoTruncate(t *testing.T) {
+	prevCol, prevAsc := ActiveSortColumnName, ActiveSortAscending
+	t.Cleanup(func() { ActiveSortColumnName, ActiveSortAscending = prevCol, prevAsc })
+	ActiveSortAscending = true
+
+	// RS column: width 3 = "RS" (2) + 1 trailing spacing. The arrow uses the
+	// spacing slot: both letters kept, no leading space.
+	ActiveSortColumnName = "Restarts"
+	assert.Equal(t, "RS↑", headerWithIndicator("RS", "Restarts", 3))
+
+	// Wide column: arrow directly follows the label (no space), padded to width.
+	ActiveSortColumnName = "Status"
+	assert.Equal(t, "STATUS↑   ", headerWithIndicator("STATUS", "Status", 10))
+
+	// Descending shows the down arrow.
+	ActiveSortAscending = false
+	assert.Equal(t, "STATUS↓   ", headerWithIndicator("STATUS", "Status", 10))
+
+	// Not the sort column: plain padded label, no arrow.
+	ActiveSortColumnName = "Status"
+	assert.Equal(t, "READY ", headerWithIndicator("READY", "Ready", 6))
+}
+
+// TestRenderStyledHeader_NoActiveSortAllDim verifies that with no active sort
+// column every header cell is dim — the pre-highlight behaviour is unchanged.
+func TestRenderStyledHeader_NoActiveSortAllDim(t *testing.T) {
+	prev := ActiveSortColumnName
+	t.Cleanup(func() { ActiveSortColumnName = prev })
+	ActiveSortColumnName = ""
+
+	segs := []headerSegment{
+		{text: "NAME ", colName: "Name"},
+		{text: "AGE ", colName: "Age"},
+	}
+	out := renderStyledHeader(segs, 200)
+
+	want := DimStyle.Bold(true).Render("NAME ") + DimStyle.Bold(true).Render("AGE ")
+	assert.Equal(t, want, out)
+}
+
+// TestRenderStyledHeader_TruncatesToWidth verifies the header is capped at the
+// given width (matching the prior Truncate(hdr, width) behaviour).
+func TestRenderStyledHeader_TruncatesToWidth(t *testing.T) {
+	prev := ActiveSortColumnName
+	t.Cleanup(func() { ActiveSortColumnName = prev })
+	ActiveSortColumnName = ""
+
+	segs := []headerSegment{
+		{text: "NAMECOLUMN", colName: "Name"},
+		{text: "AGECOLUMN", colName: "Age"},
+	}
+	out := renderStyledHeader(segs, 6)
+	assert.Equal(t, 6, lipgloss.Width(ansi.Strip(out)+""))
+	assert.LessOrEqual(t, lipgloss.Width(out), 6)
 }

@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"slices"
 	"testing"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -106,6 +107,112 @@ func TestCollectExtraColumns_ConfiguredOrderNotReshuffled(t *testing.T) {
 
 	if got := keysOf(cols); len(got) != 3 || got[0] != "Duration" || got[1] != "Parent" || got[2] != "Created At" {
 		t.Errorf("configured column order must be preserved verbatim, got %v", got)
+	}
+}
+
+// TestCollectExtraColumns_OrderStableAcrossRowOrder is the regression for the
+// sort-cycling column flicker (issue: pressing the sort key reordered or
+// dropped extra columns). Column discovery used to follow first-seen order
+// across items in their current sorted sequence, so a heterogeneous list
+// (e.g. an unscheduled Pod with no NODE column) yielded a different column
+// order depending on which row was scanned first. The detected column set and
+// order must be a function of the data alone, never the row ordering.
+func TestCollectExtraColumns_OrderStableAcrossRowOrder(t *testing.T) {
+	defer func(orig []string) { ActiveSessionColumns = orig }(ActiveSessionColumns)
+	defer func(orig map[string]int) { ActivePrinterColumns = orig }(ActivePrinterColumns)
+	defer func(orig bool) { ActiveFullscreenMode = orig }(ActiveFullscreenMode)
+	ActiveSessionColumns = nil
+	ActivePrinterColumns = nil
+	ActiveFullscreenMode = true
+
+	scheduled := func(name string) model.Item {
+		return model.Item{
+			Name: name, Namespace: "ns", Status: "Running", Kind: "Pod",
+			Columns: []model.KeyValue{
+				{Key: "QoS", Value: "Burstable"},
+				{Key: "Pod IP", Value: "10.0.0.1"},
+				{Key: "Node", Value: "node-a"},
+				{Key: "Priority Class", Value: "system"},
+			},
+		}
+	}
+	// An unscheduled Pod has no NODE column, so scanning it first used to
+	// surface "Priority Class" before "Node".
+	unscheduled := func(name string) model.Item {
+		return model.Item{
+			Name: name, Namespace: "ns", Status: "Pending", Kind: "Pod",
+			Columns: []model.KeyValue{
+				{Key: "QoS", Value: "BestEffort"},
+				{Key: "Pod IP", Value: "10.0.0.2"},
+				{Key: "Priority Class", Value: "system"},
+			},
+		}
+	}
+
+	forward := []model.Item{scheduled("a"), scheduled("b"), unscheduled("c")}
+	reversed := []model.Item{unscheduled("c"), scheduled("b"), scheduled("a")}
+
+	got1 := keysOf(collectExtraColumns(forward, 400, 40, "Pod"))
+	got2 := keysOf(collectExtraColumns(reversed, 400, 40, "Pod"))
+
+	if !slices.Equal(got1, got2) {
+		t.Errorf("extra-column order must not depend on row order:\n forward  = %v\n reversed = %v", got1, got2)
+	}
+	// Lock in the canonical data-position order (QoS, Pod IP, Node, Priority
+	// Class): columns sort by their position within an item, ties broken by
+	// key name so the result is deterministic.
+	want := []string{"QoS", "Pod IP", "Node", "Priority Class"}
+	if !slices.Equal(got1, want) {
+		t.Errorf("canonical column order = %v, want %v", got1, want)
+	}
+}
+
+// TestCollectExtraColumns_CompactBlockedFillSpareWidth verifies the issue-2
+// behaviour: on a wide layout, compact blocked columns (e.g. Service Account)
+// are revealed as low-priority overflow to fill the space NAME would otherwise
+// pad, while verbose blocked columns (Images, Labels) stay hidden. On a narrow
+// layout no overflow appears and NAME keeps the slack.
+func TestCollectExtraColumns_CompactBlockedFillSpareWidth(t *testing.T) {
+	defer func(orig []string) { ActiveSessionColumns = orig }(ActiveSessionColumns)
+	defer func(orig map[string]int) { ActivePrinterColumns = orig }(ActivePrinterColumns)
+	defer func(orig bool) { ActiveFullscreenMode = orig }(ActiveFullscreenMode)
+	ActiveSessionColumns = nil
+	ActivePrinterColumns = nil
+	ActiveFullscreenMode = true
+
+	mk := func(name string) model.Item {
+		return model.Item{
+			Name: name, Namespace: "ns", Status: "Running", Kind: "Pod",
+			Columns: []model.KeyValue{
+				{Key: "QoS", Value: "Burstable"},
+				{Key: "Service Account", Value: "default"}, // blocked, compact -> overflow
+				{Key: "Pod IP", Value: "10.0.0.1"},
+				{Key: "Images", Value: "registry.example.com/team/app:v1.2.3"}, // verbose -> hidden
+				{Key: "Labels", Value: "app=x,tier=y,env=prod"},                // verbose -> hidden
+			},
+		}
+	}
+	items := []model.Item{mk("pod-a"), mk("pod-b"), mk("pod-c")}
+
+	// Wide layout: spare width after the primary columns -> Service Account
+	// fills it; the verbose columns stay hidden.
+	wide := keysOf(collectExtraColumns(items, 400, 60, "Pod"))
+	if !slices.Contains(wide, "Service Account") {
+		t.Errorf("compact blocked column Service Account must fill spare width, got %v", wide)
+	}
+	if slices.Contains(wide, "Images") || slices.Contains(wide, "Labels") {
+		t.Errorf("verbose blocked columns must stay hidden, got %v", wide)
+	}
+	// Overflow is appended after the primary columns.
+	if i, j := slices.Index(wide, "Pod IP"), slices.Index(wide, "Service Account"); i >= 0 && j >= 0 && j < i {
+		t.Errorf("overflow Service Account must come after primary columns, got %v", wide)
+	}
+
+	// Narrow layout: no room beyond the primary columns -> no overflow, and
+	// Service Account is not forced in.
+	narrow := keysOf(collectExtraColumns(items, 70, 50, "Pod"))
+	if slices.Contains(narrow, "Service Account") {
+		t.Errorf("compact blocked column must not appear when there is no spare width, got %v", narrow)
 	}
 }
 

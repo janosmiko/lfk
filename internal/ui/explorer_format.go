@@ -32,14 +32,52 @@ func headerWithIndicator(label string, colName string, colWidth int) string {
 	if ind == "" {
 		return padRight(label, colWidth)
 	}
-	// Truncate label to make room for the indicator.
-	maxLabel := max(
-		// space + indicator
-		colWidth-2, 1)
+	// The indicator is one column wide and sits in the column's trailing
+	// spacing — directly after the label, no separating space. Only truncate
+	// the label when it genuinely doesn't fit, so a tight column like "RS"
+	// keeps both letters ("RS↑") instead of dropping one ("R ↑").
+	maxLabel := max(colWidth-1, 1)
 	if len(label) > maxLabel {
 		label = label[:maxLabel]
 	}
-	return padRight(label+" "+ind, colWidth)
+	return padRight(label+ind, colWidth)
+}
+
+// headerSegment is one cell of the table header: its pre-padded plain text and
+// the column key it represents. colName is empty for non-column padding (the
+// selection marker and the union tile gutter), which never matches the active
+// sort column.
+type headerSegment struct {
+	text    string
+	colName string
+}
+
+// renderStyledHeader renders the header segments into a single line capped at
+// width. The segment whose colName matches the active sort column is rendered
+// with SortActiveHeaderStyle (accent) so the sorted column stands out; every
+// other segment is dim+bold, matching the previous flat header. Truncation
+// happens on each segment's plain text before styling, so no ANSI escape
+// sequence is ever cut and styled cells stay self-contained.
+func renderStyledHeader(segments []headerSegment, width int) string {
+	var b strings.Builder
+	dimStyle := DimStyle.Bold(true) // derive once; reused for every inactive cell
+	remaining := width
+	for _, seg := range segments {
+		if remaining <= 0 {
+			break
+		}
+		text := seg.text
+		if lipgloss.Width(text) > remaining {
+			text = Truncate(text, remaining)
+		}
+		remaining -= lipgloss.Width(text)
+		if seg.colName != "" && seg.colName == ActiveSortColumnName {
+			b.WriteString(SortActiveHeaderStyle.Render(text))
+		} else {
+			b.WriteString(dimStyle.Render(text))
+		}
+	}
+	return b.String()
 }
 
 // plainExtraCell builds the plain-text cell for a single extra column.

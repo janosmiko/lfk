@@ -72,6 +72,11 @@ type colInfo struct {
 	maxValW  int
 	count    int
 	hasArrow bool // true if any value in this column has a trend arrow
+	// minIdx is the smallest column index at which this key appears in any
+	// item. Taking the minimum across all rows makes the discovery order a
+	// function of the data alone, not of the current row ordering — see
+	// sortDiscoveryOrder.
+	minIdx int
 }
 
 // canonicalColumnPriority pins the display position of the volatile metrics
@@ -86,6 +91,23 @@ type colInfo struct {
 var canonicalColumnPriority = map[string]int{
 	"CPU": 0, "CPU%": 1, "CPU/R": 2, "CPU/L": 3,
 	"MEM": 4, "MEM%": 5, "MEM/R": 6, "MEM/L": 7,
+}
+
+// sortDiscoveryOrder reorders detected column keys in place into a canonical,
+// row-order-independent sequence: ascending by each key's minimum position
+// within an item (minIdx), ties broken by key name. Because minIdx is a
+// minimum over all rows, the result is identical no matter how the rows are
+// sorted, which is what keeps the visible columns stable while the user cycles
+// the sort key. Runs before stabilizeColumnOrder, which then pins the metrics
+// block ahead of everything else.
+func sortDiscoveryOrder(order []string, seen map[string]*colInfo) {
+	sort.SliceStable(order, func(i, j int) bool {
+		ii, jj := seen[order[i]].minIdx, seen[order[j]].minIdx
+		if ii != jj {
+			return ii < jj
+		}
+		return order[i] < order[j]
+	})
 }
 
 // stabilizeColumnOrder reorders detected column keys in place so the canonical
@@ -151,12 +173,14 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	seen := make(map[string]*colInfo)
 	var order []string
 	for _, item := range items {
-		for _, kv := range item.Columns {
+		for idx, kv := range item.Columns {
 			info, ok := seen[kv.Key]
 			if !ok {
-				info = &colInfo{key: kv.Key}
+				info = &colInfo{key: kv.Key, minIdx: idx}
 				seen[kv.Key] = info
 				order = append(order, kv.Key)
+			} else if idx < info.minIdx {
+				info.minIdx = idx
 			}
 			info.count++
 			if strings.HasPrefix(kv.Value, "↑ ") || strings.HasPrefix(kv.Value, "↓ ") {
@@ -172,6 +196,13 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	if len(order) == 0 {
 		return nil
 	}
+
+	// Reorder by canonical data position so the column set and order depend
+	// only on the data, never on how rows happen to be sorted. Without this,
+	// cycling the sort key reshuffled which heterogeneous columns (e.g. NODE
+	// vs PRIORITY CLASS, when an unscheduled Pod lacks NODE) were discovered
+	// first, flickering columns in and out at the width-budget boundary.
+	sortDiscoveryOrder(order, seen)
 
 	// Pin the metrics block to a canonical position before candidate
 	// selection so display order does not depend on the order the refresh
@@ -367,7 +398,33 @@ func selectColumnCandidates(seen map[string]*colInfo, order []string, kind strin
 	return autoDetectColumns(seen, order, items), true
 }
 
-// autoDetectColumns selects columns based on heuristic thresholds and blocked lists.
+// overflowHiddenColumns are blocked columns that stay hidden even when the
+// layout has spare width. Their values are long, multi-valued, URL/path-like,
+// or can contain newlines, so a fixed-width overflow cell only truncates them
+// to noise (and newlines break the single-line row layout). They remain
+// reachable via the column-toggle overlay. Compact blocked columns (IPs, Node,
+// QoS, Service Account, Priority Class, ...) are deliberately absent so they
+// can fill spare width as overflow — see autoDetectColumns.
+var overflowHiddenColumns = map[string]bool{
+	"Images": true, "Image": true, "Labels": true, "Annotations": true,
+	"Finalizers": true, "Selector": true, "Description": true, "References": true,
+	"Keys": true, "Health Message": true, "Sync Message": true, "Sync Errors": true,
+	"Repo": true, "Path": true, "Source": true, "Dest Server": true, "Used By": true,
+	"Deletion": true,
+}
+
+// autoDetectColumns selects columns based on heuristic thresholds and blocked
+// lists. It returns two groups concatenated: the primary columns (not blocked
+// in the current mode) followed by overflow columns — compact columns that the
+// mode blocks for space but which may fill spare width when the layout has room
+// after the primary columns and the name's content. fitExtraColumns adds them
+// in order and stops at the width budget, so overflow never pushes out a
+// primary column or shrinks NAME below its content width.
+//
+// Overflow is fullscreen-only: the split-view block list is intentionally
+// aggressive because the middle column shares width with the side panes, so
+// revealing extras there is left untouched. Fullscreen is the wide single-pane
+// layout where the spare width actually exists.
 func autoDetectColumns(seen map[string]*colInfo, order []string, items []model.Item) []string {
 	blocked := blockedColumnsForMode()
 	// Raw metrics columns are always blocked.
@@ -377,7 +434,7 @@ func autoDetectColumns(seen map[string]*colInfo, order []string, items []model.I
 
 	threshold := max(len(items)/5, 1)
 	alwaysShow := map[string]bool{"Condition": true}
-	var candidates []string
+	var primary, overflow []string
 	for _, key := range order {
 		// CRD additionalPrinterColumns get kubectl semantics: priority 0 is
 		// always shown (bypassing the threshold and blocked list), priority > 0
@@ -385,19 +442,25 @@ func autoDetectColumns(seen map[string]*colInfo, order []string, items []model.I
 		// the column-toggle overlay (which routes through ActiveSessionColumns).
 		if prio, ok := ActivePrinterColumns[key]; ok {
 			if prio == 0 {
-				candidates = append(candidates, key)
+				primary = append(primary, key)
 			}
 			continue
 		}
-		if blocked[key] || isHiddenColumnPrefix(key) {
+		if isHiddenColumnPrefix(key) {
 			continue
 		}
 		info := seen[key]
-		if info.count >= threshold || alwaysShow[key] {
-			candidates = append(candidates, key)
+		if info.count < threshold && !alwaysShow[key] {
+			continue
+		}
+		switch {
+		case !blocked[key]:
+			primary = append(primary, key)
+		case ActiveFullscreenMode && !overflowHiddenColumns[key]:
+			overflow = append(overflow, key)
 		}
 	}
-	return candidates
+	return append(primary, overflow...)
 }
 
 // isHiddenColumnPrefix returns true if the column key uses a prefix reserved for internal data.
