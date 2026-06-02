@@ -254,6 +254,76 @@ func TestExtractGenericConditions_MissingBranches(t *testing.T) {
 	})
 }
 
+// --- appendAllConditions ---
+
+func TestAppendAllConditions(t *testing.T) {
+	t.Run("captures every condition, not just Ready", func(t *testing.T) {
+		ti := &model.Item{}
+		conditions := []any{
+			map[string]any{"type": "Initialized", "status": "True", "reason": "Init"},
+			map[string]any{"type": "Ready", "status": "True", "reason": "AllGood", "message": "ok"},
+		}
+
+		appendAllConditions(ti, conditions)
+
+		if assert.Len(t, ti.Conditions, 2) {
+			assert.Equal(t, "Initialized", ti.Conditions[0].Type)
+			assert.Equal(t, "Ready", ti.Conditions[1].Type)
+			assert.Equal(t, "AllGood", ti.Conditions[1].Reason)
+			assert.Equal(t, "ok", ti.Conditions[1].Message)
+		}
+	})
+
+	t.Run("non-map and empty-type entries are skipped", func(t *testing.T) {
+		ti := &model.Item{}
+		conditions := []any{
+			"not-a-map",
+			map[string]any{"status": "True"}, // empty type
+			map[string]any{"type": "Ready", "status": "False"},
+		}
+
+		appendAllConditions(ti, conditions)
+
+		if assert.Len(t, ti.Conditions, 1) {
+			assert.Equal(t, "Ready", ti.Conditions[0].Type)
+		}
+	})
+
+	t.Run("lastTransitionTime is parsed into the condition entry", func(t *testing.T) {
+		ti := &model.Item{}
+		conditions := []any{
+			map[string]any{
+				"type":               "Ready",
+				"status":             "True",
+				"lastTransitionTime": "2026-06-01T10:00:00Z",
+			},
+		}
+
+		appendAllConditions(ti, conditions)
+
+		if assert.Len(t, ti.Conditions, 1) {
+			want, _ := time.Parse(time.RFC3339, "2026-06-01T10:00:00Z")
+			assert.True(t, ti.Conditions[0].LastTransitionTime.Equal(want),
+				"got %v, want %v", ti.Conditions[0].LastTransitionTime, want)
+		}
+	})
+
+	t.Run("missing or invalid lastTransitionTime yields zero time", func(t *testing.T) {
+		ti := &model.Item{}
+		conditions := []any{
+			map[string]any{"type": "A", "status": "True"},
+			map[string]any{"type": "B", "status": "True", "lastTransitionTime": "not-a-time"},
+		}
+
+		appendAllConditions(ti, conditions)
+
+		if assert.Len(t, ti.Conditions, 2) {
+			assert.True(t, ti.Conditions[0].LastTransitionTime.IsZero())
+			assert.True(t, ti.Conditions[1].LastTransitionTime.IsZero())
+		}
+	})
+}
+
 // --- extractTemplateResources: missing no-containers-in-spec branch ---
 
 func TestExtractTemplateResources_NoContainersInTemplateSpec(t *testing.T) {

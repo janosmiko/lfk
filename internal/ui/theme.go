@@ -189,6 +189,7 @@ func ApplyTheme(t Theme) {
 	StatusProgressing = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Primary)).Background(baseBg)
 	StatusFailed = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Error)).Background(baseBg)
 	StatusOther = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Dimmed)).Background(baseBg)
+	StatusWarning = lipgloss.NewStyle().Foreground(lipgloss.Color(t.Warning)).Background(baseBg)
 
 	var barBg lipgloss.TerminalColor = lipgloss.NoColor{}
 	if !ConfigTransparentBg {

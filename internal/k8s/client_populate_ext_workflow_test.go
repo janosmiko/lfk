@@ -78,62 +78,9 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 		assert.Equal(t, "workflow failed at step X", colMap["Message"])
 	})
 
-	t.Run("conditions are extracted", func(t *testing.T) {
-		ti := &model.Item{Name: "my-wf"}
-		status := map[string]any{
-			"conditions": []any{
-				map[string]any{
-					"type":    "SpecWarning",
-					"status":  "True",
-					"message": "deprecated feature used",
-				},
-				map[string]any{
-					"type":    "PodRunning",
-					"status":  "True",
-					"message": "",
-				},
-			},
-		}
-		populateArgoWorkflow(ti, status)
-
-		require.Len(t, ti.Conditions, 2)
-		assert.Equal(t, "SpecWarning", ti.Conditions[0].Type)
-		assert.Equal(t, "True", ti.Conditions[0].Status)
-		assert.Equal(t, "deprecated feature used", ti.Conditions[0].Message)
-		assert.Equal(t, "PodRunning", ti.Conditions[1].Type)
-	})
-
-	t.Run("conditions skips non-map entries", func(t *testing.T) {
-		ti := &model.Item{Name: "my-wf"}
-		status := map[string]any{
-			"conditions": []any{
-				"not-a-map",
-				map[string]any{
-					"type":   "PodRunning",
-					"status": "True",
-				},
-			},
-		}
-		populateArgoWorkflow(ti, status)
-
-		require.Len(t, ti.Conditions, 1)
-		assert.Equal(t, "PodRunning", ti.Conditions[0].Type)
-	})
-
-	t.Run("conditions with empty type is skipped", func(t *testing.T) {
-		ti := &model.Item{Name: "my-wf"}
-		status := map[string]any{
-			"conditions": []any{
-				map[string]any{
-					"type":   "",
-					"status": "True",
-				},
-			},
-		}
-		populateArgoWorkflow(ti, status)
-
-		assert.Empty(t, ti.Conditions)
-	})
+	// Note: the CONDITIONS detail section (ti.Conditions) is populated centrally
+	// in populateResourceDetails for every kind, not by populateArgoWorkflow.
+	// See TestAppendAllConditions and TestPopulateResourceDetails_Conditions.
 
 	t.Run("workflow nodes are walked in BFS order", func(t *testing.T) {
 		ti := &model.Item{Name: "my-wf"}
@@ -273,12 +220,6 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 			"startedAt":  started.Format(time.RFC3339),
 			"finishedAt": finished.Format(time.RFC3339),
 			"message":    "workflow completed",
-			"conditions": []any{
-				map[string]any{
-					"type":   "Completed",
-					"status": "True",
-				},
-			},
 			"nodes": map[string]any{
 				"root": map[string]any{
 					"name":     "full-wf",
@@ -298,9 +239,6 @@ func TestPopulateArgoWorkflow(t *testing.T) {
 		assert.Equal(t, "8m0s", colMap["Duration"])
 		assert.Equal(t, "workflow completed", colMap["Message"])
 		assert.Equal(t, "Succeeded", colMap["step:final-step"])
-
-		require.Len(t, ti.Conditions, 1)
-		assert.Equal(t, "Completed", ti.Conditions[0].Type)
 	})
 
 	t.Run("invalid startedAt is ignored", func(t *testing.T) {

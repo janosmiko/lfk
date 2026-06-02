@@ -187,7 +187,6 @@ func populateArgoWorkflow(ti *model.Item, status map[string]any) {
 	if msg, ok := status["message"].(string); ok && msg != "" {
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Message", Value: msg})
 	}
-	populateArgoWorkflowConditions(ti, status)
 	populateArgoWorkflowSteps(ti, status)
 }
 
@@ -209,29 +208,6 @@ func populateArgoWorkflowDuration(ti *model.Item, status map[string]any) {
 	}
 	dur := end.Sub(started).Truncate(time.Second)
 	ti.Columns = append(ti.Columns, model.KeyValue{Key: "Duration", Value: dur.String()})
-}
-
-func populateArgoWorkflowConditions(ti *model.Item, status map[string]any) {
-	conditions, ok := status["conditions"].([]any)
-	if !ok {
-		return
-	}
-	for _, c := range conditions {
-		cond, ok := c.(map[string]any)
-		if !ok {
-			continue
-		}
-		condType, _ := cond["type"].(string)
-		condStatus, _ := cond["status"].(string)
-		condMessage, _ := cond["message"].(string)
-		if condType != "" {
-			ti.Conditions = append(ti.Conditions, model.ConditionEntry{
-				Type:    condType,
-				Status:  condStatus,
-				Message: condMessage,
-			})
-		}
-	}
 }
 
 func populateArgoWorkflowSteps(ti *model.Item, status map[string]any) {

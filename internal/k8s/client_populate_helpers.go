@@ -95,9 +95,37 @@ func populateMetadataFields(ti *model.Item, obj map[string]any) {
 	}
 }
 
-// extractGenericConditions extracts condition information from a status.conditions
-// array for generic CRD resources. It prefers the "Ready" condition; if not found,
-// it falls back to the last condition in the array.
+// appendAllConditions stores every well-formed condition on ti.Conditions for
+// the details pane's CONDITIONS section. It is the single source of that
+// section across all resource kinds; the column extractors below only produce
+// the compact at-a-glance summary in ti.Columns.
+func appendAllConditions(ti *model.Item, conditions []any) {
+	for _, c := range conditions {
+		cond, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		condType, _ := cond["type"].(string)
+		if condType == "" {
+			continue
+		}
+		condStatus, _ := cond["status"].(string)
+		condReason, _ := cond["reason"].(string)
+		condMessage, _ := cond["message"].(string)
+		ti.Conditions = append(ti.Conditions, model.ConditionEntry{
+			Type:               condType,
+			Status:             condStatus,
+			Reason:             condReason,
+			Message:            condMessage,
+			LastTransitionTime: parseConditionTime(cond),
+		})
+	}
+}
+
+// extractGenericConditions adds a compact, single-condition summary to
+// ti.Columns for generic CRD resources. It prefers the "Ready" condition; if
+// not found, it falls back to the last condition in the array. The full
+// per-condition detail is populated separately via appendAllConditions.
 func extractGenericConditions(ti *model.Item, conditions []any) {
 	var readyCond, trueCond, lastCond map[string]any
 	for _, c := range conditions {
@@ -108,22 +136,11 @@ func extractGenericConditions(ti *model.Item, conditions []any) {
 		lastCond = cond
 		condType, _ := cond["type"].(string)
 		condStatus, _ := cond["status"].(string)
-		condReason, _ := cond["reason"].(string)
-		condMessage, _ := cond["message"].(string)
 		if condType == "Ready" {
 			readyCond = cond
 		}
 		if condStatus == "True" {
 			trueCond = cond
-		}
-		// Store every condition for the details pane.
-		if condType != "" {
-			ti.Conditions = append(ti.Conditions, model.ConditionEntry{
-				Type:    condType,
-				Status:  condStatus,
-				Reason:  condReason,
-				Message: condMessage,
-			})
 		}
 	}
 
@@ -167,11 +184,23 @@ func extractGenericConditions(ti *model.Item, conditions []any) {
 		}
 		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Message", Value: condMessage})
 	}
-	if lastTransition, ok := chosen["lastTransitionTime"].(string); ok && lastTransition != "" {
-		if t, err := time.Parse(time.RFC3339, lastTransition); err == nil {
-			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Last Transition", Value: formatRelativeTime(t)})
-		}
+	if t := parseConditionTime(chosen); !t.IsZero() {
+		ti.Columns = append(ti.Columns, model.KeyValue{Key: "Last Transition", Value: formatRelativeTime(t)})
 	}
+}
+
+// parseConditionTime extracts the RFC3339 lastTransitionTime from a condition
+// map. It returns the zero time when the field is missing, empty, or unparsable.
+func parseConditionTime(cond map[string]any) time.Time {
+	s, ok := cond["lastTransitionTime"].(string)
+	if !ok || s == "" {
+		return time.Time{}
+	}
+	t, err := time.Parse(time.RFC3339, s)
+	if err != nil {
+		return time.Time{}
+	}
+	return t
 }
 
 // isNegativeConditionType returns true if the condition type name represents a

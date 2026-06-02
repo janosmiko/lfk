@@ -10,6 +10,15 @@ func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
 	status, _ := obj["status"].(map[string]any)
 	spec, _ := obj["spec"].(map[string]any)
 
+	// Populate the per-condition detail section once, for every kind, from the
+	// standard status.conditions array. Kind-specific handlers below only add
+	// the compact at-a-glance summary to ti.Columns.
+	if status != nil {
+		if conditions, ok := status["conditions"].([]any); ok {
+			appendAllConditions(ti, conditions)
+		}
+	}
+
 	switch kind {
 	case "Pod":
 		populatePodDetails(ti, obj, status, spec)
