@@ -54,6 +54,7 @@ func fetchDashboardNodes(ctx context.Context, kctx string, client *k8s.Client) d
 	if err == nil {
 		data.nodeItems = nodeItems
 		data.nodeCount = len(nodeItems)
+		data.podCapacity = sumPodCapacity(nodeItems)
 		for _, n := range nodeItems {
 			if n.Status == "Ready" {
 				data.readyNodes++
@@ -112,6 +113,7 @@ func mergeDashboardSection(acc *dashboardData, partial dashboardData) {
 		acc.nodeItems = partial.nodeItems
 		acc.nodeCount = partial.nodeCount
 		acc.readyNodes = partial.readyNodes
+		acc.podCapacity = partial.podCapacity
 	}
 	if partial.pods.total > 0 {
 		acc.pods = partial.pods
@@ -178,12 +180,28 @@ func renderStackedBar(segments []struct {
 	if total <= 0 {
 		return "[" + strings.Repeat("░", width) + "]"
 	}
+	// When the segments fully pack the total, the last one absorbs the rounding
+	// remainder so no stray empty cells appear. When they sum to less than the
+	// total (e.g. scheduled pods below cluster pod capacity), the shortfall is
+	// genuine headroom and must render as empty cells, so the last segment is
+	// sized by its own proportion instead.
+	sumCounts := 0
+	for _, seg := range segments {
+		sumCounts += seg.count
+	}
+	packed := sumCounts >= total
 	var barBuilder strings.Builder
 	used := 0
 	for i, seg := range segments {
 		chars := int(float64(seg.count) / float64(total) * float64(width))
-		// Last segment gets remaining chars to avoid rounding issues.
-		if i == len(segments)-1 {
+		// Give any non-zero segment at least one cell so a handful of Failed or
+		// Pending pods in a large cluster stay visible instead of rounding away.
+		if seg.count > 0 && chars == 0 {
+			chars = 1
+		}
+		// Last segment absorbs the rounding remainder, but only when packed;
+		// otherwise the shortfall is real headroom and must stay empty.
+		if i == len(segments)-1 && packed {
 			chars = width - used
 		}
 		if chars < 0 {
@@ -229,7 +247,9 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 	// Pods: status bar (green Running / amber Pending / red Failed / grey
 	// Succeeded) + inline breakdown. "Other" (Terminating/Unknown + rounding
 	// slack) is the neutral last segment so renderStackedBar's remainder-fill
-	// never paints leftover space red as phantom failures.
+	// never paints leftover space red as phantom failures. The denominator is
+	// the cluster's pod capacity (sum of nodes' allocatable pods) when known, so
+	// the unfilled tail reads as unallocated headroom rather than 100% usage.
 	if data.pods.total > 0 {
 		segments := []struct {
 			count int
@@ -241,7 +261,8 @@ func dashboardHeaderSection(lines []string, data dashboardData, w dashboardWidth
 			{data.pods.succeeded, ui.StatusOther},
 			{podOther(data.pods), ui.DimStyle},
 		}
-		podBar := renderStackedBar(segments, data.pods.total, w.bar)
+		denom := podBarDenominator(data)
+		podBar := renderStackedBar(segments, denom, w.bar)
 		lines = append(lines, dashboardMetricLines("Pods", podBar, podSummaryStr(data), w)...)
 	}
 	lines = append(lines, "")

@@ -456,6 +456,7 @@ func TestPopulate_NodeRolesAndTaints(t *testing.T) {
 			"allocatable": map[string]any{
 				"cpu":    "4",
 				"memory": "8Gi",
+				"pods":   "110",
 			},
 			"nodeInfo": map[string]any{
 				"kubeletVersion":          "v1.29.0",
@@ -473,6 +474,7 @@ func TestPopulate_NodeRolesAndTaints(t *testing.T) {
 	assert.Equal(t, "10.0.0.5", colMap["InternalIP"])
 	assert.Equal(t, "4", colMap["CPU Alloc"])
 	assert.Equal(t, "8Gi", colMap["Mem Alloc"])
+	assert.Equal(t, "110", colMap["Pods Alloc"])
 	assert.Equal(t, "v1.29.0", colMap["Version"])
 	assert.Equal(t, "Ubuntu 22.04", colMap["OS"])
 	assert.Equal(t, "containerd://1.7.2", colMap["Runtime"])

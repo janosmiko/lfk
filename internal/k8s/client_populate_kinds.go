@@ -61,6 +61,9 @@ func populateNodeStatus(ti *model.Item, status map[string]any) {
 		if mem, ok := alloc["memory"].(string); ok {
 			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Mem Alloc", Value: mem})
 		}
+		if pods, ok := alloc["pods"].(string); ok {
+			ti.Columns = append(ti.Columns, model.KeyValue{Key: "Pods Alloc", Value: pods})
+		}
 	}
 	if nodeInfo, ok := status["nodeInfo"].(map[string]any); ok {
 		if v, ok := nodeInfo["kubeletVersion"].(string); ok {

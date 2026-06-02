@@ -146,6 +146,86 @@ func TestPodOther(t *testing.T) {
 	assert.Equal(t, 0, podOther(podStats{total: 10, running: 8, failed: 5}))
 }
 
+func TestSumPodCapacity(t *testing.T) {
+	nodes := []model.Item{
+		{Columns: []model.KeyValue{{Key: "Pods Alloc", Value: "110"}, {Key: "CPU Alloc", Value: "4"}}},
+		{Columns: []model.KeyValue{{Key: "Pods Alloc", Value: "250"}}},
+		{Columns: []model.KeyValue{{Key: "CPU Alloc", Value: "8"}}},    // no Pods Alloc
+		{Columns: []model.KeyValue{{Key: "Pods Alloc", Value: "abc"}}}, // unparsable, skipped
+	}
+	assert.Equal(t, int64(360), sumPodCapacity(nodes))
+	assert.Equal(t, int64(0), sumPodCapacity(nil))
+}
+
+func TestPodBarDenominatorUsesCapacity(t *testing.T) {
+	// Capacity above scheduled total drives the denominator.
+	d := dashboardData{pods: podStats{total: 424}, podCapacity: 1100}
+	assert.Equal(t, 1100, podBarDenominator(d))
+	assert.Equal(t, 676, podUnallocated(d))
+
+	// Capacity unknown (0) falls back to the scheduled total; no headroom.
+	d = dashboardData{pods: podStats{total: 424}}
+	assert.Equal(t, 424, podBarDenominator(d))
+	assert.Equal(t, 0, podUnallocated(d))
+
+	// Saturated (scheduled >= capacity) never reports negative headroom.
+	d = dashboardData{pods: podStats{total: 1100}, podCapacity: 1100}
+	assert.Equal(t, 1100, podBarDenominator(d))
+	assert.Equal(t, 0, podUnallocated(d))
+}
+
+func TestPodSummaryShowsUnallocated(t *testing.T) {
+	s := stripANSI(podSummaryStr(dashboardData{
+		pods:        podStats{total: 424, running: 361, failed: 39, succeeded: 24},
+		podCapacity: 1100,
+	}))
+	assert.Contains(t, s, "361 Running")
+	assert.Contains(t, s, "676 Unallocated")
+
+	// Without capacity data, no Unallocated category appears.
+	noCap := stripANSI(podSummaryStr(dashboardData{
+		pods: podStats{total: 424, running: 361, failed: 39, succeeded: 24},
+	}))
+	assert.NotContains(t, noCap, "Unallocated")
+}
+
+func TestRenderStackedBarLeavesHeadroomBelowTotal(t *testing.T) {
+	// Segments summing to less than total (scheduled pods below pod capacity)
+	// must leave the unfilled tail as empty cells, not absorb it into the last
+	// segment.
+	segments := []struct {
+		count int
+		style lipgloss.Style
+	}{
+		{5, lipgloss.NewStyle()},
+	}
+	result := renderStackedBar(segments, 10, 20)
+	inner := stripANSI(result)
+	inner = inner[1 : len(inner)-1]
+	assert.Equal(t, 10, strings.Count(inner, "█"), "5/10 of a 20-wide bar is filled")
+	assert.Equal(t, 10, strings.Count(inner, "░"), "the remaining headroom is empty")
+}
+
+func TestRenderStackedBarKeepsTinySegmentsVisible(t *testing.T) {
+	// Mirrors a real cluster: 139 scheduled pods against 486 pod capacity in a
+	// 95-wide bar. A 1- or 2-pod segment is ~0.2-0.4 cells and would floor to 0,
+	// making Pending/Failed invisible. Each non-zero segment must claim >=1 cell.
+	segments := []struct {
+		count int
+		style lipgloss.Style
+	}{
+		{119, lipgloss.NewStyle()}, // running -> int(119/486*95) = 23
+		{2, lipgloss.NewStyle()},   // pending -> floors to 0, bumped to 1
+		{1, lipgloss.NewStyle()},   // failed  -> floors to 0, bumped to 1
+		{13, lipgloss.NewStyle()},  // succeeded -> int(13/486*95) = 2
+		{4, lipgloss.NewStyle()},   // other   -> floors to 0, bumped to 1
+	}
+	inner := stripANSI(renderStackedBar(segments, 486, 95))
+	inner = inner[1 : len(inner)-1]
+	assert.Equal(t, 28, strings.Count(inner, "█"), "23 + 1 + 1 + 2 + 1 filled cells")
+	assert.Equal(t, 67, strings.Count(inner, "░"), "remaining width is unallocated headroom")
+}
+
 func TestPodSummaryShowsOtherNotFailed(t *testing.T) {
 	// total exceeds the counted phases with zero failures: the leftover must
 	// read as Other, not as a phantom failure.
