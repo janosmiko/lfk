@@ -231,6 +231,12 @@ func TestActionKeySortNextFromHiddenColumnLandsOnFirst(t *testing.T) {
 	m := baseExplorerModel()
 	m.sortColumnName = "Node" // wide-only, hidden in narrow mode
 	m.sortAscending = true
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+	})
 	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
 	ui.ActiveSortableColumnCount = 3
 
@@ -245,6 +251,12 @@ func TestActionKeySortPrevFromHiddenColumnLandsOnLast(t *testing.T) {
 	m := baseExplorerModel()
 	m.sortColumnName = "Node" // wide-only, hidden in narrow mode
 	m.sortAscending = true
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+	})
 	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
 	ui.ActiveSortableColumnCount = 3
 
