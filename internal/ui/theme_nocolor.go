@@ -102,6 +102,7 @@ func applyNoColorTheme() {
 
 	HeaderStyle = lipgloss.NewStyle().Bold(true).Underline(true)
 	HeaderIconStyle = lipgloss.NewStyle()
+	SortActiveHeaderStyle = lipgloss.NewStyle().Bold(true).Underline(true)
 	NamespaceStyle = lipgloss.NewStyle().Bold(true).Padding(0, 1)
 
 	YamlViewStyle = lipgloss.NewStyle().Padding(1, 2)

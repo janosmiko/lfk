@@ -246,6 +246,11 @@ func ApplyTheme(t Theme) {
 		Foreground(lipgloss.Color(t.Primary)).
 		Background(baseBg)
 
+	SortActiveHeaderStyle = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(t.Primary)).
+		Background(baseBg)
+
 	NamespaceStyle = lipgloss.NewStyle().
 		Foreground(lipgloss.Color(t.Warning)).
 		Bold(true).

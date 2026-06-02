@@ -327,21 +327,23 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		age:      headerWithIndicator("AGE", "Age", ageW),
 	}
 
-	var hdrParts []string
+	var hdrSegments []headerSegment
 	if wantMarker {
-		hdrParts = append(hdrParts, "  ")
+		hdrSegments = append(hdrSegments, headerSegment{text: "  "})
 	}
 	if tileW > 0 {
 		// Reserve a blank cell in the header so the leading tile column
 		// stays aligned with the data rows below.
-		hdrParts = append(hdrParts, " ")
+		hdrSegments = append(hdrSegments, headerSegment{text: " "})
 	}
-	hdrParts = append(hdrParts, nameHeader)
+	hdrSegments = append(hdrSegments, headerSegment{text: nameHeader, colName: "Name"})
 	for _, key := range order {
-		hdrParts = append(hdrParts, headerCellForKey(key, colWidths, colHeaders, extraCols))
+		hdrSegments = append(hdrSegments, headerSegment{
+			text:    headerCellForKey(key, colWidths, colHeaders, extraCols),
+			colName: key,
+		})
 	}
-	hdr := strings.Join(hdrParts, "")
-	b.WriteString(DimStyle.Bold(true).Render(Truncate(hdr, width)))
+	b.WriteString(renderStyledHeader(hdrSegments, width))
 	height--
 
 	if ActiveMiddleScroll >= 0 {
