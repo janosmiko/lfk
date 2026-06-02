@@ -197,36 +197,23 @@ func TestCollectExtraColumns_CompactBlockedFillSpareWidth(t *testing.T) {
 	// Wide layout: spare width after the primary columns -> Service Account
 	// fills it; the verbose columns stay hidden.
 	wide := keysOf(collectExtraColumns(items, 400, 60, "Pod"))
-	if !containsKey2(wide, "Service Account") {
+	if !slices.Contains(wide, "Service Account") {
 		t.Errorf("compact blocked column Service Account must fill spare width, got %v", wide)
 	}
-	if containsKey2(wide, "Images") || containsKey2(wide, "Labels") {
+	if slices.Contains(wide, "Images") || slices.Contains(wide, "Labels") {
 		t.Errorf("verbose blocked columns must stay hidden, got %v", wide)
 	}
 	// Overflow is appended after the primary columns.
-	if i, j := indexOf(wide, "Pod IP"), indexOf(wide, "Service Account"); i >= 0 && j >= 0 && j < i {
+	if i, j := slices.Index(wide, "Pod IP"), slices.Index(wide, "Service Account"); i >= 0 && j >= 0 && j < i {
 		t.Errorf("overflow Service Account must come after primary columns, got %v", wide)
 	}
 
 	// Narrow layout: no room beyond the primary columns -> no overflow, and
 	// Service Account is not forced in.
 	narrow := keysOf(collectExtraColumns(items, 70, 50, "Pod"))
-	if containsKey2(narrow, "Service Account") {
+	if slices.Contains(narrow, "Service Account") {
 		t.Errorf("compact blocked column must not appear when there is no spare width, got %v", narrow)
 	}
-}
-
-func containsKey2(keys []string, key string) bool {
-	return indexOf(keys, key) >= 0
-}
-
-func indexOf(keys []string, key string) int {
-	for i, k := range keys {
-		if k == key {
-			return i
-		}
-	}
-	return -1
 }
 
 // TestSelectColumnCandidates_AutoDetectFlag verifies the fromAutoDetect signal
