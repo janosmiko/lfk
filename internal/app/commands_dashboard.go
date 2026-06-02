@@ -48,6 +48,7 @@ type dashboardData struct {
 	nodeItems      []model.Item
 	nodeCount      int
 	readyNodes     int
+	podCapacity    int64 // sum of nodes' allocatable pods (max schedulable)
 	pods           podStats
 	nsCount        int
 	warningEvents  []model.Item
@@ -241,11 +242,30 @@ func podOther(p podStats) int {
 	return max(p.total-p.running-p.pending-p.failed-p.succeeded, 0)
 }
 
+// podBarDenominator is the value the pod bar is measured against: cluster pod
+// capacity when it exceeds the scheduled total, otherwise the scheduled total
+// itself (capacity unknown, or already saturated). Using capacity makes the
+// bar's empty tail represent unallocated schedulable slots.
+func podBarDenominator(d dashboardData) int {
+	if d.podCapacity > int64(d.pods.total) {
+		return int(d.podCapacity)
+	}
+	return d.pods.total
+}
+
+// podUnallocated is the number of free schedulable pod slots: cluster capacity
+// minus the pods already scheduled. Zero when capacity is unknown or saturated.
+func podUnallocated(d dashboardData) int {
+	return int(max(d.podCapacity-int64(d.pods.total), 0))
+}
+
 // podSummaryStr is the inline status breakdown for the Pods row, e.g.
 // "361 Running · 39 Failed · 24 Succeeded". Only non-zero states are shown;
 // Succeeded is grey (terminal, not an error), Failed red, Pending amber, and
 // any uncounted pods show as a neutral "Other" so they never read as failures.
-// The categories and order mirror the bar segments so bar and text agree.
+// "Unallocated" (free schedulable slots = pod capacity − scheduled) is appended
+// when the cluster's pod capacity is known, mirroring the bar's empty tail. The
+// categories and order mirror the bar segments so bar and text agree.
 func podSummaryStr(d dashboardData) string {
 	parts := make([]string, 0, 5)
 	if d.pods.running > 0 {
@@ -262,6 +282,9 @@ func podSummaryStr(d dashboardData) string {
 	}
 	if other := podOther(d.pods); other > 0 {
 		parts = append(parts, ui.DimStyle.Render(fmt.Sprintf("%d Other", other)))
+	}
+	if unalloc := podUnallocated(d); unalloc > 0 {
+		parts = append(parts, ui.DimStyle.Render(fmt.Sprintf("%d Unallocated", unalloc)))
 	}
 	if len(parts) == 0 {
 		return ui.DimStyle.Render("no pods")
@@ -373,6 +396,25 @@ func (m Model) composeDashboard(data dashboardData) (content, events string) {
 	right = append(right, dashboardEventsColumn(data.allWarnings)...)
 	events = strings.Join(right, "\n")
 	return content, events
+}
+
+// sumPodCapacity adds up each node's allocatable pod count (the "Pods Alloc"
+// column populated from .status.allocatable.pods). This is the maximum number
+// of pods the cluster can schedule, used as the pod bar's denominator so the
+// unfilled tail reads as unallocated headroom rather than 100% utilization.
+func sumPodCapacity(nodeItems []model.Item) int64 {
+	var total int64
+	for _, n := range nodeItems {
+		for _, kv := range n.Columns {
+			if kv.Key == "Pods Alloc" {
+				if v, err := strconv.ParseInt(kv.Value, 10, 64); err == nil {
+					total += v
+				}
+				break
+			}
+		}
+	}
+	return total
 }
 
 // countPodStats tallies pod statuses.
