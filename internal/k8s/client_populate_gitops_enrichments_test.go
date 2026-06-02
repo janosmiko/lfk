@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
 )
@@ -450,6 +451,97 @@ func TestCertManagerEnrichments_NonCertificateKinds(t *testing.T) {
 			_, hasIssuer := colMap["Issuer"]
 			assert.False(t, hasDNS, "kind=%s should not emit DNS Names", kind)
 			assert.False(t, hasIssuer, "kind=%s should not emit Issuer", kind)
+		})
+	}
+}
+
+// ---- CONDITIONS detail section is populated for the details pane ----
+
+func TestConditionsDetail_CertManagerCertificate(t *testing.T) {
+	// A Certificate with multiple conditions: the compact column summary must
+	// still surface the Ready condition, and every condition must also be
+	// captured on ti.Conditions for the CONDITIONS detail section (issue #340).
+	obj := map[string]any{
+		"status": map[string]any{
+			"conditions": []any{
+				map[string]any{
+					"type": "Ready", "status": "True", "reason": "Ready",
+					"message":            "Certificate is up to date and has not expired",
+					"lastTransitionTime": "2026-04-01T09:55:54Z",
+				},
+				map[string]any{
+					"type": "Issuing", "status": "False", "reason": "Issued",
+					"message": "issuance succeeded",
+				},
+			},
+		},
+		"spec": map[string]any{},
+	}
+	ti := &model.Item{}
+	populateResourceDetails(ti, obj, "Certificate")
+
+	// Compact summary column (unchanged behavior).
+	colMap := columnsToMap(ti.Columns)
+	assert.Equal(t, "True", colMap["Ready"])
+
+	// Full detail section: every condition, exactly once (no double-populate).
+	if assert.Len(t, ti.Conditions, 2) {
+		assert.Equal(t, "Ready", ti.Conditions[0].Type)
+		assert.Equal(t, "Issuing", ti.Conditions[1].Type)
+		assert.False(t, ti.Conditions[0].LastTransitionTime.IsZero())
+	}
+}
+
+func TestConditionsDetail_FluxNoReadyFallbackNoDuplicate(t *testing.T) {
+	// A Flux resource whose conditions lack a Ready entry falls back to the
+	// generic column summary. The detail section must still contain each
+	// condition exactly once (appendAllConditions runs once, not per branch).
+	obj := map[string]any{
+		"spec": map[string]any{},
+		"status": map[string]any{
+			"conditions": []any{
+				map[string]any{"type": "Reconciling", "status": "True", "reason": "Progressing"},
+				map[string]any{"type": "Stalled", "status": "False"},
+			},
+		},
+	}
+	ti := &model.Item{}
+	populateResourceDetails(ti, obj, "Kustomization")
+
+	assert.Len(t, ti.Conditions, 2, "each condition must appear exactly once")
+}
+
+func TestConditionsDetail_AcrossKinds(t *testing.T) {
+	// Conditions are populated centrally for every kind, including handlers
+	// that previously only built their own summary columns (ArgoCD Application,
+	// HPA) and core workloads that never surfaced conditions before (issue #340).
+	kinds := []struct {
+		kind  string
+		types []string
+	}{
+		{"Application", []string{"Healthy", "SyncError"}},    // ArgoCD
+		{"HorizontalPodAutoscaler", []string{"AbleToScale"}}, // HPA
+		{"Workflow", []string{"Completed"}},                  // Argo Workflows
+		{"Pod", []string{"PodScheduled", "Ready"}},           // core workload
+		{"FooBar", []string{"Ready"}},                        // unknown CRD (default branch)
+	}
+	for _, tc := range kinds {
+		t.Run(tc.kind, func(t *testing.T) {
+			conds := make([]any, len(tc.types))
+			for i, ct := range tc.types {
+				conds[i] = map[string]any{"type": ct, "status": "True"}
+			}
+			obj := map[string]any{
+				"spec":   map[string]any{},
+				"status": map[string]any{"conditions": conds},
+			}
+			ti := &model.Item{}
+			populateResourceDetails(ti, obj, tc.kind)
+
+			require.Len(t, ti.Conditions, len(tc.types))
+			for i, ct := range tc.types {
+				assert.Equal(t, ct, ti.Conditions[i].Type)
+			}
 		})
 	}
 }

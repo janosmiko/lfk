@@ -83,6 +83,7 @@ func applyNoColorTheme() {
 	StatusProgressing = lipgloss.NewStyle()
 	StatusFailed = lipgloss.NewStyle().Bold(true)
 	StatusOther = lipgloss.NewStyle().Faint(true)
+	StatusWarning = lipgloss.NewStyle().Italic(true)
 
 	TitleBarStyle = lipgloss.NewStyle().Padding(0, 1)
 	TitleBreadcrumbStyle = lipgloss.NewStyle().Bold(true)

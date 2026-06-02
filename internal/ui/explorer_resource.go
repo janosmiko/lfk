@@ -71,8 +71,18 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		"Reason": true, "Message": true, "Health Message": true,
 	}
 
+	// When structured conditions are present, the dedicated CONDITIONS section
+	// below supersedes the bespoke per-condition summary columns (e.g. ArgoCD's
+	// "condition:<type>" rows and the truncated "Condition" roll-up), so skip
+	// them here to avoid showing the same condition two or three times. The
+	// list view is unaffected — it reads these columns directly, not via here.
+	hasConditions := len(item.Conditions) > 0
+
 	for _, kv := range item.Columns {
 		if metricsKeys[kv.Key] || tableKeys[kv.Key] || kv.Key == "Deletion" {
+			continue
+		}
+		if hasConditions && (kv.Key == "Condition" || strings.HasPrefix(kv.Key, "condition:")) {
 			continue
 		}
 		if strings.HasPrefix(kv.Key, "secret:") {
@@ -293,38 +303,54 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 		}
 	}
 
-	// Render CONDITIONS section from item.Conditions with color coding.
+	// Render CONDITIONS section from item.Conditions. Each condition shows its
+	// type, status (as text, color-coded), and age on the header line, followed
+	// by the reason and the full (wrapped) message on indented lines.
 	if len(item.Conditions) > 0 && len(lines) < height {
 		lines = append(lines, "")
 		lines = append(lines, detailKeyStyle.Render("CONDITIONS"))
+
+		// Align the status column by padding type names to the widest one,
+		// capped so a single long type can't push everything off-screen.
+		typeWidth := 0
+		for _, cond := range item.Conditions {
+			if w := len([]rune(cond.Type)); w > typeWidth {
+				typeWidth = w
+			}
+		}
+		typeWidth = min(typeWidth, 22)
+
 		for _, cond := range item.Conditions {
 			if len(lines) >= height {
 				break
 			}
 
-			// Color the condition type based on status and type name.
-			typeStyle := DimStyle // False = greyed out
-			if cond.Status == "True" {
-				if isNegativeCondType(cond.Type) {
-					typeStyle = ErrorStyle // True + negative type = red
-				} else {
-					typeStyle = StatusRunning // True + positive type = green
-				}
+			// Color the type/status by condition polarity (see ConditionStyle).
+			style := ConditionStyle(cond.Type, cond.Status)
+
+			status := cond.Status
+			if status == "" {
+				status = "Unknown"
+			}
+			pad := max(typeWidth-len([]rune(cond.Type)), 0)
+			header := "  " + style.Render(cond.Type) + strings.Repeat(" ", pad+1) + style.Render(status)
+			if age := FormatAge(cond.LastTransitionTime); age != "-" {
+				header += "  " + DimStyle.Render(age)
+			}
+			lines = append(lines, header)
+
+			if cond.Reason != "" && len(lines) < height {
+				lines = append(lines, "    "+DimStyle.Render(cond.Reason))
 			}
 
-			line := "  " + typeStyle.Render(cond.Type)
-			if cond.Reason != "" {
-				line += DimStyle.Render(": " + cond.Reason)
-			}
-			lines = append(lines, line)
-
-			if cond.Message != "" && cond.Status != "True" {
+			if cond.Message != "" {
 				maxW := max(width-6, 10)
-				msg := cond.Message
-				if len(msg) > maxW {
-					msg = msg[:maxW-3] + "..."
+				for _, seg := range wrapText(cond.Message, maxW) {
+					if len(lines) >= height {
+						break
+					}
+					lines = append(lines, "    "+DimStyle.Render(seg))
 				}
-				lines = append(lines, "    "+DimStyle.Render(msg))
 			}
 		}
 	}
@@ -371,18 +397,6 @@ func RenderResourceSummary(item *model.Item, yaml string, width, height int) str
 	}
 
 	return strings.Join(lines, "\n")
-}
-
-// isNegativeCondType returns true if a condition type name represents a
-// negative/failure state (e.g., "Failed", "Error", "Degraded").
-func isNegativeCondType(condType string) bool {
-	lower := strings.ToLower(condType)
-	for _, neg := range []string{"fail", "error", "degrad"} {
-		if strings.Contains(lower, neg) {
-			return true
-		}
-	}
-	return false
 }
 
 // RenderPreviewEvents renders an event timeline section for the preview pane.

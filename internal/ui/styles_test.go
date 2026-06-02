@@ -79,6 +79,78 @@ func TestAgeStyle(t *testing.T) {
 	}
 }
 
+// --- ConditionStyle ---
+
+func TestConditionStyle(t *testing.T) {
+	fgKey := func(s lipgloss.Style) string {
+		fg := s.GetForeground()
+		r, g, b, a := fg.RGBA()
+		return fmt.Sprintf("%d:%d:%d:%d", r, g, b, a)
+	}
+	red := fgKey(StatusFailed)
+	green := fgKey(StatusRunning)
+	amber := fgKey(StatusWarning)
+	blue := fgKey(StatusProgressing)
+	dim := fgKey(DimStyle)
+
+	tests := []struct {
+		condType string
+		status   string
+		want     string
+		desc     string
+	}{
+		// ArgoCD application conditions are status-less; the type encodes severity.
+		{"ComparisonError", "", red, "argocd error"},
+		{"InvalidSpecError", "", red, "argocd error"},
+		{"SharedResourceWarning", "", amber, "argocd warning"},
+		{"OrphanedResourceWarning", "", amber, "argocd warning"},
+
+		// external-secrets / cert-manager / Flux readiness conditions.
+		{"SecretSynced", "True", green, "good when True"},
+		{"Ready", "True", green, "good when True"},
+		{"Ready", "False", red, "bad when False"},
+
+		// cert-manager Issuing: True is in-progress, False is the normal idle state.
+		{"Issuing", "True", blue, "in progress"},
+		{"Issuing", "False", dim, "idle is neutral, not an error"},
+
+		// Negative-polarity types invert: False is healthy.
+		{"Degraded", "True", red, "failing"},
+		{"Degraded", "False", green, "not degraded = healthy"},
+		{"Stalled", "True", red, "flux stalled (curated)"},
+
+		// Node pressure conditions (heuristic): True is bad.
+		{"MemoryPressure", "True", red, "pressure is bad"},
+		{"MemoryPressure", "False", green, "no pressure = healthy"},
+
+		// Warning suffix wins regardless of status.
+		{"DeprecationWarning", "True", amber, "warning suffix"},
+
+		// Unknown status is always neutral.
+		{"Ready", "Unknown", dim, "unknown is neutral"},
+		{"ComparisonError", "Unknown", dim, "unknown is neutral"},
+
+		// Unrecognized informational type: True in-progress, False neutral.
+		{"CustomFlag", "True", blue, "info True"},
+		{"CustomFlag", "False", dim, "info False"},
+
+		// Negated single-token types must NOT match a ready keyword by substring
+		// (token-prefix matching): "Unbound"/"Incomplete" fall through to info.
+		{"Unbound", "True", blue, "not classified as ready (no substring inversion)"},
+		{"Incomplete", "True", blue, "not classified as ready (no substring inversion)"},
+		{"Unavailable", "True", blue, "not classified as ready (no substring inversion)"},
+		// Multi-token positives still match the relevant token.
+		{"ContainersReady", "False", red, "ready token matched, False = problem"},
+		{"JobComplete", "True", green, "complete token matched, True = good"},
+	}
+	for _, tt := range tests {
+		t.Run(tt.condType+"/"+tt.status, func(t *testing.T) {
+			got := fgKey(ConditionStyle(tt.condType, tt.status))
+			assert.Equal(t, tt.want, got, "%s %q: expected %s", tt.condType, tt.status, tt.desc)
+		})
+	}
+}
+
 // --- FillLinesBg ---
 
 // TestFillLinesBgReestablishesBgAfterShortReset guards issue #293's recurrence

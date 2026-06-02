@@ -158,10 +158,11 @@ type KeyValue struct {
 
 // ConditionEntry represents a single status condition for display in the details pane.
 type ConditionEntry struct {
-	Type    string
-	Status  string // "True" or "False"
-	Reason  string
-	Message string
+	Type               string
+	Status             string // "True", "False", or "Unknown"
+	Reason             string
+	Message            string
+	LastTransitionTime time.Time // zero when unknown/unset
 }
 
 // PinnedTypes lists resource-type pin keys (version-agnostic "group/resource",

@@ -469,6 +469,84 @@ func TestRenderResourceSummary(t *testing.T) {
 		result := RenderResourceSummary(item, "", 80, 30)
 		assert.Contains(t, result, "abc123")
 	})
+
+	t.Run("conditions render full detail including status, reason, message, and age", func(t *testing.T) {
+		item := &model.Item{
+			Name: "my-deploy",
+			Columns: []model.KeyValue{
+				{Key: "Node", Value: "node-1"},
+			},
+			Conditions: []model.ConditionEntry{
+				{
+					Type:               "Available",
+					Status:             "True",
+					Reason:             "MinimumReplicasAvailable",
+					Message:            "Deployment has minimum availability.",
+					LastTransitionTime: time.Now().Add(-2 * time.Hour),
+				},
+			},
+		}
+		result := stripANSI(RenderResourceSummary(item, "", 80, 40))
+
+		assert.Contains(t, result, "CONDITIONS")
+		assert.Contains(t, result, "Available")
+		// Status text must be visible (not color-only).
+		assert.Contains(t, result, "True")
+		assert.Contains(t, result, "MinimumReplicasAvailable")
+		// Message must show even though the status is "True".
+		assert.Contains(t, result, "Deployment has minimum availability.")
+		// Age derived from LastTransitionTime (kubectl-style "2h").
+		assert.Contains(t, result, "2h")
+	})
+
+	t.Run("condition with unknown status renders Unknown text", func(t *testing.T) {
+		item := &model.Item{
+			Name:    "my-crd",
+			Columns: []model.KeyValue{{Key: "Node", Value: "node-1"}},
+			Conditions: []model.ConditionEntry{
+				{Type: "Ready", Status: ""},
+			},
+		}
+		result := stripANSI(RenderResourceSummary(item, "", 80, 40))
+		assert.Contains(t, result, "Ready")
+		assert.Contains(t, result, "Unknown")
+	})
+
+	t.Run("bespoke condition summary columns are suppressed when structured conditions exist", func(t *testing.T) {
+		// ArgoCD emits "condition:<type>" rows and a truncated "Condition"
+		// roll-up. With structured conditions present, the CONDITIONS section
+		// supersedes them so the preview must not show them again.
+		item := &model.Item{
+			Name: "my-app",
+			Columns: []model.KeyValue{
+				{Key: "Health", Value: "Degraded"},
+				{Key: "condition:ComparisonError", Value: "rpc error (2h)"},
+				{Key: "Condition", Value: "ComparisonE~"},
+			},
+			Conditions: []model.ConditionEntry{
+				{Type: "ComparisonError", Status: "True", Message: "rpc error: failed to load target state"},
+			},
+		}
+		result := stripANSI(RenderResourceSummary(item, "", 72, 40))
+
+		assert.Contains(t, result, "HEALTH")                                 // unrelated status row kept
+		assert.NotContains(t, result, "COMPARISONERROR  rpc error (2h)")     // bespoke condition: row dropped
+		assert.NotContains(t, result, "ComparisonE~")                        // truncated roll-up dropped
+		assert.Contains(t, result, "rpc error: failed to load target state") // shown once, in CONDITIONS
+	})
+
+	t.Run("condition summary columns remain when no structured conditions", func(t *testing.T) {
+		// Without structured conditions, the bespoke columns are the only
+		// representation and must still render.
+		item := &model.Item{
+			Name: "my-app",
+			Columns: []model.KeyValue{
+				{Key: "condition:ComparisonError", Value: "rpc error (2h)"},
+			},
+		}
+		result := stripANSI(RenderResourceSummary(item, "", 72, 40))
+		assert.Contains(t, result, "COMPARISONERROR")
+	})
 }
 
 // --- RenderResourceTree (badge buckets) ---
