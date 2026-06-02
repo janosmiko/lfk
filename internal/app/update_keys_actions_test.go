@@ -219,6 +219,54 @@ func TestActionKeyLessCyclesSortPrev(t *testing.T) {
 	assert.Equal(t, "Status", result.sortColumnName)
 }
 
+// --- handleExplorerActionKey: cycling from a hidden sort column (issue #339) ---
+//
+// When the active sort column is not in the current layout's sortable set
+// (e.g. a wide-only column after leaving fullscreen), cycling must enter the
+// visible set at a predictable boundary rather than jumping past the first
+// column. Previously sortColumnIndex returned 0 for a missing column, so
+// `>` skipped Name and landed on the second column.
+
+func TestActionKeySortNextFromHiddenColumnLandsOnFirst(t *testing.T) {
+	m := baseExplorerModel()
+	m.sortColumnName = "Node" // wide-only, hidden in narrow mode
+	m.sortAscending = true
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+	})
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	ui.ActiveSortableColumnCount = 3
+
+	ret, _, handled := m.handleExplorerActionKey(runeKey('>'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Name", result.sortColumnName,
+		"next from a hidden sort column must land on the first visible column")
+}
+
+func TestActionKeySortPrevFromHiddenColumnLandsOnLast(t *testing.T) {
+	m := baseExplorerModel()
+	m.sortColumnName = "Node" // wide-only, hidden in narrow mode
+	m.sortAscending = true
+	oldCols := ui.ActiveSortableColumns
+	oldCount := ui.ActiveSortableColumnCount
+	t.Cleanup(func() {
+		ui.ActiveSortableColumns = oldCols
+		ui.ActiveSortableColumnCount = oldCount
+	})
+	ui.ActiveSortableColumns = []string{"Name", "Age", "Status"}
+	ui.ActiveSortableColumnCount = 3
+
+	ret, _, handled := m.handleExplorerActionKey(runeKey('<'))
+	assert.True(t, handled)
+	result := ret.(Model)
+	assert.Equal(t, "Status", result.sortColumnName,
+		"prev from a hidden sort column must land on the last visible column")
+}
+
 // --- handleExplorerActionKey: sort keys are no-ops at picker levels ---
 //
 // At LevelClusters and LevelResourceTypes, sortMiddleItems() early-returns,

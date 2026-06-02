@@ -12,7 +12,13 @@ func (m Model) handleExplorerActionKeySortNext() (tea.Model, tea.Cmd, bool) {
 	}
 	colCount := ui.ActiveSortableColumnCount
 	if colCount > 0 {
-		idx := sortColumnIndex(m.sortColumnName)
+		idx, ok := sortColumnIndex(m.sortColumnName)
+		if !ok {
+			// The active sort column is hidden in this layout (e.g. a
+			// wide-only column after leaving fullscreen). Enter the visible
+			// cycle at the first column instead of skipping past it.
+			idx = -1
+		}
 		idx = (idx + 1) % colCount
 		m.sortColumnName = ui.ActiveSortableColumns[idx]
 	}
@@ -29,7 +35,12 @@ func (m Model) handleExplorerActionKeySortPrev() (tea.Model, tea.Cmd, bool) {
 	}
 	colCount := ui.ActiveSortableColumnCount
 	if colCount > 0 {
-		idx := sortColumnIndex(m.sortColumnName)
+		idx, ok := sortColumnIndex(m.sortColumnName)
+		if !ok {
+			// The active sort column is hidden in this layout; enter the
+			// visible cycle at the last column (issue #339).
+			idx = colCount
+		}
 		idx = (idx - 1 + colCount) % colCount
 		m.sortColumnName = ui.ActiveSortableColumns[idx]
 	}

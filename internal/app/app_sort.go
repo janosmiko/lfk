@@ -5,15 +5,17 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
-// sortColumnIndex returns the index of sortColumnName in ActiveSortableColumns,
-// or 0 if not found.
-func sortColumnIndex(name string) int {
+// sortColumnIndex returns the index of name in ActiveSortableColumns and
+// whether it was found. Callers use the found flag to handle a sort column
+// that is hidden in the current layout (e.g. a wide-only column shown only in
+// fullscreen) rather than silently treating it as index 0 (issue #339).
+func sortColumnIndex(name string) (int, bool) {
 	for i, col := range ui.ActiveSortableColumns {
 		if col == name {
-			return i
+			return i, true
 		}
 	}
-	return 0
+	return 0, false
 }
 
 // sortPref records a user's chosen sort column and direction for a resource
