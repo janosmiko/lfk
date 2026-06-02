@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.13.4](https://github.com/janosmiko/lfk/compare/v0.13.3...v0.13.4) (2026-06-02)
+
+
+### Features
+
+* **dashboard:** show pod capacity headroom in cluster pod bar ([#345](https://github.com/janosmiko/lfk/issues/345)) ([a60341f](https://github.com/janosmiko/lfk/commit/a60341fb0156ead1290c6840d8e80c6bff0f9f20)), closes [#342](https://github.com/janosmiko/lfk/issues/342)
+* **preview:** show full condition detail with severity coloring ([#340](https://github.com/janosmiko/lfk/issues/340)) ([#351](https://github.com/janosmiko/lfk/issues/351)) ([fe50e90](https://github.com/janosmiko/lfk/commit/fe50e905a032765b06acff3ecbcc434ad1f81dfe))
+* **ui:** sort-column highlight and width-aware columns ([#350](https://github.com/janosmiko/lfk/issues/350)) ([0ba2c5b](https://github.com/janosmiko/lfk/commit/0ba2c5b864dce9fd9d82a17c380e141919007471))
+
+
+### Bug Fixes
+
+* keep sort cycling stable when sort column is hidden ([#339](https://github.com/janosmiko/lfk/issues/339)) ([#346](https://github.com/janosmiko/lfk/issues/346)) ([8e256c9](https://github.com/janosmiko/lfk/commit/8e256c9eda6e2377d2d82bb91b3bd5c46574fa3b))
+* update nix vendorHash for go modules ([#343](https://github.com/janosmiko/lfk/issues/343)) ([73c264e](https://github.com/janosmiko/lfk/commit/73c264e0fa08a85dd7a9e9bf3b5d45914074757b)), closes [#341](https://github.com/janosmiko/lfk/issues/341)
+
 ## [0.13.3](https://github.com/janosmiko/lfk/compare/v0.13.2...v0.13.3) (2026-06-01)
 
 
