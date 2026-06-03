@@ -142,3 +142,46 @@ func TestRememberSort_SkipsWhenSortNotApplicable(t *testing.T) {
 		t.Fatalf("sortMemory has %d entries, want 0 at non-sortable level", len(m.sortMemory))
 	}
 }
+
+// TestRememberSort_PersistsAcrossRestart verifies a user sort change is written
+// to the state file so it survives an app restart (issue #353): rememberSort
+// persists, and a fresh loadSortMemory recovers the same preference.
+func TestRememberSort_PersistsAcrossRestart(t *testing.T) {
+	t.Setenv("LFK_STATE_DIR", t.TempDir())
+
+	rt := model.ResourceTypeEntry{APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Kind: "Deployment"}
+	m := &Model{sortMemory: make(map[string]sortPref)}
+	m.nav = model.NavigationState{Level: model.LevelResources, Context: "ctx", ResourceType: rt}
+	m.sortColumnName = "CPU"
+	m.sortAscending = false
+	m.rememberSort()
+
+	// Simulate a restart: load fresh from disk.
+	reloaded := loadSortMemory()
+	ref := ui.ResourceRef{Group: "apps", Version: "v1", Resource: "deployments", Kind: "Deployment"}
+	got, ok := reloaded[sortMemoryKey(ref, "ctx")]
+	if !ok {
+		t.Fatalf("remembered sort not persisted; reloaded map = %v", reloaded)
+	}
+	if got.column != "CPU" || got.ascending {
+		t.Fatalf("reloaded sort = %q asc=%v, want CPU desc", got.column, got.ascending)
+	}
+}
+
+// TestForgetSort_PersistsRemoval verifies the sort-reset action persists the
+// removal, so a reset survives a restart instead of resurrecting the old sort.
+func TestForgetSort_PersistsRemoval(t *testing.T) {
+	t.Setenv("LFK_STATE_DIR", t.TempDir())
+
+	rt := model.ResourceTypeEntry{APIGroup: "apps", APIVersion: "v1", Resource: "deployments", Kind: "Deployment"}
+	m := &Model{sortMemory: make(map[string]sortPref)}
+	m.nav = model.NavigationState{Level: model.LevelResources, Context: "ctx", ResourceType: rt}
+	m.sortColumnName = "CPU"
+	m.sortAscending = false
+	m.rememberSort()
+	m.forgetSort()
+
+	if reloaded := loadSortMemory(); len(reloaded) != 0 {
+		t.Fatalf("reloaded map has %d entries after reset, want 0", len(reloaded))
+	}
+}

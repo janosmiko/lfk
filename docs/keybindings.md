@@ -55,7 +55,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `=` | Toggle sort direction (ascending/descending) |
 | `-` | Reset sort to default (Name ascending) |
 
-Your chosen sort is remembered per resource kind for the running session, so leaving a list and returning keeps your sort instead of resetting.
+Your chosen sort is remembered per resource kind and per cluster context, and persists across restarts (stored in `~/.local/state/lfk/sort_memory.yaml`), so leaving a list and returning — or quitting and reopening lfk — keeps your sort instead of resetting. Use `-` (reset) to drop a remembered sort.
 
 ## Modes & Settings
 

@@ -60,7 +60,9 @@ func (m *Model) rememberSort() {
 	if m.sortMemory == nil {
 		m.sortMemory = make(map[string]sortPref)
 	}
-	m.sortMemory[key] = sortPref{column: m.sortColumnName, ascending: m.sortAscending}
+	pref := sortPref{column: m.sortColumnName, ascending: m.sortAscending}
+	m.sortMemory[key] = pref
+	persistRememberedSort(key, pref)
 }
 
 // forgetSort drops any remembered sort for the resource kind currently in
@@ -70,6 +72,7 @@ func (m *Model) rememberSort() {
 func (m *Model) forgetSort() {
 	if key, ok := m.currentSortKey(); ok {
 		delete(m.sortMemory, key)
+		persistForgottenSort(key)
 	}
 }
 

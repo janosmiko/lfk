@@ -38,6 +38,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
 	hiddenSt := loadHiddenTypesState()
+	sortMem := loadSortMemory()
 	m := Model{
 		client: client,
 		// Start in the loading state. Init() dispatches loadContexts()
@@ -68,7 +69,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		localClusterFields:         localClusterFields{localClusterCache: loadLocalClusterState()},
 		sortColumnName:             sortColDefault,
 		sortAscending:              true,
-		sortMemory:                 make(map[string]sortPref),
+		sortMemory:                 sortMem,
 		cursorMemory:               make(map[string]int),
 		filterMemory:               make(map[string]savedFilter),
 		itemCache:                  make(map[string][]model.Item),
@@ -103,7 +104,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 			readOnly:           ui.ResolveReadOnly(contextName, opts.ReadOnly),
 			sortColumnName:     sortColDefault,
 			sortAscending:      true,
-			sortMemory:         make(map[string]sortPref),
+			sortMemory:         copyMapStringSortPref(sortMem),
 			warningEventsOnly:  true,
 			eventGrouping:      true,
 			allGroupsExpanded:  true,

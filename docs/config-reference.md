@@ -917,6 +917,7 @@ The application follows the [XDG Base Directory Specification](https://specifica
 | `$XDG_CONFIG_HOME/lfk/config.yaml` | Main configuration file (default: `~/.config/lfk/config.yaml`) |
 | `$XDG_STATE_HOME/lfk/bookmarks.yaml` | Saved bookmarks (default: `~/.local/state/lfk/bookmarks.yaml`) |
 | `$XDG_STATE_HOME/lfk/session.yaml` | Last session state, auto-managed (default: `~/.local/state/lfk/session.yaml`) |
+| `$XDG_STATE_HOME/lfk/sort_memory.yaml` | Per-context and per-resource-kind sort column/order, auto-managed (default: `~/.local/state/lfk/sort_memory.yaml`) |
 | `$XDG_STATE_HOME/lfk/pinned.yaml` | Per-context and per-union-set pinned CRD groups, managed via `p` key (default: `~/.local/state/lfk/pinned.yaml`) |
 | `$XDG_STATE_HOME/lfk/hidden_types.yaml` | Per-context and per-union-set hidden resource types, managed via the action menu (`x`) at the resource types level (default: `~/.local/state/lfk/hidden_types.yaml`) |
 | `~/.local/share/lfk/lfk.log` (default) | Application log file (configurable via `log_path`) |
