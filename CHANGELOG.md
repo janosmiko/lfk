@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.13.5](https://github.com/janosmiko/lfk/compare/v0.13.4...v0.13.5) (2026-06-03)
+
+
+### Features
+
+* persist resource-list sort order and column layout across restarts ([#359](https://github.com/janosmiko/lfk/issues/359)) ([337eaba](https://github.com/janosmiko/lfk/commit/337eabacd00ee493ccf594b43806645e76575406))
+* **preview:** list status summary band in resource-type preview ([#360](https://github.com/janosmiko/lfk/issues/360)) ([e5bc62c](https://github.com/janosmiko/lfk/commit/e5bc62c2670c3800b46c0325516efc17f4eb87e5))
+* **ui:** make Name a configurable resource-list column ([#356](https://github.com/janosmiko/lfk/issues/356)) ([dcc5bd2](https://github.com/janosmiko/lfk/commit/dcc5bd2e4906c38a37f660c6589f3891bd69f8ac))
+
+
+### Bug Fixes
+
+* **yaml:** keep long scalars on one line in resource view ([#355](https://github.com/janosmiko/lfk/issues/355)) ([#357](https://github.com/janosmiko/lfk/issues/357)) ([419f6f7](https://github.com/janosmiko/lfk/commit/419f6f7dfde068536597e76a3ae823c6f9474611))
+
 ## [0.13.4](https://github.com/janosmiko/lfk/compare/v0.13.3...v0.13.4) (2026-06-02)
 
 
