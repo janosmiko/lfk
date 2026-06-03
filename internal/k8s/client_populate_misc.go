@@ -9,6 +9,17 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// populateNamespaceDetails sets the namespace's lifecycle phase
+// (Active/Terminating) as its at-a-glance status.
+func populateNamespaceDetails(ti *model.Item, status map[string]any) {
+	if status == nil {
+		return
+	}
+	if phase, ok := status["phase"].(string); ok && phase != "" {
+		ti.Status = phase
+	}
+}
+
 func populateIngressClass(ti *model.Item, obj map[string]any) {
 	metadata, _ := obj["metadata"].(map[string]any)
 	annotations, _ := metadata["annotations"].(map[string]any)

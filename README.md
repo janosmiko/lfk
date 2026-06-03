@@ -116,6 +116,7 @@ Every contribution is appreciated and helps make LFK sustainable. Thank you for 
 - **YAML preview** in the right column with syntax highlighting
 - **Full-screen YAML viewer** with scrollable output, search, section folding (`Tab`/`z`), and in-place editing
 - **Resource details** summary in split preview (toggle with `Shift+P`)
+- **List status summary** band pinned at the bottom of the children pane (like the resource-usage footer) when hovering a resource type in the resource-type list — always shows the resource count, plus a colored status rollup for kinds with a health signal (ArgoCD Application health/sync, Pod phase, workload ready ratios, Node readiness, Namespace/PV/PVC phase, Flux & cert-manager Ready) so you can confirm a whole list is healthy without drilling in
 - **Inline log viewer** with streaming, search, line numbers, word wrap, follow mode, timestamps toggle, previous container logs, container filter, tail-first loading, line jump, structured preview pane (`P`: parses the selected line as JSON or logfmt, falls back to plain text), and automatic reconnect across init-container transitions (stays attached as each init container finishes and the next one starts)
 - **Inline describe view** with scrollable output
 - **Secret viewing/editing** with decode toggle (`Ctrl+S`) and dedicated editor (`e`)

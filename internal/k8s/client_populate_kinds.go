@@ -13,6 +13,31 @@ func populateNodeDetails(ti *model.Item, obj map[string]any, status, spec map[st
 	populateNodeStatus(ti, status)
 	populateNodeUnschedulable(ti, spec)
 	populateNodeTaints(ti, spec)
+	if s := nodeReadyStatus(status); s != "" {
+		ti.Status = s
+	}
+}
+
+// nodeReadyStatus derives a node's at-a-glance status ("Ready"/"NotReady") from
+// its Ready condition. Returns "" when the condition is absent so callers leave
+// Status untouched. Cordon state is surfaced separately via the Unschedulable
+// column, keeping the status (and its rollup) to clean Ready/NotReady buckets.
+func nodeReadyStatus(status map[string]any) string {
+	conds, _ := status["conditions"].([]any)
+	for _, c := range conds {
+		cond, ok := c.(map[string]any)
+		if !ok {
+			continue
+		}
+		if t, _ := cond["type"].(string); t != "Ready" {
+			continue
+		}
+		if s, _ := cond["status"].(string); s == "True" {
+			return "Ready"
+		}
+		return "NotReady"
+	}
+	return ""
 }
 
 func populateNodeRoles(ti *model.Item, obj map[string]any) {
