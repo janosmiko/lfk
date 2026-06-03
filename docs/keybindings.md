@@ -55,7 +55,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `=` | Toggle sort direction (ascending/descending) |
 | `-` | Reset sort to default (Name ascending) |
 
-Your chosen sort is remembered per resource kind for the running session, so leaving a list and returning keeps your sort instead of resetting.
+Your chosen sort is remembered per resource kind and per cluster context, and persists across restarts (stored in `~/.local/state/lfk/sort_memory.yaml`), so leaving a list and returning — or quitting and reopening lfk — keeps your sort instead of resetting. Use `-` (reset) to drop a remembered sort.
 
 ## Modes & Settings
 
@@ -495,8 +495,10 @@ other columns leave it little room.
 The selection you apply is explicit: the table renders exactly the
 columns you check, in the exact order they appear in the overlay, and
 will not auto-fill the remaining space with unchecked columns. The
-chosen order is remembered per resource kind for the duration of the
-session (it is not persisted to disk). To start from a clean slate,
+chosen visibility and order are remembered per resource kind and per
+cluster context, and persist across restarts (stored in
+`~/.local/state/lfk/column_prefs.yaml`) — committed on `Enter`, cleared
+by `R`; `Esc` discards uncommitted edits. To start from a clean slate,
 press `c` to uncheck every entry at once, then space-select only the
 columns you want.
 

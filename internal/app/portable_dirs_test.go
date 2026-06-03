@@ -19,6 +19,8 @@ func TestPortableStateDir(t *testing.T) {
 		want string
 	}{
 		{"session", sessionFilePath(), filepath.Join(stateDir, "session.yaml")},
+		{"sort-memory", sortMemoryFilePath(), filepath.Join(stateDir, "sort_memory.yaml")},
+		{"column-prefs", columnPrefsFilePath(), filepath.Join(stateDir, "column_prefs.yaml")},
 		{"pinned", pinnedFilePath(), filepath.Join(stateDir, "pinned.yaml")},
 		{"bookmarks", bookmarksFilePath(), filepath.Join(stateDir, "bookmarks.yaml")},
 		{"cluster-colors", clusterColorsFilePath(), filepath.Join(stateDir, "cluster-colors.yaml")},

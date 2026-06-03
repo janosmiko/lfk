@@ -195,10 +195,13 @@ func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) 
 		allGroupsExpanded: true,
 		cursorMemory:      make(map[string]int),
 		filterMemory:      make(map[string]savedFilter),
-		sortMemory:        make(map[string]sortPref),
-		itemCache:         make(map[string][]model.Item),
-		selectedItems:     make(map[string]bool),
-		selectionAnchor:   -1,
+		// Seed from disk so a session-restored tab keeps the sort the user
+		// chose before quitting (issue #353); a blank map here would override
+		// the model's loaded memory when this tab is activated.
+		sortMemory:      loadSortMemory(),
+		itemCache:       make(map[string][]model.Item),
+		selectedItems:   make(map[string]bool),
+		selectionAnchor: -1,
 	}
 
 	if st.AllNamespaces {
