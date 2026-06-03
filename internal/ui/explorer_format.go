@@ -177,10 +177,11 @@ func styledRestartsCell(item model.Item, restartsW int, anyRecentRestart bool) s
 }
 
 // formatTableRowOrdered builds a plain-text table row using the given column
-// order. Name is always emitted first. The preprocessed values (ns, ready,
-// restarts, status, age) are passed through since they have row-specific
-// handling upstream (e.g. the cursor row preprocesses restarts for arrow
-// alignment).
+// order. "Name" is rendered at its position within order; an order without a
+// "Name" entry renders no name cell (the column is hidden). The preprocessed
+// values (ns, ready, restarts, status, age) are passed through since they have
+// row-specific handling upstream (e.g. the cursor row preprocesses restarts for
+// arrow alignment).
 func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, item *model.Item,
@@ -188,8 +189,11 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 	widths := builtinColWidths{context: contextW, ns: nsW, ready: readyW, restarts: restartsW, status: statusW, age: ageW}
 	inputs := plainCellInputs{item: item, ns: ns, ready: ready, restarts: restarts, status: status, age: age, widths: widths}
 	var row strings.Builder
-	row.WriteString(plainNameCellWithBadge(name, item, nameW))
 	for _, key := range order {
+		if key == "Name" {
+			row.WriteString(plainNameCellWithBadge(name, item, nameW))
+			continue
+		}
 		if col := renderableBuiltin(key, widths); col != nil {
 			row.WriteString(col.plain(inputs))
 			continue
@@ -205,8 +209,9 @@ func formatTableRowOrdered(name, ns, ready, restarts, status, age string,
 }
 
 // formatTableRowStyledOrdered builds a styled table row using the given
-// column order. Name (with icon handling) is always emitted first via the
-// existing styled name helper; the rest is dispatched per-key.
+// column order. The Name cell (with icon + badge handling) is rendered at its
+// position within order via the styled name helper; an order without a "Name"
+// entry renders no name cell (the column is hidden).
 func formatTableRowStyledOrdered(item model.Item,
 	nameW, contextW, nsW, readyW, restartsW, statusW, ageW int,
 	order []string, extraCols []extraColumn, anyRecentRestart bool,
@@ -214,8 +219,11 @@ func formatTableRowStyledOrdered(item model.Item,
 	widths := builtinColWidths{context: contextW, ns: nsW, ready: readyW, restarts: restartsW, status: statusW, age: ageW}
 	inputs := styledCellInputs{item: item, widths: widths, anyRecentRestart: anyRecentRestart}
 	var base strings.Builder
-	base.WriteString(styledNameCell(item, nameW))
 	for _, key := range order {
+		if key == "Name" {
+			base.WriteString(styledNameCell(item, nameW))
+			continue
+		}
 		if col := renderableBuiltin(key, widths); col != nil {
 			base.WriteString(col.styled(inputs))
 			continue

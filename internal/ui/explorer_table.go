@@ -243,6 +243,14 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		markerColW = 2
 	}
 
+	// Name is a configurable column: the user can hide it via the
+	// column-toggle overlay (ActiveHiddenBuiltinColumns["Name"]). When hidden,
+	// ActiveNameHidden tells collectExtraColumns to skip the NAME width
+	// reservation so extras reclaim the freed space instead of leaving a gap.
+	nameHidden := ActiveMiddleScroll >= 0 && ActiveHiddenBuiltinColumns != nil && ActiveHiddenBuiltinColumns["Name"]
+	hasName := !nameHidden
+	ActiveNameHidden = nameHidden
+
 	var extraCols []extraColumn
 	if ActiveTableLayout != nil && ActiveTableLayout.Computed {
 		extraCols = ActiveTableLayout.ExtraCols
@@ -290,11 +298,12 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 	}
 
-	order := orderedColumnKeys(hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols)
+	order := orderedColumnKeys(hasName, hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge, extraCols)
 
 	if ActiveMiddleScroll >= 0 {
 		ActiveSortableColumns = ActiveSortableColumns[:0]
-		ActiveSortableColumns = append(ActiveSortableColumns, "Name")
+		// order now carries "Name" at its configured position, so the sortable
+		// list mirrors the on-screen column order directly.
 		ActiveSortableColumns = append(ActiveSortableColumns, order...)
 		ActiveSortableColumnCount = len(ActiveSortableColumns)
 		ActiveSortColumn = 0
@@ -312,6 +321,11 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	}
 
 	nameW := max(width-contextW-nsW-readyW-restartsW-ageW-statusW-markerColW-extraTotalW-tileW, 10)
+	if nameHidden {
+		// No name cell is emitted (Name is absent from order); zero the width
+		// so the unused value can't be mistaken for a real reservation.
+		nameW = 0
+	}
 
 	if headerLabel == "" {
 		headerLabel = "NAME"
@@ -336,12 +350,12 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		// stays aligned with the data rows below.
 		hdrSegments = append(hdrSegments, headerSegment{text: " "})
 	}
-	hdrSegments = append(hdrSegments, headerSegment{text: nameHeader, colName: "Name"})
 	for _, key := range order {
-		hdrSegments = append(hdrSegments, headerSegment{
-			text:    headerCellForKey(key, colWidths, colHeaders, extraCols),
-			colName: key,
-		})
+		text := nameHeader
+		if key != "Name" {
+			text = headerCellForKey(key, colWidths, colHeaders, extraCols)
+		}
+		hdrSegments = append(hdrSegments, headerSegment{text: text, colName: key})
 	}
 	b.WriteString(renderStyledHeader(hdrSegments, width))
 	height--
@@ -355,10 +369,11 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		if tileW > 0 {
 			x += tileW
 		}
-		ActiveMiddleColumnLayout = append(ActiveMiddleColumnLayout, MiddleColumnRegion{Key: "Name", StartX: x, EndX: x + nameW})
-		x += nameW
 		for _, key := range order {
-			w := widthForColumnKey(key, colWidths, extraCols)
+			w := nameW
+			if key != "Name" {
+				w = widthForColumnKey(key, colWidths, extraCols)
+			}
 			ActiveMiddleColumnLayout = append(ActiveMiddleColumnLayout, MiddleColumnRegion{Key: key, StartX: x, EndX: x + w})
 			x += w
 		}

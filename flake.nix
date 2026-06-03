@@ -18,14 +18,14 @@
         pkgs = nixpkgs.legacyPackages.${system};
         inherit (pkgs) lib;
 
-        # go.mod requires 1.26.3 (security). nixpkgs/master currently ships
-        # go_1_26 = 1.26.2; override the source to the official 1.26.3 tarball
+        # go.mod requires 1.26.4 (security). nixpkgs/master currently ships
+        # go_1_26 = 1.26.2; override the source to the official 1.26.4 tarball
         # until nixpkgs catches up, then delete this block.
-        go_1_26_3 = pkgs.go_1_26.overrideAttrs (_: rec {
-          version = "1.26.3";
+        go_1_26_4 = pkgs.go_1_26.overrideAttrs (_: rec {
+          version = "1.26.4";
           src = pkgs.fetchurl {
             url = "https://go.dev/dl/go${version}.src.tar.gz";
-            hash = "sha256-HGRoddCqh5kTMYTtV895/yS97+jIggRwYCqdPW2Rkrg=";
+            hash = "sha256-T2aKMvv8ETLmqIH7lowvHa2mMUkqM5IRc1+7JVpCYC0=";
           };
         });
 
@@ -40,7 +40,7 @@
       in
       {
         packages = {
-          default = (pkgs.buildGoModule.override { go = go_1_26_3; }) {
+          default = (pkgs.buildGoModule.override { go = go_1_26_4; }) {
             pname = "lfk";
             inherit version;
 

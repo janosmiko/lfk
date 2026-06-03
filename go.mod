@@ -1,6 +1,6 @@
 module github.com/janosmiko/lfk
 
-go 1.26.3
+go 1.26.4
 
 require (
 	github.com/atotto/clipboard v0.1.4

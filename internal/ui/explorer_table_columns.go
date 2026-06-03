@@ -1,5 +1,7 @@
 package ui
 
+import "slices"
+
 // isBuiltinColumnKey reports whether key is one of the fixed built-in item
 // field columns other than the union-only Context column. Context is excluded
 // because, when it isn't already requested via hasContext, an extras-defined
@@ -9,10 +11,15 @@ func isBuiltinColumnKey(key string) bool {
 	return ok && key != "Context"
 }
 
-// orderedColumnKeys returns the ordered list of column keys (excluding "Name")
-// that RenderTable should emit for a middle-column render.
-func orderedColumnKeys(hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge bool, extraCols []extraColumn) []string {
-	defaults := make([]string, 0, 6+len(extraCols))
+// orderedColumnKeys returns the ordered list of column keys that RenderTable
+// should emit for a middle-column render. "Name" is a first-class member of
+// the list (leading by default) so it can be reordered or hidden through the
+// same column-toggle machinery as every other column; hasName=false omits it.
+func orderedColumnKeys(hasName, hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge bool, extraCols []extraColumn) []string {
+	defaults := make([]string, 0, 7+len(extraCols))
+	if hasName {
+		defaults = append(defaults, "Name")
+	}
 	if hasContext {
 		defaults = append(defaults, "Context")
 	}
@@ -46,6 +53,16 @@ func orderedColumnKeys(hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasA
 
 	seen := make(map[string]bool, len(defaults))
 	ordered := make([]string, 0, len(defaults))
+
+	// Backward compatibility: saved orders that predate configurable Name omit
+	// the "Name" key. Without an explicit entry, Name keeps its historical
+	// pinned-first position instead of falling to the tail-append cleanup
+	// below. An order that DOES list "Name" (saved by the newer overlay)
+	// honours that position like any other column.
+	if visible["Name"] && !slices.Contains(ActiveColumnOrder, "Name") {
+		ordered = append(ordered, "Name")
+		seen["Name"] = true
+	}
 
 	for _, k := range ActiveColumnOrder {
 		if !visible[k] || seen[k] {

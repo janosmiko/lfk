@@ -58,10 +58,16 @@ func isMandatoryColumn(key string) bool {
 }
 
 // ActiveHiddenBuiltinColumns holds the set of built-in column keys that should
-// be suppressed in the current middle-column render. Valid keys: "Context",
-// "Namespace", "Ready", "Restarts", "Age", "Status". Set by the app before
-// rendering. Nil means no overrides.
+// be suppressed in the current middle-column render. Valid keys: "Name",
+// "Context", "Namespace", "Ready", "Restarts", "Age", "Status". Set by the app
+// before rendering. Nil means no overrides.
 var ActiveHiddenBuiltinColumns map[string]bool
+
+// ActiveNameHidden reports whether the NAME column is hidden for the current
+// middle-column render. When true, collectExtraColumns skips the name width
+// reservation so extra columns reclaim the space the name would have used.
+// Set by RenderTable before rendering.
+var ActiveNameHidden bool
 
 // collectExtraColumns discovers which extra columns to show based on item data and config.
 // usedWidth is the width already consumed by fixed columns (excluding name).
@@ -276,17 +282,22 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	}
 
 	nameReserve := longestName + 1 // +1 for column spacing
-	if nameReserve+usedWidth > totalWidth {
-		// Can't fit the full name even after dropping every extra. Cap
-		// the reservation so at least one extra gets a fair budget.
-		nameReserve = max(totalWidth-usedWidth-minExtrasBudget, nameFloor)
+	if ActiveNameHidden {
+		// NAME is hidden: reserve nothing so extras get the full row budget.
+		nameReserve = 0
+	} else {
+		if nameReserve+usedWidth > totalWidth {
+			// Can't fit the full name even after dropping every extra. Cap
+			// the reservation so at least one extra gets a fair budget.
+			nameReserve = max(totalWidth-usedWidth-minExtrasBudget, nameFloor)
+		}
+		if mandatoryBudget > 0 {
+			// Never let the name reservation crowd out mandatory columns; NAME
+			// shrinks toward its floor and overflow is clipped by the caller.
+			nameReserve = min(nameReserve, max(totalWidth-usedWidth-mandatoryBudget, nameFloor))
+		}
+		nameReserve = max(nameReserve, nameFloor)
 	}
-	if mandatoryBudget > 0 {
-		// Never let the name reservation crowd out mandatory columns; NAME
-		// shrinks toward its floor and overflow is clipped by the caller.
-		nameReserve = min(nameReserve, max(totalWidth-usedWidth-mandatoryBudget, nameFloor))
-	}
-	nameReserve = max(nameReserve, nameFloor)
 	// available may be negative when mandatory columns alone exceed the row;
 	// fitExtraColumns still emits them and the caller clips the overflow.
 	available := totalWidth - usedWidth - nameReserve
