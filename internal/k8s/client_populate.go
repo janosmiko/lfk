@@ -40,6 +40,8 @@ func populateResourceDetails(ti *model.Item, obj map[string]any, kind string) {
 		populateSecretDetails(ti, obj)
 	case "Node":
 		populateNodeDetails(ti, obj, status, spec)
+	case "Namespace":
+		populateNamespaceDetails(ti, status)
 	case "PersistentVolumeClaim":
 		populatePVCDetails(ti, status, spec)
 	case "CronJob":

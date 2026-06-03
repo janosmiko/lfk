@@ -51,12 +51,19 @@ func (m *Model) clampPreviewScroll() {
 		colHeight-- // tab bar
 	}
 
-	// Compute footer lines (must match renderRightColumn).
-	footerLines := 0
+	// Compute footer lines (must match renderRightColumn): the metrics rollup
+	// and/or the list summary band are pinned to the bottom and excluded from
+	// the scrollable area.
+	var footerParts []string
 	if !m.fullYAMLPreview && m.metricsContent != "" {
-		sep := ui.DimStyle.Render(strings.Repeat("\u2500", innerW))
-		footer := sep + "\n" + m.metricsContent
-		footerLines = strings.Count(footer, "\n") + 1
+		footerParts = append(footerParts, ui.DimStyle.Render(strings.Repeat("\u2500", innerW)), m.metricsContent)
+	}
+	if band := m.previewSummaryBand(innerW); band != "" {
+		footerParts = append(footerParts, ui.DimStyle.Render(strings.Repeat("\u2500", innerW)), band)
+	}
+	footerLines := 0
+	if len(footerParts) > 0 {
+		footerLines = strings.Count(strings.Join(footerParts, "\n"), "\n") + 1
 	}
 
 	// Compute scrollable viewport height (must match renderRightColumn).
@@ -101,13 +108,51 @@ func (m *Model) clampPreviewScroll() {
 	}
 }
 
+// previewSummaryBand renders the aggregate status band pinned at the bottom of
+// the children pane while hovering a resource type in the resource-type list — a
+// rollup of that type's resources (e.g. ArgoCD Application health / sync) so the
+// list can be assessed without drilling in. It is derived synchronously from the
+// already-loaded preview items, so it costs no API calls and cannot block the
+// UI. Returns "" unless we are at the resource-type list previewing a real,
+// summarisable kind.
+func (m Model) previewSummaryBand(width int) string {
+	if m.nav.Level != model.LevelResourceTypes {
+		return ""
+	}
+	sel := m.selectedMiddleItem()
+	// Synthetic rows (dashboards, security sources, port-forwards, captures,
+	// collapsed groups) all carry a "__"-prefixed Kind and have no status
+	// rollup; real resource types carry their Kubernetes Kind.
+	if sel == nil || strings.HasPrefix(sel.Kind, "__") {
+		return ""
+	}
+	items := m.rightItems
+	if len(items) == 0 {
+		return ""
+	}
+	summary := ui.BuildListSummary(sel.Kind, items)
+	label := sel.Name
+	if label == "" {
+		label = sel.Kind
+	}
+	return ui.RenderListSummary(summary, label, width)
+}
+
 func (m Model) renderRightColumn(width, height int) string {
-	// Build the pinned footer: only resource usage (metrics) is pinned.
+	// Build the pinned footer (bottom of the pane): resource usage (metrics)
+	// and the list summary band, each preceded by a separator. They are
+	// mutually exclusive in practice (metrics at the resource levels, the band
+	// at the resource-type list), but both are handled uniformly here.
 	var footerParts []string
 	if !m.fullYAMLPreview && m.metricsContent != "" {
 		footerParts = append(footerParts,
 			ui.DimStyle.Render(strings.Repeat("\u2500", width)),
 			m.metricsContent)
+	}
+	if band := m.previewSummaryBand(width); band != "" {
+		footerParts = append(footerParts,
+			ui.DimStyle.Render(strings.Repeat("─", width)),
+			band)
 	}
 
 	// Reserve height for the pinned footer.
@@ -170,7 +215,8 @@ func (m Model) renderRightColumn(width, height int) string {
 	}
 	result = strings.Join(lines, "\n")
 
-	// Assemble: pinned header (children) + scrollable content + pinned footer (metrics).
+	// Assemble: pinned header (children) + scrollable content + pinned footer
+	// (metrics and/or the list summary band).
 	if pinnedHeader != "" {
 		result = pinnedHeader + "\n" + result
 	}

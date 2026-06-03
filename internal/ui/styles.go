@@ -430,31 +430,47 @@ func AgeStyle(age string) lipgloss.Style {
 	}
 }
 
-// StatusStyle returns the appropriate style for a resource status string.
-func StatusStyle(status string) lipgloss.Style {
+// statusSev classifies a resource status string into a severity bucket. It is
+// the single source of truth shared by StatusStyle (which maps it to a color)
+// and StatusSeverityRank (which maps it to an ordering), so coloring and
+// severity ordering can never drift — and the ordering stays correct in
+// no-color mode, where the styles carry no distinguishing foreground.
+type statusSev int
+
+const (
+	sevUnknown     statusSev = iota // unknown non-empty status -> dimmed
+	sevBlank                        // "" -> neutral
+	sevDefault                      // literal "default" -> primary
+	sevNormal                       // "Normal" event type -> dim
+	sevRunning                      // healthy / ready / synced
+	sevDone                         // succeeded / completed
+	sevProgressing                  // pending / progressing / out-of-sync / warning
+	sevFailed                       // failed / degraded / errored
+)
+
+func statusSeverity(status string) statusSev {
 	switch status {
 	case "default":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Background(BaseBg)
+		return sevDefault
 	case "Running", "Active", "Bound", "Available", "Ready",
 		"Healthy", "Healthy/Synced", "Synced",
 		"Deployed",
 		"SecretSynced", "Created", "Updated", "Valid":
-		return StatusRunning
+		return sevRunning
 	case "Succeeded", "Completed",
 		"Superseded":
-		return StatusOther
+		return sevDone
 	case "Pending", "ContainerCreating", "PodInitializing", "Terminating",
 		"Waiting", "Init", "NotReady",
 		"Progressing", "Progressing/Synced", "Progressing/OutOfSync",
 		"Missing", "Suspended", "Unknown", "Reconciling",
 		"Healthy/OutOfSync", "Missing/OutOfSync", "Suspended/OutOfSync",
 		"OutOfSync",
-		"Pending-install", "Pending-upgrade", "Pending-rollback", "Uninstalling":
-		return StatusProgressing
-	case "Warning":
-		return StatusProgressing
+		"Pending-install", "Pending-upgrade", "Pending-rollback", "Uninstalling",
+		"Warning":
+		return sevProgressing
 	case "Normal":
-		return DimStyle
+		return sevNormal
 	case "Failed", "CrashLoopBackOff", "Error", "ImagePullBackOff", "Terminated",
 		"Degraded", "Degraded/Synced", "Degraded/OutOfSync",
 		"Missing/Synced",
@@ -463,12 +479,50 @@ func StatusStyle(status string) lipgloss.Style {
 		model.MissingRefStatus,
 		"UpdateFailed", "FailedScheduling",
 		"InvalidStoreConfiguration", "InvalidProviderConfig", "ValidationFailed":
-		return StatusFailed
+		return sevFailed
 	default:
 		if status == "" {
-			return NormalStyle
+			return sevBlank
 		}
+		return sevUnknown
+	}
+}
+
+// StatusStyle returns the appropriate style for a resource status string.
+func StatusStyle(status string) lipgloss.Style {
+	switch statusSeverity(status) {
+	case sevDefault:
+		return lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Background(BaseBg)
+	case sevRunning:
+		return StatusRunning
+	case sevDone:
 		return StatusOther
+	case sevProgressing:
+		return StatusProgressing
+	case sevNormal:
+		return DimStyle
+	case sevFailed:
+		return StatusFailed
+	case sevBlank:
+		return NormalStyle
+	default: // sevUnknown
+		return StatusOther
+	}
+}
+
+// StatusSeverityRank orders a status string worst-first (0 = most severe) for
+// status rollups and summaries. Derived from statusSeverity so it tracks
+// StatusStyle and works regardless of color profile.
+func StatusSeverityRank(status string) int {
+	switch statusSeverity(status) {
+	case sevFailed:
+		return 0
+	case sevProgressing:
+		return 2
+	case sevRunning:
+		return 3
+	default: // done / normal / default / blank / unknown
+		return 4
 	}
 }
 
