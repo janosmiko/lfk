@@ -68,6 +68,13 @@ func (m Model) handleExplorerActionKeySortReset() (tea.Model, tea.Cmd, bool) {
 		return m, nil, true
 	}
 	m.sortColumnName = sortColDefault
+	// The default sort key is Name. If Name is hidden via the column overlay it
+	// is absent from the visible sort cycle, so fall back to the first visible
+	// column to keep the status bar and header indicator coherent (mirrors the
+	// hidden-column guard in Next/Prev).
+	if _, ok := sortColumnIndex(m.sortColumnName); !ok && ui.ActiveSortableColumnCount > 0 {
+		m.sortColumnName = ui.ActiveSortableColumns[0]
+	}
 	m.sortAscending = true
 	m.forgetSort()
 	m.sortMiddleItems()

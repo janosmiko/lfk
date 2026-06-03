@@ -469,7 +469,7 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 ## Column Toggle Overlay
 
 Press `,` in the resource list to open the column toggle overlay. It lists
-every toggleable column for the current kind — both built-ins (Namespace,
+every toggleable column for the current kind — built-ins (Name, Namespace,
 Ready, Restarts, Status, Age) and extras from the resource's
 `additionalPrinterColumns`.
 
@@ -486,8 +486,11 @@ Ready, Restarts, Status, Age) and extras from the resource's
 
 Built-in and extra columns can be freely interleaved — `J`/`K` moves
 either kind, so you can put `Age` before `Namespace` or drop an extra
-like `IP` between `Ready` and `Status`. The only fixed column is `Name`,
-which always renders first and is never listed in the overlay.
+like `IP` between `Ready` and `Status`. `Name` is listed too: it renders
+first by default but can be reordered (e.g. after a `Catalog`/`Task`
+extra) or hidden like any other column. When visible, `Name` still
+absorbs the row's leftover width and compresses (truncates) when the
+other columns leave it little room.
 
 The selection you apply is explicit: the table renders exactly the
 columns you check, in the exact order they appear in the overlay, and

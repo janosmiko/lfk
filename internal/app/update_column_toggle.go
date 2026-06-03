@@ -11,8 +11,9 @@ import (
 
 // builtinColumnOrder is the canonical left-to-right order of built-in
 // columns in RenderTable. openColumnToggle emits entries in this order so
-// the overlay matches the header row.
-var builtinColumnOrder = []string{"Context", "Namespace", "Ready", "Restarts", "Status", "Age"}
+// the overlay matches the header row. Name leads the list: it renders first
+// by default but is reorderable and hideable like any other column.
+var builtinColumnOrder = []string{"Name", "Context", "Namespace", "Ready", "Restarts", "Status", "Age"}
 
 // columnToggleSnapshot captures the pre-overlay column-config state for
 // a single kind so Esc can revert after live-apply edits. The hasX
@@ -160,10 +161,11 @@ func mergeColumnToggleEntries(builtinEntries, extraEntries []columnToggleEntry, 
 }
 
 // collectBuiltinToggleEntries returns toggle entries for built-in columns
-// present in the item data. Name is intentionally excluded (it is mandatory).
-// The visible flag is true unless the column is in hiddenBuiltinColumns[kind].
+// present in the item data. Name is always present (every item has a name) and
+// is reorderable/hideable like the others. The visible flag is true unless the
+// column is in hiddenBuiltinColumns[kind].
 func (m *Model) collectBuiltinToggleEntries(items []model.Item, kind string) []columnToggleEntry {
-	present := map[string]bool{}
+	present := map[string]bool{"Name": true}
 	for _, item := range items {
 		if item.ClusterName != "" {
 			present["Context"] = true

@@ -275,9 +275,9 @@ func findColumnToggleEntry(entries []columnToggleEntry, key string, builtin bool
 }
 
 // TestCovOpenColumnToggleIncludesBuiltins verifies that opening the column
-// toggle overlay for a resource with built-in field data (Ready/Restarts/
-// Status/Age/Namespace) produces toggle entries for each built-in and that
-// Name is NOT toggleable.
+// toggle overlay for a resource with built-in field data (Name/Ready/Restarts/
+// Status/Age/Namespace) produces toggle entries for each built-in, including
+// Name.
 func TestCovOpenColumnToggleIncludesBuiltins(t *testing.T) {
 	m := baseModelNav()
 	m.middleItems = []model.Item{
@@ -301,10 +301,10 @@ func TestCovOpenColumnToggleIncludesBuiltins(t *testing.T) {
 	assert.NotNil(t, findColumnToggleEntry(entries, "Restarts", true), "Restarts built-in entry must exist")
 	assert.NotNil(t, findColumnToggleEntry(entries, "Status", true), "Status built-in entry must exist")
 	assert.NotNil(t, findColumnToggleEntry(entries, "Age", true), "Age built-in entry must exist")
-	assert.Nil(t, findColumnToggleEntry(entries, "Name", true), "Name must NOT be toggleable")
+	assert.NotNil(t, findColumnToggleEntry(entries, "Name", true), "Name is now a toggleable built-in entry")
 
 	// All built-ins should be visible by default when nothing is hidden.
-	for _, key := range []string{"Namespace", "Ready", "Restarts", "Status", "Age"} {
+	for _, key := range []string{"Name", "Namespace", "Ready", "Restarts", "Status", "Age"} {
 		e := findColumnToggleEntry(entries, key, true)
 		if assert.NotNil(t, e, "entry for %s", key) {
 			assert.True(t, e.visible, "%s must be visible when no hidden set", key)
