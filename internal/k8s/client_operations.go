@@ -1,6 +1,7 @@
 package k8s
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"strconv"
 	"time"
 
+	yaml "gopkg.in/yaml.v3"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 	k8stypes "k8s.io/apimachinery/pkg/types"
@@ -16,7 +18,6 @@ import (
 	"k8s.io/client-go/metadata"
 	"k8s.io/client-go/rest"
 	"k8s.io/client-go/tools/clientcmd"
-	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
@@ -60,11 +61,32 @@ func (c *Client) GetResourceYAML(ctx context.Context, contextName, namespace str
 
 	obj.SetManagedFields(nil)
 
-	data, err := yaml.Marshal(obj.Object)
+	data, err := marshalResourceYAML(obj.Object)
 	if err != nil {
 		return "", fmt.Errorf("marshalling to YAML: %w", err)
 	}
-	return reorderYAMLFields(string(data)), nil
+	return reorderYAMLFields(data), nil
+}
+
+// marshalResourceYAML renders a resource object to YAML for the YAML view.
+// It uses gopkg.in/yaml.v3 rather than sigs.k8s.io/yaml because the latter
+// wraps long scalar values at a hardcoded 80 columns (a yaml.v2 default),
+// which breaks both the layout and the per-line syntax highlighter for long
+// values such as status condition messages and Azure resource IDs (issue #355).
+// yaml.v3 keeps each scalar on a single line. SetIndent(2) preserves the
+// 2-space indentation the YAML view and folding logic expect.
+func marshalResourceYAML(obj map[string]any) (string, error) {
+	var buf bytes.Buffer
+	enc := yaml.NewEncoder(&buf)
+	enc.SetIndent(2)
+	if err := enc.Encode(obj); err != nil {
+		_ = enc.Close()
+		return "", err
+	}
+	if err := enc.Close(); err != nil {
+		return "", err
+	}
+	return buf.String(), nil
 }
 
 // GetPodYAML returns the YAML for a pod.
