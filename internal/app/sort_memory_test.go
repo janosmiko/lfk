@@ -13,12 +13,14 @@ import (
 
 func TestSortMemoryFilePath(t *testing.T) {
 	t.Run("uses XDG_STATE_HOME", func(t *testing.T) {
+		t.Setenv("LFK_STATE_DIR", "") // takes precedence over XDG; clear it
 		t.Setenv("XDG_STATE_HOME", "/custom/state")
 		path := sortMemoryFilePath()
 		assert.Equal(t, "/custom/state/lfk/sort_memory.yaml", path)
 	})
 
 	t.Run("falls back to home", func(t *testing.T) {
+		t.Setenv("LFK_STATE_DIR", "")
 		t.Setenv("XDG_STATE_HOME", "")
 		path := sortMemoryFilePath()
 		assert.Contains(t, path, filepath.Join(".local", "state", "lfk", "sort_memory.yaml"))
@@ -53,7 +55,6 @@ func TestLoadSortMemoryMissingFile(t *testing.T) {
 func TestLoadSortMemoryCorrupt(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LFK_STATE_DIR", dir)
-	require.NoError(t, os.MkdirAll(dir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "sort_memory.yaml"), []byte("{not: valid: yaml: ["), 0o644))
 
 	got := loadSortMemory()
@@ -61,14 +62,14 @@ func TestLoadSortMemoryCorrupt(t *testing.T) {
 	assert.Empty(t, got)
 }
 
-func TestLoadSortMemorySkipsMalformedKeys(t *testing.T) {
+func TestLoadSortMemoryRebuildsValidKeys(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LFK_STATE_DIR", dir)
 
-	// A persisted file with a context holding one entry; the in-memory key is
-	// rebuilt as context\x00gvr, so a well-formed file always yields valid keys.
+	// The nested on-disk shape is flattened back to context\x00gvr keys. (The
+	// malformed-key skip lives on the save side and is covered by
+	// TestSortMemoryToStateSkipsMalformedKeys.)
 	yaml := "contexts:\n  prod:\n    apps/v1/deployments:\n      column: Ready\n      ascending: false\n"
-	require.NoError(t, os.MkdirAll(dir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "sort_memory.yaml"), []byte(yaml), 0o644))
 
 	got := loadSortMemory()

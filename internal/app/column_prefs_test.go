@@ -15,11 +15,13 @@ import (
 
 func TestColumnPrefsFilePath(t *testing.T) {
 	t.Run("uses XDG_STATE_HOME", func(t *testing.T) {
+		t.Setenv("LFK_STATE_DIR", "") // takes precedence over XDG; clear it
 		t.Setenv("XDG_STATE_HOME", "/custom/state")
 		assert.Equal(t, "/custom/state/lfk/column_prefs.yaml", columnPrefsFilePath())
 	})
 
 	t.Run("falls back to home", func(t *testing.T) {
+		t.Setenv("LFK_STATE_DIR", "")
 		t.Setenv("XDG_STATE_HOME", "")
 		assert.Contains(t, columnPrefsFilePath(), filepath.Join(".local", "state", "lfk", "column_prefs.yaml"))
 	})
@@ -64,7 +66,6 @@ func TestLoadColumnPrefsMissingFile(t *testing.T) {
 func TestLoadColumnPrefsCorrupt(t *testing.T) {
 	dir := t.TempDir()
 	t.Setenv("LFK_STATE_DIR", dir)
-	require.NoError(t, os.MkdirAll(dir, 0o755))
 	require.NoError(t, os.WriteFile(filepath.Join(dir, "column_prefs.yaml"), []byte("{bad: ["), 0o644))
 
 	maps := loadColumnPrefs()
