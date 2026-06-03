@@ -38,10 +38,6 @@ func TestCollectBuiltinToggleEntries_NameHiddenWhenSessionHidden(t *testing.T) {
 	}
 	entries := m.collectBuiltinToggleEntries(items, "pod")
 
-	got := map[string]bool{}
-	for _, e := range entries {
-		got[e.key] = e.visible
-	}
 	visibleByKey := false
 	for _, e := range entries {
 		if e.key == "Name" {
@@ -49,4 +45,48 @@ func TestCollectBuiltinToggleEntries_NameHiddenWhenSessionHidden(t *testing.T) {
 		}
 	}
 	assert.False(t, visibleByKey, "session-hidden Name is unchecked in the overlay")
+}
+
+// TestMergeColumnToggleEntries_LegacyOrderPinsNameFirst verifies the overlay
+// keeps Name pinned first when reopening a saved order that predates
+// configurable Name (and therefore omits the "Name" key). Without this, simply
+// reopening the overlay and pressing Enter would rewrite columnOrder so Name is
+// no longer first, diverging from the renderer's pinned-first backward-compat
+// behaviour in orderedColumnKeys.
+func TestMergeColumnToggleEntries_LegacyOrderPinsNameFirst(t *testing.T) {
+	builtins := []columnToggleEntry{
+		{key: "Name", visible: true, builtin: true},
+		{key: "Namespace", visible: true, builtin: true},
+		{key: "Age", visible: true, builtin: true},
+	}
+	extras := []columnToggleEntry{{key: "IP", visible: false}}
+	// Legacy saved order: no "Name" entry.
+	savedOrder := []string{"Age", "IP", "Namespace"}
+
+	merged := mergeColumnToggleEntries(builtins, extras, savedOrder)
+
+	if assert.NotEmpty(t, merged) {
+		assert.Equal(t, "Name", merged[0].key,
+			"Name stays pinned first for a legacy order that omits it")
+	}
+}
+
+// TestMergeColumnToggleEntries_ExplicitNameOrderHonored verifies that a newer
+// saved order that lists "Name" explicitly keeps it at the chosen position.
+func TestMergeColumnToggleEntries_ExplicitNameOrderHonored(t *testing.T) {
+	builtins := []columnToggleEntry{
+		{key: "Name", visible: true, builtin: true},
+		{key: "Namespace", visible: true, builtin: true},
+		{key: "Age", visible: true, builtin: true},
+	}
+	savedOrder := []string{"Namespace", "Name", "Age"}
+
+	merged := mergeColumnToggleEntries(builtins, nil, savedOrder)
+
+	keys := make([]string, len(merged))
+	for i, e := range merged {
+		keys[i] = e.key
+	}
+	assert.Equal(t, []string{"Namespace", "Name", "Age"}, keys,
+		"explicit Name position is honored")
 }

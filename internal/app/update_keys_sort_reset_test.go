@@ -31,9 +31,13 @@ func TestSortReset_NameHiddenFallsBackToVisibleColumn(t *testing.T) {
 	res, _, _ := m.handleExplorerActionKeySortReset()
 	updated := res.(Model)
 
-	if _, ok := sortColumnIndex(updated.sortColumnName); !ok {
-		t.Fatalf("reset left sort on hidden column %q (not in %v)",
-			updated.sortColumnName, ui.ActiveSortableColumns)
+	// With Name hidden, reset falls back to the first visible sortable column.
+	if updated.sortColumnName != "Namespace" {
+		t.Fatalf("sortColumnName = %q, want %q (first visible column)",
+			updated.sortColumnName, "Namespace")
+	}
+	if !updated.sortAscending {
+		t.Fatalf("sortAscending = false, want true after reset")
 	}
 }
 

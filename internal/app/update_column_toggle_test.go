@@ -710,7 +710,9 @@ func TestCovOpenColumnToggleRespectsSavedOrder(t *testing.T) {
 			},
 		},
 	}
-	// Saved order puts Age first, then IP, then Namespace.
+	// Saved order puts Age first, then IP, then Namespace. It predates
+	// configurable Name (no "Name" entry), so Name is pinned first for
+	// backward compatibility, ahead of the saved order.
 	m.columnOrder = map[string][]string{m.columnMemoryKey("pod"): {"Age", "IP", "Namespace"}}
 	// ActiveExtraColumnKeys controls which extras are "currently visible";
 	// must include IP so it ends up visible in the overlay.
@@ -719,17 +721,18 @@ func TestCovOpenColumnToggleRespectsSavedOrder(t *testing.T) {
 
 	m.openColumnToggle()
 
-	if !assert.GreaterOrEqual(t, len(m.columnToggleItems), 3) {
+	if !assert.GreaterOrEqual(t, len(m.columnToggleItems), 4) {
 		return
 	}
-	// The first three entries must match the saved order.
-	assert.Equal(t, "Age", m.columnToggleItems[0].key)
-	assert.Equal(t, "IP", m.columnToggleItems[1].key)
-	assert.Equal(t, "Namespace", m.columnToggleItems[2].key)
+	// Name is pinned first (legacy order omits it), then the saved order.
+	assert.Equal(t, "Name", m.columnToggleItems[0].key)
+	assert.Equal(t, "Age", m.columnToggleItems[1].key)
+	assert.Equal(t, "IP", m.columnToggleItems[2].key)
+	assert.Equal(t, "Namespace", m.columnToggleItems[3].key)
 
 	// The remaining built-ins appear after, in default position.
-	remainingKeys := make([]string, 0, len(m.columnToggleItems)-3)
-	for _, e := range m.columnToggleItems[3:] {
+	remainingKeys := make([]string, 0, len(m.columnToggleItems)-4)
+	for _, e := range m.columnToggleItems[4:] {
 		remainingKeys = append(remainingKeys, e.key)
 	}
 	assert.Contains(t, remainingKeys, "Ready")

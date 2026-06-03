@@ -80,13 +80,18 @@ func TestRenderTable_NameReorderedHeader(t *testing.T) {
 	prevScroll := ActiveMiddleScroll
 	prevOrder := ActiveColumnOrder
 	prevLayout := ActiveTableLayout
+	prevHidden := ActiveHiddenBuiltinColumns
 	defer func() {
 		ActiveMiddleScroll = prevScroll
 		ActiveColumnOrder = prevOrder
 		ActiveTableLayout = prevLayout
+		ActiveHiddenBuiltinColumns = prevHidden
 	}()
 	ActiveMiddleScroll = 0
 	ActiveTableLayout = nil
+	// RenderTable derives hasName from this global; isolate it so a prior
+	// test leaving {"Name": true} can't fail this assertion for the wrong reason.
+	ActiveHiddenBuiltinColumns = nil
 	ActiveColumnOrder = []string{"Namespace", "Name"}
 
 	items := []model.Item{
