@@ -39,6 +39,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	pinnedSt := loadPinnedState()
 	hiddenSt := loadHiddenTypesState()
 	sortMem := loadSortMemory()
+	colPrefs := loadColumnPrefs()
 	m := Model{
 		client: client,
 		// Start in the loading state. Init() dispatches loadContexts()
@@ -70,6 +71,9 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		sortColumnName:             sortColDefault,
 		sortAscending:              true,
 		sortMemory:                 sortMem,
+		sessionColumns:             colPrefs.sessionColumns,
+		hiddenBuiltinColumns:       colPrefs.hiddenBuiltinColumns,
+		columnOrder:                colPrefs.columnOrder,
 		cursorMemory:               make(map[string]int),
 		filterMemory:               make(map[string]savedFilter),
 		itemCache:                  make(map[string][]model.Item),
