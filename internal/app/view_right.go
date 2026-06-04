@@ -241,26 +241,41 @@ func (m Model) renderRightColumn(width, height int) string {
 	// Render the scrollable content. For the resource-type list preview the
 	// content is a plain item table that can be very long, so render it windowed
 	// (only the visible rows) via ActiveRightScroll \u2014 each frame is O(viewport)
-	// instead of O(scroll position). Other content (details, YAML, tree) is small
-	// and uses the generic render-then-slice path below.
+	// instead of O(scroll position). The output is kept byte-identical to the
+	// generic render-then-slice path so windowing is a pure performance change:
+	// previewScroll is a display-line offset where line 0 is the table header and
+	// line i (i>=1) is rightItems[i-1], so a scrolled view drops the header and
+	// starts at item previewScroll-1. We render that window (one extra row to
+	// replace the dropped header) and strip the header line. Other content
+	// (details, YAML, tree) is small and uses the generic path below.
 	listPreview := m.isRightListPreview()
 	var result string
-	if listPreview {
+	switch {
+	case listPreview && m.previewScroll == 0:
 		prev := ui.ActiveRightScroll
-		ui.ActiveRightScroll = m.previewScroll
+		ui.ActiveRightScroll = 0
 		result = m.renderRightColumnContent(width, contentHeight)
 		ui.ActiveRightScroll = prev
-	} else {
-		renderHeight := contentHeight + m.previewScroll
-		if m.hasSplitPreview() {
-			result = m.renderDetailsOnly(width, renderHeight)
+	case listPreview:
+		prev := ui.ActiveRightScroll
+		ui.ActiveRightScroll = m.previewScroll - 1 // line previewScroll == item previewScroll-1
+		result = m.renderRightColumnContent(width, contentHeight+1)
+		ui.ActiveRightScroll = prev
+		if i := strings.IndexByte(result, '\n'); i >= 0 { // drop the header line
+			result = result[i+1:]
 		} else {
-			result = m.renderRightColumnContent(width, renderHeight)
+			result = ""
 		}
-		// Append events to scrollable content (events scroll with the details).
-		if !m.fullYAMLPreview && m.previewEventsContent != "" {
-			result += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width)) + "\n" + m.previewEventsContent
-		}
+	case m.hasSplitPreview():
+		result = m.renderDetailsOnly(width, contentHeight+m.previewScroll)
+	default:
+		result = m.renderRightColumnContent(width, contentHeight+m.previewScroll)
+	}
+
+	// Append events to scrollable content (events scroll with the details).
+	// Lists have no events; their scroll is already applied above.
+	if !listPreview && !m.fullYAMLPreview && m.previewEventsContent != "" {
+		result += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width)) + "\n" + m.previewEventsContent
 	}
 
 	// Apply preview scroll to the scrollable content. The windowed list path is

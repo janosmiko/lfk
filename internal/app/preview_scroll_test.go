@@ -10,6 +10,7 @@ import (
 	"github.com/charmbracelet/x/ansi"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func scrollPodItems(n int) []model.Item {
@@ -110,38 +111,69 @@ func TestPreviewScroll_LongTextDetailsReachBottom(t *testing.T) {
 	}
 }
 
-// TestPreviewScroll_ListWindowed verifies the list preview renders a window
-// starting at the scroll position (sticky header), so a deep scroll shows the
-// items around previewScroll rather than rendering the whole list from the top.
+// TestPreviewScroll_ListWindowed verifies the windowed list render is
+// byte-equivalent to the old line-slice path (it is a pure performance change):
+// previewScroll is a display-line offset where line 0 is the header and line i
+// is item i-1, so a scrolled view drops the header and starts at item
+// previewScroll-1 — never shifted by a row.
 func TestPreviewScroll_ListWindowed(t *testing.T) {
 	m := resourceTypePreview(scrollPodItems(1000))
-	m.previewScroll = 500
 
-	out := ansi.Strip(m.renderRightColumn(80, 46))
-
-	// The sticky header keeps the column label visible.
-	if !strings.Contains(out, "NAME") {
-		t.Errorf("windowed list should keep a header line, got:\n%s", out)
-	}
-	// Top data row is the item at previewScroll; rows from the very top are not
-	// rendered at all (windowed, not sliced from a full render).
-	if top := topPodIndex(m); top != 500 {
-		t.Errorf("windowed top item = pod-%d, want pod-500", top)
-	}
-	if strings.Contains(out, "pod-0 ") {
-		t.Errorf("item far above the window must not be rendered")
-	}
-
-	// At the top (previewScroll=0) the window starts at the first item.
+	// At the top: header visible, first data row is pod-0.
 	m.previewScroll = 0
+	out0 := ansi.Strip(m.renderRightColumn(80, 46))
+	if !strings.Contains(out0, "NAME") {
+		t.Errorf("header must be visible at the top of the list")
+	}
 	if top := topPodIndex(m); top != 0 {
-		t.Errorf("at previewScroll=0 the top item must be pod-0, got pod-%d", top)
+		t.Errorf("top item at scroll 0 = pod-%d, want pod-0", top)
 	}
 
-	// At the last item index the window clamps and still shows the final item.
+	// Scrolled: header scrolls off (like every other preview), and the top data
+	// row is item previewScroll-1 (line previewScroll), matching the line-slice.
+	m.previewScroll = 500
+	out500 := ansi.Strip(m.renderRightColumn(80, 46))
+	if strings.Contains(out500, "NAME") {
+		t.Errorf("header should scroll off the top once scrolled")
+	}
+	if top := topPodIndex(m); top != 499 {
+		t.Errorf("top item at scroll 500 = pod-%d, want pod-499", top)
+	}
+	if strings.Contains(out500, "pod-0 ") {
+		t.Errorf("items far above the window must not be rendered")
+	}
+
+	// Max offset still shows the last item.
 	m.previewScroll = 999
 	if !strings.Contains(ansi.Strip(m.renderRightColumn(80, 46)), "pod-999") {
-		t.Errorf("windowing must keep the last item visible at the maximum offset")
+		t.Errorf("last item must remain reachable at the maximum offset")
+	}
+}
+
+// TestPreviewScroll_ListWindowedEquivalence pins the windowed render to the
+// reference line-slice output across scroll positions, proving the optimization
+// changes nothing the user sees.
+func TestPreviewScroll_ListWindowedEquivalence(t *testing.T) {
+	const width = 80
+	m := resourceTypePreview(scrollPodItems(1000))
+
+	// Reference: full content rendered from the top, then line-sliced (the old
+	// behaviour). ActiveRightScroll<0 disables windowing for this measurement.
+	ui.ActiveRightScroll = -1
+	full := strings.Split(ansi.Strip(m.renderRightColumnContent(width, 1<<20)), "\n")
+
+	// Only compare the upper content rows; the bottom of the pane holds the pinned
+	// summary-band footer, which is not part of the scrollable content. 40 rows is
+	// safely within the content region for a height of 46.
+	const contentRows = 40
+	for _, p := range []int{0, 1, 137, 500, 953} {
+		m.previewScroll = p
+		got := strings.Split(ansi.Strip(m.renderRightColumn(width, 46)), "\n")
+		for i := 0; i < contentRows && i < len(got) && p+i < len(full); i++ {
+			if got[i] != full[p+i] {
+				t.Fatalf("scroll=%d row=%d: windowed %q != line-slice %q", p, i, got[i], full[p+i])
+			}
+		}
 	}
 }
 
