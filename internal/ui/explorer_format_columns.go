@@ -254,7 +254,11 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	//
 	// minExtrasBudget = capped column (maxColW + spacing). Tracks the
 	// same maxColW used below so the budget scales with fullscreen mode.
+	// compressedNameFloor is the smaller floor used when the user has
+	// explicitly configured the columns: there NAME yields so the chosen
+	// columns survive (issue #354).
 	const nameFloor = 20
+	const compressedNameFloor = len("NAME") + 1
 	maxColW := 20
 	if ActiveFullscreenMode {
 		maxColW = 40
@@ -282,10 +286,29 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	}
 
 	nameReserve := longestName + 1 // +1 for column spacing
-	if ActiveNameHidden {
+	switch {
+	case ActiveNameHidden:
 		// NAME is hidden: reserve nothing so extras get the full row budget.
 		nameReserve = 0
-	} else {
+	case !fromAutoDetect:
+		// Explicitly configured columns (column-toggle overlay or
+		// views.<kind>.columns) are authoritative. The default longestName/20
+		// reservation starves them in the narrow three-pane list, so the same
+		// config that renders fully in the wide full screen list silently drops
+		// trailing columns (issue #354). Reserve only what the configured
+		// columns leave after their capped widths and let NAME compress to a
+		// small floor; NAME still reclaims any leftover via the caller's nameW,
+		// so wide panes are unchanged.
+		configuredBudget := 0
+		for _, key := range candidates {
+			w, _ := extraColWidth(seen[key], key, maxColW)
+			configuredBudget += w
+		}
+		nameReserve = max(totalWidth-usedWidth-configuredBudget, compressedNameFloor)
+		if nameReserve > longestName+1 {
+			nameReserve = max(longestName+1, compressedNameFloor)
+		}
+	default:
 		if nameReserve+usedWidth > totalWidth {
 			// Can't fit the full name even after dropping every extra. Cap
 			// the reservation so at least one extra gets a fair budget.
@@ -301,7 +324,11 @@ func collectExtraColumns(items []model.Item, totalWidth, usedWidth int, kind str
 	// available may be negative when mandatory columns alone exceed the row;
 	// fitExtraColumns still emits them and the caller clips the overflow.
 	available := totalWidth - usedWidth - nameReserve
-	if available < 8 && mandatoryBudget == 0 {
+	// The "too tight to bother" bail-out is an auto-detect heuristic only.
+	// Explicitly configured columns are authoritative, so let fitExtraColumns
+	// surface whatever physically fits instead of dropping the whole set when
+	// the pane is very narrow (issue #354).
+	if available < 8 && mandatoryBudget == 0 && fromAutoDetect {
 		return nil
 	}
 
