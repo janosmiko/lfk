@@ -216,6 +216,88 @@ func TestCollectExtraColumns_CompactBlockedFillSpareWidth(t *testing.T) {
 	}
 }
 
+// TestCollectExtraColumns_ConfiguredColumnsCompressNameInNarrowPane is the
+// regression for issue #354: an explicitly configured column set (the column-
+// toggle overlay, surfaced here as ActiveSessionColumns) rendered fully in the
+// wide fullscreen list but lost trailing columns in the regular three-pane
+// list. The default 20-char NAME reservation starved the narrow pane and
+// fitExtraColumns dropped the tail. Configured columns are authoritative, so
+// NAME must compress to let them all fit; in a wide pane the same config keeps
+// rendering every column.
+func TestCollectExtraColumns_ConfiguredColumnsCompressNameInNarrowPane(t *testing.T) {
+	defer func(orig []string) { ActiveSessionColumns = orig }(ActiveSessionColumns)
+	defer func(orig map[string]int) { ActivePrinterColumns = orig }(ActivePrinterColumns)
+	defer func(orig bool) { ActiveFullscreenMode = orig }(ActiveFullscreenMode)
+	defer func(orig bool) { ActiveNameHidden = orig }(ActiveNameHidden)
+	ActivePrinterColumns = nil
+	ActiveNameHidden = false
+
+	// A moderately long name (35 chars) plus three configured columns whose
+	// values are ~7 chars wide. In the narrow pane the old name reservation
+	// (longestName+1 = 36) leaves room for at most one column.
+	const name = "deployment-frontend-web-server-blue"
+	mk := func(suffix string) model.Item {
+		return model.Item{
+			Name:   name + suffix,
+			Status: "Running",
+			Columns: []model.KeyValue{
+				{Key: "Catalog", Value: "buildah"},
+				{Key: "Task", Value: "compile"},
+				{Key: "Chore", Value: "nightly"},
+			},
+		}
+	}
+	items := []model.Item{mk("-a"), mk("-b"), mk("-c")}
+
+	// User explicitly configured these three columns via the overlay.
+	ActiveSessionColumns = []string{"Catalog", "Task", "Chore"}
+
+	// Regular three-pane list: narrow middle column.
+	ActiveFullscreenMode = false
+	narrow := keysOf(collectExtraColumns(items, 70, 20, "ChoreTask"))
+	for _, want := range []string{"Catalog", "Task", "Chore"} {
+		if !slices.Contains(narrow, want) {
+			t.Errorf("configured column %q must survive in the narrow three-pane list, got %v", want, narrow)
+		}
+	}
+
+	// Full screen list: the same config must still render every column.
+	ActiveFullscreenMode = true
+	wide := keysOf(collectExtraColumns(items, 200, 20, "ChoreTask"))
+	for _, want := range []string{"Catalog", "Task", "Chore"} {
+		if !slices.Contains(wide, want) {
+			t.Errorf("configured column %q must survive in the full screen list, got %v", want, wide)
+		}
+	}
+}
+
+// TestCollectExtraColumns_ConfiguredColumnSurvivesVeryNarrowPane covers the
+// boundary where the auto-detect "available < 8" bail-out would otherwise drop
+// an explicitly configured column that still physically fits. The bail-out is
+// an auto-detect heuristic and must not apply to authoritative configured sets.
+func TestCollectExtraColumns_ConfiguredColumnSurvivesVeryNarrowPane(t *testing.T) {
+	defer func(orig []string) { ActiveSessionColumns = orig }(ActiveSessionColumns)
+	defer func(orig map[string]int) { ActivePrinterColumns = orig }(ActivePrinterColumns)
+	defer func(orig bool) { ActiveFullscreenMode = orig }(ActiveFullscreenMode)
+	defer func(orig bool) { ActiveNameHidden = orig }(ActiveNameHidden)
+	ActivePrinterColumns = nil
+	ActiveNameHidden = false
+	ActiveFullscreenMode = false
+
+	// Short name and one configured column with a short value (colW = 5).
+	items := []model.Item{
+		{Name: "po", Columns: []model.KeyValue{{Key: "Task", Value: "ok"}}},
+		{Name: "px", Columns: []model.KeyValue{{Key: "Task", Value: "no"}}},
+	}
+	ActiveSessionColumns = []string{"Task"}
+
+	// totalWidth 30, usedWidth 20 -> available 5, below the 8-char bail-out.
+	cols := keysOf(collectExtraColumns(items, 30, 20, "Pod"))
+	if !slices.Contains(cols, "Task") {
+		t.Errorf("configured column must survive a very narrow pane that fits it, got %v", cols)
+	}
+}
+
 // TestSelectColumnCandidates_AutoDetectFlag verifies the fromAutoDetect signal
 // is true only on the auto-detect path, not for session or config overrides.
 func TestSelectColumnCandidates_AutoDetectFlag(t *testing.T) {
