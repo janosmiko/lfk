@@ -32,6 +32,7 @@ func (m *Model) invalidatePreviewForCursorChange() {
 	m.rightItems = nil
 	m.previewYAML = ""
 	m.previewScroll = 0
+	m.previewMeasureLines = 0 // recompute the scroll measurement for the new selection's preview
 	m.resourceTree = nil
 	m.loading = true
 	m.previewLoading = true

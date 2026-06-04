@@ -130,3 +130,22 @@ func TestPreviewScroll_MeasureMemoized(t *testing.T) {
 		t.Errorf("measure did not shrink after list shrank: %d >= %d", got, grown)
 	}
 }
+
+// TestPreviewScroll_CursorChangeInvalidatesMeasure guards against a stale
+// measurement after a cursor-driven preview change. The memo key is coarse
+// (e.g. it does not capture the split details-summary length), so the
+// content-reset paths must clear the cache or a new selection could be clamped
+// against the previous preview's line count.
+func TestPreviewScroll_CursorChangeInvalidatesMeasure(t *testing.T) {
+	m := resourceTypePreview(scrollPodItems(500))
+	m.measureScrollableLines(100, 40)
+	if m.previewMeasureLines == 0 {
+		t.Fatal("precondition: expected a cached measurement")
+	}
+
+	m.invalidatePreviewForCursorChange()
+
+	if m.previewMeasureLines != 0 {
+		t.Errorf("cursor-change invalidation must clear the cached measurement, got %d", m.previewMeasureLines)
+	}
+}
