@@ -76,6 +76,129 @@ func TestBuildListSummary_GenericStatus(t *testing.T) {
 	assert.Equal(t, "Running", bar.Buckets[2].Value)
 }
 
+// crdWithConditions builds an uncurated CRD item carrying status conditions
+// (populated for every kind via appendAllConditions), used to exercise the
+// generic conditions fallback (issue #352 follow-up).
+func crdWithConditions(conds ...model.ConditionEntry) model.Item {
+	return model.Item{Kind: "Widget", Conditions: conds}
+}
+
+// TestBuildListSummary_GenericConditionsFallback verifies that an uncurated
+// kind whose items expose .status.conditions gets a Ready/NotReady rollup
+// derived from the Ready condition, without being added to the curated
+// registry (issue #352 follow-up).
+func TestBuildListSummary_GenericConditionsFallback(t *testing.T) {
+	items := []model.Item{
+		crdWithConditions(model.ConditionEntry{Type: "Ready", Status: "True"}),
+		crdWithConditions(model.ConditionEntry{Type: "Ready", Status: "True"}),
+		crdWithConditions(model.ConditionEntry{Type: "Ready", Status: "False"}),
+		crdWithConditions(model.ConditionEntry{Type: "Ready", Status: "Unknown"}),
+	}
+
+	s := BuildListSummary("Widget", items)
+
+	assert.Equal(t, 4, s.Total)
+	require.Len(t, s.Bars, 1, "uncurated kind with conditions should get one rollup bar")
+	bar := s.Bars[0]
+	assert.Equal(t, "Status", bar.Label)
+	assert.Equal(t, 4, bar.Total)
+	values := map[string]int{}
+	for _, b := range bar.Buckets {
+		values[b.Value] = b.Count
+	}
+	assert.Equal(t, 2, values["Ready"])
+	assert.Equal(t, 1, values["NotReady"])
+	assert.Equal(t, 1, values["Unknown"])
+}
+
+// TestBuildListSummary_GenericConditionsNegativeType verifies that when the
+// primary condition is a negative type (e.g. Degraded), True is treated as
+// unhealthy and False as healthy, matching the column the user already sees.
+func TestBuildListSummary_GenericConditionsNegativeType(t *testing.T) {
+	items := []model.Item{
+		crdWithConditions(model.ConditionEntry{Type: "Degraded", Status: "True"}),
+		crdWithConditions(model.ConditionEntry{Type: "Degraded", Status: "False"}),
+	}
+
+	s := BuildListSummary("Widget", items)
+
+	require.Len(t, s.Bars, 1)
+	values := map[string]int{}
+	for _, b := range s.Bars[0].Buckets {
+		values[b.Value] = b.Count
+	}
+	assert.Equal(t, 1, values["NotReady"], "Degraded=True is unhealthy")
+	assert.Equal(t, 1, values["Ready"], "Degraded=False is healthy")
+}
+
+// TestBuildListSummary_GenericConditionsUnknownOnly verifies that a sole
+// condition with status Unknown buckets as Unknown (ambiguous), even for a
+// negative condition type, rather than being forced to NotReady.
+func TestBuildListSummary_GenericConditionsUnknownOnly(t *testing.T) {
+	items := []model.Item{
+		crdWithConditions(model.ConditionEntry{Type: "Degraded", Status: "Unknown"}),
+	}
+
+	s := BuildListSummary("Widget", items)
+
+	require.Len(t, s.Bars, 1)
+	require.Len(t, s.Bars[0].Buckets, 1)
+	assert.Equal(t, "Unknown", s.Bars[0].Buckets[0].Value)
+}
+
+// TestBuildListSummary_GenericConditionsTrueFallback covers the secondary
+// fallback: no Ready condition, the last condition is an inactive negative type
+// (Failed=False), so the active True condition is the real signal -> Ready.
+func TestBuildListSummary_GenericConditionsTrueFallback(t *testing.T) {
+	items := []model.Item{
+		crdWithConditions(
+			model.ConditionEntry{Type: "Established", Status: "True"},
+			model.ConditionEntry{Type: "Failed", Status: "False"},
+		),
+	}
+
+	s := BuildListSummary("Widget", items)
+
+	require.Len(t, s.Bars, 1)
+	require.Len(t, s.Bars[0].Buckets, 1)
+	assert.Equal(t, "Ready", s.Bars[0].Buckets[0].Value)
+}
+
+// TestBuildListSummary_GenericPhaseFallback verifies that an uncurated kind
+// whose items expose .status.phase as a Phase column gets a phase rollup.
+func TestBuildListSummary_GenericPhaseFallback(t *testing.T) {
+	mk := func(phase string) model.Item {
+		return model.Item{Kind: "Widget", Columns: []model.KeyValue{{Key: "Phase", Value: phase}}}
+	}
+	items := []model.Item{mk("Running"), mk("Running"), mk("Failed"), mk("Pending")}
+
+	s := BuildListSummary("Widget", items)
+
+	require.Len(t, s.Bars, 1)
+	bar := s.Bars[0]
+	assert.Equal(t, "Phase", bar.Label)
+	assert.Equal(t, 4, bar.Total)
+	// Worst-first: Failed, then Pending, then Running.
+	assert.Equal(t, "Failed", bar.Buckets[0].Value)
+	assert.Equal(t, "Running", bar.Buckets[2].Value)
+}
+
+// TestBuildListSummary_GenericNoiseRejected verifies the deliberate guard:
+// an uncurated kind with no Phase column and no conditions gets no status bar
+// even if Item.Status carries a non-health marker (StorageClass sets Status to
+// a "default"-class marker). It still gets a count-only band via Total.
+func TestBuildListSummary_GenericNoiseRejected(t *testing.T) {
+	items := []model.Item{
+		{Kind: "StorageClass", Status: "default"},
+		{Kind: "StorageClass", Status: ""},
+	}
+
+	s := BuildListSummary("StorageClass", items)
+
+	assert.Equal(t, 2, s.Total)
+	assert.Empty(t, s.Bars, "uncurated kind without phase/conditions must not get a noisy status bar")
+}
+
 // Worst-first ordering must hold even in no-color mode, where the status
 // styles carry no foreground — so ordering cannot be derived from color.
 func TestBuildListSummary_OrderingHoldsInNoColorMode(t *testing.T) {

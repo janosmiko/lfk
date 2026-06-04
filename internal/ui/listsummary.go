@@ -43,10 +43,15 @@ type summaryDimension struct {
 }
 
 // summaryDimensions returns the breakdown axes for a kind, in render order, or
-// nil when the kind has no meaningful status rollup. Only curated kinds are
-// summarised: grouping an arbitrary kind by Item.Status surfaces noise — e.g.
+// nil when the kind has no meaningful status rollup. Curated kinds get a
+// hand-picked signal; any other kind falls back to a generic signal derived
+// only from data the list already shows (issue #352 follow-up).
+//
+// The fallback never groups by raw Item.Status: that surfaces noise — e.g.
 // StorageClass/IngressClass/PriorityClass set Status to a "default"-class
-// marker, not health — so the summary is opt-in per kind rather than universal.
+// marker, not health. It keys strictly off a .status.phase ("Phase") column or
+// .status.conditions, both of which the user already sees as columns, so a
+// signal-less kind (the noise case) still gets only a count-only band.
 //
 // Signal source by kind:
 //   - ArgoCD Application(Set): the Health and Sync columns.
@@ -55,10 +60,11 @@ type summaryDimension struct {
 //   - Workloads (Deployment, StatefulSet, DaemonSet, ReplicaSet): the
 //     ready/desired replica ratio, since these carry no Status.
 //   - Flux & cert-manager resources: their "Ready" condition column.
+//   - Any other kind: a generic .status.phase or .status.conditions rollup.
 //
 // Kinds without any dimension still get a count-only band (just the header);
 // see RenderListSummary.
-func summaryDimensions(kind string) []summaryDimension {
+func summaryDimensions(kind string, items []model.Item) []summaryDimension {
 	switch kind {
 	case "Application", "ApplicationSet":
 		return []summaryDimension{
@@ -75,8 +81,99 @@ func summaryDimensions(kind string) []summaryDimension {
 		"Issuer", "ClusterIssuer":
 		return []summaryDimension{{label: "Status", valueOf: readyConditionValue}}
 	default:
-		return nil
+		return genericSummaryDimensions(items)
 	}
+}
+
+// maxGenericPhaseValues caps the distinct phase strings a generic .status.phase
+// rollup may carry. Phase fields are inherently low-cardinality; a column with
+// more distinct values is likely free-form text, not a status, so it is left
+// to a count-only band rather than rendering a noisy bar.
+const maxGenericPhaseValues = 8
+
+// genericSummaryDimensions derives a rollup for an uncurated kind from data the
+// list already displays: a .status.phase ("Phase") column first, then
+// .status.conditions. Returns nil when neither is present so the kind gets a
+// count-only band. A single dimension wins for the whole list: when a Phase
+// column is present (within the cardinality cap) it is used even if only some
+// items expose it, and conditions on the others are not rolled up separately.
+func genericSummaryDimensions(items []model.Item) []summaryDimension {
+	distinct := make(map[string]struct{})
+	hasConditions := false
+	for _, it := range items {
+		if v := strings.TrimSpace(it.ColumnValue("Phase")); v != "" {
+			distinct[v] = struct{}{}
+		}
+		if len(it.Conditions) > 0 {
+			hasConditions = true
+		}
+	}
+	if len(distinct) > 0 && len(distinct) <= maxGenericPhaseValues {
+		return []summaryDimension{{label: "Phase", valueOf: columnValueFn("Phase")}}
+	}
+	if hasConditions {
+		return []summaryDimension{{label: "Status", valueOf: genericConditionValue}}
+	}
+	return nil
+}
+
+// genericConditionValue maps an item's primary status condition to a coarse
+// health bucket ("Ready"/"NotReady"/"Unknown"), mirroring the condition the
+// details pane and list column already surface (see k8s.extractGenericConditions):
+// it prefers the "Ready" condition, then a True condition when the last one is
+// an inactive negative type, then the last condition. A negative condition type
+// (Failed/Error/Degraded) inverts the sense, so Degraded=True reads NotReady.
+// Returns "" when the item carries no conditions.
+func genericConditionValue(it model.Item) string {
+	var ready, trueCond, last *model.ConditionEntry
+	for i := range it.Conditions {
+		c := &it.Conditions[i]
+		last = c
+		if c.Type == "Ready" {
+			ready = c
+		}
+		if c.Status == "True" {
+			// Last True wins, matching k8s.extractGenericConditions.
+			trueCond = c
+		}
+	}
+
+	chosen := ready
+	if chosen == nil && last != nil && trueCond != nil &&
+		last.Status == "False" && negativeConditionType(last.Type) {
+		// The last condition is an inactive negative state (e.g. Failed=False);
+		// the active True condition is the real signal.
+		chosen = trueCond
+	}
+	if chosen == nil {
+		chosen = last
+	}
+	if chosen == nil {
+		return ""
+	}
+
+	if chosen.Status == "Unknown" {
+		return "Unknown"
+	}
+	positive := chosen.Status == "True"
+	if negativeConditionType(chosen.Type) {
+		positive = !positive
+	}
+	if positive {
+		return "Ready"
+	}
+	return "NotReady"
+}
+
+// negativeConditionType reports whether a condition type names a failure state,
+// so its True status means unhealthy rather than healthy. Keep the substring
+// set in sync with k8s.isNegativeConditionType so the summary bar and the list
+// column agree on which conditions are negative.
+func negativeConditionType(condType string) bool {
+	lower := strings.ToLower(condType)
+	return strings.Contains(lower, "fail") ||
+		strings.Contains(lower, "error") ||
+		strings.Contains(lower, "degrad")
 }
 
 func statusValue(it model.Item) string { return it.Status }
@@ -131,7 +228,7 @@ func parseReadyRatio(ready string) (readyN, desiredN int, ok bool) {
 // there is nothing meaningful to show.
 func BuildListSummary(kind string, items []model.Item) ListSummary {
 	s := ListSummary{Total: len(items)}
-	for _, dim := range summaryDimensions(kind) {
+	for _, dim := range summaryDimensions(kind, items) {
 		if bar := buildSummaryBar(dim, items); bar.Total > 0 {
 			s.Bars = append(s.Bars, bar)
 		}
