@@ -18,6 +18,7 @@ func (m *Model) clearRight() {
 	m.yamlView.sections = nil
 	m.previewYAML = ""
 	m.previewScroll = 0
+	m.previewMeasureLines = 0 // force the scroll measurement to recompute for the new preview
 	m.metricsContent = ""
 	m.previewEventsContent = ""
 	m.metricsData = nil
@@ -83,29 +84,86 @@ func (m *Model) clampPreviewScroll() {
 		}
 	}
 
-	// Get the scrollable content line count.
-	// Use the actual scrollable height (not 10000) to avoid inflated YAML fill.
-	measureH := max(
-		// enough headroom for scroll, but not inflated
-		scrollableH*3, 200)
-	var totalLines int
-	if m.hasSplitPreview() {
-		fullContent := m.renderDetailsOnly(innerW, measureH)
-		totalLines = strings.Count(fullContent, "\n") + 1
-	} else {
-		fullContent := m.renderRightColumnContent(innerW, measureH)
-		totalLines = strings.Count(fullContent, "\n") + 1
-	}
-
-	// Include events in the scrollable content (they scroll with details).
-	if !m.fullYAMLPreview && m.previewEventsContent != "" {
-		totalLines += 1 + strings.Count(m.previewEventsContent, "\n") + 1 // separator + event lines
-	}
-
+	totalLines := m.measureScrollableLines(innerW, scrollableH)
 	maxScroll := max(totalLines-scrollableH, 0)
 	if m.previewScroll > maxScroll {
 		m.previewScroll = maxScroll
 	}
+}
+
+// previewMeasureKey fingerprints the inputs that determine the scrollable
+// right-pane line count, so measureScrollableLines can memoize the result and
+// avoid re-rendering a large list on every scroll keystroke.
+type previewMeasureKey struct {
+	innerW      int
+	scrollableH int
+	rightLen    int
+	level       model.Level
+	split       bool
+	mapView     bool
+	fullYAML    bool
+	yamlLen     int
+	dashLen     int
+	eventsLen   int
+}
+
+// measureScrollableLines returns the line count of the scrollable right-pane
+// content, memoized on previewMeasureKey. The expensive measurement renders the
+// content once at a height tall enough to hold all of it (so a long list or YAML
+// document can scroll to the end — see the issue where the right pane froze
+// ~halfway down a few-hundred-item list because the height was capped). While
+// the user scrolls, the key is unchanged so this is O(1); it recomputes only
+// when the content or layout changes.
+func (m *Model) measureScrollableLines(innerW, scrollableH int) int {
+	yaml := m.previewYAML
+	if yaml == "" {
+		yaml = m.yamlView.content
+	}
+	key := previewMeasureKey{
+		innerW:      innerW,
+		scrollableH: scrollableH,
+		rightLen:    len(m.rightItems),
+		level:       m.nav.Level,
+		split:       m.hasSplitPreview(),
+		mapView:     m.mapView,
+		fullYAML:    m.fullYAMLPreview,
+		yamlLen:     len(yaml),
+		dashLen:     len(m.dashboardPreview) + len(m.monitoringPreview),
+		eventsLen:   len(m.previewEventsContent),
+	}
+	if key == m.previewMeasureKey && m.previewMeasureLines > 0 {
+		return m.previewMeasureLines
+	}
+
+	// Keep the historical floor so tree / container / details previews (whose
+	// length the cheap bounds below don't capture) measure as before; extend it
+	// to cover long lists and YAML so those scroll all the way down. No right-pane
+	// renderer pads up to its height argument, so an oversized measure height adds
+	// no phantom lines.
+	measureH := max(scrollableH*3, 200)
+	if n := len(m.rightItems) + 4; n > measureH { // table: header + rows + slack
+		measureH = n
+	}
+	if yaml != "" {
+		if yl := strings.Count(yaml, "\n") + 1; yl > measureH {
+			measureH = yl
+		}
+	}
+
+	var totalLines int
+	if key.split {
+		totalLines = strings.Count(m.renderDetailsOnly(innerW, measureH), "\n") + 1
+	} else {
+		totalLines = strings.Count(m.renderRightColumnContent(innerW, measureH), "\n") + 1
+	}
+	// Events scroll with the details content (excluded in full-YAML mode).
+	if !m.fullYAMLPreview && m.previewEventsContent != "" {
+		totalLines += 1 + strings.Count(m.previewEventsContent, "\n") + 1 // separator + event lines
+	}
+
+	m.previewMeasureKey = key
+	m.previewMeasureLines = totalLines
+	return totalLines
 }
 
 // previewSummaryBand renders the aggregate status band pinned at the bottom of

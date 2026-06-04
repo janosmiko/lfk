@@ -403,6 +403,12 @@ type Model struct {
 	// Preview scroll offset for the right column.
 	previewScroll int
 
+	// previewMeasure memoizes the scrollable right-pane content line count so
+	// scrolling a large list doesn't re-render the whole list on every keystroke
+	// in clampPreviewScroll. Recomputed only when the content/layout key changes.
+	previewMeasureKey   previewMeasureKey
+	previewMeasureLines int
+
 	// Mouse capture runtime state. mouseAvailable is true when mouse
 	// capture was enabled at startup (no --no-mouse flag and config allows
 	// it); mouseCaptured tracks the current runtime state so the toggle
