@@ -140,7 +140,7 @@ func genericConditionValue(it model.Item) string {
 
 	chosen := ready
 	if chosen == nil && last != nil && trueCond != nil &&
-		last.Status == "False" && negativeConditionType(last.Type) {
+		last.Status == "False" && model.IsNegativeConditionType(last.Type) {
 		// The last condition is an inactive negative state (e.g. Failed=False);
 		// the active True condition is the real signal.
 		chosen = trueCond
@@ -156,24 +156,13 @@ func genericConditionValue(it model.Item) string {
 		return "Unknown"
 	}
 	positive := chosen.Status == "True"
-	if negativeConditionType(chosen.Type) {
+	if model.IsNegativeConditionType(chosen.Type) {
 		positive = !positive
 	}
 	if positive {
 		return "Ready"
 	}
 	return "NotReady"
-}
-
-// negativeConditionType reports whether a condition type names a failure state,
-// so its True status means unhealthy rather than healthy. Keep the substring
-// set in sync with k8s.isNegativeConditionType so the summary bar and the list
-// column agree on which conditions are negative.
-func negativeConditionType(condType string) bool {
-	lower := strings.ToLower(condType)
-	return strings.Contains(lower, "fail") ||
-		strings.Contains(lower, "error") ||
-		strings.Contains(lower, "degrad")
 }
 
 func statusValue(it model.Item) string { return it.Status }

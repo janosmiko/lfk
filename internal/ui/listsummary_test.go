@@ -1,6 +1,7 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 
@@ -181,6 +182,38 @@ func TestBuildListSummary_GenericPhaseFallback(t *testing.T) {
 	// Worst-first: Failed, then Pending, then Running.
 	assert.Equal(t, "Failed", bar.Buckets[0].Value)
 	assert.Equal(t, "Running", bar.Buckets[2].Value)
+}
+
+// TestBuildListSummary_GenericPhaseCardinalityCap verifies the noise guard:
+// when the Phase column carries more than maxGenericPhaseValues distinct values
+// (likely free-form text, not a status), no Phase bar is built — it falls back
+// to conditions when present, otherwise to a count-only band.
+func TestBuildListSummary_GenericPhaseCardinalityCap(t *testing.T) {
+	mkPhase := func(i int) model.Item {
+		return model.Item{Kind: "Widget", Columns: []model.KeyValue{
+			{Key: "Phase", Value: fmt.Sprintf("free-form-%d", i)},
+		}}
+	}
+	// More than maxGenericPhaseValues distinct phase strings.
+	noisy := make([]model.Item, 0, maxGenericPhaseValues+2)
+	for i := range maxGenericPhaseValues + 2 {
+		noisy = append(noisy, mkPhase(i))
+	}
+
+	// No conditions -> count-only band, no Phase bar.
+	s := BuildListSummary("Widget", noisy)
+	assert.Equal(t, maxGenericPhaseValues+2, s.Total)
+	assert.Empty(t, s.Bars, "over-cap phase cardinality must not render a Phase bar")
+
+	// Same over-cap phases but with conditions present -> fall back to conditions.
+	withConds := make([]model.Item, len(noisy))
+	for i := range noisy {
+		withConds[i] = noisy[i]
+		withConds[i].Conditions = []model.ConditionEntry{{Type: "Ready", Status: "True"}}
+	}
+	s2 := BuildListSummary("Widget", withConds)
+	require.Len(t, s2.Bars, 1)
+	assert.Equal(t, "Status", s2.Bars[0].Label, "over-cap phase must fall back to the conditions rollup")
 }
 
 // TestBuildListSummary_GenericNoiseRejected verifies the deliberate guard:
