@@ -206,15 +206,10 @@ func parseConditionTime(cond map[string]any) time.Time {
 // isNegativeConditionType returns true if the condition type name represents a
 // negative/failure state (e.g., "Failed", "Error"). When such a condition has
 // status "False" it means the failure is NOT active and should not be shown as
-// the primary status.
+// the primary status. Thin alias over model.IsNegativeConditionType so the
+// condition column and the summary bar share one definition.
 func isNegativeConditionType(condType string) bool {
-	lower := strings.ToLower(condType)
-	for _, neg := range []string{"fail", "error", "degrad"} {
-		if strings.Contains(lower, neg) {
-			return true
-		}
-	}
-	return false
+	return model.IsNegativeConditionType(condType)
 }
 
 // populateContainerImages extracts container images from a pod template spec.

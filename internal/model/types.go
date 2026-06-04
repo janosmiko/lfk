@@ -165,6 +165,24 @@ type ConditionEntry struct {
 	LastTransitionTime time.Time // zero when unknown/unset
 }
 
+// negativeConditionSubstrings names the condition-type fragments that mark a
+// failure state. Single source of truth for both condition-column selection
+// (k8s) and the summary-bar rollup (ui).
+var negativeConditionSubstrings = []string{"fail", "error", "degrad"}
+
+// IsNegativeConditionType reports whether a condition type names a failure state
+// (e.g. "Failed", "Error", "Degraded"). For such a type, status "True" means the
+// failure IS active (unhealthy) and "False" means it is not.
+func IsNegativeConditionType(condType string) bool {
+	lower := strings.ToLower(condType)
+	for _, neg := range negativeConditionSubstrings {
+		if strings.Contains(lower, neg) {
+			return true
+		}
+	}
+	return false
+}
+
 // PinnedTypes lists resource-type pin keys (version-agnostic "group/resource",
 // e.g. "apps/deployments" or "/pods") that the user pinned. Matching sidebar
 // items move into the top-level "Pinned" section. Set from config plus
