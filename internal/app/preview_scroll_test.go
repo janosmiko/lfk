@@ -110,6 +110,41 @@ func TestPreviewScroll_LongTextDetailsReachBottom(t *testing.T) {
 	}
 }
 
+// TestPreviewScroll_ListWindowed verifies the list preview renders a window
+// starting at the scroll position (sticky header), so a deep scroll shows the
+// items around previewScroll rather than rendering the whole list from the top.
+func TestPreviewScroll_ListWindowed(t *testing.T) {
+	m := resourceTypePreview(scrollPodItems(1000))
+	m.previewScroll = 500
+
+	out := ansi.Strip(m.renderRightColumn(80, 46))
+
+	// The sticky header keeps the column label visible.
+	if !strings.Contains(out, "NAME") {
+		t.Errorf("windowed list should keep a header line, got:\n%s", out)
+	}
+	// Top data row is the item at previewScroll; rows from the very top are not
+	// rendered at all (windowed, not sliced from a full render).
+	if top := topPodIndex(m); top != 500 {
+		t.Errorf("windowed top item = pod-%d, want pod-500", top)
+	}
+	if strings.Contains(out, "pod-0 ") {
+		t.Errorf("item far above the window must not be rendered")
+	}
+
+	// At the top (previewScroll=0) the window starts at the first item.
+	m.previewScroll = 0
+	if top := topPodIndex(m); top != 0 {
+		t.Errorf("at previewScroll=0 the top item must be pod-0, got pod-%d", top)
+	}
+
+	// At the last item index the window clamps and still shows the final item.
+	m.previewScroll = 999
+	if !strings.Contains(ansi.Strip(m.renderRightColumn(80, 46)), "pod-999") {
+		t.Errorf("windowing must keep the last item visible at the maximum offset")
+	}
+}
+
 // TestPreviewScroll_NoDeadBandAtBottom verifies that one scroll-up from the
 // bottom moves the viewport by exactly one row — previously previewScroll could
 // overshoot into a dead band where scroll-up did nothing until it unwound below

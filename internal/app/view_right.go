@@ -218,7 +218,10 @@ func (m Model) renderRightColumn(width, height int) string {
 	}
 	contentHeight := max(height-footerLines, 3)
 
-	// Pin children table at the top when in split preview mode.
+	// Pin children table at the top when in split preview mode. This RenderTable
+	// is cursor-less but runs before ActiveRightScroll is set below, and split
+	// preview (LevelResources/Owned) is mutually exclusive with the windowed list
+	// preview (LevelResourceTypes), so it never picks up the windowing.
 	pinnedHeader := ""
 	pinnedHeaderLines := 0
 	if m.hasSplitPreview() {
@@ -235,23 +238,35 @@ func (m Model) renderRightColumn(width, height int) string {
 		}
 	}
 
-	// Render the scrollable content (details only when split preview, full content otherwise).
-	renderHeight := contentHeight + m.previewScroll
+	// Render the scrollable content. For the resource-type list preview the
+	// content is a plain item table that can be very long, so render it windowed
+	// (only the visible rows) via ActiveRightScroll \u2014 each frame is O(viewport)
+	// instead of O(scroll position). Other content (details, YAML, tree) is small
+	// and uses the generic render-then-slice path below.
+	listPreview := m.isRightListPreview()
 	var result string
-	if m.hasSplitPreview() {
-		result = m.renderDetailsOnly(width, renderHeight)
+	if listPreview {
+		prev := ui.ActiveRightScroll
+		ui.ActiveRightScroll = m.previewScroll
+		result = m.renderRightColumnContent(width, contentHeight)
+		ui.ActiveRightScroll = prev
 	} else {
-		result = m.renderRightColumnContent(width, renderHeight)
+		renderHeight := contentHeight + m.previewScroll
+		if m.hasSplitPreview() {
+			result = m.renderDetailsOnly(width, renderHeight)
+		} else {
+			result = m.renderRightColumnContent(width, renderHeight)
+		}
+		// Append events to scrollable content (events scroll with the details).
+		if !m.fullYAMLPreview && m.previewEventsContent != "" {
+			result += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width)) + "\n" + m.previewEventsContent
+		}
 	}
 
-	// Append events to scrollable content (events scroll with the details).
-	if !m.fullYAMLPreview && m.previewEventsContent != "" {
-		result += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width)) + "\n" + m.previewEventsContent
-	}
-
-	// Apply preview scroll to the scrollable content only.
+	// Apply preview scroll to the scrollable content. The windowed list path is
+	// already positioned at previewScroll, so only the generic path slices here.
 	lines := strings.Split(result, "\n")
-	if m.previewScroll > 0 {
+	if !listPreview && m.previewScroll > 0 {
 		if m.previewScroll >= len(lines) {
 			m.previewScroll = len(lines) - 1
 		}
@@ -279,6 +294,38 @@ func (m Model) renderRightColumn(width, height int) string {
 	}
 
 	return result
+}
+
+// isRightListPreview reports whether the right pane's scrollable content is the
+// plain resource list shown while hovering a resource type (renderRightDefault's
+// RenderTable over rightItems). Only this path honours ActiveRightScroll, so the
+// windowed render in renderRightColumn is gated on it; every other case
+// (dashboards, security sources, union members rendered with RenderColumn,
+// details/YAML/tree) falls back to the generic render-then-slice path.
+func (m Model) isRightListPreview() bool {
+	if m.nav.Level != model.LevelResourceTypes || m.mapView || m.fullYAMLPreview {
+		return false
+	}
+	if len(m.rightItems) == 0 || m.isUnionSentinel() {
+		return false
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil || strings.HasPrefix(sel.Kind, "__") {
+		return false
+	}
+	if sel.Extra == "__overview__" || sel.Extra == "__monitoring__" {
+		return false
+	}
+	// Windowing maps previewScroll (a line offset) to an item index, which only
+	// holds when each item is exactly one line. Category headers/separators break
+	// that 1:1 mapping, so fall back to the generic line-slice path if any item
+	// carries a category (instance lists normally don't).
+	for i := range m.rightItems {
+		if m.rightItems[i].Category != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // hasSplitPreview returns true when the right column shows children + details (split view).
