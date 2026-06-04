@@ -135,20 +135,16 @@ func (m *Model) measureScrollableLines(innerW, scrollableH int) int {
 		return m.previewMeasureLines
 	}
 
-	// Keep the historical floor so tree / container / details previews (whose
-	// length the cheap bounds below don't capture) measure as before; extend it
-	// to cover long lists and YAML so those scroll all the way down. No right-pane
-	// renderer pads up to its height argument, so an oversized measure height adds
-	// no phantom lines.
-	measureH := max(scrollableH*3, 200)
-	if n := len(m.rightItems) + 4; n > measureH { // table: header + rows + slack
-		measureH = n
-	}
-	if yaml != "" {
-		if yl := strings.Count(yaml, "\n") + 1; yl > measureH {
-			measureH = yl
-		}
-	}
+	// Measure at a height large enough to hold any realistic content so the true
+	// line count is captured and the pane can scroll to the very end — long
+	// resource lists AND long text details (e.g. a ConfigMap with a multi-line
+	// data value). Every right-pane renderer only truncates at its height
+	// argument, never pads up to it (RenderTable / RenderYAMLContent /
+	// RenderResourceSummary / RenderResourceTree / detail renderers), so an
+	// oversized measure height never invents phantom lines. This render is
+	// memoized on previewMeasureKey, so the O(content) cost is paid once per
+	// content change, not per scroll keystroke.
+	const measureH = 1 << 20
 
 	var totalLines int
 	if key.split {

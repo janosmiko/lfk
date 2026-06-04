@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"regexp"
 	"strconv"
+	"strings"
 	"testing"
 
 	"github.com/charmbracelet/x/ansi"
@@ -70,6 +71,42 @@ func TestPreviewScroll_ReachesBottomForLongList(t *testing.T) {
 		if got := maxPodIndexVisible(m); got != n-1 {
 			t.Errorf("n=%d: last item (pod-%d) never reached; highest visible = pod-%d", n, n-1, got)
 		}
+	}
+}
+
+// TestPreviewScroll_LongTextDetailsReachBottom is the regression for a
+// ConfigMap (or any resource) whose details exceed the pane height — e.g. a
+// multi-line `data:` value. The scroll measurement must reflect the true
+// content length, not a capped floor, so the last line is reachable.
+func TestPreviewScroll_LongTextDetailsReachBottom(t *testing.T) {
+	var body strings.Builder
+	for i := range 300 {
+		fmt.Fprintf(&body, "    config line %d\n", i)
+	}
+	cm := model.Item{
+		Kind: "ConfigMap", Name: "varnish", Namespace: "ns", Age: "1d",
+		Columns: []model.KeyValue{
+			{Key: "Data", Value: "1 keys"},
+			{Key: "data:default.vcl.tmpl", Value: body.String()},
+		},
+	}
+	m := Model{
+		nav:         model.NavigationState{Level: model.LevelResources, ResourceType: model.ResourceTypeEntry{Kind: "ConfigMap"}},
+		middleItems: []model.Item{cm},
+		width:       120, height: 50,
+	}
+	m.cursors[model.LevelResources] = 0
+
+	innerW := 41
+	contentHeight := max(m.height-4, 3)
+	measured := m.measureScrollableLines(innerW, contentHeight)
+	trueLines := strings.Count(m.renderRightColumnContent(innerW, 1<<20), "\n") + 1
+
+	if measured != trueLines {
+		t.Errorf("measured line count must equal true content: measured=%d true=%d", measured, trueLines)
+	}
+	if measured <= 200 {
+		t.Errorf("long multi-line data value should measure past the old 200 cap, got %d", measured)
 	}
 }
 
