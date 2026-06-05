@@ -53,6 +53,7 @@ You are Claude Code. I use specialized agents and skills for complex tasks.
 - TDD: Write tests first
 - 80% minimum coverage
 - Unit + integration + E2E for critical flows
+- TUI tests: build a model with `basePush80Model()`; assert on `stripANSI(view)`
 
 ### Knowledge Capture
 
@@ -72,12 +73,22 @@ Reuse existing TUI primitives instead of hand-rolling. Look for a shared helper 
 - Fullscreen view titles use `ui.ViewTitle` (2-space lead aligns with the breadcrumb); a bare `TitleStyle.Render` sits a column off.
 - Selection styling: active column → `SelectedStyle` / `ActiveSelectedStyle`; inactive/parent column → `ParentHighlightStyle` (greyish). Match these, don't invent overlay styles.
 - Theme styles live in three files — `styles.go` (default), `theme.go` (runtime, `ApplyTheme`), `theme_nocolor.go`. Add or change a style in all three.
-- Keys: never bind `ctrl+i` / `ctrl+m` / `ctrl+[` (terminals send tab/enter/esc — they never fire; a test guards this). Match explorer semantics (`y`=copy name, `Y`=copy full). Check collisions in keybinding defaults AND `case kb.X` dispatch, not just `case "x"`. Update help, hint bar, README, `docs/keybindings.md` together.
+- Theme switches must invalidate cached previews; fill backgrounds with `FillLinesBg` (theme bg), never assume black.
+- Display width via `ui.Truncate` / `lipgloss.Width`, never `len()` (multibyte + ANSI).
+- Numeric columns (CPU/MEM/ports/counts) sort numerically with `n/a` last, not lexically.
+- Keys: never bind `ctrl+i` / `ctrl+m` / `ctrl+[` (terminals send tab/enter/esc — they never fire; a test guards this). For a new hotkey, reuse the shortcut a similar action already uses elsewhere — don't invent a new one (`y`=copy name, `Y`=copy full). Check collisions in keybinding defaults AND `case kb.X` dispatch, not just `case "x"`. Update help, hint bar, README, `docs/keybindings.md` together.
 - Any movable cursor must scroll to stay visible — use `ui.VimScrollOff` (`explorer_highlight.go`) for the scrolloff viewport; don't recompute the window ad-hoc.
-- Cursor movement is vim-style: `j`/`k`, `g`/`G` (top/bottom), `ctrl+d`/`ctrl+u` (half-page), arrows + pgup/pgdn as aliases (the `kb.*` defaults).
-- Text viewers add the fuller vim set: word motions `w`/`b`/`e` (+ `W`/`B`/`E` WORD), line `^`/`$`, visual mode `v`/`V`/`ctrl+v` (char/line/block), and text objects `viw`/`vaw`/`viW`/`vaW`. Reuse `update_vim.go` (`innerWordRange`/`innerWORDRange`) — don't reimplement.
+- Cursor movement is vim-style: `j`/`k`, `g`/`G` (top/bottom), `ctrl+d`/`ctrl+u` (half-page), `ctrl+f`/`ctrl+b` (full page), arrows + pgup/pgdn as aliases (the `kb.*` defaults).
+- Text viewers add the fuller vim set: word motions `w`/`b`/`e` (+ `W`/`B`/`E` WORD), line `0`/`^`/`$`, visual mode `v`/`V`/`ctrl+v` (char/line/block), and text objects `viw`/`vaw`/`viW`/`vaW`. Reuse `update_vim.go` (`innerWordRange`/`innerWORDRange`) — don't reimplement.
 - Full-screen viewers store a return-mode so closing returns to the opener, not always the explorer.
 - Caps: files ≤ 800 lines (revive), gocyclo ≤ 30. Co-locate a feature's helpers in its own file.
+
+## App State & Event Loop
+
+- Each fullscreen viewer's fields live in a `<name>ViewState` struct (`<name>view.go`), snapshotted per tab via `cloneCurrentTab` (`tabs.go`) — loose `Model` fields leak across tabs.
+- Input focus gates global keys: when a filter/search/line-input is active, handle it first; global hotkeys stay inert (`update_keys.go`).
+- User feedback goes through `setStatusMessage(msg, isErr)` + return `scheduleStatusClear()` — never print inline or block.
+- Renderers read `ui.Active*` globals (security, columns) set in `View()` right before render; don't read them elsewhere.
 
 ---
 
