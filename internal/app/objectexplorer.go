@@ -382,6 +382,7 @@ func (m Model) viewObjectExplorer() string {
 		rt.visible(),
 		rt.cursor,
 		rt.scroll,
+		"Object Explorer: "+rt.title,
 		parentFields,
 		parentCursor,
 		m.selectedNodeYAML(),

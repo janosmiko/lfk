@@ -11,16 +11,19 @@ import (
 
 // RenderExplainView renders the API explain browser as a three-column Miller
 // layout: parent level keys (left), current field list (middle), description
-// (right). The drill path lives in the top breadcrumb, so there is no title
-// line of its own.
-func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resourceDesc string, parentFields []model.ExplainField, parentCursor int, searchQuery, hintBar string, width, height int) string {
+// (right). A title line sits below the breadcrumb (like the other fullscreen
+// views) and an outer frame wraps the columns.
+func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resourceDesc, title string, parentFields []model.ExplainField, parentCursor int, searchQuery, hintBar string, width, height int) string {
+	titleText := ViewTitle(width, title)
+
 	// Calculate column widths matching the main explorer (12%, 51%, remainder).
-	usable := width - 6 // 3 columns x 2 border chars
+	// 3 columns x 2 border chars, plus 2 for the outer frame around them.
+	usable := width - 8
 	leftW := max(10, usable*12/100)
 	middleW := max(10, usable*51/100)
 	rightW := max(10, usable-leftW-middleW)
 
-	contentHeight := max(height-3, 3) // hint bar + borders
+	contentHeight := max(height-6, 3) // title + hint bar + column borders + outer frame
 
 	// Column padding is 1 on each side, so inner content width is 2 less.
 	colPad := 2
@@ -58,8 +61,8 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 	right := InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
-
-	return lipgloss.JoinVertical(lipgloss.Left, columns, hintBar)
+	framed := explorerFrameStyle().Render(columns)
+	return lipgloss.JoinVertical(lipgloss.Left, titleText, framed, hintBar)
 }
 
 // renderExplainKeyList renders a keys-only (field names, no markers) list for

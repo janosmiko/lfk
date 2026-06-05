@@ -20,10 +20,12 @@ func TestRenderObjectExplorerView_InlineValuesAndPreview(t *testing.T) {
 	parent := []model.ObjectField{{Key: "status", Type: "<Object>", HasChildren: true}}
 	out := RenderObjectExplorerView(
 		sampleObjectFields(), 1, 0,
+		"Object Explorer: Chore/chore-1",
 		parent, 0,
 		"phase: Succeeded\nname: build\n",
 		0, "", "hint", 120, 30,
 	)
+	assert.Contains(t, out, "Object Explorer: Chore/chore-1")
 	assert.Contains(t, out, "PREVIEW")
 	// Inline value preview is shown next to keys.
 	assert.Contains(t, out, "Succeeded")
@@ -38,7 +40,7 @@ func TestRenderObjectExplorerView_InlineValuesAndPreview(t *testing.T) {
 
 func TestRenderObjectExplorerView_NoDrillHint(t *testing.T) {
 	out := RenderObjectExplorerView(
-		sampleObjectFields(), 2, 0, nil, 0,
+		sampleObjectFields(), 2, 0, "Object Explorer: x", nil, 0,
 		"a: 1\n", 0, "", "hint", 120, 30,
 	)
 	// The old explain renderer's drill hint must not appear here.
@@ -48,7 +50,7 @@ func TestRenderObjectExplorerView_NoDrillHint(t *testing.T) {
 
 func TestRenderObjectExplorerView_TopLevelParentEmpty(t *testing.T) {
 	out := RenderObjectExplorerView(
-		sampleObjectFields(), 0, 0, nil, 0,
+		sampleObjectFields(), 0, 0, "Object Explorer: x", nil, 0,
 		"a: 1\n", 0, "", "hint", 120, 30,
 	)
 	assert.Contains(t, out, "(top level)")
@@ -56,13 +58,13 @@ func TestRenderObjectExplorerView_TopLevelParentEmpty(t *testing.T) {
 
 func TestRenderObjectExplorerView_EmptyPreview(t *testing.T) {
 	out := RenderObjectExplorerView(
-		sampleObjectFields(), 0, 0, nil, 0,
+		sampleObjectFields(), 0, 0, "Object Explorer: x", nil, 0,
 		"", 0, "", "hint", 120, 30,
 	)
 	assert.Contains(t, out, "(empty)")
 }
 
 func TestRenderObjectExplorerView_NoFields(t *testing.T) {
-	out := RenderObjectExplorerView(nil, 0, 0, nil, 0, "", 0, "", "hint", 80, 20)
+	out := RenderObjectExplorerView(nil, 0, 0, "Object Explorer: x", nil, 0, "", 0, "", "hint", 80, 20)
 	assert.Contains(t, out, "(no fields)")
 }

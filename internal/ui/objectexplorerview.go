@@ -14,9 +14,11 @@ import (
 // selected node). It mirrors the API Explorer's layout but shows live values:
 // each row carries an inline value preview, and the right column renders the
 // selected node's subtree as colorized YAML instead of a schema description.
-// The drill path and resource identity live in the top breadcrumb, so this
-// view has no title line of its own.
-func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, parentFields []model.ObjectField, parentCursor int, previewYAML string, previewScroll int, filterBar, hintBar string, width, height int) string {
+// A title line sits below the breadcrumb (like the other fullscreen views) and
+// an outer frame wraps the columns.
+func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, title string, parentFields []model.ObjectField, parentCursor int, previewYAML string, previewScroll int, filterBar, hintBar string, width, height int) string {
+	titleText := ViewTitle(width, title)
+
 	// The bottom bar shows the filter input when filtering (like the API
 	// Explorer's search), otherwise the key hints.
 	bottomBar := hintBar
@@ -25,12 +27,14 @@ func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, pa
 			HelpKeyStyle.Render("/") + BarNormalStyle.Render(filterBar))
 	}
 
-	usable := width - 6
+	// Reserve 2 cells/rows for the outer frame that wraps the columns (the
+	// breadcrumb above and the hint bar below sit OUTSIDE it).
+	usable := width - 8
 	leftW := max(10, usable*12/100)
 	middleW := max(10, usable*51/100)
 	rightW := max(10, usable-leftW-middleW)
 
-	contentHeight := max(height-3, 3)
+	contentHeight := max(height-6, 3) // title + hint + column borders + outer frame
 
 	colPad := 2
 	leftInner := max(5, leftW-colPad)
@@ -71,7 +75,17 @@ func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, pa
 	right := InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
-	return lipgloss.JoinVertical(lipgloss.Left, columns, bottomBar)
+	framed := explorerFrameStyle().Render(columns)
+	return lipgloss.JoinVertical(lipgloss.Left, titleText, framed, bottomBar)
+}
+
+// explorerFrameStyle is the outer rounded border that frames the Object/API
+// Explorer columns (excluding the breadcrumb and hint bar).
+func explorerFrameStyle() lipgloss.Style {
+	return lipgloss.NewStyle().
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(ColorPrimary)).
+		BorderBackground(BaseBg)
 }
 
 // scrollYAML drops the first n lines of a YAML block for the preview pane.

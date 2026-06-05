@@ -48,7 +48,7 @@ func (m Model) viewLogs() string {
 
 func (m Model) viewDescribe() string {
 	titleText := m.describeView.title + viewModeIndicators(m.describeView.wrap, rune(m.describeView.visualMode), m.describeView.searchQuery)
-	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(titleText)
+	title := ui.ViewTitle(m.width, titleText)
 
 	// Build hint bar or search bar.
 	hints := []ui.HintEntry{
@@ -253,6 +253,7 @@ func (m Model) viewExplain() string {
 		m.explainCursor,
 		m.explainScroll,
 		m.explainDesc,
+		"API Explorer: "+m.explainTitle,
 		parentFields,
 		parentCursor,
 		searchQuery,

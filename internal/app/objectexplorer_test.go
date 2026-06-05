@@ -380,8 +380,7 @@ func TestObjectExplorer_QClosesAndViewRenders(t *testing.T) {
 	m = result.(Model)
 
 	out := m.viewObjectExplorer()
-	// The resource identity lives in the top breadcrumb now, not an internal
-	// title; the view renders the Miller columns.
+	assert.Contains(t, out, "Object Explorer: Chore/chore-1")
 	assert.Contains(t, out, "PARENT")
 	assert.Contains(t, out, "status")
 

@@ -186,14 +186,14 @@ func TestRenderFieldDescription(t *testing.T) {
 // --- RenderExplainView ---
 
 func TestRenderExplainView(t *testing.T) {
-	t.Run("renders the column layout (no internal title)", func(t *testing.T) {
+	t.Run("renders the title and column layout", func(t *testing.T) {
 		fields := []model.ExplainField{
 			{Name: "apiVersion", Type: "<string>", Description: "API version"},
 			{Name: "kind", Type: "<string>", Description: "Resource kind"},
 			{Name: "spec", Type: "<Object>", Description: "Spec of the resource."},
 		}
-		result := RenderExplainView(fields, 0, 0, "A deployment.", nil, 0, "", "hint bar", 120, 30)
-		assert.NotContains(t, result, "API Explorer:") // title now lives in the breadcrumb
+		result := RenderExplainView(fields, 0, 0, "A deployment.", "API Explorer: Deployment", nil, 0, "", "hint bar", 120, 30)
+		assert.Contains(t, result, "API Explorer: Deployment")
 		assert.Contains(t, result, "NAME")
 		assert.Contains(t, result, "DESCRIPTION")
 		assert.Contains(t, result, "apiVersion")
@@ -203,14 +203,14 @@ func TestRenderExplainView(t *testing.T) {
 	t.Run("parent pane shows parent keys", func(t *testing.T) {
 		fields := []model.ExplainField{{Name: "containers", Type: "<[]Container>"}}
 		parent := []model.ExplainField{{Name: "template", Type: "<Object>"}}
-		result := RenderExplainView(fields, 0, 0, "", parent, 0, "", "hints", 120, 30)
+		result := RenderExplainView(fields, 0, 0, "", "API Explorer: x", parent, 0, "", "hints", 120, 30)
 		assert.Contains(t, result, "PARENT")
 		assert.Contains(t, result, "template")
 		assert.Contains(t, result, "containers")
 	})
 
 	t.Run("empty fields shows no fields message", func(t *testing.T) {
-		result := RenderExplainView(nil, 0, 0, "Some desc", nil, 0, "", "", 80, 20)
+		result := RenderExplainView(nil, 0, 0, "Some desc", "API Explorer: Pod", nil, 0, "", "", 80, 20)
 		assert.Contains(t, result, "No fields found")
 	})
 }

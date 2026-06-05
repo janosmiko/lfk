@@ -26,7 +26,7 @@ func (m Model) viewYAML() string {
 			yamlTitleText += " [VISUAL LINE]"
 		}
 	}
-	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(yamlTitleText)
+	title := ui.ViewTitle(m.width, yamlTitleText)
 	var yamlHints []ui.HintEntry
 	if m.yamlView.visualMode {
 		yamlHints = []ui.HintEntry{

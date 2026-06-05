@@ -548,9 +548,7 @@ func TestViewExplainMode(t *testing.T) {
 	}
 	output := m.View()
 	stripped := stripANSI(output)
-	// The API Explorer no longer renders an internal title (the path lives in
-	// the breadcrumb); it renders the Miller columns.
-	assert.Contains(t, stripped, "PARENT")
+	assert.Contains(t, stripped, "Explain: Deployment") // title line is back
 	assert.Contains(t, stripped, "apiVersion")
 }
 
