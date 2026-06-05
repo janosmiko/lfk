@@ -112,33 +112,71 @@ func (m Model) breadcrumb() string {
 	return strings.Join(parts, " > ")
 }
 
-// explorerDrillPath returns the drill-path segments to append to the breadcrumb
-// when the Object Explorer or API Explorer is active (directly or behind help).
+// explorerDrillPath returns the trailing breadcrumb segment(s): the item under
+// the cursor (or a multi-selection count) in the regular browser, or the drill
+// path in the Object / API Explorer. Resolved behind help via helpPreviousMode.
 func (m Model) explorerDrillPath() []string {
 	mode := m.mode
 	if mode == modeHelp {
 		mode = m.helpPreviousMode
 	}
-	// The Object Explorer adds the resource name (when the nav breadcrumb does
-	// not already show it) followed by the drill path as one dotted segment,
-	// e.g. "… > Pods > pod-name > spec.volumes.[0]".
 	switch mode {
+	case modeExplorer:
+		if seg := m.cursorBreadcrumbSegment(); seg != "" {
+			return []string{seg}
+		}
 	case modeObjectExplorer:
+		// The Object Explorer adds the resource name (when the nav breadcrumb
+		// does not already show it) and the dotted path to the cursor item,
+		// e.g. "… > Pods > pod-name > spec.volumes.[0]".
 		rt := m.objectExplorerView
 		var segs []string
 		if rt.name != "" && m.nav.ResourceName != rt.name && m.nav.OwnedName != rt.name {
 			segs = append(segs, rt.name)
 		}
-		if len(rt.path) > 0 {
-			segs = append(segs, strings.Join(rt.path, "."))
+		if full := m.selectedNodePath(); len(full) > 0 {
+			segs = append(segs, strings.Join(full, "."))
 		}
 		return segs
 	case modeExplain:
-		if m.explainPath != "" {
-			return []string{m.explainPath}
+		p := m.explainPath
+		if m.explainCursor >= 0 && m.explainCursor < len(m.explainFields) {
+			cur := m.explainFields[m.explainCursor].Name
+			if p == "" {
+				p = cur
+			} else {
+				p += "." + cur
+			}
+		}
+		if p != "" {
+			return []string{p}
 		}
 	}
 	return nil
+}
+
+// cursorBreadcrumbSegment returns the trailing breadcrumb segment for the
+// regular browser: a "N selected" count when items are multi-selected, else the
+// name of the real item under the cursor (skipping virtual rows and names the
+// nav breadcrumb already shows). Empty when there is nothing useful to add.
+func (m Model) cursorBreadcrumbSegment() string {
+	if n := len(m.selectedItems); n > 0 {
+		return fmt.Sprintf("%d selected", n)
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil || sel.Name == "" {
+		return ""
+	}
+	// Skip virtual rows (overview / monitoring / collapsed groups) and context
+	// picker rows — they aren't a resource the breadcrumb should name.
+	if strings.HasPrefix(sel.Kind, "__") || strings.HasPrefix(sel.Extra, "__") || sel.IsContext {
+		return ""
+	}
+	// Don't duplicate a name the nav breadcrumb already ends with.
+	if sel.Name == m.nav.ResourceName || sel.Name == m.nav.OwnedName {
+		return ""
+	}
+	return sel.Name
 }
 
 // renderStatusHint paints m.statusMessage in the status-bar style at full

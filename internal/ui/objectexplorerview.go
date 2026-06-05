@@ -117,10 +117,6 @@ func renderResourceFieldList(fields []model.ObjectField, cursor, scroll, width, 
 		if len(name) > nameWidth {
 			name = name[:nameWidth]
 		}
-		prefix := "  "
-		if i == cursor {
-			prefix = "> "
-		}
 		marker := ""
 		if f.HasChildren {
 			marker = " " + DimStyle.Render("›") // ›
@@ -130,18 +126,22 @@ func renderResourceFieldList(fields []model.ObjectField, cursor, scroll, width, 
 		value := Truncate(f.Preview, valueWidth)
 
 		if i == cursor {
-			plain := fmt.Sprintf("%s%-*s  %s", prefix, nameWidth, name, Truncate(f.Preview, valueWidth))
+			// Selection shown by the full-width active highlight, no cursor arrow.
+			plain := fmt.Sprintf("  %-*s  %s", nameWidth, name, value)
 			if f.HasChildren {
 				plain += " ›"
 			}
-			lines = append(lines, OverlaySelectedStyle.Render(plain))
+			if pad := width - lipgloss.Width(plain); pad > 0 {
+				plain += strings.Repeat(" ", pad)
+			}
+			lines = append(lines, SelectedStyle.MaxWidth(width).Render(plain))
 			continue
 		}
 		valueCell := styleYAMLValue(value)
 		if f.HasChildren {
 			valueCell = DimStyle.Render(value)
 		}
-		namePart := NormalStyle.Render(fmt.Sprintf("%s%-*s", prefix, nameWidth, name))
+		namePart := NormalStyle.Render(fmt.Sprintf("  %-*s", nameWidth, name))
 		lines = append(lines, namePart+"  "+valueCell+marker)
 	}
 
@@ -171,7 +171,8 @@ func renderObjectKeyList(fields []model.ObjectField, cursor, width, maxLines int
 }
 
 // renderKeyRow renders one parent-pane key, highlighting the selected row with
-// the main explorer's selection style spanning the full column width.
+// the main explorer's INACTIVE-column style (ParentHighlightStyle, greyish)
+// spanning the full column width.
 func renderKeyRow(key string, selected bool, width int) string {
 	line := Truncate(" "+key, width)
 	if !selected {
@@ -180,5 +181,5 @@ func renderKeyRow(key string, selected bool, width int) string {
 	if pad := width - lipgloss.Width(line); pad > 0 {
 		line += strings.Repeat(" ", pad)
 	}
-	return SelectedStyle.Render(line)
+	return ParentHighlightStyle.MaxWidth(width).Render(line)
 }

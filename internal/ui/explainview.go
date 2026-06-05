@@ -113,11 +113,8 @@ func renderFieldList(fields []model.ExplainField, cursor, scroll, width, maxLine
 			name = name[:nameWidth]
 		}
 
-		// Format: "> name     REQ   <type>" or "  name     REQ   <type>"
+		// Selection is shown by the full-width active highlight, no cursor arrow.
 		prefix := "  "
-		if i == cursor {
-			prefix = "> "
-		}
 
 		// Build required column (4 chars wide).
 		reqStr := "    "
@@ -135,7 +132,10 @@ func renderFieldList(fields []model.ExplainField, cursor, scroll, width, maxLine
 			// Selected line: render with highlight on search matches.
 			highlightedName := highlightNameSelected(fmt.Sprintf("%-*s", nameWidth, name), searchQuery)
 			line := prefix + highlightedName + "  " + reqStr + "  " + typeStr
-			lines = append(lines, OverlaySelectedStyle.Render(line))
+			if pad := width - lipgloss.Width(line); pad > 0 {
+				line += strings.Repeat(" ", pad)
+			}
+			lines = append(lines, SelectedStyle.MaxWidth(width).Render(line))
 		} else {
 			// Normal line: highlight search matches in field name.
 			highlightedName := highlightName(fmt.Sprintf("%-*s", nameWidth, name), searchQuery)
