@@ -62,6 +62,34 @@ type Model struct {
 	// distinct right-pane preview state and are intentionally not part of it.
 	yamlView yamlViewState
 
+	// yamlReturnMode is the mode the full-screen YAML viewer returns to on
+	// q/esc. Defaults to modeExplorer (the zero value); set to
+	// modeObjectExplorer when the YAML viewer is opened from the Object Explorer
+	// browser so closing it returns there instead of the explorer.
+	yamlReturnMode viewMode
+
+	// yamlPendingPath, when set, is the object path the YAML viewer should
+	// position its cursor on once the document finishes loading. Used to sync
+	// the cursor when switching from the Object Explorer to the YAML viewer.
+	yamlPendingPath []string
+
+	// explainReturnMode is the mode the API Explorer returns to on q/esc.
+	// Defaults to modeExplorer; set to modeYAML or modeObjectExplorer when the
+	// Explorer is opened from those views (I key) so closing returns there.
+	explainReturnMode viewMode
+
+	// explainPendingField, when set, is the field name the API Explorer should
+	// place its cursor on once the level finishes loading. Used to land on a
+	// specific field (in its siblings' context) when opened from the YAML
+	// viewer / Object Explorer.
+	explainPendingField string
+
+	// explainAncestors is the stack of API Explorer levels above the current
+	// one. It feeds the parent pane (left column) and lets back-navigation
+	// restore a level without re-fetching. Pushed on drill, popped on back;
+	// reset on a fresh open or a recursive jump.
+	explainAncestors []explainLevel
+
 	// Split preview: show children in top 1/3 + YAML in bottom 2/3 of right column.
 	splitPreview bool
 	// Full YAML preview: show only YAML in the right column (no children list).
@@ -244,6 +272,16 @@ type Model struct {
 	// from the formerly flat describe* fields into one cohesive value; see
 	// describeview.go.
 	describeView describeViewState
+
+	// Full-screen Object Explorer state: drill-in navigation over the
+	// selected resource's live object (Item.Raw), mirroring the API Explorer
+	// but showing actual values. Driven entirely from objectexplorer.go.
+	objectExplorerView objectExplorerState
+
+	// objectExplorerReturnMode is the mode the Object Explorer returns to on
+	// q/esc. It is the explorer by default but the YAML viewer when the Object
+	// Explorer was opened from there (P), so closing returns to the opener.
+	objectExplorerReturnMode viewMode
 
 	// Full-screen diff viewer state (resource compare / revision diff):
 	// left/right content, scroll/cursor, unified vs side-by-side, search,

@@ -478,3 +478,28 @@ func TestViewExplorerMode(t *testing.T) {
 	// Should contain resource name.
 	assert.True(t, strings.Contains(stripped, "nginx-pod") || len(stripped) > 50)
 }
+
+func TestCursorBreadcrumbSegment(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeExplorer
+	m.middleItems = []model.Item{{Name: "pod-a", Kind: "Pod"}, {Name: "pod-b", Kind: "Pod"}}
+
+	// Cursor on the first item -> its name appears in the breadcrumb.
+	assert.Equal(t, "pod-a", m.cursorBreadcrumbSegment())
+	assert.Contains(t, m.breadcrumb(), "pod-a")
+
+	// Multi-selection -> a count instead of a single name.
+	m.selectedItems = map[string]bool{"k1": true, "k2": true}
+	assert.Equal(t, "2 selected", m.cursorBreadcrumbSegment())
+	assert.Contains(t, m.breadcrumb(), "2 selected")
+
+	// Virtual rows (overview / monitoring / collapsed groups) are skipped.
+	m.selectedItems = nil
+	m.middleItems = []model.Item{{Name: "Overview", Kind: "__overview__"}}
+	assert.Equal(t, "", m.cursorBreadcrumbSegment())
+
+	// Don't duplicate a name the nav breadcrumb already shows.
+	m.middleItems = []model.Item{{Name: "pod-a", Kind: "Pod"}}
+	m.nav.ResourceName = "pod-a"
+	assert.Equal(t, "", m.cursorBreadcrumbSegment())
+}

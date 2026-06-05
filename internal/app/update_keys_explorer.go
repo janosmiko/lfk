@@ -367,6 +367,9 @@ func (m Model) handleExplorerUIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.OrphanOverlay:
 		mdl, cmd := m.openOrphansOverlay()
 		return mdl, cmd, true
+	case kb.ObjectExplorer:
+		mdl, cmd := m.openObjectExplorer()
+		return mdl, cmd, true
 	}
 	return m, nil, false
 }

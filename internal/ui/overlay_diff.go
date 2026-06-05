@@ -305,7 +305,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 	if searchQuery != "" && !searchMode {
 		titleText += " [/" + searchQuery + "]"
 	}
-	title := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(titleText)
+	title := ViewTitle(width, titleText)
 	sepLine := gutterPad + strings.Repeat("-", colWidth) + " + " + gutterPad + strings.Repeat("-", colWidth)
 	bodyContent := header + "\n" + separatorStyle.Render(sepLine) + "\n" + strings.Join(rows, "\n")
 
@@ -482,7 +482,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 	if searchQuery != "" && !searchMode {
 		titleText += " [/" + searchQuery + "]"
 	}
-	title := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(titleText)
+	title := ViewTitle(width, titleText)
 
 	// Reserve lines for title, hint bar, and border (top+bottom).
 	maxLines := max(height-4, 3)

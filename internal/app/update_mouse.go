@@ -418,7 +418,7 @@ func (m *Model) tabAtX(x int) int {
 // their own wheel paths and are handled separately.
 func isViewerMode(mode viewMode) bool {
 	switch mode {
-	case modeYAML, modeDescribe, modeDiff, modeHelp, modeExplain:
+	case modeYAML, modeDescribe, modeDiff, modeHelp, modeExplain, modeObjectExplorer:
 		return true
 	}
 	return false

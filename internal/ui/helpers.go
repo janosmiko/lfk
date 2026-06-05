@@ -19,6 +19,14 @@ func PadToHeight(content string, height int) string {
 	return strings.Join(lines, "\n")
 }
 
+// ViewTitle renders a fullscreen view's title line. The two-space lead aligns
+// it with the top breadcrumb (TitleBarStyle padding + a prepended space), so
+// every fullscreen title (YAML, Describe, Logs, Diff, Event Viewer, the API and
+// Object Explorers) starts at the same column.
+func ViewTitle(width int, text string) string {
+	return TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(" " + text)
+}
+
 // FullscreenBorderStyle returns the standard rounded-border style used for
 // fullscreen content panels (YAML view, log viewer, explain view, etc.).
 // It applies the theme's primary border color, base background, and

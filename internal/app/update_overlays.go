@@ -211,6 +211,9 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 	case overlayExplainSearch:
 		mdl, cmd := m.handleExplainSearchOverlayKey(msg)
 		return mdl, cmd, true
+	case overlayObjectExplorerFind:
+		mdl, cmd := m.handleObjectExplorerFindKey(msg)
+		return mdl, cmd, true
 	case overlayQuitConfirm:
 		mdl, cmd := m.handleQuitConfirmOverlayKey(msg)
 		return mdl, cmd, true

@@ -11,6 +11,17 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// isFullscreenRenderMode reports whether a mode renders as a fullscreen view
+// (with its own title/tab/hint bars) rather than the three-pane explorer.
+func isFullscreenRenderMode(mode viewMode) bool {
+	switch mode {
+	case modeYAML, modeLogs, modeDescribe, modeDiff, modeExec, modeExplain, modeEventViewer, modeObjectExplorer:
+		return true
+	default:
+		return false
+	}
+}
+
 // View renders the UI.
 func (m Model) View() string {
 	if m.width == 0 {
@@ -35,7 +46,7 @@ func (m Model) View() string {
 	if m.mode == modeHelp {
 		renderMode = m.helpPreviousMode
 	}
-	if renderMode == modeYAML || renderMode == modeLogs || renderMode == modeDescribe || renderMode == modeDiff || renderMode == modeExec || renderMode == modeExplain || renderMode == modeEventViewer {
+	if isFullscreenRenderMode(renderMode) {
 		// Save original height before reducing for title/tab bar — overlays
 		// need the full terminal dimensions for correct sizing and placement.
 		fullHeight := m.height
@@ -65,6 +76,8 @@ func (m Model) View() string {
 			content = m.viewExplain()
 		case modeEventViewer:
 			content = m.viewEventViewer()
+		case modeObjectExplorer:
+			content = m.viewObjectExplorer()
 		}
 
 		var parts []string

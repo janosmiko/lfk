@@ -14,7 +14,7 @@ func (m Model) viewEventViewer() string {
 		titleText += " - " + m.actionCtx.name
 	}
 	titleText += viewModeIndicators(m.eventTimelineWrap, rune(m.eventTimelineVisualMode), m.eventTimelineSearchQuery)
-	title := ui.TitleStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(titleText)
+	title := ui.ViewTitle(m.width, titleText)
 
 	hint := m.eventViewerHintBar()
 

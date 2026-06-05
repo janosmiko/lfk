@@ -257,6 +257,9 @@ func (m Model) renderOverlayContentExtended() (string, int, int, bool) {
 	case overlayExplainSearch:
 		c, w, h := m.renderOverlayExplainSearch()
 		return c, w, h, true
+	case overlayObjectExplorerFind:
+		c, w, h := m.renderOverlayObjectExplorerFind()
+		return c, w, h, true
 	case overlayColumnToggle:
 		c, w, h := m.renderOverlayColumnToggle()
 		return c, w, h, true
@@ -513,14 +516,6 @@ func (m Model) renderOverlayCanISubject(background string) string {
 	content = ui.FillLinesBg(content, w-4, ui.SurfaceBg)
 	overlay := ui.OverlayStyle.Width(w).Height(h).Render(content)
 	return ui.PlaceOverlay(m.width, m.height, overlay, canIBg)
-}
-
-func (m Model) renderOverlayExplainSearch() (string, int, int) {
-	w := min(m.width-6, m.width*70/100)
-	h := min(m.height-4, m.height*70/100)
-	maxVisible := max(h-6, 1)
-	filtered := m.filteredExplainRecursiveResults()
-	return ui.RenderExplainSearchOverlay(filtered, m.explainRecursiveCursor, m.explainRecursiveScroll, maxVisible, m.explainRecursiveFilter.Value, m.explainRecursiveFilterActive), w, h
 }
 
 func (m Model) renderOverlayNetworkPolicy(background string) string {
