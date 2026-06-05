@@ -53,6 +53,7 @@ You are Claude Code. I use specialized agents and skills for complex tasks.
 - TDD: Write tests first
 - 80% minimum coverage
 - Unit + integration + E2E for critical flows
+- TUI tests: build a model with `basePush80Model()`; assert on `stripANSI(view)`
 
 ### Knowledge Capture
 
@@ -63,15 +64,32 @@ You are Claude Code. I use specialized agents and skills for complex tasks.
 
 ## UI / TUI Conventions (Bubble Tea)
 
-Reuse the existing TUI frameworks instead of hand-rolling. Before adding a view or overlay, look for the shared primitive first.
+Reuse existing TUI primitives instead of hand-rolling. Look for a shared helper before adding a view or overlay.
 
-- **Hotkeys go in the hint bar, never inside the overlay/view.** Register a case in `internal/app/overlay_hintbar.go` (`overlayHintBarSelector` / `...Dialog` / `...Editor` / `...Misc`); for full-screen modes use the mode's hint bar. Do not render an inline footer/keymap line inside the overlay box.
-- **Use the overlay-list framework for any list/selector overlay.** Build `[]ui.OverlayListItem` and call `ui.RenderOverlayList` with `ui.OverlayListConfig` — you get the scrollbar, filter prompt, stable height, cursor highlight, and description column for free. Don't draw rows, scrollbars, or "(N more below)" by hand.
-- **Registering a new overlay touches four places:** the `overlayKind` enum (`app_types.go`), key dispatch (`update_overlays.go`), render dispatch (`view_overlays.go`), and the hint bar (`overlay_hintbar.go`). Overlays are routed before mode handlers — `handleKey` checks `m.overlay != overlayNone` first.
-- **Reuse existing renderers.** YAML → `ui.RenderYAMLContent` / `ui.HighlightYAMLLine`; breadcrumb paths → `renderExplainPath` (pass `[]string` segments — k8s map keys contain dots, so never dot-join then split).
-- **Match the explorer's keybinding semantics.** e.g. `y` = copy name/path, `Y` = copy full/YAML. Before choosing a default key, check for collisions in BOTH the keybinding defaults and `case kb.X` dispatch, not just literal `case "x"` (e.g. `o` is already `JumpOwner`). Update the help section, hint bar, README, and `docs/keybindings.md` together.
-- **Full-screen viewers remember their origin.** When a viewer (YAML, etc.) can be opened from multiple places, store a return-mode so closing returns to the opener, not always the explorer.
-- **Respect the caps.** Files ≤ 800 lines (revive), gocyclo ≤ 30. Co-locate a feature's render/handler helpers in its own file rather than growing `view_overlays.go`.
+- Hotkeys live in the hint bar (`overlay_hintbar.go`), never inside the overlay/view box.
+- List/selector overlays use `ui.RenderOverlayList` — scrollbar, filter, cursor, description column for free. Don't hand-draw rows, scrollbars, or "(N more)".
+- A new overlay = 4 edits: `overlayKind` enum (`app_types.go`), dispatch (`update_overlays.go`), render (`view_overlays.go`), hint bar (`overlay_hintbar.go`). Overlays route before mode handlers.
+- Reuse renderers: YAML → `ui.RenderYAMLContent`; object paths → `formatObjectPath` (handles array `[i]`). Keep paths as `[]string`; never dot-join then split (k8s keys contain dots).
+- Fullscreen view titles use `ui.ViewTitle` (2-space lead aligns with the breadcrumb); a bare `TitleStyle.Render` sits a column off.
+- Selection styling: active column → `SelectedStyle` / `ActiveSelectedStyle`; inactive/parent column → `ParentHighlightStyle` (greyish). Match these, don't invent overlay styles.
+- Theme styles live in three files — `styles.go` (default), `theme.go` (runtime, `ApplyTheme`), `theme_nocolor.go`. Add or change a style in all three.
+- Theme switches must invalidate cached previews; fill backgrounds with `FillLinesBg` (theme bg), never assume black.
+- Display width via `ui.Truncate` / `lipgloss.Width`, never `len()` (multibyte + ANSI).
+- Numeric columns (CPU/MEM/ports/counts) sort numerically with `n/a` last, not lexically.
+- Keys: never bind `ctrl+i` / `ctrl+m` / `ctrl+[` (terminals send tab/enter/esc — they never fire; a test guards this). For a new hotkey, reuse the shortcut a similar action already uses elsewhere — don't invent a new one (`y`=copy name, `Y`=copy full). Check collisions in keybinding defaults AND `case kb.X` dispatch, not just `case "x"`. Update help, hint bar, README, `docs/keybindings.md` together.
+- Any movable cursor must scroll to stay visible — use `ui.VimScrollOff` (`explorer_highlight.go`) for the scrolloff viewport; don't recompute the window ad-hoc.
+- Cursor movement is vim-style: `j`/`k`, `g`/`G` (top/bottom), `ctrl+d`/`ctrl+u` (half-page), `ctrl+f`/`ctrl+b` (full page), arrows + pgup/pgdn as aliases (the `kb.*` defaults).
+- Text viewers add the fuller vim set: word motions `w`/`b`/`e` (+ `W`/`B`/`E` WORD), line `0`/`^`/`$`, visual mode `v`/`V`/`ctrl+v` (char/line/block), and text objects `viw`/`vaw`/`viW`/`vaW`. Reuse `update_vim.go` (`innerWordRange`/`innerWORDRange`) — don't reimplement.
+- Motions take a vim count prefix (`5j`, `3w`, `10G`): digits `1`-`9` accumulate in `<view>.lineInput`; read it with `consumeCountPrefix` (`count_prefix.go`), don't hand-parse.
+- Full-screen viewers store a return-mode so closing returns to the opener, not always the explorer.
+- Caps: files ≤ 800 lines (revive), gocyclo ≤ 30. Co-locate a feature's helpers in its own file.
+
+## App State & Event Loop
+
+- Each fullscreen viewer's fields live in a `<name>ViewState` struct (`<name>view.go`), snapshotted per tab via `cloneCurrentTab` (`tabs.go`) — loose `Model` fields leak across tabs.
+- Input focus gates global keys: when a filter/search/line-input is active, handle it first; global hotkeys stay inert (`update_keys.go`).
+- User feedback goes through `setStatusMessage(msg, isErr)` + return `scheduleStatusClear()` — never print inline or block.
+- Renderers read `ui.Active*` globals (security, columns) set in `View()` right before render; don't read them elsewhere.
 
 ---
 
