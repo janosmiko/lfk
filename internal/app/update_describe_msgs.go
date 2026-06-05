@@ -77,7 +77,28 @@ func (m Model) updateExplainLoaded(msg explainLoadedMsg) (tea.Model, tea.Cmd) {
 	m.explainCursor = 0
 	m.explainScroll = 0
 	m.explainSearchActive = false
+	m.applyExplainPendingField()
 	return m, nil
+}
+
+// applyExplainPendingField positions the cursor on explainPendingField (set
+// when the API Explorer is opened at a specific item from the YAML viewer /
+// resource tree), then clears it.
+func (m *Model) applyExplainPendingField() {
+	field := m.explainPendingField
+	m.explainPendingField = ""
+	if field == "" {
+		return
+	}
+	for i, f := range m.explainFields {
+		if f.Name == field {
+			m.explainCursor = i
+			if visible := max(m.height-6, 3); i >= visible {
+				m.explainScroll = i - visible + 1
+			}
+			return
+		}
+	}
 }
 
 func (m Model) updateExplainRecursive(msg explainRecursiveMsg) (tea.Model, tea.Cmd) {

@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -146,6 +147,8 @@ func (m Model) yamlMaxScroll(totalVisible int) int {
 }
 
 // handleYAMLNormalKey handles key events in normal YAML viewing mode.
+//
+//nolint:gocyclo // flat key dispatcher: complexity is "number of keys we route", not branching depth
 func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	totalVisible := visibleLineCount(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	viewportLines := m.yamlViewportLines()
@@ -154,6 +157,10 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "?", "f1":
 		return m.handleYAMLKeyQuestion()
+	case "P":
+		return m.handleYAMLKeyObjectExplorer()
+	case "I":
+		return m.openExplainAtObjectPath(m.yamlCursorPath(), modeYAML)
 	case "V":
 		return m.handleYAMLKeyV()
 	case "v":
@@ -562,6 +569,64 @@ func (m Model) handleYAMLKeyCtrlV() (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// handleYAMLKeyObjectExplorer switches from the YAML viewer to the Object Explorer
+// browser (P), positioning the tree on the node under the YAML cursor. When the
+// viewer was opened from the tree, it reuses the preserved tree; otherwise
+// (opened via Enter) it opens a fresh tree for the current resource. Together
+// with P in the tree (open YAML), P toggles between the two views with the
+// cursor kept in sync.
+func (m Model) handleYAMLKeyObjectExplorer() (tea.Model, tea.Cmd) {
+	segs := m.yamlCursorPath()
+	if m.yamlReturnMode == modeObjectExplorer && m.objectExplorerView.root != nil {
+		m.mode = modeObjectExplorer
+		m.yamlReturnMode = modeExplorer
+		if segs != nil {
+			m.navigateObjectExplorerToPath(segs)
+		}
+		m.yamlView.scroll = 0
+		m.yamlView.cursor = 0
+		m.yamlView.wrap = false
+		return m, nil
+	}
+	mdl, cmd := m.openObjectExplorer()
+	if m2, ok := mdl.(Model); ok && m2.mode == modeObjectExplorer && segs != nil {
+		m2.navigateObjectExplorerToPath(segs)
+		return m2, cmd
+	}
+	return mdl, cmd
+}
+
+// yamlCursorPath returns the object path under the YAML viewer's cursor, mapping
+// the visible cursor to a physical line and parsing the path there. Returns nil
+// when there is no resolvable path.
+func (m Model) yamlCursorPath() []string {
+	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	if m.yamlView.cursor < 0 || m.yamlView.cursor >= len(mapping) {
+		return nil
+	}
+	return model.PathForYAMLLine(m.yamlView.content, mapping[m.yamlView.cursor])
+}
+
+// applyYAMLPendingCursor positions the YAML cursor on yamlPendingPath once the
+// document has loaded, then clears the pending path. Used to sync the cursor
+// when switching from the Object Explorer into the YAML viewer.
+func (m *Model) applyYAMLPendingCursor() {
+	segs := m.yamlPendingPath
+	m.yamlPendingPath = nil
+	if len(segs) == 0 {
+		return
+	}
+	origLine := model.YAMLLineForPath(m.yamlView.content, segs)
+	if origLine < 0 {
+		return
+	}
+	_, mapping := buildVisibleLines(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
+	if vis := originalToVisible(origLine, mapping); vis >= 0 {
+		m.yamlView.cursor = vis
+		m.ensureYAMLCursorVisible()
+	}
+}
+
 func (m Model) handleYAMLKeyQ() (tea.Model, tea.Cmd) {
 	if m.yamlView.searchText.Value != "" {
 		// Clear search first.
@@ -570,7 +635,8 @@ func (m Model) handleYAMLKeyQ() (tea.Model, tea.Cmd) {
 		m.yamlView.matchIdx = 0
 		return m, nil
 	}
-	m.mode = modeExplorer
+	m.mode = m.yamlReturnMode
+	m.yamlReturnMode = modeExplorer
 	m.yamlView.scroll = 0
 	m.yamlView.cursor = 0
 	m.yamlView.wrap = false
@@ -578,7 +644,8 @@ func (m Model) handleYAMLKeyQ() (tea.Model, tea.Cmd) {
 }
 
 func (m Model) handleYAMLKeyCtrlC() (tea.Model, tea.Cmd) {
-	m.mode = modeExplorer
+	m.mode = m.yamlReturnMode
+	m.yamlReturnMode = modeExplorer
 	m.yamlView.scroll = 0
 	m.yamlView.cursor = 0
 	m.yamlView.wrap = false

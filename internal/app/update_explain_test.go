@@ -737,3 +737,79 @@ func TestCovExplainSearchOverlayNormalCtrlU(t *testing.T) {
 	rm := result.(Model)
 	assert.Less(t, rm.explainRecursiveCursor, 20)
 }
+
+// --- API Explorer integration (open at object path) ---
+
+func TestExplainTarget(t *testing.T) {
+	cases := []struct {
+		name       string
+		in         []string
+		wantParent string
+		wantField  string
+	}{
+		{"empty", nil, "", ""},
+		{"top-level field", []string{"spec"}, "", "spec"},
+		{"leaf in object", []string{"spec", "dnsPolicy"}, "spec", "dnsPolicy"},
+		{"strips array index", []string{"spec", "containers", "[0]", "image"}, "spec.containers", "image"},
+		{"trailing index lands on array field", []string{"status", "steps", "[1]"}, "status", "steps"},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			parent, field := explainTarget(tc.in)
+			assert.Equal(t, tc.wantParent, parent)
+			assert.Equal(t, tc.wantField, field)
+		})
+	}
+}
+
+func TestOpenExplainAtObjectPath(t *testing.T) {
+	m := basePush80Model()
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", APIVersion: "v1"}
+
+	// spec.dnsPolicy opens the "spec" level with the cursor pending on dnsPolicy.
+	mdl, cmd := m.openExplainAtObjectPath([]string{"spec", "dnsPolicy"}, modeObjectExplorer)
+	rm := mdl.(Model)
+	assert.True(t, rm.loading)
+	assert.Equal(t, "pods", rm.explainResource)
+	assert.Equal(t, modeObjectExplorer, rm.explainReturnMode)
+	assert.Equal(t, "dnsPolicy", rm.explainPendingField)
+	assert.NotNil(t, cmd) // execKubectlExplain command
+}
+
+func TestApplyExplainPendingField(t *testing.T) {
+	m := basePush80Model()
+	m.explainFields = []model.ExplainField{
+		{Name: "containers"}, {Name: "dnsPolicy"}, {Name: "nodeName"},
+	}
+	m.explainPendingField = "dnsPolicy"
+	m.applyExplainPendingField()
+	assert.Equal(t, 1, m.explainCursor)
+	assert.Equal(t, "", m.explainPendingField) // consumed
+
+	// A field that isn't present leaves the cursor at 0.
+	m.explainCursor = 0
+	m.explainPendingField = "missing"
+	m.applyExplainPendingField()
+	assert.Equal(t, 0, m.explainCursor)
+}
+
+func TestExplainEscReturnsToOpenerWhenExternal(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeExplain
+	m.explainReturnMode = modeObjectExplorer
+	m.explainPath = "spec" // deep, but external Esc returns straight to the opener
+
+	mdl, _ := m.handleExplainKeyEsc()
+	rm := mdl.(Model)
+	assert.Equal(t, modeObjectExplorer, rm.mode)
+}
+
+func TestExplainExitReturnsToOpener(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeExplain
+	m.explainReturnMode = modeYAML
+
+	m.exitExplainView()
+	assert.Equal(t, modeYAML, m.mode)
+	assert.Equal(t, modeExplorer, m.explainReturnMode) // reset for next open
+}

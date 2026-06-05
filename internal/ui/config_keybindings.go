@@ -38,6 +38,7 @@ type Keybindings struct {
 	SecretToggle    string `json:"secret_toggle" yaml:"secret_toggle"`
 	FinalizerSearch string `json:"finalizer_search" yaml:"finalizer_search"`
 	APIExplorer     string `json:"api_explorer" yaml:"api_explorer"`
+	ObjectExplorer  string `json:"object_explorer" yaml:"object_explorer"`
 	RBACBrowser     string `json:"rbac_browser" yaml:"rbac_browser"`
 	ThemeSelector   string `json:"theme_selector" yaml:"theme_selector"`
 	CommandBar      string `json:"command_bar" yaml:"command_bar"`
@@ -143,14 +144,14 @@ func DefaultKeybindings() Keybindings {
 		NextMatch: "n", PrevMatch: "N",
 		TogglePreview: "P", ResourceMap: "M", Fullscreen: "F",
 		FilterPresets: ".", ErrorLog: "!", SecretToggle: "ctrl+s",
-		FinalizerSearch: "ctrl+g", APIExplorer: "I", RBACBrowser: "U",
+		FinalizerSearch: "ctrl+g", APIExplorer: "I", ObjectExplorer: "O", RBACBrowser: "U",
 		ThemeSelector: "T", CommandBar: ":", WatchMode: "w",
 		SortNext: ">", SortPrev: "<", SortFlip: "=", SortReset: "-",
 		SaveResource: "W", Monitoring: "@",
 		QuotaDashboard: "Q", TasksOverlay: "`",
 		ExpandCollapse: "z", PinGroup: "p",
 		ColumnToggle: ",", ToggleRare: "H",
-		OrphanOverlay: "O",
+		OrphanOverlay: "Z",
 
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",

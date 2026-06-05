@@ -714,6 +714,7 @@ func (m Model) enterFullView() (tea.Model, tea.Cmd) {
 	}
 
 	m.mode = modeYAML
+	m.yamlReturnMode = modeExplorer
 	m.yamlView.scroll = 0
 	m.yamlView.content = "Loading..."
 	m.yamlView.sections = nil

@@ -32,6 +32,7 @@ func (m Model) updateYamlLoaded(msg yamlLoadedMsg) (tea.Model, tea.Cmd) {
 	// the main event loop stays responsive on very large CRD manifests.
 	m.yamlView.content = msg.content
 	m.yamlView.sections = msg.sections
+	m.applyYAMLPendingCursor() // sync cursor when arriving from the Object Explorer
 	return m, nil
 }
 

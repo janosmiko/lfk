@@ -63,10 +63,55 @@ func (m Model) openExplainBrowser() (tea.Model, tea.Cmd) {
 	}
 
 	m.loading = true
+	m.explainReturnMode = modeExplorer
+	m.explainPendingField = ""
 	m.explainResource = resource
 	m.explainAPIVersion = apiVersion
 	m.setStatusMessage("Loading API Explorer...", false)
 	return m, m.execKubectlExplain(resource, apiVersion, "")
+}
+
+// openExplainAtObjectPath opens the API Explorer for the current resource type
+// at the schema level CONTAINING the item under the cursor, with the cursor
+// placed on that field so it reads in the context of its siblings (e.g.
+// spec.dnsPolicy opens "spec" with the cursor on "dnsPolicy", not the bare
+// dnsPolicy leaf). Array indices ("[i]") are stripped since kubectl explain
+// describes the element schema. returnMode is the view to return to on q/esc.
+func (m Model) openExplainAtObjectPath(objPath []string, returnMode viewMode) (tea.Model, tea.Cmd) {
+	rt := m.nav.ResourceType
+	resource, apiVersion := buildExplainResourceFromType(rt)
+	if resource == "" && rt.Kind != "" {
+		resource = strings.ToLower(rt.Kind) + "s"
+	}
+	if resource == "" {
+		m.setStatusMessage("Cannot determine resource type", true)
+		return m, scheduleStatusClear()
+	}
+	parentPath, field := explainTarget(objPath)
+	m.loading = true
+	m.explainReturnMode = returnMode
+	m.explainPendingField = field
+	m.explainResource = resource
+	m.explainAPIVersion = apiVersion
+	m.setStatusMessage("Loading API Explorer...", false)
+	return m, m.execKubectlExplain(resource, apiVersion, parentPath)
+}
+
+// explainTarget converts an object path into the kubectl-explain schema path of
+// the item's PARENT plus the item's own field name. Array indices ("[i]") are
+// dropped. For a root or empty path, both are empty.
+func explainTarget(objPath []string) (parentPath, field string) {
+	segs := make([]string, 0, len(objPath))
+	for _, s := range objPath {
+		if strings.HasPrefix(s, "[") {
+			continue
+		}
+		segs = append(segs, s)
+	}
+	if len(segs) == 0 {
+		return "", ""
+	}
+	return strings.Join(segs[:len(segs)-1], "."), segs[len(segs)-1]
 }
 
 // buildExplainResourceFromType returns the resource name and api-version flag value
@@ -82,9 +127,12 @@ func buildExplainResourceFromType(rt model.ResourceTypeEntry) (resource, apiVers
 	return rt.Resource, ""
 }
 
-// exitExplainView resets all explain state and returns to explorer mode.
+// exitExplainView resets all explain state and returns to the mode the API
+// Explorer was opened from (the explorer by default; the YAML viewer or
+// resource tree when opened from there via the I key).
 func (m *Model) exitExplainView() {
-	m.mode = modeExplorer
+	m.mode = m.explainReturnMode
+	m.explainReturnMode = modeExplorer
 	m.explainFields = nil
 	m.explainDesc = ""
 	m.explainPath = ""
@@ -254,11 +302,33 @@ func (m Model) handleExplainSearchOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	return m.handleExplainSearchOverlayNormalKey(msg)
 }
 
+// renderOverlayExplainSearch builds the centered recursive field browser
+// overlay via the shared OverlayList renderer.
+func (m Model) renderOverlayExplainSearch() (string, int, int) {
+	w, h, maxVisible := m.explainRecursiveOverlayDims()
+	filtered := m.filteredExplainRecursiveResults()
+	content := ui.RenderExplainSearchOverlay(
+		filtered, m.explainRecursiveCursor, m.explainRecursiveScroll, maxVisible,
+		m.explainRecursiveFilter.Value, m.explainRecursiveFilterActive, w-4,
+	)
+	return content, w, h
+}
+
+// explainRecursiveOverlayDims returns the recursive field browser overlay box
+// width, height, and the number of result rows visible inside it. Shared by the
+// renderer and the scroll math so the scrollbar and cursor stay in sync.
+func (m Model) explainRecursiveOverlayDims() (w, h, maxVisible int) {
+	w = min(m.width-6, max(m.width*70/100, 64))
+	h = min(m.height-4, max(m.height*70/100, 12))
+	maxVisible = max(h-8, 1) // title + subtitle + filter(2) + footer(2) + borders
+	return w, h, maxVisible
+}
+
 // handleExplainSearchOverlayNormalKey handles navigation keys in the recursive field browser.
 func (m Model) handleExplainSearchOverlayNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	filtered := m.filteredExplainRecursiveResults()
 	resultCount := len(filtered)
-	visibleLines := max(m.height-8, 3)
+	_, _, visibleLines := m.explainRecursiveOverlayDims()
 
 	switch msg.String() {
 	case "/":
@@ -484,6 +554,12 @@ func (m Model) handleExplainKeyQ() (tea.Model, tea.Cmd) {
 
 func (m Model) handleExplainKeyEsc() (tea.Model, tea.Cmd) {
 	m.explainLineInput = ""
+	// When opened from the YAML viewer / resource tree, Esc returns straight to
+	// that opener (use h/Backspace to walk schema levels instead).
+	if m.explainReturnMode != modeExplorer {
+		m.exitExplainView()
+		return m, nil
+	}
 	// Step back one level; exit only at root.
 	if m.explainPath == "" {
 		m.exitExplainView()

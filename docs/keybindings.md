@@ -21,7 +21,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `H` | Toggle rarely used + hidden resource types (CSI internals, webhooks, APF, leases, advanced core); revealed types shown dimmed (rare toggle resets each launch; per-type hides persist) |
 | `0` / `1` / `2` | Jump to clusters / types / resources level |
 | `J` / `K` | Scroll preview pane down/up |
-| `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the cluster-wide orphan overview overlay |
+| `o` / `O` | `o` jumps to the owner/controller of the selected resource; `O` opens the Object Explorer for it |
 | `Backspace` | Jump back through teleport history (owner, port-forward, orphan, finding, and mark jumps push history; hierarchical `h`/`l` navigation does not) |
 
 ## Views and Tools
@@ -37,8 +37,9 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `,` | Column visibility toggle (show/hide and reorder columns — see [Column Toggle Overlay](#column-toggle-overlay) below) |
 | `Ctrl+S` | Toggle secret value visibility in details pane (YAML preview always shows actual base64 values) |
 | `I` | API Explorer (browse resource structure interactively) |
+| `O` | Object Explorer (browse the selected resource's live object as a drill-in tree) |
 | `U` | RBAC permissions browser (can-i) |
-| `Shift+O` | Open the cluster-wide Orphan overview |
+| `Shift+Z` | Open the cluster-wide Orphan overview |
 | `Ctrl+G` | Finalizer search and remove |
 | `!` | Error log |
 | `@` | Monitoring overview (active Prometheus alerts) |
@@ -989,6 +990,7 @@ keybindings:
   theme_selector: "T"    # Theme selector
   finalizer_search: "ctrl+g"  # Finalizer search
   api_explorer: "I"      # API Explorer
+  object_explorer: "O"   # Object Explorer (browse live object)
   rbac_browser: "U"      # RBAC browser
   secret_toggle: "ctrl+s" # Secret visibility
   error_log: "!"         # Error log

@@ -48,6 +48,8 @@ func (m Model) viewYAML() string {
 			{Key: "tab/z", Desc: "fold"},
 			{Key: "ctrl+w/>", Desc: "wrap"},
 			{Key: "ctrl+e", Desc: "edit"},
+			{Key: "P", Desc: "object explorer"},
+			{Key: "I", Desc: "explain"},
 			{Key: "q/esc", Desc: "back"},
 		}
 	}

@@ -37,14 +37,14 @@ func TestPadExplainToHeight(t *testing.T) {
 
 func TestRenderExplainPath(t *testing.T) {
 	t.Run("root level shows resource name highlighted", func(t *testing.T) {
-		result := renderExplainPath("", "Deployment", 30, 20)
+		result := renderExplainPath(nil, "Deployment", 30, 20)
 		assert.Contains(t, result, "PATH")
 		assert.Contains(t, result, "Deployment")
 		assert.Contains(t, result, ">")
 	})
 
 	t.Run("drilled path shows segments", func(t *testing.T) {
-		result := renderExplainPath("spec.template.metadata", "Deployment", 30, 20)
+		result := renderExplainPath([]string{"spec", "template", "metadata"}, "Deployment", 30, 20)
 		assert.Contains(t, result, "PATH")
 		assert.Contains(t, result, "Deployment")
 		assert.Contains(t, result, "spec")
@@ -55,7 +55,7 @@ func TestRenderExplainPath(t *testing.T) {
 	})
 
 	t.Run("single segment path", func(t *testing.T) {
-		result := renderExplainPath("spec", "Pod", 30, 20)
+		result := renderExplainPath([]string{"spec"}, "Pod", 30, 20)
 		assert.Contains(t, result, "Pod")
 		assert.Contains(t, result, "spec")
 		assert.Contains(t, result, ">")
@@ -200,7 +200,7 @@ func TestRenderExplainView(t *testing.T) {
 			{Name: "kind", Type: "<string>", Description: "Resource kind"},
 			{Name: "spec", Type: "<Object>", Description: "Spec of the resource."},
 		}
-		result := RenderExplainView(fields, 0, 0, "A deployment.", "Deployment", "", "", "hint bar", 120, 30)
+		result := RenderExplainView(fields, 0, 0, "A deployment.", "API Explorer: Deployment", nil, "", "hint bar", 120, 30)
 		assert.Contains(t, result, "API Explorer: Deployment")
 		assert.Contains(t, result, "PATH")
 		assert.Contains(t, result, "NAME")
@@ -213,13 +213,13 @@ func TestRenderExplainView(t *testing.T) {
 		fields := []model.ExplainField{
 			{Name: "containers", Type: "<[]Container>"},
 		}
-		result := RenderExplainView(fields, 0, 0, "", "Deployment", "spec.template", "", "hints", 120, 30)
+		result := RenderExplainView(fields, 0, 0, "", "API Explorer: Deployment", []string{"spec", "template"}, "", "hints", 120, 30)
 		assert.Contains(t, result, "spec")
 		assert.Contains(t, result, "template")
 	})
 
 	t.Run("empty fields shows no fields message", func(t *testing.T) {
-		result := RenderExplainView(nil, 0, 0, "Some desc", "Pod", "", "", "", 80, 20)
+		result := RenderExplainView(nil, 0, 0, "Some desc", "Pod", nil, "", "", 80, 20)
 		assert.Contains(t, result, "No fields found")
 	})
 }
@@ -228,15 +228,15 @@ func TestRenderExplainView(t *testing.T) {
 
 func TestRenderExplainSearchOverlay(t *testing.T) {
 	t.Run("empty results with no filter shows field count", func(t *testing.T) {
-		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "", false)
+		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "", false, 60)
 		assert.Contains(t, result, "Recursive Field Browser")
 		assert.Contains(t, result, "0 fields")
-		// Hints now live in the main status bar, not inline.
+		// Hints now live in the footer, not inline navigation text.
 		assert.NotContains(t, result, "Enter: navigate")
 	})
 
 	t.Run("empty results with filter shows no matching", func(t *testing.T) {
-		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "xyz", false)
+		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "xyz", false, 60)
 		assert.Contains(t, result, "No matching fields")
 	})
 
@@ -245,40 +245,48 @@ func TestRenderExplainSearchOverlay(t *testing.T) {
 			{Name: "containers", Type: "<[]Container>", Path: "spec.template.spec"},
 			{Name: "image", Type: "<string>", Path: "spec.template.spec.containers"},
 		}
-		result := RenderExplainSearchOverlay(results, 0, 0, 15, "", false)
+		result := RenderExplainSearchOverlay(results, 0, 0, 15, "", false, 60)
 		assert.Contains(t, result, "2 fields")
 		assert.Contains(t, result, "containers")
 		assert.Contains(t, result, "<[]Container>")
 		assert.Contains(t, result, "image")
 	})
 
-	t.Run("cursor on second item", func(t *testing.T) {
+	t.Run("cursor selects an item", func(t *testing.T) {
 		results := []model.ExplainField{
-			{Name: "a", Type: "<string>", Path: "spec"},
-			{Name: "b", Type: "<Object>", Path: "spec"},
+			{Name: "alpha", Type: "<string>", Path: "spec"},
+			{Name: "beta", Type: "<Object>", Path: "spec"},
 		}
-		result := RenderExplainSearchOverlay(results, 1, 0, 15, "", false)
-		assert.Contains(t, result, ">")
+		result := RenderExplainSearchOverlay(results, 1, 0, 15, "", false, 60)
+		// Both items render; the cursor highlight is a background style, not "> ".
+		assert.Contains(t, result, "alpha")
+		assert.Contains(t, result, "beta")
 	})
 
 	t.Run("filter active shows cursor block", func(t *testing.T) {
-		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "test", true)
+		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "test", true, 60)
 		assert.Contains(t, result, "\u2588")
 		assert.Contains(t, result, "test")
 	})
 
 	t.Run("no filter shows placeholder", func(t *testing.T) {
-		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "", false)
+		result := RenderExplainSearchOverlay(nil, 0, 0, 15, "", false, 60)
 		assert.Contains(t, result, "/ to filter")
 	})
 
-	t.Run("scroll indicators shown when needed", func(t *testing.T) {
+	t.Run("scrollbar shown when overflowing", func(t *testing.T) {
 		results := make([]model.ExplainField, 30)
 		for i := range results {
 			results[i] = model.ExplainField{Name: "field", Type: "<string>", Path: "p"}
 		}
-		result := RenderExplainSearchOverlay(results, 0, 5, 10, "", false)
-		assert.Contains(t, result, "more above")
-		assert.Contains(t, result, "more below")
+		result := RenderExplainSearchOverlay(results, 0, 5, 10, "", false, 60)
+		// Unified scrollbar track glyph.
+		assert.Contains(t, result, "\u2502")
+	})
+
+	t.Run("no inline hotkey footer (hints live in the bottom bar)", func(t *testing.T) {
+		results := []model.ExplainField{{Name: "a", Type: "<string>"}}
+		result := RenderExplainSearchOverlay(results, 0, 0, 15, "", false, 60)
+		assert.NotContains(t, result, "esc close")
 	})
 }

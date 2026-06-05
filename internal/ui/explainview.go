@@ -12,9 +12,10 @@ import (
 // RenderExplainView renders the API explain browser view with a three-column layout
 // matching the main explorer style: path breadcrumb (left), field list (middle),
 // description (right).
-func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resourceDesc, title, path, searchQuery, hintBar string, width, height int) string {
-	// Title bar.
-	titleText := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render("API Explorer: " + title)
+func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resourceDesc, title string, pathSegs []string, searchQuery, hintBar string, width, height int) string {
+	// Title bar. The caller supplies the full title (e.g. "API Explorer: …"
+	// for the schema browser, "Resource: …" for the live-object browser).
+	titleText := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(title)
 
 	// Calculate column widths matching the main explorer (12%, 51%, remainder).
 	usable := width - 6 // 3 columns x 2 border chars
@@ -31,7 +32,7 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 	rightInner := max(5, rightW-colPad)
 
 	// Left column: path breadcrumb.
-	leftCol := renderExplainPath(path, title, leftInner, contentHeight)
+	leftCol := renderExplainPath(pathSegs, title, leftInner, contentHeight)
 	leftCol = PadToHeight(leftCol, contentHeight)
 	leftCol = FillLinesBg(leftCol, leftInner, BaseBg)
 	left := InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
@@ -67,7 +68,7 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 // as a vertical breadcrumb. At root level it shows just the resource name highlighted.
 // When drilled into a nested path, each segment is shown vertically with the last
 // segment highlighted as the current level.
-func renderExplainPath(path, resourceName string, width, _ int) string {
+func renderExplainPath(pathSegs []string, resourceName string, width, _ int) string {
 	var b strings.Builder
 
 	// Header.
@@ -83,28 +84,27 @@ func renderExplainPath(path, resourceName string, width, _ int) string {
 	if len(resDisplay) > width-2 {
 		resDisplay = resDisplay[:max(width-2, 0)]
 	}
-	if path == "" {
+	if len(pathSegs) == 0 {
 		// At root level - resource name is the active breadcrumb.
 		b.WriteString(HeaderStyle.Render("> " + resDisplay))
 	} else {
 		b.WriteString(DimStyle.Render("  " + resDisplay))
 	}
 
-	// Show path segments when drilled in.
-	if path != "" {
-		segments := strings.Split(path, ".")
-		for i, seg := range segments {
-			b.WriteString("\n")
-			display := seg
-			if len(display) > width-2 {
-				display = display[:width-2]
-			}
-			if i == len(segments)-1 {
-				// Current level - highlighted.
-				b.WriteString(HeaderStyle.Render("> " + display))
-			} else {
-				b.WriteString(DimStyle.Render("  " + display))
-			}
+	// Show path segments when drilled in. Segments are passed pre-split so a
+	// map key containing dots (e.g. an annotation like "app.kubernetes.io/name")
+	// stays a single breadcrumb level.
+	for i, seg := range pathSegs {
+		b.WriteString("\n")
+		display := seg
+		if len(display) > width-2 {
+			display = display[:width-2]
+		}
+		if i == len(pathSegs)-1 {
+			// Current level - highlighted.
+			b.WriteString(HeaderStyle.Render("> " + display))
+		} else {
+			b.WriteString(DimStyle.Render("  " + display))
 		}
 	}
 
@@ -286,99 +286,34 @@ func IsDrillableType(typ string) bool {
 	return false
 }
 
-// RenderExplainSearchOverlay renders the recursive field browser overlay with filter support.
-func RenderExplainSearchOverlay(results []model.ExplainField, cursor, scroll, maxVisible int, filterText string, filterActive bool) string {
-	var b strings.Builder
-	b.WriteString(OverlayTitleStyle.Render("Recursive Field Browser"))
-	b.WriteString("\n")
-
-	// Filter bar (like namespace selector).
-	switch {
-	case filterActive:
-		b.WriteString(OverlayFilterStyle.Render("/ " + filterText + "\u2588"))
-	case filterText != "":
-		b.WriteString(OverlayFilterStyle.Render("/ " + filterText))
-	default:
-		b.WriteString(OverlayDimStyle.Render("/ to filter"))
-	}
-	b.WriteString("\n")
-
-	b.WriteString(DimStyle.Render(fmt.Sprintf("  %d fields", len(results))))
-	b.WriteString("\n")
-
-	if len(results) == 0 {
-		if filterText != "" {
-			b.WriteString("\n")
-			b.WriteString(OverlayDimStyle.Render("  No matching fields"))
+// RenderExplainSearchOverlay renders the recursive field browser overlay using
+// the shared OverlayList renderer, which provides the scrollbar, filter prompt,
+// footer hint, and stable layout. Each field's type and path render as the dim
+// secondary text. innerW is the content width (overlay box width minus chrome).
+func RenderExplainSearchOverlay(results []model.ExplainField, cursor, scroll, maxVisible int, filterText string, filterActive bool, innerW int) string {
+	items := make([]OverlayListItem, len(results))
+	for i, r := range results {
+		desc := r.Type
+		if r.Path != "" {
+			if desc != "" {
+				desc += "  "
+			}
+			desc += r.Path
 		}
-		return b.String()
+		items[i] = OverlayListItem{Name: r.Name, Description: desc}
 	}
-
-	// Clamp scroll.
-	maxScroll := max(len(results)-maxVisible, 0)
-	if scroll > maxScroll {
-		scroll = maxScroll
-	}
-	if scroll < 0 {
-		scroll = 0
-	}
-
-	end := min(scroll+maxVisible, len(results))
-
-	// Calculate column widths based on visible data.
-	nameWidth := 10
-	typeWidth := 8
-	for i := scroll; i < end; i++ {
-		r := results[i]
-		if len(r.Name) > nameWidth {
-			nameWidth = len(r.Name)
-		}
-		if len(r.Type) > typeWidth {
-			typeWidth = len(r.Type)
-		}
-	}
-	nameWidth = min(nameWidth, 30)
-	typeWidth = min(typeWidth, 20)
-
-	// Show scroll-up indicator.
-	if scroll > 0 {
-		b.WriteString(DimStyle.Render(fmt.Sprintf("  (%d more above)", scroll)))
-		b.WriteString("\n")
-	}
-
-	for i := scroll; i < end; i++ {
-		r := results[i]
-		prefix := "  "
-		if i == cursor {
-			prefix = "> "
-		}
-
-		name := r.Name
-		if len(name) > nameWidth {
-			name = name[:nameWidth]
-		}
-		typ := r.Type
-		if len(typ) > typeWidth {
-			typ = typ[:typeWidth]
-		}
-
-		line := fmt.Sprintf("%s%-*s  %-*s  %s", prefix, nameWidth, name, typeWidth, typ, r.Path)
-
-		if i == cursor {
-			b.WriteString(OverlaySelectedStyle.Render(line))
-		} else {
-			b.WriteString(OverlayNormalStyle.Render(line))
-		}
-		b.WriteString("\n")
-	}
-
-	// Show scroll-down indicator.
-	if end < len(results) {
-		b.WriteString(DimStyle.Render(fmt.Sprintf("  (%d more below)", len(results)-end)))
-		b.WriteString("\n")
-	}
-
-	return b.String()
+	return RenderOverlayList(items, OverlayListConfig{
+		Title:           "Recursive Field Browser",
+		Subtitle:        fmt.Sprintf("%d fields", len(results)),
+		Cursor:          cursor,
+		Filterable:      true,
+		Filter:          filterText,
+		FilterActive:    filterActive,
+		ShowDescription: true,
+		Scroll:          scroll,
+		MaxVisible:      maxVisible,
+		EmptyMessage:    "No matching fields",
+	}, innerW)
 }
 
 // wrapText wraps a text string to the given width, breaking on word boundaries.

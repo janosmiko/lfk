@@ -61,6 +61,18 @@ You are Claude Code. I use specialized agents and skills for complex tasks.
 - If the current task already produces the relevant docs, comments, or examples, do not duplicate the same knowledge elsewhere
 - If there is no obvious project doc location, ask before creating a new top-level doc
 
+## UI / TUI Conventions (Bubble Tea)
+
+Reuse the existing TUI frameworks instead of hand-rolling. Before adding a view or overlay, look for the shared primitive first.
+
+- **Hotkeys go in the hint bar, never inside the overlay/view.** Register a case in `internal/app/overlay_hintbar.go` (`overlayHintBarSelector` / `...Dialog` / `...Editor` / `...Misc`); for full-screen modes use the mode's hint bar. Do not render an inline footer/keymap line inside the overlay box.
+- **Use the overlay-list framework for any list/selector overlay.** Build `[]ui.OverlayListItem` and call `ui.RenderOverlayList` with `ui.OverlayListConfig` — you get the scrollbar, filter prompt, stable height, cursor highlight, and description column for free. Don't draw rows, scrollbars, or "(N more below)" by hand.
+- **Registering a new overlay touches four places:** the `overlayKind` enum (`app_types.go`), key dispatch (`update_overlays.go`), render dispatch (`view_overlays.go`), and the hint bar (`overlay_hintbar.go`). Overlays are routed before mode handlers — `handleKey` checks `m.overlay != overlayNone` first.
+- **Reuse existing renderers.** YAML → `ui.RenderYAMLContent` / `ui.HighlightYAMLLine`; breadcrumb paths → `renderExplainPath` (pass `[]string` segments — k8s map keys contain dots, so never dot-join then split).
+- **Match the explorer's keybinding semantics.** e.g. `y` = copy name/path, `Y` = copy full/YAML. Before choosing a default key, check for collisions in BOTH the keybinding defaults and `case kb.X` dispatch, not just literal `case "x"` (e.g. `o` is already `JumpOwner`). Update the help section, hint bar, README, and `docs/keybindings.md` together.
+- **Full-screen viewers remember their origin.** When a viewer (YAML, etc.) can be opened from multiple places, store a return-mode so closing returns to the opener, not always the explorer.
+- **Respect the caps.** Files ≤ 800 lines (revive), gocyclo ≤ 30. Co-locate a feature's render/handler helpers in its own file rather than growing `view_overlays.go`.
+
 ---
 
 ## Success Metrics
