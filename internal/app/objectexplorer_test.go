@@ -399,9 +399,9 @@ func TestObjectExplorer_ParentLevelAndBreadcrumb(t *testing.T) {
 	require.NotEmpty(t, fields)
 	assert.Equal(t, "status", fields[cursor].Key)
 
-	// Breadcrumb shows the object name then the dotted drill path, e.g.
-	// "… > chore-1 > spec.volumes.[0]" (the name isn't in nav at LevelResources).
+	// Breadcrumb shows the object name then the JSONPath-style drill path, e.g.
+	// "… > chore-1 > spec.volumes[0]" (the name isn't in nav at LevelResources).
 	m.objectExplorerView.path = []string{"spec", "volumes", "[0]"}
 	bc := m.breadcrumb()
-	assert.Contains(t, bc, "chore-1 > spec.volumes.[0]")
+	assert.Contains(t, bc, "chore-1 > spec.volumes[0]")
 }

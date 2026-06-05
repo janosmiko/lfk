@@ -127,15 +127,16 @@ func (m Model) explorerDrillPath() []string {
 		}
 	case modeObjectExplorer:
 		// The Object Explorer adds the resource name (when the nav breadcrumb
-		// does not already show it) and the dotted path to the cursor item,
-		// e.g. "… > Pods > pod-name > spec.volumes.[0]".
+		// does not already show it) and the path to the cursor item, formatted
+		// like a JSONPath, e.g. "… > Pods > pod-name > spec.volumes[0]".
+		// formatObjectPath attaches array indices without a leading dot.
 		rt := m.objectExplorerView
 		var segs []string
 		if rt.name != "" && m.nav.ResourceName != rt.name && m.nav.OwnedName != rt.name {
 			segs = append(segs, rt.name)
 		}
 		if full := m.selectedNodePath(); len(full) > 0 {
-			segs = append(segs, strings.Join(full, "."))
+			segs = append(segs, formatObjectPath(full))
 		}
 		return segs
 	case modeExplain:
