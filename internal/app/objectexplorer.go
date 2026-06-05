@@ -375,12 +375,13 @@ func (m Model) viewObjectExplorer() string {
 		{Key: "q", Desc: "close"},
 	}, m.width)
 
+	parentFields, parentCursor := m.objectExplorerParentLevel()
 	return ui.RenderObjectExplorerView(
 		rt.visible(),
 		rt.cursor,
 		rt.scroll,
-		"Object Explorer: "+rt.title,
-		rt.path,
+		parentFields,
+		parentCursor,
 		m.selectedNodeYAML(),
 		rt.previewScroll,
 		rt.filterBar(),
@@ -388,6 +389,25 @@ func (m Model) viewObjectExplorer() string {
 		m.width,
 		m.height,
 	)
+}
+
+// objectExplorerParentLevel returns the fields of the level above the current
+// one and the index of the field that was drilled into, for the left (parent)
+// pane. Returns nil at the top level.
+func (m Model) objectExplorerParentLevel() ([]model.ObjectField, int) {
+	rt := m.objectExplorerView
+	if len(rt.path) == 0 {
+		return nil, 0
+	}
+	parent := rt.path[:len(rt.path)-1]
+	fields := model.ObjectFieldsAt(rt.root, parent)
+	key := rt.path[len(rt.path)-1]
+	for i, f := range fields {
+		if f.Key == key {
+			return fields, i
+		}
+	}
+	return fields, 0
 }
 
 // filterBar returns the filter input string to render at the bottom (in place

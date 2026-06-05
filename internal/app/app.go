@@ -84,6 +84,12 @@ type Model struct {
 	// viewer / Object Explorer.
 	explainPendingField string
 
+	// explainAncestors is the stack of API Explorer levels above the current
+	// one. It feeds the parent pane (left column) and lets back-navigation
+	// restore a level without re-fetching. Pushed on drill, popped on back;
+	// reset on a fresh open or a recursive jump.
+	explainAncestors []explainLevel
+
 	// Split preview: show children in top 1/3 + YAML in bottom 2/3 of right column.
 	splitPreview bool
 	// Full YAML preview: show only YAML in the right column (no children list).

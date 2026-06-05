@@ -105,7 +105,33 @@ func (m Model) breadcrumb() string {
 	if m.nav.OwnedName != "" && m.nav.OwnedName != m.nav.ResourceName {
 		parts = append(parts, m.nav.OwnedName)
 	}
+	// The Object Explorer and API Explorer append their drill path so the
+	// current position reads in the top breadcrumb (the left pane shows the
+	// parent level instead of the path).
+	parts = append(parts, m.explorerDrillPath()...)
 	return strings.Join(parts, " > ")
+}
+
+// explorerDrillPath returns the drill-path segments to append to the breadcrumb
+// when the Object Explorer or API Explorer is active (directly or behind help).
+func (m Model) explorerDrillPath() []string {
+	mode := m.mode
+	if mode == modeHelp {
+		mode = m.helpPreviousMode
+	}
+	// The drill path renders as a single dotted breadcrumb segment after the
+	// object name, e.g. "… > pod-name > spec.volumes.[0]".
+	switch mode {
+	case modeObjectExplorer:
+		if p := m.objectExplorerView.path; len(p) > 0 {
+			return []string{strings.Join(p, ".")}
+		}
+	case modeExplain:
+		if m.explainPath != "" {
+			return []string{m.explainPath}
+		}
+	}
+	return nil
 }
 
 // renderStatusHint paints m.statusMessage in the status-bar style at full

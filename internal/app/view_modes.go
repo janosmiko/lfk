@@ -221,17 +221,6 @@ func highlightDescribeSearchLine(line, lowerQuery string) string {
 	return result.String()
 }
 
-// explainPathSegs splits the API Explorer's dot-joined drill path into
-// breadcrumb segments. Schema field names never contain dots, so a plain split
-// is safe here (the resource tree, whose keys can contain dots, keeps its path
-// as a []string and never round-trips through a joined string).
-func explainPathSegs(path string) []string {
-	if path == "" {
-		return nil
-	}
-	return strings.Split(path, ".")
-}
-
 func (m Model) viewExplain() string {
 	searchQuery := m.explainSearchQuery
 	if m.explainSearchActive {
@@ -258,13 +247,14 @@ func (m Model) viewExplain() string {
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
+	parentFields, parentCursor := m.explainParentLevel()
 	return ui.RenderExplainView(
 		m.explainFields,
 		m.explainCursor,
 		m.explainScroll,
 		m.explainDesc,
-		"API Explorer: "+m.explainTitle,
-		explainPathSegs(m.explainPath),
+		parentFields,
+		parentCursor,
 		searchQuery,
 		hint,
 		m.width,

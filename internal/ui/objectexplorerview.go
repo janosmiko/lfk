@@ -10,13 +10,13 @@ import (
 )
 
 // RenderObjectExplorerView renders the Object Explorer: a three-column
-// layout (PATH breadcrumb | NAME/VALUE field list | YAML PREVIEW of the
+// Miller layout (PARENT level | current NAME/VALUE list | YAML PREVIEW of the
 // selected node). It mirrors the API Explorer's layout but shows live values:
 // each row carries an inline value preview, and the right column renders the
 // selected node's subtree as colorized YAML instead of a schema description.
-func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, title string, pathSegs []string, previewYAML string, previewScroll int, filterBar, hintBar string, width, height int) string {
-	titleText := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(title)
-
+// The drill path and resource identity live in the top breadcrumb, so this
+// view has no title line of its own.
+func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, parentFields []model.ObjectField, parentCursor int, previewYAML string, previewScroll int, filterBar, hintBar string, width, height int) string {
 	// The bottom bar shows the filter input when filtering (like the API
 	// Explorer's search), otherwise the key hints.
 	bottomBar := hintBar
@@ -30,15 +30,19 @@ func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, ti
 	middleW := max(10, usable*51/100)
 	rightW := max(10, usable-leftW-middleW)
 
-	contentHeight := max(height-4, 3)
+	contentHeight := max(height-3, 3)
 
 	colPad := 2
 	leftInner := max(5, leftW-colPad)
 	middleInner := max(5, middleW-colPad)
 	rightInner := max(5, rightW-colPad)
 
-	// Left column: path breadcrumb (reused from the API Explorer).
-	leftCol := renderExplainPath(pathSegs, title, leftInner, contentHeight)
+	// Left column: the parent level's keys only (no values), with the
+	// drilled-into item highlighted (Miller-columns parent pane). Empty at the
+	// top level.
+	leftHeader := DimStyle.Bold(true).Render("PARENT")
+	leftBody := strings.Join(renderObjectKeyList(parentFields, parentCursor, leftInner, contentHeight-1), "\n")
+	leftCol := leftHeader + "\n" + leftBody
 	leftCol = PadToHeight(leftCol, contentHeight)
 	leftCol = FillLinesBg(leftCol, leftInner, BaseBg)
 	left := InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
@@ -67,7 +71,7 @@ func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, ti
 	right := InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
-	return lipgloss.JoinVertical(lipgloss.Left, titleText, columns, bottomBar)
+	return lipgloss.JoinVertical(lipgloss.Left, columns, bottomBar)
 }
 
 // scrollYAML drops the first n lines of a YAML block for the preview pane.
@@ -143,6 +147,40 @@ func renderResourceFieldList(fields []model.ObjectField, cursor, scroll, width, 
 
 	for len(lines) < maxLines {
 		lines = append(lines, "")
+	}
+	return lines
+}
+
+// renderObjectKeyList renders a keys-only list (no inline values) for the
+// parent pane, with the drilled-into row highlighted and a "›" marker on
+// drillable keys. Scrolls to keep the cursor visible.
+func renderObjectKeyList(fields []model.ObjectField, cursor, width, maxLines int) []string {
+	if len(fields) == 0 {
+		return []string{DimStyle.Render("(top level)")}
+	}
+	scroll := 0
+	if cursor >= maxLines {
+		scroll = cursor - maxLines + 1
+	}
+	end := min(scroll+maxLines, len(fields))
+	lines := make([]string, 0, end-scroll)
+	for i := scroll; i < end; i++ {
+		f := fields[i]
+		prefix := "  "
+		if i == cursor {
+			prefix = "> "
+		}
+		line := prefix + f.Key
+		if f.HasChildren {
+			line += " ›"
+		}
+		line = Truncate(line, width)
+		if i == cursor {
+			line = OverlaySelectedStyle.Render(line)
+		} else {
+			line = NormalStyle.Render(line)
+		}
+		lines = append(lines, line)
 	}
 	return lines
 }

@@ -813,3 +813,36 @@ func TestExplainExitReturnsToOpener(t *testing.T) {
 	assert.Equal(t, modeYAML, m.mode)
 	assert.Equal(t, modeExplorer, m.explainReturnMode) // reset for next open
 }
+
+// --- API Explorer ancestor stack (parent pane + back) ---
+
+func TestExplainGoBack_PopsAncestorStackWithoutRefetch(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeExplain
+	m.explainPath = "spec.template"
+	m.explainFields = []model.ExplainField{{Name: "child"}}
+	m.explainAncestors = []explainLevel{
+		{fields: []model.ExplainField{{Name: "spec"}}, cursor: 0, path: ""},
+		{fields: []model.ExplainField{{Name: "x"}, {Name: "template"}}, cursor: 1, path: "spec"},
+	}
+	mdl, cmd := m.explainGoBack()
+	rm := mdl.(Model)
+	assert.Nil(t, cmd) // restored from cache, no kubectl refetch
+	assert.Equal(t, "spec", rm.explainPath)
+	assert.Equal(t, 1, rm.explainCursor)
+	assert.Len(t, rm.explainAncestors, 1)
+}
+
+func TestExplainParentLevel(t *testing.T) {
+	m := basePush80Model()
+	m.explainAncestors = []explainLevel{
+		{fields: []model.ExplainField{{Name: "a"}, {Name: "b"}}, cursor: 1},
+	}
+	fields, cursor := m.explainParentLevel()
+	assert.Len(t, fields, 2)
+	assert.Equal(t, 1, cursor)
+
+	m.explainAncestors = nil
+	fields, _ = m.explainParentLevel()
+	assert.Nil(t, fields)
+}

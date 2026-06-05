@@ -380,9 +380,27 @@ func TestObjectExplorer_QClosesAndViewRenders(t *testing.T) {
 	m = result.(Model)
 
 	out := m.viewObjectExplorer()
-	assert.Contains(t, out, "Object Explorer: Chore/chore-1")
+	// The resource identity lives in the top breadcrumb now, not an internal
+	// title; the view renders the Miller columns.
+	assert.Contains(t, out, "PARENT")
 	assert.Contains(t, out, "status")
 
 	m = pressTree(m, key("q"))
 	assert.Equal(t, modeExplorer, m.mode)
+}
+
+func TestObjectExplorer_ParentLevelAndBreadcrumb(t *testing.T) {
+	m := objectExplorerModel(t)
+	result, _ := m.openObjectExplorer()
+	m = result.(Model)
+	m = drillTo(t, m, "status") // path = ["status"]
+
+	// Parent pane = root level, cursor on the drilled-into "status".
+	fields, cursor := m.objectExplorerParentLevel()
+	require.NotEmpty(t, fields)
+	assert.Equal(t, "status", fields[cursor].Key)
+
+	// Breadcrumb appends the dotted drill path.
+	m.objectExplorerView.path = []string{"spec", "volumes", "[0]"}
+	assert.Contains(t, m.breadcrumb(), "spec.volumes.[0]")
 }

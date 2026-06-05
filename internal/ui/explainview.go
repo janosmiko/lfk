@@ -9,21 +9,18 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
-// RenderExplainView renders the API explain browser view with a three-column layout
-// matching the main explorer style: path breadcrumb (left), field list (middle),
-// description (right).
-func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resourceDesc, title string, pathSegs []string, searchQuery, hintBar string, width, height int) string {
-	// Title bar. The caller supplies the full title (e.g. "API Explorer: …"
-	// for the schema browser, "Resource: …" for the live-object browser).
-	titleText := TitleStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(title)
-
+// RenderExplainView renders the API explain browser as a three-column Miller
+// layout: parent level keys (left), current field list (middle), description
+// (right). The drill path lives in the top breadcrumb, so there is no title
+// line of its own.
+func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resourceDesc string, parentFields []model.ExplainField, parentCursor int, searchQuery, hintBar string, width, height int) string {
 	// Calculate column widths matching the main explorer (12%, 51%, remainder).
 	usable := width - 6 // 3 columns x 2 border chars
 	leftW := max(10, usable*12/100)
 	middleW := max(10, usable*51/100)
 	rightW := max(10, usable-leftW-middleW)
 
-	contentHeight := max(height-4, 3) // title + hint bar + borders
+	contentHeight := max(height-3, 3) // hint bar + borders
 
 	// Column padding is 1 on each side, so inner content width is 2 less.
 	colPad := 2
@@ -31,8 +28,9 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 	middleInner := max(5, middleW-colPad)
 	rightInner := max(5, rightW-colPad)
 
-	// Left column: path breadcrumb.
-	leftCol := renderExplainPath(pathSegs, title, leftInner, contentHeight)
+	// Left column: the parent level's keys only, drilled-into row highlighted.
+	leftHeader := DimStyle.Bold(true).Render("PARENT")
+	leftCol := leftHeader + "\n" + strings.Join(renderExplainKeyList(parentFields, parentCursor, leftInner, contentHeight-1), "\n")
 	leftCol = PadToHeight(leftCol, contentHeight)
 	leftCol = FillLinesBg(leftCol, leftInner, BaseBg)
 	left := InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
@@ -61,54 +59,41 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
 
-	return lipgloss.JoinVertical(lipgloss.Left, titleText, columns, hintBar)
+	return lipgloss.JoinVertical(lipgloss.Left, columns, hintBar)
 }
 
-// renderExplainPath renders the left column content showing the drill-down path
-// as a vertical breadcrumb. At root level it shows just the resource name highlighted.
-// When drilled into a nested path, each segment is shown vertically with the last
-// segment highlighted as the current level.
-func renderExplainPath(pathSegs []string, resourceName string, width, _ int) string {
-	var b strings.Builder
-
-	// Header.
-	b.WriteString(DimStyle.Bold(true).Render("PATH"))
-	b.WriteString("\n")
-
-	// Resource name at top (always shown). Truncate to width-2 so the
-	// "> " / "  " prefix doesn't push the rendered line past the column
-	// boundary — lipgloss wraps overflow, which made the bottom border
-	// fall off-screen on long resource group names (e.g. an
-	// "applications (argoproj.io/v1alpha1)" header wider than leftInner).
-	resDisplay := resourceName
-	if len(resDisplay) > width-2 {
-		resDisplay = resDisplay[:max(width-2, 0)]
+// renderExplainKeyList renders a keys-only (field names) list for the parent
+// pane, with the drilled-into row highlighted and a "›" marker on drillable
+// fields. Scrolls to keep the cursor visible. Empty at the top level.
+func renderExplainKeyList(fields []model.ExplainField, cursor, width, maxLines int) []string {
+	if len(fields) == 0 {
+		return []string{DimStyle.Render("(top level)")}
 	}
-	if len(pathSegs) == 0 {
-		// At root level - resource name is the active breadcrumb.
-		b.WriteString(HeaderStyle.Render("> " + resDisplay))
-	} else {
-		b.WriteString(DimStyle.Render("  " + resDisplay))
+	scroll := 0
+	if cursor >= maxLines {
+		scroll = cursor - maxLines + 1
 	}
-
-	// Show path segments when drilled in. Segments are passed pre-split so a
-	// map key containing dots (e.g. an annotation like "app.kubernetes.io/name")
-	// stays a single breadcrumb level.
-	for i, seg := range pathSegs {
-		b.WriteString("\n")
-		display := seg
-		if len(display) > width-2 {
-			display = display[:width-2]
+	end := min(scroll+maxLines, len(fields))
+	lines := make([]string, 0, end-scroll)
+	for i := scroll; i < end; i++ {
+		f := fields[i]
+		prefix := "  "
+		if i == cursor {
+			prefix = "> "
 		}
-		if i == len(pathSegs)-1 {
-			// Current level - highlighted.
-			b.WriteString(HeaderStyle.Render("> " + display))
+		line := prefix + f.Name
+		if IsDrillableType(f.Type) {
+			line += " ›"
+		}
+		line = Truncate(line, width)
+		if i == cursor {
+			line = OverlaySelectedStyle.Render(line)
 		} else {
-			b.WriteString(DimStyle.Render("  " + display))
+			line = NormalStyle.Render(line)
 		}
+		lines = append(lines, line)
 	}
-
-	return b.String()
+	return lines
 }
 
 // renderFieldList renders the scrollable field list for the middle column.

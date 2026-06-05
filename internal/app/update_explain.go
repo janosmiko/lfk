@@ -65,6 +65,7 @@ func (m Model) openExplainBrowser() (tea.Model, tea.Cmd) {
 	m.loading = true
 	m.explainReturnMode = modeExplorer
 	m.explainPendingField = ""
+	m.explainAncestors = nil
 	m.explainResource = resource
 	m.explainAPIVersion = apiVersion
 	m.setStatusMessage("Loading API Explorer...", false)
@@ -91,6 +92,7 @@ func (m Model) openExplainAtObjectPath(objPath []string, returnMode viewMode) (t
 	m.loading = true
 	m.explainReturnMode = returnMode
 	m.explainPendingField = field
+	m.explainAncestors = nil
 	m.explainResource = resource
 	m.explainAPIVersion = apiVersion
 	m.setStatusMessage("Loading API Explorer...", false)
@@ -127,12 +129,64 @@ func buildExplainResourceFromType(rt model.ResourceTypeEntry) (resource, apiVers
 	return rt.Resource, ""
 }
 
+// explainLevel is a snapshot of one API Explorer level, kept on the ancestor
+// stack so the parent pane can render it and back-navigation can restore it
+// without re-fetching.
+type explainLevel struct {
+	fields []model.ExplainField
+	cursor int
+	scroll int
+	path   string
+	desc   string
+	title  string
+}
+
+// explainParentLevel returns the fields and cursor of the level above the
+// current one (top of the ancestor stack), for the parent pane. Nil at root.
+func (m Model) explainParentLevel() ([]model.ExplainField, int) {
+	if n := len(m.explainAncestors); n > 0 {
+		p := m.explainAncestors[n-1]
+		return p.fields, p.cursor
+	}
+	return nil, 0
+}
+
+// explainGoBack steps back one level: it pops a cached ancestor when available
+// (no re-fetch), else re-fetches the parent path, else exits at the root.
+func (m Model) explainGoBack() (tea.Model, tea.Cmd) {
+	if n := len(m.explainAncestors); n > 0 {
+		p := m.explainAncestors[n-1]
+		m.explainAncestors = m.explainAncestors[:n-1]
+		m.explainFields = p.fields
+		m.explainCursor = p.cursor
+		m.explainScroll = p.scroll
+		m.explainPath = p.path
+		m.explainDesc = p.desc
+		m.explainTitle = p.title
+		return m, nil
+	}
+	if m.explainPath == "" {
+		m.exitExplainView()
+		return m, nil
+	}
+	newPath := m.explainPath
+	if idx := strings.LastIndex(newPath, "."); idx >= 0 {
+		newPath = newPath[:idx]
+	} else {
+		newPath = ""
+	}
+	m.loading = true
+	m.setStatusMessage("Loading parent...", false)
+	return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, newPath)
+}
+
 // exitExplainView resets all explain state and returns to the mode the API
 // Explorer was opened from (the explorer by default; the YAML viewer or
-// resource tree when opened from there via the I key).
+// Object Explorer when opened from there via the I key).
 func (m *Model) exitExplainView() {
 	m.mode = m.explainReturnMode
 	m.explainReturnMode = modeExplorer
+	m.explainAncestors = nil
 	m.explainFields = nil
 	m.explainDesc = ""
 	m.explainPath = ""
@@ -406,6 +460,7 @@ func (m Model) handleExplainSearchOverlayNormalKey(msg tea.KeyMsg) (tea.Model, t
 			m.overlay = overlayNone
 			m.explainRecursiveFilter.Clear()
 			m.explainRecursiveFilterActive = false
+			m.explainAncestors = nil // jumped to an arbitrary path; no cached chain
 			m.loading = true
 			return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, parentPath)
 		}
@@ -524,6 +579,12 @@ func (m Model) handleExplainKeyDrill(fieldCount int) (tea.Model, tea.Cmd) {
 	if m.explainCursor >= 0 && m.explainCursor < fieldCount {
 		f := m.explainFields[m.explainCursor]
 		if ui.IsDrillableType(f.Type) {
+			// Push the current level onto the ancestor stack so it renders in
+			// the parent pane and back-navigation can restore it.
+			m.explainAncestors = append(m.explainAncestors, explainLevel{
+				fields: m.explainFields, cursor: m.explainCursor, scroll: m.explainScroll,
+				path: m.explainPath, desc: m.explainDesc, title: m.explainTitle,
+			})
 			m.loading = true
 			m.setStatusMessage("Loading field...", false)
 			return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, f.Path)
@@ -554,27 +615,14 @@ func (m Model) handleExplainKeyQ() (tea.Model, tea.Cmd) {
 
 func (m Model) handleExplainKeyEsc() (tea.Model, tea.Cmd) {
 	m.explainLineInput = ""
-	// When opened from the YAML viewer / resource tree, Esc returns straight to
-	// that opener (use h/Backspace to walk schema levels instead).
+	// When opened from the YAML viewer / Object Explorer, Esc returns straight
+	// to that opener (use h/Backspace to walk schema levels instead).
 	if m.explainReturnMode != modeExplorer {
 		m.exitExplainView()
 		return m, nil
 	}
-	// Step back one level; exit only at root.
-	if m.explainPath == "" {
-		m.exitExplainView()
-		return m, nil
-	}
-	// Go back one level (same as h/left/backspace).
-	newPath := m.explainPath
-	if idx := strings.LastIndex(newPath, "."); idx >= 0 {
-		newPath = newPath[:idx]
-	} else {
-		newPath = ""
-	}
-	m.loading = true
-	m.setStatusMessage("Loading parent...", false)
-	return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, newPath)
+	// Step back one level (pop the ancestor stack), exit at root.
+	return m.explainGoBack()
 }
 
 func (m Model) handleExplainKeySlash() (tea.Model, tea.Cmd) {
@@ -662,20 +710,5 @@ func (m Model) handleExplainKeyZero() (tea.Model, tea.Cmd) {
 
 func (m Model) handleExplainKeyH() (tea.Model, tea.Cmd) {
 	m.explainLineInput = ""
-	// Go back one level in the path.
-	if m.explainPath == "" {
-		// Already at root: exit explain view.
-		m.exitExplainView()
-		return m, nil
-	}
-	// Trim the last path segment.
-	newPath := m.explainPath
-	if idx := strings.LastIndex(newPath, "."); idx >= 0 {
-		newPath = newPath[:idx]
-	} else {
-		newPath = ""
-	}
-	m.loading = true
-	m.setStatusMessage("Loading parent...", false)
-	return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, newPath)
+	return m.explainGoBack()
 }
