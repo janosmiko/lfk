@@ -21,6 +21,7 @@ type objectExplorerState struct {
 	cursor int                 // index into the visible (filtered) level
 	scroll int
 	title  string // "Kind/Name"
+	name   string // the resource's name, for the breadcrumb
 
 	// In-level filter: substring match on keys at the current level.
 	filter       string
@@ -80,6 +81,7 @@ func (m Model) openObjectExplorer() (tea.Model, tea.Cmd) {
 	m.objectExplorerView = objectExplorerState{
 		root:  sel.Raw,
 		title: sel.Kind + "/" + sel.Name,
+		name:  sel.Name,
 	}
 	m.objectExplorerView.level = model.ObjectFieldsAt(sel.Raw, nil)
 	m.mode = modeObjectExplorer

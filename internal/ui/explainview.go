@@ -62,9 +62,9 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 	return lipgloss.JoinVertical(lipgloss.Left, columns, hintBar)
 }
 
-// renderExplainKeyList renders a keys-only (field names) list for the parent
-// pane, with the drilled-into row highlighted and a "›" marker on drillable
-// fields. Scrolls to keep the cursor visible. Empty at the top level.
+// renderExplainKeyList renders a keys-only (field names, no markers) list for
+// the parent pane. The drilled-into row carries the main explorer's selection
+// highlight. Scrolls to keep the cursor visible. Empty at the top level.
 func renderExplainKeyList(fields []model.ExplainField, cursor, width, maxLines int) []string {
 	if len(fields) == 0 {
 		return []string{DimStyle.Render("(top level)")}
@@ -76,22 +76,7 @@ func renderExplainKeyList(fields []model.ExplainField, cursor, width, maxLines i
 	end := min(scroll+maxLines, len(fields))
 	lines := make([]string, 0, end-scroll)
 	for i := scroll; i < end; i++ {
-		f := fields[i]
-		prefix := "  "
-		if i == cursor {
-			prefix = "> "
-		}
-		line := prefix + f.Name
-		if IsDrillableType(f.Type) {
-			line += " ›"
-		}
-		line = Truncate(line, width)
-		if i == cursor {
-			line = OverlaySelectedStyle.Render(line)
-		} else {
-			line = NormalStyle.Render(line)
-		}
-		lines = append(lines, line)
+		lines = append(lines, renderKeyRow(fields[i].Name, i == cursor, width))
 	}
 	return lines
 }

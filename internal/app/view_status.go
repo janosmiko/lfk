@@ -119,13 +119,20 @@ func (m Model) explorerDrillPath() []string {
 	if mode == modeHelp {
 		mode = m.helpPreviousMode
 	}
-	// The drill path renders as a single dotted breadcrumb segment after the
-	// object name, e.g. "… > pod-name > spec.volumes.[0]".
+	// The Object Explorer adds the resource name (when the nav breadcrumb does
+	// not already show it) followed by the drill path as one dotted segment,
+	// e.g. "… > Pods > pod-name > spec.volumes.[0]".
 	switch mode {
 	case modeObjectExplorer:
-		if p := m.objectExplorerView.path; len(p) > 0 {
-			return []string{strings.Join(p, ".")}
+		rt := m.objectExplorerView
+		var segs []string
+		if rt.name != "" && m.nav.ResourceName != rt.name && m.nav.OwnedName != rt.name {
+			segs = append(segs, rt.name)
 		}
+		if len(rt.path) > 0 {
+			segs = append(segs, strings.Join(rt.path, "."))
+		}
+		return segs
 	case modeExplain:
 		if m.explainPath != "" {
 			return []string{m.explainPath}

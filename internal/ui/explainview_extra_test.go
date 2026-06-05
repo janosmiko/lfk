@@ -41,7 +41,7 @@ func TestRenderExplainKeyList(t *testing.T) {
 		assert.Contains(t, strings.Join(lines, "\n"), "top level")
 	})
 
-	t.Run("keys only with drill marker and cursor", func(t *testing.T) {
+	t.Run("keys only, no arrows or markers", func(t *testing.T) {
 		fields := []model.ExplainField{
 			{Name: "spec", Type: "<Object>"},
 			{Name: "status", Type: "<Object>"},
@@ -49,7 +49,8 @@ func TestRenderExplainKeyList(t *testing.T) {
 		out := strings.Join(renderExplainKeyList(fields, 1, 20, 10), "\n")
 		assert.Contains(t, out, "spec")
 		assert.Contains(t, out, "status")
-		assert.Contains(t, out, "›") // drillable marker
+		assert.NotContains(t, out, "›")  // no trailing drill marker
+		assert.NotContains(t, out, "> ") // no leading cursor arrow
 	})
 }
 

@@ -151,9 +151,9 @@ func renderResourceFieldList(fields []model.ObjectField, cursor, scroll, width, 
 	return lines
 }
 
-// renderObjectKeyList renders a keys-only list (no inline values) for the
-// parent pane, with the drilled-into row highlighted and a "›" marker on
-// drillable keys. Scrolls to keep the cursor visible.
+// renderObjectKeyList renders a keys-only list (no values, no markers) for the
+// parent pane. The drilled-into row carries the same full-width background
+// highlight as the main explorer's selected row. Scrolls to keep it visible.
 func renderObjectKeyList(fields []model.ObjectField, cursor, width, maxLines int) []string {
 	if len(fields) == 0 {
 		return []string{DimStyle.Render("(top level)")}
@@ -165,22 +165,20 @@ func renderObjectKeyList(fields []model.ObjectField, cursor, width, maxLines int
 	end := min(scroll+maxLines, len(fields))
 	lines := make([]string, 0, end-scroll)
 	for i := scroll; i < end; i++ {
-		f := fields[i]
-		prefix := "  "
-		if i == cursor {
-			prefix = "> "
-		}
-		line := prefix + f.Key
-		if f.HasChildren {
-			line += " ›"
-		}
-		line = Truncate(line, width)
-		if i == cursor {
-			line = OverlaySelectedStyle.Render(line)
-		} else {
-			line = NormalStyle.Render(line)
-		}
-		lines = append(lines, line)
+		lines = append(lines, renderKeyRow(fields[i].Key, i == cursor, width))
 	}
 	return lines
+}
+
+// renderKeyRow renders one parent-pane key, highlighting the selected row with
+// the main explorer's selection style spanning the full column width.
+func renderKeyRow(key string, selected bool, width int) string {
+	line := Truncate(" "+key, width)
+	if !selected {
+		return NormalStyle.Render(line)
+	}
+	if pad := width - lipgloss.Width(line); pad > 0 {
+		line += strings.Repeat(" ", pad)
+	}
+	return SelectedStyle.Render(line)
 }
