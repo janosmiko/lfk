@@ -80,6 +80,7 @@ Reuse existing TUI primitives instead of hand-rolling. Look for a shared helper 
 - Any movable cursor must scroll to stay visible — use `ui.VimScrollOff` (`explorer_highlight.go`) for the scrolloff viewport; don't recompute the window ad-hoc.
 - Cursor movement is vim-style: `j`/`k`, `g`/`G` (top/bottom), `ctrl+d`/`ctrl+u` (half-page), `ctrl+f`/`ctrl+b` (full page), arrows + pgup/pgdn as aliases (the `kb.*` defaults).
 - Text viewers add the fuller vim set: word motions `w`/`b`/`e` (+ `W`/`B`/`E` WORD), line `0`/`^`/`$`, visual mode `v`/`V`/`ctrl+v` (char/line/block), and text objects `viw`/`vaw`/`viW`/`vaW`. Reuse `update_vim.go` (`innerWordRange`/`innerWORDRange`) — don't reimplement.
+- Motions take a vim count prefix (`5j`, `3w`, `10G`): digits `1`-`9` accumulate in `<view>.lineInput`; read it with `consumeCountPrefix` (`count_prefix.go`), don't hand-parse.
 - Full-screen viewers store a return-mode so closing returns to the opener, not always the explorer.
 - Caps: files ≤ 800 lines (revive), gocyclo ≤ 30. Co-locate a feature's helpers in its own file.
 
