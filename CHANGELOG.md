@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.13.6](https://github.com/janosmiko/lfk/compare/v0.13.5...v0.13.6) (2026-06-05)
+
+
+### Features
+
+* **preview:** generic status summary for any kind with phase/conditions ([#352](https://github.com/janosmiko/lfk/issues/352)) ([#364](https://github.com/janosmiko/lfk/issues/364)) ([65a4126](https://github.com/janosmiko/lfk/commit/65a412679f6207a238b94d326a1ec5c7fd35d500))
+
+
+### Bug Fixes
+
+* **preview:** let the right pane scroll long lists to the bottom ([#365](https://github.com/janosmiko/lfk/issues/365)) ([06a9c27](https://github.com/janosmiko/lfk/commit/06a9c27fcd409cd50932175c66e2a618a901f629))
+* **ui:** compress Name so configured columns survive the three-pane list ([#354](https://github.com/janosmiko/lfk/issues/354)) ([#362](https://github.com/janosmiko/lfk/issues/362)) ([98ac369](https://github.com/janosmiko/lfk/commit/98ac369695bf5ba238758628c5e94c3c422c995c))
+
 ## [0.13.5](https://github.com/janosmiko/lfk/compare/v0.13.4...v0.13.5) (2026-06-03)
 
 
