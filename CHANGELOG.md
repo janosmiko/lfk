@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.13.7](https://github.com/janosmiko/lfk/compare/v0.13.6...v0.13.7) (2026-06-05)
+
+
+### Features
+
+* Object Explorer — browse a resource's live object (closes [#361](https://github.com/janosmiko/lfk/issues/361)) ([#366](https://github.com/janosmiko/lfk/issues/366)) ([f626a77](https://github.com/janosmiko/lfk/commit/f626a7793232ada0933a5400626f5b152b91bd52))
+
 ## [0.13.6](https://github.com/janosmiko/lfk/compare/v0.13.5...v0.13.6) (2026-06-05)
 
 
