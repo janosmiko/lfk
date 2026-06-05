@@ -76,6 +76,16 @@ var ActiveTableLayout *TableLayoutCache
 // Same semantics as ActiveMiddleScroll.
 var ActiveLeftScroll int
 
+// ActiveRightScroll windows a non-cursor RenderTable (the right preview pane's
+// resource list) to start at this item index, so a long list renders only the
+// visible rows instead of every row from the top down (which made each frame
+// O(scroll position)). Column widths are still computed over all items, so the
+// layout stays stable while scrolling. -1 (the default) means "no windowing".
+// It applies only to a cursor-less RenderTable (cursor < 0); the middle column
+// always renders with a real cursor, so it is never affected and none of its
+// click/sort globals are touched.
+var ActiveRightScroll = -1
+
 // ActiveMiddleLineMap maps display line numbers (0-based, relative to content
 // start after the column/table header) to item indices. A value of -1 means
 // the line is non-clickable (separator or category header). Built during

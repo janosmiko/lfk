@@ -455,6 +455,15 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 		}
 	}
 
+	// Right preview pane: window the list to start at ActiveRightScroll so only
+	// the visible rows render, regardless of how far the user has scrolled. Gated
+	// on the cursor-less render (cursor < 0) so the middle column — which always
+	// renders with a real cursor — is never affected, and ActiveRightScroll
+	// defaults to -1 everywhere else.
+	if cursor < 0 && ActiveRightScroll >= 0 {
+		startIdx = min(ActiveRightScroll, max(len(items)-1, 0))
+	}
+
 	usedLines := 0
 	endIdx := startIdx
 	for endIdx < len(items) {

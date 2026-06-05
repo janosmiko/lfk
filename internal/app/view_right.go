@@ -18,6 +18,7 @@ func (m *Model) clearRight() {
 	m.yamlView.sections = nil
 	m.previewYAML = ""
 	m.previewScroll = 0
+	m.previewMeasureLines = 0 // force the scroll measurement to recompute for the new preview
 	m.metricsContent = ""
 	m.previewEventsContent = ""
 	m.metricsData = nil
@@ -83,29 +84,82 @@ func (m *Model) clampPreviewScroll() {
 		}
 	}
 
-	// Get the scrollable content line count.
-	// Use the actual scrollable height (not 10000) to avoid inflated YAML fill.
-	measureH := max(
-		// enough headroom for scroll, but not inflated
-		scrollableH*3, 200)
-	var totalLines int
-	if m.hasSplitPreview() {
-		fullContent := m.renderDetailsOnly(innerW, measureH)
-		totalLines = strings.Count(fullContent, "\n") + 1
-	} else {
-		fullContent := m.renderRightColumnContent(innerW, measureH)
-		totalLines = strings.Count(fullContent, "\n") + 1
-	}
-
-	// Include events in the scrollable content (they scroll with details).
-	if !m.fullYAMLPreview && m.previewEventsContent != "" {
-		totalLines += 1 + strings.Count(m.previewEventsContent, "\n") + 1 // separator + event lines
-	}
-
+	totalLines := m.measureScrollableLines(innerW, scrollableH)
 	maxScroll := max(totalLines-scrollableH, 0)
 	if m.previewScroll > maxScroll {
 		m.previewScroll = maxScroll
 	}
+}
+
+// previewMeasureKey fingerprints the inputs that determine the scrollable
+// right-pane line count, so measureScrollableLines can memoize the result and
+// avoid re-rendering a large list on every scroll keystroke.
+type previewMeasureKey struct {
+	innerW      int
+	scrollableH int
+	rightLen    int
+	level       model.Level
+	split       bool
+	mapView     bool
+	fullYAML    bool
+	yamlLen     int
+	dashLen     int
+	eventsLen   int
+}
+
+// measureScrollableLines returns the line count of the scrollable right-pane
+// content, memoized on previewMeasureKey. The expensive measurement renders the
+// content once at a height tall enough to hold all of it (so a long list or YAML
+// document can scroll to the end — see the issue where the right pane froze
+// ~halfway down a few-hundred-item list because the height was capped). While
+// the user scrolls, the key is unchanged so this is O(1); it recomputes only
+// when the content or layout changes.
+func (m *Model) measureScrollableLines(innerW, scrollableH int) int {
+	yaml := m.previewYAML
+	if yaml == "" {
+		yaml = m.yamlView.content
+	}
+	key := previewMeasureKey{
+		innerW:      innerW,
+		scrollableH: scrollableH,
+		rightLen:    len(m.rightItems),
+		level:       m.nav.Level,
+		split:       m.hasSplitPreview(),
+		mapView:     m.mapView,
+		fullYAML:    m.fullYAMLPreview,
+		yamlLen:     len(yaml),
+		dashLen:     len(m.dashboardPreview) + len(m.monitoringPreview),
+		eventsLen:   len(m.previewEventsContent),
+	}
+	if key == m.previewMeasureKey && m.previewMeasureLines > 0 {
+		return m.previewMeasureLines
+	}
+
+	// Measure at a height large enough to hold any realistic content so the true
+	// line count is captured and the pane can scroll to the very end — long
+	// resource lists AND long text details (e.g. a ConfigMap with a multi-line
+	// data value). Every right-pane renderer only truncates at its height
+	// argument, never pads up to it (RenderTable / RenderYAMLContent /
+	// RenderResourceSummary / RenderResourceTree / detail renderers), so an
+	// oversized measure height never invents phantom lines. This render is
+	// memoized on previewMeasureKey, so the O(content) cost is paid once per
+	// content change, not per scroll keystroke.
+	const measureH = 1 << 20
+
+	var totalLines int
+	if key.split {
+		totalLines = strings.Count(m.renderDetailsOnly(innerW, measureH), "\n") + 1
+	} else {
+		totalLines = strings.Count(m.renderRightColumnContent(innerW, measureH), "\n") + 1
+	}
+	// Events scroll with the details content (excluded in full-YAML mode).
+	if !m.fullYAMLPreview && m.previewEventsContent != "" {
+		totalLines += 1 + strings.Count(m.previewEventsContent, "\n") + 1 // separator + event lines
+	}
+
+	m.previewMeasureKey = key
+	m.previewMeasureLines = totalLines
+	return totalLines
 }
 
 // previewSummaryBand renders the aggregate status band pinned at the bottom of
@@ -164,7 +218,10 @@ func (m Model) renderRightColumn(width, height int) string {
 	}
 	contentHeight := max(height-footerLines, 3)
 
-	// Pin children table at the top when in split preview mode.
+	// Pin children table at the top when in split preview mode. This RenderTable
+	// is cursor-less but runs before ActiveRightScroll is set below, and split
+	// preview (LevelResources/Owned) is mutually exclusive with the windowed list
+	// preview (LevelResourceTypes), so it never picks up the windowing.
 	pinnedHeader := ""
 	pinnedHeaderLines := 0
 	if m.hasSplitPreview() {
@@ -181,23 +238,50 @@ func (m Model) renderRightColumn(width, height int) string {
 		}
 	}
 
-	// Render the scrollable content (details only when split preview, full content otherwise).
-	renderHeight := contentHeight + m.previewScroll
+	// Render the scrollable content. For the resource-type list preview the
+	// content is a plain item table that can be very long, so render it windowed
+	// (only the visible rows) via ActiveRightScroll \u2014 each frame is O(viewport)
+	// instead of O(scroll position). The output is kept byte-identical to the
+	// generic render-then-slice path so windowing is a pure performance change:
+	// previewScroll is a display-line offset where line 0 is the table header and
+	// line i (i>=1) is rightItems[i-1], so a scrolled view drops the header and
+	// starts at item previewScroll-1. We render that window (one extra row to
+	// replace the dropped header) and strip the header line. Other content
+	// (details, YAML, tree) is small and uses the generic path below.
+	listPreview := m.isRightListPreview()
 	var result string
-	if m.hasSplitPreview() {
-		result = m.renderDetailsOnly(width, renderHeight)
-	} else {
-		result = m.renderRightColumnContent(width, renderHeight)
+	switch {
+	case listPreview && m.previewScroll == 0:
+		prev := ui.ActiveRightScroll
+		ui.ActiveRightScroll = 0
+		result = m.renderRightColumnContent(width, contentHeight)
+		ui.ActiveRightScroll = prev
+	case listPreview:
+		prev := ui.ActiveRightScroll
+		ui.ActiveRightScroll = m.previewScroll - 1 // line previewScroll == item previewScroll-1
+		result = m.renderRightColumnContent(width, contentHeight+1)
+		ui.ActiveRightScroll = prev
+		if i := strings.IndexByte(result, '\n'); i >= 0 { // drop the header line
+			result = result[i+1:]
+		} else {
+			result = ""
+		}
+	case m.hasSplitPreview():
+		result = m.renderDetailsOnly(width, contentHeight+m.previewScroll)
+	default:
+		result = m.renderRightColumnContent(width, contentHeight+m.previewScroll)
 	}
 
 	// Append events to scrollable content (events scroll with the details).
-	if !m.fullYAMLPreview && m.previewEventsContent != "" {
+	// Lists have no events; their scroll is already applied above.
+	if !listPreview && !m.fullYAMLPreview && m.previewEventsContent != "" {
 		result += "\n" + ui.DimStyle.Render(strings.Repeat("\u2500", width)) + "\n" + m.previewEventsContent
 	}
 
-	// Apply preview scroll to the scrollable content only.
+	// Apply preview scroll to the scrollable content. The windowed list path is
+	// already positioned at previewScroll, so only the generic path slices here.
 	lines := strings.Split(result, "\n")
-	if m.previewScroll > 0 {
+	if !listPreview && m.previewScroll > 0 {
 		if m.previewScroll >= len(lines) {
 			m.previewScroll = len(lines) - 1
 		}
@@ -225,6 +309,38 @@ func (m Model) renderRightColumn(width, height int) string {
 	}
 
 	return result
+}
+
+// isRightListPreview reports whether the right pane's scrollable content is the
+// plain resource list shown while hovering a resource type (renderRightDefault's
+// RenderTable over rightItems). Only this path honours ActiveRightScroll, so the
+// windowed render in renderRightColumn is gated on it; every other case
+// (dashboards, security sources, union members rendered with RenderColumn,
+// details/YAML/tree) falls back to the generic render-then-slice path.
+func (m Model) isRightListPreview() bool {
+	if m.nav.Level != model.LevelResourceTypes || m.mapView || m.fullYAMLPreview {
+		return false
+	}
+	if len(m.rightItems) == 0 || m.isUnionSentinel() {
+		return false
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil || strings.HasPrefix(sel.Kind, "__") {
+		return false
+	}
+	if sel.Extra == "__overview__" || sel.Extra == "__monitoring__" {
+		return false
+	}
+	// Windowing maps previewScroll (a line offset) to an item index, which only
+	// holds when each item is exactly one line. Category headers/separators break
+	// that 1:1 mapping, so fall back to the generic line-slice path if any item
+	// carries a category (instance lists normally don't).
+	for i := range m.rightItems {
+		if m.rightItems[i].Category != "" {
+			return false
+		}
+	}
+	return true
 }
 
 // hasSplitPreview returns true when the right column shows children + details (split view).
