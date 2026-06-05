@@ -278,6 +278,11 @@ type Model struct {
 	// but showing actual values. Driven entirely from objectexplorer.go.
 	objectExplorerView objectExplorerState
 
+	// objectExplorerReturnMode is the mode the Object Explorer returns to on
+	// q/esc. It is the explorer by default but the YAML viewer when the Object
+	// Explorer was opened from there (P), so closing returns to the opener.
+	objectExplorerReturnMode viewMode
+
 	// Full-screen diff viewer state (resource compare / revision diff):
 	// left/right content, scroll/cursor, unified vs side-by-side, search,
 	// fold regions, and visual selection. Extracted from the formerly flat

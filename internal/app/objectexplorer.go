@@ -84,13 +84,18 @@ func (m Model) openObjectExplorer() (tea.Model, tea.Cmd) {
 		name:  sel.Name,
 	}
 	m.objectExplorerView.level = model.ObjectFieldsAt(sel.Raw, nil)
+	// Remember the opener (the explorer, or the YAML viewer when opened via P)
+	// so q/esc returns there. m.mode is still the opener at this point.
+	m.objectExplorerReturnMode = m.mode
 	m.mode = modeObjectExplorer
 	return m, nil
 }
 
-// exitObjectExplorer resets state and returns to the explorer.
+// exitObjectExplorer resets state and returns to the mode the Object Explorer
+// was opened from (the explorer by default; the YAML viewer when opened via P).
 func (m *Model) exitObjectExplorer() {
-	m.mode = modeExplorer
+	m.mode = m.objectExplorerReturnMode
+	m.objectExplorerReturnMode = modeExplorer
 	m.objectExplorerView = objectExplorerState{}
 }
 

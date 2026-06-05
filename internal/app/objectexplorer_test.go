@@ -405,3 +405,23 @@ func TestObjectExplorer_ParentLevelAndBreadcrumb(t *testing.T) {
 	bc := m.breadcrumb()
 	assert.Contains(t, bc, "chore-1 > spec.volumes[0]")
 }
+
+func TestObjectExplorer_ExitReturnsToOpener(t *testing.T) {
+	// Opened from the explorer (O) -> q returns to the explorer.
+	m := objectExplorerModel(t)
+	res, _ := m.openObjectExplorer()
+	m = res.(Model)
+	require.Equal(t, modeExplorer, m.objectExplorerReturnMode)
+	m.exitObjectExplorer()
+	assert.Equal(t, modeExplorer, m.mode)
+
+	// Opened from the YAML viewer (P) -> q returns to the YAML viewer.
+	m2 := objectExplorerModel(t)
+	m2.mode = modeYAML // simulate opening from the YAML viewer
+	res2, _ := m2.openObjectExplorer()
+	m2 = res2.(Model)
+	require.Equal(t, modeObjectExplorer, m2.mode)
+	require.Equal(t, modeYAML, m2.objectExplorerReturnMode)
+	m2.exitObjectExplorer()
+	assert.Equal(t, modeYAML, m2.mode)
+}
