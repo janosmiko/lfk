@@ -79,12 +79,12 @@ func (m Model) handleColorschemeNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.schemeCursor = clampOverlayCursor(m.schemeCursor, 10, selectableCount-1)
 		m.previewSchemeAtCursor(filtered)
 		return m, nil
 
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.schemeCursor = clampOverlayCursor(m.schemeCursor, -10, selectableCount-1)
 		m.previewSchemeAtCursor(filtered)
 		return m, nil

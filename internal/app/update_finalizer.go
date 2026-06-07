@@ -53,11 +53,11 @@ func (m Model) handleFinalizerSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.finalizerSearchCursor = maxIdx
 		return m, nil
 
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.finalizerSearchCursor = clampOverlayCursor(m.finalizerSearchCursor, 10, maxIdx)
 		return m, nil
 
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.finalizerSearchCursor = clampOverlayCursor(m.finalizerSearchCursor, -10, maxIdx)
 		return m, nil
 

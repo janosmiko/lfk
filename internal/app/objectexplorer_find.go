@@ -63,9 +63,9 @@ func (m Model) handleObjectExplorerFindKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		rt.findCursor = 0
 	case "G", "end":
 		rt.findCursor = max(n-1, 0)
-	case "ctrl+d", "pgdown":
+	case "ctrl+d", "pgdown", "shift+down":
 		rt.findCursor = min(rt.findCursor+visible/2, max(n-1, 0))
-	case "ctrl+u", "pgup":
+	case "ctrl+u", "pgup", "shift+up":
 		rt.findCursor = max(rt.findCursor-visible/2, 0)
 	}
 	m.clampFindScroll()

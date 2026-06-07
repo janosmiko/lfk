@@ -303,10 +303,10 @@ func (m Model) updateOverlayCaptureLive(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case msg.String() == "k":
 		m.captureOverlay.scrollOffset++
 		return m, nil
-	case msg.String() == "ctrl+d":
+	case msg.String() == "ctrl+d", msg.String() == "shift+down":
 		m.captureOverlay.scrollOffset = max(m.captureOverlay.scrollOffset-m.captureScrollHalfPage(), 0)
 		return m, nil
-	case msg.String() == "ctrl+u":
+	case msg.String() == "ctrl+u", msg.String() == "shift+up":
 		m.captureOverlay.scrollOffset += m.captureScrollHalfPage()
 		return m, nil
 	case msg.String() == "ctrl+f", msg.String() == "pgdown":

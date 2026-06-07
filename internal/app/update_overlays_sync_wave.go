@@ -161,12 +161,12 @@ func (m Model) handleSyncWaveBodyKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: last.waveIdx, resourceIdx: last.resourceIdx}
 		adjustBodyScrollToCursor(&m.syncWave, len(rows)-1, viewport)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		cur = min(cur+10, len(rows)-1)
 		m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: rows[cur].waveIdx, resourceIdx: rows[cur].resourceIdx}
 		adjustBodyScrollToCursor(&m.syncWave, cur, viewport)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		cur = max(cur-10, 0)
 		m.syncWave.bodyCursor = syncWaveBodyCursor{waveIdx: rows[cur].waveIdx, resourceIdx: rows[cur].resourceIdx}
 		adjustBodyScrollToCursor(&m.syncWave, cur, viewport)

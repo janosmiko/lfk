@@ -521,10 +521,10 @@ func (m Model) handleBookmarkNavKey(msg tea.KeyMsg, filtered []model.Bookmark) (
 			m.overlayCursor = maxIdx
 		}
 		return m, true
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 10, maxIdx)
 		return m, true
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, maxIdx)
 		return m, true
 	case "ctrl+f", "pgdown":

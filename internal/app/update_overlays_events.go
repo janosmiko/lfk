@@ -238,12 +238,12 @@ func (m Model) handleEventTimelineMovementKey(msg tea.KeyMsg) (Model, bool) {
 		return m.handleEventTimelineOverlayKeyE(), true
 	case "E":
 		return m.handleEventTimelineOverlayKeyE2(), true
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		step := vimScrollStep(&m.eventTimelineLineInput, &m.eventTimelineScrollOption, m.eventContentHeight())
 		m.eventTimelineCursor = min(m.eventTimelineCursor+step, maxIdx)
 		m.ensureEventCursorVisible()
 		return m, true
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		return m.handleEventTimelineOverlayKeyCtrlU(), true
 	case "ctrl+f", "pgdown":
 		n := consumeCountPrefix(&m.eventTimelineLineInput)
@@ -349,10 +349,10 @@ func (m *Model) handleEventTimelineVisualMovement(key string, maxIdx int) {
 		} else {
 			m.pendingG = true
 		}
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.eventTimelineCursor = min(m.eventTimelineCursor+scrollStep(m.eventTimelineScrollOption, m.eventContentHeight()), maxIdx)
 		m.ensureEventCursorVisible()
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.eventTimelineCursor = max(m.eventTimelineCursor-scrollStep(m.eventTimelineScrollOption, m.eventContentHeight()), 0)
 		m.ensureEventCursorVisible()
 	default:

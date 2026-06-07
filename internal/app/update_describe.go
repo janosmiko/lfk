@@ -83,10 +83,10 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.describeWordMotion(key, lines)
 		}
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		step := vimScrollStep(&m.describeView.lineInput, &m.describeView.scrollOption, m.describeContentHeight())
 		return m.describePageMove(step, maxIdx)
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		step := vimScrollStep(&m.describeView.lineInput, &m.describeView.scrollOption, m.describeContentHeight())
 		return m.describePageMove(-step, maxIdx)
 	case "ctrl+f", "pgdown":
@@ -311,13 +311,13 @@ func (m Model) handleDescribeVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		} else {
 			m.pendingG = true
 		}
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.describeView.cursor += scrollStep(m.describeView.scrollOption, m.describeContentHeight())
 		if m.describeView.cursor > maxIdx {
 			m.describeView.cursor = maxIdx
 		}
 		m.ensureDescribeCursorVisible()
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.describeView.cursor -= scrollStep(m.describeView.scrollOption, m.describeContentHeight())
 		if m.describeView.cursor < 0 {
 			m.describeView.cursor = 0

@@ -182,9 +182,9 @@ func (m Model) handleObjectExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			rt.cursor = n - 1
 			rt.previewScroll = 0
 		}
-	case kb.PageDown, "pgdown", "ctrl+f":
+	case kb.PageDown, "pgdown", "ctrl+f", "shift+down":
 		m.moveObjectExplorerCursor(max(m.objectExplorerBodyHeight()/2, 1))
-	case kb.PageUp, "pgup", "ctrl+b":
+	case kb.PageUp, "pgup", "ctrl+b", "shift+up":
 		m.moveObjectExplorerCursor(-max(m.objectExplorerBodyHeight()/2, 1))
 	}
 	m.clampObjectExplorerScroll()

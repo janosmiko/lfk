@@ -35,7 +35,7 @@ func (m Model) clearStatusOnNavigationKey(msg tea.KeyMsg) Model {
 	switch msg.String() {
 	case kb.Down, "down", kb.Up, "up", kb.Left, "left", kb.Right, "right",
 		kb.JumpTop, kb.JumpBottom, "end", "home",
-		kb.PageDown, kb.PageUp, kb.PageForward, kb.PageBack, "pgdown", "pgup",
+		kb.PageDown, kb.PageUp, kb.PageForward, kb.PageBack, "pgdown", "pgup", "shift+down", "shift+up",
 		kb.PreviewDown, kb.PreviewUp,
 		kb.LevelCluster, kb.LevelTypes, kb.LevelResources,
 		kb.JumpBack, kb.JumpOwner,

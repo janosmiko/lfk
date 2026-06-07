@@ -114,10 +114,10 @@ func (m Model) handleClusterColorOverlayKey(key string) (tea.Model, tea.Cmd) {
 			m.clusterColorOverlayCursor = (m.clusterColorOverlayCursor - 1 + rows) % rows
 		}
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.clusterColorOverlayCursor = clampOverlayCursor(m.clusterColorOverlayCursor, 10, rows-1)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.clusterColorOverlayCursor = clampOverlayCursor(m.clusterColorOverlayCursor, -10, rows-1)
 		return m, nil
 	case "ctrl+f", "pgdown":

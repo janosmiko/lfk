@@ -387,7 +387,7 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.canIResourceScroll = 0
 		return m, nil
 
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		halfPage := visibleLines / 2
 		m.canIGroupCursor = min(m.canIGroupCursor+halfPage, max(groupCount-1, 0))
 		maxScroll := max(groupCount-visibleLines, 0)
@@ -395,7 +395,7 @@ func (m Model) handleCanIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.canIResourceScroll = 0
 		return m, nil
 
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		halfPage := visibleLines / 2
 		m.canIGroupCursor = max(m.canIGroupCursor-halfPage, 0)
 		m.canIGroupScroll = max(m.canIGroupScroll-halfPage, 0)
@@ -508,11 +508,11 @@ func (m Model) handleCanISubjectNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -1, len(items)-1)
 		return m, nil
 
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 10, len(items)-1)
 		return m, nil
 
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, len(items)-1)
 		return m, nil
 

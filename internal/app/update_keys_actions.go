@@ -42,9 +42,9 @@ func (m Model) handleExplorerNavKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) 
 		return m.handleExplorerActionKeyAllNamespaces()
 	case kb.QuotaDashboard:
 		return m.handleExplorerActionKeyQuotaDashboard()
-	case kb.PageDown:
+	case kb.PageDown, "shift+down":
 		return m.handleExplorerActionKeyPageDown()
-	case kb.PageUp:
+	case kb.PageUp, "shift+up":
 		return m.handleExplorerActionKeyPageUp()
 	case kb.PageForward, "pgdown":
 		return m.handleExplorerActionKeyPageForward()

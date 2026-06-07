@@ -65,10 +65,10 @@ func (m Model) handleRightsizingOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "G", "end":
 		m.rightsizing.scroll = clampRightsizingScroll(m, math.MaxInt32)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.rightsizing.scroll = clampRightsizingScroll(m, m.rightsizing.scroll+rightsizingVisibleRows(m)/2)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.rightsizing.scroll = clampRightsizingScroll(m, m.rightsizing.scroll-rightsizingVisibleRows(m)/2)
 		return m, nil
 	case "ctrl+f", "pgdown":

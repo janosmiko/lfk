@@ -53,10 +53,10 @@ func handleEditPanePageKey(m Model, valInput *TextInput, col int, key string, ti
 	}
 	_, pageH := editValuePaneDims(m, titleH)
 	switch key {
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		editPaneMoveByLines(valInput, max(pageH/2, 1))
 		return true
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		editPaneMoveByLines(valInput, -max(pageH/2, 1))
 		return true
 	case "ctrl+f":

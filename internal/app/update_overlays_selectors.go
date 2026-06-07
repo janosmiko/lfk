@@ -229,11 +229,11 @@ func (m Model) handleNamespaceNormalMode(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -1, len(items)-1)
 		return m, nil
 
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 10, len(items)-1)
 		return m, nil
 
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, len(items)-1)
 		return m, nil
 
@@ -420,10 +420,10 @@ func (m Model) handleTemplateOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "down", "j", "ctrl+n":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, 1, len(filtered)-1)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, 10, len(filtered)-1)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.templateCursor = clampOverlayCursor(m.templateCursor, -10, len(filtered)-1)
 		return m, nil
 	case "ctrl+f", "pgdown":

@@ -647,6 +647,10 @@ func keyMsg(s string) tea.KeyMsg {
 		return tea.KeyMsg{Type: tea.KeyPgUp}
 	case "pgdown":
 		return tea.KeyMsg{Type: tea.KeyPgDown}
+	case "shift+up":
+		return tea.KeyMsg{Type: tea.KeyShiftUp}
+	case "shift+down":
+		return tea.KeyMsg{Type: tea.KeyShiftDown}
 	case "home":
 		return tea.KeyMsg{Type: tea.KeyHome}
 	case "end":

@@ -61,11 +61,11 @@ func (m Model) handleHelpKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.helpScroll = 9999
 		m.clampHelpScroll()
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.helpScroll += m.height / 2
 		m.clampHelpScroll()
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.helpScroll -= m.height / 2
 		if m.helpScroll < 0 {
 			m.helpScroll = 0
