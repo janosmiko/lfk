@@ -51,7 +51,7 @@ func TestYamlTitle(t *testing.T) {
 				},
 				namespace: "staging",
 			},
-			expected: "YAML: staging/my-pod-xyz",
+			expected: "YAML: Pod staging/my-pod-xyz",
 		},
 		{
 			name: "LevelResources with no items",

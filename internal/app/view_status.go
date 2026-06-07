@@ -192,6 +192,22 @@ func (m Model) explorerDrillPath() []string {
 	return nil
 }
 
+// resourceTitleLabel formats a resource identifier as "Kind namespace/name",
+// shared by the fullscreen viewer sub-titles (YAML, Object Explorer, logs,
+// describe, exec, events) so the same resource reads identically across views.
+// The namespace is dropped for cluster-scoped resources (empty namespace) and
+// the kind when it is unknown.
+func resourceTitleLabel(kind, namespace, name string) string {
+	label := name
+	if namespace != "" {
+		label = namespace + "/" + name
+	}
+	if kind != "" {
+		label = kind + " " + label
+	}
+	return label
+}
+
 // nameNotInNav returns name unless the nav breadcrumb already ends with it (as
 // ResourceName or OwnedName), in which case it returns "" so the drill path
 // does not duplicate a segment the breadcrumb already shows.

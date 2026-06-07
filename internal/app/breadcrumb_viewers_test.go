@@ -8,6 +8,19 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// resourceTitleLabel is the shared "Kind namespace/name" formatter that keeps
+// every viewer sub-title consistent for the same resource.
+func TestResourceTitleLabel(t *testing.T) {
+	assert.Equal(t, "Pod argo-cd/argocd-redis-ha-server-2",
+		resourceTitleLabel("Pod", "argo-cd", "argocd-redis-ha-server-2"))
+	// Cluster-scoped: no namespace segment.
+	assert.Equal(t, "Node ip-10-0-0-1", resourceTitleLabel("Node", "", "ip-10-0-0-1"))
+	// Unknown kind: just namespace/name.
+	assert.Equal(t, "default/my-pod", resourceTitleLabel("", "default", "my-pod"))
+	// Bare name.
+	assert.Equal(t, "x", resourceTitleLabel("", "", "x"))
+}
+
 // The fullscreen viewers (logs, exec, describe, diff, events) must surface the
 // object they show in the top breadcrumb, the same way the YAML viewer and the
 // Object Explorer do. Each case is exercised through explorerDrillPath, which

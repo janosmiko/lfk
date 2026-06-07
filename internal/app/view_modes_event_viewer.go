@@ -11,7 +11,7 @@ import (
 func (m Model) viewEventViewer() string {
 	titleText := "Event Timeline"
 	if m.actionCtx.name != "" {
-		titleText += " - " + m.actionCtx.name
+		titleText += ": " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 	}
 	titleText += viewModeIndicators(m.eventTimelineWrap, rune(m.eventTimelineVisualMode), m.eventTimelineSearchQuery)
 	title := ui.ViewTitle(m.width, titleText)

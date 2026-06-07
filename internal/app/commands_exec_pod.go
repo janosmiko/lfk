@@ -42,11 +42,11 @@ func (m Model) execKubectlExec() tea.Cmd {
 		if rows < 5 {
 			rows = 24
 		}
-		title := fmt.Sprintf("Exec: %s/%s", m.actionNamespace(), m.actionCtx.name)
+		title := "Exec: " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 		return startPTYExecCmd(cmd, title, cols, rows)
 	}
 
-	title := fmt.Sprintf("Exec: %s/%s", m.actionNamespace(), m.actionCtx.name)
+	title := "Exec: " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 	return runInteractiveShellExec(cmd, title, "Exec", true)
 }
 

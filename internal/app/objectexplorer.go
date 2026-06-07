@@ -80,7 +80,7 @@ func (m Model) openObjectExplorer() (tea.Model, tea.Cmd) {
 	}
 	m.objectExplorerView = objectExplorerState{
 		root:  sel.Raw,
-		title: sel.Kind + "/" + sel.Name,
+		title: resourceTitleLabel(sel.Kind, sel.Namespace, sel.Name),
 		name:  sel.Name,
 	}
 	m.objectExplorerView.level = model.ObjectFieldsAt(sel.Raw, nil)

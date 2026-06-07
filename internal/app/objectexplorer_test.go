@@ -58,7 +58,7 @@ func TestOpenObjectExplorer_RootLevel(t *testing.T) {
 	result, _ := m.openObjectExplorer()
 	m = result.(Model)
 	assert.Equal(t, modeObjectExplorer, m.mode)
-	assert.Equal(t, "Chore/chore-1", m.objectExplorerView.title)
+	assert.Equal(t, "Chore chore-1", m.objectExplorerView.title)
 	// Root keys sorted.
 	keys := make([]string, len(m.objectExplorerView.level))
 	for i, f := range m.objectExplorerView.level {
@@ -354,7 +354,7 @@ func TestYAML_OOpensFreshTreeWhenOpenedViaEnter(t *testing.T) {
 	mdl, _ := m.handleYAMLKey(key("O"))
 	m = mdl.(Model)
 	assert.Equal(t, modeObjectExplorer, m.mode)
-	assert.Equal(t, "Chore/chore-1", m.objectExplorerView.title)
+	assert.Equal(t, "Chore chore-1", m.objectExplorerView.title)
 	assert.Empty(t, m.objectExplorerView.path) // fresh at root
 }
 
@@ -380,7 +380,7 @@ func TestObjectExplorer_QClosesAndViewRenders(t *testing.T) {
 	m = result.(Model)
 
 	out := m.viewObjectExplorer()
-	assert.Contains(t, out, "Object Explorer: Chore/chore-1")
+	assert.Contains(t, out, "Object Explorer: Chore chore-1")
 	assert.Contains(t, out, "PARENT")
 	assert.Contains(t, out, "status")
 

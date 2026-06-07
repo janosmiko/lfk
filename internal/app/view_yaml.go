@@ -187,15 +187,34 @@ func (m Model) viewYAML() string {
 }
 
 func (m Model) yamlTitle() string {
-	if name := m.yamlResourceName(); name != "" {
-		return fmt.Sprintf("YAML: %s/%s", m.namespace, name)
+	if label := m.yamlResourceLabel(); label != "" {
+		return "YAML: " + label
 	}
 	return "YAML"
 }
 
+// yamlResourceLabel formats the displayed resource as "Kind namespace/name"
+// (see resourceTitleLabel) so the YAML sub-title matches the Object Explorer
+// and the other viewers for the same resource.
+func (m Model) yamlResourceLabel() string {
+	switch m.nav.Level {
+	case model.LevelResources, model.LevelOwned:
+		if sel := m.selectedMiddleItem(); sel != nil {
+			ns := sel.Namespace
+			if ns == "" {
+				ns = m.namespace
+			}
+			return resourceTitleLabel(sel.Kind, ns, sel.Name)
+		}
+	case model.LevelContainers:
+		return resourceTitleLabel("Pod", m.namespace, m.nav.OwnedName)
+	}
+	return ""
+}
+
 // yamlResourceName returns the name of the resource whose YAML is displayed,
-// or "" when it can't be resolved. Shared by the viewer sub-title and the top
-// breadcrumb's drill path (see explorerDrillPath).
+// or "" when it can't be resolved. Used by the top breadcrumb's drill path
+// (see explorerDrillPath).
 func (m Model) yamlResourceName() string {
 	switch m.nav.Level {
 	case model.LevelResources, model.LevelOwned:

@@ -96,7 +96,7 @@ func (m Model) updatePodLogSelect(msg podLogSelectMsg) (tea.Model, tea.Cmd) {
 			m.logView.loadingHistory = false
 			m.logView.cursor = 0
 			m.logView.visualMode = false
-			m.logView.title = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+			m.logView.title = "Logs: " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 			return m, m.startLogStream()
 		}
 		// Multiple pods; show inline pod selector overlay with "All Pods" at top.
