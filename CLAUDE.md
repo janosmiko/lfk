@@ -91,6 +91,17 @@ Reuse existing TUI primitives instead of hand-rolling. Look for a shared helper 
 - User feedback goes through `setStatusMessage(msg, isErr)` + return `scheduleStatusClear()` — never print inline or block.
 - Renderers read `ui.Active*` globals (security, columns) set in `View()` right before render; don't read them elsewhere.
 
+## Configuration Settings
+
+Adding or changing a config key is not done until ALL of these are updated together — in the same PR:
+
+- **Struct + apply**: add the field to `configFile` (or its sub-struct) in `internal/ui/config_load.go` and wire it through `applyConfigOptions` / `applyConfigMaps` (`internal/ui/config_apply.go`) into its `Config*` runtime global.
+- **Schema**: add the property (correct type, enum, default, description) to `docs/config.schema.json`. `TestConfigSchemaTopLevelInSync` / `TestConfigSchemaKeybindingsInSync` fail if you forget a top-level or keybinding key.
+- **Docs**: update the field table in `docs/config-reference.md` AND add a commented example to `docs/config-example.yaml`. Keep entries concise and consistent with their peers.
+- **Tests**: assert the YAML→global wiring in `internal/ui/config_wiring_test.go` (`TestLoadConfig_AllSettingsWired`) and record the field in `wiringCoveredFields`. `TestConfigFile_EveryFieldHasWiringCoverage` fails until you do. Add focused unit tests for any validation/clamping/union-shape parsing.
+
+These four tests are the forcing function — a new setting that skips the schema, the wiring test, or the coverage map will not pass CI.
+
 ---
 
 ## Success Metrics

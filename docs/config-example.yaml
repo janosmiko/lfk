@@ -1,6 +1,10 @@
+# yaml-language-server: $schema=https://raw.githubusercontent.com/janosmiko/lfk/main/docs/config.schema.json
 # lfk - Full Configuration Example
 # Place this file at ~/.config/lfk/config.yaml
 # All fields are optional — only specify what you want to override.
+#
+# The modeline above enables autocompletion and validation in editors running
+# a YAML language server. See docs/config-reference.md for the full reference.
 
 # ─── Color Scheme ──────────────────────────────────────────────────────────────
 # Built-in color scheme. 460+ themes are available (generated from ghostty themes).

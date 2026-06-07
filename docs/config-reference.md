@@ -2,6 +2,16 @@
 
 The configuration file is located at `~/.config/lfk/config.yaml`. All fields are optional — only the values you specify will override the defaults.
 
+## Editor autocompletion (JSON Schema)
+
+A JSON Schema is published at [`docs/config.schema.json`](config.schema.json). Add this modeline to the top of your `config.yaml` to get autocompletion, inline docs, and typo warnings in any editor running a YAML language server (VS Code's [YAML extension](https://marketplace.visualstudio.com/items?itemName=redhat.vscode-yaml), Neovim with `yamlls`, etc.):
+
+```yaml
+# yaml-language-server: $schema=https://raw.githubusercontent.com/janosmiko/lfk/main/docs/config.schema.json
+```
+
+Prefer a local copy? Point `$schema` at a relative or absolute path instead of the URL.
+
 ## Top-Level Fields
 
 | Field | Type | Default | Description |

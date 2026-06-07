@@ -1,0 +1,581 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/janosmiko/lfk/main/docs/config.schema.json",
+  "title": "lfk configuration",
+  "description": "Schema for the lfk config file (config.yaml). All fields are optional; only the values you set override the defaults. See docs/config-reference.md for full descriptions.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "colorscheme": {
+      "type": "string",
+      "description": "Built-in color scheme name (e.g. \"tokyonight-storm\", \"dracula\", \"nord\"). Supports dual-mode syntax for auto dark/light switching: \"dark:X,light:Y\".",
+      "default": "tokyonight-storm"
+    },
+    "theme": {
+      "anyOf": [{ "$ref": "#/definitions/theme" }, { "type": "null" }]
+    },
+    "keybindings": {
+      "anyOf": [{ "$ref": "#/definitions/keybindings" }, { "type": "null" }]
+    },
+    "log_path": {
+      "type": "string",
+      "description": "Path to the application log file. Defaults to ~/.local/share/lfk/lfk.log."
+    },
+    "kubeconfig_dir": {
+      "description": "Directory (or list of directories) recursively scanned for kubeconfig files, in addition to ~/.kube/config and KUBECONFIG. Tilde paths expand against $HOME.",
+      "oneOf": [
+        { "type": "string" },
+        { "type": "array", "items": { "type": "string" } },
+        { "type": "null" }
+      ]
+    },
+    "abbreviations": {
+      "type": ["object", "null"],
+      "description": "Custom search abbreviation overrides/extensions. Maps a short alias to a full resource type name (e.g. \"po\": \"pod\").",
+      "additionalProperties": { "type": "string" }
+    },
+    "icons": {
+      "type": "string",
+      "description": "Icon display mode. \"auto\" detects Nerd Font terminals. Overridable at runtime with the LFK_ICONS env var.",
+      "enum": ["auto", "unicode", "nerdfont", "simple", "emoji", "none"],
+      "default": "auto"
+    },
+    "resource_columns": {
+      "type": ["object", "null"],
+      "description": "Per-resource-type column lists, keyed by Kind name (case-insensitive). Deprecated: prefer \"views\".",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "type": "string" }
+      }
+    },
+    "views": {
+      "type": ["object", "null"],
+      "description": "Per-resource-type column and sort configuration, keyed by GVR (\"apps/v1/deployments\") or Kind (\"deployment\", case-insensitive).",
+      "additionalProperties": { "$ref": "#/definitions/view" }
+    },
+    "dashboard": {
+      "type": "boolean",
+      "description": "Show the cluster dashboard when entering a context. Set false to go directly to resource types.",
+      "default": true
+    },
+    "custom_actions": {
+      "type": ["object", "null"],
+      "description": "User-defined actions per resource type, keyed by Kind name (e.g. \"Pod\").",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/customAction" }
+      }
+    },
+    "filter_presets": {
+      "type": ["object", "null"],
+      "description": "User-defined quick filter presets per resource type, keyed by Kind name (case-insensitive).",
+      "additionalProperties": {
+        "type": "array",
+        "items": { "$ref": "#/definitions/filterPreset" }
+      }
+    },
+    "terminal": {
+      "type": "string",
+      "description": "How exec/shell commands run: \"pty\" (embedded in the TUI), \"exec\" (takes over the terminal), or \"mux\" (open in a new tmux/zellij window or pane).",
+      "enum": ["pty", "exec", "mux"],
+      "default": "pty"
+    },
+    "scrollback_lines": {
+      "type": "integer",
+      "description": "Per-tab capacity of the embedded PTY scrollback ring buffer. Clamped to [100, 100000]. Only meaningful in pty mode.",
+      "default": 5000
+    },
+    "pinned_groups": {
+      "type": ["array", "null"],
+      "description": "CRD API groups to pin after built-in categories (e.g. [\"karpenter.sh\", \"monitoring.coreos.com\"]).",
+      "items": { "type": "string" }
+    },
+    "pinned_types": {
+      "type": ["array", "null"],
+      "description": "Version-agnostic resource-type pin keys (\"group/resource\", e.g. \"apps/deployments\") to move into the top-level Pinned section.",
+      "items": { "type": "string" }
+    },
+    "monitoring": {
+      "type": ["object", "null"],
+      "description": "Per-cluster monitoring endpoint configuration. Keys are context names or the special key \"_global\".",
+      "additionalProperties": { "$ref": "#/definitions/monitoringConfig" }
+    },
+    "tips": {
+      "type": "boolean",
+      "description": "Show a random tip in the status bar on startup.",
+      "default": true
+    },
+    "log_tail_lines": {
+      "type": "integer",
+      "description": "Number of log lines loaded initially via --tail. Scrolling to the top loads older history.",
+      "default": 1000
+    },
+    "log_tail_lines_short": {
+      "type": "integer",
+      "description": "Number of log lines loaded by the action menu \"Tail Logs\" entry. Non-positive values are ignored.",
+      "default": 10
+    },
+    "log_render_ansi": {
+      "type": "boolean",
+      "description": "Render ANSI SGR sequences (color, bold, underline) emitted by log producers. Set false to strip them. Toggle at runtime with :set ansi / :set noansi.",
+      "default": true
+    },
+    "scrolloff": {
+      "type": "integer",
+      "description": "Number of lines to keep visible above/below the cursor when scrolling.",
+      "default": 5
+    },
+    "confirm_on_exit": {
+      "type": "boolean",
+      "description": "Show a quit confirmation when pressing ctrl+c on the last tab. Set false to exit immediately.",
+      "default": true
+    },
+    "dim_overlay": {
+      "type": "boolean",
+      "description": "Fade the rest of the screen while any overlay is up. Set false for terminals where SGR faint looks awkward.",
+      "default": true
+    },
+    "transparent_background": {
+      "type": "boolean",
+      "description": "Use the terminal's own background for bars and surfaces. Selection highlights remain opaque.",
+      "default": false
+    },
+    "mouse": {
+      "type": "boolean",
+      "description": "Capture mouse input for click navigation, scroll, and tab switching. Set false to allow native terminal text selection.",
+      "default": true
+    },
+    "watch_interval": {
+      "type": "string",
+      "description": "Polling interval used in watch mode, as a Go duration string (e.g. \"2s\", \"500ms\", \"1m\"). Clamped to [500ms, 10m].",
+      "default": "2s"
+    },
+    "clusters": {
+      "type": ["object", "null"],
+      "description": "Per-cluster configuration overrides, keyed by context name.",
+      "additionalProperties": { "$ref": "#/definitions/clusterConfig" }
+    },
+    "no_color": {
+      "type": "boolean",
+      "description": "Strip foreground/background colors from all styles (monochrome). The NO_COLOR env var takes precedence.",
+      "default": false
+    },
+    "secret_lazy_loading": {
+      "type": "boolean",
+      "description": "When true, Secret listing fetches metadata only and decoded values load on hover. Faster in clusters with many large Secrets.",
+      "default": false
+    },
+    "informer_cache": {
+      "description": "List strategy: \"off\" round-trips every list, \"auto\" promotes a resource type to a shared informer above 1000 items, \"always\" opens a watch eagerly. Legacy bool form: true -> always, false -> off.",
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "string", "enum": ["off", "auto", "always"] },
+        { "type": "null" }
+      ],
+      "default": "auto"
+    },
+    "min_contrast_ratio": {
+      "type": "number",
+      "description": "Normalized readability knob in [0.0, 1.0]. Above zero, foreground colors are nudged in HSL lightness to meet a minimum WCAG contrast ratio. 0.175 is approximately AA, 0.3 is approximately AAA.",
+      "minimum": 0,
+      "maximum": 1,
+      "default": 0
+    },
+    "read_only": {
+      "type": "boolean",
+      "description": "Disable all mutating actions globally. Per-context overrides under clusters.<name>.read_only and the --read-only CLI flag take precedence.",
+      "default": false
+    },
+    "show_rare_types": {
+      "type": "boolean",
+      "description": "Show rarely-used resource types (CSI internals, admission webhooks, leases, runtime classes, the \"Advanced\" category) from startup, as if the H toggle were pressed.",
+      "default": false
+    },
+    "security": {
+      "anyOf": [{ "$ref": "#/definitions/securityConfig" }, { "type": "null" }]
+    },
+    "rightsizing_defaults": {
+      "anyOf": [{ "$ref": "#/definitions/rightsizingDefaults" }, { "type": "null" }]
+    },
+    "kubeshark": {
+      "anyOf": [{ "$ref": "#/definitions/kubeshark" }, { "type": "null" }]
+    },
+    "scheduler": {
+      "anyOf": [{ "$ref": "#/definitions/scheduler" }, { "type": "null" }]
+    },
+    "union_sets": {
+      "description": "Named multi-cluster groups expanded by the --union-set <name> CLI flag. Accepts a list of entries or a map keyed by set name.",
+      "oneOf": [
+        { "type": "null" },
+        {
+          "type": "array",
+          "items": { "$ref": "#/definitions/unionSet" }
+        },
+        {
+          "type": "object",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "contexts": {
+                "type": "array",
+                "items": { "$ref": "#/definitions/unionSetContext" }
+              },
+              "namespace": { "type": "string" }
+            }
+          }
+        }
+      ]
+    }
+  },
+  "definitions": {
+    "theme": {
+      "type": "object",
+      "description": "Custom color theme overrides applied on top of the selected colorscheme. Values are hex colors (e.g. \"#7aa2f7\") or terminal color names/ANSI codes.",
+      "additionalProperties": false,
+      "properties": {
+        "primary": { "type": "string" },
+        "secondary": { "type": "string" },
+        "text": { "type": "string" },
+        "selected_fg": { "type": "string" },
+        "selected_bg": { "type": "string" },
+        "border": { "type": "string" },
+        "dimmed": { "type": "string" },
+        "error": { "type": "string" },
+        "warning": { "type": "string" },
+        "purple": { "type": "string" },
+        "base": { "type": "string" },
+        "bar_bg": { "type": "string" },
+        "surface": { "type": "string" }
+      }
+    },
+    "keybindings": {
+      "type": "object",
+      "description": "Custom keybinding overrides. Each value is a key string (e.g. \"j\", \"ctrl+d\", \"alt+ctrl+y\"). Avoid ctrl+i / ctrl+m / ctrl+[ (terminals emit these as tab/enter/esc).",
+      "additionalProperties": false,
+      "properties": {
+        "left": { "type": "string" },
+        "right": { "type": "string" },
+        "down": { "type": "string" },
+        "up": { "type": "string" },
+        "enter": { "type": "string" },
+        "jump_top": { "type": "string" },
+        "jump_bottom": { "type": "string" },
+        "page_down": { "type": "string" },
+        "page_up": { "type": "string" },
+        "page_forward": { "type": "string" },
+        "page_back": { "type": "string" },
+        "level_cluster": { "type": "string" },
+        "level_types": { "type": "string" },
+        "level_resources": { "type": "string" },
+        "preview_down": { "type": "string" },
+        "preview_up": { "type": "string" },
+        "jump_owner": { "type": "string" },
+        "jump_back": { "type": "string" },
+        "help": { "type": "string" },
+        "filter": { "type": "string" },
+        "search": { "type": "string" },
+        "next_match": { "type": "string" },
+        "prev_match": { "type": "string" },
+        "toggle_preview": { "type": "string" },
+        "resource_map": { "type": "string" },
+        "fullscreen": { "type": "string" },
+        "filter_presets": { "type": "string" },
+        "error_log": { "type": "string" },
+        "secret_toggle": { "type": "string" },
+        "finalizer_search": { "type": "string" },
+        "api_explorer": { "type": "string" },
+        "object_explorer": { "type": "string" },
+        "rbac_browser": { "type": "string" },
+        "theme_selector": { "type": "string" },
+        "command_bar": { "type": "string" },
+        "watch_mode": { "type": "string" },
+        "sort_next": { "type": "string" },
+        "sort_prev": { "type": "string" },
+        "sort_flip": { "type": "string" },
+        "sort_reset": { "type": "string" },
+        "save_resource": { "type": "string" },
+        "monitoring": { "type": "string" },
+        "quota_dashboard": { "type": "string" },
+        "tasks_overlay": { "type": "string" },
+        "expand_collapse": { "type": "string" },
+        "pin_group": { "type": "string" },
+        "column_toggle": { "type": "string" },
+        "toggle_rare": { "type": "string" },
+        "orphan_overlay": { "type": "string" },
+        "namespace_selector": { "type": "string" },
+        "all_namespaces": { "type": "string" },
+        "action_menu": { "type": "string" },
+        "logs": { "type": "string" },
+        "label_editor": { "type": "string" },
+        "secret_editor": { "type": "string" },
+        "create_template": { "type": "string" },
+        "refresh": { "type": "string" },
+        "restart": { "type": "string" },
+        "exec": { "type": "string" },
+        "edit": { "type": "string" },
+        "describe": { "type": "string" },
+        "delete": { "type": "string" },
+        "force_delete": { "type": "string" },
+        "scale": { "type": "string" },
+        "open_browser": { "type": "string" },
+        "copy_name": { "type": "string" },
+        "copy_yaml": { "type": "string" },
+        "paste_apply": { "type": "string" },
+        "diff": { "type": "string" },
+        "toggle_select": { "type": "string" },
+        "select_range": { "type": "string" },
+        "select_all": { "type": "string" },
+        "new_tab": { "type": "string" },
+        "next_tab": { "type": "string" },
+        "prev_tab": { "type": "string" },
+        "set_mark": { "type": "string" },
+        "open_marks": { "type": "string" },
+        "terminal_toggle": { "type": "string" },
+        "mouse_toggle": { "type": "string" },
+        "readonly_toggle": { "type": "string" },
+        "cluster_color_picker": { "type": "string" },
+        "local_cluster_manager": { "type": "string" },
+        "security_ignore_toggle": { "type": "string" },
+        "security_badge_toggle": { "type": "string" }
+      }
+    },
+    "view": {
+      "type": "object",
+      "description": "Ordered columns and an optional default sort column for a resource type.",
+      "additionalProperties": false,
+      "properties": {
+        "columns": {
+          "type": "array",
+          "description": "Ordered column specs. Each is a built-in name or a custom \"Name:.jsonPath\" spec; append flags after \"|\" (e.g. \"|W\" for wide-only).",
+          "items": { "type": "string" }
+        },
+        "sort_column": {
+          "type": "string",
+          "description": "Default sort column, optionally with direction: \"COL\", \"COL:asc\", or \"COL:desc\"."
+        }
+      }
+    },
+    "customAction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["label", "command", "key"],
+      "properties": {
+        "label": { "type": "string", "description": "Action menu label." },
+        "command": { "type": "string", "description": "Shell command template (supports template variables; see config-reference.md)." },
+        "key": { "type": "string", "description": "Shortcut key that triggers the action." },
+        "description": { "type": "string", "description": "Help text shown in the action menu." },
+        "read_only_safe": {
+          "type": "boolean",
+          "description": "Declare the action does not change cluster state, so it stays available in read-only mode. Defaults to false (treated as mutating).",
+          "default": false
+        }
+      }
+    },
+    "filterPreset": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "name": { "type": "string", "description": "Preset label." },
+        "key": { "type": "string", "description": "Shortcut key in the filter presets overlay." },
+        "match": { "$ref": "#/definitions/filterMatch" }
+      }
+    },
+    "filterMatch": {
+      "type": "object",
+      "description": "Match criteria, AND-ed together. When invert is true the result is negated.",
+      "additionalProperties": false,
+      "properties": {
+        "status": { "type": "string", "description": "Match rows whose Status equals this value." },
+        "ready_not": { "type": "boolean", "description": "Match rows that are NOT Ready." },
+        "restarts_gt": { "type": "integer", "description": "Match rows whose restart count exceeds this value." },
+        "column": { "type": "string", "description": "Column name to match against (used with column_value)." },
+        "column_value": { "type": "string", "description": "Value the named column must equal." },
+        "invert": { "type": "boolean", "description": "Negate the combined match result." }
+      }
+    },
+    "monitoringConfig": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "prometheus": { "$ref": "#/definitions/monitoringEndpoint" },
+        "alertmanager": { "$ref": "#/definitions/monitoringEndpoint" },
+        "node_metrics": {
+          "type": "string",
+          "description": "Node metrics source. Defaults to auto-detect.",
+          "enum": ["prometheus", "metrics-api"]
+        }
+      }
+    },
+    "monitoringEndpoint": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "namespaces": {
+          "type": "array",
+          "description": "Namespaces to search for the monitoring service.",
+          "items": { "type": "string" }
+        },
+        "services": {
+          "type": "array",
+          "description": "Service names to try.",
+          "items": { "type": "string" }
+        },
+        "port": {
+          "type": "string",
+          "description": "Port number (default: \"9090\" for prometheus, \"9093\" for alertmanager)."
+        }
+      }
+    },
+    "clusterConfig": {
+      "type": "object",
+      "description": "Per-cluster overrides for one context.",
+      "additionalProperties": false,
+      "properties": {
+        "resource_columns": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "array",
+            "items": { "type": "string" }
+          }
+        },
+        "views": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/definitions/view" }
+        },
+        "read_only": {
+          "type": "boolean",
+          "description": "Override the global read_only setting for this context."
+        },
+        "security": { "$ref": "#/definitions/securityConfig" },
+        "k8s_client_qps": {
+          "type": "integer",
+          "description": "Override the foreground REST client QPS for this context."
+        },
+        "k8s_client_burst": {
+          "type": "integer",
+          "description": "Override the foreground REST client burst for this context."
+        }
+      }
+    },
+    "securityConfig": {
+      "type": "object",
+      "description": "Built-in security-findings dashboard configuration.",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Turn the security dashboard on or off.",
+          "default": true
+        },
+        "sources": {
+          "type": "object",
+          "description": "Enable/disable individual sources. Keys accept friendly names (heuristic, trivy, kyverno, kubescape, falco, gatekeeper) or internal ids (trivy-operator, policy-report). Omitted sources default to enabled.",
+          "additionalProperties": { "type": "boolean" }
+        },
+        "ignore_patterns": {
+          "type": "array",
+          "description": "Declarative glob-based ignore rules applied at load. Honored only in the top-level security section.",
+          "items": { "$ref": "#/definitions/securityIgnorePattern" }
+        }
+      }
+    },
+    "securityIgnorePattern": {
+      "type": "object",
+      "description": "A finding is ignored when every non-empty field matches it. Fields support glob (* and ?). An all-empty pattern is dropped.",
+      "additionalProperties": false,
+      "properties": {
+        "cluster": { "type": "string", "description": "Globs the kube-context name. Empty = any cluster." },
+        "source": { "type": "string", "description": "Globs the security source id. Empty = any source." },
+        "group": { "type": "string", "description": "Globs the finding group key (CVE id, check label, rule name). Empty = any group." },
+        "namespace": { "type": "string", "description": "Globs the resource namespace. Empty or * = any namespace." },
+        "comment": { "type": "string", "description": "Free-text note explaining why the rule exists." }
+      }
+    },
+    "rightsizingDefaults": {
+      "type": "object",
+      "description": "Initial strategy and headroom for the right-sizing advisor on its first overlay open of the session.",
+      "additionalProperties": false,
+      "properties": {
+        "strategy": {
+          "type": "string",
+          "enum": ["vpa", "prom_max_1d", "prom_avg_1d", "prom_p95_7d", "snapshot"]
+        },
+        "headroom": {
+          "type": "number",
+          "description": "Headroom multiplier. Must match one of the picker presets.",
+          "enum": [1.0, 1.1, 1.25, 1.5, 1.75, 2.0]
+        }
+      }
+    },
+    "kubeshark": {
+      "type": "object",
+      "description": "Kubeshark hand-off backend for the Traffic Capture overlay.",
+      "additionalProperties": false,
+      "properties": {
+        "namespace": {
+          "type": "string",
+          "description": "Namespace where Service kubeshark-hub lives. Defaults to \"kubeshark\".",
+          "default": "kubeshark"
+        }
+      }
+    },
+    "scheduler": {
+      "type": "object",
+      "description": "Runtime knobs for the priority task scheduler. All fields optional; missing keys fall back to compiled defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "workers_per_context": { "type": "integer" },
+        "critical_reserved_slots": { "type": "integer" },
+        "low_reserved_slots": { "type": "integer" },
+        "default_timeout": { "type": "string", "description": "Go duration string (e.g. \"30s\")." },
+        "timeouts_by_kind": {
+          "type": "object",
+          "description": "Per-kind timeout overrides. Values are Go duration strings.",
+          "additionalProperties": { "type": "string" }
+        },
+        "k8s_client_qps": { "type": "integer" },
+        "k8s_client_burst": { "type": "integer" },
+        "show_priority_in_tasks_overlay": { "type": "boolean" },
+        "aging_threshold": {
+          "type": "integer",
+          "description": "Bounds priority starvation: a background task runs after at most this many higher-priority dispatches. 0 disables aging."
+        }
+      }
+    },
+    "unionSet": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["name"],
+      "properties": {
+        "name": { "type": "string", "description": "Identifier used by --union-set to reference this entry." },
+        "contexts": {
+          "type": "array",
+          "description": "Cluster entries to merge in this union view.",
+          "items": { "$ref": "#/definitions/unionSetContext" }
+        },
+        "namespace": { "type": "string", "description": "Namespace lfk opens in when this set is selected. --namespace overrides it." }
+      }
+    },
+    "unionSetContext": {
+      "description": "One cluster within a union set. A bare string is the context name; an object adds an optional per-set color and namespace.",
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "context": { "type": "string" },
+            "name": { "type": "string", "description": "Alias for context." },
+            "color": {
+              "type": "string",
+              "description": "Per-set row tile color. Invalid values are dropped (untinted).",
+              "enum": ["red", "yellow", "green", "blue", "magenta", "cyan", "white", "gray"]
+            },
+            "namespace": { "type": "string" }
+          }
+        }
+      ]
+    }
+  }
+}
