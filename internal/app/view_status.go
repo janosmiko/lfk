@@ -130,13 +130,37 @@ func (m Model) explorerDrillPath() []string {
 		// breadcrumb does not already show it) and the cursor's attribute path,
 		// e.g. "… > Pods > pod-name > spec.nodeSelector".
 		var segs []string
-		if name := m.yamlResourceName(); name != "" && m.nav.ResourceName != name && m.nav.OwnedName != name {
+		if name := m.nameNotInNav(m.yamlResourceName()); name != "" {
 			segs = append(segs, name)
 		}
 		if path := m.yamlCursorPath(); len(path) > 0 {
 			segs = append(segs, formatObjectPath(path))
 		}
 		return segs
+	case modeLogs, modeExec:
+		// Logs/exec target a resource (and a container when drilled in). The
+		// action context tracks the live target — logs even update it on pod
+		// re-selection — so the breadcrumb follows the currently shown pod.
+		var segs []string
+		if name := m.nameNotInNav(m.actionCtx.name); name != "" {
+			segs = append(segs, name)
+		}
+		if c := m.actionCtx.containerName; c != "" {
+			segs = append(segs, c)
+		}
+		return segs
+	case modeDescribe, modeEventViewer:
+		if name := m.nameNotInNav(m.actionCtx.name); name != "" {
+			return []string{name}
+		}
+	case modeDiff:
+		// Diff compares two resources; name both.
+		switch {
+		case m.diffView.leftName != "" && m.diffView.rightName != "":
+			return []string{m.diffView.leftName + " ↔ " + m.diffView.rightName}
+		case m.diffView.leftName != "":
+			return []string{m.diffView.leftName}
+		}
 	case modeObjectExplorer:
 		// The Object Explorer adds the resource name (when the nav breadcrumb
 		// does not already show it) and the path to the cursor item, formatted
@@ -166,6 +190,16 @@ func (m Model) explorerDrillPath() []string {
 		}
 	}
 	return nil
+}
+
+// nameNotInNav returns name unless the nav breadcrumb already ends with it (as
+// ResourceName or OwnedName), in which case it returns "" so the drill path
+// does not duplicate a segment the breadcrumb already shows.
+func (m Model) nameNotInNav(name string) string {
+	if name == "" || name == m.nav.ResourceName || name == m.nav.OwnedName {
+		return ""
+	}
+	return name
 }
 
 // cursorBreadcrumbSegment returns the trailing breadcrumb segment for the
