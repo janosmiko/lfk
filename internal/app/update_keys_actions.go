@@ -139,8 +139,8 @@ func (m Model) handleExplorerToolKeys(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool)
 // (CSI internals, admission webhooks, etc.) plus uncategorized core
 // Kubernetes resources under the synthetic "Advanced" category. It also
 // reveals resource types the user hid (rendered dimmed) so they can be
-// un-hidden via the action menu. The state is not persisted and resets on
-// each launch.
+// un-hidden via the action menu. The toggle is session state: it resets to
+// the show_rare_types config default (ui.ConfigShowRareTypes) on each launch.
 func (m Model) handleExplorerActionKeyToggleRare() (tea.Model, tea.Cmd, bool) {
 	m.showRareResources = !m.showRareResources
 	model.ShowRareResources = m.showRareResources

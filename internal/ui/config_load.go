@@ -147,6 +147,14 @@ type configFile struct {
 	// overrides under clusters.<name>.read_only take precedence; the
 	// --read-only CLI flag wins over both.
 	ReadOnly *bool `json:"read_only" yaml:"read_only"`
+	// ShowRareTypes, when true, surfaces the rarely-used resource types (CSI
+	// internals, admission webhooks, leases, runtime classes, and the
+	// synthetic "Advanced" category of uncategorized core resources) in the
+	// sidebar from startup — as if the ToggleRare key (H) were already pressed
+	// — so the full resource-type list is always visible. The runtime H toggle
+	// still flips it for the session; it resets to this value on the next
+	// launch. Default false.
+	ShowRareTypes *bool `json:"show_rare_types" yaml:"show_rare_types"`
 	// Security configures the built-in security-findings dashboard. When
 	// disabled the Security sidebar category, the SEC badge, and all source
 	// probing are turned off. Per-context overrides under

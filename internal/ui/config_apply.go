@@ -185,6 +185,9 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.ReadOnly != nil {
 		ConfigReadOnly = *cfg.ReadOnly
 	}
+	if cfg.ShowRareTypes != nil {
+		ConfigShowRareTypes = *cfg.ShowRareTypes
+	}
 	applySecurityConfig(cfg)
 	applyRightsizingDefaults(cfg.RightsizingDefaults)
 	if cfg.Scheduler != nil {

@@ -591,6 +591,12 @@ var ConfigMouse = true
 // mutating action is blocked unless overridden per-context.
 var ConfigReadOnly bool
 
+// ConfigShowRareTypes is the startup default for the "show rarely-used resource
+// types" toggle (the ToggleRare / H key). When true the sidebar surfaces the
+// rare and "Advanced" resource types from launch. The runtime H toggle
+// overrides it for the rest of the session.
+var ConfigShowRareTypes bool
+
 // ConfigClusterReadOnly maps context names to per-cluster read-only overrides.
 // A value here takes precedence over ConfigReadOnly for that specific context.
 var ConfigClusterReadOnly = map[string]bool{}

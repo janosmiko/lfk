@@ -76,6 +76,15 @@ icons: auto
 # Default: false
 # read_only: false
 
+# ─── Show rarely-used resource types ───────────────────────────────────────────
+# Surface the rarely-used resource types (CSI internals, admission webhooks,
+# leases, runtime classes, and the "Advanced" category of uncategorized core
+# resources) in the sidebar from startup — as if the H key were already pressed
+# — so the full resource-type list is always visible.
+# In-app: H toggles this for the session; it resets to this value on the next
+# launch. Default: false
+# show_rare_types: true
+
 # ─── Security Dashboard ────────────────────────────────────────────────────────
 # Built-in security findings dashboard (Security sidebar category + SEC badge).
 # Sources auto-detect by their operator/CRDs: heuristic (always on), trivy,
