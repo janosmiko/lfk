@@ -209,7 +209,7 @@ func helpSections() []helpSection {
 				{"Z", "Toggle all folds (collapse/expand)"},
 				{"Ctrl+W / >", "Toggle line wrapping"},
 				{"Ctrl+E", "Edit resource in editor"},
-				{"P", "Switch to the Object Explorer for this resource"},
+				{"O", "Switch to the Object Explorer at the attribute under the cursor"},
 				{"I", "Open the API Explorer at the schema definition of the item under the cursor"},
 				{"q/Esc", "Back to explorer (or to the Object Explorer if opened from there)"},
 			},

@@ -48,7 +48,7 @@ func (m Model) viewYAML() string {
 			{Key: "tab/z", Desc: "fold"},
 			{Key: "ctrl+w/>", Desc: "wrap"},
 			{Key: "ctrl+e", Desc: "edit"},
-			{Key: "P", Desc: "object explorer"},
+			{Key: "O", Desc: "object explorer"},
 			{Key: "I", Desc: "explain"},
 			{Key: "q/esc", Desc: "back"},
 		}
@@ -187,6 +187,18 @@ func (m Model) viewYAML() string {
 }
 
 func (m Model) yamlTitle() string {
+	title := m.yamlTitleLabel()
+	// Show the attribute path under the cursor, mirroring how the Object
+	// Explorer always surfaces the current location.
+	if segs := m.yamlCursorPath(); len(segs) > 0 {
+		title += "  " + formatObjectPath(segs)
+	}
+	return title
+}
+
+// yamlTitleLabel returns the resource label portion of the YAML viewer title
+// ("YAML: ns/name"), without the cursor attribute path.
+func (m Model) yamlTitleLabel() string {
 	switch m.nav.Level {
 	case model.LevelResources:
 		sel := m.selectedMiddleItem()
