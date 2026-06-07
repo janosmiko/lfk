@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.8](https://github.com/janosmiko/lfk/compare/v0.13.7...v0.13.8) (2026-06-07)
+
+
+### Features
+
+* alias shift+down/shift+up to ctrl+d/ctrl+u half-page scroll (closes [#369](https://github.com/janosmiko/lfk/issues/369)) ([#371](https://github.com/janosmiko/lfk/issues/371)) ([15eaf36](https://github.com/janosmiko/lfk/commit/15eaf369cbdc2d1f7cb0a356dc5ac5fd650c7d3b))
+* YAML viewer O-jump to Object Explorer + attribute path in title ([#372](https://github.com/janosmiko/lfk/issues/372)) ([4b670a3](https://github.com/janosmiko/lfk/commit/4b670a3ef605fa3fe532fea7956eb2396459f917))
+
 ## [0.13.7](https://github.com/janosmiko/lfk/compare/v0.13.6...v0.13.7) (2026-06-05)
 
 
