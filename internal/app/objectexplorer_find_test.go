@@ -82,7 +82,7 @@ func TestObjectExplorerFind_EscFromFilterKeepsOverlay(t *testing.T) {
 func TestObjectExplorerFind_OverlayRenders(t *testing.T) {
 	m := openFind(t)
 	c, w, h := m.renderOverlayObjectExplorerFind()
-	assert.Contains(t, c, "Find in Chore/chore-1")
+	assert.Contains(t, c, "Find in Chore chore-1")
 	assert.Contains(t, c, "matches")      // subtitle count
 	assert.NotContains(t, c, "esc close") // hotkeys live in the bottom hint bar, not the overlay
 	assert.Positive(t, w)

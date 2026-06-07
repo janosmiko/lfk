@@ -1,7 +1,6 @@
 package app
 
 import (
-	"fmt"
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -112,7 +111,7 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 			m.logView.tailLines = ui.ConfigLogTailLines
 			m.logView.hasMoreHistory = true
 			m.logView.loadingHistory = false
-			m.logView.title = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+			m.logView.title = "Logs: " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 			return m, m.startLogStream()
 		}
 		return m, nil
@@ -167,7 +166,7 @@ func (m *Model) applyLogPodSelection(sel model.Item) tea.Cmd {
 		m.actionCtx.kind = m.logView.parentKind
 		m.actionCtx.name = m.logView.parentName
 		m.actionCtx.containerName = ""
-		m.logView.title = fmt.Sprintf("Logs: %s/%s (all pods)", m.actionNamespace(), m.logView.parentName)
+		m.logView.title = "Logs: " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.logView.parentName) + " (all pods)"
 	} else {
 		// Specific pod selected.
 		m.actionCtx.name = sel.Name
@@ -176,7 +175,7 @@ func (m *Model) applyLogPodSelection(sel model.Item) tea.Cmd {
 			m.actionCtx.namespace = sel.Namespace
 		}
 		m.actionCtx.containerName = ""
-		m.logView.title = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+		m.logView.title = "Logs: " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 	}
 	return m.startLogStream()
 }
@@ -433,7 +432,7 @@ func (m *Model) restartLogStreamForContainerFilter() tea.Cmd {
 
 // buildLogTitle constructs the log title, including selected container names if filtered.
 func (m *Model) buildLogTitle() string {
-	base := fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
+	base := "Logs: " + resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
 	if len(m.logView.selectedContainers) > 0 && len(m.logView.selectedContainers) < len(m.logView.containers) {
 		base += " [" + strings.Join(m.logView.selectedContainers, ", ") + "]"
 	}

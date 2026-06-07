@@ -261,7 +261,11 @@ a single-character slot.
 | `Z` | Toggle all folds (collapse/expand all) |
 | `Ctrl+W` / `>` | Toggle line wrapping |
 | `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
+| `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |
+| `I` | Open the API Explorer at the schema of the attribute under the cursor |
 | `q` / `Esc` | Back to explorer |
+
+The top breadcrumb shows the resource name and the attribute path under the cursor (e.g. `lfk > ctx > Pods > my-pod > spec.containers[0].image`), like the Object Explorer location.
 
 ## Describe View
 

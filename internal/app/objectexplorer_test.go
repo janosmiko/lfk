@@ -58,7 +58,7 @@ func TestOpenObjectExplorer_RootLevel(t *testing.T) {
 	result, _ := m.openObjectExplorer()
 	m = result.(Model)
 	assert.Equal(t, modeObjectExplorer, m.mode)
-	assert.Equal(t, "Chore/chore-1", m.objectExplorerView.title)
+	assert.Equal(t, "Chore chore-1", m.objectExplorerView.title)
 	// Root keys sorted.
 	keys := make([]string, len(m.objectExplorerView.level))
 	for i, f := range m.objectExplorerView.level {
@@ -276,7 +276,7 @@ func TestObjectExplorer_FullYAMLHandoff(t *testing.T) {
 	assert.Equal(t, modeExplorer, m.yamlReturnMode) // reset for the next open
 }
 
-func TestYAML_PReturnsToPreservedTree(t *testing.T) {
+func TestYAML_OReturnsToPreservedTree(t *testing.T) {
 	m := objectExplorerModel(t)
 	result, _ := m.openObjectExplorer()
 	m = result.(Model)
@@ -285,12 +285,12 @@ func TestYAML_PReturnsToPreservedTree(t *testing.T) {
 	m = pressTree(m, key("l"))
 	require.Len(t, m.objectExplorerView.path, 1)
 
-	// Open YAML from the tree (P), then P again returns to the preserved tree.
+	// Open YAML from the tree (P), then O returns to the preserved tree.
 	mdl, _ := m.handleObjectExplorerKey(key("P"))
 	m = mdl.(Model)
 	require.Equal(t, modeYAML, m.mode)
 
-	mdl, _ = m.handleYAMLKey(key("P"))
+	mdl, _ = m.handleYAMLKey(key("O"))
 	m = mdl.(Model)
 	assert.Equal(t, modeObjectExplorer, m.mode)
 	assert.Equal(t, []string{"status"}, m.objectExplorerView.path) // position preserved
@@ -336,7 +336,7 @@ func TestYAMLCursorSync_TreeFollowsYAMLCursor(t *testing.T) {
 	m.yamlView.content = choreDisplayedYAML
 	m.yamlView.cursor = 13
 
-	mdl, _ := m.handleYAMLKey(key("P"))
+	mdl, _ := m.handleYAMLKey(key("O"))
 	m = mdl.(Model)
 	assert.Equal(t, modeObjectExplorer, m.mode)
 	assert.Equal(t, []string{"status", "steps", "[1]"}, m.objectExplorerView.path)
@@ -345,16 +345,16 @@ func TestYAMLCursorSync_TreeFollowsYAMLCursor(t *testing.T) {
 	assert.Equal(t, "phase", sel.Key)
 }
 
-func TestYAML_POpensFreshTreeWhenOpenedViaEnter(t *testing.T) {
-	// YAML opened normally (not from the tree): P opens a fresh tree.
+func TestYAML_OOpensFreshTreeWhenOpenedViaEnter(t *testing.T) {
+	// YAML opened normally (not from the tree): O opens a fresh tree.
 	m := objectExplorerModel(t)
 	m.mode = modeYAML
 	m.yamlReturnMode = modeExplorer // as set by the Enter path
 
-	mdl, _ := m.handleYAMLKey(key("P"))
+	mdl, _ := m.handleYAMLKey(key("O"))
 	m = mdl.(Model)
 	assert.Equal(t, modeObjectExplorer, m.mode)
-	assert.Equal(t, "Chore/chore-1", m.objectExplorerView.title)
+	assert.Equal(t, "Chore chore-1", m.objectExplorerView.title)
 	assert.Empty(t, m.objectExplorerView.path) // fresh at root
 }
 
@@ -380,7 +380,7 @@ func TestObjectExplorer_QClosesAndViewRenders(t *testing.T) {
 	m = result.(Model)
 
 	out := m.viewObjectExplorer()
-	assert.Contains(t, out, "Object Explorer: Chore/chore-1")
+	assert.Contains(t, out, "Object Explorer: Chore chore-1")
 	assert.Contains(t, out, "PARENT")
 	assert.Contains(t, out, "status")
 

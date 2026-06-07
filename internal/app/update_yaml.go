@@ -157,7 +157,7 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "?", "f1":
 		return m.handleYAMLKeyQuestion()
-	case "P":
+	case "O":
 		return m.handleYAMLKeyObjectExplorer()
 	case "I":
 		return m.openExplainAtObjectPath(m.yamlCursorPath(), modeYAML)
@@ -570,11 +570,11 @@ func (m Model) handleYAMLKeyCtrlV() (tea.Model, tea.Cmd) {
 }
 
 // handleYAMLKeyObjectExplorer switches from the YAML viewer to the Object Explorer
-// browser (P), positioning the tree on the node under the YAML cursor. When the
+// browser (O), positioning the tree on the node under the YAML cursor. When the
 // viewer was opened from the tree, it reuses the preserved tree; otherwise
-// (opened via Enter) it opens a fresh tree for the current resource. Together
-// with P in the tree (open YAML), P toggles between the two views with the
-// cursor kept in sync.
+// (opened via Enter) it opens a fresh tree for the current resource. The tree
+// returns to the YAML viewer with P (open full YAML), keeping the cursor in
+// sync in both directions.
 func (m Model) handleYAMLKeyObjectExplorer() (tea.Model, tea.Cmd) {
 	segs := m.yamlCursorPath()
 	if m.yamlReturnMode == modeObjectExplorer && m.objectExplorerView.root != nil {

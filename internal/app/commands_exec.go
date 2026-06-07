@@ -102,7 +102,11 @@ func (m Model) execKubectlDescribe() tea.Cmd {
 		args = append(args, "-n", ns)
 	}
 
-	title := fmt.Sprintf("Describe: %s/%s", rt.Resource, name)
+	titleNs := ""
+	if rt.Namespaced {
+		titleNs = ns
+	}
+	title := "Describe: " + resourceTitleLabel(m.actionCtx.kind, titleNs, name)
 
 	return m.trackBgTask(scheduler.KindSubprocess, title, bgtaskTarget(m.actionCtx.context, ns), func() tea.Msg {
 		cmd := exec.Command(kubectlPath, args...)

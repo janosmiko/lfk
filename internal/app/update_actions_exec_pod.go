@@ -100,20 +100,15 @@ func (m Model) executeActionLogsWithTail(pendingLabel string, tailLines int) (te
 	m.logView.cursor = 0 // will track end as lines stream in with follow mode
 	m.logView.visualMode = false
 	m.logView.visualStart = 0
-	isTail := pendingLabel == "Tail Logs"
-	if m.actionCtx.containerName != "" {
-		if isTail {
-			m.logView.title = fmt.Sprintf("Logs (tail): %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
-		} else {
-			m.logView.title = fmt.Sprintf("Logs: %s/%s [%s]", m.actionNamespace(), m.actionCtx.name, m.actionCtx.containerName)
-		}
-	} else {
-		if isTail {
-			m.logView.title = fmt.Sprintf("Logs (tail): %s/%s", m.actionNamespace(), m.actionCtx.name)
-		} else {
-			m.logView.title = fmt.Sprintf("Logs: %s/%s", m.actionNamespace(), m.actionCtx.name)
-		}
+	verb := "Logs"
+	if pendingLabel == "Tail Logs" {
+		verb = "Logs (tail)"
 	}
+	label := resourceTitleLabel(m.actionCtx.kind, m.actionNamespace(), m.actionCtx.name)
+	if m.actionCtx.containerName != "" {
+		label += " [" + m.actionCtx.containerName + "]"
+	}
+	m.logView.title = verb + ": " + label
 	return m, m.startLogStream()
 }
 

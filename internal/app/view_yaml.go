@@ -48,7 +48,7 @@ func (m Model) viewYAML() string {
 			{Key: "tab/z", Desc: "fold"},
 			{Key: "ctrl+w/>", Desc: "wrap"},
 			{Key: "ctrl+e", Desc: "edit"},
-			{Key: "P", Desc: "object explorer"},
+			{Key: "O", Desc: "object explorer"},
 			{Key: "I", Desc: "explain"},
 			{Key: "q/esc", Desc: "back"},
 		}
@@ -187,21 +187,44 @@ func (m Model) viewYAML() string {
 }
 
 func (m Model) yamlTitle() string {
-	switch m.nav.Level {
-	case model.LevelResources:
-		sel := m.selectedMiddleItem()
-		if sel != nil {
-			return fmt.Sprintf("YAML: %s/%s", m.namespace, sel.Name)
-		}
-	case model.LevelOwned:
-		sel := m.selectedMiddleItem()
-		if sel != nil {
-			return fmt.Sprintf("YAML: %s/%s", m.namespace, sel.Name)
-		}
-	case model.LevelContainers:
-		return fmt.Sprintf("YAML: %s/%s", m.namespace, m.nav.OwnedName)
+	if label := m.yamlResourceLabel(); label != "" {
+		return "YAML: " + label
 	}
 	return "YAML"
+}
+
+// yamlResourceLabel formats the displayed resource as "Kind namespace/name"
+// (see resourceTitleLabel) so the YAML sub-title matches the Object Explorer
+// and the other viewers for the same resource.
+func (m Model) yamlResourceLabel() string {
+	switch m.nav.Level {
+	case model.LevelResources, model.LevelOwned:
+		if sel := m.selectedMiddleItem(); sel != nil {
+			ns := sel.Namespace
+			if ns == "" {
+				ns = m.namespace
+			}
+			return resourceTitleLabel(sel.Kind, ns, sel.Name)
+		}
+	case model.LevelContainers:
+		return resourceTitleLabel("Pod", m.namespace, m.nav.OwnedName)
+	}
+	return ""
+}
+
+// yamlResourceName returns the name of the resource whose YAML is displayed,
+// or "" when it can't be resolved. Used by the top breadcrumb's drill path
+// (see explorerDrillPath).
+func (m Model) yamlResourceName() string {
+	switch m.nav.Level {
+	case model.LevelResources, model.LevelOwned:
+		if sel := m.selectedMiddleItem(); sel != nil {
+			return sel.Name
+		}
+	case model.LevelContainers:
+		return m.nav.OwnedName
+	}
+	return ""
 }
 
 // yamlCursorCol returns the current cursor column position within the YAML line.
