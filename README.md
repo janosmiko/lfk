@@ -2,7 +2,7 @@
 
 # :zap: LFK - Lightning Fast Kubernetes navigator
 
-[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677) 
+[![Release](https://img.shields.io/github/v/release/janosmiko/lfk)](https://github.com/janosmiko/lfk/releases) [![CI](https://img.shields.io/github/actions/workflow/status/janosmiko/lfk/ci.yml?branch=main&label=CI)](https://github.com/janosmiko/lfk/actions/workflows/ci.yml) [![Go Report Card](https://goreportcard.com/badge/github.com/janosmiko/lfk)](https://goreportcard.com/report/github.com/janosmiko/lfk) [![Security Rating](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=security_rating)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![Vulnerabilities](https://sonarcloud.io/api/project_badges/measure?project=janosmiko_lfk&metric=vulnerabilities)](https://sonarcloud.io/dashboard?id=janosmiko_lfk) [![codecov](https://codecov.io/gh/janosmiko/lfk/graph/badge.svg)](https://codecov.io/gh/janosmiko/lfk) [![OpenSSF Scorecard](https://api.scorecard.dev/projects/github.com/janosmiko/lfk/badge)](https://scorecard.dev/viewer/?uri=github.com/janosmiko/lfk) [![OpenSSF Best Practices](https://www.bestpractices.dev/projects/12677/badge)](https://www.bestpractices.dev/projects/12677)[![Cloudsmith](https://img.shields.io/badge/OSS%20hosting%20by-cloudsmith-blue?logo=cloudsmith&style=flat-square&link=https%3A%2F%2Fcloudsmith.com)](https://cloudsmith.com)
 
 **LFK** is a keyboard-focused, yazi-inspired terminal user interface for navigating and managing Kubernetes clusters. It brings a three-column Miller columns layout with an owner-based resource hierarchy to your terminal.
 
@@ -15,7 +15,12 @@ to help cover those costs and fund continued development, consider sponsoring:
 - [GitHub Sponsors](https://github.com/sponsors/janosmiko)
 - [Buy Me a Coffee](https://buymeacoffee.com/janosmiko)
 
-Every contribution is appreciated and helps make LFK sustainable. Thank you for your support!
+Every contribution is appreciated and helps make LFK sustainable.
+
+**Thank you for your support!**
+
+Package repository hosting is graciously provided by [Cloudsmith](https://cloudsmith.com).
+Cloudsmith is the only fully hosted, cloud-native, universal package management solution, that enables your organization to create, store and share packages in any format, to any place, with total confidence.
 
 ## Screenshots
 
