@@ -58,6 +58,29 @@ func TestApplyConfig_NilSchedulerSectionPreservesDefaults(t *testing.T) {
 	assert.Equal(t, 99, scheduler.ConfigWorkersPerContext, "no Scheduler section should leave globals untouched")
 }
 
+func TestApplyConfig_ShowRareTypes(t *testing.T) {
+	orig := ConfigShowRareTypes
+	defer func() { ConfigShowRareTypes = orig }()
+
+	ConfigShowRareTypes = false
+	tru := true
+	applyConfigOptions(configFile{ShowRareTypes: &tru})
+	assert.True(t, ConfigShowRareTypes, "show_rare_types: true must enable the global")
+
+	fls := false
+	applyConfigOptions(configFile{ShowRareTypes: &fls})
+	assert.False(t, ConfigShowRareTypes, "show_rare_types: false must disable the global")
+}
+
+func TestApplyConfig_ShowRareTypesNilPreserves(t *testing.T) {
+	orig := ConfigShowRareTypes
+	defer func() { ConfigShowRareTypes = orig }()
+
+	ConfigShowRareTypes = true // sentinel
+	applyConfigOptions(configFile{})
+	assert.True(t, ConfigShowRareTypes, "absent show_rare_types must leave the global untouched")
+}
+
 // snapshotKubeconfigDirs captures and restores ConfigKubeconfigDirs so tests
 // don't leak global state into each other.
 func snapshotKubeconfigDirs() func() {

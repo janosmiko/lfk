@@ -35,6 +35,11 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		watchInterval = ui.DefaultWatchInterval
 	}
 
+	// Seed the session "show rarely-used types" state from config so the full
+	// resource-type list can be visible from launch. model.ShowRareResources is
+	// the global the sidebar builder reads; keep it in sync with the field.
+	model.ShowRareResources = ui.ConfigShowRareTypes
+
 	reqCtx, reqCancel := context.WithCancel(context.Background())
 	pinnedSt := loadPinnedState()
 	hiddenSt := loadHiddenTypesState()
@@ -65,6 +70,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		watchMode:                  true,
 		readOnly:                   ui.ResolveReadOnly(contextName, opts.ReadOnly),
 		cliReadOnly:                opts.ReadOnly,
+		showRareResources:          ui.ConfigShowRareTypes,
 		contextROOverrides:         make(map[string]bool),
 		clusterColors:              loadClusterColors(),
 		localClusterFields:         localClusterFields{localClusterCache: loadLocalClusterState()},
