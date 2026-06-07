@@ -265,7 +265,7 @@ a single-character slot.
 | `I` | Open the API Explorer at the schema of the attribute under the cursor |
 | `q` / `Esc` | Back to explorer |
 
-The title bar shows the attribute path under the cursor (e.g. `spec.containers[0].image`), like the Object Explorer location.
+The top breadcrumb shows the resource name and the attribute path under the cursor (e.g. `lfk > ctx > Pods > my-pod > spec.containers[0].image`), like the Object Explorer location.
 
 ## Describe View
 

@@ -125,6 +125,18 @@ func (m Model) explorerDrillPath() []string {
 		if seg := m.cursorBreadcrumbSegment(); seg != "" {
 			return []string{seg}
 		}
+	case modeYAML:
+		// Mirror the Object Explorer: append the resource name (when the nav
+		// breadcrumb does not already show it) and the cursor's attribute path,
+		// e.g. "… > Pods > pod-name > spec.nodeSelector".
+		var segs []string
+		if name := m.yamlResourceName(); name != "" && m.nav.ResourceName != name && m.nav.OwnedName != name {
+			segs = append(segs, name)
+		}
+		if path := m.yamlCursorPath(); len(path) > 0 {
+			segs = append(segs, formatObjectPath(path))
+		}
+		return segs
 	case modeObjectExplorer:
 		// The Object Explorer adds the resource name (when the nav breadcrumb
 		// does not already show it) and the path to the cursor item, formatted

@@ -187,33 +187,25 @@ func (m Model) viewYAML() string {
 }
 
 func (m Model) yamlTitle() string {
-	title := m.yamlTitleLabel()
-	// Show the attribute path under the cursor, mirroring how the Object
-	// Explorer always surfaces the current location.
-	if segs := m.yamlCursorPath(); len(segs) > 0 {
-		title += "  " + formatObjectPath(segs)
-	}
-	return title
-}
-
-// yamlTitleLabel returns the resource label portion of the YAML viewer title
-// ("YAML: ns/name"), without the cursor attribute path.
-func (m Model) yamlTitleLabel() string {
-	switch m.nav.Level {
-	case model.LevelResources:
-		sel := m.selectedMiddleItem()
-		if sel != nil {
-			return fmt.Sprintf("YAML: %s/%s", m.namespace, sel.Name)
-		}
-	case model.LevelOwned:
-		sel := m.selectedMiddleItem()
-		if sel != nil {
-			return fmt.Sprintf("YAML: %s/%s", m.namespace, sel.Name)
-		}
-	case model.LevelContainers:
-		return fmt.Sprintf("YAML: %s/%s", m.namespace, m.nav.OwnedName)
+	if name := m.yamlResourceName(); name != "" {
+		return fmt.Sprintf("YAML: %s/%s", m.namespace, name)
 	}
 	return "YAML"
+}
+
+// yamlResourceName returns the name of the resource whose YAML is displayed,
+// or "" when it can't be resolved. Shared by the viewer sub-title and the top
+// breadcrumb's drill path (see explorerDrillPath).
+func (m Model) yamlResourceName() string {
+	switch m.nav.Level {
+	case model.LevelResources, model.LevelOwned:
+		if sel := m.selectedMiddleItem(); sel != nil {
+			return sel.Name
+		}
+	case model.LevelContainers:
+		return m.nav.OwnedName
+	}
+	return ""
 }
 
 // yamlCursorCol returns the current cursor column position within the YAML line.
