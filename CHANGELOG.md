@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.13.9](https://github.com/janosmiko/lfk/compare/v0.13.8...v0.13.9) (2026-06-07)
+
+
+### Features
+
+* add JSON Schema for config.yaml with editor autocompletion ([#376](https://github.com/janosmiko/lfk/issues/376)) ([c58ea57](https://github.com/janosmiko/lfk/commit/c58ea579d673cc6532560379c6e3b43be5fcc506))
+* add show_rare_types config to show all resource types from startup ([#321](https://github.com/janosmiko/lfk/issues/321)) ([#374](https://github.com/janosmiko/lfk/issues/374)) ([8dd78c5](https://github.com/janosmiko/lfk/commit/8dd78c574955a42520ed1cd36b5ab37b314010d3))
+
 ## [0.13.8](https://github.com/janosmiko/lfk/compare/v0.13.7...v0.13.8) (2026-06-07)
 
 
