@@ -64,11 +64,11 @@ func (m Model) handleCrashInvestigatorOverlayKey(msg tea.KeyMsg) (tea.Model, tea
 		// Sentinel — renderer clamps to maxScroll.
 		m.crashInv.setScroll(m.scrollKey(), 999999)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		// Half-page (vim) — renderer clamps to maxScroll.
 		m.crashInv.bumpScroll(m.scrollKey(), +10)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.crashInv.bumpScroll(m.scrollKey(), -10)
 		return m, nil
 	case "ctrl+f", "pgdown":

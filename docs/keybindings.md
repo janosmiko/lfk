@@ -13,7 +13,7 @@ Complete list of all keybindings in `lfk`. All keybindings can be overridden in 
 | `gg` / `Home` | Jump to top of list |
 | `G` / `End` | Jump to bottom of list |
 | `Enter` | Open full-screen YAML view / navigate into |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `z` | Toggle expand/collapse all resource groups / toggle event grouping in the Events list |
 | `p` | Pin/unpin resource type (at resource types level) |
@@ -220,7 +220,7 @@ a single-character slot.
 | `f` | Filter — narrows the visible list to lines matching the query |
 | `Esc` | Cascades: clear active search → clear active filter → close help |
 | `j` / `k` | Scroll down/up |
-| `Ctrl+D` / `Ctrl+U` | Half-page scroll down/up |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page scroll down/up |
 | `Ctrl+F` / `Ctrl+B` / `PgDown` / `PgUp` | Full-page scroll |
 | `g` / `G` | Jump to top / bottom |
 | `q` / `?` / `F1` | Close help |
@@ -243,7 +243,7 @@ a single-character slot.
 | `gg` / `Home` | Jump to top |
 | `G` / `End` | Jump to bottom |
 | `123G` | Jump to line number |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
@@ -276,7 +276,7 @@ a single-character slot.
 | `123w` / `123b` / `123e` (and capitals) | Apply word/WORD motion N times |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `123G` | Jump to line number |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
@@ -309,7 +309,7 @@ a single-character slot.
 | `123w` / `123b` / `123e` (and capitals) | Apply word/WORD motion N times |
 | `gg` / `Home` | Jump to top |
 | `G` / `End` | Jump to bottom |
-| `Ctrl+D` / `Ctrl+U` | Half page down / up |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
@@ -406,7 +406,7 @@ from `terminal:` in the config.
 | `Tab` | Switch cursor side (side-by-side mode) |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `123G` | Jump to line number |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
@@ -447,7 +447,7 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `gg` / `Home` | Jump to top |
 | `G` / `End` | Jump to bottom |
 | `123G` | Jump to specific line number |
-| `Ctrl+D` / `Ctrl+U` | Half page down / up |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half page down / up |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
@@ -568,7 +568,7 @@ The editor picks one of two modes based on the value being edited:
 | `Esc` | Cancel the in-progress edit |
 | `←` / `→` | Move cursor left / right |
 | `↑` / `↓` | Move cursor up / down (preserves byte column on the prev/next `\n`-delimited line; pane mode only) |
-| `Ctrl+D` / `Ctrl+U` | Scroll cursor down / up by half a page (pane mode only) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Scroll cursor down / up by half a page (pane mode only) |
 | `Ctrl+F` / `Ctrl+B` | Scroll cursor down / up by a full page (pane mode only) |
 | `Ctrl+A` / `Ctrl+E` | Move cursor to start / end of the **current line** (vim-like `0` / `$`) |
 | `Backspace` | Delete the character before the cursor |
@@ -591,7 +591,7 @@ The editor picks one of two modes based on the value being edited:
 | `n` / `N` | Next / previous search match (recursive: auto-drills into children / searches parent) |
 | `r` | Recursive field browser (browse all nested fields with filter) |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` | Close API explorer |
 | `Esc` | Go back one level / close at root |
@@ -606,7 +606,7 @@ The editor picks one of two modes based on the value being edited:
 | `a` | Toggle all/allowed-only permissions |
 | `s` | Switch subject (User/Group/SA) |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `Tab` | Toggle to **Who-Can** (reverse RBAC: verb + resource → subjects) |
 | `q` / `Esc` | Clear search / close |
@@ -631,7 +631,7 @@ fires a fresh query so the right pane updates as you browse.
 | `j` / `k` (or `↓` / `↑`) | Move the resource cursor (re-queries for the new resource) |
 | `J` / `K` | Scroll the subjects column (right pane) without moving the resource cursor |
 | `g` / `G` (or `Home` / `End`) | Jump to top / bottom of the resource list |
-| `Ctrl+D` / `Ctrl+U` | Half page down / up in the resource list |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half page down / up in the resource list |
 | `Ctrl+F` / `Ctrl+B` (or `PgDn` / `PgUp`) | Full page down / up in the resource list |
 | `←` / `→` (or `h` / `l`) | Cycle the verb chip (`get` `list` `watch` `create` `update` `patch` `delete` `*`) |
 | `/` | Filter the resource list by substring (Enter to accept, Esc to clear) |
@@ -654,7 +654,7 @@ grants apply everywhere); RoleBindings outside the active scope are excluded.
 | `j` / `k` | Navigate subjects |
 | `/` | Filter subjects by name |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `Enter` | Select subject |
 | `Esc` | Clear filter / close |
@@ -665,7 +665,7 @@ grants apply everywhere); RoleBindings outside the active scope are excluded.
 |---|---|
 | `j` / `k` | Scroll up/down |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `q` / `Esc` | Close visualizer |
 
@@ -704,7 +704,7 @@ existing recommendations stay visually similar after the upgrade).
 | `<` | Cycle to the previous headroom multiplier (wraps around; same snap behavior as `>`) |
 | `j` / `k` | Scroll up / down |
 | `g` / `G` (or `Home` / `End`) | Jump to top / bottom |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` (or `PgDn` / `PgUp`) | Page down / up (full page) |
 | `esc` / `q` | Close |
 
@@ -735,7 +735,7 @@ Invalid config values are dropped at startup with a warning in the error log.
 |---|---|
 | `j` / `k` | Move cursor up/down |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
-| `Ctrl+D` / `Ctrl+U` | Page down / up (half page) |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
 | `V` | Line visual selection |
 | `v` | Character visual selection (from cursor column) |
@@ -1063,7 +1063,7 @@ last logs, and describe for the failing container in one tabbed panel.
 | `p`            | Toggle previous / current logs (Logs tab only)            |
 | `j` / `k`      | Scroll within tab body                                    |
 | `g` / `G`      | Jump to top / bottom of tab body                          |
-| `Ctrl+D` / `Ctrl+U` | Half-page down / up                                  |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page down / up                                  |
 | `Ctrl+F` / `Ctrl+B` | Full-page down / up (also `PgDn` / `PgUp`)           |
 | `Shift+R`      | Refresh — re-fetch all sections, preserves cursor state  |
 | `Esc` / `q`    | Close overlay                                             |
@@ -1093,7 +1093,7 @@ on the right. `Tab` toggles which pane has focus.
 | `Enter` / `Space` | If on wave header: toggle wave collapse. If on placeholder: toggle phase collapse. If on resource: no-op |
 | `Tab` / `Shift+Tab` | Switch focus to sidebar |
 | `g` / `G` | First / last visible body row |
-| `Ctrl+D` / `Ctrl+U` | Half-page scroll |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page scroll |
 | `Ctrl+F` / `Ctrl+B` (or `PgDn` / `PgUp`) | Full-page scroll |
 
 **Shared:**
@@ -1145,7 +1145,7 @@ For Service targets, an endpoint picker appears first:
 | `Y` | Copy pcap path to system clipboard; marks capture saved |
 | `/` | Search within live table |
 | `j` / `k` | Scroll older / newer (tail-anchored: `0` = latest at bottom) |
-| `Ctrl+D` / `Ctrl+U` | Half-page scroll older / newer |
+| `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Half-page scroll older / newer |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full-page scroll older / newer |
 | `g` / `G` | Jump to oldest / return to live (latest) |
 

@@ -36,10 +36,10 @@ func (m Model) handleLogMovementKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "k", "up":
 		ret, cmd := m.handleLogKeyK()
 		return ret, cmd, true
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		ret := m.handleLogKeyCtrlD()
 		return ret, nil, true
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		ret, cmd := m.handleLogKeyCtrlU()
 		return ret, cmd, true
 	case "ctrl+f", "pgdown":
@@ -220,9 +220,9 @@ func (m Model) handleLogVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleLogVisualKeyG()
 	case "g":
 		return m.handleLogVisualKeyG2()
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		return m.handleLogVisualKeyCtrlD()
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		return m.handleLogVisualKeyCtrlU()
 	case "ctrl+c":
 		m.logView.visualMode = false

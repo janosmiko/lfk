@@ -159,7 +159,7 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		m.diffView.cursor = 0
 		m.diffView.scroll = 0
 		return m, nil
-	case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b", "pgdown", "pgup":
+	case "ctrl+d", "ctrl+u", "ctrl+f", "ctrl+b", "pgdown", "pgup", "shift+down", "shift+up":
 		return m.diffPageMoveByKey(msg.String(), maxCursor, visibleLines, maxScroll)
 	case "0":
 		if m.diffView.lineInput != "" {
@@ -325,10 +325,10 @@ func (m Model) handleDiffSearchNav(key string, foldRegions []ui.DiffFoldRegion, 
 // fall back to half-viewport). `<C-f>`/`<C-b>` scroll `count` full pages.
 func (m Model) diffPageMoveByKey(key string, maxCursor, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
 	switch key {
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		step := vimScrollStep(&m.diffView.lineInput, &m.diffView.scrollOption, visibleLines)
 		m.diffView.cursor = min(m.diffView.cursor+step, maxCursor)
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		step := vimScrollStep(&m.diffView.lineInput, &m.diffView.scrollOption, visibleLines)
 		m.diffView.cursor = max(m.diffView.cursor-step, 0)
 	case "ctrl+f", "pgdown":
@@ -441,11 +441,11 @@ func (m Model) handleDiffVisualKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		m.diffView.cursor = maxCursor
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.diffView.cursor = min(m.diffView.cursor+scrollStep(m.diffView.scrollOption, visibleLines), maxCursor)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.diffView.cursor = max(m.diffView.cursor-scrollStep(m.diffView.scrollOption, visibleLines), 0)
 		m.ensureDiffCursorVisible(visibleLines, maxScroll)
 		return m, nil

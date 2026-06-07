@@ -52,10 +52,10 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
 			m.netpolLineInput += "0"
 			return m
 		}
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.netpolLineInput = ""
 		m.netpolScroll += m.height / 2
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.netpolLineInput = ""
 		m.netpolScroll -= m.height / 2
 		if m.netpolScroll < 0 {
@@ -209,11 +209,11 @@ func (m Model) handleAlertsOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			m.alertsLineInput += "0"
 			return m, nil
 		}
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.alertsLineInput = ""
 		m.alertsScroll += 10
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.alertsLineInput = ""
 		m.alertsScroll = max(m.alertsScroll-10, 0)
 		return m, nil

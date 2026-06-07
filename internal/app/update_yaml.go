@@ -221,9 +221,9 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.yamlView.cursor = 0
 		m.ensureYAMLCursorVisible()
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		return m.handleYAMLNormalHalfPageDown(totalVisible)
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		return m.handleYAMLKeyCtrlU()
 	case "ctrl+f", "pgdown":
 		return m.handleYAMLNormalPageDown(totalVisible)

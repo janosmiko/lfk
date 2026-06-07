@@ -65,10 +65,10 @@ func (m Model) handlePodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "k", "up", "ctrl+p":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -1, len(items)-1)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 10, len(items)-1)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, len(items)-1)
 		return m, nil
 	case "ctrl+c":
@@ -132,10 +132,10 @@ func (m Model) handleLogPodSelectOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case "k", "up", "ctrl+p":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -1, len(items)-1)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 10, len(items)-1)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, len(items)-1)
 		return m, nil
 	case "ctrl+c":
@@ -315,10 +315,10 @@ func (m Model) handleLogContainerSelectOverlayKey(msg tea.KeyMsg) (tea.Model, te
 	case "k", "up", "ctrl+p":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -1, len(items)-1)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, 10, len(items)-1)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.overlayCursor = clampOverlayCursor(m.overlayCursor, -10, len(items)-1)
 		return m, nil
 	case "P", "\\":

@@ -65,11 +65,11 @@ func (m Model) handleBackgroundTasksOverlayKey(msg tea.KeyMsg) (tea.Model, tea.C
 		m.tasksOverlayScroll = m.clampTasksOverlayScroll(m.tasksOverlayScroll - 1)
 		m = m.maybeFreezeHistory()
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.tasksOverlayScroll = m.clampTasksOverlayScroll(m.tasksOverlayScroll + tasksOverlayScrollStep)
 		m = m.maybeFreezeHistory()
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.tasksOverlayScroll = m.clampTasksOverlayScroll(m.tasksOverlayScroll - tasksOverlayScrollStep)
 		m = m.maybeFreezeHistory()
 		return m, nil

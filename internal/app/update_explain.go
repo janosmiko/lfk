@@ -234,9 +234,9 @@ func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "0":
 		return m.handleExplainKeyZero()
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		return m.handleExplainPageMove(visibleLines/2, fieldCount, visibleLines)
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		return m.handleExplainPageMove(-visibleLines/2, fieldCount, visibleLines)
 	case "ctrl+f", "pgdown":
 		return m.handleExplainPageMove(visibleLines, fieldCount, visibleLines)
@@ -425,13 +425,13 @@ func (m Model) handleExplainSearchOverlayNormalKey(msg tea.KeyMsg) (tea.Model, t
 		}
 		return m, nil
 
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		halfPage := visibleLines / 2
 		m.explainRecursiveCursor = min(m.explainRecursiveCursor+halfPage, max(resultCount-1, 0))
 		m.explainRecursiveScroll = min(m.explainRecursiveScroll+halfPage, max(resultCount-visibleLines, 0))
 		return m, nil
 
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		halfPage := visibleLines / 2
 		m.explainRecursiveCursor = max(m.explainRecursiveCursor-halfPage, 0)
 		m.explainRecursiveScroll = max(m.explainRecursiveScroll-halfPage, 0)

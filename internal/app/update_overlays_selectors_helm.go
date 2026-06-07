@@ -20,10 +20,10 @@ func (m Model) handleRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, -1, len(m.rollbackRevisions)-1)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, 10, len(m.rollbackRevisions)-1)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.rollbackCursor = clampOverlayCursor(m.rollbackCursor, -10, len(m.rollbackRevisions)-1)
 		return m, nil
 	case "ctrl+f", "pgdown":
@@ -102,10 +102,10 @@ func (m Model) handleHelmRollbackOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd)
 	case "k", "up":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, -1, len(m.helmRollbackRevisions)-1)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, 10, len(m.helmRollbackRevisions)-1)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.helmRollbackCursor = clampOverlayCursor(m.helmRollbackCursor, -10, len(m.helmRollbackRevisions)-1)
 		return m, nil
 	case "ctrl+f", "pgdown":
@@ -181,10 +181,10 @@ func (m Model) handleHelmHistoryOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) 
 	case "k", "up":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, -1, len(m.helmHistoryRevisions)-1)
 		return m, nil
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, 10, len(m.helmHistoryRevisions)-1)
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.helmHistoryCursor = clampOverlayCursor(m.helmHistoryCursor, -10, len(m.helmHistoryRevisions)-1)
 		return m, nil
 	case "ctrl+f", "pgdown":

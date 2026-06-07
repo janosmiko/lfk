@@ -69,14 +69,14 @@ func (m Model) handleYAMLVisualKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case "G":
 		return m.handleYAMLVisualG(totalVisible, maxScroll)
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.yamlView.cursor += scrollStep(m.yamlView.scrollOption, m.yamlViewportLines())
 		if m.yamlView.cursor >= totalVisible {
 			m.yamlView.cursor = totalVisible - 1
 		}
 		m.ensureYAMLCursorVisible()
 		return m, nil
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.yamlView.cursor -= scrollStep(m.yamlView.scrollOption, m.yamlViewportLines())
 		if m.yamlView.cursor < 0 {
 			m.yamlView.cursor = 0

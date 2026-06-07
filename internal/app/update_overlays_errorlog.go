@@ -140,14 +140,14 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.errorLogLineInput += key
 		return m, nil
 
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.errorLogLineInput = ""
 		halfPage := maxVisible / 2
 		m.errorLogCursorLine = min(m.errorLogCursorLine+halfPage, maxCursor)
 		m.errorLogScroll = m.errorLogEnsureCursorVisible(maxVisible, maxScroll)
 		return m, nil
 
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.errorLogLineInput = ""
 		halfPage := maxVisible / 2
 		m.errorLogCursorLine = max(m.errorLogCursorLine-halfPage, 0)

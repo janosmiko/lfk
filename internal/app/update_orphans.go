@@ -153,9 +153,9 @@ func (m Model) handleOrphansKey(msg tea.KeyMsg) (Model, tea.Cmd) {
 		return m.orphansJumpCursor(0)
 	case "G", "end":
 		return m.orphansJumpCursor(len(m.orphans.visibleItems()) - 1)
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		return m.orphansMoveCursor(+max(m.orphansVisibleLines()/2, 1))
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		return m.orphansMoveCursor(-max(m.orphansVisibleLines()/2, 1))
 	case "ctrl+f", "pgdown":
 		return m.orphansMoveCursor(+max(m.orphansVisibleLines(), 1))

@@ -16,7 +16,7 @@ func helpSections() []helpSection {
 				{kb.Up + " / Up", "Move up"},
 				{kb.JumpTop + kb.JumpTop + " / Home", "Jump to top"},
 				{kb.JumpBottom + " / End", "Jump to bottom"},
-				{helpKeyDisplay(kb.PageDown) + " / " + helpKeyDisplay(kb.PageUp), "Half-page scroll down / up"},
+				{helpKeyDisplay(kb.PageDown) + " / " + helpKeyDisplay(kb.PageUp) + " / Shift+↓ / Shift+↑", "Half-page scroll down / up"},
 				{helpKeyDisplay(kb.PageForward) + " / " + helpKeyDisplay(kb.PageBack) + " / PgDn / PgUp", "Full-page scroll down / up"},
 				{kb.Enter, "Open YAML view / navigate into"},
 				{kb.LevelCluster + "/" + kb.LevelTypes + "/" + kb.LevelResources, "Jump to clusters/types/resources level"},

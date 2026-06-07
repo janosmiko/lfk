@@ -127,9 +127,9 @@ func (m Model) handleExecKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			return m.execSwitchTab((m.activeTab - 1 + len(m.tabs)) % len(m.tabs))
 		case "t":
 			return m.execNewTab()
-		case "ctrl+u":
+		case "ctrl+u", "shift+up":
 			return m.execScrollBy(-(m.execViewportRows() / 2)), nil
-		case "ctrl+d":
+		case "ctrl+d", "shift+down":
 			return m.execScrollBy(m.execViewportRows() / 2), nil
 		case "ctrl+b":
 			return m.execScrollBy(-m.execViewportRows()), nil

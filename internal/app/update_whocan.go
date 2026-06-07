@@ -122,9 +122,9 @@ func (m Model) handleWhoCanKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "G", "end":
 		visible := m.whoCanVisibleResources()
 		return m.whoCanJumpCursor(len(visible) - 1)
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		return m.whoCanMoveCursor(+m.whoCanVisibleLines() / 2)
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		return m.whoCanMoveCursor(-m.whoCanVisibleLines() / 2)
 	case "ctrl+f", "pgdown":
 		return m.whoCanMoveCursor(+m.whoCanVisibleLines())

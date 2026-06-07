@@ -297,11 +297,11 @@ func (m Model) handleColumnToggleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "k", "up":
 		return m.handleColumnToggleKeyK()
 
-	case "ctrl+d":
+	case "ctrl+d", "shift+down":
 		m.columnToggleCursor = clampOverlayCursor(m.columnToggleCursor, 10, maxIdx)
 		return m, nil
 
-	case "ctrl+u":
+	case "ctrl+u", "shift+up":
 		m.columnToggleCursor = clampOverlayCursor(m.columnToggleCursor, -10, maxIdx)
 		return m, nil
 
