@@ -363,13 +363,16 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 
 	var maxScroll int
 	if wrap {
-		// Wrap mode: long lines wrap to multiple rows. Scroll indexes whole
-		// content lines (one per visible diff line), matching the cursor model.
+		// Wrap mode clamps per logical line, not per page: one diff line can
+		// expand to several visual rows, so page-fill clamping (which mixes a
+		// visual-row count with a logical-line count) doesn't apply. Scroll
+		// indexes whole content lines, matching the cursor model, and stops at
+		// the last line so it stays reachable.
 		maxScroll = max(totalContent-1, 0)
 		scroll = min(max(scroll, 0), maxScroll)
 		rendered = append(rendered, buildWrappedUnifiedRows(rawDiffLines, visLines, scroll, contentMaxLines, contentWidth, gutterWidth, lineNumbers, searchQuery, cursor, uStyles, cursorStyleU)...)
 	} else {
-		// Clamp scroll on content lines only.
+		// Non-wrap: one row per line, so clamp to keep the last page full.
 		maxScroll = max(totalContent-contentMaxLines, 0)
 		scroll = min(max(scroll, 0), maxScroll)
 
