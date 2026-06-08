@@ -71,7 +71,7 @@ func (m Model) eventViewerHintBar() string {
 		return m.renderStatusHint()
 	}
 	if m.eventTimelineSearchActive {
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorRight())
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorLeft()) + ui.BarDimStyle.Render("█") + ui.BarNormalStyle.Render(m.eventTimelineSearchInput.CursorRight())
 		return ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 	if m.eventTimelineVisualMode != 0 {
@@ -88,9 +88,9 @@ func (m Model) eventViewerHintBar() string {
 		{Key: "h/l", Desc: "column"},
 		{Key: "v/V", Desc: "visual"},
 		{Key: "y", Desc: "copy"},
-		{Key: "/", Desc: "search"},
-		{Key: ">", Desc: "wrap"},
-		{Key: "f", Desc: "minimize"},
+		{Key: ui.ActiveKeybindings.Search, Desc: "search"},
+		{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
+		{Key: ui.ActiveKeybindings.Fullscreen, Desc: "minimize"},
 		{Key: "q/esc", Desc: "back"},
 	}, m.width)
 }

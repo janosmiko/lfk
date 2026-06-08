@@ -153,9 +153,10 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	totalVisible := visibleLineCount(m.yamlView.content, m.yamlView.sections, m.yamlView.collapsed)
 	viewportLines := m.yamlViewportLines()
 	maxScroll := m.yamlMaxScroll(totalVisible)
+	kb := ui.ActiveKeybindings
 
 	switch msg.String() {
-	case "?", "f1":
+	case kb.Help, "f1":
 		return m.handleYAMLKeyQuestion()
 	case "O":
 		return m.handleYAMLKeyObjectExplorer()
@@ -171,22 +172,22 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyQ()
 	case "ctrl+c":
 		return m.handleYAMLKeyCtrlC()
-	case "/":
+	case kb.Search:
 		return m.handleYAMLKeySlash()
-	case "n":
+	case kb.NextMatch:
 		return m.handleYAMLKeyN(viewportLines)
-	case "N":
+	case kb.PrevMatch:
 		return m.handleYAMLKeyShiftN(viewportLines)
 	case "ctrl+e":
 		return m.handleYAMLKeyCtrlE()
 	case "y":
 		return m.handleYAMLNormalCopy()
-	case "ctrl+w", ">":
+	case kb.ToggleWrap:
 		m.yamlView.wrap = !m.yamlView.wrap
 		return m, nil
-	case "z":
+	case kb.ToggleFold:
 		return m.handleYAMLKeyFoldToggle()
-	case "Z":
+	case kb.ToggleFoldAll:
 		return m.handleYAMLKeyZ()
 	case "h", "left":
 		return m.handleYAMLKeyH()

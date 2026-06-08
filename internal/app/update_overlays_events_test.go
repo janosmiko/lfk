@@ -181,14 +181,14 @@ func TestEventTimelineSearchBackspace(t *testing.T) {
 func TestEventTimelineFullscreenToggle(t *testing.T) {
 	m := newEventModel(10)
 
-	// Pressing f switches to modeEventViewer and clears overlay.
-	ret, _ := m.handleEventTimelineOverlayKey(runeKey('f'))
+	// Pressing F switches to modeEventViewer and clears overlay.
+	ret, _ := m.handleEventTimelineOverlayKey(runeKey('F'))
 	result := ret.(Model)
 	assert.Equal(t, modeEventViewer, result.mode)
 	assert.Equal(t, overlayNone, result.overlay)
 
-	// Pressing f in fullscreen mode goes back to overlay.
-	ret2, _ := result.handleEventViewerModeKey(runeKey('f'))
+	// Pressing F in fullscreen mode goes back to overlay.
+	ret2, _ := result.handleEventViewerModeKey(runeKey('F'))
 	result2 := ret2.(Model)
 	assert.Equal(t, modeExplorer, result2.mode)
 	assert.Equal(t, overlayEventTimeline, result2.overlay)

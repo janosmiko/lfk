@@ -330,7 +330,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		searchBar := HelpKeyStyle.Render("type: search") + BarDimStyle.Render(" | ") +
 			HelpKeyStyle.Render("enter") + BarDimStyle.Render(": apply | ") +
 			HelpKeyStyle.Render("esc") + BarDimStyle.Render(": cancel") +
-			BarDimStyle.Render("  /") + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
+			BarDimStyle.Render("  "+ActiveKeybindings.Search) + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(searchBar)
 	case vp.VisualMode:
 		hintContent := FormatHintParts([]HintEntry{
@@ -346,14 +346,14 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
-			{Key: "/", Desc: "search"},
+			{Key: ActiveKeybindings.Search, Desc: "search"},
 			{Key: "v/V", Desc: "select"},
 			{Key: "y", Desc: "copy"},
 			{Key: "tab", Desc: "side"},
-			{Key: "z", Desc: "fold"},
-			{Key: "#", Desc: "lines"},
-			{Key: ">", Desc: "wrap"},
-			{Key: "u", Desc: "unified"},
+			{Key: ActiveKeybindings.ToggleFold, Desc: "fold"},
+			{Key: ActiveKeybindings.ToggleLineNumbers, Desc: "lines"},
+			{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
+			{Key: ActiveKeybindings.ToggleUnified, Desc: "unified"},
 			{Key: "q/esc", Desc: "back"},
 		})
 		scrollInfo := BarDimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))
@@ -550,7 +550,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		searchBar := HelpKeyStyle.Render("type: search") + BarDimStyle.Render(" | ") +
 			HelpKeyStyle.Render("enter") + BarDimStyle.Render(": apply | ") +
 			HelpKeyStyle.Render("esc") + BarDimStyle.Render(": cancel") +
-			BarDimStyle.Render("  /") + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
+			BarDimStyle.Render("  "+ActiveKeybindings.Search) + BarDimStyle.Render(diffModeInd) + BarNormalStyle.Render(searchInput) + BarDimStyle.Render("\u2588")
 		hint = StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(searchBar)
 	case vp.VisualMode:
 		hintContent := FormatHintParts([]HintEntry{
@@ -566,13 +566,13 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
-			{Key: "/", Desc: "search"},
+			{Key: ActiveKeybindings.Search, Desc: "search"},
 			{Key: "v/V", Desc: "select"},
 			{Key: "y", Desc: "copy"},
-			{Key: "z", Desc: "fold"},
-			{Key: "#", Desc: "lines"},
-			{Key: ">", Desc: "wrap"},
-			{Key: "u", Desc: "side-by-side"},
+			{Key: ActiveKeybindings.ToggleFold, Desc: "fold"},
+			{Key: ActiveKeybindings.ToggleLineNumbers, Desc: "lines"},
+			{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
+			{Key: ActiveKeybindings.ToggleUnified, Desc: "side-by-side"},
 			{Key: "q/esc", Desc: "back"},
 		})
 		scrollInfo := BarDimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))

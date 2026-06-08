@@ -86,7 +86,7 @@ func (m Model) handleErrorLogOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "esc", "q":
 		return m.handleErrorLogOverlayKeyEsc()
 
-	case "f":
+	case ui.ActiveKeybindings.Fullscreen:
 		return m.handleErrorLogOverlayKeyF()
 
 	case "V":

@@ -202,7 +202,7 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 	}
 	if searchActive {
 		modeInd := SearchModeIndicator(searchInput)
-		prompt := HelpKeyStyle.Render("/") + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + searchInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (enter:apply  esc:cancel)")
+		prompt := HelpKeyStyle.Render(ActiveKeybindings.Search) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + searchInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (enter:apply  esc:cancel)")
 		return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(prompt)
 	}
 	if visualMode {
@@ -219,20 +219,20 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "j/k", Desc: "move"},
 		{Key: "ctrl+d/u", Desc: "half page"},
 		{Key: "ctrl+f/b", Desc: "page"},
-		{Key: "f", Desc: "follow"},
-		{Key: "tab/z/>", Desc: "wrap"},
-		{Key: "#", Desc: "line#"},
-		{Key: "s", Desc: "timestamps"},
-		{Key: "p", Desc: "prefixes"},
-		{Key: "P", Desc: "preview"},
+		{Key: ActiveKeybindings.ToggleFollow, Desc: "follow"},
+		{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
+		{Key: ActiveKeybindings.ToggleLineNumbers, Desc: "line#"},
+		{Key: ActiveKeybindings.ToggleTimestamps, Desc: "timestamps"},
+		{Key: ActiveKeybindings.TogglePrefixes, Desc: "prefixes"},
+		{Key: ActiveKeybindings.TogglePreview, Desc: "preview"},
 		{Key: "J/K", Desc: "preview scroll"},
 		{Key: "c", Desc: "previous"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "y", Desc: "copy"},
-		{Key: "/", Desc: "search"},
+		{Key: ActiveKeybindings.Search, Desc: "search"},
 	}
 	if searchQuery != "" {
-		hints = append(hints, HintEntry{Key: "n/N", Desc: "next/prev"})
+		hints = append(hints, HintEntry{Key: ActiveKeybindings.NextMatch + "/" + ActiveKeybindings.PrevMatch, Desc: "next/prev"})
 	}
 	hints = append(hints,
 		HintEntry{Key: "123G", Desc: "goto"},

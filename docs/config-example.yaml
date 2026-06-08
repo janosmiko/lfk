@@ -150,8 +150,9 @@ log_path: /tmp/lfk.log
 
 # ─── Log Viewer ──────────────────────────────────────────────────────────────
 # Settings for the log viewer (L key). The show_* defaults let you skip pressing
-# the toggle keys on every open. Runtime toggles: P (preview), p (prefixes),
-# s (timestamps). tail_lines / tail_lines_short / render_ansi were previously the
+# the toggle keys on every open. Runtime toggles (configurable keybindings):
+# toggle_preview (P), toggle_prefixes (p), toggle_timestamps (s).
+# tail_lines / tail_lines_short / render_ansi were previously the
 # flat log_tail_lines / log_tail_lines_short / log_render_ansi keys (still
 # accepted as deprecated aliases; log_viewer wins when both are set).
 # log_viewer:
@@ -165,8 +166,8 @@ log_path: /tmp/lfk.log
 # ─── Viewer Defaults ─────────────────────────────────────────────────────────
 # Startup defaults for the fullscreen YAML / diff / describe viewers. A toggle
 # changed at runtime resets to the configured default the next time the viewer
-# opens. Runtime toggles: z (wrap, yaml/describe), Ctrl+W or > (wrap, diff),
-# # (diff line numbers), u (diff unified vs side-by-side).
+# opens. Runtime toggles (configurable keybindings): toggle_wrap (>) wraps in
+# every viewer; toggle_line_numbers (#) and toggle_unified (u) for the diff viewer.
 # yaml_viewer:
 #   wrap: false
 # diff_viewer:
@@ -349,6 +350,14 @@ keybindings:
   delete: "D" # Delete resource (default: D)
   force_delete: "X" # Force delete resource (default: X)
   scale: "S" # Scale resource (default: S)
+  toggle_wrap: ">" # Toggle line wrapping in YAML/diff/describe/log/event viewers (default: >)
+  toggle_line_numbers: "#" # Toggle line numbers in diff/log viewers (default: #)
+  toggle_fold: "z" # Toggle fold under cursor in YAML/diff viewers (default: z)
+  toggle_fold_all: "Z" # Toggle all folds in YAML/diff viewers (default: Z)
+  toggle_follow: "f" # Toggle follow/auto-scroll in the log viewer (default: f)
+  toggle_timestamps: "s" # Toggle timestamps in the log viewer (default: s)
+  toggle_prefixes: "p" # Toggle pod/container line prefixes in the log viewer (default: p)
+  toggle_unified: "u" # Toggle unified vs side-by-side in the diff viewer (default: u)
   mouse_toggle: "alt+ctrl+y" # Suspend/resume mouse capture for native text selection (Ctrl+Option+Y; default: alt+ctrl+y)
   cluster_color_picker: "L" # Open cluster-color picker (default: Shift+L; reuses the Logs key, since Logs has no resource to act on at the cluster picker — at deeper levels "L" still opens Logs)
   security_ignore_toggle: "i" # Show/hide ignored security findings (default: i; security view only — shadows the Label Editor there)

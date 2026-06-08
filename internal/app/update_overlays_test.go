@@ -581,7 +581,7 @@ func TestErrorLogFullscreen(t *testing.T) {
 			width:           80,
 			height:          40,
 		}
-		ret, _ := m.handleErrorLogOverlayKey(runeKey('f'))
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('F'))
 		result := ret.(Model)
 		assert.True(t, result.errorLogFullscreen)
 	})
@@ -595,7 +595,7 @@ func TestErrorLogFullscreen(t *testing.T) {
 			width:              80,
 			height:             40,
 		}
-		ret, _ := m.handleErrorLogOverlayKey(runeKey('f'))
+		ret, _ := m.handleErrorLogOverlayKey(runeKey('F'))
 		result := ret.(Model)
 		assert.False(t, result.errorLogFullscreen)
 	})

@@ -41,12 +41,12 @@ func (m Model) viewYAML() string {
 			{Key: "g/G", Desc: "top/bottom"},
 			{Key: "ctrl+d/u", Desc: "half page"},
 			{Key: "ctrl+f/b", Desc: "page"},
-			{Key: "/", Desc: "search"},
+			{Key: ui.ActiveKeybindings.Search, Desc: "search"},
 			{Key: "123G", Desc: "goto"},
 			{Key: "v/V/ctrl+v", Desc: "visual select"},
 			{Key: "y", Desc: "copy"},
-			{Key: "tab/z", Desc: "fold"},
-			{Key: "ctrl+w/>", Desc: "wrap"},
+			{Key: ui.ActiveKeybindings.ToggleFold, Desc: "fold"},
+			{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
 			{Key: "ctrl+e", Desc: "edit"},
 			{Key: "O", Desc: "object explorer"},
 			{Key: "I", Desc: "explain"},
@@ -62,7 +62,7 @@ func (m Model) viewYAML() string {
 		hint = m.renderStatusHint()
 	case m.yamlView.searchMode:
 		yamlModeInd := ui.SearchModeIndicator(m.yamlView.searchText.Value)
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorRight())
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarDimStyle.Render(yamlModeInd) + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.yamlView.searchText.CursorRight())
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	case m.yamlView.searchText.Value != "":
 		matchInfo := fmt.Sprintf(" [%d/%d]", m.yamlView.matchIdx+1, len(m.yamlView.matchLines))
@@ -71,9 +71,9 @@ func (m Model) viewYAML() string {
 		}
 		nav := ""
 		if len(m.yamlView.matchLines) > 0 {
-			nav = ui.BarDimStyle.Render(" | ") + ui.HelpKeyStyle.Render("n/N") + ui.BarDimStyle.Render(": next/prev")
+			nav = ui.BarDimStyle.Render(" | ") + ui.HelpKeyStyle.Render(ui.ActiveKeybindings.NextMatch+"/"+ui.ActiveKeybindings.PrevMatch) + ui.BarDimStyle.Render(": next/prev")
 		}
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.yamlView.searchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.yamlView.searchText.Value) + ui.BarDimStyle.Render(matchInfo) + nav
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 

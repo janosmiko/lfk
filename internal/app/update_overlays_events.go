@@ -114,6 +114,7 @@ func (m *Model) findNextEventMatch(forward bool) {
 // It wraps the overlay key handler but overrides q/esc/f for mode transitions.
 func (m Model) handleEventViewerModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	key := msg.String()
+	kb := ui.ActiveKeybindings
 	switch key {
 	case "q", "esc":
 		if m.eventTimelineSearchActive {
@@ -132,7 +133,7 @@ func (m Model) handleEventViewerModeKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.mode = modeExplorer
 		m.eventTimelineFullscreen = false
 		return m, nil
-	case "f":
+	case kb.Fullscreen:
 		// Minimize: go back to overlay mode.
 		m.mode = modeExplorer
 		m.overlay = overlayEventTimeline
@@ -162,8 +163,9 @@ func (m Model) handleEventTimelineOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 	}
 	// Try action keys.
 	key := msg.String()
+	kb := ui.ActiveKeybindings
 	switch key {
-	case "?", "f1":
+	case kb.Help, "f1":
 		return m.handleEventTimelineOverlayKeyQuestion()
 	case "esc":
 		return m.handleEventTimelineOverlayKeyEsc()
@@ -177,21 +179,21 @@ func (m Model) handleEventTimelineOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		return m.handleEventTimelineOverlayKeyCtrlV()
 	case "y":
 		return m.handleEventTimelineOverlayKeyY()
-	case "/":
+	case kb.Search:
 		return m.handleEventTimelineOverlayKeySlash()
-	case "n":
+	case kb.NextMatch:
 		count := consumeCountPrefix(&m.eventTimelineLineInput)
 		for range count {
 			m.findNextEventMatch(true)
 		}
-	case "N":
+	case kb.PrevMatch:
 		count := consumeCountPrefix(&m.eventTimelineLineInput)
 		for range count {
 			m.findNextEventMatch(false)
 		}
-	case "f":
+	case kb.Fullscreen:
 		return m.handleEventTimelineOverlayKeyF()
-	case "tab", "z", ">":
+	case kb.ToggleWrap:
 		m.eventTimelineLineInput = ""
 		m.eventTimelineWrap = !m.eventTimelineWrap
 	case "ctrl+c":
