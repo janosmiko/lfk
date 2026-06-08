@@ -146,9 +146,9 @@ log_viewer:
 | `tail_lines` | int | `1000` | Log lines loaded initially via `--tail`. Scrolling to the top loads older history. |
 | `tail_lines_short` | int | `10` | Log lines loaded by the action menu "Tail Logs" entry. Non-positive values are ignored. |
 | `render_ansi` | bool | `true` | Render ANSI SGR sequences (color, bold, underline) from log producers. `false` strips them (every ESC byte becomes `U+FFFD`); non-SGR CSI sequences are always stripped. Toggle at runtime with `:set ansi` / `:set noansi`. |
-| `show_preview` | bool | `true` | Startup default for the structured preview side panel. Runtime toggle: `P`. |
-| `show_prefixes` | bool | `true` | Startup default for the `[pod/name/container]` line prefixes. Runtime toggle: `p`. |
-| `show_timestamps` | bool | `false` | Startup default for log line timestamps. Runtime toggle: `s`. |
+| `show_preview` | bool | `true` | Startup default for the structured preview side panel. Runtime toggle: `toggle_preview` (`P`). |
+| `show_prefixes` | bool | `true` | Startup default for the `[pod/name/container]` line prefixes. Runtime toggle: `toggle_prefixes` (`p`). |
+| `show_timestamps` | bool | `false` | Startup default for log line timestamps. Runtime toggle: `toggle_timestamps` (`s`). |
 
 The deprecated flat keys `log_tail_lines`, `log_tail_lines_short`, and `log_render_ansi` are still accepted as aliases; when both a flat key and its `log_viewer` equivalent are set, `log_viewer` wins.
 
@@ -169,11 +169,11 @@ describe_viewer:
 
 | Field | Type | Default | Runtime toggle | Description |
 |-------|------|---------|----------------|-------------|
-| `yaml_viewer.wrap` | bool | `false` | `z` | Line wrapping in the YAML viewer. |
-| `diff_viewer.wrap` | bool | `false` | `Ctrl+W` / `>` | Line wrapping in the diff viewer. |
-| `diff_viewer.line_numbers` | bool | `true` | `#` | Gutter line numbers in the diff viewer. |
-| `diff_viewer.unified` | bool | `false` | `u` | Unified (vs side-by-side) diff layout. |
-| `describe_viewer.wrap` | bool | `false` | `z` | Line wrapping in the describe viewer. |
+| `yaml_viewer.wrap` | bool | `false` | `toggle_wrap` (`>`) | Line wrapping in the YAML viewer. |
+| `diff_viewer.wrap` | bool | `false` | `toggle_wrap` (`>`) | Line wrapping in the diff viewer. |
+| `diff_viewer.line_numbers` | bool | `true` | `toggle_line_numbers` (`#`) | Gutter line numbers in the diff viewer. |
+| `diff_viewer.unified` | bool | `false` | `toggle_unified` (`u`) | Unified (vs side-by-side) diff layout. |
+| `describe_viewer.wrap` | bool | `false` | `toggle_wrap` (`>`) | Line wrapping in the describe viewer. |
 
 A toggle changed at runtime sticks for the session and resets to the configured default the next time the viewer opens.
 

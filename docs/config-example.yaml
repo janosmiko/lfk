@@ -150,8 +150,9 @@ log_path: /tmp/lfk.log
 
 # ─── Log Viewer ──────────────────────────────────────────────────────────────
 # Settings for the log viewer (L key). The show_* defaults let you skip pressing
-# the toggle keys on every open. Runtime toggles: P (preview), p (prefixes),
-# s (timestamps). tail_lines / tail_lines_short / render_ansi were previously the
+# the toggle keys on every open. Runtime toggles (configurable keybindings):
+# toggle_preview (P), toggle_prefixes (p), toggle_timestamps (s).
+# tail_lines / tail_lines_short / render_ansi were previously the
 # flat log_tail_lines / log_tail_lines_short / log_render_ansi keys (still
 # accepted as deprecated aliases; log_viewer wins when both are set).
 # log_viewer:
@@ -165,8 +166,8 @@ log_path: /tmp/lfk.log
 # ─── Viewer Defaults ─────────────────────────────────────────────────────────
 # Startup defaults for the fullscreen YAML / diff / describe viewers. A toggle
 # changed at runtime resets to the configured default the next time the viewer
-# opens. Runtime toggles: z (wrap, yaml/describe), Ctrl+W or > (wrap, diff),
-# # (diff line numbers), u (diff unified vs side-by-side).
+# opens. Runtime toggles (configurable keybindings): toggle_wrap (>) wraps in
+# every viewer; toggle_line_numbers (#) and toggle_unified (u) for the diff viewer.
 # yaml_viewer:
 #   wrap: false
 # diff_viewer:
