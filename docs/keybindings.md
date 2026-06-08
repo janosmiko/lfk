@@ -854,6 +854,7 @@ or `Esc` to cancel.
 | Wheel up/down inside a centered overlay | Scroll the list cursor (same as `j` / `k` / arrow keys) |
 | Scroll wheel over middle pane | Move the row selection up/down |
 | Scroll wheel over right pane | Scroll the preview under the pointer |
+| Scroll wheel in the Object Explorer / log viewer | Same per-pane routing — over the preview pane it scrolls the preview, over the list it moves the cursor |
 | `Ctrl+Option+Y` | Toggle mouse capture — release it to select text where `Shift+Drag` doesn't work, press again to re-enable |
 | Shift+Drag | Select text (host terminal) |
 | Shift+Option+Drag (macOS) / Alt+Drag (Linux, Windows) | Block-select text inside the embedded PTY |

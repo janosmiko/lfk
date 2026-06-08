@@ -62,23 +62,21 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 
 	// Handle mouse scroll in log viewer mode.
 	if m.mode == modeLogs {
+		return m.handleLogsMouse(msg)
+	}
+
+	// Object Explorer wheel: route by the pointer column. Over the right
+	// (preview) pane the wheel scrolls the YAML preview; over the left and
+	// middle panes it moves the tree cursor — mirroring the main explorer's
+	// per-pane wheel routing (#379). Non-wheel mouse falls through so
+	// tab-bar clicks keep working.
+	if m.mode == modeObjectExplorer {
 		switch msg.Button {
 		case tea.MouseButtonWheelUp:
-			m.logView.follow = false
-			if m.logView.scroll > 0 {
-				m.logView.scroll -= 3
-				if m.logView.scroll < 0 {
-					m.logView.scroll = 0
-				}
-			}
-			cmd := m.maybeLoadMoreHistory()
-			return m, cmd
+			return m.handleObjectExplorerWheel(msg.X, -1)
 		case tea.MouseButtonWheelDown:
-			m.logView.follow = false
-			m.logView.scroll += 3
-			m.clampLogScroll()
+			return m.handleObjectExplorerWheel(msg.X, 1)
 		}
-		return m, nil
 	}
 
 	// Wheel scroll in the other full-screen viewer modes (YAML, Describe,
@@ -165,6 +163,93 @@ func (m Model) handleExplorerWheel(x, delta int) (tea.Model, tea.Cmd) {
 	}
 	// Left and middle panes: move the selection cursor.
 	return m.moveCursor(delta)
+}
+
+// handleObjectExplorerWheel routes a wheel tick in the Object Explorer to
+// the pane under the pointer at x. Over the right (preview) pane it scrolls
+// the YAML preview, mirroring the J/K keys; over the left and middle panes
+// it moves the tree cursor, mirroring j/k. dir is -1 (up) or +1 (down);
+// each tick moves wheelStep lines to match the other viewers' wheel feel.
+func (m Model) handleObjectExplorerWheel(x, dir int) (tea.Model, tea.Cmd) {
+	const wheelStep = 3
+	rt := &m.objectExplorerView
+	if x >= m.objectExplorerRightPaneStart() {
+		// Scroll-up is a plain decrement with a zero floor; scroll-down
+		// increments and clamps to the preview content height (which
+		// re-marshals the node YAML, so only do it when scrolling down).
+		rt.previewScroll += dir * wheelStep
+		if dir < 0 {
+			if rt.previewScroll < 0 {
+				rt.previewScroll = 0
+			}
+		} else {
+			m.clampObjectExplorerPreviewScroll()
+		}
+		return m, nil
+	}
+	m.moveObjectExplorerCursor(dir * wheelStep)
+	m.clampObjectExplorerScroll()
+	return m, nil
+}
+
+// handleLogsMouse routes a mouse event in the log viewer. The wheel scrolls
+// the pane under the pointer: over the preview side panel it scrolls the
+// structured preview (mirroring the J/K keys); over the log stream it scrolls
+// the log — the same per-pane routing as the explorers (#379). Non-wheel
+// mouse is a no-op.
+func (m Model) handleLogsMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
+	if logW, previewW := splitLogPreviewWidth(m.width); m.logView.previewVisible && previewW > 0 && msg.X >= logW {
+		switch msg.Button {
+		case tea.MouseButtonWheelUp:
+			return m.scrollLogPreviewWheel(-1), nil
+		case tea.MouseButtonWheelDown:
+			return m.scrollLogPreviewWheel(1), nil
+		}
+	}
+	switch msg.Button {
+	case tea.MouseButtonWheelUp:
+		m.logView.follow = false
+		if m.logView.scroll > 0 {
+			m.logView.scroll -= 3
+			if m.logView.scroll < 0 {
+				m.logView.scroll = 0
+			}
+		}
+		return m, m.maybeLoadMoreHistory()
+	case tea.MouseButtonWheelDown:
+		m.logView.follow = false
+		m.logView.scroll += 3
+		m.clampLogScroll()
+	}
+	return m, nil
+}
+
+// scrollLogPreviewWheel scrolls the log preview side panel by wheelStep rows
+// in dir (-1 up, +1 down), reusing the J/K key handlers so the clamping math
+// lives in one place. Callers gate on previewVisible and a non-zero panel
+// width before calling.
+func (m Model) scrollLogPreviewWheel(dir int) Model {
+	const wheelStep = 3
+	for range wheelStep {
+		if dir < 0 {
+			m = m.handleLogKeyK2()
+		} else {
+			m = m.handleLogKeyJ2()
+		}
+	}
+	return m
+}
+
+// objectExplorerRightPaneStart returns the screen x at which the Object
+// Explorer's right (preview) pane begins. It mirrors the column math in
+// ui.RenderObjectExplorerView: an outer frame border (1 cell) precedes the
+// left and middle columns, each of which adds 2 border cells around its
+// content width (padding is folded into the width).
+func (m Model) objectExplorerRightPaneStart() int {
+	usable := m.width - 8
+	leftW := max(10, usable*12/100)
+	middleW := max(10, usable*51/100)
+	return 1 + (leftW + 2) + (middleW + 2)
 }
 
 // columnBoundaries returns the x boundaries between left/middle and
@@ -414,11 +499,12 @@ func (m *Model) tabAtX(x int) int {
 }
 
 // isViewerMode returns true for full-screen content viewers that don't
-// have native wheel-scroll handling. modeLogs and modeExplorer have
-// their own wheel paths and are handled separately.
+// have native wheel-scroll handling. modeLogs, modeExplorer, and
+// modeObjectExplorer have their own per-pane wheel paths and are handled
+// separately.
 func isViewerMode(mode viewMode) bool {
 	switch mode {
-	case modeYAML, modeDescribe, modeDiff, modeHelp, modeExplain, modeObjectExplorer:
+	case modeYAML, modeDescribe, modeDiff, modeHelp, modeExplain:
 		return true
 	}
 	return false
