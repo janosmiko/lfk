@@ -202,7 +202,7 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 	}
 	if searchActive {
 		modeInd := SearchModeIndicator(searchInput)
-		prompt := HelpKeyStyle.Render("/") + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + searchInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (enter:apply  esc:cancel)")
+		prompt := HelpKeyStyle.Render(ActiveKeybindings.Search) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + searchInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (enter:apply  esc:cancel)")
 		return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(prompt)
 	}
 	if visualMode {
@@ -232,7 +232,7 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: ActiveKeybindings.Search, Desc: "search"},
 	}
 	if searchQuery != "" {
-		hints = append(hints, HintEntry{Key: "n/N", Desc: "next/prev"})
+		hints = append(hints, HintEntry{Key: ActiveKeybindings.NextMatch + "/" + ActiveKeybindings.PrevMatch, Desc: "next/prev"})
 	}
 	hints = append(hints,
 		HintEntry{Key: "123G", Desc: "goto"},

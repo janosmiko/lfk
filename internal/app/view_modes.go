@@ -68,10 +68,10 @@ func (m Model) viewDescribe() string {
 	case m.hasStatusMessage():
 		hint = m.renderStatusHint()
 	case m.describeView.searchActive:
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorRight())
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorLeft()) + ui.BarDimStyle.Render("\u2588") + ui.BarNormalStyle.Render(m.describeView.searchInput.CursorRight())
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	case m.describeView.searchQuery != "":
-		searchBar := ui.HelpKeyStyle.Render("/") + ui.BarNormalStyle.Render(m.describeView.searchQuery)
+		searchBar := ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) + ui.BarNormalStyle.Render(m.describeView.searchQuery)
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	default:
 		hint = ui.RenderHintBar(hints, m.width)
