@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"flag"
 	"fmt"
@@ -21,6 +22,7 @@ import (
 	"github.com/janosmiko/lfk/internal/completion"
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
+	"github.com/janosmiko/lfk/internal/profiling"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/janosmiko/lfk/internal/version"
 )
@@ -173,6 +175,24 @@ func runTUI(opts app.StartupOptions) error {
 				logger.Warn("pprof server stopped", "error", err)
 			}
 		}()
+	}
+
+	// Optional periodic memory diagnostics for chasing leaks (issue #387).
+	// Off by default; set LFK_MEMSTATS_INTERVAL=30s to log heap and goroutine
+	// counts to the app log on each tick. A slow leak shows up as rising
+	// heap_objects (cache/buffer leak) or rising goroutines (watch/stream
+	// leak). Use alongside LFK_PPROF_ADDR for a full heap profile.
+	if raw := os.Getenv("LFK_MEMSTATS_INTERVAL"); raw != "" {
+		d, err := time.ParseDuration(raw)
+		if err != nil {
+			return fmt.Errorf("LFK_MEMSTATS_INTERVAL: %w", err)
+		}
+		if interval, ok := profiling.NormalizeInterval(d); ok {
+			logger.Info("starting memstats logger", "interval", interval)
+			profiling.StartMemStatsLogger(context.Background(), interval, func(s profiling.MemSample) {
+				logger.Info("memstats", profiling.LogFields(s)...)
+			})
+		}
 	}
 
 	// Redirect os.Stderr to capture output from exec credential plugins (e.g., AWS SSO

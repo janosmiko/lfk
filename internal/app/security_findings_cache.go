@@ -8,14 +8,13 @@
 package app
 
 import (
+	"encoding/json"
 	"errors"
 	"io/fs"
 	"os"
 	"path/filepath"
 	"sync"
 	"time"
-
-	"sigs.k8s.io/yaml"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -33,12 +32,20 @@ var securityFindingsCacheMu sync.Mutex
 
 // securityFindingsCacheSchemaVersion bumps when the on-disk shape changes.
 // A mismatch is treated as a miss so an older binary never decodes a
-// forward-incompatible file into garbage findings.
-const securityFindingsCacheSchemaVersion = 1
+// forward-incompatible file into garbage findings. Version 1 was the YAML
+// format (issue #387); version 2 is JSON with raw per-namespace entries.
+const securityFindingsCacheSchemaVersion = 2
 
 // securityFindingsCacheFilename is the per-host basename. Distinct from the
-// availability cache so both can live in the same per-host directory.
-const securityFindingsCacheFilename = "lfk-security-findings.yaml"
+// availability cache so both can live in the same per-host directory. JSON, not
+// YAML: the file can be tens of MB and sigs.k8s.io/yaml's YAML->JSON->struct
+// decode of the whole thing was the dominant startup memory spike (issue #387).
+const securityFindingsCacheFilename = "lfk-security-findings.json"
+
+// securityFindingsCacheLegacyFilename is the pre-#387 YAML basename. New code
+// never reads it; saveSecurityFindingsCacheForHost removes it so the large
+// legacy file does not linger.
+const securityFindingsCacheLegacyFilename = "lfk-security-findings.yaml"
 
 // securityFindingsCacheTTL bounds how stale a disk-seeded badge paint may be.
 // Findings older than this are not painted at startup (a miss), so a cluster
@@ -47,14 +54,26 @@ const securityFindingsCacheFilename = "lfk-security-findings.yaml"
 // regardless; this only gates the instant pre-scan paint.
 const securityFindingsCacheTTL = time.Hour
 
-// securityFindingsCacheState is the on-disk shape: one file per cluster API
-// host, holding findings keyed by namespace ("" = all-namespaces). Each entry
-// carries its own scannedAt so per-namespace TTL is independent.
-type securityFindingsCacheState struct {
-	SchemaVersion int                              `json:"schema_version"`
-	Namespaces    map[string]securityFindingsEntry `json:"namespaces"`
+// securityFindingsCacheReleaseThreshold: when the on-disk cache exceeds this,
+// seeding it reads and tokenizes the whole file, briefly allocating well beyond
+// the retained badge index. Go's background scavenger returns that memory to the
+// OS only slowly — on Windows it left the process RSS pinned at the spike for the
+// rest of the session (issue #387) — so the seed proactively frees it.
+const securityFindingsCacheReleaseThreshold = 4 << 20 // 4 MiB
+
+// securityFindingsCacheFile is the on-disk envelope: one file per cluster API
+// host, holding findings keyed by namespace ("" = all-namespaces). Per-namespace
+// entries are kept as raw JSON so a load (or a save touching one namespace)
+// never decodes the findings of the other namespaces — the reflect-heavy decode
+// of every namespace's findings was the dominant allocation in the startup
+// memory spike (issue #387).
+type securityFindingsCacheFile struct {
+	SchemaVersion int                        `json:"schema_version"`
+	Namespaces    map[string]json.RawMessage `json:"namespaces"`
 }
 
+// securityFindingsEntry is one namespace's payload; each carries its own
+// scannedAt so per-namespace TTL is independent.
 type securityFindingsEntry struct {
 	ScannedAt time.Time          `json:"scanned_at"`
 	Findings  []security.Finding `json:"findings"`
@@ -73,10 +92,24 @@ func securityFindingsCacheFilePathForHost(host string) string {
 	return filepath.Join(base, "discovery", k8s.CacheHostDir(host), securityFindingsCacheFilename)
 }
 
-// readFindingsCacheFile loads and validates the whole per-host state. Returns
-// nil on any failure (missing, corrupt, schema mismatch) so callers fall
-// through to a live scan.
-func readFindingsCacheFile(host string) *securityFindingsCacheState {
+// securityFindingsCacheLegacyPathForHost returns the pre-#387 YAML cache path,
+// or "" when it can't be resolved. Only used to clean up the legacy file.
+func securityFindingsCacheLegacyPathForHost(host string) string {
+	if host == "" {
+		return ""
+	}
+	base := k8s.DiscoveryCacheBaseDir()
+	if base == "" {
+		return ""
+	}
+	return filepath.Join(base, "discovery", k8s.CacheHostDir(host), securityFindingsCacheLegacyFilename)
+}
+
+// readFindingsCacheFile loads and validates the per-host envelope. Returns nil
+// on any failure (missing, corrupt, schema mismatch) so callers fall through to
+// a live scan. Per-namespace findings are NOT decoded here — they stay as raw
+// JSON until a specific namespace is requested (see loadSecurityFindingsCacheForHost).
+func readFindingsCacheFile(host string) *securityFindingsCacheFile {
 	path := securityFindingsCacheFilePathForHost(host)
 	if path == "" {
 		return nil
@@ -88,29 +121,36 @@ func readFindingsCacheFile(host string) *securityFindingsCacheState {
 		}
 		return nil
 	}
-	var s securityFindingsCacheState
-	if err := yaml.Unmarshal(data, &s); err != nil {
+	var f securityFindingsCacheFile
+	if err := json.Unmarshal(data, &f); err != nil {
 		logger.Warn("Security findings cache is corrupt; ignoring", "host", k8s.CacheHostDir(host), "error", err)
 		return nil
 	}
-	if s.SchemaVersion != securityFindingsCacheSchemaVersion {
+	if f.SchemaVersion != securityFindingsCacheSchemaVersion {
 		logger.Info("Security findings cache schema mismatch; ignoring",
-			"host", k8s.CacheHostDir(host), "got", s.SchemaVersion, "want", securityFindingsCacheSchemaVersion)
+			"host", k8s.CacheHostDir(host), "got", f.SchemaVersion, "want", securityFindingsCacheSchemaVersion)
 		return nil
 	}
-	return &s
+	return &f
 }
 
 // loadSecurityFindingsCacheForHost returns the cached findings for (host,
 // namespace) when present and newer than ttl, else nil (a miss). A nil return
-// is the signal to fall through to a live scan.
+// is the signal to fall through to a live scan. Only the requested namespace's
+// entry is decoded; a corrupt sibling namespace cannot block a healthy one.
 func loadSecurityFindingsCacheForHost(host, namespace string, ttl time.Duration) []security.Finding {
-	s := readFindingsCacheFile(host)
-	if s == nil {
+	f := readFindingsCacheFile(host)
+	if f == nil {
 		return nil
 	}
-	entry, ok := s.Namespaces[namespace]
+	raw, ok := f.Namespaces[namespace]
 	if !ok {
+		return nil
+	}
+	var entry securityFindingsEntry
+	if err := json.Unmarshal(raw, &entry); err != nil {
+		logger.Warn("Security findings cache namespace entry corrupt; ignoring",
+			"host", k8s.CacheHostDir(host), "namespace", namespace, "error", err)
 		return nil
 	}
 	if ttl > 0 && time.Since(entry.ScannedAt) > ttl {
@@ -136,28 +176,33 @@ func saveSecurityFindingsCacheForHost(host, namespace string, findings []securit
 	if findings == nil {
 		findings = []security.Finding{}
 	}
-	// Merge into any existing state so a save for one namespace doesn't wipe
-	// the others. A corrupt/missing file just starts fresh. The read-modify-
-	// write is serialized within this process by securityFindingsCacheMu (saves
-	// run on background goroutines, no longer the Update loop). Two lfk
-	// instances saving different namespaces of the same host concurrently can
-	// still lose one entry (last rename wins) — acceptable for a best-effort,
-	// TTL-bounded cache; the lost entry is re-derived by the next scan.
-	securityFindingsCacheMu.Lock()
-	defer securityFindingsCacheMu.Unlock()
-	state := readFindingsCacheFile(host)
-	if state == nil {
-		state = &securityFindingsCacheState{SchemaVersion: securityFindingsCacheSchemaVersion}
-	}
-	if state.Namespaces == nil {
-		state.Namespaces = make(map[string]securityFindingsEntry)
-	}
-	state.Namespaces[namespace] = securityFindingsEntry{
+	entryBytes, err := json.Marshal(securityFindingsEntry{
 		ScannedAt: scannedAt.UTC(),
 		Findings:  findings,
+	})
+	if err != nil {
+		return err
 	}
+	// Merge into any existing file so a save for one namespace doesn't wipe the
+	// others. Other namespaces are carried as raw JSON, never re-decoded. A
+	// corrupt/missing file just starts fresh. The read-modify-write is
+	// serialized within this process by securityFindingsCacheMu (saves run on
+	// background goroutines, no longer the Update loop). Two lfk instances
+	// saving different namespaces of the same host concurrently can still lose
+	// one entry (last rename wins) — acceptable for a best-effort, TTL-bounded
+	// cache; the lost entry is re-derived by the next scan.
+	securityFindingsCacheMu.Lock()
+	defer securityFindingsCacheMu.Unlock()
+	file := readFindingsCacheFile(host)
+	if file == nil {
+		file = &securityFindingsCacheFile{SchemaVersion: securityFindingsCacheSchemaVersion}
+	}
+	if file.Namespaces == nil {
+		file.Namespaces = make(map[string]json.RawMessage)
+	}
+	file.Namespaces[namespace] = json.RawMessage(entryBytes)
 
-	data, err := yaml.Marshal(state)
+	data, err := json.Marshal(file)
 	if err != nil {
 		return err
 	}
@@ -168,7 +213,15 @@ func saveSecurityFindingsCacheForHost(host, namespace string, findings []securit
 	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
-	return writeFileDurable(path, data, 0o600)
+	if err := writeFileDurable(path, data, 0o600); err != nil {
+		return err
+	}
+	// Best-effort: drop a pre-#387 YAML cache so the large legacy file does not
+	// linger on disk. Ignored when absent.
+	if legacy := securityFindingsCacheLegacyPathForHost(host); legacy != "" {
+		_ = os.Remove(legacy)
+	}
+	return nil
 }
 
 // updateSecurityFindingsCacheForContext resolves the context to its host and
@@ -182,6 +235,29 @@ func updateSecurityFindingsCacheForContext(client *k8s.Client, contextName, name
 		return nil
 	}
 	return saveSecurityFindingsCacheForHost(host, namespace, findings, time.Now().UTC())
+}
+
+// securityFindingsCacheFileSizeForContext returns the on-disk size of the
+// per-host findings cache, or 0 when it can't be resolved or stat'd. Used to
+// decide whether a seed parse was large enough to warrant returning the
+// transient memory to the OS (issue #387).
+func securityFindingsCacheFileSizeForContext(client *k8s.Client, contextName string) int64 {
+	if client == nil || contextName == "" {
+		return 0
+	}
+	host := client.HostForContext(contextName)
+	if host == "" {
+		return 0
+	}
+	path := securityFindingsCacheFilePathForHost(host)
+	if path == "" {
+		return 0
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		return 0
+	}
+	return info.Size()
 }
 
 // loadSecurityFindingsCacheForContext resolves the context's host and returns

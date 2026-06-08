@@ -463,3 +463,26 @@ Trade-off: the Type column is dropped from the list (metadata-only fetch
 doesn't include it) and there's a small per-hover fetch for decoded values
 (cached thereafter). See [Configuration Reference](config-reference.md#secret-lazy-loading)
 for details.
+
+## Diagnostics
+
+Two opt-in environment variables help diagnose performance and memory issues.
+Both are off by default.
+
+| Variable | Effect |
+|---|---|
+| `LFK_PPROF_ADDR` | Serves Go `pprof` on the given **loopback** address (e.g. `127.0.0.1:6060`). Non-loopback addresses are refused. |
+| `LFK_MEMSTATS_INTERVAL` | Logs heap and goroutine counts to the app log on each interval (Go duration, e.g. `30s`; clamped to a 1s floor). |
+
+```bash
+# Periodic memory snapshots in the app log (heap_objects, goroutines, ...)
+LFK_MEMSTATS_INTERVAL=30s lfk
+
+# Capture a heap profile while lfk runs
+LFK_PPROF_ADDR=127.0.0.1:6060 lfk
+go tool pprof http://127.0.0.1:6060/debug/pprof/heap
+```
+
+Reading a suspected leak: rising `heap_objects` with a flat `goroutines`
+count points at an unbounded cache or buffer; a steadily climbing
+`goroutines` count points at a watch or stream that is never stopped.
