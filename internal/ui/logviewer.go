@@ -219,17 +219,17 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "j/k", Desc: "move"},
 		{Key: "ctrl+d/u", Desc: "half page"},
 		{Key: "ctrl+f/b", Desc: "page"},
-		{Key: "f", Desc: "follow"},
+		{Key: ActiveKeybindings.ToggleFollow, Desc: "follow"},
 		{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
-		{Key: "#", Desc: "line#"},
-		{Key: "s", Desc: "timestamps"},
-		{Key: "p", Desc: "prefixes"},
-		{Key: "P", Desc: "preview"},
+		{Key: ActiveKeybindings.ToggleLineNumbers, Desc: "line#"},
+		{Key: ActiveKeybindings.ToggleTimestamps, Desc: "timestamps"},
+		{Key: ActiveKeybindings.TogglePrefixes, Desc: "prefixes"},
+		{Key: ActiveKeybindings.TogglePreview, Desc: "preview"},
 		{Key: "J/K", Desc: "preview scroll"},
 		{Key: "c", Desc: "previous"},
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "y", Desc: "copy"},
-		{Key: "/", Desc: "search"},
+		{Key: ActiveKeybindings.Search, Desc: "search"},
 	}
 	if searchQuery != "" {
 		hints = append(hints, HintEntry{Key: "n/N", Desc: "next/prev"})

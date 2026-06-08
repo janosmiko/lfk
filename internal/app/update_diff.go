@@ -103,9 +103,10 @@ func (m Model) handleDiffSearchInput(msg tea.KeyMsg, foldRegions []ui.DiffFoldRe
 //nolint:gocyclo // switch-based key dispatch is inherently high-complexity
 func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegion, totalLines, visibleLines, maxScroll int) (tea.Model, tea.Cmd) {
 	maxCursor := max(totalLines-1, 0)
+	kb := ui.ActiveKeybindings
 
 	switch msg.String() {
-	case "?", "f1":
+	case kb.Help, "f1":
 		m.helpPreviousMode = modeDiff
 		m.mode = modeHelp
 		m.helpScroll = 0
@@ -113,7 +114,7 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		m.helpSearchActive = false
 		m.helpContextMode = "Diff View"
 		return m, nil
-	case ui.ActiveKeybindings.ToggleWrap:
+	case kb.ToggleWrap:
 		m.diffView.wrap = !m.diffView.wrap
 		return m, nil
 	case "q", "esc":
@@ -185,32 +186,34 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		return m.diffEnterVisual(modeMap[msg.String()])
 	case "y":
 		return m.handleDiffNormalCopy(foldRegions, totalLines)
-	case "u":
+	case kb.ToggleUnified:
 		m.diffView.lineInput = ""
 		m.diffView.unified = !m.diffView.unified
 		m.diffView.scroll = 0
 		return m, nil
-	case "#":
+	case kb.ToggleLineNumbers:
 		m.diffView.lineInput = ""
 		m.diffView.lineNumbers = !m.diffView.lineNumbers
 		return m, nil
-	case "/":
+	case kb.Search:
 		m.diffView.lineInput = ""
 		m.diffView.searchMode = true
 		m.diffView.searchText.Clear()
 		m.diffView.matchLines = nil
 		m.diffView.matchIdx = 0
 		return m, nil
-	case "n", "N":
-		return m.handleDiffSearchNav(msg.String(), foldRegions, visibleLines)
+	case kb.NextMatch:
+		return m.handleDiffSearchNav("n", foldRegions, visibleLines)
+	case kb.PrevMatch:
+		return m.handleDiffSearchNav("N", foldRegions, visibleLines)
 	case "tab":
 		if !m.diffView.unified {
 			m.diffView.cursorSide = 1 - m.diffView.cursorSide
 		}
 		return m, nil
-	case "z", "Z":
+	case kb.ToggleFold, kb.ToggleFoldAll:
 		m.diffView.lineInput = ""
-		if msg.String() == "Z" {
+		if msg.String() == kb.ToggleFoldAll {
 			m.toggleAllDiffFolds(foldRegions)
 		} else {
 			m.toggleDiffFoldAtCursor(foldRegions)

@@ -104,8 +104,9 @@ func (m Model) handleLogMovementKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 
 // handleLogActionKey handles action/mode keys in the log viewer.
 func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
+	kb := ui.ActiveKeybindings
 	switch msg.String() {
-	case "?", "f1":
+	case kb.Help, "f1":
 		ret := m.handleLogKeyQuestion()
 		return ret, nil, true
 	case "q", "esc":
@@ -123,25 +124,25 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "y":
 		ret, cmd := m.handleLogNormalCopy()
 		return ret, cmd, true
-	case "f":
+	case kb.ToggleFollow:
 		ret := m.handleLogKeyF()
 		return ret, nil, true
-	case ui.ActiveKeybindings.ToggleWrap:
+	case kb.ToggleWrap:
 		ret := m.handleLogKeyTab()
 		return ret, nil, true
-	case "/":
+	case kb.Search:
 		ret := m.handleLogKeySlash()
 		return ret, nil, true
-	case "n":
+	case kb.NextMatch:
 		ret := m.handleLogKeyN()
 		return ret, nil, true
-	case "N":
+	case kb.PrevMatch:
 		ret := m.handleLogKeyN2()
 		return ret, nil, true
-	case "p":
+	case kb.TogglePrefixes:
 		ret := m.handleLogKeyP()
 		return ret, nil, true
-	case "P":
+	case kb.TogglePreview:
 		ret := m.handleLogKeyP2()
 		return ret, nil, true
 	case "J":
@@ -156,10 +157,10 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		}
 		ret := m.handleLogKeyK2()
 		return ret, nil, true
-	case "#":
+	case kb.ToggleLineNumbers:
 		ret := m.handleLogKeyHash()
 		return ret, nil, true
-	case "s":
+	case kb.ToggleTimestamps:
 		ret := m.handleLogKeyS()
 		return ret, nil, true
 	case "S":

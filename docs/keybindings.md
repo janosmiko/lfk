@@ -227,6 +227,8 @@ a single-character slot.
 
 ## YAML View
 
+> Search (`/`), help (`?`), match navigation (`n`/`N`), and the display toggles (wrap, fold, line numbers, timestamps, prefixes, unified, preview, follow) shown across the viewers below are rebindable — see [Keybindings](config-reference.md#keybindings). Core cursor navigation (`hjkl`, `g`/`G`, page motions, word-motions) is fixed.
+
 | Key | Action |
 |---|---|
 | `j` / `k` | Scroll up/down |

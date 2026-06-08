@@ -346,14 +346,14 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
-			{Key: "/", Desc: "search"},
+			{Key: ActiveKeybindings.Search, Desc: "search"},
 			{Key: "v/V", Desc: "select"},
 			{Key: "y", Desc: "copy"},
 			{Key: "tab", Desc: "side"},
-			{Key: "z", Desc: "fold"},
-			{Key: "#", Desc: "lines"},
+			{Key: ActiveKeybindings.ToggleFold, Desc: "fold"},
+			{Key: ActiveKeybindings.ToggleLineNumbers, Desc: "lines"},
 			{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
-			{Key: "u", Desc: "unified"},
+			{Key: ActiveKeybindings.ToggleUnified, Desc: "unified"},
 			{Key: "q/esc", Desc: "back"},
 		})
 		scrollInfo := BarDimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))
@@ -566,13 +566,13 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		hintContent := FormatHintParts([]HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
-			{Key: "/", Desc: "search"},
+			{Key: ActiveKeybindings.Search, Desc: "search"},
 			{Key: "v/V", Desc: "select"},
 			{Key: "y", Desc: "copy"},
-			{Key: "z", Desc: "fold"},
-			{Key: "#", Desc: "lines"},
+			{Key: ActiveKeybindings.ToggleFold, Desc: "fold"},
+			{Key: ActiveKeybindings.ToggleLineNumbers, Desc: "lines"},
 			{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
-			{Key: "u", Desc: "side-by-side"},
+			{Key: ActiveKeybindings.ToggleUnified, Desc: "side-by-side"},
 			{Key: "q/esc", Desc: "back"},
 		})
 		scrollInfo := BarDimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, max(1, maxScroll+1)))

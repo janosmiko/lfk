@@ -29,9 +29,10 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	lines := strings.Split(m.describeView.content, "\n")
 	maxIdx := max(len(lines)-1, 0)
 	key := msg.String()
+	kb := ui.ActiveKeybindings
 
 	switch key {
-	case "?", "f1":
+	case kb.Help, "f1":
 		m.describeView.lineInput = ""
 		m.helpPreviousMode = modeDescribe
 		m.mode = modeHelp
@@ -40,7 +41,7 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.helpSearchActive = false
 		m.helpContextMode = "Describe View"
 		return m, nil
-	case ui.ActiveKeybindings.ToggleWrap:
+	case kb.ToggleWrap:
 		m.describeView.lineInput = ""
 		m.describeView.wrap = !m.describeView.wrap
 		return m, nil
@@ -136,18 +137,18 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		text := strings.Join(lines[m.describeView.cursor:end], "\n")
 		m.setStatusMessage(formatCopiedLines(end-m.describeView.cursor), false)
 		return m, tea.Batch(copyToSystemClipboard(text), scheduleStatusClear())
-	case "/":
+	case kb.Search:
 		m.describeView.lineInput = ""
 		m.describeView.searchActive = true
 		m.describeView.searchInput.Clear()
 		return m, nil
-	case "n":
+	case kb.NextMatch:
 		count := consumeCountPrefix(&m.describeView.lineInput)
 		for range count {
 			m.findNextDescribeMatch(true)
 		}
 		return m, nil
-	case "N":
+	case kb.PrevMatch:
 		count := consumeCountPrefix(&m.describeView.lineInput)
 		for range count {
 			m.findNextDescribeMatch(false)

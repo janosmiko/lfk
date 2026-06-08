@@ -314,6 +314,8 @@ All theme colors accept CSS hex color codes (e.g., `"#7aa2f7"`). Only specify th
 
 All keybindings can be overridden. Only specify the keys you want to change -- defaults apply for everything else. See [`keybindings.md`](keybindings.md) for the full list.
 
+The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
+
 | Field | Default | Action |
 |---|---|---|
 | `logs` | `L` | View logs for selected resource |
@@ -329,6 +331,14 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `secret_editor` | `e` | Secret/ConfigMap editor |
 | `column_toggle` | `,` | Column visibility toggle |
 | `toggle_wrap` | `>` | Toggle line wrapping in the YAML, diff, describe, log, and event viewers. Shares the `>` default with `sort_next`, but they apply in separate contexts (viewers vs. resource list). |
+| `toggle_line_numbers` | `#` | Toggle line numbers (diff, log viewers). |
+| `toggle_fold` | `z` | Toggle fold on the section/region under the cursor (YAML, diff viewers). |
+| `toggle_fold_all` | `Z` | Toggle all folds (YAML, diff viewers). |
+| `toggle_follow` | `f` | Toggle follow / auto-scroll (log viewer). |
+| `toggle_timestamps` | `s` | Toggle timestamps (log viewer). |
+| `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
+| `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |
+| `toggle_preview` | `P` | Toggle the structured preview side panel (log viewer) / details↔YAML preview (explorer). |
 | `sort_next` | `>` | Sort by next column |
 | `sort_prev` | `<` | Sort by previous column |
 | `sort_flip` | `=` | Toggle sort direction |

@@ -56,7 +56,7 @@ func (m Model) viewDescribe() string {
 		{Key: "h/l", Desc: "column"},
 		{Key: "v/V", Desc: "visual"},
 		{Key: "y", Desc: "copy"},
-		{Key: "/", Desc: "search"},
+		{Key: ui.ActiveKeybindings.Search, Desc: "search"},
 		{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
 		{Key: "q/esc", Desc: "back"},
 	}
