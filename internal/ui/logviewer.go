@@ -220,7 +220,7 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "ctrl+d/u", Desc: "half page"},
 		{Key: "ctrl+f/b", Desc: "page"},
 		{Key: "f", Desc: "follow"},
-		{Key: "tab/z/>", Desc: "wrap"},
+		{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
 		{Key: "#", Desc: "line#"},
 		{Key: "s", Desc: "timestamps"},
 		{Key: "p", Desc: "prefixes"},

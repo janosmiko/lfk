@@ -191,7 +191,7 @@ func (m Model) handleEventTimelineOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd
 		}
 	case "f":
 		return m.handleEventTimelineOverlayKeyF()
-	case "tab", "z", ">":
+	case ui.ActiveKeybindings.ToggleWrap:
 		m.eventTimelineLineInput = ""
 		m.eventTimelineWrap = !m.eventTimelineWrap
 	case "ctrl+c":

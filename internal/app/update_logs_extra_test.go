@@ -92,7 +92,9 @@ func TestLogKeyFTogglesFollow(t *testing.T) {
 	assert.Equal(t, 2, result.logView.cursor)
 }
 
-func TestLogKeyTabTogglesWrap(t *testing.T) {
+// TestLogKeyToggleWrapBinding verifies the log viewer wraps on the unified
+// ToggleWrap keybinding (default ">").
+func TestLogKeyToggleWrapBinding(t *testing.T) {
 	m := Model{
 		mode: modeLogs,
 		logView: logViewState{
@@ -103,25 +105,28 @@ func TestLogKeyTabTogglesWrap(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogKey(specialKey(tea.KeyTab))
+	ret, _ := m.handleLogKey(runeKey('>'))
 	result := ret.(Model)
 	assert.True(t, result.logView.wrap)
 }
 
-func TestLogKeyZTogglesWrap(t *testing.T) {
-	m := Model{
-		mode: modeLogs,
-		logView: logViewState{
-			lines: []string{"a"},
-			wrap:  false,
-		},
-		tabs:   []TabState{{}},
-		width:  80,
-		height: 40,
+// TestLogKeyTabAndZNoLongerWrap guards the wrap-hotkey unification: tab and z
+// used to toggle wrap in the log viewer but are now freed (only ToggleWrap does).
+func TestLogKeyTabAndZNoLongerWrap(t *testing.T) {
+	base := func() Model {
+		return Model{
+			mode:    modeLogs,
+			logView: logViewState{lines: []string{"a"}, wrap: false},
+			tabs:    []TabState{{}},
+			width:   80,
+			height:  40,
+		}
 	}
-	ret, _ := m.handleLogKey(runeKey('z'))
-	result := ret.(Model)
-	assert.True(t, result.logView.wrap)
+	tabRet, _ := base().handleLogKey(specialKey(tea.KeyTab))
+	assert.False(t, tabRet.(Model).logView.wrap, "tab should no longer toggle wrap")
+
+	zRet, _ := base().handleLogKey(runeKey('z'))
+	assert.False(t, zRet.(Model).logView.wrap, "z should no longer toggle wrap")
 }
 
 func TestLogKeyHashTogglesLineNumbers(t *testing.T) {

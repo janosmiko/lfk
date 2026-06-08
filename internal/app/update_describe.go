@@ -40,7 +40,7 @@ func (m Model) handleDescribeNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.helpSearchActive = false
 		m.helpContextMode = "Describe View"
 		return m, nil
-	case "ctrl+w", ">":
+	case ui.ActiveKeybindings.ToggleWrap:
 		m.describeView.lineInput = ""
 		m.describeView.wrap = !m.describeView.wrap
 		return m, nil

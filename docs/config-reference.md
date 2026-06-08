@@ -328,6 +328,7 @@ All keybindings can be overridden. Only specify the keys you want to change -- d
 | `label_editor` | `i` | Edit labels/annotations |
 | `secret_editor` | `e` | Secret/ConfigMap editor |
 | `column_toggle` | `,` | Column visibility toggle |
+| `toggle_wrap` | `>` | Toggle line wrapping in the YAML, diff, describe, log, and event viewers. Shares the `>` default with `sort_next`, but they apply in separate contexts (viewers vs. resource list). |
 | `sort_next` | `>` | Sort by next column |
 | `sort_prev` | `<` | Sort by previous column |
 | `sort_flip` | `=` | Toggle sort direction |

@@ -31,6 +31,7 @@ type Keybindings struct {
 	NextMatch       string `json:"next_match" yaml:"next_match"`
 	PrevMatch       string `json:"prev_match" yaml:"prev_match"`
 	TogglePreview   string `json:"toggle_preview" yaml:"toggle_preview"`
+	ToggleWrap      string `json:"toggle_wrap" yaml:"toggle_wrap"`
 	ResourceMap     string `json:"resource_map" yaml:"resource_map"`
 	Fullscreen      string `json:"fullscreen" yaml:"fullscreen"`
 	FilterPresets   string `json:"filter_presets" yaml:"filter_presets"`
@@ -142,7 +143,7 @@ func DefaultKeybindings() Keybindings {
 		// Views
 		Help: "?", Filter: "f", Search: "/",
 		NextMatch: "n", PrevMatch: "N",
-		TogglePreview: "P", ResourceMap: "M", Fullscreen: "F",
+		TogglePreview: "P", ToggleWrap: ">", ResourceMap: "M", Fullscreen: "F",
 		FilterPresets: ".", ErrorLog: "!", SecretToggle: "ctrl+s",
 		FinalizerSearch: "ctrl+g", APIExplorer: "I", ObjectExplorer: "O", RBACBrowser: "U",
 		ThemeSelector: "T", CommandBar: ":", WatchMode: "w",

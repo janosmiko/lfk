@@ -278,6 +278,7 @@
         "next_match": { "type": "string" },
         "prev_match": { "type": "string" },
         "toggle_preview": { "type": "string" },
+        "toggle_wrap": { "type": "string" },
         "resource_map": { "type": "string" },
         "fullscreen": { "type": "string" },
         "filter_presets": { "type": "string" },

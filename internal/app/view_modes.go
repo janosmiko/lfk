@@ -57,7 +57,7 @@ func (m Model) viewDescribe() string {
 		{Key: "v/V", Desc: "visual"},
 		{Key: "y", Desc: "copy"},
 		{Key: "/", Desc: "search"},
-		{Key: "ctrl+w/>", Desc: "wrap"},
+		{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
 		{Key: "q/esc", Desc: "back"},
 	}
 	if m.describeView.autoRefresh {

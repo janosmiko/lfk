@@ -304,6 +304,7 @@ keybindings:
   delete: "D" # Delete resource (default: D)
   force_delete: "X" # Force delete resource (default: X)
   scale: "S" # Scale resource (default: S)
+  toggle_wrap: ">" # Toggle line wrapping in YAML/diff/describe/log/event viewers (default: >)
   mouse_toggle: "alt+ctrl+y" # Suspend/resume mouse capture for native text selection (Ctrl+Option+Y; default: alt+ctrl+y)
   cluster_color_picker: "L" # Open cluster-color picker (default: Shift+L; reuses the Logs key, since Logs has no resource to act on at the cluster picker — at deeper levels "L" still opens Logs)
   security_ignore_toggle: "i" # Show/hide ignored security findings (default: i; security view only — shadows the Label Editor there)

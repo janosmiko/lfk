@@ -259,7 +259,7 @@ a single-character slot.
 | `123y` | Copy number of lines from cursor (count-prefixed yank; folds skipped) |
 | `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
-| `Ctrl+W` / `>` | Toggle line wrapping |
+| `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
 | `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |
 | `I` | Open the API Explorer at the schema of the attribute under the cursor |
@@ -293,7 +293,7 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `viw` / `vaw` / `viW` / `vaW` | Select inner/around word (or WORD) under cursor |
 | `y` | Copy line under cursor (or selection in visual mode) |
 | `123y` | Copy number of lines from cursor (count-prefixed yank) |
-| `Ctrl+W` / `>` | Toggle line wrapping |
+| `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `q` / `Esc` | Back to explorer |
 
 ## Log Viewer
@@ -318,7 +318,7 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `f` | Toggle follow mode (auto-scroll to new logs) |
-| `Tab` / `z` / `>` | Toggle line wrapping |
+| `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `#` | Toggle line numbers |
 | `s` | Toggle timestamps |
 | `p` | Toggle pod/container prefixes |
@@ -427,7 +427,7 @@ from `terminal:` in the config.
 | `z` | Toggle fold unchanged section at cursor |
 | `Z` | Toggle all folds |
 | `#` | Toggle line numbers |
-| `Ctrl+W` / `>` | Toggle line wrapping |
+| `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `u` | Toggle unified/side-by-side view |
 | `q` / `Esc` | Back to explorer |
 
@@ -456,7 +456,7 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
 | `f` | Toggle fullscreen event viewer |
-| `Tab` / `z` / `>` | Toggle line wrapping |
+| `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `/` | Search in events |
 | `n` / `N` | Next / previous search match |
 | `123n` / `123N` | Jump to Nth next / previous search match |

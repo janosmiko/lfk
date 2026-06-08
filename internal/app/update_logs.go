@@ -2,6 +2,8 @@ package app
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
@@ -124,7 +126,7 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case "f":
 		ret := m.handleLogKeyF()
 		return ret, nil, true
-	case "tab", "z", ">":
+	case ui.ActiveKeybindings.ToggleWrap:
 		ret := m.handleLogKeyTab()
 		return ret, nil, true
 	case "/":

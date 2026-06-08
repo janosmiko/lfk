@@ -352,7 +352,7 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 			{Key: "tab", Desc: "side"},
 			{Key: "z", Desc: "fold"},
 			{Key: "#", Desc: "lines"},
-			{Key: ">", Desc: "wrap"},
+			{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
 			{Key: "u", Desc: "unified"},
 			{Key: "q/esc", Desc: "back"},
 		})
@@ -571,7 +571,7 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 			{Key: "y", Desc: "copy"},
 			{Key: "z", Desc: "fold"},
 			{Key: "#", Desc: "lines"},
-			{Key: ">", Desc: "wrap"},
+			{Key: ActiveKeybindings.ToggleWrap, Desc: "wrap"},
 			{Key: "u", Desc: "side-by-side"},
 			{Key: "q/esc", Desc: "back"},
 		})

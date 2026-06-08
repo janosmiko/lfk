@@ -113,7 +113,7 @@ func (m Model) handleDiffNormalKey(msg tea.KeyMsg, foldRegions []ui.DiffFoldRegi
 		m.helpSearchActive = false
 		m.helpContextMode = "Diff View"
 		return m, nil
-	case "ctrl+w", ">":
+	case ui.ActiveKeybindings.ToggleWrap:
 		m.diffView.wrap = !m.diffView.wrap
 		return m, nil
 	case "q", "esc":

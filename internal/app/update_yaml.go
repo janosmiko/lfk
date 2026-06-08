@@ -181,7 +181,7 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyCtrlE()
 	case "y":
 		return m.handleYAMLNormalCopy()
-	case "ctrl+w", ">":
+	case ui.ActiveKeybindings.ToggleWrap:
 		m.yamlView.wrap = !m.yamlView.wrap
 		return m, nil
 	case "z":
