@@ -662,11 +662,11 @@ func TestCovHandleErrorLogOverlayKeyFullscreen(t *testing.T) {
 	m := baseModelCov()
 	m.overlayErrorLog = true
 
-	r, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	r, _ := m.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}})
 	assert.True(t, r.(Model).errorLogFullscreen)
 
 	m2 := r.(Model)
-	r, _ = m2.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'f'}})
+	r, _ = m2.handleErrorLogOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'F'}})
 	assert.False(t, r.(Model).errorLogFullscreen)
 }
 

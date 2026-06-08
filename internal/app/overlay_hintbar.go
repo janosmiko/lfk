@@ -484,7 +484,7 @@ func (m Model) overlayHintBarOverlayEventTimeline() string {
 		{Key: "v/V", Desc: "select"},
 		{Key: "y", Desc: "copy"},
 		{Key: ui.ActiveKeybindings.Search, Desc: "search"},
-		{Key: "f", Desc: "fullscreen"},
+		{Key: ui.ActiveKeybindings.Fullscreen, Desc: "fullscreen"},
 		{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
 		{Key: "esc", Desc: "close"},
 	})

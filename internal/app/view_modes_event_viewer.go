@@ -90,7 +90,7 @@ func (m Model) eventViewerHintBar() string {
 		{Key: "y", Desc: "copy"},
 		{Key: ui.ActiveKeybindings.Search, Desc: "search"},
 		{Key: ui.ActiveKeybindings.ToggleWrap, Desc: "wrap"},
-		{Key: "f", Desc: "minimize"},
+		{Key: ui.ActiveKeybindings.Fullscreen, Desc: "minimize"},
 		{Key: "q/esc", Desc: "back"},
 	}, m.width)
 }

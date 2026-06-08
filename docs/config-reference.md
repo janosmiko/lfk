@@ -314,7 +314,7 @@ All theme colors accept CSS hex color codes (e.g., `"#7aa2f7"`). Only specify th
 
 All keybindings can be overridden. Only specify the keys you want to change -- defaults apply for everything else. See [`keybindings.md`](keybindings.md) for the full list.
 
-The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
+The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `search`, `help`, `next_match`, `prev_match`, and `toggle_preview` bindings, plus the `toggle_*` display toggles below. The `fullscreen` binding (default `F` / Shift+F) maximizes/minimizes everywhere it applies — the explorer's middle column and dashboard, the event timeline, and the error log. Core cursor navigation inside these viewers (`hjkl`, `g`/`G`, page motions, vim word-motions) remains fixed and is not yet rebindable.
 
 | Field | Default | Action |
 |---|---|---|
@@ -339,6 +339,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
 | `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |
 | `toggle_preview` | `P` | Toggle the structured preview side panel (log viewer) / details↔YAML preview (explorer). |
+| `fullscreen` | `F` | Maximize/minimize: explorer middle column & dashboard, event timeline, error log. |
 | `sort_next` | `>` | Sort by next column |
 | `sort_prev` | `<` | Sort by previous column |
 | `sort_flip` | `=` | Toggle sort direction |

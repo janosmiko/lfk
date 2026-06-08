@@ -435,7 +435,7 @@ from `terminal:` in the config.
 
 ## Event Timeline
 
-Press `V` on a resource (or open the Events list and press `Enter` on an event) to open the Event Timeline overlay. Press `f` to toggle between the overlay and a fullscreen viewer that takes over the whole window.
+Press `V` on a resource (or open the Events list and press `Enter` on an event) to open the Event Timeline overlay. Press `Shift+F` to toggle between the overlay and a fullscreen viewer that takes over the whole window.
 
 | Key | Action |
 |---|---|
@@ -457,7 +457,7 @@ Press `V` on a resource (or open the Events list and press `Enter` on an event) 
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Full page down / up |
 | `123 Ctrl+D` / `123 Ctrl+U` | Scroll N lines (vim `'scroll'` semantics: sets the sticky step shared between Ctrl+D and Ctrl+U; clamped to viewport) |
 | `123 Ctrl+F` / `123 Ctrl+B` | Page motion scaled by N |
-| `f` | Toggle fullscreen event viewer |
+| `Shift+F` | Toggle fullscreen event viewer (also minimizes back) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
 | `/` | Search in events |
 | `n` / `N` | Next / previous search match |
@@ -749,12 +749,12 @@ Invalid config values are dropped at startup with a warning in the error log.
 | `0` / `$` / `^` | Move cursor to line start / end / first non-whitespace |
 | `w` / `b` / `e` / `W` / `B` / `E` | Word / WORD motions |
 | `y` | Copy selected lines (visual mode) or all entries (normal mode) |
-| `f` | Toggle fullscreen / overlay mode |
+| `Shift+F` | Toggle fullscreen / overlay mode |
 | `d` | Toggle debug log visibility |
 | `Esc` | Cancel visual selection, or close overlay |
 | `q` | Close overlay |
 
-> **Fullscreen mode**: Press `f` to expand the error log to full terminal size. This removes the overlay border, so mouse text selection works cleanly without picking up background characters. Press `f` again to return to overlay mode.
+> **Fullscreen mode**: Press `Shift+F` to expand the error log to full terminal size. This removes the overlay border, so mouse text selection works cleanly without picking up background characters. Press `Shift+F` again to return to overlay mode.
 
 > **Line wrapping**: Long entries wrap onto continuation lines indented under the message column, so the full text stays readable instead of being truncated.
 

@@ -773,7 +773,7 @@ func TestCovEventViewerModeKeyF(t *testing.T) {
 	m.mode = modeEventViewer
 	m.eventTimelineFullscreen = true
 	m.eventTimelineLines = []string{"line1"}
-	result, _ := m.handleEventViewerModeKey(keyMsg("f"))
+	result, _ := m.handleEventViewerModeKey(keyMsg("F"))
 	rm := result.(Model)
 	assert.Equal(t, modeExplorer, rm.mode)
 	assert.Equal(t, overlayEventTimeline, rm.overlay)

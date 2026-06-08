@@ -95,6 +95,21 @@ func TestDiffToggles_ViaDefaultKeys(t *testing.T) {
 	assert.True(t, r2.(Model).diffView.lineNumbers, "# toggles line numbers")
 }
 
+// TestFullscreen_ShiftFEverywhere verifies the maximize/minimize action is the
+// shared Fullscreen binding (Shift+F) in the event viewer, and that the old
+// lowercase `f` no longer toggles it there.
+func TestFullscreen_ShiftFEverywhere(t *testing.T) {
+	assert.Equal(t, "F", ui.DefaultKeybindings().Fullscreen, "fullscreen default is Shift+F")
+
+	// F maximizes from the minimized overlay.
+	max, _ := newEventModel(10).handleEventTimelineOverlayKey(runeKey('F'))
+	assert.Equal(t, modeEventViewer, max.(Model).mode, "F maximizes the event timeline")
+
+	// f no longer maximizes (freed).
+	noop, _ := newEventModel(10).handleEventTimelineOverlayKey(runeKey('f'))
+	assert.NotEqual(t, modeEventViewer, noop.(Model).mode, "f no longer maximizes")
+}
+
 // TestViewerSearch_HonorsRebind verifies the YAML viewer now respects a rebound
 // `search` keybinding (category B: viewers used to hardcode "/").
 func TestViewerSearch_HonorsRebind(t *testing.T) {
