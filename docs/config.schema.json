@@ -6,9 +6,14 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "appearance": {
+      "type": ["object", "null"],
+      "description": "Visual settings group (colorscheme, icons, no_color, transparent_background, min_contrast_ratio, dim_overlay). Canonical home for these knobs; the flat keys of the same name are deprecated aliases. When both are set, appearance wins.",
+      "$ref": "#/definitions/appearanceConfig"
+    },
     "colorscheme": {
       "type": "string",
-      "description": "Built-in color scheme name (e.g. \"tokyonight-storm\", \"dracula\", \"nord\"). Supports dual-mode syntax for auto dark/light switching: \"dark:X,light:Y\".",
+      "description": "Deprecated alias for appearance.colorscheme. Built-in color scheme name (e.g. \"tokyonight-storm\", \"dracula\", \"nord\"). Supports dual-mode syntax for auto dark/light switching: \"dark:X,light:Y\".",
       "default": "tokyonight-storm"
     },
     "theme": {
@@ -36,7 +41,7 @@
     },
     "icons": {
       "type": "string",
-      "description": "Icon display mode. \"auto\" detects Nerd Font terminals. Overridable at runtime with the LFK_ICONS env var.",
+      "description": "Deprecated alias for appearance.icons. Icon display mode. \"auto\" detects Nerd Font terminals. Overridable at runtime with the LFK_ICONS env var.",
       "enum": ["auto", "unicode", "nerdfont", "simple", "emoji", "none"],
       "default": "auto"
     },
@@ -105,20 +110,60 @@
       "description": "Show a random tip in the status bar on startup.",
       "default": true
     },
+    "log_viewer": {
+      "type": ["object", "null"],
+      "description": "Log viewer settings: tail sizes, ANSI rendering, and the startup-toggle defaults for preview/prefixes/timestamps. Canonical home for these knobs; the flat log_tail_lines, log_tail_lines_short, and log_render_ansi keys are deprecated aliases. Note: log_path is the application's own log file and is NOT a log_viewer setting.",
+      "$ref": "#/definitions/logViewerConfig"
+    },
     "log_tail_lines": {
       "type": "integer",
-      "description": "Number of log lines loaded initially via --tail. Scrolling to the top loads older history.",
+      "description": "Deprecated alias for log_viewer.tail_lines. Number of log lines loaded initially via --tail. Scrolling to the top loads older history.",
       "default": 1000
     },
     "log_tail_lines_short": {
       "type": "integer",
-      "description": "Number of log lines loaded by the action menu \"Tail Logs\" entry. Non-positive values are ignored.",
+      "description": "Deprecated alias for log_viewer.tail_lines_short. Number of log lines loaded by the action menu \"Tail Logs\" entry. Non-positive values are ignored.",
       "default": 10
     },
     "log_render_ansi": {
       "type": "boolean",
-      "description": "Render ANSI SGR sequences (color, bold, underline) emitted by log producers. Set false to strip them. Toggle at runtime with :set ansi / :set noansi.",
+      "description": "Deprecated alias for log_viewer.render_ansi. Render ANSI SGR sequences (color, bold, underline) emitted by log producers. Set false to strip them. Toggle at runtime with :set ansi / :set noansi.",
       "default": true
+    },
+    "yaml_viewer": {
+      "type": ["object", "null"],
+      "description": "YAML viewer startup-toggle defaults.",
+      "$ref": "#/definitions/yamlViewerConfig"
+    },
+    "diff_viewer": {
+      "type": ["object", "null"],
+      "description": "Diff viewer startup-toggle defaults.",
+      "$ref": "#/definitions/diffViewerConfig"
+    },
+    "describe_viewer": {
+      "type": ["object", "null"],
+      "description": "Describe viewer startup-toggle defaults.",
+      "$ref": "#/definitions/describeViewerConfig"
+    },
+    "split_preview": {
+      "type": "boolean",
+      "description": "Startup default for the split preview pane. Set false to start with the pane hidden.",
+      "default": true
+    },
+    "watch_mode": {
+      "type": "boolean",
+      "description": "Startup default for live watch/polling. Set false to start with manual refresh.",
+      "default": true
+    },
+    "all_namespaces": {
+      "type": "boolean",
+      "description": "Startup namespace scope: true shows all namespaces, false scopes to the context's default namespace. The --namespace CLI flag and per-bookmark/session scope override this.",
+      "default": true
+    },
+    "events": {
+      "type": ["object", "null"],
+      "description": "Events view startup-toggle defaults.",
+      "$ref": "#/definitions/eventsConfig"
     },
     "scrolloff": {
       "type": "integer",
@@ -132,12 +177,12 @@
     },
     "dim_overlay": {
       "type": "boolean",
-      "description": "Fade the rest of the screen while any overlay is up. Set false for terminals where SGR faint looks awkward.",
+      "description": "Deprecated alias for appearance.dim_overlay. Fade the rest of the screen while any overlay is up. Set false for terminals where SGR faint looks awkward.",
       "default": true
     },
     "transparent_background": {
       "type": "boolean",
-      "description": "Use the terminal's own background for bars and surfaces. Selection highlights remain opaque.",
+      "description": "Deprecated alias for appearance.transparent_background. Use the terminal's own background for bars and surfaces. Selection highlights remain opaque.",
       "default": false
     },
     "mouse": {
@@ -157,7 +202,7 @@
     },
     "no_color": {
       "type": "boolean",
-      "description": "Strip foreground/background colors from all styles (monochrome). The NO_COLOR env var takes precedence.",
+      "description": "Deprecated alias for appearance.no_color. Strip foreground/background colors from all styles (monochrome). The NO_COLOR env var takes precedence.",
       "default": false
     },
     "secret_lazy_loading": {
@@ -176,7 +221,7 @@
     },
     "min_contrast_ratio": {
       "type": "number",
-      "description": "Normalized readability knob in [0.0, 1.0]. Above zero, foreground colors are nudged in HSL lightness to meet a minimum WCAG contrast ratio. 0.175 is approximately AA, 0.3 is approximately AAA.",
+      "description": "Deprecated alias for appearance.min_contrast_ratio. Normalized readability knob in [0.0, 1.0]. Above zero, foreground colors are nudged in HSL lightness to meet a minimum WCAG contrast ratio. 0.175 is approximately AA, 0.3 is approximately AAA.",
       "minimum": 0,
       "maximum": 1,
       "default": 0
@@ -505,6 +550,146 @@
           "type": "number",
           "description": "Headroom multiplier. Must match one of the picker presets.",
           "enum": [1.0, 1.1, 1.25, 1.5, 1.75, 2.0]
+        }
+      }
+    },
+    "logViewerConfig": {
+      "type": "object",
+      "description": "Log viewer settings. All fields optional; missing keys fall back to compiled defaults (or a deprecated flat alias).",
+      "additionalProperties": false,
+      "properties": {
+        "tail_lines": {
+          "type": "integer",
+          "description": "Number of log lines loaded initially via --tail. Scrolling to the top loads older history.",
+          "default": 1000
+        },
+        "tail_lines_short": {
+          "type": "integer",
+          "description": "Number of log lines loaded by the action menu \"Tail Logs\" entry. Non-positive values are ignored.",
+          "default": 10
+        },
+        "render_ansi": {
+          "type": "boolean",
+          "description": "Render ANSI SGR sequences (color, bold, underline) emitted by log producers. Set false to strip them. Toggle at runtime with :set ansi / :set noansi.",
+          "default": true
+        },
+        "show_preview": {
+          "type": "boolean",
+          "description": "Startup default for the structured preview side panel (runtime toggle: P). Set false to start with it hidden.",
+          "default": true
+        },
+        "show_prefixes": {
+          "type": "boolean",
+          "description": "Startup default for the [pod/name/container] line prefixes (runtime toggle: p). Set false to start with prefixes hidden.",
+          "default": true
+        },
+        "show_timestamps": {
+          "type": "boolean",
+          "description": "Startup default for log line timestamps (runtime toggle: s). Set true to start with timestamps shown.",
+          "default": false
+        }
+      }
+    },
+    "yamlViewerConfig": {
+      "type": "object",
+      "description": "YAML viewer settings. All fields optional; missing keys keep compiled defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "wrap": {
+          "type": "boolean",
+          "description": "Startup default for line wrapping (runtime toggle: z).",
+          "default": false
+        }
+      }
+    },
+    "diffViewerConfig": {
+      "type": "object",
+      "description": "Diff viewer settings. All fields optional; missing keys keep compiled defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "wrap": {
+          "type": "boolean",
+          "description": "Startup default for line wrapping (runtime toggle: Ctrl+W / >).",
+          "default": false
+        },
+        "line_numbers": {
+          "type": "boolean",
+          "description": "Startup default for the gutter line numbers (runtime toggle: #).",
+          "default": true
+        },
+        "unified": {
+          "type": "boolean",
+          "description": "Startup default for the unified (vs side-by-side) layout (runtime toggle: u).",
+          "default": false
+        }
+      }
+    },
+    "describeViewerConfig": {
+      "type": "object",
+      "description": "Describe viewer settings. All fields optional; missing keys keep compiled defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "wrap": {
+          "type": "boolean",
+          "description": "Startup default for line wrapping (runtime toggle: z).",
+          "default": false
+        }
+      }
+    },
+    "appearanceConfig": {
+      "type": "object",
+      "description": "Visual settings. All fields optional; missing keys fall back to a deprecated flat alias or the compiled default.",
+      "additionalProperties": false,
+      "properties": {
+        "colorscheme": {
+          "type": "string",
+          "description": "Built-in color scheme name. Supports dual-mode syntax \"dark:X,light:Y\".",
+          "default": "tokyonight-storm"
+        },
+        "icons": {
+          "type": "string",
+          "description": "Icon display mode. \"auto\" detects Nerd Font terminals.",
+          "enum": ["auto", "unicode", "nerdfont", "simple", "emoji", "none"],
+          "default": "auto"
+        },
+        "no_color": {
+          "type": "boolean",
+          "description": "Strip foreground/background colors (monochrome). NO_COLOR env var takes precedence.",
+          "default": false
+        },
+        "transparent_background": {
+          "type": "boolean",
+          "description": "Use the terminal's own background for bars and surfaces.",
+          "default": false
+        },
+        "min_contrast_ratio": {
+          "type": "number",
+          "description": "Readability knob in [0.0, 1.0]; nudges foreground lightness to a minimum WCAG contrast ratio.",
+          "minimum": 0,
+          "maximum": 1,
+          "default": 0
+        },
+        "dim_overlay": {
+          "type": "boolean",
+          "description": "Fade the rest of the screen while any overlay is up.",
+          "default": true
+        }
+      }
+    },
+    "eventsConfig": {
+      "type": "object",
+      "description": "Events view settings. All fields optional; missing keys keep compiled defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "warnings_only": {
+          "type": "boolean",
+          "description": "Start the events view filtered to Warning events only.",
+          "default": true
+        },
+        "grouping": {
+          "type": "boolean",
+          "description": "Start with related events grouped by reason.",
+          "default": true
         }
       }
     },

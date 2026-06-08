@@ -16,9 +16,10 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `colorscheme` | string | `"tokyonight-storm"` | Built-in color scheme name (460+ available). Press `T` to browse. Supports dual-mode syntax for auto dark/light switching: `"dark:X,light:Y"`. Custom `theme` overrides are applied on top. |
-| `transparent_background` | bool | `false` | Use the terminal's own background for bars. Selection highlights remain opaque. |
-| `icons` | string | `"auto"` | Icon display mode. One of: `"auto"` (detects Nerd Font terminals; default), `"unicode"`, `"nerdfont"` (Material Design Icons; requires Nerd Font in terminal), `"simple"` (ASCII labels), `"emoji"`, or `"none"`. Unknown values fall back to `"unicode"`. Can be overridden at runtime by the `LFK_ICONS` environment variable. |
+| `appearance` | object | *(see Appearance section)* | Visual settings group: `colorscheme`, `icons`, `no_color`, `transparent_background`, `min_contrast_ratio`, `dim_overlay`. Canonical home for these knobs. See [Appearance](#appearance). |
+| `colorscheme` | string | `"tokyonight-storm"` | **Deprecated** — use `appearance.colorscheme`. Built-in color scheme name (460+ available). Press `T` to browse. Supports dual-mode syntax for auto dark/light switching: `"dark:X,light:Y"`. Custom `theme` overrides are applied on top. |
+| `transparent_background` | bool | `false` | **Deprecated** — use `appearance.transparent_background`. Use the terminal's own background for bars. Selection highlights remain opaque. |
+| `icons` | string | `"auto"` | **Deprecated** — use `appearance.icons`. Icon display mode. One of: `"auto"` (detects Nerd Font terminals; default), `"unicode"`, `"nerdfont"` (Material Design Icons; requires Nerd Font in terminal), `"simple"` (ASCII labels), `"emoji"`, or `"none"`. Unknown values fall back to `"unicode"`. Can be overridden at runtime by the `LFK_ICONS` environment variable. |
 | `log_path` | string | `"~/.local/share/lfk/lfk.log"` | Path to the application log file. |
 | `kubeconfig_dir` | string or list[string] | `"~/.kube/config.d"` | Directory (or list of directories) recursively scanned for kubeconfig files, in addition to `~/.kube/config` and `KUBECONFIG`. Tilde paths are expanded against `$HOME`. The `--kubeconfig-dir` CLI flag (repeatable) and `KUBECONFIG_DIR` env var (colon-separated) override this; the `--kubeconfig` flag bypasses directory discovery entirely. See [Kubeconfig Directory](usage.md#kubeconfig-directory). |
 | `dashboard` | bool | `true` | Show cluster dashboard when entering a context. Set to `false` to go directly to resource types. |
@@ -35,11 +36,19 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `pinned_groups` | list[string] | `[]` | CRD API groups to pin after built-in categories. Also manageable in-app with `p` key (stored per-context and per-union-set in `~/.local/state/lfk/pinned.yaml`). |
 | `union_sets` | map[string]object or list[object] | `[]` | Named multi-cluster groups that the `--union-set <name>` CLI flag expands. See [Union Sets](#union-sets). |
 | `tips` | bool | `true` | Show a random tip in the status bar on startup. Set to `false` to disable. |
-| `log_tail_lines` | int | `1000` | Number of log lines to load initially via `--tail`. Scrolling to the top loads older history. |
-| `log_tail_lines_short` | int | `10` | Number of log lines loaded by the action menu "Tail Logs" entry (`l` key). Intended for lightweight peeks without the full history hit. Non-positive values are ignored. |
-| `log_render_ansi` | bool | `true` | Render ANSI SGR sequences (color, bold, underline) emitted by log producers. Set to `false` to strip them — the viewer replaces every ESC byte with `U+FFFD`, matching the original safe-but-noisy behavior. Non-SGR CSI sequences (cursor movement, screen erase) are always stripped regardless. Toggle at runtime with `:set ansi` / `:set noansi`. |
+| `log_viewer` | object | *(see Log Viewer section)* | Log viewer settings: tail sizes, ANSI rendering, and startup-toggle defaults for preview/prefixes/timestamps. See [Log Viewer](#log-viewer). Note: `log_path` (above) is the application's own log file, not a viewer setting. |
+| `yaml_viewer` | object | *(see Viewer Defaults)* | YAML viewer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
+| `diff_viewer` | object | *(see Viewer Defaults)* | Diff viewer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
+| `describe_viewer` | object | *(see Viewer Defaults)* | Describe viewer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
+| `split_preview` | bool | `true` | Startup default for the split preview pane. Set to `false` to start with it hidden. |
+| `watch_mode` | bool | `true` | Startup default for live watch/polling. Set to `false` to start with manual refresh. |
+| `all_namespaces` | bool | `true` | Startup namespace scope: `true` shows all namespaces, `false` scopes to the context's default namespace. The `--namespace` CLI flag and per-bookmark/session scope override this. |
+| `events` | object | *(see Events section)* | Events view startup-toggle defaults. See [Events](#events). |
+| `log_tail_lines` | int | `1000` | **Deprecated** — use `log_viewer.tail_lines`. Number of log lines to load initially via `--tail`. |
+| `log_tail_lines_short` | int | `10` | **Deprecated** — use `log_viewer.tail_lines_short`. Number of log lines loaded by the action menu "Tail Logs" entry. Non-positive values are ignored. |
+| `log_render_ansi` | bool | `true` | **Deprecated** — use `log_viewer.render_ansi`. Render ANSI SGR sequences from log producers. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
-| `dim_overlay` | bool | `true` | Fade the rest of the screen while any overlay is up. Set to `false` for terminals where SGR faint looks awkward; no-op when `no_color: true`. |
+| `dim_overlay` | bool | `true` | **Deprecated** — use `appearance.dim_overlay`. Fade the rest of the screen while any overlay is up. Set to `false` for terminals where SGR faint looks awkward; no-op when `no_color: true`. |
 | `scrolloff` | int | `5` | Number of lines to keep visible above/below the cursor when scrolling. Used by all views with cursor-based navigation. |
 | `mouse` | bool | `true` | Capture mouse input for click navigation, scroll, and tab switching. Set to `false` to allow native terminal text selection. Also available as `--no-mouse` CLI flag. |
 | `read_only` | bool | `false` | Disable all mutating actions (delete, edit, scale, restart, exec, port-forward, drain, cordon, etc.) globally. Per-context overrides under `clusters.<name>.read_only` and the `--read-only` CLI flag take precedence. See [Read-Only Mode](usage.md#read-only-mode). |
@@ -51,7 +60,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `clusters.<name>.security` | object | _(unset)_ | Per-context security override (`enabled` and/or `sources`). Wins over the global `security` settings for that context. |
 | `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. Much faster in clusters with many Helm release secrets (each release is a multi-hundred-KB Secret) or large TLS payloads, at the cost of an extra GET per hovered Secret. When `false` (default), Secrets list like every other resource type — full objects are pulled and `data` is eagerly decoded, so the Type column and decoded values are visible immediately. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
 | `informer_cache` | bool or string | `auto` | Selects the list strategy. Accepts `off` (round-trip every list — matches kubectl), `auto` (default; promote a resource type to a shared informer once a list crosses 1000 items, demote when sustained below 500), and `always` (open a watch eagerly on first use). Legacy bool form is still accepted: `true` → `always`, `false` → `off`. See [Informer cache](#informer-cache) for trade-offs. |
-| `min_contrast_ratio` | float | `0.0` | Normalized readability knob in `[0.0, 1.0]`. When above zero, foreground colors are nudged in HSL lightness space to meet a minimum WCAG contrast ratio against their paired background. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
+| `min_contrast_ratio` | float | `0.0` | **Deprecated** — use `appearance.min_contrast_ratio`. Normalized readability knob in `[0.0, 1.0]`. When above zero, foreground colors are nudged in HSL lightness space to meet a minimum WCAG contrast ratio against their paired background. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
 
 ### Auto dark/light mode
 
@@ -94,6 +103,94 @@ choose between `nerdfont` and `unicode`:
 
 If detection guesses wrong for your setup, set `icons: nerdfont` (or the mode
 you want) in your config, or export `LFK_ICONS=nerdfont` in your shell.
+
+## Appearance
+
+Visual settings, grouped. The flat keys of the same name (`colorscheme`, `icons`, `no_color`, `transparent_background`, `min_contrast_ratio`, `dim_overlay`) are deprecated aliases; when both a flat key and its `appearance` equivalent are set, `appearance` wins. The `theme` object (custom color overrides) and per-cluster overrides remain top-level.
+
+```yaml
+appearance:
+  colorscheme: tokyonight-storm
+  icons: auto
+  no_color: false
+  transparent_background: false
+  min_contrast_ratio: 0.0
+  dim_overlay: true
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `colorscheme` | string | `"tokyonight-storm"` | Built-in color scheme name. Dual-mode `"dark:X,light:Y"` supported. |
+| `icons` | string | `"auto"` | Icon display mode (`auto`/`unicode`/`nerdfont`/`simple`/`emoji`/`none`). |
+| `no_color` | bool | `false` | Strip all colors (monochrome). `NO_COLOR` env var takes precedence. |
+| `transparent_background` | bool | `false` | Use the terminal's own background for bars and surfaces. |
+| `min_contrast_ratio` | float | `0.0` | Readability knob in `[0.0, 1.0]`. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
+| `dim_overlay` | bool | `true` | Fade the screen behind overlays. No-op when `no_color: true`. |
+
+## Log Viewer
+
+Settings for the log viewer (`L` key). The startup-toggle defaults let you skip pressing the toggle keys on every open (issue #377). `log_path` is the application's own log file and is intentionally **not** part of this group.
+
+```yaml
+log_viewer:
+  tail_lines: 1000
+  tail_lines_short: 10
+  render_ansi: true
+  show_preview: true
+  show_prefixes: true
+  show_timestamps: false
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `tail_lines` | int | `1000` | Log lines loaded initially via `--tail`. Scrolling to the top loads older history. |
+| `tail_lines_short` | int | `10` | Log lines loaded by the action menu "Tail Logs" entry. Non-positive values are ignored. |
+| `render_ansi` | bool | `true` | Render ANSI SGR sequences (color, bold, underline) from log producers. `false` strips them (every ESC byte becomes `U+FFFD`); non-SGR CSI sequences are always stripped. Toggle at runtime with `:set ansi` / `:set noansi`. |
+| `show_preview` | bool | `true` | Startup default for the structured preview side panel. Runtime toggle: `P`. |
+| `show_prefixes` | bool | `true` | Startup default for the `[pod/name/container]` line prefixes. Runtime toggle: `p`. |
+| `show_timestamps` | bool | `false` | Startup default for log line timestamps. Runtime toggle: `s`. |
+
+The deprecated flat keys `log_tail_lines`, `log_tail_lines_short`, and `log_render_ansi` are still accepted as aliases; when both a flat key and its `log_viewer` equivalent are set, `log_viewer` wins.
+
+## Viewer Defaults
+
+Startup defaults for the fullscreen YAML / diff / describe viewers, so display toggles you always want don't need re-pressing on every open. Each viewer mirrors the `log_viewer` group.
+
+```yaml
+yaml_viewer:
+  wrap: false
+diff_viewer:
+  wrap: false
+  line_numbers: true
+  unified: false
+describe_viewer:
+  wrap: false
+```
+
+| Field | Type | Default | Runtime toggle | Description |
+|-------|------|---------|----------------|-------------|
+| `yaml_viewer.wrap` | bool | `false` | `z` | Line wrapping in the YAML viewer. |
+| `diff_viewer.wrap` | bool | `false` | `Ctrl+W` / `>` | Line wrapping in the diff viewer. |
+| `diff_viewer.line_numbers` | bool | `true` | `#` | Gutter line numbers in the diff viewer. |
+| `diff_viewer.unified` | bool | `false` | `u` | Unified (vs side-by-side) diff layout. |
+| `describe_viewer.wrap` | bool | `false` | `z` | Line wrapping in the describe viewer. |
+
+A toggle changed at runtime sticks for the session and resets to the configured default the next time the viewer opens.
+
+## Events
+
+Startup defaults for the events view.
+
+```yaml
+events:
+  warnings_only: true
+  grouping: true
+```
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `events.warnings_only` | bool | `true` | Start filtered to Warning events only. |
+| `events.grouping` | bool | `true` | Start with related events grouped by reason. |
 
 ## Monitoring
 

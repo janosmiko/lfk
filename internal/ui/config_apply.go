@@ -148,15 +148,9 @@ func applyConfigOptions(cfg configFile) {
 	if cfg.Tips != nil {
 		ConfigTipsEnabled = *cfg.Tips
 	}
-	if cfg.LogTailLines != nil && *cfg.LogTailLines > 0 {
-		ConfigLogTailLines = *cfg.LogTailLines
-	}
-	if cfg.LogTailLinesShort != nil && *cfg.LogTailLinesShort > 0 {
-		ConfigLogTailLinesShort = *cfg.LogTailLinesShort
-	}
-	if cfg.LogRenderAnsi != nil {
-		ConfigLogRenderAnsi = *cfg.LogRenderAnsi
-	}
+	applyLogViewerConfig(cfg)
+	applyViewerDefaults(cfg)
+	applySessionDefaults(cfg)
 	if cfg.ScrollOff != nil && *cfg.ScrollOff >= 0 {
 		ConfigScrollOff = *cfg.ScrollOff
 	}
@@ -240,6 +234,74 @@ func applyDataAccessConfig(cfg configFile) {
 		if ns := strings.TrimSpace(cfg.Kubeshark.Namespace); ns != "" {
 			ConfigKubesharkNamespace = ns
 		}
+	}
+}
+
+// applyLogViewerConfig wires every log-viewer setting (tail sizes, ANSI
+// rendering, and the preview / prefixes / timestamps startup defaults) into
+// its runtime global. The deprecated flat keys (log_tail_lines,
+// log_tail_lines_short, log_render_ansi) are applied first so the canonical
+// log_viewer group, applied second, wins when a config sets both.
+func applyLogViewerConfig(cfg configFile) {
+	// Deprecated flat aliases first.
+	applyTailLines(cfg.LogTailLines, &ConfigLogTailLines)
+	applyTailLines(cfg.LogTailLinesShort, &ConfigLogTailLinesShort)
+	applyBoolPtr(cfg.LogRenderAnsi, &ConfigLogRenderAnsi)
+
+	// Canonical log_viewer group overrides any flat alias above.
+	lv := cfg.LogViewer
+	if lv == nil {
+		return
+	}
+	applyTailLines(lv.TailLines, &ConfigLogTailLines)
+	applyTailLines(lv.TailLinesShort, &ConfigLogTailLinesShort)
+	applyBoolPtr(lv.RenderAnsi, &ConfigLogRenderAnsi)
+	applyBoolPtr(lv.ShowPreview, &ConfigLogShowPreview)
+	applyBoolPtr(lv.ShowPrefixes, &ConfigLogShowPrefixes)
+	applyBoolPtr(lv.ShowTimestamps, &ConfigLogShowTimestamps)
+}
+
+// applyViewerDefaults wires the YAML / diff / describe viewer startup-toggle
+// defaults from their config groups into the matching runtime globals.
+func applyViewerDefaults(cfg configFile) {
+	if yv := cfg.YAMLViewer; yv != nil {
+		applyBoolPtr(yv.Wrap, &ConfigYAMLViewerWrap)
+	}
+	if dv := cfg.DiffViewer; dv != nil {
+		applyBoolPtr(dv.Wrap, &ConfigDiffViewerWrap)
+		applyBoolPtr(dv.LineNumbers, &ConfigDiffViewerLineNumbers)
+		applyBoolPtr(dv.Unified, &ConfigDiffViewerUnified)
+	}
+	if dv := cfg.DescribeViewer; dv != nil {
+		applyBoolPtr(dv.Wrap, &ConfigDescribeViewerWrap)
+	}
+}
+
+// applySessionDefaults wires the session-level startup defaults (split preview,
+// watch mode, namespace scope, and the events-view toggles) into their runtime
+// globals.
+func applySessionDefaults(cfg configFile) {
+	applyBoolPtr(cfg.SplitPreview, &ConfigSplitPreview)
+	applyBoolPtr(cfg.WatchMode, &ConfigWatchMode)
+	applyBoolPtr(cfg.AllNamespaces, &ConfigAllNamespaces)
+	if ev := cfg.Events; ev != nil {
+		applyBoolPtr(ev.WarningsOnly, &ConfigEventsWarningsOnly)
+		applyBoolPtr(ev.Grouping, &ConfigEventsGrouping)
+	}
+}
+
+// applyTailLines copies a positive tail-line override into dst; non-positive
+// values are ignored so a stray `0` keeps the compiled default.
+func applyTailLines(src *int, dst *int) {
+	if src != nil && *src > 0 {
+		*dst = *src
+	}
+}
+
+// applyBoolPtr copies an optional bool override into dst when present.
+func applyBoolPtr(src *bool, dst *bool) {
+	if src != nil {
+		*dst = *src
 	}
 }
 
