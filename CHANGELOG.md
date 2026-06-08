@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.1](https://github.com/janosmiko/lfk/compare/v0.14.0...v0.14.1) (2026-06-08)
+
+
+### Bug Fixes
+
+* **security:** eliminate findings-cache memory spike ([#387](https://github.com/janosmiko/lfk/issues/387)) ([#390](https://github.com/janosmiko/lfk/issues/390)) ([548fa42](https://github.com/janosmiko/lfk/commit/548fa424efa5b1ded61da4f981d232e97ae617b5))
+* wrap long lines in diff viewer instead of truncating ([#386](https://github.com/janosmiko/lfk/issues/386)) ([#388](https://github.com/janosmiko/lfk/issues/388)) ([b2ce7ab](https://github.com/janosmiko/lfk/commit/b2ce7ab8425c0e987e1223052703b6d24d6fb679))
+
 ## [0.14.0](https://github.com/janosmiko/lfk/compare/v0.13.9...v0.14.0) (2026-06-08)
 
 
