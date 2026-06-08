@@ -13,11 +13,17 @@ import (
 // (#379). width 140 -> preview panel begins at x = logW (84).
 
 func logPreviewWheelModel() Model {
+	// Enough lines to overflow the log viewport (logContentHeight = height-5
+	// = 5 here) so wheel-down on the log pane actually advances logView.scroll.
+	lines := make([]string, 12)
+	for i := range lines {
+		lines[i] = scrollOverflowJSON
+	}
 	return Model{
 		mode: modeLogs,
 		logView: logViewState{
 			title:          "Logs",
-			lines:          []string{scrollOverflowJSON},
+			lines:          lines,
 			cursor:         0,
 			previewVisible: true,
 		},
@@ -59,6 +65,8 @@ func TestLogWheel_LogPaneScrollsLog(t *testing.T) {
 	rm := ret.(Model)
 	assert.False(t, rm.logView.follow,
 		"wheel over the log stream must take the main-log path (disables follow)")
+	assert.Greater(t, rm.logView.scroll, 0,
+		"wheel over the log stream must advance the main log scroll")
 	assert.Equal(t, 0, rm.logView.previewScroll,
 		"wheel over the log stream must not scroll the preview")
 }
@@ -73,5 +81,6 @@ func TestLogWheel_PreviewHiddenScrollsLog(t *testing.T) {
 	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: logW + 2})
 	rm := ret.(Model)
 	assert.False(t, rm.logView.follow, "hidden preview: wheel must scroll the log")
+	assert.Greater(t, rm.logView.scroll, 0, "hidden preview: wheel must advance the log scroll")
 	assert.Equal(t, 0, rm.logView.previewScroll, "hidden preview: previewScroll stays 0")
 }

@@ -56,7 +56,7 @@ func TestObjectExplorerWheel_MiddlePaneMovesCursor(t *testing.T) {
 	m := openObjectExplorerOnStatus(t)
 	m.objectExplorerView.cursor = 0
 	m.objectExplorerView.previewScroll = 5
-	x := m.objectExplorerRightPaneStart() - 10 // inside the middle pane
+	x := 0 // far-left: in the left/middle band, never the right pane
 
 	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: x})
 	rm := ret.(Model)
