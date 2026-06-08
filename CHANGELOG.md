@@ -1,5 +1,22 @@
 # Changelog
 
+## [0.14.0](https://github.com/janosmiko/lfk/compare/v0.13.9...v0.14.0) (2026-06-08)
+
+
+### ⚠ BREAKING CHANGES
+
+* the flat keys log_tail_lines, log_tail_lines_short, log_render_ansi, colorscheme, icons, no_color, transparent_background, min_contrast_ratio and dim_overlay are deprecated in favour of their grouped equivalents (log_viewer.*, appearance.*). They continue to work as aliases for now, but the grouped form is canonical and the flat keys may be removed in a future release. Migrate config.yaml to the grouped shape; when both a flat key and its group equivalent are set, the group wins.
+
+### Features
+
+* group log, viewer, session and appearance settings into config sections ([#378](https://github.com/janosmiko/lfk/issues/378)) ([e5ba655](https://github.com/janosmiko/lfk/commit/e5ba655f88d3140d4bd75cfca1a075d811d50fd0))
+* unify viewer keybindings — configurable line-wrap, display toggles, search/help/match, and Shift+F fullscreen ([#380](https://github.com/janosmiko/lfk/issues/380)) ([90b8db6](https://github.com/janosmiko/lfk/commit/90b8db62db2990c58f9027c55d2155e9a5e2f650))
+
+
+### Bug Fixes
+
+* route mouse wheel to the pane under the pointer in Object Explorer and log viewer ([#382](https://github.com/janosmiko/lfk/issues/382)) ([0a37575](https://github.com/janosmiko/lfk/commit/0a37575cc8320b5f8a77af0b8ec81bfeff2a9ee6))
+
 ## [0.13.9](https://github.com/janosmiko/lfk/compare/v0.13.8...v0.13.9) (2026-06-07)
 
 
