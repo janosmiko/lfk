@@ -586,7 +586,7 @@ func (m Model) handleYAMLKeyObjectExplorer() (tea.Model, tea.Cmd) {
 		}
 		m.yamlView.scroll = 0
 		m.yamlView.cursor = 0
-		m.yamlView.wrap = false
+		m.yamlView.wrap = ui.ConfigYAMLViewerWrap
 		return m, nil
 	}
 	mdl, cmd := m.openObjectExplorer()
@@ -640,7 +640,7 @@ func (m Model) handleYAMLKeyQ() (tea.Model, tea.Cmd) {
 	m.yamlReturnMode = modeExplorer
 	m.yamlView.scroll = 0
 	m.yamlView.cursor = 0
-	m.yamlView.wrap = false
+	m.yamlView.wrap = ui.ConfigYAMLViewerWrap
 	return m, nil
 }
 
@@ -649,7 +649,7 @@ func (m Model) handleYAMLKeyCtrlC() (tea.Model, tea.Cmd) {
 	m.yamlReturnMode = modeExplorer
 	m.yamlView.scroll = 0
 	m.yamlView.cursor = 0
-	m.yamlView.wrap = false
+	m.yamlView.wrap = ui.ConfigYAMLViewerWrap
 	m.yamlView.searchText.Clear()
 	m.yamlView.matchLines = nil
 	return m, nil

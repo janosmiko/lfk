@@ -23,6 +23,12 @@ type configFile struct {
 	// Either segment may be omitted. Without the prefix syntax the value is
 	// used as a plain scheme name and dark/light switching is disabled.
 	// Custom theme overrides in the "theme" section are applied on top.
+	// Appearance groups the visual knobs (colorscheme, icons, no_color,
+	// transparent_background, min_contrast_ratio, dim_overlay). This is the
+	// canonical home; the flat keys of the same name are deprecated aliases
+	// kept for backward compatibility. When both are set, the appearance group
+	// wins (it is merged down onto the flat fields at load time).
+	Appearance    *AppearanceConfig `json:"appearance" yaml:"appearance"`
 	Colorscheme   string            `json:"colorscheme" yaml:"colorscheme"`
 	Theme         Theme             `json:"theme" yaml:"theme"`
 	Keybindings   Keybindings       `json:"keybindings" yaml:"keybindings"`
@@ -71,20 +77,44 @@ type configFile struct {
 	// Tips controls whether to show random tips on startup.
 	// Defaults to true. Set to false to disable.
 	Tips *bool `json:"tips" yaml:"tips"`
-	// LogTailLines controls how many log lines are initially loaded via --tail.
-	// When the user scrolls to the top, older logs are fetched in the background.
-	// Defaults to 1000.
+	// LogViewer groups all log-viewer settings (tail sizes, ANSI rendering,
+	// and the startup-toggle defaults for preview / prefixes / timestamps).
+	// This is the canonical home for these knobs; the flat log_tail_lines,
+	// log_tail_lines_short, and log_render_ansi keys below are deprecated
+	// aliases kept for backward compatibility. When both are set, the
+	// log_viewer group wins. Note: log_path is the application's own log
+	// file and is intentionally NOT part of this group.
+	LogViewer *LogViewerConfig `json:"log_viewer" yaml:"log_viewer"`
+	// LogTailLines is the deprecated flat alias for log_viewer.tail_lines.
+	// Controls how many log lines are initially loaded via --tail; scrolling
+	// to the top fetches older history in the background. Defaults to 1000.
 	LogTailLines *int `json:"log_tail_lines" yaml:"log_tail_lines"`
-	// LogTailLinesShort controls how many log lines the "Tail Logs" action menu
-	// entry loads via --tail. Intended for quick peeks without the full history
-	// hit. Defaults to 10. Non-positive values are ignored (default is kept).
+	// LogTailLinesShort is the deprecated flat alias for
+	// log_viewer.tail_lines_short. Controls how many log lines the "Tail Logs"
+	// action loads via --tail. Defaults to 10. Non-positive values are ignored.
 	LogTailLinesShort *int `json:"log_tail_lines_short" yaml:"log_tail_lines_short"`
-	// LogRenderAnsi controls whether ANSI SGR sequences (colour, bold,
-	// underline) emitted by log producers are rendered in the viewer.
-	// Defaults to true. Set to false to strip all ANSI escapes, matching
-	// the historical behaviour where the sanitizer replaced every ESC
-	// byte with U+FFFD.
+	// LogRenderAnsi is the deprecated flat alias for log_viewer.render_ansi.
+	// Controls whether ANSI SGR sequences (colour, bold, underline) emitted by
+	// log producers are rendered. Defaults to true; false strips all ANSI.
 	LogRenderAnsi *bool `json:"log_render_ansi" yaml:"log_render_ansi"`
+	// YAMLViewer holds startup-default toggles for the YAML viewer.
+	YAMLViewer *YAMLViewerConfig `json:"yaml_viewer" yaml:"yaml_viewer"`
+	// DiffViewer holds startup-default toggles for the diff viewer.
+	DiffViewer *DiffViewerConfig `json:"diff_viewer" yaml:"diff_viewer"`
+	// DescribeViewer holds startup-default toggles for the describe viewer.
+	DescribeViewer *DescribeViewerConfig `json:"describe_viewer" yaml:"describe_viewer"`
+	// SplitPreview is the startup default for the split preview pane (runtime
+	// toggle from the explorer). Default true (pane shown).
+	SplitPreview *bool `json:"split_preview" yaml:"split_preview"`
+	// WatchMode is the startup default for live watch/polling. Default true.
+	WatchMode *bool `json:"watch_mode" yaml:"watch_mode"`
+	// AllNamespaces is the startup default for the namespace scope: true shows
+	// all namespaces, false starts scoped to the context's default namespace.
+	// The --namespace CLI flag and per-bookmark/session scope override this.
+	// Default true.
+	AllNamespaces *bool `json:"all_namespaces" yaml:"all_namespaces"`
+	// Events holds startup-default toggles for the events view.
+	Events *EventsConfig `json:"events" yaml:"events"`
 	// ScrollOff is the number of lines to keep visible above/below the cursor.
 	// Defaults to 5.
 	ScrollOff *int `json:"scrolloff" yaml:"scrolloff"`
@@ -265,6 +295,103 @@ type SchedulerConfig struct {
 	AgingThreshold *int `json:"aging_threshold" yaml:"aging_threshold"`
 }
 
+// LogViewerConfig is the on-disk schema for the log_viewer section. Every
+// field is a pointer so an omitted key falls through to the compiled default
+// (or a deprecated flat alias) rather than overwriting it with a zero value.
+type LogViewerConfig struct {
+	// TailLines: lines loaded initially via --tail. Default 1000.
+	TailLines *int `json:"tail_lines" yaml:"tail_lines"`
+	// TailLinesShort: lines loaded by the "Tail Logs" action. Default 10.
+	// Non-positive values are ignored.
+	TailLinesShort *int `json:"tail_lines_short" yaml:"tail_lines_short"`
+	// RenderAnsi: render ANSI SGR sequences from log producers. Default true.
+	RenderAnsi *bool `json:"render_ansi" yaml:"render_ansi"`
+	// ShowPreview: startup default for the structured preview panel (toggle P).
+	// Default true.
+	ShowPreview *bool `json:"show_preview" yaml:"show_preview"`
+	// ShowPrefixes: startup default for [pod/name/container] prefixes (toggle p).
+	// Default true.
+	ShowPrefixes *bool `json:"show_prefixes" yaml:"show_prefixes"`
+	// ShowTimestamps: startup default for log line timestamps (toggle s).
+	// Default false.
+	ShowTimestamps *bool `json:"show_timestamps" yaml:"show_timestamps"`
+}
+
+// YAMLViewerConfig is the on-disk schema for the yaml_viewer section. Every
+// field is a pointer so an omitted key keeps the compiled default.
+type YAMLViewerConfig struct {
+	// Wrap: startup default for line wrapping (toggle: z). Default false.
+	Wrap *bool `json:"wrap" yaml:"wrap"`
+}
+
+// DiffViewerConfig is the on-disk schema for the diff_viewer section.
+type DiffViewerConfig struct {
+	// Wrap: startup default for line wrapping (toggle: Ctrl+W / >). Default false.
+	Wrap *bool `json:"wrap" yaml:"wrap"`
+	// LineNumbers: startup default for the gutter line numbers (toggle: #).
+	// Default true.
+	LineNumbers *bool `json:"line_numbers" yaml:"line_numbers"`
+	// Unified: startup default for unified (vs side-by-side) layout
+	// (toggle: u). Default false.
+	Unified *bool `json:"unified" yaml:"unified"`
+}
+
+// DescribeViewerConfig is the on-disk schema for the describe_viewer section.
+type DescribeViewerConfig struct {
+	// Wrap: startup default for line wrapping (toggle: z). Default false.
+	Wrap *bool `json:"wrap" yaml:"wrap"`
+}
+
+// AppearanceConfig is the on-disk schema for the appearance section. Every
+// field is a pointer (colorscheme/icons too) so an omitted key falls through to
+// the deprecated flat alias or the compiled default rather than overwriting it.
+type AppearanceConfig struct {
+	Colorscheme      *string  `json:"colorscheme" yaml:"colorscheme"`
+	Icons            *string  `json:"icons" yaml:"icons"`
+	NoColor          *bool    `json:"no_color" yaml:"no_color"`
+	TransparentBg    *bool    `json:"transparent_background" yaml:"transparent_background"`
+	MinContrastRatio *float64 `json:"min_contrast_ratio" yaml:"min_contrast_ratio"`
+	DimOverlay       *bool    `json:"dim_overlay" yaml:"dim_overlay"`
+}
+
+// mergeAppearanceConfig folds a present appearance group down onto the flat
+// appearance fields so all downstream apply/theme logic can keep reading the
+// flat fields unchanged. The group wins over a flat alias when both are set.
+func mergeAppearanceConfig(cfg configFile) configFile {
+	a := cfg.Appearance
+	if a == nil {
+		return cfg
+	}
+	if a.Colorscheme != nil {
+		cfg.Colorscheme = *a.Colorscheme
+	}
+	if a.Icons != nil {
+		cfg.Icons = *a.Icons
+	}
+	if a.NoColor != nil {
+		cfg.NoColor = a.NoColor
+	}
+	if a.TransparentBg != nil {
+		cfg.TransparentBg = a.TransparentBg
+	}
+	if a.MinContrastRatio != nil {
+		cfg.MinContrastRatio = a.MinContrastRatio
+	}
+	if a.DimOverlay != nil {
+		cfg.DimOverlay = a.DimOverlay
+	}
+	return cfg
+}
+
+// EventsConfig is the on-disk schema for the events section.
+type EventsConfig struct {
+	// WarningsOnly: start the events view filtered to Warning events only
+	// (runtime toggle from the events view). Default true.
+	WarningsOnly *bool `json:"warnings_only" yaml:"warnings_only"`
+	// Grouping: start with related events grouped by reason. Default true.
+	Grouping *bool `json:"grouping" yaml:"grouping"`
+}
+
 // KubesharkConfig is the on-disk schema for the kubeshark section.
 type KubesharkConfig struct {
 	// Namespace where Service kubeshark-hub lives. Empty / unset falls
@@ -430,6 +557,7 @@ func LoadConfig(configOverride string) {
 		return
 	}
 
+	cfg = mergeAppearanceConfig(cfg)
 	ConfigLogPath = cfg.LogPath
 	applyColorscheme(&theme, cfg)
 	mergeThemeOverrides(&theme, cfg.Theme)

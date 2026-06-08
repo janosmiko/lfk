@@ -40,7 +40,7 @@ Column names match the table headers (case-sensitive): `Name`, `Namespace`, `Age
 | `linenumbers` / `nolinenumbers` | Line numbers |
 | `timestamps` / `notimestamps` | Timestamps |
 | `follow` / `nofollow` | Auto-scroll to tail |
-| `ansi` / `noansi` | Render ANSI SGR colors from log output. Off replaces ESC bytes with U+FFFD (see config-reference.md `log_render_ansi`). |
+| `ansi` / `noansi` | Render ANSI SGR colors from log output. Off replaces ESC bytes with U+FFFD (see config-reference.md `log_viewer.render_ansi`). |
 
 ### `:scheduler`
 

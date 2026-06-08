@@ -355,7 +355,9 @@ func (m *Model) startMultiLogStream(items []model.Item) (tea.Model, tea.Cmd) {
 	m.logView.follow = true
 	m.logView.wrap = false
 	m.logView.lineNumbers = true
-	m.logView.timestamps = false
+	m.logView.timestamps = ui.ConfigLogShowTimestamps
+	m.logView.hidePrefixes = !ui.ConfigLogShowPrefixes
+	m.logView.previewVisible = ui.ConfigLogShowPreview
 	m.logView.previous = false
 	m.logView.isMulti = true
 	m.logView.multiItems = items

@@ -346,7 +346,7 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 
 The log viewer's `/` keeps its own persistent history at `$XDG_STATE_HOME/lfk/log-search-history` (default `~/.local/state/lfk/log-search-history`), separate from the explorer's `query-history`. Log search matches raw log lines (substring/regex over arbitrary text) rather than resource names, so pooling the two would surface irrelevant entries on Up/Down in either context.
 
-Tail-first loading: Full Logs (`L` key or action menu `L`) load the last 1000 lines initially (configurable via `log_tail_lines`). Tail Logs (action menu `l`) load only the last 10 lines (configurable via `log_tail_lines_short`). Scrolling to the top loads older history.
+Tail-first loading: Full Logs (`L` key or action menu `L`) load the last 1000 lines initially (configurable via `log_viewer.tail_lines`). Tail Logs (action menu `l`) load only the last 10 lines (configurable via `log_viewer.tail_lines_short`). Scrolling to the top loads older history.
 
 Auto-reconnect across init containers: when viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — e.g. as init containers transition. The reconnect is silent. After several consecutive empty reconnects the viewer stops retrying.
 

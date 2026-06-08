@@ -237,7 +237,7 @@ func (m Model) handleDiffQuit() (tea.Model, tea.Cmd) {
 	m.diffView.cursor = 0
 	m.diffView.cursorSide = 0
 	m.diffView.lineInput = ""
-	m.diffView.wrap = false
+	m.diffView.wrap = ui.ConfigDiffViewerWrap
 	m.diffView.searchQuery = ""
 	m.diffView.searchText.Clear()
 	m.diffView.matchLines = nil

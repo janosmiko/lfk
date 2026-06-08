@@ -6,12 +6,26 @@
 # The modeline above enables autocompletion and validation in editors running
 # a YAML language server. See docs/config-reference.md for the full reference.
 
+# ─── Appearance ──────────────────────────────────────────────────────────────
+# Visual settings, grouped. The flat keys of the same name below (colorscheme,
+# icons, no_color, transparent_background, min_contrast_ratio, dim_overlay) are
+# deprecated aliases; appearance wins when both are set. The `theme` block
+# (custom color overrides) stays top-level.
+appearance:
+  colorscheme: tokyonight-storm
+  icons: auto
+  # no_color: false
+  # transparent_background: false
+  # min_contrast_ratio: 0.0
+  # dim_overlay: true
+
 # ─── Color Scheme ──────────────────────────────────────────────────────────────
 # Built-in color scheme. 460+ themes are available (generated from ghostty themes).
 # Press T in-app to browse and preview all themes interactively.
 # Popular options: tokyonight-storm (default), dracula, nord, catppuccin-mocha,
 #   rose-pine, gruvbox-dark, everforest-dark, one-half-dark, ayu-dark, nightfox
-colorscheme: tokyonight-storm
+# Deprecated flat alias — prefer appearance.colorscheme above.
+# colorscheme: tokyonight-storm
 
 # ─── Auto Dark/Light Mode ─────────────────────────────────────────────────────
 # Use Ghostty-style "dark:X,light:Y" syntax in the colorscheme field to enable
@@ -47,7 +61,8 @@ colorscheme: tokyonight-storm
 #   "emoji"    - emoji glyphs.
 #   "none"     - no icons.
 # The LFK_ICONS environment variable takes priority over this setting.
-icons: auto
+# Deprecated flat alias — prefer appearance.icons above.
+# icons: auto
 
 # ─── Mouse ────────────────────────────────────────────────────────────────────
 # Capture mouse input for click navigation, scroll, and tab switching.
@@ -113,7 +128,9 @@ icons: auto
 #       comment: accepted in system namespaces
 
 # ─── Log Path ──────────────────────────────────────────────────────────────────
-# Application log file location. Default: ~/.local/share/lfk/lfk.log
+# Application log file location (lfk's own debug log, NOT the log viewer).
+# For log viewer settings, see the "Log Viewer" section below.
+# Default: ~/.local/share/lfk/lfk.log
 log_path: /tmp/lfk.log
 
 # ─── Kubeconfig Directory ──────────────────────────────────────────────────────
@@ -131,20 +148,48 @@ log_path: /tmp/lfk.log
 #   - /team-a/configs
 #   - /team-b/configs
 
-# ─── Log Tail Lines ──────────────────────────────────────────────────────────
-# Number of log lines to load initially via --tail.
-# Scrolling to the top of the log viewer automatically fetches older history.
-# Default: 1000
-# log_tail_lines: 1000
+# ─── Log Viewer ──────────────────────────────────────────────────────────────
+# Settings for the log viewer (L key). The show_* defaults let you skip pressing
+# the toggle keys on every open. Runtime toggles: P (preview), p (prefixes),
+# s (timestamps). tail_lines / tail_lines_short / render_ansi were previously the
+# flat log_tail_lines / log_tail_lines_short / log_render_ansi keys (still
+# accepted as deprecated aliases; log_viewer wins when both are set).
+# log_viewer:
+#   tail_lines: 1000        # lines loaded initially via --tail (older history loads on scroll-up)
+#   tail_lines_short: 10    # lines loaded by the "Tail Logs" action; non-positive ignored
+#   render_ansi: true       # render ANSI colour/bold/underline; false strips them (:set ansi/noansi)
+#   show_preview: true      # structured preview side panel shown on open
+#   show_prefixes: true     # [pod/name/container] line prefixes shown on open
+#   show_timestamps: false  # log line timestamps hidden on open
 
-# ─── Log ANSI Rendering ──────────────────────────────────────────────────────
-# Render ANSI SGR escape sequences (colour, bold, underline) emitted by log
-# producers. When false, every ESC byte is replaced with U+FFFD (the original
-# safe-but-noisy behaviour). Non-SGR CSI sequences (cursor movement, screen
-# erase) are always stripped regardless — they would corrupt the viewer.
-# Toggle at runtime with `:set ansi` / `:set noansi`.
-# Default: true
-# log_render_ansi: true
+# ─── Viewer Defaults ─────────────────────────────────────────────────────────
+# Startup defaults for the fullscreen YAML / diff / describe viewers. A toggle
+# changed at runtime resets to the configured default the next time the viewer
+# opens. Runtime toggles: z (wrap, yaml/describe), Ctrl+W or > (wrap, diff),
+# # (diff line numbers), u (diff unified vs side-by-side).
+# yaml_viewer:
+#   wrap: false
+# diff_viewer:
+#   wrap: false
+#   line_numbers: true
+#   unified: false
+# describe_viewer:
+#   wrap: false
+
+# ─── Session Defaults ────────────────────────────────────────────────────────
+# Startup state for the main view. split_preview toggles the preview pane;
+# watch_mode toggles live polling; all_namespaces sets the namespace scope
+# (false starts scoped to the context's default namespace). The --namespace CLI
+# flag and per-bookmark/session scope override all_namespaces.
+# split_preview: true
+# watch_mode: true
+# all_namespaces: true
+
+# ─── Events ──────────────────────────────────────────────────────────────────
+# Startup defaults for the events view.
+# events:
+#   warnings_only: true  # show Warning events only on open
+#   grouping: true       # group related events by reason on open
 
 # ─── Dashboard ─────────────────────────────────────────────────────────────────
 # Show cluster overview dashboard when entering a context.
