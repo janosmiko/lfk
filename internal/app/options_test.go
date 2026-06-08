@@ -140,6 +140,12 @@ func TestNewModel_NoCLIOverrides(t *testing.T) {
 }
 
 func TestNewModel_LogPreviewVisibleByDefault(t *testing.T) {
+	// NewModel seeds logView.previewVisible from ui.ConfigLogShowPreview; pin it
+	// to the default so a sibling test that mutates the global can't leak in.
+	orig := ui.ConfigLogShowPreview
+	t.Cleanup(func() { ui.ConfigLogShowPreview = orig })
+	ui.ConfigLogShowPreview = true
+
 	client := newTestClientForOptions(t)
 	m := NewModel(client, StartupOptions{})
 
@@ -338,6 +344,16 @@ func TestNewModel_WatchIntervalPrecedence(t *testing.T) {
 }
 
 func TestNewModel_BasicFieldsInitialized(t *testing.T) {
+	// allNamespaces / splitPreview are seeded from config globals; pin them to
+	// their defaults so a sibling test mutating the globals can't leak in.
+	origNs, origSplit := ui.ConfigAllNamespaces, ui.ConfigSplitPreview
+	t.Cleanup(func() {
+		ui.ConfigAllNamespaces = origNs
+		ui.ConfigSplitPreview = origSplit
+	})
+	ui.ConfigAllNamespaces = true
+	ui.ConfigSplitPreview = true
+
 	client := newTestClientForOptions(t)
 
 	m := NewModel(client, StartupOptions{})
