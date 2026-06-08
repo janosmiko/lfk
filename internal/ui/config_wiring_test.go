@@ -33,6 +33,24 @@ tips: false
 log_tail_lines: 250
 log_tail_lines_short: 7
 log_render_ansi: false
+log_viewer:
+  show_preview: false
+  show_prefixes: false
+  show_timestamps: true
+yaml_viewer:
+  wrap: true
+diff_viewer:
+  wrap: true
+  line_numbers: false
+  unified: true
+describe_viewer:
+  wrap: true
+split_preview: false
+watch_mode: false
+all_namespaces: false
+events:
+  warnings_only: false
+  grouping: false
 scrolloff: 9
 confirm_on_exit: false
 dim_overlay: false
@@ -159,6 +177,19 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, 250, ConfigLogTailLines, "log_tail_lines")
 	assert.Equal(t, 7, ConfigLogTailLinesShort, "log_tail_lines_short")
 	assert.False(t, ConfigLogRenderAnsi, "log_render_ansi")
+	assert.False(t, ConfigLogShowPreview, "log_viewer.show_preview")
+	assert.False(t, ConfigLogShowPrefixes, "log_viewer.show_prefixes")
+	assert.True(t, ConfigLogShowTimestamps, "log_viewer.show_timestamps")
+	assert.True(t, ConfigYAMLViewerWrap, "yaml_viewer.wrap")
+	assert.True(t, ConfigDiffViewerWrap, "diff_viewer.wrap")
+	assert.False(t, ConfigDiffViewerLineNumbers, "diff_viewer.line_numbers")
+	assert.True(t, ConfigDiffViewerUnified, "diff_viewer.unified")
+	assert.True(t, ConfigDescribeViewerWrap, "describe_viewer.wrap")
+	assert.False(t, ConfigSplitPreview, "split_preview")
+	assert.False(t, ConfigWatchMode, "watch_mode")
+	assert.False(t, ConfigAllNamespaces, "all_namespaces")
+	assert.False(t, ConfigEventsWarningsOnly, "events.warnings_only")
+	assert.False(t, ConfigEventsGrouping, "events.grouping")
 	assert.Equal(t, 9, ConfigScrollOff, "scrolloff")
 	assert.False(t, ConfigConfirmOnExit, "confirm_on_exit")
 	assert.False(t, ConfigDimOverlay, "dim_overlay")
@@ -232,6 +263,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 // fails if a field is added (or removed) without updating this map, forcing new
 // settings to ship with a wiring test.
 var wiringCoveredFields = map[string]string{
+	"appearance":             "config_appearance_test.go (TestAppearance_*)",
 	"colorscheme":            "TestLoadConfig_AllSettingsWired + TestApplyColorscheme_*",
 	"theme":                  "TestMergeThemeOverrides (mergeThemeOverrides is the LoadConfig wiring point)",
 	"keybindings":            "TestLoadConfig_AllSettingsWired + config_keybindings_test.go",
@@ -251,7 +283,15 @@ var wiringCoveredFields = map[string]string{
 	"tips":                   "TestLoadConfig_AllSettingsWired",
 	"log_tail_lines":         "TestLoadConfig_AllSettingsWired",
 	"log_tail_lines_short":   "TestLoadConfig_AllSettingsWired",
-	"log_render_ansi":        "TestLoadConfig_AllSettingsWired",
+	"log_render_ansi":        "TestLoadConfig_AllSettingsWired (deprecated flat alias)",
+	"log_viewer":             "TestLoadConfig_AllSettingsWired + config_log_viewer_test.go (TestLogViewer_*)",
+	"yaml_viewer":            "TestLoadConfig_AllSettingsWired",
+	"diff_viewer":            "TestLoadConfig_AllSettingsWired",
+	"describe_viewer":        "TestLoadConfig_AllSettingsWired",
+	"split_preview":          "TestLoadConfig_AllSettingsWired",
+	"watch_mode":             "TestLoadConfig_AllSettingsWired",
+	"all_namespaces":         "TestLoadConfig_AllSettingsWired",
+	"events":                 "TestLoadConfig_AllSettingsWired",
 	"scrolloff":              "TestLoadConfig_AllSettingsWired",
 	"confirm_on_exit":        "TestLoadConfig_AllSettingsWired",
 	"dim_overlay":            "TestLoadConfig_AllSettingsWired",
@@ -317,6 +357,19 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origTail := ConfigLogTailLines
 	origTailShort := ConfigLogTailLinesShort
 	origAnsi := ConfigLogRenderAnsi
+	origShowPreview := ConfigLogShowPreview
+	origShowPrefixes := ConfigLogShowPrefixes
+	origShowTimestamps := ConfigLogShowTimestamps
+	origYAMLWrap := ConfigYAMLViewerWrap
+	origDiffWrap := ConfigDiffViewerWrap
+	origDiffLineNums := ConfigDiffViewerLineNumbers
+	origDiffUnified := ConfigDiffViewerUnified
+	origDescribeWrap := ConfigDescribeViewerWrap
+	origSplitPreview := ConfigSplitPreview
+	origWatchMode := ConfigWatchMode
+	origAllNamespaces := ConfigAllNamespaces
+	origEventsWarn := ConfigEventsWarningsOnly
+	origEventsGroup := ConfigEventsGrouping
 	origScrollOff := ConfigScrollOff
 	origConfirm := ConfigConfirmOnExit
 	origDim := ConfigDimOverlay
@@ -376,6 +429,19 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigLogTailLines = origTail
 		ConfigLogTailLinesShort = origTailShort
 		ConfigLogRenderAnsi = origAnsi
+		ConfigLogShowPreview = origShowPreview
+		ConfigLogShowPrefixes = origShowPrefixes
+		ConfigLogShowTimestamps = origShowTimestamps
+		ConfigYAMLViewerWrap = origYAMLWrap
+		ConfigDiffViewerWrap = origDiffWrap
+		ConfigDiffViewerLineNumbers = origDiffLineNums
+		ConfigDiffViewerUnified = origDiffUnified
+		ConfigDescribeViewerWrap = origDescribeWrap
+		ConfigSplitPreview = origSplitPreview
+		ConfigWatchMode = origWatchMode
+		ConfigAllNamespaces = origAllNamespaces
+		ConfigEventsWarningsOnly = origEventsWarn
+		ConfigEventsGrouping = origEventsGroup
 		ConfigScrollOff = origScrollOff
 		ConfigConfirmOnExit = origConfirm
 		ConfigDimOverlay = origDim

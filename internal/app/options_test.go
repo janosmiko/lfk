@@ -147,6 +147,98 @@ func TestNewModel_LogPreviewVisibleByDefault(t *testing.T) {
 		"log preview side panel should be visible by default; users can toggle off with P")
 }
 
+// TestNewModel_LogViewDefaultsFromConfig verifies the log viewer toggles
+// (preview/prefixes/timestamps) are seeded from their config globals so users
+// can set their preferred startup state (issue #377).
+func TestNewModel_LogViewDefaultsFromConfig(t *testing.T) {
+	origPreview := ui.ConfigLogShowPreview
+	origPrefixes := ui.ConfigLogShowPrefixes
+	origTimestamps := ui.ConfigLogShowTimestamps
+	t.Cleanup(func() {
+		ui.ConfigLogShowPreview = origPreview
+		ui.ConfigLogShowPrefixes = origPrefixes
+		ui.ConfigLogShowTimestamps = origTimestamps
+	})
+
+	ui.ConfigLogShowPreview = false
+	ui.ConfigLogShowPrefixes = false
+	ui.ConfigLogShowTimestamps = true
+
+	client := newTestClientForOptions(t)
+	m := NewModel(client, StartupOptions{})
+
+	assert.False(t, m.logView.previewVisible, "previewVisible should follow log_show_preview")
+	assert.True(t, m.logView.hidePrefixes, "hidePrefixes is the inverse of log_show_prefixes")
+	assert.True(t, m.logView.timestamps, "timestamps should follow log_show_timestamps")
+}
+
+// TestNewModel_ViewerDefaultsFromConfig verifies the YAML / diff / describe
+// viewer toggles are seeded from their config globals at model construction.
+func TestNewModel_ViewerDefaultsFromConfig(t *testing.T) {
+	origYAML := ui.ConfigYAMLViewerWrap
+	origDiffWrap := ui.ConfigDiffViewerWrap
+	origDiffNums := ui.ConfigDiffViewerLineNumbers
+	origDiffUnified := ui.ConfigDiffViewerUnified
+	origDescribe := ui.ConfigDescribeViewerWrap
+	t.Cleanup(func() {
+		ui.ConfigYAMLViewerWrap = origYAML
+		ui.ConfigDiffViewerWrap = origDiffWrap
+		ui.ConfigDiffViewerLineNumbers = origDiffNums
+		ui.ConfigDiffViewerUnified = origDiffUnified
+		ui.ConfigDescribeViewerWrap = origDescribe
+	})
+
+	ui.ConfigYAMLViewerWrap = true
+	ui.ConfigDiffViewerWrap = true
+	ui.ConfigDiffViewerLineNumbers = false
+	ui.ConfigDiffViewerUnified = true
+	ui.ConfigDescribeViewerWrap = true
+
+	client := newTestClientForOptions(t)
+	m := NewModel(client, StartupOptions{})
+
+	assert.True(t, m.yamlView.wrap, "yamlView.wrap follows yaml_viewer.wrap")
+	assert.True(t, m.diffView.wrap, "diffView.wrap follows diff_viewer.wrap")
+	assert.False(t, m.diffView.lineNumbers, "diffView.lineNumbers follows diff_viewer.line_numbers")
+	assert.True(t, m.diffView.unified, "diffView.unified follows diff_viewer.unified")
+	assert.True(t, m.describeView.wrap, "describeView.wrap follows describe_viewer.wrap")
+}
+
+// TestNewModel_SessionDefaultsFromConfig verifies the session-level switches
+// seed the model and its initial tab from config (no CLI overrides).
+func TestNewModel_SessionDefaultsFromConfig(t *testing.T) {
+	origSplit := ui.ConfigSplitPreview
+	origWatch := ui.ConfigWatchMode
+	origAllNs := ui.ConfigAllNamespaces
+	origWarn := ui.ConfigEventsWarningsOnly
+	origGroup := ui.ConfigEventsGrouping
+	t.Cleanup(func() {
+		ui.ConfigSplitPreview = origSplit
+		ui.ConfigWatchMode = origWatch
+		ui.ConfigAllNamespaces = origAllNs
+		ui.ConfigEventsWarningsOnly = origWarn
+		ui.ConfigEventsGrouping = origGroup
+	})
+
+	ui.ConfigSplitPreview = false
+	ui.ConfigWatchMode = false
+	ui.ConfigAllNamespaces = false
+	ui.ConfigEventsWarningsOnly = false
+	ui.ConfigEventsGrouping = false
+
+	client := newTestClientForOptions(t)
+	m := NewModel(client, StartupOptions{})
+
+	assert.False(t, m.splitPreview, "splitPreview follows split_preview")
+	assert.False(t, m.watchMode, "watchMode follows watch_mode")
+	assert.False(t, m.allNamespaces, "allNamespaces follows all_namespaces")
+	assert.False(t, m.warningEventsOnly, "warningEventsOnly follows events.warnings_only")
+	assert.False(t, m.eventGrouping, "eventGrouping follows events.grouping")
+	require.NotEmpty(t, m.tabs)
+	assert.False(t, m.tabs[0].splitPreview, "initial tab splitPreview follows config")
+	assert.False(t, m.tabs[0].watchMode, "initial tab watchMode follows config")
+}
+
 func TestNewModel_CLIOverrideSingleNamespace(t *testing.T) {
 	client := newTestClientForOptions(t)
 

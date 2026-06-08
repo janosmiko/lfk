@@ -3,6 +3,7 @@ package app
 import (
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func (m Model) restoreSession(contexts []model.Item) (tea.Model, tea.Cmd) {
@@ -188,10 +189,10 @@ func buildSessionTabState(st *SessionTab, discovered []model.ResourceTypeEntry) 
 		nav: model.NavigationState{
 			Context: st.Context,
 		},
-		splitPreview:      true,
-		watchMode:         true,
-		warningEventsOnly: true,
-		eventGrouping:     true,
+		splitPreview:      ui.ConfigSplitPreview,
+		watchMode:         ui.ConfigWatchMode,
+		warningEventsOnly: ui.ConfigEventsWarningsOnly,
+		eventGrouping:     ui.ConfigEventsGrouping,
 		allGroupsExpanded: true,
 		cursorMemory:      make(map[string]int),
 		filterMemory:      make(map[string]savedFilter),

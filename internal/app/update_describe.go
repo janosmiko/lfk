@@ -173,7 +173,7 @@ func (m Model) handleDescribeQuit() (tea.Model, tea.Cmd) {
 	m.describeView.scroll = 0
 	m.describeView.cursor = 0
 	m.describeView.cursorCol = 0
-	m.describeView.wrap = false
+	m.describeView.wrap = ui.ConfigDescribeViewerWrap
 	m.describeView.autoRefresh = false
 	m.describeView.refreshFunc = nil
 	m.describeView.visualMode = 0

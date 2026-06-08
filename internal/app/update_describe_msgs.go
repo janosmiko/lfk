@@ -2,6 +2,8 @@ package app
 
 import (
 	tea "github.com/charmbracelet/bubbletea"
+
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 func (m Model) updateDescribeLoaded(msg describeLoadedMsg) (tea.Model, tea.Cmd) {
@@ -59,7 +61,7 @@ func (m Model) updateDiffLoaded(msg diffLoadedMsg) (tea.Model, tea.Cmd) {
 	m.diffView.leftName = msg.leftName
 	m.diffView.rightName = msg.rightName
 	m.diffView.scroll = 0
-	m.diffView.unified = false
+	m.diffView.unified = ui.ConfigDiffViewerUnified
 	return m, nil
 }
 
