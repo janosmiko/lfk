@@ -100,7 +100,7 @@ func TestSecurityFindingsCacheMissReturnsNil(t *testing.T) {
 // TestSecurityFindingsCacheZeroFindingsRoundTrip verifies a clean scan with
 // zero findings is a real cached result (non-nil), not indistinguishable from
 // a miss — nil must normalize to an empty slice on save so it survives the
-// YAML null round-trip.
+// JSON null round-trip.
 func TestSecurityFindingsCacheZeroFindingsRoundTrip(t *testing.T) {
 	t.Setenv("KUBECACHEDIR", t.TempDir())
 	host := "https://api.example.test:6443"

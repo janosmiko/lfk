@@ -5,6 +5,8 @@
 package app
 
 import (
+	"runtime/debug"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/security"
@@ -136,6 +138,15 @@ func (m *Model) securityFindingsSeedCmd(resolvedCtx, namespace string) tea.Cmd {
 		return nil
 	}
 	return func() tea.Msg {
+		// Reading a large cache file tokenizes the whole thing, briefly
+		// allocating well beyond the live retained index — even on a TTL miss,
+		// where nothing is returned. Hand those transient pages back to the OS
+		// now rather than waiting on the slow background scavenger (issue #387).
+		// Deferred so it covers both the miss and hit paths; runs off the Update
+		// goroutine, so the GC pause is invisible to the UI.
+		if securityFindingsCacheFileSizeForContext(client, resolvedCtx) > securityFindingsCacheReleaseThreshold {
+			defer debug.FreeOSMemory()
+		}
 		cached := loadSecurityFindingsCacheForContext(client, resolvedCtx, namespace, securityFindingsCacheTTL)
 		if cached == nil {
 			return nil
