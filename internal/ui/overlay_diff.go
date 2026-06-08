@@ -123,9 +123,12 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		gutterWidth = len(fmt.Sprintf("%d", len(rawDiffLines))) + 1 // digits + space
 	}
 
-	// Calculate column widths: split the available content area in half with a separator.
-	// -1 for cursor gutter (> or space).
-	colWidth := max((width-8-gutterWidth*2)/2, 10)
+	// Calculate column widths: split the available content area in half with a
+	// separator. Budget per row = border+padding (4) + two cursor indicators
+	// (2) + " | " separator (3) = 9, plus a line-number gutter on each side.
+	// Under-budgeting here lets a fully-filled wrapped row exceed the border
+	// width, which makes lipgloss re-wrap it and shears the two columns apart.
+	colWidth := max((width-9-gutterWidth*2)/2, 10)
 
 	// Build header.
 	gutterPad := strings.Repeat(" ", gutterWidth)
@@ -146,141 +149,15 @@ func RenderDiffView(left, right, leftName, rightName string, scroll, width, heig
 		scroll = 0
 	}
 
-	// Visible slice.
-	visible := visLines[scroll:]
-	if len(visible) > maxLines {
-		visible = visible[:maxLines]
-	}
-
-	// Track left/right line numbers independently by counting from the start.
-	leftNum, rightNum := 1, 1
-	for i := 0; i < len(visLines) && i < scroll; i++ {
-		vl := visLines[i]
-		if vl.IsFoldPlaceholder || vl.Original < 0 {
-			continue
-		}
-		switch rawDiffLines[vl.Original].status {
-		case '=':
-			leftNum++
-			rightNum++
-		case '<':
-			leftNum++
-		case '>':
-			rightNum++
-		}
-	}
-
 	cursorStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
 
-	// Precompute visual selection range.
-	selStart, selEnd := -1, -1
-	if vp.VisualMode {
-		selStart = min(vp.VisualStart, cursor)
-		selEnd = max(vp.VisualStart, cursor)
-	}
-
-	rows := make([]string, 0, len(visible))
-	for ri, vl := range visible {
-		visIdx := ri + scroll
-		isCursorLine := visIdx == cursor
-
-		// Show cursor indicator on the active side.
-		leftCursorInd := " "
-		rightCursorInd := " "
-		if isCursorLine {
-			if vp.CursorSide == 0 {
-				leftCursorInd = cursorStyle.Render(">")
-			} else {
-				rightCursorInd = cursorStyle.Render(">")
-			}
-		}
-
-		if vl.IsFoldPlaceholder {
-			placeholder := DiffFoldPlaceholderText(vl.HiddenCount)
-			gutterPadL := strings.Repeat(" ", gutterWidth)
-			leftPlaceholder := padToWidth(placeholder, colWidth)
-			rightPlaceholder := padToWidth(placeholder, colWidth)
-			row := leftCursorInd + gutterPadL + leftPlaceholder + separatorStyle.Render(" | ") + rightCursorInd + gutterPadL + rightPlaceholder
-			rows = append(rows, row)
-			continue
-		}
-		dl := rawDiffLines[vl.Original]
-
-		isSelected := vp.VisualMode && visIdx >= selStart && visIdx <= selEnd
-
-		var leftCol, rightCol, leftGutter, rightGutter string
-		switch dl.status {
-		case '=':
-			var leftText, rightText string
-			// Apply visual selection on the active side.
-			if isSelected {
-				leftText, rightText = applyDiffVisualSelection(dl.left, dl.right, vp, visIdx, selStart, selEnd, colWidth)
-			} else {
-				if searchQuery != "" {
-					leftText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery))
-					rightText = normalStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery))
-				} else {
-					leftText = normalStyle.Render(truncateToWidth(dl.left, colWidth))
-					rightText = normalStyle.Render(truncateToWidth(dl.right, colWidth))
-				}
-			}
-			// Block cursor on cursor line (non-visual mode).
-			if isCursorLine && !vp.VisualMode {
-				if vp.CursorSide == 0 {
-					leftText = RenderCursorAtCol(leftText, dl.left, vp.CursorCol)
-				} else {
-					rightText = RenderCursorAtCol(rightText, dl.right, vp.CursorCol)
-				}
-			}
-			leftCol = leftText
-			rightCol = rightText
-			if lineNumbers {
-				leftGutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, leftNum))
-				rightGutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, rightNum))
-			}
-			leftNum++
-			rightNum++
-		case '<':
-			var leftText string
-			if isSelected && vp.CursorSide == 0 {
-				leftText = applyDiffVisualSide(dl.left, vp, visIdx, selStart, selEnd)
-			} else if searchQuery != "" {
-				leftText = removedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.left, colWidth), searchQuery))
-			} else {
-				leftText = removedStyle.Render(truncateToWidth(dl.left, colWidth))
-			}
-			if isCursorLine && !vp.VisualMode && vp.CursorSide == 0 {
-				leftText = RenderCursorAtCol(leftText, dl.left, vp.CursorCol)
-			}
-			leftCol = leftText
-			rightCol = ""
-			if lineNumbers {
-				leftGutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, leftNum))
-				rightGutter = strings.Repeat(" ", gutterWidth)
-			}
-			leftNum++
-		case '>':
-			var rightText string
-			if isSelected && vp.CursorSide == 1 {
-				rightText = applyDiffVisualSide(dl.right, vp, visIdx, selStart, selEnd)
-			} else if searchQuery != "" {
-				rightText = addedStyle.Render(highlightDiffSearchInLine(truncateToWidth(dl.right, colWidth), searchQuery))
-			} else {
-				rightText = addedStyle.Render(truncateToWidth(dl.right, colWidth))
-			}
-			if isCursorLine && !vp.VisualMode && vp.CursorSide == 1 {
-				rightText = RenderCursorAtCol(rightText, dl.right, vp.CursorCol)
-			}
-			leftCol = ""
-			rightCol = rightText
-			if lineNumbers {
-				leftGutter = strings.Repeat(" ", gutterWidth)
-				rightGutter = DimStyle.Render(fmt.Sprintf("%*d ", gutterWidth-1, rightNum))
-			}
-			rightNum++
-		}
-		row := leftCursorInd + leftGutter + padToWidth(leftCol, colWidth) + separatorStyle.Render(" | ") + rightCursorInd + rightGutter + padToWidth(rightCol, colWidth)
-		rows = append(rows, row)
+	var rows []string
+	if wrap {
+		// Wrap mode: long values wrap within their column instead of truncating.
+		st := diffSideStyles{removed: removedStyle, added: addedStyle, normal: normalStyle, cursor: cursorStyle, separator: separatorStyle}
+		rows = buildWrappedDiffRows(rawDiffLines, visLines, scroll, maxLines, colWidth, gutterWidth, lineNumbers, searchQuery, cursor, vp.CursorSide, st)
+	} else {
+		rows = buildSideBySideRows(rawDiffLines, visLines, scroll, maxLines, colWidth, gutterWidth, lineNumbers, searchQuery, cursor, vp, normalStyle, removedStyle, addedStyle, cursorStyle, separatorStyle)
 	}
 
 	// Pad rows to fill available height so content fills the border.
@@ -382,6 +259,12 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 		gutterWidth = len(fmt.Sprintf("%d", len(rawDiffLines)+2)) + 1 // +2 for header lines
 	}
 
+	// Content width = border(2) + padding(2) + leading indicator(1) + gutter.
+	// Lines are truncated (non-wrap) or wrapped (wrap) to this width so the
+	// border never has to wrap them itself.
+	contentWidth := max(width-5-gutterWidth, 10)
+	uStyles := diffUnifiedStyles{removed: removedStyle, added: addedStyle, normal: normalStyle}
+
 	// Precompute visual selection range.
 	selStart, selEnd := -1, -1
 	if vp.VisualMode {
@@ -414,55 +297,23 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 
 		isSelected := vp.VisualMode && vi >= selStart && vi <= selEnd
 		isCursorLine := vi == cursor
-		// Get the plain content for this line (without +/- prefix).
-		var plainContent string
-		if dl.left != "" {
-			plainContent = dl.left
-		} else {
-			plainContent = dl.right
-		}
 
-		switch dl.status {
-		case '=':
-			content := " " + dl.left
-			if isSelected {
-				content = applyDiffVisualSide(content, vp, vi, selStart, selEnd)
-			} else if searchQuery != "" {
-				content = normalStyle.Render(highlightDiffSearchInLine(content, searchQuery))
-			} else {
-				content = normalStyle.Render(content)
-			}
-			if isCursorLine && !vp.VisualMode {
-				content = RenderCursorAtCol(content, " "+plainContent, vp.CursorCol)
-			}
-			lines = append(lines, unifiedLine{text: gutter + content, plain: " " + plainContent, visIdx: vi})
-		case '<':
-			content := "-" + dl.left
-			if isSelected {
-				content = applyDiffVisualSide(content, vp, vi, selStart, selEnd)
-			} else if searchQuery != "" {
-				content = removedStyle.Render(highlightDiffSearchInLine(content, searchQuery))
-			} else {
-				content = removedStyle.Render(content)
-			}
-			if isCursorLine && !vp.VisualMode {
-				content = RenderCursorAtCol(content, "-"+plainContent, vp.CursorCol)
-			}
-			lines = append(lines, unifiedLine{text: gutter + content, plain: "-" + plainContent, visIdx: vi})
-		case '>':
-			content := "+" + dl.right
-			if isSelected {
-				content = applyDiffVisualSide(content, vp, vi, selStart, selEnd)
-			} else if searchQuery != "" {
-				content = addedStyle.Render(highlightDiffSearchInLine(content, searchQuery))
-			} else {
-				content = addedStyle.Render(content)
-			}
-			if isCursorLine && !vp.VisualMode {
-				content = RenderCursorAtCol(content, "+"+plainContent, vp.CursorCol)
-			}
-			lines = append(lines, unifiedLine{text: gutter + content, plain: "+" + plainContent, visIdx: vi})
+		// Truncate to the content width so the border never re-wraps the line.
+		prefix, text, style := unifiedLineParts(dl, uStyles)
+		plain := truncateToWidth(prefix+text, contentWidth)
+		var content string
+		switch {
+		case isSelected:
+			content = applyDiffVisualSide(plain, vp, vi, selStart, selEnd)
+		case searchQuery != "":
+			content = style.Render(highlightDiffSearchInLine(plain, searchQuery))
+		default:
+			content = style.Render(plain)
 		}
+		if isCursorLine && !vp.VisualMode {
+			content = RenderCursorAtCol(content, plain, vp.CursorCol)
+		}
+		lines = append(lines, unifiedLine{text: gutter + content, plain: plain, visIdx: vi})
 	}
 
 	titleText := "Resource Diff (unified)"
@@ -500,34 +351,41 @@ func RenderUnifiedDiffView(left, right, leftName, rightName string, scroll, widt
 
 	// Content area = maxLines minus header lines.
 	contentMaxLines := max(maxLines-len(headerLines), 1)
-
-	// Clamp scroll on content lines only.
 	totalContent := len(contentLines)
-	maxScroll := max(totalContent-contentMaxLines, 0)
-	if scroll > maxScroll {
-		scroll = maxScroll
-	}
-	if scroll < 0 {
-		scroll = 0
-	}
 
-	// Visible content slice.
-	visibleContent := contentLines[scroll:]
-	if len(visibleContent) > contentMaxLines {
-		visibleContent = visibleContent[:contentMaxLines]
-	}
+	cursorStyleU := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
 
 	// Build rendered lines: headers first, then scrollable content.
-	cursorStyleU := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
 	var rendered []string
 	for _, hl := range headerLines {
 		rendered = append(rendered, " "+hl.text)
 	}
-	for _, ul := range visibleContent {
-		if ul.visIdx == cursor {
-			rendered = append(rendered, cursorStyleU.Render(">")+ul.text)
-		} else {
-			rendered = append(rendered, " "+ul.text)
+
+	var maxScroll int
+	if wrap {
+		// Wrap mode clamps per logical line, not per page: one diff line can
+		// expand to several visual rows, so page-fill clamping (which mixes a
+		// visual-row count with a logical-line count) doesn't apply. Scroll
+		// indexes whole content lines, matching the cursor model, and stops at
+		// the last line so it stays reachable.
+		maxScroll = max(totalContent-1, 0)
+		scroll = min(max(scroll, 0), maxScroll)
+		rendered = append(rendered, buildWrappedUnifiedRows(rawDiffLines, visLines, scroll, contentMaxLines, contentWidth, gutterWidth, lineNumbers, searchQuery, cursor, uStyles, cursorStyleU)...)
+	} else {
+		// Non-wrap: one row per line, so clamp to keep the last page full.
+		maxScroll = max(totalContent-contentMaxLines, 0)
+		scroll = min(max(scroll, 0), maxScroll)
+
+		visibleContent := contentLines[scroll:]
+		if len(visibleContent) > contentMaxLines {
+			visibleContent = visibleContent[:contentMaxLines]
+		}
+		for _, ul := range visibleContent {
+			if ul.visIdx == cursor {
+				rendered = append(rendered, cursorStyleU.Render(">")+ul.text)
+			} else {
+				rendered = append(rendered, " "+ul.text)
+			}
 		}
 	}
 
