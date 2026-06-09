@@ -162,6 +162,7 @@ log_path: /tmp/lfk.log
 #   show_preview: true      # structured preview side panel shown on open
 #   show_prefixes: true     # [pod/name/container] line prefixes shown on open
 #   show_timestamps: false  # log line timestamps hidden on open
+#   max_lines: 50000        # max retained log lines per tab (oldest dropped); clamped [1000, 1000000]
 
 # ─── Viewer Defaults ─────────────────────────────────────────────────────────
 # Startup defaults for the fullscreen YAML / diff / describe viewers. A toggle

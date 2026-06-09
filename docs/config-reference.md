@@ -149,6 +149,7 @@ log_viewer:
 | `show_preview` | bool | `true` | Startup default for the structured preview side panel. Runtime toggle: `toggle_preview` (`P`). |
 | `show_prefixes` | bool | `true` | Startup default for the `[pod/name/container]` line prefixes. Runtime toggle: `toggle_prefixes` (`p`). |
 | `show_timestamps` | bool | `false` | Startup default for log line timestamps. Runtime toggle: `toggle_timestamps` (`s`). |
+| `max_lines` | int | `50000` | Max streamed log lines retained per tab; once exceeded, the oldest lines are dropped so a long-running follow stays bounded in memory. Clamped to `[1000, 1000000]`. |
 
 The deprecated flat keys `log_tail_lines`, `log_tail_lines_short`, and `log_render_ansi` are still accepted as aliases; when both a flat key and its `log_viewer` equivalent are set, `log_viewer` wins.
 

@@ -70,6 +70,17 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 			if m.tabs[i].logCh == msg.ch {
 				if !msg.done {
 					m.tabs[i].logLines = append(m.tabs[i].logLines, msg.line)
+					// Bound the background tab's buffer; shift its saved
+					// offsets so restoring the tab lands on the same content.
+					if trimmed, drop := capLogLines(m.tabs[i].logLines); drop > 0 {
+						m.tabs[i].logLines = trimmed
+						m.tabs[i].logScroll = shiftLogOffset(m.tabs[i].logScroll, drop)
+						m.tabs[i].logCursor = shiftLogOffset(m.tabs[i].logCursor, drop)
+						m.tabs[i].logVisualStart = shiftLogOffset(m.tabs[i].logVisualStart, drop)
+						// scroll now points at a different source line; the
+						// old sub-line skip no longer applies.
+						m.tabs[i].logWrapTopSkip = 0
+					}
 					// Continue draining: re-issue waitForLogLine for that channel.
 					ch := msg.ch
 					return m, func() tea.Msg {
@@ -105,6 +116,18 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 		m.logView.autoReconnectAttempt = 0
 	}
 	m.logView.lines = append(m.logView.lines, msg.line)
+	// Bound the live buffer so a long-running follow doesn't grow memory
+	// without limit (issue #387). Shift absolute offsets back by the number
+	// of dropped lines; in follow mode they're recomputed just below.
+	if trimmed, drop := capLogLines(m.logView.lines); drop > 0 {
+		m.logView.lines = trimmed
+		m.logView.scroll = shiftLogOffset(m.logView.scroll, drop)
+		m.logView.cursor = shiftLogOffset(m.logView.cursor, drop)
+		m.logView.visualStart = shiftLogOffset(m.logView.visualStart, drop)
+		// scroll now points at a different source line; the old sub-line
+		// skip no longer applies (follow mode recomputes it just below).
+		m.logView.wrapTopSkip = 0
+	}
 	if m.logView.follow {
 		m.logView.scroll, m.logView.wrapTopSkip = m.logMaxScrollAndSkip()
 		m.logView.cursor = len(m.logView.lines) - 1
