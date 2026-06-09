@@ -10,6 +10,19 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// cursorToField moves the Object Explorer cursor onto the field with the given
+// key at the current level, so tests stay robust to benign field-order changes.
+func cursorToField(t *testing.T, m *Model, key string) {
+	t.Helper()
+	for i, f := range m.objectExplorerView.level {
+		if f.Key == key {
+			m.objectExplorerView.cursor = i
+			return
+		}
+	}
+	t.Fatalf("field %q not found at current level", key)
+}
+
 // phasePreview returns the Preview of the "phase" field at the current level, or
 // "" when absent.
 func phasePreview(m Model) string {
@@ -39,7 +52,7 @@ func TestObjectExplorer_LiveRefreshOnResourceUpdate(t *testing.T) {
 	m = result.(Model)
 
 	// Drill into status so we exercise drill-path preservation across refresh.
-	m.objectExplorerView.cursor = 3 // status
+	cursorToField(t, &m, "status")
 	m = pressTree(m, key("l"))
 	require.Equal(t, []string{"status"}, m.objectExplorerView.path)
 	require.Equal(t, "Running", rootStatusPhase(t, m))
@@ -63,7 +76,7 @@ func TestObjectExplorer_LiveRefreshWithActiveFilter(t *testing.T) {
 	m := objectExplorerModel(t)
 	result, _ := m.openObjectExplorer()
 	m = result.(Model)
-	m.objectExplorerView.cursor = 3 // status
+	cursorToField(t, &m, "status")
 	m = pressTree(m, key("l"))
 	require.Equal(t, []string{"status"}, m.objectExplorerView.path)
 
@@ -91,15 +104,11 @@ func TestObjectExplorer_LiveRefreshTrimsVanishedPath(t *testing.T) {
 	m = result.(Model)
 
 	// Drill status -> steps -> [1] (the "deploy" element).
-	m.objectExplorerView.cursor = 3 // status
+	cursorToField(t, &m, "status")
 	m = pressTree(m, key("l"))
-	for i, f := range m.objectExplorerView.level {
-		if f.Key == "steps" {
-			m.objectExplorerView.cursor = i
-		}
-	}
+	cursorToField(t, &m, "steps")
 	m = pressTree(m, key("l"))
-	m.objectExplorerView.cursor = 1 // [1]
+	cursorToField(t, &m, "[1]")
 	m = pressTree(m, key("l"))
 	require.Equal(t, []string{"status", "steps", "[1]"}, m.objectExplorerView.path)
 
@@ -122,7 +131,7 @@ func TestObjectExplorer_PausedIgnoresRefresh(t *testing.T) {
 	m := objectExplorerModel(t)
 	result, _ := m.openObjectExplorer()
 	m = result.(Model)
-	m.objectExplorerView.cursor = 3 // status
+	cursorToField(t, &m, "status")
 	m = pressTree(m, key("l"))
 
 	// Pause live refresh (w).
@@ -144,7 +153,7 @@ func TestObjectExplorer_ManualRefreshWhilePaused(t *testing.T) {
 	m := objectExplorerModel(t)
 	result, _ := m.openObjectExplorer()
 	m = result.(Model)
-	m.objectExplorerView.cursor = 3 // status
+	cursorToField(t, &m, "status")
 	m = pressTree(m, key("l"))
 	m.objectExplorerLive = false // paused
 
