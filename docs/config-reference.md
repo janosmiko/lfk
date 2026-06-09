@@ -40,6 +40,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `yaml_viewer` | object | *(see Viewer Defaults)* | YAML viewer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `diff_viewer` | object | *(see Viewer Defaults)* | Diff viewer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `describe_viewer` | object | *(see Viewer Defaults)* | Describe viewer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
+| `object_explorer` | object | *(see Viewer Defaults)* | Object Explorer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `split_preview` | bool | `true` | Startup default for the split preview pane. Set to `false` to start with it hidden. |
 | `watch_mode` | bool | `true` | Startup default for live watch/polling. Set to `false` to start with manual refresh. |
 | `all_namespaces` | bool | `true` | Startup namespace scope: `true` shows all namespaces, `false` scopes to the context's default namespace. The `--namespace` CLI flag and per-bookmark/session scope override this. |
@@ -166,6 +167,8 @@ diff_viewer:
   unified: false
 describe_viewer:
   wrap: false
+object_explorer:
+  live: true
 ```
 
 | Field | Type | Default | Runtime toggle | Description |
@@ -175,6 +178,7 @@ describe_viewer:
 | `diff_viewer.line_numbers` | bool | `true` | `toggle_line_numbers` (`#`) | Gutter line numbers in the diff viewer. |
 | `diff_viewer.unified` | bool | `false` | `toggle_unified` (`u`) | Unified (vs side-by-side) diff layout. |
 | `describe_viewer.wrap` | bool | `false` | `toggle_wrap` (`>`) | Line wrapping in the describe viewer. |
+| `object_explorer.live` | bool | `true` | `watch_mode` (`w`) | Live-refresh the browsed object as the resource changes under watch mode. Manual refresh with `refresh` (`R`). |
 
 A toggle changed at runtime sticks for the session and resets to the configured default the next time the viewer opens.
 

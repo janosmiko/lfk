@@ -199,6 +199,14 @@ type Model struct {
 	watchMode     bool
 	watchInterval time.Duration
 
+	// objectExplorerLive controls whether the Object Explorer re-syncs its
+	// browsed object on list refreshes (issue #391). Defaults from
+	// ui.ConfigObjectExplorerLive; runtime toggle is w inside the explorer.
+	// objectExplorerForceSync forces a single re-sync on the next list refresh
+	// even when live is off, so manual refresh (R) updates the view once.
+	objectExplorerLive      bool
+	objectExplorerForceSync bool
+
 	// Read-only mode: blocks all mutating actions for the active tab. Mirrors
 	// the active TabState.readOnly; re-evaluated on context switch and tab
 	// switch.

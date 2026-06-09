@@ -95,7 +95,7 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
 - **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser
-- **Object Explorer** for drilling into the selected resource's live object (`O` key); arrays expand into indexed elements, so recursive status trees (e.g. `.status.steps[].steps[]`) are walkable
+- **Object Explorer** for drilling into the selected resource's live object (`O` key); arrays expand into indexed elements, so recursive status trees (e.g. `.status.steps[].steps[]`) are walkable; live-refreshes under watch mode (`w` to pause, `R` to refresh manually)
 - **Namespace selector** overlay with type-to-filter
 - **All-namespaces mode** (enabled by default)
 - **Local cluster management** — create, list, and delete `kind` clusters; create, list, start, stop, and delete `k3d` and `minikube` clusters (kind has no native start/stop) from inside lfk via the `Ctrl+N` manager overlay.

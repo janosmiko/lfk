@@ -300,6 +300,9 @@ func applyViewerDefaults(cfg configFile) {
 	if dv := cfg.DescribeViewer; dv != nil {
 		applyBoolPtr(dv.Wrap, &ConfigDescribeViewerWrap)
 	}
+	if oe := cfg.ObjectExplorer; oe != nil {
+		applyBoolPtr(oe.Live, &ConfigObjectExplorerLive)
+	}
 }
 
 // applySessionDefaults wires the session-level startup defaults (split preview,

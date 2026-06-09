@@ -455,6 +455,7 @@ func basePush80Model() Model {
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
 		reqCtx:              context.Background(),
+		objectExplorerLive:  true, // production default (ui.ConfigObjectExplorerLive)
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
@@ -491,6 +492,7 @@ func basePush80v2Model() Model {
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
 		reqCtx:              context.Background(),
+		objectExplorerLive:  true, // production default (ui.ConfigObjectExplorerLive)
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),
@@ -527,6 +529,7 @@ func basePush80v3Model() Model {
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
 		reqCtx:              context.Background(),
+		objectExplorerLive:  true, // production default (ui.ConfigObjectExplorerLive)
 	}
 	m.client = k8s.NewTestClient(
 		fake.NewClientset(),

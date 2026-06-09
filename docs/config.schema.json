@@ -145,6 +145,11 @@
       "description": "Describe viewer startup-toggle defaults.",
       "$ref": "#/definitions/describeViewerConfig"
     },
+    "object_explorer": {
+      "type": ["object", "null"],
+      "description": "Object Explorer startup-toggle defaults.",
+      "$ref": "#/definitions/objectExplorerConfig"
+    },
     "split_preview": {
       "type": "boolean",
       "description": "Startup default for the split preview pane. Set false to start with the pane hidden.",
@@ -646,6 +651,18 @@
           "type": "boolean",
           "description": "Startup default for line wrapping (runtime toggle: z).",
           "default": false
+        }
+      }
+    },
+    "objectExplorerConfig": {
+      "type": "object",
+      "description": "Object Explorer settings. All fields optional; missing keys keep compiled defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "live": {
+          "type": "boolean",
+          "description": "Startup default for live-refreshing the browsed object as the resource changes under watch mode (runtime toggle: w).",
+          "default": true
         }
       }
     },

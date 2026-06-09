@@ -177,6 +177,8 @@ log_path: /tmp/lfk.log
 #   unified: false
 # describe_viewer:
 #   wrap: false
+# object_explorer:
+#   live: true   # live-refresh the browsed object under watch mode (toggle: w)
 
 # ─── Session Defaults ────────────────────────────────────────────────────────
 # Startup state for the main view. split_preview toggles the preview pane;

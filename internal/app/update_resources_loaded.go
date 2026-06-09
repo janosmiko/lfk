@@ -521,6 +521,7 @@ func (m Model) updateResourcesLoadedMain(msg resourcesLoadedMsg) (tea.Model, tea
 		cmds = append(cmds, m.loadNodeMetricsForList())
 	}
 	m.suppressBgtasks = savedSuppress
+	m.syncObjectExplorerLive()
 	return m, tea.Batch(cmds...)
 }
 
