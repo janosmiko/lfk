@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.14.2](https://github.com/janosmiko/lfk/compare/v0.14.1...v0.14.2) (2026-06-09)
+
+
+### Bug Fixes
+
+* live-refresh the Object Explorer ([#391](https://github.com/janosmiko/lfk/issues/391)) ([#394](https://github.com/janosmiko/lfk/issues/394)) ([7e64bca](https://github.com/janosmiko/lfk/commit/7e64bca3bb204e60500197fd5fd26ae5cd881c67))
+* **logs:** bound live log buffer to stop unbounded memory growth ([#387](https://github.com/janosmiko/lfk/issues/387)) ([#392](https://github.com/janosmiko/lfk/issues/392)) ([a96ac1c](https://github.com/janosmiko/lfk/commit/a96ac1c4214ed601cd54da8f37ad006e674d6f31))
+
 ## [0.14.1](https://github.com/janosmiko/lfk/compare/v0.14.0...v0.14.1) (2026-06-08)
 
 
