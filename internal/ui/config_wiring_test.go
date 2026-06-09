@@ -46,6 +46,8 @@ diff_viewer:
   unified: true
 describe_viewer:
   wrap: true
+object_explorer:
+  live: false
 split_preview: false
 watch_mode: false
 all_namespaces: false
@@ -187,6 +189,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.False(t, ConfigDiffViewerLineNumbers, "diff_viewer.line_numbers")
 	assert.True(t, ConfigDiffViewerUnified, "diff_viewer.unified")
 	assert.True(t, ConfigDescribeViewerWrap, "describe_viewer.wrap")
+	assert.False(t, ConfigObjectExplorerLive, "object_explorer.live")
 	assert.False(t, ConfigSplitPreview, "split_preview")
 	assert.False(t, ConfigWatchMode, "watch_mode")
 	assert.False(t, ConfigAllNamespaces, "all_namespaces")
@@ -290,6 +293,7 @@ var wiringCoveredFields = map[string]string{
 	"yaml_viewer":            "TestLoadConfig_AllSettingsWired",
 	"diff_viewer":            "TestLoadConfig_AllSettingsWired",
 	"describe_viewer":        "TestLoadConfig_AllSettingsWired",
+	"object_explorer":        "TestLoadConfig_AllSettingsWired",
 	"split_preview":          "TestLoadConfig_AllSettingsWired",
 	"watch_mode":             "TestLoadConfig_AllSettingsWired",
 	"all_namespaces":         "TestLoadConfig_AllSettingsWired",
@@ -368,6 +372,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origDiffLineNums := ConfigDiffViewerLineNumbers
 	origDiffUnified := ConfigDiffViewerUnified
 	origDescribeWrap := ConfigDescribeViewerWrap
+	origObjectExplorerLive := ConfigObjectExplorerLive
 	origSplitPreview := ConfigSplitPreview
 	origWatchMode := ConfigWatchMode
 	origAllNamespaces := ConfigAllNamespaces
@@ -441,6 +446,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigDiffViewerLineNumbers = origDiffLineNums
 		ConfigDiffViewerUnified = origDiffUnified
 		ConfigDescribeViewerWrap = origDescribeWrap
+		ConfigObjectExplorerLive = origObjectExplorerLive
 		ConfigSplitPreview = origSplitPreview
 		ConfigWatchMode = origWatchMode
 		ConfigAllNamespaces = origAllNamespaces

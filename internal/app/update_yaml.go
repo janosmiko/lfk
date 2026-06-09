@@ -127,6 +127,18 @@ func (m Model) handleYAMLNormalCopy() (tea.Model, tea.Cmd) {
 	return m, tea.Batch(copyToSystemClipboard(strings.Join(parts, "\n")), scheduleStatusClear())
 }
 
+// handleYAMLRefresh re-fetches the resource and replaces the viewer content in
+// place. Scroll, cursor, and fold state are preserved (updateYamlLoaded only
+// swaps content/sections), so a manual refresh doesn't lose the user's spot.
+func (m Model) handleYAMLRefresh() (tea.Model, tea.Cmd) {
+	cmd := m.loadYAML()
+	if cmd == nil {
+		return m, nil
+	}
+	m.setStatusMessage("Refreshing YAML…", false)
+	return m, tea.Batch(cmd, scheduleStatusClear())
+}
+
 // handleYAMLNormalWordMotion applies a w/b/e/W/B/E motion N times, where N is
 // the digit-prefix count (defaulting to 1). Each iteration mutates m via the
 // pointer-receiver step so the loop avoids per-iteration Model copies — only
@@ -182,6 +194,8 @@ func (m Model) handleYAMLNormalKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleYAMLKeyCtrlE()
 	case "y":
 		return m.handleYAMLNormalCopy()
+	case kb.Refresh:
+		return m.handleYAMLRefresh()
 	case kb.ToggleWrap:
 		m.yamlView.wrap = !m.yamlView.wrap
 		return m, nil

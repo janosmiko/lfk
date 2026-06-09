@@ -103,6 +103,8 @@ type configFile struct {
 	DiffViewer *DiffViewerConfig `json:"diff_viewer" yaml:"diff_viewer"`
 	// DescribeViewer holds startup-default toggles for the describe viewer.
 	DescribeViewer *DescribeViewerConfig `json:"describe_viewer" yaml:"describe_viewer"`
+	// ObjectExplorer holds startup-default toggles for the Object Explorer.
+	ObjectExplorer *ObjectExplorerConfig `json:"object_explorer" yaml:"object_explorer"`
 	// SplitPreview is the startup default for the split preview pane (runtime
 	// toggle from the explorer). Default true (pane shown).
 	SplitPreview *bool `json:"split_preview" yaml:"split_preview"`
@@ -344,6 +346,13 @@ type DiffViewerConfig struct {
 type DescribeViewerConfig struct {
 	// Wrap: startup default for line wrapping (toggle: z). Default false.
 	Wrap *bool `json:"wrap" yaml:"wrap"`
+}
+
+// ObjectExplorerConfig is the on-disk schema for the object_explorer section.
+type ObjectExplorerConfig struct {
+	// Live: startup default for live-refreshing the browsed object as the
+	// resource changes under watch mode (runtime toggle: w). Default true.
+	Live *bool `json:"live" yaml:"live"`
 }
 
 // AppearanceConfig is the on-disk schema for the appearance section. Every

@@ -430,6 +430,7 @@ func (m *Model) saveCurrentTab() {
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
 	t.watchMode = m.watchMode
+	t.objectExplorerLive = m.objectExplorerLive
 	t.readOnly = m.readOnly
 	t.requestGen = m.requestGen
 	t.selectedItems = copyMapStringBool(m.selectedItems)
@@ -547,6 +548,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.sortAscending = t.sortAscending
 	m.filterText = t.filterText
 	m.watchMode = t.watchMode
+	m.objectExplorerLive = t.objectExplorerLive
 	m.readOnly = t.readOnly
 	m.requestGen = t.requestGen
 	m.selectedItems = copyMapStringBool(t.selectedItems)
@@ -718,6 +720,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		sortAscending:          m.sortAscending,
 		filterText:             m.filterText,
 		watchMode:              m.watchMode,
+		objectExplorerLive:     m.objectExplorerLive,
 		readOnly:               m.readOnly,
 		requestGen:             m.requestGen,
 		selectedItems:          copyMapStringBool(m.selectedItems),

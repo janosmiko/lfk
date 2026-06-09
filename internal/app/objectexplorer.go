@@ -23,6 +23,14 @@ type objectExplorerState struct {
 	title  string // "Kind/Name"
 	name   string // the resource's name, for the breadcrumb
 
+	// Identity of the browsed resource, captured at open so a watch-mode
+	// refresh can re-sync root from the matching list item (and skip the sync
+	// when the resource was deleted and the cursor lands on a different row).
+	namespace string
+	kind      string
+	extra     string
+	cluster   string
+
 	// In-level filter: substring match on keys at the current level.
 	filter       string
 	filterActive bool // true while the filter input is being typed
@@ -79,16 +87,114 @@ func (m Model) openObjectExplorer() (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.objectExplorerView = objectExplorerState{
-		root:  sel.Raw,
-		title: resourceTitleLabel(sel.Kind, sel.Namespace, sel.Name),
-		name:  sel.Name,
+		root:      sel.Raw,
+		title:     resourceTitleLabel(sel.Kind, sel.Namespace, sel.Name),
+		name:      sel.Name,
+		namespace: sel.Namespace,
+		kind:      sel.Kind,
+		extra:     sel.Extra,
+		cluster:   sel.ClusterName,
 	}
 	m.objectExplorerView.level = model.ObjectFieldsAt(sel.Raw, nil)
+	m.objectExplorerForceSync = false
 	// Remember the opener (the explorer, or the YAML viewer when opened via P)
 	// so q/esc returns there. m.mode is still the opener at this point.
 	m.objectExplorerReturnMode = m.mode
 	m.mode = modeObjectExplorer
 	return m, nil
+}
+
+// syncObjectExplorerLive re-points the Object Explorer at the freshly-loaded
+// object after a list refresh (watch tick or manual reload) so .status and
+// other live fields update in place instead of showing the snapshot captured at
+// open (issue #391). Navigation state (drill path, focused key, scroll) is
+// preserved. It is a no-op unless the explorer is open, and it keeps the last
+// snapshot when the browsed resource is gone or the cursor now points at a
+// different row, rather than silently swapping in unrelated content.
+func (m *Model) syncObjectExplorerLive() {
+	if m.mode != modeObjectExplorer {
+		return
+	}
+	// Live off: leave the snapshot frozen so the view doesn't shift under the
+	// user. A manual refresh (R) sets objectExplorerForceSync to apply one
+	// update anyway; consume it here so it stays a single-shot.
+	if !m.objectExplorerLive && !m.objectExplorerForceSync {
+		return
+	}
+	m.objectExplorerForceSync = false
+	rt := &m.objectExplorerView
+	if rt.root == nil {
+		return
+	}
+	sel := m.selectedMiddleItem()
+	if sel == nil || sel.Raw == nil ||
+		sel.Name != rt.name || sel.Namespace != rt.namespace ||
+		sel.Kind != rt.kind || sel.Extra != rt.extra || sel.ClusterName != rt.cluster {
+		return
+	}
+
+	// Keep the cursor on the same field across the rebuild: values change every
+	// tick, map keys rarely do.
+	var focusedKey string
+	if f, ok := rt.selected(); ok {
+		focusedKey = f.Key
+	}
+
+	rt.root = sel.Raw
+	// Trim the drill path to its deepest still-resolvable prefix in case a
+	// field the user had drilled into disappeared (e.g. an array shrank). The
+	// trimmed-into segment is gone from the rebuilt level, so the focused-key
+	// restore below misses and the cursor clamps to a valid row.
+	for len(rt.path) > 0 {
+		if _, ok := model.ResolveObjectPath(rt.root, rt.path); ok {
+			break
+		}
+		rt.path = rt.path[:len(rt.path)-1]
+	}
+	rt.level = model.ObjectFieldsAt(rt.root, rt.path)
+
+	if focusedKey != "" {
+		for i, f := range rt.visible() {
+			if f.Key == focusedKey {
+				rt.cursor = i
+				break
+			}
+		}
+	}
+	m.clampObjectExplorerScroll()
+	m.clampObjectExplorerPreviewScroll()
+
+	// Refresh the recursive-find overlay against the new object, preserving the
+	// user's cursor/scroll within it.
+	if m.overlay == overlayObjectExplorerFind {
+		savedCursor, savedScroll := rt.findCursor, rt.findScroll
+		m.recomputeFind()
+		rt.findCursor = max(0, min(savedCursor, len(rt.findResults)-1))
+		rt.findScroll = savedScroll
+		m.clampFindScroll()
+	}
+}
+
+// toggleObjectExplorerLive flips live auto-refresh for the Object Explorer.
+// Turning it on triggers an immediate catch-up refresh so the view jumps to the
+// current state instead of waiting for the next watch tick.
+func (m Model) toggleObjectExplorerLive() (tea.Model, tea.Cmd) {
+	m.objectExplorerLive = !m.objectExplorerLive
+	if m.objectExplorerLive {
+		m.setStatusMessage("Object Explorer live refresh: on", false)
+		m.objectExplorerForceSync = true
+		return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
+	}
+	m.setStatusMessage("Object Explorer live refresh: off", false)
+	return m, scheduleStatusClear()
+}
+
+// refreshObjectExplorer fetches the current resource list and applies the result
+// to the Object Explorer once, regardless of the live setting.
+func (m Model) refreshObjectExplorer() (tea.Model, tea.Cmd) {
+	m.objectExplorerForceSync = true
+	m.setStatusMessage("Refreshing…", false)
+	return m, tea.Batch(m.refreshCurrentLevel(), scheduleStatusClear())
 }
 
 // exitObjectExplorer resets state and returns to the mode the Object Explorer
@@ -148,6 +254,10 @@ func (m Model) handleObjectExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case "r":
 		m.openObjectExplorerFind()
 		return m, nil
+	case kb.WatchMode:
+		return m.toggleObjectExplorerLive()
+	case kb.Refresh:
+		return m.refreshObjectExplorer()
 	case "I":
 		return m.openExplainAtObjectPath(m.selectedNodePath(), modeObjectExplorer)
 	case "y":
@@ -369,6 +479,7 @@ func (m *Model) clampObjectExplorerScroll() {
 func (m Model) viewObjectExplorer() string {
 	rt := m.objectExplorerView
 
+	kb := ui.ActiveKeybindings
 	hint := ui.RenderHintBar([]ui.HintEntry{
 		{Key: "j/k", Desc: "navigate"},
 		{Key: "l/Enter", Desc: "drill"},
@@ -378,16 +489,23 @@ func (m Model) viewObjectExplorer() string {
 		{Key: "J/K", Desc: "scroll preview"},
 		{Key: "y/Y", Desc: "yank path/node"},
 		{Key: "P", Desc: "full yaml"},
+		{Key: kb.Refresh, Desc: "refresh"},
+		{Key: kb.WatchMode, Desc: "live on/off"},
 		{Key: "I", Desc: "explain"},
 		{Key: "q", Desc: "close"},
 	}, m.width)
+
+	title := "Object Explorer: " + rt.title
+	if !m.objectExplorerLive {
+		title += " [PAUSED]"
+	}
 
 	parentFields, parentCursor := m.objectExplorerParentLevel()
 	return ui.RenderObjectExplorerView(
 		rt.visible(),
 		rt.cursor,
 		rt.scroll,
-		"Object Explorer: "+rt.title,
+		title,
 		parentFields,
 		parentCursor,
 		m.selectedNodeYAML(),

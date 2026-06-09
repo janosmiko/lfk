@@ -37,3 +37,8 @@ var ConfigDiffViewerUnified = false
 // ConfigDescribeViewerWrap is the startup default for describe viewer line
 // wrapping (runtime toggle: z). Default false.
 var ConfigDescribeViewerWrap = false
+
+// ConfigObjectExplorerLive is the startup default for live-refreshing the
+// Object Explorer as the browsed resource changes under watch mode (runtime
+// toggle: w). Default true.
+var ConfigObjectExplorerLive = true

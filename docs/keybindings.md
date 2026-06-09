@@ -262,12 +262,34 @@ a single-character slot.
 | `z` | Toggle fold on section under cursor |
 | `Z` | Toggle all folds (collapse/expand all) |
 | `>` | Toggle line wrapping (configurable via `toggle_wrap`) |
+| `R` | Re-fetch the resource and refresh the view, keeping cursor/scroll (configurable via `refresh`) |
 | `Ctrl+E` | Edit resource in `$KUBE_EDITOR` or `$EDITOR` |
 | `O` | Switch to the Object Explorer at the attribute under the cursor (keeps position) |
 | `I` | Open the API Explorer at the schema of the attribute under the cursor |
 | `q` / `Esc` | Back to explorer |
 
 The top breadcrumb shows the resource name and the attribute path under the cursor (e.g. `lfk > ctx > Pods > my-pod > spec.containers[0].image`), like the Object Explorer location.
+
+## Object Explorer
+
+> Drill-in tree over the selected resource's live object, opened with `O`. Under watch mode the browsed object live-refreshes as the resource changes; pause it to read a stable snapshot.
+
+| Key | Action |
+|---|---|
+| `j` / `k` | Navigate fields |
+| `l` / `Enter` / `→` | Drill into object/array field |
+| `h` / `Backspace` / `←` | Go back one level |
+| `J` / `K` | Scroll the YAML preview pane |
+| `/` | Filter the current level by key |
+| `r` | Recursive find overlay (search keys across the whole object) |
+| `R` | Manually refresh the browsed object now (configurable via `refresh`) |
+| `w` | Toggle live refresh on/off — title shows `[PAUSED]` when off (configurable via `watch_mode`) |
+| `y` / `Y` | Yank the selected node's path / full YAML |
+| `P` | Open the whole resource in the full YAML viewer |
+| `I` | Open the API Explorer at the selected item's schema |
+| `q` / `Esc` | Back one level / close at root |
+
+Live refresh defaults to on; set `object_explorer.live: false` to start paused. See [Viewer Defaults](config-reference.md#viewer-defaults).
 
 ## Describe View
 
