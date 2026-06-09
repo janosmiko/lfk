@@ -148,8 +148,9 @@ winget:
 
 chocolateys:
   - name: lfk
-    title: "lfk"
+    title: "LFK (Lightning Fast Kubernetes navigator)"
     authors: janosmiko
+    package_source_url: "https://github.com/janosmiko/lfk"
     project_url: "https://github.com/janosmiko/lfk"
     icon_url: "https://raw.githubusercontent.com/janosmiko/lfk/main/docs/imgs/github-header.png"
     copyright: "{{ .Now.Format \"2006\" }} janosmiko"
