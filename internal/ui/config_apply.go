@@ -259,6 +259,31 @@ func applyLogViewerConfig(cfg configFile) {
 	applyBoolPtr(lv.ShowPreview, &ConfigLogShowPreview)
 	applyBoolPtr(lv.ShowPrefixes, &ConfigLogShowPrefixes)
 	applyBoolPtr(lv.ShowTimestamps, &ConfigLogShowTimestamps)
+	applyLogMaxLines(lv.MaxLines)
+}
+
+// applyLogMaxLines clamps a log_viewer.max_lines override into
+// [LogMaxLinesMin, LogMaxLinesMax] and applies it. A nil or zero value keeps
+// the compiled default so an omitted (or stray 0) key never disables the cap.
+func applyLogMaxLines(src *int) {
+	if src == nil || *src == 0 {
+		return
+	}
+	v := *src
+	clamped := v
+	if v < LogMaxLinesMin {
+		clamped = LogMaxLinesMin
+	} else if v > LogMaxLinesMax {
+		clamped = LogMaxLinesMax
+	}
+	if clamped != v {
+		logger.Warn("log_viewer.max_lines out of range; clamped",
+			"value", v,
+			"min", LogMaxLinesMin,
+			"max", LogMaxLinesMax,
+			"applied", clamped)
+	}
+	ConfigLogMaxLines = clamped
 }
 
 // applyViewerDefaults wires the YAML / diff / describe viewer startup-toggle

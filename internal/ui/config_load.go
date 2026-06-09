@@ -315,6 +315,10 @@ type LogViewerConfig struct {
 	// ShowTimestamps: startup default for log line timestamps (toggle s).
 	// Default false.
 	ShowTimestamps *bool `json:"show_timestamps" yaml:"show_timestamps"`
+	// MaxLines: max streamed log lines retained per tab before the oldest are
+	// dropped. Default 50000. Clamped to [1000, 1000000]. Bounds memory for a
+	// long-running follow.
+	MaxLines *int `json:"max_lines" yaml:"max_lines"`
 }
 
 // YAMLViewerConfig is the on-disk schema for the yaml_viewer section. Every

@@ -16,6 +16,7 @@ func snapshotLogViewerGlobals(t *testing.T) {
 	prevPreview := ConfigLogShowPreview
 	prevPrefixes := ConfigLogShowPrefixes
 	prevTimestamps := ConfigLogShowTimestamps
+	prevMaxLines := ConfigLogMaxLines
 	t.Cleanup(func() {
 		ConfigLogTailLines = prevTail
 		ConfigLogTailLinesShort = prevShort
@@ -23,6 +24,7 @@ func snapshotLogViewerGlobals(t *testing.T) {
 		ConfigLogShowPreview = prevPreview
 		ConfigLogShowPrefixes = prevPrefixes
 		ConfigLogShowTimestamps = prevTimestamps
+		ConfigLogMaxLines = prevMaxLines
 	})
 	// Reset to compiled defaults before each test.
 	ConfigLogTailLines = 1000
@@ -31,6 +33,7 @@ func snapshotLogViewerGlobals(t *testing.T) {
 	ConfigLogShowPreview = true
 	ConfigLogShowPrefixes = true
 	ConfigLogShowTimestamps = false
+	ConfigLogMaxLines = LogMaxLinesDefault
 }
 
 // TestLogViewer_GroupAppliesAllFields verifies the canonical log_viewer group
@@ -54,6 +57,29 @@ func TestLogViewer_GroupAppliesAllFields(t *testing.T) {
 	assert.False(t, ConfigLogShowPreview, "show_preview")
 	assert.False(t, ConfigLogShowPrefixes, "show_prefixes")
 	assert.True(t, ConfigLogShowTimestamps, "show_timestamps")
+}
+
+// TestLogViewer_MaxLinesAppliesAndClamps verifies the buffer cap is wired and
+// clamped to [LogMaxLinesMin, LogMaxLinesMax].
+func TestLogViewer_MaxLinesAppliesAndClamps(t *testing.T) {
+	tests := []struct {
+		name string
+		yaml string
+		want int
+	}{
+		{"in range", "log_viewer:\n  max_lines: 25000\n", 25000},
+		{"below floor", "log_viewer:\n  max_lines: 5\n", LogMaxLinesMin},
+		{"above ceiling", "log_viewer:\n  max_lines: 9999999\n", LogMaxLinesMax},
+		{"zero keeps default", "log_viewer:\n  max_lines: 0\n", LogMaxLinesDefault},
+		{"omitted keeps default", "log_viewer:\n  show_timestamps: true\n", LogMaxLinesDefault},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			snapshotLogViewerGlobals(t)
+			LoadConfig(writeConfigFile(t, tc.yaml))
+			assert.Equal(t, tc.want, ConfigLogMaxLines)
+		})
+	}
 }
 
 // TestLogViewer_DeprecatedFlatAliasesStillApply verifies the legacy flat keys

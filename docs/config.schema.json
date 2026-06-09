@@ -595,6 +595,11 @@
           "type": "boolean",
           "description": "Startup default for log line timestamps (runtime toggle: s). Set true to start with timestamps shown.",
           "default": false
+        },
+        "max_lines": {
+          "type": "integer",
+          "description": "Maximum streamed log lines retained per tab; once exceeded, the oldest lines are dropped so a long-running follow does not grow memory without bound. Clamped to [1000, 1000000].",
+          "default": 50000
         }
       }
     },
