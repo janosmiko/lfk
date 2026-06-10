@@ -16,13 +16,16 @@ import (
 // and execute. The kubeconfig context name is the same class of risk (kubectl
 // permits metacharacters in context names).
 func TestExpandCustomActionTemplateQuotesInjection(t *testing.T) {
+	// Harmless sentinels that still carry shell metacharacters ($(), ;) so the
+	// test proves neutralization without risking side effects on the runner if
+	// quoting ever regresses — no rm, no filesystem writes.
 	actx := actionContext{
 		name:      "my-pod",
 		namespace: "default",
-		context:   `prod"$(touch /tmp/pwn)"`,
+		context:   `prod"$(echo INJECTED)"`,
 		kind:      "Pod",
 		columns: []model.KeyValue{
-			{Key: "Image", Value: "nginx; rm -rf /"},
+			{Key: "Image", Value: "nginx; echo INJECTED"},
 		},
 	}
 
@@ -30,10 +33,10 @@ func TestExpandCustomActionTemplateQuotesInjection(t *testing.T) {
 	// the round-trip: a real shell must echo each value literally, which it can
 	// only do if $(...) / ; / etc. were neutralized rather than executed.
 	gotImage := shellEcho(t, expandCustomActionTemplate("echo {Image}", actx))
-	assert.Equal(t, "nginx; rm -rf /", gotImage, "column value must round-trip literally")
+	assert.Equal(t, "nginx; echo INJECTED", gotImage, "column value must round-trip literally")
 
 	gotCtx := shellEcho(t, expandCustomActionTemplate("echo {context}", actx))
-	assert.Equal(t, `prod"$(touch /tmp/pwn)"`, gotCtx,
+	assert.Equal(t, `prod"$(echo INJECTED)"`, gotCtx,
 		"context value must round-trip literally — the $(...) must not execute")
 }
 

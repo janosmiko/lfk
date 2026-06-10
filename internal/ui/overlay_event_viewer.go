@@ -443,22 +443,27 @@ func RenderEventViewer(p EventViewerParams) string {
 	// (and the footer's line number) off the viewport.
 	cursor := max(min(p.Cursor, len(p.Lines)-1), 0)
 	scroll := eventStartForCursor(p, evLineCtx, max(p.Scroll, 0), cursor, maxVisible)
-	end := min(scroll+maxVisible, len(p.Lines))
 	// Pagination is by physical lines, not logical events: in wrap
 	// mode one event expands to multiple sub-lines, and counting by
 	// logical events would emit far more physical rows than
 	// maxVisible — pushing the footer and the overlay's bottom
 	// border off the viewport. Stop emitting as soon as we fill the
-	// reserved height. The logical `end` is still used below by the
-	// footer for the "line N/M" indicator.
+	// reserved height. `end` tracks the last logical row actually
+	// emitted (not scroll+maxVisible) so the footer's truncation
+	// indicator is correct when wrapped rows fill the budget early.
+	end := scroll
 	var physicalLines []string
 	for i := scroll; i < len(p.Lines) && len(physicalLines) < maxVisible; i++ {
+		before := len(physicalLines)
 		rendered := renderEventViewerLine(p, i, evLineCtx)
 		for sub := range strings.SplitSeq(rendered, "\n") {
 			if len(physicalLines) >= maxVisible {
 				break
 			}
 			physicalLines = append(physicalLines, sub)
+		}
+		if len(physicalLines) > before {
+			end = i + 1
 		}
 	}
 	for len(physicalLines) < maxVisible {
