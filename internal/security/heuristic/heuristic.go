@@ -16,6 +16,8 @@ import (
 type Source struct {
 	client            kubernetes.Interface
 	ignoredNamespaces map[string]bool
+	secretEnvInclude  []string
+	secretEnvExclude  []string
 }
 
 // New returns a heuristic source with no client. Fetch returns an empty slice
@@ -26,6 +28,14 @@ func New() *Source { return &Source{} }
 // NewWithClient returns a heuristic source that lists pods via the given client.
 func NewWithClient(client kubernetes.Interface) *Source {
 	return &Source{client: client}
+}
+
+// SetSecretEnvPatterns configures extra include/exclude env-var name globs
+// for the secret_env check (from security.secret_env_include / _exclude).
+// Must be called before the first Fetch — the fields are not synchronized.
+func (s *Source) SetSecretEnvPatterns(include, exclude []string) {
+	s.secretEnvInclude = include
+	s.secretEnvExclude = exclude
 }
 
 // SetIgnoredNamespaces configures namespaces to exclude from heuristic checks.
@@ -73,6 +83,9 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 				for _, check := range allChecks {
 					findings = append(findings, check(pod, c)...)
 				}
+				// secret_env takes per-source config, so it is dispatched
+				// directly instead of through allChecks.
+				findings = append(findings, checkSecretEnvWith(pod, c, s.secretEnvInclude, s.secretEnvExclude)...)
 			}
 			for _, c := range pod.Spec.InitContainers {
 				runChecks(c)
