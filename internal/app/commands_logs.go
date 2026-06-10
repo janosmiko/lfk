@@ -665,15 +665,33 @@ func (m *Model) maybeLoadMoreHistory() tea.Cmd {
 	return nil
 }
 
-// saveLoadedLogs writes the currently buffered log lines to a file under /tmp.
-func (m *Model) saveLoadedLogs() (string, error) {
-	name := sanitizeFilename(m.actionCtx.name)
-	path := fmt.Sprintf("%s/lfk-logs-%s-%d.log", os.TempDir(), name, time.Now().Unix())
-	content := strings.Join(m.logView.lines, "\n") + "\n"
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+// writeTempLog writes log data to a uniquely-named, owner-only (0600) file in
+// the OS temp dir. pattern is an os.CreateTemp pattern (the "*" is replaced by a
+// random string). Logs frequently carry bearer tokens / connection strings, so
+// the file must not be world-readable; the random suffix plus CreateTemp's
+// O_EXCL also defeat the predictable-path symlink TOCTOU that a fixed /tmp name
+// allowed, and os.TempDir keeps it working on Windows where /tmp does not exist.
+func writeTempLog(pattern string, data []byte) (string, error) {
+	f, err := os.CreateTemp("", pattern)
+	if err != nil {
 		return "", err
 	}
-	return path, nil
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	return f.Name(), nil
+}
+
+// saveLoadedLogs writes the currently buffered log lines to a temp file.
+func (m *Model) saveLoadedLogs() (string, error) {
+	name := sanitizeFilename(m.actionCtx.name)
+	content := strings.Join(m.logView.lines, "\n") + "\n"
+	return writeTempLog("lfk-logs-"+name+"-*.log", []byte(content))
 }
 
 // saveAllLogs runs a one-shot kubectl logs (without --tail) and writes everything to a file.
@@ -739,8 +757,8 @@ func (m *Model) saveAllLogs() tea.Cmd {
 			return logSaveAllMsg{err: err}
 		}
 
-		path := fmt.Sprintf("/tmp/lfk-logs-%s-%d-all.log", sanitized, time.Now().Unix())
-		if err := os.WriteFile(path, output, 0o644); err != nil {
+		path, err := writeTempLog("lfk-logs-"+sanitized+"-all-*.log", output)
+		if err != nil {
 			return logSaveAllMsg{err: err}
 		}
 		return logSaveAllMsg{path: path}
