@@ -160,8 +160,11 @@ func (m *Model) sanitizeError(err error) string {
 		s = strings.ReplaceAll(s, "  ", " ")
 	}
 	maxLen := max(m.width-20, 40)
-	if len(s) > maxLen {
-		s = s[:maxLen-3] + "..."
+	// Rune-slice, not byte-slice: error text can contain arbitrary UTF-8 and a
+	// mid-rune cut emits a replacement char. Matches sanitizeMessage below.
+	runes := []rune(s)
+	if len(runes) > maxLen {
+		s = string(runes[:maxLen-3]) + "..."
 	}
 	return s
 }

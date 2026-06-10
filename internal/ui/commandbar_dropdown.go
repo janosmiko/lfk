@@ -104,11 +104,12 @@ func formatSuggestionLine(
 	textLabel := fmt.Sprintf("  %s", s.Text)
 	content := catLabel + textLabel
 
-	// Pad or truncate to fit width.
-	if len(content) < width {
-		content += strings.Repeat(" ", width-len(content))
-	} else if len(content) > width {
-		content = content[:width]
+	// Pad or truncate to fit width using display width — suggestion text can be
+	// a UTF-8 context name, so len()/byte-slicing would misalign and split runes.
+	if cw := lipgloss.Width(content); cw < width {
+		content += strings.Repeat(" ", width-cw)
+	} else if cw > width {
+		content = Truncate(content, width)
 	}
 
 	if isSelected {
@@ -120,7 +121,7 @@ func formatSuggestionLine(
 	styledText := textStyle.Render(textLabel)
 	padding := ""
 
-	plainLen := len(catLabel) + len(textLabel)
+	plainLen := lipgloss.Width(catLabel) + lipgloss.Width(textLabel)
 	if plainLen < width {
 		padding = strings.Repeat(" ", width-plainLen)
 	}

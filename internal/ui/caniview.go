@@ -173,22 +173,19 @@ func renderCanIGroups(groups []string, cursor, scroll, width, maxLines int) []st
 	end := min(scroll+maxLines, len(groups))
 
 	for i := scroll; i < end; i++ {
+		// Display-width aware: use lipgloss.Width / Truncate / padRight rather
+		// than len()/byte-slicing so any non-ASCII group name aligns and never
+		// gets cut mid-rune.
 		display := groups[i]
-		if len(display) > width-2 {
-			display = display[:width-2]
+		if lipgloss.Width(display) > width-2 {
+			display = Truncate(display, width-2)
 		}
 
 		if i == cursor {
-			line := fmt.Sprintf("> %-*s", width-2, display)
-			if len(line) > width {
-				line = line[:width]
-			}
+			line := Truncate(padRight("> "+display, width), width)
 			lines = append(lines, OverlaySelectedStyle.Render(line))
 		} else {
-			line := fmt.Sprintf("  %s", display)
-			if len(line) > width {
-				line = line[:width]
-			}
+			line := Truncate("  "+display, width)
 			lines = append(lines, NormalStyle.Render(line))
 		}
 	}
