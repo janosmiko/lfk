@@ -32,6 +32,23 @@ func (m *Model) clearRight() {
 // clampPreviewScroll prevents scrolling past the preview content.
 // Only details+events scroll; pinned header (children) and footer (resource usage) are excluded.
 func (m *Model) clampPreviewScroll() {
+	// This runs in the Update path (preview wheel/keys) and renders right-pane
+	// content below (the split pinned header and the measurement render), all
+	// with cursor=-1. Park the persistent pane-scroll globals around those
+	// renders: RenderTable/RenderColumn would otherwise reset ActiveMiddleScroll
+	// / ActiveLeftScroll to 0 (VimScrollOff with cursor=-1), making the pane to
+	// the left visibly jump (issue #398). ActiveMiddleLineMap is saved too:
+	// RenderTable rebuilds it (from the right pane's items, here) under the
+	// same >= 0 gate. The View path applies this guard around its right-pane
+	// render in viewExplorerThreeCol.
+	savedMiddleScroll, savedLeftScroll := ui.ActiveMiddleScroll, ui.ActiveLeftScroll
+	savedLineMap := ui.ActiveMiddleLineMap
+	ui.ActiveMiddleScroll, ui.ActiveLeftScroll = -1, -1
+	defer func() {
+		ui.ActiveMiddleScroll, ui.ActiveLeftScroll = savedMiddleScroll, savedLeftScroll
+		ui.ActiveMiddleLineMap = savedLineMap
+	}()
+
 	// The fullscreen dashboard reuses previewScroll but renders entirely
 	// different content (cluster overview / monitoring), so bound it against
 	// that content instead of the right-column preview.
