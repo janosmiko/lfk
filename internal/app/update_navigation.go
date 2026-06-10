@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -315,6 +316,11 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	// findings (stale-while-revalidate), so nil-ing after would discard it.
 	m.securityIndex = nil
 	m.securityActiveGroup = ""
+	// Drop the prior cluster's preview caches: keyed by ctx/ns/name they are
+	// dead weight for the new context, and the secret cache holds decoded
+	// plaintext we shouldn't keep resident after leaving the cluster.
+	m.secretPreviewCache = make(map[string]*model.SecretData)
+	m.serviceEndpointsCache = make(map[string]*k8s.ServiceEndpoints)
 	securitySeedCmd := m.refreshSecuritySources()
 	m.nav.Level = model.LevelResourceTypes
 	// Capture whatever the right-pane preview was already displaying for
