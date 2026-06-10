@@ -28,10 +28,20 @@ func (c *Client) KubeconfigPaths() string {
 // clusters and users that share names across files — see issue #23 and
 // restConfigForContext for the in-process equivalent.
 func (c *Client) KubeconfigPathForContext(displayName string) string {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
+	return c.kubeconfigPathForContextLocked(displayName)
+}
+
+// kubeconfigPathForContextLocked is the lock-free body of
+// KubeconfigPathForContext. The caller must hold configMu (read or write).
+// restConfigForContext reuses it while already holding the read lock.
+func (c *Client) kubeconfigPathForContextLocked(displayName string) string {
 	if info, ok := c.contexts[displayName]; ok {
 		return info.sourcePath
 	}
-	// Fallback to the first file.
+	// Fallback to the first file. loadingRules is set at construction and never
+	// swapped, so it needs no lock, but we are already under RLock here.
 	if len(c.loadingRules.Precedence) > 0 {
 		return c.loadingRules.Precedence[0]
 	}
@@ -45,6 +55,8 @@ func (c *Client) KubeconfigPathForContext(displayName string) string {
 // merged kubeconfig kubectl loads. Returns the input unchanged when the name
 // is not registered (preserves the no-collision and external-context cases).
 func (c *Client) OriginalContextName(displayName string) string {
+	c.configMu.RLock()
+	defer c.configMu.RUnlock()
 	if info, ok := c.contexts[displayName]; ok {
 		return info.original
 	}
