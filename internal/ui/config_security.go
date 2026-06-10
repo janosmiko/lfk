@@ -25,8 +25,8 @@ var ConfigSecuritySources = map[string]bool{}
 var ConfigSecurityIgnorePatterns []SecurityIgnorePattern
 
 // ConfigSecuritySecretEnvInclude / ConfigSecuritySecretEnvExclude hold the
-// `security.secret_env_include` / `_exclude` env-var name globs that tune the
-// heuristic source's secret_env check. Read-only after load.
+// `security.heuristic.secret_env_include` / `_exclude` env-var name globs that
+// tune the heuristic source's secret_env check. Read-only after load.
 var (
 	ConfigSecuritySecretEnvInclude []string
 	ConfigSecuritySecretEnvExclude []string

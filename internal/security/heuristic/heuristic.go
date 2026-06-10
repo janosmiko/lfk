@@ -31,7 +31,8 @@ func NewWithClient(client kubernetes.Interface) *Source {
 }
 
 // SetSecretEnvPatterns configures extra include/exclude env-var name globs
-// for the secret_env check (from security.secret_env_include / _exclude).
+// for the secret_env check (from security.heuristic.secret_env_include /
+// _exclude).
 // Must be called before the first Fetch — the fields are not synchronized.
 func (s *Source) SetSecretEnvPatterns(include, exclude []string) {
 	s.secretEnvInclude = include
