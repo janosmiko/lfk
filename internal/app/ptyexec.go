@@ -1,6 +1,7 @@
 package app
 
 import (
+	"errors"
 	"fmt"
 	"io"
 	"os"
@@ -303,7 +304,10 @@ func startExecPTYReader(ptmx *os.File, term vt10x.Terminal, sb *scrollback, cmd 
 				_, _ = sb.Write(buf[:n])
 			}
 			if err != nil {
-				if err != io.EOF {
+				// On Linux, reading the pty master after the child exits returns
+				// EIO (wrapped in *os.PathError), not io.EOF — both are clean
+				// terminations, not errors worth logging on every exec exit.
+				if !errors.Is(err, io.EOF) && !isBenignPTYCloseError(err) {
 					logger.Error("PTY read error", "error", err)
 				}
 				break

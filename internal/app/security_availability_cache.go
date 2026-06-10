@@ -110,7 +110,7 @@ func saveSecurityAvailabilityCacheForHost(host string, availability map[string]b
 	if err != nil {
 		return err
 	}
-	return writeFileDurable(path, data, 0o644)
+	return writeFileDurable(path, data, 0o600)
 }
 
 // loadSecurityAvailabilityCacheForContext is the convenience accessor used

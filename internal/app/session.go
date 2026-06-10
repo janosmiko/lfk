@@ -61,8 +61,8 @@ func migrateStateFile(filename, newPath string) []byte {
 		return nil
 	}
 	// Migrate: write to new location and remove legacy file.
-	if err := os.MkdirAll(filepath.Dir(newPath), 0o755); err == nil {
-		if os.WriteFile(newPath, data, 0o644) == nil {
+	if err := os.MkdirAll(filepath.Dir(newPath), 0o700); err == nil {
+		if os.WriteFile(newPath, data, 0o600) == nil {
 			_ = os.Remove(legacyPath)
 		}
 	}
@@ -102,14 +102,14 @@ func saveSession(s SessionState) error {
 	if path == "" {
 		return nil
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		return err
 	}
 	data, err := yaml.Marshal(s)
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(path, data, 0o644)
+	return os.WriteFile(path, data, 0o600)
 }
 
 // saveCurrentSession persists the current navigation state to the session file.

@@ -274,11 +274,11 @@ func (g *kubetrisGame) saveHighScore() {
 		return
 	}
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		logger.Error("kubetris: failed to create high score dir", "dir", dir, "error", err)
 		return
 	}
-	if err := os.WriteFile(path, fmt.Appendf(nil, "%d\n", g.highScore), 0o644); err != nil {
+	if err := os.WriteFile(path, fmt.Appendf(nil, "%d\n", g.highScore), 0o600); err != nil {
 		logger.Error("kubetris: failed to write high score", "path", path, "error", err)
 	}
 }
