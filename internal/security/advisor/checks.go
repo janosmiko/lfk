@@ -2,8 +2,10 @@ package advisor
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
+	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
 	corev1 "k8s.io/api/core/v1"
 	policyv1 "k8s.io/api/policy/v1"
@@ -34,6 +36,9 @@ func (d *clusterData) findings() []security.Finding {
 		d.workloadFindings(),
 		d.pdbFindings(),
 		d.hpaFindings(),
+		d.quotaFindings(),
+		d.hpaConfigFindings(),
+		d.orphanPDBFindings(),
 	}
 	total := 0
 	for _, g := range groups {
@@ -113,8 +118,84 @@ func (d *clusterData) workloadFindings() []security.Finding {
 				"missing resource requests",
 				fmt.Sprintf("Container(s) %s in %s %q set no CPU/memory requests; the scheduler places them blind.", strings.Join(names, ", "), w.kind, w.name)))
 		}
+		if w.replicas >= 2 && !w.spreadConfigured {
+			out = append(out, makeFinding(w.namespace, w.kind, w.name, "no_topology_spread", security.SeverityLow,
+				"replicas not spread",
+				fmt.Sprintf("%s %q has %d replicas but no topologySpreadConstraints or pod anti-affinity; all replicas can land on one node.", w.kind, w.name, w.replicas)))
+		}
+		if reason := badRolloutStrategy(w); reason != "" {
+			out = append(out, makeFinding(w.namespace, w.kind, w.name, "bad_rollout_strategy", security.SeverityLow,
+				"rollout causes downtime",
+				fmt.Sprintf("%s %q uses %s; every rollout takes all replicas down at once.", w.kind, w.name, reason)))
+		}
+		if names := unboundedEmptyDirs(w.volumes); len(names) > 0 {
+			out = append(out, makeFinding(w.namespace, w.kind, w.name, "emptydir_no_sizelimit", security.SeverityLow,
+				"emptyDir without sizeLimit",
+				fmt.Sprintf("Volume(s) %s in %s %q are emptyDirs with no sizeLimit; runaway writes cause node disk-pressure evictions.", strings.Join(names, ", "), w.kind, w.name)))
+		}
+		if names := containersWithIdenticalProbes(w.containers); len(names) > 0 {
+			out = append(out, makeFinding(w.namespace, w.kind, w.name, "identical_probes", security.SeverityMedium,
+				"identical liveness and readiness probes",
+				fmt.Sprintf("Container(s) %s in %s %q use the same probe for liveness and readiness; under load the pod is restarted instead of just shedding traffic.", strings.Join(names, ", "), w.kind, w.name)))
+		}
 	}
 	return out
+}
+
+// badRolloutStrategy returns a non-empty reason when a multi-replica
+// Deployment's rollout takes every replica down: strategy Recreate, or a
+// RollingUpdate that allows 100% (or >= replicas) unavailable. An empty
+// strategy Type (possible only pre-API-defaulting, e.g. fakes) falls through
+// to the RollingUpdate branch, matching the API server's default.
+func badRolloutStrategy(w *workload) string {
+	if w.strategy == nil || w.replicas < 2 {
+		return ""
+	}
+	if w.strategy.Type == appsv1.RecreateDeploymentStrategyType {
+		return "strategy: Recreate"
+	}
+	ru := w.strategy.RollingUpdate
+	if ru == nil || ru.MaxUnavailable == nil {
+		return ""
+	}
+	mu := ru.MaxUnavailable
+	if mu.Type == intstr.String && mu.StrVal == "100%" {
+		return "maxUnavailable: 100%"
+	}
+	if mu.Type == intstr.Int && int32(mu.IntValue()) >= w.replicas {
+		return fmt.Sprintf("maxUnavailable: %d with %d replicas", mu.IntValue(), w.replicas)
+	}
+	return ""
+}
+
+// unboundedEmptyDirs returns names of emptyDir volumes without an effective
+// sizeLimit — unset or explicitly zero (which the kubelet does not enforce).
+func unboundedEmptyDirs(volumes []corev1.Volume) []string {
+	var names []string
+	for i := range volumes {
+		v := &volumes[i]
+		if v.EmptyDir != nil && (v.EmptyDir.SizeLimit == nil || v.EmptyDir.SizeLimit.IsZero()) {
+			names = append(names, v.Name)
+		}
+	}
+	return names
+}
+
+// containersWithIdenticalProbes returns names of containers whose liveness
+// and readiness probes are exactly equal — the readiness failure mode
+// (shed traffic) is replaced by the liveness one (restart).
+func containersWithIdenticalProbes(containers []corev1.Container) []string {
+	var names []string
+	for i := range containers {
+		c := &containers[i]
+		if c.LivenessProbe == nil || c.ReadinessProbe == nil {
+			continue
+		}
+		if reflect.DeepEqual(c.LivenessProbe, c.ReadinessProbe) {
+			names = append(names, c.Name)
+		}
+	}
+	return names
 }
 
 // pdbMatches reports whether any PDB in the workload's namespace selects the

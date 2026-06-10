@@ -53,15 +53,34 @@ var systemNamespaces = map[string]bool{
 	"kube-node-lease": true,
 }
 
-// workload is the common shape of a Deployment or StatefulSet the checks
-// operate on.
+// workload is the common shape of a Deployment, StatefulSet, or DaemonSet
+// the checks operate on. DaemonSets carry replicas 0, which keeps them out
+// of every replica-based check (single_replica, no_pdb, no_topology_spread)
+// while the container-level checks still apply. Excluding DaemonSets from
+// no_pdb is deliberate: node drains skip DaemonSet pods by design
+// (--ignore-daemonsets), so a PDB recommendation there would be noise.
 type workload struct {
-	kind       string // "Deployment" or "StatefulSet"
+	kind       string // "Deployment", "StatefulSet", or "DaemonSet"
 	namespace  string
 	name       string
 	replicas   int32
 	podLabels  map[string]string
 	containers []corev1.Container
+	volumes    []corev1.Volume
+	// spreadConfigured is true when the pod template sets either
+	// topologySpreadConstraints or pod anti-affinity.
+	spreadConfigured bool
+	// strategy is set for Deployments only.
+	strategy *appsv1.DeploymentStrategy
+}
+
+// templateSpreads reports whether the pod template spreads replicas across
+// failure domains by either mechanism.
+func templateSpreads(tmpl *corev1.PodTemplateSpec) bool {
+	if len(tmpl.Spec.TopologySpreadConstraints) > 0 {
+		return true
+	}
+	return tmpl.Spec.Affinity != nil && tmpl.Spec.Affinity.PodAntiAffinity != nil
 }
 
 // clusterData holds everything Fetch could list. Each OK flag records whether
@@ -69,12 +88,17 @@ type workload struct {
 // skipped entirely (best-effort RBAC) instead of emitting false positives.
 type clusterData struct {
 	workloads []workload
-	pdbs      []policyv1.PodDisruptionBudget
-	pdbsOK    bool
-	hpas      []autoscalingv2.HorizontalPodAutoscaler
-	hpasOK    bool
+	// workloadsOK is true only when every workload list (Deployments,
+	// StatefulSets, DaemonSets) succeeded — required by checks that reason
+	// about the absence of a matching workload (orphan_pdb).
+	workloadsOK bool
+	pdbs        []policyv1.PodDisruptionBudget
+	pdbsOK      bool
+	hpas        []autoscalingv2.HorizontalPodAutoscaler
+	hpasOK      bool
 	// namespaces to run namespace-level checks against.
 	namespaces []string
+	quotas     []corev1.ResourceQuota
 	quotaNS    map[string]bool
 	quotasOK   bool
 	limitNS    map[string]bool
@@ -120,12 +144,15 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		for i := range deps {
 			dep := &deps[i]
 			d.workloads = append(d.workloads, workload{
-				kind:       "Deployment",
-				namespace:  dep.Namespace,
-				name:       dep.Name,
-				replicas:   replicasOrDefault(dep.Spec.Replicas),
-				podLabels:  dep.Spec.Template.Labels,
-				containers: dep.Spec.Template.Spec.Containers,
+				kind:             "Deployment",
+				namespace:        dep.Namespace,
+				name:             dep.Name,
+				replicas:         replicasOrDefault(dep.Spec.Replicas),
+				podLabels:        dep.Spec.Template.Labels,
+				containers:       dep.Spec.Template.Spec.Containers,
+				volumes:          dep.Spec.Template.Spec.Volumes,
+				spreadConfigured: templateSpreads(&dep.Spec.Template),
+				strategy:         &dep.Spec.Strategy,
 			})
 		}
 	}
@@ -140,15 +167,39 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		for i := range stss {
 			sts := &stss[i]
 			d.workloads = append(d.workloads, workload{
-				kind:       "StatefulSet",
-				namespace:  sts.Namespace,
-				name:       sts.Name,
-				replicas:   replicasOrDefault(sts.Spec.Replicas),
-				podLabels:  sts.Spec.Template.Labels,
-				containers: sts.Spec.Template.Spec.Containers,
+				kind:             "StatefulSet",
+				namespace:        sts.Namespace,
+				name:             sts.Name,
+				replicas:         replicasOrDefault(sts.Spec.Replicas),
+				podLabels:        sts.Spec.Template.Labels,
+				containers:       sts.Spec.Template.Spec.Containers,
+				volumes:          sts.Spec.Template.Spec.Volumes,
+				spreadConfigured: templateSpreads(&sts.Spec.Template),
 			})
 		}
 	}
+	dss, dssOK := collect(func(o metav1.ListOptions) ([]appsv1.DaemonSet, string, error) {
+		l, err := s.client.AppsV1().DaemonSets(namespace).List(ctx, o)
+		if err != nil {
+			return nil, "", err
+		}
+		return l.Items, l.Continue, nil
+	})
+	if dssOK {
+		for i := range dss {
+			ds := &dss[i]
+			d.workloads = append(d.workloads, workload{
+				kind:       "DaemonSet",
+				namespace:  ds.Namespace,
+				name:       ds.Name,
+				replicas:   0, // keeps DaemonSets out of replica-based checks
+				podLabels:  ds.Spec.Template.Labels,
+				containers: ds.Spec.Template.Spec.Containers,
+				volumes:    ds.Spec.Template.Spec.Volumes,
+			})
+		}
+	}
+	d.workloadsOK = depsOK && stssOK && dssOK
 
 	d.pdbs, d.pdbsOK = collect(func(o metav1.ListOptions) ([]policyv1.PodDisruptionBudget, string, error) {
 		l, err := s.client.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, o)
@@ -186,6 +237,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		}
 		return l.Items, l.Continue, nil
 	})
+	d.quotas = quotas
 	d.quotasOK = quotasOK
 	d.quotaNS = map[string]bool{}
 	for i := range quotas {
