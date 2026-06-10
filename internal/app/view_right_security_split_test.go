@@ -76,6 +76,31 @@ func TestSecurityGroupPreviewSplitGating(t *testing.T) {
 	assert.False(t, m.hasSplitPreview(), "no affected rows -> no split")
 }
 
+// TestMeasureScrollableLinesRecomputesOnSelectionChange guards the selName
+// memo-key field: switching between two finding groups whose layout
+// dimensions are identical (same affected count, level, split state) but
+// whose descriptions differ in length must recompute the scrollable line
+// count instead of returning the stale memoized value.
+func TestMeasureScrollableLinesRecomputesOnSelectionChange(t *testing.T) {
+	m := securityGroupPreviewModel()
+	short := m.middleItems[0]
+	short.Name = "short_group"
+	short.Columns = []model.KeyValue{
+		{Key: "Severity", Value: "LOW"},
+		{Key: "Affected", Value: "12"},
+		{Key: "Description", Value: "one line"},
+	}
+	m.middleItems = append(m.middleItems, short)
+
+	m.setCursor(0) // long description
+	longLines := m.measureScrollableLines(60, 20)
+	m.setCursor(1) // short description, every other key dimension unchanged
+	shortLines := m.measureScrollableLines(60, 20)
+
+	assert.Less(t, shortLines, longLines,
+		"selection change must invalidate the memoized line count")
+}
+
 // TestSecurityGroupPreviewClampUsesDetailsOnly verifies clampPreviewScroll
 // bounds the scroll against the details portion only (not the assembled
 // table+details buffer): with a short description the max scroll is small even
