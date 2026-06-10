@@ -3,11 +3,39 @@ package ui
 import (
 	"regexp"
 	"strings"
+	"sync"
 	"unicode"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
 )
+
+var (
+	searchReMu    sync.Mutex
+	searchReQuery string
+	searchRe      *regexp.Regexp
+	searchReErr   error
+	searchReSet   bool
+)
+
+// compileSearchRegex compiles "(?i)"+query, memoizing the most recently used
+// query. The search/filter hot paths call this per item per frame; only one
+// query is active at a time, so a single-entry cache eliminates redundant
+// compiles — e.g. filtering a 5k-pod list or running n/N over a 50k-line log
+// buffer would otherwise recompile the pattern thousands of times per keypress.
+func compileSearchRegex(query string) (*regexp.Regexp, error) {
+	searchReMu.Lock()
+	defer searchReMu.Unlock()
+	if searchReSet && searchReQuery == query {
+		return searchRe, searchReErr
+	}
+	re, err := regexp.Compile("(?i)" + query)
+	searchReQuery = query
+	searchRe = re
+	searchReErr = err
+	searchReSet = true
+	return re, err
+}
 
 // SearchMode represents the type of search being performed.
 type SearchMode int
@@ -71,7 +99,7 @@ func MatchLine(line, rawQuery string) bool {
 	}
 	switch mode {
 	case SearchRegex:
-		re, err := regexp.Compile("(?i)" + query)
+		re, err := compileSearchRegex(query)
 		if err != nil {
 			// Fall back to substring on invalid regex.
 			return strings.Contains(strings.ToLower(line), strings.ToLower(query))
@@ -409,7 +437,7 @@ func highlightSubstring(line, query string, style lipgloss.Style, restoreCodes s
 // runs against the plain form so the regex sees the same characters
 // the user sees on screen, never ANSI bytes.
 func highlightRegex(line, query string, style lipgloss.Style, restoreCodes string) string {
-	re, err := regexp.Compile("(?i)" + query)
+	re, err := compileSearchRegex(query)
 	if err != nil {
 		return highlightSubstring(line, query, style, restoreCodes) // fallback
 	}
@@ -516,7 +544,7 @@ func FindColumnInLine(line, rawQuery string) int {
 	}
 	switch mode {
 	case SearchRegex:
-		re, err := regexp.Compile("(?i)" + query)
+		re, err := compileSearchRegex(query)
 		if err != nil {
 			// Fallback to substring.
 			col := strings.Index(strings.ToLower(line), strings.ToLower(query))
