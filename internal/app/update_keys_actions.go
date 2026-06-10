@@ -416,12 +416,27 @@ func (m Model) handleExplorerActionKeySaveResource() (tea.Model, tea.Cmd, bool) 
 }
 
 func (m Model) handleExplorerActionKeyPreviewDown() (tea.Model, tea.Cmd, bool) {
+	if m.fullLogPreview {
+		// J: scroll toward newest (reduce fromBottom); 0 = auto-follow.
+		if m.previewLog.fromBottom > 0 {
+			m.previewLog.fromBottom--
+		}
+		m.clampPreviewScroll()
+		return m, nil, true
+	}
 	m.previewScroll++
 	m.clampPreviewScroll()
 	return m, nil, true
 }
 
 func (m Model) handleExplorerActionKeyPreviewUp() (tea.Model, tea.Cmd, bool) {
+	if m.fullLogPreview {
+		// K: scroll back toward older lines (increase fromBottom).
+		m.previewLog.fromBottom++
+		m.clampPreviewScroll()
+		m, cmd := m.maybeLoadMorePreviewHistory()
+		return m, cmd, true
+	}
 	if m.previewScroll > 0 {
 		m.previewScroll--
 	}

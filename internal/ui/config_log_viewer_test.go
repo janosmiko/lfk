@@ -27,7 +27,7 @@ func snapshotLogViewerGlobals(t *testing.T) {
 		ConfigLogMaxLines = prevMaxLines
 	})
 	// Reset to compiled defaults before each test.
-	ConfigLogTailLines = 1000
+	ConfigLogTailLines = 100
 	ConfigLogTailLinesShort = 10
 	ConfigLogRenderAnsi = true
 	ConfigLogShowPreview = true
@@ -128,7 +128,7 @@ func TestLogViewer_OmittedKeysPreserveDefaults(t *testing.T) {
 	assert.True(t, ConfigLogShowTimestamps, "show_timestamps applied")
 	assert.True(t, ConfigLogShowPreview, "show_preview default preserved")
 	assert.True(t, ConfigLogShowPrefixes, "show_prefixes default preserved")
-	assert.Equal(t, 1000, ConfigLogTailLines, "tail_lines default preserved")
+	assert.Equal(t, 100, ConfigLogTailLines, "tail_lines default preserved")
 }
 
 // TestLogViewer_NonPositiveTailLinesIgnored verifies a stray 0 keeps the default
@@ -142,6 +142,6 @@ func TestLogViewer_NonPositiveTailLinesIgnored(t *testing.T) {
 `)
 	LoadConfig(path)
 
-	assert.Equal(t, 1000, ConfigLogTailLines, "tail_lines: 0 ignored")
+	assert.Equal(t, 100, ConfigLogTailLines, "tail_lines: 0 ignored")
 	assert.Equal(t, 10, ConfigLogTailLinesShort, "tail_lines_short: -5 ignored")
 }

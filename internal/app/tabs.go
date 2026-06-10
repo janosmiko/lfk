@@ -424,6 +424,7 @@ func (m *Model) saveCurrentTab() {
 	t.yamlCollapsed = copyMapStringBool(m.yamlView.collapsed)
 	t.splitPreview = m.splitPreview
 	t.fullYAMLPreview = m.fullYAMLPreview
+	t.fullLogPreview = m.fullLogPreview
 	t.previewYAML = m.previewYAML
 	t.namespace = m.namespace
 	t.allNamespaces = m.allNamespaces
@@ -506,6 +507,11 @@ func (m *Model) saveCurrentTab() {
 	t.explainScroll = m.explainScroll
 	t.explainSearchQuery = m.explainSearchQuery
 	m.saveSecurityStateToTab(t)
+	// Cache the current preview buffer then cancel the stream so it does not
+	// outlive the tab. The fullLogPreview flag is persisted above, so the next
+	// loadTab will know to restart (and can restore from cache) if needed.
+	m.cachePreviewLog()
+	m.cancelPreviewLogStream()
 }
 
 // loadTab restores Model fields from the given tab index.
@@ -542,6 +548,7 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.yamlView.collapsed = copyMapStringBool(t.yamlCollapsed)
 	m.splitPreview = t.splitPreview
 	m.fullYAMLPreview = t.fullYAMLPreview
+	m.fullLogPreview = t.fullLogPreview
 	m.previewYAML = t.previewYAML
 	m.namespace = t.namespace
 	m.allNamespaces = t.allNamespaces
@@ -714,6 +721,7 @@ func (m *Model) cloneCurrentTab() TabState {
 		yamlCollapsed:          copyMapStringBool(m.yamlView.collapsed),
 		splitPreview:           m.splitPreview,
 		fullYAMLPreview:        m.fullYAMLPreview,
+		fullLogPreview:         m.fullLogPreview,
 		previewYAML:            m.previewYAML,
 		namespace:              m.namespace,
 		allNamespaces:          m.allNamespaces,

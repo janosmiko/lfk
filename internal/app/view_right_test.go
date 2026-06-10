@@ -316,3 +316,26 @@ func TestCovLeftColumnHeader(t *testing.T) {
 		assert.Equal(t, tt.expect, m.leftColumnHeader())
 	}
 }
+
+// --- fullLogPreview render branch ---
+
+func TestRightColumnRendersLogPreview(t *testing.T) {
+	m := basePush80Model()
+	m.fullLogPreview = true
+	m.previewLog.lines = []string{"log-line-alpha"}
+	out := stripANSI(m.renderRightColumn(40, 20))
+	assert.Contains(t, out, "LIVE LOGS")
+	assert.Contains(t, out, "log-line-alpha")
+}
+
+func TestHasSplitPreviewFalseWhenLogPreview(t *testing.T) {
+	m := Model{
+		fullLogPreview: true,
+		nav: model.NavigationState{
+			Level:        model.LevelResources,
+			ResourceType: model.ResourceTypeEntry{Kind: "Deployment"},
+		},
+		rightItems: []model.Item{{Name: "pod-1"}},
+	}
+	assert.False(t, m.hasSplitPreview(), "fullLogPreview must suppress the children/details split")
+}

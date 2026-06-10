@@ -83,7 +83,8 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			if cmd := m.loadTab(next); cmd != nil {
 				return m, cmd, true
 			}
-			return m, m.postTabSwitchCmd(), true
+			m, logCmd := m.maybeRestartOrCancelPreviewLog()
+			return m, tea.Batch(m.postTabSwitchCmd(), logCmd), true
 		}
 	case kb.PrevTab:
 		if len(m.tabs) > 1 {
@@ -95,7 +96,8 @@ func (m Model) handleTabSwitchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 			if cmd := m.loadTab(prev); cmd != nil {
 				return m, cmd, true
 			}
-			return m, m.postTabSwitchCmd(), true
+			m, logCmd := m.maybeRestartOrCancelPreviewLog()
+			return m, tea.Batch(m.postTabSwitchCmd(), logCmd), true
 		}
 	case kb.NewTab:
 		if m.mode == modeKubetris && m.kubetrisGame != nil && !m.kubetrisGame.paused {

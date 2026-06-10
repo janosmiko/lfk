@@ -555,12 +555,15 @@ var ConfigConfirmOnExit = true
 // looks awkward.
 var ConfigDimOverlay = true
 
-// ConfigLogTailLines controls how many log lines are initially loaded via --tail.
-var ConfigLogTailLines = 1000
+// ConfigLogTailLines controls how many log lines are initially loaded via
+// --tail (per container). Kept small by default — older history loads on
+// scroll-up — so opening logs on a multi-container pod doesn't dump tens of
+// thousands of lines at once.
+var ConfigLogTailLines = 100
 
 // ConfigLogTailLinesShort is the tail line count used by the "Tail Logs" action
 // menu entry. It intentionally defaults to a small value (10) so users get a
-// lightweight peek at recent output without the full 1000-line hit.
+// lightweight peek at recent output without the full 100-line hit.
 var ConfigLogTailLinesShort = 10
 
 // ConfigLogRenderAnsi controls whether the log viewer preserves ANSI SGR

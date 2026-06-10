@@ -69,6 +69,24 @@ func (m *Model) clampPreviewScroll() {
 		colHeight-- // tab bar
 	}
 
+	// The live-log preview occupies the full right pane (early-return in
+	// renderRightColumn). Clamp its dedicated fromBottom offset against the
+	// physical line count so the view cannot scroll past the oldest line.
+	// Uses the same PreviewLogPhysicalCount helper as RenderLogPreview so
+	// clamp and render always agree on the total line count.
+	if m.fullLogPreview {
+		bodyHeight := max(colHeight-1, 1)
+		total := ui.PreviewLogPhysicalCount(m.previewLog.lines, innerW)
+		maxFromBottom := max(total-bodyHeight, 0)
+		if m.previewLog.fromBottom > maxFromBottom {
+			m.previewLog.fromBottom = maxFromBottom
+		}
+		if m.previewLog.fromBottom < 0 {
+			m.previewLog.fromBottom = 0
+		}
+		return
+	}
+
 	// Compute footer lines (must match renderRightColumn): the metrics rollup
 	// and/or the list summary band are pinned to the bottom and excluded from
 	// the scrollable area.
@@ -217,6 +235,13 @@ func (m Model) previewSummaryBand(width int) string {
 }
 
 func (m Model) renderRightColumn(width, height int) string {
+	// Live-log preview mode: the right pane is fully occupied by the log tail.
+	// Return early before footer and split-preview processing, mirroring the
+	// fullYAMLPreview early-return that lives inside renderRightColumnContent.
+	if m.fullLogPreview {
+		return ui.RenderLogPreview(m.previewLog.lines, m.previewLog.err, width, height, m.previewLogPodLabel(), m.previewLog.fromBottom)
+	}
+
 	// Build the pinned footer (bottom of the pane): resource usage (metrics)
 	// and the list summary band, each preceded by a separator. They are
 	// mutually exclusive in practice (metrics at the resource levels, the band
@@ -369,7 +394,7 @@ func (m Model) isRightListPreview() bool {
 
 // hasSplitPreview returns true when the right column shows children + details (split view).
 func (m Model) hasSplitPreview() bool {
-	if m.fullYAMLPreview || m.mapView {
+	if m.fullYAMLPreview || m.mapView || m.fullLogPreview {
 		return false
 	}
 	if m.nav.Level == model.LevelResources && (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod") && len(m.rightItems) > 0 {

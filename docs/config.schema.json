@@ -118,7 +118,7 @@
     "log_tail_lines": {
       "type": "integer",
       "description": "Deprecated alias for log_viewer.tail_lines. Number of log lines loaded initially via --tail. Scrolling to the top loads older history.",
-      "default": 1000
+      "default": 100
     },
     "log_tail_lines_short": {
       "type": "integer",
@@ -395,7 +395,8 @@
         "cluster_color_picker": { "type": "string" },
         "local_cluster_manager": { "type": "string" },
         "security_ignore_toggle": { "type": "string" },
-        "security_badge_toggle": { "type": "string" }
+        "security_badge_toggle": { "type": "string" },
+        "toggle_preview_logs": { "type": "string" }
       }
     },
     "view": {
@@ -596,7 +597,7 @@
         "tail_lines": {
           "type": "integer",
           "description": "Number of log lines loaded initially via --tail. Scrolling to the top loads older history.",
-          "default": 1000
+          "default": 100
         },
         "tail_lines_short": {
           "type": "integer",
@@ -621,6 +622,11 @@
         "show_timestamps": {
           "type": "boolean",
           "description": "Startup default for log line timestamps (runtime toggle: s). Set true to start with timestamps shown.",
+          "default": false
+        },
+        "preview_live": {
+          "type": "boolean",
+          "description": "Startup default for the right-pane live-log preview toggle (runtime toggle: L). When true the explorer opens with live logs streaming in the right pane for the selected pod.",
           "default": false
         },
         "max_lines": {

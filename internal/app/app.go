@@ -94,6 +94,17 @@ type Model struct {
 	splitPreview bool
 	// Full YAML preview: show only YAML in the right column (no children list).
 	fullYAMLPreview bool
+	// Full log preview: show the selected pod's live logs in the right column.
+	fullLogPreview bool
+	// previewLog holds the bounded buffer and stream state for the live-log
+	// right-pane preview (see previewlog.go).
+	previewLog previewLogState
+	// previewLogCache is a per-pod LRU buffer cache so re-visiting a pod
+	// restores lines instantly instead of re-fetching from scratch.
+	// Keyed by podRef.key() ("ctx/ns/name"). Bounded to previewLogCacheMax entries.
+	// Cleared on context switch to prevent cross-cluster restore.
+	previewLogCache      map[string]previewLogCacheEntry
+	previewLogCacheOrder []string // insertion/access order for LRU eviction (oldest first)
 	// Separate YAML content for the split/full preview in the right column,
 	// so it doesn't conflict with the full-screen yamlView.content.
 	previewYAML string

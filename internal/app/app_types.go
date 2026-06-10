@@ -434,6 +434,7 @@ type TabState struct {
 	yamlCollapsed      map[string]bool // collapsed state for YAML sections
 	splitPreview       bool
 	fullYAMLPreview    bool
+	fullLogPreview     bool
 	previewYAML        string
 	namespace          string
 	allNamespaces      bool

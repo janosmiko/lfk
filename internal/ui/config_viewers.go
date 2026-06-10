@@ -18,6 +18,11 @@ var ConfigLogShowPrefixes = true
 // (runtime toggle: s). Default false (timestamps hidden).
 var ConfigLogShowTimestamps = false
 
+// ConfigLogPreviewLive is the startup default for the right-pane live-log
+// preview toggle (runtime toggle: L). When true the explorer opens with live
+// logs streaming in the right pane for the selected pod. Default false.
+var ConfigLogPreviewLive = false
+
 // ConfigYAMLViewerWrap is the startup default for YAML viewer line wrapping
 // (runtime toggle: z). Default false.
 var ConfigYAMLViewerWrap = false

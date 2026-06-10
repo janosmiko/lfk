@@ -13,7 +13,7 @@ func TestDefaultKeybindings_CriticalDefaults(t *testing.T) {
 	assert.Equal(t, "l", kb.Right)
 	assert.Equal(t, "j", kb.Down)
 	assert.Equal(t, "k", kb.Up)
-	assert.Equal(t, "L", kb.Logs)
+	assert.Equal(t, "ctrl+l", kb.Logs)
 	assert.Equal(t, "v", kb.Describe)
 	assert.Equal(t, "D", kb.Delete)
 	assert.Equal(t, "ctrl+g", kb.FinalizerSearch)

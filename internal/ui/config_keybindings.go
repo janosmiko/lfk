@@ -134,6 +134,13 @@ type Keybindings struct {
 	// SecurityBadgeToggle shows/hides the per-resource SEC severity badge on
 	// explorer rows without affecting the Security dashboard or source probing.
 	SecurityBadgeToggle string `json:"security_badge_toggle" yaml:"security_badge_toggle"`
+
+	// TogglePreviewLogs toggles the right-pane live-log preview for the
+	// selected pod. Bound to "L" (shift+l) at deeper levels (resources,
+	// containers); at Level=Clusters the same key opens ClusterColorPicker
+	// and the dispatcher gates accordingly. The fullscreen log viewer
+	// (kb.Logs) uses "ctrl+l" so the plain "L" is free for this toggle.
+	TogglePreviewLogs string `json:"toggle_preview_logs" yaml:"toggle_preview_logs"`
 }
 
 // DefaultKeybindings returns the default keybinding configuration.
@@ -166,7 +173,7 @@ func DefaultKeybindings() Keybindings {
 
 		// Actions
 		NamespaceSelector: "\\", AllNamespaces: "A", ActionMenu: "x",
-		Logs: "L", LabelEditor: "i", SecretEditor: "e",
+		Logs: "ctrl+l", LabelEditor: "i", SecretEditor: "e",
 		CreateTemplate: "a", Refresh: "R", Restart: "r",
 		Exec: "s", Edit: "E", Describe: "v", Delete: "D",
 		ForceDelete: "X", Scale: "S",
@@ -200,18 +207,24 @@ func DefaultKeybindings() Keybindings {
 		SecurityIgnoreToggle: "i",
 		SecurityBadgeToggle:  "B",
 
-		// Cluster color picker. Bound to Shift+L because the picker only
-		// exists at Level=Clusters and "L" is otherwise the Logs action
-		// (which has no meaning at the cluster picker — no pods to
-		// stream from). The dispatch case is gated on Level=Clusters
-		// and breaks out at deeper levels so "L" continues to open
-		// Logs everywhere else.
+		// Cluster color picker. Bound to "L" (shift+l) because the picker
+		// only exists at Level=Clusters. At deeper levels the same key
+		// opens the live-log preview pane (TogglePreviewLogs). The dispatch
+		// case in handleExplorerNavKey is gated on Level=Clusters and breaks
+		// at deeper levels so handleExplorerUIKey can pick up "L" for the
+		// live-log toggle. The fullscreen log viewer uses "ctrl+l".
 		ClusterColorPicker: "L",
 
 		// Local cluster manager. Ctrl+N is gated on Level=Clusters in
 		// the dispatcher so it doesn't shadow other keys at deeper
 		// levels.
 		LocalClusterManager: "ctrl+n",
+
+		// Live-log preview pane toggle. "L" (shift+l) at resource/container
+		// levels; at Level=Clusters the same key opens ClusterColorPicker
+		// (gated in handleExplorerNavKey). The fullscreen log viewer
+		// (kb.Logs) is "ctrl+l".
+		TogglePreviewLogs: "L",
 	}
 }
 

@@ -38,6 +38,7 @@ log_viewer:
   show_prefixes: false
   show_timestamps: true
   max_lines: 12345
+  preview_live: true
 yaml_viewer:
   wrap: true
 diff_viewer:
@@ -191,6 +192,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.False(t, ConfigLogShowPrefixes, "log_viewer.show_prefixes")
 	assert.True(t, ConfigLogShowTimestamps, "log_viewer.show_timestamps")
 	assert.Equal(t, 12345, ConfigLogMaxLines, "log_viewer.max_lines")
+	assert.True(t, ConfigLogPreviewLive, "log_viewer.preview_live")
 	assert.True(t, ConfigYAMLViewerWrap, "yaml_viewer.wrap")
 	assert.True(t, ConfigDiffViewerWrap, "diff_viewer.wrap")
 	assert.False(t, ConfigDiffViewerLineNumbers, "diff_viewer.line_numbers")
@@ -378,6 +380,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origShowPrefixes := ConfigLogShowPrefixes
 	origShowTimestamps := ConfigLogShowTimestamps
 	origLogMaxLines := ConfigLogMaxLines
+	origLogPreviewLive := ConfigLogPreviewLive
 	origYAMLWrap := ConfigYAMLViewerWrap
 	origDiffWrap := ConfigDiffViewerWrap
 	origDiffLineNums := ConfigDiffViewerLineNumbers
@@ -456,6 +459,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigLogShowPrefixes = origShowPrefixes
 		ConfigLogShowTimestamps = origShowTimestamps
 		ConfigLogMaxLines = origLogMaxLines
+		ConfigLogPreviewLive = origLogPreviewLive
 		ConfigYAMLViewerWrap = origYAMLWrap
 		ConfigDiffViewerWrap = origDiffWrap
 		ConfigDiffViewerLineNumbers = origDiffLineNums

@@ -441,6 +441,15 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case logLineMsg:
 		mdl, cmd := m.updateLogLine(msg)
 		return mdl, cmd, true
+	case previewLogLineMsg:
+		mdl, cmd := m.updatePreviewLogLine(msg)
+		return mdl, cmd, true
+	case previewLogRestartMsg:
+		mdl, cmd := m.updatePreviewLogRestart(msg)
+		return mdl, cmd, true
+	case previewLogHistoryMsg:
+		mdl := m.updatePreviewLogHistory(msg)
+		return mdl, nil, true
 	case logStreamRestartMsg:
 		mdl, cmd := m.updateLogStreamRestart(msg)
 		return mdl, cmd, true
