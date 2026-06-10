@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.14.3](https://github.com/janosmiko/lfk/compare/v0.14.2...v0.14.3) (2026-06-10)
+
+
+### Features
+
+* **preview:** live-log preview in the explorer right pane ([#405](https://github.com/janosmiko/lfk/issues/405)) ([9bc6994](https://github.com/janosmiko/lfk/commit/9bc6994de8243340ed286ef4199f2bdfe01550db))
+* **security:** advisor source with reliability recommendations ([#403](https://github.com/janosmiko/lfk/issues/403)) ([51320eb](https://github.com/janosmiko/lfk/commit/51320eb87e432a5079e25946c66cbdde8ef84b4c))
+* **security:** extended heuristic checks + tunable secret_env ([#402](https://github.com/janosmiko/lfk/issues/402)) ([34763bb](https://github.com/janosmiko/lfk/commit/34763bbc1c7e6d22f77d6385c7494a8aa250bee3))
+
+
+### Bug Fixes
+
+* **exec:** use cmd.exe/PowerShell when exec-ing into Windows pods ([#407](https://github.com/janosmiko/lfk/issues/407)) ([b078fdf](https://github.com/janosmiko/lfk/commit/b078fdfa1c73fa2693f5eb37622487c2e8b61c13)), closes [#406](https://github.com/janosmiko/lfk/issues/406)
+* pin the affected-resources table while finding-group details scroll ([#404](https://github.com/janosmiko/lfk/issues/404)) ([473f61f](https://github.com/janosmiko/lfk/commit/473f61fd4b22ebc4e21c3cc2fd47ac67f8994d08))
+* stop preview-pane wheel from scrolling the pane to its left ([#398](https://github.com/janosmiko/lfk/issues/398)) ([#399](https://github.com/janosmiko/lfk/issues/399)) ([24318b0](https://github.com/janosmiko/lfk/commit/24318b00ecfb8e58ec8d861988b629bcfd501659))
+
 ## [0.14.2](https://github.com/janosmiko/lfk/compare/v0.14.1...v0.14.2) (2026-06-09)
 
 
