@@ -395,6 +395,7 @@ type actionContext struct {
 	namespace     string // namespace of the target resource (captured at action time)
 	context       string // kubeconfig context name (captured at action time)
 	containerName string // container name (for exec/logs at container level)
+	os            string // pod OS ("windows"/"linux"/""); resolved before exec to pick the shell
 	image         string // container image (for vuln scan at container level)
 	resourceType  model.ResourceTypeEntry
 	columns       []model.KeyValue // additional item columns (e.g., Node, IP) for custom action templates

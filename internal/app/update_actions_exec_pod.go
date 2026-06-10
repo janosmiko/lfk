@@ -138,8 +138,10 @@ func (m Model) executeActionExec() (tea.Model, tea.Cmd) {
 	if m.actionCtx.containerName != "" {
 		cArg = " -c " + m.actionCtx.containerName
 	}
-	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl exec -it %s%s -n %s --context %s -- /bin/sh -c 'clear; command -v bash >/dev/null && exec bash || { command -v ash >/dev/null && exec ash || exec sh; }'", name, cArg, ns, ctx))
-	return m, m.execKubectlExec()
+	m.addLogEntry("DBG", fmt.Sprintf("$ kubectl exec -it %s%s -n %s --context %s -- <shell> (auto-selected by pod OS)", name, cArg, ns, ctx))
+	// Resolve the pod OS first (off the event loop), then launch exec with the
+	// matching shell — Linux pods get sh/bash, Windows pods get cmd/PowerShell.
+	return m, m.detectExecPodOSCmd()
 }
 
 // executeActionAttach handles the "Attach" action.
