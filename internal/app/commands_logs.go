@@ -326,9 +326,19 @@ func matchesContainerFilter(line string, selectedContainers []string) bool {
 
 // waitForLogLine returns a tea.Cmd that reads the next line from the log channel.
 func (m Model) waitForLogLine() tea.Cmd {
-	ch := m.logView.ch
+	return m.readLogChannel(m.logView.ch)
+}
+
+// readLogChannel arms a one-shot reader for ch and records that a reader is
+// outstanding (so tab switches can avoid spawning duplicates). The flag is
+// cleared in updateLogLine when the reader's message arrives — by then the
+// goroutine has exited. Returns nil for a nil channel.
+func (m Model) readLogChannel(ch chan string) tea.Cmd {
 	if ch == nil {
 		return nil
+	}
+	if m.logReaderInFlight != nil {
+		m.logReaderInFlight[ch] = true
 	}
 	return func() tea.Msg {
 		line, ok := <-ch
@@ -337,6 +347,18 @@ func (m Model) waitForLogLine() tea.Cmd {
 		}
 		return logLineMsg{line: line, ch: ch}
 	}
+}
+
+// waitForLogLineIfIdle arms a reader for the active log channel only when none
+// is already outstanding. Used by tab-switch paths, which would otherwise stack
+// a fresh reader on top of the one updateLogLine already keeps alive — leaving
+// multiple goroutines racing the same channel and delivering lines out of order.
+func (m Model) waitForLogLineIfIdle() tea.Cmd {
+	ch := m.logView.ch
+	if ch == nil || m.logReaderInFlight[ch] {
+		return nil
+	}
+	return m.readLogChannel(ch)
 }
 
 // startMultiLogStream spawns one kubectl logs process per selected item and

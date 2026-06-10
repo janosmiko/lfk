@@ -539,7 +539,7 @@ func (m Model) switchToTab(tab int) (tea.Model, tea.Cmd) {
 		return m, m.loadPreview()
 	}
 	if m.mode == modeLogs && m.logView.ch != nil {
-		return m, m.waitForLogLine()
+		return m, m.waitForLogLineIfIdle()
 	}
 	if m.mode == modeExec && m.execPTY != nil {
 		return m, m.scheduleExecTick()

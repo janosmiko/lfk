@@ -275,6 +275,15 @@ type Model struct {
 	// see logview.go.
 	logView logViewState
 
+	// logReaderInFlight records, per log channel, whether a one-shot reader
+	// goroutine is currently blocked on it. Switching into a logs tab used to
+	// arm a fresh reader unconditionally, accumulating duplicate readers (and
+	// out-of-order lines) on every switch. The guard lets tab switches skip
+	// arming when a reader is already outstanding; updateLogLine keeps the
+	// single reader alive. Shared map (reference type) so all by-value Model
+	// copies observe the same state; only touched on the update goroutine.
+	logReaderInFlight map[chan string]bool
+
 	// Full-screen describe viewer state (kubectl-describe output): content,
 	// scroll/cursor, auto-refresh, search, and visual selection. Extracted
 	// from the formerly flat describe* fields into one cohesive value; see

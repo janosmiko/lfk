@@ -164,7 +164,7 @@ func (m Model) postTabSwitchCmd() tea.Cmd {
 		return tea.Batch(cmds...)
 	}
 	if m.mode == modeLogs && m.logView.ch != nil {
-		return m.waitForLogLine()
+		return m.waitForLogLineIfIdle()
 	}
 	if m.mode == modeExec && m.execPTY != nil {
 		return m.scheduleExecTick()

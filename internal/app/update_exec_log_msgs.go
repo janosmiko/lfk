@@ -64,6 +64,18 @@ func (m Model) updateExecPTYStart(msg execPTYStartMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
+	// The reader that produced this message has exited (it does one receive then
+	// returns). Mark the channel idle; the branches below re-arm exactly one
+	// reader when the stream is still live, maintaining the single-reader
+	// invariant the tab-switch guard relies on. Drop the entry entirely on
+	// stream end so the map doesn't retain closed channels.
+	if m.logReaderInFlight != nil {
+		if msg.done {
+			delete(m.logReaderInFlight, msg.ch)
+		} else {
+			m.logReaderInFlight[msg.ch] = false
+		}
+	}
 	if msg.ch != m.logView.ch {
 		// Message from a background tab's log stream — buffer it into that tab's state.
 		for i := range m.tabs {
@@ -81,15 +93,8 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 						// old sub-line skip no longer applies.
 						m.tabs[i].logWrapTopSkip = 0
 					}
-					// Continue draining: re-issue waitForLogLine for that channel.
-					ch := msg.ch
-					return m, func() tea.Msg {
-						line, ok := <-ch
-						if !ok {
-							return logLineMsg{done: true, ch: ch}
-						}
-						return logLineMsg{line: line, ch: ch}
-					}
+					// Continue draining: re-arm a reader for that channel.
+					return m, m.readLogChannel(msg.ch)
 				}
 				break
 			}
