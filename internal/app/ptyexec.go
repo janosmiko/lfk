@@ -17,9 +17,11 @@ import (
 )
 
 // execPTYTickMsg triggers a re-render of the embedded terminal.
-// The ptmx field identifies which tab's terminal this tick belongs to.
+// The ptmx field identifies which tab's terminal this tick belongs to; gen is
+// the chain generation, used to drop ticks from superseded tick chains.
 type execPTYTickMsg struct {
 	ptmx *os.File
+	gen  uint64
 }
 
 // execPTYExitMsg signals that the PTY process has exited.
@@ -69,11 +71,25 @@ func ptyStartErrorForOS(err error, goos string) error {
 	return fmt.Errorf("failed to start PTY: %w", err)
 }
 
-// scheduleExecTick schedules the next terminal refresh tick.
+// nextExecTickGen advances and returns the terminal-refresh generation. Every
+// freshly armed tick chain takes a new generation so the handler can drop ticks
+// from chains armed by earlier tab switches. Returns 0 when the counter is
+// uninitialized (models built directly in tests rather than via NewModel), which
+// disables superseding but keeps the tick working.
+func (m Model) nextExecTickGen() uint64 {
+	if m.execTickGen == nil {
+		return 0
+	}
+	return m.execTickGen.Add(1)
+}
+
+// scheduleExecTick schedules the next terminal refresh tick, stamping it with a
+// fresh generation.
 func (m Model) scheduleExecTick() tea.Cmd {
 	ptmx := m.execPTY
+	gen := m.nextExecTickGen()
 	return tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
-		return execPTYTickMsg{ptmx: ptmx}
+		return execPTYTickMsg{ptmx: ptmx, gen: gen}
 	})
 }
 

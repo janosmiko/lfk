@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -109,6 +110,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		eventGrouping:              ui.ConfigEventsGrouping,
 		scheduler:                  scheduler.New(scheduler.DefaultThreshold),
 		diffView:                   diffViewState{wrap: ui.ConfigDiffViewerWrap, lineNumbers: ui.ConfigDiffViewerLineNumbers, unified: ui.ConfigDiffViewerUnified},
+		execTickGen:                &atomic.Uint64{},
 		reqCtx:                     reqCtx,
 		reqCancel:                  reqCancel,
 		middleTableRenderer:        ui.NewTableRenderer(),

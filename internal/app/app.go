@@ -306,6 +306,12 @@ type Model struct {
 	execEscPressed   bool           // Ctrl+] prefix pressed, waiting for follow-up key
 	execScrollback   *scrollback    // Line ring captured from the PTY byte stream for scrollback
 	execScrollOffset int            // 0 = live; >0 = N rows scrolled back into history
+	// execTickGen is the generation token for the 50ms terminal-refresh tick.
+	// Every arm (tab switch, focus, PTY start) takes a fresh generation; the
+	// tick handler re-arms only the current generation, so older chains die
+	// instead of accumulating one render loop per tab switch. Shared pointer so
+	// all by-value Model copies see the same counter.
+	execTickGen *atomic.Uint64
 
 	// Multi-selection state: maps "namespace/name" keys to selected status.
 	selectedItems   map[string]bool
