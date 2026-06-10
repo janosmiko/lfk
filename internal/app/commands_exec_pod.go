@@ -1,11 +1,13 @@
 package app
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"os"
 	"os/exec"
 	"strings"
+	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 
@@ -13,6 +15,70 @@ import (
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/ui"
 )
+
+// execPodOSResolvedMsg carries the result of the pre-exec pod-OS lookup back to
+// the Update loop so it can launch kubectl exec with the right shell. A lookup
+// failure or unknown OS is reported as an empty podOS (the Linux shell default),
+// so there is no error to propagate here.
+type execPodOSResolvedMsg struct {
+	podOS string
+}
+
+// detectExecPodOSCmd resolves the selected pod's OS in the background (a single
+// pod GET, off the Bubble Tea event loop) and emits execPodOSResolvedMsg. On
+// error the message still fires with an empty podOS so exec falls back to the
+// Linux shell rather than blocking — Windows is the only OS that needs special
+// handling, and a transient lookup failure shouldn't break Linux exec.
+func (m Model) detectExecPodOSCmd() tea.Cmd {
+	client := m.client
+	kctx := m.actionCtx.context
+	ns := m.actionNamespace()
+	name := m.actionCtx.name
+	return func() tea.Msg {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		podOS, err := client.GetPodOS(ctx, kctx, ns, name)
+		if err != nil {
+			logger.Warn("Could not resolve pod OS for exec; defaulting to Linux shell", "pod", name, "error", err)
+			return execPodOSResolvedMsg{}
+		}
+		return execPodOSResolvedMsg{podOS: podOS}
+	}
+}
+
+// updateExecPodOSResolved fires once the pre-exec pod-OS lookup completes. It
+// records the resolved OS on the action context and launches kubectl exec with
+// the matching shell. A non-nil err is already downgraded to an empty podOS by
+// detectExecPodOSCmd, so this path always proceeds to exec.
+func (m Model) updateExecPodOSResolved(msg execPodOSResolvedMsg) (tea.Model, tea.Cmd) {
+	m.actionCtx.os = msg.podOS
+	return m, m.execKubectlExec()
+}
+
+// linuxExecShellCmd is the POSIX shell bootstrap used to exec into Linux
+// containers: clear the screen, then prefer bash, then ash, then plain sh.
+const linuxExecShellCmd = "clear; command -v bash >/dev/null && exec bash || { command -v ash >/dev/null && exec ash || exec sh; }"
+
+// windowsExecShellCmd prefers PowerShell and falls back to cmd.exe when it is
+// absent (e.g. nanoserver base images, which ship only cmd.exe). cmd's `||`
+// runs the fallback when powershell.exe is missing or exits non-zero.
+const windowsExecShellCmd = "powershell.exe -NoLogo -NoProfile || cmd.exe"
+
+// execShellArgs builds the `kubectl exec` argument list for an interactive
+// shell, selecting the shell by pod OS. Windows pods (podOS "windows") get a
+// cmd.exe-launched PowerShell→cmd fallback; everything else (including an empty
+// podOS, meaning detection failed or the field is unset) gets the Linux shell
+// chain. displayCtx is the kubectl --context name; container is optional.
+func execShellArgs(name, namespace, displayCtx, container, podOS string) []string {
+	args := []string{"exec", "-it", name, "-n", namespace, "--context", displayCtx}
+	if container != "" {
+		args = append(args, "-c", container)
+	}
+	if strings.EqualFold(podOS, "windows") {
+		return append(args, "--", "cmd.exe", "/c", windowsExecShellCmd)
+	}
+	return append(args, "--", "/bin/sh", "-c", linuxExecShellCmd)
+}
 
 func (m Model) execKubectlExec() tea.Cmd {
 	kubectlPath, err := exec.LookPath("kubectl")
@@ -23,11 +89,7 @@ func (m Model) execKubectlExec() tea.Cmd {
 	}
 
 	ns := m.actionNamespace()
-	args := []string{"exec", "-it", m.actionCtx.name, "-n", ns, "--context", m.kubectlContext(m.actionCtx.context)}
-	if m.actionCtx.containerName != "" {
-		args = append(args, "-c", m.actionCtx.containerName)
-	}
-	args = append(args, "--", "/bin/sh", "-c", "clear; command -v bash >/dev/null && exec bash || { command -v ash >/dev/null && exec ash || exec sh; }")
+	args := execShellArgs(m.actionCtx.name, ns, m.kubectlContext(m.actionCtx.context), m.actionCtx.containerName, m.actionCtx.os)
 
 	logger.Info("Starting kubectl exec", "args", strings.Join(args, " "))
 	cmd := exec.Command(kubectlPath, args...)

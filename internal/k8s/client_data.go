@@ -286,6 +286,29 @@ func (c *Client) GetPodResourceRequests(ctx context.Context, contextName, namesp
 	return cpuReq, cpuLim, memReq, memLim, nil
 }
 
+// GetPodOS returns the operating system of a pod, used to pick the right
+// interactive shell on exec. It reads the GA spec.os.name field first
+// (set by the API server / admission for Windows pods), then falls back to
+// the kubernetes.io/os node selector. Returns "" when neither is present,
+// which callers treat as the default (Linux) shell.
+func (c *Client) GetPodOS(ctx context.Context, contextName, namespace, podName string) (string, error) {
+	cs, err := c.clientsetForContext(contextName)
+	if err != nil {
+		return "", err
+	}
+	pod, err := cs.CoreV1().Pods(namespace).Get(ctx, podName, metav1.GetOptions{})
+	if err != nil {
+		return "", fmt.Errorf("getting pod %s/%s: %w", namespace, podName, err)
+	}
+	if pod.Spec.OS != nil && pod.Spec.OS.Name != "" {
+		return string(pod.Spec.OS.Name), nil
+	}
+	if osLabel := pod.Spec.NodeSelector["kubernetes.io/os"]; osLabel != "" {
+		return osLabel, nil
+	}
+	return "", nil
+}
+
 // TriggerCronJob creates a Job from a CronJob template.
 func (c *Client) TriggerCronJob(ctx context.Context, contextName, namespace, cronJobName string) (string, error) {
 	logger.Info("Triggering CronJob", "context", contextName, "namespace", namespace, "cronjob", cronJobName)

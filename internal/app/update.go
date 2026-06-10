@@ -435,6 +435,9 @@ func (m Model) updateEditorResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case execPTYExitMsg:
 		mdl := m.updateExecPTYExit(msg)
 		return mdl, nil, true
+	case execPodOSResolvedMsg:
+		mdl, cmd := m.updateExecPodOSResolved(msg)
+		return mdl, cmd, true
 	case execPTYStartMsg:
 		mdl, cmd := m.updateExecPTYStart(msg)
 		return mdl, cmd, true
