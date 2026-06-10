@@ -13,6 +13,10 @@ const (
 	CategoryMisconfig  Category = "misconfig"
 	CategoryPolicy     Category = "policy"
 	CategoryCompliance Category = "compliance"
+	// CategoryReliability marks operational recommendations (missing PDBs,
+	// quotas, probes) from the advisor source. Excluded from the SEC row
+	// badge — see BuildFindingIndex — and surfaced in the dashboard only.
+	CategoryReliability Category = "reliability"
 )
 
 // Severity is a 4-level scale; sources map their own scales onto these.

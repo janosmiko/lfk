@@ -326,6 +326,23 @@ func TestFindingIndexCountBySourceCrossSourceOverlap(t *testing.T) {
 	assert.Equal(t, 1, idx.CountBySource("policy-report"))
 }
 
+// TestFindingIndexExcludesReliabilityFromCounts verifies that reliability
+// findings (advisor source) never color the per-resource SEC badge: they are
+// excluded from the per-resource severity buckets but still credited to
+// bySource so the sidebar count stays accurate.
+func TestFindingIndexExcludesReliabilityFromCounts(t *testing.T) {
+	ref := ResourceRef{Namespace: "p", Kind: "Deployment", Name: "api"}
+	idx := BuildFindingIndex([]Finding{
+		{Source: "advisor", Category: CategoryReliability, Severity: SeverityMedium, Title: "no PDB", Resource: ref},
+		{Source: "heuristic", Category: CategoryMisconfig, Severity: SeverityLow, Title: "default SA", Resource: ref},
+	})
+
+	counts := idx.For(ref)
+	assert.Equal(t, 0, counts.Medium, "reliability finding must not reach the badge buckets")
+	assert.Equal(t, 1, counts.Low, "security finding still counts")
+	assert.Equal(t, 1, idx.CountBySource("advisor"), "sidebar per-source count keeps reliability findings")
+}
+
 // TestFindingIndexDedupeKeepsHighestSeverity verifies that when two sources
 // report the same (resource, Title) at different severities, the per-resource
 // bucket records the higher one — independent of iteration order. This guards

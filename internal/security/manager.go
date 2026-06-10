@@ -588,6 +588,11 @@ func BuildFindingIndex(findings []Finding) *FindingIndex {
 	maxKey := make(map[string]string) // dedup -> resource Key for the second pass
 	for _, f := range findings {
 		idx.bySource[f.Source]++
+		// Reliability recommendations are dashboard-only: they count toward
+		// the per-source sidebar total above but never color the SEC badge.
+		if f.Category == CategoryReliability {
+			continue
+		}
 		dedup := f.Resource.Key() + "|" + f.Title
 		if cur, ok := maxSev[dedup]; !ok || f.Severity > cur {
 			maxSev[dedup] = f.Severity

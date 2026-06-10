@@ -533,7 +533,7 @@
         },
         "sources": {
           "type": "object",
-          "description": "Enable/disable individual sources. Keys accept friendly names (heuristic, trivy, kyverno, kubescape, falco, gatekeeper) or internal ids (trivy-operator, policy-report). Omitted sources default to enabled.",
+          "description": "Enable/disable individual sources. Keys accept friendly names (heuristic, advisor, trivy, kyverno, kubescape, falco, gatekeeper) or internal ids (trivy-operator, policy-report). Omitted sources default to enabled.",
           "additionalProperties": { "type": "boolean" }
         },
         "ignore_patterns": {
