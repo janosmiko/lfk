@@ -122,6 +122,10 @@ type previewMeasureKey struct {
 	yamlLen     int
 	dashLen     int
 	eventsLen   int
+	// selName invalidates the memo when the middle selection changes while
+	// every layout dimension stays equal — e.g. two security finding groups
+	// with the same affected count but different description lengths.
+	selName string
 }
 
 // measureScrollableLines returns the line count of the scrollable right-pane
@@ -147,6 +151,9 @@ func (m *Model) measureScrollableLines(innerW, scrollableH int) int {
 		yamlLen:     len(yaml),
 		dashLen:     len(m.dashboardPreview) + len(m.monitoringPreview),
 		eventsLen:   len(m.previewEventsContent),
+	}
+	if sel := m.selectedMiddleItem(); sel != nil {
+		key.selName = sel.Name
 	}
 	if key == m.previewMeasureKey && m.previewMeasureLines > 0 {
 		return m.previewMeasureLines
@@ -368,6 +375,12 @@ func (m Model) hasSplitPreview() bool {
 	if m.nav.Level == model.LevelResources && (m.resourceTypeHasChildren() || m.nav.ResourceType.Kind == "Pod") && len(m.rightItems) > 0 {
 		return true
 	}
+	// Security finding groups split the same way: affected resources pinned
+	// on top, group details scrolling below — so previewScroll never pushes
+	// the table out of view.
+	if m.isSecurityGroupSplit() {
+		return true
+	}
 	if m.nav.Level == model.LevelOwned {
 		sel := m.selectedMiddleItem()
 		if sel != nil && sel.Kind == "Pod" && len(m.rightItems) > 0 {
@@ -377,12 +390,26 @@ func (m Model) hasSplitPreview() bool {
 	return false
 }
 
+// isSecurityGroupSplit reports whether the right pane previews a security
+// finding group with its affected resources loaded.
+func (m Model) isSecurityGroupSplit() bool {
+	if m.nav.Level != model.LevelResources || len(m.rightItems) == 0 {
+		return false
+	}
+	sel := m.selectedMiddleItem()
+	return sel != nil && sel.Kind == "__security_finding_group__"
+}
+
 // renderDetailsOnly renders the details portion (without children table) for the right column.
 // The returned string contains a "DETAILS" header line followed by the summary
 // body, and fits within the requested height (body capped at height-1 to
 // reserve one line for the header).
 func (m Model) renderDetailsOnly(width, height int) string {
 	sel := m.selectedMiddleItem()
+	// Security finding groups carry their own title line; no DETAILS header.
+	if sel != nil && sel.Kind == "__security_finding_group__" {
+		return ui.RenderFindingGroupDetails(*sel, nil, width, height)
+	}
 	detailsHeader := ui.DimStyle.Bold(true).Render("DETAILS")
 	bodyHeight := max(height-1, 1)
 	var bottomContent string
@@ -521,12 +548,11 @@ func (m Model) renderRightResources(width, height int) string {
 	if sel != nil && sel.Kind == "__security_finding__" {
 		return ui.RenderFindingDetails(*sel, width, height)
 	}
-	// Security finding groups: split view — affected resources table on
-	// top + group details on the bottom, the same shape as Deployment > Pods.
+	// Security finding groups with affected rows render via the split-preview
+	// machinery in renderRightColumn (pinned affected table + scrolling
+	// details, the same shape as Deployment > Pods), so this path is only
+	// reached before the affected resources have loaded.
 	if sel != nil && sel.Kind == "__security_finding_group__" {
-		if len(m.rightItems) > 0 {
-			return m.renderSecurityGroupSplitPreview(sel, width, height)
-		}
 		if m.previewLoading {
 			return ui.DimStyle.Render(m.spinner.View() + " Loading affected resources...")
 		}
@@ -606,20 +632,6 @@ func (m Model) renderRightDefault(width, height int) string {
 	return m.withSessionColumnsForKind(m.rightColumnKind(), func() string {
 		return ui.RenderTable(strings.ToUpper(m.ownedChildKindLabel()), m.rightItems, -1, width, height, m.loading, m.spinner.View(), "", false)
 	})
-}
-
-// renderSecurityGroupSplitPreview renders a split view for a security
-// finding group: affected resources table on top, group details on the
-// bottom — the same layout as Deployment > Pods.
-func (m Model) renderSecurityGroupSplitPreview(sel *model.Item, width, height int) string {
-	childrenHeight := max((height-2)/3, 2)
-	detailsHeight := max(height-childrenHeight-2, 1)
-
-	childrenContent := ui.RenderTable("AFFECTED RESOURCES", m.rightItems, -1, width, childrenHeight, m.loading, m.spinner.View(), "", false)
-	separator := ui.DimStyle.Render(strings.Repeat("─", width))
-	detailsContent := ui.RenderFindingGroupDetails(*sel, nil, width, detailsHeight)
-
-	return childrenContent + "\n" + separator + "\n" + detailsContent
 }
 
 // renderSplitPreview renders the right column as a split: top children table, bottom details.
@@ -726,6 +738,10 @@ func (m Model) ownedItemKindLabel() string {
 // ownedChildKindLabel returns the label for the children of the selected owned item,
 // shown in the right column (e.g., Containers within a selected Pod).
 func (m Model) ownedChildKindLabel() string {
+	// Security finding groups pin their affected-resources table on top.
+	if m.isSecurityGroupSplit() {
+		return "Affected Resources"
+	}
 	// At the owned level, if the selected item is a Pod, right column shows containers.
 	if m.nav.Level == model.LevelOwned {
 		sel := m.selectedMiddleItem()
