@@ -288,8 +288,8 @@ clusters:
 ## Security
 
 Controls the built-in security findings dashboard. Disable it globally or per
-cluster, or enable only specific sources. Source keys: `heuristic`, `trivy`,
-`kyverno`, `kubescape`, `falco`, `gatekeeper` (the internal ids
+cluster, or enable only specific sources. Source keys: `heuristic`, `advisor`,
+`trivy`, `kyverno`, `kubescape`, `falco`, `gatekeeper` (the internal ids
 `trivy-operator` and `policy-report` are also accepted). Any source omitted
 from `sources` stays enabled.
 

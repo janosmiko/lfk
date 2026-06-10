@@ -106,8 +106,8 @@ appearance:
 
 # ─── Security Dashboard ────────────────────────────────────────────────────────
 # Built-in security findings dashboard (Security sidebar category + SEC badge).
-# Sources auto-detect by their operator/CRDs: heuristic (always on), trivy,
-# kyverno, kubescape, falco, gatekeeper. See docs/security.md.
+# Sources auto-detect by their operator/CRDs: heuristic and advisor (always
+# on), trivy, kyverno, kubescape, falco, gatekeeper. See docs/security.md.
 # Per-context overrides under clusters.<name>.security beat these globals.
 # Default: enabled, all sources on.
 # security:
