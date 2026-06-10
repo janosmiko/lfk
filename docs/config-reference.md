@@ -56,9 +56,10 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `clusters.<name>.read_only` | bool | _(unset)_ | Per-context read-only override. Wins over the global `read_only` so you can mark specific clusters (e.g. `prod`) read-only while leaving others mutable. |
 | `show_rare_types` | bool | `false` | Show the rarely-used resource types (CSI internals, admission webhooks, leases, runtime classes, and the "Advanced" category) in the sidebar from startup, as if `H` were pressed — so the full type list is always visible. The `H` toggle still flips it for the session; it resets to this value on the next launch. |
 | `security.enabled` | bool | `true` | Enable the built-in security findings dashboard (Security category + SEC badge). `false` turns the dashboard and all source probing off. Per-context overrides under `clusters.<name>.security` take precedence. See [Security Dashboard](security.md). |
+| `security.hide_badges` | bool | `false` | Hide the per-resource SEC severity badge by default. The dashboard still scans; only the inline row badge is suppressed. Toggle at runtime with the security badge key (`B`). Per-context overrides under `clusters.<name>.security.hide_badges` take precedence. |
 | `security.sources.<name>` | bool | `true` | Enable/disable individual sources (`heuristic`, `trivy`, `kyverno`, `kubescape`, `falco`, `gatekeeper`). A source omitted from the map stays enabled. |
 | `security.ignore_patterns` | list | _(empty)_ | Declarative glob-based ignore rules applied at load. Each entry has `cluster`, `source`, `group`, `namespace` (globs; empty = any) and an optional `comment`. A finding is hidden when every non-empty field matches. An all-empty entry is dropped. Read-only (not un-ignorable from the UI); the `i` toggle still reveals them. |
-| `clusters.<name>.security` | object | _(unset)_ | Per-context security override (`enabled` and/or `sources`). Wins over the global `security` settings for that context. |
+| `clusters.<name>.security` | object | _(unset)_ | Per-context security override (`enabled`, `hide_badges`, and/or `sources`). Wins over the global `security` settings for that context. |
 | `secret_lazy_loading` | bool | `false` | When `true`, Secret listing fetches metadata only and decoded values load on hover. Much faster in clusters with many Helm release secrets (each release is a multi-hundred-KB Secret) or large TLS payloads, at the cost of an extra GET per hovered Secret. When `false` (default), Secrets list like every other resource type — full objects are pulled and `data` is eagerly decoded, so the Type column and decoded values are visible immediately. See [Secret lazy loading](#secret-lazy-loading) for trade-offs. |
 | `informer_cache` | bool or string | `auto` | Selects the list strategy. Accepts `off` (round-trip every list — matches kubectl), `auto` (default; promote a resource type to a shared informer once a list crosses 1000 items, demote when sustained below 500), and `always` (open a watch eagerly on first use). Legacy bool form is still accepted: `true` → `always`, `false` → `off`. See [Informer cache](#informer-cache) for trade-offs. |
 | `min_contrast_ratio` | float | `0.0` | **Deprecated** — use `appearance.min_contrast_ratio`. Normalized readability knob in `[0.0, 1.0]`. When above zero, foreground colors are nudged in HSL lightness space to meet a minimum WCAG contrast ratio against their paired background. See [Minimum Contrast Ratio](#minimum-contrast-ratio). |
@@ -650,6 +651,8 @@ Template variables are substituted before execution:
 | `{<ColumnKey>}` | Any column value from the resource (e.g., `{Node}`, `{IP}`) — case-insensitive |
 
 Custom action commands are executed via `sh -c` with `KUBECONFIG` set in the environment. Interactive commands (like `ssh`) hand over the terminal to the subprocess.
+
+Substituted values are shell-quoted before insertion, so cluster data (context names, labels, image strings) containing shell metacharacters is passed literally and cannot inject commands. Quoting is transparent for normal argument use — `ssh {Node}` and `/tmp/{name}.log` work as written.
 
 ## Pinned Groups
 

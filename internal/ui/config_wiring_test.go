@@ -100,6 +100,7 @@ kubeshark:
   namespace: traffic-ns
 security:
   enabled: false
+  hide_badges: true
   sources:
     trivy: false
     heuristic: true
@@ -140,6 +141,7 @@ clusters:
         sort_column: Name
     security:
       enabled: false
+      hide_badges: true
       sources:
         falco: false
 `
@@ -212,6 +214,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 
 	// security section.
 	assert.False(t, ConfigSecurityEnabled, "security.enabled")
+	assert.True(t, ConfigSecurityHideBadges, "security.hide_badges")
 	assert.Equal(t, map[string]bool{"trivy": false, "heuristic": true}, ConfigSecuritySources, "security.sources")
 	require.Len(t, ConfigSecurityIgnorePatterns, 1, "security.ignore_patterns")
 	assert.Equal(t, "prod", ConfigSecurityIgnorePatterns[0].Cluster)
@@ -260,6 +263,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	require.Contains(t, ConfigClusterViews, "ctx1", "clusters.views")
 	require.Contains(t, ConfigClusterViews["ctx1"], "deployment")
 	assert.False(t, ConfigClusterSecurityEnabled["ctx1"], "clusters.security.enabled")
+	assert.True(t, ConfigClusterSecurityHideBadges["ctx1"], "clusters.security.hide_badges")
 	assert.Equal(t, map[string]bool{"falco": false}, ConfigClusterSecuritySources["ctx1"], "clusters.security.sources")
 }
 
@@ -393,6 +397,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origReadOnly := ConfigReadOnly
 	origShowRare := ConfigShowRareTypes
 	origSecEnabled := ConfigSecurityEnabled
+	origSecHideBadges := ConfigSecurityHideBadges
 	origSecSources := ConfigSecuritySources
 	origSecIgnore := ConfigSecurityIgnorePatterns
 	origQPS := ConfigK8sClientQPS
@@ -405,6 +410,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origClusterResCols := ConfigClusterResourceColumns
 	origClusterViews := ConfigClusterViews
 	origClusterSecEnabled := ConfigClusterSecurityEnabled
+	origClusterSecHideBadges := ConfigClusterSecurityHideBadges
 	origClusterSecSources := ConfigClusterSecuritySources
 	origClusterQPS := ConfigClusterK8sClientQPS
 	origClusterBurst := ConfigClusterK8sClientBurst
@@ -467,6 +473,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigReadOnly = origReadOnly
 		ConfigShowRareTypes = origShowRare
 		ConfigSecurityEnabled = origSecEnabled
+		ConfigSecurityHideBadges = origSecHideBadges
 		ConfigSecuritySources = origSecSources
 		ConfigSecurityIgnorePatterns = origSecIgnore
 		ConfigK8sClientQPS = origQPS
@@ -479,6 +486,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigClusterResourceColumns = origClusterResCols
 		ConfigClusterViews = origClusterViews
 		ConfigClusterSecurityEnabled = origClusterSecEnabled
+		ConfigClusterSecurityHideBadges = origClusterSecHideBadges
 		ConfigClusterSecuritySources = origClusterSecSources
 		ConfigClusterK8sClientQPS = origClusterQPS
 		ConfigClusterK8sClientBurst = origClusterBurst

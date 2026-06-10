@@ -96,7 +96,7 @@ func saveLocalClusterState(entries []localClusterCacheEntry) error {
 		logger.Warn("local cluster state save failed", "error", err)
 		return err
 	}
-	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 		wrapped := fmt.Errorf("mkdir local-cluster state dir: %w", err)
 		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
 		return wrapped
@@ -111,7 +111,7 @@ func saveLocalClusterState(entries []localClusterCacheEntry) error {
 		return wrapped
 	}
 	tmp := path + ".tmp"
-	if err := os.WriteFile(tmp, body, 0o644); err != nil {
+	if err := os.WriteFile(tmp, body, 0o600); err != nil {
 		wrapped := fmt.Errorf("write local-cluster state tmp: %w", err)
 		logger.Warn("local cluster state save failed", "path", path, "error", wrapped)
 		return wrapped

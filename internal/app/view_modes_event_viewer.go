@@ -30,6 +30,13 @@ func (m Model) viewEventViewer() string {
 	if scroll < 0 {
 		scroll = 0
 	}
+	// Under wrap the loop paginates by physical line from this logical scroll, so
+	// a wrapped entry above the cursor can push it off-screen. Resolve the start
+	// in physical-line units (mirrors the overlay's eventStartForCursor).
+	if m.eventTimelineWrap && len(lines) > 0 {
+		cursor := max(min(m.eventTimelineCursor, len(lines)-1), 0)
+		scroll = m.eventFullscreenStartForCursor(lines, scroll, cursor, maxLines, lineContentWidth)
+	}
 
 	visible := m.renderEventViewerLines(lines, scroll, maxLines, lineContentWidth)
 
@@ -140,6 +147,37 @@ func (m Model) renderEventViewerLines(lines []string, scroll, maxLines, lineCont
 		}
 	}
 	return visible
+}
+
+// eventFullscreenStartForCursor returns the scroll that keeps the cursor entry's
+// first sub-line within maxLines physical lines under wrap, walking back from the
+// cursor and summing each row's wrapped height. Mirrors the overlay's
+// eventStartForCursor so both render paths agree.
+func (m Model) eventFullscreenStartForCursor(lines []string, scroll, cursor, maxLines, contentW int) int {
+	minStart := cursor
+	used := 1 // the cursor entry's first sub-line
+	for s := cursor - 1; s >= 0; s-- {
+		used += eventRowWrappedHeight(lines[s], contentW)
+		if used > maxLines {
+			break
+		}
+		minStart = s
+	}
+	return max(min(scroll, cursor), minStart)
+}
+
+// eventRowWrappedHeight reports how many physical lines a single event row wraps
+// to, counted from the same ui.RenderWrappedEventRow the loop emits (height
+// depends only on the line, width, and hanging indent — not cursor/selection).
+func eventRowWrappedHeight(line string, contentW int) int {
+	block := ui.RenderWrappedEventRow(ui.WrappedEventRowOpts{
+		Line:          line,
+		Gutter:        " ",
+		ContentW:      contentW,
+		HangingIndent: eventTimelineMessageColumn,
+		Fullscreen:    true,
+	})
+	return strings.Count(block, "\n") + 1
 }
 
 func (m Model) renderEventViewerLinesWrapped(lines []string, scroll, maxLines, lineContentWidth, selStart, selEnd, colStart, colEnd int) []string {

@@ -205,6 +205,9 @@ func applySecurityConfig(cfg configFile) {
 	if cfg.Security.Enabled != nil {
 		ConfigSecurityEnabled = *cfg.Security.Enabled
 	}
+	if cfg.Security.HideBadges != nil {
+		ConfigSecurityHideBadges = *cfg.Security.HideBadges
+	}
 	if cfg.Security.Sources != nil {
 		ConfigSecuritySources = cfg.Security.Sources
 	}
@@ -385,6 +388,7 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 		ConfigClusterResourceColumns = make(map[string]map[string][]string, len(cfg.Clusters))
 		ConfigClusterReadOnly = make(map[string]bool, len(cfg.Clusters))
 		ConfigClusterSecurityEnabled = make(map[string]bool, len(cfg.Clusters))
+		ConfigClusterSecurityHideBadges = make(map[string]bool, len(cfg.Clusters))
 		ConfigClusterSecuritySources = make(map[string]map[string]bool, len(cfg.Clusters))
 		ConfigClusterK8sClientQPS = make(map[string]int, len(cfg.Clusters))
 		ConfigClusterK8sClientBurst = make(map[string]int, len(cfg.Clusters))
@@ -408,6 +412,9 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 			if cc.Security != nil {
 				if cc.Security.Enabled != nil {
 					ConfigClusterSecurityEnabled[ctx] = *cc.Security.Enabled
+				}
+				if cc.Security.HideBadges != nil {
+					ConfigClusterSecurityHideBadges[ctx] = *cc.Security.HideBadges
 				}
 				if cc.Security.Sources != nil {
 					ConfigClusterSecuritySources[ctx] = cc.Security.Sources

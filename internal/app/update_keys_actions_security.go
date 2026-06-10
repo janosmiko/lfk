@@ -57,6 +57,12 @@ func (m Model) handleExplorerActionKeySecurityIgnoreToggle() (tea.Model, tea.Cmd
 // hideSecurityBadges into ui.ActiveSecurityBadgesHidden on the next render.
 func (m Model) handleExplorerActionKeySecurityBadgeToggle() (tea.Model, tea.Cmd, bool) {
 	m.hideSecurityBadges = !m.hideSecurityBadges
+	// Record the choice per context so it sticks when re-entering this context
+	// but never leaks into others (mirrors the in-context read-only toggle).
+	if m.contextBadgeOverrides == nil {
+		m.contextBadgeOverrides = make(map[string]bool)
+	}
+	m.contextBadgeOverrides[m.nav.Context] = m.hideSecurityBadges
 	if m.hideSecurityBadges {
 		m.setStatusMessage("Hiding security badges", false)
 	} else {

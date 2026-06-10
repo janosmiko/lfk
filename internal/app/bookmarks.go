@@ -82,7 +82,7 @@ func saveBookmarks(bookmarks []model.Bookmark) error {
 		return nil
 	}
 	dir := filepath.Dir(path)
-	if err := os.MkdirAll(dir, 0o755); err != nil {
+	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return err
 	}
 	data, err := yaml.Marshal(bookmarks)
@@ -127,7 +127,7 @@ func copyFile(src, dst string) error {
 	if err != nil {
 		return err
 	}
-	return os.WriteFile(dst, data, 0o644)
+	return os.WriteFile(dst, data, 0o600)
 }
 
 // removeBookmark removes the bookmark at the given index.

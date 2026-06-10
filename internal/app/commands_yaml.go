@@ -11,6 +11,26 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// writeSecureFile writes data to path with owner-only (0600) permissions,
+// truncating any existing file. Unlike os.WriteFile it also tightens the mode
+// of a pre-existing file, so a resource export that may contain Secret data
+// (base64 tokens, TLS keys) never stays world-readable.
+func writeSecureFile(path string, data []byte) error {
+	f, err := os.OpenFile(path, os.O_WRONLY|os.O_CREATE|os.O_TRUNC, 0o600)
+	if err != nil {
+		return err
+	}
+	if err := f.Chmod(0o600); err != nil {
+		_ = f.Close()
+		return err
+	}
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		return err
+	}
+	return f.Close()
+}
+
 // copyYAMLToClipboard fetches the YAML for the selected resource and sends it for clipboard copy.
 func (m Model) copyYAMLToClipboard() tea.Cmd {
 	// Synthetic security items (e.g., __security_affected_resource__) have
@@ -429,7 +449,7 @@ func (m Model) exportResourceToFile() tea.Cmd {
 		sanitized := strings.ReplaceAll(name, "/", "_")
 		filename := fmt.Sprintf("%s_%s.yaml", kind, sanitized)
 
-		if err := os.WriteFile(filename, []byte(yaml), 0o644); err != nil {
+		if err := writeSecureFile(filename, []byte(yaml)); err != nil {
 			return exportDoneMsg{err: fmt.Errorf("writing file: %w", err)}
 		}
 

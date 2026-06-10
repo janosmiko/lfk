@@ -4,7 +4,6 @@ import (
 	"slices"
 	"sync"
 	"sync/atomic"
-	"time"
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/logger"
@@ -12,16 +11,17 @@ import (
 )
 
 func (m Model) updateExecPTYTick(msg execPTYTickMsg) (tea.Model, tea.Cmd) {
+	// Drop ticks from superseded chains. Every tab switch / focus arms a fresh
+	// generation; without this guard each armed chain self-perpetuates and they
+	// accumulate one 50ms render loop per switch. Generation 0 means the counter
+	// is uninitialized (test models), so skip the check there.
+	if m.execTickGen != nil && msg.gen != m.execTickGen.Load() {
+		return m, nil
+	}
+	// The chain only ticks for the focused exec PTY. Background tabs don't need
+	// ticking — their reader goroutine keeps feeding vt10x regardless, and
+	// switching back into the tab re-arms a fresh chain.
 	if msg.ptmx != m.execPTY || m.mode != modeExec {
-		// Check if a background tab owns this PTY — keep ticking for it.
-		for i := range m.tabs {
-			if i != m.activeTab && m.tabs[i].execPTY == msg.ptmx && m.tabs[i].execPTY != nil {
-				ptmx := msg.ptmx
-				return m, tea.Tick(50*time.Millisecond, func(t time.Time) tea.Msg {
-					return execPTYTickMsg{ptmx: ptmx}
-				})
-			}
-		}
 		return m, nil
 	}
 	// Continue ticking to refresh the terminal view.
@@ -64,6 +64,18 @@ func (m Model) updateExecPTYStart(msg execPTYStartMsg) (tea.Model, tea.Cmd) {
 }
 
 func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
+	// The reader that produced this message has exited (it does one receive then
+	// returns). Mark the channel idle; the branches below re-arm exactly one
+	// reader when the stream is still live, maintaining the single-reader
+	// invariant the tab-switch guard relies on. Drop the entry entirely on
+	// stream end so the map doesn't retain closed channels.
+	if m.logReaderInFlight != nil {
+		if msg.done {
+			delete(m.logReaderInFlight, msg.ch)
+		} else {
+			m.logReaderInFlight[msg.ch] = false
+		}
+	}
 	if msg.ch != m.logView.ch {
 		// Message from a background tab's log stream — buffer it into that tab's state.
 		for i := range m.tabs {
@@ -81,15 +93,8 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 						// old sub-line skip no longer applies.
 						m.tabs[i].logWrapTopSkip = 0
 					}
-					// Continue draining: re-issue waitForLogLine for that channel.
-					ch := msg.ch
-					return m, func() tea.Msg {
-						line, ok := <-ch
-						if !ok {
-							return logLineMsg{done: true, ch: ch}
-						}
-						return logLineMsg{line: line, ch: ch}
-					}
+					// Continue draining: re-arm a reader for that channel.
+					return m, m.readLogChannel(msg.ch)
 				}
 				break
 			}

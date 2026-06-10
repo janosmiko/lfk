@@ -197,13 +197,8 @@ func (c *Client) GetHelmReleaseYAML(ctx context.Context, contextName, namespace,
 		return "", fmt.Errorf("no helm release found for %s", name)
 	}
 
-	// Find the latest version.
-	latest := secretList.Items[0]
-	for _, s := range secretList.Items[1:] {
-		if s.CreationTimestamp.After(latest.CreationTimestamp.Time) {
-			latest = s
-		}
-	}
+	// Find the latest revision.
+	latest := latestHelmReleaseSecret(secretList.Items)
 
 	// Build a summary (not the compressed data).
 	info := map[string]any{
@@ -329,20 +324,37 @@ func (c *Client) collectHelmResourcesByLabels(ctx context.Context, cs kubernetes
 
 // findLatestHelmReleaseSecret returns the newest helm release secret for the
 // given release name in namespace, or ok=false if none exists. The latest is
-// determined by CreationTimestamp.
+// determined by the revision (version label).
 func findLatestHelmReleaseSecret(ctx context.Context, cs kubernetes.Interface, namespace, releaseName string) (corev1.Secret, bool) {
 	opts := metav1.ListOptions{LabelSelector: "owner=helm,name=" + releaseName}
 	list, err := cs.CoreV1().Secrets(namespace).List(ctx, opts)
 	if err != nil || len(list.Items) == 0 {
 		return corev1.Secret{}, false
 	}
-	latest := list.Items[0]
-	for _, s := range list.Items[1:] {
-		if s.CreationTimestamp.After(latest.CreationTimestamp.Time) {
-			latest = s
+	return latestHelmReleaseSecret(list.Items), true
+}
+
+// latestHelmReleaseSecret returns the highest-revision release secret. The helm
+// `version` label is the authoritative revision; CreationTimestamp only breaks
+// ties (its 1s granularity collides on fast install/rollback and CI upgrades,
+// and the API's name-sort orders "v10" before "v2"). items must be non-empty.
+func latestHelmReleaseSecret(items []corev1.Secret) corev1.Secret {
+	latest := items[0]
+	latestVer := helmReleaseRevision(latest)
+	for _, s := range items[1:] {
+		v := helmReleaseRevision(s)
+		if v > latestVer || (v == latestVer && s.CreationTimestamp.After(latest.CreationTimestamp.Time)) {
+			latest, latestVer = s, v
 		}
 	}
-	return latest, true
+	return latest
+}
+
+// helmReleaseRevision parses the integer revision from a release secret's
+// `version` label, returning 0 when absent or malformed.
+func helmReleaseRevision(s corev1.Secret) int {
+	n, _ := strconv.Atoi(s.Labels["version"])
+	return n
 }
 
 // buildItemsFromManifestRefs converts parsed manifest refs into model.Items.

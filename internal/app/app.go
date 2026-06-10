@@ -219,6 +219,11 @@ type Model struct {
 	// wins over per-context and global config when entering that context;
 	// CLI --read-only still wins over both.
 	contextROOverrides map[string]bool
+	// contextBadgeOverrides holds session-scoped per-context hide-badges state
+	// set by the user via kb.SecurityBadgeToggle. A present entry wins over
+	// per-context and global config when (re-)entering that context, so a toggle
+	// sticks within a context but never leaks across contexts.
+	contextBadgeOverrides map[string]bool
 
 	// clusterColors: per-context tint assignments set via Ctrl+L; persisted
 	// to $XDG_STATE_HOME/lfk/cluster-colors.yaml. Values validated against
@@ -275,6 +280,15 @@ type Model struct {
 	// see logview.go.
 	logView logViewState
 
+	// logReaderInFlight records, per log channel, whether a one-shot reader
+	// goroutine is currently blocked on it. Switching into a logs tab used to
+	// arm a fresh reader unconditionally, accumulating duplicate readers (and
+	// out-of-order lines) on every switch. The guard lets tab switches skip
+	// arming when a reader is already outstanding; updateLogLine keeps the
+	// single reader alive. Shared map (reference type) so all by-value Model
+	// copies observe the same state; only touched on the update goroutine.
+	logReaderInFlight map[chan string]bool
+
 	// Full-screen describe viewer state (kubectl-describe output): content,
 	// scroll/cursor, auto-refresh, search, and visual selection. Extracted
 	// from the formerly flat describe* fields into one cohesive value; see
@@ -306,6 +320,12 @@ type Model struct {
 	execEscPressed   bool           // Ctrl+] prefix pressed, waiting for follow-up key
 	execScrollback   *scrollback    // Line ring captured from the PTY byte stream for scrollback
 	execScrollOffset int            // 0 = live; >0 = N rows scrolled back into history
+	// execTickGen is the generation token for the 50ms terminal-refresh tick.
+	// Every arm (tab switch, focus, PTY start) takes a fresh generation; the
+	// tick handler re-arms only the current generation, so older chains die
+	// instead of accumulating one render loop per tab switch. Shared pointer so
+	// all by-value Model copies see the same counter.
+	execTickGen *atomic.Uint64
 
 	// Multi-selection state: maps "namespace/name" keys to selected status.
 	selectedItems   map[string]bool

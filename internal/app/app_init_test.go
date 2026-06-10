@@ -52,3 +52,61 @@ func TestNewModel_SeedsShowRareFromConfig(t *testing.T) {
 		t.Fatal("show_rare_types: false (default) must leave rare types hidden")
 	}
 }
+
+// security.hide_badges seeds m.hideSecurityBadges so the per-row SEC badge is
+// suppressed from launch (the user can still toggle it back on with B).
+func TestNewModel_SeedsHideSecurityBadgesFromConfig(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	orig := ui.ConfigSecurityHideBadges
+	defer func() { ui.ConfigSecurityHideBadges = orig }()
+
+	ui.ConfigSecurityHideBadges = true
+	m := NewModel(k8s.NewTestClient(nil, nil), StartupOptions{})
+	if !m.hideSecurityBadges {
+		t.Fatal("security.hide_badges: true must seed m.hideSecurityBadges")
+	}
+
+	ui.ConfigSecurityHideBadges = false
+	m = NewModel(k8s.NewTestClient(nil, nil), StartupOptions{})
+	if m.hideSecurityBadges {
+		t.Fatal("security.hide_badges: false (default) must leave badges shown")
+	}
+}
+
+// recomputeReadOnly runs on every context switch and must resolve the badge
+// default per context: a per-context config override beats the global default,
+// and a runtime toggle (recorded per context) beats config and never leaks to
+// another context.
+func TestRecomputeHideSecurityBadgesPerContext(t *testing.T) {
+	origGlobal := ui.ConfigSecurityHideBadges
+	origCluster := ui.ConfigClusterSecurityHideBadges
+	defer func() {
+		ui.ConfigSecurityHideBadges = origGlobal
+		ui.ConfigClusterSecurityHideBadges = origCluster
+	}()
+	ui.ConfigSecurityHideBadges = false
+	ui.ConfigClusterSecurityHideBadges = map[string]bool{"prod": true}
+
+	m := baseModelWithFakeClient()
+	m.contextBadgeOverrides = make(map[string]bool)
+
+	m.recomputeReadOnly("prod")
+	if !m.hideSecurityBadges {
+		t.Error("prod (per-context config true) must hide badges on context entry")
+	}
+	m.recomputeReadOnly("dev")
+	if m.hideSecurityBadges {
+		t.Error("dev (no override, global false) must show badges")
+	}
+
+	// A runtime toggle in dev sticks for dev only.
+	m.contextBadgeOverrides["dev"] = true
+	m.recomputeReadOnly("dev")
+	if !m.hideSecurityBadges {
+		t.Error("dev session override (true) must win over global config")
+	}
+	m.recomputeReadOnly("prod")
+	if !m.hideSecurityBadges {
+		t.Error("prod config still applies; dev override must not leak")
+	}
+}

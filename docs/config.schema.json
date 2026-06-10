@@ -526,6 +526,11 @@
           "description": "Turn the security dashboard on or off.",
           "default": true
         },
+        "hide_badges": {
+          "type": "boolean",
+          "description": "Hide the per-resource SEC severity badge by default. The dashboard still scans; only the inline row badge is suppressed (toggleable at runtime). Settable globally and per-cluster (clusters.<name>.security.hide_badges overrides the global default for that context).",
+          "default": false
+        },
         "sources": {
           "type": "object",
           "description": "Enable/disable individual sources. Keys accept friendly names (heuristic, trivy, kyverno, kubescape, falco, gatekeeper) or internal ids (trivy-operator, policy-report). Omitted sources default to enabled.",

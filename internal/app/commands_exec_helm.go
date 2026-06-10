@@ -12,6 +12,24 @@ import (
 	"github.com/janosmiko/lfk/internal/logger"
 )
 
+// runHelmCmdResult runs a prepared helm command to completion and maps the
+// outcome to an actionResultMsg. Used for the non-interactive helm operations
+// (uninstall, upgrade), which must NOT take over the terminal via
+// tea.ExecProcess — that is reserved for editHelmValues, which spawns the
+// user's $EDITOR. Output is captured so a failure surfaces in the status bar
+// instead of a suspended-TUI screen.
+func runHelmCmdResult(cmd *exec.Cmd, successMsg, failPrefix string) tea.Msg {
+	logExecCmd("Running helm command", cmd)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		// Do not log raw helm output — it can echo Secret values on error. The
+		// captured output still reaches the user via the (ephemeral) status bar.
+		logger.Error("helm command failed", "cmd", cmd.String(), "error", err)
+		return actionResultMsg{err: fmt.Errorf("%s: %w: %s", failPrefix, err, strings.TrimSpace(string(out)))}
+	}
+	return actionResultMsg{message: successMsg}
+}
+
 func (m Model) uninstallHelmRelease() tea.Cmd {
 	helmPath, err := exec.LookPath("helm")
 	if err != nil {
@@ -23,41 +41,38 @@ func (m Model) uninstallHelmRelease() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 	args := []string{"uninstall", name, "-n", ns, "--kube-context", m.kubectlContext(ctx)}
 
 	cmd := exec.Command(helmPath, args...)
-	logExecCmd("Running helm command", cmd)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			logger.Error("helm uninstall failed", "cmd", cmd.String(), "error", err)
-		}
-		return actionResultMsg{message: fmt.Sprintf("Uninstalled %s", name), err: err}
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+	return m.trackBgTask(scheduler.KindSubprocess, "Helm uninstall: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+		return runHelmCmdResult(cmd, fmt.Sprintf("Uninstalled %s", name), "helm uninstall")
 	})
 }
 
-func (m Model) editHelmValues() tea.Cmd {
-	helmPath, err := exec.LookPath("helm")
-	if err != nil {
-		return func() tea.Msg {
-			return actionResultMsg{err: fmt.Errorf("helm not found: %w", err)}
-		}
-	}
+// helmExecEnv hands the helm path, release, namespace, context, and kubeconfig
+// to the sh -c scripts as environment variables. These values (notably the
+// kubeconfig context name) are user/CI-controlled and may contain shell
+// metacharacters; passing them via the environment instead of interpolating
+// into the script text means the shell never parses them as code.
+func helmExecEnv(helmPath, release, ns, ctx, kubeconfig string) []string {
+	return append(os.Environ(),
+		"HELM="+helmPath,
+		"RELEASE="+release,
+		"NS="+ns,
+		"CTX="+ctx,
+		"KUBECONFIG="+kubeconfig,
+	)
+}
 
-	ns := m.actionNamespace()
-	name := m.actionCtx.name
-	ctx := m.actionCtx.context
-	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
-	helmCtx := m.kubectlContext(ctx)
-
-	script := fmt.Sprintf(`
+// helmEditScript drives "edit helm values": fetch values into a temp file, open
+// the user's editor, and re-apply on change. All inputs arrive via the
+// environment ($HELM/$RELEASE/$NS/$CTX/$KUBECONFIG) — no value is interpolated.
+const helmEditScript = `
 set -e
-HELM=%q
-RELEASE=%q
-NS=%q
-CTX=%q
-export KUBECONFIG=%q
 
-TMPFILE=$(mktemp /tmp/helm-values-${RELEASE}-XXXXXX.yaml)
+TMPFILE=$(mktemp "${TMPDIR:-/tmp}/helm-values-XXXXXX.yaml")
 
 $HELM get values "$RELEASE" -n "$NS" --kube-context "$CTX" -o yaml > "$TMPFILE" 2>&1
 # Replace bare 'null' with a helpful comment
@@ -102,12 +117,53 @@ if ! $HELM upgrade "$RELEASE" "$CHART_NAME" -n "$NS" --kube-context "$CTX" --reu
   exit 1
 fi
 rm -f "$TMPFILE"
-`,
-		helmPath, name, ns, helmCtx, kubeconfigPaths,
-	)
+`
 
-	cmd := exec.Command("sh", "-c", script)
-	cmd.Env = os.Environ()
+// helmUpgradeScript drives "helm upgrade --reuse-values" after resolving the
+// chart name. All inputs arrive via the environment — no value is interpolated.
+const helmUpgradeScript = `
+set -e
+
+CHART_VERSION=$($HELM list -n "$NS" --kube-context "$CTX" --filter "^${RELEASE}$" -o json 2>/dev/null \
+  | sed -n 's/.*"chart":"\([^"]*\)".*/\1/p' | head -1)
+CHART_NAME=$(echo "$CHART_VERSION" | sed 's/-[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*.*$//')
+if [ -z "$CHART_NAME" ]; then
+  echo "Could not determine chart for release $RELEASE."
+  echo "Run manually: helm upgrade $RELEASE <CHART> -n $NS --kube-context $CTX --reuse-values"
+  exit 1
+fi
+
+echo "Upgrading $RELEASE with chart $CHART_NAME..."
+$HELM upgrade "$RELEASE" "$CHART_NAME" -n "$NS" --kube-context "$CTX" --reuse-values
+`
+
+func buildHelmEditCmd(helmPath, release, ns, ctx, kubeconfig string) *exec.Cmd {
+	cmd := exec.Command("sh", "-c", helmEditScript)
+	cmd.Env = helmExecEnv(helmPath, release, ns, ctx, kubeconfig)
+	return cmd
+}
+
+func buildHelmUpgradeCmd(helmPath, release, ns, ctx, kubeconfig string) *exec.Cmd {
+	cmd := exec.Command("sh", "-c", helmUpgradeScript)
+	cmd.Env = helmExecEnv(helmPath, release, ns, ctx, kubeconfig)
+	return cmd
+}
+
+func (m Model) editHelmValues() tea.Cmd {
+	helmPath, err := exec.LookPath("helm")
+	if err != nil {
+		return func() tea.Msg {
+			return actionResultMsg{err: fmt.Errorf("helm not found: %w", err)}
+		}
+	}
+
+	ns := m.actionNamespace()
+	name := m.actionCtx.name
+	ctx := m.actionCtx.context
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
+	helmCtx := m.kubectlContext(ctx)
+
+	cmd := buildHelmEditCmd(helmPath, name, ns, helmCtx, kubeconfigPaths)
 	logger.Info("Running helm edit values", "release", name, "namespace", ns, "context", ctx)
 	return tea.ExecProcess(cmd, func(err error) tea.Msg {
 		if err != nil {
@@ -257,38 +313,10 @@ func (m Model) helmUpgrade() tea.Cmd {
 	ctx := m.actionCtx.context
 	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 
-	script := fmt.Sprintf(`
-set -e
-HELM=%q
-RELEASE=%q
-NS=%q
-CTX=%q
-export KUBECONFIG=%q
-
-CHART_VERSION=$($HELM list -n "$NS" --kube-context "$CTX" --filter "^${RELEASE}$" -o json 2>/dev/null \
-  | sed -n 's/.*"chart":"\([^"]*\)".*/\1/p' | head -1)
-CHART_NAME=$(echo "$CHART_VERSION" | sed 's/-[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*.*$//')
-if [ -z "$CHART_NAME" ]; then
-  echo "Could not determine chart for release $RELEASE."
-  echo "Run manually: helm upgrade $RELEASE <CHART> -n $NS --kube-context $CTX --reuse-values"
-  exit 1
-fi
-
-echo "Upgrading $RELEASE with chart $CHART_NAME..."
-$HELM upgrade "$RELEASE" "$CHART_NAME" -n "$NS" --kube-context "$CTX" --reuse-values
-`,
-		helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths,
-	)
-
-	cmd := exec.Command("sh", "-c", script)
-	cmd.Env = os.Environ()
+	cmd := buildHelmUpgradeCmd(helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths)
 	logger.Info("Running helm upgrade", "release", name, "namespace", ns, "context", ctx)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			logger.Error("helm upgrade failed", "release", name, "error", err)
-			return actionResultMsg{err: fmt.Errorf("helm upgrade: %w", err)}
-		}
-		return actionResultMsg{message: fmt.Sprintf("Upgraded %s", name)}
+	return m.trackBgTask(scheduler.KindSubprocess, "Helm upgrade: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+		return runHelmCmdResult(cmd, fmt.Sprintf("Upgraded %s", name), "helm upgrade")
 	})
 }
 
@@ -312,7 +340,9 @@ func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
 		logExecCmd("Running helm command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			logger.Error("helm rollback failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
+			// Don't log raw helm output (may echo Secret values); the user still
+			// sees it via the returned error in the status bar.
+			logger.Error("helm rollback failed", "cmd", cmd.String(), "error", cmdErr)
 			return helmRollbackDoneMsg{err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output)))}
 		}
 		return helmRollbackDoneMsg{}

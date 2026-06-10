@@ -365,14 +365,19 @@ func (c *Client) restConfigForContext(displayName string) (*rest.Config, error) 
 	// displayName is the lfk-side identifier (potentially disambiguated to
 	// "name (basename)"). The override below uses the *original* name from
 	// the source kubeconfig because that's what's recorded inside the file.
+	// Snapshot the kubeconfig-derived state under RLock; ReloadKubeconfig swaps
+	// c.contexts concurrently. Release before clientcmd I/O below — never hold
+	// configMu across the rest-config build.
+	c.configMu.RLock()
 	rules := c.loadingRules
 	overrideName := displayName
 	if info, ok := c.contexts[displayName]; ok {
 		rules = &clientcmd.ClientConfigLoadingRules{Precedence: []string{info.sourcePath}}
 		overrideName = info.original
-	} else if path := c.KubeconfigPathForContext(displayName); path != "" {
+	} else if path := c.kubeconfigPathForContextLocked(displayName); path != "" {
 		rules = &clientcmd.ClientConfigLoadingRules{Precedence: []string{path}}
 	}
+	c.configMu.RUnlock()
 	overrides := &clientcmd.ConfigOverrides{CurrentContext: overrideName}
 	cc := clientcmd.NewNonInteractiveDeferredLoadingClientConfig(rules, overrides)
 	cfg, err := cc.ClientConfig()

@@ -14,6 +14,25 @@ import (
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
+// Preview caches are keyed ctx/ns/name and stale-while-revalidate. Bound them so
+// a long multi-cluster session can't accumulate every resource ever hovered.
+// The secret cache holds decoded plaintext, so it gets the tighter cap (also a
+// security win — less plaintext resident). When a cache is full a fresh map is
+// started, dropping the cold set; the active hover repopulates instantly.
+const (
+	secretPreviewCacheCap    = 64
+	serviceEndpointsCacheCap = 256
+)
+
+// evictIfFull resets m's map reference at key-capacity by returning a fresh map
+// when the current one is at or over cap. Caller assigns the result back.
+func evictIfFull[V any](cache map[string]V, cap int) map[string]V {
+	if len(cache) >= cap {
+		return make(map[string]V, cap)
+	}
+	return cache
+}
+
 // metricsInputs holds the raw resource-usage numbers behind metricsContent,
 // retained so the bar can be re-rendered at the current width / theme without
 // a metrics-server round-trip (see recomposeMetrics).
@@ -114,6 +133,7 @@ func (m Model) updatePreviewServiceEndpointsLoaded(msg previewServiceEndpointsLo
 	} else {
 		// Fresh-fetch path: always update the cache so the next watch-
 		// tick rebuild can paint instantly from it.
+		m.serviceEndpointsCache = evictIfFull(m.serviceEndpointsCache, serviceEndpointsCacheCap)
 		m.serviceEndpointsCache[key] = msg.data
 	}
 
@@ -180,6 +200,7 @@ func (m Model) updatePreviewSecretDataLoaded(msg previewSecretDataLoadedMsg) Mod
 	if m.secretPreviewCache == nil {
 		m.secretPreviewCache = make(map[string]*model.SecretData)
 	}
+	m.secretPreviewCache = evictIfFull(m.secretPreviewCache, secretPreviewCacheCap)
 	key := secretPreviewCacheKey(msg.ctx, msg.ns, msg.name)
 	m.secretPreviewCache[key] = msg.data
 

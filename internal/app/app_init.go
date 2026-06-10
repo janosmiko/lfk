@@ -3,6 +3,7 @@ package app
 import (
 	"context"
 	"sync"
+	"sync/atomic"
 
 	"github.com/charmbracelet/bubbles/spinner"
 	"github.com/charmbracelet/bubbles/textinput"
@@ -78,6 +79,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		cliReadOnly:                opts.ReadOnly,
 		showRareResources:          ui.ConfigShowRareTypes,
 		contextROOverrides:         make(map[string]bool),
+		contextBadgeOverrides:      make(map[string]bool),
 		clusterColors:              loadClusterColors(),
 		localClusterFields:         localClusterFields{localClusterCache: loadLocalClusterState()},
 		sortColumnName:             sortColDefault,
@@ -109,6 +111,8 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 		eventGrouping:              ui.ConfigEventsGrouping,
 		scheduler:                  scheduler.New(scheduler.DefaultThreshold),
 		diffView:                   diffViewState{wrap: ui.ConfigDiffViewerWrap, lineNumbers: ui.ConfigDiffViewerLineNumbers, unified: ui.ConfigDiffViewerUnified},
+		execTickGen:                &atomic.Uint64{},
+		logReaderInFlight:          make(map[chan string]bool),
 		reqCtx:                     reqCtx,
 		reqCancel:                  reqCancel,
 		middleTableRenderer:        ui.NewTableRenderer(),
@@ -220,6 +224,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	// publishes it to the hook state.
 	installSecuritySourcesHook()
 	m.securityIgnores = loadSecurityIgnores()
+	m.hideSecurityBadges = ui.ResolveSecurityHideBadges(contextName)
 	m.initialSecuritySeedCmd = m.refreshSecuritySources()
 
 	// Mirror main.go's startup mouse decision: capture is on unless the

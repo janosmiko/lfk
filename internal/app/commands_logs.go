@@ -326,9 +326,19 @@ func matchesContainerFilter(line string, selectedContainers []string) bool {
 
 // waitForLogLine returns a tea.Cmd that reads the next line from the log channel.
 func (m Model) waitForLogLine() tea.Cmd {
-	ch := m.logView.ch
+	return m.readLogChannel(m.logView.ch)
+}
+
+// readLogChannel arms a one-shot reader for ch and records that a reader is
+// outstanding (so tab switches can avoid spawning duplicates). The flag is
+// cleared in updateLogLine when the reader's message arrives — by then the
+// goroutine has exited. Returns nil for a nil channel.
+func (m Model) readLogChannel(ch chan string) tea.Cmd {
 	if ch == nil {
 		return nil
+	}
+	if m.logReaderInFlight != nil {
+		m.logReaderInFlight[ch] = true
 	}
 	return func() tea.Msg {
 		line, ok := <-ch
@@ -337,6 +347,18 @@ func (m Model) waitForLogLine() tea.Cmd {
 		}
 		return logLineMsg{line: line, ch: ch}
 	}
+}
+
+// waitForLogLineIfIdle arms a reader for the active log channel only when none
+// is already outstanding. Used by tab-switch paths, which would otherwise stack
+// a fresh reader on top of the one updateLogLine already keeps alive — leaving
+// multiple goroutines racing the same channel and delivering lines out of order.
+func (m Model) waitForLogLineIfIdle() tea.Cmd {
+	ch := m.logView.ch
+	if ch == nil || m.logReaderInFlight[ch] {
+		return nil
+	}
+	return m.readLogChannel(ch)
 }
 
 // startMultiLogStream spawns one kubectl logs process per selected item and
@@ -665,15 +687,33 @@ func (m *Model) maybeLoadMoreHistory() tea.Cmd {
 	return nil
 }
 
-// saveLoadedLogs writes the currently buffered log lines to a file under /tmp.
-func (m *Model) saveLoadedLogs() (string, error) {
-	name := sanitizeFilename(m.actionCtx.name)
-	path := fmt.Sprintf("%s/lfk-logs-%s-%d.log", os.TempDir(), name, time.Now().Unix())
-	content := strings.Join(m.logView.lines, "\n") + "\n"
-	if err := os.WriteFile(path, []byte(content), 0o644); err != nil {
+// writeTempLog writes log data to a uniquely-named, owner-only (0600) file in
+// the OS temp dir. pattern is an os.CreateTemp pattern (the "*" is replaced by a
+// random string). Logs frequently carry bearer tokens / connection strings, so
+// the file must not be world-readable; the random suffix plus CreateTemp's
+// O_EXCL also defeat the predictable-path symlink TOCTOU that a fixed /tmp name
+// allowed, and os.TempDir keeps it working on Windows where /tmp does not exist.
+func writeTempLog(pattern string, data []byte) (string, error) {
+	f, err := os.CreateTemp("", pattern)
+	if err != nil {
 		return "", err
 	}
-	return path, nil
+	if _, err := f.Write(data); err != nil {
+		_ = f.Close()
+		_ = os.Remove(f.Name())
+		return "", err
+	}
+	if err := f.Close(); err != nil {
+		return "", err
+	}
+	return f.Name(), nil
+}
+
+// saveLoadedLogs writes the currently buffered log lines to a temp file.
+func (m *Model) saveLoadedLogs() (string, error) {
+	name := sanitizeFilename(m.actionCtx.name)
+	content := strings.Join(m.logView.lines, "\n") + "\n"
+	return writeTempLog("lfk-logs-"+name+"-*.log", []byte(content))
 }
 
 // saveAllLogs runs a one-shot kubectl logs (without --tail) and writes everything to a file.
@@ -739,8 +779,8 @@ func (m *Model) saveAllLogs() tea.Cmd {
 			return logSaveAllMsg{err: err}
 		}
 
-		path := fmt.Sprintf("/tmp/lfk-logs-%s-%d-all.log", sanitized, time.Now().Unix())
-		if err := os.WriteFile(path, output, 0o644); err != nil {
+		path, err := writeTempLog("lfk-logs-"+sanitized+"-all-*.log", output)
+		if err != nil {
 			return logSaveAllMsg{err: err}
 		}
 		return logSaveAllMsg{path: path}

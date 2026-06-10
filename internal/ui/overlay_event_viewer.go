@@ -408,12 +408,6 @@ func RenderEventViewer(p EventViewerParams) string {
 	// Calculate visible area.
 	maxVisible := max(p.Height-4, 1) // reserve for title, blank, footer, padding
 
-	// Clamp scroll.
-	maxScroll := max(len(p.Lines)-maxVisible, 0)
-	scroll := max(min(p.Scroll, maxScroll), 0)
-
-	end := min(scroll+maxVisible, len(p.Lines))
-
 	// Visual selection range.
 	selStart := min(p.VisualStart, p.Cursor)
 	selEnd := max(p.VisualStart, p.Cursor)
@@ -442,21 +436,34 @@ func RenderEventViewer(p EventViewerParams) string {
 		colStart:   colStart,
 		colEnd:     colEnd,
 	}
+
+	// Resolve the start index so the cursor entry is visible under physical-line
+	// pagination. The key handler tracks scroll in logical-entry units and is
+	// wrap-unaware; without this a wrapped entry above the cursor can push it
+	// (and the footer's line number) off the viewport.
+	cursor := max(min(p.Cursor, len(p.Lines)-1), 0)
+	scroll := eventStartForCursor(p, evLineCtx, max(p.Scroll, 0), cursor, maxVisible)
 	// Pagination is by physical lines, not logical events: in wrap
 	// mode one event expands to multiple sub-lines, and counting by
 	// logical events would emit far more physical rows than
 	// maxVisible — pushing the footer and the overlay's bottom
 	// border off the viewport. Stop emitting as soon as we fill the
-	// reserved height. The logical `end` is still used below by the
-	// footer for the "line N/M" indicator.
+	// reserved height. `end` tracks the last logical row actually
+	// emitted (not scroll+maxVisible) so the footer's truncation
+	// indicator is correct when wrapped rows fill the budget early.
+	end := scroll
 	var physicalLines []string
 	for i := scroll; i < len(p.Lines) && len(physicalLines) < maxVisible; i++ {
+		before := len(physicalLines)
 		rendered := renderEventViewerLine(p, i, evLineCtx)
 		for sub := range strings.SplitSeq(rendered, "\n") {
 			if len(physicalLines) >= maxVisible {
 				break
 			}
 			physicalLines = append(physicalLines, sub)
+		}
+		if len(physicalLines) > before {
+			end = i + 1
 		}
 	}
 	for len(physicalLines) < maxVisible {
@@ -484,6 +491,32 @@ func RenderEventViewer(p EventViewerParams) string {
 	}
 
 	return b.String()
+}
+
+// eventStartForCursor returns the scroll (start entry index) that keeps the
+// cursor entry's first sub-line within maxVisible physical lines. It reconciles
+// the wrap-unaware logical-entry scroll the key handler supplies with the
+// renderer's physical-line pagination, mirroring errorLogStartForCursor. The
+// incoming scroll is honoured when it already shows the cursor; otherwise it is
+// pulled down just far enough.
+func eventStartForCursor(p EventViewerParams, ctx eventLineContext, scroll, cursor, maxVisible int) int {
+	minStart := cursor
+	used := 1 // the cursor entry's first sub-line
+	for s := cursor - 1; s >= 0; s-- {
+		used += eventRowPhysicalLines(p, s, ctx)
+		if used > maxVisible {
+			break
+		}
+		minStart = s
+	}
+	return max(min(scroll, cursor), minStart)
+}
+
+// eventRowPhysicalLines reports how many physical lines event row i renders to,
+// counted from the exact same renderEventViewerLine the pagination loop emits so
+// the two never disagree.
+func eventRowPhysicalLines(p EventViewerParams, i int, ctx eventLineContext) int {
+	return strings.Count(renderEventViewerLine(p, i, ctx), "\n") + 1
 }
 
 // eventLineContext holds shared state for rendering individual event viewer lines.

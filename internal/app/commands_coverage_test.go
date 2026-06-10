@@ -20,7 +20,8 @@ func TestExpandCustomActionTemplateMultipleColumns(t *testing.T) {
 		},
 	}
 	result := expandCustomActionTemplate("curl http://{IP}:8080 on {Node}", actx)
-	assert.Equal(t, "curl http://10.0.0.5:8080 on worker-1", result)
+	// Values are shell-quoted; in-shell these concatenate to the literal URL/host.
+	assert.Equal(t, "curl http://'10.0.0.5':8080 on 'worker-1'", result)
 }
 
 // --- findCustomAction ---

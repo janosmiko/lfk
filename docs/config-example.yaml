@@ -112,6 +112,7 @@ appearance:
 # Default: enabled, all sources on.
 # security:
 #   enabled: true            # set false to turn the dashboard + probing off
+#   hide_badges: false       # true hides the per-row SEC badge by default (toggle with B)
 #   sources:
 #     falco: false           # disable a single source; omitted = enabled
 #     trivy: false
@@ -310,6 +311,7 @@ clusters:
 #   k8s_client_burst: 400
 #   security:
 #     enabled: false                      # turn the security dashboard off here
+#     hide_badges: true                   # or keep it on but hide the per-row SEC badge here
 #   views:
 #     apps/v1/deployments:
 #       columns: ["Name", "Replicas", "Available", "REV", "Age"]

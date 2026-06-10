@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"fmt"
-	"io"
 	"os"
 	"os/exec"
 	"strings"
@@ -117,11 +116,11 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 		cancel()
 		return 0, fmt.Errorf("creating stdout pipe: %w", err)
 	}
-	stderrPipe, err := cmd.StderrPipe()
-	if err != nil {
-		cancel()
-		return 0, fmt.Errorf("creating stderr pipe: %w", err)
-	}
+	// Capture stderr via cmd.Stderr (not StderrPipe + a detached io.Copy):
+	// exec runs the copy on a goroutine that cmd.Wait joins, so the monitor's
+	// post-Wait read of the buffer is race-free without extra synchronization.
+	var stderrBuf bytes.Buffer
+	cmd.Stderr = &stderrBuf
 
 	entry := &PortForwardEntry{
 		ID:           id,
@@ -152,12 +151,6 @@ func (m *PortForwardManager) Start(kubectlPath, kubeconfigPaths, resourceKind, r
 	if onUpdate != nil {
 		onUpdate()
 	}
-
-	// Capture stderr in background.
-	var stderrBuf bytes.Buffer
-	go func() {
-		_, _ = io.Copy(&stderrBuf, stderrPipe)
-	}()
 
 	// Monitor stdout for readiness confirmation and process lifecycle.
 	go func() {
