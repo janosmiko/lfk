@@ -223,6 +223,7 @@ func NewModel(client *k8s.Client, opts StartupOptions) Model {
 	// publishes it to the hook state.
 	installSecuritySourcesHook()
 	m.securityIgnores = loadSecurityIgnores()
+	m.hideSecurityBadges = ui.ConfigSecurityHideBadges
 	m.initialSecuritySeedCmd = m.refreshSecuritySources()
 
 	// Mirror main.go's startup mouse decision: capture is on unless the

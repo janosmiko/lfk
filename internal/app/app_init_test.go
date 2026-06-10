@@ -52,3 +52,23 @@ func TestNewModel_SeedsShowRareFromConfig(t *testing.T) {
 		t.Fatal("show_rare_types: false (default) must leave rare types hidden")
 	}
 }
+
+// security.hide_badges seeds m.hideSecurityBadges so the per-row SEC badge is
+// suppressed from launch (the user can still toggle it back on with B).
+func TestNewModel_SeedsHideSecurityBadgesFromConfig(t *testing.T) {
+	t.Setenv("XDG_STATE_HOME", t.TempDir())
+	orig := ui.ConfigSecurityHideBadges
+	defer func() { ui.ConfigSecurityHideBadges = orig }()
+
+	ui.ConfigSecurityHideBadges = true
+	m := NewModel(k8s.NewTestClient(nil, nil), StartupOptions{})
+	if !m.hideSecurityBadges {
+		t.Fatal("security.hide_badges: true must seed m.hideSecurityBadges")
+	}
+
+	ui.ConfigSecurityHideBadges = false
+	m = NewModel(k8s.NewTestClient(nil, nil), StartupOptions{})
+	if m.hideSecurityBadges {
+		t.Fatal("security.hide_badges: false (default) must leave badges shown")
+	}
+}

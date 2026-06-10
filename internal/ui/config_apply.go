@@ -205,6 +205,9 @@ func applySecurityConfig(cfg configFile) {
 	if cfg.Security.Enabled != nil {
 		ConfigSecurityEnabled = *cfg.Security.Enabled
 	}
+	if cfg.Security.HideBadges != nil {
+		ConfigSecurityHideBadges = *cfg.Security.HideBadges
+	}
 	if cfg.Security.Sources != nil {
 		ConfigSecuritySources = cfg.Security.Sources
 	}

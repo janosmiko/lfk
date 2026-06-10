@@ -656,6 +656,12 @@ func ResolveK8sClientRate(context string) (qps float32, burst int) {
 // When false the Security category, SEC badge, and source probing are off.
 var ConfigSecurityEnabled = true
 
+// ConfigSecurityHideBadges is the startup default for hiding the per-resource
+// SEC severity badge. The dashboard still runs and findings are still scanned;
+// only the inline row badge is suppressed. Users can flip it at runtime with
+// kb.SecurityBadgeToggle.
+var ConfigSecurityHideBadges = false
+
 // ConfigSecuritySources holds global per-source enable/disable overrides,
 // keyed by friendly name or internal source id. A source absent from the map
 // defaults to enabled.

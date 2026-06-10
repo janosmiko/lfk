@@ -100,6 +100,7 @@ kubeshark:
   namespace: traffic-ns
 security:
   enabled: false
+  hide_badges: true
   sources:
     trivy: false
     heuristic: true
@@ -212,6 +213,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 
 	// security section.
 	assert.False(t, ConfigSecurityEnabled, "security.enabled")
+	assert.True(t, ConfigSecurityHideBadges, "security.hide_badges")
 	assert.Equal(t, map[string]bool{"trivy": false, "heuristic": true}, ConfigSecuritySources, "security.sources")
 	require.Len(t, ConfigSecurityIgnorePatterns, 1, "security.ignore_patterns")
 	assert.Equal(t, "prod", ConfigSecurityIgnorePatterns[0].Cluster)
@@ -393,6 +395,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origReadOnly := ConfigReadOnly
 	origShowRare := ConfigShowRareTypes
 	origSecEnabled := ConfigSecurityEnabled
+	origSecHideBadges := ConfigSecurityHideBadges
 	origSecSources := ConfigSecuritySources
 	origSecIgnore := ConfigSecurityIgnorePatterns
 	origQPS := ConfigK8sClientQPS
@@ -467,6 +470,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigReadOnly = origReadOnly
 		ConfigShowRareTypes = origShowRare
 		ConfigSecurityEnabled = origSecEnabled
+		ConfigSecurityHideBadges = origSecHideBadges
 		ConfigSecuritySources = origSecSources
 		ConfigSecurityIgnorePatterns = origSecIgnore
 		ConfigK8sClientQPS = origQPS

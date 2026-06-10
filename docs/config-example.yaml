@@ -112,6 +112,7 @@ appearance:
 # Default: enabled, all sources on.
 # security:
 #   enabled: true            # set false to turn the dashboard + probing off
+#   hide_badges: false       # true hides the per-row SEC badge by default (toggle with B)
 #   sources:
 #     falco: false           # disable a single source; omitted = enabled
 #     trivy: false
