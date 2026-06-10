@@ -12,6 +12,22 @@ import (
 	"github.com/janosmiko/lfk/internal/logger"
 )
 
+// runHelmCmdResult runs a prepared helm command to completion and maps the
+// outcome to an actionResultMsg. Used for the non-interactive helm operations
+// (uninstall, upgrade), which must NOT take over the terminal via
+// tea.ExecProcess — that is reserved for editHelmValues, which spawns the
+// user's $EDITOR. Output is captured so a failure surfaces in the status bar
+// instead of a suspended-TUI screen.
+func runHelmCmdResult(cmd *exec.Cmd, successMsg, failPrefix string) tea.Msg {
+	logExecCmd("Running helm command", cmd)
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		logger.Error("helm command failed", "cmd", cmd.String(), "error", err, "output", string(out))
+		return actionResultMsg{err: fmt.Errorf("%s: %w: %s", failPrefix, err, strings.TrimSpace(string(out)))}
+	}
+	return actionResultMsg{message: successMsg}
+}
+
 func (m Model) uninstallHelmRelease() tea.Cmd {
 	helmPath, err := exec.LookPath("helm")
 	if err != nil {
@@ -23,15 +39,13 @@ func (m Model) uninstallHelmRelease() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	ctx := m.actionCtx.context
+	kubeconfigPaths := m.client.KubeconfigPathForContext(ctx)
 	args := []string{"uninstall", name, "-n", ns, "--kube-context", m.kubectlContext(ctx)}
 
 	cmd := exec.Command(helmPath, args...)
-	logExecCmd("Running helm command", cmd)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			logger.Error("helm uninstall failed", "cmd", cmd.String(), "error", err)
-		}
-		return actionResultMsg{message: fmt.Sprintf("Uninstalled %s", name), err: err}
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+	return m.trackBgTask(scheduler.KindSubprocess, "Helm uninstall: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+		return runHelmCmdResult(cmd, fmt.Sprintf("Uninstalled %s", name), "helm uninstall")
 	})
 }
 
@@ -299,12 +313,8 @@ func (m Model) helmUpgrade() tea.Cmd {
 
 	cmd := buildHelmUpgradeCmd(helmPath, name, ns, m.kubectlContext(ctx), kubeconfigPaths)
 	logger.Info("Running helm upgrade", "release", name, "namespace", ns, "context", ctx)
-	return tea.ExecProcess(cmd, func(err error) tea.Msg {
-		if err != nil {
-			logger.Error("helm upgrade failed", "release", name, "error", err)
-			return actionResultMsg{err: fmt.Errorf("helm upgrade: %w", err)}
-		}
-		return actionResultMsg{message: fmt.Sprintf("Upgraded %s", name)}
+	return m.trackBgTask(scheduler.KindSubprocess, "Helm upgrade: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+		return runHelmCmdResult(cmd, fmt.Sprintf("Upgraded %s", name), "helm upgrade")
 	})
 }
 
