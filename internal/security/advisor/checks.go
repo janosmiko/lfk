@@ -272,6 +272,11 @@ func pdbBlocksDrain(p *policyv1.PodDisruptionBudget, workloads []workload) strin
 			if w.namespace != p.Namespace || !pdbSelectorMatches(p, w.podLabels) {
 				continue
 			}
+			// Skip the DaemonSet replicas-0 sentinel: minAvailable >= 0 is
+			// vacuously true and replica math is meaningless per-node.
+			if w.replicas <= 0 {
+				continue
+			}
 			if int32(ma.IntValue()) >= w.replicas {
 				return fmt.Sprintf("minAvailable: %d with %d replicas", ma.IntValue(), w.replicas)
 			}

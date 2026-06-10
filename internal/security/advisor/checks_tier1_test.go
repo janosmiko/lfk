@@ -208,6 +208,10 @@ func TestOrphanPDB(t *testing.T) {
 	assert.False(t, got["prod/PodDisruptionBudget/ds-matched"]["orphan_pdb"],
 		"daemonset pods count as matched")
 	assert.True(t, got["prod/PodDisruptionBudget/orphan"]["orphan_pdb"])
+	// DaemonSets carry the replicas-0 sentinel; integer minAvailable compared
+	// against it (1 >= 0) must not flag the PDB as drain-blocking.
+	assert.False(t, got["prod/PodDisruptionBudget/ds-matched"]["pdb_blocks_drain"],
+		"sentinel replicas must not satisfy the minAvailable >= replicas test")
 }
 
 // TestOrphanPDBRequiresWorkloadLists guards the best-effort gate: when any
