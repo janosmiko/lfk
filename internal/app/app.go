@@ -219,6 +219,11 @@ type Model struct {
 	// wins over per-context and global config when entering that context;
 	// CLI --read-only still wins over both.
 	contextROOverrides map[string]bool
+	// contextBadgeOverrides holds session-scoped per-context hide-badges state
+	// set by the user via kb.SecurityBadgeToggle. A present entry wins over
+	// per-context and global config when (re-)entering that context, so a toggle
+	// sticks within a context but never leaks across contexts.
+	contextBadgeOverrides map[string]bool
 
 	// clusterColors: per-context tint assignments set via Ctrl+L; persisted
 	// to $XDG_STATE_HOME/lfk/cluster-colors.yaml. Values validated against

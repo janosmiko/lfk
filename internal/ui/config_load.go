@@ -499,9 +499,10 @@ type securityConfig struct {
 	// Enabled turns the whole security dashboard on or off. Defaults to true
 	// (omitted = enabled).
 	Enabled *bool `json:"enabled" yaml:"enabled"`
-	// HideBadges sets the startup default for suppressing the per-resource SEC
-	// severity badge. The dashboard still scans; only the inline row badge is
-	// hidden. Toggleable at runtime. Honored only in the top-level section.
+	// HideBadges sets the default for suppressing the per-resource SEC severity
+	// badge. The dashboard still scans; only the inline row badge is hidden.
+	// Toggleable at runtime. Settable globally and per-cluster (a per-cluster
+	// value overrides the global default for that context).
 	HideBadges *bool `json:"hide_badges" yaml:"hide_badges"`
 	// Sources enables or disables individual sources by name. Keys accept the
 	// friendly names (heuristic, trivy, kyverno, kubescape, falco, gatekeeper)

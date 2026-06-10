@@ -388,6 +388,7 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 		ConfigClusterResourceColumns = make(map[string]map[string][]string, len(cfg.Clusters))
 		ConfigClusterReadOnly = make(map[string]bool, len(cfg.Clusters))
 		ConfigClusterSecurityEnabled = make(map[string]bool, len(cfg.Clusters))
+		ConfigClusterSecurityHideBadges = make(map[string]bool, len(cfg.Clusters))
 		ConfigClusterSecuritySources = make(map[string]map[string]bool, len(cfg.Clusters))
 		ConfigClusterK8sClientQPS = make(map[string]int, len(cfg.Clusters))
 		ConfigClusterK8sClientBurst = make(map[string]int, len(cfg.Clusters))
@@ -412,12 +413,8 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 				if cc.Security.Enabled != nil {
 					ConfigClusterSecurityEnabled[ctx] = *cc.Security.Enabled
 				}
-				// hide_badges is a global UI preference, honored only at the
-				// top-level security section. Warn rather than silently drop.
 				if cc.Security.HideBadges != nil {
-					logger.Warn("clusters.<ctx>.security.hide_badges is ignored; "+
-						"set hide_badges at the top-level security section",
-						"context", ctx)
+					ConfigClusterSecurityHideBadges[ctx] = *cc.Security.HideBadges
 				}
 				if cc.Security.Sources != nil {
 					ConfigClusterSecuritySources[ctx] = cc.Security.Sources

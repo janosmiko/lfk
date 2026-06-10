@@ -291,6 +291,10 @@ func (m *Model) refreshContextReadOnlyMarkers() {
 // that context's own override/config, so an unlock never leaks across
 // contexts.
 func (m *Model) recomputeReadOnly(ctx string) {
+	// Recompute every per-context view default on context switch. Done here
+	// because recomputeReadOnly is already called at every switch point;
+	// keep it before the read-only early-returns so it always runs.
+	m.recomputeHideSecurityBadges(ctx)
 	if m.cliReadOnly {
 		m.readOnly = true
 		return
@@ -300,6 +304,17 @@ func (m *Model) recomputeReadOnly(ctx string) {
 		return
 	}
 	m.readOnly = ui.ResolveReadOnly(ctx, false)
+}
+
+// recomputeHideSecurityBadges sets m.hideSecurityBadges for the given context.
+// Precedence: per-context session override (kb.SecurityBadgeToggle) > per-context
+// config > global config. A toggle made in one context never leaks into another.
+func (m *Model) recomputeHideSecurityBadges(ctx string) {
+	if v, ok := m.contextBadgeOverrides[ctx]; ok {
+		m.hideSecurityBadges = v
+		return
+	}
+	m.hideSecurityBadges = ui.ResolveSecurityHideBadges(ctx)
 }
 
 // handleKeyReadOnlyToggle handles Ctrl+R based on navigation level:

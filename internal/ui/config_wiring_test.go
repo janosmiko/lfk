@@ -141,6 +141,7 @@ clusters:
         sort_column: Name
     security:
       enabled: false
+      hide_badges: true
       sources:
         falco: false
 `
@@ -262,6 +263,7 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	require.Contains(t, ConfigClusterViews, "ctx1", "clusters.views")
 	require.Contains(t, ConfigClusterViews["ctx1"], "deployment")
 	assert.False(t, ConfigClusterSecurityEnabled["ctx1"], "clusters.security.enabled")
+	assert.True(t, ConfigClusterSecurityHideBadges["ctx1"], "clusters.security.hide_badges")
 	assert.Equal(t, map[string]bool{"falco": false}, ConfigClusterSecuritySources["ctx1"], "clusters.security.sources")
 }
 
@@ -408,6 +410,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origClusterResCols := ConfigClusterResourceColumns
 	origClusterViews := ConfigClusterViews
 	origClusterSecEnabled := ConfigClusterSecurityEnabled
+	origClusterSecHideBadges := ConfigClusterSecurityHideBadges
 	origClusterSecSources := ConfigClusterSecuritySources
 	origClusterQPS := ConfigClusterK8sClientQPS
 	origClusterBurst := ConfigClusterK8sClientBurst
@@ -483,6 +486,7 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigClusterResourceColumns = origClusterResCols
 		ConfigClusterViews = origClusterViews
 		ConfigClusterSecurityEnabled = origClusterSecEnabled
+		ConfigClusterSecurityHideBadges = origClusterSecHideBadges
 		ConfigClusterSecuritySources = origClusterSecSources
 		ConfigClusterK8sClientQPS = origClusterQPS
 		ConfigClusterK8sClientBurst = origClusterBurst

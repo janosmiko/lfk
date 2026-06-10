@@ -528,7 +528,7 @@
         },
         "hide_badges": {
           "type": "boolean",
-          "description": "Hide the per-resource SEC severity badge by default. The dashboard still scans; only the inline row badge is suppressed (toggleable at runtime). Honored only in the top-level security section.",
+          "description": "Hide the per-resource SEC severity badge by default. The dashboard still scans; only the inline row badge is suppressed (toggleable at runtime). Settable globally and per-cluster (clusters.<name>.security.hide_badges overrides the global default for that context).",
           "default": false
         },
         "sources": {

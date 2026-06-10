@@ -311,6 +311,7 @@ clusters:
 #   k8s_client_burst: 400
 #   security:
 #     enabled: false                      # turn the security dashboard off here
+#     hide_badges: true                   # or keep it on but hide the per-row SEC badge here
 #   views:
 #     apps/v1/deployments:
 #       columns: ["Name", "Replicas", "Available", "REV", "Age"]
