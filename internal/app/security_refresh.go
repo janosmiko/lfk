@@ -72,7 +72,9 @@ func (m *Model) refreshSecuritySources() tea.Cmd {
 			}
 		}
 		if kc != nil {
-			register("heuristic", heuristic.NewWithClient(kc))
+			h := heuristic.NewWithClient(kc)
+			h.SetSecretEnvPatterns(ui.ConfigSecuritySecretEnvInclude, ui.ConfigSecuritySecretEnvExclude)
+			register("heuristic", h)
 			register("falco", falco.NewWithClient(kc))
 		}
 		if dc != nil {

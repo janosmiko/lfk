@@ -24,6 +24,14 @@ var ConfigSecuritySources = map[string]bool{}
 // interactive per-cluster ignore-list.
 var ConfigSecurityIgnorePatterns []SecurityIgnorePattern
 
+// ConfigSecuritySecretEnvInclude / ConfigSecuritySecretEnvExclude hold the
+// `security.heuristic.secret_env_include` / `_exclude` env-var name globs that
+// tune the heuristic source's secret_env check. Read-only after load.
+var (
+	ConfigSecuritySecretEnvInclude []string
+	ConfigSecuritySecretEnvExclude []string
+)
+
 // ConfigClusterSecurityEnabled maps context names to per-cluster
 // dashboard-enabled overrides; a value here wins over ConfigSecurityEnabled.
 var ConfigClusterSecurityEnabled = map[string]bool{}

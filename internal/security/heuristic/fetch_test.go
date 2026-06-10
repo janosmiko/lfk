@@ -88,6 +88,49 @@ func TestSourceFetchNamespaceFilter(t *testing.T) {
 	}
 }
 
+// TestSourceFetchSecretEnvPatterns verifies the secret_env check runs through
+// Fetch (it is dispatched directly, not via allChecks) and that configured
+// include/exclude patterns reach it.
+func TestSourceFetchSecretEnvPatterns(t *testing.T) {
+	pod := &corev1.Pod{
+		ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p"},
+		Spec: corev1.PodSpec{
+			Containers: []corev1.Container{{
+				Name: "c", Image: "nginx:1.25",
+				Env: []corev1.EnvVar{
+					{Name: "LEGACY_PASSWORD", Value: "x"},
+					{Name: "MY_CONN_STR", Value: "y"},
+				},
+			}},
+		},
+	}
+	secretEnvNames := func(s *Source) []string {
+		findings, err := s.Fetch(context.Background(), "", "")
+		require.NoError(t, err)
+		var sums []string
+		for _, f := range findings {
+			if f.Labels["check"] == "secret_env" {
+				sums = append(sums, f.Summary)
+			}
+		}
+		return sums
+	}
+
+	// Default: keyword name flags, non-keyword name does not.
+	defaultSums := secretEnvNames(NewWithClient(fake.NewSimpleClientset(pod.DeepCopy())))
+	require.Len(t, defaultSums, 1)
+	assert.Contains(t, defaultSums[0], "LEGACY_PASSWORD")
+	assert.NotContains(t, defaultSums[0], "MY_CONN_STR")
+
+	// Configured: exclude suppresses the keyword name, include adds the other.
+	s := NewWithClient(fake.NewSimpleClientset(pod.DeepCopy()))
+	s.SetSecretEnvPatterns([]string{"*_CONN_STR"}, []string{"LEGACY_*"})
+	configuredSums := secretEnvNames(s)
+	require.Len(t, configuredSums, 1)
+	assert.Contains(t, configuredSums[0], "MY_CONN_STR")
+	assert.NotContains(t, configuredSums[0], "LEGACY_PASSWORD")
+}
+
 func TestSourceFetchNilClient(t *testing.T) {
 	s := New()
 	findings, err := s.Fetch(context.Background(), "", "")

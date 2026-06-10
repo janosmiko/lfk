@@ -517,6 +517,21 @@ type securityConfig struct {
 	// is expressed via each pattern's `cluster` glob. A per-cluster block that
 	// sets ignore_patterns is ignored (with a warning).
 	IgnorePatterns []SecurityIgnorePattern `json:"ignore_patterns" yaml:"ignore_patterns"`
+	// Heuristic holds tuning options for the built-in heuristic source.
+	// Honored ONLY in the top-level `security` section, like IgnorePatterns.
+	Heuristic *heuristicConfig `json:"heuristic" yaml:"heuristic"`
+}
+
+// heuristicConfig is the on-disk schema for `security.heuristic`, tuning
+// options for the built-in heuristic source's checks.
+type heuristicConfig struct {
+	// SecretEnvInclude / SecretEnvExclude tune the secret_env check with
+	// case-insensitive env-var name globs (`*`, `?`). Include adds names to
+	// flag on top of the built-in credential keywords (an explicit match
+	// overrides a built-in exemption); Exclude adds names to never flag and
+	// wins over Include.
+	SecretEnvInclude []string `json:"secret_env_include" yaml:"secret_env_include"`
+	SecretEnvExclude []string `json:"secret_env_exclude" yaml:"secret_env_exclude"`
 }
 
 // SecurityIgnorePattern is a declarative ignore rule from the config file.

@@ -8,7 +8,7 @@ sources, each auto-detected by the operator or CRDs it needs.
 
 | Source | Config key | Requires in cluster | Findings |
 |---|---|---|---|
-| Heuristic | `heuristic` | nothing (built-in) | Pod-spec hardening issues: privileged, hostPath, host PID/IPC/network, default ServiceAccount, writable root filesystem, runAsRoot, allowPrivilegeEscalation |
+| Heuristic | `heuristic` | nothing (built-in) | Pod-spec hardening issues: privileged, host PID/IPC/network, hostPath + runtime-socket mounts, dangerous capabilities, runAsRoot, allowPrivilegeEscalation, writable root filesystem, seccomp Unconfined, unmasked procMount, unsafe sysctls, hostPort, shared process namespace, plaintext secrets in env, default ServiceAccount (+ token automount), missing resource limits, unpinned image tags |
 | Trivy | `trivy` | [Trivy Operator](https://github.com/aquasecurity/trivy-operator) (`VulnerabilityReport`, `ConfigAuditReport` CRDs) | Image vulnerabilities + config-audit misconfigurations |
 | Kyverno | `kyverno` | Policy Reports API (`PolicyReport`, `ClusterPolicyReport` from `wgpolicyk8s.io/v1alpha2`) | Policy violations |
 | Kubescape | `kubescape` | [kubescape-operator](https://github.com/kubescape/kubescape-operator) (`WorkloadConfigurationScan` CRD) | Failed compliance controls |
@@ -19,6 +19,12 @@ sources, each auto-detected by the operator or CRDs it needs.
 the Security category is never empty unless the dashboard is disabled. The
 internal ids `trivy-operator` and `policy-report` are also accepted as config
 keys (aliases of `trivy` and `kyverno`).
+
+The heuristic `secret_env` check (plaintext credential-looking env vars) is
+tunable with `security.heuristic.secret_env_include` / `secret_env_exclude` —
+case-insensitive env-var name globs added on top of the built-in keyword and
+exemption lists (exclude wins). See
+[config-reference.md](config-reference.md).
 
 ## Enabling / disabling
 

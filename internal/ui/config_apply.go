@@ -221,6 +221,50 @@ func applySecurityConfig(cfg configFile) {
 		patterns = append(patterns, p)
 	}
 	ConfigSecurityIgnorePatterns = patterns
+	if cfg.Security.Heuristic != nil {
+		ConfigSecuritySecretEnvInclude = trimNonEmpty(cfg.Security.Heuristic.SecretEnvInclude)
+		ConfigSecuritySecretEnvExclude = trimNonEmpty(cfg.Security.Heuristic.SecretEnvExclude)
+	}
+}
+
+// applyClusterSecurityConfig applies one clusters.<name>.security override
+// block. Extracted from applyConfigMaps to keep it under the gocyclo cap.
+func applyClusterSecurityConfig(ctx string, sec *securityConfig) {
+	if sec.Enabled != nil {
+		ConfigClusterSecurityEnabled[ctx] = *sec.Enabled
+	}
+	if sec.HideBadges != nil {
+		ConfigClusterSecurityHideBadges[ctx] = *sec.HideBadges
+	}
+	if sec.Sources != nil {
+		ConfigClusterSecuritySources[ctx] = sec.Sources
+	}
+	// ignore_patterns is honored only in the top-level security
+	// section; per-cluster scoping is expressed via each pattern's
+	// `cluster` glob instead. Warn rather than silently drop.
+	if len(sec.IgnorePatterns) > 0 {
+		logger.Warn("clusters.<ctx>.security.ignore_patterns is ignored; "+
+			"set ignore_patterns at the top-level security section and use the per-pattern 'cluster' glob",
+			"context", ctx)
+	}
+	if sec.Heuristic != nil {
+		logger.Warn("clusters.<ctx>.security.heuristic is ignored; "+
+			"set it at the top-level security section",
+			"context", ctx)
+	}
+}
+
+// trimNonEmpty returns the entries trimmed of whitespace with empties dropped,
+// so a blank YAML list item can't become a match-nothing (or, worse,
+// match-everything) pattern.
+func trimNonEmpty(in []string) []string {
+	var out []string
+	for _, s := range in {
+		if t := strings.TrimSpace(s); t != "" {
+			out = append(out, t)
+		}
+	}
+	return out
 }
 
 // applyDataAccessConfig applies the cluster-data-access settings:
@@ -410,23 +454,7 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 				ConfigClusterK8sClientBurst[ctx] = *cc.K8sClientBurst
 			}
 			if cc.Security != nil {
-				if cc.Security.Enabled != nil {
-					ConfigClusterSecurityEnabled[ctx] = *cc.Security.Enabled
-				}
-				if cc.Security.HideBadges != nil {
-					ConfigClusterSecurityHideBadges[ctx] = *cc.Security.HideBadges
-				}
-				if cc.Security.Sources != nil {
-					ConfigClusterSecuritySources[ctx] = cc.Security.Sources
-				}
-				// ignore_patterns is honored only in the top-level security
-				// section; per-cluster scoping is expressed via each pattern's
-				// `cluster` glob instead. Warn rather than silently drop.
-				if len(cc.Security.IgnorePatterns) > 0 {
-					logger.Warn("clusters.<ctx>.security.ignore_patterns is ignored; "+
-						"set ignore_patterns at the top-level security section and use the per-pattern 'cluster' glob",
-						"context", ctx)
-				}
+				applyClusterSecurityConfig(ctx, cc.Security)
 			}
 			if len(cc.Views) > 0 {
 				if ConfigClusterViews == nil {
