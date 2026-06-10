@@ -323,22 +323,29 @@ func findCustomAction(kind, label string) (ui.CustomAction, bool) {
 // from the resource item (e.g., {nodeName}, {IP}) with the key stripped of spaces and
 // lowercased for matching.
 func expandCustomActionTemplate(cmdTemplate string, actx actionContext) string {
+	// Every substituted value is shell-quoted: the expansion runs via sh -c and
+	// the values are cluster-controlled data (context names, column values such
+	// as labels/image strings/annotations) that may contain shell
+	// metacharacters. Quoting neutralizes injection while still passing the
+	// value literally — adjacent quoted/unquoted words concatenate in the shell,
+	// so mid-token uses like /tmp/{name}.log stay correct.
 	result := cmdTemplate
-	result = strings.ReplaceAll(result, "{name}", actx.name)
-	result = strings.ReplaceAll(result, "{namespace}", actx.namespace)
-	result = strings.ReplaceAll(result, "{context}", actx.context)
-	result = strings.ReplaceAll(result, "{kind}", actx.kind)
+	result = strings.ReplaceAll(result, "{name}", shellQuote(actx.name))
+	result = strings.ReplaceAll(result, "{namespace}", shellQuote(actx.namespace))
+	result = strings.ReplaceAll(result, "{context}", shellQuote(actx.context))
+	result = strings.ReplaceAll(result, "{kind}", shellQuote(actx.kind))
 
 	// Substitute column-based variables. The user writes {columnKey} where columnKey
 	// matches the column's Key field (case-insensitive, spaces removed). For example,
 	// a column with Key="Node" can be referenced as {Node} or {node}.
 	for _, kv := range actx.columns {
+		quoted := shellQuote(kv.Value)
 		// Exact match first (e.g., {Node} for Key="Node").
-		result = strings.ReplaceAll(result, "{"+kv.Key+"}", kv.Value)
+		result = strings.ReplaceAll(result, "{"+kv.Key+"}", quoted)
 		// Also support camelCase-style references (e.g., {nodeName} for Key="Node").
 		lowerKey := strings.ToLower(strings.ReplaceAll(kv.Key, " ", ""))
 		if lowerKey != kv.Key {
-			result = strings.ReplaceAll(result, "{"+lowerKey+"}", kv.Value)
+			result = strings.ReplaceAll(result, "{"+lowerKey+"}", quoted)
 		}
 	}
 

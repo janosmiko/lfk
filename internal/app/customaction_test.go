@@ -30,37 +30,37 @@ func TestExpandCustomActionTemplate(t *testing.T) {
 		{
 			name:     "basic variable substitution",
 			template: "kubectl logs {name} -n {namespace} --context {context}",
-			expected: "kubectl logs my-pod -n default --context prod-cluster",
+			expected: "kubectl logs 'my-pod' -n 'default' --context 'prod-cluster'",
 		},
 		{
 			name:     "kind substitution",
 			template: "echo {kind}/{name}",
-			expected: "echo Pod/my-pod",
+			expected: "echo 'Pod'/'my-pod'",
 		},
 		{
 			name:     "column substitution exact key",
 			template: "ssh {Node}",
-			expected: "ssh node-1",
+			expected: "ssh 'node-1'",
 		},
 		{
 			name:     "column substitution lowercase key",
 			template: "ssh {node}",
-			expected: "ssh node-1",
+			expected: "ssh 'node-1'",
 		},
 		{
 			name:     "column with spaces removed",
 			template: "echo {priorityclass}",
-			expected: "echo high",
+			expected: "echo 'high'",
 		},
 		{
 			name:     "IP column",
 			template: "curl http://{IP}:8080",
-			expected: "curl http://10.0.0.5:8080",
+			expected: "curl http://'10.0.0.5':8080",
 		},
 		{
 			name:     "multiple variables in one command",
 			template: "kubectl logs {name} -n {namespace} --context {context} > /tmp/{name}.log",
-			expected: "kubectl logs my-pod -n default --context prod-cluster > /tmp/my-pod.log",
+			expected: "kubectl logs 'my-pod' -n 'default' --context 'prod-cluster' > /tmp/'my-pod'.log",
 		},
 		{
 			name:     "no variables",
@@ -97,7 +97,7 @@ func TestExpandCustomActionTemplateNoColumns(t *testing.T) {
 	}
 
 	result := expandCustomActionTemplate("kubectl rollout history {kind}/{name} -n {namespace} --context {context}", actx)
-	assert.Equal(t, "kubectl rollout history Deployment/my-deploy -n staging --context dev-cluster", result)
+	assert.Equal(t, "kubectl rollout history 'Deployment'/'my-deploy' -n 'staging' --context 'dev-cluster'", result)
 }
 
 func TestFindCustomAction(t *testing.T) {

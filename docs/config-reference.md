@@ -652,6 +652,8 @@ Template variables are substituted before execution:
 
 Custom action commands are executed via `sh -c` with `KUBECONFIG` set in the environment. Interactive commands (like `ssh`) hand over the terminal to the subprocess.
 
+Substituted values are shell-quoted before insertion, so cluster data (context names, labels, image strings) containing shell metacharacters is passed literally and cannot inject commands. Quoting is transparent for normal argument use — `ssh {Node}` and `/tmp/{name}.log` work as written.
+
 ## Pinned Groups
 
 Pin CRD API groups so they appear right after the built-in categories (Workloads, Networking, etc.) instead of being sorted alphabetically under Custom Resources.
