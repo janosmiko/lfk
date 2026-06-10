@@ -10,6 +10,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/security"
+	"github.com/janosmiko/lfk/internal/security/advisor"
 	"github.com/janosmiko/lfk/internal/security/falco"
 	"github.com/janosmiko/lfk/internal/security/gatekeeper"
 	"github.com/janosmiko/lfk/internal/security/heuristic"
@@ -75,6 +76,7 @@ func (m *Model) refreshSecuritySources() tea.Cmd {
 			h := heuristic.NewWithClient(kc)
 			h.SetSecretEnvPatterns(ui.ConfigSecuritySecretEnvInclude, ui.ConfigSecuritySecretEnvExclude)
 			register("heuristic", h)
+			register("advisor", advisor.NewWithClient(kc))
 			register("falco", falco.NewWithClient(kc))
 		}
 		if dc != nil {

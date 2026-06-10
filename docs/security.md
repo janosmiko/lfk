@@ -9,16 +9,24 @@ sources, each auto-detected by the operator or CRDs it needs.
 | Source | Config key | Requires in cluster | Findings |
 |---|---|---|---|
 | Heuristic | `heuristic` | nothing (built-in) | Pod-spec hardening issues: privileged, host PID/IPC/network, hostPath + runtime-socket mounts, dangerous capabilities, runAsRoot, allowPrivilegeEscalation, writable root filesystem, seccomp Unconfined, unmasked procMount, unsafe sysctls, hostPort, shared process namespace, plaintext secrets in env, default ServiceAccount (+ token automount), missing resource limits, unpinned image tags |
+| Advisor | `advisor` | nothing (built-in) | Reliability recommendations: namespaces without ResourceQuota/LimitRange, multi-replica workloads without a PodDisruptionBudget, drain-blocking PDBs, single-replica workloads, missing probes, missing resource requests, HPAs whose target lacks requests |
 | Trivy | `trivy` | [Trivy Operator](https://github.com/aquasecurity/trivy-operator) (`VulnerabilityReport`, `ConfigAuditReport` CRDs) | Image vulnerabilities + config-audit misconfigurations |
 | Kyverno | `kyverno` | Policy Reports API (`PolicyReport`, `ClusterPolicyReport` from `wgpolicyk8s.io/v1alpha2`) | Policy violations |
 | Kubescape | `kubescape` | [kubescape-operator](https://github.com/kubescape/kubescape-operator) (`WorkloadConfigurationScan` CRD) | Failed compliance controls |
 | Falco | `falco` | [Falco](https://falco.org) DaemonSet + falcosidekick (pod logs / K8s Events) | Runtime security events |
 | Gatekeeper | `gatekeeper` | [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) (Constraint CRDs under `constraints.gatekeeper.sh`) | Constraint audit violations |
 
-**Heuristic is always available** — it only needs API access to list Pods, so
+**Heuristic and Advisor are always available** — they only need API access, so
 the Security category is never empty unless the dashboard is disabled. The
 internal ids `trivy-operator` and `policy-report` are also accepted as config
 keys (aliases of `trivy` and `kyverno`).
+
+Advisor findings are **reliability recommendations, not security findings**:
+they appear in the dashboard under the Advisor source but never color the
+per-resource SEC badge. The source is best-effort under restricted RBAC —
+resource types it cannot list (e.g. PDBs for a read-only user) silently skip
+their checks instead of failing the source, and the `kube-system`,
+`kube-public`, and `kube-node-lease` namespaces are always excluded.
 
 The heuristic `secret_env` check (plaintext credential-looking env vars) is
 tunable with `security.heuristic.secret_env_include` / `secret_env_exclude` —
