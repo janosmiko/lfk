@@ -166,12 +166,13 @@ log_path: /tmp/lfk.log
 # flat log_tail_lines / log_tail_lines_short / log_render_ansi keys (still
 # accepted as deprecated aliases; log_viewer wins when both are set).
 # log_viewer:
-#   tail_lines: 1000        # lines loaded initially via --tail (older history loads on scroll-up)
+#   tail_lines: 100         # lines loaded initially via --tail (per container) (older history loads on scroll-up)
 #   tail_lines_short: 10    # lines loaded by the "Tail Logs" action; non-positive ignored
 #   render_ansi: true       # render ANSI colour/bold/underline; false strips them (:set ansi/noansi)
 #   show_preview: true      # structured preview side panel shown on open
 #   show_prefixes: true     # [pod/name/container] line prefixes shown on open
 #   show_timestamps: false  # log line timestamps hidden on open
+#   preview_live: false     # right-pane live-log preview on explorer open (L to toggle)
 #   max_lines: 50000        # max retained log lines per tab (oldest dropped); clamped [1000, 1000000]
 
 # ─── Viewer Defaults ─────────────────────────────────────────────────────────
@@ -356,7 +357,8 @@ theme:
 # ─── Keybindings ───────────────────────────────────────────────────────────────
 # Override direct-action keybindings. Navigation and other keys are fixed.
 keybindings:
-  logs: "L" # View logs (default: L)
+  logs: "ctrl+l" # Open fullscreen log viewer (default: ctrl+l)
+  toggle_preview_logs: "L" # Toggle right-pane live-log preview (default: L)
   refresh: "R" # Refresh view (default: R)
   restart: "r" # Restart resource (default: r)
   exec: "s" # Exec into pod (default: s)
@@ -373,7 +375,7 @@ keybindings:
   toggle_prefixes: "p" # Toggle pod/container line prefixes in the log viewer (default: p)
   toggle_unified: "u" # Toggle unified vs side-by-side in the diff viewer (default: u)
   mouse_toggle: "alt+ctrl+y" # Suspend/resume mouse capture for native text selection (Ctrl+Option+Y; default: alt+ctrl+y)
-  cluster_color_picker: "L" # Open cluster-color picker (default: Shift+L; reuses the Logs key, since Logs has no resource to act on at the cluster picker — at deeper levels "L" still opens Logs)
+  cluster_color_picker: "L" # Open cluster-color picker (default: Shift+L; shares "L" with toggle_preview_logs, gated by level — at the cluster picker "L" opens this, at deeper levels it toggles the live-log preview)
   security_ignore_toggle: "i" # Show/hide ignored security findings (default: i; security view only — shadows the Label Editor there)
   security_badge_toggle: "B" # Show/hide the per-resource SEC severity badge (default: B)
 

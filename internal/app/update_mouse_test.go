@@ -99,6 +99,33 @@ func TestMouseWheelOverRightPaneScrollsPreview(t *testing.T) {
 	assert.Equal(t, 7, result.previewScroll, "wheel up over right pane scrolls the preview up by 3")
 }
 
+// When the live-log preview is active, the right-pane wheel scrolls the log
+// tail via its bottom-anchored fromBottom offset (wheel up = older), mirroring
+// the YAML preview's wheel behavior.
+func TestMouseWheelOverLogPreviewScrolls(t *testing.T) {
+	m := baseExplorerModel() // width=120 -> middleEnd=75
+	m.setCursor(2)
+	m.fullLogPreview = true
+	lines := make([]string, 200)
+	for i := range lines {
+		lines[i] = "log line"
+	}
+	m.previewLog.lines = lines
+	m.previewLog.fromBottom = 0
+
+	// Wheel up over the right pane (X=100) scrolls into older lines.
+	ret, _ := m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelUp, X: 100})
+	m = ret.(Model)
+	assert.Greater(t, m.previewLog.fromBottom, 0, "wheel up scrolls the log preview back into older lines")
+	assert.Equal(t, 0, m.previewScroll, "log preview wheel must not touch the YAML previewScroll")
+
+	// Wheel down returns toward the newest (floors at 0).
+	up := m.previewLog.fromBottom
+	ret, _ = m.handleMouse(tea.MouseMsg{Button: tea.MouseButtonWheelDown, X: 100})
+	m = ret.(Model)
+	assert.Less(t, m.previewLog.fromBottom, up, "wheel down scrolls the log preview toward the newest")
+}
+
 func TestMouseWheelDownOverRightPaneKeepsCursor(t *testing.T) {
 	m := baseExplorerModel()
 	m.setCursor(2)

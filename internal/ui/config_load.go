@@ -321,6 +321,10 @@ type LogViewerConfig struct {
 	// dropped. Default 50000. Clamped to [1000, 1000000]. Bounds memory for a
 	// long-running follow.
 	MaxLines *int `json:"max_lines" yaml:"max_lines"`
+	// PreviewLive: startup default for the right-pane live-log preview toggle
+	// (runtime toggle: L). When true the explorer opens with live logs streaming
+	// in the right pane for the selected pod. Default false.
+	PreviewLive *bool `json:"preview_live" yaml:"preview_live"`
 }
 
 // YAMLViewerConfig is the on-disk schema for the yaml_viewer section. Every

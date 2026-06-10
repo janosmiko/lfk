@@ -45,7 +45,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `watch_mode` | bool | `true` | Startup default for live watch/polling. Set to `false` to start with manual refresh. |
 | `all_namespaces` | bool | `true` | Startup namespace scope: `true` shows all namespaces, `false` scopes to the context's default namespace. The `--namespace` CLI flag and per-bookmark/session scope override this. |
 | `events` | object | *(see Events section)* | Events view startup-toggle defaults. See [Events](#events). |
-| `log_tail_lines` | int | `1000` | **Deprecated** — use `log_viewer.tail_lines`. Number of log lines to load initially via `--tail`. |
+| `log_tail_lines` | int | `100` | **Deprecated** — use `log_viewer.tail_lines`. Number of log lines to load initially via `--tail`. |
 | `log_tail_lines_short` | int | `10` | **Deprecated** — use `log_viewer.tail_lines_short`. Number of log lines loaded by the action menu "Tail Logs" entry. Non-positive values are ignored. |
 | `log_render_ansi` | bool | `true` | **Deprecated** — use `log_viewer.render_ansi`. Render ANSI SGR sequences from log producers. |
 | `confirm_on_exit` | bool | `true` | Show quit confirmation when pressing `ctrl+c` on the last tab. Set to `false` to exit immediately. |
@@ -137,22 +137,24 @@ Settings for the log viewer (`L` key). The startup-toggle defaults let you skip 
 
 ```yaml
 log_viewer:
-  tail_lines: 1000
+  tail_lines: 100
   tail_lines_short: 10
   render_ansi: true
   show_preview: true
   show_prefixes: true
   show_timestamps: false
+  preview_live: false
 ```
 
 | Field | Type | Default | Description |
 |-------|------|---------|-------------|
-| `tail_lines` | int | `1000` | Log lines loaded initially via `--tail`. Scrolling to the top loads older history. |
+| `tail_lines` | int | `100` | Log lines loaded initially via `--tail` (per container). Scrolling to the top loads older history. |
 | `tail_lines_short` | int | `10` | Log lines loaded by the action menu "Tail Logs" entry. Non-positive values are ignored. |
 | `render_ansi` | bool | `true` | Render ANSI SGR sequences (color, bold, underline) from log producers. `false` strips them (every ESC byte becomes `U+FFFD`); non-SGR CSI sequences are always stripped. Toggle at runtime with `:set ansi` / `:set noansi`. |
 | `show_preview` | bool | `true` | Startup default for the structured preview side panel. Runtime toggle: `toggle_preview` (`P`). |
 | `show_prefixes` | bool | `true` | Startup default for the `[pod/name/container]` line prefixes. Runtime toggle: `toggle_prefixes` (`p`). |
 | `show_timestamps` | bool | `false` | Startup default for log line timestamps. Runtime toggle: `toggle_timestamps` (`s`). |
+| `preview_live` | bool | `false` | Startup default for the right-pane live-log preview. When true the explorer opens with live logs streaming in the right pane for the selected pod. Runtime toggle: `toggle_preview_logs` (`L`). |
 | `max_lines` | int | `50000` | Max streamed log lines retained per tab; once exceeded, the oldest lines are dropped so a long-running follow stays bounded in memory. Clamped to `[1000, 1000000]`. |
 
 The deprecated flat keys `log_tail_lines`, `log_tail_lines_short`, and `log_render_ansi` are still accepted as aliases; when both a flat key and its `log_viewer` equivalent are set, `log_viewer` wins.
@@ -423,7 +425,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 
 | Field | Default | Action |
 |---|---|---|
-| `logs` | `L` | View logs for selected resource |
+| `logs` | `ctrl+l` | Open the fullscreen log viewer for the selected resource |
 | `refresh` | `R` | Refresh current view |
 | `restart` | `r` | Restart resource (action menu only) |
 | `exec` | `s` | Exec into container (action menu only) |
@@ -444,6 +446,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
 | `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |
 | `toggle_preview` | `P` | Toggle the structured preview side panel (log viewer) / details↔YAML preview (explorer). |
+| `toggle_preview_logs` | `L` | Toggle the right-pane live-log preview for the selected pod (explorer; deeper levels only). |
 | `fullscreen` | `F` | Maximize/minimize: explorer middle column & dashboard, event timeline, error log. |
 | `sort_next` | `>` | Sort by next column |
 | `sort_prev` | `<` | Sort by previous column |

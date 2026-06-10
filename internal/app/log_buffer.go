@@ -14,10 +14,24 @@ const logBufferTrimSlack = 4096
 // ui.ConfigLogMaxLines + logBufferTrimSlack, returning the trimmed slice and
 // the number of leading lines removed so callers can shift absolute offsets
 // (scroll, cursor, visual anchor). It is a no-op until the slack is exceeded,
-// and disabled entirely when the cap is non-positive.
+// and disabled entirely when the cap is non-positive. The slack batches the
+// trim so the amortised append cost stays O(1); capLines does the actual copy.
 func capLogLines(buf []string) ([]string, int) {
 	maxLines := ui.ConfigLogMaxLines
 	if maxLines <= 0 || len(buf) <= maxLines+logBufferTrimSlack {
+		return buf, 0
+	}
+	return capLines(buf, maxLines)
+}
+
+// capLines trims buf to at most maxLines, copying the retained tail into a
+// fresh slice (so the old backing array can be freed — a plain reslice would
+// keep the whole array alive) and returning the trimmed slice plus the number
+// of leading lines dropped. It is a no-op when maxLines is non-positive or the
+// buffer already fits. Unlike capLogLines this has no slack and reads no
+// config, so it is shared by the live-log preview's fixed-size buffer.
+func capLines(buf []string, maxLines int) ([]string, int) {
+	if maxLines <= 0 || len(buf) <= maxLines {
 		return buf, 0
 	}
 	drop := len(buf) - maxLines

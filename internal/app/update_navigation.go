@@ -303,6 +303,16 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 
 	logger.Info("Context selected", "context", sel.Name)
 	m.saveCursor()
+	// Cancel any running live-log preview stream before switching clusters so
+	// the old stream's goroutine does not outlive its context. Clear the flag
+	// too — the new cluster starts at the resource-type level with no pod
+	// selected, so the preview has nothing to show.
+	// Also clear the per-pod buffer cache: entries are context-specific and
+	// must not be restored after a context switch.
+	m.cancelPreviewLogStream()
+	m.fullLogPreview = false
+	m.previewLogCache = make(map[string]previewLogCacheEntry)
+	m.previewLogCacheOrder = nil
 	oldCtx := m.nav.Context
 	m.nav.Context = sel.Name
 	m.invalidateOrphanCacheForContext(oldCtx)

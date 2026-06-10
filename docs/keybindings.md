@@ -141,7 +141,8 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `x` | Open action menu (bulk actions when items selected) | `action_menu` |
 | `\` | Open namespace selector | `namespace_selector` |
 | `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
-| `L` | View logs for selected resource | `logs` |
+| `L` | Toggle live-log preview pane for selected pod (streaming tail in right pane; deeper levels only) | `toggle_preview_logs` |
+| `Ctrl+L` | Open fullscreen log viewer for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
 | `E` | Edit selected resource in $KUBE_EDITOR or $EDITOR | `edit` |
 | `R` | Refresh current view (also works inside the namespace selector — re-fetches the namespace list from the cluster) | `refresh` |
@@ -368,7 +369,7 @@ Live refresh defaults to on; set `object_explorer.live: false` to start paused. 
 
 The log viewer's `/` keeps its own persistent history at `$XDG_STATE_HOME/lfk/log-search-history` (default `~/.local/state/lfk/log-search-history`), separate from the explorer's `query-history`. Log search matches raw log lines (substring/regex over arbitrary text) rather than resource names, so pooling the two would surface irrelevant entries on Up/Down in either context.
 
-Tail-first loading: Full Logs (`L` key or action menu `L`) load the last 1000 lines initially (configurable via `log_viewer.tail_lines`). Tail Logs (action menu `l`) load only the last 10 lines (configurable via `log_viewer.tail_lines_short`). Scrolling to the top loads older history.
+Tail-first loading: Full Logs (`Ctrl+L` key or action menu `L`) load the last 100 lines initially (configurable via `log_viewer.tail_lines`). Tail Logs (action menu `l`) load only the last 10 lines (configurable via `log_viewer.tail_lines_short`). Scrolling to the top loads older history.
 
 Auto-reconnect across init containers: when viewing logs for a single Pod in all-containers mode (no specific container selected via `\`), the stream automatically reconnects each time kubectl exits — e.g. as init containers transition. The reconnect is silent. After several consecutive empty reconnects the viewer stops retrying.
 
@@ -988,6 +989,14 @@ Custom actions defined in the config file appear after the built-in actions.
 
 All keybindings can be overridden in `~/.config/lfk/config.yaml`. Only specify the keys you want to change — defaults apply for everything else.
 
+For example, to swap the live-log preview and the fullscreen log viewer (fullscreen on plain `L`, preview on `Ctrl+L`):
+
+```yaml
+keybindings:
+  logs: "L"                      # fullscreen log viewer
+  toggle_preview_logs: "ctrl+l"  # live-log preview pane
+```
+
 ```yaml
 keybindings:
   # Navigation
@@ -1037,7 +1046,8 @@ keybindings:
   action_menu: "x"       # Action menu
   namespace_selector: "\\" # Namespace selector
   all_namespaces: "A"    # Toggle all-namespaces
-  logs: "L"              # View logs
+  toggle_preview_logs: "L"  # Toggle live-log preview pane (deeper levels only)
+  logs: "ctrl+l"         # Open fullscreen log viewer
   refresh: "R"           # Refresh view
   restart: "r"           # Restart resource (action menu only)
   exec: "s"              # Exec into container (action menu only)

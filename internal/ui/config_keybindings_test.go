@@ -39,3 +39,16 @@ func TestDefaultKeybindingsNoUnreachableControlAliases(t *testing.T) {
 		}
 	}
 }
+
+// TestLogKeybindingSwap verifies the log key layout: the details-pane live-log
+// toggle claims shift+l ("L") and the fullscreen log viewer uses ctrl+l
+// (reachable on macOS without Option-as-Meta, unlike an alt+letter binding).
+func TestLogKeybindingSwap(t *testing.T) {
+	kb := DefaultKeybindings()
+	if kb.TogglePreviewLogs != "L" {
+		t.Errorf("TogglePreviewLogs = %q, want %q (details-pane live logs uses shift+l)", kb.TogglePreviewLogs, "L")
+	}
+	if kb.Logs != "ctrl+l" {
+		t.Errorf("Logs = %q, want %q (fullscreen log viewer uses ctrl+l)", kb.Logs, "ctrl+l")
+	}
+}

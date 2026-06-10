@@ -1,7 +1,6 @@
 package app
 
 import (
-	"slices"
 	"sync"
 	"sync/atomic"
 
@@ -181,33 +180,10 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 		return m
 	}
 
-	// Find overlap: search for the first 3 current lines in the fetched history.
-	overlapIdx := -1
-	if len(m.logView.lines) >= 3 && len(msg.lines) > 3 {
-		first3 := m.logView.lines[:3]
-		for i := len(msg.lines) - 3; i >= 0; i-- {
-			if msg.lines[i] == first3[0] && msg.lines[i+1] == first3[1] && msg.lines[i+2] == first3[2] {
-				overlapIdx = i
-				break
-			}
-		}
-	} else if len(m.logView.lines) > 0 && len(msg.lines) > 0 {
-		// Single-line fallback.
-		for i, line := range slices.Backward(msg.lines) {
-			if line == m.logView.lines[0] {
-				overlapIdx = i
-				break
-			}
-		}
-	}
-
-	var newOlderLines []string
-	if overlapIdx > 0 {
-		newOlderLines = msg.lines[:overlapIdx]
-	} else if overlapIdx == -1 && len(msg.lines) > 0 {
-		// No overlap found; prepend all (logs may have rotated).
-		newOlderLines = msg.lines
-	}
+	// The fetched history is the last <tail> lines of the resource; the current
+	// buffer's oldest lines overlap its tail, so only the prefix before the
+	// overlap is genuinely older.
+	newOlderLines := mergeOlderLogLines(m.logView.lines, msg.lines)
 
 	if len(newOlderLines) == 0 {
 		m.logView.hasMoreHistory = false

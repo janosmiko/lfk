@@ -167,10 +167,18 @@ func (m Model) updatePreviewDebounceTick(msg previewDebounceTickMsg) (tea.Model,
 	if msg.gen != m.previewDebounceGen {
 		return m, nil
 	}
+
+	// When the live-log preview is active, restart the stream if the cursor
+	// has landed on a different pod (or cancel it if no pod is selected).
+	// The podKey dedup inside maybeRestartOrCancelPreviewLog makes this a
+	// no-op for same-pod moves, so rapid navigation within the same pod
+	// does not thrash the stream.
+	m, logCmd := m.maybeRestartOrCancelPreviewLog()
+
 	if m.mapView {
-		return m, tea.Batch(m.loadPreview(), m.loadResourceTree())
+		return m, tea.Batch(m.loadPreview(), m.loadResourceTree(), logCmd)
 	}
-	return m, m.loadPreview()
+	return m, tea.Batch(m.loadPreview(), logCmd)
 }
 
 func (m Model) updateEventTimeline(msg eventTimelineMsg) (tea.Model, tea.Cmd) {

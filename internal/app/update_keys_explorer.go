@@ -358,6 +358,9 @@ func (m Model) handleExplorerUIKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.TogglePreview:
 		mdl, cmd := m.handleExplorerTogglePreview()
 		return mdl, cmd, true
+	case kb.TogglePreviewLogs:
+		mdl, cmd := m.handleExplorerToggleLogPreview()
+		return mdl, cmd, true
 	case kb.Fullscreen:
 		mdl, cmd := m.handleExplorerFullscreen()
 		return mdl, cmd, true
@@ -379,6 +382,8 @@ func (m Model) handleExplorerResourceMap() (tea.Model, tea.Cmd) {
 		m.mapView = !m.mapView
 		if m.mapView {
 			m.fullYAMLPreview = false
+			m.fullLogPreview = false
+			m.cancelPreviewLogStream()
 			m.previewScroll = 0
 			m.setStatusMessage("Resource map", false)
 			return m, tea.Batch(m.loadResourceTree(), scheduleStatusClear())
@@ -399,6 +404,9 @@ func (m Model) handleExplorerTogglePreview() (tea.Model, tea.Cmd) {
 	m.mapView = false
 	m.resourceTree = nil
 	if m.fullYAMLPreview {
+		// YAML preview is mutually exclusive with log preview.
+		m.fullLogPreview = false
+		m.cancelPreviewLogStream()
 		m.setStatusMessage("YAML preview", false)
 	} else {
 		m.previewYAML = ""

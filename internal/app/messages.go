@@ -207,6 +207,15 @@ type logLineMsg struct {
 	ch   chan string // the channel this line came from (for tab identity)
 }
 
+// previewLogLineMsg carries one line for the right-pane live-log preview. ch
+// correlates it with the active preview stream so a stale stream's lines are
+// dropped after a pod switch.
+type previewLogLineMsg struct {
+	line string
+	done bool
+	ch   chan string
+}
+
 // logStreamRestartMsg triggers an automatic reconnect of the log stream when
 // the previous stream ended (e.g. an init container completed and the next
 // one hasn't produced output yet). The ch field correlates the restart with
@@ -214,6 +223,23 @@ type logLineMsg struct {
 // channel (user switched pods or exited logs mode), the restart is dropped.
 type logStreamRestartMsg struct {
 	ch chan string
+}
+
+// previewLogRestartMsg triggers an automatic reconnect of the right-pane live-log
+// preview stream after a short delay. ch correlates it with the preview stream
+// that ended: if m.previewLog.ch no longer matches (user switched pods, toggled
+// off, or a new stream started), the restart is silently dropped.
+type previewLogRestartMsg struct {
+	ch chan string
+}
+
+// previewLogHistoryMsg carries a batch of older log lines fetched by a one-shot
+// kubectl logs (no -f). podKey correlates the result to the pod that was active
+// when the fetch was issued; stale results are dropped on receipt.
+type previewLogHistoryMsg struct {
+	podKey string
+	lines  []string
+	err    error
 }
 
 // podSelectMsg carries the pod list for exec/attach pod selection on parent resources.

@@ -148,6 +148,22 @@ func (m Model) handleMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 func (m Model) handleExplorerWheel(x, delta int) (tea.Model, tea.Cmd) {
 	_, middleEnd := m.columnBoundaries()
 	if x >= middleEnd {
+		// Live-log preview uses a bottom-anchored offset (fromBottom): wheel up
+		// (delta<0) scrolls into older lines, wheel down (delta>0) toward the
+		// newest. Subtracting delta maps the shared scroll direction onto it.
+		if m.fullLogPreview {
+			m.previewLog.fromBottom -= delta
+			if m.previewLog.fromBottom < 0 {
+				m.previewLog.fromBottom = 0
+			}
+			m.clampPreviewScroll()
+			// Trigger lazy history loading when scrolling up (delta<0) and at top.
+			if delta < 0 {
+				m, cmd := m.maybeLoadMorePreviewHistory()
+				return m, cmd
+			}
+			return m, nil
+		}
 		// Right pane: scroll the preview, mirroring the PreviewUp/PreviewDown
 		// keys (J/K). Scroll-up is a plain decrement with a zero floor;
 		// scroll-down increments and clamps to the rendered content height.

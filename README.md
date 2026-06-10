@@ -300,7 +300,8 @@ Namespaces are **not** a navigation level. The current namespace is shown in the
 |---|---|
 | `x` | Action menu (logs, exec, describe, edit, delete, scale, port-forward, etc.) |
 | `\` / `A` | Namespace selector / toggle all-namespaces |
-| `L` | View logs |
+| `L` | Toggle live-log preview pane (right pane, streaming tail; pod resources only) |
+| `Ctrl+L` | Open fullscreen log viewer |
 | `v` | Describe resource |
 | `D` / `X` | Delete / force delete |
 | `y` / `Y` | Copy name / open copy-as picker (YAML / JSON / Table) |
@@ -339,7 +340,8 @@ mouse: false
 
 # Custom keybinding overrides (only specify what you want to change)
 keybindings:
-  logs: "L"
+  logs: "ctrl+l"
+  toggle_preview_logs: "L"
   describe: "v"
   delete: "D"
 
