@@ -540,6 +540,23 @@
           "type": "array",
           "description": "Declarative glob-based ignore rules applied at load. Honored only in the top-level security section.",
           "items": { "$ref": "#/definitions/securityIgnorePattern" }
+        },
+        "heuristic": {
+          "type": "object",
+          "description": "Tuning options for the built-in heuristic source. Honored only in the top-level security section.",
+          "additionalProperties": false,
+          "properties": {
+            "secret_env_include": {
+              "type": "array",
+              "description": "Extra env-var name globs (* and ?, case-insensitive) the secret_env check flags, on top of the built-in credential keywords. An explicit match overrides a built-in exemption.",
+              "items": { "type": "string" }
+            },
+            "secret_env_exclude": {
+              "type": "array",
+              "description": "Env-var name globs (* and ?, case-insensitive) the secret_env check never flags, on top of the built-in exemptions. Wins over secret_env_include.",
+              "items": { "type": "string" }
+            }
+          }
         }
       }
     },

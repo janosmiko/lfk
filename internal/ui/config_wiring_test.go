@@ -108,6 +108,11 @@ security:
     - cluster: prod
       source: trivy-operator
       comment: noisy
+  heuristic:
+    secret_env_include:
+      - "*_CONN_STR"
+    secret_env_exclude:
+      - "LEGACY_*"
 rightsizing_defaults:
   strategy: prom_max_1d
   headroom: 1.5
@@ -218,6 +223,8 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.Equal(t, map[string]bool{"trivy": false, "heuristic": true}, ConfigSecuritySources, "security.sources")
 	require.Len(t, ConfigSecurityIgnorePatterns, 1, "security.ignore_patterns")
 	assert.Equal(t, "prod", ConfigSecurityIgnorePatterns[0].Cluster)
+	assert.Equal(t, []string{"*_CONN_STR"}, ConfigSecuritySecretEnvInclude, "security.heuristic.secret_env_include")
+	assert.Equal(t, []string{"LEGACY_*"}, ConfigSecuritySecretEnvExclude, "security.heuristic.secret_env_exclude")
 
 	// rightsizing_defaults.
 	assert.Equal(t, model.StrategyPromMax1D, model.ConfigDefaultRightsizingStrategy, "rightsizing_defaults.strategy")
@@ -400,6 +407,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origSecHideBadges := ConfigSecurityHideBadges
 	origSecSources := ConfigSecuritySources
 	origSecIgnore := ConfigSecurityIgnorePatterns
+	origSecEnvInclude := ConfigSecuritySecretEnvInclude
+	origSecEnvExclude := ConfigSecuritySecretEnvExclude
 	origQPS := ConfigK8sClientQPS
 	origBurst := ConfigK8sClientBurst
 	origResCols := ConfigResourceColumns
@@ -476,6 +485,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigSecurityHideBadges = origSecHideBadges
 		ConfigSecuritySources = origSecSources
 		ConfigSecurityIgnorePatterns = origSecIgnore
+		ConfigSecuritySecretEnvInclude = origSecEnvInclude
+		ConfigSecuritySecretEnvExclude = origSecEnvExclude
 		ConfigK8sClientQPS = origQPS
 		ConfigK8sClientBurst = origBurst
 		ConfigResourceColumns = origResCols

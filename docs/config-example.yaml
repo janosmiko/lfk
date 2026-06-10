@@ -127,6 +127,15 @@ appearance:
 #       namespace: kube-system   # "" or "*" = any namespace (hides whole group)
 #       cluster: "prod-*"        # kube-context glob; "" = any cluster
 #       comment: accepted in system namespaces
+#   # Tune the built-in heuristic source. secret_env_include/_exclude are
+#   # env-var name globs (* and ?, case-insensitive) for the secret_env check:
+#   # include adds names to flag on top of the built-in credential keywords;
+#   # exclude is never flagged and wins over include.
+#   heuristic:
+#     secret_env_include:
+#       - "*_CONN_STR"           # also flag literal connection strings
+#     secret_env_exclude:
+#       - "MYAPP_FAKE_TOKEN"     # known non-secret; don't flag
 
 # ─── Log Path ──────────────────────────────────────────────────────────────────
 # Application log file location (lfk's own debug log, NOT the log viewer).
