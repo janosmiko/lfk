@@ -22,7 +22,9 @@ func runHelmCmdResult(cmd *exec.Cmd, successMsg, failPrefix string) tea.Msg {
 	logExecCmd("Running helm command", cmd)
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		logger.Error("helm command failed", "cmd", cmd.String(), "error", err, "output", string(out))
+		// Do not log raw helm output — it can echo Secret values on error. The
+		// captured output still reaches the user via the (ephemeral) status bar.
+		logger.Error("helm command failed", "cmd", cmd.String(), "error", err)
 		return actionResultMsg{err: fmt.Errorf("%s: %w: %s", failPrefix, err, strings.TrimSpace(string(out)))}
 	}
 	return actionResultMsg{message: successMsg}
@@ -338,7 +340,9 @@ func (m Model) rollbackHelmRelease(revision int) tea.Cmd {
 		logExecCmd("Running helm command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
 		if cmdErr != nil {
-			logger.Error("helm rollback failed", "cmd", cmd.String(), "error", cmdErr, "output", string(output))
+			// Don't log raw helm output (may echo Secret values); the user still
+			// sees it via the returned error in the status bar.
+			logger.Error("helm rollback failed", "cmd", cmd.String(), "error", cmdErr)
 			return helmRollbackDoneMsg{err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output)))}
 		}
 		return helmRollbackDoneMsg{}

@@ -412,6 +412,13 @@ func applyConfigMaps(cfg configFile, abbr map[string]string) {
 				if cc.Security.Enabled != nil {
 					ConfigClusterSecurityEnabled[ctx] = *cc.Security.Enabled
 				}
+				// hide_badges is a global UI preference, honored only at the
+				// top-level security section. Warn rather than silently drop.
+				if cc.Security.HideBadges != nil {
+					logger.Warn("clusters.<ctx>.security.hide_badges is ignored; "+
+						"set hide_badges at the top-level security section",
+						"context", ctx)
+				}
 				if cc.Security.Sources != nil {
 					ConfigClusterSecuritySources[ctx] = cc.Security.Sources
 				}
