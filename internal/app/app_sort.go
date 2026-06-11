@@ -83,20 +83,38 @@ func (m *Model) forgetSort() {
 // kinds (port-forwards, captures, union dashboards) are no-ops — pass an empty
 // ResourceRef.Kind or skip the call entirely at those sites.
 func (m *Model) applyKindSortDefault(rt ui.ResourceRef, context string) {
+	m.sortColumnName, m.sortAscending = m.kindSortPref(rt, context)
+}
+
+// kindSortPref resolves the sort column/direction a list of the given resource
+// type renders with, without mutating the model: session sort memory first,
+// then the configured view's SortColumn, then the built-in default ("Name",
+// ascending). Shared by applyKindSortDefault and the right-pane list preview
+// so the preview order matches the drilled-in list (issue #408).
+func (m *Model) kindSortPref(rt ui.ResourceRef, context string) (column string, ascending bool) {
 	if rt.Resource != "" {
 		if p, ok := m.sortMemory[sortMemoryKey(rt, context)]; ok {
-			m.sortColumnName = p.column
-			m.sortAscending = p.ascending
-			return
+			return p.column, p.ascending
 		}
 	}
 	if v, ok := ui.ResolveView(rt, context); ok && v.SortColumn != "" {
-		m.sortColumnName = v.SortColumn
-		m.sortAscending = v.SortAsc
+		return v.SortColumn, v.SortAsc
+	}
+	return sortColDefault, true
+}
+
+// sortPreviewItems sorts a right-pane preview list in place exactly as the
+// drilled-in list of rt renders it — session sort memory, then view config,
+// then Name ascending (issue #408). Synthetic previews (port-forwards,
+// captures, union dashboards) carry a zero-valued rt and keep their fetch
+// order.
+func (m *Model) sortPreviewItems(items []model.Item, rt model.ResourceTypeEntry) {
+	if rt.Resource == "" {
 		return
 	}
-	m.sortColumnName = sortColDefault
-	m.sortAscending = true
+	ref := ui.ResourceRef{Group: rt.APIGroup, Version: rt.APIVersion, Resource: rt.Resource, Kind: rt.Kind}
+	col, asc := m.kindSortPref(ref, m.nav.Context)
+	sortItemsByColumn(items, col, asc, rt.Kind)
 }
 
 // applyResourceTypeSortDefault is a convenience wrapper around applyKindSortDefault

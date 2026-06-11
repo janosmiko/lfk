@@ -12,9 +12,12 @@ func isBuiltinColumnKey(key string) bool {
 }
 
 // orderedColumnKeys returns the ordered list of column keys that RenderTable
-// should emit for a middle-column render. "Name" is a first-class member of
-// the list (leading by default) so it can be reordered or hidden through the
-// same column-toggle machinery as every other column; hasName=false omits it.
+// should emit. ActiveColumnOrder applies to the middle column and to
+// cursor-less right-pane previews alike — preview call sites swap in the
+// rendered kind's config via withSessionColumnsForKind (issue #408). "Name"
+// is a first-class member of the list (leading by default) so it can be
+// reordered or hidden through the same column-toggle machinery as every
+// other column; hasName=false omits it.
 func orderedColumnKeys(hasName, hasContext, hasNs, hasReady, hasRestarts, hasStatus, hasAge bool, extraCols []extraColumn) []string {
 	defaults := make([]string, 0, 7+len(extraCols))
 	if hasName {
@@ -42,7 +45,7 @@ func orderedColumnKeys(hasName, hasContext, hasNs, hasReady, hasRestarts, hasSta
 		defaults = append(defaults, "Age")
 	}
 
-	if ActiveMiddleScroll < 0 || ActiveColumnOrder == nil {
+	if ActiveColumnOrder == nil {
 		return defaults
 	}
 
