@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"os/exec"
 	"runtime"
@@ -96,9 +95,10 @@ var startupTips = []string{
 	"Disable tips with 'tips: false' in ~/.config/lfk/config.yaml",
 }
 
-// scheduleStartupTip sends a random tip after a short delay to let the UI settle.
+// scheduleStartupTip sends the next tip in the rotation after a short delay
+// to let the UI settle.
 func scheduleStartupTip() tea.Cmd {
-	tip := startupTips[rand.IntN(len(startupTips))]
+	tip := nextStartupTip()
 	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
 		return startupTipMsg{tip: tip}
 	})
