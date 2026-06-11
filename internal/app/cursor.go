@@ -150,7 +150,9 @@ func carryOverMetricsColumnsFrom(oldItems, newItems []model.Item) {
 	// when metrics-server returned nothing. The previous hasUsage gate
 	// dropped the carryover whenever every value was empty/zero, which made
 	// the metrics columns flicker out and back in on each refresh.
-	type itemKey struct{ ns, name string }
+	// The key includes the cluster: in union mode the same namespace+name can
+	// exist in several clusters and must not share carried columns.
+	type itemKey struct{ cluster, ns, name string }
 	oldMetrics := make(map[itemKey][]model.KeyValue)
 	for _, item := range oldItems {
 		var cols []model.KeyValue
@@ -160,7 +162,7 @@ func carryOverMetricsColumnsFrom(oldItems, newItems []model.Item) {
 			}
 		}
 		if len(cols) > 0 {
-			oldMetrics[itemKey{item.Namespace, item.Name}] = cols
+			oldMetrics[itemKey{item.ClusterName, item.Namespace, item.Name}] = cols
 		}
 	}
 	if len(oldMetrics) == 0 {
@@ -170,7 +172,7 @@ func carryOverMetricsColumnsFrom(oldItems, newItems []model.Item) {
 	// the raw request/limit columns (CPU Req, CPU Lim, Mem Req, Mem Lim) so
 	// that podMetricsEnrichedMsg can still read them to compute percentages.
 	for i := range newItems {
-		key := itemKey{newItems[i].Namespace, newItems[i].Name}
+		key := itemKey{newItems[i].ClusterName, newItems[i].Namespace, newItems[i].Name}
 		cols, ok := oldMetrics[key]
 		if !ok {
 			continue
@@ -215,7 +217,8 @@ func carryOverServiceEndpointColumnsFrom(oldItems, newItems []model.Item) {
 		"Backing Endpoints": true,
 		"Endpoints":         true,
 	}
-	type itemKey struct{ ns, name string }
+	// Cluster-qualified key: see carryOverMetricsColumnsFrom.
+	type itemKey struct{ cluster, ns, name string }
 	old := make(map[itemKey][]model.KeyValue)
 	for _, item := range oldItems {
 		var cols []model.KeyValue
@@ -225,14 +228,14 @@ func carryOverServiceEndpointColumnsFrom(oldItems, newItems []model.Item) {
 			}
 		}
 		if len(cols) > 0 {
-			old[itemKey{item.Namespace, item.Name}] = cols
+			old[itemKey{item.ClusterName, item.Namespace, item.Name}] = cols
 		}
 	}
 	if len(old) == 0 {
 		return
 	}
 	for i := range newItems {
-		key := itemKey{newItems[i].Namespace, newItems[i].Name}
+		key := itemKey{newItems[i].ClusterName, newItems[i].Namespace, newItems[i].Name}
 		cols, ok := old[key]
 		if !ok {
 			continue
