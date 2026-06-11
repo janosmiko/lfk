@@ -20,7 +20,7 @@ import (
 //	Namespace != "" && Resource == "" -> group within one namespace
 //	Resource  != ""                   -> one specific resource (ns encoded in key)
 type SecurityIgnoreRule struct {
-	Source    string `json:"source" yaml:"source"`                           // Security source name: "heuristic", "trivy-operator", "falco", "policy-report"
+	Source    string `json:"source" yaml:"source"`                           // Security source name: "heuristic", "advisor", "rbac", "trivy-operator", "falco", "policy-report"
 	GroupKey  string `json:"group_key" yaml:"group_key"`                     // Finding group key (check label, CVE ID, rule name)
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"` // Namespace scope. Empty = any namespace. Ignored when Resource is set.
 	Resource  string `json:"resource,omitempty" yaml:"resource,omitempty"`   // ResourceRef.Key() format: "ns/kind/name". Empty = no resource scope.

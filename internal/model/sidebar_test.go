@@ -392,7 +392,7 @@ func TestBuildSidebarItems_InjectsSecuritySources(t *testing.T) {
 }
 
 // TestBuildSidebarItems_SecuritySourceOrder verifies that the built-in
-// sources (Advisor, then Heuristic) sort before external scanner sources,
+// sources (Advisor, Heuristic, RBAC) sort before external scanner sources,
 // which keep their alphabetical fallback order.
 func TestBuildSidebarItems_SecuritySourceOrder(t *testing.T) {
 	prev := SecuritySourcesFn
@@ -401,6 +401,7 @@ func TestBuildSidebarItems_SecuritySourceOrder(t *testing.T) {
 		return []SecuritySourceEntry{
 			{DisplayName: "Trivy", SourceName: "trivy-operator"},
 			{DisplayName: "CIS", SourceName: "kube-bench"},
+			{DisplayName: "RBAC", SourceName: "rbac"},
 			{DisplayName: "Advisor", SourceName: "advisor"},
 			{DisplayName: "Falco", SourceName: "falco"},
 			{DisplayName: "Heuristic", SourceName: "heuristic"},
@@ -414,7 +415,7 @@ func TestBuildSidebarItems_SecuritySourceOrder(t *testing.T) {
 			got = append(got, it.Name)
 		}
 	}
-	assert.Equal(t, []string{"Advisor", "Heuristic", "CIS", "Falco", "Trivy"}, got,
+	assert.Equal(t, []string{"Advisor", "Heuristic", "RBAC", "CIS", "Falco", "Trivy"}, got,
 		"built-in sources lead; external scanners stay alphabetical")
 }
 

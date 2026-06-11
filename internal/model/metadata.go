@@ -461,6 +461,7 @@ var BuiltInOrderRank = map[string]int{
 	// external scanners keep the alphabetical fallback below them.
 	"_security/findings-advisor":   110,
 	"_security/findings-heuristic": 111,
+	"_security/findings-rbac":      112,
 }
 
 // PseudoResources returns the LFK-only resource types that are not served

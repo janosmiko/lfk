@@ -509,7 +509,7 @@ type securityConfig struct {
 	// value overrides the global default for that context).
 	HideBadges *bool `json:"hide_badges" yaml:"hide_badges"`
 	// Sources enables or disables individual sources by name. Keys accept the
-	// friendly names (heuristic, advisor, trivy, kyverno, kubescape, falco, gatekeeper)
+	// friendly names (heuristic, advisor, rbac, trivy, kyverno, kubescape, falco, gatekeeper)
 	// or the internal source ids (trivy-operator, policy-report). Any source
 	// omitted from the map defaults to enabled.
 	Sources map[string]bool `json:"sources" yaml:"sources"`

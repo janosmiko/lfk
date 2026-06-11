@@ -124,25 +124,6 @@ type clusterData struct {
 	limitsOK   bool
 }
 
-// collect paginates one list call to completion. Any error (typically
-// Forbidden for read-only users) returns ok=false so dependent checks are
-// skipped rather than misreporting.
-func collect[T any](fn func(opts metav1.ListOptions) ([]T, string, error)) ([]T, bool) {
-	var out []T
-	opts := metav1.ListOptions{Limit: 200}
-	for {
-		items, cont, err := fn(opts)
-		if err != nil {
-			return nil, false
-		}
-		out = append(out, items...)
-		if cont == "" {
-			return out, true
-		}
-		opts.Continue = cont
-	}
-}
-
 // Fetch lists workloads, PDBs, HPAs, namespaces, quotas, and limit ranges
 // (best-effort per type) and runs the reliability checks over them. Empty
 // namespace means all namespaces.
@@ -152,7 +133,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 	}
 	d := &clusterData{}
 
-	deps, depsOK := collect(func(o metav1.ListOptions) ([]appsv1.Deployment, string, error) {
+	deps, depsOK := security.Collect(func(o metav1.ListOptions) ([]appsv1.Deployment, string, error) {
 		l, err := s.client.AppsV1().Deployments(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -177,7 +158,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 			})
 		}
 	}
-	stss, stssOK := collect(func(o metav1.ListOptions) ([]appsv1.StatefulSet, string, error) {
+	stss, stssOK := security.Collect(func(o metav1.ListOptions) ([]appsv1.StatefulSet, string, error) {
 		l, err := s.client.AppsV1().StatefulSets(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -202,7 +183,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 			})
 		}
 	}
-	dss, dssOK := collect(func(o metav1.ListOptions) ([]appsv1.DaemonSet, string, error) {
+	dss, dssOK := security.Collect(func(o metav1.ListOptions) ([]appsv1.DaemonSet, string, error) {
 		l, err := s.client.AppsV1().DaemonSets(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -227,14 +208,14 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 	}
 	d.workloadsOK = depsOK && stssOK && dssOK
 
-	d.pdbs, d.pdbsOK = collect(func(o metav1.ListOptions) ([]policyv1.PodDisruptionBudget, string, error) {
+	d.pdbs, d.pdbsOK = security.Collect(func(o metav1.ListOptions) ([]policyv1.PodDisruptionBudget, string, error) {
 		l, err := s.client.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
 		}
 		return l.Items, l.Continue, nil
 	})
-	d.hpas, d.hpasOK = collect(func(o metav1.ListOptions) ([]autoscalingv2.HorizontalPodAutoscaler, string, error) {
+	d.hpas, d.hpasOK = security.Collect(func(o metav1.ListOptions) ([]autoscalingv2.HorizontalPodAutoscaler, string, error) {
 		l, err := s.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -244,7 +225,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 
 	if namespace != "" {
 		d.namespaces = []string{namespace}
-	} else if nss, ok := collect(func(o metav1.ListOptions) ([]corev1.Namespace, string, error) {
+	} else if nss, ok := security.Collect(func(o metav1.ListOptions) ([]corev1.Namespace, string, error) {
 		l, err := s.client.CoreV1().Namespaces().List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -256,7 +237,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		}
 	}
 
-	quotas, quotasOK := collect(func(o metav1.ListOptions) ([]corev1.ResourceQuota, string, error) {
+	quotas, quotasOK := security.Collect(func(o metav1.ListOptions) ([]corev1.ResourceQuota, string, error) {
 		l, err := s.client.CoreV1().ResourceQuotas(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -269,7 +250,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 	for i := range quotas {
 		d.quotaNS[quotas[i].Namespace] = true
 	}
-	limits, limitsOK := collect(func(o metav1.ListOptions) ([]corev1.LimitRange, string, error) {
+	limits, limitsOK := security.Collect(func(o metav1.ListOptions) ([]corev1.LimitRange, string, error) {
 		l, err := s.client.CoreV1().LimitRanges(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err

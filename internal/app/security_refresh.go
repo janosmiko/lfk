@@ -16,6 +16,7 @@ import (
 	"github.com/janosmiko/lfk/internal/security/heuristic"
 	"github.com/janosmiko/lfk/internal/security/kubescape"
 	"github.com/janosmiko/lfk/internal/security/policyreport"
+	"github.com/janosmiko/lfk/internal/security/rbac"
 	"github.com/janosmiko/lfk/internal/security/trivyop"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -77,6 +78,7 @@ func (m *Model) refreshSecuritySources() tea.Cmd {
 			h.SetSecretEnvPatterns(ui.ConfigSecuritySecretEnvInclude, ui.ConfigSecuritySecretEnvExclude)
 			register("heuristic", h)
 			register("advisor", advisor.NewWithClient(kc))
+			register("rbac", rbac.NewWithClient(kc))
 			register("falco", falco.NewWithClient(kc))
 		}
 		if dc != nil {
