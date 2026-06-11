@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"os/exec"
 	"runtime"
@@ -41,7 +40,8 @@ func logExecCmd(label string, cmd *exec.Cmd) {
 	logger.Info(label, "cmd", cmd.String(), "kubeconfig", kubeconfig)
 }
 
-// startupTips is the list of tips shown randomly on startup.
+// startupTips is the list of tips shown on startup; nextStartupTip rotates
+// through it via a persisted cursor so every tip appears before any repeat.
 var startupTips = []string{
 	"Press ? to see all keybindings",
 	"Press / to search, f to filter resources",
@@ -72,12 +72,34 @@ var startupTips = []string{
 	"Press Ctrl+G to search and remove finalizers across resources",
 	"Press , to show/hide and reorder columns in the resource list",
 	"Press >/< to change sort column, = to reverse sort order, - to reset sorting",
+	"Press x then N on a Pod or Service to see the network policies affecting it",
+	"Press x on a NetworkPolicy and pick Visualize to see its rules as a diagram",
+	"Press Shift+Z to find orphaned resources cluster-wide (unused Secrets, ConfigMaps, PVCs...)",
+	"Press ` to see in-flight and completed background tasks",
+	"Press Q for the per-namespace resource quota dashboard",
+	"In the command bar (:) run kubectl with ':k get pods' or shell commands with ':! cmd'",
+	"Press a to create a resource from 25+ built-in templates",
+	"Select two resources with Space, then press d to diff their YAML",
+	"Press Ctrl+P to kubectl-apply a manifest straight from your clipboard",
+	"Press Backspace to jump back after owner, bookmark, or finding jumps",
+	"Press Ctrl+R to toggle read-only mode and block mutating actions",
+	"Press L for a live-log preview in the right pane, Ctrl+L for the fullscreen log viewer",
+	"Press Ctrl+N at the cluster list to create and manage kind/k3d/minikube clusters",
+	"Motions take vim counts: 5j moves 5 lines, 123G jumps to line 123",
+	"In text viewers v/V/Ctrl+V start a visual selection; y copies it",
+	"Press x then z on a workload for per-container CPU/memory right-sizing recommendations",
+	"Press x then I on a crashing pod to open the Crash Investigator",
+	"Press x then S on a pod to analyze its startup timing",
+	"Press x then c on a Pod or Service to capture network traffic to a pcap file",
+	"Press W to save the selected resource's YAML to a file",
+	"Resources with security findings show a SEC badge; press x then y for details",
 	"Disable tips with 'tips: false' in ~/.config/lfk/config.yaml",
 }
 
-// scheduleStartupTip sends a random tip after a short delay to let the UI settle.
+// scheduleStartupTip sends the next tip in the rotation after a short delay
+// to let the UI settle.
 func scheduleStartupTip() tea.Cmd {
-	tip := startupTips[rand.IntN(len(startupTips))]
+	tip := nextStartupTip()
 	return tea.Tick(500*time.Millisecond, func(_ time.Time) tea.Msg {
 		return startupTipMsg{tip: tip}
 	})

@@ -3,9 +3,11 @@ package app
 import (
 	"testing"
 
-	"github.com/janosmiko/lfk/internal/model"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // --- shellQuote ---
@@ -136,6 +138,20 @@ func TestStartupTipsNotEmpty(t *testing.T) {
 func TestStartupTipsAllNonEmpty(t *testing.T) {
 	for i, tip := range startupTips {
 		assert.NotEmpty(t, tip, "tip at index %d should not be empty", i)
+	}
+}
+
+func TestStartupTipsFitTheStatusBar(t *testing.T) {
+	for _, tip := range startupTips {
+		assert.LessOrEqual(t, lipgloss.Width(tip), 110, "tip too long for the status bar: %q", tip)
+	}
+}
+
+func TestStartupTipsUnique(t *testing.T) {
+	seen := make(map[string]bool, len(startupTips))
+	for _, tip := range startupTips {
+		assert.False(t, seen[tip], "duplicate tip: %q", tip)
+		seen[tip] = true
 	}
 }
 
