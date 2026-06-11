@@ -149,7 +149,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Events", Description: "Show related events", Key: "V"},
 			{Label: "Permissions", Description: "Check RBAC permissions", Key: "P"},
 		}, true
-	case "NetworkPolicy":
+	case "NetworkPolicy", "CiliumNetworkPolicy", "CiliumClusterwideNetworkPolicy":
 		return []ActionMenuItem{
 			{Label: "Visualize", Description: "Visualize network policy rules", Key: "N"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},

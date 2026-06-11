@@ -140,7 +140,7 @@ category, and every entry maps to a constant in `app_types.go`.
 | `overlayQuotaDashboard`  | `Q`, `:quota`                   | Per-namespace ResourceQuota usage.                              |
 | `overlayEventTimeline`   | `V`                             | Cluster-wide events grouped by object.                          |
 | `overlayAlerts`          | from monitoring view            | Active Prometheus alerts.                                       |
-| `overlayNetworkPolicy`   | action menu → `N` on NetworkPolicy / Pod / Service | Visualize a NetworkPolicy, or every policy affecting a Pod / Service. |
+| `overlayNetworkPolicy`   | action menu → `N` on NetworkPolicy / Cilium(Clusterwide)NetworkPolicy / Pod / Service | Visualize a network policy (Cilium included), or every policy affecting a Pod / Service. |
 | `overlayCanI`            | `U` → can-i flow (after subject) | Display can-i evaluation results.                               |
 | `overlayAutoSync`        | ArgoCD app                      | Toggle auto-sync settings.                                      |
 | `overlaySyncWave`        | action menu → `W` on Application | Per-Application ArgoCD sync wave timeline.                      |

@@ -62,15 +62,30 @@ func OverlayMaxScroll(lineCount, height int) int {
 
 // renderNetpolHeader renders the title, pod selector, affected pods, and policy types sections.
 func renderNetpolHeader(info NetworkPolicyEntry, greenStyle, labelStyle, sectionStyle lipgloss.Style) []string {
+	clusterwide := info.Kind == "CiliumClusterwideNetworkPolicy"
+
 	var lines []string
-	lines = append(lines, OverlayTitleStyle.Render(fmt.Sprintf("Network Policy: %s", info.Name)))
-	lines = append(lines, OverlayDimStyle.Render(fmt.Sprintf("  Namespace: %s", info.Namespace)))
+	kindLabel := "Network Policy"
+	if info.Kind != "" && info.Kind != "NetworkPolicy" {
+		kindLabel = info.Kind
+	}
+	lines = append(lines, OverlayTitleStyle.Render(fmt.Sprintf("%s: %s", kindLabel, info.Name)))
+	namespace := info.Namespace
+	if namespace == "" {
+		namespace = "(cluster-wide)"
+	}
+	lines = append(lines, OverlayDimStyle.Render(fmt.Sprintf("  Namespace: %s", namespace)))
 	lines = append(lines, "")
 
 	lines = append(lines, sectionStyle.Render("Pod Selector"))
-	if len(info.PodSelector) == 0 {
+	switch {
+	case info.NodePolicy:
+		lines = append(lines, OverlayWarningStyle.Render("  (node policy: selects nodes, not pods)"))
+	case len(info.PodSelector) == 0 && clusterwide:
+		lines = append(lines, OverlayDimStyle.Render("  (all pods in all namespaces)"))
+	case len(info.PodSelector) == 0:
 		lines = append(lines, OverlayDimStyle.Render("  (all pods in namespace)"))
-	} else {
+	default:
 		for _, k := range sortedKeys(info.PodSelector) {
 			lines = append(lines, fmt.Sprintf("  %s", labelStyle.Render(k+"="+info.PodSelector[k])))
 		}
@@ -140,7 +155,7 @@ func renderNetpolDirectionRules(info NetworkPolicyEntry, targetLabel string, wid
 			lines = append(lines, "")
 		}
 		for i, rule := range info.IngressRules {
-			lines = append(lines, OverlayNormalStyle.Render(fmt.Sprintf("  Rule %d:", i+1)))
+			lines = append(lines, renderNetpolRuleLabel(rule, i))
 			lines = append(lines, renderNetpolRuleDiagram(rule, targetLabel, true, width,
 				boxBorderStyle, arrowStyle, labelStyle, cidrStyle, greenStyle)...)
 			lines = append(lines, "")
@@ -155,7 +170,7 @@ func renderNetpolDirectionRules(info NetworkPolicyEntry, targetLabel string, wid
 			lines = append(lines, "")
 		}
 		for i, rule := range info.EgressRules {
-			lines = append(lines, OverlayNormalStyle.Render(fmt.Sprintf("  Rule %d:", i+1)))
+			lines = append(lines, renderNetpolRuleLabel(rule, i))
 			lines = append(lines, renderNetpolRuleDiagram(rule, targetLabel, false, width,
 				boxBorderStyle, arrowStyle, labelStyle, cidrStyle, greenStyle)...)
 			lines = append(lines, "")
@@ -167,6 +182,22 @@ func renderNetpolDirectionRules(info NetworkPolicyEntry, targetLabel string, wid
 		lines = append(lines, "")
 	}
 	return lines
+}
+
+// renderNetpolRuleLabel renders a rule's heading line: deny rules (Cilium)
+// are marked and styled as warnings; an L7 summary is appended when present.
+func renderNetpolRuleLabel(rule NetpolRuleEntry, idx int) string {
+	label := fmt.Sprintf("  Rule %d:", idx+1)
+	style := OverlayNormalStyle
+	if rule.Deny {
+		label = fmt.Sprintf("  Rule %d (deny):", idx+1)
+		style = OverlayWarningStyle
+	}
+	out := style.Render(label)
+	if rule.L7 != "" {
+		out += OverlayDimStyle.Render("  L7: " + rule.L7)
+	}
+	return out
 }
 
 // sortedKeys returns the keys of a map sorted alphabetically.
@@ -287,6 +318,15 @@ func renderNetpolRuleDiagram(
 					peerLines = append(peerLines, cidrSt.Render("  "+e))
 				}
 			}
+		case "Entity":
+			peerLines = append(peerLines, OverlayNormalStyle.Render("Entity:"))
+			peerLines = append(peerLines, greenSt.Render(truncLabel(peer.Value)))
+		case "FQDN":
+			peerLines = append(peerLines, OverlayNormalStyle.Render("FQDN:"))
+			peerLines = append(peerLines, cidrSt.Render(truncLabel(peer.Value)))
+		case "Service":
+			peerLines = append(peerLines, OverlayNormalStyle.Render("Service:"))
+			peerLines = append(peerLines, labelSt.Render(truncLabel(peer.Value)))
 		}
 
 		// Add port info.

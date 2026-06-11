@@ -51,6 +51,7 @@ func (m Model) renderOverlayNetworkPolicy(background string) string {
 func convertNetpolInfo(info k8s.NetworkPolicyInfo) ui.NetworkPolicyEntry {
 	entry := ui.NetworkPolicyEntry{
 		Name: info.Name, Namespace: info.Namespace,
+		Kind: info.Kind, NodePolicy: info.NodePolicy,
 		PodSelector: info.PodSelector, PolicyTypes: info.PolicyTypes,
 		AffectedPods: info.AffectedPods,
 	}
@@ -82,7 +83,7 @@ func convertNetpolsForResource(info *k8s.NetpolsForResource) ui.ResourceNetpolsE
 
 // convertNetpolRule converts a k8s.NetpolRule to a ui.NetpolRuleEntry.
 func convertNetpolRule(r k8s.NetpolRule) ui.NetpolRuleEntry {
-	re := ui.NetpolRuleEntry{}
+	re := ui.NetpolRuleEntry{Deny: r.Deny, L7: r.L7}
 	for _, p := range r.Ports {
 		re.Ports = append(re.Ports, ui.NetpolPortEntry{Protocol: p.Protocol, Port: p.Port})
 	}
@@ -90,6 +91,7 @@ func convertNetpolRule(r k8s.NetpolRule) ui.NetpolRuleEntry {
 		re.Peers = append(re.Peers, ui.NetpolPeerEntry{
 			Type: p.Type, Selector: p.Selector,
 			CIDR: p.CIDR, Except: p.Except, Namespace: p.Namespace,
+			Value: p.Value,
 		})
 	}
 	return re

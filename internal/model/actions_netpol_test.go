@@ -36,6 +36,23 @@ func TestNetworkPoliciesActionAbsentForUnsupported(t *testing.T) {
 	}
 }
 
+func TestVisualizeActionPresentOnCiliumKinds(t *testing.T) {
+	for _, kind := range []string{"NetworkPolicy", "CiliumNetworkPolicy", "CiliumClusterwideNetworkPolicy"} {
+		t.Run(kind, func(t *testing.T) {
+			items := ActionsForKind(kind)
+			found := false
+			for _, it := range items {
+				if it.Label == "Visualize" {
+					found = true
+					assert.Equal(t, "N", it.Key)
+					break
+				}
+			}
+			assert.True(t, found, "%q must offer the Visualize action item", kind)
+		})
+	}
+}
+
 func TestNetworkPoliciesActionKeysUnique(t *testing.T) {
 	for _, kind := range []string{"Pod", "Service"} {
 		t.Run(kind, func(t *testing.T) {

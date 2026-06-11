@@ -3,6 +3,7 @@ package k8s
 import (
 	"context"
 	"fmt"
+	"maps"
 	"sort"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -60,6 +61,18 @@ func (c *Client) GetNetworkPoliciesForPod(ctx context.Context, kubeCtx, namespac
 		info.AffectedPods = matchingPodNames(pods, sel)
 		result.Policies = append(result.Policies, NetpolForResource{NetworkPolicyInfo: *info})
 	}
+
+	augmented := ciliumPodLabels(pod.GetLabels(), namespace)
+	clusterPods := lazyClusterPods(ctx, dynClient, pods)
+	for _, ps := range listCiliumPolicySpecs(ctx, dynClient, namespace) {
+		if ps.selector == nil || !ps.selector.Matches(augmented) {
+			continue
+		}
+		info := ps.info
+		info.AffectedPods = matchingCiliumPodNames(ciliumAffectedPodPool(ps, pods, clusterPods), ps.selector)
+		result.Policies = append(result.Policies, NetpolForResource{NetworkPolicyInfo: info})
+	}
+
 	sortNetpolsByName(result.Policies)
 	return result, nil
 }
@@ -120,6 +133,30 @@ func (c *Client) GetNetworkPoliciesForService(ctx context.Context, kubeCtx, name
 		info.AffectedPods = matchingPodNames(pods, sel)
 		result.Policies = append(result.Policies, NetpolForResource{NetworkPolicyInfo: *info, MatchedPods: matched})
 	}
+
+	clusterPods := lazyClusterPods(ctx, dynClient, pods)
+	for _, ps := range listCiliumPolicySpecs(ctx, dynClient, namespace) {
+		if ps.selector == nil {
+			continue
+		}
+		var matched []string
+		for _, p := range pods {
+			if !svcSelector.Matches(labels.Set(p.GetLabels())) {
+				continue
+			}
+			if ps.selector.Matches(ciliumPodLabels(p.GetLabels(), namespace)) {
+				matched = append(matched, p.GetName())
+			}
+		}
+		if len(matched) == 0 {
+			continue
+		}
+		sort.Strings(matched)
+		info := ps.info
+		info.AffectedPods = matchingCiliumPodNames(ciliumAffectedPodPool(ps, pods, clusterPods), ps.selector)
+		result.Policies = append(result.Policies, NetpolForResource{NetworkPolicyInfo: info, MatchedPods: matched})
+	}
+
 	sortNetpolsByName(result.Policies)
 	return result, nil
 }
@@ -178,6 +215,86 @@ func matchingPodNames(pods []unstructured.Unstructured, sel labels.Selector) []s
 	var names []string
 	for _, p := range pods {
 		if sel.Matches(labels.Set(p.GetLabels())) {
+			names = append(names, p.GetName())
+		}
+	}
+	sort.Strings(names)
+	return names
+}
+
+// ciliumGVRs for the two Cilium policy CRDs.
+var (
+	ciliumCNPGVR  = schema.GroupVersionResource{Group: "cilium.io", Version: "v2", Resource: "ciliumnetworkpolicies"}
+	ciliumCCNPGVR = schema.GroupVersionResource{Group: "cilium.io", Version: "v2", Resource: "ciliumclusterwidenetworkpolicies"}
+)
+
+// listCiliumPolicySpecs lists CiliumNetworkPolicies in the namespace plus
+// all CiliumClusterwideNetworkPolicies, parsed into per-spec entries.
+// Errors are swallowed deliberately: clusters without the Cilium CRDs (or
+// without list permission) simply contribute nothing.
+func listCiliumPolicySpecs(ctx context.Context, dynClient dynamic.Interface, namespace string) []ciliumParsedSpec {
+	var out []ciliumParsedSpec
+	if list, err := dynClient.Resource(ciliumCNPGVR).Namespace(namespace).List(ctx, metav1.ListOptions{}); err == nil {
+		for i := range list.Items {
+			out = append(out, parseCiliumPolicy(&list.Items[i], "CiliumNetworkPolicy")...)
+		}
+	}
+	if list, err := dynClient.Resource(ciliumCCNPGVR).List(ctx, metav1.ListOptions{}); err == nil {
+		for i := range list.Items {
+			out = append(out, parseCiliumPolicy(&list.Items[i], "CiliumClusterwideNetworkPolicy")...)
+		}
+	}
+	return out
+}
+
+// ciliumPodLabels returns the pod's labels augmented with the namespace
+// pseudo-label Cilium injects on endpoints, so clusterwide selectors that
+// scope by namespace match correctly. Standard NetworkPolicy matching must
+// NOT use this: pods do not actually carry the pseudo-label.
+func ciliumPodLabels(lbls map[string]string, namespace string) labels.Set {
+	set := make(labels.Set, len(lbls)+1)
+	maps.Copy(set, lbls)
+	set["io.kubernetes.pod.namespace"] = namespace
+	return set
+}
+
+// lazyClusterPods returns a function that lists pods across all namespaces
+// once, on first use. Clusterwide Cilium policies need the full list to
+// report affected pods accurately; on list failure it falls back to the
+// namespace-scoped pods.
+func lazyClusterPods(ctx context.Context, dynClient dynamic.Interface, fallback []unstructured.Unstructured) func() []unstructured.Unstructured {
+	var cached []unstructured.Unstructured
+	loaded := false
+	podGVR := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
+	return func() []unstructured.Unstructured {
+		if !loaded {
+			loaded = true
+			if list, err := dynClient.Resource(podGVR).List(ctx, metav1.ListOptions{}); err == nil {
+				cached = list.Items
+			} else {
+				cached = fallback
+			}
+		}
+		return cached
+	}
+}
+
+// ciliumAffectedPodPool picks the pod pool a policy's affected-pods list is
+// computed from: namespace pods for a namespaced CNP, all cluster pods for a
+// clusterwide policy.
+func ciliumAffectedPodPool(ps ciliumParsedSpec, nsPods []unstructured.Unstructured, clusterPods func() []unstructured.Unstructured) []unstructured.Unstructured {
+	if ps.info.Kind == "CiliumClusterwideNetworkPolicy" {
+		return clusterPods()
+	}
+	return nsPods
+}
+
+// matchingCiliumPodNames is matchingPodNames with Cilium-augmented labels;
+// each pod is augmented with its own namespace pseudo-label.
+func matchingCiliumPodNames(pods []unstructured.Unstructured, sel labels.Selector) []string {
+	var names []string
+	for _, p := range pods {
+		if sel.Matches(ciliumPodLabels(p.GetLabels(), p.GetNamespace())) {
 			names = append(names, p.GetName())
 		}
 	}

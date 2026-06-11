@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
 
@@ -28,9 +29,11 @@ func netpolTestPodObj(name, namespace string, lbls map[string]string) *corev1.Po
 func netpolsTestModel(t *testing.T, objs ...runtime.Object) Model {
 	t.Helper()
 	gvrToListKind := map[schema.GroupVersionResource]string{
-		{Group: "", Version: "v1", Resource: "pods"}:                             "PodList",
-		{Group: "", Version: "v1", Resource: "services"}:                         "ServiceList",
-		{Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicies"}: "NetworkPolicyList",
+		{Group: "", Version: "v1", Resource: "pods"}:                                      "PodList",
+		{Group: "", Version: "v1", Resource: "services"}:                                  "ServiceList",
+		{Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicies"}:          "NetworkPolicyList",
+		{Group: "cilium.io", Version: "v2", Resource: "ciliumnetworkpolicies"}:            "CiliumNetworkPolicyList",
+		{Group: "cilium.io", Version: "v2", Resource: "ciliumclusterwidenetworkpolicies"}: "CiliumClusterwideNetworkPolicyList",
 	}
 	m := baseModelWithFakeDynamic(gvrToListKind, objs...)
 	m.scheduler.StartWorkers()
@@ -149,6 +152,46 @@ func TestRenderOverlayNetworkPoliciesMultiEmpty(t *testing.T) {
 	bg := strings.Repeat("bg\n", 10)
 	result := stripANSI(m.renderOverlay(bg))
 	assert.Contains(t, result, "No network policies")
+}
+
+func TestLoadNetworkPolicy_CiliumSingleSpec(t *testing.T) {
+	cnp := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "cilium.io/v2",
+		"kind":       "CiliumNetworkPolicy",
+		"metadata":   map[string]any{"name": "cnp-web", "namespace": "default"},
+		"spec": map[string]any{
+			"endpointSelector": map[string]any{"matchLabels": map[string]any{"app": "web"}},
+		},
+	}}
+	m := netpolsTestModel(t, cnp)
+	m = withActionCtx(m, "cnp-web", "default", "CiliumNetworkPolicy", model.ResourceTypeEntry{})
+	cmd := m.loadNetworkPolicy()
+	msg := execCmd(t, cmd)
+	result, ok := msg.(netpolLoadedMsg)
+	require.True(t, ok, "single-spec cilium policy must open the single view")
+	require.NoError(t, result.err)
+	assert.Equal(t, "CiliumNetworkPolicy", result.info.Kind)
+}
+
+func TestLoadNetworkPolicy_CiliumMultiSpec(t *testing.T) {
+	cnp := &unstructured.Unstructured{Object: map[string]any{
+		"apiVersion": "cilium.io/v2",
+		"kind":       "CiliumNetworkPolicy",
+		"metadata":   map[string]any{"name": "cnp-multi", "namespace": "default"},
+		"specs": []any{
+			map[string]any{"endpointSelector": map[string]any{"matchLabels": map[string]any{"app": "a"}}},
+			map[string]any{"endpointSelector": map[string]any{"matchLabels": map[string]any{"app": "b"}}},
+		},
+	}}
+	m := netpolsTestModel(t, cnp)
+	m = withActionCtx(m, "cnp-multi", "default", "CiliumNetworkPolicy", model.ResourceTypeEntry{})
+	cmd := m.loadNetworkPolicy()
+	msg := execCmd(t, cmd)
+	result, ok := msg.(netpolsForResourceLoadedMsg)
+	require.True(t, ok, "multi-spec cilium policy must open the stacked view")
+	require.NoError(t, result.err)
+	assert.Equal(t, "CiliumNetworkPolicy", result.info.Kind)
+	assert.Len(t, result.info.Policies, 2)
 }
 
 // tallNetpolModel returns a model showing a multi-policy overlay whose
