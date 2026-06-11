@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	"github.com/janosmiko/lfk/internal/app/scheduler"
-	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -518,30 +517,6 @@ func (m Model) renderOverlayCanISubject(background string) string {
 	return ui.PlaceOverlay(m.width, m.height, overlay, canIBg)
 }
 
-func (m Model) renderOverlayNetworkPolicy(background string) string {
-	if m.netpolData == nil {
-		return ""
-	}
-	entry := ui.NetworkPolicyEntry{
-		Name: m.netpolData.Name, Namespace: m.netpolData.Namespace,
-		PodSelector: m.netpolData.PodSelector, PolicyTypes: m.netpolData.PolicyTypes,
-		AffectedPods: m.netpolData.AffectedPods,
-	}
-	for _, r := range m.netpolData.IngressRules {
-		entry.IngressRules = append(entry.IngressRules, convertNetpolRule(r))
-	}
-	for _, r := range m.netpolData.EgressRules {
-		entry.EgressRules = append(entry.EgressRules, convertNetpolRule(r))
-	}
-	w, h := min(100, m.width-6), min(35, m.height-4)
-	innerW, innerH := w-4, h-2
-	netpolContent := ui.RenderNetworkPolicyOverlay(entry, m.netpolScroll, innerW, innerH)
-	netpolContent = ui.FillLinesBg(netpolContent, innerW, ui.SurfaceBg)
-	overlay := ui.OverlayStyle.Width(w).Render(netpolContent)
-	bg := ui.PadToHeight(background, m.height)
-	return ui.PlaceOverlay(m.width, m.height, overlay, bg)
-}
-
 func (m Model) renderOverlayFullscreen(background string) string {
 	var overlay string
 	switch m.overlay {
@@ -639,21 +614,6 @@ func (m Model) renderOverlayFinalizerSearch() (string, int, int) {
 		m.finalizerSearchPattern, m.finalizerSearchFilter, m.finalizerSearchFilterActive,
 		m.finalizerSearchLoading, w, h,
 	), w, h
-}
-
-// convertNetpolRule converts a k8s.NetpolRule to a ui.NetpolRuleEntry.
-func convertNetpolRule(r k8s.NetpolRule) ui.NetpolRuleEntry {
-	re := ui.NetpolRuleEntry{}
-	for _, p := range r.Ports {
-		re.Ports = append(re.Ports, ui.NetpolPortEntry{Protocol: p.Protocol, Port: p.Port})
-	}
-	for _, p := range r.Peers {
-		re.Peers = append(re.Peers, ui.NetpolPeerEntry{
-			Type: p.Type, Selector: p.Selector,
-			CIDR: p.CIDR, Except: p.Except, Namespace: p.Namespace,
-		})
-	}
-	return re
 }
 
 // renderCanIOverlay renders the Can-I browser overlay on top of the

@@ -948,12 +948,23 @@ func TestPCKeysExplainEndJumpsToBottom(t *testing.T) {
 // --- Network Policy Visualizer (handleNetworkPolicyOverlayKey) ------------------
 
 func netpolModel() Model {
+	// Enough rules that the content is far taller than the viewport, so
+	// paging keys have room to move before hitting the scroll bound.
+	rules := make([]k8s.NetpolRule, 30)
+	for i := range rules {
+		rules[i] = k8s.NetpolRule{Peers: []k8s.NetpolPeer{{Type: "All"}}}
+	}
 	return Model{
 		overlay:      overlayNetworkPolicy,
 		netpolScroll: 0,
-		tabs:         []TabState{{}},
-		width:        80,
-		height:       40,
+		netpolData: &k8s.NetworkPolicyInfo{
+			Name: "tall-policy", Namespace: "default",
+			PolicyTypes:  []string{"Ingress"},
+			IngressRules: rules,
+		},
+		tabs:   []TabState{{}},
+		width:  80,
+		height: 40,
 	}
 }
 
@@ -993,9 +1004,10 @@ func TestPCKeysNetworkPolicyEndJumpsToBottom(t *testing.T) {
 	m.netpolScroll = 0
 	m.netpolLineInput = "42"
 	r := m.handleNetworkPolicyOverlayKey(keyMsg("end"))
-	// G with no line input jumps to 9999 (sentinel clamped at render time).
-	assert.Equal(t, 9999, r.netpolScroll,
-		"end should match G (9999) regardless of netpolLineInput")
+	// End matches G with no line input: jump exactly to the bottom.
+	assert.Equal(t, m.netpolMaxScroll(), r.netpolScroll,
+		"end should match G (bottom) regardless of netpolLineInput")
+	assert.Positive(t, r.netpolScroll)
 	assert.Empty(t, r.netpolLineInput, "end should clear netpolLineInput")
 }
 

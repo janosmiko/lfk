@@ -170,6 +170,12 @@ func (m Model) executeActionVisualize() (tea.Model, tea.Cmd) {
 	return m, m.loadNetworkPolicy()
 }
 
+func (m Model) executeActionNetworkPolicies() (tea.Model, tea.Cmd) {
+	m.loading = true
+	m.setStatusMessage("Loading network policies...", false)
+	return m, m.loadNetworkPoliciesForResource()
+}
+
 func (m Model) executeActionDefault(actionLabel string) (tea.Model, tea.Cmd) {
 	if ca, ok := findCustomAction(m.actionCtx.kind, actionLabel); ok {
 		// Custom actions are arbitrary shell commands. Block them in

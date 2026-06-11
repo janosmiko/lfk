@@ -16,9 +16,10 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
 		m.netpolLineInput = ""
 		m.overlay = overlayNone
 		m.netpolData = nil
+		m.netpolsData = nil
 	case "j", "down":
 		m.netpolLineInput = ""
-		m.netpolScroll++
+		m.netpolScroll = min(m.netpolScroll+1, m.netpolMaxScroll())
 	case "k", "up":
 		m.netpolLineInput = ""
 		if m.netpolScroll > 0 {
@@ -39,10 +40,9 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
 			if lineNum > 0 {
 				lineNum--
 			}
-			m.netpolScroll = lineNum
+			m.netpolScroll = min(lineNum, m.netpolMaxScroll())
 		} else {
-			// Jump to bottom: will be clamped during rendering.
-			m.netpolScroll = 9999
+			m.netpolScroll = m.netpolMaxScroll()
 		}
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		m.netpolLineInput += msg.String()
@@ -54,30 +54,23 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
 		}
 	case "ctrl+d", "shift+down":
 		m.netpolLineInput = ""
-		m.netpolScroll += m.height / 2
+		m.netpolScroll = min(m.netpolScroll+m.height/2, m.netpolMaxScroll())
 	case "ctrl+u", "shift+up":
 		m.netpolLineInput = ""
-		m.netpolScroll -= m.height / 2
-		if m.netpolScroll < 0 {
-			m.netpolScroll = 0
-		}
+		m.netpolScroll = max(m.netpolScroll-m.height/2, 0)
 	case "ctrl+f", "pgdown":
 		m.netpolLineInput = ""
-		m.netpolScroll += m.height
+		m.netpolScroll = min(m.netpolScroll+m.height, m.netpolMaxScroll())
 	case "ctrl+b", "pgup":
 		m.netpolLineInput = ""
-		m.netpolScroll -= m.height
-		if m.netpolScroll < 0 {
-			m.netpolScroll = 0
-		}
+		m.netpolScroll = max(m.netpolScroll-m.height, 0)
 	case "home":
 		m.pendingG = false
 		m.netpolLineInput = ""
 		m.netpolScroll = 0
 	case "end":
 		m.netpolLineInput = ""
-		// Jump to bottom: will be clamped during rendering (matches G behavior).
-		m.netpolScroll = 9999
+		m.netpolScroll = m.netpolMaxScroll()
 	default:
 		m.netpolLineInput = ""
 	}

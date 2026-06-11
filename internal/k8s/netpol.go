@@ -73,6 +73,17 @@ func (c *Client) GetNetworkPolicyInfo(ctx context.Context, kubeCtx, namespace, n
 		return info, nil
 	}
 
+	populateNetpolSpec(info, spec)
+
+	// Find affected pods matching the pod selector.
+	info.AffectedPods = findAffectedPods(ctx, dynClient, namespace, info.PodSelector)
+
+	return info, nil
+}
+
+// populateNetpolSpec fills selector, policy types, and rules from a
+// NetworkPolicy spec map.
+func populateNetpolSpec(info *NetworkPolicyInfo, spec map[string]any) {
 	// Extract podSelector.
 	if podSel, ok := spec["podSelector"].(map[string]any); ok {
 		if matchLabels, ok := podSel["matchLabels"].(map[string]any); ok {
@@ -103,11 +114,6 @@ func (c *Client) GetNetworkPolicyInfo(ctx context.Context, kubeCtx, namespace, n
 			info.EgressRules = append(info.EgressRules, parseNetpolRule(rule, "to"))
 		}
 	}
-
-	// Find affected pods matching the pod selector.
-	info.AffectedPods = findAffectedPods(ctx, dynClient, namespace, info.PodSelector)
-
-	return info, nil
 }
 
 // parseNetpolRule extracts ports and peers from a single ingress/egress rule.

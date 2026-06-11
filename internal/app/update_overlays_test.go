@@ -6,6 +6,7 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/k8s"
 	"github.com/janosmiko/lfk/internal/model"
@@ -249,6 +250,9 @@ func TestEventTimelineCtrlBScrollsBackFullPage(t *testing.T) {
 // --- handleNetworkPolicyOverlayKey ---
 
 func TestNetworkPolicyOverlayKeyNavigation(t *testing.T) {
+	// expectedScroll -1 means "the bottom" (resolved per model below); scroll
+	// moves are clamped against the loaded content, so the fixture needs
+	// content taller than every expected position.
 	tests := []struct {
 		name           string
 		key            tea.KeyMsg
@@ -262,7 +266,7 @@ func TestNetworkPolicyOverlayKeyNavigation(t *testing.T) {
 		{name: "j scrolls down", key: runeKey('j'), startScroll: 0, height: 40, expectedScroll: 1},
 		{name: "k scrolls up", key: runeKey('k'), startScroll: 5, height: 40, expectedScroll: 4},
 		{name: "k at zero stays", key: runeKey('k'), startScroll: 0, height: 40, expectedScroll: 0},
-		{name: "G jumps to bottom", key: runeKey('G'), startScroll: 0, height: 40, expectedScroll: 9999},
+		{name: "G jumps to bottom", key: runeKey('G'), startScroll: 0, height: 40, expectedScroll: -1},
 		{name: "ctrl+d half page down", key: tea.KeyMsg{Type: tea.KeyCtrlD}, startScroll: 0, height: 40, expectedScroll: 20},
 		{name: "ctrl+u half page up", key: tea.KeyMsg{Type: tea.KeyCtrlU}, startScroll: 30, height: 40, expectedScroll: 10},
 		{name: "ctrl+u clamps to zero", key: tea.KeyMsg{Type: tea.KeyCtrlU}, startScroll: 5, height: 40, expectedScroll: 0},
@@ -272,19 +276,22 @@ func TestNetworkPolicyOverlayKeyNavigation(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m := Model{
-				overlay:      overlayNetworkPolicy,
-				netpolScroll: tt.startScroll,
-				tabs:         []TabState{{}},
-				width:        80,
-				height:       tt.height,
+			m := netpolModel()
+			m.netpolScroll = tt.startScroll
+			m.height = tt.height
+			expected := tt.expectedScroll
+			if expected == -1 {
+				expected = m.netpolMaxScroll()
+				require.Positive(t, expected)
 			}
+			require.GreaterOrEqual(t, m.netpolMaxScroll(), expected,
+				"fixture content too short for this case")
 			result := m.handleNetworkPolicyOverlayKey(tt.key)
 			if tt.expectClosed {
 				assert.Equal(t, overlayNone, result.overlay)
 				assert.Nil(t, result.netpolData)
 			} else {
-				assert.Equal(t, tt.expectedScroll, result.netpolScroll)
+				assert.Equal(t, expected, result.netpolScroll)
 			}
 		})
 	}

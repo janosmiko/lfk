@@ -403,6 +403,32 @@ func (m Model) loadNetworkPolicy() tea.Cmd {
 	)
 }
 
+// loadNetworkPoliciesForResource fetches the network policies that select the
+// pod or service in the action context, for the "Network Policies" action.
+func (m Model) loadNetworkPoliciesForResource() tea.Cmd {
+	client := m.client
+	kctx := m.actionCtx.context
+	ns := m.actionCtx.namespace
+	name := m.actionCtx.name
+	kind := m.actionCtx.kind
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Network Policies: "+kind+"/"+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			var info *k8s.NetpolsForResource
+			var err error
+			if kind == "Service" {
+				info, err = client.GetNetworkPoliciesForService(ctx, kctx, ns, name)
+			} else {
+				info, err = client.GetNetworkPoliciesForPod(ctx, kctx, ns, name)
+			}
+			return netpolsForResourceLoadedMsg{info: info, err: err}
+		},
+	)
+}
+
 // loadHelmValues runs `helm get values` and returns the output as a message.
 // If allValues is true, the --all flag is included to show computed defaults too.
 func (m Model) loadHelmValues(allValues bool) tea.Cmd {
