@@ -8,6 +8,7 @@ import (
 	"github.com/stretchr/testify/require"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -140,6 +141,12 @@ func TestJumpBackStaleTargetGracefulFallback(t *testing.T) {
 	m.jumpBackStack[0].nav.Context = "deleted-ctx"
 
 	m.nav.Level = model.LevelResourceTypes
+	// Live security/owned jump context from the pre-fallback view: the
+	// fallback resets to the cluster picker, so none of it may survive.
+	m.securityActiveGroup = "privileged"
+	m.securityActiveSource = "heuristic"
+	m.securityResourceFilter = []security.ResourceRef{{Namespace: "ns", Kind: "Pod", Name: "web"}}
+	m.ownedParentStack = []ownedParentState{{resourceName: "api"}}
 
 	result, _ := m.jumpBack()
 	rm := result.(Model)
@@ -147,6 +154,10 @@ func TestJumpBackStaleTargetGracefulFallback(t *testing.T) {
 		"stale snapshot context must fall back to the cluster picker, not crash")
 	assert.Equal(t, "", rm.nav.Context)
 	assert.True(t, rm.hasStatusMessage(), "stale fallback must surface a status message")
+	assert.Empty(t, rm.securityActiveGroup, "fallback must clear the drilled finding group")
+	assert.Empty(t, rm.securityActiveSource, "fallback must clear the drilled finding source")
+	assert.Empty(t, rm.securityResourceFilter, "fallback must clear the per-resource findings filter")
+	assert.Empty(t, rm.ownedParentStack, "fallback must clear the nested owned-drill ancestry")
 }
 
 func TestCaptureNavSnapshotDeepCopiesSlices(t *testing.T) {

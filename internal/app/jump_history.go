@@ -134,6 +134,13 @@ func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
 			m.nav = model.NavigationState{Level: model.LevelClusters}
 			m.leftItemsHistory = nil
 			m.expandedGroup = ""
+			// The pre-fallback view's security/owned jump context has no
+			// meaning at the cluster picker; keeping it would leak a stale
+			// finding group or owned-drill ancestry into the next cluster.
+			m.securityActiveGroup = ""
+			m.securityActiveSource = ""
+			m.securityResourceFilter = nil
+			m.ownedParentStack = nil
 			m.filterText = ""
 			m.filterInput.Clear()
 			m.filterActive = false
