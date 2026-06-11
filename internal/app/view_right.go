@@ -745,7 +745,12 @@ func kindHasOwnedChildren(kind string) bool {
 
 // ownedItemKindLabel returns the label for the items shown in the middle column at LevelOwned.
 // This reflects what the owned items *are* (e.g., Pods owned by a Deployment).
+// Security finding groups list affected resources of arbitrary kinds at this
+// level, so they get their own label instead of the Pod fallback.
 func (m Model) ownedItemKindLabel() string {
+	if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+		return "Affected Resource"
+	}
 	switch m.nav.ResourceType.Kind {
 	case "CronJob":
 		return "Job"

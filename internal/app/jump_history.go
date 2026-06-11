@@ -1,6 +1,8 @@
 package app
 
 import (
+	"strings"
+
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/model"
@@ -25,20 +27,25 @@ type navSnapshot struct {
 	leftScroll       int // ui.ActiveLeftScroll
 	expandedGroup    string
 	filterText       string
+	// securityActiveGroup preserves the security finding group whose
+	// affected-resources view the snapshot was taken in, so a jump-back
+	// reloads affected resources instead of owned children.
+	securityActiveGroup string
 }
 
 // captureNavSnapshot records the current navigation-positioning state with all
 // slices deep-copied so later mutation of the Model can't corrupt the snapshot.
 func (m *Model) captureNavSnapshot() navSnapshot {
 	snap := navSnapshot{
-		nav:           m.nav,
-		leftItems:     append([]model.Item(nil), m.leftItems...),
-		middleItems:   append([]model.Item(nil), m.middleItems...),
-		cursors:       m.cursors,
-		middleScroll:  ui.ActiveMiddleScroll,
-		leftScroll:    ui.ActiveLeftScroll,
-		expandedGroup: m.expandedGroup,
-		filterText:    m.filterText,
+		nav:                 m.nav,
+		leftItems:           append([]model.Item(nil), m.leftItems...),
+		middleItems:         append([]model.Item(nil), m.middleItems...),
+		cursors:             m.cursors,
+		middleScroll:        ui.ActiveMiddleScroll,
+		leftScroll:          ui.ActiveLeftScroll,
+		expandedGroup:       m.expandedGroup,
+		filterText:          m.filterText,
+		securityActiveGroup: m.securityActiveGroup,
 	}
 	snap.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))
 	for i, hist := range m.leftItemsHistory {
@@ -140,6 +147,7 @@ func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
 	}
 	m.cursors = snap.cursors
 	m.expandedGroup = snap.expandedGroup
+	m.securityActiveGroup = snap.securityActiveGroup
 
 	m.filterText = snap.filterText
 	m.filterInput.Clear()
@@ -159,6 +167,20 @@ func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
 		m.loading = true
 		return m.loadResources(false)
 	case model.LevelOwned:
+		// A security finding's affected-resources view also lives at
+		// LevelOwned, but its data comes from the findings index — loadOwned
+		// would look for owner references of a non-existent resource and
+		// blank the panes with "No resources found".
+		if strings.HasPrefix(m.nav.ResourceType.Kind, "__security_") {
+			if cmd := m.loadSecurityAffectedResources(false); cmd != nil {
+				m.loading = true
+				return cmd
+			}
+			// No manager/group to reload from (e.g. security disabled since
+			// the snapshot) — keep the instant-painted snapshot items rather
+			// than spinning forever.
+			return m.loadPreview()
+		}
 		m.loading = true
 		return m.loadOwned(false)
 	case model.LevelContainers:

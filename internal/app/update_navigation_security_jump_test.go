@@ -84,6 +84,79 @@ func TestNavigateChildOwnedSecurityAffectedResourcePushesJumpHistory(t *testing.
 	assert.Equal(t, model.LevelOwned, back.(Model).nav.Level, "JumpBack must return to the finding view")
 }
 
+// TestSecurityJumpSetsPendingTarget: on a cold cache the jump dispatches
+// loadResources with the cursor at 0; without pendingTarget the post-load
+// handler cannot select the target resource and the user lands on the
+// category with nothing selected (user-reported: Enter jumped to
+// ClusterRoles but did not select the affected resource).
+func TestSecurityJumpSetsPendingTarget(t *testing.T) {
+	m := baseModelBoost2()
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "ClusterRole", APIGroup: "rbac.authorization.k8s.io", APIVersion: "v1", Resource: "clusterroles"},
+	}
+	m.nav.Level = model.LevelOwned
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_rbac__", APIGroup: "_security"}
+	m.nav.ResourceName = "rbac_wildcard"
+	m.securityActiveGroup = "rbac_wildcard"
+	sel := &model.Item{
+		Kind: "__security_affected_resource__",
+		Name: "clusterrole/scary",
+		Columns: []model.KeyValue{
+			{Key: "__resource_key__", Value: "/ClusterRole/scary"},
+			{Key: "ResourceKind", Value: "ClusterRole"},
+		},
+	}
+	m.middleItems = []model.Item{*sel}
+	m.setCursor(0)
+
+	rm, _ := m.navigateChildOwned(sel)
+	rmm := rm.(Model)
+
+	assert.Equal(t, model.LevelResources, rmm.nav.Level)
+	assert.Equal(t, "scary", rmm.pendingTarget,
+		"the jump must arm pendingTarget so the resource list load selects the exact resource")
+}
+
+// TestJumpBackFromSecurityJumpRestoresAffectedResourcesView: jumping back
+// from the teleport must restore the finding's affected-resources view,
+// including securityActiveGroup (so the reload fetches affected resources,
+// not owned children — which produced the user-reported "No resources
+// found" panes).
+func TestJumpBackFromSecurityJumpRestoresAffectedResourcesView(t *testing.T) {
+	m := baseModelBoost2()
+	m.discoveredResources["test-ctx"] = []model.ResourceTypeEntry{
+		{Kind: "ClusterRole", APIGroup: "rbac.authorization.k8s.io", APIVersion: "v1", Resource: "clusterroles"},
+	}
+	m.nav.Level = model.LevelOwned
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_rbac__", APIGroup: "_security"}
+	m.nav.ResourceName = "rbac_wildcard"
+	m.securityActiveGroup = "rbac_wildcard"
+	sel := &model.Item{
+		Kind: "__security_affected_resource__",
+		Name: "clusterrole/scary",
+		Columns: []model.KeyValue{
+			{Key: "__resource_key__", Value: "/ClusterRole/scary"},
+			{Key: "ResourceKind", Value: "ClusterRole"},
+		},
+	}
+	m.middleItems = []model.Item{*sel}
+	m.setCursor(0)
+
+	rm, _ := m.navigateChildOwned(sel)
+	rmm := rm.(Model)
+	require.Empty(t, rmm.securityActiveGroup, "jump clears the group on the way out")
+	require.Len(t, rmm.jumpBackStack, 1)
+
+	back, _ := rmm.jumpBack()
+	bm := back.(Model)
+	assert.Equal(t, model.LevelOwned, bm.nav.Level)
+	assert.Equal(t, "__security_rbac__", bm.nav.ResourceType.Kind)
+	assert.Equal(t, "rbac_wildcard", bm.securityActiveGroup,
+		"jump-back must restore the active finding group so the reload fetches affected resources")
+	require.NotEmpty(t, bm.middleItems, "snapshot middle items must repaint instantly")
+	assert.Equal(t, "__security_affected_resource__", bm.middleItems[0].Kind)
+}
+
 // TestNavigateChildOwnedSecurityAffectedResourceNoHistoryOnFailedJump verifies a
 // jump that cannot resolve its target (kind not discovered) leaves the jump-back
 // stack untouched — pushing history for a no-op teleport would strand a phantom
