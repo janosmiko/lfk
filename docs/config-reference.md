@@ -41,6 +41,7 @@ Prefer a local copy? Point `$schema` at a relative or absolute path instead of t
 | `diff_viewer` | object | *(see Viewer Defaults)* | Diff viewer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `describe_viewer` | object | *(see Viewer Defaults)* | Describe viewer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `object_explorer` | object | *(see Viewer Defaults)* | Object Explorer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
+| `api_explorer` | object | *(see Viewer Defaults)* | API Explorer startup-toggle defaults. See [Viewer Defaults](#viewer-defaults). |
 | `split_preview` | bool | `true` | Startup default for the split preview pane. Set to `false` to start with it hidden. |
 | `watch_mode` | bool | `true` | Startup default for live watch/polling. Set to `false` to start with manual refresh. |
 | `all_namespaces` | bool | `true` | Startup namespace scope: `true` shows all namespaces, `false` scopes to the context's default namespace. The `--namespace` CLI flag and per-bookmark/session scope override this. |
@@ -175,6 +176,9 @@ describe_viewer:
   wrap: false
 object_explorer:
   live: true
+  tree: false
+api_explorer:
+  tree: false
 ```
 
 | Field | Type | Default | Runtime toggle | Description |
@@ -185,6 +189,8 @@ object_explorer:
 | `diff_viewer.unified` | bool | `false` | `toggle_unified` (`u`) | Unified (vs side-by-side) diff layout. |
 | `describe_viewer.wrap` | bool | `false` | `toggle_wrap` (`>`) | Line wrapping in the describe viewer. |
 | `object_explorer.live` | bool | `true` | `watch_mode` (`w`) | Live-refresh the browsed object as the resource changes under watch mode. Manual refresh with `refresh` (`R`). |
+| `object_explorer.tree` | bool | `false` | `tree_view` (`T`) | Open the Object Explorer in the ASCII-art tree view. |
+| `api_explorer.tree` | bool | `false` | `tree_view` (`T`) | Open the API Explorer in the ASCII-art tree view (sticky across navigation). |
 
 A toggle changed at runtime sticks for the session and resets to the configured default the next time the viewer opens.
 
@@ -440,12 +446,13 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `column_toggle` | `,` | Column visibility toggle |
 | `toggle_wrap` | `>` | Toggle line wrapping in the YAML, diff, describe, log, and event viewers. Shares the `>` default with `sort_next`, but they apply in separate contexts (viewers vs. resource list). |
 | `toggle_line_numbers` | `#` | Toggle line numbers (diff, log viewers). |
-| `toggle_fold` | `z` | Toggle fold on the section/region under the cursor (YAML, diff viewers). |
+| `toggle_fold` | `z` | Toggle fold on the section/region under the cursor (YAML, diff viewers; also folds tree-view branches in the Object/API Explorers, alongside `Space`). |
 | `toggle_fold_all` | `Z` | Toggle all folds (YAML, diff viewers). |
 | `toggle_follow` | `f` | Toggle follow / auto-scroll (log viewer). |
 | `toggle_timestamps` | `s` | Toggle timestamps (log viewer). |
 | `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
 | `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |
+| `tree_view` | `T` | Toggle the ASCII-art tree view (Object Explorer, API Explorer). Shares the `T` default with `theme_selector`, but they apply in separate contexts (explorers vs. resource list). |
 | `toggle_preview` | `P` | Toggle the structured preview side panel (log viewer) / details↔YAML preview (explorer). |
 | `toggle_preview_logs` | `L` | Toggle the right-pane live-log preview for the selected pod or container (explorer; deeper levels only). |
 | `fullscreen` | `F` | Maximize/minimize: explorer middle column & dashboard, event timeline, error log. |

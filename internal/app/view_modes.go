@@ -228,15 +228,22 @@ func (m Model) viewExplain() string {
 	}
 
 	// Build hint bar (default key hints).
-	hint := ui.RenderHintBar([]ui.HintEntry{
+	hints := []ui.HintEntry{
 		{Key: "j/k", Desc: "navigate"},
 		{Key: "l/Enter", Desc: "drill in"},
 		{Key: "h/Backspace", Desc: "back"},
 		{Key: "/", Desc: "search"},
 		{Key: "n/N", Desc: "next/prev match"},
-		{Key: "q", Desc: "close"},
-		{Key: "Esc", Desc: "back/close"},
-	}, m.width)
+		{Key: ui.ActiveKeybindings.TreeView, Desc: "tree"},
+	}
+	if m.explainTree {
+		hints = append(hints, ui.HintEntry{Key: "space", Desc: "fold"})
+	}
+	hints = append(hints,
+		ui.HintEntry{Key: "q", Desc: "close"},
+		ui.HintEntry{Key: "Esc", Desc: "back/close"},
+	)
+	hint := ui.RenderHintBar(hints, m.width)
 
 	// If search is active, show search bar instead of hints.
 	if m.explainSearchActive {
@@ -247,13 +254,18 @@ func (m Model) viewExplain() string {
 		hint = ui.StatusBarBgStyle.Width(m.width).MaxWidth(m.width).MaxHeight(1).Render(searchBar)
 	}
 
+	title := "API Explorer: " + m.explainTitle
+	if m.explainTree {
+		return m.viewExplainTree(title+" [TREE]", hint, searchQuery)
+	}
+
 	parentFields, parentCursor := m.explainParentLevel()
 	return ui.RenderExplainView(
 		m.explainFields,
 		m.explainCursor,
 		m.explainScroll,
 		m.explainDesc,
-		"API Explorer: "+m.explainTitle,
+		title,
 		parentFields,
 		parentCursor,
 		searchQuery,

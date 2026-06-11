@@ -153,7 +153,10 @@ func (m Model) explainParentLevel() ([]model.ExplainField, int) {
 
 // explainGoBack steps back one level: it pops a cached ancestor when available
 // (no re-fetch), else re-fetches the parent path, else exits at the root.
+// Tree mode drops back to the flat list first so the popped level renders
+// correctly.
 func (m Model) explainGoBack() (tea.Model, tea.Cmd) {
+	m.restoreExplainFlatLevel()
 	if n := len(m.explainAncestors); n > 0 {
 		p := m.explainAncestors[n-1]
 		m.explainAncestors = m.explainAncestors[:n-1]
@@ -163,6 +166,11 @@ func (m Model) explainGoBack() (tea.Model, tea.Cmd) {
 		m.explainPath = p.path
 		m.explainDesc = p.desc
 		m.explainTitle = p.title
+		// Sticky tree mode: a cached pop skips updateExplainLoaded, so
+		// re-enter the tree for the restored level here.
+		if m.explainTreeWanted {
+			return m, m.execKubectlExplainTree(m.explainResource, m.explainAPIVersion, m.explainPath)
+		}
 		return m, nil
 	}
 	if m.explainPath == "" {
@@ -197,14 +205,28 @@ func (m *Model) exitExplainView() {
 	m.explainScroll = 0
 	m.explainSearchQuery = ""
 	m.explainSearchActive = false
+	m.resetExplainTree()
 	m.explainRecursiveFilter.Clear()
 	m.explainRecursiveFilterActive = false
+}
+
+// explainVisibleLines is the number of field rows visible in the middle
+// column: the renderer's contentHeight (height-6) minus the header row.
+func (m Model) explainVisibleLines() int {
+	return max(max(m.height-6, 3)-1, 1)
+}
+
+// clampExplainScroll keeps the cursor within the visible window with the
+// vim-style scrolloff margin.
+func (m *Model) clampExplainScroll() {
+	identity := func(from, to int) int { return to - from }
+	m.explainScroll = ui.VimScrollOff(m.explainScroll, m.explainCursor, len(m.explainFields), m.explainVisibleLines(), ui.ConfigScrollOff, identity)
 }
 
 // handleExplainKey handles keyboard input in the explain view mode.
 func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	fieldCount := len(m.explainFields)
-	visibleLines := max(m.height-6, 3)
+	visibleLines := m.explainVisibleLines()
 
 	switch msg.String() {
 	case "?", "f1":
@@ -221,6 +243,12 @@ func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m.handleExplainKeyN2()
 	case "r":
 		return m.handleExplainKeyR()
+	case ui.ActiveKeybindings.TreeView:
+		m.explainLineInput = ""
+		return m.toggleExplainTree()
+	case " ", ui.ActiveKeybindings.ToggleFold:
+		m.explainLineInput = ""
+		return m.toggleExplainTreeFold()
 	case "j", "down":
 		return m.handleExplainKeyJ(fieldCount, visibleLines)
 	case "k", "up":
@@ -280,13 +308,7 @@ func (m Model) handleExplainSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.explainSearchActive = false
 		m.explainSearchInput.Clear()
 		m.explainCursor = m.explainSearchPrevCursor
-		// Adjust scroll to keep cursor visible.
-		visibleLines := max(m.height-6, 3)
-		if m.explainCursor < m.explainScroll {
-			m.explainScroll = m.explainCursor
-		} else if m.explainCursor >= m.explainScroll+visibleLines {
-			m.explainScroll = m.explainCursor - visibleLines + 1
-		}
+		m.clampExplainScroll()
 		return m, nil
 	case "backspace":
 		if len(m.explainSearchInput.Value) > 0 {
@@ -322,8 +344,6 @@ func (m *Model) explainJumpToMatch(searchQuery string, startIdx int, forward boo
 		return false
 	}
 
-	visibleLines := max(m.height-6, 3)
-
 	for i := range fieldCount {
 		var idx int
 		if forward {
@@ -336,12 +356,7 @@ func (m *Model) explainJumpToMatch(searchQuery string, startIdx int, forward boo
 		}
 		if ui.MatchLine(m.explainFields[idx].Name, query) {
 			m.explainCursor = idx
-			// Adjust scroll to keep cursor visible.
-			if m.explainCursor < m.explainScroll {
-				m.explainScroll = m.explainCursor
-			} else if m.explainCursor >= m.explainScroll+visibleLines {
-				m.explainScroll = m.explainCursor - visibleLines + 1
-			}
+			m.clampExplainScroll()
 			return true
 		}
 	}
@@ -530,13 +545,11 @@ func (m Model) handleExplainSearchOverlayFilterKey(msg tea.KeyMsg) (tea.Model, t
 	}
 }
 
-func (m Model) handleExplainKeyJ(fieldCount, visibleLines int) (tea.Model, tea.Cmd) {
+func (m Model) handleExplainKeyJ(fieldCount, _ int) (tea.Model, tea.Cmd) {
 	m.explainLineInput = ""
 	if m.explainCursor < fieldCount-1 {
 		m.explainCursor++
-		if m.explainCursor >= m.explainScroll+visibleLines {
-			m.explainScroll = m.explainCursor - visibleLines + 1
-		}
+		m.clampExplainScroll()
 	}
 	return m, nil
 }
@@ -551,16 +564,13 @@ func (m Model) handleExplainKeyG2(fieldCount, visibleLines int) (tea.Model, tea.
 		if fieldCount > 0 {
 			m.explainCursor = min(lineNum, fieldCount-1)
 		}
-		if m.explainCursor < m.explainScroll {
-			m.explainScroll = m.explainCursor
-		} else if m.explainCursor >= m.explainScroll+visibleLines {
-			m.explainScroll = m.explainCursor - visibleLines + 1
-		}
+		m.clampExplainScroll()
 		return m, nil
 	}
 	if fieldCount > 0 {
 		m.explainCursor = fieldCount - 1
 		m.explainScroll = max(fieldCount-visibleLines, 0)
+		m.clampExplainScroll()
 	}
 	return m, nil
 }
@@ -571,6 +581,7 @@ func (m Model) handleExplainPageMove(delta, fieldCount, visibleLines int) (tea.M
 	m.explainCursor = max(min(m.explainCursor, fieldCount-1), 0)
 	m.explainScroll += delta
 	m.explainScroll = max(min(m.explainScroll, max(fieldCount-visibleLines, 0)), 0)
+	m.clampExplainScroll()
 	return m, nil
 }
 
@@ -579,12 +590,19 @@ func (m Model) handleExplainKeyDrill(fieldCount int) (tea.Model, tea.Cmd) {
 	if m.explainCursor >= 0 && m.explainCursor < fieldCount {
 		f := m.explainFields[m.explainCursor]
 		if ui.IsDrillableType(f.Type) {
-			// Push the current level onto the ancestor stack so it renders in
-			// the parent pane and back-navigation can restore it.
-			m.explainAncestors = append(m.explainAncestors, explainLevel{
-				fields: m.explainFields, cursor: m.explainCursor, scroll: m.explainScroll,
-				path: m.explainPath, desc: m.explainDesc, title: m.explainTitle,
-			})
+			if m.explainTree {
+				// Tree rows can sit several levels deep, so this is an
+				// arbitrary jump: drop the cached ancestor chain (like the
+				// recursive overlay does) and load the field's flat level.
+				m.explainAncestors = nil
+			} else {
+				// Push the current level onto the ancestor stack so it renders
+				// in the parent pane and back-navigation can restore it.
+				m.explainAncestors = append(m.explainAncestors, explainLevel{
+					fields: m.explainFields, cursor: m.explainCursor, scroll: m.explainScroll,
+					path: m.explainPath, desc: m.explainDesc, title: m.explainTitle,
+				})
+			}
 			m.loading = true
 			m.setStatusMessage("Loading field...", false)
 			return m, m.execKubectlExplain(m.explainResource, m.explainAPIVersion, f.Path)
@@ -680,10 +698,7 @@ func (m Model) handleExplainKeyK() (tea.Model, tea.Cmd) {
 	m.explainLineInput = ""
 	if m.explainCursor > 0 {
 		m.explainCursor--
-		// Scroll up if cursor goes above visible area.
-		if m.explainCursor < m.explainScroll {
-			m.explainScroll = m.explainCursor
-		}
+		m.clampExplainScroll()
 	}
 	return m, nil
 }

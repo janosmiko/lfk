@@ -49,6 +49,9 @@ describe_viewer:
   wrap: true
 object_explorer:
   live: false
+  tree: true
+api_explorer:
+  tree: true
 split_preview: false
 watch_mode: false
 all_namespaces: false
@@ -200,6 +203,8 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.True(t, ConfigDiffViewerUnified, "diff_viewer.unified")
 	assert.True(t, ConfigDescribeViewerWrap, "describe_viewer.wrap")
 	assert.False(t, ConfigObjectExplorerLive, "object_explorer.live")
+	assert.True(t, ConfigObjectExplorerTree, "object_explorer.tree")
+	assert.True(t, ConfigAPIExplorerTree, "api_explorer.tree")
 	assert.False(t, ConfigSplitPreview, "split_preview")
 	assert.False(t, ConfigWatchMode, "watch_mode")
 	assert.False(t, ConfigAllNamespaces, "all_namespaces")
@@ -309,6 +314,7 @@ var wiringCoveredFields = map[string]string{
 	"diff_viewer":            "TestLoadConfig_AllSettingsWired",
 	"describe_viewer":        "TestLoadConfig_AllSettingsWired",
 	"object_explorer":        "TestLoadConfig_AllSettingsWired",
+	"api_explorer":           "TestLoadConfig_AllSettingsWired",
 	"split_preview":          "TestLoadConfig_AllSettingsWired",
 	"watch_mode":             "TestLoadConfig_AllSettingsWired",
 	"all_namespaces":         "TestLoadConfig_AllSettingsWired",
@@ -389,6 +395,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origDiffUnified := ConfigDiffViewerUnified
 	origDescribeWrap := ConfigDescribeViewerWrap
 	origObjectExplorerLive := ConfigObjectExplorerLive
+	origObjectExplorerTree := ConfigObjectExplorerTree
+	origAPIExplorerTree := ConfigAPIExplorerTree
 	origSplitPreview := ConfigSplitPreview
 	origWatchMode := ConfigWatchMode
 	origAllNamespaces := ConfigAllNamespaces
@@ -469,6 +477,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigDiffViewerUnified = origDiffUnified
 		ConfigDescribeViewerWrap = origDescribeWrap
 		ConfigObjectExplorerLive = origObjectExplorerLive
+		ConfigObjectExplorerTree = origObjectExplorerTree
+		ConfigAPIExplorerTree = origAPIExplorerTree
 		ConfigSplitPreview = origSplitPreview
 		ConfigWatchMode = origWatchMode
 		ConfigAllNamespaces = origAllNamespaces

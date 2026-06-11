@@ -17,6 +17,42 @@ import (
 // A title line sits below the breadcrumb (like the other fullscreen views) and
 // an outer frame wraps the columns.
 func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, title string, parentFields []model.ObjectField, parentCursor int, previewYAML string, previewScroll int, filterBar, hintBar string, width, height int) string {
+	d := objectExplorerDims(width, height)
+	fieldLines := renderResourceFieldList(fields, cursor, scroll, d.middleInner, d.contentHeight-1)
+	nameWidth := resourceNameWidth(fields, d.middleInner)
+	middleHeader := DimStyle.Bold(true).Render(fmt.Sprintf("  %-*s  %s", nameWidth, "NAME", "VALUE"))
+	return renderObjectExplorerLayout(d, middleHeader, fieldLines, title, parentFields, parentCursor, previewYAML, previewScroll, filterBar, hintBar, width)
+}
+
+// objectExplorerColumnDims holds the column widths shared by the flat and tree
+// variants of the Object Explorer layout.
+type objectExplorerColumnDims struct {
+	leftW, middleW, rightW             int
+	leftInner, middleInner, rightInner int
+	contentHeight                      int
+}
+
+// objectExplorerDims computes the Miller-column dimensions for the Object
+// Explorer (12% | 51% | remainder, minus borders and the outer frame).
+func objectExplorerDims(width, height int) objectExplorerColumnDims {
+	// Reserve 2 cells/rows for the outer frame that wraps the columns (the
+	// breadcrumb above and the hint bar below sit OUTSIDE it).
+	usable := width - 8
+	leftW := max(10, usable*12/100)
+	middleW := max(10, usable*51/100)
+	rightW := max(10, usable-leftW-middleW)
+	colPad := 2
+	return objectExplorerColumnDims{
+		leftW: leftW, middleW: middleW, rightW: rightW,
+		leftInner: max(5, leftW-colPad), middleInner: max(5, middleW-colPad), rightInner: max(5, rightW-colPad),
+		contentHeight: max(height-6, 3), // title + hint + column borders + outer frame
+	}
+}
+
+// renderObjectExplorerLayout assembles the three Object Explorer columns from a
+// prepared middle column (header + body lines). Shared by the flat field list
+// and the tree view.
+func renderObjectExplorerLayout(d objectExplorerColumnDims, middleHeader string, fieldLines []string, title string, parentFields []model.ObjectField, parentCursor int, previewYAML string, previewScroll int, filterBar, hintBar string, width int) string {
 	titleText := ViewTitle(width, title)
 
 	// The bottom bar shows the filter input when filtering (like the API
@@ -27,38 +63,21 @@ func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, ti
 			HelpKeyStyle.Render("/") + BarNormalStyle.Render(filterBar))
 	}
 
-	// Reserve 2 cells/rows for the outer frame that wraps the columns (the
-	// breadcrumb above and the hint bar below sit OUTSIDE it).
-	usable := width - 8
-	leftW := max(10, usable*12/100)
-	middleW := max(10, usable*51/100)
-	rightW := max(10, usable-leftW-middleW)
-
-	contentHeight := max(height-6, 3) // title + hint + column borders + outer frame
-
-	colPad := 2
-	leftInner := max(5, leftW-colPad)
-	middleInner := max(5, middleW-colPad)
-	rightInner := max(5, rightW-colPad)
-
 	// Left column: the parent level's keys only (no values), with the
 	// drilled-into item highlighted (Miller-columns parent pane). Empty at the
 	// top level.
 	leftHeader := DimStyle.Bold(true).Render("PARENT")
-	leftBody := strings.Join(renderObjectKeyList(parentFields, parentCursor, leftInner, contentHeight-1), "\n")
+	leftBody := strings.Join(renderObjectKeyList(parentFields, parentCursor, d.leftInner, d.contentHeight-1), "\n")
 	leftCol := leftHeader + "\n" + leftBody
-	leftCol = PadToHeight(leftCol, contentHeight)
-	leftCol = FillLinesBg(leftCol, leftInner, BaseBg)
-	left := InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
+	leftCol = PadToHeight(leftCol, d.contentHeight)
+	leftCol = FillLinesBg(leftCol, d.leftInner, BaseBg)
+	left := InactiveColumnStyle.Width(d.leftW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(leftCol)
 
 	// Middle column: field list with inline values (active).
-	fieldLines := renderResourceFieldList(fields, cursor, scroll, middleInner, contentHeight-1)
-	nameWidth := resourceNameWidth(fields, middleInner)
-	middleHeader := DimStyle.Bold(true).Render(fmt.Sprintf("  %-*s  %s", nameWidth, "NAME", "VALUE"))
 	middleContent := middleHeader + "\n" + strings.Join(fieldLines, "\n")
-	middleContent = PadToHeight(middleContent, contentHeight)
-	middleContent = FillLinesBg(middleContent, middleInner, BaseBg)
-	middle := ActiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(middleContent)
+	middleContent = PadToHeight(middleContent, d.contentHeight)
+	middleContent = FillLinesBg(middleContent, d.middleInner, BaseBg)
+	middle := ActiveColumnStyle.Width(d.middleW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(middleContent)
 
 	// Right column: YAML preview of the selected node's subtree (inactive),
 	// scrolled by previewScroll.
@@ -66,13 +85,13 @@ func RenderObjectExplorerView(fields []model.ObjectField, cursor, scroll int, ti
 	if strings.TrimSpace(previewYAML) == "" {
 		previewBody = DimStyle.Render("(empty)")
 	} else {
-		previewBody = RenderYAMLContent(scrollYAML(previewYAML, previewScroll), rightInner, contentHeight-1)
+		previewBody = RenderYAMLContent(scrollYAML(previewYAML, previewScroll), d.rightInner, d.contentHeight-1)
 	}
 	rightHeader := DimStyle.Bold(true).Render("PREVIEW")
 	rightContent := rightHeader + "\n" + previewBody
-	rightContent = PadToHeight(rightContent, contentHeight)
-	rightContent = FillLinesBg(rightContent, rightInner, BaseBg)
-	right := InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightContent)
+	rightContent = PadToHeight(rightContent, d.contentHeight)
+	rightContent = FillLinesBg(rightContent, d.rightInner, BaseBg)
+	right := InactiveColumnStyle.Width(d.rightW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
 	framed := explorerFrameStyle().Render(columns)

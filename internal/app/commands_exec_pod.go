@@ -469,3 +469,51 @@ func (m Model) execKubectlExplainRecursive(resource, apiVersion, query string) t
 		return explainRecursiveMsg{matches: matches, query: query}
 	})
 }
+
+// execKubectlExplainTree fetches the recursive field tree rooted at fieldPath
+// for the API Explorer's tree mode. Parsed paths come back relative to the
+// output root, so they are re-anchored at fieldPath.
+func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) tea.Cmd {
+	kubectlPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		return func() tea.Msg {
+			return explainTreeLoadedMsg{err: fmt.Errorf("kubectl not found: %w", err)}
+		}
+	}
+
+	kctx := m.effectiveContext()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
+
+	target := resource
+	if fieldPath != "" {
+		target = resource + "." + fieldPath
+	}
+
+	return m.trackBgTask(scheduler.KindSubprocess, "Explain (tree): "+target, kctx, func() tea.Msg {
+		args := []string{"explain", target, "--recursive", "--context", m.kubectlContext(kctx)}
+		if apiVersion != "" {
+			args = append(args, "--api-version", apiVersion)
+		}
+		cmd := exec.Command(kubectlPath, args...)
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+		logExecCmd("Running kubectl command", cmd)
+		output, cmdErr := cmd.CombinedOutput()
+		if cmdErr != nil {
+			return explainTreeLoadedMsg{
+				err: fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
+			}
+		}
+
+		// Recursive explain output carries no per-field descriptions, so the
+		// parser stores the path in Description (shown in the right column).
+		// Keep that in sync after re-anchoring relative paths at fieldPath.
+		fields := parseRecursiveExplainForSearch(string(output), "")
+		if fieldPath != "" {
+			for i := range fields {
+				fields[i].Path = fieldPath + "." + fields[i].Path
+				fields[i].Description = fields[i].Path
+			}
+		}
+		return explainTreeLoadedMsg{fields: fields, path: fieldPath}
+	})
+}

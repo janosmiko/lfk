@@ -14,55 +14,55 @@ import (
 // (right). A title line sits below the breadcrumb (like the other fullscreen
 // views) and an outer frame wraps the columns.
 func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resourceDesc, title string, parentFields []model.ExplainField, parentCursor int, searchQuery, hintBar string, width, height int) string {
+	d := objectExplorerDims(width, height)
+	fieldLines := renderFieldList(fields, cursor, scroll, d.middleInner, d.contentHeight-1, searchQuery) // -1 for header
+	// Build a table header row with NAME and TYPE columns, using the same nameWidth as the field rows.
+	nameWidth := explainNameWidth(fields, d.middleInner)
+	middleHeader := DimStyle.Bold(true).Render(fmt.Sprintf("  %-*s  %-4s  %s", nameWidth, "NAME", "REQ", "TYPE"))
+	return renderExplainLayout(d, middleHeader, fieldLines, fields, cursor, resourceDesc, title, parentFields, parentCursor, hintBar, width)
+}
+
+// renderExplainLayout assembles the three API Explorer columns from a prepared
+// middle column (header + body lines). Shared by the flat field list and the
+// tree view. Column dimensions match the Object Explorer's.
+func renderExplainLayout(d objectExplorerColumnDims, middleHeader string, fieldLines []string, fields []model.ExplainField, cursor int, resourceDesc, title string, parentFields []model.ExplainField, parentCursor int, hintBar string, width int) string {
 	titleText := ViewTitle(width, title)
-
-	// Calculate column widths matching the main explorer (12%, 51%, remainder).
-	// 3 columns x 2 border chars, plus 2 for the outer frame around them.
-	usable := width - 8
-	leftW := max(10, usable*12/100)
-	middleW := max(10, usable*51/100)
-	rightW := max(10, usable-leftW-middleW)
-
-	contentHeight := max(height-6, 3) // title + hint bar + column borders + outer frame
-
-	// Column padding is 1 on each side, so inner content width is 2 less.
-	colPad := 2
-	leftInner := max(5, leftW-colPad)
-	middleInner := max(5, middleW-colPad)
-	rightInner := max(5, rightW-colPad)
 
 	// Left column: the parent level's keys only, drilled-into row highlighted.
 	leftHeader := DimStyle.Bold(true).Render("PARENT")
-	leftCol := leftHeader + "\n" + strings.Join(renderExplainKeyList(parentFields, parentCursor, leftInner, contentHeight-1), "\n")
-	leftCol = PadToHeight(leftCol, contentHeight)
-	leftCol = FillLinesBg(leftCol, leftInner, BaseBg)
-	left := InactiveColumnStyle.Width(leftW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(leftCol)
+	leftCol := leftHeader + "\n" + strings.Join(renderExplainKeyList(parentFields, parentCursor, d.leftInner, d.contentHeight-1), "\n")
+	leftCol = PadToHeight(leftCol, d.contentHeight)
+	leftCol = FillLinesBg(leftCol, d.leftInner, BaseBg)
+	left := InactiveColumnStyle.Width(d.leftW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(leftCol)
 
 	// Middle column: field list (active).
-	fieldLines := renderFieldList(fields, cursor, scroll, middleInner, contentHeight-1, searchQuery) // -1 for header
-	// Build a table header row with NAME and TYPE columns, using the same nameWidth as the field rows.
-	nameWidth := 0
-	for _, f := range fields {
-		nameWidth = max(nameWidth, len(f.Name))
-	}
-	nameWidth = min(nameWidth, middleInner/2)
-	middleHeader := DimStyle.Bold(true).Render(fmt.Sprintf("  %-*s  %-4s  %s", nameWidth, "NAME", "REQ", "TYPE"))
 	middleContent := middleHeader + "\n" + strings.Join(fieldLines, "\n")
-	middleContent = PadToHeight(middleContent, contentHeight)
-	middleContent = FillLinesBg(middleContent, middleInner, BaseBg)
-	middle := ActiveColumnStyle.Width(middleW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(middleContent)
+	middleContent = PadToHeight(middleContent, d.contentHeight)
+	middleContent = FillLinesBg(middleContent, d.middleInner, BaseBg)
+	middle := ActiveColumnStyle.Width(d.middleW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(middleContent)
 
 	// Right column: description (inactive).
-	descLines := renderFieldDescription(fields, cursor, resourceDesc, rightInner, contentHeight-1) // -1 for header
+	descLines := renderFieldDescription(fields, cursor, resourceDesc, d.rightInner, d.contentHeight-1) // -1 for header
 	rightHeader := DimStyle.Bold(true).Render("DESCRIPTION")
 	rightContent := rightHeader + "\n" + strings.Join(descLines, "\n")
-	rightContent = PadToHeight(rightContent, contentHeight)
-	rightContent = FillLinesBg(rightContent, rightInner, BaseBg)
-	right := InactiveColumnStyle.Width(rightW).Height(contentHeight).MaxHeight(contentHeight + 2).Render(rightContent)
+	rightContent = PadToHeight(rightContent, d.contentHeight)
+	rightContent = FillLinesBg(rightContent, d.rightInner, BaseBg)
+	right := InactiveColumnStyle.Width(d.rightW).Height(d.contentHeight).MaxHeight(d.contentHeight + 2).Render(rightContent)
 
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
 	framed := explorerFrameStyle().Render(columns)
 	return lipgloss.JoinVertical(lipgloss.Left, titleText, framed, hintBar)
+}
+
+// explainNameWidth computes the field-name column width (display width, so
+// multibyte names align), capped at half the pane. Shared by the header and
+// the field rows so they cannot desync.
+func explainNameWidth(fields []model.ExplainField, paneInner int) int {
+	w := 0
+	for _, f := range fields {
+		w = max(w, lipgloss.Width(f.Name))
+	}
+	return min(w, paneInner/2)
 }
 
 // renderExplainKeyList renders a keys-only (field names, no markers) list for
@@ -102,12 +102,7 @@ func renderFieldList(fields []model.ExplainField, cursor, scroll, width, maxLine
 	lines := make([]string, 0, maxLines)
 	end := min(scroll+maxLines, len(fields))
 
-	// Calculate the maximum name width for alignment.
-	nameWidth := 0
-	for _, f := range fields {
-		nameWidth = max(nameWidth, len(f.Name))
-	}
-	nameWidth = min(nameWidth, width/2)
+	nameWidth := explainNameWidth(fields, width)
 
 	for i := scroll; i < end; i++ {
 		f := fields[i]
@@ -205,12 +200,6 @@ func renderFieldDescription(fields []model.ExplainField, cursor int, resourceDes
 		}
 	} else {
 		lines = append(lines, DimStyle.Render("No description available"))
-	}
-
-	// If the field has an Object or array type, show drill-in hint.
-	if IsDrillableType(f.Type) {
-		lines = append(lines, "")
-		lines = append(lines, HelpKeyStyle.Render("Press l or Enter to drill into this field"))
 	}
 
 	// Pad remaining lines.

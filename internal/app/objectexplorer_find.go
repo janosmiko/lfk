@@ -138,10 +138,15 @@ func (m *Model) navigateObjectExplorerToPath(segs []string) {
 	rt.path = append([]string{}, parent...)
 	rt.level = model.ObjectFieldsAt(rt.root, rt.path)
 	rt.resetLevelView()
-	for i, f := range rt.level {
-		if f.Key == key {
-			rt.cursor = i
-			break
+	if rt.tree {
+		rt.rebuildTreeRows()
+		rt.cursorOnTreeSegs([]string{key})
+	} else {
+		for i, f := range rt.level {
+			if f.Key == key {
+				rt.cursor = i
+				break
+			}
 		}
 	}
 	m.clampObjectExplorerScroll()

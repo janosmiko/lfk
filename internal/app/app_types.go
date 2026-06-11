@@ -447,6 +447,7 @@ type TabState struct {
 	filterText         string
 	watchMode          bool
 	objectExplorerLive bool
+	objectExplorerTree bool
 	// readOnly blocks all mutating actions for this tab. Re-evaluated on
 	// context switch from CLI flag, per-context config, and global config.
 	readOnly               bool

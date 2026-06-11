@@ -48,6 +48,7 @@ type Keybindings struct {
 	FinalizerSearch   string `json:"finalizer_search" yaml:"finalizer_search"`
 	APIExplorer       string `json:"api_explorer" yaml:"api_explorer"`
 	ObjectExplorer    string `json:"object_explorer" yaml:"object_explorer"`
+	TreeView          string `json:"tree_view" yaml:"tree_view"`
 	RBACBrowser       string `json:"rbac_browser" yaml:"rbac_browser"`
 	ThemeSelector     string `json:"theme_selector" yaml:"theme_selector"`
 	CommandBar        string `json:"command_bar" yaml:"command_bar"`
@@ -163,6 +164,9 @@ func DefaultKeybindings() Keybindings {
 		ToggleFollow: "f", ToggleTimestamps: "s", TogglePrefixes: "p", ToggleUnified: "u",
 		FilterPresets: ".", ErrorLog: "!", SecretToggle: "ctrl+s",
 		FinalizerSearch: "ctrl+g", APIExplorer: "I", ObjectExplorer: "O", RBACBrowser: "U",
+		// "T" is also the explorer-level ThemeSelector; TreeView only dispatches
+		// inside the Object/API Explorer modes, which have their own handlers.
+		TreeView:      "T",
 		ThemeSelector: "T", CommandBar: ":", WatchMode: "w",
 		SortNext: ">", SortPrev: "<", SortFlip: "=", SortReset: "-",
 		SaveResource: "W", Monitoring: "@",

@@ -65,6 +65,23 @@ func (m Model) updateDiffLoaded(msg diffLoadedMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// updateExplainMsg routes the API Explorer's load messages (flat level,
+// recursive search, field tree) to their handlers.
+func (m Model) updateExplainMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
+	switch msg := msg.(type) {
+	case explainLoadedMsg:
+		mdl, cmd := m.updateExplainLoaded(msg)
+		return mdl, cmd, true
+	case explainRecursiveMsg:
+		mdl, cmd := m.updateExplainRecursive(msg)
+		return mdl, cmd, true
+	case explainTreeLoadedMsg:
+		mdl, cmd := m.updateExplainTreeLoaded(msg)
+		return mdl, cmd, true
+	}
+	return m, nil, false
+}
+
 func (m Model) updateExplainLoaded(msg explainLoadedMsg) (tea.Model, tea.Cmd) {
 	m.loading = false
 	if msg.err != nil {
@@ -72,6 +89,7 @@ func (m Model) updateExplainLoaded(msg explainLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.mode = modeExplain
+	m.resetExplainTree() // a fresh flat level replaces any tree visualization
 	m.explainFields = msg.fields
 	m.explainDesc = msg.description
 	m.explainPath = msg.path
@@ -80,6 +98,11 @@ func (m Model) updateExplainLoaded(msg explainLoadedMsg) (tea.Model, tea.Cmd) {
 	m.explainScroll = 0
 	m.explainSearchActive = false
 	m.applyExplainPendingField()
+	// Sticky tree mode: re-enter the tree for the freshly loaded level (the
+	// flat list shows until the recursive result arrives).
+	if m.explainTreeWanted {
+		return m, m.execKubectlExplainTree(m.explainResource, m.explainAPIVersion, msg.path)
+	}
 	return m, nil
 }
 
@@ -95,9 +118,7 @@ func (m *Model) applyExplainPendingField() {
 	for i, f := range m.explainFields {
 		if f.Name == field {
 			m.explainCursor = i
-			if visible := max(m.height-6, 3); i >= visible {
-				m.explainScroll = i - visible + 1
-			}
+			m.clampExplainScroll()
 			return
 		}
 	}
