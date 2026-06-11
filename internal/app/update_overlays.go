@@ -198,7 +198,8 @@ func (m Model) handleOverlayKeySecondary(msg tea.KeyMsg) (tea.Model, tea.Cmd, bo
 		mdl, cmd := m.handleEventTimelineOverlayKey(msg)
 		return mdl, cmd, true
 	case overlayNetworkPolicy:
-		return m.handleNetworkPolicyOverlayKey(msg), nil, true
+		mdl, cmd := m.handleNetworkPolicyOverlayKey(msg)
+		return mdl, cmd, true
 	case overlayOrphans:
 		mdl, cmd := m.handleOrphansKey(msg)
 		return mdl, cmd, true

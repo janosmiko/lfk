@@ -151,6 +151,12 @@ func (m Model) updateNetpolLoaded(msg netpolLoadedMsg) (tea.Model, tea.Cmd) {
 	m.netpolData = msg.info
 	m.netpolsData = nil
 	m.netpolScroll = 0
+	// Reset search state from a prior visit: close paths that bypass
+	// closeNetpolOverlay (e.g. universal ctrl+c) leave it dirty.
+	m.netpolSearchActive = false
+	m.netpolSearchInput.Clear()
+	m.netpolSearchQuery = ""
+	m.netpolSearchPos = 0
 	m.overlay = overlayNetworkPolicy
 	return m, nil
 }
@@ -164,6 +170,12 @@ func (m Model) updateNetpolsForResourceLoaded(msg netpolsForResourceLoadedMsg) (
 	m.netpolsData = msg.info
 	m.netpolData = nil
 	m.netpolScroll = 0
+	// Reset search state from a prior visit: close paths that bypass
+	// closeNetpolOverlay (e.g. universal ctrl+c) leave it dirty.
+	m.netpolSearchActive = false
+	m.netpolSearchInput.Clear()
+	m.netpolSearchQuery = ""
+	m.netpolSearchPos = 0
 	m.overlay = overlayNetworkPolicy
 	return m, nil
 }

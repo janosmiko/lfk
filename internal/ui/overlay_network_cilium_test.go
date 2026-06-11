@@ -13,7 +13,7 @@ func TestRenderNetworkPolicyOverlay_CiliumKindShown(t *testing.T) {
 		Kind:        "CiliumNetworkPolicy",
 		PolicyTypes: []string{"Ingress"},
 	}
-	out := RenderNetworkPolicyOverlay(info, 0, 100, 40)
+	out := RenderNetworkPolicyOverlay(info, 0, 100, 40, "")
 	assert.Contains(t, out, "CiliumNetworkPolicy: cnp-web")
 }
 
@@ -22,7 +22,7 @@ func TestRenderNetworkPolicyOverlay_ClusterwideNamespace(t *testing.T) {
 		Name: "ccnp-all",
 		Kind: "CiliumClusterwideNetworkPolicy",
 	}
-	out := RenderNetworkPolicyOverlay(info, 0, 100, 40)
+	out := RenderNetworkPolicyOverlay(info, 0, 100, 40, "")
 	assert.Contains(t, out, "(cluster-wide)")
 	// Empty selector on a clusterwide policy spans every namespace.
 	assert.Contains(t, out, "(all pods in all namespaces)")
@@ -38,7 +38,7 @@ func TestRenderNetworkPolicyOverlay_DenyRuleMarked(t *testing.T) {
 			{Deny: true, Peers: []NetpolPeerEntry{{Type: "Entity", Value: "world"}}},
 		},
 	}
-	out := RenderNetworkPolicyOverlay(info, 0, 100, 40)
+	out := RenderNetworkPolicyOverlay(info, 0, 100, 40, "")
 	assert.Contains(t, out, "Rule 1 (deny):")
 }
 
@@ -52,7 +52,7 @@ func TestRenderNetworkPolicyOverlay_L7Shown(t *testing.T) {
 			{L7: "HTTP", Peers: []NetpolPeerEntry{{Type: "All"}}},
 		},
 	}
-	out := RenderNetworkPolicyOverlay(info, 0, 100, 40)
+	out := RenderNetworkPolicyOverlay(info, 0, 100, 40, "")
 	assert.Contains(t, out, "L7: HTTP")
 }
 
@@ -68,7 +68,7 @@ func TestRenderNetworkPolicyOverlay_CiliumPeerTypes(t *testing.T) {
 			{Peers: []NetpolPeerEntry{{Type: "Service", Value: "data/db"}}},
 		},
 	}
-	out := RenderNetworkPolicyOverlay(info, 0, 100, 60)
+	out := RenderNetworkPolicyOverlay(info, 0, 100, 60, "")
 	assert.Contains(t, out, "Entity:")
 	assert.Contains(t, out, "kube-apiserver")
 	assert.Contains(t, out, "FQDN:")
@@ -83,7 +83,7 @@ func TestRenderNetworkPolicyOverlay_NodePolicyNote(t *testing.T) {
 		Kind:       "CiliumClusterwideNetworkPolicy",
 		NodePolicy: true,
 	}
-	out := RenderNetworkPolicyOverlay(info, 0, 100, 40)
+	out := RenderNetworkPolicyOverlay(info, 0, 100, 40, "")
 	assert.Contains(t, out, "selects nodes, not pods")
 }
 
@@ -97,7 +97,7 @@ func TestRenderNetworkPoliciesOverlay_CiliumSpecsSummary(t *testing.T) {
 			{Name: "multi #2", Namespace: "default", Kind: "CiliumNetworkPolicy"},
 		},
 	}
-	out := RenderNetworkPoliciesOverlay(info, 0, 100, 60)
+	out := RenderNetworkPoliciesOverlay(info, 0, 100, 60, "")
 	assert.Contains(t, out, "2 policy specs")
 	assert.NotContains(t, out, "select this ciliumnetworkpolicy")
 }

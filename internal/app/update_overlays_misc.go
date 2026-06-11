@@ -7,16 +7,37 @@ import (
 
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/ui"
 )
 
 // handleNetworkPolicyOverlayKey handles keyboard input in the network policy visualizer overlay.
-func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
+func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) (Model, tea.Cmd) {
+	if m.netpolSearchActive {
+		return m.handleNetpolSearchKey(msg)
+	}
 	switch msg.String() {
-	case "esc", "q":
+	case "esc":
+		// Esc clears an active search first; a second Esc closes.
+		if m.netpolSearchQuery != "" {
+			m.netpolSearchQuery = ""
+			m.netpolSearchInput.Clear()
+			m.netpolSearchPos = 0
+			return m, nil
+		}
+		return m.closeNetpolOverlay(), nil
+	case "q":
+		return m.closeNetpolOverlay(), nil
+	case ui.ActiveKeybindings.Search:
+		m.pendingG = false
 		m.netpolLineInput = ""
-		m.overlay = overlayNone
-		m.netpolData = nil
-		m.netpolsData = nil
+		m.netpolSearchActive = true
+		m.netpolSearchInput.Clear()
+	case "n":
+		m.netpolLineInput = ""
+		return m.findNetpolMatch(true)
+	case "N":
+		m.netpolLineInput = ""
+		return m.findNetpolMatch(false)
 	case "j", "down":
 		m.netpolLineInput = ""
 		m.netpolScroll = min(m.netpolScroll+1, m.netpolMaxScroll())
@@ -46,11 +67,11 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
 		}
 	case "1", "2", "3", "4", "5", "6", "7", "8", "9":
 		m.netpolLineInput += msg.String()
-		return m
+		return m, nil
 	case "0":
 		if m.netpolLineInput != "" {
 			m.netpolLineInput += "0"
-			return m
+			return m, nil
 		}
 	case "ctrl+d", "shift+down":
 		m.netpolLineInput = ""
@@ -74,7 +95,7 @@ func (m Model) handleNetworkPolicyOverlayKey(msg tea.KeyMsg) Model {
 	default:
 		m.netpolLineInput = ""
 	}
-	return m
+	return m, nil
 }
 
 func (m Model) handleFilterPresetOverlayKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {

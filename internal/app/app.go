@@ -633,10 +633,14 @@ type Model struct {
 	// Network policy visualizer state. netpolData holds the single-policy
 	// view (Visualize on a NetworkPolicy); netpolsData the multi-policy view
 	// (Network Policies on a Pod/Service). Exactly one is set at a time.
-	netpolData      *k8s.NetworkPolicyInfo
-	netpolsData     *k8s.NetpolsForResource
-	netpolScroll    int
-	netpolLineInput string // digit buffer for 123G jump-to-line
+	netpolData         *k8s.NetworkPolicyInfo
+	netpolsData        *k8s.NetpolsForResource
+	netpolScroll       int
+	netpolLineInput    string    // digit buffer for 123G jump-to-line
+	netpolSearchActive bool      // true while typing in the / search bar
+	netpolSearchInput  TextInput // current search input
+	netpolSearchQuery  string    // committed search query (highlight + n/N)
+	netpolSearchPos    int       // line index of the last n/N match (search anchor)
 
 	// Batch label/annotation editor state.
 	batchLabelMode   int       // 0=labels, 1=annotations

@@ -221,11 +221,11 @@ func TestNetpolOverlayScrollClampedAtBottom(t *testing.T) {
 	require.Positive(t, maxScroll)
 
 	for range maxScroll + 50 {
-		m = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
+		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("j")})
 	}
 	assert.Equal(t, maxScroll, m.netpolScroll, "j must clamp at the bottom")
 
-	m = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
+	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("k")})
 	assert.Equal(t, maxScroll-1, m.netpolScroll, "first k after the bottom must scroll up")
 }
 
@@ -235,12 +235,12 @@ func TestNetpolOverlayPagingClampedAtBottom(t *testing.T) {
 	require.Positive(t, maxScroll)
 
 	for range 20 {
-		m = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlF})
+		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlF})
 	}
 	assert.Equal(t, maxScroll, m.netpolScroll, "ctrl+f must clamp at the bottom")
 
 	for range 20 {
-		m = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
+		m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyCtrlD})
 	}
 	assert.Equal(t, maxScroll, m.netpolScroll, "ctrl+d must clamp at the bottom")
 }
@@ -249,11 +249,11 @@ func TestNetpolOverlayJumpToBottomClamped(t *testing.T) {
 	m := tallNetpolModel()
 	maxScroll := m.netpolMaxScroll()
 
-	m = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
+	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune("G")})
 	assert.Equal(t, maxScroll, m.netpolScroll, "G must land exactly on the bottom")
 
 	m.netpolScroll = 0
-	m = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyEnd})
+	m, _ = m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyEnd})
 	assert.Equal(t, maxScroll, m.netpolScroll, "end must land exactly on the bottom")
 }
 
@@ -261,7 +261,7 @@ func TestNetpolOverlayEscClearsMultiData(t *testing.T) {
 	m := baseOverlayModel()
 	m.overlay = overlayNetworkPolicy
 	m.netpolsData = &k8s.NetpolsForResource{Kind: "Pod", Name: "my-pod", Namespace: "default"}
-	result := m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
+	result, _ := m.handleNetworkPolicyOverlayKey(tea.KeyMsg{Type: tea.KeyEsc})
 	assert.Equal(t, overlayNone, result.overlay)
 	assert.Nil(t, result.netpolsData)
 }

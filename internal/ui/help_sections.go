@@ -358,11 +358,13 @@ func helpSections() []helpSection {
 		{
 			title: "Network Policy Visualizer", context: "Network Policy / Pod / Service",
 			bindings: []helpEntry{
-				{"j/k", "Scroll up/down"},
+				{"j/k / Mouse wheel", "Scroll up/down"},
 				{"gg/G / Home/End", "Top/bottom"},
 				{"Ctrl+D/U", "Page down/up (half page)"},
 				{"Ctrl+F/B / PgDn/PgUp", "Page down/up (full page)"},
-				{"q/Esc", "Close visualizer"},
+				{"/", "Search (highlights matches)"},
+				{"n/N", "Next/previous match"},
+				{"q/Esc", "Close visualizer (Esc clears search first)"},
 			},
 		},
 		{
