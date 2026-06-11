@@ -94,8 +94,8 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 - **Union view**: Merge resources from multiple clusters into a single table with a `Context` column identifying the source, via `--union-context` (repeatable) or a named `--union-set` from config. See [Union View](docs/union-context.md).
 - **Cluster dashboard** when entering a context (configurable)
 - **Monitoring dashboard** with active Prometheus/Alertmanager alerts (`@` key), configurable endpoints per cluster
-- **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser
-- **Object Explorer** for drilling into the selected resource's live object (`O` key); arrays expand into indexed elements, so recursive status trees (e.g. `.status.steps[].steps[]`) are walkable; live-refreshes under watch mode (`w` to pause, `R` to refresh manually)
+- **API Explorer** for interactively browsing resource structure (`I` key) with recursive field browser and an ASCII-art tree view (`T`, sticky across navigation; `Space` folds branches)
+- **Object Explorer** for drilling into the selected resource's live object (`O` key); arrays expand into indexed elements, so recursive status trees (e.g. `.status.steps[].steps[]`) are walkable; live-refreshes under watch mode (`w` to pause, `R` to refresh manually); `T` toggles a tree view that expands the whole subtree with ASCII-art guides, `Space` folds branches
 - **Namespace selector** overlay with type-to-filter
 - **All-namespaces mode** (enabled by default)
 - **Local cluster management** — create, list, and delete `kind` clusters; create, list, start, stop, and delete `k3d` and `minikube` clusters (kind has no native start/stop) from inside lfk via the `Ctrl+N` manager overlay.

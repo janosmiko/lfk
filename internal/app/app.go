@@ -217,6 +217,7 @@ type Model struct {
 	// even when live is off, so manual refresh (R) updates the view once.
 	objectExplorerLive      bool
 	objectExplorerForceSync bool
+	objectExplorerTree      bool // session tree-view pref (T); seeded from ui.ConfigObjectExplorerTree
 
 	// Read-only mode: blocks all mutating actions for the active tab. Mirrors
 	// the active TabState.readOnly; re-evaluated on context switch and tab
@@ -756,6 +757,7 @@ type Model struct {
 	explainSearchInput           TextInput            // current search input
 	explainSearchQuery           string               // persisted search query for n/N navigation
 	explainSearchPrevCursor      int                  // cursor position before search started
+	explainTreeState                                  // embedded — tree-mode state; see explain_tree.go
 	explainRecursiveResults      []model.ExplainField // results from recursive search
 	explainRecursiveCursor       int
 	explainRecursiveScroll       int

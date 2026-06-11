@@ -105,6 +105,8 @@ type configFile struct {
 	DescribeViewer *DescribeViewerConfig `json:"describe_viewer" yaml:"describe_viewer"`
 	// ObjectExplorer holds startup-default toggles for the Object Explorer.
 	ObjectExplorer *ObjectExplorerConfig `json:"object_explorer" yaml:"object_explorer"`
+	// APIExplorer holds startup-default toggles for the API Explorer.
+	APIExplorer *APIExplorerConfig `json:"api_explorer" yaml:"api_explorer"`
 	// SplitPreview is the startup default for the split preview pane (runtime
 	// toggle from the explorer). Default true (pane shown).
 	SplitPreview *bool `json:"split_preview" yaml:"split_preview"`
@@ -357,6 +359,16 @@ type ObjectExplorerConfig struct {
 	// Live: startup default for live-refreshing the browsed object as the
 	// resource changes under watch mode (runtime toggle: w). Default true.
 	Live *bool `json:"live" yaml:"live"`
+	// Tree: startup default for the ASCII-art tree view (runtime toggle: T).
+	// Default false (flat Miller-columns level list).
+	Tree *bool `json:"tree" yaml:"tree"`
+}
+
+// APIExplorerConfig is the on-disk schema for the api_explorer section.
+type APIExplorerConfig struct {
+	// Tree: startup default for the ASCII-art tree view (runtime toggle: T).
+	// Default false (flat field list).
+	Tree *bool `json:"tree" yaml:"tree"`
 }
 
 // AppearanceConfig is the on-disk schema for the appearance section. Every

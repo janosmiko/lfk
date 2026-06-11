@@ -150,6 +150,11 @@
       "description": "Object Explorer startup-toggle defaults.",
       "$ref": "#/definitions/objectExplorerConfig"
     },
+    "api_explorer": {
+      "type": ["object", "null"],
+      "description": "API Explorer startup-toggle defaults.",
+      "$ref": "#/definitions/apiExplorerConfig"
+    },
     "split_preview": {
       "type": "boolean",
       "description": "Startup default for the split preview pane. Set false to start with the pane hidden.",
@@ -344,6 +349,7 @@
         "finalizer_search": { "type": "string" },
         "api_explorer": { "type": "string" },
         "object_explorer": { "type": "string" },
+        "tree_view": { "type": "string" },
         "rbac_browser": { "type": "string" },
         "theme_selector": { "type": "string" },
         "command_bar": { "type": "string" },
@@ -697,6 +703,23 @@
           "type": "boolean",
           "description": "Startup default for live-refreshing the browsed object as the resource changes under watch mode (runtime toggle: w).",
           "default": true
+        },
+        "tree": {
+          "type": "boolean",
+          "description": "Startup default for the ASCII-art tree view (runtime toggle: T).",
+          "default": false
+        }
+      }
+    },
+    "apiExplorerConfig": {
+      "type": "object",
+      "description": "API Explorer settings. All fields optional; missing keys keep compiled defaults.",
+      "additionalProperties": false,
+      "properties": {
+        "tree": {
+          "type": "boolean",
+          "description": "Startup default for the ASCII-art tree view (runtime toggle: T).",
+          "default": false
         }
       }
     },

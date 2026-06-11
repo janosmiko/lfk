@@ -353,6 +353,10 @@ func applyViewerDefaults(cfg configFile) {
 	}
 	if oe := cfg.ObjectExplorer; oe != nil {
 		applyBoolPtr(oe.Live, &ConfigObjectExplorerLive)
+		applyBoolPtr(oe.Tree, &ConfigObjectExplorerTree)
+	}
+	if ae := cfg.APIExplorer; ae != nil {
+		applyBoolPtr(ae.Tree, &ConfigAPIExplorerTree)
 	}
 }
 

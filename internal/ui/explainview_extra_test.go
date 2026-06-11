@@ -155,13 +155,15 @@ func TestRenderFieldDescription(t *testing.T) {
 		assert.Contains(t, found, "Spec of the resource.")
 	})
 
-	t.Run("drillable type shows hint", func(t *testing.T) {
+	t.Run("drillable type shows no hint", func(t *testing.T) {
+		// The "Press l or Enter to drill into this field" hint was removed;
+		// the hint bar already advertises the drill key.
 		fields := []model.ExplainField{
 			{Name: "spec", Type: "<PodSpec>", Description: "The pod spec."},
 		}
 		lines := renderFieldDescription(fields, 0, "", 60, 20)
 		found := strings.Join(lines, "\n")
-		assert.Contains(t, found, "drill into")
+		assert.NotContains(t, found, "drill into")
 	})
 
 	t.Run("non-drillable type does not show hint", func(t *testing.T) {

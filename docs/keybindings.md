@@ -281,8 +281,10 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `l` / `Enter` / `→` | Drill into object/array field |
 | `h` / `Backspace` / `←` | Go back one level |
 | `J` / `K` | Scroll the YAML preview pane |
-| `/` | Filter the current level by key |
+| `/` | Filter the current level by key (in tree view: keys anywhere in the subtree) |
 | `r` | Recursive find overlay (search keys across the whole object) |
+| `T` | Toggle tree view — expand the whole subtree with ASCII-art guides (configurable via `tree_view`) |
+| `Space` / `z` | Fold/unfold the subtree under the cursor (tree view; `z` configurable via `toggle_fold`) |
 | `R` | Manually refresh the browsed object now (configurable via `refresh`) |
 | `w` | Toggle live refresh on/off — title shows `[PAUSED]` when off (configurable via `watch_mode`) |
 | `y` / `Y` | Yank the selected node's path / full YAML |
@@ -290,7 +292,7 @@ The top breadcrumb shows the resource name and the attribute path under the curs
 | `I` | Open the API Explorer at the selected item's schema |
 | `q` / `Esc` | Back one level / close at root |
 
-Live refresh defaults to on; set `object_explorer.live: false` to start paused. See [Viewer Defaults](config-reference.md#viewer-defaults).
+Live refresh defaults to on; set `object_explorer.live: false` to start paused. Set `object_explorer.tree: true` to open in the tree view (`api_explorer.tree` for the API Explorer). See [Viewer Defaults](config-reference.md#viewer-defaults).
 
 ## Describe View
 
@@ -619,6 +621,8 @@ The editor picks one of two modes based on the value being edited:
 | `/` | Search fields |
 | `n` / `N` | Next / previous search match (recursive: auto-drills into children / searches parent) |
 | `r` | Recursive field browser (browse all nested fields with filter) |
+| `T` | Toggle tree view — show the whole field subtree with ASCII-art guides; stays on while drilling/going back until toggled off (configurable via `tree_view`) |
+| `Space` / `z` | Fold/unfold the field subtree under the cursor (tree view; `z` configurable via `toggle_fold`) |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |

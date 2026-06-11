@@ -31,9 +31,19 @@ type objectExplorerState struct {
 	extra     string
 	cluster   string
 
-	// In-level filter: substring match on keys at the current level.
+	// In-level filter: substring match on keys at the current level (or on
+	// keys anywhere in the subtree while tree mode is on).
 	filter       string
 	filterActive bool // true while the filter input is being typed
+
+	// Tree mode (issue #417): the middle column shows the expanded subtree at
+	// path with ASCII-art guides instead of the flat current level. treeRows
+	// is the pre-order flattened subtree, rebuilt on every path/root change.
+	// treeCollapsed holds the folded rows (space / toggle_fold), keyed by
+	// their relative segs; cleared whenever the tree re-roots.
+	tree          bool
+	treeRows      []model.ObjectTreeRow
+	treeCollapsed map[string]struct{}
 
 	// Scroll offset of the right-hand YAML preview pane.
 	previewScroll int
@@ -48,8 +58,17 @@ type objectExplorerState struct {
 }
 
 // visible returns the fields shown at the current level after applying the
-// in-level filter. The cursor indexes into this slice.
+// in-level filter. The cursor indexes into this slice. In tree mode the
+// fields mirror the visible tree rows so cursor math stays shared.
 func (rt *objectExplorerState) visible() []model.ObjectField {
+	if rt.tree {
+		rows := rt.visibleTreeRows()
+		out := make([]model.ObjectField, len(rows))
+		for i, r := range rows {
+			out[i] = r.Field
+		}
+		return out
+	}
 	if rt.filter == "" {
 		return rt.level
 	}
@@ -96,6 +115,12 @@ func (m Model) openObjectExplorer() (tea.Model, tea.Cmd) {
 		cluster:   sel.ClusterName,
 	}
 	m.objectExplorerView.level = model.ObjectFieldsAt(sel.Raw, nil)
+	// Session tree-view preference (seeded from ui.ConfigObjectExplorerTree,
+	// updated by the T toggle).
+	if m.objectExplorerTree {
+		m.objectExplorerView.tree = true
+		m.objectExplorerView.rebuildTreeRows()
+	}
 	m.objectExplorerForceSync = false
 	// Remember the opener (the explorer, or the YAML viewer when opened via P)
 	// so q/esc returns there. m.mode is still the opener at this point.
@@ -134,9 +159,14 @@ func (m *Model) syncObjectExplorerLive() {
 	}
 
 	// Keep the cursor on the same field across the rebuild: values change every
-	// tick, map keys rarely do.
+	// tick, map keys rarely do. In tree mode track the full relative path.
 	var focusedKey string
-	if f, ok := rt.selected(); ok {
+	var focusedSegs []string
+	if rt.tree {
+		if row, ok := rt.selectedTreeRow(); ok {
+			focusedSegs = row.Segs
+		}
+	} else if f, ok := rt.selected(); ok {
 		focusedKey = f.Key
 	}
 
@@ -153,7 +183,12 @@ func (m *Model) syncObjectExplorerLive() {
 	}
 	rt.level = model.ObjectFieldsAt(rt.root, rt.path)
 
-	if focusedKey != "" {
+	if rt.tree {
+		rt.rebuildTreeRows()
+		if focusedSegs != nil {
+			rt.cursorOnTreeSegs(focusedSegs)
+		}
+	} else if focusedKey != "" {
 		for i, f := range rt.visible() {
 			if f.Key == focusedKey {
 				rt.cursor = i
@@ -256,6 +291,10 @@ func (m Model) handleObjectExplorerNavKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		return m, nil
 	case kb.WatchMode:
 		return m.toggleObjectExplorerLive()
+	case kb.TreeView:
+		return m.toggleObjectExplorerTree()
+	case " ", kb.ToggleFold:
+		return m.toggleObjectExplorerTreeFold()
 	case kb.Refresh:
 		return m.refreshObjectExplorer()
 	case "I":
@@ -349,11 +388,10 @@ func (m Model) copySelectedNodeYAML() (tea.Model, tea.Cmd) {
 
 // copySelectedNodePath copies the dotted path of the node under the cursor.
 func (m Model) copySelectedNodePath() (tea.Model, tea.Cmd) {
-	f, ok := m.objectExplorerView.selected()
-	if !ok {
+	full := m.selectedNodePath()
+	if full == nil {
 		return m, nil
 	}
-	full := append(append([]string{}, m.objectExplorerView.path...), f.Key)
 	p := formatObjectPath(full)
 	m.setStatusMessage("Copied path: "+p, false)
 	return m, tea.Batch(copyToSystemClipboard(p), scheduleStatusClear())
@@ -373,9 +411,17 @@ func (m Model) openSelectedResourceYAML() (tea.Model, tea.Cmd) {
 }
 
 // selectedNodePath returns the full object path of the node under the tree
-// cursor (current path + selected key), or nil when nothing is selected.
+// cursor (current path + selected key, or + the selected tree row's relative
+// path in tree mode), or nil when nothing is selected.
 func (m Model) selectedNodePath() []string {
 	rt := m.objectExplorerView
+	if rt.tree {
+		row, ok := rt.selectedTreeRow()
+		if !ok {
+			return nil
+		}
+		return append(append([]string{}, rt.path...), row.Segs...)
+	}
 	f, ok := rt.selected()
 	if !ok {
 		return nil
@@ -384,8 +430,20 @@ func (m Model) selectedNodePath() []string {
 }
 
 // objectExplorerDrill descends into the object/array field under the cursor.
+// In tree mode the tree re-roots at the selected node's path.
 func (m *Model) objectExplorerDrill() {
 	rt := &m.objectExplorerView
+	if rt.tree {
+		row, ok := rt.selectedTreeRow()
+		if !ok || !row.Field.HasChildren {
+			return
+		}
+		rt.path = append(append([]string{}, rt.path...), row.Segs...)
+		rt.level = model.ObjectFieldsAt(rt.root, rt.path)
+		rt.resetLevelView()
+		rt.rebuildTreeRows()
+		return
+	}
 	f, ok := rt.selected()
 	if !ok || !f.HasChildren {
 		return
@@ -407,23 +465,32 @@ func (m *Model) objectExplorerBack() {
 	rt.path = rt.path[:len(rt.path)-1]
 	rt.level = model.ObjectFieldsAt(rt.root, rt.path)
 	rt.resetLevelView()
-	for i, f := range rt.level {
-		if f.Key == last {
-			rt.cursor = i
-			break
+	if rt.tree {
+		rt.rebuildTreeRows()
+		// A single-element segs match is always right here: back pops exactly
+		// one segment, so the drilled-from node sits at depth 0 of the rebuilt
+		// tree under its bare key.
+		rt.cursorOnTreeSegs([]string{last})
+	} else {
+		for i, f := range rt.level {
+			if f.Key == last {
+				rt.cursor = i
+				break
+			}
 		}
 	}
 	m.clampObjectExplorerScroll()
 }
 
-// resetLevelView clears the filter and resets cursor/scroll after the current
-// level changes (drill or back).
+// resetLevelView clears the filter, folds, and cursor/scroll after the
+// current level changes (drill or back).
 func (rt *objectExplorerState) resetLevelView() {
 	rt.filter = ""
 	rt.filterActive = false
 	rt.cursor = 0
 	rt.scroll = 0
 	rt.previewScroll = 0
+	rt.treeCollapsed = nil
 }
 
 // moveObjectExplorerCursor advances the cursor by delta, clamped to the visible
@@ -434,15 +501,15 @@ func (m *Model) moveObjectExplorerCursor(delta int) {
 	rt.previewScroll = 0
 }
 
-// objectExplorerBodyHeight mirrors the contentHeight the renderer uses (title +
-// hint bar + borders consume 4 lines).
+// objectExplorerBodyHeight mirrors the contentHeight the renderer uses
+// (title + hint bar + column borders + outer frame consume 6 lines).
 func (m Model) objectExplorerBodyHeight() int {
-	return max(m.height-4, 3)
+	return max(m.height-6, 3)
 }
 
 // previewPaneHeight is the number of YAML lines visible in the preview pane.
 func (m Model) previewPaneHeight() int {
-	return max(m.height-5, 1) // contentHeight (height-4) minus the header line
+	return max(m.objectExplorerBodyHeight()-1, 1) // minus the header line
 }
 
 // clampObjectExplorerPreviewScroll keeps the preview scroll within the selected node's YAML.
@@ -453,25 +520,20 @@ func (m *Model) clampObjectExplorerPreviewScroll() {
 	rt.previewScroll = max(0, min(rt.previewScroll, maxScroll))
 }
 
-// clampObjectExplorerScroll keeps the cursor within the visible window.
+// clampObjectExplorerScroll keeps the cursor within the visible window with
+// the vim-style scrolloff margin.
 func (m *Model) clampObjectExplorerScroll() {
 	rt := &m.objectExplorerView
+	n := len(rt.visible())
 	if rt.cursor < 0 {
 		rt.cursor = 0
 	}
-	if n := len(rt.visible()); rt.cursor >= n {
+	if rt.cursor >= n {
 		rt.cursor = max(0, n-1)
 	}
 	visible := max(m.objectExplorerBodyHeight()-1, 1) // -1 for the column header
-	if rt.cursor < rt.scroll {
-		rt.scroll = rt.cursor
-	}
-	if rt.cursor >= rt.scroll+visible {
-		rt.scroll = rt.cursor - visible + 1
-	}
-	if rt.scroll < 0 {
-		rt.scroll = 0
-	}
+	identity := func(from, to int) int { return to - from }
+	rt.scroll = ui.VimScrollOff(rt.scroll, rt.cursor, n, visible, ui.ConfigScrollOff, identity)
 }
 
 // viewObjectExplorer renders the browser: PATH breadcrumb | NAME/VALUE list |
@@ -480,24 +542,38 @@ func (m Model) viewObjectExplorer() string {
 	rt := m.objectExplorerView
 
 	kb := ui.ActiveKeybindings
-	hint := ui.RenderHintBar([]ui.HintEntry{
+	hints := []ui.HintEntry{
 		{Key: "j/k", Desc: "navigate"},
 		{Key: "l/Enter", Desc: "drill"},
 		{Key: "h/Esc", Desc: "back"},
 		{Key: "/", Desc: "filter"},
 		{Key: "r", Desc: "find"},
-		{Key: "J/K", Desc: "scroll preview"},
-		{Key: "y/Y", Desc: "yank path/node"},
-		{Key: "P", Desc: "full yaml"},
-		{Key: kb.Refresh, Desc: "refresh"},
-		{Key: kb.WatchMode, Desc: "live on/off"},
-		{Key: "I", Desc: "explain"},
-		{Key: "q", Desc: "close"},
-	}, m.width)
+		{Key: kb.TreeView, Desc: "tree"},
+	}
+	if rt.tree {
+		hints = append(hints, ui.HintEntry{Key: "space", Desc: "fold"})
+	}
+	hints = append(hints,
+		ui.HintEntry{Key: "J/K", Desc: "scroll preview"},
+		ui.HintEntry{Key: "y/Y", Desc: "yank path/node"},
+		ui.HintEntry{Key: "P", Desc: "full yaml"},
+		ui.HintEntry{Key: kb.Refresh, Desc: "refresh"},
+		ui.HintEntry{Key: kb.WatchMode, Desc: "live on/off"},
+		ui.HintEntry{Key: "I", Desc: "explain"},
+		ui.HintEntry{Key: "q", Desc: "close"},
+	)
+	hint := ui.RenderHintBar(hints, m.width)
 
 	title := "Object Explorer: " + rt.title
 	if !m.objectExplorerLive {
 		title += " [PAUSED]"
+	}
+	if rt.tree {
+		title += " [TREE]"
+	}
+
+	if rt.tree {
+		return m.viewObjectExplorerTree(title, hint)
 	}
 
 	parentFields, parentCursor := m.objectExplorerParentLevel()
@@ -553,11 +629,10 @@ func (rt *objectExplorerState) filterBar() string {
 // pane. Returns "" when there is no valid selection.
 func (m Model) selectedNodeYAML() string {
 	rt := m.objectExplorerView
-	f, ok := rt.selected()
-	if !ok {
+	segs := m.selectedNodePath()
+	if segs == nil {
 		return ""
 	}
-	segs := append(append([]string{}, rt.path...), f.Key)
 	val, ok := model.ResolveObjectPath(rt.root, segs)
 	if !ok {
 		return ""

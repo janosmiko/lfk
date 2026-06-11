@@ -365,12 +365,8 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case diffLoadedMsg:
 		mdl, cmd := m.updateDiffLoaded(msg)
 		return mdl, cmd, true
-	case explainLoadedMsg:
-		mdl, cmd := m.updateExplainLoaded(msg)
-		return mdl, cmd, true
-	case explainRecursiveMsg:
-		mdl, cmd := m.updateExplainRecursive(msg)
-		return mdl, cmd, true
+	case explainLoadedMsg, explainRecursiveMsg, explainTreeLoadedMsg:
+		return m.updateExplainMsg(msg)
 	}
 	return m, nil, false
 }

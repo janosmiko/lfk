@@ -47,3 +47,11 @@ var ConfigDescribeViewerWrap = false
 // Object Explorer as the browsed resource changes under watch mode (runtime
 // toggle: w). Default true.
 var ConfigObjectExplorerLive = true
+
+// ConfigObjectExplorerTree is the startup default for the Object Explorer's
+// ASCII-art tree view (runtime toggle: T). Default false.
+var ConfigObjectExplorerTree = false
+
+// ConfigAPIExplorerTree is the startup default for the API Explorer's
+// ASCII-art tree view (runtime toggle: T). Default false.
+var ConfigAPIExplorerTree = false
