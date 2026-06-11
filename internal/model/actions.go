@@ -89,6 +89,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Startup Analysis", Description: "Analyze pod startup timing", Key: "S"},
 			{Label: "Crash Investigator", Description: "Investigate crash loop / failing pod", Key: "I"},
 			{Label: "Capture Traffic", Description: "Capture network packets to pcap", Key: "c"},
+			{Label: "Network Policies", Description: "Show network policies affecting this pod", Key: "N"},
 			{Label: "Go to Node", Description: "Navigate to the node hosting this pod", Key: "g"},
 			{Label: "Describe", Description: "Describe resource", Key: "v"},
 			{Label: "Edit", Description: "Edit resource YAML", Key: "E"},
@@ -123,6 +124,7 @@ func actionsForCoreKind(kind string) ([]ActionMenuItem, bool) {
 			{Label: "Delete", Description: "Delete this service", Key: "D"},
 			{Label: "Debug Pod", Description: "Run alpine debug pod in namespace", Key: "b"},
 			{Label: "Capture Traffic", Description: "Capture packets on a backing pod", Key: "c"},
+			{Label: "Network Policies", Description: "Show network policies affecting this service's pods", Key: "N"},
 			{Label: "Events", Description: "Show related events", Key: "V"},
 		}, true
 	case "Secret":

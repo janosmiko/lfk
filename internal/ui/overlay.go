@@ -122,6 +122,18 @@ type NetworkPolicyEntry struct {
 	IngressRules []NetpolRuleEntry
 	EgressRules  []NetpolRuleEntry
 	AffectedPods []string
+	MatchedPods  []string // multi-policy view from a Service: backing pods this policy selects
+}
+
+// ResourceNetpolsEntry holds the policies affecting a pod or service for the
+// multi-policy view opened from the resource's action menu.
+type ResourceNetpolsEntry struct {
+	Kind        string // "Pod" or "Service"
+	Name        string
+	Namespace   string
+	NoSelector  bool     // Service only: the service defines no pod selector
+	BackingPods []string // Service only: pods backing the service
+	Policies    []NetworkPolicyEntry
 }
 
 // NetpolRuleEntry holds a single ingress/egress rule for rendering.

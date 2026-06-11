@@ -536,6 +536,13 @@ type netpolLoadedMsg struct {
 	err  error
 }
 
+// netpolsForResourceLoadedMsg carries the network policies affecting a pod or
+// service, for the "Network Policies" action.
+type netpolsForResourceLoadedMsg struct {
+	info *k8s.NetpolsForResource
+	err  error
+}
+
 // previewEventsLoadedMsg carries events for the preview pane.
 type previewEventsLoadedMsg struct {
 	events []k8s.EventInfo

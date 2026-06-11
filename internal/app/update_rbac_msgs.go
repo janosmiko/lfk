@@ -131,6 +131,17 @@ func (m Model) updateAlertsLoaded(msg alertsLoadedMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
+// routeNetpolMsg dispatches single- and multi-policy load results.
+func (m Model) routeNetpolMsg(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case netpolLoadedMsg:
+		return m.updateNetpolLoaded(msg)
+	case netpolsForResourceLoadedMsg:
+		return m.updateNetpolsForResourceLoaded(msg)
+	}
+	return m, nil
+}
+
 func (m Model) updateNetpolLoaded(msg netpolLoadedMsg) (tea.Model, tea.Cmd) {
 	m.loading = false
 	if msg.err != nil {
@@ -138,6 +149,20 @@ func (m Model) updateNetpolLoaded(msg netpolLoadedMsg) (tea.Model, tea.Cmd) {
 		return m, scheduleStatusClear()
 	}
 	m.netpolData = msg.info
+	m.netpolsData = nil
+	m.netpolScroll = 0
+	m.overlay = overlayNetworkPolicy
+	return m, nil
+}
+
+func (m Model) updateNetpolsForResourceLoaded(msg netpolsForResourceLoadedMsg) (tea.Model, tea.Cmd) {
+	m.loading = false
+	if msg.err != nil {
+		m.setStatusMessage(fmt.Sprintf("Failed to load network policies: %v", msg.err), true)
+		return m, scheduleStatusClear()
+	}
+	m.netpolsData = msg.info
+	m.netpolData = nil
 	m.netpolScroll = 0
 	m.overlay = overlayNetworkPolicy
 	return m, nil

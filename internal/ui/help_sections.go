@@ -356,7 +356,7 @@ func helpSections() []helpSection {
 			},
 		},
 		{
-			title: "Network Policy Visualizer", context: "Network Policy",
+			title: "Network Policy Visualizer", context: "Network Policy / Pod / Service",
 			bindings: []helpEntry{
 				{"j/k", "Scroll up/down"},
 				{"gg/G / Home/End", "Top/bottom"},

@@ -347,8 +347,8 @@ func (m Model) updateActionResultMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case alertsLoadedMsg:
 		mdl, cmd := m.updateAlertsLoaded(msg)
 		return mdl, cmd, true
-	case netpolLoadedMsg:
-		mdl, cmd := m.updateNetpolLoaded(msg)
+	case netpolLoadedMsg, netpolsForResourceLoadedMsg:
+		mdl, cmd := m.routeNetpolMsg(msg)
 		return mdl, cmd, true
 	case orphansLoadedMsg:
 		mdl, cmd := m.handleOrphansLoaded(msg)

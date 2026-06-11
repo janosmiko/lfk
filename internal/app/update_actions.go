@@ -444,6 +444,9 @@ func (m Model) executeActionCoreK8s(actionLabel string) (tea.Model, tea.Cmd, boo
 	case "Events":
 		mdl, cmd := m.executeActionEvents()
 		return mdl, cmd, true
+	case "Network Policies":
+		mdl, cmd := m.executeActionNetworkPolicies()
+		return mdl, cmd, true
 	}
 	return m, nil, false
 }

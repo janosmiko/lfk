@@ -14,6 +14,12 @@ import (
 // The overlay shows pod selector, policy types, affected pods, and a visual diagram
 // of ingress/egress rules using box-drawing characters and arrows.
 func RenderNetworkPolicyOverlay(info NetworkPolicyEntry, scroll, width, height int) string {
+	return renderScrollableLines(buildNetpolOverlayLines(info, width), scroll, width, height)
+}
+
+// buildNetpolOverlayLines composes the full (unscrolled) line list for the
+// single-policy view.
+func buildNetpolOverlayLines(info NetworkPolicyEntry, width int) []string {
 	greenStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorSecondary)).Background(SurfaceBg)
 	arrowStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorPrimary)).Bold(true).Background(SurfaceBg)
 	boxBorderStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ColorBorder)).Background(SurfaceBg)
@@ -25,8 +31,33 @@ func RenderNetworkPolicyOverlay(info NetworkPolicyEntry, scroll, width, height i
 	targetLabel := renderNetpolTargetLabel(info)
 	lines = append(lines, renderNetpolDirectionRules(info, targetLabel, width, sectionStyle, boxBorderStyle, arrowStyle, labelStyle, cidrStyle, greenStyle)...)
 	lines = append(lines, "")
+	return flattenRenderedLines(lines)
+}
 
-	return renderScrollableLines(lines, scroll, height)
+// flattenRenderedLines splits multi-row entries into physical rows. Styles
+// with vertical padding (e.g. OverlayTitleStyle) render embedded newlines;
+// scrolling must operate on terminal rows or the overlay height shifts as a
+// multi-row entry enters or leaves the viewport.
+func flattenRenderedLines(lines []string) []string {
+	out := make([]string, 0, len(lines))
+	for _, l := range lines {
+		out = append(out, strings.Split(l, "\n")...)
+	}
+	return out
+}
+
+// NetworkPolicyOverlayLineCount returns the total line count of the
+// single-policy view at the given width, for scroll clamping.
+func NetworkPolicyOverlayLineCount(info NetworkPolicyEntry, width int) int {
+	return len(buildNetpolOverlayLines(info, width))
+}
+
+// OverlayMaxScroll returns the bottom scroll position for a scrollable
+// overlay body of lineCount lines in a viewport of the given height. Must
+// stay in sync with renderScrollableLines.
+func OverlayMaxScroll(lineCount, height int) int {
+	maxVisible := max(height, 3)
+	return max(lineCount-maxVisible, 0)
 }
 
 // renderNetpolHeader renders the title, pod selector, affected pods, and policy types sections.
@@ -149,25 +180,41 @@ func sortedKeys(m map[string]string) []string {
 }
 
 // renderScrollableLines applies scroll/clamp logic and returns the visible body string.
-func renderScrollableLines(lines []string, scroll, height int) string {
-	maxVisible := max(height-1, 3)
-	maxScroll := max(len(lines)-maxVisible, 0)
+// Lines wider than width are truncated: an over-wide line would wrap inside
+// the overlay frame and change the overlay height while scrolling. When the
+// content overflows the viewport, each row gets the shared right-edge
+// scrollbar cell (same look as the list overlays).
+func renderScrollableLines(lines []string, scroll, width, height int) string {
+	maxVisible := max(height, 3)
+	maxScroll := OverlayMaxScroll(len(lines), height)
 	if scroll > maxScroll {
 		scroll = maxScroll
 	}
 	if scroll < 0 {
 		scroll = 0
 	}
+	showScrollbar := maxScroll > 0 && width > 2
+	lineWidth := width
+	if showScrollbar {
+		lineWidth = width - 2 // leave room for " " + scrollbar cell
+	}
 	end := min(scroll+maxVisible, len(lines))
-	visible := lines[scroll:end]
+	visible := make([]string, 0, maxVisible)
+	for _, line := range lines[scroll:end] {
+		if lineWidth > 0 && lipgloss.Width(line) > lineWidth {
+			line = ansi.Truncate(line, lineWidth, "~")
+		}
+		visible = append(visible, line)
+	}
 	for len(visible) < maxVisible {
 		visible = append(visible, "")
 	}
-	body := strings.Join(visible, "\n")
-	if maxScroll > 0 {
-		body += "\n" + DimStyle.Render(fmt.Sprintf(" [%d/%d]", scroll+1, maxScroll+1))
+	if showScrollbar {
+		for i, line := range visible {
+			visible[i] = padRight(line, lineWidth) + " " + renderScrollbar(i, maxVisible, len(lines), scroll)
+		}
 	}
-	return body
+	return strings.Join(visible, "\n")
 }
 
 // renderNetpolRuleDiagram renders a visual diagram for a single ingress/egress rule.
@@ -275,7 +322,13 @@ func renderNetpolRuleDiagram(
 			arrow = arrowSt.Render(" -----> ")
 		}
 
-		boxLines := renderTwoBoxes(leftBox, rightBox, arrow, boxBorder, width)
+		// The diagram is indented by 2 columns below, so cap the boxes 2
+		// short of the available width or the indented lines overflow it.
+		boxWidth := width
+		if boxWidth > 0 {
+			boxWidth -= 2
+		}
+		boxLines := renderTwoBoxes(leftBox, rightBox, arrow, boxBorder, boxWidth)
 		for _, bl := range boxLines {
 			lines = append(lines, "  "+bl)
 		}
