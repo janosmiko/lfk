@@ -25,6 +25,15 @@ type securityModelState struct {
 	// __security_finding_group__ row; consumed by loadSecurityAffectedResources
 	// to know which group's affected resources to fetch.
 	securityActiveGroup string
+	// securityActiveSource is the source of the drilled finding group (from
+	// its __source__ column). The per-resource findings view mixes sources,
+	// so the source can't be derived from nav.ResourceType.Kind there;
+	// loadSecurityAffectedResources uses this to scope the drill-in fetch.
+	securityActiveSource string
+	// securityResourceFilter holds the refs (resource + owners) the
+	// per-resource findings view (SecurityResourceFindingsKind) is filtered
+	// to. Set by the "Security Findings" action; consumed by loadResources.
+	securityResourceFilter []security.ResourceRef
 	// showSecurityIgnored toggles whether ignored findings surface in the
 	// explorer. Off by default; flipped with kb.SecurityIgnoreToggle.
 	showSecurityIgnored bool

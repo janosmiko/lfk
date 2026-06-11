@@ -17,6 +17,13 @@ const SecurityVirtualAPIGroup = "_security"
 // doesn't dispatch a doomed fetch.
 const SecurityLoaderKind = "__security_loader__"
 
+// SecurityResourceFindingsKind is the synthetic Kind of the per-resource
+// findings view opened by the "Security Findings" action: a LevelResources
+// list of finding groups from ALL sources, filtered to one resource and its
+// owners. Unlike the per-source kinds ("__security_<source>__"), the source
+// is not encoded in the Kind — each row carries its own source column.
+const SecurityResourceFindingsKind = "__security_resource_findings__"
+
 // SecuritySourceEntry describes one entry shown under the Security category
 // in the middle column. Populated at startup by the app layer.
 type SecuritySourceEntry struct {

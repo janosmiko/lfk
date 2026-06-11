@@ -121,6 +121,12 @@ clusters:
   groups (one per check/CVE), then drill into a group to see affected
   resources. `Enter` on an affected resource jumps to the real object;
   `Backspace` jumps back.
+- **Per-resource findings**: the `Security Findings` action (`x` on a resource
+  row) opens a finding-group list filtered to that resource **and its owners**
+  across all sources — the same set the SEC badge counts (e.g. a Pod row
+  includes its Deployment's trivy CVEs). Rows carry a `Source` column;
+  `Enter` drills into a group's affected resources as usual, and `Backspace`
+  jumps back to the originating list.
 
 ## Ignoring findings
 

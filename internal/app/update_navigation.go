@@ -326,6 +326,8 @@ func (m Model) navigateChildCluster(sel *model.Item) (tea.Model, tea.Cmd) {
 	// findings (stale-while-revalidate), so nil-ing after would discard it.
 	m.securityIndex = nil
 	m.securityActiveGroup = ""
+	m.securityActiveSource = ""
+	m.securityResourceFilter = nil
 	// Drop the prior cluster's preview caches: keyed by ctx/ns/name they are
 	// dead weight for the new context, and the secret cache holds decoded
 	// plaintext we shouldn't keep resident after leaving the cluster.
@@ -533,6 +535,10 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	if sel.Kind == "__security_finding_group__" {
 		m.saveCursor()
 		m.securityActiveGroup = sel.Extra
+		// The per-resource findings view mixes sources, so the drilled
+		// group's source must travel with the group key — it cannot be
+		// recovered from nav.ResourceType.Kind there.
+		m.securityActiveSource = sel.ColumnValue("__source__")
 		m.nav.ResourceName = sel.Name
 		m.nav.Level = model.LevelOwned
 		m.pushLeft()
@@ -684,6 +690,8 @@ func (m Model) jumpToFindingResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.nav.Namespace = namespace
 	m.nav.Level = model.LevelResources
 	m.securityActiveGroup = ""
+	m.securityActiveSource = ""
+	m.securityResourceFilter = nil
 	// Arm the post-load auto-select: on a cold cache the cursor below stays
 	// at 0 and only the resources-loaded handler can place it on the target.
 	// Armed on the cache-hit path too, so the refresh load re-selects the

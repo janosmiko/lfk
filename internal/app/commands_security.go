@@ -323,17 +323,29 @@ func (m Model) loadSecurityAffectedResources(forPreview bool) tea.Cmd {
 		return nil
 	}
 	groupKey := m.securityActiveGroup
+	sourceName := m.securityActiveSource
 	if forPreview {
 		sel := m.selectedMiddleItem()
 		if sel == nil || sel.Kind != "__security_finding_group__" {
 			return nil
 		}
 		groupKey = sel.Extra
+		sourceName = sel.ColumnValue("__source__")
 	}
 	if groupKey == "" {
 		return nil
 	}
 	rt := m.nav.ResourceType
+	// The per-resource findings view mixes sources, so its sentinel Kind
+	// carries no source. Rebuild a per-source RT from the row's source so
+	// the k8s getters scope the fetch correctly; without a source there is
+	// nothing to fetch.
+	if rt.Kind == model.SecurityResourceFindingsKind {
+		if sourceName == "" {
+			return nil
+		}
+		rt.Kind = "__security_" + sourceName + "__"
+	}
 	kctx := m.nav.Context
 	ns := m.effectiveNamespace()
 	gen := m.requestGen

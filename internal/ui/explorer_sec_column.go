@@ -151,7 +151,28 @@ func MergedSecurityCounts(idx *security.FindingIndex, item *model.Item) security
 	if idx == nil || item == nil {
 		return security.SeverityCounts{}
 	}
-	counts := idx.For(itemSecurityRef(item))
+	var counts security.SeverityCounts
+	for _, ref := range SecurityRefsForItem(item) {
+		c := idx.For(ref)
+		counts.Critical += c.Critical
+		counts.High += c.High
+		counts.Medium += c.Medium
+		counts.Low += c.Low
+	}
+	return counts
+}
+
+// SecurityRefsForItem returns the ResourceRefs the SEC badge aggregates over
+// for an item: the item's own ref followed by one ref per owner:N column
+// (value "APIVersion||Kind||Name", owners share the item's namespace).
+// Malformed owner columns are skipped. Returns nil for a nil item. Exported
+// so the "Security Findings" action filters its per-resource list by the
+// exact same set the badge counts.
+func SecurityRefsForItem(item *model.Item) []security.ResourceRef {
+	if item == nil {
+		return nil
+	}
+	refs := []security.ResourceRef{itemSecurityRef(item)}
 	for _, col := range item.Columns {
 		if len(col.Key) < 6 || col.Key[:6] != "owner:" {
 			continue
@@ -160,17 +181,11 @@ func MergedSecurityCounts(idx *security.FindingIndex, item *model.Item) security
 		if len(parts) != 3 {
 			continue
 		}
-		ownerKind, ownerName := parts[1], parts[2]
-		ownerRef := security.ResourceRef{
+		refs = append(refs, security.ResourceRef{
 			Namespace: item.Namespace,
-			Kind:      ownerKind,
-			Name:      ownerName,
-		}
-		oc := idx.For(ownerRef)
-		counts.Critical += oc.Critical
-		counts.High += oc.High
-		counts.Medium += oc.Medium
-		counts.Low += oc.Low
+			Kind:      parts[1],
+			Name:      parts[2],
+		})
 	}
-	return counts
+	return refs
 }

@@ -6,6 +6,7 @@ import (
 	tea "github.com/charmbracelet/bubbletea"
 
 	"github.com/janosmiko/lfk/internal/model"
+	"github.com/janosmiko/lfk/internal/security"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -31,21 +32,35 @@ type navSnapshot struct {
 	// affected-resources view the snapshot was taken in, so a jump-back
 	// reloads affected resources instead of owned children.
 	securityActiveGroup string
+	// securityActiveSource pairs with securityActiveGroup: the group's
+	// source, needed to reload affected resources when the snapshot was
+	// taken inside the cross-source per-resource findings view.
+	securityActiveSource string
+	// securityResourceFilter preserves the per-resource findings view's
+	// ref filter so a jump-back into that view reloads the same list.
+	securityResourceFilter []security.ResourceRef
+	// ownedParentStack preserves nested owned-drill ancestry (Deployment ->
+	// ReplicaSet -> Pods) so back-navigation after a jump-back walks the
+	// same chain the user descended.
+	ownedParentStack []ownedParentState
 }
 
 // captureNavSnapshot records the current navigation-positioning state with all
 // slices deep-copied so later mutation of the Model can't corrupt the snapshot.
 func (m *Model) captureNavSnapshot() navSnapshot {
 	snap := navSnapshot{
-		nav:                 m.nav,
-		leftItems:           append([]model.Item(nil), m.leftItems...),
-		middleItems:         append([]model.Item(nil), m.middleItems...),
-		cursors:             m.cursors,
-		middleScroll:        ui.ActiveMiddleScroll,
-		leftScroll:          ui.ActiveLeftScroll,
-		expandedGroup:       m.expandedGroup,
-		filterText:          m.filterText,
-		securityActiveGroup: m.securityActiveGroup,
+		nav:                    m.nav,
+		leftItems:              append([]model.Item(nil), m.leftItems...),
+		middleItems:            append([]model.Item(nil), m.middleItems...),
+		cursors:                m.cursors,
+		middleScroll:           ui.ActiveMiddleScroll,
+		leftScroll:             ui.ActiveLeftScroll,
+		expandedGroup:          m.expandedGroup,
+		filterText:             m.filterText,
+		securityActiveGroup:    m.securityActiveGroup,
+		securityActiveSource:   m.securityActiveSource,
+		securityResourceFilter: append([]security.ResourceRef(nil), m.securityResourceFilter...),
+		ownedParentStack:       append([]ownedParentState(nil), m.ownedParentStack...),
 	}
 	snap.leftItemsHistory = make([][]model.Item, len(m.leftItemsHistory))
 	for i, hist := range m.leftItemsHistory {
@@ -65,6 +80,8 @@ func (s navSnapshot) clone() navSnapshot {
 	out := s
 	out.leftItems = append([]model.Item(nil), s.leftItems...)
 	out.middleItems = append([]model.Item(nil), s.middleItems...)
+	out.securityResourceFilter = append([]security.ResourceRef(nil), s.securityResourceFilter...)
+	out.ownedParentStack = append([]ownedParentState(nil), s.ownedParentStack...)
 	out.leftItemsHistory = make([][]model.Item, len(s.leftItemsHistory))
 	for i, hist := range s.leftItemsHistory {
 		out.leftItemsHistory[i] = append([]model.Item(nil), hist...)
@@ -148,6 +165,9 @@ func (m *Model) restoreNavSnapshot(snap navSnapshot) tea.Cmd {
 	m.cursors = snap.cursors
 	m.expandedGroup = snap.expandedGroup
 	m.securityActiveGroup = snap.securityActiveGroup
+	m.securityActiveSource = snap.securityActiveSource
+	m.securityResourceFilter = append([]security.ResourceRef(nil), snap.securityResourceFilter...)
+	m.ownedParentStack = append([]ownedParentState(nil), snap.ownedParentStack...)
 
 	m.filterText = snap.filterText
 	m.filterInput.Clear()
