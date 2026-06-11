@@ -32,19 +32,29 @@ func (m *Model) sortMiddleItems() {
 		// items the caller may want to keep in their original sequence.
 		return
 	}
-	asc := m.sortAscending
+	m.middleItemsRev++
+	sortItemsByColumn(m.middleItems, colName, m.sortAscending, m.nav.ResourceType.Kind)
+}
+
+// sortItemsByColumn sorts items in place by colName/asc with the shared
+// stable tiebreaker chain. Used for the middle column (sortMiddleItems) and
+// for the right-pane list preview so both render in the same order (issue
+// #408). kind supplies the Event LastSeen default override.
+func sortItemsByColumn(items []model.Item, colName string, asc bool, kind string) {
+	if colName == "" {
+		return
+	}
 
 	// Events default to LastSeen ordering (most recent first) when the
 	// user hasn't explicitly chosen a different column. The override
 	// uses a sentinel that comparePrimaryColumn recognizes, without
 	// injecting "Last Seen" into the sortable-column cycle.
-	if colName == sortColDefault && m.nav.ResourceType.Kind == "Event" {
+	if colName == sortColDefault && kind == "Event" {
 		colName = sortColEventLastSeen
 	}
 
-	m.middleItemsRev++
-	sort.SliceStable(m.middleItems, func(i, j int) bool {
-		a, b := m.middleItems[i], m.middleItems[j]
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := items[i], items[j]
 
 		// Metrics-less rows ("n/a") always sort last, in BOTH directions.
 		// This cannot live inside comparePrimaryColumn: the asc/desc sign

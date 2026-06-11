@@ -58,9 +58,9 @@ func isMandatoryColumn(key string) bool {
 }
 
 // ActiveHiddenBuiltinColumns holds the set of built-in column keys that should
-// be suppressed in the current middle-column render. Valid keys: "Name",
-// "Context", "Namespace", "Ready", "Restarts", "Age", "Status". Set by the app
-// before rendering. Nil means no overrides.
+// be suppressed in the current table render (middle column or right-pane
+// preview). Valid keys: "Name", "Context", "Namespace", "Ready", "Restarts",
+// "Age", "Status". Set by the app before rendering. Nil means no overrides.
 var ActiveHiddenBuiltinColumns map[string]bool
 
 // ActiveNameHidden reports whether the NAME column is hidden for the current

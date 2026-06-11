@@ -12,6 +12,13 @@ import (
 
 // RenderTable renders items in a table format with column headers for resource views.
 // headerLabel is used as the first column header; defaults to "NAME" if empty.
+//
+// Column-config contract: RenderTable applies the Active* column globals
+// (ActiveSessionColumns, ActiveHiddenBuiltinColumns, ActiveColumnOrder,
+// ActivePrinterColumns) to every render, including cursor-less right-pane
+// previews (issue #408). A cursor-less call site must scope those globals to
+// the rendered kind via withSessionColumnsForKind (app layer), or it silently
+// inherits whatever kind's config was applied last in the frame.
 func RenderTable(headerLabel string, items []model.Item, cursor int, width, height int, loading bool, spinnerView string, errMsg string, showMarker ...bool) string { //nolint:gocyclo // rendering function with inherent layout complexity
 	var b strings.Builder
 
@@ -86,7 +93,11 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 			}
 		}
 
-		if ActiveMiddleScroll >= 0 && ActiveHiddenBuiltinColumns != nil {
+		// Applies to the middle column AND cursor-less right-pane previews:
+		// every preview call site swaps in the rendered kind's config via
+		// withSessionColumnsForKind, so honoring it here keeps the preview
+		// list's columns identical to the drilled-in list (issue #408).
+		if ActiveHiddenBuiltinColumns != nil {
 			if ActiveHiddenBuiltinColumns["Context"] {
 				hasContext = false
 			}
@@ -247,7 +258,7 @@ func RenderTable(headerLabel string, items []model.Item, cursor int, width, heig
 	// column-toggle overlay (ActiveHiddenBuiltinColumns["Name"]). When hidden,
 	// ActiveNameHidden tells collectExtraColumns to skip the NAME width
 	// reservation so extras reclaim the freed space instead of leaving a gap.
-	nameHidden := ActiveMiddleScroll >= 0 && ActiveHiddenBuiltinColumns != nil && ActiveHiddenBuiltinColumns["Name"]
+	nameHidden := ActiveHiddenBuiltinColumns != nil && ActiveHiddenBuiltinColumns["Name"]
 	hasName := !nameHidden
 	ActiveNameHidden = nameHidden
 

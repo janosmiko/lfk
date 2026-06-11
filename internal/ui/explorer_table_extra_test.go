@@ -136,7 +136,11 @@ func TestRenderTable(t *testing.T) {
 		assert.NotContains(t, result, "STATUS", "STATUS header must be suppressed")
 	})
 
-	t.Run("ActiveHiddenBuiltinColumns ignored for non-middle render", func(t *testing.T) {
+	t.Run("ActiveHiddenBuiltinColumns applies to non-middle render", func(t *testing.T) {
+		// Right-pane preview renders (ActiveMiddleScroll = -1) swap in the
+		// rendered kind's config via withSessionColumnsForKind, so hidden
+		// built-ins apply there too — the preview list must show the same
+		// columns as the drilled-in list (issue #408).
 		origMS := ActiveMiddleScroll
 		ActiveMiddleScroll = -1 // non-middle render (child/right pane)
 		defer func() { ActiveMiddleScroll = origMS }()
@@ -153,7 +157,7 @@ func TestRenderTable(t *testing.T) {
 			{Name: "nginx", Ready: "1/1", Age: "5m"},
 		}
 		result := RenderTable("NAME", items, 0, 80, 20, false, "", "")
-		assert.Contains(t, result, "READY", "READY header must be shown for non-middle renders")
+		assert.NotContains(t, result, "READY", "READY header must be suppressed for non-middle renders too")
 	})
 
 	t.Run("items with namespace show NAMESPACE header", func(t *testing.T) {
