@@ -4,6 +4,8 @@
 // file-length-limit.
 package app
 
+import "github.com/janosmiko/lfk/internal/security"
+
 // saveSecurityStateToTab copies the model's per-tab security state into t.
 // The map share their underlying storage with m via pointer copy; that's
 // fine because mutations go through maps.Copy on a fresh map in
@@ -14,6 +16,10 @@ func (m *Model) saveSecurityStateToTab(t *TabState) {
 	t.securityAvailabilityByName = m.securityAvailabilityByName
 	t.securityIndex = m.securityIndex
 	t.securityActiveGroup = m.securityActiveGroup
+	t.securityActiveSource = m.securityActiveSource
+	// Copy: unlike the maps above, slices invite in-place appends; sharing
+	// the backing array would let later model mutations corrupt the tab.
+	t.securityResourceFilter = append([]security.ResourceRef(nil), m.securityResourceFilter...)
 	t.showSecurityIgnored = m.showSecurityIgnored
 }
 
@@ -28,6 +34,8 @@ func (m *Model) loadSecurityStateFromTab(t *TabState) {
 	m.securityAvailabilityByName = t.securityAvailabilityByName
 	m.securityIndex = t.securityIndex
 	m.securityActiveGroup = t.securityActiveGroup
+	m.securityActiveSource = t.securityActiveSource
+	m.securityResourceFilter = append([]security.ResourceRef(nil), t.securityResourceFilter...)
 	m.showSecurityIgnored = t.showSecurityIgnored
 	setSecurityHookState(m.securityManager, m.securityAvailabilityByName)
 	if m.client == nil {

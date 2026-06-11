@@ -562,6 +562,8 @@ type TabState struct {
 	securityAvailabilityByName map[string]bool
 	securityIndex              *security.FindingIndex
 	securityActiveGroup        string
+	securityActiveSource       string
+	securityResourceFilter     []security.ResourceRef
 	showSecurityIgnored        bool
 }
 

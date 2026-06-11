@@ -210,6 +210,32 @@ func (m Model) loadResources(forPreview bool) tea.Cmd {
 			}
 		}
 	}
+	// Per-resource findings view (the "Security Findings" action): filter the
+	// shared scan to m.securityResourceFilter's refs across every source.
+	// Must dispatch before the generic security branch below — the sentinel
+	// Kind does not encode a source, so the per-source getter would resolve
+	// a bogus source name and return an empty list.
+	if rt.Kind == model.SecurityResourceFindingsKind && m.client != nil {
+		refs := m.securityResourceFilter
+		if items, ok, err := m.client.GetSecurityFindingsForResourceCached(kctx, ns, refs); ok {
+			rtCopy := rt
+			return func() tea.Msg {
+				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+			}
+		}
+		client := m.client
+		rtCopy := rt
+		return m.scheduleK8sCall(
+			scheduler.PriorityHigh,
+			scheduler.KindResourceList,
+			"Security findings: "+model.DisplayNameFor(rt),
+			bgtaskTarget(kctx, ns),
+			func(ctx context.Context) tea.Msg {
+				items, err := client.GetSecurityFindingsForResource(ctx, kctx, ns, refs)
+				return resourcesLoadedMsg{items: items, err: err, forPreview: forPreview, gen: gen, silent: silent, rt: rtCopy}
+			},
+		)
+	}
 	// Security findings share one coalesced, cached cluster scan. When that
 	// scan is already warm, render the source's findings synchronously off the
 	// scheduler — instant even when the scheduler is congested, and without a

@@ -150,6 +150,15 @@ func groupFindings(findings []security.Finding, sourceName string, checker Ignor
 		groups = append(groups, g)
 	}
 
+	sortFindingGroups(groups)
+
+	return groups
+}
+
+// sortFindingGroups orders groups severity desc, affected count desc, then
+// title asc — the canonical finding-group ordering shared by the per-source
+// list and the cross-source per-resource list.
+func sortFindingGroups(groups []findingGroup) {
 	sort.SliceStable(groups, func(i, j int) bool {
 		if groups[i].Severity != groups[j].Severity {
 			return groups[i].Severity > groups[j].Severity
@@ -159,8 +168,6 @@ func groupFindings(findings []security.Finding, sourceName string, checker Ignor
 		}
 		return groups[i].Title < groups[j].Title
 	})
-
-	return groups
 }
 
 // findingGroupToItem maps a findingGroup onto a model.Item for the
@@ -206,9 +213,8 @@ func findingGroupToItem(g findingGroup) model.Item {
 	}
 
 	// Hidden column with affected resource names so the text filter
-	// matches when the user navigates from a specific resource via the
-	// "Security Findings" action (e.g., filtering by "web" matches
-	// groups that affect pod/web). The __ prefix keeps it hidden.
+	// matches groups by the resources they touch (e.g., typing "web"
+	// matches groups that affect pod/web). The __ prefix keeps it hidden.
 	if len(g.Resources) > 0 {
 		var names []string
 		for _, r := range g.Resources {
