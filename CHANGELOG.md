@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.14.4](https://github.com/janosmiko/lfk/compare/v0.14.3...v0.14.4) (2026-06-11)
+
+
+### Features
+
+* **explorer:** ASCII-art tree view for Object and API Explorers ([#420](https://github.com/janosmiko/lfk/issues/420)) ([c90bd12](https://github.com/janosmiko/lfk/commit/c90bd12c6d72b721f49152e76f99af5f1e062700))
+* **logs:** live-log preview for container rows ([#419](https://github.com/janosmiko/lfk/issues/419)) ([729ed9d](https://github.com/janosmiko/lfk/commit/729ed9d17b387d046f6061daf4fa5e98bfe54e62))
+* **netpol:** CiliumNetworkPolicy and CiliumClusterwideNetworkPolicy support ([#414](https://github.com/janosmiko/lfk/issues/414)) ([e8b3d06](https://github.com/janosmiko/lfk/commit/e8b3d06549ee14171bac7da34368b0be81dc4fa1)), closes [#409](https://github.com/janosmiko/lfk/issues/409)
+* **netpol:** mouse wheel scroll and / search in the policy visualizer ([#421](https://github.com/janosmiko/lfk/issues/421)) ([6a08d6e](https://github.com/janosmiko/lfk/commit/6a08d6efac767354c61be849f978caa9d576613c))
+* **netpol:** show network policies affecting a pod or service ([#412](https://github.com/janosmiko/lfk/issues/412)) ([914a635](https://github.com/janosmiko/lfk/commit/914a635a8dc34e4aa2207c888ddddf68e2643352))
+* **security:** 37 new built-in checks, RBAC source, and finding-jump fixes ([#413](https://github.com/janosmiko/lfk/issues/413)) ([8ed8e5d](https://github.com/janosmiko/lfk/commit/8ed8e5d0254254bd20b1e9629c3e134f980150dc))
+* **security:** Security Findings action opens a per-resource findings list ([#418](https://github.com/janosmiko/lfk/issues/418)) ([55f4ca8](https://github.com/janosmiko/lfk/commit/55f4ca81c7c2d8ad7d991c9b113b91deb493b12c))
+* **tips:** promote lesser-known features in the startup tip bar ([#416](https://github.com/janosmiko/lfk/issues/416)) ([70c8e7d](https://github.com/janosmiko/lfk/commit/70c8e7dbee2b41f64285d4fb517925660a6fc68c))
+
+
+### Bug Fixes
+
+* **preview:** follow the list's sorting and column config in list previews ([#410](https://github.com/janosmiko/lfk/issues/410)) ([a7b7dc7](https://github.com/janosmiko/lfk/commit/a7b7dc7f97e6b61f4c39b38529af70bd47e542b7))
+* **preview:** stop column flicker by carrying enriched columns into preview refetches ([#422](https://github.com/janosmiko/lfk/issues/422)) ([cd787b2](https://github.com/janosmiko/lfk/commit/cd787b2f41bc343ea24c4a51271859a7e9495487))
+
 ## [0.14.3](https://github.com/janosmiko/lfk/compare/v0.14.2...v0.14.3) (2026-06-10)
 
 
