@@ -17,11 +17,7 @@ func RenderExplainView(fields []model.ExplainField, cursor, scroll int, resource
 	d := objectExplorerDims(width, height)
 	fieldLines := renderFieldList(fields, cursor, scroll, d.middleInner, d.contentHeight-1, searchQuery) // -1 for header
 	// Build a table header row with NAME and TYPE columns, using the same nameWidth as the field rows.
-	nameWidth := 0
-	for _, f := range fields {
-		nameWidth = max(nameWidth, len(f.Name))
-	}
-	nameWidth = min(nameWidth, d.middleInner/2)
+	nameWidth := explainNameWidth(fields, d.middleInner)
 	middleHeader := DimStyle.Bold(true).Render(fmt.Sprintf("  %-*s  %-4s  %s", nameWidth, "NAME", "REQ", "TYPE"))
 	return renderExplainLayout(d, middleHeader, fieldLines, fields, cursor, resourceDesc, title, parentFields, parentCursor, hintBar, width)
 }
@@ -56,6 +52,17 @@ func renderExplainLayout(d objectExplorerColumnDims, middleHeader string, fieldL
 	columns := lipgloss.JoinHorizontal(lipgloss.Top, left, middle, right)
 	framed := explorerFrameStyle().Render(columns)
 	return lipgloss.JoinVertical(lipgloss.Left, titleText, framed, hintBar)
+}
+
+// explainNameWidth computes the field-name column width (display width, so
+// multibyte names align), capped at half the pane. Shared by the header and
+// the field rows so they cannot desync.
+func explainNameWidth(fields []model.ExplainField, paneInner int) int {
+	w := 0
+	for _, f := range fields {
+		w = max(w, lipgloss.Width(f.Name))
+	}
+	return min(w, paneInner/2)
 }
 
 // renderExplainKeyList renders a keys-only (field names, no markers) list for
@@ -95,12 +102,7 @@ func renderFieldList(fields []model.ExplainField, cursor, scroll, width, maxLine
 	lines := make([]string, 0, maxLines)
 	end := min(scroll+maxLines, len(fields))
 
-	// Calculate the maximum name width for alignment.
-	nameWidth := 0
-	for _, f := range fields {
-		nameWidth = max(nameWidth, len(f.Name))
-	}
-	nameWidth = min(nameWidth, width/2)
+	nameWidth := explainNameWidth(fields, width)
 
 	for i := scroll; i < end; i++ {
 		f := fields[i]

@@ -395,6 +395,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 	origDiffUnified := ConfigDiffViewerUnified
 	origDescribeWrap := ConfigDescribeViewerWrap
 	origObjectExplorerLive := ConfigObjectExplorerLive
+	origObjectExplorerTree := ConfigObjectExplorerTree
+	origAPIExplorerTree := ConfigAPIExplorerTree
 	origSplitPreview := ConfigSplitPreview
 	origWatchMode := ConfigWatchMode
 	origAllNamespaces := ConfigAllNamespaces
@@ -475,6 +477,8 @@ func snapshotAllConfigGlobals(t *testing.T) func() {
 		ConfigDiffViewerUnified = origDiffUnified
 		ConfigDescribeViewerWrap = origDescribeWrap
 		ConfigObjectExplorerLive = origObjectExplorerLive
+		ConfigObjectExplorerTree = origObjectExplorerTree
+		ConfigAPIExplorerTree = origAPIExplorerTree
 		ConfigSplitPreview = origSplitPreview
 		ConfigWatchMode = origWatchMode
 		ConfigAllNamespaces = origAllNamespaces

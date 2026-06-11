@@ -2,6 +2,7 @@ package model
 
 import (
 	"reflect"
+	"strconv"
 	"strings"
 	"testing"
 )
@@ -84,11 +85,7 @@ func TestObjectTreeRowsAt(t *testing.T) {
 }
 
 func formatRow(r ObjectTreeRow) string {
-	return strings.Join([]string{itoaDepth(r.Depth), strings.Join(r.Segs, "/")}, ":")
-}
-
-func itoaDepth(d int) string {
-	return string(rune('0' + d))
+	return strings.Join([]string{strconv.Itoa(r.Depth), strings.Join(r.Segs, "/")}, ":")
 }
 
 func TestObjectTreeRowsAtFieldData(t *testing.T) {

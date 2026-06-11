@@ -1,5 +1,7 @@
 package model
 
+import "strings"
+
 // ObjectTreeRow is one row of the Object Explorer's expanded tree view: a node
 // of the subtree flattened in pre-order, with its path relative to the subtree
 // root and its nesting depth (0 for direct children of the root).
@@ -12,6 +14,23 @@ type ObjectTreeRow struct {
 // DefaultObjectTreeRowLimit caps the flattened tree so a pathological object
 // (e.g. huge managedFields) cannot produce an unbounded row list.
 const DefaultObjectTreeRowLimit = 10000
+
+// FormatObjectPath renders path segments as a readable dotted path, appending
+// array indices like "steps[0]" rather than "steps.[0]".
+func FormatObjectPath(segs []string) string {
+	var b strings.Builder
+	for _, s := range segs {
+		if strings.HasPrefix(s, "[") {
+			b.WriteString(s)
+			continue
+		}
+		if b.Len() > 0 {
+			b.WriteString(".")
+		}
+		b.WriteString(s)
+	}
+	return b.String()
+}
 
 // ObjectTreeRowsAt flattens the subtree at segs within root into pre-order
 // rows, in the same per-level order as ObjectFieldsAt (sorted map keys, array

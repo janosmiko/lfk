@@ -644,19 +644,8 @@ func (m Model) selectedNodeYAML() string {
 	return string(out)
 }
 
-// formatObjectPath renders path segments as a readable dotted path, appending
-// array indices like "steps[0]" rather than "steps.[0]".
+// formatObjectPath renders path segments as a readable dotted path; see
+// model.FormatObjectPath.
 func formatObjectPath(segs []string) string {
-	var b strings.Builder
-	for _, s := range segs {
-		if strings.HasPrefix(s, "[") {
-			b.WriteString(s)
-			continue
-		}
-		if b.Len() > 0 {
-			b.WriteString(".")
-		}
-		b.WriteString(s)
-	}
-	return b.String()
+	return model.FormatObjectPath(segs)
 }

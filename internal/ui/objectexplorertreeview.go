@@ -31,7 +31,7 @@ func objectTreeLabels(rows []model.ObjectTreeRow, filtered bool) (labels, prefix
 	prefixes = make([]string, len(rows))
 	if filtered {
 		for i, r := range rows {
-			labels[i] = joinObjectSegs(r.Segs)
+			labels[i] = model.FormatObjectPath(r.Segs)
 		}
 		return labels, prefixes
 	}
@@ -41,23 +41,6 @@ func objectTreeLabels(rows []model.ObjectTreeRow, filtered bool) (labels, prefix
 		labels[i] = r.Field.Key
 	}
 	return labels, TreeGuidePrefixes(depths)
-}
-
-// joinObjectSegs renders path segments dotted, appending array indices
-// directly ("containers[0]" rather than "containers.[0]").
-func joinObjectSegs(segs []string) string {
-	var b strings.Builder
-	for _, s := range segs {
-		if strings.HasPrefix(s, "[") {
-			b.WriteString(s)
-			continue
-		}
-		if b.Len() > 0 {
-			b.WriteString(".")
-		}
-		b.WriteString(s)
-	}
-	return b.String()
 }
 
 // objectTreeNameWidth computes the name-column width (guide prefix + label),
