@@ -147,6 +147,98 @@ func TestExecuteActionSecurityFindingsFromOwnedLevelUnwinds(t *testing.T) {
 	assert.Empty(t, updated.leftItemsHistory)
 }
 
+// unwindToResourcesLevel must pop exactly the pushes performed since
+// LevelResources for every entry path: LevelContainers reached directly from a
+// Pod list (one push), LevelContainers under a workload (two pushes), nested
+// owned chains (one extra push per ownedParentStack entry), and LevelOwned
+// with a nested chain. The container paths are not reachable through the
+// action menu today (containers don't offer Security Findings), so this
+// guards the helper directly.
+func TestUnwindToResourcesLevelPopCounts(t *testing.T) {
+	sidebar := []model.Item{{Name: "sidebar", Kind: "ResourceType"}}
+	nested := ownedParentState{
+		resourceType: model.ResourceTypeEntry{Kind: "Deployment"},
+		resourceName: "api",
+		namespace:    "default",
+	}
+
+	cases := []struct {
+		name    string
+		setup   func(m *Model)
+		history [][]model.Item // bottom -> top; sidebar must be the entry left after unwind
+	}{
+		{
+			name: "containers entered directly from a Pod list",
+			setup: func(m *Model) {
+				m.nav.Level = model.LevelContainers
+				m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod"}
+				m.nav.OwnedName = "api-xyz"
+			},
+			// One push: Pods list promoted to the left pane on drill-in.
+			history: [][]model.Item{sidebar},
+		},
+		{
+			name: "containers under a workload",
+			setup: func(m *Model) {
+				m.nav.Level = model.LevelContainers
+				m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Deployment"}
+				m.nav.ResourceName = "api"
+				m.nav.OwnedName = "api-xyz"
+			},
+			// Two pushes: Deployments -> owned pods -> containers.
+			history: [][]model.Item{sidebar, {{Name: "api", Kind: "Deployment"}}},
+		},
+		{
+			name: "containers under a nested owned chain",
+			setup: func(m *Model) {
+				m.nav.Level = model.LevelContainers
+				m.nav.ResourceType = model.ResourceTypeEntry{Kind: "ReplicaSet"}
+				m.nav.ResourceName = "api-rs"
+				m.nav.OwnedName = "api-xyz"
+				m.ownedParentStack = []ownedParentState{nested}
+			},
+			// Three pushes: Deployments -> deployment's owned (RS) ->
+			// RS's pods -> containers, minus the LevelResources baseline.
+			history: [][]model.Item{
+				sidebar,
+				{{Name: "api", Kind: "Deployment"}},
+				{{Name: "api-rs", Kind: "ReplicaSet"}},
+			},
+		},
+		{
+			name: "owned level with a nested chain",
+			setup: func(m *Model) {
+				m.nav.Level = model.LevelOwned
+				m.nav.ResourceType = model.ResourceTypeEntry{Kind: "ReplicaSet"}
+				m.nav.ResourceName = "api-rs"
+				m.ownedParentStack = []ownedParentState{nested}
+			},
+			// Two pushes: Deployments -> deployment's owned (RS) -> RS's pods.
+			history: [][]model.Item{sidebar, {{Name: "api", Kind: "Deployment"}}},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			m := baseModelBoost2()
+			tc.setup(&m)
+			m.leftItemsHistory = tc.history
+			m.leftItems = []model.Item{{Name: "top-of-stack"}}
+
+			m.unwindToResourcesLevel()
+
+			assert.Equal(t, model.LevelResources, m.nav.Level)
+			assert.Empty(t, m.nav.ResourceName)
+			assert.Empty(t, m.nav.OwnedName)
+			assert.Nil(t, m.ownedParentStack)
+			require.Len(t, m.leftItems, 1)
+			assert.Equal(t, "sidebar", m.leftItems[0].Name,
+				"left pane must land exactly on the sidebar entry")
+			assert.Empty(t, m.leftItemsHistory, "every push since LevelResources must be popped")
+		})
+	}
+}
+
 // In union-sentinel mode the per-resource list cannot resolve a single
 // cluster's scan; the action keeps the count-summary fallback.
 func TestExecuteActionSecurityFindingsUnionFallsBackToSummary(t *testing.T) {
