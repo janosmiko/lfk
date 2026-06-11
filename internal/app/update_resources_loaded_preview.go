@@ -5,6 +5,10 @@ import (
 	"github.com/janosmiko/lfk/internal/model"
 )
 
+// updateResourcesLoadedPreview handles a resourcesLoadedMsg destined for the
+// right preview pane: it sorts the items the way the drilled-in list renders
+// them (issue #408), primes the drill-in itemCache, and applies the Event
+// warnings-only filter and grouping before exposing the list as rightItems.
 func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) Model {
 	m.previewLoading = false
 	msg.items = m.filterLoadedItemsBySelectedNamespaces(msg.items)

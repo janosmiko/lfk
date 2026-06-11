@@ -12,14 +12,38 @@ import (
 // built-ins and explicit order, applied via withSessionColumnsForKind —
 // must still take effect so the preview matches the drilled-in list.
 
-func TestRenderTableCursorlessHonorsHiddenBuiltinColumns(t *testing.T) {
+// resetColumnGlobals snapshots every column-config global RenderTable reads
+// and restores it on cleanup, then sets deterministic defaults so the test
+// outcome cannot depend on state left behind by other tests.
+func resetColumnGlobals(t *testing.T) {
+	t.Helper()
 	origHidden := ActiveHiddenBuiltinColumns
+	origOrder := ActiveColumnOrder
+	origSession := ActiveSessionColumns
+	origPrinter := ActivePrinterColumns
 	origScroll := ActiveMiddleScroll
+	origLayout := ActiveTableLayout
+	origNameHidden := ActiveNameHidden
 	t.Cleanup(func() {
 		ActiveHiddenBuiltinColumns = origHidden
+		ActiveColumnOrder = origOrder
+		ActiveSessionColumns = origSession
+		ActivePrinterColumns = origPrinter
 		ActiveMiddleScroll = origScroll
+		ActiveTableLayout = origLayout
+		ActiveNameHidden = origNameHidden
 	})
+	ActiveHiddenBuiltinColumns = nil
+	ActiveColumnOrder = nil
+	ActiveSessionColumns = nil
+	ActivePrinterColumns = nil
 	ActiveMiddleScroll = -1
+	ActiveTableLayout = nil
+	ActiveNameHidden = false
+}
+
+func TestRenderTableCursorlessHonorsHiddenBuiltinColumns(t *testing.T) {
+	resetColumnGlobals(t)
 	ActiveHiddenBuiltinColumns = map[string]bool{"Status": true, "Age": true}
 
 	items := []model.Item{
@@ -34,13 +58,7 @@ func TestRenderTableCursorlessHonorsHiddenBuiltinColumns(t *testing.T) {
 }
 
 func TestRenderTableCursorlessHonorsColumnOrder(t *testing.T) {
-	origOrder := ActiveColumnOrder
-	origScroll := ActiveMiddleScroll
-	t.Cleanup(func() {
-		ActiveColumnOrder = origOrder
-		ActiveMiddleScroll = origScroll
-	})
-	ActiveMiddleScroll = -1
+	resetColumnGlobals(t)
 	ActiveColumnOrder = []string{"Age", "Status"}
 
 	items := []model.Item{
@@ -59,14 +77,7 @@ func TestRenderTableCursorlessHonorsColumnOrder(t *testing.T) {
 }
 
 func TestRenderTableCursorlessHonorsHiddenNameColumn(t *testing.T) {
-	origHidden := ActiveHiddenBuiltinColumns
-	origScroll := ActiveMiddleScroll
-	t.Cleanup(func() {
-		ActiveHiddenBuiltinColumns = origHidden
-		ActiveMiddleScroll = origScroll
-		ActiveNameHidden = false
-	})
-	ActiveMiddleScroll = -1
+	resetColumnGlobals(t)
 	ActiveHiddenBuiltinColumns = map[string]bool{"Name": true}
 
 	items := []model.Item{
