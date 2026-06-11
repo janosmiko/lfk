@@ -130,6 +130,15 @@ func (m *Model) setMiddleItems(items []model.Item) {
 // This prevents blinking during watch mode refreshes while metrics load async.
 // Only carries over if actual usage data exists (CPU/MEM have real values).
 func (m *Model) carryOverMetricsColumns(newItems []model.Item) {
+	carryOverMetricsColumnsFrom(m.middleItems, newItems)
+}
+
+// carryOverMetricsColumnsFrom is the source-explicit core of
+// carryOverMetricsColumns. The right-pane list preview carries from its own
+// previous items / the drill-in cache instead of middleItems (issue #408:
+// preview fetches return unenriched items, so without the carry-over the
+// preview's column set flips against the drilled list on every refetch).
+func carryOverMetricsColumnsFrom(oldItems, newItems []model.Item) {
 	metricsKeys := map[string]bool{
 		"CPU": true, "CPU/R": true, "CPU/L": true,
 		"MEM": true, "MEM/R": true, "MEM/L": true,
@@ -143,7 +152,7 @@ func (m *Model) carryOverMetricsColumns(newItems []model.Item) {
 	// the metrics columns flicker out and back in on each refresh.
 	type itemKey struct{ ns, name string }
 	oldMetrics := make(map[itemKey][]model.KeyValue)
-	for _, item := range m.middleItems {
+	for _, item := range oldItems {
 		var cols []model.KeyValue
 		for _, kv := range item.Columns {
 			if metricsKeys[kv.Key] {
@@ -195,13 +204,20 @@ func (m *Model) carryOverMetricsColumns(newItems []model.Item) {
 //
 // Same reasoning as carryOverMetricsColumns above.
 func (m *Model) carryOverServiceEndpointColumns(newItems []model.Item) {
+	carryOverServiceEndpointColumnsFrom(m.middleItems, newItems)
+}
+
+// carryOverServiceEndpointColumnsFrom is the source-explicit core of
+// carryOverServiceEndpointColumns, shared with the right-pane list preview
+// (see carryOverMetricsColumnsFrom).
+func carryOverServiceEndpointColumnsFrom(oldItems, newItems []model.Item) {
 	endpointKeys := map[string]bool{
 		"Backing Endpoints": true,
 		"Endpoints":         true,
 	}
 	type itemKey struct{ ns, name string }
 	old := make(map[itemKey][]model.KeyValue)
-	for _, item := range m.middleItems {
+	for _, item := range oldItems {
 		var cols []model.KeyValue
 		for _, kv := range item.Columns {
 			if endpointKeys[kv.Key] {
