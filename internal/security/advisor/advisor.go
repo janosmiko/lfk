@@ -72,6 +72,20 @@ type workload struct {
 	spreadConfigured bool
 	// strategy is set for Deployments only.
 	strategy *appsv1.DeploymentStrategy
+	// zeroGracePeriod is true when the pod template sets
+	// terminationGracePeriodSeconds: 0 (instant SIGKILL).
+	zeroGracePeriod bool
+	// onDeleteUpdate is true for DaemonSets/StatefulSets with an explicit
+	// updateStrategy: OnDelete. An empty type is NOT OnDelete — the API
+	// server defaults it to RollingUpdate.
+	onDeleteUpdate bool
+}
+
+// templateZeroGrace reports whether the pod template requests instant
+// SIGKILL on termination.
+func templateZeroGrace(tmpl *corev1.PodTemplateSpec) bool {
+	g := tmpl.Spec.TerminationGracePeriodSeconds
+	return g != nil && *g == 0
 }
 
 // templateSpreads reports whether the pod template spreads replicas across
@@ -153,6 +167,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 				volumes:          dep.Spec.Template.Spec.Volumes,
 				spreadConfigured: templateSpreads(&dep.Spec.Template),
 				strategy:         &dep.Spec.Strategy,
+				zeroGracePeriod:  templateZeroGrace(&dep.Spec.Template),
 			})
 		}
 	}
@@ -175,6 +190,8 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 				containers:       sts.Spec.Template.Spec.Containers,
 				volumes:          sts.Spec.Template.Spec.Volumes,
 				spreadConfigured: templateSpreads(&sts.Spec.Template),
+				zeroGracePeriod:  templateZeroGrace(&sts.Spec.Template),
+				onDeleteUpdate:   sts.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType,
 			})
 		}
 	}
@@ -189,13 +206,15 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		for i := range dss {
 			ds := &dss[i]
 			d.workloads = append(d.workloads, workload{
-				kind:       "DaemonSet",
-				namespace:  ds.Namespace,
-				name:       ds.Name,
-				replicas:   0, // keeps DaemonSets out of replica-based checks
-				podLabels:  ds.Spec.Template.Labels,
-				containers: ds.Spec.Template.Spec.Containers,
-				volumes:    ds.Spec.Template.Spec.Volumes,
+				kind:            "DaemonSet",
+				namespace:       ds.Namespace,
+				name:            ds.Name,
+				replicas:        0, // keeps DaemonSets out of replica-based checks
+				podLabels:       ds.Spec.Template.Labels,
+				containers:      ds.Spec.Template.Spec.Containers,
+				volumes:         ds.Spec.Template.Spec.Volumes,
+				zeroGracePeriod: templateZeroGrace(&ds.Spec.Template),
+				onDeleteUpdate:  ds.Spec.UpdateStrategy.Type == appsv1.OnDeleteDaemonSetStrategyType,
 			})
 		}
 	}

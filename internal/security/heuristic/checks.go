@@ -230,6 +230,9 @@ var allChecks = []checkFn{
 	checkSeccompUnconfined,
 	checkShareProcessNamespace,
 	checkSATokenAutomount,
+	checkEnvFromSecret,
+	checkEphemeralContainers,
+	checkHostProcess,
 	// checkSecretEnv is NOT listed: it takes per-source include/exclude
 	// config, so Fetch dispatches checkSecretEnvWith directly.
 }

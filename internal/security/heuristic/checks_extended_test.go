@@ -11,9 +11,9 @@ import (
 )
 
 func TestExtendedChecksRegistered(t *testing.T) {
-	// 17, not 18: checkSecretEnv takes per-source config, so Fetch dispatches
+	// 20, not 21: checkSecretEnv takes per-source config, so Fetch dispatches
 	// it directly instead of through allChecks.
-	assert.Len(t, allChecks, 17, "all extended checks must be wired into allChecks")
+	assert.Len(t, allChecks, 20, "all extended checks must be wired into allChecks")
 }
 
 func TestCheckSecretEnvWith(t *testing.T) {
