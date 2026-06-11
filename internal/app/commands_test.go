@@ -3,9 +3,11 @@ package app
 import (
 	"testing"
 
-	"github.com/janosmiko/lfk/internal/model"
+	"github.com/charmbracelet/lipgloss"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+
+	"github.com/janosmiko/lfk/internal/model"
 )
 
 // --- shellQuote ---
@@ -141,7 +143,7 @@ func TestStartupTipsAllNonEmpty(t *testing.T) {
 
 func TestStartupTipsFitTheStatusBar(t *testing.T) {
 	for _, tip := range startupTips {
-		assert.LessOrEqual(t, len(tip), 110, "tip too long for the status bar: %q", tip)
+		assert.LessOrEqual(t, lipgloss.Width(tip), 110, "tip too long for the status bar: %q", tip)
 	}
 }
 

@@ -40,7 +40,8 @@ func logExecCmd(label string, cmd *exec.Cmd) {
 	logger.Info(label, "cmd", cmd.String(), "kubeconfig", kubeconfig)
 }
 
-// startupTips is the list of tips shown randomly on startup.
+// startupTips is the list of tips shown on startup; nextStartupTip rotates
+// through it via a persisted cursor so every tip appears before any repeat.
 var startupTips = []string{
 	"Press ? to see all keybindings",
 	"Press / to search, f to filter resources",
