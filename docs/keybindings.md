@@ -937,7 +937,8 @@ Press `:` to open the command bar. It supports four types of input:
 ## Action Menu Items
 
 The action menu (`x` key) shows context-specific actions based on the resource type.
-Items below are listed by hotkey; the in-app menu groups them by task instead.
+Both the in-app menu and the lists below are ordered by hotkey (lowercase before
+uppercase); custom actions appear after the built-in ones.
 
 ### Pod Actions
 `A` Attach, `b` Debug Pod, `B` Debug, `c` Capture Traffic, `D` Delete, `E` Edit, `g` Go to Node, `I` Crash Investigator, `l` Tail Logs (last N lines + follow), `L` Logs (full), `N` Network Policies (policies whose pod selector matches this pod), `p` Port Forward, `s` Exec, `S` Startup Analysis, `v` Describe, `V` Events, `X` Force Delete, `y` Security Findings, `z` Right-sizing

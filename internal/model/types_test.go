@@ -237,10 +237,9 @@ func TestActionsForBulkApplication(t *testing.T) {
 	assert.Contains(t, labels, "Refresh", "Application bulk should include Refresh")
 	// Should still have generic bulk actions.
 	assert.Contains(t, labels, "Delete")
-	// ArgoCD actions should appear before generic actions.
-	assert.Equal(t, "Sync", actions[0].Label, "Sync should be first")
-	assert.Equal(t, "Sync (Apply Only)", actions[1].Label, "Sync (Apply Only) should be second")
-	assert.Equal(t, "Refresh", actions[2].Label, "Refresh should be third")
+	// Items are ordered by hotkey: a, d, D, l, L, r, R, s, S, X.
+	assert.Equal(t, "Sync (Apply Only)", actions[0].Label, "'a' sorts first")
+	assert.Equal(t, "Diff", actions[1].Label, "'d' sorts second")
 }
 
 func TestActionsForPortForward(t *testing.T) {

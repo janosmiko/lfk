@@ -1,7 +1,32 @@
 package model
 
-// ActionsForContainer returns the action menu items for a container.
+import (
+	"sort"
+	"strings"
+)
+
+// sortActionsByKey orders menu items by hotkey, case-insensitively, with
+// lowercase before uppercase on ties, so every action menu reads as a
+// hotkey index. Sorts in place and returns the slice for chaining.
+func sortActionsByKey(items []ActionMenuItem) []ActionMenuItem {
+	sort.SliceStable(items, func(i, j int) bool {
+		a, b := items[i].Key, items[j].Key
+		la, lb := strings.ToLower(a), strings.ToLower(b)
+		if la != lb {
+			return la < lb
+		}
+		return a > b // same letter: lowercase ('b' > 'B') first
+	})
+	return items
+}
+
+// ActionsForContainer returns the action menu items for a container,
+// ordered by hotkey.
 func ActionsForContainer() []ActionMenuItem {
+	return sortActionsByKey(actionsForContainerGrouped())
+}
+
+func actionsForContainerGrouped() []ActionMenuItem {
 	return []ActionMenuItem{
 		{Label: "Tail Logs", Description: "Tail the last 10 lines and follow", Key: "l"},
 		{Label: "Logs", Description: "View container logs", Key: "L"},
@@ -14,10 +39,13 @@ func ActionsForContainer() []ActionMenuItem {
 	}
 }
 
-// ActionsForBulk returns the action menu items available for bulk operations.
-// Kind-specific bulk actions are prepended when kind is non-empty, matching the
-// single-resource action menu order where kind-specific actions appear first.
+// ActionsForBulk returns the action menu items available for bulk
+// operations, ordered by hotkey.
 func ActionsForBulk(kind string) []ActionMenuItem {
+	return sortActionsByKey(actionsForBulkGrouped(kind))
+}
+
+func actionsForBulkGrouped(kind string) []ActionMenuItem {
 	var kindActions []ActionMenuItem //nolint:prealloc // size depends on kind
 	switch kind {
 	case "Application":
@@ -50,6 +78,10 @@ func ActionsForBulk(kind string) []ActionMenuItem {
 // will land on a follow-up that distinguishes Service-by-APIGroup. Revision /
 // Configuration / Route are Knative-only kinds and route here.
 func ActionsForKind(kind string) []ActionMenuItem {
+	return sortActionsByKey(actionsForKindGrouped(kind))
+}
+
+func actionsForKindGrouped(kind string) []ActionMenuItem {
 	if actions, ok := actionsForCoreKind(kind); ok {
 		return actions
 	}
@@ -613,23 +645,25 @@ func ActionsForClusterPicker(keys ClusterPickerKeys) []ActionMenuItem {
 	}
 }
 
-// ActionsForPortForward returns the action menu items for a port forward entry.
+// ActionsForPortForward returns the action menu items for a port forward
+// entry, ordered by hotkey.
 func ActionsForPortForward() []ActionMenuItem {
-	return []ActionMenuItem{
+	return sortActionsByKey([]ActionMenuItem{
 		{Label: "Stop", Description: "Stop this port forward", Key: "s"},
 		{Label: "Restart", Description: "Restart this port forward", Key: "r"},
 		{Label: "Remove", Description: "Remove this entry", Key: "D"},
 		{Label: "Open in Browser", Description: "Open localhost port in browser", Key: "O"},
-	}
+	})
 }
 
-// ActionsForCapture returns the action menu items for a capture entry.
+// ActionsForCapture returns the action menu items for a capture entry,
+// ordered by hotkey.
 func ActionsForCapture() []ActionMenuItem {
-	return []ActionMenuItem{
+	return sortActionsByKey([]ActionMenuItem{
 		{Label: "Open", Description: "Re-open the capture overlay attached to this entry", Key: "o"},
 		{Label: "Stop", Description: "Stop a running capture", Key: "s"},
 		{Label: "Delete File", Description: "Delete the on-disk pcap file", Key: "D"},
-	}
+	})
 }
 
 // MonitoringEndpoint defines a custom monitoring service endpoint.
