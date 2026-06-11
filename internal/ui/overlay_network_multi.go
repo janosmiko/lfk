@@ -55,9 +55,14 @@ func renderNetpolMultiBody(info ResourceNetpolsEntry, width int, greenStyle, lab
 	var lines []string
 
 	var summary string
-	if len(info.Policies) == 1 {
+	switch {
+	case strings.HasPrefix(info.Kind, "Cilium"):
+		// Stacked view of one multi-spec Cilium policy, not of policies
+		// selecting a resource.
+		summary = fmt.Sprintf("%d policy specs", len(info.Policies))
+	case len(info.Policies) == 1:
 		summary = fmt.Sprintf("1 network policy selects this %s", strings.ToLower(info.Kind))
-	} else {
+	default:
 		summary = fmt.Sprintf("%d network policies select this %s", len(info.Policies), strings.ToLower(info.Kind))
 	}
 	lines = append(lines, fmt.Sprintf("  %s", greenStyle.Render(summary)))

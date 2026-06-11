@@ -16,9 +16,11 @@ import (
 func netpolMatchFakeDyn(objects ...runtime.Object) *dynamicfake.FakeDynamicClient {
 	scheme := runtime.NewScheme()
 	gvrs := map[schema.GroupVersionResource]string{
-		{Group: "", Version: "v1", Resource: "pods"}:                             "PodList",
-		{Group: "", Version: "v1", Resource: "services"}:                         "ServiceList",
-		{Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicies"}: "NetworkPolicyList",
+		{Group: "", Version: "v1", Resource: "pods"}:                                      "PodList",
+		{Group: "", Version: "v1", Resource: "services"}:                                  "ServiceList",
+		{Group: "networking.k8s.io", Version: "v1", Resource: "networkpolicies"}:          "NetworkPolicyList",
+		{Group: "cilium.io", Version: "v2", Resource: "ciliumnetworkpolicies"}:            "CiliumNetworkPolicyList",
+		{Group: "cilium.io", Version: "v2", Resource: "ciliumclusterwidenetworkpolicies"}: "CiliumClusterwideNetworkPolicyList",
 	}
 	return dynamicfake.NewSimpleDynamicClientWithCustomListKinds(scheme, gvrs, objects...)
 }

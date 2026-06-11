@@ -117,6 +117,8 @@ type AlertEntry struct {
 type NetworkPolicyEntry struct {
 	Name         string
 	Namespace    string
+	Kind         string // "" = NetworkPolicy; or CiliumNetworkPolicy / CiliumClusterwideNetworkPolicy
+	NodePolicy   bool   // Cilium: selects nodes, not pods
 	PodSelector  map[string]string
 	PolicyTypes  []string
 	IngressRules []NetpolRuleEntry
@@ -140,6 +142,8 @@ type ResourceNetpolsEntry struct {
 type NetpolRuleEntry struct {
 	Ports []NetpolPortEntry
 	Peers []NetpolPeerEntry
+	Deny  bool   // Cilium: deny rule
+	L7    string // Cilium: L7 protocol summary
 }
 
 // NetpolPortEntry holds port information for a network policy rule.
@@ -155,4 +159,5 @@ type NetpolPeerEntry struct {
 	CIDR      string
 	Except    []string
 	Namespace string
+	Value     string // Entity name, FQDN pattern, or Service reference
 }

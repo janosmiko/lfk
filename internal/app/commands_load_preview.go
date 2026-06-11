@@ -385,20 +385,41 @@ func (m Model) loadAlerts() tea.Cmd {
 	})
 }
 
-// loadNetworkPolicy fetches and parses a NetworkPolicy for visualization.
+// loadNetworkPolicy fetches and parses a network policy for visualization.
+// Cilium policies may carry multiple specs; a multi-spec policy opens the
+// stacked multi-policy view instead of the single view.
 func (m Model) loadNetworkPolicy() tea.Cmd {
 	client := m.client
 	kctx := m.actionCtx.context
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
+	kind := m.actionCtx.kind
+	cilium := kind == "CiliumNetworkPolicy" || kind == "CiliumClusterwideNetworkPolicy"
 	return m.scheduleK8sCall(
 		scheduler.PriorityHigh,
 		scheduler.KindResourceList,
-		"NetworkPolicy: "+name,
+		kind+": "+name,
 		bgtaskTarget(kctx, ns),
 		func(ctx context.Context) tea.Msg {
-			info, err := client.GetNetworkPolicyInfo(ctx, kctx, ns, name)
-			return netpolLoadedMsg{info: info, err: err}
+			if !cilium {
+				info, err := client.GetNetworkPolicyInfo(ctx, kctx, ns, name)
+				return netpolLoadedMsg{info: info, err: err}
+			}
+			infos, err := client.GetCiliumNetworkPolicyInfo(ctx, kctx, ns, name, kind)
+			if err != nil {
+				return netpolLoadedMsg{err: err}
+			}
+			if len(infos) == 0 {
+				return netpolLoadedMsg{err: fmt.Errorf("policy %s has no parseable spec", name)}
+			}
+			if len(infos) == 1 {
+				return netpolLoadedMsg{info: &infos[0]}
+			}
+			res := &k8s.NetpolsForResource{Kind: kind, Name: name, Namespace: ns}
+			for _, info := range infos {
+				res.Policies = append(res.Policies, k8s.NetpolForResource{NetworkPolicyInfo: info})
+			}
+			return netpolsForResourceLoadedMsg{info: res}
 		},
 	)
 }

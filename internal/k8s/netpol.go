@@ -12,10 +12,13 @@ import (
 	"k8s.io/client-go/dynamic"
 )
 
-// NetworkPolicyInfo holds the parsed data from a Kubernetes NetworkPolicy resource.
+// NetworkPolicyInfo holds the parsed data from a network policy resource —
+// a Kubernetes NetworkPolicy or a Cilium policy mapped onto the same shape.
 type NetworkPolicyInfo struct {
 	Name         string
 	Namespace    string
+	Kind         string            // "" = NetworkPolicy; or CiliumNetworkPolicy / CiliumClusterwideNetworkPolicy
+	NodePolicy   bool              // Cilium: selects nodes (nodeSelector), not pods
 	PodSelector  map[string]string // pod selector match labels
 	PolicyTypes  []string          // "Ingress", "Egress"
 	IngressRules []NetpolRule
@@ -27,6 +30,8 @@ type NetworkPolicyInfo struct {
 type NetpolRule struct {
 	Ports []NetpolPort
 	Peers []NetpolPeer
+	Deny  bool   // Cilium: ingressDeny/egressDeny rule
+	L7    string // Cilium: L7 protocol summary ("HTTP", "DNS", "Kafka")
 }
 
 // NetpolPort represents a port in a network policy rule.
@@ -37,11 +42,12 @@ type NetpolPort struct {
 
 // NetpolPeer represents a source/destination peer in a network policy rule.
 type NetpolPeer struct {
-	Type      string            // "Pod", "Namespace", "Namespace+Pod", "CIDR", "All"
+	Type      string            // "Pod", "Namespace", "Namespace+Pod", "CIDR", "All", "Entity", "FQDN", "Service"
 	Selector  map[string]string // pod selector labels
 	CIDR      string
 	Except    []string
 	Namespace string // namespace selector description
+	Value     string // Entity name, FQDN pattern, or Service reference
 }
 
 // GetNetworkPolicyInfo fetches and parses a NetworkPolicy, returning a structured

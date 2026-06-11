@@ -690,11 +690,12 @@ grants apply everywhere); RoleBindings outside the active scope are excluded.
 
 ## Network Policy Visualizer
 
-Opens via the action menu (`x` → "Visualize", default key `N`) on a NetworkPolicy,
-or via `x` → "Network Policies" (`N`) on a Pod or Service to see every policy
-whose pod selector matches the pod (or the service's backing pods). When no
-policy selects the resource, the view says so explicitly — no policy
-restrictions apply.
+Opens via the action menu (`x` → "Visualize", default key `N`) on a
+NetworkPolicy, CiliumNetworkPolicy, or CiliumClusterwideNetworkPolicy, or via
+`x` → "Network Policies" (`N`) on a Pod or Service to see every policy whose
+pod selector matches the pod (or the service's backing pods) — Cilium
+policies included when the CRDs are installed. When no policy selects the
+resource, the view says so explicitly — no policy restrictions apply.
 
 | Key | Action |
 |---|---|
