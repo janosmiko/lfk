@@ -19,6 +19,29 @@ func (m Model) updateResourcesLoadedPreview(msg resourcesLoadedMsg) Model {
 	// Sort before the cache priming below so the drill-in shortcut serves
 	// the same order the preview showed.
 	m.sortPreviewItems(msg.items, msg.rt)
+	// Anti-flap carry-over, mirroring updateResourcesLoadedMain: preview
+	// fetches return unenriched items (no CPU/MEM metrics, no Service
+	// endpoint rollup), while the drilled list enriches them async. The
+	// rt-level watch tick drops the preview fingerprint every interval, so
+	// each hover refetch would otherwise flip the auto-detected column set
+	// — columns appear and disappear in the preview (#408 follow-up).
+	// Carry from the drill-in cache (which the drilled list's metrics
+	// ticks keep enriched) and fall back to the currently shown preview.
+	// Runs before the cache prime below so the prime keeps the enrichment
+	// instead of clobbering the drilled list's enriched cache entry.
+	if msg.rt.Kind == "Pod" || msg.rt.Kind == "Node" || msg.rt.Kind == "Service" {
+		prev := m.itemCache[m.nav.Context+"/"+msg.rt.Resource]
+		if len(prev) == 0 && len(m.rightItems) > 0 && m.rightItems[0].Kind == msg.rt.Kind {
+			prev = m.rightItems
+		}
+		if len(prev) > 0 && prev[0].Kind == msg.rt.Kind {
+			if msg.rt.Kind == "Service" {
+				carryOverServiceEndpointColumnsFrom(prev, msg.items)
+			} else {
+				carryOverMetricsColumnsFrom(prev, msg.items)
+			}
+		}
+	}
 	// Prime itemCache under the drill-in navKey so loadResources can serve
 	// the list instantly and skip a redundant fetch when the user drills
 	// in or re-hovers this rt later. Only do this when msg.rt carries a
