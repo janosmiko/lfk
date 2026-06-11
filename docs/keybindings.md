@@ -699,11 +699,13 @@ resource, the view says so explicitly — no policy restrictions apply.
 
 | Key | Action |
 |---|---|
-| `j` / `k` | Scroll up/down |
+| `j` / `k` / Mouse wheel | Scroll up/down |
 | `gg` / `G` / `Home` / `End` | Jump to top / bottom |
 | `Ctrl+D` / `Ctrl+U` / `Shift+↓` / `Shift+↑` | Page down / up (half page) |
 | `Ctrl+F` / `Ctrl+B` / `PgDn` / `PgUp` | Page down / up (full page) |
-| `q` / `Esc` | Close visualizer |
+| `/` | Search (matches highlighted; `Enter` jumps to the first hit) |
+| `n` / `N` | Next / previous match |
+| `q` / `Esc` | Close visualizer (`Esc` clears an active search first) |
 
 ## Right-sizing Advisor
 

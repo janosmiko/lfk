@@ -699,7 +699,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			PodSelector: map[string]string{"app": "backend"},
 			PolicyTypes: []string{"Ingress", "Egress"},
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 40)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 40, "")
 		assert.Contains(t, result, "deny-all")
 		assert.Contains(t, result, "production")
 	})
@@ -711,7 +711,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			PodSelector: map[string]string{"app": "frontend", "tier": "web"},
 			PolicyTypes: []string{"Ingress"},
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 40)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 40, "")
 		assert.Contains(t, result, "app=frontend")
 		assert.Contains(t, result, "tier=web")
 	})
@@ -722,7 +722,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			Namespace:   "default",
 			PolicyTypes: []string{"Ingress"},
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 40)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 40, "")
 		assert.Contains(t, result, "all pods in namespace")
 	})
 
@@ -733,7 +733,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			PolicyTypes:  []string{"Ingress"},
 			AffectedPods: []string{"pod-1", "pod-2", "pod-3"},
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 40)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 40, "")
 		assert.Contains(t, result, "3 pod(s)")
 		assert.Contains(t, result, "pod-1")
 		assert.Contains(t, result, "pod-3")
@@ -745,7 +745,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			Namespace:   "default",
 			PolicyTypes: []string{"Ingress"},
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 40)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 40, "")
 		assert.Contains(t, result, "all ingress denied")
 	})
 
@@ -765,7 +765,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 				},
 			},
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 50)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 50, "")
 		assert.Contains(t, result, "INGRESS RULES")
 		assert.Contains(t, result, "Rule 1")
 		assert.Contains(t, result, "app=frontend")
@@ -789,7 +789,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 				},
 			},
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 50)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 50, "")
 		assert.Contains(t, result, "EGRESS RULES")
 		assert.Contains(t, result, "10.0.0.0/8")
 		assert.Contains(t, result, "10.0.1.0/24")
@@ -810,7 +810,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 				},
 			},
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 50)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 50, "")
 		assert.Contains(t, result, "env=production")
 		assert.Contains(t, result, "Namespace")
 	})
@@ -821,7 +821,7 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			Name:      "test",
 			Namespace: "default",
 		}
-		result := RenderNetworkPolicyOverlay(info, 0, 70, 40)
+		result := RenderNetworkPolicyOverlay(info, 0, 70, 40, "")
 		assert.NotContains(t, result, "j/k")
 		assert.NotContains(t, result, "close")
 	})
@@ -838,8 +838,8 @@ func TestRenderNetworkPolicyOverlay(t *testing.T) {
 			},
 		}
 		// Use a very small height to force scrolling.
-		result0 := RenderNetworkPolicyOverlay(info, 0, 70, 10)
-		result1 := RenderNetworkPolicyOverlay(info, 1, 70, 10)
+		result0 := RenderNetworkPolicyOverlay(info, 0, 70, 10, "")
+		result1 := RenderNetworkPolicyOverlay(info, 1, 70, 10, "")
 		// Scrolled results should differ.
 		assert.NotEqual(t, result0, result1)
 	})

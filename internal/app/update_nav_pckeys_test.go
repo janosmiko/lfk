@@ -971,8 +971,8 @@ func netpolModel() Model {
 func TestPCKeysNetworkPolicyPgDownMatchesCtrlF(t *testing.T) {
 	m := netpolModel()
 	m.netpolScroll = 0
-	rPg := m.handleNetworkPolicyOverlayKey(keyMsg("pgdown"))
-	rCF := m.handleNetworkPolicyOverlayKey(keyMsg("ctrl+f"))
+	rPg, _ := m.handleNetworkPolicyOverlayKey(keyMsg("pgdown"))
+	rCF, _ := m.handleNetworkPolicyOverlayKey(keyMsg("ctrl+f"))
 	assert.Equal(t, rCF.netpolScroll, rPg.netpolScroll,
 		"pgdown should match ctrl+f in network policy overlay")
 	assert.Greater(t, rPg.netpolScroll, 0)
@@ -981,8 +981,8 @@ func TestPCKeysNetworkPolicyPgDownMatchesCtrlF(t *testing.T) {
 func TestPCKeysNetworkPolicyPgUpMatchesCtrlB(t *testing.T) {
 	m := netpolModel()
 	m.netpolScroll = 100
-	rPg := m.handleNetworkPolicyOverlayKey(keyMsg("pgup"))
-	rCB := m.handleNetworkPolicyOverlayKey(keyMsg("ctrl+b"))
+	rPg, _ := m.handleNetworkPolicyOverlayKey(keyMsg("pgup"))
+	rCB, _ := m.handleNetworkPolicyOverlayKey(keyMsg("ctrl+b"))
 	assert.Equal(t, rCB.netpolScroll, rPg.netpolScroll,
 		"pgup should match ctrl+b in network policy overlay")
 	assert.Less(t, rPg.netpolScroll, 100)
@@ -993,7 +993,7 @@ func TestPCKeysNetworkPolicyHomeJumpsToTop(t *testing.T) {
 	m.netpolScroll = 50
 	m.netpolLineInput = "15"
 	m.pendingG = true
-	r := m.handleNetworkPolicyOverlayKey(keyMsg("home"))
+	r, _ := m.handleNetworkPolicyOverlayKey(keyMsg("home"))
 	assert.Equal(t, 0, r.netpolScroll, "home should reset netpolScroll to 0")
 	assert.Empty(t, r.netpolLineInput, "home should clear netpolLineInput")
 	assert.False(t, r.pendingG, "home must clear pendingG")
@@ -1003,7 +1003,7 @@ func TestPCKeysNetworkPolicyEndJumpsToBottom(t *testing.T) {
 	m := netpolModel()
 	m.netpolScroll = 0
 	m.netpolLineInput = "42"
-	r := m.handleNetworkPolicyOverlayKey(keyMsg("end"))
+	r, _ := m.handleNetworkPolicyOverlayKey(keyMsg("end"))
 	// End matches G with no line input: jump exactly to the bottom.
 	assert.Equal(t, m.netpolMaxScroll(), r.netpolScroll,
 		"end should match G (bottom) regardless of netpolLineInput")

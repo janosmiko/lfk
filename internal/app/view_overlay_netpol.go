@@ -37,9 +37,9 @@ func (m Model) renderOverlayNetworkPolicy(background string) string {
 	w, innerW, innerH := m.netpolOverlayDims()
 	var netpolContent string
 	if m.netpolsData != nil {
-		netpolContent = ui.RenderNetworkPoliciesOverlay(convertNetpolsForResource(m.netpolsData), m.netpolScroll, innerW, innerH)
+		netpolContent = ui.RenderNetworkPoliciesOverlay(convertNetpolsForResource(m.netpolsData), m.netpolScroll, innerW, innerH, m.netpolSearchQuery)
 	} else {
-		netpolContent = ui.RenderNetworkPolicyOverlay(convertNetpolInfo(*m.netpolData), m.netpolScroll, innerW, innerH)
+		netpolContent = ui.RenderNetworkPolicyOverlay(convertNetpolInfo(*m.netpolData), m.netpolScroll, innerW, innerH, m.netpolSearchQuery)
 	}
 	netpolContent = ui.FillLinesBg(netpolContent, innerW, ui.SurfaceBg)
 	overlay := ui.OverlayStyle.Width(w).Render(netpolContent)

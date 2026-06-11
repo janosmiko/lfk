@@ -290,11 +290,19 @@ func (m Model) overlayHintBarMisc() string {
 		hints = append(hints, ui.HintEntry{Key: "esc", Desc: "close"})
 		return m.renderHints(hints)
 	case overlayNetworkPolicy:
+		if m.netpolSearchActive {
+			return ui.HelpKeyStyle.Render(ui.ActiveKeybindings.Search) +
+				ui.BarNormalStyle.Render(m.netpolSearchInput.CursorLeft()) +
+				ui.BarDimStyle.Render("█") +
+				ui.BarNormalStyle.Render(m.netpolSearchInput.CursorRight())
+		}
 		return m.renderHints([]ui.HintEntry{
 			{Key: "j/k", Desc: "scroll"},
 			{Key: "g/G", Desc: "top/bottom"},
 			{Key: "ctrl+d/u", Desc: "half page"},
 			{Key: "ctrl+f/b", Desc: "page"},
+			{Key: "/", Desc: "search"},
+			{Key: "n/N", Desc: "next/prev match"},
 			{Key: "esc", Desc: "close"},
 		})
 	case overlayQuotaDashboard:

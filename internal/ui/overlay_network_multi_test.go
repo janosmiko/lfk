@@ -35,7 +35,7 @@ func TestRenderNetworkPoliciesOverlay_PodWithPolicies(t *testing.T) {
 			},
 		},
 	}
-	result := RenderNetworkPoliciesOverlay(info, 0, 80, 60)
+	result := RenderNetworkPoliciesOverlay(info, 0, 80, 60, "")
 	assert.Contains(t, result, "Pod: web-1")
 	assert.Contains(t, result, "allow-web")
 	assert.Contains(t, result, "default-deny")
@@ -48,7 +48,7 @@ func TestRenderNetworkPoliciesOverlay_NoPolicies(t *testing.T) {
 		Name:      "web-1",
 		Namespace: "default",
 	}
-	result := RenderNetworkPoliciesOverlay(info, 0, 80, 40)
+	result := RenderNetworkPoliciesOverlay(info, 0, 80, 40, "")
 	assert.Contains(t, result, "No network policies")
 	assert.Contains(t, result, "all traffic allowed")
 }
@@ -68,7 +68,7 @@ func TestRenderNetworkPoliciesOverlay_ServiceCoveredPods(t *testing.T) {
 			},
 		},
 	}
-	result := RenderNetworkPoliciesOverlay(info, 0, 80, 60)
+	result := RenderNetworkPoliciesOverlay(info, 0, 80, 60, "")
 	assert.Contains(t, result, "Service: web-svc")
 	assert.Contains(t, result, "canary-only")
 	// Partial coverage must be visible: the policy covers 1 of 2 backing pods.
@@ -110,7 +110,7 @@ func TestRenderNetworkPolicyOverlay_LinesNeverExceedWidth(t *testing.T) {
 	info := wideNetpolEntry()
 	total := NetworkPolicyOverlayLineCount(info, width)
 	for scroll := 0; scroll <= total; scroll++ {
-		out := RenderNetworkPolicyOverlay(info, scroll, width, height)
+		out := RenderNetworkPolicyOverlay(info, scroll, width, height, "")
 		for line := range strings.SplitSeq(out, "\n") {
 			assert.LessOrEqual(t, lipgloss.Width(line), width,
 				"scroll=%d line %q exceeds width", scroll, line)
@@ -122,10 +122,10 @@ func TestRenderNetworkPolicyOverlay_LinesNeverExceedWidth(t *testing.T) {
 func TestRenderNetworkPolicyOverlay_HeightStableAcrossScroll(t *testing.T) {
 	const width, height = 60, 12
 	info := wideNetpolEntry()
-	base := strings.Count(RenderNetworkPolicyOverlay(info, 0, width, height), "\n")
+	base := strings.Count(RenderNetworkPolicyOverlay(info, 0, width, height, ""), "\n")
 	total := NetworkPolicyOverlayLineCount(info, width)
 	for scroll := 1; scroll <= total; scroll++ {
-		got := strings.Count(RenderNetworkPolicyOverlay(info, scroll, width, height), "\n")
+		got := strings.Count(RenderNetworkPolicyOverlay(info, scroll, width, height, ""), "\n")
 		assert.Equal(t, base, got, "height changed at scroll=%d", scroll)
 	}
 }
@@ -147,10 +147,10 @@ func TestRenderNetworkPolicyOverlay_HeightStableWithShortTitle(t *testing.T) {
 			{Peers: []NetpolPeerEntry{{Type: "All"}}},
 		},
 	}
-	base := strings.Count(RenderNetworkPolicyOverlay(info, 0, width, height), "\n")
+	base := strings.Count(RenderNetworkPolicyOverlay(info, 0, width, height, ""), "\n")
 	total := NetworkPolicyOverlayLineCount(info, width)
 	for scroll := 1; scroll <= total; scroll++ {
-		got := strings.Count(RenderNetworkPolicyOverlay(info, scroll, width, height), "\n")
+		got := strings.Count(RenderNetworkPolicyOverlay(info, scroll, width, height, ""), "\n")
 		assert.Equal(t, base, got, "height changed at scroll=%d", scroll)
 	}
 }
@@ -171,10 +171,10 @@ func TestRenderNetworkPoliciesOverlay_HeightStableWithShortTitle(t *testing.T) {
 			},
 		},
 	}
-	base := strings.Count(RenderNetworkPoliciesOverlay(info, 0, width, height), "\n")
+	base := strings.Count(RenderNetworkPoliciesOverlay(info, 0, width, height, ""), "\n")
 	total := NetworkPoliciesOverlayLineCount(info, width)
 	for scroll := 1; scroll <= total; scroll++ {
-		got := strings.Count(RenderNetworkPoliciesOverlay(info, scroll, width, height), "\n")
+		got := strings.Count(RenderNetworkPoliciesOverlay(info, scroll, width, height, ""), "\n")
 		assert.Equal(t, base, got, "height changed at scroll=%d", scroll)
 	}
 }
@@ -190,7 +190,7 @@ func TestRenderNetworkPoliciesOverlay_LinesNeverExceedWidth(t *testing.T) {
 	}
 	total := NetworkPoliciesOverlayLineCount(info, width)
 	for scroll := 0; scroll <= total; scroll++ {
-		out := RenderNetworkPoliciesOverlay(info, scroll, width, height)
+		out := RenderNetworkPoliciesOverlay(info, scroll, width, height, "")
 		for line := range strings.SplitSeq(out, "\n") {
 			assert.LessOrEqual(t, lipgloss.Width(line), width,
 				"scroll=%d line %q exceeds width", scroll, line)
@@ -210,14 +210,14 @@ func TestOverlayMaxScroll(t *testing.T) {
 func TestRenderNetworkPolicyOverlay_ScrollbarReplacesIndicator(t *testing.T) {
 	const width, height = 80, 10
 	info := wideNetpolEntry()
-	out := RenderNetworkPolicyOverlay(info, 0, width, height)
+	out := RenderNetworkPolicyOverlay(info, 0, width, height, "")
 	assert.Contains(t, out, "█", "overflowing content must show a scrollbar thumb")
 	assert.Contains(t, out, "│", "overflowing content must show the scrollbar track")
 	assert.NotContains(t, out, "[1/", "the [n/m] indicator must be gone")
 
 	// The thumb must move as the view scrolls: at the bottom the first
 	// visible row is track, not thumb.
-	bottom := RenderNetworkPolicyOverlay(info, OverlayMaxScroll(NetworkPolicyOverlayLineCount(info, width), height), width, height)
+	bottom := RenderNetworkPolicyOverlay(info, OverlayMaxScroll(NetworkPolicyOverlayLineCount(info, width), height), width, height, "")
 	topRows := strings.SplitN(out, "\n", 2)
 	bottomRows := strings.SplitN(bottom, "\n", 2)
 	assert.True(t, strings.HasSuffix(topRows[0], "█"), "thumb starts at the top row")
@@ -226,7 +226,7 @@ func TestRenderNetworkPolicyOverlay_ScrollbarReplacesIndicator(t *testing.T) {
 
 func TestRenderNetworkPolicyOverlay_NoScrollbarWhenContentFits(t *testing.T) {
 	info := NetworkPolicyEntry{Name: "tiny", Namespace: "default"}
-	out := RenderNetworkPolicyOverlay(info, 0, 80, 40)
+	out := RenderNetworkPolicyOverlay(info, 0, 80, 40, "")
 	assert.NotContains(t, out, "█")
 }
 
@@ -237,6 +237,29 @@ func TestRenderNetworkPoliciesOverlay_ServiceNoSelector(t *testing.T) {
 		Namespace:  "default",
 		NoSelector: true,
 	}
-	result := RenderNetworkPoliciesOverlay(info, 0, 80, 40)
+	result := RenderNetworkPoliciesOverlay(info, 0, 80, 40, "")
 	assert.Contains(t, result, "no pod selector")
+}
+
+// --- search query rendering ---
+
+// A search query must only change styling (highlight), never the text
+// content of the rendered overlay.
+func TestRenderNetworkPolicyOverlay_QueryKeepsTextIntact(t *testing.T) {
+	info := wideNetpolEntry()
+	plain := stripANSI(RenderNetworkPolicyOverlay(info, 0, 80, 30, ""))
+	queried := stripANSI(RenderNetworkPolicyOverlay(info, 0, 80, 30, "ingress"))
+	assert.Equal(t, plain, queried)
+}
+
+// The exported line lists must match the line counts the scroll math uses.
+func TestNetworkPolicyOverlayLinesMatchLineCount(t *testing.T) {
+	info := wideNetpolEntry()
+	assert.Len(t, NetworkPolicyOverlayLines(info, 80), NetworkPolicyOverlayLineCount(info, 80))
+
+	multi := ResourceNetpolsEntry{
+		Kind: "Pod", Name: "web-1", Namespace: "default",
+		Policies: []NetworkPolicyEntry{info},
+	}
+	assert.Len(t, NetworkPoliciesOverlayLines(multi, 80), NetworkPoliciesOverlayLineCount(multi, 80))
 }

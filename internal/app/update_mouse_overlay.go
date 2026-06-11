@@ -29,6 +29,14 @@ import (
 func (m Model) handleOverlayMouse(msg tea.MouseMsg) (tea.Model, tea.Cmd) {
 	box, ok := m.centeredOverlayBox()
 	if !ok {
+		// The network policy visualizer is custom-rendered but plain
+		// scrollable text, so wheel maps cleanly onto its scroll offset.
+		// Clicks are still swallowed below like the other fullscreen /
+		// custom-rendered overlays.
+		if m.overlay == overlayNetworkPolicy &&
+			(msg.Button == tea.MouseButtonWheelUp || msg.Button == tea.MouseButtonWheelDown) {
+			return m.handleNetpolWheel(msg), nil
+		}
 		// Fullscreen / custom-rendered overlay: swallow every mouse
 		// event (clicks AND wheel) so we don't accidentally drive the
 		// explorer underneath, and so wheel doesn't start scrolling

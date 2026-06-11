@@ -9,9 +9,16 @@ import (
 
 // RenderNetworkPoliciesOverlay renders the multi-policy view opened from a
 // pod or service action menu: every network policy that selects the resource,
-// stacked, with the same diagrams as the single-policy visualizer.
-func RenderNetworkPoliciesOverlay(info ResourceNetpolsEntry, scroll, width, height int) string {
-	return renderScrollableLines(buildNetpolsOverlayLines(info, width), scroll, width, height)
+// stacked, with the same diagrams as the single-policy visualizer. A non-empty
+// query highlights matching text in the visible lines.
+func RenderNetworkPoliciesOverlay(info ResourceNetpolsEntry, scroll, width, height int, query string) string {
+	return renderScrollableLines(buildNetpolsOverlayLines(info, width), scroll, width, height, query)
+}
+
+// NetworkPoliciesOverlayLines returns the full (unscrolled) styled line list
+// of the multi-policy view, for search/match scanning by the key handler.
+func NetworkPoliciesOverlayLines(info ResourceNetpolsEntry, width int) []string {
+	return buildNetpolsOverlayLines(info, width)
 }
 
 // NetworkPoliciesOverlayLineCount returns the total line count of the

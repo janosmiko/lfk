@@ -12,9 +12,16 @@ import (
 
 // RenderNetworkPolicyOverlay renders the network policy visualizer overlay content.
 // The overlay shows pod selector, policy types, affected pods, and a visual diagram
-// of ingress/egress rules using box-drawing characters and arrows.
-func RenderNetworkPolicyOverlay(info NetworkPolicyEntry, scroll, width, height int) string {
-	return renderScrollableLines(buildNetpolOverlayLines(info, width), scroll, width, height)
+// of ingress/egress rules using box-drawing characters and arrows. A non-empty
+// query highlights matching text in the visible lines.
+func RenderNetworkPolicyOverlay(info NetworkPolicyEntry, scroll, width, height int, query string) string {
+	return renderScrollableLines(buildNetpolOverlayLines(info, width), scroll, width, height, query)
+}
+
+// NetworkPolicyOverlayLines returns the full (unscrolled) styled line list of
+// the single-policy view, for search/match scanning by the key handler.
+func NetworkPolicyOverlayLines(info NetworkPolicyEntry, width int) []string {
+	return buildNetpolOverlayLines(info, width)
 }
 
 // buildNetpolOverlayLines composes the full (unscrolled) line list for the
@@ -214,8 +221,10 @@ func sortedKeys(m map[string]string) []string {
 // Lines wider than width are truncated: an over-wide line would wrap inside
 // the overlay frame and change the overlay height while scrolling. When the
 // content overflows the viewport, each row gets the shared right-edge
-// scrollbar cell (same look as the list overlays).
-func renderScrollableLines(lines []string, scroll, width, height int) string {
+// scrollbar cell (same look as the list overlays). A non-empty query
+// highlights matches in the visible lines (before truncation, so a match
+// past the right edge is simply cut with the rest of the line).
+func renderScrollableLines(lines []string, scroll, width, height int, query string) string {
 	maxVisible := max(height, 3)
 	maxScroll := OverlayMaxScroll(len(lines), height)
 	if scroll > maxScroll {
@@ -232,6 +241,9 @@ func renderScrollableLines(lines []string, scroll, width, height int) string {
 	end := min(scroll+maxVisible, len(lines))
 	visible := make([]string, 0, maxVisible)
 	for _, line := range lines[scroll:end] {
+		if query != "" {
+			line = HighlightMatchInline(line, query, SearchHighlightStyle)
+		}
 		if lineWidth > 0 && lipgloss.Width(line) > lineWidth {
 			line = ansi.Truncate(line, lineWidth, "~")
 		}
