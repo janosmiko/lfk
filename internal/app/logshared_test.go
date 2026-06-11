@@ -10,7 +10,7 @@ import (
 // needed to survive init-container transitions (-f, --max-log-requests,
 // --ignore-errors) plus the common all-containers/prefix/timestamps set.
 func TestKubectlPodLogArgs_Follow(t *testing.T) {
-	got := kubectlPodLogArgs("mypod", "myns", "myctx", true, 50)
+	got := kubectlPodLogArgs("mypod", "myns", "myctx", true, 50, "")
 	assert.Equal(t, []string{
 		"logs", "-f", "mypod",
 		"-n", "myns",
@@ -27,7 +27,7 @@ func TestKubectlPodLogArgs_Follow(t *testing.T) {
 // TestKubectlPodLogArgs_Snapshot asserts the one-shot variant (lazy history
 // fetch) omits -f and the follow-only flags but keeps --tail/--timestamps.
 func TestKubectlPodLogArgs_Snapshot(t *testing.T) {
-	got := kubectlPodLogArgs("mypod", "myns", "myctx", false, 200)
+	got := kubectlPodLogArgs("mypod", "myns", "myctx", false, 200, "")
 	assert.Equal(t, []string{
 		"logs", "mypod",
 		"-n", "myns",
@@ -39,9 +39,35 @@ func TestKubectlPodLogArgs_Snapshot(t *testing.T) {
 	}, got)
 }
 
+// TestKubectlPodLogArgs_Container asserts the single-container variant scopes
+// the stream with -c and drops the all-containers flags (--all-containers,
+// --prefix, --max-log-requests) that only make sense for multi-stream tails.
+func TestKubectlPodLogArgs_Container(t *testing.T) {
+	got := kubectlPodLogArgs("mypod", "myns", "myctx", true, 50, "sidecar")
+	assert.Equal(t, []string{
+		"logs", "-f", "mypod",
+		"-n", "myns",
+		"--context", "myctx",
+		"-c", "sidecar",
+		"--ignore-errors",
+		"--tail=50",
+		"--timestamps",
+	}, got)
+
+	snapshot := kubectlPodLogArgs("mypod", "myns", "myctx", false, 200, "sidecar")
+	assert.Equal(t, []string{
+		"logs", "mypod",
+		"-n", "myns",
+		"--context", "myctx",
+		"-c", "sidecar",
+		"--tail=200",
+		"--timestamps",
+	}, snapshot)
+}
+
 // TestKubectlPodLogArgs_NoTail asserts a negative tail omits the --tail flag.
 func TestKubectlPodLogArgs_NoTail(t *testing.T) {
-	got := kubectlPodLogArgs("p", "n", "c", false, -1)
+	got := kubectlPodLogArgs("p", "n", "c", false, -1, "")
 	assert.NotContains(t, got, "--tail=-1")
 	for _, a := range got {
 		assert.NotContains(t, a, "--tail", "no --tail flag when tail < 0")

@@ -10,20 +10,29 @@ import (
 	"slices"
 )
 
-// kubectlPodLogArgs builds the kubectl args to tail all containers of a single
-// pod. When follow is true the stream stays open (-f) with the flags needed to
-// survive init-container transitions (--max-log-requests, --ignore-errors);
-// when false it is a one-shot snapshot used for lazy history fetches. A tail of
-// 0 means "no backlog", a positive tail caps the backlog, and a negative tail
-// omits --tail entirely.
-func kubectlPodLogArgs(name, namespace, kctx string, follow bool, tail int) []string {
+// kubectlPodLogArgs builds the kubectl args to tail a single pod: all of its
+// containers when container is "", or just that container via -c. When follow
+// is true the stream stays open (-f) with the flags needed to survive
+// init-container transitions (--ignore-errors, plus --max-log-requests for the
+// multi-stream all-containers tail); when false it is a one-shot snapshot used
+// for lazy history fetches. A tail of 0 means "no backlog", a positive tail
+// caps the backlog, and a negative tail omits --tail entirely.
+func kubectlPodLogArgs(name, namespace, kctx string, follow bool, tail int, container string) []string {
 	args := []string{"logs"}
 	if follow {
 		args = append(args, "-f")
 	}
-	args = append(args, name, "-n", namespace, "--context", kctx, "--all-containers=true", "--prefix")
+	args = append(args, name, "-n", namespace, "--context", kctx)
+	if container != "" {
+		args = append(args, "-c", container)
+	} else {
+		args = append(args, "--all-containers=true", "--prefix")
+	}
 	if follow {
-		args = append(args, "--max-log-requests=20", "--ignore-errors")
+		if container == "" {
+			args = append(args, "--max-log-requests=20")
+		}
+		args = append(args, "--ignore-errors")
 	}
 	if tail >= 0 {
 		args = append(args, fmt.Sprintf("--tail=%d", tail))

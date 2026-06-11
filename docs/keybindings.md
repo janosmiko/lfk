@@ -141,7 +141,7 @@ Search supports abbreviated resource type names (e.g., `pvc`, `hpa`, `deploy`).
 | `x` | Open action menu (bulk actions when items selected) | `action_menu` |
 | `\` | Open namespace selector | `namespace_selector` |
 | `A` | Toggle all-namespaces mode (also works inside the namespace selector — clears individual selections and enables all-ns) | `all_namespaces` |
-| `L` | Toggle live-log preview pane for selected pod (streaming tail in right pane; deeper levels only) | `toggle_preview_logs` |
+| `L` | Toggle live-log preview pane for selected pod or container (streaming tail in right pane; deeper levels only) | `toggle_preview_logs` |
 | `Ctrl+L` | Open fullscreen log viewer for selected resource | `logs` |
 | `e` | Secret/ConfigMap editor (inline key-value editing) | `secret_editor` |
 | `E` | Edit selected resource in $KUBE_EDITOR or $EDITOR | `edit` |

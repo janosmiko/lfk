@@ -24,14 +24,14 @@ func TestPreviewCacheRestoreOnReturn(t *testing.T) {
 
 	// Enter pod A (fresh start — no cache).
 	m = withSelectedPod(t, m, "ns", "pod-a")
-	m, _ = m.enterPreviewLogPod(podRef{"test-ctx", "ns", "pod-a"})
+	m, _ = m.enterPreviewLogPod(podRef{context: "test-ctx", namespace: "ns", name: "pod-a"})
 
 	// Simulate some lines arriving.
 	m.previewLog.lines = []string{"line-1", "line-2", "line-3"}
 
 	// Navigate to pod B — A's buffer should be cached.
 	m = withSelectedPod(t, m, "ns", "pod-b")
-	m, _ = m.enterPreviewLogPod(podRef{"test-ctx", "ns", "pod-b"})
+	m, _ = m.enterPreviewLogPod(podRef{context: "test-ctx", namespace: "ns", name: "pod-b"})
 
 	keyA := "test-ctx/ns/pod-a"
 	assert.Contains(t, m.previewLogCache, keyA, "pod-a buffer must be cached on leave")
@@ -39,7 +39,7 @@ func TestPreviewCacheRestoreOnReturn(t *testing.T) {
 
 	// Return to pod A — buffer must be restored.
 	m = withSelectedPod(t, m, "ns", "pod-a")
-	m, _ = m.enterPreviewLogPod(podRef{"test-ctx", "ns", "pod-a"})
+	m, _ = m.enterPreviewLogPod(podRef{context: "test-ctx", namespace: "ns", name: "pod-a"})
 
 	assert.Equal(t, "test-ctx/ns/pod-a", m.previewLog.podKey, "podKey must be pod-a after restore")
 	assert.Equal(t, []string{"line-1", "line-2", "line-3"}, m.previewLog.lines,
@@ -56,7 +56,7 @@ func TestPreviewCacheToggleOffOnSamePod(t *testing.T) {
 	m = withSelectedPod(t, m, "ns", "pod-a")
 
 	// Enter pod A.
-	m, _ = m.enterPreviewLogPod(podRef{"test-ctx", "ns", "pod-a"})
+	m, _ = m.enterPreviewLogPod(podRef{context: "test-ctx", namespace: "ns", name: "pod-a"})
 	m.previewLog.lines = []string{"a", "b", "c"}
 
 	// Toggle off: cache then cancel.
@@ -67,7 +67,7 @@ func TestPreviewCacheToggleOffOnSamePod(t *testing.T) {
 	assert.Contains(t, m.previewLogCache, "test-ctx/ns/pod-a", "buffer must be cached on disable")
 
 	// Toggle on again: restore from cache.
-	m, _ = m.enterPreviewLogPod(podRef{"test-ctx", "ns", "pod-a"})
+	m, _ = m.enterPreviewLogPod(podRef{context: "test-ctx", namespace: "ns", name: "pod-a"})
 	assert.Equal(t, []string{"a", "b", "c"}, m.previewLog.lines,
 		"re-enabling must restore from cache")
 	assert.Equal(t, "test-ctx/ns/pod-a", m.previewLog.podKey)
@@ -88,7 +88,7 @@ func TestPreviewCacheLRUEvicts(t *testing.T) {
 		// Set current pod lines before switching away so cachePreviewLog has content.
 		m.previewLog.podKey = "test-ctx/ns/" + podName
 		m.previewLog.lines = []string{"line-from-" + podName}
-		m, _ = m.enterPreviewLogPod(podRef{"test-ctx", "ns", fmt.Sprintf("pod-%d", i+1)})
+		m, _ = m.enterPreviewLogPod(podRef{context: "test-ctx", namespace: "ns", name: fmt.Sprintf("pod-%d", i+1)})
 	}
 
 	assert.LessOrEqual(t, len(m.previewLogCache), previewLogCacheMax,
@@ -364,6 +364,19 @@ func withSelectedResource(_ *testing.T, m Model, kind, ns, name string) Model {
 	return m
 }
 
+// withSelectedContainer positions the model at LevelContainers inside pod
+// (ns/podName) with the cursor on a single Container row, mirroring what
+// navigateChildResource does when drilling into a Pod.
+func withSelectedContainer(_ *testing.T, m Model, ns, podName, container string) Model {
+	m.nav.Level = model.LevelContainers
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "Pod", Resource: "pods", Namespaced: true}
+	m.nav.Namespace = ns
+	m.nav.OwnedName = podName
+	m.middleItems = []model.Item{{Name: container, Kind: "Container", Status: "Running"}}
+	m.setCursor(0)
+	return m
+}
+
 func TestUpdatePreviewLogLineAppendsForCurrentStream(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m.previewLog.readerInFlight = &atomic.Bool{}
@@ -437,7 +450,7 @@ func TestStartPreviewLogStreamReplacesPrevious(t *testing.T) {
 	m.previewLog.cancel = func() { cancelled = true }
 	m.previewLog.podKey = "ctx/ns/old"
 
-	m, _ = m.startPreviewLogStream(podRef{"ctx", "ns", "new"}, false)
+	m, _ = m.startPreviewLogStream(podRef{context: "ctx", namespace: "ns", name: "new"}, false)
 	assert.True(t, cancelled, "switching pods must cancel the previous stream")
 	assert.Equal(t, "ctx/ns/new", m.previewLog.podKey)
 }
@@ -456,7 +469,7 @@ func TestPreviewReconnectPreservesBufferAndCounter(t *testing.T) {
 	m.previewLog.fromBottom = 2
 	m.previewLog.podKey = "ctx/ns/pod-1"
 
-	m, _ = m.startPreviewLogStream(podRef{"ctx", "ns", "pod-1"}, true)
+	m, _ = m.startPreviewLogStream(podRef{context: "ctx", namespace: "ns", name: "pod-1"}, true)
 
 	assert.True(t, cancelled, "reconnect must cancel the previous kubectl stream")
 	assert.Equal(t, []string{"a", "b"}, m.previewLog.lines, "reconnect must preserve existing lines")
@@ -478,7 +491,7 @@ func TestPreviewSwitchClearsBuffer(t *testing.T) {
 	m.previewLog.fromBottom = 3
 	m.previewLog.podKey = "ctx/ns/pod-1"
 
-	m, _ = m.startPreviewLogStream(podRef{"ctx", "ns", "pod-2"}, false)
+	m, _ = m.startPreviewLogStream(podRef{context: "ctx", namespace: "ns", name: "pod-2"}, false)
 
 	assert.Empty(t, m.previewLog.lines, "pod switch must clear the buffer")
 	assert.Equal(t, 0, m.previewLog.autoReconnectAttempt, "pod switch must reset attempt counter")
@@ -527,6 +540,40 @@ func TestSelectedPodForLogPreview(t *testing.T) {
 		_, ok := m.selectedPodForLogPreview()
 		assert.False(t, ok)
 	})
+	t.Run("container row resolves to its pod plus container", func(t *testing.T) {
+		m := baseModelWithFakeClient()
+		m = withSelectedContainer(t, m, "ns", "pod-1", "sidecar")
+		ref, ok := m.selectedPodForLogPreview()
+		assert.True(t, ok)
+		assert.Equal(t, "pod-1", ref.name, "pod name comes from nav.OwnedName")
+		assert.Equal(t, "ns", ref.namespace)
+		assert.Equal(t, "sidecar", ref.container)
+	})
+	t.Run("container row without owned pod does not resolve", func(t *testing.T) {
+		m := baseModelWithFakeClient()
+		m = withSelectedContainer(t, m, "ns", "", "sidecar")
+		_, ok := m.selectedPodForLogPreview()
+		assert.False(t, ok)
+	})
+}
+
+// Two containers of the same pod must stream and cache independently: the
+// podRef key embeds the container so a container switch restarts the stream.
+func TestPodRefKeyDistinguishesContainers(t *testing.T) {
+	pod := podRef{context: "ctx", namespace: "ns", name: "pod-1"}
+	app := podRef{context: "ctx", namespace: "ns", name: "pod-1", container: "app"}
+	sidecar := podRef{context: "ctx", namespace: "ns", name: "pod-1", container: "sidecar"}
+
+	assert.Equal(t, "ctx/ns/pod-1", pod.key(), "whole-pod key keeps its historical shape")
+	assert.NotEqual(t, app.key(), sidecar.key())
+	assert.NotEqual(t, pod.key(), app.key())
+}
+
+// The pane title shows which container is being tailed.
+func TestPreviewLogPodLabelIncludesContainer(t *testing.T) {
+	m := baseModelWithFakeClient()
+	m = withSelectedContainer(t, m, "ns", "pod-1", "app")
+	assert.Equal(t, "ns/pod-1/app", m.previewLogPodLabel())
 }
 
 func TestToggleLogPreviewMutualExclusivity(t *testing.T) {
@@ -564,7 +611,7 @@ func TestPreviewLogSwitchesOnlyOnPodChange(t *testing.T) {
 		m := baseModelWithFakeClient()
 		m.fullLogPreview = true
 		m.previewLog.podKey = "ctx/ns/pod-1"
-		m2, cmd := m.maybeRestartPreviewLog(podRef{"ctx", "ns", "pod-1"})
+		m2, cmd := m.maybeRestartPreviewLog(podRef{context: "ctx", namespace: "ns", name: "pod-1"})
 		assert.Equal(t, "ctx/ns/pod-1", m2.previewLog.podKey, "same pod must not change podKey")
 		assert.Nil(t, cmd, "same pod must return nil cmd (no-op)")
 	})
@@ -574,7 +621,7 @@ func TestPreviewLogSwitchesOnlyOnPodChange(t *testing.T) {
 		m.previewLog.readerInFlight = &atomic.Bool{}
 		m.fullLogPreview = true
 		m.previewLog.podKey = "ctx/ns/pod-1"
-		m2, _ := m.maybeRestartPreviewLog(podRef{"ctx", "ns", "pod-2"})
+		m2, _ := m.maybeRestartPreviewLog(podRef{context: "ctx", namespace: "ns", name: "pod-2"})
 		assert.Equal(t, "ctx/ns/pod-2", m2.previewLog.podKey, "different pod must update podKey")
 	})
 }
