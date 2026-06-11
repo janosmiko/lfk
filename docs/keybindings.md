@@ -939,7 +939,7 @@ Press `:` to open the command bar. It supports four types of input:
 The action menu (`x` key) shows context-specific actions based on the resource type:
 
 ### Pod Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
 
 ### Deployment Actions
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
@@ -951,7 +951,7 @@ The action menu (`x` key) shows context-specific actions based on the resource t
 `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Service Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `c` Capture Traffic, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies affecting the service's backing pods), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
 
 ### Secret Actions
 `e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
