@@ -447,7 +447,7 @@ The fullscreen viewers (YAML, diff, describe, log, events) honor the shared `sea
 | `toggle_prefixes` | `p` | Toggle `[pod/name/container]` line prefixes (log viewer). |
 | `toggle_unified` | `u` | Toggle unified vs side-by-side layout (diff viewer). |
 | `toggle_preview` | `P` | Toggle the structured preview side panel (log viewer) / details↔YAML preview (explorer). |
-| `toggle_preview_logs` | `L` | Toggle the right-pane live-log preview for the selected pod (explorer; deeper levels only). |
+| `toggle_preview_logs` | `L` | Toggle the right-pane live-log preview for the selected pod or container (explorer; deeper levels only). |
 | `fullscreen` | `F` | Maximize/minimize: explorer middle column & dashboard, event timeline, error log. |
 | `sort_next` | `>` | Sort by next column |
 | `sort_prev` | `<` | Sort by previous column |

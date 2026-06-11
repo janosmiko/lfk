@@ -184,7 +184,7 @@ func (m Model) startPreviewLogStream(ref podRef, reconnect bool) (Model, tea.Cmd
 		m.previewLog.historyTail = initialTail
 	}
 
-	args := kubectlPodLogArgs(ref.name, ref.namespace, m.kubectlContext(ref.context), true, tail)
+	args := kubectlPodLogArgs(ref.name, ref.namespace, m.kubectlContext(ref.context), true, tail, ref.container)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	m.previewLog.cancel = cancel
@@ -400,21 +400,37 @@ func (m Model) maybeRestartOrCancelPreviewLog() (Model, tea.Cmd) {
 	return m.maybeRestartPreviewLog(ref)
 }
 
-// previewLogPodLabel returns "namespace/name" for the currently-selected pod,
-// or "" when no pod resolves (so RenderLogPreview shows its placeholder).
+// previewLogPodLabel returns "namespace/name" for the currently-selected pod
+// ("namespace/name/container" for a container stream), or "" when no pod
+// resolves (so RenderLogPreview shows its placeholder).
 func (m Model) previewLogPodLabel() string {
 	ref, ok := m.selectedPodForLogPreview()
 	if !ok {
 		return ""
 	}
-	return ref.namespace + "/" + ref.name
+	label := ref.namespace + "/" + ref.name
+	if ref.container != "" {
+		label += "/" + ref.container
+	}
+	return label
 }
 
-// podRef identifies a single pod for the live-log preview stream.
-type podRef struct{ context, namespace, name string }
+// podRef identifies a single pod — or one container of it — for the live-log
+// preview stream. An empty container means "all containers" (the whole-pod
+// stream).
+type podRef struct{ context, namespace, name, container string }
 
-// key returns the cache/dedup key for this pod ref ("ctx/ns/name").
-func (r podRef) key() string { return r.context + "/" + r.namespace + "/" + r.name }
+// key returns the cache/dedup key for this ref ("ctx/ns/name", with a
+// "/container" suffix for single-container streams so a container switch is
+// seen as a stream change). Kubernetes name validation forbids "/" in
+// namespace, pod, and container names, so the separator is unambiguous.
+func (r podRef) key() string {
+	k := r.context + "/" + r.namespace + "/" + r.name
+	if r.container != "" {
+		k += "/" + r.container
+	}
+	return k
+}
 
 // cachePreviewLog saves the current preview buffer under its podKey so it can
 // be restored when the user returns to the same pod. A copy of the slice is
@@ -552,14 +568,22 @@ func (m Model) previewLogViewportHeight() int {
 
 // selectedPodForLogPreview returns the pod to tail when the current selection
 // resolves to exactly one pod (a Pod row at LevelResources, or a Pod selected
-// after drilling into a parent at LevelOwned). Returns ok=false for multi-pod
-// parents and non-pod resources.
+// after drilling into a parent at LevelOwned) or one container of a pod (a
+// Container row at LevelContainers — the parent pod comes from nav.OwnedName,
+// mirroring buildActionCtx). Returns ok=false for multi-pod parents and
+// non-pod resources.
 func (m Model) selectedPodForLogPreview() (podRef, bool) {
 	sel := m.selectedMiddleItem()
 	if sel == nil {
 		return podRef{}, false
 	}
-	if sel.Kind != "Pod" {
+	name, container := sel.Name, ""
+	if sel.Kind == "Container" {
+		if m.nav.OwnedName == "" {
+			return podRef{}, false
+		}
+		name, container = m.nav.OwnedName, sel.Name
+	} else if sel.Kind != "Pod" {
 		return podRef{}, false
 	}
 	// Mirror the namespace resolution from buildActionCtx.
@@ -573,7 +597,8 @@ func (m Model) selectedPodForLogPreview() (podRef, bool) {
 	return podRef{
 		context:   m.effectiveContext(),
 		namespace: ns,
-		name:      sel.Name,
+		name:      name,
+		container: container,
 	}, true
 }
 
@@ -592,7 +617,7 @@ func (m Model) fetchOlderPreviewLogs(ref podRef, tail int) tea.Cmd {
 	kubeconfigPaths := m.client.KubeconfigPathForContext(ref.context)
 	podKey := ref.key()
 
-	args := kubectlPodLogArgs(ref.name, ref.namespace, m.kubectlContext(ref.context), false, tail)
+	args := kubectlPodLogArgs(ref.name, ref.namespace, m.kubectlContext(ref.context), false, tail, ref.container)
 
 	return func() tea.Msg {
 		cmd := exec.Command(kubectlPath, args...) //nolint:gosec
