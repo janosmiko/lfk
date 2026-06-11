@@ -32,6 +32,11 @@ var (
 	ConfigSecuritySecretEnvExclude []string
 )
 
+// ConfigSecurityScanSecrets gates the heuristic checks that list Secret
+// objects (`security.heuristic.scan_secrets`): legacy_sa_token_secret and
+// tls_secret_expiry. Defaults to true. Read-only after load.
+var ConfigSecurityScanSecrets = true
+
 // ConfigClusterSecurityEnabled maps context names to per-cluster
 // dashboard-enabled overrides; a value here wins over ConfigSecurityEnabled.
 var ConfigClusterSecurityEnabled = map[string]bool{}

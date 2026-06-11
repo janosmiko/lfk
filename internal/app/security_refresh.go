@@ -76,6 +76,7 @@ func (m *Model) refreshSecuritySources() tea.Cmd {
 		if kc != nil {
 			h := heuristic.NewWithClient(kc)
 			h.SetSecretEnvPatterns(ui.ConfigSecuritySecretEnvInclude, ui.ConfigSecuritySecretEnvExclude)
+			h.SetScanSecrets(ui.ConfigSecurityScanSecrets)
 			register("heuristic", h)
 			register("advisor", advisor.NewWithClient(kc))
 			register("rbac", rbac.NewWithClient(kc))

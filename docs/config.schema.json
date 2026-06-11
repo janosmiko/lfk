@@ -556,6 +556,12 @@
               "type": "array",
               "description": "Env-var name globs (* and ?, case-insensitive) the secret_env check never flags, on top of the built-in exemptions. Wins over secret_env_include.",
               "items": { "type": "string" }
+            },
+            "scan_secrets": {
+              "type": "boolean",
+              "default": true,
+              "description": "Allow the heuristic source to list Secret objects for the legacy_sa_token_secret and tls_secret_expiry checks. Set false to keep the source from ever reading Secrets.",
+              "examples": [false]
             }
           }
         }

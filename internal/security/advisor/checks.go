@@ -41,6 +41,8 @@ func (d *clusterData) findings() []security.Finding {
 		d.orphanPDBFindings(),
 		d.lifecycleFindings(),
 		d.scalingFindings(),
+		d.serviceFindings(),
+		d.batchFindings(),
 	}
 	total := 0
 	for _, g := range groups {

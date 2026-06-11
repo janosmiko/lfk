@@ -536,6 +536,10 @@ type heuristicConfig struct {
 	// wins over Include.
 	SecretEnvInclude []string `json:"secret_env_include" yaml:"secret_env_include"`
 	SecretEnvExclude []string `json:"secret_env_exclude" yaml:"secret_env_exclude"`
+	// ScanSecrets gates the heuristic checks that list Secret objects
+	// (legacy_sa_token_secret, tls_secret_expiry). Defaults to true; set
+	// false to keep the source from ever listing Secrets.
+	ScanSecrets *bool `json:"scan_secrets" yaml:"scan_secrets"`
 }
 
 // SecurityIgnorePattern is a declarative ignore rule from the config file.
