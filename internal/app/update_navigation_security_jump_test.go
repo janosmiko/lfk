@@ -157,6 +157,31 @@ func TestJumpBackFromSecurityJumpRestoresAffectedResourcesView(t *testing.T) {
 	assert.Equal(t, "__security_affected_resource__", bm.middleItems[0].Kind)
 }
 
+// TestSecurityGroupDrillInWithoutManagerDoesNotStrandLoading: drilling into
+// a finding group when loadSecurityAffectedResources cannot produce a
+// command (security manager torn down mid-session) must not leave the
+// loading spinner armed forever (CodeRabbit PR #413 finding).
+func TestSecurityGroupDrillInWithoutManagerDoesNotStrandLoading(t *testing.T) {
+	m := baseModelBoost2()
+	m.securityManager = nil
+	m.nav.Level = model.LevelResources
+	m.nav.ResourceType = model.ResourceTypeEntry{Kind: "__security_rbac__", APIGroup: model.SecurityVirtualAPIGroup}
+	sel := &model.Item{
+		Kind:  "__security_finding_group__",
+		Name:  "rbac_wildcard",
+		Extra: "rbac_wildcard",
+	}
+	m.middleItems = []model.Item{*sel}
+	m.setCursor(0)
+
+	rm, _ := m.navigateChildResource(sel)
+	rmm := rm.(Model)
+
+	assert.Equal(t, model.LevelOwned, rmm.nav.Level, "navigation itself still proceeds")
+	assert.False(t, rmm.loading,
+		"loading must not be armed when no affected-resources load can be dispatched")
+}
+
 // TestNavigateChildOwnedSecurityAffectedResourceNoHistoryOnFailedJump verifies a
 // jump that cannot resolve its target (kind not discovered) leaves the jump-back
 // stack untouched — pushing history for a no-op teleport would strand a phantom

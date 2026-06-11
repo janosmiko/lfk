@@ -545,8 +545,14 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 			m.setMiddleItems(nil)
 			m.setCursor(0)
 		}
-		m.loading = true
-		return m, m.loadSecurityAffectedResources(false)
+		// loadSecurityAffectedResources legitimately returns nil (manager
+		// torn down, no group key); arming the spinner without a command
+		// would strand it forever.
+		if cmd := m.loadSecurityAffectedResources(false); cmd != nil {
+			m.loading = true
+			return m, cmd
+		}
+		return m, m.loadPreview()
 	}
 	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
 		return m, nil
