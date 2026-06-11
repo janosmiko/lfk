@@ -456,6 +456,12 @@ var BuiltInOrderRank = map[string]int{
 	// API and CRDs
 	"apiregistration.k8s.io/apiservices":             100,
 	"apiextensions.k8s.io/customresourcedefinitions": 101,
+
+	// Security — the built-in sources (no external scanner required) lead;
+	// external scanners keep the alphabetical fallback below them.
+	"_security/findings-advisor":   110,
+	"_security/findings-heuristic": 111,
+	"_security/findings-rbac":      112,
 }
 
 // PseudoResources returns the LFK-only resource types that are not served

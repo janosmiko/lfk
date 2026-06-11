@@ -48,6 +48,7 @@ func buildSecuritySourceEntries(mgr *security.Manager, availability map[string]b
 	}{
 		"heuristic":      {"Heuristic", model.Icon{Unicode: "◉", Simple: "[He]", NerdFont: "\U000f0483"}},
 		"advisor":        {"Advisor", model.Icon{Unicode: "◌", Simple: "[Ad]", NerdFont: "\U000f0483"}},
+		"rbac":           {"RBAC", model.Icon{Unicode: "◒", Simple: "[Rb]", NerdFont: "\U000f0483"}},
 		"trivy-operator": {"Trivy", model.Icon{Unicode: "◈", Simple: "[Tr]", NerdFont: "\U000f0483"}},
 		"policy-report":  {"Kyverno", model.Icon{Unicode: "◇", Simple: "[Ky]", NerdFont: "\U000f0483"}},
 		"falco":          {"Falco", model.Icon{Unicode: "◎", Simple: "[Fa]", NerdFont: "\U000f0483"}},

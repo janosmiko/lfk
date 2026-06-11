@@ -106,7 +106,7 @@ appearance:
 
 # ─── Security Dashboard ────────────────────────────────────────────────────────
 # Built-in security findings dashboard (Security sidebar category + SEC badge).
-# Sources auto-detect by their operator/CRDs: heuristic and advisor (always
+# Sources auto-detect by their operator/CRDs: heuristic, advisor, and rbac (always
 # on), trivy, kyverno, kubescape, falco, gatekeeper. See docs/security.md.
 # Per-context overrides under clusters.<name>.security beat these globals.
 # Default: enabled, all sources on.
@@ -136,6 +136,9 @@ appearance:
 #       - "*_CONN_STR"           # also flag literal connection strings
 #     secret_env_exclude:
 #       - "MYAPP_FAKE_TOKEN"     # known non-secret; don't flag
+#     scan_secrets: false        # forbid the source from listing Secrets
+#                                # (disables legacy-token + TLS-expiry checks
+#                                # and Secret-reference verification)
 
 # ─── Log Path ──────────────────────────────────────────────────────────────────
 # Application log file location (lfk's own debug log, NOT the log viewer).

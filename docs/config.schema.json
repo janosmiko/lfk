@@ -534,7 +534,7 @@
         },
         "sources": {
           "type": "object",
-          "description": "Enable/disable individual sources. Keys accept friendly names (heuristic, advisor, trivy, kyverno, kubescape, falco, gatekeeper) or internal ids (trivy-operator, policy-report). Omitted sources default to enabled.",
+          "description": "Enable/disable individual sources. Keys accept friendly names (heuristic, advisor, rbac, trivy, kyverno, kubescape, falco, gatekeeper) or internal ids (trivy-operator, policy-report). Omitted sources default to enabled.",
           "additionalProperties": { "type": "boolean" }
         },
         "ignore_patterns": {
@@ -556,6 +556,12 @@
               "type": "array",
               "description": "Env-var name globs (* and ?, case-insensitive) the secret_env check never flags, on top of the built-in exemptions. Wins over secret_env_include.",
               "items": { "type": "string" }
+            },
+            "scan_secrets": {
+              "type": "boolean",
+              "default": true,
+              "description": "Allow the heuristic source to list Secret objects for the legacy_sa_token_secret and tls_secret_expiry checks. Set false to keep the source from ever reading Secrets.",
+              "examples": [false]
             }
           }
         }

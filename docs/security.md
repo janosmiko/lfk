@@ -8,22 +8,25 @@ sources, each auto-detected by the operator or CRDs it needs.
 
 | Source | Config key | Requires in cluster | Findings |
 |---|---|---|---|
-| Heuristic | `heuristic` | nothing (built-in) | Pod-spec hardening issues: privileged, host PID/IPC/network, hostPath + runtime-socket mounts, dangerous capabilities, runAsRoot, allowPrivilegeEscalation, writable root filesystem, seccomp Unconfined, unmasked procMount, unsafe sysctls, hostPort, shared process namespace, plaintext secrets in env, default ServiceAccount (+ token automount), missing resource limits, unpinned image tags |
-| Advisor | `advisor` | nothing (built-in) | Reliability recommendations: namespaces without ResourceQuota/LimitRange, multi-replica workloads without a PodDisruptionBudget or topology spread, drain-blocking or orphaned PDBs, single-replica workloads, missing probes or resource requests, identical liveness/readiness probes, downtime rollout strategies, emptyDir without sizeLimit, quotas near their limit, HPAs pinned / at their ceiling / lacking target requests |
+| Heuristic | `heuristic` | nothing (built-in) | Pod- and Service-spec hardening issues: privileged, host PID/IPC/network, hostPath + runtime-socket mounts, dangerous capabilities, runAsRoot, allowPrivilegeEscalation, writable root filesystem, seccomp Unconfined, unmasked procMount, unsafe sysctls, hostPort, shared process namespace, plaintext secrets in env, entire Secrets in env (envFrom), default ServiceAccount (+ token automount), missing resource limits, unpinned image tags, leftover ephemeral debug containers, Windows HostProcess containers, Services with externalIPs, namespaces without Pod Security enforcement labels or NetworkPolicies, credential-looking ConfigMap keys, Ingresses without TLS or with catch-all hosts, legacy ServiceAccount token Secrets, expired/expiring TLS certificates, bare pods without a controller (reliability), pods referencing missing ConfigMaps/Secrets (reliability) |
+| Advisor | `advisor` | nothing (built-in) | Reliability recommendations: namespaces without ResourceQuota/LimitRange, multi-replica workloads without a PodDisruptionBudget or topology spread, drain-blocking or orphaned PDBs, single-replica workloads, missing probes or resource requests, identical liveness/readiness probes, liveness without readiness, downtime rollout strategies, OnDelete update strategies, zero termination grace period, emptyDir without sizeLimit, quotas near their limit, HPAs pinned / at their ceiling / lacking target requests, PDB minAvailable above HPA minimums, PDBs without unhealthyPodEvictionPolicy, manifests pinning replicas under an HPA, StatefulSets with missing or non-headless governing Services, Services with zero or one ready endpoint, suspended CronJobs, standalone Jobs without TTL, StatefulSet volumes on non-expandable StorageClasses |
+| RBAC | `rbac` | nothing (built-in) | Privilege-escalation paths in Roles/ClusterRoles and their bindings: wildcard rules, impersonation, bind/escalate verbs, pods/exec + attach + port-forward grants, kubelet API (nodes/proxy), CSR approval, admission-webhook write access, cluster-wide secret reads, and bindings to anonymous users, system:masters, cluster-admin, or the default ServiceAccount. Kubernetes built-ins (bootstrap-labeled or system:-prefixed) are excluded — note this also skips user-created objects deliberately named `system:*`, so the source audits misconfigurations, not active evasion |
 | Trivy | `trivy` | [Trivy Operator](https://github.com/aquasecurity/trivy-operator) (`VulnerabilityReport`, `ConfigAuditReport` CRDs) | Image vulnerabilities + config-audit misconfigurations |
 | Kyverno | `kyverno` | Policy Reports API (`PolicyReport`, `ClusterPolicyReport` from `wgpolicyk8s.io/v1alpha2`) | Policy violations |
 | Kubescape | `kubescape` | [kubescape-operator](https://github.com/kubescape/kubescape-operator) (`WorkloadConfigurationScan` CRD) | Failed compliance controls |
 | Falco | `falco` | [Falco](https://falco.org) DaemonSet + falcosidekick (pod logs / K8s Events) | Runtime security events |
 | Gatekeeper | `gatekeeper` | [OPA Gatekeeper](https://open-policy-agent.github.io/gatekeeper/) (Constraint CRDs under `constraints.gatekeeper.sh`) | Constraint audit violations |
 
-**Heuristic and Advisor are always available** — they only need API access, so
-the Security category is never empty unless the dashboard is disabled. The
+**Heuristic, Advisor, and RBAC are always available** — they only need API
+access, so the Security category is never empty unless the dashboard is
+disabled. The
 internal ids `trivy-operator` and `policy-report` are also accepted as config
 keys (aliases of `trivy` and `kyverno`).
 
 Advisor findings are **reliability recommendations, not security findings**:
 they appear in the dashboard under the Advisor source but never color the
-per-resource SEC badge. The source is best-effort under restricted RBAC —
+per-resource SEC badge. The heuristic's `bare_pod` check is
+reliability-categorized the same way and likewise stays off the badge. The source is best-effort under restricted RBAC —
 resource types it cannot list (e.g. PDBs for a read-only user) silently skip
 their checks instead of failing the source, and the `kube-system`,
 `kube-public`, and `kube-node-lease` namespaces are always excluded.
@@ -31,7 +34,11 @@ their checks instead of failing the source, and the `kube-system`,
 The heuristic `secret_env` check (plaintext credential-looking env vars) is
 tunable with `security.heuristic.secret_env_include` / `secret_env_exclude` —
 case-insensitive env-var name globs added on top of the built-in keyword and
-exemption lists (exclude wins). See
+exemption lists (exclude wins); the same patterns also drive the
+`configmap_secret_keys` check. The Secret-listing checks
+(`legacy_sa_token_secret`, `tls_secret_expiry`, and Secret-reference
+verification) can be turned off with `security.heuristic.scan_secrets: false`
+if the source should never read Secret objects. See
 [config-reference.md](config-reference.md).
 
 ## Enabling / disabling

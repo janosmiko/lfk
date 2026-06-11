@@ -545,8 +545,14 @@ func (m Model) navigateChildResource(sel *model.Item) (tea.Model, tea.Cmd) {
 			m.setMiddleItems(nil)
 			m.setCursor(0)
 		}
-		m.loading = true
-		return m, m.loadSecurityAffectedResources(false)
+		// loadSecurityAffectedResources legitimately returns nil (manager
+		// torn down, no group key); arming the spinner without a command
+		// would strand it forever.
+		if cmd := m.loadSecurityAffectedResources(false); cmd != nil {
+			m.loading = true
+			return m, cmd
+		}
+		return m, m.loadPreview()
 	}
 	if !m.resourceTypeHasChildren() && m.nav.ResourceType.Kind != "Pod" {
 		return m, nil
@@ -678,6 +684,11 @@ func (m Model) jumpToFindingResource(sel *model.Item) (tea.Model, tea.Cmd) {
 	m.nav.Namespace = namespace
 	m.nav.Level = model.LevelResources
 	m.securityActiveGroup = ""
+	// Arm the post-load auto-select: on a cold cache the cursor below stays
+	// at 0 and only the resources-loaded handler can place it on the target.
+	// Armed on the cache-hit path too, so the refresh load re-selects the
+	// same row instead of drifting.
+	m.pendingTarget = name
 	m.clearRight()
 	m.saveCurrentSession()
 	if cached, cacheHit := m.itemCache[m.navKey()]; cacheHit {

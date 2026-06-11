@@ -224,6 +224,9 @@ func applySecurityConfig(cfg configFile) {
 	if cfg.Security.Heuristic != nil {
 		ConfigSecuritySecretEnvInclude = trimNonEmpty(cfg.Security.Heuristic.SecretEnvInclude)
 		ConfigSecuritySecretEnvExclude = trimNonEmpty(cfg.Security.Heuristic.SecretEnvExclude)
+		if cfg.Security.Heuristic.ScanSecrets != nil {
+			ConfigSecurityScanSecrets = *cfg.Security.Heuristic.ScanSecrets
+		}
 	}
 }
 

@@ -200,7 +200,8 @@ func TestFetchPDBBlocksDrain(t *testing.T) {
 	assert.True(t, got["prod/PodDisruptionBudget/zero-maxunavail"]["pdb_blocks_drain"])
 	assert.True(t, got["prod/PodDisruptionBudget/full-minavail"]["pdb_blocks_drain"])
 	assert.True(t, got["prod/PodDisruptionBudget/min-eq-replicas"]["pdb_blocks_drain"])
-	assert.Nil(t, got["prod/PodDisruptionBudget/healthy"])
+	assert.False(t, got["prod/PodDisruptionBudget/healthy"]["pdb_blocks_drain"],
+		"a satisfiable PDB must not be flagged as drain-blocking")
 }
 
 func TestFetchHPAChecks(t *testing.T) {

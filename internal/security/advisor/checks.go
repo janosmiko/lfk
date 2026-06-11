@@ -39,6 +39,10 @@ func (d *clusterData) findings() []security.Finding {
 		d.quotaFindings(),
 		d.hpaConfigFindings(),
 		d.orphanPDBFindings(),
+		d.lifecycleFindings(),
+		d.scalingFindings(),
+		d.serviceFindings(),
+		d.batchFindings(),
 	}
 	total := 0
 	for _, g := range groups {
@@ -85,6 +89,15 @@ func (d *clusterData) hpaTargets() map[string]bool {
 }
 
 func workloadKey(w *workload) string { return w.namespace + "/" + w.kind + "/" + w.name }
+
+// workloadByKey indexes the workloads by "ns/kind/name" for HPA-target joins.
+func (d *clusterData) workloadByKey() map[string]*workload {
+	byKey := make(map[string]*workload, len(d.workloads))
+	for i := range d.workloads {
+		byKey[workloadKey(&d.workloads[i])] = &d.workloads[i]
+	}
+	return byKey
+}
 
 func (d *clusterData) workloadFindings() []security.Finding {
 	var out []security.Finding
@@ -292,10 +305,7 @@ func (d *clusterData) hpaFindings() []security.Finding {
 	if !d.hpasOK {
 		return nil
 	}
-	byKey := make(map[string]*workload, len(d.workloads))
-	for i := range d.workloads {
-		byKey[workloadKey(&d.workloads[i])] = &d.workloads[i]
-	}
+	byKey := d.workloadByKey()
 	var out []security.Finding
 	for i := range d.hpas {
 		h := &d.hpas[i]

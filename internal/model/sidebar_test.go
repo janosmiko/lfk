@@ -391,6 +391,34 @@ func TestBuildSidebarItems_InjectsSecuritySources(t *testing.T) {
 		"Extra encodes the virtual API group so the explorer dispatches to security.Manager")
 }
 
+// TestBuildSidebarItems_SecuritySourceOrder verifies that the built-in
+// sources (Advisor, Heuristic, RBAC) sort before external scanner sources,
+// which keep their alphabetical fallback order.
+func TestBuildSidebarItems_SecuritySourceOrder(t *testing.T) {
+	prev := SecuritySourcesFn
+	t.Cleanup(func() { SecuritySourcesFn = prev })
+	SecuritySourcesFn = func() []SecuritySourceEntry {
+		return []SecuritySourceEntry{
+			{DisplayName: "Trivy", SourceName: "trivy-operator"},
+			{DisplayName: "CIS", SourceName: "kube-bench"},
+			{DisplayName: "RBAC", SourceName: "rbac"},
+			{DisplayName: "Advisor", SourceName: "advisor"},
+			{DisplayName: "Falco", SourceName: "falco"},
+			{DisplayName: "Heuristic", SourceName: "heuristic"},
+		}
+	}
+
+	items := BuildSidebarItems(nil)
+	var got []string
+	for _, it := range items {
+		if it.Category == "Security" {
+			got = append(got, it.Name)
+		}
+	}
+	assert.Equal(t, []string{"Advisor", "Heuristic", "RBAC", "CIS", "Falco", "Trivy"}, got,
+		"built-in sources lead; external scanners stay alphabetical")
+}
+
 // TestBuildSidebarItems_NilSecurityHook ensures the Security category is
 // still navigable as an empty header when no sources are registered. This
 // matters during the brief window between cluster switch and probe completion.

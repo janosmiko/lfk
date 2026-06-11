@@ -23,7 +23,7 @@ func podWith(container corev1.Container) *corev1.Pod {
 func TestSourceMetadata(t *testing.T) {
 	s := NewWithClient(fake.NewSimpleClientset())
 	assert.Equal(t, "heuristic", s.Name())
-	assert.Equal(t, []security.Category{security.CategoryMisconfig}, s.Categories())
+	assert.Equal(t, []security.Category{security.CategoryMisconfig, security.CategoryReliability}, s.Categories())
 	ok, err := s.IsAvailable(context.Background(), "")
 	assert.NoError(t, err)
 	assert.True(t, ok, "heuristic source with a client is always available")

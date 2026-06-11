@@ -10,8 +10,11 @@ import (
 
 	appsv1 "k8s.io/api/apps/v1"
 	autoscalingv2 "k8s.io/api/autoscaling/v2"
+	batchv1 "k8s.io/api/batch/v1"
 	corev1 "k8s.io/api/core/v1"
+	discoveryv1 "k8s.io/api/discovery/v1"
 	policyv1 "k8s.io/api/policy/v1"
+	storagev1 "k8s.io/api/storage/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
 
@@ -72,6 +75,32 @@ type workload struct {
 	spreadConfigured bool
 	// strategy is set for Deployments only.
 	strategy *appsv1.DeploymentStrategy
+	// zeroGracePeriod is true when the pod template sets
+	// terminationGracePeriodSeconds: 0 (instant SIGKILL).
+	zeroGracePeriod bool
+	// onDeleteUpdate is true for DaemonSets/StatefulSets with an explicit
+	// updateStrategy: OnDelete. An empty type is NOT OnDelete — the API
+	// server defaults it to RollingUpdate.
+	onDeleteUpdate bool
+	// staticReplicasOwner is the field manager that owns .spec.replicas
+	// through a whole-object write per managedFields (scale-subresource
+	// writers like the HPA are excluded) — empty when no manifest pins
+	// the replica count.
+	staticReplicasOwner string
+	// stsServiceName is the StatefulSet's spec.serviceName (governing
+	// headless Service); empty for other kinds.
+	stsServiceName string
+	// stsVCTClasses holds the storageClassName of each StatefulSet
+	// volumeClaimTemplate ("" = the cluster default class); nil for other
+	// kinds.
+	stsVCTClasses []string
+}
+
+// templateZeroGrace reports whether the pod template requests instant
+// SIGKILL on termination.
+func templateZeroGrace(tmpl *corev1.PodTemplateSpec) bool {
+	g := tmpl.Spec.TerminationGracePeriodSeconds
+	return g != nil && *g == 0
 }
 
 // templateSpreads reports whether the pod template spreads replicas across
@@ -97,31 +126,39 @@ type clusterData struct {
 	hpas        []autoscalingv2.HorizontalPodAutoscaler
 	hpasOK      bool
 	// namespaces to run namespace-level checks against.
-	namespaces []string
-	quotas     []corev1.ResourceQuota
-	quotaNS    map[string]bool
-	quotasOK   bool
-	limitNS    map[string]bool
-	limitsOK   bool
+	namespaces     []string
+	quotas         []corev1.ResourceQuota
+	quotaNS        map[string]bool
+	quotasOK       bool
+	limitNS        map[string]bool
+	limitsOK       bool
+	services       []corev1.Service
+	servicesOK     bool
+	endpointSlices []discoveryv1.EndpointSlice
+	epsOK          bool
+	cronJobs       []batchv1.CronJob
+	cronJobsOK     bool
+	jobs           []batchv1.Job
+	jobsOK         bool
+	storageClasses []storagev1.StorageClass
+	scOK           bool
 }
 
-// collect paginates one list call to completion. Any error (typically
-// Forbidden for read-only users) returns ok=false so dependent checks are
-// skipped rather than misreporting.
-func collect[T any](fn func(opts metav1.ListOptions) ([]T, string, error)) ([]T, bool) {
-	var out []T
-	opts := metav1.ListOptions{Limit: 200}
-	for {
-		items, cont, err := fn(opts)
-		if err != nil {
-			return nil, false
-		}
-		out = append(out, items...)
-		if cont == "" {
-			return out, true
-		}
-		opts.Continue = cont
+// vctClasses extracts the storageClassName of each volumeClaimTemplate
+// ("" when unset, meaning the cluster default class).
+func vctClasses(vcts []corev1.PersistentVolumeClaim) []string {
+	if len(vcts) == 0 {
+		return nil
 	}
+	classes := make([]string, 0, len(vcts))
+	for i := range vcts {
+		name := ""
+		if vcts[i].Spec.StorageClassName != nil {
+			name = *vcts[i].Spec.StorageClassName
+		}
+		classes = append(classes, name)
+	}
+	return classes
 }
 
 // Fetch lists workloads, PDBs, HPAs, namespaces, quotas, and limit ranges
@@ -133,7 +170,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 	}
 	d := &clusterData{}
 
-	deps, depsOK := collect(func(o metav1.ListOptions) ([]appsv1.Deployment, string, error) {
+	deps, depsOK := security.Collect(func(o metav1.ListOptions) ([]appsv1.Deployment, string, error) {
 		l, err := s.client.AppsV1().Deployments(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -144,19 +181,21 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		for i := range deps {
 			dep := &deps[i]
 			d.workloads = append(d.workloads, workload{
-				kind:             "Deployment",
-				namespace:        dep.Namespace,
-				name:             dep.Name,
-				replicas:         replicasOrDefault(dep.Spec.Replicas),
-				podLabels:        dep.Spec.Template.Labels,
-				containers:       dep.Spec.Template.Spec.Containers,
-				volumes:          dep.Spec.Template.Spec.Volumes,
-				spreadConfigured: templateSpreads(&dep.Spec.Template),
-				strategy:         &dep.Spec.Strategy,
+				kind:                "Deployment",
+				namespace:           dep.Namespace,
+				name:                dep.Name,
+				replicas:            replicasOrDefault(dep.Spec.Replicas),
+				podLabels:           dep.Spec.Template.Labels,
+				containers:          dep.Spec.Template.Spec.Containers,
+				volumes:             dep.Spec.Template.Spec.Volumes,
+				spreadConfigured:    templateSpreads(&dep.Spec.Template),
+				strategy:            &dep.Spec.Strategy,
+				zeroGracePeriod:     templateZeroGrace(&dep.Spec.Template),
+				staticReplicasOwner: staticReplicasOwner(dep.ManagedFields),
 			})
 		}
 	}
-	stss, stssOK := collect(func(o metav1.ListOptions) ([]appsv1.StatefulSet, string, error) {
+	stss, stssOK := security.Collect(func(o metav1.ListOptions) ([]appsv1.StatefulSet, string, error) {
 		l, err := s.client.AppsV1().StatefulSets(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -167,18 +206,23 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		for i := range stss {
 			sts := &stss[i]
 			d.workloads = append(d.workloads, workload{
-				kind:             "StatefulSet",
-				namespace:        sts.Namespace,
-				name:             sts.Name,
-				replicas:         replicasOrDefault(sts.Spec.Replicas),
-				podLabels:        sts.Spec.Template.Labels,
-				containers:       sts.Spec.Template.Spec.Containers,
-				volumes:          sts.Spec.Template.Spec.Volumes,
-				spreadConfigured: templateSpreads(&sts.Spec.Template),
+				kind:                "StatefulSet",
+				namespace:           sts.Namespace,
+				name:                sts.Name,
+				replicas:            replicasOrDefault(sts.Spec.Replicas),
+				podLabels:           sts.Spec.Template.Labels,
+				containers:          sts.Spec.Template.Spec.Containers,
+				volumes:             sts.Spec.Template.Spec.Volumes,
+				spreadConfigured:    templateSpreads(&sts.Spec.Template),
+				zeroGracePeriod:     templateZeroGrace(&sts.Spec.Template),
+				onDeleteUpdate:      sts.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType,
+				staticReplicasOwner: staticReplicasOwner(sts.ManagedFields),
+				stsServiceName:      sts.Spec.ServiceName,
+				stsVCTClasses:       vctClasses(sts.Spec.VolumeClaimTemplates),
 			})
 		}
 	}
-	dss, dssOK := collect(func(o metav1.ListOptions) ([]appsv1.DaemonSet, string, error) {
+	dss, dssOK := security.Collect(func(o metav1.ListOptions) ([]appsv1.DaemonSet, string, error) {
 		l, err := s.client.AppsV1().DaemonSets(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -189,26 +233,28 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		for i := range dss {
 			ds := &dss[i]
 			d.workloads = append(d.workloads, workload{
-				kind:       "DaemonSet",
-				namespace:  ds.Namespace,
-				name:       ds.Name,
-				replicas:   0, // keeps DaemonSets out of replica-based checks
-				podLabels:  ds.Spec.Template.Labels,
-				containers: ds.Spec.Template.Spec.Containers,
-				volumes:    ds.Spec.Template.Spec.Volumes,
+				kind:            "DaemonSet",
+				namespace:       ds.Namespace,
+				name:            ds.Name,
+				replicas:        0, // keeps DaemonSets out of replica-based checks
+				podLabels:       ds.Spec.Template.Labels,
+				containers:      ds.Spec.Template.Spec.Containers,
+				volumes:         ds.Spec.Template.Spec.Volumes,
+				zeroGracePeriod: templateZeroGrace(&ds.Spec.Template),
+				onDeleteUpdate:  ds.Spec.UpdateStrategy.Type == appsv1.OnDeleteDaemonSetStrategyType,
 			})
 		}
 	}
 	d.workloadsOK = depsOK && stssOK && dssOK
 
-	d.pdbs, d.pdbsOK = collect(func(o metav1.ListOptions) ([]policyv1.PodDisruptionBudget, string, error) {
+	d.pdbs, d.pdbsOK = security.Collect(func(o metav1.ListOptions) ([]policyv1.PodDisruptionBudget, string, error) {
 		l, err := s.client.PolicyV1().PodDisruptionBudgets(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
 		}
 		return l.Items, l.Continue, nil
 	})
-	d.hpas, d.hpasOK = collect(func(o metav1.ListOptions) ([]autoscalingv2.HorizontalPodAutoscaler, string, error) {
+	d.hpas, d.hpasOK = security.Collect(func(o metav1.ListOptions) ([]autoscalingv2.HorizontalPodAutoscaler, string, error) {
 		l, err := s.client.AutoscalingV2().HorizontalPodAutoscalers(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -218,7 +264,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 
 	if namespace != "" {
 		d.namespaces = []string{namespace}
-	} else if nss, ok := collect(func(o metav1.ListOptions) ([]corev1.Namespace, string, error) {
+	} else if nss, ok := security.Collect(func(o metav1.ListOptions) ([]corev1.Namespace, string, error) {
 		l, err := s.client.CoreV1().Namespaces().List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -230,7 +276,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		}
 	}
 
-	quotas, quotasOK := collect(func(o metav1.ListOptions) ([]corev1.ResourceQuota, string, error) {
+	quotas, quotasOK := security.Collect(func(o metav1.ListOptions) ([]corev1.ResourceQuota, string, error) {
 		l, err := s.client.CoreV1().ResourceQuotas(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err
@@ -243,7 +289,43 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 	for i := range quotas {
 		d.quotaNS[quotas[i].Namespace] = true
 	}
-	limits, limitsOK := collect(func(o metav1.ListOptions) ([]corev1.LimitRange, string, error) {
+	d.services, d.servicesOK = security.Collect(func(o metav1.ListOptions) ([]corev1.Service, string, error) {
+		l, err := s.client.CoreV1().Services(namespace).List(ctx, o)
+		if err != nil {
+			return nil, "", err
+		}
+		return l.Items, l.Continue, nil
+	})
+	d.endpointSlices, d.epsOK = security.Collect(func(o metav1.ListOptions) ([]discoveryv1.EndpointSlice, string, error) {
+		l, err := s.client.DiscoveryV1().EndpointSlices(namespace).List(ctx, o)
+		if err != nil {
+			return nil, "", err
+		}
+		return l.Items, l.Continue, nil
+	})
+	d.cronJobs, d.cronJobsOK = security.Collect(func(o metav1.ListOptions) ([]batchv1.CronJob, string, error) {
+		l, err := s.client.BatchV1().CronJobs(namespace).List(ctx, o)
+		if err != nil {
+			return nil, "", err
+		}
+		return l.Items, l.Continue, nil
+	})
+	d.jobs, d.jobsOK = security.Collect(func(o metav1.ListOptions) ([]batchv1.Job, string, error) {
+		l, err := s.client.BatchV1().Jobs(namespace).List(ctx, o)
+		if err != nil {
+			return nil, "", err
+		}
+		return l.Items, l.Continue, nil
+	})
+	d.storageClasses, d.scOK = security.Collect(func(o metav1.ListOptions) ([]storagev1.StorageClass, string, error) {
+		l, err := s.client.StorageV1().StorageClasses().List(ctx, o)
+		if err != nil {
+			return nil, "", err
+		}
+		return l.Items, l.Continue, nil
+	})
+
+	limits, limitsOK := security.Collect(func(o metav1.ListOptions) ([]corev1.LimitRange, string, error) {
 		l, err := s.client.CoreV1().LimitRanges(namespace).List(ctx, o)
 		if err != nil {
 			return nil, "", err

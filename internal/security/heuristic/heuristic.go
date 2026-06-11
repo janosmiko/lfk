@@ -18,6 +18,9 @@ type Source struct {
 	ignoredNamespaces map[string]bool
 	secretEnvInclude  []string
 	secretEnvExclude  []string
+	// scanSecrets gates the Secret-listing checks (legacy_sa_token_secret,
+	// tls_secret_expiry); from security.heuristic.scan_secrets.
+	scanSecrets bool
 }
 
 // New returns a heuristic source with no client. Fetch returns an empty slice
@@ -39,6 +42,14 @@ func (s *Source) SetSecretEnvPatterns(include, exclude []string) {
 	s.secretEnvExclude = exclude
 }
 
+// SetScanSecrets enables the Secret-listing checks (legacy_sa_token_secret,
+// tls_secret_expiry). Off unless explicitly enabled by the app from
+// security.heuristic.scan_secrets (default true there). Must be called
+// before the first Fetch — the field is not synchronized.
+func (s *Source) SetScanSecrets(enabled bool) {
+	s.scanSecrets = enabled
+}
+
 // SetIgnoredNamespaces configures namespaces to exclude from heuristic checks.
 func (s *Source) SetIgnoredNamespaces(namespaces []string) {
 	s.ignoredNamespaces = make(map[string]bool, len(namespaces))
@@ -50,9 +61,11 @@ func (s *Source) SetIgnoredNamespaces(namespaces []string) {
 // Name returns the stable identifier.
 func (s *Source) Name() string { return "heuristic" }
 
-// Categories returns the categories this source contributes to.
+// Categories returns the categories this source contributes to. Reliability
+// covers the bare_pod check, which is a recommendation rather than a
+// misconfiguration and stays off the SEC badge.
 func (s *Source) Categories() []security.Category {
-	return []security.Category{security.CategoryMisconfig}
+	return []security.Category{security.CategoryMisconfig, security.CategoryReliability}
 }
 
 // IsAvailable returns true only when a kubernetes client has been injected.
@@ -61,12 +74,25 @@ func (s *Source) IsAvailable(ctx context.Context, kubeCtx string) (bool, error) 
 }
 
 // Fetch lists pods in the given namespace (empty = all namespaces) and runs
-// every registered check against every container.
+// every registered check against every container, then the best-effort
+// non-pod scans (Services, namespaces, ConfigMaps, Ingresses).
 func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]security.Finding, error) {
 	if s.client == nil {
 		return nil, nil
 	}
 	var findings []security.Finding
+	// ConfigMaps and Secrets are listed before the pod scan so each pod's
+	// references can be verified against the existing names. Both are
+	// best-effort: a failed (or, for Secrets, disabled) list disables only
+	// the reference verification, never the pod checks.
+	cmFindings, cmNames, cmOK := s.fetchConfigMapFindings(ctx, namespace)
+	findings = append(findings, cmFindings...)
+	secretFindings, secretNames, secretsOK := s.fetchSecretFindings(ctx, namespace)
+	findings = append(findings, secretFindings...)
+	// Namespaces that contain at least one scanned pod, for the
+	// namespace-level checks (no point flagging a missing NetworkPolicy in
+	// an empty namespace).
+	nsWithPods := map[string]bool{}
 	// Paginate so an unbounded List can't degrade control-plane
 	// responsiveness on large clusters.
 	opts := metav1.ListOptions{Limit: 200}
@@ -80,6 +106,7 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 			if s.ignoredNamespaces[pod.Namespace] {
 				continue
 			}
+			nsWithPods[pod.Namespace] = true
 			runChecks := func(c corev1.Container) {
 				for _, check := range allChecks {
 					findings = append(findings, check(pod, c)...)
@@ -99,13 +126,47 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 			for _, ec := range pod.Spec.EphemeralContainers {
 				runChecks(corev1.Container(ec.EphemeralContainerCommon))
 			}
+			findings = append(findings, checkMissingRefs(pod, cmNames, cmOK, secretNames, secretsOK)...)
 		}
 		if list.Continue == "" {
 			break
 		}
 		opts.Continue = list.Continue
 	}
+	findings = append(findings, s.fetchServiceFindings(ctx, namespace)...)
+	findings = append(findings, s.fetchNamespaceFindings(ctx, namespace, nsWithPods)...)
+	findings = append(findings, s.fetchIngressFindings(ctx, namespace)...)
 	return findings, nil
+}
+
+// fetchServiceFindings lists Services (paginated) and runs the Service-level
+// checks. Best-effort: a list error (typically Forbidden for restricted
+// users) stops the Service scan without failing the source — the pod
+// findings must survive. Findings from pages that did load are kept; the
+// checks are presence-based, so a partial list can under-report but never
+// invent findings.
+func (s *Source) fetchServiceFindings(ctx context.Context, namespace string) []security.Finding {
+	var findings []security.Finding
+	opts := metav1.ListOptions{Limit: 200}
+	for {
+		list, err := s.client.CoreV1().Services(namespace).List(ctx, opts)
+		if err != nil {
+			return findings
+		}
+		for i := range list.Items {
+			svc := &list.Items[i]
+			if s.ignoredNamespaces[svc.Namespace] {
+				continue
+			}
+			for _, check := range serviceChecks {
+				findings = append(findings, check(svc)...)
+			}
+		}
+		if list.Continue == "" {
+			return findings
+		}
+		opts.Continue = list.Continue
+	}
 }
 
 // checkFn is the signature all heuristic checks implement.

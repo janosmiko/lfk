@@ -509,7 +509,7 @@ type securityConfig struct {
 	// value overrides the global default for that context).
 	HideBadges *bool `json:"hide_badges" yaml:"hide_badges"`
 	// Sources enables or disables individual sources by name. Keys accept the
-	// friendly names (heuristic, advisor, trivy, kyverno, kubescape, falco, gatekeeper)
+	// friendly names (heuristic, advisor, rbac, trivy, kyverno, kubescape, falco, gatekeeper)
 	// or the internal source ids (trivy-operator, policy-report). Any source
 	// omitted from the map defaults to enabled.
 	Sources map[string]bool `json:"sources" yaml:"sources"`
@@ -536,6 +536,10 @@ type heuristicConfig struct {
 	// wins over Include.
 	SecretEnvInclude []string `json:"secret_env_include" yaml:"secret_env_include"`
 	SecretEnvExclude []string `json:"secret_env_exclude" yaml:"secret_env_exclude"`
+	// ScanSecrets gates the heuristic checks that list Secret objects
+	// (legacy_sa_token_secret, tls_secret_expiry). Defaults to true; set
+	// false to keep the source from ever listing Secrets.
+	ScanSecrets *bool `json:"scan_secrets" yaml:"scan_secrets"`
 }
 
 // SecurityIgnorePattern is a declarative ignore rule from the config file.

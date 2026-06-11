@@ -119,6 +119,21 @@ func TestMiddleColumnHeader(t *testing.T) {
 			expected: "PORT FORWARDS",
 		},
 		{
+			// The affected-resources view of a security finding group lives
+			// at LevelOwned but lists arbitrary resource kinds — the generic
+			// "POD" fallback was wrong for it (user-reported).
+			name: "LevelOwned security affected resources",
+			nav: model.NavigationState{
+				Level: model.LevelOwned,
+				ResourceType: model.ResourceTypeEntry{
+					Kind:        "__security_rbac__",
+					DisplayName: "RBAC",
+					APIGroup:    "_security",
+				},
+			},
+			expected: "AFFECTED RESOURCE",
+		},
+		{
 			name:     "LevelContainers",
 			nav:      model.NavigationState{Level: model.LevelContainers},
 			expected: "CONTAINER",
