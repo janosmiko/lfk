@@ -75,6 +75,30 @@ func TestCheckEphemeralContainers(t *testing.T) {
 	})
 }
 
+func TestCheckBarePod(t *testing.T) {
+	makePod := func(owners ...metav1.OwnerReference) *corev1.Pod {
+		return &corev1.Pod{
+			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "p", OwnerReferences: owners},
+			Spec:       corev1.PodSpec{Containers: []corev1.Container{{Name: "c1"}, {Name: "c2"}}},
+		}
+	}
+	t.Run("bare pod flagged once as reliability", func(t *testing.T) {
+		pod := makePod()
+		findings := checkBarePod(pod, pod.Spec.Containers[0])
+		assert.Len(t, findings, 1)
+		assert.Equal(t, security.SeverityLow, findings[0].Severity)
+		assert.Equal(t, security.CategoryReliability, findings[0].Category,
+			"bare_pod is a reliability recommendation and must not color the SEC badge")
+		assert.Equal(t, "bare_pod", findings[0].Labels["check"])
+		assert.Nil(t, checkBarePod(pod, pod.Spec.Containers[1]),
+			"pod-level check must emit only for the first container")
+	})
+	t.Run("controller-owned pod is clean", func(t *testing.T) {
+		pod := makePod(metav1.OwnerReference{Kind: "ReplicaSet", Name: "rs"})
+		assert.Nil(t, checkBarePod(pod, pod.Spec.Containers[0]))
+	})
+}
+
 func TestCheckHostProcess(t *testing.T) {
 	winOpts := func(hostProcess bool) *corev1.WindowsSecurityContextOptions {
 		return &corev1.WindowsSecurityContextOptions{HostProcess: &hostProcess}

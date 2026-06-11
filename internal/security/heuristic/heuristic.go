@@ -50,9 +50,11 @@ func (s *Source) SetIgnoredNamespaces(namespaces []string) {
 // Name returns the stable identifier.
 func (s *Source) Name() string { return "heuristic" }
 
-// Categories returns the categories this source contributes to.
+// Categories returns the categories this source contributes to. Reliability
+// covers the bare_pod check, which is a recommendation rather than a
+// misconfiguration and stays off the SEC badge.
 func (s *Source) Categories() []security.Category {
-	return []security.Category{security.CategoryMisconfig}
+	return []security.Category{security.CategoryMisconfig, security.CategoryReliability}
 }
 
 // IsAvailable returns true only when a kubernetes client has been injected.
@@ -105,7 +107,38 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		}
 		opts.Continue = list.Continue
 	}
+	findings = append(findings, s.fetchServiceFindings(ctx, namespace)...)
 	return findings, nil
+}
+
+// fetchServiceFindings lists Services (paginated) and runs the Service-level
+// checks. Best-effort: a list error (typically Forbidden for restricted
+// users) stops the Service scan without failing the source — the pod
+// findings must survive. Findings from pages that did load are kept; the
+// checks are presence-based, so a partial list can under-report but never
+// invent findings.
+func (s *Source) fetchServiceFindings(ctx context.Context, namespace string) []security.Finding {
+	var findings []security.Finding
+	opts := metav1.ListOptions{Limit: 200}
+	for {
+		list, err := s.client.CoreV1().Services(namespace).List(ctx, opts)
+		if err != nil {
+			return findings
+		}
+		for i := range list.Items {
+			svc := &list.Items[i]
+			if s.ignoredNamespaces[svc.Namespace] {
+				continue
+			}
+			for _, check := range serviceChecks {
+				findings = append(findings, check(svc)...)
+			}
+		}
+		if list.Continue == "" {
+			return findings
+		}
+		opts.Continue = list.Continue
+	}
 }
 
 // checkFn is the signature all heuristic checks implement.

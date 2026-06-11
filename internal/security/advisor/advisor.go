@@ -79,6 +79,11 @@ type workload struct {
 	// updateStrategy: OnDelete. An empty type is NOT OnDelete — the API
 	// server defaults it to RollingUpdate.
 	onDeleteUpdate bool
+	// staticReplicasOwner is the field manager that owns .spec.replicas
+	// through a whole-object write per managedFields (scale-subresource
+	// writers like the HPA are excluded) — empty when no manifest pins
+	// the replica count.
+	staticReplicasOwner string
 }
 
 // templateZeroGrace reports whether the pod template requests instant
@@ -158,16 +163,17 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		for i := range deps {
 			dep := &deps[i]
 			d.workloads = append(d.workloads, workload{
-				kind:             "Deployment",
-				namespace:        dep.Namespace,
-				name:             dep.Name,
-				replicas:         replicasOrDefault(dep.Spec.Replicas),
-				podLabels:        dep.Spec.Template.Labels,
-				containers:       dep.Spec.Template.Spec.Containers,
-				volumes:          dep.Spec.Template.Spec.Volumes,
-				spreadConfigured: templateSpreads(&dep.Spec.Template),
-				strategy:         &dep.Spec.Strategy,
-				zeroGracePeriod:  templateZeroGrace(&dep.Spec.Template),
+				kind:                "Deployment",
+				namespace:           dep.Namespace,
+				name:                dep.Name,
+				replicas:            replicasOrDefault(dep.Spec.Replicas),
+				podLabels:           dep.Spec.Template.Labels,
+				containers:          dep.Spec.Template.Spec.Containers,
+				volumes:             dep.Spec.Template.Spec.Volumes,
+				spreadConfigured:    templateSpreads(&dep.Spec.Template),
+				strategy:            &dep.Spec.Strategy,
+				zeroGracePeriod:     templateZeroGrace(&dep.Spec.Template),
+				staticReplicasOwner: staticReplicasOwner(dep.ManagedFields),
 			})
 		}
 	}
@@ -182,16 +188,17 @@ func (s *Source) Fetch(ctx context.Context, kubeCtx, namespace string) ([]securi
 		for i := range stss {
 			sts := &stss[i]
 			d.workloads = append(d.workloads, workload{
-				kind:             "StatefulSet",
-				namespace:        sts.Namespace,
-				name:             sts.Name,
-				replicas:         replicasOrDefault(sts.Spec.Replicas),
-				podLabels:        sts.Spec.Template.Labels,
-				containers:       sts.Spec.Template.Spec.Containers,
-				volumes:          sts.Spec.Template.Spec.Volumes,
-				spreadConfigured: templateSpreads(&sts.Spec.Template),
-				zeroGracePeriod:  templateZeroGrace(&sts.Spec.Template),
-				onDeleteUpdate:   sts.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType,
+				kind:                "StatefulSet",
+				namespace:           sts.Namespace,
+				name:                sts.Name,
+				replicas:            replicasOrDefault(sts.Spec.Replicas),
+				podLabels:           sts.Spec.Template.Labels,
+				containers:          sts.Spec.Template.Spec.Containers,
+				volumes:             sts.Spec.Template.Spec.Volumes,
+				spreadConfigured:    templateSpreads(&sts.Spec.Template),
+				zeroGracePeriod:     templateZeroGrace(&sts.Spec.Template),
+				onDeleteUpdate:      sts.Spec.UpdateStrategy.Type == appsv1.OnDeleteStatefulSetStrategyType,
+				staticReplicasOwner: staticReplicasOwner(sts.ManagedFields),
 			})
 		}
 	}

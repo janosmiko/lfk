@@ -233,6 +233,7 @@ var allChecks = []checkFn{
 	checkEnvFromSecret,
 	checkEphemeralContainers,
 	checkHostProcess,
+	checkBarePod,
 	// checkSecretEnv is NOT listed: it takes per-source include/exclude
 	// config, so Fetch dispatches checkSecretEnvWith directly.
 }

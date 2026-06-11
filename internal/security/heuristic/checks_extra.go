@@ -50,6 +50,25 @@ func checkEphemeralContainers(pod *corev1.Pod, c corev1.Container) []security.Fi
 		fmt.Sprintf("Pod carries ephemeral container(s) %s, likely a leftover kubectl debug session. Recreate the pod to remove them.", strings.Join(names, ", ")))}
 }
 
+// checkBarePod flags pods with no ownerReferences — not managed by any
+// controller, so never rescheduled on node failure, excluded from rollouts,
+// and invisible to PDBs. Emitted as CategoryReliability: it is an
+// operational recommendation, kept off the per-resource SEC badge like the
+// advisor's findings. Only emits for the first container — pod-level.
+func checkBarePod(pod *corev1.Pod, c corev1.Container) []security.Finding {
+	if !firstContainer(pod, c) {
+		return nil
+	}
+	if len(pod.OwnerReferences) > 0 {
+		return nil
+	}
+	f := makeFinding(pod, c, "bare_pod", security.SeverityLow,
+		"bare pod without a controller",
+		"Pod has no owning controller; it is never rescheduled on node failure and no rollout or PodDisruptionBudget covers it. Manage it with a Deployment, StatefulSet, or Job.")
+	f.Category = security.CategoryReliability
+	return []security.Finding{f}
+}
+
 // checkHostProcess flags Windows containers running as a HostProcess —
 // the Windows equivalent of privileged: the container runs directly on the
 // host with the pod's identity. Container-level windowsOptions override

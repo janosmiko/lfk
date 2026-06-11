@@ -8,8 +8,8 @@ sources, each auto-detected by the operator or CRDs it needs.
 
 | Source | Config key | Requires in cluster | Findings |
 |---|---|---|---|
-| Heuristic | `heuristic` | nothing (built-in) | Pod-spec hardening issues: privileged, host PID/IPC/network, hostPath + runtime-socket mounts, dangerous capabilities, runAsRoot, allowPrivilegeEscalation, writable root filesystem, seccomp Unconfined, unmasked procMount, unsafe sysctls, hostPort, shared process namespace, plaintext secrets in env, entire Secrets in env (envFrom), default ServiceAccount (+ token automount), missing resource limits, unpinned image tags, leftover ephemeral debug containers, Windows HostProcess containers |
-| Advisor | `advisor` | nothing (built-in) | Reliability recommendations: namespaces without ResourceQuota/LimitRange, multi-replica workloads without a PodDisruptionBudget or topology spread, drain-blocking or orphaned PDBs, single-replica workloads, missing probes or resource requests, identical liveness/readiness probes, liveness without readiness, downtime rollout strategies, OnDelete update strategies, zero termination grace period, emptyDir without sizeLimit, quotas near their limit, HPAs pinned / at their ceiling / lacking target requests |
+| Heuristic | `heuristic` | nothing (built-in) | Pod- and Service-spec hardening issues: privileged, host PID/IPC/network, hostPath + runtime-socket mounts, dangerous capabilities, runAsRoot, allowPrivilegeEscalation, writable root filesystem, seccomp Unconfined, unmasked procMount, unsafe sysctls, hostPort, shared process namespace, plaintext secrets in env, entire Secrets in env (envFrom), default ServiceAccount (+ token automount), missing resource limits, unpinned image tags, leftover ephemeral debug containers, Windows HostProcess containers, Services with externalIPs, bare pods without a controller (reliability) |
+| Advisor | `advisor` | nothing (built-in) | Reliability recommendations: namespaces without ResourceQuota/LimitRange, multi-replica workloads without a PodDisruptionBudget or topology spread, drain-blocking or orphaned PDBs, single-replica workloads, missing probes or resource requests, identical liveness/readiness probes, liveness without readiness, downtime rollout strategies, OnDelete update strategies, zero termination grace period, emptyDir without sizeLimit, quotas near their limit, HPAs pinned / at their ceiling / lacking target requests, PDB minAvailable above HPA minimums, PDBs without unhealthyPodEvictionPolicy, manifests pinning replicas under an HPA |
 | Trivy | `trivy` | [Trivy Operator](https://github.com/aquasecurity/trivy-operator) (`VulnerabilityReport`, `ConfigAuditReport` CRDs) | Image vulnerabilities + config-audit misconfigurations |
 | Kyverno | `kyverno` | Policy Reports API (`PolicyReport`, `ClusterPolicyReport` from `wgpolicyk8s.io/v1alpha2`) | Policy violations |
 | Kubescape | `kubescape` | [kubescape-operator](https://github.com/kubescape/kubescape-operator) (`WorkloadConfigurationScan` CRD) | Failed compliance controls |
@@ -23,7 +23,8 @@ keys (aliases of `trivy` and `kyverno`).
 
 Advisor findings are **reliability recommendations, not security findings**:
 they appear in the dashboard under the Advisor source but never color the
-per-resource SEC badge. The source is best-effort under restricted RBAC —
+per-resource SEC badge. The heuristic's `bare_pod` check is
+reliability-categorized the same way and likewise stays off the badge. The source is best-effort under restricted RBAC —
 resource types it cannot list (e.g. PDBs for a read-only user) silently skip
 their checks instead of failing the source, and the `kube-system`,
 `kube-public`, and `kube-node-lease` namespaces are always excluded.

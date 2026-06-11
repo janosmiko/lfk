@@ -25,7 +25,12 @@ func TestSourceFetch(t *testing.T) {
 			},
 		},
 		&corev1.Pod{
-			ObjectMeta: metav1.ObjectMeta{Namespace: "prod", Name: "clean"},
+			ObjectMeta: metav1.ObjectMeta{
+				Namespace: "prod", Name: "clean",
+				// A fully clean pod is controller-managed; without an owner
+				// the bare_pod check fires.
+				OwnerReferences: []metav1.OwnerReference{{Kind: "ReplicaSet", Name: "rs"}},
+			},
 			Spec: corev1.PodSpec{
 				ServiceAccountName: "api-sa",
 				Containers: []corev1.Container{{
@@ -64,6 +69,12 @@ func TestSourceFetch(t *testing.T) {
 
 	for _, f := range findings {
 		assert.Equal(t, "heuristic", f.Source)
+		if f.Labels["check"] == "bare_pod" {
+			// bare_pod is the one reliability recommendation the heuristic
+			// emits; it must stay off the SEC badge.
+			assert.Equal(t, security.CategoryReliability, f.Category)
+			continue
+		}
 		assert.Equal(t, security.CategoryMisconfig, f.Category)
 	}
 }
