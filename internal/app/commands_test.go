@@ -139,6 +139,20 @@ func TestStartupTipsAllNonEmpty(t *testing.T) {
 	}
 }
 
+func TestStartupTipsFitTheStatusBar(t *testing.T) {
+	for _, tip := range startupTips {
+		assert.LessOrEqual(t, len(tip), 110, "tip too long for the status bar: %q", tip)
+	}
+}
+
+func TestStartupTipsUnique(t *testing.T) {
+	seen := make(map[string]bool, len(startupTips))
+	for _, tip := range startupTips {
+		assert.False(t, seen[tip], "duplicate tip: %q", tip)
+		seen[tip] = true
+	}
+}
+
 func TestCov80BulkDeleteWithFakeClient(t *testing.T) {
 	m := basePush80Model()
 	m.bulkItems = []model.Item{
