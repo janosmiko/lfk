@@ -936,58 +936,59 @@ Press `:` to open the command bar. It supports four types of input:
 
 ## Action Menu Items
 
-The action menu (`x` key) shows context-specific actions based on the resource type:
+The action menu (`x` key) shows context-specific actions based on the resource type.
+Items below are listed by hotkey; the in-app menu groups them by task instead.
 
 ### Pod Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `B` Debug, `b` Debug Pod, `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies whose pod selector matches this pod), `S` Startup Analysis, `I` Crash Investigator, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `V` Events
+`A` Attach, `b` Debug Pod, `B` Debug, `c` Capture Traffic, `D` Delete, `E` Edit, `g` Go to Node, `I` Crash Investigator, `l` Tail Logs (last N lines + follow), `L` Logs (full), `N` Network Policies (policies whose pod selector matches this pod), `p` Port Forward, `s` Exec, `S` Startup Analysis, `v` Describe, `V` Events, `X` Force Delete, `y` Security Findings, `z` Right-sizing
 
 ### Deployment Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `R` Rollback, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
+`A` Attach, `b` Debug Pod, `D` Delete, `E` Edit, `l` Tail Logs (last N lines + follow), `L` Logs (full), `p` Port Forward, `r` Restart, `R` Rollback, `s` Exec, `S` Scale, `v` Describe, `V` Events, `y` Security Findings, `z` Right-sizing
 
 ### StatefulSet Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `S` Scale, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
+`A` Attach, `b` Debug Pod, `D` Delete, `E` Edit, `l` Tail Logs (last N lines + follow), `L` Logs (full), `p` Port Forward, `r` Restart, `s` Exec, `S` Scale, `v` Describe, `V` Events, `y` Security Findings, `z` Right-sizing
 
 ### DaemonSet Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `r` Restart, `p` Port Forward, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
+`A` Attach, `b` Debug Pod, `D` Delete, `E` Edit, `l` Tail Logs (last N lines + follow), `L` Logs (full), `p` Port Forward, `r` Restart, `s` Exec, `v` Describe, `V` Events, `y` Security Findings, `z` Right-sizing
 
 ### Service Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec (into pod behind service), `A` Attach (to pod behind service), `p` Port Forward, `c` Capture Traffic, `N` Network Policies (policies affecting the service's backing pods), `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`A` Attach (to pod behind service), `b` Debug Pod, `c` Capture Traffic, `D` Delete, `E` Edit, `l` Tail Logs (last N lines + follow), `L` Logs (full), `N` Network Policies (policies affecting the service's backing pods), `p` Port Forward, `s` Exec (into pod behind service), `v` Describe, `V` Events
 
 ### Secret Actions
-`e` Secret Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
+`b` Debug Pod, `D` Delete, `e` Secret Editor, `E` Edit, `l` Labels / Annotations, `P` Permissions, `v` Describe, `V` Events
 
 ### ConfigMap Actions
-`e` ConfigMap Editor, `v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
+`b` Debug Pod, `D` Delete, `e` ConfigMap Editor, `E` Edit, `l` Labels / Annotations, `P` Permissions, `v` Describe, `V` Events
 
 ### Node Actions
-`c` Cordon, `u` Uncordon, `n` Drain, `t` Taint, `T` Untaint, `s` Shell, `v` Describe, `E` Edit, `b` Debug Pod, `V` Events
+`b` Debug Pod, `c` Cordon, `E` Edit, `n` Drain, `s` Shell, `t` Taint, `T` Untaint, `u` Uncordon, `v` Describe, `V` Events
 
 ### Job Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `X` Force Delete, `b` Debug Pod, `V` Events
+`A` Attach, `b` Debug Pod, `D` Delete, `E` Edit, `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `v` Describe, `V` Events, `X` Force Delete, `y` Security Findings, `z` Right-sizing
 
 ### CronJob Actions
-`l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `A` Attach, `t` Trigger (create Job), `v` Describe, `E` Edit, `z` Right-sizing, `D` Delete, `b` Debug Pod, `V` Events
+`A` Attach, `b` Debug Pod, `D` Delete, `E` Edit, `l` Tail Logs (last N lines + follow), `L` Logs (full), `s` Exec, `t` Trigger (create Job), `v` Describe, `V` Events, `y` Security Findings, `z` Right-sizing
 
 ### ArgoCD Application Actions
-`s` Sync, `a` Sync (Apply Only), `f` Diff, `R` Refresh, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`a` Sync (Apply Only), `A` Configure AutoSync, `b` Debug Pod, `D` Delete, `E` Edit, `R` Refresh, `s` Sync, `T` Terminate Sync, `v` Describe, `V` Events, `W` Sync Wave Timeline
 
 ### Helm Release Actions
-`u` Values, `A` All Values, `E` Edit Values, `d` Diff, `U` Upgrade, `R` Rollback, `h` History, `v` Describe, `D` Delete, `b` Debug Pod, `V` Events
+`A` All Values, `b` Debug Pod, `d` Diff, `D` Delete (uninstall), `E` Edit Values, `h` History, `R` Rollback, `u` Values, `U` Upgrade, `v` Describe, `V` Events
 
 ### Ingress Actions
-`o` Open in Browser, `v` Describe, `E` Edit, `D` Delete, `b` Debug Pod, `V` Events
+`b` Debug Pod, `D` Delete, `E` Edit, `o` Open in Browser, `v` Describe, `V` Events
 
 ### PVC Actions
-`g` Go to Pod, `b` Debug Mount, `B` Debug Pod, `v` Describe, `E` Edit, `D` Delete, `V` Events
+`b` Debug Mount, `B` Debug Pod, `D` Delete, `E` Edit, `g` Go to Pod, `r` Resize, `v` Describe, `V` Events
 
 ### Default Actions (all other resources)
-`v` Describe, `E` Edit, `D` Delete, `l` Labels / Annotations, `P` Permissions, `b` Debug Pod, `V` Events
+`b` Debug Pod, `D` Delete, `E` Edit, `l` Labels / Annotations, `P` Permissions, `v` Describe, `V` Events
 
 ### Bulk Actions (when items multi-selected)
-`D` Delete, `X` Force Delete, `S` Scale, `r` Restart
+`d` Diff (compare two), `D` Delete, `l` Labels / Annotations, `L` Logs, `r` Restart, `S` Scale, `X` Force Delete
 
 ArgoCD Application bulk actions (when Application resources are multi-selected):
-`s` Sync, `a` Sync (Apply Only), `R` Refresh
+`a` Sync (Apply Only), `R` Refresh, `s` Sync
 
 Custom actions defined in the config file appear after the built-in actions.
 
