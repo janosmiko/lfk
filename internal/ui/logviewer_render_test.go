@@ -1,9 +1,13 @@
 package ui
 
 import (
+	"fmt"
 	"strings"
+	"sync"
 	"testing"
 
+	"github.com/charmbracelet/lipgloss"
+	"github.com/muesli/termenv"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -371,6 +375,14 @@ func TestRenderLogViewer(t *testing.T) {
 
 // --- colorizePodPrefix ---
 
+// resetPodPrefixColors clears the prefix-to-color assignments between tests.
+func resetPodPrefixColors() {
+	podPrefixColorMu.Lock()
+	defer podPrefixColorMu.Unlock()
+	podPrefixColorIdx = map[string]int{}
+	podPrefixColorTaken = make([]bool, len(podPrefixColors))
+}
+
 func TestColorizePodPrefix(t *testing.T) {
 	t.Run("preserves prefix and content", func(t *testing.T) {
 		line := "[pod/myapp-abc12/app] some log output"
@@ -391,6 +403,8 @@ func TestColorizePodPrefix(t *testing.T) {
 	})
 
 	t.Run("same pod gets same result", func(t *testing.T) {
+		resetPodPrefixColors()
+		t.Cleanup(resetPodPrefixColors)
 		line1 := "[pod/myapp-abc12/app] log 1"
 		line2 := "[pod/myapp-abc12/app] log 2"
 		r1 := colorizePodPrefix(line1)
@@ -409,17 +423,90 @@ func TestColorizePodPrefix(t *testing.T) {
 		assert.Equal(t, line, result)
 	})
 
-	t.Run("extracts pod name correctly for hashing", func(t *testing.T) {
-		// Two lines with same pod but different containers should get same color.
-		line1 := "[pod/myapp-abc12/app] log 1"
-		line2 := "[pod/myapp-abc12/sidecar] log 2"
-		r1 := colorizePodPrefix(line1)
-		r2 := colorizePodPrefix(line2)
-		// Both reference pod "myapp-abc12" so they should get same color styling.
-		// We can't directly compare ANSI codes in non-terminal tests,
-		// but verify both process correctly.
-		assert.Contains(t, r1, "pod/myapp-abc12/app")
-		assert.Contains(t, r2, "pod/myapp-abc12/sidecar")
+	t.Run("different containers in same pod get different colors", func(t *testing.T) {
+		origProfile := lipgloss.DefaultRenderer().ColorProfile()
+		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
+		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+		resetPodPrefixColors()
+		t.Cleanup(resetPodPrefixColors)
+
+		r1 := colorizePodPrefix("[pod/myapp-abc12/app] log 1")
+		r2 := colorizePodPrefix("[pod/myapp-abc12/sidecar] log 2")
+		pre1, ok1 := strings.CutSuffix(r1, " log 1")
+		pre2, ok2 := strings.CutSuffix(r2, " log 2")
+		assert.True(t, ok1)
+		assert.True(t, ok2)
+		assert.NotEqual(t, pre1, pre2,
+			"containers app and sidecar of the same pod must get distinct colors")
+	})
+
+	t.Run("first palette-size prefixes all get distinct colors", func(t *testing.T) {
+		origProfile := lipgloss.DefaultRenderer().ColorProfile()
+		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
+		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+		resetPodPrefixColors()
+		t.Cleanup(resetPodPrefixColors)
+
+		seen := map[string]string{}
+		for i := range podPrefixColors {
+			line := fmt.Sprintf("[pod/myapp-abc12/c%d] x", i)
+			r := colorizePodPrefix(line)
+			styled, ok := strings.CutSuffix(r, " x")
+			assert.True(t, ok)
+			// Compare only the ANSI escape prefix (styling), not the text.
+			color, _, _ := strings.Cut(styled, "[pod/")
+			for prev, prevColor := range seen {
+				assert.NotEqual(t, prevColor, color,
+					"prefix %q and c%d must not share a color", prev, i)
+			}
+			seen[line] = color
+		}
+	})
+
+	t.Run("prefix keeps its color once assigned", func(t *testing.T) {
+		origProfile := lipgloss.DefaultRenderer().ColorProfile()
+		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
+		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+		resetPodPrefixColors()
+		t.Cleanup(resetPodPrefixColors)
+
+		first := colorizePodPrefix("[pod/myapp-abc12/app] x")
+		for i := range 20 {
+			colorizePodPrefix(fmt.Sprintf("[pod/other-%d/app] x", i))
+		}
+		again := colorizePodPrefix("[pod/myapp-abc12/app] x")
+		assert.Equal(t, first, again, "a prefix must keep its color for the session")
+	})
+
+	t.Run("palette exhaustion still colorizes without panic", func(t *testing.T) {
+		origProfile := lipgloss.DefaultRenderer().ColorProfile()
+		t.Cleanup(func() { lipgloss.DefaultRenderer().SetColorProfile(origProfile) })
+		lipgloss.DefaultRenderer().SetColorProfile(termenv.ANSI256)
+		resetPodPrefixColors()
+		t.Cleanup(resetPodPrefixColors)
+
+		for i := range 3 * len(podPrefixColors) {
+			line := fmt.Sprintf("[pod/pod-%d/app] x", i)
+			r := colorizePodPrefix(line)
+			assert.Contains(t, r, fmt.Sprintf("pod/pod-%d/app", i))
+			// Deterministic: same prefix renders identically on repeat.
+			assert.Equal(t, r, colorizePodPrefix(line))
+		}
+	})
+
+	t.Run("concurrent calls are safe", func(t *testing.T) {
+		resetPodPrefixColors()
+		t.Cleanup(resetPodPrefixColors)
+
+		var wg sync.WaitGroup
+		for g := range 8 {
+			wg.Go(func() {
+				for i := range 50 {
+					colorizePodPrefix(fmt.Sprintf("[pod/pod-%d/c%d] x", i%20, g%3))
+				}
+			})
+		}
+		wg.Wait()
 	})
 
 	t.Run("no-color mode emits no ANSI escape codes", func(t *testing.T) {
