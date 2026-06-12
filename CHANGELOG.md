@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.6](https://github.com/janosmiko/lfk/compare/v0.14.5...v0.14.6) (2026-06-12)
+
+
+### Bug Fixes
+
+* **logs:** give each container a distinct prefix color in the log viewer ([#425](https://github.com/janosmiko/lfk/issues/425)) ([be5b259](https://github.com/janosmiko/lfk/commit/be5b259b71b7dc5553f6941a58ac5c562a03e147))
+
 ## [0.14.5](https://github.com/janosmiko/lfk/compare/v0.14.4...v0.14.5) (2026-06-12)
 
 
