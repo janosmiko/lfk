@@ -3,6 +3,7 @@ package ui
 import (
 	"fmt"
 	"strings"
+	"sync"
 
 	"github.com/charmbracelet/lipgloss"
 	"github.com/charmbracelet/x/ansi"
@@ -490,9 +491,48 @@ var podPrefixColors = []string{
 	"#41a6b5", // dark cyan
 }
 
-// colorizePodPrefix replaces the "[pod/name/container] " prefix with a colorized
-// version. The color is deterministically assigned based on the pod name so the
-// same pod always gets the same color across the session.
+// podPrefixColorIdx remembers the palette slot assigned to each
+// "pod/name/container" prefix so a prefix keeps its color for the session.
+// Only the first len(podPrefixColors) distinct prefixes are recorded (each
+// entry claims a free slot), so the map is bounded at the palette size;
+// later prefixes fall back to their stable hash slot without caching.
+var (
+	podPrefixColorMu    sync.Mutex
+	podPrefixColorIdx   = map[string]int{}
+	podPrefixColorTaken = make([]bool, len(podPrefixColors))
+)
+
+// podPrefixColor picks the color for a "pod/name/container" prefix. The hash
+// of the full prefix (pod AND container) seeds the slot, then probing skips
+// slots already taken by other prefixes — so different containers of the
+// same pod never share a color until the palette is exhausted. Past
+// exhaustion the raw hash slot is used, which is still deterministic.
+func podPrefixColor(prefix string) string {
+	podPrefixColorMu.Lock()
+	defer podPrefixColorMu.Unlock()
+	if idx, ok := podPrefixColorIdx[prefix]; ok {
+		return podPrefixColors[idx]
+	}
+
+	var hash uint32
+	for _, c := range prefix {
+		hash = hash*31 + uint32(c)
+	}
+	start := int(hash % uint32(len(podPrefixColors)))
+	for i := range podPrefixColors {
+		cand := (start + i) % len(podPrefixColors)
+		if !podPrefixColorTaken[cand] {
+			podPrefixColorTaken[cand] = true
+			podPrefixColorIdx[prefix] = cand
+			return podPrefixColors[cand]
+		}
+	}
+	return podPrefixColors[start]
+}
+
+// colorizePodPrefix replaces the "[pod/name/container] " prefix with a
+// colorized version. Each distinct pod/container pair gets its own color
+// (see podPrefixColor), stable for the session.
 func colorizePodPrefix(line string) string {
 	if len(line) == 0 || line[0] != '[' {
 		return line
@@ -504,25 +544,7 @@ func colorizePodPrefix(line string) string {
 	prefix := line[1:closeBracket] // "pod/name/container"
 	rest := line[closeBracket+2:]
 
-	// Extract pod name for color hashing (between first and last slash).
-	podName := prefix
-	if _, after, ok := strings.Cut(prefix, "/"); ok {
-		afterFirst := after
-		if lastSlash := strings.LastIndex(afterFirst, "/"); lastSlash >= 0 {
-			podName = afterFirst[:lastSlash]
-		} else {
-			podName = afterFirst
-		}
-	}
-
-	// Simple hash to pick a deterministic color.
-	var hash uint32
-	for _, c := range podName {
-		hash = hash*31 + uint32(c)
-	}
-	color := podPrefixColors[hash%uint32(len(podPrefixColors))]
-	style := lipgloss.NewStyle().Foreground(ThemeColor(color))
-
+	style := lipgloss.NewStyle().Foreground(ThemeColor(podPrefixColor(prefix)))
 	return style.Render("["+prefix+"]") + " " + rest
 }
 
