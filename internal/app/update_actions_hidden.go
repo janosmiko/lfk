@@ -72,6 +72,7 @@ func (m Model) openResourceTypeActionMenu() Model {
 		items = append(items, model.Item{Name: hideLabel, Extra: hideDesc, Status: hideMenuChip})
 	}
 
+	sortActionMenuItems(items)
 	m.overlay = overlayAction
 	m.overlayItems = items
 	m.overlayCursor = 0

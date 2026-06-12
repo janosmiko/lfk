@@ -102,10 +102,39 @@ func (m Model) openResourceActionMenu() Model {
 		}
 	}
 
+	sortActionMenuItems(items)
 	m.overlay = overlayAction
 	m.overlayItems = items
 	m.overlayCursor = 0
 	return m
+}
+
+// sortActionMenuItems orders action-menu items by their hotkey chip
+// (Item.Status) so the menu reads in the order of the shortcut letters:
+// case-insensitive alphabetical, lowercase before uppercase on a case tie,
+// keyless items last in their original order.
+func sortActionMenuItems(items []model.Item) {
+	sort.SliceStable(items, func(i, j int) bool {
+		return compareActionMenuKeys(items[i].Status, items[j].Status) < 0
+	})
+}
+
+// compareActionMenuKeys compares two hotkey chips for sortActionMenuItems.
+func compareActionMenuKeys(a, b string) int {
+	switch {
+	case a == b:
+		return 0
+	case a == "":
+		return 1
+	case b == "":
+		return -1
+	}
+	la, lb := strings.ToLower(a), strings.ToLower(b)
+	if la != lb {
+		return strings.Compare(la, lb)
+	}
+	// Same letter, different case: lowercase ("l") sorts before uppercase ("L").
+	return strings.Compare(b, a)
 }
 
 // buildActionCtx creates an actionContext from the current selection, extracting

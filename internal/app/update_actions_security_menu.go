@@ -105,6 +105,7 @@ func (m Model) openSecurityActionMenu() Model {
 		Status: "R",
 	})
 
+	sortActionMenuItems(items)
 	m.overlay = overlayAction
 	m.overlayItems = items
 	m.overlayCursor = 0

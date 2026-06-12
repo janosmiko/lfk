@@ -26,6 +26,7 @@ func (m Model) openClusterPickerActionMenu() Model {
 	for _, a := range actions {
 		items = append(items, model.Item{Name: a.Label, Status: a.Key, Extra: a.Description})
 	}
+	sortActionMenuItems(items)
 	m.bulkMode = false
 	m.overlay = overlayAction
 	m.overlayItems = items
