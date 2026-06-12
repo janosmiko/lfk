@@ -88,8 +88,10 @@ func TestExplainTreeDesc_LoadedMergesByPath(t *testing.T) {
 	m = mdl.(Model)
 
 	mdl = m.updateExplainTreeDescLoaded(explainTreeDescMsg{
-		resource: "deployments",
-		parent:   "spec.template",
+		resource:   "deployments",
+		apiVersion: m.explainAPIVersion,
+		kctx:       m.effectiveContext(),
+		parent:     "spec.template",
 		fields: []model.ExplainField{
 			{Name: "spec", Path: "spec.template.spec", Description: "Specification of the desired behavior of the pod."},
 		},
@@ -111,21 +113,28 @@ func TestExplainTreeDesc_LoadedMergesByPath(t *testing.T) {
 	assert.Nil(t, cmd)
 }
 
-// TestExplainTreeDesc_StaleResourceIgnored: a batch for a different resource
-// (the user left and reopened the explorer) must not merge.
-func TestExplainTreeDesc_StaleResourceIgnored(t *testing.T) {
+// TestExplainTreeDesc_StaleIdentityIgnored: a batch whose request identity
+// (resource, API version, or kube context) no longer matches the explorer
+// session (the user left and reopened it elsewhere) must not merge.
+func TestExplainTreeDesc_StaleIdentityIgnored(t *testing.T) {
 	m := explainTreeDescModel(t)
-	mdl := m.updateExplainTreeDescLoaded(explainTreeDescMsg{
-		resource: "pods",
-		parent:   "spec.template",
-		fields: []model.ExplainField{
-			{Name: "spec", Path: "spec.template.spec", Description: "wrong resource"},
-		},
-	})
-	m = mdl.(Model)
-	assert.Empty(t, m.explainFields[2].Description)
-	_, fetched := m.explainTreeDescFetched["spec.template"]
-	assert.False(t, fetched)
+	stale := []explainTreeDescMsg{
+		{resource: "pods", apiVersion: m.explainAPIVersion, kctx: m.effectiveContext()},
+		{resource: "deployments", apiVersion: "apps/v1beta1", kctx: m.effectiveContext()},
+		{resource: "deployments", apiVersion: m.explainAPIVersion, kctx: "other-cluster"},
+	}
+	for _, msg := range stale {
+		msg.parent = "spec.template"
+		msg.fields = []model.ExplainField{
+			{Name: "spec", Path: "spec.template.spec", Description: "stale batch"},
+		}
+		mdl := m.updateExplainTreeDescLoaded(msg)
+		m = mdl.(Model)
+		assert.Empty(t, m.explainFields[2].Description,
+			"stale batch %+v must not merge", msg)
+		_, fetched := m.explainTreeDescFetched["spec.template"]
+		assert.False(t, fetched, "stale batch %+v must not mark the level described", msg)
+	}
 }
 
 // TestExplainTreeDesc_ErrorMarksLevelDescribed: a failed fetch must not
@@ -137,9 +146,11 @@ func TestExplainTreeDesc_ErrorMarksLevelDescribed(t *testing.T) {
 	m = mdl.(Model)
 
 	mdl = m.updateExplainTreeDescLoaded(explainTreeDescMsg{
-		resource: "deployments",
-		parent:   "spec.template",
-		err:      assert.AnError,
+		resource:   "deployments",
+		apiVersion: m.explainAPIVersion,
+		kctx:       m.effectiveContext(),
+		parent:     "spec.template",
+		err:        assert.AnError,
 	})
 	m = mdl.(Model)
 	assert.Empty(t, m.explainTreeDescInflight)

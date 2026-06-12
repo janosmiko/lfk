@@ -25,13 +25,16 @@ type explainTreeLoadedMsg struct {
 
 // explainTreeDescMsg carries the per-field descriptions of one schema level
 // (a plain kubectl explain of parent), merged into the tree rows under it.
-// resource guards against results arriving after the explorer moved to a
-// different resource type.
+// resource, apiVersion, and kctx identify the request so results arriving
+// after the explorer moved to a different resource type, API version, or
+// cluster context are dropped instead of merged into the wrong tree.
 type explainTreeDescMsg struct {
-	resource string
-	parent   string
-	fields   []model.ExplainField
-	err      error
+	resource   string
+	apiVersion string
+	kctx       string
+	parent     string
+	fields     []model.ExplainField
+	err        error
 }
 
 // explainTreeState holds the API Explorer's tree-mode state, embedded in
@@ -170,7 +173,8 @@ func seedExplainDescriptions(dst, src []model.ExplainField) {
 // the cache resets with the next tree load.
 func (m Model) updateExplainTreeDescLoaded(msg explainTreeDescMsg) tea.Model {
 	delete(m.explainTreeDescInflight, msg.parent)
-	if !m.explainTree || msg.resource != m.explainResource {
+	if !m.explainTree || msg.resource != m.explainResource ||
+		msg.apiVersion != m.explainAPIVersion || msg.kctx != m.effectiveContext() {
 		return m
 	}
 	if m.explainTreeDescFetched == nil {

@@ -520,14 +520,18 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 // explain output carries no descriptions, so tree mode merges these in
 // lazily as the cursor visits each level.
 func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath string) tea.Cmd {
+	kctx := m.effectiveContext()
+	ident := explainTreeDescMsg{resource: resource, apiVersion: apiVersion, kctx: kctx, parent: parentPath}
+
 	kubectlPath, err := exec.LookPath("kubectl")
 	if err != nil {
 		return func() tea.Msg {
-			return explainTreeDescMsg{resource: resource, parent: parentPath, err: fmt.Errorf("kubectl not found: %w", err)}
+			msg := ident
+			msg.err = fmt.Errorf("kubectl not found: %w", err)
+			return msg
 		}
 	}
 
-	kctx := m.effectiveContext()
 	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
 
 	target := resource
@@ -544,14 +548,12 @@ func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath strin
 		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
 		logExecCmd("Running kubectl command", cmd)
 		output, cmdErr := cmd.CombinedOutput()
+		msg := ident
 		if cmdErr != nil {
-			return explainTreeDescMsg{
-				resource: resource,
-				parent:   parentPath,
-				err:      fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
-			}
+			msg.err = fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output)))
+			return msg
 		}
-		_, fields := parseExplainOutput(string(output), parentPath)
-		return explainTreeDescMsg{resource: resource, parent: parentPath, fields: fields}
+		_, msg.fields = parseExplainOutput(string(output), parentPath)
+		return msg
 	})
 }
