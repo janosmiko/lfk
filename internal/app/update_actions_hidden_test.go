@@ -95,12 +95,13 @@ func TestOpenResourceTypeActionMenu_LabelReflectsState(t *testing.T) {
 	m := hiddenTestModel(t)
 	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
 
+	// Items sort by hotkey chip: hide ("h") precedes pin ("p").
 	menu := m.openResourceTypeActionMenu()
 	require.Len(t, menu.overlayItems, 2, "menu offers both Pin and Hide")
-	assert.Equal(t, actionLabelPinType, menu.overlayItems[0].Name)
-	assert.Equal(t, ui.ActiveKeybindings.PinGroup, menu.overlayItems[0].Status, "pin entry carries the pin key chip")
-	assert.Equal(t, actionLabelHideType, menu.overlayItems[1].Name)
-	assert.Equal(t, hideMenuChip, menu.overlayItems[1].Status, "hide entry carries a key chip")
+	assert.Equal(t, actionLabelHideType, menu.overlayItems[0].Name)
+	assert.Equal(t, hideMenuChip, menu.overlayItems[0].Status, "hide entry carries a key chip")
+	assert.Equal(t, actionLabelPinType, menu.overlayItems[1].Name)
+	assert.Equal(t, ui.ActiveKeybindings.PinGroup, menu.overlayItems[1].Status, "pin entry carries the pin key chip")
 
 	// Hide it, then reopen: the hide entry flips to Show.
 	defer func(orig bool) { model.ShowRareResources = orig }(model.ShowRareResources)
@@ -110,7 +111,7 @@ func TestOpenResourceTypeActionMenu_LabelReflectsState(t *testing.T) {
 	rm.setCursor(cursorIndexOfItem(&rm, "Gadgets"))
 	menu2 := rm.openResourceTypeActionMenu()
 	require.Len(t, menu2.overlayItems, 2)
-	assert.Equal(t, actionLabelShowType, menu2.overlayItems[1].Name)
+	assert.Equal(t, actionLabelShowType, menu2.overlayItems[0].Name)
 }
 
 // rareTestModel builds a model whose sidebar includes a rarely-used type
@@ -163,9 +164,10 @@ func TestOpenResourceTypeActionMenu_PinLabelReflectsState(t *testing.T) {
 	m.pinnedState = newPinnedState()
 	m.setCursor(cursorIndexOfItem(&m, "Gadgets"))
 
+	// Items sort by hotkey chip: pin ("p") lands after hide ("h").
 	menu := m.openResourceTypeActionMenu()
 	require.Len(t, menu.overlayItems, 2)
-	assert.Equal(t, actionLabelPinType, menu.overlayItems[0].Name)
+	assert.Equal(t, actionLabelPinType, menu.overlayItems[1].Name)
 
 	// Pin via the menu dispatch path, then reopen: the entry flips to Unpin.
 	res, _ := m.handleKeyPinGroup()
@@ -173,5 +175,5 @@ func TestOpenResourceTypeActionMenu_PinLabelReflectsState(t *testing.T) {
 	rm.setCursor(cursorIndexOfItem(&rm, "Gadgets"))
 	menu2 := rm.openResourceTypeActionMenu()
 	require.Len(t, menu2.overlayItems, 2)
-	assert.Equal(t, actionLabelUnpinType, menu2.overlayItems[0].Name)
+	assert.Equal(t, actionLabelUnpinType, menu2.overlayItems[1].Name)
 }

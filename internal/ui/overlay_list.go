@@ -205,15 +205,19 @@ func RenderOverlayList(items []OverlayListItem, cfg OverlayListConfig, innerW in
 			// (badge or scrollbar) that needs a stable left edge —
 			// padding rows without a reserve regresses the historical
 			// "non-cursor rows keep their short visible width" behaviour.
+			// The padding renders through OverlayDimStyle so it carries the
+			// theme's surface background — raw spaces would punch through to
+			// the terminal background between the row text and the badge /
+			// scrollbar column.
 			if hasOverflow || cfg.BadgeWidth > 0 {
 				if pad := itemWidth - lipgloss.Width(line); pad > 0 {
-					line += strings.Repeat(" ", pad)
+					line += OverlayDimStyle.Render(strings.Repeat(" ", pad))
 				}
 			}
 			row = line
 		}
 		if cfg.BadgeWidth > 0 {
-			row += " " + it.Badge
+			row += OverlayDimStyle.Render(" ") + it.Badge
 		}
 		if hasOverflow {
 			row += renderScrollbar(i-start, visible, len(items), start)

@@ -346,9 +346,11 @@ func renderAutoSyncOverlay(m Model) string {
 	contentH := chromeRows + 3 + 2 // title chrome + 3 rows + blank + footer
 	innerW := max(boxW-4, 1)
 
-	onStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true)
-	offStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorError))
-	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed))
+	// Badges carry the surface background — fg-only styles would punch
+	// through to the terminal background inside the themed overlay box.
+	onStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorSecondary)).Bold(true).Background(ui.SurfaceBg)
+	offStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorError)).Background(ui.SurfaceBg)
+	dimStyle := lipgloss.NewStyle().Foreground(lipgloss.Color(ui.ColorDimmed)).Background(ui.SurfaceBg)
 
 	badge := func(on, disabled bool) string {
 		switch {

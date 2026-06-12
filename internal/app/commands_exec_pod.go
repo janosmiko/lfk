@@ -504,16 +504,56 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 			}
 		}
 
-		// Recursive explain output carries no per-field descriptions, so the
-		// parser stores the path in Description (shown in the right column).
-		// Keep that in sync after re-anchoring relative paths at fieldPath.
 		fields := parseRecursiveExplainForSearch(string(output), "")
 		if fieldPath != "" {
 			for i := range fields {
 				fields[i].Path = fieldPath + "." + fields[i].Path
-				fields[i].Description = fields[i].Path
 			}
 		}
 		return explainTreeLoadedMsg{fields: fields, path: fieldPath}
+	})
+}
+
+// execKubectlExplainTreeDesc fetches the per-field descriptions for one
+// schema level of the API Explorer tree (a plain kubectl explain of
+// parentPath, the same call the flat view makes per level). Recursive
+// explain output carries no descriptions, so tree mode merges these in
+// lazily as the cursor visits each level.
+func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath string) tea.Cmd {
+	kctx := m.effectiveContext()
+	ident := explainTreeDescMsg{resource: resource, apiVersion: apiVersion, kctx: kctx, parent: parentPath}
+
+	kubectlPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		return func() tea.Msg {
+			msg := ident
+			msg.err = fmt.Errorf("kubectl not found: %w", err)
+			return msg
+		}
+	}
+
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
+
+	target := resource
+	if parentPath != "" {
+		target = resource + "." + parentPath
+	}
+
+	return m.trackBgTask(scheduler.KindSubprocess, "Explain (descriptions): "+target, kctx, func() tea.Msg {
+		args := []string{"explain", target, "--context", m.kubectlContext(kctx)}
+		if apiVersion != "" {
+			args = append(args, "--api-version", apiVersion)
+		}
+		cmd := exec.Command(kubectlPath, args...)
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+		logExecCmd("Running kubectl command", cmd)
+		output, cmdErr := cmd.CombinedOutput()
+		msg := ident
+		if cmdErr != nil {
+			msg.err = fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output)))
+			return msg
+		}
+		_, msg.fields = parseExplainOutput(string(output), parentPath)
+		return msg
 	})
 }

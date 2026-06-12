@@ -300,10 +300,9 @@ func parseRecursiveExplainForSearch(output, query string) []model.ExplainField {
 		// When query is empty, return all fields (for namespace-selector-style browsing).
 		if lowerQuery == "" || ui.MatchLine(fieldName, query) {
 			results = append(results, model.ExplainField{
-				Name:        fieldName,
-				Type:        fieldType,
-				Path:        fullPath,
-				Description: fullPath,
+				Name: fieldName,
+				Type: fieldType,
+				Path: fullPath,
 			})
 		}
 	}

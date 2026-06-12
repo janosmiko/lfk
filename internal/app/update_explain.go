@@ -223,8 +223,16 @@ func (m *Model) clampExplainScroll() {
 	m.explainScroll = ui.VimScrollOff(m.explainScroll, m.explainCursor, len(m.explainFields), m.explainVisibleLines(), ui.ConfigScrollOff, identity)
 }
 
-// handleExplainKey handles keyboard input in the explain view mode.
+// handleExplainKey handles keyboard input in the explain view mode. In tree
+// mode, every key dispatch is followed by a lazy fetch of the cursor row's
+// level descriptions when they are not loaded yet (see explain_tree.go).
 func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	mdl, cmd := m.handleExplainKeyDispatch(msg)
+	return withExplainTreeDescFetch(mdl, cmd)
+}
+
+// handleExplainKeyDispatch routes a key press to the explain view's handlers.
+func (m Model) handleExplainKeyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	fieldCount := len(m.explainFields)
 	visibleLines := m.explainVisibleLines()
 
@@ -297,8 +305,15 @@ func (m Model) handleExplainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	return m, nil
 }
 
-// handleExplainSearchKey handles keyboard input when search is active in the explain view.
+// handleExplainSearchKey handles keyboard input when search is active in the
+// explain view. Search jumps move the cursor, so tree mode chains the same
+// lazy description fetch as handleExplainKey.
 func (m Model) handleExplainSearchKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	mdl, cmd := m.handleExplainSearchKeyDispatch(msg)
+	return withExplainTreeDescFetch(mdl, cmd)
+}
+
+func (m Model) handleExplainSearchKeyDispatch(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "enter":
 		m.explainSearchActive = false
