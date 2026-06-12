@@ -8,30 +8,30 @@ Set Framerate 24
 
 Type "lfk"
 Enter
-Sleep 1
+Sleep 1s
 Type "T"
-Sleep 2
+Sleep 2s
 Type "k"
-Sleep 1
+Sleep 1s
 Type "k"
-Sleep 3
+Sleep 3s
 Type "k"
-Sleep 3
+Sleep 3s
 Type "k"
-Sleep 3
+Sleep 3s
 Type "/catpp"
 Enter
-Sleep 3
+Sleep 3s
 Type "/kanagawa-wave"
-Sleep 3
+Sleep 3s
 Escape
 Type "/nord"
 Enter
-Sleep 3
+Sleep 3s
 Type "/synthwave-everything"
-Sleep 3
+Sleep 3s
 Escape
 Type "/bluloco"
 Enter
-Sleep 3
+Sleep 3s
 Ctrl+c
