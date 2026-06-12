@@ -1,40 +1,27 @@
 Output demo.gif
 Set FontSize 14
-Set Width 1200
-Set Height 600
+Set Width 1920
+Set Height 1080
 Set Theme "Catppuccin Mocha"
 Set Padding 20
-
-Type "# We are going to demonstrate how lfk works."
-Enter
-Type "# We will do some basic navigation and actions in kubernetes."
-Enter
-Type "# Check the documentation for more features and details."
-Enter
-Sleep 3s
-
-Type "clear"
-Enter
+Set Framerate 24
 
 Type "lfk"
-Sleep 1s
 Enter
-Sleep 1s
-Type "l"
-Sleep 2s
+Sleep 5s
 Type "/"
 Sleep 1s
 Type "pod"
 Sleep 1s
 Enter
 Type "l"
-Sleep 1s
+Sleep 3s
 Type "j"
-Sleep 500ms
+Sleep 2s
 Type "j"
-Sleep 500ms
+Sleep 2s
 Type "j"
-Sleep 1500ms
+Sleep 2s
 Type "h"
 Sleep 1s
 Type "j"
@@ -47,8 +34,10 @@ Type "j"
 Sleep 1s
 Type "j"
 Sleep 1s
-Type "L"
-Sleep 2s
+Type "j"
+Sleep 1s
+Ctrl+L
+Sleep 5s
 Type "q"
 Sleep 1s
 Enter
@@ -58,23 +47,19 @@ Type "z"
 Sleep 1s
 Type "/containers"
 Enter
-Sleep 1s
+Sleep 3s
 Type "qq"
 Sleep 1s
 Type "h"
 Type "/"
 Sleep 1s
 Type "service"
-Sleep 1s
+Sleep 3s
 Enter
 Type "l"
 Type "x"
-Sleep 2s
-Type "j"
-Sleep 500ms
-Type "j"
-Sleep 500ms
-Type "j"
+Sleep 4s
+Type "p"
 Sleep 500ms
 Enter
 Sleep 2s

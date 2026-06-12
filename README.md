@@ -32,43 +32,33 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 
 ![Themes](./docs/imgs/themes.gif)
 
-### Pods
+### Features
 
-![Pods](./docs/imgs/pods.png)
-
-### Pods fullscreen
-
-![Pods fullscreen](./docs/imgs/pods-fullscreen.png)
-
-### Helm integration
-
-![Helm integration](./docs/imgs/helm-integration.png)
-
-### ArgoCD integration
-
-![ArgoCD integration](./docs/imgs/argocd-integration.png)
-
-![ArgoCD auto-sync config](./docs/imgs/argocd-autosync.png)
-
-### ConfigMap and Secret editors
-
-![ConfigMap editor](./docs/imgs/configmap-editor.png)
-
-### Label and annotation editor
-
-![Label editor](./docs/imgs/label-editor.png)
-
-### Can-I RBAC permissions browser
-
-![Can-I viewer](./docs/imgs/can-i.png)
-
-### YAML preview
-
-![Yaml preview](./docs/imgs/yaml-preview.png)
-
-### API Explorer
-
-![API Explorer](./docs/imgs/api-explorer.png)
+| Feature | |
+| --- | --- |
+| Pods | <img src="./docs/imgs/pods.png" alt="Pods" width="600"> |
+| Pods fullscreen | <img src="./docs/imgs/pods-fullscreen.png" alt="Pods fullscreen" width="600"> |
+| Pod action menu | <img src="./docs/imgs/pods-actions.png" alt="Pod actions" width="600"> |
+| Cluster Dashboard | <img src="./docs/imgs/cluster-dashboard.png" alt="Cluster Dashboard" width="600"> |
+| Object Explorer | <img src="./docs/imgs/object-explorer.png" alt="Object Explorer" width="600"> |
+| API Explorer | <img src="./docs/imgs/api-explorer.png" alt="API Explorer" width="600"> |
+| YAML Viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML Viewer" width="600"> |
+| Log Viewer | <img src="./docs/imgs/log-viewer.png" alt="Log Viewer" width="600"> |
+| Helm integration | <img src="./docs/imgs/helm-integration.png" alt="Helm integration" width="600"> |
+| ArgoCD integration | <img src="./docs/imgs/argocd-integration.png" alt="ArgoCD integration" width="600"> |
+| ArgoCD AutoSync config | <img src="./docs/imgs/argocd-autosync.png" alt="ArgoCD auto-sync config" width="300"> |
+| Security dashboard | <img src="./docs/imgs/security-heuristics.png" alt="Built-in security heuristics" width="600"> |
+| Trivy integration | <img src="./docs/imgs/trivy-integration.png" alt="Trivy integration" width="600"> |
+| Crash Investigator | <img src="./docs/imgs/crash-investigator.png" alt="Crash Investigator" width="600"> |
+| Pod Startup Analysis | <img src="./docs/imgs/startup-analysis.png" alt="Pod Startup Analysis" width="600"> |
+| Can-I RBAC permissions browser | <img src="./docs/imgs/can-i.png" alt="Can-I viewer" width="600"> |
+| Label and annotation editor | <img src="./docs/imgs/label-annotation-editor.png" alt="Label and annotation editor" width="600"> |
+| Quick filters | <img src="./docs/imgs/quick-filters.png" alt="Quick filters" width="600"> |
+| Column visibility and reordering | <img src="./docs/imgs/column-visibility-reordering.png" alt="Column visibility and reordering" width="600"> |
+| Bookmarks | <img src="./docs/imgs/bookmarks.png" alt="Bookmarks" width="600"> |
+| Multi-tab support | <img src="./docs/imgs/tab-support.png" alt="Multi-tab support" width="600"> |
+| Union view | <img src="./docs/imgs/union-sets.png" alt="Union sets" width="600"> |
+| Local cluster management | <img src="./docs/imgs/local-clusters.png" alt="Local clusters" width="600"> |
 
 ## Features
 
@@ -365,6 +355,50 @@ All search and filter inputs support three modes, auto-detected from the query s
 **Clipboard paste**: All search, filter, and command bar inputs accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). Multiline paste shows a confirmation dialog.
 
 **Recall previous queries**: While the `f` filter or `/` search input is open, press `Up` / `Down` to cycle through previous queries. `/` and `f` share one history (the matcher and matched fields are identical between them), kept separate from the `:` command bar. The log viewer's `/` search has its own history because it matches raw log lines (substring/regex over arbitrary text) rather than resource names — pooling it would surface irrelevant entries. All three persist across sessions under `$XDG_STATE_HOME/lfk/` (default `~/.local/state/lfk/`) — `query-history` for explorer `/` and `f`, `log-search-history` for the log viewer's `/`, and `history` for the command bar.
+
+## Tips and Tricks
+
+- Peek at Pod/Deployment logs with `L` (live-log preview pane), or open the fullscreen log viewer with `Ctrl+L`
+- Jump straight to a resource type from anywhere: type `:pod`, `:dep`, `:pvc` in the command bar
+- Press `o` on a resource to jump to its owner (e.g. Pod -> Deployment), then `Backspace` to jump back
+- Typos are fine in search: `/~deplymnt` fuzzy-matches `deployments`
+- Multi-select with `Space` (range-select with `Ctrl+Space`), then bulk delete/scale/restart via `x`
+- Set a bookmark with `m<letter>`, jump back with `'<letter>` - lowercase slots are context-aware. Press tab to jump to the namespace
+- Press `.` for quick filter presets (e.g. only failing Pods); extend them per resource type in config
+- Decode Secret values in the preview with `Ctrl+S`, or edit them decoded with `e`
+- Copy the resource name with `y`; press `Y` to copy as YAML, JSON, or Table
+- Apply a manifest straight from your clipboard with `Ctrl+P`
+- Hunt down unused ConfigMaps, Secrets, PVCs and more with `Shift+Z` (orphan detection)
+- Run kubectl without leaving lfk (`:k get pods -o wide`) or any shell command (`:! curl ...`)
+- Investigate a crash-looping Pod with `x` -> `I`: restart history, events, previous logs, and describe in one tabbed view
+- Lock a session against destructive actions with `Ctrl+R` (read-only mode)
+- Try a new look without restarting: `T` live-previews 460+ themes
+- Resource stuck in Terminating? `Ctrl+G` searches its finalizers and removes them
+- Press `Tab` inside `/` or `f` to broaden matching to labels, annotations, finalizers, and other column values
+- Recall earlier queries with `Up`/`Down` inside `/`, `f`, and the `:` command bar - history persists across restarts
+- See how a resource connects to everything else with `M` (relationship map)
+- Need everything except a few namespaces? In the `\` selector, `Tab` excludes namespaces instead of selecting them
+- Pin your daily-driver resource types with `p` and hide noisy ones via `x` - both remembered per cluster
+- Teleport between levels with `0` / `1` / `2` (clusters / resource types / resources)
+- Sort by any column with `>` / `<`, flip direction with `=`, reset with `-`
+- Check firing Prometheus/Alertmanager alerts with `@` and namespace quotas with `Q`
+- Open an Ingress host in your browser with `Ctrl+O`
+- Save the selected resource manifest to a file with `W`
+- Spin up a throwaway kind/k3d/minikube cluster without leaving lfk: `Ctrl+N` at the cluster list
+- Capture a Pod's network traffic with `c` - live decode plus pcap export (kubectl-debug or kubeshark)
+- Walk any resource's live object with `O` (Object Explorer): `r` finds keys recursively, `T` expands an ASCII tree, `y` copies the field path
+- Forget `kubectl explain` - `I` opens the API Explorer, and `n`/`N` searches auto-drill into nested fields
+- In the YAML viewer, press `O` on a line to jump into the Object Explorer at that attribute, or `I` to see its schema
+- Fold YAML sections with `z` (`Z` folds all); edit the resource in your `$EDITOR` with `Ctrl+E`
+- Every viewer speaks vim: counts (`100j`, `42G`, `5n`), visual selections (`v` / `V` / `Ctrl+V`), and text objects (`viw`) work everywhere
+- Make noisy logs readable with `P` - the structured preview parses JSON, logfmt, klog, zap, nginx, envoy, Java, and postgres lines
+- Save logs to a file with `S` (loaded lines) or `Ctrl+S` (full history) - the path lands on your clipboard
+- Switch pods or filter containers without leaving the log viewer: press `\`
+- Replay a resource's event history as a timeline with `V`
+- Flip the RBAC question: inside the Can-I browser (`U`), `Tab` opens Who-Can - every subject allowed to run a verb on a resource
+- Get per-container CPU/memory recommendations with `x` -> `z` (Right-sizing Advisor, VPA-backed when available)
+- Watch an ArgoCD Application roll out wave by wave: `x` -> `W` opens the Sync Wave Timeline
+- Waiting for a rollout? `:nyan` and `:kubetris` are real commands
 
 ## Contributing
 
