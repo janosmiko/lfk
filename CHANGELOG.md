@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.5](https://github.com/janosmiko/lfk/compare/v0.14.4...v0.14.5) (2026-06-12)
+
+
+### Bug Fixes
+
+* action menu hotkey order, overlay badge background, tree-view descriptions ([#423](https://github.com/janosmiko/lfk/issues/423)) ([6ae13b5](https://github.com/janosmiko/lfk/commit/6ae13b5a24d4575297f07145c56bad086dc49650))
+
 ## [0.14.4](https://github.com/janosmiko/lfk/compare/v0.14.3...v0.14.4) (2026-06-11)
 
 
