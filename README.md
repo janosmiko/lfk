@@ -356,9 +356,49 @@ All search and filter inputs support three modes, auto-detected from the query s
 
 **Recall previous queries**: While the `f` filter or `/` search input is open, press `Up` / `Down` to cycle through previous queries. `/` and `f` share one history (the matcher and matched fields are identical between them), kept separate from the `:` command bar. The log viewer's `/` search has its own history because it matches raw log lines (substring/regex over arbitrary text) rather than resource names — pooling it would surface irrelevant entries. All three persist across sessions under `$XDG_STATE_HOME/lfk/` (default `~/.local/state/lfk/`) — `query-history` for explorer `/` and `f`, `log-search-history` for the log viewer's `/`, and `history` for the command bar.
 
-### Tips and Tricks
+## Tips and Tricks
 
 - Quickly open POD/Deployment and other resource logs with `L`, or open the advanced log viewer with `Ctrl+L`
+- Jump straight to a resource type from anywhere: type `:pod`, `:dep`, `:pvc` in the command bar
+- Press `o` on a resource to jump to its owner (e.g. Pod -> Deployment), then `Backspace` to jump back
+- Typos are fine in search: `/~deplymnt` fuzzy-matches `deployments`
+- Multi-select with `Space` (range-select with `Ctrl+Space`), then bulk delete/scale/restart via `x`
+- Set a bookmark with `m<letter>`, jump back with `'<letter>` - lowercase slots are context-aware. Press tab to jump to the namespace
+- Press `.` for quick filter presets (e.g. only failing Pods); extend them per resource type in config
+- Decode Secret values in the preview with `Ctrl+S`, or edit them decoded with `e`
+- Copy the resource name with `y`; press `Y` to copy as YAML, JSON, or Table
+- Apply a manifest straight from your clipboard with `Ctrl+P`
+- Hunt down unused ConfigMaps, Secrets, PVCs and more with `Shift+Z` (orphan detection)
+- Run kubectl without leaving lfk (`:k get pods -o wide`) or any shell command (`:! curl ...`)
+- Investigate a crash-looping Pod with `x` -> `I`: restart history, events, previous logs, and describe in one tabbed view
+- Lock a session against destructive actions with `Ctrl+R` (read-only mode)
+- Try a new look without restarting: `T` live-previews 460+ themes
+- Resource stuck in Terminating? `Ctrl+G` searches its finalizers and removes them
+- Press `Tab` inside `/` or `f` to broaden matching to labels, annotations, finalizers, and other column values
+- Recall earlier queries with `Up`/`Down` inside `/`, `f`, and the `:` command bar - history persists across restarts
+- See how a resource connects to everything else with `M` (relationship map)
+- Need everything except a few namespaces? In the `\` selector, `Tab` excludes namespaces instead of selecting them
+- Pin your daily-driver resource types with `p` and hide noisy ones via `x` - both remembered per cluster
+- Teleport between levels with `0` / `1` / `2` (clusters / resource types / resources)
+- Sort by any column with `>` / `<`, flip direction with `=`, reset with `-`
+- Check firing Prometheus/Alertmanager alerts with `@` and namespace quotas with `Q`
+- Open an Ingress host in your browser with `Ctrl+O`
+- Save the selected resource manifest to a file with `W`
+- Spin up a throwaway kind/k3d/minikube cluster without leaving lfk: `Ctrl+N` at the cluster list
+- Capture a Pod's network traffic with `c` - live decode plus pcap export (kubectl-debug or kubeshark)
+- Walk any resource's live object with `O` (Object Explorer): `r` finds keys recursively, `T` expands an ASCII tree, `y` copies the field path
+- Forget `kubectl explain` - `I` opens the API Explorer, and `n`/`N` searches auto-drill into nested fields
+- In the YAML viewer, press `O` on a line to jump into the Object Explorer at that attribute, or `I` to see its schema
+- Fold YAML sections with `z` (`Z` folds all); edit the resource in your `$EDITOR` with `Ctrl+E`
+- Every viewer speaks vim: counts (`100j`, `42G`, `5n`), visual selections (`v` / `V` / `Ctrl+V`), and text objects (`viw`) work everywhere
+- Make noisy logs readable with `P` - the structured preview parses JSON, logfmt, klog, zap, nginx, envoy, Java, and postgres lines
+- Save logs to a file with `S` (loaded lines) or `Ctrl+S` (full history) - the path lands on your clipboard
+- Switch pods or filter containers without leaving the log viewer: press `\`
+- Replay a resource's event history as a timeline with `V`
+- Flip the RBAC question: inside the Can-I browser (`U`), `Tab` opens Who-Can - every subject allowed to run a verb on a resource
+- Get per-container CPU/memory recommendations with `x` -> `z` (Right-sizing Advisor, VPA-backed when available)
+- Watch an ArgoCD Application roll out wave by wave: `x` -> `W` opens the Sync Wave Timeline
+- Waiting for a rollout? `:nyan` and `:kubetris` are real commands
 
 ## Contributing
 
