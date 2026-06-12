@@ -358,7 +358,7 @@ All search and filter inputs support three modes, auto-detected from the query s
 
 ## Tips and Tricks
 
-- Quickly open POD/Deployment and other resource logs with `L`, or open the advanced log viewer with `Ctrl+L`
+- Peek at Pod/Deployment logs with `L` (live-log preview pane), or open the fullscreen log viewer with `Ctrl+L`
 - Jump straight to a resource type from anywhere: type `:pod`, `:dep`, `:pvc` in the command bar
 - Press `o` on a resource to jump to its owner (e.g. Pod -> Deployment), then `Backspace` to jump back
 - Typos are fine in search: `/~deplymnt` fuzzy-matches `deployments`
