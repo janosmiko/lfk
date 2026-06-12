@@ -504,16 +504,54 @@ func (m Model) execKubectlExplainTree(resource, apiVersion, fieldPath string) te
 			}
 		}
 
-		// Recursive explain output carries no per-field descriptions, so the
-		// parser stores the path in Description (shown in the right column).
-		// Keep that in sync after re-anchoring relative paths at fieldPath.
 		fields := parseRecursiveExplainForSearch(string(output), "")
 		if fieldPath != "" {
 			for i := range fields {
 				fields[i].Path = fieldPath + "." + fields[i].Path
-				fields[i].Description = fields[i].Path
 			}
 		}
 		return explainTreeLoadedMsg{fields: fields, path: fieldPath}
+	})
+}
+
+// execKubectlExplainTreeDesc fetches the per-field descriptions for one
+// schema level of the API Explorer tree (a plain kubectl explain of
+// parentPath, the same call the flat view makes per level). Recursive
+// explain output carries no descriptions, so tree mode merges these in
+// lazily as the cursor visits each level.
+func (m Model) execKubectlExplainTreeDesc(resource, apiVersion, parentPath string) tea.Cmd {
+	kubectlPath, err := exec.LookPath("kubectl")
+	if err != nil {
+		return func() tea.Msg {
+			return explainTreeDescMsg{resource: resource, parent: parentPath, err: fmt.Errorf("kubectl not found: %w", err)}
+		}
+	}
+
+	kctx := m.effectiveContext()
+	kubeconfigPaths := m.client.KubeconfigPathForContext(kctx)
+
+	target := resource
+	if parentPath != "" {
+		target = resource + "." + parentPath
+	}
+
+	return m.trackBgTask(scheduler.KindSubprocess, "Explain (descriptions): "+target, kctx, func() tea.Msg {
+		args := []string{"explain", target, "--context", m.kubectlContext(kctx)}
+		if apiVersion != "" {
+			args = append(args, "--api-version", apiVersion)
+		}
+		cmd := exec.Command(kubectlPath, args...)
+		cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPaths)
+		logExecCmd("Running kubectl command", cmd)
+		output, cmdErr := cmd.CombinedOutput()
+		if cmdErr != nil {
+			return explainTreeDescMsg{
+				resource: resource,
+				parent:   parentPath,
+				err:      fmt.Errorf("%w: %s", cmdErr, strings.TrimSpace(string(output))),
+			}
+		}
+		_, fields := parseExplainOutput(string(output), parentPath)
+		return explainTreeDescMsg{resource: resource, parent: parentPath, fields: fields}
 	})
 }

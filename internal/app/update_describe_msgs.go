@@ -78,6 +78,8 @@ func (m Model) updateExplainMsg(msg tea.Msg) (tea.Model, tea.Cmd, bool) {
 	case explainTreeLoadedMsg:
 		mdl, cmd := m.updateExplainTreeLoaded(msg)
 		return mdl, cmd, true
+	case explainTreeDescMsg:
+		return m.updateExplainTreeDescLoaded(msg), nil, true
 	}
 	return m, nil, false
 }

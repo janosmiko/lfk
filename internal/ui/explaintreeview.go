@@ -13,9 +13,9 @@ import (
 // three-column Miller layout, but the middle column shows the recursive field
 // tree of the current schema path with ASCII-art guides (issue #417). depths
 // holds each field's nesting depth relative to the tree root; folded marks
-// rows whose subtree is folded away (rendered with a trailing "›"). Recursive
-// kubectl explain output carries no per-field descriptions, so the right
-// column shows the selected field's name/type only.
+// rows whose subtree is folded away (rendered with a trailing "›"). The right
+// column shows the selected field's description, lazily loaded per schema
+// level by the app (recursive kubectl explain output carries none itself).
 func RenderExplainTreeView(fields []model.ExplainField, depths []int, folded []bool, cursor, scroll int, resourceDesc, title string, parentFields []model.ExplainField, parentCursor int, searchQuery, hintBar string, width, height int) string {
 	d := objectExplorerDims(width, height)
 	if len(depths) != len(fields) {

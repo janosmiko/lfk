@@ -23,6 +23,17 @@ type explainTreeLoadedMsg struct {
 	err    error
 }
 
+// explainTreeDescMsg carries the per-field descriptions of one schema level
+// (a plain kubectl explain of parent), merged into the tree rows under it.
+// resource guards against results arriving after the explorer moved to a
+// different resource type.
+type explainTreeDescMsg struct {
+	resource string
+	parent   string
+	fields   []model.ExplainField
+	err      error
+}
+
 // explainTreeState holds the API Explorer's tree-mode state, embedded in
 // Model.
 type explainTreeState struct {
@@ -32,6 +43,13 @@ type explainTreeState struct {
 	explainTreeCollapsed map[string]struct{}  // folded subtree roots, keyed by schema path
 	explainTreeWanted    bool                 // sticky: re-enter tree mode after every level load
 	explainFlatLevel     explainLevel         // flat level stashed while tree mode is on
+
+	// Recursive explain output carries no per-field descriptions, so tree
+	// mode lazily describes one schema level at a time (a plain kubectl
+	// explain of the cursor row's parent path) and caches which levels are
+	// done / in flight for the life of the tree.
+	explainTreeDescFetched  map[string]struct{} // levels whose descriptions are merged (or failed)
+	explainTreeDescInflight map[string]struct{} // levels with a fetch currently in flight
 }
 
 // toggleExplainTree flips the API Explorer between the flat field list and
@@ -79,6 +97,8 @@ func (m *Model) resetExplainTree() {
 	m.explainTreeAll = nil
 	m.explainTreeCollapsed = nil
 	m.explainFlatLevel = explainLevel{}
+	m.explainTreeDescFetched = nil
+	m.explainTreeDescInflight = nil
 }
 
 // updateExplainTreeLoaded swaps the recursive field tree into the active
@@ -109,6 +129,11 @@ func (m Model) updateExplainTreeLoaded(msg explainTreeLoadedMsg) (tea.Model, tea
 	if !m.explainTree && m.explainCursor >= 0 && m.explainCursor < len(m.explainFields) {
 		selPath = m.explainFields[m.explainCursor].Path
 	}
+	// The tree's depth-0 rows are the same fields the flat level showed —
+	// carry their descriptions over and mark the level as described.
+	seedExplainDescriptions(msg.fields, m.explainFields)
+	m.explainTreeDescFetched = map[string]struct{}{m.explainPath: {}}
+	m.explainTreeDescInflight = nil
 	m.explainFlatLevel = explainLevel{fields: m.explainFields, cursor: m.explainCursor, scroll: m.explainScroll}
 	m.explainTree = true
 	m.explainTreeAll = msg.fields
@@ -117,6 +142,96 @@ func (m Model) updateExplainTreeLoaded(msg explainTreeLoadedMsg) (tea.Model, tea
 	m.explainScroll = 0
 	m.applyExplainTreeVisible(selPath)
 	return m, nil
+}
+
+// seedExplainDescriptions copies non-empty descriptions from src onto the
+// dst fields with the same schema path.
+func seedExplainDescriptions(dst, src []model.ExplainField) {
+	descByPath := make(map[string]string, len(src))
+	for _, f := range src {
+		if f.Description != "" {
+			descByPath[f.Path] = f.Description
+		}
+	}
+	if len(descByPath) == 0 {
+		return
+	}
+	for i := range dst {
+		if d, ok := descByPath[dst[i].Path]; ok {
+			dst[i].Description = d
+		}
+	}
+}
+
+// updateExplainTreeDescLoaded merges an arrived description batch into the
+// tree rows under msg.parent (both the full tree and the visible list) and
+// marks the level described. Failed fetches mark the level described too —
+// retrying on every cursor move would spawn a kubectl process per keypress;
+// the cache resets with the next tree load.
+func (m Model) updateExplainTreeDescLoaded(msg explainTreeDescMsg) tea.Model {
+	delete(m.explainTreeDescInflight, msg.parent)
+	if !m.explainTree || msg.resource != m.explainResource {
+		return m
+	}
+	if m.explainTreeDescFetched == nil {
+		m.explainTreeDescFetched = make(map[string]struct{})
+	}
+	m.explainTreeDescFetched[msg.parent] = struct{}{}
+	if msg.err != nil || len(msg.fields) == 0 {
+		return m
+	}
+	seedExplainDescriptions(m.explainTreeAll, msg.fields)
+	seedExplainDescriptions(m.explainFields, msg.fields)
+	return m
+}
+
+// maybeFetchExplainTreeDesc returns a command fetching the descriptions for
+// the cursor row's schema level when tree mode hasn't loaded them yet, and
+// remembers the fetch as in flight. Nil outside tree mode or when the level
+// is already described / loading.
+func (m *Model) maybeFetchExplainTreeDesc() tea.Cmd {
+	if !m.explainTree || m.explainCursor < 0 || m.explainCursor >= len(m.explainFields) {
+		return nil
+	}
+	parent := explainParentPath(m.explainFields[m.explainCursor].Path)
+	if _, ok := m.explainTreeDescFetched[parent]; ok {
+		return nil
+	}
+	if _, ok := m.explainTreeDescInflight[parent]; ok {
+		return nil
+	}
+	if m.explainTreeDescInflight == nil {
+		m.explainTreeDescInflight = make(map[string]struct{})
+	}
+	m.explainTreeDescInflight[parent] = struct{}{}
+	return m.execKubectlExplainTreeDesc(m.explainResource, m.explainAPIVersion, parent)
+}
+
+// withExplainTreeDescFetch chains a tree-description fetch for the cursor
+// row's level onto a key handler's result when one is needed.
+func withExplainTreeDescFetch(mdl tea.Model, cmd tea.Cmd) (tea.Model, tea.Cmd) {
+	m, ok := mdl.(Model)
+	if !ok {
+		return mdl, cmd
+	}
+	fetch := m.maybeFetchExplainTreeDesc()
+	switch {
+	case fetch == nil:
+		return m, cmd
+	case cmd == nil:
+		return m, fetch
+	default:
+		return m, tea.Batch(cmd, fetch)
+	}
+}
+
+// explainParentPath returns the schema path one level above path ("" at the
+// resource root).
+func explainParentPath(path string) string {
+	if idx := strings.LastIndex(path, "."); idx >= 0 {
+		return path[:idx]
+	}
+	return ""
 }
 
 // applyExplainTreeVisible recomputes the visible tree (explainFields +
