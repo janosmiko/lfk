@@ -32,43 +32,33 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 
 ![Themes](./docs/imgs/themes.gif)
 
-### Pods
+### Features
 
-![Pods](./docs/imgs/pods.png)
-
-### Pods fullscreen
-
-![Pods fullscreen](./docs/imgs/pods-fullscreen.png)
-
-### Helm integration
-
-![Helm integration](./docs/imgs/helm-integration.png)
-
-### ArgoCD integration
-
-![ArgoCD integration](./docs/imgs/argocd-integration.png)
-
-![ArgoCD auto-sync config](./docs/imgs/argocd-autosync.png)
-
-### ConfigMap and Secret editors
-
-![ConfigMap editor](./docs/imgs/configmap-editor.png)
-
-### Label and annotation editor
-
-![Label editor](./docs/imgs/label-editor.png)
-
-### Can-I RBAC permissions browser
-
-![Can-I viewer](./docs/imgs/can-i.png)
-
-### YAML preview
-
-![Yaml preview](./docs/imgs/yaml-preview.png)
-
-### API Explorer
-
-![API Explorer](./docs/imgs/api-explorer.png)
+| Feature | |
+| --- | --- |
+| Pods | ![Pods](./docs/imgs/pods.png) |
+| Pods fullscreen | ![Pods fullscreen](./docs/imgs/pods-fullscreen.png) |
+| Pod action menu | ![Pod actions](./docs/imgs/pods-actions.png) |
+| Cluster Dashboard | ![Cluster Dashboard](./docs/imgs/cluster-dashboard.png) |
+| Object Explorer | ![Object Explorer](./docs/imgs/object-explorer.png) |
+| API Explorer | ![API Explorer](./docs/imgs/api-explorer.png) |
+| YAML Viewer | ![YAML Viewer](./docs/imgs/yaml-preview.png) |
+| Log Viewer | ![Log Viewer](./docs/imgs/log-viewer.png) |
+| Helm integration | ![Helm integration](./docs/imgs/helm-integration.png) |
+| ArgoCD integration | ![ArgoCD integration](./docs/imgs/argocd-integration.png) |
+| ArgoCD AutoSync config | ![ArgoCD auto-sync config](./docs/imgs/argocd-autosync.png) |
+| Security dashboard | ![Built-in security heuristics](./docs/imgs/security-heuristics.png) |
+| Trivy integration | ![Trivy integration](./docs/imgs/trivy-integration.png) |
+| Crash Investigator | ![Crash Investigator](./docs/imgs/crash-investigator.png) |
+| Pod Startup Analysis | ![Pod Startup Analysis](./docs/imgs/startup-analysis.png) |
+| Can-I RBAC permissions browser | ![Can-I viewer](./docs/imgs/can-i.png) |
+| Label and annotation editor | ![Label and annotation editor](./docs/imgs/label-annotation-editor.png) |
+| Quick filters | ![Quick filters](./docs/imgs/quick-filters.png) |
+| Column visibility and reordering | ![Column visibility and reordering](./docs/imgs/column-visibility-reordering.png) |
+| Bookmarks | ![Bookmarks](./docs/imgs/bookmarks.png) |
+| Multi-tab support | ![Multi-tab support](./docs/imgs/tab-support.png) |
+| Union view | ![Union sets](./docs/imgs/union-sets.png) |
+| Local cluster management | ![Local clusters](./docs/imgs/local-clusters.png) |
 
 ## Features
 
@@ -365,6 +355,10 @@ All search and filter inputs support three modes, auto-detected from the query s
 **Clipboard paste**: All search, filter, and command bar inputs accept pasted text (`Cmd+V` on macOS, `Ctrl+Shift+V` on Linux). Multiline paste shows a confirmation dialog.
 
 **Recall previous queries**: While the `f` filter or `/` search input is open, press `Up` / `Down` to cycle through previous queries. `/` and `f` share one history (the matcher and matched fields are identical between them), kept separate from the `:` command bar. The log viewer's `/` search has its own history because it matches raw log lines (substring/regex over arbitrary text) rather than resource names — pooling it would surface irrelevant entries. All three persist across sessions under `$XDG_STATE_HOME/lfk/` (default `~/.local/state/lfk/`) — `query-history` for explorer `/` and `f`, `log-search-history` for the log viewer's `/`, and `history` for the command bar.
+
+### Tips and Tricks
+
+- Quickly open POD/Deployment and other resource logs with `L`, or open the advanced log viewer with `Ctrl+L`
 
 ## Contributing
 
