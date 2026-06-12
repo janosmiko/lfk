@@ -36,29 +36,29 @@ Cloudsmith is the only fully hosted, cloud-native, universal package management 
 
 | Feature | |
 | --- | --- |
-| Pods | ![Pods](./docs/imgs/pods.png) |
-| Pods fullscreen | ![Pods fullscreen](./docs/imgs/pods-fullscreen.png) |
-| Pod action menu | ![Pod actions](./docs/imgs/pods-actions.png) |
-| Cluster Dashboard | ![Cluster Dashboard](./docs/imgs/cluster-dashboard.png) |
-| Object Explorer | ![Object Explorer](./docs/imgs/object-explorer.png) |
-| API Explorer | ![API Explorer](./docs/imgs/api-explorer.png) |
-| YAML Viewer | ![YAML Viewer](./docs/imgs/yaml-preview.png) |
-| Log Viewer | ![Log Viewer](./docs/imgs/log-viewer.png) |
-| Helm integration | ![Helm integration](./docs/imgs/helm-integration.png) |
-| ArgoCD integration | ![ArgoCD integration](./docs/imgs/argocd-integration.png) |
-| ArgoCD AutoSync config | ![ArgoCD auto-sync config](./docs/imgs/argocd-autosync.png) |
-| Security dashboard | ![Built-in security heuristics](./docs/imgs/security-heuristics.png) |
-| Trivy integration | ![Trivy integration](./docs/imgs/trivy-integration.png) |
-| Crash Investigator | ![Crash Investigator](./docs/imgs/crash-investigator.png) |
-| Pod Startup Analysis | ![Pod Startup Analysis](./docs/imgs/startup-analysis.png) |
-| Can-I RBAC permissions browser | ![Can-I viewer](./docs/imgs/can-i.png) |
-| Label and annotation editor | ![Label and annotation editor](./docs/imgs/label-annotation-editor.png) |
-| Quick filters | ![Quick filters](./docs/imgs/quick-filters.png) |
-| Column visibility and reordering | ![Column visibility and reordering](./docs/imgs/column-visibility-reordering.png) |
-| Bookmarks | ![Bookmarks](./docs/imgs/bookmarks.png) |
-| Multi-tab support | ![Multi-tab support](./docs/imgs/tab-support.png) |
-| Union view | ![Union sets](./docs/imgs/union-sets.png) |
-| Local cluster management | ![Local clusters](./docs/imgs/local-clusters.png) |
+| Pods | <img src="./docs/imgs/pods.png" alt="Pods" width="600"> |
+| Pods fullscreen | <img src="./docs/imgs/pods-fullscreen.png" alt="Pods fullscreen" width="600"> |
+| Pod action menu | <img src="./docs/imgs/pods-actions.png" alt="Pod actions" width="600"> |
+| Cluster Dashboard | <img src="./docs/imgs/cluster-dashboard.png" alt="Cluster Dashboard" width="600"> |
+| Object Explorer | <img src="./docs/imgs/object-explorer.png" alt="Object Explorer" width="600"> |
+| API Explorer | <img src="./docs/imgs/api-explorer.png" alt="API Explorer" width="600"> |
+| YAML Viewer | <img src="./docs/imgs/yaml-preview.png" alt="YAML Viewer" width="600"> |
+| Log Viewer | <img src="./docs/imgs/log-viewer.png" alt="Log Viewer" width="600"> |
+| Helm integration | <img src="./docs/imgs/helm-integration.png" alt="Helm integration" width="600"> |
+| ArgoCD integration | <img src="./docs/imgs/argocd-integration.png" alt="ArgoCD integration" width="600"> |
+| ArgoCD AutoSync config | <img src="./docs/imgs/argocd-autosync.png" alt="ArgoCD auto-sync config" width="300"> |
+| Security dashboard | <img src="./docs/imgs/security-heuristics.png" alt="Built-in security heuristics" width="600"> |
+| Trivy integration | <img src="./docs/imgs/trivy-integration.png" alt="Trivy integration" width="600"> |
+| Crash Investigator | <img src="./docs/imgs/crash-investigator.png" alt="Crash Investigator" width="600"> |
+| Pod Startup Analysis | <img src="./docs/imgs/startup-analysis.png" alt="Pod Startup Analysis" width="600"> |
+| Can-I RBAC permissions browser | <img src="./docs/imgs/can-i.png" alt="Can-I viewer" width="600"> |
+| Label and annotation editor | <img src="./docs/imgs/label-annotation-editor.png" alt="Label and annotation editor" width="600"> |
+| Quick filters | <img src="./docs/imgs/quick-filters.png" alt="Quick filters" width="600"> |
+| Column visibility and reordering | <img src="./docs/imgs/column-visibility-reordering.png" alt="Column visibility and reordering" width="600"> |
+| Bookmarks | <img src="./docs/imgs/bookmarks.png" alt="Bookmarks" width="600"> |
+| Multi-tab support | <img src="./docs/imgs/tab-support.png" alt="Multi-tab support" width="600"> |
+| Union view | <img src="./docs/imgs/union-sets.png" alt="Union sets" width="600"> |
+| Local cluster management | <img src="./docs/imgs/local-clusters.png" alt="Local clusters" width="600"> |
 
 ## Features
 
