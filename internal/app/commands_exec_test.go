@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 	"github.com/stretchr/testify/assert"
@@ -298,6 +299,7 @@ func TestPush3ExecKubectlEditNoKubectl(t *testing.T) {
 
 func TestPush3DeleteResourceNoClient(t *testing.T) {
 	m := basePush80v3Model()
+	m.scheduler = scheduler.New(0)
 	m.actionCtx = actionContext{
 		name:         "pod-1",
 		namespace:    "default",
@@ -307,7 +309,7 @@ func TestPush3DeleteResourceNoClient(t *testing.T) {
 	cmd := m.deleteResource()
 	require.NotNil(t, cmd)
 	// Execute -- should try to delete via fake client.
-	msg := cmd()
+	msg := execScheduled(t, m, cmd)
 	amsg, ok := msg.(actionResultMsg)
 	require.True(t, ok)
 	// Fake client will fail since the pod doesn't exist.
@@ -493,7 +495,7 @@ func TestCovResizePVC(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-pvc", "default", "PersistentVolumeClaim", model.ResourceTypeEntry{})
 	cmd := m.resizePVC("10Gi")
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result := msg.(actionResultMsg)
 	// PVC doesn't exist in fake client.
 	assert.Error(t, result.err)
@@ -503,7 +505,7 @@ func TestCovScaleResource(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-deploy", "default", "Deployment", model.ResourceTypeEntry{})
 	cmd := m.scaleResource(3)
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result := msg.(actionResultMsg)
 	// Deployment doesn't exist in fake client.
 	assert.Error(t, result.err)
@@ -522,7 +524,7 @@ func TestCovRollbackDeployment(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-deploy", "default", "Deployment", model.ResourceTypeEntry{})
 	cmd := m.rollbackDeployment(1)
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(rollbackDoneMsg)
 	require.True(t, ok)
 	assert.Error(t, result.err)
@@ -532,7 +534,7 @@ func TestCovTriggerCronJob(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-cj", "default", "CronJob", model.ResourceTypeEntry{})
 	cmd := m.triggerCronJob()
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(triggerCronJobMsg)
 	require.True(t, ok)
 	assert.Error(t, result.err)

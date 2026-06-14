@@ -34,16 +34,22 @@ func (m Model) detectExecPodOSCmd() tea.Cmd {
 	kctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
-	return func() tea.Msg {
-		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-		defer cancel()
-		podOS, err := client.GetPodOS(ctx, kctx, ns, name)
-		if err != nil {
-			logger.Warn("Could not resolve pod OS for exec; defaulting to Linux shell", "pod", name, "error", err)
-			return execPodOSResolvedMsg{}
-		}
-		return execPodOSResolvedMsg{podOS: podOS}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Detect pod OS: "+name,
+		bgtaskTarget(kctx, ns),
+		func(schedCtx context.Context) tea.Msg {
+			ctx, cancel := context.WithTimeout(schedCtx, 5*time.Second)
+			defer cancel()
+			podOS, err := client.GetPodOS(ctx, kctx, ns, name)
+			if err != nil {
+				logger.Warn("Could not resolve pod OS for exec; defaulting to Linux shell", "pod", name, "error", err)
+				return execPodOSResolvedMsg{}
+			}
+			return execPodOSResolvedMsg{podOS: podOS}
+		},
+	)
 }
 
 // updateExecPodOSResolved fires once the pre-exec pod-OS lookup completes. It

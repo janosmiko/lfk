@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"os/exec"
@@ -49,7 +50,7 @@ func (m Model) disruptNodeClaim() tea.Cmd {
 	ctx := m.actionCtx.context
 	name := m.actionCtx.name
 	logger.Info("Karpenter NodeClaim disrupt requested", "context", ctx, "name", name)
-	return m.trackBgTask(scheduler.KindMutation, "Disrupt NodeClaim: "+name, ctx, func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Disrupt NodeClaim: "+name, ctx, func(_ context.Context) tea.Msg {
 		if err := m.client.DisruptNodeClaim(ctx, name); err != nil {
 			return actionResultMsg{err: err}
 		}

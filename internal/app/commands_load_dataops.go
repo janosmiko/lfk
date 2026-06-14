@@ -5,6 +5,7 @@ import (
 	"maps"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 )
 
 // loadSecretData fetches secret data for the secret editor.
@@ -21,12 +22,17 @@ func (m Model) loadSecretData() tea.Cmd {
 	}
 	name := sel.Name
 	client := m.client
-	reqCtx := m.reqCtx
 
-	return func() tea.Msg {
-		data, err := client.GetSecretData(reqCtx, kctx, ns, name)
-		return secretDataLoadedMsg{data: data, err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Secret data: "+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			data, err := client.GetSecretData(ctx, kctx, ns, name)
+			return secretDataLoadedMsg{data: data, err: err}
+		},
+	)
 }
 
 // saveSecretData saves the modified secret data back to the cluster.
@@ -49,10 +55,16 @@ func (m Model) saveSecretData() tea.Cmd {
 	maps.Copy(data, m.secretData.Data)
 	client := m.client
 
-	return func() tea.Msg {
-		err := client.UpdateSecretData(ctx, ns, name, data)
-		return secretSavedMsg{err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindMutation,
+		"Save secret: "+name,
+		bgtaskTarget(ctx, ns),
+		func(_ context.Context) tea.Msg {
+			err := client.UpdateSecretData(ctx, ns, name, data)
+			return secretSavedMsg{err: err}
+		},
+	)
 }
 
 // loadConfigMapData fetches configmap data for the configmap editor.
@@ -69,12 +81,17 @@ func (m Model) loadConfigMapData() tea.Cmd {
 	}
 	name := sel.Name
 	client := m.client
-	reqCtx := m.reqCtx
 
-	return func() tea.Msg {
-		data, err := client.GetConfigMapData(reqCtx, kctx, ns, name)
-		return configMapDataLoadedMsg{data: data, err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"ConfigMap data: "+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			data, err := client.GetConfigMapData(ctx, kctx, ns, name)
+			return configMapDataLoadedMsg{data: data, err: err}
+		},
+	)
 }
 
 // saveConfigMapData saves the modified configmap data back to the cluster.
@@ -97,10 +114,16 @@ func (m Model) saveConfigMapData() tea.Cmd {
 	maps.Copy(data, m.configMapData.Data)
 	client := m.client
 
-	return func() tea.Msg {
-		err := client.UpdateConfigMapData(ctx, ns, name, data)
-		return configMapSavedMsg{err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindMutation,
+		"Save configmap: "+name,
+		bgtaskTarget(ctx, ns),
+		func(_ context.Context) tea.Msg {
+			err := client.UpdateConfigMapData(ctx, ns, name, data)
+			return configMapSavedMsg{err: err}
+		},
+	)
 }
 
 // loadLabelData fetches labels and annotations for the selected resource.
@@ -117,12 +140,17 @@ func (m Model) loadLabelData() tea.Cmd {
 	name := sel.Name
 	rt := m.labelResourceType
 	client := m.client
-	reqCtx := m.reqCtx
 
-	return func() tea.Msg {
-		data, err := client.GetLabelAnnotationData(reqCtx, kctx, rt, ns, name)
-		return labelDataLoadedMsg{data: data, err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Labels: "+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			data, err := client.GetLabelAnnotationData(ctx, kctx, rt, ns, name)
+			return labelDataLoadedMsg{data: data, err: err}
+		},
+	)
 }
 
 // saveLabelData saves modified labels and annotations.
@@ -147,8 +175,14 @@ func (m Model) saveLabelData() tea.Cmd {
 	maps.Copy(annotations, m.labelData.Annotations)
 	client := m.client
 
-	return func() tea.Msg {
-		err := client.UpdateLabelAnnotationData(context.Background(), kctx, rt, ns, name, labels, annotations)
-		return labelSavedMsg{err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindMutation,
+		"Save labels: "+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			err := client.UpdateLabelAnnotationData(ctx, kctx, rt, ns, name, labels, annotations)
+			return labelSavedMsg{err: err}
+		},
+	)
 }

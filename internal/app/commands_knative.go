@@ -1,6 +1,7 @@
 package app
 
 import (
+	"context"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -34,7 +35,7 @@ func (m Model) activateKnativeRevision() tea.Cmd {
 	ns := m.actionCtx.namespace
 	name := m.actionCtx.name
 	logger.Info("Knative Revision activation requested", "context", ctx, "namespace", ns, "name", name)
-	return m.trackBgTask(scheduler.KindMutation, "Activate Revision: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Activate Revision: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		parent, err := m.client.ActivateKnativeRevision(ctx, ns, name)
 		if err != nil {
 			return actionResultMsg{err: err}
