@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.14.7](https://github.com/janosmiko/lfk/compare/v0.14.6...v0.14.7) (2026-06-14)
+
+
+### Features
+
+* **security:** label-match ignore patterns for findings ([#428](https://github.com/janosmiko/lfk/issues/428)) ([#432](https://github.com/janosmiko/lfk/issues/432)) ([4cbc43a](https://github.com/janosmiko/lfk/commit/4cbc43a4019f42521d54b5aee1980269ac25827e))
+
+
+### Bug Fixes
+
+* **scheduler:** wire unscheduled K8s reads through the task scheduler ([#429](https://github.com/janosmiko/lfk/issues/429)) ([9574ad5](https://github.com/janosmiko/lfk/commit/9574ad53871634ce13aa5dc14cb4eb0f05c6db4c))
+
 ## [0.14.6](https://github.com/janosmiko/lfk/compare/v0.14.5...v0.14.6) (2026-06-12)
 
 
