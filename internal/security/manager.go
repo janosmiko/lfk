@@ -64,6 +64,14 @@ type Manager struct {
 	perSourceAvail map[string]map[string]bool
 
 	ignoredNamespaces map[string]bool // global namespace filter applied to all sources
+
+	// labelResolver resolves a finding resource's Kubernetes labels by
+	// (kubeCtx, namespace, kind, name) for findings whose source did not
+	// expose them (e.g. Trivy CVEs keyed by a workload). nil disables
+	// resolution — the app only installs it when label-match ignore patterns
+	// exist, so the lookups are pure overhead otherwise. Returns nil on any
+	// failure so a finding simply stays visible.
+	labelResolver func(ctx context.Context, kubeCtx, namespace, kind, name string) map[string]string
 }
 
 type availEntry struct {
@@ -99,6 +107,22 @@ func (m *Manager) SetRefreshTTL(d time.Duration) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.refreshTTL = d
+}
+
+// SetLabelResolver installs the workload-label resolver consulted after a scan
+// for findings whose source did not expose resource labels. Pass nil to
+// disable. Safe to call concurrently with FetchAll.
+func (m *Manager) SetLabelResolver(fn func(ctx context.Context, kubeCtx, namespace, kind, name string) map[string]string) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.labelResolver = fn
+}
+
+// labelResolverFn returns the current resolver under lock.
+func (m *Manager) labelResolverFn() func(ctx context.Context, kubeCtx, namespace, kind, name string) map[string]string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.labelResolver
 }
 
 // CachedFindings returns the cached FetchAll result for (kubeCtx, namespace)
@@ -462,6 +486,18 @@ func (m *Manager) fetchAllScan(ctx context.Context, kubeCtx, namespace, cacheKey
 		}
 		res.Findings = filtered
 	}
+
+	// Propagate resource labels across same-resource findings so label-match
+	// ignore patterns reach every source. Sources that hold the live object
+	// (heuristic) stamp ResourceRef.Labels; this fills in findings on the same
+	// resource from sources that don't (trivy, kyverno). In-memory only —
+	// labels are not persisted (ResourceRef.Labels is json:"-").
+	propagateResourceLabels(res.Findings)
+
+	// Resolve labels for findings still missing them (e.g. Trivy CVEs keyed by
+	// a workload no label-carrying source observed). No-op unless the app
+	// installed a resolver, which it does only when label-match patterns exist.
+	m.resolveWorkloadLabels(ctx, kubeCtx, res.Findings)
 
 	m.mu.Lock()
 	// Cache the result regardless of success — a clean cluster with zero

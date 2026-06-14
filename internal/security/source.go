@@ -37,6 +37,13 @@ type ResourceRef struct {
 	Kind      string
 	Name      string
 	Container string
+
+	// Labels are the target object's Kubernetes labels, used by the
+	// declarative label-match ignore patterns. Populated by sources that hold
+	// the live object (heuristic, advisor) and propagated across same-resource
+	// findings by the Manager. Excluded from JSON/YAML so the on-disk findings
+	// cache stays lean (see issue #387); re-stamped on every fresh scan.
+	Labels map[string]string `json:"-" yaml:"-"`
 }
 
 // Key returns a stable identifier used by FindingIndex aggregation.

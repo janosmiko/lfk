@@ -175,3 +175,52 @@ security:
 Config patterns are read-only — they cannot be un-ignored from the action menu —
 but the `i` toggle still reveals findings they hide. A pattern with every field
 empty is ignored (it would otherwise hide everything).
+
+#### Label matching
+
+The optional `labels` field matches the target resource's Kubernetes labels —
+the right tool for silencing whole classes of infrastructure pods (CNI, CSI,
+storage) without naming each one. Each entry is a label key mapped to a glob
+value (`*`, `?`); **all** entries must match (AND). `labels` combines with the
+other fields, so you can still scope by source, namespace, or cluster.
+
+Semantics:
+
+- **Resource-scoped**: a label pattern hides matching resources within a group,
+  never the whole group (labels vary per resource).
+- **Coverage**: the always-on heuristic source stamps every pod's labels, and
+  those propagate to other sources' findings on the **same pod**. Findings a
+  source attaches to a workload instead of the pod (e.g. most Trivy image CVEs,
+  keyed by Deployment/DaemonSet) have their labels resolved from the live
+  object — but only when at least one `labels` pattern is configured, and only
+  for the standard workload kinds (Pod, Deployment, ReplicaSet, StatefulSet,
+  DaemonSet, Job, CronJob). The lookups run on the throttled security client and
+  are capped per scan; other kinds (and CRDs) resolve to no labels.
+- A resource with no resolvable labels is never hidden by a label pattern.
+- **Cached badges**: labels are not persisted to the on-disk findings cache, so
+  on reopen the cached badges paint before the live scan re-stamps labels — a
+  label-ignored resource may flash its badge briefly until the background scan
+  completes. The other ignore fields apply immediately.
+
+Examples — exclude common infrastructure so only findings that might matter
+remain:
+
+```yaml
+security:
+  ignore_patterns:
+    - labels:
+        k8s-app: cilium               # Cilium CNI pods
+      comment: CNI managed by the platform team
+    - labels:
+        app.kubernetes.io/name: "longhorn-*"   # Longhorn storage pods
+      comment: storage accepted as-is
+    - labels:
+        app: csi-driver               # any CSI driver pod
+      namespace: kube-system          # only in kube-system
+      comment: CSI drivers
+```
+
+> Label ignores hide privileged host-level pods, which is usually the intent for
+> CNI/CSI. Add them deliberately — a compromised infrastructure pod then
+> produces no finding. They are opt-in for exactly this reason; lfk ships no
+> default ignores.

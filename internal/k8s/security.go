@@ -281,7 +281,7 @@ func (c *Client) affectedResourcesFromResult(res security.FetchResult, sourceNam
 	checker, showIgnored := c.securityIgnoreSnapshot()
 	items := make([]model.Item, 0, len(refs))
 	for _, ref := range refs {
-		ignored := checker != nil && checker.IsResourceIgnored(sourceName, groupKey, ref.Key())
+		ignored := checker != nil && checker.IsResourceIgnored(sourceName, groupKey, ref.Key(), ref.Labels)
 		if ignored && !showIgnored {
 			continue
 		}

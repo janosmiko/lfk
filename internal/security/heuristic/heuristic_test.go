@@ -19,6 +19,21 @@ func podWith(container corev1.Container) *corev1.Pod {
 	}
 }
 
+// Heuristic findings must carry the pod's labels on the ResourceRef so
+// declarative label-match ignore patterns can exclude infrastructure pods.
+func TestBaseRefCarriesPodLabels(t *testing.T) {
+	pod := podWith(corev1.Container{
+		Name:            "cilium-agent",
+		SecurityContext: &corev1.SecurityContext{Privileged: new(true)},
+	})
+	pod.Labels = map[string]string{"k8s-app": "cilium"}
+
+	findings := checkPrivileged(pod, pod.Spec.Containers[0])
+	if assert.NotEmpty(t, findings, "privileged container should produce a finding") {
+		assert.Equal(t, map[string]string{"k8s-app": "cilium"}, findings[0].Resource.Labels)
+	}
+}
+
 func TestSourceMetadata(t *testing.T) {
 	s := NewWithClient(fake.NewSimpleClientset())
 	assert.Equal(t, "heuristic", s.Name())

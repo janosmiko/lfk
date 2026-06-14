@@ -24,6 +24,21 @@ var ConfigSecuritySources = map[string]bool{}
 // interactive per-cluster ignore-list.
 var ConfigSecurityIgnorePatterns []SecurityIgnorePattern
 
+// HasSecurityLabelIgnorePatterns reports whether any configured ignore pattern
+// carries a label constraint. The app uses this to gate the workload-label
+// resolver: when no pattern matches on labels, resolving resource labels would
+// be pure overhead, so the resolver is only wired when this is true. Reads
+// ConfigSecurityIgnorePatterns, which is read-only after load — add
+// synchronization here if a concurrent config-reload path is ever introduced.
+func HasSecurityLabelIgnorePatterns() bool {
+	for _, p := range ConfigSecurityIgnorePatterns {
+		if len(p.Labels) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
 // ConfigSecuritySecretEnvInclude / ConfigSecuritySecretEnvExclude hold the
 // `security.heuristic.secret_env_include` / `_exclude` env-var name globs that
 // tune the heuristic source's secret_env check. Read-only after load.

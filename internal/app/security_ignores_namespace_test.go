@@ -120,21 +120,21 @@ func TestModelIgnoreCheckerCombinesStateAndConfig(t *testing.T) {
 
 	// YAML rule still works.
 	assert.True(t, c.IsGroupIgnored("heuristic", "manual-ignore"))
-	assert.True(t, c.IsResourceIgnored("heuristic", "manual-ignore", "default/Pod/x"))
+	assert.True(t, c.IsResourceIgnored("heuristic", "manual-ignore", "default/Pod/x", nil))
 
 	// Config namespace-scoped pattern: hides the resource in kube-system only,
 	// and does NOT mark the whole group ignored.
-	assert.True(t, c.IsResourceIgnored("trivy-operator", "CVE-2024-1", "kube-system/Pod/x"))
-	assert.False(t, c.IsResourceIgnored("trivy-operator", "CVE-2024-1", "default/Pod/x"))
+	assert.True(t, c.IsResourceIgnored("trivy-operator", "CVE-2024-1", "kube-system/Pod/x", nil))
+	assert.False(t, c.IsResourceIgnored("trivy-operator", "CVE-2024-1", "default/Pod/x", nil))
 	assert.False(t, c.IsGroupIgnored("trivy-operator", "CVE-2024-1"))
 
 	// Config any-namespace pattern hides the whole falco group, including
 	// cluster-scoped findings (empty namespace from "/ClusterRole/admin").
 	assert.True(t, c.IsGroupIgnored("falco", "any-rule"))
-	assert.True(t, c.IsResourceIgnored("falco", "any-rule", "default/Pod/x"))
-	assert.True(t, c.IsResourceIgnored("falco", "any-rule", "/ClusterRole/admin"))
+	assert.True(t, c.IsResourceIgnored("falco", "any-rule", "default/Pod/x", nil))
+	assert.True(t, c.IsResourceIgnored("falco", "any-rule", "/ClusterRole/admin", nil))
 
 	// Cluster glob gates: a different context is unaffected by the prod pattern.
 	other := newModelIgnoreChecker(state, "staging")
-	assert.False(t, other.IsResourceIgnored("trivy-operator", "CVE-2024-1", "kube-system/Pod/x"))
+	assert.False(t, other.IsResourceIgnored("trivy-operator", "CVE-2024-1", "kube-system/Pod/x", nil))
 }

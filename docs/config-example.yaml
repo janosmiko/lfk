@@ -127,6 +127,16 @@ appearance:
 #       namespace: kube-system   # "" or "*" = any namespace (hides whole group)
 #       cluster: "prod-*"        # kube-context glob; "" = any cluster
 #       comment: accepted in system namespaces
+#     # Label match: exclude infrastructure pods (CNI/CSI) by label. Each entry
+#     # is a label key -> glob value; ALL must match. Resource-scoped (hides
+#     # matching pods, not the whole group); matches pods the heuristic source
+#     # observed and same-pod findings.
+#     - labels:
+#         k8s-app: cilium        # silence all findings on Cilium pods
+#       comment: CNI managed separately
+#     - labels:
+#         app.kubernetes.io/name: "longhorn-*"
+#       comment: Longhorn storage pods
 #   # Tune the built-in heuristic source. secret_env_include/_exclude are
 #   # env-var name globs (* and ?, case-insensitive) for the secret_env check:
 #   # include adds names to flag on top of the built-in credential keywords;

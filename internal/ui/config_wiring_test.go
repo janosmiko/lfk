@@ -112,6 +112,9 @@ security:
     - cluster: prod
       source: trivy-operator
       comment: noisy
+    - labels:
+        k8s-app: cilium
+      comment: CNI
   heuristic:
     secret_env_include:
       - "*_CONN_STR"
@@ -229,8 +232,10 @@ func TestLoadConfig_AllSettingsWired(t *testing.T) {
 	assert.False(t, ConfigSecurityEnabled, "security.enabled")
 	assert.True(t, ConfigSecurityHideBadges, "security.hide_badges")
 	assert.Equal(t, map[string]bool{"trivy": false, "heuristic": true}, ConfigSecuritySources, "security.sources")
-	require.Len(t, ConfigSecurityIgnorePatterns, 1, "security.ignore_patterns")
+	require.Len(t, ConfigSecurityIgnorePatterns, 2, "security.ignore_patterns")
 	assert.Equal(t, "prod", ConfigSecurityIgnorePatterns[0].Cluster)
+	assert.Equal(t, map[string]string{"k8s-app": "cilium"}, ConfigSecurityIgnorePatterns[1].Labels,
+		"security.ignore_patterns[].labels")
 	assert.Equal(t, []string{"*_CONN_STR"}, ConfigSecuritySecretEnvInclude, "security.heuristic.secret_env_include")
 	assert.Equal(t, []string{"LEGACY_*"}, ConfigSecuritySecretEnvExclude, "security.heuristic.secret_env_exclude")
 	assert.False(t, ConfigSecurityScanSecrets, "security.heuristic.scan_secrets")

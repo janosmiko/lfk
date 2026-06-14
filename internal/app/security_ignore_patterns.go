@@ -62,10 +62,11 @@ func patternIsEmpty(p ui.SecurityIgnorePattern) bool {
 }
 
 // patternIgnoresResource reports whether any config pattern hides the finding
-// identified by (ctx, source, groupKey, namespace). Every non-empty field of
-// a pattern must match. namespace is the finding's namespace (empty for
-// cluster-scoped findings).
-func patternIgnoresResource(patterns []ui.SecurityIgnorePattern, ctx, source, groupKey, namespace string) bool {
+// identified by (ctx, source, groupKey, namespace) and the target resource's
+// labels. Every non-empty field of a pattern must match. namespace is the
+// finding's namespace (empty for cluster-scoped findings); labels are the
+// target object's Kubernetes labels (nil when the source did not expose them).
+func patternIgnoresResource(patterns []ui.SecurityIgnorePattern, ctx, source, groupKey, namespace string, labels map[string]string) bool {
 	for _, p := range patterns {
 		if patternIsEmpty(p) {
 			continue
@@ -73,11 +74,31 @@ func patternIgnoresResource(patterns []ui.SecurityIgnorePattern, ctx, source, gr
 		if globMatch(p.Cluster, ctx) &&
 			globMatch(p.Source, source) &&
 			globMatch(p.Group, groupKey) &&
-			globMatch(p.Namespace, namespace) {
+			globMatch(p.Namespace, namespace) &&
+			patternLabelsMatch(p.Labels, labels) {
 			return true
 		}
 	}
 	return false
+}
+
+// patternLabelsMatch reports whether a resource's labels satisfy a pattern's
+// label constraints. Every constraint entry (label key -> glob value) must
+// match an identically-keyed label on the resource (AND). An empty constraint
+// map imposes no restriction. A resource missing a constrained key — including
+// the nil-labels case for sources that don't expose labels — never matches, so
+// a label-bearing pattern leaves such findings visible.
+func patternLabelsMatch(constraints, resourceLabels map[string]string) bool {
+	if len(constraints) == 0 {
+		return true
+	}
+	for key, valGlob := range constraints {
+		val, ok := resourceLabels[key]
+		if !ok || !globMatch(valGlob, val) {
+			return false
+		}
+	}
+	return true
 }
 
 // patternIgnoresGroup reports whether any config pattern hides the entire
@@ -88,6 +109,12 @@ func patternIgnoresResource(patterns []ui.SecurityIgnorePattern, ctx, source, gr
 func patternIgnoresGroup(patterns []ui.SecurityIgnorePattern, ctx, source, groupKey string) bool {
 	for _, p := range patterns {
 		if patternIsEmpty(p) {
+			continue
+		}
+		// A label constraint is inherently resource-scoped — labels vary per
+		// resource, so a label-bearing pattern can never hide an entire group.
+		// Skip it here (it still applies in patternIgnoresResource).
+		if len(p.Labels) > 0 {
 			continue
 		}
 		// An all-"*" namespace glob ("", "*", "**", …) means "any namespace" —
