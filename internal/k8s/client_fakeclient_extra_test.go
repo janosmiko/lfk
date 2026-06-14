@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"maps"
 	"testing"
 
@@ -234,7 +233,7 @@ func TestGetAutoSyncConfig_Enabled(t *testing.T) {
 	dc := newFakeDynClient(app)
 	c := newFakeClient(nil, dc)
 
-	enabled, selfHeal, prune, err := c.GetAutoSyncConfig(context.Background(), "", "argocd", "my-app")
+	enabled, selfHeal, prune, err := c.GetAutoSyncConfig(t.Context(), "", "argocd", "my-app")
 	require.NoError(t, err)
 	assert.True(t, enabled)
 	assert.True(t, selfHeal)
@@ -253,7 +252,7 @@ func TestGetAutoSyncConfig_Disabled(t *testing.T) {
 	dc := newFakeDynClient(app)
 	c := newFakeClient(nil, dc)
 
-	enabled, _, _, err := c.GetAutoSyncConfig(context.Background(), "", "argocd", "my-app")
+	enabled, _, _, err := c.GetAutoSyncConfig(t.Context(), "", "argocd", "my-app")
 	require.NoError(t, err)
 	assert.False(t, enabled)
 }
@@ -270,7 +269,7 @@ func TestUpdateAutoSyncConfig_Enable(t *testing.T) {
 	dc := newFakeDynClient(app)
 	c := newFakeClient(nil, dc)
 
-	err := c.UpdateAutoSyncConfig(context.Background(), "", "argocd", "my-app", true, true, false)
+	err := c.UpdateAutoSyncConfig(t.Context(), "", "argocd", "my-app", true, true, false)
 	require.NoError(t, err)
 }
 
@@ -290,7 +289,7 @@ func TestUpdateAutoSyncConfig_Disable(t *testing.T) {
 	dc := newFakeDynClient(app)
 	c := newFakeClient(nil, dc)
 
-	err := c.UpdateAutoSyncConfig(context.Background(), "", "argocd", "my-app", false, false, false)
+	err := c.UpdateAutoSyncConfig(t.Context(), "", "argocd", "my-app", false, false, false)
 	require.NoError(t, err)
 }
 
@@ -556,7 +555,7 @@ func TestGetWorkflowStatus(t *testing.T) {
 	dc := newFakeDynClient(wf)
 	c := newFakeClient(nil, dc)
 
-	statusStr, running, err := c.GetWorkflowStatus(context.Background(), "", "default", "my-wf")
+	statusStr, running, err := c.GetWorkflowStatus(t.Context(), "", "default", "my-wf")
 	require.NoError(t, err)
 	assert.Contains(t, statusStr, "Succeeded")
 	assert.False(t, running) // Succeeded is not running
@@ -616,7 +615,7 @@ func TestBuildDeploymentTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "deploy", Kind: "Deployment", Namespace: "default"}
-	err := c.buildDeploymentTree(context.Background(), dc, "default", "deploy", root)
+	err := c.buildDeploymentTree(t.Context(), dc, "default", "deploy", root)
 	require.NoError(t, err)
 	assert.Len(t, root.Children, 1)
 	assert.Equal(t, "ReplicaSet", root.Children[0].Kind)
@@ -643,7 +642,7 @@ func TestBuildPodOwnerTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "my-sts", Kind: "StatefulSet", Namespace: "default"}
-	err := c.buildPodOwnerTree(context.Background(), dc, "default", "StatefulSet", "my-sts", root)
+	err := c.buildPodOwnerTree(t.Context(), dc, "default", "StatefulSet", "my-sts", root)
 	require.NoError(t, err)
 	assert.Len(t, root.Children, 1)
 	assert.Equal(t, "Pod", root.Children[0].Kind)
@@ -666,7 +665,7 @@ func TestBuildCronJobTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "my-cron", Kind: "CronJob", Namespace: "default"}
-	err := c.buildCronJobTree(context.Background(), dc, "default", "my-cron", root)
+	err := c.buildCronJobTree(t.Context(), dc, "default", "my-cron", root)
 	require.NoError(t, err)
 	assert.Len(t, root.Children, 1)
 	assert.Equal(t, "Job", root.Children[0].Kind)
@@ -705,7 +704,7 @@ func TestGetPodsViaReplicaSets(t *testing.T) {
 	dc := newFakeDynClient(rs, pod)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getPodsViaReplicaSets(context.Background(), dc, "default", "deploy")
+	items, err := c.getPodsViaReplicaSets(t.Context(), dc, "default", "deploy")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, "deploy-abc-xyz", items[0].Name)
@@ -732,7 +731,7 @@ func TestGetPodsByOwner(t *testing.T) {
 	dc := newFakeDynClient(pod)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getPodsByOwner(context.Background(), dc, "default", "StatefulSet", "my-sts")
+	items, err := c.getPodsByOwner(t.Context(), dc, "default", "StatefulSet", "my-sts")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
@@ -753,7 +752,7 @@ func TestGetJobsByOwner(t *testing.T) {
 	dc := newFakeDynClient(job)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getJobsByOwner(context.Background(), dc, "default", "my-cron")
+	items, err := c.getJobsByOwner(t.Context(), dc, "default", "my-cron")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
@@ -790,7 +789,7 @@ func TestBuildGenericOwnerTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "my-cluster", Kind: "Cluster", Namespace: "default"}
-	err := c.buildGenericOwnerTree(context.Background(), dc, "default", "Cluster", "my-cluster", root)
+	err := c.buildGenericOwnerTree(t.Context(), dc, "default", "Cluster", "my-cluster", root)
 	require.NoError(t, err)
 	assert.Greater(t, len(root.Children), 0)
 }
@@ -853,7 +852,7 @@ func TestGetNetworkPolicyInfo(t *testing.T) {
 	dc := newFakeDynClient(np, pod)
 	c := newFakeClient(nil, dc)
 
-	info, err := c.GetNetworkPolicyInfo(context.Background(), "", "default", "my-np")
+	info, err := c.GetNetworkPolicyInfo(t.Context(), "", "default", "my-np")
 	require.NoError(t, err)
 	assert.Equal(t, "my-np", info.Name)
 	assert.Equal(t, map[string]string{"app": "web"}, info.PodSelector)
@@ -875,7 +874,7 @@ func TestGetNetworkPolicyInfo_NoSpec(t *testing.T) {
 	dc := newFakeDynClient(np)
 	c := newFakeClient(nil, dc)
 
-	info, err := c.GetNetworkPolicyInfo(context.Background(), "", "default", "empty-np")
+	info, err := c.GetNetworkPolicyInfo(t.Context(), "", "default", "empty-np")
 	require.NoError(t, err)
 	assert.Equal(t, "empty-np", info.Name)
 	assert.Nil(t, info.IngressRules)
@@ -923,7 +922,7 @@ func TestRollbackDeployment(t *testing.T) {
 	cs := k8sfake.NewClientset(dep, rs1, rs2)
 	c := newFakeClient(cs, nil)
 
-	err := c.RollbackDeployment(context.Background(), "", "default", "my-deploy", 1)
+	err := c.RollbackDeployment(t.Context(), "", "default", "my-deploy", 1)
 	require.NoError(t, err)
 }
 
@@ -934,7 +933,7 @@ func TestRollbackDeployment_RevisionNotFound(t *testing.T) {
 	cs := k8sfake.NewClientset(dep, rs)
 	c := newFakeClient(cs, nil)
 
-	err := c.RollbackDeployment(context.Background(), "", "default", "my-deploy", 99)
+	err := c.RollbackDeployment(t.Context(), "", "default", "my-deploy", 99)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "revision 99 not found")
 }
@@ -965,7 +964,7 @@ func TestGetFluxManagedResources(t *testing.T) {
 	dc := newFakeDynClient(ks)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getFluxManagedResources(context.Background(), dc, "flux-system", "my-ks")
+	items, err := c.getFluxManagedResources(t.Context(), dc, "flux-system", "my-ks")
 	require.NoError(t, err)
 	assert.Len(t, items, 5)
 	// Items should be sorted by Kind then Name.
@@ -1000,7 +999,7 @@ func TestGetFluxManagedResources_PreservesK8sNameForCrossNamespace(t *testing.T)
 	dc := newFakeDynClient(ks)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getFluxManagedResources(context.Background(), dc, "flux-system", "my-ks")
+	items, err := c.getFluxManagedResources(t.Context(), dc, "flux-system", "my-ks")
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 
@@ -1034,7 +1033,7 @@ func TestGetFluxManagedResources_NoStatus(t *testing.T) {
 	dc := newFakeDynClient(ks)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getFluxManagedResources(context.Background(), dc, "flux-system", "my-ks")
+	items, err := c.getFluxManagedResources(t.Context(), dc, "flux-system", "my-ks")
 	require.NoError(t, err)
 	assert.Nil(t, items)
 }
@@ -1051,7 +1050,7 @@ func TestGetFluxManagedResources_NoInventory(t *testing.T) {
 	dc := newFakeDynClient(ks)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getFluxManagedResources(context.Background(), dc, "flux-system", "my-ks")
+	items, err := c.getFluxManagedResources(t.Context(), dc, "flux-system", "my-ks")
 	require.NoError(t, err)
 	assert.Nil(t, items)
 }
@@ -1072,7 +1071,7 @@ func TestGetFluxManagedResources_EmptyEntries(t *testing.T) {
 	dc := newFakeDynClient(ks)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getFluxManagedResources(context.Background(), dc, "flux-system", "my-ks")
+	items, err := c.getFluxManagedResources(t.Context(), dc, "flux-system", "my-ks")
 	require.NoError(t, err)
 	assert.Nil(t, items)
 }
@@ -1100,7 +1099,7 @@ func TestGetFluxManagedResources_IconMapping(t *testing.T) {
 	dc := newFakeDynClient(ks)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getFluxManagedResources(context.Background(), dc, "flux-system", "my-ks")
+	items, err := c.getFluxManagedResources(t.Context(), dc, "flux-system", "my-ks")
 	require.NoError(t, err)
 	assert.Len(t, items, 6)
 }
@@ -1133,7 +1132,7 @@ func TestGetArgoManagedResources_WithStatusResources(t *testing.T) {
 	dc := newFakeDynClient(app)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.getArgoManagedResources(context.Background(), dc, "", "argocd", "my-app")
+	items, err := c.getArgoManagedResources(t.Context(), dc, "", "argocd", "my-app")
 	require.NoError(t, err)
 	assert.Len(t, items, 2)
 	// First should have combined status.
@@ -1176,7 +1175,7 @@ func TestGetArgoManagedResources_FallbackToLabels(t *testing.T) {
 	dc := newFakeDynClient(app)
 	c := newFakeClient(cs, dc)
 
-	items, err := c.getArgoManagedResources(context.Background(), dc, "", "argocd", "my-app")
+	items, err := c.getArgoManagedResources(t.Context(), dc, "", "argocd", "my-app")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(items), 1)
 }
@@ -1201,7 +1200,7 @@ func TestBuildServiceTree(t *testing.T) {
 	c := newFakeClient(cs, nil)
 
 	root := &model.ResourceNode{Name: "my-svc", Kind: "Service", Namespace: "default"}
-	err := c.buildServiceTree(context.Background(), "", "default", "my-svc", root)
+	err := c.buildServiceTree(t.Context(), "", "default", "my-svc", root)
 	require.NoError(t, err)
 	assert.Len(t, root.Children, 1)
 	assert.Equal(t, "Pod", root.Children[0].Kind)
@@ -1230,7 +1229,7 @@ func TestGetPodsOnNode(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	// Note: the fake client returns ALL pods regardless of field selector.
-	items, err := c.getPodsOnNode(context.Background(), dc, "node-1")
+	items, err := c.getPodsOnNode(t.Context(), dc, "node-1")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(items), 1)
 }
@@ -1253,7 +1252,7 @@ func TestBuildNodeTree(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	root := &model.ResourceNode{Name: "node-1", Kind: "Node"}
-	err := c.buildNodeTree(context.Background(), dc, "node-1", root)
+	err := c.buildNodeTree(t.Context(), dc, "node-1", root)
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(root.Children), 1)
 }
@@ -1290,7 +1289,7 @@ func TestWrapWithOwners(t *testing.T) {
 			{Name: "app", Kind: "Container", Namespace: "default"},
 		},
 	}
-	c.wrapWithOwners(context.Background(), dc, "default", "ReplicaSet", "deploy-abc", root)
+	c.wrapWithOwners(t.Context(), dc, "default", "ReplicaSet", "deploy-abc", root)
 
 	// After wrapping, the root should be the Deployment (topmost owner).
 	assert.Equal(t, "Deployment", root.Kind)
@@ -1305,7 +1304,7 @@ func TestWrapWithOwners_UnknownKind(t *testing.T) {
 	root := &model.ResourceNode{
 		Name: "pod-xyz", Kind: "Pod", Namespace: "default",
 	}
-	c.wrapWithOwners(context.Background(), dc, "default", "UnknownCRD", "some-resource", root)
+	c.wrapWithOwners(t.Context(), dc, "default", "UnknownCRD", "some-resource", root)
 	// Should still wrap even with unknown kind (adds single chain entry).
 	assert.Equal(t, "UnknownCRD", root.Kind)
 }
@@ -1318,7 +1317,7 @@ func TestWrapWithOwners_EmptyChain(t *testing.T) {
 		Name: "pod-xyz", Kind: "Pod", Namespace: "default",
 	}
 	// No owner references from an existing resource - should still process.
-	c.wrapWithOwners(context.Background(), dc, "default", "ReplicaSet", "nonexistent-rs", root)
+	c.wrapWithOwners(t.Context(), dc, "default", "ReplicaSet", "nonexistent-rs", root)
 	// Should wrap with the RS (even though it doesn't exist, it adds a chain entry).
 	assert.Equal(t, "ReplicaSet", root.Kind)
 }
@@ -1363,7 +1362,7 @@ func TestGetOwnedResources_Deployment(t *testing.T) {
 	dc := newFakeDynClient(rs, pod)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "Deployment", "my-deploy")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "Deployment", "my-deploy")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, "Pod", items[0].Kind)
@@ -1389,7 +1388,7 @@ func TestGetOwnedResources_StatefulSet(t *testing.T) {
 	dc := newFakeDynClient(pod)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "StatefulSet", "my-sts")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "StatefulSet", "my-sts")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
@@ -1411,7 +1410,7 @@ func TestGetOwnedResources_Node(t *testing.T) {
 	dc := newFakeDynClient(pod)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "", "Node", "node-1")
+	items, err := c.GetOwnedResources(t.Context(), "", "", "Node", "node-1")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(items), 1)
 }
@@ -1432,7 +1431,7 @@ func TestGetOwnedResources_Service(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(cs, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "Service", "my-svc")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "Service", "my-svc")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
@@ -1457,7 +1456,7 @@ func TestGetResourceTree_Deployment(t *testing.T) {
 	dc := newFakeDynClient(rs)
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "Deployment", "my-deploy")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "Deployment", "my-deploy")
 	require.NoError(t, err)
 	assert.Equal(t, "my-deploy", root.Name)
 }
@@ -1466,7 +1465,7 @@ func TestGetResourceTree_StatefulSet(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "StatefulSet", "my-sts")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "StatefulSet", "my-sts")
 	require.NoError(t, err)
 	assert.Equal(t, "my-sts", root.Name)
 }
@@ -1475,7 +1474,7 @@ func TestGetResourceTree_CronJob(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "CronJob", "my-cron")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "CronJob", "my-cron")
 	require.NoError(t, err)
 	assert.Equal(t, "my-cron", root.Name)
 }
@@ -1489,7 +1488,7 @@ func TestGetResourceTree_Service(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(cs, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "Service", "my-svc")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "Service", "my-svc")
 	require.NoError(t, err)
 	assert.Equal(t, "my-svc", root.Name)
 }
@@ -1498,7 +1497,7 @@ func TestGetResourceTree_Node(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "", "Node", "node-1")
+	root, err := c.GetResourceTree(t.Context(), "", "", "Node", "node-1")
 	require.NoError(t, err)
 	assert.Equal(t, "node-1", root.Name)
 }
@@ -1513,7 +1512,7 @@ func TestGetResourceTree_Pod(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(cs, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "Pod", "my-pod")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "Pod", "my-pod")
 	require.NoError(t, err)
 	assert.Equal(t, "Running", root.Status)
 }
@@ -1522,7 +1521,7 @@ func TestGetResourceTree_ReplicaSet(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "ReplicaSet", "my-rs")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "ReplicaSet", "my-rs")
 	require.NoError(t, err)
 	assert.Equal(t, "my-rs", root.Name)
 }
@@ -1531,7 +1530,7 @@ func TestGetResourceTree_Job(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "Job", "my-job")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "Job", "my-job")
 	require.NoError(t, err)
 	assert.Equal(t, "my-job", root.Name)
 }
@@ -1540,7 +1539,7 @@ func TestGetResourceTree_DaemonSet(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "DaemonSet", "my-ds")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "DaemonSet", "my-ds")
 	require.NoError(t, err)
 	assert.Equal(t, "my-ds", root.Name)
 }
@@ -1567,7 +1566,7 @@ func TestGetOwnedResources_Kustomization(t *testing.T) {
 	dc := newFakeDynClient(ks)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "Kustomization", "my-ks")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "Kustomization", "my-ks")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
@@ -1591,7 +1590,7 @@ func TestGetOwnedResources_Job(t *testing.T) {
 	dc := newFakeDynClient(pod)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "Job", "my-job")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "Job", "my-job")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
@@ -1615,7 +1614,7 @@ func TestGetOwnedResources_DaemonSet(t *testing.T) {
 	dc := newFakeDynClient(pod)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "DaemonSet", "my-ds")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "DaemonSet", "my-ds")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 }
@@ -1640,7 +1639,7 @@ func TestGetOwnedResources_HelmRelease(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(cs, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "HelmRelease", "myrel")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "HelmRelease", "myrel")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(items), 1)
 }
@@ -1651,7 +1650,7 @@ func TestGetOwnedResources_HelmRelease(t *testing.T) {
 
 func TestFindAffectedPods_Empty(t *testing.T) {
 	dc := newFakeDynClient()
-	result := findAffectedPods(context.Background(), dc, "default", map[string]string{"app": "web"})
+	result := findAffectedPods(t.Context(), dc, "default", map[string]string{"app": "web"})
 	assert.Empty(t, result)
 }
 
@@ -1667,7 +1666,7 @@ func TestFindAffectedPods_WithPods(t *testing.T) {
 		},
 	}
 	dc := newFakeDynClient(pod)
-	result := findAffectedPods(context.Background(), dc, "default", nil)
+	result := findAffectedPods(t.Context(), dc, "default", nil)
 	assert.GreaterOrEqual(t, len(result), 1)
 }
 
@@ -1702,7 +1701,7 @@ func TestGetPodYAML(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	yamlStr, err := c.GetPodYAML(context.Background(), "", "default", "my-pod")
+	yamlStr, err := c.GetPodYAML(t.Context(), "", "default", "my-pod")
 	require.NoError(t, err)
 	assert.Contains(t, yamlStr, "kind: Pod")
 	assert.Contains(t, yamlStr, "name: my-pod")

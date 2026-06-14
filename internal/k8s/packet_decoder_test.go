@@ -2,7 +2,6 @@ package k8s
 
 import (
 	"bytes"
-	"context"
 	"errors"
 	"io"
 	"sync/atomic"
@@ -140,7 +139,7 @@ func TestPacketDecoder_Run_CountsPacketsAndBytes(t *testing.T) {
 		byteCount:   &byt,
 		onPacket:    func(s PacketSummary) { got = append(got, s) },
 	}
-	if err := d.Run(context.Background(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
+	if err := d.Run(t.Context(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -223,7 +222,7 @@ func TestPacketDecoder_LinuxSLL_LinkTypeDispatch(t *testing.T) {
 		byteCount:   &byt,
 		onPacket:    func(s PacketSummary) { got = append(got, s) },
 	}
-	if err := d.Run(context.Background(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
+	if err := d.Run(t.Context(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -307,7 +306,7 @@ func TestPacketDecoder_LinuxSLL2_DecodesIPv4(t *testing.T) {
 		byteCount:   &byt,
 		onPacket:    func(s PacketSummary) { got = append(got, s) },
 	}
-	if err := d.Run(context.Background(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
+	if err := d.Run(t.Context(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
 		t.Fatalf("Run: %v", err)
 	}
 
@@ -378,7 +377,7 @@ func TestPacketDecoder_LinuxSLL2_BigEndianMagic(t *testing.T) {
 		byteCount:   &byt,
 		onPacket:    func(s PacketSummary) { got = append(got, s) },
 	}
-	if err := d.Run(context.Background(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
+	if err := d.Run(t.Context(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
 		t.Fatalf("Run: %v", err)
 	}
 	if len(got) != 1 {
@@ -422,7 +421,7 @@ func TestPacketDecoder_Run_NilCountersDoNotPanic(t *testing.T) {
 		byteCount:   nil,
 		onPacket:    func(PacketSummary) {},
 	}
-	if err := d.Run(context.Background(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
+	if err := d.Run(t.Context(), &pcapBuf); err != nil && !errors.Is(err, io.EOF) {
 		t.Fatalf("Run: %v", err)
 	}
 }

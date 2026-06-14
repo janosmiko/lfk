@@ -97,7 +97,7 @@ func TestCreateLocalClusterCmd_ReturnsMsg(t *testing.T) {
 		name: "kind", installed: true,
 		listFn: func(context.Context) ([]localcluster.Cluster, error) { return nil, nil },
 	}
-	cmd := createLocalClusterCmd(context.Background(), 7, prov, localcluster.CreateSpec{Name: "dev"})
+	cmd := createLocalClusterCmd(t.Context(), 7, prov, localcluster.CreateSpec{Name: "dev"})
 	msg := cmd().(localClusterCreatedMsg)
 	if msg.gen != 7 || msg.provider != "kind" || msg.name != "dev" {
 		t.Fatalf("msg = %+v", msg)
@@ -106,7 +106,7 @@ func TestCreateLocalClusterCmd_ReturnsMsg(t *testing.T) {
 
 func TestStartLocalClusterCmd(t *testing.T) {
 	prov := fakeProvider{name: "k3d", installed: true}
-	cmd := startLocalClusterCmd(context.Background(), 1, prov, "staging")
+	cmd := startLocalClusterCmd(t.Context(), 1, prov, "staging")
 	msg := cmd().(localClusterMutatedMsg)
 	if msg.gen != 1 || msg.verb != "started" {
 		t.Fatalf("msg = %+v, want gen=1 verb=started", msg)
@@ -115,7 +115,7 @@ func TestStartLocalClusterCmd(t *testing.T) {
 
 func TestStopLocalClusterCmd(t *testing.T) {
 	prov := fakeProvider{name: "k3d", installed: true}
-	cmd := stopLocalClusterCmd(context.Background(), 2, prov, "staging")
+	cmd := stopLocalClusterCmd(t.Context(), 2, prov, "staging")
 	msg := cmd().(localClusterMutatedMsg)
 	if msg.gen != 2 || msg.verb != "stopped" {
 		t.Fatalf("msg = %+v, want gen=2 verb=stopped", msg)
@@ -124,7 +124,7 @@ func TestStopLocalClusterCmd(t *testing.T) {
 
 func TestDeleteLocalClusterCmd(t *testing.T) {
 	prov := fakeProvider{name: "kind", installed: true}
-	cmd := deleteLocalClusterCmd(context.Background(), 3, prov, "dev")
+	cmd := deleteLocalClusterCmd(t.Context(), 3, prov, "dev")
 	msg := cmd().(localClusterMutatedMsg)
 	if msg.gen != 3 || msg.verb != "deleted" {
 		t.Fatalf("msg = %+v, want gen=3 verb=deleted", msg)

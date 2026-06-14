@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"fmt"
 	"testing"
 	"time"
@@ -111,7 +110,7 @@ func TestGetResources_SecretMetadataPath(t *testing.T) {
 	)
 	c := newClientWithMeta(mc, nil)
 
-	items, err := c.GetResources(context.Background(), "", "default", secretRT)
+	items, err := c.GetResources(t.Context(), "", "default", secretRT)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -136,7 +135,7 @@ func TestGetResources_SecretNoDataColumns(t *testing.T) {
 	)
 	c := newClientWithMeta(mc, nil)
 
-	items, err := c.GetResources(context.Background(), "", "ns1", secretRT)
+	items, err := c.GetResources(t.Context(), "", "ns1", secretRT)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 
@@ -159,7 +158,7 @@ func TestGetResources_SecretDeletionTimestamp(t *testing.T) {
 	)
 	c := newClientWithMeta(mc, nil)
 
-	items, err := c.GetResources(context.Background(), "", "default", secretRT)
+	items, err := c.GetResources(t.Context(), "", "default", secretRT)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -185,7 +184,7 @@ func TestGetResources_SecretNamespacedPath_AllNamespaces(t *testing.T) {
 	c := newClientWithMeta(mc, nil)
 
 	// namespace="" means all namespaces for a namespaced resource.
-	items, err := c.GetResources(context.Background(), "", "", secretRT)
+	items, err := c.GetResources(t.Context(), "", "", secretRT)
 	require.NoError(t, err)
 	// Fake client returns all objects regardless of namespace filter when namespace is "".
 	assert.GreaterOrEqual(t, len(items), 2)
@@ -200,7 +199,7 @@ func TestGetResources_SecretClusterScoped(t *testing.T) {
 	)
 	c := newClientWithMeta(mc, nil)
 
-	items, err := c.GetResources(context.Background(), "", "", secretRTCluster)
+	items, err := c.GetResources(t.Context(), "", "", secretRTCluster)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	assert.Equal(t, "cluster-secret", items[0].Name)
@@ -217,7 +216,7 @@ func TestGetResources_SecretSortedAlphabetically(t *testing.T) {
 	)
 	c := newClientWithMeta(mc, nil)
 
-	items, err := c.GetResources(context.Background(), "", "default", secretRT)
+	items, err := c.GetResources(t.Context(), "", "default", secretRT)
 	require.NoError(t, err)
 	require.Len(t, items, 3)
 
@@ -236,7 +235,7 @@ func TestGetResources_SecretWithOwnerReferences(t *testing.T) {
 	)
 	c := newClientWithMeta(mc, nil)
 
-	items, err := c.GetResources(context.Background(), "", "default", secretRT)
+	items, err := c.GetResources(t.Context(), "", "default", secretRT)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -302,7 +301,7 @@ func TestGetResources_NonSecretUsesDynamicPath(t *testing.T) {
 		Namespaced: true,
 	}
 
-	items, err := c.GetResources(context.Background(), "", "default", podRT)
+	items, err := c.GetResources(t.Context(), "", "default", podRT)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -342,7 +341,7 @@ func TestGetResources_SecretLazyLoadingDisabledUsesDynamicPath(t *testing.T) {
 	c := NewTestClient(nil, dc) // lazy loading off by default
 	require.False(t, c.secretLazyLoading.Load(), "precondition: flag must default to false")
 
-	items, err := c.GetResources(context.Background(), "", "default", secretRT)
+	items, err := c.GetResources(t.Context(), "", "default", secretRT)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -374,7 +373,7 @@ func TestGetResources_SecretLazyLoadingEnabledUsesMetadataPath(t *testing.T) {
 
 	c := newClientWithMeta(mc, dc) // helper enables the flag
 
-	items, err := c.GetResources(context.Background(), "", "default", secretRT)
+	items, err := c.GetResources(t.Context(), "", "default", secretRT)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 

@@ -17,7 +17,7 @@ func TestDetectKubeshark_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	dc := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
 	c := newFakeClient(cs, dc)
-	info, err := c.DetectKubeshark(context.Background(), "test-ctx")
+	info, err := c.DetectKubeshark(t.Context(), "test-ctx")
 	if err != nil {
 		t.Fatalf("err = %v, want nil", err)
 	}
@@ -36,7 +36,7 @@ func TestDetectKubeshark_Found(t *testing.T) {
 	cs := k8sfake.NewClientset(svc)
 	dc := dynamicfake.NewSimpleDynamicClient(runtime.NewScheme())
 	c := newFakeClient(cs, dc)
-	info, err := c.DetectKubeshark(context.Background(), "test-ctx")
+	info, err := c.DetectKubeshark(t.Context(), "test-ctx")
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -80,7 +80,7 @@ func TestDetectKubeshark_HonoursOverrideNamespace(t *testing.T) {
 	c := newFakeClient(cs, dc)
 	c.SetKubesharkNamespace("trafcap")
 
-	info, err := c.DetectKubeshark(context.Background(), "test-ctx")
+	info, err := c.DetectKubeshark(t.Context(), "test-ctx")
 	if err != nil {
 		t.Fatalf("err: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestWaitForKubesharkPort_Timeout(t *testing.T) {
 	mgr := NewPortForwardManager()
 	t.Cleanup(mgr.StopAll)
 	// No matching entry — must time out.
-	_, err := waitForKubesharkPort(context.Background(), mgr, 999, 50*time.Millisecond, 10*time.Millisecond)
+	_, err := waitForKubesharkPort(t.Context(), mgr, 999, 50*time.Millisecond, 10*time.Millisecond)
 	if err == nil {
 		t.Fatal("expected timeout error, got nil")
 	}
@@ -114,7 +114,7 @@ func TestWaitForKubesharkPort_Timeout(t *testing.T) {
 func TestWaitForKubesharkPort_ContextCancel(t *testing.T) {
 	mgr := NewPortForwardManager()
 	t.Cleanup(mgr.StopAll)
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel()
 	_, err := waitForKubesharkPort(ctx, mgr, 999, 5*time.Second, 10*time.Millisecond)
 	if !errors.Is(err, context.Canceled) {

@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"sync"
 	"testing"
 	"time"
@@ -67,7 +66,7 @@ func TestWatchTickRemovesDeletedPodFromList(t *testing.T) {
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
 		scheduler:           scheduler.New(0),
-		reqCtx:              context.Background(),
+		reqCtx:              t.Context(),
 		watchMode:           true,
 	}
 	m.client = k8s.NewTestClient(clientfake.NewClientset(), dyn)
@@ -92,7 +91,7 @@ func TestWatchTickRemovesDeletedPodFromList(t *testing.T) {
 
 	// Pod terminates: remove it from the fake API.
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-	if err := dyn.Resource(gvr).Namespace("default").Delete(context.Background(), "doomed-pod", metav1.DeleteOptions{}); err != nil {
+	if err := dyn.Resource(gvr).Namespace("default").Delete(t.Context(), "doomed-pod", metav1.DeleteOptions{}); err != nil {
 		t.Fatalf("fake delete failed: %v", err)
 	}
 
@@ -171,7 +170,7 @@ func TestWatchTickRefreshesPreviewAtLevelResourceTypes(t *testing.T) {
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
 		scheduler:           scheduler.New(0),
-		reqCtx:              context.Background(),
+		reqCtx:              t.Context(),
 		watchMode:           true,
 	}
 	// middleItems must mirror BuildSidebarItems' output so updateResourceTypes

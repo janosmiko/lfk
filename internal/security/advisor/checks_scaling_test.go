@@ -1,7 +1,6 @@
 package advisor
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -156,7 +155,7 @@ func TestPDBVsHPAMinNoDuplicateFindings(t *testing.T) {
 		hpaScaled("prod", "hpa-a", "a", 1, 10, 5),
 		hpaScaled("prod", "hpa-b", "b", 1, 10, 5),
 	))
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	count := 0
 	for _, f := range findings {

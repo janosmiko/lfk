@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"errors"
 	"sync/atomic"
 	"testing"
@@ -170,7 +169,7 @@ func TestDiscoverAPIResources_MergesPrinterColumns(t *testing.T) {
 
 	c := newFakeClient(cs, dc)
 
-	entries, err := c.DiscoverAPIResources(context.Background(), "")
+	entries, err := c.DiscoverAPIResources(t.Context(), "")
 	require.NoError(t, err)
 
 	// Pod has no printer columns (core resource, discovery API has no columns).
@@ -229,7 +228,7 @@ func TestDiscoverAPIResources_PartialGroupFailure(t *testing.T) {
 
 	c := newFakeClient(cs, dc)
 
-	entries, err := c.DiscoverAPIResources(context.Background(), "")
+	entries, err := c.DiscoverAPIResources(t.Context(), "")
 	// The ErrGroupDiscoveryFailed branch falls through and returns the
 	// successful subset with no error. If the reactor pathway above does
 	// not produce ErrGroupDiscoveryFailed (the fake may surface it as a

@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -92,7 +91,7 @@ func TestGetNetworkPoliciesForPod_MatchesByLabels(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	assert.Equal(t, "Pod", info.Kind)
 	assert.Equal(t, "web-1", info.Name)
@@ -114,7 +113,7 @@ func TestGetNetworkPoliciesForPod_EmptySelectorMatchesAll(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 1)
 	assert.Equal(t, "default-deny", info.Policies[0].Name)
@@ -138,12 +137,12 @@ func TestGetNetworkPoliciesForPod_MatchExpressions(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 1)
 	assert.Equal(t, "expr-policy", info.Policies[0].Name)
 
-	info, err = c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "api-1")
+	info, err = c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "api-1")
 	require.NoError(t, err)
 	assert.Empty(t, info.Policies)
 }
@@ -159,7 +158,7 @@ func TestGetNetworkPoliciesForPod_NoMatch(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	assert.Empty(t, info.Policies)
 }
@@ -180,7 +179,7 @@ func TestGetNetworkPoliciesForPod_SpecLessPolicy(t *testing.T) {
 	c := NewTestClient(nil, dyn)
 
 	// No spec means an absent podSelector, which selects all pods.
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 1)
 	assert.Equal(t, "spec-less", info.Policies[0].Name)
@@ -190,7 +189,7 @@ func TestGetNetworkPoliciesForPod_PodNotFound(t *testing.T) {
 	dyn := netpolMatchFakeDyn()
 	c := NewTestClient(nil, dyn)
 
-	_, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "missing")
+	_, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "missing")
 	require.Error(t, err)
 }
 
@@ -206,7 +205,7 @@ func TestGetNetworkPoliciesForPod_SortedByName(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 2)
 	assert.Equal(t, "aa-policy", info.Policies[0].Name)
@@ -234,7 +233,7 @@ func TestGetNetworkPoliciesForService_MatchesBackingPods(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForService(context.Background(), "test-ctx", "default", "web-svc")
+	info, err := c.GetNetworkPoliciesForService(t.Context(), "test-ctx", "default", "web-svc")
 	require.NoError(t, err)
 	assert.Equal(t, "Service", info.Kind)
 	assert.Equal(t, "web-svc", info.Name)
@@ -250,7 +249,7 @@ func TestGetNetworkPoliciesForService_NoSelector(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForService(context.Background(), "test-ctx", "default", "external-svc")
+	info, err := c.GetNetworkPoliciesForService(t.Context(), "test-ctx", "default", "external-svc")
 	require.NoError(t, err)
 	assert.True(t, info.NoSelector)
 	assert.Empty(t, info.Policies)
@@ -260,6 +259,6 @@ func TestGetNetworkPoliciesForService_ServiceNotFound(t *testing.T) {
 	dyn := netpolMatchFakeDyn()
 	c := NewTestClient(nil, dyn)
 
-	_, err := c.GetNetworkPoliciesForService(context.Background(), "test-ctx", "default", "missing")
+	_, err := c.GetNetworkPoliciesForService(t.Context(), "test-ctx", "default", "missing")
 	require.Error(t, err)
 }

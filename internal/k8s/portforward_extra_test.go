@@ -12,7 +12,7 @@ import (
 
 func TestPortForwardManagerEntries_WithEntries(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	mgr.mu.Lock()
@@ -58,7 +58,7 @@ func TestPortForwardManagerEntries_WithEntries(t *testing.T) {
 
 func TestPortForwardManagerActiveCount_MixedStatuses(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	mgr.mu.Lock()
@@ -76,7 +76,7 @@ func TestPortForwardManagerActiveCount_MixedStatuses(t *testing.T) {
 
 func TestPortForwardManagerActiveCount_AllStopped(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 	defer cancel()
 
 	mgr.mu.Lock()
@@ -93,7 +93,7 @@ func TestPortForwardManagerActiveCount_AllStopped(t *testing.T) {
 
 func TestPortForwardManagerStop_RunningEntry(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	callbackCalled := false
 	mgr.SetUpdateCallback(func() {
@@ -120,7 +120,7 @@ func TestPortForwardManagerStop_RunningEntry(t *testing.T) {
 
 func TestPortForwardManagerStop_StartingEntry(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -139,7 +139,7 @@ func TestPortForwardManagerStop_StartingEntry(t *testing.T) {
 
 func TestPortForwardManagerStop_AlreadyStopped(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -158,7 +158,7 @@ func TestPortForwardManagerStop_AlreadyStopped(t *testing.T) {
 
 func TestPortForwardManagerStop_FailedEntry(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -184,7 +184,7 @@ func TestPortForwardManagerStop_NotFound(t *testing.T) {
 
 func TestPortForwardManagerStop_NoCallback(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	// No callback set.
 	mgr.mu.Lock()
@@ -201,7 +201,7 @@ func TestPortForwardManagerStop_NoCallback(t *testing.T) {
 
 func TestPortForwardManagerRemove_StoppedEntry(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	callbackCalled := false
 	mgr.SetUpdateCallback(func() {
@@ -223,7 +223,7 @@ func TestPortForwardManagerRemove_StoppedEntry(t *testing.T) {
 
 func TestPortForwardManagerRemove_RunningEntry(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -238,7 +238,7 @@ func TestPortForwardManagerRemove_RunningEntry(t *testing.T) {
 
 func TestPortForwardManagerRemove_StartingEntry(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -252,7 +252,7 @@ func TestPortForwardManagerRemove_StartingEntry(t *testing.T) {
 
 func TestPortForwardManagerRemove_NoCallback(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -268,7 +268,7 @@ func TestPortForwardManagerRemove_NoCallback(t *testing.T) {
 
 func TestPortForwardManagerGetEntry_Found(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -310,7 +310,7 @@ func TestPortForwardManagerGetEntry_NotFound(t *testing.T) {
 
 func TestPortForwardManagerGetEntry_ReturnsCopy(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel := context.WithCancel(context.Background())
+	_, cancel := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -329,9 +329,9 @@ func TestPortForwardManagerGetEntry_ReturnsCopy(t *testing.T) {
 
 func TestPortForwardManagerStopAll_MixedStatuses(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel1 := context.WithCancel(context.Background())
-	_, cancel2 := context.WithCancel(context.Background())
-	_, cancel3 := context.WithCancel(context.Background())
+	_, cancel1 := context.WithCancel(t.Context())
+	_, cancel2 := context.WithCancel(t.Context())
+	_, cancel3 := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{
@@ -352,8 +352,8 @@ func TestPortForwardManagerStopAll_MixedStatuses(t *testing.T) {
 
 func TestPortForwardManagerStopAll_AllRunning(t *testing.T) {
 	mgr := NewPortForwardManager()
-	_, cancel1 := context.WithCancel(context.Background())
-	_, cancel2 := context.WithCancel(context.Background())
+	_, cancel1 := context.WithCancel(t.Context())
+	_, cancel2 := context.WithCancel(t.Context())
 
 	mgr.mu.Lock()
 	mgr.entries = []*PortForwardEntry{

@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,7 +42,7 @@ func TestGetResourcesUnion_FanOutStampingAndSort(t *testing.T) {
 
 	contexts := []string{"green", "blue"} // unsorted to prove secondary sort
 	items, err := c.GetResourcesUnion(
-		context.Background(),
+		t.Context(),
 		contexts,
 		"cloud-cd",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
@@ -92,7 +91,7 @@ func TestGetResourcesUnion_SortsSameNameClusterByNamespace(t *testing.T) {
 	c := newFakeClient(nil, dyn)
 
 	items, err := c.GetResourcesUnion(
-		context.Background(),
+		t.Context(),
 		[]string{"blue"},
 		"",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
@@ -109,7 +108,7 @@ func TestGetResourcesUnion_EmptyContextsList(t *testing.T) {
 	c := newFakeClient(nil, dyn)
 
 	items, err := c.GetResourcesUnion(
-		context.Background(),
+		t.Context(),
 		nil,
 		"cloud-cd",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
@@ -142,7 +141,7 @@ func TestGetResourcesUnion_UsesStandardGetResources(t *testing.T) {
 
 	// Single-context union: one cluster, one pod → one row with ClusterName stamped.
 	items, err := c.GetResourcesUnion(
-		context.Background(),
+		t.Context(),
 		[]string{"solo-cluster"},
 		"cloud-cd",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},
@@ -154,7 +153,7 @@ func TestGetResourcesUnion_UsesStandardGetResources(t *testing.T) {
 	// And the non-union GetResources must NOT stamp ClusterName — that field
 	// is the union feature's contract. Verify the two code paths differ here.
 	plain, err := c.GetResources(
-		context.Background(),
+		t.Context(),
 		"solo-cluster",
 		"cloud-cd",
 		model.ResourceTypeEntry{Kind: "Pod", APIVersion: "v1", Resource: "pods", Namespaced: true},

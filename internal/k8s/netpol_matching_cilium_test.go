@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -48,7 +47,7 @@ func TestGetNetworkPoliciesForPod_IncludesCiliumPolicies(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 1)
 	assert.Equal(t, "cnp-web", info.Policies[0].Name)
@@ -72,7 +71,7 @@ func TestGetNetworkPoliciesForPod_ClusterwideMatchesByNamespaceLabel(t *testing.
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 1)
 	assert.Equal(t, "ccnp-default-ns", info.Policies[0].Name)
@@ -88,7 +87,7 @@ func TestGetNetworkPoliciesForPod_CiliumNodePolicySkipped(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	assert.Empty(t, info.Policies, "node policies must not appear in the pod view")
 }
@@ -107,7 +106,7 @@ func TestGetNetworkPoliciesForPod_CiliumCRDAbsent(t *testing.T) {
 	})
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err, "missing Cilium CRDs must not fail the lookup")
 	require.Len(t, info.Policies, 1)
 	assert.Equal(t, "std-policy", info.Policies[0].Name)
@@ -134,7 +133,7 @@ func TestGetNetworkPoliciesForPod_ClusterwideAffectedPodsSpanNamespaces(t *testi
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForPod(context.Background(), "test-ctx", "default", "web-1")
+	info, err := c.GetNetworkPoliciesForPod(t.Context(), "test-ctx", "default", "web-1")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 1)
 	// Clusterwide policies report affected pods across all namespaces, not
@@ -154,7 +153,7 @@ func TestGetNetworkPoliciesForService_IncludesClusterwide(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForService(context.Background(), "test-ctx", "default", "web-svc")
+	info, err := c.GetNetworkPoliciesForService(t.Context(), "test-ctx", "default", "web-svc")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 1)
 	assert.Equal(t, "ccnp-default", info.Policies[0].Name)
@@ -174,7 +173,7 @@ func TestGetNetworkPoliciesForService_IncludesCilium(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	info, err := c.GetNetworkPoliciesForService(context.Background(), "test-ctx", "default", "web-svc")
+	info, err := c.GetNetworkPoliciesForService(t.Context(), "test-ctx", "default", "web-svc")
 	require.NoError(t, err)
 	require.Len(t, info.Policies, 1)
 	assert.Equal(t, "cnp-canary", info.Policies[0].Name)

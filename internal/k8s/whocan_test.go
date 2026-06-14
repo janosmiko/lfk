@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"sort"
 	"strings"
 	"testing"
@@ -50,7 +49,7 @@ func TestWhoCan_ClusterRoleBindingMatch(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "get")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "get")
 	require.NoError(t, err)
 
 	got := sortSubjects(out)
@@ -81,7 +80,7 @@ func TestWhoCan_RoleBindingToClusterRoleMatch(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, rb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "delete")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "delete")
 	require.NoError(t, err)
 
 	got := sortSubjects(out)
@@ -108,7 +107,7 @@ func TestWhoCan_RoleBindingToRoleMatch(t *testing.T) {
 	cs := k8sfake.NewClientset(r, rb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods/log", "get")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods/log", "get")
 	require.NoError(t, err)
 	got := sortSubjects(out)
 	assert.Contains(t, strings.Join(got, "\n"), "User/operator@",
@@ -132,7 +131,7 @@ func TestWhoCan_VerbWildcard(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 	for _, v := range []string{"get", "delete", "patch", "create"} {
-		out, err := c.WhoCan(context.Background(), "", "", "", "pods", v)
+		out, err := c.WhoCan(t.Context(), "", "", "", "pods", v)
 		require.NoError(t, err, "verb %s", v)
 		assert.NotEmpty(t, out, "verb=%q with rule.Verbs=[*] must match", v)
 	}
@@ -153,7 +152,7 @@ func TestWhoCan_ResourceWildcard(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 	for _, r := range []string{"pods", "secrets", "configmaps"} {
-		out, err := c.WhoCan(context.Background(), "", "", "", r, "get")
+		out, err := c.WhoCan(t.Context(), "", "", "", r, "get")
 		require.NoError(t, err)
 		assert.NotEmpty(t, out, "resource=%q with rule.Resources=[*] must match", r)
 	}
@@ -174,7 +173,7 @@ func TestWhoCan_GroupWildcard(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "apps", "deployments", "get")
+	out, err := c.WhoCan(t.Context(), "", "", "apps", "deployments", "get")
 	require.NoError(t, err)
 	assert.NotEmpty(t, out, "group=apps with rule.APIGroups=[*] must match")
 }
@@ -208,7 +207,7 @@ func TestWhoCan_NamespaceScopeFiltersRoleBindingsButNotClusterBindings(t *testin
 	cs := k8sfake.NewClientset(cr, rbA, rbB, crb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "team-a", "", "pods", "list")
+	out, err := c.WhoCan(t.Context(), "", "team-a", "", "pods", "list")
 	require.NoError(t, err)
 	got := sortSubjects(out)
 	joined := strings.Join(got, "\n")
@@ -238,7 +237,7 @@ func TestWhoCan_AllNamespacesIncludesEveryRoleBinding(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, rbA, rbB)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "list")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "list")
 	require.NoError(t, err)
 	joined := strings.Join(sortSubjects(out), "\n")
 	assert.Contains(t, joined, "User/alice@", "all-namespaces (ns=\"\") includes team-a's RB")
@@ -251,7 +250,7 @@ func TestWhoCan_NoMatchReturnsEmpty(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "delete")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "delete")
 	require.NoError(t, err)
 	assert.Empty(t, out, "empty cluster (no roles, no bindings) → no subjects")
 }
@@ -269,7 +268,7 @@ func TestWhoCan_BindingWithoutMatchingRuleIsSkipped(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "get")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "get")
 	require.NoError(t, err)
 	assert.Empty(t, out, "binding's rules don't grant pods/get → skip subject")
 }
@@ -294,7 +293,7 @@ func TestWhoCan_NonResourceURLRulesIgnored(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "get")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "get")
 	require.NoError(t, err)
 	assert.Empty(t, out, "nonResourceURLs rules don't grant resource permissions")
 }
@@ -322,7 +321,7 @@ func TestWhoCan_QueryVerbWildcardMatchesAnyVerbRule(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "*")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "*")
 	require.NoError(t, err)
 	assert.Len(t, out, 1, "alice has list/watch on pods → must appear under verb=*")
 	assert.Equal(t, "alice", out[0].Name)
@@ -355,7 +354,7 @@ func TestWhoCan_ResourceNamesRulesAreSkipped(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "get")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "get")
 	require.NoError(t, err)
 	assert.Empty(t, out, "ResourceNames-scoped rules must not be reported as generic pod access")
 }
@@ -390,7 +389,7 @@ func TestWhoCan_ResultsSortedByName(t *testing.T) {
 	cs := k8sfake.NewClientset(cr, crb)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.WhoCan(context.Background(), "", "", "", "pods", "get")
+	out, err := c.WhoCan(t.Context(), "", "", "", "pods", "get")
 	require.NoError(t, err)
 
 	names := make([]string, len(out))

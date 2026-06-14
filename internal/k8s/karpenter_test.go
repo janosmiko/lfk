@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -104,7 +103,7 @@ func TestDisruptNodeClaim(t *testing.T) {
 	require.NoError(t, c.DisruptNodeClaim("test-ctx", "doomed"))
 
 	// Verify the NodeClaim is gone from the fake API.
-	_, err := dyn.Resource(karpenterNodeClaimGVR).Get(context.Background(), "doomed", metav1.GetOptions{})
+	_, err := dyn.Resource(karpenterNodeClaimGVR).Get(t.Context(), "doomed", metav1.GetOptions{})
 	require.Error(t, err, "DisruptNodeClaim must delete the NodeClaim from the API")
 }
 

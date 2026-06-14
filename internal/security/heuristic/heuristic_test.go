@@ -1,7 +1,6 @@
 package heuristic
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,14 +23,14 @@ func TestSourceMetadata(t *testing.T) {
 	s := NewWithClient(fake.NewSimpleClientset())
 	assert.Equal(t, "heuristic", s.Name())
 	assert.Equal(t, []security.Category{security.CategoryMisconfig, security.CategoryReliability}, s.Categories())
-	ok, err := s.IsAvailable(context.Background(), "")
+	ok, err := s.IsAvailable(t.Context(), "")
 	assert.NoError(t, err)
 	assert.True(t, ok, "heuristic source with a client is always available")
 }
 
 func TestSourceUnavailableWithoutClient(t *testing.T) {
 	s := New()
-	ok, err := s.IsAvailable(context.Background(), "")
+	ok, err := s.IsAvailable(t.Context(), "")
 	assert.NoError(t, err)
 	assert.False(t, ok, "heuristic with nil client reports unavailable")
 }

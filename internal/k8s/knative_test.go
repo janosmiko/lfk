@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"encoding/json"
 	"testing"
 
@@ -52,7 +51,7 @@ func TestActivateKnativeRevision(t *testing.T) {
 	// Verify the Service's spec.traffic was replaced with a single
 	// 100% entry pointing at the activated Revision. JSON merge-patch
 	// treats arrays as atomic, which is the intended semantic.
-	got, err := dyn.Resource(knativeServiceGVR).Namespace("default").Get(context.Background(), "my-svc", metav1.GetOptions{})
+	got, err := dyn.Resource(knativeServiceGVR).Namespace("default").Get(t.Context(), "my-svc", metav1.GetOptions{})
 	require.NoError(t, err)
 	traffic, found, err := unstructured.NestedSlice(got.Object, "spec", "traffic")
 	require.NoError(t, err)

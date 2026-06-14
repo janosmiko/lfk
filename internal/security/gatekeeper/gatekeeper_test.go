@@ -1,7 +1,6 @@
 package gatekeeper
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -126,7 +125,7 @@ func TestIsAvailableFallsBackToV1beta1(t *testing.T) {
 		})
 
 	s := NewWithClients(nil, dc)
-	ok, err := s.IsAvailable(context.Background(), "ctx")
+	ok, err := s.IsAvailable(t.Context(), "ctx")
 	require.NoError(t, err)
 	assert.True(t, ok, "v1 NotFound must fall back to v1beta1")
 }
@@ -142,7 +141,7 @@ func TestIsAvailableBothVersionsNotFound(t *testing.T) {
 		})
 
 	s := NewWithClients(nil, dc)
-	ok, err := s.IsAvailable(context.Background(), "ctx")
+	ok, err := s.IsAvailable(t.Context(), "ctx")
 	require.NoError(t, err)
 	assert.False(t, ok)
 }
@@ -160,7 +159,7 @@ func TestDiscoverConstraintKindsNotFoundReturnsEmpty(t *testing.T) {
 	clientset := fake.NewSimpleClientset()
 	clientset.Resources = []*metav1.APIResourceList{}
 
-	kinds, err := discoverConstraintKinds(context.Background(), clientset)
+	kinds, err := discoverConstraintKinds(t.Context(), clientset)
 	require.NoError(t, err, "NotFound must NOT propagate as an error")
 	assert.Empty(t, kinds)
 }

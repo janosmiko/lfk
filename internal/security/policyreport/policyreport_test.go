@@ -1,7 +1,6 @@
 package policyreport
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,14 +27,14 @@ func TestSourceCategories(t *testing.T) {
 
 func TestIsAvailableNilClient(t *testing.T) {
 	s := New()
-	ok, err := s.IsAvailable(context.Background(), "ctx")
+	ok, err := s.IsAvailable(t.Context(), "ctx")
 	assert.False(t, ok)
 	assert.NoError(t, err)
 }
 
 func TestFetchNilClient(t *testing.T) {
 	s := New()
-	findings, err := s.Fetch(context.Background(), "ctx", "")
+	findings, err := s.Fetch(t.Context(), "ctx", "")
 	assert.Nil(t, findings)
 	assert.NoError(t, err)
 }
@@ -238,11 +237,11 @@ func TestFetchWithFakeClient(t *testing.T) {
 
 	s := NewWithDynamic(dc)
 
-	ok, err := s.IsAvailable(context.Background(), "ctx")
+	ok, err := s.IsAvailable(t.Context(), "ctx")
 	require.NoError(t, err)
 	assert.True(t, ok)
 
-	findings, err := s.Fetch(context.Background(), "ctx", "")
+	findings, err := s.Fetch(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.Equal(t, "check-ro-rootfs", findings[0].Title)

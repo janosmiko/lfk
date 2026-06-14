@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -45,7 +44,7 @@ func TestGetSecretData(t *testing.T) {
 	cs := k8sfake.NewClientset(secret)
 	c := newFakeClient(cs, nil)
 
-	result, err := c.GetSecretData(context.Background(), "", "default", "my-secret")
+	result, err := c.GetSecretData(t.Context(), "", "default", "my-secret")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"password", "username"}, result.Keys)
 	assert.Equal(t, "s3cret", result.Data["password"])
@@ -56,7 +55,7 @@ func TestGetSecretData_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	_, err := c.GetSecretData(context.Background(), "", "default", "missing")
+	_, err := c.GetSecretData(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "getting secret")
 }
@@ -77,7 +76,7 @@ func TestUpdateSecretData(t *testing.T) {
 	require.NoError(t, err)
 
 	// Verify the update took effect.
-	updated, err := cs.CoreV1().Secrets("default").Get(context.Background(), "my-secret", metav1.GetOptions{})
+	updated, err := cs.CoreV1().Secrets("default").Get(t.Context(), "my-secret", metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, []byte("new-value"), updated.Data["new-key"])
 	_, hasOld := updated.Data["old-key"]
@@ -106,7 +105,7 @@ func TestGetConfigMapData(t *testing.T) {
 	cs := k8sfake.NewClientset(cm)
 	c := newFakeClient(cs, nil)
 
-	result, err := c.GetConfigMapData(context.Background(), "", "default", "my-cm")
+	result, err := c.GetConfigMapData(t.Context(), "", "default", "my-cm")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"app.conf", "config.yaml"}, result.Keys)
 	assert.Equal(t, "key: value", result.Data["config.yaml"])
@@ -116,7 +115,7 @@ func TestGetConfigMapData_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	_, err := c.GetConfigMapData(context.Background(), "", "default", "missing")
+	_, err := c.GetConfigMapData(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "getting configmap")
 }
@@ -136,7 +135,7 @@ func TestUpdateConfigMapData(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	updated, err := cs.CoreV1().ConfigMaps("default").Get(context.Background(), "my-cm", metav1.GetOptions{})
+	updated, err := cs.CoreV1().ConfigMaps("default").Get(t.Context(), "my-cm", metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "data", updated.Data["new"])
 	_, hasOld := updated.Data["old"]
@@ -191,7 +190,7 @@ func TestGetPodResourceRequests(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	cpuReq, cpuLim, memReq, memLim, err := c.GetPodResourceRequests(context.Background(), "", "default", "my-pod")
+	cpuReq, cpuLim, memReq, memLim, err := c.GetPodResourceRequests(t.Context(), "", "default", "my-pod")
 	require.NoError(t, err)
 	assert.Equal(t, int64(150), cpuReq) // 100m + 50m
 	assert.Equal(t, int64(700), cpuLim) // 500m + 200m
@@ -209,7 +208,7 @@ func TestGetPodResourceRequests_NoResources(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	cpuReq, cpuLim, memReq, memLim, err := c.GetPodResourceRequests(context.Background(), "", "default", "bare-pod")
+	cpuReq, cpuLim, memReq, memLim, err := c.GetPodResourceRequests(t.Context(), "", "default", "bare-pod")
 	require.NoError(t, err)
 	assert.Equal(t, int64(0), cpuReq)
 	assert.Equal(t, int64(0), cpuLim)
@@ -221,7 +220,7 @@ func TestGetPodResourceRequests_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	_, _, _, _, err := c.GetPodResourceRequests(context.Background(), "", "default", "missing")
+	_, _, _, _, err := c.GetPodResourceRequests(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "getting pod")
 }
@@ -248,12 +247,12 @@ func TestTriggerCronJob(t *testing.T) {
 	cs := k8sfake.NewClientset(cronJob)
 	c := newFakeClient(cs, nil)
 
-	jobName, err := c.TriggerCronJob(context.Background(), "", "default", "my-cron")
+	jobName, err := c.TriggerCronJob(t.Context(), "", "default", "my-cron")
 	require.NoError(t, err)
 	assert.Contains(t, jobName, "my-cron-manual-")
 
 	// Verify the job was created.
-	jobs, err := cs.BatchV1().Jobs("default").List(context.Background(), metav1.ListOptions{})
+	jobs, err := cs.BatchV1().Jobs("default").List(t.Context(), metav1.ListOptions{})
 	require.NoError(t, err)
 	assert.Len(t, jobs.Items, 1)
 	assert.Equal(t, "busybox", jobs.Items[0].Spec.Template.Spec.Containers[0].Image)
@@ -271,7 +270,7 @@ func TestTriggerCronJob_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	_, err := c.TriggerCronJob(context.Background(), "", "default", "missing")
+	_, err := c.TriggerCronJob(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "getting cronjob")
 }
@@ -304,7 +303,7 @@ func TestGetContainers(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetContainers(context.Background(), "", "default", "my-pod")
+	items, err := c.GetContainers(t.Context(), "", "default", "my-pod")
 	require.NoError(t, err)
 	assert.Len(t, items, 3)
 	// Init containers come first.
@@ -317,7 +316,7 @@ func TestGetContainers_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	_, err := c.GetContainers(context.Background(), "", "default", "missing")
+	_, err := c.GetContainers(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 }
 
@@ -350,7 +349,7 @@ func TestGetContainers_WithEphemeralContainers(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetContainers(context.Background(), "", "default", "my-pod")
+	items, err := c.GetContainers(t.Context(), "", "default", "my-pod")
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 
@@ -386,7 +385,7 @@ func TestGetContainerPorts(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	ports, err := c.GetContainerPorts(context.Background(), "", "default", "my-pod")
+	ports, err := c.GetContainerPorts(t.Context(), "", "default", "my-pod")
 	require.NoError(t, err)
 	assert.Len(t, ports, 2)
 	assert.Equal(t, int32(8080), ports[0].ContainerPort)
@@ -408,7 +407,7 @@ func TestGetServicePorts(t *testing.T) {
 	cs := k8sfake.NewClientset(svc)
 	c := newFakeClient(cs, nil)
 
-	ports, err := c.GetServicePorts(context.Background(), "", "default", "my-svc")
+	ports, err := c.GetServicePorts(t.Context(), "", "default", "my-svc")
 	require.NoError(t, err)
 	assert.Len(t, ports, 2)
 	assert.Equal(t, int32(80), ports[0].ContainerPort)
@@ -439,7 +438,7 @@ func TestGetDeploymentPorts(t *testing.T) {
 	cs := k8sfake.NewClientset(dep)
 	c := newFakeClient(cs, nil)
 
-	ports, err := c.GetDeploymentPorts(context.Background(), "", "default", "my-deploy")
+	ports, err := c.GetDeploymentPorts(t.Context(), "", "default", "my-deploy")
 	require.NoError(t, err)
 	assert.Len(t, ports, 1)
 	assert.Equal(t, int32(8080), ports[0].ContainerPort)
@@ -470,7 +469,7 @@ func TestGetStatefulSetPorts(t *testing.T) {
 	cs := k8sfake.NewClientset(sts)
 	c := newFakeClient(cs, nil)
 
-	ports, err := c.GetStatefulSetPorts(context.Background(), "", "default", "my-sts")
+	ports, err := c.GetStatefulSetPorts(t.Context(), "", "default", "my-sts")
 	require.NoError(t, err)
 	assert.Len(t, ports, 1)
 	assert.Equal(t, int32(5432), ports[0].ContainerPort)
@@ -501,7 +500,7 @@ func TestGetDaemonSetPorts(t *testing.T) {
 	cs := k8sfake.NewClientset(ds)
 	c := newFakeClient(cs, nil)
 
-	ports, err := c.GetDaemonSetPorts(context.Background(), "", "default", "my-ds")
+	ports, err := c.GetDaemonSetPorts(t.Context(), "", "default", "my-ds")
 	require.NoError(t, err)
 	assert.Len(t, ports, 1)
 	assert.Equal(t, int32(9100), ports[0].ContainerPort)
@@ -521,7 +520,7 @@ func TestGetNamespaces(t *testing.T) {
 	cs := k8sfake.NewClientset(ns1, ns2)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetNamespaces(context.Background(), "")
+	items, err := c.GetNamespaces(t.Context(), "")
 	require.NoError(t, err)
 	assert.Len(t, items, 2)
 	// Should be sorted by name.
@@ -538,7 +537,7 @@ func TestListServiceAccounts(t *testing.T) {
 	cs := k8sfake.NewClientset(sa1, sa2)
 	c := newFakeClient(cs, nil)
 
-	names, err := c.ListServiceAccounts(context.Background(), "", "default")
+	names, err := c.ListServiceAccounts(t.Context(), "", "default")
 	require.NoError(t, err)
 	assert.Len(t, names, 2)
 	assert.Equal(t, "admin", names[0]) // sorted
@@ -551,7 +550,7 @@ func TestListServiceAccounts_AllNamespaces(t *testing.T) {
 	cs := k8sfake.NewClientset(sa1, sa2)
 	c := newFakeClient(cs, nil)
 
-	names, err := c.ListServiceAccounts(context.Background(), "", "")
+	names, err := c.ListServiceAccounts(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Len(t, names, 2)
 	// When namespace is empty, names include namespace prefix.
@@ -579,7 +578,7 @@ func TestListRBACSubjects(t *testing.T) {
 	cs := k8sfake.NewClientset(crb, rb)
 	c := newFakeClient(cs, nil)
 
-	subjects, err := c.ListRBACSubjects(context.Background(), "")
+	subjects, err := c.ListRBACSubjects(t.Context(), "")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(subjects), 4)
 	// Check ordering: Users first, then Groups, then ServiceAccounts.
@@ -667,7 +666,7 @@ func TestGetDeploymentRevisions(t *testing.T) {
 	cs := k8sfake.NewClientset(dep, rs1, rs2, rsOther)
 	c := newFakeClient(cs, nil)
 
-	revisions, err := c.GetDeploymentRevisions(context.Background(), "", "default", "my-deploy")
+	revisions, err := c.GetDeploymentRevisions(t.Context(), "", "default", "my-deploy")
 	require.NoError(t, err)
 	assert.Len(t, revisions, 2)
 	// Sorted by revision descending.
@@ -681,7 +680,7 @@ func TestGetDeploymentRevisions_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	_, err := c.GetDeploymentRevisions(context.Background(), "", "default", "missing")
+	_, err := c.GetDeploymentRevisions(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 }
 
@@ -761,7 +760,7 @@ func TestGetPodSelector_Deployment(t *testing.T) {
 	cs := k8sfake.NewClientset(dep)
 	c := newFakeClient(cs, nil)
 
-	sel, err := c.GetPodSelector(context.Background(), "", "default", "Deployment", "my-deploy")
+	sel, err := c.GetPodSelector(t.Context(), "", "default", "Deployment", "my-deploy")
 	require.NoError(t, err)
 	assert.Contains(t, sel, "app=test")
 	assert.Contains(t, sel, "env=prod")
@@ -781,7 +780,7 @@ func TestGetPodSelector_StatefulSet(t *testing.T) {
 	cs := k8sfake.NewClientset(sts)
 	c := newFakeClient(cs, nil)
 
-	sel, err := c.GetPodSelector(context.Background(), "", "default", "StatefulSet", "my-sts")
+	sel, err := c.GetPodSelector(t.Context(), "", "default", "StatefulSet", "my-sts")
 	require.NoError(t, err)
 	assert.Equal(t, "app=db", sel)
 }
@@ -800,7 +799,7 @@ func TestGetPodSelector_DaemonSet(t *testing.T) {
 	cs := k8sfake.NewClientset(ds)
 	c := newFakeClient(cs, nil)
 
-	sel, err := c.GetPodSelector(context.Background(), "", "default", "DaemonSet", "my-ds")
+	sel, err := c.GetPodSelector(t.Context(), "", "default", "DaemonSet", "my-ds")
 	require.NoError(t, err)
 	assert.Equal(t, "app=agent", sel)
 }
@@ -821,7 +820,7 @@ func TestGetPodSelector_Job(t *testing.T) {
 	cs := k8sfake.NewClientset(job)
 	c := newFakeClient(cs, nil)
 
-	sel, err := c.GetPodSelector(context.Background(), "", "default", "Job", "my-job")
+	sel, err := c.GetPodSelector(t.Context(), "", "default", "Job", "my-job")
 	require.NoError(t, err)
 	assert.Equal(t, "job-name=my-job", sel)
 }
@@ -837,7 +836,7 @@ func TestGetPodSelector_Service(t *testing.T) {
 	cs := k8sfake.NewClientset(svc)
 	c := newFakeClient(cs, nil)
 
-	sel, err := c.GetPodSelector(context.Background(), "", "default", "Service", "my-svc")
+	sel, err := c.GetPodSelector(t.Context(), "", "default", "Service", "my-svc")
 	require.NoError(t, err)
 	assert.Equal(t, "app=web", sel)
 }
@@ -846,7 +845,7 @@ func TestGetPodSelector_UnknownKind(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	sel, err := c.GetPodSelector(context.Background(), "", "default", "ConfigMap", "my-cm")
+	sel, err := c.GetPodSelector(t.Context(), "", "default", "ConfigMap", "my-cm")
 	require.NoError(t, err)
 	assert.Empty(t, sel)
 }
@@ -859,7 +858,7 @@ func TestGetPodSelector_NoSelector(t *testing.T) {
 	cs := k8sfake.NewClientset(svc)
 	c := newFakeClient(cs, nil)
 
-	sel, err := c.GetPodSelector(context.Background(), "", "default", "Service", "headless")
+	sel, err := c.GetPodSelector(t.Context(), "", "default", "Service", "headless")
 	require.NoError(t, err)
 	assert.Empty(t, sel)
 }
@@ -895,7 +894,7 @@ func TestGetHelmReleases(t *testing.T) {
 	cs := k8sfake.NewClientset(s1, s2, s3)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetHelmReleases(context.Background(), "", "default")
+	items, err := c.GetHelmReleases(t.Context(), "", "default")
 	require.NoError(t, err)
 	assert.Len(t, items, 2)
 	// Should find myapp (latest v2) and other (v1).
@@ -915,7 +914,7 @@ func TestGetHelmReleases_NoNamespace(t *testing.T) {
 	cs := k8sfake.NewClientset(s)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetHelmReleases(context.Background(), "", "")
+	items, err := c.GetHelmReleases(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, "prod", items[0].Namespace)
@@ -932,7 +931,7 @@ func TestGetHelmReleases_SkipsNoName(t *testing.T) {
 	cs := k8sfake.NewClientset(s)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetHelmReleases(context.Background(), "", "default")
+	items, err := c.GetHelmReleases(t.Context(), "", "default")
 	require.NoError(t, err)
 	assert.Len(t, items, 0)
 }
@@ -952,7 +951,7 @@ func TestGetHelmReleaseYAML(t *testing.T) {
 	cs := k8sfake.NewClientset(s)
 	c := newFakeClient(cs, nil)
 
-	yamlStr, err := c.GetHelmReleaseYAML(context.Background(), "", "default", "myapp")
+	yamlStr, err := c.GetHelmReleaseYAML(t.Context(), "", "default", "myapp")
 	require.NoError(t, err)
 	assert.Contains(t, yamlStr, "name: myapp")
 	assert.Contains(t, yamlStr, "status: deployed")
@@ -962,7 +961,7 @@ func TestGetHelmReleaseYAML_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	_, err := c.GetHelmReleaseYAML(context.Background(), "", "default", "missing")
+	_, err := c.GetHelmReleaseYAML(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "no helm release found")
 }
@@ -989,7 +988,7 @@ func TestGetHelmReleaseYAML_PicksLatest(t *testing.T) {
 	cs := k8sfake.NewClientset(old, newer)
 	c := newFakeClient(cs, nil)
 
-	yamlStr, err := c.GetHelmReleaseYAML(context.Background(), "", "default", "myapp")
+	yamlStr, err := c.GetHelmReleaseYAML(t.Context(), "", "default", "myapp")
 	require.NoError(t, err)
 	assert.Contains(t, yamlStr, "version: \"2\"")
 }
@@ -1044,7 +1043,7 @@ func TestGetPodStartupAnalysis(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	info, err := c.GetPodStartupAnalysis(context.Background(), "", "default", "my-pod")
+	info, err := c.GetPodStartupAnalysis(t.Context(), "", "default", "my-pod")
 	require.NoError(t, err)
 	assert.Equal(t, "my-pod", info.PodName)
 	assert.Equal(t, "default", info.Namespace)
@@ -1082,7 +1081,7 @@ func TestGetPodStartupAnalysis_PendingPod(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	info, err := c.GetPodStartupAnalysis(context.Background(), "", "default", "pending-pod")
+	info, err := c.GetPodStartupAnalysis(t.Context(), "", "default", "pending-pod")
 	require.NoError(t, err)
 	assert.Equal(t, "pending-pod", info.PodName)
 	// Should have scheduling phase in-progress.
@@ -1138,7 +1137,7 @@ func TestGetPodStartupAnalysis_WithImagePullEvents(t *testing.T) {
 	cs := k8sfake.NewClientset(pod, pullingEvent, pulledEvent)
 	c := newFakeClient(cs, nil)
 
-	info, err := c.GetPodStartupAnalysis(context.Background(), "", "default", "pull-pod")
+	info, err := c.GetPodStartupAnalysis(t.Context(), "", "default", "pull-pod")
 	require.NoError(t, err)
 
 	var foundImagePull bool
@@ -1156,7 +1155,7 @@ func TestGetPodStartupAnalysis_NotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	_, err := c.GetPodStartupAnalysis(context.Background(), "", "default", "missing")
+	_, err := c.GetPodStartupAnalysis(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 }
 
@@ -1204,7 +1203,7 @@ func TestGetPodStartupAnalysis_InitContainerRunning(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	info, err := c.GetPodStartupAnalysis(context.Background(), "", "default", "init-running-pod")
+	info, err := c.GetPodStartupAnalysis(t.Context(), "", "default", "init-running-pod")
 	require.NoError(t, err)
 	assert.Equal(t, "init-running-pod", info.PodName)
 	// Should have init container phases.
@@ -1262,7 +1261,7 @@ func TestGetPodStartupAnalysis_TerminatedContainer(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	info, err := c.GetPodStartupAnalysis(context.Background(), "", "default", "terminated-pod")
+	info, err := c.GetPodStartupAnalysis(t.Context(), "", "default", "terminated-pod")
 	require.NoError(t, err)
 	assert.Equal(t, "terminated-pod", info.PodName)
 }
@@ -1300,7 +1299,7 @@ func TestGetPodStartupAnalysis_ContainersReadyNoReady(t *testing.T) {
 	cs := k8sfake.NewClientset(pod)
 	c := newFakeClient(cs, nil)
 
-	info, err := c.GetPodStartupAnalysis(context.Background(), "", "default", "readiness-waiting")
+	info, err := c.GetPodStartupAnalysis(t.Context(), "", "default", "readiness-waiting")
 	require.NoError(t, err)
 	// Should have readiness probes in-progress.
 	var foundReadiness bool
@@ -1344,7 +1343,7 @@ func TestGetPodStartupAnalysis_InProgressImagePull(t *testing.T) {
 	cs := k8sfake.NewClientset(pod, pullingEvent)
 	c := newFakeClient(cs, nil)
 
-	info, err := c.GetPodStartupAnalysis(context.Background(), "", "default", "pulling-pod")
+	info, err := c.GetPodStartupAnalysis(t.Context(), "", "default", "pulling-pod")
 	require.NoError(t, err)
 
 	var foundImagePull bool
@@ -1432,7 +1431,7 @@ func TestGetResources_EventsSortedByLastSeen(t *testing.T) {
 	dc := newFakeDynClient(eventA, eventB, eventC)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetResources(context.Background(), "", "default", model.ResourceTypeEntry{
+	items, err := c.GetResources(t.Context(), "", "default", model.ResourceTypeEntry{
 		Kind: "Event", APIGroup: "", APIVersion: "v1", Resource: "events", Namespaced: true,
 	})
 	require.NoError(t, err)
@@ -1462,7 +1461,7 @@ func TestDeleteResource_Namespaced(t *testing.T) {
 
 	// Verify it's gone.
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
-	_, err = dc.Resource(gvr).Namespace("default").Get(context.Background(), "my-cm", metav1.GetOptions{})
+	_, err = dc.Resource(gvr).Namespace("default").Get(t.Context(), "my-cm", metav1.GetOptions{})
 	require.Error(t, err)
 }
 
@@ -1526,7 +1525,7 @@ func TestGetResourceYAML_Namespaced(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	yamlStr, err := c.GetResourceYAML(context.Background(), "", "default", model.ResourceTypeEntry{
+	yamlStr, err := c.GetResourceYAML(t.Context(), "", "default", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "configmaps", Namespaced: true,
 	}, "my-cm")
 	require.NoError(t, err)
@@ -1547,7 +1546,7 @@ func TestGetResourceYAML_ClusterScoped(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	yamlStr, err := c.GetResourceYAML(context.Background(), "", "", model.ResourceTypeEntry{
+	yamlStr, err := c.GetResourceYAML(t.Context(), "", "", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "namespaces", Namespaced: false,
 	}, "my-ns")
 	require.NoError(t, err)
@@ -1565,7 +1564,7 @@ func TestGetResourceYAML_HelmVirtualType(t *testing.T) {
 	cs := k8sfake.NewClientset(s)
 	c := newFakeClient(cs, nil)
 
-	yamlStr, err := c.GetResourceYAML(context.Background(), "", "default", model.ResourceTypeEntry{
+	yamlStr, err := c.GetResourceYAML(t.Context(), "", "default", model.ResourceTypeEntry{
 		APIGroup: "_helm", Resource: "releases",
 	}, "myapp")
 	require.NoError(t, err)
@@ -1575,7 +1574,7 @@ func TestGetResourceYAML_HelmVirtualType(t *testing.T) {
 func TestGetResourceYAML_PortForwardVirtualType(t *testing.T) {
 	c := newFakeClient(nil, nil)
 
-	yamlStr, err := c.GetResourceYAML(context.Background(), "", "default", model.ResourceTypeEntry{
+	yamlStr, err := c.GetResourceYAML(t.Context(), "", "default", model.ResourceTypeEntry{
 		APIGroup: "_portforward",
 	}, "any")
 	require.NoError(t, err)
@@ -1606,7 +1605,7 @@ func TestGetLabelAnnotationData_Namespaced(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	result, err := c.GetLabelAnnotationData(context.Background(), "", model.ResourceTypeEntry{
+	result, err := c.GetLabelAnnotationData(t.Context(), "", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "configmaps", Namespaced: true,
 	}, "default", "my-cm")
 	require.NoError(t, err)
@@ -1631,7 +1630,7 @@ func TestGetLabelAnnotationData_ClusterScoped(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	result, err := c.GetLabelAnnotationData(context.Background(), "", model.ResourceTypeEntry{
+	result, err := c.GetLabelAnnotationData(t.Context(), "", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "namespaces", Namespaced: false,
 	}, "", "my-ns")
 	require.NoError(t, err)
@@ -1653,7 +1652,7 @@ func TestGetLabelAnnotationData_NoLabelsOrAnnotations(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	result, err := c.GetLabelAnnotationData(context.Background(), "", model.ResourceTypeEntry{
+	result, err := c.GetLabelAnnotationData(t.Context(), "", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "configmaps", Namespaced: true,
 	}, "default", "bare-cm")
 	require.NoError(t, err)
@@ -1680,7 +1679,7 @@ func TestUpdateLabelAnnotationData_Namespaced(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	err := c.UpdateLabelAnnotationData(context.Background(), "", model.ResourceTypeEntry{
+	err := c.UpdateLabelAnnotationData(t.Context(), "", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "configmaps", Namespaced: true,
 	}, "default", "my-cm",
 		map[string]string{"keep": "yes", "new-label": "added"},
@@ -1703,7 +1702,7 @@ func TestUpdateLabelAnnotationData_ClusterScoped(t *testing.T) {
 	dc := newFakeDynClient(obj)
 	c := newFakeClient(nil, dc)
 
-	err := c.UpdateLabelAnnotationData(context.Background(), "", model.ResourceTypeEntry{
+	err := c.UpdateLabelAnnotationData(t.Context(), "", model.ResourceTypeEntry{
 		APIGroup: "", APIVersion: "v1", Resource: "namespaces", Namespaced: false,
 	}, "", "my-ns",
 		map[string]string{"env": "new"},
@@ -1744,7 +1743,7 @@ func TestFindResourcesWithFinalizer(t *testing.T) {
 		{APIGroup: "", APIVersion: "v1", Resource: "configmaps", Kind: "ConfigMap", Namespaced: true},
 	}
 
-	results, err := c.FindResourcesWithFinalizer(context.Background(), "", "default", "finalizer", rts)
+	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "default", "finalizer", rts)
 	require.NoError(t, err)
 	assert.Len(t, results, 1)
 	assert.Equal(t, "cm-with-finalizer", results[0].Name)
@@ -1760,7 +1759,7 @@ func TestFindResourcesWithFinalizer_SkipsVirtualTypes(t *testing.T) {
 		{APIGroup: "_portforward", Resource: "portforwards"},
 	}
 
-	results, err := c.FindResourcesWithFinalizer(context.Background(), "", "", "test", rts)
+	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "", "test", rts)
 	require.NoError(t, err)
 	assert.Len(t, results, 0)
 }
@@ -1784,7 +1783,7 @@ func TestFindResourcesWithFinalizer_CaseInsensitive(t *testing.T) {
 		{APIGroup: "", APIVersion: "v1", Resource: "configmaps", Kind: "ConfigMap", Namespaced: true},
 	}
 
-	results, err := c.FindResourcesWithFinalizer(context.Background(), "", "default", "myfinalizer", rts)
+	results, err := c.FindResourcesWithFinalizer(t.Context(), "", "default", "myfinalizer", rts)
 	require.NoError(t, err)
 	assert.Len(t, results, 1)
 }
@@ -1817,7 +1816,7 @@ func TestRemoveFinalizerFromResource(t *testing.T) {
 		Matched:    "remove.this/finalizer",
 	}
 
-	err := c.RemoveFinalizerFromResource(context.Background(), "", match)
+	err := c.RemoveFinalizerFromResource(t.Context(), "", match)
 	require.NoError(t, err)
 }
 
@@ -1845,7 +1844,7 @@ func TestRemoveFinalizerFromResource_ClusterScoped(t *testing.T) {
 		Matched:    "kubernetes",
 	}
 
-	err := c.RemoveFinalizerFromResource(context.Background(), "", match)
+	err := c.RemoveFinalizerFromResource(t.Context(), "", match)
 	require.NoError(t, err)
 }
 
@@ -1913,7 +1912,7 @@ func TestGetResourceEvents(t *testing.T) {
 	dc := newFakeDynClient(event1, event2, event3)
 	c := newFakeClient(nil, dc)
 
-	events, err := c.GetResourceEvents(context.Background(), "", "default", "my-deploy", "Deployment")
+	events, err := c.GetResourceEvents(t.Context(), "", "default", "my-deploy", "Deployment")
 	require.NoError(t, err)
 	assert.Len(t, events, 2)
 	// Most recent first.
@@ -1926,7 +1925,7 @@ func TestGetResourceEvents_NoEvents(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	events, err := c.GetResourceEvents(context.Background(), "", "default", "my-deploy", "Deployment")
+	events, err := c.GetResourceEvents(t.Context(), "", "default", "my-deploy", "Deployment")
 	require.NoError(t, err)
 	assert.Empty(t, events)
 }
@@ -1954,7 +1953,7 @@ func TestGetResourceEvents_EventTimeAndCreationFallback(t *testing.T) {
 	dc := newFakeDynClient(ev)
 	c := newFakeClient(nil, dc)
 
-	events, err := c.GetResourceEvents(context.Background(), "", "default", "my-pod", "Pod")
+	events, err := c.GetResourceEvents(t.Context(), "", "default", "my-pod", "Pod")
 	require.NoError(t, err)
 	assert.Len(t, events, 1)
 	// Should use eventTime.
@@ -1983,7 +1982,7 @@ func TestGetResourceEvents_ReportingComponentFallback(t *testing.T) {
 	dc := newFakeDynClient(ev)
 	c := newFakeClient(nil, dc)
 
-	events, err := c.GetResourceEvents(context.Background(), "", "default", "my-pod", "Pod")
+	events, err := c.GetResourceEvents(t.Context(), "", "default", "my-pod", "Pod")
 	require.NoError(t, err)
 	assert.Len(t, events, 1)
 	assert.Equal(t, "kubelet", events[0].Source)
@@ -2027,7 +2026,7 @@ func TestGetPodsUsingPVC(t *testing.T) {
 	dc := newFakeDynClient(pod1, pod2)
 	c := newFakeClient(nil, dc)
 
-	names, err := c.GetPodsUsingPVC(context.Background(), "", "default", "my-pvc")
+	names, err := c.GetPodsUsingPVC(t.Context(), "", "default", "my-pvc")
 	require.NoError(t, err)
 	assert.Equal(t, []string{"pod-using-pvc"}, names)
 }
@@ -2036,7 +2035,7 @@ func TestGetPodsUsingPVC_NoPods(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	names, err := c.GetPodsUsingPVC(context.Background(), "", "default", "my-pvc")
+	names, err := c.GetPodsUsingPVC(t.Context(), "", "default", "my-pvc")
 	require.NoError(t, err)
 	assert.Empty(t, names)
 }
@@ -2084,7 +2083,7 @@ func TestGetOwnedResources_PersistentVolumeClaim(t *testing.T) {
 	dc := newFakeDynClient(mounting, unrelated)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "PersistentVolumeClaim", "target-pvc")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "PersistentVolumeClaim", "target-pvc")
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	assert.Equal(t, "mounter", items[0].Name)
@@ -2109,7 +2108,7 @@ func TestPatchLabels_Namespaced(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
-	err := c.PatchLabels(context.Background(), "", "default", "my-cm", gvr, map[string]any{
+	err := c.PatchLabels(t.Context(), "", "default", "my-cm", gvr, map[string]any{
 		"env": "prod",
 	})
 	require.NoError(t, err)
@@ -2129,7 +2128,7 @@ func TestPatchLabels_ClusterScoped(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
-	err := c.PatchLabels(context.Background(), "", "", "my-ns", gvr, map[string]any{
+	err := c.PatchLabels(t.Context(), "", "", "my-ns", gvr, map[string]any{
 		"env": "prod",
 	})
 	require.NoError(t, err)
@@ -2152,7 +2151,7 @@ func TestPatchAnnotations_Namespaced(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "configmaps"}
-	err := c.PatchAnnotations(context.Background(), "", "default", "my-cm", gvr, map[string]any{
+	err := c.PatchAnnotations(t.Context(), "", "default", "my-cm", gvr, map[string]any{
 		"note": "important",
 	})
 	require.NoError(t, err)
@@ -2172,7 +2171,7 @@ func TestPatchAnnotations_ClusterScoped(t *testing.T) {
 	c := newFakeClient(nil, dc)
 
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "namespaces"}
-	err := c.PatchAnnotations(context.Background(), "", "", "my-ns", gvr, map[string]any{
+	err := c.PatchAnnotations(t.Context(), "", "", "my-ns", gvr, map[string]any{
 		"note": "important",
 	})
 	require.NoError(t, err)
@@ -2208,7 +2207,7 @@ func TestGetNamespaceQuotas(t *testing.T) {
 	dc := newFakeDynClient(quota)
 	c := newFakeClient(nil, dc)
 
-	quotas, err := c.GetNamespaceQuotas(context.Background(), "", "default")
+	quotas, err := c.GetNamespaceQuotas(t.Context(), "", "default")
 	require.NoError(t, err)
 	assert.Len(t, quotas, 1)
 	assert.Equal(t, "my-quota", quotas[0].Name)
@@ -2243,7 +2242,7 @@ func TestGetNamespaceQuotas_NoStatus(t *testing.T) {
 	dc := newFakeDynClient(quota)
 	c := newFakeClient(nil, dc)
 
-	quotas, err := c.GetNamespaceQuotas(context.Background(), "", "default")
+	quotas, err := c.GetNamespaceQuotas(t.Context(), "", "default")
 	require.NoError(t, err)
 	assert.Len(t, quotas, 1)
 	assert.Len(t, quotas[0].Resources, 1)
@@ -2267,7 +2266,7 @@ func TestGetNamespaceQuotas_AllNamespaces(t *testing.T) {
 	dc := newFakeDynClient(quota)
 	c := newFakeClient(nil, dc)
 
-	quotas, err := c.GetNamespaceQuotas(context.Background(), "", "")
+	quotas, err := c.GetNamespaceQuotas(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Len(t, quotas, 1)
 }
@@ -2278,7 +2277,7 @@ func TestGetPodMetrics_NotAvailable(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	_, err := c.GetPodMetrics(context.Background(), "", "default", "my-pod")
+	_, err := c.GetPodMetrics(t.Context(), "", "default", "my-pod")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "metrics API unavailable")
 }
@@ -2316,7 +2315,7 @@ func TestGetPodsForService(t *testing.T) {
 	cs := k8sfake.NewClientset(svc, pod)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.getPodsForService(context.Background(), "", "default", "my-svc")
+	items, err := c.getPodsForService(t.Context(), "", "default", "my-svc")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, "web-pod", items[0].Name)
@@ -2332,7 +2331,7 @@ func TestGetPodsForService_NoSelector(t *testing.T) {
 	cs := k8sfake.NewClientset(svc)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.getPodsForService(context.Background(), "", "default", "headless")
+	items, err := c.getPodsForService(t.Context(), "", "default", "headless")
 	require.NoError(t, err)
 	assert.Nil(t, items)
 }
@@ -2370,7 +2369,7 @@ func TestBuildPodTree_WithEphemeralContainers(t *testing.T) {
 	c := newFakeClient(cs, dc)
 
 	root := &model.ResourceNode{Name: "my-pod", Kind: "Pod", Namespace: "default"}
-	err := c.buildPodTree(context.Background(), "", "default", "my-pod", root)
+	err := c.buildPodTree(t.Context(), "", "default", "my-pod", root)
 	require.NoError(t, err)
 
 	// Exactly 2 container children: app + debugger. AutomountServiceAccountToken=false suppresses the SA ref.
@@ -2409,7 +2408,7 @@ func TestBuildPodTree(t *testing.T) {
 	c := newFakeClient(cs, dc)
 
 	root := &model.ResourceNode{Name: "my-pod", Kind: "Pod", Namespace: "default"}
-	err := c.buildPodTree(context.Background(), "", "default", "my-pod", root)
+	err := c.buildPodTree(t.Context(), "", "default", "my-pod", root)
 	require.NoError(t, err)
 	assert.Equal(t, "Running", root.Status)
 	// init + app containers, plus the default ServiceAccount ref attached by appendPodRefs.
@@ -2453,7 +2452,7 @@ func TestBuildPodTree_RefsMissingAndPresent(t *testing.T) {
 	c := newFakeClient(cs, dc)
 
 	root := &model.ResourceNode{Name: "my-pod", Kind: "Pod", Namespace: "default"}
-	err := c.buildPodTree(context.Background(), "", "default", "my-pod", root)
+	err := c.buildPodTree(t.Context(), "", "default", "my-pod", root)
 	require.NoError(t, err)
 
 	byName := map[string]*model.ResourceNode{}
@@ -2538,7 +2537,7 @@ func TestGetResourceTree_DeploymentRefsMissingAndPresent(t *testing.T) {
 	dc := newFakeDynClient(deploy, rs, pod, presentSecret)
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "Deployment", "myapp")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "Deployment", "myapp")
 	require.NoError(t, err)
 	require.NotNil(t, root)
 
@@ -2610,7 +2609,7 @@ func TestGetHelmManagedResources(t *testing.T) {
 	cs := k8sfake.NewClientset(dep, svc)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.getHelmManagedResources(context.Background(), "", "default", "myapp")
+	items, err := c.getHelmManagedResources(t.Context(), "", "default", "myapp")
 	require.NoError(t, err)
 	assert.GreaterOrEqual(t, len(items), 2)
 }
@@ -2621,7 +2620,7 @@ func TestGetOwnedResources_DefaultReturnsNil(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "ConfigMap", "my-cm")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "ConfigMap", "my-cm")
 	require.NoError(t, err)
 	assert.Nil(t, items)
 }
@@ -2651,7 +2650,7 @@ func TestGetOwnedResources_CronJob(t *testing.T) {
 	dc := newFakeDynClient(job)
 	c := newFakeClient(nil, dc)
 
-	items, err := c.GetOwnedResources(context.Background(), "", "default", "CronJob", "my-cron")
+	items, err := c.GetOwnedResources(t.Context(), "", "default", "CronJob", "my-cron")
 	require.NoError(t, err)
 	assert.Len(t, items, 1)
 	assert.Equal(t, "my-cron-12345", items[0].Name)
@@ -2663,7 +2662,7 @@ func TestGetResourceTree_UnknownKind(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
 
-	root, err := c.GetResourceTree(context.Background(), "", "default", "ConfigMap", "my-cm")
+	root, err := c.GetResourceTree(t.Context(), "", "default", "ConfigMap", "my-cm")
 	require.NoError(t, err)
 	assert.Equal(t, "my-cm", root.Name)
 }

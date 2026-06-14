@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"errors"
 	"testing"
 
@@ -85,7 +84,7 @@ func TestSourceNameFromKind(t *testing.T) {
 func TestGetSecurityFindingsNilManager(t *testing.T) {
 	c := &Client{}
 	items, err := c.getSecurityFindings(
-		context.Background(),
+		t.Context(),
 		"kctx", "",
 		model.ResourceTypeEntry{Kind: "__security_trivy-operator__"},
 	)
@@ -98,7 +97,7 @@ func TestGetSecurityFindingsUnknownKind(t *testing.T) {
 	c := &Client{}
 	c.SetSecurityManager(mgr)
 	_, err := c.getSecurityFindings(
-		context.Background(),
+		t.Context(),
 		"kctx", "",
 		model.ResourceTypeEntry{Kind: "not-a-security-kind"},
 	)
@@ -138,7 +137,7 @@ func TestGetSecurityFindingsFiltersBySource(t *testing.T) {
 	c.SetSecurityManager(mgr)
 
 	items, err := c.getSecurityFindings(
-		context.Background(),
+		t.Context(),
 		"kctx", "",
 		model.ResourceTypeEntry{Kind: "__security_trivy-operator__"},
 	)
@@ -176,7 +175,7 @@ func TestGetSecurityFindingsSortsBySeverity(t *testing.T) {
 	c.SetSecurityManager(mgr)
 
 	items, err := c.getSecurityFindings(
-		context.Background(),
+		t.Context(),
 		"other-context", "",
 		model.ResourceTypeEntry{Kind: "__security_trivy-operator__"},
 	)
@@ -213,7 +212,7 @@ func TestGetResourcesDispatchesSecurityAPIGroup(t *testing.T) {
 		APIGroup: model.SecurityVirtualAPIGroup,
 		Resource: "findings-trivy-operator",
 	}
-	items, err := c.GetResources(context.Background(), "kctx", "", rt)
+	items, err := c.GetResources(t.Context(), "kctx", "", rt)
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 	assert.Equal(t, "__security_finding_group__", items[0].Kind)
@@ -247,7 +246,7 @@ func TestGetSecurityAffectedResources(t *testing.T) {
 	rt := model.ResourceTypeEntry{Kind: "__security_heuristic__"}
 
 	items, err := c.GetSecurityAffectedResources(
-		context.Background(), "kctx", "", rt, "privileged",
+		t.Context(), "kctx", "", rt, "privileged",
 	)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
@@ -277,7 +276,7 @@ func TestGetSecurityAffectedResourcesPropagatesSourceError(t *testing.T) {
 	rt := model.ResourceTypeEntry{Kind: "__security_heuristic__"}
 
 	items, err := c.GetSecurityAffectedResources(
-		context.Background(), "kctx", "", rt, "privileged",
+		t.Context(), "kctx", "", rt, "privileged",
 	)
 	require.Error(t, err)
 	assert.Nil(t, items)

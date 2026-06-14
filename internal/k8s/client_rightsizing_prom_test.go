@@ -163,7 +163,7 @@ func TestGetRightsizing_PrometheusMax1D(t *testing.T) {
 	// Explicit 1.2 headroom keeps the legacy expected values stable
 	// (the new picker default is 1.25, so without this the snap math
 	// would land on different canonical values).
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromMax1D, 1.2)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromMax1D, 1.2)
 	require.NoError(t, err)
 	assert.Equal(t, model.StrategyPromMax1D, out.Strategy)
 	assert.Equal(t, "1d-max", out.Source)
@@ -190,7 +190,7 @@ func TestGetRightsizing_PrometheusAvg1D(t *testing.T) {
 	}
 	c := newPromTestClient(t, pods, dep, stub)
 
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromAvg1D, 1.2)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromAvg1D, 1.2)
 	require.NoError(t, err)
 	assert.Equal(t, model.StrategyPromAvg1D, out.Strategy)
 	assert.Equal(t, "1d", out.Window)
@@ -212,7 +212,7 @@ func TestGetRightsizing_PrometheusP957D(t *testing.T) {
 	}
 	c := newPromTestClient(t, pods, dep, stub)
 
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromP957D, 1.2)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromP957D, 1.2)
 	require.NoError(t, err)
 	assert.Equal(t, model.StrategyPromP957D, out.Strategy)
 	assert.Equal(t, "7d", out.Window)
@@ -231,7 +231,7 @@ func TestGetRightsizing_PrometheusQueryFailureLeavesSuggestionEmpty(t *testing.T
 	}
 	c := newPromTestClient(t, pods, dep, stub)
 
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromMax1D, model.DefaultRightsizingHeadroom)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategyPromMax1D, model.DefaultRightsizingHeadroom)
 	require.NoError(t, err, "Prom failure must be soft — strategy still selected")
 	require.Len(t, out.Containers, 1)
 	assert.Empty(t, out.Containers[0].CPU.RecommendedRequest)

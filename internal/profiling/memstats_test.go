@@ -57,7 +57,7 @@ func TestLogFields_KeysValuesAndOrder(t *testing.T) {
 }
 
 func TestStartMemStatsLogger_EmitsBaselineThenStops(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 
 	var mu sync.Mutex
 	var count int

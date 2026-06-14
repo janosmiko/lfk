@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -70,7 +69,7 @@ func baseSecretModel(t *testing.T) Model {
 		execMu:              &sync.Mutex{},
 		client:              k8s.NewTestClient(cs, dyn),
 		namespace:           "default",
-		reqCtx:              context.Background(),
+		reqCtx:              t.Context(),
 		scheduler:           scheduler.New(scheduler.DefaultThreshold),
 	}
 	m.middleItems = []model.Item{

@@ -32,7 +32,7 @@ func TestManagerFetchAllCoalescesConcurrentCalls(t *testing.T) {
 	var wg sync.WaitGroup
 	for range n {
 		wg.Go(func() {
-			_, _ = m.FetchAll(context.Background(), "ctx", "")
+			_, _ = m.FetchAll(t.Context(), "ctx", "")
 		})
 	}
 	wg.Wait()
@@ -54,7 +54,7 @@ func TestManagerRegisterAndFetchAll(t *testing.T) {
 	m.Register(s1)
 	m.Register(s2)
 
-	res, err := m.FetchAll(context.Background(), "ctx", "")
+	res, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	assert.Len(t, res.Findings, 2)
 	assert.Empty(t, res.Errors)
@@ -70,7 +70,7 @@ func TestManagerFetchAllParallel(t *testing.T) {
 	m.Register(s2)
 
 	start := time.Now()
-	_, err := m.FetchAll(context.Background(), "ctx", "")
+	_, err := m.FetchAll(t.Context(), "ctx", "")
 	elapsed := time.Since(start)
 
 	require.NoError(t, err)
@@ -93,12 +93,12 @@ func TestManagerFetchAllWaiterRespectsContext(t *testing.T) {
 	})
 
 	// Kick off a scan that will be in flight for ~800ms.
-	go func() { _, _ = m.FetchAll(context.Background(), "ctx", "") }()
+	go func() { _, _ = m.FetchAll(t.Context(), "ctx", "") }()
 	time.Sleep(50 * time.Millisecond) // let the flight start
 
 	// A second caller for the same key with a short deadline must return when
 	// its own context expires, not block until the in-flight scan completes.
-	cctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
+	cctx, cancel := context.WithTimeout(t.Context(), 100*time.Millisecond)
 	defer cancel()
 	start := time.Now()
 	_, err := m.FetchAll(cctx, "ctx", "")
@@ -119,7 +119,7 @@ func TestManagerFetchAllPartialFailure(t *testing.T) {
 	m.Register(good)
 	m.Register(bad)
 
-	res, err := m.FetchAll(context.Background(), "ctx", "")
+	res, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err, "partial failures must not return error")
 	assert.Len(t, res.Findings, 1)
 	assert.Contains(t, res.Errors, "bad")
@@ -139,7 +139,7 @@ func TestManagerSkipsUnavailableSources(t *testing.T) {
 	m.Register(avail)
 	m.Register(gone)
 
-	res, err := m.FetchAll(context.Background(), "ctx", "")
+	res, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	assert.Len(t, res.Findings, 1)
 	assert.Equal(t, "ok", res.Findings[0].ID)
@@ -151,7 +151,7 @@ func TestManagerAnyAvailable(t *testing.T) {
 	m := NewManager()
 	m.Register(&FakeSource{NameStr: "a", Available: false})
 	m.Register(&FakeSource{NameStr: "b", Available: true})
-	ok, err := m.AnyAvailable(context.Background(), "ctx")
+	ok, err := m.AnyAvailable(t.Context(), "ctx")
 	require.NoError(t, err)
 	assert.True(t, ok)
 }
@@ -159,7 +159,7 @@ func TestManagerAnyAvailable(t *testing.T) {
 func TestManagerCancellation(t *testing.T) {
 	m := NewManager()
 	m.Register(&FakeSource{NameStr: "slow", Available: true, FetchDelay: 500 * time.Millisecond})
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel before call
 
 	start := time.Now()
@@ -176,7 +176,7 @@ func TestManagerAnyAvailableSkipsSourcesWithErrors(t *testing.T) {
 	m.Register(&FakeSource{NameStr: "broken", Available: false, AvailableErr: errors.New("probe failed")})
 	m.Register(&FakeSource{NameStr: "healthy", Available: true})
 
-	ok, err := m.AnyAvailable(context.Background(), "ctx")
+	ok, err := m.AnyAvailable(t.Context(), "ctx")
 	require.NoError(t, err)
 	assert.True(t, ok, "AnyAvailable must skip erroring sources and return true when another is healthy")
 }
@@ -190,9 +190,9 @@ func TestManagerCachedFetch(t *testing.T) {
 	}
 	m.Register(s)
 
-	_, err := m.FetchAll(context.Background(), "ctx", "")
+	_, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
-	_, err = m.FetchAll(context.Background(), "ctx", "")
+	_, err = m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), s.FetchCalls.Load(),
 		"second call within TTL should hit cache")
@@ -207,8 +207,8 @@ func TestManagerForceRefresh(t *testing.T) {
 	}
 	m.Register(s)
 
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
-	_, _ = m.Refresh(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
+	_, _ = m.Refresh(t.Context(), "ctx", "")
 	assert.Equal(t, int32(2), s.FetchCalls.Load(),
 		"Refresh must bypass the cache")
 }
@@ -222,8 +222,8 @@ func TestManagerInvalidateOnContextChange(t *testing.T) {
 	}
 	m.Register(s)
 
-	_, _ = m.FetchAll(context.Background(), "ctxA", "")
-	_, _ = m.FetchAll(context.Background(), "ctxB", "")
+	_, _ = m.FetchAll(t.Context(), "ctxA", "")
+	_, _ = m.FetchAll(t.Context(), "ctxB", "")
 	assert.Equal(t, int32(2), s.FetchCalls.Load(),
 		"different kubeCtx should bypass cache")
 }
@@ -234,8 +234,8 @@ func TestManagerAvailabilityCached(t *testing.T) {
 	s := &FakeSource{NameStr: "s", Available: true}
 	m.Register(s)
 
-	_, _ = m.AnyAvailable(context.Background(), "ctx")
-	_, _ = m.AnyAvailable(context.Background(), "ctx")
+	_, _ = m.AnyAvailable(t.Context(), "ctx")
+	_, _ = m.AnyAvailable(t.Context(), "ctx")
 	assert.Equal(t, int32(1), s.AvailCalls.Load(),
 		"availability should be cached within TTL")
 }
@@ -258,7 +258,7 @@ func TestFindingIndexCountsAndLookup(t *testing.T) {
 	}}
 	m.Register(s)
 
-	_, err := m.FetchAll(context.Background(), "ctx", "")
+	_, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 
 	idx := m.Index()
@@ -400,15 +400,15 @@ func TestManagerInvalidateClearsCache(t *testing.T) {
 	}
 	m.Register(s)
 
-	_, err := m.FetchAll(context.Background(), "ctx", "")
+	_, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), s.FetchCalls.Load())
 
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	assert.Equal(t, int32(1), s.FetchCalls.Load())
 
 	m.Invalidate()
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	assert.Equal(t, int32(2), s.FetchCalls.Load())
 }
 
@@ -425,7 +425,7 @@ func TestManagerInvalidateClearsIndex(t *testing.T) {
 		Findings: []Finding{{ID: "1", Source: "s", Severity: SeverityCritical, Resource: ref}},
 	})
 
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	require.Equal(t, 1, m.Index().For(ref).Total(), "index populated after FetchAll")
 
 	m.Invalidate()
@@ -445,11 +445,11 @@ func TestManagerCachesSuccessfulEmptyResults(t *testing.T) {
 	s := &FakeSource{NameStr: "s", Available: true} // zero findings on purpose
 	m.Register(s)
 
-	_, err := m.FetchAll(context.Background(), "ctx", "")
+	_, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	require.Equal(t, int32(1), s.FetchCalls.Load(), "first call hits the source")
 
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	assert.Equal(t, int32(1), s.FetchCalls.Load(), "second call must hit the cache, not the source")
 }
 
@@ -467,17 +467,17 @@ func TestManagerNegativeCacheOnAllErroredFetch(t *testing.T) {
 	bad := &FakeSource{NameStr: "bad", Available: true, FetchErr: errors.New("boom")}
 	m.Register(bad)
 
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	require.Equal(t, int32(1), bad.FetchCalls.Load())
 
 	// Within the error TTL, the result is served from cache.
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	assert.Equal(t, int32(1), bad.FetchCalls.Load(),
 		"all-errored fetch within errorTTL must hit the negative cache")
 
 	// After the error TTL, the next call re-fires.
 	time.Sleep(60 * time.Millisecond)
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	assert.Equal(t, int32(2), bad.FetchCalls.Load(),
 		"after errorTTL elapses the source must be re-probed")
 }
@@ -505,7 +505,7 @@ func TestManagerSetAvailabilityHintSkipsIsAvailableProbe(t *testing.T) {
 		"kubescape": false, // hint says NOT available — skip Fetch entirely
 	})
 
-	res, err := m.FetchAll(context.Background(), "ctx", "")
+	res, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	assert.Len(t, res.Findings, 1, "only available source's findings show")
 	assert.Equal(t, int32(0), available.AvailCalls.Load(),
@@ -537,7 +537,7 @@ func TestManagerFetchAllRespectsConcurrencyCap(t *testing.T) {
 	}
 
 	start := time.Now()
-	res, err := m.FetchAll(context.Background(), "ctx", "")
+	res, err := m.FetchAll(t.Context(), "ctx", "")
 	elapsed := time.Since(start)
 	require.NoError(t, err)
 	assert.Len(t, res.Sources, sourceCount, "every source must produce a status")
@@ -567,7 +567,7 @@ func TestManagerFetchAllUnboundedConcurrency(t *testing.T) {
 	}
 
 	start := time.Now()
-	_, err := m.FetchAll(context.Background(), "ctx", "")
+	_, err := m.FetchAll(t.Context(), "ctx", "")
 	elapsed := time.Since(start)
 	require.NoError(t, err)
 	// Fully parallel: elapsed ≈ delay + scheduler overhead.
@@ -586,7 +586,7 @@ func TestManagerFetchAllFallsBackToProbeWhenNoHint(t *testing.T) {
 	}
 	m.Register(s)
 
-	_, err := m.FetchAll(context.Background(), "ctx", "")
+	_, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	assert.Equal(t, int32(1), s.AvailCalls.Load(),
 		"no hint → IsAvailable must run as before")
@@ -604,7 +604,7 @@ func TestManagerUnavailableSourceReportsAvailableFalse(t *testing.T) {
 	notInstalled := &FakeSource{NameStr: "trivy", Available: false}
 	m.Register(notInstalled)
 
-	res, err := m.FetchAll(context.Background(), "ctx", "")
+	res, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	require.Len(t, res.Sources, 1)
 	assert.False(t, res.Sources[0].Available,
@@ -622,11 +622,11 @@ func TestManagerErroringSourceUsesNegativeCache(t *testing.T) {
 	bad := &FakeSource{NameStr: "s", Available: true, FetchErr: errors.New("boom")}
 	m.Register(bad)
 
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	require.Equal(t, int32(1), bad.FetchCalls.Load())
 
 	time.Sleep(60 * time.Millisecond)
-	_, _ = m.FetchAll(context.Background(), "ctx", "")
+	_, _ = m.FetchAll(t.Context(), "ctx", "")
 	assert.Equal(t, int32(2), bad.FetchCalls.Load(),
 		"errored source must re-fire after errorTTL")
 }
@@ -648,12 +648,12 @@ func TestManagerIgnoredNamespacesFilterDoesNotAliasCachedSlice(t *testing.T) {
 	}
 	m.Register(s)
 
-	res, err := m.FetchAll(context.Background(), "ctx", "")
+	res, err := m.FetchAll(t.Context(), "ctx", "")
 	require.NoError(t, err)
 	require.Len(t, res.Findings, 1)
 	// Mutating the returned slice must not corrupt the cached one.
 	res.Findings = append(res.Findings, Finding{ID: "tamper"})
-	cached, _ := m.FetchAll(context.Background(), "ctx", "")
+	cached, _ := m.FetchAll(t.Context(), "ctx", "")
 	require.Len(t, cached.Findings, 1, "cache must be insulated from caller mutation")
 	assert.NotEqual(t, "tamper", cached.Findings[0].ID)
 }

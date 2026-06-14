@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -43,7 +42,7 @@ func TestGetRightsizing_PodCurrentSpecExtracted(t *testing.T) {
 	}
 	cs := fake.NewSimpleClientset(pod)
 	c := NewTestClient(cs, nil)
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Pod", "pod-a", model.StrategySnapshot, model.DefaultRightsizingHeadroom)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Pod", "pod-a", model.StrategySnapshot, model.DefaultRightsizingHeadroom)
 	assert.NoError(t, err)
 	assert.NotNil(t, out)
 	assert.Equal(t, "snapshot", out.Source, "snapshot strategy yields snapshot label")
@@ -63,7 +62,7 @@ func TestGetRightsizing_PodCurrentSpecExtracted(t *testing.T) {
 func TestGetRightsizing_UnsupportedKindErrors(t *testing.T) {
 	cs := fake.NewSimpleClientset()
 	c := NewTestClient(cs, nil)
-	_, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "ConfigMap", "x", model.StrategySnapshot, model.DefaultRightsizingHeadroom)
+	_, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "ConfigMap", "x", model.StrategySnapshot, model.DefaultRightsizingHeadroom)
 	assert.Error(t, err, "kinds outside in-scope set must error")
 }
 
@@ -144,7 +143,7 @@ func TestGetRightsizing_VPAMatchesPopulatesRecommendations(t *testing.T) {
 	// headroom = 1.0 keeps the VPA target verbatim so the existing
 	// expected values (60m, 300m, 200Mi, 400Mi) still hold. The non-1.0
 	// case is covered by TestGetRightsizing_VPAHeadroomMultipliesTarget.
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Pod", "frontend-aaa", model.StrategyVPA, 1.0)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Pod", "frontend-aaa", model.StrategyVPA, 1.0)
 	assert.NoError(t, err)
 	assert.Equal(t, "VPA", out.Source)
 	assert.Equal(t, model.StrategyVPA, out.Strategy)
@@ -187,7 +186,7 @@ func TestGetRightsizing_VPATargetMismatchFallsThrough(t *testing.T) {
 	// VPA dispatch (no recommendations layered) and falls through to the
 	// metrics-server "live Usage" reading. Source label reflects the
 	// requested strategy because it didn't escalate to a different one.
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Pod", "frontend-aaa", model.StrategyVPA, model.DefaultRightsizingHeadroom)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Pod", "frontend-aaa", model.StrategyVPA, model.DefaultRightsizingHeadroom)
 	assert.NoError(t, err)
 	assert.Equal(t, model.StrategyVPA, out.Strategy, "requested strategy is preserved")
 }
@@ -255,7 +254,7 @@ func TestGetRightsizing_MetricsFallbackMaxAggregation(t *testing.T) {
 	// Explicit 1.2 headroom keeps the legacy expected values stable
 	// (the new picker default is 1.25, so without this the snap math
 	// would land on different canonical values).
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Deployment", "frontend", model.StrategySnapshot, 1.2)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategySnapshot, 1.2)
 	assert.NoError(t, err)
 	assert.Equal(t, "snapshot", out.Source)
 	assert.Equal(t, model.StrategySnapshot, out.Strategy)
@@ -314,7 +313,7 @@ func TestGetRightsizing_MetricsWindowPlumbedThrough(t *testing.T) {
 	}
 	c := NewTestClient(cs, dyn)
 
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Deployment", "frontend", model.StrategySnapshot, model.DefaultRightsizingHeadroom)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategySnapshot, model.DefaultRightsizingHeadroom)
 	assert.NoError(t, err)
 	assert.Equal(t, "30s", out.Window, "metrics-server PodMetrics 'window' field should be plumbed to model.Rightsizing.Window")
 }
@@ -368,7 +367,7 @@ func TestGetRightsizing_HeadroomZeroDefaults(t *testing.T) {
 	}
 	c := NewTestClient(cs, dyn)
 
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Deployment", "frontend", model.StrategySnapshot, 0)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategySnapshot, 0)
 	assert.NoError(t, err)
 	require.Len(t, out.Containers, 1)
 	// 80m * 1.25 = 100m → snap up to 100m. (1.25 is the default headroom
@@ -420,7 +419,7 @@ func TestGetRightsizing_HeadroomCustomMultiplier(t *testing.T) {
 	}
 	c := NewTestClient(cs, dyn)
 
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Deployment", "frontend", model.StrategySnapshot, 1.5)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Deployment", "frontend", model.StrategySnapshot, 1.5)
 	assert.NoError(t, err)
 	require.Len(t, out.Containers, 1)
 	// 80m * 1.5 = 120m → snap up to 120m
@@ -466,7 +465,7 @@ func TestGetRightsizing_VPAHeadroomMultipliesTarget(t *testing.T) {
 	c := NewTestClient(cs, dyn)
 
 	// At headroom 1.5: cpu 60m × 1.5 = 90m; memory 200Mi × 1.5 = 300Mi
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Pod", "frontend-aaa", model.StrategyVPA, 1.5)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Pod", "frontend-aaa", model.StrategyVPA, 1.5)
 	assert.NoError(t, err)
 	require.Len(t, out.Containers, 1)
 	assert.Equal(t, "90m", out.Containers[0].CPU.RecommendedRequest, "VPA target × 1.5 headroom")
@@ -503,7 +502,7 @@ func TestGetRightsizing_VPAHeadroom1RawTarget(t *testing.T) {
 	}))
 	c := NewTestClient(cs, dyn)
 
-	out, err := c.GetRightsizing(context.Background(), "test-ctx", "default", "Pod", "frontend-aaa", model.StrategyVPA, 1.0)
+	out, err := c.GetRightsizing(t.Context(), "test-ctx", "default", "Pod", "frontend-aaa", model.StrategyVPA, 1.0)
 	assert.NoError(t, err)
 	assert.Equal(t, "60m", out.Containers[0].CPU.RecommendedRequest, "headroom 1.0 returns raw VPA target")
 }
@@ -586,7 +585,7 @@ func TestAvailableRightsizingStrategies(t *testing.T) {
 			}, tc.vpaObj)
 			c := NewTestClient(cs, dyn)
 
-			got := c.AvailableRightsizingStrategies(context.Background(), "test-ctx", "default", "Pod", "frontend-aaa")
+			got := c.AvailableRightsizingStrategies(t.Context(), "test-ctx", "default", "Pod", "frontend-aaa")
 			assert.Equal(t, tc.want, got, tc.comment)
 		})
 	}

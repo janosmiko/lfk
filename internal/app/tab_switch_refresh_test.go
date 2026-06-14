@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -223,7 +222,7 @@ func newTabSwitchTestModel(t *testing.T, level model.Level) Model {
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
 		scheduler:           scheduler.New(0),
-		reqCtx:              context.Background(),
+		reqCtx:              t.Context(),
 		mode:                modeExplorer,
 	}
 	m.scheduler.StartWorkers()

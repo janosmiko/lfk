@@ -1,7 +1,6 @@
 package advisor
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -99,16 +98,16 @@ func TestSourceMetadata(t *testing.T) {
 	s := NewWithClient(fake.NewSimpleClientset())
 	assert.Equal(t, "advisor", s.Name())
 	assert.Equal(t, []security.Category{security.CategoryReliability}, s.Categories())
-	ok, err := s.IsAvailable(context.Background(), "")
+	ok, err := s.IsAvailable(t.Context(), "")
 	require.NoError(t, err)
 	assert.True(t, ok)
 
 	none := New()
-	ok, err = none.IsAvailable(context.Background(), "")
+	ok, err = none.IsAvailable(t.Context(), "")
 	require.NoError(t, err)
 	assert.False(t, ok)
 
-	findings, err := none.Fetch(context.Background(), "", "")
+	findings, err := none.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Empty(t, findings)
 }
@@ -122,7 +121,7 @@ func TestFetchNamespaceChecks(t *testing.T) {
 		&corev1.LimitRange{ObjectMeta: metav1.ObjectMeta{Namespace: "guarded", Name: "lr"}},
 	)
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	got := checksFor(t, findings)
 
@@ -145,7 +144,7 @@ func TestFetchWorkloadChecks(t *testing.T) {
 		deployment("kube-system", "coredns", 1, nil, corev1.Container{Name: "c"}),
 	)
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	got := checksFor(t, findings)
 
@@ -163,7 +162,7 @@ func TestFetchProbeAndRequestChecks(t *testing.T) {
 		deployment("prod", "lax", 1, nil, bare, hardened("good")),
 	)
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 
 	var probeSummary, reqSummary string
@@ -193,7 +192,7 @@ func TestFetchPDBBlocksDrain(t *testing.T) {
 		pdb("healthy", web, new(intstr.FromInt32(1)), nil),
 	)
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	got := checksFor(t, findings)
 
@@ -233,7 +232,7 @@ func TestFetchHPAChecks(t *testing.T) {
 		hpa("hpa-withreq", "withreq"),
 	)
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	got := checksFor(t, findings)
 
@@ -264,7 +263,7 @@ func TestFetchBestEffortRBAC(t *testing.T) {
 	forbid("horizontalpodautoscalers")
 
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	got := checksFor(t, findings)
 
@@ -285,7 +284,7 @@ func TestFetchNilReplicasDefaultsToOne(t *testing.T) {
 	dep.Spec.Replicas = nil
 	client := fake.NewSimpleClientset(dep)
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	got := checksFor(t, findings)
 	assert.True(t, got["prod/Deployment/implicit"]["single_replica"])
@@ -297,7 +296,7 @@ func TestFetchNamespaceFilter(t *testing.T) {
 		deployment("staging", "b", 1, nil, hardened("c")),
 	)
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "prod")
+	findings, err := s.Fetch(t.Context(), "", "prod")
 	require.NoError(t, err)
 	for _, f := range findings {
 		assert.Equal(t, "prod", f.Resource.Namespace)

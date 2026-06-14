@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"errors"
 	"testing"
 	"time"
@@ -26,7 +25,7 @@ func TestDetectOrphans_EmptyCluster(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 
 	require.NoError(t, err)
 	assert.Empty(t, report.Pods)
@@ -64,7 +63,7 @@ func TestDetectOrphans_PodNoOwner(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(objs...)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 
 	require.NoError(t, err)
 	require.Len(t, report.Pods, 2)
@@ -108,7 +107,7 @@ func TestDetectOrphans_SecretExclusions(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(objs...)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 
 	require.NoError(t, err)
 	require.Len(t, report.Secrets, 1, "expected only old-tls-cert to be flagged")
@@ -140,7 +139,7 @@ func TestDetectOrphans_ConfigMapExclusions(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(objs...)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 
 	require.NoError(t, err)
 	require.Len(t, report.ConfigMaps, 1)
@@ -239,7 +238,7 @@ func TestDetectOrphans_ServiceNoEndpoints(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(objs...)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 
 	require.NoError(t, err)
 	require.Len(t, report.Services, 1)
@@ -325,7 +324,7 @@ func TestDetectOrphans_WorkloadTemplatesPreventFalsePositives(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(objs...)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 
 	require.NoError(t, err)
 
@@ -420,7 +419,7 @@ func TestDetectOrphans_PVC(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(objs...)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 
 	require.NoError(t, err)
 	require.Len(t, report.PVCs, 3, "live-data and owned-by-sts should be excluded")
@@ -463,7 +462,7 @@ func TestDetectOrphans_HPA(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(deployment, live, stale)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 	require.NoError(t, err)
 	require.Len(t, report.HPAs, 1)
 	assert.Equal(t, "ghost-hpa", report.HPAs[0].Name)
@@ -511,7 +510,7 @@ func TestDetectOrphans_PDB_NetPolSelector(t *testing.T) {
 	cs := k8sfake.NewSimpleClientset(cronJob, pdbMatches, pdbStale, netpolStale)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 	require.NoError(t, err)
 
 	// matches-cron should NOT be orphan (CronJob template label matches).
@@ -561,7 +560,7 @@ func TestDetectOrphans_RBAC(t *testing.T) {
 	)
 	c := newFakeClient(cs, nil)
 
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 	require.NoError(t, err)
 
 	roleNames := orphanNames(report.Roles)
@@ -598,7 +597,7 @@ func TestDetectOrphans_PartialDenial(t *testing.T) {
 	})
 
 	c := newFakeClient(cs, nil)
-	report, err := c.DetectOrphans(context.Background(), "", "")
+	report, err := c.DetectOrphans(t.Context(), "", "")
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "ingresses")

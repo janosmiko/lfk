@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -20,7 +19,7 @@ func TestGetPodOS_SpecOSName(t *testing.T) {
 	}
 	c := newFakeClient(k8sfake.NewClientset(pod), nil)
 
-	got, err := c.GetPodOS(context.Background(), "ctx", "default", "win-pod")
+	got, err := c.GetPodOS(t.Context(), "ctx", "default", "win-pod")
 	require.NoError(t, err)
 	assert.Equal(t, "windows", got)
 }
@@ -33,7 +32,7 @@ func TestGetPodOS_NodeSelectorFallback(t *testing.T) {
 	}
 	c := newFakeClient(k8sfake.NewClientset(pod), nil)
 
-	got, err := c.GetPodOS(context.Background(), "ctx", "default", "win-pod")
+	got, err := c.GetPodOS(t.Context(), "ctx", "default", "win-pod")
 	require.NoError(t, err)
 	assert.Equal(t, "windows", got)
 }
@@ -46,7 +45,7 @@ func TestGetPodOS_Linux(t *testing.T) {
 	}
 	c := newFakeClient(k8sfake.NewClientset(pod), nil)
 
-	got, err := c.GetPodOS(context.Background(), "ctx", "default", "linux-pod")
+	got, err := c.GetPodOS(t.Context(), "ctx", "default", "linux-pod")
 	require.NoError(t, err)
 	assert.Equal(t, "linux", got)
 }
@@ -59,13 +58,13 @@ func TestGetPodOS_Unknown(t *testing.T) {
 	}
 	c := newFakeClient(k8sfake.NewClientset(pod), nil)
 
-	got, err := c.GetPodOS(context.Background(), "ctx", "default", "plain-pod")
+	got, err := c.GetPodOS(t.Context(), "ctx", "default", "plain-pod")
 	require.NoError(t, err)
 	assert.Empty(t, got)
 }
 
 func TestGetPodOS_NotFound(t *testing.T) {
 	c := newFakeClient(k8sfake.NewClientset(), nil)
-	_, err := c.GetPodOS(context.Background(), "ctx", "default", "missing")
+	_, err := c.GetPodOS(t.Context(), "ctx", "default", "missing")
 	assert.Error(t, err)
 }

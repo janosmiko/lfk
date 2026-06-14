@@ -29,6 +29,7 @@ linters:
     - unconvert
     - unparam
     - unused
+    - usetesting
   settings:
     gocyclo:
       min-complexity: 30
@@ -46,6 +47,12 @@ linters:
             - max: 800
               skipComments: false
               skipBlankLines: false
+    usetesting:
+      # Prefer t.Context() over context.Background()/context.TODO() in tests
+      # (Go 1.24+). Only flagged where a *testing.T is in scope; helpers
+      # without a t keep context.Background().
+      context-background: true
+      context-todo: true
   exclusions:
     paths:
       - vendor

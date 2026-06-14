@@ -1,7 +1,6 @@
 package trivyop
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -35,7 +34,7 @@ func TestSourceMetadata(t *testing.T) {
 
 func TestIsAvailableNilClient(t *testing.T) {
 	s := New()
-	ok, err := s.IsAvailable(context.Background(), "")
+	ok, err := s.IsAvailable(t.Context(), "")
 	require.NoError(t, err)
 	assert.False(t, ok)
 }
@@ -43,7 +42,7 @@ func TestIsAvailableNilClient(t *testing.T) {
 func TestIsAvailableCRDReachable(t *testing.T) {
 	client := newFakeDyn()
 	s := NewWithDynamic(client)
-	ok, err := s.IsAvailable(context.Background(), "")
+	ok, err := s.IsAvailable(t.Context(), "")
 	require.NoError(t, err)
 	assert.True(t, ok, "empty list still means the CRD is served")
 }
@@ -205,7 +204,7 @@ func TestFetchAggregatesBothCRDs(t *testing.T) {
 
 	client := newFakeDyn(vuln, audit)
 	s := NewWithDynamic(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Len(t, findings, 2)
 
@@ -248,7 +247,7 @@ func TestFetchNamespaceFilter(t *testing.T) {
 
 	client := newFakeDyn(make("prod", "a"), make("staging", "b"))
 	s := NewWithDynamic(client)
-	findings, err := s.Fetch(context.Background(), "", "prod")
+	findings, err := s.Fetch(t.Context(), "", "prod")
 	require.NoError(t, err)
 	assert.Len(t, findings, 1)
 	assert.Equal(t, "prod", findings[0].Resource.Namespace)
@@ -256,7 +255,7 @@ func TestFetchNamespaceFilter(t *testing.T) {
 
 func TestFetchNilClient(t *testing.T) {
 	s := New()
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Empty(t, findings)
 }

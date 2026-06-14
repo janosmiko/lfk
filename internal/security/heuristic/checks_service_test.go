@@ -1,7 +1,6 @@
 package heuristic
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -32,7 +31,7 @@ func TestSourceFetchServiceExternalIPs(t *testing.T) {
 	)
 	s := NewWithClient(client)
 	s.SetIgnoredNamespaces([]string{"ignored-ns"})
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 
 	byName := map[string]security.Finding{}
@@ -66,7 +65,7 @@ func TestSourceFetchServiceListBestEffort(t *testing.T) {
 	})
 
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	var privileged bool
 	for _, f := range findings {

@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -64,7 +63,7 @@ func webRefs() []security.ResourceRef {
 func TestGetSecurityFindingsForResource_FiltersByRefsAcrossSources(t *testing.T) {
 	c, _ := resourceFindingsClient()
 
-	items, err := c.GetSecurityFindingsForResource(context.Background(), "kctx", "", webRefs())
+	items, err := c.GetSecurityFindingsForResource(t.Context(), "kctx", "", webRefs())
 	require.NoError(t, err)
 	require.Len(t, items, 2, "only groups touching pod/web or deploy/web-deploy survive")
 
@@ -87,7 +86,7 @@ func TestGetSecurityFindingsForResource_FiltersByRefsAcrossSources(t *testing.T)
 func TestGetSecurityFindingsForResource_NoMatchingRefs(t *testing.T) {
 	c, _ := resourceFindingsClient()
 
-	items, err := c.GetSecurityFindingsForResource(context.Background(), "kctx", "",
+	items, err := c.GetSecurityFindingsForResource(t.Context(), "kctx", "",
 		[]security.ResourceRef{{Namespace: "ns", Kind: "Pod", Name: "absent"}})
 	require.NoError(t, err)
 	assert.Empty(t, items)
@@ -97,14 +96,14 @@ func TestGetSecurityFindingsForResource_AppliesIgnorePolicy(t *testing.T) {
 	c, _ := resourceFindingsClient()
 	c.SetIgnoreChecker(stubIgnoreChecker{groups: map[string]bool{"privileged": true}})
 
-	items, err := c.GetSecurityFindingsForResource(context.Background(), "kctx", "", webRefs())
+	items, err := c.GetSecurityFindingsForResource(t.Context(), "kctx", "", webRefs())
 	require.NoError(t, err)
 	require.Len(t, items, 1, "ignored group is hidden")
 	assert.Equal(t, "CVE-2024-1", items[0].Name)
 
 	// Show-ignored mode reveals the group tagged __ignored__.
 	c.SetShowIgnored(true)
-	items, err = c.GetSecurityFindingsForResource(context.Background(), "kctx", "", webRefs())
+	items, err = c.GetSecurityFindingsForResource(t.Context(), "kctx", "", webRefs())
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 	assert.Equal(t, "true", items[1].ColumnValue("__ignored__"))
@@ -120,7 +119,7 @@ func TestGetSecurityFindingsForResourceCached_ColdThenWarm(t *testing.T) {
 	assert.Nil(t, items)
 
 	// Warm the shared scan, then the cached getter serves synchronously.
-	_, err = mgr.FetchAll(context.Background(), "kctx", "")
+	_, err = mgr.FetchAll(t.Context(), "kctx", "")
 	require.NoError(t, err)
 	items, ok, err = c.GetSecurityFindingsForResourceCached("kctx", "", webRefs())
 	require.NoError(t, err)
@@ -130,7 +129,7 @@ func TestGetSecurityFindingsForResourceCached_ColdThenWarm(t *testing.T) {
 
 func TestGetSecurityFindingsForResource_NilManager(t *testing.T) {
 	c := &Client{}
-	items, err := c.GetSecurityFindingsForResource(context.Background(), "kctx", "", webRefs())
+	items, err := c.GetSecurityFindingsForResource(t.Context(), "kctx", "", webRefs())
 	require.NoError(t, err)
 	assert.Nil(t, items)
 
