@@ -1478,6 +1478,7 @@ func TestCov80LoadMetricsAtLevelOwned(t *testing.T) {
 
 func TestCov80SaveLabelDataWithSelection(t *testing.T) {
 	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
 	m.labelData = &model.LabelAnnotationData{
 		Labels:      map[string]string{"env": "prod"},
 		Annotations: map[string]string{"note": "test"},
@@ -1486,7 +1487,7 @@ func TestCov80SaveLabelDataWithSelection(t *testing.T) {
 	m.setCursor(0)
 	cmd := m.saveLabelData()
 	require.NotNil(t, cmd)
-	msg := cmd()
+	msg := execScheduled(t, m, cmd)
 	_, ok := msg.(labelSavedMsg)
 	assert.True(t, ok)
 }

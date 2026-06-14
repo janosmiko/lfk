@@ -55,10 +55,16 @@ func (m Model) saveSecretData() tea.Cmd {
 	maps.Copy(data, m.secretData.Data)
 	client := m.client
 
-	return func() tea.Msg {
-		err := client.UpdateSecretData(ctx, ns, name, data)
-		return secretSavedMsg{err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindMutation,
+		"Save secret: "+name,
+		bgtaskTarget(ctx, ns),
+		func(_ context.Context) tea.Msg {
+			err := client.UpdateSecretData(ctx, ns, name, data)
+			return secretSavedMsg{err: err}
+		},
+	)
 }
 
 // loadConfigMapData fetches configmap data for the configmap editor.
@@ -108,10 +114,16 @@ func (m Model) saveConfigMapData() tea.Cmd {
 	maps.Copy(data, m.configMapData.Data)
 	client := m.client
 
-	return func() tea.Msg {
-		err := client.UpdateConfigMapData(ctx, ns, name, data)
-		return configMapSavedMsg{err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindMutation,
+		"Save configmap: "+name,
+		bgtaskTarget(ctx, ns),
+		func(_ context.Context) tea.Msg {
+			err := client.UpdateConfigMapData(ctx, ns, name, data)
+			return configMapSavedMsg{err: err}
+		},
+	)
 }
 
 // loadLabelData fetches labels and annotations for the selected resource.
@@ -163,8 +175,14 @@ func (m Model) saveLabelData() tea.Cmd {
 	maps.Copy(annotations, m.labelData.Annotations)
 	client := m.client
 
-	return func() tea.Msg {
-		err := client.UpdateLabelAnnotationData(context.Background(), kctx, rt, ns, name, labels, annotations)
-		return labelSavedMsg{err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityCritical,
+		scheduler.KindMutation,
+		"Save labels: "+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			err := client.UpdateLabelAnnotationData(ctx, kctx, rt, ns, name, labels, annotations)
+			return labelSavedMsg{err: err}
+		},
+	)
 }

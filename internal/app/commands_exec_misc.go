@@ -23,7 +23,7 @@ func (m Model) deleteResource() tea.Cmd {
 	rt := m.actionCtx.resourceType
 	name := m.actionCtx.name
 	logger.Info("Deleting resource", "resource", rt.Resource, "name", name, "namespace", ns, "context", ctx)
-	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, fmt.Sprintf("Delete %s/%s", rt.Resource, name), bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.DeleteResource(ctx, ns, rt, name)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -138,7 +138,7 @@ func (m Model) resizePVC(newSize string) tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logger.Info("Resizing PVC", "name", name, "newSize", newSize, "namespace", ns, "context", ctx)
-	return m.trackBgTask(scheduler.KindMutation, "Resize PVC: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resize PVC: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.ResizePVC(ctx, ns, name, newSize)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -153,7 +153,7 @@ func (m Model) scaleResource(replicas int32) tea.Cmd {
 	name := m.actionCtx.name
 	kind := m.actionCtx.kind
 	logger.Info("Scaling resource", "kind", kind, "name", name, "replicas", replicas, "namespace", ns, "context", ctx)
-	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Scale %s/%s → %d", kind, name, replicas), bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, fmt.Sprintf("Scale %s/%s → %d", kind, name, replicas), bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.ScaleResource(ctx, ns, name, kind, replicas)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -183,8 +183,8 @@ func (m Model) rollbackDeployment(revision int64) tea.Cmd {
 	name := m.actionCtx.name
 	client := m.client
 
-	return m.trackBgTask(scheduler.KindMutation, fmt.Sprintf("Rollback Deployment: %s@%d", name, revision), bgtaskTarget(kctx, ns), func() tea.Msg {
-		err := client.RollbackDeployment(context.Background(), kctx, ns, name, revision)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, fmt.Sprintf("Rollback Deployment: %s@%d", name, revision), bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		err := client.RollbackDeployment(ctx, kctx, ns, name, revision)
 		return rollbackDoneMsg{err: err}
 	})
 }
@@ -251,8 +251,8 @@ func (m Model) triggerCronJob() tea.Cmd {
 	kctx := m.actionCtx.context
 	client := m.client
 
-	return m.trackBgTask(scheduler.KindMutation, "Trigger CronJob: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
-		jobName, err := client.TriggerCronJob(context.Background(), kctx, ns, name)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Trigger CronJob: "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		jobName, err := client.TriggerCronJob(ctx, kctx, ns, name)
 		return triggerCronJobMsg{jobName: jobName, err: err}
 	})
 }

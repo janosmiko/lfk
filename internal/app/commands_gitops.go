@@ -28,7 +28,7 @@ func (m Model) syncArgoApp(applyOnly bool) tea.Cmd {
 	if applyOnly {
 		label = "Sync ArgoApp (apply only)"
 	}
-	return m.trackBgTask(scheduler.KindMutation, label+": "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, label+": "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.SyncArgoApp(ctx, ns, name, applyOnly)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -46,7 +46,7 @@ func (m Model) refreshArgoApp() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("ArgoCD app refresh requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Refresh ArgoApp: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Refresh ArgoApp: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.RefreshArgoApp(ctx, ns, name)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -60,7 +60,7 @@ func (m Model) refreshArgoAppSet() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("ArgoCD ApplicationSet refresh requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Refresh ApplicationSet: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Refresh ApplicationSet: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.RefreshArgoAppSet(ctx, ns, name)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -81,7 +81,7 @@ func (m Model) reconcileFluxResource() tea.Cmd {
 		Resource: rt.Resource,
 	}
 	logGitOps("Flux reconcile requested", ctx, ns, name, "kind", rt.Kind)
-	return m.trackBgTask(scheduler.KindMutation, "Reconcile Flux: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Reconcile Flux: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.ReconcileFluxResource(ctx, ns, name, gvr)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -102,7 +102,7 @@ func (m Model) suspendFluxResource() tea.Cmd {
 		Resource: rt.Resource,
 	}
 	logGitOps("Flux suspend requested", ctx, ns, name, "kind", rt.Kind)
-	return m.trackBgTask(scheduler.KindMutation, "Suspend Flux: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Suspend Flux: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.SuspendFluxResource(ctx, ns, name, gvr)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -123,7 +123,7 @@ func (m Model) resumeFluxResource() tea.Cmd {
 		Resource: rt.Resource,
 	}
 	logGitOps("Flux resume requested", ctx, ns, name, "kind", rt.Kind)
-	return m.trackBgTask(scheduler.KindMutation, "Resume Flux: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resume Flux: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.ResumeFluxResource(ctx, ns, name, gvr)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -139,7 +139,7 @@ func (m Model) forceRenewCertificate() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("cert-manager Certificate renewal requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Renew certificate: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Renew certificate: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		if err := m.client.ForceRenewCertificate(ctx, ns, name); err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -154,7 +154,7 @@ func (m Model) suspendArgoWorkflow() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("Argo Workflow suspend requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Suspend workflow: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Suspend workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		if err := m.client.SuspendArgoWorkflow(ctx, ns, name); err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -167,7 +167,7 @@ func (m Model) resumeArgoWorkflow() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("Argo Workflow resume requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Resume workflow: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resume workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		if err := m.client.ResumeArgoWorkflow(ctx, ns, name); err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -180,7 +180,7 @@ func (m Model) stopArgoWorkflow() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("Argo Workflow stop requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Stop workflow: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Stop workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		if err := m.client.StopArgoWorkflow(ctx, ns, name); err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -193,7 +193,7 @@ func (m Model) terminateArgoWorkflow() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("Argo Workflow terminate requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Terminate workflow: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Terminate workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		if err := m.client.TerminateArgoWorkflow(ctx, ns, name); err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -206,7 +206,7 @@ func (m Model) resubmitArgoWorkflow() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("Argo Workflow resubmit requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Resubmit workflow: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resubmit workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		newName, err := m.client.ResubmitArgoWorkflow(ctx, ns, name)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -220,7 +220,7 @@ func (m Model) submitWorkflowFromTemplate(clusterScope bool) tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("Argo Workflow submit-from-template requested", ctx, ns, name, "clusterScope", clusterScope)
-	return m.trackBgTask(scheduler.KindMutation, "Submit workflow from template: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Submit workflow from template: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		newName, err := m.client.SubmitWorkflowFromTemplate(ctx, ns, name, clusterScope)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -234,7 +234,7 @@ func (m Model) suspendCronWorkflow() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("Argo CronWorkflow suspend requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Suspend cron workflow: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Suspend cron workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		if err := m.client.SuspendCronWorkflow(ctx, ns, name); err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -247,7 +247,7 @@ func (m Model) resumeCronWorkflow() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("Argo CronWorkflow resume requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Resume cron workflow: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Resume cron workflow: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		if err := m.client.ResumeCronWorkflow(ctx, ns, name); err != nil {
 			return actionResultMsg{err: err}
 		}
@@ -297,7 +297,7 @@ func (m Model) forceRefreshExternalSecret() tea.Cmd {
 		ns = ""
 	}
 	logGitOps("ExternalSecret force-refresh requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Refresh ExternalSecret: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Refresh ExternalSecret: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.ForceRefreshExternalSecret(ctx, ns, name, gvr)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -318,7 +318,7 @@ func (m Model) pauseKEDAResource() tea.Cmd {
 		Resource: rt.Resource,
 	}
 	logGitOps("KEDA pause requested", ctx, ns, name, "kind", rt.Kind)
-	return m.trackBgTask(scheduler.KindMutation, "Pause KEDA: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Pause KEDA: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.PauseKEDAResource(ctx, ns, name, gvr)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -339,7 +339,7 @@ func (m Model) unpauseKEDAResource() tea.Cmd {
 		Resource: rt.Resource,
 	}
 	logGitOps("KEDA unpause requested", ctx, ns, name, "kind", rt.Kind)
-	return m.trackBgTask(scheduler.KindMutation, "Unpause KEDA: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Unpause KEDA: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.UnpauseKEDAResource(ctx, ns, name, gvr)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -411,7 +411,7 @@ func (m Model) terminateArgoSync() tea.Cmd {
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
 	logGitOps("ArgoCD sync termination requested", ctx, ns, name)
-	return m.trackBgTask(scheduler.KindMutation, "Terminate sync: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Terminate sync: "+name, bgtaskTarget(ctx, ns), func(_ context.Context) tea.Msg {
 		err := m.client.TerminateArgoSync(ctx, ns, name)
 		if err != nil {
 			return actionResultMsg{err: err}
@@ -475,8 +475,8 @@ func (m Model) saveAutoSyncConfig() tea.Cmd {
 	client := m.client
 
 	logGitOps("ArgoCD autosync config save requested", kctx, ns, name, "enabled", enabled, "selfHeal", selfHeal, "prune", prune)
-	return m.trackBgTask(scheduler.KindMutation, "Save autosync config: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
-		err := client.UpdateAutoSyncConfig(context.Background(), kctx, ns, name, enabled, selfHeal, prune)
+	return m.scheduleK8sCall(scheduler.PriorityCritical, scheduler.KindMutation, "Save autosync config: "+name, bgtaskTarget(kctx, ns), func(ctx context.Context) tea.Msg {
+		err := client.UpdateAutoSyncConfig(ctx, kctx, ns, name, enabled, selfHeal, prune)
 		return autoSyncSavedMsg{err: err}
 	})
 }

@@ -92,6 +92,72 @@ func TestK8sReadsAreScheduled(t *testing.T) {
 	})
 }
 
+// TestK8sMutationsAreScheduled asserts in-process write operations route through
+// scheduleK8sCall (KindMutation) instead of trackBgTask / raw closures, so they
+// share the bounded worker pool and Critical priority. Mutations NeverCoalesce,
+// so unlike reads there is no coalescing hazard. Subprocess mutations (kubectl /
+// helm) and bulk-loop mutations stay on trackBgTask and are not covered here.
+func TestK8sMutationsAreScheduled(t *testing.T) {
+	podRT := model.ResourceTypeEntry{Resource: "pods", Kind: "Pod", Namespaced: true}
+	deployRT := model.ResourceTypeEntry{Resource: "deployments", Kind: "Deployment", Namespaced: true}
+
+	t.Run("deleteResource", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "pod-1", "default", "Pod", podRT)
+		assertSchedulesOne(t, m, m.deleteResource())
+	})
+	t.Run("scaleResource", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "deploy-1", "default", "Deployment", deployRT)
+		assertSchedulesOne(t, m, m.scaleResource(3))
+	})
+	t.Run("resizePVC", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "pvc-1", "default", "PersistentVolumeClaim", model.ResourceTypeEntry{})
+		assertSchedulesOne(t, m, m.resizePVC("10Gi"))
+	})
+	t.Run("rollbackDeployment", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "deploy-1", "default", "Deployment", deployRT)
+		assertSchedulesOne(t, m, m.rollbackDeployment(1))
+	})
+	t.Run("triggerCronJob", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "cj-1", "default", "CronJob", model.ResourceTypeEntry{})
+		assertSchedulesOne(t, m, m.triggerCronJob())
+	})
+	t.Run("syncArgoApp", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "my-app", "argocd", "Application", model.ResourceTypeEntry{})
+		assertSchedulesOne(t, m, m.syncArgoApp(false))
+	})
+	t.Run("terminateArgoSync", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "my-app", "argocd", "Application", model.ResourceTypeEntry{})
+		assertSchedulesOne(t, m, m.terminateArgoSync())
+	})
+	t.Run("disruptNodeClaim", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "nc-1", "", "NodeClaim", model.ResourceTypeEntry{})
+		assertSchedulesOne(t, m, m.disruptNodeClaim())
+	})
+	t.Run("activateKnativeRevision", func(t *testing.T) {
+		m := withActionCtx(baseModelWithFakeClient(), "rev-1", "default", "Revision", model.ResourceTypeEntry{})
+		assertSchedulesOne(t, m, m.activateKnativeRevision())
+	})
+	t.Run("saveAutoSyncConfig", func(t *testing.T) {
+		m := withMiddleItem(baseModelWithFakeClient(), model.Item{Name: "my-app", Namespace: "argocd"})
+		assertSchedulesOne(t, m, m.saveAutoSyncConfig())
+	})
+	t.Run("saveSecretData", func(t *testing.T) {
+		m := withMiddleItem(baseModelWithFakeClient(), model.Item{Name: "my-secret", Namespace: "default"})
+		m.secretData = &model.SecretData{Data: map[string]string{"k": "v"}}
+		assertSchedulesOne(t, m, m.saveSecretData())
+	})
+	t.Run("saveConfigMapData", func(t *testing.T) {
+		m := withMiddleItem(baseModelWithFakeClient(), model.Item{Name: "my-cm", Namespace: "default"})
+		m.configMapData = &model.ConfigMapData{Data: map[string]string{"k": "v"}}
+		assertSchedulesOne(t, m, m.saveConfigMapData())
+	})
+	t.Run("saveLabelData", func(t *testing.T) {
+		m := withMiddleItem(baseModelWithFakeClient(), model.Item{Name: "pod-1", Namespace: "default"})
+		m.labelData = &model.LabelAnnotationData{Labels: map[string]string{"l": "v"}, Annotations: map[string]string{"a": "v"}}
+		assertSchedulesOne(t, m, m.saveLabelData())
+	})
+}
+
 // assertSchedulesOne fails unless cmd is non-nil and a task was Submitted
 // synchronously onto the model's scheduler (QueueLen == 1) at Cmd-construction
 // time — proof the loader routes through scheduleK8sCall, not a raw closure.

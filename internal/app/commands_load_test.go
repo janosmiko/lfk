@@ -997,7 +997,7 @@ func TestCovSaveSecretData(t *testing.T) {
 	m = withMiddleItem(m, model.Item{Name: "my-secret", Namespace: "default"})
 	m.secretData = &model.SecretData{Data: map[string]string{"key": "new"}}
 	cmd := m.saveSecretData()
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(secretSavedMsg)
 	require.True(t, ok)
 	assert.NoError(t, result.err)
@@ -1049,7 +1049,7 @@ func TestCovSaveConfigMapData(t *testing.T) {
 	m = withMiddleItem(m, model.Item{Name: "my-cm", Namespace: "default"})
 	m.configMapData = &model.ConfigMapData{Data: map[string]string{"key": "new"}}
 	cmd := m.saveConfigMapData()
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(configMapSavedMsg)
 	require.True(t, ok)
 	assert.NoError(t, result.err)
