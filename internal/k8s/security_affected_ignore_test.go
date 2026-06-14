@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,7 +39,7 @@ func TestGetSecurityAffectedResources_HidesIgnoredWhenToggleOff(t *testing.T) {
 	c.SetIgnoreChecker(stubIgnoreChecker{resources: map[string]bool{"ns/Pod/api": true}})
 	c.SetShowIgnored(false)
 
-	items, err := c.GetSecurityAffectedResources(context.Background(), "kctx", "",
+	items, err := c.GetSecurityAffectedResources(t.Context(), "kctx", "",
 		model.ResourceTypeEntry{Kind: "__security_heuristic__"}, "privileged")
 	require.NoError(t, err)
 	require.Len(t, items, 1, "the ignored resource must be filtered out")
@@ -55,7 +54,7 @@ func TestGetSecurityAffectedResources_TagsIgnoredWhenToggleOn(t *testing.T) {
 	c.SetIgnoreChecker(stubIgnoreChecker{resources: map[string]bool{"ns/Pod/api": true}})
 	c.SetShowIgnored(true)
 
-	items, err := c.GetSecurityAffectedResources(context.Background(), "kctx", "",
+	items, err := c.GetSecurityAffectedResources(t.Context(), "kctx", "",
 		model.ResourceTypeEntry{Kind: "__security_heuristic__"}, "privileged")
 	require.NoError(t, err)
 	require.Len(t, items, 2, "both resources shown in show-ignored mode")

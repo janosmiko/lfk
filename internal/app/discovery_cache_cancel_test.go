@@ -22,7 +22,7 @@ func TestLoadAllDiscoveryCaches_RespectsCancelledContext(t *testing.T) {
 		c.AddTestContext(name, "https://"+name+".example.local:6443")
 	}
 
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // cancel before the call so the loop exits on the first check
 
 	out := loadAllDiscoveryCaches(ctx, c)
@@ -43,7 +43,7 @@ func TestLoadAllDiscoveryCaches_BackgroundContextProcessesAll(t *testing.T) {
 		c.AddTestContext(contextName(i), "https://h.example.local:6443")
 	}
 
-	out := loadAllDiscoveryCaches(context.Background(), c)
+	out := loadAllDiscoveryCaches(t.Context(), c)
 	// No cache files on disk → empty result map; the test passes if the
 	// call returned without hanging.
 	_ = out

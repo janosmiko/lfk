@@ -1,7 +1,6 @@
 package heuristic
 
 import (
-	"context"
 	"crypto/ecdsa"
 	"crypto/elliptic"
 	"crypto/rand"
@@ -75,7 +74,7 @@ func TestSecretChecks(t *testing.T) {
 
 	s := scanningSource(expired, expiring, healthy, garbage, legacy, opaque, ignored)
 	s.SetIgnoredNamespaces([]string{"ignored-ns"})
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 
 	bySecret := map[string]security.Finding{}
@@ -109,7 +108,7 @@ func TestSecretChecksDisabledByDefault(t *testing.T) {
 		listed = true
 		return false, nil, nil
 	})
-	findings, err := NewWithClient(client).Fetch(context.Background(), "", "")
+	findings, err := NewWithClient(client).Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	for _, f := range findings {
 		assert.NotEqual(t, "Secret", f.Resource.Kind)
@@ -138,7 +137,7 @@ func TestSecretListBestEffort(t *testing.T) {
 	forbidList(client, "secrets")
 	s := NewWithClient(client)
 	s.SetScanSecrets(true)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	var privileged bool
 	for _, f := range findings {
@@ -157,7 +156,7 @@ func TestSecretSummariesNeverLeakData(t *testing.T) {
 		Data:       map[string][]byte{"token": []byte("super-secret-token-bytes")},
 	}
 	s := scanningSource(legacy)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, findings)
 	for _, f := range findings {

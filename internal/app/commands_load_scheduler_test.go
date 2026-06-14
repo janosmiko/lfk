@@ -1,7 +1,6 @@
 package app
 
 import (
-	"context"
 	"sync"
 	"testing"
 
@@ -36,7 +35,7 @@ func newLoadResourcesTestModel(t *testing.T) Model {
 		execMu:              &sync.Mutex{},
 		namespace:           "default",
 		scheduler:           scheduler.New(0),
-		reqCtx:              context.Background(),
+		reqCtx:              t.Context(),
 	}
 	m.client = k8s.NewTestClient(clientfake.NewClientset(), newFinalDynClient())
 	return m

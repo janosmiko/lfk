@@ -1,7 +1,6 @@
 package heuristic
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -28,7 +27,7 @@ func refPod(ns, name string, spec corev1.PodSpec) *corev1.Pod {
 
 func missingRefFindings(t *testing.T, s *Source) map[string]security.Finding {
 	t.Helper()
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	out := map[string]security.Finding{}
 	for _, f := range findings {

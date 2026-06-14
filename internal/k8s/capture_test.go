@@ -60,7 +60,7 @@ func TestCaptureManager_Start_PopulatesEntry(t *testing.T) {
 		return &fakeBackend{stream: bytes.NewReader(emptyPcapHeader())}, nil
 	})
 
-	id, err := m.Start(context.Background(), req, func(s PacketSummary) {})
+	id, err := m.Start(t.Context(), req, func(s PacketSummary) {})
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -131,7 +131,7 @@ func TestCaptureManager_FindByPod(t *testing.T) {
 		Backend: BackendKubectlDebug, Context: "ctx", Namespace: "ns", PodName: "pod1",
 		OutputDir: tmp,
 	}
-	id, err := m.Start(context.Background(), req, func(s PacketSummary) {})
+	id, err := m.Start(t.Context(), req, func(s PacketSummary) {})
 	if err != nil {
 		t.Fatalf("Start: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestCaptureManager_Start_RefusesPreexistingPath(t *testing.T) {
 		Backend: BackendKubectlDebug, Context: "ctx", Namespace: "ns", PodName: "pod1",
 		OutputDir: tmp,
 	}
-	id1, err := m.Start(context.Background(), req, func(s PacketSummary) {})
+	id1, err := m.Start(t.Context(), req, func(s PacketSummary) {})
 	if err != nil {
 		t.Fatalf("first Start: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestCaptureManager_Entries_AtomicCountersRace(t *testing.T) {
 func TestCaptureManager_Start_KubesharkRejected(t *testing.T) {
 	m := NewCaptureManager()
 	req := CaptureRequest{Backend: BackendKubeshark, OutputDir: t.TempDir()}
-	_, err := m.Start(context.Background(), req, func(s PacketSummary) {})
+	_, err := m.Start(t.Context(), req, func(s PacketSummary) {})
 	if err == nil {
 		t.Error("Start should reject BackendKubeshark — kubeshark hand-off has separate code path")
 	}

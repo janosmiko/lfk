@@ -1,7 +1,6 @@
 package heuristic
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,7 +47,7 @@ func TestConfigMapSecretKeysNeverLeaksValues(t *testing.T) {
 	s := NewWithClient(fake.NewSimpleClientset(
 		configMap("prod", "leaky", map[string]string{"DB_PASSWORD": "sup3r-s3cret-value"}),
 	))
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.Contains(t, findings[0].Summary, "DB_PASSWORD")
@@ -65,7 +64,7 @@ func TestConfigMapSecretKeysHonorsPatterns(t *testing.T) {
 	})
 	s := NewWithClient(fake.NewSimpleClientset(cm))
 	s.SetSecretEnvPatterns([]string{"*_CONN_STR"}, []string{"LEGACY_*"})
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	require.Len(t, findings, 1)
 	assert.Contains(t, findings[0].Summary, "MY_CONN_STR")
@@ -77,7 +76,7 @@ func TestConfigMapListBestEffort(t *testing.T) {
 		configMap("prod", "leaky", map[string]string{"DB_PASSWORD": "x"}),
 	)
 	forbidList(client, "configmaps")
-	findings, err := NewWithClient(client).Fetch(context.Background(), "", "")
+	findings, err := NewWithClient(client).Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Empty(t, findings)
 }

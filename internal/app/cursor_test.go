@@ -1294,7 +1294,7 @@ func TestMoveCursorBumpsRequestGenAndDiscardsStalePreview(t *testing.T) {
 
 func TestMoveCursorDoesNotCancelInFlightReqCtx(t *testing.T) {
 	m := basePush80Model()
-	m.reqCtx, m.reqCancel = context.WithCancel(context.Background())
+	m.reqCtx, m.reqCancel = context.WithCancel(t.Context())
 	oldCtx := m.reqCtx
 	m.setCursor(0)
 

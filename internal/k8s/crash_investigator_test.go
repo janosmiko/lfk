@@ -43,7 +43,7 @@ func TestGetCrashInvestigation_PodSummary(t *testing.T) {
 		return "Name: crashy\nNamespace: default\n", nil
 	}
 
-	got, err := c.GetCrashInvestigation(context.Background(), "", "default", "crashy")
+	got, err := c.GetCrashInvestigation(t.Context(), "", "default", "crashy")
 	require.NoError(t, err)
 	assert.Equal(t, "crashy", got.Pod.Name)
 	assert.Equal(t, "default", got.Pod.Namespace)
@@ -99,7 +99,7 @@ func TestGetCrashInvestigation_SingleContainerCLB(t *testing.T) {
 	c := newFakeClient(cs, nil)
 	c.describeOverride = func(_ context.Context, _, _, _ string) (string, error) { return "", nil }
 
-	got, err := c.GetCrashInvestigation(context.Background(), "", "default", "p")
+	got, err := c.GetCrashInvestigation(t.Context(), "", "default", "p")
 	require.NoError(t, err)
 	require.Len(t, got.AppContainers, 1)
 	require.Empty(t, got.InitContainers)
@@ -151,7 +151,7 @@ func TestGetCrashInvestigation_InitContainerCLB(t *testing.T) {
 	c := newFakeClient(cs, nil)
 	c.describeOverride = func(_ context.Context, _, _, _ string) (string, error) { return "", nil }
 
-	got, err := c.GetCrashInvestigation(context.Background(), "", "default", "p")
+	got, err := c.GetCrashInvestigation(t.Context(), "", "default", "p")
 	require.NoError(t, err)
 	require.Len(t, got.InitContainers, 1)
 	require.Len(t, got.AppContainers, 1)
@@ -190,7 +190,7 @@ func TestGetCrashInvestigation_MultiContainerOnlyOneFailing(t *testing.T) {
 	c := newFakeClient(cs, nil)
 	c.describeOverride = func(_ context.Context, _, _, _ string) (string, error) { return "", nil }
 
-	got, err := c.GetCrashInvestigation(context.Background(), "", "default", "p")
+	got, err := c.GetCrashInvestigation(t.Context(), "", "default", "p")
 	require.NoError(t, err)
 	require.Len(t, got.AppContainers, 2)
 	assert.Equal(t, "app", got.AppContainers[0].Name)
@@ -218,7 +218,7 @@ func TestGetCrashInvestigation_HealthyPod(t *testing.T) {
 	c := newFakeClient(cs, nil)
 	c.describeOverride = func(_ context.Context, _, _, _ string) (string, error) { return "", nil }
 
-	got, err := c.GetCrashInvestigation(context.Background(), "", "default", "p")
+	got, err := c.GetCrashInvestigation(t.Context(), "", "default", "p")
 	require.NoError(t, err)
 	assert.Len(t, got.AppContainers, 1)
 	assert.True(t, got.AppContainers[0].Ready)
@@ -247,7 +247,7 @@ func TestGetCrashInvestigation_LogsPopulated(t *testing.T) {
 
 	// fakeclient `GetLogs` returns "fake logs" by default; that's enough
 	// to assert both PreviousLog and CurrentLog are populated.
-	got, err := c.GetCrashInvestigation(context.Background(), "", "default", "p")
+	got, err := c.GetCrashInvestigation(t.Context(), "", "default", "p")
 	require.NoError(t, err)
 	require.Len(t, got.AppContainers, 1)
 	cc := got.AppContainers[0]
@@ -288,7 +288,7 @@ func TestGetCrashInvestigation_EventsFiltered(t *testing.T) {
 	c := newFakeClient(cs, nil)
 	c.describeOverride = func(_ context.Context, _, _, _ string) (string, error) { return "", nil }
 
-	got, err := c.GetCrashInvestigation(context.Background(), "", "default", "p")
+	got, err := c.GetCrashInvestigation(t.Context(), "", "default", "p")
 	require.NoError(t, err)
 	require.Len(t, got.Events, 2)
 	// Newest first.
@@ -299,7 +299,7 @@ func TestGetCrashInvestigation_EventsFiltered(t *testing.T) {
 func TestGetCrashInvestigation_PodNotFound(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
-	_, err := c.GetCrashInvestigation(context.Background(), "", "default", "missing")
+	_, err := c.GetCrashInvestigation(t.Context(), "", "default", "missing")
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
 }
@@ -315,7 +315,7 @@ func TestGetCrashInvestigation_DescribeFailureNonFatal(t *testing.T) {
 		return "", fmt.Errorf("kubectl not in PATH")
 	}
 
-	got, err := c.GetCrashInvestigation(context.Background(), "", "default", "p")
+	got, err := c.GetCrashInvestigation(t.Context(), "", "default", "p")
 	require.NoError(t, err, "describe failure must not fail the whole call")
 	require.NotNil(t, got)
 	assert.Empty(t, got.Describe)

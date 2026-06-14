@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -71,7 +70,7 @@ func TestGetHelmReleases_PopulatesChartColumns(t *testing.T) {
 	cs := k8sfake.NewClientset(secret)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetHelmReleases(context.Background(), "", "default")
+	items, err := c.GetHelmReleases(t.Context(), "", "default")
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -118,7 +117,7 @@ func TestGetHelmReleases_GracefulBlobFailure(t *testing.T) {
 	cs := k8sfake.NewClientset(secret)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetHelmReleases(context.Background(), "", "default")
+	items, err := c.GetHelmReleases(t.Context(), "", "default")
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -146,7 +145,7 @@ func TestGetHelmReleases_StripsControlCharsFromDescription(t *testing.T) {
 	cs := k8sfake.NewClientset(secret)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetHelmReleases(context.Background(), "", "default")
+	items, err := c.GetHelmReleases(t.Context(), "", "default")
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -255,7 +254,7 @@ func TestGetHelmManagedResources_ManifestPath(t *testing.T) {
 	cs := k8sfake.NewClientset(secret, liveDep)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.getHelmManagedResources(context.Background(), "", "default", "cilium")
+	items, err := c.getHelmManagedResources(t.Context(), "", "default", "cilium")
 	require.NoError(t, err)
 
 	kinds := map[string]int{}
@@ -333,7 +332,7 @@ func TestGetHelmManagedResources_EmptyManifestFallsBackToLabels(t *testing.T) {
 	cs := k8sfake.NewClientset(secret, labelledDep)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.getHelmManagedResources(context.Background(), "", "default", "legacy")
+	items, err := c.getHelmManagedResources(t.Context(), "", "default", "legacy")
 	require.NoError(t, err)
 	// Fallback path must still pick up the labelled Deployment.
 	var found bool
@@ -377,7 +376,7 @@ func TestGetHelmManagedResources_DecodeFailureFallsBack(t *testing.T) {
 	cs := k8sfake.NewClientset(brokenSecret, labelledSvc)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.getHelmManagedResources(context.Background(), "", "default", "broken")
+	items, err := c.getHelmManagedResources(t.Context(), "", "default", "broken")
 	require.NoError(t, err)
 	// Expect label-based fallback to surface the labelled Service.
 	var found bool
@@ -417,7 +416,7 @@ metadata:
 	cs := k8sfake.NewClientset(oldSec, newSec)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.getHelmManagedResources(context.Background(), "", "default", "stacked")
+	items, err := c.getHelmManagedResources(t.Context(), "", "default", "stacked")
 	require.NoError(t, err)
 
 	var names []string
@@ -502,7 +501,7 @@ func TestGetHelmReleases_LatestVersionWins(t *testing.T) {
 	cs := k8sfake.NewClientset(oldSecret, newSecret)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.GetHelmReleases(context.Background(), "", "default")
+	items, err := c.GetHelmReleases(t.Context(), "", "default")
 	require.NoError(t, err)
 	require.Len(t, items, 1)
 
@@ -539,7 +538,7 @@ metadata:
 	cs := k8sfake.NewClientset(secret)
 	c := newFakeClient(cs, nil)
 
-	items, err := c.getHelmManagedResources(context.Background(), "", "default", "storage-bundle")
+	items, err := c.getHelmManagedResources(t.Context(), "", "default", "storage-bundle")
 	require.NoError(t, err)
 
 	var va *model.Item

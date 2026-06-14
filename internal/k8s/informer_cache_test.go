@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"runtime"
 	"sync"
 	"testing"
@@ -75,7 +74,7 @@ func TestGetResources_InformerCache_NamespaceSwitchHitsCache(t *testing.T) {
 	t.Cleanup(c.Shutdown)
 
 	// First list — primes the informer (the underlying watch fires one LIST).
-	itemsAll, err := c.GetResources(context.Background(), "", "", podRT)
+	itemsAll, err := c.GetResources(t.Context(), "", "", podRT)
 	require.NoError(t, err)
 	require.Len(t, itemsAll, 3)
 
@@ -85,11 +84,11 @@ func TestGetResources_InformerCache_NamespaceSwitchHitsCache(t *testing.T) {
 	// Switch to team-a, then team-b, then back to all-namespaces. Each call
 	// is the moment the user pressed the namespace selector — under the
 	// pre-#86 code these would have round-tripped to the apiserver.
-	itemsA, err := c.GetResources(context.Background(), "", "team-a", podRT)
+	itemsA, err := c.GetResources(t.Context(), "", "team-a", podRT)
 	require.NoError(t, err)
-	itemsB, err := c.GetResources(context.Background(), "", "team-b", podRT)
+	itemsB, err := c.GetResources(t.Context(), "", "team-b", podRT)
 	require.NoError(t, err)
-	itemsAll2, err := c.GetResources(context.Background(), "", "", podRT)
+	itemsAll2, err := c.GetResources(t.Context(), "", "", podRT)
 	require.NoError(t, err)
 
 	assert.Equal(t, []string{"api-1", "api-2"}, []string{itemsA[0].Name, itemsA[1].Name})
@@ -112,7 +111,7 @@ func TestGetResources_InformerCache_OffModeHitsApiserverEveryTime(t *testing.T) 
 	c.SetInformerCacheMode(InformerCacheOff)
 
 	for range 3 {
-		_, err := c.GetResources(context.Background(), "", "team-a", podRT)
+		_, err := c.GetResources(t.Context(), "", "team-a", podRT)
 		require.NoError(t, err)
 	}
 
@@ -135,7 +134,7 @@ func TestGetResources_InformerCache_PicksUpDeletes(t *testing.T) {
 	t.Cleanup(c.Shutdown)
 
 	// Warm the cache.
-	items, err := c.GetResources(context.Background(), "", "team-a", podRT)
+	items, err := c.GetResources(t.Context(), "", "team-a", podRT)
 	require.NoError(t, err)
 	require.Len(t, items, 2)
 
@@ -143,11 +142,11 @@ func TestGetResources_InformerCache_PicksUpDeletes(t *testing.T) {
 	// asynchronously, so we poll the cached list until it converges instead
 	// of asserting on the very next call.
 	gvr := schema.GroupVersionResource{Group: "", Version: "v1", Resource: "pods"}
-	require.NoError(t, dc.Resource(gvr).Namespace("team-a").Delete(context.Background(), "api-2", metav1.DeleteOptions{}))
+	require.NoError(t, dc.Resource(gvr).Namespace("team-a").Delete(t.Context(), "api-2", metav1.DeleteOptions{}))
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		items, err = c.GetResources(context.Background(), "", "team-a", podRT)
+		items, err = c.GetResources(t.Context(), "", "team-a", podRT)
 		require.NoError(t, err)
 		if len(items) == 1 {
 			break
@@ -221,7 +220,7 @@ func TestInformerCache_ConcurrentStopAndDemoteNoPanic(t *testing.T) {
 		withTunedThresholds(c, 1, 5, 1)
 
 		// Warm up: promotes on first list (1 item >= promoteAt=1).
-		_, err := c.GetResources(context.Background(), "", "", podRT)
+		_, err := c.GetResources(t.Context(), "", "", podRT)
 		require.NoError(t, err, "iter %d", iter)
 		require.True(t, c.informers.isPromoted("", podGVR()), "iter %d", iter)
 
@@ -236,7 +235,7 @@ func TestInformerCache_ConcurrentStopAndDemoteNoPanic(t *testing.T) {
 		go func() {
 			defer wg.Done()
 			<-barrier
-			_, _ = c.GetResources(context.Background(), "", "", podRT)
+			_, _ = c.GetResources(t.Context(), "", "", podRT)
 		}()
 		go func() {
 			defer wg.Done()
@@ -272,7 +271,7 @@ func TestInformerCache_WaitForSyncTimeoutFallsBack(t *testing.T) {
 	entry.synced = make(chan struct{})
 
 	start := time.Now()
-	err = waitForSync(context.Background(), entry, 10*time.Millisecond)
+	err = waitForSync(t.Context(), entry, 10*time.Millisecond)
 	elapsed := time.Since(start)
 
 	require.Error(t, err, "expected timeout error when sync never completes")
@@ -295,7 +294,7 @@ func TestInformerCache_StopWaitsForGoroutines(t *testing.T) {
 	c.SetInformerCacheMode(InformerCacheAlways)
 
 	// Force the informer to start by issuing a list.
-	_, err := c.GetResources(context.Background(), "", "", podRT)
+	_, err := c.GetResources(t.Context(), "", "", podRT)
 	require.NoError(t, err)
 	require.Greater(t, runtime.NumGoroutine(), baseline,
 		"expected new goroutines for inf.Run + sync watcher")
@@ -348,7 +347,7 @@ func TestGetResources_InformerCache_AutoPromote(t *testing.T) {
 
 	// First call: direct LIST against the apiserver (cache not yet warm).
 	// Result has 4 items, which crosses promoteAt.
-	_, err := c.GetResources(context.Background(), "", "", podRT)
+	_, err := c.GetResources(t.Context(), "", "", podRT)
 	require.NoError(t, err)
 	listsAfterFirst := listActionCount(dc.Actions())
 	require.Equal(t, 1, listsAfterFirst, "first auto-mode call should LIST the apiserver directly")
@@ -358,12 +357,12 @@ func TestGetResources_InformerCache_AutoPromote(t *testing.T) {
 	// Second call: routed through the informer. The informer's own initial
 	// LIST counts as one apiserver call; subsequent namespace switches do
 	// not. Wait briefly for the watch to populate before asserting items.
-	_, err = c.GetResources(context.Background(), "", "team-a", podRT)
+	_, err = c.GetResources(t.Context(), "", "team-a", podRT)
 	require.NoError(t, err)
 
 	// Third call (different namespace) — must not add another apiserver list.
 	listsBefore := listActionCount(dc.Actions())
-	_, err = c.GetResources(context.Background(), "", "team-b", podRT)
+	_, err = c.GetResources(t.Context(), "", "team-b", podRT)
 	require.NoError(t, err)
 	assert.Equal(t, listsBefore, listActionCount(dc.Actions()),
 		"after promotion, namespace switching should be served from the cache")
@@ -387,14 +386,14 @@ func TestGetResources_InformerCache_AutoDemote(t *testing.T) {
 	// is the minimum to exercise the consecutive-call counter.
 
 	// Warm up: first list promotes the GVR (2 items >= promoteAt=1).
-	_, err := c.GetResources(context.Background(), "", "", podRT)
+	_, err := c.GetResources(t.Context(), "", "", podRT)
 	require.NoError(t, err)
 	require.True(t, c.informers.isPromoted("", podGVR()), "expected promotion after first list")
 
 	// Three more cached lists, each below demoteBelow. The third must trip
 	// the demote: state flips back to direct and the watch is torn down.
 	for i := range 3 {
-		_, err := c.GetResources(context.Background(), "", "", podRT)
+		_, err := c.GetResources(t.Context(), "", "", podRT)
 		require.NoError(t, err, "cached list iteration %d", i)
 	}
 	assert.False(t, c.informers.isPromoted("", podGVR()),
@@ -403,7 +402,7 @@ func TestGetResources_InformerCache_AutoDemote(t *testing.T) {
 	// Verify the watch was actually closed by re-promoting and observing
 	// that a fresh informer was started — i.e. demote is not a no-op.
 	listsBefore := listActionCount(dc.Actions())
-	_, err = c.GetResources(context.Background(), "", "", podRT)
+	_, err = c.GetResources(t.Context(), "", "", podRT)
 	require.NoError(t, err)
 	listsAfter := listActionCount(dc.Actions())
 	assert.Greater(t, listsAfter, listsBefore,
@@ -441,13 +440,13 @@ func TestListItems_MemoizesPerItem(t *testing.T) {
 	// Warmup: starts the informer, walks indexer, runs build per item,
 	// stores memo. GetResources is deliberately not used here so we
 	// don't pre-populate the memo with the production build.
-	first, builds, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+	first, builds, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 	require.NoError(t, err)
 	require.Len(t, first, 2)
 	assert.Equal(t, 2, builds, "warmup builds every item once")
 	assert.Equal(t, 2, buildCalls)
 
-	second, builds, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+	second, builds, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 	require.NoError(t, err)
 	require.Len(t, second, 2)
 	assert.Equal(t, 0, builds,
@@ -476,13 +475,13 @@ func TestListItems_RebuildsOnlyChangedItems(t *testing.T) {
 	}
 
 	// Warmup: builds all 3.
-	_, builds, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+	_, builds, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 	require.NoError(t, err)
 	require.Equal(t, 3, builds)
 
 	// Mutate exactly one pod: the watch bumps its individual RV; the
 	// other two pods' resourceVersion stays unchanged.
-	require.NoError(t, dc.Resource(gvr).Namespace("team-a").Delete(context.Background(), "api-2", metav1.DeleteOptions{}))
+	require.NoError(t, dc.Resource(gvr).Namespace("team-a").Delete(t.Context(), "api-2", metav1.DeleteOptions{}))
 
 	// Poll until the indexer reflects the delete (watch is async).
 	// Once it has, the next listItems should return 2 items and have
@@ -490,7 +489,7 @@ func TestListItems_RebuildsOnlyChangedItems(t *testing.T) {
 	// memo entries.
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		items, builds, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+		items, builds, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 		require.NoError(t, err)
 		if len(items) == 2 {
 			assert.Equal(t, 0, builds,
@@ -524,7 +523,7 @@ func TestListItems_RebuildsUpdatedItem(t *testing.T) {
 		return model.Item{Name: obj.GetName(), Namespace: obj.GetNamespace()}
 	}
 
-	_, _, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+	_, _, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 	require.NoError(t, err)
 	require.ElementsMatch(t, []string{"api-1", "api-2"}, buildNames)
 	buildNames = buildNames[:0]
@@ -537,13 +536,13 @@ func TestListItems_RebuildsUpdatedItem(t *testing.T) {
 	meta := updated.Object["metadata"].(map[string]any)
 	meta["labels"] = map[string]any{"updated": "true"}
 	meta["resourceVersion"] = "2"
-	_, err = dc.Resource(gvr).Namespace("team-a").Update(context.Background(), updated, metav1.UpdateOptions{})
+	_, err = dc.Resource(gvr).Namespace("team-a").Update(t.Context(), updated, metav1.UpdateOptions{})
 	require.NoError(t, err)
 
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
 		buildNames = buildNames[:0]
-		_, builds, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+		_, builds, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 		require.NoError(t, err)
 		if builds == 1 && len(buildNames) == 1 && buildNames[0] == "api-2" {
 			return
@@ -601,12 +600,12 @@ func TestListItems_ClusterScopedResource(t *testing.T) {
 		return model.Item{Name: obj.GetName(), Kind: "Namespace"}
 	}
 
-	first, builds, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+	first, builds, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 	require.NoError(t, err)
 	require.Len(t, first, 2)
 	assert.Equal(t, 2, builds, "warmup builds every cluster-scoped item once")
 
-	second, builds, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+	second, builds, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 	require.NoError(t, err)
 	require.Len(t, second, 2)
 	assert.Equal(t, 0, builds,
@@ -639,17 +638,17 @@ func TestApplyMemo_PrunesDeletedKeysOnAllNamespacesList(t *testing.T) {
 	}
 
 	// Warmup: memo gets both keys.
-	_, _, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+	_, _, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 	require.NoError(t, err)
 	entry := c.informers.entries[""][gvr]
 	require.Contains(t, entry.memo, "team-a/api-1")
 	require.Contains(t, entry.memo, "team-a/api-2")
 
 	// Delete api-2 and wait for the watch to apply.
-	require.NoError(t, dc.Resource(gvr).Namespace("team-a").Delete(context.Background(), "api-2", metav1.DeleteOptions{}))
+	require.NoError(t, dc.Resource(gvr).Namespace("team-a").Delete(t.Context(), "api-2", metav1.DeleteOptions{}))
 	deadline := time.Now().Add(2 * time.Second)
 	for time.Now().Before(deadline) {
-		items, _, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+		items, _, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 		require.NoError(t, err)
 		if len(items) == 1 {
 			break
@@ -686,7 +685,7 @@ func TestApplyMemo_PerNamespaceListDoesNotPruneOtherNamespaces(t *testing.T) {
 	}
 
 	// Warmup: all-namespaces list seeds memo with all three pods.
-	_, _, err := c.informers.listItems(context.Background(), "", gvr, "", build)
+	_, _, err := c.informers.listItems(t.Context(), "", gvr, "", build)
 	require.NoError(t, err)
 	entry := c.informers.entries[""][gvr]
 	require.Contains(t, entry.memo, "team-a/api-1")
@@ -696,7 +695,7 @@ func TestApplyMemo_PerNamespaceListDoesNotPruneOtherNamespaces(t *testing.T) {
 	// Now list only team-a. Even though team-b/worker-1 is not in the
 	// returned objs, the prune logic must leave its memo entry alone —
 	// the team-a list isn't authoritative for team-b.
-	_, _, err = c.informers.listItems(context.Background(), "", gvr, "team-a", build)
+	_, _, err = c.informers.listItems(t.Context(), "", gvr, "team-a", build)
 	require.NoError(t, err)
 	assert.Contains(t, entry.memo, "team-a/api-1")
 	assert.Contains(t, entry.memo, "team-a/api-2")

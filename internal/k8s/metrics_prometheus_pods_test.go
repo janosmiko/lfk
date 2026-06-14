@@ -58,7 +58,7 @@ func TestGetAllPodMetricsFromPrometheus(t *testing.T) {
 			{"metric":{"namespace":"dev","pod":"web-1"},"value":[1700000000,"209715200"]}]}}`), nil
 	}
 
-	got, err := c.getAllPodMetricsFromPrometheus(context.Background(), "ctx", "dev")
+	got, err := c.getAllPodMetricsFromPrometheus(t.Context(), "ctx", "dev")
 	require.NoError(t, err)
 	require.Contains(t, got, "dev/web-1")
 	pm := got["dev/web-1"]
@@ -90,7 +90,7 @@ func TestGetAllPodMetrics_PrefersPrometheusWhenConfigured(t *testing.T) {
 		}},
 	}
 
-	got, err := c.GetAllPodMetrics(context.Background(), "ctx", "dev")
+	got, err := c.GetAllPodMetrics(t.Context(), "ctx", "dev")
 	require.NoError(t, err)
 	require.Contains(t, got, "dev/web-1")
 	assert.Equal(t, int64(100), got["dev/web-1"].CPU)

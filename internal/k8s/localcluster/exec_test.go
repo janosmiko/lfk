@@ -54,7 +54,7 @@ func TestRealRunnerRun(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			ctx := context.Background()
+			ctx := t.Context()
 			if tc.cancelCtx {
 				var cancel context.CancelFunc
 				ctx, cancel = context.WithCancel(ctx)
@@ -103,7 +103,7 @@ func TestFakeRunnerSubstitutes(t *testing.T) {
 	if _, err := f.LookPath("k3d"); err == nil {
 		t.Fatalf("expected error for k3d")
 	}
-	out, _, _, err := f.Run(context.Background(), "kind", "version")
+	out, _, _, err := f.Run(t.Context(), "kind", "version")
 	if err != nil {
 		t.Fatalf("Run returned unexpected error: %v", err)
 	}

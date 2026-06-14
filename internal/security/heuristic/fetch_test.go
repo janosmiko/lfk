@@ -1,7 +1,6 @@
 package heuristic
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -51,7 +50,7 @@ func TestSourceFetch(t *testing.T) {
 	)
 
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 
 	badCount := 0
@@ -92,7 +91,7 @@ func TestSourceFetchNamespaceFilter(t *testing.T) {
 	)
 
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "prod")
+	findings, err := s.Fetch(t.Context(), "", "prod")
 	require.NoError(t, err)
 	for _, f := range findings {
 		assert.Equal(t, "prod", f.Resource.Namespace)
@@ -116,7 +115,7 @@ func TestSourceFetchSecretEnvPatterns(t *testing.T) {
 		},
 	}
 	secretEnvNames := func(s *Source) []string {
-		findings, err := s.Fetch(context.Background(), "", "")
+		findings, err := s.Fetch(t.Context(), "", "")
 		require.NoError(t, err)
 		var sums []string
 		for _, f := range findings {
@@ -144,7 +143,7 @@ func TestSourceFetchSecretEnvPatterns(t *testing.T) {
 
 func TestSourceFetchNilClient(t *testing.T) {
 	s := New()
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Empty(t, findings)
 }
@@ -173,7 +172,7 @@ func TestSourceFetchScansInitAndEphemeralContainers(t *testing.T) {
 	}
 	client := fake.NewSimpleClientset(pod)
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 
 	containers := map[string]bool{}

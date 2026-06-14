@@ -107,7 +107,7 @@ func TestInstalledDelegates(t *testing.T) {
 }
 
 func TestValidateConfigFile(t *testing.T) {
-	tmp, err := os.CreateTemp("", "lfk-validate-*.yaml")
+	tmp, err := os.CreateTemp(t.TempDir(), "lfk-validate-*.yaml")
 	if err != nil {
 		t.Fatal(err)
 	}

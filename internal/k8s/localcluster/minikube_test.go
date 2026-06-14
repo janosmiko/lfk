@@ -24,7 +24,7 @@ func TestMinikubeList_ParsesValid(t *testing.T) {
 		},
 	}
 	p := newMinikubeProvider(fake)
-	got, err := p.List(context.Background())
+	got, err := p.List(t.Context())
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -45,7 +45,7 @@ func TestMinikubeList_EmptyValid(t *testing.T) {
 		},
 	}
 	p := newMinikubeProvider(fake)
-	got, err := p.List(context.Background())
+	got, err := p.List(t.Context())
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -65,7 +65,7 @@ func TestMinikubeList_NonZeroExitErrors(t *testing.T) {
 		},
 	}
 	p := newMinikubeProvider(fake)
-	_, err := p.List(context.Background())
+	_, err := p.List(t.Context())
 	if err == nil || !strings.Contains(err.Error(), "minikube:") {
 		t.Fatalf("expected wrapped 'minikube:' error, got %v", err)
 	}
@@ -79,7 +79,7 @@ func TestMinikubeList_BadJSON(t *testing.T) {
 		},
 	}
 	p := newMinikubeProvider(fake)
-	_, err := p.List(context.Background())
+	_, err := p.List(t.Context())
 	if err == nil {
 		t.Fatal("expected error on bad JSON")
 	}
@@ -114,7 +114,7 @@ func TestMinikubeCreate_RejectsConfigFile(t *testing.T) {
 		RunFn:      func(context.Context, string, ...string) (string, string, int, error) { return "", "", 0, nil },
 	}
 	p := newMinikubeProvider(fake)
-	err := p.Create(context.Background(), CreateSpec{Name: "exp", ConfigFile: "/tmp/foo.yaml"})
+	err := p.Create(t.Context(), CreateSpec{Name: "exp", ConfigFile: "/tmp/foo.yaml"})
 	if err == nil || !strings.Contains(err.Error(), "config-file is not supported") {
 		t.Fatalf("expected ConfigFile-not-supported error, got %v", err)
 	}
@@ -129,7 +129,7 @@ func TestMinikubeCreate_NameOnly(t *testing.T) {
 		RunFn:      func(context.Context, string, ...string) (string, string, int, error) { return "", "", 0, nil },
 	}
 	p := newMinikubeProvider(fake)
-	if err := p.Create(context.Background(), CreateSpec{Name: "exp"}); err != nil {
+	if err := p.Create(t.Context(), CreateSpec{Name: "exp"}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 	got := strings.Join(fake.CallsSnapshot()[0].Args, " ")
@@ -149,7 +149,7 @@ func TestMinikubeCreate_AlwaysPassesNonInteractive(t *testing.T) {
 		RunFn:      func(context.Context, string, ...string) (string, string, int, error) { return "", "", 0, nil },
 	}
 	p := newMinikubeProvider(fake)
-	_ = p.Create(context.Background(), CreateSpec{Name: "exp", K8sVersion: "v1.30.0", Nodes: 2})
+	_ = p.Create(t.Context(), CreateSpec{Name: "exp", K8sVersion: "v1.30.0", Nodes: 2})
 	got := strings.Join(fake.CallsSnapshot()[0].Args, " ")
 	if !strings.Contains(got, "--interactive=false") {
 		t.Fatalf("argv = %q, must contain --interactive=false", got)
@@ -162,7 +162,7 @@ func TestMinikubeCreate_WithVersionAndNodes(t *testing.T) {
 		RunFn:      func(context.Context, string, ...string) (string, string, int, error) { return "", "", 0, nil },
 	}
 	p := newMinikubeProvider(fake)
-	_ = p.Create(context.Background(), CreateSpec{Name: "x", K8sVersion: "v1.30.0", Nodes: 3})
+	_ = p.Create(t.Context(), CreateSpec{Name: "x", K8sVersion: "v1.30.0", Nodes: 3})
 	got := strings.Join(fake.CallsSnapshot()[0].Args, " ")
 	if !strings.Contains(got, "--kubernetes-version v1.30.0") {
 		t.Fatalf("argv = %q, want --kubernetes-version v1.30.0", got)
@@ -182,13 +182,13 @@ func TestMinikubeDeleteStartStop(t *testing.T) {
 	if !ok {
 		t.Fatal("minikubeProvider must satisfy LifecycleProvider")
 	}
-	if err := p.Delete(context.Background(), "exp"); err != nil {
+	if err := p.Delete(t.Context(), "exp"); err != nil {
 		t.Fatal(err)
 	}
-	if err := lp.Start(context.Background(), "exp"); err != nil {
+	if err := lp.Start(t.Context(), "exp"); err != nil {
 		t.Fatal(err)
 	}
-	if err := lp.Stop(context.Background(), "exp"); err != nil {
+	if err := lp.Stop(t.Context(), "exp"); err != nil {
 		t.Fatal(err)
 	}
 	wantArgs := []string{

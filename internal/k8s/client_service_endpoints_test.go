@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"strings"
 	"testing"
 
@@ -54,7 +53,7 @@ func TestGetServiceEndpoints_AggregatesAcrossSlices(t *testing.T) {
 	cs := k8sfake.NewClientset(slice1, slice2)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.GetServiceEndpoints(context.Background(), "", "default", "my-svc")
+	out, err := c.GetServiceEndpoints(t.Context(), "", "default", "my-svc")
 	require.NoError(t, err)
 	require.NotNil(t, out)
 
@@ -74,7 +73,7 @@ func TestGetServiceEndpoints_NoSlicesReturnsEmpty(t *testing.T) {
 	cs := k8sfake.NewClientset()
 	c := newFakeClient(cs, nil)
 
-	out, err := c.GetServiceEndpoints(context.Background(), "", "default", "lonely")
+	out, err := c.GetServiceEndpoints(t.Context(), "", "default", "lonely")
 	require.NoError(t, err)
 	require.NotNil(t, out)
 	assert.Equal(t, 0, out.Ready)
@@ -119,7 +118,7 @@ func TestGetServiceEndpoints_FilterIgnoresOtherServices(t *testing.T) {
 	cs := k8sfake.NewClientset(owned, other)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.GetServiceEndpoints(context.Background(), "", "default", "my-svc")
+	out, err := c.GetServiceEndpoints(t.Context(), "", "default", "my-svc")
 	require.NoError(t, err)
 	assert.Equal(t, 1, out.Ready)
 	assert.NotContains(t, out.Block, "10.99.99.99",
@@ -149,7 +148,7 @@ func TestGetServiceEndpoints_MissingConditionsTreatedAsReady(t *testing.T) {
 	cs := k8sfake.NewClientset(slice)
 	c := newFakeClient(cs, nil)
 
-	out, err := c.GetServiceEndpoints(context.Background(), "", "default", "my-svc")
+	out, err := c.GetServiceEndpoints(t.Context(), "", "default", "my-svc")
 	require.NoError(t, err)
 	assert.Equal(t, 1, out.Ready, "missing conditions.ready counts as ready")
 	assert.Equal(t, 0, out.NotReady)

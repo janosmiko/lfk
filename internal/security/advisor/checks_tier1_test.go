@@ -1,7 +1,6 @@
 package advisor
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -40,7 +39,7 @@ func daemonSet(ns, name string, labels map[string]string, containers ...corev1.C
 func fetchChecks(t *testing.T, objs ...runtime.Object) map[string]map[string]bool {
 	t.Helper()
 	s := NewWithClient(fake.NewSimpleClientset(objs...))
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	return checksFor(t, findings)
 }
@@ -118,7 +117,7 @@ func TestEmptyDirNoSizeLimit(t *testing.T) {
 	}
 
 	s := NewWithClient(fake.NewSimpleClientset(unbounded, bounded))
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	got := checksFor(t, findings)
 	assert.True(t, got["prod/Deployment/unbounded"]["emptydir_no_sizelimit"])
@@ -223,7 +222,7 @@ func TestOrphanPDBRequiresWorkloadLists(t *testing.T) {
 	)
 	forbidList(client, "deployments")
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	// Assert on the raw findings, not a map lookup that is vacuously false
 	// for a mistyped key.

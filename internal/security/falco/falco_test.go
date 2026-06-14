@@ -1,7 +1,6 @@
 package falco
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -24,13 +23,13 @@ func TestSourceCategories(t *testing.T) {
 }
 
 func TestIsAvailableNilClient(t *testing.T) {
-	ok, err := New().IsAvailable(context.Background(), "ctx")
+	ok, err := New().IsAvailable(t.Context(), "ctx")
 	assert.False(t, ok)
 	assert.NoError(t, err)
 }
 
 func TestFetchNilClient(t *testing.T) {
-	findings, err := New().Fetch(context.Background(), "ctx", "")
+	findings, err := New().Fetch(t.Context(), "ctx", "")
 	assert.Nil(t, findings)
 	assert.NoError(t, err)
 }
@@ -210,11 +209,11 @@ func TestFetchWithFakeClient(t *testing.T) {
 	s := NewWithClient(client)
 
 	// IsAvailable: checks for pods with the falco label.
-	ok, err := s.IsAvailable(context.Background(), "ctx")
+	ok, err := s.IsAvailable(t.Context(), "ctx")
 	require.NoError(t, err)
 	assert.True(t, ok)
 
-	findings, err := s.Fetch(context.Background(), "ctx", "prod")
+	findings, err := s.Fetch(t.Context(), "ctx", "prod")
 	require.NoError(t, err)
 	require.GreaterOrEqual(t, len(findings), 1)
 	assert.Equal(t, "Unexpected Outbound Connection", findings[0].Title)

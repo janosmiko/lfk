@@ -1,7 +1,6 @@
 package security
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -21,7 +20,7 @@ func TestCachedFindings(t *testing.T) {
 	assert.False(t, ok, "cold cache before any fetch")
 	assert.Equal(t, int32(0), src.FetchCalls.Load(), "peek must not scan")
 
-	_, err := mgr.FetchAll(context.Background(), "kctx", "")
+	_, err := mgr.FetchAll(t.Context(), "kctx", "")
 	require.NoError(t, err)
 	require.Equal(t, int32(1), src.FetchCalls.Load())
 

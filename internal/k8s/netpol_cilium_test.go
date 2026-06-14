@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"maps"
 	"testing"
 
@@ -278,7 +277,7 @@ func TestGetCiliumNetworkPolicyInfo_SingleSpec(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	infos, err := c.GetCiliumNetworkPolicyInfo(context.Background(), "test-ctx", "default", "cnp-web", "CiliumNetworkPolicy")
+	infos, err := c.GetCiliumNetworkPolicyInfo(t.Context(), "test-ctx", "default", "cnp-web", "CiliumNetworkPolicy")
 	require.NoError(t, err)
 	require.Len(t, infos, 1)
 	assert.Equal(t, "CiliumNetworkPolicy", infos[0].Kind)
@@ -294,7 +293,7 @@ func TestGetCiliumNetworkPolicyInfo_Clusterwide(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	infos, err := c.GetCiliumNetworkPolicyInfo(context.Background(), "test-ctx", "", "ccnp-all", "CiliumClusterwideNetworkPolicy")
+	infos, err := c.GetCiliumNetworkPolicyInfo(t.Context(), "test-ctx", "", "ccnp-all", "CiliumClusterwideNetworkPolicy")
 	require.NoError(t, err)
 	require.Len(t, infos, 1)
 	assert.Equal(t, "CiliumClusterwideNetworkPolicy", infos[0].Kind)
@@ -312,7 +311,7 @@ func TestGetCiliumNetworkPolicyInfo_MultiSpec(t *testing.T) {
 	)
 	c := NewTestClient(nil, dyn)
 
-	infos, err := c.GetCiliumNetworkPolicyInfo(context.Background(), "test-ctx", "default", "multi", "CiliumNetworkPolicy")
+	infos, err := c.GetCiliumNetworkPolicyInfo(t.Context(), "test-ctx", "default", "multi", "CiliumNetworkPolicy")
 	require.NoError(t, err)
 	require.Len(t, infos, 2)
 }
@@ -321,7 +320,7 @@ func TestGetCiliumNetworkPolicyInfo_NotFound(t *testing.T) {
 	dyn := netpolMatchFakeDyn()
 	c := NewTestClient(nil, dyn)
 
-	_, err := c.GetCiliumNetworkPolicyInfo(context.Background(), "test-ctx", "default", "missing", "CiliumNetworkPolicy")
+	_, err := c.GetCiliumNetworkPolicyInfo(t.Context(), "test-ctx", "default", "missing", "CiliumNetworkPolicy")
 	require.Error(t, err)
 }
 

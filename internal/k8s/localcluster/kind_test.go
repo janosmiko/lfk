@@ -16,7 +16,7 @@ func TestKindList_Empty(t *testing.T) {
 		},
 	}
 	p := newKindProvider(fake)
-	got, err := p.List(context.Background())
+	got, err := p.List(t.Context())
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestKindList_OneRunningCluster(t *testing.T) {
 		},
 	}
 	p := newKindProvider(fake)
-	got, err := p.List(context.Background())
+	got, err := p.List(t.Context())
 	if err != nil {
 		t.Fatalf("List: %v", err)
 	}
@@ -61,7 +61,7 @@ func TestKindList_DockerMissingMarksUnknown(t *testing.T) {
 		},
 	}
 	p := newKindProvider(fake)
-	got, _ := p.List(context.Background())
+	got, _ := p.List(t.Context())
 	if len(got) != 1 || got[0].Status != ClusterStatusUnknown {
 		t.Fatalf("expected single cluster with unknown status, got %+v", got)
 	}
@@ -75,7 +75,7 @@ func TestKindList_KindCLIError(t *testing.T) {
 		},
 	}
 	p := newKindProvider(fake)
-	_, err := p.List(context.Background())
+	_, err := p.List(t.Context())
 	if err == nil || !strings.Contains(err.Error(), "kind:") {
 		t.Fatalf("expected wrapped 'kind:' error, got %v", err)
 	}
@@ -92,7 +92,7 @@ func TestKindList_MultilineFiltered(t *testing.T) {
 		},
 	}
 	p := newKindProvider(fake)
-	got, _ := p.List(context.Background())
+	got, _ := p.List(t.Context())
 	if len(got) != 2 {
 		t.Fatalf("expected 2 clusters, got %d", len(got))
 	}
@@ -104,7 +104,7 @@ func TestKindCreate_BuildsArgvNameOnly(t *testing.T) {
 		RunFn:      func(context.Context, string, ...string) (string, string, int, error) { return "", "", 0, nil },
 	}
 	p := newKindProvider(fake)
-	if err := p.Create(context.Background(), CreateSpec{Name: "dev"}); err != nil {
+	if err := p.Create(t.Context(), CreateSpec{Name: "dev"}); err != nil {
 		t.Fatalf("Create: %v", err)
 	}
 	calls := fake.CallsSnapshot()
@@ -124,7 +124,7 @@ func TestKindCreate_BuildsArgvWithVersion(t *testing.T) {
 		RunFn:      func(context.Context, string, ...string) (string, string, int, error) { return "", "", 0, nil },
 	}
 	p := newKindProvider(fake)
-	_ = p.Create(context.Background(), CreateSpec{Name: "dev", K8sVersion: "v1.30.0"})
+	_ = p.Create(t.Context(), CreateSpec{Name: "dev", K8sVersion: "v1.30.0"})
 	got := strings.Join(fake.CallsSnapshot()[0].Args, " ")
 	want := "create cluster --name dev --image kindest/node:v1.30.0"
 	if got != want {
@@ -138,7 +138,7 @@ func TestKindCreate_BuildsArgvWithMultipleNodes(t *testing.T) {
 		RunFn:      func(context.Context, string, ...string) (string, string, int, error) { return "", "", 0, nil },
 	}
 	p := newKindProvider(fake)
-	_ = p.Create(context.Background(), CreateSpec{Name: "dev", Nodes: 3})
+	_ = p.Create(t.Context(), CreateSpec{Name: "dev", Nodes: 3})
 	got := strings.Join(fake.CallsSnapshot()[0].Args, " ")
 	if !strings.Contains(got, "--config") {
 		t.Fatalf("argv = %q, want --config flag for multi-node", got)
@@ -153,7 +153,7 @@ func TestKindCreate_PropagatesError(t *testing.T) {
 		},
 	}
 	p := newKindProvider(fake)
-	err := p.Create(context.Background(), CreateSpec{Name: "dev"})
+	err := p.Create(t.Context(), CreateSpec{Name: "dev"})
 	if err == nil || !strings.Contains(err.Error(), "kind:") {
 		t.Fatalf("expected wrapped 'kind:' error, got %v", err)
 	}
@@ -165,7 +165,7 @@ func TestKindDelete_BuildsArgv(t *testing.T) {
 		RunFn:      func(context.Context, string, ...string) (string, string, int, error) { return "", "", 0, nil },
 	}
 	p := newKindProvider(fake)
-	if err := p.Delete(context.Background(), "dev"); err != nil {
+	if err := p.Delete(t.Context(), "dev"); err != nil {
 		t.Fatalf("Delete: %v", err)
 	}
 	got := strings.Join(fake.CallsSnapshot()[0].Args, " ")
@@ -203,7 +203,7 @@ func TestKindContainerStatusMapping(t *testing.T) {
 					return tc.dockerStdout, "", 0, nil
 				},
 			}
-			got := kindContainerStatus(context.Background(), fake, "dev")
+			got := kindContainerStatus(t.Context(), fake, "dev")
 			if got != tc.want {
 				t.Fatalf("status for %q = %v, want %v", tc.dockerStdout, got, tc.want)
 			}

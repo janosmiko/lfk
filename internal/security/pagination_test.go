@@ -68,7 +68,7 @@ func TestListPaginatedAccumulatesPages(t *testing.T) {
 	const total = 753 // not a multiple of page size on purpose
 	f := &fakeLister{totalItems: total}
 
-	out, err := ListPaginated(context.Background(), f)
+	out, err := ListPaginated(t.Context(), f)
 	require.NoError(t, err)
 	assert.Len(t, out.Items, total)
 	// 753 / 200 page size = 4 pages (200, 200, 200, 153). pager's first
@@ -85,7 +85,7 @@ func TestListPaginatedAccumulatesPages(t *testing.T) {
 // List shape callers expect.
 func TestListPaginatedEmpty(t *testing.T) {
 	f := &fakeLister{totalItems: 0}
-	out, err := ListPaginated(context.Background(), f)
+	out, err := ListPaginated(t.Context(), f)
 	require.NoError(t, err)
 	assert.Empty(t, out.Items)
 	assert.Equal(t, 1, f.calls)
@@ -95,7 +95,7 @@ func TestListPaginatedEmpty(t *testing.T) {
 // still return all items and stop (no follow-up call).
 func TestListPaginatedSinglePage(t *testing.T) {
 	f := &fakeLister{totalItems: 50}
-	out, err := ListPaginated(context.Background(), f)
+	out, err := ListPaginated(t.Context(), f)
 	require.NoError(t, err)
 	assert.Len(t, out.Items, 50)
 	assert.Equal(t, 1, f.calls)
@@ -110,7 +110,7 @@ func TestListPaginatedPropagatesError(t *testing.T) {
 	wantErr := errors.New("connection lost")
 	f := &fakeLister{totalItems: 1000, failOnPage: 2, listErr: wantErr}
 
-	_, err := ListPaginated(context.Background(), f)
+	_, err := ListPaginated(t.Context(), f)
 	require.Error(t, err)
 	assert.ErrorIs(t, err, wantErr)
 }
@@ -121,7 +121,7 @@ func TestListPaginatedPropagatesError(t *testing.T) {
 // the walker stops requesting more pages.
 func TestListPaginatedRespectsCancellation(t *testing.T) {
 	f := &fakeLister{totalItems: 10_000}
-	ctx, cancel := context.WithCancel(context.Background())
+	ctx, cancel := context.WithCancel(t.Context())
 	cancel() // already cancelled
 
 	_, err := ListPaginated(ctx, f)

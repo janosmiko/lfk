@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +16,7 @@ func TestResolvePodsForWorkload_PodSelf(t *testing.T) {
 		ObjectMeta: metav1.ObjectMeta{Name: "pod-a", Namespace: "default"},
 	})
 	c := NewTestClient(cs, nil)
-	pods, err := c.resolvePodsForWorkload(context.Background(), "test-ctx", "default", "Pod", "pod-a")
+	pods, err := c.resolvePodsForWorkload(t.Context(), "test-ctx", "default", "Pod", "pod-a")
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"pod-a"}, pods)
 }
@@ -40,7 +39,7 @@ func TestResolvePodsForWorkload_DeploymentByLabels(t *testing.T) {
 	}
 	cs := fake.NewSimpleClientset(dep, pod1, pod2, other)
 	c := NewTestClient(cs, nil)
-	pods, err := c.resolvePodsForWorkload(context.Background(), "test-ctx", "default", "Deployment", "frontend")
+	pods, err := c.resolvePodsForWorkload(t.Context(), "test-ctx", "default", "Deployment", "frontend")
 	assert.NoError(t, err)
 	assert.ElementsMatch(t, []string{"frontend-aaa", "frontend-bbb"}, pods, "backend pod with non-matching labels must be excluded")
 }
@@ -57,7 +56,7 @@ func TestResolvePodsForWorkload_StatefulSetByLabels(t *testing.T) {
 	}
 	cs := fake.NewSimpleClientset(ss, pod)
 	c := NewTestClient(cs, nil)
-	pods, err := c.resolvePodsForWorkload(context.Background(), "test-ctx", "default", "StatefulSet", "db")
+	pods, err := c.resolvePodsForWorkload(t.Context(), "test-ctx", "default", "StatefulSet", "db")
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"db-0"}, pods)
 }
@@ -74,7 +73,7 @@ func TestResolvePodsForWorkload_DaemonSetByLabels(t *testing.T) {
 	}
 	cs := fake.NewSimpleClientset(ds, pod)
 	c := NewTestClient(cs, nil)
-	pods, err := c.resolvePodsForWorkload(context.Background(), "test-ctx", "default", "DaemonSet", "node-exporter")
+	pods, err := c.resolvePodsForWorkload(t.Context(), "test-ctx", "default", "DaemonSet", "node-exporter")
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"node-exporter-x"}, pods)
 }
@@ -91,7 +90,7 @@ func TestResolvePodsForWorkload_JobByLabels(t *testing.T) {
 	}
 	cs := fake.NewSimpleClientset(job, pod)
 	c := NewTestClient(cs, nil)
-	pods, err := c.resolvePodsForWorkload(context.Background(), "test-ctx", "default", "Job", "report")
+	pods, err := c.resolvePodsForWorkload(t.Context(), "test-ctx", "default", "Job", "report")
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"report-x"}, pods)
 }
@@ -114,7 +113,7 @@ func TestResolvePodsForWorkload_CronJobWalksJobs(t *testing.T) {
 	}
 	cs := fake.NewSimpleClientset(cj, job, pod)
 	c := NewTestClient(cs, nil)
-	pods, err := c.resolvePodsForWorkload(context.Background(), "test-ctx", "default", "CronJob", "report")
+	pods, err := c.resolvePodsForWorkload(t.Context(), "test-ctx", "default", "CronJob", "report")
 	assert.NoError(t, err)
 	assert.Equal(t, []string{"report-1-pod"}, pods)
 }
@@ -122,6 +121,6 @@ func TestResolvePodsForWorkload_CronJobWalksJobs(t *testing.T) {
 func TestResolvePodsForWorkload_UnsupportedKind(t *testing.T) {
 	cs := fake.NewSimpleClientset()
 	c := NewTestClient(cs, nil)
-	_, err := c.resolvePodsForWorkload(context.Background(), "test-ctx", "default", "Service", "x")
+	_, err := c.resolvePodsForWorkload(t.Context(), "test-ctx", "default", "Service", "x")
 	assert.Error(t, err, "kinds outside the in-scope set must error")
 }

@@ -2,7 +2,6 @@ package app
 
 import (
 	"bytes"
-	"context"
 	"log/slog"
 	"testing"
 
@@ -40,7 +39,7 @@ func TestBulkScaleResources_UnionRoutesPerItemCluster(t *testing.T) {
 	// happens when an unrelated Deployment object is in the fake clientset).
 	// What we care about is the routing log line emitted before the call.
 	m := baseModelWithFakeClient()
-	m.reqCtx = context.Background()
+	m.reqCtx = t.Context()
 	m.bulkItems = []model.Item{
 		{Name: "blue-app", Namespace: "ns1", ClusterName: "blue"},
 		{Name: "green-app", Namespace: "ns1", ClusterName: "green"},
@@ -70,7 +69,7 @@ func TestBatchPatchLabels_UnionRoutesPerItemCluster(t *testing.T) {
 	buf := captureLogger(t)
 
 	m := baseModelWithFakeClient()
-	m.reqCtx = context.Background()
+	m.reqCtx = t.Context()
 	m.bulkItems = []model.Item{
 		{Name: "pod-blue", Namespace: "ns1", ClusterName: "blue"},
 		{Name: "pod-green", Namespace: "ns1", ClusterName: "green"},

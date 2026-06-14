@@ -1,7 +1,6 @@
 package rbac
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -49,7 +48,7 @@ func rule(verbs, apiGroups, resources []string) rbacv1.PolicyRule {
 func fetchChecks(t *testing.T, objs ...runtime.Object) map[string]map[string]bool {
 	t.Helper()
 	s := NewWithClient(fake.NewSimpleClientset(objs...))
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	out := map[string]map[string]bool{}
 	for _, f := range findings {
@@ -68,11 +67,11 @@ func TestSourceMetadata(t *testing.T) {
 	s := NewWithClient(fake.NewSimpleClientset())
 	assert.Equal(t, "rbac", s.Name())
 	assert.Equal(t, []security.Category{security.CategoryMisconfig}, s.Categories())
-	ok, err := s.IsAvailable(context.Background(), "")
+	ok, err := s.IsAvailable(t.Context(), "")
 	require.NoError(t, err)
 	assert.True(t, ok)
 
-	findings, err := New().Fetch(context.Background(), "", "")
+	findings, err := New().Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	assert.Empty(t, findings, "nil client fetches nothing")
 }
@@ -204,7 +203,7 @@ func TestForbiddenListsSkipDependentChecks(t *testing.T) {
 		client.PrependReactor("list", "clusterroles", func(k8stesting.Action) (bool, runtime.Object, error) {
 			return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "clusterroles"}, "", nil)
 		})
-		findings, err := NewWithClient(client).Fetch(context.Background(), "", "")
+		findings, err := NewWithClient(client).Fetch(t.Context(), "", "")
 		require.NoError(t, err)
 		var masters bool
 		for _, f := range findings {
@@ -219,7 +218,7 @@ func TestForbiddenListsSkipDependentChecks(t *testing.T) {
 		client.PrependReactor("list", "clusterrolebindings", func(k8stesting.Action) (bool, runtime.Object, error) {
 			return true, nil, apierrors.NewForbidden(schema.GroupResource{Resource: "clusterrolebindings"}, "", nil)
 		})
-		findings, err := NewWithClient(client).Fetch(context.Background(), "", "")
+		findings, err := NewWithClient(client).Fetch(t.Context(), "", "")
 		require.NoError(t, err)
 		for _, f := range findings {
 			assert.NotEqual(t, "rbac_secrets_cluster_wide", f.Labels["check"],

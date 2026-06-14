@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -48,7 +47,7 @@ func TestGetSecurityFindingsCached_ColdThenWarm(t *testing.T) {
 	assert.Equal(t, int32(0), src.FetchCalls.Load(), "cached getter must never trigger a scan")
 
 	// Warm the shared scan.
-	_, err = mgr.FetchAll(context.Background(), "kctx", "")
+	_, err = mgr.FetchAll(t.Context(), "kctx", "")
 	require.NoError(t, err)
 	require.Equal(t, int32(1), src.FetchCalls.Load())
 
@@ -70,7 +69,7 @@ func TestGetSecurityAffectedResourcesCached_ColdThenWarm(t *testing.T) {
 	assert.False(t, ok, "cold cache reports not-cached")
 	assert.Equal(t, int32(0), src.FetchCalls.Load())
 
-	_, err = mgr.FetchAll(context.Background(), "kctx", "")
+	_, err = mgr.FetchAll(t.Context(), "kctx", "")
 	require.NoError(t, err)
 
 	items, ok, err := c.GetSecurityAffectedResourcesCached("kctx", "", rt, "privileged")

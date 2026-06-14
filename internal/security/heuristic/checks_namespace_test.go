@@ -1,7 +1,6 @@
 package heuristic
 
 import (
-	"context"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -44,7 +43,7 @@ func netpol(ns, name string) *networkingv1.NetworkPolicy {
 
 func checksByResource(t *testing.T, s *Source) map[string]map[string]bool {
 	t.Helper()
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	out := map[string]map[string]bool{}
 	for _, f := range findings {
@@ -93,7 +92,7 @@ func TestNamespaceChecksBestEffort(t *testing.T) {
 	forbidList(client, "namespaces")
 	forbidList(client, "networkpolicies")
 	s := NewWithClient(client)
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	for _, f := range findings {
 		assert.NotEqual(t, "psa_labels_missing", f.Labels["check"])
@@ -103,7 +102,7 @@ func TestNamespaceChecksBestEffort(t *testing.T) {
 
 func TestNamespaceFindingCategory(t *testing.T) {
 	s := NewWithClient(fake.NewSimpleClientset(namespaceObj("prod", nil)))
-	findings, err := s.Fetch(context.Background(), "", "")
+	findings, err := s.Fetch(t.Context(), "", "")
 	require.NoError(t, err)
 	require.NotEmpty(t, findings)
 	for _, f := range findings {

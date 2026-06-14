@@ -1,7 +1,6 @@
 package k8s
 
 import (
-	"context"
 	"math"
 	"testing"
 
@@ -326,7 +325,7 @@ func TestFetchWaveAnnotations_ReadsFromAnnotation(t *testing.T) {
 		// Resource with SyncStatus=Missing must be skipped, no fetch attempted.
 		{Group: "", Version: "v1", Kind: "Service", Namespace: "default", Name: "missing", SyncStatus: "Missing"},
 	}
-	got, err := c.fetchWaveAnnotations(context.Background(), "", in)
+	got, err := c.fetchWaveAnnotations(t.Context(), "", in)
 	require.NoError(t, err)
 	require.Len(t, got, 3)
 
@@ -358,7 +357,7 @@ func TestFetchWaveAnnotations_MissingAnnotationDefaultsToZero(t *testing.T) {
 	in := []SyncWaveResource{
 		{Group: "", Version: "v1", Kind: "ConfigMap", Namespace: "default", Name: "config"},
 	}
-	got, err := c.fetchWaveAnnotations(context.Background(), "", in)
+	got, err := c.fetchWaveAnnotations(t.Context(), "", in)
 	require.NoError(t, err)
 	require.Len(t, got, 1)
 	assert.Equal(t, 0, got[0].wave, "missing annotation must default to wave 0")
@@ -371,7 +370,7 @@ func TestFetchWaveAnnotations_PerResourceErrorIsNonFatal(t *testing.T) {
 	in := []SyncWaveResource{
 		{Group: "apps", Version: "v1", Kind: "Deployment", Namespace: "default", Name: "ghost"},
 	}
-	got, err := c.fetchWaveAnnotations(context.Background(), "", in)
+	got, err := c.fetchWaveAnnotations(t.Context(), "", in)
 	require.NoError(t, err) // top-level call succeeds
 	require.Len(t, got, 1)
 	assert.Equal(t, unknownWave, got[0].wave)
@@ -396,7 +395,7 @@ func TestFetchWaveAnnotations_BadAnnotationLandsAtUnknown(t *testing.T) {
 	in := []SyncWaveResource{
 		{Group: "apps", Version: "v1", Kind: "Deployment", Namespace: "default", Name: "api"},
 	}
-	got, _ := c.fetchWaveAnnotations(context.Background(), "", in)
+	got, _ := c.fetchWaveAnnotations(t.Context(), "", in)
 	require.Len(t, got, 1)
 	assert.Equal(t, unknownWave, got[0].wave)
 }
@@ -457,7 +456,7 @@ func TestGetSyncWaveTimelineSkeleton_FastPath(t *testing.T) {
 	dc := newFakeDynClient(app, deploy, cm)
 	c := newFakeClient(nil, dc)
 
-	tl, err := c.GetSyncWaveTimelineSkeleton(context.Background(), "", "argocd", "my-app")
+	tl, err := c.GetSyncWaveTimelineSkeleton(t.Context(), "", "argocd", "my-app")
 	require.NoError(t, err)
 	require.NotNil(t, tl)
 
@@ -498,7 +497,7 @@ func TestGetSyncWaveTimelineSkeleton_FastPath(t *testing.T) {
 func TestGetSyncWaveTimelineSkeleton_AppNotFound(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
-	_, err := c.GetSyncWaveTimelineSkeleton(context.Background(), "", "argocd", "ghost")
+	_, err := c.GetSyncWaveTimelineSkeleton(t.Context(), "", "argocd", "ghost")
 	require.Error(t, err)
 }
 
@@ -551,7 +550,7 @@ func TestGetSyncWaveTimeline_FullPath(t *testing.T) {
 	dc := newFakeDynClient(app, deploy, cm)
 	c := newFakeClient(nil, dc)
 
-	tl, err := c.GetSyncWaveTimeline(context.Background(), "", "argocd", "my-app")
+	tl, err := c.GetSyncWaveTimeline(t.Context(), "", "argocd", "my-app")
 	require.NoError(t, err)
 	require.NotNil(t, tl)
 
@@ -596,7 +595,7 @@ func TestGetSyncWaveTimeline_FullPath(t *testing.T) {
 func TestGetSyncWaveTimeline_AppNotFound(t *testing.T) {
 	dc := newFakeDynClient()
 	c := newFakeClient(nil, dc)
-	_, err := c.GetSyncWaveTimeline(context.Background(), "", "argocd", "ghost")
+	_, err := c.GetSyncWaveTimeline(t.Context(), "", "argocd", "ghost")
 	require.Error(t, err)
 }
 
@@ -610,7 +609,7 @@ func TestGetSyncWaveTimeline_EmptyApp(t *testing.T) {
 	}
 	dc := newFakeDynClient(app)
 	c := newFakeClient(nil, dc)
-	tl, err := c.GetSyncWaveTimeline(context.Background(), "", "argocd", "empty")
+	tl, err := c.GetSyncWaveTimeline(t.Context(), "", "argocd", "empty")
 	require.NoError(t, err)
 	assert.Equal(t, "empty", tl.AppName)
 	// Even when the Application has no status, the timeline must still
