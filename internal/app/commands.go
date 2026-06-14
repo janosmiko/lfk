@@ -12,6 +12,7 @@ import (
 
 	"github.com/atotto/clipboard"
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/logger"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
@@ -186,10 +187,16 @@ func (m Model) loadPodsForAction() tea.Cmd {
 	ns := m.actionNamespace()
 	kind := m.actionCtx.kind
 	name := m.actionCtx.name
-	return func() tea.Msg {
-		items, err := m.client.GetOwnedResources(context.Background(), kctx, ns, kind, name)
-		return podSelectMsg{items: items, err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"List pods: "+kind+"/"+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			items, err := m.client.GetOwnedResources(ctx, kctx, ns, kind, name)
+			return podSelectMsg{items: items, err: err}
+		},
+	)
 }
 
 // loadPodsForLogAction fetches pods matching the parent resource's selector using kubectl.
@@ -259,16 +266,22 @@ func (m Model) loadContainersForAction() tea.Cmd {
 	kctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	podName := m.actionCtx.name
-	return func() tea.Msg {
-		items, err := m.client.GetContainers(context.Background(), kctx, ns, podName)
-		// Reverse order for the selector: regular containers first (reversed),
-		// then init/sidecar containers (reversed), so the most relevant
-		// container is at the top.
-		for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
-			items[i], items[j] = items[j], items[i]
-		}
-		return containerSelectMsg{items: items, err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindContainers,
+		"List containers (action)",
+		bgtaskTarget(kctx, ns)+" / "+podName,
+		func(ctx context.Context) tea.Msg {
+			items, err := m.client.GetContainers(ctx, kctx, ns, podName)
+			// Reverse order for the selector: regular containers first (reversed),
+			// then init/sidecar containers (reversed), so the most relevant
+			// container is at the top.
+			for i, j := 0, len(items)-1; i < j; i, j = i+1, j-1 {
+				items[i], items[j] = items[j], items[i]
+			}
+			return containerSelectMsg{items: items, err: err}
+		},
+	)
 }
 
 // loadContainersForLogFilter fetches the container list for the current pod in the log viewer.
@@ -277,17 +290,23 @@ func (m Model) loadContainersForLogFilter() tea.Cmd {
 	kctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	podName := m.actionCtx.name
-	return func() tea.Msg {
-		items, err := m.client.GetContainers(context.Background(), kctx, ns, podName)
-		if err != nil {
-			return logContainersLoadedMsg{err: err}
-		}
-		var names []string
-		for _, item := range items {
-			names = append(names, item.Name)
-		}
-		return logContainersLoadedMsg{containers: names}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindContainers,
+		"List containers (log filter)",
+		bgtaskTarget(kctx, ns)+" / "+podName,
+		func(ctx context.Context) tea.Msg {
+			items, err := m.client.GetContainers(ctx, kctx, ns, podName)
+			if err != nil {
+				return logContainersLoadedMsg{err: err}
+			}
+			var names []string
+			for _, item := range items {
+				names = append(names, item.Name)
+			}
+			return logContainersLoadedMsg{containers: names}
+		},
+	)
 }
 
 // clearBeforeExec wraps cmd to clear the terminal screen before running it.

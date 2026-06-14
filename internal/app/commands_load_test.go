@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -14,6 +15,7 @@ import (
 
 func TestCov80LoadContainersForLogFilter(t *testing.T) {
 	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
 	m.actionCtx = actionContext{
 		context:   "test-ctx",
 		name:      "my-pod",
@@ -21,7 +23,7 @@ func TestCov80LoadContainersForLogFilter(t *testing.T) {
 	}
 	cmd := m.loadContainersForLogFilter()
 	require.NotNil(t, cmd)
-	msg := cmd()
+	msg := execScheduled(t, m, cmd)
 	lmsg, ok := msg.(logContainersLoadedMsg)
 	require.True(t, ok)
 	// Fake client returns empty containers, so err is set or containers is empty.
@@ -30,6 +32,7 @@ func TestCov80LoadContainersForLogFilter(t *testing.T) {
 
 func TestCov80LoadContainersForLogFilterNoPod(t *testing.T) {
 	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
 	m.actionCtx = actionContext{
 		context:   "test-ctx",
 		name:      "nonexistent-pod",
@@ -37,7 +40,7 @@ func TestCov80LoadContainersForLogFilterNoPod(t *testing.T) {
 	}
 	cmd := m.loadContainersForLogFilter()
 	require.NotNil(t, cmd)
-	msg := cmd()
+	msg := execScheduled(t, m, cmd)
 	_, ok := msg.(logContainersLoadedMsg)
 	assert.True(t, ok)
 }
@@ -812,7 +815,7 @@ func TestCovLoadDiff(t *testing.T) {
 	itemA := model.Item{Name: "cm-1", Namespace: "default"}
 	itemB := model.Item{Name: "cm-2", Namespace: "default"}
 	cmd := m.loadDiff(rt, itemA, itemB)
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(diffLoadedMsg)
 	require.True(t, ok)
 	assert.NoError(t, result.err)
@@ -832,7 +835,7 @@ func TestCovLoadDiffDifferentNamespaces(t *testing.T) {
 	itemA := model.Item{Name: "cm-1", Namespace: "ns-a"}
 	itemB := model.Item{Name: "cm-2", Namespace: "ns-b"}
 	cmd := m.loadDiff(rt, itemA, itemB)
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(diffLoadedMsg)
 	require.True(t, ok)
 	// Items don't exist so we expect an error.
@@ -971,7 +974,7 @@ func TestCovLoadSecretData(t *testing.T) {
 	m := baseModelWithFakeClient(secret)
 	m = withMiddleItem(m, model.Item{Name: "my-secret", Namespace: "default"})
 	cmd := m.loadSecretData()
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(secretDataLoadedMsg)
 	require.True(t, ok)
 	assert.NoError(t, result.err)
@@ -1023,7 +1026,7 @@ func TestCovLoadConfigMapData(t *testing.T) {
 	m := baseModelWithFakeClient(cm)
 	m = withMiddleItem(m, model.Item{Name: "my-cm", Namespace: "default"})
 	cmd := m.loadConfigMapData()
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(configMapDataLoadedMsg)
 	require.True(t, ok)
 	assert.NoError(t, result.err)

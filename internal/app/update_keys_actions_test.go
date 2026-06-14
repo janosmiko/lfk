@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 	"github.com/janosmiko/lfk/internal/ui"
 )
@@ -895,13 +896,14 @@ func TestCopyYAMLSelectionFilteredOutFallsBack(t *testing.T) {
 // TestUpdateYamlClipboardCountAwareStatus/bulk against the receiver directly.
 func TestCopyYAMLBulkErrorWrapsNamespaceName(t *testing.T) {
 	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
 	m.toggleSelection(m.middleItems[0]) // default/pod-1
 	m.toggleSelection(m.middleItems[1]) // ns-2/pod-2
 
 	cmd := m.copyYAMLToClipboard()
 	require.NotNil(t, cmd)
 
-	ymsg, ok := cmd().(yamlClipboardMsg)
+	ymsg, ok := execScheduled(t, m, cmd).(yamlClipboardMsg)
 	require.True(t, ok)
 	require.Error(t, ymsg.err, "fake client has no pods seeded; first fetch must fail")
 	assert.Contains(t, ymsg.err.Error(), "default/pod-1",
@@ -1027,6 +1029,7 @@ func TestUpdateYamlClipboardCountAwareStatus(t *testing.T) {
 // assertion pins down which branch ran.
 func TestCopyYAMLBulkLevelOwnedWrapsErrorWithNamespaceName(t *testing.T) {
 	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
 	m.nav.Level = model.LevelOwned
 	m.toggleSelection(m.middleItems[0]) // default/pod-1
 	m.toggleSelection(m.middleItems[1]) // ns-2/pod-2
@@ -1034,7 +1037,7 @@ func TestCopyYAMLBulkLevelOwnedWrapsErrorWithNamespaceName(t *testing.T) {
 	cmd := m.copyYAMLToClipboard()
 	require.NotNil(t, cmd)
 
-	ymsg, ok := cmd().(yamlClipboardMsg)
+	ymsg, ok := execScheduled(t, m, cmd).(yamlClipboardMsg)
 	require.True(t, ok)
 	require.Error(t, ymsg.err, "fake client has no pods seeded; first fetch must fail")
 	assert.Contains(t, ymsg.err.Error(), "default/pod-1",
@@ -1074,6 +1077,7 @@ func TestCopyYAMLBulkLevelOwnedDispatcherShowsFetchingStatus(t *testing.T) {
 // confirms the bulk path was taken rather than the single-pod fallthrough.
 func TestCopyYAMLLevelContainersBulkSelection(t *testing.T) {
 	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
 	m.nav.Level = model.LevelContainers
 	m.nav.OwnedName = "pod-1"
 	m.middleItems = []model.Item{
@@ -1096,7 +1100,7 @@ func TestCopyYAMLLevelContainersBulkSelection(t *testing.T) {
 		"LevelContainers now supports bulk; dispatcher must show the fetching toast")
 	require.NotNil(t, cmd, "must still dispatch a bulk fetch")
 
-	ymsg, ok := cmd().(yamlClipboardMsg)
+	ymsg, ok := execScheduled(t, r, cmd).(yamlClipboardMsg)
 	require.True(t, ok)
 	require.Error(t, ymsg.err, "fake client has no pod seeded; Pod GET must fail")
 	assert.Contains(t, ymsg.err.Error(), "default/pod-1",

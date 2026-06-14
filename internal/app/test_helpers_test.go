@@ -614,6 +614,19 @@ func execCmd(t *testing.T, cmd tea.Cmd) tea.Msg {
 	return cmd()
 }
 
+// execScheduled runs a cmd that was Submitted to m.scheduler via scheduleK8sCall.
+// Such a cmd blocks until a worker delivers its Future, so the model's scheduler
+// must have workers running. StartWorkers retroactively spawns pools for queues
+// created by an earlier synchronous Submit, so starting here (after the cmd is
+// built) is sufficient. Workers are stopped before returning to avoid leaks.
+func execScheduled(t *testing.T, m Model, cmd tea.Cmd) tea.Msg {
+	t.Helper()
+	require.NotNil(t, cmd)
+	m.scheduler.StartWorkers()
+	defer m.scheduler.StopWorkers()
+	return cmd()
+}
+
 func keyMsg(s string) tea.KeyMsg {
 	switch s {
 	case "esc":

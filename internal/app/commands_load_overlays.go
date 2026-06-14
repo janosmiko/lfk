@@ -1,10 +1,12 @@
 package app
 
 import (
+	"context"
 	"fmt"
 
 	tea "github.com/charmbracelet/bubbletea"
 
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -49,9 +51,14 @@ func (m Model) loadRightsizing() tea.Cmd {
 	}
 
 	client := m.client
-	reqCtx := m.reqCtx
-	return func() tea.Msg {
-		data, err := client.GetRightsizing(reqCtx, ctx.context, ctx.namespace, ctx.kind, ctx.name, strategy, headroom)
-		return rightsizingLoadedMsg{key: key, data: data, err: err, generation: gen}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityLow,
+		scheduler.KindMetrics,
+		"Rightsizing: "+ctx.name,
+		bgtaskTarget(ctx.context, ctx.namespace),
+		func(reqCtx context.Context) tea.Msg {
+			data, err := client.GetRightsizing(reqCtx, ctx.context, ctx.namespace, ctx.kind, ctx.name, strategy, headroom)
+			return rightsizingLoadedMsg{key: key, data: data, err: err, generation: gen}
+		},
+	)
 }

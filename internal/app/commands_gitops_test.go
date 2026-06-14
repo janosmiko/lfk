@@ -238,7 +238,7 @@ func TestCovWatchArgoWorkflow(t *testing.T) {
 	m := baseModelWithFakeClient()
 	m = withActionCtx(m, "my-wf", "argo", "Workflow", model.ResourceTypeEntry{})
 	cmd := m.watchArgoWorkflow()
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(describeLoadedMsg)
 	require.True(t, ok)
 	assert.Error(t, result.err)
@@ -347,7 +347,7 @@ func TestCovLoadAutoSyncConfig(t *testing.T) {
 	item := model.Item{Name: "my-app", Namespace: "argocd"}
 	m = withMiddleItem(m, item)
 	cmd := m.loadAutoSyncConfig()
-	msg := execCmd(t, cmd)
+	msg := execScheduled(t, m, cmd)
 	result, ok := msg.(autoSyncLoadedMsg)
 	require.True(t, ok)
 	assert.Error(t, result.err)

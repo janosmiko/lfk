@@ -557,7 +557,6 @@ func (m Model) loadDiff(rt model.ResourceTypeEntry, itemA, itemB model.Item) tea
 		}
 	}
 	kctx := m.nav.Context
-	reqCtx := m.reqCtx
 
 	resolveCtx := func(item model.Item) string {
 		if item.ClusterName != "" {
@@ -591,22 +590,28 @@ func (m Model) loadDiff(rt model.ResourceTypeEntry, itemA, itemB model.Item) tea
 		rightLabel = ctxB + "/" + rightLabel
 	}
 
-	return func() tea.Msg {
-		yamlA, errA := m.client.GetResourceYAML(reqCtx, ctxA, nsA, rt, nameA)
-		if errA != nil {
-			return diffLoadedMsg{err: fmt.Errorf("fetching %s: %w", nameA, errA)}
-		}
-		yamlB, errB := m.client.GetResourceYAML(reqCtx, ctxB, nsB, rt, nameB)
-		if errB != nil {
-			return diffLoadedMsg{err: fmt.Errorf("fetching %s: %w", nameB, errB)}
-		}
-		return diffLoadedMsg{
-			left:      yamlA,
-			right:     yamlB,
-			leftName:  leftLabel,
-			rightName: rightLabel,
-		}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindYAMLFetch,
+		"Diff: "+nameA+" vs "+nameB,
+		bgtaskTarget(kctx, nsA),
+		func(ctx context.Context) tea.Msg {
+			yamlA, errA := m.client.GetResourceYAML(ctx, ctxA, nsA, rt, nameA)
+			if errA != nil {
+				return diffLoadedMsg{err: fmt.Errorf("fetching %s: %w", nameA, errA)}
+			}
+			yamlB, errB := m.client.GetResourceYAML(ctx, ctxB, nsB, rt, nameB)
+			if errB != nil {
+				return diffLoadedMsg{err: fmt.Errorf("fetching %s: %w", nameB, errB)}
+			}
+			return diffLoadedMsg{
+				left:      yamlA,
+				right:     yamlB,
+				leftName:  leftLabel,
+				rightName: rightLabel,
+			}
+		},
+	)
 }
 
 // resolveNamespace returns the namespace to use for get/describe operations.
@@ -630,12 +635,17 @@ func (m Model) loadRevisions() tea.Cmd {
 	}
 	name := sel.Name
 	client := m.client
-	reqCtx := m.reqCtx
 
-	return func() tea.Msg {
-		revs, err := client.GetDeploymentRevisions(reqCtx, kctx, ns, name)
-		return revisionListMsg{revisions: revs, err: err}
-	}
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Revisions: "+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			revs, err := client.GetDeploymentRevisions(ctx, kctx, ns, name)
+			return revisionListMsg{revisions: revs, err: err}
+		},
+	)
 }
 
 // bgtaskTarget formats a context+namespace pair for the :tasks overlay's

@@ -1833,12 +1833,13 @@ func TestCov80CopyYAMLLevelResources(t *testing.T) {
 
 func TestCov80CopyYAMLLevelOwnedPod(t *testing.T) {
 	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
 	m.nav.Level = model.LevelOwned
 	m.middleItems = []model.Item{{Name: "pod-1", Kind: "Pod", Namespace: "default"}}
 	m.setCursor(0)
 	cmd := m.copyYAMLToClipboard()
 	require.NotNil(t, cmd)
-	ymsg, ok := cmd().(yamlClipboardMsg)
+	ymsg, ok := execScheduled(t, m, cmd).(yamlClipboardMsg)
 	require.True(t, ok)
 	assert.Equal(t, 1, ymsg.count, "single-item path must tag count=1")
 }
@@ -1867,13 +1868,14 @@ func TestCov80CopyYAMLLevelOwnedUnknownKind(t *testing.T) {
 
 func TestCov80CopyYAMLLevelContainers(t *testing.T) {
 	m := basePush80Model()
+	m.scheduler = scheduler.New(0)
 	m.nav.Level = model.LevelContainers
 	m.nav.OwnedName = "pod-1"
 	m.middleItems = []model.Item{{Name: "container-1"}}
 	m.setCursor(0)
 	cmd := m.copyYAMLToClipboard()
 	require.NotNil(t, cmd)
-	ymsg, ok := cmd().(yamlClipboardMsg)
+	ymsg, ok := execScheduled(t, m, cmd).(yamlClipboardMsg)
 	require.True(t, ok)
 	assert.Equal(t, 1, ymsg.count, "single-item path must tag count=1")
 }

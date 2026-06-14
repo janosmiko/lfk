@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	tea "github.com/charmbracelet/bubbletea"
+	"github.com/janosmiko/lfk/internal/app/scheduler"
 	"github.com/janosmiko/lfk/internal/model"
 )
 
@@ -32,6 +33,12 @@ func writeSecureFile(path string, data []byte) error {
 }
 
 // copyYAMLToClipboard fetches the YAML for the selected resource and sends it for clipboard copy.
+//
+// Every fetch routes through scheduleK8sCall (KindYAMLFetch) so it shares the
+// bounded worker pool, priority lanes, and gen-based cancellation with the rest
+// of the K8s reads. The task names are deliberately distinct from the "YAML: …"
+// preview path so a copy never coalesces onto an in-flight preview fetch (which
+// would deliver the copy a nil result and silently drop it).
 func (m Model) copyYAMLToClipboard() tea.Cmd {
 	// Synthetic security items (e.g., __security_affected_resource__) have
 	// no YAML; short-circuit to avoid "unknown resource type" warnings.
@@ -40,6 +47,7 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 	}
 	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
+	target := bgtaskTarget(kctx, ns)
 
 	switch m.nav.Level {
 	case model.LevelResources:
@@ -66,19 +74,21 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 				}
 				targets[i] = fetchTarget{ns: itemNs, name: it.Name, ctx: itemCtx}
 			}
-			return func() tea.Msg {
-				docs := make([]string, 0, len(targets))
-				var failures []string
-				for _, t := range targets {
-					content, err := m.client.GetResourceYAML(context.Background(), t.ctx, t.ns, rt, t.name)
-					if err != nil {
-						failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
-						continue
+			return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+				fmt.Sprintf("Copy YAML (%d items)", len(targets)), target,
+				func(ctx context.Context) tea.Msg {
+					docs := make([]string, 0, len(targets))
+					var failures []string
+					for _, t := range targets {
+						content, err := m.client.GetResourceYAML(ctx, t.ctx, t.ns, rt, t.name)
+						if err != nil {
+							failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+							continue
+						}
+						docs = append(docs, strings.TrimRight(content, "\n"))
 					}
-					docs = append(docs, strings.TrimRight(content, "\n"))
-				}
-				return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
-			}
+					return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
+				})
 		}
 		sel := m.selectedMiddleItem()
 		if sel == nil {
@@ -93,10 +103,12 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 		if sel.ClusterName != "" {
 			itemCtx = sel.ClusterName
 		}
-		return func() tea.Msg {
-			content, err := m.client.GetResourceYAML(context.Background(), itemCtx, itemNs, rt, name)
-			return yamlClipboardMsg{content: content, count: 1, err: err}
-		}
+		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+			"Copy YAML: "+name, target,
+			func(ctx context.Context) tea.Msg {
+				content, err := m.client.GetResourceYAML(ctx, itemCtx, itemNs, rt, name)
+				return yamlClipboardMsg{content: content, count: 1, err: err}
+			})
 	case model.LevelOwned:
 		// Bulk path mirrors LevelResources: gate on visible selection so a
 		// selection that's been filtered out of view falls through to the
@@ -124,30 +136,32 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 				}
 				targets[i] = t
 			}
-			return func() tea.Msg {
-				docs := make([]string, 0, len(targets))
-				var failures []string
-				for _, t := range targets {
-					var (
-						content string
-						err     error
-					)
-					switch {
-					case t.isPod:
-						content, err = m.client.GetPodYAML(context.Background(), kctx, t.ns, t.name)
-					case t.resolved:
-						content, err = m.client.GetResourceYAML(context.Background(), kctx, t.ns, t.rt, t.name)
-					default:
-						err = fmt.Errorf("unknown resource type: %s", t.kind)
+			return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+				fmt.Sprintf("Copy YAML (%d items)", len(targets)), target,
+				func(ctx context.Context) tea.Msg {
+					docs := make([]string, 0, len(targets))
+					var failures []string
+					for _, t := range targets {
+						var (
+							content string
+							err     error
+						)
+						switch {
+						case t.isPod:
+							content, err = m.client.GetPodYAML(ctx, kctx, t.ns, t.name)
+						case t.resolved:
+							content, err = m.client.GetResourceYAML(ctx, kctx, t.ns, t.rt, t.name)
+						default:
+							err = fmt.Errorf("unknown resource type: %s", t.kind)
+						}
+						if err != nil {
+							failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+							continue
+						}
+						docs = append(docs, strings.TrimRight(content, "\n"))
 					}
-					if err != nil {
-						failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
-						continue
-					}
-					docs = append(docs, strings.TrimRight(content, "\n"))
-				}
-				return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
-			}
+					return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
+				})
 		}
 		sel := m.selectedMiddleItem()
 		if sel == nil {
@@ -159,10 +173,12 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 			itemNs = sel.Namespace
 		}
 		if sel.Kind == "Pod" {
-			return func() tea.Msg {
-				content, err := m.client.GetPodYAML(context.Background(), kctx, itemNs, name)
-				return yamlClipboardMsg{content: content, count: 1, err: err}
-			}
+			return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+				"Copy YAML: "+name, target,
+				func(ctx context.Context) tea.Msg {
+					content, err := m.client.GetPodYAML(ctx, kctx, itemNs, name)
+					return yamlClipboardMsg{content: content, count: 1, err: err}
+				})
 		}
 		rt, ok := m.resolveOwnedResourceType(sel)
 		if !ok {
@@ -170,10 +186,12 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 				return yamlClipboardMsg{err: fmt.Errorf("unknown resource type: %s", sel.Kind)}
 			}
 		}
-		return func() tea.Msg {
-			content, err := m.client.GetResourceYAML(context.Background(), kctx, itemNs, rt, name)
-			return yamlClipboardMsg{content: content, count: 1, err: err}
-		}
+		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+			"Copy YAML: "+name, target,
+			func(ctx context.Context) tea.Msg {
+				content, err := m.client.GetResourceYAML(ctx, kctx, itemNs, rt, name)
+				return yamlClipboardMsg{content: content, count: 1, err: err}
+			})
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
 		// Bulk path: if the user has selected N containers in this Pod,
@@ -186,22 +204,26 @@ func (m Model) copyYAMLToClipboard() tea.Cmd {
 			for i, it := range items {
 				names[i] = it.Name
 			}
-			return func() tea.Msg {
-				content, err := m.client.GetPodYAML(context.Background(), kctx, ns, podName)
-				if err != nil {
-					return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", ns, podName, err)}
-				}
-				out, err := ExtractContainerBlocksYAML(content, names)
-				if err != nil {
-					return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", ns, podName, err)}
-				}
-				return yamlClipboardMsg{content: out, count: len(names)}
-			}
+			return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+				"Copy YAML: "+podName, target,
+				func(ctx context.Context) tea.Msg {
+					content, err := m.client.GetPodYAML(ctx, kctx, ns, podName)
+					if err != nil {
+						return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", ns, podName, err)}
+					}
+					out, err := ExtractContainerBlocksYAML(content, names)
+					if err != nil {
+						return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", ns, podName, err)}
+					}
+					return yamlClipboardMsg{content: out, count: len(names)}
+				})
 		}
-		return func() tea.Msg {
-			content, err := m.client.GetPodYAML(context.Background(), kctx, ns, podName)
-			return yamlClipboardMsg{content: content, count: 1, err: err}
-		}
+		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+			"Copy YAML: "+podName, target,
+			func(ctx context.Context) tea.Msg {
+				content, err := m.client.GetPodYAML(ctx, kctx, ns, podName)
+				return yamlClipboardMsg{content: content, count: 1, err: err}
+			})
 	}
 	return nil
 }
@@ -228,6 +250,7 @@ func (m Model) copyYAMLForScope(scope []model.Item) tea.Cmd {
 	}
 	kctx := m.nav.Context
 	ns := m.resolveNamespace()
+	target := bgtaskTarget(kctx, ns)
 
 	switch m.nav.Level {
 	case model.LevelResources:
@@ -243,19 +266,21 @@ func (m Model) copyYAMLForScope(scope []model.Item) tea.Cmd {
 			}
 			targets[i] = fetchTarget{ns: itemNs, name: it.Name}
 		}
-		return func() tea.Msg {
-			docs := make([]string, 0, len(targets))
-			var failures []string
-			for _, t := range targets {
-				content, err := m.client.GetResourceYAML(context.Background(), kctx, t.ns, rt, t.name)
-				if err != nil {
-					failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
-					continue
+		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+			fmt.Sprintf("Copy YAML (%d items)", len(targets)), target,
+			func(ctx context.Context) tea.Msg {
+				docs := make([]string, 0, len(targets))
+				var failures []string
+				for _, t := range targets {
+					content, err := m.client.GetResourceYAML(ctx, kctx, t.ns, rt, t.name)
+					if err != nil {
+						failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+						continue
+					}
+					docs = append(docs, strings.TrimRight(content, "\n"))
 				}
-				docs = append(docs, strings.TrimRight(content, "\n"))
-			}
-			return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
-		}
+				return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
+			})
 	case model.LevelOwned:
 		type fetchTarget struct {
 			ns, name string
@@ -276,47 +301,51 @@ func (m Model) copyYAMLForScope(scope []model.Item) tea.Cmd {
 			}
 			targets[i] = t
 		}
-		return func() tea.Msg {
-			docs := make([]string, 0, len(targets))
-			var failures []string
-			for _, t := range targets {
-				var (
-					content string
-					err     error
-				)
-				switch {
-				case t.isPod:
-					content, err = m.client.GetPodYAML(context.Background(), kctx, t.ns, t.name)
-				case t.resolved:
-					content, err = m.client.GetResourceYAML(context.Background(), kctx, t.ns, t.rt, t.name)
-				default:
-					err = fmt.Errorf("unknown resource type: %s", t.kind)
+		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+			fmt.Sprintf("Copy YAML (%d items)", len(targets)), target,
+			func(ctx context.Context) tea.Msg {
+				docs := make([]string, 0, len(targets))
+				var failures []string
+				for _, t := range targets {
+					var (
+						content string
+						err     error
+					)
+					switch {
+					case t.isPod:
+						content, err = m.client.GetPodYAML(ctx, kctx, t.ns, t.name)
+					case t.resolved:
+						content, err = m.client.GetResourceYAML(ctx, kctx, t.ns, t.rt, t.name)
+					default:
+						err = fmt.Errorf("unknown resource type: %s", t.kind)
+					}
+					if err != nil {
+						failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
+						continue
+					}
+					docs = append(docs, strings.TrimRight(content, "\n"))
 				}
-				if err != nil {
-					failures = append(failures, fmt.Sprintf("%s/%s: %v", t.ns, t.name, err))
-					continue
-				}
-				docs = append(docs, strings.TrimRight(content, "\n"))
-			}
-			return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
-		}
+				return buildBulkYAMLClipboardMsg(docs, failures, len(targets))
+			})
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
 		names := make([]string, len(scope))
 		for i, it := range scope {
 			names[i] = it.Name
 		}
-		return func() tea.Msg {
-			content, err := m.client.GetPodYAML(context.Background(), kctx, ns, podName)
-			if err != nil {
-				return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", ns, podName, err)}
-			}
-			out, err := ExtractContainerBlocksYAML(content, names)
-			if err != nil {
-				return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", ns, podName, err)}
-			}
-			return yamlClipboardMsg{content: out, count: len(names)}
-		}
+		return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+			"Copy YAML: "+podName, target,
+			func(ctx context.Context) tea.Msg {
+				content, err := m.client.GetPodYAML(ctx, kctx, ns, podName)
+				if err != nil {
+					return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", ns, podName, err)}
+				}
+				out, err := ExtractContainerBlocksYAML(content, names)
+				if err != nil {
+					return yamlClipboardMsg{err: fmt.Errorf("%s/%s: %w", ns, podName, err)}
+				}
+				return yamlClipboardMsg{content: out, count: len(names)}
+			})
 	}
 	return nil
 }
@@ -364,7 +393,8 @@ func (m Model) exportResourceToFile() tea.Cmd {
 	kctx := m.effectiveContext()
 	ns := m.resolveNamespace()
 
-	var fetchYAML func() (string, string, error) // returns (yaml, kindForFilename, error)
+	var fetchYAML func(ctx context.Context) (string, string, error) // returns (yaml, kindForFilename, error)
+	var exportName string
 
 	switch m.nav.Level {
 	case model.LevelResources:
@@ -374,6 +404,7 @@ func (m Model) exportResourceToFile() tea.Cmd {
 		}
 		rt := m.nav.ResourceType
 		name := sel.Name
+		exportName = name
 		itemNs := ns
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
@@ -383,8 +414,8 @@ func (m Model) exportResourceToFile() tea.Cmd {
 			itemCtx = sel.ClusterName
 		}
 		kind := strings.ToLower(rt.Kind)
-		fetchYAML = func() (string, string, error) {
-			content, err := m.client.GetResourceYAML(context.Background(), itemCtx, itemNs, rt, name)
+		fetchYAML = func(ctx context.Context) (string, string, error) {
+			content, err := m.client.GetResourceYAML(ctx, itemCtx, itemNs, rt, name)
 			return content, kind, err
 		}
 	case model.LevelOwned:
@@ -393,6 +424,7 @@ func (m Model) exportResourceToFile() tea.Cmd {
 			return nil
 		}
 		name := sel.Name
+		exportName = name
 		itemNs := ns
 		if sel.Namespace != "" {
 			itemNs = sel.Namespace
@@ -402,8 +434,8 @@ func (m Model) exportResourceToFile() tea.Cmd {
 			itemCtx = sel.ClusterName
 		}
 		if sel.Kind == "Pod" {
-			fetchYAML = func() (string, string, error) {
-				content, err := m.client.GetPodYAML(context.Background(), itemCtx, itemNs, name)
+			fetchYAML = func(ctx context.Context) (string, string, error) {
+				content, err := m.client.GetPodYAML(ctx, itemCtx, itemNs, name)
 				return content, "pod", err
 			}
 		} else {
@@ -414,49 +446,52 @@ func (m Model) exportResourceToFile() tea.Cmd {
 				}
 			}
 			kind := strings.ToLower(rt.Kind)
-			fetchYAML = func() (string, string, error) {
-				content, err := m.client.GetResourceYAML(context.Background(), itemCtx, itemNs, rt, name)
+			fetchYAML = func(ctx context.Context) (string, string, error) {
+				content, err := m.client.GetResourceYAML(ctx, itemCtx, itemNs, rt, name)
 				return content, kind, err
 			}
 		}
 	case model.LevelContainers:
 		podName := m.nav.OwnedName
-		fetchYAML = func() (string, string, error) {
-			content, err := m.client.GetPodYAML(context.Background(), kctx, ns, podName)
+		exportName = podName
+		fetchYAML = func(ctx context.Context) (string, string, error) {
+			content, err := m.client.GetPodYAML(ctx, kctx, ns, podName)
 			return content, "pod", err
 		}
 	default:
 		return nil
 	}
 
-	return func() tea.Msg {
-		yaml, kind, err := fetchYAML()
-		if err != nil {
-			return exportDoneMsg{err: fmt.Errorf("fetching resource: %w", err)}
-		}
-
-		// Build filename: <kind>_<name>.yaml
-		var name string
-		switch m.nav.Level {
-		case model.LevelContainers:
-			name = m.nav.OwnedName
-		default:
-			sel := m.selectedMiddleItem()
-			if sel != nil {
-				name = sel.Name
+	return m.scheduleK8sCall(scheduler.PriorityHigh, scheduler.KindYAMLFetch,
+		"Export YAML: "+exportName, bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			yaml, kind, err := fetchYAML(ctx)
+			if err != nil {
+				return exportDoneMsg{err: fmt.Errorf("fetching resource: %w", err)}
 			}
-		}
-		sanitized := strings.ReplaceAll(name, "/", "_")
-		filename := fmt.Sprintf("%s_%s.yaml", kind, sanitized)
 
-		if err := writeSecureFile(filename, []byte(yaml)); err != nil {
-			return exportDoneMsg{err: fmt.Errorf("writing file: %w", err)}
-		}
+			// Build filename: <kind>_<name>.yaml
+			var name string
+			switch m.nav.Level {
+			case model.LevelContainers:
+				name = m.nav.OwnedName
+			default:
+				sel := m.selectedMiddleItem()
+				if sel != nil {
+					name = sel.Name
+				}
+			}
+			sanitized := strings.ReplaceAll(name, "/", "_")
+			filename := fmt.Sprintf("%s_%s.yaml", kind, sanitized)
 
-		abs, _ := filepath.Abs(filename)
-		if abs == "" {
-			abs = filename
-		}
-		return exportDoneMsg{path: abs}
-	}
+			if err := writeSecureFile(filename, []byte(yaml)); err != nil {
+				return exportDoneMsg{err: fmt.Errorf("writing file: %w", err)}
+			}
+
+			abs, _ := filepath.Abs(filename)
+			if abs == "" {
+				abs = filename
+			}
+			return exportDoneMsg{path: abs}
+		})
 }

@@ -265,13 +265,21 @@ func (m Model) watchArgoWorkflow() tea.Cmd {
 	ctx := m.actionCtx.context
 	ns := m.actionNamespace()
 	name := m.actionCtx.name
-	return m.trackBgTask(scheduler.KindResourceList, "Watch workflow: "+name, bgtaskTarget(ctx, ns), func() tea.Msg {
-		content, _, err := m.client.GetWorkflowStatus(ctx, ns, name)
-		if err != nil {
-			return describeLoadedMsg{title: "Watch: " + name, err: err}
-		}
-		return describeLoadedMsg{title: "Watch: " + name, content: content}
-	})
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Watch workflow: "+name,
+		bgtaskTarget(ctx, ns),
+		// GetWorkflowStatus takes the kube-context string, not a
+		// context.Context, so the scheduler ctx is unused here.
+		func(_ context.Context) tea.Msg {
+			content, _, err := m.client.GetWorkflowStatus(ctx, ns, name)
+			if err != nil {
+				return describeLoadedMsg{title: "Watch: " + name, err: err}
+			}
+			return describeLoadedMsg{title: "Watch: " + name, content: content}
+		},
+	)
 }
 
 // forceRefreshExternalSecret triggers a force sync on an ESO resource.
@@ -437,10 +445,16 @@ func (m Model) loadAutoSyncConfig() tea.Cmd {
 	name := sel.Name
 	client := m.client
 
-	return m.trackBgTask(scheduler.KindResourceList, "Autosync config: "+name, bgtaskTarget(kctx, ns), func() tea.Msg {
-		enabled, selfHeal, prune, err := client.GetAutoSyncConfig(context.Background(), kctx, ns, name)
-		return autoSyncLoadedMsg{enabled: enabled, selfHeal: selfHeal, prune: prune, err: err}
-	})
+	return m.scheduleK8sCall(
+		scheduler.PriorityHigh,
+		scheduler.KindResourceList,
+		"Autosync config: "+name,
+		bgtaskTarget(kctx, ns),
+		func(ctx context.Context) tea.Msg {
+			enabled, selfHeal, prune, err := client.GetAutoSyncConfig(ctx, kctx, ns, name)
+			return autoSyncLoadedMsg{enabled: enabled, selfHeal: selfHeal, prune: prune, err: err}
+		},
+	)
 }
 
 func (m Model) saveAutoSyncConfig() tea.Cmd {
