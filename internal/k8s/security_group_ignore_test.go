@@ -24,7 +24,7 @@ func (s stubIgnoreChecker) IsGroupIgnored(_, groupKey string) bool {
 	return s.groups[groupKey]
 }
 
-func (s stubIgnoreChecker) IsResourceIgnored(_, groupKey, resourceKey string) bool {
+func (s stubIgnoreChecker) IsResourceIgnored(_, groupKey, resourceKey string, _ map[string]string) bool {
 	if s.groups[groupKey] || s.resources[resourceKey] {
 		return true
 	}

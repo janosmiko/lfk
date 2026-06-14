@@ -5,6 +5,7 @@
 package app
 
 import (
+	"context"
 	"runtime/debug"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -92,6 +93,14 @@ func (m *Model) refreshSecuritySources() tea.Cmd {
 		// client to list each kind's instances.
 		if kc != nil && dc != nil {
 			register("gatekeeper", gatekeeper.NewWithClients(kc, dc))
+		}
+		// Resolve workload labels for label-match patterns (e.g. Trivy CVEs
+		// keyed by a Deployment) only when such patterns exist — otherwise the
+		// lookups would be pure overhead. Runs on the throttled security client.
+		if m.client != nil && ui.HasSecurityLabelIgnorePatterns() {
+			mgr.SetLabelResolver(func(ctx context.Context, kubeCtx, namespace, kind, name string) map[string]string {
+				return m.client.ResourceLabels(ctx, kubeCtx, namespace, kind, name)
+			})
 		}
 	}
 	m.securityManager = mgr

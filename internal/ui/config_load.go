@@ -572,15 +572,25 @@ type SecurityIgnorePattern struct {
 	// which hides the whole group; a specific value scopes the ignore to that
 	// namespace only. Cluster-scoped findings have an empty namespace.
 	Namespace string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+	// Labels match the target resource's Kubernetes labels: each entry is a
+	// label key mapped to a glob value pattern, and ALL entries must match
+	// (AND). A label constraint is resource-scoped — it hides matching
+	// resources within a group, never the whole group — and matches when the
+	// finding's resource has resolvable labels: heuristic-observed pods (plus
+	// same-resource findings), and workload labels resolved from the live
+	// object for standard kinds when a label pattern is set. Empty = no label
+	// constraint.
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	// Comment is a free-text note explaining why the rule exists.
 	Comment string `json:"comment,omitempty" yaml:"comment,omitempty"`
 }
 
 // IsEmpty reports whether the pattern has no match constraints (every glob
-// field empty). Such a pattern would match every finding, so it is dropped at
-// load and skipped at match time.
+// field empty and no label constraints). Such a pattern would match every
+// finding, so it is dropped at load and skipped at match time.
 func (p SecurityIgnorePattern) IsEmpty() bool {
-	return p.Cluster == "" && p.Source == "" && p.Group == "" && p.Namespace == ""
+	return p.Cluster == "" && p.Source == "" && p.Group == "" &&
+		p.Namespace == "" && len(p.Labels) == 0
 }
 
 // RightsizingDefaultsConfig is the on-disk schema for the

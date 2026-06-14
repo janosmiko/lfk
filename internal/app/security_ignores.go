@@ -326,10 +326,12 @@ func (c *modelIgnoreChecker) IsGroupIgnored(source, groupKey string) bool {
 
 // IsResourceIgnored returns true when the specific resource within a group is
 // ignored — by an interactive rule (group / namespace / resource scope) or a
-// matching config pattern.
-func (c *modelIgnoreChecker) IsResourceIgnored(source, groupKey, resourceKey string) bool {
+// matching config pattern. labels are the target object's Kubernetes labels
+// (nil when the source did not expose them), consulted only by label-match
+// config patterns.
+func (c *modelIgnoreChecker) IsResourceIgnored(source, groupKey, resourceKey string, labels map[string]string) bool {
 	if isResourceIgnored(c.state, c.ctx, source, groupKey, resourceKey) {
 		return true
 	}
-	return patternIgnoresResource(c.patterns, c.ctx, source, groupKey, namespaceFromResourceKey(resourceKey))
+	return patternIgnoresResource(c.patterns, c.ctx, source, groupKey, namespaceFromResourceKey(resourceKey), labels)
 }

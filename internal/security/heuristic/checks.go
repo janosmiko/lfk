@@ -15,6 +15,13 @@ func baseRef(pod *corev1.Pod, container corev1.Container) security.ResourceRef {
 		Kind:      "Pod",
 		Name:      pod.Name,
 		Container: container.Name,
+		// Carry the pod's labels so declarative label-match ignore patterns can
+		// exclude infrastructure pods (CNI/CSI) by label. The Manager
+		// propagates these to same-resource findings from other sources.
+		// Aliasing pod.Labels (not cloning) is safe: pods come from a direct,
+		// ephemeral Pods().List() — never a shared informer cache — and the map
+		// is only read after the scan, so nothing mutates it.
+		Labels: pod.Labels,
 	}
 }
 

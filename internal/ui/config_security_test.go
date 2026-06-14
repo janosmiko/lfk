@@ -43,6 +43,21 @@ func TestApplySecurityConfigIgnorePatterns(t *testing.T) {
 	assert.Equal(t, "kube-system", ConfigSecurityIgnorePatterns[0].Namespace)
 }
 
+func TestHasSecurityLabelIgnorePatterns(t *testing.T) {
+	saveSecurityGlobals(t)
+
+	assert.False(t, HasSecurityLabelIgnorePatterns(), "no patterns -> false")
+
+	ConfigSecurityIgnorePatterns = []SecurityIgnorePattern{{Source: "trivy-operator", Namespace: "kube-system"}}
+	assert.False(t, HasSecurityLabelIgnorePatterns(), "non-label patterns -> false")
+
+	ConfigSecurityIgnorePatterns = []SecurityIgnorePattern{
+		{Source: "heuristic"},
+		{Labels: map[string]string{"k8s-app": "cilium"}},
+	}
+	assert.True(t, HasSecurityLabelIgnorePatterns(), "any label pattern -> true")
+}
+
 func TestResolveSecurityEnabled(t *testing.T) {
 	t.Run("default enabled", func(t *testing.T) {
 		saveSecurityGlobals(t)

@@ -19,7 +19,10 @@ import (
 // no filtering (all findings shown).
 type IgnoreChecker interface {
 	IsGroupIgnored(source, groupKey string) bool
-	IsResourceIgnored(source, groupKey, resourceKey string) bool
+	// IsResourceIgnored decides whether one resource within a group is hidden.
+	// labels are the target object's Kubernetes labels (nil when the source
+	// did not expose them), consulted by declarative label-match patterns.
+	IsResourceIgnored(source, groupKey, resourceKey string, labels map[string]string) bool
 }
 
 // findingGroup aggregates one or more findings that share the same
@@ -88,7 +91,7 @@ func groupFindings(findings []security.Finding, sourceName string, checker Ignor
 			if checker.IsGroupIgnored(sourceName, key) {
 				continue
 			}
-			if checker.IsResourceIgnored(sourceName, key, f.Resource.Key()) {
+			if checker.IsResourceIgnored(sourceName, key, f.Resource.Key(), f.Resource.Labels) {
 				continue
 			}
 		}
