@@ -584,7 +584,7 @@
         "namespace": { "type": "string", "description": "Globs the resource namespace. Empty or * = any namespace." },
         "labels": {
           "type": "object",
-          "description": "Match the target resource's Kubernetes labels: each entry is a label key mapped to a glob value pattern; ALL entries must match (AND). Resource-scoped (hides matching resources within a group, never the whole group). Only matches findings whose resource exposes labels (heuristic-observed pods and same-pod findings).",
+          "description": "Match the target resource's Kubernetes labels: each entry is a label key mapped to a glob value pattern; ALL entries must match (AND). Resource-scoped (hides matching resources within a group, never the whole group). Matches when labels are available on the finding's resource: heuristic-observed pods (and same-pod findings from other sources), plus workload labels resolved from the live object for standard kinds (Pod, Deployment, ReplicaSet, StatefulSet, DaemonSet, Job, CronJob) when a label pattern is configured.",
           "additionalProperties": { "type": "string" }
         },
         "comment": { "type": "string", "description": "Free-text note explaining why the rule exists." }

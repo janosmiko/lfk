@@ -29,7 +29,11 @@ func (m *Manager) resolveWorkloadLabels(ctx context.Context, kubeCtx string, fin
 			continue
 		}
 		ref := findings[i].Resource
-		if ref.Kind == "" || ref.Name == "" {
+		// Skip refs the resolver is guaranteed to reject — the mapped kinds are
+		// all namespaced, so a namespace-less ref (e.g. a cluster-scoped RBAC
+		// finding) resolves to nil. Skipping here keeps such refs from burning
+		// the lookup budget and starving resolvable workloads later in the scan.
+		if ref.Kind == "" || ref.Name == "" || ref.Namespace == "" {
 			continue
 		}
 		key := ref.Key()

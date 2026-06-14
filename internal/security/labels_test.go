@@ -86,6 +86,23 @@ func TestResolveWorkloadLabels_NoResolverIsNoOp(t *testing.T) {
 	assert.Nil(t, findings[0].Resource.Labels)
 }
 
+// Namespace-less refs (e.g. cluster-scoped RBAC findings) must not reach the
+// resolver — the mapped kinds are all namespaced, so the lookup is guaranteed
+// nil and would only burn the lookup budget.
+func TestResolveWorkloadLabels_SkipsNamespacelessRefs(t *testing.T) {
+	m := NewManager()
+	calls := 0
+	m.SetLabelResolver(func(_ context.Context, _, _, _, _ string) map[string]string {
+		calls++
+		return nil
+	})
+	findings := []Finding{
+		{Source: "rbac", Resource: ResourceRef{Kind: "ClusterRole", Name: "admin"}}, // no namespace
+	}
+	m.resolveWorkloadLabels(t.Context(), "ctx", findings)
+	assert.Equal(t, 0, calls, "namespace-less ref must not consume a lookup")
+}
+
 func TestResolveWorkloadLabels_CapsLookups(t *testing.T) {
 	m := NewManager()
 	calls := 0
@@ -96,7 +113,7 @@ func TestResolveWorkloadLabels_CapsLookups(t *testing.T) {
 	// More distinct resources than the cap; resolver must stop at maxLabelLookups.
 	findings := make([]Finding, maxLabelLookups+50)
 	for i := range findings {
-		findings[i] = Finding{Resource: ResourceRef{Kind: "Deployment", Name: fmt.Sprintf("d-%d", i)}}
+		findings[i] = Finding{Resource: ResourceRef{Namespace: "default", Kind: "Deployment", Name: fmt.Sprintf("d-%d", i)}}
 	}
 	m.resolveWorkloadLabels(t.Context(), "ctx", findings)
 	assert.Equal(t, maxLabelLookups, calls, "resolver calls capped at maxLabelLookups")
