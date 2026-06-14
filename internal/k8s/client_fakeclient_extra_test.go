@@ -556,7 +556,7 @@ func TestGetWorkflowStatus(t *testing.T) {
 	dc := newFakeDynClient(wf)
 	c := newFakeClient(nil, dc)
 
-	statusStr, running, err := c.GetWorkflowStatus("", "default", "my-wf")
+	statusStr, running, err := c.GetWorkflowStatus(context.Background(), "", "default", "my-wf")
 	require.NoError(t, err)
 	assert.Contains(t, statusStr, "Succeeded")
 	assert.False(t, running) // Succeeded is not running

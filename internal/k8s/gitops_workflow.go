@@ -164,14 +164,14 @@ func (c *Client) SubmitWorkflowFromTemplate(contextName, namespace, templateName
 
 // GetWorkflowStatus fetches an Argo Workflow and returns a formatted status string
 // showing the phase and each node's name, type, phase, and duration.
-func (c *Client) GetWorkflowStatus(contextName, namespace, name string) (string, bool, error) {
+func (c *Client) GetWorkflowStatus(ctx context.Context, contextName, namespace, name string) (string, bool, error) {
 	dynClient, err := c.dynamicForContext(contextName)
 	if err != nil {
 		return "", false, err
 	}
 
 	gvr := schema.GroupVersionResource{Group: "argoproj.io", Version: "v1alpha1", Resource: "workflows"}
-	wf, err := dynClient.Resource(gvr).Namespace(namespace).Get(context.Background(), name, metav1.GetOptions{})
+	wf, err := dynClient.Resource(gvr).Namespace(namespace).Get(ctx, name, metav1.GetOptions{})
 	if err != nil {
 		return "", false, fmt.Errorf("getting workflow %s: %w", name, err)
 	}

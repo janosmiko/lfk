@@ -270,10 +270,8 @@ func (m Model) watchArgoWorkflow() tea.Cmd {
 		scheduler.KindResourceList,
 		"Watch workflow: "+name,
 		bgtaskTarget(ctx, ns),
-		// GetWorkflowStatus takes the kube-context string, not a
-		// context.Context, so the scheduler ctx is unused here.
-		func(_ context.Context) tea.Msg {
-			content, _, err := m.client.GetWorkflowStatus(ctx, ns, name)
+		func(schedCtx context.Context) tea.Msg {
+			content, _, err := m.client.GetWorkflowStatus(schedCtx, ctx, ns, name)
 			if err != nil {
 				return describeLoadedMsg{title: "Watch: " + name, err: err}
 			}
