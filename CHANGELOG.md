@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.14.8](https://github.com/janosmiko/lfk/compare/v0.14.7...v0.14.8) (2026-06-15)
+
+
+### Bug Fixes
+
+* **namespace:** restore selection when leaving all-namespaces mode ([#433](https://github.com/janosmiko/lfk/issues/433)) ([#434](https://github.com/janosmiko/lfk/issues/434)) ([512ee4a](https://github.com/janosmiko/lfk/commit/512ee4a22ec8552161e9b2d4e770edf702d963b5))
+
 ## [0.14.7](https://github.com/janosmiko/lfk/compare/v0.14.6...v0.14.7) (2026-06-14)
 
 
