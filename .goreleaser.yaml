@@ -169,10 +169,7 @@ chocolateys:
     release_notes: "https://github.com/janosmiko/lfk/releases/tag/v{{ .Version }}"
     api_key: "{{ .Env.CHOCOLATEY_API_KEY }}"
     source_repo: "https://push.chocolatey.org/"
-    # Push.chocolatey.org returns 403 while no version of `lfk` has been approved
-    # by a human moderator yet (0.10.4 is in the queue). Flip back to false once
-    # the first version is approved.
-    skip_publish: true
+    skip_publish: false
 
 aurs:
   - name: lfk-bin
