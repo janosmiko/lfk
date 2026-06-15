@@ -441,13 +441,18 @@ type TabState struct {
 	allNamespaces      bool
 	selectedNamespaces map[string]bool
 	nsSelectionNegated bool
-	sortColumnName     string // column name to sort by (e.g. "Name", "Age", "CPU")
-	sortAscending      bool
-	sortMemory         map[string]sortPref
-	filterText         string
-	watchMode          bool
-	objectExplorerLive bool
-	objectExplorerTree bool
+	// Stashed namespace selection while all-namespaces mode is active, so
+	// toggling the mode off restores the prior multi-select instead of
+	// resetting to the default namespace.
+	savedSelectedNamespaces map[string]bool
+	savedNsSelectionNegated bool
+	sortColumnName          string // column name to sort by (e.g. "Name", "Age", "CPU")
+	sortAscending           bool
+	sortMemory              map[string]sortPref
+	filterText              string
+	watchMode               bool
+	objectExplorerLive      bool
+	objectExplorerTree      bool
 	// readOnly blocks all mutating actions for this tab. Re-evaluated on
 	// context switch from CLI flag, per-context config, and global config.
 	readOnly               bool

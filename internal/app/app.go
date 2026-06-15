@@ -170,14 +170,14 @@ type Model struct {
 	// Text input for type-to-confirm overlay (e.g., Force Finalize).
 	confirmTypeInput TextInput
 
-	// Namespace selection state (all-namespaces mode + multi-select).
-	allNamespaces       bool
-	selectedNamespaces  map[string]bool
-	nsSelectionNegated  bool // when true, selectedNamespaces is an EXCLUDE set
-	nsFilterMode        bool
-	nsSelectionModified bool   // tracks if Space was pressed in current ns overlay session
-	nsFilterEntryItem   string // namespace name selected when filter mode was entered; restored on Esc
-	nsOverlayContext    string // context the open namespace overlay lists; used by the in-overlay refresh (R)
+	// Namespace selection state. saved* stash the selection during all-namespaces mode so toggling off restores it.
+	allNamespaces                               bool
+	selectedNamespaces, savedSelectedNamespaces map[string]bool
+	nsSelectionNegated, savedNsSelectionNegated bool // nsSelectionNegated: EXCLUDE set
+	nsFilterMode                                bool
+	nsSelectionModified                         bool   // tracks if Space was pressed in current ns overlay session
+	nsFilterEntryItem                           string // namespace name selected when filter mode was entered; restored on Esc
+	nsOverlayContext                            string // context the open namespace overlay lists; used by the in-overlay refresh (R)
 
 	// Fullscreen toggles: middle = hides left and right columns; dashboard
 	// = renders the cluster dashboard full screen.

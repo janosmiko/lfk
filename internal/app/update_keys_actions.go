@@ -238,9 +238,18 @@ func (m Model) handleExplorerActionKeyAllNamespaces() (tea.Model, tea.Cmd, bool)
 	}
 	m.allNamespaces = !m.allNamespaces
 	if m.allNamespaces {
+		// Stash the current selection so toggling back off restores it
+		// instead of resetting to the default namespace.
+		m.savedSelectedNamespaces = m.selectedNamespaces
+		m.savedNsSelectionNegated = m.nsSelectionNegated
 		m.selectedNamespaces = nil
+		m.nsSelectionNegated = false
 		m.setStatusMessage("All namespaces mode ON", false)
 	} else {
+		m.selectedNamespaces = m.savedSelectedNamespaces
+		m.nsSelectionNegated = m.savedNsSelectionNegated
+		m.savedSelectedNamespaces = nil
+		m.savedNsSelectionNegated = false
 		m.setStatusMessage("All namespaces mode OFF (ns: "+m.namespace+")", false)
 	}
 	m.cancelAndReset()

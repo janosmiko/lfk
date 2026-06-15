@@ -430,6 +430,8 @@ func (m *Model) saveCurrentTab() {
 	t.allNamespaces = m.allNamespaces
 	t.selectedNamespaces = copyMapStringBool(m.selectedNamespaces)
 	t.nsSelectionNegated = m.nsSelectionNegated
+	t.savedSelectedNamespaces = copyMapStringBool(m.savedSelectedNamespaces)
+	t.savedNsSelectionNegated = m.savedNsSelectionNegated
 	t.sortColumnName = m.sortColumnName
 	t.sortAscending = m.sortAscending
 	t.filterText = m.filterText
@@ -555,6 +557,8 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 	m.allNamespaces = t.allNamespaces
 	m.selectedNamespaces = copyMapStringBool(t.selectedNamespaces)
 	m.nsSelectionNegated = t.nsSelectionNegated
+	m.savedSelectedNamespaces = copyMapStringBool(t.savedSelectedNamespaces)
+	m.savedNsSelectionNegated = t.savedNsSelectionNegated
 	m.sortColumnName = t.sortColumnName
 	m.sortAscending = t.sortAscending
 	m.filterText = t.filterText
@@ -707,58 +711,60 @@ func (m *Model) loadTab(idx int) tea.Cmd {
 // cloneCurrentTab creates a deep copy of the current model state as a new TabState.
 func (m *Model) cloneCurrentTab() TabState {
 	newTab := TabState{
-		nav:                    m.nav,
-		leftItems:              append([]model.Item(nil), m.leftItems...),
-		middleItems:            append([]model.Item(nil), m.middleItems...),
-		rightItems:             append([]model.Item(nil), m.rightItems...),
-		cursors:                m.cursors,
-		middleScroll:           ui.ActiveMiddleScroll,
-		leftScroll:             ui.ActiveLeftScroll,
-		cursorMemory:           copyMapStringInt(m.cursorMemory),
-		filterMemory:           copyMapStringSavedFilter(m.filterMemory),
-		sortMemory:             copyMapStringSortPref(m.sortMemory),
-		itemCache:              copyItemCache(m.itemCache),
-		cacheFingerprints:      copyMapStringString(m.cacheFingerprints),
-		yamlContent:            m.yamlView.content,
-		yamlCollapsed:          copyMapStringBool(m.yamlView.collapsed),
-		splitPreview:           m.splitPreview,
-		fullYAMLPreview:        m.fullYAMLPreview,
-		fullLogPreview:         m.fullLogPreview,
-		previewYAML:            m.previewYAML,
-		namespace:              m.namespace,
-		allNamespaces:          m.allNamespaces,
-		selectedNamespaces:     copyMapStringBool(m.selectedNamespaces),
-		nsSelectionNegated:     m.nsSelectionNegated,
-		sortColumnName:         m.sortColumnName,
-		sortAscending:          m.sortAscending,
-		filterText:             m.filterText,
-		watchMode:              m.watchMode,
-		objectExplorerLive:     m.objectExplorerLive,
-		objectExplorerTree:     m.objectExplorerTree,
-		readOnly:               m.readOnly,
-		requestGen:             m.requestGen,
-		selectedItems:          copyMapStringBool(m.selectedItems),
-		selectionAnchor:        m.selectionAnchor,
-		fullscreenMiddle:       m.fullscreenMiddle,
-		fullscreenDashboard:    m.fullscreenDashboard,
-		dashboardPreview:       m.dashboardPreview,
-		dashboardEventsPreview: m.dashboardEventsPreview,
-		monitoringPreview:      m.monitoringPreview,
-		metricsContent:         m.metricsContent,
-		previewEventsContent:   m.previewEventsContent,
-		metricsData:            m.metricsData,
-		metricsLoading:         m.metricsLoading,
-		previewEventsData:      append([]ui.EventTimelineEntry(nil), m.previewEventsData...),
-		warningEventsOnly:      m.warningEventsOnly,
-		eventGrouping:          m.eventGrouping,
-		expandedGroup:          m.expandedGroup,
-		allGroupsExpanded:      m.allGroupsExpanded,
-		logCursor:              m.logView.cursor,
-		logVisualMode:          false, // don't clone visual mode into new tabs
-		logVisualStart:         0,
-		logVisualType:          'V',
-		logVisualCol:           0,
-		logVisualCurCol:        0,
+		nav:                     m.nav,
+		leftItems:               append([]model.Item(nil), m.leftItems...),
+		middleItems:             append([]model.Item(nil), m.middleItems...),
+		rightItems:              append([]model.Item(nil), m.rightItems...),
+		cursors:                 m.cursors,
+		middleScroll:            ui.ActiveMiddleScroll,
+		leftScroll:              ui.ActiveLeftScroll,
+		cursorMemory:            copyMapStringInt(m.cursorMemory),
+		filterMemory:            copyMapStringSavedFilter(m.filterMemory),
+		sortMemory:              copyMapStringSortPref(m.sortMemory),
+		itemCache:               copyItemCache(m.itemCache),
+		cacheFingerprints:       copyMapStringString(m.cacheFingerprints),
+		yamlContent:             m.yamlView.content,
+		yamlCollapsed:           copyMapStringBool(m.yamlView.collapsed),
+		splitPreview:            m.splitPreview,
+		fullYAMLPreview:         m.fullYAMLPreview,
+		fullLogPreview:          m.fullLogPreview,
+		previewYAML:             m.previewYAML,
+		namespace:               m.namespace,
+		allNamespaces:           m.allNamespaces,
+		selectedNamespaces:      copyMapStringBool(m.selectedNamespaces),
+		nsSelectionNegated:      m.nsSelectionNegated,
+		savedSelectedNamespaces: copyMapStringBool(m.savedSelectedNamespaces),
+		savedNsSelectionNegated: m.savedNsSelectionNegated,
+		sortColumnName:          m.sortColumnName,
+		sortAscending:           m.sortAscending,
+		filterText:              m.filterText,
+		watchMode:               m.watchMode,
+		objectExplorerLive:      m.objectExplorerLive,
+		objectExplorerTree:      m.objectExplorerTree,
+		readOnly:                m.readOnly,
+		requestGen:              m.requestGen,
+		selectedItems:           copyMapStringBool(m.selectedItems),
+		selectionAnchor:         m.selectionAnchor,
+		fullscreenMiddle:        m.fullscreenMiddle,
+		fullscreenDashboard:     m.fullscreenDashboard,
+		dashboardPreview:        m.dashboardPreview,
+		dashboardEventsPreview:  m.dashboardEventsPreview,
+		monitoringPreview:       m.monitoringPreview,
+		metricsContent:          m.metricsContent,
+		previewEventsContent:    m.previewEventsContent,
+		metricsData:             m.metricsData,
+		metricsLoading:          m.metricsLoading,
+		previewEventsData:       append([]ui.EventTimelineEntry(nil), m.previewEventsData...),
+		warningEventsOnly:       m.warningEventsOnly,
+		eventGrouping:           m.eventGrouping,
+		expandedGroup:           m.expandedGroup,
+		allGroupsExpanded:       m.allGroupsExpanded,
+		logCursor:               m.logView.cursor,
+		logVisualMode:           false, // don't clone visual mode into new tabs
+		logVisualStart:          0,
+		logVisualType:           'V',
+		logVisualCol:            0,
+		logVisualCurCol:         0,
 	}
 	// New tabs inherit the active tab's security state because they
 	// start on the same cluster; navigateChildCluster will rebuild
