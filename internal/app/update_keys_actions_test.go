@@ -30,6 +30,75 @@ func TestActionKeyATogglesAllNamespaces(t *testing.T) {
 	assert.False(t, result.allNamespaces)
 }
 
+func TestActionKeyAllNamespacesRestoresPreviousSelection(t *testing.T) {
+	m := baseExplorerModel()
+	m.selectedNamespaces = map[string]bool{"alpha": true, "beta": true}
+	m.allNamespaces = false
+
+	// Toggle ON: selection stashed, all-namespaces enabled.
+	ret, _, handled := m.handleExplorerActionKey(runeKey('A'))
+	require.True(t, handled)
+	on := ret.(Model)
+	assert.True(t, on.allNamespaces)
+	assert.Empty(t, on.selectedNamespaces, "selection cleared while in all-namespaces mode")
+
+	// Toggle OFF: previous multi-select restored, not reset to default.
+	ret, _, handled = on.handleExplorerActionKey(runeKey('A'))
+	require.True(t, handled)
+	off := ret.(Model)
+	assert.False(t, off.allNamespaces)
+	assert.Equal(t, map[string]bool{"alpha": true, "beta": true}, off.selectedNamespaces)
+}
+
+func TestActionKeyAllNamespacesRestoresNegatedSelection(t *testing.T) {
+	m := baseExplorerModel()
+	m.selectedNamespaces = map[string]bool{"kube-system": true}
+	m.nsSelectionNegated = true
+	m.allNamespaces = false
+
+	ret, _, _ := m.handleExplorerActionKey(runeKey('A'))
+	on := ret.(Model)
+	assert.True(t, on.allNamespaces)
+	assert.False(t, on.nsSelectionNegated, "negation flag cleared while in all-namespaces mode")
+
+	ret, _, _ = on.handleExplorerActionKey(runeKey('A'))
+	off := ret.(Model)
+	assert.True(t, off.nsSelectionNegated, "negation flag restored on toggle off")
+	assert.Equal(t, map[string]bool{"kube-system": true}, off.selectedNamespaces)
+}
+
+// TestActionKeyAllNamespacesSavedSelectionSurvivesTabSwitch proves the
+// stashed selection is per-tab: toggling all-namespaces ON, switching tabs
+// away and back, then toggling OFF must restore that tab's own selection.
+func TestActionKeyAllNamespacesSavedSelectionSurvivesTabSwitch(t *testing.T) {
+	m := baseExplorerModel()
+	m.tabs = []TabState{{}, {}}
+	m.activeTab = 0
+
+	// Tab 1: select two namespaces, then toggle all-namespaces ON.
+	m.selectedNamespaces = map[string]bool{"alpha": true, "beta": true}
+	ret, _, _ := m.handleExplorerActionKey(runeKey('A'))
+	m = ret.(Model)
+	require.True(t, m.allNamespaces)
+	require.Empty(t, m.selectedNamespaces)
+
+	// Switch to tab 2 and back to tab 1.
+	ret, _, _ = m.handleExplorerActionKeyNextTab()
+	m = ret.(Model)
+	require.Equal(t, 1, m.activeTab)
+	ret, _, _ = m.handleExplorerActionKeyPrevTab()
+	m = ret.(Model)
+	require.Equal(t, 0, m.activeTab)
+
+	// Tab 1 is still in all-namespaces mode; toggling OFF restores the
+	// selection that was stashed before the tab round-trip.
+	require.True(t, m.allNamespaces)
+	ret, _, _ = m.handleExplorerActionKey(runeKey('A'))
+	m = ret.(Model)
+	assert.False(t, m.allNamespaces)
+	assert.Equal(t, map[string]bool{"alpha": true, "beta": true}, m.selectedNamespaces)
+}
+
 func TestActionKeyAllNamespacesNoOpAtClusters(t *testing.T) {
 	m := baseExplorerModel()
 	m.nav.Level = model.LevelClusters
