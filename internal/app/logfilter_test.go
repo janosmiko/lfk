@@ -52,3 +52,40 @@ func TestRebuildLogView_ClampsCursor(t *testing.T) {
 		t.Fatalf("cursor %d not clamped into %d lines", m.logView.cursor, len(m.logView.lines))
 	}
 }
+
+func TestRebuildLogView_EmptyResultClampsAndExitsVisual(t *testing.T) {
+	var m Model
+	m.logView.rawLines = []string{"alpha", "beta"}
+	m.logView.cursor = 1
+	m.logView.scroll = 1
+	m.logView.visualMode = true
+	m.logView.filterQuery = "no-such-text"
+	m.rebuildLogView()
+	if len(m.logView.lines) != 0 {
+		t.Fatalf("want 0 lines, got %d", len(m.logView.lines))
+	}
+	if m.logView.cursor != -1 {
+		t.Errorf("cursor = %d, want -1 on empty view", m.logView.cursor)
+	}
+	if m.logView.scroll != 0 {
+		t.Errorf("scroll = %d, want 0 on empty view", m.logView.scroll)
+	}
+	if m.logView.visualMode {
+		t.Error("visualMode should be cleared on empty view")
+	}
+}
+
+func TestRebuildLogView_FirstLineContinuationDropped(t *testing.T) {
+	var m Model
+	// First line has no detectable level (SevUnknown -> inherits SevUnknown=0),
+	// so at an ERROR threshold it is dropped; the error line survives.
+	m.logView.rawLines = []string{
+		"\tat com.example.Foo.bar(Foo.java:42)",
+		`{"level":"error","msg":"boom"}`,
+	}
+	m.logView.sevThreshold = ui.SevError
+	m.rebuildLogView()
+	if len(m.logView.lines) != 1 {
+		t.Fatalf("want 1 line (only the error), got %d: %v", len(m.logView.lines), m.logView.lines)
+	}
+}

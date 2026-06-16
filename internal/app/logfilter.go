@@ -37,7 +37,7 @@ func (m *Model) ensureRawSev() {
 // so a stack trace stays attached to its ERROR.
 func (m *Model) rebuildLogView() {
 	if !m.logFilterActive() {
-		m.logView.lines = m.logView.rawLines
+		m.logView.lines = append([]string(nil), m.logView.rawLines...)
 		m.clampLogOffsets()
 		return
 	}
@@ -48,6 +48,10 @@ func (m *Model) rebuildLogView() {
 	lastRank := ui.SevUnknown
 	for i, ln := range m.logView.rawLines {
 		if m.logView.sevThreshold > 0 {
+			// Continuation lines (no own level) inherit the previous detected
+			// severity so a stack trace stays attached to its ERROR. This applies
+			// to severity filtering only; text filtering matches each line on its
+			// own content (grep-like).
 			r := m.logView.rawSev[i]
 			if r == ui.SevUnknown {
 				r = lastRank
@@ -70,6 +74,9 @@ func (m *Model) rebuildLogView() {
 // clampLogOffsets keeps cursor/scroll/visualStart within the current lines.
 func (m *Model) clampLogOffsets() {
 	n := len(m.logView.lines)
+	if n == 0 {
+		m.logView.visualMode = false
+	}
 	if m.logView.follow {
 		m.logView.scroll = 0
 		m.logView.wrapTopSkip = 0

@@ -19,7 +19,7 @@ import (
 type logViewState struct {
 	lines          []string           // buffered log lines (filtered projection of rawLines)
 	rawLines       []string           // full unfiltered stream (source of lines)
-	rawSev         []int              // per-rawLine severity rank; populated when sevThreshold>0
+	rawSev         []int              // per-rawLine severity rank; rawSev[i] is for rawLines[i]; populated when sevThreshold>0
 	scroll         int                // scroll offset (top visible source line)
 	wrapTopSkip    int                // wrap mode: number of sub-lines to skip from the top of lines[scroll]
 	follow         bool               // auto-scroll to bottom
