@@ -86,7 +86,7 @@ func TestLogKeyFTogglesFollow(t *testing.T) {
 		width:  80,
 		height: 40,
 	}
-	ret, _ := m.handleLogKey(runeKey('f'))
+	ret, _ := m.handleLogKey(runeKey('F'))
 	result := ret.(Model)
 	assert.True(t, result.logView.follow)
 	assert.Equal(t, 2, result.logView.cursor)

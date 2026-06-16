@@ -52,3 +52,19 @@ func TestLogKeybindingSwap(t *testing.T) {
 		t.Errorf("Logs = %q, want %q (fullscreen log viewer uses ctrl+l)", kb.Logs, "ctrl+l")
 	}
 }
+
+func TestSeverityAndFollowDefaults(t *testing.T) {
+	kb := DefaultKeybindings()
+	if kb.ToggleFollow != "F" {
+		t.Errorf("ToggleFollow = %q, want %q (f now opens the log filter)", kb.ToggleFollow, "F")
+	}
+	if kb.Filter != "f" {
+		t.Errorf("Filter = %q, want %q", kb.Filter, "f")
+	}
+	if kb.SeverityDown != "-" {
+		t.Errorf("SeverityDown = %q, want %q", kb.SeverityDown, "-")
+	}
+	if kb.SeverityUp != "+" {
+		t.Errorf("SeverityUp = %q, want %q", kb.SeverityUp, "+")
+	}
+}

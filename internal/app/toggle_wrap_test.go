@@ -67,7 +67,7 @@ func TestViewerToggleBindings_Defaults(t *testing.T) {
 	assert.Equal(t, "#", kb.ToggleLineNumbers, "toggle_line_numbers")
 	assert.Equal(t, "z", kb.ToggleFold, "toggle_fold")
 	assert.Equal(t, "Z", kb.ToggleFoldAll, "toggle_fold_all")
-	assert.Equal(t, "f", kb.ToggleFollow, "toggle_follow")
+	assert.Equal(t, "F", kb.ToggleFollow, "toggle_follow")
 	assert.Equal(t, "s", kb.ToggleTimestamps, "toggle_timestamps")
 	assert.Equal(t, "p", kb.TogglePrefixes, "toggle_prefixes")
 	assert.Equal(t, "u", kb.ToggleUnified, "toggle_unified")

@@ -28,6 +28,8 @@ type Keybindings struct {
 	Help          string `json:"help" yaml:"help"`
 	Filter        string `json:"filter" yaml:"filter"`
 	Search        string `json:"search" yaml:"search"`
+	SeverityUp    string `json:"severity_up" yaml:"severity_up"`
+	SeverityDown  string `json:"severity_down" yaml:"severity_down"`
 	NextMatch     string `json:"next_match" yaml:"next_match"`
 	PrevMatch     string `json:"prev_match" yaml:"prev_match"`
 	TogglePreview string `json:"toggle_preview" yaml:"toggle_preview"`
@@ -158,10 +160,11 @@ func DefaultKeybindings() Keybindings {
 
 		// Views
 		Help: "?", Filter: "f", Search: "/",
+		SeverityUp: "+", SeverityDown: "-",
 		NextMatch: "n", PrevMatch: "N",
 		TogglePreview: "P", ToggleWrap: ">", ResourceMap: "M", Fullscreen: "F",
 		ToggleLineNumbers: "#", ToggleFold: "z", ToggleFoldAll: "Z",
-		ToggleFollow: "f", ToggleTimestamps: "s", TogglePrefixes: "p", ToggleUnified: "u",
+		ToggleFollow: "F", ToggleTimestamps: "s", TogglePrefixes: "p", ToggleUnified: "u",
 		FilterPresets: ".", ErrorLog: "!", SecretToggle: "ctrl+s",
 		FinalizerSearch: "ctrl+g", APIExplorer: "I", ObjectExplorer: "O", RBACBrowser: "U",
 		// "T" is also the explorer-level ThemeSelector; TreeView only dispatches
