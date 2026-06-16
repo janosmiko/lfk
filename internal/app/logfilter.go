@@ -122,6 +122,7 @@ func (m *Model) clampLogOffsets() {
 	n := len(m.logView.lines)
 	if n == 0 {
 		m.logView.visualMode = false
+		m.logView.wrapTopSkip = 0
 	}
 	if m.logView.follow {
 		m.logView.scroll = 0
