@@ -71,6 +71,46 @@ func (m *Model) rebuildLogView() {
 	m.clampLogOffsets()
 }
 
+// appendRawLogLine appends one streamed line to rawLines and updates the
+// displayed projection. O(1) when no filter is active; when filtering, the
+// new line is appended to lines only if it passes (avoids a full rescan).
+//
+// In the no-filter path, lines is intentionally aliased to rawLines — this is
+// the hot path and lines is only ever re-pointed (never independently appended)
+// once streaming routes exclusively through appendRawLogLine.
+func (m *Model) appendRawLogLine(line string) {
+	m.logView.rawLines = append(m.logView.rawLines, line)
+	if !m.logFilterActive() {
+		m.logView.lines = m.logView.rawLines
+		return
+	}
+	if m.logView.sevThreshold > 0 {
+		r := ui.LineSeverity(line)
+		m.logView.rawSev = append(m.logView.rawSev, r)
+		if r == ui.SevUnknown {
+			r = m.lastKnownRawSev()
+		}
+		if r < m.logView.sevThreshold {
+			return
+		}
+	}
+	if m.logView.filterQuery != "" && !ui.MatchLine(line, m.logView.filterQuery) {
+		return
+	}
+	m.logView.lines = append(m.logView.lines, line)
+}
+
+// lastKnownRawSev returns the most recent non-unknown severity rank in rawSev
+// (excluding the just-appended last entry), for continuation-line inheritance.
+func (m *Model) lastKnownRawSev() int {
+	for i := len(m.logView.rawSev) - 2; i >= 0; i-- {
+		if m.logView.rawSev[i] != ui.SevUnknown {
+			return m.logView.rawSev[i]
+		}
+	}
+	return ui.SevUnknown
+}
+
 // clampLogOffsets keeps cursor/scroll/visualStart within the current lines.
 func (m *Model) clampLogOffsets() {
 	n := len(m.logView.lines)

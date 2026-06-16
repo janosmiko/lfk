@@ -119,18 +119,27 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 	if m.logView.autoReconnectAttempt > 0 {
 		m.logView.autoReconnectAttempt = 0
 	}
-	m.logView.lines = append(m.logView.lines, msg.line)
+	m.appendRawLogLine(msg.line)
 	// Bound the live buffer so a long-running follow doesn't grow memory
-	// without limit (issue #387). Shift absolute offsets back by the number
-	// of dropped lines; in follow mode they're recomputed just below.
-	if trimmed, drop := capLogLines(m.logView.lines); drop > 0 {
-		m.logView.lines = trimmed
-		m.logView.scroll = shiftLogOffset(m.logView.scroll, drop)
-		m.logView.cursor = shiftLogOffset(m.logView.cursor, drop)
-		m.logView.visualStart = shiftLogOffset(m.logView.visualStart, drop)
-		// scroll now points at a different source line; the old sub-line
-		// skip no longer applies (follow mode recomputes it just below).
-		m.logView.wrapTopSkip = 0
+	// without limit (issue #387). Trim the raw stream; offsets index the
+	// displayed projection, so without a filter we shift them by the dropped
+	// count, and with a filter we re-project (offsets re-clamped there).
+	if trimmed, drop := capLogLines(m.logView.rawLines); drop > 0 {
+		m.logView.rawLines = trimmed
+		if len(m.logView.rawSev) > 0 {
+			m.logView.rawSev = m.logView.rawSev[min(drop, len(m.logView.rawSev)):]
+		}
+		if m.logFilterActive() {
+			m.rebuildLogView()
+		} else {
+			m.logView.lines = m.logView.rawLines
+			m.logView.scroll = shiftLogOffset(m.logView.scroll, drop)
+			m.logView.cursor = shiftLogOffset(m.logView.cursor, drop)
+			m.logView.visualStart = shiftLogOffset(m.logView.visualStart, drop)
+			// scroll now points at a different source line; the old sub-line
+			// skip no longer applies (follow mode recomputes it just below).
+			m.logView.wrapTopSkip = 0
+		}
 	}
 	if m.logView.follow {
 		m.logView.scroll, m.logView.wrapTopSkip = m.logMaxScrollAndSkip()
@@ -183,7 +192,7 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	// The fetched history is the last <tail> lines of the resource; the current
 	// buffer's oldest lines overlap its tail, so only the prefix before the
 	// overlap is genuinely older.
-	newOlderLines := mergeOlderLogLines(m.logView.lines, msg.lines)
+	newOlderLines := mergeOlderLogLines(m.logView.rawLines, msg.lines)
 
 	if len(newOlderLines) == 0 {
 		m.logView.hasMoreHistory = false
@@ -195,11 +204,17 @@ func (m Model) updateLogHistory(msg logHistoryMsg) Model {
 	// async fetch resolved before they navigated), in which case keep them
 	// at 0 so the newly revealed older lines come into view.
 	prepended := len(newOlderLines)
-	m.logView.lines = append(newOlderLines, m.logView.lines...)
-	if m.logView.cursor > 0 || m.logView.scroll > 0 {
-		m.logView.scroll += prepended
-		if m.logView.cursor >= 0 {
-			m.logView.cursor += prepended
+	m.logView.rawLines = append(newOlderLines, m.logView.rawLines...)
+	m.logView.rawSev = nil // ordering changed; recompute lazily when needed
+	if m.logFilterActive() {
+		m.rebuildLogView()
+	} else {
+		m.logView.lines = m.logView.rawLines
+		if m.logView.cursor > 0 || m.logView.scroll > 0 {
+			m.logView.scroll += prepended
+			if m.logView.cursor >= 0 {
+				m.logView.cursor += prepended
+			}
 		}
 	}
 	m.logView.tailLines += ui.ConfigLogTailLines

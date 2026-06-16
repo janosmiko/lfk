@@ -89,3 +89,41 @@ func TestRebuildLogView_FirstLineContinuationDropped(t *testing.T) {
 		t.Fatalf("want 1 line (only the error), got %d: %v", len(m.logView.lines), m.logView.lines)
 	}
 }
+
+func TestAppendRawLogLine_FilteredView(t *testing.T) {
+	var m Model
+	m.logView.filterQuery = "keep"
+	m.appendRawLogLine("keep this")
+	m.appendRawLogLine("drop this")
+	m.appendRawLogLine("keep that")
+	if len(m.logView.rawLines) != 3 {
+		t.Fatalf("rawLines = %d, want 3", len(m.logView.rawLines))
+	}
+	if len(m.logView.lines) != 2 {
+		t.Fatalf("filtered lines = %d, want 2: %v", len(m.logView.lines), m.logView.lines)
+	}
+}
+
+func TestAppendRawLogLine_NoFilter(t *testing.T) {
+	var m Model
+	m.appendRawLogLine("a")
+	m.appendRawLogLine("b")
+	if len(m.logView.lines) != 2 {
+		t.Fatalf("lines = %d, want 2", len(m.logView.lines))
+	}
+}
+
+func TestAppendRawLogLine_SeverityFilter(t *testing.T) {
+	var m Model
+	m.logView.sevThreshold = ui.SevError
+	m.appendRawLogLine(`{"level":"info","msg":"a"}`)
+	m.appendRawLogLine(`{"level":"error","msg":"b"}`)
+	m.appendRawLogLine("\tcontinuation tail")
+	if len(m.logView.rawLines) != 3 {
+		t.Fatalf("rawLines = %d, want 3", len(m.logView.rawLines))
+	}
+	// error line + its continuation tail (inherits error) shown; info dropped.
+	if len(m.logView.lines) != 2 {
+		t.Fatalf("lines = %d, want 2 (error+continuation): %v", len(m.logView.lines), m.logView.lines)
+	}
+}

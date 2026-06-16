@@ -1972,7 +1972,8 @@ func TestUpdateLogHistoryMidScrollPreservesPosition(t *testing.T) {
 	m := baseModel()
 	m.mode = modeLogs
 	m.logView.loadingHistory = true
-	m.logView.lines = []string{"existing-1", "existing-2", "existing-3"}
+	m.logView.rawLines = []string{"existing-1", "existing-2", "existing-3"}
+	m.logView.lines = m.logView.rawLines
 	m.logView.cursor = 2
 	m.logView.scroll = 1
 
@@ -1992,7 +1993,8 @@ func TestUpdateLogHistoryNoOverlapAtTopKeepsCursor(t *testing.T) {
 	m := baseModel()
 	m.mode = modeLogs
 	m.logView.loadingHistory = true
-	m.logView.lines = []string{"current-1", "current-2", "current-3"}
+	m.logView.rawLines = []string{"current-1", "current-2", "current-3"}
+	m.logView.lines = m.logView.rawLines
 	m.logView.cursor = 0
 	m.logView.scroll = 0
 
