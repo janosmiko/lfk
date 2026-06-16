@@ -40,7 +40,7 @@ func (m Model) viewLogs() string {
 	if previewWidth > 0 {
 		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logView.previewScroll, true)
 		panes := lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
-		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logView.searchActive, m.logView.searchInput.Value, m.logView.searchQuery, m.logView.visualMode, canSwitchPod, canFilterContainers, m.logView.filterActive, m.logView.filterInput.Value, m.logView.filterQuery, m.logView.sevThreshold)
+		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logView.searchActive, m.logView.searchInput.Value, m.logView.searchQuery, m.logView.visualMode, canSwitchPod, canFilterContainers, m.logView.filterActive, m.logView.filterInput.Value)
 		return lipgloss.JoinVertical(lipgloss.Left, panes, footer)
 	}
 	return logView

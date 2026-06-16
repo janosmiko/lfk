@@ -233,11 +233,11 @@ func TestLogView_FilterAndSeverityIndicators(t *testing.T) {
 	m.logView.sevThreshold = ui.SevWarn
 	m.rebuildLogView()
 	out := stripANSI(m.View())
-	if !strings.Contains(out, "boomtoken") {
-		t.Errorf("expected active filter query shown in view, got:\n%s", out)
+	if !strings.Contains(out, "[F:boomtoken]") {
+		t.Errorf("expected [F:boomtoken] filter indicator in title, got:\n%s", out)
 	}
-	if !strings.Contains(out, "WARN") {
-		t.Errorf("expected severity indicator (>=WARN) shown in view, got:\n%s", out)
+	if !strings.Contains(out, "[≥WARN]") {
+		t.Errorf("expected [>=WARN] severity indicator in title, got:\n%s", out)
 	}
 }
 
@@ -251,7 +251,7 @@ func TestLogView_FilterPromptWhenActive(t *testing.T) {
 	m.logView.filterQuery = "alph"
 	m.rebuildLogView()
 	out := stripANSI(m.View())
-	if !strings.Contains(out, "alph") {
-		t.Errorf("expected filter input echo in footer, got:\n%s", out)
+	if !strings.Contains(out, "esc:clear") {
+		t.Errorf("expected filter prompt footer (esc:clear), got:\n%s", out)
 	}
 }

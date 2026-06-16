@@ -26,7 +26,7 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, filterQuery, sevThreshold)
 	var footer string
 	if !omitFooter {
-		footer = RenderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers, filterActive, filterInput, filterQuery, sevThreshold)
+		footer = RenderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers, filterActive, filterInput)
 	}
 
 	// Content area: subtract border top + bottom (2 lines).
@@ -199,7 +199,7 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 // Exported so callers can render the footer at a wider terminal width than the
 // log column itself (e.g. when the side preview pane is on and the hint bar
 // must span the full screen below the JoinHorizontal'd panes \u2014 issue #71).
-func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool, filterActive bool, filterInput, filterQuery string, sevThreshold int) string {
+func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool, filterActive bool, filterInput string) string {
 	if statusMsg != "" {
 		style := HelpKeyStyle
 		if statusIsErr {
