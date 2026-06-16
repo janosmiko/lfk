@@ -7,6 +7,10 @@ import (
 )
 
 func (m Model) handleLogKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	// Handle log filter input mode.
+	if m.logView.filterActive {
+		return m.handleLogFilterKey(msg)
+	}
 	// Handle log search input mode.
 	if m.logView.searchActive {
 		return m.handleLogSearchKey(msg)
@@ -123,6 +127,9 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 		return ret, nil, true
 	case "y":
 		ret, cmd := m.handleLogNormalCopy()
+		return ret, cmd, true
+	case kb.Filter:
+		ret, cmd := m.handleLogKeyFilter()
 		return ret, cmd, true
 	case kb.ToggleFollow:
 		ret := m.handleLogKeyF()

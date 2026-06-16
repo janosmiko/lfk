@@ -3,6 +3,7 @@ package app
 import (
 	"testing"
 
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/janosmiko/lfk/internal/ui"
 )
 
@@ -136,6 +137,36 @@ func TestTabPersistence_FilterRoundTrip(t *testing.T) {
 	}
 	if len(m2.logView.rawLines) != 3 {
 		t.Fatalf("rawLines not restored: %d", len(m2.logView.rawLines))
+	}
+}
+
+func TestFilterInput_LiveNarrows(t *testing.T) {
+	var m Model
+	m.mode = modeLogs
+	m.logView.rawLines = []string{"alpha", "beta", "alphabet"}
+	m.rebuildLogView()
+	mdl, _ := m.handleLogKeyFilter()
+	m = mdl
+	if !m.logView.filterActive {
+		t.Fatal("filterActive should be true after opening")
+	}
+	for _, r := range "alph" {
+		mm, _ := m.handleLogFilterKey(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{r}})
+		m = mm.(Model)
+	}
+	if m.logView.filterQuery != "alph" {
+		t.Fatalf("filterQuery = %q, want alph", m.logView.filterQuery)
+	}
+	if len(m.logView.lines) != 2 {
+		t.Fatalf("live filter should show 2 (alpha, alphabet), got %d: %v", len(m.logView.lines), m.logView.lines)
+	}
+	mm, _ := m.handleLogFilterKey(tea.KeyMsg{Type: tea.KeyEsc})
+	m = mm.(Model)
+	if m.logView.filterActive || m.logView.filterQuery != "" {
+		t.Fatal("esc should cancel and clear the filter")
+	}
+	if len(m.logView.lines) != 3 {
+		t.Fatalf("clearing filter should restore 3 lines, got %d", len(m.logView.lines))
 	}
 }
 

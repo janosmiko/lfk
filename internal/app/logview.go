@@ -73,8 +73,8 @@ type logViewState struct {
 	lineInput string
 
 	// Filter state (live text filter + min-severity threshold).
-	filterActive bool      //nolint:unused // wired in Tasks 8+10 of the log-filter feature
-	filterInput  TextInput //nolint:unused // wired in Tasks 8+10 of the log-filter feature
+	filterActive bool      // true while the live text-filter input is open
+	filterInput  TextInput // text input buffer for the live filter
 	filterQuery  string    // applied text filter (live)
 	sevThreshold int       // 0=off, else minimum ui.Sev* rank
 
