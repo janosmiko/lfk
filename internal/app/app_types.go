@@ -507,6 +507,8 @@ type TabState struct {
 	logTailLines      int  // current --tail value for the active stream
 	logHasMoreHistory bool // true if older lines may exist
 	logLoadingHistory bool // true while fetching older logs
+	logFilterQuery    string
+	logSevThreshold   int
 	logCursor         int  // cursor position (absolute line index), -1 when inactive
 	logVisualMode     bool // true when in visual line selection mode
 	logVisualStart    int  // anchor line where visual selection started

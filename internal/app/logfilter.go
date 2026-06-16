@@ -10,8 +10,6 @@ func (m Model) logFilterActive() bool {
 // resetLogBuffer clears the raw stream, the displayed projection, and the
 // cached per-line severity. Filter settings (query/threshold) are preserved so
 // they keep applying to a freshly (re)started stream.
-//
-//nolint:unused // wired in Task 7 of the log-filter feature
 func (m *Model) resetLogBuffer() {
 	m.logView.rawLines = nil
 	m.logView.lines = nil

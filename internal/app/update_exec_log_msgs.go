@@ -127,7 +127,10 @@ func (m Model) updateLogLine(msg logLineMsg) (tea.Model, tea.Cmd) {
 	if trimmed, drop := capLogLines(m.logView.rawLines); drop > 0 {
 		m.logView.rawLines = trimmed
 		if len(m.logView.rawSev) > 0 {
-			m.logView.rawSev = m.logView.rawSev[min(drop, len(m.logView.rawSev)):]
+			cut := min(drop, len(m.logView.rawSev))
+			retained := make([]int, len(m.logView.rawSev)-cut)
+			copy(retained, m.logView.rawSev[cut:])
+			m.logView.rawSev = retained
 		}
 		if m.logFilterActive() {
 			m.rebuildLogView()

@@ -113,6 +113,32 @@ func TestAppendRawLogLine_NoFilter(t *testing.T) {
 	}
 }
 
+func TestTabPersistence_FilterRoundTrip(t *testing.T) {
+	var m Model
+	m.logView.rawLines = []string{"keep a", "drop", "keep b"}
+	m.logView.filterQuery = "keep"
+	m.logView.sevThreshold = ui.SevWarn
+	m.rebuildLogView()
+
+	var ts TabState
+	ts.logLines = append([]string(nil), m.logView.rawLines...)
+	ts.logFilterQuery = m.logView.filterQuery
+	ts.logSevThreshold = m.logView.sevThreshold
+
+	var m2 Model
+	m2.logView.rawLines = append([]string(nil), ts.logLines...)
+	m2.logView.filterQuery = ts.logFilterQuery
+	m2.logView.sevThreshold = ts.logSevThreshold
+	m2.rebuildLogView()
+
+	if m2.logView.filterQuery != "keep" || m2.logView.sevThreshold != ui.SevWarn {
+		t.Fatalf("filter state not restored: q=%q sev=%d", m2.logView.filterQuery, m2.logView.sevThreshold)
+	}
+	if len(m2.logView.rawLines) != 3 {
+		t.Fatalf("rawLines not restored: %d", len(m2.logView.rawLines))
+	}
+}
+
 func TestAppendRawLogLine_SeverityFilter(t *testing.T) {
 	var m Model
 	m.logView.sevThreshold = ui.SevError

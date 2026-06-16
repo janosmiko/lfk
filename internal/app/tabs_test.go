@@ -1179,8 +1179,9 @@ func TestTabSwitchPreservesYAMLViewerState(t *testing.T) {
 // TestTabSwitchPreservesLogViewerState pins the save->switch->restore contract
 // for the inline log viewer before/after the logViewState extraction. The log
 // viewer persists most of its state per tab; this guards a representative
-// subset (lines, scroll, follow, cursor, title, containers) plus deep-copy of
-// the lines slice.
+// subset (rawLines, scroll, follow, cursor, title, containers) plus deep-copy
+// of the rawLines slice. logLines in TabState now stores the raw stream; the
+// displayed projection is rebuilt by rebuildLogView on loadTab.
 func TestTabSwitchPreservesLogViewerState(t *testing.T) {
 	m := Model{
 		tabs: []TabState{
@@ -1196,9 +1197,9 @@ func TestTabSwitchPreservesLogViewerState(t *testing.T) {
 		},
 		activeTab: 0,
 		// Mirror Tab A's log state into the active model so saveCurrentTab
-		// has something to persist.
+		// has something to persist. Use rawLines (the authoritative buffer).
 		logView: logViewState{
-			lines:      []string{"a-1", "a-2", "a-3"},
+			rawLines:   []string{"a-1", "a-2", "a-3"},
 			scroll:     44,
 			follow:     true,
 			cursor:     1,
@@ -1225,8 +1226,8 @@ func TestTabSwitchPreservesLogViewerState(t *testing.T) {
 	assert.True(t, m.logView.follow, "Tab B's follow flag must not bleed into Tab A")
 	assert.Equal(t, "Logs: a", m.logView.title)
 
-	// Deep-copy guard: mutating the restored slice must not corrupt the stored tab.
-	m.logView.lines[0] = "mutated"
+	// Deep-copy guard: mutating the restored rawLines must not corrupt the stored tab.
+	m.logView.rawLines[0] = "mutated"
 	assert.Equal(t, "a-1", m.tabs[0].logLines[0], "loadTab must deep-copy logLines")
 }
 
