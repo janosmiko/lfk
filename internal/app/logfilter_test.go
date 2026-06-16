@@ -170,6 +170,44 @@ func TestFilterInput_LiveNarrows(t *testing.T) {
 	}
 }
 
+func TestSeverityStep(t *testing.T) {
+	// Severity constants: SevUnknown=0, SevTrace=1, SevDebug=2, SevInfo=3,
+	// SevWarn=4, SevError=5, SevFatal=6.
+	var m Model
+	m.logView.rawLines = []string{
+		`{"level":"info","msg":"a"}`,
+		`{"level":"warn","msg":"b"}`,
+		`{"level":"error","msg":"c"}`,
+	}
+	m.rebuildLogView()
+	m = m.severityStep(+1)
+	if m.logView.sevThreshold != ui.SevTrace {
+		t.Fatalf("after +1 want SevTrace(%d), got %d", ui.SevTrace, m.logView.sevThreshold)
+	}
+	// Step up to SevWarn (3 more steps from SevTrace=1).
+	for range 3 {
+		m = m.severityStep(+1)
+	}
+	if m.logView.sevThreshold != ui.SevWarn {
+		t.Fatalf("after reaching SevWarn want %d, got %d", ui.SevWarn, m.logView.sevThreshold)
+	}
+	if len(m.logView.lines) != 2 {
+		t.Fatalf("warn+ should show 2 lines (warn+error), got %d", len(m.logView.lines))
+	}
+	for range 10 {
+		m = m.severityStep(+1)
+	}
+	if m.logView.sevThreshold != ui.SevFatal {
+		t.Fatalf("should clamp at SevFatal, got %d", m.logView.sevThreshold)
+	}
+	for range 20 {
+		m = m.severityStep(-1)
+	}
+	if m.logView.sevThreshold != 0 {
+		t.Fatalf("should clamp at off, got %d", m.logView.sevThreshold)
+	}
+}
+
 func TestAppendRawLogLine_SeverityFilter(t *testing.T) {
 	var m Model
 	m.logView.sevThreshold = ui.SevError

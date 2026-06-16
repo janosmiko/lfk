@@ -134,6 +134,10 @@ func (m Model) handleLogActionKey(msg tea.KeyMsg) (tea.Model, tea.Cmd, bool) {
 	case kb.ToggleFollow:
 		ret := m.handleLogKeyF()
 		return ret, nil, true
+	case kb.SeverityUp:
+		return m.severityStep(+1), nil, true
+	case kb.SeverityDown:
+		return m.severityStep(-1), nil, true
 	case kb.ToggleWrap:
 		ret := m.handleLogKeyTab()
 		return ret, nil, true

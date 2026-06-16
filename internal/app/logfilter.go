@@ -109,6 +109,14 @@ func (m *Model) lastKnownRawSev() int {
 	return ui.SevUnknown
 }
 
+// severityStep raises (+1) or lowers (-1) the minimum-severity threshold by
+// one level, clamped to [off, SevFatal], then re-projects the view.
+func (m Model) severityStep(delta int) Model {
+	m.logView.sevThreshold = max(0, min(m.logView.sevThreshold+delta, ui.SevFatal))
+	(&m).rebuildLogView()
+	return m
+}
+
 // clampLogOffsets keeps cursor/scroll/visualStart within the current lines.
 func (m *Model) clampLogOffsets() {
 	n := len(m.logView.lines)
