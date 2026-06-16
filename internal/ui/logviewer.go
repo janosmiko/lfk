@@ -22,11 +22,11 @@ var LogSearchHighlightStyle = lipgloss.NewStyle().
 // (e.g. with the side preview pane). The output is one row shorter than the
 // default rendering. Callers that pass omitFooter=true must render their own
 // footer via RenderLogFooter.
-func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, wrapTopSkip int, omitFooter bool) string {
-	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery)
+func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes bool, title, searchQuery, searchInput string, searchActive, canSwitchPod, canFilterContainers, hasMoreHistory, loadingHistory bool, statusMsg string, statusIsErr bool, cursor int, visualMode bool, visualStart int, visualType rune, visualCol, visualCurCol, wrapTopSkip int, omitFooter bool, filterActive bool, filterInput, filterQuery string, sevThreshold int) string {
+	titleBar := renderLogTitleBar(title, lines, width, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode, visualType, loadingHistory, searchQuery, filterQuery, sevThreshold)
 	var footer string
 	if !omitFooter {
-		footer = RenderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers)
+		footer = RenderLogFooter(width, statusMsg, statusIsErr, searchActive, searchInput, searchQuery, visualMode, canSwitchPod, canFilterContainers, filterActive, filterInput, filterQuery, sevThreshold)
 	}
 
 	// Content area: subtract border top + bottom (2 lines).
@@ -136,7 +136,7 @@ func RenderLogViewer(lines []string, scroll, width, height int, follow, wrap, li
 }
 
 // renderLogTitleBar builds the title bar with status indicators for the log viewer.
-func renderLogTitleBar(title string, lines []string, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string) string {
+func renderLogTitleBar(title string, lines []string, width int, follow, wrap, lineNumbers, timestamps, previous, hidePrefixes, visualMode bool, visualType rune, loadingHistory bool, searchQuery string, filterQuery string, sevThreshold int) string {
 	type indicatorFlag struct {
 		enabled bool
 		label   string
@@ -169,6 +169,12 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 	if searchQuery != "" {
 		indicators = append(indicators, HelpKeyStyle.Render("[/"+searchQuery+"]"))
 	}
+	if filterQuery != "" {
+		indicators = append(indicators, HelpKeyStyle.Render("[F:"+filterQuery+"]"))
+	}
+	if sevThreshold > 0 {
+		indicators = append(indicators, HelpKeyStyle.Render("[>="+SeverityName(sevThreshold)+"]"))
+	}
 
 	titleText := " " + title + " "
 	if len(indicators) > 0 {
@@ -193,7 +199,7 @@ func renderLogTitleBar(title string, lines []string, width int, follow, wrap, li
 // Exported so callers can render the footer at a wider terminal width than the
 // log column itself (e.g. when the side preview pane is on and the hint bar
 // must span the full screen below the JoinHorizontal'd panes \u2014 issue #71).
-func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool) string {
+func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool, searchInput, searchQuery string, visualMode, canSwitchPod, canFilterContainers bool, filterActive bool, filterInput, filterQuery string, sevThreshold int) string {
 	if statusMsg != "" {
 		style := HelpKeyStyle
 		if statusIsErr {
@@ -204,6 +210,11 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 	if searchActive {
 		modeInd := SearchModeIndicator(searchInput)
 		prompt := HelpKeyStyle.Render(ActiveKeybindings.Search) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + searchInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (enter:apply  esc:cancel)")
+		return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(prompt)
+	}
+	if filterActive {
+		modeInd := SearchModeIndicator(filterInput)
+		prompt := HelpKeyStyle.Render(ActiveKeybindings.Filter) + BarDimStyle.Render(": ") + BarDimStyle.Render(modeInd) + filterInput + BarDimStyle.Render("\u2588") + BarDimStyle.Render("  (esc:clear  enter:keep)")
 		return StatusBarBgStyle.Width(width).MaxWidth(width).MaxHeight(1).Render(prompt)
 	}
 	if visualMode {
@@ -231,6 +242,8 @@ func RenderLogFooter(width int, statusMsg string, statusIsErr, searchActive bool
 		{Key: "v/V/ctrl+v", Desc: "select"},
 		{Key: "y", Desc: "copy"},
 		{Key: ActiveKeybindings.Search, Desc: "search"},
+		{Key: ActiveKeybindings.Filter, Desc: "filter"},
+		{Key: ActiveKeybindings.SeverityDown + "/" + ActiveKeybindings.SeverityUp, Desc: "severity"},
 	}
 	if searchQuery != "" {
 		hints = append(hints, HintEntry{Key: ActiveKeybindings.NextMatch + "/" + ActiveKeybindings.PrevMatch, Desc: "next/prev"})

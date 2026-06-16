@@ -1,6 +1,7 @@
 package app
 
 import (
+	"strings"
 	"testing"
 
 	tea "github.com/charmbracelet/bubbletea"
@@ -220,5 +221,37 @@ func TestAppendRawLogLine_SeverityFilter(t *testing.T) {
 	// error line + its continuation tail (inherits error) shown; info dropped.
 	if len(m.logView.lines) != 2 {
 		t.Fatalf("lines = %d, want 2 (error+continuation): %v", len(m.logView.lines), m.logView.lines)
+	}
+}
+
+func TestLogView_FilterAndSeverityIndicators(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogs
+	m.logView.title = "logs"
+	m.logView.rawLines = []string{`{"level":"error","msg":"boomtoken"}`}
+	m.logView.filterQuery = "boomtoken"
+	m.logView.sevThreshold = ui.SevWarn
+	m.rebuildLogView()
+	out := stripANSI(m.View())
+	if !strings.Contains(out, "boomtoken") {
+		t.Errorf("expected active filter query shown in view, got:\n%s", out)
+	}
+	if !strings.Contains(out, "WARN") {
+		t.Errorf("expected severity indicator (>=WARN) shown in view, got:\n%s", out)
+	}
+}
+
+func TestLogView_FilterPromptWhenActive(t *testing.T) {
+	m := basePush80Model()
+	m.mode = modeLogs
+	m.logView.title = "logs"
+	m.logView.rawLines = []string{"alpha", "beta"}
+	m.logView.filterActive = true
+	m.logView.filterInput.Set("alph")
+	m.logView.filterQuery = "alph"
+	m.rebuildLogView()
+	out := stripANSI(m.View())
+	if !strings.Contains(out, "alph") {
+		t.Errorf("expected filter input echo in footer, got:\n%s", out)
 	}
 }

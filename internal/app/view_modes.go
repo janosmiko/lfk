@@ -35,12 +35,12 @@ func (m Model) viewLogs() string {
 	// keeps its built-in footer for the standalone (no-preview) layout.
 	omitInnerFooter := previewWidth > 0
 
-	logView := ui.RenderLogViewer(m.logView.lines, m.logView.scroll, logWidth, viewH, m.logView.follow, m.logView.wrap, m.logView.lineNumbers, m.logView.timestamps, m.logView.previous, m.logView.hidePrefixes, m.logView.title, m.logView.searchQuery, m.logView.searchInput.Value, m.logView.searchActive, canSwitchPod, canFilterContainers, m.logView.hasMoreHistory, m.logView.loadingHistory, statusMsg, statusIsErr, m.logView.cursor, m.logView.visualMode, m.logView.visualStart, m.logView.visualType, m.logView.visualCol, m.logView.visualCurCol, m.logView.wrapTopSkip, omitInnerFooter)
+	logView := ui.RenderLogViewer(m.logView.lines, m.logView.scroll, logWidth, viewH, m.logView.follow, m.logView.wrap, m.logView.lineNumbers, m.logView.timestamps, m.logView.previous, m.logView.hidePrefixes, m.logView.title, m.logView.searchQuery, m.logView.searchInput.Value, m.logView.searchActive, canSwitchPod, canFilterContainers, m.logView.hasMoreHistory, m.logView.loadingHistory, statusMsg, statusIsErr, m.logView.cursor, m.logView.visualMode, m.logView.visualStart, m.logView.visualType, m.logView.visualCol, m.logView.visualCurCol, m.logView.wrapTopSkip, omitInnerFooter, m.logView.filterActive, m.logView.filterInput.Value, m.logView.filterQuery, m.logView.sevThreshold)
 
 	if previewWidth > 0 {
 		preview := ui.RenderLogPreviewPane(m.logPreviewLine(), previewWidth, viewH, m.logView.previewScroll, true)
 		panes := lipgloss.JoinHorizontal(lipgloss.Top, logView, preview)
-		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logView.searchActive, m.logView.searchInput.Value, m.logView.searchQuery, m.logView.visualMode, canSwitchPod, canFilterContainers)
+		footer := ui.RenderLogFooter(m.width, statusMsg, statusIsErr, m.logView.searchActive, m.logView.searchInput.Value, m.logView.searchQuery, m.logView.visualMode, canSwitchPod, canFilterContainers, m.logView.filterActive, m.logView.filterInput.Value, m.logView.filterQuery, m.logView.sevThreshold)
 		return lipgloss.JoinVertical(lipgloss.Left, panes, footer)
 	}
 	return logView
